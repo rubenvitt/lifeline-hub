@@ -1,5 +1,6 @@
 //! Reine Auswertung der Bright-Sky-Antworten (LFH-633): `/alerts` → Warnzelle + Warnungen,
-//! `/weather` → Vorhersage. Kein Netz, keine Uhr — die Zeit kommt als `jetzt` herein.
+//! `/weather` → Vorhersage, `/current_weather` → jüngste Messung (LFH-864). Kein Netz, keine
+//! Uhr — die Zeit kommt als `jetzt` herein.
 //!
 //! **Lieber zu niedrig als verschwiegen:** eine Warnung mit unbekanntem `severity` bleibt
 //! stehen (als `gering`, geloggt), ebenso eine mit unbekannter Kategorie. Bewusst gefiltert
@@ -8,7 +9,10 @@
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::Value;
 
-use super::{WetterOrt, WetterStunde, WetterVorhersage, WetterWarnstufe, WetterWarnung};
+use super::{
+    WetterAktuell, WetterErgaenzung, WetterMessgroesse, WetterOrt, WetterStation, WetterStunde,
+    WetterSymbol, WetterVorhersage, WetterWarnstufe, WetterWarnung,
+};
 
 /// Die Warnkategorie, die nicht erscheint: Gesundheitswarnungen (Hitze, UV).
 pub const KATEGORIE_GESUNDHEIT: &str = "health";
@@ -166,6 +170,253 @@ pub fn kommende_stunden(mut v: WetterVorhersage, jetzt: DateTime<Utc>) -> Wetter
     v.stunden
         .retain(|s| zeit(&s.zeitpunkt).is_some_and(|t| t.timestamp() >= volle_stunde));
     v
+}
+
+/// Ab diesem Alter der Messung gilt sie nicht mehr als aktueller Stand (Spec „Datenstand und
+/// Quellausfall“, 3 h nach der Messzeit).
+pub const OBERGRENZE_MESSUNG_S: i64 = 3 * 3600;
+
+/// So weit darf eine Messzeit vor der eigenen Uhr liegen (Uhrversatz); eine Messung weiter in
+/// der Zukunft gibt es nicht, sie gilt als unbekannt. Das Frontend prüft dasselbe.
+pub const UHRVERSATZ_S: i64 = 10 * 60;
+
+/// Sonnenhöhe, ab der Tag gilt: −0,833° (Refraktion und Sonnenradius), wie Auf- und
+/// Untergang definiert sind.
+const HORIZONT_GRAD: f64 = -0.833;
+
+/// Höhe der Sonne über dem Horizont in Grad, am Ort `lat`/`lon` (Grad) zur Zeit `zeit`.
+/// Näherung des Astronomical Almanac (auch NOAA), auf etwa 0,01° genau — für Tag oder Nacht
+/// mehr als genug. Rein.
+fn sonnenhoehe_grad(lat: f64, lon: f64, zeit: DateTime<Utc>) -> f64 {
+    // Tage seit J2000.0 (2000-01-01 12:00 UT).
+    let n = zeit.timestamp() as f64 / 86_400.0 + 2_440_587.5 - 2_451_545.0;
+    let mittlere_laenge = (280.460 + 0.985_647_4 * n).rem_euclid(360.0);
+    let anomalie = (357.528 + 0.985_600_3 * n).rem_euclid(360.0).to_radians();
+    let ekliptik_laenge =
+        (mittlere_laenge + 1.915 * anomalie.sin() + 0.020 * (2.0 * anomalie).sin()).to_radians();
+    let schiefe = (23.439 - 0.000_000_4 * n).to_radians();
+    let rektaszension = (schiefe.cos() * ekliptik_laenge.sin()).atan2(ekliptik_laenge.cos());
+    let deklination = (schiefe.sin() * ekliptik_laenge.sin()).asin();
+    let sternzeit = (280.460_618_37 + 360.985_647_366_29 * n).rem_euclid(360.0);
+    let stundenwinkel = (sternzeit + lon - rektaszension.to_degrees()).to_radians();
+    let breite = lat.to_radians();
+    (breite.sin() * deklination.sin() + breite.cos() * deklination.cos() * stundenwinkel.cos())
+        .asin()
+        .to_degrees()
+}
+
+/// Steht die Sonne am Ort zur Zeit über dem Horizont (Tag nach der Definition von Auf- und
+/// Untergang)? Rein.
+pub fn sonne_ueber_horizont(lat: f64, lon: f64, zeit: DateTime<Utc>) -> bool {
+    sonnenhoehe_grad(lat, lon, zeit) > HORIZONT_GRAD
+}
+
+/// `icon` der Quelle → Wetterlage. `fog` trennt die Quelle nicht nach Tageszeit; das tut
+/// `tag` (Sonnenstand an der Station). Unbekannt → `None` samt Log: ein falsches „klar“ wäre
+/// eine erfundene Angabe.
+fn symbol_aus_icon(icon: Option<&str>, tag: impl FnOnce() -> bool) -> Option<WetterSymbol> {
+    let icon = icon?;
+    Some(match icon {
+        "clear-day" => WetterSymbol::KlarTag,
+        "clear-night" => WetterSymbol::KlarNacht,
+        "partly-cloudy-day" => WetterSymbol::TeilsBewoelktTag,
+        "partly-cloudy-night" => WetterSymbol::TeilsBewoelktNacht,
+        "cloudy" => WetterSymbol::Bewoelkt,
+        "fog" if tag() => WetterSymbol::NebelTag,
+        "fog" => WetterSymbol::NebelNacht,
+        "wind" => WetterSymbol::Wind,
+        "rain" => WetterSymbol::Regen,
+        "sleet" => WetterSymbol::Schneeregen,
+        "snow" => WetterSymbol::Schnee,
+        "hail" => WetterSymbol::Hagel,
+        "thunderstorm" => WetterSymbol::Gewitter,
+        andere => {
+            tracing::warn!("Bright Sky: unbekannte Wetterlage {andere:?}, ohne Symbol gezeigt");
+            return None;
+        }
+    })
+}
+
+/// Gezeigte Messgröße → ihre Felder in `/current_weather`. Felder, die das Paneel nicht zeigt
+/// (30-min-Werte, Sonnenschein, Strahlung, Böenrichtung), kommen nicht vor.
+const FELDER: [(WetterMessgroesse, &[&str]); 10] = [
+    (WetterMessgroesse::Temperatur, &["temperature"]),
+    (
+        WetterMessgroesse::Wind,
+        &["wind_speed_10", "wind_direction_10"],
+    ),
+    (WetterMessgroesse::Boeen, &["wind_gust_speed_60"]),
+    (WetterMessgroesse::Niederschlag, &["precipitation_60"]),
+    (WetterMessgroesse::Wetterlage, &["icon", "condition"]),
+    (WetterMessgroesse::Sicht, &["visibility"]),
+    (WetterMessgroesse::Bewoelkung, &["cloud_cover"]),
+    (WetterMessgroesse::Luftfeuchte, &["relative_humidity"]),
+    (WetterMessgroesse::Taupunkt, &["dew_point"]),
+    (WetterMessgroesse::Luftdruck, &["pressure_msl"]),
+];
+
+/// Herkunft jeder gezeigten Größe mit Wert: die Quelle aus `fallback_source_ids` des ersten
+/// ihrer Felder mit Wert, das ergänzt ist, sonst `haupt_id`. Eine Größe ohne Wert — auch eine
+/// Wetterlage ohne Symbol (`symbol_bekannt`) — hat keine Herkunft und zählt nicht.
+fn herkunft(
+    w: &Value,
+    haupt_id: Option<i64>,
+    symbol_bekannt: bool,
+) -> Vec<(WetterMessgroesse, Option<i64>)> {
+    let rueckgriff = w.get("fallback_source_ids").and_then(Value::as_object);
+    FELDER
+        .iter()
+        .filter_map(|(groesse, felder)| {
+            let mit_wert: Vec<&str> = felder
+                .iter()
+                .copied()
+                .filter(|f| w.get(*f).is_some_and(|v| !v.is_null()))
+                .collect();
+            let gezeigt = match groesse {
+                WetterMessgroesse::Wetterlage => symbol_bekannt,
+                _ => !mit_wert.is_empty(),
+            };
+            if !gezeigt {
+                return None;
+            }
+            let ergaenzt = mit_wert
+                .iter()
+                .find_map(|f| rueckgriff.and_then(|r| r.get(*f)).and_then(Value::as_i64));
+            Some((*groesse, ergaenzt.or(haupt_id)))
+        })
+        .collect()
+}
+
+/// Die Station im Kopf: die, von der die meisten gezeigten Werte stammen (Entscheidung
+/// 01.10.2026 — Bright Sky nennt mitunter eine Station, die keinen gezeigten Wert trägt).
+/// Gleichstand: die genannte (`source_id`), dann die nähere (`sources` ist nach Entfernung
+/// sortiert). Ohne jeden Wert die genannte, sonst die erste.
+fn kopf_station<'a>(
+    quellen: &'a [Value],
+    herkunft: &[(WetterMessgroesse, Option<i64>)],
+    haupt_id: Option<i64>,
+) -> Option<&'a Value> {
+    let id = |q: &Value| q.get("id").and_then(Value::as_i64);
+    let anteil = |q: &Value| {
+        herkunft
+            .iter()
+            .filter(|(_, h)| *h == id(q) && h.is_some())
+            .count()
+    };
+    let mut beste: Option<(&Value, (usize, bool))> = None;
+    for q in quellen {
+        let rang = (anteil(q), haupt_id.is_some() && id(q) == haupt_id);
+        if rang.0 > 0 && beste.is_none_or(|(_, b)| rang > b) {
+            beste = Some((q, rang));
+        }
+    }
+    beste.map(|(q, _)| q).or_else(|| {
+        quellen
+            .iter()
+            .find(|q| haupt_id.is_some() && id(q) == haupt_id)
+            .or_else(|| quellen.first())
+    })
+}
+
+fn wetter_station(q: &Value) -> Option<WetterStation> {
+    Some(WetterStation {
+        name: text(q, "station_name")?,
+        entfernung_m: zahl(q, "distance"),
+    })
+}
+
+/// Werte aus einer anderen als der Kopf-Station → Ergänzungen je Station, in der Reihenfolge
+/// von `sources` (nach Entfernung), Größen in der Reihenfolge von [`WetterMessgroesse`]. Eine
+/// Quelle, die `sources` nicht nennt, fällt heraus (geloggt) — ihr Wert bleibt stehen.
+fn ergaenzungen(
+    quellen: &[Value],
+    herkunft: &[(WetterMessgroesse, Option<i64>)],
+    kopf_id: Option<i64>,
+) -> Vec<WetterErgaenzung> {
+    let id = |q: &Value| q.get("id").and_then(Value::as_i64);
+    for h in herkunft.iter().filter_map(|(_, h)| *h) {
+        if !quellen.iter().any(|q| id(q) == Some(h)) {
+            tracing::warn!("Bright Sky: Wert aus unbekannter Quelle {h}, ohne Herkunft gezeigt");
+        }
+    }
+    quellen
+        .iter()
+        .filter(|q| id(q).is_some() && id(q) != kopf_id)
+        .filter_map(|q| {
+            let groessen: Vec<WetterMessgroesse> = herkunft
+                .iter()
+                .filter(|(_, h)| *h == id(q))
+                .map(|(g, _)| *g)
+                .collect();
+            if groessen.is_empty() {
+                return None;
+            }
+            Some(WetterErgaenzung {
+                station: wetter_station(q)?,
+                groessen,
+            })
+        })
+        .collect()
+}
+
+/// `/current_weather?lat&lon` → jüngste Messung. Die Station ist die mit den meisten gezeigten
+/// Werten ([`kopf_station`]). `None`, wenn Messung, lesbare Messzeit oder Station fehlen — ohne
+/// sie gibt es keinen Stand und keine Herkunft.
+pub fn parse_current_weather(roh: &Value) -> Option<WetterAktuell> {
+    let w = roh.get("weather").filter(|w| w.is_object())?;
+    let zeitpunkt = zeit(w.get("timestamp")?.as_str()?)?;
+    let quellen: &[Value] = roh
+        .get("sources")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    // Ohne `source_id` gehören die nicht ergänzten Werte der ersten (nächsten) Quelle.
+    let haupt_id = w
+        .get("source_id")
+        .and_then(Value::as_i64)
+        .or_else(|| quellen.first()?.get("id")?.as_i64());
+    // Vorläufig mit Tag: ob `icon` bekannt ist, hängt nicht am Sonnenstand; Nebel wird erst an
+    // der Kopf-Station nach Tageszeit geteilt.
+    let symbol = symbol_aus_icon(w.get("icon").and_then(Value::as_str), || true);
+    let herkunft = herkunft(w, haupt_id, symbol.is_some());
+    let haupt = kopf_station(quellen, &herkunft, haupt_id)?;
+    let kopf_id = haupt.get("id").and_then(Value::as_i64);
+    let tag = || match (zahl(haupt, "lat"), zahl(haupt, "lon")) {
+        (Some(lat), Some(lon)) => sonne_ueber_horizont(lat, lon, zeitpunkt),
+        _ => {
+            tracing::warn!("Bright Sky: Station ohne Lage, Nebel als Tag gezeigt");
+            true
+        }
+    };
+    Some(WetterAktuell {
+        gemessen_at: zeitpunkt.to_rfc3339_opts(SecondsFormat::Secs, true),
+        station: wetter_station(haupt)?,
+        symbol: match symbol {
+            Some(WetterSymbol::NebelTag) if !tag() => Some(WetterSymbol::NebelNacht),
+            andere => andere,
+        },
+        temperatur_c: zahl(w, "temperature"),
+        taupunkt_c: zahl(w, "dew_point"),
+        luftfeuchte_prozent: zahl(w, "relative_humidity"),
+        luftdruck_hpa: zahl(w, "pressure_msl"),
+        sicht_m: zahl(w, "visibility"),
+        bewoelkung_prozent: zahl(w, "cloud_cover"),
+        wind_kmh: zahl(w, "wind_speed_10"),
+        windrichtung_grad: zahl(w, "wind_direction_10"),
+        boeen_kmh: zahl(w, "wind_gust_speed_60"),
+        niederschlag_mm: zahl(w, "precipitation_60"),
+        ergaenzt: ergaenzungen(quellen, &herkunft, kopf_id),
+    })
+}
+
+/// Lässt eine Messung nur stehen, solange sie höchstens [`OBERGRENZE_MESSUNG_S`] alt ist —
+/// auch ein gerade gelungener Abruf kann die Messung einer ausgefallenen Station tragen — und
+/// höchstens [`UHRVERSATZ_S`] in der Zukunft liegt. Unlesbare Messzeit → `None`.
+pub fn frische_messung(a: WetterAktuell, jetzt: DateTime<Utc>) -> Option<WetterAktuell> {
+    let alter = (jetzt - zeit(&a.gemessen_at)?).num_seconds();
+    (-UHRVERSATZ_S..=OBERGRENZE_MESSUNG_S)
+        .contains(&alter)
+        .then_some(a)
 }
 
 #[cfg(test)]
@@ -420,5 +671,342 @@ mod tests {
         assert_eq!(k.stunden[0].zeitpunkt, "2026-09-23T14:00:00Z");
         assert_eq!(k.stunden.len(), 23);
         assert_eq!(k.station.as_deref(), Some("BREMEN"));
+    }
+    /// Aufgezeichnete Antwort von `/current_weather?lat=52.00&lon=9.50` (Hameln, 01.10.2026
+    /// 06:00Z, unverändert): `source_id` Ottenstein, nur der Niederschlag ist von dort;
+    /// Temperatur, Feuchte und Taupunkt aus Hameln-Hastenbeck, Wind und Böen aus Hameln,
+    /// Luftdruck, Bewölkung, Wetterlage und Sicht aus Alfeld (im Kopf, vier Größen),
+    /// Sonnenschein und Strahlung (nicht gezeigt) aus Luegde-Paenbruch.
+    fn current_weather() -> Value {
+        serde_json::from_str(include_str!("testdaten/current_weather.json")).unwrap()
+    }
+
+    /// Kopie der Aufzeichnung mit geänderten Feldern der Messung.
+    fn current_weather_mit(felder: Value) -> Value {
+        let mut roh = current_weather();
+        let w = roh["weather"].as_object_mut().unwrap();
+        for (k, v) in felder.as_object().unwrap() {
+            w.insert(k.clone(), v.clone());
+        }
+        roh
+    }
+
+    fn station(name: &str, entfernung_m: f64) -> WetterStation {
+        WetterStation {
+            name: name.into(),
+            entfernung_m: Some(entfernung_m),
+        }
+    }
+
+    #[test]
+    fn current_weather_werte_der_hauptstation() {
+        let a = parse_current_weather(&current_weather()).unwrap();
+        assert_eq!(a.gemessen_at, "2026-10-01T06:00:00Z");
+        // Alfeld trägt vier der zehn gezeigten Größen, Hameln-Hastenbeck drei, Hameln zwei,
+        // das nächste Ottenstein nur den Niederschlag.
+        assert_eq!(a.station, station("Alfeld", 21432.0));
+        assert_eq!(a.symbol, Some(WetterSymbol::Bewoelkt));
+        assert_eq!(a.temperatur_c, Some(14.8));
+        assert_eq!(a.taupunkt_c, Some(11.38));
+        assert_eq!(a.luftfeuchte_prozent, Some(80.0));
+        assert_eq!(a.luftdruck_hpa, Some(1020.8));
+        assert_eq!(a.sicht_m, Some(53235.0));
+        assert_eq!(a.bewoelkung_prozent, Some(100.0));
+        assert_eq!(a.wind_kmh, Some(3.2));
+        assert_eq!(a.windrichtung_grad, Some(50.0));
+        assert_eq!(a.boeen_kmh, Some(4.7));
+        assert_eq!(a.niederschlag_mm, Some(0.0), "gemessene 0,0 mm bleibt 0");
+    }
+
+    #[test]
+    fn current_weather_fenster_10_60_60() {
+        let a = parse_current_weather(&current_weather_mit(json!({
+            "wind_speed_10": 11.0, "wind_speed_30": 12.0, "wind_speed_60": 13.0,
+            "wind_direction_10": 140, "wind_direction_60": 200,
+            "wind_gust_speed_10": 17.0, "wind_gust_speed_30": 21.0, "wind_gust_speed_60": 34.0,
+            "precipitation_10": 0.1, "precipitation_30": 0.4, "precipitation_60": 1.2,
+        })))
+        .unwrap();
+        assert_eq!(a.wind_kmh, Some(11.0), "mittlerer Wind: jüngste 10 min");
+        assert_eq!(a.windrichtung_grad, Some(140.0));
+        assert_eq!(a.boeen_kmh, Some(34.0), "Böe: stärkste der letzten Stunde");
+        assert_eq!(
+            a.niederschlag_mm,
+            Some(1.2),
+            "Niederschlag: Summe der letzten Stunde"
+        );
+    }
+
+    #[test]
+    fn current_weather_ergaenzungen_je_station() {
+        let a = parse_current_weather(&current_weather()).unwrap();
+        use WetterMessgroesse as M;
+        assert_eq!(
+            a.ergaenzt,
+            vec![
+                WetterErgaenzung {
+                    station: station("Ottenstein", 9034.0),
+                    groessen: vec![M::Niederschlag],
+                },
+                WetterErgaenzung {
+                    station: station("Hameln-Hastenbeck", 11086.0),
+                    groessen: vec![M::Temperatur, M::Luftfeuchte, M::Taupunkt],
+                },
+                WetterErgaenzung {
+                    station: station("Hameln", 12094.0),
+                    groessen: vec![M::Wind, M::Boeen],
+                },
+            ],
+            "Alfeld steht im Kopf; Luegde-Paenbruch ergänzt nur Ungezeigtes und erscheint nicht"
+        );
+    }
+
+    /// Bremen am 01.10.2026: Bright Sky nennt den Bürgerpark (2,5 km), jeder gezeigte Wert
+    /// stammt aber aus Bremen (3,9 km). Im Kopf steht Bremen, kein Wert trägt einen Hinweis.
+    #[test]
+    fn station_ohne_eigenen_wert_steht_nicht_im_kopf() {
+        let felder = [
+            "temperature",
+            "wind_speed_10",
+            "wind_direction_10",
+            "wind_gust_speed_60",
+            "precipitation_60",
+            "condition",
+            "visibility",
+            "cloud_cover",
+            "relative_humidity",
+            "dew_point",
+            "pressure_msl",
+        ];
+        let mut roh = current_weather();
+        roh["weather"]["source_id"] = json!(1);
+        roh["weather"]["fallback_source_ids"] =
+            Value::Object(felder.iter().map(|f| (f.to_string(), json!(2))).collect());
+        roh["sources"] = json!([
+            { "id": 1, "station_name": "Bremen (Buergerpark)", "distance": 2520.0,
+              "lat": 53.09, "lon": 8.81 },
+            { "id": 2, "station_name": "Bremen", "distance": 3887.0,
+              "lat": 53.0451, "lon": 8.79808 }
+        ]);
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.station, station("Bremen", 3887.0));
+        assert!(a.ergaenzt.is_empty(), "{:?}", a.ergaenzt);
+    }
+
+    /// Gleichstand: zuerst die Station, die Bright Sky nennt, sonst die nähere.
+    #[test]
+    fn gleichstand_der_stationen() {
+        let mut roh = current_weather();
+        // Ottenstein (genannt): Niederschlag, Wetterlage, Sicht, Bewölkung, Luftdruck = 5;
+        // Hameln-Hastenbeck: Temperatur, Wind, Böen, Luftfeuchte, Taupunkt = 5.
+        roh["weather"]["fallback_source_ids"] = json!({
+            "temperature": 245112, "wind_speed_10": 245112, "wind_gust_speed_60": 245112,
+            "relative_humidity": 245112, "dew_point": 245112
+        });
+        assert_eq!(
+            parse_current_weather(&roh).unwrap().station,
+            station("Ottenstein", 9034.0)
+        );
+        // Ohne Anteil der genannten Station: Hameln-Hastenbeck (11,1 km) vor Alfeld (21,4 km).
+        roh["weather"]["fallback_source_ids"] = json!({
+            "temperature": 245112, "wind_speed_10": 245112, "wind_gust_speed_60": 245112,
+            "relative_humidity": 245112, "dew_point": 245112,
+            "precipitation_60": 80881, "condition": 80881, "visibility": 80881,
+            "cloud_cover": 80881, "pressure_msl": 80881
+        });
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.station, station("Hameln-Hastenbeck", 11086.0));
+        assert_eq!(a.ergaenzt.len(), 1);
+        assert_eq!(a.ergaenzt[0].station, station("Alfeld", 21432.0));
+    }
+
+    #[test]
+    fn current_weather_ohne_rueckgriff_und_unbekannte_quelle() {
+        let mut roh = current_weather();
+        roh["weather"]["fallback_source_ids"] = json!(null);
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.station, station("Ottenstein", 9034.0));
+        assert!(a.ergaenzt.is_empty());
+
+        // Eine Quelle, die `sources` nicht nennt: ihr Wert bleibt, ihre Herkunft fehlt.
+        roh["weather"]["fallback_source_ids"] =
+            json!({ "temperature": 999, "precipitation_60": 277810 });
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.temperatur_c, Some(14.8));
+        assert_eq!(a.station, station("Ottenstein", 9034.0));
+        assert_eq!(
+            a.ergaenzt,
+            vec![WetterErgaenzung {
+                station: station("Hameln", 12094.0),
+                groessen: vec![WetterMessgroesse::Niederschlag],
+            }]
+        );
+    }
+
+    #[test]
+    fn current_weather_null_bleibt_none() {
+        let a = parse_current_weather(&current_weather_mit(json!({
+            "visibility": null, "temperature": null, "icon": null
+        })))
+        .unwrap();
+        assert_eq!(a.sicht_m, None);
+        assert_eq!(a.temperatur_c, None);
+        assert_eq!(a.symbol, None);
+        let draht = serde_json::to_value(&a).unwrap();
+        assert!(!draht.as_object().unwrap().contains_key("sicht_m"));
+    }
+
+    #[test]
+    fn current_weather_alle_symbole_und_das_unbekannte() {
+        let symbol = |icon: &str| {
+            parse_current_weather(&current_weather_mit(json!({ "icon": icon })))
+                .unwrap()
+                .symbol
+        };
+        use WetterSymbol as S;
+        assert_eq!(symbol("clear-day"), Some(S::KlarTag));
+        assert_eq!(symbol("clear-night"), Some(S::KlarNacht));
+        assert_eq!(symbol("partly-cloudy-day"), Some(S::TeilsBewoelktTag));
+        assert_eq!(symbol("partly-cloudy-night"), Some(S::TeilsBewoelktNacht));
+        assert_eq!(symbol("cloudy"), Some(S::Bewoelkt));
+        assert_eq!(symbol("wind"), Some(S::Wind));
+        assert_eq!(symbol("rain"), Some(S::Regen));
+        assert_eq!(symbol("sleet"), Some(S::Schneeregen));
+        assert_eq!(symbol("snow"), Some(S::Schnee));
+        assert_eq!(symbol("hail"), Some(S::Hagel));
+        assert_eq!(symbol("thunderstorm"), Some(S::Gewitter));
+        // 06:00Z am 01.10. in Alfeld (Kopf-Station): Sonne knapp über dem Horizont.
+        assert_eq!(symbol("fog"), Some(S::NebelTag));
+        assert_eq!(symbol("tornado"), None, "unbekannt wird nie „klar“");
+    }
+
+    #[test]
+    fn nebel_nach_sonnenstand_der_station() {
+        let roh = current_weather_mit(json!({
+            "timestamp": "2026-10-01T02:00:00+00:00", "icon": "fog"
+        }));
+        assert_eq!(
+            parse_current_weather(&roh).unwrap().symbol,
+            Some(WetterSymbol::NebelNacht)
+        );
+        // Ohne Lage der Station: Tag (und ein Log-Eintrag).
+        let mut roh = roh;
+        for q in roh["sources"].as_array_mut().unwrap() {
+            q.as_object_mut().unwrap().remove("lat");
+        }
+        assert_eq!(
+            parse_current_weather(&roh).unwrap().symbol,
+            Some(WetterSymbol::NebelTag)
+        );
+    }
+
+    #[test]
+    fn current_weather_unvollstaendige_antwort() {
+        assert!(parse_current_weather(&json!({ "title": "Not Found" })).is_none());
+        assert!(parse_current_weather(&json!({ "weather": null, "sources": [] })).is_none());
+        let ohne_zeit = current_weather_mit(json!({ "timestamp": "kaputt" }));
+        assert!(
+            parse_current_weather(&ohne_zeit).is_none(),
+            "ohne Messzeit kein Stand"
+        );
+        let mut ohne_station = current_weather();
+        ohne_station["sources"] = json!([]);
+        assert!(
+            parse_current_weather(&ohne_station).is_none(),
+            "ohne Station keine Herkunft"
+        );
+        // Versatz in der Messzeit wird nach UTC umgerechnet.
+        let a = parse_current_weather(&current_weather_mit(json!({
+            "timestamp": "2026-10-01T08:00:00+02:00"
+        })))
+        .unwrap();
+        assert_eq!(a.gemessen_at, "2026-10-01T06:00:00Z");
+    }
+
+    #[test]
+    fn sonnenstand_bremen_und_jahreszeiten() {
+        // Bremen, 01.10.2026: Aufgang etwa 05:24Z, Untergang etwa 17:05Z.
+        let (lat, lon) = (53.08, 8.80);
+        assert!(!sonne_ueber_horizont(lat, lon, t("2026-10-01T05:00:00Z")));
+        assert!(sonne_ueber_horizont(lat, lon, t("2026-10-01T06:00:00Z")));
+        assert!(sonne_ueber_horizont(lat, lon, t("2026-10-01T16:30:00Z")));
+        assert!(!sonne_ueber_horizont(lat, lon, t("2026-10-01T17:30:00Z")));
+        // Mittag und Mitternacht im Sommer und im Winter.
+        assert!(sonne_ueber_horizont(lat, lon, t("2026-06-21T11:30:00Z")));
+        assert!(!sonne_ueber_horizont(lat, lon, t("2026-06-21T23:30:00Z")));
+        assert!(sonne_ueber_horizont(lat, lon, t("2026-12-21T11:30:00Z")));
+        assert!(!sonne_ueber_horizont(lat, lon, t("2026-12-21T23:30:00Z")));
+        // 21.12. in Bremen: Aufgang etwa 07:37Z. Um 07:40Z steht die Sonne bei etwa −0,4°,
+        // also zwischen −0,833° und 0° — schon Tag nach der Definition des Aufgangs (Grenze
+        // der Gegenprobe gegen eine Schwelle von 0°).
+        assert!(sonne_ueber_horizont(lat, lon, t("2026-12-21T07:40:00Z")));
+        assert!(!sonne_ueber_horizont(lat, lon, t("2026-12-21T07:15:00Z")));
+    }
+
+    #[test]
+    fn frische_messung_grenze_drei_stunden() {
+        let a = parse_current_weather(&current_weather()).unwrap();
+        let jetzt = |s: &str| t(s);
+        assert!(frische_messung(a.clone(), jetzt("2026-10-01T08:00:00Z")).is_some());
+        assert!(
+            frische_messung(a.clone(), jetzt("2026-10-01T09:00:00Z")).is_some(),
+            "genau 3 h gilt noch"
+        );
+        assert!(frische_messung(a.clone(), jetzt("2026-10-01T09:00:01Z")).is_none());
+        let mut kaputt = a.clone();
+        kaputt.gemessen_at = "kaputt".into();
+        assert!(frische_messung(kaputt, jetzt("2026-10-01T06:00:00Z")).is_none());
+        // Messzeit in der Zukunft: bis 10 min Uhrversatz gilt sie, danach nicht.
+        assert!(frische_messung(a.clone(), jetzt("2026-10-01T05:50:00Z")).is_some());
+        assert!(frische_messung(a, jetzt("2026-10-01T05:49:59Z")).is_none());
+    }
+
+    /// Gleichstand zwischen der genannten Station und einer näheren: die genannte gewinnt.
+    #[test]
+    fn gleichstand_genannte_vor_naeherer() {
+        let mut roh = current_weather();
+        // Alfeld (21,4 km) ist genannt und trägt Niederschlag, Wetterlage, Sicht, Bewölkung,
+        // Luftdruck = 5; Hameln-Hastenbeck (11,1 km) Temperatur, Wind, Böen, Luftfeuchte,
+        // Taupunkt = 5.
+        roh["weather"]["source_id"] = json!(80881);
+        roh["weather"]["fallback_source_ids"] = json!({
+            "temperature": 245112, "wind_speed_10": 245112, "wind_gust_speed_60": 245112,
+            "relative_humidity": 245112, "dew_point": 245112
+        });
+        assert_eq!(
+            parse_current_weather(&roh).unwrap().station,
+            station("Alfeld", 21432.0)
+        );
+    }
+
+    /// Ohne `source_id` gehören die nicht ergänzten Werte der ersten Quelle — sonst stünden sie
+    /// ohne Hinweis unter der Station, die nur einen Wert ergänzt hat.
+    #[test]
+    fn ohne_source_id_gilt_die_erste_quelle() {
+        let mut roh = current_weather();
+        roh["weather"].as_object_mut().unwrap().remove("source_id");
+        roh["weather"]["fallback_source_ids"] = json!({ "temperature": 277810 });
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.station, station("Ottenstein", 9034.0));
+        assert_eq!(
+            a.ergaenzt,
+            vec![WetterErgaenzung {
+                station: station("Hameln", 12094.0),
+                groessen: vec![WetterMessgroesse::Temperatur],
+            }]
+        );
+    }
+
+    /// Herkunft nur für Gezeigtes: eine Wetterlage ohne Symbol hat keine, und der Rückgriff
+    /// eines Felds ohne Wert zählt nicht.
+    #[test]
+    fn herkunft_nur_fuer_gezeigte_werte() {
+        let mut roh = current_weather_mit(json!({ "icon": "tornado", "wind_direction_10": null }));
+        roh["weather"]["fallback_source_ids"] =
+            json!({ "condition": 80881, "wind_direction_10": 277810 });
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.symbol, None);
+        assert_eq!(a.station, station("Ottenstein", 9034.0));
+        assert!(a.ergaenzt.is_empty(), "{:?}", a.ergaenzt);
     }
 }

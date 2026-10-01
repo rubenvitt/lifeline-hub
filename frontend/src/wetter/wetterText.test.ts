@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import type { WetterErgaenzung } from '../api/types';
 import {
+  druckText,
   entfernungText,
+  ergaenztVon,
   niederschlagText,
+  prozentText,
+  sichtText,
   stationText,
   temperaturText,
   titelSchreibung,
   warnZeitraum,
+  wetterSymbolWort,
   windText,
+  zahlText,
 } from './wetterText';
 
 const BERLIN = { zeitzone: 'Europe/Berlin' };
@@ -19,6 +26,12 @@ describe('titelSchreibung', () => {
     expect(titelSchreibung('BREMEN')).toBe('Bremen');
     expect(titelSchreibung('BERLIN-ALEX.')).toBe('Berlin-Alex.');
     expect(titelSchreibung('  ')).toBe('');
+  });
+
+  it('lässt gemischte Schreibung der Quelle stehen (SYNOP-Namen)', () => {
+    expect(titelSchreibung('Bremen (Buergerpark)')).toBe('Bremen (Buergerpark)');
+    expect(titelSchreibung('Frankfurt/Main')).toBe('Frankfurt/Main');
+    expect(stationText('Bremen (Buergerpark)', 2520)).toBe('Station Bremen (Buergerpark), 2,5 km');
   });
 });
 
@@ -75,5 +88,53 @@ describe('warnZeitraum', () => {
       'seit 13:00 · bis auf Weiteres',
     );
     expect(warnZeitraum(null, '2026-09-22T14:00:00Z', JETZT, BERLIN)).toBe('bis 16:00');
+  });
+});
+
+describe('aktuelle Bedingungen (LFH-864) — ein fehlender Wert ist ein Strich, nie 0', () => {
+  it('Zahl für die Kennzahl, ohne Einheit, mit Minus U+2212', () => {
+    expect(zahlText(15.25, 1)).toBe('15,3');
+    expect(zahlText(-0.4, 1)).toBe('−0,4');
+    expect(zahlText(0, 1)).toBe('0,0');
+    expect(zahlText(16.6, 0)).toBe('17');
+    expect(zahlText(null, 1)).toBe('—');
+    expect(zahlText(Number.NaN, 0)).toBe('—');
+  });
+
+  it('Sicht unter 1 km in m, sonst km mit einer Stelle', () => {
+    expect(sichtText(180)).toBe('180 m');
+    expect(sichtText(53235)).toBe('53,2 km');
+    expect(sichtText(undefined)).toBe('—');
+  });
+
+  it('Prozent und Luftdruck', () => {
+    expect(prozentText(80)).toBe('80 %');
+    expect(prozentText(0)).toBe('0 %');
+    expect(prozentText(null)).toBe('—');
+    expect(druckText(1020.8)).toBe('1021 hPa');
+    expect(druckText(undefined)).toBe('—');
+  });
+
+  it('ein Wort je Wetterlage, Tag und Nacht gleich benannt', () => {
+    expect(wetterSymbolWort('klar_tag')).toBe('klar');
+    expect(wetterSymbolWort('klar_nacht')).toBe('klar');
+    expect(wetterSymbolWort('teils_bewoelkt_nacht')).toBe('teils bewölkt');
+    expect(wetterSymbolWort('bewoelkt')).toBe('bewölkt');
+    expect(wetterSymbolWort('nebel_nacht')).toBe('Nebel');
+    expect(wetterSymbolWort('wind')).toBe('windig');
+    expect(wetterSymbolWort('schneeregen')).toBe('Schneeregen');
+    expect(wetterSymbolWort('gewitter')).toBe('Gewitter');
+    expect(wetterSymbolWort(undefined)).toBe('—');
+  });
+
+  it('Herkunft eines ergänzten Werts: „Station Hameln, 12,1 km", sonst null', () => {
+    const ergaenzt: WetterErgaenzung[] = [
+      { station: { name: 'Hameln-Hastenbeck', entfernung_m: 11086 }, groessen: ['temperatur'] },
+      { station: { name: 'Hameln', entfernung_m: 12094 }, groessen: ['wind', 'boeen'] },
+    ];
+    expect(ergaenztVon(ergaenzt, 'boeen')).toBe('Station Hameln, 12,1 km');
+    expect(ergaenztVon(ergaenzt, 'temperatur')).toBe('Station Hameln-Hastenbeck, 11,1 km');
+    expect(ergaenztVon(ergaenzt, 'sicht')).toBeNull();
+    expect(ergaenztVon([], 'wind')).toBeNull();
   });
 });
