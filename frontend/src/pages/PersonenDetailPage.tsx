@@ -1113,19 +1113,17 @@ export default function PersonenDetailPage() {
             <Button type="primary" onClick={() => fuehreKopfaktionAus(aktionenPlan.primaer)}>
               {aktionenPlan.primaer.label}
             </Button>
-            {aktionenPlan.weitere.length > 0 && (
-              <MenueAusloeser
-                eintraege={aktionenPlan.weitere}
-                laeuft={laeuftStatus}
-                // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
-                // gleichnamige Knöpfe kein Ziel.
-                zugaenglicherName={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
-                onWahl={(key) => {
-                  const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
-                  if (eintrag) fuehreKopfaktionAus(eintrag);
-                }}
-              />
-            )}
+            <MenueAusloeser
+              eintraege={aktionenPlan.weitere}
+              laeuft={laeuftStatus}
+              // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
+              // gleichnamige Knöpfe kein Ziel.
+              zugaenglicherName={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
+              onWahl={(key) => {
+                const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
+                if (eintrag) fuehreKopfaktionAus(eintrag);
+              }}
+            />
           </Space>
         )
       }

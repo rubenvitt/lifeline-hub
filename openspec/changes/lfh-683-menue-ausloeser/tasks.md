@@ -26,13 +26,14 @@
 
 - [x] 4.1 Tests in `chat/NachrichtenStrom.test.tsx` zuerst umschreiben: Name „Aktionen zu Nachricht von ‹Autor›, ‹Uhrzeit›“; Löschen über Dialog (Titel, „Ja, löschen“ löscht, „Abbrechen“ lässt stehen); gelöschte Nachricht ohne Auslöser. Prüfen: Tests ROT
 - [x] 4.2 `chat/NachrichtenStrom.tsx` umstellen (D4: `MenueAusloeser`, `<Modal>` außerhalb von `renderItem`, kein `Popconfirm`). Prüfen: 4.1 grün, `pages/ChatPage.test.tsx` grün (angepasst, falls er den alten Namen nutzt)
+- [x] 4.3 Review-Befunde nachziehen: eindeutiger Name bei gleicher Minute (`chat/aktionsNamen.ts`, laufende Nummer), Lösch-Dialog liest die Nachricht aus der Live-Liste und schließt bei Grabstein, neue Tests greifen über das offene Menü. Prüfen: Tests grün; Mutationsprobe (Grabstein-Prüfung entfernt) → rot
 
 ## 5. Wächter und Regel
 
 - [x] 5.1 `components/menueAusloeser.guard.test.ts` (D5, Muster `dichte.guard.test.ts`) mit Ausnahme `pages/lagekarte/AnsichtSwitcher.tsx` samt Grund. Prüfen: grün; Mutationsprobe (eine Kopie zurückgeschrieben → rot)
-- [ ] 5.2 e2e-Fall „Fokus springt ins Menü“ in einem bestehenden Spec ergänzen, der ein Menü ohnehin öffnet (z. B. Meldungen oder ETB): Auslöser per Tastatur öffnen, Fokus liegt im `[role="menu"]`, Escape schließt. Prüfen: Spec grün; Mutationsprobe `autoFocus` entfernt → rot
+- [x] 5.2 e2e-Fall „Fokus springt ins Menü“ in einem bestehenden Spec ergänzen, der ein Menü ohnehin öffnet (z. B. Meldungen oder ETB): Auslöser per Tastatur öffnen, Fokus liegt im `[role="menu"]`, Escape schließt. Prüfen: Spec grün; Mutationsprobe `autoFocus` entfernt → rot. **Ergebnis:** in `e2e/etb-chronologie.spec.ts` („LFH-683: Menüauslöser per Tastatur“), grün; mit `autoFocus={false}` rot (Fokus bleibt am Auslöser)
 - [x] 5.3 `frontend/AGENTS.md`, Abschnitt „Aktionen“: Absatz „Datensatz-Aktionen werden gebündelt“ auf den Baustein umstellen (Mechanik dort, hier nur Zählung, Modal, Rechte-Riegel, Guard); Kommentarverweise „`autoFocus` wie am Aktionsmenü in …“ per `grep` nachziehen. Prüfen: Prettier über `frontend/` grün, `grep -rn "autoFocus wie am" frontend/src` zeigt nur noch gültige Verweise
 
 ## 6. Gesamtlauf
 
-- [ ] 6.1 `./scripts/check-all.sh` grün (bzw. die Bündel, die in der Umgebung laufen; der volle Lauf wird mit der CI des PRs belegt); `e2e/gate3-trefflaeche.spec.ts` für die betroffenen Seiten grün (Layout der Hülle). Ergebnis hier vermerken
+- [x] 6.1 `./scripts/check-all.sh` grün (bzw. die Bündel, die in der Umgebung laufen; der volle Lauf wird mit der CI des PRs belegt); `e2e/gate3-trefflaeche.spec.ts` für die betroffenen Seiten grün (Layout der Hülle). Ergebnis hier vermerken. **Ergebnis lokal (Cloud-Sitzung ohne mise, Node 22, Chromium aus `/opt/pw-browsers`):** Bündel `schnell` grün bis auf Schritt 12 (Werkzeugversionen, braucht `mise`); Prettier, Lint, Typecheck, Typ-Drift, OpenSpec-Archiv grün. Vitest 8122/8124: rot nur `api/kartenbilder.test.ts` (bekannter Node-22-Bruch, `mise.toml`) und einmal `EtbPage` LFH-463 im Timeout unter paralleler e2e-Last (einzeln grün, 3,5 s; auf der Basis `38742ed` 4,1 s). `gate3-trefflaeche.spec.ts` 38/39 grün; rot nur „Führungsfunktionen: der Bearbeiten-Knopf“ (9 Knoten erwartet), ebenso rot auf `origin/alpha`, berührt keine Datei dieser Change. Voller Lauf: CI des PRs

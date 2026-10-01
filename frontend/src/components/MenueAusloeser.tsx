@@ -78,7 +78,9 @@ export function MenueAusloeser<K extends string = string>({
      *
      * Nur `click`: React stoppt dabei auch das native Event am Portal-Container, und rc-dropdown
      * hört Escape (`keydown`) am `window`. `pointerdown` bleibt ebenso frei (Dokument-Hörer in
-     * `etb/Schnellerfassung.tsx`, `components/zugPointerSensor.ts`).
+     * `etb/Schnellerfassung.tsx`, `components/zugPointerSensor.ts`). Ein Klick im Menü erreicht
+     * `document`/`window` damit nicht mehr; dort hört im Frontend niemand auf `click` (geprüft
+     * LFH-683). Wer einen solchen Hörer einführt, hört in der Capture-Phase.
      */
     <span
       style={{ display: 'inline-flex' }}

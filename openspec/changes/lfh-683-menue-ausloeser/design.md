@@ -113,11 +113,16 @@ rot. Weitere Trenner gibt es nicht.
 ### D4 — Chat: Name und Rückfrage
 
 - Name: `Aktionen zu Nachricht von ${autor_name}, ${formatZeitKurz(erstellt_at)}`; dieselbe
-  Kennung wie die sichtbare Kopfzeile der Nachricht.
-- Löschen: `<Modal>` außerhalb der `renderItem`-Schleife mit eigenem Zustand (Muster
-  `MeldungKarte`, „Erledigt“), Titel „Nachricht wirklich löschen?“, OK „Ja, löschen“ rot,
-  „Abbrechen“.
+  Kennung wie die sichtbare Kopfzeile der Nachricht. Die Uhrzeit ist minutengenau; zwei
+  Nachrichten desselben Autors in derselben Minute bekommen eine laufende Nummer „(1)“, „(2)“
+  in Listenreihenfolge (`chat/aktionsNamen.ts`, nachgezogen aus dem Review).
+- Löschen: `<Modal>` außerhalb der `renderItem`-Schleife (Muster `MeldungKarte`, „Erledigt“),
+  Titel „Nachricht wirklich löschen?“, OK „Ja, löschen“ rot, „Abbrechen“. Der Zustand hält nur
+  die ID; die Nachricht wird aus der Live-Liste gelesen, damit der Dialog schließt, wenn sie
+  währenddessen anderswo gelöscht wird (kein zweites DELETE, ebenfalls aus dem Review).
 - **Verworfen:** `Popconfirm` behalten über einen Knoten-Etikett-Ausgang im Baustein (s. D1).
+- **Verworfen:** die Nachrichten-ID im Namen. Sie steht nirgends sichtbar; eine Kennung, die
+  nur Hilfstechnik hört, hilft beim gemeinsamen Bedienen nicht.
 
 ### D5 — Guard gegen neue Kopien
 

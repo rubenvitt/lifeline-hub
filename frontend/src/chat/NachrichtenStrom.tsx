@@ -1,10 +1,11 @@
 import { Button, Modal, Popover, Space, Tag, Tooltip, Typography, theme } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../anzeige/format';
 import DownloadAnker from '../components/DownloadAnker';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { aktionsNamen } from './aktionsNamen';
 import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 import { formatGroesse } from '../karten/formatGroesse';
@@ -86,11 +87,20 @@ export default function NachrichtenStrom({
    */
   const [markeId, setMarkeId] = useState<number | null>(null);
   /**
-   * Die Nachricht, deren Löschen gerade nachgefragt wird. Die Rückfrage ist EIN `<Modal>` außerhalb
+   * Die Nachricht, deren Löschen gerade nachgefragt wird (über ihre ID). Die Rückfrage ist EIN `<Modal>` außerhalb
    * der Zeilenschleife (LFH-365): eine Blase am Menüeintrag hielt das Menü per gestopptem Klick
    * offen und war der Grund für Knoten-Etiketten im Menü (LFH-683).
    */
-  const [loeschFrage, setLoeschFrage] = useState<ChatNachricht | null>(null);
+  const [loeschFrageId, setLoeschFrageId] = useState<number | null>(null);
+  /**
+   * Aus der LIVE-Liste gelesen, nicht als Schnappschuss: wird die Nachricht gelöscht (anderer Tab,
+   * Live-Ereignis), während der Dialog offen ist, schließt er, statt ein zweites DELETE zu senden.
+   */
+  const loeschZiel =
+    loeschFrageId == null
+      ? undefined
+      : nachrichten.find((n) => n.id === loeschFrageId && n.geloescht_at === null);
+  const namen = useMemo(() => aktionsNamen(nachrichten), [nachrichten]);
   const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
 
   /** Flankenwechsel am unteren Rand: Marke setzen bzw. räumen. */
@@ -190,19 +200,18 @@ export default function NachrichtenStrom({
             else if (key === 'auftrag') onHeraufstufenAuftrag(n);
             else if (key === 'bezug') onBezugSetzen?.(n);
             else if (key === 'edit') onBearbeiten(n);
-            else if (key === 'del') setLoeschFrage(n);
+            else if (key === 'del') setLoeschFrageId(n.id);
           };
           return (
             <ListenEintrag
               actions={
                 eintraege.length > 0
                   ? [
-                      // Autor und Uhrzeit wie in der Kopfzeile: n Nachrichten, n unterscheidbare
-                      // Auslöser.
+                      // n Nachrichten, n unterscheidbare Auslöser ({@link aktionsNamen}).
                       <MenueAusloeser
                         key="aktionen"
                         eintraege={eintraege}
-                        zugaenglicherName={`Aktionen zu Nachricht von ${n.autor_name}, ${formatZeitKurz(n.erstellt_at)}`}
+                        zugaenglicherName={namen.get(n.id)!}
                         onWahl={waehle}
                       />,
                     ]
@@ -306,16 +315,16 @@ export default function NachrichtenStrom({
         }}
       />
       <Modal
-        open={loeschFrage != null}
+        open={loeschZiel != null}
         title="Nachricht wirklich löschen?"
         okText="Ja, löschen"
         cancelText="Abbrechen"
         okButtonProps={{ danger: true }}
         onOk={() => {
-          if (loeschFrage) onLoeschen(loeschFrage);
-          setLoeschFrage(null);
+          if (loeschZiel) onLoeschen(loeschZiel);
+          setLoeschFrageId(null);
         }}
-        onCancel={() => setLoeschFrage(null)}
+        onCancel={() => setLoeschFrageId(null)}
       >
         Die Nachricht bleibt als „Nachricht gelöscht“ im Verlauf stehen.
       </Modal>

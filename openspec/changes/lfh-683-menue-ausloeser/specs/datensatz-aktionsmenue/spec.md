@@ -17,8 +17,12 @@ Auslöser auf einer Seite per Name unterscheidbar sind. Das Zeichen selbst MUST 
 Hilfstechnik verborgen sein.
 
 #### Scenario: Zwei Nachrichten im Chat
-- **WHEN** der Chat zwei Nachrichten mit Aktionen zeigt, eine von „Meier“ um 14:02 und eine von „Schulz“ um 14:05
-- **THEN** heißen ihre Auslöser „Aktionen zu Nachricht von Meier, 14:02“ und „Aktionen zu Nachricht von Schulz, 14:05“
+- **WHEN** der Chat heute zwei Nachrichten mit Aktionen zeigt, eine von „Meier“ um 14:02 und eine von „Schulz“ um 14:05
+- **THEN** heißen ihre Auslöser „Aktionen zu Nachricht von Meier, 1402“ und „Aktionen zu Nachricht von Schulz, 1405“ (Uhrzeit taktisch wie in der Kopfzeile)
+
+#### Scenario: Dieselbe Minute
+- **WHEN** „Meier“ heute um 14:02 zwei Nachrichten schreibt
+- **THEN** heißen ihre Auslöser „Aktionen zu Nachricht von Meier, 1402 (1)“ und „… (2)“ in Listenreihenfolge
 
 #### Scenario: Zeile einer Tabelle
 - **WHEN** die Tabelle der Betreuungsstellen eine Stelle „Turnhalle Nord“ mit Aktionen zeigt
@@ -58,8 +62,8 @@ Fehlen die Bedienung verwirren würde.
 einen Eintrag hervorheben und Escape das Menü schließt.
 
 #### Scenario: Menü per Tastatur
-- **WHEN** jemand den Auslöser einer Meldungskarte per Tastatur fokussiert und mit Enter öffnet
-- **THEN** liegt der Fokus im Menü, und die Pfeiltaste nach unten hebt den ersten Eintrag hervor
+- **WHEN** jemand den Auslöser eines ETB-Eintrags per Tastatur fokussiert und mit Enter öffnet
+- **THEN** liegt der Fokus im Menü, die Pfeiltaste nach unten hebt einen Eintrag hervor, und Escape schließt das Menü
 
 ### Requirement: Ein Griff ins Menü löst nur die gewählte Aktion aus
 
@@ -79,6 +83,10 @@ einen Eintrag MUST genau dessen Aktion auslösen.
 
 Braucht eine Aktion aus dem Menü eine Rückfrage, SHALL sie in einem Dialog erscheinen, der nach
 dem Schließen des Menüs öffnet, nicht in einer Blase am Menüeintrag.
+
+#### Scenario: Nachricht wird währenddessen gelöscht
+- **WHEN** der Dialog „Nachricht wirklich löschen?“ offen ist und dieselbe Nachricht anderswo gelöscht wird
+- **THEN** schließt der Dialog, und es wird kein zweites Löschen gesendet
 
 #### Scenario: Eigene Nachricht löschen
 - **WHEN** jemand im Menü einer eigenen Nachricht „Löschen“ wählt
