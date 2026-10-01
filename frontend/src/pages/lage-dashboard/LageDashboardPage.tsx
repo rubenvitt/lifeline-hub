@@ -401,11 +401,15 @@ export default function LageDashboardPage() {
           )}
           {/* Die sechs Plätze stehen auch vor dem ersten Einsatz-Abruf (Kriterium 12, CLS), als
             Ladezelle ohne Ziel und ohne Beschriftung — welche Kennzahl auf die Lageplätze kommt,
-            steht erst mit dem Einsatz fest. Das geschützte Leerzeichen hält die Zeilenhöhe. */}
+            steht erst mit dem Einsatz fest. Das geschützte Leerzeichen hält die Zeilenhöhe.
+            Notizplatz: unter `md` zwei Zeilen Boden (LFH-629), ab `md` drei Zeilen Boden und
+            Deckel (LFH-691) — sonst sprängen die Paneele mit „· 1 ohne Meldung“ oder der
+            Pegel-Prognose. */}
           <Kennzahlenband
             beschriftung="Lage in Zahlen"
             spalten={bandSpalten}
             notizZeilenSchmal={2}
+            notizZeilen={3}
             style={{ border: 'none' }}
           >
             {lagebild == null

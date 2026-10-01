@@ -26,6 +26,12 @@ export interface LiveVerbindungOptionen {
    * gleich zu Beginn die Org-Keys ab (`openspec/changes/archive/2026-10-01-lfh-734-org-live-ereignis/design.md`, D4).
    */
   beimErstenOpen?: () => void;
+  /**
+   * Nach einem CLOSED-Fehler bei gültiger Sitzung: ist das Ziel endgültig weg (LFH-732, etwa ein
+   * gelöschter Einsatz)? Dann kein Reconnect, Status `idle` statt `lost` und `beiEndzustand`.
+   */
+  istEndzustand?: () => Promise<boolean>;
+  beiEndzustand?: () => void;
 }
 
 /**
@@ -66,6 +72,18 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
       // Session abgelaufen → die Sitzungswache übernimmt (ein 401-Pfad für SSE und HTTP).
       meldeSitzungAbgelaufen();
       return;
+    }
+    if (opt.istEndzustand) {
+      const weg = await opt.istEndzustand();
+      if (abgebrochen) return;
+      if (weg) {
+        tote.close();
+        // `idle` statt `lost`: die Seite sagt den Fehler, die Betriebszeile soll keine
+        // unterbrochene Leitung danebenstellen (LFH-331 · B3).
+        meldeStatus('idle');
+        opt.beiEndzustand?.();
+        return;
+      }
     }
     tote.close();
     const wartezeit = RECONNECT_BACKOFF_MS[Math.min(backoffStufe, RECONNECT_BACKOFF_MS.length - 1)];

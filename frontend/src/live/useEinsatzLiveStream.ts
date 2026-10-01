@@ -108,6 +108,23 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['abloesung', onAbloesung as EventListener]);
 
+    // Endzustand (LFH-732): bei gültiger Sitzung fragt eine zweite Probe den Einsatz selbst ab.
+    // Ein 404 (hart gelöscht, etwa beim Entfernen der Demo-Daten, oder vom Aufbewahrungs-Purge)
+    // ist kein Netzproblem: dann kein Reconnect mehr. Die Detailroute steht hinter demselben
+    // Lese-Gate wie `/live` (`EinsatzLesezugriff`), ihr 404 ist also der des Feeds.
+    const einsatzExistiertNicht = async (): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/einsaetze/${einsatzId}`, {
+          credentials: 'same-origin',
+          signal: AbortSignal.timeout(15_000),
+        });
+        return res.status === 404;
+      } catch {
+        // Netzfehler → kein Beleg für einen Endzustand, weiter per Backoff.
+        return false;
+      }
+    };
+
     // Reconnect-Resync: jeder Folge-Open gleicht ab wie `lagged`. Der Erst-Open lädt nur die
     // Org-Keys nach (die Einsatz-Abfragen laden beim Mount ohnehin): ein Org-Ereignis kann beim
     // Wechsel aus dem Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734).
@@ -116,8 +133,16 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       listeners,
       beiWiederaufbau: vollabgleich,
       beimErstenOpen: () => invalidiereOrgLiveKeys(qc),
+      istEndzustand: einsatzExistiertNicht,
+      // Den Weg in die Sackgasse öffnet der neu geholte Einsatzkopf, dessen 404 `EinsatzLayout`
+      // dorthin führt.
+      beiEndzustand: () => inval(EINSATZ_KEYS.einsatz),
     });
     const abmelden = meldeEinsatzStrom();
+    return () => {
+      schliessen();
+      abmelden();
+    };
     return () => {
       schliessen();
       abmelden();

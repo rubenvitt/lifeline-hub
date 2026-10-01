@@ -31,11 +31,29 @@ const TICK_SEKUNDEN: u64 = 600;
 /// Async + injiziertes `jetzt` = deterministisch testbar. Idempotent: ein zweiter
 /// Tick ohne neue Fälligkeiten liefert 0.
 ///
+/// Ohne Gedächtnis für einen ausstehenden WAL-Rückschrieb; der laufende Scheduler nimmt
+/// [`tick_mit_rueckschrieb`].
+///
 /// Ein Soft-Delete meldet `einsatzliste` an die Leser des Einsatzes (LFH-734): er verschwindet
 /// aus ihrer Liste. Die Schwärzung (Phase B) trifft nur schon gesperrte Einsätze und meldet nichts.
 pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>) -> usize {
+    tick_mit_rueckschrieb(pool, live, jetzt, &mut false).await
+}
+
+/// Wie [`tick_einmal`], schreibt nach einer Schwärzung aber den WAL zurück (LFH-725, Spec
+/// `aufbewahrung`, „Physische Entfernung geschwärzter Werte“): erst damit sind die genullten
+/// Seiten in der Hauptdatei und der Vorzustand aus dem WAL getilgt. Blockiert eine andere
+/// Verbindung den Rückschrieb, bleibt `rueckschrieb_ausstehend` gesetzt, und jeder folgende Tick
+/// versucht es erneut, bis es gelingt.
+pub async fn tick_mit_rueckschrieb(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    jetzt: DateTime<Utc>,
+    rueckschrieb_ausstehend: &mut bool,
+) -> usize {
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let mut anzahl = 0;
+    let mut geschwaerzt = 0;
 
     // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start) ---
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
@@ -72,7 +90,10 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
                     "Purge Phase B: PII-SCHWÄRZUNG (irreversibel) — Karenz abgelaufen"
                 );
                 match repo::schwaerze_einsatz(pool, id, &jetzt_s).await {
-                    Ok(true) => anzahl += 1,
+                    Ok(true) => {
+                        anzahl += 1;
+                        geschwaerzt += 1;
+                    }
                     Ok(false) => {} // Bereits geschwärzt (Idempotenz).
                     Err(e) => tracing::error!(einsatz_id = id, "Purge Phase B fehlgeschlagen: {e}"),
                 }
@@ -99,6 +120,32 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
         Err(e) => tracing::warn!("Purge Phase C: Auth-Audit-Purge fehlgeschlagen: {e}"),
     }
 
+    // --- Rückschrieb nach der Schwärzung (LFH-725) ---
+    // Nicht in jedem Tick: TRUNCATE hält beim Warten auf Lesende die Schreibsperre.
+    if geschwaerzt > 0 || *rueckschrieb_ausstehend {
+        match crate::db::wal_zurueckschreiben(pool).await {
+            Ok(true) => {
+                if *rueckschrieb_ausstehend {
+                    tracing::info!("Purge: ausstehender WAL-Rückschrieb nachgeholt");
+                }
+                *rueckschrieb_ausstehend = false;
+            }
+            Ok(false) => {
+                tracing::warn!(
+                    "Purge: WAL-Rückschrieb von anderen Verbindungen blockiert, nächster Tick \
+                     versucht es erneut"
+                );
+                *rueckschrieb_ausstehend = true;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Purge: WAL-Rückschrieb fehlgeschlagen, nächster Tick versucht es erneut: {e}"
+                );
+                *rueckschrieb_ausstehend = true;
+            }
+        }
+    }
+
     anzahl
 }
 
@@ -107,9 +154,12 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
 pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
+        // `true`: der erste Tick (sofort) holt einen beim Start blockierten Rückschrieb nach,
+        // etwa nach einem Absturz zwischen Schwärzung und Rückschrieb.
+        let mut rueckschrieb_ausstehend = true;
         loop {
             ticker.tick().await;
-            tick_einmal(&pool, &live, Utc::now()).await;
+            tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;
             // Verwaiste Anhänge (hochgeladen-nicht-gesendet) jenseits der Karenz entfernen
             // (LFH-250) — gegen monotones BLOB-Wachstum. Fehler nur loggen, nie den Tick killen.
             match crate::anhang::repo::sweep_verwaiste(&pool, Utc::now()).await {
@@ -451,7 +501,8 @@ mod tests {
 
     /// F02/LFH-229: die vormals ungescrubbten Lücken (Einsatz-Kopf, Anhang-BLOB,
     /// Lage-/Gefahren-Freitexte, operative Freitext-Zettel) werden jetzt data-driven aus
-    /// der Registry mit-geschwärzt; Führungs-Doku (ETB/Meldung) + operatives Skelett bleiben.
+    /// der Registry mit-geschwärzt; ETB-Wortlaut + operatives Skelett bleiben, der Meldungs-Freitext
+    /// geht seit LFH-701 mit (die Führungsdokumentation ist das ETB).
     /// Exerziert zugleich alle Generator-Pfade: SelbstId (Kopf), EinsatzId (NullSetzen),
     /// Platzhalter (lage_meldung.text NOT NULL), ZeileLoeschen (anhang), UeberParent
     /// (gefahr_bewertung über gefahrengebiet).
@@ -526,10 +577,10 @@ mod tests {
         .await
         .unwrap();
 
-        // Meldung (Führungs-Doku, RETAIN) + daraus abgeleitetes lage_meldung (text NOT NULL → Platzhalter).
+        // Meldung (Freitext Scrub, LFH-701) + daraus abgeleitetes lage_meldung (text NOT NULL → Platzhalter).
         let meldung: i64 = sqlx::query_scalar(
             "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, eingang_at, erfasst_von_id) \
-             VALUES (?, 1, 'Florian 1', 'funk', 'Lagemeldung Wortlaut bleibt (ETB-Doku)', \
+             VALUES (?, 1, 'Florian 1', 'funk', 'Lagemeldung Wortlaut (nur im ETB erhalten)', \
                 '2026-01-01 09:00:00', '2026-01-01 09:01:00', ?) RETURNING id",
         )
         .bind(e)
@@ -662,15 +713,17 @@ mod tests {
         );
         assert_eq!(ea_bem, None, "operativer Freitext-Zettel gescrubbt");
 
-        // (f) Führungs-Dokumentation (Meldung-Wortlaut) + ETB-Skelett bleiben erhalten.
+        // (f) Führungsdokumentation ist das ETB (LFH-701, Linie A): Der Meldungs-Wortlaut im
+        // Modul wird geschwärzt, das ETB-Skelett bleibt im Wortlaut erhalten.
         let m_inhalt: String = sqlx::query_scalar("SELECT inhalt FROM meldung WHERE id = ?")
             .bind(meldung)
             .fetch_one(&pool)
             .await
             .unwrap();
         assert_eq!(
-            m_inhalt, "Lagemeldung Wortlaut bleibt (ETB-Doku)",
-            "Führungs-Doku (Meldung) bleibt"
+            m_inhalt,
+            crate::einsatz::repo::SCHWAERZUNG_PLATZHALTER,
+            "Meldungs-Freitext im Modul geschwärzt"
         );
         let etb_original: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'ETB ORIGINAL'",
@@ -1325,5 +1378,180 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(s.as_deref(), Some("2026-07-02 12:00:00"));
+    }
+
+    // ---------- LFH-725: physische Entfernung ----------
+
+    const NAME_KLARTEXT: &str = "LFH725-Gepflanzter-Name";
+    const ANHANG_KLARTEXT: &[u8] = b"LFH725-GEPFLANZTER-ANHANG";
+
+    /// Pool mit den Produktionsoptionen (`db::connect`) auf einer Datei — nur dort gibt es eine
+    /// Hauptdatei und einen WAL, in denen Altbytes stehen bleiben können.
+    async fn produktions_pool() -> (tempfile::TempDir, std::path::PathBuf, SqlitePool) {
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("prod.db");
+        let pool = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        (dir, pfad, pool)
+    }
+
+    /// Vorgemerkter Einsatz, Karenz zum Zeitpunkt `2026-03-01` abgelaufen, mit dem Klartext in
+    /// einer Scrub-Spalte (Personenname) und in einem Anhang, der über mehrere Seiten reicht
+    /// (Overflow-Seiten — genau die lässt `secure_delete = FAST` stehen).
+    async fn faelliger_einsatz_mit_klartext(pool: &SqlitePool) -> i64 {
+        let e = abgeschlossen_mit_frist(pool, "2026-01-01 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-01-02 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, name, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'betroffen', ?, ?, ?)",
+        )
+        .bind(e)
+        .bind(NAME_KLARTEXT)
+        .bind(b)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+        let daten = ANHANG_KLARTEXT.repeat(1000);
+        sqlx::query(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'foto.jpg', 'image/jpeg', ?, 'x', ?, ?)",
+        )
+        .bind(e)
+        .bind(daten.len() as i64)
+        .bind(&daten)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+        e
+    }
+
+    fn enthaelt_klartext(pfad: &std::path::Path) -> bool {
+        crate::db::datei_oder_wal_enthaelt(pfad, NAME_KLARTEXT.as_bytes())
+            || crate::db::datei_oder_wal_enthaelt(pfad, ANHANG_KLARTEXT)
+    }
+
+    /// Spec `aufbewahrung`, „Physische Entfernung geschwärzter Werte“: nach dem Purge-Lauf steht
+    /// der gepflanzte Klartext weder in der DB-Datei noch im WAL. Mutationsproben: ohne
+    /// `secure_delete` in `db::connect`, mit `FAST` oder ohne den Rückschrieb wird dieser Test rot.
+    #[tokio::test]
+    async fn schwaerzung_hinterlaesst_keine_altbytes() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        assert!(
+            enthaelt_klartext(&pfad),
+            "Vorbedingung: Klartext liegt in der Datei"
+        );
+
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await, 1);
+
+        let s: Option<String> =
+            sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(s.is_some(), "Einsatz geschwärzt");
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, NAME_KLARTEXT.as_bytes()),
+            "Name aus der Scrub-Spalte steht noch in DB-Datei oder WAL"
+        );
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
+            "Anhang-Bytes stehen noch in DB-Datei oder WAL"
+        );
+    }
+
+    /// Spec `aufbewahrung`, Szenario „Rückschrieb blockiert“: ein Lesender mit älterem Stand
+    /// hält den Rückschrieb auf (der Klartext steht noch in der Hauptdatei); der nächste Tick
+    /// holt ihn nach. Wartet einmal `busy_timeout` (5 s).
+    #[tokio::test]
+    async fn blockierter_rueckschrieb_wird_im_naechsten_tick_nachgeholt() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        faelliger_einsatz_mit_klartext(&pool).await;
+
+        let mut leser = pool.acquire().await.unwrap();
+        sqlx::query("BEGIN").execute(&mut *leser).await.unwrap();
+        sqlx::query("SELECT count(*) FROM einsatz")
+            .execute(&mut *leser)
+            .await
+            .unwrap();
+
+        let mut ausstehend = false;
+        assert_eq!(
+            tick_mit_rueckschrieb(&pool, &LiveHub::new(), t("2026-03-01 12:00:00"), &mut ausstehend).await,
+            1
+        );
+        assert!(ausstehend, "blockierter Rückschrieb bleibt vorgemerkt");
+        assert!(
+            enthaelt_klartext(&pfad),
+            "ohne Rückschrieb steht der Vorzustand noch da"
+        );
+
+        sqlx::query("COMMIT").execute(&mut *leser).await.unwrap();
+        drop(leser);
+
+        assert_eq!(
+            tick_mit_rueckschrieb(&pool, &LiveHub::new(), t("2026-03-01 12:10:00"), &mut ausstehend).await,
+            0,
+            "nichts Neues zu schwärzen"
+        );
+        assert!(!ausstehend);
+        assert!(!enthaelt_klartext(&pfad));
+    }
+
+    /// Spec `aufbewahrung`, „Rückspielen einer Sicherung von vor der Schwärzung“: die Sicherung
+    /// trägt den vorgemerkten Einsatz ungeschwärzt; nach dem Restore schwärzt der nächste
+    /// Purge-Lauf ihn erneut, und die Vormerkung aus der Sicherung gilt weiter.
+    #[tokio::test]
+    async fn restore_von_vor_der_schwaerzung_wird_erneut_geschwaerzt() {
+        let (dir, pfad, pool) = produktions_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        let sicherung = dir.path().join("vorher.sqlite");
+        crate::backup::erzeuge_sicherung(&pool, &sicherung)
+            .await
+            .unwrap();
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await, 1);
+        pool.close().await;
+
+        crate::backup::restore::restore_aus_datei(&sicherung, &pfad, true)
+            .await
+            .unwrap();
+        let pool = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        let geschwaerzt = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, (Option<String>, Option<String>)>(
+                "SELECT geschwaerzt_at, geloescht_at FROM einsatz WHERE id = ?",
+            )
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+        assert_eq!(
+            geschwaerzt(pool.clone()).await,
+            (None, Some("2026-01-02 00:00:00".to_string())),
+            "Vorbedingung: die Sicherung trägt den Einsatz ungeschwärzt"
+        );
+
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:10:00")).await, 1);
+        assert_eq!(
+            geschwaerzt(pool.clone()).await,
+            (
+                Some("2026-03-01 12:10:00".to_string()),
+                Some("2026-01-02 00:00:00".to_string())
+            ),
+            "erneut geschwärzt, Vormerkung aus der Sicherung unverändert"
+        );
+        assert!(!enthaelt_klartext(&pfad));
     }
 }

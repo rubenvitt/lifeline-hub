@@ -377,9 +377,13 @@ speichern. Meldungen ohne `client_id` MUST sich wie bisher verhalten.
 
 Die Oberfläche MUST eine Stand- oder Belegungsmeldung, die mangels Verbindung nicht gesendet
 werden kann, auf dem Gerät vormerken und bei wiederhergestellter Verbindung senden. Die
-vorgemerkte Meldung MUST den Zeitpunkt der Erfassung tragen, nicht den des Sendens. Eine
-vom Server fachlich abgelehnte vorgemerkte Meldung MUST mit Grund und vollständigem Inhalt
-sichtbar bleiben, bis sie verworfen oder erneut versucht wird.
+vorgemerkte Meldung MUST den Zeitpunkt der Erfassung tragen, nicht den des Sendens. Hat die
+Person keinen Zeitpunkt eingetragen, MUST dieser Erfassungszeitpunkt nach der Serveruhr
+bemessen sein, soweit das Gerät seinen Versatz zur Serveruhr aus einer Antwort des Servers
+kennt; ohne bekannten Versatz gilt die Geräteuhr. Ein eingetragener Zeitpunkt MUST
+unverändert gesendet werden. Eine vom Server fachlich abgelehnte vorgemerkte Meldung MUST
+mit Grund und vollständigem Inhalt sichtbar bleiben, bis sie verworfen oder erneut versucht
+wird.
 
 #### Scenario: Wiederholte Standmeldung
 - **WHEN** eine Standmeldung „480 evakuiert“ mit `client_id` „a1“ gespeichert ist und dieselbe Meldung mit „a1“ erneut eintrifft
@@ -429,3 +433,21 @@ sichtbar bleiben, bis sie verworfen oder erneut versucht wird.
 #### Scenario: Vorgemerkte Meldung wird abgelehnt
 - **WHEN** eine vorgemerkte Standmeldung beim Senden abgelehnt wird, weil der Bezirk inzwischen storniert ist
 - **THEN** steht sie im Wiederherstellungsbereich als abgelehnte Standmeldung mit Grund und vollständigem Inhalt
+
+#### Scenario: Vorgehende Geräteuhr bei kurzem Ausfall
+- **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät vor dem Ausfall eine Antwort des Servers erhalten hat und es eine Standmeldung offline vormerkt, die nach 30 s Ausfall gesendet wird
+- **THEN** nimmt das System die Meldung an
+- **AND** ihr Zeitpunkt ist der Erfassungszeitpunkt nach der Serveruhr, nicht der nach der Geräteuhr
+
+#### Scenario: Vorgehende Geräteuhr verdrängt keine neuere Meldung
+- **WHEN** die Uhr eines Geräts 5 min vorgeht, dort um 10:00 Serverzeit die Standmeldung „200“ offline vorgemerkt wird, ein anderes Gerät um 10:02 „480“ meldet und die vorgemerkte Meldung um 10:10 gesendet wird
+- **THEN** bleibt der aktuelle Stand 480
+- **AND** die Meldung „200“ ist mit 10:00 gespeichert und im ETB als nachgetragen nachgewiesen
+
+#### Scenario: Ohne bekannten Versatz gilt die Geräteuhr
+- **WHEN** ein Gerät seit dem Start keine Antwort des Servers erhalten hat und eine Belegungsmeldung offline vormerkt
+- **THEN** trägt die vorgemerkte Meldung den Erfassungszeitpunkt nach der Geräteuhr
+
+#### Scenario: Eingetragener Zeitpunkt bleibt unverändert
+- **WHEN** die Uhr eines Geräts 5 min vorgeht und eine Person beim offline Vormerken einer Standmeldung den Zeitpunkt 09:30 einträgt
+- **THEN** trägt die vorgemerkte Meldung den Zeitpunkt 09:30

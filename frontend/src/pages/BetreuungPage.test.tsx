@@ -13,6 +13,7 @@ import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
+import { setzeOnline } from '../test/utils';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -476,17 +477,19 @@ describe('BetreuungPage (LFH-639)', () => {
 
   describe('Melden ohne Verbindung (LFH-675)', () => {
     afterEach(async () => {
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+      setzeOnline(true);
       await queueLeerenFuerTests();
     });
 
     it('offline: Belegung wird vorgemerkt — Hinweis statt Rückgängig, Dialog schließt', async () => {
       await queueLeerenFuerTests();
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
       renderPage();
-      await userEvent.click(
-        await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
-      );
+      const melden = await screen.findByRole('button', {
+        name: 'Belegung melden für Turnhalle Ost',
+      });
+      // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+      setzeOnline(false);
+      await userEvent.click(melden);
       const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
       await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
@@ -501,6 +504,29 @@ describe('BetreuungPage (LFH-639)', () => {
         stelle_id: 8,
         bezeichnung: 'Turnhalle Ost',
         daten: { belegt: 95, zeitpunkt_at: expect.any(String) },
+      });
+    });
+
+    it('offline: Standmeldung wird vorgemerkt statt angehalten (LFH-705, D6)', async () => {
+      await queueLeerenFuerTests();
+      renderPage();
+      const melden = await screen.findByRole('button', {
+        name: 'Stand melden für Bezirk Uferstraße 12–40',
+      });
+      setzeOnline(false);
+      await userEvent.click(melden);
+      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
+      await userEvent.type(within(dialog).getByLabelText('Evakuiert (Personen)'), '200');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+
+      expect(await screen.findByText(/Offline vorgemerkt — Standmeldung/)).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(api.meldeStand).not.toHaveBeenCalled();
+      const [zeile] = await schreibaktionenLaden(BENUTZER_ID, 1);
+      expect(zeile.aktion).toMatchObject({
+        art: 'stand',
+        bezeichnung: 'Uferstraße 12–40',
+        daten: { evakuiert: 200, zeitpunkt_at: expect.any(String) },
       });
     });
 

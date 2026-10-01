@@ -133,8 +133,9 @@ async function schliesseBezugsliste(d: HTMLElement) {
 const neuGezeichnet = () => act(() => new Promise((r) => setTimeout(r, 20)));
 
 /**
- * Der Dialog, NACHDEM sein Anfangsfokus sitzt: die Hülle fokussiert „Datei wählen“ per
- * `requestAnimationFrame`, ein vorher tippender Test verlöre die Tasten an den Fokuswechsel.
+ * Der Dialog, NACHDEM sein Anfangsfokus sitzt. Die Hülle setzt ihn im Mount-Effekt
+ * (`components/Erfassung.tsx`); hinge er an einem Frame, verlöre ein vorher tippender Test die
+ * Tasten an den Fokuswechsel (LFH-672, Gegenprobe „Anfangsfokus hängt an keinem Frame“).
  */
 async function dialog() {
   const d = (await screen.findAllByRole('dialog'))[0];
@@ -220,9 +221,39 @@ describe('DokumentAblegenModal', () => {
   it('überschreibt einen schon getippten Titel NICHT', async () => {
     rendere();
     const d = await dialog();
-    await userEvent.type(within(d).getByRole('textbox', { name: 'Titel' }), 'Eigener Titel');
+    const titel = within(d).getByRole('textbox', { name: 'Titel' });
+    await userEvent.type(titel, 'Eigener Titel');
+    // Vorbedingung: der getippte Titel steht im Feld. Fehlt er, liegt es am Tippen (Fokus), nicht
+    // an der Titel-Übernahme — der CI-Befund aus LFH-672 sah sonst aus wie ein Überschreiben.
+    expect(titel).toHaveValue('Eigener Titel');
     await userEvent.upload(dateiInput(d), pdf());
-    expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Eigener Titel');
+    expect(titel).toHaveValue('Eigener Titel');
+  });
+
+  it('Anfangsfokus hängt an keinem Frame: sofortiges Tippen bleibt im Titel (LFH-672)', async () => {
+    // Bis zum 26.09.2026 fokussierte `DateiFeld` „Datei wählen“ per `requestAnimationFrame`. Unter
+    // Last kam der Frame erst, als schon getippt wurde, und zog den Fokus aus dem Titel — das
+    // Getippte ging verloren. Hier kommt KEIN Frame, bis getippt ist: sitzt der Fokus trotzdem
+    // und bleibt der Titel stehen, hängt er an keinem.
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    try {
+      rendere();
+      const d = (await screen.findAllByRole('dialog'))[0];
+      expect(document.activeElement).toBe(within(d).getByRole('button', { name: /Datei wählen/ }));
+
+      const titel = within(d).getByRole('textbox', { name: 'Titel' });
+      await userEvent.type(titel, 'Eigener Titel');
+      act(() => frames.splice(0).forEach((cb) => cb(performance.now())));
+
+      expect(document.activeElement).toBe(titel);
+      expect(titel).toHaveValue('Eigener Titel');
+    } finally {
+      raf.mockRestore();
+    }
   });
 
   it('legt ohne Bezug ab und schickt kein bezug-Feld', async () => {

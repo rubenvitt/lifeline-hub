@@ -306,6 +306,122 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         spalte: "einsatz_dokument.kategorie",
         begruendung: "Kategorie als Enum-Label, kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
     },
+    // --- LFH-701, Linie A: Führungsmodule. Die Führungsdokumentation ist der ETB-Wortlaut,
+    // die Freitexte der Modulzeilen werden geschwärzt. ---
+    Ausnahme {
+        datei: "src/meldung/repo.rs",
+        funktion: "anlegen_mit_client_id_tx",
+        spalte: "meldung.absender",
+        begruendung: "Absender als `von` der Auto-ETB-Meldung",
+    },
+    Ausnahme {
+        datei: "src/meldung/repo.rs",
+        funktion: "anlegen_mit_client_id_tx",
+        spalte: "meldung.empfaenger",
+        begruendung: "Empfänger als `an` der Auto-ETB-Meldung",
+    },
+    Ausnahme {
+        datei: "src/meldung/repo.rs",
+        funktion: "anlegen_mit_client_id_tx",
+        spalte: "meldung.inhalt",
+        begruendung: "Meldungswortlaut als `inhalt` der Auto-ETB-Meldung",
+    },
+    Ausnahme {
+        datei: "src/auftrag/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "auftrag.auftrag_text",
+        begruendung: "Auftragstext als `inhalt` der Auto-ETB-Anordnung",
+    },
+    Ausnahme {
+        datei: "src/auftrag/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "auftrag_empfaenger.snap_anzeige",
+        begruendung: "Empfänger-Snapshots verkettet als `an` der Anordnung",
+    },
+    Ausnahme {
+        datei: "src/auftrag/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "auftrag_empfaenger.funktion_text",
+        begruendung: "Funktionsbezeichnung über den Empfänger-Snapshot in `an`",
+    },
+    Ausnahme {
+        datei: "src/auftrag/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "auftrag_empfaenger.extern_bezeichnung",
+        begruendung: "Klartext der externen Stelle über den Empfänger-Snapshot in `an`",
+    },
+    Ausnahme {
+        datei: "src/auftrag/repo.rs",
+        funktion: "melde_vollzug_tx",
+        spalte: "auftrag.vollzugsmeldung",
+        begruendung: "Vollzugsmeldung als `inhalt` einer ETB-Meldung",
+    },
+    Ausnahme {
+        datei: "src/nachforderung/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "nachforderung.art",
+        begruendung: "Bedarfsart (Freitext) im `inhalt` der Anforderung",
+    },
+    Ausnahme {
+        datei: "src/nachforderung/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "nachforderung.bezeichnung",
+        begruendung: "Bedarf im `inhalt` der Anforderung („Nachforderung: …× … — …“)",
+    },
+    Ausnahme {
+        datei: "src/nachforderung/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "nachforderung.adressat_bezeichnung",
+        begruendung: "Adressat als `an` der Anforderung",
+    },
+    Ausnahme {
+        datei: "src/nachforderung/repo.rs",
+        funktion: "anlegen_tx",
+        spalte: "nachforderung.begruendung",
+        begruendung: "Begründung als `veranlassung` der Anforderung",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "lagebericht.titel",
+        begruendung: "Titel als Überschrift des Freigabe-Snapshots",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "lagebericht.abschnitte",
+        begruendung: "Abschnittstexte als Markdown im Freigabe-Snapshot",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "befehl.titel",
+        begruendung: "Titel als Überschrift des Freigabe-Snapshots",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "befehl.abschnitte",
+        begruendung: "Abschnittstexte als Markdown im Freigabe-Snapshot",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "pressemitteilung.titel",
+        begruendung: "Titel als Überschrift des Freigabe-Snapshots",
+    },
+    Ausnahme {
+        datei: "src/vorlagendokument/repo.rs",
+        funktion: "freigeben_tx",
+        spalte: "pressemitteilung.abschnitte",
+        begruendung: "Abschnittstexte als Markdown im Freigabe-Snapshot",
+    },
+    Ausnahme {
+        datei: "src/stab/repo.rs",
+        funktion: "lagebesprechung_abschliessen",
+        spalte: "einsatz_lagebesprechung.entschluss",
+        begruendung: "Entschluss im ETB-Eintrag (Entscheidung) der Lagebesprechung",
+    },
 ];
 
 /// Die Liste darf nicht verrotten: jede Fundstelle nennt eine Datei, in der die Funktion
@@ -316,8 +432,10 @@ fn ausnahmeliste_zeigt_auf_existierende_scrub_stellen() {
     for a in AUSNAHMEN_SYSTEM_ETB {
         let quelle =
             std::fs::read_to_string(a.datei).unwrap_or_else(|_| panic!("{} fehlt", a.datei));
+        // `fn name(` oder generisch `fn name<` (etwa `snapshot_freigeben_tx<T: …>`).
         assert!(
-            quelle.contains(&format!("fn {}(", a.funktion)),
+            quelle.contains(&format!("fn {}(", a.funktion))
+                || quelle.contains(&format!("fn {}<", a.funktion)),
             "{}: Funktion {} nicht gefunden",
             a.datei,
             a.funktion

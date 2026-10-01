@@ -61,6 +61,9 @@ function BefehlDetail() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();
+  // Nur der Titel: er speist im Entwurf den Druckkopf (LFH-731). Kein `useWatch([])`, das die
+  // Seite bei jedem Anschlag in einem Abschnitt neu rendern ließe.
+  const formTitel = Form.useWatch('titel', form);
   const speicherfolge = useRef<Promise<unknown>>(Promise.resolve());
   const aktiv = useRef(true);
   useEffect(() => {
@@ -187,6 +190,15 @@ function BefehlDetail() {
   const v = vorlage(befehl.vorlage);
   const istEntwurf = befehl.status === 'entwurf';
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  /**
+   * Druckkopf im Entwurf aus dem Formular (LFH-731): das Titel-Feld ist im Druck ausgeblendet, das
+   * Papier trägt den Titel nur noch im Kopf. Der gespeicherte Titel verlöre dort eine ungespeicherte
+   * Änderung. Kein Speichern vor dem Druck: Strg+P läuft am `DruckKnopf` vorbei, und ein Druck soll
+   * keinen PATCH auslösen. Vor dem Einhängen des Formulars gilt der Serverstand. Zwilling in
+   * `LageberichtDetailPage`.
+   */
+  const druckTitel =
+    istEntwurf && darfSchreiben && typeof formTitel === 'string' ? formTitel : befehl.titel;
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder vor dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
@@ -336,7 +348,7 @@ function BefehlDetail() {
           Angaben. In der Druckwurzel, weil `druck/druck.css` alles außerhalb ausblendet. */}
       <Druckkopf
         dokumentart="Befehl"
-        titel={befehl.titel}
+        titel={druckTitel}
         einsatz={einsatz}
         sichtbarkeit="druck"
         zeilen={[
@@ -409,7 +421,14 @@ function BefehlDetail() {
               {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
                   (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
               <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
-              <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+              {/* Den Titel trägt auf Papier der Druckkopf, aus diesem Feld gespeist (LFH-731); als
+                  Formularfeld stünde er doppelt auf dem Blatt. */}
+              <Form.Item
+                label="Titel"
+                name="titel"
+                rules={[{ required: true }]}
+                className="befehl-no-print"
+              >
                 <Input />
               </Form.Item>
               {v?.abschnitte.map((a) => (

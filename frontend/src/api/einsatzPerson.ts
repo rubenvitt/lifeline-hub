@@ -11,7 +11,8 @@ import type {
   Verlaufsnotiz,
   Abgleich,
 } from './types';
-import { apiGet, apiSend, type ApiSendOptionen } from './client';
+import { apiDatei, apiGet, apiSend, type ApiSendOptionen } from './client';
+import { EXPORT_TIMEOUT_MS } from './exportTimeout';
 import { patchBody } from './patchTriState';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
@@ -64,6 +65,12 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
 export function listePersonen(einsatzId: number, status?: PersonStatus): Promise<Person[]> {
   const q = status ? `?status=${status}` : '';
   return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${q}`);
+}
+
+/** CSV aller nicht stornierten Personen des Einsatzes (`routes/einsatz_person.rs`, `export`).
+ *  Schreibt serverseitig JE ABRUF einen `export`-Audit-Eintrag. */
+export function ladePersonenExport(einsatzId: number): Promise<Blob> {
+  return apiDatei(`/api/einsaetze/${einsatzId}/personen/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
 }
 
 export function ladePerson(einsatzId: number, personId: number): Promise<PersonDetail> {
