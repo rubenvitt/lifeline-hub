@@ -55,7 +55,7 @@ Motivation: siehe proposal.md. Hier nur der Bestand, der den Weg bestimmt (gegen
   (`docs/superpowers/specs/2026-05-27-erfassung-sichtung-medizinischer-verlauf-design.md:318`).
 - Kein CSV-Knopf im Frontend und keine Änderung an den CSV-Exporten.
 - Keine Einsicht in listenweite Protokollzeilen (`export`, `druck`). Diese Lücke besteht heute
-  schon für `export`; sie wird als Folge-Task erfasst, nicht hier geschlossen.
+  schon für `export`. Sie ist als Folge-Task LFH-916 erfasst und wird hier nicht geschlossen.
 - Kein Protokoll beim Tier- und Schadensdruck. Tiere führen keine besondere Kategorie, und das
   Tier-CSV ist ebenfalls unprotokolliert. Personenbezüge in Schäden (Geschädigte) erscheinen
   dort nur als Registriernummer oder als Name aus dem Personal- bzw. Organisationsbestand.
@@ -153,9 +153,16 @@ ETB-Druck. Für Tiere und Schäden wird bewusst ein eigener Präfix genommen und
 `einsatzKeys.tiere`/`schaeden`, denn diese sind live, und ein SSE-Ereignis schöbe sonst neue
 Zeilen in die offene Druckansicht.
 
-Personen-Verbleib braucht die UHS-Namen (`verbleibText(p, uhsName)`). Die Seite lädt dafür
-`listeUhs` wie die Liste. Scheitert das, steht „UHS“ ohne Namen, und gedruckt werden kann
-trotzdem.
+Personen-Verbleib braucht die UHS-Namen (`verbleibText(p, uhsName)`). Sie gehören zum selben
+Schnappschuss: Der Abruf der Druckseite lädt `listeUhs` neben dem Druck-Abruf. Ein Fehler dort
+(Modul gesperrt) ergibt eine leere Liste, dann steht „UHS“ ohne Namen, und gedruckt werden kann
+trotzdem. Den live gehaltenen UHS-Key nutzt die Seite nicht, sonst änderte eine Umbenennung die
+offene Ansicht.
+
+Die Seiten reichen die Felder der Abfrage einzeln an den Rahmen weiter (`ListenDruckAbfrage`),
+nicht das Ergebnisobjekt. `useQuery` beobachtet nur die Felder, die beim Rendern gelesen
+werden. Der Rahmen liest den Fehler erst, wenn der Einsatz geladen ist. Ein früher Fehler
+blieb deshalb unsichtbar auf „wird geladen“ stehen, und ein Seitentest hat das aufgedeckt.
 
 ### D5 — Adresse und Auswahl in Worten
 
@@ -183,26 +190,28 @@ Die Routen `personen/druck`, `tiere/druck` und `schaeden/druck` stehen in `App.t
 
 ### D6 — Tabellen
 
-Jede Tabelle ist ein schlichtes `<table>` mit `thead` und nach dem Vorbild `EtbDruckTabelle`
-weder `KatalogTabelle` noch `Datensicht`, weil die Druckansicht kein Bedienort ist. Sie hat
-keine Sortierung und keine Links und ordnet aufsteigend nach `registrier_nr`. Jede Zeile trägt
-`break-inside: avoid`. Die Zellen sind reiner Text, Labels kommen aus den Helfern der Listen.
+Jede Modultabelle (`personen/PersonenDruckTabelle.tsx`, `pages/tiere/TiereDruckTabelle.tsx`,
+`pages/schaeden/SchaedenDruckTabelle.tsx`) legt nur ihre Spalten fest und ordnet aufsteigend
+nach `registrier_nr`. Gerendert wird über `druck/DruckTabelle.tsx`, ein schlichtes `<table>`
+mit `thead` nach dem Vorbild `EtbDruckTabelle`. Es ist weder `KatalogTabelle` noch
+`Datensicht`, weil die Druckansicht kein Bedienort ist. Es gibt keine Sortierung und keine
+Links. Kopfwiederholung und „Zeile nicht über den Rand“ trägt `druck.css`. Die Zellen sind
+reiner Text, Labels und Nummern kommen aus den Helfern der Listen.
 
-- **Personen:** Nr. · Name · Geschlecht/Alter (`geschlechtAlter`) · Sichtung (Kategorie in
-  Worten aus `SK_META`, ohne Farbe; „ohne Sichtung“) · Status · Fundort · Verbleib
+- **Personen:** Nr. · Name · Geschl./Alter (`geschlechtAlter`) · Sichtung (Wort aus
+  `SK_META`, ohne Farbe; sonst „ohne Sichtung“) · Status · Fundort (mit Koordinate) · Verbleib
   (`verbleibText`) · erfasst (Org-Zeit).
-- **Tiere:** Nr. · Status · Spezies · Rufname · Rasse/Beschreibung · Halter
-  (Registriernummer der Person oder Kontakt) · Antreffort · erfasst.
-- **Schäden:** Nr. · Typ · Ausmaß · Ort · Status (mit „übergeben an …“) · Geschädigt (als Text,
-  ohne Deeplink) · erfasst.
-
-Die Registriernummer steht in der Form der Liste (Helfer der Spalten, kein eigenes Format).
+- **Tiere:** Nr. · Status · Spezies · Rufname · Rasse · Halter (R-Nummer, ggf. „(storniert)“,
+  sonst Kontakt, sonst „unbekannt“) · Antreffort · erfasst.
+- **Schäden:** Nr. · Typ · Ausmaß · Ort · Status (bei Übergabe „übergeben an …“) · Geschädigt
+  (`geschaedigtText`, ohne Deeplink) · erfasst. Die Spalte „Verortet“ entfällt, weil sie eine
+  Frage vor der Karte beantwortet.
 
 ### D7 — Einstieg auf den Listen
 
-`PersonenPage`, `TierePage` und `SchaedenPage` bekommen im Kopf-Slot `aktionen` einen
-sekundären Link-Knopf „Drucken / als PDF“ auf den jeweiligen Druckpfad mit dem aktiven
-Seitenfilter. Er funktioniert wie der ETB-Knopf: `href` und `navigate`, Strg/⌘-Klick öffnet
+`PersonenPage`, `TierePage` und `SchaedenPage` bekommen im Kopf-Slot `aktionen` den
+sekundären Link-Knopf `druck/DruckAnsichtKnopf.tsx` („Drucken / als PDF“) auf den jeweiligen
+Druckpfad mit dem aktiven Seitenfilter. Er funktioniert wie der ETB-Knopf: `href` und `navigate`, Strg/⌘-Klick öffnet
 einen Tab. Er schickt nichts ab, deshalb steht er im Kopf. „Genau eine Primäraktion“ bleibt
 erfüllt. Er erscheint unabhängig vom Schreibrecht, denn Drucken ist Lesen.
 

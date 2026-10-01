@@ -27,5 +27,16 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **ETB-Druck** (`pages/EtbDruckPage.tsx`, `etb/EtbDruckTabelle.tsx`): schlichtes `<table>` nach
   `lfd_nr`, Vollabruf `etb/druckAbruf.ts` über die bestehende Liste, Drucken erst komplett;
   `einsatzKeys.etbDruck` nicht live, `refetchOnMount: 'always'`.
+- **Modul-Listen-Druck** (LFH-727, Herleitung
+  `openspec/changes/lfh-727-druck-modul-listen/design.md`): `/einsaetze/:id/{personen|tiere|schaeden}/druck`
+  über den Rahmen `druck/ListenDruckSeite.tsx` und `druck/DruckTabelle.tsx` (schlichtes `<table>`,
+  aufsteigend nach Registriernummer); Einstieg `druck/DruckAnsichtKnopf.tsx` im Kopf der Liste, auch
+  ohne Schreibrecht. Der Seitenfilter reist in der Adresse (`personenDruckPfad` usw.), fehlend =
+  „alle“; gefiltert wird mit der Funktion der Liste. Keys `personenDruck`/`tiereDruck`/`schaedenDruck`
+  nicht live, außerhalb des Offline-Lagebilds. Query-Felder einzeln an den Rahmen geben, nie das
+  Ergebnisobjekt (`useQuery` beobachtet nur, was die Seite liest).
+- **Personendruck nur über `GET …/personen/druck`**: jeder Abruf schreibt einen `druck`-Eintrag in
+  `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache,
+  `retry: false`, `refetchOnMount: 'always'`. Tiere und Schäden drucken über ihre Liste, ohne Protokoll.
 - **Org-Branding** (`PATCH /api/organisation`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
   Virenscan) liegt außerhalb der Schwärzung (`schwaerzung_registry.rs`).

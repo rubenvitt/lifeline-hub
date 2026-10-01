@@ -43,8 +43,8 @@ Code. Vor jedem „fertig“ stehen `superpowers:verification-before-completion`
 
 ## 6. Regeln, e2e und Abschluss
 
-- [ ] 6.1 Block „Modul-Listen-Druck (LFH-727)“ in `frontend/src/druck/AGENTS.md` (D8). Nachweis: Prettier über `frontend/` grün, Verweis auf diese Change bzw. ihr Archiv
-- [ ] 6.2 e2e `frontend/e2e/modul-listen-druck.spec.ts` (Regeln `frontend/e2e/AGENTS.md`): Personen mit Filter „Betroffen“ aus der Liste öffnen, Kopf nennt die Auswahl, ausgelöstes `beforeprint` zeigt nur die Druckwurzel, Tabellenkopf als `table-header-group`; Tiere- und Schäden-Druckansicht öffnen und Zeilenzahl prüfen. Nachweis: Spec grün
-- [ ] 6.3 Folge-Task „Einsicht in listenweite Zugriffe (`export`, `druck`)“ über `clickup-task-anlegen` erfassen. Nachweis: Task-ID in der PR-Beschreibung
+- [x] 6.1 Block „Modul-Listen-Druck (LFH-727)“ in `frontend/src/druck/AGENTS.md` (D8). Nachweis: Prettier über `frontend/` grün, Verweis auf diese Change bzw. ihr Archiv
+- [x] 6.2 e2e `frontend/e2e/modul-listen-druck.spec.ts` (Regeln `frontend/e2e/AGENTS.md`): Personen mit Filter „Betroffen“ aus der Liste öffnen, Kopf nennt die Auswahl, ausgelöstes `beforeprint` zeigt nur die Druckwurzel, Tabellenkopf als `table-header-group`; Tiere- und Schäden-Druckansicht öffnen und Zeilenzahl prüfen. Nachweis: Spec grün
+- [x] 6.3 Folge-Task „Einsicht in listenweite Zugriffe (`export`, `druck`)“ über `clickup-task-anlegen` erfassen. Nachweis: Task-ID in der PR-Beschreibung
 - [ ] 6.4 `./scripts/check-all.sh` grün (Nachweis: Lauf dieses Branches bzw. die CI des PRs)
 - [ ] 6.5 Prüfliste für die Handprüfung in die PR-Beschreibung: Druckvorschau der drei Listen in Firefox und Safari (Kopf auf Seite 1, Kopfwiederholung, kein App-Rahmen); Chromium belegt 6.2. Die Prüfung selbst macht der Mensch (Cloud-Sitzung ohne Firefox/Safari, vgl. LFH-729). Nachweis: Prüfliste steht im PR
