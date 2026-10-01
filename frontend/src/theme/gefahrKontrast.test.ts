@@ -1,5 +1,6 @@
+import { theme } from 'antd';
 import { describe, expect, it } from 'vitest';
-import { antdKomponenten, farbenDunkel, farbenHell } from './tokens';
+import { antdAlgorithmus, antdKomponenten, antdToken, farbenDunkel, farbenHell } from './tokens';
 
 /**
  * Gefahrrot als Text und Beschriftung auf Gefahrfläche, GERECHNET statt behauptet (WCAG-Formel).
@@ -30,10 +31,15 @@ function token(quelle: object | undefined, name: string): string {
 }
 
 describe.each([
-  ['Tag', farbenHell, 7],
-  ['Nacht', farbenDunkel, 5],
-] as const)('Gefahrrot — %s (LFH-693)', (_modus, farben, boden) => {
+  ['Tag', farbenHell, false, 7],
+  ['Nacht', farbenDunkel, true, 5],
+] as const)('Gefahrrot — %s (LFH-693)', (_modus, farben, dunkel, boden) => {
   const { Dropdown, Button } = antdKomponenten(farben, 'kompakt');
+  // Die Tönung unter einem Gefahrknopf ohne Rahmen leitet antd aus dem GLOBALEN `colorError` ab.
+  const { colorErrorBg } = theme.getDesignToken({
+    token: antdToken(farben),
+    algorithm: antdAlgorithmus(dunkel),
+  });
 
   it('roter Menüeintrag in Ruhe auf der Menüfläche', () => {
     expect(kontrast(token(Dropdown, 'colorError'), farben.flaeche2)).toBeGreaterThanOrEqual(boden);
@@ -61,14 +67,17 @@ describe.each([
     },
   );
 
-  // Der Gefahrknopf ohne Rahmen (`type="text"`) steht auf dem Seitengrund. Hier scheiterte ein
-  // Zeigerton HELLER als die Ruhe (`#a11f14`: 6,46 am Tag) — deshalb dunkelt `alarmHover`.
-  it.each(['colorError', 'colorErrorHover'])(
-    'Gefahrknopf ohne Rahmen: Beschriftung %s auf dem Seitengrund',
-    (schrift) => {
-      expect(kontrast(token(Button, schrift), farben.grund)).toBeGreaterThanOrEqual(boden);
-    },
-  );
+  // Der Gefahrknopf ohne Rahmen (`type="text"`) steht in Ruhe auf dem Seitengrund, unter dem
+  // Zeiger auf antds Tönung `colorErrorBg`. Dort scheiterte ein Zeigerton HELLER als die Ruhe
+  // (`#a11f14`: 6,46 auf grund, 6,2 auf der Tönung) — deshalb dunkelt `alarmHover`.
+  it('Gefahrknopf ohne Rahmen: Beschriftung in Ruhe auf dem Seitengrund', () => {
+    expect(kontrast(token(Button, 'colorError'), farben.grund)).toBeGreaterThanOrEqual(boden);
+  });
+
+  it('Gefahrknopf ohne Rahmen: Beschriftung unter dem Zeiger auf der Gefahrtönung', () => {
+    expect(colorErrorBg).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(kontrast(token(Button, 'colorErrorHover'), colorErrorBg)).toBeGreaterThanOrEqual(boden);
+  });
 
   it('die Gefahrfläche unter dem Zeiger unterscheidet sich von der Ruhe', () => {
     expect(token(Button, 'colorErrorHover').toLowerCase()).not.toBe(

@@ -131,7 +131,7 @@ export interface Farbrollen {
  * Hervorhebungsfläche `flaeche3` liegen beide bei 6,59 bzw. 6,60, unter dem Tagesboden (LFH-877).
  *
  * Gefahrrot (LFH-693, `antdKomponenten`): als Text `alarmText`, roter Menüeintrag auf flaeche2
- * 8,29; Weiß auf `alarmText` 8,96 (gefüllter Gefahrknopf in Ruhe, Menüeintrag unter dem Zeiger),
+ * 8,29, Gefahrknopf ohne Rahmen auf grund 7,51 (knappstes Paar); Weiß auf `alarmText` 8,96 (gefüllter Gefahrknopf in Ruhe, Menüeintrag unter dem Zeiger),
  * auf `alarmHover` 10,45 (Zeiger und Drücken); `alarmHover` als Schrift des umrandeten Knopfs auf
  * flaeche 10,45, auf grund 8,75. `alarm` trüge hier nicht: als Text auf flaeche2 6,27, Weiß darauf
  * 6,78.
@@ -656,13 +656,14 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  *
  * Gefahrrot (LFH-693, Spec `farbrollen-kontrast`) läuft deshalb über die Komponenten-Tokens.
  * Das `Dropdown` färbt den roten Eintrag in Ruhe mit `colorError` und hinterlegt ihn unter dem
- * Zeiger mit `colorError`, die Schrift dort ist `colorTextLightSolid`. Beide liest im Dropdown
- * nur `dropdown/style/status.js` (antd 6.6.5); `aufBedien` bleibt so auf den Gefahreintrag
- * begrenzt, wie beim Knopf. Der `Button` nimmt `colorError` als Fläche des gefüllten und als
- * Schrift des umrandeten und des `text`-Gefahrknopfs, `colorErrorHover`/`colorErrorActive`
- * ebenso unter dem Zeiger und beim Drücken. Deshalb dunkelt der Gefahrknopf unter dem Zeiger
- * (`alarmHover`), statt wie der Primärknopf aufzuhellen: ein hellerer Ton hielte als Schrift den
- * Tagesboden nicht (Herleitung: Change `lfh-693-gefahrtext-alarmtext`, `design.md` E2).
+ * Zeiger mit `colorError`, die Schrift dort ist `colorTextLightSolid`. Der `Button` nimmt
+ * `colorError` als Fläche des gefüllten und als Schrift des umrandeten und des `text`-Knopfs,
+ * `colorErrorHover`/`colorErrorActive` ebenso unter dem Zeiger und beim Drücken (warum der
+ * Zeiger dunkelt: {@link Farbrollen.alarmHover}).
+ * GRENZE: antd setzt die Überschreibungen als CSS-Variablen auf die Wurzel des Popups bzw. des
+ * Knopfs; sie gelten für den ganzen Teilbaum. Heute liest darin nur der Gefahreintrag
+ * (`dropdown/style/status.js`) bzw. der Knopf selbst sie (antd 6.6.5). Wer Badge, gefüllten Tag,
+ * Switch oder Spin in ein Dropdown oder einen Gefahrknopf legt, prüft deren Farbe.
  *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
