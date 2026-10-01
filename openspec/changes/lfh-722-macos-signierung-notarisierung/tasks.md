@@ -13,7 +13,7 @@
 ## 3. Doku
 
 - [ ] 3.1 `docs/betrieb/desktop-app.md`: Installation für macOS ohne Umweg (nur noch die Rückfrage „aus dem Internet geladen“), neuer Abschnitt „Signierung und Notarisierung (macOS)“ nach D8, Grenzen aktualisiert (Signierung macOS erledigt, Windows → LFH-875; die Zeile „Anmeldung im Browser, nicht gemessen … mit signierter App“ nach dem Ergebnis von 5.3). Prüfen: Jeder `op read`-Befehl der Datei, neu und alt, liefert lokal einen nicht leeren Wert (nur Länge ausgeben, nie den Wert).
-- [ ] 3.2 `src-tauri/AGENTS.md`: ein Satz, dass die Release-Signierung nur in `artefakte.yml` getragen wird und `signingIdentity` in `tauri.conf.json` `"-"` bleibt. Prüfen: Die Datei bleibt bei ihrem Umfang, und `grep` findet den Verweis auf diese Change.
+- [x] 3.2 `src-tauri/AGENTS.md`: ein Satz, dass die Release-Signierung nur in `artefakte.yml` getragen wird und `signingIdentity` in `tauri.conf.json` `"-"` bleibt. Prüfen: Die Datei bleibt bei ihrem Umfang, und `grep` findet den Verweis auf diese Change.
 
 ## 4. Prüflauf in der CI (nach außen wirksam, nur mit Zustimmung)
 
