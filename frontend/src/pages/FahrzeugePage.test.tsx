@@ -337,13 +337,15 @@ describe('FahrzeugePage', () => {
       fahrzeug_id: null,
       staerke_position: 'fuehrer',
     });
-    const { container } = render(einsatz(), [crew, frei]);
+    render(einsatz(), [crew, frei]);
     await screen.findByText('Florian 1');
 
-    // Besatzung ist standardmäßig eingeklappt → Zeile per Icon aufklappen.
-    const expandIcon = container.querySelector('.ant-table-row-expand-icon-collapsed');
-    expect(expandIcon).not.toBeNull();
-    fireEvent.click(expandIcon!);
+    // Besatzung ist standardmäßig eingeklappt → über den beschrifteten Auslöser aufklappen.
+    const ausloeser = screen.getByRole('button', { name: 'Besatzung zu Florian 1' });
+    expect(ausloeser).toHaveAttribute('aria-expanded', 'false');
+    expect(ausloeser).toHaveTextContent('Besatzung');
+    await userEvent.click(ausloeser);
+    expect(ausloeser).toHaveAttribute('aria-expanded', 'true');
 
     // Besatzungsmitglied (fahrzeug_id === 10) wird angezeigt, mit Freigeben-Aktion.
     expect(await screen.findByText(/Anna Crew/)).toBeInTheDocument();
@@ -357,9 +359,24 @@ describe('FahrzeugePage', () => {
     const crew = person({ id: 100, name: 'Cara Diskrepanz', fahrzeug_id: 10, einheit_id: 3 });
     const { container } = render(einsatz(), [crew]);
     await screen.findByText('Florian 1');
-    fireEvent.click(container.querySelector('.ant-table-row-expand-icon-collapsed')!);
+    await klappeZeileAuf(container);
     expect(await screen.findByText(/Cara Diskrepanz/)).toBeInTheDocument();
     expect(screen.getByText('andere Einheit')).toBeInTheDocument();
+  });
+
+  it('erreicht die Besatzung auch im Kartenzweig unter md (LFH-697)', async () => {
+    setzeViewportBreite(390);
+    const crew = person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 });
+    const { container } = render(einsatz(), [crew]);
+    await screen.findByText('Florian 1');
+    expect(container.querySelector('.ant-table'), 'unter md steht keine Tabelle').toBeNull();
+
+    const ausloeser = screen.getByRole('button', { name: 'Besatzung zu Florian 1' });
+    await userEvent.click(ausloeser);
+    // Der Bereich ist als Region nach seinem Auslöser benannt und trägt den Besatzungsblock.
+    const bereich = screen.getByRole('region', { name: 'Besatzung zu Florian 1' });
+    expect(within(bereich).getByText(/Anna Crew/)).toBeInTheDocument();
+    expect(within(bereich).getByText('Kraft zur Besatzung …')).toBeInTheDocument();
   });
 
   // ── Datensicht ──
@@ -1031,9 +1048,7 @@ async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
   await userEvent.click(within(feld!).getByRole('combobox'));
 }
 
-/** Klappt die erste Datenzeile auf — dort hängt der Besatzungsblock. */
+/** Klappt die Zeile von „Florian 1" auf — dort hängt der Besatzungsblock. */
 async function klappeZeileAuf(container: HTMLElement) {
-  const ausloeser = container.querySelector<HTMLElement>('.ant-table-row-expand-icon');
-  expect(ausloeser, 'die Fahrzeugzeile muss aufklappbar sein').not.toBeNull();
-  await userEvent.click(ausloeser!);
+  await userEvent.click(within(container).getByRole('button', { name: 'Besatzung zu Florian 1' }));
 }

@@ -1,16 +1,11 @@
-import {
-  IkoneMuelleimer,
-  IkonePfeilHoch,
-  IkonePfeilRunter,
-  IkonePunkteSenkrecht,
-  IkoneStift,
-} from '../../ikonen';
+import { IkoneMuelleimer, IkonePfeilHoch, IkonePfeilRunter, IkoneStift } from '../../ikonen';
 import { useId, useMemo, useState } from 'react';
-import { Alert, App, Button, Dropdown, Tag, Typography } from 'antd';
+import { Alert, App, Button, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Formularpaneel, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
+import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
@@ -279,70 +274,58 @@ export default function EinsatzPegel() {
               actions={
                 darf
                   ? [
-                      <Dropdown
+                      // Einheitsform (LFH-683): Verschieben und Prognose neutral, dann EIN
+                      // Trenner, dann das Entfernende rot. Der Name trägt die Zeilenkennung.
+                      <MenueAusloeser
                         key="aktionen"
-                        trigger={['click']}
-                        autoFocus
-                        disabled={laeuft}
-                        menu={{
-                          items: [
-                            {
-                              key: 'hoch',
-                              icon: <IkonePfeilHoch />,
-                              label: 'Nach oben',
-                              disabled: index === 0,
-                            },
-                            {
-                              key: 'runter',
-                              icon: <IkonePfeilRunter />,
-                              label: 'Nach unten',
-                              disabled: index === liste.length - 1,
-                            },
-                            { type: 'divider' as const },
-                            {
-                              key: 'prognose',
-                              icon: <IkoneStift />,
-                              label: p.prognose ? 'Prognose ändern …' : 'Prognose erfassen …',
-                            },
-                            ...(p.prognose
-                              ? [
-                                  {
-                                    key: 'prognose-loeschen',
-                                    icon: <IkoneMuelleimer />,
-                                    label: 'Prognose löschen',
-                                    danger: true,
-                                  },
-                                ]
-                              : []),
-                            { type: 'divider' as const },
-                            {
-                              key: 'entfernen',
-                              icon: <IkoneMuelleimer />,
-                              label: 'Entfernen',
-                              danger: true,
-                            },
-                          ],
-                          // Zuordnung am Menü, nicht je Eintrag.
-                          onClick: ({ key }) => {
-                            const uuid = p.station_uuid;
-                            if (key === 'hoch')
-                              aendern.mutate({ art: 'verschieben', uuid, richtung: -1 });
-                            else if (key === 'runter')
-                              aendern.mutate({ art: 'verschieben', uuid, richtung: 1 });
-                            else if (key === 'entfernen')
-                              aendern.mutate({ art: 'entfernen', uuid });
-                            else if (key === 'prognose') setPrognoseFuer(p);
-                            else if (key === 'prognose-loeschen') prognoseLoeschen.mutate(p);
+                        gesperrt={laeuft}
+                        eintraege={[
+                          {
+                            key: 'hoch',
+                            ikone: <IkonePfeilHoch />,
+                            label: 'Nach oben',
+                            ...(index === 0 ? { gesperrt: true as const } : {}),
                           },
+                          {
+                            key: 'runter',
+                            ikone: <IkonePfeilRunter />,
+                            label: 'Nach unten',
+                            ...(index === liste.length - 1 ? { gesperrt: true as const } : {}),
+                          },
+                          {
+                            key: 'prognose',
+                            ikone: <IkoneStift />,
+                            label: p.prognose ? 'Prognose ändern …' : 'Prognose erfassen …',
+                          },
+                          ...(p.prognose
+                            ? [
+                                {
+                                  key: 'prognose-loeschen',
+                                  ikone: <IkoneMuelleimer />,
+                                  label: 'Prognose löschen',
+                                  gefahr: true as const,
+                                },
+                              ]
+                            : []),
+                          {
+                            key: 'entfernen',
+                            ikone: <IkoneMuelleimer />,
+                            label: 'Entfernen',
+                            gefahr: true,
+                          },
+                        ]}
+                        zugaenglicherName={`Aktionen zu Pegel ${p.name}`}
+                        onWahl={(key) => {
+                          const uuid = p.station_uuid;
+                          if (key === 'hoch')
+                            aendern.mutate({ art: 'verschieben', uuid, richtung: -1 });
+                          else if (key === 'runter')
+                            aendern.mutate({ art: 'verschieben', uuid, richtung: 1 });
+                          else if (key === 'entfernen') aendern.mutate({ art: 'entfernen', uuid });
+                          else if (key === 'prognose') setPrognoseFuer(p);
+                          else if (key === 'prognose-loeschen') prognoseLoeschen.mutate(p);
                         }}
-                      >
-                        {/* Der Name trägt die Zeilenkennung. Kein `size`. */}
-                        <Button
-                          type="text"
-                          icon={<IkonePunkteSenkrecht />}
-                          aria-label={`Aktionen zu Pegel ${p.name}`}
-                        />
-                      </Dropdown>,
+                      />,
                     ]
                   : undefined
               }

@@ -61,6 +61,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   bleibt in jeder Dichte 1 px; eine klickbare Zelle rückt ihren Link um 0 / 4 / 8 px ein
   (`kennzahlZielEinzug`), damit Ziele ≥ 8 / ≥ 16 px auseinanderstehen (LFH-630,
   `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`).
+  Ein Band, über dessen Notizen sich die Lage ändert, hält ihre Höhe fest: unter `md` als Boden
+  (`notizZeilenSchmal`), ab `md` als Boden und Deckel (`notizZeilen`, „Lage in Zahlen“ drei
+  Zeilen; Längeres endet mit „…“ und steht ganz im `title`). Die tragende Aussage einer Notiz
+  steht deshalb vorn (LFH-691, `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`).
 - **Eine Heimat je Zahl** (LFH-550,
   `openspec/changes/archive/2026-09-30-lfh-550-lagebesprechung-eine-verdichtung/design.md`):
   Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig)
@@ -151,6 +155,13 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `achtung`/`alarm` als Text über `achtungText`/`alarmText`; Hervorhebung auf `flaeche3`, nicht
   `flaeche2`; Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
   `e2e/kontrast-kern.ts`).
+- **Textboden für jede Textstufe** (LFH-643, Spec `textstufen-kontrast`,
+  `openspec/changes/archive/2026-10-01-lfh-643-tertiaertext-tagesboden/design.md`): `text`,
+  `text2`, `gedaempft` und auch Tertiärtext `schwach` (Augenbraue, Meta, Platzhalter)
+  halten auf jeder deckenden Fläche Tag ≥ 7 : 1, Nacht ≥ 5 : 1; benachbarte Stufen
+  liegen ≥ 5 ΔL\* auseinander (`theme/textstufen.test.ts`). Eine Textstufe unterschreitet
+  den Boden nur für Gesperrtes (≥ 4,5, Sperre auch ohne Farbe); Kontrast-Gates führen keine
+  Tertiär-Ausnahme.
 
 **Lagekarte** (auch `pages/LagekartePage.tsx`): `frontend/src/pages/lagekarte/AGENTS.md`.
 
@@ -208,6 +219,10 @@ anwendbar), „nicht geprüft" ist keins.
   `switchMasse`/`antdKomponenten(farben, dichte)`; Nachweis am CSS der `css-var-…`-Klasse über
   `innerHTML`, nicht `textContent`. Schalter in fester Breite brechen um, statt zu kürzen
   (`pages/lagekarte/Sidebar.tsx`, `e2e/lagekarte-leiste-dichte.spec.ts`).
+- **Klappkopf** (LFH-653): jedes `Collapse` bekommt den Boden über den Kontext
+  (`antdKlappkopf(dichte)` in `theme/tokens.ts`, `collapse` am `ConfigProvider`: `minHeight`
+  30/48/72 + Mittellage); antd rechnet den Kopf sonst aus der Schrift (36/45/55). Kein lokales
+  `styles.header` je Stelle. Nachweis `e2e/dokumente.spec.ts` „Dichte-Staffel“.
 - **Handgebautes Bedienziel** (LFH-365): `minHeight: token.controlHeight` **plus** `padding` aus
   `token.paddingSM`/`token.padding` (aufgelöste Tokens, nie `var(--lfh-*)`), geprüft über eine
   reine exportierte Stilfunktion (`bedienzielStil`) mit Böden als **Literalen**. **Ein `<a>` erbt
@@ -220,11 +235,14 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Aktionen**
 
-- **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) ein
-  `Dropdown` (`menu={{ items }}`, `trigger={['click']}`, `autoFocus`, icon-only
-  `<Button type="text">`), kein `Popover`. Zugänglicher Name mit **Zeilenkennung**. Rückfrage per
-  `<Modal>` außerhalb der Zeilen-`map`, kein `Popconfirm`. Portal-Klick per Riegel am
-  **Container**; Rechte-Riegel an der Ableitung (ein Callback ist kein Rechtebeleg). Test über
+- **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) hinter
+  **`components/MenueAusloeser.tsx`** (LFH-683, Spec `datensatz-aktionsmenue`). Der Baustein
+  trägt Auslöser, `autoFocus`, Einheitsform (neutral, ein Trenner, Gefahr rot) und den Riegel
+  gegen Portal-Klicks; kein eigenes `Dropdown` mit Dreipunkt (`menueAusloeser.guard.test.ts`).
+  Beim Aufrufer bleiben: die Zählung, der zugängliche Name mit **Zeilenkennung**, die Rückfrage
+  per `<Modal>` außerhalb der Zeilen-`map` (kein `Popconfirm`, Etiketten sind Text) und der
+  Rechte-Riegel an der Ableitung (ein Callback ist kein Rechtebeleg). Prüft ein Aufrufer
+  `aktionen != null`, gibt er bei leerer Menge selbst `null` zurück. Test über
   `.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`. Kartenmodus: `Datensicht`
   baut `weitere`.
 - **Ein Sprung ist keine Handlung** (LFH-616): gezählt werden nur ändernde Aktionen; Deeplinks
@@ -298,7 +316,12 @@ anwendbar), „nicht geprüft" ist keins.
   `theme/rahmenKontrast.test.ts` und wird dort gerechnet (der Test sieht keine Verwendung, nur
   die Liste). Gilt für jede weitere dauerdunkle Fläche.
 - **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
-  `size="middle"` (`aktionsabstand.guard.test.ts`).
+  `size="middle"` (`aktionsabstand.guard.test.ts`). Dialogfüße halten dieselbe Stufe (LFH-653,
+  11/18/26 px, Leitlinie ≥ 8 / ≥ 16): der Fuß der Erfassungs-Hülle über `size="middle"`, antds
+  eigene Füße (Modal, `modal.confirm`, `Popconfirm`) über eine Regel in `index.css` mit
+  `var(--ant-padding)`. **Kein Komponenten-Token `marginXS`:** jeder antd-Knopf setzt die Variable
+  mit seiner `css-var-…`-Klasse zurück, die Überschreibung kommt am Knopf nie an (gemessen 7 px).
+  Nachweis `e2e/dialogfuss-dichte.spec.ts`, `e2e/dokumente.spec.ts`.
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",
   „Deaktivieren", eine gelöste Zuordnung) → Abstand + `danger`, keine Rückfrage; Unumkehrbares →
   Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}`.

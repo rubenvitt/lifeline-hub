@@ -573,6 +573,8 @@ export function lagekartePfad(
     snapshot?: number;
     platzieren?: { typ: PlatzierenZielTyp; id: number };
     zentrum?: Kartenzentrum;
+    /** Adresssuche (LFH-638): die Karte übernimmt den Text ins Suchfeld und sucht ihn. */
+    ort?: string;
     evakuierungsbezirk?: number;
   } = {},
 ): string {
@@ -588,6 +590,8 @@ export function lagekartePfad(
     // Kartenmittelpunkt (Koordinatensprung der Sprungpalette): die Karte fliegt hin und räumt den
     // Parameter. Fünf Nachkommastellen ≙ rund 1 m.
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
+    // Adresssuche der Sprungpalette (LFH-638): Suchfeld der Leiste vorbelegen, suchen, räumen.
+    ort: opts.ort,
   });
 }
 
