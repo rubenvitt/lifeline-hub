@@ -159,9 +159,10 @@ Sie bekommen die Eintrags-ID, die Datei die Datei-ID. Neue Befehle ebenso.
 - [Lizenzvereinbarung nicht akzeptiert oder Mitgliedschaft abgelaufen] → Apple lehnt die
   Einreichung ab, der Bau scheitert laut. Steht als Ausfallgrund in der Betriebsdoku; die
   aktualisierte Vereinbarung ist bis 02.10.2026 zu akzeptieren.
-- [Hardened Runtime bricht etwas, das ad hoc lief] → Lokal geprüft (Nachweise); die Hülle lädt
-  keine fremden Bibliotheken. Was Menschen an der signierten App von Hand bestätigen, steht in
-  `tasks.md`.
+- [Hardened Runtime oder echte Signatur ändern Verhalten, das ad hoc lief] → Start und Laden
+  des Servers im lokalen Netz sind belegt (Nachweise). Druck, Deeplink und „Im Browser
+  anmelden“ (`ASWebAuthenticationSession`, LFH-818 hat ausdrücklich „mit signierter App“ offen
+  gelassen) sind offen → Task 5.3. Die Hülle lädt keine fremden Bibliotheken.
 - [Neue Signatur, neue Identität für macOS-Rückfragen] → Es gibt noch kein stabiles Release mit
   ad-hoc-App (Stand 01.10.2026, nur Alpha-Releases). Freigaben wie „lokales Netzwerk“ müssen
   also bei niemandem neu erteilt werden.
@@ -197,6 +198,8 @@ halbe Minute).
 | `.dmg` | von Tauri signiert (Team `H95J852PKP`), Einreichung `013504de-b07f-416e-b468-182ba33b6df9` Accepted, gestapelt; `spctl -a -t open --context context:primary-signature`: accepted, `Notarized Developer ID` |
 | App im `.app.tar.gz` | entpackt: `stapler validate` ok, `spctl` accepted, `Notarized Developer ID`. Tauri packt das Archiv also nach dem Stapeln |
 | Updater-Signatur | `.app.tar.gz.sig` entsteht wie bisher |
+| Start der notarisierten App (Hardened Runtime) | startet, lädt die gespeicherte Adresse `https://elw.local:8443/` („Seite geladen“, 08:56:39 UTC im Protokoll der Hülle), also `.local`-Auflösung und lokales Netz unverändert; die Update-Prüfung läuft an (404, es gibt noch kein stabiles Release) |
 
 Offen bleiben der Erststart auf einem fremden Mac (5.1), die Update-Kette mit notarisierten
-Bauten (5.2) und der Lauf auf dem GitHub-Runner (4.1).
+Bauten (5.2), Druck, Deeplink und „Im Browser anmelden“ an der signierten App (5.3) und der
+Lauf auf dem GitHub-Runner (4.1).
