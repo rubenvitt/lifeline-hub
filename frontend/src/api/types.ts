@@ -359,6 +359,10 @@ export type WetterAnzeige = S['WetterAnzeige'];
 export type WetterOrt = S['WetterOrt'];
 export type WetterWarnung = S['WetterWarnung'];
 export type WetterWarnstufe = S['WetterWarnstufe'];
+export type WetterAktuell = S['WetterAktuell'];
+export type WetterErgaenzung = S['WetterErgaenzung'];
+export type WetterMessgroesse = S['WetterMessgroesse'];
+export type WetterSymbol = S['WetterSymbol'];
 
 // ============================== LFH-632 Dokumentenablage ==============================
 export type Dokument = S['DokumentAnzeige'];

@@ -16,6 +16,8 @@ import { adminFixture, freigabenFixture } from '../test/fixtures';
 import type { ModulFreigaben } from '../api/types';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
+// Der Unwetter-Wächter hängt am Modulzähler-Modul und hat eigene Tests (`wetter/`, LFH-663).
+vi.mock('../wetter/UnwetterHinweis', () => ({ default: () => null }));
 
 /**
  * Der gemerkte Rahmen-Zustand wird gegen ein HANDGESCHRIEBENES Literal geprüft, sonst prüfte

@@ -287,6 +287,27 @@ describe('Kennzahlenband', () => {
     expect(screen.getByRole('group', { name: 'Lage in Zahlen' })).toBeInTheDocument();
   });
 
+  // LFH-629: die Höhe selbst setzt `sprache.css` unter `md` (Vitest fährt ohne CSS); gemessen wird
+  // sie in `e2e/lagebild-cls-schmal.spec.ts`. Hier, dass nur das Band mit der Prop sie anfordert.
+  it('fordert den Notizplatz unter `md` nur mit `notizZeilenSchmal` an', () => {
+    renderMitProviders(
+      <>
+        <Kennzahlenband beschriftung="Mit" notizZeilenSchmal={2}>
+          <Kennzahl titel="A" wert={1} notiz="n" />
+        </Kennzahlenband>
+        <Kennzahlenband beschriftung="Ohne">
+          <Kennzahl titel="B" wert={2} notiz="n" />
+        </Kennzahlenband>
+      </>,
+    );
+    const mit = screen.getByRole('group', { name: 'Mit' });
+    expect(mit).toHaveClass('lfh-kennzahlenband--notizzeilen');
+    expect(mit.style.getPropertyValue('--lfh-kennzahl-notizzeilen')).toBe('2');
+    const ohne = screen.getByRole('group', { name: 'Ohne' });
+    expect(ohne).not.toHaveClass('lfh-kennzahlenband--notizzeilen');
+    expect(ohne.style.getPropertyValue('--lfh-kennzahl-notizzeilen')).toBe('');
+  });
+
   it('zeigt eine Aufgliederung nur im Zustand `daten`', () => {
     const seg = { segmente: [{ label: 'SK I', wert: 2, farbe: 'red' }], titel: 'Sichtung' };
     const { rerender } = renderMitProviders(<Kennzahl titel="A" wert={2} aufgliederung={seg} />);

@@ -12,8 +12,10 @@ import {
   einheitenOhneErreichbarkeit,
   einheitenOhneSprechgruppe,
   lokaleSprechgruppenOhneZuordnung,
+  verbindungenOhneGemeinsameSprechgruppe,
   type Luecke,
   type Quelle,
+  type Verbindung,
 } from './luecken';
 
 /**
@@ -241,6 +243,8 @@ export interface FunkplanLuecken {
   abschnitteOhneSprechgruppe: Luecke<Einsatzabschnitt>;
   einheitenOhneSprechgruppe: Luecke<Einheit>;
   einheitenOhneErreichbarkeit: Luecke<Einheit>;
+  /** Stelle und übergeordnete Stelle ohne gemeinsame Sprechgruppe (LFH-625 D3). */
+  verbindungenOhneGemeinsameSprechgruppe: Luecke<Verbindung>;
   lokaleSprechgruppenOhneZuordnung: Luecke<Sprechgruppe>;
 }
 
@@ -249,6 +253,10 @@ export function funkplanLuecken(q: FunkplanQuellen): FunkplanLuecken {
     abschnitteOhneSprechgruppe: abschnitteOhneSprechgruppe(q.abschnitte),
     einheitenOhneSprechgruppe: einheitenOhneSprechgruppe(q.einheiten),
     einheitenOhneErreichbarkeit: einheitenOhneErreichbarkeit(q.einheiten),
+    verbindungenOhneGemeinsameSprechgruppe: verbindungenOhneGemeinsameSprechgruppe(
+      q.abschnitte,
+      q.einheiten,
+    ),
     lokaleSprechgruppenOhneZuordnung: lokaleSprechgruppenOhneZuordnung(
       q.sprechgruppen,
       q.abschnitte,
@@ -382,6 +390,11 @@ export function rendereFunkplanMarkdown(
       'Einheiten ohne Erreichbarkeit',
       luecken.einheitenOhneErreichbarkeit,
       (e) => e.name,
+    ),
+    lueckeMarkdown(
+      'Verbindungen ohne gemeinsame Sprechgruppe',
+      luecken.verbindungenOhneGemeinsameSprechgruppe,
+      (v) => `${v.unten.name} → ${v.oben.name}`,
     ),
     lueckeMarkdown(
       'Einsatzlokale Sprechgruppen ohne Zuordnung',

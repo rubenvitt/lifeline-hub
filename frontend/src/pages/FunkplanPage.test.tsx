@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Routes, Route } from 'react-router';
+import { Routes, Route, useLocation } from 'react-router';
 import { http, HttpResponse } from 'msw';
 import { QueryClient } from '@tanstack/react-query';
 import { renderMitProviders } from '../test/utils';
@@ -501,5 +501,199 @@ describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
     await screen.findByText('Florian ELW 1');
     await waitFor(() => expect(screen.getByText(/Einheiten: nicht geladen/)).toBeInTheDocument());
     expect(screen.queryByText(/Einheiten: nicht freigegeben/)).toBeNull();
+  });
+});
+
+/**
+ * Darstellung „Skizze“ (LFH-625): die Fernmeldeskizze als zweite Darstellung derselben Seite.
+ * Umschalter im Kopf, Sichtvorgabe `?ansicht=` apply-then-clean, Druckkopf je Darstellung,
+ * getrennte Klappmengen, dieselbe Übernahme und dasselbe Lücken-Paneel.
+ */
+describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
+  function SuchAnzeige() {
+    return <span data-testid="suche">{useLocation().search}</span>;
+  }
+  function rendereMit(route = '/einsaetze/1/stab/funkplan') {
+    return renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+        </Routes>
+        <SuchAnzeige />
+      </>,
+      { route },
+    );
+  }
+  const skizze = () => screen.getByRole('region', { name: 'Fernmeldeskizze' });
+  const druckkopf = (c: HTMLElement) =>
+    c.querySelector('[data-lfh="druckwurzel"] [data-lfh="druckkopf"]') as HTMLElement;
+
+  it('schaltet auch ohne Schreibrecht auf die Skizze um; die Lücken bleiben stehen', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
+    const { container } = rendereMit();
+    await screen.findByText('Florian 1/42-1');
+    const umschalter = screen.getByRole('radiogroup', { name: 'Darstellung' });
+    expect(within(umschalter).getByRole('radio', { name: 'Tabelle' })).toBeChecked();
+    await userEvent.click(within(umschalter).getByRole('radio', { name: 'Skizze' }));
+    expect(within(skizze()).getByRole('link', { name: 'Abschnitt Nord' })).toBeInTheDocument();
+    expect(container.querySelector('.ant-table')).toBeNull();
+    // Fahrzeuge sind keine Knoten der Skizze.
+    expect(within(skizze()).queryByText('Florian 1/42-1')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Lücken' })).toBeInTheDocument();
+  });
+
+  it('?ansicht=skizze öffnet die Skizze und räumt den Parameter', async () => {
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    expect(await screen.findByRole('region', { name: 'Fernmeldeskizze' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Darstellung' })).getByRole('radio', {
+        name: 'Skizze',
+      }),
+    ).toBeChecked();
+  });
+
+  it('ein unbrauchbarer Wert wird nur geräumt, die Darstellung bleibt Tabelle', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=quatsch');
+    await screen.findByText('Florian 1/42-1');
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(container.querySelector('.ant-table')).not.toBeNull();
+    expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
+  });
+
+  it('zeigt bei gesperrtem Stab auch mit ?ansicht=skizze nur die Sperre', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    expect(
+      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
+  });
+
+  it('nennt im Druckkopf die Dokumentart der aktiven Darstellung', async () => {
+    const { container } = rendereMit();
+    await screen.findByText('Florian 1/42-1');
+    expect(druckkopf(container)).toHaveTextContent('Funkplan');
+    expect(druckkopf(container)).not.toHaveTextContent('Fernmeldeskizze');
+    await userEvent.click(screen.getByRole('radio', { name: 'Skizze' }));
+    expect(druckkopf(container)).toHaveTextContent('Fernmeldeskizze');
+    expect(container.querySelectorAll('[data-lfh="druckwurzel"]')).toHaveLength(1);
+  });
+
+  it('klappt nur in der Skizze über „Alle zuklappen“, die Tabelle behält ihren Zustand', async () => {
+    const { container } = rendereMit();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.queryByRole('button', { name: 'Alle zuklappen' })).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Skizze' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Alle zuklappen' }));
+    expect(within(skizze()).queryByRole('link', { name: '1. Zug' })).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Tabelle' }));
+    // Die Tabelle steht weiter offen, mit dem Fahrzeug unter der Einheit.
+    expect(container.querySelector('tr[data-row-key="fz-100"]')).not.toBeNull();
+  });
+
+  it('klappt vor dem Druck die Skizze auf', async () => {
+    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    await userEvent.click(screen.getByRole('button', { name: 'Alle zuklappen' }));
+    expect(within(skizze()).queryByRole('link', { name: '1. Zug' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+    expect(await within(skizze()).findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    drucke.mockRestore();
+  });
+
+  it('übernimmt auch aus der Skizze den Funkplan mit genau einem Aufruf', async () => {
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/77'));
+    expect(legeLageberichtAn).toHaveBeenCalledTimes(1);
+    const [, eingabe] = vi.mocked(legeLageberichtAn).mock.calls[0];
+    expect(eingabe.titel).toMatch(/^Funkplan /);
+    expect(eingabe.abschnitte?.[0].text).toContain('Verbindungen ohne gemeinsame Sprechgruppe');
+  });
+
+  it('zeigt mit ?ansicht=skizze die Tabelle nie, auch nicht im ersten Bild', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    const tabellen: number[] = [];
+    const beobachter = new MutationObserver(() =>
+      tabellen.push(container.querySelectorAll('.ant-table').length),
+    );
+    beobachter.observe(container, { childList: true, subtree: true });
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    beobachter.disconnect();
+    expect(Math.max(0, ...tabellen)).toBe(0);
+  });
+
+  it('zählt im Umfang der Skizze keine Fahrzeuge, die sie nicht zeigt', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    expect(druckkopf(container)).toHaveTextContent('2 Abschnitte · 1 Einheiten');
+    expect(druckkopf(container)).not.toHaveTextContent('Fahrzeuge');
+    await userEvent.click(screen.getByRole('radio', { name: 'Tabelle' }));
+    expect(druckkopf(container)).toHaveTextContent('2 Fahrzeuge');
+  });
+
+  it('nennt bei gesperrten Abschnitten den Grund statt eines Sammelknotens', async () => {
+    vi.mocked(listeAbschnitte).mockRejectedValue(new ApiError(403, 'verboten'));
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    expect(
+      await screen.findByText('Keine Skizze darstellbar — Abschnitte: nicht freigegeben'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Ohne Abschnitt' })).toBeNull();
+  });
+
+  it('fragt bei vom Server gesperrten Abschnitten nicht an und nennt den Grund (LFH-669)', async () => {
+    vi.mocked(listeAbschnitte).mockClear();
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ einsatzabschnitte: { zugriff: false } }),
+    );
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    expect(
+      await screen.findByText('Keine Skizze darstellbar — Abschnitte: nicht freigegeben'),
+    ).toBeInTheDocument();
+    expect(vi.mocked(listeAbschnitte)).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
+  });
+
+  it('nennt bei fehlenden Einheiten den Grund und zeigt die Abschnitte', async () => {
+    vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(500, 'kaputt'));
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    const region = await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    expect(within(region).getByRole('link', { name: 'Abschnitt Nord' })).toBeInTheDocument();
+    expect(screen.getByText('Einheiten: nicht geladen')).toBeInTheDocument();
+  });
+});
+
+describe('FunkplanPage — Lücke „Verbindungen ohne gemeinsame Sprechgruppe“ (LFH-625)', () => {
+  it('zählt die Verbindung und verweist auf die untere Stelle', async () => {
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      { ...EINHEITEN[0], sprechgruppen: [sg(5, 'DMO', 'DMO 506')] },
+    ]);
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    const zeile = lueckenZeile('Verbindungen ohne gemeinsame Sprechgruppe');
+    expect(within(zeile).getByText('1')).toBeInTheDocument();
+    // Beide Enden der Verbindung stehen da, der Verweis führt zur unteren Stelle.
+    expect(within(zeile).getByRole('link', { name: '1. Zug → Abschnitt Nord' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/10',
+    );
+  });
+
+  it('zeigt bei gesperrten Einheiten „—“ mit Grund statt „0“', async () => {
+    vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(403, 'verboten'));
+    setup();
+    await screen.findByText('Florian ELW 1');
+    const zeile = lueckenZeile('Verbindungen ohne gemeinsame Sprechgruppe');
+    expect(within(zeile).getByText('—')).toBeInTheDocument();
+    expect(within(zeile).getByText(/nicht freigegeben/)).toBeInTheDocument();
   });
 });

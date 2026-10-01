@@ -57,9 +57,10 @@ export type ServerZaehlerQuelle =
   | 'chat';
 /**
  * Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet: `abloesung` hängt an der
- * Uhr (Vorwarnzeit), `betreuung` teilt sich die Übersicht mit Seite und Kennzahl.
+ * Uhr (Vorwarnzeit), `betreuung` teilt sich die Übersicht mit Seite und Kennzahl,
+ * `wetter-pegel` zählt Unwetterwarnungen aus einer externen Quelle ohne Live-Ereignis (LFH-663).
  */
-export type ClientZaehlerQuelle = 'dokumente' | 'abloesung' | 'betreuung';
+export type ClientZaehlerQuelle = 'dokumente' | 'abloesung' | 'betreuung' | 'wetter-pegel';
 export type ModulZaehlerQuelle = ServerZaehlerQuelle | ClientZaehlerQuelle;
 
 export interface Kategorie {
@@ -119,7 +120,9 @@ export const kategorien: Kategorie[] = [
   {
     key: 'erfassung',
     label: 'Erfassung',
-    kurz: 'Erfassung',
+    // Kurzform wie „Komm.“/„Einst.“: „ERFASSUNG“ ist in 9 px Versalien breiter als die 60-px-Rail
+    // (LFH-644). Die Sperrung bleibt Token, keine Ausnahme je Etikett.
+    kurz: 'Erfass.',
     ikone: { umriss: IkoneKlemmbrett, gefuellt: IkoneKlemmbrettGefuellt },
   },
   {
@@ -393,6 +396,8 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IkoneGewitterwolke,
     route: 'wetter-pegel',
     status: 'fertig',
+    // Gültige Unwetterwarnungen (schwer/extrem) am Einsatzort, neutral (LFH-663).
+    zaehlerQuelle: 'wetter-pegel',
     beschreibung:
       'Maßgebliche Pegel mit 24-h-Verlauf, DWD-Warnungen und Vorhersage für den Einsatzort.',
   },

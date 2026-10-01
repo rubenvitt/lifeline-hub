@@ -1,4 +1,5 @@
-//! Abruf von Warnungen und Vorhersage für den Einsatzort mit Cache (LFH-633).
+//! Abruf von Warnungen, Vorhersage (LFH-633) und aktuellen Bedingungen (LFH-864) für den
+//! Einsatzort mit Cache.
 //!
 //! Das Muster und die Bremsen sind die von `pegel::abruf`:
 //!
@@ -25,7 +26,9 @@
 //!
 //! Der Cache hält die Warnungen **ungefiltert**; abgelaufene entfernt [`anzeige`] bei jeder
 //! Antwort (`quelle::gueltige`), vergangene Vorhersagestunden ebenso
-//! (`quelle::kommende_stunden`).
+//! (`quelle::kommende_stunden`), und eine Messung, die älter als 3 h ist, gilt als `ausfall`
+//! (`quelle::frische_messung`) — der Stand der aktuellen Bedingungen ist die Messzeit, nicht
+//! der Abruf (LFH-864 design.md D4).
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -37,10 +40,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::SqlitePool;
 
-use super::quelle::{gueltige, kommende_stunden, parse_alerts, parse_weather};
+use super::quelle::{
+    frische_messung, gueltige, kommende_stunden, parse_alerts, parse_current_weather, parse_weather,
+};
 use super::{
-    WetterAnzeige, WetterOrt, WetterTeilZustand, WetterVorhersage, WetterVorhersageTeil,
-    WetterWarnung, WetterWarnungen,
+    WetterAktuell, WetterAktuellTeil, WetterAnzeige, WetterOrt, WetterTeilZustand,
+    WetterVorhersage, WetterVorhersageTeil, WetterWarnung, WetterWarnungen,
 };
 use crate::karte::cache;
 use crate::karte::quellen::hole_json;
@@ -54,6 +59,12 @@ pub const TTL_VORHERSAGE_S: i64 = 30 * 60;
 pub const OBERGRENZE_WARNUNGEN_S: i64 = 6 * 3600;
 /// Ab diesem Alter gilt ein Vorhersagestand nicht mehr.
 pub const OBERGRENZE_VORHERSAGE_S: i64 = 12 * 3600;
+/// Lebensdauer eines Stands der aktuellen Bedingungen (Sekunden). SYNOP-Messungen kommen
+/// höchstens alle 10 min neu.
+pub const TTL_AKTUELL_S: i64 = 10 * 60;
+/// Ab diesem Cache-Alter gelten die aktuellen Bedingungen nicht mehr. Dieselbe Grenze gilt
+/// für das Alter der Messung selbst (`quelle::OBERGRENZE_MESSUNG_S`).
+pub const OBERGRENZE_AKTUELL_S: i64 = super::quelle::OBERGRENZE_MESSUNG_S;
 /// Obergrenze je Abruf (wie `pegel::abruf::ABRUF_FRIST`).
 pub const ABRUF_FRIST: Duration = Duration::from_secs(8);
 /// Ruhezeit eines Schlüssels nach einem gescheiterten Abruf.
@@ -116,6 +127,14 @@ const VORHERSAGE: Teil<WetterVorhersage> = Teil {
     parse: parse_weather,
 };
 
+const AKTUELL: Teil<WetterAktuell> = Teil {
+    praefix: "wetter-aktuell",
+    ttl_s: TTL_AKTUELL_S,
+    obergrenze_s: OBERGRENZE_AKTUELL_S,
+    url: |basis, ort, _| aktuell_url(basis, ort),
+    parse: parse_current_weather,
+};
+
 /// Cache-Schlüssel (zugleich In-flight- und Abkühlungsschlüssel).
 fn schluessel(praefix: &str, ort: &GerundeterOrt) -> String {
     format!("{praefix}:{}:{},{}", ort.org_id, ort.lat, ort.lon)
@@ -129,6 +148,20 @@ pub fn schluessel_warnungen(ort: &GerundeterOrt) -> String {
 /// Cache-Schlüssel der Vorhersage, z. B. `wetter-vorhersage:1:53.08,8.80` (Org 1).
 pub fn schluessel_vorhersage(ort: &GerundeterOrt) -> String {
     schluessel(VORHERSAGE.praefix, ort)
+}
+
+/// Cache-Schlüssel der aktuellen Bedingungen, z. B. `wetter-aktuell:1:53.08,8.80` (Org 1).
+pub fn schluessel_aktuell(ort: &GerundeterOrt) -> String {
+    schluessel(AKTUELL.praefix, ort)
+}
+
+/// `/current_weather` für den Punkt: die jüngste Messung naher SYNOP-Stationen, Lücken
+/// aus Nachbarstationen ergänzt (`fallback_source_ids`). Einheiten in der Vorgabe `dwd`.
+pub fn aktuell_url(basis: &str, ort: &GerundeterOrt) -> String {
+    format!(
+        "{basis}/current_weather?lat={}&lon={}&tz=Etc/UTC",
+        ort.lat, ort.lon
+    )
 }
 
 /// `/alerts` für den Punkt: Warnungen der Gemeinde-Warnzelle samt deren Namen.
@@ -312,14 +345,24 @@ pub async fn vorhersage(
     stand(fe, pool, &VORHERSAGE, ort, jetzt).await
 }
 
+/// Stand der aktuellen Bedingungen für den Ort (ohne Prüfung des Messalters).
+pub async fn aktuell(
+    fe: &FachebenenState,
+    pool: &SqlitePool,
+    ort: &GerundeterOrt,
+    jetzt: DateTime<Utc>,
+) -> Stand<WetterAktuell> {
+    stand(fe, pool, &AKTUELL, ort, jetzt).await
+}
+
 /// `jetzt − Alter` als RFC 3339 in UTC: der Zeitpunkt des letzten erfolgreichen Abrufs.
 fn abgerufen_at(jetzt: DateTime<Utc>, alter_s: i64) -> String {
     (jetzt - chrono::Duration::seconds(alter_s.max(0))).to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 /// Die ganze Antwort des Wetter-Endpunkts. `ort` ist der Einsatzort (lat, lon); ohne ihn
-/// sind beide Teile `kein_ort`, und es gibt keinen Abruf. `org_id` ist die Organisation des
-/// Einsatzes (nur im Cache-Schlüssel). Beide Teile laufen parallel.
+/// sind alle drei Teile `kein_ort`, und es gibt keinen Abruf. `org_id` ist die Organisation des
+/// Einsatzes (nur im Cache-Schlüssel). Die Teile laufen parallel.
 pub async fn anzeige(
     fe: &FachebenenState,
     pool: &SqlitePool,
@@ -340,12 +383,18 @@ pub async fn anzeige(
                 abgerufen_at: None,
                 daten: None,
             },
+            aktuell: WetterAktuellTeil {
+                zustand: WetterTeilZustand::KeinOrt,
+                abgerufen_at: None,
+                daten: None,
+            },
         };
     };
     let ort = GerundeterOrt::neu(org_id, lat, lon);
-    let (warn, vorh) = tokio::join!(
+    let (warn, vorh, akt) = tokio::join!(
         warnlage(fe, pool, &ort, jetzt),
-        vorhersage(fe, pool, &ort, jetzt)
+        vorhersage(fe, pool, &ort, jetzt),
+        aktuell(fe, pool, &ort, jetzt)
     );
     let (wetter_ort, warnungen) = match warn {
         Stand::Ok { wert, alter_s } => (
@@ -377,17 +426,37 @@ pub async fn anzeige(
             daten: None,
         },
     };
+    let aktuell = match akt {
+        Stand::Ok { wert, alter_s } => match frische_messung(wert, jetzt) {
+            Some(wert) => WetterAktuellTeil {
+                zustand: WetterTeilZustand::Ok,
+                abgerufen_at: Some(abgerufen_at(jetzt, alter_s)),
+                daten: Some(wert),
+            },
+            None => WetterAktuellTeil {
+                zustand: WetterTeilZustand::Ausfall,
+                abgerufen_at: None,
+                daten: None,
+            },
+        },
+        Stand::Ausfall => WetterAktuellTeil {
+            zustand: WetterTeilZustand::Ausfall,
+            abgerufen_at: None,
+            daten: None,
+        },
+    };
     WetterAnzeige {
         ort: wetter_ort,
         warnungen,
         vorhersage,
+        aktuell,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::wetter::{WetterStunde, WetterWarnstufe};
+    use crate::wetter::{WetterStation, WetterStunde, WetterSymbol, WetterWarnstufe};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// Bremen-Mitte, nicht auf einer Rundungsgrenze.
@@ -523,6 +592,11 @@ mod tests {
         assert_eq!(o.lon, "8.80");
         assert_eq!(schluessel_warnungen(&o), "wetter-warnungen:1:53.08,8.80");
         assert_eq!(schluessel_vorhersage(&o), "wetter-vorhersage:1:53.08,8.80");
+        assert_eq!(schluessel_aktuell(&o), "wetter-aktuell:1:53.08,8.80");
+        assert_eq!(
+            aktuell_url("https://b", &o),
+            "https://b/current_weather?lat=53.08&lon=8.80&tz=Etc/UTC"
+        );
         assert_eq!(
             GerundeterOrt::neu(1, 53.0751, 8.7951),
             GerundeterOrt::neu(1, 53.0849, 8.8049),
@@ -561,6 +635,7 @@ mod tests {
         let a = anzeige(&fe, &pool, ORG, None, Utc::now()).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::KeinOrt);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::KeinOrt);
+        assert_eq!(a.aktuell.zustand, WetterTeilZustand::KeinOrt);
         assert_eq!(a.ort, None);
         let a = anzeige(&fe, &pool, ORG, Some((f64::NAN, 8.8)), Utc::now()).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::KeinOrt);
@@ -579,11 +654,13 @@ mod tests {
         )
         .await;
         cache::setze_wert(&pool, &schluessel_vorhersage(&ort()), &vorhersage_ab(jetzt)).await;
+        cache::setze_wert(&pool, &schluessel_aktuell(&ort()), &aktuell_gemessen(jetzt)).await;
         let (basis, zaehler) = quelle_404().await;
         let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
 
         let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), jetzt).await;
         assert_eq!(a.ort.as_ref().unwrap().name, "Stadt Bremen");
+        assert_eq!(a.aktuell.zustand, WetterTeilZustand::Ok);
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ok);
         assert_eq!(a.warnungen.daten.as_ref().unwrap().len(), 1);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ok);
@@ -645,6 +722,8 @@ mod tests {
         let a = anzeige(&ohne_netz(), &pool, ORG, Some((LAT, LON)), Utc::now()).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ausfall);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ausfall);
+        assert_eq!(a.aktuell.zustand, WetterTeilZustand::Ausfall);
+        assert_eq!(a.aktuell.daten, None);
         assert_eq!(a.warnungen.daten, None);
         assert_eq!(a.warnungen.abgerufen_at, None);
         assert_eq!(a.ort, None);
@@ -765,9 +844,14 @@ mod tests {
                         .unwrap_or_default()
                         .to_string();
                     let body = if zeile.contains("/alerts") {
-                        r#"{"alerts":[],"location":{"name":"Stadt Bremen"}}"#
+                        r#"{"alerts":[],"location":{"name":"Stadt Bremen"}}"#.to_string()
+                    } else if zeile.contains("/current_weather") {
+                        format!(
+                            r#"{{"weather":{{"source_id":1,"timestamp":"{}","temperature":9.5}},"sources":[{{"id":1,"station_name":"Bremen","distance":3887.0}}]}}"#,
+                            fmt(Utc::now())
+                        )
                     } else {
-                        r#"{"weather":[],"sources":[]}"#
+                        r#"{"weather":[],"sources":[]}"#.to_string()
                     };
                     a2.lock().unwrap().push(zeile);
                     let antwort = format!(
@@ -785,8 +869,12 @@ mod tests {
         assert_eq!(a.ort.unwrap().name, "Stadt Bremen");
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ok);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ok);
+        assert_eq!(a.aktuell.zustand, WetterTeilZustand::Ok);
+        let aktuell = a.aktuell.daten.unwrap();
+        assert_eq!(aktuell.station.name, "Bremen");
+        assert_eq!(aktuell.temperatur_c, Some(9.5));
         let anfragen = anfragen.lock().unwrap().clone();
-        assert_eq!(anfragen.len(), 2);
+        assert_eq!(anfragen.len(), 3);
         assert!(
             anfragen.iter().all(|z| z.contains("lat=53.08&lon=8.80")),
             "nur die gerundete Koordinate verlässt das Haus: {anfragen:?}"
@@ -796,5 +884,75 @@ mod tests {
                 .await
                 .is_some()
         );
+    }
+    fn aktuell_gemessen(gemessen: DateTime<Utc>) -> WetterAktuell {
+        WetterAktuell {
+            gemessen_at: fmt(gemessen),
+            station: WetterStation {
+                name: "Bremen".into(),
+                entfernung_m: Some(3887.0),
+            },
+            symbol: Some(WetterSymbol::Bewoelkt),
+            temperatur_c: Some(15.3),
+            taupunkt_c: None,
+            luftfeuchte_prozent: None,
+            luftdruck_hpa: None,
+            sicht_m: None,
+            bewoelkung_prozent: None,
+            wind_kmh: None,
+            windrichtung_grad: None,
+            boeen_kmh: None,
+            niederschlag_mm: None,
+            ergaenzt: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn aktuell_stand_ist_die_messzeit() {
+        let pool = crate::db::test_pool().await;
+        let jetzt = Utc::now();
+        let (basis, zaehler) = quelle_404().await;
+        let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
+
+        // Frischer Abruf, zwei Stunden alte Messung: `ok` — „veraltet“ entscheidet das
+        // Frontend an `gemessen_at`.
+        let messung = aktuell_gemessen(jetzt - chrono::Duration::hours(2));
+        cache::setze_wert(&pool, &schluessel_aktuell(&ort()), &messung).await;
+        let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), jetzt).await;
+        assert_eq!(a.aktuell.zustand, WetterTeilZustand::Ok);
+        assert_eq!(a.aktuell.daten, Some(messung));
+        assert!(a.aktuell.abgerufen_at.is_some());
+
+        // Frischer Abruf, vier Stunden alte Messung (ausgefallene Station): `ausfall`.
+        cache::setze_wert(
+            &pool,
+            &schluessel_aktuell(&ort()),
+            &aktuell_gemessen(jetzt - chrono::Duration::hours(4)),
+        )
+        .await;
+        let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), jetzt).await;
+        assert_eq!(a.aktuell.zustand, WetterTeilZustand::Ausfall);
+        assert_eq!(a.aktuell.daten, None);
+        assert_eq!(a.aktuell.abgerufen_at, None);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(
+            anzahl(&zaehler),
+            2,
+            "frischer Cache: kein Abruf für `aktuell`"
+        );
+    }
+
+    #[tokio::test]
+    async fn aktuell_cache_ueber_der_obergrenze_reisst_nichts_mit() {
+        let pool = crate::db::test_pool().await;
+        let jetzt = Utc::now();
+        cache::setze_wert(&pool, &schluessel_warnungen(&ort()), &warnlage_mit(vec![])).await;
+        cache::setze_wert(&pool, &schluessel_vorhersage(&ort()), &vorhersage_ab(jetzt)).await;
+        cache::setze_wert(&pool, &schluessel_aktuell(&ort()), &aktuell_gemessen(jetzt)).await;
+        altere(&pool, OBERGRENZE_AKTUELL_S + 60).await;
+        let a = anzeige(&ohne_netz(), &pool, ORG, Some((LAT, LON)), jetzt).await;
+        assert_eq!(a.aktuell.zustand, WetterTeilZustand::Ausfall);
+        assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ok);
+        assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ok);
     }
 }

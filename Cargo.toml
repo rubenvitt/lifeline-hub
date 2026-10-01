@@ -36,6 +36,9 @@ axum-extra = { version = "0.12", features = ["cookie"] }
 # `Max-Age` des Sitzungscookies (LFH-779); `cookie` nimmt nur `time::Duration`, axum-extra
 # reicht `time` nicht durch. Liegt ohnehin schon im Lockfile (über `cookie`).
 time = "0.3"
+# Netzliste der vertrauenswürdigen Reverse-Proxys (LFH-604). Liegt ohnehin schon im Lockfile
+# (über `hyper-util`).
+ipnet = "2"
 tokio-stream = { version = "0.1", features = ["sync"] }
 tempfile = "3"
 sha2 = "0.11"
@@ -120,7 +123,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.61"
+version = "1.0.0-alpha.62"
 
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]

@@ -341,6 +341,14 @@ const VERBINDUNG: Record<LiveVerbindungsStatus, string> = {
   lost: 'Verbindung unterbrochen',
 };
 
+/**
+ * Breite des Verbindungsworts: die des längsten, in `ch` (das Meta ist Mono, jedes Zeichen gleich
+ * breit). Ob der Paneelkopf umbricht, hängt sonst am Zustand: auf 390 px passte „live“ neben den
+ * Titel, „Verbindung wird aufgebaut“ nicht, und der Kopf schrumpfte beim Verbinden von 53 auf
+ * 38 px (LFH-629). Mit fester Breite bricht er in jedem Zustand gleich.
+ */
+const VERBINDUNG_BREITE = `${Math.max(...Object.values(VERBINDUNG).map((w) => w.length))}ch`;
+
 export function MeldungsstromPaneel({
   zustand,
   sichtbar,
@@ -378,7 +386,15 @@ export function MeldungsstromPaneel({
     <Paneel
       titel="Meldungsstrom"
       meta={
-        <span data-lfh="strom-live" style={{ color: metaFarbe }}>
+        <span
+          data-lfh="strom-live"
+          style={{
+            color: metaFarbe,
+            display: 'inline-block',
+            minWidth: VERBINDUNG_BREITE,
+            textAlign: 'end',
+          }}
+        >
           {VERBINDUNG[liveStatus]}
         </span>
       }

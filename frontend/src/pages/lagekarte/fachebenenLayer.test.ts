@@ -73,8 +73,31 @@ function passt(filter: unknown, props: Record<string, unknown>): boolean {
       return !passt(args[0], props);
     case 'has':
       return (args[0] as string) in props;
+    case '==':
+      return wert(args[0], props) === wert(args[1], props);
+    case '!=':
+      return wert(args[0], props) !== wert(args[1], props);
     default:
       throw new Error(`Filter-Operator ${op} im Test nicht ausgewertet`);
+  }
+}
+
+/**
+ * Wert eines Ausdrucks: `['get', k]`, `['geometry-type']` (aus `__geometrie`, sonst `Polygon`),
+ * `['case', bedingung, dann, sonst]` oder ein Literal.
+ */
+function wert(ausdruck: unknown, props: Record<string, unknown>): unknown {
+  if (!Array.isArray(ausdruck)) return ausdruck;
+  const [op, ...args] = ausdruck as [string, ...unknown[]];
+  switch (op) {
+    case 'get':
+      return props[args[0] as string];
+    case 'geometry-type':
+      return props.__geometrie ?? 'Polygon';
+    case 'case':
+      return passt(args[0], props) ? wert(args[1], props) : wert(args[2], props);
+    default:
+      throw new Error(`Ausdruck ${op} im Test nicht ausgewertet`);
   }
 }
 
@@ -256,6 +279,60 @@ describe('fachebenenLayer', () => {
     entferneFachebeneLayer(m as never, 'dwd');
     expect(m._sources.has(fachebeneSourceId('dwd'))).toBe(false);
     expect(m._layers.has('fachebene-dwd-fill')).toBe(false);
+  });
+});
+
+describe('angekündigte Warnungen auf Polygon-Ebenen (LFH-662)', () => {
+  const geltend = { EVENT: 'STURM' };
+  const angekuendigt = { EVENT: 'FROST', angekuendigt: true };
+  const zeichnet = (spec: LayerSpec | undefined, props: Record<string, unknown>) =>
+    passt(spec?.filter, props);
+
+  function dwdKarte() {
+    const m = fakeMap();
+    sorgeFuerFachebeneLayer(m as never, FACHEBENEN.dwd, leer as never, FARBE, TREFFER);
+    return m;
+  }
+
+  it('zeichnet die Kontur einer angekündigten Warnung gestrichelt, die einer geltenden durchgezogen', () => {
+    const m = dwdKarte();
+    const voll = m._specs.get('fachebene-dwd-line');
+    const gestrichelt = m._specs.get('fachebene-dwd-line-angekuendigt');
+    expect(gestrichelt?.type).toBe('line');
+    expect(gestrichelt?.paint?.['line-dasharray']).toEqual([3, 2]);
+    expect(voll?.paint?.['line-dasharray']).toBeUndefined();
+    // Jede Warnung bekommt genau eine Kontur.
+    expect([zeichnet(voll, geltend), zeichnet(gestrichelt, geltend)]).toEqual([true, false]);
+    expect([zeichnet(voll, angekuendigt), zeichnet(gestrichelt, angekuendigt)]).toEqual([
+      false,
+      true,
+    ]);
+    // Nur Polygone, wie die übrigen Flächenebenen.
+    expect(zeichnet(gestrichelt, { ...angekuendigt, __geometrie: 'Point' })).toBe(false);
+  });
+
+  it('füllt eine angekündigte Warnung schwächer als eine geltende', () => {
+    const deckkraft = m(dwdKarte());
+    function m(k: ReturnType<typeof fakeMap>) {
+      const d = k._specs.get('fachebene-dwd-fill')?.paint?.['fill-opacity'];
+      return (props: Record<string, unknown>) => wert(d, props) as number;
+    }
+    expect(deckkraft(geltend)).toBe(0.2);
+    expect(deckkraft(angekuendigt)).toBe(0.08);
+    expect(deckkraft(angekuendigt)).toBeLessThan(deckkraft(geltend));
+  });
+
+  it('legt die gestrichelte Kontur über die Fläche und räumt sie beim Entfernen mit', () => {
+    const m = dwdKarte();
+    expect(m._reihenfolge.indexOf('fachebene-dwd-line-angekuendigt')).toBeGreaterThan(
+      m._reihenfolge.indexOf('fachebene-dwd-fill'),
+    );
+    entferneFachebeneLayer(m as never, 'dwd');
+    expect(m._layers.size).toBe(0);
+  });
+
+  it('die gestrichelte Kontur ist keine Klickebene — geklickt wird die Fläche', () => {
+    expect(fachebeneClickLayerIds(FACHEBENEN.dwd)).toEqual(['fachebene-dwd-fill']);
   });
 });
 

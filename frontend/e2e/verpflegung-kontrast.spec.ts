@@ -19,10 +19,9 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * Die drei Paare stehen einzeln und benannt — im Textbaum wären „8" oder „60" nicht zuzuordnen.
  * Nachts ist `alarmText` wertgleich mit `alarm`.
  *
- * ZWEI BENANNTE AUSNAHMEN (geteilte Rollen; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
- *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
- *  · Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag.
- * Fallen die Ausnahmen, wenn LFH-643/LFH-661 landen.
+ * EINE BENANNTE AUSNAHME (geteilte Rolle; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
+ *  · Tertiärtext (`schwach`) → LFH-643, beide Modi.
+ * Fällt die Ausnahme, wenn LFH-643 landet. Der Primärknopf trägt seit LFH-661 den vollen Boden.
  *
  * Der Rand der OFFENEN Karte trägt keinen Zustand (Linienfarbe) — gemessen und angehängt, und
  * zugesichert, dass er sich von den Zustandsrändern unterscheidet. Sichtbarer Text unter
@@ -31,7 +30,7 @@ import { kontrast, randKontrast } from './kontrast-kern';
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die zwei Ausnahmen oben. */
+/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die Ausnahme oben. */
 const BODEN = 4.5;
 const ZUSTAND = 3;
 
@@ -83,7 +82,6 @@ interface Textknoten {
   ziel: Locator;
   text: string;
   tertiaer: boolean;
-  primaer: boolean;
 }
 
 /** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text, als Locator über eine Messmarke,
@@ -93,7 +91,7 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   const funde = await wurzel.evaluate((w, tertiaer) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: { text: string; tertiaer: boolean; primaer: boolean }[] = [];
+    const liste: { text: string; tertiaer: boolean }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       if (!el.checkVisibility()) continue;
@@ -107,7 +105,6 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
       liste.push({
         text: eigen,
         tertiaer: el.closest(tertiaer) != null,
-        primaer: el.closest('.ant-btn-primary') != null,
       });
     }
     return liste;
@@ -189,7 +186,6 @@ for (const modus of ['light', 'dark'] as const) {
 
     const messwerte: Record<string, unknown>[] = [];
     const raender: Record<string, string> = {};
-    const tag = modus === 'light';
 
     // (1) Ränder und Etikett je Einstufung.
     for (const k of KARTEN) {
@@ -276,13 +272,9 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer, primaer } of knoten) {
+      for (const { ziel, text, tertiaer } of knoten) {
         const m = await kontrast(ziel);
-        const ausnahme = tertiaer
-          ? 'Tertiärtext → LFH-643'
-          : tag && primaer
-            ? 'Weiß auf bedien → LFH-661'
-            : null;
+        const ausnahme = tertiaer ? 'Tertiärtext → LFH-643' : null;
         const schranke = ausnahme ? BODEN : TEXT[modus];
         const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
         messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
@@ -365,6 +357,10 @@ for (const modus of ['light', 'dark'] as const) {
       'Weitere Angaben',
       'Nachforderung',
       'Bemerkung',
+      // Primärknöpfe: Kopfknopf und Absende-Knöpfe der Dialoge (LFH-661).
+      'Zeitfenster anlegen',
+      'Anlegen',
+      'Erfassen',
     ])
       pruefeGesehen(tragend, true);
     for (const ausnahme of [

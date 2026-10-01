@@ -12,7 +12,9 @@
  *
  * BEWUSST NICHT: „irgendeine Statusrolle `alarm`" (defektes Material, überfällige
  * Ablösung sind Arbeit auf einer Liste, keine Warnung, die man wegdimmen könnte);
- * DWD-Unwetter (nur seitenlokal abgefragt, Folgeticket).
+ * DWD-Unwetter (Folgeticket LFH-774). Seit LFH-663 fragt der Einsatzrahmen das Wetter für
+ * Modulzähler und Unwetterhinweis ohnehin ab; was „Unwetter" heißt, steht in
+ * `wetter/unwetter.ts:unwetterLage`. Ob es die Sperre auslöst, bleibt eine eigene Entscheidung.
  *
  * Eine fehlende Quelle — kein Modulrecht, lädt noch, Abruf gescheitert — ist `undefined`
  * und trägt nichts bei: eine Sperre ohne Beleg verböte das Dimmen, ohne dass jemand sieht,

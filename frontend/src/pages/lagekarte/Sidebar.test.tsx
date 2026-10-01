@@ -483,6 +483,23 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
   });
 
+  it('gibt jedem Fachebenen-Schalter den Ebenennamen als zugänglichen Namen (LFH-631)', () => {
+    renderMitProviders(<Sidebar {...basisProps} />);
+    // Jeder Schalter einer Zeile, nicht nur die, die ein Name trifft: ein namenloser Schalter
+    // fiele bei `getByRole(…, { name })` sonst einfach durch.
+    const schalter = [...document.querySelectorAll<HTMLElement>('[data-fachebene]')].map((zeile) =>
+      within(zeile).getByRole('switch'),
+    );
+    expect(schalter).toHaveLength(fachebeneKeys().length);
+    for (const key of fachebeneKeys()) {
+      expect(screen.getByRole('switch', { name: FACHEBENEN[key].label }), `Schalter ${key}`).toBe(
+        within(document.querySelector<HTMLElement>(`[data-fachebene="${key}"]`)!).getByRole(
+          'switch',
+        ),
+      );
+    }
+  });
+
   // Zeile einer Fachebene: die Zeile um Schalter, Label und Hinweis (`data-fachebene`).
   const fachebenenZeile = (label: string) =>
     screen.getByText(label).closest<HTMLElement>('[data-fachebene]')!;

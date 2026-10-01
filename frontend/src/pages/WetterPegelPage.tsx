@@ -14,7 +14,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { useRollen, type PaneelDatenzustand } from '../components/instrument';
 import { einsatzdatenPfad, einsatzEinstellungenPfad } from '../routing/deeplinks';
 import PegelPaneel from '../wetter/PegelPaneel';
-import { VorhersagePaneel, WarnungenPaneel } from '../wetter/WetterPaneele';
+import { AktuellPaneel, VorhersagePaneel, WarnungenPaneel } from '../wetter/WetterPaneele';
 import { teileWarnungen } from '../wetter/wetterStand';
 
 /** „1 Warnung" · „n Warnungen" (Seitenkopf). Rein. */
@@ -49,14 +49,15 @@ function paneelZustand(q: { isLoading: boolean; isError: boolean }): PaneelDaten
 /**
  * Fachmodul „Wetter & Pegel" (LFH-633): was Wasser und Wetter am Einsatzort tun.
  *
- * Drei Paneele, drei Stände: Pegel, Warnungen und Vorhersage kommen aus zwei Quellen (PEGELONLINE,
- * Bright Sky) und tragen je ihren Stand. Fällt eine aus, zeigt nur ihr Paneel „Stand unbekannt".
+ * Vier Paneele, vier Stände: Pegel, aktuelle Bedingungen (LFH-864), Warnungen und Vorhersage kommen
+ * aus zwei Quellen (PEGELONLINE, Bright Sky) und tragen je ihren Stand. Fällt ein Teil aus, zeigt
+ * nur sein Paneel „Stand unbekannt". Reihenfolge: Wasser, Wetter jetzt, was kommt.
  * Der Seitenkopf zeigt den ältesten Abruf (`gemeinsamerDatenstand`).
  *
  * Leseseite: gepflegt wird in Einstellungen › Pegel. Die Primäraktion im Kopf öffnet dorthin; diese
  * Seite schreibt nichts und braucht keinen Rechte-Hinweis.
  *
- * Kein Live-Ereignis: alle drei Abfragen fragen alle 5 min nach. Die Uhr (30 s) lässt „veraltet"
+ * Kein Live-Ereignis: alle drei Abfragen (Pegel, Verlauf, Wetter) fragen alle 5 min nach. Die Uhr (30 s) lässt „veraltet"
  * auch ohne Abruf umschlagen.
  */
 export default function WetterPegelPage() {
@@ -154,6 +155,15 @@ export default function WetterPegelPage() {
               void pegelQuery.refetch();
               void verlaufQuery.refetch();
             }}
+          />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <AktuellPaneel
+            zustand={paneelZustand(wetterQuery)}
+            wetter={wetterQuery.data}
+            jetzt={jetzt}
+            konv={konv}
+            onNeuladen={() => void wetterQuery.refetch()}
           />
         </div>
         <div style={{ minWidth: 0 }}>

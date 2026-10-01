@@ -49,6 +49,18 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/gefahrengebiete', () => HttpResponse.json([])),
   /**
+   * Wetter — „kein Ort" als Default (LFH-663). Der Rahmen fragt es für Modulzähler und
+   * Unwetterhinweis ab (`einsatz/useModulZaehler.ts`, `wetter/useUnwetterHinweis.ts`); „kein
+   * Ort" ist ein echter Serverzustand ohne Zahl und ohne Hinweis. Tests mit Warnungen
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/wetter', () =>
+    HttpResponse.json({
+      warnungen: { zustand: 'kein_ort' },
+      vorhersage: { zustand: 'kein_ort' },
+    }),
+  ),
+  /**
    * Stammdaten der eigenen Organisation ohne Logo als Default; der Druckkopf fragt sie beim
    * Mount ab.
    */

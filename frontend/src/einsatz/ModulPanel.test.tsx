@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel } from '../theme/tokens';
 import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
-import type { ModulEintrag } from './modulRegistry';
+import { modulRegistry, type ModulEintrag } from './modulRegistry';
 import type { Sprungmarke } from './sprungmarken';
 import type { ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
@@ -184,6 +184,29 @@ describe('ModulPanel', () => {
       'aria-hidden',
       'true',
     );
+  });
+
+  it('zeigt die Unwetterwarnungen am Modul „Wetter & Pegel" neutral mit Bedeutung (LFH-663)', () => {
+    const wetter = modulRegistry.find((m) => m.key === 'wetter-pegel')!;
+    renderMitProviders(
+      <ModulPanel
+        titel="Lage"
+        module={[wetter]}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        zaehler={{
+          'wetter-pegel': {
+            wert: 2,
+            beschreibung: '2 Unwetterwarnungen für den Einsatzort, davon 1 angekündigt',
+          },
+        }}
+      />,
+    );
+    const knopf = screen.getByRole('button', {
+      name: 'Wetter & Pegel, 2 Unwetterwarnungen für den Einsatzort, davon 1 angekündigt',
+    });
+    expect(knopf.querySelector('[data-lfh="modul-zaehler"]')!.textContent).toBe('2');
   });
 
   it('traegt den Testanker des e2e-Trefflaechennachweises', () => {

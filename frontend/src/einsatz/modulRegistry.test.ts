@@ -153,7 +153,7 @@ describe('modulRegistry', () => {
     expect(kategorien.map((k) => k.kurz)).toEqual([
       'Führung',
       'Kräfte',
-      'Erfassung',
+      'Erfass.',
       'Lage',
       'Komm.',
       'Einst.',

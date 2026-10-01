@@ -15,7 +15,8 @@ import type {
   Stabsfunktion,
 } from '../../api/types';
 import type { Quelle } from '../../stab/luecken';
-import Organigramm, { OrganigrammBild, organigrammZielStil } from './Organigramm';
+import Organigramm, { OrganigrammBild } from './Organigramm';
+import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
 
@@ -495,19 +496,19 @@ describe('Organigramm — Druck', () => {
  * Steuerhöhe. Geprüft wird die reine Stilfunktion gegen die Dichtestufen; die Böden stehen als
  * LITERALE da, sonst prüfte der Token sich selbst.
  */
-describe('organigrammZielStil', () => {
+describe('baumZielStil', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
     controlHeight: dichten[stufe].zeilenhoehe,
   });
 
   it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
-    expect(organigrammZielStil(tokenFuer('kompakt')).minHeight).toBe(30);
-    expect(organigrammZielStil(tokenFuer('komfortabel')).minHeight).toBe(48);
-    expect(organigrammZielStil(tokenFuer('handschuh')).minHeight).toBe(72);
+    expect(baumZielStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(baumZielStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(baumZielStil(tokenFuer('handschuh')).minHeight).toBe(72);
   });
 
   it('ist ein Block in der Zeile, damit die Höhe greift', () => {
-    expect(organigrammZielStil(tokenFuer('kompakt')).display).toBe('inline-flex');
+    expect(baumZielStil(tokenFuer('kompakt')).display).toBe('inline-flex');
   });
 
   it('hängt an den Namenslinks', () => {

@@ -27,6 +27,18 @@ const punktFarbe = (farbe: string) => ['coalesce', ['get', 'farbe'], farbe];
 const PUNKT_RADIUS = ['coalesce', ['get', 'radius'], 5];
 
 /**
+ * Angekündigte Warnung (LFH-662): der Beginn liegt in der Zukunft. Die Property setzt nur der
+ * Client (`dwdGueltigkeit.ts`), im Minutentakt; ohne sie gilt eine Fläche als geltend.
+ */
+const IST_ANGEKUENDIGT = ['==', ['get', 'angekuendigt'], true];
+
+/**
+ * Eine angekündigte Fläche tritt zurück (0,08 statt 0,2), bleibt aber als Gebiet erkennbar. Der
+ * zweite Kanal ist die gestrichelte Kontur, nicht die Deckkraft.
+ */
+const FLAECHE_DECKKRAFT = ['case', IST_ANGEKUENDIGT, 0.08, 0.2];
+
+/**
  * Doppelkante (LFH-600) wie bei den Personen-Markern (`KANTE_PAINT` in `markerLayer.ts`): 2 px Weiß
  * als Rand am Zeichen, darunter 2 px Schwarz als eigene Ebene, also Zeichenradius + 4. Weiß und
  * Schwarz nebeneinander halten gegen jeden Kartengrund max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58
@@ -82,7 +94,7 @@ export function sorgeFuerFachebeneLayer(
         type: 'fill',
         source: src,
         filter: ['==', ['geometry-type'], 'Polygon'],
-        paint: { 'fill-color': farbe, 'fill-opacity': 0.2 },
+        paint: { 'fill-color': farbe, 'fill-opacity': FLAECHE_DECKKRAFT as never },
       });
     }
     if (!map.getLayer(`fachebene-${def.key}-line`)) {
@@ -90,8 +102,20 @@ export function sorgeFuerFachebeneLayer(
         id: `fachebene-${def.key}-line`,
         type: 'line',
         source: src,
-        filter: ['==', ['geometry-type'], 'Polygon'],
+        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['!', IST_ANGEKUENDIGT]] as never,
         paint: { 'line-color': farbe, 'line-width': 1.5 },
+      });
+    }
+    // Durchgezogen und gestrichelt als zwei gefilterte Layer statt eines datengetriebenen
+    // `line-dasharray`, wie `zonen-line-gestrichelt` (`kartenLayer.ts`). Keine Klickebene: geklickt
+    // wird die Fläche (`fachebeneClickLayerIds`).
+    if (!map.getLayer(`fachebene-${def.key}-line-angekuendigt`)) {
+      map.addLayer({
+        id: `fachebene-${def.key}-line-angekuendigt`,
+        type: 'line',
+        source: src,
+        filter: ['all', ['==', ['geometry-type'], 'Polygon'], IST_ANGEKUENDIGT] as never,
+        paint: { 'line-color': farbe, 'line-width': 1.5, 'line-dasharray': [3, 2] },
       });
     }
   } else {
@@ -202,6 +226,7 @@ function zieheEbenenfarbeNach(map: MapLibreMap, key: FachebeneQuelle, farbe: str
   const ziele: [string, 'fill-color' | 'line-color' | 'circle-color', unknown][] = [
     [`fachebene-${key}-fill`, 'fill-color', farbe],
     [`fachebene-${key}-line`, 'line-color', farbe],
+    [`fachebene-${key}-line-angekuendigt`, 'line-color', farbe],
     [`fachebene-${key}-buendel`, 'circle-color', farbe],
     [`fachebene-${key}-circle`, 'circle-color', punktFarbe(farbe)],
   ];
@@ -215,6 +240,7 @@ function zieheEbenenfarbeNach(map: MapLibreMap, key: FachebeneQuelle, farbe: str
 const layerIds = (key: FachebeneQuelle) => [
   `fachebene-${key}-fill`,
   `fachebene-${key}-line`,
+  `fachebene-${key}-line-angekuendigt`,
   `fachebene-${key}-circle`,
   `fachebene-${key}-kante`,
   `fachebene-${key}-treffer`,

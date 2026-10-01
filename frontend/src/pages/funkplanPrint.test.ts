@@ -40,6 +40,9 @@ describe('funkplanPrint.css', () => {
     const seite = readFileSync(join(HIER, 'FunkplanPage.tsx'), 'utf8');
     expect(seite).toMatch(/className="funkplan-print-root"\s+data-lfh="druckwurzel"/);
     expect(seite).toContain("import './funkplanPrint.css';");
-    expect(seite).toMatch(/<Druckkopf\s+dokumentart="Funkplan"/);
+    // Die Dokumentart folgt der Darstellung (LFH-625): „Funkplan“ bzw. „Fernmeldeskizze“.
+    expect(seite).toMatch(
+      /<Druckkopf\s+dokumentart=\{ansicht === 'skizze' \? 'Fernmeldeskizze' : 'Funkplan'\}/,
+    );
   });
 });
