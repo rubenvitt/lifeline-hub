@@ -945,12 +945,21 @@ describe('CommandPalette · Adresszeile (LFH-638)', () => {
     expect(karte).not.toHaveBeenCalled();
   });
 
-  it('auch allein ist sie wählbar', async () => {
+  it('allein ist sie nicht vorausgewählt: ↵ tut nichts, erst ↓ wählt sie', async () => {
+    // Wer eine Kennung tippt und sofort ↵ drückt, bevor die Datensätze da sind, soll nicht auf der
+    // Karte landen.
     const u = userEvent.setup();
     karte.mockClear();
     renderMitProviders(<CommandPalette befehle={[]} adressSprung={adresse} schliesse={() => {}} />);
-    await u.type(screen.getByRole('combobox'), 'Rathausplatz');
+    const feld = screen.getByRole('combobox');
+    await u.type(feld, 'Rathausplatz');
     expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByRole('option')).toHaveAttribute('aria-selected', 'false');
+    expect(feld).not.toHaveAttribute('aria-activedescendant');
+    await u.keyboard('{Enter}');
+    expect(karte).not.toHaveBeenCalled();
+    await u.keyboard('{ArrowDown}');
+    expect(screen.getByRole('option')).toHaveAttribute('aria-selected', 'true');
     await u.keyboard('{Enter}');
     expect(karte).toHaveBeenCalledTimes(1);
   });

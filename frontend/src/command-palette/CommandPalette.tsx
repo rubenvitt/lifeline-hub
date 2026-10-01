@@ -247,7 +247,11 @@ export function CommandPalette({
   const indexVon = useMemo(() => new Map(flach.map((b, i) => [b.id, i])), [flach]);
   // Fällt der markierte Befehl aus der Liste, gilt wieder die erste Zeile (`findIndex` liefert -1).
   const gefunden = aktivId === null ? -1 : flach.findIndex((b) => b.id === aktivId);
-  const aktiv = gefunden >= 0 ? gefunden : 0;
+  // Die Adresszeile (LFH-638) ist NIE vorausgewählt, auch nicht allein: wer eine Kennung tippt und
+  // sofort ↵ drückt, bevor die Datensätze da sind, landete sonst auf der Lagekarte. Sie steht immer
+  // zuletzt, an Stelle 0 also nur allein — dann ist nichts markiert (-1), ↵ tut nichts, ↓ wählt sie.
+  const vorgabe = flach[0]?.gruppe === 'ortssuche' ? -1 : 0;
+  const aktiv = gefunden >= 0 ? gefunden : vorgabe;
 
   useEffect(() => {
     setAktivId(null);

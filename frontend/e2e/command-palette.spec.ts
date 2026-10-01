@@ -86,7 +86,8 @@ test('öffnet auf 390 px per sichtbarem Trigger, fokussiert die Palette und navi
   await expect(paletteInput(page)).toBeFocused();
 
   await paletteInput(page).fill('lagekarte');
-  await expect(page.getByRole('option', { name: /Lagekarte/ })).toHaveAttribute(
+  // Exakt: am Ende steht auch „Adresse auf Lagekarte suchen · „lagekarte““ (LFH-638).
+  await expect(page.getByRole('option', { name: 'Lagekarte', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
@@ -162,7 +163,8 @@ test('Schnellaktion „Neue Person" navigiert und öffnet die Schnellerfassung (
   await page.keyboard.press('Control+k');
   await expect(paletteInput(page)).toBeVisible();
   await paletteInput(page).fill('Neue Person');
-  await page.getByRole('option', { name: /Neue Person/ }).click();
+  // Verankert: am Ende steht auch „Adresse auf Lagekarte suchen · „Neue Person““ (LFH-638).
+  await page.getByRole('option', { name: /^Neue Person/ }).click();
 
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/personen`));
   await expect(page.getByRole('dialog', { name: 'Schnellerfassung' })).toBeVisible();

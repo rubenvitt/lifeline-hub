@@ -86,8 +86,10 @@ Handschirme vorsieht). Die Vorbelegung geht als Prop `vorbelegung: { text, nonce
 ### D5 — Palette: Zeile springt, sucht nicht selbst
 Neue Gruppe `ortssuche` in `BefehlGruppe` (exhaustive Records `GRUPPE_MERKBAR` = false,
 Beschriftung „Adresse“). Die Zeile entsteht in einem Hook neben `useKoordinatenSprung` (gleiche
-Rechteprüfung, gleiche Lazy-Abfrage), steht **am Ende** der Treffer (nicht vorausgewählt, damit ↵
-weiter den besten Datensatz öffnet) und navigiert per `sprungZu(lagekartePfad(id, { ort }))`. Damit
+Rechteprüfung, gleiche Lazy-Abfrage), steht **am Ende** der Treffer und ist nie vorausgewählt — auch
+allein nicht (dann ist nichts markiert, ↓ wählt sie; Review-Befund: eine schnell getippte Kennung
+mit ↵ landete sonst auf der Karte, bevor die Datensätze da sind), damit ↵ weiter den besten
+Datensatz öffnet und navigiert per `sprungZu(lagekartePfad(id, { ort }))`. Damit
 gelten ↵, Strg/⌘+↵ und Gedächtnisregeln wie für jede Navigationszeile, und die Adresssuche hat
 genau einen Aufrufer (die Karte).
 *Alternative:* Geocoding in der Palette mit Trefferliste — verworfen: die Palette sucht live und

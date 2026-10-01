@@ -42,7 +42,8 @@ describe('CommandPaletteProvider · Adresszeile (LFH-638)', () => {
     await u.type(screen.getByRole('combobox'), 'Hauptstraße 12');
     const zeilen = screen.getAllByRole('option');
     expect(zeilen[zeilen.length - 1]).toHaveTextContent(ADRESSE);
-    await u.keyboard('{Enter}');
+    // Allein steht sie unmarkiert da (nie vorausgewählt) — ↓ wählt sie.
+    await u.keyboard('{ArrowDown}{Enter}');
     expect(screen.getByTestId('ort')).toHaveTextContent(
       '/einsaetze/5/lagekarte?ort=Hauptstra%C3%9Fe%2012',
     );
@@ -55,6 +56,7 @@ describe('CommandPaletteProvider · Adresszeile (LFH-638)', () => {
     await u.keyboard('{Control>}k{/Control}');
     await u.type(screen.getByRole('combobox'), 'Hauptstraße 12');
     expect(screen.getByRole('option', { name: new RegExp(ADRESSE) })).toBeInTheDocument();
+    await u.keyboard('{ArrowDown}');
     fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter', ctrlKey: true });
     expect(oeffne).toHaveBeenCalledTimes(1);
     expect(String(oeffne.mock.calls[0][0])).toBe(

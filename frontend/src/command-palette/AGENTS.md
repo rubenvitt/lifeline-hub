@@ -21,6 +21,6 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   `datensicht-karte`), kein eigener Auswahlzustand. `nurMitFokus` hält zeilengebundene Aktionen aus
   dem Anzeige-Fallback; der Leerfall ist die tragende Aussage (`StatusWahl.palette.test.tsx`).
 - **Adresszeile** (LFH-638, `adressSprung.ts`): „Adresse auf Lagekarte suchen“ steht im
-  Vorgabemodus immer zuletzt und nie vorausgewählt (Stufe 3, Score hinter jedem Treffer, Gruppe
-  `ortssuche` zuletzt). Sie **springt nur** (`lagekartePfad(id, { ort })`); die Palette fragt den
+  Vorgabemodus immer zuletzt und nie vorausgewählt, auch allein nicht (Stufe 3, Score hinter
+  jedem Treffer, Gruppe `ortssuche` zuletzt; Vorgabe -1 in `CommandPalette.tsx`). Sie **springt nur** (`lagekartePfad(id, { ort })`); die Palette fragt den
   Geocoder nie. Rechte wie der Koordinatensprung über `useLagekarteZugang`.
