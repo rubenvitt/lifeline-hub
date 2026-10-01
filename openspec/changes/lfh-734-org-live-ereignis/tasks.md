@@ -46,8 +46,8 @@ und `requesting-code-review`.
 
 ## 7. Nachweis Ende zu Ende
 
-- [ ] 7.1 `e2e/org-live.spec.ts` (Muster `einsatzkopf-live.spec.ts`, zwei Seiten im selben Kontext): Seite B auf der Einsatzliste, Seite A legt einen Einsatz an → B zeigt ihn ohne Reload (Inhaltsanker); Seite B in einem Einsatz mit offenem Switcher, Seite A schließt einen anderen aktiven Einsatz ab → der Switcher verliert ihn; Seite B auf der Personal-Verwaltung, Seite A legt eine Person an → B zeigt sie.
-- [ ] 7.2 Mutationsproben: `einsatzliste` aus `ORG_STREAM_EVENTS` nehmen → 7.1 rot; Mitglieder-Abfrage im Helfer weglassen → 3.4 rot; Empfängerfilter auf „ganze Org" stellen → 3.1 rot; zurückdrehen → grün. Befund in `design.md` oder im PR festhalten.
+- [x] 7.1 `e2e/org-live.spec.ts` (Muster `einsatzkopf-live.spec.ts`, zwei Seiten im selben Kontext): Seite B auf der Einsatzliste, Seite A legt einen Einsatz an → B zeigt ihn ohne Reload (Inhaltsanker); Seite B in einem Einsatz mit offenem Switcher, Seite A schließt einen anderen aktiven Einsatz ab → der Switcher verliert ihn; Seite B auf der Personal-Verwaltung, Seite A legt eine Person an → B zeigt sie.
+- [x] 7.2 Mutationsproben: `einsatzliste` aus `ORG_STREAM_EVENTS` nehmen → 7.1 rot; Mitglieder-Abfrage im Helfer weglassen → 3.4 rot; Empfängerfilter auf „ganze Org" stellen → 3.1 rot; zurückdrehen → grün. Befund in `design.md` oder im PR festhalten.
 
 ## 8. Doku
 

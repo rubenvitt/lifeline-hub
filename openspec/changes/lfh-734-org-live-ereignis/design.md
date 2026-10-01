@@ -206,3 +206,13 @@ Ein PR, Reihenfolge wie bei LFH-555: Backend (Hub, Route, Emitter, Middleware) �
 Frontend. Die Wire-Kontrakte beider Seiten stehen im selben Commit wie das Enum. Keine Migration.
 Rückweg ist ein Revert. Ohne Frontend-Teil bleibt das Backend kompatibel, denn unbekannte
 SSE-Ereignisse ignoriert `EventSource`.
+
+## Nachweis (Mutationsproben, 01.10.2026)
+
+| Probe | Erwartung | Befund |
+| --- | --- | --- |
+| `einsatzliste: []` in `ORG_STREAM_EVENTS` | e2e Liste und Switcher rot | `org-live.spec.ts` Test 1 und 2 rot, Test 3 (Personal) grün; zurück → 3/3 grün |
+| Mitglieder-Abfrage in `einsatzleser_lesen` weggelassen | Mitglied erfährt nichts | Kopfänderungen, Soft-Delete, Wiederherstellen rot. Die Mitgliedschaftstests bleiben grün, weil dort die betroffene Person ohnehin zusätzlich übergeben wird |
+| Empfängerfilter `Einsatzleser` auf „ganze Org" | Benutzer ohne Bezug erhält das Ereignis | Anlage, Kopfänderungen, Mitglied hinzufügen/entfernen, Soft-Delete rot |
+| `/api/material` in `STAMMDATEN_PFADE` durch toten Präfix ersetzt | beide Guards rot | `jede_schreibende_katalogroute_ist_abgedeckt` und `jeder_praefix_deckt_eine_schreibende_route` rot |
+| Org-Listener im Einsatz-Hook entfernt | Vitest rot | 3 Tests der LFH-734-Gruppe in `useEinsatzLiveStream.test.tsx` rot |
