@@ -37,6 +37,32 @@ describe('PaneelZustand', () => {
     expect(screen.queryByText('Inhalt')).toBeNull();
   });
 
+  // LFH-629: der Ladezustand hat die Form des Leerzustands, sonst springt das Paneel beim Eintreffen
+  // der (leeren) Daten. Höhen misst jsdom nicht — `e2e/lagebild-cls-schmal.spec.ts` misst sie.
+  it('hat im Ladezustand die Form des Leerzustands: Satz und Platz der Aktion, kein Knopf', () => {
+    rendere('laden');
+    const laden = screen.getByLabelText('Meldungen wird geladen');
+    expect(laden).toHaveTextContent('wird abgerufen');
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(laden.querySelectorAll('.ant-skeleton-button')).toHaveLength(1);
+  });
+
+  it('hält im Ladezustand keinen Aktionsplatz, wo der Leerzustand keine Aktion trägt', () => {
+    renderMitProviders(
+      <PaneelZustand
+        zustand="laden"
+        titel="Meldungen"
+        leerText="Keine offenen Meldungen."
+        onNeuladen={vi.fn()}
+      >
+        <p>Inhalt</p>
+      </PaneelZustand>,
+    );
+    const laden = screen.getByLabelText('Meldungen wird geladen');
+    expect(laden).toHaveTextContent('wird abgerufen');
+    expect(laden.querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
+  });
+
   it('unterscheidet Fehler von leer — Alarm, „Stand unbekannt" und Neuladen', async () => {
     const { onNeuladen, onLeerAktion } = rendere('fehler');
     const alarm = screen.getByRole('alert');

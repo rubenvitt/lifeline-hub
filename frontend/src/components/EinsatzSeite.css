@@ -23,6 +23,40 @@
   }
 }
 
+/* Der Ortspfad auf schmalem Schirm auf eigener Zeile, die nie umbricht (LFH-629, gemessen bei
+   390 px). Er nennt den Einsatz, und der Name kommt erst mit dem Abruf: aus „Einsätze › … ›“
+   wurde „Einsätze › E2E Lagebild CLS 1790835097189 ›“, der Titel brach in eine zweite Zeile, und
+   alles darunter rückte 22 px (CLS 0,168 auf dem Lage-Dashboard). Auf eigener Zeile ändert der
+   Name nur die Breite dieser Zeile; ein langer kürzt mit Auslassung. Der volle Name steht im
+   Einsatz-Wechsler der Kopfleiste.
+
+   Aus demselben Grund nimmt der Titelblock die ganze Zeile, und die Aktionen stehen darunter:
+   sonst entschied die Breite des Ortspfads, ob der Aktionen-Slot daneben Platz hat. Mit „…“
+   passte „Stand vor 0 s“ neben den Titel, mit dem Namen nicht mehr, und der Kopf wuchs beim
+   Eintreffen des Einsatzes von 49 auf 69 px. */
+@media (max-width: 767.98px) {
+  .lfh-seitenkopf__titelblock {
+    flex-basis: 100%;
+  }
+  .lfh-seitenkopf__pfad {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .lfh-seitenkopf__pfad .ant-breadcrumb ol {
+    flex-wrap: nowrap;
+  }
+  .lfh-seitenkopf__pfad .ant-breadcrumb ol > li {
+    flex-shrink: 0;
+  }
+  .lfh-seitenkopf__pfad .ant-breadcrumb ol > li:not(.ant-breadcrumb-separator) {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 /* Der Datenstand-Platzhalter gilt nur dort, wo er eine Zeile hält: unter `md` (oben). Ab `md`
    steht die Gruppe in der Titelzeile, und die spät eintreffende Meta schob den schon stehenden
    Platzhalter weit nach rechts. CLS rechnet die größte Strecke eines Bildes mal der ganzen

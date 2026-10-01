@@ -262,6 +262,7 @@ export default function EinsatzSeite({
        */}
       <div data-lfh="seitenkopf" style={seitenkopfStil(token, farben, true)}>
         <div
+          className="lfh-seitenkopf__titelblock"
           style={{
             display: 'flex',
             flexWrap: 'wrap',
