@@ -24,7 +24,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 | # | Kriterium | A · Kennzahl | B · Sektion | C · Inspector |
 | --- | --- | --- | --- | --- |
 | 1 | Treffläche | **erfüllt** [M1] | **erfüllt** [M2] | **erfüllt** [T5] |
-| 2 | Handschuh-Modus | **offen → O4** [M1] | **erfüllt** [M2] | **erfüllt** [T5] |
+| 2 | Handschuh-Modus | **erfüllt** (O4 eingelöst, LFH-630) [M1] | **erfüllt** [M2] | **erfüllt** [T5] |
 | 3 | Rückmeldung vor Serverantwort | **nicht anwendbar** | **erfüllt** [T1, B1] | **erfüllt** [T4, B1] |
 | 4 | Zweite Handlung bei kritischer Aktion | **nicht anwendbar** | **nicht anwendbar** | **nicht anwendbar** |
 | 5 | Kontrast in beiden Modi | **erfüllt** [M3] | **erfüllt** [M4] | **erfüllt** [M4, T5] |
@@ -49,8 +49,9 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   am Inspector fehlt (→ O3).
 - **2 · A:** Die Zellen erreichen 72 px Höhe. Sie stehen aber im Fugenraster des Neuentwurfs
   (1 px Fuge), der geforderte Abstand von ≥ 16 px fehlt. Das ist Bestand aus dem Band
-  selbst und nicht durch LFH-606 entstanden. Weil ein Verdikt die ganze Zeile trägt, ist es
-  **offen** (O4).
+  selbst und nicht durch LFH-606 entstanden. Weil ein Verdikt die ganze Zeile trägt, war es
+  **offen** (O4). Eingelöst mit LFH-630: die Links rücken in ihrer Zelle um 8 px ein, die Fuge
+  bleibt 1 px, Gate 3 misst ≥ 16 px zwischen den Kennzahlen.
 - **2 · B:** Alle Ziele erreichen im Handschuh-Betrieb 72 px, auf 1366 und 390 px. Die
   Abstände liegen bei 16 px (Auswahl ↔ „Hinzufügen“) sowie 33 bzw. 83 px (Zeilenmenüs
   untereinander); die Spec sichert ≥ 16 px zu. Die Einträge im geöffneten Dreipunkt-Menü
@@ -217,7 +218,8 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   zugänglichen Namen**; ein Test kann sie nicht per Rolle und Name greifen. Kriterien 1, 5
   und 13 sind am Inspector deshalb über Bauform-Gleichheit belegt, nicht gemessen. Nebenbefund:
   Der namenlose Schalter ist selbst ein Zugänglichkeitsmangel.
-- **O4 · Abstand zwischen den Kennzahl-Zellen:** Das Fugenraster des Neuentwurfs setzt 1 px
+- **O4 · Abstand zwischen den Kennzahl-Zellen — eingelöst (LFH-630,
+  `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`).** Das Fugenraster des Neuentwurfs setzt 1 px
   zwischen die Zellen des Bands, im Handschuh-Betrieb fordert Kriterium 2 ≥ 16 px. Das betrifft
   alle sechs Zellen und ist mit dem Band entstanden, nicht mit LFH-606.
 - **O6 · Kopfzeile bricht bei 1024 px beim Start auf zwei Reihen um (Bestand, alle

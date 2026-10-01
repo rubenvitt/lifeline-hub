@@ -127,18 +127,20 @@
    antd-Innereien. Geometrie und Farben der Zustände, die ein Test prüfen soll,
    stehen als Inline-Stil in den Bausteinen (Vitest fährt mit `css: false`). */
 
-/* Kennzahl im Fugenraster: Grund hier, damit `:hover` ihn überschreiben kann. */
+/* Kennzahl im Fugenraster: Grund hier, damit `:hover` ihn überschreiben kann. Mit Ziel steht
+   der Link eingerückt in der Zelle (LFH-630, Einzug 0 / 4 / 8 px je Dichtestufe): Hover und
+   Fokus liegen auf ihm, damit die Tönung die Trefffläche zeigt und nicht den stillen Rand. */
 .lfh-kennzahl {
   background: var(--lfh-flaeche);
+}
+.lfh-kennzahl__ziel {
+  cursor: pointer;
   transition: background var(--lfh-uebergang);
 }
-.lfh-kennzahl--ziel {
-  cursor: pointer;
-}
-.lfh-kennzahl--ziel:hover {
+.lfh-kennzahl__ziel:hover {
   background: var(--lfh-flaeche-3);
 }
-.lfh-kennzahl--ziel:focus-visible {
+.lfh-kennzahl__ziel:focus-visible {
   outline: 2px solid var(--lfh-bedien);
   outline-offset: -2px;
 }

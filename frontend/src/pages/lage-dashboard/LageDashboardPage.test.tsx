@@ -326,9 +326,14 @@ function paneel(titel: string): HTMLElement {
   return screen.getByRole('region', { name: titel });
 }
 
-/** Die Innenkante der Kennzahl (zweiter Kanal zur Tonfarbe). */
+/**
+ * Die Innenkante der Kennzahl (zweiter Kanal zur Tonfarbe). Mit Ziel liegt sie als Auflage in
+ * der Rasterzelle um den eingerückten Link (LFH-630), ohne Ziel an der Kennzahl selbst.
+ */
 function kante(el: HTMLElement): number {
-  const m = el.style.boxShadow.match(/inset (\d+)px/);
+  const zelle = el.closest<HTMLElement>('[data-lfh="kennzahl-zelle"]');
+  const traeger = zelle ? zelle.querySelector<HTMLElement>('[data-lfh="kennzahl-kante"]') : el;
+  const m = (traeger?.style.boxShadow ?? '').match(/inset (\d+)px/);
   return m ? Number(m[1]) : 0;
 }
 

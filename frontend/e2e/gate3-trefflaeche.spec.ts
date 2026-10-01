@@ -193,7 +193,14 @@ async function gesperrtHaeltStufe(ziel: Locator, soll: number, name: string): Pr
   return haeltStufe(ziel, soll, name);
 }
 
-test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+/**
+ * Abstand zwischen zwei Treffflächen nach der Bedien-Leitlinie (Kriterium 2): komfortabel
+ * ≥ 8 px (Material), handschuh ≥ 16 px (MIL-STD-1472F Fig. 24, abgeleitet), kompakt die
+ * Spacing-Ausnahme. Literale aus demselben Grund wie die Staffel oben.
+ */
+const ZIELABSTAND = { kompakt: null, komfortabel: 8, handschuh: 16 } as const;
+
+test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Staffel 30 / 48 / 72 px, Kennzahlen halten den Zielabstand', async ({
   page,
 }) => {
   // Drei Stufen mit je einem Neuladen: unter Volllast der Suite reicht das Vorgabebudget nicht.
@@ -222,7 +229,27 @@ test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Sta
     // Drei, nicht „mindestens einer": mit `1` bliebe der Test grün, wenn zwei Paneele verschwänden.
     const ausgang = await alleHaltenStufe(ausgaenge, soll, `Paneel-Ausgang (${dichte})`, 3);
 
-    gemessen.push(`${dichte} (Soll ≥ ${soll}): Kennzahl ${kennzahl}, Ausgang ${ausgang}`);
+    // Zielabstand (LFH-630): die Links rücken in ihrer Rasterzelle ein, die Fuge bleibt 1 px.
+    // Gemessen wird jeder der sechs Links gegen jedes andere Bedienziel im Band.
+    const band = page.getByRole('group', { name: 'Lage in Zahlen' });
+    let abstand = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 6; i += 1) {
+      abstand = Math.min(abstand, await abstandZuNachbarn(band, kennzahlen.nth(i)));
+    }
+    const sollAbstand = ZIELABSTAND[dichte];
+    if (sollAbstand != null) {
+      expect(abstand, `kleinster Abstand zwischen Kennzahlen (${dichte})`).toBeGreaterThanOrEqual(
+        sollAbstand - SUBPIXEL,
+      );
+    }
+    if (dichte === 'handschuh') {
+      const fuge = await band.evaluate((el) => getComputedStyle(el).columnGap);
+      expect(fuge, 'das Fugenraster bleibt im Handschuh-Betrieb 1 px').toBe('1px');
+    }
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Kennzahl ${kennzahl}, Ausgang ${ausgang}, Abstand ${abstand}`,
+    );
   }
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
