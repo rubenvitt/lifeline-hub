@@ -80,7 +80,13 @@ export default function AbloesungKarte({
         color: rollen.text,
       }}
     >
-      {/* Zeitspalte: die Fälligkeit bzw. der Vollzug führt, in Mono. */}
+      {/* Zeitspalte: die Fälligkeit bzw. der Vollzug führt, in Mono. Die Zeit ist immer so breit
+          wie das breiteste `kurz`-Format (`DDHHmm`, sechs Ziffern): `HHmm` gilt nur für heute,
+          und wüchse die Spalte mit dem Text, bräche die Karte kurz vor Mitternacht anders um als
+          am Tag — eine fremde Rhythmusänderung ließ sie dann mobil um eine Zeile wachsen
+          (LFH-708, Kriterium 12). `ch` misst die Ziffer der Mono-Schrift, also jede Dichte.
+          Herleitung:
+          `openspec/changes/archive/2026-10-01-lfh-708-abloesungskarte-hoehe-stabil/design.md` */}
       <div
         style={{
           flex: '0 0 auto',
@@ -93,7 +99,7 @@ export default function AbloesungKarte({
           gap: 2,
         }}
       >
-        <span style={{ ...monoStil(13, 500) }} data-lfh="abloesung-zeit">
+        <span style={{ ...monoStil(13, 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
           <ZeitAnzeige wert={laufend ? s.faellig_at : s.vollzogen_at} format="kurz" />
         </span>
         <span style={{ ...monoStil(10), color: rollen.schwach }}>
@@ -111,9 +117,14 @@ export default function AbloesungKarte({
           {laufend && <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>}
           <Text type="secondary">
             {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}
-            im Einsatz seit <ZeitAnzeige wert={s.beginn_at} format="kurz" /> · Rhythmus{' '}
-            {rhythmusText(s.rhythmus_minuten)} (
-            {s.rhythmus_quelle === 'abschnitt' ? 'Vorgabe des Abschnitts' : 'eigener Wert'})
+            im Einsatz seit <ZeitAnzeige wert={s.beginn_at} format="kurz" />
+          </Text>
+          {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
+              Zeile darf sie berühren. Die kurzen Quellenwörter halten auch 167 h 59 min als
+              Vorgabe auf 390 px einzeilig (LFH-708); den Abschnitt nennt die Zeile darüber. */}
+          <Text type="secondary" data-lfh="abloesung-rhythmus">
+            Rhythmus {rhythmusText(s.rhythmus_minuten)} (
+            {s.rhythmus_quelle === 'abschnitt' ? 'Vorgabe' : 'eigen'})
           </Text>
           {s.abloesende_einheit_name && (
             <Text type="secondary">

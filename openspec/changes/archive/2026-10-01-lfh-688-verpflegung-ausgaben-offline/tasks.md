@@ -5,8 +5,8 @@ Code. „Verifiziert“ heißt: Der genannte Test läuft grün **und** war vorhe
 
 ## 1. Schema und Schwärzung
 
-- [x] 1.1 `git fetch origin alpha` und `scripts/check-migrationen.sh`, um die nächste freie Nummer zu bestätigen (Stand Entwurf: `0131`). Verifiziert, wenn das Skript die Nummer als frei meldet.
-- [x] 1.2 `migrations/0131_verpflegung_ausgabe_client_id.sql`: `ADD COLUMN client_id TEXT` an `verpflegung_ausgabe` und partieller UNIQUE-Index `(einsatz_id, client_id) WHERE client_id IS NOT NULL` (D1). Verifiziert mit einem `db`-Test nach dem Muster der Betreuung (0122): Mehrere NULL sind erlaubt, dieselbe `client_id` im selben Einsatz verletzt UNIQUE, in einem anderen Einsatz nicht.
+- [x] 1.1 `git fetch origin alpha` und `scripts/check-migrationen.sh`, um die nächste freie Nummer zu bestätigen (Stand Entwurf: `0131`). Verifiziert, wenn das Skript die Nummer als frei meldet. Vor dem Merge auf `0132` umgelegt (`scripts/check-migrationen.sh --umnummerieren`), weil `alpha` inzwischen `0131_etb_berichtigt_index.sql` trug.
+- [x] 1.2 `migrations/0132_verpflegung_ausgabe_client_id.sql`: `ADD COLUMN client_id TEXT` an `verpflegung_ausgabe` und partieller UNIQUE-Index `(einsatz_id, client_id) WHERE client_id IS NOT NULL` (D1). Verifiziert mit einem `db`-Test nach dem Muster der Betreuung (0122): Mehrere NULL sind erlaubt, dieselbe `client_id` im selben Einsatz verletzt UNIQUE, in einem anderen Einsatz nicht.
 - [x] 1.3 `src/einsatz/schwaerzung_registry.rs`: `retain("client_id", G_IDEMPOTENZ)` in der Regel `verpflegung_ausgabe` (D10). Verifiziert, wenn die Vollständigkeits-Tests der Registry grün sind. Nach 1.2 und ohne den Eintrag sind sie rot.
 
 ## 2. Repo: idempotentes Erfassen

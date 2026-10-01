@@ -48,7 +48,7 @@ _keine_
 
 ## Impact
 
-- **Datenbank:** neue Migration `0131_verpflegung_ausgabe_client_id.sql` (Stand Entwurf; die
+- **Datenbank:** neue Migration `0132_verpflegung_ausgabe_client_id.sql` (Stand Entwurf; die
   Nummer bestätigt `scripts/check-migrationen.sh`). Sie enthält ein `ADD COLUMN` und einen
   partiellen UNIQUE-Index, aber keinen Rebuild.
 - **Backend:** `src/verpflegung/repo.rs` (`AusgabeEingabe.client_id`, `laden_nach_client_id`,

@@ -7,12 +7,12 @@
  * ConfigProvider ohne Theme-Provider auf.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button, Collapse, Popconfirm, Switch, theme } from 'antd';
 import { ThemeModeProvider, useDichte } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
-import { setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
+import { sendeZeigerAenderung, setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
 
 const STUFEN: Dichte[] = ['kompakt', 'komfortabel', 'handschuh'];
 const SPEICHER_SCHLUESSEL = 'lifeline-hub.dichte';
@@ -151,6 +151,21 @@ describe('Bediendichte — Ableitung aus der Zeigerart (LFH-361 · B5a)', () => 
     setzeZeigerGrob(true);
     zeigeSonde();
     expect(stufe()).toBe('komfortabel');
+  });
+
+  // Spec `bedien-dichte`, „Keine Umschaltung während der Sitzung“ (LFH-724): die Zeigerart wird
+  // nur beim Start gelesen. Ein 2-in-1, dessen Tastatur abgenommen wird, behält seine Stufe —
+  // ein hilfreicher Zuhörer ließe das Layout unter dem Finger springen.
+  it('ein Zeigerwechsel während der Sitzung ändert die Stufe nicht (LFH-724)', () => {
+    setzeZeigerGrob(false);
+    zeigeSonde();
+    expect(stufe()).toBe('kompakt');
+
+    act(() => {
+      sendeZeigerAenderung(true);
+    });
+    expect(stufe()).toBe('kompakt');
+    expect(localStorage.getItem(SPEICHER_SCHLUESSEL)).toBeNull();
   });
 });
 

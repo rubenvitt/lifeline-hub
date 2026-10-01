@@ -130,6 +130,9 @@ export default function MeldungenPage() {
   // folgt; Zuklappen ist ausdrückliche Nutzeraktion. Ein Zuklappen unmountete es samt Serienzähler
   // und Wertübernahme.
   const anlegenMutation = useMutation({
+    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
+    // (LFH-705, design.md D6).
+    networkMode: 'always',
     mutationFn: (d: NeueMeldung) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);

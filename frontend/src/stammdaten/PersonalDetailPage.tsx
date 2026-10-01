@@ -1,4 +1,5 @@
-import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, Row, theme } from 'antd';
+import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, Row, Space, theme } from 'antd';
+import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
@@ -131,7 +132,12 @@ export default function PersonalDetailPage() {
       />
       <AdminPage
         breite="schmal"
-        titel={person.name}
+        titel={
+          <Space size={8}>
+            {person.name}
+            {person.ist_demo && <DemoMarke />}
+          </Space>
+        }
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die eine Person nicht auffindbar ist."
         hinweis={
           <SeitenHinweise

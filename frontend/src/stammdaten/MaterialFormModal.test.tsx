@@ -24,6 +24,7 @@ const material: Material = {
   bemerkung: null,
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-26 10:00:00',
+  ist_demo: false,
 };
 
 function handler() {

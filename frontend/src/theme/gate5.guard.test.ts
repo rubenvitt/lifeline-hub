@@ -52,13 +52,14 @@ const dateien = lieseQuellen(SRC);
 
 /**
  * Die Status-, Bedien- und Markenwerte aus `farbenHell`/`farbenDunkel` samt den eindeutigen
- * Textstufen (`normalText`, `bedienText`, `bedienHover`, `achtungText`/`alarmText` am Tag).
+ * Textstufen (`normalText`, `bedienText`, `bedienHover`, `achtungText`/`alarmText` am Tag) und
+ * `alarmHover` (LFH-693).
  *
  * NICHT aufgenommen sind die ETB-Typ- und Warnstufen-Kanten: es sind antd-Presets, die
  * `pages/lagekarte/` als modusunabhängige KARTENFARBEN nutzt; der Scan meldete dort Fehlalarme.
  */
 const ROLLENWERT =
-  /#(b02318|7a5200|1c6640|154e84|185895|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12)/i;
+  /#(b02318|7a5200|1c6640|154e84|185895|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12|7d1810|e88a87|144779)/i;
 
 /**
  * Benannte Ausnahmen: Datei + Wert, jeweils mit Grund, ohne Zeilennummer. Ein Eintrag, der

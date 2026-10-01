@@ -784,3 +784,29 @@ describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
     expect(oeffnung ?? 'hier').toBe('hier');
   });
 });
+
+describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
+  it('springt im Einsatz auf die Druckansicht des Berichts und ist über „Einsatzbericht“ findbar', () => {
+    const k = kontext();
+    const b = baueBefehle(k).find((x) => x.id === 'sprung:einsatzbericht');
+    expect(b).toBeDefined();
+    expect(b!.label).toBe('Einsatzbericht drucken');
+    expect(b!.gruppe).toBe('module');
+    b!.ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einsatzdaten/bericht');
+  });
+
+  it('fehlt ohne Einsatz-Kontext', () => {
+    expect(
+      baueBefehle(kontext({ einsatzId: null })).some((x) => x.id === 'sprung:einsatzbericht'),
+    ).toBe(false);
+  });
+
+  it('steht auch für Beobachter da: der Bericht prüft die Rechte je Quelle selbst', () => {
+    expect(
+      baueBefehle(kontext({ darfSchreibenImEinsatz: false })).some(
+        (x) => x.id === 'sprung:einsatzbericht',
+      ),
+    ).toBe(true);
+  });
+});

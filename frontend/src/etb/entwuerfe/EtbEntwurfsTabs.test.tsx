@@ -9,7 +9,7 @@ import type { EtbBaustein } from '../../api/types';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './entwurfStore';
-import EtbEntwurfsTabs from './EtbEntwurfsTabs';
+import EtbEntwurfsTabs, { entfernenStil } from './EtbEntwurfsTabs';
 import { einsatzFixture } from '../../test/fixtures';
 
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
@@ -211,7 +211,10 @@ describe('EtbEntwurfsTabs', () => {
   async function setzeAnUndMeldeweg(feld: HTMLElement) {
     await userEvent.type(feld, ' /an');
     await userEvent.click(await screen.findByText('An'));
-    await userEvent.type(await screen.findByLabelText('An'), 'Florian 1{Enter}');
+    // Eingefügt statt getippt (LFH-672, Begründung im Test unten); Enter bestätigt wie getippt.
+    await userEvent.click(await screen.findByLabelText('An'));
+    await userEvent.paste('Florian 1');
+    await userEvent.keyboard('{Enter}');
     await userEvent.type(feld, ' /meldeweg');
     await userEvent.click(await screen.findByText('Meldeweg'));
     await userEvent.click(await screen.findByText('Funk'));
@@ -224,7 +227,11 @@ describe('EtbEntwurfsTabs', () => {
     // In `props()` steht der Schalter auf AN.
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).toBeChecked();
 
-    await userEvent.type(feld, 'Erste Meldung');
+    // Meldungstext EINGEFÜGT, nicht getippt: jeder Tastendruck zeichnet die Schnellerfassung neu
+    // (~85 ms in jsdom); mit ~50 Tasten stand der Test bei 3,7 s und riss unter Last die 10 s
+    // (LFH-672). Getippt bleibt, was der Test prüft: die Slash-Befehle und das Absenden.
+    await userEvent.click(feld);
+    await userEvent.paste('Erste Meldung');
     await setzeAnUndMeldeweg(feld);
     await userEvent.type(feld, '{Enter}');
 
@@ -249,7 +256,9 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
 
     // …und sie werden beim nächsten Eintrag ohne erneutes Tippen mitgesendet.
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Zweite Meldung{Enter}');
+    await userEvent.click(screen.getByPlaceholderText(/Inhalt/));
+    await userEvent.paste('Zweite Meldung');
+    await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[1][0]).toMatchObject({
       inhalt: 'Zweite Meldung',
@@ -560,5 +569,35 @@ describe('EtbEntwurfsTabs', () => {
     fireEvent.click(screen.getByRole('button', { name: /Erfassen$/ }));
     await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
     expect(erfassen.mock.calls[1][0].client_id).toBe(neueId);
+  });
+});
+
+/**
+ * Das × eines Entwurfstabs ist ein unbeschriftetes Bedienziel (LFH-724): antds Vorgabe maß
+ * 15 × 24 px in jeder Stufe. Boden auf BEIDEN Achsen ist die kleine Steuerhöhe 24 / 48 / 72
+ * (Literale); die gerenderte Größe misst `e2e/trefflaeche-pruefflaechen.spec.ts`.
+ */
+describe('Entwurfstab schließen — Trefffläche (LFH-724)', () => {
+  for (const [controlHeightSM, boden] of [
+    [24, 24],
+    [48, 48],
+    [72, 72],
+  ] as const) {
+    it(`kleine Steuerhöhe ${controlHeightSM}: das × misst mindestens ${boden} × ${boden} px`, () => {
+      const stil = entfernenStil({ controlHeightSM });
+      expect(stil.minWidth).toBe(boden);
+      expect(stil.minHeight).toBe(boden);
+    });
+  }
+
+  // Der Kartentab hat ein FESTES senkrechtes Polster aus `cardHeight` (antd `cardPadding`): ein
+  // 72-px-Inhalt streckte ihn in handschuh von 90 auf rund 141 px und risse den Deckel der
+  // ETB-Erfassungsleiste (`e2e/leisten-flaeche.spec.ts`). Der negative Rand nimmt die Fläche
+  // aus dem Layout — Margin-Box-Höhe 0 —, die Trefffläche bleibt.
+  it('ist für das Layout höhenneutral: der senkrechte Rand hebt die Höhe genau auf', () => {
+    for (const controlHeightSM of [24, 48, 72]) {
+      const stil = entfernenStil({ controlHeightSM });
+      expect(stil.minHeight + 2 * stil.marginBlock, String(controlHeightSM)).toBe(0);
+    }
   });
 });

@@ -1052,3 +1052,83 @@ async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
 async function klappeZeileAuf(container: HTMLElement) {
   await userEvent.click(within(container).getByRole('button', { name: 'Besatzung zu Florian 1' }));
 }
+
+/**
+ * LFH-733 (Spec `demo-daten`): Demo-Stammdaten bleiben in der Auswahl, stehen aber gesammelt in
+ * der Gruppe „Demo-Daten“ hinter allen echten Fahrzeugen; disponierte Demo-Fahrzeuge tragen die
+ * Marke „Demo“ in der Tabelle.
+ */
+describe('FahrzeugePage · Demo-Marke', () => {
+  const stamm = (id: number, funkrufname: string, ist_demo: boolean) => ({
+    id,
+    funkrufname,
+    fahrzeugtyp: 'LF 20',
+    traegerorganisation: null,
+    kennzeichen: null,
+    opta: null,
+    standort: null,
+    fms_issi: null,
+    sondersignal: false,
+    tragenkapazitaet: null,
+    staerke: null,
+    bemerkung: null,
+    dienststatus: 'in_dienst',
+    angelegt_at: '2026-05-26 09:00:00',
+    ist_demo,
+  });
+
+  function zeige(efs: Record<string, unknown>[], pool: ReturnType<typeof stamm>[]) {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(efs)),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
+      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
+      http.get('/api/fahrzeuge', () => HttpResponse.json(pool)),
+    );
+    return renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+      </Routes>,
+      { route: '/einsaetze/7/fahrzeuge' },
+    );
+  }
+
+  it('Auswahl: echte Fahrzeuge vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...ef, id: 30, fahrzeug_id: 2, ist_demo: true });
+      }),
+    );
+    const { container } = zeige(
+      [],
+      [stamm(2, 'Florian Demo', true), stamm(1, 'Florian Echt', false)],
+    );
+    await screen.findByText('Noch keine Fahrzeuge disponiert');
+    await oeffneAuswahl(container, 'Stamm-Fahrzeug disponieren …');
+    await screen.findByText('Florian Echt (LF 20)');
+    const eintraege = [
+      ...document.querySelectorAll<HTMLElement>('.ant-select-dropdown .ant-select-item'),
+    ].map((e) => e.textContent);
+    expect(eintraege).toEqual(['Florian Echt (LF 20)', 'Demo-Daten', 'Florian Demo (LF 20)Demo']);
+
+    await userEvent.click(screen.getByText('Florian Demo (LF 20)'));
+    await waitFor(() => expect(gesendet).toEqual([{ fahrzeug_id: 2 }]));
+  });
+
+  it('Tabelle: nur die Demo-Disposition trägt „Demo“', async () => {
+    zeige(
+      [
+        { ...ef, id: 10, fahrzeug_id: 1, funkrufname: 'Florian Echt', ist_demo: false },
+        { ...ef, id: 11, fahrzeug_id: 2, funkrufname: 'Florian Demo', ist_demo: true },
+      ],
+      [],
+    );
+    const demoZeile = (await screen.findByText('Florian Demo')).closest('tr')!;
+    const echteZeile = screen.getByText('Florian Echt').closest('tr')!;
+    expect(within(demoZeile).getByText('Demo')).toBeInTheDocument();
+    expect(within(echteZeile).queryByText('Demo')).not.toBeInTheDocument();
+  });
+});

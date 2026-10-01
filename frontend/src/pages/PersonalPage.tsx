@@ -48,6 +48,8 @@ import {
 import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
+import DemoMarke from '../components/DemoMarke';
+import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import {
@@ -218,12 +220,11 @@ export default function PersonalPage() {
   const disponierteIds = new Set(
     eps.map((e) => e.personal_id).filter((x): x is number => x != null),
   );
-  const poolOptionen = (poolQuery.data ?? [])
-    .filter((p) => !disponierteIds.has(p.id))
-    .map((p) => ({
-      value: p.id,
-      label: `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,
-    }));
+  // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
+  const poolOptionen = demoGruppierteOptionen(
+    (poolQuery.data ?? []).filter((p) => !disponierteIds.has(p.id)),
+    (p) => `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,
+  );
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
@@ -291,6 +292,7 @@ export default function PersonalPage() {
         <Space>
           {ep.name}
           {ep.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
+          {ep.ist_demo && <DemoMarke />}
         </Space>
       ),
     },

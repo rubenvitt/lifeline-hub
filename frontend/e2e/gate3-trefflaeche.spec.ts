@@ -6,12 +6,32 @@ import {
   zuordnungsKarte,
 } from './einheit-fixture';
 import { benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import {
+  BODEN_KARTE,
+  BODEN_MENUE,
+  FUEKW,
+  HANDSCHIRM,
+  STAFFEL,
+  SUBPIXEL,
+  ZIELABSTAND,
+  alleHaltenStufe,
+  anlegen,
+  anmelden,
+  einsatzAnlegen,
+  gegenprobe,
+  gesperrtHaeltStufe,
+  haeltStufe,
+  kurzeAchseHaelt,
+  rechteHinweisSteht,
+  ruhigeHoehe,
+  stelleDichte,
+} from './trefflaeche-kern';
 
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
  * Einsatzauswahl, Einheiten-Detailroute, Einsatz-Navigationsrahmen, Kräfteübersicht mit
- * Verdichtungszeile und Stab-Route. Alle Blöcke teilen die Helfer unten; wer etwas anhängt,
- * nimmt dieselben Helfer statt einer Kopie.
+ * Verdichtungszeile und Stab-Route. Alle Blöcke teilen die Helfer aus `trefflaeche-kern.ts`
+ * (LFH-724); wer etwas anhängt, nimmt dieselben Helfer statt einer Kopie.
  *
  * Browser statt Vitest: Vitest fährt mit `css: false`, jsdom rechnet kein Layout. Ein
  * überschriebenes `min-height`, ein `display: inline` oder ein Wrapper ohne Staffel wären
@@ -37,28 +57,6 @@ import { benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
  * `command-palette.spec.ts` per strict mode flaken.
  */
 
-const ADMIN = 'admin';
-const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-
-/** Die Dichte-Staffel als handgeschriebene Zahlen — siehe Kopfkommentar. */
-const STAFFEL = [
-  { dichte: 'kompakt', soll: 30 },
-  { dichte: 'komfortabel', soll: 48 },
-  { dichte: 'handschuh', soll: 72 },
-] as const;
-
-/**
- * Subpixel-Spielraum: `boundingBox()` liefert Fließkomma, und Chromium rundet unter Last
- * anders (47,99999809 gegen 48). Ein halbes Pixel trennt die Stufen weiterhin klar.
- */
-const SUBPIXEL = 0.5;
-
-/** Fükw-Maß aus der Bedien-Leitlinie (A1, Gate 1). */
-const FUEKW = { width: 1366, height: 768 };
-
-/** Handschirm-Maß aus A1 — unter antds `lg`, also der Drawer-Zweig des Navigationsrahmens. */
-const HANDSCHIRM = { width: 390, height: 844 };
-
 /**
  * Die Böden JE ZIEL des Navigationsrahmens, als Literale wie {@link STAFFEL}. Der Rahmen
  * trägt drei Verträge:
@@ -81,89 +79,9 @@ const BODEN = {
   benutzermenue: { kompakt: 40, komfortabel: 48, handschuh: 72 },
 } as const;
 
-/** Schlüssel aus `theme/ThemeModeProvider.tsx`. Bewusst literal — Vertrag, kein Import. */
-const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
-
 /** `SUCHE_AB` aus `EinsaetzePage.tsx`, als Literal: fällt die Schwelle dort, fehlt das
  *  Suchfeld, und `toHaveCount(1)` sagt es laut. */
 const SUCHE_AB = 8;
-
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-/** Einsatz per API: acht Einsätze über die UI wären 32 Formularaktionen ohne Erkenntnisgewinn. */
-async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
-  expect(
-    antwort.ok(),
-    `Seeding Einsatz „${bezeichnung}": ${antwort.status()} ${await antwort.text()}`,
-  ).toBeTruthy();
-  const { id } = (await antwort.json()) as { id: number };
-  return String(id);
-}
-
-async function anlegen(page: Page, einsatzId: string, pfad: string, data: unknown, was: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
-  expect(antwort.ok(), `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
-}
-
-/**
- * Stellt die Bediendichte und lädt neu — `ThemeModeProvider` liest den Speicher nur beim
- * Montieren. Die `data-dichte`-Wache trennt „Ziel zu klein" von „Stufe nicht angekommen".
- */
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
-    DICHTE_SCHLUESSEL,
-    dichte,
-  ] as const);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-}
-
-/** Höhe GENAU EINES Knotens, subpixel-tolerant gegen die Sollstufe (Untergrenze). */
-async function haeltStufe(ziel: Locator, soll: number, name: string): Promise<number> {
-  await expect(ziel, `${name}: genau ein Knoten muss gemessen werden`).toHaveCount(1);
-  const kasten = await ziel.boundingBox();
-  expect(kasten, `${name}: kein Kasten messbar`).not.toBeNull();
-  expect(
-    kasten!.height,
-    `${name} (gemessen ${kasten!.height}px hoch, Soll ≥ ${soll})`,
-  ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
-  return kasten!.height;
-}
-
-/**
- * Höhe JEDES Knotens einer Menge. `mindestens` ist die Zahl, die das Seeding garantiert —
- * trifft der Locator weniger, misst er einen Leer- oder Ladezustand. Zurück kommt das
- * kleinste Maß für die Anmerkung am Test.
- */
-async function alleHaltenStufe(
-  ziele: Locator,
-  soll: number,
-  name: string,
-  mindestens: number,
-): Promise<number> {
-  const anzahl = await ziele.count();
-  expect(anzahl, `${name}: mindestens ${mindestens} Knoten erwartet`).toBeGreaterThanOrEqual(
-    mindestens,
-  );
-  let kleinstes = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < anzahl; i += 1) {
-    const kasten = await ziele.nth(i).boundingBox();
-    expect(kasten, `${name} #${i + 1}: kein Kasten messbar`).not.toBeNull();
-    expect(
-      kasten!.height,
-      `${name} #${i + 1} (gemessen ${kasten!.height}px hoch, Soll ≥ ${soll})`,
-    ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
-    kleinstes = Math.min(kleinstes, kasten!.height);
-  }
-  return kleinstes;
-}
 
 // ── Nur-Lese-Zweig (LFH-435) ───────────────────────────────────────────────────────────
 //
@@ -172,33 +90,6 @@ async function alleHaltenStufe(
 // was dem Beobachter bleibt. Reihenfolge je Stufe: erst ein DATENANKER (die Seite trägt ihre
 // Daten), dann die Vorbedingungen des Zweigs, dann die Messung. Ein `toHaveCount(0)` vor dem
 // Anker wäre grün durch Nichtstun — während des Ladens fehlen die Ziele ohnehin.
-
-/** Wortanfang aller Rechtehinweise der Einsatzmodule (aktiver Einsatz, ohne Schreibrecht). */
-const NUR_SCHREIBENDE = /^Nur Einsatzleitung und Führungspersonal/;
-
-/** Der Rechtehinweis des Nur-Lese-Zweigs (`RechteHinweis`, antd `Alert` mit `role="alert"`). */
-async function rechteHinweisSteht(page: Page) {
-  await expect(
-    page.getByRole('alert').filter({ hasText: NUR_SCHREIBENDE }),
-    'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
-  ).toBeVisible();
-}
-
-/**
- * Eine gesperrte Primäraktion im Seitenkopf: gesperrt statt versteckt, also MUSS sie da und
- * gesperrt sein — und hält trotzdem die Stufe (ein gesperrtes Ziel ist ein sichtbares Ziel).
- */
-async function gesperrtHaeltStufe(ziel: Locator, soll: number, name: string): Promise<number> {
-  await expect(ziel, `Vorbedingung: ${name} steht gesperrt`).toBeDisabled();
-  return haeltStufe(ziel, soll, name);
-}
-
-/**
- * Abstand zwischen zwei Treffflächen nach der Bedien-Leitlinie (Kriterium 2): komfortabel
- * ≥ 8 px (Material), handschuh ≥ 16 px (MIL-STD-1472F Fig. 24, abgeleitet), kompakt die
- * Spacing-Ausnahme. Literale aus demselben Grund wie die Staffel oben.
- */
-const ZIELABSTAND = { kompakt: null, komfortabel: 8, handschuh: 16 } as const;
 
 test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Staffel 30 / 48 / 72 px, Kennzahlen halten den Zielabstand', async ({
   page,
@@ -2837,84 +2728,13 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
 
 // ── ETB, Lagekarte, Gefahrenmatrix ───────────────────────────────────────────────────
 //
-// Zwei Zusätze zu den Helfern oben:
+// Zwei Zusätze zu den Helfern (`trefflaeche-kern.ts`):
 //  - DIE KURZE ACHSE: ein unbeschriftetes Ziel (Symbolknopf, Matrixzelle) muss die Stufe auf
 //    BEIDEN Achsen halten; {@link kurzeAchseHaelt} misst `min(Breite, Höhe)`.
 //  - EINE GEGENPROBE, DIE ROT WERDEN KANN: Untergrenzen blieben grün, wenn jedes Ziel in
 //    jeder Stufe 72 px mäße — dann hätte die Stufe nichts bewirkt. Jeder Block sichert
 //    deshalb zu, dass das kleinste Maß in `kompakt` STRENG kleiner ist als in `handschuh`;
 //    die Matrix hält in `kompakt` zusätzlich eine Obergrenze (< 48).
-
-/** Boden der Menüeinträge eines `Dropdown`: antd gibt ihnen `controlHeightSM` (24 / 48 / 72). */
-const BODEN_MENUE = { kompakt: 24, komfortabel: 48, handschuh: 72 } as const;
-
-/** Boden der Kartenknöpfe: `kartenKnopfKante = max(32, controlHeight)` in
- *  `KartenUeberlagerung.tsx` — in `kompakt` also 32, nicht 30. Literal, kein Import. */
-const BODEN_KARTE = { kompakt: 32, komfortabel: 48, handschuh: 72 } as const;
-
-/**
- * Kurze Achse JEDES Knotens einer Menge: `min(Breite, Höhe) ≥ soll`. Zurück kommen das
- * kleinste Maß (für die Anmerkung und die Gegenprobe) und das größte Maß der LANGEN Achse
- * (für eine Obergrenze in `kompakt`).
- */
-async function kurzeAchseHaelt(
-  ziele: Locator,
-  soll: number,
-  name: string,
-  mindestens: number,
-): Promise<{ kleinstes: number; groesstes: number }> {
-  const anzahl = await ziele.count();
-  expect(anzahl, `${name}: mindestens ${mindestens} Knoten erwartet`).toBeGreaterThanOrEqual(
-    mindestens,
-  );
-  let kleinstes = Number.POSITIVE_INFINITY;
-  let groesstes = 0;
-  for (let i = 0; i < anzahl; i += 1) {
-    const kasten = await ziele.nth(i).boundingBox();
-    expect(kasten, `${name} #${i + 1}: kein Kasten messbar`).not.toBeNull();
-    const kurz = Math.min(kasten!.width, kasten!.height);
-    expect(
-      kurz,
-      `${name} #${i + 1} (gemessen ${kasten!.width}×${kasten!.height}px, kurze Achse Soll ≥ ${soll})`,
-    ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
-    kleinstes = Math.min(kleinstes, kurz);
-    groesstes = Math.max(groesstes, kasten!.width, kasten!.height);
-  }
-  return { kleinstes, groesstes };
-}
-
-/**
- * Höhe eines animiert aufklappenden Menüeintrags, erst wenn der Kasten STEHT (zwei gleiche
- * Lesungen). Mitten in der `scaleY`-Animation gelesen wäre er in `kompakt` zu klein, und die
- * Gegenprobe „kompakt < handschuh" grün durch zu frühes Hinsehen.
- */
-async function ruhigeHoehe(ziel: Locator, name: string): Promise<number> {
-  let vorher = -1;
-  let jetzt = 0;
-  await expect
-    .poll(
-      async () => {
-        vorher = jetzt;
-        jetzt = (await ziel.boundingBox())?.height ?? 0;
-        return jetzt > 0 && jetzt === vorher;
-      },
-      { message: `${name}: der Kasten kommt nicht zur Ruhe`, intervals: [100, 150, 200] },
-    )
-    .toBe(true);
-  return jetzt;
-}
-
-/** Legt die Gegenprobe für eine Zielsorte fest: kompakt STRENG kleiner als handschuh. */
-function gegenprobe(je: Map<string, number>, sorte: string) {
-  const k = je.get(`kompakt ${sorte}`);
-  const h = je.get(`handschuh ${sorte}`);
-  expect(k, `${sorte}: kompakt nicht gemessen`).toBeDefined();
-  expect(h, `${sorte}: handschuh nicht gemessen`).toBeDefined();
-  expect(
-    k!,
-    `${sorte}: die Stufe muss durchschlagen — kompakt ${k} px, handschuh ${h} px`,
-  ).toBeLessThan(h!);
-}
 
 test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dichte-Staffel', async ({
   page,
