@@ -23,12 +23,12 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * laufen („angeordnet", „läuft", „fast voll"; „voll", „überbelegt"). Ebenso tragend ist der
  * gewählte Radio-Knopf, dessen Text `src/index.css` auf `--lfh-bedien-text` setzt.
  *
- * DREI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen; bis dahin gilt 4,5 : 1, der
+ * ZWEI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen; bis dahin gilt 4,5 : 1, der
  * Zielwert steht in jeder Meldung:
  *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
- *  · Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag;
  *  · Rot am Tag → LFH-693: der Menüeintrag „Stornieren" und der rote Knopf im Storno-Dialog.
- * Fallen die Ausnahmen, wenn diese Tickets landen.
+ * Fallen die Ausnahmen, wenn diese Tickets landen. Der Primärknopf (Weiß auf `bedien`) trägt
+ * seit LFH-661 den vollen Boden.
  *
  * ═══ KRITERIUM 13 — Fokus nie verdeckt (WCAG 2.4.11) ════════════════════════════════════
  *
@@ -221,7 +221,6 @@ interface Textknoten {
   ziel: Locator;
   text: string;
   tertiaer: boolean;
-  primaer: boolean;
   rotText: boolean;
   weissAufAlarm: boolean;
 }
@@ -234,7 +233,6 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
     const liste: {
       text: string;
       tertiaer: boolean;
-      primaer: boolean;
       rotText: boolean;
       weissAufAlarm: boolean;
     }[] = [];
@@ -251,7 +249,6 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
       liste.push({
         text: eigen,
         tertiaer: el.closest(tertiaer) != null,
-        primaer: el.closest('.ant-btn-primary') != null,
         rotText: el.closest('.ant-dropdown-menu-item-danger') != null,
         weissAufAlarm: el.closest('.ant-btn-dangerous.ant-btn-primary') != null,
       });
@@ -357,7 +354,7 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer, primaer, rotText, weissAufAlarm } of knoten) {
+      for (const { ziel, text, tertiaer, rotText, weissAufAlarm } of knoten) {
         const m = await kontrast(ziel);
         const ausnahme = tertiaer
           ? 'Tertiärtext → LFH-643'
@@ -365,9 +362,7 @@ for (const modus of ['light', 'dark'] as const) {
             ? 'Rot als Text → LFH-693'
             : tag && weissAufAlarm
               ? 'Weiß auf alarm → LFH-693'
-              : tag && primaer
-                ? 'Weiß auf bedien → LFH-661'
-                : null;
+              : null;
         const schranke = ausnahme ? BODEN : TEXT[modus];
         const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
         messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
@@ -494,6 +489,9 @@ for (const modus of ['light', 'dark'] as const) {
       ['Zeilenmenü', 'Bearbeiten (Status, Kapazität)'],
       ['Stornieren', 'Betreuungsstelle Turnhalle Ost stornieren?'],
       ['Stornieren', 'Abbrechen'],
+      // Primärknöpfe: Kopfknopf und Absende-Knopf (Weiß auf `bedien`, LFH-661).
+      ['Stelle bearbeiten', 'Speichern'],
+      ['kopf', 'Evakuierungsbezirk anlegen'],
     ] as const)
       pruefeGesehen(flaeche, tragend, true);
     for (const [flaeche, ausnahme] of [
@@ -520,13 +518,10 @@ for (const modus of ['light', 'dark'] as const) {
       ],
     ] as const)
       pruefeGesehen(flaeche, ausnahme, false);
-    // Am Tag unter einer Ausnahme, nachts tragend: Rot als Text und Weiß auf `alarm`
-    // (LFH-693), Weiß auf `bedien` im Primärknopf (LFH-661).
+    // Am Tag unter einer Ausnahme, nachts tragend: Rot als Text und Weiß auf `alarm` (LFH-693).
     for (const [flaeche, nurTagsAusnahme] of [
       ['Zeilenmenü', 'Stornieren'],
       ['Stornieren', 'Stornieren'],
-      ['Stelle bearbeiten', 'Speichern'],
-      ['kopf', 'Evakuierungsbezirk anlegen'],
     ] as const)
       pruefeGesehen(flaeche, nurTagsAusnahme, !tag);
 

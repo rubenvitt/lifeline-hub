@@ -15,17 +15,16 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * Textbaum gefunden (eine Selektorliste übersähe das nächste Textstück). Zustandstragende
  * Kartenränder gegen Seitengrund und Kartenfläche sowie Etikettränder ≥ 3 : 1 (WCAG 1.4.11).
  *
- * ZWEI BENANNTE AUSNAHMEN (geteilte Rollen; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
- *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
- *  · Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag.
- * Fallen die Ausnahmen, wenn LFH-643/LFH-661 landen.
+ * EINE BENANNTE AUSNAHME (geteilte Rolle; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
+ *  · Tertiärtext (`schwach`) → LFH-643, beide Modi.
+ * Fällt die Ausnahme, wenn LFH-643 landet. Der Primärknopf trägt seit LFH-661 den vollen Boden.
  *
  * Der Rand der planmäßigen und der abgelösten Karte trägt keinen Zustand (Linienfarbe) —
  * gemessen und angehängt, und zugesichert, dass er sich von den Zustandsrändern unterscheidet.
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die zwei Ausnahmen oben. */
+/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die Ausnahme oben. */
 const BODEN = 4.5;
 const ZUSTAND = 3;
 
@@ -72,7 +71,6 @@ interface Textknoten {
   ziel: Locator;
   text: string;
   tertiaer: boolean;
-  primaer: boolean;
 }
 
 /** Jedes Element unter `wurzel` mit eigenem, sichtbarem Text, als Locator über eine
@@ -82,7 +80,7 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
     // Marken eines früheren Aufrufs räumen, sonst träfe dieselbe Nummer zwei Knoten.
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: { text: string; tertiaer: boolean; primaer: boolean }[] = [];
+    const liste: { text: string; tertiaer: boolean }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       const eigen = [...el.childNodes]
@@ -95,7 +93,6 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
       liste.push({
         text: eigen,
         tertiaer: el.closest(tertiaer) != null,
-        primaer: el.closest('.ant-btn-primary') != null,
       });
     }
     return liste;
@@ -215,14 +212,9 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer, primaer } of knoten) {
+      for (const { ziel, text, tertiaer } of knoten) {
         const m = await kontrast(ziel);
-        const tag = modus === 'light';
-        const ausnahme = tertiaer
-          ? 'Tertiärtext → LFH-643'
-          : tag && primaer
-            ? 'Weiß auf bedien → LFH-661'
-            : null;
+        const ausnahme = tertiaer ? 'Tertiärtext → LFH-643' : null;
         const schranke = ausnahme ? BODEN : TEXT[modus];
         const kontext = `${modus}, ${ansicht}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
         messwerte.push({ modus, ansicht, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
@@ -283,6 +275,9 @@ for (const modus of ['light', 'dark'] as const) {
       'Zeitpunkt',
       'Ablösung',
       /^4 laufend · 2 fällig$/,
+      // Primärknöpfe: Kopfknopf und Absende-Knöpfe der Dialoge (LFH-661).
+      'Schicht beginnen',
+      'Vollziehen',
     ])
       pruefeGesehen(tragend, true);
     for (const ausnahme of ['fällig', 'abgelöst', `Abgelöst durch ${FOLGE}`, 'Leer: jetzt'])
