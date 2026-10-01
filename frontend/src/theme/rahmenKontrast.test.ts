@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { kontrast, luminanz } from '../test/farbmass';
 import { farbenDunkel, rahmenFarben } from './tokens';
 
 /**
@@ -10,18 +11,6 @@ import { farbenDunkel, rahmenFarben } from './tokens';
  * (WCAG 1.4.3 nimmt inaktive Komponenten aus) halten den Boden ≥ 4,5 : 1 und tragen die Sperre
  * zusätzlich ohne Farbe (Schloss-Ikone, `AppLayout.tsx`). Böden als Literale.
  */
-function luminanz(hex: string): number {
-  const h = hex.replace('#', '');
-  const [r, g, b] = [0, 2, 4].map((i) => {
-    const s = Number.parseInt(h.slice(i, i + 2), 16) / 255;
-    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-function kontrast(a: string, b: string): number {
-  const [x, y] = [luminanz(a), luminanz(b)];
-  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
-}
 
 /** Jeder Grund, auf dem im Rahmen Text steht: Leiste/Rail, Suchfeld, aktive Rail-Zeile. */
 const GRUENDE = ['grund', 'feld', 'aktiv'] as const;
