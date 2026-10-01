@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
@@ -11,6 +11,9 @@ import DokumentePage from './DokumentePage';
 import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
+// Gewartet wird mit RTLs `waitFor` (5 s, `test/setup.ts`), nicht mit `vi.waitFor`: dessen Budget
+// steht fest auf 1 s, und unter Last kam der Einsatz später — „?neu=1 … NICHT für Beobachter“
+// scheiterte so am Warten statt an der Sache (LFH-672).
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
@@ -113,7 +116,7 @@ async function dialogBearbeiten() {
 
 /** Das offene Menü der gebündelten Kartenaktionen (Muster `Datensicht.test.tsx`). */
 async function offenesMenue() {
-  return vi.waitFor(() => {
+  return waitFor(() => {
     const m = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
@@ -175,7 +178,7 @@ describe('DokumentePage', () => {
     await screen.findByRole('link', { name: 'Foto Einsatzstelle' });
     await userEvent.click(screen.getByRole('combobox', { name: 'Kategorie' }));
     await userEvent.click(await screen.findByTitle('Foto'));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Lageplan Nord' })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('link', { name: 'Foto Einsatzstelle' })).toBeInTheDocument();
@@ -200,7 +203,7 @@ describe('DokumentePage', () => {
     // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt entschieden.
     // Auf den Leertext zu warten reichte nicht: ein fälschlich geöffneter Dialog hängt erst danach
     // ein.
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
@@ -246,7 +249,7 @@ describe('DokumentePage', () => {
     await userEvent.clear(titel);
     await userEvent.type(titel, 'Lageplan Süd');
     await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(aenderungen).toEqual([
         {
           id: '5',
@@ -275,7 +278,7 @@ describe('DokumentePage', () => {
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(loeschAufrufe).toEqual([]);
     await userEvent.click(ok);
-    await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
+    await waitFor(() => expect(loeschAufrufe).toEqual(['5']));
   });
 
   it('Kartenzweig: Bearbeiten ist die Primäraktion und öffnet den Dialog', async () => {
@@ -316,7 +319,7 @@ describe('DokumentePage', () => {
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(loeschAufrufe).toEqual([]);
     await userEvent.click(ok);
-    await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
+    await waitFor(() => expect(loeschAufrufe).toEqual(['5']));
   });
 
   it('zeigt ein gescheitertes Entfernen im Hinweis-Slot der Seite', async () => {
