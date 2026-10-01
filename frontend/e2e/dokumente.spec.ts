@@ -291,7 +291,10 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
   const rueckfrage = page.getByRole('dialog').filter({ hasText: 'Dokument entfernen?' });
   const ok = rueckfrage.getByRole('button', { name: 'Entfernen' });
   await expect(ok, 'das OK der Rückfrage ist rot').toHaveClass(/ant-btn-dangerous/);
+  // Erst nach der Zoom-Einblendung klicken: währenddessen nimmt das Modal keinen Klick an.
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
   await ok.click();
+  await expect(rueckfrage, 'die Rückfrage schließt mit dem OK').toBeHidden();
   await expect(page.getByRole('link', { name: 'Lageplan Nord' })).toHaveCount(0);
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
 });

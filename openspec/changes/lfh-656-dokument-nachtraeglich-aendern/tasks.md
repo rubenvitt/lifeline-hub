@@ -68,13 +68,13 @@
       Seiten-`<Modal>` für die Karten-Rückfrage, Zustand `inBearbeitung: Dokument | null`. Den
       Dateikopf („── Entfernen ──“) auf zwei Aktionen nachziehen. Prüfung: `DokumentePage.test.tsx`
       und `aktionsabstand.guard.test.ts` grün.
-- [ ] 5.3 e2e-Fall in der bestehenden Dokumente-Suite unter `frontend/e2e/` ergänzen (Regeln in
+- [x] 5.3 e2e-Fall in der bestehenden Dokumente-Suite unter `frontend/e2e/` ergänzen (Regeln in
       `frontend/e2e/AGENTS.md`): Dokument ablegen, über „Bearbeiten“ Titel ändern, neue Zeile und
       ETB-Eintrag „Dokument geändert:“ sichtbar. Prüfung: Der Fall läuft lokal grün.
 
 ## 6. Nachweis und Abschluss
 
-- [ ] 6.1 Prüfliste `docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md` ist eingefrorenes
+- [x] 6.1 Prüfliste `docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md` ist eingefrorenes
       Archiv und bleibt unangetastet. Stattdessen im ClickUp-Task LFH-656 die Belegstellen
       (Tests aus 2–5) nennen. Prüfung: Kommentar am Task vorhanden.
 - [ ] 6.2 `./scripts/check-all.sh` läuft grün (bzw. in der CI des PRs). Prüfung: Ausgabe ohne
