@@ -279,6 +279,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
             "lagebericht_id",
             "folgeauftraege",
             "anhaenge",
+            "berichtigt_durch",
         ] {
             assert!(!o.contains_key(k), "Archiv-ETB darf {k} nicht tragen");
         }
