@@ -225,22 +225,25 @@ export function rendereFuehrungsorganisationMarkdown(
   org: Fuehrungsorganisation,
   opts: {
     stand: string;
-    stab: readonly Stabsfunktion[] | null;
+    /** `null`: nicht freigegeben (kein Wort darüber) · `'fehler'`: Abruf gescheitert. */
+    stab: readonly Stabsfunktion[] | 'fehler' | null;
     einheitenZustand: AbrufZustand;
   },
 ): string {
   const stab =
     opts.stab == null
       ? []
-      : [
-          `- Stab: ${
-            opts.stab.length === 0 || stabZeilen(opts.stab).length === 0
-              ? 'kein Sachgebiet besetzt'
-              : stabZeilen(opts.stab)
-                  .map((z) => `${z.kuerzel} ${md(z.text)}`)
-                  .join(' · ')
-          }`,
-        ];
+      : opts.stab === 'fehler'
+        ? ['- Stab: Besetzung nicht geladen']
+        : [
+            `- Stab: ${
+              opts.stab.length === 0 || stabZeilen(opts.stab).length === 0
+                ? 'kein Sachgebiet besetzt'
+                : stabZeilen(opts.stab)
+                    .map((z) => `${z.kuerzel} ${md(z.text)}`)
+                    .join(' · ')
+            }`,
+          ];
   // Der Bericht geht bei Freigabe unveränderlich ins ETB: was fehlt, steht darin.
   const quellen =
     opts.einheitenZustand !== 'daten'

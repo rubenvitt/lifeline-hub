@@ -207,6 +207,17 @@ describe('baueFuehrungsorganisation — Stärke aus derselben Rechnung wie der G
     });
   });
 
+  it('pinnt die Werte als Literale, nicht nur gegen dieselbe Funktion', () => {
+    // 10 (1/1/4, kumuliert inkl. 11) in Abschnitt 2, 12 (0/1/5) in Abschnitt 3; 11 zählt nicht
+    // doppelt. Abschnitt 1 trägt beide Unterabschnitte.
+    expect(finde(org.wurzeln, 'ab-2')).toMatchObject({
+      staerke: { fuehrer: 1, unterfuehrer: 1, mannschaft: 4 },
+    });
+    expect(finde(org.wurzeln, 'ab-1')).toMatchObject({
+      staerke: { fuehrer: 1, unterfuehrer: 2, mannschaft: 9 },
+    });
+  });
+
   it('Abschnitt ohne Einheiten hat null, nicht 0/0/0', () => {
     expect(finde(org.wurzeln, 'ab-4')).toMatchObject({ staerke: null });
   });
@@ -317,6 +328,13 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       einheitenZustand: 'daten',
     });
     expect(leer).toContain('- Stab: kein Sachgebiet besetzt\n');
+    // Was fehlt, steht darin: ein gescheiterter Abruf ist kein leerer Stab.
+    const fehler = rendereFuehrungsorganisationMarkdown(org, {
+      stand: 'x',
+      stab: 'fehler',
+      einheitenZustand: 'daten',
+    });
+    expect(fehler).toContain('- Stab: Besetzung nicht geladen\n');
   });
 
   it('nennt fehlende Einheiten als Quelle und schreibt die Stärke als „—“', () => {

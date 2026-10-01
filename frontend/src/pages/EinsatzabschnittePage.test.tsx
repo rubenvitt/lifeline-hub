@@ -770,6 +770,34 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
   });
 
+  it('„Abschnitt anlegen“ im Organigramm führt in die Gliederung mit offenem Entwurf', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    await screen.findByRole('region', { name: 'Organigramm' });
+    await userEvent.click(screen.getByRole('button', { name: 'Abschnitt anlegen' }));
+    expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
+  });
+
+  it('?neu=1 gewinnt gegen ?ansicht=organigramm: der Entwurf steht sichtbar in der Gliederung', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte?neu=1&ansicht=organigramm');
+    expect(await screen.findByText('Neuer Abschnitt (ungespeichert)')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
+  });
+
+  it('ohne Abschnitte behauptet es keine leere Lage, solange die Einheiten fehlen', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
+      ...handlers('einsatzleitung', 'aktiv', []),
+      ...organigrammHandler,
+    );
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    expect(await screen.findByText('Einheiten: nicht geladen')).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Abschnitte')).not.toBeInTheDocument();
+  });
+
   it('nennt fehlende Einheiten als Grund und zeigt keine Stärke', async () => {
     // Der erste passende Handler gewinnt: der Fehler muss vor der Grundausstattung stehen.
     server.use(

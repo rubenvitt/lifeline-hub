@@ -28,6 +28,7 @@ import { ZUSTAND_GRUND } from '../../stab/funkplan';
 import type { Quelle } from '../../stab/luecken';
 import { useStabFreigabe } from '../../stab/useStabFreigabe';
 import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
+import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import {
   baueFuehrungsorganisation,
   klappbareSchluessel,
@@ -232,7 +233,8 @@ function Zweig({ knoten, tiefe, einsatzId, zugeklappt, onUmschalten }: ZweigProp
           data-lfh="org-klappen"
           aria-label={`Unterstellte von ${bezeichnung}`}
           aria-expanded={offen}
-          aria-controls={kinderId}
+          // Zugeklappt ist die Liste nicht im DOM; ein Verweis zeigte ins Leere.
+          aria-controls={offen ? kinderId : undefined}
           icon={offen ? <IkoneChevronRunter /> : <IkoneChevronRechts />}
           onClick={() => onUmschalten(knoten.key)}
         />
@@ -306,22 +308,28 @@ function KnotenInhalt({
       ? einsatzabschnittePfad(einsatzId, { abschnitt: knoten.id })
       : einheitDetailPfad(einsatzId, knoten.id);
   const meta: CSSProperties = { ...monoStil(12), overflowWrap: 'anywhere' };
+  // Dieselbe Prüfung wie in `EinsatzZeichen` (rendert dort `null`): hier entscheidet sie, ob der
+  // Platz überhaupt entsteht.
+  const darstellbar = fachobjektZeichen(knoten.tz) != null;
   return (
     <>
-      {/* Zierde: die Bezeichnung daneben trägt die Bedeutung. */}
-      <span
-        aria-hidden="true"
-        data-lfh="org-zeichen"
-        style={{
-          display: 'inline-flex',
-          flex: `0 0 ${ZEICHEN_PX}px`,
-          inlineSize: ZEICHEN_PX,
-          blockSize: ZEICHEN_PX,
-          marginBlockStart: token.paddingXXS,
-        }}
-      >
-        <EinsatzZeichen tz={knoten.tz} size={ZEICHEN_PX} />
-      </span>
+      {/* Zierde: die Bezeichnung daneben trägt die Bedeutung. Ist kein Zeichen darstellbar,
+          entfällt der Platz ganz (Spec „Taktische Zeichen als Zierde“). */}
+      {darstellbar && (
+        <span
+          aria-hidden="true"
+          data-lfh="org-zeichen"
+          style={{
+            display: 'inline-flex',
+            flex: `0 0 ${ZEICHEN_PX}px`,
+            inlineSize: ZEICHEN_PX,
+            blockSize: ZEICHEN_PX,
+            marginBlockStart: token.paddingXXS,
+          }}
+        >
+          <EinsatzZeichen tz={knoten.tz} size={ZEICHEN_PX} />
+        </span>
+      )}
       <div style={{ minWidth: 0, flex: 1 }}>
         <Link
           to={ziel}
@@ -413,7 +421,12 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
 
   const uebernehmen = useMutation({
     mutationFn: async () => {
-      const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
+      // Der Stand der Daten, nicht des Klicks: eine Liste aus dem Zwischenspeicher trägt ihr
+      // Alter in den unveränderlichen Bericht (Review LFH-626).
+      const stand = taktischeDtgVoll(
+        new Date(datenstand || Date.now()).toISOString(),
+        konventionen,
+      );
       // EIN Aufruf mit Startinhalt (Spec `dokument-uebernahme`): der Bericht entsteht mit Text
       // oder gar nicht.
       const lb = await legeLageberichtAn(einsatz.id, {
@@ -424,7 +437,12 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
             schluessel: 'text',
             text: rendereFuehrungsorganisationMarkdown(org, {
               stand,
-              stab: stab.zustand === 'daten' ? stab.besetzung : null,
+              stab:
+                stab.zustand === 'daten'
+                  ? stab.besetzung
+                  : stab.zustand === 'fehler'
+                    ? 'fehler'
+                    : null,
               einheitenZustand: einheiten.zustand,
             }),
           },

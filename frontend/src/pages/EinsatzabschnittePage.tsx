@@ -173,17 +173,21 @@ export default function EinsatzabschnittePage() {
       setBearbeiten(false);
       form.resetFields();
       setEntwurf(true);
+      // Der Entwurf steht in der Gliederung; aus dem Organigramm sähe ihn sonst niemand.
+      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
     }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('neu');
     setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, form]);
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, form, einsatzId]);
 
   // Sichtvorgabe ?ansicht= (LFH-626), apply-then-clean wie auf der Fahrzeugseite. Geräumt wird
   // auch ein unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
   useEffect(() => {
     if (!searchParams.has('ansicht')) return;
-    const vorgabe = parseAbschnitteAnsicht(searchParams);
+    // `?neu=1` gewinnt: ein Entwurf braucht die Gliederung (Review LFH-626).
+    const vorgabe =
+      searchParams.get('neu') === '1' ? undefined : parseAbschnitteAnsicht(searchParams);
     if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
     const rest = new URLSearchParams(searchParams);
     rest.delete('ansicht');
@@ -278,6 +282,7 @@ export default function EinsatzabschnittePage() {
     setBearbeiten(false);
     form.resetFields();
     setEntwurf(true);
+    setzeAnsicht('gliederung');
   }
 
   const baumDaten = useMemo(() => {
@@ -423,7 +428,11 @@ export default function EinsatzabschnittePage() {
             ursache={abschnitteQuery.error}
             onWiederholen={() => void abschnitteQuery.refetch()}
           />
-        ) : abschnitte.length === 0 && einheitenQuelle.daten.length === 0 ? (
+        ) : abschnitte.length === 0 &&
+          einheitenQuelle.zustand === 'daten' &&
+          einheitenQuelle.daten.length === 0 ? (
+          // Leer nur, wenn BEIDE Quellen da sind: ohne Einheiten wäre „keine Abschnitte“ eine
+          // Aussage über eine Lage, die niemand geprüft hat.
           <SeitenLeer
             titel="Noch keine Abschnitte"
             hinweis="Die Führungsorganisation entsteht aus der Gliederung in Abschnitte."

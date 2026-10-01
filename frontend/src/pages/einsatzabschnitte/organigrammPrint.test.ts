@@ -45,6 +45,11 @@ describe('organigrammPrint.css', () => {
   });
 
   it('bricht zwischen Knoten, nicht in einem Knoten', () => {
+    // Auch die äußere Liste selbst: `druck.css` hält jedes `ul` zusammen, sonst rutschte das
+    // ganze Grid auf Seite 2 (Review LFH-626).
+    expect(regelKoerper(".organigramm-print-root [data-lfh='org-ebene1']")).toMatch(
+      /break-inside:\s*auto/,
+    );
     expect(regelKoerper(".organigramm-print-root [data-lfh='org-ebene1'] ul")).toMatch(
       /break-inside:\s*auto/,
     );

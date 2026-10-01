@@ -178,6 +178,8 @@ describe('OrganigrammBild — Klappen', () => {
     const { onUmschalten, rerender } = bild();
     const knopf = screen.getByRole('button', { name: 'Unterstellte von EA Nord' });
     expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    const kinder = document.getElementById(knopf.getAttribute('aria-controls')!);
+    expect(kinder).not.toBeNull();
     await userEvent.click(knopf);
     expect(onUmschalten).toHaveBeenCalledWith('ab-1');
 
@@ -197,6 +199,10 @@ describe('OrganigrammBild — Klappen', () => {
     );
     expect(screen.getByRole('link', { name: 'EA Nord' })).toBeInTheDocument();
     expect(screen.getByText('1/2/6//9')).toBeInTheDocument();
+    // Zugeklappt sind die Kinder nicht im DOM: dann verweist der Knopf auch auf nichts.
+    expect(screen.getByRole('button', { name: 'Unterstellte von EA Nord' })).not.toHaveAttribute(
+      'aria-controls',
+    );
     expect(screen.queryByRole('link', { name: 'UA Deich' })).toBeNull();
     expect(screen.queryByRole('link', { name: '1. Zug' })).toBeNull();
   });
@@ -360,6 +366,38 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
     expect(eingabe.abschnitte).toHaveLength(1);
     expect(eingabe.abschnitte![0].schluessel).toBe('text');
     expect(eingabe.abschnitte![0].text).toContain('**EA Nord** · Rufname EA-N');
+  });
+
+  it('nimmt den Stand aus dem Datenstand, nicht aus dem Klick', async () => {
+    renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={ABSCHNITTE}
+        einheiten={daten(EINHEITEN)}
+        datenstand={new Date('2026-01-01T10:12:00Z').getTime()}
+      />,
+    );
+    const knopf = await screen.findByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
+    const eingabe = vi.mocked(legeLageberichtAn).mock.calls[0][1];
+    expect(eingabe.titel).toMatch(/^Führungsorganisation 01\d{4}JAN2026$/);
+  });
+
+  it('schreibt einen gescheiterten Stababruf in den Bericht', async () => {
+    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeStab).mockRejectedValue(new Error('kaputt'));
+    container();
+    const stab = await screen.findByRole('group', { name: 'Stab' });
+    await within(stab).findByText('Besetzung nicht geladen');
+    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text).toContain(
+      '- Stab: Besetzung nicht geladen',
+    );
   });
 
   it('übernimmt den Stab nur, wenn er freigegeben und geladen ist', async () => {
