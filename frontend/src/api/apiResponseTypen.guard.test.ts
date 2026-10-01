@@ -38,6 +38,9 @@ const AUSNAHMEN: Record<string, string> = {
   'client.ts#UploadOptionen':
     'FE-lokale Transportoptionen für Datei-Uploads (Timeout, LFH-632) — weder Request- noch ' +
     'Response-Wire-DTO.',
+  'client.ts#UploadMitFortschrittOptionen':
+    'FE-lokale Transportoptionen des Uploads mit Fortschritt (Timeout, Rückruf, LFH-654) — ' +
+    'weder Request- noch Response-Wire-DTO.',
 
   // ── Request-/Eingabe-DTOs, die die Namenskonvention nicht treffen. ──
   'lagezonen.ts#ZoneNeu': 'POST-Body einer Lage-Zone (Wortstellung „Neu" hinten statt vorn).',
