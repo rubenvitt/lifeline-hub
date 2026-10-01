@@ -51,7 +51,7 @@ Motivation: siehe proposal.md. Die Änderung setzt auf folgenden Bestand auf:
 
 ### D1 — Schema: `client_id` an `verpflegung_ausgabe`, eindeutig je Einsatz
 
-`0132_verpflegung_ausgabe_client_id.sql` (Nummer laut Entwurf, `check-migrationen.sh`
+`0133_verpflegung_ausgabe_client_id.sql` (Nummer laut Entwurf, `check-migrationen.sh`
 bestätigt sie): `ALTER TABLE verpflegung_ausgabe ADD COLUMN client_id TEXT`, dazu
 `CREATE UNIQUE INDEX idx_verpflegung_ausgabe_client_id ON verpflegung_ausgabe(einsatz_id,
 client_id) WHERE client_id IS NOT NULL`. NULL bleibt erlaubt, für Aufrufe ohne Schlüssel und für
