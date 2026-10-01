@@ -295,7 +295,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     for (const key of k.zuletztModulKeys ?? []) {
       if (key === k.aktuellerModulKey) continue;
       const m = modulRegistry.find((x) => x.key === key);
-      if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+      if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
         id: `zuletzt:${m.key}`,
@@ -309,7 +309,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
 
     // 3. Module
     for (const m of modulRegistry) {
-      if (!istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+      if (!istModulFreigegeben(m, k.freigaben)) continue;
       const ziel = einsatzModulPfad(k.einsatzId, modulZielRoute(m));
       befehle.push({
         id: `modul:${m.key}`,
@@ -324,16 +324,20 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
 
     // 3a. Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, kein Modul und keine
     //     Schnellaktion (er legt nichts an). Für jedes Mitglied, auch Beobachter: welche Teile es
-    //     lesen darf, prüft der Bericht je Quelle selbst.
-    befehle.push({
-      id: 'sprung:einsatzbericht',
-      gruppe: 'module',
-      label: 'Einsatzbericht drucken',
-      kontext: kategorieKontext('fuehrung'),
-      icon: IkoneDokument,
-      schlagworte: ['einsatzbericht', 'abschlussbericht', 'nachbereitung', 'pdf', 'drucken'],
-      ...sprungZu(einsatzberichtPfad(k.einsatzId), k.navigate),
-    });
+    //     lesen darf, prüft der Bericht je Quelle selbst — anhand der Modulfreigaben. Solange die
+    //     noch laden, steht er nicht da: die Gruppe „Module“ bleibt dann leer (LFH-669), und die
+    //     Druckseite wartete ohnehin auf dieselben Freigaben.
+    if (k.freigaben) {
+      befehle.push({
+        id: 'sprung:einsatzbericht',
+        gruppe: 'module',
+        label: 'Einsatzbericht drucken',
+        kontext: kategorieKontext('fuehrung'),
+        icon: IkoneDokument,
+        schlagworte: ['einsatzbericht', 'abschlussbericht', 'nachbereitung', 'pdf', 'drucken'],
+        ...sprungZu(einsatzberichtPfad(k.einsatzId), k.navigate),
+      });
+    }
 
     // 4. Schnellaktionen, nur mit Schreibrecht (kein Beobachter, aktiver Einsatz). Modulfilter ist
     //    die LESEACHSE `istModulFreigegeben` wie in 2. und 3., sonst zeigte eine Schnellaktion auf
@@ -341,7 +345,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     if (k.darfSchreibenImEinsatz) {
       for (const a of SCHNELLAKTIONEN) {
         const m = modulRegistry.find((x) => x.key === a.modulKey);
-        if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) continue;
+        if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
         const ziel = a.pfad(k.einsatzId);
         befehle.push({
           id: `aktion:${a.modulKey}`,

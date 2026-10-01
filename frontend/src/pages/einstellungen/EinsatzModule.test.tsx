@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -35,12 +36,12 @@ import { ApiError } from '../../api/client';
 
 const EINSTELLUNGEN = { einsatz_id: 1, org_defaults: { org_id: 1 } };
 
-function rendern() {
+function rendern(client?: QueryClient) {
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/einstellungen/module" element={<EinsatzModule />} />
     </Routes>,
-    { route: '/einsaetze/1/einstellungen/module' },
+    { route: '/einsaetze/1/einstellungen/module', client },
   );
 }
 
@@ -83,6 +84,22 @@ describe('EinsatzModule', () => {
         benoetigte_rolle: null,
       }),
     );
+  });
+
+  it('invalidiert nach dem Speichern die Modulfreigaben dieses Einsatzes (LFH-669)', async () => {
+    // `new QueryClient()`: `neuerQueryClient()` räumte unbeobachtete Einträge beim ersten await.
+    const client = new QueryClient();
+    // Literale Keys, nicht die Factory.
+    client.setQueryData(['einsatz-modul-freigaben', 1], {});
+    client.setQueryData(['einsatz-modul-freigaben', 2], {});
+    rendern(client);
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: ETB' }));
+
+    await waitFor(() =>
+      expect(client.getQueryState(['einsatz-modul-freigaben', 1])?.isInvalidated).toBe(true),
+    );
+    expect(client.getQueryState(['einsatz-modul-freigaben', 2])?.isInvalidated).toBe(false);
   });
 
   it('laesst beim Aendern der Rolle die Sichtbarkeit als Bestandswert mitfahren (Vollersatz-PUT)', async () => {

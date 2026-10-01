@@ -723,8 +723,8 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
       { route },
     );
   }
+  // Die Modul-Freigaben (Stab, Lageberichte) liefert der MSW-Default: alles frei.
   const organigrammHandler = [
-    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/1/stab', () => HttpResponse.json({ besetzung: [] })),
   ];
 

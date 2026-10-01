@@ -6,7 +6,8 @@ import { useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { CommandPaletteProvider } from './CommandPaletteProvider';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
+import type { ModulFreigaben } from '../api/types';
 
 /**
  * Die Naht an der verdrahteten Palette: Tastendruck → Entprellung → Query → Kern → Optionszeile →
@@ -39,14 +40,14 @@ const SCHADEN = {
 const FAHRZEUG = { id: 3, einsatz_id: EINSATZ, funkrufname: 'Florian 1' };
 const ETB = { id: 12, lfd_nr: 42, inhalt: 'Lage erkundet', typ: 'lage' };
 
-/** Sichtbarkeits-Overrides, die der Handler ausliefert — je Test gesetzt. */
-let overrides: Record<string, object>;
+/** Modulfreigaben des Servers, die der Handler ausliefert — je Test gesetzt (LFH-669). */
+let freigaben: ModulFreigaben;
 
 beforeEach(() => {
-  overrides = {};
+  freigaben = freigabenFixture();
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/:id/modul-overrides', () => HttpResponse.json(overrides)),
+    http.get('/api/einsaetze/:id/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/:id/personen', () => HttpResponse.json([PERSON])),
     http.get('/api/einsaetze/:id/schaeden', () => HttpResponse.json([SCHADEN])),
     http.get('/api/einsaetze/:id/uhs', () => HttpResponse.json([])),
@@ -153,16 +154,7 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
   });
 
   it('unterdrückt den Personen-Treffer, wenn das Personen-Modul ausgeblendet ist', async () => {
-    overrides = {
-      personen: {
-        einsatz_id: EINSATZ,
-        modul_key: 'personen',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
+    freigaben = freigabenFixture({ personen: { sichtbar: false } });
     const u = userEvent.setup();
     zeigePalette();
 
@@ -173,6 +165,36 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     expect(
       screen.queryByRole('option', { name: /R-042/, description: 'Personen' }),
     ).not.toBeInTheDocument();
+  });
+
+  /**
+   * Spec `modul-freigabe`, „Sprungpalette“: sperrt die Org-Vorgabe die Schäden (`zugriff: false`),
+   * bietet die Palette keinen Schaden an, und die Schadensliste wird gar nicht erst angefragt.
+   */
+  it('bietet aus einem Modul ohne Zugriff (Org-Vorgabe) nichts an und fragt seine Liste nicht', async () => {
+    freigaben = freigabenFixture({ schaeden: { zugriff: false } });
+    let schadenAbrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/:id/schaeden', () => {
+        schadenAbrufe += 1;
+        return HttpResponse.json([SCHADEN]);
+      }),
+    );
+    const u = userEvent.setup();
+    zeigePalette(`/einsaetze/${EINSATZ}/etb`);
+
+    await suche(u, '42');
+
+    // Die Person trägt dieselbe Nummer und kommt — die Suche läuft, nur das Modul fehlt.
+    await screen.findByRole(
+      'option',
+      { name: /R-042 · Müller/, description: 'Personen' },
+      { timeout: 3000 },
+    );
+    expect(
+      screen.queryByRole('option', { name: /S-042/, description: 'Schäden' }),
+    ).not.toBeInTheDocument();
+    expect(schadenAbrufe).toBe(0);
   });
 });
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -193,17 +193,24 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   });
   const einsatz = einsatzQuery.data;
 
-  // Modul-Overrides für die Navigation; geteilter Query-Key wie die Einstellungen.
-  const modulOverridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+  // Modulfreigaben des Servers für die Navigation (LFH-669); derselbe Key wie in jeder Seite,
+  // die Daten eines fremden Moduls lädt.
+  const modulFreigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
   });
-  const modulOverrides = modulOverridesQuery.data;
-  const modulZaehler = useModulZaehler({ einsatzId, benutzer, overrides: modulOverrides });
+  const modulFreigaben = modulFreigabenQuery.data;
+  const modulZaehler = useModulZaehler({ einsatzId, freigaben: modulFreigaben });
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
   // die Sperre mit — in der Einsatzauswahl gibt es keine Einsatzwarnung.
-  useWarnsperre(useAktiveWarnung({ einsatzId, benutzer, overrides: modulOverrides }));
+  useWarnsperre(
+    useAktiveWarnung({
+      einsatzId,
+      freigaben: modulFreigaben,
+      freigabenGescheitert: modulFreigabenQuery.isError,
+    }),
+  );
 
   /**
    * FRÜHER AUSSTIEG vor dem Haupt-JSX: die Kindseite liest denselben Einsatz aus demselben Cache
@@ -241,7 +248,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     setOffeneKategorie(key);
     setPanelEingeklappt(false);
     schreibeNavEingeklappt(false);
-    const ziel = erstesFreigegebenesModul(key, benutzer, modulOverrides);
+    const ziel = erstesFreigegebenesModul(key, modulFreigaben);
     if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
   }
 
@@ -381,17 +388,18 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           </div>
         </KopfRechts>
       </Header>
-      {/* Warnung, keine Sackgasse: ohne Overrides fällt `istModulSichtbar` nach OFFEN, jedes
-         ausgeblendete Modul stünde stumm wieder in der Navigation. Ein stiller Fehlschlag sähe aus wie
-         eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der Gefahr vorbehalten ist. */}
-      {modulOverridesQuery.isError && (
+      {/* Warnung, keine Sackgasse: ohne Freigaben fällt `istModulSichtbar` nach OFFEN, jedes
+         ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller
+         Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der
+         Gefahr vorbehalten ist. */}
+      {modulFreigabenQuery.isError && (
         <Alert
           type="warning"
           showIcon
           banner
-          title="Modul-Sichtbarkeit konnte nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet sind."
+          title="Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind."
           action={
-            <Button onClick={() => void modulOverridesQuery.refetch()}>Erneut abrufen</Button>
+            <Button onClick={() => void modulFreigabenQuery.refetch()}>Erneut abrufen</Button>
           }
         />
       )}
@@ -410,8 +418,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             titel={kategorien.find((k) => k.key === offeneKategorie)!.label}
             einsatz={einsatz}
             module={moduleNachKategorie(offeneKategorie)}
-            benutzer={benutzer}
-            overrides={modulOverrides}
+            freigaben={modulFreigaben}
             zaehler={modulZaehler}
             aktiverModulKey={aktuellesModul?.key ?? null}
             onModulKlick={onModulKlick}
@@ -424,7 +431,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
-            <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} overrides={modulOverrides} />
+            <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} freigaben={modulFreigaben} />
             <Outlet />
           </EinsatzAnzeigeProvider>
         </Content>
@@ -447,8 +454,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             kategorien={kategorien}
             offeneKategorie={offeneKategorie}
             aktiverModulKey={aktuellesModul?.key ?? null}
-            benutzer={benutzer}
-            overrides={modulOverrides}
+            freigaben={modulFreigaben}
             zaehler={modulZaehler}
             onKategorieKlick={onDrawerKategorieKlick}
             onModulKlick={onModulKlick}

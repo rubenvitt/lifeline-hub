@@ -3,13 +3,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../test/utils';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { erfasseAnruf, ladeAnrufe, setzeAnrufStatus } from '../api/infotelefon';
 import { ApiError } from '../api/client';
 import type { EinsatzAnzeige, InfotelefonAnruf } from '../api/types';
 import InfotelefonPage from './InfotelefonPage';
+import { freigabenFixture } from '../test/fixtures';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulOverrides: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/infotelefon', () => ({
   ladeAnrufe: vi.fn(),
   erfasseAnruf: vi.fn(),
@@ -62,7 +63,7 @@ const kennzahl = (titel: string) =>
 
 beforeEach(() => {
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
-  vi.mocked(ladeModulOverrides).mockResolvedValue({});
+  vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(ladeAnrufe).mockResolvedValue(ANRUFE);
   vi.mocked(erfasseAnruf)
     .mockReset()
@@ -92,6 +93,23 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(screen.queryByText('2')).toBeNull();
   });
 
+  it('hebt den per ?anruf= angesprungenen Anruf mit Fläche hervor, nicht nur mit der Klasse (LFH-698)', async () => {
+    // `Zeitachseneintrag` setzt seinen Grund inline; die Klassenregel in `index.css` liefert nur
+    // die Linie. Ohne eigenen Inline-Grund bliebe der Anruf ohne `bedienFlaeche` (Spec
+    // `deeplink-hervorhebung`, zwei Kanäle) — so wie im ETB gelöst.
+    setup('/einsaetze/1/stab/infotelefon?anruf=1');
+    const ziel = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-anruf="1"]');
+      expect(el).toHaveClass('zeile-hervorgehoben');
+      return el!;
+    });
+    const nachbar = document.querySelector<HTMLElement>('[data-anruf="2"]')!;
+    expect(nachbar).not.toHaveClass('zeile-hervorgehoben');
+    expect(nachbar.style.background).toBe('transparent');
+    expect(ziel.style.background).not.toBe('transparent');
+    expect(ziel.style.background).not.toBe('');
+  });
+
   it('filtert auf offene Rückrufe', async () => {
     setup();
     await screen.findByText('Sperrung B 3');
@@ -107,9 +125,9 @@ describe('InfotelefonPage (LFH-554)', () => {
       expect.stringContaining('filter=vermisst'),
     );
     unmount();
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      personen: { sichtbar: false, einsatz_id: 1, modul_key: 'personen' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ personen: { sichtbar: false } }),
+    );
     setup();
     await screen.findByText('sucht Vater');
     expect(screen.queryByRole('link', { name: /Vermisste/ })).toBeNull();

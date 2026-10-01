@@ -71,6 +71,8 @@ export const EINSATZ_KEYS = {
   mitglieder: 'einsatz-mitglieder',
   sprechgruppen: 'einsatz-sprechgruppen',
   modulOverrides: 'einsatz-modul-overrides',
+  // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
+  modulFreigaben: 'einsatz-modul-freigaben',
   ortVorschau: 'ort-vorschau',
   // Adresssuche der Lagekarte (LFH-638): Suchtext → Treffer des Geocoders.
   ortSuche: 'ort-suche',
@@ -232,6 +234,9 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
  *   eines anderen Nutzers propagiert nicht live.
+ * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).
+ *   Die eigene Änderung invalidiert die Mutation; die eines anderen wirkt beim nächsten Abruf,
+ *   das 403 der Server-Gates bleibt das Netz.
  * - `ortVorschau`: abgeleiteter Geo-Lookup mit Debounce + Client-Cache; live zu invalidieren
  *   wäre schädlich (Nominatim-ToS).
  * - `ortSuche`: Adresssuche auf Enter (LFH-638), aus demselben Grund nie live; bewusst auch
@@ -253,6 +258,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.mitglieder,
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.modulOverrides,
+  EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.ortSuche,
   EINSATZ_KEYS.uhsDetail,
@@ -314,6 +320,10 @@ export const einsatzKeys = {
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulOverrides: (einsatzId: number | null) => [EINSATZ_KEYS.modulOverrides, einsatzId] as const,
+  // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
+  modulFreigaben: (einsatzId: number | null) => [EINSATZ_KEYS.modulFreigaben, einsatzId] as const,
+  // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe wirkt auf jeden Einsatz der Org.
+  modulFreigabenAlle: () => [EINSATZ_KEYS.modulFreigaben] as const,
 
   // Personen / Personal
   personen: (einsatzId: number) => [EINSATZ_KEYS.personen, einsatzId] as const,
@@ -676,9 +686,10 @@ export const globalKeys = {
  */
 export const LAGEBILD_OFFLINE = {
   einsatz: [
-    // Rahmen
+    // Rahmen. Freigaben statt Overrides (LFH-669): ohne sie lädt keine Seite die Daten eines
+    // fremden Moduls; die Overrides liest nur noch der Editor (Einstellungs-Key, draußen).
     EINSATZ_KEYS.einsatz,
-    EINSATZ_KEYS.modulOverrides,
+    EINSATZ_KEYS.modulFreigaben,
     EINSATZ_KEYS.einstellungen,
     EINSATZ_KEYS.modulZaehler,
     // ETB — samt der Nummern-Abfragen der Palette unter demselben Prefix: dieselbe

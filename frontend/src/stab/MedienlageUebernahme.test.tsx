@@ -3,14 +3,15 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, Input } from 'antd';
 import { renderMitProviders } from '../test/utils';
-import { ladeModulOverrides } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { ladeMedienkontakte, ladePressemitteilungen } from '../api/presse';
 import { ladeAnrufe } from '../api/infotelefon';
 import { ApiError } from '../api/client';
 import type { Medienkontakt } from '../api/types';
 import MedienlageUebernahme from './MedienlageUebernahme';
+import { freigabenFixture } from '../test/fixtures';
 
-vi.mock('../api/einsaetze', () => ({ ladeModulOverrides: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/presse', () => ({ ladeMedienkontakte: vi.fn(), ladePressemitteilungen: vi.fn() }));
 vi.mock('../api/infotelefon', () => ({ ladeAnrufe: vi.fn() }));
 
@@ -45,7 +46,7 @@ const feld = () => screen.getByLabelText('Medienlage') as HTMLTextAreaElement;
 
 beforeEach(() => {
   geaendert.mockReset();
-  vi.mocked(ladeModulOverrides).mockResolvedValue({});
+  vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(ladeMedienkontakte).mockResolvedValue([KONTAKT]);
   vi.mocked(ladePressemitteilungen).mockResolvedValue([]);
   vi.mocked(ladeAnrufe).mockResolvedValue([]);
@@ -92,11 +93,11 @@ describe('MedienlageUebernahme (LFH-554)', () => {
   });
 
   it('fehlt, wenn der Stab für die Person nicht freigegeben ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     renderMitProviders(<Probe />);
-    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalled());
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
     await screen.findByLabelText('Medienlage');
     // Der Abruf muss abgeschlossen sein, sonst wäre die Abwesenheit trivial (Ladezustand).
     await new Promise((r) => setTimeout(r, 50));

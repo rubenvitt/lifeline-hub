@@ -7,7 +7,7 @@ import { meHandler, server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import type { EinsatzberichtRoh } from '../druck/einsatzbericht/abruf';
 import { BETROFFENEN_MERKMALE, rohBericht } from '../druck/einsatzbericht/testdaten';
 import EinsatzberichtDruckPage from './EinsatzberichtDruckPage';
@@ -59,13 +59,18 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
       const typ = new URL(request.url).searchParams.get('typ');
       return HttpResponse.json(typ === 'entscheidung' ? etb.eintraege : []);
     }),
-    http.get(`/api/einsaetze/${E}/modul-overrides`, () => HttpResponse.json({})),
+    http.get(`/api/einsaetze/${E}/modul-freigaben`, () => HttpResponse.json(freigabenFixture())),
   );
   return aufrufe;
 }
 
-function overrides(o: Record<string, { sichtbar: boolean; benoetigte_rolle: string | null }>) {
-  server.use(http.get(`/api/einsaetze/${E}/modul-overrides`, () => HttpResponse.json(o)));
+/** Modulfreigaben, wie der Server sie für den Benutzer ausrechnet (LFH-669). */
+function freigaben(abweichend: Parameters<typeof freigabenFixture>[0]) {
+  server.use(
+    http.get(`/api/einsaetze/${E}/modul-freigaben`, () =>
+      HttpResponse.json(freigabenFixture(abweichend)),
+    ),
+  );
 }
 
 function rendere() {
@@ -142,7 +147,7 @@ describe('EinsatzberichtDruckPage', () => {
 
   it('Rollensperre: nennt die fehlenden Module, ruft sie nicht ab und bietet kein Drucken an', async () => {
     const aufrufe = quellen();
-    overrides({ personen: { sichtbar: true, benoetigte_rolle: 'fuehrungskraft' } });
+    freigaben({ personen: { zugriff: false } });
     rendere();
     expect(
       await screen.findByText('Für den Einsatzbericht fehlen Rechte an: Personen.'),
@@ -154,7 +159,7 @@ describe('EinsatzberichtDruckPage', () => {
 
   it('im Einsatz ausgeblendete Betreuung: druckbar, Vermerk, kein Abruf', async () => {
     const aufrufe = quellen();
-    overrides({ betreuung: { sichtbar: false, benoetigte_rolle: null } });
+    freigaben({ betreuung: { sichtbar: false } });
     rendere();
     await fertig();
     const bilanz = document.querySelector(

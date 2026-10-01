@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useDichte, useHelligkeit, useThemeMode } from '../theme/ThemeModeProvider';
-import { listeEinsaetze, ladeModulOverrides, ladeEinsatz } from '../api/einsaetze';
+import { listeEinsaetze, ladeModulFreigaben, ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
@@ -52,9 +52,10 @@ export function useBefehle(
     queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
   });
-  const { data: overrides } = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId!),
+  // Modulfreigaben des Servers (LFH-669): solange sie fehlen, bietet die Palette kein Modul an.
+  const { data: freigaben } = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId!),
     enabled: einsatzId != null,
   });
   const { data: aktuellerEinsatz } = useQuery({
@@ -98,7 +99,7 @@ export function useBefehle(
         einsatzId,
         benutzer,
         einsaetze,
-        overrides,
+        freigaben,
         darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
         zuletztModulKeys,
         aktuellerModulKey,
@@ -122,7 +123,7 @@ export function useBefehle(
       einsatzId,
       benutzer,
       einsaetze,
-      overrides,
+      freigaben,
       darfSchreibenImEinsatz,
       navigate,
       setModus,

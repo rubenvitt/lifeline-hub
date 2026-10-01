@@ -9,8 +9,11 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 
 - **Eine Druckwurzel je Seite** (`data-lfh="druckwurzel"`); Mechanik nur in `druck/druck.css`
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen
-  nur Eigenheiten. Nachweis `druck/druck.test.ts`, `e2e/druck-fluss.spec.ts`; Firefox/Safari per
-  Hand.
+  nur Eigenheiten. Nachweis `druck/druck.test.ts`, `e2e/druck-fluss.spec.ts` und
+  `e2e/etb-druck.spec.ts` in Chromium, Firefox und WebKit (LFH-729: Mechanik unter Druckmedium).
+  Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
+  Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
+  `DRUCK_SPECS` der `playwright.config.ts`.
 - **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe sind `DruckKnopf`
   (`useDrucken`, wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
   nicht „letzter Abruf gelungen"). **Kein

@@ -1,15 +1,16 @@
-import type { BenutzerAnzeige, ModulOverrides } from '../../api/types';
-import { istModulGesperrt, istModulSichtbar, modulRegistry } from '../../einsatz/modulRegistry';
+import type { ModulFreigaben } from '../../api/types';
+import { istModulSichtbar, modulRegistry } from '../../einsatz/modulRegistry';
 
 /**
  * Einsatzbericht (LFH-726): woraus der Bericht schöpft und ob er es abrufen darf
  * (`openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md` D3).
  *
  * Die Weiche fällt VOR dem Abruf: ein im Einsatz ausgeblendetes Modul ist „nicht genutzt“ und
- * sperrt den Druck nicht, ein für die Rolle gesperrtes Modul sperrt ihn. Am Server sähen beide
- * gleich aus (403), deshalb unterscheidet sie der Client über die Overrides. Der Server bleibt
- * Türsteher: ein 403 trotz `abrufen` (Org-Vorgabe, Aufbewahrungsfrist) wertet der Abruf als
- * „kein Zugriff“, nie als leeren Bestand.
+ * sperrt den Druck nicht, ein Modul ohne Zugriff sperrt ihn. Am Server sähen beide gleich aus
+ * (403), deshalb unterscheidet sie der Client über die Modulfreigaben, die der Server je Benutzer
+ * ausrechnet (`GET …/modul-freigaben`, LFH-669: Override, Rolle UND Org-Vorgabe). Unbekannt gibt
+ * nichts frei (Spec `modul-freigabe`). Der Server bleibt Türsteher: ein 403 trotz `abrufen`
+ * (Aufbewahrungsfrist) wertet der Abruf als „kein Zugriff“, nie als leeren Bestand.
  */
 
 export type BlockSchluessel =
@@ -99,30 +100,25 @@ export interface BerichtFreigabe {
   gesperrteModule: string[];
 }
 
-/** Zustand einer Quelle aus den Overrides; ausgeblendet geht vor gesperrt. */
-function freigabeDerQuelle(
-  quelle: Quelle,
-  benutzer: BenutzerAnzeige | null,
-  overrides: ModulOverrides,
-): QuellenFreigabe {
+/** Zustand einer Quelle aus den Modulfreigaben; ausgeblendet geht vor gesperrt. */
+function freigabeDerQuelle(quelle: Quelle, freigaben: ModulFreigaben): QuellenFreigabe {
   if (quelle.modul == null) return 'abrufen';
   const modul = modulRegistry.find((m) => m.key === quelle.modul);
   // Ein unbekannter Key ist ein Programmierfehler (Test „nur Modul-Keys der Registry“); im
   // Betrieb fail-closed.
   if (!modul) return 'gesperrt';
-  if (!istModulSichtbar(modul, overrides)) return 'nicht-genutzt';
-  if (istModulGesperrt(modul, benutzer, overrides)) return 'gesperrt';
+  if (!istModulSichtbar(modul, freigaben)) return 'nicht-genutzt';
+  // Nicht `istModulGesperrt`: das lässt Unbekanntes frei (gegen Flackern der Navigation). Vor einem
+  // Abruf gilt fail-closed — ein fehlender Eintrag sperrt.
+  if (freigaben[modul.key]?.zugriff !== true) return 'gesperrt';
   return 'abrufen';
 }
 
-export function berichtFreigabe(
-  benutzer: BenutzerAnzeige | null,
-  overrides: ModulOverrides,
-): BerichtFreigabe {
+export function berichtFreigabe(freigaben: ModulFreigaben): BerichtFreigabe {
   const je = {} as Record<QuellenSchluessel, QuellenFreigabe>;
   const gesperrteModule: string[] = [];
   for (const quelle of QUELLEN) {
-    const zustand = freigabeDerQuelle(quelle, benutzer, overrides);
+    const zustand = freigabeDerQuelle(quelle, freigaben);
     je[quelle.schluessel] = zustand;
     if (zustand === 'gesperrt') {
       const label = modulLabel(quelle.modul);

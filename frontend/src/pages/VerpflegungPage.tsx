@@ -12,7 +12,7 @@ import {
 } from '../abloesung/zufluss';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeNachforderungen } from '../api/nachforderungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
@@ -151,17 +151,16 @@ export default function VerpflegungPage() {
     queryKey: einsatzKeys.verpflegung(einsatzId),
     queryFn: () => ladeVerpflegung(einsatzId),
   });
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
   });
-  const overrides = overridesQuery.data;
+  const freigaben = freigabenQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
 
-  // Nachforderungen nur bei bedienbarem Modul — und erst, wenn die Overrides bekannt sind: ohne sie
-  // hielte `istKeyFreigegeben` jedes Modul für sichtbar. Ein 403 bleibt still.
-  const nachforderungenFrei =
-    overrides !== undefined && istKeyFreigegeben('nachforderungen', benutzer, overrides);
+  // Nachforderungen nur bei bedienbarem Modul — und erst, wenn die Freigaben bekannt sind
+  // (`istKeyFreigegeben` gibt bei unbekannten Freigaben nichts frei). Ein 403 bleibt still.
+  const nachforderungenFrei = istKeyFreigegeben('nachforderungen', freigaben);
   const nachforderungenQuery = useQuery({
     // Derselbe Schlüssel und dieselbe Abfrage wie `NachforderungenPage` — ein Cache-Fach, eine Form.
     queryKey: einsatzKeys.nachforderungen(einsatzId),
@@ -451,8 +450,7 @@ export default function VerpflegungPage() {
         <ZeitfensterDialog
           modus={{ art: 'anlegen', onErfassen: (body) => anlegenMut.mutateAsync(body) }}
           einsatzId={einsatzId}
-          benutzer={benutzer}
-          overrides={overrides}
+          freigaben={freigaben}
           jetzt={jetzt}
           laeuft={anlegenMut.isPending}
           fehler={anlegenMut.error}
@@ -468,8 +466,7 @@ export default function VerpflegungPage() {
             onErfassen: (patch) => aendernMut.mutateAsync({ zfId: dialog.zf.id, patch }),
           }}
           einsatzId={einsatzId}
-          benutzer={benutzer}
-          overrides={overrides}
+          freigaben={freigaben}
           jetzt={jetzt}
           laeuft={aendernMut.isPending}
           fehler={aendernMut.error}
