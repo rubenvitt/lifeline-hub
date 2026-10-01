@@ -1,10 +1,11 @@
 /* Problemzeile des Meldebilds (Neuentwurf S6): eine Einheit mit Ausfall. Die Tönung ist
    Verstärkung, der zweite Kanal ist die Ausfall-Zahl in der Statusspalte.
    An die `td`, nicht an die `tr`: antd färbt die Zellen, ein Hintergrund am `tr` bliebe
-   verdeckt — die fixierte Kennungsspalte trägt sogar einen eigenen deckenden Grund. Die
-   Form folgt `.zeile-hervorgehoben > td` (`index.css`), dem belegten Präzedenzfall; das
-   Präfix `.kraefte-print-root` hebt die Spezifität über die Grundregel der fixierten
-   Spalte, der Hover von antd bleibt darüber. Ein Karten-Zweitselektor wie bei `.zeile-hervorgehoben` ist hier NICHT nötig:
+   verdeckt — die fixierte Kennungsspalte trägt sogar einen eigenen deckenden Grund (dieselbe
+   Lage wie bei der Deeplink-Hervorhebung in `index.css`). Das Präfix `.kraefte-print-root` hebt
+   die Spezifität über die Grundregel der fixierten Spalte, der Hover von antd bleibt darüber;
+   eine sortierbare Spalte gibt es im Meldebild nicht (an der Sortierspalte verlor eine schwächere
+   Form, LFH-698). Ein Karten-Zweitselektor wie bei `.zeile-hervorgehoben` ist hier NICHT nötig:
    das Meldebild ist in jeder Breite Tabelle (`form="tabelle"`). */
 .kraefte-print-root tr.meldebild-problemzeile > td {
   background-color: var(--lfh-problem-zeile);
@@ -49,6 +50,7 @@
      Berichtigt (LFH-71): hier stand, der Layoutbeweis über mehrere Blätter sei „auch in
      Playwright nicht zu haben". `emulateMedia` liefert tatsächlich keine Seitenumbrüche —
      `page.pdf()` in Chromium aber sehr wohl ein umbrochenes Dokument, dessen Seiten sich
-     zählen lassen (`e2e/druck-fluss.spec.ts`). Nicht automatisch prüfbar bleiben Firefox und
-     Safari (LFH-729). */
+     zählen lassen (`e2e/druck-fluss.spec.ts`). Firefox und WebKit prüfen dort seit LFH-729 die
+     Mechanik unter Druckmedium; den Umbruch auf dem Blatt zeigt in Firefox und Safari weiter nur
+     die Handprüfung, und das Meldebild gehört nicht zu den Druck-Specs dieser Projekte. */
 }

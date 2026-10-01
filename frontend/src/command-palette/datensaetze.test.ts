@@ -18,12 +18,11 @@ import type {
   EinsatzPersonal,
   EtbEintragAnzeige,
   Meldung,
-  ModulOverride,
   Person,
   Schaden,
   Uhs,
 } from '../api/types';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Fixturen als TEILOBJEKTE mit `as`-Cast: der Kern liest je Entität zwei bis drei Felder, volle
@@ -64,28 +63,12 @@ const einheit = (o: Partial<Einheit>): Einheit =>
 const etb = (o: Partial<EtbEintragAnzeige>): EtbEintragAnzeige =>
   ({ id: 1, lfd_nr: 1, inhalt: 'Lage erkundet', typ: 'lage', ...o }) as EtbEintragAnzeige;
 
-const fuehrungskraft = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
-
-/** Vollständiges ModulOverride bauen (Bauform `befehle.test.ts:19`). */
-function ueberschreibung(felder: Partial<ModulOverride>): ModulOverride {
-  return {
-    einsatz_id: 5,
-    modul_key: 'personen',
-    sichtbar: true,
-    benoetigte_rolle: null,
-    geaendert_at: null,
-    geaendert_von: null,
-    ...felder,
-  };
-}
-
 function kontext(over: Partial<DatensatzKontext> = {}): DatensatzKontext {
   return {
     einsatzId: 5,
     suche: '',
     modus: 'alles',
-    benutzer: fuehrungskraft,
-    overrides: undefined,
+    freigaben: freigabenFixture(),
     aktuellerModulKey: null,
     navigate: vi.fn(),
     quellen: {},
@@ -589,11 +572,28 @@ describe('baueDatensatzTreffer — Rechte', () => {
       personen: [person({ id: 7, registrier_nr: 42 })],
       schaeden: [schaden({ id: 8, registrier_nr: 42 })],
     };
-    const overrides = { personen: ueberschreibung({ modul_key: 'personen', sichtbar: false }) };
+    const freigaben = freigabenFixture({ personen: { sichtbar: false } });
     // Der Schaden bleibt — der Riegel wirkt je Modul, nicht global.
-    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen, overrides })))).toEqual([
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen, freigaben })))).toEqual([
       'datensatz:schaeden:8',
     ]);
+  });
+  it('unterdrückt Schaden-Treffer, wenn der Server den Zugriff verweigert (Org-Vorgabe)', () => {
+    const quellen = {
+      personen: [person({ id: 7, registrier_nr: 42 })],
+      schaeden: [schaden({ id: 8, registrier_nr: 42 })],
+    };
+    const freigaben = freigabenFixture({ schaeden: { zugriff: false } });
+    expect(ids(baueDatensatzTreffer(kontext({ suche: '42', quellen, freigaben })))).toEqual([
+      'datensatz:personen:7',
+    ]);
+  });
+  /** Unbekannt heißt nicht freigegeben (LFH-669): auch ein warmer Cache zeigt dann nichts. */
+  it('zeigt ohne Freigaben keinen Treffer', () => {
+    const quellen = { personen: [person({ id: 7, registrier_nr: 42 })] };
+    expect(baueDatensatzTreffer(kontext({ suche: '42', quellen, freigaben: undefined }))).toEqual(
+      [],
+    );
   });
 });
 
@@ -1009,9 +1009,7 @@ describe('baueDatensatzTreffer — Lageberichte, Gefahrengebiete, Einsatzabschni
     const t = baueDatensatzTreffer(
       kontext({
         suche: 'deich',
-        overrides: {
-          gefahrenzonen: ueberschreibung({ modul_key: 'gefahrenzonen', sichtbar: false }),
-        },
+        freigaben: freigabenFixture({ gefahrenzonen: { sichtbar: false } }),
         quellen: { gefahrengebiete: [gebiet({})], abschnitte: [abschnitt({})] },
       }),
     );
@@ -1087,7 +1085,7 @@ describe('baueDatensatzTreffer — ETB-Sammeltreffer (LFH-619)', () => {
     const t = baueDatensatzTreffer(
       kontext({
         suche: 'deich',
-        overrides: { etb: ueberschreibung({ modul_key: 'etb', sichtbar: false }) },
+        freigaben: freigabenFixture({ etb: { zugriff: false } }),
         quellen: { etbAnzahl: { anzahl: 5 } },
       }),
     );

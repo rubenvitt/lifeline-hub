@@ -30,14 +30,21 @@ import {
 } from '../components/erfassungsSitzung';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { tiereDetailPfad } from '../routing/deeplinks';
-import { SPEZIES_META, TIER_STATUS, filterTiere, type TiereSicht } from './tiere/tierHelfer';
+import { tiereDetailPfad, tiereDruckPfad } from '../routing/deeplinks';
+import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
+import {
+  SPEZIES_META,
+  TIERE_SICHTEN,
+  TIER_STATUS,
+  filterTiere,
+  halterNummer,
+  type TiereSicht,
+} from './tiere/tierHelfer';
 import type { Spezies, Tier } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
-import { registrierNummer } from '../anzeige/registrierNummer';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 
@@ -47,17 +54,6 @@ const SPEZIES_KEYS = Object.keys(SPEZIES_META) as Spezies[];
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */
 type Sicht = TiereSicht;
-const SICHTEN: { key: Sicht; label: string }[] = [
-  { key: 'aktiv', label: 'Aktiv' },
-  { key: 'vermisst', label: 'Vermisst' },
-  { key: 'abgeschlossen', label: 'Abgeschlossen' },
-  { key: 'alle', label: 'Alle' },
-];
-
-/** Registriernummer des Halters in Anzeigeschreibweise, oder `null`. */
-function halterNummer(t: Tier): string | null {
-  return t.halter_registrier_nr != null ? registrierNummer('R', t.halter_registrier_nr) : null;
-}
 
 /** Halter-Kurzanzeige für die Liste. */
 function halterAnzeige(t: Tier): React.ReactNode {
@@ -330,6 +326,7 @@ export default function TierePage() {
       }
       aktionen={
         <Space wrap style={{ minWidth: 0 }}>
+          <DruckAnsichtKnopf pfad={tiereDruckPfad(einsatzId, { sicht, spezies: speziesFilter })} />
           {darfSchreiben && (
             <>
               <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>
@@ -371,7 +368,7 @@ export default function TierePage() {
           beschriftung="Tiere nach Status filtern"
           wert={sicht}
           onWechsel={(k) => setSichtFuer(einsatzId, k)}
-          optionen={SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
+          optionen={TIERE_SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
         />
         <Augenbraue>Spezies</Augenbraue>
         {/* `aria-label`, weil die `Typography.Text` daneben kein `<label>` ist: ohne ihn hätte

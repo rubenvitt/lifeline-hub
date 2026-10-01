@@ -1,4 +1,5 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
+import { pdfAuszug } from './pdf-kern';
 
 /**
  * ETB-Druckansicht gegen einen echten Server: Vollabruf über MEHR als eine Serverseite (höchstens
@@ -7,6 +8,9 @@ import { expect, test, type APIResponse, type Page } from '@playwright/test';
  *
  * Über 500 Einträge werden per `page.request` in parallelen Bündeln gesät; großzügige Frist,
  * weil das auf den 2-vCPU-Shards Zeit kostet.
+ *
+ * DREI ENGINES (LFH-729): läuft auch in `firefox` und `webkit` (Druckbild unter Druckmedium).
+ * Das PDF — Seitenzählung je Seite, letzter Eintrag auf der letzten Seite — nur in Chromium.
  */
 
 const ADMIN = 'admin';
@@ -101,6 +105,7 @@ function zeile(page: Page, nr: number) {
 
 test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, Berichtigung, Druckbild', async ({
   page,
+  browserName,
 }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E ETB-Druck ${Date.now()}`);
@@ -163,6 +168,25 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   expect(druck.seitenkopf, 'Bedienung der Druckansicht steht nicht auf dem Papier').toBe('none');
   expect(druck.tabellenkopf, 'Tabellenkopf wiederholt sich je Seite').toBe('table-header-group');
   await page.emulateMedia({ media: null });
+
+  // ── PDF (nur Chromium): jede Seite trägt „Seite n von m", der letzte Eintrag steht hinten.
+  if (browserName === 'chromium') {
+    const auszug = await pdfAuszug(await page.pdf({ format: 'A4' }));
+    const m = auszug.length;
+    expect(m, 'mehrseitiges PDF').toBeGreaterThanOrEqual(2);
+    auszug.forEach((s, i) => {
+      expect(s.text, `Seite ${i + 1} trägt die Seitenzählung`).toContain(`Seite ${i + 1} von ${m}`);
+    });
+    expect(auszug[m - 1].text, 'letzter Eintrag auf der letzten Seite').toContain(
+      'Berichtigung: Deich Süd, nicht Nord',
+    );
+    test.info().annotations.push({ type: 'messwert', description: `ETB-Druck: PDF ${m} Seiten` });
+  } else {
+    test.info().annotations.push({
+      type: 'nur-chromium',
+      description: 'ETB-Druck: Seitenzählung und letzter Eintrag im PDF',
+    });
+  }
 
   // ── Gefilterter Druck: nur Meldungen; die Berichtigung liegt außerhalb der Auswahl.
   await page.goto(`/einsaetze/${einsatzId}/etb?typ=meldung`);

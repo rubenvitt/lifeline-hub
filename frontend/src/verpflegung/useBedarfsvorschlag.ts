@@ -1,7 +1,7 @@
 /**
  * Verpflegung — Bedarfsvorschläge für ein Zeitfenster.
  *
- * Zwei Quellen, beide nur, wenn das Quellmodul für die Person BEDIENBAR ist
+ * Zwei Quellen, beide nur, wenn das Quellmodul laut Server-Freigabe BEDIENBAR ist
  * (`istKeyFreigegeben`) — sichtbar allein reicht nicht, eine Rollensperre ist 403. Ein Fehler
  * lässt die Quelle leer: kein Vorschlag, keine Fehleranzeige, kein Wiederholungsversuch.
  *
@@ -19,7 +19,7 @@ import { zuWanduhr } from '../anzeige/zeitEingabe';
 import { ladeBelegungKopfzahl } from '../api/betreuung';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BelegungKopfzahl, BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { BelegungKopfzahl, ModulFreigaben } from '../api/types';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { verdichte } from '../kraefte/kraeftebild';
 
@@ -44,12 +44,11 @@ export interface BedarfsvorschlagArgs {
   /** Beginn des Zeitfensters als Wire-String (UTC ohne Zonenkennung); ohne Beginn gilt die
    *  Kopfzahl „jetzt“. */
   vonAt: string | undefined;
-  benutzer: BenutzerAnzeige | null;
   /**
-   * Modul-Overrides des Einsatzes. Anders als bei `istModulSichtbar` heißt `undefined` hier „noch
-   * unbekannt“ und sperrt beide Quellen, damit kein Abruf ein 403 riskiert. „Keine Overrides“ ist `{}`.
+   * Modul-Freigaben des Servers (LFH-669). `undefined` heißt „noch unbekannt“ und sperrt beide
+   * Quellen (`istKeyFreigegeben` gibt dann nichts frei), damit kein Abruf ein 403 riskiert.
    */
-  overrides: ModulOverrides | undefined;
+  freigaben: ModulFreigaben | undefined;
   /** Uhr für „liegt der Beginn in der Zukunft?“ — die Seite reicht `useJetzt()` durch. */
   jetzt?: Dayjs;
 }
@@ -83,13 +82,12 @@ function betreuteVorschlag(
 export function useBedarfsvorschlag({
   einsatzId,
   vonAt,
-  benutzer,
-  overrides,
+  freigaben,
   jetzt,
 }: BedarfsvorschlagArgs): Bedarfsvorschlag {
-  const bekannt = Number.isFinite(einsatzId) && overrides !== undefined;
-  const personalFrei = bekannt && istKeyFreigegeben('personal', benutzer, overrides);
-  const betreuungFrei = bekannt && istKeyFreigegeben('betreuung', benutzer, overrides);
+  const gueltig = Number.isFinite(einsatzId);
+  const personalFrei = gueltig && istKeyFreigegeben('personal', freigaben);
+  const betreuungFrei = gueltig && istKeyFreigegeben('betreuung', freigaben);
   const { konventionen } = useAnzeigeKonventionen();
 
   const personalQ = useQuery({

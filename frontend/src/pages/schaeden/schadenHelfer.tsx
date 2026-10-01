@@ -37,15 +37,40 @@ export const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlu
   }),
 );
 
+/** Statussicht der Schäden-Liste: ein Status oder „alle" (kein Filter). */
+export type SchaedenSicht = SchadenStatus | 'alle';
+
+/** Reiter der Schäden-Liste in Bedienreihenfolge — dieselben Wörter im Kopf der Druckansicht. */
+export const SCHAEDEN_SICHTEN: readonly { key: SchaedenSicht; label: string }[] = [
+  { key: 'offen', label: 'Offen' },
+  { key: 'uebergeben', label: 'Übergeben' },
+  { key: 'abgeschlossen', label: 'Abgeschlossen' },
+  { key: 'alle', label: 'Alle' },
+];
+
 /**
  * Reiterachse der Schäden-Liste: Status oder „alle". Typ, Ausmaß und Freitextsuche laufen im
  * `Datensicht`-Primitiv (Spaltenfilter bzw. `suche`).
  */
-export function filterSchaeden(
-  alle: Schaden[],
-  opts: { sicht: SchadenStatus | 'alle' },
-): Schaden[] {
+export function filterSchaeden(alle: Schaden[], opts: { sicht: SchaedenSicht }): Schaden[] {
   return alle.filter((s) => opts.sicht === 'alle' || s.status === opts.sicht);
+}
+
+/**
+ * Geschädigt als reiner Text, ohne Deeplink — für Papier (LFH-727). Dieselbe Rangfolge wie
+ * {@link geschaedigtAnzeige}: Person (R-Nummer, ggf. storniert), Einsatzkraft, eigene Organisation,
+ * freier Kontakt.
+ */
+export function geschaedigtText(s: Schaden): string {
+  if (s.geschaedigt_registrier_nr != null) {
+    const label = registrierNummer('R', s.geschaedigt_registrier_nr);
+    return s.geschaedigt_storniert_at ? `${label} (storniert)` : label;
+  }
+  if (s.geschaedigt_personal_id != null) return s.geschaedigt_personal_name ?? 'Einsatzkraft';
+  if (s.geschaedigt_organisation_id != null) {
+    return s.geschaedigt_organisation_name ?? 'Eigene Organisation';
+  }
+  return s.geschaedigt_kontakt || '—';
 }
 
 /** Kompakte Geschädigt-Anzeige inkl. Deeplinks (Person→Detailseite, Einsatzkraft→Personal-Liste). */

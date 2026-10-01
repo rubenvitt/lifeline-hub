@@ -1,4 +1,4 @@
-import type { BenutzerAnzeige, ModulOverrides } from '../../api/types';
+import type { ModulFreigaben } from '../../api/types';
 import type { ModulEintrag } from '../../einsatz/modulRegistry';
 import { personenZugriffVon, type PersonenZugriff } from './personenEbene';
 
@@ -13,11 +13,9 @@ import { personenZugriffVon, type PersonenZugriff } from './personenEbene';
 export type BetreuungZugriff = Exclude<PersonenZugriff, 'rueckblick'>;
 
 export function betreuungZugriffVon(a: {
-  /** Overrides-Abfrage ist abgeschlossen (Erfolg ODER Fehler — dann gilt der Registry-Default). */
-  rechteBekannt: boolean;
   modul: ModulEintrag | undefined;
-  benutzer: BenutzerAnzeige | null;
-  overrides: ModulOverrides | undefined;
+  /** Freigaben des Servers; `undefined`, solange sie laden oder ihr Abruf gescheitert ist. */
+  freigaben: ModulFreigaben | undefined;
   /** Die Betreuungs-Übersicht kam mit 403 zurück. */
   abgelehnt: boolean;
 }): BetreuungZugriff {

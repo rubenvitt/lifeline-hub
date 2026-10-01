@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -7,28 +7,25 @@ import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useAdressSprung } from './useAdressSprung';
 import type { PaletteModus } from './typen';
-import { authWertFixture, benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
+import type { ModulFreigaben } from '../api/types';
 
 /**
  * Beschaffung der Adresszeile (LFH-638): Rechte wie beim Koordinatensprung, und NIE eine Anfrage an
  * die Adresssuche — die Palette tippt live, gesucht wird erst auf der Karte.
  */
-vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
-}));
-
 const EINSATZ = 1;
 
 let zaehler: Record<string, number>;
-let overrides: Record<string, object>;
+let freigaben: ModulFreigaben;
 
 beforeEach(() => {
   zaehler = {};
-  overrides = {};
+  freigaben = freigabenFixture();
   server.use(
-    http.get('/api/einsaetze/:id/modul-overrides', () => {
-      zaehler.overrides = (zaehler.overrides ?? 0) + 1;
-      return HttpResponse.json(overrides);
+    http.get('/api/einsaetze/:id/modul-freigaben', () => {
+      zaehler.freigaben = (zaehler.freigaben ?? 0) + 1;
+      return HttpResponse.json(freigaben);
     }),
     http.get('/api/einsaetze/:id/einstellungen', () => HttpResponse.json({})),
     http.get('/api/einsaetze/:id/karte/ort-suche', () => {
@@ -88,18 +85,9 @@ describe('useAdressSprung (LFH-638)', () => {
   });
 
   it('bietet nichts an, wenn die Lagekarte im Einsatz ausgeblendet ist', async () => {
-    overrides = {
-      lagekarte: {
-        einsatz_id: EINSATZ,
-        modul_key: 'lagekarte',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
+    freigaben = freigabenFixture({ lagekarte: { sichtbar: false, zugriff: false } });
     const { result } = starte({ suche: 'Hauptstraße 12' });
-    await waitFor(() => expect(zaehler.overrides).toBe(1));
+    await waitFor(() => expect(zaehler.freigaben).toBe(1));
     await ruhe();
     expect(result.current('Hauptstraße 12')).toBeNull();
   });

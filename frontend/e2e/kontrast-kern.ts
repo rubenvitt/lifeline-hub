@@ -8,7 +8,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 type Farbe = [number, number, number, number];
 
 interface Auftrag {
-  /** CSS-Eigenschaft des Vordergrunds, z. B. `color` oder `border-left-color`. */
+  /** CSS-Eigenschaft des Vordergrunds, z. B. `color`, `border-left-color` oder `box-shadow`. */
   vordergrund: string;
   /** Grundfläche: die komponierte Fläche des Elements selbst oder die seines Elternteils. */
   grund: 'selbst' | 'eltern';
@@ -20,9 +20,61 @@ interface Messung {
   verhaeltnis: number;
 }
 
+/**
+ * Wartet, bis Element und Vorfahren eingeschwungen sind (LFH-702, Spec `textkontrast-rollen`,
+ * „Messung im eingeschwungenen Zustand"). Eine antd-Tabellenzeile geht unter dem Zeiger per
+ * Transition von `flaeche` nach `flaeche3` über; ein Versuch mittendrin las einen helleren Grund,
+ * bestand, und `toPass` beendete die Schleife — der Test war grün oder rot je nach Zeitpunkt.
+ *
+ * `getComputedStyle` stößt die Stilberechnung an, erst danach gibt es die Transition eines gerade
+ * gesetzten `:hover`. Endlose Animationen (Ladekreisel) zählen nicht; eine endliche, die nicht
+ * rechtzeitig endet, ist ein Fehler mit Namen und Ziel, keine Messung.
+ *
+ * Läuft vor JEDER Messung (`messe`), also für `pruefe`, `kontrast` und `randKontrast`. Einen
+ * Zustand, den erst JavaScript setzt (antds Zeilen-Hover kommt als Klasse
+ * `ant-table-cell-row-hover` aus `onMouseEnter`, nicht aus `:hover`), sieht es nicht kommen: der
+ * Aufrufer sichert ihn vorher als Vorbedingung zu.
+ */
+async function eingeschwungen(ziel: Locator) {
+  await ziel.evaluate(async (element) => {
+    const kette = new Set<Element>();
+    for (let e: Element | null = element; e; e = e.parentElement) {
+      kette.add(e);
+      void getComputedStyle(e).backgroundColor;
+    }
+    const laufend = document.getAnimations().filter((a) => {
+      const effekt = a.effect as KeyframeEffect | null;
+      return (
+        a.playState === 'running' &&
+        !!effekt?.target &&
+        kette.has(effekt.target) &&
+        effekt.getComputedTiming().iterations !== Infinity
+      );
+    });
+    const beschreibung = laufend
+      .map((a) => {
+        const effekt = a.effect as KeyframeEffect;
+        const t = effekt.target as Element;
+        const name =
+          a instanceof CSSTransition
+            ? a.transitionProperty
+            : a instanceof CSSAnimation
+              ? a.animationName
+              : a.id || a.constructor.name;
+        return `${name} an ${t.tagName}.${t.getAttribute('class') ?? ''}${effekt.pseudoElement ?? ''}`;
+      })
+      .join(', ');
+    const frist = new Promise<never>((_, nein) =>
+      setTimeout(() => nein(new Error(`Nicht eingeschwungen nach 5 s: ${beschreibung}`)), 5_000),
+    );
+    await Promise.race([Promise.all(laufend.map((a) => a.finished.catch(() => undefined))), frist]);
+  });
+}
+
 // Echte Text-/Hintergrundpaare inklusive transparenter Vorfahren. Keine Farbwerte aus dem
 // Produkt importieren: eine schlechte Palette muss rot werden.
-function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
+async function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
+  await eingeschwungen(ziel);
   return ziel.evaluate((element, { vordergrund, grund: grundAb }) => {
     type F = [number, number, number, number];
     function rgb(wert: string): F {
@@ -64,7 +116,16 @@ function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
       grund = darueber(rgb(stil.backgroundColor), grund);
     }
     if (grund[3] !== 1) throw new Error('Kein opaker Hintergrund belegt');
-    const vorne = darueber(rgb(getComputedStyle(element).getPropertyValue(vordergrund)), grund);
+    let wert = getComputedStyle(element).getPropertyValue(vordergrund);
+    // Eine Schattenlinie (`box-shadow: inset …`) misst ihre Farbe; mehrere Schatten nur, wenn
+    // sie dieselbe Farbe tragen — sonst wäre unklar, welche Linie gemeint ist.
+    if (vordergrund === 'box-shadow') {
+      const farben = wert.match(/rgba?\([^)]*\)/g);
+      if (!farben) throw new Error(`Kein Schatten an ${element.tagName}: ${wert}`);
+      if (new Set(farben).size !== 1) throw new Error(`Schatten in mehreren Farben: ${wert}`);
+      wert = farben[0];
+    }
+    const vorne = darueber(rgb(wert), grund);
     const [a, b] = [luminanz(vorne), luminanz(grund)].sort((x, y) => x - y);
     return { vordergrund: vorne, grund, verhaeltnis: (b + 0.05) / (a + 0.05) };
   }, auftrag);
@@ -137,12 +198,86 @@ export async function pruefe(tag: Locator, minimum: number, name: string) {
   await expect(tag, name).toBeVisible();
   // Modal-Einblendung erst abwarten: Opacity-Gruppen liefern keine belastbare Messung.
   // Ein dauerhaft nicht unterstützter Stil bleibt ein Fehler, statt still zu bestehen.
+  // Jeder Versuch schwingt zuerst ein (`messe`): schon der erste misst den Endwert, ein Wert unter
+  // dem Boden bleibt in jedem Versuch rot (LFH-702).
   await expect(async () => {
     const messung = await kontrast(tag);
     expect(messung.verhaeltnis, `${name}: ${JSON.stringify(messung)}`).toBeGreaterThanOrEqual(
       minimum,
     );
   }).toPass({ timeout: 10_000 });
+}
+
+/**
+ * WCAG-Verhältnis zweier opaker Farben, für Paare, die nicht an EINEM Element hängen. Dieselbe
+ * Formel wie in `messe` — dort läuft sie im Browser (`evaluate`) und kann nicht hierher zeigen.
+ */
+export function verhaeltnis(a: Farbe, b: Farbe): number {
+  const luminanz = (f: Farbe) => {
+    const linear = f.slice(0, 3).map((n) => {
+      const s = n / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+  };
+  const [x, y] = [luminanz(a), luminanz(b)].sort((p, q) => p - q);
+  return (y + 0.05) / (x + 0.05);
+}
+
+/**
+ * Die Form der Schattenlinie: GENAU zwei `inset`-Schatten ohne Weichzeichnung und ohne
+ * waagerechten Versatz, einer nach unten (Oberlinie), einer nach oben (Unterlinie), je mindestens
+ * 1 px. Ein Ring (`0 0 0 2px`, die Form des Fokusrings), ein äußerer Schatten, eine einzelne Linie
+ * oder eine Nulllinie wären unsichtbar oder etwas anderes, aber farblich messbar — deshalb vorab.
+ */
+async function pruefeLinienform(ziel: Locator) {
+  const wert = await ziel.evaluate((el) => getComputedStyle(el).boxShadow);
+  // Kommas innerhalb von `rgb(…)` trennen keine Schatten.
+  const schatten = wert.split(/,(?![^(]*\))/).map((t) => t.trim());
+  const form = schatten.map((t) => {
+    const laengen = t
+      .replace(/rgba?\([^)]*\)/, '')
+      .replace('inset', '')
+      .trim()
+      .split(/\s+/)
+      .map((l) => parseFloat(l));
+    const [x = NaN, y = NaN, unschaerfe = 0, ausdehnung = 0] = laengen;
+    return { inset: /\binset\b/.test(t), x, y, unschaerfe, ausdehnung };
+  });
+  const beschreibung = `box-shadow: ${wert}`;
+  expect(form, beschreibung).toHaveLength(2);
+  for (const f of form) {
+    expect(f.inset, beschreibung).toBe(true);
+    expect(f.x, beschreibung).toBe(0);
+    expect(f.unschaerfe, beschreibung).toBe(0);
+    expect(f.ausdehnung, beschreibung).toBe(0);
+  }
+  const ys = form.map((f) => f.y).sort((a, b) => a - b);
+  expect(ys[0], `Unterlinie fehlt — ${beschreibung}`).toBeLessThanOrEqual(-1);
+  expect(ys[1], `Oberlinie fehlt — ${beschreibung}`).toBeGreaterThanOrEqual(1);
+}
+
+/**
+ * Kontrast einer Schattenlinie (`box-shadow: inset …`, LFH-698) gegen die Fläche, auf der sie
+ * liegt, UND gegen die Fläche eines Nachbarn — die Linie trennt die Zeile von beiden. Ein Element
+ * ohne Schatten oder mit einer anderen Schattenform ist ein Fehler, keine Messung.
+ */
+export async function schattenKontrast(ziel: Locator, nachbar: Locator) {
+  await pruefeLinienform(ziel);
+  const innen = await messe(ziel, { vordergrund: 'box-shadow', grund: 'selbst' });
+  const { grund: nachbarGrund } = await messe(nachbar, { vordergrund: 'color', grund: 'selbst' });
+  return {
+    linie: innen.vordergrund,
+    flaeche: innen.grund,
+    nachbar: nachbarGrund,
+    gegenFlaeche: innen.verhaeltnis,
+    gegenNachbar: verhaeltnis(innen.vordergrund, nachbarGrund),
+  };
+}
+
+/** Komponierte Fläche eines Elements (alle Vorfahren übereinander), opak. */
+export async function flaeche(ziel: Locator): Promise<Farbe> {
+  return (await messe(ziel, { vordergrund: 'color', grund: 'selbst' })).grund;
 }
 
 /**

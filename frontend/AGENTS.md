@@ -157,10 +157,21 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Tag dunkler, nicht heller), über die `Dropdown`-/`Button`-Token in `antdKomponenten`, nie je
   Menü oder Knopf. Gemessen in `e2e/gefahr-kontrast.spec.ts`; kein Kontrast-Spec führt Rot unter
   einer Ausnahme.
+- **Deeplink-Hervorhebung** (LFH-698, Spec `deeplink-hervorhebung`; `.zeile-hervorgehoben` an
+  Datensicht und Zeitachse): `bedienFlaeche` plus Ober- und Unterlinie in `bedien` (`box-shadow`,
+  `index.css`); ein `Zeitachseneintrag` setzt die Fläche inline mit. Nie `flaeche3` (das ist der
+  Hover; die Tagmodus-Regel unten meint Hover und aktive Segmente) und nie eine Statusfläche;
+  Nachweis `e2e/deeplink-hervorhebung-kontrast.spec.ts`. **Farbliterale
+  in CSS nur in `theme/rollen.css`** (Spec `css-farbquelle`, `theme/cssFarbquelle.guard.test.ts`,
+  Schuldmenge `OFFEN` schrumpft nur).
 - **Tagmodus** (LFH-618, `docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`):
   `achtung`/`alarm` als Text über `achtungText`/`alarmText`; Hervorhebung auf `flaeche3`, nicht
   `flaeche2`; Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
-  `e2e/kontrast-kern.ts`).
+  `e2e/kontrast-kern.ts`). **Text auf der Hervorhebung hält den vollen Boden** (LFH-702/LFH-877,
+  Spec `textkontrast-rollen`): Hover- und Aktivzeile sind Grund wie jede Fläche; deshalb ist
+  `bedienText` am Tag so dunkel, dass er auf `flaeche3` ≥ 7 hält — die Fläche wird nicht
+  aufgehellt, die Rolle nicht lokal überschrieben
+  (`openspec/changes/archive/2026-10-01-lfh-702-hervorhebung-textboden/design.md`).
 - **Textboden für jede Textstufe** (LFH-643, Spec `textstufen-kontrast`,
   `openspec/changes/archive/2026-10-01-lfh-643-tertiaertext-tagesboden/design.md`): `text`,
   `text2`, `gedaempft` und auch Tertiärtext `schwach` (Augenbraue, Meta, Platzhalter)
@@ -218,6 +229,12 @@ anwendbar), „nicht geprüft" ist keins.
   Schuldmenge `OFFEN` schrumpft nur, im selben Commit wie der Fix; Stand: UHS-Platzkarte in
   `pages/uhs/Grundriss.tsx`, nur in `kompakt`, sonst `platzBedienform`). `Card`/`Descriptions`/
   `Space`/`Liste` dürfen klein bleiben.
+- **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
+  gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
+  `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
+  Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
+  `e2e/dichte-ableitung.spec.ts`; Flächenmessung der Modul-Prüflisten
+  `e2e/trefflaeche-pruefflaechen.spec.ts`, Messhelfer in `e2e/trefflaeche-kern.ts`.
 - **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel
   (`Math.max(48, controlHeight)`, Griffe über `navGriffMass`); die Rail-Spalte wächst mit
   (`railBreite` in `components/Kopfleiste.tsx`, 73 px in `handschuh`).
@@ -443,7 +460,7 @@ Spec `bedien-arbeitsplatz`).
   über einen Einstieg in einer bestehenden Fläche erreicht (Primäraktion im Seitenkopf,
   Sprungmarke, Leeraktion eines Paneels, Sprungpalette) und hat eine Adresse, die als Lesezeichen
   taugt. Was je Standort verschieden ist, trägt die Kontext-Achse **am Gerät**; „Fükw-Arbeitsplatz“
-  in `ThemeModeProvider.tsx` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
+  in `theme/dichte.ts` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
   von Startziel, Primäraktion, Modulreihenfolge oder Dichte je Person; `standard_modul` gilt für
   den ganzen Einsatz. Je Person liegt nur das Palettengedächtnis „Zuletzt“
   (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener Schlüsselraum).

@@ -2,7 +2,7 @@ import type { Ikone } from '../ikonen';
 import type {
   BenutzerAnzeige,
   EinsatzAnzeige,
-  ModulOverrides,
+  ModulFreigaben,
   Koordinatenformat,
 } from '../api/types';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
@@ -139,7 +139,11 @@ export interface BefehlKontext {
   einsatzId: number | null;
   benutzer: BenutzerAnzeige | null;
   einsaetze: EinsatzAnzeige[];
-  overrides?: ModulOverrides;
+  /**
+   * Modulfreigaben des Servers für den aktuellen Einsatz (`GET …/modul-freigaben`, LFH-669).
+   * Fehlen sie (laden, Fehler, kein Einsatz), ist kein Modul freigegeben (`istModulFreigegeben`).
+   */
+  freigaben?: ModulFreigaben;
   darfSchreibenImEinsatz: boolean;
   /** Zuletzt besuchte Modulschlüssel des aktuellen Einsatzes, jüngstes zuerst
    *  (`einsatz/zuletztModule.ts`). */

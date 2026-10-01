@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { hashKey, QueryClientProvider, type QueryClient } from '@tanstack/react-query';
@@ -9,7 +9,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import { parseEtbFilter } from '../routing/deeplinks';
 import { etbNummerSchluessel, etbSuchSchluessel, useDatensaetze } from './useDatensaetze';
 import type { PaletteModus } from './typen';
-import { authWertFixture, benutzerFixture } from '../test/fixtures';
+import type { ModulFreigaben } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Die BESCHAFFUNGS-Aussagen des Datensatz-Finders: WAS ÜBERHAUPT ANGEFRAGT WIRD (der reine Kern
@@ -19,12 +20,9 @@ import { authWertFixture, benutzerFixture } from '../test/fixtures';
  * Request“ und „doch ein Request“ im selben Lauf nebeneinander. `onUnhandledRequest: 'error'`
  * bricht bei einem zu früh feuernden Request.
  *
- * `useAuth` ist gestubbt: der echte `AuthProvider` brächte einen weiteren Abruf in jeden Zähler.
- * Die Rechteachse fährt über die Overrides.
+ * Die Rechteachse fährt über die Modulfreigaben des Servers (LFH-669); der Hook kennt den
+ * Benutzer nicht.
  */
-vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
-}));
 
 const EINSATZ = 1;
 
@@ -34,8 +32,8 @@ let zaehler: Record<string, number>;
 let etbAdressen: URL[];
 /** Angefragte Zähl-Adressen des ETB-Sammeltreffers. */
 let anzahlAdressen: URL[];
-/** Sichtbarkeits-Overrides, die der Handler ausliefert — je Test gesetzt. */
-let overrides: Record<string, object>;
+/** Modulfreigaben, die der Handler ausliefert — je Test gesetzt. */
+let freigaben: ModulFreigaben;
 
 function json(name: string, koerper: object[]) {
   return () => {
@@ -57,11 +55,11 @@ beforeEach(() => {
   zaehler = {};
   etbAdressen = [];
   anzahlAdressen = [];
-  overrides = {};
+  freigaben = freigabenFixture();
   server.use(
-    http.get('/api/einsaetze/:id/modul-overrides', () => {
-      zaehler['modul-overrides'] = (zaehler['modul-overrides'] ?? 0) + 1;
-      return HttpResponse.json(overrides);
+    http.get('/api/einsaetze/:id/modul-freigaben', () => {
+      zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
+      return HttpResponse.json(freigaben);
     }),
     http.get('/api/einsaetze/:id/personen', json('personen', [PERSON])),
     http.get('/api/einsaetze/:id/schaeden', json('schaeden', [])),
@@ -162,16 +160,7 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
    * je Modul greift und nicht alles abwürgt.
    */
   it('lädt die freigegebenen Listen und lässt die des ausgeblendeten Moduls ungefragt', async () => {
-    overrides = {
-      personen: {
-        einsatz_id: EINSATZ,
-        modul_key: 'personen',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
+    freigaben = freigabenFixture({ personen: { sichtbar: false } });
     starte({ suche: 'meier' });
 
     await waitFor(() => expect(zaehler.schaeden).toBe(1));
@@ -179,21 +168,54 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
   });
 
   /**
-   * Der Riegel wartet auf die Antwort der Overrides; sonst liefen die Listen in der Ladelücke gegen
-   * den Registry-Default „sichtbar“ los, ein Fehler, der bei warmem Cache verschwände.
+   * Spec `modul-freigabe`, „Sprungpalette“: sperrt die Org-Vorgabe ein Modul (`sichtbar: true,
+   * zugriff: false`), geht keine Anfrage an seine Liste. Die alte Client-Regel kannte die
+   * Org-Vorgaben nicht und fragte hier auf Verdacht. PAAR wie oben.
    */
-  it('holt die Sichtbarkeit, bevor die erste Liste angefragt wird', async () => {
+  it('lässt die Liste eines Moduls ohne Zugriff (Org-Vorgabe) ungefragt', async () => {
+    freigaben = freigabenFixture({ schaeden: { zugriff: false } });
+    const { result } = starte({ suche: 'meier' });
+
+    await waitFor(() => expect(zaehler.personen).toBe(1));
+    await ruhe();
+    expect(zaehler.schaeden).toBeUndefined();
+    expect(result.current.schaeden).toBeUndefined();
+  });
+
+  /**
+   * Unbekannt heißt nicht freigegeben: scheitert der Abruf der Freigaben, geht keine Liste los,
+   * statt auf Verdacht gegen 403 zu laufen (Spec `modul-freigabe`).
+   */
+  it('fragt keine Liste ab, wenn der Abruf der Freigaben scheitert', async () => {
+    server.use(
+      http.get('/api/einsaetze/:id/modul-freigaben', () => {
+        zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
+        return HttpResponse.json({ fehler: 'kaputt' }, { status: 500 });
+      }),
+    );
+    starte({ suche: 'meier' });
+
+    await waitFor(() => expect(zaehler['modul-freigaben']).toBeGreaterThanOrEqual(1));
+    await ruhe();
+    expect(Object.keys(zaehler)).toEqual(['modul-freigaben']);
+  });
+
+  /**
+   * Der Riegel wartet auf die Antwort der Freigaben; sonst liefen die Listen in der Ladelücke auf
+   * Verdacht los, ein Fehler, der bei warmem Cache verschwände.
+   */
+  it('holt die Freigaben, bevor die erste Liste angefragt wird', async () => {
     /*
      * Die REIHENFOLGE wird außerhalb der Handler geprüft: ein `expect` im Handler wirft in MSW, der
      * Zähler ist dann schon hochgezählt, und der Test bliebe grün.
      */
     const reihenfolge: string[] = [];
     server.use(
-      http.get('/api/einsaetze/:id/modul-overrides', async () => {
+      http.get('/api/einsaetze/:id/modul-freigaben', async () => {
         // Verzögert, damit „danach“ nicht bloß die schnellere Leitung ist.
         await new Promise((r) => setTimeout(r, 20));
-        reihenfolge.push('modul-overrides');
-        return HttpResponse.json({});
+        reihenfolge.push('modul-freigaben');
+        return HttpResponse.json(freigabenFixture());
       }),
       http.get('/api/einsaetze/:id/personen', () => {
         zaehler.personen = (zaehler.personen ?? 0) + 1;
@@ -203,7 +225,7 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
     );
     starte({ suche: 'meier' });
     await waitFor(() => expect(zaehler.personen).toBe(1));
-    expect(reihenfolge).toEqual(['modul-overrides', 'personen']);
+    expect(reihenfolge).toEqual(['modul-freigaben', 'personen']);
   });
 });
 
@@ -354,7 +376,7 @@ describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
     expect(Object.keys(zaehler).sort()).toEqual([
       'einheiten',
       'fahrzeuge',
-      'modul-overrides',
+      'modul-freigaben',
       'personal',
       'personen',
     ]);
@@ -366,7 +388,7 @@ describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
     await ruhe();
 
     // Der Sammeltreffer gehört zum ETB und kommt unter „#“ mit.
-    expect(Object.keys(zaehler).sort()).toEqual(['etb', 'etb-anzahl', 'modul-overrides']);
+    expect(Object.keys(zaehler).sort()).toEqual(['etb', 'etb-anzahl', 'modul-freigaben']);
   });
 
   /**

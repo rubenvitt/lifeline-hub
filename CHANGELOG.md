@@ -1,3 +1,107 @@
+## [1.0.0-alpha.63](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.62...v1.0.0-alpha.63) (2026-10-01)
+
+### Wichtige Änderungen
+
+- **macOS-Pakete werden jetzt signiert und notarisiert**: Die Desktop-Anwendung für macOS ist nun mit einer Apple Developer ID signiert und notarisiert, wodurch die Sicherheitswarnungen beim ersten Start entfallen und Updates reibungsloser verlaufen.
+
+### Einsatztagebuch
+
+- **Berichtigungen sind jetzt in der Vorschau sichtbar**: Wurde ein Eintrag berichtigt, zeigt die Vorschau nun „berichtigt durch Nr. …" mit Verweis auf die Berichtigung.
+- **Chat-Anhänge können beim Heraufstufen ins Tagebuch übernommen werden**: Beim Übertragen einer Chat-Nachricht ins Einsatztagebuch können bis zu zehn Dateien ausgewählt und als Kopie mitgenommen werden.
+- **Schnellere Entwurfs-Navigation**: Die Entwurfstabs im Tagebuch passen sich besser der gewählten Bediendichte an und nehmen weniger Platz weg.
+
+### Lagekarte
+
+- **Ortssuche auf der Karte**: Das Suchfeld der Karte erkennt nun Koordinaten und sucht auf Enter nach Adressen. Gefundene Orte werden mit einer Suchnadel markiert.
+- **Adresssuche in der Sprungpalette**: Über die Palette (Strg+K) kann jetzt auch nach Adressen gesucht und direkt zur Lagekarte gesprungen werden.
+- **Unwetterwarnungen des DWD besser sichtbar**: Abgelaufene Warnungen werden nicht mehr angezeigt, angekündigte Warnungen erscheinen gestrichelt. Die Warnstufe wird farblich korrekt nach Schwere dargestellt.
+- **Schwere Unwetterwarnungen als Modulzähler und Hinweis**: Unwetterwarnungen der Stufen „schwer" und „extrem" werden gezählt, lösen einen einmaligen Hinweis aus und erscheinen als Marke im Überblick.
+- **Fachebenen-Inspector besser erreichbar**: Die Schalter zum Ein- und Ausblenden von Fachebenen sind nun durchgehend benannt und mit der Tastatur besser zugänglich.
+- **Betroffenen-Karte stabiler bei Live-Updates**: Personen-Marker auf der Karte springen nicht mehr, solange sich der Zeiger über der Karte befindet oder ein Bündel aufgefächert ist. Änderungen werden in einem Banner angezeigt.
+- **Datensichten mit Lagekarte prüfen Modulrechte**: Das Verorten von Personen auf der Karte ist nur noch möglich, wenn das Modul „Personen" freigegeben ist.
+
+### Kräfte und Mittel
+
+- **Ablösungskarte springt nicht mehr kurz vor Mitternacht**: Die Karte behält ihre Höhe bei, auch wenn die Zeitangaben von kurzer zu langer Form wechseln.
+- **Funkplan mit Fernmeldeskizze**: Der Funkplan kann jetzt auch als Fernmeldeskizze dargestellt werden, die Verbindungen über gemeinsame Sprechgruppen visualisiert.
+- **Besatzung besser erreichbar**: Die Besatzung von Fahrzeugen lässt sich nun über einen beschrifteten Aufklappbereich öffnen, auch auf schmalen Bildschirmen.
+
+### Betroffene und Schadenserfassung
+
+- **Offline-Erfassung nach Serveruhr**: Betreuungsmeldungen, die ohne Netzverbindung vorgemerkt werden, erhalten automatisch einen Zeitstempel, der mit der Serveruhr abgeglichen wird. Dadurch werden Meldungen von vorgehenden Geräten nicht mehr abgelehnt.
+- **CSV-Export für Betroffene und Tiere**: Die Listen von Personen und Tieren können jetzt als CSV-Datei exportiert werden.
+
+### Führung
+
+- **Einsatzbericht drucken**: Die Seite „Einsatzdaten" bietet jetzt einen Einsatzbericht als Druckvorlage mit allen wichtigen Daten des Einsatzes.
+- **Führungs-Freitexte werden bei Schwärzung entfernt**: Bei der Schwärzung nach Ablauf der Aufbewahrungsfrist werden Freitexte von Meldungen, Aufträgen, Nachforderungen, Lageberichten, Befehlen und Pressemitteilungen entfernt. Das Einsatztagebuch bleibt vollständig erhalten.
+- **Geschwärzte Daten physisch überschrieben**: Geschwärzte personenbezogene Daten werden nun auch in den physischen Blöcken der Datenbank überschrieben, sodass sie nicht mehr wiederherstellbar sind.
+
+### Dokumente
+
+- **Upload-Fortschritt sichtbar**: Beim Hochladen von Dokumenten wird der Fortschritt in Prozent und mit Balken angezeigt, auch während der Prüfphase nach dem Upload.
+- **Dokumente nachträglich bearbeiten**: Titel, Kategorie und Bezug eines abgelegten Dokuments können jetzt nachträglich geändert werden.
+- **Bezugswahl durchsuchbar**: Beim Ablegen von Dokumenten kann der Bezug (z. B. ein Tagebucheintrag) nun auch über eine Volltextsuche gefunden werden, die am Server läuft und auch ältere Einträge findet.
+- **Bezugswahl springt nicht mehr**: Die Liste der möglichen Bezüge bleibt beim Öffnen stabil, auch wenn neue Einträge hinzukommen.
+
+### Wetter und Pegel
+
+- **Aktuelle Bedingungen am Einsatzort**: Die Seite „Wetter & Pegel" zeigt nun die gemessenen Werte der nächsten DWD-Station mit Wetterlage, Temperatur, Luftdruck, Luftfeuchtigkeit, Sichtweite, Windgeschwindigkeit und Windböen.
+
+### Alarmierung und Hinweise
+
+- **Ton-Status klarer**: Solange der Alarmton noch nicht geprüft wurde, erscheint „Ton prüft" statt „Ton blockiert", um keine falsche Störung zu melden.
+- **Unwetterhinweise nur einmal**: Schwere Unwetterwarnungen lösen einen Hinweis mit Ton aus, der pro Einsatz und Person nur einmal erscheint.
+
+### Kommunikation
+
+- **Dreipunkt-Menüs durchgehend benannt**: Die Aktionsmenüs (⋮) tragen nun durchgehend eindeutige Namen, z. B. „Aktionen zu Nachricht von … um …".
+- **Chat-Löschung über eigenen Dialog**: Das Löschen einer Chat-Nachricht wird jetzt in einem eigenen Dialog bestätigt, nicht mehr im Menü.
+
+### Bedienung und Barrierefreiheit
+
+- **Textkontraste durchgehend erhöht**: Links, Beschreibungstexte, Tabellenköpfe, Formularmeldungen und Knöpfe unter dem Zeiger halten nun auch bei hellem Hintergrund den vollen Textkontrast von mindestens 7:1 (Tag) bzw. 5:1 (Nacht).
+- **Tertiärtext besser lesbar**: Augenbrauen, Meta-Angaben, Platzhalter und Feldhilfen sind nun heller, sodass sie auch auf helleren Flächen lesbar bleiben.
+- **Primärknopf besser lesbar**: Die Beschriftung auf Primärknöpfen hält nun auch am Tag den vollen Textkontrast.
+- **Gefahrrot besser lesbar**: Rote Menüeinträge und Gefahrknöpfe verwenden nun einen dunkleren Rotton, der auch am Tag den Textkontrast hält.
+- **Fokusring durchgehend sichtbar**: Der Fokusring an Eingabefeldern, Links und Knöpfen ist nun in allen Situationen ausreichend kontrastreich.
+- **Formularmeldungen klarer**: Fehlermeldungen in Formularen sind nun besser lesbar und folgen den Kontrastregeln.
+- **Deeplink-Hervorhebung einheitlich**: Hervorgehobene Zeilen (z. B. nach Sprung aus der Palette) nutzen nun eine einheitliche Farbe aus dem Rollensystem statt hartkodiertem Gelb.
+- **Handschuh-Betrieb verbessert**: Im Handschuh-Modus sind Dialogfüße und Klappköpfe nun ausreichend groß.
+- **Dateiname in Upload-Listen kein Tab-Stopp mehr**: Der Dateiname in Upload-Listen ist kein unnötiger Tab-Stopp mehr, da er keine Aktion auslöst.
+- **Rail-Etiketten nicht mehr abgeschnitten**: Die Etiketten in der Seitenleiste (z. B. „Erfass.") werden nicht mehr abgeschnitten.
+- **Sammelbanner auf schmalen Bildschirmen lesbar**: Das Sammelbanner in Ablösung und Verpflegung zeigt auf schmalen Bildschirmen nun eine Kurzform und läuft nicht mehr über.
+- **Lage-Dashboard und Überblick ohne Layoutsprung**: Auf schmalen Bildschirmen (390 px) springen die Seiten beim Laden nicht mehr.
+
+### Verwaltung und Einstellungen
+
+- **Modulfreigaben vom Server**: Die Sichtbarkeit und Zugriffsberechtigung von Modulen wird nun vollständig vom Server berechnet und berücksichtigt Organisations-Vorgaben.
+- **Demo-Daten durchgehend gekennzeichnet**: Demo-Stammdaten (Fahrzeuge, Personen, Einheiten) sind nun in Katalogen, Auswahllisten, Detailseiten und Einsatz-Tabellen als „Demo" gekennzeichnet.
+- **Dokumente-Zähler vom Server**: Der Zähler im Navigationsrahmen für neue Dokumente wird nun vom Server berechnet und berücksichtigt gelöschte Dokumente korrekt.
+
+### Betrieb und Installation
+
+- **macOS-App signiert und notarisiert**: Die Desktop-Anwendung für macOS ist nun mit einer Apple Developer ID signiert und notarisiert, wodurch Sicherheitswarnungen beim ersten Start entfallen.
+- **Druck in Firefox und WebKit getestet**: Druckvorlagen (Lagebericht, Befehl, Pressemitteilung, Einsatzbericht) werden nun auch in Firefox und WebKit automatisch getestet.
+- **Logo und Seitenzählung im PDF**: Gedruckte Dokumente enthalten nun das Logo im Druckkopf und eine Seitenzählung „Seite n von m".
+- **Dev-Seed nutzt Organisation des Erstellers**: Der Entwicklungs-Seed legt Einsätze und Tagebucheinträge nun über die regulären Wege an und nutzt die Organisation des Bootstrap-Admins.
+- **Erinnerungen lösen nur in aktiven Einsätzen aus**: Erinnerungen werden nur noch in aktiven Einsätzen ausgelöst, nicht mehr in abgeschlossenen, gelöschten oder geschwärzten Einsätzen.
+- **404 des Einsatzes beendet Live-Feed**: Nach dem Löschen eines Einsatzes versucht der Live-Feed nicht mehr endlos, sich neu zu verbinden.
+- **Einsatzabschnitte werden geprüft**: Beim Anlegen von Unterkünften und Bereitstellungsräumen wird nun geprüft, dass der Einsatzabschnitt zum eigenen Einsatz gehört.
+- **Ansichts-IDs werden geprüft**: Beim Anlegen von Zonen, freien Zeichen und Bild-Hintergründen auf der Lagekarte wird nun geprüft, dass die Ansichts-ID zum eigenen Einsatz gehört.
+
+### Drucken
+
+- **Entwurfsdruck ohne Formularfelder**: Beim Druck eines Entwurfs (Lagebericht, Befehl) stehen Titel- und Zeitstand-Felder nicht mehr doppelt auf dem Papier.
+- **Druckkopf aus Formularwerten**: Der Druckkopf eines Entwurfs zeigt den aktuellen Stand der Eingabefelder, auch wenn dieser noch nicht gespeichert ist.
+- **Einsatzbericht-Druckvorschau kontrastgeprüft**: Die Druckvorschau des Einsatzberichts hält nun in Tag- und Nachtbetrieb die Kontrastanforderungen.
+
+### Technische Verbesserungen
+
+- **Vitest-Tests stabiler**: Drei unter Last wacklige Tests wurden an der Ursache gefasst und warten nun auf echte Ereignisse statt auf feste Zeitgrenzen.
+- **E2E-Dev-Server stabiler**: Der Vite-Dev-Server der E2E-Suite stürzt nicht mehr unter Node 26.7.0 ab, da vorgebündelte Pakete ohne Sourcemap ausgeliefert werden.
+- **Energie-Tests warten auf Signal**: Tests der Energie-Abfrage warten nun auf ein Signal des Abrufs statt auf die Wanduhr, wodurch sie unter Last nicht mehr scheitern.
+
 ## [1.0.0-alpha.62](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.61...v1.0.0-alpha.62) (2026-10-01)
 
 ### Betrieb und Installation

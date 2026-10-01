@@ -1,4 +1,4 @@
-use super::{EtbEintragAnzeige, FolgeauftragVerweis};
+use super::{BerichtigungVerweis, EtbEintragAnzeige, FolgeauftragVerweis};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
@@ -363,6 +363,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     .ok_or(AppError::NotFound)?;
     folgeauftraege_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
+    berichtigungen_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
 }
 
@@ -401,6 +402,50 @@ async fn folgeauftraege_nachladen(
             eintraege[i]
                 .folgeauftraege
                 .push(FolgeauftragVerweis { id, lfd_nr });
+        }
+    }
+    Ok(())
+}
+
+/// Füllt `berichtigt_durch` (LFH-689) für alle übergebenen Einträge mit EINER Abfrage nach —
+/// kein N+1 je Zeile, Index `idx_etb_berichtigt` (Migration 0131). Ohne Listenfilter und ohne
+/// Cursor: eine Berichtigung zählt auch, wenn sie auf einer anderen Seite stünde oder nicht zum
+/// Filter passt. Die Einsatzgrenze hält die Abfrage SELBST (Join auf den Grundeintrag): die
+/// Schreiber prüfen sie heute (`routes::etb` mit `gehoert_zu_einsatz`, Betreuung und Ablösung
+/// über einsatzgefilterte Zeilen), die Datenbank nicht — ein künftiger Schreiber ohne Prüfung
+/// legte sonst id und Nummer eines fremden Einsatzes offen. `typ = 'berichtigung'` wie der
+/// Client-Index (`etb/zeitachseModell.ts`, `berichtigungsindex`).
+async fn berichtigungen_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    if eintraege.is_empty() {
+        return Ok(());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT b.berichtigt_eintrag_id, b.id, b.lfd_nr FROM etb_eintrag b \
+         JOIN etb_eintrag g ON g.id = b.berichtigt_eintrag_id AND g.einsatz_id = b.einsatz_id \
+         WHERE b.typ = 'berichtigung' AND b.berichtigt_eintrag_id IN (",
+    );
+    let mut ids = qb.separated(", ");
+    for e in eintraege.iter() {
+        ids.push_bind(e.id);
+    }
+    qb.push(") ORDER BY b.lfd_nr");
+    let zeilen: Vec<(i64, i64, i64)> = qb.build_query_as().fetch_all(pool).await?;
+    if zeilen.is_empty() {
+        return Ok(());
+    }
+    let index: HashMap<i64, usize> = eintraege
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id, i))
+        .collect();
+    for (grund, id, lfd_nr) in zeilen {
+        if let Some(&i) = index.get(&grund) {
+            eintraege[i]
+                .berichtigt_durch
+                .push(BerichtigungVerweis { id, lfd_nr });
         }
     }
     Ok(())
@@ -662,6 +707,7 @@ pub async fn abfrage(
         .await?;
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
     anhaenge_nachladen(pool, &mut eintraege).await?;
+    berichtigungen_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 
@@ -1093,6 +1139,56 @@ mod tests {
         assert_eq!(b.typ, EtbTyp::Berichtigung);
         assert_eq!(b.berichtigt_eintrag_id, Some(original.id));
         assert_eq!(b.lfd_nr, 2);
+    }
+
+    /// Eine Berichtigung von `grund` im Einsatz `einsatz` — ohne die Einsatzprüfung der Route.
+    async fn berichtige(pool: &SqlitePool, einsatz: i64, benutzer: i64, grund: i64) -> i64 {
+        let mut korrektur = daten("Korrektur");
+        korrektur.typ = "berichtigung";
+        korrektur.berichtigt_eintrag_id = Some(grund);
+        anlegen(pool, einsatz, benutzer, korrektur)
+            .await
+            .unwrap()
+            .id
+    }
+
+    #[tokio::test]
+    async fn laden_traegt_die_berichtigungen_des_eintrags() {
+        // LFH-689: auch das Einzelladen (Erfassen-Antwort, Replay über `client_id`) trägt die
+        // Rückrichtung, nicht nur die Liste.
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let grund = anlegen(&pool, einsatz, benutzer, daten("Pegel 4,20 m"))
+            .await
+            .unwrap();
+        let b = berichtige(&pool, einsatz, benutzer, grund.id).await;
+
+        let geladen = laden(&pool, grund.id).await.unwrap();
+        assert_eq!(
+            geladen.berichtigt_durch,
+            vec![BerichtigungVerweis { id: b, lfd_nr: 2 }]
+        );
+    }
+
+    #[tokio::test]
+    async fn berichtigung_aus_fremdem_einsatz_erscheint_nicht() {
+        // LFH-689: die Routen prüfen die Einsatzgrenze beim Schreiben, die Datenbank nicht. Ein
+        // künftiger Schreiber ohne Prüfung darf über `berichtigt_durch` keine id/Nummer eines
+        // fremden Einsatzes offenlegen — die Nachlade-Abfrage hält die Grenze selbst.
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let fremd = zweiter_einsatz(&pool).await;
+        let grund = anlegen(&pool, einsatz, benutzer, daten("Pegel 4,20 m"))
+            .await
+            .unwrap();
+        berichtige(&pool, fremd, benutzer, grund.id).await;
+
+        assert_eq!(
+            laden(&pool, grund.id).await.unwrap().berichtigt_durch,
+            vec![]
+        );
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        assert_eq!(liste[0].berichtigt_durch, vec![]);
     }
 
     #[tokio::test]

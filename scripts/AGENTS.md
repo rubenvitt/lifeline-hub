@@ -32,6 +32,12 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   frei mit dem Worktree. Ein älterer Worktree ohne die Datei erbt unter einem Main-Checkout
   mit ihr dessen Ziel, bis er auf `alpha` vorgezogen ist
   (`openspec/changes/archive/2026-09-30-lfh-520-cargo-artefakte-isolieren/design.md`).
+- **Playwright fährt drei Projekte** (LFH-729): `chromium` alles, `firefox` und `webkit` nur die
+  Druck-Specs (`frontend/playwright.config.ts`). Die vier Pflicht-Shards `e2e k/4` fahren alle
+  drei und installieren alle drei Browser. Ein eigener Job sperrte erst mit einem Eintrag im
+  Ruleset 17017911. `PW_PROJEKTE=chromium` wählt lokal eine Teilmenge. Schritt 7 bricht vorab
+  ab, wenn ein Browser fehlt, und überspringt nie still
+  (`openspec/changes/archive/2026-10-01-lfh-729-druck-firefox-webkit-pdf-nachweis/design.md`, D1/D2).
 - Optionaler pre-push-Hook: `git config core.hooksPath .githooks`.
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über

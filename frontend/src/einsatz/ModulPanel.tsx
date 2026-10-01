@@ -4,7 +4,7 @@ import { theme } from 'antd';
 import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
 import { navZeilen, sprungZiel, type Sprungmarke } from './sprungmarken';
 import { form, schrift, type Farbrollen } from '../theme/tokens';
-import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides } from '../api/types';
+import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
@@ -22,9 +22,8 @@ const MARKE = { breite: 2, hoehe: 16 } as const;
 
 interface ListeProps {
   module: ModulEintrag[];
-  benutzer: BenutzerAnzeige | null;
-  /** Modul-Overrides des Einsatzes; steuern Sichtbarkeit und Rollen-Schranke. */
-  overrides?: ModulOverrides;
+  /** Modulfreigaben des Servers (LFH-669); steuern Sichtbarkeit und Sperre. */
+  freigaben?: ModulFreigaben;
   aktiverModulKey: string | null;
   onModulKlick: (modul: ModulEintrag) => void;
   /**
@@ -137,8 +136,7 @@ interface Props extends ListeProps {
  */
 export function ModulListe({
   module,
-  benutzer,
-  overrides,
+  freigaben,
   aktiverModulKey,
   onModulKlick,
   mindestTrefflaeche,
@@ -159,8 +157,8 @@ export function ModulListe({
           const { marke } = zeile;
           const ziel = sprungZiel(marke);
           // Ein Sprung in ein ausgeblendetes oder unfertiges Modul wäre einer ins Leere.
-          if (!ziel || ziel.status !== 'fertig' || !istModulSichtbar(ziel, overrides)) return null;
-          const gesperrt = istModulGesperrt(ziel, benutzer, overrides);
+          if (!ziel || ziel.status !== 'fertig' || !istModulSichtbar(ziel, freigaben)) return null;
+          const gesperrt = istModulGesperrt(ziel, freigaben);
           return (
             <button
               key={`sprung:${marke.key}`}
@@ -197,8 +195,8 @@ export function ModulListe({
           );
         }
         const m = zeile.modul;
-        if (!istModulSichtbar(m, overrides)) return null;
-        const gesperrt = istModulGesperrt(m, benutzer, overrides);
+        if (!istModulSichtbar(m, freigaben)) return null;
+        const gesperrt = istModulGesperrt(m, freigaben);
         const aktiv = m.key === aktiverModulKey;
         const modulZaehler = m.zaehlerQuelle ? zaehler?.[m.zaehlerQuelle] : undefined;
         const zaehlerSichtbar = modulZaehler !== undefined && modulZaehler.wert > 0;

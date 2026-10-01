@@ -14,6 +14,9 @@ import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import EtbDruckPage from './pages/EtbDruckPage';
+import PersonenDruckPage from './pages/PersonenDruckPage';
+import TiereDruckPage from './pages/TiereDruckPage';
+import SchaedenDruckPage from './pages/SchaedenDruckPage';
 import EinsatzberichtDruckPage from './pages/EinsatzberichtDruckPage';
 import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
@@ -264,6 +267,10 @@ export const appRouten = createRoutesFromElements(
           <Route path="personen/aufnahme" element={<AufnahmePage />} />
           {/* ETB-Druckansicht (LFH-22), Filter aus der Adresse. */}
           <Route path="etb/druck" element={<EtbDruckPage />} />
+          {/* Druckansichten der Modul-Listen (LFH-727), Seitenfilter aus der Adresse. */}
+          <Route path="personen/druck" element={<PersonenDruckPage />} />
+          <Route path="tiere/druck" element={<TiereDruckPage />} />
+          <Route path="schaeden/druck" element={<SchaedenDruckPage />} />
           {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder
               gesperrt sind; die Rechte prüft der Bericht je Quelle selbst. */}
           <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />

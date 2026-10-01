@@ -1758,3 +1758,35 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     expect(screen.queryByTestId('kartenflaeche-stub')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Einstieg in den Druck (LFH-727, design.md D7): ein sekundärer Link-Knopf im Kopf, der den
+ * aktiven Seitenfilter mitnimmt — auch für Lesende, denn Drucken ist Lesen.
+ */
+describe('PersonenPage — Einstieg in den Druck (LFH-727)', () => {
+  async function kopf(): Promise<HTMLElement> {
+    return waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+  }
+
+  it('verlinkt im Kopf auf die Druckansicht mit dem aktiven Statusfilter', async () => {
+    render(einsatzAktiv, [person, unbekannt], '/einsaetze/1/personen?filter=vermisst');
+    await screen.findByText('R-002');
+    const link = await within(await kopf()).findByRole('link', { name: 'Drucken / als PDF' });
+    const ziel = new URL(link.getAttribute('href')!, 'http://x');
+    expect(ziel.pathname).toBe('/einsaetze/1/personen/druck');
+    expect(Object.fromEntries(ziel.searchParams)).toEqual({ filter: 'vermisst' });
+    expect(link).not.toHaveClass('ant-btn-primary');
+  });
+
+  it('steht auch für Beobachter ohne Schreibrecht da', async () => {
+    render(einsatzBeobachter, [person]);
+    await screen.findByText('R-001');
+    expect(
+      await within(await kopf()).findByRole('link', { name: 'Drucken / als PDF' }),
+    ).toHaveAttribute('href', '/einsaetze/1/personen/druck');
+  });
+});

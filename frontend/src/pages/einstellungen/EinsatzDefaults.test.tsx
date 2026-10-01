@@ -139,6 +139,26 @@ describe('EinsatzDefaults', () => {
     );
   });
 
+  it('invalidiert nach einem Modul-Rollen-Default die Modulfreigaben ALLER Einsätze (LFH-669)', async () => {
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({} as never);
+    const client = new QueryClient();
+    // Literale Keys, nicht die Factory.
+    client.setQueryData(['einsatz-modul-freigaben', 7], {});
+    client.setQueryData(['einsatz-modul-freigaben', 8], {});
+    client.setQueryData(['einsatz-modul-overrides', 7], {});
+    renderMitProviders(<EinsatzDefaults />, { client });
+
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
+    fireEvent.click(await screen.findByText('Admin'));
+
+    await waitFor(() =>
+      expect(client.getQueryState(['einsatz-modul-freigaben', 7])?.isInvalidated).toBe(true),
+    );
+    expect(client.getQueryState(['einsatz-modul-freigaben', 8])?.isInvalidated).toBe(true);
+    // Die Overrides des Einsatzes ändert eine Org-Vorgabe nicht.
+    expect(client.getQueryState(['einsatz-modul-overrides', 7])?.isInvalidated).toBe(false);
+  });
+
   it('speichert Modul-Rollen-Default sofort per PUT', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({ etb: 'fuehrungskraft' } as never);
 

@@ -6,9 +6,10 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
-import type { ModulOverrides } from '../api/types';
+import type { ModulFreigaben } from '../api/types';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { alsOrtszeit } from '../etb/filterZeit';
+import { freigabenFixture } from '../test/fixtures';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
 import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
@@ -18,7 +19,7 @@ import { uhrzeitenText } from './verpflegungText';
 dayjs.extend(utc);
 
 // Der Hook ist eigens getestet (`useBedarfsvorschlag.test.tsx`). Hier zählt, WAS der Dialog
-// hineingibt (Beginn als Wire, Overrides unverändert) und was er mit der Antwort tut.
+// hineingibt (Beginn als Wire, Freigaben unverändert) und was er mit der Antwort tut.
 const vorschlag = vi.hoisted(() => ({
   aufrufe: [] as BedarfsvorschlagArgs[],
   liefere: (() => ({
@@ -43,7 +44,7 @@ const {
   zeitfensterPatch,
 } = await import('./VerpflegungDialoge');
 
-const OVERRIDES: ModulOverrides = {};
+const FREIGABEN: ModulFreigaben = freigabenFixture();
 
 /** Die zuletzt an den Hook gegebenen Argumente (`Array.at` fehlt in `lib` ES2020). */
 const letzterAufruf = () => vorschlag.aufrufe[vorschlag.aufrufe.length - 1];
@@ -103,8 +104,7 @@ function zeigeAnlegen(onErfassen = vi.fn().mockResolvedValue(undefined), onSchli
     <ZeitfensterDialog
       modus={{ art: 'anlegen', onErfassen }}
       einsatzId={1}
-      benutzer={null}
-      overrides={OVERRIDES}
+      freigaben={FREIGABEN}
       jetzt={JETZT}
       laeuft={false}
       fehler={null}
@@ -260,8 +260,8 @@ describe('ZeitfensterDialog — anlegen', () => {
     expect(within(dialog).getByLabelText('Betreute (EP)')).toHaveValue('70');
     expect(within(dialog).getByText(K_HINWEIS)).toBeInTheDocument();
     expect(within(dialog).getByText(B_HINWEIS)).toBeInTheDocument();
-    // Die Overrides gehen unverändert hinein — `undefined` hieße „unbekannt, nichts anfragen".
-    expect(letzterAufruf().overrides).toBe(OVERRIDES);
+    // Die Freigaben gehen unverändert hinein — `undefined` hieße „unbekannt, nichts anfragen".
+    expect(letzterAufruf().freigaben).toBe(FREIGABEN);
     expect(letzterAufruf().vonAt).toBeUndefined();
   });
 
@@ -326,8 +326,7 @@ describe('ZeitfensterDialog — anlegen', () => {
     const props = {
       modus: { art: 'anlegen' as const, onErfassen: vi.fn() },
       einsatzId: 1,
-      benutzer: null,
-      overrides: OVERRIDES,
+      freigaben: FREIGABEN,
       laeuft: false,
       fehler: null,
       onSchliessen: vi.fn(),
@@ -349,8 +348,7 @@ describe('ZeitfensterDialog — anlegen', () => {
     const onSchliessen = vi.fn();
     const props = {
       einsatzId: 1,
-      benutzer: null,
-      overrides: OVERRIDES,
+      freigaben: FREIGABEN,
       jetzt: JETZT,
       laeuft: false,
       onSchliessen,
@@ -380,8 +378,7 @@ describe('ZeitfensterDialog — bearbeiten', () => {
       <ZeitfensterDialog
         modus={{ art: 'bearbeiten', zeitfenster: zeitfenster(), onErfassen }}
         einsatzId={1}
-        benutzer={null}
-        overrides={OVERRIDES}
+        freigaben={FREIGABEN}
         jetzt={JETZT}
         laeuft={false}
         fehler={null}
@@ -639,8 +636,7 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
         <ZeitfensterDialog
           modus={{ art: 'bearbeiten', zeitfenster: zeitfenster(), onErfassen }}
           einsatzId={1}
-          benutzer={null}
-          overrides={OVERRIDES}
+          freigaben={FREIGABEN}
           jetzt={JETZT}
           laeuft={false}
           fehler={null}
@@ -680,8 +676,7 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
         <ZeitfensterDialog
           modus={{ art: 'anlegen', onErfassen }}
           einsatzId={1}
-          benutzer={null}
-          overrides={OVERRIDES}
+          freigaben={FREIGABEN}
           jetzt={JETZT}
           laeuft={false}
           fehler={null}

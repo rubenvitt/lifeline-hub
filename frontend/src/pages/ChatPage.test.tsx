@@ -317,7 +317,7 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Zu ETB' }));
     expect(await screen.findByRole('checkbox', { name: /deich\.jpg/ })).toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));

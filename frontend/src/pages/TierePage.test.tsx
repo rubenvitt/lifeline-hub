@@ -967,3 +967,43 @@ describe('TierePage', () => {
     expect(screen.queryByText('Tiere konnten nicht geladen werden')).not.toBeInTheDocument();
   });
 });
+
+/** Einstieg in den Druck (LFH-727, design.md D7): sekundär im Kopf, mit der aktiven Sicht. */
+describe('TierePage — Einstieg in den Druck (LFH-727)', () => {
+  async function druckLink(): Promise<HTMLElement> {
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    return within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
+  }
+
+  it('nimmt die Vorgabe-Sicht „aktiv“ ausdrücklich mit', async () => {
+    render(einsatzAktiv, [tierBasis, tierVermisst]);
+    await screen.findByText('T-001');
+    const link = await druckLink();
+    expect(link).toHaveAttribute('href', '/einsaetze/1/tiere/druck?sicht=aktiv');
+    expect(link).not.toHaveClass('ant-btn-primary');
+  });
+
+  it('nimmt Sicht und Spezies nach einem Wechsel mit', async () => {
+    render(einsatzAktiv, [tierBasis, tierVermisst]);
+    await screen.findByText('T-001');
+    await userEvent.click(screen.getByRole('radio', { name: 'Vermisst' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Spezies' }));
+    await userEvent.click(await screen.findByTitle('Katze'));
+    await waitFor(async () =>
+      expect(await druckLink()).toHaveAttribute(
+        'href',
+        '/einsaetze/1/tiere/druck?sicht=vermisst&spezies=katze',
+      ),
+    );
+  });
+
+  it('steht auch für Beobachter ohne Schreibrecht da', async () => {
+    render(einsatzBeobachter, [tierBasis]);
+    await screen.findByText('T-001');
+    expect(await druckLink()).toBeInTheDocument();
+  });
+});

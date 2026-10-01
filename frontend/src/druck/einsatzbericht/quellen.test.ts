@@ -1,19 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { BenutzerAnzeige, ModulOverrides } from '../../api/types';
+import type { ModulFreigaben } from '../../api/types';
 import { modulRegistry } from '../../einsatz/modulRegistry';
-import { adminFixture, benutzerFixture } from '../../test/fixtures';
+import { freigabenFixture } from '../../test/fixtures';
 import { BLOECKE, QUELLEN, berichtFreigabe } from './quellen';
 
-const kraft: BenutzerAnzeige = benutzerFixture({ system_rolle: 'keiner', org_rolle: 'keine' });
-const fuehrung: BenutzerAnzeige = benutzerFixture({
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-});
-const admin = adminFixture();
-
-function override(sichtbar: boolean, benoetigte_rolle: string | null = null) {
-  return { sichtbar, benoetigte_rolle } as ModulOverrides[string];
-}
+/**
+ * Die Freigaben rechnet der Server je Benutzer aus (LFH-669: Override, Rolle, Org-Vorgabe):
+ * `sichtbar` = im Einsatz eingeblendet, `zugriff` = für DIESEN Benutzer abrufbar. Eine
+ * Rollensperre kommt hier also als `zugriff: false` an, nicht als Rolle plus Override.
+ */
 
 describe('QUELLEN', () => {
   it('nennt nur Modul-Keys, die es in der Registry gibt', () => {
@@ -45,32 +40,28 @@ describe('QUELLEN', () => {
 });
 
 describe('berichtFreigabe', () => {
-  it('ruft ohne Overrides jede Quelle ab', () => {
-    const f = berichtFreigabe(kraft, {});
+  it('ruft bei freien Modulen jede Quelle ab', () => {
+    const f = berichtFreigabe(freigabenFixture());
     expect(Object.values(f.je).every((z) => z === 'abrufen')).toBe(true);
     expect(f.gesperrteModule).toEqual([]);
   });
 
   it('ein im Einsatz ausgeblendetes Modul ist „nicht genutzt“ und sperrt nicht', () => {
-    const f = berichtFreigabe(kraft, { betreuung: override(false) });
+    const f = berichtFreigabe(freigabenFixture({ betreuung: { sichtbar: false } }));
     expect(f.je.betreuung).toBe('nicht-genutzt');
     expect(f.gesperrteModule).toEqual([]);
   });
 
-  it('eine Rollensperre sperrt für Einsatzkräfte, nicht für Führungskraft und Admin', () => {
-    const overrides = { personen: override(true, 'fuehrungskraft') };
-    const f = berichtFreigabe(kraft, overrides);
+  it('ein Modul ohne Zugriff (Rolle oder Org-Vorgabe) sperrt den Bericht', () => {
+    const f = berichtFreigabe(freigabenFixture({ personen: { zugriff: false } }));
     expect(f.je.personen).toBe('gesperrt');
     expect(f.gesperrteModule).toEqual(['Personen']);
-    expect(berichtFreigabe(fuehrung, overrides).je.personen).toBe('abrufen');
-    expect(berichtFreigabe(admin, overrides).je.personen).toBe('abrufen');
   });
 
   it('nennt ein gesperrtes Modul mit mehreren Quellen genau einmal', () => {
-    const f = berichtFreigabe(kraft, {
-      personal: override(true, 'fuehrungskraft'),
-      etb: override(true, 'admin'),
-    });
+    const f = berichtFreigabe(
+      freigabenFixture({ personal: { zugriff: false }, etb: { zugriff: false } }),
+    );
     expect(f.je.personal).toBe('gesperrt');
     expect(f.je.personalPerioden).toBe('gesperrt');
     expect(f.je.etbZaehler).toBe('gesperrt');
@@ -79,16 +70,24 @@ describe('berichtFreigabe', () => {
   });
 
   it('ausgeblendet geht vor gesperrt', () => {
-    const f = berichtFreigabe(kraft, { schaeden: override(false, 'fuehrungskraft') });
+    const f = berichtFreigabe(freigabenFixture({ schaeden: { sichtbar: false, zugriff: false } }));
     expect(f.je.schaeden).toBe('nicht-genutzt');
     expect(f.gesperrteModule).toEqual([]);
   });
 
+  it('ein Modul ohne Eintrag in den Freigaben sperrt (unbekannt gibt nichts frei)', () => {
+    const freigaben: ModulFreigaben = freigabenFixture();
+    delete freigaben.personen;
+    const f = berichtFreigabe(freigaben);
+    expect(f.je.personen).toBe('gesperrt');
+    expect(f.gesperrteModule).toEqual(['Personen']);
+  });
+
   it('Einsatz und Mitglieder hängen an keinem Modul und werden immer abgerufen', () => {
     const alleAus = Object.fromEntries(
-      modulRegistry.map((m) => [m.key, override(false, 'admin')]),
-    ) as ModulOverrides;
-    const f = berichtFreigabe(kraft, alleAus);
+      modulRegistry.map((m) => [m.key, { sichtbar: false, zugriff: false }]),
+    ) as ModulFreigaben;
+    const f = berichtFreigabe(alleAus);
     expect(f.je.einsatz).toBe('abrufen');
     expect(f.je.mitglieder).toBe('abrufen');
   });

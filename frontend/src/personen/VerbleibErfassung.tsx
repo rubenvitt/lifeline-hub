@@ -1,13 +1,12 @@
 import { Collapse, Form, Input } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
-import { ladeModulOverrides } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { ladeBetreuung } from '../api/betreuung';
 import { ApiError } from '../api/client';
 import { erfasseVerbleib, type VerbleibEingabe } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Betreuungsstelle } from '../api/types';
-import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -57,17 +56,15 @@ export default function VerbleibErfassung({
 }: VerbleibErfassungProps) {
   const [form] = Form.useForm<VerbleibFormWerte>();
   const art = Form.useWatch('art', form);
-  const { benutzer } = useAuth();
 
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+  // Freigaben des Servers (LFH-669): solange sie fehlen, gilt die Betreuung als nicht frei.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const vorab = betreuungZugriffVon({
-    rechteBekannt: overridesQuery.isFetched,
     modul: BETREUUNG_MODUL,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben: freigabenQuery.data,
     abgelehnt: false,
   });
   const betreuungQuery = useQuery({
@@ -76,10 +73,8 @@ export default function VerbleibErfassung({
     enabled: vorab === 'frei',
   });
   const zugriff = betreuungZugriffVon({
-    rechteBekannt: overridesQuery.isFetched,
     modul: BETREUUNG_MODUL,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben: freigabenQuery.data,
     abgelehnt: betreuungQuery.error instanceof ApiError && betreuungQuery.error.status === 403,
   });
   const stellen = betreuungQuery.data?.stellen ?? [];

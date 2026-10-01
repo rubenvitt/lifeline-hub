@@ -116,6 +116,17 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
       return neu;
     })();
 
+/*
+ * Firefox und WebKit fahren NUR die Druck-Specs (LFH-729): der Druck soll in allen drei Browsern
+ * halten, und dort prüfen sie, ob ihre CSS-Engine die Druckmechanik unter Druckmedium genauso
+ * anwendet (`:has()`, komplexe `:not()`, Wurzel im Fluss). Den Seitenumbruch selbst zeigt nur
+ * `page.pdf()`, und das gibt es nur in Chromium — die Specs fragen dafür `browserName`.
+ * Eine weitere Druck-Spec kommt hier hinein, nicht als eigenes Projekt. Die CI verteilt alle drei
+ * Projekte über die vier Pflicht-Shards (`.github/workflows/ci.yml`); lokal wählt
+ * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
+ */
+const DRUCK_SPECS = /\/(druck-fluss|etb-druck)\.spec\.ts$/;
+
 const { backendPort, frontendPort, datenbank } = lauf;
 const backendUrl = `http://127.0.0.1:${backendPort}`;
 // IPv4 durchgängig: Vite bindet ohne --host nur auf [::1], und Playwrights Health-Check gegen
@@ -171,7 +182,11 @@ export default defineConfig({
    */
   reporter: process.env.CI ? [['blob'], ['github']] : 'list',
   use: { baseURL, trace: 'on-first-retry' },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', testMatch: DRUCK_SPECS, use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', testMatch: DRUCK_SPECS, use: { ...devices['Desktop Safari'] } },
+  ],
   webServer: [
     {
       name: 'Backend',
