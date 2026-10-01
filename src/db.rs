@@ -3123,4 +3123,166 @@ mod tests {
                 .unwrap();
         assert_eq!(fk_verletzungen, 0);
     }
+
+    /// Alt-DB im 0021-Stand (`person_zugriff_audit`) mit FK-Zwang und minimalen Eltern-Tabellen.
+    async fn alt_db_person_zugriff_audit() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .expect("In-Memory-Pool");
+        sqlx::raw_sql(
+            "CREATE TABLE einsatz (id INTEGER PRIMARY KEY); \
+             CREATE TABLE einsatz_person (id INTEGER PRIMARY KEY); \
+             CREATE TABLE benutzer (id INTEGER PRIMARY KEY); \
+             INSERT INTO einsatz (id) VALUES (1); \
+             INSERT INTO einsatz_person (id) VALUES (1); \
+             INSERT INTO benutzer (id) VALUES (1);",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql(include_str!("../migrations/0021_person_zugriff_audit.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool
+    }
+
+    const MIGRATION_0131: &str = include_str!("../migrations/0131_person_zugriff_audit_druck.sql");
+
+    // --- Migration 0131: Leaf-Rebuild von person_zugriff_audit mit Art 'druck' (LFH-727) ---
+    //
+    // Eine befüllte 0021-DB mit beiden Bestandsarten, deren höchste Zeile gelöscht ist
+    // (Sequenz > MAX(id)), und die echte 0131: ein vergessener Spaltenname, eine verlorene Zeile
+    // oder Sequenz fiele sonst nicht auf.
+    #[tokio::test]
+    async fn migration_0131_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = alt_db_person_zugriff_audit().await;
+        sqlx::query(
+            "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art, zugriff_at) \
+             VALUES (1, 1, 1, 'detail', '2026-09-30 10:00:00'), \
+                    (1, NULL, 1, 'export', '2026-09-30 10:01:00'), \
+                    (1, 1, 1, 'detail', '2026-09-30 10:02:00')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_zugriff_audit WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let schema_vorher = schema_von(&pool, "person_zugriff_audit").await;
+        let ddl = || async {
+            let sql: String = sqlx::query_scalar(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' \
+                 AND name = 'person_zugriff_audit'",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            sql.replacen("CREATE TABLE \"person_zugriff_audit\"", "CREATE TABLE T", 1)
+                .replacen("CREATE TABLE person_zugriff_audit_neu", "CREATE TABLE T", 1)
+                .replacen("CREATE TABLE person_zugriff_audit", "CREATE TABLE T", 1)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let ddl_vorher = ddl().await;
+        type Zeile = (i64, i64, Option<i64>, i64, String, String);
+        let alle = "SELECT id, einsatz_id, person_id, benutzer_id, art, zugriff_at \
+                    FROM person_zugriff_audit ORDER BY id";
+        let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+
+        assert!(
+            MIGRATION_0131.starts_with("-- no-transaction"),
+            "sqlx erkennt die Direktive nur am Dateianfang"
+        );
+        sqlx::raw_sql(MIGRATION_0131)
+            .execute(&pool)
+            .await
+            .expect("0131 muss auf einer befüllten DB durchlaufen");
+
+        let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(
+            zeilen_nachher, zeilen_vorher,
+            "alle Zeilen samt ids verlustfrei kopiert"
+        );
+        assert_eq!(
+            schema_von(&pool, "person_zugriff_audit").await,
+            schema_vorher,
+            "Spalten, FKs und Indizes unverändert"
+        );
+        assert_eq!(
+            ddl().await.replacen(",'druck'", "", 1),
+            ddl_vorher,
+            "die DDL unterscheidet sich ausschließlich im art-CHECK"
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'person_zugriff_audit_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'person_zugriff_audit_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+
+        // Die Sequenz überlebt: die gelöschte id 3 wird nicht wiedervergeben.
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+             VALUES (1, NULL, 1, 'druck') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("der neue CHECK nimmt 'druck'");
+        assert_eq!(neue_id, 4, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        assert!(
+            sqlx::query(
+                "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+                 VALUES (1, NULL, 1, 'foo')",
+            )
+            .execute(&pool)
+            .await
+            .is_err(),
+            "der CHECK lehnt unbekannte Arten weiter ab"
+        );
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+    }
+
+    // Sind ALLE Zeilen gelöscht, kopiert der Rebuild nichts; ohne Übernahme der Sequenz begänne die
+    // Nummerierung wieder bei 1.
+    #[tokio::test]
+    async fn migration_0131_erhaelt_sequenz_auch_bei_leerer_tabelle() {
+        let pool = alt_db_person_zugriff_audit().await;
+        sqlx::query(
+            "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+             VALUES (1, 1, 1, 'detail'), (1, NULL, 1, 'export')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_zugriff_audit")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(MIGRATION_0131).execute(&pool).await.unwrap();
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+             VALUES (1, NULL, 1, 'druck') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
+    }
 }

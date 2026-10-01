@@ -767,6 +767,21 @@ pub async fn export(
         .into_response())
 }
 
+/// GET /api/einsaetze/{id}/personen/druck — Personenliste für die Druckansicht (LFH-727,
+/// `openspec/changes/lfh-727-druck-modul-listen/design.md` D1). Dieselbe Menge und dasselbe Gate
+/// wie die Liste, aber **protokolliert**: erst der `druck`-Eintrag (person_id = NULL), dann die
+/// Daten. Scheitert der Eintrag, verlässt keine Person den Server; ein Fehler danach hinterlässt
+/// höchstens einen Eintrag zu viel, nie einen zu wenig. Kein Statusfilter: gefiltert wird im
+/// Client, wie am Bildschirm.
+pub async fn druck(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Json<Vec<PersonAnzeige>>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    audit_repo::anlegen(&state.pool, einsatz_id, None, ctx.benutzer.id, "druck").await?;
+    Ok(Json(repo::liste(&state.pool, einsatz_id, None).await?))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct VerbleibBody {
     pub art: String,
