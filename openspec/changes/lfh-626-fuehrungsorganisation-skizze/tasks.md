@@ -8,7 +8,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 1. Knotenmodell (D2, D4, Spec „Knotenaufbau“, „Knoteninhalt“, „Stärke“)
 
-- [ ] 1.1 Test zuerst: `pages/einsatzabschnitte/fuehrungsorganisation.test.ts` deckt diese Fälle
+- [x] 1.1 Test zuerst: `pages/einsatzabschnitte/fuehrungsorganisation.test.ts` deckt diese Fälle
   von `baueFuehrungsorganisation` ab:
   - oberste Abschnitte als Wurzeln, Unterabschnitte vor Einheiten
   - Untereinheit unter ihrer Einheit, nicht unter dem Abschnitt
@@ -17,17 +17,17 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Sammelknoten „Ohne Abschnitt“ nur bei Einheiten ohne Abschnitt
   - Zyklus `ueber_abschnitt_id` A↔B: jeder Knoten höchstens einmal, kein Absturz
   - Rufname, Leitung, Stärke `null` bei fehlenden Einheiten, `einheitenFehlen` gesetzt
-  - stabile `key`s `ab-<id>`, `eh-<id>`, `ohne`
+  - stabile `key`s `ab-<id>`, `eh-<id>`, `sammel` (wie im Funkplan)
 
   Nachweis: rot belegt, Datei existiert.
-- [ ] 1.2 Test zuerst, Stärke-Gleichheit: Für denselben Datensatz (zwei Unterabschnitte, eine
+- [x] 1.2 Test zuerst, Stärke-Gleichheit: Für denselben Datensatz (zwei Unterabschnitte, eine
   unterstellte Einheit) ist die Stärke jedes Abschnittsknotens gleich
   `abschnittStaerken(...).inklUnter`, also dem Wert des Gliederungsbaums. Ein Abschnitt ohne
   Einheiten hat `null`, nicht 0/0/0. Nachweis: rot belegt.
-- [ ] 1.3 Test zuerst, gleiche Platzierung wie der Funkplan: Für einen gemeinsamen Datensatz
+- [x] 1.3 Test zuerst, gleiche Platzierung wie der Funkplan: Für einen gemeinsamen Datensatz
   ergibt `baueFuehrungsorganisation` dieselbe Abschnitt/Einheit-Struktur wie `baueFunkplan` ohne
   Fahrzeuge (Vergleich über die `key`-Bäume). Nachweis: rot belegt.
-- [ ] 1.4 Umsetzung `baueFuehrungsorganisation` in `pages/einsatzabschnitte/fuehrungsorganisation.ts`
+- [x] 1.4 Umsetzung `baueFuehrungsorganisation` in `pages/einsatzabschnitte/fuehrungsorganisation.ts`
   (Typen `OrgKnoten`, `Fuehrungsorganisation`). Stärke über `abschnittStaerken` und
   `summiereStaerke`, Zeichen über `baueTzProps`. Dateikopf mit Verweis auf diese Change.
   Nachweis: Tests aus 1.1 bis 1.3 grün, `pnpm exec tsc -b` grün.

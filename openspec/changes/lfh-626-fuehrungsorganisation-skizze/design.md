@@ -126,7 +126,7 @@ type OrgKnoten =
       leitung: string | null; staerke: Staerke | null; tz: TzProps; kinder: OrgKnoten[] }
   | { art: 'einheit'; key: string; id: number; name: string; rufname: string | null;
       leitung: string | null; staerke: Staerke | null; tz: TzProps; kinder: OrgKnoten[] }
-  | { art: 'ohne-abschnitt'; key: 'ohne'; kinder: OrgKnoten[] };
+  | { art: 'sammel'; key: 'sammel'; kinder: OrgKnoten[] };
 
 interface Fuehrungsorganisation {
   wurzeln: OrgKnoten[];             // oberste Abschnitte, dann „Ohne Abschnitt“
@@ -325,7 +325,7 @@ Rechteachse und kann mehrere Personen tragen, auch einen Führungsassistenten
   bearbeitet, das Organigramm liest, druckt und übernimmt. Der Umschalter steht im Kopf und ist im
   Druck ausgeblendet.
 - **[Abhängigkeit zu LFH-625]** → Das Modell legt für LFH-625 nur den Baum und stabile `key`s fest
-  (`ab-<id>`, `eh-<id>`, wie im Funkplan). Die Kommunikationsebene entscheidet LFH-625 selbst.
+  (`ab-<id>`, `eh-<id>`, `sammel`, wie im Funkplan). Die Kommunikationsebene entscheidet LFH-625 selbst.
 
 ## Migration Plan
 
