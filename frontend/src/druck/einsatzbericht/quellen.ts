@@ -3,7 +3,7 @@ import { istModulGesperrt, istModulSichtbar, modulRegistry } from '../../einsatz
 
 /**
  * Einsatzbericht (LFH-726): woraus der Bericht schöpft und ob er es abrufen darf
- * (`openspec/changes/lfh-726-einsatzbericht/design.md` D3).
+ * (`openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md` D3).
  *
  * Die Weiche fällt VOR dem Abruf: ein im Einsatz ausgeblendetes Modul ist „nicht genutzt“ und
  * sperrt den Druck nicht, ein für die Rolle gesperrtes Modul sperrt ihn. Am Server sähen beide

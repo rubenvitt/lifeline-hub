@@ -28,7 +28,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `lfd_nr`, Vollabruf `etb/druckAbruf.ts` über die bestehende Liste, Drucken erst komplett;
   `einsatzKeys.etbDruck` nicht live, `refetchOnMount: 'always'`.
 - **Einsatzbericht** (LFH-726, `pages/EinsatzberichtDruckPage.tsx`, `druck/einsatzbericht/`,
-  `openspec/changes/lfh-726-einsatzbericht/design.md`): Route `einsatzdaten/bericht` (erbt die
+  `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md`): Route `einsatzdaten/bericht` (erbt die
   nie gesperrten Einsatzdaten), Einstieg sekundär auf der Einsatzdaten-Seite und in der Palette.
   Vollständig oder gar nicht: `berichtFreigabe` entscheidet VOR dem Abruf (im Einsatz
   ausgeblendet → „nicht genutzt“, Rollensperre → Sackgasse mit den Modulen); ein 403 im Abruf ist

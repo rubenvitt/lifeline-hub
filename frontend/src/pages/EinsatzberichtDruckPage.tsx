@@ -18,7 +18,7 @@ import { verdichteEinsatzbericht } from '../druck/einsatzbericht/verdichtung';
 import { einsatzdatenPfad } from '../routing/deeplinks';
 
 /**
- * Druckansicht des Einsatzberichts (LFH-726, `openspec/changes/lfh-726-einsatzbericht/`): der
+ * Druckansicht des Einsatzberichts (LFH-726, `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/`): der
  * ganze Einsatz auf wenigen Seiten für Nachbereitung und Behörde, über den Druckdialog des
  * Browsers.
  *
