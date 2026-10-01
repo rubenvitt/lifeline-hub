@@ -4,6 +4,19 @@ Standardmäßig bedient `lifeline-hub` HTTP (Dev/localhost). `--tls`
 (`LIFELINE_TLS=true`) schaltet auf HTTPS um und aktiviert `Secure`-Cookies
 (Session-Cookie wird nur noch über eine verschlüsselte Verbindung gesendet).
 
+## Hinter einem TLS-Proxy (LFH-603)
+
+Terminiert ein Reverse-Proxy (Traefik o. Ä.) TLS und spricht die App selbst
+HTTP, entscheidet jede Anfrage selbst: Kommt sie mit
+`X-Forwarded-Proto: https`, tragen Sitzungs-, MFA-, OIDC- und
+WebAuthn-Cookies `Secure` wie unter `--tls`. Traefik setzt diesen Kopf von
+sich aus, es ist nichts zu konfigurieren. Ein direkter http-Aufruf (LAN,
+Dev) bekommt die Cookies weiter ohne `Secure`, sonst legte der Browser sie
+nicht ab und die Anmeldung schlüge fehl.
+
+Setzt ein Proxy den Kopf nicht, erzwingt `--cookie-secure`
+(`LIFELINE_COOKIE_SECURE=true`) `Secure` für jede Antwort.
+
 ## Cert-Beschaffung (Präzedenz)
 
 Beim Start mit `--tls` wird ein Server-Zertifikat in dieser Reihenfolge

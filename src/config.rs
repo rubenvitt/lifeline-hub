@@ -385,6 +385,16 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_TLS", default_value_t = false)]
     pub tls: bool,
 
+    /// Sitzungs- und Anmelde-Cookies immer `Secure` markieren, obwohl die App selbst kein TLS
+    /// bedient (LFH-603). Hinter einem TLS-Proxy, der `X-Forwarded-Proto: https` setzt (Traefik
+    /// tut das), ist der Schalter nicht nötig: dort entscheidet jede Anfrage selbst
+    /// (`auth::session::SichererTransport`). Er ist der Zwang für Proxys ohne diesen Kopf; mit
+    /// `--tls` ist `Secure` ohnehin an. **Default aus**, damit direkter HTTP-Betrieb (LAN, Dev)
+    /// funktioniert — ein Browser legt ein `Secure`-Cookie über http nicht ab. Die Env nimmt nur
+    /// `true`/`false`.
+    #[arg(long, env = "LIFELINE_COOKIE_SECURE", default_value_t = false)]
+    pub cookie_secure: bool,
+
     /// Demo-Daten zur Laufzeit importieren und entfernen (LFH-690). **Default AUS.** Nur mit
     /// diesem Schalter werden die Routen unter `/api/demo-daten` überhaupt registriert; ohne
     /// ihn antworten sie wie ein unbekannter Pfad (404). Sie öffnen einen harten Löschweg für
@@ -445,6 +455,15 @@ pub struct Config {
     /// `--webauthn-rp-id`.
     #[arg(long, env = "LIFELINE_WEBAUTHN_RP_ORIGIN")]
     pub webauthn_rp_origin: Option<String>,
+}
+
+impl Config {
+    /// Ob Cookies prozessweit `Secure` tragen (LFH-603): bei eigenem TLS oder mit
+    /// `--cookie-secure`. Eine Quelle für den Serverstart, statt `Secure` am TLS-Zweig zu hängen;
+    /// hinter einem Proxy kommt die Erkennung je Anfrage dazu (`auth::session::SichererTransport`).
+    pub fn cookies_secure(&self) -> bool {
+        self.tls || self.cookie_secure
+    }
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).
@@ -650,6 +669,28 @@ mod tests {
         assert_eq!(c.tls_cert.as_deref(), Some("/c.pem"));
         assert_eq!(c.tls_key.as_deref(), Some("/k.pem"));
         assert_eq!(c.tls_hostname.as_deref(), Some("elw.local"));
+    }
+
+    /// LFH-603: `Secure` ohne eigenes TLS (hinter einem TLS-Proxy). Vorgabe aus, damit der lokale
+    /// HTTP-Betrieb unverändert bleibt; die Env nimmt nur `true`/`false` (wie `LIFELINE_TLS`).
+    #[test]
+    fn cookie_secure_vorgabe_aus_und_zuschaltbar() {
+        assert!(!parse_hermetisch(["lifeline-hub"]).cookie_secure);
+        assert!(parse_hermetisch(["lifeline-hub", "--cookie-secure"]).cookie_secure);
+        assert!(parse_mit_env("LIFELINE_COOKIE_SECURE", "true", &["lifeline-hub"]).cookie_secure);
+        assert!(!parse_mit_env("LIFELINE_COOKIE_SECURE", "false", &["lifeline-hub"]).cookie_secure);
+        assert!(
+            try_parse_mit_env("LIFELINE_COOKIE_SECURE", "1", &["lifeline-hub"]).is_err(),
+            "LIFELINE_COOKIE_SECURE=1 muss ein Parse-Fehler sein, kein stilles Aus"
+        );
+    }
+
+    /// Eigenes TLS oder der Proxy-Schalter machen die Cookies `Secure`, sonst bleiben sie es nicht.
+    #[test]
+    fn cookies_secure_folgt_tls_oder_schalter() {
+        assert!(!parse_hermetisch(["lifeline-hub"]).cookies_secure());
+        assert!(parse_hermetisch(["lifeline-hub", "--tls"]).cookies_secure());
+        assert!(parse_hermetisch(["lifeline-hub", "--cookie-secure"]).cookies_secure());
     }
 
     #[test]
