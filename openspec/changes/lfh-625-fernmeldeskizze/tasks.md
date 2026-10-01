@@ -28,7 +28,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   `OrganigrammOhneZeichen.test.tsx`, `fuehrungsorganisation.test.ts` und
   `EinsatzabschnittePage.test.tsx` bleiben grün, ohne geänderte Zusicherung. `pnpm exec tsc -b` ist
   grün.
-- [ ] 1.3 Druck-CSS: `components/organigramm/haengenderBaumPrint.css` übernimmt die Regeln aus
+- [x] 1.3 Druck-CSS: `components/organigramm/haengenderBaumPrint.css` übernimmt die Regeln aus
   `organigrammPrint.css`, gebunden an `[data-lfh='druckwurzel'] [data-lfh='org-…']`.
   `organigrammPrint.css` behält nur `.organigramm-no-print`. `organigrammPrint.test.ts` wird auf
   die neue Datei umgestellt, mit unveränderten Zusicherungen. Nachweis: Vitest grün,
@@ -94,7 +94,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
   Nachweis: Die Werte stehen als Nachtrag in `design.md` D5. Bestätigt sich `SPALTE_MIN_PX = 300`,
   wird das festgehalten, sonst die Abweichung begründet.
-- [ ] 4.2 Test zuerst, `stab/Fernmeldeskizze.test.tsx`:
+- [x] 4.2 Test zuerst, `stab/FernmeldeskizzeBild.test.tsx`:
   - Wurzel „Einsatzleitung“ mit „Gegenstelle nicht erfasst“, ohne Stabsstelle
   - Knoten mit Namenslink (Abschnitt → `einsatzabschnittePfad({abschnitt})`, Einheit →
     `einheitDetailPfad`), Rufname bzw. „kein Rufname“, TMO/DMO, Kommunikationsmittel
@@ -106,7 +106,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Klappen über das Gerüst
 
   Nachweis: rot belegt.
-- [ ] 4.3 Umsetzung `stab/Fernmeldeskizze.tsx` über `HaengenderBaum`. Farben aus `useRollen`,
+- [x] 4.3 Umsetzung `stab/FernmeldeskizzeBild.tsx` über `HaengenderBaum`. Farben aus `useRollen`,
   Namenslinks mit `baumZielStil`, `data-lfh="skizze"` und `skizze-kante`. Nachweis: 4.2 grün.
 
 ## 5. Seite: Umschalter, Druck, Lücke im Paneel (D1, D6, D7, Spec „Zweite Darstellung“, „Druck“, „Übernahme“)

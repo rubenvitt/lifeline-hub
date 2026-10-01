@@ -240,7 +240,7 @@ Trefffläche gefunden (LFH-626 D3, Nachtrag), und der Fix soll nur einmal stehen
 
 ### D5 · Darstellung der Skizze
 
-`stab/Fernmeldeskizze.tsx` ist eine reine Darstellung über `HaengenderBaum`.
+`stab/FernmeldeskizzeBild.tsx` ist eine reine Darstellung über `HaengenderBaum`.
 
 - **Kopf:** Kasten „Einsatzleitung“ mit „Gegenstelle nicht erfasst“ in gedämpfter Schrift
   (Kommentar auf LFH-849). Er trägt kein Zeichen und keine Stabsstelle.
@@ -305,7 +305,7 @@ Trefffläche gefunden (LFH-626 D3, Nachtrag), und der Fix soll nur einmal stehen
     Zahl mit der Lücke, gleiche Struktur wie das Organigramm
   - `stab/funkplan.test.ts`: Markdown
   - `components/organigramm/HaengenderBaum.test.tsx`
-  - `stab/Fernmeldeskizze.test.tsx`
+  - `stab/FernmeldeskizzeBild.test.tsx`
   - `pages/FunkplanPage.test.tsx`: Umschalter, `?ansicht=`, Druckkopf je Darstellung, Klappmengen
     getrennt, Übernahme in beiden
   - `routing/deeplinks.test.ts`

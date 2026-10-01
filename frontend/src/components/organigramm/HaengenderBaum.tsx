@@ -12,7 +12,7 @@ import './haengenderBaumPrint.css';
  * trägt ihre eigene Oberkante; ein durchgehender Querbalken löge beim Umbruch in die zweite Zeile.
  *
  * Nutzer: das Organigramm der Führungsorganisation (`pages/einsatzabschnitte/Organigramm.tsx`)
- * und die Fernmeldeskizze des S6 (`stab/Fernmeldeskizze.tsx`). Das Gerüst kennt weder Knotenart
+ * und die Fernmeldeskizze des S6 (`stab/FernmeldeskizzeBild.tsx`). Das Gerüst kennt weder Knotenart
  * noch Inhalt; Druckregeln in `haengenderBaumPrint.css`. Die `data-lfh`-Namen (`org-…`) tragen
  * Gates und e2e beider Nutzer.
  *

@@ -65,7 +65,7 @@ die Sprechgruppen zweier Zeilen von Hand vergleicht.
 - **Frontend:**
   - `stab/luecken.ts` bekommt die Verbindungslücke.
   - `stab/funkplan.ts` erweitert die Lücken und das Markdown um sie.
-  - Neu: `stab/fernmeldeskizze.ts` (reines Modell) und `stab/Fernmeldeskizze.tsx` (Darstellung).
+  - Neu: `stab/fernmeldeskizze.ts` (reines Modell) und `stab/FernmeldeskizzeBild.tsx` (Darstellung).
   - `pages/FunkplanPage.tsx` bekommt Umschalter, Druckkopf je Darstellung und die neue Lückenzeile.
   - `routing/deeplinks.ts` bekommt `funkplanPfad` mit `ansicht` und `parseFunkplanAnsicht`.
   - Neu: geteiltes Gerüst `components/organigramm/` (Layout und Druck-CSS) aus
