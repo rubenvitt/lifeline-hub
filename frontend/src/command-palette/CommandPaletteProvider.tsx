@@ -12,6 +12,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useBefehle } from './useBefehle';
 import { useDatensatzTreffer } from './useDatensaetze';
 import { useKoordinatenSprung } from './useKoordinatenSprung';
+import { useAdressSprung } from './useAdressSprung';
 import { useZuletztBefehle, type BefehlsGedaechtnis } from './useZuletztBefehle';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { modulAusPfad } from '../einsatz/modulRegistry';
@@ -366,6 +367,12 @@ function PaletteHost({
     suche: stand.rest,
     navigate: gehZu,
   });
+  const adressSprung = useAdressSprung({
+    einsatzId,
+    modus: stand.modus,
+    suche: stand.rest,
+    navigate: gehZu,
+  });
 
   return (
     <CommandPalette
@@ -374,6 +381,7 @@ function PaletteHost({
       onSucheEntprellt={melde}
       // Außerhalb eines Einsatzes gibt es keine Lagekarte, also auch keinen Fußhinweis.
       koordinatenSprung={einsatzId == null ? undefined : koordinatenSprung}
+      adressSprung={einsatzId == null ? undefined : adressSprung}
       // Vorschauen gibt es nur für Datensätze, Datensätze nur im Einsatz.
       vorschauVerfuegbar={einsatzId != null}
       schliesse={schliesse}
