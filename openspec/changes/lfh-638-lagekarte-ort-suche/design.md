@@ -55,9 +55,12 @@ Enter-Suche existiert: ohne Ortssuche braucht `MarkerSuche` keinen `QueryClientP
 Der Zustand der Adresssuche ist `{ begriff, ergebnis }` über einen TanStack-Query mit Schlüssel aus
 `queryKeys.ts` (`einsatzKeys.ortSuche(einsatzId, begriff)`, nicht live, nicht im Lagebild offline), `enabled` erst nach Enter. Ändert sich der
 Text, ist `begriff !== suche.trim()` und die Gruppe „Adresse“ wird nicht mehr gezeigt (Spec:
-Weitertippen verwirft). Der Query-Cache hält gleiche Begriffe (`staleTime` 10 min), ein zweites
-Enter auf denselben Begriff fragt nicht erneut. Genau ein Treffer → `onOrtWaehlen` direkt (einmal
-je Ergebnis, nicht bei jedem Render).
+Weitertippen verwirft). Der Query-Cache hält gleiche Begriffe mit `ok` frisch (`staleTime` 10 min),
+ein zweites Enter auf denselben Begriff fragt dann nicht erneut. „ausgelastet“, „nicht erreichbar“
+und ein Serverfehler sind sofort veraltet, und ein neues Enter fragt neu (Review: der Hinweis „gleich
+erneut Enter drücken“ muss stimmen). Genau ein Treffer → `onOrtWaehlen` direkt, einmal je Enter;
+ein Fehlzustand verbraucht das Enter nicht. Die Vorbelegung aus `?ort=` räumt die Seite nach der
+Übernahme (`onVorbelegungVerbraucht`), sonst übernähme ein neu eingehängtes Suchfeld sie erneut.
 
 ### D3 — Suchnadel als GeoJSON-Ebene ohne Klickrolle
 Die Suchnadel ist eine eigene GeoJSON-Quelle `suchnadel` mit Symbol-/Kreis-Ebene, gebaut wie
