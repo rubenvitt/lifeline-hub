@@ -3052,6 +3052,17 @@ test('Lagekarte (LFH-600): Punkt-Fachebenen tragen die Trefferzone der Staffel, 
         await merkmaleAm(page, daneben, [zone]),
         `${key}: Versatz in der Zone (${dichte})`,
       ).toBe(1);
+      // Der Mauszeiger kündigt die Zone an: vom Punkt nach außen bleibt er „pointer“, auch wenn
+      // der gezeichnete Kreis verlassen ist (Review LFH-600).
+      await page.mouse.move(mitte.x, mitte.y);
+      await page.mouse.move(daneben.x, daneben.y, { steps: 4 });
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte.getCanvas().style.cursor,
+        ),
+        `${key}: Zeiger über der Zone (${dichte})`,
+      ).toBe('pointer');
       await page.mouse.click(daneben.x, daneben.y);
       await expect(
         auswahl(titel),
