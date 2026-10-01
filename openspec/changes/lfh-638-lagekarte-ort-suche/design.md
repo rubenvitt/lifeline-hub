@@ -51,7 +51,7 @@ nicht.
 
 ### D2 — Adresssuche: Enter, gebunden an den gesuchten Begriff
 Der Zustand der Adresssuche ist `{ begriff, ergebnis }` über einen TanStack-Query mit Schlüssel aus
-`queryKeys.ts` (`karteKeys.ortSuche(einsatzId, begriff)`), `enabled` erst nach Enter. Ändert sich der
+`queryKeys.ts` (`einsatzKeys.ortSuche(einsatzId, begriff)`, nicht live, nicht im Lagebild offline), `enabled` erst nach Enter. Ändert sich der
 Text, ist `begriff !== suche.trim()` und die Gruppe „Adresse“ wird nicht mehr gezeigt (Spec:
 Weitertippen verwirft). Der Query-Cache hält gleiche Begriffe (`staleTime` 10 min), ein zweites
 Enter auf denselben Begriff fragt nicht erneut. Genau ein Treffer → `onOrtWaehlen` direkt (einmal

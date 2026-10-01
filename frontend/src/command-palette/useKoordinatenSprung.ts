@@ -6,7 +6,8 @@ import { ladeEinstellungen, ladeModulOverrides } from '../api/einsaetze';
 import { effektivesKoordinatenformat } from '../anzeige/format';
 import { useKoordinatenSystemOverride } from '../anzeige/koordinatenSystemStore';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
-import { erkenneKoordinate, koordinatenBefehl } from './koordinatenSprung';
+import { erkenneKoordinate } from '../anzeige/koordinatenErkennung';
+import { koordinatenBefehl } from './koordinatenSprung';
 import type { Befehl, Oeffnung, PaletteModus } from './typen';
 
 /** Frische wie beim Datensatz-Finder: die Fächer hängen am SSE-Fan-out. */

@@ -2,23 +2,23 @@
 
 ## 1. Backend: Vorwärtssuche im Geocoding (TDD)
 
-- [ ] 1.1 `geocoding::suche_mit` neben `reverse_mit` in `src/geocoding/mod.rs` (D6): `/search` mit
+- [x] 1.1 `geocoding::suche_mit` neben `reverse_mit` in `src/geocoding/mod.rs` (D6): `/search` mit
       `q`, `format=jsonv2`, `limit=5`, `accept-language=de`, optionaler `viewbox` mit `bounded=0`;
       geteilter Token-Bucket mit bis zu 1 s Warten; Ergebnis `ok(Vec<Treffer>)` /
       `ausgelastet` / `nicht_erreichbar`. Tests zuerst gegen den vorhandenen Mini-Stub: Erfolg
       (Felder `lat`/`lon` als Strings geparst, `display_name`), leere Liste = `ok` ohne Treffer,
       geschlossener Port = `nicht_erreichbar`, leerer Bucket ohne Nachfüllung = `ausgelastet`,
       Viewbox-Parameter kommt am Stub an. Prüfung: `cargo test geocoding::` grün.
-- [ ] 1.2 In-Memory-Cache der Vorwärtssuche (D6: normalisierter Begriff + Viewbox, 24 h, 500
+- [x] 1.2 In-Memory-Cache der Vorwärtssuche (D6: normalisierter Begriff + Viewbox, 24 h, 500
       Einträge, nur `ok`). Prüfung: Test „zweite gleiche Suche erreicht den Stub nicht“ und
       „`nicht_erreichbar` wird nicht gecacht“ grün.
-- [ ] 1.3 Datenschutz-Kopf von `src/geocoding/mod.rs` um die Vorwärtssuche ergänzen (Suchtext +
+- [x] 1.3 Datenschutz-Kopf von `src/geocoding/mod.rs` um die Vorwärtssuche ergänzen (Suchtext +
       grober Ausschnitt gehen an den Geocoder, kein Suchtext im Log). Prüfung: Review des
       Kommentars; `grep` zeigt keinen `tracing`-Aufruf mit dem Suchtext.
 
 ## 2. Backend: Route `GET /api/einsaetze/{id}/karte/ort-suche` (TDD)
 
-- [ ] 2.1 `src/routes/karte_ort_suche.rs` mit `EinsatzLesezugriff<Lagekarte>`, Validierung `q`
+- [x] 2.1 `src/routes/karte_ort_suche.rs` mit `EinsatzLesezugriff<Lagekarte>`, Validierung `q`
       3–200 Zeichen (400), Viewbox aus dem Einsatzort (`geocoding::marker`), Geocoder-URL aus den
       Org-Einstellungen; Antwort `OrtSucheAntwort { zustand, treffer }` mit `ToSchema`, immer 200.
       Route in `src/app.rs` registrieren, Typen in `src/api_doc.rs`. Integrationstests in
@@ -26,19 +26,19 @@
       Lagekarte-Modul (Geocoder-Stub zählt keinen Aufruf), 200 + `nicht_erreichbar` bei totem
       Geocoder, 200 + Treffer mit Stub, Viewbox nur mit verortetem Einsatzort. Prüfung:
       `cargo test --test karte_ort_suche` grün, Modul-Guard (`einsatz::modul`) grün.
-- [ ] 2.2 Typ-Codegen: `scripts/check-typ-codegen.sh`, `frontend/src/api/openapi.json` und
-      `types.generated.ts` mitcommitten. Prüfung: Skript grün, `OrtSucheAntwort` im Barrel
-      `api/types.ts` erreichbar.
+- [x] 2.2 Typ-Codegen: `scripts/check-typ-codegen.sh`, `frontend/src/api/openapi.json` und
+      `types.generated.ts` mitcommitten. Prüfung: Skript grün, `OrtSucheAntwort` über
+      `api/karteOrtSuche.ts` erreichbar (Muster `api/ortVorschau.ts`, nicht der Barrel).
 
 ## 3. Frontend: Koordinatenerkennung teilen
 
-- [ ] 3.1 `erkenneKoordinate` samt Formen nach `anzeige/koordinatenErkennung.ts` heben (D1),
+- [x] 3.1 `erkenneKoordinate` samt Formen nach `anzeige/koordinatenErkennung.ts` heben (D1),
       `command-palette/koordinatenSprung.ts` importiert von dort; bestehende Tests mitziehen.
       Prüfung: `koordinatenSprung.test.ts` und der verschobene Test grün, `tsc --noEmit` grün.
 
 ## 4. Frontend: Ortsgruppen im Suchfeld (TDD)
 
-- [ ] 4.1 API-Client `api/karteOrtSuche.ts` und Query-Key `karteKeys.ortSuche(einsatzId, begriff)`
+- [x] 4.1 API-Client `api/karteOrtSuche.ts` und Query-Key `einsatzKeys.ortSuche(einsatzId, begriff)`
       in `api/queryKeys.ts` (Regeln in `frontend/AGENTS.md`, Query-Keys). Prüfung: Unit-Test
       des Clients (URL-Kodierung des Suchtexts) grün.
 - [ ] 4.2 `MarkerSuche`: Gruppe „Koordinate“ aus der Eingabe (Spec „Koordinate im Suchfeld“),
