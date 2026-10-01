@@ -139,7 +139,7 @@ Läufe am Stand `30a8c324` liefen ohne jeden Eingriff.
   Hochladen (bis 25 MiB, Timeout 120 s), sichtbarer Zustand der Zeile während des Entfernens;
   die Offline-Ablage mit Queue und `client_id` (Kandidat aus dem Plan) gehört hierher.
   **Eingelöst** (Zeilen 1 · 3 und 2 · 3 erfüllt); die Offline-Ablage ist bewusst nicht gebaut
-  (Entscheidung in der archivierten Change `lfh-654-dokumentenablage-rueckmeldung`, D5).
+  (Entscheidung: `openspec/changes/archive/2026-10-01-lfh-654-dokumentenablage-rueckmeldung/design.md`, D5).
 - **LFH-655 — Bezugswahl im Ablegen-Dialog einfrieren**, solange die Optionsliste offen ist (oder
   neue Einträge hinten anhängen); dazu der bereits vermerkte Nachzug „ETB-Bezugswahl nur die
   jüngsten 100 Einträge" (serverseitige Suche).

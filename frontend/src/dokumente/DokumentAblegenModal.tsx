@@ -93,9 +93,9 @@ function zuAblage(werte: AblageFormular): DokumentAblage {
  *
  * Rückmeldung (LFH-654, Prüfliste LFH-632 Zeile 2 · 3): während der Übertragung Prozent aus den
  * Bytes, danach „Datei wird geprüft“ (`components/UploadFortschritt`). Ohne Verbindung wird
- * NICHTS vorgemerkt — kein Blob in IndexedDB, keine Offline-Queue (Entscheidung und Gründe:
- * Change `lfh-654-dokumentenablage-rueckmeldung`, design.md D5); der Dialog bleibt mit Datei
- * und Feldern stehen, „Ablegen“ versucht es erneut.
+ * NICHTS vorgemerkt — kein Blob in IndexedDB, keine Offline-Queue (Spec `dokumentenablage`;
+ * Gründe: `openspec/changes/archive/2026-10-01-lfh-654-dokumentenablage-rueckmeldung/design.md`,
+ * D5); der Dialog bleibt mit Datei und Feldern stehen, „Ablegen“ versucht es erneut.
  */
 export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }: Props) {
   const { message } = App.useApp();
