@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
 import { Alert, Breadcrumb, Button, Typography } from 'antd';
+import { ApiError } from '../api/client';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -17,8 +16,6 @@ import { berichtZustand, ladeEinsatzbericht } from '../druck/einsatzbericht/abru
 import { berichtFreigabe } from '../druck/einsatzbericht/quellen';
 import { verdichteEinsatzbericht } from '../druck/einsatzbericht/verdichtung';
 import { einsatzdatenPfad } from '../routing/deeplinks';
-
-dayjs.extend(utc);
 
 /**
  * Druckansicht des Einsatzberichts (LFH-726, `openspec/changes/lfh-726-einsatzbericht/`): der
@@ -78,6 +75,18 @@ export default function EinsatzberichtDruckPage() {
   );
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  // Nach Ablauf der Aufbewahrungsfrist sperrt der Server schon den Einsatzkopf
+  // (`src/einsatz/berechtigung.rs`, `darf_lesen`): ein 403 hier ist endgültig, ein neuer Versuch
+  // änderte nichts (Spec `einsatzbericht`, „Aufbewahrungsfrist abgelaufen“).
+  if (einsatzQuery.error instanceof ApiError && einsatzQuery.error.status === 403) {
+    return (
+      <SeitenSackgasse
+        titel="Einsatzbericht nicht verfügbar"
+        hinweis="Der Einsatz ist nicht lesbar: kein Zugriff, oder die Aufbewahrungsfrist ist abgelaufen. Der Einsatzbericht kann nicht erzeugt werden."
+        rueckweg={{ pfad: '/einsaetze', label: 'Zur Einsatzliste' }}
+      />
+    );
+  }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler
@@ -90,8 +99,12 @@ export default function EinsatzberichtDruckPage() {
   const zurueck = einsatzdatenPfad(einsatzId);
   const keinZugriff = gesperrt || zustand?.art === 'kein-zugriff';
   const laedt = !berichtQuery.data || berichtQuery.isFetching;
-  const fristAbgelaufen =
-    !!einsatz.retention_bis && dayjs.utc(einsatz.retention_bis).isBefore(dayjs());
+  // Kopf und Blöcke aus DEMSELBEN Schnappschuss: ein umbenannter Einsatz stünde sonst im Kopf
+  // anders als in den Stammdaten.
+  const einsatzStand =
+    berichtQuery.data?.quellen.einsatz.zustand === 'daten'
+      ? berichtQuery.data.quellen.einsatz.daten
+      : einsatz;
 
   let inhalt;
   if (overridesQuery.isError) {
@@ -128,14 +141,9 @@ export default function EinsatzberichtDruckPage() {
       </Typography.Text>
     );
   } else if (zustand?.art === 'kein-zugriff') {
-    inhalt = fristAbgelaufen ? (
-      <Alert
-        type="info"
-        showIcon
-        title="Aufbewahrungsfrist abgelaufen"
-        description="Die Daten des Einsatzes sind nicht mehr lesbar; der Einsatzbericht kann nicht mehr erzeugt werden."
-      />
-    ) : (
+    // Ein 403 trotz Freigabe: eine Rollensperre als Org-Vorgabe (die Overrides sehen sie nicht),
+    // eine Rechteänderung nach dem Laden oder eine eben abgelaufene Frist.
+    inhalt = (
       <Alert
         type="info"
         showIcon
@@ -158,7 +166,7 @@ export default function EinsatzberichtDruckPage() {
       <div data-lfh="druckwurzel">
         <Druckkopf
           dokumentart="Einsatzbericht"
-          einsatz={einsatz}
+          einsatz={einsatzStand}
           sichtbarkeit="immer"
           // Am Bildschirm steht darüber der Seitenkopf mit dem `h1`.
           ebene={2}

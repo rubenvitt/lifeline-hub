@@ -1,13 +1,17 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
+import { wechsleZu, wechsleZuRolle } from './rollen-kern';
 
 /**
  * Einsatzbericht (LFH-726) gegen einen echten Server: Einstieg über die Einsatzdaten, sieben
  * Blöcke in fester Reihenfolge, „In diesem Einsatz nicht genutzt“ für ein ausgeblendetes Modul,
  * kein Name einer betroffenen Person auf dem Blatt, Vorläufig-Vermerk im Kopf und das Druckbild.
  *
- * Gegen den Server, weil die Freigabe-Weiche (`druck/einsatzbericht/quellen.ts`) Modul-Keys auf
- * Server-Gates abbildet: ein falscher Key wäre im Unit-Test grün und hier ein 403 statt des
- * Vermerks. Die Seitenlogik decken `EinsatzberichtDruckPage.test.tsx` und
+ * Der zweite Fall läuft als Beobachter (nicht privilegiert, `e2e/rollen-kern.ts`; ein Admin
+ * übergeht Modul-Gates am Server wie im Client): Sind ALLE Module des Berichts im Einsatz
+ * ausgeblendet, muss er druckbar sein und überall „nicht genutzt“ sagen. Bildete
+ * `druck/einsatzbericht/quellen.ts` eine Quelle auf den falschen Modul-Key ab, riefe der Client sie
+ * ab und der Server antwortete 403 — der Fall würde rot. Danach führt eine Rollensperre in die
+ * Sackgasse. Die Seitenlogik decken `EinsatzberichtDruckPage.test.tsx` und
  * `druck/einsatzbericht/*.test.ts`.
  *
  * Druckbild mit ausgelöstem `beforeprint` (`window.print` als Stub, `druck/AGENTS.md`), nicht nur
@@ -133,13 +137,32 @@ test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Pers
   const kraefte = page.locator('[data-lfh="einsatzbericht-block-kraefte"]');
   await expect(kraefte.locator('dt', { hasText: 'Einheiten' }).last()).toBeVisible();
   const bilanz = page.locator('[data-lfh="einsatzbericht-block-bilanz"]');
-  await expect(bilanz).toContainText('SK II');
+  // Die Zahl, nicht das Etikett: jede Sichtungsklasse steht immer da, auch mit 0.
+  await expect(
+    bilanz.locator('dt', { hasText: /^SK II$/ }).locator('xpath=following-sibling::dd[1]'),
+  ).toHaveText('1');
   await expect(bilanz.getByText('In diesem Einsatz nicht genutzt')).toHaveCount(1);
 
   // Kein Personenbezug Betroffener auf dem Blatt.
   const text = await wurzel.innerText();
   expect(text).not.toContain(NAME);
   expect(text).not.toContain(VORNAME);
+
+  // ── Schmaler Schirm (390 px, mobil): nichts ragt seitlich aus der Wurzel.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const schmal = await wurzel.evaluate((w) => ({
+    breite: w.clientWidth,
+    inhalt: w.scrollWidth,
+    rechts: Math.max(
+      ...Array.from(w.querySelectorAll('*')).map((el) => el.getBoundingClientRect().right),
+    ),
+    wurzelRechts: w.getBoundingClientRect().right,
+  }));
+  expect(schmal.inhalt, 'kein Überlauf bei 390 px').toBeLessThanOrEqual(schmal.breite + 1);
+  expect(schmal.rechts, 'kein Element ragt bei 390 px rechts heraus').toBeLessThanOrEqual(
+    schmal.wurzelRechts + 1,
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
 
   // ── Druckbild: `window.print` als Stub, der wie der Browser `beforeprint` feuert.
   await page.evaluate(() => {
@@ -177,4 +200,59 @@ test('Einsatzbericht: Einstieg, sieben Blöcke, nicht genutztes Modul, kein Pers
   expect(druck.rechts, 'nichts ragt rechts aus der Druckwurzel').toBeLessThanOrEqual(
     druck.wurzelRechts + 1,
   );
+});
+
+/** Die Module, aus denen der Bericht schöpft (`druck/einsatzbericht/quellen.ts`). */
+const BERICHT_MODULE = [
+  'stab',
+  'einheiten',
+  'personal',
+  'fahrzeuge',
+  'lageberichte',
+  'personen',
+  'schaeden',
+  'betreuung',
+  'verpflegung',
+  'etb',
+];
+
+test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensperre führt in die Sackgasse', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht Rollen ${Date.now()}`);
+  const basis = `/api/einsaetze/${einsatzId}`;
+  for (const modul of BERICHT_MODULE) {
+    await sende(page, 'PUT', `${basis}/modul-overrides/${modul}`, {
+      sichtbar: false,
+      benoetigte_rolle: null,
+    });
+  }
+  const beobachter = await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  // ── Alles ausgeblendet: kein Abruf eines gesperrten Endpunkts, also druckbar.
+  await page.goto(`/einsaetze/${einsatzId}/einsatzdaten/bericht`);
+  const drucken = page.getByRole('button', { name: 'Drucken / als PDF' });
+  await expect(drucken).toBeEnabled({ timeout: 60_000 });
+  await expect(page.getByText('Kein Zugriff auf den Einsatzbericht')).toHaveCount(0);
+  const wurzel = page.locator('[data-lfh="druckwurzel"]');
+  // Stab, Lagebesprechungen, Lage, vier Bilanz-Abschnitte, zwei ETB-Abschnitte und die
+  // Zeilen der Kräfte tragen den Vermerk.
+  expect(await wurzel.getByText('In diesem Einsatz nicht genutzt').count()).toBeGreaterThanOrEqual(
+    10,
+  );
+
+  // ── Rollensperre auf Personen (zurück zum Admin, dann wieder Beobachter).
+  await wechsleZu(page, { benutzername: ADMIN, passwort: PW });
+  await sende(page, 'PUT', `${basis}/modul-overrides/personen`, {
+    sichtbar: true,
+    benoetigte_rolle: 'fuehrungskraft',
+  });
+  await wechsleZu(page, beobachter);
+  await page.goto(`/einsaetze/${einsatzId}/einsatzdaten/bericht`);
+  await expect(page.getByText('Für den Einsatzbericht fehlen Rechte an: Personen.')).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(drucken).toHaveCount(0);
+  await expect(wurzel).toHaveCount(0);
 });

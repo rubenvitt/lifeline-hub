@@ -18,6 +18,8 @@ import type { Abschnitt, Einsatzbericht, Inhalt } from './verdichtung';
 
 /** Ziffern vorn (Zahl, Zeit, Stärke, Dauer) setzen Mono mit Tabellenziffern (`frontend/AGENTS.md`). */
 const BEGINNT_MIT_ZIFFER = /^\d/;
+/** Reine Nummer, Datum oder Uhrzeit bricht nicht um; Freitext (auch ein Titel) immer. */
+const NUR_ZAHL_ODER_ZEIT = /^[\d.: ]+$/;
 
 function InhaltAnzeige({ inhalt }: { inhalt: Inhalt }) {
   const { token } = theme.useToken();
@@ -90,7 +92,7 @@ function InhaltAnzeige({ inhalt }: { inhalt: Inhalt }) {
                     key={j}
                     style={{
                       ...zelle,
-                      whiteSpace: j < 2 ? 'nowrap' : 'pre-wrap',
+                      whiteSpace: NUR_ZAHL_ODER_ZEIT.test(wert) ? 'nowrap' : 'pre-wrap',
                       ...(BEGINNT_MIT_ZIFFER.test(wert) ? monoStil(token.fontSize) : {}),
                     }}
                   >

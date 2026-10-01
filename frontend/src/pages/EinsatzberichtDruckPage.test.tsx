@@ -198,25 +198,61 @@ describe('EinsatzberichtDruckPage', () => {
     expect(druckKnopf()).not.toBeInTheDocument();
   });
 
-  it('abgelaufene Aufbewahrungsfrist: sagt es, kein Drucken', async () => {
-    const roh = rohBericht();
-    const einsatz = wert<object>(roh, 'einsatz');
-    quellen(
-      rohBericht({
-        einsatz: {
-          zustand: 'daten',
-          daten: { ...einsatz, status: 'abgeschlossen', retention_bis: '2020-01-01T00:00:00' },
-        } as never,
-      }),
-    );
+  it('abgelaufene Aufbewahrungsfrist: der Server sperrt schon den Einsatz, Sackgasse ohne Neuversuch', async () => {
+    quellen();
+    // So antwortet der Server nach Ablauf der Frist (`berechtigung.rs`, `darf_lesen`).
     server.use(
-      http.get(`/api/einsaetze/${E}/etb/zaehler`, () =>
+      http.get(`/api/einsaetze/${E}`, () =>
         HttpResponse.json({ error: 'verboten' }, { status: 403 }),
       ),
     );
     rendere();
-    expect(await screen.findByText('Aufbewahrungsfrist abgelaufen')).toBeInTheDocument();
+    expect(await screen.findByText(/die Aufbewahrungsfrist ist abgelaufen/)).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  it('ist ein Schnappschuss: Live-Änderungen ändern ihn nicht, „Neu laden“ holt den neuen Stand', async () => {
+    quellen();
+    const { client } = rendere();
+    await fertig();
+    const gesamt = () => {
+      const block = document.querySelector('[data-lfh="einsatzbericht-block-etb"]') as HTMLElement;
+      return within(block).getByText('Gesamt').nextElementSibling?.textContent;
+    };
+    const kopf = () => document.querySelector('[data-lfh="druckkopf"]') as HTMLElement;
+    expect(gesamt()).toBe('3');
+    expect(kopf()).toHaveTextContent('Großbrand Halle 3');
+
+    // Der Server hat Neues; die Live-Ereignisse invalidieren Einsatzkopf und ETB.
+    const roh = rohBericht();
+    server.use(
+      http.get(`/api/einsaetze/${E}`, () =>
+        HttpResponse.json({ ...wert<object>(roh, 'einsatz'), bezeichnung: 'Umbenannt' }),
+      ),
+      http.get(`/api/einsaetze/${E}/etb/zaehler`, () =>
+        HttpResponse.json({
+          gesamt: 4,
+          je_typ: {
+            meldung: 3,
+            anordnung: 0,
+            entscheidung: 1,
+            lage: 0,
+            berichtigung: 0,
+            system: 0,
+          },
+        }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(E) });
+    await client.invalidateQueries({ queryKey: einsatzKeys.etbZaehler(E, {}) });
+    await waitFor(() => expect(screen.getByText('Umbenannt')).toBeInTheDocument());
+    expect(gesamt()).toBe('3');
+    expect(kopf()).toHaveTextContent('Großbrand Halle 3');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Neu laden' }));
+    await waitFor(() => expect(gesamt()).toBe('4'));
+    expect(kopf()).toHaveTextContent('Umbenannt');
   });
 
   it('sperrt das Drucken, solange geladen wird', async () => {

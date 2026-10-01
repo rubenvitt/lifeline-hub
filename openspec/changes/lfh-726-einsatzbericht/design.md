@@ -98,9 +98,14 @@ nicht abgerufen und erscheinen mit dem Vermerk. Ein Test gleicht die Modul-Keys 
 prüft die Aufgabe 1.2 einmal von Hand gegen die Routen.
 
 Liefert eine Quelle trotz `abrufen` ein 403, ist das kein leerer Bestand (`abrufZustand`). Ursache
-ist dann eine Aufbewahrungsfrist oder eine Rechteänderung nach dem Laden der Overrides. Die
-Ansicht sperrt das Drucken und nennt den Grund: bei abgelaufenem `retention_bis` des Einsatzes
-„Aufbewahrungsfrist abgelaufen“, sonst „kein Zugriff auf <Modul>“.
+ist dann eine Rollensperre als Vorgabe der Organisation (die Overrides des Einsatzes zeigen sie
+nicht) oder eine Rechteänderung nach dem Laden der Overrides. Die Ansicht sperrt das Drucken und
+nennt die Module („kein Zugriff auf <Modul>“).
+
+Nach Ablauf der Aufbewahrungsfrist sperrt der Server schon den Einsatzkopf
+(`src/einsatz/berechtigung.rs`, `darf_lesen`). Ein 403 auf `GET /api/einsaetze/{id}` führt deshalb
+in eine Sackgasse ohne neuen Versuch, die beide Ursachen nennt (kein Zugriff oder Frist
+abgelaufen). Am Client ist nicht unterscheidbar, welche vorliegt.
 
 *Verworfen: einfach alles abrufen und an 403 erkennen.* Dann wären „ausgeblendet“ und
 „gesperrt“ nicht zu unterscheiden, und ein ausgeblendetes Modul machte den Bericht für alle
@@ -166,7 +171,8 @@ gleich mit. Dargestellt wird eine schlanke Tabelle: Nr., Zeit, Inhalt, Kennzeich
 
 ### D9 Vorläufig-Vermerk und Kopfzeilen
 
-Der Druckkopf bekommt `dokumentart="Einsatzbericht"` und `sichtbarkeit="immer"`. Seine Zeilen
+Der Druckkopf bekommt `dokumentart="Einsatzbericht"` und `sichtbarkeit="immer"`, den Einsatz
+aus demselben Schnappschuss wie die Blöcke. Seine Zeilen
 sind „Stand“ (`geladenAt`) und, nur bei `status === 'aktiv'`, „Status: Vorläufig – Einsatz
 läuft“. Bei einem laufenden Einsatz zeigt der Block Zeiten als Ende „läuft“, die Dauer reicht
 bis `geladenAt`.

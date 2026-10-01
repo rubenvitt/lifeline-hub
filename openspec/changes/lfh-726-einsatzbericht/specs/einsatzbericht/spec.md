@@ -140,6 +140,13 @@ das Drucken gesperrt sein.
 
 - **WHEN** die Aufbewahrungsfrist des Einsatzes abgelaufen ist
 - **THEN** zeigt die Ansicht, dass der Bericht nicht mehr erzeugt werden kann
+- **AND** sie bietet weder Drucken noch einen neuen Versuch an
+
+#### Scenario: Rollensperre als Vorgabe der Organisation
+
+- **WHEN** ein Modul des Berichts für die Rolle der Person über die Vorgabe der Organisation
+  gesperrt ist
+- **THEN** nennt die Ansicht das Modul, auf das kein Zugriff besteht
 - **AND** sie bietet kein Drucken an
 
 ### Requirement: Im Einsatz ausgeblendete Module
