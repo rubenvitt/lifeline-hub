@@ -126,8 +126,13 @@ werden.
 
 ## 6. Abschluss
 
-- [ ] 6.1 Gesamtprüfung: `./scripts/check-all.sh` grün. Belegt wird das durch den lokalen Lauf
-  oder die CI des PRs, mit Verweis auf den Lauf.
+- [x] 6.1 Gesamtprüfung: `./scripts/check-all.sh` grün. Belegt wird das durch den lokalen Lauf
+  oder die CI des PRs, mit Verweis auf den Lauf. Lokal (Cloud-Container, 01.10.2026, Stand
+  f917045): 11 von 13 Schritten grün, Rust-Workspace und Vitest vollständig grün. Rot nur aus
+  der Umgebung: Schritt 4 beim Bau der Desktop-Hülle (`gdk-sys`, GTK fehlt im Container) und
+  Schritt 7, weil der Playwright-Browser fehlt (`chromium_headless_shell-1234`);
+  `e2e/wetter-pegel.spec.ts` lief mit dem vorinstallierten Chromium 6/6 grün. Nachweis des
+  vollen Gates: die CI des PRs.
 - [x] 6.2 Sichtprüfung im Dev-Stack mit einem verorteten Einsatz: Das Paneel zeigt echte Werte
   von Bright Sky. Aufnahme bei 1440 und 390 px, Tag und Nacht, als Anhang am PR. Nachweis:
   Aufnahmen liegen vor — `sichtprobe/` (Bremen 01.10.2026 08:00Z, Hameln 390 px). Befunde der

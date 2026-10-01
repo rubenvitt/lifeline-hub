@@ -18,7 +18,7 @@
 //! das Backend, weil nur es das Cache-Alter kennt — dieselbe Arbeitsteilung wie beim Pegel.
 //!
 //! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/`, für die
-//! aktuellen Bedingungen `openspec/changes/lfh-864-aktuelle-bedingungen/`.
+//! aktuellen Bedingungen `openspec/changes/archive/2026-10-01-lfh-864-aktuelle-bedingungen/`.
 
 use crate::wire_enum::wire_enum;
 use serde::{Deserialize, Serialize};

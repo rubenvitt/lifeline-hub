@@ -2,7 +2,7 @@
 //! samt aktuellen Bedingungen (LFH-864).
 //!
 //! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/specs/lage-wetter-pegel/spec.md`,
-//! `openspec/changes/lfh-864-aktuelle-bedingungen/specs/lage-wetter-pegel/spec.md`.
+//! `openspec/changes/archive/2026-10-01-lfh-864-aktuelle-bedingungen/specs/lage-wetter-pegel/spec.md`.
 //!
 //! **Kein Test geht ins Netz.** Jeder Router bekommt eine Bright-Sky-Attrappe auf
 //! `127.0.0.1` (oder eine tote Adresse) und ein EIGENES `karten_dir` (Tempdir): der
