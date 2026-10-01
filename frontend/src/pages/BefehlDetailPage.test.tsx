@@ -925,3 +925,39 @@ describe('BefehlDetailPage — Druckkopf (LFH-22)', () => {
     drucke.mockRestore();
   });
 });
+
+/**
+ * ── Entwurfsdruck: Titel aus dem Formular, das Eingabefeld nicht auf Papier (LFH-731) ──
+ *
+ * Im Entwurf stand das Titel-Feld als Formularfeld auf dem Blatt, der Titel damit doppelt. Nur
+ * ausblenden reichte nicht: der Druckkopf las den GESPEICHERTEN Titel, eine ungespeicherte
+ * Änderung fehlte dann auf dem Papier. Zwilling in `LageberichtDetailPage.test.tsx`.
+ */
+describe('BefehlDetailPage — Entwurfsdruck (LFH-731)', () => {
+  it('trägt eine ungespeicherte Titeländerung im Druckkopf; das Titel-Feld wird nicht gedruckt', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    const feld = await screen.findByLabelText('Titel');
+    await waitFor(() => expect(feld).toHaveValue('Befehl 1'));
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Befehl neu');
+
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(within(kopf!).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
+      'Befehl – Befehl neu',
+    );
+    // Gespeichert wurde nichts: der Kopf folgt dem Formular, nicht einem PATCH.
+    expect(befehleApi.aktualisiereBefehl).not.toHaveBeenCalled();
+    expect(feld.closest('.befehl-no-print')).not.toBeNull();
+  });
+
+  it('Lesezweig: der Druckkopf trägt weiter den gespeicherten Titel (Gegenaussage)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    await screen.findByRole('button', { name: 'Fortschreiben' });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(within(kopf!).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
+      'Befehl – Befehl 1',
+    );
+  });
+});

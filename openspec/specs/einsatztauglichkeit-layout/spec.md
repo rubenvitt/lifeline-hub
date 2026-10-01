@@ -62,6 +62,49 @@ Trefffläche MUST weiterhin die Steuerhöhe der Stufe erreichen (30 / 48 / 72 px
 - **WHEN** das Band in `kompakt` steht
 - **THEN** füllt die Trefffläche jeder klickbaren Kennzahl ihre Zelle vollständig aus
 
+### Requirement: Klappkopf folgt der Dichtestufe
+
+Jeder Klappkopf eines aufklappbaren Abschnitts („Weitere Angaben“ in Erfassungsmasken und
+jede andere Stelle der App) SHALL in jeder Dichtestufe mindestens die Steuerhöhe der Stufe
+erreichen (30 / 48 / 72 px). Seine Beschriftung MUST senkrecht mittig im Kopf stehen. Ein
+Kopf, der schon höher ist als der Boden, MUST NOT gekürzt werden.
+
+#### Scenario: Handschuh-Betrieb im Ablegen-Dialog
+- **WHEN** die Dichtestufe `handschuh` gewählt ist und der Dialog „Dokument ablegen“ offen ist
+- **THEN** misst der Klappkopf „Bezug (optional)“ mindestens 72 px in der Höhe
+
+#### Scenario: Touch-Betrieb
+- **WHEN** derselbe Dialog in der Stufe `komfortabel` steht
+- **THEN** misst der Klappkopf mindestens 48 px
+
+#### Scenario: Kompakt wird nicht gekürzt
+- **WHEN** derselbe Dialog in der Stufe `kompakt` steht
+- **THEN** misst der Klappkopf mindestens 30 px und ist nicht niedriger als vor dieser Änderung
+
+### Requirement: Abstand zwischen den Knöpfen eines Dialogfußes
+
+In der Fußzeile einer Erfassungsmaske und in jeder Rückfrage (Dialog mit Standardfuß,
+Bestätigungsdialog, Bestätigungsblase) SHALL zwischen zwei benachbarten Knöpfen in der
+Dichtestufe `komfortabel` mindestens 8 px und in `handschuh` mindestens 16 px Abstand liegen.
+Jeder dieser Knöpfe MUST weiterhin mindestens `controlHeightSM` der Stufe erreichen
+(24 / 48 / 72 px).
+
+#### Scenario: Erfassungsfuß im Handschuh-Betrieb
+- **WHEN** die Dichtestufe `handschuh` gewählt ist und der Dialog „Dokument ablegen“ offen ist
+- **THEN** liegen zwischen „Abbrechen“ und „Ablegen“ mindestens 16 px, und beide Knöpfe sind mindestens 72 px hoch
+
+#### Scenario: Bestätigungsblase im Handschuh-Betrieb
+- **WHEN** in `handschuh` die Rückfrage zum Entfernen eines Dokuments offen ist
+- **THEN** liegen zwischen ihrem Abbrechen-Knopf und dem roten Bestätigungsknopf mindestens 16 px
+
+#### Scenario: Touch-Betrieb
+- **WHEN** dieselben Füße in der Stufe `komfortabel` stehen
+- **THEN** beträgt der Abstand zwischen den Knöpfen mindestens 8 px
+
+#### Scenario: Dialog mit Standardfuß
+- **WHEN** ein Dialog mit dem Standardfuß (Abbrechen und Bestätigen) in `handschuh` geöffnet wird
+- **THEN** liegen zwischen beiden Knöpfen mindestens 16 px, und der Abstand zwischen Titel und Inhalt des Dialogs ist derselbe wie vor dieser Änderung
+
 ### Requirement: Kein Fokusziel vollständig verdeckt
 
 Beim Durchlauf mit der Tabulatortaste MUST kein fokussiertes Ziel vollständig von einem
@@ -139,3 +182,29 @@ verschieben.
 #### Scenario: Fremdänderung einer Zelle
 - **WHEN** eine andere Sitzung eine Zelle auf „akut“ setzt und die Zelle diese Stufe live übernimmt
 - **THEN** bleibt die Lage der Tabelle unverändert, und die Summe der Verschiebungen seit dem Ruhezustand ist höchstens 0,1
+
+### Requirement: Kennzahlenband hält seine Höhe
+
+Das Band „Lage in Zahlen“ im Lage-Dashboard und in Führung · Überblick MUST ab einer
+Fensterbreite von 768 px seine Höhe behalten, wenn sich die Länge einer Notiz ändert. Jede
+Notiz des Bands SHALL dort genau drei Textzeilen hoch sein, ob ihr Text kürzer oder länger
+ist. Eine längere Notiz MUST mit einer Auslassung („…“) enden, ihr vollständiger Text MUST
+als Hinweistext am Mauszeiger und im zugänglichen Namen der Kennzahl erreichbar bleiben.
+Eine Notiz, die in drei Zeilen passt, MUST NOT gekürzt werden. Unter 768 px gilt weiter der
+Boden von zwei Zeilen ohne Kürzung.
+
+#### Scenario: Neue Standmeldung bei „Evakuiert“
+- **WHEN** bei 1200, 1440 oder 1920 px Breite die Notiz von „Evakuiert“ „von ≈ 1 850 geplant · 1 ohne Meldung“ lautet und eine neue Standmeldung sie zu „von 1 850 geplant“ verkürzt
+- **THEN** ist das Band danach genauso hoch wie davor, und Gefahrenmatrix, Sichtung und Meldungsstrom bleiben an ihrem Platz
+
+#### Scenario: Pegel-Notiz mit und ohne Prognose
+- **WHEN** die Pegel-Notiz bei derselben Breite einmal ohne und einmal mit „· Prognose … · +1 weitere“ steht
+- **THEN** ist das Band in beiden Fällen gleich hoch
+
+#### Scenario: Keine Aussage geht verloren
+- **WHEN** die Notiz „von ≈ 1 850 geplant · 1 ohne Meldung“ bei 1200, 1440 oder 1920 px steht
+- **THEN** ist sie ganz sichtbar, einschließlich „≈“ und „ohne Meldung“, ohne Auslassung
+
+#### Scenario: Zu lange Notiz
+- **WHEN** eine Notiz länger ist als drei Zeilen ihrer Zelle
+- **THEN** endet die dritte Zeile mit „…“, der Hinweistext der Notiz zeigt den vollständigen Text, und der zugängliche Name der Kennzahl enthält ihn ebenfalls

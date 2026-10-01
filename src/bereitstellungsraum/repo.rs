@@ -96,12 +96,16 @@ pub async fn anlegen(
 /// Legt einen BR auf einer offenen Verbindung/Transaktion an und lädt ihn dort zurück
 /// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
 /// UNIQUE(einsatz_id, bezeichnung) → `Conflict` (409) wie in der Pool-Hülle.
+/// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: &NeueDaten<'_>,
 ) -> Result<BrAnzeige, AppError> {
+    if let Some(abschnitt) = daten.abschnitt_id {
+        crate::einsatzabschnitt::repo::pruefe_im_einsatz(&mut *conn, einsatz_id, abschnitt).await?;
+    }
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO bereitstellungsraum \
             (einsatz_id, abschnitt_id, bezeichnung, standort, notiz, \
@@ -132,6 +136,7 @@ pub async fn anlegen_tx(
 
 /// Aktualisiert BR-Stammfelder (NICHT Status). `Some(None)` setzt ein Feld
 /// explizit auf NULL (z. B. Standort löschen); `None` lässt unverändert.
+/// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -139,6 +144,9 @@ pub async fn aktualisiere(
     geaendert_von: i64,
     daten: PatchDaten<'_>,
 ) -> Result<BrAnzeige, AppError> {
+    if let Some(Some(abschnitt)) = daten.abschnitt_id {
+        crate::einsatzabschnitt::repo::pruefe_im_einsatz(pool, einsatz_id, abschnitt).await?;
+    }
     let ergebnis = sqlx::query(
         "UPDATE bereitstellungsraum \
          SET bezeichnung = COALESCE(?1, bezeichnung), \

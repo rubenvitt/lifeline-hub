@@ -45,8 +45,8 @@
   --lfh-linie-stark: #b9bfc6;
   --lfh-raster-linie: rgba(26, 95, 160, 0.07);
   --lfh-text: #111418;
-  --lfh-gedaempft: #474e57;
-  --lfh-schwach: #58606a;
+  --lfh-gedaempft: #363d45;
+  --lfh-schwach: #424a53;
   --lfh-bedien: #154e84;
   --lfh-alarm: #b02318;
   --lfh-achtung: #7a5200;
@@ -70,6 +70,7 @@
   --lfh-normal-text: #155234;
   --lfh-achtung-text: #604200;
   --lfh-alarm-text: #8f1c12;
+  --lfh-alarm-hover: #7d1810;
   --lfh-normal-flaeche: #e3f1e8;
   --lfh-achtung-flaeche: #f7efd5;
   --lfh-alarm-flaeche: #f9e3e3;
@@ -92,8 +93,8 @@
   --lfh-etb-lage-wort: #005357;
   --lfh-etb-berichtigung-kante: #cf1322;
   --lfh-etb-berichtigung-wort: #8f1c12;
-  --lfh-etb-system-kante: #58606a;
-  --lfh-etb-system-wort: #474e57;
+  --lfh-etb-system-kante: #424a53;
+  --lfh-etb-system-wort: #363d45;
 
   /* ── Warnstufen-Balken · Tagmodus (tokens.ts: warnstufeFarbenHell) ─────── */
   --lfh-warnstufe-niedrig: #9e7f00;
@@ -152,7 +153,7 @@
   --lfh-rahmen-linie: #22262b;
   --lfh-rahmen-text: #e8ebee;
   --lfh-rahmen-gedaempft: #a0a8b1;
-  --lfh-rahmen-gesperrt: #7d858e;
+  --lfh-rahmen-gesperrt: #838b94;
   --lfh-rahmen-alarm: #ff7070;
   --lfh-rahmen-marke: #a8071a;
 
@@ -209,7 +210,7 @@
   --lfh-raster-linie: rgba(77, 148, 214, 0.055);
   --lfh-text: #e8ebee;
   --lfh-gedaempft: #9aa2ab;
-  --lfh-schwach: #7d858e;
+  --lfh-schwach: #838b94;
   --lfh-bedien: #4d94d6;
   --lfh-alarm: #ff6b6b;
   --lfh-achtung: #e8cc3a;
@@ -233,6 +234,7 @@
   --lfh-normal-text: #7ddc4a;
   --lfh-achtung-text: #e8cc3a;
   --lfh-alarm-text: #ff6b6b;
+  --lfh-alarm-hover: #e88a87;
   --lfh-normal-flaeche: #0d1a0a;
   --lfh-achtung-flaeche: #1c1705;
   --lfh-alarm-flaeche: #1c0a0d;
@@ -255,7 +257,7 @@
   --lfh-etb-lage-wort: #13c2c2;
   --lfh-etb-berichtigung-kante: #cf1322;
   --lfh-etb-berichtigung-wort: #ff6b6b;
-  --lfh-etb-system-kante: #7d858e;
+  --lfh-etb-system-kante: #838b94;
   --lfh-etb-system-wort: #9aa2ab;
 
   /* ── Warnstufen-Balken · Nachtmodus (tokens.ts: warnstufeFarbenDunkel) ─── */

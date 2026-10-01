@@ -81,6 +81,10 @@ export interface Farbrollen {
   achtungText: string;
   /** Text in Alarmfarbe — Gegenstück zu {@link Farbrollen.achtungText}. */
   alarmText: string;
+  /** Gefahrrot unter dem Zeiger und beim Drücken (antds `colorErrorHover`/`colorErrorActive` am
+   *  Knopf, LFH-693). Am Tag DUNKLER als `alarmText`: antd färbt mit demselben Ton auch die
+   *  Schrift umrandeter Gefahrknöpfe, ein hellerer Ton trüge dort den Tagesboden nicht. */
+  alarmHover: string;
   /** Deckende Statusflächen: „Ampel als Fläche, Zahl bleibt lesbar" (Statuszelle/-Chip). */
   normalFlaeche: string;
   achtungFlaeche: string;
@@ -105,7 +109,7 @@ export interface Farbrollen {
  * LFH-352-Werte; neu gestimmt sind Flächen- und Textstufen und `bedien`/`bedienHover`.
  *
  * Kontrast (WCAG; `grund` · `flaeche`): text 15,46 · 18,47 — text2 11,00 · 13,13 —
- * gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; normalText/
+ * gedaempft 9,20 · 10,99 — schwach 7,53 · 8,99; steuerRahmen 3,30 · 3,95; normalText/
  * normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
  *
  * Primärknopf (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung auf satter Bedienfläche
@@ -115,6 +119,12 @@ export interface Farbrollen {
  * `#236aad`, 5,62): gleicher Ton und gleiche Sättigung, nur dunkler; der Zeiger hellt um
  * denselben Schritt auf wie zuvor (1,17). bedien auf grund 7,16. Gerechnet in
  * `bedienKontrast.test.ts`, gemessen in `e2e/primaerknopf-kontrast.spec.ts`.
+ *
+ * TEXTBODEN für JEDE Textstufe, auch den Tertiärtext `schwach` (Augenbraue, Meta,
+ * Platzhalter): ≥ 7 : 1 auf jeder deckenden Fläche (LFH-643, Spec `textstufen-kontrast`). Die
+ * dunkelste ist `flaeche3`: gedaempft 8,62, schwach 7,05. Die Rangfolge bleibt sichtbar,
+ * benachbarte Stufen liegen ≥ 5 ΔL* auseinander (L* text 6,2 · text2 20,0 · gedaempft 25,4 ·
+ * schwach 31,1). Gerechnet in `textstufen.test.ts`.
  *
  * `achtung`/`alarm` tragen als TEXT den Tagesboden nicht (auf ihrer Fläche 6,02 bzw. 5,52),
  * dafür stehen `achtungText`/`alarmText` (auf Weiß 9,22 bzw. 8,96, auf ihren Flächen und
@@ -130,6 +140,12 @@ export interface Farbrollen {
  * normalText 8,82. Abhebung gegen flaeche 1,04, gegen den Hover `flaeche3` 1,23, gegen
  * `lueckeZeile` 1,07. Gerechnet in `bedienKontrast.test.ts`; den Zeilentext einer echten Tabellenzeile
  * misst `e2e/hervorhebung-kontrast.spec.ts`.
+ *
+ * Gefahrrot (LFH-693, `antdKomponenten`): als Text `alarmText`, roter Menüeintrag auf flaeche2
+ * 8,29, Gefahrknopf ohne Rahmen auf grund 7,51 (knappstes Paar); Weiß auf `alarmText` 8,96 (gefüllter Gefahrknopf in Ruhe, Menüeintrag unter dem Zeiger),
+ * auf `alarmHover` 10,45 (Zeiger und Drücken); `alarmHover` als Schrift des umrandeten Knopfs auf
+ * flaeche 10,45, auf grund 8,75. `alarm` trüge hier nicht: als Text auf flaeche2 6,27, Weiß darauf
+ * 6,78.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -139,8 +155,8 @@ export const farbenHell: Farbrollen = {
   linieStark: '#b9bfc6',
   rasterLinie: 'rgba(26, 95, 160, 0.07)',
   text: '#111418',
-  gedaempft: '#474e57',
-  schwach: '#58606a',
+  gedaempft: '#363d45',
+  schwach: '#424a53',
   bedien: '#154e84',
   alarm: '#b02318',
   achtung: '#7a5200',
@@ -163,6 +179,7 @@ export const farbenHell: Farbrollen = {
   normalText: '#155234',
   achtungText: '#604200',
   alarmText: '#8f1c12',
+  alarmHover: '#7d1810',
   normalFlaeche: '#e3f1e8',
   achtungFlaeche: '#f7efd5',
   alarmFlaeche: '#f9e3e3',
@@ -183,6 +200,9 @@ export const farbenHell: Farbrollen = {
  * 11,60 · 11,10 — gedaempft 7,71 · 7,27 · 6,96 — bedien 6,19 · 5,84 · 5,58 — alarm 7,18 · 6,77 ·
  * 6,48 — achtung 12,45 · 11,75 · 11,24 — normal 8,79 · 8,29 · 7,94 — aufBedien auf bedien 6,19,
  * auf alarm 7,18. Statusflächen: normalText 10,44, achtung 11,18, alarm 6,89, bedienText 9,65.
+ * Gefahrrot (LFH-693): roter Menüeintrag auf flaeche2 6,48; aufBedien auf alarm 7,18 (gefüllter
+ * Gefahrknopf, Menüeintrag unter dem Zeiger — vorher antds Weiß, 2,78), auf alarmHover 7,98
+ * (Zeiger und Drücken, vorher gedrückt 3,74).
  * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
  * Tabellenkopf auf kopf 7,48.
  * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696): text 12,64 · text2 9,34 · gedaempft 5,86 ·
@@ -190,10 +210,11 @@ export const farbenHell: Farbrollen = {
  * 1,24, gegen den Hover `flaeche3` 1,17, gegen `lueckeZeile` 1,23.
  *
  * Zwei bewusste Abweichungen vom Entwurf:
- * - `schwach` `#7d858e` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
- *   `colorTextTertiary`/`colorTextPlaceholder` echten Text und 10-px-Augenbrauen (WCAG 1.4.3);
- *   `colorTextDescription` liest seit LFH-652 `gedaempft`.
- *   `#7d858e` hält ≥ 4,72 auf allen Flächenstufen.
+ * - `schwach` `#838b94` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
+ *   `colorTextTertiary`/`colorTextPlaceholder` echten Text und 10-px-Augenbrauen
+ *   (`colorTextDescription` liest seit LFH-652 `gedaempft`) und hält deshalb den Nachtboden
+ *   aller Textstufen, ≥ 5 : 1 auf jeder deckenden Fläche (LFH-643; 5,77 auf `grund`, 5,21 auf
+ *   `flaeche2` = Dialog, 5,11 auf `flaeche3`).
  * - `steuerRahmen` `#626a73` trägt antds `colorBorder`, nicht `linieStark` (`#2e343a`, 1,49 auf
  *   `flaeche`). `#626a73` hält ≥ 3,21 auf allen Flächenstufen (WCAG 1.4.11).
  *
@@ -209,7 +230,7 @@ export const farbenDunkel: Farbrollen = {
   rasterLinie: 'rgba(77, 148, 214, 0.055)',
   text: '#e8ebee',
   gedaempft: '#9aa2ab',
-  schwach: '#7d858e',
+  schwach: '#838b94',
   bedien: '#4d94d6',
   alarm: '#ff6b6b',
   achtung: '#e8cc3a',
@@ -232,6 +253,7 @@ export const farbenDunkel: Farbrollen = {
   normalText: '#7ddc4a',
   achtungText: '#e8cc3a',
   alarmText: '#ff6b6b',
+  alarmHover: '#e88a87',
   normalFlaeche: '#0d1a0a',
   achtungFlaeche: '#1c1705',
   alarmFlaeche: '#1c0a0d',
@@ -254,7 +276,7 @@ export const farbenDunkel: Farbrollen = {
  * Kontrast (LFH-434): der Rahmen wird auch bei Tageslicht gelesen, deshalb hält bedienbarer Text
  * die TAG-Schwelle ≥ 7 : 1 auf jedem Rahmengrund (`grund` · `feld` · `aktiv`): text 16,15 ·
  * 15,02 · 14,74 — gedaempft 8,04 · 7,47 · 7,33. Eine schwächere Textstufe gibt es im Rahmen nur
- * für Gesperrtes: `gesperrt` 5,17 auf `grund` (Boden 4,5; WCAG 1.4.3 nimmt inaktive Komponenten
+ * für Gesperrtes: `gesperrt` 5,60 auf `grund` (Boden 4,5; WCAG 1.4.3 nimmt inaktive Komponenten
  * aus), die Sperre trägt zusätzlich ein Zeichen ohne Farbe. Gerechnet in `rahmenKontrast.test.ts`.
  */
 export const rahmenFarben = {
@@ -643,10 +665,21 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * (LFH-667; `alarm` lag am Tag bei 5,67 : 1 auf `grund`). Das `Form`-Token färbt nur Feldmeldung,
  * Pflichtsternchen und Rückmeldesymbol; die Felder selbst ziehen ihren Fehlerrand aus dem eigenen
  * Komponententoken.
- * `colorError` global umzustellen träfe auch Gefahrknöpfe und Ränder, und dort ist die Füllfarbe
- * richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein Linkknopf zeigt
- * den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText` darauf 7,11 Tag
- * · 9,65 Nacht).
+ * `colorError` global umzustellen träfe auch Ränder, Ikonen und Feldränder, und dort ist die
+ * Füllfarbe richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein
+ * Linkknopf zeigt den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText`
+ * darauf 7,11 Tag · 9,65 Nacht).
+ *
+ * Gefahrrot (LFH-693, Spec `farbrollen-kontrast`) läuft deshalb über die Komponenten-Tokens.
+ * Das `Dropdown` färbt den roten Eintrag in Ruhe mit `colorError` und hinterlegt ihn unter dem
+ * Zeiger mit `colorError`, die Schrift dort ist `colorTextLightSolid`. Der `Button` nimmt
+ * `colorError` als Fläche des gefüllten und als Schrift des umrandeten und des `text`-Knopfs,
+ * `colorErrorHover`/`colorErrorActive` ebenso unter dem Zeiger und beim Drücken (warum der
+ * Zeiger dunkelt: {@link Farbrollen.alarmHover}).
+ * GRENZE: antd setzt die Überschreibungen als CSS-Variablen auf die Wurzel des Popups bzw. des
+ * Knopfs; sie gelten für den ganzen Teilbaum. Heute liest darin nur der Gefahreintrag
+ * (`dropdown/style/status.js`) bzw. der Knopf selbst sie (antd 6.6.5). Wer Badge, gefüllten Tag,
+ * Switch oder Spin in ein Dropdown oder einen Gefahrknopf legt, prüft deren Farbe.
  *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
@@ -662,12 +695,27 @@ export function antdKomponenten(
       defaultHoverColor: farben.bedienText,
       defaultActiveColor: farben.bedienText,
       linkHoverBg: farben.bedienFlaeche,
+      colorError: farben.alarmText,
+      colorErrorHover: farben.alarmHover,
+      colorErrorActive: farben.alarmHover,
+    },
+    Dropdown: {
+      colorError: farben.alarmText,
+      colorTextLightSolid: farben.aufBedien,
     },
     Form: {
       colorError: farben.alarmText,
       colorWarning: farben.achtungText,
     },
     Switch: switchMasse(dichten[dichte]),
+    // `colorPrimaryBorder` (= `bedien`, Fokusring LFH-737) ist auch die Ruhefarbe von Spur und
+    // Griff. antd färbt den Griff unter dem Zeiger in `colorPrimary`, also gleich, und die Spur in
+    // der abgeleiteten Hover-Stufe, nachts dunkler als `bedien`. Der Zeiger nimmt deshalb
+    // `bedienHover` wie am Primärknopf.
+    Slider: {
+      trackHoverBg: farben.bedienHover,
+      handleActiveColor: farben.bedienHover,
+    },
   };
 }
 
@@ -691,6 +739,25 @@ export function antdKnopf(dichte: Dichte = 'kompakt'): NonNullable<ConfigProvide
 }
 
 /**
+ * Der Boden des Klappkopfs für JEDES `Collapse` (LFH-653): `minHeight` = Steuerhöhe der Stufe,
+ * also 30 / 48 / 72 (A1 Gate 3), dazu die Beschriftung senkrecht mittig.
+ *
+ * antd rechnet den Kopf aus Schrift und Polsterung (`fontSize · lineHeight + 2 · paddingSM`,
+ * `collapse/style/index.js`), nicht aus `controlHeight`: gemessen 36 / 45 / 55 px. Das Muster ist
+ * das handgebaute Bedienziel aus LFH-365 — Boden plus Polsterung; die Polsterung bleibt antds
+ * `paddingSM`/`padding`, die schon der Staffel folgen. In `kompakt` liegt der Inhalt mit 36 px
+ * über dem Boden, der Kopf bleibt dort wie er war. Ohne `alignItems` stünde die Beschriftung im
+ * 72-px-Kopf oben (antd: `flex-start`).
+ *
+ * Am Kontext statt je Stelle (rund 25 `Collapse`, kein gemeinsamer Baustein): antd führt
+ * Kontext- und Komponenten-`styles` zusammen. Der Wert kommt aus derselben Zeile von
+ * {@link dichten}, aus der `antdToken` `controlHeight` setzt — der Kontext sieht kein Token.
+ */
+export function antdKlappkopf(dichte: Dichte): NonNullable<ConfigProviderProps['collapse']> {
+  return { styles: { header: { minHeight: dichten[dichte].zeilenhoehe, alignItems: 'center' } } };
+}
+
+/**
  * Leitet die antd-Tokens aus den Rollen ab, eine Richtung, keine zweite Liste. Was antd nicht
  * kennt (Marke, Kartenraster, Versal-Sperrung), lebt allein in `rollen.css`.
  */
@@ -703,6 +770,12 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorWarning: farben.achtung,
     colorSuccess: farben.normal,
     colorInfo: farben.bedien,
+    // Der Fokusring (LFH-737): antd zeichnet ihn als `outline` in `colorPrimaryBorder`
+    // (`genFocusOutline`) und leitete ihn als helle Stufe aus `bedien` ab, Tag 2,57–3,28 und Nacht
+    // 1,51–1,70 gegen die Flächen, unter WCAG 1.4.11. Als `bedien` hält er Tag ≥ 6,71, Nacht
+    // ≥ 5,48 auf jeder deckenden Fläche, wie die eigenen Klassen in `sprache.css`. Gerechnet in
+    // `bedienKontrast.test.ts`, gemessen in `e2e/fokusring-kontrast.spec.ts`.
+    colorPrimaryBorder: farben.bedien,
     // Ein Link ist blauer TEXT und trägt die Textrolle, in Ruhe wie unter dem Zeiger (LFH-652):
     // aus `bedien` abgeleitet verdunkelte ihn die Nachtpalette auf 4,55, und antds Hover-Ableitung
     // hellt ihn am Tag auf rund 4,3 auf. Die Rückmeldung unter dem Zeiger ist die Unterstreichung,
@@ -724,7 +797,7 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorTextDescription: farben.gedaempft,
     colorTextTertiary: farben.schwach,
     // Der Platzhalter ist bei mehreren Filtern die EINZIGE Beschriftung. antds Ableitung aus
-    // `colorTextQuaternary` lag unter 2,5 : 1; `schwach` hält ≥ 5 : 1.
+    // `colorTextQuaternary` lag unter 2,5 : 1; `schwach` hält den Textboden (Tag ≥ 7, Nacht ≥ 5).
     colorTextPlaceholder: farben.schwach,
 
     // Der Rahmen eines Steuerelements, nicht die dekorative Linie (Messwerte bei `farbenDunkel`).

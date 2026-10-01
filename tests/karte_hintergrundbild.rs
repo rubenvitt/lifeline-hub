@@ -8,7 +8,7 @@
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, Request, StatusCode};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod common;
@@ -446,4 +446,52 @@ async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
     assert!(ids.contains(&bx), "X-Bild sichtbar: {ids:?}");
     assert!(ids.contains(&bnull), "NULL-Bild sichtbar: {ids:?}");
     assert!(!ids.contains(&by), "Y-Bild NICHT sichtbar auf X: {ids:?}");
+}
+
+/// LFH-738: Eine `ansicht_id` aus einem ANDEREN Einsatz wird abgelehnt, beim Hochladen wie im
+/// PATCH, mit 404 wie eine unbekannte id (kein Existenz-Orakel).
+#[tokio::test]
+async fn fremde_ansicht_id_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let eigene = standard_ansicht_id(&app, &admin, einsatz).await;
+    let fremde = standard_ansicht_id(&app, &admin, anderer).await;
+    let png = minimal_png();
+
+    for aid in [fremde, 999_999_999] {
+        let (s, v) = upload_bild_ansicht(&app, einsatz, &admin, &png, ECKEN, Some(aid)).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "Upload ansicht_id={aid}: {v:?}");
+    }
+
+    let (s, bild) = upload_bild_ansicht(&app, einsatz, &admin, &png, ECKEN, Some(eigene)).await;
+    assert_eq!(s, StatusCode::CREATED, "{bild:?}");
+    let bid = bild["id"].as_i64().unwrap();
+    for aid in [fremde, 999_999_999] {
+        let (s, v) = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder/{bid}"),
+            &admin,
+            Some(&json!({"ansicht_id": aid}).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "PATCH ansicht_id={aid}: {v:?}");
+    }
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
+        &admin,
+        None,
+    )
+    .await;
+    let bilder = liste.as_array().unwrap();
+    assert_eq!(bilder.len(), 1, "kein Bild angelegt: {bilder:?}");
+    assert_eq!(
+        bilder[0]["ansicht_id"], eigene,
+        "Zuordnung unverändert: {bilder:?}"
+    );
 }
