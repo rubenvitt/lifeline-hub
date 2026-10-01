@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
@@ -11,6 +11,9 @@ import DokumentePage from './DokumentePage';
 import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
+// Gewartet wird mit RTLs `waitFor` (5 s, `test/setup.ts`), nicht mit `vi.waitFor`: dessen Budget
+// steht fest auf 1 s, und unter Last kam der Einsatz später — „?neu=1 … NICHT für Beobachter“
+// scheiterte so am Warten statt an der Sache (LFH-672).
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
@@ -113,7 +116,7 @@ async function dialogBearbeiten() {
 
 /** Das offene Menü der gebündelten Kartenaktionen (Muster `Datensicht.test.tsx`). */
 async function offenesMenue() {
-  return vi.waitFor(() => {
+  return waitFor(() => {
     const m = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
@@ -175,7 +178,7 @@ describe('DokumentePage', () => {
     await screen.findByRole('link', { name: 'Foto Einsatzstelle' });
     await userEvent.click(screen.getByRole('combobox', { name: 'Kategorie' }));
     await userEvent.click(await screen.findByTitle('Foto'));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Lageplan Nord' })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('link', { name: 'Foto Einsatzstelle' })).toBeInTheDocument();
@@ -200,7 +203,7 @@ describe('DokumentePage', () => {
     // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt entschieden.
     // Auf den Leertext zu warten reichte nicht: ein fälschlich geöffneter Dialog hängt erst danach
     // ein.
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
@@ -246,7 +249,7 @@ describe('DokumentePage', () => {
     await userEvent.clear(titel);
     await userEvent.type(titel, 'Lageplan Süd');
     await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(aenderungen).toEqual([
         {
           id: '5',
@@ -275,7 +278,7 @@ describe('DokumentePage', () => {
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(loeschAufrufe).toEqual([]);
     await userEvent.click(ok);
-    await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
+    await waitFor(() => expect(loeschAufrufe).toEqual(['5']));
   });
 
   it('Kartenzweig: Bearbeiten ist die Primäraktion und öffnet den Dialog', async () => {
@@ -316,7 +319,7 @@ describe('DokumentePage', () => {
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(loeschAufrufe).toEqual([]);
     await userEvent.click(ok);
-    await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
+    await waitFor(() => expect(loeschAufrufe).toEqual(['5']));
   });
 
   it('zeigt ein gescheitertes Entfernen im Hinweis-Slot der Seite', async () => {
@@ -396,8 +399,8 @@ describe('DokumentePage', () => {
     halt: { freigeben: () => void },
     ausloeser: (titel: string) => string,
   ) {
-    await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
-    const zeile = await vi.waitFor(() => {
+    await waitFor(() => expect(loeschAufrufe).toEqual(['5']));
+    const zeile = await waitFor(() => {
       const z = zeileVon('Lageplan Nord');
       expect(z).toHaveTextContent('wird entfernt');
       return z;
@@ -414,7 +417,7 @@ describe('DokumentePage', () => {
     expect(screen.getByRole('link', { name: 'Lageplan Nord' })).toBeInTheDocument();
 
     halt.freigeben();
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Lageplan Nord' })).not.toBeInTheDocument(),
     );
     expect(screen.queryByText(/wird entfernt/)).not.toBeInTheDocument();
@@ -442,7 +445,7 @@ describe('DokumentePage', () => {
       '.ant-modal',
     )!;
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Entfernen' }));
-    await vi.waitFor(() => expect(ausloeser).toHaveClass('ant-btn-loading'));
+    await waitFor(() => expect(ausloeser).toHaveClass('ant-btn-loading'));
     // Keine zweite Löschung: der ladende Knopf öffnet kein weiteres Menü. jsdom beendet die
     // Schließbewegung des ersten nicht von selbst, deshalb zählt der Zuwachs.
     const offeneMenues = () =>
@@ -457,7 +460,7 @@ describe('DokumentePage', () => {
   it('die Zeile behält den Zusatz, bis die neu geladene Liste sie entfernt — kein Aufblitzen', async () => {
     const halt = rendereZwei();
     await bestaetigeEntfernen('Dokument Lageplan Nord entfernen');
-    await vi.waitFor(() => expect(zeileVon('Lageplan Nord')).toHaveTextContent('wird entfernt'));
+    await waitFor(() => expect(zeileVon('Lageplan Nord')).toHaveTextContent('wird entfernt'));
     // Die Liste nach dem Erfolg hängt, bis der Test sie freigibt.
     let listeFrei!: () => void;
     const liste = new Promise<void>((res) => (listeFrei = res));
@@ -471,7 +474,7 @@ describe('DokumentePage', () => {
     expect(await screen.findByText('Dokument entfernt')).toBeInTheDocument();
     expect(zeileVon('Lageplan Nord')).toHaveTextContent('wird entfernt');
     listeFrei();
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Lageplan Nord' })).not.toBeInTheDocument(),
     );
   });
@@ -480,13 +483,13 @@ describe('DokumentePage', () => {
     const halt = rendereZwei();
     await bestaetigeEntfernen('Dokument Lageplan Nord entfernen');
     const knopf = await screen.findByRole('button', { name: 'Dokument Lageplan Nord entfernen' });
-    await vi.waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
+    await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
     // jsdom beendet die Schließbewegung der ersten Rückfrage nicht von selbst.
     const offeneRueckfragen = () =>
       [...document.querySelectorAll<HTMLElement>('.ant-popover')].filter(
         (p) => !p.classList.contains('ant-popover-hidden'),
       );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       offeneRueckfragen().forEach((p) => {
         fireEvent.animationEnd(p);
         fireEvent.transitionEnd(p);
@@ -496,7 +499,7 @@ describe('DokumentePage', () => {
     await userEvent.click(knopf);
     expect(offeneRueckfragen()).toHaveLength(0);
     halt.freigeben();
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Lageplan Nord' })).not.toBeInTheDocument(),
     );
     expect(loeschAufrufe).toEqual(['5']);
@@ -507,13 +510,13 @@ describe('DokumentePage', () => {
       HttpResponse.json({ error: 'Serverfehler beim Entfernen' }, { status: 500 }),
     );
     await bestaetigeEntfernen('Dokument Lageplan Nord entfernen');
-    await vi.waitFor(() => expect(zeileVon('Lageplan Nord')).toHaveTextContent('wird entfernt'));
+    await waitFor(() => expect(zeileVon('Lageplan Nord')).toHaveTextContent('wird entfernt'));
     halt.freigeben();
     const alarm = await screen.findByRole('alert');
     expect(alarm).toHaveTextContent('Nicht entfernt');
     expect(alarm).toHaveTextContent('Serverfehler beim Entfernen');
     const zeile = zeileVon('Lageplan Nord');
-    await vi.waitFor(() => expect(zeile).not.toHaveTextContent('wird entfernt'));
+    await waitFor(() => expect(zeile).not.toHaveTextContent('wird entfernt'));
     expect(
       within(zeile).getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
     ).not.toHaveClass('ant-btn-loading');

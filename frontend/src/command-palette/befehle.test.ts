@@ -8,37 +8,19 @@ import {
 } from './befehle';
 import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
-import type {
-  BenutzerAnzeige,
-  EinsatzAnzeige,
-  ModulOverride,
-  Koordinatenformat,
-} from '../api/types';
-import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import type { BenutzerAnzeige, EinsatzAnzeige, Koordinatenformat } from '../api/types';
+import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 
 const fuehrungskraft = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 const sichter: BenutzerAnzeige = { ...fuehrungskraft, id: 2, org_rolle: 'keine' };
 const admin: BenutzerAnzeige = { ...fuehrungskraft, id: 3, system_rolle: 'admin' };
-
-/** Vollständiges ModulOverride bauen (alle 6 Pflichtfelder), Default frei+sichtbar. */
-function ueberschreibung(felder: Partial<ModulOverride>): ModulOverride {
-  return {
-    einsatz_id: 5,
-    modul_key: 'etb',
-    sichtbar: true,
-    benoetigte_rolle: null,
-    geaendert_at: null,
-    geaendert_von: null,
-    ...felder,
-  };
-}
 
 function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
   return {
     einsatzId: 5,
     benutzer: fuehrungskraft,
     einsaetze: [],
-    overrides: undefined,
+    freigaben: freigabenFixture(),
     darfSchreibenImEinsatz: true,
     navigate: vi.fn(),
     setThemeModus: vi.fn(),
@@ -64,24 +46,28 @@ describe('baueBefehle — Module', () => {
     expect(b.some((x) => x.gruppe === 'module')).toBe(false);
     expect(b.some((x) => x.gruppe === 'schnellaktionen')).toBe(false);
   });
-  it('sperrt rollen-pflichtige Module für Nicht-Berechtigte aus (Override)', () => {
-    const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
+  it('sperrt Module ohne Zugriff aus (Freigabe des Servers, z. B. Org-Vorgabe)', () => {
+    const freigaben = freigabenFixture({ etb: { zugriff: false } });
+    expect(baueBefehle(kontext()).some((x) => x.id === 'modul:etb')).toBe(true);
+    expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === 'modul:etb')).toBe(false);
+  });
+  it('versteckt unsichtbar geschaltete Module, auch wenn der Zugriff bleibt (Admin)', () => {
+    const freigaben = freigabenFixture({ etb: { sichtbar: false, zugriff: true } });
     expect(
-      baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some(
-        (x) => x.id === 'modul:etb',
-      ),
-    ).toBe(true);
-    expect(
-      baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'modul:etb'),
+      baueBefehle(kontext({ benutzer: admin, freigaben })).some((x) => x.id === 'modul:etb'),
     ).toBe(false);
   });
-  it('versteckt unsichtbar geschaltete Module für alle (Override)', () => {
-    const overrides = { etb: ueberschreibung({ sichtbar: false }) };
-    expect(
-      baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some(
-        (x) => x.id === 'modul:etb',
-      ),
-    ).toBe(false);
+  /** Unbekannt heißt nicht freigegeben (LFH-669): solange die Freigaben laden, kein Modul. */
+  it('bietet ohne Freigaben kein Modul und keine Schnellaktion an', () => {
+    const b = baueBefehle(kontext({ freigaben: undefined }));
+    expect(b.some((x) => x.gruppe === 'module')).toBe(false);
+    expect(b.some((x) => x.gruppe === 'schnellaktionen')).toBe(false);
+    expect(b.some((x) => x.id === 'nav:einsaetze')).toBe(true);
+  });
+  it('bietet ein Modul ohne Eintrag in den Freigaben nicht an', () => {
+    const freigaben = freigabenFixture();
+    delete freigaben.etb;
+    expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === 'modul:etb')).toBe(false);
   });
 });
 
@@ -164,19 +150,13 @@ describe('baueBefehle — Schnellaktionen', () => {
     }
   });
   it('folgt dem Modulfilter: versteckte Trägermodule liefern keine Schnellaktion', () => {
-    const overrides = { etb: ueberschreibung({ sichtbar: false }) };
-    expect(baueBefehle(kontext({ overrides })).some((x) => x.id === 'aktion:etb')).toBe(false);
+    const freigaben = freigabenFixture({ etb: { sichtbar: false } });
+    expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === 'aktion:etb')).toBe(false);
   });
-  it('folgt dem Rollen-Lock: gesperrte Trägermodule liefern keine Schnellaktion', () => {
-    const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
-    expect(
-      baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'aktion:etb'),
-    ).toBe(false);
-    expect(
-      baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some(
-        (x) => x.id === 'aktion:etb',
-      ),
-    ).toBe(true);
+  it('folgt dem Zugriff: gesperrte Trägermodule liefern keine Schnellaktion', () => {
+    const freigaben = freigabenFixture({ etb: { zugriff: false } });
+    expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === 'aktion:etb')).toBe(false);
+    expect(baueBefehle(kontext()).some((x) => x.id === 'aktion:etb')).toBe(true);
   });
   it('versteckt ALLE Schnellaktionen wenn darfSchreibenImEinsatz=false (Beobachter/abgeschlossen)', () => {
     const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false }));
@@ -482,21 +462,19 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
       ...kontext(),
       einsatzId: 1,
       zuletztModulKeys: ['etb'],
-      overrides: { etb: ueberschreibung({ sichtbar: false }) },
+      freigaben: freigabenFixture({ etb: { sichtbar: false } }),
     });
     expect(befehle.filter((b) => b.gruppe === 'zuletzt')).toEqual([]);
   });
 
-  it('nimmt ein rollen-gesperrtes Modul NICHT in Zuletzt auf', () => {
-    // Zweiter Freigabe-Filter: `istModulSichtbar` und `istModulGesperrt` sind getrennte Prüfungen;
-    // die Zuletzt-Schleife muss BEIDE anwenden.
-    const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
+  it('nimmt ein gesperrtes Modul NICHT in Zuletzt auf', () => {
+    // Zweiter Freigabe-Filter: `sichtbar` und `zugriff` sind getrennte Angaben des Servers; die
+    // Zuletzt-Schleife muss BEIDE anwenden.
     const befehle = baueBefehle({
       ...kontext(),
-      benutzer: sichter,
       einsatzId: 1,
       zuletztModulKeys: ['etb'],
-      overrides,
+      freigaben: freigabenFixture({ etb: { zugriff: false } }),
     });
     expect(befehle.filter((b) => b.gruppe === 'zuletzt')).toEqual([]);
   });
@@ -782,5 +760,31 @@ describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
     const [pfad, oeffnung] = vi.mocked(k.navigate).mock.calls[0];
     expect(pfad).toBe('/profil');
     expect(oeffnung ?? 'hier').toBe('hier');
+  });
+});
+
+describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
+  it('springt im Einsatz auf die Druckansicht des Berichts und ist über „Einsatzbericht“ findbar', () => {
+    const k = kontext();
+    const b = baueBefehle(k).find((x) => x.id === 'sprung:einsatzbericht');
+    expect(b).toBeDefined();
+    expect(b!.label).toBe('Einsatzbericht drucken');
+    expect(b!.gruppe).toBe('module');
+    b!.ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einsatzdaten/bericht');
+  });
+
+  it('fehlt ohne Einsatz-Kontext', () => {
+    expect(
+      baueBefehle(kontext({ einsatzId: null })).some((x) => x.id === 'sprung:einsatzbericht'),
+    ).toBe(false);
+  });
+
+  it('steht auch für Beobachter da: der Bericht prüft die Rechte je Quelle selbst', () => {
+    expect(
+      baueBefehle(kontext({ darfSchreibenImEinsatz: false })).some(
+        (x) => x.id === 'sprung:einsatzbericht',
+      ),
+    ).toBe(true);
   });
 });

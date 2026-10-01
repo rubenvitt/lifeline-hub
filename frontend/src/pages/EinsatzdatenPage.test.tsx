@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -776,5 +776,48 @@ describe('EinsatzdatenPage · Live-Refetch des Kopfs (LFH-555)', () => {
     await waitFor(() => expect(abrufe()).toBeGreaterThan(vorher));
 
     expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('LS-42');
+  });
+});
+
+/**
+ * ── Einstieg in den Einsatzbericht (LFH-726) ──
+ *
+ * „Einsatzbericht drucken" öffnet die Druckansicht und sendet nichts ab: Kopf-Slot, sekundär, als
+ * Link mit Knopfgestalt. Auch für Beobachter und abgeschlossene Einsätze — der Bericht prüft die
+ * Rechte je Quelle selbst.
+ */
+describe('EinsatzdatenPage — Einstieg in den Einsatzbericht (LFH-726)', () => {
+  async function kopf() {
+    return waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+  }
+
+  it('verlinkt sekundär auf die Druckansicht; höchstens eine Primäraktion bleibt', async () => {
+    setup();
+    const k = await kopf();
+    const link = await within(k).findByRole('link', { name: 'Einsatzbericht drucken' });
+    expect(link).toHaveAttribute('href', '/einsaetze/7/einsatzdaten/bericht');
+    expect(link).not.toHaveClass('ant-btn-primary');
+    expect(k.querySelectorAll('.ant-btn-primary').length).toBeLessThanOrEqual(1);
+  });
+
+  it('steht auch für Beobachter und im abgeschlossenen Einsatz da', async () => {
+    setup({
+      einsatz: { meine_rolle: 'beobachter', status: 'abgeschlossen' },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
+    const k = await kopf();
+    expect(await within(k).findByRole('link', { name: 'Einsatzbericht drucken' })).toBeVisible();
+  });
+
+  it('weicht im Bearbeiten-Modus', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByText('Einsatzdaten bearbeiten');
+    expect(screen.queryByRole('link', { name: 'Einsatzbericht drucken' })).not.toBeInTheDocument();
   });
 });

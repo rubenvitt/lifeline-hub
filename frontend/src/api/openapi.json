@@ -1701,6 +1701,24 @@
           }
         }
       },
+      "BerichtigungVerweis": {
+        "type": "object",
+        "description": "Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`\nfür den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines\nETB-Eintrags nie leer.",
+        "required": [
+          "id",
+          "lfd_nr"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "BesetzungArt": {
         "type": "string",
         "description": "Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.\n\n**Keine Zeile = „nicht vergeben\"** — das ist der im Fükw der Führungsstufe B\ndokumentierte Normalzustand von S1/S4/S5/S6 und deshalb *kein* eigener Enum-Wert.\nDer Unterschied zu [`BesetzungArt::Einsatzleitung`] ist die Anregungsfunktion\n(„haben wir S4 bedacht?\").",
@@ -3303,7 +3321,8 @@
           "einsatz_id",
           "ist_adhoc",
           "funkrufname",
-          "disponiert_at"
+          "disponiert_at",
+          "ist_demo"
         ],
         "properties": {
           "aktueller_br_id": {
@@ -3365,6 +3384,10 @@
           },
           "ist_adhoc": {
             "type": "boolean"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus\n`demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo."
           },
           "kennzeichen": {
             "type": [
@@ -3469,7 +3492,8 @@
           "bezeichnung",
           "menge",
           "status",
-          "disponiert_at"
+          "disponiert_at",
+          "ist_demo"
         ],
         "properties": {
           "bemerkung": {
@@ -3515,6 +3539,10 @@
           },
           "ist_adhoc": {
             "type": "boolean"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus\n`demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo."
           },
           "kategorie": {
             "type": [
@@ -3601,7 +3629,8 @@
           "einsatz_id",
           "ist_adhoc",
           "name",
-          "disponiert_at"
+          "disponiert_at",
+          "ist_demo"
         ],
         "properties": {
           "bemerkung": {
@@ -3653,6 +3682,10 @@
           },
           "ist_adhoc": {
             "type": "boolean"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus\n`demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo."
           },
           "name": {
             "type": "string"
@@ -4383,7 +4416,8 @@
           "ereigniszeit",
           "received_at",
           "folgeauftraege",
-          "anhaenge"
+          "anhaenge",
+          "berichtigt_durch"
         ],
         "properties": {
           "an": {
@@ -4414,6 +4448,13 @@
             ],
             "format": "int64",
             "description": "Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`."
+          },
+          "berichtigt_durch": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BerichtigungVerweis"
+            },
+            "description": "Berichtigungen, die auf DIESEN Eintrag zeigen (LFH-689) — die Rückrichtung zu\n`berichtigt_eintrag_id`. Aufsteigend nach `lfd_nr`, leer statt fehlend, unabhängig von\nSeite und Listenfilter: die Palette-Vorschau liest einen Eintrag allein und muss trotzdem\nsagen, dass er überholt ist. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen\ndie Liste je Seite mit einer gebündelten Abfrage nach, wie `folgeauftraege`."
           },
           "berichtigt_eintrag_id": {
             "type": [
@@ -4782,7 +4823,8 @@
           "funkrufname",
           "sondersignal",
           "dienststatus",
-          "angelegt_at"
+          "angelegt_at",
+          "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -4815,6 +4857,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`."
           },
           "kennzeichen": {
             "type": [
@@ -6243,7 +6289,8 @@
           "id",
           "bezeichnung",
           "dienststatus",
-          "angelegt_at"
+          "angelegt_at",
+          "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -6270,6 +6317,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`."
           },
           "kategorie": {
             "type": [
@@ -6736,6 +6787,24 @@
           }
         }
       },
+      "ModulFreigabe": {
+        "type": "object",
+        "description": "Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von\n`GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter\n[`fordere_modul_zugriff`] und [`erlaubte_module`].",
+        "required": [
+          "sichtbar",
+          "zugriff"
+        ],
+        "properties": {
+          "sichtbar": {
+            "type": "boolean",
+            "description": "Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares\nModul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`)."
+          },
+          "zugriff": {
+            "type": "boolean",
+            "description": "Der Benutzer darf die Endpunkte des Moduls aufrufen: genau die Entscheidung des\nModul-Gates der Listen-Endpunkte."
+          }
+        }
+      },
       "ModulZaehlerAnzeige": {
         "type": "object",
         "description": "Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys\n(`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt\".",
@@ -6754,6 +6823,16 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/ChatZaehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dokumente": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MengenZaehler"
               },
               {
                 "type": "null"
@@ -8184,7 +8263,8 @@
           "name",
           "dienststatus",
           "angelegt_at",
-          "qualifikationen"
+          "qualifikationen",
+          "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -8209,6 +8289,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`."
           },
           "name": {
             "type": "string"

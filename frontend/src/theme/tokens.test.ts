@@ -8,7 +8,13 @@ import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
 import { navDrawerBreite } from './tokens';
-import { antdAlgorithmus, antdKomponenten, switchMasse } from './tokens';
+import {
+  antdAlgorithmus,
+  antdKlappkopf,
+  antdKomponenten,
+  kopfzeilenMasse,
+  switchMasse,
+} from './tokens';
 import { farbenDunkel } from './tokens';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -184,6 +190,44 @@ describe('Switch-Maße (LFH-380)', () => {
 });
 
 /**
+ * Tab (LFH-724): antd rechnet ihn aus der SCHRIFT, `2 × paddingSM + (fontSize + 8)` — gemessen
+ * 35,5 / 45 / 55 px, also unter der Staffel in `komfortabel` und `handschuh`. Den Collapse-Kopf
+ * trägt `antdKlappkopf` (LFH-653). Die Böden stehen als LITERALE da; die gerenderte Höhe misst
+ * `e2e/trefflaeche-pruefflaechen.spec.ts`.
+ */
+describe('Tab-Kopfzeile (LFH-724)', () => {
+  const STUFEN: Dichte[] = ['kompakt', 'komfortabel', 'handschuh'];
+  const BODEN: Record<Dichte, number> = { kompakt: 30, komfortabel: 48, handschuh: 72 };
+  /** antds Zeilenhöhe der Grundschrift: `fontSize + 8` (`getLineHeight`). */
+  const zeile = (d: Dichte) => dichten[d].schriftgroesse + 8;
+
+  it('hebt die Kopfzeile je Stufe mindestens auf die Steuerhöhe 30 / 48 / 72', () => {
+    for (const d of STUFEN) {
+      const { polsterVertikal } = kopfzeilenMasse(dichten[d]);
+      expect(2 * polsterVertikal + zeile(d), d).toBeGreaterThanOrEqual(BODEN[d]);
+    }
+  });
+
+  it('lässt kompakt bei antds Vorgabe paddingSM — nur, wo die Zeile zu niedrig wäre, wächst sie', () => {
+    expect(kopfzeilenMasse(dichten.kompakt).polsterVertikal).toBe(dichten.kompakt.abstand.sm);
+    // Und kein Aufblähen über den Boden hinaus: in handschuh genau 72.
+    expect(2 * kopfzeilenMasse(dichten.handschuh).polsterVertikal + zeile('handschuh')).toBe(72);
+  });
+
+  it('antdKomponenten trägt das Polster der GEWÄHLTEN Stufe am Tab, den Collapse-Kopf nicht', () => {
+    const pv = kopfzeilenMasse(dichten.handschuh).polsterVertikal;
+    expect(antdKomponenten(farbenHell, 'handschuh').Tabs).toMatchObject({
+      horizontalItemPadding: `${pv}px 0`,
+    });
+    expect(antdKomponenten(farbenHell, 'kompakt').Tabs).toMatchObject({
+      horizontalItemPadding: `${dichten.kompakt.abstand.sm}px 0`,
+    });
+    // Eine Regel, ein Träger: der Collapse-Kopf hängt am Kontext (`antdKlappkopf`).
+    expect(antdKomponenten(farbenHell, 'handschuh').Collapse).toBeUndefined();
+  });
+});
+
+/**
  * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary`, am Tag bis
  * LFH-661 6,59 : 1 und damit unter dem Tagesboden 7 : 1. Blauer Bedien-TEXT nimmt `bedienText`.
  *
@@ -213,6 +257,26 @@ describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
   it('kein Komponenten-Token für das Radio — der färbte auch Scheibe und Flächen', () => {
     expect(antdKomponenten(farbenHell, 'kompakt').Radio).toBeUndefined();
     expect(antdKomponenten(farbenDunkel, 'kompakt').Radio).toBeUndefined();
+  });
+});
+
+/**
+ * Klappkopf von antds `Collapse` (LFH-653). antd rechnet den Kopf aus Schrift und `paddingSM`
+ * (gemessen 36 / 45 / 55 px), nicht aus `controlHeight`. Der Boden kommt über den Kontext; die
+ * Literale sind die Staffel, nicht ihre Quelle.
+ */
+describe('Klappkopf folgt der Staffel (LFH-653)', () => {
+  const SOLL: Record<Dichte, number> = { kompakt: 30, komfortabel: 48, handschuh: 72 };
+
+  it('setzt den Boden der GEWÄHLTEN Stufe und stellt die Beschriftung mittig', () => {
+    for (const d of Object.keys(SOLL) as Dichte[]) {
+      const kopf = antdKlappkopf(d).styles;
+      expect(typeof kopf, d).toBe('object');
+      expect((kopf as { header?: unknown }).header, d).toEqual({
+        minHeight: SOLL[d],
+        alignItems: 'center',
+      });
+    }
   });
 });
 
@@ -282,6 +346,40 @@ describe('Geerbte Textfarben auf Textrollen (LFH-652)', () => {
 });
 
 /**
+ * Die Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und `Popconfirm` trennen
+ * ihre Knöpfe mit `marginXS` (3 / 5 / 7 px). Eine globale Regel in `index.css` setzt den zweiten
+ * Knopf auf antds `padding` (11 / 18 / 26) — die Variable löst AM KNOPF auf, wo eine
+ * Komponenten-Überschreibung von `marginXS` nie ankam (D4 in
+ * `openspec/changes/archive/2026-10-01-lfh-653-erfassung-handschuh-klappkopf-fuge/design.md`).
+ * Quelltext statt Pixel: jsdom rechnet kein Layout, die Auflösung messen
+ * `e2e/dokumente.spec.ts` und `e2e/dialogfuss-dichte.spec.ts`.
+ */
+describe('Fußfuge der antd-Füße (LFH-653)', () => {
+  // Ohne Kommentare: sonst fiele der Kommentar über der Regel in die erste Selektorgruppe.
+  const css = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'index.css'),
+    'utf8',
+  ).replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('eine Regel trifft alle drei Füße mit var(--ant-padding)', () => {
+    const regel = /([^{}]*)\{\s*margin-inline-start:\s*var\(--ant-padding\);\s*\}/.exec(css);
+    expect(regel, 'Regel mit margin-inline-start: var(--ant-padding)').not.toBeNull();
+    const selektoren = regel![1].split(',').map((s) => s.replace(/\s+/g, ' ').trim());
+    // `:root` hebt die Regel über antds `:where(…)`-Selektoren (Modal: vier Klassen), egal in
+    // welcher Reihenfolge cssinjs und `index.css` im Dokument stehen.
+    expect(
+      selektoren.filter((s) => s.startsWith(':root ')),
+      'jeder mit :root',
+    ).toHaveLength(3);
+    expect(selektoren).toEqual([
+      ':root .ant-modal .ant-modal-footer > .ant-btn + .ant-btn',
+      ':root .ant-modal-confirm .ant-modal-confirm-btns .ant-btn + .ant-btn',
+      ':root .ant-popconfirm .ant-popconfirm-buttons .ant-btn + .ant-btn',
+    ]);
+  });
+});
+
+/**
  * Die Feldmeldung eines Formulars (`.ant-form-item-explain-error`) schreibt ihren TEXT in antds
  * `colorError` = `alarm`, am Tag 5,67 : 1 auf `grund` und damit unter dem Tagesboden 7 : 1.
  * Roter TEXT nimmt `alarmText` (LFH-618). Der Komponententoken trifft nur das Formular;
@@ -302,6 +400,5 @@ describe('Feldmeldung: Text in alarmText (LFH-667)', () => {
     ['Nacht', farbenDunkel],
   ])('%s: das globale colorError bleibt die Füllfarbe alarm', (_modus, farben) => {
     expect(antdToken(farben)?.colorError).toBe(farben.alarm);
-    expect(antdKomponenten(farben, 'kompakt').Button).not.toHaveProperty('colorError');
   });
 });

@@ -12,7 +12,8 @@ use serde_json::{json, Value};
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup, setup_mit_pool,
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, multipart_post, rolle_setzen, setup,
+    setup_mit_pool,
 };
 
 fn uri(einsatz: i64) -> String {
@@ -423,11 +424,43 @@ async fn chat_zaehlt_je_benutzer() {
     );
 }
 
+/// Dokumente (LFH-666): die lebenden Dokumente, dasselbe Prädikat wie die Dokumentliste —
+/// die Erwartung kommt aus dem Listen-Endpunkt, nicht nur aus der handgesetzten 2.
+#[tokio::test]
+async fn dokumente_zaehlen_wie_die_liste_ohne_geloeschte() {
+    let (app, admin, einsatz) = aufbau().await;
+    let pfad = format!("/api/einsaetze/{einsatz}/dokumente");
+    let mut ids = vec![];
+    for titel in ["Lageplan", "Funkskizze", "Foto"] {
+        let (status, v) = multipart_post(
+            &app,
+            &pfad,
+            &admin,
+            Some(("plan.pdf", b"%PDF-1.4 inhalt")),
+            &[("titel", titel), ("kategorie", "lagekarte_plan")],
+        )
+        .await;
+        assert!(status.is_success(), "ablegen: {status} {v:?}");
+        ids.push(v["id"].as_i64().unwrap());
+    }
+    let (status, v) = anfrage(&app, "DELETE", &format!("{pfad}/{}", ids[0]), &admin, None).await;
+    assert!(status.is_success(), "entfernen: {status} {v:?}");
+
+    let liste = get(&app, &admin, &pfad).await;
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(v["dokumente"], json!({ "gesamt": 2 }), "{v:?}");
+    assert_eq!(
+        v["dokumente"]["gesamt"].as_i64(),
+        Some(anzahl(&liste, |_| true))
+    );
+}
+
 #[tokio::test]
 async fn erlaubtes_leeres_modul_steht_auf_null() {
     let (app, admin, einsatz) = aufbau().await;
     let v = zaehler(&app, &admin, einsatz).await;
     assert_eq!(v["personen"], json!({ "gesamt": 0 }), "{v:?}");
+    assert_eq!(v["dokumente"], json!({ "gesamt": 0 }), "{v:?}");
     assert_eq!(
         v["meldungen"],
         json!({ "offen": 0, "ungesehen": 0, "bestaetigung_ueberfaellig": 0 }),
@@ -441,6 +474,7 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
         [
             "auftraege",
             "chat",
+            "dokumente",
             "einheiten",
             "einsatzabschnitte",
             "erinnerungen",
@@ -464,6 +498,26 @@ async fn ausgeblendetes_modul_fehlt_statt_null() {
         felder.contains_key("personen"),
         "übrige Module bleiben: {v:?}"
     );
+}
+
+#[tokio::test]
+async fn ausgeblendete_dokumente_fehlen_statt_null() {
+    let (app, admin, einsatz) = aufbau().await;
+    let erika = erika(&app, &admin, einsatz).await;
+    assert!(
+        zaehler(&app, &erika, einsatz)
+            .await
+            .as_object()
+            .unwrap()
+            .contains_key("dokumente"),
+        "Gegenprobe: sichtbar ist das Feld da"
+    );
+    modul_ausblenden(&app, &admin, einsatz, "dokumente").await;
+
+    let v = zaehler(&app, &erika, einsatz).await;
+    let felder = v.as_object().unwrap();
+    assert!(!felder.contains_key("dokumente"), "{v:?}");
+    assert!(felder.contains_key("etb"), "übrige Module bleiben: {v:?}");
 }
 
 #[tokio::test]

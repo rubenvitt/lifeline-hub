@@ -1,5 +1,4 @@
-import { IkonePunkteSenkrecht } from '../ikonen';
-import { Button, Dropdown, Space, Typography, theme } from 'antd';
+import { Button, Space, Typography, theme } from 'antd';
 import { useMemo, type CSSProperties } from 'react';
 import type {
   Betreuungsstelle,
@@ -8,13 +7,8 @@ import type {
   StelleNamentlich,
 } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import Datensicht, {
-  HERVORGEHOBEN,
-  menueEintraege,
-  spaltenFuer,
-  type Kartenplan,
-  type MenueEintrag,
-} from '../components/Datensicht';
+import Datensicht, { HERVORGEHOBEN, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { monoStil } from '../components/instrument';
 import Bereichskopf from '../kommunikation/Bereichskopf';
@@ -65,7 +59,7 @@ export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
 const GESCHLOSSEN_HINWEIS =
   'Die Stelle ist geschlossen. Zurücknehmen geht erst, wenn sie wieder in Betrieb ist.';
 
-const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
+const MENUE: readonly MenueEintrag<StelleAktion>[] = [
   { key: 'bearbeiten', label: 'Bearbeiten (Status, Kapazität)' },
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
@@ -73,7 +67,7 @@ const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
 /** Menü einer Zeile: unverortet zuerst „Auf Karte verorten". */
 function stellenMenue(
   s: Pick<Betreuungsstelle, 'lat' | 'lon'>,
-): readonly (MenueEintrag & { key: StelleAktion })[] {
+): readonly MenueEintrag<StelleAktion>[] {
   const verortet = s.lat != null && s.lon != null;
   return verortet ? MENUE : [{ key: 'verorten', label: 'Auf Karte verorten' }, ...MENUE];
 }
@@ -204,24 +198,11 @@ const stellenSpalten = (
                     Belegung melden
                   </Button>
                 )}
-                <Dropdown
-                  trigger={['click']}
-                  autoFocus
-                  menu={{
-                    items: menueEintraege(stellenMenue(s)),
-                    onClick: ({ key }) => onAktion(key as StelleAktion, s),
-                  }}
-                >
-                  <Button
-                    type="text"
-                    aria-label={`Aktionen zu Stelle ${s.bezeichnung}`}
-                    icon={
-                      <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                        <IkonePunkteSenkrecht />
-                      </span>
-                    }
-                  />
-                </Dropdown>
+                <MenueAusloeser
+                  eintraege={stellenMenue(s)}
+                  zugaenglicherName={`Aktionen zu Stelle ${s.bezeichnung}`}
+                  onWahl={(aktion) => onAktion(aktion, s)}
+                />
               </Space>
             ),
           },

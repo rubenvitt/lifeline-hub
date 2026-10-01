@@ -1,0 +1,17 @@
+# Tasks
+
+## 1. e2e gegen die Uhr (rot zuerst)
+
+- [x] 1.1 `e2e/abloesung-zufluss.spec.ts`, Fall „fremde Rhythmusänderung ordnet erst mit dem Banner um“: `timezoneId: 'Europe/Berlin'`, je Kontext zwei Läufe mit `page.clock.setFixedTime(T)` (T = nächster Zeitpunkt 12:00 bzw. 23:40 Europe/Berlin, mindestens 60 min voraus, über `Intl` berechnet; Review-Befund: zurückliegend schickte der Server Hinweise, die den Banner verdecken können), Schichten per `beginn_at = T − 5 min`; zusätzlich zur Oberkante die Höhe jeder Karte messen (≤ 0,5 px) und die Zeitspaltenbreite als Messwert annotieren (D E-5). Vor der Umsetzung: der Lauf „mobil, 23:40“ ist rot mit Karte 3 +23 px, die übrigen fünf grün
+- [x] 1.2 Neuer e2e-Fall „längster Rhythmus bleibt einzeilig“ (390 px, `komfortabel` und `handschuh`): Abschnittsvorgabe 10079 min, eine Schicht ohne eigenen Rhythmus; die Rhythmuszeile (`data-lfh="abloesung-rhythmus"`) ist so hoch wie ihre Zeilenhöhe. Vor der Umsetzung rot (Selektor fehlt bzw. zwei Zeilen)
+
+## 2. Karte umsetzen (`abloesung/AbloesungKarte.tsx`)
+
+- [x] 2.1 Vitest zuerst (neben der Karte oder in `pages/AbloesungPage.test.tsx`): die Rhythmuszeile ist ein eigenes Element mit `data-lfh="abloesung-rhythmus"` und dem Text „Rhythmus 6 h (Vorgabe)“ bzw. „Rhythmus 6 h (eigen)“; die Zeile darüber nennt Abschnitt und Beginn ohne „Rhythmus“; der Zeit-Span trägt `min-width: 6ch`. Bestehende Erwartungen auf „Vorgabe des Abschnitts“/„eigener Wert“ in `AbloesungPage.test.tsx` auf die neuen Wörter ziehen. Rot sehen, dann E-1 bis E-3 umsetzen; `mise exec -- pnpm -C frontend vitest run src/pages/AbloesungPage.test.tsx src/abloesung` ist grün
+- [x] 2.2 Kommentar der Karte (Dateikopf bzw. an der Zeitspalte) nennt die feste Breite und den Grund (Kriterium 12, LFH-708, Verweis auf diese Change). `tsc -b`, ESLint und Prettier im Frontend sind grün
+- [x] 2.3 e2e aus Gruppe 1 grün: alle sechs Läufe des Rhythmus-Falls (drei Kontexte × Tag/Mitternacht) und beide Läufe „längster Rhythmus“, dazu die übrigen Fälle in `abloesung-zufluss.spec.ts` und `abloesung-kontrast.spec.ts` (14 grün). Mutationsproben: (1) Zeitspalte ohne feste Breite → die drei Tag-Läufe rot an der neuen Breitenprüfung „Zeit gegen sechs Ziffern“ (36–41 px gegen 48 px); der Sprung selbst bleibt dabei aus, weil die eigene Rhythmuszeile ihn schon verhindert, deshalb prüft der Test die Breite direkt (Spec-Szenario „gleich breit“). (2) Quellenwort „Vorgabe des Abschnitts“ (Testtext mitgezogen) → beide „längster Rhythmus“ rot, Rhythmuszeile 39 px bei 23 px Zeilenhöhe. (3) alter Zeilenschnitt samt alter Zeitspalte → „mobil, Mitternacht“ rot, Karte 3 +23 px
+
+## 3. Prüfliste und Abschluss
+
+- [x] 3.1 `docs/superpowers/specs/2026-09-22-lfh-635-pruefliste.md`, Nr. 12: Befund LFH-708 (Ursache, Reproduktion mit fester Uhr), neue Messwerte Tag/Mitternacht je Kontext, Mutationsproben und die benannten Reste (fremde Beginnänderung, fremd geplante ablösende Einheit, Einstufungswort im Kopf, Inhalt unter 226 px) nachtragen; Verdikt nach Beleg
+- [x] 3.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs). Lokal am 01.10.2026: Bündel `schnell` grün (Schritte 1–3, 6, 8–13), Bündel `frontend` grün (Vitest, 600 Dateien, 8195 Tests; nach den Review-Korrekturen `AbloesungPage.test.tsx` und `src/abloesung` erneut grün, 51 Tests), e2e `abloesung-zufluss.spec.ts` und `abloesung-kontrast.spec.ts` grün (14). Rust und die volle e2e-Suite belegt die CI des PRs (Browser in dieser Umgebung nur behelfsmäßig verlinkt)

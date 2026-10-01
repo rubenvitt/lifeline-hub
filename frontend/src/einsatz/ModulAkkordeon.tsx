@@ -10,7 +10,7 @@ import {
   type ModulEintrag,
 } from './modulRegistry';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulFreigaben } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
 
 /**
@@ -30,9 +30,8 @@ interface Props {
   kategorien: Kategorie[];
   offeneKategorie: KategorieKey | null;
   aktiverModulKey: string | null;
-  benutzer: BenutzerAnzeige | null;
-  /** Modul-Overrides des Einsatzes (LFH-132); wird an die Modulliste durchgereicht. */
-  overrides?: ModulOverrides;
+  /** Modulfreigaben des Servers (LFH-669); wird an die Modulliste durchgereicht. */
+  freigaben?: ModulFreigaben;
   onKategorieKlick: (key: KategorieKey) => void;
   onModulKlick: (modul: ModulEintrag) => void;
   /** Sprungmarken (LFH-620) — dieselben wie im Panel, je Kategorie. */
@@ -89,8 +88,7 @@ export default function ModulAkkordeon({
   kategorien,
   offeneKategorie,
   aktiverModulKey,
-  benutzer,
-  overrides,
+  freigaben,
   onKategorieKlick,
   onModulKlick,
   onSprungKlick,
@@ -122,8 +120,7 @@ export default function ModulAkkordeon({
               <div style={{ background: farben.paneel }}>
                 <ModulListe
                   module={moduleNachKategorie(k.key)}
-                  benutzer={benutzer}
-                  overrides={overrides}
+                  freigaben={freigaben}
                   aktiverModulKey={aktiverModulKey}
                   onModulKlick={onModulKlick}
                   mindestTrefflaeche={TREFFLAECHE}

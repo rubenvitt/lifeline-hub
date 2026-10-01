@@ -1,9 +1,8 @@
-import { IkonePunkteSenkrecht } from '../ikonen';
-import { Button, Dropdown, Flex, Typography } from 'antd';
-import type { MenuProps } from 'antd';
+import { Button, Flex, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { VerpflegungAusgabe, VerpflegungZeitfenster } from '../api/types';
+import { MenueAusloeser } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import {
   Augenbraue,
@@ -40,7 +39,7 @@ export interface ZeitfensterKarteProps {
   jetzt: Dayjs;
   darfSchreiben: boolean;
   /**
-   * Modul Nachforderungen für die Person bedienbar (und Overrides bekannt). Ohne: kein
+   * Modul Nachforderungen für die Person bedienbar (und Freigaben bekannt). Ohne: kein
    * „Nachfordern" und am Verweis nur „Nachforderung #n".
    */
   nachforderungenFrei: boolean;
@@ -113,11 +112,6 @@ export default function ZeitfensterKarte({
     if (key === 'nachfordern') onNachfordern?.(zf);
     if (key === 'loeschen') onLoeschen?.(zf);
   };
-  const menuItems: MenuProps['items'] = weitere.flatMap((a): NonNullable<MenuProps['items']> =>
-    a.danger
-      ? [{ type: 'divider' }, { key: a.key, label: a.label, danger: true }]
-      : [{ key: a.key, label: a.label }],
-  );
 
   return (
     <article
@@ -295,17 +289,15 @@ export default function ZeitfensterKarte({
             </Button>
           )}
           {gebuendelt ? (
-            <Dropdown
-              trigger={['click']}
-              autoFocus
-              menu={{ items: menuItems, onClick: ({ key }) => fuehreAus(key as Aktionsschluessel) }}
-            >
-              <Button
-                type="text"
-                aria-label={`Aktionen zu Zeitfenster ${kennung}`}
-                icon={<IkonePunkteSenkrecht />}
-              />
-            </Dropdown>
+            <MenueAusloeser
+              eintraege={weitere.map((a) => ({
+                key: a.key,
+                label: a.label,
+                ...(a.danger ? { gefahr: true as const } : {}),
+              }))}
+              zugaenglicherName={`Aktionen zu Zeitfenster ${kennung}`}
+              onWahl={fuehreAus}
+            />
           ) : (
             weitere.map((a) => (
               <Button

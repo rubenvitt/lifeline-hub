@@ -840,10 +840,12 @@ pub async fn faellige_purge(
 /// `storniert_at`-Filter — auch stornierte Zeilen tragen reale PII), setzt den
 /// `geschwaerzt_at`-Tombstone und schreibt einen System-ETB-Audit — alles in EINER
 /// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz-Struktur,
-/// ETB, Zähler/registrier_nr, Führungs-Doku, anonymisierte Triage) bleibt erhalten.
-/// Chat- und Erinnerungs-Freitexte werden seit LFH-290 mitgeschwärzt; ins ETB oder in
-/// einen Auftrag heraufgestufte Chat-Nachrichten bleiben als Kopie in der Führungs-Doku
-/// stehen (ETB-Politik, `etb_eintrag.inhalt`/`auftrag.auftrag_text` sind Retain).
+/// ETB im Wortlaut, Zähler/registrier_nr, anonymisierte Triage) bleibt erhalten.
+/// Chat- und Erinnerungs-Freitexte werden seit LFH-290 mitgeschwärzt, die Freitexte der
+/// Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl, Pressemitteilung,
+/// Lagebesprechung) seit LFH-701: Die Führungsdokumentation ist allein der ETB-Wortlaut
+/// (`etb_eintrag.inhalt`/`von`/`an` sind Retain), dort bleiben auch heraufgestufte
+/// Chat-Nachrichten stehen.
 ///
 /// Idempotent: der `geschwaerzt_at IS NULL`-Guard liefert `false`, wenn der Einsatz
 /// schon geschwärzt (oder nicht soft-gelöscht/abgeschlossen) ist — kein Doppel-Scrub.
@@ -893,15 +895,16 @@ pub async fn schwaerze_einsatz(
         etb_startwert,
         "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
          Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
-         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte \
-         sowie die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen) wurden \
-         unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
-         Zähler/registrier_nr, operative Objekte, die Struktur von Chat und Erinnerungen mit \
-         Zeitpunkten, Verfassern und Status), die Führungs-Dokumentation (ETB, Meldungen, Aufträge, \
-         Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet; ins ETB oder in einen \
-         Auftrag heraufgestufte Chat-Nachrichten stehen dort weiter im Wortlaut) und \
-         anonymisierte Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/ \
-         statistische Aufbewahrung.",
+         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
+         die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
+         Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
+         Befehle, Pressemitteilungen, Lagebesprechungen)) wurden unwiderruflich entfernt. \
+         Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
+         operative Objekte, die Struktur von Chat, Erinnerungen und Führungsmodulen mit \
+         Nummern, Zeitpunkten, Verfassern und Status), die Führungsdokumentation im ETB im \
+         Wortlaut (auch ins ETB heraufgestufte Chat-Nachrichten) und anonymisierte \
+         Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/statistische \
+         Aufbewahrung.",
     )
     .await?;
 
@@ -1553,6 +1556,88 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn schwaerzung_loescht_heraufgestufte_kopie_samt_chat_quelle_und_haelt_den_eintrag() {
+        // LFH-700, design.md D1: Die Kopie beim Heraufstufen ist eine gewöhnliche
+        // `anhang`-Zeile des Einsatzes. Die Schwärzung räumt sie wie die Chat-Quelle, der
+        // Eintrag bleibt mit Inhalt (G_ETB).
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let foto = crate::anhang::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            "Familie Müller.jpg",
+            "image/jpeg",
+            b"JPEG",
+        )
+        .await
+        .unwrap();
+        let kanal = crate::chat::repo::kanal_anlegen(&pool, einsatz.id, leit, "K", None)
+            .await
+            .unwrap();
+        let m = crate::chat::repo::anlegen_mit_anhaengen(
+            &pool,
+            einsatz.id,
+            leit,
+            kanal.id,
+            "Lage am Deich",
+            &[foto.id],
+        )
+        .await
+        .unwrap();
+        let etb_id = crate::chat::repo::heraufstufen_zu_etb(
+            &pool,
+            einsatz.id,
+            m.id,
+            leit,
+            "meldung",
+            "Lage am Deich",
+            &m.erstellt_at,
+            &[foto.id],
+        )
+        .await
+        .unwrap();
+        let kopie = crate::etb::repo::laden(&pool, etb_id)
+            .await
+            .unwrap()
+            .anhaenge[0]
+            .id;
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let (dateien, links): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM anhang WHERE id IN (?1, ?2)), \
+                    (SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?2)",
+        )
+        .bind(foto.id)
+        .bind(kopie)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            (dateien, links),
+            (0, 0),
+            "Quelle, Kopie und Verknüpfung weg"
+        );
+        let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+            .bind(etb_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(inhalt, "Lage am Deich", "Eintrag bleibt (G_ETB)");
+    }
+
+    #[tokio::test]
     async fn schwaerzung_nullt_freies_zeichen_label_pii() {
         // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.
         // Müller"). Es MUSS von schwaerze_einsatz genullt werden (wie karte_hintergrundbild.name);
@@ -1972,12 +2057,302 @@ mod tests {
             "Audit nennt die Chat-/Erinnerungs-Freitexte als entfernt: {audit}"
         );
         assert!(
-            audit.contains("die Struktur von Chat und Erinnerungen"),
+            audit.contains("die Struktur von Chat, Erinnerungen und Führungsmodulen"),
             "Audit nennt die erhaltene Struktur: {audit}"
         );
         assert!(
             !audit.contains("sowie Chat-Kanäle, Chat-Nachrichten und Erinnerungen)"),
             "kein Overclaim, die Datensätze seien entfernt: {audit}"
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_entfernt_fuehrungs_freitexte_und_haelt_das_etb() {
+        // LFH-701, Linie A: Die Führungsdokumentation ist das ETB. Die Freitexte der
+        // Führungsmodule (Meldung, Auftrag samt Empfänger, Nachforderung, Lagebericht, Befehl,
+        // Pressemitteilung, Lagebesprechung) werden geschwärzt, auch die, die nie ins ETB
+        // gelangt sind (Fünf-Punkte-Felder, Ablehnungsgrund, Entwürfe). Struktur bleibt, der
+        // ETB-Wortlaut auch.
+        let pool = crate::db::test_pool().await;
+        let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
+        let etb_id: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, \
+                erfasser_id, ereigniszeit) \
+             VALUES (?, 900, 'meldung', 'Fam. Yilmaz, Hauptstr. 5, Tochter vermisst', \
+                'Anrufer Herr Krause', 'S2 Frau Lang', 'telefon', ?, '2026-01-01 10:00:00') \
+             RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let meldung_id: i64 = sqlx::query_scalar(
+            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, empfaenger, meldeweg, inhalt, \
+                ereigniszeit, eingang_at, etb_meldung_id, erfasst_von_id) \
+             VALUES (?, 1, 'Anrufer Herr Krause', 'S2 Frau Lang', 'telefon', \
+                'Fam. Yilmaz, Hauptstr. 5, Tochter vermisst', '2026-01-01 10:00:00', \
+                '2026-01-01 10:00:00', ?, ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(etb_id)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let auftrag_id: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, zeit, \
+                mittel, verbindung, sicherheit, vollzugsmeldung, erteilt_at, erstellt_von_id) \
+             VALUES (?, 1, 'Fam. Yilmaz evakuieren', 'Tochter Yilmaz finden', \
+                'Herr Krause meldet Keller unter Wasser', 'Hauptstr. 5', 'sofort', 'Boot', \
+                'Tel. 0170 333', 'Hund im Haus', 'Fam. Yilmaz übergeben an Klinikum', \
+                '2026-01-01 10:05:00', ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let empfaenger_id: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, funktion_text, \
+                extern_kategorie, extern_bezeichnung, snap_anzeige) \
+             VALUES (?, 'extern', 'Herr Peters (Ortsbürgermeister)', NULL, \
+                'Herr Peters, Bürgerbüro', 'Herr Peters, Bürgerbüro') RETURNING id",
+        )
+        .bind(auftrag_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let nachforderung_id: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, adressat_kategorie, \
+                adressat_bezeichnung, begruendung, status, abgelehnt_at, abgelehnt_grund, \
+                angefordert_at, erstellt_von_id) \
+             VALUES (?, 'Dolmetscher', 'Dolmetscher für Fam. Yilmaz', 'leitstelle', \
+                'Leitstelle Nord, Herr Kurz', 'Frau Yilmaz spricht kein Deutsch', 'abgelehnt', \
+                '2026-01-01 11:00:00', 'Herr Kurz nicht erreichbar', '2026-01-01 10:30:00', ?) \
+             RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut dokumente = Vec::new();
+        for (tabelle, vorlage, status) in [
+            ("lagebericht", "lagebericht", "freigegeben"),
+            ("lagebericht", "lagebericht", "entwurf"),
+            ("befehl", "befehl_lad", "entwurf"),
+            ("pressemitteilung", "freitext", "entwurf"),
+        ] {
+            let id: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "INSERT INTO {tabelle} (einsatz_id, vorlage, titel, zeitstand, status, \
+                    abschnitte, ersteller_id) \
+                 VALUES (?, ?, 'Lage Fam. Yilmaz', '2026-01-01 12:00:00', ?, \
+                    '[{{\"schluessel\":\"lage\",\"text\":\"Fam. Yilmaz im Keller\"}}]', ?) \
+                 RETURNING id"
+            )))
+            .bind(eid)
+            .bind(vorlage)
+            .bind(status)
+            .bind(leit)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            dokumente.push((tabelle, id));
+        }
+        // Freigabe-Snapshot des freigegebenen Lageberichts im ETB (wie `render_snapshot`).
+        let snapshot = "# Lage Fam. Yilmaz\n_Zeitstand: 2026-01-01 12:00:00_\n\n## Lage\nFam. Yilmaz im Keller";
+        let snapshot_etb_id: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit, \
+                lagebericht_id) \
+             VALUES (?, 901, 'lage', ?, ?, '2026-01-01 12:00:00', ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(snapshot)
+        .bind(leit)
+        .bind(dokumente[0].1)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE lagebericht SET etb_eintrag_id = ? WHERE id = ?")
+            .bind(snapshot_etb_id)
+            .bind(dokumente[0].1)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let besprechung_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_lagebesprechung (einsatz_id, lfd_nr, abgehalten_at, entschluss, \
+                etb_eintrag_id, erfasst_von_id) \
+             VALUES (?, 1, '2026-01-01 13:00:00', 'Fam. Yilmaz bleibt in der Notunterkunft', \
+                ?, ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(etb_id)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let p = || SCHWAERZUNG_PLATZHALTER.to_string();
+        let meldung: (i64, String, Option<String>, String, String, String) = sqlx::query_as(
+            "SELECT lfd_nr, absender, empfaenger, meldeweg, inhalt, status FROM meldung \
+             WHERE id = ?",
+        )
+        .bind(meldung_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            meldung,
+            (1, p(), None, "telefon".into(), p(), "neu".into()),
+            "Meldung: Freitexte weg, Nummer/Meldeweg/Status bleiben"
+        );
+
+        type AuftragZeile = (Option<i64>, String, [Option<String>; 8], String);
+        let a: (
+            Option<i64>,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+        ) = sqlx::query_as(
+            "SELECT lfd_nr, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, \
+                sicherheit, vollzugsmeldung, erteilt_at FROM auftrag WHERE id = ?",
+        )
+        .bind(auftrag_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let auftrag: AuftragZeile = (a.0, a.1, [a.2, a.3, a.4, a.5, a.6, a.7, a.8, a.9], a.10);
+        assert_eq!(
+            auftrag,
+            (
+                Some(1),
+                p(),
+                Default::default(),
+                "2026-01-01 10:05:00".to_string()
+            ),
+            "Auftrag: Auftragstext Platzhalter, Fünf-Punkte und Vollzug NULL, Struktur bleibt"
+        );
+
+        let empfaenger: (String, Option<String>, Option<String>, String) = sqlx::query_as(
+            "SELECT empfaenger_typ, funktion_text, extern_bezeichnung, snap_anzeige \
+             FROM auftrag_empfaenger WHERE id = ?",
+        )
+        .bind(empfaenger_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            empfaenger,
+            ("extern".into(), None, None, p()),
+            "Auftragsempfänger: Klartext und Snapshot weg, Typ bleibt"
+        );
+
+        let nachforderung: (
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT art, bezeichnung, adressat_bezeichnung, begruendung, status, \
+                abgelehnt_grund FROM nachforderung WHERE id = ?",
+        )
+        .bind(nachforderung_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            nachforderung,
+            (p(), p(), None, None, "abgelehnt".into(), None),
+            "Nachforderung: Freitexte weg (auch der nie ins ETB gelangte Ablehnungsgrund)"
+        );
+
+        for (tabelle, id) in &dokumente {
+            let dok: (String, String, String, String) = sqlx::query_as(sqlx::AssertSqlSafe(
+                format!("SELECT titel, zeitstand, status, abschnitte FROM {tabelle} WHERE id = ?"),
+            ))
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                (dok.0, dok.1, dok.3),
+                (p(), "2026-01-01 12:00:00".to_string(), "[]".to_string()),
+                "{tabelle} ({}): Titel Platzhalter, Abschnitte leer, Zeitstand bleibt",
+                dok.2
+            );
+        }
+
+        let entschluss: String =
+            sqlx::query_scalar("SELECT entschluss FROM einsatz_lagebesprechung WHERE id = ?")
+                .bind(besprechung_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(entschluss, p(), "Entschluss der Lagebesprechung geschwärzt");
+
+        // Der ETB-Wortlaut ist die Führungsdokumentation und bleibt vollständig.
+        let etb: (String, Option<String>, Option<String>) =
+            sqlx::query_as("SELECT inhalt, von, an FROM etb_eintrag WHERE id = ?")
+                .bind(etb_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            etb,
+            (
+                "Fam. Yilmaz, Hauptstr. 5, Tochter vermisst".to_string(),
+                Some("Anrufer Herr Krause".to_string()),
+                Some("S2 Frau Lang".to_string())
+            ),
+            "ETB-Eintrag behält den Wortlaut"
+        );
+        let snapshot_nachher: String =
+            sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+                .bind(snapshot_etb_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            snapshot_nachher, snapshot,
+            "Freigabe-Snapshot des Lageberichts bleibt im ETB"
+        );
+
+        let audit: String = sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag \
+             WHERE einsatz_id = ? AND inhalt LIKE 'PII-Schwärzung durchgeführt%'",
+        )
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            audit.contains(
+                "Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, \
+                 Lageberichte, Befehle, Pressemitteilungen, Lagebesprechungen)"
+            ),
+            "Audit nennt die Führungs-Freitexte als entfernt: {audit}"
+        );
+        assert!(
+            audit.contains("die Führungsdokumentation im ETB im Wortlaut"),
+            "Audit nennt das ETB als erhaltene Führungsdokumentation: {audit}"
+        );
+        assert!(
+            !audit.contains("ETB, Meldungen, Aufträge"),
+            "kein Overclaim, Meldungen und Aufträge blieben als Text: {audit}"
         );
     }
 

@@ -91,12 +91,16 @@ pub async fn anlegen(
 /// Legt eine UHS auf einer offenen Verbindung/Transaktion an und lädt sie dort zurück
 /// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
 /// UNIQUE(einsatz_id, bezeichnung) → `Conflict` (409) wie in der Pool-Hülle.
+/// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: &NeueDaten<'_>,
 ) -> Result<UhsAnzeige, AppError> {
+    if let Some(abschnitt) = daten.abschnitt_id {
+        crate::einsatzabschnitt::repo::pruefe_im_einsatz(&mut *conn, einsatz_id, abschnitt).await?;
+    }
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO uhs \
             (einsatz_id, abschnitt_id, typ, bezeichnung, standort, notiz, \
@@ -127,6 +131,7 @@ pub async fn anlegen_tx(
 
 /// Aktualisiert UHS-Stammfelder (NICHT Status). `Some(None)` setzt ein Feld
 /// explizit auf NULL (z. B. Standort löschen); `None` lässt unverändert.
+/// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
 ///
 /// Optimistisches Lock (LFH-241/F10): `erwartet_geaendert_at` trägt den beim Laden gelesenen
 /// Stand; das UPDATE schreibt nur, solange `geaendert_at` unverändert ist — sonst `Conflict`
@@ -139,6 +144,9 @@ pub async fn aktualisiere(
     erwartet_geaendert_at: Option<&str>,
     daten: PatchDaten<'_>,
 ) -> Result<UhsAnzeige, AppError> {
+    if let Some(Some(abschnitt)) = daten.abschnitt_id {
+        crate::einsatzabschnitt::repo::pruefe_im_einsatz(pool, einsatz_id, abschnitt).await?;
+    }
     let mut sql = String::from(
         "UPDATE uhs \
          SET bezeichnung = COALESCE(?1, bezeichnung), \

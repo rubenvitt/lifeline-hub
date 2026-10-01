@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -8,32 +8,31 @@ import { neuerQueryClient } from '../test/utils';
 import { formatiere } from '../anzeige/koordinaten';
 import { useKoordinatenSprung } from './useKoordinatenSprung';
 import type { PaletteModus } from './typen';
-import { authWertFixture, benutzerFixture } from '../test/fixtures';
+import type { ModulFreigaben } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Die Beschaffungs-Hälfte des Koordinatensprungs: WANN angefragt wird und dass Rechte und Format
  * ankommen (der reine Kern steht in `koordinatenSprung.test.ts`). „Kein Request ohne Koordinate“
- * hält die Palettentests mit `onUnhandledRequest: 'error'` grün.
+ * hält die Palettentests mit `onUnhandledRequest: 'error'` grün. Die Rechte sind die
+ * Modulfreigaben des Servers (LFH-669).
  */
-vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
-}));
 
 const EINSATZ = 1;
 const BERLIN = '52.52194, 13.41321';
 
 let zaehler: Record<string, number>;
-let overrides: Record<string, object>;
+let freigaben: ModulFreigaben;
 let einstellungen: object;
 
 beforeEach(() => {
   zaehler = {};
-  overrides = {};
+  freigaben = freigabenFixture();
   einstellungen = {};
   server.use(
-    http.get('/api/einsaetze/:id/modul-overrides', () => {
-      zaehler.overrides = (zaehler.overrides ?? 0) + 1;
-      return HttpResponse.json(overrides);
+    http.get('/api/einsaetze/:id/modul-freigaben', () => {
+      zaehler.freigaben = (zaehler.freigaben ?? 0) + 1;
+      return HttpResponse.json(freigaben);
     }),
     http.get('/api/einsaetze/:id/einstellungen', () => {
       zaehler.einstellungen = (zaehler.einstellungen ?? 0) + 1;
@@ -100,18 +99,31 @@ describe('useKoordinatenSprung', () => {
   });
 
   it('bietet nichts an, wenn die Lagekarte im Einsatz ausgeblendet ist', async () => {
-    overrides = {
-      lagekarte: {
-        einsatz_id: EINSATZ,
-        modul_key: 'lagekarte',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
+    freigaben = freigabenFixture({ lagekarte: { sichtbar: false } });
     const { result } = starte({ suche: BERLIN });
-    await waitFor(() => expect(zaehler.overrides).toBe(1));
+    await waitFor(() => expect(zaehler.freigaben).toBe(1));
+    await ruhe();
+    expect(result.current(BERLIN)).toBeNull();
+  });
+
+  it('bietet nichts an, wenn der Server den Zugriff auf die Lagekarte verweigert', async () => {
+    freigaben = freigabenFixture({ lagekarte: { zugriff: false } });
+    const { result } = starte({ suche: BERLIN });
+    await waitFor(() => expect(zaehler.freigaben).toBe(1));
+    await ruhe();
+    expect(result.current(BERLIN)).toBeNull();
+  });
+
+  /** Unbekannt heißt nicht freigegeben (LFH-669): ein gescheiterter Abruf gibt nichts frei. */
+  it('bietet nichts an, wenn der Abruf der Freigaben scheitert', async () => {
+    server.use(
+      http.get('/api/einsaetze/:id/modul-freigaben', () => {
+        zaehler.freigaben = (zaehler.freigaben ?? 0) + 1;
+        return HttpResponse.json({ fehler: 'kaputt' }, { status: 500 });
+      }),
+    );
+    const { result } = starte({ suche: BERLIN });
+    await waitFor(() => expect(zaehler.freigaben).toBe(1));
     await ruhe();
     expect(result.current(BERLIN)).toBeNull();
   });

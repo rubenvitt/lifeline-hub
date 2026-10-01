@@ -63,6 +63,8 @@ export default function EinsatzModule() {
       setzeModulOverride(einsatzId, vars.modulKey, vars.update),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.modulOverrides(einsatzId) });
+      // Die Freigaben leiten sich aus den Overrides ab; die Navigation folgt ohne Neuladen (LFH-669).
+      qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigaben(einsatzId) });
       quittiereModulGespeichert(message, 'Modul-Einstellung gespeichert');
     },
   });

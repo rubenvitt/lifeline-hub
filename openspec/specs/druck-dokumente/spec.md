@@ -1,7 +1,7 @@
 # druck-dokumente Specification
 
 ## Purpose
-Legt fest, wie ein Druckstück der App (Lagebericht, Befehl, Meldebild, ETB-Druck) über den
+Legt fest, wie ein Druckstück der App (Lagebericht, Befehl, Meldebild, ETB-Druck, Einsatzbericht) über den
 Druckdialog des Browsers vollständig, zuordenbar und lesbar auf Papier oder in ein PDF kommt.
 
 ## Requirements
@@ -114,9 +114,9 @@ Jedes Druckstück SHALL auf der ersten Seite einen Druckkopf tragen, der das Dok
 Bildschirm zuordenbar macht: Name der Organisation, Logo der Organisation (falls hinterlegt),
 Dokumentart und -titel, Einsatzbezeichnung mit Einsatznummer (falls vergeben), Stand der Daten
 bzw. die gedruckte Auswahl, Name der druckenden Person und Druckzeitpunkt. Zeitangaben im
-Druckkopf MUST in der Zeitzone der Organisation stehen. Lagebericht, Befehl, Meldebild und
-ETB-Druck MUST denselben Druckkopf verwenden. Am Bildschirm SHALL der Druckkopf nur auf der
-ETB-Druckansicht sichtbar sein.
+Druckkopf MUST in der Zeitzone der Organisation stehen. Lagebericht, Befehl, Meldebild,
+ETB-Druck und Einsatzbericht MUST denselben Druckkopf verwenden. Am Bildschirm SHALL der
+Druckkopf nur auf den Druckansichten (ETB-Druck, Einsatzbericht) sichtbar sein.
 
 #### Scenario: Meldebild mit Auswahl
 
@@ -135,6 +135,13 @@ ETB-Druckansicht sichtbar sein.
   sind
 - **THEN** öffnet sich der Druckdialog erst, wenn Name und (falls vorhanden) Logo bereitstehen
 - **AND** scheitert das Laden des Logos, wird ohne Logo gedruckt statt gar nicht
+
+#### Scenario: Einsatzbericht trägt den gemeinsamen Kopf
+
+- **WHEN** ein Einsatzbericht gedruckt wird
+- **THEN** nennt der Druckkopf Organisation, „Einsatzbericht“, Einsatz mit Einsatznummer,
+  Stand, die druckende Person und den Druckzeitpunkt
+- **AND** am Bildschirm steht derselbe Kopf über dem Bericht
 
 ### Requirement: Seitenzählung, wo der Browser sie trägt
 

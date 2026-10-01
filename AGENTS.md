@@ -17,7 +17,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/AGENTS.md` | Gestaltungssprache, UI-Form, Bedien-Leitlinie, Erfassung, Deeplinks, Query-Keys, Lint |
 | `frontend/src/etb/AGENTS.md` | ETB: Zeitachse, Erfassung, Kopfzahl und Modulzähler, Entwurfsspeicher |
 | `frontend/src/pages/lagekarte/AGENTS.md` | Lagekarte, Zeichnen und Messen |
-| `frontend/src/offline/AGENTS.md` | Lagebild ohne Netz (LFH-723) |
+| `frontend/src/offline/AGENTS.md` | Lagebild ohne Netz (LFH-723), Schreiben ohne Netz (LFH-705) |
 | `frontend/src/auth/AGENTS.md` | Sitzung über mehrere Tabs, Client und Server (LFH-387) |
 | `frontend/src/betreuung/AGENTS.md` | Betreuung und Verpflegung, Client und Server |
 | `frontend/src/command-palette/AGENTS.md` | Sprungpalette |

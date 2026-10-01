@@ -1,22 +1,18 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import type { ModulOverrides } from '../api/types';
 import { modulRegistry } from './modulRegistry';
 import {
   berechneAbloesungZaehler,
   berechneBetreuungZaehler,
-  berechneDokumentZaehler,
   berechneUnwetterZaehler,
   bildeZaehler,
   darfZaehlerZeigen,
   ZAEHLER_QUELLEN,
 } from './useModulZaehler';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
-
-const benutzer = benutzerFixture({ anzeigename: 'E' });
 
 describe('Modul-Zähler', () => {
   // Die Zahlen kommen vom Server; die Wortlaute (Mehrzahl / Einzahl) bleiben die der Liste.
@@ -48,13 +44,12 @@ describe('Modul-Zähler', () => {
       chat: { wert: 1, beschreibung: '1 ungelesene Chat-Nachricht' },
     });
 
-    expect(berechneDokumentZaehler([{}, {}, {}])).toEqual({
-      wert: 3,
-      beschreibung: '3 abgelegte Dokumente',
+    // Dokumente zählt seit LFH-666 der Server; der Wortlaut bleibt der des Browser-Zählers.
+    expect(bildeZaehler({ dokumente: { gesamt: 3 } })).toEqual({
+      dokumente: { wert: 3, beschreibung: '3 abgelegte Dokumente' },
     });
-    expect(berechneDokumentZaehler([{}])).toEqual({
-      wert: 1,
-      beschreibung: '1 abgelegtes Dokument',
+    expect(bildeZaehler({ dokumente: { gesamt: 1 } })).toEqual({
+      dokumente: { wert: 1, beschreibung: '1 abgelegtes Dokument' },
     });
   });
 
@@ -111,18 +106,9 @@ describe('Modul-Zähler', () => {
   });
 
   it('zeigt den Betreuungszähler nur bei sichtbarem Modul (LFH-639)', () => {
-    expect(darfZaehlerZeigen('betreuung', benutzer)).toBe(true);
-    const versteckt: ModulOverrides = {
-      betreuung: {
-        einsatz_id: 7,
-        modul_key: 'betreuung',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
-    expect(darfZaehlerZeigen('betreuung', benutzer, versteckt)).toBe(false);
+    expect(darfZaehlerZeigen('betreuung', freigabenFixture())).toBe(true);
+    const versteckt = freigabenFixture({ betreuung: { sichtbar: false, zugriff: false } });
+    expect(darfZaehlerZeigen('betreuung', versteckt)).toBe(false);
   });
 
   it('zählt Unwetterwarnungen am Einsatzort — nur schwer/extrem, nie 0 ohne Stand (LFH-663)', () => {
@@ -162,7 +148,7 @@ describe('Modul-Zähler', () => {
 
   it('der Unwetterzähler hängt am Modul „Wetter & Pegel" (LFH-663)', () => {
     expect(modulRegistry.find((m) => m.zaehlerQuelle === 'wetter-pegel')?.key).toBe('wetter-pegel');
-    expect(darfZaehlerZeigen('wetter-pegel', benutzer)).toBe(true);
+    expect(darfZaehlerZeigen('wetter-pegel', freigabenFixture())).toBe(true);
   });
 
   it('bildet die Gesamtmengen mit Einzahl und Mehrzahl ab', () => {
@@ -206,30 +192,25 @@ describe('Modul-Zähler', () => {
     }
   });
 
-  it('zeigt keine Zähler an ausgeblendeten oder rollen-gesperrten Modulen', () => {
-    const versteckt: ModulOverrides = {
-      meldungen: {
-        einsatz_id: 7,
-        modul_key: 'meldungen',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
-    expect(darfZaehlerZeigen('meldungen', benutzer, versteckt)).toBe(false);
+  it('zeigt keine Zähler an ausgeblendeten oder vom Server gesperrten Modulen (LFH-669)', () => {
+    const versteckt = freigabenFixture({ meldungen: { sichtbar: false, zugriff: false } });
+    expect(darfZaehlerZeigen('meldungen', versteckt)).toBe(false);
 
-    const gesperrt: ModulOverrides = {
-      chat: {
-        einsatz_id: 7,
-        modul_key: 'chat',
-        sichtbar: true,
-        benoetigte_rolle: 'fuehrungskraft',
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
-    expect(darfZaehlerZeigen('chat', benutzer, gesperrt)).toBe(false);
-    expect(darfZaehlerZeigen('erinnerungen', benutzer)).toBe(true);
+    const gesperrt = freigabenFixture({ chat: { zugriff: false } });
+    expect(darfZaehlerZeigen('chat', gesperrt)).toBe(false);
+    expect(darfZaehlerZeigen('erinnerungen', gesperrt)).toBe(true);
+
+    // Ausgeblendet, aber erreichbar (System-Admin): die Navigation zeigt das Modul nicht, also
+    // auch keinen Zähler daran.
+    const adminAusgeblendet = freigabenFixture({ meldungen: { sichtbar: false, zugriff: true } });
+    expect(darfZaehlerZeigen('meldungen', adminAusgeblendet)).toBe(false);
+  });
+
+  it('gibt bei unbekannten Freigaben keinen Zähler frei — sie sind das Ladegate (LFH-669)', () => {
+    for (const quelle of ZAEHLER_QUELLEN) {
+      expect(darfZaehlerZeigen(quelle, undefined), quelle).toBe(false);
+    }
+    // Ein Modul, das in der Antwort fehlt, ist ebenso unbekannt.
+    expect(darfZaehlerZeigen('chat', {})).toBe(false);
   });
 });

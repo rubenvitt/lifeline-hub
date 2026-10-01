@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ladeBetreuung } from '../api/betreuung';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulFreigaben } from '../api/types';
 import { darfZaehlerZeigen } from '../einsatz/useModulZaehler';
 import { evakuierungKennzahl, type EvakuierungKennzahl } from './evakuierungKennzahl';
 
@@ -25,11 +25,11 @@ export type EvakuierungKennzahlZustand =
 
 interface Args {
   einsatzId: number;
-  benutzer: BenutzerAnzeige | null;
-  overrides?: ModulOverrides;
+  /** Modul-Freigaben des Servers (LFH-669); `undefined` heißt „noch unbekannt“ und gibt nichts frei. */
+  freigaben?: ModulFreigaben;
   /**
-   * `false`, solange Benutzer oder Modul-Overrides laden: dann gilt `laden` OHNE Abruf — ohne
-   * Overrides hielte `darfZaehlerZeigen` ein ausgeblendetes Modul für sichtbar (403).
+   * `false`, solange die Modul-Freigaben laden: dann gilt `laden` OHNE Abruf — sonst stünde bis
+   * zur Antwort `aus` statt `laden` in der Zelle.
    */
   bereit?: boolean;
 }
@@ -41,11 +41,10 @@ interface Args {
  */
 export function useEvakuierungKennzahl({
   einsatzId,
-  benutzer,
-  overrides,
+  freigaben,
   bereit = true,
 }: Args): EvakuierungKennzahlZustand {
-  const aktiv = Number.isFinite(einsatzId) && darfZaehlerZeigen('betreuung', benutzer, overrides);
+  const aktiv = Number.isFinite(einsatzId) && darfZaehlerZeigen('betreuung', freigaben);
   const query = useQuery({
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),

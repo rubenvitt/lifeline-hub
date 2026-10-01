@@ -9,6 +9,7 @@ import { MemoryRouter, Routes, Route } from 'react-router';
 import AbloesungPage from './AbloesungPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung } from '../api/types';
+import { setzeViewportBreite } from '../test/viewport';
 
 dayjs.extend(utc);
 
@@ -142,9 +143,26 @@ describe('AbloesungPage (LFH-635)', () => {
     expect(ueber.style.animation).toBe('');
     // Kopf nennt Zahl der laufenden und der fälligen (Vorwarnung + überfällig).
     expect(screen.getByText('3 laufend · 2 fällig')).toBeInTheDocument();
-    // Herkunft des Rhythmus als Wort.
-    expect(within(bald).getByText(/Vorgabe des Abschnitts/)).toBeInTheDocument();
-    expect(within(plan).getByText(/eigener Wert/)).toBeInTheDocument();
+    // Herkunft des Rhythmus als Wort, in einer eigenen Zeile (LFH-708): eine fremde
+    // Rhythmusänderung berührt nur diese Zeile, nicht den Umbruch von Abschnitt und Beginn.
+    const rhythmus = (k: HTMLElement) =>
+      k.querySelector<HTMLElement>('[data-lfh="abloesung-rhythmus"]');
+    expect(rhythmus(bald)).toHaveTextContent(/^Rhythmus 6 h \(Vorgabe\)$/);
+    expect(rhythmus(plan)).toHaveTextContent(/^Rhythmus 6 h \(eigen\)$/);
+    const herkunft = within(bald).getByText(/^Deichwache Nord · im Einsatz seit \d{4,6}$/);
+    expect(herkunft).not.toContainElement(rhythmus(bald));
+  });
+
+  it('die Zeit trägt die Mindestbreite von sechs Ziffern (6ch)', async () => {
+    // `kurz` zeigt heute `HHmm`, sonst `DDHHmm`. Wüchse die Spalte mit dem Text, bräche die
+    // Karte kurz vor Mitternacht anders um als am Tag (LFH-708, Kriterium 12). jsdom misst
+    // nicht; die Breite gegen sechs Ziffern belegt `e2e/abloesung-zufluss.spec.ts`.
+    renderPage();
+    const karten = await screen.findAllByRole('article');
+    for (const k of karten) {
+      const zeit = k.querySelector<HTMLElement>('[data-lfh="abloesung-zeit"]')!;
+      expect(zeit.style.minWidth).toBe('6ch');
+    }
   });
 
   it('ohne Schreibrecht: Grund im Kopf, Primäraktion gesperrt, keine Kartenaktionen', async () => {
@@ -377,6 +395,28 @@ describe('AbloesungPage (LFH-635)', () => {
       expect(sammelbanner()!.parentElement).toBe(zeile);
     });
 
+    // ── Handschirm (LFH-694): neben der Segmentleiste trägt nur die Kurzform ──
+    it('auf dem Handschirm ist das Banner ein Knopf „1 neu“, der volle Satz bleibt im Status', async () => {
+      setzeViewportBreite(390);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([fremd(), eins(), zwei(), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+
+      const banner = sammelbanner() as HTMLElement;
+      expect(banner).toHaveTextContent('1 neue Schicht, davon 1 fällig');
+      const knopf = within(banner).getByRole('button', { name: '1 neu anzeigen' });
+      expect(knopf).toHaveTextContent(/^1 neu$/);
+      expect(banner.parentElement).toBe(
+        document.querySelector('[data-lfh="abloesung-werkzeugzeile"]'),
+      );
+
+      await userEvent.click(knopf);
+      expect(kartenNamen()[0]).toBe('Schicht Florian 9');
+      expect(sammelbanner()).toBeNull();
+    });
+
     // ── Eine fremde Änderung von Rhythmus/Beginn ordnet nicht unter dem Cursor um (LFH-660) ──
     // Gezeigt: 1 überfällig, 4 planmäßig (2 h, eigener Rhythmus), 3 planmäßig (4 h, folgt der
     // Vorgabe). Fremd wird 3 auf „seit 30 min überfällig" gezogen — die Server-Ordnung stellte sie
@@ -430,6 +470,19 @@ describe('AbloesungPage (LFH-635)', () => {
         'Schicht Florian 4',
       ]);
       expect(sammelbanner()).toBeNull();
+    });
+
+    it('auf dem Handschirm meldet eine reine Umordnung „umgeordnet“ statt einer Zahl (LFH-694)', async () => {
+      setzeViewportBreite(390);
+      laufendLiefert([eins(), vier(), drei()]);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([dreiVorgezogen(), eins(), vier()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(
+        within(sammelbanner() as HTMLElement).getByRole('button', { name: 'umgeordnet anzeigen' }),
+      ).toHaveTextContent(/^umgeordnet$/);
     });
 
     it('eine fremde Änderung, die die Folge nicht berührt, zeigt kein Banner', async () => {

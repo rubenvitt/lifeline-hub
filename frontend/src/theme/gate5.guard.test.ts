@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ohneKommentare } from '../test/ohneKommentare';
 
 /**
  * Gate-5-Guard (A1): **kein A0-Farbwert außerhalb `src/theme/`.** Eine Kopie eines Rollenwerts
@@ -52,13 +53,14 @@ const dateien = lieseQuellen(SRC);
 
 /**
  * Die Status-, Bedien- und Markenwerte aus `farbenHell`/`farbenDunkel` samt den eindeutigen
- * Textstufen (`normalText`, `bedienText`, `bedienHover`, `achtungText`/`alarmText` am Tag).
+ * Textstufen (`normalText`, `bedienText`, `bedienHover`, `achtungText`/`alarmText` am Tag) und
+ * `alarmHover` (LFH-693).
  *
  * NICHT aufgenommen sind die ETB-Typ- und Warnstufen-Kanten: es sind antd-Presets, die
  * `pages/lagekarte/` als modusunabhängige KARTENFARBEN nutzt; der Scan meldete dort Fehlalarme.
  */
 const ROLLENWERT =
-  /#(b02318|7a5200|1c6640|154e84|185895|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12)/i;
+  /#(b02318|7a5200|1c6640|154e84|185895|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12|7d1810|e88a87|144779)/i;
 
 /**
  * Benannte Ausnahmen: Datei + Wert, jeweils mit Grund, ohne Zeilennummer. Ein Eintrag, der
@@ -85,43 +87,6 @@ function istAusnahme(pfad: string, zeile: string): boolean {
     treffer.length > 0 &&
     treffer.every((wert) => AUSNAHMEN.some((a) => a.pfad === pfad && a.wert === wert))
   );
-}
-
-/**
- * Blendet Kommentarinhalt aus und behält die Zeilenzahl bei (Index = Zeile − 1).
- * Trägt den Block-Zustand über Zeilengrenzen, damit auch Fortsetzungszeilen fallen.
- */
-function ohneKommentare(inhalt: string): string[] {
-  const zeilen: string[] = [];
-  let imBlock = false;
-  for (const roh of inhalt.split('\n')) {
-    let rest = roh;
-    let sichtbar = '';
-    while (rest.length > 0) {
-      if (imBlock) {
-        const ende = rest.indexOf('*/');
-        if (ende === -1) break; // Rest der Zeile liegt im Block
-        imBlock = false;
-        rest = rest.slice(ende + 2);
-        continue;
-      }
-      const block = rest.indexOf('/*');
-      const einzeilig = rest.indexOf('//');
-      if (block === -1 && einzeilig === -1) {
-        sichtbar += rest;
-        break;
-      }
-      if (einzeilig !== -1 && (block === -1 || einzeilig < block)) {
-        sichtbar += rest.slice(0, einzeilig);
-        break;
-      }
-      sichtbar += rest.slice(0, block);
-      rest = rest.slice(block + 2);
-      imBlock = true;
-    }
-    zeilen.push(sichtbar);
-  }
-  return zeilen;
 }
 
 describe('Gate-5-Guard (LFH-328): kein A0-Farbwert außerhalb src/theme/', () => {

@@ -37,6 +37,7 @@ const fahrzeug = {
   bemerkung: 'Reserve',
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-26 10:00:00',
+  ist_demo: false,
 };
 
 /** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
@@ -267,5 +268,18 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     expect(await screen.findByRole('heading', { name: 'Florian 2' })).toBeInTheDocument();
     expect(screen.getByLabelText('OPTA')).toHaveValue('FL MUS 08');
     expect(screen.getByLabelText('Bemerkung')).toHaveValue('Zweiter');
+  });
+});
+
+/** LFH-733 (Spec `demo-daten`): der Seitenkopf kennzeichnet ein Demo-Fahrzeug. */
+describe('FahrzeugDetailPage — Demo-Marke', () => {
+  it.each([
+    [true, 'zeigt'],
+    [false, 'zeigt keine'],
+  ])('ist_demo=%s: der Kopf %s Marke „Demo“', async (istDemo) => {
+    handler(admin, [{ ...fahrzeug, ist_demo: istDemo }]);
+    renderRoute('/admin/stammdaten/fahrzeuge/7');
+    const kopf = await screen.findByRole('heading', { level: 1, name: /Florian 1/ });
+    expect(kopf.textContent?.includes('Demo')).toBe(istDemo);
   });
 });

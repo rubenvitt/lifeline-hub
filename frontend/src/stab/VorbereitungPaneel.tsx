@@ -6,16 +6,17 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { schlechtesterZustand, type AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
-import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides, Stab } from '../api/types';
+import type { BenutzerAnzeige, EinsatzAnzeige, ModulFreigaben, Stab } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { auftragsStand, meldungsStand } from '../pages/lage-dashboard/fuehrungsZahlen';
 import { baueLagebild, kennzahlReihe } from '../pages/lage-dashboard/lagebild';
-import { standDer, useLagebild } from '../pages/lage-dashboard/useLagebild';
+import { useLagebild } from '../pages/lage-dashboard/useLagebild';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { quellenLaden, vorbereitungMarkdown, vorbereitungsZeilen } from './vorbereitung';
 
@@ -37,7 +38,7 @@ interface Props {
   einsatzId: number;
   einsatz: EinsatzAnzeige;
   benutzer: BenutzerAnzeige | null;
-  overrides: ModulOverrides | undefined;
+  freigaben: ModulFreigaben | undefined;
   stab: Stab | undefined;
   stabZustand: AbrufZustand;
   stabStand: number;
@@ -56,7 +57,7 @@ export default function VorbereitungPaneel({
   einsatzId,
   einsatz,
   benutzer,
-  overrides,
+  freigaben,
   stab,
   stabZustand,
   stabStand,
@@ -70,7 +71,7 @@ export default function VorbereitungPaneel({
     return () => window.clearInterval(t);
   }, []);
 
-  const { q, zustand, basis } = useLagebild(einsatzId, { mitPegel: false });
+  const { q, zustand, basis, stand: standVon } = useLagebild(einsatzId, { mitPegel: false });
   // Die Lageplätze (Pegel, Evakuiert) zeigt die Vorbereitung nicht: sie baut mit der Reihe ohne
   // Lagekennzahlen, die Kern-Kennzahlen sind dieselben wie im Dashboard.
   const lagebild = useMemo(
@@ -106,17 +107,18 @@ export default function VorbereitungPaneel({
 
   const stand = Math.min(
     ...[
-      standDer(
-        q.einsatz,
-        q.personen,
-        q.personal,
-        q.fahrzeuge,
-        q.material,
-        q.einheiten,
-        q.abschnitte,
-        q.gefahren,
-        q.lageberichte,
-        q.zaehler,
+      // Eine gesperrte Quelle zählt nicht in den Stand (LFH-669, `useLagebild`).
+      gemeinsamerDatenstand(
+        standVon('einsatz'),
+        standVon('personen'),
+        standVon('personal'),
+        standVon('fahrzeuge'),
+        standVon('material'),
+        standVon('einheiten'),
+        standVon('abschnitte'),
+        standVon('gefahren'),
+        standVon('lageberichte'),
+        standVon('zaehler'),
       ),
       stabStand,
     ].filter((s) => s > 0),
@@ -124,12 +126,11 @@ export default function VorbereitungPaneel({
   const standWire = Number.isFinite(stand) ? alsWire(stand) : null;
   const laedt = quellenLaden(zeilen);
 
-  // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND Modul Lageberichte frei.
+  // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND Modul Lageberichte frei
+  // (Freigabe vom Server; solange sie fehlt, gilt das Modul als nicht frei).
   // Solange eine Quelle lädt, stünde „lädt" im Bericht — der Knopf ist dann gesperrt.
   const darfUebernehmen =
-    darfImEinsatzSchreiben(einsatz, benutzer) &&
-    overrides != null &&
-    istKeyFreigegeben('lageberichte', benutzer, overrides);
+    darfImEinsatzSchreiben(einsatz, benutzer) && istKeyFreigegeben('lageberichte', freigaben);
 
   const uebernehmen = useMutation({
     mutationFn: async () => {

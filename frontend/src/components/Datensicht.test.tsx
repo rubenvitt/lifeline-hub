@@ -528,7 +528,7 @@ describe('pruefeKartenplan()', () => {
     expect(meldung(befunde, 'filter')).toHaveLength(1);
   });
 
-  it('meldet baum zusammen mit aufklappzeile und mit gruppen', () => {
+  it('meldet baum zusammen mit gruppen', () => {
     const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
     const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
     const befunde = pruefeKartenplan(
@@ -536,16 +536,14 @@ describe('pruefeKartenplan()', () => {
         spalten: ohneFilterSpalten,
         karte,
         baum,
-        aufklappzeile: () => 'Besatzung',
         gruppen: { schluessel: () => 'a', etikett: (w) => w, unterEbene: 1 },
       },
       'Meldebild',
     );
-    expect(meldung(befunde, 'aufklappzeile')).toHaveLength(1);
     expect(meldung(befunde, 'gruppen')).toHaveLength(1);
   });
 
-  it('meldet aufklappen zusammen mit baum und mit aufklappzeile (LFH-676)', () => {
+  it('meldet aufklappen zusammen mit baum und mit karte.art eigen (LFH-676)', () => {
     const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
     const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
     const aufklappen = {
@@ -556,15 +554,6 @@ describe('pruefeKartenplan()', () => {
     expect(
       meldung(
         pruefeKartenplan({ spalten: ohneFilterSpalten, karte, baum, aufklappen }, 'Meldebild'),
-        'aufklappen',
-      ),
-    ).toHaveLength(1);
-    expect(
-      meldung(
-        pruefeKartenplan(
-          { spalten, karte, aufklappen, aufklappzeile: () => 'Besatzung' },
-          'Fahrzeuge',
-        ),
         'aufklappen',
       ),
     ).toHaveLength(1);
@@ -1425,17 +1414,6 @@ describe('Datensicht · Tabellenzweig', () => {
       'Florian 1',
       'Florian 3',
     ]);
-  });
-
-  it('aufklappzeile läuft nur im Tabellenzweig', () => {
-    const breit = rendere({ aufklappzeile: (f) => `Besatzung von ${f.funkrufname}` });
-    expect(breit.container.querySelectorAll('.ant-table-row-expand-icon')).toHaveLength(3);
-    breit.unmount();
-
-    setzeViewportBreite(390);
-    const schmal = rendere({ aufklappzeile: (f) => `Besatzung von ${f.funkrufname}` });
-    expect(schmal.container.querySelectorAll('.ant-table-row-expand-icon')).toHaveLength(0);
-    expect(schmal.queryByText('Besatzung von Florian 1')).toBeNull();
   });
 
   it('der Baum läuft über antds expandable, kontrolliert von außen', () => {

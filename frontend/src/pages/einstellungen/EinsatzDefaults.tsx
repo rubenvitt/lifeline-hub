@@ -13,7 +13,7 @@ import {
 import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
-import { globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
+import { einsatzKeys, globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
@@ -74,6 +74,8 @@ export default function EinsatzDefaults() {
       setzeOrgModulEinstellung(vars.modulKey, vars.rolle),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
+      // Eine Org-Vorgabe wirkt auf die Freigaben JEDES Einsatzes der Org (LFH-669).
+      qc.invalidateQueries({ queryKey: einsatzKeys.modulFreigabenAlle() });
       quittiereModulGespeichert(message, 'Modul-Default gespeichert');
     },
   });

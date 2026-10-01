@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import AufnahmePage from './AufnahmePage';
@@ -23,7 +23,7 @@ function merkeRequest({ request }: { request: Request }) {
 
 beforeEach(async () => {
   vi.stubGlobal('EventSource', FakeEventSource);
-  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  setzeOnline(true);
   sessionStorage.clear();
   schreibrequests.length = 0;
   server.events.on('request:start', merkeRequest);
@@ -298,9 +298,10 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
   it.each(['Erfassen', 'Speichern und nächste'])(
     'merkt die UHS offline ohne Handarbeitsvorbehalt vor: %s',
     async (aktion) => {
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
       render(einsatzAktiv, [], '/einsaetze/1/personen/aufnahme?uhs=7');
       await screen.findByRole('radiogroup');
+      // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+      setzeOnline(false);
       await userEvent.click(screen.getByRole('button', { name: aktion }));
       if (aktion === 'Erfassen') {
         await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/7'));

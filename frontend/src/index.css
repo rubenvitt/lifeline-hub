@@ -6,18 +6,26 @@ body {
   padding: 0;
 }
 
-/* Deeplink-Highlight einer per ?<modul>=<id> angesteuerten Zeile (LFH-25).
+/* Deeplink-Highlight einer per ?<modul>=<id> angesteuerten Zeile (LFH-25), aus Rollen (LFH-698,
+   Spec `deeplink-hervorhebung`). Zwei Kanäle: die Fläche `bedien-flaeche` („aktive Beziehung“,
+   dieselbe Rolle, die die ETB-Zeitachse inline setzt) und eine 2-px-Linie oben und unten in
+   `bedien`. Nachts hebt sich keine vorhandene Fläche allein ab (1,03 : 1), die Linie trägt dort
+   die Sichtbarkeit (≥ 5,4 : 1) und trennt die Markierung vom Hover (`flaeche3`, ohne Linie). Oben
+   und unten, nicht links: links stehen die ETB-Typkanten; kein umlaufender Rahmen: das ist der
+   Fokusring. `box-shadow` statt `border`, damit die Zeile beim Sprung nicht wächst.
    Zwei Selektoren, weil `Datensicht` unter `md` Karten statt Zeilen rendert. Im Tabellenzweig
-   muss die Farbe an die `td` (antd färbt die Zellen, ein Hintergrund am `tr` bliebe verdeckt). */
-.zeile-hervorgehoben > td,
+   gehört die Farbe an die `td` (antd färbt die Zellen, ein Hintergrund am `tr` bliebe verdeckt),
+   in der Spezifität der Lückentönung (`personen/betroffene.css`, (0,3,2)): sie liegt über antds
+   Sortierspalte (`.ant-table-wrapper td.ant-table-column-sort`, (0,2,1); `:where(.css-…)` zählt
+   null). Die alte Form `.zeile-hervorgehoben > td` (0,1,1) verlor dort, die fixierte Kennung
+   blieb am Tag ohne Hervorhebung (gemessen, LFH-698). */
+.ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td,
 [data-lfh='datensicht-karte'].zeile-hervorgehoben {
-  background-color: #fffbe6;
+  background-color: var(--lfh-bedien-flaeche);
+  box-shadow:
+    inset 0 2px 0 var(--lfh-bedien),
+    inset 0 -2px 0 var(--lfh-bedien);
   transition: background-color 0.4s ease;
-}
-
-[data-theme='dark'] .zeile-hervorgehoben > td,
-[data-theme='dark'] [data-lfh='datensicht-karte'].zeile-hervorgehoben {
-  background-color: #2b2611;
 }
 
 /* ETB-Erfassung als angepinnte Leiste am Fuß der Zeitachse (Begründung in `pages/EtbPage.tsx`).
@@ -59,6 +67,22 @@ body {
 .ant-radio-group-outline .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
 .ant-radio-group-outline .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled):hover {
   color: var(--lfh-bedien-text);
+}
+
+/* Fußfuge der Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und
+   Bestätigungsblase trennen ihre Knöpfe mit `marginXS` = 3 / 5 / 7 px; in einer Rückfrage steht
+   fast immer Rot neben „Abbrechen", und im Handschuh-Betrieb verlangt die Leitlinie ≥ 16 px.
+   `var(--ant-padding)` ist antds Token `padding` = `abstand.md` = 11 / 18 / 26, dieselbe Stufe
+   wie `<Space size="middle">`. Eine Stilregel statt eines Komponenten-Tokens: jeder antd-Knopf
+   trägt die `css-var-…`-Klasse des globalen Themes und setzt dort `--ant-margin-xs` zurück, eine
+   Überschreibung an Blase oder Modal kam am Knopf nie an (gemessen 7 px). `--ant-padding` löst am
+   Knopf in der gewählten Stufe auf. `:root` hebt die Regel über antds `:where(…)`-Selektoren
+   (Modal-Fuß: vier Klassen), unabhängig von der Reihenfolge im Dokument. Nachweis:
+   `theme/tokens.test.ts` (Quelltext), `e2e/dokumente.spec.ts` (Messung). */
+:root .ant-modal .ant-modal-footer > .ant-btn + .ant-btn,
+:root .ant-modal-confirm .ant-modal-confirm-btns .ant-btn + .ant-btn,
+:root .ant-popconfirm .ant-popconfirm-buttons .ant-btn + .ant-btn {
+  margin-inline-start: var(--ant-padding);
 }
 
 /* ETB: Fokusabstand zur angepinnten Erfassungsleiste (LFH-373, WCAG 2.4.11).

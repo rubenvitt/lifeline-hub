@@ -2,12 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Betreuungsstelle, ModulOverrides } from '../api/types';
-import { meHandler, server } from '../test/server';
+import type { Betreuungsstelle, ModulFreigaben } from '../api/types';
+import { server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import VerbleibErfassung from './VerbleibErfassung';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Verbleib-Dialog auf der Hülle. Die reinen Kerne prüft `verbleibErfassungKern.test.ts`; hier
@@ -28,13 +28,13 @@ const SUED = stelle({ id: 8, bezeichnung: 'NU Schule Süd' });
 
 let gesendet: Record<string, unknown>[];
 let betreuungAbrufe: number;
-let overrides: ModulOverrides;
+let freigaben: ModulFreigaben;
 let postAntwort: () => Response;
 
 beforeEach(() => {
   gesendet = [];
   betreuungAbrufe = 0;
-  overrides = {};
+  freigaben = freigabenFixture();
   postAntwort = () =>
     HttpResponse.json(
       {
@@ -48,8 +48,7 @@ beforeEach(() => {
       { status: 201 },
     );
   server.use(
-    meHandler(benutzerFixture({ anzeigename: 'F', org_rolle: 'fuehrungskraft' })),
-    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json(overrides)),
+    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/1/betreuung', () => {
       betreuungAbrufe += 1;
       return HttpResponse.json({ bezirke: [], stellen: [NORD, SUED] });
@@ -167,26 +166,23 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
   });
 
   /**
-   * Solange die Overrides nicht geladen sind, fehlt die Auswahl ohnehin; die Abwesenheit sagt
+   * Solange die Freigaben nicht geladen sind, fehlt die Auswahl ohnehin; die Abwesenheit sagt
    * erst etwas, wenn sie nachweislich im Cache stehen — der Gegenfall mit freiem Modul zeigt,
    * dass der Test die Auswahl sonst findet.
    */
   it.each([
     ['frei', {}, true],
-    [
-      'ausgeblendet',
-      { betreuung: { einsatz_id: 1, modul_key: 'betreuung', sichtbar: false } },
-      false,
-    ],
+    ['ausgeblendet', { betreuung: { sichtbar: false } }, false],
+    ['gesperrt', { betreuung: { zugriff: false } }, false],
   ] as const)(
     'Modul Betreuung %s: Auswahl erst nach geladenen Rechten entschieden',
     async (_, o, erwartet) => {
       const user = userEvent.setup();
-      overrides = o as ModulOverrides;
+      freigaben = freigabenFixture(o);
       const { client } = zeige();
       await waehle(user, 'Art', 'Notunterkunft');
       await waitFor(() =>
-        expect(client.getQueryState(einsatzKeys.modulOverrides(1))?.status).toBe('success'),
+        expect(client.getQueryState(einsatzKeys.modulFreigaben(1))?.status).toBe('success'),
       );
       if (erwartet) {
         expect(

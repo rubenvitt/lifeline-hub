@@ -1,4 +1,4 @@
-use super::{EtbEintragAnzeige, FolgeauftragVerweis};
+use super::{BerichtigungVerweis, EtbEintragAnzeige, FolgeauftragVerweis};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
@@ -138,7 +138,9 @@ pub fn ist_derselbe_eintrag(
 }
 
 /// Legt einen client-erfassten ETB-Eintrag idempotent an (F03/LFH-261), optional mit
-/// Anhängen (LFH-117).
+/// Anhängen (LFH-117). Der zweite Schreibpfad in `etb_eintrag_anhang` ist
+/// [`anhaenge_kopieren_tx`] (Heraufstufen aus dem Chat, LFH-700): Er bindet Kopien, nie die
+/// Chat-Datei.
 ///
 /// Trägt der Aufrufer eine `client_id` (client-generierte UUID der Offline-/Direkterfassung),
 /// dedupliziert diese Funktion gegen `UNIQUE(einsatz_id, client_id)`: ein erneutes Senden
@@ -269,6 +271,49 @@ async fn pruefe_anhaenge(
     Ok(())
 }
 
+/// Kopiert Dateien des Einsatzes und bindet die Kopien an den Eintrag `eintrag_id` (LFH-700,
+/// Heraufstufen aus dem Chat). Neben [`anlegen_idempotent`] der zweite Schreibpfad in
+/// `etb_eintrag_anhang`. Die Quelle bleibt unberührt: Sie wird NICHT gebunden. Eine Chat-Datei
+/// am ETB sperrte sonst den Chat-Download, und „eine Datei, ein Lebenszyklus" (LFH-117) gälte
+/// nicht mehr. Die Kopie ist eine neue, freie Datei, braucht also kein [`pruefe_anhaenge`].
+///
+/// `INSERT … SELECT` kopiert den BLOB innerhalb von SQLite, die Bytes laufen nicht durch Rust.
+/// Übernommen werden auch `hochgeladen_von` und `erstellt_at` (design.md D4): die Herkunft
+/// der Datei. Wer heraufgestuft hat, steht am Eintrag.
+///
+/// Ob die Datei kopiert werden DARF (sie hängt an der heraufgestuften Nachricht), prüft der
+/// Aufrufer. Als Netz kopiert der Baustein selbst nie eine modulgebundene Datei
+/// (`anhang::repo::MODUL_LINKER`) und nie eine aus einem anderen Einsatz. Beides ergibt 400, und
+/// der Aufrufer rollt die Transaktion zurück.
+pub(crate) async fn anhaenge_kopieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    eintrag_id: i64,
+    anhang_ids: &[i64],
+) -> Result<(), AppError> {
+    for &quelle in anhang_ids {
+        let kopie: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO anhang \
+               (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von, erstellt_at) \
+             SELECT a.einsatz_id, a.dateiname, a.mime, a.groesse, a.sha256, a.daten, \
+                    a.hochgeladen_von, a.erstellt_at \
+             FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? AND NOT {} RETURNING id",
+            crate::anhang::repo::modul_gebunden_sql("a")
+        )))
+        .bind(quelle)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let kopie = kopie.ok_or_else(|| AppError::Validation(ANHANG_UNBEKANNT.into()))?;
+        sqlx::query("INSERT INTO etb_eintrag_anhang (eintrag_id, anhang_id) VALUES (?, ?)")
+            .bind(eintrag_id)
+            .bind(kopie)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(())
+}
+
 /// id des Eintrags mit dieser `(einsatz_id, client_id)`, falls vorhanden.
 async fn bestehende_client_id(
     conn: &mut SqliteConnection,
@@ -318,6 +363,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     .ok_or(AppError::NotFound)?;
     folgeauftraege_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
+    berichtigungen_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
 }
 
@@ -356,6 +402,50 @@ async fn folgeauftraege_nachladen(
             eintraege[i]
                 .folgeauftraege
                 .push(FolgeauftragVerweis { id, lfd_nr });
+        }
+    }
+    Ok(())
+}
+
+/// Füllt `berichtigt_durch` (LFH-689) für alle übergebenen Einträge mit EINER Abfrage nach —
+/// kein N+1 je Zeile, Index `idx_etb_berichtigt` (Migration 0131). Ohne Listenfilter und ohne
+/// Cursor: eine Berichtigung zählt auch, wenn sie auf einer anderen Seite stünde oder nicht zum
+/// Filter passt. Die Einsatzgrenze hält die Abfrage SELBST (Join auf den Grundeintrag): die
+/// Schreiber prüfen sie heute (`routes::etb` mit `gehoert_zu_einsatz`, Betreuung und Ablösung
+/// über einsatzgefilterte Zeilen), die Datenbank nicht — ein künftiger Schreiber ohne Prüfung
+/// legte sonst id und Nummer eines fremden Einsatzes offen. `typ = 'berichtigung'` wie der
+/// Client-Index (`etb/zeitachseModell.ts`, `berichtigungsindex`).
+async fn berichtigungen_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    if eintraege.is_empty() {
+        return Ok(());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT b.berichtigt_eintrag_id, b.id, b.lfd_nr FROM etb_eintrag b \
+         JOIN etb_eintrag g ON g.id = b.berichtigt_eintrag_id AND g.einsatz_id = b.einsatz_id \
+         WHERE b.typ = 'berichtigung' AND b.berichtigt_eintrag_id IN (",
+    );
+    let mut ids = qb.separated(", ");
+    for e in eintraege.iter() {
+        ids.push_bind(e.id);
+    }
+    qb.push(") ORDER BY b.lfd_nr");
+    let zeilen: Vec<(i64, i64, i64)> = qb.build_query_as().fetch_all(pool).await?;
+    if zeilen.is_empty() {
+        return Ok(());
+    }
+    let index: HashMap<i64, usize> = eintraege
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id, i))
+        .collect();
+    for (grund, id, lfd_nr) in zeilen {
+        if let Some(&i) = index.get(&grund) {
+            eintraege[i]
+                .berichtigt_durch
+                .push(BerichtigungVerweis { id, lfd_nr });
         }
     }
     Ok(())
@@ -617,6 +707,7 @@ pub async fn abfrage(
         .await?;
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
     anhaenge_nachladen(pool, &mut eintraege).await?;
+    berichtigungen_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 
@@ -1048,6 +1139,56 @@ mod tests {
         assert_eq!(b.typ, EtbTyp::Berichtigung);
         assert_eq!(b.berichtigt_eintrag_id, Some(original.id));
         assert_eq!(b.lfd_nr, 2);
+    }
+
+    /// Eine Berichtigung von `grund` im Einsatz `einsatz` — ohne die Einsatzprüfung der Route.
+    async fn berichtige(pool: &SqlitePool, einsatz: i64, benutzer: i64, grund: i64) -> i64 {
+        let mut korrektur = daten("Korrektur");
+        korrektur.typ = "berichtigung";
+        korrektur.berichtigt_eintrag_id = Some(grund);
+        anlegen(pool, einsatz, benutzer, korrektur)
+            .await
+            .unwrap()
+            .id
+    }
+
+    #[tokio::test]
+    async fn laden_traegt_die_berichtigungen_des_eintrags() {
+        // LFH-689: auch das Einzelladen (Erfassen-Antwort, Replay über `client_id`) trägt die
+        // Rückrichtung, nicht nur die Liste.
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let grund = anlegen(&pool, einsatz, benutzer, daten("Pegel 4,20 m"))
+            .await
+            .unwrap();
+        let b = berichtige(&pool, einsatz, benutzer, grund.id).await;
+
+        let geladen = laden(&pool, grund.id).await.unwrap();
+        assert_eq!(
+            geladen.berichtigt_durch,
+            vec![BerichtigungVerweis { id: b, lfd_nr: 2 }]
+        );
+    }
+
+    #[tokio::test]
+    async fn berichtigung_aus_fremdem_einsatz_erscheint_nicht() {
+        // LFH-689: die Routen prüfen die Einsatzgrenze beim Schreiben, die Datenbank nicht. Ein
+        // künftiger Schreiber ohne Prüfung darf über `berichtigt_durch` keine id/Nummer eines
+        // fremden Einsatzes offenlegen — die Nachlade-Abfrage hält die Grenze selbst.
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let fremd = zweiter_einsatz(&pool).await;
+        let grund = anlegen(&pool, einsatz, benutzer, daten("Pegel 4,20 m"))
+            .await
+            .unwrap();
+        berichtige(&pool, fremd, benutzer, grund.id).await;
+
+        assert_eq!(
+            laden(&pool, grund.id).await.unwrap().berichtigt_durch,
+            vec![]
+        );
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        assert_eq!(liste[0].berichtigt_durch, vec![]);
     }
 
     #[tokio::test]
@@ -1750,5 +1891,90 @@ mod tests {
         let seite = abfrage(&pool, einsatz, &f).await.unwrap();
         assert_eq!(seite.len(), 1);
         assert_eq!(ids(&seite[0]), vec![a, b]);
+    }
+
+    // --- LFH-700: Kopie beim Heraufstufen aus dem Chat ---
+
+    #[tokio::test]
+    async fn anhaenge_kopieren_bindet_eine_kopie_und_laesst_die_quelle_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let quelle = freier_anhang(&pool, einsatz, benutzer, "foto.jpg").await;
+        let (e, _) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[], daten("Foto"))
+            .await
+            .unwrap();
+
+        let mut conn = pool.acquire().await.unwrap();
+        anhaenge_kopieren_tx(&mut conn, einsatz, e.id, &[quelle])
+            .await
+            .unwrap();
+        drop(conn);
+
+        let e = laden(&pool, e.id).await.unwrap();
+        assert_eq!(e.anhaenge.len(), 1);
+        let kopie = &e.anhaenge[0];
+        assert_ne!(kopie.id, quelle, "die Kopie ist eine neue Datei");
+        assert_eq!(kopie.dateiname, "foto.jpg");
+        assert_eq!(kopie.mime, "image/jpeg");
+        assert_eq!(kopie.hochgeladen_von, benutzer);
+        let (daten_kopie, sha_kopie): (Vec<u8>, String) =
+            sqlx::query_as("SELECT daten, sha256 FROM anhang WHERE id = ?")
+                .bind(kopie.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(daten_kopie, b"ABC");
+        assert_eq!(sha_kopie, "deadbeef");
+        // Die Quelle bleibt eine eigene, ungebundene Datei: nicht ans ETB gehängt.
+        let quelle_am_etb: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?")
+                .bind(quelle)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(quelle_am_etb, 0);
+    }
+
+    #[tokio::test]
+    async fn anhaenge_kopieren_kopiert_keine_datei_eines_fremden_einsatzes() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let nachbar = zweiter_einsatz(&pool).await;
+        let fremd = freier_anhang(&pool, nachbar, benutzer, "fremd.jpg").await;
+        let (e, _) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[], daten("x"))
+            .await
+            .unwrap();
+
+        let mut conn = pool.acquire().await.unwrap();
+        let err = anhaenge_kopieren_tx(&mut conn, einsatz, e.id, &[fremd])
+            .await
+            .unwrap_err();
+        drop(conn);
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+        assert_eq!(verknuepfte_anhaenge(&pool).await, 0);
+    }
+
+    #[tokio::test]
+    async fn anhaenge_kopieren_kopiert_keine_modulgebundene_datei() {
+        // Schutz in der Tiefe (Review LFH-700 B4): die Prüfung „hängt an der Nachricht" steht
+        // beim Aufrufer. Vergisst ein künftiger Aufrufer sie, kopiert der Baustein trotzdem
+        // keine Datei, die einem Modul gehört (hier: einem anderen ETB-Eintrag).
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let gebunden = freier_anhang(&pool, einsatz, benutzer, "gebunden.jpg").await;
+        anlegen_idempotent(&pool, einsatz, benutzer, None, &[gebunden], daten("alt"))
+            .await
+            .unwrap();
+        let (neu, _) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[], daten("neu"))
+            .await
+            .unwrap();
+
+        let mut conn = pool.acquire().await.unwrap();
+        let err = anhaenge_kopieren_tx(&mut conn, einsatz, neu.id, &[gebunden])
+            .await
+            .unwrap_err();
+        drop(conn);
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+        assert_eq!(verknuepfte_anhaenge(&pool).await, 1, "nur die alte Bindung");
     }
 }

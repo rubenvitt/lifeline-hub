@@ -1,11 +1,14 @@
-# Lagebild ohne Netz lesen (LFH-723) — Regeln
+# Lagebild ohne Netz lesen (LFH-723) und schreiben (LFH-705) — Regeln
 
 Gilt für `frontend/src/offline/`, `api/queryKeys.ts`, `api/queryClient.ts` und den
-`AuthProvider`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
+`AuthProvider`, ergänzt `frontend/AGENTS.md`. Der Abschnitt „Schreiben ohne Netz“ gilt
+außerdem für jede Mutation, die eine `erfasse…OfflineFaehig`-Funktion ruft, für
+`api/client.ts` und für `setzeOnline` in `test/utils.tsx`. Pfade relativ zu `frontend/src/`.
 
 **Was ohne Netz lesbar bleibt, steht in der Registry, nicht im Persister:** `LAGEBILD_OFFLINE`
 und `istLagebildOfflineKey` in `api/queryKeys.ts`. Das sind ETB, Meldebild, Betroffene,
-Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Freigaben, Einstellungen, Zähler,
+Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Modulfreigaben `modulFreigaben` — seit
+LFH-669 statt der Overrides —, Einstellungen, Zähler,
 Einsatzliste, Kartenkonfiguration, Organisation, Fahrzeugstatus). Von den Meldungen zählen nur
 die Rückmeldungen. Gespeichert wird in einer eigenen IndexedDB `lifeline-lagebild`
 (`offline/lagebildSpeicher.ts`, genau ein Datensatz je Gerät), nie über Workbox auf URL-Ebene.
@@ -60,3 +63,21 @@ draußen gelassen werden.
 - **Offen:** die übrigen personenbezogenen Daten auf dem Gerät (LFH-767). Herleitung und
   Prüfspur: `openspec/changes/archive/2026-09-30-lfh-723-lagebild-offline-lesen/design.md`, Prüfliste
   `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`.
+
+## Schreiben ohne Netz (LFH-705)
+
+- **Eine Mutation, die eine `erfasse…OfflineFaehig`-Funktion aus `offline/schreiben.ts` ruft,
+  läuft mit `networkMode: 'always'`.** Die Funktion entscheidet selbst, ob sie sendet oder
+  vormerkt. TanStacks Vorgabe `'online'` hielte die Mutation ohne Netz an: Dann erschiene
+  nie „Offline vorgemerkt“, und nach der Rückkehr des Netzes ginge die Erfassung online
+  hinaus. Bis LFH-705 galt das für alle fünf solchen Mutationen.
+- **Seitentests schalten offline über `setzeOnline` (`test/utils.tsx`)**, nicht nur über
+  `navigator.onLine`. Ein Browser führt beim Ereignis `offline` auch TanStacks `onlineManager`
+  nach. Der alte Testaufbau blieb gegen den Fehler grün. Geladen wird dabei online, dann fällt
+  das Netz weg.
+- **Der Erfassungszeitpunkt (`zeitpunkt_at`) einer vorgemerkten Stand- oder
+  Belegungsmeldung gilt nach der Serveruhr** (`serverJetzt()` aus `offline/serveruhr.ts`,
+  Versatz aus dem `Date`-Header jeder Antwort von `apiGet`, `apiSend` und `apiUpload`). Ohne
+  frischen Versatz gilt die Geräteuhr. Die Ereigniszeit von Meldung und ETB-Eintrag kommt
+  weiter aus der Geräteuhr; ob sie umgerechnet wird, ist offen (LFH-895). Herleitung:
+  `openspec/changes/archive/2026-10-01-lfh-705-serveruhr-versatz-offline/design.md`.

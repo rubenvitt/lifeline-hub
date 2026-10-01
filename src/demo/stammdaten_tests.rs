@@ -937,3 +937,52 @@ async fn rundlauf_angelegtes_verschwindet_mitbenutztes_bleibt() {
         ]
     );
 }
+
+/// LFH-733 (Spec `demo-daten`, „Demo-Marke in den Stammdaten-Antworten“): Nach einem Import
+/// melden die Stammdaten-Listen jede angelegte Zeile mit `ist_demo`, jede mitbenutzte ohne — je
+/// Art über die Liste, die auch die Oberfläche liest.
+#[tokio::test]
+async fn listen_melden_angelegtes_als_demo_und_mitbenutztes_nicht() {
+    let pool = crate::db::test_pool().await;
+    let a = aufbau(&pool, 1).await;
+    let fz = fahrzeug_anlegen(&pool, a.org, szenario::FAHRZEUGE[0].funkrufname).await;
+    let ps = personal_anlegen(&pool, a.org, szenario::PERSONAL[0].personalnummer).await;
+    let ma = material_anlegen(&pool, a.org, szenario::MATERIAL[0].bestandsnummer).await;
+
+    let erg = importieren(&pool, a.org, a.kopf)
+        .await
+        .expect("importieren");
+
+    let fahrzeuge = crate::fahrzeug::repo::liste(&pool, a.org, false)
+        .await
+        .unwrap();
+    assert_eq!(fahrzeuge.len(), szenario::FAHRZEUGE.len());
+    for f in &fahrzeuge {
+        assert_eq!(
+            f.anzeige().ist_demo,
+            f.id != fz,
+            "Fahrzeug {}",
+            f.funkrufname
+        );
+    }
+    let personal = crate::personal::repo::liste_anzeige(&pool, a.org, false)
+        .await
+        .unwrap();
+    assert_eq!(personal.len(), szenario::PERSONAL.len());
+    for p in &personal {
+        assert_eq!(p.ist_demo, p.id != ps, "Person {}", p.name);
+    }
+    let material = crate::material::repo::liste(&pool, a.org, false)
+        .await
+        .unwrap();
+    assert_eq!(material.len(), szenario::MATERIAL.len());
+    for m in &material {
+        assert_eq!(
+            m.anzeige().ist_demo,
+            m.id != ma,
+            "Material {}",
+            m.bezeichnung
+        );
+    }
+    assert_eq!(erg.fahrzeug(szenario::FAHRZEUGE[0].schluessel).unwrap(), fz);
+}

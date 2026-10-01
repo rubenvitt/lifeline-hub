@@ -664,13 +664,21 @@ export default function LagekartePage() {
     const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
     if (!auftrag) return;
     if (ladt) return;
-    // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf — sonst endete der Klick in
-    // einem 403. Bis die Rechte feststehen, bleibt der Auftrag stehen.
-    const istStelle = auftrag.typ === 'betreuungsstelle';
-    if (istStelle && !rechteBekannt) return;
+    // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf, eine Person nur mit dem Modul
+    // Personen (LFH-670) — sonst endete der Klick in einem 403. Bis die Rechte feststehen, bleibt
+    // der Auftrag stehen.
+    const modulZugriff =
+      auftrag.typ === 'betreuungsstelle'
+        ? betreuungZugriff
+        : auftrag.typ === 'person'
+          ? personenZugriff
+          : null;
+    if (modulZugriff !== null && !rechteBekannt) return;
     // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
     // Modus startete, und der Parameter blieb in der URL stehen.
-    if (darfSchreiben && (!istStelle || betreuungZugriff === 'frei')) onPlatzierenStart(auftrag);
+    if (darfSchreiben && (modulZugriff === null || modulZugriff === 'frei')) {
+      onPlatzierenStart(auftrag);
+    }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('platzieren');
     setSearchParams(naechste, { replace: true });
@@ -682,6 +690,7 @@ export default function LagekartePage() {
     onPlatzierenStart,
     rechteBekannt,
     betreuungZugriff,
+    personenZugriff,
   ]);
 
   /**

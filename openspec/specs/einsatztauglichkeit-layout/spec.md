@@ -17,14 +17,37 @@ Die folgenden Bedienziele SHALL in jeder Dichtestufe mindestens die Steuerhöhe 
 erreichen (30 / 48 / 72 px). Menüeinträge in einem aufgeklappten Menü MUST mindestens
 `controlHeightSM` erreichen (24 / 48 / 72 px). Ziele ohne Beschriftung (nur Symbol oder ein
 Kürzel) MUST diesen Boden auf **beiden** Achsen erreichen. Kartenknöpfe haben den Boden
-32 / 48 / 72 px.
+32 / 48 / 72 px. Für die Ziele der Modul-Prüflisten (ab „Kommunikation“) gilt in `kompakt` der
+Boden aus A1 Gate 3 (24 px), in `komfortabel` und `handschuh` die Steuerhöhe; unbeschriftete
+Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
 
 - ETB: Zeilen des Slash-Menüs, Auslöser „Aktionen zu Eintrag N“ und die Einträge seines
-  Menüs.
+  Menüs, dazu Textfeld und Knopf „Erfassen“ der Schnellerfassung, der Entwurfstab und sein
+  Schließen-Kreuz.
 - Lagekarte: Einträge der Leistenkarte „Verortet“, die fünf Kartenknöpfe
   (Hineinzoomen, Herauszoomen, Nach Norden ausrichten, Messen, Zeichenwerkzeuge) und die
   Knöpfe der ausgeklappten Zeitachse, einschließlich „Abspielen“.
 - Gefahrenmatrix: alle 58 Zell-Auslöser und die Gebietszeilen.
+- Kommunikation (Meldungen, Erinnerungen, Nachforderungen, Aufträge und Befehle, Chat): die
+  Primäraktion des Seitenkopfs, die Aktionsknöpfe und Auswahlfelder jeder Karte, auf der Seite
+  Aufträge die Tabs „Aufträge“ und „Befehle“ und der Kopf „Befehlsdetails“, der Link einer
+  Befehlskarte, im Chat Eingabefeld und Senden-Knopf.
+- Einsatz-Einstellungen: die Sektionswahl, Auswahl- und Zahlfelder, der Speichern-Knopf und die
+  Modulzeilen (Schalter, Rollenauswahl). Einsatzdaten: die Bearbeiten-Knöpfe und der
+  Akkordeon-Kopf „Technische Angaben“. Profil: „Passwort ändern“ und „2FA einrichten“. Die
+  Verwaltungsseite „Anzeige“: Auswahlfelder und Speichern-Knopf.
+- Verwaltung: die Zeilenknöpfe der Fahrzeug-Katalogseite; Text-, Auswahl- und Zahlfelder und der
+  Speichern-Knopf der Fahrzeug-Detailseite; die Rollenauswahl der Modulzeilen und der
+  Speichern-Knopf der Seite „Einsatz-Vorgaben“.
+- Einsatzabschnitte: die Baumknoten, ihre Aufklapper und die Aktionen der Detailkarte.
+  Bereitstellungsraum: der Raumwechsler und die Knöpfe „zuweisen“ der Leiste „Kräfte ohne BR“.
+- Lagebericht: die Abschnittsköpfe des Akkordeons und die Kopfaktionen der Detailseite, „Neuer
+  Bericht“ und der Link einer Berichtskarte, die Filtersegmente und das Suchfeld der Seite
+  „Lagemeldungen“.
+
+Nicht Teil dieser Zusicherung sind die Brotkrume im Seitenkopf, Kennungs-Links in
+Tabellenzellen, beschriftete Checkboxen und das Löschkreuz eines Auswahlfelds (das Feld selbst
+ist das gleichwertige Ziel).
 
 #### Scenario: Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und die Seite neu geladen wurde
@@ -32,11 +55,16 @@ Kürzel) MUST diesen Boden auf **beiden** Achsen erreichen. Kartenknöpfe haben 
 
 #### Scenario: Die Stufe schlägt tatsächlich durch
 - **WHEN** dieselben Ziele in `kompakt` gemessen werden
-- **THEN** ist ihre Höhe kleiner als in `handschuh`, und keine Matrixzelle ist in `kompakt` 48 px oder breiter
+- **THEN** ist ihre Höhe kleiner als in `handschuh` (ausgenommen das mehrzeilige Textfeld der Schnellerfassung, dessen Höhe der Inhalt bestimmt), und keine Matrixzelle ist in `kompakt` 48 px oder breiter
 
 #### Scenario: Abspielknopf der Zeitachse
 - **WHEN** die Zeitachse der Lagekarte auf dem Handschirm ausgeklappt ist
 - **THEN** ist der Knopf „Abspielen“ in jeder Stufe mindestens so breit wie hoch
+
+#### Scenario: Nur-Lese-Zweig im Handschuh-Betrieb
+- **WHEN** eine Person ohne Schreibrecht (Beobachter bzw. Führungskraft in der Verwaltung) eine der neu genannten Flächen in `handschuh` öffnet
+- **THEN** steht der Rechtehinweis, wo die Seite einen trägt, und die Aktion ist gesperrt oder abwesend
+- **AND** misst jedes verbleibende genannte Ziel mindestens 72 px in der Höhe
 
 ### Requirement: Abstand zwischen klickbaren Kennzahlen
 
@@ -61,6 +89,49 @@ Trefffläche MUST weiterhin die Steuerhöhe der Stufe erreichen (30 / 48 / 72 px
 #### Scenario: Kompakt bleibt unverändert
 - **WHEN** das Band in `kompakt` steht
 - **THEN** füllt die Trefffläche jeder klickbaren Kennzahl ihre Zelle vollständig aus
+
+### Requirement: Klappkopf folgt der Dichtestufe
+
+Jeder Klappkopf eines aufklappbaren Abschnitts („Weitere Angaben“ in Erfassungsmasken und
+jede andere Stelle der App) SHALL in jeder Dichtestufe mindestens die Steuerhöhe der Stufe
+erreichen (30 / 48 / 72 px). Seine Beschriftung MUST senkrecht mittig im Kopf stehen. Ein
+Kopf, der schon höher ist als der Boden, MUST NOT gekürzt werden.
+
+#### Scenario: Handschuh-Betrieb im Ablegen-Dialog
+- **WHEN** die Dichtestufe `handschuh` gewählt ist und der Dialog „Dokument ablegen“ offen ist
+- **THEN** misst der Klappkopf „Bezug (optional)“ mindestens 72 px in der Höhe
+
+#### Scenario: Touch-Betrieb
+- **WHEN** derselbe Dialog in der Stufe `komfortabel` steht
+- **THEN** misst der Klappkopf mindestens 48 px
+
+#### Scenario: Kompakt wird nicht gekürzt
+- **WHEN** derselbe Dialog in der Stufe `kompakt` steht
+- **THEN** misst der Klappkopf mindestens 30 px und ist nicht niedriger als vor dieser Änderung
+
+### Requirement: Abstand zwischen den Knöpfen eines Dialogfußes
+
+In der Fußzeile einer Erfassungsmaske und in jeder Rückfrage (Dialog mit Standardfuß,
+Bestätigungsdialog, Bestätigungsblase) SHALL zwischen zwei benachbarten Knöpfen in der
+Dichtestufe `komfortabel` mindestens 8 px und in `handschuh` mindestens 16 px Abstand liegen.
+Jeder dieser Knöpfe MUST weiterhin mindestens `controlHeightSM` der Stufe erreichen
+(24 / 48 / 72 px).
+
+#### Scenario: Erfassungsfuß im Handschuh-Betrieb
+- **WHEN** die Dichtestufe `handschuh` gewählt ist und der Dialog „Dokument ablegen“ offen ist
+- **THEN** liegen zwischen „Abbrechen“ und „Ablegen“ mindestens 16 px, und beide Knöpfe sind mindestens 72 px hoch
+
+#### Scenario: Bestätigungsblase im Handschuh-Betrieb
+- **WHEN** in `handschuh` die Rückfrage zum Entfernen eines Dokuments offen ist
+- **THEN** liegen zwischen ihrem Abbrechen-Knopf und dem roten Bestätigungsknopf mindestens 16 px
+
+#### Scenario: Touch-Betrieb
+- **WHEN** dieselben Füße in der Stufe `komfortabel` stehen
+- **THEN** beträgt der Abstand zwischen den Knöpfen mindestens 8 px
+
+#### Scenario: Dialog mit Standardfuß
+- **WHEN** ein Dialog mit dem Standardfuß (Abbrechen und Bestätigen) in `handschuh` geöffnet wird
+- **THEN** liegen zwischen beiden Knöpfen mindestens 16 px, und der Abstand zwischen Titel und Inhalt des Dialogs ist derselbe wie vor dieser Änderung
 
 ### Requirement: Kein Fokusziel vollständig verdeckt
 
@@ -139,3 +210,61 @@ verschieben.
 #### Scenario: Fremdänderung einer Zelle
 - **WHEN** eine andere Sitzung eine Zelle auf „akut“ setzt und die Zelle diese Stufe live übernimmt
 - **THEN** bleibt die Lage der Tabelle unverändert, und die Summe der Verschiebungen seit dem Ruhezustand ist höchstens 0,1
+
+### Requirement: Das Sammelbanner einer Werkzeugzeile bleibt auf dem Handschirm bedienbar
+
+Steht das Sammelbanner der Ablösung oder der Verpflegung, MUST es auf dem Handschirm in allen
+drei Dichtestufen ungekürzt zeigen, wie viele Einträge warten (oder dass nur die Reihenfolge
+wartet). Seine Freigabe MUST vollständig im Fenster liegen, und das Dokument MUST nicht breiter
+als das Fenster werden. Die vollständige Mitteilung MUST Hilfstechnik erreichen. Das Banner
+MUST weder die Höhe der Werkzeugzeile noch die Lage der obersten Karte ändern.
+
+#### Scenario: Verpflegung im Handschuh-Betrieb
+- **WHEN** die Verpflegung bei 390 × 844 in `handschuh` offen ist und eine andere Sitzung ein Zeitfenster anlegt
+- **THEN** zeigt das Banner „1 neu“ ungekürzt, der Knopf mit „anzeigen“ im Namen liegt mit seiner rechten Kante innerhalb von 390 px, und das Dokument ist nicht breiter als 390 px
+
+#### Scenario: Ablösung in jeder Dichtestufe
+- **WHEN** die Ablösung bei 390 × 844 nacheinander in `kompakt`, `komfortabel` und `handschuh` offen ist und eine andere Sitzung eine Schicht beginnt
+- **THEN** zeigt das Banner jeweils „1 neu“ ungekürzt, und ein Klick auf den Knopf „anzeigen“ gibt die wartende Schicht frei
+
+#### Scenario: Nur die Reihenfolge wartet
+- **WHEN** auf dem Handschirm keine neue Schicht wartet, aber eine fremde Änderung die Reihenfolge umgestellt hat
+- **THEN** zeigt das Banner „umgeordnet“ ungekürzt statt einer Zahl
+
+#### Scenario: Kein Sprung beim Eintreffen
+- **WHEN** das Banner auf dem Handschirm erscheint
+- **THEN** ändern sich die Höhe der Werkzeugzeile und die Oberkante der obersten Karte um höchstens 0,5 px
+
+#### Scenario: Mitteilung für Hilfstechnik
+- **WHEN** das Banner auf dem Handschirm in der Kurzform steht
+- **THEN** trägt sein Statusbereich die vollständige Mitteilung, etwa „1 neues Zeitfenster, davon 1 mit Unterdeckung“, und der Name des Knopfes enthält „1 neu“ und „anzeigen“
+
+#### Scenario: Breite Schirme unverändert
+- **WHEN** dieselbe Seite bei 1366 × 768 oder 1024 × 768 offen ist
+- **THEN** steht der volle Satz wie bisher in der Werkzeugzeile neben der Segmentleiste, rechts die Aktion „anzeigen“
+
+### Requirement: Kennzahlenband hält seine Höhe
+
+Das Band „Lage in Zahlen“ im Lage-Dashboard und in Führung · Überblick MUST ab einer
+Fensterbreite von 768 px seine Höhe behalten, wenn sich die Länge einer Notiz ändert. Jede
+Notiz des Bands SHALL dort genau drei Textzeilen hoch sein, ob ihr Text kürzer oder länger
+ist. Eine längere Notiz MUST mit einer Auslassung („…“) enden, ihr vollständiger Text MUST
+als Hinweistext am Mauszeiger und im zugänglichen Namen der Kennzahl erreichbar bleiben.
+Eine Notiz, die in drei Zeilen passt, MUST NOT gekürzt werden. Unter 768 px gilt weiter der
+Boden von zwei Zeilen ohne Kürzung.
+
+#### Scenario: Neue Standmeldung bei „Evakuiert“
+- **WHEN** bei 1200, 1440 oder 1920 px Breite die Notiz von „Evakuiert“ „von ≈ 1 850 geplant · 1 ohne Meldung“ lautet und eine neue Standmeldung sie zu „von 1 850 geplant“ verkürzt
+- **THEN** ist das Band danach genauso hoch wie davor, und Gefahrenmatrix, Sichtung und Meldungsstrom bleiben an ihrem Platz
+
+#### Scenario: Pegel-Notiz mit und ohne Prognose
+- **WHEN** die Pegel-Notiz bei derselben Breite einmal ohne und einmal mit „· Prognose … · +1 weitere“ steht
+- **THEN** ist das Band in beiden Fällen gleich hoch
+
+#### Scenario: Keine Aussage geht verloren
+- **WHEN** die Notiz „von ≈ 1 850 geplant · 1 ohne Meldung“ bei 1200, 1440 oder 1920 px steht
+- **THEN** ist sie ganz sichtbar, einschließlich „≈“ und „ohne Meldung“, ohne Auslassung
+
+#### Scenario: Zu lange Notiz
+- **WHEN** eine Notiz länger ist als drei Zeilen ihrer Zelle
+- **THEN** endet die dritte Zeile mit „…“, der Hinweistext der Notiz zeigt den vollständigen Text, und der zugängliche Name der Kennzahl enthält ihn ebenfalls

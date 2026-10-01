@@ -21,6 +21,7 @@ const material = {
   bemerkung: null,
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-27 10:00:00',
+  ist_demo: false,
 };
 
 // Voreinstellung bleibt EIN Posten: die Prüfungen unten greifen „Bearbeiten" per `getByRole`
@@ -273,5 +274,20 @@ describe('MaterialTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
     await keinStehenderFehler('Material ist einem laufenden Einsatz zugeordnet');
     expect(versuch).toBe(2);
+  });
+});
+
+/** LFH-733 (Spec `demo-daten`): die Demo-Zeile trägt „Demo“ neben der Leitspalte, keine andere. */
+describe('MaterialTab — Demo-Marke', () => {
+  it('kennzeichnet nur die Demo-Zeile', async () => {
+    const { container } = render(nichtAdmin, [
+      material,
+      { ...material, id: 2, bezeichnung: 'Demo-Decke', ist_demo: true },
+    ]);
+    await screen.findByText('Wolldecke');
+    const echt = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const demo = container.querySelector('[data-row-key="2"]') as HTMLElement;
+    expect(within(demo).getByText('Demo')).toBeInTheDocument();
+    expect(within(echt).queryByText('Demo')).not.toBeInTheDocument();
   });
 });

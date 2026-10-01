@@ -4,7 +4,7 @@ import { spieleAlarmTon } from '../alarm/alarmTon';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { wetterAbfrage } from '../api/wetter';
 import { darfZaehlerZeigen } from '../einsatz/useModulZaehler';
 import { erkenneNeue, paarSchluessel, unwetterHinweisText, unwetterLage } from './unwetter';
@@ -13,7 +13,7 @@ import { ladeGedaechtnis, speichereGedaechtnis } from './unwetterGedaechtnis';
 interface Args {
   einsatzId: number;
   benutzer: BenutzerAnzeige | null;
-  overrides?: ModulOverrides;
+  freigaben?: ModulFreigaben;
 }
 
 /**
@@ -27,13 +27,10 @@ interface Args {
  * je Person und Einsatz; es wird im selben synchronen Zug gelesen und geschrieben, damit Tabs
  * desselben Browsers nicht doppelt melden.
  */
-export function useUnwetterHinweis({ einsatzId, benutzer, overrides }: Args): void {
-  // Erst nach geladenen Overrides: vorher gälte das Modul als frei, und ein ausgeblendetes
-  // antwortete mit 403.
-  const aktiv =
-    benutzer != null &&
-    overrides !== undefined &&
-    darfZaehlerZeigen('wetter-pegel', benutzer, overrides);
+export function useUnwetterHinweis({ einsatzId, benutzer, freigaben }: Args): void {
+  // Nur bei bekannter Freigabe des Servers (LFH-669): unbekannte Freigaben geben nichts frei, ein
+  // ausgeblendetes oder gesperrtes Modul bekommt keine Anfrage.
+  const aktiv = benutzer != null && darfZaehlerZeigen('wetter-pegel', freigaben);
   // Auch im verdeckten Tab nachfragen: genau dort trägt die Desktop-Meldung den Hinweis.
   const { data } = useQuery({
     ...wetterAbfrage(einsatzId),

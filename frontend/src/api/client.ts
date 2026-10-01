@@ -1,4 +1,5 @@
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
+import { merkeServerzeit } from '../offline/serveruhr';
 
 export type HttpMethode = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -163,8 +164,36 @@ export async function apiGet<T>(pfad: string): Promise<T> {
       credentials: 'same-origin',
       signal: AbortSignal.timeout(15_000),
     });
+    // Jede Antwort des Servers, auch eine Ablehnung, nennt seine Uhr (LFH-705).
+    merkeServerzeit(res);
     if (!res.ok) return fehlerWerfen(res);
     return (await res.json()) as T;
+  } catch (e) {
+    netzFehlerWerfen(e);
+  }
+}
+
+interface DateiOptionen {
+  /** Abbruch nach dieser Zeit. Default 15 s; ein Vollexport braucht mehr. */
+  timeoutMs?: number;
+}
+
+/**
+ * Lädt eine Datei (CSV-Export u. ä., LFH-728) als `Blob`. Fehler wie bei {@link apiGet}: der
+ * Aufrufer zeigt sie an der Seite, statt eine Fehlerantwort als Datei zu speichern.
+ *
+ * `no-store`, anders als `apiGet`: ein Export ist eine Momentaufnahme (der Personen-Export wird
+ * je Abruf auditiert) und hat im HTTP-Cache des Browsers nichts verloren.
+ */
+export async function apiDatei(pfad: string, optionen: DateiOptionen = {}): Promise<Blob> {
+  try {
+    const res = await fetch(pfad, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
+    });
+    if (!res.ok) return fehlerWerfen(res);
+    return await res.blob();
   } catch (e) {
     netzFehlerWerfen(e);
   }
@@ -191,6 +220,7 @@ export async function apiUpload<T>(
       body: formData,
       signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
     });
+    merkeServerzeit(res);
     if (!res.ok) return fehlerWerfen(res);
     return (await res.json()) as T;
   } catch (e) {
@@ -285,6 +315,7 @@ export async function apiSend<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(15_000),
     });
+    merkeServerzeit(res);
     if (!res.ok) return fehlerWerfen(res);
     // Leerer Body: nicht nur 204, sondern auch 200/201 ohne Json (z. B. WebAuthn-Finish). Aufrufer
     // solcher Endpunkte MÜSSEN T = void verwenden, nur dann ist der Cast sicher; `res.json()`
