@@ -396,6 +396,23 @@ describe('einsatzKeys.etbDruck (LFH-22)', () => {
   });
 });
 
+/**
+ * Einsatzbericht: EIN Schnappschuss über alle Quellen (LFH-726, design.md D4). Eigener Prefix,
+ * damit kein Modul-Ereignis den geöffneten Bericht per Präfix ändert.
+ */
+describe('einsatzKeys.einsatzberichtDruck (LFH-726)', () => {
+  it('baut den Key als [prefix, einsatzId] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.einsatzberichtDruck(7)).toEqual(['einsatz-einsatzbericht-druck', 7]);
+  });
+
+  it('ist nicht live: kein Ereignis invalidiert ihn, NICHT_LIVE_KEYS führt ihn', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-einsatzbericht-druck');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-einsatzbericht-druck');
+    }
+  });
+});
+
 describe('istRueckmeldungenKey (LFH-610)', () => {
   it('trifft die Rückmeldungen jedes Einsatzes, aber keine Meldungsliste', () => {
     expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'rueckmeldungen'])).toBe(true);
