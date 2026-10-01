@@ -39,8 +39,8 @@ test('vorgebündelte Pakete kommen ohne Sourcemap und unter 4 MiB', async ({ pag
   const zuGross: string[] = [];
   const mitInlineMap: string[] = [];
   for (const datei of dateien) {
-    // Ohne `?v=`: Vite prüft den Browser-Hash dann nicht, und eine Neu-Optimierung mitten im
-    // Lauf ergäbe kein 504. Ausgeliefert wird dieselbe Antwort wie mit Hash.
+    // Ohne `?v=`: Vite vergleicht dann keinen Browser-Hash, ausgeliefert wird dieselbe Antwort
+    // wie mit Hash. Optimiert Vite mitten in der Schleife neu, kommt 404 oder 504 statt 200.
     const antwort = await request.get(`/node_modules/.vite/deps/${datei}`);
     expect(antwort.status(), datei).toBe(200);
     const inhalt = await antwort.body();
