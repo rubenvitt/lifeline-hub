@@ -91,5 +91,9 @@
       Koordinate tippen → Treffer → Nadel-Band sichtbar; Adresssuche mit abgefangener Route
       (ein Treffer → Direktflug); `?ort=` bei 390 px öffnet die Leiste mit Gruppe „Adresse“;
       Tipp auf Marker unter der Nadel wählt den Marker. Prüfung: Spec grün.
-- [ ] 8.3 `./scripts/check-all.sh` vollständig grün (Bündel laut Skriptkopf). Prüfung: Ausgabe
+- [x] 8.3 `./scripts/check-all.sh` vollständig grün (Bündel laut Skriptkopf). Prüfung: Ausgabe
       ohne rote Schritte; Kästchen, die erst die CI belegt, mit Verweis auf den PR-Lauf abhaken.
+      Stand der Sitzung (01.10.2026): `cargo test` (113 Binaries), Vitest, Format, Lint, Typ-Codegen,
+      Migrationen und OpenSpec-Wächter grün; die betroffenen e2e-Specs (Ortssuche, Lagekarte, Palette)
+      grün. Rot nur Umgebung (Node 22 statt 26, Chromium-Build, `mise` fehlt) — auf `origin/alpha`
+      identisch. Den vollen Lauf belegt die CI des PRs.

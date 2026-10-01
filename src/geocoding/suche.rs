@@ -1,5 +1,5 @@
 //! Vorwärtssuche (Adresse → Koordinate) für die Ortssuche der Lagekarte (LFH-638,
-//! `openspec/changes/lfh-638-lagekarte-ort-suche/design.md`, D6).
+//! `openspec/changes/archive/2026-10-01-lfh-638-lagekarte-ort-suche/design.md`, D6).
 //!
 //! Gleicher Geocoder wie das Reverse-Geocoding (Nominatim-kompatibles `/search`), gleicher Client
 //! und **derselbe** Token-Bucket: das Limit des Dienstes (≤ 1 Anfrage/s) gilt für die Anwendung,
