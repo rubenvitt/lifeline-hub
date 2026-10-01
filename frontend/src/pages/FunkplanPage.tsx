@@ -57,7 +57,10 @@ import './funkplanPrint.css';
  * - **Ort:** Unterroute des Stabs (`funkplanPfad`), Einstieg in der S6-Zeile der Stabseite. Kein
  *   eigenes Modul; Sperre und Sichtbarkeit erbt die Seite vom Stab (D1).
  * - **Daten:** fünf bestehende Listen, jede mit eigener Rechteweiche. Eine gesperrte Liste ist
- *   kein leerer Bestand: ihre Ebene fehlt, und der Grund steht oberhalb der Tabelle (D2).
+ *   kein leerer Bestand: ihre Ebene fehlt, und der Grund steht oberhalb der Tabelle (D2). Eine
+ *   Liste eines fremden Moduls läuft nur bei Freigabe des Servers (LFH-669, Spec
+ *   `modul-freigabe`); ist ihr Modul gesperrt, geht sie ohne Anfrage durch dieselbe Weiche wie
+ *   ein 403. Die Sprechgruppen gehören keinem Modul (`PFAD_KEY`).
  * - **Form:** `form="tabelle"` in jeder Breite (Vergleichsfläche, `NUR_TABELLE`). Kein Suchen,
  *   Sortieren oder Filtern, die Ordnung ist der Baum (D3, D4). Bearbeitet wird am Datensatz, jede
  *   Zeile führt über ihre Kennung dorthin (D7).
@@ -70,16 +73,21 @@ type SpalteKey =
 
 /**
  * Eine Liste als Quelle des Funkplans, identitätsstabil je Daten und Zustand. Ein Fehler MIT
- * Daten ist ein Stand, kein Ausfall (der Datenstand im Kopf zeigt sein Alter).
+ * Daten ist ein Stand, kein Ausfall (der Datenstand im Kopf zeigt sein Alter). Ohne Freigabe ihres
+ * Moduls (`frei: false`) ist sie `gesperrt` wie bei einem 403 und trägt keine Daten, auch keinen
+ * Altstand aus dem Cache (LFH-669).
  */
-function useQuelle<T>(q: {
-  data: T[] | undefined;
-  error: unknown;
-  isError: boolean;
-  isPending: boolean;
-}): Quelle<T> {
-  const zustand: AbrufZustand = q.data != null ? 'daten' : abrufZustand(q);
-  const { data } = q;
+function useQuelle<T>(
+  q: {
+    data: T[] | undefined;
+    error: unknown;
+    isError: boolean;
+    isPending: boolean;
+  },
+  frei = true,
+): Quelle<T> {
+  const zustand: AbrufZustand = !frei ? 'gesperrt' : q.data != null ? 'daten' : abrufZustand(q);
+  const data = frei ? q.data : undefined;
   return useMemo(() => ({ zustand, daten: data ?? [] }), [zustand, data]);
 }
 
@@ -292,21 +300,33 @@ export default function FunkplanPage() {
   // Die Sperre des Stabs gilt auch hier (D1): die Listen des Funkplans hängen an ANDEREN Modulen,
   // kein Endpunkt dieser Seite prüft den Stab. Fail-closed über `useStabFreigabe`.
   const stabFreigabe = useStabFreigabe(einsatzId);
+  // Modulgrenze (LFH-669): eine Liste läuft erst, wenn der Stab frei ist (sonst zeigt die Seite
+  // ohnehin nichts) UND der Server ihr Modul freigibt. Keys nach `PFAD_KEY`.
+  const frei = (key: string) =>
+    stabFreigabe.zustand === 'frei' && istKeyFreigegeben(key, stabFreigabe.freigaben);
+  const abschnitteFrei = frei('einsatzabschnitte');
+  const einheitenFrei = frei('einheiten');
+  const fahrzeugeFrei = frei('fahrzeuge');
+  const personalFrei = frei('personal');
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
+    enabled: abschnitteFrei,
   });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: einheitenFrei,
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: fahrzeugeFrei,
   });
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
+    enabled: personalFrei,
   });
   // Nicht live (`NICHT_LIVE_KEYS`): eine fremd angelegte lokale Sprechgruppe erscheint erst beim
   // nächsten Abruf. Die Zuordnungen selbst kommen live über Abschnitte und Einheiten (D10).
@@ -315,10 +335,10 @@ export default function FunkplanPage() {
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
 
-  const abschnitte = useQuelle(abschnitteQuery);
-  const einheiten = useQuelle(einheitenQuery);
-  const fahrzeuge = useQuelle(fahrzeugeQuery);
-  const personal = useQuelle(personalQuery);
+  const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
+  const einheiten = useQuelle(einheitenQuery, einheitenFrei);
+  const fahrzeuge = useQuelle(fahrzeugeQuery, fahrzeugeFrei);
+  const personal = useQuelle(personalQuery, personalFrei);
   const sprechgruppen = useQuelle(sprechgruppenQuery);
   const quellen: FunkplanQuellen = useMemo(
     () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen }),
@@ -376,11 +396,12 @@ export default function FunkplanPage() {
     istKeyFreigegeben('lageberichte', stabFreigabe.freigaben);
   const quellenLaden = Object.values(quellen).some((q) => q.zustand === 'laden');
 
+  // Ein gesperrtes Modul zählt nicht zum Stand: sein Cache-Zeitstempel gehört zu nichts Gezeigtem.
   const datenstand = gemeinsamerDatenstand(
-    abschnitteQuery.dataUpdatedAt,
-    einheitenQuery.dataUpdatedAt,
-    fahrzeugeQuery.dataUpdatedAt,
-    personalQuery.dataUpdatedAt,
+    abschnitteFrei ? abschnitteQuery.dataUpdatedAt : undefined,
+    einheitenFrei ? einheitenQuery.dataUpdatedAt : undefined,
+    fahrzeugeFrei ? fahrzeugeQuery.dataUpdatedAt : undefined,
+    personalFrei ? personalQuery.dataUpdatedAt : undefined,
     sprechgruppenQuery.dataUpdatedAt,
   );
 

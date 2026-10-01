@@ -3,6 +3,7 @@ import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router';
 import { http, HttpResponse } from 'msw';
+import { QueryClient } from '@tanstack/react-query';
 import { renderMitProviders } from '../test/utils';
 import { server } from '../test/server';
 import FunkplanPage from './FunkplanPage';
@@ -421,5 +422,84 @@ describe('FunkplanPage — nichts wird als leerer Bestand behauptet', () => {
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text;
     expect(text).toContain('Fahrzeuge: nicht freigegeben');
+  });
+});
+
+/**
+ * Modulgrenze der Quellen (LFH-669, Spec `modul-freigabe`): der Funkplan fragt die Liste eines
+ * Moduls nur bei Freigabe des Servers an. Eine gesperrte Liste geht durch dieselbe Weiche wie ein
+ * 403 („nicht freigegeben“, die Ebene fehlt mit Grund) — kein Ausfall, kein vollständiger Plan.
+ */
+describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
+  const LISTEN = [listeAbschnitte, listeEinheiten, listeEinsatzFahrzeuge, listeEinsatzPersonal];
+  beforeEach(() => {
+    for (const f of LISTEN) vi.mocked(f).mockClear();
+  });
+
+  it('fragt ein gesperrtes Modul nicht an und nennt die Ebene „nicht freigegeben“, nicht als Ausfall', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ einheiten: { zugriff: false } }),
+    );
+    setup();
+    await screen.findByText('Florian ELW 1');
+    // Vorbedingung: die freien Listen liefen.
+    expect(vi.mocked(listeAbschnitte)).toHaveBeenCalled();
+    expect(vi.mocked(listeEinsatzFahrzeuge)).toHaveBeenCalled();
+    expect(vi.mocked(listeEinheiten)).not.toHaveBeenCalled();
+    // Der Plan wirkt nicht vollständig: die fehlende Ebene steht mit Grund da.
+    expect(screen.getByText(/Einheiten: nicht freigegeben/)).toBeInTheDocument();
+    const zeile = lueckenZeile('Einheiten ohne Sprechgruppe');
+    expect(within(zeile).getByText('—')).toBeInTheDocument();
+    expect(within(zeile).queryByText('0')).toBeNull();
+    // Gesperrt ist kein Ausfall.
+    expect(screen.queryByText(/nicht geladen/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('zeigt auch keinen Altstand eines gesperrten Moduls aus dem Cache', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ einheiten: { zugriff: false } }),
+    );
+    const client = new QueryClient();
+    client.setQueryData(['einsatz-einheiten', 1], EINHEITEN);
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/stab/funkplan', client },
+    );
+    await screen.findByText('Florian ELW 1');
+    expect(screen.queryByText('1. Zug')).toBeNull();
+    expect(screen.getByText(/Einheiten: nicht freigegeben/)).toBeInTheDocument();
+  });
+
+  it('fragt keine Liste an, solange die Freigaben laden', async () => {
+    vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise(() => {}));
+    setup();
+    await waitFor(() => expect(vi.mocked(ladeModulFreigaben)).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
+  });
+
+  it('fragt keine Liste an, wenn die Freigaben scheitern, und zeigt den Fehler', async () => {
+    vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
+    setup();
+    expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
+    for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
+  });
+
+  it('fragt keine Liste an, wenn der Stab gesperrt ist', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
+    setup();
+    await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/);
+    for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
+  });
+
+  it('ein freies Modul mit echtem Ausfall bleibt ein Ausfall („nicht geladen“)', async () => {
+    vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(500, 'kaputt'));
+    setup();
+    await screen.findByText('Florian ELW 1');
+    await waitFor(() => expect(screen.getByText(/Einheiten: nicht geladen/)).toBeInTheDocument());
+    expect(screen.queryByText(/Einheiten: nicht freigegeben/)).toBeNull();
   });
 });

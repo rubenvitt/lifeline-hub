@@ -22,6 +22,7 @@ import {
   type KennzahlZustand,
 } from '../../components/instrument';
 import { einsatzKeys } from '../../api/queryKeys';
+import { schlechtesterZustand, type AbrufZustand } from '../../api/abrufZustand';
 import { verfasserText } from '../../etb/verfasser';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
@@ -97,6 +98,14 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * nicht durch `zustandVon` — ein 403 ist für Rollen ohne das Modul der Normalfall. Solange sie lädt
  * oder scheitert, zeigt die Zeile dazu nichts.
  *
+ * Modulgrenze der Quellen (LFH-669, Spec `modul-freigabe`): jede Liste eines fremden Moduls läuft
+ * nur, wenn der Server das Modul freigibt — ohne bekannte Freigaben (Laden, Fehler) gar nicht.
+ * Gesperrt ist weder Ausfall noch leerer Bestand: eine Kennzahl steht als „—" mit „nicht
+ * freigegeben" (wie die Aufträge aus dem Modulzähler), ein Paneel nennt den Grund; Altstand im
+ * Cache bleibt unsichtbar. Scheitern die Freigaben selbst, zeigen die gebundenen Blöcke „Stand
+ * unbekannt". Nur Beiwerk (Rückmeldungen, Aufträge in der Abschnittszeile, Fristen der Marken)
+ * entfällt still, wie die Ablösungsmarken.
+ *
  * Keine erfundenen Daten: Lagezustand, Kürzel, fester Auftrag und Fortschritt kommen aus dem
  * Abschnitt selbst und fehlen, solange sie dort nicht gepflegt sind.
  */
@@ -107,15 +116,36 @@ const ETB_ENTSCHEIDUNGEN = { typ: 'entscheidung' as const, limit: 50 };
 /** Wie viele offene Aufträge das Paneel zeigt; der Rest steht im Modul. */
 const AUFTRAEGE_MAX = 8;
 
-type Zustand = KennzahlZustand;
+/** `gesperrt`: das Modul der Quelle ist für die Person nicht freigegeben (LFH-669). */
+type Zustand = AbrufZustand;
+
+/** Eine Quelle der Seite: ihre Abfrage und ob ihr Modul frei ist (modul-lose Quellen: `true`). */
+interface Quelle {
+  q: UseQueryResult<unknown>;
+  frei: boolean;
+}
+
+/** Stand der Freigaben: solange sie fehlen, ist jede gebundene Quelle unbestimmt. */
+type FreigabenStand = 'da' | 'laden' | 'fehler';
 
 /**
- * Fehler schlägt Laden: eine halb geladene Fläche mit totem Teil darf nicht vollständig aussehen.
+ * Gesperrt vor Fehler vor Laden (`schlechtesterZustand`): eine halb geladene Fläche mit totem Teil
+ * darf nicht vollständig aussehen, und ein gesperrter Teil wird durch Neuladen nicht frei.
  */
-function zustandVon(...queries: UseQueryResult<unknown>[]): Zustand {
-  if (queries.some((q) => q.isError)) return 'fehler';
-  if (queries.some((q) => q.isLoading)) return 'laden';
-  return 'daten';
+function zustandVon(freigaben: FreigabenStand, ...quellen: Quelle[]): Zustand {
+  return schlechtesterZustand(
+    ...quellen.map(({ q, frei }): Zustand => {
+      if (!frei) return freigaben === 'da' ? 'gesperrt' : freigaben;
+      if (q.isError) return 'fehler';
+      if (q.isLoading) return 'laden';
+      return 'daten';
+    }),
+  );
+}
+
+/** Der Zustand, den eine Kennzahl kennt — gesperrt steht als Wert „—" mit Grund da. */
+function kennzahlZustand(z: Zustand): KennzahlZustand {
+  return z === 'gesperrt' ? 'daten' : z;
 }
 
 /** Die Uhr der Seite — tickt alle 30 s, damit „in 60 min" und Fristfarben mitlaufen. */
@@ -166,6 +196,14 @@ function Zustandsfeld({
       </div>
     );
   }
+  if (zustand === 'gesperrt') {
+    // Kein Ausfall (kein `alert`, kein Neuladen) und kein Leerzustand: der Grund steht da.
+    return (
+      <div style={{ ...polster, fontSize: 12, color: rollen.gedaempft }}>
+        Modul nicht freigegeben.
+      </div>
+    );
+  }
   if (zustand === 'fehler') {
     return (
       <div role="alert" style={{ ...polster, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -208,37 +246,67 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
+  // Modulgrenze (LFH-669, Dateikopf): die Freigaben vor den Listen, jede gebundene Liste mit
+  // `enabled` an ihrem Modul (Keys nach `PFAD_KEY` in `src/einsatz/modul.rs`).
+  const freigabenQ = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const freigaben = freigabenQ.data;
+  // Ein gescheiterter Neuabruf lässt die alten Freigaben gültig, wie auf der Lagekarte.
+  const freigabenStand: FreigabenStand =
+    freigaben !== undefined ? 'da' : freigabenQ.isError ? 'fehler' : 'laden';
+  const personenFrei = istKeyFreigegeben('personen', freigaben);
+  const personalFrei = istKeyFreigegeben('personal', freigaben);
+  const fahrzeugeFrei = istKeyFreigegeben('fahrzeuge', freigaben);
+  const materialFrei = istKeyFreigegeben('material', freigaben);
+  const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigaben);
+  const gefahrenFrei = istKeyFreigegeben('gefahrenzonen', freigaben);
+  const auftraegeFrei = istKeyFreigegeben('auftraege', freigaben);
+  const erinnerungenFrei = istKeyFreigegeben('erinnerungen', freigaben);
+  const etbFrei = istKeyFreigegeben('etb', freigaben);
+  const rueckmeldungenFrei = istKeyFreigegeben('meldungen', freigaben);
+
   const personenQ = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
+    enabled: personenFrei,
   });
   const personalQ = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
+    enabled: personalFrei,
   });
   const fahrzeugeQ = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: fahrzeugeFrei,
   });
   const materialQ = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listeEinsatzMaterial(einsatzId),
+    enabled: materialFrei,
   });
   const einheitenQ = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: einheitenFrei,
   });
   const abschnitteQ = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
+    enabled: abschnitteFrei,
   });
   const gefahrenQ = useQuery({
     queryKey: einsatzKeys.gefahrengebiete(einsatzId),
     queryFn: () => ladeGefahrengebiete(einsatzId),
+    enabled: gefahrenFrei,
   });
   const auftraegeQ = useQuery({
     queryKey: einsatzKeys.auftraege(einsatzId),
     queryFn: () => listeAuftraege(einsatzId),
+    enabled: auftraegeFrei,
   });
   // Die Kennzahl „Offene Aufträge" zählt der Server (LFH-550): derselbe Cache wie das Modulpanel.
   // Die Liste darüber speist nur das Paneel und die Fristen.
@@ -249,13 +317,10 @@ export default function UeberblickPage() {
   const erinnerungenQ = useQuery({
     queryKey: einsatzKeys.erinnerungen(einsatzId),
     queryFn: () => listeErinnerungen(einsatzId, false),
+    enabled: erinnerungenFrei,
   });
   // Ablösungsmarken nur, wenn das Modul sichtbar und frei ist — sonst 403 und ein Seitenkanal über
   // ausgeblendete Daten (dieselbe Prüfung wie `darfZaehlerZeigen`).
-  const freigabenQ = useQuery({
-    queryKey: einsatzKeys.modulFreigaben(einsatzId),
-    queryFn: () => ladeModulFreigaben(einsatzId),
-  });
   const abloesungSichtbar = freigabenQ.isSuccess && darfZaehlerZeigen('abloesung', freigabenQ.data);
   // „Erwarteter Höchststand" führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die
   // Pflege (`pegelZielPfad`).
@@ -269,10 +334,12 @@ export default function UeberblickPage() {
   const etbQ = useQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
+    enabled: etbFrei,
   });
   const rueckmeldungenQ = useQuery({
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
     queryFn: () => holeRueckmeldungen(einsatzId),
+    enabled: rueckmeldungenFrei,
   });
   const pegelQ = useQuery(pegelAbfrage(einsatzId));
 
@@ -282,19 +349,21 @@ export default function UeberblickPage() {
    * Hinweis — ein beim Laden aufblitzender Grund wäre falsch.
    */
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
-  const personen = personenQ.data;
-  const personal = personalQ.data;
-  const fahrzeuge = fahrzeugeQ.data;
-  const material = materialQ.data;
-  const einheiten = einheitenQ.data;
-  const abschnitte = abschnitteQ.data;
-  const gefahren = gefahrenQ.data;
-  const auftraege = auftraegeQ.data;
-  const erinnerungen = erinnerungenQ.data;
-  const etb = etbQ.data;
+  // Daten nur aus freien Quellen: der Cache eines gesperrten Moduls kann einen Altstand tragen.
+  const personen = personenFrei ? personenQ.data : undefined;
+  const personal = personalFrei ? personalQ.data : undefined;
+  const fahrzeuge = fahrzeugeFrei ? fahrzeugeQ.data : undefined;
+  const material = materialFrei ? materialQ.data : undefined;
+  const einheiten = einheitenFrei ? einheitenQ.data : undefined;
+  const abschnitte = abschnitteFrei ? abschnitteQ.data : undefined;
+  const gefahren = gefahrenFrei ? gefahrenQ.data : undefined;
+  const auftraege = auftraegeFrei ? auftraegeQ.data : undefined;
+  const erinnerungen = erinnerungenFrei ? erinnerungenQ.data : undefined;
+  const etb = etbFrei ? etbQ.data : undefined;
   // Nur ein erfolgreicher Abruf zählt: react-query behält `data` nach einem Fehler, das wäre eine
   // stille Aussage über veraltete Daten.
-  const rueckmeldungen = rueckmeldungenQ.isError ? undefined : rueckmeldungenQ.data;
+  const rueckmeldungen =
+    !rueckmeldungenFrei || rueckmeldungenQ.isError ? undefined : rueckmeldungenQ.data;
 
   const betroffene = useMemo(() => betroffeneKennzahl(personen ?? [], jetzt), [personen, jetzt]);
   const kraefte = useMemo(
@@ -351,19 +420,48 @@ export default function UeberblickPage() {
     ],
   );
 
-  const zBetroffene = zustandVon(personenQ);
-  const zKraefte = zustandVon(personalQ, fahrzeugeQ, materialQ);
-  const zWarnstufe = zustandVon(gefahrenQ);
-  const zAuftraege = zustandVon(auftraegeQ);
-  const zAbschnitteZahl = zustandVon(abschnitteQ);
-  const zAbschnitte = zustandVon(abschnitteQ, einheitenQ, personalQ, fahrzeugeQ, materialQ);
-  const zEntscheidungen = zustandVon(etbQ);
-  const zMarken = zustandVon(einsatzQ, auftraegeQ, erinnerungenQ);
+  const qEinsatz: Quelle = { q: einsatzQ, frei: true };
+  const qPersonen: Quelle = { q: personenQ, frei: personenFrei };
+  const qPersonal: Quelle = { q: personalQ, frei: personalFrei };
+  const qFahrzeuge: Quelle = { q: fahrzeugeQ, frei: fahrzeugeFrei };
+  const qMaterial: Quelle = { q: materialQ, frei: materialFrei };
+  const qEinheiten: Quelle = { q: einheitenQ, frei: einheitenFrei };
+  const qAbschnitte: Quelle = { q: abschnitteQ, frei: abschnitteFrei };
+  const qGefahren: Quelle = { q: gefahrenQ, frei: gefahrenFrei };
+  const qAuftraege: Quelle = { q: auftraegeQ, frei: auftraegeFrei };
+  const qErinnerungen: Quelle = { q: erinnerungenQ, frei: erinnerungenFrei };
+  const qEtb: Quelle = { q: etbQ, frei: etbFrei };
+  /** Beiwerk entfällt still, wenn sein Modul gesperrt ist; unbekannt bleibt es unbestimmt. */
+  const ohneGesperrte = (...quellen: Quelle[]) =>
+    quellen.filter((x) => x.frei || freigabenStand !== 'da');
+
+  const zBetroffene = zustandVon(freigabenStand, qPersonen);
+  const zKraefte = zustandVon(freigabenStand, qPersonal, qFahrzeuge, qMaterial);
+  const zWarnstufe = zustandVon(freigabenStand, qGefahren);
+  const zAuftraege = zustandVon(freigabenStand, qAuftraege);
+  const zAbschnitteZahl = zustandVon(freigabenStand, qAbschnitte);
+  const zAbschnitte = zustandVon(
+    freigabenStand,
+    qAbschnitte,
+    qEinheiten,
+    qPersonal,
+    qFahrzeuge,
+    qMaterial,
+  );
+  const zEntscheidungen = zustandVon(freigabenStand, qEtb);
+  // Die Marken sammeln Fristen aus mehreren Quellen; eine gesperrte trägt nichts bei (wie die
+  // Ablösungen), die Lagebesprechung bleibt.
+  const zMarken = zustandVon(freigabenStand, qEinsatz, ...ohneGesperrte(qAuftraege, qErinnerungen));
+  /** „Erneut abrufen": gescheiterte Freigaben zuerst, Listen nur freier Module. */
+  const nachladen = (...quellen: Quelle[]) => {
+    if (freigabenStand === 'fehler') void freigabenQ.refetch();
+    for (const { q, frei } of quellen) if (frei) void q.refetch();
+  };
 
   const zeile = zeilenzielStil(rollen, token);
   const uhrzeit = (s: string | null | undefined) => formatUhrzeit(s, konventionen);
   const frist = (s: string | null | undefined) => formatUhrzeitMitTag(s, konventionen);
-  const auftraegeFehlen = auftraegeQ.isError;
+  const auftraegeFehlen = auftraegeFrei && auftraegeQ.isError;
 
   const markenZiel = (m: Marke): string =>
     m.art === 'auftrag'
@@ -448,32 +546,39 @@ export default function UeberblickPage() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
           <Kennzahlenband beschriftung="Lage in Zahlen">
+            {/* Gesperrt: „—" mit Grund und ohne Link, wie die Aufträge aus dem Modulzähler. */}
             <Kennzahl
               titel="Betroffene"
               groesse="gross"
-              zustand={zBetroffene}
-              wert={betroffene.anzahl}
-              einheit="Pers."
-              notiz={`+${betroffene.neu} in 60 min`}
-              ziel={personenPfad(einsatzId)}
+              zustand={kennzahlZustand(zBetroffene)}
+              wert={zBetroffene === 'gesperrt' ? '—' : betroffene.anzahl}
+              einheit={zBetroffene === 'gesperrt' ? undefined : 'Pers.'}
+              notiz={
+                zBetroffene === 'gesperrt' ? NICHT_FREIGEGEBEN : `+${betroffene.neu} in 60 min`
+              }
+              ziel={zBetroffene === 'gesperrt' ? undefined : personenPfad(einsatzId)}
             />
             <Kennzahl
               titel="Kräfte im Einsatz"
               groesse="gross"
-              zustand={zKraefte}
-              wert={kraefte.gesamt}
-              einheit="Ges."
-              notiz={`F/UF/M//Σ ${kraefte.text}`}
+              zustand={kennzahlZustand(zKraefte)}
+              wert={zKraefte === 'gesperrt' ? '—' : kraefte.gesamt}
+              einheit={zKraefte === 'gesperrt' ? undefined : 'Ges.'}
+              notiz={zKraefte === 'gesperrt' ? NICHT_FREIGEGEBEN : `F/UF/M//Σ ${kraefte.text}`}
               ziel={kraefteuebersichtPfad(einsatzId)}
             />
             <Kennzahl
               titel="Warnstufe"
               groesse="gross"
-              zustand={zWarnstufe}
-              ton={warnstufe.ton}
-              wert={warnstufe.wort}
-              notiz={warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)}
-              ziel={gefahrenPfad(einsatzId)}
+              zustand={kennzahlZustand(zWarnstufe)}
+              ton={zWarnstufe === 'gesperrt' ? 'neutral' : warnstufe.ton}
+              wert={zWarnstufe === 'gesperrt' ? '—' : warnstufe.wort}
+              notiz={
+                zWarnstufe === 'gesperrt'
+                  ? [NICHT_FREIGEGEBEN, pegelNotiz].filter(Boolean).join(' · ')
+                  : warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)
+              }
+              ziel={zWarnstufe === 'gesperrt' ? undefined : gefahrenPfad(einsatzId)}
             />
             <Kennzahl
               titel="Offene Aufträge"
@@ -502,14 +607,16 @@ export default function UeberblickPage() {
             <Kennzahl
               titel="Einsatzabschnitte"
               groesse="gross"
-              zustand={zAbschnitteZahl}
-              wert={abschnitte?.length ?? 0}
+              zustand={kennzahlZustand(zAbschnitteZahl)}
+              wert={zAbschnitteZahl === 'gesperrt' ? '—' : (abschnitte?.length ?? 0)}
               notiz={
-                abschnitte && abschnitte.length > 0
-                  ? abschnittNamen(abschnitte)
-                  : 'noch keine angelegt'
+                zAbschnitteZahl === 'gesperrt'
+                  ? NICHT_FREIGEGEBEN
+                  : abschnitte && abschnitte.length > 0
+                    ? abschnittNamen(abschnitte)
+                    : 'noch keine angelegt'
               }
-              ziel={einsatzabschnittePfad(einsatzId)}
+              ziel={zAbschnitteZahl === 'gesperrt' ? undefined : einsatzabschnittePfad(einsatzId)}
             />
           </Kennzahlenband>
 
@@ -539,13 +646,9 @@ export default function UeberblickPage() {
                     ? { text: 'Abschnitt anlegen', ziel: einsatzabschnittePfad(einsatzId) }
                     : undefined
                 }
-                onNeuladen={() => {
-                  void abschnitteQ.refetch();
-                  void einheitenQ.refetch();
-                  void personalQ.refetch();
-                  void fahrzeugeQ.refetch();
-                  void materialQ.refetch();
-                }}
+                onNeuladen={() =>
+                  nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
+                }
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                   {zeilen.map((z) => (
@@ -571,7 +674,7 @@ export default function UeberblickPage() {
                 leer={offene.length === 0}
                 leerText="Keine offenen Aufträge."
                 leerAktion={{ text: 'Zu den Aufträgen', ziel: auftraegePfad(einsatzId) }}
-                onNeuladen={() => void auftraegeQ.refetch()}
+                onNeuladen={() => nachladen(qAuftraege)}
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                   {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
@@ -657,20 +760,23 @@ export default function UeberblickPage() {
                     : undefined
                 }
                 aktion={
-                  <Link
-                    to={etbPfad(einsatzId, { typ: 'entscheidung' })}
-                    aria-label="Entscheidungen im Einsatztagebuch öffnen"
-                    style={{
-                      ...monoStil(11),
-                      color: rollen.bedien,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      minHeight: token.controlHeight,
-                      paddingInline: token.paddingXS,
-                    }}
-                  >
-                    ETB ↗
-                  </Link>
+                  // Kein Sprung ins gesperrte ETB (wie die Kennzahlen ohne Link).
+                  zEntscheidungen === 'gesperrt' ? undefined : (
+                    <Link
+                      to={etbPfad(einsatzId, { typ: 'entscheidung' })}
+                      aria-label="Entscheidungen im Einsatztagebuch öffnen"
+                      style={{
+                        ...monoStil(11),
+                        color: rollen.bedien,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        minHeight: token.controlHeight,
+                        paddingInline: token.paddingXS,
+                      }}
+                    >
+                      ETB ↗
+                    </Link>
+                  )
                 }
               >
                 <Zustandsfeld
@@ -682,7 +788,7 @@ export default function UeberblickPage() {
                       ? { text: 'Eintrag erfassen', ziel: etbPfad(einsatzId, { neu: true }) }
                       : undefined
                   }
-                  onNeuladen={() => void etbQ.refetch()}
+                  onNeuladen={() => nachladen(qEtb)}
                 >
                   <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                     {entscheidungen.eintraege.map((e) => {
@@ -738,11 +844,7 @@ export default function UeberblickPage() {
                   zustand={zMarken}
                   leer={marken.marken.length === 0}
                   leerText="Keine anstehenden Fristen."
-                  onNeuladen={() => {
-                    void einsatzQ.refetch();
-                    void auftraegeQ.refetch();
-                    void erinnerungenQ.refetch();
-                  }}
+                  onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
                 >
                   <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                     {marken.marken.map((m) => (
