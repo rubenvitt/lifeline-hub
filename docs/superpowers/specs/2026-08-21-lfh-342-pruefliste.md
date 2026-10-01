@@ -31,7 +31,7 @@ mitbewertet: `etb/Schnellerfassung.tsx`, `etb/MetaChip.tsx`, `etb/SlashMenu.tsx`
 | #  | Verdikt | Beleg / Zielticket |
 | -- | ------- | ------------------ |
 | 1 · Treffläche | **erfüllt** | Unverändert gegenüber B5e: kein Element im Umfang trägt eine Klein-Angabe, alle erben `controlHeight` (30 / 48 / 72 px). C7 fügt vier Auslöser hinzu, alle ohne `size`-Prop: die vier Schnellwahl-Knöpfe der Wiedervorlage, „Erneut senden" und „Verwerfen" an einer abgelehnten Zeile. Der Kartenzweig baut seine Zeile selbst, seine Aktionen sind aber dieselben antd-`Button` wie im Tabellenzweig — dieselbe Funktion `zeilenAktionen`, damit die Zweige nicht auseinanderlaufen. **Grenze unverändert:** `test/utils.tsx` mountet ein nacktes `ConfigProvider`, Höhenmessungen in Vitest ergäben antd-Vorgaben; die Staffel misst `e2e/datensicht-schmal.spec.ts` am Primitiv |
-| 2 · Handschuh-Modus | **teilweise erfüllt, unverändert** | Die Stufe greift auf der ganzen Seite. Offen bleibt dasselbe wie in B5e: die Ableitung der Stufe aus dem Einsatzkontext hängt an `localStorage['lifeline-hub.dichte']` (B5-Restpunkt → **LFH-724**), und die gerenderte Zeilenhöhe der ETB-Fläche ist nur im Browser messbar → **LFH-373** (gemessen, siehe Nachtrag). C7 verschlechtert nichts und misst es auch nicht neu: die neue e2e-Spec prüft Breiten, nicht Höhen |
+| 2 · Handschuh-Modus | **erfüllt (Nachtrag LFH-724)** | Slash-Menü, Zeilenauslöser und Zeilenmenü messen 72 px (LFH-373, `gate3-trefflaeche.spec.ts`). Schnellerfassung und Entwurfstab misst LFH-724 in `e2e/trefflaeche-pruefflaechen.spec.ts` mit `kompakt`-Gegenprobe; das Schließen-× des Entwurfstabs maß 15 × 24 px und ist behoben. Die Stufen**ableitung** ist festgelegt: Wahl → Zeigerart → `kompakt`, nie aus Person oder Funktion (Spec `bedien-dichte`, LFH-724). Siehe „Nachtrag LFH-724“ |
 | 3 · Rückmeldung vor der Serverantwort | **erfüllt, verbessert** | Bestand unverändert (`isPending` an Abschluss, Nachladen, Auftragsmodal; `ladend` bis an die Chronologie). **Neu:** ein gepufferter Eintrag ist jetzt selbst die Rückmeldung — er steht als Zeile mit dem Etikett „wird gesendet …" in der Chronologie, statt nur in einem Banner darüber. Das ist die Rückmeldung an dem Ort, an dem der Erfasser das Ergebnis erwartet. Optimistische Updates gibt es weiterhin nicht → **B6 (LFH-334)**. **Neu am Befehlsentwurf:** der stille Autosave meldet sich nicht per Toast (eine Meldung alle 30 s wäre eine Alarmquelle nach EEMUA 191), sondern über den Zeitstempel „zuletzt gespeichert HH:MM" neben dem Knopf — der Fehlerfall dagegen meldet sich sehr wohl |
 | 4 · Kritische Aktion hat eine zweite Handlung | **erfüllt** | Das Tagebuch bleibt append-only. **Neu bewertet — „Verwerfen" an einer abgelehnten Zeile ist unumkehrbar** und trägt trotzdem keine Rückfrage: der Eintrag wurde vom Server bereits **abgelehnt und nicht gespeichert**, verworfen wird also eine gescheiterte Sendung, nicht ein Datensatz. Die Umkehrung steht als „Erneut senden" unmittelbar daneben, und beide stehen offen statt in einem Menü — eine Ablehnung verlangt eine Entscheidung. Nach der Trennlinie aus LFH-363 wäre eine zusätzliche Rückfrage hier Reibung ohne Schutzwirkung. **Neu am Befehlsentwurf:** der Verlust-Fall, den N18 beschreibt, ist die kritische Stelle — der Schutz ist der Autosave selbst plus `beforeunload` |
 | 5 · Kontrast in beiden Modi | **erfüllt für C7, ein Bestandsbefund unverändert** | C7 führt **keinen** Farbwert ein. Die Marken der gepufferten Zeilen kommen aus `StatusTag` mit den Rollen `achtung` (ausstehend) und `alarm` (abgelehnt), also aus `theme/statusFarben.ts`; die gestrichelte Zeilenmarkierung nimmt `colorSplit`/`colorBorder` aus dem Token, keinen Hexwert. `theme/gate5.guard.test.ts` ist grün. **Bestandsbefund unverändert:** `.etb-erfassung-sticky` (`index.css:51-66`) hält vier hartkodierte Werte → **LFH-375** |
@@ -50,7 +50,7 @@ mitbewertet: `etb/Schnellerfassung.tsx`, `etb/MetaChip.tsx`, `etb/SlashMenu.tsx`
 
 | Zeile | offen woran | Ziel |
 | --- | --- | --- |
-| 2 | Dichtestufe aus dem Einsatzkontext | **LFH-724** (umgehängt 25.09.2026, vorher LFH-373) |
+| 2 | ~~Dichtestufe aus dem Einsatzkontext~~ — festgelegt und gemessen, siehe „Nachtrag LFH-724“ | **LFH-724** |
 | 2, 12, 13 | ~~gerenderte Zeilenhöhe und Fokusverdeckung am sticky Kopf~~ — gemessen und behoben, siehe „Nachtrag LFH-373“ unten | **LFH-373** |
 | 8 | kein Helligkeitsregler in der Anwendung | **LFH-397**, app-weit |
 | 5 | vier Hexwerte in `.etb-erfassung-sticky` | **LFH-375** — Ticket existiert |
@@ -160,6 +160,24 @@ den damaligen C7-Stand. Aktuelle Entscheidung und Grenzen:
   und eine zweite Umbruchachse im Primitiv wäre eine Änderung an allen elf Konsumenten für
   einen ungeprüften Zwischenbereich → Nachzug, falls das Führungs-Tablet quer die Karten
   braucht.
+
+## Nachtrag LFH-724 (Messung, 01.10.2026)
+
+Zeile 2 stand hier auf „teilweise erfüllt“, weil zwei Dinge fehlten: die Ableitung der
+Dichtestufe aus dem Einsatzkontext und die gerenderte 72-px-Messung an dieser Fläche. Beides
+ist nachgezogen.
+
+- **Ableitung:** Der Einsatzkontext ist das Gerät, nicht die Person. Beim Sitzungsstart gilt
+  die gespeicherte Wahl, ohne Wahl die Zeigerart (grob → `komfortabel`), sonst `kompakt`.
+  `handschuh` entsteht nur durch Wahl, und Rolle, Funktion oder Führungsstelle fließen nie ein
+  (Spec `bedien-dichte`, Träger `frontend/src/theme/dichte.ts`, Browser-Beleg
+  `e2e/dichte-ableitung.spec.ts`).
+- **Messung:** `e2e/trefflaeche-pruefflaechen.spec.ts` misst `kompakt` und `handschuh`, mit der Gegenprobe
+  „kompakt < handschuh“ je Zielsorte und einem Geschwister ohne Schreibrecht.
+  Herleitung und Befundtabelle: `openspec/changes/lfh-724-dichtestufe-aus-dem-geraet/design.md`
+  (D5, D8).
+- **Zeile 2:** erfüllt. Zu den LFH-373-Zielen kommen Knopf „Erfassen“, Textfeld und Entwurfstab der Schnellerfassung. Das Schließen-× des Entwurfstabs maß 15 × 24 px in jeder Stufe und hält jetzt die kleine Steuerhöhe auf beiden Achsen (`entfernenStil`, `EtbEntwurfsTabs.tsx`). Test: „C7 · ETB: Schnellerfassung und Entwurfstab halten 72 px, kompakt bleibt kleiner“. „Werte behalten“ (Checkbox, 36 px) → **LFH-907**.
+- Querschnittlich, auf keiner Fläche dieser Prüfliste eigens: die Brotkrume im Seitenkopf misst 20 px → **LFH-909**.
 
 ## Offene Nachzüge
 

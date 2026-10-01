@@ -38,7 +38,7 @@ D6 behandelt (lokal beheben mit Vitest/e2e-Beleg, sonst Folgeticket).
 
 ## 5. Prüflisten und Projektregel (D7)
 
-- [ ] 5.1 Je Prüfliste (C7, C8, C10, C11, C12, C13) den Abschnitt „Nachtrag LFH-724“ schreiben: Verdikt je Tabelle mit messendem Test (Datei + Titel) und Verweis auf die Spec `bedien-dichte`. Zeile 2 auf das Verdikt nachziehen, veraltete Zeilenangaben auf Testtitel umstellen. Beleg: `grep -rn "Einsatzkontext" docs/superpowers/specs` zeigt für die Stufenableitung keinen Verweis auf LFH-373, und keine Zeile 2 der sechs Dateien steht mehr auf „teilweise erfüllt“ ohne Folgeticket.
+- [x] 5.1 Je Prüfliste (C7, C8, C10, C11, C12, C13) den Abschnitt „Nachtrag LFH-724“ schreiben: Verdikt je Tabelle mit messendem Test (Datei + Titel) und Verweis auf die Spec `bedien-dichte`. Zeile 2 auf das Verdikt nachziehen, veraltete Zeilenangaben auf Testtitel umstellen. Beleg: `grep -rn "Einsatzkontext" docs/superpowers/specs` zeigt für die Stufenableitung keinen Verweis auf LFH-373, und keine Zeile 2 der sechs Dateien steht mehr auf „teilweise erfüllt“ ohne Folgeticket.
 - [x] 5.2 `frontend/AGENTS.md`: ein Absatz „Bediendichte (LFH-724)“ mit der Reihenfolge, dem Träger `theme/dichte.ts` und dem Verweis auf die Spec. Die Datei bleibt prettier-sauber (`scripts/check-fmt.sh`).
 
 ## 6. Abschluss
