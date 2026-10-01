@@ -272,7 +272,9 @@ scripts/marke/erzeuge-symbole.sh
   bietet ihn dort deshalb nicht an (LFH-817), sondern „Im Browser anmelden“ (LFH-818, siehe
   unten). Die Einrichtung eines Passkeys geschieht im Browser. Windows und der Browser bleiben
   unverändert.
-- **Anmeldung im Browser, nicht gemessen:** mit Firefox oder Safari als Standardbrowser und mit
-  signierter App (LFH-722). Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari
-  direkt (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`).
+- **Anmeldung im Browser, nicht gemessen:** mit Firefox oder Safari als Standardbrowser.
+  Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari direkt
+  (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`),
+  mit der signierten und notarisierten App zusätzlich der Standardbrowser des Messrechners
+  (LFH-722, `openspec/changes/lfh-722-macos-signierung-notarisierung/design.md`).
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.

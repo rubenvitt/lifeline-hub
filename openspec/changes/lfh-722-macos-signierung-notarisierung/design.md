@@ -255,3 +255,20 @@ gezogen und gestartet: Ruben bestätigt „funktioniert alles“, also kein „k
 werden“ und kein Umweg über „Datenschutz & Sicherheit“. Den genauen Wortlaut der Rückfrage hat
 niemand festgehalten. Das `.dmg` aus dem CI-Lauf (Task 4.2) ist auf demselben Weg entstanden
 wie dieses.
+
+### Druck, Deeplink, „Im Browser anmelden“ an der signierten App (Task 5.3, 01.10.2026)
+
+App: 1.0.1 aus dem Update-Test (Developer ID, notarisiert). Server: Debug-Binary dieses
+Branches, `--tls` mit mkcert (CA im System-Schlüsselbund), `0.0.0.0:8443`,
+`--tls-hostname elw.local`, Wegwerf-Datenbank; `elw.local` per mDNS auf den Messrechner.
+Bedient hat Ruben.
+
+| Punkt | Ergebnis | Beleg |
+|---|---|---|
+| „Im Browser anmelden“ (`ASWebAuthenticationSession`) | geht, App danach angemeldet | Server-Protokoll: Anmeldung im Browser 09:29:50 UTC, „Anmeldung aus dem Browser eingelöst“ (`/api/auth/app-code/einloesen`) 09:29:52; Bestätigung Ruben |
+| Druck | Druckdialog erscheint | Bestätigung Ruben („der Rest sieht gut aus“) |
+| Deeplink, gleiche Adresse | keine sichtbare Wirkung, so gewollt (`Aktion::Nichts`, nur Fokus) | erster Versuch von Ruben; der Testschritt nannte fälschlich eine Wirkung |
+| Deeplink, andere Adresse (`lifeline://verbinden?server=https://lfh722-test.local:8443`), Kaltstart | Rückfrage „Server wechseln“ mit beiden Adressen; „Verbinden“ speichert die neue Adresse | Ruben sah den Dialog und bestätigte; `verbindung.json` trug danach `https://lfh722-test.local:8443/` (danach von Hand auf `elw.local` zurückgesetzt) |
+
+Den Standardbrowser bei der Messung hat niemand festgehalten. In der Umgebung von LFH-818 war
+es Vivaldi.
