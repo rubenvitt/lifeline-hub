@@ -37,4 +37,4 @@ Test rot macht.
 ## 6. Abschluss
 
 - [ ] 6.1 `./scripts/check-all.sh` grün (lokal, soweit die Umgebung trägt, sonst die CI des PRs). Dazu `mise exec -- pnpm -C frontend exec playwright test e2e/dokumente.spec.ts`. Verifikation: Ausgabe ohne Fehler.
-- [ ] 6.2 Review (`superpowers:requesting-code-review`), Befunde abgearbeitet. Verifikation: keine offenen bestätigten Befunde.
+- [x] 6.2 Review (`superpowers:requesting-code-review`), Befunde abgearbeitet. Verifikation: keine offenen bestätigten Befunde.

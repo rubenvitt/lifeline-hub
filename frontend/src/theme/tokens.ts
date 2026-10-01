@@ -168,7 +168,8 @@ export const farbenHell: Farbrollen = {
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#7d858e` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
- *   `colorTextTertiary`/`colorTextDescription` echten Text und 10-px-Augenbrauen (WCAG 1.4.3).
+ *   `colorTextTertiary`/`colorTextPlaceholder` echten Text und 10-px-Augenbrauen (WCAG 1.4.3);
+ *   `colorTextDescription` liest seit LFH-652 `gedaempft`.
  *   `#7d858e` hält ≥ 4,72 auf allen Flächenstufen.
  * - `steuerRahmen` `#626a73` trägt antds `colorBorder`, nicht `linieStark` (`#2e343a`, 1,49 auf
  *   `flaeche`). `#626a73` hält ≥ 3,21 auf allen Flächenstufen (WCAG 1.4.11).
