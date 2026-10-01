@@ -214,3 +214,27 @@ describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
     expect(antdKomponenten(farbenDunkel, 'kompakt').Radio).toBeUndefined();
   });
 });
+
+/**
+ * Die Feldmeldung eines Formulars (`.ant-form-item-explain-error`) schreibt ihren TEXT in antds
+ * `colorError` = `alarm`, am Tag 5,67 : 1 auf `grund` und damit unter dem Tagesboden 7 : 1.
+ * Roter TEXT nimmt `alarmText` (LFH-618). Der Komponententoken trifft nur das Formular;
+ * `colorError` global umzustellen färbte auch Gefahrknöpfe und Ränder, und dort ist die
+ * Füllfarbe richtig.
+ */
+describe('Feldmeldung: Text in alarmText (LFH-667)', () => {
+  it.each([
+    ['Tag', farbenHell],
+    ['Nacht', farbenDunkel],
+  ])('%s: das Formular liest colorError = alarmText', (_modus, farben) => {
+    expect(antdKomponenten(farben, 'kompakt').Form).toEqual({ colorError: farben.alarmText });
+  });
+
+  it.each([
+    ['Tag', farbenHell],
+    ['Nacht', farbenDunkel],
+  ])('%s: das globale colorError bleibt die Füllfarbe alarm', (_modus, farben) => {
+    expect(antdToken(farben)?.colorError).toBe(farben.alarm);
+    expect(antdKomponenten(farben, 'kompakt').Button).not.toHaveProperty('colorError');
+  });
+});

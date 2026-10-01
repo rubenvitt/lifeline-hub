@@ -604,6 +604,12 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * Tooltip, Avatar, Badge, Layout-Kopf u. v. m., und `#08090b` wäre dort nachts dunkel auf
  * dunkel.
  *
+ * Die Feldmeldung (`.ant-form-item-explain-error`) ist roter TEXT und nimmt `alarmText` (LFH-667,
+ * Tagmodus-Regel aus LFH-618): mit antds `colorError` = `alarm` lag sie am Tag bei 5,67 : 1 auf
+ * `grund`. Der Token am `Form` färbt dort nur Feldmeldung, Pflichtsternchen und Rückmeldesymbol;
+ * die Felder selbst ziehen ihren Fehlerrand aus dem eigenen Komponententoken. `colorError`
+ * global umzustellen träfe auch Gefahrknöpfe und Ränder, und dort ist die Füllfarbe richtig.
+ *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
  */
@@ -616,6 +622,7 @@ export function antdKomponenten(
       primaryColor: farben.aufBedien,
       dangerColor: farben.aufBedien,
     },
+    Form: { colorError: farben.alarmText },
     Switch: switchMasse(dichten[dichte]),
   };
 }
