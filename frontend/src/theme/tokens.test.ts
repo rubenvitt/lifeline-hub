@@ -8,7 +8,13 @@ import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
 import { navDrawerBreite } from './tokens';
-import { antdAlgorithmus, antdKlappkopf, antdKomponenten, switchMasse } from './tokens';
+import {
+  antdAlgorithmus,
+  antdKlappkopf,
+  antdKomponenten,
+  kopfzeilenMasse,
+  switchMasse,
+} from './tokens';
 import { farbenDunkel } from './tokens';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -180,6 +186,44 @@ describe('Switch-Maße (LFH-380)', () => {
     expect(antdKomponenten(farbenHell, 'kompakt').Switch).toMatchObject({ trackHeight: 24 });
     expect(antdKomponenten(farbenHell, 'komfortabel').Switch).toMatchObject({ trackHeight: 48 });
     expect(antdKomponenten(farbenHell, 'handschuh').Switch).toMatchObject({ trackHeight: 72 });
+  });
+});
+
+/**
+ * Tab (LFH-724): antd rechnet ihn aus der SCHRIFT, `2 × paddingSM + (fontSize + 8)` — gemessen
+ * 35,5 / 45 / 55 px, also unter der Staffel in `komfortabel` und `handschuh`. Den Collapse-Kopf
+ * trägt `antdKlappkopf` (LFH-653). Die Böden stehen als LITERALE da; die gerenderte Höhe misst
+ * `e2e/trefflaeche-pruefflaechen.spec.ts`.
+ */
+describe('Tab-Kopfzeile (LFH-724)', () => {
+  const STUFEN: Dichte[] = ['kompakt', 'komfortabel', 'handschuh'];
+  const BODEN: Record<Dichte, number> = { kompakt: 30, komfortabel: 48, handschuh: 72 };
+  /** antds Zeilenhöhe der Grundschrift: `fontSize + 8` (`getLineHeight`). */
+  const zeile = (d: Dichte) => dichten[d].schriftgroesse + 8;
+
+  it('hebt die Kopfzeile je Stufe mindestens auf die Steuerhöhe 30 / 48 / 72', () => {
+    for (const d of STUFEN) {
+      const { polsterVertikal } = kopfzeilenMasse(dichten[d]);
+      expect(2 * polsterVertikal + zeile(d), d).toBeGreaterThanOrEqual(BODEN[d]);
+    }
+  });
+
+  it('lässt kompakt bei antds Vorgabe paddingSM — nur, wo die Zeile zu niedrig wäre, wächst sie', () => {
+    expect(kopfzeilenMasse(dichten.kompakt).polsterVertikal).toBe(dichten.kompakt.abstand.sm);
+    // Und kein Aufblähen über den Boden hinaus: in handschuh genau 72.
+    expect(2 * kopfzeilenMasse(dichten.handschuh).polsterVertikal + zeile('handschuh')).toBe(72);
+  });
+
+  it('antdKomponenten trägt das Polster der GEWÄHLTEN Stufe am Tab, den Collapse-Kopf nicht', () => {
+    const pv = kopfzeilenMasse(dichten.handschuh).polsterVertikal;
+    expect(antdKomponenten(farbenHell, 'handschuh').Tabs).toMatchObject({
+      horizontalItemPadding: `${pv}px 0`,
+    });
+    expect(antdKomponenten(farbenHell, 'kompakt').Tabs).toMatchObject({
+      horizontalItemPadding: `${dichten.kompakt.abstand.sm}px 0`,
+    });
+    // Eine Regel, ein Träger: der Collapse-Kopf hängt am Kontext (`antdKlappkopf`).
+    expect(antdKomponenten(farbenHell, 'handschuh').Collapse).toBeUndefined();
   });
 });
 

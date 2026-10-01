@@ -35,7 +35,8 @@ import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
-import { Sammelbanner, Segmentleiste, useRollen } from '../components/instrument';
+import { Sammelbanner, sammelbannerKurz, Segmentleiste, useRollen } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -111,7 +112,10 @@ type Dialog =
  * Mengen an bestehenden Karten fließen direkt ein.
  *
  * Das Banner nimmt keine eigene Zeile: es steht in der immer gerenderten Werkzeugzeile, deren Höhe
- * es nicht ändert.
+ * es nicht ändert. Auf dem Handschirm (unter `md`) trägt die Zeile Satz und Knopf nicht (LFH-694:
+ * 0 px Text, im Handschuh-Betrieb 59 px Überlauf). Dort heißt das erste Segment „aktuell (n)“, und
+ * das Banner steht als Kurzform „1 neu" in einem Knopf; der volle Satz bleibt für Hilfstechnik im
+ * Status. Gemessen in `e2e/gate1-ueberlauf.spec.ts`.
  *
  * Die Uhr tickt alle 30 s (`useUhr`): Einstufung und Trennung „vergangen" laufen ohne Abruf mit.
  * Nichts blinkt.
@@ -128,6 +132,7 @@ export default function VerpflegungPage() {
   const { token } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useUhr();
+  const { istSchmal } = useViewport();
 
   const [ansicht, setAnsicht] = useState<Ansicht>('laufend');
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -351,7 +356,7 @@ export default function VerpflegungPage() {
           optionen={[
             {
               wert: 'laufend',
-              label: `laufend & anstehend (${alle.length - vergangen.length})`,
+              label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'} (${alle.length - vergangen.length})`,
             },
             { wert: 'vergangen', label: `vergangen (${vergangen.length})` },
           ]}
@@ -360,6 +365,7 @@ export default function VerpflegungPage() {
         {(zurueckgehalten.length > 0 || umgeordnet) && (
           <Sammelbanner
             aktion={{ label: 'anzeigen', onKlick: gibFrei }}
+            kurz={istSchmal ? sammelbannerKurz(zurueckgehalten.length, umgeordnet) : undefined}
             style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
           >
             <span

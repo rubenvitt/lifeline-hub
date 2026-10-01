@@ -109,3 +109,32 @@ describe.each([
     expect(farben.bedienHover).not.toBe(aufgeloest().colorPrimaryBorder);
   });
 });
+
+/**
+ * Text auf jeder Flächenstufe (LFH-702/LFH-877, Spec `textkontrast-rollen`): `bedienText` (Link)
+ * und `gedaempft` (Beschreibung, Tabellenkopf, „—") halten den Textboden auch auf der
+ * Hervorhebungsfläche `flaeche3` (Hover- und Aktivzeile). Gemessen im Browser in
+ * `e2e/dokumente.spec.ts` und `e2e/betroffene-kontrast.spec.ts`.
+ */
+describe.each([
+  ['Tag', farbenHell, 7],
+  ['Nacht', farbenDunkel, 5],
+] as const)('Textrollen auf jeder Flächenstufe — %s (LFH-702/LFH-877)', (_modus, farben, boden) => {
+  const flaechen = [
+    'grund',
+    'flaeche',
+    'flaeche2',
+    'kopf',
+    'paneel',
+    'flaeche3',
+    'bedienFlaeche',
+  ] as const;
+  it.each(['bedienText', 'gedaempft'] as const)('%s hält den Textboden', (rolle) => {
+    for (const flaeche of flaechen) {
+      expect(
+        kontrast(farben[rolle], farben[flaeche]),
+        `${rolle} auf ${flaeche}`,
+      ).toBeGreaterThanOrEqual(boden);
+    }
+  });
+});

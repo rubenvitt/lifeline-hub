@@ -37,7 +37,7 @@ hatten.
 | #  | Verdikt | Beleg / Zielticket |
 | -- | ------- | ------------------ |
 | 1 · Treffläche | **erfüllt** | Jedes verbliebene `size="small"` im Umfang sitzt auf `Card`/`Descriptions`/`Space`/`Liste` — nach CLAUDE.md ausdrücklich **kein** Verstoß (nicht-interaktiv; auf `Liste` ist `size` ein Abstandsmaß). Interaktive Elemente tragen keine Größen-Prop und erben `controlHeight` (30 / 48 / 72 px). C8 fügt Knöpfe hinzu (Rückgängig im Toast, Segmented-Leiste, Collapse-Auslöser) — alle ohne `size`. **Das ist der Ticket-Punkt M68, und er war bereits abgetragen**: die Umstellung kam mit LFH-362 (Dichte-Token) und LFH-364 (das „quittieren" steht seit dort in eigener Zeile als vollwertiger Knopf mit Empfänger im zugänglichen Namen, nicht mehr als 12-px-Link im Tag). C8 hat dafür keine Zeile Code gebraucht — belegt durch den Scan oben, nicht behauptet |
-| 2 · Handschuh-Modus | **teilweise erfüllt** | Die Dichtestufe greift auf allen fünf Seiten (`ConfigProvider`). C8 verbessert die Lage an zwei Stellen konkret: das Auftrags-Modal trägt statt 14 nur noch 4 Felder, und jede Routine-Statusaktion kostet einen Klick statt zweier — beides senkt die Zahl der Ziele, die auf 72 px getroffen werden müssen. Offen bleibt wie überall die Ableitung der Stufe aus dem Einsatzkontext (`localStorage`-gebunden) → **LFH-724**; gerenderte Zeilenhöhen misst C8 nicht neu |
+| 2 · Handschuh-Modus | **erfüllt nach Fix (Nachtrag LFH-724)** | An allen fünf Seiten gemessen (`e2e/trefflaeche-pruefflaechen.spec.ts`, C8, mit `kompakt`-Gegenprobe und Beobachter-Geschwister). Die Tabs „Aufträge“/„Befehle“ maßen 55 px und sind über `kopfzeilenMasse` behoben, der Kopf „Befehlsdetails“ hält die Staffel über `antdKlappkopf` (LFH-653); alle übrigen Ziele hielten 72 px schon. Die Stufen**ableitung** ist festgelegt: Wahl → Zeigerart → `kompakt`, nie aus Person oder Funktion (Spec `bedien-dichte`, LFH-724). Siehe „Nachtrag LFH-724“ |
 | 3 · Rückmeldung vor der Serverantwort | **erfüllt, verbessert** | Bestand unverändert (`isPending` an allen Mutationen, optimistischer Cache beim Quittieren eines Auftragsempfängers). **Neu:** die Erfassungshülle zeigt den Serienzähler („Erfasst: n") und hält den Knopf im Ladezustand; der Rückgängig-Toast erscheint erst **nach** der Serverantwort, also nie für etwas, das nicht angekommen ist. Optimistische Updates für die Statusschritte gibt es weiterhin nicht → **B6 (LFH-334)** |
 | 4 · Kritische Aktion hat eine zweite Handlung | **erfüllt — und zwar durch Umkehrbarkeit statt durch Reibung** | Das ist der Kern von C8. Die Regel aus LFH-378 lautet „erst die Umkehrbarkeit, dann die Rückfrage" — C8 hat sie zum ersten Mal in die andere Richtung angewandt: statt Rückfragen zu entfernen und zu hoffen, wurden **erst die Rückwege gebaut** (`POST …/vollzug` mit `status: 'offen'`, `POST …/erinnerungen/{eid}/oeffnen`, `uebergang_erlaubt` um eine Stufe rückwärts), dann die Rückfragen. Wo kein Rückweg existiert, bleibt die Rückfrage — siehe die zwei benannten Abweichungen unten. Der Rückgängig-Toast ist **handlungsfähig** und deshalb keine Alarmquelle (Zeile 10) |
 | 5 · Kontrast in beiden Modi | **erfüllt** | C8 führt **keinen** Farbwert ein. Der Neu-Akzent nimmt `token.colorWarning`, der Alarm weiterhin `token.colorError`; das Etikett läuft über antds `warning`-Preset. Kein Hexwert, kein `var(--lfh-*)` in TSX. `theme/gate5.guard.test.ts` grün |
@@ -56,7 +56,7 @@ hatten.
 
 | Zeile | offen woran | Ziel |
 | --- | --- | --- |
-| 2 | Dichtestufe aus dem Einsatzkontext, gerenderte Zeilenhöhen | **LFH-724** — umgehängt 25.09.2026 (vorher LFH-373) |
+| 2 | ~~Dichtestufe aus dem Einsatzkontext, gerenderte Zeilenhöhen~~ — festgelegt, gemessen und behoben, siehe „Nachtrag LFH-724“ | **LFH-724** |
 | 8 | kein Helligkeitsregler in der Anwendung | **LFH-397**, app-weit |
 
 ---
@@ -104,6 +104,24 @@ die Kopfzeile umgebaut, die M73 anfasst — der Autosave-Beleg („zuletzt gespe
 getestet.
 
 ---
+
+## Nachtrag LFH-724 (Messung, 01.10.2026)
+
+Zeile 2 stand hier auf „teilweise erfüllt“, weil zwei Dinge fehlten: die Ableitung der
+Dichtestufe aus dem Einsatzkontext und die gerenderte 72-px-Messung an dieser Fläche. Beides
+ist nachgezogen.
+
+- **Ableitung:** Der Einsatzkontext ist das Gerät, nicht die Person. Beim Sitzungsstart gilt
+  die gespeicherte Wahl, ohne Wahl die Zeigerart (grob → `komfortabel`), sonst `kompakt`.
+  `handschuh` entsteht nur durch Wahl, und Rolle, Funktion oder Führungsstelle fließen nie ein
+  (Spec `bedien-dichte`, Träger `frontend/src/theme/dichte.ts`, Browser-Beleg
+  `e2e/dichte-ableitung.spec.ts`).
+- **Messung:** `e2e/trefflaeche-pruefflaechen.spec.ts` misst `kompakt` und `handschuh`, mit der Gegenprobe
+  „kompakt < handschuh“ je Zielsorte und einem Geschwister ohne Schreibrecht.
+  Herleitung und Befundtabelle: `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`
+  (D5, D8).
+- **Zeile 2:** erfüllt nach Fix. Kopfaktion, Kartenaktionen und -auswahl, Tabs, Befehlskarte und Chat halten 72 px. Die Tabs und der Kopf „Befehlsdetails“ maßen 55 px (antd rechnet beide aus der Schrift). Die Tabs folgen jetzt `kopfzeilenMasse` in `theme/tokens.ts`, der Collapse-Kopf `antdKlappkopf` (LFH-653, parallel auf `alpha` entstanden). Tests: „C8 · Kommunikation: Kopfaktionen, Kartenaktionen, Tabs und Chat halten 72 px, kompakt bleibt kleiner“ und „C8 · Kommunikation (Beobachter): …“.
+- Querschnittlich, auf keiner Fläche dieser Prüfliste eigens: die Brotkrume im Seitenkopf misst 20 px → **LFH-909**.
 
 ## Nachzüge
 

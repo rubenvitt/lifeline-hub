@@ -499,6 +499,11 @@ pub async fn bezug_loesen(
     laden(pool, nachricht_id).await
 }
 
+/// 400-Wortlaut, wenn die Auswahl beim Heraufstufen eine Datei nennt, die nicht an der
+/// Nachricht hängt (LFH-700). Fremde und unbekannte IDs klingen gleich, damit sich keine IDs
+/// abtasten lassen.
+pub const ANHANG_NICHT_AN_NACHRICHT: &str = "Anhang gehört nicht zur Nachricht";
+
 /// Stuft eine Chat-Nachricht zu einem ETB-Eintrag herauf — transaktional nach dem
 /// Muster von `lagebericht::freigeben`: legt den ETB-Eintrag an und setzt den
 /// Rückverweis `chat_nachricht.etb_eintrag_id` im selben Commit. Der ETB-Eintrag
@@ -507,6 +512,12 @@ pub async fn bezug_loesen(
 ///
 /// `etb_typ`, `inhalt` und `ereigniszeit` sind bereits vom Handler validiert/normalisiert.
 /// Liefert die neue ETB-`id`.
+///
+/// `anhang_ids` (LFH-700, sortiert und dedupliziert vom Handler): Anhänge DIESER Nachricht,
+/// die als Kopie an den Eintrag gehen (`etb::repo::anhaenge_kopieren_tx`). Die Chat-Datei
+/// selbst bleibt am Chat. Eine ID, die nicht an der Nachricht hängt, ergibt 400, und nichts
+/// wird geschrieben. Die 409-Guards (heraufgestuft, gelöscht) gehen vor.
+#[allow(clippy::too_many_arguments)]
 pub async fn heraufstufen_zu_etb(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -515,6 +526,7 @@ pub async fn heraufstufen_zu_etb(
     etb_typ: &str,
     inhalt: &str,
     ereigniszeit: &str,
+    anhang_ids: &[i64],
 ) -> Result<i64, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let etb_id = crate::write_retry!(pool, |conn| {
@@ -535,6 +547,22 @@ pub async fn heraufstufen_zu_etb(
                 "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
             ));
         }
+        // Die Auswahl vor dem Eintrag prüfen: ein Fehler kostet dann keinen Insert. Dass danach
+        // weder Kopie noch laufende Nummer bleibt, leistet der Rollback von `write_retry!`.
+        for &aid in anhang_ids {
+            let an_der_nachricht: Option<i64> = sqlx::query_scalar(
+                "SELECT 1 FROM chat_nachricht_anhang l JOIN anhang a ON a.id = l.anhang_id \
+                 WHERE l.nachricht_id = ? AND l.anhang_id = ? AND a.einsatz_id = ?",
+            )
+            .bind(nachricht_id)
+            .bind(aid)
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+            if an_der_nachricht.is_none() {
+                return Err(AppError::Validation(ANHANG_NICHT_AN_NACHRICHT.into()));
+            }
+        }
 
         let etb_id = crate::etb::repo::anlegen_tx(
             &mut *conn,
@@ -554,6 +582,7 @@ pub async fn heraufstufen_zu_etb(
             },
         )
         .await?;
+        crate::etb::repo::anhaenge_kopieren_tx(&mut *conn, einsatz_id, etb_id, anhang_ids).await?;
 
         sqlx::query("UPDATE chat_nachricht SET etb_eintrag_id = ? WHERE id = ?")
             .bind(etb_id)
@@ -1030,6 +1059,7 @@ mod tests {
             "meldung",
             "Deich instabil",
             &m.erstellt_at,
+            &[],
         )
         .await
         .unwrap();
@@ -1069,6 +1099,7 @@ mod tests {
             "meldung",
             "x",
             &m.erstellt_at,
+            &[],
         )
         .await
         .unwrap();
@@ -1081,9 +1112,173 @@ mod tests {
             "meldung",
             "x",
             &m.erstellt_at,
+            &[],
         )
         .await;
         assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
+    }
+
+    // --- LFH-700: Anhänge beim Heraufstufen kopieren ---
+
+    /// Datei im Einsatz, direkt eingefügt (Bytes „ABC").
+    async fn datei(pool: &SqlitePool, einsatz: i64, von: i64, name: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, ?, 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(name)
+        .bind(b"ABC".as_slice())
+        .bind(von)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn zaehle(pool: &SqlitePool, sql: &str) -> i64 {
+        sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_string()))
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_kopiert_den_gewaehlten_anhang_und_laesst_die_quelle_am_chat() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let foto = datei(&pool, einsatz, benutzer, "deich.jpg").await;
+        let andere = datei(&pool, einsatz, benutzer, "privat.jpg").await;
+        let m = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "Deich", &[foto, andere])
+            .await
+            .unwrap();
+
+        let etb_id = heraufstufen_zu_etb(
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            "meldung",
+            "Deich",
+            &m.erstellt_at,
+            &[foto],
+        )
+        .await
+        .unwrap();
+
+        let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
+        assert_eq!(etb.anhaenge.len(), 1, "nur die gewählte Datei");
+        assert_eq!(etb.anhaenge[0].dateiname, "deich.jpg");
+        assert_ne!(etb.anhaenge[0].id, foto, "Kopie, nicht die Chat-Datei");
+        let nachher = laden(&pool, m.id).await.unwrap();
+        let am_chat: Vec<i64> = nachher.anhaenge.iter().map(|a| a.id).collect();
+        assert_eq!(am_chat, vec![foto, andere], "der Chat behält beide Dateien");
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_ohne_auswahl_uebernimmt_keinen_anhang() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let foto = datei(&pool, einsatz, benutzer, "deich.jpg").await;
+        let m = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "Deich", &[foto])
+            .await
+            .unwrap();
+
+        let etb_id = heraufstufen_zu_etb(
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            "meldung",
+            "Deich",
+            &m.erstellt_at,
+            &[],
+        )
+        .await
+        .unwrap();
+
+        let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
+        assert!(etb.anhaenge.is_empty());
+        assert_eq!(zaehle(&pool, "SELECT COUNT(*) FROM anhang").await, 1);
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_mit_datei_einer_anderen_nachricht_rollt_alles_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let eigen = datei(&pool, einsatz, benutzer, "eigen.jpg").await;
+        let fremd = datei(&pool, einsatz, benutzer, "fremd.jpg").await;
+        let m = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "Deich", &[eigen])
+            .await
+            .unwrap();
+        anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "andere", &[fremd])
+            .await
+            .unwrap();
+        let etb_vorher = zaehle(&pool, "SELECT COUNT(*) FROM etb_eintrag").await;
+
+        // Die eigene Datei steht VORN: der Test belegt die Atomarität. Was vor dem Fehler schon
+        // geschrieben war, rollt mit zurück.
+        let err = heraufstufen_zu_etb(
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            "meldung",
+            "Deich",
+            &m.erstellt_at,
+            &[eigen, fremd],
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+        assert_eq!(
+            zaehle(&pool, "SELECT COUNT(*) FROM etb_eintrag").await,
+            etb_vorher,
+            "kein Eintrag, keine verbrauchte laufende Nummer"
+        );
+        assert_eq!(
+            zaehle(&pool, "SELECT COUNT(*) FROM anhang").await,
+            2,
+            "keine Kopie"
+        );
+        assert_eq!(laden(&pool, m.id).await.unwrap().etb_eintrag_id, None);
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_einer_geloeschten_nachricht_bleibt_konflikt_vor_der_auswahl() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "x",
+            },
+        )
+        .await
+        .unwrap();
+        loeschen(&pool, m.id).await.unwrap();
+
+        // Unbekannte Datei UND gelöschte Nachricht: der Lebenszyklus (409) geht vor.
+        let err = heraufstufen_zu_etb(
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            "meldung",
+            "x",
+            &m.erstellt_at,
+            &[9999],
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
     }
 
     /// Baut minimale, valide Auftragsdaten (ein Funktions-Empfänger, keine DB-Lookups nötig).

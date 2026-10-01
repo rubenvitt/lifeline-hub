@@ -43,9 +43,11 @@ import {
   Paneel,
   PaneelZeile,
   Sammelbanner,
+  sammelbannerKurz,
   Segmentleiste,
   useRollen,
 } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 
@@ -75,6 +77,9 @@ type Rhythmusziel =
  * Das Banner nimmt keine eigene Zeile: es steht in der immer gerenderten Segmentzeile, deren Höhe
  * es nicht ändert — sonst schöbe es die Karten weg, die es schützen soll. Kein `sticky`-Overlay: es
  * verdeckte die oberste, also dringlichste Karte. Die Höhe misst `e2e/abloesung-zufluss.spec.ts`.
+ * Auf dem Handschirm (unter `md`) bleibt neben der Segmentleiste kein Platz für Satz und Knopf
+ * (LFH-694: im Handschuh-Betrieb 0 px Text); dort steht die Kurzform „1 neu" als ein Knopf, der
+ * volle Satz bleibt für Hilfstechnik im Status. Gemessen in `e2e/gate1-ueberlauf.spec.ts`.
  *
  * Die Uhr tickt alle 30 s (`useUhr`): Einstufung und „in x min" laufen ohne Abruf mit. Nichts
  * blinkt; der Hinweis bei Fälligkeit kommt einmalig über die AlarmZentrale.
@@ -87,6 +92,7 @@ export default function AbloesungPage() {
   const qc = useQueryClient();
   const { token } = useRollen();
   const jetzt = useUhr();
+  const { istSchmal } = useViewport();
 
   const [ansicht, setAnsicht] = useState<'laufend' | 'abgeloest'>('laufend');
   const [beginnenOffen, setBeginnenOffen] = useState(false);
@@ -345,6 +351,7 @@ export default function AbloesungPage() {
         {ansicht === 'laufend' && (zurueckgehalten.length > 0 || umgeordnet) && (
           <Sammelbanner
             aktion={{ label: 'anzeigen', onKlick: gibFrei }}
+            kurz={istSchmal ? sammelbannerKurz(zurueckgehalten.length, umgeordnet) : undefined}
             style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
           >
             <span

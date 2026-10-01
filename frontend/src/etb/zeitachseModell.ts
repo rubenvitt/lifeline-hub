@@ -84,6 +84,11 @@ interface Berichtigungsindex {
  * und gilt auch, wenn der Grundeintrag noch nicht geladen ist — dann fehlt nur seine Nummer
  * (`lfd_nr: null`), und der Aufrufer darf sie nicht erfinden. Die Gegenrichtung kennt nur,
  * was geladen ist.
+ *
+ * Der Server liefert die Gegenrichtung inzwischen vollständig am Eintrag (`berichtigt_durch`,
+ * LFH-689; die Palette-Vorschau liest sie dort). Zeitachse, Druck und Bilanz bilden sie bewusst
+ * weiter hier: umgestellt zeigte die gefilterte Zeitachse auch Berichtigungen außerhalb der
+ * Liste — eine eigene Entscheidung, kein Beifang.
  */
 export function berichtigungsindex(eintraege: readonly EtbEintragAnzeige[]): Berichtigungsindex {
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));

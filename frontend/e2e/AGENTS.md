@@ -16,3 +16,8 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
 - e2e ist selbsttragend, braucht aber das Debug-Binary; Schritt 7 baut bei Bedarf den Prod-Bundle
   (`prod_bundle_bereitstellen`; Service Worker für `e2e/lagekarte-offline-precache.spec.ts`,
   ausgeliefert vom e2e-Backend über `src/static_files.rs`).
+- **Kontrast misst eingeschwungen** (LFH-702): jede Messung in `e2e/kontrast-kern.ts` (`pruefe`,
+  `kontrast`, `randKontrast`) wartet zuerst die endlichen Animationen an Element und Vorfahren ab;
+  ein Übergang braucht keine eigene Wartezeit, ein Wert unter dem Boden ist in jedem Lauf rot.
+  Einen Zustand, den erst JavaScript setzt (antds Zeilen-Hover: `td.ant-table-cell-row-hover`),
+  sichert der Test vor der Messung als Vorbedingung zu.

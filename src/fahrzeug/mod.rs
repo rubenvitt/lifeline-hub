@@ -49,6 +49,9 @@ pub struct Fahrzeug {
     pub bemerkung: Option<String>,
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Demo-Herkunft (LFH-733): wahr, solange `demo_herkunft` die Zeile markiert. Live gelesen
+    /// über `SPALTEN`, kein gespeichertes Flag.
+    pub ist_demo: bool,
 }
 
 impl Fahrzeug {
@@ -81,6 +84,7 @@ impl Fahrzeug {
             bemerkung: self.bemerkung.clone(),
             dienststatus: self.dienststatus.clone(),
             angelegt_at: self.angelegt_at.clone(),
+            ist_demo: self.ist_demo,
         }
     }
 }
@@ -103,6 +107,8 @@ pub struct FahrzeugAnzeige {
     #[schema(value_type = crate::katalog::Dienststatus)]
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`.
+    pub ist_demo: bool,
 }
 
 /// Abgeleitete AutoComplete-Vorschläge für die Stamm-Felder (DISTINCT, org-weit).
@@ -168,6 +174,9 @@ pub struct EinsatzFahrzeugAnzeige {
     pub soll_besatzung: Option<Staerke>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,
+    /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+    /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+    pub ist_demo: bool,
 }
 
 #[cfg(test)]
@@ -193,6 +202,7 @@ mod tests {
             bemerkung: None,
             dienststatus: DIENSTSTATUS_IN_DIENST.into(),
             angelegt_at: "2026-05-26 10:00:00".into(),
+            ist_demo: false,
         }
     }
 

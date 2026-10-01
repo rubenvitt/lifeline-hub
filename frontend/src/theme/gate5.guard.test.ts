@@ -67,7 +67,7 @@ const dateien = lieseQuellen(SRC);
  * `pages/lagekarte/` als modusunabhängige KARTENFARBEN nutzt; der Scan meldete dort Fehlalarme.
  */
 const ROLLENWERT =
-  /#(b02318|7a5200|1c6640|154e84|185895|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12|7d1810|e88a87)/i;
+  /#(b02318|7a5200|1c6640|154e84|185895|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12|7d1810|e88a87|144779)/i;
 
 /** Jeder Hex-Farbwert (#rgb, #rgba, #rrggbb, #rrggbbaa) — die zweite Prüfung für CSS. */
 const ROHER_HEXWERT = /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b/i;

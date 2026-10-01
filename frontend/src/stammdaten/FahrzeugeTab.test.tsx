@@ -26,6 +26,7 @@ const fahrzeug = {
   bemerkung: null,
   dienststatus: 'in_dienst',
   angelegt_at: '2026-05-26 10:00:00',
+  ist_demo: false,
 };
 
 // Voreinstellung bleibt EIN Fahrzeug: die Prüfungen unten greifen „Bearbeiten" per
@@ -267,5 +268,20 @@ describe('FahrzeugeTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
     await keinStehenderFehler('Fahrzeug ist einem laufenden Einsatz zugeordnet');
     expect(versuch).toBe(2);
+  });
+});
+
+/** LFH-733 (Spec `demo-daten`): die Demo-Zeile trägt „Demo“ neben der Leitspalte, keine andere. */
+describe('FahrzeugeTab — Demo-Marke', () => {
+  it('kennzeichnet nur die Demo-Zeile', async () => {
+    const { container } = render(nichtAdmin, [
+      fahrzeug,
+      { ...fahrzeug, id: 2, funkrufname: 'Musterstadt 11-1', ist_demo: true },
+    ]);
+    await screen.findByText('Florian 1');
+    const echt = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const demo = container.querySelector('[data-row-key="2"]') as HTMLElement;
+    expect(within(demo).getByText('Demo')).toBeInTheDocument();
+    expect(within(echt).queryByText('Demo')).not.toBeInTheDocument();
   });
 });

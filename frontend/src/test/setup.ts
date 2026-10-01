@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
+import { onlineManager } from '@tanstack/react-query';
 import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
 import { lagebildLoeschenPlatte } from '../offline/lagebildSpeicher';
@@ -110,6 +111,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
+  // Ein offline geschalteter Test (`setzeOnline`) leckt sonst: beide Hälften zurück, damit
+  // nicht TanStack online und `navigator.onLine` offline meldet.
+  Reflect.deleteProperty(navigator, 'onLine');
+  onlineManager.setOnline(true);
   localStorage.clear(); // Persistenz (z. B. gemerkte Basemap/UHS) nicht zwischen Tests lecken lassen
   setzeViewportZurueck(); // Breite/Zeigerart/Zuhörer zurück auf den Ausgangszustand
   // Vorgehaltenes Lagebild (LFH-723): jeder `AuthProvider` legt bei bestätigter Sitzung einen

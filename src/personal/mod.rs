@@ -57,6 +57,9 @@ pub struct Personal {
     pub bemerkung: Option<String>,
     pub dienststatus: String,
     pub angelegt_at: String,
+    /// Demo-Herkunft (LFH-733): wahr, solange `demo_herkunft` die Zeile markiert. Live gelesen
+    /// über `SPALTEN`, kein gespeichertes Flag.
+    pub ist_demo: bool,
 }
 
 /// Aufgelöste Qualifikation einer Person (id + label), inkl. deaktivierter
@@ -83,6 +86,8 @@ pub struct PersonalAnzeige {
     pub dienststatus: String,
     pub angelegt_at: String,
     pub qualifikationen: Vec<QualifikationRef>,
+    /// Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`.
+    pub ist_demo: bool,
 }
 
 /// Abgeleitete AutoComplete-Vorschläge für die Trägerorganisation (DISTINCT, org-weit).
@@ -143,6 +148,9 @@ pub struct EinsatzPersonalAnzeige {
     pub bemerkung: Option<String>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,
+    /// Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+    /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+    pub ist_demo: bool,
 }
 
 /// Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).

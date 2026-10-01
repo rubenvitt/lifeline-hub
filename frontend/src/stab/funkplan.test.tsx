@@ -55,6 +55,7 @@ function fahrzeug(id: number, p: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug
     funkrufname: `Florian ${id}`,
     disponiert_at: '2026-09-30T10:00:00',
     ist_adhoc: false,
+    ist_demo: false,
     ...p,
   };
 }
@@ -66,6 +67,7 @@ function person(id: number, p: Partial<EinsatzPersonal> = {}): EinsatzPersonal {
     name: `Person ${id}`,
     disponiert_at: '2026-09-30T10:00:00',
     ist_adhoc: false,
+    ist_demo: false,
     ...p,
   };
 }

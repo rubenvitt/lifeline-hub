@@ -61,6 +61,10 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   modulgebundene (400). Upload `POST …/etb/anhaenge` (Dokument-Allowlist, eine Datei je Anfrage),
   Download `GET …/etb/{eintrag_id}/anhaenge/{aid}`; Binden über `anhang_ids` in derselben
   Transaktion (`anlegen_idempotent`, `write_retry!`). **Append-only**, nur die Schwärzung löscht.
+- **Heraufstufen aus dem Chat kopiert** (LFH-700): `anhang_ids` der Nachricht (explizit, leer =
+  keine, ≤ 10, fremd → 400) gehen als neue `anhang`-Zeile an den Eintrag
+  (`etb::repo::anhaenge_kopieren_tx`); die Chat-Datei wird nie ans ETB gebunden. Herleitung:
+  `openspec/changes/archive/2026-10-01-lfh-700-heraufstufen-anhaenge/design.md`.
 - Offline geht nur der Upload nicht. Während des Sendens ist die ganze Erfassung gesperrt;
   **Entwurfs-id = `client_id`**. **Replay nur bei DEMSELBEN Eintrag** (Typ, getrimmter Inhalt,
   Anhangsmenge; Route UND Transaktion), sonst 409; danach neue id (`entwurfNeuAusweisen`).
@@ -88,6 +92,10 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   (`src/demo/schema_tests.rs`).
 - Einsatz-IDs werden nie wiederverwendet (`einsatz::repo::anlegen_tx`). Die Szenariouhr setzt
   `received_at = ereigniszeit` nur am Demo-Einsatz; nie eine FTS-Spalte per UPDATE ändern.
+- **„Ist Demo“ hat eine Quelle: die Marke** (LFH-733). `ist_demo` in Stamm- und
+  Dispositions-Antworten liest `demo_herkunft` live per `EXISTS` (Stamm-`SPALTEN`,
+  `SELECT_AUFGELOEST`), nie ein gespeichertes Flag. Darstellung: `frontend/AGENTS.md`, „Farbe
+  und Zeichen“. Herleitung: `openspec/changes/archive/2026-10-01-lfh-733-demo-marke-stammdaten/design.md`.
 
 ## Backend — Aufbewahrung (LFH-23)
 

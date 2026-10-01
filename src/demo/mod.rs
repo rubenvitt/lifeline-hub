@@ -31,7 +31,7 @@ mod schema_tests;
 #[cfg(test)]
 mod stammdaten_tests;
 #[cfg(test)]
-mod test_hilfen;
+pub(crate) mod test_hilfen;
 
 /// Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
