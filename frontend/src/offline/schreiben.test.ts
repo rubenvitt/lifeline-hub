@@ -4,6 +4,7 @@ import { ApiError, NetzFehler } from '../api/client';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { queueLeerenFuerTests, schreibaktionenLaden } from './queue';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from './serveruhr';
 import {
   erfasseBelegungOfflineFaehig,
   erfasseMeldungOfflineFaehig,
@@ -25,6 +26,7 @@ function online(wert: boolean): void {
 beforeEach(async () => {
   vi.clearAllMocks();
   online(true);
+  serveruhrVergessenFuerTests();
   await queueLeerenFuerTests();
 });
 
@@ -185,5 +187,72 @@ describe('offlinefähige Stand- und Belegungsmeldungen (LFH-675)', () => {
       erfasseStandOfflineFaehig(11, 7, bezirk, { evakuiert: 1, erhebung: 'gezaehlt' }),
     ).rejects.toMatchObject({ status: 409 });
     expect(await schreibaktionenLaden(11, 7)).toHaveLength(1);
+  });
+});
+
+describe('Erfassungszeitpunkt nach der Serveruhr (LFH-705)', () => {
+  const bezirk = { id: 3, bezeichnung: 'Uferstraße 12–40' };
+  const stelle = { id: 4, bezeichnung: 'Turnhalle Ost' };
+  const SERVER = Date.parse('2026-10-01T10:00:00Z');
+  const VORLAUF = 5 * 60_000;
+
+  // Die Geräteuhr geht 5 min vor, der Server hat vor dem Ausfall einmal geantwortet.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER + VORLAUF);
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(SERVER).toUTCString() } }));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('merkt Stand- und Belegungsmeldung mit der Serverzeit vor, nicht der Geräteuhr', async () => {
+    online(false);
+    await erfasseStandOfflineFaehig(11, 7, bezirk, {
+      evakuiert: 200,
+      erhebung: 'gezaehlt',
+      client_id: 'stand-uhr',
+    });
+    await erfasseBelegungOfflineFaehig(11, 7, stelle, { belegt: 37, client_id: 'beleg-uhr' });
+    const zeilen = await schreibaktionenLaden(11, 7);
+    expect(zeilen.map((z) => z.aktion.daten)).toEqual([
+      expect.objectContaining({ client_id: 'stand-uhr', zeitpunkt_at: '2026-10-01 10:00:00' }),
+      expect.objectContaining({ client_id: 'beleg-uhr', zeitpunkt_at: '2026-10-01 10:00:00' }),
+    ]);
+  });
+
+  it('ohne Messung gilt die Geräteuhr', async () => {
+    serveruhrVergessenFuerTests();
+    online(false);
+    await erfasseBelegungOfflineFaehig(11, 7, stelle, { belegt: 37 });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toHaveProperty('zeitpunkt_at', '2026-10-01 10:05:00');
+  });
+
+  it('lässt einen eingetragenen Zeitpunkt unverändert', async () => {
+    online(false);
+    await erfasseStandOfflineFaehig(11, 7, bezirk, {
+      evakuiert: 200,
+      erhebung: 'gezaehlt',
+      zeitpunkt_at: '2026-10-01 09:30:00',
+    });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toHaveProperty('zeitpunkt_at', '2026-10-01 09:30:00');
+  });
+
+  it('der Online-Versuch trägt weiter keinen Zeitpunkt', async () => {
+    vi.mocked(meldeStand).mockResolvedValue({} as Awaited<ReturnType<typeof meldeStand>>);
+    await erfasseStandOfflineFaehig(11, 7, bezirk, { evakuiert: 480, erhebung: 'gezaehlt' });
+    expect(vi.mocked(meldeStand).mock.calls[0][2]).not.toHaveProperty('zeitpunkt_at');
+  });
+
+  it('nimmt den Zeitpunkt vor dem Online-Versuch, nicht nach seinem Timeout', async () => {
+    vi.mocked(meldeBelegung).mockImplementationOnce(async () => {
+      vi.setSystemTime(Date.now() + 15_000);
+      throw new NetzFehler();
+    });
+    await erfasseBelegungOfflineFaehig(11, 7, stelle, { belegt: 37 });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toHaveProperty('zeitpunkt_at', '2026-10-01 10:00:00');
   });
 });

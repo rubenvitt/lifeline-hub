@@ -195,7 +195,9 @@ pub struct ModulLinker {
 /// Fremdschlüsseln auf `anhang` und wird rot, sobald eine Tabelle fehlt.
 ///
 /// Der Chat (`chat_nachricht_anhang`) steht bewusst NICHT hier: n : m, Tombstone-Regel, und
-/// der generische Upload/Download ist sein Weg. Die Reihenfolge ist die der Meldung in
+/// der generische Upload/Download ist sein Weg. Wer eine Chat-Datei ins ETB heraufstuft,
+/// bindet eine KOPIE (`etb::repo::anhaenge_kopieren_tx`, LFH-700) und braucht deshalb keine
+/// Ausnahme hier. Die Reihenfolge ist die der Meldung in
 /// [`gebunden_meldung`].
 pub const MODUL_LINKER: &[ModulLinker] = &[
     ModulLinker {

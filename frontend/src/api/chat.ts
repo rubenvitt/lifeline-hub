@@ -101,11 +101,14 @@ export function heraufstufenZuEtb(
   nachrichtId: number,
   typ: EtbTyp,
   inhalt: string,
+  anhangIds: number[] = [],
 ): Promise<ChatNachricht> {
+  // LFH-700: gewählte Anhänge gehen als Kopie ins ETB. Ohne Auswahl fehlt das Feld, der Server
+  // übernimmt dann keine Datei.
   return apiSend<ChatNachricht>(
     `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-etb`,
     'POST',
-    { typ, inhalt },
+    anhangIds.length > 0 ? { typ, inhalt, anhang_ids: anhangIds } : { typ, inhalt },
   );
 }
 

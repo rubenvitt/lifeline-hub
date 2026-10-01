@@ -1556,6 +1556,88 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn schwaerzung_loescht_heraufgestufte_kopie_samt_chat_quelle_und_haelt_den_eintrag() {
+        // LFH-700, design.md D1: Die Kopie beim Heraufstufen ist eine gewöhnliche
+        // `anhang`-Zeile des Einsatzes. Die Schwärzung räumt sie wie die Chat-Quelle, der
+        // Eintrag bleibt mit Inhalt (G_ETB).
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let foto = crate::anhang::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            "Familie Müller.jpg",
+            "image/jpeg",
+            b"JPEG",
+        )
+        .await
+        .unwrap();
+        let kanal = crate::chat::repo::kanal_anlegen(&pool, einsatz.id, leit, "K", None)
+            .await
+            .unwrap();
+        let m = crate::chat::repo::anlegen_mit_anhaengen(
+            &pool,
+            einsatz.id,
+            leit,
+            kanal.id,
+            "Lage am Deich",
+            &[foto.id],
+        )
+        .await
+        .unwrap();
+        let etb_id = crate::chat::repo::heraufstufen_zu_etb(
+            &pool,
+            einsatz.id,
+            m.id,
+            leit,
+            "meldung",
+            "Lage am Deich",
+            &m.erstellt_at,
+            &[foto.id],
+        )
+        .await
+        .unwrap();
+        let kopie = crate::etb::repo::laden(&pool, etb_id)
+            .await
+            .unwrap()
+            .anhaenge[0]
+            .id;
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let (dateien, links): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM anhang WHERE id IN (?1, ?2)), \
+                    (SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?2)",
+        )
+        .bind(foto.id)
+        .bind(kopie)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            (dateien, links),
+            (0, 0),
+            "Quelle, Kopie und Verknüpfung weg"
+        );
+        let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+            .bind(etb_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(inhalt, "Lage am Deich", "Eintrag bleibt (G_ETB)");
+    }
+
+    #[tokio::test]
     async fn schwaerzung_nullt_freies_zeichen_label_pii() {
         // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.
         // Müller"). Es MUSS von schwaerze_einsatz genullt werden (wie karte_hintergrundbild.name);

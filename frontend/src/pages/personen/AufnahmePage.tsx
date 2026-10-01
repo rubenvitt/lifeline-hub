@@ -76,6 +76,9 @@ export default function AufnahmePage() {
   });
 
   const anlegenMutation = useMutation({
+    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
+    // (LFH-705, design.md D6).
+    networkMode: 'always',
     mutationFn: async (daten: AufnahmeEingabe) => {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfassePersonOfflineFaehig(benutzer.id, einsatzId, {

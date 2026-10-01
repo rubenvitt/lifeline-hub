@@ -11,6 +11,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
+import { setzeOnline } from '../test/utils';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
@@ -131,7 +132,7 @@ function renderPage(route = '/einsaetze/1/meldungen') {
 describe('MeldungenPage', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    setzeOnline(true);
     await queueLeerenFuerTests();
     listeMeldungen.mockResolvedValue([meldung()]);
   });
@@ -174,9 +175,10 @@ describe('MeldungenPage', () => {
   });
 
   it('merkt den vollständigen Wortlaut offline sichtbar vor', async () => {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     renderPage();
     await screen.findByText('Florian Nord 1');
+    // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+    setzeOnline(false);
     await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Offline-Lage');

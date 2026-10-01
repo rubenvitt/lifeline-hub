@@ -47,6 +47,7 @@ function personal(n: number): EinsatzPersonal[] {
     einsatz_id: 7,
     name: `Kraft ${i + 1}`,
     ist_adhoc: false,
+    ist_demo: false,
     disponiert_at: '2026-09-24 08:00:00',
     // Ohne Position: `verdichte` zählt die Zeile trotzdem einmal (Rückfall Mannschaft).
     staerke_position: i % 3 === 0 ? 'fuehrer' : null,

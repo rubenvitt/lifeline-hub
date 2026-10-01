@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
+import { serverJetzt, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 import {
   ApiError,
@@ -320,6 +321,74 @@ describe('ApiError — wer hat geantwortet? (LFH-723, Review Befund 4)', () => {
     expect((eigen as ApiError).vomAnwendungsserver).toBe(true);
     const gateway = await apiGet('/api/gateway').catch((e: unknown) => e);
     expect((gateway as ApiError).vomAnwendungsserver).toBe(false);
+  });
+});
+
+describe('Versatz zur Serveruhr aus dem Date-Header (LFH-705)', () => {
+  const SERVER = Date.parse('2026-10-01T10:00:00Z');
+  const VORLAUF = 5 * 60_000;
+  const datum = { Date: new Date(SERVER).toUTCString() };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER + VORLAUF);
+    serveruhrVergessenFuerTests();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    serveruhrVergessenFuerTests();
+  });
+
+  function korrigiert(): boolean {
+    return Math.abs(serverJetzt().valueOf() - SERVER) <= 1_000;
+  }
+
+  it('misst an einer 200 aus apiGet', async () => {
+    server.use(http.get('/api/ding', () => HttpResponse.json({}, { headers: datum })));
+    await apiGet('/api/ding');
+    expect(korrigiert()).toBe(true);
+  });
+
+  it('misst auch an einer fachlichen Ablehnung aus apiSend', async () => {
+    server.use(
+      http.post('/api/ding', () =>
+        HttpResponse.json({ error: 'ungültig' }, { status: 422, headers: datum }),
+      ),
+    );
+    await expect(apiSend('/api/ding', 'POST', {})).rejects.toMatchObject({ status: 422 });
+    expect(korrigiert()).toBe(true);
+  });
+
+  it('misst an einer Antwort aus apiUpload', async () => {
+    server.use(http.post('/api/upload', () => HttpResponse.json({}, { headers: datum })));
+    await apiUpload('/api/upload', new FormData());
+    expect(korrigiert()).toBe(true);
+  });
+
+  it('misst auch an einer Ablehnung aus apiGet', async () => {
+    server.use(
+      http.get('/api/ding', () =>
+        HttpResponse.json({ error: 'x' }, { status: 401, headers: datum }),
+      ),
+    );
+    await expect(apiGet('/api/ding')).rejects.toMatchObject({ status: 401 });
+    expect(korrigiert()).toBe(true);
+  });
+
+  it('misst auch an einer Ablehnung aus apiUpload', async () => {
+    server.use(
+      http.post('/api/upload', () =>
+        HttpResponse.json({ error: 'zu groß' }, { status: 413, headers: datum }),
+      ),
+    );
+    await expect(apiUpload('/api/upload', new FormData())).rejects.toMatchObject({ status: 413 });
+    expect(korrigiert()).toBe(true);
+  });
+
+  it('ein Netzfehler misst nichts', async () => {
+    server.use(http.get('/api/ding', () => HttpResponse.error()));
+    await expect(apiGet('/api/ding')).rejects.toBeInstanceOf(NetzFehler);
+    expect(serverJetzt().valueOf()).toBe(SERVER + VORLAUF);
   });
 });
 

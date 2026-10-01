@@ -1241,6 +1241,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             ist_adhoc: boolean;
+            /**
+             * @description Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+             *     `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+             */
+            ist_demo: boolean;
             kennzeichen?: string | null;
             /** Format: double */
             lat?: number | null;
@@ -1284,6 +1289,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             ist_adhoc: boolean;
+            /**
+             * @description Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+             *     `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+             */
+            ist_demo: boolean;
             kategorie?: string | null;
             /**
              * Format: int64
@@ -1342,6 +1352,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             ist_adhoc: boolean;
+            /**
+             * @description Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+             *     `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+             */
+            ist_demo: boolean;
             name: string;
             /**
              * Format: int64
@@ -1770,6 +1785,8 @@ export interface components {
             funkrufname: string;
             /** Format: int64 */
             id: number;
+            /** @description Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`. */
+            ist_demo: boolean;
             kennzeichen?: string | null;
             opta?: string | null;
             sondersignal: boolean;
@@ -2302,6 +2319,8 @@ export interface components {
             dienststatus: components["schemas"]["Dienststatus"];
             /** Format: int64 */
             id: number;
+            /** @description Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`. */
+            ist_demo: boolean;
             kategorie?: string | null;
             standort?: string | null;
             traegerorganisation?: string | null;
@@ -3047,6 +3066,8 @@ export interface components {
             dienststatus: components["schemas"]["Dienststatus"];
             /** Format: int64 */
             id: number;
+            /** @description Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`. */
+            ist_demo: boolean;
             name: string;
             personalnummer?: string | null;
             qualifikationen: components["schemas"]["QualifikationRef"][];

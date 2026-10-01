@@ -418,3 +418,75 @@ describe('LageberichtDetailPage — Druckkopf (LFH-22)', () => {
     drucke.mockRestore();
   });
 });
+
+/**
+ * ── Entwurfsdruck: Titel und Zeitstand aus dem Formular, die Eingabefelder nicht auf Papier
+ * (LFH-731) ──
+ *
+ * Im Entwurf standen Titel- und Zeitstand-Feld als Formularfelder auf dem Blatt, der Titel damit
+ * doppelt. Nur ausblenden reichte nicht: der Druckkopf las den GESPEICHERTEN Stand, eine
+ * ungespeicherte Änderung fehlte dann auf dem Papier. Zwilling in `BefehlDetailPage.test.tsx`.
+ */
+describe('LageberichtDetailPage — Entwurfsdruck (LFH-731)', () => {
+  // Der Picker zeigt Ortszeit des Geräts; auf einer UTC-Maschine wären Ortszeit und Anzeigezone
+  // gleich und die Zeitstand-Aussage blind — wie im Block „Zeitstand im Entwurf".
+  const tzVorher = process.env.TZ;
+  afterEach(() => {
+    if (tzVorher === undefined) delete process.env.TZ;
+    else process.env.TZ = tzVorher;
+  });
+
+  beforeEach(() => {
+    process.env.TZ = 'Europe/Berlin';
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1,
+      zeitzone: 'Europe/Berlin',
+      org_defaults: { org_id: 1 },
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf', zeitstand: '2026-07-25 12:00:00' }) as never,
+    );
+  });
+
+  function kopf(): HTMLElement {
+    const k = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(k).not.toBeNull();
+    return k!;
+  }
+
+  it('trägt eine ungespeicherte Titeländerung im Druckkopf; Titel- und Zeitstand-Feld werden nicht gedruckt', async () => {
+    renderMitZone('/einsaetze/1/lageberichte/9');
+    const titel = await screen.findByLabelText('Titel');
+    await waitFor(() => expect(titel).toHaveValue('Lage 1'));
+    await userEvent.clear(titel);
+    await userEvent.type(titel, 'Lage neu');
+
+    expect(within(kopf()).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
+      'Lagebericht – Lage neu',
+    );
+    // Gespeichert wurde nichts: der Kopf folgt dem Formular, nicht einem PATCH.
+    expect(lageberichteApi.aktualisiereLagebericht).not.toHaveBeenCalled();
+    expect(titel.closest('.lagebericht-no-print')).not.toBeNull();
+    expect(screen.getByLabelText('Zeitstand').closest('.lagebericht-no-print')).not.toBeNull();
+  });
+
+  it('trägt einen ungespeicherten Zeitstand im Druckkopf, als taktische DTG in der Anzeigezone', async () => {
+    renderMitZone('/einsaetze/1/lageberichte/9');
+    const picker = await screen.findByLabelText('Zeitstand');
+    await waitFor(() => expect(picker).toHaveValue('25.07.2026 14:00'));
+    expect(within(kopf()).getByText('251400JUL2026')).toBeInTheDocument();
+
+    await userEvent.click(picker);
+    await userEvent.clear(picker);
+    await userEvent.type(picker, '25.07.2026 16:30{Enter}');
+    // 16:30 Ortszeit (Berlin, Sommerzeit) = 14:30 UTC → in der Anzeigezone wieder 16:30.
+    await waitFor(() => expect(within(kopf()).getByText('251630JUL2026')).toBeInTheDocument());
+    expect(lageberichteApi.aktualisiereLagebericht).not.toHaveBeenCalled();
+  });
+});

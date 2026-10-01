@@ -10,7 +10,7 @@ import {
   Typography,
   theme,
 } from 'antd';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -281,6 +281,20 @@ function LageberichtDetail() {
   const v = vorlage(bericht.vorlage);
   const istEntwurf = bericht.status === 'entwurf';
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  /**
+   * Druckkopf im Entwurf aus dem Formular (LFH-731): Titel- und Zeitstand-Feld sind im Druck
+   * ausgeblendet, das Papier trägt beide nur noch im Kopf. Der gespeicherte Stand verlöre dort eine
+   * ungespeicherte Änderung. Kein Speichern vor dem Druck: Strg+P läuft am `DruckKnopf` vorbei,
+   * und ein Druck soll keinen PATCH auslösen. Vor dem Einhängen des Formulars (`werte` leer) gilt
+   * der Serverstand.
+   */
+  const schreibtEntwurf = istEntwurf && darfSchreiben;
+  const druckTitel =
+    schreibtEntwurf && typeof werte?.titel === 'string' ? werte.titel : bericht.titel;
+  const druckZeitstand =
+    schreibtEntwurf && dayjs.isDayjs(werte?.zeitstand)
+      ? alsBackendZeit(werte.zeitstand)
+      : bericht.zeitstand;
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder vor dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
@@ -347,7 +361,7 @@ function LageberichtDetail() {
           Angaben. In der Druckwurzel, weil `druck/druck.css` alles außerhalb ausblendet. */}
       <Druckkopf
         dokumentart="Lagebericht"
-        titel={bericht.titel}
+        titel={druckTitel}
         einsatz={einsatz}
         sichtbarkeit="druck"
         zeilen={[
@@ -355,7 +369,7 @@ function LageberichtDetail() {
             etikett: 'Stand',
             wert: `${LAGEBERICHT_STATUS[bericht.status].label} · Version ${bericht.version}`,
           },
-          { etikett: 'Zeitstand', wert: <ZeitAnzeige wert={bericht.zeitstand} /> },
+          { etikett: 'Zeitstand', wert: <ZeitAnzeige wert={druckZeitstand} /> },
         ]}
       />
       <EinsatzSeite
@@ -444,7 +458,7 @@ function LageberichtDetail() {
         {/* Im Entwurf trägt das Picker-Feld den Zeitstand — eine zweite Anzeige zeigte zwei
             Uhrzeiten für denselben Wert. Der Lesezweig rendert über `ZeitAnzeige` in der
             taktischen DTG und der Anzeigezone (der Wirestring ist UTC ohne Zonenkennung). */}
-        {!(istEntwurf && darfSchreiben) && (
+        {!schreibtEntwurf && (
           <Typography.Paragraph type="secondary" style={monoStil(12)}>
             Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
           </Typography.Paragraph>
@@ -453,7 +467,7 @@ function LageberichtDetail() {
         {/* Im Entwurf trägt das Abschnittsakkordeon die Gliederung selbst; ein Paneel darum
             kostete Kopfzeile und Polster auf einer Seite, deren Höhe gemessen gedeckelt ist
             (`e2e/lagebericht-schmal.spec.ts`). Das Paneel rahmt nur den Lesezweig. */}
-        {istEntwurf && darfSchreiben ? (
+        {schreibtEntwurf ? (
           <Form
             form={form}
             layout="vertical"
@@ -466,12 +480,19 @@ function LageberichtDetail() {
             {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
                 (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
             <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
-            <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+            {/* Titel und Zeitstand trägt auf Papier der Druckkopf, aus diesen Feldern gespeist
+                (LFH-731); als Formularfeld stünde der Titel doppelt auf dem Blatt. */}
+            <Form.Item
+              label="Titel"
+              name="titel"
+              rules={[{ required: true }]}
+              className="lagebericht-no-print"
+            >
               <Input />
             </Form.Item>
             {/* Feld in der Anzeigezone, Wire in UTC — frontend/AGENTS.md, „Zeiteingabe in der
                 Anzeigezone“. */}
-            <Form.Item label="Zeitstand" name="zeitstand">
+            <Form.Item label="Zeitstand" name="zeitstand" className="lagebericht-no-print">
               {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
                   würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die
                   DB. */}

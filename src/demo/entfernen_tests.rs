@@ -412,6 +412,13 @@ async fn demo_fahrzeug_im_echten_einsatz_bleibt_und_verliert_die_marke() {
     let fahrzeug_vorher = zeilen(&pool, "fahrzeug", "id = ?", demo.fahrzeug).await;
     let dispo_vorher = zeilen(&pool, "einsatz_fahrzeug", "einsatz_id = ?", echt).await;
     assert_eq!(dispo_vorher.len(), 1, "Vorbedingung: disponiert");
+    assert!(
+        crate::fahrzeug::repo::laden(&pool, 1, demo.fahrzeug)
+            .await
+            .unwrap()
+            .ist_demo,
+        "Vorbedingung: vor dem Entfernen meldet das Fahrzeug ist_demo (LFH-733)"
+    );
 
     let bericht = entfernen(&pool, 1).await.expect("entfernen");
 
@@ -434,6 +441,16 @@ async fn demo_fahrzeug_im_echten_einsatz_bleibt_und_verliert_die_marke() {
         .await,
         0,
         "die Marke ist weg"
+    );
+    // LFH-733: eine behaltene Zeile ist Bestand, die Anzeige meldet sie nicht mehr als Demo.
+    assert!(
+        !crate::fahrzeug::repo::liste(&pool, 1, false)
+            .await
+            .unwrap()
+            .iter()
+            .find(|f| f.id == demo.fahrzeug)
+            .expect("das behaltene Fahrzeug steht in der Liste")
+            .ist_demo
     );
     erwarte_zeile(&bericht, DemoStammdatenArt::Fahrzeug, 0, 1);
     // Die übrigen Arten laufen weiter, der Konflikt bricht nichts ab.

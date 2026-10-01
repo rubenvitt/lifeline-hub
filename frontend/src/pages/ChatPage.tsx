@@ -290,8 +290,17 @@ export default function ChatPage() {
     onError: fehler,
   });
   const heraufstufenMutation = useMutation({
-    mutationFn: ({ nid, typ, text }: { nid: number; typ: EtbTyp; text: string }) =>
-      heraufstufenZuEtb(einsatzId, nid, typ, text),
+    mutationFn: ({
+      nid,
+      typ,
+      text,
+      anhangIds,
+    }: {
+      nid: number;
+      typ: EtbTyp;
+      text: string;
+      anhangIds: number[];
+    }) => heraufstufenZuEtb(einsatzId, nid, typ, text, anhangIds),
     onSuccess: () => {
       invalidiereNachrichten();
       setHeraufstufenAuswahl(null);
@@ -552,9 +561,13 @@ export default function ChatPage() {
         nachricht={heraufstufen}
         senden={heraufstufenMutation.isPending}
         onAbbrechen={() => setHeraufstufenAuswahl(null)}
-        onBestaetigen={(typ, text) => {
-          if (heraufstufen) heraufstufenMutation.mutate({ nid: heraufstufen.id, typ, text });
-        }}
+        // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Eintrag angekommen
+        // ist.
+        onHeraufstufen={(typ, text, anhangIds) =>
+          heraufstufen
+            ? heraufstufenMutation.mutateAsync({ nid: heraufstufen.id, typ, text, anhangIds })
+            : Promise.reject(new Error('Keine Quellnachricht'))
+        }
       />
       <HeraufstufenAuftragModal
         einsatzId={einsatzId}

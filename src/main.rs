@@ -94,7 +94,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // Dev-Passwort für den Login-Picker.
     #[cfg(feature = "dev-seeds")]
     {
-        lifeline_hub::dev::seed::dev_seed(&pool).await?;
+        lifeline_hub::dev::seed::dev_seed(&pool, &config.admin_user).await?;
         tracing::warn!(
             "dev-seeds AKTIV: Testdaten geseedet, /api/dev/users verfügbar — NIEMALS in Production!"
         );

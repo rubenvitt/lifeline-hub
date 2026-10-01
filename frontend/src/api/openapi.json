@@ -3303,7 +3303,8 @@
           "einsatz_id",
           "ist_adhoc",
           "funkrufname",
-          "disponiert_at"
+          "disponiert_at",
+          "ist_demo"
         ],
         "properties": {
           "aktueller_br_id": {
@@ -3365,6 +3366,10 @@
           },
           "ist_adhoc": {
             "type": "boolean"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus\n`demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo."
           },
           "kennzeichen": {
             "type": [
@@ -3469,7 +3474,8 @@
           "bezeichnung",
           "menge",
           "status",
-          "disponiert_at"
+          "disponiert_at",
+          "ist_demo"
         ],
         "properties": {
           "bemerkung": {
@@ -3515,6 +3521,10 @@
           },
           "ist_adhoc": {
             "type": "boolean"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus\n`demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo."
           },
           "kategorie": {
             "type": [
@@ -3601,7 +3611,8 @@
           "einsatz_id",
           "ist_adhoc",
           "name",
-          "disponiert_at"
+          "disponiert_at",
+          "ist_demo"
         ],
         "properties": {
           "bemerkung": {
@@ -3653,6 +3664,10 @@
           },
           "ist_adhoc": {
             "type": "boolean"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus\n`demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo."
           },
           "name": {
             "type": "string"
@@ -4782,7 +4797,8 @@
           "funkrufname",
           "sondersignal",
           "dienststatus",
-          "angelegt_at"
+          "angelegt_at",
+          "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -4815,6 +4831,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`."
           },
           "kennzeichen": {
             "type": [
@@ -6243,7 +6263,8 @@
           "id",
           "bezeichnung",
           "dienststatus",
-          "angelegt_at"
+          "angelegt_at",
+          "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -6270,6 +6291,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`."
           },
           "kategorie": {
             "type": [
@@ -8194,7 +8219,8 @@
           "name",
           "dienststatus",
           "angelegt_at",
-          "qualifikationen"
+          "qualifikationen",
+          "ist_demo"
         ],
         "properties": {
           "angelegt_at": {
@@ -8219,6 +8245,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`."
           },
           "name": {
             "type": "string"

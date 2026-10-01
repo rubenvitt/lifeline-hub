@@ -7,7 +7,8 @@ use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
 
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN fahrzeug) und Status. Live oder Snapshot
-/// wählt `zu_anzeige` mit `einsatz_aktiv`.
+/// wählt `zu_anzeige` mit `einsatz_aktiv`. `ist_demo` liest die Demo-Marke des Stamm-Fahrzeugs
+/// live (LFH-733, design.md D2); ad-hoc (`fahrzeug_id IS NULL`) findet keine Marke.
 const SELECT_AUFGELOEST: &str = "\
     SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.einheit_id, ef.status_id, \
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
@@ -20,7 +21,9 @@ const SELECT_AUFGELOEST: &str = "\
            f.traegerorganisation AS live_traegerorganisation, f.dienststatus AS live_dienststatus, \
            f.staerke_fuehrer AS soll_fuehrer, f.staerke_unterfuehrer AS soll_unterfuehrer, \
            f.staerke_mannschaft AS soll_mannschaft, \
-           s.label AS status_label, s.kategorie AS status_kategorie, s.farbe AS status_farbe \
+           s.label AS status_label, s.kategorie AS status_kategorie, s.farbe AS status_farbe, \
+           EXISTS(SELECT 1 FROM demo_herkunft dh \
+                  WHERE dh.tabelle = 'fahrzeug' AND dh.datensatz_id = ef.fahrzeug_id) AS ist_demo \
     FROM einsatz_fahrzeug ef \
     LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
     LEFT JOIN fahrzeug_status s ON s.id = ef.status_id";
@@ -58,6 +61,8 @@ struct Row {
     status_label: Option<String>,
     status_kategorie: Option<StatusKategorie>,
     status_farbe: Option<String>,
+    /// LFH-733: Demo-Marke des Stamm-Datensatzes (D2), bei Ad-hoc ohne Treffer und damit `false`.
+    ist_demo: bool,
 }
 
 /// Auflösungsregel: Live-Felder nur mit Stamm-Bezug, aktivem Einsatz UND Fahrzeug in Dienst,
@@ -117,6 +122,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         },
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
+        ist_demo: row.ist_demo,
     }
 }
 
@@ -871,5 +877,63 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(emp, None, "Empfänger.fahrzeug_id muss NULL sein (SET NULL)");
+    }
+
+    /// LFH-733 (design.md D2): `ist_demo` folgt der Marke des Stamm-Fahrzeugs, unabhängig von
+    /// der Live-oder-Snapshot-Regel; ein Ad-hoc-Fahrzeug ist nie Demo.
+    #[tokio::test]
+    async fn ist_demo_folgt_der_stamm_marke() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let demo = fz_repo::anlegen(&pool, 1, fz_daten("Florian Demo"))
+            .await
+            .unwrap();
+        let echt = fz_repo::anlegen(&pool, 1, fz_daten("Florian Echt"))
+            .await
+            .unwrap();
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "fahrzeug", demo.id).await;
+        // Dieselbe ID unter den anderen Tabellen markiert: ohne den Filter `dh.tabelle`
+        // meldete auch echt Demo.
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "personal", echt.id).await;
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "material", echt.id).await;
+        // Erst das echte, dann das Demo-Stück disponieren: so trägt die Disposition des
+        // Demo-Stücks eine andere ID als sein Stamm, und `datensatz_id = ef.id` statt
+        // `ef.fahrzeug_id` fiele auf.
+        let ef_echt = disponiere_stamm(&pool, einsatz, 1, echt.id, benutzer)
+            .await
+            .unwrap();
+        let ef_adhoc = disponiere_adhoc(
+            &pool,
+            einsatz,
+            1,
+            AdhocDaten {
+                funkrufname: "FW Extern",
+                fahrzeugtyp: None,
+                kennzeichen: None,
+                opta: None,
+                traegerorganisation: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+        let ef_demo = disponiere_stamm(&pool, einsatz, 1, demo.id, benutzer)
+            .await
+            .unwrap();
+        assert_ne!(ef_demo, demo.id, "Vorbedingung: IDs entkoppelt");
+
+        for einsatz_aktiv in [true, false] {
+            let alle = liste(&pool, einsatz, einsatz_aktiv).await.unwrap();
+            let marke = |id| alle.iter().find(|a| a.id == id).unwrap().ist_demo;
+            assert!(marke(ef_demo), "einsatz_aktiv={einsatz_aktiv}");
+            assert!(!marke(ef_echt), "einsatz_aktiv={einsatz_aktiv}");
+            assert!(!marke(ef_adhoc), "einsatz_aktiv={einsatz_aktiv}");
+        }
+        assert!(
+            laden_anzeige(&pool, einsatz, ef_demo, true)
+                .await
+                .unwrap()
+                .ist_demo
+        );
     }
 }
