@@ -19,6 +19,17 @@ body {
   transition: background-color 0.4s ease;
 }
 
+/* Zweiter Kanal (WCAG 1.4.1): eine 3-px-Kante links in `achtung`. Nachts hebt sich die Tönung in
+   der Helligkeit kaum ab (sie trägt den Textboden auch für `schwach`, LFH-643); die Kante trägt
+   das Auffinden. Als `inset`-Schatten, damit nichts verrutscht. In der Tabelle an der ersten
+   Zelle, an der Karte an ihr selbst; die Zeitachse setzt nur ihren Grund inline, der Schatten aus
+   der Klasse kommt an (LFH-696, Entscheidung 6 in
+   `openspec/changes/archive/2026-10-01-lfh-696-deeplink-hervorhebung-rolle/design.md`). */
+.ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td:first-child,
+[data-lfh='datensicht-karte'].zeile-hervorgehoben {
+  box-shadow: inset 3px 0 0 0 var(--lfh-achtung);
+}
+
 /* ETB-Erfassung als angepinnte Leiste am Fuß der Zeitachse (Begründung in `pages/EtbPage.tsx`).
    Negative Seitenränder ziehen sie randlos über die Seitenrinne, der Innenrand nimmt dieselbe
    Rinne wieder auf, damit der Text mit dem Seiteninhalt fluchtet; beide lesen dieselbe

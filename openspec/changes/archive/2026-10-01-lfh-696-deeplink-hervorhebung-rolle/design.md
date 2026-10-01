@@ -152,6 +152,32 @@ Nachweis: Unit-Test für `zeilenGrund(…, 'hervorhebung')`, Render-Tests für E
 (Inline-Grund = Rolle, Vorrang bei Berichtigung), e2e-Kartenfall im ETB je Modus
 (Grund = Literal, Textboden), in `e2e/hervorhebung-kontrast.spec.ts`.
 
+### Entscheidung 6: Nachtwert und zweiter Kanal (Nachtrag nach dem Merge von LFH-643, 01.10.2026)
+
+Während der PR offen war, kam LFH-643 auf `alpha` (Spec `textstufen-kontrast`): Jede Textstufe,
+auch `schwach`, hält auf jeder deckenden Fläche nachts ≥ 5 : 1, Zeilentönungen eingeschlossen.
+`schwach` wurde dabei zu `#838b94` (nachts) bzw. `#424a53` (am Tag). Auf dem Nachtwert `#2b2611`
+hielt `schwach` nur 4,38. Die CI des PRs zeigte das am ETB-Kartenfall, und `textstufen.test.ts`
+wurde rot, sobald die Rolle in seine Liste deckender Flächen kam.
+
+Entschieden am 01.10.2026: Der Nachtwert wird `#1c190b` (`schwach` 5,10, alle Textstufen und
+Statustexte ≥ 5). Das ist eine **benannte Tonverschiebung nachts**, am Tag bleibt `#fffbe6`. Damit
+hebt sich die Tönung nachts in der Helligkeit kaum noch ab (gegen flaeche 1,07, gegen den Hover
+1,00, nur der Farbton trennt). Den Fund trägt deshalb ein **zweiter Kanal**: eine 3-px-Kante links
+in `achtung` (`inset`-Schatten, Kontrast gegen die Tönung 6,65 am Tag, 11,00 nachts; WCAG 1.4.11
+verlangt 3). In Tabellen sitzt sie an der ersten Zelle, an Karten an der Karte selbst, gesetzt
+über `.zeile-hervorgehoben` in `index.css`. Die Zeitachse setzt nur ihren Grund inline, ein
+Schatten aus der Klasse kommt dort an.
+
+Damit entfällt die `schwach`-Grenze des e2e-Specs (Entscheidung 1, Absatz zu `schwach`):
+`schwach` hält auf der Tönung jetzt 8,64 bzw. 5,10. Der Folgetask LFH-898 ist in seinem Kern durch
+LFH-643 erledigt.
+
+*Verworfen:* `#2b2611` behalten und `schwach` auf der Tönung als Ausnahme führen. Das widerspricht
+der MUST-Regel aus `textstufen-kontrast`, und laut `frontend/AGENTS.md` führen Kontrast-Gates keine
+Tertiär-Ausnahme. Ebenfalls verworfen: nur dunkler, ohne Kante. Nachts wäre die angesteuerte
+Zeile dann kaum zu finden.
+
 ## Risks / Trade-offs
 
 - [Die Tönung stand in Tabellen bisher gar nicht] → Dann wird sie mit dieser Change zum ersten Mal

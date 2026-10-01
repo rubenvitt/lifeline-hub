@@ -10,14 +10,17 @@ import { pruefe } from './kontrast-kern';
  * Böden aus Kriterium 5: Tag ≥ 7, Nacht ≥ 5.
  */
 const ZIEL = { light: 7, dark: 5 } as const;
-const TOENUNG = { light: 'rgb(255, 251, 230)', dark: 'rgb(43, 38, 17)' } as const;
-/*
- * BENANNTE GRENZE: Text in der Rolle `schwach` misst dieser Spec nicht. Die Zeitachse setzt Nr.,
- * Meta und Meldeweg in `schwach`, und die Rolle hält den Boden auf KEINEM Grund (am Tag auch auf
- * `flaeche` nur 6,37). Die Spec `farbrollen-kontrast` zählt sie nicht zum Zeilentext; den
- * Umzug auf `gedaempft` trägt LFH-898, das diese Ausnahme streicht.
- */
-const SCHWACH = { light: 'rgb(88, 96, 106)', dark: 'rgb(125, 133, 142)' } as const;
+const TOENUNG = { light: 'rgb(255, 251, 230)', dark: 'rgb(28, 25, 11)' } as const;
+/* Zweiter Kanal (WCAG 1.4.1): 3-px-Kante links in `achtung`. Nachts hebt sich die Tönung in der
+   Helligkeit kaum ab (gegen den Hover 1,00), die Kante trägt das Auffinden. */
+const KANTE = { light: 'rgb(122, 82, 0)', dark: 'rgb(232, 204, 58)' } as const;
+
+/** Die Kante: ein `inset`-Schatten von 3 px links in der Farbe des Modus. */
+async function pruefeKante(traeger: Locator, modus: 'light' | 'dark', name: string) {
+  const schatten = await traeger.evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(schatten, `${modus}/${name}: Kante`).toContain(KANTE[modus]);
+  expect(schatten, `${modus}/${name}: Kante`).toMatch(/3px 0px 0px 0px inset/);
+}
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -57,31 +60,27 @@ async function zellgruende(zeile: Locator): Promise<string[]> {
  * (Folgetask LFH-891 für die blauen Tags).
  */
 async function pruefeTextAufToenung(traeger: Locator, modus: 'light' | 'dark', name: string) {
-  const anzahl = await traeger.evaluate(
-    (wurzel, { toenung, schwach }) => {
-      let n = 0;
-      for (const el of [wurzel, ...wurzel.querySelectorAll('*')]) {
-        const eigenerText = [...el.childNodes].some(
-          (k) => k.nodeType === Node.TEXT_NODE && k.textContent!.trim() !== '',
-        );
-        if (!eigenerText || (el as HTMLElement).offsetParent === null) continue;
-        if (getComputedStyle(el).color === schwach) continue; // Grenze oben, LFH-898
-        let aufToenung = false;
-        for (let e: Element | null = el; e; e = e.parentElement) {
-          const grund = getComputedStyle(e).backgroundColor;
-          if (grund === toenung) {
-            aufToenung = true;
-            break;
-          }
-          if (grund !== 'rgba(0, 0, 0, 0)') break; // eigene Fläche vor der Tönung
-          if (e === wurzel) break;
+  const anzahl = await traeger.evaluate((wurzel, toenung) => {
+    let n = 0;
+    for (const el of [wurzel, ...wurzel.querySelectorAll('*')]) {
+      const eigenerText = [...el.childNodes].some(
+        (k) => k.nodeType === Node.TEXT_NODE && k.textContent!.trim() !== '',
+      );
+      if (!eigenerText || (el as HTMLElement).offsetParent === null) continue;
+      let aufToenung = false;
+      for (let e: Element | null = el; e; e = e.parentElement) {
+        const grund = getComputedStyle(e).backgroundColor;
+        if (grund === toenung) {
+          aufToenung = true;
+          break;
         }
-        if (aufToenung) el.setAttribute('data-lfh-messung', String(n++));
+        if (grund !== 'rgba(0, 0, 0, 0)') break; // eigene Fläche vor der Tönung
+        if (e === wurzel) break;
       }
-      return n;
-    },
-    { toenung: TOENUNG[modus], schwach: SCHWACH[modus] },
-  );
+      if (aufToenung) el.setAttribute('data-lfh-messung', String(n++));
+    }
+    return n;
+  }, TOENUNG[modus]);
   expect(anzahl, `${name}: der Träger zeigt messbaren Text auf der Tönung`).toBeGreaterThan(0);
   for (let i = 0; i < anzahl; i++) {
     // Seitenweit gesucht: der Träger selbst kann markiert sein. Ein Aufruf je Test.
@@ -123,6 +122,15 @@ for (const modus of ['light', 'dark'] as const) {
     const gruende = await zellgruende(zeile);
     expect(gruende.length).toBeGreaterThan(1);
     expect(gruende, `${modus}: Grund der Zellen`).toEqual(gruende.map(() => TOENUNG[modus]));
+
+    // Szenario „Zweiter Kanal“: die erste Zelle trägt die Kante, die anderen nicht.
+    await pruefeKante(zeile.locator('td').first(), modus, 'Fahrzeuge');
+    expect(
+      await zeile
+        .locator('td')
+        .last()
+        .evaluate((el) => getComputedStyle(el).boxShadow),
+    ).toBe('none');
 
     // Szenario „Zeilentext hält den Textboden“.
     await pruefeTextAufToenung(zeile, modus, 'Fahrzeuge');
@@ -169,6 +177,9 @@ for (const modus of ['light', 'dark'] as const) {
     expect(await nachbar.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
       TOENUNG[modus],
     );
+
+    await pruefeKante(karte, modus, 'ETB');
+    expect(await nachbar.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
 
     await pruefeTextAufToenung(karte, modus, 'ETB');
   });

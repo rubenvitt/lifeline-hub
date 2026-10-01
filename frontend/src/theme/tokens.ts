@@ -135,11 +135,12 @@ export interface Farbrollen {
  * kopf 7,36 · paneel 7,71; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 7,37. Auf der
  * Hervorhebungsfläche `flaeche3` liegen beide bei 6,59 bzw. 6,60, unter dem Tagesboden (LFH-877).
  *
- * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696, Werte unverändert aus LFH-25): text 17,76 ·
- * text2 12,63 · gedaempft 8,09 · bedienText 8,09 · achtungText 8,87 · alarmText 8,62 ·
- * normalText 8,82. Abhebung gegen flaeche 1,04, gegen den Hover `flaeche3` 1,23, gegen
- * `lueckeZeile` 1,07. Gerechnet in `bedienKontrast.test.ts`; den Zeilentext einer echten Tabellenzeile
- * misst `e2e/hervorhebung-kontrast.spec.ts`.
+ * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696, Tagwert unverändert aus LFH-25): text 17,76
+ * · text2 12,63 · gedaempft 10,57 · schwach 8,64 · bedienText 8,09 · achtungText 8,87 ·
+ * alarmText 8,62 · normalText 8,82. Abhebung gegen flaeche 1,04, gegen den Hover `flaeche3` 1,23,
+ * gegen `lueckeZeile` 1,07; zweiter Kanal ist die Kante in `achtung` (6,65 gegen die Tönung,
+ * `index.css`). Gerechnet in `bedienKontrast.test.ts`/`textstufen.test.ts`; den Zeilentext einer
+ * echten Tabellenzeile misst `e2e/hervorhebung-kontrast.spec.ts`.
  *
  * Gefahrrot (LFH-693, `antdKomponenten`): als Text `alarmText`, roter Menüeintrag auf flaeche2
  * 8,29, Gefahrknopf ohne Rahmen auf grund 7,51 (knappstes Paar); Weiß auf `alarmText` 8,96 (gefüllter Gefahrknopf in Ruhe, Menüeintrag unter dem Zeiger),
@@ -205,9 +206,12 @@ export const farbenHell: Farbrollen = {
  * (Zeiger und Drücken, vorher gedrückt 3,74).
  * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
  * Tabellenkopf auf kopf 7,48.
- * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696): text 12,64 · text2 9,34 · gedaempft 5,86 ·
- * bedienText 8,01 · achtungText 9,46 · alarmText 5,45 · normalText 8,80. Abhebung gegen flaeche
- * 1,24, gegen den Hover `flaeche3` 1,17, gegen `lueckeZeile` 1,23.
+ * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696): `#1c190b` statt des LFH-25-Werts `#2b2611`,
+ * weil `schwach` darauf nur 4,38 hielt (Textboden aller Stufen, LFH-643). Jetzt text 14,71 · text2
+ * 10,87 · gedaempft 6,81 · schwach 5,10 · bedienText 9,32 · achtungText 11,00 · alarmText 6,34 ·
+ * normalText 10,23. Die Helligkeit hebt sich kaum ab (gegen flaeche 1,07, gegen den Hover
+ * `flaeche3` 1,00, gegen `lueckeZeile` 1,06): der Farbton trennt, und die Kante in `achtung`
+ * (11,00 gegen die Tönung, `index.css`) trägt das Auffinden.
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#838b94` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
@@ -263,7 +267,7 @@ export const farbenDunkel: Farbrollen = {
   berichtigungZeile: '#160d0f',
   lueckeZeile: '#161305',
   problemZeile: '#130f0f',
-  hervorhebungZeile: '#2b2611',
+  hervorhebungZeile: '#1c190b',
 };
 
 /**

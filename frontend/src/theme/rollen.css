@@ -244,7 +244,7 @@
   --lfh-berichtigung-zeile: #160d0f;
   --lfh-luecke-zeile: #161305;
   --lfh-problem-zeile: #130f0f;
-  --lfh-hervorhebung-zeile: #2b2611;
+  --lfh-hervorhebung-zeile: #1c190b;
 
   /* ── ETB-Typfarben · Nachtmodus (tokens.ts: etbTypFarbenDunkel) ────────── */
   --lfh-etb-meldung-kante: #1677ff;

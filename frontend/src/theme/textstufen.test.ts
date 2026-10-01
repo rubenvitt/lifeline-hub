@@ -38,6 +38,8 @@ const DECKENDE_FLAECHEN = [
   'berichtigungZeile',
   'lueckeZeile',
   'problemZeile',
+  // Deeplink-Hervorhebung (LFH-696): die angesteuerte Zeile ist ein Textgrund wie jede Zeilentönung.
+  'hervorhebungZeile',
 ] as const satisfies readonly (keyof Farbrollen)[];
 
 const MODI = [

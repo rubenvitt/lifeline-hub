@@ -63,6 +63,10 @@ Sie MUST auch in einer Tabelle tatsächlich als Grund der Zellen stehen.
 - **WHEN** der angesteuerte Eintrag zugleich eine andere Zeilentönung trüge, etwa als Berichtigung
 - **THEN** trägt er die Hervorhebungstönung, solange er angesteuert ist
 
+#### Scenario: Zweiter Kanal neben der Tönung
+- **WHEN** eine Zeile oder Karte über einen Deeplink angesteuert ist
+- **THEN** trägt sie an ihrer linken Kante eine Markierung in der Achtungsfarbe, die mindestens 3 : 1 gegen die Tönung hält, und eine nicht angesteuerte Zeile trägt keine
+
 #### Scenario: Unterscheidbar vom Zeiger
 - **WHEN** im Tag- oder Nachtmodus eine nicht angesteuerte Zeile unter dem Zeiger steht
 - **THEN** hat ihre Fläche eine andere Farbe als die Hervorhebungstönung desselben Modus

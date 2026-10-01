@@ -41,8 +41,8 @@ describe.each([
  * Zeilentext auf der Deeplink-Hervorhebung (LFH-696, Spec `farbrollen-kontrast`, „Zeilentext hält
  * den Textboden auf der Hervorhebung“), gerechnet mit derselben Formel. Der Browser-Nachweis in
  * `e2e/hervorhebung-kontrast.spec.ts` misst nur, was eine Fahrzeugzeile tatsächlich zeigt; die
- * Textrollen der Status deckt erst diese Rechnung ab. `schwach` fehlt bewusst: die Rolle trägt
- * keinen Zeilentext (Spec `textkontrast-rollen`).
+ * Textrollen der Status deckt erst diese Rechnung ab. Die Textstufen (`text` bis `schwach`) auf
+ * der Tönung hält zusätzlich `textstufen.test.ts` (LFH-643).
  */
 describe.each([
   ['Tag', farbenHell, 7],
