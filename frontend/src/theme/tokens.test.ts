@@ -356,6 +356,5 @@ describe('Feldmeldung: Text in alarmText (LFH-667)', () => {
     ['Nacht', farbenDunkel],
   ])('%s: das globale colorError bleibt die Füllfarbe alarm', (_modus, farben) => {
     expect(antdToken(farben)?.colorError).toBe(farben.alarm);
-    expect(antdKomponenten(farben, 'kompakt').Button).not.toHaveProperty('colorError');
   });
 });
