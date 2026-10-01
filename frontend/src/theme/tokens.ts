@@ -107,6 +107,10 @@ export interface Farbrollen {
  * dafür stehen `achtungText`/`alarmText` (auf Weiß 9,22 bzw. 8,96, auf ihren Flächen und
  * Zeilentönungen ≥ 7,31, auf grund 7,72 bzw. 7,51). Die Füllfarben bleiben für Kante, Punkt
  * und Balken.
+ *
+ * Geerbter Text (LFH-652, `antdToken`): `bedienText` als Link auf grund 7,04 · flaeche 8,41 ·
+ * kopf 7,36 · paneel 7,71; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 7,37. Auf der
+ * Hervorhebungsfläche `flaeche3` liegen beide bei 6,59 bzw. 6,60, unter dem Tagesboden (LFH-877).
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -159,6 +163,8 @@ export const farbenHell: Farbrollen = {
  * 11,60 · 11,10 — gedaempft 7,71 · 7,27 · 6,96 — bedien 6,19 · 5,84 · 5,58 — alarm 7,18 · 6,77 ·
  * 6,48 — achtung 12,45 · 11,75 · 11,24 — normal 8,79 · 8,29 · 7,94 — aufBedien auf bedien 6,19,
  * auf alarm 7,18. Statusflächen: normalText 10,44, achtung 11,18, alarm 6,89, bedienText 9,65.
+ * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
+ * Tabellenkopf auf kopf 7,48.
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#7d858e` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
@@ -557,10 +563,12 @@ export function antdAlgorithmus(dunkel: boolean): MappingAlgorithm | MappingAlgo
   return dunkel ? [antdTheme.darkAlgorithm, seedTreu] : antdTheme.defaultAlgorithm;
 }
 
-/** Zweite Stufe des Nacht-Algorithmus: die Signalfarben tragen genau ihren Rollenwert. */
+/** Zweite Stufe des Nacht-Algorithmus: die Signalfarben tragen genau ihren Rollenwert. `colorLink`
+ *  gehört dazu, weil er Text ist: die dunkle Palette verdunkelte ihn auf 4,55 : 1 (LFH-652). */
 const seedTreu: MappingAlgorithm = (seed, abgeleitet) => ({
   ...(abgeleitet ?? antdTheme.darkAlgorithm(seed)),
   colorPrimary: seed.colorPrimary,
+  colorLink: seed.colorLink,
   colorInfo: seed.colorInfo,
   colorError: seed.colorError,
   colorWarning: seed.colorWarning,
@@ -604,6 +612,14 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * Tooltip, Avatar, Badge, Layout-Kopf u. v. m., und `#08090b` wäre dort nachts dunkel auf
  * dunkel.
  *
+ * Textrollen statt Füll- und Hover-Tönen, wo antd TEXT färbt (LFH-652, Spec
+ * `textkontrast-rollen`): die Beschriftung des Standardknopfs unter dem Zeiger (`bedienHover`
+ * läge am Tag bei 5,62) und die Meldung eines Formularfelds samt Pflichtmarke (`alarm` 6,27). Das
+ * `Form`-Token wirkt nur auf die Stile des Formulars; Rahmen und Status der Eingabefelder rechnet
+ * `Input` selbst und behält die Füllfarbe. Die Kante des Standardknopfs bleibt `bedienHover`
+ * (Boden 3 : 1). Ein Linkknopf zeigt den Zeiger als `bedienFlaeche`, denn sein Ton wechselt
+ * nicht mehr (`bedienText` darauf 7,11 Tag · 9,65 Nacht).
+ *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
  */
@@ -615,6 +631,13 @@ export function antdKomponenten(
     Button: {
       primaryColor: farben.aufBedien,
       dangerColor: farben.aufBedien,
+      defaultHoverColor: farben.bedienText,
+      defaultActiveColor: farben.bedienText,
+      linkHoverBg: farben.bedienFlaeche,
+    },
+    Form: {
+      colorError: farben.alarmText,
+      colorWarning: farben.achtungText,
     },
     Switch: switchMasse(dichten[dichte]),
   };
@@ -652,6 +675,13 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorWarning: farben.achtung,
     colorSuccess: farben.normal,
     colorInfo: farben.bedien,
+    // Ein Link ist blauer TEXT und trägt die Textrolle, in Ruhe wie unter dem Zeiger (LFH-652):
+    // aus `bedien` abgeleitet lag er bei 6,59 (Tag) und 4,55 (Nacht). Die Rückmeldung unter dem
+    // Zeiger ist die Unterstreichung, kein hellerer Ton (`bedienHover` am Tag 5,62).
+    colorLink: farben.bedienText,
+    colorLinkHover: farben.bedienText,
+    colorLinkActive: farben.bedienText,
+    linkHoverDecoration: 'underline',
 
     colorBgLayout: farben.grund,
     colorBgContainer: farben.flaeche,
@@ -659,6 +689,10 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
 
     colorText: farben.text,
     colorTextSecondary: farben.gedaempft,
+    // Beschreibung ist Text (`Typography` `secondary`, Seitenbeschreibung, „—“). antd leitete sie
+    // aus der tertiären Stufe ab, `schwach` läge am Tag bei 5,33–6,37 (LFH-652). `schwach` bleibt
+    // Augenbraue, Platzhalter und Ikonen (LFH-643).
+    colorTextDescription: farben.gedaempft,
     colorTextTertiary: farben.schwach,
     // Der Platzhalter ist bei mehreren Filtern die EINZIGE Beschriftung. antds Ableitung aus
     // `colorTextQuaternary` lag unter 2,5 : 1; `schwach` hält ≥ 5 : 1.
