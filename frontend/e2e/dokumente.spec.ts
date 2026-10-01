@@ -275,17 +275,64 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
   await expect(page.locator('.ant-table'), 'keine Tabelle bei 390 px').toHaveCount(0);
   await keinQuerlauf(page, `${pfad} @390`);
 
-  // Entfernen im Kartenzweig: Auslöser neutral, OK der Rückfrage rot; der zugängliche Name
-  // trägt den Titel.
-  const entfernenKarte = page.getByRole('button', { name: 'Dokument Lageplan Nord entfernen' });
-  await expect(entfernenKarte, 'der Auslöser ist NICHT rot').not.toHaveClass(/ant-btn-dangerous/);
-  await entfernenKarte.click();
-  // Das Primitiv setzt kein `okText` — gegriffen wird der Primärknopf der offenen Rückfrage.
-  const ok = page.locator('.ant-popconfirm:not(.ant-popover-hidden) .ant-btn-primary');
+  // Entfernen im Kartenzweig (LFH-656): Primäraktion ist „Bearbeiten“, Entfernen steht als roter
+  // Eintrag im Aktionsmenü; die Rückfrage ist ein Seiten-Modal mit rotem OK. Der zugängliche
+  // Name trägt den Titel.
+  await expect(
+    page.getByRole('button', { name: 'Dokument Lageplan Nord bearbeiten' }),
+    'Primäraktion der Karte',
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Aktionen zu Dokument Lageplan Nord' }).click();
+  const eintrag = page
+    .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+    .getByRole('menuitem', { name: 'Entfernen' });
+  await expect(eintrag, 'der Menüeintrag ist rot').toHaveClass(/ant-dropdown-menu-item-danger/);
+  await eintrag.click();
+  const rueckfrage = page.getByRole('dialog').filter({ hasText: 'Dokument entfernen?' });
+  const ok = rueckfrage.getByRole('button', { name: 'Entfernen' });
   await expect(ok, 'das OK der Rückfrage ist rot').toHaveClass(/ant-btn-dangerous/);
+  // Erst nach der Zoom-Einblendung klicken: währenddessen nimmt das Modal keinen Klick an.
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
   await ok.click();
+  await expect(rueckfrage, 'die Rückfrage schließt mit dem OK').toBeHidden();
   await expect(page.getByRole('link', { name: 'Lageplan Nord' })).toHaveCount(0);
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
+});
+
+test('Bearbeiten: Titel und Kategorie ändern, Datei bleibt, ETB weist die Änderung nach', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Ablage Bearbeiten ${Date.now()}`);
+  await seedeDokument(page, einsatzId, 'Lagepaln Nord', 'sonstiges', 'Lageplan Nord.pdf', PDF);
+  await page.goto(`/einsaetze/${einsatzId}/dokumente`);
+
+  await page.getByRole('button', { name: 'Dokument Lagepaln Nord bearbeiten' }).click();
+  const dialog = page.getByRole('dialog').filter({ hasText: 'Dokument bearbeiten' });
+  await expect(dialog.getByLabel('Titel'), 'vorbelegt mit dem Stand').toHaveValue('Lagepaln Nord');
+  await dialog.getByLabel('Titel').fill('Lageplan Nord');
+  await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
+  await waehleOption(page, 'Lagekarte/Plan');
+  await dialog.getByRole('button', { name: 'Speichern' }).click();
+  await expect(dialog).toBeHidden();
+
+  const zeile = page.getByRole('row', { name: /Lageplan Nord/ });
+  await expect(zeile.getByRole('link', { name: 'Lageplan Nord' })).toBeVisible();
+  await expect(zeile.getByText('Lagekarte/Plan')).toBeVisible();
+  // Die Datei ist dieselbe: Dateiname und Download bleiben.
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    zeile.getByRole('link', { name: 'Lageplan Nord' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('Lageplan Nord.pdf');
+
+  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const eintraege = (await etb.json()) as { typ: string; inhalt: string }[];
+  expect(
+    eintraege.filter((e) => e.typ === 'system' && e.inhalt.startsWith('Dokument geändert:')),
+    'genau ein ETB-Nachweis der Änderung',
+  ).toHaveLength(1);
 });
 
 /** Höhe eines Ziels in CSS-px, auf eine Nachkommastelle. */
@@ -338,6 +385,9 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
 
       const ziele: Record<string, Locator> = {
         'Download-Anker': anker,
+        'Bearbeiten (Zeile)': page.getByRole('button', {
+          name: 'Dokument Lageplan Nord bearbeiten',
+        }),
         'Entfernen (Zeile)': page.getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
         'Datei wählen': dialog.locator('button.ant-btn', { hasText: 'Datei wählen' }),
         'Kategorie (Select)': dialog.locator('.ant-select').first(),
