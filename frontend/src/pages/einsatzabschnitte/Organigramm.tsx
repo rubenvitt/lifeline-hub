@@ -18,7 +18,10 @@ import type { Einheit, EinsatzAnzeige, Einsatzabschnitt, Stabsfunktion } from '.
 import { staerkeText } from '../../anzeige/staerke';
 import { monoStil, useRollen } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
-import { IkoneChevronRechts, IkoneChevronRunter } from '../../ikonen';
+import HaengenderBaum, {
+  baumZielStil,
+  klappbareSchluessel,
+} from '../../components/organigramm/HaengenderBaum';
 import {
   einheitDetailPfad,
   einsatzabschnittePfad,
@@ -31,7 +34,6 @@ import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import {
   baueFuehrungsorganisation,
-  klappbareSchluessel,
   rendereFuehrungsorganisationMarkdown,
   stabZeilen,
   type Fuehrungsorganisation,
@@ -44,30 +46,15 @@ import './organigrammPrint.css';
  * Einsatzabschnitte. Liest, druckt und übernimmt; bearbeitet wird am Datensatz (Namen sind
  * Deeplinks). Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`.
  *
- * - **Hängendes Layout ohne Bibliothek** (D3): die erste Ebene unter der Einsatzleitung bricht in
- *   Spalten um (`auto-fill`), tiefere Ebenen hängen senkrecht. So bleibt es in jeder Breite ohne
- *   waagerechtes Scrollen. Jede Spalte trägt ihre eigene Oberkante; ein durchgehender Querbalken
- *   löge beim Umbruch in die zweite Zeile.
+ * - **Hängendes Layout ohne Bibliothek** (D3): das Gerüst `components/organigramm/HaengenderBaum`
+ *   (Spalten der ersten Ebene, senkrechte Zweige, Klappziele, Druckregeln), geteilt mit der
+ *   Fernmeldeskizze des S6 (LFH-625 D4).
  * - **Einsatzleitung ohne erfundene Leitung** (D5): die eigene Führungsstelle ist kein Datum
  *   (LFH-849). Der Stab steht nur mit Stab-Freigabe daneben — fail-closed über `useStabFreigabe`.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
  */
 
-/** Mindestbreite einer Spalte der ersten Ebene; gemessen vor dem Bau (design.md D3, Nachtrag). */
-export const SPALTE_MIN_PX = 300;
-/** Ab dieser Tiefe rückt nichts mehr weiter ein, die Linie bleibt (D3). */
-const EINRUECKEN_BIS_TIEFE = 4;
 const ZEICHEN_PX = 22;
-
-/**
- * Trefffläche der Namenslinks (LFH-365, Muster `bedienzielStil`): ein `<a>` erbt keine
- * Steuerhöhe, der Boden kommt aus `controlHeight` (30 / 48 / 72). Ohne waagerechte Polsterung:
- * der Name fluchtet mit dem Zeichen, und die Spalte ist schmal (design.md D3). Rein und
- * exportiert, damit die Zusicherung ohne Layout prüfbar ist.
- */
-export function organigrammZielStil(token: { controlHeight: number }): CSSProperties {
-  return { display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight };
-}
 
 export type StabsstelleZustand =
   | { zustand: 'aus' }
@@ -96,83 +83,66 @@ export function OrganigrammBild({ einsatzId, org, stab, zugeklappt, onUmschalten
     minWidth: 0,
   };
 
-  return (
-    <section aria-label="Organigramm" data-lfh="organigramm">
-      {/* ── Kopf: Einsatzleitung, daneben (unter `md` darunter) die Stabsstelle ── */}
+  // ── Kopf: Einsatzleitung, daneben (unter `md` darunter) die Stabsstelle ──
+  const kopf = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: breit ? 'row' : 'column',
+        alignItems: breit ? 'center' : 'stretch',
+        justifyContent: 'center',
+      }}
+    >
       <div
-        style={{
-          display: 'flex',
-          flexDirection: breit ? 'row' : 'column',
-          alignItems: breit ? 'center' : 'stretch',
-          justifyContent: 'center',
-        }}
+        role="group"
+        aria-label="Einsatzleitung"
+        data-lfh="org-einsatzleitung"
+        style={{ ...kasten, borderWidth: 2 }}
       >
-        <div
-          role="group"
-          aria-label="Einsatzleitung"
-          data-lfh="org-einsatzleitung"
-          style={{ ...kasten, borderWidth: 2 }}
-        >
-          <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
-          {/* LFH-849: der Einsatz kennt die eigene Führungsstelle nicht. Keine erfundene Leitung,
-              sondern die benannte Lücke. */}
-          <div style={{ color: rollen.gedaempft }}>Leitung nicht erfasst</div>
-        </div>
-        {stab.zustand !== 'aus' && (
-          <>
-            {/* Stabslinie: der Stab ist beigeordnet, nicht unterstellt (FwDV 100). */}
-            <span
-              aria-hidden
-              style={
-                breit
-                  ? { flex: `0 0 ${token.marginLG}px`, borderBlockStart: linie }
-                  : {
-                      alignSelf: 'center',
-                      blockSize: token.marginSM,
-                      borderInlineStart: linie,
-                    }
-              }
-            />
-            <Stabsstelle stab={stab} stil={kasten} />
-          </>
-        )}
+        <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
+        {/* LFH-849: der Einsatz kennt die eigene Führungsstelle nicht. Keine erfundene Leitung,
+            sondern die benannte Lücke. */}
+        <div style={{ color: rollen.gedaempft }}>Leitung nicht erfasst</div>
       </div>
-
-      {/* ── Erste Ebene: Spalten mit eigener Oberkante ── */}
-      {org.wurzeln.length > 0 && (
-        <ul
-          data-lfh="org-ebene1"
-          style={{
-            listStyle: 'none',
-            margin: `${token.marginLG}px 0 0`,
-            padding: 0,
-            display: 'grid',
-            gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${SPALTE_MIN_PX}px), 1fr))`,
-            gap: token.margin,
-          }}
-        >
-          {org.wurzeln.map((k) => (
-            <li
-              key={k.key}
-              data-lfh="org-spalte"
-              style={{
-                borderBlockStart: `2px solid ${rollen.linieStark}`,
-                paddingTop: token.paddingXS,
-                minWidth: 0,
-              }}
-            >
-              <Zweig
-                knoten={k}
-                tiefe={0}
-                einsatzId={einsatzId}
-                zugeklappt={zugeklappt}
-                onUmschalten={onUmschalten}
-              />
-            </li>
-          ))}
-        </ul>
+      {stab.zustand !== 'aus' && (
+        <>
+          {/* Stabslinie: der Stab ist beigeordnet, nicht unterstellt (FwDV 100). */}
+          <span
+            aria-hidden
+            style={
+              breit
+                ? { flex: `0 0 ${token.marginLG}px`, borderBlockStart: linie }
+                : {
+                    alignSelf: 'center',
+                    blockSize: token.marginSM,
+                    borderInlineStart: linie,
+                  }
+            }
+          />
+          <Stabsstelle stab={stab} stil={kasten} />
+        </>
       )}
-    </section>
+    </div>
+  );
+
+  return (
+    <HaengenderBaum<OrgKnoten>
+      bezeichnung="Organigramm"
+      lfh="organigramm"
+      kopf={kopf}
+      wurzeln={org.wurzeln}
+      zugeklappt={zugeklappt}
+      onUmschalten={onUmschalten}
+      knotenName={(k) => (k.art === 'sammel' ? 'Ohne Abschnitt' : k.name)}
+      gruppe={(k) => (k.art === 'sammel' ? 'Ohne Abschnitt' : null)}
+      inhalt={(k) =>
+        k.art === 'sammel' ? (
+          <div style={{ fontWeight: 600, paddingBlock: token.paddingXXS }}>Ohne Abschnitt</div>
+        ) : (
+          <KnotenInhalt knoten={k} einsatzId={einsatzId} />
+        )
+      }
+    />
   );
 }
 
@@ -203,95 +173,6 @@ function Stabsstelle({ stab, stil }: { stab: StabsstelleZustand; stil: CSSProper
       <div style={{ fontWeight: 600 }}>Stab</div>
       {inhalt}
     </div>
-  );
-}
-
-interface ZweigProps {
-  knoten: OrgKnoten;
-  tiefe: number;
-  einsatzId: number;
-  zugeklappt: ReadonlySet<string>;
-  onUmschalten: (key: string) => void;
-}
-
-/** Ein Knoten mit seinen Kindern, senkrecht darunter. */
-function Zweig({ knoten, tiefe, einsatzId, zugeklappt, onUmschalten }: ZweigProps) {
-  const { token, rollen } = useRollen();
-  const offen = !zugeklappt.has(knoten.key);
-  const kinderId = `org-kinder-${knoten.key}`;
-  const hatKinder = knoten.kinder.length > 0;
-  const bezeichnung = knoten.art === 'sammel' ? 'Ohne Abschnitt' : knoten.name;
-
-  const kopf = (
-    <div
-      data-lfh="org-knoten"
-      style={{ display: 'flex', alignItems: 'flex-start', gap: token.marginXS, minWidth: 0 }}
-    >
-      {hatKinder ? (
-        <Button
-          type="text"
-          data-lfh="org-klappen"
-          aria-label={`Unterstellte von ${bezeichnung}`}
-          aria-expanded={offen}
-          // Zugeklappt ist die Liste nicht im DOM; ein Verweis zeigte ins Leere.
-          aria-controls={offen ? kinderId : undefined}
-          icon={offen ? <IkoneChevronRunter /> : <IkoneChevronRechts />}
-          onClick={() => onUmschalten(knoten.key)}
-        />
-      ) : (
-        // Platzhalter in Knopfbreite, damit Zeichen und Namen einer Ebene fluchten.
-        <span
-          aria-hidden
-          data-lfh="org-klappen-platz"
-          // Breite des Klappknopfs: ein Icon-Knopf ist so breit wie hoch (`controlHeight`).
-          style={{ flex: `0 0 ${token.controlHeight}px` }}
-        />
-      )}
-      {knoten.art === 'sammel' ? (
-        <div style={{ fontWeight: 600, paddingBlock: token.paddingXXS }}>Ohne Abschnitt</div>
-      ) : (
-        <KnotenInhalt knoten={knoten} einsatzId={einsatzId} />
-      )}
-    </div>
-  );
-
-  const kinder = hatKinder && offen && (
-    <ul
-      id={kinderId}
-      style={{
-        listStyle: 'none',
-        margin: 0,
-        // Einrückung gedeckelt: tiefe Gliederungen wachsen nach unten, nicht in die Breite.
-        // Unabhängig von der Knopfhöhe: im Handschuh wüchse der Einzug sonst je Ebene um 36 px.
-        marginInlineStart: tiefe < EINRUECKEN_BIS_TIEFE ? token.paddingXS : 0,
-        paddingInlineStart: tiefe < EINRUECKEN_BIS_TIEFE ? token.paddingSM : token.paddingXXS,
-        borderInlineStart: `1px solid ${rollen.linieStark}`,
-      }}
-    >
-      {knoten.kinder.map((k) => (
-        <li key={k.key} style={{ minWidth: 0 }}>
-          <Zweig
-            knoten={k}
-            tiefe={tiefe + 1}
-            einsatzId={einsatzId}
-            zugeklappt={zugeklappt}
-            onUmschalten={onUmschalten}
-          />
-        </li>
-      ))}
-    </ul>
-  );
-
-  return knoten.art === 'sammel' ? (
-    <div role="group" aria-label="Ohne Abschnitt">
-      {kopf}
-      {kinder}
-    </div>
-  ) : (
-    <>
-      {kopf}
-      {kinder}
-    </>
   );
 }
 
@@ -334,7 +215,7 @@ function KnotenInhalt({
         <Link
           to={ziel}
           style={{
-            ...organigrammZielStil(token),
+            ...baumZielStil(token),
             color: rollen.bedienText,
             fontWeight: knoten.art === 'abschnitt' ? 600 : 400,
             overflowWrap: 'anywhere',

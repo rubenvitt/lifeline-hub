@@ -583,6 +583,311 @@ async fn fremde_org_ist_403() {
     )
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "DELETE");
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/{did}", pfad(einsatz)),
+        &fremd,
+        Some(r#"{"titel":"Fremd"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "PATCH");
+}
+
+// ---------- LFH-656: Angaben nachträglich ändern ----------
+
+/// Legt das Standard-Dokument ab und liefert seine id.
+async fn standard_ablegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
+    let (status, json) = ablegen(app, einsatz, cookie, Some(PDF), STANDARD).await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn aendern(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    did: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("{}/{did}", pfad(einsatz)),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+/// System-Einträge, die mit „Dokument geändert:“ beginnen.
+async fn aenderungs_eintraege(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
+    etb(app, cookie, einsatz)
+        .await
+        .iter()
+        .filter(|e| e["typ"] == "system")
+        .filter_map(|e| e["inhalt"].as_str().map(str::to_string))
+        .filter(|i| i.starts_with("Dokument geändert:"))
+        .collect()
+}
+
+#[tokio::test]
+async fn aendern_setzt_titel_und_kategorie_und_laesst_die_datei() {
+    let (app, admin, einsatz) = start().await;
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+
+    let (status, json) = aendern(
+        &app,
+        &admin,
+        einsatz,
+        did,
+        r#"{"titel":"  Lageplan Süd  ","kategorie":"befehl"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["id"], did);
+    assert_eq!(json["titel"], "Lageplan Süd");
+    assert_eq!(json["kategorie"], "befehl");
+    assert_eq!(json["dateiname"], "lageplan.pdf");
+
+    let (_, liste) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+    assert_eq!(liste[0]["titel"], "Lageplan Süd");
+    let (status, _, bytes) = datei_laden(&app, einsatz, did, &admin).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(bytes, PDF.1);
+}
+
+#[tokio::test]
+async fn aendern_nur_titel_laesst_kategorie_und_bezug() {
+    let (app, admin, einsatz) = start().await;
+    let abschnitt = abschnitt_anlegen(&app, &admin, einsatz, "Nord").await;
+    let (_, json) = ablegen(
+        &app,
+        einsatz,
+        &admin,
+        Some(PDF),
+        &[
+            ("titel", "Lageplan Nord"),
+            ("kategorie", "lagekarte_plan"),
+            ("bezug_typ", "abschnitt"),
+            ("bezug_id", &abschnitt.to_string()),
+        ],
+    )
+    .await;
+    let did = json["id"].as_i64().unwrap();
+
+    let (status, json) = aendern(&app, &admin, einsatz, did, r#"{"titel":"Neu"}"#).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["titel"], "Neu");
+    assert_eq!(json["kategorie"], "lagekarte_plan");
+    assert_eq!(json["bezug_abschnitt_id"], abschnitt);
+}
+
+#[tokio::test]
+async fn aendern_setzt_wechselt_und_entfernt_den_bezug() {
+    let (app, admin, einsatz) = start().await;
+    let nord = abschnitt_anlegen(&app, &admin, einsatz, "Nord").await;
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+
+    // Setzen.
+    let (status, json) = aendern(
+        &app,
+        &admin,
+        einsatz,
+        did,
+        &format!(r#"{{"bezug_typ":"abschnitt","bezug_id":{nord}}}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["bezug_abschnitt_id"], nord);
+    assert_eq!(json["bezug_abschnitt_name"], "Nord");
+
+    // Wechseln auf einen ETB-Eintrag: der Abschnitt fällt weg.
+    let etb_id = etb(&app, &admin, einsatz).await[0]["id"].as_i64().unwrap();
+    let (status, json) = aendern(
+        &app,
+        &admin,
+        einsatz,
+        did,
+        &format!(r#"{{"bezug_typ":"etb_eintrag","bezug_id":{etb_id}}}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["bezug_etb_eintrag_id"], etb_id);
+    assert!(json.get("bezug_abschnitt_id").is_none(), "{json:?}");
+
+    // Entfernen.
+    let (status, json) = aendern(
+        &app,
+        &admin,
+        einsatz,
+        did,
+        r#"{"bezug_typ":null,"bezug_id":null}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert!(json.get("bezug_etb_eintrag_id").is_none(), "{json:?}");
+    assert!(json.get("bezug_abschnitt_id").is_none(), "{json:?}");
+}
+
+#[tokio::test]
+async fn aendern_feldfehler_sind_400_und_aendern_nichts() {
+    let (app, admin, einsatz) = start().await;
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+    let fremder_einsatz = einsatz_anlegen(&app, &admin).await;
+    let fremd = abschnitt_anlegen(&app, &admin, fremder_einsatz, "Fremd").await;
+    let lang = "x".repeat(201);
+
+    for body in [
+        r#"{"titel":"   "}"#.to_string(),
+        format!(r#"{{"titel":"{lang}"}}"#),
+        r#"{"kategorie":"plakat"}"#.to_string(),
+        r#"{"kategorie":""}"#.to_string(),
+        r#"{"bezug_typ":"fahrzeug","bezug_id":1}"#.to_string(),
+        r#"{"bezug_typ":"abschnitt","bezug_id":"x"}"#.to_string(),
+        format!(r#"{{"bezug_typ":"abschnitt","bezug_id":{fremd}}}"#),
+        r#"{"bezug_typ":"abschnitt","bezug_id":999999}"#.to_string(),
+        r#"{}"#.to_string(),
+        r#"{"titel":null}"#.to_string(),
+    ] {
+        let (status, json) = aendern(&app, &admin, einsatz, did, &body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {json:?}");
+    }
+    let (_, liste) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+    assert_eq!(liste[0]["titel"], "Lageplan Nord");
+    assert_eq!(liste[0]["kategorie"], "lagekarte_plan");
+    assert!(liste[0].get("bezug_abschnitt_id").is_none());
+    assert!(aenderungs_eintraege(&app, &admin, einsatz).await.is_empty());
+}
+
+#[tokio::test]
+async fn aendern_halber_bezug_ist_422() {
+    let (app, admin, einsatz) = start().await;
+    let nord = abschnitt_anlegen(&app, &admin, einsatz, "Nord").await;
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+
+    for body in [
+        r#"{"bezug_typ":"abschnitt"}"#.to_string(),
+        format!(r#"{{"bezug_id":{nord}}}"#),
+        r#"{"bezug_typ":"abschnitt","bezug_id":null}"#.to_string(),
+        format!(r#"{{"bezug_typ":null,"bezug_id":{nord}}}"#),
+        r#"{"bezug_typ":null}"#.to_string(),
+    ] {
+        let (status, json) = aendern(&app, &admin, einsatz, did, &body).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}: {json:?}");
+    }
+}
+
+#[tokio::test]
+async fn aendern_braucht_schreibrecht_und_aktiven_einsatz() {
+    let (app, admin, einsatz) = start().await;
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+    let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&app, "beobachter", "beobachterpw1").await;
+
+    let (status, _) = aendern(&app, &beob_cookie, einsatz, did, r#"{"titel":"X"}"#).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(status.is_success(), "abschliessen: {status}");
+    let (status, json) = aendern(&app, &admin, einsatz, did, r#"{"titel":"X"}"#).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
+}
+
+#[tokio::test]
+async fn aendern_entferntes_oder_fremdes_dokument_ist_404() {
+    let (app, admin, einsatz) = start().await;
+    let einsatz_b = einsatz_anlegen(&app, &admin).await;
+    let fremd = standard_ablegen(&app, &admin, einsatz_b).await;
+    let (status, _) = aendern(&app, &admin, einsatz, fremd, r#"{"titel":"X"}"#).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/{did}", pfad(einsatz)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = aendern(&app, &admin, einsatz, did, r#"{"titel":"X"}"#).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = aendern(&app, &admin, einsatz, 999_999, r#"{"titel":"X"}"#).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn aendern_schreibt_etb_nachweis_mit_alt_und_neu() {
+    let (app, admin, einsatz) = start().await;
+    let nord = abschnitt_anlegen(&app, &admin, einsatz, "Nord").await;
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+
+    let (status, _) = aendern(
+        &app,
+        &admin,
+        einsatz,
+        did,
+        r#"{"titel":"Befehl 1 – Nachtrag","kategorie":"befehl"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let eintraege = aenderungs_eintraege(&app, &admin, einsatz).await;
+    assert_eq!(eintraege.len(), 1, "{eintraege:?}");
+    let text = &eintraege[0];
+    assert!(
+        text.starts_with("Dokument geändert: Befehl 1 – Nachtrag (Befehl)"),
+        "{text}"
+    );
+    assert!(text.contains("„Lageplan Nord“"), "{text}");
+    assert!(text.contains("Lagekarte/Plan → Befehl"), "{text}");
+    assert!(!text.contains("Bezug:"), "nur Geändertes: {text}");
+
+    let (status, _) = aendern(
+        &app,
+        &admin,
+        einsatz,
+        did,
+        &format!(r#"{{"bezug_typ":"abschnitt","bezug_id":{nord}}}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let eintraege = aenderungs_eintraege(&app, &admin, einsatz).await;
+    assert_eq!(eintraege.len(), 2, "{eintraege:?}");
+    assert!(
+        eintraege
+            .iter()
+            .any(|t| t.contains("Bezug: ohne → Abschnitt Nord") && !t.contains("Titel:")),
+        "{eintraege:?}"
+    );
+}
+
+#[tokio::test]
+async fn aendern_ohne_wirkung_schreibt_keinen_etb_eintrag() {
+    let (app, admin, einsatz) = start().await;
+    let did = standard_ablegen(&app, &admin, einsatz).await;
+    let vorher = etb(&app, &admin, einsatz).await.len();
+
+    let (status, json) = aendern(
+        &app,
+        &admin,
+        einsatz,
+        did,
+        r#"{"titel":" Lageplan Nord ","kategorie":"lagekarte_plan","bezug_typ":null,"bezug_id":null}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["titel"], "Lageplan Nord");
+    assert_eq!(etb(&app, &admin, einsatz).await.len(), vorher);
 }
 
 // ---------- LFH-21: Abschottung der Schaden-Anhänge ----------

@@ -6,7 +6,7 @@ import { farbenDunkel, farbenHell, type Farbrollen } from './tokens';
  * Wächter der Textstufen (LFH-643, Spec `textstufen-kontrast`), gerechnet statt behauptet.
  *
  * JEDE Textstufe hält auf JEDER deckenden Fläche ihres Modus den Textboden: Tag ≥ 7 : 1,
- * Nacht ≥ 5 : 1 — auch der Tertiärtext `schwach` (Augenbraue, Meta, Platzhalter, Feldhilfe).
+ * Nacht ≥ 5 : 1 — auch der Tertiärtext `schwach` (Augenbraue, Meta, Platzhalter).
  * Unter dem Boden liegt nur Gesperrtes im Rahmen (`rahmenKontrast.test.ts`).
  *
  * Die Rangfolge bleibt sichtbar: benachbarte Stufen liegen ≥ 5 ΔL* auseinander. Das

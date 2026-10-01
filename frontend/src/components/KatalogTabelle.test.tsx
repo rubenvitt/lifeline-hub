@@ -13,8 +13,10 @@ import KatalogTabelle, {
   KOPF_FREIRAUM,
   fliessBreite,
   setzeKopfFreiraum,
+  tabellenTokens,
   type KatalogSpalte,
 } from './KatalogTabelle';
+import { farbenDunkel, farbenHell } from '../theme/tokens';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -990,5 +992,14 @@ describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
     expect(css).toMatch(
       /\.ant-table-wrapper\.lfh-katalog \.ant-table-tbody \*\s*\{[^}]*scroll-margin-top:\s*var\(--lfh-tabellenkopf-hoehe/,
     );
+  });
+});
+
+describe('tabellenTokens — Kopftext (LFH-652)', () => {
+  const polster = { paddingSM: 7, padding: 11 };
+
+  it('der Kopftext liest gedaempft, nicht schwach: am Tag hielte schwach auf kopf nur 5,58', () => {
+    expect(tabellenTokens(farbenHell, false, polster).headerColor).toBe(farbenHell.gedaempft);
+    expect(tabellenTokens(farbenDunkel, true, polster).headerColor).toBe(farbenDunkel.gedaempft);
   });
 });

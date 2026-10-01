@@ -300,7 +300,7 @@ for (const modus of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Vermisst melden' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
-    // `extra` steht in `colorTextDescription` = `schwach`; seit LFH-643 voller Boden.
+    // `extra` steht in `colorTextDescription` = `gedaempft` (LFH-652): voller Boden.
     await misst(
       dialog.getByText('Ohne Angabe gilt der Zeitpunkt der Meldung.'),
       minimum,

@@ -70,6 +70,36 @@ for (const modus of ['light', 'dark'] as const) {
   });
 }
 
+// Der Titel-Link einer Datensicht ist ein react-router-`Link` ohne eigene Farbe: er erbt antds
+// Linkfarbe. Die trägt seit LFH-652 die Textrolle (Spec `textkontrast-rollen`); aus `bedien`
+// abgeleitet lag sie nachts bei 4,55.
+for (const modus of ['light', 'dark'] as const) {
+  test(`${modus}: Datensicht-Titel-Link erbt die Linkfarbe und hält den Boden`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await anmelden(page, modus);
+    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 652 ${modus} ${Date.now()}`,
+    });
+    await post(page, `/api/einsaetze/${einsatzId}/schaeden`, {
+      typ: 'sachschaden',
+      ausmass: 'gering',
+      ort: 'Messung Titel-Link',
+    });
+    await page.goto(`/einsaetze/${einsatzId}/schaeden`);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    await page.mouse.move(0, 0);
+    const titel = page
+      .locator('.ant-table-tbody tr.ant-table-row')
+      .first()
+      .locator(`a[href*="/schaeden/"]`)
+      .first();
+    await pruefe(titel, ZIEL[modus], `${modus}/Datensicht/Titel-Link`);
+  });
+}
+
 /** Die Rollenfläche als `rgb(…)`, so wie der Browser sie für `--lfh-<rolle>` auflöst. */
 async function rollenGrund(page: Page, rolle: string): Promise<string> {
   return page.evaluate((r) => {

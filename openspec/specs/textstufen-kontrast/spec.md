@@ -11,7 +11,7 @@ auseinanderliegen und für welchen Text eine Ausnahme gilt.
 
 Jede Textstufe SHALL auf jeder deckenden Fläche ihres Modus den Textboden halten: im
 Tagbetrieb mindestens 7 : 1, im Nachtbetrieb mindestens 5 : 1. Das gilt auch für die
-Tertiärstufe `schwach`, also für Augenbrauen, Metazeilen, Platzhalter und Feldhilfen. Deckende
+Tertiärstufe `schwach`, also für Augenbrauen, Metazeilen und Platzhalter. Deckende
 Flächen sind die Flächenstufen, die Kopfbänder, die deckenden Status- und Bannerflächen und die
 Zeilentönungen. Durchscheinende Füllungen sind keine Textgründe.
 
@@ -25,10 +25,10 @@ Zeilentönungen. Durchscheinende Füllungen sind keine Textgründe.
 - **WHEN** die Augenbraue „fällig“ im Tagbetrieb auf der überfälligen Ablösungskarte (`alarmFlaeche`) steht
 - **THEN** liegt ihr Kontrast bei mindestens 7 : 1
 
-#### Scenario: Feldhilfe im Dialog bei Nacht
+#### Scenario: Tertiärtext im Dialog bei Nacht
 
-- **WHEN** im Nachtbetrieb eine Feldhilfe auf der Dialogfläche steht
-- **THEN** liegt ihr Kontrast bei mindestens 5 : 1
+- **WHEN** im Nachtbetrieb Text in der Stufe `schwach` auf der Dialogfläche (`flaeche2`) steht
+- **THEN** liegt sein Kontrast bei mindestens 5 : 1
 
 #### Scenario: Sekundärtext hält denselben Boden
 

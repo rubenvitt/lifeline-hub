@@ -4,6 +4,7 @@ import { listeAbloesungen } from '../api/abloesungen';
 import { ladeBetreuung } from '../api/betreuung';
 import { listeDokumente } from '../api/dokumente';
 import { ladeModulZaehler } from '../api/modulZaehler';
+import { wetterAbfrage } from '../api/wetter';
 import { EINSATZ_KEYS, einsatzKeys, type EinsatzKey } from '../api/queryKeys';
 import type {
   Abloesung,
@@ -15,6 +16,8 @@ import type {
 import { zaehleFaellige } from '../abloesung/einstufung';
 import { useEinstufungsUhr } from '../abloesung/useUhr';
 import { istAktiverBezirk } from '../betreuung/evakuierungKennzahl';
+import { unwetterLage } from '../wetter/unwetter';
+import { useUnwetterUhr } from '../wetter/useUnwetterUhr';
 import {
   istModulGesperrt,
   istModulSichtbar,
@@ -151,6 +154,27 @@ export function berechneBetreuungZaehler(
 }
 
 /**
+ * Gültige Unwetterwarnungen (schwer/extrem) am Einsatzort, gilt jetzt und angekündigt (LFH-663,
+ * `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D7). Was „Unwetter" heißt,
+ * steht EINMAL in `wetter/unwetter.ts`. Ohne verwertbaren Stand `undefined`: keine Zahl, auch
+ * keine 0.
+ */
+export function berechneUnwetterZaehler(
+  warnungen: Parameters<typeof unwetterLage>[0],
+  jetzt: number,
+): ModulZaehlerWert | undefined {
+  const lage = unwetterLage(warnungen, jetzt);
+  if (!lage) return undefined;
+  const wert = lage.giltJetzt.length + lage.angekuendigt.length;
+  const davon =
+    lage.angekuendigt.length > 0 ? `, davon ${lage.angekuendigt.length} angekündigt` : '';
+  return {
+    wert,
+    beschreibung: `${plural(wert, 'Unwetterwarnung', 'Unwetterwarnungen')} für den Einsatzort${davon}`,
+  };
+}
+
+/**
  * Ob der Rahmen den Zähler einer Quelle zeigen darf: nur an einem sichtbaren UND freien Modul.
  * Das Laden filtert der Server (ein nicht erlaubtes Modul fehlt); diese Prüfung hält die Anzeige
  * an dieselbe Sicht wie die Navigation. Für die Browser-Zähler ist sie zugleich das Ladegate:
@@ -175,6 +199,10 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   const dokumenteAktiv = darfZaehlerZeigen('dokumente', benutzer, overrides);
   const abloesungAktiv = darfZaehlerZeigen('abloesung', benutzer, overrides);
   const betreuungAktiv = darfZaehlerZeigen('betreuung', benutzer, overrides);
+  // Das Wetter erst nach geladenen Overrides (LFH-663): vorher gälte das Modul als frei, und ein
+  // ausgeblendetes antwortete mit 403 — die Spec verlangt dann gar keine Anfrage.
+  const wetterAktiv =
+    overrides !== undefined && darfZaehlerZeigen('wetter-pegel', benutzer, overrides);
 
   const zaehler = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
@@ -196,6 +224,10 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
     queryFn: () => ladeBetreuung(einsatzId),
     enabled: betreuungAktiv,
   });
+  // Dieselbe Abfrage wie Modulseite und Unwetterhinweis: ein Abruf je 5 min, ein Cache-Fach.
+  const wetter = useQuery({ ...wetterAbfrage(einsatzId), enabled: wetterAktiv });
+  // Eine abgelaufene Warnung fällt auch zwischen zwei Abrufen heraus.
+  const wetterJetzt = useUnwetterUhr(wetterAktiv ? wetter.data?.warnungen : undefined);
   // Die Einstufung hängt an der Uhr: ohne Wecker bliebe der Zähler bei einer Schicht, die in die
   // Vorwarnzeit läuft, auf dem alten Stand.
   const jetzt = useEinstufungsUhr(abloesungAktiv ? abloesungen.data : undefined);
@@ -212,6 +244,10 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   }
   if (betreuungAktiv && betreuung.isSuccess) {
     karte.betreuung = berechneBetreuungZaehler(betreuung.data.bezirke);
+  }
+  if (wetterAktiv && wetter.isSuccess) {
+    const unwetter = berechneUnwetterZaehler(wetter.data.warnungen, wetterJetzt);
+    if (unwetter) karte['wetter-pegel'] = unwetter;
   }
   return karte;
 }
