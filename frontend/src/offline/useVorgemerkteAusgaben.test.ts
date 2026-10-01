@@ -1,6 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  QUEUE_KANAL,
+  queueKanalZuruecksetzenFuerTests,
   queueLeerenFuerTests,
   schreibaktionAblehnen,
   schreibaktionEinreihen,
@@ -18,6 +20,10 @@ const ausgabe = (zeitfenster_id: number, client_id: string) => ({
 
 beforeEach(async () => {
   await queueLeerenFuerTests();
+});
+afterEach(() => {
+  queueKanalZuruecksetzenFuerTests();
+  vi.restoreAllMocks();
 });
 
 describe('useVorgemerkteAusgaben (LFH-688)', () => {
@@ -55,6 +61,26 @@ describe('useVorgemerkteAusgaben (LFH-688)', () => {
     const [zeile] = await schreibaktionenLaden(11, 7);
     await schreibaktionAblehnen(11, zeile, 'Nicht gefunden');
     await waitFor(() => expect(result.current).toHaveLength(0));
+  });
+
+  it('folgt auch einem Flush in einem anderen Tab (BroadcastChannel)', async () => {
+    await schreibaktionEinreihen(11, 7, ausgabe(9, 'anderer-tab'));
+    const { result } = renderHook(() => useVorgemerkteAusgaben(11, 7));
+    await waitFor(() => expect(result.current).toHaveLength(1));
+
+    // Der andere Tab entfernt die Zeile: hier kommt kein lokales Fenster-Ereignis an …
+    const lokal = vi.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    await schreibaktionEntfernen(11, zeile.id!);
+    lokal.mockRestore();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(result.current).toHaveLength(1);
+
+    // … nur sein datenloses Signal über den Kanal.
+    const andererTab = new BroadcastChannel(QUEUE_KANAL);
+    andererTab.postMessage({ typ: 'queue-geaendert' });
+    await waitFor(() => expect(result.current).toHaveLength(0));
+    andererTab.close();
   });
 
   it('liefert ohne Benutzer nichts', async () => {

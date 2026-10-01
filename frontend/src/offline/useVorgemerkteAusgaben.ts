@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  OFFLINE_QUEUE_EVENT,
+  beobachteQueueAenderungen,
   schreibaktionenLaden,
   type AusstehendeSchreibaktion,
   type OfflineSchreibaktion,
@@ -20,7 +20,8 @@ function istAusgabe(z: AusstehendeSchreibaktion): z is VorgemerkteAusgabe {
 /**
  * Reaktive Sicht auf die vorgemerkten Ausgaben eines Einsatzes (LFH-688, design.md D8). Nur der
  * Store der ausstehenden Schreibaktionen: abgelehnte gehören in den Wiederherstellungs-Drawer,
- * nicht als „ausstehend“ an die Karte. Muster wie `useOfflineQueueZaehler`.
+ * nicht als „ausstehend“ an die Karte. Muster wie `useOfflineQueueZaehler`, aber auch über Tabs
+ * hinweg: flusht ein anderer Tab, entfällt „ausstehend“ hier ebenfalls (`beobachteQueueAenderungen`).
  */
 export function useVorgemerkteAusgaben(
   benutzerId: number | undefined,
@@ -47,9 +48,9 @@ export function useVorgemerkteAusgaben(
 
   useEffect(() => {
     laden();
-    window.addEventListener(OFFLINE_QUEUE_EVENT, laden);
+    const beenden = beobachteQueueAenderungen(laden);
     return () => {
-      window.removeEventListener(OFFLINE_QUEUE_EVENT, laden);
+      beenden();
       ladeGeneration.current += 1;
     };
   }, [laden]);

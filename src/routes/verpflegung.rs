@@ -2,10 +2,10 @@
 //!
 //! Gates strukturell über `EinsatzLesezugriff<Verpflegung>` (alle Einsatzmitglieder inkl.
 //! Beobachter) bzw. `EinsatzSchreibzugriff<Verpflegung>` (Schreibrecht, aktiver Einsatz,
-//! Modul). Ausnahme ist „Ausgabe erfassen“ mit `EinsatzSchreibfreigabe` (LFH-688): ihr
-//! Replay-Lookup läuft vor `fordere_aktiv`. Ein abgeschlossener Einsatz ist damit 409 aus `fordere_aktiv` im Extractor — wie bei
-//! Ablösung und Betreuung, NICHT über `fordere_aktiv_in_tx` (design.md D4). Bodies nur über
-//! `JsonBody`, Sub-IDs nur über `PfadParam`.
+//! Modul). Für diese Schreibrouten ist ein abgeschlossener Einsatz 409 aus `fordere_aktiv` im
+//! Extractor — wie bei Ablösung, NICHT über `fordere_aktiv_in_tx` (design.md D4). Ausnahme ist
+//! „Ausgabe erfassen“ mit `EinsatzSchreibfreigabe` (LFH-688): ihr Replay-Lookup läuft vor
+//! `fordere_aktiv` im Handler. Bodies nur über `JsonBody`, Sub-IDs nur über `PfadParam`.
 //!
 //! **Statuscodes** (design.md D4, src/AGENTS.md „Statuscode-Konvention“):
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, leere Bezeichnung, negativer

@@ -194,6 +194,21 @@ Die Tabellenregel `verpflegung_ausgabe` bekommt `retain("client_id", G_IDEMPOTEN
 ist eine technische UUID ohne Personenbezug. Die Registry prüft die Spalten gegen das Schema, ohne
 den Eintrag wäre sie rot.
 
+### D11 — „ausstehend“ folgt auch einem Flush in einem anderen Tab (Nachtrag aus dem Review)
+
+Das Fenster-Ereignis `OFFLINE_QUEUE_EVENT` erreicht nur den eigenen Tab. Flusht ein anderer Tab
+desselben Geräts die Queue, lädt dieser Tab über das Live-Ereignis die bestätigte Ausgabe, behielte
+aber die Zeile „ausstehend“, und die Ausgabe stünde doppelt da. Das verletzt das Szenario „Nach
+der Bestätigung gezählt“. `queue.ts` sendet deshalb bei jeder Änderung zusätzlich ein datenloses
+Signal über den `BroadcastChannel` `lfh:offline-queue`. `beobachteQueueAenderungen` hört auf
+beides, und `useVorgemerkteAusgaben` nutzt es. Das Muster stammt aus `offline/ereignisse.ts`.
+
+Das Signal wird **nicht** als Fenster-Ereignis weitergereicht. Darauf hört auch der Flush
+(`useOfflineSync`), und jede Änderung eines anderen Tabs stieße sonst einen Flush an. Den Zähler
+(`useOfflineQueueZaehler`) lässt diese Änderung unverändert, denn sein Nachlauf über Tabs ist
+heute schon so und nicht Gegenstand von LFH-688. Ohne `BroadcastChannel` gilt wie bisher nur das
+Fenster-Ereignis.
+
 ## Risks / Trade-offs
 
 - [Ein Tab mit altem Bundle flusht die gemeinsame Queue] → Ein Bundle mit der exhaustiven Kette
