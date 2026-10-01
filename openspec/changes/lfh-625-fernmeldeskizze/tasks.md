@@ -87,7 +87,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 4. Darstellung der Skizze (D5, Spec „Knoteninhalt“, „Kante“, „Einsatzleitung“, „Quellen“, „Ein- und Ausklappen“, „Deeplinks“)
 
-- [ ] 4.1 Vor dem Bau messen, im neuen Block „Skizze“ in `e2e/funkplan.spec.ts`:
+- [x] 4.1 Vor dem Bau messen, im neuen Block „Skizze“ in `e2e/funkplan.spec.ts`:
   - Contentbreite der Funkplan-Seite bei 1366 × 768 mit offenem Panel
   - Laufweite einer langen Sprechgruppen-Bezeichnung (gesät, ≥ 24 Zeichen) und von
     `⇄ TMO … · DMO …` in Mono 12
@@ -139,7 +139,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 6. Nachweise im Browser und Regeln (D8)
 
-- [ ] 6.1 `e2e/funkplan.spec.ts`, Block „Skizze“:
+- [x] 6.1 `e2e/funkplan.spec.ts`, Block „Skizze“:
   - acht Abschnitte mit je drei Einheiten mit je zwei Sprechgruppen bei 1366 × 768 mit Panel:
     mehrere Spaltenzeilen, kein Überhang von Seite, Skizze und Knoten
   - dasselbe bei 1024, 768 und 390 px
@@ -150,10 +150,10 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
     Neuladen von „keine gemeinsame Sprechgruppe“ zu `⇄ …` wechseln
 
   Nachweis: grün.
-- [ ] 6.2 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`) und Gate 3 (`e2e/gate3-trefflaeche.spec.ts`)
+- [x] 6.2 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`) und Gate 3 (`e2e/gate3-trefflaeche.spec.ts`)
   nehmen `stab/funkplan?ansicht=skizze` auf, als Admin und als Beobachter. Nachweis: beide Specs
   grün, und Gate 3 meldet Namenslinks, Klappziele und Umschalter bei 30/48/72 px.
-- [ ] 6.3 Mutationsproben, jede einzeln eingesetzt, rot belegt und zurückgenommen:
+- [x] 6.3 Mutationsproben, jede einzeln eingesetzt, rot belegt und zurückgenommen:
   1. `verbindungsurteil` vergleicht Bezeichnungen statt `id`
   2. `ohne-urteil` bei leerer Seite entfällt (gilt dann als `keine`)
   3. Druckkopf immer „Funkplan“
@@ -164,11 +164,14 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   8. Sichtvorgabe nicht geräumt
 
   Nachweis: Liste mit Ergebnis in `pruefliste.md`.
-- [ ] 6.4 `stab/AGENTS.md`: Der Funkplan-Eintrag nennt die Darstellung „Skizze“ (Fernmeldeskizze),
+- [x] 6.4 `stab/AGENTS.md`: Der Funkplan-Eintrag nennt die Darstellung „Skizze“ (Fernmeldeskizze),
   das Modell `stab/fernmeldeskizze.ts` über `baueFuehrungsorganisation`, die Kante nur über
   `verbindungsurteil` aus `stab/luecken.ts` und den Verweis auf diese Change im Archiv. Nachweis:
   Prettier-Prüfung grün, Verweis zeigt nach `/opsx:archive` auf den Archivpfad.
-- [ ] 6.5 `pruefliste.md` dieser Change mit den Kriterien der Prüfliste Einsatztauglichkeit
+- [x] 6.5 `pruefliste.md` dieser Change mit den Kriterien der Prüfliste Einsatztauglichkeit
   (Vorbild LFH-626), Schwerpunkt Fükw und Tablet. Nachweis: Datei vollständig, jedes Kriterium mit
   Verdikt und Beleg.
-- [ ] 6.6 `./scripts/check-all.sh` grün (lokal bzw. im CI-Lauf des PRs, mit Verweis darauf).
+- [x] 6.6 `./scripts/check-all.sh` grün (lokal bzw. im CI-Lauf des PRs, mit Verweis darauf).
+  Lokal: `--nur schnell` grün (10/10), volle Vitest-Suite grün mit `TZ=Europe/Berlin`,
+  e2e `funkplan`, `fuehrungsorganisation`, Gate 1 und Gate 3 grün. Rust ist unberührt; den
+  vollen Lauf belegt die CI des PRs (`.github/workflows/ci.yml` ruft das Skript unverändert).
