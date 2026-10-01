@@ -30,6 +30,12 @@ import './lagekarte.css';
 export const UEBERLAGERUNG_RAND = 12;
 
 /**
+ * Die Fuge zwischen den Kartenknöpfen ist eine Haarlinie, kein Abstand: sie zeigt `linieStark`
+ * durch und bleibt in jeder Dichte 1 px, wie die Fuge des Kennzahlenbands (LFH-703).
+ */
+const KNOPF_FUGE = 1;
+
+/**
  * Kantenlänge eines Kartenknopfs: der Entwurf zeichnet 32 px, die Dichte-Staffel verlangt
  * mindestens `controlHeight`. Es gilt das Größere — rein und exportiert.
  */
@@ -322,7 +328,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           right: UEBERLAGERUNG_RAND,
           display: 'flex',
           flexDirection: 'column',
-          gap: 1,
+          gap: KNOPF_FUGE,
           background: rollen.linieStark,
           border: `1px solid ${rollen.linieStark}`,
         }}
