@@ -154,6 +154,28 @@ pub async fn laden(
     Ok(row.map(zu_anzeige))
 }
 
+/// Prüft eine gesendete `ansicht_id` gegen den Einsatz (LFH-738). Die id von `karten_ansicht`
+/// gilt für die ganze Instanz; ungeprüft hinge ein Kartenobjekt an der Ansicht eines fremden
+/// Einsatzes, und deren Löschen setzte die Zuordnung per `ON DELETE SET NULL` still zurück.
+/// `None` (auf allen Ansichten sichtbar) ist immer zulässig. Fremd und unbekannt sind beide
+/// `NotFound` (404) — ununterscheidbar, damit kein Existenz-Orakel entsteht.
+pub async fn pruefe_zugehoerig(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ansicht_id: Option<i64>,
+) -> Result<(), AppError> {
+    let Some(id) = ansicht_id else {
+        return Ok(());
+    };
+    let gefunden: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM karten_ansicht WHERE einsatz_id = ? AND id = ?")
+            .bind(einsatz_id)
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+    gefunden.map(|_| ()).ok_or(AppError::NotFound)
+}
+
 /// Konfiguration einer Ansicht überschreiben (Vollersatz der Config, s. [`AnsichtPatch`]).
 /// `None` = die Ansicht gehört nicht zu diesem Einsatz (→ 404). Enum-Werte sind vom
 /// Handler bereits validiert.

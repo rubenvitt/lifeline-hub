@@ -5,7 +5,8 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Die Abstände der rechten Kartenleiste kommen aus der Dichte-Staffel, nicht aus einer Zahl.
+ * Die Abstände der rechten Kartenleiste und der Bausteine über der Karte kommen aus der
+ * Dichte-Staffel, nicht aus einer Zahl (LFH-377, LFH-703).
  * Haarlinien trennen die Abschnitte (`KlappPaneel`/`LeistenAbschnitt`), gepolstert mit
  * `token.padding`.
  *
@@ -22,13 +23,31 @@ import { describe, expect, it } from 'vitest';
  * Was er nicht sieht (Teil des Vertrags): einen Wert aus einer Variablen (`padding: rand` mit
  * `const rand = 12`), einen Spread aus einer Hilfsfunktion in einer anderen Datei, Stile aus
  * CSS-Dateien (die Leiste hat dort keine Abstände; `lagekarte.css` polstert nur die Maßstabsleiste)
- * und Bausteine außerhalb der drei Dateien.
+ * und Bausteine außerhalb von `DATEIEN`.
+ *
+ * Bewusst fest und deshalb benannt statt als Zahl: die Haarlinie zwischen den Kartenknöpfen
+ * (`KNOPF_FUGE` in `KartenUeberlagerung.tsx`, 1 px in jeder Dichte, wie die Fuge des
+ * Kennzahlenbands), der Kartenrand `UEBERLAGERUNG_RAND`/`FUSS_ABSTAND` (Abstand zur
+ * Kartenkante, kein Abstand im Baustein) und die Abstände des Zeitachsen-Bands in
+ * `SnapshotLeiste.tsx` (wüchse es mit, risse es im Handschuh-Betrieb den Deckel der halben Karte;
+ * Begründung dort, Umbau LFH-899). Die Datei bleibt im Scan, damit keine neue Zahl dazukommt.
  */
 
 const hier = dirname(fileURLToPath(import.meta.url));
 
-/** Die Leiste selbst und was sie unmittelbar als Abschnittsinhalt einhängt. */
-const DATEIEN = ['Sidebar.tsx', 'KlappPaneel.tsx', 'AnsichtSwitcher.tsx'] as const;
+/** Die Leiste selbst und was sie unmittelbar als Abschnittsinhalt einhängt — seit LFH-703 auch
+ *  die Inspectors im Abschnitt „Ausgewählt“ und die Bausteine über der Karte (Detailkarte,
+ *  Überlagerung, Snapshot-Band im Fuß). */
+const DATEIEN = [
+  'Sidebar.tsx',
+  'KlappPaneel.tsx',
+  'AnsichtSwitcher.tsx',
+  'FachebenenInspector.tsx',
+  'Inspector.tsx',
+  'KartenDetailCard.tsx',
+  'KartenUeberlagerung.tsx',
+  'SnapshotLeiste.tsx',
+] as const;
 
 /** Stil-Schlüssel, die einen Abstand tragen. `0` bleibt erlaubt: es ist kein Maß, sondern
  *  das Abschalten der Browser-Vorgabe (`margin: 0` an Überschrift und Absatz). */
@@ -120,7 +139,7 @@ function festeAbstaende(datei: string, quelle: string): Fund[] {
   return funde;
 }
 
-describe('Abstände der Kartenleiste (LFH-377)', () => {
+describe('Abstände der Kartenleiste und der Kartenbausteine (LFH-377, LFH-703)', () => {
   it.each(DATEIEN)('%s trägt keinen festen Abstand in den Formen, die der Scan sieht', (datei) => {
     const quelle = readFileSync(join(hier, datei), 'utf8');
     expect(festeAbstaende(datei, quelle)).toEqual([]);

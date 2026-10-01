@@ -141,16 +141,18 @@ pub async fn laden(
         .ok_or(AppError::NotFound)
 }
 
-/// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung), sonst `NotFound`.
+/// Prüft, ob ein Abschnitt zum Einsatz gehört, sonst `NotFound` — für die Parent-Validierung
+/// und für Module, die auf einen Abschnitt zeigen (UHS, Bereitstellungsraum; LFH-735): der
+/// Fremdschlüssel allein ließe den Abschnitt eines anderen Einsatzes zu.
 /// Executor-generisch, damit [`anlegen_tx`] auf der offenen Verbindung prüft.
-async fn pruefe_parent(
+pub async fn pruefe_im_einsatz(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
-    parent_id: i64,
+    abschnitt_id: i64,
 ) -> Result<(), AppError> {
     let treffer: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
-            .bind(parent_id)
+            .bind(abschnitt_id)
             .bind(einsatz_id)
             .fetch_optional(executor)
             .await?;
@@ -216,7 +218,7 @@ async fn validiere(
     daten: &AbschnittDaten<'_>,
 ) -> Result<(), AppError> {
     if let Some(parent) = daten.ueber_abschnitt_id {
-        pruefe_parent(&mut *conn, einsatz_id, parent).await?;
+        pruefe_im_einsatz(&mut *conn, einsatz_id, parent).await?;
     }
     if let Some(leiter) = daten.leiter_id {
         pruefe_leiter(&mut *conn, einsatz_id, leiter).await?;
@@ -301,7 +303,7 @@ async fn validiere_patch(
     patch: &AbschnittPatch<'_>,
 ) -> Result<(), AppError> {
     if let Some(Some(parent)) = patch.ueber_abschnitt_id {
-        pruefe_parent(pool, einsatz_id, parent).await?;
+        pruefe_im_einsatz(pool, einsatz_id, parent).await?;
         if waere_zyklus(pool, self_id, parent).await? {
             return Err(AppError::Validation(
                 "Abschnitt darf nicht eigener Vorfahr werden".into(),

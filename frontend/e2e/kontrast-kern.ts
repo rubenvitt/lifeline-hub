@@ -1,4 +1,4 @@
-import { expect, type Locator } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Messkern für Text-/Hintergrund- und Randkontrast, geteilt von allen Kontrast-Specs. Eine
@@ -116,6 +116,32 @@ export async function randKontrast(ziel: Locator, seite: 'left' | 'top' = 'left'
   };
 }
 
+/**
+ * Kontrast eines Fokusumrisses (`outline`, WCAG 1.4.11) gegen den Grund, auf dem er steht
+ * (LFH-737). Mit `outline-offset` ≥ 0 liegt der Umriss AUSSERHALB der Border-Box, also auf der
+ * Fläche des Elternteils; ein negativer Versatz legt ihn auf die eigene Fläche.
+ *
+ * Kein Umriss ist ein Fehler, keine Messung: Stil `none` oder Breite 0 hätte sonst den Kontrast
+ * einer Farbe, die niemand sieht (antd zeichnet ihn nur unter `:focus-visible`).
+ */
+export async function umrissKontrast(ziel: Locator) {
+  const umriss = await ziel.evaluate((el) => {
+    const stil = getComputedStyle(el);
+    return {
+      stil: stil.outlineStyle,
+      breite: parseFloat(stil.outlineWidth),
+      versatz: parseFloat(stil.outlineOffset),
+    };
+  });
+  if (umriss.stil === 'none' || !(umriss.breite > 0))
+    throw new Error(`Kein Fokusumriss gezeichnet: ${JSON.stringify(umriss)}`);
+  const m = await messe(ziel, {
+    vordergrund: 'outline-color',
+    grund: umriss.versatz < 0 ? 'selbst' : 'eltern',
+  });
+  return { ...umriss, umriss: m.vordergrund, grund: m.grund, verhaeltnis: m.verhaeltnis };
+}
+
 export async function pruefe(tag: Locator, minimum: number, name: string) {
   await expect(tag, name).toBeVisible();
   // Modal-Einblendung erst abwarten: Opacity-Gruppen liefern keine belastbare Messung.
@@ -198,4 +224,69 @@ export async function schattenKontrast(ziel: Locator, nachbar: Locator) {
 /** Komponierte Fläche eines Elements (alle Vorfahren übereinander), opak. */
 export async function flaeche(ziel: Locator): Promise<Farbe> {
   return (await messe(ziel, { vordergrund: 'color', grund: 'selbst' })).grund;
+}
+
+/**
+ * Misst erst, wenn das Bild STEHT: antd blendet Knopffläche und -farbe über, und ein früher
+ * Wechsel ist ein Zwischenbild (gemessen 1 Farbwert neben der Ruhe), das jede Hover-Farbe
+ * bestünde. Gewartet wird auf das Ende aller Übergänge, dann müssen zwei Messungen gleich sein.
+ * Einblendungen (Karte, Modal) laufen als Opacity-Gruppe, die der Messkern ablehnt, bis sie
+ * stehen.
+ */
+export async function stehend(ziel: Locator, name: string) {
+  let messung: Awaited<ReturnType<typeof kontrast>> | undefined;
+  const ende = () =>
+    ziel.evaluate((el) =>
+      Promise.all(
+        [el, ...el.querySelectorAll('*')].flatMap((e) => e.getAnimations()).map((a) => a.finished),
+      ),
+    );
+  await expect(async () => {
+    await ende();
+    const erste = await kontrast(ziel);
+    await ende();
+    messung = await kontrast(ziel);
+    expect(messung, `${name} steht`).toEqual(erste);
+  }).toPass({ timeout: 10_000 });
+  return messung!;
+}
+
+/**
+ * Beschriftung auf einer Bedien- oder Gefahrfläche in Ruhe UND unter dem Zeiger (LFH-661,
+ * LFH-693; Spec `farbrollen-kontrast`). Kein eigener Knopfboden: die Begründung setzt voraus,
+ * dass die Beschriftung kein Großtext nach WCAG 1.4.3 ist (fett erst ab 18,66 px). Wächst sie
+ * darüber, ist das neu zu fragen. Unter dem Zeiger wird erst gemessen, wenn der Zustand
+ * gewechselt hat; sonst wäre „Hover gemessen“ trivial wahr. Was wechselt, sagt `wechsel`: die
+ * Fläche (gefüllter Knopf, Menüeintrag) oder die Schrift (umrandeter Knopf, Fläche bleibt).
+ */
+export async function ruheUndZeiger(
+  page: Page,
+  ziel: Locator,
+  schranke: number,
+  name: string,
+  wechsel: 'grund' | 'text' = 'grund',
+) {
+  await expect(ziel, name).toBeVisible();
+  const schrift = await ziel.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(schrift, `${name}: Schriftgröße`).toBeLessThan(18.66);
+  // Kein Zeiger, kein Fokus: die Ruhe.
+  await page.mouse.move(0, 0);
+  await ziel.evaluate((el) => (el as HTMLElement).blur());
+  const ruhe = await stehend(ziel, `${name}, Ruhe`);
+  expect(ruhe.verhaeltnis, `${name}, Ruhe: ${JSON.stringify(ruhe)}`).toBeGreaterThanOrEqual(
+    schranke,
+  );
+
+  await ziel.hover();
+  const wechselText = `${name}: ${wechsel === 'grund' ? 'Fläche' : 'Schrift'} unter dem Zeiger wechselt`;
+  await expect(async () => {
+    const zeiger = await kontrast(ziel);
+    expect(zeiger[wechsel], wechselText).not.toEqual(ruhe[wechsel]);
+  }).toPass({ timeout: 10_000 });
+  const zeiger = await stehend(ziel, `${name}, Zeiger`);
+  expect(zeiger[wechsel], wechselText).not.toEqual(ruhe[wechsel]);
+  expect(zeiger.verhaeltnis, `${name}, Zeiger: ${JSON.stringify(zeiger)}`).toBeGreaterThanOrEqual(
+    schranke,
+  );
+  return { ruhe, zeiger };
 }

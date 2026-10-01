@@ -227,7 +227,7 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Bezug' }));
     const comboboxen = screen.getAllByRole('combobox');
     await userEvent.click(comboboxen[0]);
@@ -266,7 +266,7 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Bearbeiten' }));
     const feld = await screen.findByDisplayValue('Erste Lage');
     await userEvent.clear(feld);

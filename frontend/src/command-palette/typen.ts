@@ -205,6 +205,7 @@ export const GRUPPEN_REIHENFOLGE = [
   'einsaetze',
   'einstellungen',
   'navigation',
+  'ortssuche',
 ] as const;
 
 export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
@@ -234,6 +235,11 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
   einsaetze: 'Einsatz wechseln',
   einstellungen: 'Einstellungen',
   navigation: 'Navigation',
+  /**
+   * Die Adresszeile (`adressSprung.ts`, LFH-638): höchstens EINE Zeile, nur bei aktiver Suche und
+   * immer am Ende (Gruppe zuletzt, Score hinter jedem Treffer) — nie vorausgewählt.
+   */
+  ortssuche: 'Adresse',
 };
 
 /**
@@ -249,7 +255,7 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
  *    das Gedächtnis blind.
  *  - `aktionen`: die ID benennt einen SLOT (`tastatur:speichern` bedeutet je Maske etwas
  *    anderes); gegen eine fremde Maske aufgelöst schriebe „Speichern“ etwas anderes.
- *  - `koordinate`: eine getippte Stelle ist kein wiederkehrender Befehl.
+ *  - `koordinate`/`ortssuche`: eine getippte Stelle ist kein wiederkehrender Befehl.
  *  - `ausgefuehrt`: die Kopie trägt die Meldung des ORIGINALS schon in `ausfuehren`.
  *
  * `navigation` ist `true` (wiederholte Sprünge), ausgenommen Abmelden über
@@ -268,6 +274,8 @@ export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
   einsaetze: true,
   einstellungen: true,
   navigation: true,
+  // Ein getippter Suchtext ist kein wiederkehrender Befehl.
+  ortssuche: false,
 };
 
 /**
@@ -287,6 +295,7 @@ export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
   einsaetze: false,
   einstellungen: false,
   navigation: false,
+  ortssuche: false,
 };
 
 /**

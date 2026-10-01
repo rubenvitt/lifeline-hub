@@ -381,8 +381,7 @@ export function AusgabeDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      {/* Normaltext, nicht `secondary`: die Zeile ist die einzige Angabe der Fehlmenge im Dialog, und
-         Tertiärtext hält nachts den Kontrastboden nicht. */}
+      {/* Normaltext, nicht `secondary`: die Zeile ist die einzige Angabe der Fehlmenge im Dialog. */}
       <Typography.Paragraph style={{ fontVariantNumeric: 'tabular-nums' }}>
         Bedarf {zf.bedarf.gesamt} · ausgegeben {zf.ausgegeben.gesamt} · fehlt {zf.fehlmenge.gesamt}{' '}
         EP
@@ -432,7 +431,8 @@ export function AusgabeDialog({
 
 /**
  * Rückfrage vor einer unumkehrbaren Aktion: eigenes `Modal` mit rotem Bestätigungsknopf, kein
- * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Karten.
+ * `Popconfirm`. Der Aufrufer rendert EINEN Dialog außerhalb der Karten. Während `laeuft` ist sie
+ * nicht schließbar, damit ein Server-Grund (422/409) im Dialog ankommt.
  */
 function Rueckfrage({
   titel,
@@ -459,7 +459,16 @@ function Rueckfrage({
       okButtonProps={{ danger: true }}
       confirmLoading={laeuft}
       onOk={onBestaetigen}
-      onCancel={onSchliessen}
+      // Solange die Aktion läuft, führt KEIN Weg hinaus: ein Fehlschlag danach ginge still verloren
+      // (LFH-706, wie `betreuung/MeldeVerlauf.tsx`). antd 6 verwirft `onCancel` unter
+      // `confirmLoading` zwar selbst, ließe „Abbrechen“ und das Kreuz aber bedienbar aussehen.
+      onCancel={() => {
+        if (!laeuft) onSchliessen();
+      }}
+      cancelButtonProps={{ disabled: laeuft }}
+      closable={!laeuft}
+      keyboard={!laeuft}
+      mask={{ closable: !laeuft }}
       destroyOnHidden
     >
       {children}

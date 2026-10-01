@@ -1020,3 +1020,73 @@ async fn verorten_lon_ausserhalb_range_ist_422() {
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+/// Legt einen Einsatzabschnitt an.
+async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        cookie,
+        Some(&json!({"name": name})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Abschnitt: {v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// LFH-735: der Fremdschlüssel allein lässt den Abschnitt eines anderen Einsatzes zu. Anlage
+/// und PATCH prüfen ihn wie bei den Einheiten (`einheit::repo`) → 404, nichts geschrieben.
+#[tokio::test]
+async fn abschnitt_eines_fremden_einsatzes_ist_404() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let fremder_einsatz = einsatz_anlegen(&app, &cookie).await;
+    let eigener = abschnitt_anlegen(&app, &cookie, einsatz, "Nord").await;
+    let fremder = abschnitt_anlegen(&app, &cookie, fremder_einsatz, "Fremd").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/uhs");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP X", "abschnitt_id": fremder})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::NOT_FOUND,
+        "Anlage mit fremdem Abschnitt: {v}"
+    );
+    let (_, liste) = anfrage_json(&app, "GET", &pfad, &cookie, None).await;
+    assert_eq!(
+        liste.as_array().unwrap().len(),
+        0,
+        "nichts angelegt: {liste}"
+    );
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP N", "abschnitt_id": eigener})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "eigener Abschnitt geht: {v}");
+    let uhs = v["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{pfad}/{uhs}"),
+        &cookie,
+        Some(&json!({"abschnitt_id": fremder})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "PATCH mit fremdem Abschnitt: {v}");
+    let (_, v) = anfrage_json(&app, "GET", &format!("{pfad}/{uhs}"), &cookie, None).await;
+    assert_eq!(v["abschnitt_id"], eigener, "Abschnitt unverändert: {v}");
+}

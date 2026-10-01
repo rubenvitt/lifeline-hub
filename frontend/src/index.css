@@ -69,6 +69,22 @@ body {
   color: var(--lfh-bedien-text);
 }
 
+/* Fußfuge der Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und
+   Bestätigungsblase trennen ihre Knöpfe mit `marginXS` = 3 / 5 / 7 px; in einer Rückfrage steht
+   fast immer Rot neben „Abbrechen", und im Handschuh-Betrieb verlangt die Leitlinie ≥ 16 px.
+   `var(--ant-padding)` ist antds Token `padding` = `abstand.md` = 11 / 18 / 26, dieselbe Stufe
+   wie `<Space size="middle">`. Eine Stilregel statt eines Komponenten-Tokens: jeder antd-Knopf
+   trägt die `css-var-…`-Klasse des globalen Themes und setzt dort `--ant-margin-xs` zurück, eine
+   Überschreibung an Blase oder Modal kam am Knopf nie an (gemessen 7 px). `--ant-padding` löst am
+   Knopf in der gewählten Stufe auf. `:root` hebt die Regel über antds `:where(…)`-Selektoren
+   (Modal-Fuß: vier Klassen), unabhängig von der Reihenfolge im Dokument. Nachweis:
+   `theme/tokens.test.ts` (Quelltext), `e2e/dokumente.spec.ts` (Messung). */
+:root .ant-modal .ant-modal-footer > .ant-btn + .ant-btn,
+:root .ant-modal-confirm .ant-modal-confirm-btns .ant-btn + .ant-btn,
+:root .ant-popconfirm .ant-popconfirm-buttons .ant-btn + .ant-btn {
+  margin-inline-start: var(--ant-padding);
+}
+
 /* ETB: Fokusabstand zur angepinnten Erfassungsleiste (LFH-373, WCAG 2.4.11).
    `scroll-margin` an den ZIELEN von Seitenkopf und Inhalt, NICHT `scroll-padding` am Dokument:
    die Scrollport-Variante zählt auch die Ziele IN der Leiste zum verdeckten Streifen und rollt
