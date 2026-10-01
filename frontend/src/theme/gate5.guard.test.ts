@@ -17,6 +17,14 @@ import { describe, expect, it } from 'vitest';
  * 3. Kommentare sind ausgenommen (`ohneKommentare`, mit Block-Zustand über Zeilengrenzen). Ein
  *    `//` in einem String blendet den Zeilenrest aus: Falsch-Negative, nie Falsch-Positive.
  * 4. Tests sind ausgenommen (`*.test.*`), sie pinnen Werte bewusst.
+ *
+ * ── ZWEITE PRÜFUNG: ROHE WERTE IN CSS (LFH-696) ──
+ *
+ * Der Scan oben findet nur KOPIEN von Rollenwerten. Ein Wert, der keiner Rolle gleicht, rutschte
+ * durch (die Deeplink-Hervorhebung in `index.css` bis LFH-696). Deshalb gilt für
+ * handgeschriebenes `*.css` außerhalb `src/theme/` strenger: KEIN Hex-Farbwert, ohne
+ * Ausnahmeliste (Spec `farbrollen-herkunft`). TSX bleibt beim Rollenwert-Scan, dort tragen
+ * `pages/lagekarte/` modusunabhängige Kartenfarben. Grenze 1 gilt mit: nur Hex, kein rgba.
  */
 
 /**
@@ -59,6 +67,9 @@ const dateien = lieseQuellen(SRC);
  */
 const ROLLENWERT =
   /#(b02318|7a5200|1c6640|154e84|185895|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12)/i;
+
+/** Jeder Hex-Farbwert (#rgb, #rgba, #rrggbb, #rrggbbaa) — die zweite Prüfung für CSS. */
+const ROHER_HEXWERT = /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b/i;
 
 /**
  * Benannte Ausnahmen: Datei + Wert, jeweils mit Grund, ohne Zeilennummer. Ein Eintrag, der
@@ -145,6 +156,21 @@ describe('Gate-5-Guard (LFH-328): kein A0-Farbwert außerhalb src/theme/', () =>
     ).toEqual([]);
   });
 
+  it('kein roher Hex-Farbwert in handgeschriebenem CSS außerhalb src/theme/ (LFH-696)', () => {
+    const verstoesse: string[] = [];
+    for (const [pfad, inhalt] of Object.entries(dateien)) {
+      if (!pfad.endsWith('.css') || pfad.startsWith('/src/theme/')) continue;
+      ohneKommentare(inhalt).forEach((zeile, i) => {
+        if (ROHER_HEXWERT.test(zeile)) verstoesse.push(`${pfad}:${i + 1}  ${zeile.trim()}`);
+      });
+    }
+    expect(
+      verstoesse,
+      `Rohe Farbwerte in CSS — der Wert gehört als Rolle nach theme/tokens.ts + ` +
+        `theme/rollen.css und wird hier über var(--lfh-*) gelesen:\n${verstoesse.join('\n')}`,
+    ).toEqual([]);
+  });
+
   it('jede benannte Ausnahme trifft noch etwas — sonst gehört sie gestrichen', () => {
     for (const a of AUSNAHMEN) {
       const inhalt = dateien[a.pfad];
@@ -173,5 +199,20 @@ describe('Gate-5-Guard (LFH-328): kein A0-Farbwert außerhalb src/theme/', () =>
       ].join('\n'),
     );
     expect(sichtbar.filter((z) => ROLLENWERT.test(z))).toEqual(['echt: #a8071a;']);
+  });
+
+  it('der CSS-Scan trifft rohe Werte, aber nicht ihre Erwähnung im Kommentar', () => {
+    const sichtbar = ohneKommentare(
+      [
+        '/* früher #fffbe6, jetzt die Rolle */',
+        '.a { background-color: var(--lfh-hervorhebung-zeile); }',
+        '.b { color: #2b2611; }',
+        '.c { border-color: #abc; }',
+      ].join('\n'),
+    );
+    expect(sichtbar.filter((z) => ROHER_HEXWERT.test(z))).toEqual([
+      '.b { color: #2b2611; }',
+      '.c { border-color: #abc; }',
+    ]);
   });
 });

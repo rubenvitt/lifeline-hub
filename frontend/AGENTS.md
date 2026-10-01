@@ -17,7 +17,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Nachtpalette abgeleitet.
 - **Rollen** in `theme/tokens.ts` + `theme/rollen.css` (Gate 5), u. a. `kopf`, `paneel`,
   `flaeche3`, `text2`, `steuerRahmen` (= antds `colorBorder`), `bedienText`, Statusflächen,
-  `bannerGrund`/`bannerLinie`, Zeilentönungen. `rahmenFarben` ist modusunabhängig und keine
+  `bannerGrund`/`bannerLinie`, Zeilentönungen (darunter `hervorhebungZeile` für die per Deeplink
+  angesteuerte Zeile, LFH-696). Handgeschriebenes CSS außerhalb `theme/` nennt keinen Hex-Wert
+  (Gate 5, Spec `farbrollen-herkunft`). `rahmenFarben` ist modusunabhängig und keine
   `Farbrolle` (`rollen.guard.test.ts`). Eigene Paletten statt `Statusrolle`:
   `etbTypFarben{Dunkel,Hell}` (`etbTypFarbe()`), `warnstufeFarben{Dunkel,Hell}`
   (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, LFH-593:
@@ -148,8 +150,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Primärknopfs hält den Textboden in Ruhe und unter dem Zeiger; Werte und Messung am Wert in
   `theme/tokens.ts`. Ein Kontrast-Spec führt den Primärknopf nie unter einer Ausnahme.
 - **Tagmodus** (LFH-618, `docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`):
-  `achtung`/`alarm` als Text über `achtungText`/`alarmText`; Hervorhebung auf `flaeche3`, nicht
-  `flaeche2`; Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
+  `achtung`/`alarm` als Text über `achtungText`/`alarmText`; aktive Zeile auf `flaeche3`, nicht
+  `flaeche2` (die Deeplink-Hervorhebung trägt `hervorhebungZeile`); Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
   `e2e/kontrast-kern.ts`).
 
 **Lagekarte** (auch `pages/LagekartePage.tsx`): `frontend/src/pages/lagekarte/AGENTS.md`.

@@ -305,3 +305,26 @@ describe('Feldmeldung: Text in alarmText (LFH-667)', () => {
     expect(antdKomponenten(farben, 'kompakt').Button).not.toHaveProperty('colorError');
   });
 });
+
+describe('Deeplink-Hervorhebung als eigene Zeilentönung (LFH-696)', () => {
+  // Spec `farbrollen-kontrast`: die Tönung unterscheidet sich vom Hover (`flaeche3`, antds
+  // `rowHoverBg` der KatalogTabelle) und von den übrigen Zeilentönungen — in beiden Modi.
+  // `achtungFlaeche` mit dabei: die Tönung darf sich nicht als Statusfläche „Achtung“ lesen.
+  for (const [modus, farben] of [
+    ['hell', farbenHell],
+    ['dunkel', farbenDunkel],
+  ] as const) {
+    it(`${modus}: hervorhebungZeile gleicht keiner Nachbarrolle`, () => {
+      const nachbarn = {
+        flaeche3: farben.flaeche3,
+        lueckeZeile: farben.lueckeZeile,
+        berichtigungZeile: farben.berichtigungZeile,
+        problemZeile: farben.problemZeile,
+        achtungFlaeche: farben.achtungFlaeche,
+      };
+      for (const [rolle, wert] of Object.entries(nachbarn)) {
+        expect(farben.hervorhebungZeile.toLowerCase(), rolle).not.toBe(wert.toLowerCase());
+      }
+    });
+  }
+});

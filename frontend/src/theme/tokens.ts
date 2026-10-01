@@ -93,6 +93,11 @@ export interface Farbrollen {
   berichtigungZeile: string;
   lueckeZeile: string;
   problemZeile: string;
+  /** Zeilentönung der per Deeplink angesteuerten Zeile oder Karte (LFH-25, `.zeile-hervorgehoben`
+   *  in `index.css`). Eigene Rolle seit LFH-696: `achtungFlaeche` läse sich als Warnung und ist
+   *  nachts kaum vom Hover zu trennen, `lueckeZeile` steht auf der Personenseite in derselben
+   *  Tabelle, `flaeche3` IST der Tabellen-Hover. Messwerte an den Paletten. */
+  hervorhebungZeile: string;
 }
 
 /**
@@ -119,6 +124,11 @@ export interface Farbrollen {
  * Geerbter Text (LFH-652, `antdToken`): `bedienText` als Link auf grund 7,04 · flaeche 8,41 ·
  * kopf 7,36 · paneel 7,71; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 7,37. Auf der
  * Hervorhebungsfläche `flaeche3` liegen beide bei 6,59 bzw. 6,60, unter dem Tagesboden (LFH-877).
+ *
+ * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696, Werte unverändert aus LFH-25): text 17,76 ·
+ * text2 12,63 · gedaempft 8,09 · bedienText 8,09 · achtungText 8,87 · alarmText 8,62 ·
+ * normalText 8,82. Abhebung gegen flaeche 1,04, gegen den Hover `flaeche3` 1,23, gegen
+ * `lueckeZeile` 1,07. Gemessen in `e2e/hervorhebung-kontrast.spec.ts`.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -161,6 +171,7 @@ export const farbenHell: Farbrollen = {
   berichtigungZeile: '#fbeaea',
   lueckeZeile: '#faf3da',
   problemZeile: '#f8eded',
+  hervorhebungZeile: '#fffbe6',
 };
 
 /**
@@ -173,6 +184,9 @@ export const farbenHell: Farbrollen = {
  * auf alarm 7,18. Statusflächen: normalText 10,44, achtung 11,18, alarm 6,89, bedienText 9,65.
  * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
  * Tabellenkopf auf kopf 7,48.
+ * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696): text 12,64 · text2 9,34 · gedaempft 5,86 ·
+ * bedienText 8,01 · achtungText 9,46 · alarmText 5,45 · normalText 8,80. Abhebung gegen flaeche
+ * 1,24, gegen den Hover `flaeche3` 1,17, gegen `lueckeZeile` 1,23.
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#7d858e` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
@@ -226,6 +240,7 @@ export const farbenDunkel: Farbrollen = {
   berichtigungZeile: '#160d0f',
   lueckeZeile: '#161305',
   problemZeile: '#130f0f',
+  hervorhebungZeile: '#2b2611',
 };
 
 /**
