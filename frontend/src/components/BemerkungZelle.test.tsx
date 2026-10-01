@@ -302,7 +302,7 @@ describe('BemerkungZelle', () => {
      */
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }).style.color).toBe(
-      'rgb(22, 79, 134)',
+      'rgb(20, 71, 121)',
     );
   });
 });

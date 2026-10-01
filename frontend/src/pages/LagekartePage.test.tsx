@@ -1541,6 +1541,30 @@ describe('LagekartePage', () => {
     expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
   });
 
+  it('Deeplink ?platzieren=person: startet den Platzier-Modus und räumt (LFH-670)', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');
+    expect(await screen.findByText(/Klick auf die Karte setzt die Koordinate/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+  });
+
+  it('Deeplink ?platzieren=person: ohne Modul Personen kein Platziermodus (LFH-670)', async () => {
+    // Schreibrecht im Einsatz reicht nicht: der PATCH einer Person verlangt das Modul, ohne es endete
+    // der Klick auf die Karte in einem 403.
+    basisHandler([
+      http.get('/api/einsaetze/1/modul-overrides', () =>
+        HttpResponse.json({ personen: { sichtbar: false, benoetigte_rolle: null } }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+  });
+
   it('hebt eine Zone auf (DELETE)', async () => {
     let geloescht = false;
     const ZONE_FREI = {

@@ -96,6 +96,7 @@ const FAHRZEUGE: EinsatzFahrzeug[] = [
     fahrzeugtyp: 'HLF 20',
     disponiert_at: '2026-09-30T10:00:00',
     ist_adhoc: false,
+    ist_demo: false,
   },
   {
     id: 101,
@@ -103,6 +104,7 @@ const FAHRZEUGE: EinsatzFahrzeug[] = [
     funkrufname: 'Florian ELW 1',
     disponiert_at: '2026-09-30T10:00:00',
     ist_adhoc: false,
+    ist_demo: false,
   },
 ];
 
@@ -115,6 +117,7 @@ const PERSONAL: EinsatzPersonal[] = [
     staerke_position: 'fuehrer',
     disponiert_at: '2026-09-30T10:00:00',
     ist_adhoc: false,
+    ist_demo: false,
   },
 ];
 

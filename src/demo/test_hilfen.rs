@@ -143,6 +143,30 @@ pub(super) async fn kopf_anlegen(pool: &SqlitePool, org_id: i64, einsatz_id: i64
     .unwrap()
 }
 
+/// Markiert eine Stammdatenzeile als Demo, wie der Import es täte (LFH-733): legt bei Bedarf
+/// einen aktiven Kopf für `org_id` an und trägt die Marke ein. Die Einsatz-ID des Kopfes ist
+/// beliebig, `demo_import.einsatz_id` hat keinen Fremdschlüssel. `tabelle` ist ein Wert aus dem
+/// CHECK von `demo_herkunft`.
+pub(crate) async fn demo_markieren(pool: &SqlitePool, org_id: i64, tabelle: &str, id: i64) {
+    let kopf: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM demo_import WHERE org_id = ? AND entfernt_at IS NULL")
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap();
+    let kopf = match kopf {
+        Some(k) => k,
+        None => kopf_anlegen(pool, org_id, 0).await,
+    };
+    sqlx::query("INSERT INTO demo_herkunft (import_id, tabelle, datensatz_id) VALUES (?, ?, ?)")
+        .bind(kopf)
+        .bind(tabelle)
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
 /// Alle Zeilen einer Tabelle unter einer Bedingung mit genau einem Parameter, jede Zeile als
 /// `quote()`-Text aller Spalten, in `rowid`-Reihenfolge — so fällt auch eine geänderte Spalte
 /// auf, nicht nur eine fehlende Zeile. `tabelle` und `bedingung` sind feste Literale aus den

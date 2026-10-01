@@ -1,10 +1,21 @@
-import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { QueryClientProvider, onlineManager, type QueryClient } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
 import { App as AntApp, ConfigProvider } from 'antd';
 import { MemoryRouter } from 'react-router';
 import type { ReactElement, ReactNode } from 'react';
 import { AuthProvider } from '../auth/AuthContext';
 import { erzeugeQueryClient } from '../api/queryClient';
+
+/**
+ * Netz an oder aus wie im Browser: `navigator.onLine` UND TanStacks `onlineManager`, den ein
+ * Browser über das Fensterereignis `online`/`offline` nachführt. Nur `navigator.onLine` zu
+ * setzen, ließ eine von TanStack angehaltene Mutation unbemerkt (LFH-705, design.md D6).
+ */
+export function setzeOnline(wert: boolean): void {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: wert });
+  onlineManager.setOnline(wert);
+  window.dispatchEvent(new Event(wert ? 'online' : 'offline'));
+}
 
 /**
  * Frischer QueryClient ohne Retries/Cache-Wiederverwendung. Dieselbe Fabrik wie `main.tsx`,

@@ -64,7 +64,7 @@ gewesen, ohne dass die Seite kürzer ist.
 | # | Verdikt | Beleg |
 | --- | --- | --- |
 | **1 · Treffläche** | **erfüllt [abgeleitet]** | Kein interaktives Element trägt eine `size`-Angabe: die zwei Fundstellen sind `Spin size="large"` (`:159`) und `Space size={6}` (`:227`), beide außerhalb des Vertrags von `dichte.guard.test.ts`. Knöpfe, `Input`, `DatePicker`, `Checkbox` und die Kopfzeilen des Akkordeons (antd-`Collapse`, `controlHeight`-gebunden) erben 30 / 48 / 72. Kein Pixelmaß auf dieser Route; Ableitung über `e2e/dichte.spec.ts:57-83` |
-| **2 · Handschuh-Modus** | **teilweise erfüllt** | Stufenweitergabe route-unabhängig belegt (`dichte.spec.ts`), hier nicht gemessen. Die Kopfzeile bricht um (`Flex wrap`, `:215-221` — vorher ein `Space` ohne `wrap`, auf 390 px schob der Titel die Aktionen aus dem Bild; Muster C8/M73). Die Stufen**wahl** aus dem Kontext bleibt app-weit offen → **LFH-724** |
+| **2 · Handschuh-Modus** | **erfüllt nach Fix · Checkbox offen → LFH-907 (Nachtrag LFH-724)** | Abschnittsköpfe und Kopfaktionen gemessen (`e2e/trefflaeche-pruefflaechen.spec.ts`, C13, mit `kompakt`-Gegenprobe; Beobachter: Lesezweig). Die acht Abschnittsköpfe maßen 55 px und halten die Staffel jetzt über `antdKlappkopf` (LFH-653). „Vorschau neben dem Text“ (Checkbox) misst 36 px → **LFH-907**. Die Stufen**ableitung** ist festgelegt: Wahl → Zeigerart → `kompakt`, nie aus Person oder Funktion (Spec `bedien-dichte`, LFH-724) |
 | **3 · Rückmeldung vor der Serverantwort** | **erfüllt** | Ladebild beim Einstieg (`:157-161`), `loading` an allen drei Aktionen. **Neu:** der stille Autosave hat einen sichtbaren Beleg — „ungespeicherte Änderungen" / „zuletzt gespeichert HH:MM" neben dem Speichern-Knopf (`:243-247`); ohne ihn wäre „gespeichert" von „nicht gespeichert" nicht zu unterscheiden. Test `LageberichtePage.test.tsx` „speichert beim Verlassen eines Feldes von selbst und zeigt den Zeitstempel" |
 | **4 · Kritische Aktion hat eine zweite Handlung** | **erfüllt** | „Freigeben" ist unumkehrbar (ETB-Snapshot) und trägt `modal.confirm` (`:180-197`), das **zuerst speichert** und bei Fehlschlag den Dialog offen lässt. „Entwurf speichern" braucht keine — umkehrbar durch weiteres Editieren. Der Bestätigungsknopf ist **nicht** `danger`: die Freigabe ist die gewollte Vorwärtsbewegung, kein Löschen (dieselbe Einordnung wie am Befehl) |
 | **5 · Kontrast in beiden Modi** | **erfüllt** | Keine Farbliterale; das Akkordeon nimmt `token.colorSuccess` / `token.colorTextSecondary` (`AbschnittsAkkordeon.tsx:79`). `farbliteral.guard.test.ts` deckt `pages/`. In jsdom nicht messbar, in Playwright auf dieser Route nicht gemessen. **Offener Preis der N1-Entscheidung (LFH-493):** weil die Phasenachse außerhalb von A2 bleibt, behält das Statusetikett farbigen Text auf getöntem Grund — genau die Form, die LFH-446 für `StatusTag` verworfen hat (dort hell nur 4,88–6,94:1 statt 7:1). Entlastend, aber ungemessen: `colorSuccess` ist hier `farben.normal` (`#1c6640`) und damit deutlich dunkler als antds `#52c41a`, und die Listen rendern seit je so — es ist keine Verschlechterung. Der Messnachweis steht weiter aus |
@@ -88,7 +88,7 @@ gewesen, ohne dass die Seite kürzer ist.
 | # | Verdikt | Beleg |
 | --- | --- | --- |
 | **1 · Treffläche** | **erfüllt [abgeleitet]** | Einzige `size`-Angabe: `Spin size="large"` (`:179`). Karte, Links, Filter-`Select` und Suchfeld kommen aus `Datensicht` und sind dort über die Dichtestaffel gemessen (`e2e/datensicht-schmal.spec.ts`) |
-| **2 · Handschuh-Modus** | **teilweise erfüllt** | wie Tabelle 1; Kartensicht in jeder Breite (Guard `NUR_KARTE`) → **LFH-724** |
+| **2 · Handschuh-Modus** | **erfüllt (Nachtrag LFH-724)** | „Neuer Bericht“ und der Link der Berichtskarte messen 72 px (`e2e/trefflaeche-pruefflaechen.spec.ts`, C13). Die Stufen**ableitung** ist festgelegt: Wahl → Zeigerart → `kompakt`, nie aus Person oder Funktion (Spec `bedien-dichte`, LFH-724) |
 | **3 · Rückmeldung vor der Serverantwort** | **erfüllt** | `ladend` an der Sicht, `laeuft` an der Hülle (Knöpfe auf Ladeanzeige), Kopf zählt Bestand |
 | **4 · Kritische Aktion hat eine zweite Handlung** | **nicht anwendbar** | Die Liste hat keine destruktive Aktion; Anlegen ist umkehrbar (Entwurf) |
 | **5 · Kontrast in beiden Modi** | **erfüllt** | Keine Farbliterale; `StatusBadge` aus `kommunikation/` |
@@ -112,7 +112,7 @@ gewesen, ohne dass die Seite kürzer ist.
 | # | Verdikt | Beleg |
 | --- | --- | --- |
 | **1 · Treffläche** | **erfüllt [abgeleitet]** | Einzige `size`-Angabe: `Spin size="large"` (`:96`). Links, Filter-`Select`s, Suchfeld aus `Datensicht` |
-| **2 · Handschuh-Modus** | **teilweise erfüllt** | wie oben → **LFH-724** |
+| **2 · Handschuh-Modus** | **erfüllt für Filter und Suche · Meldungs-Link offen → LFH-908 (Nachtrag LFH-724)** | Die sieben Filtersegmente und das Suchfeld messen 72 px (`e2e/trefflaeche-pruefflaechen.spec.ts`, C13). Der Link „Meldung #N“ misst 13 px → **LFH-908**. Die Stufen**ableitung** ist festgelegt: Wahl → Zeigerart → `kompakt`, nie aus Person oder Funktion (Spec `bedien-dichte`, LFH-724) |
 | **3 · Rückmeldung vor der Serverantwort** | **erfüllt** | `ladend`; Leerzustand erst **nach** dem Laden (`!lageQuery.isLoading && …`, `:122`) — vorher zeigte die Seite beim Laden kurz „Noch keine …" |
 | **4 · Kritische Aktion hat eine zweite Handlung** | **nicht anwendbar** | Lesefläche ohne Aktion (B3: keine Primäraktion, Begründung im Quelltext) |
 | **5 · Kontrast in beiden Modi** | **erfüllt** | Keine Farbliterale. Der `Tag color="gold"` „Lageobjekt" des Bestands ist **entfallen**: eine Farbfläche ohne Aussage auf einer Seite, die schon „Lagerelevante Meldungen" heißt |
@@ -158,6 +158,27 @@ Zwei Minor-Punkte ebenfalls mitgenommen: der Zeitstand-Picker ist nicht mehr lö
 (`zeitstand` ist serverseitig nicht nullbar, ein geleertes Feld zeigte dauerhaft etwas
 anderes als die DB), und im Entwurfszweig steht der rohe UTC-Wirestring nicht mehr direkt
 über dem Picker in Ortszeit.
+
+## Nachtrag LFH-724 (Messung, 01.10.2026)
+
+Zeile 2 stand hier auf „teilweise erfüllt“, weil zwei Dinge fehlten: die Ableitung der
+Dichtestufe aus dem Einsatzkontext und die gerenderte 72-px-Messung an dieser Fläche. Beides
+ist nachgezogen.
+
+- **Ableitung:** Der Einsatzkontext ist das Gerät, nicht die Person. Beim Sitzungsstart gilt
+  die gespeicherte Wahl, ohne Wahl die Zeigerart (grob → `komfortabel`), sonst `kompakt`.
+  `handschuh` entsteht nur durch Wahl, und Rolle, Funktion oder Führungsstelle fließen nie ein
+  (Spec `bedien-dichte`, Träger `frontend/src/theme/dichte.ts`, Browser-Beleg
+  `e2e/dichte-ableitung.spec.ts`).
+- **Messung:** `e2e/trefflaeche-pruefflaechen.spec.ts` misst `kompakt` und `handschuh`, mit der Gegenprobe
+  „kompakt < handschuh“ je Zielsorte und einem Geschwister ohne Schreibrecht.
+  Herleitung und Befundtabelle: `openspec/changes/archive/2026-10-01-lfh-724-dichtestufe-aus-dem-geraet/design.md`
+  (D5, D8).
+- **Tabelle 1, Zeile 2:** erfüllt nach Fix. Die acht Abschnittsköpfe maßen 55 px und halten die Staffel jetzt über `antdKlappkopf` (LFH-653). Der Beobachter sieht den Lesezweig ohne Akkordeon; dort hält die Druckaktion 72 px. „Vorschau neben dem Text“ (Checkbox, 36 px) → **LFH-907**.
+- **Tabelle 2, Zeile 2:** erfüllt.
+- **Tabelle 3, Zeile 2:** Filtersegmente und Suche erfüllt; der Link „Meldung #N“ misst 13 px → **LFH-908**.
+- Tests: „C13 · Lagebericht, Berichtsliste und Lagemeldungen halten 72 px, kompakt bleibt kleiner“ und „C13 · Lagebericht (Beobachter): …“.
+- Querschnittlich, auf keiner Fläche dieser Prüfliste eigens: die Brotkrume im Seitenkopf misst 20 px → **LFH-909**.
 
 ## Nachzüge
 

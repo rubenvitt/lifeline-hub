@@ -44,6 +44,8 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { einsatzStatus, materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
+import DemoMarke from '../components/DemoMarke';
+import { demoGruppierteOptionen } from '../stammdaten/demoAuswahl';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 
@@ -243,10 +245,11 @@ export default function MaterialPage() {
 
   // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach als getrennte Position
   // disponiert werden (Mengen-Splitting auf Einheiten).
-  const poolOptionen = (poolQuery.data ?? []).map((m) => ({
-    value: m.id,
-    label: `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
-  }));
+  // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
+  const poolOptionen = demoGruppierteOptionen(
+    poolQuery.data ?? [],
+    (m) => `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
+  );
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,
@@ -289,6 +292,7 @@ export default function MaterialPage() {
         <Space>
           {em.bezeichnung}
           {em.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
+          {em.ist_demo && <DemoMarke />}
         </Space>
       ),
     },

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
@@ -27,6 +27,7 @@ import { useOfflineSync } from '../offline/useOfflineSync';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import * as dateiSpeichern from '../components/dateiSpeichern';
 
 /**
  * Die echte Karte braucht WebGL, jsdom hat keins — Stub nach dem Muster von
@@ -80,7 +81,7 @@ beforeEach(async () => {
   FakeBroadcastChannel.instanzen = [];
   vi.stubGlobal('EventSource', FakeEventSource);
   vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
-  Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  setzeOnline(true);
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
   // Die Seite lädt die Unfallhilfsstellen für `@UHS` und die Verbleib-Spalte; ohne eigene Angabe
   // gibt es keine.
@@ -512,7 +513,6 @@ describe('PersonenPage', () => {
   });
 
   it('ersetzt die Offline-Warnung nach korreliertem Flush durch Registriernummer und Highlight', async () => {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const vermisst = {
       ...person,
       id: 48,
@@ -521,7 +521,10 @@ describe('PersonenPage', () => {
       name: 'Offline Neu',
     };
     const { client } = render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    const vermisstMelden = await screen.findByRole('button', { name: 'Vermisst melden' });
+    // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+    setzeOnline(false);
+    await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline Neu');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
@@ -549,7 +552,6 @@ describe('PersonenPage', () => {
   });
 
   it('liefert die Personen-Quittung nach Unmount und globalem Flush beim Remount genau einmal aus', async () => {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const vermisst = {
       ...person,
       id: 49,
@@ -567,13 +569,16 @@ describe('PersonenPage', () => {
     );
 
     const ersteSeite = render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    const vermisstMelden = await screen.findByRole('button', { name: 'Vermisst melden' });
+    // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+    setzeOnline(false);
+    await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Nach Reload');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     ersteSeite.unmount();
 
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    setzeOnline(true);
     const globalerSync = renderMitProviders(<OfflineSyncTest benutzerId={nutzer.id} />);
     await vi.waitFor(() => expect(post).toHaveBeenCalledOnce());
     await vi.waitFor(async () =>
@@ -744,7 +749,6 @@ describe('PersonenPage', () => {
   });
 
   it('ordnet auch einen Offline-Abschluss nach dem Routewechsel ausschließlich Einsatz A zu', async () => {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const personA = {
       ...person,
       id: 78,
@@ -773,13 +777,18 @@ describe('PersonenPage', () => {
       ),
     );
     const { container } = renderMitEinsatzNavigation();
-    await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
+    const vermisstMelden = await screen.findByRole('button', { name: 'Vermisst melden' });
+    // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+    setzeOnline(false);
+    await userEvent.click(vermisstMelden);
     await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline A');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);
     if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
 
+    // Das Netz ist zurück, bevor Einsatz B geladen wird.
+    setzeOnline(true);
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     expect(await screen.findByText('Person B')).toBeInTheDocument();
     await act(async () => {
@@ -1432,12 +1441,11 @@ describe('PersonenPage', () => {
     });
 
     it('merkt offline vor (client_id, Sichtung in der vorgemerkten Anlage) und leert das Feld', async () => {
-      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
       render(einsatzAktiv, []);
-      await userEvent.type(
-        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
-        'Neumann, Ilse w 84 sk2{Enter}',
-      );
+      const kurzeingabe = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
+      // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
+      setzeOnline(false);
+      await userEvent.type(kurzeingabe, 'Neumann, Ilse w 84 sk2{Enter}');
       await vi.waitFor(() => expect(feld()).toHaveValue(''));
       expect(document.querySelector('[data-lfh="zuletzt"]')).toHaveTextContent(
         'Zuletzt: offline vorgemerkt · Neumann, Ilse · SK II',
@@ -1452,6 +1460,64 @@ describe('PersonenPage', () => {
         client_id: expect.any(String),
       });
     });
+  });
+});
+
+/**
+ * CSV-Export (LFH-728). Der Endpunkt verlangt nur Lesezugriff auf das Modul — dasselbe Recht wie
+ * die Liste —, schreibt aber je Abruf einen Audit-Eintrag. Ein Abruf je Klick, nie beim Laden.
+ */
+describe('PersonenPage — CSV-Export (LFH-728)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('lädt erst auf Klick, genau einmal, und speichert unter einem Dateinamen mit Einsatz', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/personen/export', () => {
+        abrufe += 1;
+        return new HttpResponse('registrier_nr;status\nR-001;"erfasst"\n');
+      }),
+    );
+    render(einsatzAktiv, [person]);
+    const knopf = await screen.findByRole('button', { name: 'CSV exportieren' });
+    expect(abrufe).toBe(0);
+
+    await userEvent.click(knopf);
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    expect(abrufe).toBe(1);
+    const [datei, name] = speichern.mock.calls[0];
+    expect(await (datei as Blob).text()).toContain('R-001');
+    expect(name).toMatch(/^personen-einsatz-1-\d{4}-\d{2}-\d{2}-\d{4}\.csv$/);
+  });
+
+  it('steht auch für Beobachter im Kopf', async () => {
+    render(einsatzBeobachter, [person]);
+    const kopf = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(within(kopf).getByRole('button', { name: 'CSV exportieren' })).toBeInTheDocument();
+    expect(within(kopf).queryByRole('button', { name: 'Schnellerfassung' })).toBeNull();
+  });
+
+  it('zeigt den Fehler an der Seite neben dem Abschluss-Hinweis, nicht im Toast', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    server.use(
+      http.get('/api/einsaetze/1/personen/export', () =>
+        HttpResponse.json({ error: 'Kein Zugriff auf das Modul Personen' }, { status: 403 }),
+      ),
+    );
+    render(einsatzFixture({ status: 'abgeschlossen' }), [person]);
+    await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+
+    const meldung = await screen.findByText('Kein Zugriff auf das Modul Personen');
+    expect(meldung.closest('.ant-message')).toBeNull();
+    expect(meldung.closest('.ant-alert')).not.toBeNull();
+    expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz ist abgeschlossen — nur Ansicht.')).toBeInTheDocument();
+    expect(speichern).not.toHaveBeenCalled();
   });
 });
 

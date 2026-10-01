@@ -94,6 +94,8 @@ export const EINSATZ_KEYS = {
   personenDruck: 'einsatz-personen-druck',
   tiereDruck: 'einsatz-tiere-druck',
   schaedenDruck: 'einsatz-schaeden-druck',
+  // Einsatzbericht: ein Schnappschuss über alle Quellen (LFH-726).
+  einsatzberichtDruck: 'einsatz-einsatzbericht-druck',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -195,7 +197,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
   ],
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
-  dokument: [EINSATZ_KEYS.dokumente],
+  dokument: [EINSATZ_KEYS.dokumente, EINSATZ_KEYS.modulZaehler],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
   // das Ereignis `art`, stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Hook).
   // Der Vollzug beendet die Einsatzperiode der abgelösten Einheit (LFH-552).
@@ -243,6 +245,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `personenDruck`/`tiereDruck`/`schaedenDruck` (LFH-727): dieselbe Begründung wie `etbDruck`
  *   für die Druckansichten der Modul-Listen. Beim Personendruck kommt hinzu: jeder Abruf ist ein
  *   Eintrag im Zugriffsprotokoll, ein Live-Refetch schriebe also Protokollzeilen ohne Handlung.
+ * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
+ *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einstellungen,
@@ -263,6 +267,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.personenDruck,
   EINSATZ_KEYS.tiereDruck,
   EINSATZ_KEYS.schaedenDruck,
+  EINSATZ_KEYS.einsatzberichtDruck,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -375,6 +380,9 @@ export const einsatzKeys = {
   personenDruck: (einsatzId: number) => [EINSATZ_KEYS.personenDruck, einsatzId] as const,
   tiereDruck: (einsatzId: number) => [EINSATZ_KEYS.tiereDruck, einsatzId] as const,
   schaedenDruck: (einsatzId: number) => [EINSATZ_KEYS.schaedenDruck, einsatzId] as const,
+  // Einsatzbericht: alle Quellen in einem Abruf, nicht live (siehe NICHT_LIVE_KEYS).
+  einsatzberichtDruck: (einsatzId: number) =>
+    [EINSATZ_KEYS.einsatzberichtDruck, einsatzId] as const,
 
   // Stab: Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

@@ -142,6 +142,11 @@ export function einsatzdatenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'einsatzdaten');
 }
 
+/** Druckansicht des Einsatzberichts (LFH-726): Unterroute der Einsatzdaten, erbt deren Freigabe. */
+export function einsatzberichtPfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'einsatzdaten')}/bericht`;
+}
+
 export function erinnerungenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'erinnerungen');
 }

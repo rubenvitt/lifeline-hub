@@ -8,7 +8,12 @@ import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { listePersonen, registrierAnzeige, schlageAbgleichVor } from '../api/einsatzPerson';
+import {
+  ladePersonenExport,
+  listePersonen,
+  registrierAnzeige,
+  schlageAbgleichVor,
+} from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeUhs } from '../api/einsatzUhs';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
@@ -56,6 +61,8 @@ import {
 } from '../offline/queue';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
+import { useCsvExport } from '../components/useCsvExport';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
@@ -219,6 +226,9 @@ export default function PersonenPage() {
   const fehler = useFehlerMeldung();
 
   const anlegenMutation = useMutation({
+    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
+    // (LFH-705, design.md D6).
+    networkMode: 'always',
     mutationFn: async (v: {
       benutzerId: number;
       einsatzId: number;
@@ -492,6 +502,8 @@ export default function PersonenPage() {
     einsatzId,
   ]);
 
+  const csvExport = useCsvExport(einsatzId, 'personen', ladePersonenExport);
+
   const abgleichVorschlagMutation = useMutation({
     mutationFn: (v: { vermisstId: number; gefundenId: number }) =>
       schlageAbgleichVor(einsatzId, v.vermisstId, v.gefundenId),
@@ -521,6 +533,7 @@ export default function PersonenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
 
   const alle = frischErfasst.alle;
   const gefundene = gefundenePersonen(alle);
@@ -610,6 +623,12 @@ export default function PersonenPage() {
               </Button>
             </>
           )}
+          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (`frontend/AGENTS.md`,
+              Aktionen). Ohne Schreib-Riegel: der Endpunkt verlangt nur den Lesezugriff, den schon
+              die Liste braucht. Jeder Klick ist serverseitig ein `export`-Audit-Eintrag. */}
+          <Button loading={csvExport.laeuft} onClick={csvExport.exportieren}>
+            CSV exportieren
+          </Button>
         </>
       }
       // Zweiter Bedienweg auf die Erfassung („Neue Zeile" in der Palette) mit demselben
@@ -618,10 +637,16 @@ export default function PersonenPage() {
       neueZeile={
         darfSchreiben ? () => requestAnimationFrame(() => feldRef.current?.focus()) : undefined
       }
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        (nurAnsicht || csvExport.fehler != null) && (
+          <SeitenHinweise
+            rechteText="Einsatz ist abgeschlossen — nur Ansicht."
+            rechteFehlt={nurAnsicht}
+            fehler={csvExport.fehler}
+            fehlerTitel="Export fehlgeschlagen"
+            fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
+          />
         )
       }
     >

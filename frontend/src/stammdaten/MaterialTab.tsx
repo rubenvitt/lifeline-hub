@@ -1,4 +1,5 @@
-import { Button, type TableColumnsType } from 'antd';
+import { Button, Space, type TableColumnsType } from 'antd';
+import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -45,6 +46,13 @@ export default function MaterialTab() {
        * ist ein Angebot — absteigend und mit `de`-Kollation statt SQLites BINARY-Vergleich.
        */
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
+      // LFH-733: die Marke steht neben der Bezeichnung; `dataIndex` hält den Suchkorpus beim Rohwert.
+      render: (_, m) => (
+        <Space size={4}>
+          {m.bezeichnung}
+          {m.ist_demo && <DemoMarke />}
+        </Space>
+      ),
     },
     { title: 'Kategorie', dataIndex: 'kategorie', key: 'kategorie', render: (t) => t ?? '—' },
     {

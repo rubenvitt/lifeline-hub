@@ -17,6 +17,7 @@ import EtbDruckPage from './pages/EtbDruckPage';
 import PersonenDruckPage from './pages/PersonenDruckPage';
 import TiereDruckPage from './pages/TiereDruckPage';
 import SchaedenDruckPage from './pages/SchaedenDruckPage';
+import EinsatzberichtDruckPage from './pages/EinsatzberichtDruckPage';
 import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
 import AuftraegePage from './pages/AuftraegePage';
@@ -270,6 +271,9 @@ export const appRouten = createRoutesFromElements(
           <Route path="personen/druck" element={<PersonenDruckPage />} />
           <Route path="tiere/druck" element={<TiereDruckPage />} />
           <Route path="schaeden/druck" element={<SchaedenDruckPage />} />
+          {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder
+              gesperrt sind; die Rechte prüft der Bericht je Quelle selbst. */}
+          <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
           {/* Funkplan S6 (LFH-548): Unterroute des Stabs, kein Modul; `modulAusPfad` markiert den
               Stab, Sperre und Sichtbarkeit kommen vom Stab. */}
           <Route path="stab/funkplan" element={<FunkplanPage />} />

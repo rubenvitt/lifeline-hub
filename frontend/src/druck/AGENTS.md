@@ -38,5 +38,14 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **Personendruck nur über `GET …/personen/druck`**: jeder Abruf schreibt einen `druck`-Eintrag in
   `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache,
   `retry: false`, `refetchOnMount: 'always'`. Tiere und Schäden drucken über ihre Liste, ohne Protokoll.
+- **Einsatzbericht** (LFH-726, `pages/EinsatzberichtDruckPage.tsx`, `druck/einsatzbericht/`,
+  `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md`): Route `einsatzdaten/bericht` (erbt die
+  nie gesperrten Einsatzdaten), Einstieg sekundär auf der Einsatzdaten-Seite und in der Palette.
+  Vollständig oder gar nicht: `berichtFreigabe` entscheidet VOR dem Abruf (im Einsatz
+  ausgeblendet → „nicht genutzt“, Rollensperre → Sackgasse mit den Modulen); ein 403 im Abruf ist
+  „kein Zugriff“, nie ein leerer Bestand. Eine neue Quelle braucht ihre Zeile in `quellen.ts` mit
+  dem Gate der Route. EIN nicht-live Schnappschuss-Key `einsatzKeys.einsatzberichtDruck`. Personen
+  und Schäden gelangen nur als Zählung in `verdichtung.ts`; die Darstellung bildet nur deren
+  Objekt ab.
 - **Org-Branding** (`PATCH /api/organisation`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
   Virenscan) liegt außerhalb der Schwärzung (`schwaerzung_registry.rs`).

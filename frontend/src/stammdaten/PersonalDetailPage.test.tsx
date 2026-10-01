@@ -30,6 +30,7 @@ const person = {
   dienststatus: 'in_dienst',
   qualifikationen: [{ id: 1, label: 'Sanitäter' }],
   angelegt_at: '2026-05-26 09:00:00',
+  ist_demo: false,
 };
 
 /** Zweiter Datensatz derselben Route — Ziel des Detail→Detail-Wechsels. */
@@ -192,5 +193,18 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     expect(await screen.findByRole('heading', { name: 'Anna Schmidt' })).toBeInTheDocument();
     expect(screen.getByLabelText('Telefon')).toHaveValue('0160 7654321');
     expect(screen.getByLabelText('Bemerkung')).toHaveValue('Zweite');
+  });
+});
+
+/** LFH-733 (Spec `demo-daten`): der Seitenkopf kennzeichnet eine Demo-Person. */
+describe('PersonalDetailPage — Demo-Marke', () => {
+  it.each([
+    [true, 'zeigt'],
+    [false, 'zeigt keine'],
+  ])('ist_demo=%s: der Kopf %s Marke „Demo“', async (istDemo) => {
+    handler(admin, [{ ...person, ist_demo: istDemo }]);
+    renderRoute('/admin/stammdaten/personal/5');
+    const kopf = await screen.findByRole('heading', { level: 1, name: /Thomas Müller/ });
+    expect(kopf.textContent?.includes('Demo')).toBe(istDemo);
   });
 });

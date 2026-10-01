@@ -39,6 +39,7 @@ import {
   pegelZielPfad,
   etbPfad,
   etbDruckPfad,
+  einsatzberichtPfad,
   parseEtbFilter,
   parsePersonenSicht,
   personalPfad,
@@ -519,6 +520,12 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
   it('liefert für eine leere Query ein leeres Filterobjekt', () => {
     // Ohne Parameter ist kein Filter gesetzt (Gegenaussage zu `filterAktiv` in `EtbPage`).
     expect(parseEtbFilter(new URLSearchParams(''))).toEqual({});
+  });
+});
+
+describe('einsatzberichtPfad (LFH-726)', () => {
+  it('zeigt auf die Druckansicht unter den Einsatzdaten', () => {
+    expect(einsatzberichtPfad(7)).toBe('/einsaetze/7/einsatzdaten/bericht');
   });
 });
 

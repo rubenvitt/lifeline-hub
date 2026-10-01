@@ -72,7 +72,15 @@ export default function KartenDetailCard({
         >
           {kachel ?? 'TZ'}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: token.marginXS,
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
           <h3
             style={{
               margin: 0,

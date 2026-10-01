@@ -1166,10 +1166,11 @@ async fn abschluss_auf_abgeschlossenem_einsatz_ist_409() {
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
-/// Die Schwärzung lässt `entschluss` stehen (G_FUEHRUNG) — dieselbe Klassifikation wie
-/// `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe Entschluss ist.
+/// Die Schwärzung ersetzt `entschluss` durch den Platzhalter (LFH-701, Linie A) — wie
+/// `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe Entschluss ist. Der Wortlaut
+/// bleibt im ETB-Eintrag der Lagebesprechung, der Führungsdokumentation.
 #[tokio::test]
-async fn schwaerzung_laesst_den_entschluss_stehen() {
+async fn schwaerzung_ersetzt_den_entschluss_und_haelt_den_etb_wortlaut() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -1188,15 +1189,22 @@ async fn schwaerzung_laesst_den_entschluss_stehen() {
         .unwrap();
     tx.commit().await.unwrap();
 
-    let entschluss: String =
-        sqlx::query_scalar("SELECT entschluss FROM einsatz_lagebesprechung WHERE einsatz_id = ?")
-            .bind(einsatz)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let (entschluss, etb_inhalt): (String, String) = sqlx::query_as(
+        "SELECT b.entschluss, e.inhalt FROM einsatz_lagebesprechung b \
+         JOIN etb_eintrag e ON e.id = b.etb_eintrag_id WHERE b.einsatz_id = ?",
+    )
+    .bind(einsatz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(
-        entschluss, "Riegelstellung Nordufer halten",
-        "Führungs-Freitext bleibt — Alleingang auf Scrub für EINE der drei Tabellen wäre inkonsistent"
+        entschluss,
+        lifeline_hub::einsatz::repo::SCHWAERZUNG_PLATZHALTER,
+        "Modul-Freitext geschwärzt, gemeinsam mit Lagebericht und Befehl"
+    );
+    assert!(
+        etb_inhalt.contains("Riegelstellung Nordufer halten"),
+        "ETB behält den Entschluss im Wortlaut: {etb_inhalt}"
     );
 }
 

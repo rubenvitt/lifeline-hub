@@ -1,8 +1,20 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
+mod physisch;
+#[cfg(test)]
+pub(crate) use physisch::datei_oder_wal_enthaelt;
+pub use physisch::{bereinige_altbestand_einmalig, wal_zurueckschreiben};
+
 /// Öffnet einen SQLite-Pool auf der angegebenen Datei.
 /// Aktiviert WAL-Journal, Foreign Keys und legt die Datei bei Bedarf an.
+///
+/// `secure_delete = ON` auf jeder Verbindung (LFH-725): SQLite nullt freigewordenen Platz,
+/// statt die alten Bytes stehen zu lassen — sonst wären geschwärzte Werte mit einem Hex-Editor
+/// wiederherstellbar. Nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
+/// ungenullt auf der Freelist. Den Rest erledigt [`wal_zurueckschreiben`] nach der Schwärzung;
+/// Messung und Herleitung in
+/// `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
 pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
     let options = SqliteConnectOptions::new()
         .filename(db_path)
@@ -13,7 +25,8 @@ pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
         // dafür
         // `BEGIN IMMEDIATE`.
         .busy_timeout(std::time::Duration::from_secs(5))
-        .foreign_keys(true);
+        .foreign_keys(true)
+        .pragma("secure_delete", "ON");
 
     SqlitePoolOptions::new()
         .max_connections(5)
@@ -109,7 +122,8 @@ pub async fn test_pool_datei() -> (tempfile::TempDir, SqlitePool) {
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .busy_timeout(std::time::Duration::from_secs(5))
-        .foreign_keys(true);
+        .foreign_keys(true)
+        .pragma("secure_delete", "ON");
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
@@ -157,6 +171,41 @@ mod tests {
             .unwrap()
             .get(0);
         assert_eq!(foreign_keys, 1);
+    }
+
+    /// LFH-725: `secure_delete` ist ein Verbindungs-PRAGMA. Geprüft wird deshalb jede Verbindung,
+    /// die der Pool gleichzeitig hergibt, nicht nur die erste.
+    #[tokio::test]
+    async fn connect_setzt_secure_delete_auf_jeder_verbindung() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let pool = connect(path.to_str().unwrap()).await.unwrap();
+
+        let mut verbindungen = Vec::new();
+        for _ in 0..pool.options().get_max_connections() {
+            verbindungen.push(pool.acquire().await.unwrap());
+        }
+        for conn in &mut verbindungen {
+            let wert: i64 = sqlx::query_scalar("PRAGMA secure_delete;")
+                .fetch_one(&mut **conn)
+                .await
+                .unwrap();
+            assert_eq!(
+                wert, 1,
+                "secure_delete muss ON sein (1), nicht OFF (0) oder FAST (2)"
+            );
+        }
+    }
+
+    /// Produktionsparität: der Datei-Pool der Tests überschreibt wie `connect`.
+    #[tokio::test]
+    async fn test_pool_datei_setzt_secure_delete() {
+        let (_dir, pool) = test_pool_datei().await;
+        let wert: i64 = sqlx::query_scalar("PRAGMA secure_delete;")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(wert, 1);
     }
 
     #[tokio::test]

@@ -15,7 +15,7 @@ import type { Farbrollen } from '../../theme/tokens';
  * | Ton      | Text / Grund                 | Tag   | Nacht |
  * |----------|------------------------------|-------|-------|
  * | normal   | normalText / normalFlaeche   | 7,87  | 10,44 |
- * | bedien   | bedienText / bedienFlaeche   | 7,11  |  9,65 |
+ * | bedien   | bedienText / bedienFlaeche   | 8,04  |  9,65 |
  * | achtung  | achtungText / achtungFlaeche | 8,02  | 11,18 |
  * | alarm    | alarmText / alarmFlaeche     | 7,31  |  6,89 |
  * | neutral  | text2 / flaeche3             | 10,30 | 10,89 |

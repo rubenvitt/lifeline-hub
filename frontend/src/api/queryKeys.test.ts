@@ -166,6 +166,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
         'auftrag',
         'erinnerung',
         'chat',
+        'dokument',
       ]),
     );
     for (const [ev, keys] of betroffen) {
@@ -423,6 +424,23 @@ describe('Druck-Keys der Modul-Listen (LFH-727)', () => {
     expect(einsatzKeys.personenDruck(1)[0]).not.toBe(einsatzKeys.personen(1)[0]);
     expect(einsatzKeys.tiereDruck(1)[0]).not.toBe(einsatzKeys.tiere(1)[0]);
     expect(einsatzKeys.schaedenDruck(1)[0]).not.toBe(einsatzKeys.schaeden(1)[0]);
+  });
+});
+
+/**
+ * Einsatzbericht: EIN Schnappschuss über alle Quellen (LFH-726, design.md D4). Eigener Prefix,
+ * damit kein Modul-Ereignis den geöffneten Bericht per Präfix ändert.
+ */
+describe('einsatzKeys.einsatzberichtDruck (LFH-726)', () => {
+  it('baut den Key als [prefix, einsatzId] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.einsatzberichtDruck(7)).toEqual(['einsatz-einsatzbericht-druck', 7]);
+  });
+
+  it('ist nicht live: kein Ereignis invalidiert ihn, NICHT_LIVE_KEYS führt ihn', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-einsatzbericht-druck');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-einsatzbericht-druck');
+    }
   });
 });
 

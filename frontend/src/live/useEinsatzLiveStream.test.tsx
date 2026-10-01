@@ -559,7 +559,14 @@ describe('useEinsatzLiveStream', () => {
 
   it('leitet bei CLOSED-Fehler mit 401 in den Login-Flow (F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
-    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    let einsatzProben = 0;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      http.get('/api/einsaetze/1', () => {
+        einsatzProben += 1;
+        return HttpResponse.json({ error: 'x' }, { status: 401 });
+      }),
+    );
     const authVerloren = vi.fn();
     window.addEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     const status: string[] = [];
@@ -575,13 +582,18 @@ describe('useEinsatzLiveStream', () => {
     FakeEventSource.letzte?.emitError(FakeEventSource.CLOSED);
     await waitFor(() => expect(authVerloren).toHaveBeenCalled());
     expect(status).toContain('lost');
+    // LFH-732: der 401-Pfad bleibt unverändert — die Einsatzprobe läuft erst bei gültiger Sitzung.
+    expect(einsatzProben).toBe(0);
     window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     window.removeEventListener('lfh:live-status', onStatus);
   });
 
   it('reconnectet nach CLOSED-Fehler bei gültiger Session statt Login (F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
-    server.use(http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })));
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/einsaetze/1', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+    );
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const authVerloren = vi.fn();
@@ -602,5 +614,48 @@ describe('useEinsatzLiveStream', () => {
     window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     setTimeoutSpy.mockRestore();
     timeoutSpy.mockRestore();
+  });
+
+  it('beendet die Wiederverbindung, wenn der Einsatz nicht mehr existiert (404, LFH-732)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
+      ),
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const authVerloren = vi.fn();
+    window.addEventListener(SITZUNG_ABGELAUFEN, authVerloren);
+    const status: string[] = [];
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte;
+    setTimeoutSpy.mockClear();
+    quelle?.emitError(FakeEventSource.CLOSED);
+
+    // Der Einsatzkopf wird neu geholt: sein 404 führt den Rahmen in die vorhandene Sackgasse.
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz', 1]);
+    });
+    // Kein weiterer Verbindungsversuch: kein Backoff-Timer, keine zweite Quelle.
+    expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(false);
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    expect(quelle?.closed).toBe(true);
+    // Die Sackgasse sagt den Fehler; die Betriebszeile meldet keine unterbrochene Leitung dazu.
+    expect(status[status.length - 1]).toBe('idle');
+    expect(authVerloren).not.toHaveBeenCalled();
+    window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
+    window.removeEventListener('lfh:live-status', onStatus);
+    setTimeoutSpy.mockRestore();
   });
 });

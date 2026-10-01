@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError } from '../api/client';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -16,6 +15,7 @@ import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import { alsBackendZeit } from '../etb/filterZeit';
 import { istOfflineTransient } from './fehler';
 import { schreibaktionEinreihen } from './queue';
+import { serverJetzt } from './serveruhr';
 
 type OfflineSchreibErgebnis<T> =
   { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
@@ -105,6 +105,8 @@ interface BetreuungsZiel {
  * Nur die vorgemerkte Kopie bekommt den Erfassungszeitpunkt (falls keiner eingetragen ist):
  * sonst stempelte der Server beim Flush „jetzt“, und eine ältere Zahl verdrängte eine neuere.
  * Online gilt die Serveruhr — eine vorgehende Tablet-Uhr machte sonst Meldungen zu 400.
+ * Auch der Erfassungszeitpunkt ist nach der Serveruhr bemessen, soweit ihr Versatz bekannt ist
+ * (LFH-705): sonst scheiterte er auf einem vorgehenden Gerät am Zukunftsriegel des Servers.
  */
 async function betreuungsmeldungOfflineFaehig<
   E extends { client_id?: string; zeitpunkt_at?: string },
@@ -116,7 +118,7 @@ async function betreuungsmeldungOfflineFaehig<
   senden: (daten: E) => Promise<T>,
   aktion: (daten: E) => Parameters<typeof schreibaktionEinreihen>[2],
 ): Promise<OfflineSchreibErgebnis<T>> {
-  const erfasst = alsBackendZeit(dayjs());
+  const erfasst = alsBackendZeit(serverJetzt());
   const daten: E = { ...eingabe, client_id: clientId(eingabe.client_id) };
   const vormerkenMitZeit = () =>
     vormerken(
