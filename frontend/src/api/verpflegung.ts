@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, type ApiSendOptionen } from './client';
 import type {
   AusgabeEingabe,
   Verpflegung,
@@ -45,16 +45,21 @@ export function loescheZeitfenster(einsatzId: number, zeitfensterId: number): Pr
   return apiSend<void>(`${basis(einsatzId)}/zeitfenster/${zeitfensterId}`, 'DELETE');
 }
 
-/** Antwort trägt die neue Ausgabe-ID und das Zeitfenster mit nachgerechneter Deckung. */
+/**
+ * Antwort trägt die neue Ausgabe-ID und das Zeitfenster mit nachgerechneter Deckung. Mit
+ * `client_id` ist der Aufruf idempotent (LFH-688): ein Replay liefert die gespeicherte Ausgabe.
+ */
 export function erfasseAusgabe(
   einsatzId: number,
   zeitfensterId: number,
   body: AusgabeEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<VerpflegungAusgabeErgebnis> {
   return apiSend<VerpflegungAusgabeErgebnis>(
     `${basis(einsatzId)}/zeitfenster/${zeitfensterId}/ausgaben`,
     'POST',
     body,
+    optionen,
   );
 }
 

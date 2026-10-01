@@ -844,6 +844,81 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn verpflegung_ausgabe_client_id_migration_partieller_unique() {
+        // LFH-688: Ausgaben tragen den Idempotenzschlüssel je Einsatz, nicht je Zeitfenster
+        // (design.md D1) — NULL beliebig oft.
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 1, 'Leit', 'leit', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mut fenster = Vec::new();
+        for name in ["A", "A", "B"] {
+            let e: i64 = match fenster.last() {
+                Some(&(e, _)) if name == "A" => e,
+                _ => sqlx::query_scalar(
+                    "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, ?) RETURNING id",
+                )
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            };
+            let zf: i64 = sqlx::query_scalar(
+                "INSERT INTO verpflegung_zeitfenster (einsatz_id, bezeichnung, von_at, bis_at, \
+                    bedarf_kraefte, bedarf_betreute, bedarf_weitere, angelegt_von_id) \
+                 VALUES (?, 'Mittag', '2026-09-24 12:00:00', '2026-09-24 13:00:00', 10, 0, 0, 1) \
+                 RETURNING id",
+            )
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            fenster.push((e, zf));
+        }
+
+        async fn ausgabe(
+            pool: &SqlitePool,
+            (e, zf): (i64, i64),
+            client_id: Option<&str>,
+        ) -> Result<(), sqlx::Error> {
+            sqlx::query(
+                "INSERT INTO verpflegung_ausgabe (einsatz_id, zeitfenster_id, zeitpunkt_at, \
+                    menge, erfasst_von_id, client_id) \
+                 VALUES (?, ?, '2026-09-24 12:10:00', 5, 1, ?)",
+            )
+            .bind(e)
+            .bind(zf)
+            .bind(client_id)
+            .execute(pool)
+            .await
+            .map(|_| ())
+        }
+
+        let (mittag_a, abend_a, mittag_b) = (fenster[0], fenster[1], fenster[2]);
+        assert_eq!(mittag_a.0, abend_a.0, "zwei Zeitfenster im selben Einsatz");
+        ausgabe(&pool, mittag_a, Some("v1")).await.unwrap();
+        assert!(
+            ausgabe(&pool, mittag_a, Some("v1")).await.is_err(),
+            "Dublette im selben Zeitfenster"
+        );
+        assert!(
+            ausgabe(&pool, abend_a, Some("v1")).await.is_err(),
+            "Schlüssel gilt je Einsatz, auch über Zeitfenster hinweg"
+        );
+        ausgabe(&pool, mittag_a, None).await.unwrap();
+        ausgabe(&pool, mittag_a, None).await.unwrap();
+        ausgabe(&pool, mittag_b, Some("v1")).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn etb_fts_wird_bei_cascade_delete_bereinigt() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")

@@ -2,6 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import type {
+  AusgabeEingabe,
   BelegungsmeldungEingabe,
   NeueMeldung,
   Person,
@@ -13,15 +14,16 @@ import type {
 export const OFFLINE_QUEUE_EVENT = 'lfh:offline-queue-geaendert';
 
 /**
- * Stand- und Belegungsmeldungen tragen zusätzlich die `bezeichnung` — nur für die Anzeige im
- * Wiederherstellungs-Drawer, gesendet wird sie nicht. Neue Varianten liegen als Wert im
- * bestehenden Store und brauchen keine DB-Version.
+ * Stand- und Belegungsmeldungen und Verpflegungsausgaben tragen zusätzlich die `bezeichnung`
+ * (Bezirk, Stelle bzw. Zeitfenster) — nur für die Anzeige, gesendet wird sie nicht. Neue
+ * Varianten liegen als Wert im bestehenden Store und brauchen keine DB-Version.
  */
 export type OfflineSchreibaktion =
   | { art: 'person'; daten: PersonAnlegenEingabe }
   | { art: 'meldung'; daten: NeueMeldung }
   | { art: 'stand'; bezirk_id: number; bezeichnung: string; daten: StandmeldungEingabe }
-  | { art: 'belegung'; stelle_id: number; bezeichnung: string; daten: BelegungsmeldungEingabe };
+  | { art: 'belegung'; stelle_id: number; bezeichnung: string; daten: BelegungsmeldungEingabe }
+  | { art: 'ausgabe'; zeitfenster_id: number; bezeichnung: string; daten: AusgabeEingabe };
 
 export interface AusstehendeSchreibaktion {
   id?: number;

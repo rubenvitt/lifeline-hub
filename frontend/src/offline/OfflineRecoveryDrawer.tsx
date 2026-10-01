@@ -45,6 +45,8 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
       return `Abgelehnte Standmeldung: ${aktion.bezeichnung}`;
     case 'belegung':
       return `Abgelehnte Belegungsmeldung: ${aktion.bezeichnung}`;
+    case 'ausgabe':
+      return `Abgelehnte Verpflegungsausgabe: ${aktion.bezeichnung}`;
     default: {
       const nie: never = aktion;
       return `Abgelehnte Offline-Aktion ${JSON.stringify(nie)}`;

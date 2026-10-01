@@ -3,12 +3,14 @@ import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError, NetzFehler } from '../api/client';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
+import { erfasseAusgabe } from '../api/verpflegung';
 import { queueLeerenFuerTests, schreibaktionenLaden } from './queue';
 import {
   erfasseBelegungOfflineFaehig,
   erfasseMeldungOfflineFaehig,
   erfassePersonOfflineFaehig,
   erfasseStandOfflineFaehig,
+  erfasseVerpflegungsausgabeOfflineFaehig,
 } from './schreiben';
 
 vi.mock('../api/einsatzPerson', async (importOriginal) => {
@@ -17,6 +19,7 @@ vi.mock('../api/einsatzPerson', async (importOriginal) => {
 });
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
 vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
+vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 
 function online(wert: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: wert });
@@ -184,6 +187,92 @@ describe('offlinefähige Stand- und Belegungsmeldungen (LFH-675)', () => {
     await expect(
       erfasseStandOfflineFaehig(11, 7, bezirk, { evakuiert: 1, erhebung: 'gezaehlt' }),
     ).rejects.toMatchObject({ status: 409 });
+    expect(await schreibaktionenLaden(11, 7)).toHaveLength(1);
+  });
+});
+
+describe('offlinefähige Verpflegungsausgaben (LFH-688)', () => {
+  const mittag = { id: 9, bezeichnung: 'Mittag' };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-24T09:40:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('merkt offline mit dem Erfassungszeitpunkt vor und liest die Aktion unverändert zurück', async () => {
+    online(false);
+    const ergebnis = await erfasseVerpflegungsausgabeOfflineFaehig(11, 7, mittag, {
+      menge: 120,
+      ort: 'Verpflegungsstelle Deich',
+      sonderkost: { vegan: 3 },
+      client_id: 'ausgabe-1',
+    });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'ausgabe-1' });
+    expect(erfasseAusgabe).not.toHaveBeenCalled();
+    expect(await schreibaktionenLaden(11, 7)).toEqual([
+      expect.objectContaining({
+        aktion: {
+          art: 'ausgabe',
+          zeitfenster_id: 9,
+          bezeichnung: 'Mittag',
+          daten: {
+            menge: 120,
+            ort: 'Verpflegungsstelle Deich',
+            sonderkost: { vegan: 3 },
+            client_id: 'ausgabe-1',
+            zeitpunkt_at: '2026-09-24 09:40:00',
+          },
+        },
+      }),
+    ]);
+  });
+
+  it('lässt einen eingetragenen Zeitpunkt beim Vormerken stehen', async () => {
+    online(false);
+    await erfasseVerpflegungsausgabeOfflineFaehig(11, 7, mittag, {
+      menge: 5,
+      zeitpunkt_at: '2026-09-24 07:30:00',
+    });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toMatchObject({ menge: 5, zeitpunkt_at: '2026-09-24 07:30:00' });
+    expect(zeile.aktion.daten).toHaveProperty('client_id', expect.any(String));
+  });
+
+  it('sendet online ohne zugesetzten Zeitpunkt — der Server nimmt seine Uhr', async () => {
+    const antwort = { ausgabe_id: 5 } as Awaited<ReturnType<typeof erfasseAusgabe>>;
+    vi.mocked(erfasseAusgabe).mockResolvedValue(antwort);
+    const ergebnis = await erfasseVerpflegungsausgabeOfflineFaehig(11, 7, mittag, {
+      menge: 120,
+      client_id: 'ausgabe-2',
+    });
+    expect(ergebnis).toEqual({ zustand: 'gesendet', daten: antwort });
+    expect(erfasseAusgabe).toHaveBeenCalledWith(
+      7,
+      9,
+      { menge: 120, client_id: 'ausgabe-2' },
+      { offlineQueueBenutzerId: 11 },
+    );
+    expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
+  });
+
+  it('merkt nach transientem Fehler mit DERSELBEN client_id vor, fachliche 4xx wirft', async () => {
+    vi.mocked(erfasseAusgabe).mockRejectedValueOnce(new NetzFehler());
+    const ergebnis = await erfasseVerpflegungsausgabeOfflineFaehig(11, 7, mittag, { menge: 120 });
+    expect(ergebnis.zustand).toBe('vorgemerkt');
+    const gesendet = vi.mocked(erfasseAusgabe).mock.calls[0][2];
+    expect(gesendet.client_id).toEqual(expect.any(String));
+    expect(gesendet).not.toHaveProperty('zeitpunkt_at');
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-09-24 09:40:00' });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+
+    vi.mocked(erfasseAusgabe).mockRejectedValueOnce(new ApiError(404, 'Nicht gefunden'));
+    await expect(
+      erfasseVerpflegungsausgabeOfflineFaehig(11, 7, mittag, { menge: 1 }),
+    ).rejects.toMatchObject({ status: 404 });
     expect(await schreibaktionenLaden(11, 7)).toHaveLength(1);
   });
 });

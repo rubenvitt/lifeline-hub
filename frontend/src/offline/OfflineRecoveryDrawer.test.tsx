@@ -91,3 +91,27 @@ describe('OfflineRecoveryDrawer: abgelehnte Betreuungsmeldungen (LFH-675)', () =
     expect(screen.getByText(/"belegt": 37/)).toBeInTheDocument();
   });
 });
+
+describe('OfflineRecoveryDrawer: abgelehnte Verpflegungsausgaben (LFH-688)', () => {
+  it('benennt das Zeitfenster und zeigt Grund und vollständigen Inhalt', async () => {
+    await schreibaktionEinreihen(11, 7, {
+      art: 'ausgabe',
+      zeitfenster_id: 9,
+      bezeichnung: 'Mittag',
+      daten: { menge: 120, zeitpunkt_at: '2026-09-24 09:40:00', client_id: 'ausgabe-abgelehnt' },
+    });
+    const [ausgabe] = await schreibaktionenLaden(11, 7);
+    await schreibaktionAblehnen(11, ausgabe, 'Nicht gefunden');
+
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+      </App>,
+    );
+
+    expect(await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag')).toBeInTheDocument();
+    expect(screen.getByText(/Nicht gefunden/)).toBeInTheDocument();
+    expect(screen.getByText(/"client_id": "ausgabe-abgelehnt"/)).toBeInTheDocument();
+    expect(screen.getByText(/"menge": 120/)).toBeInTheDocument();
+  });
+});

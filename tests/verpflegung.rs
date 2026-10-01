@@ -786,3 +786,158 @@ async fn leerlauf_patch_publiziert_kein_ereignis() {
         "Leerlauf-PATCH darf nichts publizieren: {text:?}"
     );
 }
+
+// ── Offline-Replay (LFH-688) ────────────────────────────────────────────────────────────────
+
+fn ausgabe_body(menge: i64, client_id: &str) -> String {
+    serde_json::json!({ "menge": menge, "client_id": client_id }).to_string()
+}
+
+/// Spec „Wiederholte Ausgabe“ über die Route: 201 mit derselben Kennung, genau eine Ausgabe,
+/// die ausgegebene Menge steigt nicht. Ein leerer Schlüssel ist keiner.
+#[tokio::test]
+async fn replay_liefert_die_bestehende_ausgabe() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let erst = ausgabe(&app, &admin, e, zid, &ausgabe_body(120, "v1")).await;
+    let wieder = ausgabe(&app, &admin, e, zid, &ausgabe_body(120, " v1 ")).await;
+    assert_eq!(wieder["ausgabe_id"], erst["ausgabe_id"]);
+    assert_eq!(wieder["zeitfenster"]["ausgegeben"]["gesamt"], 120);
+    assert_eq!(
+        wieder["zeitfenster"]["ausgaben"].as_array().unwrap().len(),
+        1
+    );
+
+    let a = ausgabe(&app, &admin, e, zid, &ausgabe_body(1, "  ")).await;
+    let b = ausgabe(&app, &admin, e, zid, &ausgabe_body(1, "  ")).await;
+    assert_ne!(
+        a["ausgabe_id"], b["ausgabe_id"],
+        "leer heißt: kein Schlüssel"
+    );
+}
+
+/// Spec „Zu langer Schlüssel“: 400, nichts gespeichert.
+#[tokio::test]
+async fn client_id_zu_lang_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/zeitfenster/{zid}/ausgaben", pfad(e)),
+        &admin,
+        Some(&ausgabe_body(5, &"x".repeat(65))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["zeitfenster"][0]["ausgaben"].as_array().unwrap().len(), 0);
+}
+
+/// Spec „Replay nach Einsatzende“, „Neue Ausgabe nach Einsatzende“ und „Schlüssel eines
+/// anderen Zeitfensters“.
+#[tokio::test]
+async fn replay_nach_abschluss_und_schluessel_eines_anderen_zeitfensters() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mittag = zeitfenster(&app, &admin, e, MITTAG).await;
+    let abend = zeitfenster(&app, &admin, e, &MITTAG.replace("\"Mittag\"", "\"Abend\"")).await;
+    let erst = ausgabe(&app, &admin, e, mittag, &ausgabe_body(120, "v4")).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/zeitfenster/{abend}/ausgaben", pfad(e)),
+        &admin,
+        Some(&ausgabe_body(120, "v4")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "Einsatz abschließen: {s}");
+    let url = format!("{}/zeitfenster/{mittag}/ausgaben", pfad(e));
+    let (s, wieder) = anfrage(&app, "POST", &url, &admin, Some(&ausgabe_body(120, "v4"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
+    assert_eq!(wieder["ausgabe_id"], erst["ausgabe_id"]);
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&ausgabe_body(5, "v4-neu"))).await;
+    assert_eq!(s, StatusCode::CONFLICT, "echter Insert bleibt gesperrt");
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some(r#"{"menge":5}"#)).await;
+    assert_eq!(s, StatusCode::CONFLICT, "ohne Schlüssel ebenfalls");
+}
+
+/// Spec „Beobachter ohne Schreibrecht“: die Gates laufen vor dem Replay-Lookup. Ein fremder
+/// Queue-Besitzer ist 412.
+#[tokio::test]
+async fn gates_vor_dem_replay() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    ausgabe(&app, &admin, e, zid, &ausgabe_body(120, "v6")).await;
+
+    let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, e, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&app, "beobachter", "beobachterpw1").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &url,
+        &beob_cookie,
+        Some(&ausgabe_body(120, "v6")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert!(json.get("ausgabe_id").is_none(), "{json:?}");
+
+    let (s, _) = anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &url,
+        &admin,
+        Some(&ausgabe_body(120, "v6")),
+        i64::MAX,
+    )
+    .await;
+    assert_eq!(s, StatusCode::PRECONDITION_FAILED);
+}
+
+/// Spec „Kein zweites Live-Ereignis beim Replay“ (design.md D5).
+#[tokio::test]
+async fn replay_verteilt_kein_live_ereignis() {
+    use lifeline_hub::live::LiveEvent;
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let mut events = live.abonniere(e);
+
+    ausgabe(&app, &admin, e, zid, &ausgabe_body(5, "v7")).await;
+    let erstes = tokio::time::timeout(std::time::Duration::from_secs(1), events.recv())
+        .await
+        .expect("Erstausgabe verteilt live")
+        .unwrap()
+        .event;
+    assert_eq!(erstes, LiveEvent::Verpflegung);
+
+    ausgabe(&app, &admin, e, zid, &ausgabe_body(5, "v7")).await;
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(150), events.recv())
+            .await
+            .is_err(),
+        "ein Replay verteilt nichts"
+    );
+}
