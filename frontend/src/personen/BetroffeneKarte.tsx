@@ -58,7 +58,7 @@ export interface BetroffeneKarteProps {
 }
 
 const SCHLUESSEL_PRAEFIX = 'person-';
-/** Ein Fokus so kurz nach einem Druck im Bereich stammt vom Zeiger, nicht von der Tastatur. */
+/** Ein Fokus so kurz nach Druck oder Loslassen im Bereich stammt vom Zeiger, nicht von der Tastatur. */
 const ZEIGER_FOKUS_MS = 1000;
 
 /** Personen-id aus einem Marker-Schlüssel; der Einsatzort und Fremdes ergeben `null`. */
@@ -157,9 +157,14 @@ export default function BetroffeneKarte({
    * jsdom kennt es aber nicht.)
    */
   const letzterDruckRef = useRef(Number.NEGATIVE_INFINITY);
+  // Ein Zeigerfokus ÜBERNIMMT die Bedingung: wer erst per Tab, dann per Klick in die Karte kommt,
+  // hält danach nicht mehr über den alten Tastaturfokus (Re-Review LFH-668).
   const fokusRein = (e: FocusEvent) => {
-    if (e.timeStamp - letzterDruckRef.current < ZEIGER_FOKUS_MS) return;
-    setzeBedingung('fokus', true);
+    setzeBedingung('fokus', e.timeStamp - letzterDruckRef.current >= ZEIGER_FOKUS_MS);
+  };
+  // Druck UND Loslassen: ein langer Druck auf „anzeigen" fokussiert erst im `click`.
+  const zeigerDruck = (e: PointerEvent) => {
+    letzterDruckRef.current = e.timeStamp;
   };
   // `blur` feuert auch beim Wechsel zwischen zwei Zielen des Bereichs — nur ein Ziel außerhalb taut.
   const fokusRaus = (e: FocusEvent) => {
@@ -229,7 +234,6 @@ export default function BetroffeneKarte({
         height: standHoehe,
         marginBlockEnd: token.marginXS,
         display: 'flex',
-        outline: 'none',
       }}
     >
       {wartet !== null ? (
@@ -278,9 +282,8 @@ export default function BetroffeneKarte({
     onPointerEnter: zeigerRein,
     onPointerMove: zeigerBewegt,
     onPointerLeave: zeigerRaus,
-    onPointerDownCapture: (e: PointerEvent) => {
-      letzterDruckRef.current = e.timeStamp;
-    },
+    onPointerDownCapture: zeigerDruck,
+    onPointerUpCapture: zeigerDruck,
     onFocus: fokusRein,
     onBlur: fokusRaus,
   };

@@ -77,8 +77,9 @@ Zu, solange mindestens eine der drei Bedingungen gilt. Sie gelten für den ganze
    Betreten: Erscheint die Ansicht unter einem ruhenden Zeiger, meldet Chrome beim nächsten
    Bewegen kein `pointerenter` (Befund aus dem e2e-Lauf bei 390 px).
 2. **Fokus von der Tastatur:** `focusin`/`focusout` mit der `contains`-Prüfung der Datensicht
-   (Kartenknöpfe, Banner-Aktion). Ein Fokus bis 1 s nach einem `pointerdown` im Bereich zählt
-   nicht. MapLibre gibt dem Canvas `tabindex=0`, also fokussiert jeder Klick oder Tipp ihn, und
+   (Kartenknöpfe, Banner-Aktion). Ein Fokus bis 1 s nach `pointerdown` oder `pointerup` im
+   Bereich kommt vom Zeiger und räumt die Bedingung, statt sie zu setzen (sonst hielte ein
+   früherer Tastaturfokus nach Klick und Verlassen weiter, Re-Review). MapLibre gibt dem Canvas `tabindex=0`, also fokussiert jeder Klick oder Tipp ihn, und
    sonst bliebe die Karte nach dem Verlassen gehalten (Review). Bei Touch kommt das kompatible
    `mousedown` erst nach `pointerup`, deshalb ein Zeitfenster. `:focus-visible` wäre genauer, ist
    aber in jsdom nicht prüfbar. Entfernt ein Render den fokussierten Knoten (der Knopf

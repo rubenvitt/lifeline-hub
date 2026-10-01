@@ -235,6 +235,38 @@ describe('BetroffeneKarte — Schleuse (LFH-668)', () => {
     expect(marker()).toHaveLength(3);
   });
 
+  it('Tastaturfokus, dann Klick in die Karte: der Zeigerfokus übernimmt, Verlassen gibt frei (Re-Review LFH-668)', async () => {
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    act(() => screen.getByRole('button', { name: 'stub-auffaechern' }).focus());
+    const ziel = screen.getByRole('button', { name: 'stub-zuklappen' });
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    fireEvent.pointerDown(ziel, { pointerType: 'mouse' });
+    act(() => ziel.focus());
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    neu([p(1), p(2)]);
+    expect(marker()).toHaveLength(2);
+  });
+
+  it('langer Druck: das Zeitfenster läuft auch ab dem Loslassen (Re-Review LFH-668)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const { neu } = renderKarte([p(1)]);
+      await screen.findByTestId('kartenflaeche-stub');
+      const ziel = screen.getByRole('button', { name: 'stub-auffaechern' });
+      fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+      fireEvent.pointerDown(ziel, { pointerType: 'mouse' });
+      vi.setSystemTime(Date.now() + 3000);
+      fireEvent.pointerUp(ziel, { pointerType: 'mouse' });
+      act(() => ziel.focus());
+      fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+      neu([p(1), p(2)]);
+      expect(marker()).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('„anzeigen" lässt keine Fokus-Bedingung zurück: nach dem Verlassen ist die Karte live (Review LFH-668)', async () => {
     const { neu } = renderKarte([p(1)]);
     await screen.findByTestId('kartenflaeche-stub');
