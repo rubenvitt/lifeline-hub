@@ -46,7 +46,15 @@ describe.each([
   ['Tag', farbenHell, 7],
   ['Nacht', farbenDunkel, 5],
 ] as const)('Textrollen auf jeder Flächenstufe — %s (LFH-702/LFH-877)', (_modus, farben, boden) => {
-  const flaechen = ['grund', 'flaeche', 'flaeche2', 'kopf', 'paneel', 'flaeche3'] as const;
+  const flaechen = [
+    'grund',
+    'flaeche',
+    'flaeche2',
+    'kopf',
+    'paneel',
+    'flaeche3',
+    'bedienFlaeche',
+  ] as const;
   it.each(['bedienText', 'gedaempft'] as const)('%s hält den Textboden', (rolle) => {
     for (const flaeche of flaechen) {
       expect(

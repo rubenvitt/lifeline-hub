@@ -615,6 +615,9 @@ for (const modus of ['light', 'dark'] as const) {
     // Dieselben Stellen auf der Hervorhebungsfläche der Zeile unter dem Zeiger (LFH-702/LFH-877):
     // auch dort gilt der volle Boden. `pruefe` misst erst nach dem Hover-Übergang.
     await zeile.hover();
+    // Vorbedingung: antd setzt den Zeilen-Hover per Klasse aus `onMouseEnter`, nicht per `:hover`.
+    // Ohne sie mäße `pruefe` womöglich noch die Ruhe (`kontrast-kern.ts`, `eingeschwungen`).
+    await expect(zeile.locator('td.ant-table-cell-row-hover').first()).toBeAttached();
     const unterDemZeiger: Record<string, Locator> = {
       'Titel-Anker unter dem Zeiger': zeile.locator('[data-lfh="download-anker-name"]'),
       'Bezug „—" unter dem Zeiger': zeile.getByText('—', { exact: true }),

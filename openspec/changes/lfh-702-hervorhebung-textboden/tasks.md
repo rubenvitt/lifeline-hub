@@ -20,9 +20,9 @@ Test rot macht.
 
 ## 3. Browsernachweis auf der Hervorhebungsfläche (Spec „Böden für geerbten Text“)
 
-- [x] 3.1 `frontend/e2e/dokumente.spec.ts`, Test „Kontrast …“: Nach dem Block „geerbt“ den Zeiger über die Dokumentzeile legen (`zeile.hover()`) und Titel-Anker sowie „—“ gegen `KONTRAST_ZIEL[modus]` messen. Die Messwerte kommen in den Anhang. Verifikation: In beiden Modi grün. Mit `bedienText` oder `gedaempft` auf dem alten Wert ist der Tag-Lauf rot.
+- [x] 3.1 `frontend/e2e/dokumente.spec.ts`, Test „Kontrast …“: Nach dem Block „geerbt“ den Zeiger über die Dokumentzeile legen (`zeile.hover()`, Vorbedingung `td.ant-table-cell-row-hover`) und Titel-Anker sowie „—“ gegen `KONTRAST_ZIEL[modus]` messen. Die Messwerte kommen in den Anhang. Verifikation: In beiden Modi grün. Mit `bedienText` oder `gedaempft` auf dem alten Wert ist der Tag-Lauf rot.
 - [x] 3.2 `frontend/e2e/betroffene-kontrast.spec.ts` (light und dark, LFH-650) mit `--repeat-each 3`. Verifikation: 3 von 3 grün. Messwert „Zustand-Knopf leer+hover“ am Tag gegen `bedienFlaeche` (Knopffläche unter dem Zeiger), nicht gegen `flaeche3`.
-- [x] 3.3 Alle Kontrast-Specs mit dem neuen Messkern: `abloesung`, `betroffene`, `fachebenen`, `hellmodus`, `kraefte`, `primaerknopf`, `verpflegung`, `dokumente`, je `--repeat-each 3`. Verifikation: alle grün. Wird eine Stelle rot, die nicht über `bedienText`/`gedaempft` läuft, ist das ein Blocker für den Menschen und keine Ausnahme im Spec (`design.md`, Risiken).
+- [ ] 3.3 Alle Nutzer des Messkerns (`grep -l kontrast-kern e2e/`; `karten-pixel-kern.ts` nennt ihn nur im Kommentar) mit dem neuen Messkern, je `--repeat-each 3`. Zuerst gelaufen (vor dem Review-Befund, nur `pruefe` schwang ein): `abloesung`, `betroffene`, `fachebenen`, `hellmodus`, `kraefte`, `primaerknopf`, `verpflegung`-Kontrast und `dokumente` -g Kontrast, 99 + 6 grün. Nach der Verlegung in `messe()` (Review): alle Nutzer erneut. Verifikation: alle grün. Wird eine Stelle rot, die nicht über `bedienText`/`gedaempft` läuft, ist das ein Blocker für den Menschen und keine Ausnahme im Spec (`design.md`, Risiken).
 
 ## 4. Regeln und Prüfspur
 

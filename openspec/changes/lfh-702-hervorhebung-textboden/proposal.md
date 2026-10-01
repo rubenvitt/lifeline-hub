@@ -48,10 +48,13 @@ halten.
 
 ## Impact
 
-- `frontend/e2e/kontrast-kern.ts`: `pruefe()`/`kontrast()` warten auf den eingeschwungenen
-  Zustand. Das betrifft alle Kontrast-Specs (`abloesung`, `betroffene`, `fachebenen`,
-  `hellmodus`, `kraefte`, `primaerknopf`, `verpflegung`, `dokumente`). Hover-Messungen, die bisher
-  nur zufällig grün waren, können dabei rot werden.
+- `frontend/e2e/kontrast-kern.ts`: jede Messung (`pruefe()`, `kontrast()`, `randKontrast()`)
+  wartet auf den eingeschwungenen Zustand. Das betrifft jeden Nutzer des Kerns (`abloesung-`,
+  `betroffene-`, `hellmodus-`, `primaerknopf-`, `verpflegung-kontrast`, `dokumente`,
+  `aufbewahrung`, `betreuung-pruefliste`, `etb-anhang-pruefliste`, `ikonen-stilprobe`,
+  `schaden-anhaenge`, `wetter-pegel`).
+  `fachebenen-` und `kraefte-kontrast` haben eigene Messungen. Hover-Messungen, die bisher nur
+  zufällig grün waren, können dabei rot werden.
 - `frontend/src/theme/tokens.ts` (`farbenHell.bedienText`, `farbenHell.gedaempft`, Kommentare),
   `frontend/src/theme/rollen.css` (Tag-Spiegel), `frontend/src/theme/bedienKontrast.test.ts`
   (gerechneter Boden auf den Flächenstufen).

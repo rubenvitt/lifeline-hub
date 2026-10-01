@@ -57,6 +57,12 @@ Messversuch aufruft. Er läuft im Browser:
 3. Auf deren `finished` wird mit einer Obergrenze gewartet. Läuft die Obergrenze ab, ist das ein
    Fehler und keine Messung.
 
+Der Schritt sitzt in `messe()` und gilt damit für `pruefe`, `kontrast` und `randKontrast`
+(Review-Befund: zuerst hing er nur an `pruefe`, die Spec gilt aber jedem Nachweis). Einen
+Zustand, den erst JavaScript setzt, sieht er nicht kommen: antds Zeilen-Hover ist die Klasse
+`ant-table-cell-row-hover` aus `onMouseEnter`, kein `:hover`. Der Test sichert ihn deshalb vorher
+als Vorbedingung zu.
+
 `toPass` bleibt um den Messversuch herum stehen, und zwar für den ursprünglichen Zweck: Ein Dialog
 kann noch gar nicht im DOM sein, oder eine Animation startet erst einen Frame später. Weil jeder
 Versuch zuerst einschwingt, misst schon der erste Versuch den Endwert. Liegt der unter dem Boden,
