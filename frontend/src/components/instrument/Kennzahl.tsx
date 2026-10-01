@@ -15,6 +15,8 @@ import '../../theme/sprache.css';
  * Eine Zelle: Augenbraue · Zahl Mono 500 in drei Stufen (22 / 32 / 40 aus `schriftskala`) ·
  * optionale Einheit Mono 12 `schwach` · Notiz 11 `gedaempft` · optionaler Aufgliederungsbalken.
  * Das Band setzt n Zellen ins FUGENRASTER: `gap: 1px` auf `linie`, jede Zelle auf `flaeche`.
+ * Die Fuge bleibt in jeder Dichtestufe 1 px; den Abstand klickbarer Zellen hält der Einzug
+ * (siehe „KLICKBAR“).
  *
  * ── DATENZUSTÄNDE (wie im Lage-Dashboard, LFH-331 · B3) ────────────────────────────
  *
@@ -56,10 +58,21 @@ import '../../theme/sprache.css';
  *
  * ── KLICKBAR ────────────────────────────────────────────────────────────────────────
  *
- * Mit `ziel` wird die ganze Zelle ein `<Link>` — ein handgebautes Bedienziel mit den ZWEI
- * Angaben aus LFH-365. Grund sowie Hover/Fokus tragen die Klassen `lfh-kennzahl` /
- * `lfh-kennzahl--ziel` in `sprache.css`. Auch im Zustand `laden` bleibt die Zelle ein Link: das
- * Ziel existiert ohne Zahl.
+ * Mit `ziel` trägt die Zelle einen `<Link>` — ein handgebautes Bedienziel mit den ZWEI
+ * Angaben aus LFH-365. Auch im Zustand `laden` bleibt sie ein Link: das Ziel existiert ohne
+ * Zahl.
+ *
+ * ABSTAND ZWISCHEN ZIELEN (LFH-630, Bedien-Leitlinie Kriterium 2): im Fugenraster stünden zwei
+ * Links nur 1 px auseinander, die Leitlinie verlangt in `komfortabel` ≥ 8 px und in `handschuh`
+ * ≥ 16 px. Die Fuge bleibt deshalb 1 px, und der Link rückt INNERHALB seiner Rasterzelle um
+ * {@link kennzahlZielEinzug} (0 / 4 / 8 px) von jedem Rand ab: zwischen zwei Treffflächen liegen
+ * Zellfläche, Fuge, Zellfläche. Die Polsterung des Links sinkt um denselben Betrag, Zahl und
+ * Notiz stehen also wie ohne Ziel. Die Zelle (`data-lfh="kennzahl-zelle"`) trägt Grund und
+ * Eskalationskante, der Link Inhalt, Treffhöhe und die Prüfanker (`data-lfh="kennzahl"`,
+ * `data-ton`). Hover und Fokus liegen als `.lfh-kennzahl__ziel` in `sprache.css` auf dem Link:
+ * die Tönung zeigt, wo ein Tippen wirkt, der Rand bleibt still. Herleitung und verworfene
+ * Wege (breitere Fuge, Kacheln):
+ * `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`.
  */
 
 export type KennzahlZustand = 'daten' | 'laden' | 'fehler';
@@ -143,6 +156,48 @@ export function kennzahlStil(
     ...(kante > 0
       ? { boxShadow: `inset ${kante}px 0 0 0 ${ton === 'alarm' ? rollen.alarm : rollen.achtung}` }
       : {}),
+  };
+}
+
+/**
+ * Einzug der Trefffläche in ihrer Rasterzelle je Dichtestufe — siehe Dateikopf „Abstand
+ * zwischen Zielen“. Abgeleitet aus `controlHeight`, derselben Quelle wie Treffhöhe und
+ * Polsterung: unter einem lokal überschriebenen Theme hielte die Zelle sonst die Höhe der einen
+ * und den Abstand der anderen Stufe. Die Werte stehen als Literale: 2 · 4 + 1 ≥ 8 (komfortabel),
+ * 2 · 8 + 1 ≥ 16 (handschuh); `kompakt` hat die Spacing-Ausnahme der Leitlinie (Fükw, Maus).
+ */
+export function kennzahlZielEinzug(token: { controlHeight: number }): number {
+  if (token.controlHeight >= 72) return 8;
+  if (token.controlHeight >= 48) return 4;
+  return 0;
+}
+
+/**
+ * Stile der klickbaren Zelle — rein und exportiert. `zelle` ist die Fläche im Fugenraster
+ * (Einzug als Polsterung, Eskalationskante am Zellrand), `ziel` der Link mit dem Zellstil aus
+ * {@link kennzahlStil}, dessen Polsterung um den Einzug sinkt.
+ */
+export function kennzahlZielStil(
+  rollen: Pick<Farbrollen, 'text' | 'achtung' | 'alarm'>,
+  token: { controlHeight: number; padding: number; paddingLG: number; marginXS: number },
+  ton: KennzahlTon,
+  zustand: KennzahlZustand,
+): { zelle: CSSProperties; ziel: CSSProperties } {
+  const einzug = kennzahlZielEinzug(token);
+  const { boxShadow, ...zellstil } = kennzahlStil(rollen, token, ton, zustand);
+  return {
+    zelle: {
+      display: 'flex',
+      minWidth: 0,
+      padding: einzug,
+      ...(boxShadow != null ? { boxShadow } : {}),
+    },
+    ziel: {
+      ...zellstil,
+      flex: '1 1 auto',
+      paddingBlock: token.padding - einzug,
+      paddingInline: token.paddingLG - einzug,
+    },
   };
 }
 
@@ -254,28 +309,33 @@ export function Kennzahl({
     </>
   );
 
-  const stil = { ...kennzahlStil(rollen, token, ton, zustand), ...style };
   // Der WIRKSAME Ton als Marke (Prüfanker für e2e-Kontrast und Tests): außerhalb von `daten`
   // neutral, wie Farbe und Kante.
   const datenTon: KennzahlTon = zustand === 'daten' ? ton : 'neutral';
-  return ziel != null ? (
-    <Link
-      to={ziel}
-      aria-label={zielBeschriftung}
-      className="lfh-kennzahl lfh-kennzahl--ziel"
-      data-lfh="kennzahl"
-      data-ton={datenTon}
-      style={stil}
-    >
-      {inhalt}
-    </Link>
-  ) : (
+  if (ziel != null) {
+    const { zelle, ziel: zielStil } = kennzahlZielStil(rollen, token, ton, zustand);
+    return (
+      <div className="lfh-kennzahl" data-lfh="kennzahl-zelle" style={zelle}>
+        <Link
+          to={ziel}
+          aria-label={zielBeschriftung}
+          className="lfh-kennzahl__ziel"
+          data-lfh="kennzahl"
+          data-ton={datenTon}
+          style={{ ...zielStil, ...style }}
+        >
+          {inhalt}
+        </Link>
+      </div>
+    );
+  }
+  return (
     <div
       className="lfh-kennzahl"
       data-lfh="kennzahl"
       data-ton={datenTon}
       aria-busy={zustand === 'laden' || undefined}
-      style={stil}
+      style={{ ...kennzahlStil(rollen, token, ton, zustand), ...style }}
     >
       {inhalt}
     </div>

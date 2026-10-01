@@ -1,11 +1,15 @@
 import { screen } from '@testing-library/react';
+import { ConfigProvider } from 'antd';
+import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
-import { dichten, farbenDunkel, farbenHell } from '../../theme/tokens';
+import { antdToken, dichten, farbenDunkel, farbenHell } from '../../theme/tokens';
 import {
   Kennzahl,
   Kennzahlenband,
   kennzahlStil,
+  kennzahlZielEinzug,
+  kennzahlZielStil,
   kennzahlenbandStil,
   punktFarbe,
   zahlFarbe,
@@ -122,7 +126,7 @@ describe('Kennzahl — Ton und zweiter Kanal', () => {
 });
 
 describe('Kennzahl — klickbar', () => {
-  it('mit Ziel ist die ganze Zelle ein Link', () => {
+  it('mit Ziel trägt die Zelle einen Link', () => {
     renderMitProviders(<Kennzahl titel="Betroffene" wert={248} ziel="/einsaetze/1/personen" />);
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', '/einsaetze/1/personen');
@@ -144,6 +148,96 @@ describe('Kennzahl — klickbar', () => {
       (s) => kennzahlStil(farbenHell, tokenFuer(s), 'neutral', 'daten').paddingBlock,
     );
     expect(polster[0]).not.toBe(polster[1]);
+  });
+});
+
+describe('Kennzahl — Abstand zwischen Zielen (LFH-630, Bedien-Leitlinie Kriterium 2)', () => {
+  // Literale statt Rücklesen aus dem Token (frontend/AGENTS.md): die Böden der Leitlinie sind
+  // komfortabel ≥ 8 px und handschuh ≥ 16 px zwischen zwei Treffflächen, die Fuge misst 1 px.
+  const FUGE = 1;
+
+  it('der Einzug je Stufe: kompakt 0, komfortabel 4, handschuh 8', () => {
+    expect(kennzahlZielEinzug(tokenFuer('kompakt'))).toBe(0);
+    expect(kennzahlZielEinzug(tokenFuer('komfortabel'))).toBe(4);
+    expect(kennzahlZielEinzug(tokenFuer('handschuh'))).toBe(8);
+  });
+
+  it('zwei Einzüge plus Fuge halten den Abstand der Leitlinie', () => {
+    expect(2 * kennzahlZielEinzug(tokenFuer('komfortabel')) + FUGE).toBeGreaterThanOrEqual(8);
+    expect(2 * kennzahlZielEinzug(tokenFuer('handschuh')) + FUGE).toBeGreaterThanOrEqual(16);
+  });
+
+  it('Einzug und Restpolsterung ergeben die Polsterung der Zelle ohne Ziel — nichts verschiebt sich', () => {
+    for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const ohne = kennzahlStil(farbenHell, tokenFuer(stufe), 'neutral', 'daten');
+      const { zelle, ziel } = kennzahlZielStil(farbenHell, tokenFuer(stufe), 'neutral', 'daten');
+      const e = kennzahlZielEinzug(tokenFuer(stufe));
+      expect(zelle.padding, stufe).toBe(e);
+      expect(Number(ziel.paddingBlock) + e, stufe).toBe(ohne.paddingBlock);
+      expect(Number(ziel.paddingInline) + e, stufe).toBe(ohne.paddingInline);
+    }
+  });
+
+  it('die Trefffläche behält den Boden 30 / 48 / 72 px', () => {
+    const hoehe = (s: keyof typeof dichten) =>
+      kennzahlZielStil(farbenHell, tokenFuer(s), 'neutral', 'daten').ziel.minHeight;
+    expect(hoehe('kompakt')).toBe(30);
+    expect(hoehe('komfortabel')).toBe(48);
+    expect(hoehe('handschuh')).toBe(72);
+  });
+
+  it('die Eskalationskante sitzt am Zellrand, nicht an der eingerückten Trefffläche', () => {
+    const { zelle, ziel } = kennzahlZielStil(farbenHell, tokenFuer('handschuh'), 'alarm', 'daten');
+    expect(zelle.boxShadow).toBe(`inset 6px 0 0 0 ${farbenHell.alarm}`);
+    expect(ziel.boxShadow).toBeUndefined();
+    const laden = kennzahlZielStil(farbenHell, tokenFuer('handschuh'), 'alarm', 'laden');
+    expect(laden.zelle.boxShadow).toBeUndefined();
+  });
+
+  const imHandschuh = (ui: ReactElement) =>
+    renderMitProviders(
+      <ConfigProvider theme={{ token: antdToken(farbenHell, 'handschuh') }}>{ui}</ConfigProvider>,
+    );
+
+  it('mit Ziel steht der Link eingerückt in seiner Rasterzelle und trägt die Prüfanker', () => {
+    imHandschuh(
+      <Kennzahl
+        titel="Betroffene"
+        wert={248}
+        ton="achtung"
+        ziel="/einsaetze/1/personen"
+        zielBeschriftung="Betroffene öffnen"
+      />,
+    );
+    const link = screen.getByRole('link', { name: 'Betroffene öffnen' });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/personen');
+    expect(link).toHaveAttribute('data-lfh', 'kennzahl');
+    expect(link).toHaveAttribute('data-ton', 'achtung');
+    expect(link).toHaveClass('lfh-kennzahl__ziel');
+    const zelle = link.parentElement!;
+    expect(zelle).toHaveAttribute('data-lfh', 'kennzahl-zelle');
+    expect(zelle).toHaveClass('lfh-kennzahl');
+    expect(zelle.style.padding).toBe('8px');
+    expect(zelle.style.boxShadow).toMatch(/^inset 3px 0(px)? 0(px)? /);
+    expect(link.style.boxShadow).toBe('');
+  });
+
+  it('auch im Zustand `laden` bleibt die Zelle mit Ziel ein eingerückter Link', () => {
+    imHandschuh(<Kennzahl titel="Betroffene" wert="" zustand="laden" ziel="/x" />);
+    expect(screen.getByRole('link').parentElement).toHaveAttribute('data-lfh', 'kennzahl-zelle');
+  });
+
+  it('ohne Ziel bleibt die Zelle ein einzelnes Element ohne Zellhülle', () => {
+    const { container } = imHandschuh(<Kennzahl titel="Betroffene" wert={248} />);
+    expect(container.querySelector('[data-lfh="kennzahl-zelle"]')).toBeNull();
+    expect(container.querySelector('[data-lfh="kennzahl"]')).toHaveClass('lfh-kennzahl');
+  });
+
+  it('`style` des Aufrufers überschreibt den Stil der Trefffläche, nicht den Einzug', () => {
+    imHandschuh(<Kennzahl titel="A" wert={1} ziel="/x" style={{ paddingBlock: 3 }} />);
+    const link = screen.getByRole('link');
+    expect(link.style.paddingBlock).toBe('3px');
+    expect(link.parentElement!.style.padding).toBe('8px');
   });
 });
 

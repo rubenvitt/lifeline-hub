@@ -213,8 +213,10 @@ for (const modus of ['light', 'dark'] as const) {
 
       const wert = await kontrast(zelle.locator('[data-lfh="kennzahl-wert"]'));
       const notiz = await kontrast(zelle.locator('[data-lfh="kennzahl-notiz"]'));
+      // Die Kante sitzt an der Rasterzelle um den eingerückten Link (LFH-630).
       const kante = await zelle.evaluate((el) => {
-        const m = getComputedStyle(el).boxShadow.match(/rgba?\([^)]+\)/);
+        const zelle = el.closest('[data-lfh="kennzahl-zelle"]') ?? el;
+        const m = getComputedStyle(zelle).boxShadow.match(/rgba?\([^)]+\)/);
         return m ? m[0] : null;
       });
       const kanteK = kante
