@@ -516,6 +516,8 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   **Charakterisierungstests bauen ihre Keys als Literale**, nicht über die Factory.
 - **Ein neuer Prefix entscheidet über `LAGEBILD_OFFLINE`** (auf die Platte oder ausdrücklich
   draußen): `frontend/src/offline/AGENTS.md`.
+- **Eine Mutation, die eine `erfasse…OfflineFaehig`-Funktion ruft, und Seitentests ohne Netz**
+  (`networkMode`, `setzeOnline`): `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“.
 
 ## Frontend — Lint-Disziplin
 
