@@ -41,6 +41,7 @@ import {
 } from '../lageberichte/AbschnittsAkkordeon';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import FormularEingehaengt from '../components/FormularEingehaengt';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -356,6 +357,9 @@ function PressemitteilungDetail() {
             onBlur={schutz.autosaveJetzt}
             onFinish={(w) => speichernMutation.mutate(w as FormWerte)}
           >
+            {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
+                (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
+            <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
             <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
               <Input />
             </Form.Item>

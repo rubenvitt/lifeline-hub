@@ -1,6 +1,8 @@
 import { Form } from 'antd';
 import { useEffect, useRef } from 'react';
 import { ErfassungsModal } from '../components/Erfassung';
+import FormularEingehaengt from '../components/FormularEingehaengt';
+import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
@@ -62,6 +64,7 @@ export default function PersonErfassungModal({
 }: Props) {
   const [form] = Form.useForm<AufnahmeWerte>();
   const geladeneOeffnung = useRef<string | null>(null);
+  const formular = useFormularEingehaengt();
 
   useEffect(() => {
     const oeffnung = modus === null ? null : `${einsatzId}:person`;
@@ -69,11 +72,14 @@ export default function PersonErfassungModal({
       geladeneOeffnung.current = null;
       return;
     }
+    // antds `Modal` hängt sein `<Form>` erst nach `open` ein; vorher meldete das Setzen „not
+    // connected" (LFH-627, `components/FormularEingehaengt.tsx`).
+    if (!formular.da) return;
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
     const ort = liesErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort');
     if (ort !== undefined) form.setFieldValue('antreff_ort', ort);
-  }, [einsatzId, form, modus]);
+  }, [einsatzId, form, formular.da, modus]);
 
   const ortMerken = (daten: AufnahmeWerte) => {
     if (typeof daten.antreff_ort === 'string') {
@@ -96,6 +102,7 @@ export default function PersonErfassungModal({
       serie
       uebernahme={['antreff_ort']}
     >
+      <FormularEingehaengt onWechsel={formular.melde} />
       <AufnahmeFelder modus={modus ?? 'schnell'} />
     </ErfassungsModal>
   );

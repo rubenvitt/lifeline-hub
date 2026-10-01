@@ -21,6 +21,8 @@ import Datensicht, {
 } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsModal } from '../components/Erfassung';
+import FormularEingehaengt from '../components/FormularEingehaengt';
+import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
@@ -198,11 +200,13 @@ export default function TierePage() {
   const [form] = Form.useForm<TierEingabe>();
   const geladeneOeffnung = useRef<string | null>(null);
   const formularEinsatzId = useRef(einsatzId);
+  /** Hängt das `<Form>` des Dialogs (LFH-627, `components/useFormularEingehaengt.ts`)? */
+  const formular = useFormularEingehaengt();
 
   useEffect(() => {
     if (formularEinsatzId.current !== einsatzId) {
       formularEinsatzId.current = einsatzId;
-      form.resetFields();
+      if (formular.jeDa.current) form.resetFields();
       geladeneOeffnung.current = null;
     }
     const oeffnung = aktuellerModus === null ? null : `${einsatzId}:tier`;
@@ -210,11 +214,13 @@ export default function TierePage() {
       geladeneOeffnung.current = null;
       return;
     }
+    // antds `Modal` hängt sein `<Form>` erst nach `open` ein.
+    if (!formular.da) return;
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
     const ort = liesErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort');
     form.setFieldValue('antreff_ort', ort);
-  }, [aktuellerModus, einsatzId, form]);
+  }, [aktuellerModus, einsatzId, form, formular.da, formular.jeDa]);
 
   // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Sprungpalette, LFH-506). Warten bis der
   // Einsatz geladen ist; Param immer löschen, Maske nur bei Schreibrecht. Eine Kopie statt
@@ -455,6 +461,7 @@ export default function TierePage() {
         onFertig={() => setModus((alt) => (alt?.einsatzId === einsatzId ? null : alt))}
         onAbbrechen={() => setModus((alt) => (alt?.einsatzId === einsatzId ? null : alt))}
       >
+        <FormularEingehaengt onWechsel={formular.melde} />
         <Form.Item
           label="Spezies"
           name="spezies"

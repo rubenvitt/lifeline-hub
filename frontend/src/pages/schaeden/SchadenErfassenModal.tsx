@@ -7,6 +7,8 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { legeSchadenAn, type SchadenEingabe } from '../../api/einsatzSchaden';
 import type { Ausmass, SchadenTyp } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
+import FormularEingehaengt from '../../components/FormularEingehaengt';
+import { useFormularEingehaengt } from '../../components/useFormularEingehaengt';
 import KoordinatenFeld from '../../anzeige/KoordinatenFeld';
 import {
   alsLatLon,
@@ -51,11 +53,13 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
   const geladeneOeffnung = useRef<string | null>(null);
   const formularEinsatzId = useRef(einsatzId);
   const [geschaedigt, setGeschaedigt] = useState<GeschaedigtWert>(null);
+  /** Hängt das `<Form>` des Dialogs (LFH-627, `components/useFormularEingehaengt.ts`)? */
+  const formular = useFormularEingehaengt();
 
   useEffect(() => {
     if (formularEinsatzId.current !== einsatzId) {
       formularEinsatzId.current = einsatzId;
-      form.resetFields();
+      if (formular.jeDa.current) form.resetFields();
       setGeschaedigt(null);
       geladeneOeffnung.current = null;
     }
@@ -64,11 +68,13 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       geladeneOeffnung.current = null;
       return;
     }
+    // antds `Modal` hängt sein `<Form>` erst nach `open` ein.
+    if (!formular.da) return;
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
     const ort = liesErfassungsSitzungswert(einsatzId, 'schaden', 'ort');
     form.setFieldValue('ort', ort);
-  }, [einsatzId, form, open]);
+  }, [einsatzId, form, formular.da, formular.jeDa, open]);
 
   const anlegenMutation = useMutation({
     mutationFn: (v: SchadenEingabe) => legeSchadenAn(einsatzId, v),
@@ -121,6 +127,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       serie
       uebernahme={['ort']}
     >
+      <FormularEingehaengt onWechsel={formular.melde} />
       <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
         <Select
           options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({

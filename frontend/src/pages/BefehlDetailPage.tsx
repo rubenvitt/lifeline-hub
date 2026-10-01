@@ -14,6 +14,7 @@ import { vorlage } from '../befehle/vorlagen';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import FormularEingehaengt from '../components/FormularEingehaengt';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
@@ -405,6 +406,9 @@ function BefehlDetail() {
               onBlur={schutz.autosaveJetzt}
               onFinish={(werte) => speichernMutation.mutate(werte as Record<string, string>)}
             >
+              {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
+                  (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
+              <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
               <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
                 <Input />
               </Form.Item>

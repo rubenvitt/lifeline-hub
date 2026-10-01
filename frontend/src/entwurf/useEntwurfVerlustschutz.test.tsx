@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { Form, Input } from 'antd';
 import { useState } from 'react';
+import FormularEingehaengt from '../components/FormularEingehaengt';
 import { AUTOSAVE_MS, useEntwurfVerlustschutz } from './useEntwurfVerlustschutz';
 
 interface Daten {
@@ -50,6 +51,7 @@ function Traeger({ daten, speichern, istEntwurf = true }: TraegerProps) {
         <Form.Item label="Titel" name="titel">
           <Input />
         </Form.Item>
+        <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
       </Form>
       <button type="button" onClick={() => form.submit()}>
         Entwurf speichern
