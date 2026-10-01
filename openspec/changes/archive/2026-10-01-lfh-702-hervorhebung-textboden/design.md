@@ -124,6 +124,12 @@ nehmen wir in Kauf, weil der Boden am Tag die Lesbarkeit im Freien trägt (Krite
   (b) `bedienText` zurück auf `#164f86`: Der Einheitstest auf `flaeche3` und die Hover-Messung
   werden rot. (c) `gedaempft` zurück: Einheitstest und „—“ unter dem Zeiger werden rot.
 
+**Nachtrag beim Merge mit `alpha` (01.10.2026):** LFH-643 (Spec `textstufen-kontrast`) hat
+`gedaempft` am Tag inzwischen auf `#363d45` und `schwach` auf `#424a53` gesetzt, beide halten den
+Tagesboden auf jeder Fläche (`gedaempft` auf `flaeche3` 8,62, `schwach` 7,05). Der Merge übernimmt
+diese Werte; aus dieser Change bleibt für die Palette nur `bedienText` = `#144779` (7,46 auf
+`flaeche3`). Die Zahlen für `gedaempft` oben beschreiben den Stand vor dem Merge.
+
 ## Risks / Trade-offs
 
 - [Der strengere Messkern macht weitere Hover-Messungen rot, die bisher nur zufällig grün

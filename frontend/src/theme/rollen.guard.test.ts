@@ -115,6 +115,7 @@ const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
   normalText: '--lfh-normal-text',
   achtungText: '--lfh-achtung-text',
   alarmText: '--lfh-alarm-text',
+  alarmHover: '--lfh-alarm-hover',
   normalFlaeche: '--lfh-normal-flaeche',
   achtungFlaeche: '--lfh-achtung-flaeche',
   alarmFlaeche: '--lfh-alarm-flaeche',

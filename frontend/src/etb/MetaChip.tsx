@@ -1,5 +1,5 @@
-import { IkonePunkteSenkrecht } from '../ikonen';
-import { AutoComplete, Button, DatePicker, Dropdown, Input, Space, Tag } from 'antd';
+import { AutoComplete, DatePicker, Input, Space, Tag } from 'antd';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
 import { useState } from 'react';
@@ -9,6 +9,11 @@ import BuchstabierHilfe from './BuchstabierHilfe';
 import { teilwortSuche } from '../components/teilwortSuche';
 
 type Wert = string | dayjs.Dayjs | MeldeWeg | undefined;
+
+const CHIP_MENUE: readonly MenueEintrag<'bearbeiten' | 'entfernen'>[] = [
+  { key: 'bearbeiten', label: 'Bearbeiten' },
+  { key: 'entfernen', label: 'Entfernen', gefahr: true },
+];
 
 interface Props {
   feld: MetaFeld;
@@ -155,45 +160,28 @@ export default function MetaChip({
          ein Nachfahre: ein Synthetic Event steigt durch den Komponentenbaum auf, auch über die
          Portal-Grenze. Ein Griff auf das 4-px-Polsterband des Overlays
          (`dropdownEdgeChildPadding` → `paddingXXS`) schlösse das Menü ohne Aktion UND schaltete den
-         Chip in den Editor. Riegel am Auslöser oder am Menü-`onClick` fangen das nicht (der feuert
-         nur für Einträge); richtig ist, dem Overlay den klickbaren Vorfahren zu nehmen. Der Handler
-         liegt deshalb an einem Geschwisterknoten des Menüs, ohne `stopPropagation`. */}
+         Chip in den Editor. Riegel am Menü-`onClick` fangen das nicht (der feuert nur für
+         Einträge); richtig ist, dem Overlay den klickbaren Vorfahren zu nehmen. Der Handler liegt
+         deshalb an einem Geschwisterknoten des Menüs, ohne `stopPropagation`. Der Portal-Riegel in
+         `components/MenueAusloeser.tsx` (LFH-683) fängt denselben Fall noch einmal; er ist die
+         zweite Sicherung, nicht der Grund, den Schnellweg zurück an den `<Tag>` zu hängen. */}
       <span
         onClick={gesperrt ? undefined : () => onEdit(feld)}
         style={{ cursor: gesperrt ? 'default' : 'pointer' }}
       >
         {d.label}: {anzeige(feld, wert)}
       </span>
-      <Dropdown
-        trigger={['click']}
-        disabled={gesperrt}
-        /*
-         * `autoFocus` wie am Aktionsmenü in `EtbZeitachse.tsx` und `components/Datensicht.tsx`: ohne
-         * ihn bleibt der Fokus am Auslöser und die Pfeiltasten heben im Menü nichts hervor.
-         */
-        autoFocus
-        menu={{
-          items: [
-            { key: 'bearbeiten', label: 'Bearbeiten' },
-            // `danger`, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar — „Bearbeiten"
-            // daneben legt es wieder an (LFH-363).
-            { key: 'entfernen', label: 'Entfernen', danger: true },
-          ],
-          // Zuordnung am Menü statt an jedem Eintrag (Muster `pages/lagekarte/AnsichtSwitcher.tsx`).
-          onClick: ({ key }) => {
-            if (key === 'bearbeiten') onEdit(feld);
-            if (key === 'entfernen') onRemove(feld);
-          },
+      {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
+         „Bearbeiten" daneben legt es wieder an (LFH-363). */}
+      <MenueAusloeser
+        eintraege={CHIP_MENUE}
+        zugaenglicherName={`Aktionen zu ${d.label}`}
+        gesperrt={gesperrt}
+        onWahl={(key) => {
+          if (key === 'bearbeiten') onEdit(feld);
+          if (key === 'entfernen') onRemove(feld);
         }}
-      >
-        {/* Kein `size`-Prop: die Trefffläche kommt aus `controlHeight` und zieht mit der Dichtestufe mit. */}
-        <Button
-          type="text"
-          disabled={gesperrt}
-          aria-label={`Aktionen zu ${d.label}`}
-          icon={<IkonePunkteSenkrecht />}
-        />
-      </Dropdown>
+      />
     </Tag>
   );
 }

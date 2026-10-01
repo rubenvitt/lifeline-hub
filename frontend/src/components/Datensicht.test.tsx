@@ -528,7 +528,7 @@ describe('pruefeKartenplan()', () => {
     expect(meldung(befunde, 'filter')).toHaveLength(1);
   });
 
-  it('meldet baum zusammen mit aufklappzeile und mit gruppen', () => {
+  it('meldet baum zusammen mit gruppen', () => {
     const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
     const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
     const befunde = pruefeKartenplan(
@@ -536,16 +536,14 @@ describe('pruefeKartenplan()', () => {
         spalten: ohneFilterSpalten,
         karte,
         baum,
-        aufklappzeile: () => 'Besatzung',
         gruppen: { schluessel: () => 'a', etikett: (w) => w, unterEbene: 1 },
       },
       'Meldebild',
     );
-    expect(meldung(befunde, 'aufklappzeile')).toHaveLength(1);
     expect(meldung(befunde, 'gruppen')).toHaveLength(1);
   });
 
-  it('meldet aufklappen zusammen mit baum und mit aufklappzeile (LFH-676)', () => {
+  it('meldet aufklappen zusammen mit baum und mit karte.art eigen (LFH-676)', () => {
     const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
     const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
     const aufklappen = {
@@ -556,15 +554,6 @@ describe('pruefeKartenplan()', () => {
     expect(
       meldung(
         pruefeKartenplan({ spalten: ohneFilterSpalten, karte, baum, aufklappen }, 'Meldebild'),
-        'aufklappen',
-      ),
-    ).toHaveLength(1);
-    expect(
-      meldung(
-        pruefeKartenplan(
-          { spalten, karte, aufklappen, aufklappzeile: () => 'Besatzung' },
-          'Fahrzeuge',
-        ),
         'aufklappen',
       ),
     ).toHaveLength(1);
@@ -928,6 +917,46 @@ describe('Datensicht · Kartenzweig', () => {
     });
     expect(screen.getAllByRole('button', { name: /^Aktionen zu / })).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Aktionen zu Rotkreuz 2' })).toBeInTheDocument();
+  });
+
+  it('weitere.laeuft() zeigt den Ladezustand nur am Menü-Auslöser der laufenden Zeile (LFH-654)', () => {
+    setzeViewportBreite(390);
+    rendere({
+      karte: {
+        ...karte,
+        weitere: {
+          eintraege: () => [{ key: 'entfernen', label: 'Entfernen', gefahr: true }],
+          zugaenglicherName: (f) => `Aktionen zu ${f.funkrufname}`,
+          laeuft: (f) => f.id === DREI[1].id,
+          onWahl: () => {},
+        },
+      },
+    });
+    const name = (i: number) => `Aktionen zu ${DREI[i].funkrufname}`;
+    expect(screen.getByRole('button', { name: name(1) })).toHaveClass('ant-btn-loading');
+    expect(screen.getByRole('button', { name: name(0) })).not.toHaveClass('ant-btn-loading');
+    expect(screen.getByRole('button', { name: name(2) })).not.toHaveClass('ant-btn-loading');
+  });
+
+  it('ein laufender Menü-Auslöser öffnet kein Menü — keine zweite Löschung (LFH-654)', async () => {
+    setzeViewportBreite(390);
+    const onWahl = vi.fn();
+    rendere({
+      karte: {
+        ...karte,
+        weitere: {
+          eintraege: () => [{ key: 'entfernen', label: 'Entfernen', gefahr: true }],
+          zugaenglicherName: (f) => `Aktionen zu ${f.funkrufname}`,
+          laeuft: () => true,
+          onWahl,
+        },
+      },
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: `Aktionen zu ${DREI[0].funkrufname}` }),
+    );
+    expect(document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden)')).toBeNull();
+    expect(onWahl).not.toHaveBeenCalled();
   });
 
   it('der Statusslot rendert ein Etikett MIT Text, nicht nur eine Farbe', () => {
@@ -1385,17 +1414,6 @@ describe('Datensicht · Tabellenzweig', () => {
       'Florian 1',
       'Florian 3',
     ]);
-  });
-
-  it('aufklappzeile läuft nur im Tabellenzweig', () => {
-    const breit = rendere({ aufklappzeile: (f) => `Besatzung von ${f.funkrufname}` });
-    expect(breit.container.querySelectorAll('.ant-table-row-expand-icon')).toHaveLength(3);
-    breit.unmount();
-
-    setzeViewportBreite(390);
-    const schmal = rendere({ aufklappzeile: (f) => `Besatzung von ${f.funkrufname}` });
-    expect(schmal.container.querySelectorAll('.ant-table-row-expand-icon')).toHaveLength(0);
-    expect(schmal.queryByText('Besatzung von Florian 1')).toBeNull();
   });
 
   it('der Baum läuft über antds expandable, kontrolliert von außen', () => {

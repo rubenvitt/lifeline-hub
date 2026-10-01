@@ -114,6 +114,12 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   per `tracing::error!`).
 - **Scrub-Werte in System-ETB-Texten** stehen in `AUSNAHMEN_SYSTEM_ETB`
   (`tests/aufbewahrung_e2e.rs`) — kein Test bemerkt einen fehlenden Eintrag.
+- **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
+  `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
+  stehen), und nach einer Schwärzung schreibt der Purge-Lauf den WAL per
+  `db::wal_zurueckschreiben` zurück. Die Haupt-DB nur über `db::connect` öffnen. Netz:
+  `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler.rs`). Herleitung und
+  Messung: `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

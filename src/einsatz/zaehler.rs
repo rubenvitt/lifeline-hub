@@ -1,8 +1,8 @@
 //! Modulzähler des Einsatz-Navigationsrahmens (LFH-612).
 //!
 //! Gezählt wird nur, wo die Bedeutung belegt ist: die Gesamtmengen von ETB, Betroffenen,
-//! Einheiten und Einsatzabschnitten sowie die Handlungsmengen der vier Kommunikationsmodule. Ein
-//! weiteres Modul braucht eine eigene Entscheidung.
+//! Einheiten, Einsatzabschnitten und Dokumenten (LFH-666) sowie die Handlungsmengen der vier
+//! Kommunikationsmodule. Ein weiteres Modul braucht eine eigene Entscheidung.
 //!
 //! **Fehlt ≠ 0.** Jedes Feld fehlt, wenn der Benutzer das Modul nicht sehen darf
 //! ([`crate::einsatz::berechtigung::erlaubte_module`]); eine 0 wäre eine Auskunft über ein
@@ -157,6 +157,8 @@ pub struct ModulZaehlerAnzeige {
     pub erinnerungen: Option<ErinnerungsZaehler>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chat: Option<ChatZaehler>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dokumente: Option<MengenZaehler>,
 }
 
 /// Zählt eine Tabelle je Einsatz. `sql` ist ein festes Literal (kein Nutzereingang).
@@ -266,6 +268,19 @@ pub async fn berechne(
             ungelesen: kanaele.iter().map(|k| k.ungelesen_anzahl).sum(),
         });
     }
+    if erlaubt.contains("dokumente") {
+        // Dasselbe Prädikat wie `dokument::repo::liste`: gelöschte zählen nicht. Den Join auf
+        // `anhang` braucht die Zahl nicht — `anhang_id` ist NOT NULL mit ON DELETE CASCADE.
+        z.dokumente = Some(
+            menge(
+                pool,
+                "SELECT COUNT(*) FROM einsatz_dokument \
+                 WHERE einsatz_id = ? AND geloescht_at IS NULL",
+                einsatz_id,
+            )
+            .await?,
+        );
+    }
     Ok(z)
 }
 
@@ -293,10 +308,11 @@ mod tests {
             }),
             erinnerungen: Some(ErinnerungsZaehler { faellig: 1 }),
             chat: Some(ChatZaehler { ungelesen: 1 }),
+            dokumente: Some(MengenZaehler { gesamt: 1 }),
         };
         let v = serde_json::to_value(&voll).unwrap();
         let felder = v.as_object().unwrap();
-        assert_eq!(felder.len(), 8, "{v:?}");
+        assert_eq!(felder.len(), 9, "{v:?}");
         for feld in felder.keys() {
             assert!(
                 MODUL_KEYS.contains(&feld.as_str()),

@@ -48,6 +48,10 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  * Der Schalter startet **AUS**: ein Vorgabewert AN wäre benutzt, ohne gewählt zu sein. Er hält
  * für die Lebensdauer des Dialogs.
  *
+ * Die Knöpfe der Aktion stehen mit `size="middle"` auseinander (`token.padding` = 11 / 18 / 26 px,
+ * LFH-653): der Primärknopf kann rot sein (`unumkehrbar`), und im Handschuh-Betrieb verlangt die
+ * Leitlinie ≥ 16 px zwischen zwei Zielen. antds Vorgabe wären 3 / 5 / 7 px (`paddingXS`).
+ *
  * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
  * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
  * durchreicht. Der Riegel gegen doppeltes Absenden sitzt in `abschicken` (`sendetRef`): ein
@@ -346,7 +350,7 @@ export function ErfassungsFormular<T extends object>({
             </div>
           )}
           {/* AKTION */}
-          <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Space size="middle" style={{ display: 'flex', justifyContent: 'flex-end' }}>
             {onAbbrechen && <Button onClick={abbrechen}>Abbrechen</Button>}
             {serie && (
               // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im

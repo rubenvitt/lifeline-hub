@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { createContext, useContext, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { Farbrollen, Schriftstufenname } from '../../theme/tokens';
 import Augenbraue from './Augenbraue';
@@ -49,6 +49,16 @@ import '../../theme/sprache.css';
  * `neutral` steht in `text` (Tag 18,47). Die Füllfarben selbst tragen den Tagesboden als Text
  * nicht, deshalb die `…Text`-Rollen.
  *
+ * ── NOTIZHÖHE (LFH-629, LFH-691) ──────────────────────────────────────────────────
+ *
+ * Eine Notiz, deren Länge sich mit der Lage ändert, ließe das Band wachsen und schrumpfen und
+ * alles darunter springen (Prüfliste Kriterium 12). Das Band fordert deshalb Platz an, gesetzt in
+ * `sprache.css` vom ersten Bild an: unter `md` mit `notizZeilenSchmal` einen Boden (LFH-629), ab
+ * `md` mit `notizZeilen` Boden UND Deckel (LFH-691). Eine längere Notiz endet dort mit „…“; der
+ * volle Text bleibt im DOM, also im zugänglichen Namen, und steht im Zustand `daten` im `title`.
+ * Die tragende Aussage einer Notiz steht deshalb vorn. Herleitung:
+ * `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`.
+ *
  * ── STATUSPUNKT ────────────────────────────────────────────────────────────────────
  *
  * `punkt` setzt ein 8-px-Quadrat in der Tonfarbe VOR die Augenbraue — die Kachel benennt damit
@@ -79,6 +89,9 @@ import '../../theme/sprache.css';
 export type KennzahlZustand = 'daten' | 'laden' | 'fehler';
 export type KennzahlTon = 'neutral' | 'normal' | 'bedien' | 'achtung' | 'alarm';
 type KennzahlGroesse = 'klein' | 'mittel' | 'gross';
+
+/** Ob das umgebende Band eine feste Notizhöhe hat (`Kennzahlenband notizZeilen`). */
+const NotizFestKontext = createContext(false);
 
 const STUFE: Record<KennzahlGroesse, Schriftstufenname> = {
   klein: 'datenwertKlein',
@@ -256,6 +269,11 @@ export function Kennzahl({
     );
   const notizText =
     zustand === 'fehler' ? STAND_UNBEKANNT : zustand === 'laden' ? WIRD_ABGERUFEN : notiz;
+  // Im Band mit fester Notizhöhe kann die Notiz gekürzt sein: der volle Text als Hinweis (siehe
+  // Dateikopf „NOTIZHÖHE“). Nur in `daten` — im Zustand `fehler` trägt schon die Zahl den Titel.
+  const notizFest = useContext(NotizFestKontext);
+  const notizTitel =
+    notizFest && zustand === 'daten' && typeof notiz === 'string' ? notiz : undefined;
 
   const inhalt = (
     <>
@@ -302,6 +320,7 @@ export function Kennzahl({
       {notizText != null && (
         <span
           data-lfh="kennzahl-notiz"
+          title={notizTitel}
           style={{
             fontSize: 11,
             lineHeight: 1.4,
@@ -381,6 +400,12 @@ interface KennzahlenbandProps {
    * Bandbreite um und schöbe alles darunter. Ohne die Prop wächst die Notiz mit ihrem Text.
    */
   notizZeilenSchmal?: number;
+  /**
+   * Höhe jeder Notiz ab `md` in Zeilen, als Boden UND Deckel (LFH-691, `sprache.css`): eine
+   * längere Notiz endet mit „…“ und trägt den vollen Text im `title`. Ohne die Prop wächst die
+   * Notiz ab `md` mit ihrem Text.
+   */
+  notizZeilen?: number;
   style?: CSSProperties;
 }
 
@@ -389,24 +414,32 @@ export function Kennzahlenband({
   spalten,
   beschriftung,
   notizZeilenSchmal,
+  notizZeilen,
   style,
 }: KennzahlenbandProps) {
   const { rollen } = useRollen();
+  const klassen = [
+    notizZeilenSchmal != null && 'lfh-kennzahlenband--notizzeilen',
+    notizZeilen != null && 'lfh-kennzahlenband--notizfest',
+  ].filter(Boolean);
   return (
     <div
       role={beschriftung ? 'group' : undefined}
       aria-label={beschriftung}
       data-lfh="kennzahlenband"
-      className={notizZeilenSchmal != null ? 'lfh-kennzahlenband--notizzeilen' : undefined}
+      className={klassen.length > 0 ? klassen.join(' ') : undefined}
       style={{
         ...kennzahlenbandStil(rollen, spalten),
         ...(notizZeilenSchmal != null
           ? ({ '--lfh-kennzahl-notizzeilen': notizZeilenSchmal } as CSSProperties)
           : {}),
+        ...(notizZeilen != null
+          ? ({ '--lfh-kennzahl-notizzeilen-fest': notizZeilen } as CSSProperties)
+          : {}),
         ...style,
       }}
     >
-      {children}
+      <NotizFestKontext.Provider value={notizZeilen != null}>{children}</NotizFestKontext.Provider>
     </div>
   );
 }

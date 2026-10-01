@@ -23,12 +23,9 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * laufen („angeordnet", „läuft", „fast voll"; „voll", „überbelegt"). Ebenso tragend ist der
  * gewählte Radio-Knopf, dessen Text `src/index.css` auf `--lfh-bedien-text` setzt.
  *
- * ZWEI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen; bis dahin gilt 4,5 : 1, der
- * Zielwert steht in jeder Meldung:
- *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
- *  · Rot am Tag → LFH-693: der Menüeintrag „Stornieren" und der rote Knopf im Storno-Dialog.
- * Fallen die Ausnahmen, wenn diese Tickets landen. Der Primärknopf (Weiß auf `bedien`) trägt
- * seit LFH-661 den vollen Boden.
+ * KEINE AUSNAHME: Tertiärtext (`schwach`, LFH-643), der Primärknopf (Weiß auf `bedien`, LFH-661)
+ * und Rot (Menüeintrag „Stornieren" und roter Knopf im Storno-Dialog, LFH-693) tragen den vollen
+ * Boden (Specs `textstufen-kontrast`, `farbrollen-kontrast`).
  *
  * ═══ KRITERIUM 13 — Fokus nie verdeckt (WCAG 2.4.11) ════════════════════════════════════
  *
@@ -42,29 +39,11 @@ import { kontrast, randKontrast } from './kontrast-kern';
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die drei Ausnahmen oben. */
-const BODEN = 4.5;
 const ZUSTAND = 3;
 
 const FUEKW = { width: 1366, height: 600 };
 const HANDSCHIRM = { width: 390, height: 844 };
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
-
-/**
- * Tertiärtext, enumeriert — ausschließlich über Selektoren, die den TRÄGER selbst treffen,
- * nie einen Container: `closest()` senkte sonst still den Boden für alles darin.
- */
-const TERTIAER = [
-  '.ant-typography-secondary',
-  // Augenbraue (`schwach`): Blockköpfe und Feldetiketten der Bezirkskarte.
-  '.lfh-augenbraue',
-  // Kopf der Stellentabelle (`schwach`). Die Kopfzelle IST der Träger: sonst stehen darin nur
-  // `aria-hidden`-Zeichen für Sortierung und Filter.
-  '.ant-table-thead > tr > th',
-  '.ant-form-item-extra',
-  '.ant-select-placeholder',
-  '.lfh-seitenkopf__pfad li:not(:last-child)',
-].join(', ');
 
 const BEZIRKE = [
   {
@@ -220,22 +199,14 @@ async function weitereAufklappen(page: Page, dialog: Locator) {
 interface Textknoten {
   ziel: Locator;
   text: string;
-  tertiaer: boolean;
-  rotText: boolean;
-  weissAufAlarm: boolean;
 }
 
 /** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text (Muster Verpflegung). */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
-  const funde = await wurzel.evaluate((w, tertiaer) => {
+  const funde = await wurzel.evaluate((w) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: {
-      text: string;
-      tertiaer: boolean;
-      rotText: boolean;
-      weissAufAlarm: boolean;
-    }[] = [];
+    const liste: { text: string }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       if (!el.checkVisibility()) continue;
@@ -248,13 +219,10 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
       el.setAttribute('data-kontrastprobe', String(liste.length));
       liste.push({
         text: eigen,
-        tertiaer: el.closest(tertiaer) != null,
-        rotText: el.closest('.ant-dropdown-menu-item-danger') != null,
-        weissAufAlarm: el.closest('.ant-btn-dangerous.ant-btn-primary') != null,
       });
     }
     return liste;
-  }, TERTIAER);
+  });
   return funde.map((f, i) => ({ ...f, ziel: wurzel.locator(`[data-kontrastprobe="${i}"]`) }));
 }
 
@@ -292,7 +260,6 @@ for (const modus of ['light', 'dark'] as const) {
     await page.mouse.move(0, 0);
 
     const messwerte: Record<string, unknown>[] = [];
-    const tag = modus === 'light';
 
     /** Etikett: Wort, Rolle, Text gegen die eigene Tönung, Rand gegen außen und innen. */
     const pruefeEtikett = async (etikett: Locator, wo: string, wort: string, rolle: string) => {
@@ -346,7 +313,7 @@ for (const modus of ['light', 'dark'] as const) {
     // (3) Jeder Text — Seitenkopf, Seiteninhalt und drei Dialoge.
     const kopf = page.locator('[data-lfh="seitenkopf"]');
     const inhalt = page.locator('[data-lfh="seiten-inhalt"]');
-    const gemessen: [string, string, string | null][] = [];
+    const gemessen: [string, string][] = [];
     const messeTexte = async (wurzel: Locator, flaeche: string) => {
       await page.mouse.move(0, 0);
       const knoten = await textknoten(wurzel);
@@ -354,20 +321,12 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer, rotText, weissAufAlarm } of knoten) {
+      for (const { ziel, text } of knoten) {
         const m = await kontrast(ziel);
-        const ausnahme = tertiaer
-          ? 'Tertiärtext → LFH-643'
-          : tag && rotText
-            ? 'Rot als Text → LFH-693'
-            : tag && weissAufAlarm
-              ? 'Weiß auf alarm → LFH-693'
-              : null;
-        const schranke = ausnahme ? BODEN : TEXT[modus];
-        const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
-        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
-        gemessen.push([flaeche, text, ausnahme]);
-        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(schranke);
+        const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Schranke ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`;
+        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ...m });
+        gemessen.push([flaeche, text]);
+        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(TEXT[modus]);
       }
     };
     await messeTexte(kopf, 'kopf');
@@ -425,9 +384,8 @@ for (const modus of ['light', 'dark'] as const) {
     await page.keyboard.press('Escape');
     await expect(storno).toBeHidden();
 
-    // Die Probe hat die Texte wirklich gesehen, und die tragenden liefen OHNE Ausnahme — eine
-    // zu weit gefasste Ausnahme-Liste senkte sonst still den Boden.
-    const pruefeGesehen = (flaeche: string | null, pflicht: string | RegExp, tragend: boolean) => {
+    // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf trivial wahr.
+    const pruefeGesehen = (flaeche: string | null, pflicht: string | RegExp) => {
       const treffer = gemessen.filter(
         ([f, t]) =>
           (flaeche == null || f === flaeche) &&
@@ -437,12 +395,6 @@ for (const modus of ['light', 'dark'] as const) {
         treffer.length,
         `Text ${String(pflicht)} in ${flaeche ?? 'irgendwo'} gemessen`,
       ).toBeGreaterThan(0);
-      const mitAusnahme = treffer.filter(([, , a]) => a != null).length;
-      if (tragend) expect(mitAusnahme, `Text ${String(pflicht)} ohne Ausnahme gemessen`).toBe(0);
-      else
-        expect(mitAusnahme, `Text ${String(pflicht)} unter der benannten Ausnahme`).toBe(
-          treffer.length,
-        );
     };
     for (const [flaeche, tragend] of [
       ['kopf', 'Betreuung'],
@@ -493,8 +445,9 @@ for (const modus of ['light', 'dark'] as const) {
       ['Stelle bearbeiten', 'Speichern'],
       ['kopf', 'Evakuierungsbezirk anlegen'],
     ] as const)
-      pruefeGesehen(flaeche, tragend, true);
-    for (const [flaeche, ausnahme] of [
+      pruefeGesehen(flaeche, tragend);
+    // Tertiärtext (`schwach`), bis LFH-643 unter einer Ausnahme, jetzt tragend.
+    for (const [flaeche, tertiaer] of [
       // Sekundärtext der Stellentabelle: „keine Meldung" (Sporthalle West, Schule Nord) und
       // „—" (frei, Kapazität, Stand, Abschnitt).
       ['inhalt', 'keine Meldung'],
@@ -517,13 +470,14 @@ for (const modus of ['light', 'dark'] as const) {
         'Leer: jetzt. Eine nachgetragene ältere Meldung ändert den aktuellen Stand nicht.',
       ],
     ] as const)
-      pruefeGesehen(flaeche, ausnahme, false);
-    // Am Tag unter einer Ausnahme, nachts tragend: Rot als Text und Weiß auf `alarm` (LFH-693).
-    for (const [flaeche, nurTagsAusnahme] of [
+      pruefeGesehen(flaeche, tertiaer);
+    // Rot, bis LFH-693 am Tag unter einer Ausnahme: der Menüeintrag und der rote Knopf im
+    // Storno-Dialog.
+    for (const [flaeche, rot] of [
       ['Zeilenmenü', 'Stornieren'],
       ['Stornieren', 'Stornieren'],
     ] as const)
-      pruefeGesehen(flaeche, nurTagsAusnahme, !tag);
+      pruefeGesehen(flaeche, rot);
 
     await testInfo.attach(`kontrastwerte-${modus}.json`, {
       body: JSON.stringify(messwerte, null, 2),
