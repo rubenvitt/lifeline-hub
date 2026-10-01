@@ -19,8 +19,8 @@ oder eine Statustönung einer Zeile verwenden, weil die angesprungene Zeile kein
 - **THEN** stimmen Fläche und Linie der Markierung mit den Werten der Bedienrollen des Modus überein
 
 #### Scenario: Kein Warnton
-- **WHEN** eine Zeile per Deeplink angesprungen wird
-- **THEN** trägt sie weder die Achtung- noch die Alarmfläche, noch eine Lücken-, Problem- oder Berichtigungstönung
+- **WHEN** eine Zeile ohne eigene Statustönung per Deeplink angesprungen wird
+- **THEN** fügt die Markierung weder die Achtung- noch die Alarmfläche, noch eine Lücken-, Problem- oder Berichtigungstönung hinzu
 
 ### Requirement: Zwei Kanäle, in beiden Modi sichtbar
 

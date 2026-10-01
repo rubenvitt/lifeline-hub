@@ -35,6 +35,24 @@ Ist-Stand, der den Entwurf bestimmt:
   Textstufen halten dort dieselben Werte wie auf der Tabelle. Die Browsermessung in Aufgabe 3
   ersetzt diese Rechnung, sie bestätigt sie nicht nur.
 
+**Gemessen vor dem Fix** (Chromium, Dev-Stack der e2e-Suite, 01.10.2026, Personalseite per
+`?personal=<id>`, ETB per `?eintrag=<id>`, Zeiger außerhalb):
+
+| Stelle | Tag | Nacht |
+| --- | --- | --- |
+| Tabellenzelle | `rgb(255, 251, 230)` | `rgb(43, 38, 17)` |
+| fixierte, sortierte Kennungszelle | `rgb(250, 250, 250)` — antds Sortierspalten-Grund, die Regel verliert | `rgb(43, 38, 17)` |
+| Nachbarzeile, Kennungszelle | `rgb(250, 250, 250)` | `rgb(25, 27, 30)` |
+| Karte unter `md` | `rgb(255, 251, 230)` | `rgb(43, 38, 17)` |
+| ETB-Zeile | inline `bedienFlaeche` `rgb(228, 237, 247)` | inline `bedienFlaeche` `rgb(13, 22, 32)` |
+
+Drei Befunde: (1) Am Tag verliert die alte Regel (0,1,1) an der fixierten Kennung gegen antds
+Sortierspalte; nur nachts gewinnt sie über `[data-theme='dark']` (0,2,1). (2) Die ETB-Zeitachse
+setzt ihre Hervorhebung schon inline auf `bedienFlaeche` (`etb/EtbZeitachse.tsx`, „Die
+Hervorhebung als Rollenfläche“); die Klassenregel erreicht dort die Fläche nicht. Die Wahl in E1
+ist damit kein neuer Ton, sondern zieht die übrigen Zweige auf die Rolle nach, die das ETB schon
+trägt. (3) Keine markierte Stelle trägt einen `box-shadow`.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -85,12 +103,15 @@ Verworfene Alternativen:
 
 ### E2: Spezifität wie die Lückentönung
 
-Selektoren: `.ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td` und
-`[data-lfh='datensicht-karte'].zeile-hervorgehoben`. Damit hängt die Fläche nicht an der
-Einfügereihenfolge gegen antds Zellregel und erreicht die fixierte Spalte. Unter dem Zeiger darf
-antds Hover die Fläche übernehmen (gleiche Spezifität, antd injiziert später); die Linien liegen
-im `box-shadow`, den der Hover nicht anfasst, und tragen die Markierung weiter. Das Scenario
-„Markierte Zeile unter dem Zeiger“ pinnt genau das. Das `[data-theme='dark']`-Duplikat fällt
+Selektoren: `.ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td` (0,3,2) und
+`[data-lfh='datensicht-karte'].zeile-hervorgehoben`, die Form der Lückentönung. Sie liegt über
+antds Sortierspalte (`.ant-table-wrapper .ant-table td.ant-table-column-sort`, (0,3,1),
+`antd/es/table/style/sorter.js`), an der die alte Regel (0,1,1) am Tag verlor (gemessen, s. o.).
+Eine zusätzliche Zellklasse (0,4,2) war erwogen und bringt nichts: die Gegenprobe mit (0,3,2) hält
+die Fläche in jeder Zelle einschließlich der fixierten, sortierten Kennung (e2e, „uneinheitliche
+Fläche“). Die Linien liegen im `box-shadow`, den antd an der Zelle nicht setzt; unter dem Zeiger
+bleiben sie stehen. In der ETB-Zeitachse setzt der Baustein seinen Grund inline
+(`bedienFlaeche`); die Klassenregel liefert dort nur die Linie, und das ist gewollt. Das `[data-theme='dark']`-Duplikat fällt
 weg, weil die Rollen-Properties den Modus selbst tragen.
 
 ### E3: CSS-Farbgate bauen, mit Schuldmenge
@@ -120,7 +141,11 @@ LFH-698), und der Guard ist grün geboren bis auf eine benannte Schuld.
 - [Schatten an jeder `td` zeigt kleine Fugen, wenn antd Zellabstände setzt] → antd-Tabellen
   stehen auf `border-spacing: 0`; der Screenshot-Blick in Aufgabe 3 bestätigt es.
 - [`box-shadow` am `td` einer fixierten Spalte konkurriert mit antds Schatten der Fixkante] →
-  antd setzt den Fixschatten an `::after`, nicht an der Zelle; in Aufgabe 1 geprüft.
+  geprüft: antd zeichnet den Fixschatten an `::after` der Zelle (`ant-table-cell-fix-start-shadow`,
+  in Ruhe `none`), nicht an der Zelle selbst.
+- [Eine ETB-Zeile mit Statustönung (Berichtigung) verlöre ihre Tönung] → geprüft: die Tönung und
+  die Hervorhebung setzt `Zeitachseneintrag` inline; eine Klassenregel kommt an den Grund nicht
+  heran, nur die Linie kommt hinzu.
 - [`schwach` (Platzhalter, Ikonen) liegt am Tag auf `bedienFlaeche` bei 5,39] → `schwach` ist
   keine Textstufe mit Tagesboden (LFH-643/LFH-652); dieselbe Lage wie auf `flaeche3`. Kein
   Handlungsbedarf, aber im Spec nicht als Text gemessen.

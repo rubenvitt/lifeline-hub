@@ -8,7 +8,7 @@ import { expect, type Locator } from '@playwright/test';
 type Farbe = [number, number, number, number];
 
 interface Auftrag {
-  /** CSS-Eigenschaft des Vordergrunds, z. B. `color` oder `border-left-color`. */
+  /** CSS-Eigenschaft des Vordergrunds, z. B. `color`, `border-left-color` oder `box-shadow`. */
   vordergrund: string;
   /** Grundfläche: die komponierte Fläche des Elements selbst oder die seines Elternteils. */
   grund: 'selbst' | 'eltern';
@@ -64,7 +64,16 @@ function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
       grund = darueber(rgb(stil.backgroundColor), grund);
     }
     if (grund[3] !== 1) throw new Error('Kein opaker Hintergrund belegt');
-    const vorne = darueber(rgb(getComputedStyle(element).getPropertyValue(vordergrund)), grund);
+    let wert = getComputedStyle(element).getPropertyValue(vordergrund);
+    // Eine Schattenlinie (`box-shadow: inset …`) misst ihre Farbe; mehrere Schatten nur, wenn
+    // sie dieselbe Farbe tragen — sonst wäre unklar, welche Linie gemeint ist.
+    if (vordergrund === 'box-shadow') {
+      const farben = wert.match(/rgba?\([^)]*\)/g);
+      if (!farben) throw new Error(`Kein Schatten an ${element.tagName}: ${wert}`);
+      if (new Set(farben).size !== 1) throw new Error(`Schatten in mehreren Farben: ${wert}`);
+      wert = farben[0];
+    }
+    const vorne = darueber(rgb(wert), grund);
     const [a, b] = [luminanz(vorne), luminanz(grund)].sort((x, y) => x - y);
     return { vordergrund: vorne, grund, verhaeltnis: (b + 0.05) / (a + 0.05) };
   }, auftrag);
@@ -117,4 +126,39 @@ export async function pruefe(tag: Locator, minimum: number, name: string) {
       minimum,
     );
   }).toPass({ timeout: 10_000 });
+}
+
+/** WCAG-Verhältnis zweier opaker Farben, für Paare, die nicht an EINEM Element hängen. */
+export function verhaeltnis(a: Farbe, b: Farbe): number {
+  const luminanz = (f: Farbe) => {
+    const linear = f.slice(0, 3).map((n) => {
+      const s = n / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+  };
+  const [x, y] = [luminanz(a), luminanz(b)].sort((p, q) => p - q);
+  return (y + 0.05) / (x + 0.05);
+}
+
+/**
+ * Kontrast einer Schattenlinie (`box-shadow: inset …`, LFH-698) gegen die Fläche, auf der sie
+ * liegt, UND gegen die Fläche eines Nachbarn — die Linie trennt die Zeile von beiden. Ein Element
+ * ohne Schatten ist ein Fehler, keine Messung.
+ */
+export async function schattenKontrast(ziel: Locator, nachbar: Locator) {
+  const innen = await messe(ziel, { vordergrund: 'box-shadow', grund: 'selbst' });
+  const { grund: nachbarGrund } = await messe(nachbar, { vordergrund: 'color', grund: 'selbst' });
+  return {
+    linie: innen.vordergrund,
+    flaeche: innen.grund,
+    nachbar: nachbarGrund,
+    gegenFlaeche: innen.verhaeltnis,
+    gegenNachbar: verhaeltnis(innen.vordergrund, nachbarGrund),
+  };
+}
+
+/** Komponierte Fläche eines Elements (alle Vorfahren übereinander), opak. */
+export async function flaeche(ziel: Locator): Promise<Farbe> {
+  return (await messe(ziel, { vordergrund: 'color', grund: 'selbst' })).grund;
 }
