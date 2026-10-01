@@ -29,7 +29,7 @@ echten Seitenumbruch zeigt in Firefox und Safari weiter nur das Blatt: `emulateM
 fragmentiert nicht, und `page.pdf()` gibt es nur in Chromium. Playwrights WebKit teilt die
 Engine mit Safari, nicht dessen Druckpfad. Logo und Seitenzählung belegt das Chromium-PDF.
 Belege, Messwerte und Mutationsproben stehen in
-`openspec/changes/lfh-729-druck-firefox-webkit-pdf-nachweis/pruefliste.md`. Eine Zelle
+`openspec/changes/archive/2026-10-01-lfh-729-druck-firefox-webkit-pdf-nachweis/pruefliste.md`. Eine Zelle
 „offen → Handprüfung …" ist kein Verdikt „erfüllt": sie wird mit dem Beleg der Handprüfung
 umgeschrieben.
 

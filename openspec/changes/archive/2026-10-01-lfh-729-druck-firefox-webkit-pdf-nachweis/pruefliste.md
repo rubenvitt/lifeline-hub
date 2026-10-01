@@ -74,6 +74,23 @@ Frontend „No known vulnerabilities found“. `cargo-audit` war in der Cloud-Um
 installiert; das prüft der Job „Schnellprüfungen“ der CI. Nach `pnpm run build` enthält
 `frontend/dist` keinen Treffer für `pdfjs-dist`.
 
+## Volllauf des Gates (lokal)
+
+- `./scripts/check-all.sh --nur e2e` mit allen drei Projekten: 553 Fälle, 538 bestanden,
+  5 übersprungen, 10 rot, in 54,4 min. Alle zehn roten Fälle laufen in Chromium, keiner davon ist
+  ein Druckfall. Sieben sind 30-s-Timeouts, das Lastbild aus LFH-398 (Last bis 11 auf 4 Kernen).
+  Einzeln wiederholt bleiben fünf rot: `etb-anhang.spec.ts:39` und `schaden-anhaenge.spec.ts:81`
+  (Download-Dateiname `download` statt des Namens mit Umlaut), `gate3-trefflaeche.spec.ts:312`
+  (Führungsfunktionen ohne Zeilen), `chat-neue-nachrichten.spec.ts:122` und
+  `etb-chronologie.spec.ts:112` (kompakt). **Dieselben fünf sind auf `origin/alpha` in dieser
+  Umgebung ebenfalls rot** (Gegenprobe im eigenen Worktree, gleiches Binary und gleiche Browser).
+  In der CI von PR #297 sind sie grün. Sie hängen also an diesem Container, nicht an LFH-729.
+- `./scripts/check-all.sh --nur schnell`: grün. `cargo-audit` fehlt lokal und läuft in der CI.
+- Vitest über die zehn Dateien, die Druck-CSS einlesen (`druck.test.ts`, `*Print.test.ts` u. a.):
+  183 bestanden.
+- Rust-Suite und volle Vitest-Suite: nicht lokal gefahren, weil LFH-729 weder Rust noch
+  Anwendungscode ändert (nur e2e, Config, Gate, CI und Kommentare). Beide belegt die CI des PRs.
+
 ## CI-Laufzeit der Pflicht-Shards (D1)
 
 Vorher (PR #297, nur Chromium): e2e 1/4 11:25 min, 2/4 22:46 min, 3/4 10:24 min,

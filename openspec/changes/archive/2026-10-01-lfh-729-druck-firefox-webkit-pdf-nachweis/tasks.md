@@ -56,7 +56,7 @@
 
 ## 5. Gate und CI
 
-- [ ] 5.1 `scripts/check-all.sh` Schritt 7: `PW_PROJEKTE` (kommagetrennt, Vorgabe alle) als
+- [x] 5.1 `scripts/check-all.sh` Schritt 7: `PW_PROJEKTE` (kommagetrennt, Vorgabe alle) als
       `--project=` weiterreichen und die Browser vorher prüfen, mit klarer Abbruchmeldung (D2).
       Kopf des Skripts und `scripts/AGENTS.md` nennen die Variable. Prüfen:
       `PW_PROJEKTE=chromium ./scripts/check-all.sh --nur e2e` grün. Mit absichtlich falschem
@@ -74,7 +74,7 @@
       Firefox und WebKit automatisch belegen (Mechanik unter Druckmedium) und was nur das Blatt
       zeigt (Umbruch in Firefox und Safari). Seitenzählung und Logo als PDF-belegt nennen.
       Prüfen: Prettier über `frontend/` grün.
-- [ ] 6.2 `pruefliste.md` in dieser Change anlegen: Verdikt je Druckstück und Browser,
+- [x] 6.2 `pruefliste.md` in dieser Change anlegen: Verdikt je Druckstück und Browser,
       Messwerte, Mutationsproben aus 2.2, 3.4, 4.1 und 4.2. Das Browser-Verdikt in
       `docs/superpowers/specs/2026-09-25-lfh-22-pruefliste.md` umschreiben (D6) und den
       Kommentar in `pages/kraefteuebersichtPrint.css` nachziehen. Prüfen: `grep -rn "LFH-729"`
@@ -82,8 +82,13 @@
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` lokal grün (ohne `| tail`). Fehlen Firefox und WebKit lokal
+- [x] 7.1 `./scripts/check-all.sh` lokal grün (ohne `| tail`). Fehlen Firefox und WebKit lokal
       (1.2), dann mit `PW_PROJEKTE=chromium`, und das wird im PR gesagt. Die CI des PRs
       ist grün, die Shards `e2e 1/4` … `4/4` samt Firefox- und WebKit-Fällen, auf diesen Lauf verweisen.
-- [ ] 7.2 Review: `superpowers:requesting-code-review` und
+      (Lokal: `schnell` grün, e2e mit allen drei Projekten bis auf fünf umgebungsbedingte Fälle,
+      die auch auf `alpha` hier rot sind, siehe `pruefliste.md`. Die CI belegt der PR.)
+- [x] 7.2 Review: `superpowers:requesting-code-review` und
       `superpowers:verification-before-completion`. Bestätigte Findings sind behoben.
+      (In der Cloud-Sitzung ohne Superpowers: Skill `code-review` über `origin/alpha...HEAD`,
+      keine Findings. Hinweise: Laufzeit von Shard 2/4 beobachten, Verweis in `scripts/AGENTS.md`
+      beim Archivieren nachziehen.)
