@@ -46,6 +46,7 @@ import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deepli
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
+import { useUnwetterHinweis } from '../wetter/useUnwetterHinweis';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useWarnsperre } from '../theme/ThemeModeProvider';
 
@@ -199,6 +200,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   });
   const modulOverrides = modulOverridesQuery.data;
   const modulZaehler = useModulZaehler({ einsatzId, benutzer, overrides: modulOverrides });
+  // Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663). Hier, weil
+  // nur dieser Rahmen für den ganzen Einsatz steht; die Abfrage teilt er mit dem Modulzähler.
+  useUnwetterHinweis({ einsatzId, benutzer, overrides: modulOverrides });
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
   // die Sperre mit — in der Einsatzauswahl gibt es keine Einsatzwarnung.

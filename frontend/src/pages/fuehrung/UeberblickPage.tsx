@@ -38,6 +38,8 @@ import { holeRueckmeldungen } from '../../api/meldungen';
 import { ladeModulZaehler } from '../../api/modulZaehler';
 import { NICHT_FREIGEGEBEN, auftragsStand } from '../lage-dashboard/fuehrungsZahlen';
 import { pegelAbfrage } from '../../api/pegel';
+import { wetterAbfrage } from '../../api/wetter';
+import { unwetterLage } from '../../wetter/unwetter';
 import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import { listeAbloesungen } from '../../api/abloesungen';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
@@ -55,6 +57,7 @@ import {
   stabPfad,
   abloesungPfad,
   pegelZielPfad,
+  wetterPegelPfad,
 } from '../../routing/deeplinks';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
@@ -276,6 +279,9 @@ export default function UeberblickPage() {
     queryFn: () => holeRueckmeldungen(einsatzId),
   });
   const pegelQ = useQuery(pegelAbfrage(einsatzId));
+  // Unwettermarken nur bei freiem Modul — sonst 403 und ein Seitenkanal (LFH-663). Dieselbe
+  // Abfrage wie Modulseite und Rahmen, also kein zusätzlicher Abruf.
+  const wetterQ = useQuery({ ...wetterAbfrage(einsatzId), enabled: wetterPegelFrei });
 
   const einsatz = einsatzQ.data;
   /*
@@ -331,6 +337,13 @@ export default function UeberblickPage() {
     [abschnitte, einheiten, personal, fahrzeuge, material, auftraege, rueckmeldungen],
   );
   const entscheidungen = useMemo(() => entscheidungenAuswahl(etb ?? [], jetzt), [etb, jetzt]);
+  // Ein Wetterfehler macht die Marken NICHT zum Fehlerzustand: dann fehlen nur die Unwettermarken,
+  // wie Zähler und Hinweis auch (design.md D8).
+  const wetterWarnungen = wetterPegelFrei && wetterQ.isSuccess ? wetterQ.data.warnungen : undefined;
+  const angekuendigtesUnwetter = useMemo(
+    () => unwetterLage(wetterWarnungen, jetzt.valueOf())?.angekuendigt ?? [],
+    [wetterWarnungen, jetzt],
+  );
   const marken = useMemo(
     () =>
       naechsteMarken(
@@ -340,6 +353,7 @@ export default function UeberblickPage() {
         jetzt,
         pegel ?? [],
         abloesungSichtbar ? (abloesungenQ.data ?? []) : [],
+        angekuendigtesUnwetter,
       ),
     [
       auftraege,
@@ -349,6 +363,7 @@ export default function UeberblickPage() {
       pegel,
       abloesungSichtbar,
       abloesungenQ.data,
+      angekuendigtesUnwetter,
     ],
   );
 
@@ -375,7 +390,9 @@ export default function UeberblickPage() {
           ? pegelZielPfad(einsatzId, wetterPegelFrei)
           : m.art === 'abloesung'
             ? abloesungPfad(einsatzId)
-            : stabPfad(einsatzId);
+            : m.art === 'unwetter'
+              ? wetterPegelPfad(einsatzId)
+              : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 

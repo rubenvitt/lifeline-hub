@@ -29,6 +29,7 @@ import {
   auftraegePfad,
   erinnerungenPfad,
   meldungenPfad,
+  wetterPegelPfad,
 } from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
@@ -69,6 +70,17 @@ function abloesungAlarmText(detail: AbloesungAlarmDetail): {
     : { titel: 'Ablösung fällig', beschreibung: `Ablösung fällig: ${bei}` };
 }
 
+/**
+ * Payload von `lfh:unwetter-alarm` (`wetter/useUnwetterHinweis.ts`, LFH-663). Die Texte baut der
+ * Auslöser, weil nur er die Anzeige-Konventionen des Einsatzes kennt; `schluessel` ist das Paar
+ * aus Stufe und Ereignis.
+ */
+type UnwetterDetail = {
+  schluessel?: string;
+  titel?: string;
+  beschreibung?: string;
+};
+
 type ErinnerungDetail = {
   erinnerung_id?: number;
   bezug_typ?: 'auftrag' | 'meldung' | 'etb' | null;
@@ -86,7 +98,7 @@ type AlarmToast = {
 
 const MAX_SICHTBARE_TOASTS = 3;
 
-type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen' | 'abloesung';
+type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen' | 'abloesung' | 'wetter-pegel';
 
 type AlarmScope = {
   keyPrefix: string;
@@ -97,6 +109,8 @@ type AlarmScope = {
   einzelneToastZiele: Map<string, AlarmZiel>;
   gebuendelteToastZiele: Map<string, AlarmZiel>;
   eigeneToastKeys: Set<string>;
+  /** Key des zuletzt gezeigten Unwetterhinweises — ein neuer ersetzt ihn (ein Platz im Budget). */
+  unwetterKey: string | null;
 };
 
 type DesktopZustand = 'aus' | 'erlaubt' | 'browser-blockiert';
@@ -109,7 +123,8 @@ function desktopZustand(permission: NotificationPermission | 'unsupported'): Des
 
 /**
  * Einsatzweite Alarm-Zentrale: lauscht auf `lfh:sofortmeldung`, `lfh:erinnerung-alarm` und die
- * Ablösungshinweise (von useEinsatzLiveStream ausgelöst) und zeigt NICHT selbst-schließende
+ * Ablösungshinweise (von useEinsatzLiveStream ausgelöst) sowie auf `lfh:unwetter-alarm` (vom
+ * Rahmen, `wetter/useUnwetterHinweis.ts`) und zeigt NICHT selbst-schließende
  * Toasts mit Deeplink zur Quelle, optional eine Desktop-Benachrichtigung bei Hintergrund-Tab.
  * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
  * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438).
@@ -135,6 +150,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       einzelneToastZiele: new Map(),
       gebuendelteToastZiele: new Map(),
       eigeneToastKeys: new Set(),
+      unwetterKey: null,
     };
   }, [einsatzId, instanzId]);
 
@@ -153,6 +169,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       if (ziel === 'auftraege') return auftraegePfad(einsatzId);
       if (ziel === 'erinnerungen') return erinnerungenPfad(einsatzId);
       if (ziel === 'abloesung') return abloesungPfad(einsatzId);
+      if (ziel === 'wetter-pegel') return wetterPegelPfad(einsatzId);
       return meldungenPfad(einsatzId);
     },
     [einsatzId],
@@ -187,6 +204,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       { ziel: 'auftraege', text: 'Zu Aufträgen' },
       { ziel: 'erinnerungen', text: 'Zu Erinnerungen' },
       { ziel: 'abloesung', text: 'Zu Ablösungen' },
+      { ziel: 'wetter-pegel', text: 'Zu Wetter & Pegel' },
     ];
 
     alarmScope.eigeneToastKeys.add(alarmScope.sammelKey);
@@ -446,6 +464,55 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
     window.addEventListener('lfh:abloesung-alarm', onAbloesung);
     return () => window.removeEventListener('lfh:abloesung-alarm', onAbloesung);
+  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
+
+  // Neue Unwetterwarnung am Einsatzort (LFH-663,
+  // `openspec/changes/lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
+  // der Rahmen erkennt „neu" selbst und meldet es hierher, der Ton spielt dort. Ein neuer Hinweis
+  // ERSETZT einen noch einzeln sichtbaren älteren — das Wetter belegt nie mehr als einen der drei
+  // Plätze. Eigener Key je Paar, damit „schon gebündelt" ihn nie verschluckt.
+  useEffect(() => {
+    const onUnwetter = (ev: Event) => {
+      const detail = (ev as CustomEvent<UnwetterDetail>).detail ?? {};
+      const key = `${alarmScope.keyPrefix}-unwetter-${detail.schluessel ?? ++alarmScope.zaehler}`;
+      const vorher = alarmScope.unwetterKey;
+      if (vorher && vorher !== key && alarmScope.einzelneToastKeys.includes(vorher)) {
+        notification.destroy(vorher);
+        alarmScope.eigeneToastKeys.delete(vorher);
+        alarmScope.einzelneToastZiele.delete(vorher);
+        alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys.filter((k) => k !== vorher);
+      }
+      alarmScope.unwetterKey = key;
+      const titel = detail.titel ?? 'Unwetterwarnung';
+      const beschreibung =
+        detail.beschreibung ?? 'Für den Einsatzort liegt eine Unwetterwarnung vor.';
+      const ziel = wetterPegelPfad(einsatzId);
+      const oeffnen = () => {
+        if (!alarmScope.aktiv) return;
+        navigate(ziel);
+        notification.destroy(key);
+      };
+      zeigeAlarmToast({
+        key,
+        art: 'warning',
+        titel,
+        beschreibung,
+        aktion: (
+          <Button type="primary" onClick={oeffnen}>
+            Öffnen
+          </Button>
+        ),
+        ziel: 'wetter-pegel',
+      });
+      zeigeDesktopAlarm(titel, {
+        koerper: beschreibung,
+        beiKlick: () => {
+          if (alarmScope.aktiv) navigate(ziel);
+        },
+      });
+    };
+    window.addEventListener('lfh:unwetter-alarm', onUnwetter);
+    return () => window.removeEventListener('lfh:unwetter-alarm', onUnwetter);
   }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
 
   const tonUmschalten = async () => {

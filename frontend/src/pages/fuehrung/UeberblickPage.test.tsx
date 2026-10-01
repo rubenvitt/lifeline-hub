@@ -625,6 +625,73 @@ describe('UeberblickPage', () => {
     });
   });
 
+  describe('Nächste Marken: angekündigtes Unwetter (LFH-663)', () => {
+    const wetter = () => {
+      const jetzt = Date.now();
+      const um = (ms: number) => new Date(jetzt + ms).toISOString();
+      return {
+        ort: { name: 'Hann. Münden' },
+        warnungen: {
+          zustand: 'ok',
+          abgerufen_at: um(-60_000),
+          daten: [
+            {
+              stufe: 'schwer',
+              ereignis: 'ORKANBÖEN',
+              ueberschrift: 'Amtliche UNWETTERWARNUNG vor ORKANBÖEN',
+              beginn: um(2 * 3_600_000),
+              ende: um(5 * 3_600_000),
+            },
+          ],
+        },
+        vorhersage: { zustand: 'ausfall' },
+      };
+    };
+
+    it('Modul frei → Marke „Unwetterwarnung: Orkanböen" mit Weg zur Modulseite', async () => {
+      stelleBereit(volleDaten, [
+        http.get('/api/einsaetze/1/wetter', () => HttpResponse.json(wetter())),
+      ]);
+      rendern();
+      const p = await waitFor(() => paneel('Nächste Marken'));
+      const m = await within(p).findByRole('link', { name: /Unwetterwarnung: Orkanböen/ });
+      expect(m).toHaveAttribute('href', '/einsaetze/1/wetter-pegel');
+      expect(m).toHaveAttribute('data-ton', 'neutral');
+    });
+
+    it('Modul ausgeblendet → keine Anfrage an …/wetter, keine Unwettermarke', async () => {
+      let wetterAbrufe = 0;
+      let overridesGeliefert = 0;
+      stelleBereit(volleDaten, [
+        http.get('/api/einsaetze/1/wetter', () => {
+          wetterAbrufe += 1;
+          return HttpResponse.json(wetter());
+        }),
+        http.get('/api/einsaetze/1/modul-overrides', () => {
+          overridesGeliefert += 1;
+          return HttpResponse.json({
+            'wetter-pegel': {
+              einsatz_id: 1,
+              modul_key: 'wetter-pegel',
+              sichtbar: false,
+              benoetigte_rolle: null,
+              geaendert_at: null,
+            },
+          });
+        }),
+      ]);
+      rendern();
+      const p = await waitFor(() => paneel('Nächste Marken'));
+      await within(p).findByText('Lagebesprechung');
+      await waitFor(() => expect(overridesGeliefert).toBeGreaterThan(0));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(wetterAbrufe).toBe(0);
+      expect(within(p).queryByText(/Unwetterwarnung/)).toBeNull();
+    });
+  });
+
   it('Nächste Marken: fällige Ablösungen je Abschnitt zusammengefasst, Link zur Ablösung (LFH-635)', async () => {
     const schicht = (id: number) => ({
       id,
