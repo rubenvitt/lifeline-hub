@@ -24,5 +24,5 @@
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh` grün (lokal; Kästchen verweist auf den CI-Lauf des PR).
+- [x] 4.1 `./scripts/check-all.sh` grün (lokal; Kästchen verweist auf den CI-Lauf des PR). Lokal: Bündel `schnell` und `frontend` grün; `rust` passt nicht ins Plattenkontingent der Cloud-Sitzung (rund 100 Testbinaries, Abbruch mit „No space left on device“), die Änderung berührt kein Rust; `e2e` mit 12 roten Tests (`fokus-verdeckung`, `etb-anhang`, `schaden-anhaenge`, `gate3-trefflaeche` Führungsfunktionen), die mit `index.css` und `InfotelefonPage.tsx` aus `origin/alpha` identisch rot sind (Umgebung: Chromium 1194 statt 1234). Beleg für alle Bündel ist der CI-Lauf des PR.
 - [x] 4.2 Prüfliste: Gate-Frage im ClickUp-Task beantwortet (gebaut, mit Schuldmenge), Farbverschiebung Gelb → Bedienblau als gewollte Korrektur in PR und Task benannt.
