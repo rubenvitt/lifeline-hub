@@ -239,8 +239,10 @@ describe('Klappkopf folgt der Staffel (LFH-653)', () => {
  * Die Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und `Popconfirm` trennen
  * ihre Knöpfe mit `marginXS` (3 / 5 / 7 px). Eine globale Regel in `index.css` setzt den zweiten
  * Knopf auf antds `padding` (11 / 18 / 26) — die Variable löst AM KNOPF auf, wo eine
- * Komponenten-Überschreibung von `marginXS` nie ankam (`design.md`, D4). Quelltext statt Pixel:
- * jsdom rechnet kein Layout, die Auflösung misst `e2e/dokumente.spec.ts`.
+ * Komponenten-Überschreibung von `marginXS` nie ankam (D4 in
+ * `openspec/changes/archive/2026-10-01-lfh-653-erfassung-handschuh-klappkopf-fuge/design.md`).
+ * Quelltext statt Pixel: jsdom rechnet kein Layout, die Auflösung messen
+ * `e2e/dokumente.spec.ts` und `e2e/dialogfuss-dichte.spec.ts`.
  */
 describe('Fußfuge der antd-Füße (LFH-653)', () => {
   // Ohne Kommentare: sonst fiele der Kommentar über der Regel in die erste Selektorgruppe.

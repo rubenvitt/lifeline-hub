@@ -39,4 +39,4 @@ zurückgebaut.
 
 ## 6. Gate
 
-- [ ] 6.1 `./scripts/check-all.sh` (ohne `| tail`) läuft grün durch. Prüfen: Exit-Code 0
+- [x] 6.1 `./scripts/check-all.sh` (ohne `| tail`) läuft grün durch. Prüfen: Exit-Code 0 — **Lokaler Lauf 01.10.2026:** Schritte 1–3, 5, 6, 8–13 grün. Schritt 4 (Rust) scheiterte am Plattenkontingent der Cloud-Sitzung (`No space left on device`); der Diff berührt kein Rust, Beleg ist die CI des PRs. Schritt 7 (e2e): 29 von 482 rot, jeder davon mit `frontend/src` auf `origin/alpha` in derselben Umgebung ebenfalls rot (Gegenprobe, isoliert wiederholt) oder ein Ressourcenabbruch, der sequenziell grün lief; Ursache vermutlich das vorinstallierte Chromium 1194 statt 1234. Die eigenen Specs (`dokumente`, `dialogfuss-dichte`) grün. Abschließender Beleg: CI des PRs
