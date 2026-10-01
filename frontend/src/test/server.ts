@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { BenutzerAnzeige } from '../api/types';
+import { freigabenFixture } from './fixtures';
 
 /** `/api/auth/me` mit einem angemeldeten Benutzer — für `server.use(...)`. */
 export function meHandler(benutzer: BenutzerAnzeige) {
@@ -32,6 +33,14 @@ export const server = setupServer(
    * echter Serverzustand). Tests der Zähler überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
+  /**
+   * Modulfreigaben (LFH-669) — jedes Modul sichtbar und frei als Default: der echte Zustand eines
+   * Einsatzes ohne Overrides und ohne Org-Vorgaben. Rahmen und jede Seite, die Daten eines
+   * fremden Moduls lädt, fragen sie ab; Tests mit Sperren überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+    HttpResponse.json(freigabenFixture()),
+  ),
   /**
    * Gefahrengebiete — leere Liste als Default (LFH-397). Der Rahmen fragt sie für die
    * Warnsperre des Helligkeitsreglers beim Mount ab (`einsatz/useAktiveWarnung.ts`); `[]`

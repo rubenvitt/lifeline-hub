@@ -6,9 +6,9 @@ import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BetreuungUebersicht, ModulOverrides } from '../api/types';
+import type { BetreuungUebersicht } from '../api/types';
 import { useEvakuierungKennzahl } from './useEvakuierungKennzahl';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Der Hook zur Kennzahl — der Query-Zustand, den die reine Funktion nicht sieht: „kein Bezirk"
@@ -16,7 +16,8 @@ import { benutzerFixture } from '../test/fixtures';
  * MSW statt `vi.mock`: nur der Handler-Zähler macht „kein Request" prüfbar.
  */
 
-const benutzer = benutzerFixture({ anzeigename: 'E' });
+/** Modul-Freigaben des Servers: alles frei. */
+const freigaben = freigabenFixture();
 
 const PFAD = '/api/einsaetze/7/betreuung';
 
@@ -63,7 +64,7 @@ function zaehleAbrufe(antwort: () => Response): { anzahl: number } {
 describe('useEvakuierungKennzahl', () => {
   it('kein Bezirk → Zustand `daten` mit `kennzahl: null` (keine geplante Evakuierung)', async () => {
     zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
-    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, benutzer }), {
+    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, freigaben }), {
       wrapper: wrapper(neuerQueryClient()),
     });
     await waitFor(() => expect(result.current.zustand).toBe('daten'));
@@ -72,7 +73,7 @@ describe('useEvakuierungKennzahl', () => {
 
   it('Abruffehler → Zustand `fehler`, nie `kennzahl: null`', async () => {
     zaehleAbrufe(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
-    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, benutzer }), {
+    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, freigaben }), {
       wrapper: wrapper(neuerQueryClient()),
     });
     await waitFor(() => expect(result.current.zustand).toBe('fehler'));
@@ -85,7 +86,7 @@ describe('useEvakuierungKennzahl', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(einsatzKeys.betreuung(7), UEBERSICHT);
     zaehleAbrufe(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
-    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, benutzer }), {
+    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, freigaben }), {
       wrapper: wrapper(client),
     });
     // Vorbedingung: die Altdaten sind wirklich da und wurden gelesen …
@@ -99,7 +100,7 @@ describe('useEvakuierungKennzahl', () => {
 
   it('lädt zuerst und liefert dann die Kennzahl aus der Übersicht', async () => {
     zaehleAbrufe(() => HttpResponse.json(UEBERSICHT));
-    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, benutzer }), {
+    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, freigaben }), {
       wrapper: wrapper(neuerQueryClient()),
     });
     expect(result.current).toEqual({ zustand: 'laden' });
@@ -109,18 +110,9 @@ describe('useEvakuierungKennzahl', () => {
 
   it('lädt NICHT bei ausgeblendetem Modul — kein Abruf, Zustand `aus` (weder fehler noch null)', async () => {
     const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
-    const versteckt: ModulOverrides = {
-      betreuung: {
-        einsatz_id: 7,
-        modul_key: 'betreuung',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
+    const versteckt = freigabenFixture({ betreuung: { sichtbar: false } });
     const { result } = renderHook(
-      () => useEvakuierungKennzahl({ einsatzId: 7, benutzer, overrides: versteckt }),
+      () => useEvakuierungKennzahl({ einsatzId: 7, freigaben: versteckt }),
       { wrapper: wrapper(neuerQueryClient()) },
     );
     // Einen Tick Zeit lassen, damit ein fälschlich aktivierter Abruf den Handler erreicht.
@@ -129,20 +121,11 @@ describe('useEvakuierungKennzahl', () => {
     expect(result.current).toEqual({ zustand: 'aus' });
   });
 
-  it('lädt NICHT bei rollen-gesperrtem Modul', async () => {
+  it('lädt NICHT bei gesperrtem Modul (Freigabe ohne Zugriff)', async () => {
     const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
-    const gesperrt: ModulOverrides = {
-      betreuung: {
-        einsatz_id: 7,
-        modul_key: 'betreuung',
-        sichtbar: true,
-        benoetigte_rolle: 'fuehrungskraft',
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
+    const gesperrt = freigabenFixture({ betreuung: { zugriff: false } });
     const { result } = renderHook(
-      () => useEvakuierungKennzahl({ einsatzId: 7, benutzer, overrides: gesperrt }),
+      () => useEvakuierungKennzahl({ einsatzId: 7, freigaben: gesperrt }),
       { wrapper: wrapper(neuerQueryClient()) },
     );
     await new Promise((r) => setTimeout(r, 20));
@@ -150,13 +133,22 @@ describe('useEvakuierungKennzahl', () => {
     expect(result.current).toEqual({ zustand: 'aus' });
   });
 
+  it('lädt NICHT bei unbekannten Freigaben — unbekannt gibt nichts frei (LFH-669)', async () => {
+    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
+    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7 }), {
+      wrapper: wrapper(neuerQueryClient()),
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current).toEqual({ zustand: 'aus' });
+  });
+
   it('`bereit: false` (Freigaben noch unbekannt) → `laden` OHNE Abruf, danach entscheidet das Recht (LFH-607)', async () => {
-    // Ohne diesen Riegel liefe der Abruf, bevor die Overrides da sind — bei ausgeblendetem Modul
-    // ein 403.
+    // Ohne diesen Riegel stünde `aus` in der Zelle, solange die Freigaben laden, statt `laden`.
     const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
     const { result, rerender } = renderHook(
       ({ bereit }: { bereit: boolean }) =>
-        useEvakuierungKennzahl({ einsatzId: 7, benutzer, bereit }),
+        useEvakuierungKennzahl({ einsatzId: 7, freigaben, bereit }),
       { wrapper: wrapper(neuerQueryClient()), initialProps: { bereit: false } },
     );
     await new Promise((r) => setTimeout(r, 20));

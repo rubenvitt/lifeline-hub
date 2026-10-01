@@ -7,7 +7,8 @@ außerdem für jede Mutation, die eine `erfasse…OfflineFaehig`-Funktion ruft, 
 
 **Was ohne Netz lesbar bleibt, steht in der Registry, nicht im Persister:** `LAGEBILD_OFFLINE`
 und `istLagebildOfflineKey` in `api/queryKeys.ts`. Das sind ETB, Meldebild, Betroffene,
-Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Freigaben, Einstellungen, Zähler,
+Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Modulfreigaben `modulFreigaben` — seit
+LFH-669 statt der Overrides —, Einstellungen, Zähler,
 Einsatzliste, Kartenkonfiguration, Organisation, Fahrzeugstatus). Von den Meldungen zählen nur
 die Rückmeldungen. Gespeichert wird in einer eigenen IndexedDB `lifeline-lagebild`
 (`offline/lagebildSpeicher.ts`, genau ein Datensatz je Gerät), nie über Workbox auf URL-Ebene.

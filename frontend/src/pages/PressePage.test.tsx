@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../test/utils';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
   ladeMedienkontakte,
   ladePressemitteilungen,
@@ -13,8 +13,9 @@ import {
 import { ladeAnrufe } from '../api/infotelefon';
 import type { EinsatzAnzeige, Medienkontakt, Pressemitteilung } from '../api/types';
 import PressePage, { statusOptionen } from './PressePage';
+import { freigabenFixture } from '../test/fixtures';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulOverrides: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/presse', () => ({
   ladeMedienkontakte: vi.fn(),
   ladePressemitteilungen: vi.fn(),
@@ -74,7 +75,7 @@ function setup(route = '/einsaetze/1/stab/presse') {
 
 beforeEach(() => {
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
-  vi.mocked(ladeModulOverrides).mockResolvedValue({});
+  vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(ladeMedienkontakte).mockResolvedValue([
     kontakt({}),
     kontakt({ id: 2, art: 'termin', medium: 'RTL', thema: 'Dreh', status: 'erledigt' }),
@@ -216,9 +217,9 @@ describe('PressePage (LFH-554)', () => {
 
   it('ist bei gesperrtem Stab nicht erreichbar und lädt nichts', async () => {
     vi.mocked(ladeMedienkontakte).mockClear();
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     setup();
     expect(await screen.findByText('Pressearbeit nicht verfügbar')).toBeInTheDocument();
     expect(ladeMedienkontakte).not.toHaveBeenCalled();

@@ -2524,6 +2524,23 @@ export interface components {
             zugewiesen_at: string;
         };
         /**
+         * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
+         *     `GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter
+         *     [`fordere_modul_zugriff`] und [`erlaubte_module`].
+         */
+        ModulFreigabe: {
+            /**
+             * @description Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares
+             *     Modul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`).
+             */
+            sichtbar: boolean;
+            /**
+             * @description Der Benutzer darf die Endpunkte des Moduls aufrufen: genau die Entscheidung des
+             *     Modul-Gates der Listen-Endpunkte.
+             */
+            zugriff: boolean;
+        };
+        /**
          * @description Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys
          *     (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
          */
@@ -4020,10 +4037,10 @@ export interface components {
         };
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-         *     `art IN ('detail','export')` (migrations/0021_person_zugriff_audit.sql).
+         *     `art IN ('detail','export','druck')` (migrations/0132_person_zugriff_audit_druck.sql, zuvor 0021).
          * @enum {string}
          */
-        ZugriffArt: "detail" | "export";
+        ZugriffArt: "detail" | "export" | "druck";
     };
     responses: never;
     parameters: never;

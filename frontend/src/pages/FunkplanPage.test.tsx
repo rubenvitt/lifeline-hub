@@ -3,10 +3,11 @@ import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, useLocation } from 'react-router';
 import { http, HttpResponse } from 'msw';
+import { QueryClient } from '@tanstack/react-query';
 import { renderMitProviders } from '../test/utils';
 import { server } from '../test/server';
 import FunkplanPage from './FunkplanPage';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -14,6 +15,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { ApiError } from '../api/client';
+import { freigabenFixture } from '../test/fixtures';
 import type {
   Einheit,
   EinsatzAnzeige,
@@ -23,7 +25,7 @@ import type {
   Sprechgruppe,
 } from '../api/types';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulOverrides: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
@@ -131,7 +133,7 @@ beforeEach(() => {
   navigiere.mockReset();
   vi.mocked(legeLageberichtAn).mockClear();
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
-  vi.mocked(ladeModulOverrides).mockResolvedValue({});
+  vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(listeAbschnitte).mockResolvedValue(ABSCHNITTE);
   vi.mocked(listeEinheiten).mockResolvedValue(EINHEITEN);
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue(FAHRZEUGE);
@@ -329,9 +331,9 @@ describe('FunkplanPage — Baum', () => {
 
 describe('FunkplanPage — Sperre des Stabs', () => {
   it('ist nicht erreichbar, wenn der Stab im Einsatz ausgeblendet ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     const { container } = setup();
     expect(
       await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
@@ -340,15 +342,11 @@ describe('FunkplanPage — Sperre des Stabs', () => {
     expect(screen.queryByRole('region', { name: 'Lücken' })).toBeNull();
   });
 
-  it('ist gesperrt, wenn der Stab eine Rolle verlangt, die die Person nicht hat', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: {
-        sichtbar: true,
-        benoetigte_rolle: 'fuehrungskraft',
-        einsatz_id: 1,
-        modul_key: 'stab',
-      },
-    });
+  it('ist gesperrt, wenn der Server den Zugriff auf den Stab verweigert', async () => {
+    // Etwa weil der Stab eine Rolle verlangt, die die Person nicht hat: das rechnet der Server.
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: true, zugriff: false } }),
+    );
     const { container } = setup();
     expect(
       await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
@@ -356,34 +354,29 @@ describe('FunkplanPage — Sperre des Stabs', () => {
     expect(container.querySelector('.ant-table')).toBeNull();
   });
 
-  it('Gegenprobe: der System-Admin sieht den Funkplan trotz Rollensperre', async () => {
+  it('Gegenprobe: der Client rechnet keine Rolle nach — gibt der Server den Stab frei, ist der Funkplan da', async () => {
+    // Person ohne Org- und Systemrolle; ob der Stab eine Rolle verlangt, entscheidet allein der
+    // Server (LFH-669). Sagt die Freigabe „frei“, zeigt die Seite ihren Inhalt.
     server.use(
       http.get('/api/auth/me', () =>
         HttpResponse.json({
           id: 1,
-          anzeigename: 'Anna Admin',
-          benutzername: 'anna',
-          system_rolle: 'admin',
+          anzeigename: 'Max Mitglied',
+          benutzername: 'max',
+          system_rolle: 'keiner',
           org_rolle: 'keine',
           aktiv: true,
           erstellt_at: '2026-05-23 10:00:00',
         }),
       ),
     );
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: {
-        sichtbar: true,
-        benoetigte_rolle: 'fuehrungskraft',
-        einsatz_id: 1,
-        modul_key: 'stab',
-      },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     setup();
     expect(await screen.findByText('Florian 1/42-1')).toBeInTheDocument();
   });
 
   it('zeigt nichts, solange die Freigabe nicht ermittelt ist, und bei deren Fehler einen Fehler', async () => {
-    vi.mocked(ladeModulOverrides).mockRejectedValue(new ApiError(500, 'kaputt'));
+    vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     const { container } = setup();
     expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
     expect(container.querySelector('.ant-table')).toBeNull();
@@ -414,9 +407,9 @@ describe('FunkplanPage — nichts wird als leerer Bestand behauptet', () => {
   });
 
   it('bietet keine Übernahme an, wenn das Modul Lageberichte nicht freigegeben ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      lageberichte: { sichtbar: false, einsatz_id: 1, modul_key: 'lageberichte' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ lageberichte: { sichtbar: false } }),
+    );
     setup();
     await screen.findByText('Florian 1/42-1');
     expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
@@ -432,6 +425,85 @@ describe('FunkplanPage — nichts wird als leerer Bestand behauptet', () => {
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledTimes(1));
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text;
     expect(text).toContain('Fahrzeuge: nicht freigegeben');
+  });
+});
+
+/**
+ * Modulgrenze der Quellen (LFH-669, Spec `modul-freigabe`): der Funkplan fragt die Liste eines
+ * Moduls nur bei Freigabe des Servers an. Eine gesperrte Liste geht durch dieselbe Weiche wie ein
+ * 403 („nicht freigegeben“, die Ebene fehlt mit Grund) — kein Ausfall, kein vollständiger Plan.
+ */
+describe('FunkplanPage — Modulgrenze der Quellen (LFH-669)', () => {
+  const LISTEN = [listeAbschnitte, listeEinheiten, listeEinsatzFahrzeuge, listeEinsatzPersonal];
+  beforeEach(() => {
+    for (const f of LISTEN) vi.mocked(f).mockClear();
+  });
+
+  it('fragt ein gesperrtes Modul nicht an und nennt die Ebene „nicht freigegeben“, nicht als Ausfall', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ einheiten: { zugriff: false } }),
+    );
+    setup();
+    await screen.findByText('Florian ELW 1');
+    // Vorbedingung: die freien Listen liefen.
+    expect(vi.mocked(listeAbschnitte)).toHaveBeenCalled();
+    expect(vi.mocked(listeEinsatzFahrzeuge)).toHaveBeenCalled();
+    expect(vi.mocked(listeEinheiten)).not.toHaveBeenCalled();
+    // Der Plan wirkt nicht vollständig: die fehlende Ebene steht mit Grund da.
+    expect(screen.getByText(/Einheiten: nicht freigegeben/)).toBeInTheDocument();
+    const zeile = lueckenZeile('Einheiten ohne Sprechgruppe');
+    expect(within(zeile).getByText('—')).toBeInTheDocument();
+    expect(within(zeile).queryByText('0')).toBeNull();
+    // Gesperrt ist kein Ausfall.
+    expect(screen.queryByText(/nicht geladen/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('zeigt auch keinen Altstand eines gesperrten Moduls aus dem Cache', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ einheiten: { zugriff: false } }),
+    );
+    const client = new QueryClient();
+    client.setQueryData(['einsatz-einheiten', 1], EINHEITEN);
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/stab/funkplan', client },
+    );
+    await screen.findByText('Florian ELW 1');
+    expect(screen.queryByText('1. Zug')).toBeNull();
+    expect(screen.getByText(/Einheiten: nicht freigegeben/)).toBeInTheDocument();
+  });
+
+  it('fragt keine Liste an, solange die Freigaben laden', async () => {
+    vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise(() => {}));
+    setup();
+    await waitFor(() => expect(vi.mocked(ladeModulFreigaben)).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
+  });
+
+  it('fragt keine Liste an, wenn die Freigaben scheitern, und zeigt den Fehler', async () => {
+    vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
+    setup();
+    expect(await screen.findByText(/Freigabe des Stabs nicht ermittelbar/)).toBeInTheDocument();
+    for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
+  });
+
+  it('fragt keine Liste an, wenn der Stab gesperrt ist', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture({ stab: { zugriff: false } }));
+    setup();
+    await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/);
+    for (const f of LISTEN) expect(vi.mocked(f)).not.toHaveBeenCalled();
+  });
+
+  it('ein freies Modul mit echtem Ausfall bleibt ein Ausfall („nicht geladen“)', async () => {
+    vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(500, 'kaputt'));
+    setup();
+    await screen.findByText('Florian ELW 1');
+    await waitFor(() => expect(screen.getByText(/Einheiten: nicht geladen/)).toBeInTheDocument());
+    expect(screen.queryByText(/Einheiten: nicht freigegeben/)).toBeNull();
   });
 });
 
@@ -493,9 +565,9 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   });
 
   it('zeigt bei gesperrtem Stab auch mit ?ansicht=skizze nur die Sperre', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
     expect(
       await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
@@ -579,6 +651,19 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Ohne Abschnitt' })).toBeNull();
+  });
+
+  it('fragt bei vom Server gesperrten Abschnitten nicht an und nennt den Grund (LFH-669)', async () => {
+    vi.mocked(listeAbschnitte).mockClear();
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ einsatzabschnitte: { zugriff: false } }),
+    );
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    expect(
+      await screen.findByText('Keine Skizze darstellbar — Abschnitte: nicht freigegeben'),
+    ).toBeInTheDocument();
+    expect(vi.mocked(listeAbschnitte)).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Fernmeldeskizze' })).toBeNull();
   });
 
   it('nennt bei fehlenden Einheiten den Grund und zeigt die Abschnitte', async () => {

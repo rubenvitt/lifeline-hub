@@ -7,6 +7,7 @@ import type {
   EinsatzEinstellungen,
   EinstellungenUpdate,
   ModulOverride,
+  ModulFreigaben,
   ModulOverrides,
   ModulOverrideUpdate,
 } from './types';
@@ -125,6 +126,14 @@ export function speichereEinstellungen(
 /** Modul-Overrides eines Einsatzes laden (LFH-132); Map modul_key→Override (leer = Defaults). */
 export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
   return apiGet<ModulOverrides>(`/api/einsaetze/${id}/modul-overrides`);
+}
+
+/**
+ * Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669): je Modul-Key
+ * `{ sichtbar, zugriff }`, ausgewertet vom Server mit derselben Regel wie die Modul-Gates.
+ */
+export function ladeModulFreigaben(id: number): Promise<ModulFreigaben> {
+  return apiGet<ModulFreigaben>(`/api/einsaetze/${id}/modul-freigaben`);
 }
 
 /** Sichtbarkeit + benötigte Rolle eines Moduls überschreiben; nur Einsatzleitung/Admin, aktiver Einsatz. */

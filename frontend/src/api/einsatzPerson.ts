@@ -67,6 +67,15 @@ export function listePersonen(einsatzId: number, status?: PersonStatus): Promise
   return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${q}`);
 }
 
+/**
+ * Personenliste für die Druckansicht (LFH-727). Schreibt serverseitig EINEN `druck`-Eintrag ins
+ * Zugriffsprotokoll und liefert sonst dieselbe Menge wie `listePersonen`. Deshalb nie still
+ * wiederholen und nie aus dem Cache der Liste ersetzen (`frontend/src/druck/AGENTS.md`).
+ */
+export function ladePersonenDruck(einsatzId: number): Promise<Person[]> {
+  return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen/druck`);
+}
+
 /** CSV aller nicht stornierten Personen des Einsatzes (`routes/einsatz_person.rs`, `export`).
  *  Schreibt serverseitig JE ABRUF einen `export`-Audit-Eintrag. */
 export function ladePersonenExport(einsatzId: number): Promise<Blob> {

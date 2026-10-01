@@ -5,8 +5,10 @@ use crate::auth::Benutzer;
 use crate::einsatz::effektiv::effektive_modul_rolle;
 use crate::error::AppError;
 use chrono::{DateTime, Duration, Utc};
+use serde::Serialize;
 use sqlx::SqlitePool;
 use std::collections::{HashMap, HashSet};
+use utoipa::ToSchema;
 
 /// DSGVO-Schonfrist in Stunden: solange bleibt ein abgeschlossener Einsatz
 /// für alle Mitglieder lesbar; danach nur noch für höhere Berechtigungen.
@@ -198,73 +200,111 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
     }
 }
 
-/// Per-Handler-Guard für die Modul-Sichtbarkeit/Berechtigung (LFH-132). Rein und
-/// testbar gegen die bereits geladenen Override-Maps eines Einsatzes.
+/// Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
+/// `GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter
+/// [`fordere_modul_zugriff`] und [`erlaubte_module`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ModulFreigabe {
+    /// Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares
+    /// Modul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`).
+    pub sichtbar: bool,
+    /// Der Benutzer darf die Endpunkte des Moduls aufrufen: genau die Entscheidung des
+    /// Modul-Gates der Listen-Endpunkte.
+    pub zugriff: bool,
+}
+
+/// Reine Auswertung der Modul-Sichtbarkeit/Berechtigung (LFH-132, LFH-669) gegen die bereits
+/// geladenen Override-Maps eines Einsatzes.
 ///
-/// Reihenfolge (additive Verschärfung NACH dem bestehenden Lese-/Schreibrecht-Gate;
+/// `zugriff` — Reihenfolge (additive Verschärfung NACH dem bestehenden Lese-/Schreibrecht-Gate;
 /// loosened nie eine bestehende Schranke):
 /// 1. System-Admin behält IMMER Zugriff (Mindest-Guard), unabhängig vom Override.
-/// 2. Ausblenden: ist das Modul ausblendbar und der Override setzt `sichtbar=false`,
-///    → `Forbidden`. Nicht-ausblendbare Module (einsatzdaten, einsatz-einstellungen)
-///    werden NIE versteckt — ein `sichtbar=false` darauf wird defensiv ignoriert.
-/// 3. Rollen-Schranke: effektive Rolle = Einsatz-Override ?? Org-Default. `admin` → nur
-///    System-Admin (oben schon durch), sonst `Forbidden`; `fuehrungskraft` → System-Admin
-///    oder org-weite Führungskraft (`ist_hoehere_berechtigung`), sonst `Forbidden`.
-///    `None` → frei.
+/// 2. Nicht-ausblendbare Module (Stammdaten, Einstellungen) sind NIE sperrbar — weder
+///    versteckt noch rollen-beschränkt (Selbst-Aussperr-Schutz, beide Dimensionen). Ein
+///    etwaiger Override darauf wird defensiv ignoriert.
+/// 3. Ausblenden: Override `sichtbar=false` → kein Zugriff.
+/// 4. Rollen-Schranke: effektive Rolle = Einsatz-Override ?? Org-Default. `admin` → nur
+///    System-Admin (oben schon durch); `fuehrungskraft` → System-Admin oder org-weite
+///    Führungskraft (`ist_hoehere_berechtigung`). `None` → frei.
+///
+/// `sichtbar` hängt bewusst NICHT am Admin: ein ausgeblendetes Modul steht auch für ihn in
+/// keiner Navigation (das bisherige Client-Verhalten), erreichbar bleibt es über `zugriff`.
+pub fn modul_freigabe(
+    overrides: &HashMap<String, EinsatzModulOverride>,
+    org_defaults: &HashMap<String, Option<String>>,
+    modul_key: &str,
+    benutzer: &Benutzer,
+) -> ModulFreigabe {
+    if !ist_ausblendbar(modul_key) {
+        return ModulFreigabe {
+            sichtbar: true,
+            zugriff: true,
+        };
+    }
+    let ueberschreibung = overrides.get(modul_key);
+    let sichtbar = ueberschreibung.is_none_or(|o| o.sichtbar);
+    if benutzer.ist_admin() {
+        return ModulFreigabe {
+            sichtbar,
+            zugriff: true,
+        };
+    }
+    if !sichtbar {
+        return ModulFreigabe {
+            sichtbar,
+            zugriff: false,
+        };
+    }
+    let einsatz_override_rolle = ueberschreibung.and_then(|o| o.benoetigte_rolle.as_deref());
+    let org_default = org_defaults.get(modul_key).and_then(|r| r.as_deref());
+    let zugriff = match effektive_modul_rolle(einsatz_override_rolle, org_default).as_deref() {
+        Some("admin") => false, // System-Admin ist oben bereits durch.
+        Some("fuehrungskraft") => benutzer.ist_hoehere_berechtigung(),
+        _ => true,
+    };
+    ModulFreigabe { sichtbar, zugriff }
+}
+
+/// Per-Handler-Guard für die Modul-Berechtigung (LFH-132): `Forbidden`, wenn
+/// [`modul_freigabe`] keinen Zugriff gibt.
 pub fn fordere_modul_zugriff(
     overrides: &HashMap<String, EinsatzModulOverride>,
     org_defaults: &HashMap<String, Option<String>>,
     modul_key: &str,
     benutzer: &Benutzer,
 ) -> Result<(), AppError> {
-    // 1. Admin-Mindest-Guard.
-    if benutzer.ist_admin() {
-        return Ok(());
-    }
-
-    // 2. Nicht-ausblendbare Module (Stammdaten, Einstellungen) sind NIE sperrbar —
-    //    weder versteckt noch rollen-beschränkt (Selbst-Aussperr-Schutz, beide
-    //    Dimensionen). Ein etwaiger Override darauf wird defensiv ignoriert.
-    if !ist_ausblendbar(modul_key) {
-        return Ok(());
-    }
-
-    let ueberschreibung = overrides.get(modul_key);
-
-    // 3. Ausblend-Schranke.
-    if ueberschreibung.is_some_and(|o| !o.sichtbar) {
-        return Err(AppError::Forbidden);
-    }
-
-    // 4. Rollen-Schranke: Einsatz-Override ?? Org-Default.
-    let einsatz_override_rolle = ueberschreibung.and_then(|o| o.benoetigte_rolle.as_deref());
-    let org_default = org_defaults.get(modul_key).and_then(|r| r.as_deref());
-    let effektiv = effektive_modul_rolle(einsatz_override_rolle, org_default);
-    match effektiv.as_deref() {
-        Some("admin") => Err(AppError::Forbidden), // System-Admin ist oben bereits durch.
-        Some("fuehrungskraft") => {
-            if benutzer.ist_hoehere_berechtigung() {
-                Ok(())
-            } else {
-                Err(AppError::Forbidden)
-            }
-        }
-        _ => Ok(()),
+    if modul_freigabe(overrides, org_defaults, modul_key, benutzer).zugriff {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden)
     }
 }
 
-/// Async-Wrapper für Route-Handler: lädt Einsatz-Override-Map + Org-Modul-Defaults
-/// aus der DB und ruft dann `fordere_modul_zugriff` auf.
-///
-/// Ersetzt in jedem Handler das Muster
-/// `let overrides = modul_override::laden_alle(...); fordere_modul_zugriff(&overrides, ...)`
-/// durch einen einzigen Aufruf.
+/// Lädt die beiden Eingaben der Modulregel: Einsatz-Override-Map und Org-Modul-Defaults.
 ///
 /// Bewusst uncached (LFH-230): Autorisierungs-Daten; ein Rechte-Entzug muss sofort
-/// greifen. Override-/Org-Default-Maps sind auf ≤25 indizierte Zeilen gedeckelt
+/// greifen. Override-/Org-Default-Maps sind auf je eine Zeile pro Modul-Key gedeckelt
 /// (PK `(einsatz_id, modul_key)` / `(org_id, modul_key)`) — ein Per-Request-Cache
 /// spart nichts (kein Handler zieht das Gate doppelt), ein App-Cache tauschte den
 /// korrektheits-neutralen Read gegen eine Invalidierungs-Angriffsfläche.
+async fn lade_modul_regeln(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+) -> Result<
+    (
+        HashMap<String, EinsatzModulOverride>,
+        HashMap<String, Option<String>>,
+    ),
+    AppError,
+> {
+    let overrides = modul_override::laden_alle(pool, einsatz_id).await?;
+    let org_defaults = crate::org::modul_einstellung::laden_alle(pool, org_id).await?;
+    Ok((overrides, org_defaults))
+}
+
+/// Async-Wrapper für Route-Handler: lädt die Modulregeln aus der DB und ruft dann
+/// `fordere_modul_zugriff` auf.
 pub async fn fordere_modul_zugriff_laden(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -272,32 +312,49 @@ pub async fn fordere_modul_zugriff_laden(
     modul_key: &str,
     benutzer: &Benutzer,
 ) -> Result<(), AppError> {
-    let overrides = modul_override::laden_alle(pool, einsatz_id).await?;
-    let org_defaults = crate::org::modul_einstellung::laden_alle(pool, org_id).await?;
+    let (overrides, org_defaults) = lade_modul_regeln(pool, einsatz_id, org_id).await?;
     fordere_modul_zugriff(&overrides, &org_defaults, modul_key, benutzer)
 }
 
-/// Die Modul-Keys, die `benutzer` in diesem Einsatz sehen darf — [`fordere_modul_zugriff`]
-/// über alle [`super::modul::MODUL_KEYS`] auf einmal.
+/// Die Freigabe JEDES Modul-Keys ([`super::modul::MODUL_KEYS`]) für `benutzer` in diesem
+/// Einsatz (LFH-669): die Auskunft, nach der der Client Module zeigt und Daten lädt, statt
+/// die Regel nachzubauen (ihm fehlen die Org-Defaults).
+pub async fn modul_freigaben(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer: &Benutzer,
+) -> Result<HashMap<&'static str, ModulFreigabe>, AppError> {
+    let (overrides, org_defaults) = lade_modul_regeln(pool, einsatz_id, org_id).await?;
+    Ok(super::modul::MODUL_KEYS
+        .iter()
+        .map(|key| {
+            (
+                *key,
+                modul_freigabe(&overrides, &org_defaults, key, benutzer),
+            )
+        })
+        .collect())
+}
+
+/// Die Modul-Keys, die `benutzer` in diesem Einsatz sehen darf — [`modul_freigaben`] mit
+/// `zugriff`.
 ///
-/// Lädt Override- und Org-Default-Map genau einmal (zwei indizierte Reads, je ≤25 Zeilen
-/// über die PKs `(einsatz_id, modul_key)` / `(org_id, modul_key)`) und wertet danach rein
-/// in-memory aus. Konsumenten: der Event-Filter des Live-Feeds (F01/LFH-227) und die
-/// Modulzähler (LFH-612) — beide gehören keinem Modul und lassen die Modulrechte als
-/// FILTER wirken, nicht als Türsteher. Eine zweite Auswertung der Rangfolge daneben wäre
-/// die Stelle, an der ein Zähler ein Modul verriete, das die Liste mit 403 abweist.
+/// Konsumenten: der Event-Filter des Live-Feeds (F01/LFH-227) und die Modulzähler
+/// (LFH-612) — beide gehören keinem Modul und lassen die Modulrechte als FILTER wirken,
+/// nicht als Türsteher. Eine zweite Auswertung der Rangfolge daneben wäre die Stelle, an
+/// der ein Zähler ein Modul verriete, das die Liste mit 403 abweist.
 pub async fn erlaubte_module(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
     benutzer: &Benutzer,
 ) -> Result<HashSet<&'static str>, AppError> {
-    let overrides = modul_override::laden_alle(pool, einsatz_id).await?;
-    let org_defaults = crate::org::modul_einstellung::laden_alle(pool, org_id).await?;
-    Ok(super::modul::MODUL_KEYS
-        .iter()
-        .copied()
-        .filter(|key| fordere_modul_zugriff(&overrides, &org_defaults, key, benutzer).is_ok())
+    Ok(modul_freigaben(pool, einsatz_id, org_id, benutzer)
+        .await?
+        .into_iter()
+        .filter(|(_, f)| f.zugriff)
+        .map(|(key, _)| key)
         .collect())
 }
 
@@ -1005,6 +1062,155 @@ mod tests {
             fordere_modul_zugriff(&leer, &org, "einsatz-einstellungen", &normal).is_ok(),
             "Org-Default darf nicht-ausblendbares Modul nicht sperren"
         );
+    }
+
+    // --- Modulfreigabe je Benutzer (LFH-669) ---
+
+    fn freigabe(sichtbar: bool, zugriff: bool) -> ModulFreigabe {
+        ModulFreigabe { sichtbar, zugriff }
+    }
+
+    #[test]
+    fn freigabe_ohne_override_und_org_default_ist_frei() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer = overrides_mit(vec![]);
+        assert_eq!(
+            modul_freigabe(&leer, &leere_org_defaults(), "schaeden", &normal),
+            freigabe(true, true)
+        );
+    }
+
+    #[test]
+    fn freigabe_org_default_fuehrungskraft_sperrt_mitglied() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer = overrides_mit(vec![]);
+        let org = org_defaults_mit("schaeden", Some("fuehrungskraft"));
+        assert_eq!(
+            modul_freigabe(&leer, &org, "schaeden", &normal),
+            freigabe(true, false)
+        );
+    }
+
+    #[test]
+    fn freigabe_org_default_fuehrungskraft_laesst_fuehrungskraft_durch() {
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        let leer = overrides_mit(vec![]);
+        let org = org_defaults_mit("schaeden", Some("fuehrungskraft"));
+        assert_eq!(
+            modul_freigabe(&leer, &org, "schaeden", &fk),
+            freigabe(true, true)
+        );
+    }
+
+    #[test]
+    fn freigabe_einsatz_override_geht_org_default_vor() {
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        let ov = overrides_mit(vec![override_zeile("schaeden", true, Some("admin"))]);
+        let org = org_defaults_mit("schaeden", Some("fuehrungskraft"));
+        assert_eq!(
+            modul_freigabe(&ov, &org, "schaeden", &fk),
+            freigabe(true, false)
+        );
+    }
+
+    #[test]
+    fn freigabe_nicht_ausblendbar_ist_immer_frei() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        for key in crate::einsatz::modul::NICHT_AUSBLENDBAR {
+            let ov = overrides_mit(vec![override_zeile(key, false, Some("admin"))]);
+            let org = org_defaults_mit(key, Some("admin"));
+            assert_eq!(
+                modul_freigabe(&ov, &org, key, &normal),
+                freigabe(true, true),
+                "{key} ist nie sperrbar"
+            );
+        }
+    }
+
+    #[test]
+    fn freigabe_ausgeblendet_fuer_mitglied() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile("meldungen", false, None)]);
+        assert_eq!(
+            modul_freigabe(&ov, &leere_org_defaults(), "meldungen", &normal),
+            freigabe(false, false)
+        );
+    }
+
+    #[test]
+    fn freigabe_ausgeblendet_bleibt_fuer_admin_unsichtbar_aber_erreichbar() {
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile("meldungen", false, None)]);
+        assert_eq!(
+            modul_freigabe(&ov, &leere_org_defaults(), "meldungen", &admin),
+            freigabe(false, true)
+        );
+    }
+
+    /// Unabhängige Referenz: die Entscheidung von `fordere_modul_zugriff` vor LFH-669, Wort für
+    /// Wort aus dem alten Rumpf (Admin → nicht ausblendbar → versteckt → Rolle aus Einsatz-Override,
+    /// sonst Org-Vorgabe). `fordere_modul_zugriff` delegiert heute an `modul_freigabe`; ein
+    /// Vergleich damit wäre tautologisch.
+    fn alte_entscheidung(
+        overrides: &HashMap<String, EinsatzModulOverride>,
+        org_defaults: &HashMap<String, Option<String>>,
+        key: &str,
+        b: &Benutzer,
+    ) -> bool {
+        if b.ist_admin() {
+            return true;
+        }
+        if !ist_ausblendbar(key) {
+            return true;
+        }
+        let ue = overrides.get(key);
+        if ue.is_some_and(|o| !o.sichtbar) {
+            return false;
+        }
+        let ov = ue.and_then(|o| o.benoetigte_rolle.as_deref());
+        let org = org_defaults.get(key).and_then(|r| r.as_deref());
+        match ov.or(org) {
+            Some("admin") => false,
+            Some("fuehrungskraft") => b.ist_hoehere_berechtigung(),
+            _ => true,
+        }
+    }
+
+    /// Gleichlauf: `zugriff` ist für jede Kombination die alte Entscheidung des Gates, und das
+    /// Gate folgt `zugriff`.
+    #[test]
+    fn freigabe_zugriff_ist_die_alte_entscheidung_des_gates() {
+        let benutzer = [
+            benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE),
+            benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT),
+            benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE),
+        ];
+        let rollen = [None, Some("fuehrungskraft"), Some("admin")];
+        for b in &benutzer {
+            for ov in [None, Some(true), Some(false)] {
+                for ov_rolle in rollen {
+                    for org_rolle in rollen {
+                        for key in ["etb", "einsatzdaten"] {
+                            let ovs = match ov {
+                                None => overrides_mit(vec![]),
+                                Some(sichtbar) => {
+                                    overrides_mit(vec![override_zeile(key, sichtbar, ov_rolle)])
+                                }
+                            };
+                            let org = org_defaults_mit(key, org_rolle);
+                            let fall = format!("{key} ov={ov:?}/{ov_rolle:?} org={org_rolle:?}");
+                            let zugriff = modul_freigabe(&ovs, &org, key, b).zugriff;
+                            assert_eq!(zugriff, alte_entscheidung(&ovs, &org, key, b), "{fall}");
+                            assert_eq!(
+                                fordere_modul_zugriff(&ovs, &org, key, b).is_ok(),
+                                zugriff,
+                                "{fall}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // --- Integrationstest: DB + Guard-Kette (Task 11) ---

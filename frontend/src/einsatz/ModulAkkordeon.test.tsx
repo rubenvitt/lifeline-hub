@@ -4,26 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import ModulAkkordeon, { akkordeonKopfStil } from './ModulAkkordeon';
 import { kategorien } from './modulRegistry';
-import type { ModulOverrides } from '../api/types';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 import { dichten, farbenDunkel } from '../theme/tokens';
-
-const ohne = benutzerFixture({ anzeigename: 'E' });
-
-const ueberschreibung = (
-  modulKey: string,
-  sichtbar: boolean,
-  benoetigteRolle: 'admin' | 'fuehrungskraft' | null = null,
-): ModulOverrides => ({
-  [modulKey]: {
-    einsatz_id: 7,
-    modul_key: modulKey,
-    sichtbar,
-    benoetigte_rolle: benoetigteRolle,
-    geaendert_at: null,
-    geaendert_von: null,
-  },
-});
 
 function zeige(props: Partial<React.ComponentProps<typeof ModulAkkordeon>> = {}) {
   return renderMitProviders(
@@ -31,7 +13,6 @@ function zeige(props: Partial<React.ComponentProps<typeof ModulAkkordeon>> = {})
       kategorien={kategorien}
       offeneKategorie="erfassung"
       aktiverModulKey="etb"
-      benutzer={ohne}
       onKategorieKlick={() => {}}
       onModulKlick={() => {}}
       {...props}
@@ -92,12 +73,12 @@ describe('ModulAkkordeon', () => {
     expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
   });
 
-  it('reicht Sperre und Ausblendung der Modulliste durch (LFH-132)', () => {
+  it('reicht Sperre und Ausblendung der Modulliste durch (LFH-132/LFH-669)', () => {
     zeige({
-      overrides: {
-        ...ueberschreibung('etb', true, 'fuehrungskraft'),
-        ...ueberschreibung('tiere', false),
-      },
+      freigaben: freigabenFixture({
+        etb: { zugriff: false },
+        tiere: { sichtbar: false, zugriff: false },
+      }),
     });
     expect(screen.getByRole('button', { name: 'ETB' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Tiere' })).not.toBeInTheDocument();

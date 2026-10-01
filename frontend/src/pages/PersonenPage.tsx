@@ -3,7 +3,8 @@ import { Alert, App, Breadcrumb, Button, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { parsePersonenSicht, personDetailPfad } from '../routing/deeplinks';
+import { parsePersonenSicht, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
+import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -604,6 +605,12 @@ export default function PersonenPage() {
             optionen={ANSICHT_OPTIONEN}
             wert={sicht.ansicht}
             onWechsel={(ansicht) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, ansicht }))}
+          />
+          <DruckAnsichtKnopf
+            pfad={personenDruckPfad(einsatzId, {
+              filter: sicht.filter,
+              nurLuecken: sicht.nurLuecken,
+            })}
           />
           {/* Die Masken bleiben der vollständige Weg (Name, Notiz, Melder; Vermisst-Meldung
               ohne Sichtung). Alle drei sekundär: die Primärhandlung der Seite ist die Zeile. */}

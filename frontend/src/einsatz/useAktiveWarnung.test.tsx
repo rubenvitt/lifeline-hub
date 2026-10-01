@@ -10,19 +10,9 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
-import type { BenutzerAnzeige, ModulOverrides, Warnstufe } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
+import type { ModulFreigaben, Warnstufe } from '../api/types';
 import { useAktiveWarnung } from './useAktiveWarnung';
-
-const benutzer: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-09-29 08:00:00',
-  totp_aktiviert: false,
-};
 
 const GEBIETE = '/api/einsaetze/7/gefahrengebiete';
 const ZAEHLER = '/api/einsaetze/7/modul-zaehler';
@@ -56,25 +46,25 @@ function bestaetigungUeberfaellig(anzahl: number) {
   );
 }
 
-const gefahrenAusgeblendet: ModulOverrides = {
-  gefahrenzonen: {
-    einsatz_id: 7,
-    modul_key: 'gefahrenzonen',
-    sichtbar: false,
-    benoetigte_rolle: null,
-    geaendert_at: null,
-    geaendert_von: null,
-  },
-};
-
 function wrapper(client: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   };
 }
 
-function starte(overrides?: ModulOverrides) {
-  return renderHook(() => useAktiveWarnung({ einsatzId: 7, benutzer, overrides }), {
+/**
+ * Freigaben wie vom Server (LFH-669); `{ freigaben: undefined }` steht für „noch nicht
+ * geladen/gescheitert“ — als Feld, weil ein Default-Parameter `undefined` verschluckte.
+ */
+function starte(
+  {
+    freigaben,
+    freigabenGescheitert = false,
+  }: { freigaben: ModulFreigaben | undefined; freigabenGescheitert?: boolean } = {
+    freigaben: freigabenFixture(),
+  },
+) {
+  return renderHook(() => useAktiveWarnung({ einsatzId: 7, freigaben, freigabenGescheitert }), {
     wrapper: wrapper(neuerQueryClient()),
   });
 }
@@ -120,9 +110,39 @@ describe('useAktiveWarnung', () => {
 
   it('Gefahrenmodul ausgeblendet → keine Anfrage und keine Warnung, auch wenn ein Gebiet akut wäre', async () => {
     const abrufe = gebiete('akut');
-    const { result } = starte(gefahrenAusgeblendet);
+    const { result } = starte({
+      freigaben: freigabenFixture({ gefahrenzonen: { sichtbar: false, zugriff: false } }),
+    });
     await takt();
     expect(abrufe.anzahl).toBe(0);
     expect(result.current).toBe(false);
+  });
+
+  it('Gefahrenmodul gesperrt (zugriff: false) → keine Anfrage und keine Warnung', async () => {
+    const abrufe = gebiete('akut');
+    const { result } = starte({
+      freigaben: freigabenFixture({ gefahrenzonen: { zugriff: false } }),
+    });
+    await takt();
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current).toBe(false);
+  });
+
+  it('Freigaben laden noch → das Gefahrenmodul wird nicht abgefragt', async () => {
+    const abrufe = gebiete('akut');
+    const { result } = starte({ freigaben: undefined });
+    await takt();
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current).toBe(false);
+  });
+
+  it('Freigaben gescheitert → keine Anfrage, aber die Sperre hält (fail-safe, LFH-669)', async () => {
+    // Ohne Freigaben weiß niemand, ob ein Gebiet akut ist. Abgefragt wird trotzdem nicht (Spec
+    // `modul-freigabe`); der Helligkeitsregler hält dafür den Warnboden.
+    const abrufe = gebiete('akut');
+    const { result } = starte({ freigaben: undefined, freigabenGescheitert: true });
+    await takt();
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current).toBe(true);
   });
 });

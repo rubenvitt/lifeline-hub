@@ -4,7 +4,13 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../test/utils';
-import { authWertFixture, benutzerFixture, einsatzFixture } from '../test/fixtures';
+import {
+  authWertFixture,
+  benutzerFixture,
+  einsatzFixture,
+  freigabenFixture,
+} from '../test/fixtures';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { merkeModulBesuch } from '../einsatz/zuletztModule';
 import { useBefehle } from './useBefehle';
 
@@ -16,7 +22,7 @@ vi.mock('../auth/AuthContext', () => ({
 }));
 vi.mock('../api/einsaetze', () => ({
   listeEinsaetze: vi.fn(() => Promise.resolve([])),
-  ladeModulOverrides: vi.fn(() => Promise.resolve({})),
+  ladeModulFreigaben: vi.fn(() => Promise.resolve(freigabenFixture())),
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatzFixture({ id: 5 }))),
 }));
 
@@ -35,6 +41,22 @@ describe('useBefehle', () => {
       wrapper: wrapper('/einsaetze/5/etb'),
     });
     await waitFor(() => expect(result.current.some((b) => b.id === 'modul:etb')).toBe(true));
+  });
+  /**
+   * Die Naht zum Server (LFH-669): der Hook reicht die geladenen Freigaben durch. Paar im selben
+   * Lauf ('personen' erscheint, 'schaeden' nicht), sonst wäre auch ein leerer Bestand grün.
+   */
+  it('liefert für ein Modul ohne Zugriff (Org-Vorgabe) keinen Befehl', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValueOnce(
+      freigabenFixture({ schaeden: { zugriff: false } }),
+    );
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
+    await waitFor(() => expect(result.current.some((b) => b.id === 'modul:personen')).toBe(true));
+    expect(ladeModulFreigaben).toHaveBeenCalledWith(5);
+    expect(result.current.some((b) => b.id === 'modul:schaeden')).toBe(false);
+    expect(result.current.some((b) => b.id === 'aktion:schaeden')).toBe(false);
   });
   it('liefert keine Modul-Befehle außerhalb eines Einsatzes', () => {
     const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {

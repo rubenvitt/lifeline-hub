@@ -4,7 +4,7 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { ladeModulOverrides } from '../../api/einsaetze';
+import { ladeModulFreigaben } from '../../api/einsaetze';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { ladeStab } from '../../api/stab';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -289,14 +289,13 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
 
   // Dieselbe Abfrage wie `useStabFreigabe` (gemeinsamer Cache): die Übernahme legt einen
   // Lagebericht an, also braucht es Schreibrecht UND das freigegebene Modul Lageberichte.
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatz.id),
-    queryFn: () => ladeModulOverrides(einsatz.id),
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatz.id),
+    queryFn: () => ladeModulFreigaben(einsatz.id),
   });
   const darfUebernehmen =
-    overridesQuery.data != null &&
     darfImEinsatzSchreiben(einsatz, benutzer) &&
-    istKeyFreigegeben('lageberichte', benutzer, overridesQuery.data);
+    istKeyFreigegeben('lageberichte', freigabenQuery.data);
   // Solange eine Quelle lädt, stünde „lädt“ im unveränderlichen Bericht.
   const quellenLaden = einheiten.zustand === 'laden' || (stabFrei && stabQuery.isPending);
 

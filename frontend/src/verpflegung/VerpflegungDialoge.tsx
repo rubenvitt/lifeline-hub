@@ -5,9 +5,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type {
   AusgabeEingabe,
-  BenutzerAnzeige,
   Kostform,
-  ModulOverrides,
+  ModulFreigaben,
   SonderkostEingabe,
   VerpflegungAusgabe,
   VerpflegungZeitfenster,
@@ -193,9 +192,8 @@ type ZeitfensterModus =
 interface ZeitfensterDialogProps extends DialogBasis {
   modus: ZeitfensterModus;
   einsatzId: number;
-  benutzer: BenutzerAnzeige | null;
-  /** `overridesQuery.data` unverändert — `undefined` heißt „noch unbekannt" (Hook-Vertrag). */
-  overrides: ModulOverrides | undefined;
+  /** `freigabenQuery.data` unverändert — `undefined` heißt „noch unbekannt" (Hook-Vertrag). */
+  freigaben: ModulFreigaben | undefined;
   jetzt: Dayjs;
 }
 
@@ -204,8 +202,7 @@ type Bedarfsfeld = 'bedarf_kraefte' | 'bedarf_betreute';
 export function ZeitfensterDialog({
   modus,
   einsatzId,
-  benutzer,
-  overrides,
+  freigaben,
   jetzt,
   laeuft,
   fehler,
@@ -227,7 +224,7 @@ export function ZeitfensterDialog({
       : zeitraum === undefined && vorher
         ? normalisiert(vorher.von_at)
         : undefined;
-  const vorschlag = useBedarfsvorschlag({ einsatzId, vonAt, benutzer, overrides, jetzt });
+  const vorschlag = useBedarfsvorschlag({ einsatzId, vonAt, freigaben, jetzt });
 
   // Eigener Merker statt `isFieldTouched`: eine Vorbelegung per `setFieldValue` wäre sonst von der
   // Hand der Person nicht zu trennen, und ein nachziehender Vorschlag überschriebe ihre Zahl.

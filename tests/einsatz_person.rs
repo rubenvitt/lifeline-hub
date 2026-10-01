@@ -2128,3 +2128,174 @@ async fn replay_derselben_client_id_aendert_koordinate_und_vermisst_seit_nicht()
     assert_eq!(zweite["zustand"], "unklar");
     assert_eq!(personen_anzahl(&app, &admin, e).await, 1);
 }
+
+// ---------- Personendruck mit Protokoll (LFH-727, design.md D1) ----------
+
+async fn druck_audit_anzahl(pool: &sqlx::SqlitePool, e: i64) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_zugriff_audit \
+         WHERE einsatz_id = ? AND art = 'druck' AND person_id IS NULL",
+    )
+    .bind(e)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn druck_schreibt_genau_einen_druck_audit_und_liefert_liste() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Mustermann","vorname":"Max"}"#).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Musterfrau"}"#).await;
+
+    let (status, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        druck_audit_anzahl(&pool, e).await,
+        0,
+        "die Liste bleibt unprotokolliert"
+    );
+
+    let (status, druck) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/druck"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        druck, liste,
+        "der Druck liefert dieselbe Menge wie die Liste"
+    );
+    assert_eq!(druck_audit_anzahl(&pool, e).await, 1);
+    let (benutzer, art): (String, String) = sqlx::query_as(
+        "SELECT b.benutzername, a.art FROM person_zugriff_audit a \
+         JOIN benutzer b ON b.id = a.benutzer_id WHERE a.einsatz_id = ?",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((benutzer.as_str(), art.as_str()), ("admin", "druck"));
+
+    // Jeder Abruf ist ein eigener Eintrag (Neu laden).
+    anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/druck"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(druck_audit_anzahl(&pool, e).await, 2);
+}
+
+#[tokio::test]
+async fn druck_als_beobachter_erlaubt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, e, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+
+    let (status, druck) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/druck"),
+        &erika_c,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(druck.as_array().unwrap().len(), 1);
+    assert_eq!(druck_audit_anzahl(&pool, e).await, 1);
+}
+
+#[tokio::test]
+async fn druck_ohne_modulzugriff_ist_403_ohne_audit() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, frieda, "fuehrungspersonal").await;
+    let frieda_c = login_cookie(&app, "frieda", "friedapw1").await;
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/druck"),
+        &frieda_c,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: sichtbar druckt sie");
+    assert_eq!(druck_audit_anzahl(&pool, e).await, 1);
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override: {v}");
+
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/druck"),
+        &frieda_c,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        druck_audit_anzahl(&pool, e).await,
+        1,
+        "der abgewiesene Abruf schreibt keinen Eintrag"
+    );
+}
+
+#[tokio::test]
+async fn druck_liefert_ohne_protokolleintrag_keine_personen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Mustermann"}"#).await;
+    // Der Protokolleintrag scheitert (wie bei voller Platte oder gesperrter DB).
+    sqlx::query(
+        "CREATE TRIGGER druck_audit_kaputt BEFORE INSERT ON person_zugriff_audit \
+         WHEN NEW.art = 'druck' BEGIN SELECT RAISE(ABORT, 'kaputt'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (status, body) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/druck"),
+        &admin,
+        None,
+    )
+    .await;
+    // 500 (nicht 400/404): der Fehler kommt aus dem Protokolleintrag, nicht aus dem Routing.
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
+    assert!(
+        !body.to_string().contains("Mustermann"),
+        "keine Personendaten ohne Protokoll: {body}"
+    );
+}

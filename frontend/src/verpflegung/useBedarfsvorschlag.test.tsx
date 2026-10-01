@@ -7,16 +7,14 @@ import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { erzeugeQueryClient } from '../api/queryClient';
-import type { BelegungKopfzahl, EinsatzPersonal, ModulOverrides } from '../api/types';
+import type { BelegungKopfzahl, EinsatzPersonal } from '../api/types';
 import { useBedarfsvorschlag, type BedarfsvorschlagArgs } from './useBedarfsvorschlag';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Bedarfsvorschläge, geprüft am Draht: was angefragt wird (Aufrufzähler), was vorbelegt wird und
  * was als Hinweis dasteht.
  */
-
-const benutzer = benutzerFixture({ anzeigename: 'E' });
 
 const P_PERSONAL = '/api/einsaetze/7/personal';
 const P_KOPFZAHL = '/api/einsaetze/7/betreuung/belegung';
@@ -24,20 +22,6 @@ const P_KOPFZAHL = '/api/einsaetze/7/betreuung/belegung';
 /** Beginn 10:00 UTC (12:00 in Berlin), jetzt 10:30 UTC → hat begonnen. */
 const VON = '2026-09-24 10:00:00';
 const JETZT_NACH_BEGINN = dayjs('2026-09-24T10:30:00Z');
-
-function override(
-  modul_key: string,
-  teil: { sichtbar?: boolean; benoetigte_rolle?: 'fuehrungskraft' | null },
-): ModulOverrides[string] {
-  return {
-    einsatz_id: 7,
-    modul_key,
-    sichtbar: teil.sichtbar ?? true,
-    benoetigte_rolle: teil.benoetigte_rolle ?? null,
-    geaendert_at: null,
-    geaendert_von: null,
-  };
-}
 
 function personal(n: number): EinsatzPersonal[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -97,8 +81,7 @@ function rendere(args: Partial<BedarfsvorschlagArgs> = {}, client = neuerQueryCl
       useBedarfsvorschlag({
         einsatzId: 7,
         vonAt: VON,
-        benutzer,
-        overrides: {},
+        freigaben: freigabenFixture(),
         jetzt: JETZT_NACH_BEGINN,
         ...args,
       }),
@@ -260,7 +243,7 @@ describe('useBedarfsvorschlag — Quelle nicht zugänglich', () => {
   it('Betreuung ausgeblendet: keine Anfrage an die Kopfzahl, Feld ohne Vorschlag', async () => {
     const z = antworte(personal(5), kopfzahl({ summe: 70 }));
     const { result } = rendere({
-      overrides: { betreuung: override('betreuung', { sichtbar: false }) },
+      freigaben: freigabenFixture({ betreuung: { sichtbar: false } }),
     });
     // Gemischter Fall: Personal ist frei und wird genau einmal gefragt.
     await waitFor(() => expect(result.current.kraefte.wert).toBe(5));
@@ -270,10 +253,10 @@ describe('useBedarfsvorschlag — Quelle nicht zugänglich', () => {
     expect(result.current.betreute).toEqual({ wert: null, hinweis: null });
   });
 
-  it('Betreuung per Rolle gesperrt: ebenfalls keine Anfrage', async () => {
+  it('Betreuung gesperrt (Freigabe ohne Zugriff): ebenfalls keine Anfrage', async () => {
     const z = antworte(personal(5), kopfzahl({ summe: 70 }));
     const { result } = rendere({
-      overrides: { betreuung: override('betreuung', { benoetigte_rolle: 'fuehrungskraft' }) },
+      freigaben: freigabenFixture({ betreuung: { zugriff: false } }),
     });
     await waitFor(() => expect(result.current.kraefte.wert).toBe(5));
     await einTakt();
@@ -284,7 +267,7 @@ describe('useBedarfsvorschlag — Quelle nicht zugänglich', () => {
   it('Personal ausgeblendet: keine Anfrage an das Personal', async () => {
     const z = antworte(personal(5), kopfzahl({}));
     const { result } = rendere({
-      overrides: { personal: override('personal', { sichtbar: false }) },
+      freigaben: freigabenFixture({ personal: { sichtbar: false } }),
     });
     await waitFor(() => expect(z.kopfzahl).toBe(1));
     await einTakt();
@@ -292,19 +275,19 @@ describe('useBedarfsvorschlag — Quelle nicht zugänglich', () => {
     expect(result.current.kraefte).toEqual({ wert: null, hinweis: null });
   });
 
-  it('Personal per Rolle gesperrt: keine Anfrage an das Personal', async () => {
+  it('Personal gesperrt (Freigabe ohne Zugriff): keine Anfrage an das Personal', async () => {
     const z = antworte(personal(5), kopfzahl({}));
     rendere({
-      overrides: { personal: override('personal', { benoetigte_rolle: 'fuehrungskraft' }) },
+      freigaben: freigabenFixture({ personal: { zugriff: false } }),
     });
     await waitFor(() => expect(z.kopfzahl).toBe(1));
     await einTakt();
     expect(z.personal).toBe(0);
   });
 
-  it('Freigaben noch unbekannt (`overrides` undefined): keine der beiden Quellen wird gefragt', async () => {
+  it('Freigaben noch unbekannt (`freigaben` undefined): keine der beiden Quellen wird gefragt', async () => {
     const z = antworte(personal(5), kopfzahl({ summe: 70 }));
-    const { result } = rendere({ overrides: undefined });
+    const { result } = rendere({ freigaben: undefined });
     await einTakt();
     expect(z).toMatchObject({ personal: 0, kopfzahl: 0 });
     expect(result.current).toEqual({

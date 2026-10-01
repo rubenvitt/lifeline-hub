@@ -19,7 +19,7 @@ import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
  *  Allowlist sich selbst. */
 const ERWARTET_EINSATZ = new Set([
   'einsatz',
-  'einsatz-modul-overrides',
+  'einsatz-modul-freigaben',
   'einsatz-einstellungen',
   'einsatz-modul-zaehler',
   'etb',

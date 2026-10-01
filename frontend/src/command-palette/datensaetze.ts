@@ -37,7 +37,6 @@ import {
 } from './typen';
 import type {
   Auftrag,
-  BenutzerAnzeige,
   Einheit,
   Einsatzabschnitt,
   EinsatzFahrzeug,
@@ -47,7 +46,7 @@ import type {
   EinsatzPersonal,
   EtbEintragAnzeige,
   Meldung,
-  ModulOverrides,
+  ModulFreigaben,
   Person,
   Schaden,
   Uhs,
@@ -107,8 +106,8 @@ export interface DatensatzKontext {
    * still in die volle Menge.
    */
   modus: PaletteModus;
-  benutzer: BenutzerAnzeige | null;
-  overrides?: ModulOverrides;
+  /** Modulfreigaben des Servers (LFH-669); fehlen sie, ist keine Quelle frei. */
+  freigaben?: ModulFreigaben;
   /**
    * Modulschlüssel der Seite, auf der die Palette geöffnet wurde (`modulAusPfad`), `null` außerhalb
    * eines Moduls. Wer im Kräfte-Modul einen Funkrufnamen tippt, meint eher das Fahrzeug als die
@@ -398,7 +397,7 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
   const offen = quellen(k).filter((qu) => {
     if (erlaubt !== null && !erlaubt.includes(qu.quelle)) return false;
     const m = modulRegistry.find((x) => x.key === qu.modulKey);
-    return m != null && istModulFreigegeben(m, k.benutzer, k.overrides);
+    return m != null && istModulFreigegeben(m, k.freigaben);
   });
 
   const gesehen = new Set<string>();
@@ -517,7 +516,7 @@ function etbSammeltreffer(k: DatensatzKontext, suche: string): Treffer | null {
   const n = k.quellen.etbAnzahl?.anzahl ?? 0;
   if (n <= 0) return null;
   const m = modulRegistry.find((x) => x.key === QUELLE_MODUL.etbAnzahl);
-  if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) return null;
+  if (!m || !istModulFreigegeben(m, k.freigaben)) return null;
   const ziel = etbPfad(k.einsatzId, { q: suche });
   return {
     befehl: {

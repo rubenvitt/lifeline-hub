@@ -3,11 +3,13 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
+import { QueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { benutzerFixture } from '../../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../../test/fixtures';
+import type { ModulFreigabe } from '../../api/types';
 import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import UeberblickPage from './UeberblickPage';
 
@@ -217,8 +219,8 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
       json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
     ),
     http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
-    // Modul-Overrides (Sichtbarkeit der Ablösung) und laufende Schichten.
-    http.get('/api/einsaetze/1/modul-overrides', json({})),
+    // Laufende Schichten; die Modul-Freigaben (Sichtbarkeit der Ablösung) liefert der
+    // MSW-Default: alles frei.
     http.get('/api/einsaetze/1/abloesungen', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
@@ -601,25 +603,17 @@ describe('UeberblickPage', () => {
     });
 
     it('Modul ausgeblendet → die Marke führt in die Pegel-Einstellungen', async () => {
-      // Vor der Override-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
-      let overridesGeliefert = 0;
+      // Vor der Freigaben-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
+      let freigabenGeliefert = 0;
       stelleBereit(daten(), [
-        http.get('/api/einsaetze/1/modul-overrides', () => {
-          overridesGeliefert += 1;
-          return HttpResponse.json({
-            'wetter-pegel': {
-              einsatz_id: 1,
-              modul_key: 'wetter-pegel',
-              sichtbar: false,
-              benoetigte_rolle: null,
-              geaendert_at: null,
-            },
-          });
+        http.get('/api/einsaetze/1/modul-freigaben', () => {
+          freigabenGeliefert += 1;
+          return HttpResponse.json(freigabenFixture({ 'wetter-pegel': { sichtbar: false } }));
         }),
       ]);
       rendern();
       const { m } = await marke();
-      await waitFor(() => expect(overridesGeliefert).toBeGreaterThan(0));
+      await waitFor(() => expect(freigabenGeliefert).toBeGreaterThan(0));
       await act(async () => {
         await new Promise((r) => setTimeout(r, 20));
       });
@@ -663,29 +657,21 @@ describe('UeberblickPage', () => {
 
     it('Modul ausgeblendet → keine Anfrage an …/wetter, keine Unwettermarke', async () => {
       let wetterAbrufe = 0;
-      let overridesGeliefert = 0;
+      let freigabenGeliefert = 0;
       stelleBereit(volleDaten, [
         http.get('/api/einsaetze/1/wetter', () => {
           wetterAbrufe += 1;
           return HttpResponse.json(wetter());
         }),
-        http.get('/api/einsaetze/1/modul-overrides', () => {
-          overridesGeliefert += 1;
-          return HttpResponse.json({
-            'wetter-pegel': {
-              einsatz_id: 1,
-              modul_key: 'wetter-pegel',
-              sichtbar: false,
-              benoetigte_rolle: null,
-              geaendert_at: null,
-            },
-          });
+        http.get('/api/einsaetze/1/modul-freigaben', () => {
+          freigabenGeliefert += 1;
+          return HttpResponse.json(freigabenFixture({ 'wetter-pegel': { sichtbar: false } }));
         }),
       ]);
       rendern();
       const p = await waitFor(() => paneel('Nächste Marken'));
       await within(p).findByText('Lagebesprechung');
-      await waitFor(() => expect(overridesGeliefert).toBeGreaterThan(0));
+      await waitFor(() => expect(freigabenGeliefert).toBeGreaterThan(0));
       await act(async () => {
         await new Promise((r) => setTimeout(r, 20));
       });
@@ -737,16 +723,8 @@ describe('UeberblickPage', () => {
   it('Nächste Marken: ohne sichtbares Modul Ablösung keine Anfrage und keine Marke (LFH-635)', async () => {
     let abgefragt = 0;
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/modul-overrides', () =>
-        HttpResponse.json({
-          abloesung: {
-            einsatz_id: 1,
-            modul_key: 'abloesung',
-            sichtbar: false,
-            benoetigte_rolle: null,
-            geaendert_at: null,
-          },
-        }),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ abloesung: { sichtbar: false } })),
       ),
       http.get('/api/einsaetze/1/abloesungen', () => {
         abgefragt += 1;
@@ -1011,5 +989,174 @@ describe('UeberblickPage', () => {
       expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze$/);
       expect(localStorage.length).toBe(0);
     });
+  });
+});
+
+/**
+ * Modulgrenze der Quellen (LFH-669, Spec `modul-freigabe`, „Keine Anfrage an ein nicht
+ * freigegebenes Modul"): der Überblick fragt die Liste eines fremden Moduls nur bei Freigabe des
+ * Servers an. Gesperrt ist kein Ausfall und kein leerer Bestand — die Zahl fehlt mit Grund. Die
+ * Tests zählen die Requests mit: „nichts gezeigt" allein belegte nicht, dass nichts geladen wurde.
+ */
+describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
+  const GEBUNDEN = [
+    '/api/einsaetze/1/personen',
+    '/api/einsaetze/1/personal',
+    '/api/einsaetze/1/fahrzeuge',
+    '/api/einsaetze/1/material',
+    '/api/einsaetze/1/einheiten',
+    '/api/einsaetze/1/abschnitte',
+    '/api/einsaetze/1/gefahrengebiete',
+    '/api/einsaetze/1/auftraege',
+    '/api/einsaetze/1/erinnerungen',
+    '/api/einsaetze/1/etb',
+    '/api/einsaetze/1/meldungen/rueckmeldungen',
+  ];
+
+  /**
+   * Volle Daten; `freigaben` je Fall (`'fehler'` = 500, `'haengt'` = antwortet nie). Die Zähler
+   * antworten nicht selbst (MSW fällt auf den Daten-Handler von `stelleBereit` durch).
+   */
+  function mitFreigaben(
+    freigaben: Record<string, Partial<ModulFreigabe>> | 'fehler' | 'haengt',
+    weitere: Parameters<typeof server.use> = [],
+  ) {
+    const aufrufe: Record<string, number> = {};
+    stelleBereit(volleDaten, [
+      ...weitere,
+      ...GEBUNDEN.map((pfad) =>
+        http.get(pfad, () => {
+          aufrufe[pfad] = (aufrufe[pfad] ?? 0) + 1;
+        }),
+      ),
+      http.get('/api/einsaetze/1/modul-freigaben', async () => {
+        if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
+        if (freigaben === 'haengt') {
+          await delay('infinite');
+        }
+        return HttpResponse.json(freigabenFixture(freigaben === 'haengt' ? {} : freigaben));
+      }),
+    ]);
+    return aufrufe;
+  }
+
+  /** Die Zelle einer Kennzahl im Band — mit oder ohne Link. */
+  const zelle = (titel: string) =>
+    within(band()).getByText(titel).closest('[data-lfh="kennzahl"]') as HTMLElement;
+
+  it('gesperrte Module: keine Anfrage, „—" mit Grund statt Zahl, kein Fehlerhinweis', async () => {
+    const aufrufe = mitFreigaben({
+      personen: { zugriff: false },
+      auftraege: { zugriff: false },
+      etb: { zugriff: false },
+      meldungen: { sichtbar: false, zugriff: false },
+    });
+    rendern();
+    // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
+    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
+    expect(aufrufe['/api/einsaetze/1/personen']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/etb']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/meldungen/rueckmeldungen']).toBeUndefined();
+
+    // Betroffene: keine erfundene 0, kein „?", kein Link ins gesperrte Modul.
+    const betroffene = zelle('Betroffene');
+    expect(betroffene).toHaveTextContent('—');
+    expect(betroffene).toHaveTextContent('nicht freigegeben');
+    expect(betroffene).not.toHaveTextContent('0');
+    expect(betroffene.closest('a')).toBeNull();
+    expect(betroffene).not.toHaveTextContent('Stand unbekannt');
+
+    // Paneele des gesperrten Moduls: Grund statt „keine" und statt Ausfall.
+    const auftraege = paneel('Offene Aufträge');
+    expect(within(auftraege).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
+    expect(within(auftraege).queryByText('Keine offenen Aufträge.')).toBeNull();
+    const entscheidungen = paneel(/Entscheidungen/);
+    expect(within(entscheidungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
+    expect(within(entscheidungen).queryByText(/Noch keine Entscheidung/)).toBeNull();
+    // Kein Sprung ins gesperrte ETB.
+    expect(within(entscheidungen).queryByRole('link', { name: /Einsatztagebuch/ })).toBeNull();
+
+    // Abschnittszeile ohne Rückmeldung und ohne Aufträge, aber ohne Ausfall.
+    const zeile = await within(paneel('Einsatzabschnitte')).findByRole('link', {
+      name: /Abschnitt Nord/,
+    });
+    await waitFor(() => expect(zeile).toHaveTextContent('1/0/1//2'));
+    expect(zeile).not.toHaveTextContent(/Rückmeldung/);
+    expect(screen.queryByText(/Aufträge nicht abrufbar/)).toBeNull();
+
+    // Nirgends ein Ausfall.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText(/Stand unbekannt/)).toBeNull();
+  });
+
+  it('gesperrtes Modul mit Altstand im Cache: keine Daten aus dem Cache', async () => {
+    mitFreigaben({ personen: { zugriff: false } });
+    // Eigener Client ohne `gcTime: 0`: der Altstand muss den ersten await überleben. Literaler Key.
+    const client = new QueryClient();
+    client.setQueryData(['einsatz-personen', 1], volleDaten.personen);
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/ueberblick" element={<UeberblickPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/ueberblick', client },
+    );
+    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    const betroffene = zelle('Betroffene');
+    expect(betroffene).toHaveTextContent('nicht freigegeben');
+    expect(betroffene).not.toHaveTextContent('3');
+  });
+
+  it('solange die Freigaben laden, geht keine modulgebundene Anfrage raus', async () => {
+    const aufrufe = mitFreigaben('haengt');
+    rendern();
+    // Modul-lose Quellen laufen; die gebundenen warten und zeigen „wird abgerufen", keine Null.
+    await screen.findByText('Hochwasser Weserlauf');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
+    expect(zelle('Betroffene')).toHaveTextContent('wird abgerufen');
+    expect(within(paneel('Offene Aufträge')).getByText('wird abgerufen')).toBeInTheDocument();
+  });
+
+  it('scheitern die Freigaben, steht „Stand unbekannt" — und nichts Gebundenes wird geladen', async () => {
+    const aufrufe = mitFreigaben('fehler');
+    rendern();
+    const auftraege = await waitFor(() => paneel('Offene Aufträge'));
+    expect(await within(auftraege).findByRole('alert')).toHaveTextContent('Stand unbekannt');
+    // Kein still leeres, ruhiges Bild.
+    expect(within(auftraege).queryByText('Keine offenen Aufträge.')).toBeNull();
+    expect(zelle('Betroffene')).toHaveTextContent('Stand unbekannt');
+    for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
+  });
+
+  it('„Erneut abrufen" nach gescheiterten Freigaben fragt sie neu an, nicht die gesperrten Listen', async () => {
+    let freigabenAbrufe = 0;
+    const aufrufe = mitFreigaben({}, [
+      http.get('/api/einsaetze/1/modul-freigaben', () => {
+        freigabenAbrufe += 1;
+        return freigabenAbrufe === 1
+          ? new HttpResponse(null, { status: 500 })
+          : HttpResponse.json(freigabenFixture({ auftraege: { zugriff: false } }));
+      }),
+    ]);
+    rendern();
+    const auftraege = await waitFor(() => paneel('Offene Aufträge'));
+    await userEvent.click(await within(auftraege).findByRole('button', { name: 'Erneut abrufen' }));
+    expect(await within(auftraege).findByText('Modul nicht freigegeben.')).toBeInTheDocument();
+    expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
+  });
+
+  it('freies Modul mit echtem Ausfall bleibt ein Ausfall', async () => {
+    mitFreigaben({}, [
+      http.get('/api/einsaetze/1/personen', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    rendern();
+    await waitFor(() => expect(zelle('Betroffene')).toHaveTextContent('Stand unbekannt'));
+    expect(zelle('Betroffene')).not.toHaveTextContent('nicht freigegeben');
   });
 });
