@@ -576,8 +576,8 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
    */
   await expect(dialog, 'Dialog fertig eingeblendet').not.toHaveClass(/ant-zoom-(enter|appear)/);
 
-  // Tab-Reihenfolge im Dialog, gemessen: rc-upload hüllt den Knopf in ein `span[role=button]`
-  // — wäre das ein eigener Tab-Stopp, stünde er hier doppelt.
+  // Tab-Reihenfolge im Dialog, gemessen. rc-upload hüllt den Knopf in ein `span`, das ohne
+  // `hasControlInside` selbst `role=button` und `tabIndex` trüge; die Rückwärtsreihe prüft das.
   const beschreibe = () =>
     page.evaluate(() => {
       const e = document.activeElement;
@@ -603,18 +603,26 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
     'Abbrechen',
     'Ablegen',
   ]);
+  /*
+   * Rückwärts einen Schritt über „Datei wählen“ hinaus bis „Schließen“ (LFH-686). Die Hülle von
+   * rc-upload liegt im DOM VOR dem Knopf. Als eigener Tab-Stopp stünde sie deshalb nur hier
+   * doppelt, nicht in der Vorwärtsreihe ab dem Knopf. Mutationsprobe `hasControlInside={false}`
+   * am `Upload` von `DateiFeld`: mit fünf Schritten grün, mit sechs rot.
+   */
   const rueck: string[] = [];
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 6; i += 1) {
     await page.keyboard.press('Shift+Tab');
     rueck.push(await beschreibe());
   }
-  expect(rueck, 'rückwärts dieselbe Reihe').toEqual([
+  expect(rueck, 'rückwärts dieselbe Reihe, davor nur „Schließen“').toEqual([
     'Abbrechen',
     'Bezug (optional)',
     'Titel',
     'Kategorie',
     'Datei wählen',
+    'Schließen',
   ]);
+  await page.keyboard.press('Tab');
   await expect(dateiKnopf, 'zurück am ersten Ziel').toBeFocused();
 
   // Enter auf dem Knopf öffnet den Dateidialog — genau EIN `input.click()` je Tastendruck.
