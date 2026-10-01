@@ -27,10 +27,10 @@ Epic LFH-60).
 - **Neue devDependency `pdfjs-dist`** (nur Testwerkzeug, nicht im ausgelieferten Bundle). Sie
   muss durch `scripts/check-deps.sh`.
 - **Gate und CI:** `scripts/check-all.sh` wählt die Playwright-Projekte über `PW_PROJEKTE`
-  (Vorgabe: alle). Die vier bestehenden e2e-Shards laufen nur `chromium`. Firefox und WebKit
-  laufen in einem eigenen Job `e2e Druck Firefox/WebKit`, parallel zu den Shards. Der
-  Release wartet auch auf diesen Job, der Berichts-Job zählt fünf Teilberichte.
-  Die Shard-Zahl und ihre Check-Namen bleiben unverändert (Pin im Ruleset 17017911).
+  (Vorgabe: alle). Die vier Pflicht-Shards `e2e 1/4` … `e2e 4/4` fahren alle drei Projekte,
+  `--shard` verteilt die Firefox- und WebKit-Fälle mit. Ein roter Fall sperrt damit den PR,
+  ohne neuen Check-Namen und ohne Eintrag im Ruleset 17017911. Shard-Zahl, Check-Namen,
+  `berichte` und `release.needs` bleiben unverändert.
 - **Regeln und Prüfliste:** `frontend/src/druck/AGENTS.md` sagt nicht mehr „Firefox/Safari
   per Hand“, sondern nennt, was die Engines automatisch belegen und was weiter nur das Blatt
   zeigt. Das Browser-Verdikt der LFH-22-Prüfliste wird mit den neuen Belegen umgeschrieben.
@@ -59,12 +59,10 @@ Epic LFH-60).
   devDependency).
 - **Gate und CI:** `scripts/check-all.sh` (Schritt 7: `PW_PROJEKTE`, Vorprüfung der
   installierten Browser mit klarer Meldung), `scripts/AGENTS.md`, `.github/workflows/ci.yml`
-  (neuer Job, Shards auf `chromium`, `berichte`, `release.needs`).
-- **CI-Laufzeit:** Der kritische Pfad wächst nicht, weil der neue Job parallel zu den Shards
-  läuft. Es kommt ein Runner hinzu: Browser-Installation plus rund 26 Testfälle.
-- **Ruleset (Handgriff außerhalb des Repos):** Damit ein roter Firefox/WebKit-Lauf einen PR
-  sperrt, muss ein Mensch den neuen Check-Namen im Ruleset 17017911 als Required Check
-  eintragen. Bis dahin hält ihn nur `release.needs` vom Release fern.
+  (die e2e-Shards installieren `chromium firefox webkit`).
+- **CI-Laufzeit:** Die e2e-Shards sind heute der kritische Pfad (in PR #297 zwischen 10 und
+  23 min). Je Shard kommen schätzungsweise 2–4 min dazu: die Installation der Systempakete
+  plus der Anteil an rund 26 zusätzlichen Testfällen.
 - **Lokal:** Wer `./scripts/check-all.sh` ohne `PW_PROJEKTE` startet, braucht Firefox und
   WebKit für Playwright (`playwright install firefox webkit`). Fehlen sie, bricht Schritt 7 mit
   dieser Anweisung ab, nicht mit einem Stacktrace.

@@ -17,7 +17,9 @@ Siehe proposal.md, „Why“. Stand im Code:
   ohne `--clamav-addr`, also ein No-op). Kein e2e-Spec lädt bisher ein Logo hoch, und keiner
   sichert zu, dass keines da ist.
 - CI (`.github/workflows/ci.yml`): vier e2e-Shards `e2e 1/4` … `e2e 4/4`, deren Namen im
-  Ruleset 17017911 als Required Checks gepinnt sind. Jeder Shard installiert nur Chromium
+  Ruleset 17017911 als Required Checks gepinnt sind. Pflicht sind dort genau Schnellprüfungen,
+  Rust-Suite, e2e-Binary, Frontend-Suite 1–4/4 und e2e 1–4/4. „Testberichte zusammenführen“
+  ist es nicht (abgefragt am 01.10.2026 über `GET /repos/…/rules/branches/alpha`). Jeder Shard installiert nur Chromium
   (`playwright install --with-deps chromium`) und ruft `check-all.sh --nur e2e` mit
   `PW_SHARD`. `berichte` erwartet genau vier Playwright-Blobs, `release.needs` nennt alle
   Prüfjobs.
@@ -51,41 +53,43 @@ Siehe proposal.md, „Why“. Stand im Code:
 
 ## Decisions
 
-### D1 — Firefox und WebKit in einem eigenen CI-Job, nicht in den Shards
+### D1 — Firefox und WebKit verteilt über die vier Pflicht-Shards
 
-Ein neuer Job `e2e Druck Firefox/WebKit` (`needs: binaer`) läuft parallel zu den vier Shards.
-Er installiert nur `firefox webkit` (`--with-deps`) und ruft
-`check-all.sh --nur e2e` mit `PW_PROJEKTE=firefox,webkit`. Die Shards setzen
-`PW_PROJEKTE=chromium`. `release.needs` bekommt den neuen Job, und `berichte` lädt dessen
-Blob mit und zählt fünf statt vier.
+Die vier Shards `e2e 1/4` … `e2e 4/4` fahren alle drei Projekte in EINEM
+`playwright test --shard=k/4`. Playwright verteilt die Firefox- und WebKit-Fälle dabei mit.
+Jeder Shard installiert deshalb `chromium firefox webkit` (`--with-deps`). Kein neuer Job,
+keine neuen Check-Namen, und `berichte` (vier Blobs) sowie `release.needs` bleiben
+unverändert. Die CI setzt kein `PW_PROJEKTE`, also gilt die Vorgabe „alle“ (D2), und die CI
+prüft in Summe dasselbe wie ein lokaler Vollauf.
 
-Warum: In die Shards gemischt, verteilt Playwright die Firefox- und WebKit-Fälle nach
-Testzahl auf irgendeinen Shard. Welcher das ist, steht vorher nicht fest. Deshalb müsste
-**jeder** der vier Shards beide Browser samt Systempaketen installieren. Die apt-Pakete für
-WebKit liegen in keinem Cache, und das verlängert den kritischen Pfad aller vier Shards. Der
-eigene Job zahlt die Installation einmal und auf einem Nebenpfad.
+Warum: Ein roter Firefox/WebKit-Fall soll den PR sperren (Festlegung des Menschen,
+01.10.2026), und zwar über die CI, ohne Handgriff am Ruleset. Pflicht sind nur die oben
+genannten Checks. Ein Fall sperrt also nur, wenn er in einem dieser Jobs läuft.
 
-Preis: Der neue Check-Name ist nicht required, bis ein Mensch ihn im Ruleset 17017911
-einträgt. Bis dahin sperrt ein roter Firefox/WebKit-Lauf keinen PR, wohl aber den Release
-(`release.needs`). Diesen Handgriff kann kein Agent ausführen. Er steht als offene Aufgabe in
-tasks.md (Gruppe 6) und in der Abschlussmeldung.
+Preis: Jeder Shard zahlt die Installation, denn welcher Shard welche Fälle bekommt, hängt an
+der Testzahl und steht nicht fest. Die Browser-Dateien liegen im Playwright-Cache, dessen
+Schlüssel die Browserliste nennt. Die apt-Pakete liegen in keinem Cache. Geschätzt kommen je
+Shard 2–4 min auf den kritischen Pfad. Der gemessene Wert kommt in `pruefliste.md`.
 
 *Verworfen:*
 
-- **In die bestehenden Shards (alle Projekte, `--shard` verteilt):** sofort required und ohne
-  Ruleset-Handgriff, aber die Browser-Installation landet auf dem kritischen Pfad jedes Shards
-  (s. o.). Ist dir der Ruleset-Handgriff wichtiger als die Laufzeit, ist das die Alternative.
-  Sie kostet in tasks.md nur Gruppe 5.
+- **Eigener Job `e2e Druck Firefox/WebKit` parallel zu den Shards:** billiger in der Laufzeit,
+  aber er sperrt erst mit einem Eintrag im Ruleset 17017911. Über einen anderen Job lässt sich
+  das nicht umgehen. „Testberichte zusammenführen“ ist nicht Pflicht. Ein Pflichtjob mit
+  `needs` auf den neuen Job liefe erst nach ihm und verlängerte den Pfad stärker als die
+  Verteilung.
+- **Nur ein Shard fährt Firefox und WebKit (Zusatzschritt):** installiert nur einmal, macht
+  diesen Shard aber um die ganze Firefox/WebKit-Last länger statt um ein Viertel davon.
 - **Nächtlicher Lauf (`schedule`):** verschiebt den Befund vom PR auf den nächsten Morgen und
   sperrt weder Merge noch Release.
-- **Shard-Zahl erhöhen (5/5 mit einem Browser-Shard):** ändert alle gepinnten Check-Namen
-  (Kommentar in `ci.yml`). Jeder PR hinge auf „Expected“, bis das Ruleset nachzieht.
+- **Shard-Zahl erhöhen (5/5):** ändert alle gepinnten Check-Namen (Kommentar in `ci.yml`).
+  Jeder PR hinge auf „Expected“, bis das Ruleset nachzieht.
 
 ### D2 — `PW_PROJEKTE` in `check-all.sh`, Vorgabe alle Projekte
 
 Schritt 7 reicht `PW_PROJEKTE` als `--project=<name>` je Eintrag an `playwright test` weiter.
 Ohne Variable laufen alle Projekte, damit ein lokaler Vollauf dasselbe prüft wie die CI in
-Summe. Vor dem Lauf prüft Schritt 7, ob die Browser der gewählten Projekte installiert sind.
+Summe (D1: die CI setzt die Variable nicht). Lokal wählt man damit z. B. nur `chromium`. Vor dem Lauf prüft Schritt 7, ob die Browser der gewählten Projekte installiert sind.
 Dazu fragt er Playwright nach dem Pfad der ausführbaren Datei
 (`chromium|firefox|webkit.executablePath()`). Fehlt einer, bricht der Schritt mit der
 Anweisung `pnpm -C frontend exec playwright install firefox webkit` ab, statt dass jeder
@@ -188,15 +192,17 @@ nachgezogen.
   Vite-Kaltstart)] → Die Fälle nutzen dieselben Helfer wie in Chromium. Was dabei auffällt, ist
   ein eigener Befund. Er wird nicht in den Druckfall eingeschmiert, sondern bei Bedarf als
   ClickUp-Task angelegt.
-- [`etb-druck` sät 510 Einträge, im lokalen Vollauf dreimal parallel auf derselben SQLite] →
-  Die 503-Wiederholung im Seeding gibt es schon. Die Frist von 240 s gilt je Fall. In der CI
-  laufen Firefox und WebKit im eigenen Job, nicht neben den Chromium-Shards.
+- [`etb-druck` sät 510 Einträge, bis zu dreimal parallel auf derselben SQLite (lokal und, je
+  nach Verteilung, im selben Shard)] → Die 503-Wiederholung im Seeding gibt es schon. Die Frist
+  von 240 s gilt je Fall. Wird ein Shard dadurch rot, ist das ein Befund, kein Anlass für eine
+  längere Frist.
+- [Die Shards werden länger (D1)] → Der Wert wird je Shard gemessen und steht in
+  `pruefliste.md`. Liegt er deutlich über 4 min, geht die Frage zurück an den Menschen, bevor
+  der PR gemergt wird.
 - [Lokal fehlen Firefox und WebKit (auch in dieser Cloud-Umgebung)] → D2 bricht mit klarer
   Anweisung ab. Für die Umsetzung hier wird `playwright install firefox webkit` versucht
   (nur diese beiden; Chromium bleibt aus `/opt/pw-browsers`). Scheitert das am Netz oder an
   den Systempaketen, belegt erst die CI des PRs die beiden Projekte, und das wird so gemeldet.
-- [Der neue Check ist nicht required (D1)] → `release.needs` sperrt den Release. Der
-  Ruleset-Eintrag steht als offener Handgriff in tasks.md und in der Abschlussmeldung.
 - [`pdfjs-dist` bekommt ein `high`-Advisory] → `check-deps.sh` wird rot, wie bei jeder anderen
   Abhängigkeit, und der Fund wird nach der Regel in `pnpm-workspace.yaml` behoben. Da das Paket
   nur im Test liest, ist die Fläche klein.
@@ -204,5 +210,5 @@ nachgezogen.
 ## Migration Plan
 
 Kein Daten- oder Laufzeitwechsel. Reihenfolge im PR: Abhängigkeit, Config und Spec, Gate, CI.
-Rückweg: Den neuen Job aus `ci.yml` nehmen und `PW_PROJEKTE=chromium` stehen lassen. Die
-Chromium-Fälle bleiben dann unverändert wirksam.
+Rückweg: In den Shards `PW_PROJEKTE: chromium` setzen und die Installation wieder auf
+`chromium` stellen. Die Chromium-Fälle bleiben dann unverändert wirksam.

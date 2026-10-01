@@ -61,12 +61,12 @@
       Kopf des Skripts und `scripts/AGENTS.md` nennen die Variable. Prüfen:
       `PW_PROJEKTE=chromium ./scripts/check-all.sh --nur e2e` grün. Mit absichtlich falschem
       Browserpfad bricht der Schritt mit der Installationsanweisung ab.
-- [ ] 5.2 `.github/workflows/ci.yml`: Shards mit `PW_PROJEKTE: chromium`. Neuer Job
-      `e2e Druck Firefox/WebKit` (`needs: binaer`, Installation `firefox webkit --with-deps`,
-      eigener Playwright-Cache-Schlüssel, Blob `playwright-blob-druck-browser`). `berichte`
-      lädt fünf Blobs und zählt sie, und `release.needs` nennt den Job. Shard-Zahl und
-      Shard-Namen bleiben unverändert. Prüfen: YAML lädt (`python3 -c 'import yaml…'`), der
-      Diff zeigt keine geänderten `name:`-Zeilen der Shards.
+- [ ] 5.2 `.github/workflows/ci.yml`: Die e2e-Shards installieren
+      `chromium firefox webkit --with-deps`, mit Playwright-Cache-Schlüssel samt Browserliste.
+      Sie setzen kein `PW_PROJEKTE`. Kein neuer Job, Shard-Zahl, Shard-Namen, `berichte` und
+      `release.needs` bleiben unverändert, und die Kommentare im Kopf und am Shard-Job nennen
+      den Grund (D1). Prüfen: YAML lädt (`python3 -c 'import yaml…'`), und der Diff zeigt keine
+      geänderte `name:`-Zeile. Nach dem PR-Lauf die Laufzeit je Shard in `pruefliste.md`.
 
 ## 6. Regeln und Prüfliste
 
@@ -79,14 +79,10 @@
       `docs/superpowers/specs/2026-09-25-lfh-22-pruefliste.md` umschreiben (D6) und den
       Kommentar in `pages/kraefteuebersichtPrint.css` nachziehen. Prüfen: `grep -rn "LFH-729"`
       zeigt keine Zelle mehr mit „automatisiert in LFH-729“ als offenem Verweis.
-- [ ] 6.3 Ruleset-Handgriff festhalten: ClickUp-Task (Skill `clickup-task-anlegen`) „Check
-      `e2e Druck Firefox/WebKit` im Ruleset 17017911 als Required Check eintragen“, zugewiesen an
-      den Menschen. Prüfen: Die Task-ID steht in `pruefliste.md` und im PR.
-
 ## 7. Abschluss
 
 - [ ] 7.1 `./scripts/check-all.sh` lokal grün (ohne `| tail`). Fehlen Firefox und WebKit lokal
       (1.2), dann mit `PW_PROJEKTE=chromium`, und das wird im PR gesagt. Die CI des PRs
-      ist grün, einschließlich `e2e Druck Firefox/WebKit`, auf diesen Lauf verweisen.
+      ist grün, die Shards `e2e 1/4` … `4/4` samt Firefox- und WebKit-Fällen, auf diesen Lauf verweisen.
 - [ ] 7.2 Review: `superpowers:requesting-code-review` und
       `superpowers:verification-before-completion`. Bestätigte Findings sind behoben.
