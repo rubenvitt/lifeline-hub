@@ -245,3 +245,13 @@ Updater-Schlüssel wie im Release. Die Dateien sind danach aus git wiederhergest
 Befund Translocation: Das betrifft jede Mac-App, die sich selbst ersetzt, und nicht die
 Signierung. Es trifft nur, wer die App direkt aus „Downloads“ oder aus dem geöffneten `.dmg`
 startet statt aus „Programme“. Die Betriebsdoku sagt das jetzt ausdrücklich.
+
+### Erststart auf einem fremden Mac (Task 5.1, 01.10.2026)
+
+Frische macOS-VM in Parallels, die die App nie gesehen hat. Das lokal notarisierte `.dmg` (Bau
+aus „Nachweise“, gestapelt) hat die VM (`10.211.55.7`) um 11:17:37 per Safari vom Host geladen,
+die Quarantäne war also gesetzt (Zugriffsprotokoll des Host-Servers). App nach „Programme“
+gezogen und gestartet: Ruben bestätigt „funktioniert alles“, also kein „kann nicht geöffnet
+werden“ und kein Umweg über „Datenschutz & Sicherheit“. Den genauen Wortlaut der Rückfrage hat
+niemand festgehalten. Das `.dmg` aus dem CI-Lauf (Task 4.2) ist auf demselben Weg entstanden
+wie dieses.
