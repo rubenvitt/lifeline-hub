@@ -299,6 +299,110 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
 });
 
+/**
+ * LFH-654 (Prüfliste LFH-632, Zeilen 1 · 3 und 2 · 3): was jsdom nicht tragen kann — echter
+ * Upload-Fortschritt aus dem Browser, die Prüfphase nach dem letzten Byte und der
+ * Entfernen-Zustand bis zur Serverantwort.
+ *
+ * Die Strecke drosselt CDP (`Network.emulateNetworkConditions`, nur Chromium): wenig
+ * Upload-Bandbreite für den Prozentlauf, hohe Latenz für die Prüfphase — die Antwort kommt
+ * Sekunden nach dem letzten Byte. Eine Route (`page.route`) taugt für die Prüfphase NICHT:
+ * solange Playwright die Anfrage festhält, meldet Chromium keinerlei Upload-Ereignis (gemessen).
+ * Die Zahl im Balken muss mindestens zweimal ZWISCHEN 0 und 100 stehen — sonst wäre sie nur ein
+ * Endzustand, kein Fortschritt.
+ */
+test('Rückmeldung: Fortschritt, Prüfphase und Entfernen-Zustand (LFH-654)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Ablage Fortschritt ${Date.now()}`);
+  await page.goto(`/einsaetze/${einsatzId}/dokumente`);
+  await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
+
+  // ── 1 · Prozent aus den Bytes, unter gedrosselter Strecke ─────────────────────────────
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Network.enable');
+  await cdp.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 3_000, // die Antwort trifft Sekunden nach dem letzten Byte ein → Prüfphase
+    downloadThroughput: -1,
+    uploadThroughput: 256 * 1024, // Bytes/s: 2 MiB brauchen rund 8 s
+  });
+  const gross = Buffer.concat([Buffer.from('%PDF-1.4 e2e '), Buffer.alloc(2 * 1024 * 1024, 32)]);
+
+  await page.getByRole('button', { name: 'Dokument ablegen' }).click();
+  const dialog = ablegenDialog(page);
+  await dialog
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'Lageplan Gross.pdf', mimeType: 'application/pdf', buffer: gross });
+  await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
+  await waehleOption(page, 'Lagekarte/Plan');
+  await dialog.getByRole('button', { name: 'Ablegen' }).click();
+
+  const balken = dialog.getByRole('progressbar');
+  await expect(balken, 'der Balken steht sofort, noch vor dem ersten Byte').toBeVisible();
+  const zwischenwerte = new Set<number>();
+  await expect
+    .poll(
+      async () => {
+        const wert = Number(await balken.getAttribute('aria-valuenow'));
+        if (wert > 0 && wert < 100) zwischenwerte.add(wert);
+        return zwischenwerte.size;
+      },
+      { message: 'der Balken steht mindestens zweimal zwischen 0 und 100 %', timeout: 30_000 },
+    )
+    .toBeGreaterThanOrEqual(2);
+  // Das sichtbare Etikett (die Ansage-Region daneben spricht nur in 10-%-Schritten).
+  await expect(
+    dialog.locator('[aria-hidden="true"]', { hasText: /^Wird hochgeladen · \d+ %$/ }),
+  ).toBeVisible();
+  const pruefBalken = dialog.getByRole('progressbar', { name: 'Datei wird geprüft' });
+  await expect(pruefBalken, 'nach dem letzten Byte: Prüfphase ohne Zahl').toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(pruefBalken).not.toHaveAttribute('aria-valuenow');
+  await expect(dialog.getByText(/%/)).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: /Ablegen/ })).toHaveClass(/ant-btn-loading/);
+  await expect(dialog, 'nach dem Erfolg schließt der Dialog').toBeHidden({ timeout: 60_000 });
+  await cdp.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
+  test.info().annotations.push({
+    type: 'Zwischenwerte',
+    description: [...zwischenwerte].sort((a, b) => a - b).join(', '),
+  });
+  await expect(page.getByRole('link', { name: 'Lageplan Gross' })).toBeVisible();
+
+  // ── 2 · Entfernen: Zeile steht mit „wird entfernt“ bis zur Serverantwort ─────────────
+  await seedeDokument(page, einsatzId, 'Foto Zufahrt', 'foto', 'Foto Zufahrt.jpg', JPG);
+  await expect(page.getByRole('link', { name: 'Foto Zufahrt' })).toBeVisible();
+  let loeschFrei!: () => void;
+  const loeschen = new Promise<void>((res) => (loeschFrei = res));
+  await page.route(`**/api/einsaetze/${einsatzId}/dokumente/*`, async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback();
+    await loeschen;
+    await route.continue();
+  });
+  await page.getByRole('button', { name: 'Dokument Foto Zufahrt entfernen' }).click();
+  await page
+    .locator('.ant-popconfirm:not(.ant-popover-hidden)')
+    .getByRole('button', { name: 'Entfernen' })
+    .click();
+  const zeile = page.locator('tr', { has: page.getByRole('link', { name: 'Foto Zufahrt' }) });
+  await expect(zeile, 'die Zeile steht und trägt den Zusatz').toContainText('wird entfernt');
+  await expect(zeile.getByRole('button', { name: 'Dokument Foto Zufahrt entfernen' })).toHaveClass(
+    /ant-btn-loading/,
+  );
+  const andere = page.locator('tr', { has: page.getByRole('link', { name: 'Lageplan Gross' }) });
+  await expect(andere).not.toContainText('wird entfernt');
+  loeschFrei();
+  await expect(page.getByRole('link', { name: 'Foto Zufahrt' })).toHaveCount(0);
+  await expect(page.getByText('wird entfernt')).toHaveCount(0);
+});
+
 test('Bearbeiten: Titel und Kategorie ändern, Datei bleibt, ETB weist die Änderung nach', async ({
   page,
 }) => {
