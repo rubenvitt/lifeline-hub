@@ -12,7 +12,7 @@ mod common;
 
 async fn setup() -> axum::Router {
     let pool = db::test_pool().await;
-    dev_seed(&pool).await.unwrap();
+    dev_seed(&pool, "admin").await.unwrap();
     build_router(common::test_state(&pool, &LiveHub::new()))
 }
 

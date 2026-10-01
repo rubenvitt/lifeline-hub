@@ -63,6 +63,11 @@ pub const SEED_BENUTZER: &[DevBenutzer] = &[
 /// reproduzierbar sind.
 const SEED_ORG_NAME: &str = "Entwicklung";
 
+/// Wer die Seed-Einsätze anlegt und den abgeschlossenen abschließt. Über ihn bestimmt
+/// `einsatz::repo::anlegen` die Organisation der Einsätze (LFH-232), und er wird dort
+/// Einsatzleitung — wie beim Anlegen im Betrieb.
+const SEED_ERSTELLER: &str = "leitung";
+
 /// Seed-Einsätze: (bezeichnung, stichwort, status). `bezeichnung` ist der
 /// natürliche Schlüssel für die Idempotenz.
 const SEED_EINSAETZE: &[(&str, &str, &str)] = &[
@@ -72,24 +77,36 @@ const SEED_EINSAETZE: &[(&str, &str, &str)] = &[
 ];
 
 /// Legt reproduzierbare Dev-Testdaten an, idempotent. Läuft in `main` NACH `bootstrap_admin` und
-/// nutzt dessen Organisation; die Seed-Benutzer werden per Upsert auf den Dev-Stand gesetzt.
-pub async fn dev_seed(pool: &SqlitePool) -> Result<(), AppError> {
-    let org_id = organisation_anlegen(pool).await?;
+/// nutzt die Organisation des Admins `admin_benutzername`; die Seed-Benutzer werden per Upsert
+/// auf den Dev-Stand gesetzt. Einsätze und ETB-Einträge entstehen über die Repo-Wege des
+/// Betriebs (LFH-736), nicht über rohes SQL.
+pub async fn dev_seed(pool: &SqlitePool, admin_benutzername: &str) -> Result<(), AppError> {
+    let org_id = organisation_bestimmen(pool, admin_benutzername).await?;
     benutzer_seeden(pool, org_id).await?;
     einsaetze_seeden(pool, org_id).await?;
-    mitgliedschaften_seeden(pool).await?;
-    etb_seeden(pool).await?;
+    mitgliedschaften_seeden(pool, org_id).await?;
+    etb_seeden(pool, org_id).await?;
     Ok(())
 }
 
-/// Liefert die id der (einzigen) Organisation; legt sie an, falls keine existiert.
-async fn organisation_anlegen(pool: &SqlitePool) -> Result<i64, AppError> {
-    if let Some(id) =
-        sqlx::query_scalar::<_, i64>("SELECT id FROM organisation ORDER BY id LIMIT 1")
-            .fetch_optional(pool)
-            .await?
-    {
-        return Ok(id);
+/// Liefert die Organisation des Admins aus `bootstrap_admin`, ohne ihn die des Seed-Erstellers
+/// aus einem früheren Lauf (anderer `admin_benutzername` an derselben DB); erst wenn es beide
+/// nicht gibt (Tests ohne Bootstrap), wird die Dev-Organisation angelegt. Nicht
+/// `ORDER BY id LIMIT 1` (LFH-736): mit einer zweiten Organisation landeten die Seed-Benutzer
+/// und ihre Einsätze in einer fremden.
+async fn organisation_bestimmen(
+    pool: &SqlitePool,
+    admin_benutzername: &str,
+) -> Result<i64, AppError> {
+    for benutzername in [admin_benutzername, SEED_ERSTELLER] {
+        if let Some(id) =
+            sqlx::query_scalar::<_, i64>("SELECT org_id FROM benutzer WHERE benutzername = ?")
+                .bind(benutzername)
+                .fetch_optional(pool)
+                .await?
+        {
+            return Ok(id);
+        }
     }
     let id =
         sqlx::query_scalar::<_, i64>("INSERT INTO organisation (name) VALUES (?) RETURNING id")
@@ -138,34 +155,67 @@ const SEED_MITGLIEDSCHAFTEN: &[(&str, &str, &str)] = &[
     ("Verkehrsunfall B27", "mitglied", "fuehrungspersonal"),
 ];
 
-/// Seedet die `SEED_EINSAETZE`. Idempotent: nur fehlende `bezeichnung`en anlegen.
+/// Die id eines Seed-Einsatzes in der Seed-Organisation. `bezeichnung` ist nur innerhalb
+/// einer Organisation eindeutig.
+async fn seed_einsatz_id(
+    pool: &SqlitePool,
+    org_id: i64,
+    bezeichnung: &str,
+) -> Result<Option<i64>, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT id FROM einsatz WHERE bezeichnung = ? AND org_id = ?")
+            .bind(bezeichnung)
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
+/// Die id eines Seed-Benutzers; er existiert, weil `benutzer_seeden` vorher läuft.
+async fn seed_benutzer_id(pool: &SqlitePool, benutzername: &str) -> Result<i64, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = ?")
+            .bind(benutzername)
+            .fetch_one(pool)
+            .await?,
+    )
+}
+
+/// Seedet die `SEED_EINSAETZE` über `einsatz::repo::anlegen` (LFH-736): Einsatznummer
+/// (LFH-617), ID oberhalb der Demo-Sperre (LFH-690), Organisation des Erstellers (LFH-232).
+/// Idempotent: nur fehlende `bezeichnung`en anlegen. Das Abschließen läuft auch für einen
+/// vorhandenen Einsatz: Anlegen und Abschließen sind zwei Transaktionen, und `abschliessen`
+/// schreibt nur an einem aktiven Einsatz.
 async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
+    let ersteller_id = seed_benutzer_id(pool, SEED_ERSTELLER).await?;
     for &(bezeichnung, stichwort, status) in SEED_EINSAETZE {
-        let existiert: Option<i64> =
-            sqlx::query_scalar("SELECT 1 FROM einsatz WHERE bezeichnung = ? AND org_id = ?")
-                .bind(bezeichnung)
-                .bind(org_id)
-                .fetch_optional(pool)
-                .await?;
-        if existiert.is_some() {
-            continue;
+        let einsatz_id = match seed_einsatz_id(pool, org_id, bezeichnung).await? {
+            Some(id) => id,
+            None => {
+                crate::einsatz::repo::anlegen(
+                    pool,
+                    crate::einsatz::repo::NeuerEinsatzDaten {
+                        bezeichnung,
+                        stichwort: Some(stichwort),
+                        einsatzart: None,
+                        begonnen_at: None,
+                    },
+                    ersteller_id,
+                )
+                .await?
+                .id
+            }
+        };
+        if status == crate::einsatz::STATUS_ABGESCHLOSSEN {
+            crate::einsatz::repo::abschliessen(pool, einsatz_id, ersteller_id).await?;
         }
-        sqlx::query(
-            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, status) VALUES (?, ?, ?, ?)",
-        )
-        .bind(org_id)
-        .bind(bezeichnung)
-        .bind(stichwort)
-        .bind(status)
-        .execute(pool)
-        .await?;
     }
     Ok(())
 }
 
 /// Seed-ETB-Einträge: (einsatz_bezeichnung, typ, inhalt, erfasser_benutzername,
 /// ereigniszeit). typ ∈ {meldung, anordnung, lage, ...}. Reihenfolge bestimmt
-/// die lfd_nr innerhalb eines Einsatzes (ab 1, lückenlos).
+/// die lfd_nr innerhalb eines Einsatzes (ab dem ETB-Startwert, lückenlos).
 const SEED_ETB: &[(&str, &str, &str, &str, &str)] = &[
     (
         "Übung Hochwasser",
@@ -206,13 +256,9 @@ const SEED_ETB: &[(&str, &str, &str, &str, &str)] = &[
 
 /// Seedet die `SEED_MITGLIEDSCHAFTEN`. Idempotent über den Primärschlüssel
 /// `(einsatz_id, benutzer_id)` via `ON CONFLICT DO NOTHING`.
-async fn mitgliedschaften_seeden(pool: &SqlitePool) -> Result<(), AppError> {
+async fn mitgliedschaften_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
     for &(einsatz_bez, benutzername, rolle) in SEED_MITGLIEDSCHAFTEN {
-        let einsatz_id: Option<i64> =
-            sqlx::query_scalar("SELECT id FROM einsatz WHERE bezeichnung = ?")
-                .bind(einsatz_bez)
-                .fetch_optional(pool)
-                .await?;
+        let einsatz_id = seed_einsatz_id(pool, org_id, einsatz_bez).await?;
         let benutzer_id: Option<i64> =
             sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = ?")
                 .bind(benutzername)
@@ -234,16 +280,13 @@ async fn mitgliedschaften_seeden(pool: &SqlitePool) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Seedet die `SEED_ETB`. Idempotent pro Einsatz: nur anlegen, wenn der
-/// Einsatz noch KEINE Einträge hat (so bleibt lfd_nr lückenlos ab 1).
-async fn etb_seeden(pool: &SqlitePool) -> Result<(), AppError> {
+/// Seedet die `SEED_ETB` über `etb::repo::anlegen` (LFH-736): `lfd_nr` ab dem ETB-Startwert
+/// des Einsatzes (LFH-133) und Funktions-Snapshot des Verfassers (LFH-615). Idempotent pro
+/// Einsatz: nur anlegen, wenn der Einsatz noch KEINE Einträge hat (so bleibt `lfd_nr`
+/// lückenlos).
+async fn etb_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
     for &(einsatz_bez, _, _) in SEED_EINSAETZE {
-        let einsatz_id: Option<i64> =
-            sqlx::query_scalar("SELECT id FROM einsatz WHERE bezeichnung = ?")
-                .bind(einsatz_bez)
-                .fetch_optional(pool)
-                .await?;
-        let Some(einsatz_id) = einsatz_id else {
+        let Some(einsatz_id) = seed_einsatz_id(pool, org_id, einsatz_bez).await? else {
             continue;
         };
 
@@ -256,29 +299,27 @@ async fn etb_seeden(pool: &SqlitePool) -> Result<(), AppError> {
             continue;
         }
 
-        let mut lfd_nr: i64 = 0;
         for &(bez, typ, inhalt, erfasser, ereigniszeit) in SEED_ETB {
             if bez != einsatz_bez {
                 continue;
             }
-            let erfasser_id: i64 =
-                sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = ?")
-                    .bind(erfasser)
-                    .fetch_one(pool)
-                    .await?;
-            lfd_nr += 1;
-            sqlx::query(
-                "INSERT INTO etb_eintrag \
-                    (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
-                 VALUES (?, ?, ?, ?, ?, ?)",
+            let erfasser_id = seed_benutzer_id(pool, erfasser).await?;
+            crate::etb::repo::anlegen(
+                pool,
+                einsatz_id,
+                erfasser_id,
+                crate::etb::repo::EintragDaten {
+                    typ,
+                    inhalt,
+                    von: None,
+                    an: None,
+                    meldeweg: None,
+                    veranlassung: None,
+                    ereigniszeit: Some(ereigniszeit),
+                    erfasst_lokal_at: None,
+                    berichtigt_eintrag_id: None,
+                },
             )
-            .bind(einsatz_id)
-            .bind(lfd_nr)
-            .bind(typ)
-            .bind(inhalt)
-            .bind(erfasser_id)
-            .bind(ereigniszeit)
-            .execute(pool)
             .await?;
         }
     }
@@ -319,7 +360,7 @@ mod tests {
         )
         .await
         .unwrap();
-        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
 
         // bootstrap_admin hat den FMS-Default-Katalog geseedet (10 Hauptstatus).
         let status: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fahrzeug_status")
@@ -354,8 +395,8 @@ mod tests {
     #[tokio::test]
     async fn einsatz_seeding_ist_idempotent() {
         let pool = crate::db::test_pool().await;
-        dev_seed(&pool).await.unwrap();
-        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
 
         let einsaetze: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz")
             .fetch_one(&pool)
@@ -380,12 +421,12 @@ mod tests {
     #[tokio::test]
     async fn mitgliedschaft_seeding_ist_idempotent() {
         let pool = crate::db::test_pool().await;
-        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
         let n1: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_mitgliedschaft")
             .fetch_one(&pool)
             .await
             .unwrap();
-        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
         let n2: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_mitgliedschaft")
             .fetch_one(&pool)
             .await
@@ -409,12 +450,12 @@ mod tests {
     #[tokio::test]
     async fn etb_seeding_ist_idempotent_und_lfd_nr_lueckenlos() {
         let pool = crate::db::test_pool().await;
-        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
         let n1: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
             .fetch_one(&pool)
             .await
             .unwrap();
-        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
         let n2: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
             .fetch_one(&pool)
             .await
@@ -441,12 +482,170 @@ mod tests {
         }
     }
 
+    /// LFH-736: Die Seed-Daten gehören zur Organisation des Bootstrap-Admins, nicht zur
+    /// ältesten der Instanz (`ORDER BY id LIMIT 1`).
+    #[tokio::test]
+    async fn seed_nutzt_die_organisation_des_bootstrap_admins() {
+        let pool = crate::db::test_pool().await;
+        let fremd: i64 =
+            sqlx::query_scalar("INSERT INTO organisation (name) VALUES ('Fremd') RETURNING id")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        crate::auth::bootstrap::bootstrap_admin(&pool, "Eigene", "chef", Some("pw"))
+            .await
+            .unwrap();
+        let eigene: i64 =
+            sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'chef'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_ne!(fremd, eigene);
+
+        dev_seed(&pool, "chef").await.unwrap();
+
+        let je_org: Vec<(i64, i64)> =
+            sqlx::query_as("SELECT org_id, COUNT(*) FROM einsatz GROUP BY org_id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            je_org,
+            vec![(eigene, 3)],
+            "alle Einsätze in der Org des Admins"
+        );
+        let leitung_org: i64 =
+            sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'leitung'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(leitung_org, eigene);
+    }
+
+    /// LFH-736: Die Einsätze entstehen über `einsatz::repo::anlegen` — mit Einsatznummer
+    /// (LFH-617) und oberhalb jeder ID, die eine entfernte Demo-Historie sperrt (LFH-690).
+    #[tokio::test]
+    async fn seed_einsaetze_tragen_nummer_und_achten_die_demo_sperre() {
+        let pool = crate::db::test_pool().await;
+        crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("pw"))
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO demo_import (org_id, einsatz_id, bericht, entfernt_at) \
+             SELECT org_id, 41, '{}', datetime('now') FROM benutzer WHERE benutzername = 'admin'",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        dev_seed(&pool, "admin").await.unwrap();
+
+        let (min_id, ohne_nummer): (i64, i64) = sqlx::query_as(
+            "SELECT MIN(id), SUM(einsatznummer_intern IS NULL OR nummer_lfd IS NULL) FROM einsatz",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(min_id > 41, "gesperrte Demo-ID wiederverwendet: {min_id}");
+        assert_eq!(
+            ohne_nummer, 0,
+            "jeder Seed-Einsatz trägt eine Einsatznummer"
+        );
+    }
+
+    /// LFH-736: Der abgeschlossene Seed-Einsatz wird über den Betriebsweg abgeschlossen, mit
+    /// Zeitpunkt und abschließender Person.
+    #[tokio::test]
+    async fn abgeschlossener_seed_einsatz_traegt_abschluss() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool, "admin").await.unwrap();
+
+        let (status, at, von): (String, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT e.status, e.abgeschlossen_at, b.benutzername FROM einsatz e \
+             LEFT JOIN benutzer b ON b.id = e.abgeschlossen_von \
+             WHERE e.bezeichnung = 'Sturmtief Abschluss'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(status, "abgeschlossen");
+        assert!(at.is_some(), "abgeschlossen_at gesetzt");
+        assert_eq!(von.as_deref(), Some(SEED_ERSTELLER));
+    }
+
+    /// LFH-736: Die Seed-ETB-Einträge entstehen über `etb::repo::anlegen` und tragen den
+    /// Funktions-Snapshot (LFH-615) ihres Verfassers.
+    #[tokio::test]
+    async fn seed_etb_traegt_funktions_snapshot() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool, "admin").await.unwrap();
+
+        let funktionen: Vec<Option<String>> = sqlx::query_scalar(
+            "SELECT t.erfasser_funktion FROM etb_eintrag t \
+             JOIN einsatz e ON e.id = t.einsatz_id \
+             JOIN benutzer b ON b.id = t.erfasser_id \
+             WHERE e.bezeichnung = 'Übung Hochwasser' AND b.benutzername = 'leitung'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert!(!funktionen.is_empty());
+        assert!(
+            funktionen.iter().all(|f| f.as_deref() == Some("EL")),
+            "Einsatzleitung schreibt als „EL“: {funktionen:?}"
+        );
+    }
+
+    /// LFH-736 (Review): Ein Admin-Name ohne Konto — etwa ein geändertes
+    /// `LIFELINE_ADMIN_USER` an einer schon geseedeten DB — legt keine neue Organisation an;
+    /// der Seed bleibt bei der seines Erstellers.
+    #[tokio::test]
+    async fn unbekannter_admin_bleibt_bei_der_org_des_erstellers() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool, "admin").await.unwrap();
+        dev_seed(&pool, "chef").await.unwrap();
+        dev_seed(&pool, "chef").await.unwrap();
+
+        let (orgs, einsaetze): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM organisation), (SELECT COUNT(*) FROM einsatz)",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((orgs, einsaetze), (1, 3));
+    }
+
+    /// LFH-736 (Review): Anlegen und Abschließen sind zwei Transaktionen. Bricht der Lauf
+    /// dazwischen ab, schließt der nächste den Einsatz nach.
+    #[tokio::test]
+    async fn liegengebliebener_abschluss_wird_nachgeholt() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool, "admin").await.unwrap();
+        sqlx::query(
+            "UPDATE einsatz SET status = 'aktiv', abgeschlossen_at = NULL, \
+             abgeschlossen_von = NULL WHERE bezeichnung = 'Sturmtief Abschluss'",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        dev_seed(&pool, "admin").await.unwrap();
+
+        let status: String = sqlx::query_scalar(
+            "SELECT status FROM einsatz WHERE bezeichnung = 'Sturmtief Abschluss'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(status, "abgeschlossen");
+    }
+
     #[tokio::test]
     async fn org_und_benutzer_seeding_ist_idempotent() {
         let pool = crate::db::test_pool().await;
 
-        dev_seed(&pool).await.unwrap();
-        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
+        dev_seed(&pool, "admin").await.unwrap();
 
         // Genau eine Organisation, egal wie oft geseedet wird.
         let orgs: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM organisation")

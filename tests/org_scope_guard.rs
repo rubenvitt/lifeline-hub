@@ -28,16 +28,9 @@ fn rust_dateien(wurzel: &Path, ziel: &mut Vec<std::path::PathBuf>) {
     }
 }
 
-/// Dateien, die das Muster bewusst behalten dürfen — mit Begründung.
-const AUSNAHMEN: &[(&str, &str)] = &[
-    // Dev-Seed baut eine Demo-Landschaft in der bestehenden Einzel-Org auf; er läuft nur
-    // über das `dev`-Feature und hat keinen handelnden Benutzer, aus dem sich eine Org
-    // ableiten ließe.
-    (
-        "src/dev/seed.rs",
-        "Dev-Seed ohne Benutzerkontext, nur mit dev-Feature",
-    ),
-];
+/// Dateien, die das Muster bewusst behalten dürfen — mit Begründung. Derzeit keine: der
+/// Dev-Seed, die letzte Ausnahme, nimmt seit LFH-736 die Org des Bootstrap-Admins.
+const AUSNAHMEN: &[(&str, &str)] = &[];
 
 #[test]
 fn keine_erste_organisation_heuristik_in_produktivem_code() {
