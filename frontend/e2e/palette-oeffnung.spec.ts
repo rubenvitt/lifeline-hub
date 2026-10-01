@@ -402,3 +402,43 @@ test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
   await expect(vorschau).toBeHidden();
   await expect(paletteInput(page)).toHaveValue('#Wasserstand');
 });
+
+/**
+ * Die Rückrichtung der Berichtigung (LFH-689): der Grundeintrag steht allein auf der Seite des
+ * Nummerncursors, seine Berichtigung nicht — der Server trägt sie trotzdem an ihm mit. Der Klick
+ * auf den Verweis öffnet die Berichtigung im ETB und schließt die Palette.
+ */
+test('→ nennt am berichtigten ETB-Eintrag „berichtigt durch Nr. …" und führt hin', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Berichtigung ${Date.now()}`);
+  const basis = `/api/einsaetze/${einsatzId}/etb`;
+  const grund = await apiPost(page, basis, {
+    typ: 'meldung',
+    inhalt: 'Pegel Nordbrücke bei vier Metern zwanzig',
+  });
+  const berichtigung = await apiPost(page, basis, {
+    typ: 'berichtigung',
+    inhalt: 'Pegel Nordbrücke richtig: drei Meter zwanzig',
+    berichtigt_eintrag_id: grund.id,
+  });
+
+  await zumModul(page, einsatzId, 'personen');
+  await suche(page, '#vier Metern');
+  await expect(page.getByRole('option', { name: /vier Metern zwanzig/ })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.keyboard.press('ArrowRight');
+
+  const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
+  const verweis = vorschau.getByRole('link', {
+    name: `berichtigt durch Nr. ${berichtigung.lfd_nr}`,
+  });
+  await verweis.click();
+  await expect(page).toHaveURL(
+    new RegExp(`/einsaetze/${einsatzId}/etb\\?eintrag=${berichtigung.id}$`),
+  );
+  await expect(paletteInput(page)).toBeHidden();
+});
