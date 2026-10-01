@@ -11,32 +11,33 @@ interface Eintrag {
 const label = (e: Eintrag) => e.name;
 
 describe('demoGruppierteOptionen', () => {
+  /** Eingang weder nach id noch nach Name sortiert: eine Sortierung im Helfer fiele auf. */
   it('stellt echte Einträge flach vorn, Demo-Einträge als Gruppe dahinter', () => {
     const optionen = demoGruppierteOptionen<Eintrag>(
       [
-        { id: 1, name: 'Anton', ist_demo: true },
-        { id: 2, name: 'Berta', ist_demo: false },
         { id: 3, name: 'Cäsar', ist_demo: true },
         { id: 4, name: 'Dora', ist_demo: false },
+        { id: 1, name: 'Anton', ist_demo: true },
+        { id: 2, name: 'Berta', ist_demo: false },
       ],
       label,
     );
-    expect(optionen.map((o) => ('value' in o ? o.value : o.title))).toEqual([2, 4, DEMO_GRUPPE]);
+    expect(optionen.map((o) => ('value' in o ? o.value : o.title))).toEqual([4, 2, DEMO_GRUPPE]);
     const gruppe = optionen[2];
-    expect('options' in gruppe && gruppe.options.map((o) => o.value)).toEqual([1, 3]);
+    expect('options' in gruppe && gruppe.options.map((o) => o.value)).toEqual([3, 1]);
   });
 
-  it('zeigt ohne Demo-Einträge keine Gruppe', () => {
+  it('zeigt ohne Demo-Einträge keine Gruppe und hält die Eingangsreihenfolge', () => {
     const optionen = demoGruppierteOptionen<Eintrag>(
       [
-        { id: 2, name: 'Berta', ist_demo: false },
         { id: 4, name: 'Dora', ist_demo: false },
+        { id: 2, name: 'Berta', ist_demo: false },
       ],
       label,
     );
     expect(optionen).toEqual([
-      { value: 2, label: 'Berta' },
       { value: 4, label: 'Dora' },
+      { value: 2, label: 'Berta' },
     ]);
   });
 

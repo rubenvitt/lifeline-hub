@@ -103,8 +103,10 @@ Label aus Text und Marke. Die drei Seiten rufen diese Funktion statt ihrer eigen
 Umrandung des Tags ist die Form. Eine Farbe gibt es nicht. Das ist kein Status, deshalb keine
 Karte in `theme/statusFarben.ts` und kein `StatusTag`. Blau scheidet aus, weil es bedient
 („Rot bedient nichts“, `frontend/AGENTS.md`). Alle Fundstellen (Kataloge, Detailköpfe,
-Auswahllisten, Einsatz-Tabellen) nutzen nur diese Komponente. Die Regel dazu steht als ein Satz
-in `src/AGENTS.md`, Abschnitt „Demo-Daten zur Laufzeit“, weil sie Client und Server betrifft.
+Auswahllisten, Einsatz-Tabellen) nutzen nur diese Komponente. Die Regel ist geteilt, wie es der
+Kopf von `src/AGENTS.md` verlangt: Die Server-Hälfte (live per `EXISTS`, kein Flag) steht in
+`src/AGENTS.md`, Abschnitt „Demo-Daten zur Laufzeit“, die Darstellung in `frontend/AGENTS.md`,
+„Farbe und Zeichen“. Ein Agent, der Seiten im Frontend ändert, lädt nur die zweite.
 
 ## Risks / Trade-offs
 

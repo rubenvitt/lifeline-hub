@@ -40,6 +40,6 @@ Code). Vor jedem „fertig“ gelten `superpowers:verification-before-completion
 
 ## 7. Regeln und Abschluss
 
-- [x] 7.1 `src/AGENTS.md`, Abschnitt „Demo-Daten zur Laufzeit“: ein Satz zur Regel. „Ist Demo“ wird nur live aus `demo_herkunft` gelesen (`ist_demo` in Stamm- und Dispositions-Antworten), angezeigt nur über `components/DemoMarke.tsx`. Verweis auf diese Change bzw. ihr Archiv. Beleg: `rg DemoMarke src/AGENTS.md` trifft.
+- [x] 7.1 Regel zweigeteilt (Review-Finding): `src/AGENTS.md`, Abschnitt „Demo-Daten zur Laufzeit“, trägt die Server-Hälfte („ist Demo“ nur live aus `demo_herkunft`, `ist_demo` in Stamm- und Dispositions-Antworten). `frontend/AGENTS.md`, „Farbe und Zeichen“, trägt die Darstellung (nur `components/DemoMarke.tsx`, Gruppierung nur über `stammdaten/demoAuswahl.tsx`). Beide verweisen auf das Archiv dieser Change. Beleg: `rg DemoMarke frontend/AGENTS.md` und `rg demo_herkunft src/AGENTS.md` treffen.
 - [ ] 7.2 `./scripts/check-all.sh` grün (Format, Lint, Typen, Codegen, Tests, OpenSpec-Archiv-Wächter). Beleg: Ausgabe des Laufs bzw. die CI des PRs.
 - [ ] 7.3 Prüfung im laufenden Stack (`cargo run --features dev-seeds -- --demo-daten`, Vite-Dev-Server): importieren, Fahrzeugkatalog zeigt „Demo“, in einem echten Einsatz steht die Gruppe „Demo-Daten“ am Ende der Fahrzeugauswahl, ein disponiertes Demo-Fahrzeug zeigt „Demo“ in der Tabelle, nach dem Entfernen ist die Marke am behaltenen Fahrzeug weg. Beleg: Notiz mit dem Ergebnis im PR.

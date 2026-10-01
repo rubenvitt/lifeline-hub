@@ -720,6 +720,10 @@ mod tests {
         let demo = anlegen(&pool, 1, daten("Florian Demo")).await.unwrap();
         let echt = anlegen(&pool, 1, daten("Florian Echt")).await.unwrap();
         crate::demo::test_hilfen::demo_markieren(&pool, 1, "fahrzeug", demo.id).await;
+        // Dieselbe ID unter den anderen Tabellen markiert: ohne den Filter `dh.tabelle`
+        // meldete auch echt Demo.
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "personal", echt.id).await;
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "material", echt.id).await;
 
         for nur_im_dienst in [false, true] {
             let alle = liste(&pool, 1, nur_im_dienst).await.unwrap();

@@ -892,9 +892,13 @@ mod tests {
             .await
             .unwrap();
         crate::demo::test_hilfen::demo_markieren(&pool, 1, "fahrzeug", demo.id).await;
-        let ef_demo = disponiere_stamm(&pool, einsatz, 1, demo.id, benutzer)
-            .await
-            .unwrap();
+        // Dieselbe ID unter den anderen Tabellen markiert: ohne den Filter `dh.tabelle`
+        // meldete auch echt Demo.
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "personal", echt.id).await;
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "material", echt.id).await;
+        // Erst das echte, dann das Demo-Stück disponieren: so trägt die Disposition des
+        // Demo-Stücks eine andere ID als sein Stamm, und `datensatz_id = ef.id` statt
+        // `ef.fahrzeug_id` fiele auf.
         let ef_echt = disponiere_stamm(&pool, einsatz, 1, echt.id, benutzer)
             .await
             .unwrap();
@@ -913,6 +917,10 @@ mod tests {
         )
         .await
         .unwrap();
+        let ef_demo = disponiere_stamm(&pool, einsatz, 1, demo.id, benutzer)
+            .await
+            .unwrap();
+        assert_ne!(ef_demo, demo.id, "Vorbedingung: IDs entkoppelt");
 
         for einsatz_aktiv in [true, false] {
             let alle = liste(&pool, einsatz, einsatz_aktiv).await.unwrap();

@@ -51,5 +51,6 @@ _keine_
 - **Frontend:** neue gemeinsame Marke in `components/`, `stammdaten/*Tab.tsx`,
   `stammdaten/{Fahrzeug,Personal}DetailPage.tsx`, `pages/{Fahrzeuge,Personal,Material}Page.tsx`
   sowie die Fixtures der Tests, die diese Typen bauen.
-- **Regeln:** ein Satz im Abschnitt „Demo-Daten zur Laufzeit“ in `src/AGENTS.md`.
+- **Regeln:** ein Satz im Abschnitt „Demo-Daten zur Laufzeit“ in `src/AGENTS.md` (Server) und
+  einer unter „Farbe und Zeichen“ in `frontend/AGENTS.md` (Darstellung).
 - Keine neue Abhängigkeit, kein neuer Endpunkt, keine Rechteänderung.

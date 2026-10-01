@@ -2,7 +2,7 @@ import { Tag } from 'antd';
 
 /**
  * Marke „Demo“ an Stammdaten aus dem Demo-Import (LFH-733, Spec `demo-daten`,
- * `openspec/changes/lfh-733-demo-marke-stammdaten/design.md` D5).
+ * `openspec/changes/archive/2026-10-01-lfh-733-demo-marke-stammdaten/design.md` D5).
  *
  * Bewusst ein neutrales `Tag` ohne `color`: der Text trägt die Bedeutung (WCAG 1.4.1), die
  * Umrandung ist die Form. Es ist kein Status — deshalb keine Karte in `theme/statusFarben.ts`

@@ -4,7 +4,7 @@ import DemoMarke from '../components/DemoMarke';
 
 /**
  * Auswahllisten zum Disponieren aus den Stammdaten (LFH-733, Spec `demo-daten`, Anforderung
- * „Demo-Stammdaten in den Auswahllisten“; `openspec/changes/lfh-733-demo-marke-stammdaten/design.md`
+ * „Demo-Stammdaten in den Auswahllisten“; `openspec/changes/archive/2026-10-01-lfh-733-demo-marke-stammdaten/design.md`
  * D4): Demo-Stammdaten bleiben wählbar, tragen die `DemoMarke` und stehen gesammelt in einer
  * Gruppe hinter allen echten Einträgen. Die echten Einträge behalten die Eingangsreihenfolge
  * (das Backend sortiert).
