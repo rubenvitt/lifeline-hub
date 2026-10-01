@@ -44,6 +44,7 @@ import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
+import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import FachebeneStand from './FachebeneStand';
@@ -203,6 +204,14 @@ export interface SidebarProps {
   suchbar: KarteMarker[];
   /** Eine Quelle der Suche ist ausgefallen — dann „—" statt Zahlen, keine behauptete Leere. */
   suchbarUnvollstaendig?: boolean;
+  /**
+   * Ortssuche im selben Feld (LFH-638): Koordinate und Adresse anspringen. Eine `vorbelegung`
+   * (`?ort=`) öffnet das Paneel „Verortet“, damit die Treffer zu sehen sind.
+   */
+  ortssuche?: {
+    onOrtWaehlen: (ort: GefundenerOrt) => void;
+    vorbelegung?: { text: string; nonce: number } | null;
+  };
   darfSchreiben: boolean;
   platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
@@ -620,6 +629,13 @@ export default function Sidebar(props: SidebarProps) {
   // Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
   const zeichnenRef = useRef<HTMLDivElement>(null);
   const { setze: paneelSetzen } = paneele;
+  // Ortssuche von außen (`?ort=`): das Paneel mit dem Suchfeld öffnen, je Vorbelegung einmal.
+  const vorbelegungNonce = props.ortssuche?.vorbelegung?.nonce;
+  useEffect(() => {
+    if (vorbelegungNonce == null) return;
+    paneelSetzen('verortet', true);
+  }, [vorbelegungNonce, paneelSetzen]);
+
   useEffect(() => {
     if (!props.zeichnenAnfrage) return;
     paneelSetzen('zeichnen', true);
@@ -854,6 +870,9 @@ export default function Sidebar(props: SidebarProps) {
           onMarkerWaehlen={props.onMarkerWaehlen}
           zaehlerUnbekannt={
             sektionFehler.nichtVerortet != null || props.suchbarUnvollstaendig === true
+          }
+          ortssuche={
+            props.ortssuche ? { einsatzId: props.einsatzId, ...props.ortssuche } : undefined
           }
         />
       </KlappPaneel>

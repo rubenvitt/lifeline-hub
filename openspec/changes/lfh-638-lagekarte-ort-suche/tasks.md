@@ -41,33 +41,35 @@
 - [x] 4.1 API-Client `api/karteOrtSuche.ts` und Query-Key `einsatzKeys.ortSuche(einsatzId, begriff)`
       in `api/queryKeys.ts` (Regeln in `frontend/AGENTS.md`, Query-Keys). Prüfung: Unit-Test
       des Clients (URL-Kodierung des Suchtexts) grün.
-- [ ] 4.2 `MarkerSuche`: Gruppe „Koordinate“ aus der Eingabe (Spec „Koordinate im Suchfeld“),
+- [x] 4.2 `MarkerSuche`: Gruppe „Koordinate“ aus der Eingabe (Spec „Koordinate im Suchfeld“),
       beschriftet im wirksamen Format; Treffer als Bedienziel mit Trefflächenboden. Tests zuerst
-      in `MarkerSuche.test.tsx`: Dezimalgrad, MGRS mit WGS84-Beschriftung, „12 34“ ohne Gruppe.
+      in `MarkerSuche.ortssuche.test.tsx`: Dezimalgrad, MGRS mit WGS84-Beschriftung, „12 34“ ohne
+      Gruppe. Beschriftung über `useAnzeigeKonventionen().formatKoordinate`.
       Prüfung: Tests grün.
-- [ ] 4.3 `MarkerSuche`: Adresssuche auf Enter (D2) mit Gruppe „Adresse“, Lade-, Leer-,
+- [x] 4.3 `MarkerSuche`: Adresssuche auf Enter (D2) mit Gruppe „Adresse“, Lade-, Leer-,
       `ausgelastet`- und `nicht_erreichbar`-Zustand, Verwerfen beim Weitertippen, Direktflug bei
       genau einem Treffer (einmal je Ergebnis). Tests zuerst mit `userEvent.keyboard('{Enter}')`
       und gemocktem Client: kein Aufruf beim Tippen, kein Aufruf unter drei Zeichen, Zustände
       wörtlich nach Spec, Objektgruppen bleiben sichtbar. Prüfung: Tests grün.
-- [ ] 4.4 Leerzustand nach MODIFIED `lagekarte-objektsuche`: mit Koordinaten- oder Adressgruppe nur
+- [x] 4.4 Leerzustand nach MODIFIED `lagekarte-objektsuche`: mit Koordinaten- oder Adressgruppe nur
       der knappe Hinweis „Kein Kartenobjekt zu „…““. Prüfung: neuer Test „Koordinate ohne
       Objekttreffer“ und die bestehenden Leerzustands-Tests grün.
 
 ## 5. Frontend: Suchnadel (TDD)
 
-- [ ] 5.1 `pages/lagekarte/suchnadelLayer.ts` nach dem Muster `eigenpositionLayer.ts` (D3), samt
+- [x] 5.1 `pages/lagekarte/suchnadelLayer.ts` nach dem Muster `eigenpositionLayer.ts` (D3), samt
       Wiederherstellung nach `setStyle` in `Kartenflaeche`; keine Rolle in `ordneKlickebene`, kein
       Trefferlayer. Tests zuerst: GeoJSON aus Zustand, `null` räumt die Quelle, Guard in
       `klickziel.test.ts` bleibt grün und kennt keine Suchnadel-Rolle. Prüfung: Tests grün.
-- [ ] 5.2 Zustand `suchnadel` in `LagekartePage`, `onOrtWaehlen` setzt Nadel + `setFlyToZiel`;
-      Band in `KartenFuss` mit Beschriftung und Knopf „Suchnadel entfernen“ (`bandStil`, LFH-355).
-      Tests: `KartenFuss.test.tsx` (Band nur mit Nadel, Knopf räumt), Seiten-Test: neue Wahl ersetzt
-      die alte, Ansicht-Speichern enthält keine Nadel. Prüfung: Tests grün.
+- [x] 5.2 Zustand `suchnadel` in `LagekartePage`, `onOrtWaehlen` setzt Nadel + `setFlyToZiel`;
+      Band `SuchnadelBand` in `KartenFuss` mit Beschriftung und Knopf „Suchnadel entfernen“
+      (`bandStil`, LFH-355). Tests: `SuchnadelBand.test.tsx` (Band nur mit Nadel, Knopf räumt),
+      Seiten-Test: neue Wahl ersetzt die alte, nach dem Neuladen keine Nadel (die Nadel lebt nur im
+      Seitenzustand, kein Pfad in Ansicht oder Snapshot). Prüfung: Tests grün.
 
 ## 6. Frontend: Deeplinks
 
-- [ ] 6.1 `lagekartePfad` um `ort` erweitern (`routing/deeplinks.ts`), `?zentrum=`-Effekt setzt die
+- [x] 6.1 `lagekartePfad` um `ort` erweitern (`routing/deeplinks.ts`), `?zentrum=`-Effekt setzt die
       Suchnadel mit Koordinatenbeschriftung, neuer `?ort=`-Effekt (Vorbelegung mit Nonce,
       Adresssuche ausgelöst, Leiste per `zeige()`, Parameter geräumt) (D4). Tests: Deeplink-Test
       für `ort` (Kodierung), Seiten-Tests für beide Parameter. Prüfung: Tests grün.

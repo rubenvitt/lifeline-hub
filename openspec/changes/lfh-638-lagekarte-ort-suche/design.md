@@ -44,8 +44,10 @@ Das Feld bleibt `MarkerSuche`, bekommt aber zwei Gruppen vor den Objektgruppen: 
 Enter-Suche). Die Erkennung wird aus `command-palette/koordinatenSprung.ts` nicht kopiert, sondern
 nach `anzeige/koordinatenErkennung.ts` gehoben und von beiden importiert (Palette und Karte
 erkennen dieselben Formen, eine Quelle). Die Lagekarte reicht der Suche ein Callback
-`onOrtWaehlen({ lat, lon, beschriftung })` und das Format herein; die Suche selbst kennt die Karte
-nicht.
+`onOrtWaehlen({ lat, lon, beschriftung })` herein; die Suche selbst kennt die Karte nicht. Die
+Beschriftung kommt aus `useAnzeigeKonventionen().formatKoordinate` (dieselbe Quelle wie die übrige
+Karte). Die Adressabfrage lebt in einer Kindkomponente `AdressGruppe`, die nur bei einer laufenden
+Enter-Suche existiert: ohne Ortssuche braucht `MarkerSuche` keinen `QueryClientProvider`.
 *Alternative:* eigenes schwebendes Feld über der Karte — am Checkpoint abgewählt (neue
 Überlagerung, konkurriert am Handschirm mit Fuß und Knopfspalte).
 
