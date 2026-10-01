@@ -163,10 +163,21 @@ interface Daten {
   /** Freigaben-Abruf hängt bzw. scheitert (Freigaben unbekannt). */
   freigabenLaedt?: boolean;
   freigabenStatus?: number;
+  /**
+   * Zählt die Abrufe der modulgebundenen Listen (Schlüssel = letzter Pfadteil, Matrix =
+   * `matrix`) — „nichts angezeigt" allein belegte nicht, dass nichts angefragt wurde (LFH-669).
+   */
+  abrufe?: Record<string, number>;
 }
 
 function mockEndpunkte(d: Daten) {
-  const json = (arr?: unknown[]) => HttpResponse.json(arr ?? []);
+  const zaehle = (name: string) => {
+    if (d.abrufe) d.abrufe[name] = (d.abrufe[name] ?? 0) + 1;
+  };
+  const json = (arr?: unknown[], name?: string) => {
+    if (name) zaehle(name);
+    return HttpResponse.json(arr ?? []);
+  };
   server.use(
     http.get('/api/einsaetze/1', async () => {
       if (d.einsatzLaedt) await delay('infinite');
@@ -175,25 +186,29 @@ function mockEndpunkte(d: Daten) {
         lagekennzahlen: d.lagekennzahlen ?? einsatz.lagekennzahlen,
       });
     }),
-    http.get('/api/einsaetze/1/personen', () =>
-      d.personenStatus ? new HttpResponse(null, { status: d.personenStatus }) : json(d.personen),
-    ),
-    http.get('/api/einsaetze/1/uhs', () => json(d.uhs)),
-    http.get('/api/einsaetze/1/schaeden', () => json(d.schaeden)),
-    http.get('/api/einsaetze/1/gefahrengebiete', () =>
-      d.gefahrenStatus ? new HttpResponse(null, { status: d.gefahrenStatus }) : json(d.gefahren),
-    ),
-    http.get('/api/einsaetze/1/gefahrengebiete/:gid/matrix', ({ params }) =>
-      d.matrixStatus
-        ? new HttpResponse(null, { status: d.matrixStatus })
-        : json(d.matrix?.[Number(params.gid)]),
-    ),
-    http.get('/api/einsaetze/1/lageberichte', () => json(d.lageberichte)),
-    http.get('/api/einsaetze/1/einheiten', () => json(d.einheiten)),
-    http.get('/api/einsaetze/1/personal', () => json(d.personal)),
-    http.get('/api/einsaetze/1/fahrzeuge', () => json(d.fahrzeuge)),
-    http.get('/api/einsaetze/1/material', () => json(d.material)),
-    http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte)),
+    http.get('/api/einsaetze/1/personen', () => {
+      if (!d.personenStatus) return json(d.personen, 'personen');
+      zaehle('personen');
+      return new HttpResponse(null, { status: d.personenStatus });
+    }),
+    http.get('/api/einsaetze/1/uhs', () => json(d.uhs, 'uhs')),
+    http.get('/api/einsaetze/1/schaeden', () => json(d.schaeden, 'schaeden')),
+    http.get('/api/einsaetze/1/gefahrengebiete', () => {
+      if (!d.gefahrenStatus) return json(d.gefahren, 'gefahrengebiete');
+      zaehle('gefahrengebiete');
+      return new HttpResponse(null, { status: d.gefahrenStatus });
+    }),
+    http.get('/api/einsaetze/1/gefahrengebiete/:gid/matrix', ({ params }) => {
+      if (!d.matrixStatus) return json(d.matrix?.[Number(params.gid)], 'matrix');
+      zaehle('matrix');
+      return new HttpResponse(null, { status: d.matrixStatus });
+    }),
+    http.get('/api/einsaetze/1/lageberichte', () => json(d.lageberichte, 'lageberichte')),
+    http.get('/api/einsaetze/1/einheiten', () => json(d.einheiten, 'einheiten')),
+    http.get('/api/einsaetze/1/personal', () => json(d.personal, 'personal')),
+    http.get('/api/einsaetze/1/fahrzeuge', () => json(d.fahrzeuge, 'fahrzeuge')),
+    http.get('/api/einsaetze/1/material', () => json(d.material, 'material')),
+    http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte, 'abschnitte')),
     http.get('/api/einsaetze/1/modul-zaehler', () =>
       HttpResponse.json(
         d.zaehler ?? {
@@ -203,7 +218,7 @@ function mockEndpunkte(d: Daten) {
       ),
     ),
     http.get('/api/einsaetze/1/etb', () =>
-      d.etbStatus ? new HttpResponse(null, { status: d.etbStatus }) : json(d.etb),
+      d.etbStatus ? new HttpResponse(null, { status: d.etbStatus }) : json(d.etb, 'etb'),
     ),
     http.get('/api/einsaetze/1/pegel', () =>
       d.pegelStatus ? new HttpResponse(null, { status: d.pegelStatus }) : json(d.pegel),
@@ -314,12 +329,14 @@ function kennzahl(etikett: string, band?: string): HTMLElement {
 
 /**
  * Wartesignal „Daten sind da": die Plätze stehen schon während des Einsatz-Abrufs, deshalb am Link
- * ansetzen, den erst das Lagebild baut.
+ * ansetzen, den erst das Lagebild baut — und an der Zahl, denn modulgebundene Quellen laden erst
+ * nach den Freigaben (LFH-669), das Lagebild steht also vor ihren Daten.
  */
 function kennzahlGeladen(etikett: string): Promise<HTMLElement> {
   return waitFor(() => {
     const el = kennzahl(etikett);
     expect(el.tagName).toBe('A');
+    expect(el.querySelector('[aria-busy="true"]')).toBeNull();
     return el;
   });
 }
@@ -756,7 +773,8 @@ describe('LageDashboardPage — Kennzahlenband', () => {
         freigabenLaedt: true,
       });
       render();
-      await kennzahlGeladen('Betroffene');
+      // Nicht „Betroffene": ohne Freigaben lädt auch die Personenliste nicht (LFH-669).
+      await kennzahlGeladen('Einsatzdauer');
       const zelle = kennzahl('Evakuiert');
       expect(zelle).toHaveTextContent('wird abgerufen');
       expect(zelle.tagName).not.toBe('A');
@@ -1074,6 +1092,8 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
       http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+      // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
+      http.get('/api/einsaetze/2/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
     function Wechsel() {
@@ -1108,6 +1128,8 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
       http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+      // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
+      http.get('/api/einsaetze/2/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
     function Wechsel() {
@@ -1281,6 +1303,171 @@ describe('LageDashboardPage — Führungsstand', () => {
     await waitFor(() =>
       expect(kennzahl('Lagebericht', FUEHRUNG)).toHaveTextContent('noch nicht erstellt'),
     );
+  });
+});
+
+/**
+ * Modulgrenze des Lagebilds (LFH-669, Spec `modul-freigabe`, „Keine Anfrage an ein nicht
+ * freigegebenes Modul"): eine Liste eines fremden Moduls wird nur bei Freigabe des Servers
+ * angefragt. Gesperrt ist kein Ausfall und kein leerer Bestand — die Zahl fehlt mit Grund. Die
+ * Tests zählen die Requests mit.
+ */
+describe('LageDashboardPage — Modulgrenze des Lagebilds (LFH-669)', () => {
+  const FUEHRUNG = 'Führungsstand';
+  const wert = (z: HTMLElement) => z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent;
+  const kurzWarten = () =>
+    act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+  it('gesperrte Module: keine Anfrage, keine (auch keine gecachten) Daten, KEIN Ausfall', async () => {
+    const abrufe: Record<string, number> = {};
+    const freigabenGeliefert = { n: 0 };
+    mockEndpunkte({
+      lagekennzahlen: [],
+      abrufe,
+      freigabenGeliefert,
+      personen: [person('sk1')],
+      gefahren: [gebiet(1, 'hoch')],
+      freigaben: {
+        personen: { zugriff: false },
+        schaeden: { zugriff: false },
+        einheiten: { zugriff: false },
+        gefahrenzonen: { zugriff: false },
+        lageberichte: { zugriff: false },
+        unfallhilfsstellen: { zugriff: false },
+      },
+    });
+    // Altstand im Cache (etwa aus der Zeit vor der Sperre): er darf nicht als Lage erscheinen.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(einsatzKeys.personen(1), [person('sk1'), person(null, 'vermisst')]);
+    client.setQueryData(einsatzKeys.gefahrengebiete(1), [gebiet(1, 'akut')]);
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/lage-dashboard" element={<LageDashboardPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/lage-dashboard', client },
+    );
+    await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
+    await waitFor(() => expect(kennzahl('Betroffene')).toHaveTextContent('nicht freigegeben'));
+    await kurzWarten();
+
+    // Vorbedingung: die freien Quellen liefen — sonst wäre „kein Request" trivial.
+    expect(abrufe.personal).toBe(1);
+    for (const liste of [
+      'personen',
+      'uhs',
+      'schaeden',
+      'einheiten',
+      'gefahrengebiete',
+      'matrix',
+      'lageberichte',
+    ]) {
+      expect(abrufe[liste], liste).toBeUndefined();
+    }
+
+    // Kennzahlen: „—" mit Grund, kein Link ins gesperrte Modul, kein „Stand unbekannt".
+    for (const etikett of [
+      'Verbleib offen',
+      'Betroffene',
+      'Schäden offen',
+      'Kräfte',
+      'Vermisste',
+    ]) {
+      const z = kennzahl(etikett);
+      expect(wert(z), etikett).toBe('—');
+      expect(z, etikett).toHaveTextContent('nicht freigegeben');
+      expect(z, etikett).not.toHaveTextContent('Stand unbekannt');
+      expect(z.tagName, etikett).not.toBe('A');
+    }
+    for (const etikett of ['Lagebericht', 'UHS aktiv']) {
+      const z = kennzahl(etikett, FUEHRUNG);
+      expect(wert(z), etikett).toBe('—');
+      expect(z, etikett).toHaveTextContent('nicht freigegeben');
+      expect(z.querySelector('a'), etikett).toBeNull();
+    }
+    // Was nicht gesperrt ist, bleibt lesbar.
+    expect(kennzahl('Einsatzdauer')).toHaveTextContent(/seit /);
+
+    // Paneele: Grund statt Fehler oder Leertext, kein Weg ins gesperrte Modul.
+    const sichtung = paneel('Sichtung');
+    expect(within(sichtung).getByText('Modul Personen nicht freigegeben.')).toBeInTheDocument();
+    expect(within(sichtung).queryByText('Daten nicht abrufbar')).toBeNull();
+    expect(within(sichtung).queryByText('Noch keine Personen erfasst.')).toBeNull();
+    expect(within(sichtung).queryByRole('button')).toBeNull();
+    const matrix = paneel('Gefahrenmatrix');
+    expect(within(matrix).getByText('Modul Gefahren nicht freigegeben.')).toBeInTheDocument();
+    expect(within(matrix).queryByText('Daten nicht abrufbar')).toBeNull();
+    expect(within(matrix).queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    // Keine Warnstufe aus dem Altstand.
+    expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
+  });
+
+  it('solange die Freigaben laden: keine modulgebundene Anfrage, die Zahlen „wird abgerufen"', async () => {
+    const abrufe: Record<string, number> = {};
+    mockEndpunkte({ abrufe, freigabenLaedt: true });
+    render();
+    await kennzahlGeladen('Einsatzdauer');
+    await kurzWarten();
+    expect(abrufe).toEqual({});
+    expect(kennzahl('Betroffene')).toHaveTextContent('wird abgerufen');
+    expect(kennzahl('Kräfte')).toHaveTextContent('wird abgerufen');
+    expect(within(paneel('Sichtung')).getByLabelText('Sichtung wird geladen')).toBeInTheDocument();
+  });
+
+  it('scheitert der Freigaben-Abruf: sichtbarer Ausfall statt ruhiger Lage, keine Anfrage, „Erneut abrufen" fragt die Freigaben', async () => {
+    const abrufe: Record<string, number> = {};
+    const freigabenGeliefert = { n: 0 };
+    mockEndpunkte({ abrufe, freigabenGeliefert, freigabenStatus: 500 });
+    render();
+    await kennzahlGeladen('Einsatzdauer');
+    await waitFor(() => expect(kennzahl('Betroffene')).toHaveTextContent('Stand unbekannt'));
+    expect(kennzahl('Kräfte')).toHaveTextContent('Stand unbekannt');
+    expect(kennzahl('Schäden offen')).toHaveTextContent('Stand unbekannt');
+    const sichtung = paneel('Sichtung');
+    expect(within(sichtung).getByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(sichtung).queryByText('Noch keine Personen erfasst.')).toBeNull();
+    expect(within(paneel('Gefahrenmatrix')).getByText('Daten nicht abrufbar')).toBeInTheDocument();
+
+    const vorher = freigabenGeliefert.n;
+    await userEvent.click(within(sichtung).getByRole('button', { name: 'Erneut abrufen' }));
+    await waitFor(() => expect(freigabenGeliefert.n).toBe(vorher + 1));
+    await kurzWarten();
+    expect(abrufe).toEqual({});
+  });
+
+  it('ein freies Modul, dessen Liste scheitert, bleibt ein Ausfall wie bisher', async () => {
+    const abrufe: Record<string, number> = {};
+    mockEndpunkte({ abrufe, personenStatus: 500 });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() => expect(kennzahl('Betroffene')).toHaveTextContent('Stand unbekannt'));
+    expect(kennzahl('Betroffene')).not.toHaveTextContent('nicht freigegeben');
+    expect(abrufe.personen).toBe(1);
+    expect(within(paneel('Sichtung')).getByText('Daten nicht abrufbar')).toBeInTheDocument();
+  });
+
+  it('ETB gesperrt: der Meldungsstrom nennt den Grund, ohne Anfrage an …/etb (LFH-669)', async () => {
+    const abrufe: Record<string, number> = {};
+    const freigabenGeliefert = { n: 0 };
+    mockEndpunkte({
+      lagekennzahlen: [],
+      abrufe,
+      freigabenGeliefert,
+      etb: [etb(1)],
+      freigaben: { etb: { zugriff: false } },
+    });
+    render();
+    await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
+    const box = paneel('Meldungsstrom');
+    expect(await within(box).findByText('Modul ETB nicht freigegeben.')).toBeInTheDocument();
+    await kurzWarten();
+    // Vorbedingung: die freien Quellen liefen.
+    expect(abrufe.personal).toBe(1);
+    expect(abrufe.etb).toBeUndefined();
+    expect(within(box).queryByText('Daten nicht abrufbar')).toBeNull();
+    expect(within(box).queryByRole('button')).toBeNull();
   });
 });
 

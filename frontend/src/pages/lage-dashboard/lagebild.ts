@@ -56,6 +56,13 @@ import {
 export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
 
 /**
+ * Datenzustand einer Fläche, deren Quelle an einem Modul hängt. `gesperrt` heißt: das Modul ist
+ * für die Person nicht freigegeben (LFH-669, `useLagebild`). Das ist kein Ausfall und kein leerer
+ * Bestand — die Fläche nennt den Grund statt einer Zahl.
+ */
+export type Quellzustand = Datenzustand | 'gesperrt';
+
+/**
  * Alle Kennzahl-Etiketten, die das Band tragen kann; die Reihe eines Einsatzes wählt sechs davon
  * ({@link kennzahlReihe}).
  */

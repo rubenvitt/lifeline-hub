@@ -9,13 +9,14 @@ import { legeLageberichtAn } from '../api/lageberichte';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulFreigaben, Stab } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
+import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { auftragsStand, meldungsStand } from '../pages/lage-dashboard/fuehrungsZahlen';
 import { baueLagebild, kennzahlReihe } from '../pages/lage-dashboard/lagebild';
-import { standDer, useLagebild } from '../pages/lage-dashboard/useLagebild';
+import { useLagebild } from '../pages/lage-dashboard/useLagebild';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { quellenLaden, vorbereitungMarkdown, vorbereitungsZeilen } from './vorbereitung';
 
@@ -70,7 +71,7 @@ export default function VorbereitungPaneel({
     return () => window.clearInterval(t);
   }, []);
 
-  const { q, zustand, basis } = useLagebild(einsatzId, { mitPegel: false });
+  const { q, zustand, basis, stand: standVon } = useLagebild(einsatzId, { mitPegel: false });
   // Die Lageplätze (Pegel, Evakuiert) zeigt die Vorbereitung nicht: sie baut mit der Reihe ohne
   // Lagekennzahlen, die Kern-Kennzahlen sind dieselben wie im Dashboard.
   const lagebild = useMemo(
@@ -106,17 +107,18 @@ export default function VorbereitungPaneel({
 
   const stand = Math.min(
     ...[
-      standDer(
-        q.einsatz,
-        q.personen,
-        q.personal,
-        q.fahrzeuge,
-        q.material,
-        q.einheiten,
-        q.abschnitte,
-        q.gefahren,
-        q.lageberichte,
-        q.zaehler,
+      // Eine gesperrte Quelle zählt nicht in den Stand (LFH-669, `useLagebild`).
+      gemeinsamerDatenstand(
+        standVon('einsatz'),
+        standVon('personen'),
+        standVon('personal'),
+        standVon('fahrzeuge'),
+        standVon('material'),
+        standVon('einheiten'),
+        standVon('abschnitte'),
+        standVon('gefahren'),
+        standVon('lageberichte'),
+        standVon('zaehler'),
       ),
       stabStand,
     ].filter((s) => s > 0),

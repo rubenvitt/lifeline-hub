@@ -30,7 +30,7 @@ dann der Code. Commits und PR nennen `LFH-669`.
 
 ## 4b. Review-Nachträge
 
-- [ ] 4b.1 `pages/lage-dashboard/useLagebild.ts` (Lage-Dashboard, Stab-Vorbereitung) nach design.md D4b: jede modulgebundene Quelle nur bei Freigabe; gesperrt kein Ausfall, Freigaben-Fehler sichtbar. Verifiziert durch Tests (gesperrt → keine Anfrage, kein Hinweis; Freigaben laden → keine Anfrage; Freigaben-Fehler → Hinweis; freies Modul mit 500 → Ausfall wie bisher) und eine Mutationsprobe
+- [x] 4b.1 `pages/lage-dashboard/useLagebild.ts` (Lage-Dashboard, Stab-Vorbereitung) nach design.md D4b: jede modulgebundene Quelle nur bei Freigabe; gesperrt kein Ausfall, Freigaben-Fehler sichtbar. Verifiziert durch Tests (gesperrt → keine Anfrage, kein Hinweis; Freigaben laden → keine Anfrage; Freigaben-Fehler → Hinweis; freies Modul mit 500 → Ausfall wie bisher) und eine Mutationsprobe
 - [x] 4b.2 `pages/fuehrung/UeberblickPage.tsx` und `pages/FunkplanPage.tsx` nach design.md D4b. Verifiziert durch dieselben vier Testfälle je Seite und eine Mutationsprobe
 - [x] 4b.3 Lagekarte: der Datenstand zählt nur freigegebene Quellen (gesperrte Quelle mit Altstand im Cache). Verifiziert durch den Hook-Test „gesperrtes Modul mit Altstand im Cache“ (vorher rot: 1000 statt jünger)
 - [x] 4b.4 Warnsperre fail-safe: `useAktiveWarnung` meldet bei gescheiterten Freigaben die Warnung, ohne die Gefahrengebiete abzufragen (design.md, Risks). Verifiziert durch den Test „Freigaben gescheitert → keine Anfrage, aber die Sperre hält“ (vorher rot)

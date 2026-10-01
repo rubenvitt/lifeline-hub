@@ -36,6 +36,8 @@ interface Lagequellen {
   personenStatus?: number;
   personal?: object[];
   zaehler?: object;
+  /** Zählt die Abrufe der modulgebundenen Listen (Schlüssel = letzter Pfadteil, LFH-669). */
+  abrufe?: Record<string, number>;
 }
 const ZAEHLER = {
   auftraege: { offen: 5, in_arbeit: 2, ueberfaellig: 1 },
@@ -54,11 +56,15 @@ function rendere({
   einsatzObj = einsatz(),
   stab = leererStab as object,
   stabStatus = 200,
-  freigaben = freigabenFixture(),
+  /** `'haengt'` = antwortet nie, `'fehler'` = 500 (Freigaben unbekannt, LFH-669). */
+  freigaben = freigabenFixture() as ReturnType<typeof freigabenFixture> | 'haengt' | 'fehler',
   route = '/einsaetze/1/stab',
   post = () => HttpResponse.json(leererStab, { status: 201 }) as Response,
   lage = {} as Lagequellen,
 } = {}) {
+  const zaehle = (liste: string) => {
+    if (lage.abrufe) lage.abrufe[liste] = (lage.abrufe[liste] ?? 0) + 1;
+  };
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
@@ -70,18 +76,36 @@ function rendere({
     http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
     http.post('/api/einsaetze/1/stab/lagebesprechungen', () => post()),
-    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/1/personal', () => HttpResponse.json(lage.personal ?? [])),
-    http.get('/api/einsaetze/1/personen', () =>
-      lage.personenStatus
+    http.get('/api/einsaetze/1/modul-freigaben', () => {
+      if (freigaben === 'haengt') return new Promise<Response>(() => {});
+      if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
+      return HttpResponse.json(freigaben);
+    }),
+    http.get('/api/einsaetze/1/personal', () => {
+      zaehle('personal');
+      return HttpResponse.json(lage.personal ?? []);
+    }),
+    http.get('/api/einsaetze/1/personen', () => {
+      zaehle('personen');
+      return lage.personenStatus
         ? HttpResponse.json({ error: 'gesperrt' }, { status: lage.personenStatus })
-        : HttpResponse.json(lage.personen ?? []),
+        : HttpResponse.json(lage.personen ?? []);
+    }),
+    ...[
+      'uhs',
+      'schaeden',
+      'gefahrengebiete',
+      'lageberichte',
+      'einheiten',
+      'fahrzeuge',
+      'material',
+      'abschnitte',
+    ].map((l) =>
+      http.get(`/api/einsaetze/1/${l}`, () => {
+        zaehle(l);
+        return HttpResponse.json([]);
+      }),
     ),
-    ...['uhs', 'schaeden', 'gefahrengebiete', 'lageberichte', 'einheiten', 'fahrzeuge'].map((l) =>
-      http.get(`/api/einsaetze/1/${l}`, () => HttpResponse.json([])),
-    ),
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/modul-zaehler', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
   );
   return renderMitProviders(
@@ -528,6 +552,75 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
     expect(zeile(p, 'betroffene')).toHaveTextContent('—');
     expect(zeile(p, 'betroffene')).not.toHaveTextContent(/\b0\b/);
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
+  });
+
+  /*
+   * Modulgrenze (LFH-669, Spec `modul-freigabe`): die Vorbereitung fragt die Liste eines fremden
+   * Moduls nur bei Freigabe des Servers an. Gesperrt ist kein Ausfall, sondern „—“ mit Grund.
+   */
+  const kurzWarten = () =>
+    act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+
+  it('ein gesperrtes Modul wird nicht angefragt: „—“ mit Grund, keine 0, kein Ausfall', async () => {
+    const abrufe: Record<string, number> = {};
+    rendere({
+      freigaben: freigabenFixture({
+        personen: { zugriff: false },
+        einheiten: { zugriff: false },
+        lageberichte: { zugriff: false },
+      }),
+      lage: { abrufe, personen: [person(1)] },
+    });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'betroffene')).toHaveTextContent('nicht freigegeben'));
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
+    await kurzWarten();
+    // Vorbedingung: die freien Quellen liefen.
+    expect(abrufe.personal).toBe(1);
+    expect(abrufe.personen).toBeUndefined();
+    expect(abrufe.einheiten).toBeUndefined();
+    expect(abrufe.lageberichte).toBeUndefined();
+    for (const s of ['betroffene', 'vermisste', 'sichtung', 'kraefte', 'lagebericht']) {
+      expect(zeile(p, s), s).toHaveAttribute('data-zustand', 'gesperrt');
+      expect(zeile(p, s), s).toHaveTextContent('—');
+      expect(zeile(p, s), s).not.toHaveTextContent('nicht geladen');
+    }
+    expect(zeile(p, 'betroffene')).not.toHaveTextContent(/\b0\b/);
+  });
+
+  it('solange die Freigaben laden: keine modulgebundene Anfrage, die Zeilen „lädt“', async () => {
+    const abrufe: Record<string, number> = {};
+    rendere({ freigaben: 'haengt', lage: { abrufe } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
+    await kurzWarten();
+    expect(abrufe).toEqual({});
+    expect(zeile(p, 'betroffene')).toHaveAttribute('data-zustand', 'laden');
+    expect(zeile(p, 'kraefte')).toHaveAttribute('data-zustand', 'laden');
+  });
+
+  it('scheitert der Freigaben-Abruf: „nicht geladen“ statt ruhiger Lage, keine Anfrage', async () => {
+    const abrufe: Record<string, number> = {};
+    rendere({ freigaben: 'fehler', lage: { abrufe } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'betroffene')).toHaveTextContent('nicht geladen'));
+    await kurzWarten();
+    expect(abrufe).toEqual({});
+    for (const s of ['betroffene', 'kraefte', 'warnstufe', 'lagebericht']) {
+      expect(zeile(p, s), s).toHaveAttribute('data-zustand', 'fehler');
+      expect(zeile(p, s), s).toHaveTextContent('—');
+    }
+  });
+
+  it('ein freies Modul, dessen Liste scheitert, bleibt ein Ausfall wie bisher', async () => {
+    const abrufe: Record<string, number> = {};
+    rendere({ lage: { abrufe, personenStatus: 500 } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'betroffene')).toHaveTextContent('nicht geladen'));
+    expect(zeile(p, 'betroffene')).toHaveAttribute('data-zustand', 'fehler');
+    expect(abrufe.personen).toBe(1);
   });
 
   it('„In Lagebericht übernehmen“ legt EINEN Freitext-Bericht an und öffnet ihn', async () => {
