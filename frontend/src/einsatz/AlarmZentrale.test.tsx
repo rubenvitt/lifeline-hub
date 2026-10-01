@@ -7,6 +7,8 @@ import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate, useParams } from 'react-router';
 import AlarmZentrale from './AlarmZentrale';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
 
@@ -694,5 +696,37 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     expect(screen.getByRole('button', { name: 'Alarmton einschalten' })).toHaveTextContent(
       'Ton stumm',
     );
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`, „Zeit in Texten“): Browser auf UTC, Einsatz auf Europe/Berlin. */
+describe('AlarmZentrale — Uhrzeit der Ablösung in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('13:30 UTC erscheint im Hinweis als 15:30', async () => {
+    render(
+      <AntApp>
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <MemoryRouter initialEntries={['/einsaetze/1/start']}>
+            <Routes>
+              <Route path="/einsaetze/:id/*" element={<AlarmTestRoute mitSteuerung={false} />} />
+            </Routes>
+          </MemoryRouter>
+        </AnzeigeKonventionenProvider>
+      </AntApp>,
+    );
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:abloesung-alarm', {
+          detail: {
+            abloesung_id: 9,
+            art: 'faellig',
+            titel: 'Ablösung fällig: Florian 1',
+            faellig_at: '2026-09-22 13:30:00',
+          },
+        }),
+      );
+    });
+    expect(await screen.findByText('Ablösung fällig: Florian 1, 15:30')).toBeInTheDocument();
   });
 });

@@ -372,7 +372,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
            Einsatz nicht nur über eine Ikone laufen. */}
         <KopfRechts>
           <div data-lfh="kopf-alarm" style={kopfZelleStil(zellToken)}>
-            <AlarmZentrale einsatzId={einsatzId} />
+            {/* Eigener Provider (geteilter Query-Key, kein zweiter Abruf): der Kopf liegt außerhalb
+               des Inhalts-Providers, und der Ablösungshinweis nennt eine Uhrzeit (LFH-692). */}
+            <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+              <AlarmZentrale einsatzId={einsatzId} />
+            </EinsatzAnzeigeProvider>
           </div>
           <SyncAnzeige liveErwartet kompakt={!mittel} ruheOhneWort={!weit} />
           {mittel && <Uhr />}

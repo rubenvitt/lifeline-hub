@@ -1,10 +1,11 @@
-import { Alert, App, Button, DatePicker, Form, InputNumber } from 'antd';
+import { Alert, App, Button, Form, InputNumber } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeVorhersage, pegelSchreibScope, setzePrognose } from '../../api/pegel';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { PegelAnzeige } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useRollen } from '../../components/instrument';
@@ -133,7 +134,7 @@ export default function PegelPrognoseModal({
         name="zeitpunkt"
         rules={[{ required: true, message: 'Zeitpunkt angeben' }]}
       >
-        <DatePicker showTime format={ZEITFORMAT} style={{ width: '100%' }} />
+        <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
       </Form.Item>
       <SpeicherFehler fehler={speichern.error} titel="Prognose nicht gespeichert" />
     </ErfassungsModal>

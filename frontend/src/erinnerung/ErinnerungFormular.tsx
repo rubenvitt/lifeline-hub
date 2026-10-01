@@ -1,4 +1,6 @@
-import { Col, DatePicker, Input, InputNumber, Form, Row } from 'antd';
+import { Col, Input, InputNumber, Form, Row } from 'antd';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
 import dayjs, { type Dayjs } from 'dayjs';
 import { ErfassungsFormular } from '../components/Erfassung';
@@ -9,12 +11,7 @@ import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 
 const { TextArea } = Input;
 
-/// Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss' (rein, testbar).
-function dayjsZuWire(d: Dayjs): string {
-  return d.utc().format('YYYY-MM-DD HH:mm:ss');
-}
-
-/** Werte des Formulars (lokale Picker-Zeit vor der UTC-Wandlung). */
+/** Werte des Formulars; Zeiten sind Zeitpunkte, das Feld zeigt die Anzeigezone (LFH-692). */
 interface FormWerte {
   titel: string;
   beschreibung: string;
@@ -56,7 +53,7 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true, ein
     return onAnlegen({
       titel: w.titel.trim(),
       beschreibung: w.beschreibung?.trim() || undefined,
-      faellig_at: dayjsZuWire(w.faellig),
+      faellig_at: alsBackendZeit(w.faellig),
       intervall_minuten: w.intervall ?? undefined,
       empfaenger_funktion: empfaenger.text,
       empfaenger_funktion_code: empfaenger.funktion,
@@ -98,7 +95,7 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true, ein
             label="Fällig"
             rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
           >
-            <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+            <ZeitpunktEingabe format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>

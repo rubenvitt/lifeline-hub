@@ -1,4 +1,4 @@
-import { Collapse, DatePicker, Form, Input, InputNumber, Modal, Typography } from 'antd';
+import { Collapse, Form, Input, InputNumber, Modal, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -16,7 +16,8 @@ import type {
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
+import { ZeitpunktEingabe, ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { useBedarfsvorschlag, type Vorschlag } from './useBedarfsvorschlag';
 import { KOSTFORM_LABEL, KOSTFORMEN, sonderkostText, uhrzeit, zitat } from './verpflegungText';
 
@@ -31,7 +32,8 @@ dayjs.extend(utc);
  * in einem `Collapse` mit `forceRender`, sonst fehlen die Werte in `onFinish`.
  *
  * ZEIT: Wire-Zeiten sind UTC ohne Zone — hinaus über `alsBackendZeit`, herein über
- * `alsOrtszeit`, nie `dayjs(s)`. Ein LEERER Ausgabezeitpunkt lässt den Schlüssel weg: „jetzt"
+ * `alsZeitpunkt`, nie `dayjs(s)`; die Felder zeigen und lesen die Anzeigezone (`ZeitraumEingabe`,
+ * `ZeitpunktEingabe`, LFH-692). Ein LEERER Ausgabezeitpunkt lässt den Schlüssel weg: „jetzt"
  * setzt der Server.
  *
  * PATCH: Schlüssel fehlt = unverändert, kein `null`. Gesendet werden nur geänderte Schlüssel;
@@ -252,7 +254,7 @@ export function ZeitfensterDialog({
   const initialValues: Partial<ZeitfensterWerte> | undefined = vorher
     ? {
         bezeichnung: vorher.bezeichnung,
-        zeitraum: [alsOrtszeit(vorher.von_at)!, alsOrtszeit(vorher.bis_at)!],
+        zeitraum: [alsZeitpunkt(vorher.von_at)!, alsZeitpunkt(vorher.bis_at)!],
         bedarf_kraefte: vorher.bedarf.kraefte,
         bedarf_betreute: vorher.bedarf.betreute,
         bedarf_weitere: vorher.bedarf.weitere,
@@ -289,8 +291,7 @@ export function ZeitfensterDialog({
         label="Zeitraum"
         rules={[{ required: true, message: 'Bitte Beginn und Ende angeben' }]}
       >
-        <DatePicker.RangePicker
-          showTime
+        <ZeitraumEingabe
           format={ZEITFORMAT}
           placeholder={['Beginn', 'Ende']}
           style={{ width: '100%' }}
@@ -394,7 +395,7 @@ export function AusgabeDialog({
         <Input />
       </Form.Item>
       <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt" extra="Leer: jetzt">
-        <DatePicker showTime format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
+        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       {eingeklappt(
         'Weitere Angaben',

@@ -1,7 +1,8 @@
-import { DatePicker, Form, Input, theme } from 'antd';
+import { Form, Input, theme } from 'antd';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { parseKoordinate } from './koordinate';
 
 dayjs.extend(utc);
@@ -12,8 +13,9 @@ dayjs.extend(utc);
  *  · **Koordinate** — EIN Textfeld `52.2691/9.1342`, geprüft über `personen/koordinate.ts`.
  *    Leer ist gültig. Zerlegt wird vom Aufrufer: die Maske schickt eine leere Koordinate nicht,
  *    die Detailseite leert mit ihr das Paar.
- *  · **„vermisst seit"** — das Formular hält den WIRE-String (UTC ohne Zone), der Picker zeigt
- *    Ortszeit (`etb/filterZeit.ts`). Höchstens fünf Minuten Vorlauf wie im Backend (sonst 400).
+ *  · **„vermisst seit"** — das Formular hält den WIRE-String (UTC ohne Zone), das Feld zeigt und
+ *    liest die Anzeigezone (`ZeitpunktEingabe`, LFH-692). Höchstens fünf Minuten Vorlauf wie im
+ *    Backend (sonst 400).
  */
 
 /** Wie das Backend: höchstens fünf Minuten Vorlauf (vorgehende Geräteuhr). */
@@ -46,7 +48,7 @@ export function VermisstSeitFeld({ hinweis }: { hinweis?: string }) {
       label="vermisst seit"
       name="vermisst_seit"
       extra={hinweis}
-      getValueProps={(wert?: string) => ({ value: alsOrtszeit(wert) })}
+      getValueProps={(wert?: string) => ({ value: alsZeitpunkt(wert) ?? null })}
       normalize={(d?: dayjs.Dayjs | null) => (d ? alsBackendZeit(d) : undefined)}
       rules={[
         {
@@ -57,7 +59,7 @@ export function VermisstSeitFeld({ hinweis }: { hinweis?: string }) {
         },
       ]}
     >
-      <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+      <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
     </Form.Item>
   );
 }

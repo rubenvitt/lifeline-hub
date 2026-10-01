@@ -7,6 +7,7 @@ import utc from 'dayjs/plugin/utc';
 import type { PrognoseEingabe } from '../../api/pegel';
 import type { PegelPrognose, PegelVorhersage } from '../../api/types';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../../anzeige/format';
+import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import { standZeit, wasserstandMeter } from '../../pegel/pegelKennzahl';
 
 dayjs.extend(utc);
@@ -29,12 +30,15 @@ export function prognoseBody(w: PrognoseFormWerte): PrognoseEingabe | null {
   return { hoechststand_cm: meterAlsCm(w.hoechststand_m), zeitpunkt: w.zeitpunkt.toISOString() };
 }
 
-/** Vorbelegung zum Bearbeiten: die gespeicherte Prognose (Wire-Zeit UTC) als Formularwerte. Rein. */
+/**
+ * Vorbelegung zum Bearbeiten: die gespeicherte Prognose (Wire-Zeit UTC) als Formularwerte. Der
+ * Zeitpunkt bleibt ein Zeitpunkt; in die Anzeigezone wandelt erst das Feld (LFH-692). Rein.
+ */
 export function prognoseVorbelegung(p: PegelPrognose | null | undefined): PrognoseFormWerte {
   if (!p) return { hoechststand_m: null, zeitpunkt: null };
   return {
     hoechststand_m: p.hoechststand_cm / 100,
-    zeitpunkt: dayjs.utc(p.zeitpunkt).local(),
+    zeitpunkt: alsZeitpunkt(p.zeitpunkt) ?? null,
   };
 }
 

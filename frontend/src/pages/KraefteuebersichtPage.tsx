@@ -795,7 +795,8 @@ export default function KraefteuebersichtPage() {
 
   const uebernehmen = useMutation({
     mutationFn: async () => {
-      const stand = taktischeDtgVoll(new Date().toISOString());
+      // Stand in der Anzeigezone: die DTG landet als Text im Lagebericht (LFH-692).
+      const stand = taktischeDtgVoll(new Date().toISOString(), konventionen);
       // Der Lagebericht behält die Abschnittsgliederung: ein Meldetext wird nach Abschnitten
       // gelesen, das Raster am Schirm nach Einheiten verglichen.
       const bild = baueKraeftebild(

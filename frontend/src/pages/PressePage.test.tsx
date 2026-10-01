@@ -3,6 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../test/utils';
+import { mitProzessZone } from '../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
   ladeMedienkontakte,
@@ -223,5 +225,37 @@ describe('PressePage (LFH-554)', () => {
     setup();
     expect(await screen.findByText('Pressearbeit nicht verfügbar')).toBeInTheDocument();
     expect(ladeMedienkontakte).not.toHaveBeenCalled();
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Einsatz auf Europe/Berlin. */
+describe('PressePage — Eingang in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('ein Eingang 13:00 Berliner Zeit geht als 11:00 UTC hinaus', async () => {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <Routes>
+          <Route path="/einsaetze/:id/stab/presse" element={<PressePage />} />
+        </Routes>
+      </AnzeigeKonventionenProvider>,
+      { route: '/einsaetze/1/stab/presse' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Medienkontakt erfassen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Medium'), 'dpa');
+    await userEvent.type(within(dialog).getByLabelText('Thema'), 'Sperrung B 3');
+    await userEvent.click(within(dialog).getByText('Ansprechperson und Uhrzeit'));
+    const eingang = within(dialog).getByRole('textbox', { name: 'Eingang' });
+    await userEvent.click(eingang);
+    await userEvent.type(eingang, '30.09.2026 13:00');
+    // Enter übernimmt die Zeit und sendet (Erfassungs-Norm).
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(legeMedienkontaktAn).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ eingang_at: '2026-09-30 11:00:00' }),
+      ),
+    );
   });
 });

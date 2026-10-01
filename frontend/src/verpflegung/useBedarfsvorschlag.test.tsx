@@ -5,6 +5,8 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import type { ReactNode } from 'react';
 import { server } from '../test/server';
+import { mitProzessZone } from '../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { neuerQueryClient } from '../test/utils';
 import { erzeugeQueryClient } from '../api/queryClient';
 import type { BelegungKopfzahl, EinsatzPersonal } from '../api/types';
@@ -311,5 +313,40 @@ describe('useBedarfsvorschlag — Quelle nicht zugänglich', () => {
       betreute: { wert: null, hinweis: null },
     });
     expect(fehlerAusgabe).not.toHaveBeenCalled();
+  });
+});
+
+describe('useBedarfsvorschlag — Stand-Zeit in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('Browser UTC, Anzeigezone Europe/Berlin: „Stand“ nennt die Berliner Uhrzeit', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-24T07:58:00Z'));
+    try {
+      antworte(personal(186), kopfzahl({}));
+      const client = neuerQueryClient();
+      const { result } = renderHook(
+        () =>
+          useBedarfsvorschlag({
+            einsatzId: 7,
+            vonAt: VON,
+            freigaben: freigabenFixture(),
+            jetzt: JETZT_NACH_BEGINN,
+          }),
+        {
+          wrapper: ({ children }: { children: ReactNode }) => (
+            <QueryClientProvider client={client}>
+              <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+                {children}
+              </AnzeigeKonventionenProvider>
+            </QueryClientProvider>
+          ),
+        },
+      );
+      await waitFor(() => expect(result.current.kraefte.wert).toBe(186));
+      expect(result.current.kraefte.hinweis).toBe('Vorschlag: Personal im Einsatz, Stand 09:58');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

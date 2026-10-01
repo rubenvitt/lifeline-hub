@@ -1,4 +1,6 @@
-import { App, Col, Collapse, DatePicker, Form, Input, Row } from 'antd';
+import { App, Col, Collapse, Form, Input, Row } from 'antd';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
@@ -32,7 +34,7 @@ export interface ZielOption {
   name: string;
 }
 
-/** Werte des Formulars (lokale Picker-Zeiten, vor der UTC-Wandlung). */
+/** Werte des Formulars; Zeiten sind Zeitpunkte, das Feld zeigt die Anzeigezone (LFH-692). */
 interface FormWerte {
   /**
    * EIN Empfängerfeld für alle Sorten: strukturierte Ziele tragen den Präfix
@@ -55,11 +57,6 @@ interface FormWerte {
   richtung: Richtung;
   frist: dayjs.Dayjs | null;
   erteiltAm: dayjs.Dayjs | null;
-}
-
-/** Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss'. */
-function dayjsZuWire(d: dayjs.Dayjs | null): string | undefined {
-  return d ? d.utc().format('YYYY-MM-DD HH:mm:ss') : undefined;
 }
 
 /**
@@ -186,8 +183,8 @@ export default function AuftragFormular({
       sicherheit: w.sicherheit?.trim() || undefined,
       prioritaet: w.prioritaet,
       richtung: w.richtung,
-      frist_at: dayjsZuWire(w.frist ?? null),
-      erteilt_at: dayjsZuWire(w.erteiltAm ?? null),
+      frist_at: w.frist ? alsBackendZeit(w.frist) : undefined,
+      erteilt_at: w.erteiltAm ? alsBackendZeit(w.erteiltAm) : undefined,
       empfaenger,
     });
   };
@@ -227,7 +224,7 @@ export default function AuftragFormular({
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="erteiltAm" label="Erteilt am (mündlich/per Funk – optional)">
-            <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+            <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
           </Form.Item>
         </Col>
       </Row>
@@ -361,7 +358,7 @@ export default function AuftragFormular({
         </Col>
         <Col xs={24} sm={6}>
           <Form.Item name="frist" label="Frist (Quittung/Vollzug)">
-            <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+            <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
           </Form.Item>
         </Col>
       </Row>

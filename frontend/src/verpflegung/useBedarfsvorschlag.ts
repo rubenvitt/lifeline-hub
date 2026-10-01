@@ -14,6 +14,8 @@
 import { useQuery } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { zuWanduhr } from '../anzeige/zeitEingabe';
 import { ladeBelegungKopfzahl } from '../api/betreuung';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
@@ -86,6 +88,7 @@ export function useBedarfsvorschlag({
   const gueltig = Number.isFinite(einsatzId);
   const personalFrei = gueltig && istKeyFreigegeben('personal', freigaben);
   const betreuungFrei = gueltig && istKeyFreigegeben('betreuung', freigaben);
+  const { konventionen } = useAnzeigeKonventionen();
 
   const personalQ = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
@@ -106,7 +109,10 @@ export function useBedarfsvorschlag({
   if (personalFrei && personalQ.data && !personalQ.isError) {
     const gesamt = verdichte(personalQ.data, [], []).staerke.gesamt;
     if (gesamt > 0) {
-      const stand = dayjs(personalQ.dataUpdatedAt).format('HH:mm');
+      // Stand in der Anzeigezone, wie jede andere Uhrzeit im Dialog (LFH-692).
+      const stand = zuWanduhr(dayjs(personalQ.dataUpdatedAt), konventionen.zeitzone).format(
+        'HH:mm',
+      );
       kraefte = { wert: gesamt, hinweis: `Vorschlag: Personal im Einsatz, Stand ${stand}` };
     }
   }

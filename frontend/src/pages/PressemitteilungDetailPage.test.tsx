@@ -3,6 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../test/utils';
+import { mitProzessZone } from '../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
   aktualisierePressemitteilung,
@@ -132,5 +134,32 @@ describe('PressemitteilungDetailPage (LFH-554)', () => {
     );
     expect(screen.getByRole('button', { name: 'Folgemeldung schreiben' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Freigeben' })).toBeNull();
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Einsatz auf Europe/Berlin. */
+describe('PressemitteilungDetailPage — Zeitstand in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('der Zeitstand steht in Berlin; Speichern ohne Änderung verschiebt ihn nicht', async () => {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <Routes>
+          <Route
+            path="/einsaetze/:id/stab/presse/mitteilungen/:mitteilungId"
+            element={<PressemitteilungDetailPage />}
+          />
+        </Routes>
+      </AnzeigeKonventionenProvider>,
+      { route: '/einsaetze/1/stab/presse/mitteilungen/4' },
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
+    // 12:00 UTC → 14:00 in Berlin (Sommerzeit).
+    await waitFor(() => expect(feld).toHaveValue('30.09.2026 14:00'));
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() => expect(aktualisierePressemitteilung).toHaveBeenCalled());
+    expect(vi.mocked(aktualisierePressemitteilung).mock.calls[0]).toContainEqual(
+      expect.objectContaining({ zeitstand: '2026-09-30 12:00:00' }),
+    );
   });
 });

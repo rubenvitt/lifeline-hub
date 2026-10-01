@@ -172,8 +172,8 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
  * Blöcke sind freigegeben und sähen den Riegel nie.
  */
 describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
-  // Der Picker zeigt Ortszeit des Geräts (`alsOrtszeit`). Läuft der Test auf einer UTC-Maschine,
-  // wären Ortszeit und Wirestring gleich und die Aussage blind — die Prozesszone wird gestellt.
+  // Der Picker zeigt die Anzeigezone (Europe/Berlin), nicht die des Geräts (LFH-692). Die
+  // Prozesszone steht deshalb auf UTC: unter Berlin fielen beide zusammen und die Aussage wäre blind.
   const tzVorher = process.env.TZ;
   afterEach(() => {
     if (tzVorher === undefined) delete process.env.TZ;
@@ -181,7 +181,7 @@ describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
   });
 
   beforeEach(() => {
-    process.env.TZ = 'Europe/Berlin';
+    process.env.TZ = 'UTC';
     vi.mocked(einsaetzeApi.ladeEinstellungen).mockResolvedValue({
       einsatz_id: 1,
       zeitzone: 'Europe/Berlin',
@@ -192,7 +192,7 @@ describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
     );
   });
 
-  it('mit Schreibrecht: kein Absatz, der Picker trägt den Zeitstand in Ortszeit', async () => {
+  it('mit Schreibrecht: kein Absatz, der Picker trägt den Zeitstand in der Anzeigezone', async () => {
     vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
       id: 1,
       status: 'aktiv',
@@ -202,7 +202,8 @@ describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
     renderMitZone('/einsaetze/1/lageberichte/9');
 
     const picker = await screen.findByLabelText('Zeitstand');
-    // 12:00 UTC → 14:00 Ortszeit (Berlin, Sommerzeit). Der Wert kommt per Effekt nach dem Laden.
+    // 12:00 UTC → 14:00 in Berlin (Sommerzeit), obwohl das Gerät auf UTC steht. Der Wert kommt
+    // per Effekt nach dem Laden.
     await waitFor(() => expect(picker).toHaveValue('25.07.2026 14:00'));
     expect(screen.queryByText(/^Zeitstand: /)).toBeNull();
   });

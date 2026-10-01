@@ -1,4 +1,5 @@
-import { Button, Checkbox, Collapse, DatePicker, Flex, Form, Input } from 'antd';
+import { Button, Checkbox, Collapse, Flex, Form, Input } from 'antd';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { RefSelectProps } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useRef, useState } from 'react';
@@ -147,7 +148,7 @@ export default function AnrufErfassung({
                     extra="Leer gelassen: jetzt"
                     style={{ marginBottom: 0, flex: '1 1 200px' }}
                   >
-                    <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                    <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
                   </Form.Item>
                 </Flex>
               ),

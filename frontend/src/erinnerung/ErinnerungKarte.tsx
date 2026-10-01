@@ -11,7 +11,7 @@ import {
   abloesungPfad,
 } from '../routing/deeplinks';
 import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator } from '../kommunikation';
-import { formatZeit } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -78,6 +78,8 @@ export default function ErinnerungKarte({
   onQuittieren,
 }: ErinnerungKarteProps) {
   const { id: einsatzId } = useParams();
+  // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
+  const { formatZeit } = useAnzeigeKonventionen();
   const status = ERINNERUNG_STATUS[e.status] ?? ERINNERUNG_STATUS.offen;
   const istAbg = ansicht === 'abgeschlossen';
   // `ist_faellig` bleibt auf abgeschlossenen Erinnerungen true → Hervorhebung nur in der Offen-Ansicht.

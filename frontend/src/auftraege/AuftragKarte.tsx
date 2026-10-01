@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { Auftrag } from '../api/types';
 import { AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
-import { formatZeit } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -28,8 +28,11 @@ const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
   { key: 'erteilt_at', label: 'Erteilt am', zeit: true },
 ];
 
-/** Die gesetzten Schemafelder eines Auftrags; `erteilt_at` über formatZeit. */
-function gefuellteFelder(a: Auftrag): { label: string; wert: string }[] {
+/** Die gesetzten Schemafelder eines Auftrags; `erteilt_at` über `formatZeit` der Anzeigezone. */
+function gefuellteFelder(
+  a: Auftrag,
+  formatZeit: (wire?: string | null) => string,
+): { label: string; wert: string }[] {
   return SCHEMA_FELDER.map(({ key, label, zeit }) => {
     const roh = (a[key] ?? '') as string;
     const wert = zeit && roh ? formatZeit(roh) : roh;
@@ -67,12 +70,14 @@ export default function AuftragKarte({
   onAbnehmen,
 }: AuftragKarteProps) {
   const { rollen } = useRollen();
+  // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
+  const { formatZeit } = useAnzeigeKonventionen();
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
   const ueberfaellig = a.ist_ueberfaellig;
   // Eingangszustand (wie `MELDUNG_STATUS.neu`): der linke Rand ist vom Überfällig-Alarm belegt,
   // Gefahr gewinnt; das Etikett bleibt unberührt.
   const unbearbeitet = !!status.unbearbeitet && !ueberfaellig;
-  const details = gefuellteFelder(a);
+  const details = gefuellteFelder(a, formatZeit);
   // Der Statuschip zeigt nur QUITTIERTE Empfänger; offene stehen in der Zeile „Quittung offen:".
   // Die Zeile hängt NICHT am Schreibrecht, nur ihr Knopf — sonst verlöre ein Beobachter den Namen
   // des offenen Empfängers.

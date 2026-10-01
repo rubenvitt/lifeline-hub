@@ -8,6 +8,8 @@ import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Lagebesprechung, Stab } from '../api/types';
 import { server } from '../test/server';
+import { mitProzessZone } from '../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
 import LagebesprechungModal from './LagebesprechungModal';
 import { zeigeAbschlussToast } from './abschlussToast';
@@ -377,5 +379,43 @@ describe('LagebesprechungModal · Fehler im Modal, Erfolg im Toast', () => {
         /^\/einsaetze\/1\/etb$/,
       ),
     );
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. Termin und
+ * Zeitpunkt der Besprechung stehen in Berlin, gesendet wird derselbe absolute Zeitpunkt.
+ */
+describe('LagebesprechungModal · Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  function zeigeBerlin(daten: Stab) {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <Routes>
+          <Route path="/einsaetze/:id/stab" element={<Harness daten={daten} />} />
+        </Routes>
+      </AnzeigeKonventionenProvider>,
+      { route: '/einsaetze/1/stab' },
+    );
+    return screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
+  }
+
+  it('Termin und Zeitpunkt erscheinen mit der Berliner Uhrzeit; unverändert geht nichts verschoben hinaus', async () => {
+    const dialog = await zeigeBerlin(stab({ naechste_lagebesprechung_at: wireAb(45) }));
+    // 10:45 UTC → 12:45 Berlin; jetzt 10:00 UTC → 12:00 Berlin.
+    expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('2026-09-13 12:45');
+    expect(feld(dialog, 'Zeitpunkt der Besprechung').value).toBe('2026-09-13 12:00');
+    await absenden(dialog);
+    expect(gesendet[0]).toEqual({ entschluss: 'Lage unverändert', abgehalten_at: wireAb(0) });
+  });
+
+  it('die Schnellwahl „+1 h“ zeigt 13:00 Berlin und sendet 11:00 UTC', async () => {
+    const dialog = await zeigeBerlin(stab());
+    const u = userEvent.setup();
+    await u.click(within(dialog).getByRole('button', { name: '+1 h' }));
+    expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('2026-09-13 13:00');
+    await absenden(dialog);
+    expect(gesendet[0]).toMatchObject({ naechste_at: '2026-09-13 11:00:00' });
   });
 });

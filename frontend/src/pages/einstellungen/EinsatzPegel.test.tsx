@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { mitProzessZone } from '../../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { QueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import EinsatzPegel, { stationenAus, stationsLabel, verschiebe, wendeAn } from './EinsatzPegel';
@@ -776,5 +778,41 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
       expect(document.querySelector('[data-lfh="pegel-prognose"]')).not.toBeNull(),
     );
     expect(screen.queryByRole('button', { name: /Aktionen zu Pegel/ })).toBeNull();
+  });
+
+  /**
+   * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Einsatz auf Europe/Berlin. Der übernommene
+   * Vorschlag (06:00 Berliner Zeit) steht als 06:00 im Feld und geht als derselbe Zeitpunkt hinaus.
+   */
+  describe('in der Anzeigezone (LFH-692)', () => {
+    mitProzessZone('UTC');
+
+    it('Übernehmen zeigt 06:00 Berlin und sendet denselben Zeitpunkt', async () => {
+      stelleBereit();
+      const aufrufe = prognoseRouten([HMUE], 'ja');
+      renderMitProviders(
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <Routes>
+            <Route path="/einsaetze/:id/einstellungen/pegel" element={<EinsatzPegel />} />
+          </Routes>
+        </AnzeigeKonventionenProvider>,
+        { route: '/einsaetze/1/einstellungen/pegel' },
+      );
+      await waitFor(() => expect(zeilentitel()).toHaveLength(1));
+      await zeilenaktion('HANN. MÜNDEN', /Prognose erfassen/);
+      const vorschlag = await waitFor(() => {
+        const v = document.querySelector<HTMLElement>('[data-lfh="pegel-vorhersage"]');
+        expect(v).not.toBeNull();
+        return v!;
+      });
+      await userEvent.click(within(vorschlag).getByRole('button', { name: 'Übernehmen' }));
+      expect(screen.getByRole('textbox', { name: 'Zeitpunkt' })).toHaveValue('2099-09-23 06:00');
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() => expect(aufrufe).toHaveLength(1));
+      expect(aufrufe[0].body).toEqual({
+        hoechststand_cm: 723,
+        zeitpunkt: new Date('2099-09-23T06:00:00+02:00').toISOString(),
+      });
+    });
   });
 });

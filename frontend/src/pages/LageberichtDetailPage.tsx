@@ -3,7 +3,6 @@ import {
   Breadcrumb,
   Button,
   Checkbox,
-  DatePicker,
   Form,
   Input,
   Space,
@@ -46,7 +45,8 @@ import MedienlageUebernahme from '../stab/MedienlageUebernahme';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -57,8 +57,8 @@ import './lageberichtPrint.css';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
- * Formularwerte des Entwurfs: Titel, Zeitstand (lokale Picker-Zeit, UTC erst beim Senden —
- * `etb/filterZeit.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
+ * Formularwerte des Entwurfs: Titel, Zeitstand (Zeitpunkt, die Anzeigezone nur im Feld, UTC erst
+ * beim Senden — `anzeige/zeitEingabe.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
  */
 type FormWerte = { titel: string; zeitstand?: Dayjs } & Record<string, string | Dayjs | undefined>;
 
@@ -175,7 +175,7 @@ function LageberichtDetail() {
     istEntwurf: berichtQuery.data?.status === 'entwurf',
     form,
     werteAus: (b) => {
-      const werte: FormWerte = { titel: b.titel, zeitstand: alsOrtszeit(b.zeitstand) };
+      const werte: FormWerte = { titel: b.titel, zeitstand: alsZeitpunkt(b.zeitstand) };
       for (const a of b.abschnitte) werte[a.schluessel] = a.text;
       return werte;
     },
@@ -490,13 +490,13 @@ function LageberichtDetail() {
             >
               <Input />
             </Form.Item>
-            {/* Picker in Ortszeit, Wire in UTC — `etb/filterZeit`. */}
+            {/* Feld in der Anzeigezone, Wire in UTC — frontend/AGENTS.md, „Zeiteingabe in der
+                Anzeigezone“. */}
             <Form.Item label="Zeitstand" name="zeitstand" className="lagebericht-no-print">
               {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
                   würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die
                   DB. */}
-              <DatePicker
-                showTime
+              <ZeitpunktEingabe
                 allowClear={false}
                 format="DD.MM.YYYY HH:mm"
                 style={{ width: '100%' }}

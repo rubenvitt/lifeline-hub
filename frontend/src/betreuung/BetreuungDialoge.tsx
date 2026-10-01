@@ -1,15 +1,6 @@
-import {
-  Alert,
-  Checkbox,
-  Collapse,
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Radio,
-} from 'antd';
+import { Alert, Checkbox, Collapse, Form, Input, InputNumber, Modal, Radio } from 'antd';
 import { Typography } from 'antd';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
@@ -294,12 +285,8 @@ function zeitpunktFeld() {
       rules={[zeitRegel]}
       style={{ marginBottom: 0 }}
     >
-      <DatePicker
-        showTime
-        format={ZEITFORMAT}
-        disabledDate={(d) => d.isAfter(dayjs(), 'day')}
-        style={{ width: '100%' }}
-      />
+      {/* Uhrzeit und Kalendertag in der Anzeigezone (LFH-692); `zeitRegel` prüft den Zeitpunkt. */}
+      <ZeitpunktEingabe format={ZEITFORMAT} keineZukunftstage style={{ width: '100%' }} />
     </Form.Item>
   );
 }

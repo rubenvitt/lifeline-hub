@@ -4,12 +4,13 @@ import {
   Breadcrumb,
   Button,
   Collapse,
-  DatePicker,
   Form,
   Input,
   InputNumber,
   Space,
 } from 'antd';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -60,26 +61,8 @@ import { einsatzStatus } from '../theme/statusFarben';
 dayjs.extend(utc);
 
 /**
- * UTC-Wirestring → Dayjs für den DatePicker, in lokaler Zeit.
- *
- * `dayjs(wire)` läse den naiven Wirestring als lokale Zeit und landete auf einem anderen Instant.
- * Das `.local()` hält den Picker auf derselben Wanduhrzeit, die `ZeitAnzeige` daneben rendert
- * (`anzeige/format.ts:inZone` → `dayjs.utc(x).local()`); ein Dayjs im UTC-Modus widerspräche der
- * Zelle daneben. Nebeneffekt: antds generateConfig bleibt im Lokal-Modus, auch bei neu gewähltem
- * Wert.
- */
-export function wireZuPicker(wire: string): Dayjs {
-  return dayjs.utc(wire).local();
-}
-
-/** Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss' (rein, testbar). */
-export function pickerZuWire(d: Dayjs): string {
-  return d.utc().format('YYYY-MM-DD HH:mm:ss');
-}
-
-/**
  * Zeitpunkte gleich, wenn derselbe Instant (LFH-472, D5) — nicht dasselbe Objekt: jeder Render
- * baut über `wireZuPicker` ein frisches Dayjs, und ein Neuabruf zwischen Öffnen und Speichern
+ * baut über `alsZeitpunkt` ein frisches Dayjs, und ein Neuabruf zwischen Öffnen und Speichern
  * machte sonst aus „unverändert" einen PATCH.
  */
 export function gleicherZeitpunkt(a: Dayjs | null, b: Dayjs | null): boolean {
@@ -142,7 +125,10 @@ function TextAngabe({
   );
 }
 
-/** Ein Zeitpunkt als Zeile. Hin und zurück über `wireZuPicker`/`pickerZuWire`, keine zweite Wandlung. */
+/**
+ * Ein Zeitpunkt als Zeile. Hin über `alsZeitpunkt`, zurück über `alsBackendZeit`; das Feld zeigt
+ * und liest die Anzeigezone, in der auch `ZeitAnzeige` daneben steht (LFH-692).
+ */
 function ZeitpunktAngabe({
   etikett,
   wire,
@@ -161,18 +147,17 @@ function ZeitpunktAngabe({
   return (
     <InlineAngabe<Dayjs | null>
       etikett={etikett}
-      wert={wire ? wireZuPicker(wire) : null}
+      wert={alsZeitpunkt(wire) ?? null}
       anzeige={wire ? <ZeitAnzeige wert={wire} format="dtgVoll" /> : null}
       leer={(d) => d === null}
       gleich={gleicherZeitpunkt}
       pflicht={pflicht}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(d) => speichern(etikett, zuPatch(d ? pickerZuWire(d) : null))}
+      onSpeichern={(d) => speichern(etikett, zuPatch(d ? alsBackendZeit(d) : null))}
       eingabe={({ feld, popup, value, onChange }) => (
-        <DatePicker
+        <ZeitpunktEingabe
           {...feld}
           {...popup}
-          showTime
           format="YYYY-MM-DD HH:mm:ss"
           style={{ width: '100%' }}
           value={value}
@@ -183,7 +168,7 @@ function ZeitpunktAngabe({
   );
 }
 
-/** Werte des Bearbeiten-Formulars (begonnen_at als lokale Picker-Zeit vor der UTC-Wandlung). */
+/** Werte des Bearbeiten-Formulars (`begonnen_at` als Zeitpunkt, vor der UTC-Wandlung; LFH-692). */
 interface FormWerte {
   bezeichnung: string;
   stichwort?: string;
@@ -365,10 +350,8 @@ export default function EinsatzdatenPage() {
       meldende_stelle: einsatz.meldende_stelle ?? undefined,
       sachverhalt: einsatz.sachverhalt ?? undefined,
       anzahl_betroffene_initial: einsatz.anzahl_betroffene_initial ?? undefined,
-      begonnen_at: wireZuPicker(einsatz.begonnen_at),
-      naechste_lagebesprechung_at: einsatz.naechste_lagebesprechung_at
-        ? wireZuPicker(einsatz.naechste_lagebesprechung_at)
-        : null,
+      begonnen_at: alsZeitpunkt(einsatz.begonnen_at),
+      naechste_lagebesprechung_at: alsZeitpunkt(einsatz.naechste_lagebesprechung_at) ?? null,
     });
     setBearbeiten(true);
   }
@@ -386,9 +369,9 @@ export default function EinsatzdatenPage() {
       meldende_stelle: leerZuNull(werte.meldende_stelle),
       sachverhalt: leerZuNull(werte.sachverhalt),
       anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
-      begonnen_at: pickerZuWire(werte.begonnen_at),
+      begonnen_at: alsBackendZeit(werte.begonnen_at),
       naechste_lagebesprechung_at: werte.naechste_lagebesprechung_at
-        ? pickerZuWire(werte.naechste_lagebesprechung_at)
+        ? alsBackendZeit(werte.naechste_lagebesprechung_at)
         : null,
     };
     speichernMutation.mutate(felder);
@@ -464,7 +447,7 @@ export default function EinsatzdatenPage() {
               <Input />
             </Form.Item>
             <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
-              <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
+              <ZeitpunktEingabe format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item label="Einsatzort (Adresse)" name="einsatzort">
               <Input />
@@ -473,7 +456,7 @@ export default function EinsatzdatenPage() {
               label="Nächste Lagebesprechung (optional)"
               name="naechste_lagebesprechung_at"
             >
-              <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
+              <ZeitpunktEingabe format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
             </Form.Item>
             <KoordinatenFeld
               label="Koordinate"

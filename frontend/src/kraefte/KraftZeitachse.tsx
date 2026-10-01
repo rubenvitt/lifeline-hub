@@ -1,9 +1,10 @@
-import { Button, DatePicker, Form, Input, Typography } from 'antd';
+import { Button, Form, Input, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../anzeige/format';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { ladeZeitachse, streicheEreignis, trageNach, type KraftArt } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
 import type { ZeitachseEreignis, ZeitachseNachtragBody } from '../api/types';
@@ -239,12 +240,8 @@ export default function KraftZeitachse({
           label="Zeitpunkt"
           rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
         >
-          <DatePicker
-            showTime
-            format={ZEITFORMAT}
-            style={{ width: '100%' }}
-            disabledDate={(d) => d.isAfter(dayjs(), 'day')}
-          />
+          {/* Zeit und Kalendertag in der Anzeigezone (LFH-692, `keineZukunftstage`). */}
+          <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} keineZukunftstage />
         </Form.Item>
         <Form.Item<NachtragWerte> name="notiz" label="Notiz (optional)">
           <Input placeholder="z. B. per Funk gemeldet" />

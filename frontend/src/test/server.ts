@@ -78,6 +78,23 @@ export const server = setupServer(
     HttpResponse.json({ ereignisse: [], perioden: [] }),
   ),
   /**
+   * Org-Einstellungen: 403 als Default — der echte Zustand für Rollen ohne Leserecht. Der
+   * `OrgAnzeigeProvider` (LFH-692) fragt sie außerhalb eines Einsatzes ab („Einsatz anlegen“,
+   * Archivakte) und bleibt dann bei der Browserzone. Tests mit Zone überschreiben per
+   * `server.use()`.
+   */
+  http.get('/api/org-einstellungen', () =>
+    HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
+  ),
+  /**
+   * Einsatz-Einstellungen: 403 als Default. Die Archivakte (LFH-692) fragt sie für ihre
+   * Anzeigezone ab und fällt ohne Leserecht auf die Org-Zone zurück; Tests mit Einstellungen
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/einstellungen', () =>
+    HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+  ),
+  /**
    * Demo-Daten: 404 als Default — der echte Zustand ohne `--demo-daten`, aus dem das Frontend
    * „nicht freigeschaltet“ liest. Einsatzliste und Verwaltung fragen ihn für jeden System-Admin ab.
    */

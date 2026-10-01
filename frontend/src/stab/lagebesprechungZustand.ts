@@ -1,5 +1,6 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 import type { StatusDarstellung } from '../theme/statusFarben';
 
 dayjs.extend(utc);
@@ -7,11 +8,10 @@ dayjs.extend(utc);
 /**
  * Wire-Zeit → Zeitpunkt. Der Wire-String ist UTC OHNE Zonenkennung, `dayjs(s)` läse ihn als
  * Ortszeit. `null` bei fehlendem oder unlesbarem Wert — ein `Invalid Date` sähe aus wie ein Termin.
+ * Ein ZEITPUNKT, keine Wanduhr: Felder wandeln selbst in die Anzeigezone (LFH-692).
  */
 export function terminZeitpunkt(wire: string | null | undefined): Dayjs | null {
-  if (!wire) return null;
-  const d = dayjs.utc(wire);
-  return d.isValid() ? d.local() : null;
+  return alsZeitpunkt(wire) ?? null;
 }
 
 /** „23 min" · „2 h 05 min" — ganze Minuten. */

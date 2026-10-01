@@ -1,4 +1,5 @@
 import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -57,6 +58,8 @@ export default function ErinnerungenPage() {
     queryFn: () => listeErinnerungen(einsatzId, false),
   });
 
+  // „Heute fällig“ nach dem Kalendertag der Anzeigezone (LFH-692).
+  const { konventionen } = useAnzeigeKonventionen();
   const fehler = useFehlerMeldung();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
 
@@ -124,7 +127,7 @@ export default function ErinnerungenPage() {
     (gruppe) => ({
       gruppe,
       erinnerungen: offene
-        .filter((e) => faelligGruppe(e.faellig_at, e.ist_faellig) === gruppe)
+        .filter((e) => faelligGruppe(e.faellig_at, e.ist_faellig, konventionen.zeitzone) === gruppe)
         .sort((a, b) => (a.faellig_at ?? '￿').localeCompare(b.faellig_at ?? '￿')),
     }),
   ).filter(({ erinnerungen }) => erinnerungen.length > 0);

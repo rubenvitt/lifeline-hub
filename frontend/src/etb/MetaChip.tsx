@@ -1,4 +1,5 @@
-import { AutoComplete, DatePicker, Input, Space, Tag } from 'antd';
+import { AutoComplete, Input, Space, Tag } from 'antd';
+import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
@@ -35,9 +36,15 @@ function feldDef(feld: MetaFeld) {
   return METADATEN_FELDER.find((d) => d.feld === feld)!;
 }
 
-function anzeige(feld: MetaFeld, wert: Wert): string {
+function anzeige(
+  feld: MetaFeld,
+  wert: Wert,
+  formatiere: (d: dayjs.Dayjs, format: string) => string,
+): string {
   if (wert == null) return '';
-  if (feldDef(feld).editor === 'zeit') return (wert as dayjs.Dayjs).format('HHmm');
+  // Uhrzeit in der Anzeigezone, nie im Modus des Objekts: ein wiederhergestellter Entwurf trägt
+  // einen UTC-Zeitpunkt (`entwurfModell.zuWerte`) und zeigte sonst die UTC-Uhrzeit (LFH-692).
+  if (feldDef(feld).editor === 'zeit') return formatiere(wert as dayjs.Dayjs, 'HHmm');
   if (feld === 'meldeweg')
     return MELDEWEG_OPTIONEN.find((o) => o.value === wert)?.label ?? String(wert);
   return String(wert);
@@ -68,6 +75,7 @@ export default function MetaChip({
 }: Props) {
   const d = feldDef(feld);
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
+  const { formatiere } = useZeitEingabe();
 
   if (editing) {
     if (d.editor === 'text') {
@@ -139,12 +147,13 @@ export default function MetaChip({
     }
     // editor === 'zeit'
     return (
-      <DatePicker
-        showTime
+      <ZeitpunktEingabe
         ref={fokusOhneRollen}
         aria-label={d.label}
         defaultValue={dayjs.isDayjs(wert) ? wert : dayjs()}
-        onOk={(v) => onCommit(feld, v)}
+        onOk={(v) => {
+          if (v) onCommit(feld, v);
+        }}
         onKeyDown={(e: React.KeyboardEvent) => {
           if (e.key === 'Escape') onCancel(feld);
         }}
@@ -169,7 +178,7 @@ export default function MetaChip({
         onClick={gesperrt ? undefined : () => onEdit(feld)}
         style={{ cursor: gesperrt ? 'default' : 'pointer' }}
       >
-        {d.label}: {anzeige(feld, wert)}
+        {d.label}: {anzeige(feld, wert, formatiere)}
       </span>
       {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
          „Bearbeiten" daneben legt es wieder an (LFH-363). */}

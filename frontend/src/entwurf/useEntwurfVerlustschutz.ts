@@ -1,6 +1,7 @@
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 
 /** Frist des stillen Autosave. */
@@ -109,6 +110,10 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   speichernRef.current = speichern;
   const onGespeichertRef = useRef(onGespeichert);
   onGespeichertRef.current = onGespeichert;
+  // „zuletzt gespeichert“ in der Anzeigezone (LFH-692); als Ref aus demselben Grund wie oben.
+  const { formatiere } = useZeitEingabe();
+  const uhrzeitRef = useRef(() => formatiere(dayjs(), 'HH:mm'));
+  uhrzeitRef.current = () => formatiere(dayjs(), 'HH:mm');
 
   useEffect(() => {
     if (!daten) return;
@@ -128,7 +133,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
 
   const quittiereGespeichert = useCallback(() => {
     setUngespeichert(false);
-    setZuletztGespeichert(dayjs().format('HH:mm'));
+    setZuletztGespeichert(uhrzeitRef.current());
     setSpeicherFehler(null);
   }, []);
 
@@ -154,7 +159,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
       setSpeicherFehler(null);
       gesichertRef.current = stand;
       if (aenderungRef.current === stand) quittiereGespeichert();
-      else setZuletztGespeichert(dayjs().format('HH:mm'));
+      else setZuletztGespeichert(uhrzeitRef.current());
     };
   }, [quittiereGespeichert]);
 

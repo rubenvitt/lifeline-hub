@@ -1,4 +1,5 @@
 import { Button, Flex, Typography, theme } from 'antd';
+import { EinsatzAnzeigeProvider, OrgAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router';
@@ -461,5 +462,13 @@ export default function ArchivAktePage() {
       </AdminPage>
     );
   }
-  return <AkteInhalt einsatzId={einsatzId} akte={abfrage.data} />;
+  // Anzeige und Frist-Eingabe in der Zone dieses Einsatzes; ist sie nicht lesbar, in der der
+  // Organisation (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines Einsatzes“).
+  return (
+    <OrgAnzeigeProvider>
+      <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+        <AkteInhalt einsatzId={einsatzId} akte={abfrage.data} />
+      </EinsatzAnzeigeProvider>
+    </OrgAnzeigeProvider>
+  );
 }

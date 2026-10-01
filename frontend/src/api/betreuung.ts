@@ -19,7 +19,7 @@ import type {
 /**
  * Fachmodul Betreuung: Evakuierungsbezirke mit Standmeldungen, Betreuungsstellen mit
  * Belegungsmeldungen. Zeiten gehen als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über
- * `alsBackendZeit`, zurück über `alsOrtszeit` (`etb/filterZeit.ts`), nie über `dayjs(s)`.
+ * `alsBackendZeit`, zurück über `alsZeitpunkt` (`anzeige/zeitEingabe.ts`), nie über `dayjs(s)`.
  */
 const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/betreuung`;
 

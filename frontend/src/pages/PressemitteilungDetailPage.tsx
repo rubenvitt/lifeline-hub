@@ -1,14 +1,4 @@
-import {
-  App,
-  Breadcrumb,
-  Button,
-  Checkbox,
-  DatePicker,
-  Form,
-  Input,
-  Space,
-  Typography,
-} from 'antd';
+import { App, Breadcrumb, Button, Checkbox, Form, Input, Space, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -45,7 +35,8 @@ import FormularEingehaengt from '../components/FormularEingehaengt';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
-import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -170,7 +161,7 @@ function PressemitteilungDetail() {
     istEntwurf: pmQuery.data?.status === 'entwurf',
     form,
     werteAus: (pm) => {
-      const w: FormWerte = { titel: pm.titel, zeitstand: alsOrtszeit(pm.zeitstand) };
+      const w: FormWerte = { titel: pm.titel, zeitstand: alsZeitpunkt(pm.zeitstand) };
       for (const a of pm.abschnitte) w[a.schluessel] = a.text;
       return w;
     },
@@ -364,8 +355,7 @@ function PressemitteilungDetail() {
               <Input />
             </Form.Item>
             <Form.Item label="Zeitstand" name="zeitstand">
-              <DatePicker
-                showTime
+              <ZeitpunktEingabe
                 allowClear={false}
                 format="DD.MM.YYYY HH:mm"
                 style={{ width: '100%' }}

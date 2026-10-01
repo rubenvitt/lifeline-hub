@@ -1,6 +1,6 @@
 import { Tooltip } from 'antd';
 import { StatusChip } from '../components/instrument';
-import { formatZeit } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 
 const ERKLAERUNG = 'Quittiert = empfangen/zur Kenntnis genommen — sagt nichts über die Erledigung.';
 
@@ -18,6 +18,8 @@ export default function QuittungIndikator({
   von?: string | null;
   am?: string | null;
 }) {
+  // Quittierzeit in der Anzeigezone (LFH-692).
+  const { formatZeit } = useAnzeigeKonventionen();
   if (!quittiert) {
     return (
       <Tooltip title={ERKLAERUNG}>

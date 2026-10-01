@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { Form, Input } from 'antd';
 import { useState } from 'react';
 import FormularEingehaengt from '../components/FormularEingehaengt';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 import { AUTOSAVE_MS, useEntwurfVerlustschutz } from './useEntwurfVerlustschutz';
 
 interface Daten {
@@ -430,5 +432,27 @@ describe('useEntwurfVerlustschutz', () => {
     ereignis = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(ereignis);
     expect(ereignis.defaultPrevented).toBe(true);
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`, „Zeit in Texten“): die Speicherzeit steht in der Anzeigezone. */
+describe('useEntwurfVerlustschutz — „zuletzt gespeichert“ in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('Browser UTC, Anzeigezone Berlin: 10:32 UTC erscheint als 12:32', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-07-14T10:32:00Z'));
+    try {
+      render(
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <Huelle />
+        </AnzeigeKonventionenProvider>,
+      );
+      await userEvent.type(screen.getByLabelText('Titel'), 'x');
+      await userEvent.tab();
+      expect(await screen.findByText('zuletzt gespeichert 12:32')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

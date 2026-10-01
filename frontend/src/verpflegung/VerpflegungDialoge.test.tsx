@@ -7,11 +7,14 @@ import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import type { ModulFreigaben } from '../api/types';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { alsOrtszeit } from '../etb/filterZeit';
 import { freigabenFixture } from '../test/fixtures';
+import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
 import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
 import type { Bedarfsvorschlag, BedarfsvorschlagArgs } from './useBedarfsvorschlag';
+import { uhrzeitenText } from './verpflegungText';
 
 dayjs.extend(utc);
 
@@ -615,5 +618,111 @@ describe('Rückfragen', () => {
     expect(screen.getByRole('dialog', { name: fall.name })).toBe(dialog);
     // Nach dem Fehlschlag ist der Weg hinaus wieder frei.
     expect(abbrechen).toBeEnabled();
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. Vorher zeigte
+ * die Karte 12:00–13:30 und der Dialog 10:00–11:30; wer dort 12:00 „korrigierte“, speicherte
+ * 14:00 Berliner Zeit. Unter der Suiten-Zone Berlin wäre jede dieser Aussagen blind grün.
+ */
+describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => {
+  mitProzessZone('UTC');
+  const BERLIN = { zeitzone: 'Europe/Berlin' };
+
+  function zeigeBearbeitenBerlin(onErfassen = vi.fn().mockResolvedValue(undefined)) {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <ZeitfensterDialog
+          modus={{ art: 'bearbeiten', zeitfenster: zeitfenster(), onErfassen }}
+          einsatzId={1}
+          freigaben={FREIGABEN}
+          jetzt={JETZT}
+          laeuft={false}
+          fehler={null}
+          onSchliessen={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    return { onErfassen };
+  }
+
+  it('der Bearbeiten-Dialog zeigt dieselben Uhrzeiten wie die Karte', async () => {
+    zeigeBearbeitenBerlin();
+    const dialog = await screen.findByRole('dialog');
+    expect(uhrzeitenText(zeitfenster(), BERLIN)).toBe('12:00–13:30');
+    expect(within(dialog).getByPlaceholderText('Beginn')).toHaveValue('2026-09-24 12:00');
+    expect(within(dialog).getByPlaceholderText('Ende')).toHaveValue('2026-09-24 13:30');
+    expect(within(dialog).getAllByText('Europe/Berlin').length).toBeGreaterThan(0);
+  });
+
+  it('Speichern mit nur geändertem Bedarf schickt keinen Zeitraum', async () => {
+    const { onErfassen } = zeigeBearbeitenBerlin();
+    const dialog = await screen.findByRole('dialog');
+    const betreute = within(dialog).getByLabelText('Betreute (EP)');
+    await userEvent.clear(betreute);
+    await userEvent.type(betreute, '90');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ bedarf_betreute: 90 }));
+  });
+
+  // Rückweg über das Anlegen: in jsdom übernimmt antds RangePicker eine Tastatur-Korrektur an
+  // einem SCHON belegten Zeitraum nicht ins Formular (auch ohne Baustein gemessen). Die Wandlung
+  // ist dieselbe; die Anzeige beim Bearbeiten pinnt der erste Fall.
+  it('ein eingegebenes Fenster 13:00–14:30 Berliner Zeit geht als 11:00–12:30 UTC hinaus', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <ZeitfensterDialog
+          modus={{ art: 'anlegen', onErfassen }}
+          einsatzId={1}
+          freigaben={FREIGABEN}
+          jetzt={JETZT}
+          laeuft={false}
+          fehler={null}
+          onSchliessen={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Mittag');
+    await waehleZeitraum(dialog, '2026-09-24 13:00', '2026-09-24 14:30');
+    await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '1');
+    await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '0');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({
+      von_at: '2026-09-24 11:00:00',
+      bis_at: '2026-09-24 12:30:00',
+    });
+    // Und die Kopfzahl-Anfrage bekam den Beginn als Zeitpunkt, nicht als Browser-Wanduhr (nach
+    // dem Anlegen setzt der Dialog zurück, daher nicht der letzte Aufruf).
+    expect(vorschlag.aufrufe.map((a) => a.vonAt)).toContain('2026-09-24 11:00:00');
+  });
+
+  it('Ausgabe: ein eingegebener Zeitpunkt 12:15 gilt in Berlin', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <AusgabeDialog
+          zeitfenster={zeitfenster()}
+          nachforderungen={null}
+          laeuft={false}
+          fehler={null}
+          onErfassen={onErfassen}
+          onSchliessen={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '120');
+    const feld = within(dialog).getByPlaceholderText('jetzt');
+    await userEvent.click(feld);
+    await userEvent.type(feld, '2026-09-24 12:15');
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({ menge: 120, zeitpunkt_at: '2026-09-24 10:15:00' }),
+    );
   });
 });

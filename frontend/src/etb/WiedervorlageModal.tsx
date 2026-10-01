@@ -1,8 +1,10 @@
-import { App, Button, DatePicker, Form, Input, Space, Typography } from 'antd';
+import { App, Button, Form, Input, Space, Typography } from 'antd';
 import { useEffect, useReducer } from 'react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { legeErinnerungAn } from '../api/erinnerungen';
 import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -65,11 +67,10 @@ export default function WiedervorlageModal({
   const qc = useQueryClient();
   const [form] = Form.useForm<FormWerte>();
   const [zeitPruefung, pruefeZeit] = useReducer((wert: number) => wert + 1, 0);
-  // Der Wirestring ist UTC ohne Offset. Lokal parsen würde den Instant verschieben.
-  const lagebesprechung = naechsteLagebesprechungAt
-    ? dayjs.utc(naechsteLagebesprechungAt).local()
-    : null;
-  const terminBekannt = lagebesprechung?.isValid() && lagebesprechung.isAfter(dayjs());
+  // Der Wirestring ist UTC ohne Offset. Lokal parsen würde den Instant verschieben. Der
+  // Formularwert ist ein Zeitpunkt; in die Anzeigezone wandelt erst das Feld (LFH-692).
+  const lagebesprechung = alsZeitpunkt(naechsteLagebesprechungAt) ?? null;
+  const terminBekannt = lagebesprechung?.isAfter(dayjs()) ?? false;
   const offen = eintrag !== null;
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function WiedervorlageModal({
     mutationFn: (werte: FormWerte) =>
       legeErinnerungAn(einsatzId, {
         titel: werte.titel.trim(),
-        faellig_at: werte.faellig.utc().format('YYYY-MM-DD HH:mm:ss'),
+        faellig_at: alsBackendZeit(werte.faellig),
         beschreibung: werte.beschreibung?.trim() || undefined,
         bezug_typ: 'etb',
         bezug_id: eintrag!.id,
@@ -130,7 +131,7 @@ export default function WiedervorlageModal({
         {/*
           Die Schnellwahl steht ÜBER dem Feld, in demselben `Form.Item`: sie ist eine
           Vorbelegung desselben Wertes, kein eigenes Feld — das Budget bleibt bei drei
-          (LFH-19). Der DatePicker darunter trägt weiter den freien Fall.
+          (LFH-19). Das Zeitfeld darunter trägt weiter den freien Fall.
         */}
         <Space wrap style={{ marginBottom: abstand.sm }}>
           <Typography.Text type="secondary">Schnellwahl</Typography.Text>
@@ -162,7 +163,7 @@ export default function WiedervorlageModal({
           noStyle
           rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
         >
-          <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+          <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
         </Form.Item>
       </Form.Item>
       <Form.Item label="Beschreibung (optional)" name="beschreibung">

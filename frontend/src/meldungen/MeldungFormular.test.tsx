@@ -2,6 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App as AntApp } from 'antd';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 import MeldungFormular, { vonZuBezug } from './MeldungFormular';
 import type { Einheit, Einsatzabschnitt } from '../api/types';
 
@@ -219,5 +221,32 @@ describe('MeldungFormular', () => {
       expect(vonZuBezug('einheit:x')).toEqual({});
       expect(vonZuBezug(undefined)).toEqual({});
     });
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. */
+describe('MeldungFormular — Ereigniszeit in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('eine eingegebene 13:00 Berliner Zeit geht als 11:00 UTC hinaus', async () => {
+    const onAnlegen = anlegenMock();
+    render(
+      <AntApp>
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <MeldungFormular senden={false} onAnlegen={onAnlegen} />
+        </AnzeigeKonventionenProvider>
+      </AntApp>,
+    );
+    await fuellePflichtfelder('RTW 2', 'MANV');
+    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit (≠ Erfassung)' });
+    await userEvent.click(feld);
+    await userEvent.type(feld, '2026-09-24 13:00');
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(
+        expect.objectContaining({ ereigniszeit: '2026-09-24 11:00:00' }),
+      ),
+    );
   });
 });
