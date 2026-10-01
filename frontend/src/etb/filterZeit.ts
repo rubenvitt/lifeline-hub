@@ -12,10 +12,8 @@ dayjs.extend(utc);
  * beidseits beider Sommerzeit-Grenzen gegen den absoluten Zeitpunkt.
  */
 
-/** Wandelt einen dayjs-Zeitpunkt ins SQLite-/Backend-Format (UTC). */
-export function alsBackendZeit(d: dayjs.Dayjs): string {
-  return d.utc().format('YYYY-MM-DD HH:mm:ss');
-}
+/** Wandelt einen dayjs-Zeitpunkt ins SQLite-/Backend-Format (UTC); Kern in `anzeige/zeitEingabe`. */
+export { alsBackendZeit } from '../anzeige/zeitEingabe';
 
 /**
  * Umkehr von {@link alsBackendZeit}.

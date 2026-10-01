@@ -83,7 +83,8 @@ Zone ab (`Intl.DateTimeFormat().resolvedOptions().timeZone` gegen die effektive 
 Baustein die Zone zweimal:
 
 - im Panel-Fuß,
-- als `suffix`-Text am Feld, damit sie auch bei geschlossenem Panel sichtbar ist.
+- als `prefix`-Text am Feld (bleibt anders als das Suffix auch unter dem Löschkreuz stehen), damit
+  sie auch bei geschlossenem Panel sichtbar ist.
 
 Stimmen die Zonen überein, wird nichts gerendert.
 
@@ -98,7 +99,8 @@ bekommt die Konventionen als Parameter und rechnet „heute“ über `inZone`.
 ### D5 Zone außerhalb eines Einsatzes
 
 - `AnzeigeKonventionenContext` bekommt einen zweiten Provider, `OrgAnzeigeProvider`. Er lädt
-  `ladeOrgEinstellungen()` unter einem neuen Query-Key in `api/queryKeys.ts`. Bei 403 oder einem
+  `ladeOrgEinstellungen()` unter dem bestehenden Query-Key `globalKeys.orgEinstellungen`, den auch
+  die Einstellungsseiten nutzen (kein zweiter Abruf). Bei 403 oder einem
   Fehler fällt er still auf die Defaults zurück, also auf die Browserzone. Der Endpunkt erlaubt
   nur Admin oder Führungskraft, und das sind genau die Rollen, die Einsätze anlegen oder die
   Archivakte sehen.

@@ -7,19 +7,19 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
 
 ## 1. Wandlungskern und Bausteine (`anzeige/`)
 
-- [ ] 1.1 Reine Funktionen in `anzeige/zeitEingabe.ts` anlegen: `alsZeitpunkt`, `alsBackendZeit`
+- [x] 1.1 Reine Funktionen in `anzeige/zeitEingabe.ts` anlegen: `alsZeitpunkt`, `alsBackendZeit`
       (umgezogen), `zuWanduhr`, `ausWanduhr`, `heuteInZone` und `istZukunftstag`.
       `zeitEingabe.test.ts` deckt unter TZ=UTC mit Anzeigezone Europe/Berlin Hin- und Rückweg
       ab, dazu beide Umstellungen 2026, die doppelte Stunde, eine ungültige Zone (Rückfall auf
       den Browser) und die nicht darstellbare Wanduhr. Gegenprobe unter Berlin mit Anzeigezone
       UTC. Erledigt, wenn der Test grün ist.
-- [ ] 1.2 `useZeitEingabe()` sowie `ZeitpunktEingabe` und `ZeitraumEingabe` bauen: Zeitpunkt
+- [x] 1.2 `useZeitEingabe()` sowie `ZeitpunktEingabe` und `ZeitraumEingabe` bauen: Zeitpunkt
       hinein und heraus, `showNow` aus, eigener Knopf „Jetzt“ und Zonenhinweis im Panel-Fuß,
       Zonenhinweis am Feld nur bei Abweichung, Prop `keineZukunftstage`. Komponententests unter
       TZ=UTC prüfen: Anzeige 12:00 für 10:00 UTC, Eingabe 13:00 ergibt 11:00 UTC, „Jetzt“, und
       der Hinweis erscheint bzw. fehlt.
-- [ ] 1.3 `OrgAnzeigeProvider` mit neuem Query-Key in `api/queryKeys.ts` anlegen (bei 403 oder
-      Fehler gelten die Defaults). Test: die Zone kommt aus den Org-Einstellungen, bei 403 aus
+- [x] 1.3 `OrgAnzeigeProvider` am bestehenden Query-Key `globalKeys.orgEinstellungen` anlegen
+      (geteilt mit den Einstellungsseiten; bei 403 oder Fehler gelten die Defaults). Test: die Zone kommt aus den Org-Einstellungen, bei 403 aus
       dem Browser. `queryKeys.guard.test.ts` bleibt grün.
 
 ## 2. Verpflegung (Referenzfall LFH-634)

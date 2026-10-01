@@ -1,12 +1,25 @@
 import { screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { EinsatzAnzeigeProvider, useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
+import {
+  EinsatzAnzeigeProvider,
+  OrgAnzeigeProvider,
+  useAnzeigeKonventionen,
+} from './AnzeigeKonventionenContext';
 import { setzeOverride } from './koordinatenSystemStore';
 import type { EinsatzEinstellungen, OrgEinstellungen } from '../api/types';
+import { ApiError } from '../api/client';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinstellungen: vi.fn() }));
+vi.mock('../api/orgEinstellungen', () => ({ ladeOrgEinstellungen: vi.fn() }));
 import { ladeEinstellungen } from '../api/einsaetze';
+import { ladeOrgEinstellungen } from '../api/orgEinstellungen';
+
+/** Zeigt die effektive Zeitzone des Kontexts. */
+function ZonenSonde() {
+  const { konventionen } = useAnzeigeKonventionen();
+  return <span data-testid="zone">{konventionen.zeitzone ?? 'browser'}</span>;
+}
 
 /** Testkomponente, die den Hook ausliest und Formatter-Ergebnisse rendert. */
 function Sonde() {
@@ -275,5 +288,64 @@ describe('useAnzeigeKonventionen', () => {
     // Distanz warten: die taktische Zeit kann zufällig dem Lokalzeit-Default gleichen.
     await waitFor(() => expect(screen.getByTestId('distanz').textContent).toBe('3.11 mi'));
     expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
+  });
+});
+
+describe('OrgAnzeigeProvider — Zone außerhalb eines Einsatzes (LFH-692)', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('liefert die Zeitzone der Organisation', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue(
+      orgDefaultsMock({ zeitzone: 'Europe/Berlin' }),
+    );
+    renderMitProviders(
+      <OrgAnzeigeProvider>
+        <ZonenSonde />
+      </OrgAnzeigeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('zone').textContent).toBe('Europe/Berlin'));
+  });
+
+  it('ohne Leserecht (403) bleibt die Browserzone, ohne Wiederholung', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockRejectedValue(new ApiError(403, 'verboten'));
+    renderMitProviders(
+      <OrgAnzeigeProvider>
+        <ZonenSonde />
+      </OrgAnzeigeProvider>,
+    );
+    await waitFor(() => expect(ladeOrgEinstellungen).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('zone').textContent).toBe('browser');
+  });
+
+  it('Einsatz-Provider darin: nicht lesbare Einsatz-Einstellungen fallen auf die Org-Zone', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue(
+      orgDefaultsMock({ zeitzone: 'Europe/Berlin' }),
+    );
+    vi.mocked(ladeEinstellungen).mockRejectedValue(new ApiError(403, 'verboten'));
+    renderMitProviders(
+      <OrgAnzeigeProvider>
+        <EinsatzAnzeigeProvider einsatzId={7}>
+          <ZonenSonde />
+        </EinsatzAnzeigeProvider>
+      </OrgAnzeigeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('zone').textContent).toBe('Europe/Berlin'));
+  });
+
+  it('Einsatz-Provider darin: die Zone des Einsatzes sticht die der Organisation', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue(
+      orgDefaultsMock({ zeitzone: 'Europe/Berlin' }),
+    );
+    vi.mocked(ladeEinstellungen).mockResolvedValue(
+      einstellungenMock({ zeitzone: 'Europe/Vienna' }),
+    );
+    renderMitProviders(
+      <OrgAnzeigeProvider>
+        <EinsatzAnzeigeProvider einsatzId={7}>
+          <ZonenSonde />
+        </EinsatzAnzeigeProvider>
+      </OrgAnzeigeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('zone').textContent).toBe('Europe/Vienna'));
   });
 });
