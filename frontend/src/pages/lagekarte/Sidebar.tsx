@@ -390,7 +390,10 @@ function EbenenZeilenKnopf({
       style={{
         ...ebenenZeileStil(token),
         borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-        color: zeile.sichtbar ? rollen.text : rollen.schwach,
+        // Aus = `text2`, nicht `schwach`: den Zustand tragen Farbfeld und `aria-checked`, die
+        // Schrift hält in jedem Zustand den Textboden, auch auf dem Hover-Grund `flaeche3`
+        // (`schwach` am Tag 5,8 : 1 auf `paneel`; LFH-671, `e2e/lagekarte-ebenen-kontrast.spec.ts`).
+        color: zeile.sichtbar ? rollen.text : rollen.text2,
       }}
     >
       <span
@@ -409,7 +412,8 @@ function EbenenZeilenKnopf({
         }}
       />
       <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
-      <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.anzahl}</span>
+      {/* `text2` aus demselben Grund; `gedaempft` hielte am Tag auf `flaeche3` nur 6,6 : 1. */}
+      <span style={{ ...monoStil(11), color: rollen.text2 }}>{zeile.anzahl}</span>
     </button>
   );
 }
