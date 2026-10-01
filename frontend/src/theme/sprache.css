@@ -156,6 +156,23 @@
   }
 }
 
+/* Notizhöhe ab `md` (LFH-691, `Kennzahlenband notizZeilen`): Boden UND Deckel. Ohne feste Höhe
+   brach „von ≈ 1 850 geplant · 1 ohne Meldung“ bei 1440 px zweizeilig um und die Pegel-Notiz mit
+   Prognose drei- bis vierzeilig; mit der ersten Standmeldung bzw. dem Ablauf der Prognose sprang
+   das Band samt Paneelen darunter zurück. Eine längere Notiz endet mit „…“, der volle Text bleibt
+   im DOM (zugänglicher Name) und im `title`. Herleitung und verworfene Wege:
+   `openspec/changes/lfh-691-kennzahl-notiz-feste-hoehe/design.md`. */
+@media (min-width: 768px) {
+  .lfh-kennzahlenband--notizfest [data-lfh='kennzahl-notiz'] {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--lfh-kennzahl-notizzeilen-fest);
+    line-clamp: var(--lfh-kennzahl-notizzeilen-fest);
+    overflow: hidden;
+    min-height: calc(var(--lfh-kennzahl-notizzeilen-fest) * 1.4em);
+  }
+}
+
 /* Segmentleiste — Fugenraster auf `linie-stark`; aktiv `flaeche-3` + Text. Der Entwurf nennt
    `flaeche-2`; die liegt am Tag bei 1,08 : 1 auf `flaeche` und hebt nichts hervor, nachts
    trennen `flaeche-2` und `flaeche-3` nur 1,02 : 1 (LFH-618). Gilt ebenso für den Hover der
