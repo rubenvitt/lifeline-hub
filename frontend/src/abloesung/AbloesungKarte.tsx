@@ -94,7 +94,14 @@ export default function AbloesungKarte({
           gap: 2,
         }}
       >
-        <span style={{ ...monoStil(13, 500) }} data-lfh="abloesung-zeit">
+        {/* Die Spalte hält die Breite der LÄNGEREN Form („020540", Tag + Uhrzeit), auch wenn
+            heute nur „0540" steht: sonst hinge die Breite der Angaben rechts an der Tageszeit, und
+            eine Karte bräche nachts anders um als tags (LFH-707). Mono mit `tabular-nums`, also
+            ist `6ch` genau sechs Ziffern. */}
+        <span
+          style={{ ...monoStil(13, 500), display: 'inline-block', minWidth: '6ch' }}
+          data-lfh="abloesung-zeit"
+        >
           <ZeitAnzeige wert={laufend ? s.faellig_at : s.vollzogen_at} format="kurz" />
         </span>
         <span style={{ ...monoStil(10), color: rollen.schwach }}>
@@ -110,12 +117,22 @@ export default function AbloesungKarte({
         </Flex>
         <Space orientation="vertical" size={2} style={{ width: '100%', marginTop: 4 }}>
           {laufend && <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>}
-          <Text type="secondary">
-            {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}
-            im Einsatz seit <ZeitAnzeige wert={s.beginn_at} format="kurz" /> · Rhythmus{' '}
-            {rhythmusText(s.rhythmus_minuten)} (
-            {s.rhythmus_quelle === 'abschnitt' ? 'Vorgabe des Abschnitts' : 'eigener Wert'})
-          </Text>
+          {/* Der Rhythmus ist ein eigener Baustein: eine fremde Rhythmusänderung („6 h" → „30 min")
+              darf die Karte nicht höher machen (Kriterium 12). Im Fließtext verschob ihre Länge den
+              Umbruch der ganzen Zeile, mobil lag die Zeile genau an der Kante (LFH-707). Breit
+              stehen beide nebeneinander, schmal untereinander. */}
+          <Flex wrap style={{ columnGap: token.margin }} data-lfh="abloesung-angaben">
+            <Text type="secondary">
+              {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}
+              <span style={{ whiteSpace: 'nowrap' }}>
+                im Einsatz seit <ZeitAnzeige wert={s.beginn_at} format="kurz" />
+              </span>
+            </Text>
+            <Text type="secondary" data-lfh="abloesung-rhythmus">
+              Rhythmus {rhythmusText(s.rhythmus_minuten)} (
+              {s.rhythmus_quelle === 'abschnitt' ? 'Vorgabe des Abschnitts' : 'eigener Wert'})
+            </Text>
+          </Flex>
           {s.abloesende_einheit_name && (
             <Text type="secondary">
               {laufend ? 'Ablösung geplant durch ' : 'Abgelöst durch '}

@@ -147,6 +147,25 @@ describe('AbloesungPage (LFH-635)', () => {
     expect(within(plan).getByText(/eigener Wert/)).toBeInTheDocument();
   });
 
+  // Die Höhen selbst misst `e2e/abloesung-zufluss.spec.ts` (jsdom rechnet kein Layout); hier
+  // steht nur die Form, die sie trägt.
+  it('LFH-707: Zeitspalte hält sechs Ziffern, der Rhythmus steht als eigener Baustein', async () => {
+    renderPage();
+    const karten = await screen.findAllByRole('article');
+    for (const karte of karten) {
+      const zeit = karte.querySelector<HTMLElement>('[data-lfh="abloesung-zeit"]')!;
+      // „0540" heute wie „020540" an einem anderen Tag: dieselbe Spaltenbreite.
+      expect(zeit.style.minWidth).toBe('6ch');
+      expect(zeit.style.display).toBe('inline-block');
+      const rhythmus = karte.querySelector('[data-lfh="abloesung-rhythmus"]')!;
+      expect(rhythmus.textContent).toMatch(
+        /^Rhythmus 6 h \((Vorgabe des Abschnitts|eigener Wert)\)$/,
+      );
+      // Abschnitt und Beginn stehen NICHT im selben Baustein: dessen Umbruch hängt nicht am Rhythmus.
+      expect(rhythmus.textContent).not.toMatch(/seit/);
+    }
+  });
+
   it('ohne Schreibrecht: Grund im Kopf, Primäraktion gesperrt, keine Kartenaktionen', async () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     renderPage();
