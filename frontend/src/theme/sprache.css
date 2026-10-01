@@ -143,6 +143,17 @@
   outline-offset: -2px;
 }
 
+/* Notizplatz eines Bandes auf schmalem Schirm (LFH-629, `Kennzahlenband notizZeilenSchmal`): im
+   Ladezustand steht einzeilig „wird abgerufen“, mit den Daten brach eine Notiz wie die des
+   Pegels in der halben Bandbreite zweizeilig um, und die Reihe wuchs 16 px. Der Platz steht
+   deshalb vom ersten Bild an. Die Zeilenhöhe ist die der Notiz (`lineHeight: 1.4`), die
+   Schwelle antds `md` wie in `EinsatzSeite.css`. */
+@media (max-width: 767.98px) {
+  .lfh-kennzahlenband--notizzeilen [data-lfh='kennzahl-notiz'] {
+    min-height: calc(var(--lfh-kennzahl-notizzeilen) * 1.4em);
+  }
+}
+
 /* Segmentleiste — Fugenraster auf `linie-stark`; aktiv `flaeche-3` + Text. Der Entwurf nennt
    `flaeche-2`; die liegt am Tag bei 1,08 : 1 auf `flaeche` und hebt nichts hervor, nachts
    trennen `flaeche-2` und `flaeche-3` nur 1,02 : 1 (LFH-618). Gilt ebenso für den Hover der
