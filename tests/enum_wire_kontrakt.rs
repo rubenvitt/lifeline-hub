@@ -445,6 +445,7 @@ fn orphan_enums_wire() {
     enum_wire!(lifeline_hub::person::audit_repo::ZugriffArt {
         Detail => "detail",
         Export => "export",
+        Druck => "druck",
     });
     enum_wire!(lifeline_hub::erinnerung::ErinnerungStatus {
         Offen => "offen",

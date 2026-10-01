@@ -13,6 +13,7 @@ import {
   type Dichte,
 } from './tokens';
 import { zeigerIstGrob } from '../components/useViewport';
+import { DICHTE_DEFAULT, startDichte } from './dichte';
 import {
   HELLIGKEIT_DEFAULT,
   abdunkelung,
@@ -30,12 +31,6 @@ const SPEICHER_SCHLUESSEL = 'lifeline-hub.theme';
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 /** Gespiegelt im Bootstrap-Skript von `index.html` (LFH-397) — wer eines ändert, ändert beide. */
 const HELLIGKEIT_SCHLUESSEL = 'lifeline-hub.helligkeit';
-
-/** Ausgangsstufe ohne gespeicherte Wahl: der Fükw-Arbeitsplatz (A1 Festlegung 1). */
-const DICHTE_DEFAULT: Dichte = 'kompakt';
-
-/** …und die Ausgangsstufe, wenn der primäre Zeiger grob ist. */
-const DICHTE_DEFAULT_BERUEHRUNG: Dichte = 'komfortabel';
 
 interface ThemeModeWert {
   modus: ThemeModus;
@@ -74,20 +69,15 @@ function gespeicherterModus(): ThemeModus {
   return istThemeModus(wert) ? wert : MODUS_DEFAULT;
 }
 
-function istDichte(wert: string | null): wert is Dichte {
-  return wert === 'kompakt' || wert === 'komfortabel' || wert === 'handschuh';
-}
-
 /**
- * Die Stufe, mit der eine Sitzung beginnt. Eine getroffene Wahl gewinnt IMMER, die Zeigerart
- * belegt nur vor; sonst drehte sich der Dichte-Umschalter beim Neuladen selbst zurück. Ein
- * unbekannter gespeicherter Wert fällt auf das Zeigersignal zurück. Die Zeigerfrage kommt aus
- * `useViewport` (`zeigerIstGrob`), nicht aus einem eigenen `matchMedia`.
+ * Die Stufe, mit der eine Sitzung beginnt — die Regel steht in `./dichte` (LFH-724, Spec
+ * `bedien-dichte`): Wahl → Zeigerart → `kompakt`. Hier nur die Quellen: der Speicher des
+ * Geräts und die Zeigerfrage aus `useViewport` (`zeigerIstGrob`), kein eigenes `matchMedia`.
+ * Gelesen EINMAL im `useState`-Initialisierer; ein Zuhörer auf die Zeigerart fehlt mit
+ * Absicht (Spec: keine Umschaltung während der Sitzung).
  */
 function gespeicherteDichte(): Dichte {
-  const wert = localStorage.getItem(DICHTE_SCHLUESSEL);
-  if (istDichte(wert)) return wert;
-  return zeigerIstGrob() ? DICHTE_DEFAULT_BERUEHRUNG : DICHTE_DEFAULT;
+  return startDichte(localStorage.getItem(DICHTE_SCHLUESSEL), zeigerIstGrob());
 }
 
 function gespeicherteHelligkeit(): Helligkeit {

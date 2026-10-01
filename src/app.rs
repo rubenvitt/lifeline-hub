@@ -155,6 +155,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz::modul_overrides_laden),
         )
         .route(
+            "/api/einsaetze/{id}/modul-freigaben",
+            get(routes::einsatz::modul_freigaben_laden),
+        )
+        .route(
             "/api/einsaetze/{id}/modul-overrides/{modul_key}",
             put(routes::einsatz::modul_override_setzen),
         )
@@ -647,6 +651,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen/export",
             get(routes::einsatz_person::export),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/druck",
+            get(routes::einsatz_person::druck),
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}",

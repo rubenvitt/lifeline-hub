@@ -56,7 +56,6 @@ function render(
     http.get('/api/einsaetze/1/stab', stab),
     http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
     // Quellen der Vorbereitung (LFH-550) — leer; diese Tests prüfen die Palette.
     ...[
       'personen',

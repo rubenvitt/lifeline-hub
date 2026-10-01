@@ -38,6 +38,9 @@ const SUBPIXEL = 0.5;
 const STAFFEL = [
   { dichte: 'kompakt', zeilenhoehe: 30, abstandSm: 7, abstandMd: 11 },
   { dichte: 'komfortabel', zeilenhoehe: 48, abstandSm: 11, abstandMd: 18 },
+  // Dritte Stufe (LFH-724, Prüfliste C11 Tabelle 1): die offene Hälfte war „ein dritter Eintrag
+  // in STAFFEL, kein Umbau“.
+  { dichte: 'handschuh', zeilenhoehe: 72, abstandSm: 16, abstandMd: 26 },
 ] as const;
 
 /** Ein Modul, dessen Zeile in den Einsatz-Defaults immer steht. */

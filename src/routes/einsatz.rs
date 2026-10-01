@@ -558,6 +558,28 @@ pub async fn modul_overrides_laden(
     Ok(Json(modul_override::laden_alle(&state.pool, id).await?))
 }
 
+/// GET /api/einsaetze/{id}/modul-freigaben — die effektive Freigabe jedes Moduls für den
+/// anfragenden Benutzer (LFH-669), als Map `modul_key → { sichtbar, zugriff }`.
+///
+/// `EinsatzLesezugriff<OhneModul>`: Org-Floor + Lesezugriff, **kein** Modul-Gate. `zugriff`
+/// ist dieselbe Auswertung wie das Modul-Gate jedes Listen-Endpunkts
+/// ([`crate::einsatz::berechtigung::modul_freigabe`]) — der Client übernimmt sie, statt die
+/// Regel ohne die Org-Defaults nachzubauen.
+pub async fn modul_freigaben_laden(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff,
+) -> Result<Json<HashMap<&'static str, crate::einsatz::berechtigung::ModulFreigabe>>, AppError> {
+    Ok(Json(
+        crate::einsatz::berechtigung::modul_freigaben(
+            &state.pool,
+            ctx.einsatz.id,
+            ctx.einsatz.org_id,
+            &ctx.benutzer,
+        )
+        .await?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ModulOverrideUpdate {
     pub sichtbar: bool,

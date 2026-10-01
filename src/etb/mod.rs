@@ -215,6 +215,22 @@ pub struct EtbEintragAnzeige {
     // gebündelten Abfrage nach, wie `folgeauftraege`.
     #[sqlx(skip)]
     pub anhaenge: Vec<crate::anhang::AnhangAnzeige>,
+    /// Berichtigungen, die auf DIESEN Eintrag zeigen (LFH-689) — die Rückrichtung zu
+    /// `berichtigt_eintrag_id`. Aufsteigend nach `lfd_nr`, leer statt fehlend, unabhängig von
+    /// Seite und Listenfilter: die Palette-Vorschau liest einen Eintrag allein und muss trotzdem
+    /// sagen, dass er überholt ist. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen
+    /// die Liste je Seite mit einer gebündelten Abfrage nach, wie `folgeauftraege`.
+    #[sqlx(skip)]
+    pub berichtigt_durch: Vec<BerichtigungVerweis>,
+}
+
+/// Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`
+/// für den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines
+/// ETB-Eintrags nie leer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BerichtigungVerweis {
+    pub id: i64,
+    pub lfd_nr: i64,
 }
 
 /// Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink

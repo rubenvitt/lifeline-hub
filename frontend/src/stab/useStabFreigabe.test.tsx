@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
-import { ladeModulOverrides } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { stabFreigabeAnzeige, useStabFreigabe } from './useStabFreigabe';
+import { freigabenFixture } from '../test/fixtures';
 
-vi.mock('../api/einsaetze', () => ({ ladeModulOverrides: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 
 const SEITE = { titel: 'Informationstelefon', mitArtikel: 'das Informationstelefon' };
 
@@ -21,15 +22,15 @@ function Probe() {
  */
 describe('useStabFreigabe', () => {
   it('zeigt den Inhalt erst, wenn der Stab frei ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     renderMitProviders(<Probe />);
     expect(await screen.findByText('Inhalt der Seite')).toBeInTheDocument();
   });
 
   it('nennt die Seite in der Sackgasse, wenn der Stab ausgeblendet ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     renderMitProviders(<Probe />);
     expect(await screen.findByText('Informationstelefon nicht verfügbar')).toBeInTheDocument();
     expect(screen.getByText(/das Informationstelefon gehört dazu/)).toBeInTheDocument();
@@ -37,7 +38,7 @@ describe('useStabFreigabe', () => {
   });
 
   it('zeigt bei einem gescheiterten Abruf einen Fehler statt des Inhalts', async () => {
-    vi.mocked(ladeModulOverrides).mockRejectedValue(new ApiError(500, 'kaputt'));
+    vi.mocked(ladeModulFreigaben).mockRejectedValue(new ApiError(500, 'kaputt'));
     renderMitProviders(<Probe />);
     expect(
       await screen.findByText(/nicht ermittelbar — das Informationstelefon bleibt verborgen/),

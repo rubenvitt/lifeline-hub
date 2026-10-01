@@ -15,8 +15,10 @@
  * `parseRouteId`, Render-Stellen mit möglicherweise fehlender ID guarden vor dem Aufruf.
  */
 import type { EtbFilterWerte } from '../api/etb';
-import type { EtbTyp } from '../api/types';
+import type { EtbTyp, SchadenStatus, Spezies } from '../api/types';
 import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter';
+import type { TiereSicht } from '../pages/tiere/tierHelfer';
+import type { SchaedenSicht } from '../pages/schaeden/schadenHelfer';
 
 /** Zentrale Route zur Einsatzliste. */
 export function einsaetzePfad(): string {
@@ -138,6 +140,11 @@ export function tierePfad(einsatzId: number, opts: { neu?: boolean } = {}): stri
 
 export function einsatzdatenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'einsatzdaten');
+}
+
+/** Druckansicht des Einsatzberichts (LFH-726): Unterroute der Einsatzdaten, erbt deren Freigabe. */
+export function einsatzberichtPfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'einsatzdaten')}/bericht`;
 }
 
 export function erinnerungenPfad(einsatzId: number): string {
@@ -400,6 +407,112 @@ export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
   const einheit = parseRouteId(params.get('einheit_id') ?? undefined);
   if (einheit != null) werte.einheit_id = einheit;
   return werte;
+}
+
+// ── Druckansichten der Modul-Listen (LFH-727, design.md D5) ──────────────────────────
+//
+// Die Adresse trägt den Seitenfilter der Liste, damit genau die gezeigte Auswahl gedruckt wird
+// und ein Neuladen sie behält. Ein fehlender Wert heißt „alle“, NICHT die Vorgabe der Liste —
+// die Liste übergibt ihre Sicht deshalb immer ausdrücklich. Ein unbekannter Wert fällt je Achse
+// ganz weg (exhaustive Records wie {@link ETB_TYP_ERLAUBT}).
+
+/** Auswahl der Personen-Druckansicht: Statusfilter und Schalter „nur offene Felder“. */
+export interface PersonenDruckAuswahl {
+  filter: PersonenFilter;
+  nurLuecken: boolean;
+}
+
+export function personenDruckPfad(einsatzId: number, auswahl: PersonenDruckAuswahl): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'personen')}/druck`, {
+    filter: auswahl.filter === 'alle' ? undefined : auswahl.filter,
+    luecken: auswahl.nurLuecken ? 1 : undefined,
+  });
+}
+
+/** Umkehr von {@link personenDruckPfad}. */
+export function parsePersonenDruckAuswahl(params: URLSearchParams): PersonenDruckAuswahl {
+  const filter = params.get('filter');
+  return {
+    filter:
+      filter && Object.prototype.hasOwnProperty.call(PERSONEN_FILTER_ERLAUBT, filter)
+        ? (filter as PersonenFilter)
+        : 'alle',
+    nurLuecken: params.get('luecken') === '1',
+  };
+}
+
+/** Auswahl der Tiere-Druckansicht: Statussicht und optional eine Spezies. */
+export interface TiereDruckAuswahl {
+  sicht: TiereSicht;
+  spezies?: Spezies;
+}
+
+const TIERE_SICHT_ERLAUBT: Record<TiereSicht, true> = {
+  aktiv: true,
+  vermisst: true,
+  abgeschlossen: true,
+  alle: true,
+};
+const SPEZIES_ERLAUBT: Record<Spezies, true> = {
+  hund: true,
+  katze: true,
+  grosstier: true,
+  nutzgefluegel: true,
+  kleintier: true,
+  wildtier: true,
+  sonstige: true,
+};
+
+export function tiereDruckPfad(einsatzId: number, auswahl: TiereDruckAuswahl): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'tiere')}/druck`, {
+    sicht: auswahl.sicht === 'alle' ? undefined : auswahl.sicht,
+    spezies: auswahl.spezies,
+  });
+}
+
+/** Umkehr von {@link tiereDruckPfad}. */
+export function parseTiereDruckAuswahl(params: URLSearchParams): TiereDruckAuswahl {
+  const sicht = params.get('sicht');
+  const spezies = params.get('spezies');
+  const auswahl: TiereDruckAuswahl = {
+    sicht:
+      sicht && Object.prototype.hasOwnProperty.call(TIERE_SICHT_ERLAUBT, sicht)
+        ? (sicht as TiereSicht)
+        : 'alle',
+  };
+  if (spezies && Object.prototype.hasOwnProperty.call(SPEZIES_ERLAUBT, spezies)) {
+    auswahl.spezies = spezies as Spezies;
+  }
+  return auswahl;
+}
+
+/** Auswahl der Schäden-Druckansicht: die Statussicht der Liste. */
+export interface SchaedenDruckAuswahl {
+  sicht: SchaedenSicht;
+}
+
+const SCHAEDEN_SICHT_ERLAUBT: Record<SchadenStatus | 'alle', true> = {
+  offen: true,
+  uebergeben: true,
+  abgeschlossen: true,
+  alle: true,
+};
+
+export function schaedenDruckPfad(einsatzId: number, auswahl: SchaedenDruckAuswahl): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'schaeden')}/druck`, {
+    sicht: auswahl.sicht === 'alle' ? undefined : auswahl.sicht,
+  });
+}
+
+/** Umkehr von {@link schaedenDruckPfad}. */
+export function parseSchaedenDruckAuswahl(params: URLSearchParams): SchaedenDruckAuswahl {
+  const sicht = params.get('sicht');
+  return {
+    sicht:
+      sicht && Object.prototype.hasOwnProperty.call(SCHAEDEN_SICHT_ERLAUBT, sicht)
+        ? (sicht as SchaedenSicht)
+        : 'alle',
+  };
 }
 
 export function personalPfad(einsatzId: number, opts: { personal?: number } = {}): string {

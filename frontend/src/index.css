@@ -6,18 +6,26 @@ body {
   padding: 0;
 }
 
-/* Deeplink-Highlight einer per ?<modul>=<id> angesteuerten Zeile (LFH-25).
+/* Deeplink-Highlight einer per ?<modul>=<id> angesteuerten Zeile (LFH-25), aus Rollen (LFH-698,
+   Spec `deeplink-hervorhebung`). Zwei Kanäle: die Fläche `bedien-flaeche` („aktive Beziehung“,
+   dieselbe Rolle, die die ETB-Zeitachse inline setzt) und eine 2-px-Linie oben und unten in
+   `bedien`. Nachts hebt sich keine vorhandene Fläche allein ab (1,03 : 1), die Linie trägt dort
+   die Sichtbarkeit (≥ 5,4 : 1) und trennt die Markierung vom Hover (`flaeche3`, ohne Linie). Oben
+   und unten, nicht links: links stehen die ETB-Typkanten; kein umlaufender Rahmen: das ist der
+   Fokusring. `box-shadow` statt `border`, damit die Zeile beim Sprung nicht wächst.
    Zwei Selektoren, weil `Datensicht` unter `md` Karten statt Zeilen rendert. Im Tabellenzweig
-   muss die Farbe an die `td` (antd färbt die Zellen, ein Hintergrund am `tr` bliebe verdeckt). */
-.zeile-hervorgehoben > td,
+   gehört die Farbe an die `td` (antd färbt die Zellen, ein Hintergrund am `tr` bliebe verdeckt),
+   in der Spezifität der Lückentönung (`personen/betroffene.css`, (0,3,2)): sie liegt über antds
+   Sortierspalte (`.ant-table-wrapper td.ant-table-column-sort`, (0,2,1); `:where(.css-…)` zählt
+   null). Die alte Form `.zeile-hervorgehoben > td` (0,1,1) verlor dort, die fixierte Kennung
+   blieb am Tag ohne Hervorhebung (gemessen, LFH-698). */
+.ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td,
 [data-lfh='datensicht-karte'].zeile-hervorgehoben {
-  background-color: #fffbe6;
+  background-color: var(--lfh-bedien-flaeche);
+  box-shadow:
+    inset 0 2px 0 var(--lfh-bedien),
+    inset 0 -2px 0 var(--lfh-bedien);
   transition: background-color 0.4s ease;
-}
-
-[data-theme='dark'] .zeile-hervorgehoben > td,
-[data-theme='dark'] [data-lfh='datensicht-karte'].zeile-hervorgehoben {
-  background-color: #2b2611;
 }
 
 /* ETB-Erfassung als angepinnte Leiste am Fuß der Zeitachse (Begründung in `pages/EtbPage.tsx`).

@@ -19,7 +19,7 @@ import type { LiveVerbindungsStatus } from '../../live/liveVerbindung';
 import { etbTyp, sichtung, warnstufeBalkenFarbe } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
-import { warnstufeTon, type Datenzustand } from './lagebild';
+import { warnstufeTon, type Quellzustand } from './lagebild';
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
 import { MATRIX_KLASSE } from './matrixGeometrie';
 import './gefahrenmatrix.css';
@@ -37,7 +37,8 @@ export function GefahrenmatrixPaneel({
   onNeuladen,
   onGefahren,
 }: {
-  zustand: Datenzustand;
+  /** `gesperrt`: Modul Gefahren nicht freigegeben — Grund statt Fehler, kein Weg dorthin. */
+  zustand: Quellzustand;
   zeilen: GefahrenZeile[];
   unbewertet: number;
   gebiete: number;
@@ -45,13 +46,17 @@ export function GefahrenmatrixPaneel({
   onGefahren: () => void;
 }) {
   const { token, rollen } = useRollen();
-  const leerText =
-    gebiete === 0 ? 'Noch keine Gefahrengebiete angelegt.' : 'Noch keine Gefahr bewertet.';
+  const gesperrt = zustand === 'gesperrt';
+  const leerText = gesperrt
+    ? 'Modul Gefahren nicht freigegeben.'
+    : gebiete === 0
+      ? 'Noch keine Gefahrengebiete angelegt.'
+      : 'Noch keine Gefahr bewertet.';
   return (
     <Paneel
       titel="Gefahrenmatrix"
       meta={zustand === 'daten' ? `${gebiete} ${gebiete === 1 ? 'Gebiet' : 'Gebiete'}` : undefined}
-      aktion={<PaneelLink label="Gefahren" onKlick={onGefahren} />}
+      aktion={gesperrt ? undefined : <PaneelLink label="Gefahren" onKlick={onGefahren} />}
       fuss={
         zustand === 'daten' && unbewertet > 0 ? (
           <span style={{ ...monoStil(11), color: rollen.schwach }}>
@@ -62,10 +67,10 @@ export function GefahrenmatrixPaneel({
       style={IM_RASTER}
     >
       <PaneelZustand
-        zustand={zustand}
+        zustand={gesperrt ? 'leer' : zustand}
         titel="Gefahrenmatrix"
         leerText={leerText}
-        leerAktion="Gefahren bewerten"
+        leerAktion={gesperrt ? undefined : 'Gefahren bewerten'}
         onLeerAktion={onGefahren}
         onNeuladen={onNeuladen}
       >
@@ -184,7 +189,8 @@ export function SichtungsPaneel({
   onPersonen,
   onAufnehmen,
 }: {
-  zustand: Datenzustand;
+  /** `gesperrt`: Modul Personen nicht freigegeben — Grund statt Fehler, kein Weg dorthin. */
+  zustand: Quellzustand;
   zeilen: SichtungsZeile[];
   erfasst: number;
   ohneSichtung: number;
@@ -195,11 +201,12 @@ export function SichtungsPaneel({
   onAufnehmen: () => void;
 }) {
   const { token, rollen } = useRollen();
+  const gesperrt = zustand === 'gesperrt';
   return (
     <Paneel
       titel="Sichtung"
       meta={zustand === 'daten' ? `${erfasst} erfasst` : undefined}
-      aktion={<PaneelLink label="Personen" onKlick={onPersonen} />}
+      aktion={gesperrt ? undefined : <PaneelLink label="Personen" onKlick={onPersonen} />}
       // Fuß: „Ohne Sichtung" und „Transportiert / offen" (`transportBilanz`: nach Verbleib-Art,
       // eine Voranmeldung ist kein Transport). „Ohne Sichtung" steht immer, auch mit 0 — sonst
       // schob die live kommende und gehende Zeile das Paneel.
@@ -228,10 +235,10 @@ export function SichtungsPaneel({
       style={IM_RASTER}
     >
       <PaneelZustand
-        zustand={zustand}
+        zustand={gesperrt ? 'leer' : zustand}
         titel="Sichtung"
-        leerText="Noch keine Personen erfasst."
-        leerAktion="Person aufnehmen"
+        leerText={gesperrt ? 'Modul Personen nicht freigegeben.' : 'Noch keine Personen erfasst.'}
+        leerAktion={gesperrt ? undefined : 'Person aufnehmen'}
         onLeerAktion={onAufnehmen}
         onNeuladen={onNeuladen}
       >
@@ -354,7 +361,8 @@ export function MeldungsstromPaneel({
   onEtb,
   onErfassen,
 }: {
-  zustand: Datenzustand;
+  /** `gesperrt`: Modul ETB nicht freigegeben — Grund statt Fehler, kein Weg dorthin (LFH-669). */
+  zustand: Quellzustand;
   sichtbar: EtbEintragAnzeige[];
   neu: number;
   neuMindestens: boolean;
@@ -366,6 +374,7 @@ export function MeldungsstromPaneel({
   onErfassen: () => void;
 }) {
   const { rollen } = useRollen();
+  const gesperrt = zustand === 'gesperrt';
   // „live" nur bei offener Leitung — bei totem Stream liefert der Cache weiter alte Daten.
   const metaFarbe =
     liveStatus === 'open'
@@ -389,14 +398,16 @@ export function MeldungsstromPaneel({
           {VERBINDUNG[liveStatus]}
         </span>
       }
-      aktion={<PaneelLink label="ETB" onKlick={onEtb} />}
+      aktion={gesperrt ? undefined : <PaneelLink label="ETB" onKlick={onEtb} />}
       style={IM_RASTER}
     >
       <PaneelZustand
-        zustand={zustand}
+        zustand={gesperrt ? 'leer' : zustand}
         titel="Meldungsstrom"
-        leerText="Noch keine Einträge im Einsatztagebuch."
-        leerAktion="Eintrag erfassen"
+        leerText={
+          gesperrt ? 'Modul ETB nicht freigegeben.' : 'Noch keine Einträge im Einsatztagebuch.'
+        }
+        leerAktion={gesperrt ? undefined : 'Eintrag erfassen'}
         onLeerAktion={onErfassen}
         onNeuladen={onNeuladen}
       >

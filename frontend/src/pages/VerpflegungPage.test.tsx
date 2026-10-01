@@ -7,20 +7,23 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import { AuthProvider } from '../auth/AuthContext';
-import type { ModulOverrides, VerpflegungZeitfenster } from '../api/types';
+import type { ModulFreigaben, VerpflegungZeitfenster } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
 import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
 import { zeitfensterKennung } from '../verpflegung/verpflegungText';
 import { parseNachforderungVorbelegung } from '../routing/deeplinks';
+import { setzeViewportBreite } from '../test/viewport';
 
 dayjs.extend(utc);
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
-  overrides: {} as ModulOverrides,
+  /** Modul-Freigaben des Servers; `beforeEach` setzt „alles frei“. */
+  freigaben: {} as ModulFreigaben,
 }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
-  ladeModulOverrides: vi.fn(() => Promise.resolve(einsatz.overrides)),
+  ladeModulFreigaben: vi.fn(() => Promise.resolve(einsatz.freigaben)),
 }));
 
 const listeNachforderungen = vi.fn();
@@ -142,7 +145,7 @@ describe('VerpflegungPage (LFH-634)', () => {
       status: 'aktiv',
       meine_rolle: 'einsatzleitung',
     };
-    einsatz.overrides = {};
+    einsatz.freigaben = freigabenFixture();
     liefert([fruehstueck(), mittag(), abend()]);
     listeNachforderungen.mockResolvedValue([
       { id: 4, bezeichnung: 'Feldküche', art: 'Verpflegung', status: 'eingetroffen' },
@@ -307,9 +310,7 @@ describe('VerpflegungPage (LFH-634)', () => {
     });
 
     it('Modul ausgeblendet: keine Anfrage, kein „Nachfordern", nur „Nachforderung #n"', async () => {
-      einsatz.overrides = {
-        nachforderungen: { einsatz_id: 1, modul_key: 'nachforderungen', sichtbar: false },
-      };
+      einsatz.freigaben = freigabenFixture({ nachforderungen: { sichtbar: false } });
       liefert([
         zeitfenster({
           id: 1,
@@ -367,6 +368,41 @@ describe('VerpflegungPage (LFH-634)', () => {
       );
       expect(kartenNamen()).toEqual(['Imbiss', 'Mittag', 'Abend']);
       expect(sammelbanner()).toBeNull();
+    });
+
+    it('auf dem Handschirm: Segment „aktuell (n)“, Banner als Knopf „1 neu“, voller Satz im Status (LFH-694)', async () => {
+      setzeViewportBreite(390);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      // Unter `md` kurz, damit neben der Segmentleiste Platz für das Banner bleibt.
+      expect(screen.getByRole('radio', { name: 'aktuell (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'vergangen (1)' })).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /laufend & anstehend/ })).toBeNull();
+
+      liefert([fruehstueck(), fremd(), mittag(), abend()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+
+      const banner = sammelbanner() as HTMLElement;
+      expect(banner).toHaveTextContent('1 neues Zeitfenster, davon 1 mit Unterdeckung');
+      const knopf = within(banner).getByRole('button', { name: '1 neu anzeigen' });
+      expect(knopf).toHaveTextContent(/^1 neu$/);
+      await userEvent.click(knopf);
+      expect(kartenNamen()).toEqual(['Imbiss', 'Mittag', 'Abend']);
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('breit bleiben Segmentbeschriftung und Banner wie bisher (LFH-694)', async () => {
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      expect(screen.getByRole('radio', { name: 'laufend & anstehend (2)' })).toBeInTheDocument();
+      liefert([fruehstueck(), fremd(), mittag(), abend()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(
+        within(sammelbanner() as HTMLElement).getByRole('button', { name: 'anzeigen' }),
+      ).toBeInTheDocument();
+      expect(within(sammelbanner() as HTMLElement).queryByText('1 neu')).toBeNull();
     });
 
     it('ein fremd vorgezogener Beginn ordnet nicht unter dem Cursor um (Muster LFH-660)', async () => {

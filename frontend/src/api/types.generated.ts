@@ -607,6 +607,17 @@ export interface components {
             geaendert_at?: string | null;
         };
         /**
+         * @description Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`
+         *     für den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines
+         *     ETB-Eintrags nie leer.
+         */
+        BerichtigungVerweis: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            lfd_nr: number;
+        };
+        /**
          * @description Besetzungszustand eines Sachgebiets (Entscheidung 3 der Spec). Wire == `as_str()`.
          *
          *     **Keine Zeile = „nicht vergeben"** — das ist der im Fükw der Führungsstufe B
@@ -1241,6 +1252,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             ist_adhoc: boolean;
+            /**
+             * @description Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+             *     `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+             */
+            ist_demo: boolean;
             kennzeichen?: string | null;
             /** Format: double */
             lat?: number | null;
@@ -1284,6 +1300,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             ist_adhoc: boolean;
+            /**
+             * @description Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+             *     `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+             */
+            ist_demo: boolean;
             kategorie?: string | null;
             /**
              * Format: int64
@@ -1342,6 +1363,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             ist_adhoc: boolean;
+            /**
+             * @description Trägt der Stamm-Datensatz eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus
+             *     `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
+             */
+            ist_demo: boolean;
             name: string;
             /**
              * Format: int64
@@ -1599,6 +1625,14 @@ export interface components {
              * @description Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`.
              */
             befehl_id?: number | null;
+            /**
+             * @description Berichtigungen, die auf DIESEN Eintrag zeigen (LFH-689) — die Rückrichtung zu
+             *     `berichtigt_eintrag_id`. Aufsteigend nach `lfd_nr`, leer statt fehlend, unabhängig von
+             *     Seite und Listenfilter: die Palette-Vorschau liest einen Eintrag allein und muss trotzdem
+             *     sagen, dass er überholt ist. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen
+             *     die Liste je Seite mit einer gebündelten Abfrage nach, wie `folgeauftraege`.
+             */
+            berichtigt_durch: components["schemas"]["BerichtigungVerweis"][];
             /** Format: int64 */
             berichtigt_eintrag_id?: number | null;
             ereigniszeit: string;
@@ -1770,6 +1804,8 @@ export interface components {
             funkrufname: string;
             /** Format: int64 */
             id: number;
+            /** @description Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`. */
+            ist_demo: boolean;
             kennzeichen?: string | null;
             opta?: string | null;
             sondersignal: boolean;
@@ -2302,6 +2338,8 @@ export interface components {
             dienststatus: components["schemas"]["Dienststatus"];
             /** Format: int64 */
             id: number;
+            /** @description Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`. */
+            ist_demo: boolean;
             kategorie?: string | null;
             standort?: string | null;
             traegerorganisation?: string | null;
@@ -2484,6 +2522,23 @@ export interface components {
             /** @description Anzeige der Führungsstelle: „S2 Lage“, „Fachberater: THW“ oder der Freitext. */
             fuehrungsstelle_anzeige?: string | null;
             zugewiesen_at: string;
+        };
+        /**
+         * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
+         *     `GET /api/einsaetze/{id}/modul-freigaben` und die EINE Auswertung hinter
+         *     [`fordere_modul_zugriff`] und [`erlaubte_module`].
+         */
+        ModulFreigabe: {
+            /**
+             * @description Das Modul erscheint in der Navigation. `false` nur, wenn der Einsatz ein ausblendbares
+             *     Modul ausblendet — auch für System-Admins, die es dennoch erreichen (`zugriff`).
+             */
+            sichtbar: boolean;
+            /**
+             * @description Der Benutzer darf die Endpunkte des Moduls aufrufen: genau die Entscheidung des
+             *     Modul-Gates der Listen-Endpunkte.
+             */
+            zugriff: boolean;
         };
         /**
          * @description Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys
@@ -3053,6 +3108,8 @@ export interface components {
             dienststatus: components["schemas"]["Dienststatus"];
             /** Format: int64 */
             id: number;
+            /** @description Trägt die Zeile eine Demo-Marke (LFH-733, Spec `demo-daten`)? Live aus `demo_herkunft`. */
+            ist_demo: boolean;
             name: string;
             personalnummer?: string | null;
             qualifikationen: components["schemas"]["QualifikationRef"][];
@@ -3986,10 +4043,10 @@ export interface components {
         };
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-         *     `art IN ('detail','export')` (migrations/0021_person_zugriff_audit.sql).
+         *     `art IN ('detail','export','druck')` (migrations/0132_person_zugriff_audit_druck.sql, zuvor 0021).
          * @enum {string}
          */
-        ZugriffArt: "detail" | "export";
+        ZugriffArt: "detail" | "export" | "druck";
     };
     responses: never;
     parameters: never;

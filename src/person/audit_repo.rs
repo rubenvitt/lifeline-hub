@@ -4,12 +4,14 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-/// `art IN ('detail','export')` (migrations/0021_person_zugriff_audit.sql).
+/// `art IN ('detail','export','druck')` (migrations/0132_person_zugriff_audit_druck.sql, zuvor 0021).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ZugriffArt {
     Detail,
     Export,
+    /// LFH-727: Abruf der Personen-Druckansicht (`GET …/personen/druck`), ohne Person.
+    Druck,
 }
 
 /// Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).
@@ -24,8 +26,8 @@ pub struct ZugriffAnzeige {
     pub zugriff_at: String,
 }
 
-/// Schreibt einen append-only Audit-Eintrag. `person_id = None` beim Export der
-/// gesamten Liste. `art` ist 'detail' oder 'export'.
+/// Schreibt einen append-only Audit-Eintrag. `person_id = None` beim Export oder Druck der
+/// gesamten Liste. `art` ist 'detail', 'export' oder 'druck'.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -125,5 +127,24 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(count, 1);
+    }
+
+    /// LFH-727: der Personendruck schreibt `druck` ohne Person (wie der Export der Liste); die
+    /// Einsicht je Person zeigt ihn deshalb nicht.
+    #[tokio::test]
+    async fn druck_eintrag_ohne_person() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        anlegen(&pool, e, None, b, "druck").await.unwrap();
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM person_zugriff_audit \
+             WHERE einsatz_id = ? AND art = 'druck' AND person_id IS NULL",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(count, 1);
+        assert!(liste_je_person(&pool, e, p).await.unwrap().is_empty());
     }
 }

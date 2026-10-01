@@ -8,9 +8,11 @@ import {
   Input,
   InputNumber,
   Row,
+  Space,
   Switch,
   theme,
 } from 'antd';
+import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
@@ -151,7 +153,12 @@ export default function FahrzeugDetailPage() {
       />
       <AdminPage
         breite="schmal"
-        titel={<span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>}
+        titel={
+          <Space size={8}>
+            <span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>
+            {fahrzeug.ist_demo && <DemoMarke />}
+          </Space>
+        }
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die ein Fahrzeug nicht auffindbar ist."
         hinweis={
           <SeitenHinweise

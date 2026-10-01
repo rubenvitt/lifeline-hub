@@ -116,6 +116,10 @@ die Angaben, die seine Fachseite zum Lesen zeigt. Angaben, für die es keine Dat
 gibt, MUST sie weglassen, statt einen Platzhalter zu zeigen. Sie MUST nur lesen: Sie trägt
 keine Aktion, die einen Datensatz verändert.
 
+Die Vorschau eines ETB-Eintrags MUST jede Berichtigung, die auf diesen Eintrag zeigt, mit
+ihrer laufenden Nummer und einem Verweis auf sie nennen, auch wenn die Berichtigung nicht
+zur Trefferliste gehört. Ein Eintrag ohne Berichtigung MUST keinen solchen Hinweis tragen.
+
 Zeilen ohne Datensatz tragen weiterhin keine Vorschau. Dazu gehören Module, Aktionen, der
 ETB-Sammeltreffer „Alle Einträge zu …“ und der Koordinatensprung.
 
@@ -126,6 +130,18 @@ ETB-Sammeltreffer „Alle Einträge zu …“ und der Koordinatensprung.
 #### Scenario: Berichtigung verweist auf den Grundeintrag
 - **WHEN** die Vorschau eines ETB-Eintrags geöffnet wird, der einen älteren Eintrag berichtigt
 - **THEN** sagt sie, dass er einen älteren Eintrag berichtigt, und trägt einen Verweis auf diesen Grundeintrag
+
+#### Scenario: Berichtigter Eintrag nennt seine Berichtigungen
+- **WHEN** die Vorschau von ETB-Eintrag Nr. 7 geöffnet wird und Nr. 9 und Nr. 12 Berichtigungen von Nr. 7 sind
+- **THEN** trägt sie die Verweise „berichtigt durch Nr. 9“ und „berichtigt durch Nr. 12“ in aufsteigender Reihenfolge, und ein Klick auf einen davon zeigt diese Berichtigung im ETB und schließt die Palette
+
+#### Scenario: Eintrag ohne Berichtigung
+- **WHEN** die Vorschau eines ETB-Eintrags geöffnet wird, auf den keine Berichtigung zeigt
+- **THEN** trägt sie keinen Hinweis „berichtigt durch“
+
+#### Scenario: Berichtigung kommt während der offenen Vorschau dazu
+- **WHEN** die Vorschau eines ETB-Eintrags offen ist und an anderer Stelle eine Berichtigung dieses Eintrags erfasst wird
+- **THEN** nennt die Vorschau die neue Berichtigung, ohne dass sie neu geöffnet werden muss
 
 #### Scenario: Meldung
 - **WHEN** eine Meldung als Treffer markiert ist und → gedrückt wird

@@ -23,7 +23,7 @@ export {
   naechsterIndex,
   type SegmentOption,
 } from './Segmentleiste';
-export { default as Sammelbanner } from './Sammelbanner';
+export { default as Sammelbanner, sammelbannerKurz } from './Sammelbanner';
 export { default as Schnellerfassungszeile } from './Schnellerfassungszeile';
 export { rollenwerte, useRollen, monoStil } from './rollenwerte';
 export { default as Datenraster, Datenfeld } from './Datenraster';

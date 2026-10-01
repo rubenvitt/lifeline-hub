@@ -1,4 +1,4 @@
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { useUnwetterHinweis } from './useUnwetterHinweis';
 
 /**
@@ -8,7 +8,7 @@ import { useUnwetterHinweis } from './useUnwetterHinweis';
 export default function UnwetterHinweis(props: {
   einsatzId: number;
   benutzer: BenutzerAnzeige | null;
-  overrides: ModulOverrides | undefined;
+  freigaben: ModulFreigaben | undefined;
 }) {
   useUnwetterHinweis(props);
   return null;

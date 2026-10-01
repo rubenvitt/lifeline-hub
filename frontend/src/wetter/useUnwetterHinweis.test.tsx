@@ -3,9 +3,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ModulOverrides } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useUnwetterHinweis } from './useUnwetterHinweis';
@@ -74,16 +73,7 @@ beforeEach(() => {
   client = neuerQueryClient();
 });
 
-const ausgeblendet: ModulOverrides = {
-  'wetter-pegel': {
-    einsatz_id: 7,
-    modul_key: 'wetter-pegel',
-    sichtbar: false,
-    benoetigte_rolle: null,
-    geaendert_at: null,
-    geaendert_von: null,
-  },
-};
+const ausgeblendet = freigabenFixture({ 'wetter-pegel': { sichtbar: false, zugriff: false } });
 
 const ereignisse: CustomEvent[] = [];
 const merke = (ev: Event) => ereignisse.push(ev as CustomEvent);
@@ -101,7 +91,10 @@ const warteTakt = () => new Promise((r) => setTimeout(r, 30));
 describe('useUnwetterHinweis', () => {
   it('meldet eine neue Unwetterwarnung genau einmal, mit dezentem Ton, ohne „mäßig"', async () => {
     const abrufe = liefere();
-    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: {} }), { wrapper });
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      { wrapper },
+    );
     await waitFor(() => expect(ereignisse).toHaveLength(1));
     expect(ereignisse[0].detail).toMatchObject({
       schluessel: 'schwer|SCHWERES GEWITTER',
@@ -114,13 +107,19 @@ describe('useUnwetterHinweis', () => {
 
   it('nach einem Neuladen mit demselben Gedächtnis: kein weiterer Hinweis', async () => {
     liefere();
-    const erster = renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: {} }), {
-      wrapper,
-    });
+    const erster = renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      {
+        wrapper,
+      },
+    );
     await waitFor(() => expect(ereignisse).toHaveLength(1));
     erster.unmount();
     const abrufe = liefere();
-    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: {} }), { wrapper });
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      { wrapper },
+    );
     await waitFor(() => expect(abrufe.anzahl).toBe(1));
     await warteTakt();
     expect(ereignisse).toHaveLength(1);
@@ -128,21 +127,30 @@ describe('useUnwetterHinweis', () => {
 
   it('eine andere Person am selben Browser bekommt den Hinweis', async () => {
     liefere();
-    const erster = renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: {} }), {
-      wrapper,
-    });
+    const erster = renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      {
+        wrapper,
+      },
+    );
     await waitFor(() => expect(ereignisse).toHaveLength(1));
     erster.unmount();
     const andere = benutzerFixture({ id: benutzer.id + 1, anzeigename: 'F' });
-    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer: andere, overrides: {} }), {
-      wrapper,
-    });
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer: andere, freigaben: freigabenFixture() }),
+      {
+        wrapper,
+      },
+    );
     await waitFor(() => expect(ereignisse).toHaveLength(2));
   });
 
   it('bei „Stand unbekannt" kein Hinweis', async () => {
     const abrufe = liefere(7 * STUNDE);
-    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: {} }), { wrapper });
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      { wrapper },
+    );
     await waitFor(() => expect(abrufe.anzahl).toBe(1));
     await warteTakt();
     expect(ereignisse).toHaveLength(0);
@@ -151,7 +159,7 @@ describe('useUnwetterHinweis', () => {
 
   it('Modul ausgeblendet: keine Anfrage, kein Hinweis', async () => {
     const abrufe = liefere();
-    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: ausgeblendet }), {
+    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: ausgeblendet }), {
       wrapper,
     });
     await warteTakt();
@@ -159,9 +167,9 @@ describe('useUnwetterHinweis', () => {
     expect(ereignisse).toHaveLength(0);
   });
 
-  it('solange die Modul-Overrides laden: keine Anfrage (kein 403 bei ausgeblendetem Modul)', async () => {
+  it('solange die Modulfreigaben laden: keine Anfrage (kein 403 bei ausgeblendetem Modul)', async () => {
     const abrufe = liefere();
-    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: undefined }), {
+    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: undefined }), {
       wrapper,
     });
     await warteTakt();
@@ -170,7 +178,10 @@ describe('useUnwetterHinweis', () => {
 
   it('fragt auch im Hintergrund-Tab nach — sonst griffe die Desktop-Meldung nie', async () => {
     liefere();
-    renderHook(() => useUnwetterHinweis({ einsatzId: 7, benutzer, overrides: {} }), { wrapper });
+    renderHook(
+      () => useUnwetterHinweis({ einsatzId: 7, benutzer, freigaben: freigabenFixture() }),
+      { wrapper },
+    );
     await waitFor(() => expect(ereignisse).toHaveLength(1));
     const query = client.getQueryCache().find({ queryKey: einsatzKeys.wetter(7) });
     expect(query?.observers.some((o) => o.options.refetchIntervalInBackground === true)).toBe(true);

@@ -34,7 +34,9 @@
  * Uhr-Takt (`TAKT_MS`) nach.
  *
  * Datenzustände: jede Kennzahl und jedes Paneel hängt an seinen Abfragen und unterscheidet `laden`
- * / `fehler` / `leer` sichtbar; fällt die Gefahrenmatrix aus, bleibt der Rest lesbar.
+ * / `fehler` / `leer` sichtbar; fällt die Gefahrenmatrix aus, bleibt der Rest lesbar. Ein nicht
+ * freigegebenes Modul (LFH-669, `useLagebild`) wird nicht angefragt und steht als „—" bzw. Satz mit
+ * Grund da, nie als Ausfall und nie als 0.
  */
 import { IkoneWarndreieck } from '../../ikonen';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
@@ -57,8 +59,7 @@ import {
   unfallhilfsstellenListePfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
-import { ladeModulOverrides } from '../../api/einsaetze';
-import { useAuth } from '../../auth/AuthContext';
+import { ladeModulFreigaben } from '../../api/einsaetze';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import { ladeMatrix } from '../../api/gefahren';
@@ -89,6 +90,7 @@ import {
   warnstufeTon,
   type Datenzustand,
   type EvakuierungStand,
+  type Quellzustand,
   type KennzahlEtikett,
 } from './lagebild';
 import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
@@ -106,6 +108,7 @@ import {
   type Zaehlstand,
 } from './fuehrungsZahlen';
 import { useLagebild } from './useLagebild';
+import { schlechtesterZustand } from '../../api/abrufZustand';
 
 /**
  * Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener Block mit
@@ -147,66 +150,62 @@ export default function LageDashboardPage() {
 
   // Die Quellen des Lagebilds teilt sich die Seite mit der Vorbereitung der Lagebesprechung
   // (LFH-550): eine Zusammenstellung, ein `baueLagebild`.
-  const { q: quellen, basis } = useLagebild(einsatzId, { mitPegel: true });
+  // Modulgebundene Quellen fragt `useLagebild` nur bei Freigabe an (LFH-669); ihre Daten liest die
+  // Seite aus `daten`, ihren Zustand aus `quellZustand` — nie roh aus der Abfrage, sonst erschiene
+  // ein Altstand aus dem Cache als Lage.
   const {
-    einsatz: einsatzQuery,
-    personen: personenQuery,
-    uhs: uhsQuery,
-    schaeden: schaedenQuery,
-    gefahren: gefahrenQuery,
-    lageberichte: lageberichteQuery,
-    einheiten: einheitenQuery,
-    personal: personalQuery,
-    fahrzeuge: fahrzeugeQuery,
-    material: materialQuery,
-    abschnitte: abschnitteQuery,
-    pegel: pegelQuery,
-    zaehler: zaehlerQuery,
-  } = quellen;
+    q: quellen,
+    basis,
+    zustand: quellZustand,
+    daten,
+    stand,
+    nachladen,
+  } = useLagebild(einsatzId, { mitPegel: true });
+  const { einsatz: einsatzQuery, pegel: pegelQuery, zaehler: zaehlerQuery } = quellen;
   // Die Matrix je Gefahrengebiet unter demselben Key wie die Gefahrenseite: Cache geteilt, das
   // Live-Event `gefahr` invalidiert beide.
   const matrixQueries = useQueries({
-    queries: (gefahrenQuery.data ?? []).map((g) => ({
+    queries: (daten.gefahren ?? []).map((g) => ({
       queryKey: einsatzKeys.gefahrenmatrix(einsatzId, g.id),
       queryFn: () => ladeMatrix(einsatzId, g.id),
     })),
   });
+  // Die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die Pflege.
+  // Bis die Freigaben da sind, gilt die Pflege — sonst ein Sprung ins womöglich ausgeblendete
+  // Modul.
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
   // Eigener Filter-Key (`{ limit }`), getrennt vom Endlos-Abruf der ETB-Seite; beide hängen am
-  // Prefix `etb`, das Live-Event trifft also auch diesen.
+  // Prefix `etb`, das Live-Event trifft also auch diesen. Nur bei Freigabe des ETB (LFH-669).
+  const etbFrei = istKeyFreigegeben('etb', freigabenQuery.data);
   const etbQuery = useQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, { limit: STROM_ABRUF }),
     queryFn: () => listeEtb(einsatzId, { limit: STROM_ABRUF }),
-  });
-  // Die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die Pflege.
-  // Bis die Overrides da sind, gilt die Pflege — sonst ein Sprung ins womöglich ausgeblendete
-  // Modul.
-  const { benutzer, laedt: authLaedt } = useAuth();
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+    enabled: etbFrei,
   });
   const pegelZiel = pegelZielPfad(
     einsatzId,
-    overridesQuery.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQuery.data),
+    freigabenQuery.isSuccess && istKeyFreigegeben('wetter-pegel', freigabenQuery.data),
   );
-  // „Evakuiert" erst `bereit`, wenn Benutzer und Overrides feststehen: vorher kein Abruf (sonst 403
+  // „Evakuiert" erst `bereit`, wenn die Modul-Freigaben feststehen: vorher kein Abruf (sonst 403
   // bei ausgeblendetem Modul), kein aufblitzendes „nicht freigegeben", kein Link. Scheitert der
-  // Overrides-Abruf, zeigt die Zelle „Stand unbekannt".
-  const freigabenBekannt = !authLaedt && overridesQuery.isSuccess;
+  // Freigaben-Abruf, zeigt die Zelle „Stand unbekannt".
+  const freigabenBekannt = freigabenQuery.isSuccess;
   const evakuierungZustand = useEvakuierungKennzahl({
     einsatzId,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben: freigabenQuery.data,
     bereit: freigabenBekannt,
   });
-  const freigabenFehler = overridesQuery.isError;
+  const freigabenFehler = freigabenQuery.isError;
   const evakuierung = useMemo(
     (): EvakuierungStand =>
       freigabenFehler ? { zustand: 'fehler' } : evakuierungStand(evakuierungZustand),
     [freigabenFehler, evakuierungZustand],
   );
   const evakuierungZiel =
-    freigabenBekannt && darfZaehlerZeigen('betreuung', benutzer, overridesQuery.data)
+    freigabenBekannt && darfZaehlerZeigen('betreuung', freigabenQuery.data)
       ? betreuungPfad(einsatzId)
       : undefined;
 
@@ -261,7 +260,8 @@ export default function LageDashboardPage() {
     setMarkeFuer(einsatzId);
     setAngezeigtBis(null);
   }
-  const etbDaten = etbQuery.data;
+  // Ohne Freigabe auch kein Altstand aus dem Cache.
+  const etbDaten = etbFrei ? etbQuery.data : undefined;
   // Abgeleiteter Zustand während des Renderns: erster Abruf und leer gewordenes Paneel ziehen die
   // Marke nach, alles andere wartet auf „anzeigen".
   if (etbDaten && wassermarkeNachziehen(etbDaten, angezeigtBis)) {
@@ -270,43 +270,55 @@ export default function LageDashboardPage() {
   const strom = stromAuswahl(etbDaten ?? [], angezeigtBis);
 
   // ── Zustände je Block ──
-  const zBetroffene = zustandVon(personenQuery);
-  const zKraefte = zustandVon(
-    abschnitteQuery,
-    einheitenQuery,
-    personalQuery,
-    fahrzeugeQuery,
-    materialQuery,
+  // Die Lagebild-Quellen tragen `gesperrt` (Modul nicht freigegeben, LFH-669); mehrere Quellen
+  // einer Aussage verdichtet `schlechtesterZustand` wie in der Vorbereitung.
+  const zBetroffene: Quellzustand = quellZustand.personen;
+  const zKraefte: Quellzustand = schlechtesterZustand(
+    quellZustand.abschnitte,
+    quellZustand.einheiten,
+    quellZustand.personal,
+    quellZustand.fahrzeuge,
+    quellZustand.material,
   );
-  const zGefahren = zustandVon(gefahrenQuery);
-  const zMatrixRoh = zustandVon(gefahrenQuery, ...matrixQueries);
+  const zGefahren: Quellzustand = quellZustand.gefahren;
+  const zMatrixRoh: Quellzustand = zGefahren === 'daten' ? zustandVon(...matrixQueries) : zGefahren;
   const matrix = verdichteGefahrenmatrix(matrixQueries.flatMap((q) => q.data ?? []));
-  const anzahlGebiete = gefahrenQuery.data?.length ?? 0;
-  const zMatrix: Datenzustand =
+  const anzahlGebiete = daten.gefahren?.length ?? 0;
+  const zMatrix: Quellzustand =
     zMatrixRoh === 'daten' && matrix.zeilen.length === 0 ? 'leer' : zMatrixRoh;
-  const zStromRoh = zustandVon(etbQuery);
-  const zStrom: Datenzustand =
+  // Freigaben unbekannt: laden bzw. Fehler (wie die übrigen gebundenen Quellen); verweigert:
+  // `gesperrt`, kein Ausfall.
+  const zStromRoh: Quellzustand =
+    freigabenQuery.data === undefined
+      ? freigabenQuery.isError
+        ? 'fehler'
+        : 'laden'
+      : etbFrei
+        ? zustandVon(etbQuery)
+        : 'gesperrt';
+  const zStrom: Quellzustand =
     zStromRoh === 'daten' && (etbDaten ?? []).length === 0 ? 'leer' : zStromRoh;
 
   // Je Kennzahl der Zustand ihrer Quelle — als `Record` über alle Etiketten, damit eine neue
   // Kennzahl den Build bricht.
-  const kennzahlZustand: Record<KennzahlEtikett, Datenzustand> = {
+  const kennzahlZustand: Record<KennzahlEtikett, Quellzustand> = {
     Pegel: zustandVon(pegelQuery),
     'Verbleib offen': zBetroffene,
     Betroffene: zBetroffene,
     Kräfte: zKraefte,
     Vermisste: zBetroffene,
     Evakuiert: evakuierungDatenzustand(evakuierung),
-    'Schäden offen': zustandVon(schaedenQuery),
+    'Schäden offen': quellZustand.schaeden,
     Einsatzdauer: zustandVon(einsatzQuery),
   };
 
+  // Eine gesperrte Quelle zählt nicht in den Datenstand (`stand` liefert dann 0).
   const datenstand = gemeinsamerDatenstand(
     einsatzQuery.dataUpdatedAt,
-    personenQuery.dataUpdatedAt,
-    gefahrenQuery.dataUpdatedAt,
-    schaedenQuery.dataUpdatedAt,
-    einheitenQuery.dataUpdatedAt,
+    stand('personen'),
+    stand('gefahren'),
+    stand('schaeden'),
+    stand('einheiten'),
     zaehlerQuery.dataUpdatedAt,
     etbQuery.dataUpdatedAt,
   );
@@ -320,8 +332,11 @@ export default function LageDashboardPage() {
   const breit = abBreite('lg');
   const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
   const fuehrung = lagebild?.fuehrung;
-  const zFuehrung = (q: UseQueryResult<unknown>): KennzahlZustand =>
-    lagebild ? alsKennzahlZustand(zustandVon(q)) : 'laden';
+  const zFuehrung = (z: Quellzustand): KennzahlZustand =>
+    !lagebild ? 'laden' : z === 'gesperrt' ? 'daten' : alsKennzahlZustand(z);
+  // Gesperrt erst mit Lagebild: vorher behauptet der Führungsstand keinen Stand, auch keinen Grund.
+  const lageberichteGesperrt = lagebild != null && quellZustand.lageberichte === 'gesperrt';
+  const uhsGesperrt = lagebild != null && quellZustand.uhs === 'gesperrt';
   // Aufträge und Meldungen aus dem Modulzähler (LFH-550): dieselbe Zahl wie im Modulpanel. Ein
   // fehlendes Modul steht als „—" mit Grund da, nie als 0.
   const auftraege = auftragsStand(zaehlerQuery);
@@ -416,20 +431,34 @@ export default function LageDashboardPage() {
               ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
                   <Kennzahl key={i} titel={'\u00a0'} wert="" zustand="laden" />
                 ))
-              : lagebild.kennzahlen.map((k) => (
-                  <Kennzahl
-                    key={k.etikett}
-                    titel={k.etikett}
-                    wert={k.wert}
-                    einheit={k.einheit}
-                    notiz={k.notiz}
-                    ton={k.ton}
-                    zustand={alsKennzahlZustand(kennzahlZustand[k.etikett])}
-                    ziel={
-                      k.ohneZiel ? undefined : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route))
-                    }
-                  />
-                ))}
+              : lagebild.kennzahlen.map((k) => {
+                  const z = kennzahlZustand[k.etikett];
+                  // Nicht freigegeben (LFH-669): „—" mit Grund, kein Ausfall, keine erfundene 0,
+                  // kein Sprung ins gesperrte Modul — wie „Aufträge offen".
+                  return z === 'gesperrt' ? (
+                    <Kennzahl
+                      key={k.etikett}
+                      titel={k.etikett}
+                      wert="—"
+                      notiz={NICHT_FREIGEGEBEN}
+                    />
+                  ) : (
+                    <Kennzahl
+                      key={k.etikett}
+                      titel={k.etikett}
+                      wert={k.wert}
+                      einheit={k.einheit}
+                      notiz={k.notiz}
+                      ton={k.ton}
+                      zustand={alsKennzahlZustand(z)}
+                      ziel={
+                        k.ohneZiel
+                          ? undefined
+                          : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route))
+                      }
+                    />
+                  );
+                })}
           </Kennzahlenband>
 
           <div
@@ -448,22 +477,22 @@ export default function LageDashboardPage() {
               unbewertet={matrix.unbewertet}
               gebiete={anzahlGebiete}
               onNeuladen={() => {
-                void gefahrenQuery.refetch();
+                nachladen('gefahren');
                 for (const q of matrixQueries) void q.refetch();
               }}
               onGefahren={() => waehle(gefahrenPfad(einsatzId))}
             />
             <SichtungsPaneel
               zustand={
-                zBetroffene === 'daten' && (personenQuery.data ?? []).length === 0
+                zBetroffene === 'daten' && (daten.personen ?? []).length === 0
                   ? 'leer'
                   : zBetroffene
               }
               zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
               erfasst={lagebild?.betroffeneGesamt ?? 0}
               ohneSichtung={lagebild?.sk.ohne ?? 0}
-              transport={transportBilanz(personenQuery.data ?? [])}
-              onNeuladen={() => void personenQuery.refetch()}
+              transport={transportBilanz(daten.personen ?? [])}
+              onNeuladen={() => nachladen('personen')}
               onPersonen={() => waehle(personenPfad(einsatzId))}
               onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}
             />
@@ -475,7 +504,10 @@ export default function LageDashboardPage() {
               liveStatus={liveStatus}
               konv={konv}
               onAnzeigen={() => setAngezeigtBis(strom.hoechste)}
-              onNeuladen={() => void etbQuery.refetch()}
+              onNeuladen={() =>
+                // `refetch` umginge `enabled`: ohne Freigaben erst die Freigaben.
+                void (freigabenQuery.data === undefined ? freigabenQuery : etbQuery).refetch()
+              }
               onEtb={() => waehle(etbPfad(einsatzId))}
               onErfassen={() => waehle(etbPfad(einsatzId, { neu: true }))}
             />
@@ -547,27 +579,35 @@ export default function LageDashboardPage() {
               // `stand` ist ein UTC-Wirestring ohne Zonenkennung; formatiert wird hier, weil die Zone
               // am Provider hängt.
               wert={
-                fuehrung?.bericht ? formatUhrzeitMitTag(fuehrung.bericht.stand, konv) : 'keiner'
+                lageberichteGesperrt
+                  ? '—'
+                  : fuehrung?.bericht
+                    ? formatUhrzeitMitTag(fuehrung.bericht.stand, konv)
+                    : 'keiner'
               }
               notiz={
-                fuehrung?.bericht
-                  ? `${fuehrung.bericht.statusLabel} · ${fuehrung.bericht.titel}`
-                  : 'noch nicht erstellt'
+                lageberichteGesperrt
+                  ? NICHT_FREIGEGEBEN
+                  : fuehrung?.bericht
+                    ? `${fuehrung.bericht.statusLabel} · ${fuehrung.bericht.titel}`
+                    : 'noch nicht erstellt'
               }
-              zustand={zFuehrung(lageberichteQuery)}
+              zustand={zFuehrung(quellZustand.lageberichte)}
               ziel={
-                fuehrung?.bericht
-                  ? lageberichtDetailPfad(einsatzId, fuehrung.bericht.id)
-                  : lageberichtePfad(einsatzId)
+                lageberichteGesperrt
+                  ? undefined
+                  : fuehrung?.bericht
+                    ? lageberichtDetailPfad(einsatzId, fuehrung.bericht.id)
+                    : lageberichtePfad(einsatzId)
               }
             />
             <Kennzahl
               titel="UHS aktiv"
               groesse="klein"
-              wert={fuehrung?.uhsAktiv ?? ''}
-              notiz={`${fuehrung?.uhsGeplant ?? 0} geplant`}
-              zustand={zFuehrung(uhsQuery)}
-              ziel={unfallhilfsstellenListePfad(einsatzId)}
+              wert={uhsGesperrt ? '—' : (fuehrung?.uhsAktiv ?? '')}
+              notiz={uhsGesperrt ? NICHT_FREIGEGEBEN : `${fuehrung?.uhsGeplant ?? 0} geplant`}
+              zustand={zFuehrung(quellZustand.uhs)}
+              ziel={uhsGesperrt ? undefined : unfallhilfsstellenListePfad(einsatzId)}
             />
           </Kennzahlenband>
         </div>

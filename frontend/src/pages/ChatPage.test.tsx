@@ -282,6 +282,51 @@ describe('ChatPage', () => {
     ).toBeInTheDocument();
   });
 
+  // LFH-700: Die im Dialog gewählten Anhänge gehen als `anhang_ids` an den Server.
+  it('stuft eine Nachricht samt gewähltem Anhang ins ETB herauf', async () => {
+    let gesendet: unknown = null;
+    const mitFoto: ChatNachricht = {
+      ...nachricht,
+      anhaenge: [
+        {
+          id: 31,
+          einsatz_id: 7,
+          dateiname: 'deich.jpg',
+          mime: 'image/jpeg',
+          groesse: 2048,
+          hochgeladen_von: 1,
+          erstellt_at: '2026-06-10 10:00:00',
+        },
+      ],
+    };
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([mitFoto])),
+      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-etb', async ({ request }) => {
+        gesendet = await request.json();
+        return HttpResponse.json({ ...mitFoto, etb_eintrag_id: 40 });
+      }),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Zu ETB' }));
+    expect(await screen.findByRole('checkbox', { name: /deich\.jpg/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
+
+    await waitFor(() =>
+      expect(gesendet).toEqual({ typ: 'meldung', inhalt: 'Erste Lage', anhang_ids: [31] }),
+    );
+  });
+
   it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {
     server.use(
       meHandler(nutzer),
