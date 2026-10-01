@@ -331,8 +331,10 @@ Umgebung und ist damit für Build-Skripte fremder Crates sichtbar. So ist Tauri 
 `TAURI_SIGNING_PRIVATE_KEY` gilt es schon heute; ein eigener Schlüsselbund-Schritt verschöbe das
 Risiko nur (D1).
 
-Den CI-Lauf mit dem geänderten Prüfschritt gibt es noch nicht. Der Lauf vom 01.10. (Run
-36840664489) lief mit dem Stand vor dem Review.
+Zweiter CI-Prüflauf mit dem geänderten Workflow (Run 36847372846, Stand `336a412b`, Tag
+`v1.0.0-alpha.60`, mit Zustimmung): `desktop-macos-arm64` grün. App notarisiert (`fba2f466-…`),
+`.dmg` notarisiert (`d01e6438-…`), Prüfschritt mit aktivem Gatekeeper: App, `.dmg`, App im
+eingehängten `.dmg` und App im Update-Archiv je `accepted`. `desktop-windows-x86_64` grün.
 
 ### Gate-Lauf (Task 6.1, 01.10.2026)
 
