@@ -252,7 +252,8 @@ anwendbar), „nicht geprüft" ist keins.
   der Fahrzeug-/Personal-/Material-DTOs leitet der Server beim Lesen aus `demo_herkunft` ab
   (`EXISTS` in `SPALTEN` der Repos unter `src/`), nie aus einer eigenen Spalte. Kennung samt Marke
   über `components/DemoMarke.tsx`; Auswahllisten über `stammdaten/demoMarke.ts` (Wortlaut
-  „ · Demo“, markierte Einträge hinten).
+  „ · Demo“, markierte Einträge hinten). Herleitung:
+  `openspec/changes/archive/2026-10-01-lfh-733-demo-stammdaten-kennzeichnen/design.md`.
 
 **Inline-Bearbeitung und Status**
 

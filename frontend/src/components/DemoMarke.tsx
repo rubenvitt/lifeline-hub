@@ -5,7 +5,7 @@ import type { StatusDarstellung } from '../theme/statusFarben';
 
 /**
  * Herkunftsmarke für Demo-Stammdaten (LFH-733; Regel in `frontend/AGENTS.md`, Bedien-Leitlinie;
- * Herleitung in `openspec/changes/lfh-733-demo-stammdaten-kennzeichnen/design.md` D4).
+ * Herleitung in `openspec/changes/archive/2026-10-01-lfh-733-demo-stammdaten-kennzeichnen/design.md` D4).
  *
  * Der Wortlaut „Demo“ trägt die Bedeutung, der Rahmen ist der zweite Kanal; eine Farbe braucht
  * die Marke nicht (WCAG 1.4.1). `neutral` statt `achtung`: Herkunft ist kein Warnzustand, und
