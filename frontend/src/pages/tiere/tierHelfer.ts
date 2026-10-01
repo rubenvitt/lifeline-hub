@@ -1,4 +1,5 @@
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../../api/types';
+import { registrierNummer } from '../../anzeige/registrierNummer';
 import type { StatusTon } from '../../components/instrument';
 
 /** Tierart als Wort — die eine Zuordnung für Liste, Detailseite und Archivakte. */
@@ -41,6 +42,19 @@ export const TIER_STATUS: Record<TierStatus, { label: string; ton: StatusTon }> 
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */
 export type TiereSicht = 'aktiv' | 'vermisst' | 'abgeschlossen' | 'alle';
+
+/** Reiter der Tierliste in Bedienreihenfolge — dieselben Wörter im Kopf der Druckansicht. */
+export const TIERE_SICHTEN: readonly { key: TiereSicht; label: string }[] = [
+  { key: 'aktiv', label: 'Aktiv' },
+  { key: 'vermisst', label: 'Vermisst' },
+  { key: 'abgeschlossen', label: 'Abgeschlossen' },
+  { key: 'alle', label: 'Alle' },
+];
+
+/** Registriernummer des Halters in Anzeigeschreibweise, oder `null` — Liste und Druck. */
+export function halterNummer(t: Pick<Tier, 'halter_registrier_nr'>): string | null {
+  return t.halter_registrier_nr != null ? registrierNummer('R', t.halter_registrier_nr) : null;
+}
 
 /** Zeilenmenge aus Statussicht UND Spezies — Schnittmenge, keine Vereinigung. */
 export function filterTiere(

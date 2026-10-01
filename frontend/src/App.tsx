@@ -15,6 +15,7 @@ import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import EtbDruckPage from './pages/EtbDruckPage';
 import PersonenDruckPage from './pages/PersonenDruckPage';
+import TiereDruckPage from './pages/TiereDruckPage';
 import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
 import AuftraegePage from './pages/AuftraegePage';
@@ -266,6 +267,7 @@ export const appRouten = createRoutesFromElements(
           <Route path="etb/druck" element={<EtbDruckPage />} />
           {/* Druckansichten der Modul-Listen (LFH-727), Seitenfilter aus der Adresse. */}
           <Route path="personen/druck" element={<PersonenDruckPage />} />
+          <Route path="tiere/druck" element={<TiereDruckPage />} />
           {/* Funkplan S6 (LFH-548): Unterroute des Stabs, kein Modul; `modulAusPfad` markiert den
               Stab, Sperre und Sichtbarkeit kommen vom Stab. */}
           <Route path="stab/funkplan" element={<FunkplanPage />} />

@@ -29,10 +29,10 @@ Code. Vor jedem „fertig“ stehen `superpowers:verification-before-completion`
 
 ## 4. Tiere-Druck
 
-- [ ] 4.1 `pages/tiere/druckAuswahl.ts:tiereDruckAuswahl` (Labels aus `TIER_STATUS`, `SPEZIES_META`). Nachweis: Unit-Test
-- [ ] 4.2 `pages/tiere/TiereDruckTabelle.tsx` (D6). Nachweis: Test zu Reihenfolge und Halterangabe (Registriernummer bzw. Kontakt)
-- [ ] 4.3 `pages/TiereDruckPage.tsx` mit Route `tiere/druck`; Abruf `listeTiere(einsatzId, {})` unter `tiereDruck`, Filter per `filterTiere`. Nachweis: Seitentest (Auswahl aus Adresse, fehlende Sicht = alle, kein Live-Nachschub nach SSE-Invalidierung von `tiere`)
-- [ ] 4.4 Einstieg in `TierePage` mit `sicht` (immer ausdrücklich) und `spezies`. Nachweis: Seitentest des Links
+- [x] 4.1 `pages/tiere/druckAuswahl.ts:tiereDruckAuswahl` (Labels aus `TIER_STATUS`, `SPEZIES_META`). Nachweis: Unit-Test
+- [x] 4.2 `pages/tiere/TiereDruckTabelle.tsx` (D6). Nachweis: Test zu Reihenfolge und Halterangabe (Registriernummer bzw. Kontakt)
+- [x] 4.3 `pages/TiereDruckPage.tsx` mit Route `tiere/druck`; Abruf `listeTiere(einsatzId, {})` unter `tiereDruck`, Filter per `filterTiere`. Nachweis: Seitentest (Auswahl aus Adresse, fehlende Sicht = alle, kein Live-Nachschub nach SSE-Invalidierung von `tiere`)
+- [x] 4.4 Einstieg in `TierePage` mit `sicht` (immer ausdrücklich) und `spezies`. Nachweis: Seitentest des Links
 
 ## 5. Schäden-Druck
 
