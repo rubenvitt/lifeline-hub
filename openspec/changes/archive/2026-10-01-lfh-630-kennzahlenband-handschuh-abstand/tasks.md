@@ -23,5 +23,5 @@ Treffer durchsehen (design.md, Risiken).
 
 ## 4. Verifikation
 
-- [ ] 4.1 `./scripts/check-all.sh` grün (Format, Lint `--max-warnings 0`, Vitest, e2e inkl. Kontrast-Specs, `lage-dashboard-schmal`, `pegel-pruefliste`, OpenSpec-Archivwächter nach `/opsx:archive`). Verifiziert durch den Exit-Code des Skripts bzw. die CI des PRs
+- [x] 4.1 `./scripts/check-all.sh` grün (Format, Lint `--max-warnings 0`, Vitest, e2e inkl. Kontrast-Specs, `lage-dashboard-schmal`, `pegel-pruefliste`, OpenSpec-Archivwächter nach `/opsx:archive`). Verifiziert durch den Exit-Code des Skripts bzw. die CI des PRs (lokal vorab: Schnell-Bündel grün; Vitest der berührten Bereiche und die e2e-Specs `gate3-trefflaeche`, `pegel-pruefliste`, `lage-dashboard-schmal` grün bis auf den Block „Führungsfunktionen: der Bearbeiten-Knopf“, der auf `alpha` identisch fehlschlägt; der volle Lauf liegt beim PR)
 - [x] 4.2 Im Browser gegen den Dev-Stack, Lage-Dashboard in `kompakt` und `handschuh`: Zahl, Augenbraue und Notiz stehen an derselben Stelle, Zellhöhe gleich, Fuge 1 px; in `handschuh` tönt der Hover nur die eingerückte Trefffläche. Verifiziert durch je einen Screenshot beider Stufen (Lauf gegen den e2e-Stack: Bandmaße und alle sechs Zahlpositionen in `kompakt` und `handschuh` pixelgleich zum Bestand, Hover im Handschuh tönt nur die eingerückte Trefffläche)
