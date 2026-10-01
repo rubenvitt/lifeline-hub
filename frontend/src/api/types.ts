@@ -634,6 +634,8 @@ export interface AusgabeEingabe {
   sonderkost?: SonderkostEingabe;
   nachforderung_id?: number;
   bemerkung?: string;
+  /** Idempotenzschlüssel der Offline-Queue (LFH-688); ein Replay liefert die gespeicherte Ausgabe. */
+  client_id?: string;
 }
 
 // ============================== LFH-51 Terminierte Erinnerungen ==============================

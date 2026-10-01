@@ -8,7 +8,8 @@ import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person } from '../api/types';
+import type { Person, Verpflegung, VerpflegungZeitfenster } from '../api/types';
+import { erfasseAusgabe } from '../api/verpflegung';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 import { abgleichFuer } from './useOfflineSync';
 import {
@@ -16,6 +17,7 @@ import {
   type OfflineSchreibaktionGesendet,
 } from './ereignisse';
 import {
+  OFFLINE_QUEUE_EVENT,
   queueEinreihen,
   queueLeerenFuerTests,
   queueZaehlerLaden,
@@ -27,6 +29,7 @@ vi.mock('../api/etb', () => ({ erfasseEtb: vi.fn() }));
 vi.mock('../api/einsatzPerson', () => ({ legePersonAn: vi.fn() }));
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
 vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
+vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 
 const BENUTZER_A = 11;
 const BENUTZER_B = 22;
@@ -413,6 +416,87 @@ describe('Stand- und Belegungsmeldungen in der Offline-Queue (LFH-675)', () => {
       wrapper: wrapperFuer().Wrapper,
     });
     await waitFor(() => expect(meldeStand).toHaveBeenCalled());
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
+    unmount();
+  });
+});
+
+describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
+  const ausgabe = {
+    art: 'ausgabe' as const,
+    zeitfenster_id: 9,
+    bezeichnung: 'Mittag',
+    daten: { menge: 120, zeitpunkt_at: '2026-09-24 09:40:00', client_id: 'ausgabe-1' },
+  };
+  const fenster = (id: number, gesamt: number) =>
+    ({ id, ausgegeben: { gesamt } }) as unknown as VerpflegungZeitfenster;
+
+  it('schreibt das bestätigte Zeitfenster vor dem Entfernen in den Cache und invalidiert', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    client.setQueryData<Verpflegung>(einsatzKeys.verpflegung(7), {
+      zeitfenster: [fenster(8, 0), fenster(9, 100)],
+    });
+    vi.mocked(erfasseAusgabe).mockResolvedValue({ ausgabe_id: 5, zeitfenster: fenster(9, 220) });
+    await schreibaktionEinreihen(BENUTZER_A, 7, ausgabe);
+    // Beim Entfernen der Zeile (Queue-Ereignis) muss die Ausgabe schon bestätigt im Cache stehen,
+    // sonst fehlte sie einen Takt lang auf der Karte (design.md D7).
+    const beimEntfernen: (number | undefined)[] = [];
+    const merke = () =>
+      beimEntfernen.push(
+        client
+          .getQueryData<Verpflegung>(einsatzKeys.verpflegung(7))
+          ?.zeitfenster.find((z) => z.id === 9)?.ausgegeben.gesamt,
+      );
+    window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+    try {
+      renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+      await waitFor(async () =>
+        expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+          ausstehend: 0,
+          abgelehnt: 0,
+        }),
+      );
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+    }
+    expect(erfasseAusgabe).toHaveBeenCalledExactlyOnceWith(7, 9, ausgabe.daten, {
+      offlineQueueBenutzerId: BENUTZER_A,
+    });
+    expect(beimEntfernen[0]).toBe(220);
+    expect(
+      client.getQueryData<Verpflegung>(einsatzKeys.verpflegung(7))?.zeitfenster.map((z) => z.id),
+    ).toEqual([8, 9]);
+    expect(client.getQueryState(einsatzKeys.verpflegung(7))?.isInvalidated).toBe(true);
+    expect(legeMeldungAn).not.toHaveBeenCalled();
+  });
+
+  it('legt ohne vorhandenen Cache keinen an', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    vi.mocked(erfasseAusgabe).mockResolvedValue({ ausgabe_id: 5, zeitfenster: fenster(9, 220) });
+    await schreibaktionEinreihen(BENUTZER_A, 7, ausgabe);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0 }),
+    );
+    expect(client.getQueryData(einsatzKeys.verpflegung(7))).toBeUndefined();
+  });
+
+  it('legt eine abgelehnte Ausgabe (gelöschtes Zeitfenster, 404) unter „abgelehnt“ ab', async () => {
+    vi.mocked(erfasseAusgabe).mockRejectedValue(new ApiError(404, 'Nicht gefunden'));
+    await schreibaktionEinreihen(BENUTZER_A, 7, ausgabe);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
+    );
+  });
+
+  it('lässt sie bei einem transienten Fehler stehen', async () => {
+    vi.mocked(erfasseAusgabe).mockRejectedValue(new NetzFehler());
+    await schreibaktionEinreihen(BENUTZER_A, 7, ausgabe);
+    const { unmount } = renderHook(() => useOfflineSync(BENUTZER_A), {
+      wrapper: wrapperFuer().Wrapper,
+    });
+    await waitFor(() => expect(erfasseAusgabe).toHaveBeenCalled());
     expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
     unmount();
   });

@@ -1030,6 +1030,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zurueckgenommen_von_id", G_FK),
             retain("erfasst_von_id", G_FK),
             retain("erfasst_at", G_ZEIT),
+            retain("client_id", G_IDEMPOTENZ),
         ],
     },
     // Abgeschlossene Lagebesprechungen. `entschluss` wird gescrubbt wie

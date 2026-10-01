@@ -25,6 +25,12 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
   der EP; Ausgabe verweist nur per `nachforderung_id`; Einstufung im Client
   (`verpflegung/deckung.ts`); ins ETB nur Zeitfenster und Bedarf (Org-Zeitzone); kein Modulzähler.
+- **Ausgaben offline** (LFH-688, `openspec/changes/archive/2026-10-01-lfh-688-verpflegung-ausgaben-offline/design.md`):
+  `offline/schreiben.ts` (`ausgabe`) mit `client_id`; Replay-Lookup **vor** `fordere_aktiv`
+  (`EinsatzSchreibfreigabe`), fremdes Zeitfenster 422, Replay ohne Live; Erfassungszeit nur an der
+  vorgemerkten Kopie; vorgemerkte Ausgaben stehen als „ausstehend“ an der Karte
+  (`useVorgemerkteAusgaben`) und zählen **nie** in die Deckung; der Sync schreibt das bestätigte
+  Zeitfenster vor dem Entfernen der Zeile in den Cache.
 - **Versorgung S4** (LFH-553, Entscheidung 30.09.2026,
   `openspec/changes/archive/2026-09-30-lfh-553-versorgung-abgrenzung/design.md`, Spec
   `stab-versorgung`): kein Modul „Versorgung“, keine Tabelle `versorgungsposten`. Träger:

@@ -1023,6 +1023,7 @@ mod tests {
                 bemerkung: Some("für Frau Meyer glutenfrei".into()),
                 sonderkost,
                 nachforderung_id: Some(nachforderung),
+                client_id: None,
             },
         )
         .await

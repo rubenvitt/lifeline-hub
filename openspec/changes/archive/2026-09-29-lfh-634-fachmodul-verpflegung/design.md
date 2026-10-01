@@ -61,7 +61,8 @@ mit weicher Rücknahme, Rücknahme mit roter Rückfrage).
   der Rückweg aus C8 sprechen dagegen.
 - Kein Modulzähler, keine Marke im Überblick, kein Hinweis in der AlarmZentrale.
   Unterdeckung ist ein Zustand auf der Seite, kein Alarmereignis.
-- Keine Offline-Queue in v1 (Folgeticket LFH-688).
+- Keine Offline-Queue in v1 (Folgeticket LFH-688, eingelöst durch
+  `openspec/changes/archive/2026-10-01-lfh-688-verpflegung-ausgaben-offline/`).
 - Keine Bearbeitung einer Ausgabe. Eine Korrektur heißt zurücknehmen und neu erfassen.
 
 ## Decisions

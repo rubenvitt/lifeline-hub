@@ -2,6 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import type {
+  AusgabeEingabe,
   BelegungsmeldungEingabe,
   NeueMeldung,
   Person,
@@ -13,15 +14,16 @@ import type {
 export const OFFLINE_QUEUE_EVENT = 'lfh:offline-queue-geaendert';
 
 /**
- * Stand- und Belegungsmeldungen tragen zusätzlich die `bezeichnung` — nur für die Anzeige im
- * Wiederherstellungs-Drawer, gesendet wird sie nicht. Neue Varianten liegen als Wert im
- * bestehenden Store und brauchen keine DB-Version.
+ * Stand- und Belegungsmeldungen und Verpflegungsausgaben tragen zusätzlich die `bezeichnung`
+ * (Bezirk, Stelle bzw. Zeitfenster) — nur für die Anzeige, gesendet wird sie nicht. Neue
+ * Varianten liegen als Wert im bestehenden Store und brauchen keine DB-Version.
  */
 export type OfflineSchreibaktion =
   | { art: 'person'; daten: PersonAnlegenEingabe }
   | { art: 'meldung'; daten: NeueMeldung }
   | { art: 'stand'; bezirk_id: number; bezeichnung: string; daten: StandmeldungEingabe }
-  | { art: 'belegung'; stelle_id: number; bezeichnung: string; daten: BelegungsmeldungEingabe };
+  | { art: 'belegung'; stelle_id: number; bezeichnung: string; daten: BelegungsmeldungEingabe }
+  | { art: 'ausgabe'; zeitfenster_id: number; bezeichnung: string; daten: AusgabeEingabe };
 
 export interface AusstehendeSchreibaktion {
   id?: number;
@@ -190,8 +192,57 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
   return dbPromise;
 }
 
+/**
+ * Tabübergreifendes, datenloses Signal „die Queue hat sich geändert“ (LFH-688). Das Fenster-
+ * Ereignis erreicht nur den eigenen Tab; flusht ein anderer Tab desselben Geräts, bliebe eine
+ * vorgemerkte Ausgabe hier sonst als „ausstehend“ neben ihrer bestätigten Fassung stehen.
+ * Bewusst NICHT als Fenster-Ereignis weitergereicht: der Flush (`useOfflineSync`) hört auf
+ * `OFFLINE_QUEUE_EVENT` und soll nicht von jeder Änderung eines anderen Tabs angestoßen werden.
+ */
+export const QUEUE_KANAL = 'lfh:offline-queue';
+
+let queueKanal: BroadcastChannel | null | undefined;
+
+function holeQueueKanal(): BroadcastChannel | null {
+  if (queueKanal !== undefined) return queueKanal;
+  if (typeof BroadcastChannel === 'undefined') {
+    queueKanal = null;
+    return queueKanal;
+  }
+  try {
+    queueKanal = new BroadcastChannel(QUEUE_KANAL);
+  } catch {
+    // Restriktive Browserkontexte: dann gilt nur das Fenster-Ereignis des eigenen Tabs.
+    queueKanal = null;
+  }
+  return queueKanal;
+}
+
 function meldeQueueAenderung(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(OFFLINE_QUEUE_EVENT));
+  try {
+    holeQueueKanal()?.postMessage({ typ: 'queue-geaendert' });
+  } catch {
+    // Ein geschlossener Kanal darf den schon geschriebenen Queue-Stand nicht in einen Fehler
+    // verwandeln; der nächste Mount liest IndexedDB ohnehin neu.
+  }
+}
+
+/** Hört auf Queue-Änderungen dieses Tabs (Fenster-Ereignis) UND anderer Tabs (Kanal). */
+export function beobachteQueueAenderungen(listener: () => void): () => void {
+  const kanal = holeQueueKanal();
+  window.addEventListener(OFFLINE_QUEUE_EVENT, listener);
+  kanal?.addEventListener('message', listener);
+  return () => {
+    window.removeEventListener(OFFLINE_QUEUE_EVENT, listener);
+    kanal?.removeEventListener('message', listener);
+  };
+}
+
+/** Test-Seam, damit ein Kanal nicht zwischen Vitest-Fällen weiterlebt. */
+export function queueKanalZuruecksetzenFuerTests(): void {
+  queueKanal?.close();
+  queueKanal = undefined;
 }
 
 const benutzerEinsatz = (benutzerId: number, einsatzId: number): [number, number] => [

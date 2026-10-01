@@ -25,7 +25,6 @@ import type {
 } from '../api/types';
 import {
   aendereZeitfenster,
-  erfasseAusgabe,
   ladeVerpflegung,
   legeZeitfensterAn,
   loescheZeitfenster,
@@ -40,6 +39,8 @@ import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { erfasseVerpflegungsausgabeOfflineFaehig } from '../offline/schreiben';
+import { useVorgemerkteAusgaben, type VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
 import { nachforderungenPfad } from '../routing/deeplinks';
 import {
   AusgabeDialog,
@@ -182,6 +183,18 @@ export default function VerpflegungPage() {
     : null;
 
   const alle = useMemo(() => verpflegungQuery.data?.zeitfenster ?? [], [verpflegungQuery.data]);
+  // Auf diesem Gerät vorgemerkte Ausgaben je Zeitfenster — „ausstehend“, außerhalb der Deckung
+  // (LFH-688, design.md D8).
+  const vorgemerkt = useVorgemerkteAusgaben(benutzer?.id, einsatzId);
+  const ausstehendJe = useMemo(() => {
+    const je = new Map<number, VorgemerkteAusgabe[]>();
+    for (const v of vorgemerkt) {
+      const liste = je.get(v.aktion.zeitfenster_id) ?? [];
+      liste.push(v);
+      je.set(v.aktion.zeitfenster_id, liste);
+    }
+    return je;
+  }, [vorgemerkt]);
 
   // ── Live-Zufluss ────────────────────────────────────────────────────────────────────
   const zufluss: Zuflussstand =
@@ -265,15 +278,24 @@ export default function VerpflegungPage() {
     },
   });
   const ausgabeMut = useMutation({
-    mutationFn: ({ zf, body }: { zf: VerpflegungZeitfenster; body: AusgabeEingabe }) =>
-      erfasseAusgabe(einsatzId, zf.id, body),
-    // Die Ausgabe hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage.
-    onSuccess: (erg, { zf, body }) => {
+    mutationFn: ({ zf, body }: { zf: VerpflegungZeitfenster; body: AusgabeEingabe }) => {
+      if (!benutzer) throw new Error('Nicht angemeldet');
+      return erfasseVerpflegungsausgabeOfflineFaehig(benutzer.id, einsatzId, zf, body);
+    },
+    onSuccess: (ergebnis, { zf, body }) => {
+      // Vorgemerkt gibt es noch keine Ausgabe auf dem Server — also kein „Rückgängig“ (D9).
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning(
+          `Offline vorgemerkt — Ausgabe ${body.menge} EP zu ${zitat(zf.bezeichnung)} wird bei Verbindung gesendet`,
+        );
+        return;
+      }
+      // Die Ausgabe hat einen serverseitigen Rückweg → Rückgängig-Toast statt Rückfrage.
       invalidiere(false);
       zeigeRueckgaengig(
         message,
         `Ausgabe erfasst: ${body.menge} EP zu ${zitat(zf.bezeichnung)}`,
-        () => rueckgaengigMut.mutate(erg.ausgabe_id),
+        () => rueckgaengigMut.mutate(ergebnis.daten.ausgabe_id),
       );
     },
   });
@@ -439,6 +461,7 @@ export default function VerpflegungPage() {
                 ruecknahmeMut.reset();
                 setDialog({ art: 'ruecknahme', zf: x, ausgabe: a });
               }}
+              ausstehend={ausstehendJe.get(zf.id)}
             />
           ))}
         </section>

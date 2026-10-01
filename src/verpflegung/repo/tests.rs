@@ -91,6 +91,14 @@ fn ausgabe_eingabe(menge: i64) -> AusgabeEingabe {
         bemerkung: None,
         sonderkost: SonderkostEingabe::default(),
         nachforderung_id: None,
+        client_id: None,
+    }
+}
+
+fn mit_client_id(menge: i64, client_id: &str) -> AusgabeEingabe {
+    AusgabeEingabe {
+        client_id: Some(client_id.into()),
+        ..ausgabe_eingabe(menge)
     }
 }
 
@@ -674,6 +682,99 @@ async fn ruecknahme_senkt_ausgegeben_zweite_ist_422_ohne_etb() {
         "fremde Ausgabe"
     );
     assert_eq!(etb(&w.pool, w.e).await.len(), 1, "nur der Anlage-Eintrag");
+}
+
+// ── Offline-Replay (LFH-688) ────────────────────────────────────────────────────────────────
+
+/// Spec „Wiederholte Ausgabe“: derselbe Schlüssel liefert dieselbe Ausgabe als Replay, ohne
+/// zweite Zeile, und die ausgegebene Menge steigt nicht.
+#[tokio::test]
+async fn replay_mit_client_id_legt_keine_zweite_ausgabe_an() {
+    let w = welt().await;
+    let id = anlegen(&w, mittag()).await.unwrap().id;
+    let erst = ausgabe(&w, id, mit_client_id(120, "v1")).await.unwrap();
+    assert!(erst.neu);
+    let zweit = ausgabe(&w, id, mit_client_id(120, "v1")).await.unwrap();
+    assert_eq!(zweit.ausgabe_id, erst.ausgabe_id);
+    assert_eq!(zweit.zeitfenster_id, id);
+    assert!(!zweit.neu, "Replay");
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_ausgabe").await,
+        1
+    );
+    assert_eq!(laden(&w, id).await.ausgegeben.gesamt, 120);
+    // Ohne Schlüssel bleibt alles wie bisher: zwei Aufrufe, zwei Ausgaben.
+    ausgabe(&w, id, ausgabe_eingabe(5)).await.unwrap();
+    ausgabe(&w, id, ausgabe_eingabe(5)).await.unwrap();
+    assert_eq!(laden(&w, id).await.ausgegeben.gesamt, 130);
+}
+
+/// Spec „Replay einer zurückgenommenen Ausgabe“ (design.md D4): der Replay liefert sie, eine
+/// Neuanlage höbe die Rücknahme still auf.
+#[tokio::test]
+async fn replay_einer_zurueckgenommenen_ausgabe_liefert_sie() {
+    let w = welt().await;
+    let id = anlegen(&w, mittag()).await.unwrap().id;
+    let erst = ausgabe(&w, id, mit_client_id(120, "v5")).await.unwrap();
+    zuruecknehmen_in(&w, w.e, erst.ausgabe_id).await.unwrap();
+    let replay = ausgabe(&w, id, mit_client_id(120, "v5")).await.unwrap();
+    assert_eq!(replay.ausgabe_id, erst.ausgabe_id);
+    assert!(!replay.neu);
+    let zf = laden(&w, id).await;
+    assert_eq!(zf.ausgaben.len(), 1);
+    assert_eq!(zf.ausgegeben.gesamt, 0, "die Rücknahme bleibt wirksam");
+}
+
+/// Spec „Schlüssel eines anderen Zeitfensters“ (design.md D3): 422, nichts gespeichert.
+#[tokio::test]
+async fn client_id_eines_anderen_zeitfensters_ist_422() {
+    let w = welt().await;
+    let mittag_id = anlegen(&w, mittag()).await.unwrap().id;
+    let mut abend = mittag();
+    abend.bezeichnung = "Abend".into();
+    let abend_id = anlegen(&w, abend).await.unwrap().id;
+    ausgabe(&w, mittag_id, mit_client_id(120, "v2"))
+        .await
+        .unwrap();
+    assert_eq!(
+        status(ausgabe(&w, abend_id, mit_client_id(120, "v2")).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM verpflegung_ausgabe").await,
+        1
+    );
+}
+
+/// Spec „Schlüssel eines anderen Einsatzes“: der Lookup ist einsatzgebunden.
+#[tokio::test]
+async fn lookup_nach_client_id_ist_einsatzgebunden() {
+    let w = welt().await;
+    let id = anlegen(&w, mittag()).await.unwrap().id;
+    let erst = ausgabe(&w, id, mit_client_id(120, "v3")).await.unwrap();
+    let treffer = laden_nach_client_id(&w.pool, w.e, "v3")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(treffer.ausgabe_id, erst.ausgabe_id);
+    assert_eq!(treffer.zeitfenster_id, id);
+    assert!(!treffer.neu);
+    assert_eq!(
+        laden_nach_client_id(&w.pool, w.e2, "v3").await.unwrap(),
+        None
+    );
+    assert_eq!(
+        laden_nach_client_id(&w.pool, w.e, "v9").await.unwrap(),
+        None
+    );
+
+    // Im anderen Einsatz entsteht mit demselben Schlüssel eine eigene Ausgabe.
+    let id2 = anlegen_in(&w, w.e2, mittag()).await.unwrap().id;
+    let fremd = ausgabe_in(&w, w.e2, id2, mit_client_id(30, "v3"))
+        .await
+        .unwrap();
+    assert!(fremd.neu);
+    assert_ne!(fremd.ausgabe_id, erst.ausgabe_id);
 }
 
 // ── Zeitzone ────────────────────────────────────────────────────────────────────────────────

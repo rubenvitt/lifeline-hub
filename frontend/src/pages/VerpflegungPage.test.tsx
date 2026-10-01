@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,6 +12,9 @@ import { freigabenFixture } from '../test/fixtures';
 import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
 import { zeitfensterKennung } from '../verpflegung/verpflegungText';
 import { parseNachforderungVorbelegung } from '../routing/deeplinks';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
+import { meHandler, server } from '../test/server';
+import { benutzerFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 
 dayjs.extend(utc);
@@ -107,7 +110,12 @@ function baum(client: QueryClient) {
   );
 }
 
+/** Angemeldet als Benutzer 1: Ausgaben laufen über die Offline-Queue, und die gehört einem
+ *  Benutzer (LFH-688). */
+const BENUTZER_ID = 1;
+
 function renderPage() {
+  server.use(meHandler(benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Leitung' })));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ergebnis = render(baum(client));
   /** Zeichnet neu, ohne neu zu laden — so tickt die (gemockte) Uhr. */
@@ -254,11 +262,70 @@ describe('VerpflegungPage (LFH-634)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
     await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '20');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
-    await waitFor(() => expect(erfasseAusgabe).toHaveBeenCalledWith(1, 1, { menge: 20 }));
+    await waitFor(() =>
+      expect(erfasseAusgabe).toHaveBeenCalledWith(
+        1,
+        1,
+        { menge: 20, client_id: expect.any(String) },
+        { offlineQueueBenutzerId: BENUTZER_ID },
+      ),
+    );
+    expect(erfasseAusgabe.mock.calls[0][2]).not.toHaveProperty('zeitpunkt_at');
     await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
     await waitFor(() => expect(nimmAusgabeZurueck).toHaveBeenCalledWith(1, 55));
     const keys = spion.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
     expect(keys).not.toContain(JSON.stringify(['etb', 1]));
+    expect(screen.queryByText(/Offline vorgemerkt/)).toBeNull();
+  });
+
+  describe('Ausgabe ohne Verbindung (LFH-688)', () => {
+    afterEach(async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+      await queueLeerenFuerTests();
+    });
+
+    it('offline: vorgemerkt — Hinweis ohne Rückgängig, Dialog schließt, „ausstehend“ an der Karte', async () => {
+      await queueLeerenFuerTests();
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+      renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(
+        screen.getByRole('button', { name: `Ausgabe erfassen zu ${zeitfensterKennung(mittag())}` }),
+      );
+      const dialog = await screen.findByRole('dialog', { name: 'Ausgabe erfassen: Mittag' });
+      await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '40');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+
+      expect(await screen.findByText(/Offline vorgemerkt — Ausgabe 40 EP/)).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(screen.queryByRole('button', { name: /Rückgängig/ })).toBeNull();
+      expect(erfasseAusgabe).not.toHaveBeenCalled();
+      const [zeile] = await schreibaktionenLaden(BENUTZER_ID, 1);
+      expect(zeile.aktion).toMatchObject({
+        art: 'ausgabe',
+        zeitfenster_id: 1,
+        bezeichnung: 'Mittag',
+        daten: { menge: 40, zeitpunkt_at: expect.any(String), client_id: expect.any(String) },
+      });
+
+      const k = await karte(mittag());
+      const ausstehend = await waitFor(() => {
+        const z = k.querySelector<HTMLElement>('[data-lfh="verpflegung-ausgabe-ausstehend"]');
+        expect(z).not.toBeNull();
+        return z!;
+      });
+      expect(within(ausstehend).getByText('40 EP')).toBeInTheDocument();
+      // Nicht in der Deckung: die Karte zeigt weiter die Zahlen des Servers (Fehlmenge 20).
+      expect(k).toHaveAttribute('data-einstufung', 'unterdeckung');
+      expect(
+        [...k.querySelectorAll<HTMLElement>('[data-lfh="kennzahl"]')].find((x) =>
+          x.textContent?.startsWith('fehlt'),
+        )?.textContent,
+      ).toContain('20');
+      // Die vorgemerkte Ausgabe steht nur an IHREM Zeitfenster.
+      const andere = await karte(abend());
+      expect(andere.querySelector('[data-lfh="verpflegung-ausgabe-ausstehend"]')).toBeNull();
+    });
   });
 
   it('Zurücknehmen aus der Liste fragt rot zurück; Abbrechen sendet nichts', async () => {

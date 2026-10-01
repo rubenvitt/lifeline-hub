@@ -67,6 +67,8 @@ pub struct AusgabeEingabe {
     /// Fehlende Kostformen sind 0.
     pub sonderkost: SonderkostEingabe,
     pub nachforderung_id: Option<i64>,
+    /// Idempotenzschlüssel der Offline-Queue (LFH-688), von der Route normalisiert.
+    pub client_id: Option<String>,
 }
 
 /// Ergebnis eines Schreibvorgangs an einem Zeitfenster: seine Kennung und die geschriebenen
@@ -82,6 +84,9 @@ pub struct Geschrieben {
 pub struct AusgabeGeschrieben {
     pub ausgabe_id: i64,
     pub zeitfenster_id: i64,
+    /// `false` nur beim Replay einer Erfassung über ihre `client_id` (LFH-688): nichts
+    /// geschrieben, also auch nichts zu publizieren.
+    pub neu: bool,
 }
 
 // ── Zeilen ──────────────────────────────────────────────────────────────────────────────────
@@ -578,6 +583,14 @@ pub async fn ausgabe_erfassen_tx(
     benutzer_id: i64,
     eingabe: &AusgabeEingabe,
 ) -> Result<AusgabeGeschrieben, AppError> {
+    // Replay vor jeder Prüfung (LFH-688, design.md D2): unter `BEGIN IMMEDIATE` ist der Lookup
+    // gegen das INSERT unten nicht verschränkbar — zwei gleichzeitige Flushes desselben
+    // Schlüssels ergeben eine Zeile.
+    if let Some(cid) = eingabe.client_id.as_deref() {
+        if let Some(replay) = laden_nach_client_id(&mut *conn, einsatz_id, cid).await? {
+            return replay_am_zeitfenster(replay, zeitfenster_id);
+        }
+    }
     zeitfenster_roh_tx(conn, einsatz_id, zeitfenster_id).await?;
     // 400 — jedes Feld für sich
     draht_lesen("zeitpunkt_at", &eingabe.zeitpunkt_at)?;
@@ -597,8 +610,8 @@ pub async fn ausgabe_erfassen_tx(
         "INSERT INTO verpflegung_ausgabe \
             (einsatz_id, zeitfenster_id, zeitpunkt_at, menge, ort, bemerkung, sk_vegetarisch, \
              sk_vegan, sk_ohne_schwein, sk_diaet_allergenarm, sk_saeugling_kleinkind, \
-             nachforderung_id, erfasst_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             nachforderung_id, erfasst_von_id, client_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(zeitfenster_id)
@@ -613,12 +626,56 @@ pub async fn ausgabe_erfassen_tx(
     .bind(sonderkost.saeugling_kleinkind)
     .bind(eingabe.nachforderung_id)
     .bind(benutzer_id)
+    .bind(eingabe.client_id.as_deref())
     .fetch_one(&mut *conn)
     .await?;
     Ok(AusgabeGeschrieben {
         ausgabe_id,
         zeitfenster_id,
+        neu: true,
     })
+}
+
+/// Die gespeicherte Ausgabe mit dieser `client_id` im Einsatz, als Replay (`neu: false`).
+/// Einsatzgebunden: dieselbe `client_id` in einem anderen Einsatz findet nichts und legt dort
+/// nichts offen. Läuft auf dem Pool (Vorab-Lookup der Route) wie in der Transaktion.
+pub async fn laden_nach_client_id<'e, E: sqlx::SqliteExecutor<'e>>(
+    ex: E,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<AusgabeGeschrieben>, AppError> {
+    let treffer: Option<(i64, i64)> = sqlx::query_as(
+        "SELECT id, zeitfenster_id FROM verpflegung_ausgabe \
+         WHERE einsatz_id = ? AND client_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(client_id)
+    .fetch_optional(ex)
+    .await?;
+    Ok(
+        treffer.map(|(ausgabe_id, zeitfenster_id)| AusgabeGeschrieben {
+            ausgabe_id,
+            zeitfenster_id,
+            neu: false,
+        }),
+    )
+}
+
+/// Ein Replay gilt nur für das Zeitfenster, an dem die Ausgabe gespeichert ist. Ein Schlüssel
+/// an einem anderen Zeitfenster ist 422 (design.md D3): jedes Feld ist für sich gültig, erst der
+/// gespeicherte Zusammenhang verbietet die Aktion. Die fremde Ausgabe zurückzugeben behauptete
+/// die Deckung eines Zeitfensters, das der Client nicht adressiert hat.
+pub fn replay_am_zeitfenster(
+    replay: AusgabeGeschrieben,
+    zeitfenster_id: i64,
+) -> Result<AusgabeGeschrieben, AppError> {
+    if replay.zeitfenster_id == zeitfenster_id {
+        Ok(replay)
+    } else {
+        Err(AppError::UnprocessableEntity(
+            "client_id gehört zu einer Ausgabe an einem anderen Zeitfenster".into(),
+        ))
+    }
 }
 
 /// Nimmt eine Ausgabe zurück. Die Zeile bleibt stehen (append-only) und zählt nicht mehr in die
@@ -654,6 +711,7 @@ pub async fn ausgabe_zuruecknehmen_tx(
     Ok(AusgabeGeschrieben {
         ausgabe_id,
         zeitfenster_id,
+        neu: true,
     })
 }
 

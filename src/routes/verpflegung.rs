@@ -2,9 +2,10 @@
 //!
 //! Gates strukturell über `EinsatzLesezugriff<Verpflegung>` (alle Einsatzmitglieder inkl.
 //! Beobachter) bzw. `EinsatzSchreibzugriff<Verpflegung>` (Schreibrecht, aktiver Einsatz,
-//! Modul). Ein abgeschlossener Einsatz ist damit 409 aus `fordere_aktiv` im Extractor — wie bei
-//! Ablösung und Betreuung, NICHT über `fordere_aktiv_in_tx` (design.md D4). Bodies nur über
-//! `JsonBody`, Sub-IDs nur über `PfadParam`.
+//! Modul). Für diese Schreibrouten ist ein abgeschlossener Einsatz 409 aus `fordere_aktiv` im
+//! Extractor — wie bei Ablösung, NICHT über `fordere_aktiv_in_tx` (design.md D4). Ausnahme ist
+//! „Ausgabe erfassen“ mit `EinsatzSchreibfreigabe` (LFH-688): ihr Replay-Lookup läuft vor
+//! `fordere_aktiv` im Handler. Bodies nur über `JsonBody`, Sub-IDs nur über `PfadParam`.
 //!
 //! **Statuscodes** (design.md D4, src/AGENTS.md „Statuscode-Konvention“):
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, leere Bezeichnung, negativer
@@ -23,14 +24,14 @@
 //! schreiben keinen ETB-Eintrag und publizieren nur das Modul-Ereignis.
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 
 use serde::Deserialize;
 
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Verpflegung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -215,16 +216,44 @@ pub struct AusgabeErfassen {
     nachforderung_id: Option<i64>,
     #[serde(default)]
     bemerkung: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LFH-688): leer = fehlend, > 64 Zeichen = 400.
+    #[serde(default)]
+    client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben — ohne ETB-Eintrag.
+///
+/// Idempotent über `client_id` (LFH-688, design.md D2): Reihenfolge wie `routes/meldung.rs`
+/// — Gates im Extractor (Org, Schreibrecht, Modul), Queue-Besitzer, Replay-Lookup, ERST DANN
+/// `fordere_aktiv`. Ein gespeicherter Replay kommt so auch nach dem Einsatzende zurück; ein
+/// Replay publiziert nichts (D5).
 pub async fn ausgabe_erfassen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Verpflegung>,
+    ctx: EinsatzSchreibfreigabe<Verpflegung>,
+    headers: HeaderMap,
     PfadParam((_eid, zid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<AusgabeErfassen>,
 ) -> Result<(StatusCode, Json<AusgabeErgebnis>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = req
+        .client_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    if client_id.as_ref().is_some_and(|cid| cid.len() > 64) {
+        return Err(AppError::Validation(
+            "client_id zu lang (max. 64 Zeichen)".into(),
+        ));
+    }
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            let a = repo::replay_am_zeitfenster(replay, zid)?;
+            return antwort(&state, einsatz_id, a).await;
+        }
+    }
+    ctx.fordere_aktiv()?;
     let zeitpunkt_at = match req.zeitpunkt_at.as_deref().map(str::trim) {
         Some(s) if !s.is_empty() => zeit(s)?,
         _ => crate::zeit::jetzt(),
@@ -244,12 +273,25 @@ pub async fn ausgabe_erfassen(
         bemerkung: req.bemerkung,
         sonderkost: req.sonderkost.unwrap_or_default(),
         nachforderung_id: req.nachforderung_id,
+        client_id,
     };
     let benutzer_id = ctx.benutzer.id;
     let a = crate::write_retry!(&state.pool, |conn| {
         repo::ausgabe_erfassen_tx(conn, einsatz_id, zid, benutzer_id, &eingabe).await
     })?;
-    publiziere(&state, einsatz_id, &[]);
+    antwort(&state, einsatz_id, a).await
+}
+
+/// 201 mit Ausgabe und Zeitfenster danach; das Modul-Ereignis nur, wenn wirklich geschrieben
+/// wurde (ein Replay publiziert nichts, design.md D5).
+async fn antwort(
+    state: &AppState,
+    einsatz_id: i64,
+    a: repo::AusgabeGeschrieben,
+) -> Result<(StatusCode, Json<AusgabeErgebnis>), AppError> {
+    if a.neu {
+        publiziere(state, einsatz_id, &[]);
+    }
     Ok((
         StatusCode::CREATED,
         Json(AusgabeErgebnis {

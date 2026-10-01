@@ -1,7 +1,12 @@
 import { Button, Flex, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import type { VerpflegungAusgabe, VerpflegungZeitfenster } from '../api/types';
+import type {
+  Sonderkost,
+  SonderkostEingabe,
+  VerpflegungAusgabe,
+  VerpflegungZeitfenster,
+} from '../api/types';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import {
@@ -13,6 +18,7 @@ import {
   useRollen,
   type KennzahlTon,
 } from '../components/instrument';
+import type { VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
 import { rollenFarbe, verpflegungDeckung, type VerpflegungDeckung } from '../theme/statusFarben';
 import { deckungEinstufung } from './deckung';
 import {
@@ -26,6 +32,17 @@ import {
 } from './verpflegungText';
 
 const { Text } = Typography;
+
+/** Eine vorgemerkte Ausgabe trägt nur die belegten Kostformen; fehlende sind 0. */
+function sonderkostVoll(sk: SonderkostEingabe | undefined): Sonderkost {
+  return {
+    vegetarisch: sk?.vegetarisch ?? 0,
+    vegan: sk?.vegan ?? 0,
+    ohne_schwein: sk?.ohne_schwein ?? 0,
+    diaet_allergenarm: sk?.diaet_allergenarm ?? 0,
+    saeugling_kleinkind: sk?.saeugling_kleinkind ?? 0,
+  };
+}
 
 /** Ton der Fehlmenge — folgt der Einstufung („offen" ohne Alarm). */
 const FEHLT_TON: Record<VerpflegungDeckung, KennzahlTon> = {
@@ -50,6 +67,12 @@ export interface ZeitfensterKarteProps {
   onNachfordern?: (zf: VerpflegungZeitfenster) => void;
   onLoeschen?: (zf: VerpflegungZeitfenster) => void;
   onZuruecknehmen?: (ausgabe: VerpflegungAusgabe, zf: VerpflegungZeitfenster) => void;
+  /**
+   * Auf diesem Gerät vorgemerkte, vom Server noch nicht bestätigte Ausgaben (LFH-688). Sie
+   * stehen als „ausstehend“ in der Liste und zählen NICHT in Ausgegeben, Fehlmenge und
+   * Einstufung — die kommen allein vom Server (design.md D8).
+   */
+  ausstehend?: readonly VorgemerkteAusgabe[];
 }
 
 type Aktionsschluessel = 'bearbeiten' | 'nachfordern' | 'loeschen';
@@ -85,6 +108,7 @@ export default function ZeitfensterKarte({
   onNachfordern,
   onLoeschen,
   onZuruecknehmen,
+  ausstehend = [],
 }: ZeitfensterKarteProps) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
@@ -213,7 +237,7 @@ export default function ZeitfensterKarte({
         </div>
       )}
 
-      {zf.ausgaben.length > 0 && (
+      {(zf.ausgaben.length > 0 || ausstehend.length > 0) && (
         <ul
           aria-label={`Ausgaben zu ${kennung}`}
           data-lfh="verpflegung-ausgaben"
@@ -263,6 +287,26 @@ export default function ZeitfensterKarte({
                       <span data-lfh="ausgabe-nachforderung">{verweis}</span>
                     </>
                   )}
+                </span>
+              </Zeitachseneintrag>
+            );
+          })}
+          {ausstehend.map((v) => {
+            const d = v.aktion.daten;
+            const sk = sonderkostText(sonderkostVoll(d.sonderkost));
+            return (
+              <Zeitachseneintrag
+                key={`ausstehend-${v.id ?? d.client_id}`}
+                als="li"
+                data-lfh="verpflegung-ausgabe-ausstehend"
+                zeit={d.zeitpunkt_at ? uhrzeit(d.zeitpunkt_at, konventionen) : ''}
+                typwort="ausstehend"
+                hinweis="Offline vorgemerkt — zählt erst nach dem Senden"
+              >
+                <span style={{ color: rollen.text2 }}>
+                  <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                  {d.ort ? ` · ${d.ort}` : ''}
+                  {sk ? ` · ${sk}` : ''}
                 </span>
               </Zeitachseneintrag>
             );

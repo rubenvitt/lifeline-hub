@@ -6,7 +6,8 @@ import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person } from '../api/types';
+import type { Person, Verpflegung } from '../api/types';
+import { erfasseAusgabe } from '../api/verpflegung';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import { meldeOfflineSchreibaktionGesendet } from './ereignisse';
 import { istOfflineTransient } from './fehler';
@@ -148,6 +149,30 @@ export function useOfflineSync(benutzerId?: number): void {
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
             void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(element.wert.einsatz_id) });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
+          } else if (aktion.art === 'ausgabe') {
+            // LFH-688, design.md D7: das bestätigte Zeitfenster steht im Cache, BEVOR die
+            // ausstehende Zeile verschwindet — sonst fehlte die Ausgabe einen Takt lang auf der
+            // Karte. Kein ETB: eine Ausgabe schreibt keinen Eintrag.
+            const { zeitfenster } = await erfasseAusgabe(
+              element.wert.einsatz_id,
+              aktion.zeitfenster_id,
+              aktion.daten,
+              { offlineQueueBenutzerId: aktuellerBenutzerId },
+            );
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            const key = einsatzKeys.verpflegung(element.wert.einsatz_id);
+            qc.setQueryData<Verpflegung>(key, (alt) =>
+              alt
+                ? {
+                    ...alt,
+                    zeitfenster: alt.zeitfenster.map((z) =>
+                      z.id === zeitfenster.id ? zeitfenster : z,
+                    ),
+                  }
+                : alt,
+            );
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+            void qc.invalidateQueries({ queryKey: key });
           } else {
             const nie: never = aktion;
             throw new Error(`Unbekannte Offline-Schreibaktion ${JSON.stringify(nie)}`);
