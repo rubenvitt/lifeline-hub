@@ -1,22 +1,15 @@
 import { useRef, useState } from 'react';
 import { App, Collapse, Form, Input, type UploadFile } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzKeys } from '../api/queryKeys';
 import DateiFeld from '../components/DateiFeld';
-import {
-  DOKUMENT_ACCEPT,
-  legeDokumentAb,
-  type DokumentAblage,
-  type DokumentBezugTyp,
-} from '../api/dokumente';
-import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { listeEinheiten } from '../api/einheiten';
-import { listeEtb } from '../api/etb';
+import { DOKUMENT_ACCEPT, legeDokumentAb, type DokumentAblage } from '../api/dokumente';
 import type { DokumentKategorie } from '../api/types';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from './kategorien';
+import { bezugAusWert, useBezugOptionen } from './bezug';
 
 interface Props {
   einsatzId: number;
@@ -32,24 +25,12 @@ interface AblageFormular {
   bezug?: string;
 }
 
-/** So viele ETB-Einträge stehen als Bezug zur Wahl (die jüngsten). Eigener Filter im Key, damit
- *  die Abfrage nicht das Cache-Fach der Infinite-Query von `EtbPage` teilt. */
-const ETB_BEZUG_DECKEL = 100;
-const BEZUG_TYPEN: readonly DokumentBezugTyp[] = ['abschnitt', 'einheit', 'etb_eintrag'];
-const kuerze = (text: string, max: number) =>
-  text.length > max ? `${text.slice(0, max - 1)}…` : text;
-
-/** Formularwerte → API-Eingabe. Ein unbekannter Präfix fällt weg, statt einen halben Bezug
- *  zu senden. */
+/** Formularwerte → API-Eingabe. */
 function zuAblage(werte: AblageFormular): DokumentAblage {
   const datei = werte.datei?.[0]?.originFileObj as File;
   const ablage: DokumentAblage = { datei, titel: werte.titel, kategorie: werte.kategorie };
-  if (werte.bezug) {
-    const trenner = werte.bezug.lastIndexOf(':');
-    const typ = werte.bezug.slice(0, trenner) as DokumentBezugTyp;
-    const id = Number(werte.bezug.slice(trenner + 1));
-    if (BEZUG_TYPEN.includes(typ) && Number.isInteger(id) && id > 0) ablage.bezug = { typ, id };
-  }
+  const bezug = bezugAusWert(werte.bezug);
+  if (bezug) ablage.bezug = bezug;
   return ablage;
 }
 
@@ -73,20 +54,9 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
    *  trägt, darf eine neue Dateiwahl ihn ersetzen — ein getippter Titel bleibt immer stehen. */
   const autoTitel = useRef<string | null>(null);
 
-  const abschnitteQuery = useQuery({
-    queryKey: einsatzKeys.abschnitte(einsatzId),
-    queryFn: () => listeAbschnitte(einsatzId),
-    enabled: offen,
-  });
-  const einheitenQuery = useQuery({
-    queryKey: einsatzKeys.einheiten(einsatzId),
-    queryFn: () => listeEinheiten(einsatzId),
-    enabled: offen,
-  });
-  const etbQuery = useQuery({
-    queryKey: einsatzKeys.etbListe(einsatzId, { limit: ETB_BEZUG_DECKEL }),
-    queryFn: () => listeEtb(einsatzId, { limit: ETB_BEZUG_DECKEL }),
-    enabled: offen && bezugOffen,
+  const { optionen: bezugOptionen, etbLaedt } = useBezugOptionen(einsatzId, {
+    aktiv: offen,
+    etbLaden: bezugOffen,
   });
 
   const mutation = useMutation({
@@ -104,30 +74,6 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
     mutation.reset();
     onSchliessen();
   }
-
-  const bezugOptionen = [
-    {
-      label: 'Abschnitte',
-      options: (abschnitteQuery.data ?? []).map((a) => ({
-        value: `abschnitt:${a.id}`,
-        label: a.name,
-      })),
-    },
-    {
-      label: 'Einheiten',
-      options: (einheitenQuery.data ?? []).map((e) => ({
-        value: `einheit:${e.id}`,
-        label: e.name,
-      })),
-    },
-    {
-      label: 'ETB-Einträge',
-      options: (etbQuery.data ?? []).map((e) => ({
-        value: `etb_eintrag:${e.id}`,
-        label: `ETB ${e.lfd_nr} · ${kuerze(e.inhalt, 60)}`,
-      })),
-    },
-  ];
 
   return (
     <ErfassungsModal<AblageFormular>
@@ -182,11 +128,7 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
             forceRender: true,
             children: (
               <Form.Item name="bezug" label="Bezug">
-                <Select
-                  allowClear
-                  loading={bezugOffen && etbQuery.isLoading}
-                  options={bezugOptionen}
-                />
+                <Select allowClear loading={etbLaedt} options={bezugOptionen} />
               </Form.Item>
             ),
           },

@@ -202,6 +202,143 @@ pub async fn ablegen(
     })
 }
 
+/// Eingabe für [`aendern`] — vom Handler validiert. `None` = Feld bleibt; beim Bezug ist
+/// `Some(None)` „Bezug entfernen“ (LFH-656, D1).
+pub struct Aenderung {
+    pub titel: Option<String>,
+    pub kategorie: Option<DokumentKategorie>,
+    pub bezug: Option<Option<Bezug>>,
+}
+
+/// Lesbarer Name eines Bezugs für den ETB-Text: „Abschnitt Nord“, „Einheit X“, „ETB 12“,
+/// „ohne“. Ein inzwischen verschwundenes Ziel fällt auf seine id zurück.
+async fn bezug_label(
+    conn: &mut SqliteConnection,
+    bezug: Option<Bezug>,
+) -> Result<String, AppError> {
+    let (art, sql, id) = match bezug {
+        None => return Ok("ohne".into()),
+        Some(Bezug::Abschnitt(id)) => (
+            "Abschnitt",
+            "SELECT name FROM einsatzabschnitt WHERE id = ?",
+            id,
+        ),
+        Some(Bezug::Einheit(id)) => (
+            "Einheit",
+            "SELECT name FROM einsatz_einheit WHERE id = ?",
+            id,
+        ),
+        Some(Bezug::EtbEintrag(id)) => (
+            "ETB",
+            "SELECT CAST(lfd_nr AS TEXT) FROM etb_eintrag WHERE id = ?",
+            id,
+        ),
+    };
+    let name: Option<String> = sqlx::query_scalar(sql)
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    Ok(match name {
+        Some(name) => format!("{art} {name}"),
+        None => format!("{art} #{id}"),
+    })
+}
+
+/// Ändert Titel, Kategorie und Bezug eines lebenden Dokuments in EINER Transaktion samt
+/// System-ETB-Nachweis (LFH-656, D2). Fremd/unbekannt/gelöscht → `NotFound`; ein genanntes
+/// Bezugsziel wird wie beim Ablegen geprüft. Liefert die ETB-id, oder `None`, wenn die
+/// Anfrage nichts ändert — dann gibt es weder UPDATE noch ETB-Eintrag.
+pub async fn aendern(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    aenderung: &Aenderung,
+) -> Result<Option<i64>, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    crate::write_retry!(pool, |conn| {
+        let (titel_alt, kategorie_alt, ab, eh, et): (
+            String,
+            String,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+        ) = sqlx::query_as(
+            "SELECT titel, kategorie, bezug_abschnitt_id, bezug_einheit_id, bezug_etb_eintrag_id \
+             FROM einsatz_dokument WHERE id = ? AND einsatz_id = ? AND geloescht_at IS NULL",
+        )
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+        let kategorie_alt = DokumentKategorie::parse(&kategorie_alt).ok_or_else(|| {
+            AppError::Internal(format!("Unbekannte Kategorie in DB: {kategorie_alt}"))
+        })?;
+        let bezug_alt = match (ab, eh, et) {
+            (Some(i), _, _) => Some(Bezug::Abschnitt(i)),
+            (_, Some(i), _) => Some(Bezug::Einheit(i)),
+            (_, _, Some(i)) => Some(Bezug::EtbEintrag(i)),
+            _ => None,
+        };
+        if let Some(Some(b)) = aenderung.bezug {
+            bezug_pruefen(conn, einsatz_id, b).await?;
+        }
+
+        let titel = aenderung.titel.clone().unwrap_or_else(|| titel_alt.clone());
+        let kategorie = aenderung.kategorie.unwrap_or(kategorie_alt);
+        let bezug = aenderung.bezug.unwrap_or(bezug_alt);
+
+        let mut teile = Vec::new();
+        if titel != titel_alt {
+            teile.push(format!("Titel: „{titel_alt}“ → „{titel}“"));
+        }
+        if kategorie != kategorie_alt {
+            teile.push(format!(
+                "Kategorie: {} → {}",
+                kategorie_alt.label(),
+                kategorie.label()
+            ));
+        }
+        if bezug != bezug_alt {
+            let alt = bezug_label(conn, bezug_alt).await?;
+            let neu = bezug_label(conn, bezug).await?;
+            teile.push(format!("Bezug: {alt} → {neu}"));
+        }
+        if teile.is_empty() {
+            return Ok(None);
+        }
+
+        let (ab, eh, et) = match bezug {
+            Some(Bezug::Abschnitt(i)) => (Some(i), None, None),
+            Some(Bezug::Einheit(i)) => (None, Some(i), None),
+            Some(Bezug::EtbEintrag(i)) => (None, None, Some(i)),
+            None => (None, None, None),
+        };
+        sqlx::query(
+            "UPDATE einsatz_dokument SET titel = ?, kategorie = ?, bezug_abschnitt_id = ?, \
+               bezug_einheit_id = ?, bezug_etb_eintrag_id = ? \
+             WHERE id = ?",
+        )
+        .bind(&titel)
+        .bind(kategorie.as_str())
+        .bind(ab)
+        .bind(eh)
+        .bind(et)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        let inhalt = format!(
+            "Dokument geändert: {titel} ({}) — {}",
+            kategorie.label(),
+            teile.join("; ")
+        );
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &inhalt)
+            .await
+            .map(Some)
+    })
+}
+
 /// Soft-Delete mit System-ETB-Nachweis. Fremd/unbekannt/schon gelöscht → `NotFound`.
 /// Liefert die ETB-id.
 pub async fn entfernen(

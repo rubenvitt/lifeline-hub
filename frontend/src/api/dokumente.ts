@@ -37,6 +37,25 @@ export function legeDokumentAb(einsatzId: number, eingabe: DokumentAblage): Prom
   return apiUpload<Dokument>(basis(einsatzId), fd, { timeoutMs: UPLOAD_TIMEOUT_MS });
 }
 
+/**
+ * Body von `PATCH …/dokumente/{did}` (LFH-656, handgepflegt wie jedes Request-DTO). Ein fehlendes
+ * Feld bleibt; der Bezug kommt als Paar — beide `null` entfernt ihn, eine Mischung ist 422.
+ */
+export interface DokumentAenderung {
+  titel?: string;
+  kategorie?: DokumentKategorie;
+  bezug_typ?: DokumentBezugTyp | null;
+  bezug_id?: number | null;
+}
+
+export function aendereDokument(
+  einsatzId: number,
+  dokumentId: number,
+  aenderung: DokumentAenderung,
+): Promise<Dokument> {
+  return apiSend<Dokument>(`${basis(einsatzId)}/${dokumentId}`, 'PATCH', aenderung);
+}
+
 export function entferneDokument(einsatzId: number, dokumentId: number): Promise<void> {
   return apiSend<void>(`${basis(einsatzId)}/${dokumentId}`, 'DELETE');
 }
