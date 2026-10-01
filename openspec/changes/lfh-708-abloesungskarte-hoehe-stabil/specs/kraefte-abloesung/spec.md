@@ -8,7 +8,8 @@ Die Karte einer Schicht SHALL ihre Fälligkeit in einer Zeitspalte fester Breite
 breiteste Zeitformat (Tag und Uhrzeit) fasst. Ob die Fälligkeit heute oder an einem anderen Tag
 liegt, MUST weder die Spaltenbreite noch den Zeilenumbruch der Karte ändern. Der Rhythmus MUST
 in einer eigenen Zeile stehen, die Quelle als „Vorgabe“ oder „eigen“. Ändert eine andere Person
-den Rhythmus einer gezeigten Schicht, MUST die Karte ihre Höhe behalten.
+den Rhythmus einer gezeigten Schicht, MUST die Karte ihre Höhe behalten, solange die Zeile mit
+mindestens 226 px Platz für Text steht (390 px Breite in jeder Dichte, alle breiteren Flächen).
 
 #### Scenario: Fremde Rhythmusänderung kurz vor Mitternacht, mobil
 - **WHEN** um 23:40 (Anzeigezone Europe/Berlin) auf 390 px Breite in der Dichte `komfortabel` drei Schichten mit 6 h gezeigt werden und eine andere Person den Rhythmus der mittleren auf 30 min setzt

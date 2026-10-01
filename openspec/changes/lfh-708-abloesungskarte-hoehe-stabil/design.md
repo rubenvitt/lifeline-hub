@@ -63,8 +63,9 @@ Textbreiten bei 15 px (`komfortabel`/`handschuh`; `kompakt` 13,5 px ist schmaler
 
 ### E-1 Zeitspalte in fester Breite statt Mindestbreite
 
-Die Zeit bekommt eine Mindestbreite von `6ch` in ihrer eigenen Mono-Schrift
-(`display: inline-block` am `abloesung-zeit`-Span), die Spalte behält ihr Padding. `ch` bezieht
+Die Zeit bekommt eine Mindestbreite von `6ch` in ihrer eigenen Mono-Schrift (am
+`abloesung-zeit`-Span; er ist Flex-Kind der Spalte und damit schon blockartig), die Spalte
+behält ihr Padding. `ch` bezieht
 sich auf die Ziffernbreite der Mono-Schrift, deshalb passt sich das an jede Dichte an, ohne
 Pixelkonstante. Die Spalte ist damit immer so breit wie in der Nacht. Mobil heißt das:
 `komfortabel` 85 px statt 73 px am Tag, also 12 px weniger Inhalt.
@@ -77,8 +78,10 @@ still veraltet. Ebenso verworfen: das Format für die Karte auf immer `DDHHmm` z
 
 Die Sekundärzeile wird zwei Zeilen: „Abschnitt · im Einsatz seit …“ und „Rhythmus …
 (Quelle)“. Eine fremde Rhythmusänderung berührt nur noch die zweite. Wie die erste umbricht,
-ändert sie nicht mehr. Am Fükw kostet das eine Zeile je Karte (≈ 21 px bei `kompakt`). Mobil
-kostet es nichts, denn dort brach die gemeinsame Zeile ohnehin in zwei Zeilen um.
+ändert sie nicht mehr. Das kostet eine Zeile je Karte, gemessen (Höhe am Tag vorher → nachher):
+Fükw 121,9 → 145,4 px, Tablet 188 → 213 px, mobil 175 → 200 px. Mobil bricht „Deichwache Nord ·
+im Einsatz seit 1155“ auf 252 px schon für sich in zwei Zeilen um (Nachtrag aus der Umsetzung,
+der Entwurf hatte mobil keine Mehrhöhe erwartet).
 
 *Verworfen:* eine Zeile mit Segmenten als nicht umbrechende Blöcke (`inline-block`). Ein
 breiter werdendes Segment kann trotzdem in die nächste Zeile rutschen, die Garantie fehlt also.
@@ -88,7 +91,9 @@ breiter werdendes Segment kann trotzdem in die nächste Zeile rutschen, die Gara
 Mit „(Vorgabe des Abschnitts)“ passt die Rhythmuszeile mobil nie in eine Zeile (261–317 px gegen
 252 px). Mit „(eigener Wert)“ reicht es nur knapp (249 px). Ein Wechsel der Quelle, etwa „zurück
 zur Vorgabe“ durch eine andere Person, änderte dann die Zeilenzahl. „(Vorgabe)“ und „(eigen)“
-halten den längsten zulässigen Rhythmus bei 224 px. Den Abschnitt nennt die Zeile darüber, und
+halten den längsten zulässigen Rhythmus bei 224 px (Archivo hat proportionale Ziffern, ein
+anderer Wert wie „138 h 38 min“ ist um weniger als 0,5 px breiter; die Reserve in `handschuh`
+beträgt 2 px). Den Abschnitt nennt die Zeile darüber, und
 die Spec verlangt nur die Kennzeichnung „Vorgabe oder eigener Wert“. Die Dialoge behalten ihre
 ausführlichen Wörter, denn dort erklären sie ein leeres Feld.
 
@@ -107,13 +112,18 @@ ausführlichen Wörter, denn dort erklären sie ein leeres Feld.
 ### E-5 e2e mit fester Uhr
 
 `test.use({ timezoneId: 'Europe/Berlin' })` und `page.clock.setFixedTime(T)` vor dem ersten
-`goto`. `T` ist der jüngste vergangene Zeitpunkt 12:00 bzw. 23:40 in Europe/Berlin, berechnet
-über `Intl` (Sommer- und Winterzeit). Die drei Schichten beginnen per `beginn_at` bei `T − 5 min`.
+`goto`. `T` ist der nächste Zeitpunkt 12:00 bzw. 23:40 in Europe/Berlin, berechnet
+über `Intl` (Sommer- und Winterzeit; siehe Nachtrag unten). Die drei Schichten beginnen per `beginn_at` bei `T − 5 min`.
 Die Fälligkeit liegt dadurch relativ zur Browser-Uhr wie im echten Lauf (6 h bzw. 25 min
 voraus), und die mittlere Karte steht nach der Änderung auf „Vorwarnung“. `setFixedTime` hält nur
 `Date` fest, die Timer laufen weiter (SSE, `useUhr`). Der Server rechnet mit seiner echten Uhr,
 die Karte rechnet die Einstufung aber im Client nach, und nur diese prüft der Test. Gemessen
 wird zusätzlich die Höhe jeder Karte, nicht nur die Oberkante.
+
+**Nachtrag aus dem Review:** `T` ist nicht der jüngste vergangene, sondern der nächste Zeitpunkt
+12:00 bzw. 23:40, mindestens 60 min voraus. Läge `T` zurück, wären die Schichten für den Server
+überfällig, und Hinweise der AlarmZentrale (`duration: 0`, oben rechts) könnten „anzeigen“ im
+Banner verdecken. Der Server prüft `beginn_at` nicht gegen „jetzt“.
 
 Ein eigener kleiner Fall belegt Scenario 3: Rhythmus 10079 min (167 h 59 min) als Vorgabe des
 Abschnitts, mobil in `komfortabel` und `handschuh`. Die Rhythmuszeile ist dann so hoch wie eine
@@ -123,8 +133,11 @@ Zeilenhöhe.
 
 - [Reserve in `handschuh` mobil nur 2 px (224 gegen 226 px)] → Der e2e-Fall „längster
   Rhythmus“ misst genau dort. Kippt eine Schriftänderung das, wird er rot.
-- [Fükw-Karten werden eine Zeile höher] → Bewusst. Die Zeile trägt den Rhythmus, der bei
-  fremder Änderung wechselt. Am Fükw ist Platz, mobil kostet es nichts.
+- [Jede Karte wird eine Zeile höher, auch mobil (+23,5 bzw. +25 px)] → Bewusst. Die Zeile trägt
+  den Rhythmus, der bei fremder Änderung wechselt. Mobil passen damit zwei statt bisher fast drei
+  Karten in 844 px Höhe unter den Kopf. Wer das zurückholen will, braucht einen kürzeren
+  Wortlaut der ersten Zeile („seit 1155“ statt „im Einsatz seit 1155“), das ist eine eigene
+  Entscheidung.
 - [Rest: fremde Beginnänderung] → „seit 2335“ ↔ „seit 302335“ kann die erste Zeile umbrechen
   lassen, je nach Länge des Abschnittsnamens. Bleibt benannter Rest in der Prüfliste.
 - [Rest: fremd geplante ablösende Einheit] → fügt eine Zeile „Ablösung geplant durch …“ hinzu,
@@ -133,6 +146,6 @@ Zeilenhöhe.
 - [Rest: Einstufungswort im Kopf] → „planmäßig“ → „Ablösung bald fällig“ ist länger und kann
   bei langem Einheitennamen den Kopf umbrechen lassen. Das löst auch die Zeit allein aus, nicht
   nur eine fremde Änderung. Bleibt benannter Rest.
-- [Server-Uhr ≠ Browser-Uhr im e2e] → Der Server stuft die Schichten am Tag-Fall evtl. anders
-  ein und kann Hinweise an die AlarmZentrale schicken. Toasts liegen über dem Inhalt
-  (fixiert) und verschieben keine Karte. In der Reproduktion war das so.
+- [Server-Uhr ≠ Browser-Uhr im e2e] → Die feste Uhr liegt mindestens 60 min in der Zukunft, der
+  Server sieht also keine fällige Schicht, und kein Hinweis der AlarmZentrale kann den Banner
+  verdecken (Review-Befund).
