@@ -85,8 +85,9 @@ export default function AbloesungKarte({
           wie das breiteste `kurz`-Format (`DDHHmm`, sechs Ziffern): `HHmm` gilt nur für heute,
           und wüchse die Spalte mit dem Text, bräche die Karte kurz vor Mitternacht anders um als
           am Tag — eine fremde Rhythmusänderung ließ sie dann mobil um eine Zeile wachsen
-          (LFH-708, Kriterium 12; Change `lfh-708-abloesungskarte-hoehe-stabil`). `ch` misst die
-          Ziffer der Mono-Schrift, also jede Dichte. */}
+          (LFH-708, Kriterium 12). `ch` misst die Ziffer der Mono-Schrift, also jede Dichte.
+          Herleitung:
+          `openspec/changes/archive/2026-10-01-lfh-708-abloesungskarte-hoehe-stabil/design.md` */}
       <div
         style={{
           flex: '0 0 auto',
