@@ -381,8 +381,7 @@ export function AusgabeDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      {/* Normaltext, nicht `secondary`: die Zeile ist die einzige Angabe der Fehlmenge im Dialog, und
-         Tertiärtext hält nachts den Kontrastboden nicht. */}
+      {/* Normaltext, nicht `secondary`: die Zeile ist die einzige Angabe der Fehlmenge im Dialog. */}
       <Typography.Paragraph style={{ fontVariantNumeric: 'tabular-nums' }}>
         Bedarf {zf.bedarf.gesamt} · ausgegeben {zf.ausgegeben.gesamt} · fehlt {zf.fehlmenge.gesamt}{' '}
         EP
