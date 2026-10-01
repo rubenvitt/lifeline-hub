@@ -1,8 +1,10 @@
 /**
  * Reine Einordnung der Wetterteile der Modulseite „Wetter & Pegel".
  *
- * Das Backend meldet `ausfall` ab der OBERGRENZE (6 h Warnungen, 12 h Vorhersage). „Veraltet"
- * entscheidet diese Datei gegen die Uhr der Anzeige aus `abgerufen_at` — und prüft die
+ * Das Backend meldet `ausfall` ab der OBERGRENZE (6 h Warnungen, 12 h Vorhersage, 3 h aktuelle
+ * Bedingungen). „Veraltet" entscheidet diese Datei gegen die Uhr der Anzeige aus `abgerufen_at`
+ * — bei den aktuellen Bedingungen aus der Messzeit `daten.gemessen_at` (LFH-864: ein frischer
+ * Abruf kann die alte Messung einer ausgefallenen Station tragen) — und prüft die
  * Obergrenze NOCH EINMAL: kommt keine neue Antwort (offline, Ruhezustand), hält die Abfrage
  * alte Daten und die Backend-Prüfung greift nie. Aus demselben Grund fallen abgelaufene
  * Warnungen und vergangene Stunden hier noch einmal heraus.
@@ -12,7 +14,7 @@
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { PEGEL_STAND_UNBEKANNT, VERALTET, standZeit } from '../pegel/pegelKennzahl';
 
-type WetterTeilName = 'warnungen' | 'vorhersage';
+type WetterTeilName = 'warnungen' | 'vorhersage' | 'aktuell';
 
 /** Ab diesem Alter des letzten Abrufs ist ein Teil „veraltet" (Spec „Datenstand"). */
 export const VERALTET_AB_MS: Record<WetterTeilName, number> = {
@@ -20,6 +22,8 @@ export const VERALTET_AB_MS: Record<WetterTeilName, number> = {
   warnungen: 30 * 60_000,
   // MOSMIX wird stündlich gerechnet; der Abruf läuft alle 30 min.
   vorhersage: 3 * 60 * 60_000,
+  // Gemessen an der Messzeit: ein ausgefallener SYNOP-Termin ist noch aktuell, zwei nicht.
+  aktuell: 90 * 60_000,
 };
 
 /** Ab diesem Alter ist ein Stand „Stand unbekannt" — dieselben Grenzen wie im Backend
@@ -27,6 +31,7 @@ export const VERALTET_AB_MS: Record<WetterTeilName, number> = {
 export const OBERGRENZE_MS: Record<WetterTeilName, number> = {
   warnungen: 6 * 60 * 60_000,
   vorhersage: 12 * 60 * 60_000,
+  aktuell: 3 * 60 * 60_000,
 };
 
 export { PEGEL_STAND_UNBEKANNT as STAND_UNBEKANNT, VERALTET };
@@ -35,27 +40,52 @@ export type TeilStandArt = 'aktuell' | 'veraltet' | 'unbekannt' | 'kein_ort';
 
 export interface TeilStand {
   art: TeilStandArt;
-  /** „Stand 14:25" · „Stand unbekannt" · `null` bei fehlendem Einsatzort. */
+  /** „Stand 14:25" · „Messung 14:20" (`messStand`) · „Stand unbekannt" · `null` ohne Einsatzort. */
   stand: string | null;
 }
 
-/** Zustand eines Teils. Fehlendes oder unlesbares `abgerufen_at` bei `ok` zählt als unbekannt.
-    Rein. */
-export function teilStand(
-  teil: { zustand: string; abgerufen_at?: string | null },
+/** Einordnung gegen die Uhr der Anzeige; `zeitpunkt` ist der maßgebliche Stand. Rein. */
+function einordnen(
+  zustand: string,
+  zeitpunkt: string | null | undefined,
   name: WetterTeilName,
+  wort: 'Stand' | 'Messung',
   jetzt: number,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  konv: AnzeigeKonventionen,
 ): TeilStand {
-  if (teil.zustand === 'kein_ort') return { art: 'kein_ort', stand: null };
-  const epoche = teil.abgerufen_at ? Date.parse(teil.abgerufen_at) : Number.NaN;
-  if (teil.zustand !== 'ok' || !Number.isFinite(epoche)) {
+  if (zustand === 'kein_ort') return { art: 'kein_ort', stand: null };
+  const epoche = zeitpunkt ? Date.parse(zeitpunkt) : Number.NaN;
+  if (zustand !== 'ok' || !Number.isFinite(epoche)) {
     return { art: 'unbekannt', stand: PEGEL_STAND_UNBEKANNT };
   }
   const alter = jetzt - epoche;
   if (alter > OBERGRENZE_MS[name]) return { art: 'unbekannt', stand: PEGEL_STAND_UNBEKANNT };
-  const stand = `Stand ${standZeit(teil.abgerufen_at as string, jetzt, konv)}`;
+  const stand = `${wort} ${standZeit(zeitpunkt as string, jetzt, konv)}`;
   return { art: alter > VERALTET_AB_MS[name] ? 'veraltet' : 'aktuell', stand };
+}
+
+/** Zustand von Warnungen oder Vorhersage am letzten Abruf. Fehlendes oder unlesbares
+    `abgerufen_at` bei `ok` zählt als unbekannt. Rein. */
+export function teilStand(
+  teil: { zustand: string; abgerufen_at?: string | null },
+  name: 'warnungen' | 'vorhersage',
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): TeilStand {
+  return einordnen(teil.zustand, teil.abgerufen_at, name, 'Stand', jetzt, konv);
+}
+
+/**
+ * Zustand der aktuellen Bedingungen (LFH-864) an der MESSZEIT `daten.gemessen_at`, nicht am
+ * Abruf: ein frischer Abruf kann die alte Messung einer ausgefallenen Station tragen. „Messung
+ * 08:00"; fehlt die Messzeit oder ist sie unlesbar, zählt ein `ok` als unbekannt. Rein.
+ */
+export function messStand(
+  teil: { zustand: string; daten?: { gemessen_at: string } | null },
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): TeilStand {
+  return einordnen(teil.zustand, teil.daten?.gemessen_at, 'aktuell', 'Messung', jetzt, konv);
 }
 
 /**

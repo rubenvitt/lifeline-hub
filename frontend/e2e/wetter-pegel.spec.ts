@@ -119,9 +119,41 @@ const wetter = (warnAlterMin = 2) => ({
       })),
     },
   },
+  // LFH-864: lange Stationsnamen und Ergänzungen aus zwei Nachbarstationen — der schwierigste
+  // Fall für den Querlauf des Paneels.
+  aktuell: {
+    zustand: 'ok',
+    abgerufen_at: vor(3 * MIN),
+    daten: {
+      gemessen_at: vor(10 * MIN),
+      station: { name: 'Garmisch-Partenkirchen-Hausberg', entfernung_m: 9348 },
+      symbol: 'schneeregen',
+      temperatur_c: -12.4,
+      taupunkt_c: -15.1,
+      luftfeuchte_prozent: 96,
+      luftdruck_hpa: 1003.4,
+      sicht_m: 180,
+      bewoelkung_prozent: 100,
+      wind_kmh: 118,
+      windrichtung_grad: 292,
+      boeen_kmh: 142,
+      niederschlag_mm: 12.6,
+      ergaenzt: [
+        {
+          station: { name: 'Oberstdorf-Nebelhorn-Gipfelstation', entfernung_m: 48213 },
+          groessen: ['wind', 'boeen'],
+        },
+        { station: { name: 'Mittenwald-Buckelwiesen', entfernung_m: 21640 }, groessen: ['sicht'] },
+      ],
+    },
+  },
 });
 
-const AUSFALL = { warnungen: { zustand: 'ausfall' }, vorhersage: { zustand: 'ausfall' } };
+const AUSFALL = {
+  warnungen: { zustand: 'ausfall' },
+  vorhersage: { zustand: 'ausfall' },
+  aktuell: { zustand: 'ausfall' },
+};
 
 async function anmelden(page: Page) {
   await page.goto('/login');
@@ -175,8 +207,9 @@ test('Quellausfall: „Stand unbekannt" sichtbar, ohne Liste — die Pegelwerte 
   await oeffne(page, einsatzId);
 
   const unbekannt = page.locator('[data-lfh="wetter-stand-unbekannt"]');
-  await expect(unbekannt).toHaveCount(2);
+  await expect(unbekannt).toHaveCount(3);
   for (const u of await unbekannt.all()) {
+    await u.scrollIntoViewIfNeeded();
     await expect(u).toBeInViewport();
     await expect(u).toContainText('Stand unbekannt');
   }
@@ -210,6 +243,7 @@ test('Gate 1: kein waagerechter Querlauf auf 1366, 1024 und 390 px — auch aufg
     await page.setViewportSize({ width: breite, height: hoehe });
     await oeffne(page, einsatzId);
     await expect(page.locator('[data-lfh="wetter-stunde"]')).toHaveCount(8);
+    await expect(page.locator('[data-lfh="wetter-aktuell"]')).toContainText('Mittenwald');
     // Aufgeklappt ist der längste Zustand der Seite.
     await page.getByRole('button', { name: 'Beschreibung und Handlungsempfehlung' }).click();
     const ueber = await page.evaluate(
@@ -271,5 +305,13 @@ for (const modus of ['light', 'dark'] as const) {
         .last();
       await pruefe(chip, boden, `${modus} ${stufe}`);
     }
+    // LFH-864: Herkunft eines ergänzten Werts und das Wort der Wetterlage.
+    const aktuell = page.locator('[data-lfh="wetter-aktuell"]');
+    await pruefe(
+      aktuell.locator('[data-lfh="kennzahl-notiz"]', { hasText: 'Oberstdorf' }).first(),
+      boden,
+      `${modus} Herkunft`,
+    );
+    await pruefe(aktuell.getByText('Schneeregen', { exact: true }), boden, `${modus} Wetterlage`);
   });
 }

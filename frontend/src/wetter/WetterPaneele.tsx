@@ -1,18 +1,28 @@
 /**
- * Paneele „Warnungen (DWD)" und „Vorhersage 24 h" der Modulseite „Wetter & Pegel".
+ * Paneele „Aktuelle Bedingungen" (LFH-864), „Warnungen (DWD)" und „Vorhersage 24 h" der
+ * Modulseite „Wetter & Pegel".
  *
  * Jeder Teil trägt seinen Stand: `kein_ort` erklärt, was fehlt; `ausfall` (oder ein Stand über
  * der Obergrenze) zeigt „Stand unbekannt" und KEINE Liste; ein veralteter Stand bleibt sichtbar
  * mit Wort und Abrufzeit. Die Einordnung steht in `wetterStand.ts`.
- * Beide sind Listen zum Lesen; Beschreibung und Handlungsempfehlung einer Warnung stehen inline
- * hinter einem Umschalter, nicht in einem Drawer.
+ * Warnungen und Vorhersage sind Listen zum Lesen; Beschreibung und Handlungsempfehlung einer
+ * Warnung stehen inline hinter einem Umschalter, nicht in einem Drawer.
+ *
+ * „Aktuelle Bedingungen" zeigt die jüngste MESSUNG der nächsten DWD-Station, keinen Modellwert;
+ * ihr Stand ist die Messzeit (`wetterStand.ts`). „Zahl führt": vier Kennzahlen ohne Ton — das
+ * Paneel bewertet nichts (keine Einsatzgrenzen, kein Alarm, LFH-864 design.md). Ergänzt die
+ * Quelle einen Wert aus einer anderen Station, steht diese als Text beim Wert, vorlesbar.
  */
 import { Button } from 'antd';
-import { useId, useState } from 'react';
-import type { WetterAnzeige, WetterOrt, WetterWarnung } from '../api/types';
+import { useId, useState, type ReactNode } from 'react';
+import type { WetterAktuell, WetterAnzeige, WetterOrt, WetterWarnung } from '../api/types';
 import type { AnzeigeKonventionen } from '../anzeige/format';
 import {
   Augenbraue,
+  Datenfeld,
+  Datenraster,
+  Kennzahl,
+  Kennzahlenband,
   Paneel,
   PaneelZustand,
   StatusChip,
@@ -27,22 +37,33 @@ import {
   STAND_UNBEKANNT,
   VERALTET,
   dreiStundenTakt,
+  himmelsrichtung,
+  messStand,
   teileWarnungen,
   teilStand,
   type TeilStand,
 } from './wetterStand';
+import { wetterSymbolIkone } from './wetterSymbol';
 import {
+  druckText,
+  ergaenztVon,
   niederschlagText,
+  prozentText,
+  sichtText,
   stationText,
   temperaturText,
   titelSchreibung,
   warnZeitraum,
+  wetterSymbolWort,
   windText,
+  zahlText,
 } from './wetterText';
 
 const QUELLENVERMERK = 'Datenbasis: Deutscher Wetterdienst · über Bright Sky';
 const KEIN_ORT_TEXT =
   'Warnungen und Vorhersage brauchen einen verorteten Einsatzort. Der Einsatz hat noch keine Koordinate.';
+const KEIN_ORT_AKTUELL =
+  'Die aktuellen Bedingungen brauchen einen verorteten Einsatzort. Der Einsatz hat noch keine Koordinate.';
 const AUSFALL_TEXT =
   'Die Wetterquelle antwortet nicht, und es liegt kein verwertbarer Stand vor. Es werden keine Werte gezeigt.';
 
@@ -67,16 +88,18 @@ function standMeta(stand: TeilStand, vorne?: string | null): string | undefined 
 function StandHinweis({
   stand,
   onEinsatzdaten,
+  keinOrtText = KEIN_ORT_TEXT,
 }: {
   stand: TeilStand;
   onEinsatzdaten?: () => void;
+  keinOrtText?: string;
 }) {
   const { token, rollen } = useRollen();
   const polster = { paddingBlock: token.paddingSM, paddingInline: token.padding } as const;
   if (stand.art === 'kein_ort') {
     return (
       <div data-lfh="wetter-kein-ort" style={{ ...polster, display: 'grid', gap: token.marginXS }}>
-        <span style={{ color: rollen.text2, fontSize: 12 }}>{KEIN_ORT_TEXT}</span>
+        <span style={{ color: rollen.text2, fontSize: 12 }}>{keinOrtText}</span>
         {onEinsatzdaten && (
           <span>
             <Button onClick={onEinsatzdaten}>Einsatzort in den Einsatzdaten verorten</Button>
@@ -359,5 +382,123 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
           ))}
       </PaneelZustand>
     </Paneel>
+  );
+}
+
+const FEHLT = '—';
+
+/** Notiz einer Kennzahl: Zusatz und, bei einem ergänzten Wert, dessen Station. */
+function notiz(...teile: Array<string | null | undefined>): string | undefined {
+  const t = teile.filter((x): x is string => !!x);
+  return t.length ? t.join(' · ') : undefined;
+}
+
+/** Einheit nur hinter einem Wert — „— °C" läse sich wie ein Messwert. */
+function einheit(v: number | null | undefined, e: string): string | undefined {
+  return v != null && Number.isFinite(v) ? e : undefined;
+}
+
+function Messwerte({ a }: { a: WetterAktuell }) {
+  const { token, rollen } = useRollen();
+  const von = (g: Parameters<typeof ergaenztVon>[1]) => ergaenztVon(a.ergaenzt, g);
+  const richtung = himmelsrichtung(a.windrichtung_grad);
+  const SymbolIkone = wetterSymbolIkone(a.symbol);
+  /** Wert eines Datenfelds, bei Ergänzung mit der Station darunter. */
+  const wert = (text: ReactNode, herkunft: string | null) => (
+    <span style={{ display: 'grid', gap: 2 }}>
+      <span>{text}</span>
+      {herkunft && <span style={{ fontSize: 11, color: rollen.gedaempft }}>{herkunft}</span>}
+    </span>
+  );
+  return (
+    <div style={{ display: 'grid', gap: token.marginSM, padding: token.padding }}>
+      <Kennzahlenband beschriftung="Messwerte">
+        <Kennzahl
+          titel="Temperatur"
+          wert={zahlText(a.temperatur_c, 1)}
+          einheit={einheit(a.temperatur_c, '°C')}
+          notiz={notiz(von('temperatur'))}
+        />
+        <Kennzahl
+          titel="Wind"
+          wert={zahlText(a.wind_kmh, 0)}
+          einheit={einheit(a.wind_kmh, 'km/h')}
+          notiz={notiz(`aus ${richtung ?? FEHLT}`, von('wind'))}
+        />
+        <Kennzahl
+          titel="Böen"
+          wert={zahlText(a.boeen_kmh, 0)}
+          einheit={einheit(a.boeen_kmh, 'km/h')}
+          notiz={notiz('stärkste der letzten Stunde', von('boeen'))}
+        />
+        <Kennzahl
+          titel="Niederschlag"
+          wert={zahlText(a.niederschlag_mm, 1)}
+          einheit={einheit(a.niederschlag_mm, 'mm')}
+          notiz={notiz('letzte Stunde', von('niederschlag'))}
+        />
+      </Kennzahlenband>
+      <Datenraster beschriftung="Weitere Messwerte">
+        <Datenfeld label="Wetterlage">
+          {wert(
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+              {SymbolIkone && <SymbolIkone />}
+              {wetterSymbolWort(a.symbol)}
+            </span>,
+            von('wetterlage'),
+          )}
+        </Datenfeld>
+        <Datenfeld label="Sicht" mono>
+          {wert(sichtText(a.sicht_m), von('sicht'))}
+        </Datenfeld>
+        <Datenfeld label="Bewölkung" mono>
+          {wert(prozentText(a.bewoelkung_prozent), von('bewoelkung'))}
+        </Datenfeld>
+        <Datenfeld label="Luftfeuchte" mono>
+          {wert(prozentText(a.luftfeuchte_prozent), von('luftfeuchte'))}
+        </Datenfeld>
+        <Datenfeld label="Taupunkt" mono>
+          {wert(temperaturText(a.taupunkt_c), von('taupunkt'))}
+        </Datenfeld>
+        <Datenfeld label="Luftdruck" mono>
+          {wert(druckText(a.luftdruck_hpa), von('luftdruck'))}
+        </Datenfeld>
+      </Datenraster>
+    </div>
+  );
+}
+
+export function AktuellPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: TeilProps) {
+  const { rollen } = useRollen();
+  const teil = wetter?.aktuell;
+  const stand = teil ? messStand(teil, jetzt, konv) : null;
+  const daten = teil?.zustand === 'ok' ? teil.daten : null;
+  const mitInhalt = daten && stand && (stand.art === 'aktuell' || stand.art === 'veraltet');
+  const station = daten ? stationText(daten.station.name, daten.station.entfernung_m) : null;
+  return (
+    <div data-lfh="wetter-aktuell">
+      <Paneel
+        titel="Aktuelle Bedingungen"
+        meta={stand ? standMeta(stand, mitInhalt ? station : null) : undefined}
+        fuss={
+          <span style={{ color: rollen.gedaempft, fontSize: 11 }}>
+            {['Messung', 'SYNOP', QUELLENVERMERK].join(' · ')}
+          </span>
+        }
+      >
+        <PaneelZustand
+          zustand={zustand}
+          titel="Aktuelle Bedingungen"
+          leerText=""
+          leerAktion=""
+          onLeerAktion={onNeuladen}
+          onNeuladen={onNeuladen}
+        >
+          {/* Den Weg zu den Einsatzdaten trägt das Warnpaneel, nicht drei gleichnamige Knöpfe. */}
+          {stand && <StandHinweis stand={stand} keinOrtText={KEIN_ORT_AKTUELL} />}
+          {mitInhalt && <Messwerte a={daten} />}
+        </PaneelZustand>
+      </Paneel>
+    </div>
   );
 }

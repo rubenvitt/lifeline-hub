@@ -4,6 +4,7 @@ import {
   VERALTET_AB_MS,
   dreiStundenTakt,
   himmelsrichtung,
+  messStand,
   teileWarnungen,
   teilStand,
 } from './wetterStand';
@@ -13,6 +14,48 @@ const BERLIN = { zeitzone: 'Europe/Berlin' };
 const JETZT = Date.UTC(2026, 8, 22, 12, 30, 0);
 const vor = (ms: number) => new Date(JETZT - ms).toISOString();
 const MIN = 60_000;
+
+describe('messStand — aktuelle Bedingungen (LFH-864): der Stand ist die Messzeit', () => {
+  // Der Abruf ist jedes Mal frisch: der Stand hängt allein an der Messzeit.
+  const aktuell = (gemessenVor: number) => ({
+    zustand: 'ok',
+    abgerufen_at: vor(0),
+    daten: { gemessen_at: vor(gemessenVor) },
+  });
+
+  it('„Messung HH:MM" aus `gemessen_at`, nicht aus dem Abruf', () => {
+    expect(messStand(aktuell(10 * MIN), JETZT, BERLIN)).toEqual({
+      art: 'aktuell',
+      stand: 'Messung 14:20',
+    });
+  });
+
+  it('veraltet ab 90 min nach der Messung, auch bei frischem Abruf', () => {
+    expect(VERALTET_AB_MS.aktuell).toBe(90 * MIN);
+    expect(messStand(aktuell(89 * MIN), JETZT, BERLIN).art).toBe('aktuell');
+    expect(messStand(aktuell(91 * MIN), JETZT, BERLIN)).toEqual({
+      art: 'veraltet',
+      stand: 'Messung 12:59',
+    });
+  });
+
+  it('„Stand unbekannt" ab 3 h nach der Messung', () => {
+    expect(OBERGRENZE_MS.aktuell).toBe(180 * MIN);
+    expect(messStand(aktuell(179 * MIN), JETZT, BERLIN).art).toBe('veraltet');
+    expect(messStand(aktuell(181 * MIN), JETZT, BERLIN)).toEqual({
+      art: 'unbekannt',
+      stand: 'Stand unbekannt',
+    });
+  });
+
+  it('ohne lesbare Messzeit unbekannt; kein Ort bleibt eigener Zustand', () => {
+    expect(messStand({ zustand: 'ok', daten: { gemessen_at: 'kaputt' } }, JETZT, BERLIN).art).toBe(
+      'unbekannt',
+    );
+    expect(messStand({ zustand: 'ok' }, JETZT, BERLIN).art).toBe('unbekannt');
+    expect(messStand({ zustand: 'kein_ort' }, JETZT, BERLIN).art).toBe('kein_ort');
+  });
+});
 
 describe('teilStand', () => {
   it('ok und jung: aktuell mit „Stand HH:MM"', () => {
@@ -43,7 +86,8 @@ describe('teilStand', () => {
 
   it('Obergrenze auch gegen die eigene Uhr: gehaltene Daten werden „Stand unbekannt" (6 h / 12 h)', () => {
     // Ohne neue Antwort (offline, aufgewachter Rechner) prüft das Backend nichts mehr.
-    expect(OBERGRENZE_MS).toEqual({ warnungen: 6 * 60 * MIN, vorhersage: 12 * 60 * MIN });
+    expect(OBERGRENZE_MS.warnungen).toBe(6 * 60 * MIN);
+    expect(OBERGRENZE_MS.vorhersage).toBe(12 * 60 * MIN);
     expect(
       teilStand({ zustand: 'ok', abgerufen_at: vor(6 * 60 * MIN) }, 'warnungen', JETZT, BERLIN).art,
     ).toBe('veraltet');

@@ -1,6 +1,8 @@
-//! Integrationstests des Wetters am Einsatzort (LFH-633), `GET /api/einsaetze/{id}/wetter`.
+//! Integrationstests des Wetters am Einsatzort (LFH-633), `GET /api/einsaetze/{id}/wetter`,
+//! samt aktuellen Bedingungen (LFH-864).
 //!
-//! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/specs/lage-wetter-pegel/spec.md`.
+//! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/specs/lage-wetter-pegel/spec.md`,
+//! `openspec/changes/lfh-864-aktuelle-bedingungen/specs/lage-wetter-pegel/spec.md`.
 //!
 //! **Kein Test geht ins Netz.** Jeder Router bekommt eine Bright-Sky-Attrappe auf
 //! `127.0.0.1` (oder eine tote Adresse) und ein EIGENES `karten_dir` (Tempdir): der
@@ -40,8 +42,8 @@ async fn setup_mit_basis(basis: &str) -> Umgebung {
     }
 }
 
-/// Bright-Sky-Attrappe: `/alerts` und `/weather` mit festen Körpern, jede Anfrage gezählt
-/// und ihre Anfragezeile mitgeschrieben.
+/// Bright-Sky-Attrappe: `/alerts`, `/weather` und `/current_weather` mit festen Körpern, jede
+/// Anfrage gezählt und ihre Anfragezeile mitgeschrieben.
 struct Attrappe {
     basis: String,
     anfragen: Arc<Mutex<Vec<String>>>,
@@ -70,6 +72,8 @@ async fn attrappe(alerts: Value, weather: Value) -> Attrappe {
                     .to_string();
                 let body = if zeile.contains("/alerts") {
                     alerts.to_string()
+                } else if zeile.contains("/current_weather") {
+                    current_weather().to_string()
                 } else {
                     weather.to_string()
                 };
@@ -145,6 +149,27 @@ fn weather() -> Value {
     })
 }
 
+/// Messung der Station Bremen vor zehn Minuten; Wind und Böen aus Bremen-Flughafen ergänzt.
+fn current_weather() -> Value {
+    let gemessen =
+        (Utc::now() - chrono::Duration::minutes(10)).to_rfc3339_opts(SecondsFormat::Secs, true);
+    json!({
+        "weather": {
+            "source_id": 1, "timestamp": gemessen, "icon": "rain", "condition": "rain",
+            "temperature": 15.3, "relative_humidity": null, "wind_speed_10": 10.8,
+            "wind_direction_10": 140, "wind_gust_speed_10": 12.0, "wind_gust_speed_60": 16.6,
+            "precipitation_60": 0.4,
+            "fallback_source_ids": { "wind_speed_10": 2, "wind_gust_speed_60": 2 }
+        },
+        "sources": [
+            { "id": 1, "station_name": "Bremen", "distance": 3887.0, "lat": 53.0451,
+              "lon": 8.79808, "observation_type": "synop" },
+            { "id": 2, "station_name": "Bremen-Flughafen", "distance": 5120.0, "lat": 53.047,
+              "lon": 8.787, "observation_type": "synop" }
+        ]
+    })
+}
+
 fn pfad(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/wetter")
 }
@@ -175,7 +200,8 @@ async fn ohne_ort_kein_ort_und_keine_anfrage() {
         json,
         json!({
             "warnungen": { "zustand": "kein_ort" },
-            "vorhersage": { "zustand": "kein_ort" }
+            "vorhersage": { "zustand": "kein_ort" },
+            "aktuell": { "zustand": "kein_ort" }
         })
     );
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -234,10 +260,37 @@ async fn mit_ort_warnungen_samt_gemeinde_und_vorhersage() {
         "ein fehlender Wert fehlt, er wird nicht 0"
     );
 
+    // LFH-864: die Messung der Station, ergänzte Werte mit ihrer Station.
+    let k = &json["aktuell"];
+    assert_eq!(k["zustand"], "ok");
+    assert!(k["abgerufen_at"].as_str().unwrap().ends_with('Z'));
+    assert_eq!(
+        k["daten"]["station"],
+        json!({ "name": "Bremen", "entfernung_m": 3887.0 })
+    );
+    assert_eq!(k["daten"]["symbol"], "regen");
+    assert_eq!(k["daten"]["temperatur_c"], 15.3);
+    assert_eq!(
+        k["daten"]["boeen_kmh"], 16.6,
+        "stärkste Böe der letzten Stunde"
+    );
+    assert!(
+        !k["daten"]
+            .as_object()
+            .unwrap()
+            .contains_key("luftfeuchte_prozent"),
+        "`null` fehlt, er wird nicht 0"
+    );
+    assert_eq!(
+        k["daten"]["ergaenzt"],
+        json!([{ "station": { "name": "Bremen-Flughafen", "entfernung_m": 5120.0 },
+                 "groessen": ["wind", "boeen"] }])
+    );
+
     // Nur die gerundete Koordinate geht an die Quelle, und ein zweiter Aufruf kommt aus dem
     // Cache.
     let anfragen = a.anfragen.lock().unwrap().clone();
-    assert_eq!(anfragen.len(), 2, "{anfragen:?}");
+    assert_eq!(anfragen.len(), 3, "{anfragen:?}");
     assert!(
         anfragen
             .iter()
@@ -245,11 +298,11 @@ async fn mit_ort_warnungen_samt_gemeinde_und_vorhersage() {
         "{anfragen:?}"
     );
     anfrage(&u.app, "GET", &pfad(einsatz), &admin, None).await;
-    assert_eq!(a.zaehler.load(Ordering::SeqCst), 2, "frisch aus dem Cache");
+    assert_eq!(a.zaehler.load(Ordering::SeqCst), 3, "frisch aus dem Cache");
 }
 
 #[tokio::test]
-async fn tote_quelle_ist_ausfall_fuer_beide_und_trotzdem_200() {
+async fn tote_quelle_ist_ausfall_fuer_alle_teile_und_trotzdem_200() {
     let u = setup_mit_basis("http://127.0.0.1:1").await;
     let admin = login_cookie(&u.app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&u.app, &admin).await;
@@ -261,7 +314,8 @@ async fn tote_quelle_ist_ausfall_fuer_beide_und_trotzdem_200() {
         json,
         json!({
             "warnungen": { "zustand": "ausfall" },
-            "vorhersage": { "zustand": "ausfall" }
+            "vorhersage": { "zustand": "ausfall" },
+            "aktuell": { "zustand": "ausfall" }
         })
     );
     // Die Pegel bleiben davon unberührt.

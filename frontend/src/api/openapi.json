@@ -9809,14 +9809,165 @@
           "akut"
         ]
       },
+      "WetterAktuell": {
+        "type": "object",
+        "description": "Die jüngste Messung der nächsten DWD-Wetterstation (LFH-864). Jeder Wert, den die Quelle\nnicht liefert, fehlt — er wird nie zu 0.",
+        "required": [
+          "gemessen_at",
+          "station",
+          "ergaenzt"
+        ],
+        "properties": {
+          "bewoelkung_prozent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Bewölkung in %."
+          },
+          "boeen_kmh": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Stärkste Böe der letzten 60 Minuten in km/h (`wind_gust_speed_60`)."
+          },
+          "ergaenzt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WetterErgaenzung"
+            },
+            "description": "Werte aus anderen Stationen; leer, wenn alles von [`Self::station`] stammt."
+          },
+          "gemessen_at": {
+            "type": "string",
+            "description": "Messzeit (`timestamp`), RFC 3339 in UTC (`…Z`). Sie ist der Stand des Teils."
+          },
+          "luftdruck_hpa": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Luftdruck auf Meereshöhe in hPa."
+          },
+          "luftfeuchte_prozent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Relative Luftfeuchte in %."
+          },
+          "niederschlag_mm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Niederschlag der letzten 60 Minuten in mm (`precipitation_60`)."
+          },
+          "sicht_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Sichtweite in Metern."
+          },
+          "station": {
+            "$ref": "#/components/schemas/WetterStation",
+            "description": "Die Station der Messung (`source_id`)."
+          },
+          "symbol": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WetterSymbol",
+                "description": "Wetterlage aus `icon`; fehlt bei einem unbekannten Wert."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taupunkt_c": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Taupunkt in °C."
+          },
+          "temperatur_c": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Lufttemperatur in °C."
+          },
+          "wind_kmh": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Mittlerer Wind der letzten 10 Minuten in km/h (`wind_speed_10`)."
+          },
+          "windrichtung_grad": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Windrichtung der letzten 10 Minuten in Grad (0 = Nord), woher der Wind weht."
+          }
+        }
+      },
+      "WetterAktuellTeil": {
+        "type": "object",
+        "description": "Teil „Aktuell“ der Wetter-Antwort (LFH-864).",
+        "required": [
+          "zustand"
+        ],
+        "properties": {
+          "abgerufen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt des letzten erfolgreichen Abrufs, RFC 3339 in UTC. Nur bei `ok`. Den Stand\nträgt `daten.gemessen_at`, nicht der Abruf."
+          },
+          "daten": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WetterAktuell",
+                "description": "Nur bei `ok`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/WetterTeilZustand"
+          }
+        }
+      },
       "WetterAnzeige": {
         "type": "object",
         "description": "Antwort von `GET /api/einsaetze/{id}/wetter`.",
         "required": [
           "warnungen",
-          "vorhersage"
+          "vorhersage",
+          "aktuell"
         ],
         "properties": {
+          "aktuell": {
+            "$ref": "#/components/schemas/WetterAktuellTeil"
+          },
           "ort": {
             "oneOf": [
               {
@@ -9835,6 +9986,42 @@
             "$ref": "#/components/schemas/WetterWarnungen"
           }
         }
+      },
+      "WetterErgaenzung": {
+        "type": "object",
+        "description": "Werte, die die Quelle aus einer anderen als der nächsten Station ergänzt hat\n(`fallback_source_ids`), gruppiert je Station.",
+        "required": [
+          "station",
+          "groessen"
+        ],
+        "properties": {
+          "groessen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WetterMessgroesse"
+            },
+            "description": "Die ergänzten gezeigten Größen, in der Reihenfolge von [`WetterMessgroesse`]."
+          },
+          "station": {
+            "$ref": "#/components/schemas/WetterStation"
+          }
+        }
+      },
+      "WetterMessgroesse": {
+        "type": "string",
+        "description": "Eine gezeigte Messgröße der aktuellen Bedingungen — benennt, welche Werte die Quelle aus\neiner anderen Station ergänzt hat. Die Reihenfolge ist die der Anzeige und ordnet\n`WetterErgaenzung::groessen`. Wire == `as_str()`.",
+        "enum": [
+          "temperatur",
+          "wind",
+          "boeen",
+          "niederschlag",
+          "wetterlage",
+          "sicht",
+          "bewoelkung",
+          "luftfeuchte",
+          "taupunkt",
+          "luftdruck"
+        ]
       },
       "WetterOrt": {
         "type": "object",
@@ -9860,6 +10047,27 @@
           "name": {
             "type": "string",
             "description": "Name der Warnzelle, z. B. „Stadt Bremerhaven“."
+          }
+        }
+      },
+      "WetterStation": {
+        "type": "object",
+        "description": "Eine Wetterstation, wie die Quelle sie nennt (SYNOP).",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "entfernung_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Entfernung zum (gerundeten) Einsatzort in Metern."
+          },
+          "name": {
+            "type": "string",
+            "description": "Stationsname, z. B. „Bremen“ oder „Hameln-Hastenbeck“."
           }
         }
       },
@@ -9923,6 +10131,25 @@
             "description": "Beginn der Stunde, RFC 3339 in UTC (`…Z`)."
           }
         }
+      },
+      "WetterSymbol": {
+        "type": "string",
+        "description": "Wetterlage der jüngsten Messung, aus `icon` von `/current_weather` (LFH-864, design.md\nD5). Die Quelle trennt Tag und Nacht nur bei klar und teils bewölkt; Nebel teilt\n`quelle` selbst nach dem Sonnenstand an der Station. Wire == `as_str()`.",
+        "enum": [
+          "klar_tag",
+          "klar_nacht",
+          "teils_bewoelkt_tag",
+          "teils_bewoelkt_nacht",
+          "bewoelkt",
+          "nebel_tag",
+          "nebel_nacht",
+          "wind",
+          "regen",
+          "schneeregen",
+          "schnee",
+          "hagel",
+          "gewitter"
+        ]
       },
       "WetterTeilZustand": {
         "type": "string",

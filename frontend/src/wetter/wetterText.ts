@@ -2,6 +2,7 @@
  * Reine Textbausteine der Wetter-Paneele. Jede Angabe trägt ihre Einheit, ein fehlender Wert
  * erscheint als Strich — nie als 0. Deutsches Komma, Minus als U+2212.
  */
+import type { WetterErgaenzung, WetterMessgroesse, WetterSymbol } from '../api/types';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { standZeit } from '../pegel/pegelKennzahl';
 import { himmelsrichtung } from './wetterStand';
@@ -95,4 +96,61 @@ export function warnZeitraum(
     Number.isFinite(e) ? `bis ${standZeit(ende as string, jetzt, konv)}` : 'bis auf Weiteres',
   );
   return teile.join(' · ');
+}
+
+// ── Aktuelle Bedingungen (LFH-864) ───────────────────────────────────────────────
+
+/** Zahl ohne Einheit für eine Kennzahl („15,3", „17", „−0,4"); fehlend „—". Rein. */
+export function zahlText(v: number | null | undefined, stellen: 0 | 1): string {
+  if (!da(v)) return FEHLT;
+  return zahl(stellen === 1 ? EINE_STELLE : GANZ, v);
+}
+
+/** Sichtweite: „180 m" · „53,2 km"; fehlend „—". Rein. */
+export function sichtText(meter: number | null | undefined): string {
+  return entfernungText(meter) ?? FEHLT;
+}
+
+/** „80 %"; fehlend „—". Rein. */
+export function prozentText(p: number | null | undefined): string {
+  return da(p) ? `${GANZ.format(p)} %` : FEHLT;
+}
+
+/** Luftdruck ganzzahlig: „1021 hPa"; fehlend „—". Rein. */
+export function druckText(hpa: number | null | undefined): string {
+  return da(hpa) ? `${GANZ.format(hpa)} hPa` : FEHLT;
+}
+
+/** Ein Wort je Wetterlage; Tag und Nacht unterscheidet nur die Ikone (design.md D5). */
+const SYMBOL_WORT: Record<WetterSymbol, string> = {
+  klar_tag: 'klar',
+  klar_nacht: 'klar',
+  teils_bewoelkt_tag: 'teils bewölkt',
+  teils_bewoelkt_nacht: 'teils bewölkt',
+  bewoelkt: 'bewölkt',
+  nebel_tag: 'Nebel',
+  nebel_nacht: 'Nebel',
+  wind: 'windig',
+  regen: 'Regen',
+  schneeregen: 'Schneeregen',
+  schnee: 'Schnee',
+  hagel: 'Hagel',
+  gewitter: 'Gewitter',
+};
+
+/** Wort der Wetterlage; ohne (unbekannte) Wetterlage „—". Rein. */
+export function wetterSymbolWort(s: WetterSymbol | null | undefined): string {
+  return s ? SYMBOL_WORT[s] : FEHLT;
+}
+
+/**
+ * Herkunft eines Werts, den die Quelle aus einer anderen Station ergänzt hat:
+ * „Station Hameln, 12,1 km"; stammt er von der Hauptstation, `null`. Rein.
+ */
+export function ergaenztVon(
+  ergaenzt: readonly WetterErgaenzung[],
+  groesse: WetterMessgroesse,
+): string | null {
+  const e = ergaenzt.find((x) => x.groessen.includes(groesse));
+  return e ? stationText(e.station.name, e.station.entfernung_m) : null;
 }
