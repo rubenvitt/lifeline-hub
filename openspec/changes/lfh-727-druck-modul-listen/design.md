@@ -94,18 +94,22 @@ des Aufbaus im Speicher.
 
 ### D2 — Migration 0131: CHECK-Rebuild einer Blatt-Tabelle
 
-`migrations/0131_person_zugriff_audit_druck.sql` folgt dem Rebuild-Muster aus 0082:
+`migrations/0131_person_zugriff_audit_druck.sql` folgt Zeile für Zeile dem Blatt-Rebuild aus
+0112 (`person_verbleib`, LFH-613), dem nächsten Vorbild im Projekt:
 
-1. `CREATE TABLE person_zugriff_audit_new` mit gleichen Spalten und Fremdschlüsseln und
-   `CHECK (art IN ('detail','export','druck'))`.
-2. `INSERT … SELECT` mit allen Spalten, die ids bleiben erhalten.
-3. `DROP TABLE`, dann `RENAME`.
-4. `sqlite_sequence` nachziehen und `idx_person_audit_einsatz` neu anlegen.
+1. `-- no-transaction` am Dateianfang, wie 0112.
+2. `CREATE TABLE person_zugriff_audit_neu` mit gleichen Spalten, Fremdschlüsseln und
+   Spaltenkommentaren und `CHECK (art IN ('detail','export','druck'))`. Die Kommentare bleiben
+   wortgleich, weil SQLite sie in der gespeicherten DDL mitführt.
+3. `INSERT … SELECT` mit allen Spalten, die ids bleiben erhalten.
+4. `sqlite_sequence` der Alt-Tabelle übernehmen, `DROP TABLE`, `RENAME`.
+5. `idx_person_audit_einsatz` neu anlegen.
 
-Die Tabelle hat keine eingehenden Fremdschlüssel. `PRAGMA foreign_keys = OFF` und
-`-- no-transaction` braucht es deshalb nicht. Die Migration läuft in der Transaktion von sqlx,
-und ein Fehler rollt sie ganz zurück. Ob das stimmt, prüft die Umsetzung vorher mit
-`grep -n "REFERENCES person_zugriff_audit" migrations/`. Die Nummer wird vor dem Merge mit
+Die Tabelle hat keine eingehenden Fremdschlüssel (`grep` über `migrations/` bestätigt das).
+`PRAGMA foreign_keys = OFF` braucht es deshalb nicht. Abgesichert ist das wie bei 0112 durch
+zwei Tests in `src/db.rs`. Sie laufen auf einer befüllten 0021-DB mit `include_str!`. Geprüft
+wird, dass Zeilen samt ids, Sequenz und Schema erhalten bleiben, dass die DDL sich nur im CHECK
+unterscheidet und dass `foreign_key_check` leer ist. Die Nummer wird vor dem Merge mit
 `scripts/check-migrationen.sh` gegen `origin/alpha` geprüft.
 
 `ZugriffArt` bekommt `Druck`. Doc-Kommentar und Schema-Anker nennen die neue CHECK-Quelle 0131.

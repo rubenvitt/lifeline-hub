@@ -37,14 +37,22 @@ export const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlu
   }),
 );
 
+/** Statussicht der Schäden-Liste: ein Status oder „alle" (kein Filter). */
+export type SchaedenSicht = SchadenStatus | 'alle';
+
+/** Reiter der Schäden-Liste in Bedienreihenfolge — dieselben Wörter im Kopf der Druckansicht. */
+export const SCHAEDEN_SICHTEN: readonly { key: SchaedenSicht; label: string }[] = [
+  { key: 'offen', label: 'Offen' },
+  { key: 'uebergeben', label: 'Übergeben' },
+  { key: 'abgeschlossen', label: 'Abgeschlossen' },
+  { key: 'alle', label: 'Alle' },
+];
+
 /**
  * Reiterachse der Schäden-Liste: Status oder „alle". Typ, Ausmaß und Freitextsuche laufen im
  * `Datensicht`-Primitiv (Spaltenfilter bzw. `suche`).
  */
-export function filterSchaeden(
-  alle: Schaden[],
-  opts: { sicht: SchadenStatus | 'alle' },
-): Schaden[] {
+export function filterSchaeden(alle: Schaden[], opts: { sicht: SchaedenSicht }): Schaden[] {
   return alle.filter((s) => opts.sicht === 'alle' || s.status === opts.sicht);
 }
 

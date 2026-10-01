@@ -6,19 +6,19 @@ Code. Vor jedem „fertig“ stehen `superpowers:verification-before-completion`
 
 ## 1. Protokollart `druck` (Backend)
 
-- [ ] 1.1 `migrations/0131_person_zugriff_audit_druck.sql` als CHECK-Rebuild nach D2. Vorher prüfen, dass keine Migration `person_zugriff_audit` referenziert. Nachweis: neuer Test in `src/db.rs` (Muster `bis(version)`): legt bis 0130 Zeilen `detail` und `export` an, spielt 0131 ein und findet sie samt ids danach unverändert; `druck` wird angenommen, `foo` scheitert am CHECK; `sqlite_sequence` vergibt danach keine alte id neu
-- [ ] 1.2 `ZugriffArt::Druck` in `src/person/audit_repo.rs`, Doc-Kommentare auf 0131; Wire-Kontrakt in `tests/enum_wire_kontrakt.rs`. Nachweis: `cargo test --test enum_wire_kontrakt` und Repo-Test `druck_eintrag_ohne_person`
-- [ ] 1.3 Handler `einsatz_person::druck` und Route `GET /api/einsaetze/{id}/personen/druck` in `src/app.rs` (D1). Nachweis in `tests/einsatz_person.rs`: `druck_schreibt_genau_einen_druck_audit_und_liefert_liste` (gleiche Menge wie die Liste, `person_id` NULL, Benutzer), `druck_ohne_modulzugriff_ist_403_ohne_audit`, `druck_als_beobachter_erlaubt`, `liste_bleibt_unprotokolliert` (bestehender Test deckt es, sonst ergänzen) und ein Test, dass ein fehlgeschlagenes Protokoll keine Daten ausliefert (z. B. Trigger, der den INSERT abweist → 500, kein Body mit Personen)
-- [ ] 1.4 Codegen: `scripts/check-typ-codegen.sh`, beide generierten Dateien mitcommitten. Nachweis: `ZugriffArt: "detail" | "export" | "druck"` in `types.generated.ts`, Skript grün
-- [ ] 1.5 `scripts/check-migrationen.sh` gegen `origin/alpha` (vorher `git fetch`). Nachweis: grün
+- [x] 1.1 `migrations/0131_person_zugriff_audit_druck.sql` als CHECK-Rebuild nach D2. Vorher prüfen, dass keine Migration `person_zugriff_audit` referenziert. Nachweis: neuer Test in `src/db.rs` (Muster `bis(version)`): legt bis 0130 Zeilen `detail` und `export` an, spielt 0131 ein und findet sie samt ids danach unverändert; `druck` wird angenommen, `foo` scheitert am CHECK; `sqlite_sequence` vergibt danach keine alte id neu
+- [x] 1.2 `ZugriffArt::Druck` in `src/person/audit_repo.rs`, Doc-Kommentare auf 0131; Wire-Kontrakt in `tests/enum_wire_kontrakt.rs`. Nachweis: `cargo test --test enum_wire_kontrakt` und Repo-Test `druck_eintrag_ohne_person`
+- [x] 1.3 Handler `einsatz_person::druck` und Route `GET /api/einsaetze/{id}/personen/druck` in `src/app.rs` (D1). Nachweis in `tests/einsatz_person.rs`: `druck_schreibt_genau_einen_druck_audit_und_liefert_liste` (gleiche Menge wie die Liste, `person_id` NULL, Benutzer), `druck_ohne_modulzugriff_ist_403_ohne_audit`, `druck_als_beobachter_erlaubt`, `liste_bleibt_unprotokolliert` (bestehender Test deckt es, sonst ergänzen) und ein Test, dass ein fehlgeschlagenes Protokoll keine Daten ausliefert (z. B. Trigger, der den INSERT abweist → 500, kein Body mit Personen)
+- [x] 1.4 Codegen: `scripts/check-typ-codegen.sh`, beide generierten Dateien mitcommitten. Nachweis: `ZugriffArt: "detail" | "export" | "druck"` in `types.generated.ts`, Skript grün
+- [x] 1.5 `scripts/check-migrationen.sh` gegen `origin/alpha` (vorher `git fetch`). Nachweis: grün
 
 ## 2. Gemeinsame Bausteine (Frontend)
 
-- [ ] 2.1 Query-Keys `personenDruck`, `tiereDruck`, `schaedenDruck` in `api/queryKeys.ts` (eigene Präfixe, `NICHT_LIVE_KEYS` mit Begründung, außerhalb `LAGEBILD_OFFLINE`). Nachweis: `api/queryKeys.test.ts`, `queryKeys.guard.test.ts`, `api/lagebildOffline.guard.test.ts` grün
-- [ ] 2.2 `ladePersonenDruck(einsatzId)` in `api/einsatzPerson.ts` mit Kommentar zur Protokollwirkung. Nachweis: Vitest gegen MSW, ruft genau `GET /api/einsaetze/1/personen/druck`
-- [ ] 2.3 Pfadbauer und Parser `personenDruckPfad`/`parsePersonenDruckAuswahl`, `tiereDruckPfad`/`parseTiereDruckAuswahl`, `schaedenDruckPfad`/`parseSchaedenDruckAuswahl` in `routing/deeplinks.ts` (D5). Nachweis: `routing/deeplinks.test.ts` mit Rundlauf über `URLSearchParams`, Verwerfen unbekannter Werte, fehlender Wert = `alle`; `inlinePfade.guard.test.ts` grün
-- [ ] 2.4 Seitenrahmen `druck/ListenDruckSeite.tsx` (D3). Nachweis: `druck/ListenDruckSeite.test.tsx`: genau eine Druckwurzel, Drucken gesperrt beim Laden und nach Fehler, 403 → „Kein Zugriff“ ohne Druckknopf, Fehler → „Erneut laden“, leere Auswahl → Leermeldung und druckbar, Hinweiszeile erscheint nur, wenn gesetzt
-- [ ] 2.5 Sichten-Labels der Schadensliste nach `pages/schaeden/schadenHelfer.tsx` verschieben, `SchaedenPage` nutzt sie von dort. Nachweis: `SchaedenPage`-Tests unverändert grün
+- [x] 2.1 Query-Keys `personenDruck`, `tiereDruck`, `schaedenDruck` in `api/queryKeys.ts` (eigene Präfixe, `NICHT_LIVE_KEYS` mit Begründung, außerhalb `LAGEBILD_OFFLINE`). Nachweis: `api/queryKeys.test.ts`, `queryKeys.guard.test.ts`, `api/lagebildOffline.guard.test.ts` grün
+- [x] 2.2 `ladePersonenDruck(einsatzId)` in `api/einsatzPerson.ts` mit Kommentar zur Protokollwirkung. Nachweis: Vitest gegen MSW, ruft genau `GET /api/einsaetze/1/personen/druck`
+- [x] 2.3 Pfadbauer und Parser `personenDruckPfad`/`parsePersonenDruckAuswahl`, `tiereDruckPfad`/`parseTiereDruckAuswahl`, `schaedenDruckPfad`/`parseSchaedenDruckAuswahl` in `routing/deeplinks.ts` (D5). Nachweis: `routing/deeplinks.test.ts` mit Rundlauf über `URLSearchParams`, Verwerfen unbekannter Werte, fehlender Wert = `alle`; `inlinePfade.guard.test.ts` grün
+- [x] 2.4 Seitenrahmen `druck/ListenDruckSeite.tsx` (D3). Nachweis: `druck/ListenDruckSeite.test.tsx`: genau eine Druckwurzel, Drucken gesperrt beim Laden und nach Fehler, 403 → „Kein Zugriff“ ohne Druckknopf, Fehler → „Erneut laden“, leere Auswahl → Leermeldung und druckbar, Hinweiszeile erscheint nur, wenn gesetzt
+- [x] 2.5 Sichten-Labels der Schadensliste nach `pages/schaeden/schadenHelfer.tsx` verschieben, `SchaedenPage` nutzt sie von dort. Nachweis: `SchaedenPage`-Tests unverändert grün
 
 ## 3. Personen-Druck
 

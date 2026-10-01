@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  personenDruckPfad,
+  parsePersonenDruckAuswahl,
+  tiereDruckPfad,
+  parseTiereDruckAuswahl,
+  schaedenDruckPfad,
+  parseSchaedenDruckAuswahl,
   einsaetzePfad,
   einsatzPfad,
   einsatzModulPfad,
@@ -532,6 +538,70 @@ describe('etbDruckPfad (LFH-22)', () => {
     const pfad = etbDruckPfad(7, filter);
     expect(pfad.startsWith('/einsaetze/7/etb/druck?')).toBe(true);
     expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual(filter);
+  });
+});
+
+/**
+ * Druck der Modul-Listen (LFH-727, design.md D5): Die Adresse trägt den Seitenfilter der Liste.
+ * Ein fehlender Wert heißt „alle“ (nicht die Vorgabe der Liste), ein unbekannter fällt ganz weg.
+ */
+describe('Druckpfade der Modul-Listen (LFH-727)', () => {
+  const rundlauf = (pfad: string) => new URLSearchParams(pfad.split('?')[1] ?? '');
+
+  it('Personen: ohne Filter der blanke Pfad, mit Filter hin und zurück', () => {
+    expect(personenDruckPfad(7, { filter: 'alle', nurLuecken: false })).toBe(
+      '/einsaetze/7/personen/druck',
+    );
+    const pfad = personenDruckPfad(7, { filter: 'vermisst', nurLuecken: true });
+    expect(pfad).toBe('/einsaetze/7/personen/druck?filter=vermisst&luecken=1');
+    expect(parsePersonenDruckAuswahl(rundlauf(pfad))).toEqual({
+      filter: 'vermisst',
+      nurLuecken: true,
+    });
+  });
+
+  it('Personen: Unbekanntes fällt weg, fehlender Filter ist „alle“', () => {
+    expect(parsePersonenDruckAuswahl(new URLSearchParams('filter=patienten&luecken=ja'))).toEqual({
+      filter: 'alle',
+      nurLuecken: false,
+    });
+    expect(parsePersonenDruckAuswahl(new URLSearchParams(''))).toEqual({
+      filter: 'alle',
+      nurLuecken: false,
+    });
+  });
+
+  it('Tiere: Sicht und Spezies hin und zurück, „alle“ entfällt', () => {
+    expect(tiereDruckPfad(7, { sicht: 'alle' })).toBe('/einsaetze/7/tiere/druck');
+    const pfad = tiereDruckPfad(7, { sicht: 'vermisst', spezies: 'hund' });
+    expect(pfad).toBe('/einsaetze/7/tiere/druck?sicht=vermisst&spezies=hund');
+    expect(parseTiereDruckAuswahl(rundlauf(pfad))).toEqual({ sicht: 'vermisst', spezies: 'hund' });
+    // Die Vorgabe der Liste (`aktiv`) reist ausdrücklich mit.
+    expect(parseTiereDruckAuswahl(rundlauf(tiereDruckPfad(7, { sicht: 'aktiv' })))).toEqual({
+      sicht: 'aktiv',
+    });
+  });
+
+  it('Tiere: fehlende Sicht ist „alle“, Unbekanntes fällt je Achse weg', () => {
+    expect(parseTiereDruckAuswahl(new URLSearchParams(''))).toEqual({ sicht: 'alle' });
+    expect(parseTiereDruckAuswahl(new URLSearchParams('sicht=weg&spezies=drache'))).toEqual({
+      sicht: 'alle',
+    });
+    expect(parseTiereDruckAuswahl(new URLSearchParams('sicht=weg&spezies=katze'))).toEqual({
+      sicht: 'alle',
+      spezies: 'katze',
+    });
+  });
+
+  it('Schäden: Sicht hin und zurück, fehlend oder unbekannt ist „alle“', () => {
+    expect(schaedenDruckPfad(7, { sicht: 'alle' })).toBe('/einsaetze/7/schaeden/druck');
+    const pfad = schaedenDruckPfad(7, { sicht: 'uebergeben' });
+    expect(pfad).toBe('/einsaetze/7/schaeden/druck?sicht=uebergeben');
+    expect(parseSchaedenDruckAuswahl(rundlauf(pfad))).toEqual({ sicht: 'uebergeben' });
+    expect(parseSchaedenDruckAuswahl(new URLSearchParams('sicht=storniert'))).toEqual({
+      sicht: 'alle',
+    });
+    expect(parseSchaedenDruckAuswahl(new URLSearchParams(''))).toEqual({ sicht: 'alle' });
   });
 });
 

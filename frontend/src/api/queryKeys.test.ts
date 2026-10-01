@@ -396,6 +396,36 @@ describe('einsatzKeys.etbDruck (LFH-22)', () => {
   });
 });
 
+/**
+ * Druck der Modul-Listen (LFH-727, design.md D4): drei Schnappschüsse mit eigenem Prefix, nicht
+ * live. Der Filter gehört NICHT in den Key — er wählt aus der geladenen Menge, und ein Wechsel darf
+ * beim Personendruck keinen zweiten protokollierten Abruf auslösen.
+ */
+describe('Druck-Keys der Modul-Listen (LFH-727)', () => {
+  it('baut die Keys als [prefix, einsatzId] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.personenDruck(1)).toEqual(['einsatz-personen-druck', 1]);
+    expect(einsatzKeys.tiereDruck(1)).toEqual(['einsatz-tiere-druck', 1]);
+    expect(einsatzKeys.schaedenDruck(1)).toEqual(['einsatz-schaeden-druck', 1]);
+  });
+
+  it('ist nicht live: kein Ereignis invalidiert sie, NICHT_LIVE_KEYS führt sie', () => {
+    for (const prefix of [
+      'einsatz-personen-druck',
+      'einsatz-tiere-druck',
+      'einsatz-schaeden-druck',
+    ]) {
+      expect(NICHT_LIVE_KEYS as readonly string[]).toContain(prefix);
+      for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+        expect(prefixe as readonly string[]).not.toContain(prefix);
+      }
+    }
+    // Und die Prefixe der Listen treffen sie nicht (TanStack matcht per Präfix).
+    expect(einsatzKeys.personenDruck(1)[0]).not.toBe(einsatzKeys.personen(1)[0]);
+    expect(einsatzKeys.tiereDruck(1)[0]).not.toBe(einsatzKeys.tiere(1)[0]);
+    expect(einsatzKeys.schaedenDruck(1)[0]).not.toBe(einsatzKeys.schaeden(1)[0]);
+  });
+});
+
 describe('istRueckmeldungenKey (LFH-610)', () => {
   it('trifft die Rückmeldungen jedes Einsatzes, aber keine Meldungsliste', () => {
     expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'rueckmeldungen'])).toBe(true);
