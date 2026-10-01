@@ -1,4 +1,5 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
+import { pdfAuszug, pngMitMassen, type PdfSeite } from './pdf-kern';
 
 /**
  * Druck im normalen Fluss: ein Druckstück (Lagebericht lesend und im Entwurf, Befehl) steht
@@ -11,9 +12,15 @@ import { expect, test, type APIResponse, type Page } from '@playwright/test';
  * (`visibility: hidden` plus `position: absolute`) lag auch oben und trug den Text auch
  * jenseits einer A4-Höhe.
  *
- * NICHT BEWIESEN: Firefox und Safari selbst (Playwright fährt nur Chromium, `page.pdf()` gibt
- * es nur dort) — die prüft die Prüfliste von Hand. Die PDF-Seitenzahl ist Plausibilität; den
- * PDF-Text prüft der Spec nicht (subsetted und komprimiert).
+ * DREI ENGINES (LFH-729): der Spec läuft auch in den Projekten `firefox` und `webkit`. Dort gelten
+ * dieselben Aussagen unter Druckmedium; was `page.pdf()` braucht, nur in Chromium (nur dort gibt
+ * es ein PDF), und der Bericht trägt dafür die Annotation `nur-chromium`. Im PDF belegt der Spec
+ * Seitenzahl, die Seitenzählung „Seite n von m" je Seite, die Lage der Endmarke und das Logo im
+ * Druckkopf (`e2e/pdf-kern.ts`).
+ *
+ * NICHT BEWIESEN: der echte Seitenumbruch in Firefox und Safari — `emulateMedia` setzt die
+ * Druck-Media-Queries, fragmentiert aber nicht in Seiten. Den prüft die Prüfliste von Hand.
+ * Playwrights WebKit ist außerdem nicht Safari, es teilt nur die Engine.
  *
  * Seeding per `page.request`.
  */
@@ -195,6 +202,29 @@ async function druckLage(page: Page) {
   }, ENDMARKE);
 }
 
+/** Nur Chromium erzeugt ein PDF (`page.pdf()`); Firefox und WebKit prüfen die Mechanik ohne. */
+function erzeugtPdf(page: Page): boolean {
+  return page.context().browser()?.browserType().name() === 'chromium';
+}
+
+/** Ein übersprungener PDF-Schritt steht im Bericht, damit er nicht als bestanden gilt. */
+function nurChromium(was: string) {
+  test.info().annotations.push({ type: 'nur-chromium', description: was });
+}
+
+/**
+ * „Seite n von m" auf JEDER Seite (Randfeld aus `druck/druck.css`), n fortlaufend und m gleich
+ * der Seitenzahl — die pdf.js zählt und die der Rohtext zählt: zwei unabhängige Quellen.
+ */
+function pruefeSeitenzaehlung(auszug: PdfSeite[], seiten: number, fall: string) {
+  expect(auszug.length, `${fall}: pdf.js zählt so viele Seiten wie der Rohtext`).toBe(seiten);
+  auszug.forEach((s, i) => {
+    expect(s.text, `${fall}: Seite ${i + 1} trägt die Seitenzählung`).toContain(
+      `Seite ${i + 1} von ${seiten}`,
+    );
+  });
+}
+
 /** Seiten eines PDF: `/Type /Page`, nicht `/Type /Pages` (der Seitenbaum). */
 function seitenImPdf(pdf: Buffer): number {
   return (pdf.toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
@@ -243,7 +273,17 @@ async function pruefeDruckImFluss(page: Page, fall: string) {
     `${fall}: der letzte Abschnitt liegt jenseits der ersten Seite (Endmarke bei ${papier.endmarkeOben}px)`,
   ).toBeGreaterThan(A4_HOEHE);
 
-  // (3) PLAUSIBILITÄT: das PDF hat mindestens zwei Seiten und keine Leerseiten.
+  // (3) PDF — nur Chromium erzeugt eines.
+  if (!erzeugtPdf(page)) {
+    nurChromium(`${fall}: PDF-Seitenzahl, Seitenzählung und Endmarke im PDF`);
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `${fall}: Wurzel ${Math.round(papier.wurzelHoehe)}px, Endmarke bei ${Math.round(papier.endmarkeOben)}px`,
+    });
+    await page.emulateMedia({ media: null });
+    return;
+  }
+  // PLAUSIBILITÄT: das PDF hat mindestens zwei Seiten und keine Leerseiten.
   const pdf = await page.pdf({ format: 'A4' });
   const seiten = seitenImPdf(pdf);
   const obergrenze = Math.ceil(papier.wurzelHoehe / NUTZ_HOEHE) + 1;
@@ -253,9 +293,21 @@ async function pruefeDruckImFluss(page: Page, fall: string) {
     `${fall}: keine Leerseiten (${seiten} Seiten für ${papier.wurzelHoehe}px Inhalt)`,
   ).toBeLessThanOrEqual(obergrenze);
 
+  // (4) SEITENZÄHLUNG UND ENDMARKE im Text des PDF.
+  const auszug = await pdfAuszug(pdf);
+  pruefeSeitenzaehlung(auszug, seiten, fall);
+  const endSeite = auszug.findIndex((s) => s.text.includes(ENDMARKE));
+  expect(endSeite, `${fall}: Endmarke im PDF-Text nach Seite 1`).toBeGreaterThan(0);
+  auszug.slice(endSeite + 1).forEach((s, i) => {
+    const nr = endSeite + 2 + i;
+    expect(s.text, `${fall}: Seite ${nr} nach der Endmarke trägt nur die Zählung`).toBe(
+      `Seite ${nr} von ${seiten}`,
+    );
+  });
+
   test.info().annotations.push({
     type: 'messwert',
-    description: `${fall}: Wurzel ${Math.round(papier.wurzelHoehe)}px, Endmarke bei ${Math.round(papier.endmarkeOben)}px, PDF ${seiten} Seiten (Obergrenze ${obergrenze})`,
+    description: `${fall}: Wurzel ${Math.round(papier.wurzelHoehe)}px, Endmarke bei ${Math.round(papier.endmarkeOben)}px, PDF ${seiten} Seiten (Obergrenze ${obergrenze}), Endmarke auf Seite ${endSeite + 1}`,
   });
   await page.emulateMedia({ media: null });
 }
@@ -301,9 +353,31 @@ async function pressemitteilungSaeen(
 // Kaltstart der Detailrouten unter Vite plus PDF-Erzeugung.
 test.setTimeout(90_000);
 
-test('Zähler-Selbsttest: ein einseitiges Dokument hat genau eine PDF-Seite', async ({ page }) => {
+test('Zähler-Selbsttest: ein einseitiges Dokument hat genau eine PDF-Seite', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', '`page.pdf()` gibt es nur in Chromium');
   await page.setContent('<p>eine Seite</p>');
   expect(seitenImPdf(await page.pdf({ format: 'A4' }))).toBe(1);
+});
+
+/**
+ * Hält den PDF-Auszug ehrlich: zwei erzwungene Seiten mit bekanntem Text, auf Seite 1 ein
+ * Bild mit bekannten Abmessungen. Liefe der Auszug je Seite falsch zu, fänden die Druckfälle
+ * Seitenzählung und Logo an der falschen Stelle — und blieben trotzdem grün.
+ */
+test('PDF-Auszug-Selbsttest: Text und Bilder je Seite', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', '`page.pdf()` gibt es nur in Chromium');
+  const png = pngMitMassen(53, 29).toString('base64');
+  await page.setContent(
+    `<p>ERSTE-SEITE-TEXT</p><img src="data:image/png;base64,${png}">` +
+      '<p style="break-before: page">ZWEITE-SEITE-TEXT</p>',
+  );
+  const auszug = await pdfAuszug(await page.pdf({ format: 'A4' }));
+  expect(auszug.map((s) => s.text)).toEqual(['ERSTE-SEITE-TEXT', 'ZWEITE-SEITE-TEXT']);
+  expect(auszug[0].bilder).toEqual([{ breite: 53, hoehe: 29 }]);
+  expect(auszug[1].bilder).toEqual([]);
 });
 
 test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', async ({ page }) => {
@@ -402,6 +476,77 @@ test('Befehl (freigegeben) druckt im normalen Fluss über mehrere Seiten', async
   await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${id}`);
   await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
   await pruefeDruckImFluss(page, 'Befehl lesend');
+});
+
+/**
+ * LFH-729: das Logo der Organisation im Druckkopf. Ein im Test gebautes PNG mit ungewöhnlichen
+ * Maßen macht das Bild im PDF wiedererkennbar — „irgendein Bild auf Seite 1" bliebe grün, wenn
+ * ein anderes Bild in den Kopf rutschte.
+ *
+ * DIE ORGANISATION IST GLOBAL: das Logo bleibt nach dem Fall stehen. Ein Löschen zöge einem
+ * parallel laufenden Logo-Fall (anderes Projekt im lokalen Vollauf) das Bild unter dem Druck
+ * weg; dieselben Bytes erneut hochzuladen ist ein Upsert. Kein anderer Spec sichert zu, dass
+ * KEIN Logo da ist — wer das braucht, entfernt es selbst und läuft nicht neben diesem Fall.
+ */
+const LOGO = { breite: 97, hoehe: 41 };
+
+test('Lagebericht mit Organisationslogo: Logo im Druckkopf, im PDF nur auf Seite 1', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const hoch = await mitWiederholung(() =>
+    page.request.post('/api/organisation/logo', {
+      multipart: {
+        datei: {
+          name: 'logo.png',
+          mimeType: 'image/png',
+          buffer: pngMitMassen(LOGO.breite, LOGO.hoehe),
+        },
+      },
+    }),
+  );
+  expect(hoch.ok(), await hoch.text()).toBe(true);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Logo ${Date.now()}`);
+  const id = await lageberichtSaeen(page, einsatzId, true);
+  await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
+  await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
+  await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled();
+
+  // Alle Engines: unter Druckmedium steht im Kopf ein GELADENES Bild mit den Maßen des Logos,
+  // und es belegt Fläche (nicht `display: none`, nicht kaputt und weggefallen).
+  await page.emulateMedia({ media: 'print' });
+  const logo = page.locator('[data-lfh="druckkopf"] img');
+  await expect(logo, 'genau ein Bild im Druckkopf').toHaveCount(1);
+  await expect
+    .poll(
+      () =>
+        logo.evaluate((img: HTMLImageElement) => ({
+          geladen: img.complete,
+          breite: img.naturalWidth,
+          hoehe: img.naturalHeight,
+          flaeche: img.getClientRects().length > 0 && img.getBoundingClientRect().width > 0,
+        })),
+      { message: 'Logo im Druckkopf: geladen, in den Maßen des Logos, mit Fläche' },
+    )
+    .toEqual({ geladen: true, breite: LOGO.breite, hoehe: LOGO.hoehe, flaeche: true });
+
+  if (!erzeugtPdf(page)) {
+    nurChromium('Logo als Bild auf Seite 1 des PDF');
+    await page.emulateMedia({ media: null });
+    return;
+  }
+  // Chromium: Seite 1 zeichnet das Logo, keine Folgeseite zeichnet ein Bild (der Bericht hat
+  // keine eigenen Bilder). Die Seitenzählung gilt auch hier.
+  const pdf = await page.pdf({ format: 'A4' });
+  const auszug = await pdfAuszug(pdf);
+  expect(auszug.length, 'mehrseitiges PDF').toBeGreaterThanOrEqual(2);
+  pruefeSeitenzaehlung(auszug, seitenImPdf(pdf), 'Lagebericht mit Logo');
+  expect(auszug[0].bilder, 'Seite 1 zeichnet das Logo').toContainEqual(LOGO);
+  auszug.slice(1).forEach((s, i) => {
+    expect(s.bilder, `Seite ${i + 2} zeichnet kein Bild`).toEqual([]);
+  });
+  await page.emulateMedia({ media: null });
 });
 
 /**

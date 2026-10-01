@@ -3,10 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Typography } from 'antd';
 import { ApiError } from '../api/client';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
@@ -35,20 +34,20 @@ export default function EinsatzberichtDruckPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  const { benutzer } = useAuth();
   const { konventionen } = useAnzeigeKonventionen();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+  // Die Freigaben rechnet der Server je Benutzer aus (LFH-669: Override, Rolle, Org-Vorgabe).
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const freigabe = useMemo(
-    () => (overridesQuery.data ? berichtFreigabe(benutzer, overridesQuery.data) : null),
-    [benutzer, overridesQuery.data],
+    () => (freigabenQuery.data ? berichtFreigabe(freigabenQuery.data) : null),
+    [freigabenQuery.data],
   );
   const gesperrt = freigabe != null && freigabe.gesperrteModule.length > 0;
 
@@ -107,12 +106,12 @@ export default function EinsatzberichtDruckPage() {
       : einsatz;
 
   let inhalt;
-  if (overridesQuery.isError) {
+  if (freigabenQuery.isError) {
     inhalt = (
       <SeitenFehler
         text="Freigaben des Einsatzes nicht ermittelbar — der Bericht bleibt verborgen"
-        ursache={overridesQuery.error}
-        onWiederholen={() => void overridesQuery.refetch()}
+        ursache={freigabenQuery.error}
+        onWiederholen={() => void freigabenQuery.refetch()}
       />
     );
   } else if (!freigabe) {
@@ -141,8 +140,8 @@ export default function EinsatzberichtDruckPage() {
       </Typography.Text>
     );
   } else if (zustand?.art === 'kein-zugriff') {
-    // Ein 403 trotz Freigabe: eine Rollensperre als Org-Vorgabe (die Overrides sehen sie nicht),
-    // eine Rechteänderung nach dem Laden oder eine eben abgelaufene Frist.
+    // Ein 403 trotz Freigabe: eine Rechteänderung nach dem Laden der Freigaben oder eine eben
+    // abgelaufene Frist (Org-Vorgaben stehen seit LFH-669 schon in den Freigaben).
     inhalt = (
       <Alert
         type="info"
