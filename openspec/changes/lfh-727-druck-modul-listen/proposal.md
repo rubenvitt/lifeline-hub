@@ -25,7 +25,7 @@ protokolliert (`person_zugriff_audit`, Art `export`), beim Druck bisher nicht.
   der neuen Art **`druck`** (Entscheidung des Product Owners vom 01.10.2026). Die
   Personen-Druckansicht lädt ausschließlich darüber. Tiere und Schäden drucken über ihre
   bestehenden Listen, ohne Protokoll, wie beim Tier-CSV.
-- **Migration 0131** baut `person_zugriff_audit` mit erweiterter CHECK-Bedingung
+- **Migration 0132** baut `person_zugriff_audit` mit erweiterter CHECK-Bedingung
   `art IN ('detail','export','druck')` neu auf. Die Zeilen bleiben erhalten, ebenso die ids und
   die AUTOINCREMENT-Folge. `ZugriffArt` bekommt `Druck`, Codegen und Wire-Kontrakt ziehen nach.
 - Rechte wie bei der jeweiligen Liste: Wer die Liste lesen darf, darf drucken. Ein gesperrtes
@@ -47,7 +47,7 @@ protokolliert (`person_zugriff_audit`, Art `export`), beim Druck bisher nicht.
 ## Impact
 
 - **Backend:** `src/routes/einsatz_person.rs` (Handler `druck`), `src/app.rs` (Route),
-  `src/person/audit_repo.rs` (`ZugriffArt::Druck`), `migrations/0131_…sql`, `src/api_doc.rs`,
+  `src/person/audit_repo.rs` (`ZugriffArt::Druck`), `migrations/0132_…sql`, `src/api_doc.rs`,
   `tests/einsatz_person.rs`, `tests/enum_wire_kontrakt.rs`.
 - **Codegen:** `frontend/src/api/openapi.json`, `frontend/src/api/types.generated.ts`.
 - **Frontend:** drei Druckseiten und -tabellen, ein gemeinsamer Seitenrahmen für Listen-Druck,

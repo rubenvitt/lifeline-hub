@@ -3202,15 +3202,15 @@ mod tests {
         pool
     }
 
-    const MIGRATION_0131: &str = include_str!("../migrations/0131_person_zugriff_audit_druck.sql");
+    const MIGRATION_0132: &str = include_str!("../migrations/0132_person_zugriff_audit_druck.sql");
 
-    // --- Migration 0131: Leaf-Rebuild von person_zugriff_audit mit Art 'druck' (LFH-727) ---
+    // --- Migration 0132: Leaf-Rebuild von person_zugriff_audit mit Art 'druck' (LFH-727) ---
     //
     // Eine befüllte 0021-DB mit beiden Bestandsarten, deren höchste Zeile gelöscht ist
-    // (Sequenz > MAX(id)), und die echte 0131: ein vergessener Spaltenname, eine verlorene Zeile
+    // (Sequenz > MAX(id)), und die echte 0132: ein vergessener Spaltenname, eine verlorene Zeile
     // oder Sequenz fiele sonst nicht auf.
     #[tokio::test]
-    async fn migration_0131_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+    async fn migration_0132_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
         let pool = alt_db_person_zugriff_audit().await;
         sqlx::query(
             "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art, zugriff_at) \
@@ -3249,13 +3249,13 @@ mod tests {
         let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
 
         assert!(
-            MIGRATION_0131.starts_with("-- no-transaction"),
+            MIGRATION_0132.starts_with("-- no-transaction"),
             "sqlx erkennt die Direktive nur am Dateianfang"
         );
-        sqlx::raw_sql(MIGRATION_0131)
+        sqlx::raw_sql(MIGRATION_0132)
             .execute(&pool)
             .await
-            .expect("0131 muss auf einer befüllten DB durchlaufen");
+            .expect("0132 muss auf einer befüllten DB durchlaufen");
 
         let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
         assert_eq!(
@@ -3311,7 +3311,7 @@ mod tests {
     // Sind ALLE Zeilen gelöscht, kopiert der Rebuild nichts; ohne Übernahme der Sequenz begänne die
     // Nummerierung wieder bei 1.
     #[tokio::test]
-    async fn migration_0131_erhaelt_sequenz_auch_bei_leerer_tabelle() {
+    async fn migration_0132_erhaelt_sequenz_auch_bei_leerer_tabelle() {
         let pool = alt_db_person_zugriff_audit().await;
         sqlx::query(
             "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
@@ -3324,7 +3324,7 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        sqlx::raw_sql(MIGRATION_0131).execute(&pool).await.unwrap();
+        sqlx::raw_sql(MIGRATION_0132).execute(&pool).await.unwrap();
         let neue_id: i64 = sqlx::query_scalar(
             "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
              VALUES (1, NULL, 1, 'druck') RETURNING id",

@@ -92,9 +92,9 @@ des Aufbaus im Speicher.
   Ein Client, der den Ping auslässt, druckte ohne Spur. Auch der gewählte Weg weiß nicht, ob
   wirklich Papier entsteht. Er weiß aber sicher, wer die Druckfassung erhalten hat.
 
-### D2 — Migration 0131: CHECK-Rebuild einer Blatt-Tabelle
+### D2 — Migration 0132: CHECK-Rebuild einer Blatt-Tabelle
 
-`migrations/0131_person_zugriff_audit_druck.sql` folgt Zeile für Zeile dem Blatt-Rebuild aus
+`migrations/0132_person_zugriff_audit_druck.sql` folgt Zeile für Zeile dem Blatt-Rebuild aus
 0112 (`person_verbleib`, LFH-613), dem nächsten Vorbild im Projekt:
 
 1. `-- no-transaction` am Dateianfang, wie 0112.
@@ -112,7 +112,7 @@ wird, dass Zeilen samt ids, Sequenz und Schema erhalten bleiben, dass die DDL si
 unterscheidet und dass `foreign_key_check` leer ist. Die Nummer wird vor dem Merge mit
 `scripts/check-migrationen.sh` gegen `origin/alpha` geprüft.
 
-`ZugriffArt` bekommt `Druck`. Doc-Kommentar und Schema-Anker nennen die neue CHECK-Quelle 0131.
+`ZugriffArt` bekommt `Druck`. Doc-Kommentar und Schema-Anker nennen die neue CHECK-Quelle 0132.
 `tests/enum_wire_kontrakt.rs` und der Codegen (`scripts/check-typ-codegen.sh`) ziehen nach.
 Die Spalte „Art“ der Protokolleinsicht je Person bleibt, wie sie ist: Druckzeilen haben keine
 `person_id` und erscheinen dort nicht.
@@ -238,7 +238,7 @@ Client-Anteil liegt (Muster der Wurzel-`AGENTS.md`).
   in Worten, Suche und Spaltenfilter gehören nicht dazu. Das steht im Non-Goal und in der
   Spec.
 - [CHECK-Rebuild verliert Zeilen] → Der Rebuild kopiert alle Spalten. Ein Migrationstest legt
-  vor 0131 Zeilen beider Arten an und prüft sie danach, samt `sqlite_sequence`.
+  vor 0132 Zeilen beider Arten an und prüft sie danach, samt `sqlite_sequence`.
 - [Große Lage (≥ 2 000 Personen)] → Es ist ein Abruf wie die Liste. Die Dauer der
   Druckvorschau liegt beim Browser.
 
