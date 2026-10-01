@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
 import { navDrawerBreite } from './tokens';
-import { antdKomponenten, switchMasse } from './tokens';
+import { antdKlappkopf, antdKomponenten, switchMasse } from './tokens';
 import { farbenDunkel } from './tokens';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -212,5 +212,25 @@ describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
   it('kein Komponenten-Token für das Radio — der färbte auch Scheibe und Flächen', () => {
     expect(antdKomponenten(farbenHell, 'kompakt').Radio).toBeUndefined();
     expect(antdKomponenten(farbenDunkel, 'kompakt').Radio).toBeUndefined();
+  });
+});
+
+/**
+ * Klappkopf von antds `Collapse` (LFH-653). antd rechnet den Kopf aus Schrift und `paddingSM`
+ * (gemessen 36 / 45 / 55 px), nicht aus `controlHeight`. Der Boden kommt über den Kontext; die
+ * Literale sind die Staffel, nicht ihre Quelle.
+ */
+describe('Klappkopf folgt der Staffel (LFH-653)', () => {
+  const SOLL: Record<Dichte, number> = { kompakt: 30, komfortabel: 48, handschuh: 72 };
+
+  it('setzt den Boden der GEWÄHLTEN Stufe und stellt die Beschriftung mittig', () => {
+    for (const d of Object.keys(SOLL) as Dichte[]) {
+      const kopf = antdKlappkopf(d).styles;
+      expect(typeof kopf, d).toBe('object');
+      expect((kopf as { header?: unknown }).header, d).toEqual({
+        minHeight: SOLL[d],
+        alignItems: 'center',
+      });
+    }
   });
 });

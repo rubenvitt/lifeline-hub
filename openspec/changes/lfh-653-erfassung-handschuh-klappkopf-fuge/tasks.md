@@ -2,15 +2,15 @@
 
 ## 1. Fußabstand der Erfassungs-Hülle (D3)
 
-- [ ] 1.1 `components/Erfassung.tsx` in `MIT_NACHBARSCHAFT` von `components/aktionsabstand.guard.test.ts` aufnehmen (mit Kommentar: Primärknopf `danger={unumkehrbar}` neben „Abbrechen“). Prüfen: Guard rot mit Befund an der Knopf-`<Space>` der Hülle
-- [ ] 1.2 Die Knopf-`<Space>` in `components/Erfassung.tsx` auf `size="middle"` setzen und den Dateikopf um den Abstand ergänzen. Prüfen: Guard grün, `Erfassung.test.tsx` grün
+- [x] 1.1 `components/Erfassung.tsx` in `MIT_NACHBARSCHAFT` von `components/aktionsabstand.guard.test.ts` aufnehmen (mit Kommentar: Primärknopf `danger={unumkehrbar}` neben „Abbrechen“). Prüfen: Guard rot mit Befund an der Knopf-`<Space>` der Hülle
+- [x] 1.2 Die Knopf-`<Space>` in `components/Erfassung.tsx` auf `size="middle"` setzen und den Dateikopf um den Abstand ergänzen. Prüfen: Guard grün, `Erfassung.test.tsx` grün
 
 ## 2. Klappkopf über den Kontext (D1)
 
-- [ ] 2.1 Test in `theme/tokens.test.ts`: `antdKlappkopf('kompakt' | 'komfortabel' | 'handschuh')` liefert `styles.header` mit `minHeight` 30 / 48 / 72 (Literale) und `alignItems: 'center'`. Prüfen: rot, weil die Funktion fehlt
-- [ ] 2.2 `antdKlappkopf(dichte)` in `theme/tokens.ts` umsetzen (rein, exportiert, Doku-Kommentar mit Bezug LFH-653/LFH-365 und den antd-Messwerten 36 / 45 / 55). Prüfen: Test aus 2.1 grün
-- [ ] 2.3 Vor dem Verdrahten `grep -n -A6 '<Collapse' frontend/src` auf lokale `styles=`/`size=` durchsehen und Treffer im Commit vermerken. Prüfen: Liste steht in der Commit-Nachricht
-- [ ] 2.4 Test in `theme/ThemeModeProvider.test.tsx`: in `handschuh` gerendertes `Collapse` trägt am Kopf `min-height: 72px` und `align-items: center`. Danach `collapse={…}` im `ThemeModeProvider` neben `button={knopf}` verdrahten (memoisiert wie `knopf`). Prüfen: erst rot, dann grün
+- [x] 2.1 Test in `theme/tokens.test.ts`: `antdKlappkopf('kompakt' | 'komfortabel' | 'handschuh')` liefert `styles.header` mit `minHeight` 30 / 48 / 72 (Literale) und `alignItems: 'center'`. Prüfen: rot, weil die Funktion fehlt
+- [x] 2.2 `antdKlappkopf(dichte)` in `theme/tokens.ts` umsetzen (rein, exportiert, Doku-Kommentar mit Bezug LFH-653/LFH-365 und den antd-Messwerten 36 / 45 / 55). Prüfen: Test aus 2.1 grün
+- [x] 2.3 Vor dem Verdrahten `grep -n -A6 '<Collapse' frontend/src` auf lokale `styles=`/`size=` durchsehen und Treffer im Commit vermerken. Prüfen: Liste steht in der Commit-Nachricht
+- [x] 2.4 Test in `theme/ThemeModeProvider.test.tsx`: in `handschuh` gerendertes `Collapse` trägt am Kopf `min-height: 72px` und `align-items: center`. Danach `collapse={…}` im `ThemeModeProvider` neben `button={knopf}` verdrahten (memoisiert wie `knopf`). Prüfen: erst rot, dann grün
 
 ## 3. antds eigene Füße (D4)
 
