@@ -64,7 +64,8 @@ zeigerGrob: boolean): Dichte` in `theme/dichte.ts`. Das ist dieselbe Bauform wie
 `theme/helligkeit.ts`. Der Provider ruft sie mit `localStorage` und `zeigerIstGrob()` auf. Die
 Wahrheitstafel (3 Stufen + leer + unbrauchbar) × (grob, fein) steht in `theme/dichte.test.ts`.
 
-Eine Wache (`theme/dichte.guard.test.ts`) liest die Quelltexte von `dichte.ts` und
+Eine Wache (`theme/dichteQuelle.guard.test.ts`; eigener Name, weil
+`components/dichte.guard.test.ts` schon die `size="small"`-Sperre trägt) liest die Quelltexte von `dichte.ts` und
 `ThemeModeProvider.tsx`. Sie macht jeden Import aus der Personen- und Einsatzachse rot
 (`api/`, `auth/`, `einsatz/`, `fuehrung/`, `stab/`, `react-router`). Das ist das Muster der
 übrigen `*.guard.test.ts`. Der Satz „die Person fließt nie ein“ kann damit rot werden, ohne

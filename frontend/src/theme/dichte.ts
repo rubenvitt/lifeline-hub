@@ -6,7 +6,7 @@
  * Bedien-Leitlinie schneidet ihre vier Kontexte nach Gerät, Hand und Haltung; eine S-Funktion
  * sagt nichts darüber, ob jemand am Fükw sitzt oder mit Handschuh am Tablet steht, und die
  * Spec `bedien-arbeitsplatz` verbietet die Vorbelegung über den Arbeitsplatz. Deshalb kennt
- * dieses Modul weder Einsatz noch Rolle — `dichte.guard.test.ts` lässt nur `./tokens` als
+ * dieses Modul weder Einsatz noch Rolle — `dichteQuelle.guard.test.ts` lässt nur `./tokens` als
  * Import zu.
  *
  * Reihenfolge: gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`.
