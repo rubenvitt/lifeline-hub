@@ -143,7 +143,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
     Lagebericht übernehmen“ ergänzen.
 
   Nachweis: beide Specs grün.
-- [ ] 5.3 Regel-Eintrag in `frontend/AGENTS.md`, UI-Form-Leitlinie neben dem FMS-Tableau:
+- [x] 5.3 Regel-Eintrag in `frontend/AGENTS.md`, UI-Form-Leitlinie neben dem FMS-Tableau:
   - Das Organigramm ist eine Ansicht von Einsatzabschnitte, kein Modul.
   - Es ist rein abgeleitet über `baueFuehrungsorganisation`, mit derselben Platzierung wie der
     Funkplan.
@@ -151,7 +151,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Die Herleitung verweist auf diese Change im Archivpfad.
 
   Nachweis: `prettier --check` über `frontend/` grün.
-- [ ] 5.4 `pruefliste.md` in dieser Change: die 15 Kriterien der Prüfliste Einsatztauglichkeit,
+- [x] 5.4 `pruefliste.md` in dieser Change: die 15 Kriterien der Prüfliste Einsatztauglichkeit,
   jede Zeile mit Verdikt (erfüllt mit Beleg, offen → Zielticket, nicht anwendbar mit Grund).
   Nachweis: Die Datei liegt vor, keine Zeile steht auf „nicht geprüft“.
 - [ ] 5.5 `./scripts/check-all.sh` (Bündel `schnell` lokal, voll in der CI des PRs). Nachweis:
