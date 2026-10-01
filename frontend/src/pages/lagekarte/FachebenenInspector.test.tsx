@@ -32,10 +32,98 @@ describe('FachebenenInspector', () => {
     );
     expect(document.body.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(screen.getByText('Amtliche Warnung vor Dauerregen')).toBeInTheDocument(); // volle Headline im Body
-    expect(screen.getByText('Mäßig')).toBeInTheDocument();
+    // Schwere mit der amtlichen DWD-Bezeichnung aus dem Vertrag (LFH-662), nicht „Mäßig“.
+    expect(screen.getByText('Markantes Wetter')).toHaveAttribute('data-rolle', 'achtung');
     expect(screen.getByText('Sofort')).toBeInTheDocument();
     expect(screen.getByText('Es tritt Dauerregen auf.')).toBeInTheDocument();
     expect(screen.getByText('Meiden Sie überflutete Bereiche.')).toBeInTheDocument();
+  });
+
+  describe('Schwere aus dem Statusfarb-Vertrag (LFH-662)', () => {
+    const warnung = (quelle: 'dwd' | 'nina', properties: Record<string, unknown>) =>
+      render(
+        <FachebenenInspector quelle={quelle} properties={properties} onSchliessen={() => {}} />,
+      );
+
+    it('DWD „Minor“ heißt „Wetterwarnung“ in der Achtung-Rolle, nichts in Blau', () => {
+      const { container } = warnung('dwd', { EVENT: 'FROST', SEVERITY: 'Minor' });
+      expect(screen.getByText('Wetterwarnung')).toHaveAttribute('data-rolle', 'achtung');
+      expect(screen.queryByText('Gering')).toBeNull();
+      expect(container.querySelector('.ant-tag-blue, [data-rolle="bedien"]')).toBeNull();
+    });
+
+    it('DWD „Extreme“ heißt „Extremes Unwetter“ in der Alarm-Rolle', () => {
+      warnung('dwd', { EVENT: 'ORKANBÖEN', SEVERITY: 'Extreme' });
+      expect(screen.getByText('Extremes Unwetter')).toHaveAttribute('data-rolle', 'alarm');
+    });
+
+    it('NINA „Severe“ heißt „Schwer“ in der Alarm-Rolle', () => {
+      warnung('nina', { titel: 'Gefahrstoffaustritt', schwere: 'Severe' });
+      expect(screen.getByText('Schwer')).toHaveAttribute('data-rolle', 'alarm');
+      expect(screen.queryByText('Unwetterwarnung')).toBeNull();
+    });
+
+    it('NINA „Minor“ heißt „Gering“ in der Achtung-Rolle, nicht Blau', () => {
+      const { container } = warnung('nina', { titel: 'Hinweis', schwere: 'Minor' });
+      expect(screen.getByText('Gering')).toHaveAttribute('data-rolle', 'achtung');
+      expect(container.querySelector('.ant-tag-blue, [data-rolle="bedien"]')).toBeNull();
+    });
+
+    it('eine unbekannte Schwere steht als Rohwert ohne Rollenfarbe da', () => {
+      warnung('nina', { titel: 'Test', schwere: 'Unknown' });
+      const tag = screen.getByText('Unknown');
+      expect(tag).not.toHaveAttribute('data-rolle');
+      expect(tag.className).not.toMatch(/ant-tag-(red|volcano|gold|blue)/);
+    });
+  });
+
+  describe('angekündigte DWD-Warnung (LFH-662)', () => {
+    const KUENFTIG = '2099-09-23T18:00:00Z';
+
+    it('nennt „angekündigt“ und den Beginn als volle DTG', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'STURMBÖEN', SEVERITY: 'Moderate', ONSET: KUENFTIG }}
+          onSchliessen={() => {}}
+        />,
+      );
+      const zeile = screen.getByText(/angekündigt/);
+      expect(zeile).toHaveTextContent(`angekündigt · ab ${taktischeDtgVoll(KUENFTIG)}`);
+    });
+
+    it('folgt der Markierung der Karte, auch ohne lesbaren Beginn', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'STURMBÖEN', angekuendigt: true }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(screen.getByText(/^angekündigt$/)).toBeInTheDocument();
+    });
+
+    it('eine geltende Warnung ist nicht angekündigt', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'STURMBÖEN', ONSET: '2020-01-01T00:00:00Z' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(screen.queryByText(/angekündigt/)).toBeNull();
+    });
+
+    it('NINA kennt keine Ankündigung — auch nicht mit Beginn in der Zukunft', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Test', beginn: KUENFTIG }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(screen.queryByText(/angekündigt/)).toBeNull();
+    });
   });
 
   it('ODL: Messwert, Messende, Stufe im Wortlaut und der Hinweis auf die Projekt-Einteilung (LFH-78)', () => {

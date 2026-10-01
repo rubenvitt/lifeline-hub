@@ -60,6 +60,14 @@ diese Zusage.
   Veraltet ist eine Marke am `ok`, kein Status; Schwelle `veraltetNachMin` je Ebene
   (`fachebenen.ts`, Tabelle in `docs/fachebenen-quellen.md`), Anzeige nur über
   `FachebeneStand.tsx`, Takt `components/useMinutenTakt.ts`.
+- **Warnebenen enden nach 6 h, DWD-Warnungen nach ihrem Ende** (LFH-662,
+  `openspec/changes/lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md`): NINA und DWD liefern
+  einen Cache-Stand über `WARN_OBERGRENZE` nicht mehr aus (`swr_weg`, kalt → `offline`), die
+  übrigen Ebenen bleiben bei 48 h. `EXPIRES ≤ jetzt` filtern **beide** Seiten: der Server bei
+  jeder Auslieferung (`dwd_gueltige`, der Cache hält den Rohstand), der Client im Minutentakt
+  (`dwdGueltigkeit.ts`) für gehaltene Daten. `angekuendigt` (`ONSET > jetzt`) setzt nur der
+  Client; gestrichelt über die eigene Ebene `-line-angekuendigt`, nie über einen
+  datengetriebenen `line-dasharray`. Schwere im Inspector nur aus `dwdWarnstufe`/`capSchwere`.
 - **Fachebenen antworten bedingt** (LFH-594, `fachebene_antwort` in `routes/karte.rs`): ETag =
   Hash der ausgelieferten Bytes (nicht `gespeichert_at`), `private, no-cache`, 304 ohne Body;
   `If-None-Match` vergleicht schwach (`support::if_none_match_matcht`). Das 304 löst der

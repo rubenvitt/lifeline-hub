@@ -14,7 +14,7 @@ use crate::karte::normalisierung::{
     ENERGIE_OSM_ATTRIB, ENERGIE_OSM_RAND_RADIEN,
 };
 use crate::karte::odl_grundpegel::{self, GrundpegelKarte};
-use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
+use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort, FachebeneStatus};
 use crate::karte::FachebenenState;
 use futures::stream::{self, StreamExt};
 use serde_json::Value;
@@ -24,23 +24,56 @@ use std::future::Future;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+/// Obergrenze der Warnebenen DWD und NINA (LFH-662): ein älterer Stand wird nicht mehr
+/// ausgeliefert, sondern wie ein fehlender behandelt. Dieselbe Grenze wie
+/// `wetter::abruf::OBERGRENZE_WARNUNGEN_S` (LFH-633) — ein sechs Stunden alter Warnstand ist für
+/// die Lage keine Aussage mehr. Die übrigen Ebenen behalten das Stale-Serving bis zum Cache-Deckel.
+pub(crate) const WARN_OBERGRENZE: Duration = Duration::from_secs(6 * 3600);
+
+/// Weg durch [`liefere_mit_swr`] je Cache-Zustand, rein (LFH-662).
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum SwrWeg {
+    /// Jünger als die TTL → unverändert ausliefern.
+    Frisch,
+    /// Veraltet, aber nicht über der Obergrenze → alten Stand ausliefern, im Hintergrund erneuern.
+    AltUndErneuern,
+    /// Kein Eintrag oder älter als die Obergrenze → blockierend abrufen, sonst `offline`.
+    Kalt,
+}
+
+/// Genau auf der TTL gilt ein Stand als veraltet, genau auf der Obergrenze noch als
+/// auslieferbar (Spec `lagekarte-fachebenen`, „Grenze genau getroffen“).
+pub(crate) fn swr_weg(alter: Option<i64>, ttl: Duration, obergrenze: Option<Duration>) -> SwrWeg {
+    match alter {
+        Some(a) if a < ttl.as_secs() as i64 => SwrWeg::Frisch,
+        Some(a) if obergrenze.is_none_or(|o| a <= o.as_secs() as i64) => SwrWeg::AltUndErneuern,
+        _ => SwrWeg::Kalt,
+    }
+}
+
 /// SWR-Kern: frisch → sofort, veraltet → sofort plus Hintergrund-Refresh, kalt → blockierend.
 /// `erneuere` liefert ein `'static`-Future für `tokio::spawn`, das die Quelle holt, cacht und
 /// das Ergebnis zurückgibt (`None` bei Fehlschlag). `inflight` verhindert doppelte Refreshes.
+/// Mit `obergrenze` zählt ein Stand jenseits davon als kalt (LFH-662, [`swr_weg`]).
 async fn liefere_mit_swr<Fut>(
     pool: &SqlitePool,
     inflight: &Arc<Mutex<HashSet<String>>>,
     key: &str,
     ttl: Duration,
+    obergrenze: Option<Duration>,
     offline: impl FnOnce() -> FachebeneAntwort,
     erneuere: impl FnOnce() -> Fut,
 ) -> FachebeneAntwort
 where
     Fut: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
 {
-    match cache::eintrag(pool, key).await {
-        Some((a, alter)) if alter < ttl.as_secs() as i64 => a, // frisch
-        Some((a, _)) => {
+    let eintrag = cache::eintrag(pool, key).await;
+    match (
+        swr_weg(eintrag.as_ref().map(|(_, alter)| *alter), ttl, obergrenze),
+        eintrag,
+    ) {
+        (SwrWeg::Frisch, Some((a, _))) => a,
+        (SwrWeg::AltUndErneuern, Some((a, _))) => {
             // Veraltet → alten Stand sofort ausliefern, im Hintergrund erneuern; nur ein Refresh je
             // Schlüssel gleichzeitig.
             let claimed = inflight.lock().unwrap().insert(key.to_string());
@@ -55,7 +88,7 @@ where
             }
             a
         }
-        None => erneuere().await.unwrap_or_else(offline), // kalt → blockierend
+        _ => erneuere().await.unwrap_or_else(offline), // kalt → blockierend
     }
 }
 
@@ -102,15 +135,62 @@ const DWD_URL: &str = "https://maps.dwd.de/geoserver/dwd/ows?service=WFS&version
 
 pub async fn fetch_dwd(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let (client, pool2) = (s.client.clone(), pool.clone());
-    liefere_mit_swr(
+    liefere_dwd(pool, &s.inflight, chrono::Utc::now(), move || {
+        erneuere_dwd(client, pool2)
+    })
+    .await
+}
+
+/// Kern von [`fetch_dwd`], ohne HTTP prüfbar: SWR mit der Obergrenze der Warnebenen, danach der
+/// Gültigkeitsfilter (LFH-662). Gefiltert wird bei jeder Auslieferung, nicht vor dem Cachen —
+/// sonst blieben Warnungen stehen, die zwischen zwei Abrufen ablaufen.
+async fn liefere_dwd<Fut>(
+    pool: &SqlitePool,
+    inflight: &Arc<Mutex<HashSet<String>>>,
+    jetzt: chrono::DateTime<chrono::Utc>,
+    erneuere: impl FnOnce() -> Fut,
+) -> FachebeneAntwort
+where
+    Fut: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
+{
+    let a = liefere_mit_swr(
         pool,
-        &s.inflight,
+        inflight,
         "dwd",
         DWD_TTL,
+        Some(WARN_OBERGRENZE),
         || FachebeneAntwort::offline("dwd", DWD_ATTRIB),
-        move || erneuere_dwd(client, pool2),
+        erneuere,
     )
-    .await
+    .await;
+    dwd_gueltige(a, jetzt)
+}
+
+/// Entfernt DWD-Warnungen, deren Ende (`EXPIRES`) erreicht ist (`ende ≤ jetzt`, wie
+/// `wetter::quelle::gueltige`). Ohne oder mit unlesbarem Ende bleibt eine Warnung stehen: lieber
+/// zu viel als verschwiegen. Bleibt nichts, wird die Antwort `leer`; `abgerufen`, `stand` und
+/// `attribution` bleiben unberührt.
+pub(crate) fn dwd_gueltige(
+    mut a: FachebeneAntwort,
+    jetzt: chrono::DateTime<chrono::Utc>,
+) -> FachebeneAntwort {
+    if a.status == FachebeneStatus::Offline {
+        return a;
+    }
+    let Some(features) = a.features.get_mut("features").and_then(Value::as_array_mut) else {
+        return a;
+    };
+    features.retain(|f| {
+        !f.get("properties")
+            .and_then(|p| p.get("EXPIRES"))
+            .and_then(Value::as_str)
+            .and_then(|e| chrono::DateTime::parse_from_rfc3339(e).ok())
+            .is_some_and(|ende| ende <= jetzt)
+    });
+    if features.is_empty() {
+        a.status = FachebeneStatus::Leer;
+    }
+    a
 }
 
 async fn erneuere_dwd(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
@@ -140,6 +220,7 @@ pub async fn fetch_pegelonline(s: &FachebenenState, pool: &SqlitePool) -> Facheb
         &s.inflight,
         "pegelonline",
         PEGEL_TTL,
+        None,
         || FachebeneAntwort::offline("pegelonline", PEGEL_ATTRIB),
         move || erneuere_pegelonline(client, pool2),
     )
@@ -188,6 +269,7 @@ pub async fn fetch_odl(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwo
         &s.inflight,
         "odl",
         ODL_TTL,
+        None,
         || FachebeneAntwort::offline("odl", ODL_ATTRIB),
         move || erneuere_odl(client, pool2),
     )
@@ -335,13 +417,27 @@ fn nina_geojson_url(id: &str) -> String {
 
 pub async fn fetch_nina(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let (client, pool2) = (s.client.clone(), pool.clone());
+    liefere_nina(pool, &s.inflight, move || erneuere_nina(client, pool2)).await
+}
+
+/// Kern von [`fetch_nina`], ohne HTTP prüfbar. NINA trägt kein Ende (`mapData` liefert nur
+/// `startDate`), deshalb nur die Obergrenze der Warnebenen und kein Gültigkeitsfilter (LFH-662).
+async fn liefere_nina<Fut>(
+    pool: &SqlitePool,
+    inflight: &Arc<Mutex<HashSet<String>>>,
+    erneuere: impl FnOnce() -> Fut,
+) -> FachebeneAntwort
+where
+    Fut: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
+{
     liefere_mit_swr(
         pool,
-        &s.inflight,
+        inflight,
         "nina",
         NINA_TTL,
+        Some(WARN_OBERGRENZE),
         || FachebeneAntwort::offline("nina", NINA_ATTRIB),
-        move || erneuere_nina(client, pool2),
+        erneuere,
     )
     .await
 }
@@ -446,6 +542,7 @@ pub async fn fetch_hochwasser(s: &FachebenenState, pool: &SqlitePool) -> Fachebe
         &s.inflight,
         "hochwasser",
         HOCHWASSER_TTL,
+        None,
         || FachebeneAntwort::offline("hochwasser", HOCHWASSER_ATTRIB),
         move || erneuere_hochwasser(client, pool2),
     )
@@ -851,6 +948,7 @@ pub async fn fetch_luftqualitaet(s: &FachebenenState, pool: &SqlitePool) -> Fach
         &s.inflight,
         "luftqualitaet",
         LUFTQUALITAET_TTL,
+        None,
         || FachebeneAntwort::offline("luftqualitaet", LUFTQUALITAET_ATTRIB),
         move || erneuere_luftqualitaet(client, pool2),
     )
@@ -2021,6 +2119,7 @@ mod swr_tests {
             &inflight(),
             "k",
             Duration::from_secs(60),
+            None,
             || FachebeneAntwort::offline("k", "o"),
             move || {
                 c.fetch_add(1, Ordering::SeqCst);
@@ -2042,6 +2141,7 @@ mod swr_tests {
             &inflight(),
             "k",
             Duration::from_secs(60),
+            None,
             || FachebeneAntwort::offline("k", "o"),
             move || {
                 c.fetch_add(1, Ordering::SeqCst);
@@ -2061,6 +2161,7 @@ mod swr_tests {
             &inflight(),
             "k",
             Duration::from_secs(60),
+            None,
             || FachebeneAntwort::offline("k", "o"),
             move || async { None }, // Quelle nicht erreichbar
         )
@@ -2079,6 +2180,7 @@ mod swr_tests {
             &inflight(),
             "k",
             Duration::from_secs(0), // alles gilt sofort als veraltet
+            None,
             || FachebeneAntwort::offline("k", "o"),
             move || {
                 c.fetch_add(1, Ordering::SeqCst);
@@ -2109,6 +2211,7 @@ mod swr_tests {
             &inflight(),
             "k",
             Duration::from_secs(300),
+            None,
             || FachebeneAntwort::offline("k", "o"),
             move || async { None }, // Quelle nicht erreichbar
         )
@@ -2289,5 +2392,252 @@ mod odl_antwort_tests {
         ] {
             assert!(odl_antwort(&roh).is_none(), "{roh}");
         }
+    }
+}
+
+/// LFH-662: Obergrenze der Warnebenen und Gültigkeit der DWD-Warnungen.
+#[cfg(test)]
+mod warnebenen_tests {
+    use super::*;
+    use chrono::{DateTime, TimeZone, Utc};
+    use serde_json::json;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    const STUNDE: i64 = 3600;
+
+    fn inflight() -> Arc<Mutex<HashSet<String>>> {
+        Arc::new(Mutex::new(HashSet::new()))
+    }
+
+    fn warnung(event: &str, expires: Option<&str>) -> Value {
+        let mut p = json!({ "EVENT": event, "ONSET": "2026-09-23T12:00:00Z" });
+        if let Some(e) = expires {
+            p["EXPIRES"] = json!(e);
+        }
+        json!({ "type": "Feature", "geometry": null, "properties": p })
+    }
+
+    fn dwd(features: Vec<Value>) -> FachebeneAntwort {
+        let mut a = FachebeneAntwort::ok(
+            "dwd",
+            DWD_ATTRIB,
+            None,
+            json!({ "type": "FeatureCollection", "features": features }),
+        );
+        a.abgerufen = Some("2026-09-23T12:30:00Z".into());
+        a
+    }
+
+    fn events(a: &FachebeneAntwort) -> Vec<String> {
+        a.features["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["properties"]["EVENT"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    fn um(stunde: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 9, 23, stunde, 0, 0).unwrap()
+    }
+
+    /// Den Eintrag `stunden` alt machen, wie nach ausgefallenen Abrufen.
+    async fn altere(pool: &SqlitePool, schluessel: &str, stunden: i64) {
+        sqlx::query(
+            "UPDATE fachebenen_cache SET gespeichert_at = unixepoch() - ? WHERE schluessel = ?",
+        )
+        .bind(stunden * STUNDE)
+        .bind(schluessel)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    // ---- Wegwahl
+
+    #[test]
+    fn wegwahl_mit_und_ohne_obergrenze() {
+        let ttl = Duration::from_secs(300);
+        let og = Some(Duration::from_secs(6 * STUNDE as u64));
+        assert_eq!(swr_weg(None, ttl, og), SwrWeg::Kalt);
+        assert_eq!(swr_weg(None, ttl, None), SwrWeg::Kalt);
+        assert_eq!(swr_weg(Some(299), ttl, og), SwrWeg::Frisch);
+        // Genau auf der TTL veraltet — die bisherige Grenze von `liefere_mit_swr`.
+        assert_eq!(swr_weg(Some(300), ttl, og), SwrWeg::AltUndErneuern);
+        assert_eq!(swr_weg(Some(2 * STUNDE), ttl, og), SwrWeg::AltUndErneuern);
+        // Genau auf der Obergrenze noch auslieferbar, eine Sekunde darüber kalt.
+        assert_eq!(swr_weg(Some(6 * STUNDE), ttl, og), SwrWeg::AltUndErneuern);
+        assert_eq!(swr_weg(Some(6 * STUNDE + 1), ttl, og), SwrWeg::Kalt);
+        // Ohne Obergrenze gilt der alte Vertrag: alt bleibt alt, bis das Prune ihn räumt.
+        assert_eq!(
+            swr_weg(Some(47 * STUNDE), ttl, None),
+            SwrWeg::AltUndErneuern
+        );
+    }
+
+    #[test]
+    fn obergrenze_ist_die_des_wetter_moduls() {
+        assert_eq!(WARN_OBERGRENZE, Duration::from_secs(6 * 3600));
+        assert_eq!(
+            WARN_OBERGRENZE.as_secs() as i64,
+            crate::wetter::abruf::OBERGRENZE_WARNUNGEN_S
+        );
+    }
+
+    // ---- Obergrenze über die Ebenen
+
+    #[tokio::test]
+    async fn alter_dwd_stand_bei_ausgefallener_quelle_ist_offline() {
+        let pool = crate::db::test_pool().await;
+        cache::setze(&pool, "dwd", &dwd(vec![warnung("STURM", None)])).await;
+        altere(&pool, "dwd", 7).await;
+        let a = liefere_dwd(&pool, &inflight(), Utc::now(), || async { None }).await;
+        assert_eq!(a.status, FachebeneStatus::Offline);
+        assert_eq!(a.abgerufen, None);
+        assert!(a.features["features"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn dwd_stand_unter_der_obergrenze_bleibt_bei_ausgefallener_quelle() {
+        let pool = crate::db::test_pool().await;
+        cache::setze(&pool, "dwd", &dwd(vec![warnung("STURM", None)])).await;
+        altere(&pool, "dwd", 2).await;
+        let a = liefere_dwd(&pool, &inflight(), Utc::now(), || async { None }).await;
+        assert_eq!(a.status, FachebeneStatus::Ok);
+        assert_eq!(events(&a), vec!["STURM"]);
+    }
+
+    #[tokio::test]
+    async fn alter_nina_stand_wird_frisch_geholt_wenn_die_quelle_antwortet() {
+        let pool = crate::db::test_pool().await;
+        let alt = FachebeneAntwort::ok(
+            "nina",
+            NINA_ATTRIB,
+            None,
+            json!({ "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "titel": "alt" } }] }),
+        );
+        cache::setze(&pool, "nina", &alt).await;
+        altere(&pool, "nina", 7).await;
+        let abrufe = Arc::new(AtomicUsize::new(0));
+        let z = abrufe.clone();
+        let a = liefere_nina(&pool, &inflight(), move || {
+            z.fetch_add(1, Ordering::SeqCst);
+            async {
+                Some(FachebeneAntwort::ok(
+                    "nina",
+                    NINA_ATTRIB,
+                    None,
+                    json!({ "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "titel": "neu" } }] }),
+                ))
+            }
+        })
+        .await;
+        // Blockierend geholt, nicht der alte Stand mit Hintergrund-Refresh.
+        assert_eq!(abrufe.load(Ordering::SeqCst), 1);
+        assert_eq!(a.features["features"][0]["properties"]["titel"], "neu");
+    }
+
+    #[tokio::test]
+    async fn alter_nina_stand_bei_ausgefallener_quelle_ist_offline() {
+        let pool = crate::db::test_pool().await;
+        let alt = FachebeneAntwort::ok(
+            "nina",
+            NINA_ATTRIB,
+            None,
+            json!({ "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": {} }] }),
+        );
+        cache::setze(&pool, "nina", &alt).await;
+        altere(&pool, "nina", 7).await;
+        let a = liefere_nina(&pool, &inflight(), || async { None }).await;
+        assert_eq!(a.status, FachebeneStatus::Offline);
+    }
+
+    // ---- Gültigkeit der DWD-Warnungen
+
+    #[test]
+    fn abgelaufene_warnung_faellt_weg() {
+        let a = dwd(vec![
+            warnung("FROST", Some("2026-09-23T14:00:00Z")),
+            warnung("STURM", Some("2026-09-23T18:00:00Z")),
+        ]);
+        let g = dwd_gueltige(a, um(15));
+        assert_eq!(events(&g), vec!["STURM"]);
+        assert_eq!(g.status, FachebeneStatus::Ok);
+        assert_eq!(g.abgerufen.as_deref(), Some("2026-09-23T12:30:00Z"));
+        assert_eq!(g.attribution, DWD_ATTRIB);
+    }
+
+    #[test]
+    fn ende_genau_jetzt_ist_abgelaufen() {
+        let g = dwd_gueltige(
+            dwd(vec![warnung("FROST", Some("2026-09-23T15:00:00Z"))]),
+            um(15),
+        );
+        assert!(events(&g).is_empty());
+    }
+
+    #[test]
+    fn ende_mit_offset_wird_als_zeitpunkt_verglichen() {
+        // 16:30+02:00 ist 14:30 UTC: um 15:00 UTC abgelaufen.
+        let g = dwd_gueltige(
+            dwd(vec![
+                warnung("FROST", Some("2026-09-23T16:30:00+02:00")),
+                warnung("STURM", Some("2026-09-23T17:30:00+02:00")),
+            ]),
+            um(15),
+        );
+        assert_eq!(events(&g), vec!["STURM"]);
+    }
+
+    #[test]
+    fn warnung_ohne_oder_mit_unlesbarem_ende_bleibt() {
+        let mut ohne = warnung("OHNE", None);
+        ohne["properties"]["EXPIRES"] = Value::Null;
+        let g = dwd_gueltige(
+            dwd(vec![
+                warnung("FEHLT", None),
+                ohne,
+                warnung("KAPUTT", Some("kaputt")),
+            ]),
+            um(15),
+        );
+        assert_eq!(events(&g), vec!["FEHLT", "OHNE", "KAPUTT"]);
+    }
+
+    #[test]
+    fn alle_abgelaufen_macht_die_antwort_leer_und_behaelt_den_abruf() {
+        let g = dwd_gueltige(
+            dwd(vec![warnung("FROST", Some("2026-09-23T14:00:00Z"))]),
+            um(15),
+        );
+        assert_eq!(g.status, FachebeneStatus::Leer);
+        assert!(events(&g).is_empty());
+        assert_eq!(g.abgerufen.as_deref(), Some("2026-09-23T12:30:00Z"));
+    }
+
+    #[test]
+    fn offline_bleibt_offline() {
+        let o = FachebeneAntwort::offline("dwd", DWD_ATTRIB);
+        let g = dwd_gueltige(o, um(15));
+        assert_eq!(g.status, FachebeneStatus::Offline);
+    }
+
+    /// Gefiltert wird bei der Auslieferung; der Cache hält den Rohstand.
+    #[tokio::test]
+    async fn cache_haelt_den_rohstand_und_die_antwort_ist_gefiltert() {
+        let pool = crate::db::test_pool().await;
+        cache::setze(
+            &pool,
+            "dwd",
+            &dwd(vec![
+                warnung("FROST", Some("2026-09-23T14:00:00Z")),
+                warnung("STURM", Some("2026-09-23T18:00:00Z")),
+            ]),
+        )
+        .await;
+        let a = liefere_dwd(&pool, &inflight(), um(15), || async { None }).await;
+        assert_eq!(events(&a), vec!["STURM"]);
+        let (roh, _) = cache::eintrag(&pool, "dwd").await.unwrap();
+        assert_eq!(events(&roh), vec!["FROST", "STURM"]);
     }
 }
