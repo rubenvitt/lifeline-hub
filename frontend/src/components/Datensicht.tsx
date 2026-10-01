@@ -870,8 +870,7 @@ export default function Datensicht<T extends object, const K extends string>(
         aria-expanded={offen}
         aria-controls={mitRegion && offen ? `${idPraefix}-bereich-${idTeil(k)}` : undefined}
         aria-label={aufklappen.zugaenglicherName(zeile)}
-        // `bedienText` statt antds `colorLink`: der Linkton unterschreitet 7 : 1 (Tag) bzw. 5 : 1
-        // (Nacht). Blauer TEXT nimmt die Textrolle.
+        // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
         style={{ color: rollenwerte(token).bedienText }}
         onClick={(e) => {
           // Die Tabelle darf den Klick nicht zusätzlich als Zeilenklick lesen.
