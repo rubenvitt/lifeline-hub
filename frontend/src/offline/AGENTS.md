@@ -79,4 +79,4 @@ draußen gelassen werden.
   Versatz aus dem `Date`-Header jeder Antwort von `apiGet`, `apiSend` und `apiUpload`). Ohne
   frischen Versatz gilt die Geräteuhr. Die Ereigniszeit von Meldung und ETB-Eintrag kommt
   weiter aus der Geräteuhr; ob sie umgerechnet wird, ist offen (LFH-895). Herleitung:
-  `openspec/changes/lfh-705-serveruhr-versatz-offline/design.md`.
+  `openspec/changes/archive/2026-10-01-lfh-705-serveruhr-versatz-offline/design.md`.

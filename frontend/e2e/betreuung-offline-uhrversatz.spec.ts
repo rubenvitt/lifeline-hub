@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
  * und der Server lehnte ihn als mehr als 60 s in der Zukunft mit 400 ab: Die Meldung lag im
  * Wiederherstellungs-Drawer statt im Bezirk. Jetzt rechnet das Frontend die Geräteuhr über den
  * `Date`-Header der echten API-Antworten auf die Serveruhr um
- * (`openspec/changes/lfh-705-serveruhr-versatz-offline/design.md`).
+ * (`openspec/changes/archive/2026-10-01-lfh-705-serveruhr-versatz-offline/design.md`).
  *
  * Der Test braucht den echten Server, denn er belegt auch, dass dessen Antworten `Date` tragen.
  */

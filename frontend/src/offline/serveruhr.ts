@@ -2,7 +2,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 
 /**
  * Versatz der Geräteuhr zur Serveruhr (LFH-705,
- * `openspec/changes/lfh-705-serveruhr-versatz-offline/design.md`).
+ * `openspec/changes/archive/2026-10-01-lfh-705-serveruhr-versatz-offline/design.md`).
  *
  * Eine offline vorgemerkte Meldung trägt ihren Erfassungszeitpunkt. Nach der Geräteuhr
  * gestempelt, scheiterte sie auf einem vorgehenden Gerät am Zukunftsriegel des Servers oder
