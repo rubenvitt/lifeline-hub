@@ -10,7 +10,7 @@
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
  * Er liest Quelltext, keine Laufzeit: ein `dayjs().format('HH:mm')` in einem Text fängt er nicht
  * (die bewussten Gerätezeiten — Uhr und Datenstand im Kopf — stehen unter „Non-Goals“ in
- * `openspec/changes/lfh-692-zeiteingabe-anzeigezone/design.md`).
+ * `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`).
  */
 import { describe, expect, it } from 'vitest';
 

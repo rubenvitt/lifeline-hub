@@ -10,7 +10,7 @@
  *   festen Versatz, den `.add`/`.set` über eine Sommerzeitgrenze nicht nachführen — deshalb wird
  *   nur an der Grenze gewandelt (`zuWanduhr` hinein, `ausWanduhr` heraus), nie dazwischen.
  *
- * Herleitung: `openspec/changes/lfh-692-zeiteingabe-anzeigezone/design.md` (D1, D2, D4).
+ * Herleitung: `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md` (D1, D2, D4).
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';

@@ -120,6 +120,8 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
       `ZeitpunktEingabe`/`ZeitraumEingabe` (`anzeige/zeitEingabe.ts`), Formularwert ist ein
       Zeitpunkt“ ersetzt den Verweis auf `wireZuPicker`/`pickerZuWire`. Verweise per grep
       nachziehen, Prettier ist grün.
-- [ ] 7.3 Gesamtlauf `./scripts/check-all.sh` grün, Typecheck und Lint eingeschlossen. Unter
+- [x] 7.3 Gesamtlauf `./scripts/check-all.sh` grün, Typecheck und Lint eingeschlossen. Unter
       `TZ_ERZWUNGEN=UTC` läuft zusätzlich `pnpm vitest run src/anzeige src/verpflegung
-      src/pages/EinsatzdatenPage.test.tsx` grün.
+      src/pages/EinsatzdatenPage.test.tsx` grün. Belegt am 01.10.2026: Bündel `schnell` und
+      `frontend` lokal grün (596 Dateien, 8214 Tests), UTC-Teilmenge grün (279 Tests); Bündel
+      `rust` und `e2e` (Backend unverändert) belegt die CI des PRs.

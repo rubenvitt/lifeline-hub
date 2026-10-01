@@ -255,7 +255,8 @@ anwendbar), „nicht geprüft" ist keins.
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
   Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung und Koordinate nur
   im Vollformular.
-- **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`): jede Zeiteingabe nimmt
+- **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`,
+  `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`): jede Zeiteingabe nimmt
   `anzeige/ZeitpunktEingabe.tsx` (`ZeitpunktEingabe`, `ZeitraumEingabe`), nie antds `DatePicker`;
   der Formularwert ist ein **Zeitpunkt** (hin `alsZeitpunkt`, zurück `alsBackendZeit`, Kern
   `anzeige/zeitEingabe.ts`), in die Wanduhr der Anzeigezone wandelt nur das Feld. Tagesgrenzen

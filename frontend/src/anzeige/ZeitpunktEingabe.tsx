@@ -5,7 +5,7 @@
  *
  * `value`/`onChange` tauschen ABSOLUTE Zeitpunkte. Nur zum Picker hin wird in die Wanduhr der
  * Anzeigezone gewandelt (`zeitEingabe.ts`, Begründung dort und in
- * `openspec/changes/lfh-692-zeiteingabe-anzeigezone/design.md`, D1–D4):
+ * `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`, D1–D4):
  * - `onChange` feuert nur bei einer Eingabe — ein unberührtes Feld behält den gelesenen Zeitpunkt.
  * - antds „Jetzt“ wäre browserlokal; es ist aus, ein eigener Knopf im Panel-Fuß setzt `dayjs()`.
  * - Weicht die Anzeigezone von der Browserzone ab, steht die Zone am Feld und im Panel-Fuß.
