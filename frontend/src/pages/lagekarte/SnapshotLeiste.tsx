@@ -52,6 +52,20 @@ function merkeEingeklappt(wert: boolean): void {
 }
 
 /**
+ * Die Abstände des Bands bleiben fest und wachsen NICHT mit der Dichte-Staffel (LFH-703,
+ * Entscheidung 01.10.2026). Das Band steht schon so im Handschuh-Betrieb am Handschirm bei 49 % der
+ * Karte (Deckel 50 %, `e2e/leisten-flaeche.spec.ts`); mit Lücke und Polsterung aus der Staffel
+ * wuchs es auf 314–362 px und riss den Deckel bei 390 und 1024 px. Der Umbau, nach dem das Band
+ * mitwachsen darf, ist LFH-899. Benannt, damit der Guard
+ * `leistenAbstand.guard.test.ts` jede neue Zahl im Band weiter findet.
+ */
+const BAND_LUECKE = 12;
+const BAND_POLSTER = '8px 12px';
+const STAND_LUECKE = 6;
+const ZEITLEISTE_LUECKE = 8;
+const SCHIEBER_RAND = '0 8px';
+
+/**
  * Die Reihe der gesicherten Stände teilt sich die Zeile mit Sichern und Zeitleiste. Ohne
  * `flex`-Basis und `minWidth: 0` nahm sie ihre volle Inhaltsbreite an, brach in eine zweite Zeile
  * um und verdoppelte die Höhe der Leiste. Jetzt schrumpft sie auf den Rest und rollt waagerecht;
@@ -60,16 +74,14 @@ function merkeEingeklappt(wert: boolean): void {
  * 120 statt 160: unter Linux-Schriften sind Feld und „Stand sichern" breiter als unter macOS, bei
  * 1440 px rutschte der Einklapp-Pfeil sonst in eine dritte Reihe.
  */
-export function standLeisteStil(luecke: number): CSSProperties {
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    gap: luecke,
-    flex: '1 1 120px',
-    minWidth: 0,
-    overflowX: 'auto',
-  };
-}
+export const standLeisteStil: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: STAND_LUECKE,
+  flex: '1 1 120px',
+  minWidth: 0,
+  overflowX: 'auto',
+};
 
 /**
  * Das Bezeichnungsfeld neben „Stand sichern": bevorzugt 180 px, schrumpfbar. Fest 180 px ragte das
@@ -82,16 +94,14 @@ export const sichernFeldStil: CSSProperties = { flex: '0 1 180px', minWidth: 0 }
  * Der Zeitleisten-Block (Aktuell · Abspielen · Schieber · Stand) darf umbrechen: seine
  * Mindestbreite lag sonst über der Bandbreite.
  */
-export function zeitleisteStil(luecke: number): CSSProperties {
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: luecke,
-    flex: '1 1 260px',
-    minWidth: 0,
-  };
-}
+export const zeitleisteStil: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: ZEITLEISTE_LUECKE,
+  flex: '1 1 260px',
+  minWidth: 0,
+};
 
 /** Der Abspielknopf schrumpft nicht: als Flex-Kind fiel er auf 16 px Breite. */
 export const abspielenStil: CSSProperties = { flexShrink: 0 };
@@ -247,10 +257,9 @@ export function SnapshotLeiste({
         ...bandStil('voll', true),
         display: 'flex',
         alignItems: 'center',
-        // Zwischen den Gruppen (Sichern · Zeitleiste · Stände) `margin`, in ihnen `marginSM`.
-        gap: token.margin,
+        gap: BAND_LUECKE,
         flexWrap: 'wrap',
-        padding: `${token.paddingSM}px ${token.padding}px`,
+        padding: BAND_POLSTER,
         borderRadius: token.borderRadiusLG,
         background: token.colorBgElevated,
         boxShadow: token.boxShadow,
@@ -283,7 +292,7 @@ export function SnapshotLeiste({
       )}
 
       {chrono.length > 0 && (
-        <div style={zeitleisteStil(token.marginSM)}>
+        <div style={zeitleisteStil}>
           <Button type={aktiverSnapshotId == null ? 'primary' : 'default'} onClick={zurueckAktuell}>
             Aktuell
           </Button>
@@ -297,7 +306,7 @@ export function SnapshotLeiste({
             />
           </Tooltip>
           <Slider
-            style={{ flex: 1, margin: `0 ${token.marginSM}px`, minWidth: 120 }}
+            style={{ flex: 1, margin: SCHIEBER_RAND, minWidth: 120 }}
             min={0}
             max={Math.max(0, chrono.length - 1)}
             value={aktiverIndex >= 0 ? aktiverIndex : 0}
@@ -322,7 +331,7 @@ export function SnapshotLeiste({
       )}
 
       {chrono.length > 0 && (
-        <div data-lfh="zeitachse-staende" style={standLeisteStil(token.marginSM)}>
+        <div data-lfh="zeitachse-staende" style={standLeisteStil}>
           {chrono.map((s) => (
             <Tooltip key={s.id} title={s.notiz ?? undefined}>
               <Button

@@ -266,13 +266,11 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
     staende.y - band.y,
     `die Stand-Reihe steht in der ersten Reihe des Bands (${staende.y - band.y}px unter der Oberkante)`,
   ).toBeLessThan(zeile);
-  // Zwei Reihen = zwei Steuerhöhen plus Fuge und Polsterung des Bands. Beide kommen aus der
-  // Dichte-Staffel (LFH-703); der Desktop läuft in `kompakt`: Fuge `margin` 11 px, Polsterung
-  // 2 × `paddingSM` 7 px.
+  // Zwei Reihen = zwei Steuerhöhen plus Fuge (12 px) und Polsterung des Bands (2 × 8 px).
   expect(
     band.height,
     `Zeitachse ${band.height}px hoch bei ${zeile}px Zeilenhöhe — höchstens zwei Reihen`,
-  ).toBeLessThanOrEqual(zeile * 2 + 11 + 14 + 1);
+  ).toBeLessThanOrEqual(zeile * 2 + 12 + 16 + 1);
 
   // Unter `xl` startet die Zeitachse ohne gemerkte Wahl eingeklappt; zur Sicherheit geräumt.
   await page.evaluate(() => localStorage.removeItem('lfh:lagekarte:zeitachse-eingeklappt'));

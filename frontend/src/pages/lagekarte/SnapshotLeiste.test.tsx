@@ -285,7 +285,7 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
     expect(reihe.style.overflowX).toBe('auto');
     // 120 statt 160: unter Linux-Schriften rutschte der Einklapp-Pfeil bei 1440 px sonst allein in
     // eine dritte Reihe. Die Stand-Reihe rollt ohnehin — die Basis ist nur ihre Umbruchschwelle.
-    expect(standLeisteStil(7).flex).toBe('1 1 120px');
+    expect(standLeisteStil.flex).toBe('1 1 120px');
   });
 
   it('Startzustand: gemerkte Wahl gewinnt, ohne Wahl eingeklappt nur auf dem Handschirm', () => {
@@ -327,8 +327,8 @@ describe('SnapshotLeiste — Umbruch statt Überlauf (LFH-373)', () => {
   });
 
   it('die Zeitleiste bricht um, statt über den Bandrand zu laufen', () => {
-    expect(zeitleisteStil(7).flexWrap).toBe('wrap');
-    expect(zeitleisteStil(7).minWidth).toBe(0);
+    expect(zeitleisteStil.flexWrap).toBe('wrap');
+    expect(zeitleisteStil.minWidth).toBe(0);
   });
 
   it('der Abspielknopf schrumpft nicht unter seine Kante', () => {
