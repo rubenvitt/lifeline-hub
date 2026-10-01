@@ -108,17 +108,18 @@ Nach D2 nutzt nur noch `medienkontakt` (medium, thema, antwort, freigabe_durch) 
 Deren Text („bei Freigabe ins ETB gesnapshottet“) stimmt dort nicht: Das Presse-Log schreibt
 kein ETB (`presse/repo.rs`, Modulkopf). Neue Konstante mit dem tatsächlichen Grund (das Log ist
 selbst der Nachweis der Pressearbeit, LFH-554 D9). Ob das nach Linie A so bleiben soll, ist eine
-eigene Abwägung und kommt als Folgeticket aufs Board.
+eigene Abwägung und steht als Folgeticket LFH-901 auf dem Board.
 
 ### D6 — Ausnahmeliste der ETB-Spur
 
 Mit D2 übernehmen diese Schreibwege einen Scrub-Wert in den ETB-Wortlaut und gehören in
 `AUSNAHMEN_SYSTEM_ETB` (`tests/aufbewahrung_e2e.rs`): Meldung anlegen (absender, empfaenger,
-inhalt), Auftrag anlegen (auftrag_text, snap_anzeige), Vollzug (vollzugsmeldung), Nachforderung
+inhalt), Auftrag anlegen (auftrag_text sowie snap_anzeige, funktion_text, extern_bezeichnung über den
+Empfänger-Snapshot), Vollzug (vollzugsmeldung), Nachforderung
 anlegen (bezeichnung, adressat_bezeichnung, begruendung), Freigabe eines Vorlagendokuments
 (titel, abschnitte der drei Tabellen) und Lagebesprechung abschließen (entschluss). Der
-Selbsttest der Liste prüft Funktionsname und Scrub-Klassifikation. Die genauen Funktionsnamen
-werden beim Eintragen am Code abgelesen.
+Selbsttest der Liste prüft Funktionsname und Scrub-Klassifikation. Der Selbsttest erkennt
+seit LFH-701 auch generische Funktionen (`fn name<…>`), weil `snapshot_freigeben_tx` eine ist.
 
 ### D7 — Audit-Text
 

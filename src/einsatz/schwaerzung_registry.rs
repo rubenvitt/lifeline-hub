@@ -35,6 +35,10 @@ pub enum Strategie {
     /// den
     /// Index ab der zweiten Zeile und bräche die ganze Schwärzung ab. Die Zeilen-ID ist Struktur.
     PlatzhalterMitId,
+    /// `col = '[]'` — NOT-NULL-Spalte mit einem JSON-Array, das beim Laden deserialisiert wird
+    /// (`abschnitte` der Vorlagendokumente, LFH-701). Ein Text-Platzhalter wäre kein gültiges
+    /// JSON; das leere Array heißt „keine Abschnitte“.
+    LeeresJsonArray,
     /// Die ganze Zeile wird gelöscht. Für Tabellen, deren Nutzlast selbst PII ist und die kein
     /// Skelett tragen (`anhang`: Foto-BLOBs Betroffener); CASCADE räumt abhängige Zeilen mit.
     ZeileLoeschen,
@@ -117,9 +121,12 @@ const G_OP_LABEL: &str =
     "Operatives Struktur-Label (Objekt-/Einheiten-/Abschnitts-/Funkgruppen-Bezeichnung, kein Personenbezug)";
 const G_OP_SNAP: &str =
     "Disponier-Snapshot von Betriebsmittel-Stammdaten (Fahrzeug/Material/Einheit der eigenen Org, kein Betroffenen-Bezug)";
-const G_FUEHRUNG: &str =
-    "DV100-Führungsdokumentation; bei Freigabe unveränderlich ins ETB gesnapshottet \
-     (Rechtsstand liegt im ETB, hier Arbeitskopie)";
+// Die Freitexte der Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl,
+// Pressemitteilung, Lagebesprechung) werden gescrubbt: Die Führungsdokumentation ist allein
+// der ETB-Wortlaut (G_ETB), die Module sind Arbeitsstand (LFH-701, Linie A).
+const G_PRESSE_LOG: &str =
+    "Presse-Log ist selbst der Nachweis der Pressearbeit (kein ETB-Eintrag, LFH-554 D9); \
+     Medium, Thema, Antwort und Freigabeangabe ohne Ansprechperson";
 const G_ETB: &str =
     "ETB — rechtsverbindliche Führungs-/Einsatzdokumentation, gesetzliches Aufbewahrungs-Skelett";
 const G_TRIAGE: &str =
@@ -1025,9 +1032,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_at", G_ZEIT),
         ],
     },
-    // Abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG), wie
-    // `lagebericht.abschnitte` und `befehl`, die denselben Entschluss tragen; eine andere Linie
-    // gälte nur für alle drei gemeinsam.
+    // Abgeschlossene Lagebesprechungen. `entschluss` wird gescrubbt wie
+    // `lagebericht.abschnitte` und `befehl`, die denselben Entschluss tragen — eine Linie für
+    // alle drei (LFH-701, Linie A). Der Wortlaut bleibt im ETB-Eintrag der Besprechung.
     TabellenRegel {
         tabelle: "einsatz_lagebesprechung",
         scoping: Scoping::EinsatzId,
@@ -1037,7 +1044,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("lfd_nr", G_ZAEHLER),
             retain("abgehalten_at", G_ZEIT),
-            retain("entschluss", G_FUEHRUNG),
+            scrub("entschluss", Strategie::Platzhalter), // NOT NULL
             retain("naechste_at", G_ZEIT),
             retain("etb_eintrag_id", G_FK),
             retain("erfasst_von_id", G_FK),
@@ -1281,10 +1288,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("client_id", G_IDEMPOTENZ),
             retain("lfd_nr", G_ZAEHLER),
-            retain("absender", G_FUEHRUNG),
-            retain("empfaenger", G_FUEHRUNG),
-            retain("meldeweg", G_FUEHRUNG),
-            retain("inhalt", G_FUEHRUNG),
+            // Führungs-Freitexte (LFH-701, Linie A): Die Führungsdokumentation ist der
+            // ETB-Wortlaut (`etb_eintrag.von`/`an`/`inhalt`, G_ETB); die Meldung ist Arbeitsstand.
+            scrub("absender", Strategie::Platzhalter), // NOT NULL
+            scrub("empfaenger", Strategie::NullSetzen),
+            retain("meldeweg", G_ENUM),
+            scrub("inhalt", Strategie::Platzhalter), // NOT NULL
             retain("meldungsart", G_ENUM),
             retain("prioritaet", G_ENUM),
             retain("status", G_ENUM),
@@ -1313,19 +1322,21 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            retain("auftrag_text", G_FUEHRUNG),
-            retain("absicht", G_FUEHRUNG),
-            retain("lage", G_FUEHRUNG),
-            retain("ort", G_FUEHRUNG),
-            retain("zeit", G_FUEHRUNG),
-            retain("mittel", G_FUEHRUNG),
-            retain("verbindung", G_FUEHRUNG),
-            retain("sicherheit", G_FUEHRUNG),
+            // Führungs-Freitexte (LFH-701, Linie A): `auftrag_text` und `vollzugsmeldung` stehen
+            // im ETB-Wortlaut; die Fünf-Punkte-Felder gelangen nie ins ETB und gehen ganz.
+            scrub("auftrag_text", Strategie::Platzhalter), // NOT NULL
+            scrub("absicht", Strategie::NullSetzen),
+            scrub("lage", Strategie::NullSetzen),
+            scrub("ort", Strategie::NullSetzen),
+            scrub("zeit", Strategie::NullSetzen),
+            scrub("mittel", Strategie::NullSetzen),
+            scrub("verbindung", Strategie::NullSetzen),
+            scrub("sicherheit", Strategie::NullSetzen),
             retain("prioritaet", G_ENUM),
             retain("frist_at", G_ZEIT),
             retain("erteilt_at", G_ZEIT),
             retain("in_arbeit_at", G_ZEIT),
-            retain("vollzugsmeldung", G_FUEHRUNG),
+            scrub("vollzugsmeldung", Strategie::NullSetzen),
             retain("abgenommen_at", G_ZEIT),
             retain("abgenommen_von_id", G_FK),
             retain("etb_anordnung_id", G_FK),
@@ -1351,20 +1362,16 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             retain("person_id", G_FK),
             retain("fahrzeug_id", G_FK),
-            retain("funktion_text", G_FUEHRUNG),
+            // Empfänger-Klartext kann einen Namen tragen (externe Stelle, Funktionsbezeichnung,
+            // bei Typ `person` `einsatz_personal.snap_name`, das selbst gescrubbt wird). Er steht
+            // verkettet in `etb_eintrag.an` der Anordnung (LFH-701, Linie A); die Bezeichnung
+            // von Einheit/Abschnitt/Fahrzeug bleibt zudem über den Verweis erhalten.
+            scrub("funktion_text", Strategie::NullSetzen),
             // Katalogcode (LFH-549) — kein Personenbezug.
             retain("funktion", G_ENUM),
             retain("extern_kategorie", G_ENUM),
-            // REVIEW: externer Empfänger-Klartext (Auftrags-Adressierung, Führungs-Doku;
-            // kann externen Namen tragen) — im ETB gesnapshottet.
-            retain(
-                "extern_bezeichnung",
-                "Auftrags-Empfänger-Klartext (Führungs-Doku) — REVIEW LFH-229",
-            ),
-            retain(
-                "snap_anzeige",
-                "Auftrags-Empfänger-Snapshot (Führungs-Doku) — REVIEW LFH-229",
-            ),
+            scrub("extern_bezeichnung", Strategie::NullSetzen),
+            scrub("snap_anzeige", Strategie::Platzhalter), // NOT NULL
             retain("quittiert_at", G_ZEIT),
             retain("quittiert_von_id", G_FK),
         ],
@@ -1377,10 +1384,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("vorlage", G_ENUM),
-            retain("titel", G_FUEHRUNG),
-            retain("zeitstand", G_FUEHRUNG),
+            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            retain("zeitstand", G_ZEIT),
             retain("status", G_ENUM),
-            retain("abschnitte", G_FUEHRUNG),
+            scrub("abschnitte", Strategie::LeeresJsonArray), // NOT NULL, JSON
             retain("version", G_ZAEHLER),
             retain("vorgaenger_id", G_FK),
             retain("ersteller_id", G_FK),
@@ -1399,10 +1406,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("vorlage", G_ENUM),
-            retain("titel", G_FUEHRUNG),
-            retain("zeitstand", G_FUEHRUNG),
+            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            retain("zeitstand", G_ZEIT),
             retain("status", G_ENUM),
-            retain("abschnitte", G_FUEHRUNG),
+            scrub("abschnitte", Strategie::LeeresJsonArray), // NOT NULL, JSON
             retain("version", G_ZAEHLER),
             retain("vorgaenger_id", G_FK),
             retain("ersteller_id", G_FK),
@@ -1414,7 +1421,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     // ---------- Presse- und Medienarbeit S5 (LFH-554) ----------
-    // Die Pressemitteilung ist ein veröffentlichter Text: RETAIN wie `lagebericht`/`befehl`.
+    // Die Pressemitteilung folgt `lagebericht`/`befehl` (gemeinsamer Kern `vorlagendokument`,
+    // LFH-701, Linie A): Die freigegebene Fassung steht im ETB-Wortlaut, Entwürfe nirgends.
     TabellenRegel {
         tabelle: "pressemitteilung",
         scoping: Scoping::EinsatzId,
@@ -1423,10 +1431,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("vorlage", G_ENUM),
-            retain("titel", G_FUEHRUNG),
-            retain("zeitstand", G_FUEHRUNG),
+            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            retain("zeitstand", G_ZEIT),
             retain("status", G_ENUM),
-            retain("abschnitte", G_FUEHRUNG),
+            scrub("abschnitte", Strategie::LeeresJsonArray), // NOT NULL, JSON
             retain("version", G_ZAEHLER),
             retain("vorgaenger_id", G_FK),
             retain("ersteller_id", G_FK),
@@ -1439,7 +1447,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     // Presse-Log: Ansprechperson und Erreichbarkeit sind personenbezogen. Medium (eine
     // Redaktion, keine Person), Thema, Antwort und Freigabeangabe bleiben als Nachweis der
-    // Pressearbeit (dieselbe Abwägung wie beim Lagebericht, design.md D9).
+    // Pressearbeit (LFH-554 design.md D9). Anders als die Führungsmodule schreibt das Log kein
+    // ETB; ob es Linie A folgen soll, ist eine eigene Abwägung (LFH-701, design.md D5).
     TabellenRegel {
         tabelle: "medienkontakt",
         scoping: Scoping::EinsatzId,
@@ -1448,14 +1457,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("art", G_ENUM),
-            retain("medium", G_FUEHRUNG),
-            retain("thema", G_FUEHRUNG),
+            retain("medium", G_PRESSE_LOG),
+            retain("thema", G_PRESSE_LOG),
             scrub("kontakt_name", Strategie::NullSetzen),
             scrub("kontakt_erreichbarkeit", Strategie::NullSetzen),
             retain("eingang_at", G_ZEIT),
             retain("status", G_ENUM),
-            retain("antwort", G_FUEHRUNG),
-            retain("freigabe_durch", G_FUEHRUNG),
+            retain("antwort", G_PRESSE_LOG),
+            retain("freigabe_durch", G_PRESSE_LOG),
             retain("pressemitteilung_id", G_FK),
             retain("bearbeitet_von_id", G_FK),
             retain("bearbeitet_at", G_ZEIT),
@@ -1493,18 +1502,20 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("art", G_ENUM),
-            retain("bezeichnung", G_FUEHRUNG),
+            // Führungs-Freitexte (LFH-701, Linie A): Bezeichnung, Adressat und Begründung stehen
+            // im ETB-Wortlaut der Anforderung; der Ablehnungsgrund gelangt nie ins ETB.
+            scrub("bezeichnung", Strategie::Platzhalter), // NOT NULL
             retain("anzahl", G_ZAEHLER),
             retain("adressat_kategorie", G_ENUM),
-            retain("adressat_bezeichnung", G_FUEHRUNG),
-            retain("begruendung", G_FUEHRUNG),
+            scrub("adressat_bezeichnung", Strategie::NullSetzen),
+            scrub("begruendung", Strategie::NullSetzen),
             retain("prioritaet", G_ENUM),
             retain("status", G_ENUM),
             retain("zugesagt_at", G_ZEIT),
             retain("unterwegs_at", G_ZEIT),
             retain("eingetroffen_at", G_ZEIT),
             retain("abgelehnt_at", G_ZEIT),
-            retain("abgelehnt_grund", G_FUEHRUNG),
+            scrub("abgelehnt_grund", Strategie::NullSetzen),
             retain("angefordert_at", G_ZEIT),
             retain("etb_nachforderung_id", G_FK),
             retain("erstellt_von_id", G_FK),
@@ -1514,8 +1525,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
     // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------
     // Chat- und Erinnerungs-Freitexte tragen Personenbezug und werden entfernt, auch in
     // soft-gelöschten Nachrichten. Heraufgestufte Nachrichten liegen als KOPIE in
-    // `etb_eintrag.inhalt` (G_ETB) bzw. `auftrag.auftrag_text` (G_FUEHRUNG) und bleiben dort als
-    // Führungsdokumentation.
+    // `etb_eintrag.inhalt` (G_ETB) und bleiben dort als Führungsdokumentation; die Kopie in
+    // `auftrag.auftrag_text` wird seit LFH-701 mitgescrubbt (bei Auto-ETB steht sie im ETB der
+    // Anordnung).
     TabellenRegel {
         tabelle: "chat_kanal",
         scoping: Scoping::EinsatzId,
@@ -1779,6 +1791,7 @@ pub async fn scrubbe_aus_registry(
                     sets.push(format!("{spalte} = ? || ' ' || id"));
                     platzhalter_binds += 1;
                 }
+                Strategie::LeeresJsonArray => sets.push(format!("{spalte} = '[]'")),
                 Strategie::ZeileLoeschen => unreachable!("oben abgefangen"),
             }
         }

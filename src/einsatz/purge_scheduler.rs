@@ -634,15 +634,17 @@ mod tests {
         );
         assert_eq!(ea_bem, None, "operativer Freitext-Zettel gescrubbt");
 
-        // (f) Führungs-Dokumentation (Meldung-Wortlaut) + ETB-Skelett bleiben erhalten.
+        // (f) Führungsdokumentation ist das ETB (LFH-701, Linie A): Der Meldungs-Wortlaut im
+        // Modul wird geschwärzt, das ETB-Skelett bleibt im Wortlaut erhalten.
         let m_inhalt: String = sqlx::query_scalar("SELECT inhalt FROM meldung WHERE id = ?")
             .bind(meldung)
             .fetch_one(&pool)
             .await
             .unwrap();
         assert_eq!(
-            m_inhalt, "Lagemeldung Wortlaut bleibt (ETB-Doku)",
-            "Führungs-Doku (Meldung) bleibt"
+            m_inhalt,
+            crate::einsatz::repo::SCHWAERZUNG_PLATZHALTER,
+            "Meldungs-Freitext im Modul geschwärzt"
         );
         let etb_original: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'ETB ORIGINAL'",
