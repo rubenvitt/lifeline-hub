@@ -105,7 +105,7 @@ export interface Farbrollen {
  *
  * Kontrast (WCAG; `grund` · `flaeche`): text 15,46 · 18,47 — text2 11,00 · 13,13 —
  * gedaempft 9,20 · 10,99 — schwach 7,53 · 8,99; steuerRahmen 3,30 · 3,95; normalText/
- * normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
+ * normalFlaeche 7,87, bedienText/bedienFlaeche 8,04.
  *
  * Primärknopf (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung auf satter Bedienfläche
  * hält den TAGESBODEN 7 : 1, in Ruhe und unter dem Zeiger — KEIN eigener Knopfboden. Die
@@ -126,9 +126,13 @@ export interface Farbrollen {
  * Zeilentönungen ≥ 7,31, auf grund 7,72 bzw. 7,51). Die Füllfarben bleiben für Kante, Punkt
  * und Balken.
  *
- * Geerbter Text (LFH-652, `antdToken`): `bedienText` als Link auf grund 7,04 · flaeche 8,41 ·
- * kopf 7,36 · paneel 7,71; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 7,37. Auf der
- * Hervorhebungsfläche `flaeche3` liegen beide bei 6,59 bzw. 6,60, unter dem Tagesboden (LFH-877).
+ * Geerbter Text (LFH-652, `antdToken`): `bedienText` als Link auf grund 7,97 · flaeche 9,51 ·
+ * kopf 8,33 · paneel 8,72; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 9,62. Auch auf
+ * der Hervorhebungsfläche `flaeche3` (Hover- und Aktivzeile) halten beide den Tagesboden: 7,46
+ * bzw. 8,62 (LFH-702/LFH-877, Spec `textkontrast-rollen`). `bedienText` ist dafür gegenüber
+ * LFH-652 um ein Zehntel dunkler (vorher `#164f86`, auf `flaeche3` 6,59), `gedaempft` trägt den
+ * Wert aus LFH-643; `flaeche3` aufzuhellen hätte die Hervorhebung auf `grund` verschwinden
+ * lassen. Gerechnet in `bedienKontrast.test.ts`.
  *
  * Gefahrrot (LFH-693, `antdKomponenten`): als Text `alarmText`, roter Menüeintrag auf flaeche2
  * 8,29, Gefahrknopf ohne Rahmen auf grund 7,51 (knappstes Paar); Weiß auf `alarmText` 8,96 (gefüllter Gefahrknopf in Ruhe, Menüeintrag unter dem Zeiger),
@@ -163,7 +167,7 @@ export const farbenHell: Farbrollen = {
   text2: '#2b3138',
   steuerRahmen: '#79818a',
   bedienHover: '#185895',
-  bedienText: '#164f86',
+  bedienText: '#144779',
   aufBedien: '#ffffff',
   normalText: '#155234',
   achtungText: '#604200',
@@ -652,7 +656,7 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * `colorError` global umzustellen träfe auch Ränder, Ikonen und Feldränder, und dort ist die
  * Füllfarbe richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein
  * Linkknopf zeigt den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText`
- * darauf 7,11 Tag · 9,65 Nacht).
+ * darauf 8,04 Tag · 9,65 Nacht).
  *
  * Gefahrrot (LFH-693, Spec `farbrollen-kontrast`) läuft deshalb über die Komponenten-Tokens.
  * Das `Dropdown` färbt den roten Eintrag in Ruhe mit `colorError` und hinterlegt ihn unter dem

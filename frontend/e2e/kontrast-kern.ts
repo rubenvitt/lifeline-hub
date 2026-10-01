@@ -20,9 +20,61 @@ interface Messung {
   verhaeltnis: number;
 }
 
+/**
+ * Wartet, bis Element und Vorfahren eingeschwungen sind (LFH-702, Spec `textkontrast-rollen`,
+ * „Messung im eingeschwungenen Zustand"). Eine antd-Tabellenzeile geht unter dem Zeiger per
+ * Transition von `flaeche` nach `flaeche3` über; ein Versuch mittendrin las einen helleren Grund,
+ * bestand, und `toPass` beendete die Schleife — der Test war grün oder rot je nach Zeitpunkt.
+ *
+ * `getComputedStyle` stößt die Stilberechnung an, erst danach gibt es die Transition eines gerade
+ * gesetzten `:hover`. Endlose Animationen (Ladekreisel) zählen nicht; eine endliche, die nicht
+ * rechtzeitig endet, ist ein Fehler mit Namen und Ziel, keine Messung.
+ *
+ * Läuft vor JEDER Messung (`messe`), also für `pruefe`, `kontrast` und `randKontrast`. Einen
+ * Zustand, den erst JavaScript setzt (antds Zeilen-Hover kommt als Klasse
+ * `ant-table-cell-row-hover` aus `onMouseEnter`, nicht aus `:hover`), sieht es nicht kommen: der
+ * Aufrufer sichert ihn vorher als Vorbedingung zu.
+ */
+async function eingeschwungen(ziel: Locator) {
+  await ziel.evaluate(async (element) => {
+    const kette = new Set<Element>();
+    for (let e: Element | null = element; e; e = e.parentElement) {
+      kette.add(e);
+      void getComputedStyle(e).backgroundColor;
+    }
+    const laufend = document.getAnimations().filter((a) => {
+      const effekt = a.effect as KeyframeEffect | null;
+      return (
+        a.playState === 'running' &&
+        !!effekt?.target &&
+        kette.has(effekt.target) &&
+        effekt.getComputedTiming().iterations !== Infinity
+      );
+    });
+    const beschreibung = laufend
+      .map((a) => {
+        const effekt = a.effect as KeyframeEffect;
+        const t = effekt.target as Element;
+        const name =
+          a instanceof CSSTransition
+            ? a.transitionProperty
+            : a instanceof CSSAnimation
+              ? a.animationName
+              : a.id || a.constructor.name;
+        return `${name} an ${t.tagName}.${t.getAttribute('class') ?? ''}${effekt.pseudoElement ?? ''}`;
+      })
+      .join(', ');
+    const frist = new Promise<never>((_, nein) =>
+      setTimeout(() => nein(new Error(`Nicht eingeschwungen nach 5 s: ${beschreibung}`)), 5_000),
+    );
+    await Promise.race([Promise.all(laufend.map((a) => a.finished.catch(() => undefined))), frist]);
+  });
+}
+
 // Echte Text-/Hintergrundpaare inklusive transparenter Vorfahren. Keine Farbwerte aus dem
 // Produkt importieren: eine schlechte Palette muss rot werden.
-function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
+async function messe(ziel: Locator, auftrag: Auftrag): Promise<Messung> {
+  await eingeschwungen(ziel);
   return ziel.evaluate((element, { vordergrund, grund: grundAb }) => {
     type F = [number, number, number, number];
     function rgb(wert: string): F {
@@ -137,6 +189,8 @@ export async function pruefe(tag: Locator, minimum: number, name: string) {
   await expect(tag, name).toBeVisible();
   // Modal-Einblendung erst abwarten: Opacity-Gruppen liefern keine belastbare Messung.
   // Ein dauerhaft nicht unterstützter Stil bleibt ein Fehler, statt still zu bestehen.
+  // Jeder Versuch schwingt zuerst ein (`messe`): schon der erste misst den Endwert, ein Wert unter
+  // dem Boden bleibt in jedem Versuch rot (LFH-702).
   await expect(async () => {
     const messung = await kontrast(tag);
     expect(messung.verhaeltnis, `${name}: ${JSON.stringify(messung)}`).toBeGreaterThanOrEqual(
