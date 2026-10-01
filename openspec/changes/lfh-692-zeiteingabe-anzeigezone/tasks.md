@@ -99,12 +99,16 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
       Szenario „Archivakte“, `fristModell.test.ts` bleibt grün.
 - [x] 6.5 `einsatz/EinsatzLayout.tsx`: `AlarmZentrale` unter den Einsatz-Provider legen. Test:
       Die Uhrzeit im Hinweis steht in der Anzeigezone.
+- [x] 6.6 Beim Durchsuchen nach „Zeit in Texten“ gefunden: die Auto-Platzhalter `{datum}` und
+      `{uhrzeit}` der ETB-Textbausteine (`etb/bausteinEinsetzen.ts`,
+      `etb/BausteinPlatzhalterModal.tsx`) schreiben die Gerätezeit in den ETB-Text; jetzt
+      Anzeigezone. Test unter TZ=UTC mit Anzeigezone Europe/Berlin über den Tageswechsel.
 
 ## 7. Regel, Guard, Abschluss
 
-- [ ] 7.1 `anzeige/zeitEingabe.guard.test.ts` nach D7 schreiben. Er muss auf dem Stand vor
+- [x] 7.1 `anzeige/zeitEingabe.guard.test.ts` nach D7 schreiben. Er muss auf dem Stand vor
       Gruppe 2 rot sein (Probe) und am Ende grün.
-- [ ] 7.2 `frontend/AGENTS.md`, Abschnitt Inline-Bearbeitung: Die Regel „Zeiteingabe nur über
+- [x] 7.2 `frontend/AGENTS.md`, Abschnitt Inline-Bearbeitung: Die Regel „Zeiteingabe nur über
       `ZeitpunktEingabe`/`ZeitraumEingabe` (`anzeige/zeitEingabe.ts`), Formularwert ist ein
       Zeitpunkt“ ersetzt den Verweis auf `wireZuPicker`/`pickerZuWire`. Verweise per grep
       nachziehen, Prettier ist grün.

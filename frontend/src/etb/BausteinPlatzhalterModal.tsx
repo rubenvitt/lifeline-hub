@@ -1,6 +1,7 @@
 // src/etb/BausteinPlatzhalterModal.tsx
 import { Button, Form, Input, Modal, Space } from 'antd';
 import { useEffect } from 'react';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
 import { ermittlePlatzhalter, setzeBausteinEin, type BausteinFelder } from './bausteinEinsetzen';
 
@@ -21,13 +22,15 @@ export default function BausteinPlatzhalterModal({
   onAbbrechenAll,
 }: Props) {
   const [form] = Form.useForm<Record<string, string>>();
-  const offenePlatzhalter = baustein ? ermittlePlatzhalter(baustein, einsatz) : [];
+  // `{datum}`/`{uhrzeit}` in der Anzeigezone (LFH-692).
+  const zone = useAnzeigeKonventionen().konventionen.zeitzone ?? null;
+  const offenePlatzhalter = baustein ? ermittlePlatzhalter(baustein, einsatz, zone) : [];
 
   // Bausteine ohne manuelle Platzhalter sofort einsetzen (kein Dialog nötig).
   useEffect(() => {
     if (!baustein) return;
     if (offenePlatzhalter.length === 0) {
-      onEinsetzen(setzeBausteinEin(baustein, einsatz, {}));
+      onEinsetzen(setzeBausteinEin(baustein, einsatz, {}, zone));
       return;
     }
     // Zurückgesetzt wird nur, wenn der Dialog aufgeht: antds `Modal` rendert sein
@@ -39,7 +42,7 @@ export default function BausteinPlatzhalterModal({
 
   function anwenden(werte: Record<string, string>) {
     if (!baustein) return;
-    onEinsetzen(setzeBausteinEin(baustein, einsatz, werte));
+    onEinsetzen(setzeBausteinEin(baustein, einsatz, werte, zone));
     form.resetFields();
   }
 

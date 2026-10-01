@@ -251,10 +251,19 @@ anwendbar), „nicht geprüft" ist keins.
   mit `keyCode`, Mausweg (`onBlur`) eigens, Speicherfall mit `rerender`. **Pflichtangaben und
   andere Eingabearten** (Datum, Auswahl, Zahl) nehmen `components/InlineAngabe.tsx` (LFH-472):
   eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
-  Hinweis per `data-fehler`; Zeitpunkte über `wireZuPicker`/`pickerZuWire` und Gleichheit am
-  Instant. Die Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
+  Hinweis per `data-fehler`; Zeitpunkte über `ZeitpunktEingabe` und Gleichheit am Instant. Die
+  Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
   Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung und Koordinate nur
   im Vollformular.
+- **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`): jede Zeiteingabe nimmt
+  `anzeige/ZeitpunktEingabe.tsx` (`ZeitpunktEingabe`, `ZeitraumEingabe`), nie antds `DatePicker`;
+  der Formularwert ist ein **Zeitpunkt** (hin `alsZeitpunkt`, zurück `alsBackendZeit`, Kern
+  `anzeige/zeitEingabe.ts`), in die Wanduhr der Anzeigezone wandelt nur das Feld. Tagesgrenzen
+  über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über `useZeitEingabe().formatiere`;
+  `.local()` steht nur in `anzeige/` (Guard `anzeige/zeitEingabe.guard.test.ts`). Außerhalb eines
+  Einsatzes `OrgAnzeigeProvider`. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Zonentests
+  stellen die Prozesszone per `test/prozessZone.ts` auf UTC — unter der Suiten-Zone Berlin wäre
+  Anzeigezone Berlin blind.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).

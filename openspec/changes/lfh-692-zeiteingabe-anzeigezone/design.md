@@ -35,7 +35,9 @@ Motivation: siehe `proposal.md` (Why). Bestand (Inventur am 01.10.2026):
 
 **Non-Goals:**
 
-- Die Uhr der Kopfleiste bleibt bewusst Browserzeit (Kommentar `Kopfleiste.tsx`).
+- Die Uhr der Kopfleiste bleibt bewusst Browserzeit (Kommentar `Kopfleiste.tsx`), ebenso der
+  „Datenstand HH:mm“ (`components/Datenstand.tsx`): er steht neben dieser Uhr und sagt, wie alt
+  die geladenen Daten sind — zwei Gerätezeiten, die einander widersprächen, wenn nur eine wechselte.
 - Wire-Format und Backend bleiben unverändert.
 - antds Markierung „heute“ im Kalenderpanel (siehe Risiken).
 - Reine Anzeigestellen, die schon über `inZone` laufen, werden nicht angefasst.

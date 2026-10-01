@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mitProzessZone } from '../test/prozessZone';
 import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
 import { ermittlePlatzhalter, setzeBausteinEin } from './bausteinEinsetzen';
 import { einsatzFixture } from '../test/fixtures';
@@ -74,5 +75,22 @@ describe('setzeBausteinEin', () => {
   it('lässt meldeweg weg, wenn der Baustein keines hat', () => {
     const b = baustein({ inhalt: 'x', meldeweg: null });
     expect(setzeBausteinEin(b, einsatz, {})).not.toHaveProperty('meldeweg');
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`, „Zeit in Texten“): `{datum}`/`{uhrzeit}` in der Anzeigezone. */
+describe('Auto-Platzhalter Datum und Uhrzeit in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('Browser UTC, Anzeigezone Berlin: 30.09. 23:30 UTC wird „01.10.2026 01:30“', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-30T23:30:00Z'));
+    const b = baustein({ inhalt: 'Stand {datum} {uhrzeit}' });
+    expect(setzeBausteinEin(b, einsatz, {}, 'Europe/Berlin').inhalt).toBe('Stand 01.10.2026 01:30');
+    // Ohne Anzeigezone bleibt es die Browserzone.
+    expect(setzeBausteinEin(b, einsatz, {}).inhalt).toBe('Stand 30.09.2026 23:30');
   });
 });
