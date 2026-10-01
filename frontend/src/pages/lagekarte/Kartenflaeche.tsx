@@ -33,7 +33,13 @@ import {
   type MarkerFeatureCollection,
   type MarkerProps,
 } from './markerLayer';
-import { baueSpiderFc, SPIDER_CAP, type SpiderProjektor } from './spiderfy';
+import {
+  aktualisiereSpiderBlaetter,
+  baueSpiderFc,
+  nurInhaltGeaendert,
+  SPIDER_CAP,
+  type SpiderProjektor,
+} from './spiderfy';
 import {
   baueZeichenRegistry,
   kartenPixelRatio,
@@ -223,6 +229,12 @@ export interface KartenflaecheProps {
   /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
   onZeigerLage?: (lage: { lat: number; lon: number } | null) => void;
   /**
+   * Meldet, ob ein Bündel aufgefächert ist: `true`, sobald die Blätter stehen, `false` beim
+   * Zuklappen. Ein Wechsel A→B meldet kein Zwischen-`false`. Die Betroffenen-Karte hält daran ihre
+   * Schleuse (LFH-668, Touch-Fall).
+   */
+  onSpiderOffen?: (offen: boolean) => void;
+  /**
    * Ziel-Element der Maßstabsleiste. MapLibres `ScaleControl` hinge sonst absolut in seiner Ecke,
    * genau dort, wo `KartenFuss` die Bänder im Fluss stapelt — deshalb über `onAdd`/`onRemove` in
    * ein Band des Fußes gehängt.
@@ -261,6 +273,8 @@ export interface KartenHandle {
   zoomRaus(): void;
   /** Drehung und Neigung zurücksetzen (Nordung) — der Kompass des alten `NavigationControl`. */
   nachNorden(): void;
+  /** Ein aufgefächertes Bündel einklappen (meldet `onSpiderOffen(false)`); sonst nichts. */
+  klappeSpiderEin(): void;
 }
 
 const klickzielJeTipp = new WeakMap<Event, Klickziel<maplibregl.MapGeoJSONFeature> | null>();
@@ -317,6 +331,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     griffModus,
     onGriffStand,
     onZeigerLage,
+    onSpiderOffen,
     massstabZiel,
     startAnsicht,
   },
@@ -333,6 +348,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     type: 'FeatureCollection',
     features: [],
   });
+  // Der zuletzt tatsächlich per `setData` eingespielte Stand: `wendeKartenDatenAn` kann vertagen,
+  // und ein Spider kann im Fenster dazwischen aufgehen (LFH-668, Review).
+  const markerAngewandtRef = useRef<MarkerFeatureCollection>(markerDatenRef.current);
   const einsatzortDatenRef = useRef<MarkerFeatureCollection>({
     type: 'FeatureCollection',
     features: [],
@@ -351,6 +369,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // `getClusterLeaves` (schneller A→B-Wechsel darf nicht A's Leaves über B malen).
   const spiderOffenRef = useRef<string | null>(null);
   const spiderTokenRef = useRef(0);
+  // Was der offene Spider zeigt — eine reine Inhaltsänderung schreibt die Blätter daraus neu, statt
+  // zuzuklappen (LFH-668, D5).
+  const spiderDatenRef = useRef<{
+    leaves: MarkerFeatureCollection;
+    legs: { type: 'FeatureCollection'; features: unknown[] };
+  } | null>(null);
+  const onSpiderOffenRef = useRef(onSpiderOffen);
+  onSpiderOffenRef.current = onSpiderOffen;
   // Controller-Funktionen als Refs, damit Donut-Klickhandler und Effekte sie aufrufen können, ohne
   // neu zu binden.
   const oeffneSpiderRef = useRef<
@@ -460,6 +486,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       },
       nachNorden() {
         mapRef.current?.resetNorthPitch();
+      },
+      klappeSpiderEin() {
+        schliesseSpiderRef.current();
       },
     };
   }, []);
@@ -929,22 +958,46 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     const marker = baueMarkerFc(markers, markerPlakette);
     const einsatzort = baueEinsatzortFc(markers, markerPlakette);
+    // Nur der Inhalt anders (Sichtung, Status, Beschriftung)? Dann bildet die Quelle dieselben
+    // Bündel, und ein offener Spider bleibt stehen (LFH-668, D5).
+    const nurInhalt = nurInhaltGeaendert(markerDatenRef.current, marker);
     markerDatenRef.current = marker;
     einsatzortDatenRef.current = einsatzort;
     // Registry für styleimagemissing (Key → Zeichenquelle). `markerIconKey` ist die eine Quelle der
     // Key-Bildung, identisch zum icon-Property aus `baueMarkerFc`.
     zeichenRegistryRef.current = baueZeichenRegistry(markers);
-    wendeKartenDatenAn(map, () =>
-      reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current),
-    );
     // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; ein
-    // wiederverwendeter `cluster_id` zeigte sonst veraltete Segmente.
-    for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
-    clusterDomOnScreenRef.current = {};
-    clusterDomRef.current = {};
-    // Ein offener Spider hielte einen veralteten `getClusterLeaves`-Stand → bei jeder
-    // Daten-Änderung einklappen.
-    schliesseSpiderRef.current?.();
+    // wiederverwendeter `cluster_id` zeigte sonst veraltete Segmente. Der Donut des offenen
+    // Spiders entsteht im `render`-Abgleich neu, mit durchlässiger Hülle.
+    const verwirfDonuts = () => {
+      for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
+      clusterDomOnScreenRef.current = {};
+      clusterDomRef.current = {};
+    };
+    wendeKartenDatenAn(map, () => {
+      // Verglichen wird mit dem EINGESPIELTEN Stand: wurde vertagt, kann der Spider im Fenster
+      // dazwischen auf dem alten Stand aufgegangen sein.
+      const nurInhaltAngewandt = nurInhaltGeaendert(
+        markerAngewandtRef.current,
+        markerDatenRef.current,
+      );
+      markerAngewandtRef.current = markerDatenRef.current;
+      reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current);
+      // Auch hier: bis zum vertagten `setData` hat der `render`-Abgleich die Donuts aus dem alten
+      // Quellstand neu gebaut.
+      verwirfDonuts();
+      const spider = spiderDatenRef.current;
+      if (!nurInhaltAngewandt) schliesseSpiderRef.current?.();
+      else if (spider) {
+        const leaves = aktualisiereSpiderBlaetter(spider.leaves, markerDatenRef.current);
+        spiderDatenRef.current = { leaves, legs: spider.legs };
+        setzeSpiderDaten(map, leaves, spider.legs);
+      }
+    });
+    verwirfDonuts();
+    // Ändern sich Menge, Folge oder Lage, hielte ein offener Spider einen veralteten
+    // `getClusterLeaves`-Stand → einklappen. Ein reiner Inhaltswechsel klappt nichts zu.
+    if (!nurInhalt) schliesseSpiderRef.current?.();
   }, [markers, markerPlakette]);
 
   // Eigenposition nachführen. Nach dem Marker-Effekt registriert, damit sie über den Markern liegt.
@@ -1035,6 +1088,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           });
           marker = new maplibregl.Marker({ element: el }).setLngLat(coords);
           clusterDomRef.current[id] = marker;
+          // Neu gebaut, während sein Spider offen steht (reine Inhaltsänderung, LFH-668): die
+          // Hülle sofort durchlässig, sonst finge sie im Handschuh-Modus den Tipp auf die Blätter.
+          if (spiderOffenRef.current === id) setzeHuelleDurchlaessig(el, true);
         }
         neu[id] = marker;
         if (!clusterDomOnScreenRef.current[id]) marker.addTo(map);
@@ -1064,14 +1120,27 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     const leer = { type: 'FeatureCollection' as const, features: [] };
 
-    const schliesse = () => {
+    // Gemeldet wird nur ein Wechsel; ein A→B-Wechsel ist für den Zuhörer kein Zuklappen.
+    let gemeldet = false;
+    const melde = (offen: boolean) => {
+      if (gemeldet === offen) return;
+      gemeldet = offen;
+      onSpiderOffenRef.current?.(offen);
+    };
+
+    const klappeEin = () => {
       spiderTokenRef.current++; // in-flight getClusterLeaves entwerten (load-bearing)
       if (spiderOffenRef.current === null) return;
       setzeHuelleDurchlaessig(clusterDomRef.current[spiderOffenRef.current]?.getElement(), false);
       spiderOffenRef.current = null;
+      spiderDatenRef.current = null;
       // `mapRef` wird im Map-Cleanup zuerst genullt → beim Unmount mit offenem Spider ist die Map
       // schon weg, und `getSource` würfe. Der Token-Bump läuft trotzdem.
       if (mapRef.current) setzeSpiderDaten(map, leer, leer);
+    };
+    const schliesse = () => {
+      klappeEin();
+      melde(false);
     };
 
     const oeffne = (
@@ -1085,13 +1154,17 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         schliesse();
         return;
       } // Toggle / erneuter Klick
-      schliesse(); // A→B: A einklappen
+      klappeEin(); // A→B: A einklappen, ohne Zwischen-Meldung
       // Die Quelle des geklickten Donuts fragen: ein Personen-Cluster kennt `marker-cluster` nicht.
       // Die Spider-Quellen sind gemeinsam — offen ist höchstens einer.
       const src = map.getSource(quelle) as GeoJSONSource | undefined;
-      if (!src) return;
+      if (!src) {
+        melde(false);
+        return;
+      }
       // Großcluster → Fallback: reinzoomen (verkleinert Cluster, dann erneut auffächerbar).
       if (anzahl > SPIDER_CAP) {
+        melde(false);
         src
           .getClusterExpansionZoom(clusterId)
           .then((zoom) => map.easeTo({ center, zoom }))
@@ -1110,13 +1183,19 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
             unproject: (px) => map.unproject([px.x, px.y]),
           };
           const props = leaves.map((f) => f.properties as MarkerProps);
-          const { leaves: leafFc, legs } = baueSpiderFc(props, center, projektor);
+          // Die Blätter kommen aus dem Worker-Stand der Quelle; kam inzwischen eine reine
+          // Inhaltsänderung (die den Token nicht erhöht), gilt der neuere Inhalt (Review LFH-668).
+          const { leaves: roh, legs } = baueSpiderFc(props, center, projektor);
+          const leafFc = aktualisiereSpiderBlaetter(roh, markerDatenRef.current);
           setzeSpiderDaten(map, leafFc, legs);
           spiderOffenRef.current = schluessel;
+          spiderDatenRef.current = { leaves: leafFc, legs };
           setzeHuelleDurchlaessig(clusterDomRef.current[schluessel]?.getElement(), true);
+          melde(true);
         })
         .catch(() => {
-          /* Cluster nach Daten-Update weg → ignorieren */
+          // Cluster nach Daten-Update weg → nichts offen. Ein neuerer Auftrag meldet selbst.
+          if (token === spiderTokenRef.current) melde(false);
         });
     };
 

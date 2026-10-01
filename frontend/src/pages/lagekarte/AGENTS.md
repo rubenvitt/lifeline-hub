@@ -89,6 +89,13 @@ diese Zusage.
   selbst keinen (`getSource` vor `isSourceLoaded`).
   Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
   `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
+- **Ein aufgefächertes Bündel überlebt eine reine Inhaltsänderung** (LFH-668,
+  `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`, D5): gleiche Schlüssel in gleicher
+  Folge an gleicher Lage (`nurInhaltGeaendert`, `spiderfy.ts`) → Blätter bleiben stehen und nehmen die
+  neuen Eigenschaften (`aktualisiereSpiderBlaetter`), die Hülle des neu gebauten Donuts bleibt
+  durchlässig; sonst klappt der Spider zu. Verglichen wird mit dem EINGESPIELTEN Stand
+  (`wendeKartenDatenAn` kann vertagen). `onSpiderOffen` meldet nur Wechsel, A→B ohne
+  Zwischen-`false`; `KartenHandle.klappeSpiderEin()` klappt von außen ein.
 - Nachweise: `e2e/lagekarte-smoke.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`,
   `e2e/lagekarte-touch.spec.ts` (LFH-713, `hasTouch`, Trefferwache `elementFromPoint`), `fokus-verdeckung.spec.ts`; Kartenaufbauten sieht
   `e2e/fokus-kern.ts` nur über `zusatzKandidaten`, das Abschneiden der nachgiebigen Zeitachse nur

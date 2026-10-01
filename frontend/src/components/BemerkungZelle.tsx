@@ -135,9 +135,8 @@ export function BemerkungZelle({
         ref={knopfRef}
         type="link"
         loading={laeuft}
-        // `bedienText` statt antds `colorLink`: in einer Zeile mit Lücken-Tönung hielt `colorLink` die
-        // Kontrastböden nicht (`e2e/betroffene-kontrast.spec.ts`). `bedienText` ist die Rolle für
-        // blauen TEXT.
+        // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
+        // Gemessen auf der Lücken-Tönung in `e2e/betroffene-kontrast.spec.ts`.
         style={{ color: rollen.bedienText }}
         // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
         // so breit wie die längste Kennung.

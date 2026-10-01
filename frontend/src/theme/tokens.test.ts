@@ -3,11 +3,12 @@
  * Tokens. Geprüft werden auch die Abstände: ein `antdToken`, das `padding*` weiter aus der
  * Modulkonstante läse, wäre sonst halb verdrahtet und trotzdem grün.
  */
+import { theme as antdTheme } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
 import { navDrawerBreite } from './tokens';
-import { antdKomponenten, switchMasse } from './tokens';
+import { antdAlgorithmus, antdKomponenten, switchMasse } from './tokens';
 import { farbenDunkel } from './tokens';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -216,6 +217,71 @@ describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
 });
 
 /**
+ * Geerbter Text hält die Böden der Bedien-Leitlinie (LFH-652, Spec `textkontrast-rollen`).
+ * Geprüft wird der von antd AUFGELÖSTE Token mit dem echten Algorithmus je Modus: `colorLink` ist
+ * ein Seed, den die dunkle Palette umrechnet; ein bloßer Blick auf `antdToken()` sähe das nicht.
+ */
+describe('Geerbte Textfarben auf Textrollen (LFH-652)', () => {
+  const modi = [
+    ['Tag', farbenHell, false],
+    ['Nacht', farbenDunkel, true],
+  ] as const;
+
+  for (const [name, farben, dunkel] of modi) {
+    const aufgeloest = () =>
+      antdTheme.getDesignToken({
+        token: antdToken(farben),
+        algorithm: antdAlgorithmus(dunkel),
+      });
+
+    it(`${name}: Link in Ruhe, unter dem Zeiger und gedrückt trägt bedienText`, () => {
+      const t = aufgeloest();
+      expect(t.colorLink).toBe(farben.bedienText);
+      expect(t.colorLinkHover).toBe(farben.bedienText);
+      expect(t.colorLinkActive).toBe(farben.bedienText);
+    });
+
+    it(`${name}: unter dem Zeiger unterstreicht der Link, statt den Ton zu wechseln`, () => {
+      expect(aufgeloest().linkHoverDecoration).toBe('underline');
+    });
+
+    it(`${name}: Beschreibungstext auf gedaempft, Tertiär und Platzhalter bleiben schwach`, () => {
+      const t = aufgeloest();
+      expect(t.colorTextDescription).toBe(farben.gedaempft);
+      expect(t.colorTextTertiary).toBe(farben.schwach);
+      expect(t.colorTextPlaceholder).toBe(farben.schwach);
+    });
+
+    it(`${name}: Formularmeldung und Pflichtmarke in der Textrolle des Status`, () => {
+      expect(antdKomponenten(farben, 'kompakt').Form).toEqual({
+        colorError: farben.alarmText,
+        colorWarning: farben.achtungText,
+      });
+    });
+
+    it(`${name}: Standardknopf schreibt unter dem Zeiger und gedrückt bedienText, die Kante bleibt`, () => {
+      const knopf = antdKomponenten(farben, 'kompakt').Button;
+      expect(knopf).toMatchObject({
+        defaultHoverColor: farben.bedienText,
+        defaultActiveColor: farben.bedienText,
+      });
+      expect(knopf).not.toHaveProperty('defaultHoverBorderColor');
+    });
+
+    it(`${name}: Linkknopf zeigt den Zeiger als bedienFlaeche`, () => {
+      expect(antdKomponenten(farben, 'kompakt').Button).toMatchObject({
+        linkHoverBg: farben.bedienFlaeche,
+      });
+    });
+  }
+
+  it('globales colorError bleibt die Füllfarbe — Kante, Badge und Gefahrknopf lesen sie', () => {
+    expect(antdToken(farbenHell)?.colorError).toBe(farbenHell.alarm);
+    expect(antdToken(farbenDunkel)?.colorError).toBe(farbenDunkel.alarm);
+  });
+});
+
+/**
  * Die Feldmeldung eines Formulars (`.ant-form-item-explain-error`) schreibt ihren TEXT in antds
  * `colorError` = `alarm`, am Tag 5,67 : 1 auf `grund` und damit unter dem Tagesboden 7 : 1.
  * Roter TEXT nimmt `alarmText` (LFH-618). Der Komponententoken trifft nur das Formular;
@@ -227,7 +293,8 @@ describe('Feldmeldung: Text in alarmText (LFH-667)', () => {
     ['Tag', farbenHell],
     ['Nacht', farbenDunkel],
   ])('%s: das Formular liest colorError = alarmText', (_modus, farben) => {
-    expect(antdKomponenten(farben, 'kompakt').Form).toEqual({ colorError: farben.alarmText });
+    // `toMatchObject`: LFH-652 setzt am Formular zusätzlich `colorWarning = achtungText`.
+    expect(antdKomponenten(farben, 'kompakt').Form).toMatchObject({ colorError: farben.alarmText });
   });
 
   it.each([

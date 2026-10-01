@@ -117,19 +117,20 @@ type OhneAntdAusblendung<C> = C extends unknown ? Omit<C, 'responsive' | 'hidden
 /**
  * Die Tabellen-Tokens, rein und exportiert (jsdom rechnet kein CSS-in-JS).
  *
- * Kopfzeile auf `kopf`, Kopftext `schwach`, keine senkrechten Trenner im Kopf. Zeilentrenner als
+ * Kopfzeile auf `kopf`, Kopftext `gedaempft` (7,37 Tag · 7,48 Nacht; `schwach` lag am Tag bei
+ * 5,58, LFH-652), keine senkrechten Trenner im Kopf. Zeilentrenner als
  * Haarlinie: nachts `flaeche2`, am Tag `flaeche3` (`flaeche2` läge dort bei 1,08 : 1 auf Weiß).
  * Hover auf `flaeche3` aus demselben Grund. Die Zellpolsterung folgt der Dichte-Staffel
  * (`paddingSM` / `padding`).
  */
-function tabellenTokens(
-  rollen: Pick<Farbrollen, 'kopf' | 'schwach' | 'flaeche2' | 'flaeche3'>,
+export function tabellenTokens(
+  rollen: Pick<Farbrollen, 'kopf' | 'gedaempft' | 'flaeche2' | 'flaeche3'>,
   dunkel: boolean,
   token: { paddingSM: number; padding: number },
 ) {
   return {
     headerBg: rollen.kopf,
-    headerColor: rollen.schwach,
+    headerColor: rollen.gedaempft,
     headerSplitColor: 'transparent',
     headerSortActiveBg: rollen.kopf,
     headerSortHoverBg: rollen.flaeche3,

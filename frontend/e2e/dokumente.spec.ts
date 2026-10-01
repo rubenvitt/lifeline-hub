@@ -660,9 +660,9 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await expect(page.getByRole('link', { name: 'Einsatzbefehl 3' })).toBeVisible();
 });
 
-// Kriterium 5: Tag ≥ 7, Nacht ≥ 5, nie < 4,5 — als Literale.
+// Kriterium 5: Tag ≥ 7, Nacht ≥ 5 — als Literale. Seit LFH-652 tragen auch die geerbten Rollen
+// diesen Boden, der absolute Boden 4,5 hat hier keine Stelle mehr.
 const KONTRAST_ZIEL = { light: 7, dark: 5 } as const;
-const KONTRAST_BODEN = 4.5;
 
 for (const modus of ['light', 'dark'] as const) {
   test(`Kontrast ${modus}: Zellen, Dialog und Pflichtmeldung`, async ({ page }, testInfo) => {
@@ -704,15 +704,15 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Titel-Anker (bedienText)`,
     );
 
-    // App-weite Rollen, die das Modul nur ERBT: zugesichert ist der absolute Boden, der
-    // Messwert steht als Anhang.
+    // App-weite Rollen, die das Modul nur ERBT (LFH-652, Spec `textkontrast-rollen`): sie
+    // tragen denselben Boden wie die eigenen Stellen. Der Messwert steht zusätzlich als Anhang.
     const geerbt: Record<string, Locator> = {
       Tabellenkopf: page.locator('.ant-table-thead th').first(),
-      'Bezug „—" (Sekundärtext)': zeile.getByText('—', { exact: true }),
+      'Bezug „—" (Beschreibungstext)': zeile.getByText('—', { exact: true }),
     };
     const werte: string[] = [];
     for (const [name, ziel] of Object.entries(geerbt)) {
-      await pruefe(ziel, KONTRAST_BODEN, `${modus}/${name}`);
+      await pruefe(ziel, KONTRAST_ZIEL[modus], `${modus}/${name}`);
       werte.push(`${name}: ${(await kontrast(ziel)).verhaeltnis.toFixed(2)}`);
     }
 
@@ -730,11 +730,20 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Datei wählen`,
     );
     await pruefe(dialog.getByText('Bezug (optional)'), KONTRAST_ZIEL[modus], `${modus}/Klappkopf`);
-    // Pflichtmeldung: Rot als TEXT ist eine app-weite Rolle, deshalb nur Boden plus Messwert.
+    // Pflichtmeldung: Rot als TEXT liest die Textrolle `alarmText` (LFH-652).
     await dialog.getByRole('button', { name: 'Ablegen' }).click();
     const pflicht = dialog.getByText('Bitte eine Datei wählen');
-    await pruefe(pflicht, KONTRAST_BODEN, `${modus}/Pflichtmeldung`);
-    werte.push(`Pflichtmeldung (colorError): ${(await kontrast(pflicht)).verhaeltnis.toFixed(2)}`);
+    await pruefe(pflicht, KONTRAST_ZIEL[modus], `${modus}/Pflichtmeldung`);
+    werte.push(`Pflichtmeldung: ${(await kontrast(pflicht)).verhaeltnis.toFixed(2)}`);
+    // Standardknopf unter dem Zeiger: die Beschriftung wechselt nicht auf den helleren Hover-Ton
+    // (LFH-652, Nachtrag aus LFH-690).
+    const abbrechen = dialog.locator('button.ant-btn', { hasText: 'Abbrechen' });
+    await abbrechen.hover();
+    // Erst nach dem Farbübergang messen: mitten in der Transition läge die Beschriftung noch nahe
+    // am Ruheton und bestünde den Boden, egal welchen Hover-Ton antd ansteuert.
+    await abbrechen.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+    await pruefe(abbrechen, KONTRAST_ZIEL[modus], `${modus}/Abbrechen unter dem Zeiger`);
+    werte.push(`Abbrechen unter dem Zeiger: ${(await kontrast(abbrechen)).verhaeltnis.toFixed(2)}`);
     await testInfo.attach(`Kontrast ${modus}`, {
       body: werte.join('\n'),
       contentType: 'text/plain',
