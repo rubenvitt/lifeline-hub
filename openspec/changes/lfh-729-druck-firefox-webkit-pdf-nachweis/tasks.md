@@ -79,6 +79,7 @@
       `docs/superpowers/specs/2026-09-25-lfh-22-pruefliste.md` umschreiben (D6) und den
       Kommentar in `pages/kraefteuebersichtPrint.css` nachziehen. Prüfen: `grep -rn "LFH-729"`
       zeigt keine Zelle mehr mit „automatisiert in LFH-729“ als offenem Verweis.
+
 ## 7. Abschluss
 
 - [ ] 7.1 `./scripts/check-all.sh` lokal grün (ohne `| tail`). Fehlen Firefox und WebKit lokal
