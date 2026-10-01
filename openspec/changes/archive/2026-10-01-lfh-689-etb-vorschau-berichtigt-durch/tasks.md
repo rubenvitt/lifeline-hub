@@ -60,7 +60,12 @@ Code. LFH-689.
 
 ## 5. Integration
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (lokal, sonst durch die CI des PRs belegt).
-- [ ] 5.2 Sichtprüfung im Dev-Stack: Einsatz mit Eintrag Nr. n und einer Berichtigung, in der
+- [x] 5.1 `./scripts/check-all.sh` grün (lokal, sonst durch die CI des PRs belegt). Lokal grün:
+  Bündel `schnell` (nach dem Merge von `origin/alpha`), Rust-Suite von `lifeline-hub` portionsweise
+  (3524 Tests, Platzkontingent der Sitzung), Vitest 8108/8109 (rot nur ein Last-Timeout in
+  `EinsatzdatenPage`, isoliert 47/47). e2e belegt die CI des PRs (lokales Chromium passt nicht
+  zum Playwright-Stand).
+- [x] 5.2 Sichtprüfung im Dev-Stack: Einsatz mit Eintrag Nr. n und einer Berichtigung, in der
   Palette `#n` → Vorschau nennt „berichtigt durch Nr. m ↗“, Klick öffnet das ETB mit der
-  Berichtigung und schließt die Palette.
+  Berichtigung und schließt die Palette. Belegt als e2e-Fall in `e2e/palette-oeffnung.spec.ts`
+  (lokal grün mit dem Chromium der Sitzung).
