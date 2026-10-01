@@ -36,7 +36,7 @@ Motivation: siehe proposal.md.
 Je gewählter Datei entsteht in der Heraufstufen-Transaktion eine neue `anhang`-Zeile per
 `INSERT INTO anhang (…) SELECT … FROM anhang WHERE id = ? AND einsatz_id = ? RETURNING id`,
 danach `INSERT INTO etb_eintrag_anhang`. SQLite kopiert den BLOB intern, Rust hält ihn nie
-im Speicher. Die Kopie ist ab dann ein gewöhnlicher ETB-Anhang: unveränderlich, nur über
+im Speicher (SQLite selbst schon, es läuft im Prozess). Die Kopie ist ab dann ein gewöhnlicher ETB-Anhang: unveränderlich, nur über
 `GET …/etb/{eintrag_id}/anhaenge/{aid}` ladbar, von der Schwärzung über die `anhang`-Regel
 gelöscht. Es gibt keine neue Tabelle und keine Migration. Der Registerguard
 `jeder_fremdschluessel_auf_anhang_ist_registriert` bleibt grün.
@@ -69,13 +69,23 @@ Vor dem Anlegen des Eintrags prüft die Transaktion je ID
 nicht zur Nachricht“. Die ID ist dann für diese Anfrage unbekannt. Unterschieden wird nicht,
 damit sich keine fremden IDs abtasten lassen. Erst prüfen, dann schreiben, wie
 `pruefe_anhaenge`. Mehr als 10 IDs ergeben 400 schon im Handler, über die Konstante
-`routes::etb::MAX_ANHAENGE_JE_EINTRAG`, keine zweite Zahl. Die Grenze hält zugleich die
-Schreibsperre kurz (D6). Die bestehenden 409-Fälle (schon heraufgestuft, gelöscht) bleiben
-zuerst, denn sie beschreiben den Lebenszyklus der Nachricht.
+`routes::etb::MAX_ANHAENGE_JE_EINTRAG`, keine zweite Zahl, wie beim ETB-Erfassen. Diese
+Feldprüfung läuft vor der Transaktion, eine schon heraufgestufte Nachricht mit elf IDs bekommt
+also 400. Die Grenze hält zugleich die Schreibsperre kurz (D6). **In der Transaktion** gehen
+die 409-Fälle (schon heraufgestuft, gelöscht) der Auswahlprüfung vor, denn sie beschreiben den
+Lebenszyklus der Nachricht.
+
+Ohne Text im Body fällt der Handler auf den Nachrichtentext zurück. Eine Nachricht nur mit
+Anhang trägt dort `""`. Der Rückfall greift dann nicht, die Anfrage ergibt 400 „Kein Inhalt
+zum Heraufstufen“. Sonst entstünde ein leerer, unveränderlicher Eintrag. Der Fall war schon
+vorher möglich, wird mit diesem Change aber zum Normalfall (Review B8).
 
 Eine Chat-Datei kann nie modulgebunden sein, denn das verhindert die Kreuzsperre in
-`anlegen_mit_anhaengen`. Eine eigene Prüfung gegen `MODUL_LINKER` braucht es daher nicht. Die
-Kopie ist neu und an nichts gebunden, also ist sie ohne `pruefe_anhaenge` bindbar.
+`anlegen_mit_anhaengen`. Trotzdem kopiert `anhaenge_kopieren_tx` als Netz keine modulgebundene
+Datei (`NOT modul_gebunden_sql`, 400) und ist nur `pub(crate)`. Vergisst ein künftiger
+Aufrufer die Prüfung „hängt an der Nachricht“, holt er so wenigstens keine Datei aus
+Dokumentenablage, Schaden oder einem anderen Eintrag (Review B4). Die Kopie ist neu und an
+nichts gebunden, also ist sie ohne `pruefe_anhaenge` bindbar.
 
 **D4: Die Kopie trägt die Herkunft der Datei.**
 `dateiname`, `mime`, `groesse`, `sha256`, `daten`, `hochgeladen_von` und `erstellt_at` werden
@@ -122,6 +132,15 @@ offen, welche fehlen.
 - [Rechte] Mit Lesezugriff aufs ETB und ohne Chat-Modul sieht man die übernommene Datei. → Das
   ist die Bedeutung von Heraufstufen und gilt schon heute für den Text. Die Auswahl im Dialog
   macht es sichtbar.
+- [Schreibrecht] Das Heraufstufen verlangt Schreibrecht im Chat, nicht im ETB-Modul. Wer Chat,
+  aber kein ETB darf, legt also ETB-Einträge an, und jetzt auch mit Dateien. Das galt schon vor
+  diesem Change und bleibt unverändert, um das Heraufstufen nicht nebenbei neu zu regeln. →
+  Nachzug LFH-904 (Review B2).
+- [Fremde Dateien im Chat] Der Chat prüft beim Verknüpfen weder die hochladende Person noch den
+  Tombstone (LFH-117 design.md D12, „Offen bleibt“). Über eine eigene Nachricht ließe sich so
+  ein fremder freier Upload oder eine nur noch an gelöschten Nachrichten hängende Datei
+  heraufstufen. → Nachzug LFH-903 am Chat (Review B1). Die Auswahl hier vertraut der Bindung an
+  die Nachricht.
 - [Unumkehrbarkeit] Eine falsch übernommene Datei bleibt bis zur Schwärzung am Eintrag. →
   Auswahl mit Abwahl und Hinweis im Dialog (D2/D6). Korrigieren lässt sich das über eine
   Berichtigung wie bei jedem ETB-Eintrag. Die Datei selbst bleibt.

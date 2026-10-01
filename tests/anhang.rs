@@ -1379,3 +1379,54 @@ async fn heraufgestufte_kopie_ueberlebt_das_loeschen_der_nachricht() {
     assert_eq!(s, StatusCode::OK, "die Kopie bleibt am Eintrag");
     assert_eq!(bytes, b"JPEGDATEN");
 }
+
+/// Grenze von beiden Seiten: zehn verschiedene Dateien gehen durch (Review LFH-700 B6).
+#[tokio::test]
+async fn heraufstufen_mit_zehn_dateien_geht_durch() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let mut ids = Vec::new();
+    for i in 0..10 {
+        ids.push(hochgeladen(&app, einsatz, &admin, &format!("f{i}.jpg")).await);
+    }
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &ids).await;
+
+    let (s, hoch) = heraufstufen(&app, einsatz, mid, &admin, &ids).await;
+    assert_eq!(s, StatusCode::OK, "{hoch:?}");
+    let etb_id = hoch["etb_eintrag_id"].as_i64().unwrap();
+    let eintrag = etb_eintrag(&app, einsatz, etb_id, &admin).await;
+    assert_eq!(eintrag["anhaenge"].as_array().unwrap().len(), 10);
+}
+
+/// Eine Nachricht nur mit Foto hat keinen Text. Ohne eigenen Text im Body entsteht kein
+/// ETB-Eintrag mit leerem Inhalt (Review LFH-700 B8).
+#[tokio::test]
+async fn heraufstufen_einer_reinen_foto_nachricht_ohne_text_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let foto = hochgeladen(&app, einsatz, &admin, "deich.jpg").await;
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        Some(&format!(r#"{{"inhalt":"","anhang_ids":[{foto}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    let mid = m["id"].as_i64().unwrap();
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &admin,
+        Some(&format!(r#"{{"typ":"meldung","anhang_ids":[{foto}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}

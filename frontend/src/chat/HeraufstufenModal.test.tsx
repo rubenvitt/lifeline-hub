@@ -90,7 +90,8 @@ describe('HeraufstufenModal', () => {
   });
 
   it('wählt bei elf Anhängen zehn vor und lässt keinen elften zu', async () => {
-    const elf = Array.from({ length: 11 }, (_, i) => anhang(100 + i, `f${i}.jpg`));
+    // Absichtlich absteigend: vorgewählt werden die ersten zehn NACH id, nicht nach Lieferfolge.
+    const elf = Array.from({ length: 11 }, (_, i) => anhang(100 + i, `f${i}.jpg`)).reverse();
     const onHeraufstufen = oeffne(nachricht(elf));
 
     const kaestchen = screen.getAllByRole('checkbox');

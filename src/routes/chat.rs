@@ -352,7 +352,9 @@ pub async fn heraufstufen(
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(str::to_string)
-        .or_else(|| quelle.inhalt.clone())
+        // Eine Nachricht nur mit Anhang trägt `""`: kein Fallback, sonst entstünde ein leerer,
+        // unveränderlicher ETB-Eintrag (LFH-700).
+        .or_else(|| quelle.inhalt.clone().filter(|s| !s.trim().is_empty()))
         .ok_or_else(|| AppError::Validation("Kein Inhalt zum Heraufstufen".into()))?;
 
     let etb_id = repo::heraufstufen_zu_etb(

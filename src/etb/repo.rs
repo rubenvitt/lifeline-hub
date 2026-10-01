@@ -277,23 +277,29 @@ async fn pruefe_anhaenge(
 /// am ETB sperrte sonst den Chat-Download, und „eine Datei, ein Lebenszyklus" (LFH-117) gälte
 /// nicht mehr. Die Kopie ist eine neue, freie Datei, braucht also kein [`pruefe_anhaenge`].
 ///
-/// `INSERT … SELECT` kopiert den BLOB in SQLite, die Bytes laufen nicht durch den Prozess.
+/// `INSERT … SELECT` kopiert den BLOB innerhalb von SQLite, die Bytes laufen nicht durch Rust.
 /// Übernommen werden auch `hochgeladen_von` und `erstellt_at` (design.md D4): die Herkunft
-/// der Datei. Wer heraufgestuft hat, steht am Eintrag. Eine ID, die im Einsatz nicht
-/// existiert, ergibt 400. Der Aufrufer rollt die Transaktion dann zurück.
-pub async fn anhaenge_kopieren_tx(
+/// der Datei. Wer heraufgestuft hat, steht am Eintrag.
+///
+/// Ob die Datei kopiert werden DARF (sie hängt an der heraufgestuften Nachricht), prüft der
+/// Aufrufer. Als Netz kopiert der Baustein selbst nie eine modulgebundene Datei
+/// (`anhang::repo::MODUL_LINKER`) und nie eine aus einem anderen Einsatz. Beides ergibt 400, und
+/// der Aufrufer rollt die Transaktion zurück.
+pub(crate) async fn anhaenge_kopieren_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     eintrag_id: i64,
     anhang_ids: &[i64],
 ) -> Result<(), AppError> {
     for &quelle in anhang_ids {
-        let kopie: Option<i64> = sqlx::query_scalar(
+        let kopie: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "INSERT INTO anhang \
                (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von, erstellt_at) \
-             SELECT einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von, erstellt_at \
-             FROM anhang WHERE id = ? AND einsatz_id = ? RETURNING id",
-        )
+             SELECT a.einsatz_id, a.dateiname, a.mime, a.groesse, a.sha256, a.daten, \
+                    a.hochgeladen_von, a.erstellt_at \
+             FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? AND NOT {} RETURNING id",
+            crate::anhang::repo::modul_gebunden_sql("a")
+        )))
         .bind(quelle)
         .bind(einsatz_id)
         .fetch_optional(&mut *conn)
@@ -1850,5 +1856,29 @@ mod tests {
         drop(conn);
         assert!(matches!(err, AppError::Validation(_)), "{err:?}");
         assert_eq!(verknuepfte_anhaenge(&pool).await, 0);
+    }
+
+    #[tokio::test]
+    async fn anhaenge_kopieren_kopiert_keine_modulgebundene_datei() {
+        // Schutz in der Tiefe (Review LFH-700 B4): die Prüfung „hängt an der Nachricht" steht
+        // beim Aufrufer. Vergisst ein künftiger Aufrufer sie, kopiert der Baustein trotzdem
+        // keine Datei, die einem Modul gehört (hier: einem anderen ETB-Eintrag).
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let gebunden = freier_anhang(&pool, einsatz, benutzer, "gebunden.jpg").await;
+        anlegen_idempotent(&pool, einsatz, benutzer, None, &[gebunden], daten("alt"))
+            .await
+            .unwrap();
+        let (neu, _) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[], daten("neu"))
+            .await
+            .unwrap();
+
+        let mut conn = pool.acquire().await.unwrap();
+        let err = anhaenge_kopieren_tx(&mut conn, einsatz, neu.id, &[gebunden])
+            .await
+            .unwrap_err();
+        drop(conn);
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+        assert_eq!(verknuepfte_anhaenge(&pool).await, 1, "nur die alte Bindung");
     }
 }

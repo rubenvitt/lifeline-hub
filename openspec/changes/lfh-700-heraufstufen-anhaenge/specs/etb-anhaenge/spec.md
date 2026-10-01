@@ -22,6 +22,10 @@ entstehen. Fehlt die Liste oder ist sie leer, SHALL keine Datei übernommen werd
 - **WHEN** eine Nachricht samt Foto heraufgestuft und die Nachricht danach gelöscht wird
 - **THEN** bleibt die Kopie am ETB-Eintrag und ist über die ETB-Route ladbar
 
+#### Scenario: Nachricht nur mit Foto, ohne Text
+- **WHEN** eine Nachricht ohne Text, nur mit einem Foto, ohne eigenen Text im Body heraufgestuft wird
+- **THEN** antwortet das System mit 400, und es entsteht kein Eintrag
+
 #### Scenario: Kopie folgt den ETB-Regeln
 - **WHEN** die übernommene Datei über die generische Anhang-Route geladen oder gelöscht wird
 - **THEN** antwortet das System wie bei jedem ETB-Anhang (404 beim Laden, 422 beim Löschen)

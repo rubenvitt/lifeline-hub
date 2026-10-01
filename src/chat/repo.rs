@@ -547,8 +547,8 @@ pub async fn heraufstufen_zu_etb(
                 "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
             ));
         }
-        // Erst alle prüfen, dann schreiben: ein Fehler hinten kopiert vorn nichts und
-        // verbraucht keine laufende Nummer.
+        // Die Auswahl vor dem Eintrag prüfen: ein Fehler kostet dann keinen Insert. Dass danach
+        // weder Kopie noch laufende Nummer bleibt, leistet der Rollback von `write_retry!`.
         for &aid in anhang_ids {
             let an_der_nachricht: Option<i64> = sqlx::query_scalar(
                 "SELECT 1 FROM chat_nachricht_anhang l JOIN anhang a ON a.id = l.anhang_id \
@@ -1218,8 +1218,8 @@ mod tests {
             .unwrap();
         let etb_vorher = zaehle(&pool, "SELECT COUNT(*) FROM etb_eintrag").await;
 
-        // Die eigene Datei steht VORN: ein Pfad, der je ID prüft und sofort kopiert, hätte sie
-        // schon kopiert, bevor die fremde scheitert.
+        // Die eigene Datei steht VORN: der Test belegt die Atomarität. Was vor dem Fehler schon
+        // geschrieben war, rollt mit zurück.
         let err = heraufstufen_zu_etb(
             &pool,
             einsatz,
