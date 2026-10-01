@@ -211,6 +211,12 @@ export interface WeitereAktionen<T> {
   /** Zugänglicher Name des Auslösers MIT Zeilenkennung („Aktionen zu Bezirk X"). */
   zugaenglicherName: (zeile: T) => string;
   onWahl: (key: string, zeile: T) => void;
+  /**
+   * Läuft eine Aktion aus dem Menü für diese Zeile gerade (z. B. Entfernen bis zur Serverantwort,
+   * LFH-654)? Dann trägt der Auslöser den Ladezustand und öffnet das Menü nicht — keine zweite
+   * Löschung. Die Kennzeichnung der Zeile als Text bleibt Sache des Spalten-`render` (Kriterium 6).
+   */
+  laeuft?: (zeile: T) => boolean;
 }
 
 /**
@@ -1332,12 +1338,16 @@ export default function Datensicht<T extends object, const K extends string>(
     // Vorab ausgewertet: `aktionen.length` entscheidet unten über die Aktionsleiste, und ein
     // Baustein, der `null` rendert, zählte dort mit.
     const weitereEintraege = weitere?.eintraege(zeile) ?? [];
+    const weitereLaeuft = weitere?.laeuft?.(zeile) ?? false;
     const menueKnopf =
       weitere && weitereEintraege.length > 0 ? (
         <MenueAusloeser
           key="weitere"
           eintraege={weitereEintraege}
           zugaenglicherName={weitere.zugaenglicherName(zeile)}
+          // Eine laufende Aktion sperrt den Auslöser und zeigt sich an ihm (LFH-654).
+          gesperrt={weitereLaeuft}
+          laeuft={weitereLaeuft}
           onWahl={(key) => weitere.onWahl(key, zeile)}
         />
       ) : null;

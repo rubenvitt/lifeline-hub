@@ -1,20 +1,26 @@
-//! Geocoding & Peilung für die Koordinaten-Plausibilitätsprüfung (Ort-Vorschau).
+//! Geocoding & Peilung für die Koordinaten-Plausibilitätsprüfung (Ort-Vorschau) und die
+//! Ortssuche der Lagekarte (Vorwärtssuche, `suche`, LFH-638).
 //!
-//! Zwei Schichten:
+//! Schichten:
 //! - `peilung` — reine Mathematik (Haversine + 8-Strich-Bearing) zum nächsten bekannten
 //!   verorteten Einsatz-Marker. Funktioniert IMMER offline, ohne externen Dienst.
 //! - Reverse-Geocoding — ergänzt einen Ortsnamen über einen konfigurierbaren
 //!   Nominatim-kompatiblen Dienst, mit hartem Timeout, Token-Bucket-Rate-Limit und Cache.
+//! - Vorwärtssuche (`suche`) — Adresse → Koordinaten über denselben Dienst und denselben
+//!   Token-Bucket, mit Prozess-Cache; Geocoder-Fehler sind ein Ergebnis, kein Fehler.
 //!
 //! DATENSCHUTZ (bewusste Abwägung): Der Default-Geocoder (öffentlicher Nominatim) sendet die
 //! Einsatz-Koordinate an einen Dritt-Server — anders als die *Pulls* öffentlicher Warndaten
 //! (NINA/DWD/Pegel). Der Cache-Key wird auf ~100 m gerundet (Nachbarpunkte teilen einen
 //! Eintrag). Admins können eine eigene Geocoder-URL hinterlegen. Die Peilung kommt ohne jeden
-//! externen Dienst aus.
+//! externen Dienst aus. Die Vorwärtssuche sendet den Suchtext und, mit verortetem Einsatzort,
+//! einen groben Ausschnitt (±0,25°) an denselben Dienst; der Suchtext steht in keiner Log-Zeile
+//! und wird nur im Prozess gecacht (`suche.rs`).
 
 pub mod cache;
 pub mod marker;
 pub mod peilung;
+pub mod suche;
 
 use sqlx::SqlitePool;
 use std::collections::HashSet;
@@ -35,6 +41,7 @@ struct Statics {
     client: reqwest::Client,
     bucket: Arc<Mutex<TokenBucket>>,
     inflight: Arc<Mutex<HashSet<String>>>,
+    suche_cache: Mutex<suche::SuchCache>,
 }
 
 static STATICS: OnceLock<Statics> = OnceLock::new();
@@ -48,6 +55,7 @@ fn statics() -> &'static Statics {
             .expect("reqwest-Client baubar"),
         bucket: Arc::new(Mutex::new(TokenBucket::neu(1.0, 1.0))),
         inflight: Arc::new(Mutex::new(HashSet::new())),
+        suche_cache: Mutex::new(suche::SuchCache::default()),
     })
 }
 
@@ -88,6 +96,26 @@ impl TokenBucket {
 pub async fn reverse(pool: &SqlitePool, base_url: &str, lat: f64, lon: f64) -> Option<String> {
     let s = statics();
     reverse_mit(&s.client, &s.bucket, &s.inflight, pool, base_url, lat, lon).await
+}
+
+/// Vorwärtssuche (prod, LFH-638): derselbe Client und **derselbe** Token-Bucket wie
+/// [`reverse`] — das Limit des Dienstes gilt für die Anwendung, nicht je Endpunkt.
+pub async fn suche(
+    base_url: &str,
+    q: &str,
+    ausschnitt: Option<suche::Ausschnitt>,
+) -> suche::SuchErgebnis {
+    let s = statics();
+    suche::suche_mit(
+        &s.client,
+        &s.bucket,
+        &s.suche_cache,
+        base_url,
+        q,
+        ausschnitt,
+        suche::TOKEN_WARTEN_MAX,
+    )
+    .await
 }
 
 /// Rate-limitierter Geocode + Cache-Write (keine Cache-Lesung). None bei Limit/Offline/leer.

@@ -37,6 +37,7 @@ pub mod health;
 pub mod infotelefon;
 pub mod karte;
 pub mod karte_hintergrundbild;
+pub mod karte_ort_suche;
 pub mod karten_ansicht;
 pub mod lage_snapshot;
 pub mod lage_zone;

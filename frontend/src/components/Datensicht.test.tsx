@@ -930,6 +930,46 @@ describe('Datensicht · Kartenzweig', () => {
     expect(screen.getByRole('button', { name: 'Aktionen zu Rotkreuz 2' })).toBeInTheDocument();
   });
 
+  it('weitere.laeuft() zeigt den Ladezustand nur am Menü-Auslöser der laufenden Zeile (LFH-654)', () => {
+    setzeViewportBreite(390);
+    rendere({
+      karte: {
+        ...karte,
+        weitere: {
+          eintraege: () => [{ key: 'entfernen', label: 'Entfernen', gefahr: true }],
+          zugaenglicherName: (f) => `Aktionen zu ${f.funkrufname}`,
+          laeuft: (f) => f.id === DREI[1].id,
+          onWahl: () => {},
+        },
+      },
+    });
+    const name = (i: number) => `Aktionen zu ${DREI[i].funkrufname}`;
+    expect(screen.getByRole('button', { name: name(1) })).toHaveClass('ant-btn-loading');
+    expect(screen.getByRole('button', { name: name(0) })).not.toHaveClass('ant-btn-loading');
+    expect(screen.getByRole('button', { name: name(2) })).not.toHaveClass('ant-btn-loading');
+  });
+
+  it('ein laufender Menü-Auslöser öffnet kein Menü — keine zweite Löschung (LFH-654)', async () => {
+    setzeViewportBreite(390);
+    const onWahl = vi.fn();
+    rendere({
+      karte: {
+        ...karte,
+        weitere: {
+          eintraege: () => [{ key: 'entfernen', label: 'Entfernen', gefahr: true }],
+          zugaenglicherName: (f) => `Aktionen zu ${f.funkrufname}`,
+          laeuft: () => true,
+          onWahl,
+        },
+      },
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: `Aktionen zu ${DREI[0].funkrufname}` }),
+    );
+    expect(document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden)')).toBeNull();
+    expect(onWahl).not.toHaveBeenCalled();
+  });
+
   it('der Statusslot rendert ein Etikett MIT Text, nicht nur eine Farbe', () => {
     // `label` ist am `StatusDarstellung`-Typ Pflicht und damit der zweite Kanal (WCAG 1.4.1).
     setzeViewportBreite(390);
