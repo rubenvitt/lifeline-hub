@@ -89,20 +89,24 @@ pub async fn dev_seed(pool: &SqlitePool, admin_benutzername: &str) -> Result<(),
     Ok(())
 }
 
-/// Liefert die Organisation des Admins aus `bootstrap_admin`; gibt es ihn nicht (Tests ohne
-/// Bootstrap), wird die Dev-Organisation angelegt. Nicht `ORDER BY id LIMIT 1` (LFH-736): mit
-/// einer zweiten Organisation landeten die Seed-Benutzer und ihre Einsätze in einer fremden.
+/// Liefert die Organisation des Admins aus `bootstrap_admin`, ohne ihn die des Seed-Erstellers
+/// aus einem früheren Lauf (anderer `admin_benutzername` an derselben DB); erst wenn es beide
+/// nicht gibt (Tests ohne Bootstrap), wird die Dev-Organisation angelegt. Nicht
+/// `ORDER BY id LIMIT 1` (LFH-736): mit einer zweiten Organisation landeten die Seed-Benutzer
+/// und ihre Einsätze in einer fremden.
 async fn organisation_bestimmen(
     pool: &SqlitePool,
     admin_benutzername: &str,
 ) -> Result<i64, AppError> {
-    if let Some(id) =
-        sqlx::query_scalar::<_, i64>("SELECT org_id FROM benutzer WHERE benutzername = ?")
-            .bind(admin_benutzername)
-            .fetch_optional(pool)
-            .await?
-    {
-        return Ok(id);
+    for benutzername in [admin_benutzername, SEED_ERSTELLER] {
+        if let Some(id) =
+            sqlx::query_scalar::<_, i64>("SELECT org_id FROM benutzer WHERE benutzername = ?")
+                .bind(benutzername)
+                .fetch_optional(pool)
+                .await?
+        {
+            return Ok(id);
+        }
     }
     let id =
         sqlx::query_scalar::<_, i64>("INSERT INTO organisation (name) VALUES (?) RETURNING id")
@@ -179,26 +183,31 @@ async fn seed_benutzer_id(pool: &SqlitePool, benutzername: &str) -> Result<i64, 
 
 /// Seedet die `SEED_EINSAETZE` über `einsatz::repo::anlegen` (LFH-736): Einsatznummer
 /// (LFH-617), ID oberhalb der Demo-Sperre (LFH-690), Organisation des Erstellers (LFH-232).
-/// Idempotent: nur fehlende `bezeichnung`en anlegen.
+/// Idempotent: nur fehlende `bezeichnung`en anlegen. Das Abschließen läuft auch für einen
+/// vorhandenen Einsatz: Anlegen und Abschließen sind zwei Transaktionen, und `abschliessen`
+/// schreibt nur an einem aktiven Einsatz.
 async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
     let ersteller_id = seed_benutzer_id(pool, SEED_ERSTELLER).await?;
     for &(bezeichnung, stichwort, status) in SEED_EINSAETZE {
-        if seed_einsatz_id(pool, org_id, bezeichnung).await?.is_some() {
-            continue;
-        }
-        let einsatz = crate::einsatz::repo::anlegen(
-            pool,
-            crate::einsatz::repo::NeuerEinsatzDaten {
-                bezeichnung,
-                stichwort: Some(stichwort),
-                einsatzart: None,
-                begonnen_at: None,
-            },
-            ersteller_id,
-        )
-        .await?;
+        let einsatz_id = match seed_einsatz_id(pool, org_id, bezeichnung).await? {
+            Some(id) => id,
+            None => {
+                crate::einsatz::repo::anlegen(
+                    pool,
+                    crate::einsatz::repo::NeuerEinsatzDaten {
+                        bezeichnung,
+                        stichwort: Some(stichwort),
+                        einsatzart: None,
+                        begonnen_at: None,
+                    },
+                    ersteller_id,
+                )
+                .await?
+                .id
+            }
+        };
         if status == crate::einsatz::STATUS_ABGESCHLOSSEN {
-            crate::einsatz::repo::abschliessen(pool, einsatz.id, ersteller_id).await?;
+            crate::einsatz::repo::abschliessen(pool, einsatz_id, ersteller_id).await?;
         }
     }
     Ok(())
@@ -585,6 +594,50 @@ mod tests {
             funktionen.iter().all(|f| f.as_deref() == Some("EL")),
             "Einsatzleitung schreibt als „EL“: {funktionen:?}"
         );
+    }
+
+    /// LFH-736 (Review): Ein Admin-Name ohne Konto — etwa ein geändertes
+    /// `LIFELINE_ADMIN_USER` an einer schon geseedeten DB — legt keine neue Organisation an;
+    /// der Seed bleibt bei der seines Erstellers.
+    #[tokio::test]
+    async fn unbekannter_admin_bleibt_bei_der_org_des_erstellers() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool, "admin").await.unwrap();
+        dev_seed(&pool, "chef").await.unwrap();
+        dev_seed(&pool, "chef").await.unwrap();
+
+        let (orgs, einsaetze): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM organisation), (SELECT COUNT(*) FROM einsatz)",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((orgs, einsaetze), (1, 3));
+    }
+
+    /// LFH-736 (Review): Anlegen und Abschließen sind zwei Transaktionen. Bricht der Lauf
+    /// dazwischen ab, schließt der nächste den Einsatz nach.
+    #[tokio::test]
+    async fn liegengebliebener_abschluss_wird_nachgeholt() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool, "admin").await.unwrap();
+        sqlx::query(
+            "UPDATE einsatz SET status = 'aktiv', abgeschlossen_at = NULL, \
+             abgeschlossen_von = NULL WHERE bezeichnung = 'Sturmtief Abschluss'",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        dev_seed(&pool, "admin").await.unwrap();
+
+        let status: String = sqlx::query_scalar(
+            "SELECT status FROM einsatz WHERE bezeichnung = 'Sturmtief Abschluss'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(status, "abgeschlossen");
     }
 
     #[tokio::test]
