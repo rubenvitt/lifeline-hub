@@ -33,8 +33,8 @@ Die Motivation steht in `proposal.md`, Abschnitt „Why“. Darauf baut die Änd
   dort keine Zukunft ab. Es scheitert also nichts, aber ein vorgehendes Gerät datiert
   Einträge zu spät, und bei Meldungen verschiebt das auch die Bestätigungsfrist. Das ist ein
   anderer Befund (Fehldatierung, nicht Ablehnung) mit eigener Entscheidung: Soll eine
-  Ereigniszeit, die eine Person sieht und bestätigt, still umgerechnet werden? Er kommt als
-  Nachzug aufs Board. Das Versatzmodul ist so geschnitten, dass er es wiederverwenden kann.
+  Ereigniszeit, die eine Person sieht und bestätigt, still umgerechnet werden? Er steht als
+  Nachzug LFH-895 auf dem Board. Das Versatzmodul ist so geschnitten, dass er es wiederverwenden kann.
 - Keine Änderung am Server und keine an der 60-s-Toleranz.
 - Keine nachträgliche Korrektur von Aktionen, die schon in der Queue liegen. Auch
   „Erneut versuchen“ im Drawer sendet den gespeicherten Zeitpunkt unverändert.

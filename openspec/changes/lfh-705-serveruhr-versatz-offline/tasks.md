@@ -21,5 +21,5 @@ Code. „Verifiziert“ heißt, der genannte Test läuft grün **und** war vorhe
 
 ## 4. Abschluss
 
-- [ ] 4.1 Nachzug für ETB- und Meldungs-Ereigniszeit aus der Geräteuhr (Non-Goal in `design.md`) per `clickup-task-anlegen` aufs Board. Verifiziert, wenn die Task-ID hier und in `design.md` steht.
+- [x] 4.1 Nachzug für ETB- und Meldungs-Ereigniszeit aus der Geräteuhr (Non-Goal in `design.md`) per `clickup-task-anlegen` aufs Board. Verifiziert, wenn die Task-ID hier und in `design.md` steht. **Ergebnis:** LFH-895.
 - [ ] 4.2 `./scripts/check-all.sh` vollständig grün. Verifiziert durch Exit-Code 0 ohne `| tail`, Ergebnis hier eintragen.
