@@ -1452,7 +1452,10 @@ mod tests {
             "Vorbedingung: Klartext liegt in der Datei"
         );
 
-        assert_eq!(tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            1
+        );
 
         let s: Option<String> =
             sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
@@ -1488,7 +1491,13 @@ mod tests {
 
         let mut ausstehend = false;
         assert_eq!(
-            tick_mit_rueckschrieb(&pool, &LiveHub::new(), t("2026-03-01 12:00:00"), &mut ausstehend).await,
+            tick_mit_rueckschrieb(
+                &pool,
+                &LiveHub::new(),
+                t("2026-03-01 12:00:00"),
+                &mut ausstehend
+            )
+            .await,
             1
         );
         assert!(ausstehend, "blockierter Rückschrieb bleibt vorgemerkt");
@@ -1501,7 +1510,13 @@ mod tests {
         drop(leser);
 
         assert_eq!(
-            tick_mit_rueckschrieb(&pool, &LiveHub::new(), t("2026-03-01 12:10:00"), &mut ausstehend).await,
+            tick_mit_rueckschrieb(
+                &pool,
+                &LiveHub::new(),
+                t("2026-03-01 12:10:00"),
+                &mut ausstehend
+            )
+            .await,
             0,
             "nichts Neues zu schwärzen"
         );
@@ -1520,7 +1535,10 @@ mod tests {
         crate::backup::erzeuge_sicherung(&pool, &sicherung)
             .await
             .unwrap();
-        assert_eq!(tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            1
+        );
         pool.close().await;
 
         crate::backup::restore::restore_aus_datei(&sicherung, &pfad, true)
@@ -1543,7 +1561,10 @@ mod tests {
             "Vorbedingung: die Sicherung trägt den Einsatz ungeschwärzt"
         );
 
-        assert_eq!(tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:10:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:10:00")).await,
+            1
+        );
         assert_eq!(
             geschwaerzt(pool.clone()).await,
             (
