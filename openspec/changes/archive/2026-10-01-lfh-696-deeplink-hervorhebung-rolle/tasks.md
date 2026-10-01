@@ -35,4 +35,4 @@ durchsehen, die Klasse und ihr Name bleiben unverändert.
 
 ## 6. Verifikation
 
-- [ ] 6.1 `./scripts/check-all.sh` grün (Format, Lint, Vitest, e2e mit dem neuen Spec, OpenSpec-Archivwächter nach `/opsx:archive`). Verifiziert durch den Exit-Code bzw. die CI des PRs
+- [x] 6.1 `./scripts/check-all.sh` grün (Format, Lint, Vitest, e2e mit dem neuen Spec, OpenSpec-Archivwächter nach `/opsx:archive`). Verifiziert durch den Exit-Code bzw. die CI des PRs. **Lokal am 01.10.2026:** `schnell` und `frontend` grün (Vitest 589 Dateien, 8130 Tests). `e2e` 492 grün, 18 rot, alle ohne Bezug zur Hervorhebung: keiner der roten Fälle öffnet einen Deeplink. Fehlerbilder sind Verdeckung durch klebende Leisten, Leistenhöhe, Download-Dateiname, Browserabsturz, `aria-expanded`, Pegel-Knopf und der bekannte Block „Führungsfunktionen: der Bearbeiten-Knopf“. Ursache vermutlich das Container-Chromium (Build 1194 statt 1234). Der neue Spec ist grün in allen 4 Fällen. Den vollen Lauf belegt die CI des PRs.

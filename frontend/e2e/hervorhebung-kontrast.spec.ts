@@ -152,7 +152,8 @@ for (const modus of ['light', 'dark'] as const) {
     await post(page, `${basis}/etb`, { typ: 'meldung', inhalt: 'Nachbar 696' });
 
     // Szenario „Angesteuerte Karte einer Zeitachse“: der Baustein setzt seinen Grund inline,
-    // die Klasse allein färbte hier nichts (OpenSpec-Change, design.md, Entscheidung 5).
+    // die Klasse allein färbte hier nichts (LFH-696, Entscheidung 5 in
+    // `openspec/changes/archive/2026-10-01-lfh-696-deeplink-hervorhebung-rolle/design.md`).
     await page.goto(`/einsaetze/${einsatzId}/etb?eintrag=${ziel}`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await page.mouse.move(0, 0);

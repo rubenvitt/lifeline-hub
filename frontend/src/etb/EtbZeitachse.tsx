@@ -382,8 +382,8 @@ export default function EtbZeitachse({
         meta={vonAn(e.von, e.an)}
         // Die Hervorhebung als Zeilentönung des Bausteins: er setzt seinen Grund inline, die
         // Klassenregel aus `index.css` käme nicht an. Vorrang vor der Berichtigung, solange
-        // angesteuert — Typwort und Kante tragen die Berichtigung weiter (LFH-696, OpenSpec-Change
-        // `lfh-696-deeplink-hervorhebung-rolle`, design.md, Entscheidung 5).
+        // angesteuert — Typwort und Kante tragen die Berichtigung weiter (LFH-696, Entscheidung 5 in
+        // `openspec/changes/archive/2026-10-01-lfh-696-deeplink-hervorhebung-rolle/design.md`).
         toenung={
           hervorgehoben ? 'hervorhebung' : e.typ === 'berichtigung' ? 'berichtigung' : undefined
         }

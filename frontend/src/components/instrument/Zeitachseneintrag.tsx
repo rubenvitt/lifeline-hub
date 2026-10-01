@@ -24,8 +24,8 @@ import { monoStil, useRollen } from './rollenwerte';
  * `hervorhebung` ist die per Deeplink angesteuerte Zeile (LFH-25/LFH-696): der Grund steht inline,
  * die Klassenregel `.zeile-hervorgehoben` aus `index.css` käme hier nicht an. Wer hervorhebt,
  * übergibt die Tönung UND die Klasse (`scrolleZurZeile` sucht die Klasse); die Hervorhebung hat
- * Vorrang vor jeder anderen Tönung (OpenSpec-Change `lfh-696-deeplink-hervorhebung-rolle`,
- * design.md, Entscheidung 5).
+ * Vorrang vor jeder anderen Tönung (Entscheidung 5 in
+ * `openspec/changes/archive/2026-10-01-lfh-696-deeplink-hervorhebung-rolle/design.md`).
  *
  * Die Hülle reicht HTML-Attribute durch (`data-*`, `id`, `className`): eine Zeile braucht
  * `data-lfh="datensicht-karte"` und ihre Zeilenklasse, sonst findet `scrolleZurZeile` sie nicht.
