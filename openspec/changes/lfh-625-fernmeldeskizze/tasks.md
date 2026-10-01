@@ -111,10 +111,10 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 5. Seite: Umschalter, Druck, Lücke im Paneel (D1, D6, D7, Spec „Zweite Darstellung“, „Druck“, „Übernahme“)
 
-- [ ] 5.1 Test zuerst, dann Umsetzung in `routing/deeplinks.ts`: `funkplanPfad(id, {ansicht})` und
+- [x] 5.1 Test zuerst, dann Umsetzung in `routing/deeplinks.ts`: `funkplanPfad(id, {ansicht})` und
   `parseFunkplanAnsicht` (nur `tabelle`/`skizze`, sonst `undefined`). Nachweis:
   `routing/deeplinks.test.ts` rot, dann grün.
-- [ ] 5.2 Test zuerst, `pages/FunkplanPage.test.tsx`:
+- [x] 5.2 Test zuerst, `pages/FunkplanPage.test.tsx`:
   - Umschalter „Tabelle | Skizze“, auch ohne Schreibrecht
   - `?ansicht=skizze` öffnet die Skizze und wird geräumt; `?ansicht=quatsch` wird geräumt, die
     Tabelle bleibt
@@ -128,7 +128,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - neue Lückenzeile mit Verweis auf die untere Stelle, „—“ mit Grund bei gesperrten Einheiten
 
   Nachweis: rot belegt.
-- [ ] 5.3 Umsetzung in `pages/FunkplanPage.tsx`:
+- [x] 5.3 Umsetzung in `pages/FunkplanPage.tsx`:
   - `Segmentleiste` in `aktionen`, Sichtvorgabe anwenden und räumen
   - Druckkopf je Darstellung
   - Werkzeugzeile je Darstellung

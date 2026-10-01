@@ -277,8 +277,24 @@ export function stabPfad(einsatzId: number, opts: { neu?: boolean } = {}): strin
  * Navigation markiert den Stab (`modulAusPfad` liest das Segment nach der Einsatz-ID), Sperre und
  * Sichtbarkeit erbt die Seite vom Stab.
  */
-export function funkplanPfad(einsatzId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'stab')}/funkplan`;
+export function funkplanPfad(einsatzId: number, opts: { ansicht?: FunkplanAnsicht } = {}): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'stab')}/funkplan`, { ansicht: opts.ansicht });
+}
+
+/**
+ * Darstellung des Funkplans (LFH-625): Tabelle oder Fernmeldeskizze. `ansicht` ist ein AUFTRAG wie
+ * bei {@link einsatzabschnittePfad} (apply-then-clean); als Lesezeichen taugt die Adresse ohne.
+ */
+export type FunkplanAnsicht = 'tabelle' | 'skizze';
+
+const FUNKPLAN_ANSICHT_ERLAUBT: Record<FunkplanAnsicht, true> = { tabelle: true, skizze: true };
+
+/** Umkehr von {@link funkplanPfad}: ein unbekannter Wert wird GANZ verworfen. */
+export function parseFunkplanAnsicht(params: URLSearchParams): FunkplanAnsicht | undefined {
+  const ansicht = params.get('ansicht');
+  return ansicht && Object.prototype.hasOwnProperty.call(FUNKPLAN_ANSICHT_ERLAUBT, ansicht)
+    ? (ansicht as FunkplanAnsicht)
+    : undefined;
 }
 
 /**
