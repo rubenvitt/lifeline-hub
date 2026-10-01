@@ -16,9 +16,9 @@
 
 - [x] 3.1 `e2e/deeplink-hervorhebung-kontrast.spec.ts` (Messkern `e2e/kontrast-kern.ts`, Böden als Literale Tag 7 / Nacht 5 / Linie 3) für beide Modi: Tabellenzeile mit fixierter Kennung per Deeplink, Kartenzweig auf 390 px, ETB-Zeile; misst Zellentext gegen komponierte Fläche, Linienfarbe (`box-shadow`) gegen Markierungs- und Nachbarfläche, Fläche ≠ Hover-Fläche einer Nachbarzeile, Linie bleibt unter dem Zeiger. Verifikation: Spec ist gegen den unveränderten Stand ROT (keine Linie).
 - [x] 3.2 `index.css`: Regel auf `var(--lfh-bedien-flaeche)` + `box-shadow: inset 0 2px 0 var(--lfh-bedien), inset 0 -2px 0 var(--lfh-bedien)`, Selektoren wie `personen/betroffene.css` (über antds Sortierspalte, s. design.md E2), Nachtblock entfällt; Kopfkommentar nennt LFH-698 und die zwei Kanäle. Verifikation: Spec aus 3.1 grün in beiden Modi; Guard aus 2.2 grün; `grep -nE '#[0-9a-fA-F]{3,6}' frontend/src/index.css` ohne Treffer.
-- [ ] 3.3 Verweise nachziehen: Kommentare in `personen/betroffene.css` und `pages/kraefteuebersichtPrint.css`, die `.zeile-hervorgehoben > td` als Präzedenzfall nennen, auf die neue Form anpassen. Verifikation: `grep -rn "zeile-hervorgehoben > td" frontend/src` leer oder stimmig.
-- [ ] 3.4 `frontend/AGENTS.md`, Farbachsen: eine Zeile „Deeplink-Hervorhebung = `bedienFlaeche` + Ober-/Unterlinie `bedien` (LFH-698); Farbliterale in CSS nur in `theme/rollen.css` (`theme/cssFarbquelle.guard.test.ts`)“. Verifikation: `prettier --check frontend/AGENTS.md` grün.
-- [ ] 3.5 Screenshots beider Modi (Tabelle mit Hover auf Nachbarzeile, Karte) im PR anhängen. Verifikation: Bilder im PR-Body.
+- [x] 3.3 Verweise nachziehen: Kommentare in `personen/betroffene.css` und `pages/kraefteuebersichtPrint.css`, die `.zeile-hervorgehoben > td` als Präzedenzfall nennen, auf die neue Form anpassen. Verifikation: `grep -rn "zeile-hervorgehoben > td" frontend/src` leer oder stimmig.
+- [x] 3.4 `frontend/AGENTS.md`, Farbachsen: eine Zeile „Deeplink-Hervorhebung = `bedienFlaeche` + Ober-/Unterlinie `bedien` (LFH-698); Farbliterale in CSS nur in `theme/rollen.css` (`theme/cssFarbquelle.guard.test.ts`)“. Verifikation: `prettier --check frontend/AGENTS.md` grün.
+- [x] 3.5 Screenshots beider Modi (Tabelle mit Hover auf Nachbarzeile, Karte) dem Menschen übergeben und im PR beschrieben (aus der Cloud-Sitzung lassen sich keine Bilder in den PR laden). Verifikation: vier Bilder in der Sitzung, Beschreibung im PR-Body.
 
 ## 4. Abschluss
 
