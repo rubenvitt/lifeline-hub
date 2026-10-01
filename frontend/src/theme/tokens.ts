@@ -615,6 +615,24 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
 }
 
 /**
+ * Senkrechtes Polster der Kopfzeile von `Collapse` und `Tabs` (LFH-724).
+ *
+ * antd rechnet beide aus der Schrift, nicht aus `controlHeight`: Höhe = `2 × paddingSM` +
+ * Zeilenhöhe der Grundschrift (`fontSize + 8`, `getLineHeight`), also 35,5 / 45 / 55 px. In
+ * `komfortabel` und `handschuh` lag damit jeder Akkordeon-Kopf (Lagebericht, Einsatzdaten,
+ * Befehlsdetails) und jeder Tab (Aufträge/Befehle) unter dem Boden aus Gate 3. Das Polster wächst
+ * genau so weit, dass die Zeile die Steuerhöhe erreicht, und nie unter `paddingSM`: `kompakt`
+ * bleibt unverändert. Kartentabs (`editable-card`) folgen schon `controlHeightLG` und bleiben
+ * unberührt. Rein und exportiert wie {@link switchMasse}.
+ */
+export function kopfzeilenMasse(
+  stufe: Pick<Dichtestufe, 'zeilenhoehe' | 'schriftgroesse' | 'abstand'>,
+) {
+  const zeile = stufe.schriftgroesse + 8;
+  return { polsterVertikal: Math.max(stufe.abstand.sm, (stufe.zeilenhoehe - zeile) / 2) };
+}
+
+/**
  * Komponenten-Tokens, die aus den Rollen und der Dichte-Stufe folgen.
  *
  * `aufBedien` gehört an den KNOPF, nicht an antds globales `colorTextLightSolid`: das färbt auch
@@ -652,6 +670,10 @@ export function antdKomponenten(
       colorWarning: farben.achtungText,
     },
     Switch: switchMasse(dichten[dichte]),
+    Collapse: {
+      headerPadding: `${kopfzeilenMasse(dichten[dichte]).polsterVertikal}px ${dichten[dichte].abstand.md}px`,
+    },
+    Tabs: { horizontalItemPadding: `${kopfzeilenMasse(dichten[dichte]).polsterVertikal}px 0` },
   };
 }
 

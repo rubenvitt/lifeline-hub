@@ -9,7 +9,7 @@ import type { EtbBaustein } from '../../api/types';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './entwurfStore';
-import EtbEntwurfsTabs from './EtbEntwurfsTabs';
+import EtbEntwurfsTabs, { entfernenStil } from './EtbEntwurfsTabs';
 import { einsatzFixture } from '../../test/fixtures';
 
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
@@ -561,4 +561,23 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
     expect(erfassen.mock.calls[1][0].client_id).toBe(neueId);
   });
+});
+
+/**
+ * Das × eines Entwurfstabs ist ein unbeschriftetes Bedienziel (LFH-724): antds Vorgabe maß
+ * 15 × 24 px in jeder Stufe. Boden auf BEIDEN Achsen ist die kleine Steuerhöhe 24 / 48 / 72
+ * (Literale); die gerenderte Größe misst `e2e/trefflaeche-pruefflaechen.spec.ts`.
+ */
+describe('Entwurfstab schließen — Trefffläche (LFH-724)', () => {
+  for (const [controlHeightSM, boden] of [
+    [24, 24],
+    [48, 48],
+    [72, 72],
+  ] as const) {
+    it(`kleine Steuerhöhe ${controlHeightSM}: das × misst mindestens ${boden} × ${boden} px`, () => {
+      const stil = entfernenStil({ controlHeightSM });
+      expect(stil.minWidth).toBe(boden);
+      expect(stil.minHeight).toBe(boden);
+    });
+  }
 });

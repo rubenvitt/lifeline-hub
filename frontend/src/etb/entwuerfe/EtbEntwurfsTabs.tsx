@@ -1,4 +1,4 @@
-import { Spin, Tabs } from 'antd';
+import { Spin, Tabs, theme } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
@@ -9,6 +9,7 @@ import { entwurfLabel, zuWerte } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
 import { anVorbelegung } from '../../fuehrung/funktionsOptionenKern';
+import { IkoneKreuz } from '../../ikonen';
 
 interface EtbEntwurfsTabsProps {
   einsatzId: number;
@@ -33,6 +34,21 @@ interface EtbEntwurfsTabsProps {
 /** Stabile leere Liste: ein frisches `[]` je Render wäre für die Schnellerfassung jedes Mal neu. */
 const KEINE_DATEIEN: File[] = [];
 
+/**
+ * Stil des Schließen-Kreuzes je Entwurfstab — rein und exportiert (Muster `bedienzielStil`).
+ * Ein unbeschriftetes Ziel hält den Boden auf BEIDEN Achsen (A1 Gate 3); antds Vorgabe maß
+ * 15 × 24 px in jeder Stufe (LFH-724).
+ */
+export function entfernenStil(token: { controlHeightSM: number }) {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: token.controlHeightSM,
+    minHeight: token.controlHeightSM,
+  } as const;
+}
+
 export default function EtbEntwurfsTabs({
   einsatzId,
   erfassen,
@@ -44,6 +60,7 @@ export default function EtbEntwurfsTabs({
   onSendetChange,
   dateien: dateienVonAussen,
 }: EtbEntwurfsTabsProps) {
+  const { token } = theme.useToken();
   const {
     entwuerfe,
     aktiverId,
@@ -203,6 +220,11 @@ export default function EtbEntwurfsTabs({
   return (
     <Tabs
       type="editable-card"
+      removeIcon={
+        <span style={entfernenStil(token)}>
+          <IkoneKreuz />
+        </span>
+      }
       activeKey={aktiverId ?? undefined}
       onChange={aktivenSetzen}
       onEdit={onEdit}
