@@ -1,7 +1,8 @@
-import { Button, Collapse, DatePicker, Form, Input, Space } from 'antd';
+import { Button, Collapse, Form, Input, Space } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useState } from 'react';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { einsatzKeys } from '../api/queryKeys';
 import { schliesseLagebesprechungAb } from '../api/stab';
 import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
@@ -39,6 +40,8 @@ interface LagebesprechungModalProps {
  * Zeitpunkt unter „Weitere Angaben". `forceRender` ist TRAGEND: nur so kommt der Zeitpunkt
  * zugeklappt in `onFinish` an, und nur mit ihm lässt sich die POST-Antwort der eigenen Anfrage
  * zuordnen (`eigeneLagebesprechung`).
+ *
+ * Zeiten sind Zeitpunkte; Felder zeigen und lesen die Anzeigezone (`ZeitpunktEingabe`, LFH-692).
  *
  * Montiert = offen: `useState` friert Vorbelegung und Vergleichsbasis beim ÖFFNEN ein, obwohl
  * `stab` live invalidiert wird, und jede Öffnung hat eine frische Mutation. Fehler des POST
@@ -132,12 +135,7 @@ export default function LagebesprechungModal({
           </Space>
         }
       >
-        <DatePicker
-          showTime
-          format={ZEITFORMAT}
-          placeholder="kein Termin"
-          style={{ width: '100%' }}
-        />
+        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="kein Termin" style={{ width: '100%' }} />
       </Form.Item>
       <Collapse
         ghost
@@ -153,7 +151,7 @@ export default function LagebesprechungModal({
                 extra="Leer: Zeitpunkt des Abschließens"
                 style={{ marginBottom: 0 }}
               >
-                <DatePicker showTime format={ZEITFORMAT} style={{ width: '100%' }} />
+                <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
               </Form.Item>
             ),
           },

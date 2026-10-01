@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes, useNavigate } from 'react-router';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -12,6 +12,7 @@ import LageberichtDetailPage from './LageberichtDetailPage';
 import type { LageberichtAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { alsOrtszeit } from '../etb/filterZeit';
+import { mitProzessZone } from '../test/prozessZone';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
 
@@ -924,5 +925,42 @@ describe('LageberichtePage — Fassungszeile (LFH-350 · H60)', () => {
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
     expect(await screen.findByText('v1 · 251400JUL2026 · A')).toBeInTheDocument();
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Einsatz auf Europe/Berlin. Titelvorschlag und
+ * Zeitstand stehen in der Anzeigezone.
+ */
+describe('LageberichtePage — Anlegen in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('Titelvorschlag nennt 1200 für 10:00 UTC, ein Zeitstand 13:00 Berlin geht als 11:00 UTC hinaus', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-07-25T10:00:00Z'));
+    const posts: Record<string, unknown>[] = [];
+    setupMitZone([]);
+    server.use(
+      http.post('/api/einsaetze/7/lageberichte', async ({ request }) => {
+        posts.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(bericht, { status: 201 });
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
+    const titel = await screen.findByLabelText('Titel');
+    await waitFor(() => expect(titel).toHaveValue('Lageüberblick 1200'));
+    const zeitstand = screen.getByRole('textbox', { name: 'Zeitstand' });
+    await userEvent.click(zeitstand);
+    await userEvent.type(zeitstand, '25.07.2026 13:00');
+    // Enter übernimmt die Zeit UND sendet das Formular (Erfassungs-Norm: Knopf im `<form>`).
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatchObject({
+      titel: 'Lageüberblick 1200',
+      zeitstand: '2026-07-25 11:00:00',
+    });
   });
 });

@@ -71,15 +71,17 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
 - [x] 5.2 `kommunikation/gruppierung.ts:faelligGruppe` bekommt die Konventionen, die Aufrufer
       `AuftraegeListe` und `ErinnerungenPage` reichen sie durch. Ein Test prüft das Szenario
       „Frist heute“.
-- [ ] 5.3 `stab/LagebesprechungModal.tsx` und `stab/lagebesprechungZustand.ts`:
+- [x] 5.3 `stab/LagebesprechungModal.tsx` und `stab/lagebesprechungZustand.ts`:
       `terminZeitpunkt` ohne `.local()`, Felder und Schnellwahl über den Baustein, formatierende
       Aufrufer über `inZone`. `lagebesprechungZustand.test.ts` bleibt grün, neuer Test für das
       Modal unter abweichender Zone.
-- [ ] 5.4 `infotelefon/AnrufErfassung.tsx`, `pages/PressePage.tsx`,
+- [x] 5.4 `infotelefon/AnrufErfassung.tsx`, `pages/PressePage.tsx`,
       `pages/PressemitteilungDetailPage.tsx`, `pages/LageberichtDetailPage.tsx` und
       `pages/LageberichtePage.tsx`: Felder über den Baustein, Titelvorschlag in der
       Anzeigezone (Szenario „Titelvorschlag“). Je Seite ein Test für den gesendeten Wert,
-      `LageberichtDetailPage.test.tsx` bleibt grün.
+      `LageberichtDetailPage.test.tsx` bleibt grün (der LFH-499-Block läuft jetzt unter TZ=UTC
+      und ist damit scharf). Beim Umstellen gefunden und mitgenommen: „zuletzt gespeichert“ des
+      Entwurfsschutzes (`entwurf/useEntwurfVerlustschutz.ts`) in der Anzeigezone.
 
 ## 6. Einsatz, Einstellungen, Aufbewahrung
 

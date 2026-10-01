@@ -1,5 +1,6 @@
 import { IkonePlus } from '../ikonen';
-import { Breadcrumb, Button, DatePicker, Form, Input, Spin, Typography, theme } from 'antd';
+import { Breadcrumb, Button, Form, Input, Spin, Typography, theme } from 'antd';
+import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
@@ -116,10 +117,11 @@ interface AnlegenWerte {
 }
 
 /**
- * Titelvorschlag aus der Uhrzeit („Lageüberblick 10:30 Uhr") in taktischer Schreibweise.
+ * Titelvorschlag aus der Uhrzeit („Lageüberblick 10:30 Uhr") in taktischer Schreibweise — in der
+ * Anzeigezone, nicht in der des Geräts (LFH-692, Spec `zeiteingabe`).
  */
-function titelVorschlag(jetzt: Dayjs): string {
-  return `Lageüberblick ${jetzt.format('HHmm')}`;
+function titelVorschlag(jetzt: Dayjs, formatiere: (d: Dayjs, format: string) => string): string {
+  return `Lageüberblick ${formatiere(jetzt, 'HHmm')}`;
 }
 
 export default function LageberichtePage() {
@@ -157,6 +159,7 @@ export default function LageberichtePage() {
     // hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
   });
 
+  const { formatiere } = useZeitEingabe();
   /**
    * Der Titelvorschlag wird beim Öffnen in den Formularspeicher geschrieben, nicht über
    * `initialValues`: der Speicher von rc-field-form überlebt `destroyOnHidden`, und beim nächsten
@@ -170,8 +173,8 @@ export default function LageberichtePage() {
    * der alte Grund sonst ein Bild lang über einem frischen Formular stünde.
    */
   useEffect(() => {
-    if (anlegenOffen) form.setFieldsValue({ titel: titelVorschlag(dayjs()) });
-  }, [anlegenOffen, form]);
+    if (anlegenOffen) form.setFieldsValue({ titel: titelVorschlag(dayjs(), formatiere) });
+  }, [anlegenOffen, form, formatiere]);
 
   if (einsatzQuery.isLoading) {
     return (
@@ -286,7 +289,7 @@ export default function LageberichtePage() {
           <Select options={VORLAGEN.map((v) => ({ value: v.schluessel, label: v.label }))} />
         </Form.Item>
         <Form.Item label="Zeitstand" name="zeitstand" extra="Leer gelassen: jetzt">
-          <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+          <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
         </Form.Item>
       </ErfassungsModal>
     </EinsatzSeite>

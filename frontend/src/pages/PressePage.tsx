@@ -1,4 +1,5 @@
-import { App, Breadcrumb, Button, Collapse, DatePicker, Flex, Form, Input, Space } from 'antd';
+import { App, Breadcrumb, Button, Collapse, Flex, Form, Input, Space } from 'antd';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { IkonePlus } from '../ikonen';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
@@ -486,7 +487,7 @@ export default function PressePage() {
                     <Input placeholder="Telefon oder E-Mail" />
                   </Form.Item>
                   <Form.Item label="Eingang" name="eingang" extra="Leer gelassen: jetzt">
-                    <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                    <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
                   </Form.Item>
                 </>
               ),
