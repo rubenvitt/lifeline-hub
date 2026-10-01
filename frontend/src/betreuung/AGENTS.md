@@ -16,7 +16,7 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Reihenfolge `juengste_meldung!`/`meldereihenfolge!` (`src/betreuung/repo.rs`); `aktuell` nur aus
   dem Zeiger am Objekt; fremdes Objekt 404 vor dem Lesen; nachgetragen ≥ 60 s
   (`istNachgetragen`); Rücknahme unumkehrbar mit Rückfrage (`betreuung/MeldeVerlauf.tsx`);
-  Aufklappen über `Datensicht.aufklappen` (`aufklappzeile` fällt mit LFH-697).
+  Aufklappen über `Datensicht.aufklappen`, seit LFH-697 der einzige Aufklappweg.
 - **Meldungen offline** (LFH-675, `openspec/changes/archive/2026-09-29-lfh-675-betreuung-meldungen-offline/design.md`):
   `offline/schreiben.ts` (`stand`/`belegung`) mit `client_id`; Replay-Lookup **vor** jeder
   Zustandsprüfung (auch nach Einsatzende, `EinsatzSchreibfreigabe`); Erfassungszeit nur an der vorgemerkten Kopie, online die Serveruhr.

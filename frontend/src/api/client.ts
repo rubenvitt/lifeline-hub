@@ -74,8 +74,26 @@ export class NetzFehler extends TypeError {
   }
 }
 
+const AUSGANG_UNBEKANNT_TEXT =
+  'Keine Antwort — ob die Aktion angekommen ist, ist unklar. Erst die Liste prüfen, dann erneut versuchen';
+
+/**
+ * Die Anfrage ist vollständig beim Server angekommen, die Antwort aber ausgeblieben (Zeitlimit
+ * oder Leitungsabbruch NACH dem letzten Byte, LFH-654). Ob der Server gespeichert hat, weiß der
+ * Client nicht — „NICHT abgeschickt“ wäre hier falsch. Als Unterklasse bleibt sie für jede
+ * Offline-Erkennung ein {@link NetzFehler}.
+ */
+export class AusgangUnbekannt extends NetzFehler {
+  constructor() {
+    super();
+    this.name = 'AusgangUnbekannt';
+    this.message = AUSGANG_UNBEKANNT_TEXT;
+  }
+}
+
 /** Bedienbarer Fehlertext für schreibende Aktionen; fachliche API-Meldungen bleiben erhalten. */
 export function fehlerText(e: unknown, standard = 'Aktion fehlgeschlagen'): string {
+  if (e instanceof AusgangUnbekannt) return AUSGANG_UNBEKANNT_TEXT;
   if (e instanceof NetzFehler) return NETZFEHLER_TEXT;
   if (e instanceof ApiError) return e.message;
   return standard;
@@ -182,6 +200,74 @@ export async function apiUpload<T>(
   } catch (e) {
     netzFehlerWerfen(e);
   }
+}
+
+/**
+ * Stand einer Übertragung (LFH-654): `senden` mit dem Anteil der übertragenen Bytes (0…1, `null`,
+ * wenn der Browser die Gesamtgröße nicht kennt), danach `pruefen` — das letzte Byte ist beim
+ * Server, die Antwort (Virenscan, Speichern) steht noch aus.
+ */
+export type UploadFortschritt = { phase: 'senden'; anteil: number | null } | { phase: 'pruefen' };
+
+export interface UploadMitFortschrittOptionen extends UploadOptionen {
+  onFortschritt?: (stand: UploadFortschritt) => void;
+}
+
+/** Status, deren `Response` keinen Body tragen darf. */
+const OHNE_BODY = new Set([204, 205, 304]);
+
+/**
+ * Upload mit Byte-Fortschritt (LFH-654) über `XMLHttpRequest`: `fetch` meldet keinen
+ * Upload-Fortschritt, ein Stream-Body (`duplex: 'half'`) fehlt in Safari/iOS. Köpfe, Cookie und
+ * Fehlerformat wie {@link apiUpload} — eine Nicht-2xx-Antwort läuft durch dasselbe
+ * `fehlerWerfen`. Bestandsweg für die übrigen Uploads bleibt `apiUpload`.
+ *
+ * Bricht die Leitung ab oder läuft das Zeitlimit ab, entscheidet die Phase: vor dem letzten Byte
+ * {@link NetzFehler} („nicht abgeschickt“), danach {@link AusgangUnbekannt}.
+ */
+export function apiUploadMitFortschritt<T>(
+  pfad: string,
+  formData: FormData,
+  optionen: UploadMitFortschrittOptionen = {},
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let uebertragen = false;
+    xhr.open('POST', pfad);
+    xhr.withCredentials = true;
+    xhr.timeout = optionen.timeoutMs ?? 15_000;
+    for (const [name, wert] of Object.entries(schreibKoepfe())) xhr.setRequestHeader(name, wert);
+
+    xhr.upload.addEventListener('progress', (e) => {
+      const anteil = e.lengthComputable && e.total > 0 ? e.loaded / e.total : null;
+      optionen.onFortschritt?.({ phase: 'senden', anteil });
+    });
+    xhr.upload.addEventListener('load', () => {
+      uebertragen = true;
+      optionen.onFortschritt?.({ phase: 'pruefen' });
+    });
+
+    const leitungWeg = () => reject(uebertragen ? new AusgangUnbekannt() : new NetzFehler());
+    xhr.addEventListener('error', leitungWeg);
+    xhr.addEventListener('timeout', leitungWeg);
+    xhr.addEventListener('abort', leitungWeg);
+    xhr.addEventListener('load', () => {
+      // Status 0 nach `load` gibt es nur ohne Antwort (z. B. CORS-Abbruch) — Leitung, nicht Server.
+      if (xhr.status === 0) return leitungWeg();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve((xhr.responseText.length === 0 ? undefined : JSON.parse(xhr.responseText)) as T);
+        } catch (e) {
+          reject(e);
+        }
+        return;
+      }
+      const body = OHNE_BODY.has(xhr.status) ? null : xhr.responseText;
+      fehlerWerfen(new Response(body, { status: xhr.status })).catch(reject);
+    });
+
+    xhr.send(formData);
+  });
 }
 
 export async function apiSend<T>(

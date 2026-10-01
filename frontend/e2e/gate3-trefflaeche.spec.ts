@@ -1009,6 +1009,121 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Fahrzeugseite: Besatzungs-Auslöser (LFH-697) ──────────────────────────────────────
+//
+// Die Besatzung klappt über den beschrifteten Aufklappbereich der `Datensicht` auf, nicht mehr
+// über antds 16-px-Symbol. Gemessen wird in BEIDEN Zweigen: Tabelle auf dem Fükw, Karte auf dem
+// Handschirm (unter `md` fehlte der Block bis LFH-697 ganz). Der Zweig ist Vorbedingung, sonst
+// mäße der Handschirm-Lauf still eine Tabelle. Nach dem Aufklappen muss der Block dastehen: ein
+// Knopf der richtigen Größe ohne Wirkung bestünde sonst.
+
+/** Zwei Fahrzeuge → zwei Auslöser je Zweig; `alleHaltenStufe` misst jeden. */
+const BESATZUNG_FAHRZEUGE = ['Florian Musterstadt 3/44-1', 'Florian Musterstadt 3/44-2'];
+
+const BESATZUNG_ZWEIGE = [
+  { zweig: 'tabelle', groesse: FUEKW },
+  { zweig: 'karte', groesse: HANDSCHIRM },
+] as const;
+
+/**
+ * Misst die Besatzungs-Auslöser je Stufe und Zweig. `schreibend` trennt die Rollenzweige: der
+ * Frei-Pool-Picker im aufgeklappten Block steht nur mit Schreibrecht da, der Auslöser in beiden
+ * (Aufklappen ist Lesen).
+ */
+async function messeBesatzungsAusloeser(
+  page: Page,
+  einsatzId: string,
+  schreibend: boolean,
+): Promise<string[]> {
+  const gemessen: string[] = [];
+  for (const { zweig, groesse } of BESATZUNG_ZWEIGE) {
+    await page.setViewportSize(groesse);
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+      await stelleDichte(page, dichte);
+
+      // Datenanker: beide gesäten Fahrzeuge tragen ihren Auslöser.
+      const ausloeser = page.getByRole('button', { name: /^Besatzung zu Florian Musterstadt 3\// });
+      await expect(ausloeser).toHaveCount(BESATZUNG_FAHRZEUGE.length);
+      // Vorbedingung: der erwartete Zweig steht.
+      if (zweig === 'tabelle') {
+        await expect(page.locator('.ant-table')).toHaveCount(1);
+      } else {
+        await expect(page.locator('.ant-table')).toHaveCount(0);
+        await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(
+          BESATZUNG_FAHRZEUGE.length,
+        );
+      }
+
+      const hoehe = await alleHaltenStufe(
+        ausloeser,
+        soll,
+        `Besatzung ${zweig} (${dichte})`,
+        BESATZUNG_FAHRZEUGE.length,
+      );
+
+      const erster = page.getByRole('button', {
+        name: `Besatzung zu ${BESATZUNG_FAHRZEUGE[0]}`,
+        exact: true,
+      });
+      await expect(erster).toHaveAttribute('aria-expanded', 'false');
+      await erster.click();
+      await expect(erster).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByText('Keine Besatzung zugeordnet')).toBeVisible();
+      await expect(page.getByText('Kraft zur Besatzung …')).toHaveCount(schreibend ? 1 : 0);
+
+      gemessen.push(`${zweig} ${dichte} (Soll ≥ ${soll}): Besatzung ${hoehe}`);
+    }
+  }
+  return gemessen;
+}
+
+async function besatzungEinsatz(page: Page, bezeichnung: string): Promise<string> {
+  const einsatzId = await einsatzAnlegen(page, bezeichnung);
+  for (const funkrufname of BESATZUNG_FAHRZEUGE) {
+    await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, 'Fahrzeug');
+  }
+  return einsatzId;
+}
+
+test('Fahrzeuge: der Besatzungs-Auslöser folgt in Tabelle und Karte der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  // Zwei Zweige × drei Stufen, je ein Neuladen.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await besatzungEinsatz(page, `E2E Gate3 ${Date.now()} Besatzung`);
+
+  const gemessen = await messeBesatzungsAusloeser(page, einsatzId, true);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Frei-Pool fehlt', async ({
+  page,
+}) => {
+  // LFH-435: ohne Schreibrecht fehlen „Ad-hoc-Fahrzeug" im Kopf und der Frei-Pool-Picker im
+  // aufgeklappten Block; der Auslöser bleibt, Aufklappen ist Lesen.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await besatzungEinsatz(page, `E2E Gate3 ${Date.now()} Besatzung Lesend`);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  // Datenanker vor der Abwesenheit: die Seite trägt ihre Fahrzeuge.
+  await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+  await expect(
+    page.getByRole('button', { name: /^Besatzung zu Florian Musterstadt 3\// }),
+  ).toHaveCount(BESATZUNG_FAHRZEUGE.length);
+  await expect(
+    page.getByRole('button', { name: 'Ad-hoc-Fahrzeug', exact: true }),
+    'Vorbedingung: ohne Schreibrecht kein „Ad-hoc-Fahrzeug"',
+  ).toHaveCount(0);
+
+  const gemessen = await messeBesatzungsAusloeser(page, einsatzId, false);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Stab ────────────────────────────────────────────────────────────────────────────
 //
 // Vitest belegt für `stabZeilenzielStil` nur den Inline-Style, nicht dass ein `<Link>` in

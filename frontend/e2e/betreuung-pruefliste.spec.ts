@@ -23,12 +23,10 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * laufen („angeordnet", „läuft", „fast voll"; „voll", „überbelegt"). Ebenso tragend ist der
  * gewählte Radio-Knopf, dessen Text `src/index.css` auf `--lfh-bedien-text` setzt.
  *
- * ZWEI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen; bis dahin gilt 4,5 : 1, der
- * Zielwert steht in jeder Meldung:
- *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
- *  · Rot am Tag → LFH-693: der Menüeintrag „Stornieren" und der rote Knopf im Storno-Dialog.
- * Fallen die Ausnahmen, wenn diese Tickets landen. Der Primärknopf (Weiß auf `bedien`) trägt
- * seit LFH-661 den vollen Boden.
+ * EINE BENANNTE AUSNAHME — Eigenschaft einer geteilten Rolle; bis dahin gilt 4,5 : 1, der
+ * Zielwert steht in jeder Meldung: Rot am Tag → LFH-693, der Menüeintrag „Stornieren" und der
+ * rote Knopf im Storno-Dialog. Fällt, wenn das Ticket landet. Tertiärtext (`schwach`, LFH-643)
+ * und der Primärknopf (Weiß auf `bedien`, LFH-661) tragen den vollen Boden.
  *
  * ═══ KRITERIUM 13 — Fokus nie verdeckt (WCAG 2.4.11) ════════════════════════════════════
  *
@@ -42,29 +40,13 @@ import { kontrast, randKontrast } from './kontrast-kern';
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die drei Ausnahmen oben. */
+/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die Ausnahme oben. */
 const BODEN = 4.5;
 const ZUSTAND = 3;
 
 const FUEKW = { width: 1366, height: 600 };
 const HANDSCHIRM = { width: 390, height: 844 };
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
-
-/**
- * Tertiärtext, enumeriert — ausschließlich über Selektoren, die den TRÄGER selbst treffen,
- * nie einen Container: `closest()` senkte sonst still den Boden für alles darin.
- */
-const TERTIAER = [
-  '.ant-typography-secondary',
-  // Augenbraue (`schwach`): Blockköpfe und Feldetiketten der Bezirkskarte.
-  '.lfh-augenbraue',
-  // Kopf der Stellentabelle (`schwach`). Die Kopfzelle IST der Träger: sonst stehen darin nur
-  // `aria-hidden`-Zeichen für Sortierung und Filter.
-  '.ant-table-thead > tr > th',
-  '.ant-form-item-extra',
-  '.ant-select-placeholder',
-  '.lfh-seitenkopf__pfad li:not(:last-child)',
-].join(', ');
 
 const BEZIRKE = [
   {
@@ -220,19 +202,17 @@ async function weitereAufklappen(page: Page, dialog: Locator) {
 interface Textknoten {
   ziel: Locator;
   text: string;
-  tertiaer: boolean;
   rotText: boolean;
   weissAufAlarm: boolean;
 }
 
 /** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text (Muster Verpflegung). */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
-  const funde = await wurzel.evaluate((w, tertiaer) => {
+  const funde = await wurzel.evaluate((w) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
     const liste: {
       text: string;
-      tertiaer: boolean;
       rotText: boolean;
       weissAufAlarm: boolean;
     }[] = [];
@@ -248,13 +228,12 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
       el.setAttribute('data-kontrastprobe', String(liste.length));
       liste.push({
         text: eigen,
-        tertiaer: el.closest(tertiaer) != null,
         rotText: el.closest('.ant-dropdown-menu-item-danger') != null,
         weissAufAlarm: el.closest('.ant-btn-dangerous.ant-btn-primary') != null,
       });
     }
     return liste;
-  }, TERTIAER);
+  });
   return funde.map((f, i) => ({ ...f, ziel: wurzel.locator(`[data-kontrastprobe="${i}"]`) }));
 }
 
@@ -354,11 +333,10 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer, rotText, weissAufAlarm } of knoten) {
+      for (const { ziel, text, rotText, weissAufAlarm } of knoten) {
         const m = await kontrast(ziel);
-        const ausnahme = tertiaer
-          ? 'Tertiärtext → LFH-643'
-          : tag && rotText
+        const ausnahme =
+          tag && rotText
             ? 'Rot als Text → LFH-693'
             : tag && weissAufAlarm
               ? 'Weiß auf alarm → LFH-693'
@@ -494,7 +472,8 @@ for (const modus of ['light', 'dark'] as const) {
       ['kopf', 'Evakuierungsbezirk anlegen'],
     ] as const)
       pruefeGesehen(flaeche, tragend, true);
-    for (const [flaeche, ausnahme] of [
+    // Tertiärtext (`schwach`), bis LFH-643 unter einer Ausnahme, jetzt tragend.
+    for (const [flaeche, tertiaer] of [
       // Sekundärtext der Stellentabelle: „keine Meldung" (Sporthalle West, Schule Nord) und
       // „—" (frei, Kapazität, Stand, Abschnitt).
       ['inhalt', 'keine Meldung'],
@@ -517,7 +496,7 @@ for (const modus of ['light', 'dark'] as const) {
         'Leer: jetzt. Eine nachgetragene ältere Meldung ändert den aktuellen Stand nicht.',
       ],
     ] as const)
-      pruefeGesehen(flaeche, ausnahme, false);
+      pruefeGesehen(flaeche, tertiaer, true);
     // Am Tag unter einer Ausnahme, nachts tragend: Rot als Text und Weiß auf `alarm` (LFH-693).
     for (const [flaeche, nurTagsAusnahme] of [
       ['Zeilenmenü', 'Stornieren'],
