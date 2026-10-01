@@ -20,6 +20,9 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
 - **Meldungen offline** (LFH-675, `openspec/changes/archive/2026-09-29-lfh-675-betreuung-meldungen-offline/design.md`):
   `offline/schreiben.ts` (`stand`/`belegung`) mit `client_id`; Replay-Lookup **vor** jeder
   Zustandsprüfung (auch nach Einsatzende, `EinsatzSchreibfreigabe`); Erfassungszeit nur an der vorgemerkten Kopie, online die Serveruhr.
+  Die Erfassungszeit ist nach der Serveruhr bemessen (`serverJetzt()` aus `offline/serveruhr.ts`, Versatz aus dem
+  `Date`-Header jeder eigenen API-Antwort), nie nach `dayjs()`: ein vorgehendes Gerät scheiterte sonst am
+  Zukunftsriegel (LFH-705, `openspec/changes/lfh-705-serveruhr-versatz-offline/design.md`).
 - **Verpflegung** (LFH-634, `pages/VerpflegungPage.tsx`, `src/verpflegung/`): eigene Zeitfenster;
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge
   der EP; Ausgabe verweist nur per `nachforderung_id`; Einstufung im Client
