@@ -48,16 +48,24 @@ const gitkeepBewahren = (): Plugin => {
 // verwirft Vite das Transform-Ergebnis samt leerer Map und liefert die geladene Map doch aus.
 // Nur im e2e-Lauf (`playwright.config.ts` setzt die Variable): im Entwickeln bleiben die Pakete
 // debugbar. Gemessen wird das in `e2e/dev-server-antwortgroesse.spec.ts`.
-const depsOhneSourcemap = (): Plugin => ({
+//
+// Registriert ist das Plugin IMMER, geschaltet wird im Handler: Vite bildet den Cache-Hash der
+// Vorbündelung auch aus den Plugin-Namen. Stünde es nur im e2e-Lauf in der Liste, schriebe jeder
+// Wechsel zwischen `pnpm dev` und `pnpm e2e` das geteilte `node_modules/.vite/deps` neu, und ein
+// laufender Dev-Server verlöre seine Chunks mitten in der Sitzung.
+const depsOhneSourcemap = (aktiv: boolean): Plugin => ({
   name: 'lifeline-deps-ohne-sourcemap',
   apply: 'serve',
   enforce: 'pre',
   transform: {
     filter: { id: /\/node_modules\/\.vite\/deps\// },
-    handler: (code) => ({
-      code: `${code}\n// Sourcemap im e2e-Lauf weggelassen (LFH-659)\n`,
-      map: { mappings: '' },
-    }),
+    handler: (code) =>
+      aktiv
+        ? {
+            code: `${code}\n// Sourcemap im e2e-Lauf weggelassen (LFH-659)\n`,
+            map: { mappings: '' },
+          }
+        : null,
   },
 });
 
@@ -72,7 +80,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       gitkeepBewahren(),
-      env.LIFELINE_DEPS_OHNE_SOURCEMAP === '1' && depsOhneSourcemap(),
+      depsOhneSourcemap(env.LIFELINE_DEPS_OHNE_SOURCEMAP === '1'),
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
