@@ -87,7 +87,7 @@
 - [x] 8.1 `frontend/src/pages/lagekarte/AGENTS.md` Punkt „Ortssuche“ und
       `frontend/src/command-palette/AGENTS.md` Satz zur Adresszeile (D7), Prettier über
       `frontend/`. Prüfung: `scripts/check-fmt.sh` grün.
-- [ ] 8.2 e2e `frontend/e2e/lagekarte-ortssuche.spec.ts` (Regeln `frontend/e2e/AGENTS.md`):
+- [x] 8.2 e2e `frontend/e2e/lagekarte-ortssuche.spec.ts` (Regeln `frontend/e2e/AGENTS.md`):
       Koordinate tippen → Treffer → Nadel-Band sichtbar; Adresssuche mit abgefangener Route
       (ein Treffer → Direktflug); `?ort=` bei 390 px öffnet die Leiste mit Gruppe „Adresse“;
       Tipp auf Marker unter der Nadel wählt den Marker. Prüfung: Spec grün.
