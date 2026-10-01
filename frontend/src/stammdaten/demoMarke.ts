@@ -1,6 +1,7 @@
 /**
- * Demo-Stammdaten in den Dispositions-Auswahllisten (LFH-733,
- * `openspec/changes/lfh-733-demo-stammdaten-kennzeichnen/design.md` D1/D5).
+ * Demo-Stammdaten in den Dispositions-Auswahllisten (LFH-733; Regel in `frontend/AGENTS.md`,
+ * Bedien-Leitlinie; Herleitung in `openspec/changes/lfh-733-demo-stammdaten-kennzeichnen/design.md`
+ * D1/D5).
  *
  * Demo-Stammdaten werden **gekennzeichnet, nie ausgeblendet**: Wer einen Funkrufnamen im
  * Katalog „in Dienst“ sieht, findet ihn auch in der Auswahl. Das Wort „Demo“ steht im

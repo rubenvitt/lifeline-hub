@@ -244,7 +244,7 @@ export default function MaterialPage() {
 
   // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach als getrennte Position
   // disponiert werden (Mengen-Splitting auf Einheiten). Demo-Stammdaten gekennzeichnet und
-  // hinten, nie ausgeblendet (LFH-733, `stammdaten/demoMarke.ts`).
+  // hinten, nie ausgeblendet (`frontend/AGENTS.md`, Bedien-Leitlinie, LFH-733).
   const poolOptionen = dispositionsOptionen(
     poolQuery.data ?? [],
     (m) => `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,

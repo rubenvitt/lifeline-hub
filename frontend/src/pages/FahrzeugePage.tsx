@@ -420,7 +420,7 @@ export default function FahrzeugePage() {
   const disponierteIds = new Set(
     efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null),
   );
-  // Demo-Stammdaten gekennzeichnet und hinten, nie ausgeblendet (LFH-733, `stammdaten/demoMarke.ts`).
+  // Demo-Stammdaten gekennzeichnet und hinten, nie ausgeblendet (`frontend/AGENTS.md`, Bedien-Leitlinie, LFH-733).
   const poolOptionen = dispositionsOptionen(
     (poolQuery.data ?? []).filter((f) => !disponierteIds.has(f.id)),
     (f) => `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,

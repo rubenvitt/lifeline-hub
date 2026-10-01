@@ -4,7 +4,7 @@ Gilt für den Server (`src/`, `tests/`, `migrations/`), zusätzlich zur `AGENTS.
 Pfade ohne Präfix sind relativ zu `src/`. Fachblöcke mit Server- und Client-Anteil stehen
 einmal, beim Client: ETB-Zähler und Modulzähler in `frontend/src/etb/AGENTS.md`, Betreuung und
 Verpflegung in `frontend/src/betreuung/AGENTS.md`, Sitzung über mehrere Tabs (412) in
-`frontend/src/auth/AGENTS.md`.
+`frontend/src/auth/AGENTS.md`, Demo-Marke an Stammdaten (LFH-733) in `frontend/AGENTS.md`.
 
 ## Backend — Statuscode-Konvention (LFH-267/F22)
 
@@ -81,10 +81,6 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
 - 404 ohne Schalter kommt aus der Registrierung (`RouterOptionen { demo_daten }`,
   `build_router_mit`); den Demo-Status liest das Frontend nur über `GET /api/demo-daten`
   (`admin/useDemoDaten.ts`).
-- **Demo-Marke an Stammdaten** (LFH-733): `demo` der Fahrzeug-/Personal-/Material-DTOs kommt beim
-  Lesen aus `demo_herkunft` (`EXISTS` in `SPALTEN`), nie aus einer eigenen Spalte. Die Oberfläche
-  kennzeichnet Demo-Stammdaten und blendet sie nie aus (`components/DemoMarke.tsx`,
-  Auswahllisten über `stammdaten/demoMarke.ts`).
 - **Import ist eine Transaktion nur über `…_tx(conn)`-Funktionen** (eine Pool-Funktion unter
   offener `BEGIN IMMEDIATE` endet in 503); kein rohes SQL.
 - **Löschen erreicht strukturell nur Demo-Daten** (Einsatz-ID aus `demo_import`, `org_id` in jedem

@@ -95,6 +95,7 @@ describe('MaterialPage', () => {
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const feld = container.querySelector('[data-row-key="10"] .ant-input-number');
+    expect(feld).not.toBeNull();
     expect(feld!.className).not.toMatch(/ant-input-number-sm\b/);
   });
 

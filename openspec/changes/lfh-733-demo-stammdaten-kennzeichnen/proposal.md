@@ -36,9 +36,9 @@ Keine.
 
 ### Modified Capabilities
 
-- `demo-daten`: neue Anforderung „Sichtbare Demo-Marke an Stammdaten“. Sie umfasst das Feld
-  im Lese-Vertrag, die Marke in den Katalogen und auf den Detailseiten sowie die
-  Kennzeichnung samt Sortierung in den Dispositions-Auswahllisten.
+- `demo-daten`: drei neue Anforderungen, „Demo-Marke im Lese-Vertrag der Stammdaten“,
+  „Demo-Marke in Katalogen und Detailseiten“ und „Demo-Stammdaten in den
+  Dispositions-Auswahllisten“ (Kennzeichnung samt Sortierung).
 
 ## Impact
 
@@ -51,6 +51,7 @@ Keine.
   Pflichtfeld.
 - **Frontend:** `stammdaten/{Fahrzeuge,Personal,Material}Tab.tsx`,
   `stammdaten/{Fahrzeug,Personal}DetailPage.tsx`, `pages/{Fahrzeuge,Personal,Material}Page.tsx`,
-  eine geteilte Marke samt Darstellung in `theme/statusFarben.ts`.
+  die Marke als Einzeldarstellung in `components/DemoMarke.tsx` (keine Karte in
+  `theme/statusFarben.ts`) und die Optionsfunktion in `stammdaten/demoMarke.ts`.
 - **Nicht betroffen:** Demo-Import und Entfernen, Offline-Lagebild, Druck, die
   Dispositionstabellen im Einsatz (s. design.md, Non-Goals).

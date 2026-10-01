@@ -248,6 +248,11 @@ anwendbar), „nicht geprüft" ist keins.
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt
   (`/admin/stammdaten/{fahrzeuge,personal}/:id`), sonst Einzel-GET; Admin-Pfade in
   `admin/adminNav.tsx`.
+- **Demo-Stammdaten werden gekennzeichnet, nie ausgeblendet** (LFH-733, Client und Server): `demo`
+  der Fahrzeug-/Personal-/Material-DTOs leitet der Server beim Lesen aus `demo_herkunft` ab
+  (`EXISTS` in `SPALTEN` der Repos unter `src/`), nie aus einer eigenen Spalte. Kennung samt Marke
+  über `components/DemoMarke.tsx`; Auswahllisten über `stammdaten/demoMarke.ts` (Wortlaut
+  „ · Demo“, markierte Einträge hinten).
 
 **Inline-Bearbeitung und Status**
 

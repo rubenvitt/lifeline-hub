@@ -637,8 +637,10 @@ describe('PersonalPage · Datenzustände', () => {
     expect(screen.queryByText('Personalliste konnte nicht geladen werden')).not.toBeInTheDocument();
   });
 
-  // LFH-733, design.md D5: „Demo“ steht im Wortlaut, also findet die Suche es.
-  it('Tippen von „Demo“ lässt nur die Demo-Personen in der Auswahl', async () => {
+  // LFH-733, design.md D5: „Demo“ steht im Wortlaut, also findet die Suche jede Demo-Person.
+  // Die Suche bleibt eine Teilstring-Suche: wer „Demo“ im eigenen Namen trägt, bleibt auch
+  // stehen; erst der Zusatz „· Demo“ grenzt genau auf die markierten ein.
+  it('Tippen von „Demo“ behält jede Demo-Person, „· Demo“ nur sie', async () => {
     const { container } = zeige(
       http.get('/api/personal', () =>
         HttpResponse.json([
@@ -671,7 +673,13 @@ describe('PersonalPage · Datenzustände', () => {
     const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
       s.textContent?.includes('Person aus Pool disponieren …'),
     );
-    await userEvent.type(within(feld!).getByRole('combobox'), '· Demo');
+    const eingabe = within(feld!).getByRole('combobox');
+    await userEvent.type(eingabe, 'Demo');
+    await waitFor(() =>
+      expect(sichtbareOptionen()).toEqual(['Dora Demo-Frei', 'Berta Beispiel (DEMO-P-002) · Demo']),
+    );
+    await userEvent.clear(eingabe);
+    await userEvent.type(eingabe, '· Demo');
     await waitFor(() =>
       expect(sichtbareOptionen()).toEqual(['Berta Beispiel (DEMO-P-002) · Demo']),
     );
@@ -806,11 +814,6 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
   });
 });
 
-/**
- * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:
- * dessen Knoten trägt `pointer-events: none`. Gegriffen wird die Combobox — der Knoten, den auch
- * die Tastatur fokussiert.
- */
 /** Die Optionen eines geöffneten Auswahlfelds in Anzeigereihenfolge (LFH-733). */
 function sichtbareOptionen(): string[] {
   return [...document.querySelectorAll<HTMLElement>('.ant-select-item-option-content')].map(
@@ -818,6 +821,11 @@ function sichtbareOptionen(): string[] {
   );
 }
 
+/**
+ * Öffnet ein antd-Auswahlfeld über seinen Platzhaltertext. Nicht per Klick auf den Platzhalter:
+ * dessen Knoten trägt `pointer-events: none`. Gegriffen wird die Combobox — der Knoten, den auch
+ * die Tastatur fokussiert.
+ */
 async function oeffnePersonalAuswahl(container: HTMLElement, platzhalter: string) {
   const feld = [...container.querySelectorAll<HTMLElement>('.ant-select')].find((s) =>
     s.textContent?.includes(platzhalter),

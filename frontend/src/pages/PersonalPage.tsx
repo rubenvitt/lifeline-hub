@@ -219,7 +219,7 @@ export default function PersonalPage() {
   const disponierteIds = new Set(
     eps.map((e) => e.personal_id).filter((x): x is number => x != null),
   );
-  // Demo-Stammdaten gekennzeichnet und hinten, nie ausgeblendet (LFH-733, `stammdaten/demoMarke.ts`).
+  // Demo-Stammdaten gekennzeichnet und hinten, nie ausgeblendet (`frontend/AGENTS.md`, Bedien-Leitlinie, LFH-733).
   const poolOptionen = dispositionsOptionen(
     (poolQuery.data ?? []).filter((p) => !disponierteIds.has(p.id)),
     (p) => `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}`,

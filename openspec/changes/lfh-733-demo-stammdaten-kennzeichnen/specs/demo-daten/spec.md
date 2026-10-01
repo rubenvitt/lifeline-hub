@@ -54,8 +54,8 @@ zeigen. Zeilen mit `demo: false` MUST ohne Marke bleiben.
 
 Die Auswahllisten, mit denen ein Einsatz Fahrzeuge, Personal oder Material aus den
 Stammdaten disponiert, SHALL Demo-Stammdaten anbieten und kennzeichnen, nicht ausblenden.
-Eine Option mit `demo: true` MUST das Wort „Demo“ im Wortlaut tragen, über die Suche
-auffindbar sein und hinter allen Optionen ohne Marke stehen. Innerhalb beider Gruppen MUST
+Eine Option mit `demo: true` MUST das Wort „Demo“ im Wortlaut tragen, über die Suche nach
+„Demo“ auffindbar sein und hinter allen Optionen ohne Marke stehen. Innerhalb beider Gruppen MUST
 die bisherige Reihenfolge erhalten bleiben. Das gilt in jedem Einsatz.
 
 #### Scenario: Echter Einsatz
@@ -64,7 +64,8 @@ die bisherige Reihenfolge erhalten bleiben. Das gilt in jedem Einsatz.
 
 #### Scenario: Suche nach dem Wort
 - **WHEN** jemand in der Personal-Auswahl „Demo“ tippt
-- **THEN** bleiben genau die Personen mit `demo: true` übrig
+- **THEN** bleibt jede Person mit `demo: true` in der Auswahl
+- **AND** eine Person ohne Marke bleibt nur, wenn ihr eigener Wortlaut „Demo“ enthält
 
 #### Scenario: Gewählte Option
 - **WHEN** jemand ein Demo-Material auswählt
