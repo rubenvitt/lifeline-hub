@@ -162,6 +162,61 @@ describe('ZeitfensterKarte — Ausgaben', () => {
   });
 });
 
+describe('ZeitfensterKarte — ausstehende Ausgaben (LFH-688)', () => {
+  const vorgemerkt = (menge: number, client_id: string) => ({
+    id: 1,
+    benutzer_id: 11,
+    einsatz_id: 1,
+    erstellt_at: '2026-09-24T09:40:00.000Z',
+    aktion: {
+      art: 'ausgabe' as const,
+      zeitfenster_id: 1,
+      bezeichnung: 'Mittag',
+      daten: {
+        menge,
+        ort: 'Deich',
+        sonderkost: { vegan: 2 },
+        zeitpunkt_at: '2026-09-24 09:40:00',
+        client_id,
+      },
+    },
+  });
+
+  it('steht als „ausstehend“ ohne Rücknahme da und zählt nicht in die Deckung', () => {
+    // Bedarf 250, ausgegeben 100 (Server), vorgemerkt 120 → weiter Fehlmenge 150.
+    const { karte } = zeige(
+      zeitfenster({
+        ausgegeben: { gesamt: 100, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
+        fehlmenge: { gesamt: 150, sonderkost: KEINE_SONDERKOST },
+        ausgaben: [ausgabe({ id: 11, menge: 100 })],
+      }),
+      { ausstehend: [vorgemerkt(120, 'a-1')] },
+    );
+    const zeile = karte.querySelector<HTMLElement>('[data-lfh="verpflegung-ausgabe-ausstehend"]');
+    expect(zeile).not.toBeNull();
+    expect(within(zeile!).getByText('ausstehend')).toBeInTheDocument();
+    expect(within(zeile!).getByText('120 EP')).toBeInTheDocument();
+    expect(zeile!.textContent).toContain('Deich');
+    expect(zeile!.textContent).toContain('2 vegan');
+    expect(within(zeile!).queryByRole('button')).toBeNull();
+    expect(within(fehltWert(karte)).getByText('150')).toBeInTheDocument();
+    expect(karte.querySelectorAll('[data-lfh="verpflegung-ausgabe"]')).toHaveLength(1);
+  });
+
+  it('zeigt die Liste auch, wenn bisher nur Ausstehendes da ist', () => {
+    const { karte } = zeige(
+      zeitfenster({
+        ausgegeben: { gesamt: 0, sonderkost: KEINE_SONDERKOST },
+        fehlmenge: { gesamt: 250, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
+        ausgaben: [],
+      }),
+      { ausstehend: [vorgemerkt(40, 'a-2')] },
+    );
+    expect(within(karte).getByRole('list', { name: `Ausgaben zu ${kennung}` })).toBeInTheDocument();
+    expect(karte.querySelectorAll('[data-lfh="verpflegung-ausgabe-ausstehend"]')).toHaveLength(1);
+  });
+});
+
 describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
   it('ohne Schreibrecht keine Aktionen, auch keine Rücknahme', () => {
     const { karte } = zeige(zeitfenster(), { darfSchreiben: false });
