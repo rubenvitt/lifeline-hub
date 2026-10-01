@@ -41,6 +41,9 @@ import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
 import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
 import { EIGENPOSITION_SPERRGRUND, useEigenposition } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
+import SuchnadelBand from './lagekarte/SuchnadelBand';
+import type { GefundenerOrt } from '../anzeige/ortssuche';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import PlatzierSteuerung, { type PlatzierModus } from './lagekarte/PlatzierSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
@@ -426,6 +429,37 @@ export default function LagekartePage() {
   // sich ausblenden, die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und Vorrang in
   // `lagekarte/leistenWahl.ts`. Der laufende Kartenmodus gibt unter `lg` die Karte frei (LFH-765).
   const leistenWahl = useLeistenWahl(breit, exklusiverModusAktiv);
+  const zeigeLeiste = leistenWahl.zeige;
+
+  // Ortssuche (LFH-638, Spec `lagekarte-ortssuche`): höchstens eine Suchnadel, nur in diesem Zustand
+  // — nicht in Ansicht, Snapshot oder Speicher, nach dem Neuladen fort.
+  const { formatKoordinate } = useAnzeigeKonventionen();
+  const [suchnadel, setSuchnadel] = useState<GefundenerOrt | null>(null);
+  const [ortVorbelegung, setOrtVorbelegung] = useState<{ text: string; nonce: number } | null>(
+    null,
+  );
+  const zeigeOrt = useCallback(
+    (ort: GefundenerOrt) => {
+      setSuchnadel(ort);
+      setFlyToZiel({ lng: ort.lon, lat: ort.lat });
+    },
+    [setFlyToZiel],
+  );
+  // Die Nonce zählt in einer Ref weiter: die Vorbelegung wird nach der Übernahme geräumt, und der
+  // nächste `?ort=` braucht trotzdem eine neue Nonce.
+  const ortNonceRef = useRef(0);
+  const vorbelegungVerbraucht = useCallback(
+    (nonce: number) => setOrtVorbelegung((v) => (v?.nonce === nonce ? null : v)),
+    [],
+  );
+  const ortssuche = useMemo(
+    () => ({
+      onOrtWaehlen: zeigeOrt,
+      vorbelegung: ortVorbelegung,
+      onVorbelegungVerbraucht: vorbelegungVerbraucht,
+    }),
+    [zeigeOrt, ortVorbelegung, vorbelegungVerbraucht],
+  );
 
   const {
     bilder,
@@ -630,13 +664,21 @@ export default function LagekartePage() {
     const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
     if (!auftrag) return;
     if (ladt) return;
-    // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf — sonst endete der Klick in
-    // einem 403. Bis die Rechte feststehen, bleibt der Auftrag stehen.
-    const istStelle = auftrag.typ === 'betreuungsstelle';
-    if (istStelle && !rechteBekannt) return;
+    // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf, eine Person nur mit dem Modul
+    // Personen (LFH-670) — sonst endete der Klick in einem 403. Bis die Rechte feststehen, bleibt
+    // der Auftrag stehen.
+    const modulZugriff =
+      auftrag.typ === 'betreuungsstelle'
+        ? betreuungZugriff
+        : auftrag.typ === 'person'
+          ? personenZugriff
+          : null;
+    if (modulZugriff !== null && !rechteBekannt) return;
     // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
     // Modus startete, und der Parameter blieb in der URL stehen.
-    if (darfSchreiben && (!istStelle || betreuungZugriff === 'frei')) onPlatzierenStart(auftrag);
+    if (darfSchreiben && (modulZugriff === null || modulZugriff === 'frei')) {
+      onPlatzierenStart(auftrag);
+    }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('platzieren');
     setSearchParams(naechste, { replace: true });
@@ -648,6 +690,7 @@ export default function LagekartePage() {
     onPlatzierenStart,
     rechteBekannt,
     betreuungZugriff,
+    personenZugriff,
   ]);
 
   /**
@@ -665,11 +708,39 @@ export default function LagekartePage() {
     if (roh === null) return;
     if (ladt) return;
     const zentrum = parseKartenzentrum(roh);
-    if (zentrum) setFlyToZiel({ lng: zentrum.lon, lat: zentrum.lat });
+    // Mit Suchnadel (LFH-638): der Sprung markiert die Stelle, beschriftet im eingestellten Format.
+    if (zentrum) {
+      zeigeOrt({
+        lat: zentrum.lat,
+        lon: zentrum.lon,
+        beschriftung: formatKoordinate(zentrum.lat, zentrum.lon),
+        art: 'koordinate',
+      });
+    }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('zentrum');
     setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, setFlyToZiel]);
+  }, [searchParams, setSearchParams, ladt, zeigeOrt, formatKoordinate]);
+
+  /**
+   * Adresssuche per Link: `?ort=<Text>` aus der Sprungpalette (LFH-638) — Text ins Suchfeld der
+   * Leiste, Adresssuche auslösen, Leiste zeigen (am Handschirm nur für die Sitzung, `zeige()`),
+   * dann räumen. Wie beim Koordinatensprung erst mit geladener Seite: vorher steht keine Leiste.
+   */
+  useEffect(() => {
+    const roh = searchParams.get('ort');
+    if (roh === null) return;
+    if (ladt) return;
+    const text = roh.trim();
+    if (text) {
+      ortNonceRef.current += 1;
+      setOrtVorbelegung({ text, nonce: ortNonceRef.current });
+      zeigeLeiste();
+    }
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('ort');
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, ladt, zeigeLeiste]);
 
   if (ladt) {
     return <SeitenSkeleton />;
@@ -909,6 +980,7 @@ export default function LagekartePage() {
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
         eigenposition={eigenposition.position}
+        suchnadel={suchnadel}
       />
       <KartenUeberlagerung
         grundlage={istSchmal ? null : grundlageWahl}
@@ -1009,6 +1081,7 @@ export default function LagekartePage() {
           onNeu={() => kartenRef.current?.neuMessen()}
           onBeenden={onMessenBeenden}
         />
+        <SuchnadelBand ort={suchnadel} onEntfernen={() => setSuchnadel(null)} />
         {/* Maßstab: MapLibres `ScaleControl`, von `Kartenflaeche` über `IControl` in dieses
             Band gehängt — nicht in MapLibres Ecke, die absolut über dem Fuß läge. */}
         <div
@@ -1072,6 +1145,7 @@ export default function LagekartePage() {
         // Betroffene zählen nicht zum Lagebild-Fehler, gehören aber bei eingeschalteter Ebene zur
         // Suche — ihr Ausfall macht sie unvollständig.
         suchbarUnvollstaendig={lagebildFehler || (personenFehler && layer.person)}
+        ortssuche={ortssuche}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={onPlatzierenStart}

@@ -2511,6 +2511,7 @@ export interface components {
         ModulZaehlerAnzeige: {
             auftraege?: components["schemas"]["AuftragsZaehler"] | null;
             chat?: components["schemas"]["ChatZaehler"] | null;
+            dokumente?: components["schemas"]["MengenZaehler"] | null;
             einheiten?: components["schemas"]["MengenZaehler"] | null;
             einsatzabschnitte?: components["schemas"]["MengenZaehler"] | null;
             erinnerungen?: components["schemas"]["ErinnerungsZaehler"] | null;
@@ -2821,6 +2822,23 @@ export interface components {
             logo?: components["schemas"]["OrgLogoAnzeige"] | null;
             name: string;
             tz_organisation?: string | null;
+        };
+        OrtSucheAntwort: {
+            treffer: components["schemas"]["OrtTreffer"][];
+            zustand: components["schemas"]["OrtSucheZustand"];
+        };
+        /**
+         * @description Ausgang der Adresssuche. `ok` ohne Treffer heißt „nichts gefunden“.
+         * @enum {string}
+         */
+        OrtSucheZustand: "ok" | "ausgelastet" | "nicht_erreichbar";
+        OrtTreffer: {
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lon: number;
+            /** @description Anzeigename des Geocoders (bei Nominatim `display_name`). */
+            name: string;
         };
         /**
          * @description LFH-265: beide Felder werden ABSENT statt present-null serialisiert, damit der generierte

@@ -663,6 +663,39 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
     expect(within(menue).queryByRole('menuitem', { name: /Prognose löschen/ })).toBeNull();
   });
 
+  it('mit Prognose: Einheitsform des Menüs — neutral, EIN Trenner, dann rot Löschen und Entfernen (LFH-683)', async () => {
+    // Spec `datensatz-aktionsmenue`, Szenario „Pegel mit Prognose". Vorher trennte ein zweiter
+    // Trenner das Verschieben von der Prognose; das Einheitsmenü kennt genau einen.
+    stelleBereit();
+    prognoseRouten([mitPrognose(ZUKUNFT)]);
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Pegel HANN. MÜNDEN' }));
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    const folge = [...menue.children].map((k) =>
+      k.classList.contains('ant-dropdown-menu-item-divider') ? '—' : k.textContent,
+    );
+    expect(folge).toEqual([
+      'Nach oben',
+      'Nach unten',
+      'Prognose ändern …',
+      '—',
+      'Prognose löschen',
+      'Entfernen',
+    ]);
+    for (const name of [/Prognose löschen/, /Entfernen/]) {
+      expect(within(menue).getByRole('menuitem', { name })).toHaveClass(
+        'ant-dropdown-menu-item-danger',
+      );
+    }
+  });
+
   it('Erfassen: Vorschlag aus der Vorhersage übernehmen und speichern → PUT in cm', async () => {
     stelleBereit();
     const aufrufe = prognoseRouten([HMUE], 'ja');

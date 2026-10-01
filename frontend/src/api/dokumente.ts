@@ -1,4 +1,4 @@
-import { apiGet, apiSend, apiUpload } from './client';
+import { apiGet, apiSend, apiUploadMitFortschritt, type UploadFortschritt } from './client';
 import type { Dokument, DokumentKategorie } from './types';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 
@@ -25,7 +25,12 @@ export function listeDokumente(einsatzId: number): Promise<Dokument[]> {
   return apiGet<Dokument[]>(basis(einsatzId));
 }
 
-export function legeDokumentAb(einsatzId: number, eingabe: DokumentAblage): Promise<Dokument> {
+/** Legt ab und meldet den Stand der Übertragung (LFH-654, Prüfliste LFH-632 Zeile 2 · 3). */
+export function legeDokumentAb(
+  einsatzId: number,
+  eingabe: DokumentAblage,
+  onFortschritt?: (stand: UploadFortschritt) => void,
+): Promise<Dokument> {
   const fd = new FormData();
   fd.append('datei', eingabe.datei);
   fd.append('titel', eingabe.titel);
@@ -34,7 +39,10 @@ export function legeDokumentAb(einsatzId: number, eingabe: DokumentAblage): Prom
     fd.append('bezug_typ', eingabe.bezug.typ);
     fd.append('bezug_id', String(eingabe.bezug.id));
   }
-  return apiUpload<Dokument>(basis(einsatzId), fd, { timeoutMs: UPLOAD_TIMEOUT_MS });
+  return apiUploadMitFortschritt<Dokument>(basis(einsatzId), fd, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+    onFortschritt,
+  });
 }
 
 /**

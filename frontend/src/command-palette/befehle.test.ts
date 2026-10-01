@@ -726,8 +726,10 @@ describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
 
   it('belegt jede Befehlsgruppe (sonst prüft der Guard weniger, als er behauptet)', () => {
     const gruppen = new Set(baueBefehle(vollerKontext()).map((b) => b.gruppe));
-    // `koordinate` und `datensaetze` baut `baueBefehle` nicht — sie haben eigene Guards.
-    for (const g of GRUPPEN_REIHENFOLGE.filter((x) => x !== 'koordinate' && x !== 'datensaetze')) {
+    // `koordinate`, `ortssuche` und `datensaetze` baut `baueBefehle` nicht — sie haben eigene
+    // Guards (`koordinatenSprung.test.ts`, `adressSprung.test.ts`, `datensaetze.test.ts`).
+    const eigene = new Set(['koordinate', 'ortssuche', 'datensaetze']);
+    for (const g of GRUPPEN_REIHENFOLGE.filter((x) => !eigene.has(x))) {
       expect(gruppen, g).toContain(g);
     }
   });

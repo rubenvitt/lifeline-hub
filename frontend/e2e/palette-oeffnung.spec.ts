@@ -60,7 +60,10 @@ async function personErfassen(page: Page, einsatzId: string): Promise<string> {
 }
 
 function personOption(page: Page, kennung: string): Locator {
-  return page.getByRole('option', { name: new RegExp(kennung) });
+  // Ohne die Adresszeile am Ende („Adresse auf Lagekarte suchen · „R-001““, LFH-638).
+  return page
+    .getByRole('option', { name: new RegExp(kennung) })
+    .filter({ hasNotText: 'Adresse auf Lagekarte suchen' });
 }
 
 /** Das Tippziel „Vorschau" rechts in einer Zeile. */

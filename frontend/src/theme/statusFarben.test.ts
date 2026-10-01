@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import * as sf from './statusFarben';
+import { abstand, kontrast } from '../test/farbmass';
 import {
   antdAlgorithmus,
   antdToken,
@@ -680,35 +681,6 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
     'kritis',
     'energie',
   ];
-
-  /** Relative Leuchtdichte und Kontrast nach WCAG 2.x — gerechnet, nicht behauptet. */
-  function luminanz(hex: string): number {
-    const [r, g, b] = [1, 3, 5].map((i) => {
-      const s = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
-      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-  function kontrast(a: string, b: string): number {
-    const [x, y] = [luminanz(a), luminanz(b)];
-    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
-  }
-  /** Farbabstand ΔE (CIE76) in CIELAB, D65. */
-  function abstand(a: string, b: string): number {
-    const lab = (hex: string) => {
-      const [r, g, b2] = [1, 3, 5].map((i) => {
-        const s = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
-        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      });
-      const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-      const x = f((r * 0.4124 + g * 0.3576 + b2 * 0.1805) / 0.95047);
-      const y = f(r * 0.2126 + g * 0.7152 + b2 * 0.0722);
-      const z = f((r * 0.0193 + g * 0.1192 + b2 * 0.9505) / 1.08883);
-      return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-    };
-    const [p, q] = [lab(a), lab(b)];
-    return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
-  }
 
   it('hält am Tag die bisherigen Töne — keine Umfärbung (Literale)', () => {
     expect(EBENEN.map((q) => sf.fachebeneFarbe(q, hellToken))).toEqual([

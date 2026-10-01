@@ -53,6 +53,14 @@ import DownloadAnker from '../components/DownloadAnker';
  * `<Modal>` auf Seitenebene, außerhalb der Zeilen-`map` (Bündelungsregel), nicht ein
  * `Popconfirm` im Menü. `zugaenglicherName` trägt je Aktion den Titel, damit n Karten nicht n
  * gleichnamige Knöpfe liefern.
+ *
+ * Zwischen Bestätigung und Serverantwort (LFH-654, Prüfliste LFH-632 Zeile 1 · 3) bleibt die Zeile
+ * stehen: ihr Entfernen-Auslöser lädt — in der Tabelle der Mülleimer, in der Karte der Menü-Knopf
+ * (`WeitereAktionen.laeuft`) —, und neben dem Titel steht „wird entfernt“ als Text — NEBEN dem
+ * Anker, damit sein zugänglicher Name gleich bleibt. Kein optimistisches Ausblenden: die Zeilen
+ * darunter rückten unter dem Zeiger weg (Kriterium 12). Die Menge `entferntGerade` räumt erst,
+ * wenn die Liste nach dem Erfolg neu geladen ist (`onSuccess` wartet auf die Invalidierung), sonst
+ * stünde die Zeile kurz ohne Zusatz da.
  */
 
 const rechteText = (status: EinsatzStatus) =>
@@ -80,6 +88,7 @@ const dokumentSpalten = (
   darfSchreiben: boolean,
   onBearbeiten: (d: Dokument) => void,
   onEntfernen: (d: Dokument) => void,
+  entferntGerade: ReadonlySet<number>,
 ) =>
   spaltenFuer<Dokument>()([
     {
@@ -88,13 +97,23 @@ const dokumentSpalten = (
       immerSichtbar: true,
       sortWert: (d) => d.titel,
       suchText: (d) => `${d.titel} ${d.dateiname}`,
-      render: (_, d) => (
-        <DownloadAnker
-          href={dokumentDownloadPfad(einsatzId, d.id)}
-          dateiname={d.dateiname}
-          text={d.titel}
-        />
-      ),
+      render: (_, d) => {
+        const anker = (
+          <DownloadAnker
+            href={dokumentDownloadPfad(einsatzId, d.id)}
+            dateiname={d.dateiname}
+            text={d.titel}
+          />
+        );
+        return entferntGerade.has(d.id) ? (
+          <span>
+            {anker}
+            <span> · wird entfernt</span>
+          </span>
+        ) : (
+          anker
+        );
+      },
     },
     {
       title: 'Kategorie',
@@ -162,11 +181,13 @@ const dokumentSpalten = (
                   okText="Entfernen"
                   okButtonProps={{ danger: true }}
                   onConfirm={() => onEntfernen(d)}
+                  disabled={entferntGerade.has(d.id)}
                 >
                   <Button
                     danger
                     type="text"
                     icon={<IkoneMuelleimer />}
+                    loading={entferntGerade.has(d.id)}
                     aria-label={`Dokument ${d.titel} entfernen`}
                   />
                 </Popconfirm>
@@ -183,6 +204,7 @@ const dokumentKarte = (
   darfSchreiben: boolean,
   onBearbeiten: (d: Dokument) => void,
   onEntfernenWahl: (d: Dokument) => void,
+  entferntGerade: ReadonlySet<number>,
 ): Kartenplan<Dokument, DokumentSpaltenKey> => ({
   art: 'plan',
   // KEIN `ziel` — siehe Dateikopf: der Download-Anker kommt aus dem Spalten-`render`.
@@ -202,6 +224,7 @@ const dokumentKarte = (
       darfSchreiben ? [{ key: 'entfernen', label: 'Entfernen', gefahr: true }] : [],
     zugaenglicherName: (d) => `Aktionen zu Dokument ${d.titel}`,
     onWahl: (_key, d) => onEntfernenWahl(d),
+    laeuft: (d) => entferntGerade.has(d.id),
   },
 });
 
@@ -213,6 +236,7 @@ export default function DokumentePage() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [ablegenOffen, setAblegenOffen] = useState(false);
+  const [entferntGerade, setEntferntGerade] = useState<ReadonlySet<number>>(() => new Set());
   const [inBearbeitung, setInBearbeitung] = useState<Dokument | null>(null);
   /** Rückfrage „Entfernen“ aus dem Kartenmenü (die Tabelle fragt per `Popconfirm`). */
   const [zuEntfernen, setZuEntfernen] = useState<Dokument | null>(null);
@@ -229,22 +253,37 @@ export default function DokumentePage() {
 
   const entfernenMutation = useMutation({
     mutationFn: (dokumentId: number) => entferneDokument(einsatzId, dokumentId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: einsatzKeys.dokumente(einsatzId) });
-      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    // Optionsebene statt Aufruf-Rückruf: bei zwei laufenden Löschungen räumt jede ihre eigene ID.
+    onMutate: (dokumentId) => setEntferntGerade((alt) => new Set(alt).add(dokumentId)),
+    onSettled: (_daten, _fehler, dokumentId) =>
+      setEntferntGerade((alt) => {
+        const neu = new Set(alt);
+        neu.delete(dokumentId);
+        return neu;
+      }),
+    onSuccess: async () => {
       message.success('Dokument entfernt');
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      await qc.invalidateQueries({ queryKey: einsatzKeys.dokumente(einsatzId) });
     },
   });
   const { mutate: entfernen } = entfernenMutation;
 
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
   const spalten = useMemo(
-    () => dokumentSpalten(einsatzId, darfSchreibenRoh, setInBearbeitung, (d) => entfernen(d.id)),
-    [einsatzId, darfSchreibenRoh, entfernen],
+    () =>
+      dokumentSpalten(
+        einsatzId,
+        darfSchreibenRoh,
+        setInBearbeitung,
+        (d) => entfernen(d.id),
+        entferntGerade,
+      ),
+    [einsatzId, darfSchreibenRoh, entfernen, entferntGerade],
   );
   const karte = useMemo(
-    () => dokumentKarte(darfSchreibenRoh, setInBearbeitung, setZuEntfernen),
-    [darfSchreibenRoh],
+    () => dokumentKarte(darfSchreibenRoh, setInBearbeitung, setZuEntfernen, entferntGerade),
+    [darfSchreibenRoh, entferntGerade],
   );
 
   // Schnellaktion: ?neu=1 öffnet den Dialog (Command-Palette). Param immer löschen, Dialog nur mit

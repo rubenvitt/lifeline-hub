@@ -6786,6 +6786,16 @@
               }
             ]
           },
+          "dokumente": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MengenZaehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "einheiten": {
             "oneOf": [
               {
@@ -7630,6 +7640,55 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "OrtSucheAntwort": {
+        "type": "object",
+        "required": [
+          "zustand",
+          "treffer"
+        ],
+        "properties": {
+          "treffer": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrtTreffer"
+            }
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/OrtSucheZustand"
+          }
+        }
+      },
+      "OrtSucheZustand": {
+        "type": "string",
+        "description": "Ausgang der Adresssuche. `ok` ohne Treffer heißt „nichts gefunden“.",
+        "enum": [
+          "ok",
+          "ausgelastet",
+          "nicht_erreichbar"
+        ]
+      },
+      "OrtTreffer": {
+        "type": "object",
+        "required": [
+          "lat",
+          "lon",
+          "name"
+        ],
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lon": {
+            "type": "number",
+            "format": "double"
+          },
+          "name": {
+            "type": "string",
+            "description": "Anzeigename des Geocoders (bei Nominatim `display_name`)."
           }
         }
       },

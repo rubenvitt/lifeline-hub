@@ -308,6 +308,71 @@ describe('Kennzahlenband', () => {
     expect(ohne.style.getPropertyValue('--lfh-kennzahl-notizzeilen')).toBe('');
   });
 
+  // LFH-691: Boden UND Deckel ab `md` setzt ebenfalls `sprache.css`; gemessen in
+  // `e2e/kennzahlenband-notizhoehe.spec.ts`. Hier Klasse und Zeilenzahl.
+  it('fordert die feste Notizhöhe ab `md` nur mit `notizZeilen` an', () => {
+    renderMitProviders(
+      <>
+        <Kennzahlenband beschriftung="Fest" notizZeilen={3} notizZeilenSchmal={2}>
+          <Kennzahl titel="A" wert={1} notiz="n" />
+        </Kennzahlenband>
+        <Kennzahlenband beschriftung="Frei">
+          <Kennzahl titel="B" wert={2} notiz="n" />
+        </Kennzahlenband>
+      </>,
+    );
+    const fest = screen.getByRole('group', { name: 'Fest' });
+    expect(fest).toHaveClass('lfh-kennzahlenband--notizfest');
+    expect(fest.style.getPropertyValue('--lfh-kennzahl-notizzeilen-fest')).toBe('3');
+    // Der Boden unter `md` bleibt daneben unverändert (LFH-629).
+    expect(fest).toHaveClass('lfh-kennzahlenband--notizzeilen');
+    expect(fest.style.getPropertyValue('--lfh-kennzahl-notizzeilen')).toBe('2');
+    const frei = screen.getByRole('group', { name: 'Frei' });
+    expect(frei).not.toHaveClass('lfh-kennzahlenband--notizfest');
+    expect(frei.style.getPropertyValue('--lfh-kennzahl-notizzeilen-fest')).toBe('');
+  });
+
+  it('trägt den vollen Notiztext im `title`, nur im Band mit fester Notizhöhe', () => {
+    const lang = 'WESER · steigend +9 cm/h · Stand 11:57 · Prognose 7,10 m bis 16:57 · +1 weitere';
+    renderMitProviders(
+      <>
+        <Kennzahlenband beschriftung="Fest" notizZeilen={3}>
+          <Kennzahl titel="Pegel" wert="6,84" notiz={lang} ziel="/x" />
+        </Kennzahlenband>
+        <Kennzahlenband beschriftung="Frei">
+          <Kennzahl titel="Pegel" wert="6,84" notiz={lang} ziel="/y" />
+        </Kennzahlenband>
+      </>,
+    );
+    const notizIn = (band: string) =>
+      screen
+        .getByRole('group', { name: band })
+        .querySelector<HTMLElement>('[data-lfh="kennzahl-notiz"]')!;
+    expect(notizIn('Fest')).toHaveAttribute('title', lang);
+    expect(notizIn('Frei')).not.toHaveAttribute('title');
+    // Die Kürzung ist nur Darstellung: der zugängliche Name des Links enthält den ganzen Text.
+    const link = screen
+      .getByRole('group', { name: 'Fest' })
+      .querySelector<HTMLElement>('a[data-lfh="kennzahl"]')!;
+    expect(link).toHaveAccessibleName(expect.stringContaining('+1 weitere'));
+  });
+
+  it('setzt im festen Band außerhalb von `daten` keinen `title` an die Notiz', () => {
+    const { rerender } = renderMitProviders(
+      <Kennzahlenband beschriftung="Fest" notizZeilen={3}>
+        <Kennzahl titel="A" wert="" notiz="x" zustand="fehler" />
+      </Kennzahlenband>,
+    );
+    // Den Titel „Stand unbekannt“ trägt allein die Zahl.
+    expect(screen.getAllByTitle('Stand unbekannt')).toHaveLength(1);
+    rerender(
+      <Kennzahlenband beschriftung="Fest" notizZeilen={3}>
+        <Kennzahl titel="A" wert="" notiz="x" zustand="laden" />
+      </Kennzahlenband>,
+    );
+    expect(screen.getByText('wird abgerufen')).not.toHaveAttribute('title');
+  });
+
   it('zeigt eine Aufgliederung nur im Zustand `daten`', () => {
     const seg = { segmente: [{ label: 'SK I', wert: 2, farbe: 'red' }], titel: 'Sichtung' };
     const { rerender } = renderMitProviders(<Kennzahl titel="A" wert={2} aufgliederung={seg} />);

@@ -4,13 +4,11 @@ import {
   IkoneHochladen,
   IkoneLupe,
   IkoneMuelleimer,
-  IkonePunkteSenkrecht,
   IkoneSchloss,
   IkoneVollbildEcken,
 } from '../../ikonen';
 import {
   Button,
-  Dropdown,
   Input,
   Modal,
   Radio,
@@ -23,6 +21,7 @@ import {
   Upload,
 } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
+import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { monoStil, Segmentleiste, useRollen } from '../../components/instrument';
@@ -44,6 +43,7 @@ import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
+import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import FachebeneStand from './FachebeneStand';
@@ -203,6 +203,15 @@ export interface SidebarProps {
   suchbar: KarteMarker[];
   /** Eine Quelle der Suche ist ausgefallen — dann „—" statt Zahlen, keine behauptete Leere. */
   suchbarUnvollstaendig?: boolean;
+  /**
+   * Ortssuche im selben Feld (LFH-638): Koordinate und Adresse anspringen. Eine `vorbelegung`
+   * (`?ort=`) öffnet das Paneel „Verortet“, damit die Treffer zu sehen sind.
+   */
+  ortssuche?: {
+    onOrtWaehlen: (ort: GefundenerOrt) => void;
+    vorbelegung?: { text: string; nonce: number } | null;
+    onVorbelegungVerbraucht?: (nonce: number) => void;
+  };
   darfSchreiben: boolean;
   platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
@@ -380,7 +389,10 @@ function EbenenZeilenKnopf({
       style={{
         ...ebenenZeileStil(token),
         borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-        color: zeile.sichtbar ? rollen.text : rollen.schwach,
+        // Aus = `text2`, nicht `schwach`: den Zustand tragen Farbfeld und `aria-checked`, die
+        // Schrift hält in jedem Zustand den Textboden, auch auf dem Hover-Grund `flaeche3`
+        // (`schwach` am Tag 5,8 : 1 auf `paneel`; LFH-671, `e2e/lagekarte-ebenen-kontrast.spec.ts`).
+        color: zeile.sichtbar ? rollen.text : rollen.text2,
       }}
     >
       <span
@@ -399,7 +411,8 @@ function EbenenZeilenKnopf({
         }}
       />
       <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
-      <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.anzahl}</span>
+      {/* `text2` aus demselben Grund; `gedaempft` hielte am Tag auf `flaeche3` nur 6,6 : 1. */}
+      <span style={{ ...monoStil(11), color: rollen.text2 }}>{zeile.anzahl}</span>
     </button>
   );
 }
@@ -426,8 +439,8 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
         cursor: 'not-allowed',
         background: 'transparent',
         borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile und muss am Tag 7 : 1
-        // halten (`schwach` auf `paneel`: 5,8 : 1).
+        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile, keine Beischrift.
+        // (Den Textboden hielte seit LFH-643 auch `schwach`.)
         color: rollen.text2,
       }}
     >
@@ -620,6 +633,13 @@ export default function Sidebar(props: SidebarProps) {
   // Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
   const zeichnenRef = useRef<HTMLDivElement>(null);
   const { setze: paneelSetzen } = paneele;
+  // Ortssuche von außen (`?ort=`): das Paneel mit dem Suchfeld öffnen, je Vorbelegung einmal.
+  const vorbelegungNonce = props.ortssuche?.vorbelegung?.nonce;
+  useEffect(() => {
+    if (vorbelegungNonce == null) return;
+    paneelSetzen('verortet', true);
+  }, [vorbelegungNonce, paneelSetzen]);
+
   useEffect(() => {
     if (!props.zeichnenAnfrage) return;
     paneelSetzen('zeichnen', true);
@@ -854,6 +874,9 @@ export default function Sidebar(props: SidebarProps) {
           onMarkerWaehlen={props.onMarkerWaehlen}
           zaehlerUnbekannt={
             sektionFehler.nichtVerortet != null || props.suchbarUnvollstaendig === true
+          }
+          ortssuche={
+            props.ortssuche ? { einsatzId: props.einsatzId, ...props.ortssuche } : undefined
           }
         />
       </KlappPaneel>
@@ -1176,54 +1199,37 @@ export default function Sidebar(props: SidebarProps) {
                         eine, dann steht der Zentrieren-Knopf direkt da. */}
                     <div style={{ flexShrink: 0 }}>
                       {darfSchreiben ? (
-                        <Dropdown
-                          trigger={['click']}
-                          // `autoFocus`: ohne ihn klebt der Fokus am Auslöser. In jsdom nicht
-                          // prüfbar.
-                          autoFocus
-                          menu={{
-                            items: [
-                              {
-                                key: 'zentrieren',
-                                icon: <IkoneVollbildEcken />,
-                                label: 'Auf Bild zentrieren',
-                              },
-                              {
-                                key: 'platzieren',
-                                icon: <IkoneFadenkreuz />,
-                                label: imPlatzieren
-                                  ? 'Platzieren beenden'
-                                  : 'Auf der Karte platzieren',
-                              },
-                              /*
-                               * Die Trennung zwischen destruktiver und harmloser Aktion ist im Menü
-                               * der Trenner.
-                               */
-                              { type: 'divider' as const },
-                              {
-                                key: 'loeschen',
-                                icon: <IkoneMuelleimer />,
-                                label: 'Bild entfernen …',
-                                danger: true,
-                              },
-                            ],
-                            // Zuordnung am Menü, nicht je Eintrag: ein Riegel hat dann einen Ort.
-                            onClick: ({ key }) => {
-                              if (key === 'zentrieren') props.onBildZentrieren(b.id);
-                              else if (key === 'platzieren') {
-                                if (imPlatzieren) props.onBildPlatzierenFertig();
-                                else props.onBildPlatzieren(b.id);
-                              } else if (key === 'loeschen') setLoeschBildId(b.id);
+                        <MenueAusloeser
+                          eintraege={[
+                            {
+                              key: 'zentrieren',
+                              ikone: <IkoneVollbildEcken />,
+                              label: 'Auf Bild zentrieren',
                             },
+                            {
+                              key: 'platzieren',
+                              ikone: <IkoneFadenkreuz />,
+                              label: imPlatzieren
+                                ? 'Platzieren beenden'
+                                : 'Auf der Karte platzieren',
+                            },
+                            {
+                              key: 'loeschen',
+                              ikone: <IkoneMuelleimer />,
+                              label: 'Bild entfernen …',
+                              gefahr: true,
+                            },
+                          ]}
+                          // Der Name trägt die Bild-Kennung.
+                          zugaenglicherName={`Aktionen zu ${b.name}`}
+                          onWahl={(key) => {
+                            if (key === 'zentrieren') props.onBildZentrieren(b.id);
+                            else if (key === 'platzieren') {
+                              if (imPlatzieren) props.onBildPlatzierenFertig();
+                              else props.onBildPlatzieren(b.id);
+                            } else if (key === 'loeschen') setLoeschBildId(b.id);
                           }}
-                        >
-                          {/* Der Name trägt die Bild-Kennung. Kein `size`. */}
-                          <Button
-                            type="text"
-                            icon={<IkonePunkteSenkrecht />}
-                            aria-label={`Aktionen zu ${b.name}`}
-                          />
-                        </Dropdown>
+                        />
                       ) : (
                         <Tooltip title="Auf Bild zentrieren">
                           <Button

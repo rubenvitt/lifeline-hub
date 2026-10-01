@@ -159,6 +159,54 @@ Statuskategorien. Eine Rücknahme MUST es nicht geben.
 - **WHEN** der Purge-Lauf einen bereits geschwärzten Einsatz erneut antrifft
 - **THEN** ändert er nichts und schreibt keinen Eintrag
 
+### Requirement: Physische Entfernung geschwärzter Werte
+
+Nach einer erfolgreichen Schwärzung MUST kein geschwärzter Wert mehr als Bytefolge in der
+Datenbankdatei oder ihrem Write-Ahead-Log stehen. Das gilt für jede Scrub-Spalte und für jede
+Zeile, die die Schwärzung löscht, Datei-Anhänge eingeschlossen. Kann der Rückschrieb des Logs
+nicht sofort vollständig erfolgen, etwa weil eine andere Verbindung liest, MUST das System ihn
+in jedem folgenden Purge-Lauf erneut versuchen, bis er gelingt, auch über einen Neustart
+hinweg.
+
+#### Scenario: Gepflanzter Klartext nach der Schwärzung
+- **WHEN** ein Einsatz mit einem eindeutigen Klartext in einer Scrub-Spalte und in einem Datei-Anhang geschwärzt wird
+- **THEN** kommt der Klartext weder in der Datenbankdatei noch im Write-Ahead-Log als Bytefolge vor
+
+#### Scenario: Rückschrieb blockiert
+- **WHEN** der Rückschrieb des Logs nach einer Schwärzung wegen eines aktiven Lesevorgangs unvollständig bleibt und der Lesevorgang danach endet
+- **THEN** führt der nächste Purge-Lauf ihn vollständig aus
+- **AND** kommt der Klartext danach in keiner der beiden Dateien vor
+
+#### Scenario: Gelöschte Zeilen außerhalb der Schwärzung
+- **WHEN** im laufenden Betrieb eine Zeile gelöscht oder ein Wert überschrieben wird
+- **THEN** überschreibt die Datenbank den freigewordenen Platz, statt die alten Bytes stehen zu lassen
+
+### Requirement: Altbestand vor der physischen Entfernung
+
+Eine Datenbank, die vor Einführung der physischen Entfernung betrieben wurde, MUST beim ersten
+Serverstart danach genau einmal so neu aufgebaut werden, dass freigewordener Platz keine alten
+Bytes mehr trägt. Scheitert der Neuaufbau, MUST der Server trotzdem starten, den Fehler melden
+und den Neuaufbau beim nächsten Start erneut versuchen.
+
+#### Scenario: Erster Start nach dem Update
+- **WHEN** der Server auf einer Datenbank startet, in der ein früher geschwärzter Wert noch in freigewordenem Platz steht
+- **THEN** kommt dieser Wert nach dem Start nicht mehr in der Datenbankdatei vor
+
+#### Scenario: Weitere Starts
+- **WHEN** der Server ein zweites Mal startet
+- **THEN** baut er die Datenbank nicht erneut neu auf
+
+### Requirement: Rückspielen einer Sicherung von vor der Schwärzung
+
+Wird eine Sicherung zurückgespielt, in der ein inzwischen geschwärzter Einsatz bereits zur
+Löschung vorgemerkt, aber noch ungeschwärzt ist, MUST das System ihn ohne Eingriff erneut
+schwärzen, spätestens im nächsten Purge-Lauf nach Ablauf seiner Karenz. Die Vormerkung aus der
+Sicherung MUST dabei gelten, die Karenz beginnt nicht neu.
+
+#### Scenario: Restore nach Ablauf der Karenz
+- **WHEN** eine Sicherung zurückgespielt wird, in der ein vorgemerkter Einsatz mit inzwischen abgelaufener Karenz noch ungeschwärzt ist
+- **THEN** ist der Einsatz nach dem nächsten Purge-Lauf geschwärzt
+
 ### Requirement: Auslöser der Aufbewahrung
 
 Das System SHALL die Aufbewahrung ausschließlich über diese Auslöser bewegen: den Abschluss
@@ -214,3 +262,38 @@ Stelle ohne Eintrag in der Liste ist ein Fehler.
 - **WHEN** ein Schaden mit Ort angelegt und der Einsatz später geschwärzt wird
 - **THEN** ist der Ort in der Schadenszeile geschwärzt
 - **AND** steht die Ortskurzform weiter im System-Eintrag der Anlage
+
+### Requirement: Führungsdokumentation steht allein im ETB
+
+Die rechtsverbindliche Führungsdokumentation eines Einsatzes SHALL das ETB sein. Die
+Datensätze der Führungsmodule (Meldungen, Aufträge samt Empfängern, Nachforderungen,
+Lageberichte, Befehle, Pressemitteilungen, Lagebesprechungen) MUST bei der Schwärzung ihre
+Freitexte verlieren: Absender und Empfänger, Inhalt, Auftragstext und Befehlsgliederung,
+Vollzugsmeldung, Bedarfsart und Bezeichnungen, Begründungen, Ablehnungsgründe, Titel, Abschnitte
+und Entschluss. Erhalten bleiben MUST laufende Nummer, Meldungsart, Meldeweg, Priorität, Status,
+Zeitpunkte und Verweise dieser Datensätze. Ein Freitext, der im Wortlaut eines ETB-Eintrags
+steht, MUST dort erhalten bleiben. Ein Freitext, der nie ins ETB gelangt ist, MUST nach der
+Schwärzung nirgends mehr stehen.
+
+#### Scenario: Meldung und Auftrag nach der Schwärzung
+- **WHEN** ein Einsatz mit einer Meldung „Fam. Yilmaz, Hauptstr. 5“ und einem Auftrag an eine
+  externe Stelle mit Lage- und Absichtstext geschwärzt wird
+- **THEN** tragen Meldung, Auftrag und Auftragsempfänger keinen dieser Freitexte mehr
+- **AND** tragen sie weiter laufende Nummer, Meldeweg, Status und Zeitpunkte
+- **AND** steht der Meldungsinhalt weiter im Wortlaut des zugehörigen ETB-Eintrags
+
+#### Scenario: Freitext ohne ETB-Kopie
+- **WHEN** eine Nachforderung abgelehnt wurde und der Einsatz später geschwärzt wird
+- **THEN** steht der Ablehnungsgrund weder in der Nachforderung noch im ETB
+
+#### Scenario: Lagebericht nach der Schwärzung
+- **WHEN** ein Einsatz mit einem freigegebenen Lagebericht und einem Entwurf geschwärzt wird
+- **THEN** tragen beide Versionen weder Titel noch Abschnittstext
+- **AND** bleiben Version, Status und Zeitstand erhalten
+- **AND** steht der freigegebene Bericht weiter im Wortlaut des ETB
+
+#### Scenario: Audit nennt, was bleibt
+- **WHEN** ein Einsatz geschwärzt wird
+- **THEN** nennt der System-Eintrag der Schwärzung die Freitexte der Führungsmodule als entfernt
+- **AND** nennt er das ETB im Wortlaut als erhaltene Führungsdokumentation
+- **AND** behauptet er nicht, Meldungen, Aufträge oder Berichte blieben als Text erhalten

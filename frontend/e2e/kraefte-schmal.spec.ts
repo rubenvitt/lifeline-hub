@@ -182,6 +182,10 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
           karte.getByRole('combobox'),
           'Vorbedingung: die Karte trägt keine Besatzungs-Auswahl',
         ).toHaveCount(0);
+        await expect(
+          karte.getByRole('button', { name: `Besatzung zu ${FUNKRUFNAME}` }),
+          'Vorbedingung: der lesende Aufklapper der Besatzung steht (LFH-697)',
+        ).toHaveCount(1);
         await expect(page.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toHaveCount(0);
       },
     ],

@@ -706,19 +706,23 @@ export default function FahrzeugePage() {
                 unterEbene: 1,
               }}
               zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
-              // Besatzung je Fahrzeug eingeklappt, per Icon aufklappbar; die Ist/Soll-Stärke steht
-              // dauerhaft in der Besatzungs-Spalte. Nur im Tabellenzweig — unter `md` fehlt der
-              // Block.
-              aufklappzeile={(ef) => (
-                <BesatzungsBlock
-                  ef={ef}
-                  personal={personal}
-                  darfSchreiben={darfSchreiben}
-                  freiInhalt={besatzungInhalt}
-                  onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-                  onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
-                />
-              )}
+              // Besatzung je Fahrzeug eingeklappt, über den beschrifteten Auslöser in Tabelle UND
+              // Karte aufklappbar (LFH-697); die Ist/Soll-Stärke steht dauerhaft in der
+              // Besatzungs-Spalte bzw. im Sekundärfeld.
+              aufklappen={{
+                etikett: 'Besatzung',
+                zugaenglicherName: (ef) => `Besatzung zu ${ef.funkrufname}`,
+                inhalt: (ef) => (
+                  <BesatzungsBlock
+                    ef={ef}
+                    personal={personal}
+                    darfSchreiben={darfSchreiben}
+                    freiInhalt={besatzungInhalt}
+                    onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
+                    onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+                  />
+                ),
+              }}
               karte={{
                 art: 'plan',
                 titel: { spalte: 'funkrufname' },
