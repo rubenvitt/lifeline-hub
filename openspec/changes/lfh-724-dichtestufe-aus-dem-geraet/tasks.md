@@ -9,8 +9,8 @@
 
 ## 2. Browser-Beleg der Ableitung (D4)
 
-- [ ] 2.1 `e2e/dichte-ableitung.spec.ts` mit `hasTouch` auf `/login`: ohne Wahl `komfortabel`, Wahl `kompakt` bleibt `kompakt`, unbrauchbarer Wert ergibt `komfortabel`, Wahl `handschuh` bleibt `handschuh`. Geprüft wird jeweils `html[data-dichte]` und die Höhe des Anmelde-Knopfs im Fenster der Stufe (Muster `dichte.spec.ts`). Die Datei läuft grün.
-- [ ] 2.2 Test „die Wahl gehört zum Gerät“ in derselben Datei: Admin wählt `handschuh` über das Benutzermenü, meldet sich ab, eine zweite Person (`rollen-kern.ts`) meldet sich an, danach steht weiter `handschuh`. Der Test läuft grün.
+- [x] 2.1 `e2e/dichte-ableitung.spec.ts` mit `hasTouch` auf `/login`: ohne Wahl `komfortabel`, Wahl `kompakt` bleibt `kompakt`, unbrauchbarer Wert ergibt `komfortabel`, Wahl `handschuh` bleibt `handschuh`. Geprüft wird jeweils `html[data-dichte]` und die Höhe des Anmelde-Knopfs im Fenster der Stufe (Muster `dichte.spec.ts`). Die Datei läuft grün.
+- [x] 2.2 Test „die Wahl gehört zum Gerät“ in derselben Datei: Admin wählt `handschuh` über das Benutzermenü, meldet sich ab, eine zweite Person (`rollen-kern.ts`) meldet sich an, danach steht weiter `handschuh`. Der Test läuft grün.
 
 ## 3. Messhelfer in einen Kern (D5)
 
