@@ -7539,6 +7539,14 @@
           }
         }
       },
+      "OrgLiveEvent": {
+        "type": "string",
+        "description": "SSE-Wire-Namen der Org-Ereignisse (LFH-734). Das Frontend bildet sie in\n`ORG_STREAM_EVENTS` (`api/queryKeys.ts`) auf die globalen Query-Keys ab.",
+        "enum": [
+          "einsatzliste",
+          "stammdaten"
+        ]
+      },
       "OrgLogoAnzeige": {
         "type": "object",
         "description": "Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`.",

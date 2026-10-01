@@ -76,3 +76,83 @@ pub async fn org_stream(
     let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")));
     Sse::new(verbunden.chain(stream)).keep_alive(KeepAlive::default())
 }
+
+/// Pfadpräfixe der Stammdaten-Kataloge (LFH-734). Eine schreibende Anfrage, deren Route unter
+/// einem dieser Präfixe liegt, meldet nach Erfolg `stammdaten` an die Organisation des
+/// Benutzers ([`stammdaten_live`]). Ein Präfix deckt den Pfad selbst und alles unter `…/`.
+///
+/// Gegen eine vergessene Route wacht `tests/stammdaten_live_guard.rs`: jede schreibende Route
+/// eines Katalog-Moduls muss hier abgedeckt sein, und jeder Eintrag braucht eine schreibende
+/// Route. Bewusst NICHT dabei: Org-Einstellungen und Org-Modul-Einstellungen (enger Lesekreis),
+/// Benutzer, Karten (instanzweit) — Spec `org-live`, „Bewusst nicht live".
+pub const STAMMDATEN_PFADE: &[&str] = &[
+    "/api/fahrzeuge",
+    "/api/fahrzeug-status",
+    "/api/personal",
+    "/api/personal-status",
+    "/api/material",
+    "/api/qualifikationen",
+    "/api/einheit-typen",
+    "/api/sprechgruppen",
+    "/api/etb-bausteine",
+    "/api/stichwort-vorschlaege",
+    "/api/org-fuehrungsfunktionen",
+    "/api/organisation",
+];
+
+/// Ob `pfad` (das `MatchedPath`-Muster) unter einem Stammdaten-Präfix liegt.
+pub fn ist_stammdaten_pfad(pfad: &str) -> bool {
+    STAMMDATEN_PFADE.iter().any(|p| {
+        pfad.strip_prefix(p)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+    })
+}
+
+/// Middleware: meldet `stammdaten` nach jeder erfolgreichen (2xx) schreibenden Anfrage an eine
+/// Katalog-Route (LFH-734, design.md D5). Der Handler hat beim Erfolg schon committet. Den
+/// Benutzer löst die Middleware selbst auf; scheitert das, scheitert auch der Handler, und es
+/// gibt nichts zu melden.
+pub async fn stammdaten_live(
+    State(state): State<AppState>,
+    pfad: Option<axum::extract::MatchedPath>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let betroffen = req.method() != axum::http::Method::GET
+        && req.method() != axum::http::Method::HEAD
+        && pfad.is_some_and(|p| ist_stammdaten_pfad(p.as_str()));
+    if !betroffen {
+        return next.run(req).await;
+    }
+    let (mut parts, body) = req.into_parts();
+    let org_id = {
+        use axum::extract::FromRequestParts;
+        CurrentUser::from_request_parts(&mut parts, &state)
+            .await
+            .ok()
+            .map(|CurrentUser(b)| b.org_id)
+    };
+    let antwort = next
+        .run(axum::extract::Request::from_parts(parts, body))
+        .await;
+    if let (true, Some(org_id)) = (antwort.status().is_success(), org_id) {
+        state.live.publiziere_stammdaten(org_id);
+    }
+    antwort
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stammdaten_praefix_ist_segmentgenau() {
+        assert!(ist_stammdaten_pfad("/api/fahrzeuge"));
+        assert!(ist_stammdaten_pfad("/api/fahrzeuge/{id}/ausser-dienst"));
+        assert!(ist_stammdaten_pfad("/api/organisation/logo"));
+        assert!(!ist_stammdaten_pfad("/api/fahrzeuge-x"));
+        assert!(!ist_stammdaten_pfad("/api/fahrzeug-vorschlaege"));
+        assert!(!ist_stammdaten_pfad("/api/einsaetze/{id}/sprechgruppen"));
+        assert!(!ist_stammdaten_pfad("/api/org-einstellungen"));
+    }
+}

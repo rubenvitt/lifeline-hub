@@ -135,12 +135,19 @@ mit einer einzigen `Last-Event-ID`. Der Gewinn wäre klein, denn das Ereignis be
   zeigt dieselben Kopfspalten. Dazu kommen Anlage, Mitglied setzen und entfernen, Wiederherstellen
   (`routes/aufbewahrung.rs`), Demo-Routen und der Purge-Scheduler. `starte_purge_scheduler`
   bekommt den `LiveHub`, wie der Erinnerungs-Scheduler.
-- **`stammdaten`:** Die Katalog-Routen wandern in einen eigenen Teil-Router mit
-  `route_layer(middleware::from_fn_with_state(…))`. Die Middleware publiziert nach jeder
-  Nicht-GET-Antwort mit 2xx an die Org des angemeldeten Benutzers. Der Handler hat dann schon
-  committet. Ein Guard-Test prüft, dass jede schreibende Route unter den Katalogpfaden im
-  Teil-Router liegt (Muster `tests/zulassung_guard.rs`). Damit ist eine neue Katalogroute ohne
-  eigenes Zutun live. Demo-Import, -Neuimport und -Entfernen publizieren `stammdaten` explizit.
+- **`stammdaten`:** Eine Middleware am Router (`routes::live::stammdaten_live`) publiziert
+  nach jeder schreibenden Anfrage mit 2xx an die Org des angemeldeten Benutzers, wenn das
+  `MatchedPath`-Muster unter einem Präfix aus `STAMMDATEN_PFADE` liegt (Muster der
+  Ausnahmeliste in `zulassung.rs`). Der Handler hat dann schon committet. Ein Guard
+  (`tests/stammdaten_live_guard.rs`) liest `src/app.rs`: Jede schreibende Route eines
+  Katalog-Moduls außerhalb von `/api/einsaetze/` muss unter einem Präfix liegen, und jeder Präfix
+  braucht eine schreibende Route. Eine neue Route unter einem bestehenden Katalogpfad ist damit
+  ohne eigenes Zutun live, ein neuer Pfad fällt im Guard auf. Demo-Import, -Neuimport und
+  -Entfernen publizieren `stammdaten` explizit.
+
+  Umgesetzt mit Präfixliste statt eines eigenen Teil-Routers: Das Ergebnis ist dasselbe, aber
+  rund 60 Routen in `src/app.rs` müssen nicht umziehen, und es bleibt kein Raum für Konflikte
+  zwischen zwei Routern mit demselben Pfad (GET und POST getrennt registriert).
 
 Verworfen: **Aufruf in jedem Katalog-Handler.** Das wären rund 35 Stellen, und eine vergessene
 fällt keinem Test auf.

@@ -28,9 +28,9 @@ und `requesting-code-review`.
 
 ## 4. Emitter `stammdaten` per Middleware (D5)
 
-- [ ] 4.1 Tests zuerst: je Katalog mindestens eine Schreibroute → `stammdaten` an die eigene Org, nicht an eine fremde; GET → nichts; abgelehnte Schreibanfrage (403 als Nicht-Admin, 400) → nichts. Rot belegen.
-- [ ] 4.2 Katalog-Routen aus `app.rs` in einen Teil-Router mit `route_layer` der Middleware `stammdaten_live` (nach 2xx und Nicht-GET an `benutzer.org_id`). Tests aus 4.1 grün; `tests/org_scope_guard.rs`, `tests/zulassung_guard.rs`, `tests/fehler_vertrag.rs` unverändert grün.
-- [ ] 4.3 Guard-Test: Jede Route mit schreibender Methode unter den Katalogpfaden (`/api/fahrzeuge`, `/api/fahrzeug-status`, `/api/fahrzeug-vorschlaege`, `/api/personal`, `/api/personal-status`, `/api/personal-vorschlaege`, `/api/material`, `/api/material-kategorien`, `/api/qualifikationen`, `/api/einheit-typen`, `/api/sprechgruppen`, `/api/etb-bausteine`, `/api/stichwort-vorschlaege`, `/api/fuehrungsfunktionen`, `/api/org-fuehrungsfunktionen`, `/api/organisation`) liegt hinter der Middleware. Mutationsprobe: eine Route aus dem Teil-Router nehmen → rot; zurück → grün.
+- [x] 4.1 Tests zuerst: je Katalog mindestens eine Schreibroute → `stammdaten` an die eigene Org, nicht an eine fremde; GET → nichts; abgelehnte Schreibanfrage (403 als Nicht-Admin, 400) → nichts. Rot belegen.
+- [x] 4.2 Middleware `stammdaten_live` (`src/routes/live.rs`) am Router mit der Präfixliste `STAMMDATEN_PFADE` (nach 2xx und Nicht-GET an `benutzer.org_id`), montiert in `app.rs`. Tests aus 4.1 grün; `tests/org_scope_guard.rs`, `tests/zulassung_guard.rs`, `tests/fehler_vertrag.rs` unverändert grün.
+- [x] 4.3 Guard `tests/stammdaten_live_guard.rs`: Jede schreibende Route eines Katalog-Moduls außerhalb `/api/einsaetze/` liegt unter einem Präfix aus `STAMMDATEN_PFADE`, jeder Präfix deckt eine schreibende Route, die Middleware ist montiert. Mutationsprobe: `/api/material` durch einen toten Präfix ersetzt → beide Guards rot; zurück → grün.
 
 ## 5. Codegen
 

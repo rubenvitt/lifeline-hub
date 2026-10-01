@@ -542,3 +542,121 @@ async fn wiederherstellen_meldet_einsatzliste() {
         "{alle:?}"
     );
 }
+
+// ---------- Auslöser `stammdaten`: Middleware an den Katalog-Routen (design.md D5) ----------
+
+/// Je Katalog eine erfolgreiche Schreibanfrage des System-Admins.
+const KATALOG_SCHREIBEN: &[(&str, &str, &str)] = &[
+    (
+        "POST",
+        "/api/fahrzeuge",
+        r#"{"funkrufname":"Test 1","kennzeichen":"XX-T 1"}"#,
+    ),
+    (
+        "POST",
+        "/api/fahrzeug-status",
+        r#"{"label":"Reserve","kategorie":"verfuegbar"}"#,
+    ),
+    ("POST", "/api/personal", r#"{"name":"Test Person"}"#),
+    (
+        "POST",
+        "/api/personal-status",
+        r#"{"label":"Reserve","kategorie":"verfuegbar"}"#,
+    ),
+    (
+        "POST",
+        "/api/material",
+        r#"{"bezeichnung":"Decke","kategorie":"Betreuung"}"#,
+    ),
+    ("POST", "/api/qualifikationen", r#"{"label":"Hundeführer"}"#),
+    ("POST", "/api/einheit-typen", r#"{"label":"Verband"}"#),
+    (
+        "POST",
+        "/api/sprechgruppen",
+        r#"{"bezeichnung":"TMO 1","betriebsart":"TMO","sortier":1}"#,
+    ),
+    (
+        "POST",
+        "/api/etb-bausteine",
+        r#"{"typ":"meldung","label":"X","inhalt":"x"}"#,
+    ),
+    ("POST", "/api/stichwort-vorschlaege", r#"{"text":"Sturm"}"#),
+    (
+        "PUT",
+        "/api/org-fuehrungsfunktionen/s4",
+        r#"{"label":"Versorgung (Logistik)"}"#,
+    ),
+    ("PATCH", "/api/organisation", r#"{"name":"Neu"}"#),
+];
+
+#[tokio::test]
+async fn jede_katalog_schreibroute_meldet_stammdaten_an_die_eigene_org() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let b = besetzung(&app, &pool, &admin).await;
+    let mut rx = live.abonniere_org();
+
+    for (methode, pfad, rumpf) in KATALOG_SCHREIBEN {
+        let (status, json) = anfrage(&app, methode, pfad, &admin, Some(rumpf)).await;
+        assert!(status.is_success(), "{methode} {pfad}: {status} {json:?}");
+        let alle = org_eingegangen(&mut rx);
+        let st = OrgLiveEvent::Stammdaten;
+        assert_eq!(
+            erreicht(&alle, &b.ohne_bezug, st),
+            1,
+            "{methode} {pfad}: {alle:?}"
+        );
+        assert_eq!(
+            erreicht(&alle, &b.fremd_admin, st),
+            0,
+            "{methode} {pfad}: fremde Org"
+        );
+        assert_eq!(
+            erreicht(&alle, &b.fremd_fk, st),
+            0,
+            "{methode} {pfad}: fremde Org"
+        );
+    }
+}
+
+#[tokio::test]
+async fn lesen_und_abgelehnte_katalog_anfragen_melden_nichts() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    besetzung(&app, &pool, &admin).await;
+    let ohne = login_cookie(&app, "ohnebezug", "ohnebezugpw1").await;
+    let mut rx = live.abonniere_org();
+
+    let (status, _) = anfrage(&app, "GET", "/api/fahrzeuge", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &ohne,
+        Some(r#"{"funkrufname":"X 1"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/fahrzeug-status",
+        &admin,
+        Some(r#"{"label":"X","kategorie":"quatsch"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        "/api/fahrzeuge/999999",
+        &admin,
+        Some(r#"{"funkrufname":"Y 1"}"#),
+    )
+    .await;
+    assert!(status.is_client_error(), "{status}");
+
+    let alle = org_eingegangen(&mut rx);
+    assert!(alle.is_empty(), "{alle:?}");
+}

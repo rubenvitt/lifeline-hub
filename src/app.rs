@@ -1376,6 +1376,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // abzureißen
         // (das hielte das Frontend für „kein Netz“).
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
+        // Stammdaten-Kataloge melden schreibende Erfolge an die eigene Org (LFH-734). Außerhalb
+        // von CatchPanic: nach einer Handler-Panik sieht sie dessen 500 und meldet nichts.
+        // `MatchedPath` ist beim Routing gesetzt.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            routes::live::stammdaten_live,
+        ))
         // Zulassungssteuerung: Zeitbudget und Gleichzeitigkeits-Cap mit Lastabwurf. Muss AUSSERHALB
         // des `CatchPanicLayer` liegen, damit sie dessen 500-Antwort bekommt statt eines Unwinds.
         // `MatchedPath` ist beim Routing gesetzt, die Ausnahmeliste greift also trotzdem.
