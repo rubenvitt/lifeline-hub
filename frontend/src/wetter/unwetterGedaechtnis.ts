@@ -1,6 +1,6 @@
 /**
  * Was dieser Browser einer Person zu einem Einsatz schon als Unwetter gemeldet hat (LFH-663,
- * `openspec/changes/lfh-663-unwetterwarnung-alarmbudget/design.md` D5).
+ * `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D5).
  *
  * `localStorage`, weil ein Neuladen nicht erneut alarmieren darf und Tabs desselben Browsers
  * sich das Gedächtnis teilen sollen (der erste meldet, die anderen sehen das Paar schon). Die

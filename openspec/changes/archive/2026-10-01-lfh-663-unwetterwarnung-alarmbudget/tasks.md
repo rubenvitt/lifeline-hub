@@ -80,5 +80,7 @@ relativ zu `frontend/src/`. Kommandos laufen über `mise exec -- pnpm -C fronten
   abgefragt, Folgeticket)“) auf den neuen Stand bringen (Abfrage jetzt im Rahmen, Sperre bleibt
   Folgeticket). Für die Warnsperre per `clickup-task-anlegen` ein Ticket anlegen, falls keines
   besteht. Prüfen: grep nach „seitenlokal“ und Ticketnummer im Kommentar.
-- [ ] 6.2 `./scripts/check-all.sh` grün (Lint, Prettier, `tsc`, Vitest, Gates). Prüfen: Lauf
-  ohne Fehler, sonst in der CI des PRs belegt.
+- [x] 6.2 `./scripts/check-all.sh` grün (Lint, Prettier, `tsc`, Vitest, Gates). Prüfen: Lauf
+  ohne Fehler, sonst in der CI des PRs belegt. Lokal am 01.10.2026: Bündel `schnell` und
+  `frontend` grün (578 Dateien, 7913 Tests); `rust` und `e2e` belegt die CI des PRs (keine
+  Backend-Änderung).

@@ -155,7 +155,7 @@ export function berechneBetreuungZaehler(
 
 /**
  * Gültige Unwetterwarnungen (schwer/extrem) am Einsatzort, gilt jetzt und angekündigt (LFH-663,
- * `openspec/changes/lfh-663-unwetterwarnung-alarmbudget/design.md` D7). Was „Unwetter" heißt,
+ * `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D7). Was „Unwetter" heißt,
  * steht EINMAL in `wetter/unwetter.ts`. Ohne verwertbaren Stand `undefined`: keine Zahl, auch
  * keine 0.
  */

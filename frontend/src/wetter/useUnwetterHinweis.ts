@@ -18,7 +18,7 @@ interface Args {
 
 /**
  * Erkennt im Einsatzrahmen eine NEUE Unwetterwarnung am Einsatzort und meldet sie der
- * AlarmZentrale (LFH-663, `openspec/changes/lfh-663-unwetterwarnung-alarmbudget/design.md`
+ * AlarmZentrale (LFH-663, `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md`
  * D2/D6). Kein Live-Ereignis: die Quelle ist extern, der Rahmen fragt nach — dieselbe Abfrage wie
  * Modulseite und Modulzähler, also kein zusätzlicher Abruf.
  *

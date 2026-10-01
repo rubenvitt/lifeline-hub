@@ -467,7 +467,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
 
   // Neue Unwetterwarnung am Einsatzort (LFH-663,
-  // `openspec/changes/lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
+  // `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
   // der Rahmen erkennt „neu" selbst und meldet es hierher, der Ton spielt dort. Ein neuer Hinweis
   // ERSETZT einen noch einzeln sichtbaren älteren — das Wetter belegt nie mehr als einen der drei
   // Plätze. Eigener Key je Auslösung, damit „schon gebündelt" ihn nie verschluckt.

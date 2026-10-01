@@ -1,6 +1,6 @@
 /**
  * Die EINE Ableitung „Unwetter am Einsatzort" (LFH-663,
- * `openspec/changes/lfh-663-unwetterwarnung-alarmbudget/design.md` D4/D9): Modulzähler,
+ * `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D4/D9): Modulzähler,
  * AlarmZentrale-Hinweis und Überblick-Marke lesen nur diese Datei.
  *
  * „Unwetter" heißt: amtliche Stufe schwer oder extrem, gültig (Ende nicht verstrichen), aus
