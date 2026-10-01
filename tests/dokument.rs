@@ -23,53 +23,6 @@ async fn ablegen(
     multipart_post(app, &pfad(einsatz), cookie, datei, felder).await
 }
 
-async fn multipart_post(
-    app: &axum::Router,
-    uri: &str,
-    cookie: &str,
-    datei: Option<(&str, &[u8])>,
-    felder: &[(&str, &str)],
-) -> (StatusCode, Value) {
-    let b = "LFHDOKBOUNDARY";
-    let mut body = Vec::new();
-    for (name, wert) in felder {
-        body.extend_from_slice(
-            format!("--{b}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{wert}\r\n")
-                .as_bytes(),
-        );
-    }
-    if let Some((dateiname, daten)) = datei {
-        body.extend_from_slice(format!(
-            "--{b}\r\nContent-Disposition: form-data; name=\"datei\"; filename=\"{dateiname}\"\r\nContent-Type: application/octet-stream\r\n\r\n"
-        ).as_bytes());
-        body.extend_from_slice(daten);
-        body.extend_from_slice(b"\r\n");
-    }
-    body.extend_from_slice(format!("--{b}--\r\n").as_bytes());
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri(uri)
-                .header(header::COOKIE, cookie)
-                .header(
-                    header::CONTENT_TYPE,
-                    format!("multipart/form-data; boundary={b}"),
-                )
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-
 async fn datei_laden(
     app: &axum::Router,
     einsatz: i64,
