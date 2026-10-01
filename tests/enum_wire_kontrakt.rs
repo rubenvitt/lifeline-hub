@@ -650,6 +650,44 @@ fn wetter_teil_zustand_wire() {
     });
 }
 
+/// LFH-864: aktuelle Bedingungen. `WetterSymbol` ist aus `icon` der Quelle abgebildet (Nebel nach
+/// Sonnenstand geteilt, Frontend-Tabellen `wetterSymbolIkone`/`wetterSymbolWort`),
+/// `WetterMessgroesse` benennt die aus Nachbarstationen ergänzten Werte.
+#[test]
+fn wetter_symbol_wire() {
+    enum_wire_as_str!(lifeline_hub::wetter::WetterSymbol {
+        KlarTag,
+        KlarNacht,
+        TeilsBewoelktTag,
+        TeilsBewoelktNacht,
+        Bewoelkt,
+        NebelTag,
+        NebelNacht,
+        Wind,
+        Regen,
+        Schneeregen,
+        Schnee,
+        Hagel,
+        Gewitter,
+    });
+}
+
+#[test]
+fn wetter_messgroesse_wire() {
+    enum_wire_as_str!(lifeline_hub::wetter::WetterMessgroesse {
+        Temperatur,
+        Wind,
+        Boeen,
+        Niederschlag,
+        Wetterlage,
+        Sicht,
+        Bewoelkung,
+        Luftfeuchte,
+        Taupunkt,
+        Luftdruck,
+    });
+}
+
 /// LFH-635: Ablösung. `AbloesungStatus` und `RhythmusQuelle` tragen die DB-CHECK-Werte aus
 /// `migrations/0114_abloesung.sql`; `Einstufung` ist berechnet, aber Wire-Kontrakt des
 /// Frontends (`abloesung/einstufung.ts` rechnet dieselben drei Stufen nach).

@@ -246,6 +246,8 @@ function rendern() {
 }
 
 const band = () => screen.getByRole('group', { name: 'Lage in Zahlen' });
+/** Das Band erst nach dem Einsatz-Abruf — der Körper wartet auf ihn (LFH-629). */
+const bandDa = () => screen.findByRole('group', { name: 'Lage in Zahlen' });
 const paneel = (name: string | RegExp) => screen.getByRole('region', { name });
 
 describe('UeberblickPage', () => {
@@ -321,14 +323,14 @@ describe('UeberblickPage', () => {
   it('Warnstufe bei Pegel-Ausfall und bei gescheitertem Pegel-Abruf: „Pegel: Stand unbekannt"', async () => {
     stelleBereit({ ...volleDaten, pegel: [leitpegel(null)] });
     const erster = rendern();
-    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    expect(await within(await bandDa()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
     erster.unmount();
 
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/pegel', () => new HttpResponse(null, { status: 500 })),
     ]);
     rendern();
-    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    expect(await within(await bandDa()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
     // Der tote Pegel-Abruf macht die Warnstufe nicht unlesbar.
     expect(within(band()).getAllByRole('link')[2]).toHaveTextContent('hoch');
   });
@@ -625,6 +627,73 @@ describe('UeberblickPage', () => {
     });
   });
 
+  describe('Nächste Marken: angekündigtes Unwetter (LFH-663)', () => {
+    const wetter = () => {
+      const jetzt = Date.now();
+      const um = (ms: number) => new Date(jetzt + ms).toISOString();
+      return {
+        ort: { name: 'Hann. Münden' },
+        warnungen: {
+          zustand: 'ok',
+          abgerufen_at: um(-60_000),
+          daten: [
+            {
+              stufe: 'schwer',
+              ereignis: 'ORKANBÖEN',
+              ueberschrift: 'Amtliche UNWETTERWARNUNG vor ORKANBÖEN',
+              beginn: um(2 * 3_600_000),
+              ende: um(5 * 3_600_000),
+            },
+          ],
+        },
+        vorhersage: { zustand: 'ausfall' },
+      };
+    };
+
+    it('Modul frei → Marke „Unwetterwarnung: Orkanböen" mit Weg zur Modulseite', async () => {
+      stelleBereit(volleDaten, [
+        http.get('/api/einsaetze/1/wetter', () => HttpResponse.json(wetter())),
+      ]);
+      rendern();
+      const p = await waitFor(() => paneel('Nächste Marken'));
+      const m = await within(p).findByRole('link', { name: /Unwetterwarnung: Orkanböen/ });
+      expect(m).toHaveAttribute('href', '/einsaetze/1/wetter-pegel');
+      expect(m).toHaveAttribute('data-ton', 'neutral');
+    });
+
+    it('Modul ausgeblendet → keine Anfrage an …/wetter, keine Unwettermarke', async () => {
+      let wetterAbrufe = 0;
+      let overridesGeliefert = 0;
+      stelleBereit(volleDaten, [
+        http.get('/api/einsaetze/1/wetter', () => {
+          wetterAbrufe += 1;
+          return HttpResponse.json(wetter());
+        }),
+        http.get('/api/einsaetze/1/modul-overrides', () => {
+          overridesGeliefert += 1;
+          return HttpResponse.json({
+            'wetter-pegel': {
+              einsatz_id: 1,
+              modul_key: 'wetter-pegel',
+              sichtbar: false,
+              benoetigte_rolle: null,
+              geaendert_at: null,
+            },
+          });
+        }),
+      ]);
+      rendern();
+      const p = await waitFor(() => paneel('Nächste Marken'));
+      await within(p).findByText('Lagebesprechung');
+      await waitFor(() => expect(overridesGeliefert).toBeGreaterThan(0));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(wetterAbrufe).toBe(0);
+      expect(within(p).queryByText(/Unwetterwarnung/)).toBeNull();
+    });
+  });
+
   it('Nächste Marken: fällige Ablösungen je Abschnitt zusammengefasst, Link zur Ablösung (LFH-635)', async () => {
     const schicht = (id: number) => ({
       id,
@@ -822,15 +891,62 @@ describe('UeberblickPage', () => {
       http.get('/api/einsaetze/1/auftraege', haengt),
     ]);
     rendern();
-    const betroffene = await within(band()).findByRole('link', { name: /Betroffene/ });
+    const betroffene = await within(await bandDa()).findByRole('link', { name: /Betroffene/ });
     expect(betroffene).toHaveTextContent('wird abgerufen');
     expect(betroffene.querySelector('[aria-busy="true"]')).not.toBeNull();
     const p = paneel('Offene Aufträge');
-    expect(within(p).getByText('wird abgerufen')).toHaveAttribute('aria-busy', 'true');
+    expect(within(p).getByText('wird abgerufen').closest('[aria-busy="true"]')).not.toBeNull();
     // Eine unabhängige Quelle lädt trotzdem durch.
     await waitFor(() =>
       expect(within(band()).getByRole('link', { name: /Warnstufe/ })).toHaveTextContent('hoch'),
     );
+  });
+
+  /*
+   * LFH-629: der Ladezustand eines Paneels hat die Form seines Leerzustands — Satz und, wo „leer"
+   * eine Aktion trägt, ihr Platz in Knopfhöhe. Höhen misst jsdom nicht; die Seiten-CLS auf 390 px
+   * misst `e2e/lagebild-cls-schmal.spec.ts`. Hier die Struktur, als Paar mit und ohne Aktion.
+   */
+  it('Ladezustand hält den Platz der Leeraktion, nur wo „leer" eine trägt (LFH-629)', async () => {
+    const haengt = async () => {
+      await delay('infinite');
+      return HttpResponse.json([]);
+    };
+    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/auftraege', haengt)]);
+    rendern();
+    await bandDa();
+    // „Offene Aufträge" trägt leer „Zu den Aufträgen" — im Laden steht ihr Platz, kein Knopf.
+    const auftraege = paneel('Offene Aufträge');
+    const laden = within(auftraege).getByText('wird abgerufen').closest('[aria-busy="true"]')!;
+    expect(laden.querySelectorAll('.ant-skeleton-button')).toHaveLength(1);
+    expect(within(auftraege).queryByRole('button')).toBeNull();
+    // „Nächste Marken" hängt ebenfalls an den Aufträgen, trägt leer aber keine Aktion.
+    const marken = paneel('Nächste Marken');
+    expect(within(marken).getByText('wird abgerufen')).toBeInTheDocument();
+    expect(marken.querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
+  });
+
+  it('Körper erst mit dem Einsatz: davor weder Band noch Paneele noch Rechtehinweis (LFH-629)', async () => {
+    let freigeben!: () => void;
+    const tor = new Promise<void>((f) => (freigeben = f));
+    stelleBereit(leereDaten, [
+      http.get('/api/einsaetze/1', async () => {
+        await tor;
+        return HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' });
+      }),
+    ]);
+    rendern();
+    expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
+    // Die übrigen Abfragen sind längst da — gewartet wird allein auf den Einsatz.
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="seiten-inhalt"]')).toBeEmptyDOMElement(),
+    );
+    expect(screen.queryByRole('group', { name: 'Lage in Zahlen' })).toBeNull();
+    expect(screen.queryByText(/Nur Einsatzleitung und Führungspersonal/)).toBeNull();
+    act(() => freigeben());
+    // Mit dem Einsatz kommen Hinweis und Körper im selben Zug.
+    expect(await screen.findByText(/Nur Einsatzleitung und Führungspersonal/)).toBeInTheDocument();
+    expect(await bandDa()).toBeInTheDocument();
   });
 
   /**

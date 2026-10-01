@@ -189,17 +189,21 @@ export default defineConfig({
       // Port als CLI-Argument, nicht über FRONTEND_PORT (steht in der mise-Umgebung auf 5173
       // und gewönne). Vite direkt, weil `pnpm run dev -- --port X` das `--` durchreicht.
       //
-      // `--no-turbo-fast-api-calls`: Node 26 (V8 14.6, in jedem 26.x-Release) bricht den
+      // Node 26 (V8 14.6, in jedem 26.x-Release, auch dem gepinnten 26.7.0) bricht den
       // Dev-Server gelegentlich mit „Lazy deopt after a fast API call with return value is
-      // unsupported" ab (`Buffer.byteLength` beim Ausliefern eines großen vorgebündelten
-      // Moduls); alle Folgetests liefen dann in ERR_CONNECTION_REFUSED. Der Schalter ist eine
-      // V8-Option und in NODE_OPTIONS verboten, deshalb startet der Befehl Node selbst
-      // (`process.execPath`, dieselbe gepinnte Version).
+      // unsupported" ab (`Buffer.byteLength` beim Ausliefern eines großen Strings); alle
+      // Folgetests liefen dann in ERR_CONNECTION_REFUSED. Der Auslöser war das vorgebündelte
+      // `antd.js` mit angehängter Sourcemap, 11,3 MB; `LIFELINE_DEPS_OHNE_SOURCEMAP` drückt es
+      // auf 3,2 MB (LFH-659, gemessen in `e2e/dev-server-antwortgroesse.spec.ts`). Der Schalter
+      // `--no-turbo-fast-api-calls` bleibt als zweite Sicherung: der Abbruch hängt nicht allein
+      // an der Größe, und lokal ließ er sich nicht nachstellen. Er ist eine V8-Option und in
+      // NODE_OPTIONS verboten, deshalb startet der Befehl Node selbst (`process.execPath`,
+      // dieselbe gepinnte Version).
       command: `"${process.execPath}" --no-turbo-fast-api-calls node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${frontendPort} --strictPort`,
       url: baseURL,
-      // Proxy-Ziel auf unser Test-Backend umbiegen (vite.config.ts liest die Variable,
+      // Proxy-Ziel auf unser Test-Backend umbiegen (vite.config.ts liest die Variablen,
       // process.env hat dort Vorrang vor .env.local).
-      env: { LIFELINE_BACKEND_URL: backendUrl },
+      env: { LIFELINE_BACKEND_URL: backendUrl, LIFELINE_DEPS_OHNE_SOURCEMAP: '1' },
       reuseExistingServer: false,
       timeout: 60_000,
     },
