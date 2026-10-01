@@ -11,11 +11,12 @@ use std::sync::OnceLock;
 /// Name des Session-Cookies.
 pub const SESSION_COOKIE: &str = "lifeline_sid";
 
-/// Prozessweiter `Secure`-Cookie-Schalter (nur bei aktivem HTTPS `true`, ungesetzt `false`).
+/// Prozessweiter `Secure`-Cookie-Schalter (`true` bei eigenem TLS oder hinter einem TLS-Proxy,
+/// `Config::cookies_secure`, LFH-603; ungesetzt `false`).
 /// OnceLock statt AppState-Feld, damit die Inline-Test-Konstruktionen unberührt bleiben.
 static COOKIE_SECURE: OnceLock<bool> = OnceLock::new();
 
-/// Einmalig beim Serverstart setzen (true bei HTTPS). Doppelsetzen wird ignoriert.
+/// Einmalig beim Serverstart setzen (`Config::cookies_secure`). Doppelsetzen wird ignoriert.
 pub fn set_cookie_secure(v: bool) {
     let _ = COOKIE_SECURE.set(v);
 }

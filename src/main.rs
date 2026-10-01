@@ -189,6 +189,18 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
     }
 
+    // `Secure` für alle Sitzungs- und Anmelde-Cookies: bei eigenem TLS und hinter einem TLS-Proxy
+    // (`--cookie-secure`, LFH-603). Vor beiden Serve-Zweigen, damit der HTTP-Zweig es auch kennt.
+    lifeline_hub::auth::session::set_cookie_secure(config.cookies_secure());
+    if let Some(variable) = config.https_origin_ohne_secure_cookie() {
+        tracing::warn!(
+            "{variable} nennt eine https-Adresse, aber die Cookies tragen kein `Secure`: weder \
+             --tls noch --cookie-secure (LIFELINE_COOKIE_SECURE) ist gesetzt. Hinter einem \
+             TLS-Proxy gehört --cookie-secure an, sonst geht das Sitzungs-Cookie bei einem \
+             http-Aufruf im Klartext mit."
+        );
+    }
+
     // Demo-Daten: der Schalter reist als Router-Option. Er öffnet einen harten Löschweg und steht
     // deshalb im Log.
     if config.demo_daten {
@@ -251,8 +263,6 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         let (cert_pfad, key_pfad) = lifeline_hub::tls::beschaffe_cert(&config, sans).await?;
         let tls_config =
             axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_pfad, &key_pfad).await?;
-
-        lifeline_hub::auth::session::set_cookie_secure(true);
 
         // Anders als `TcpListener::bind` erwartet axum-server eine `SocketAddr`: unter `--tls` muss
         // `--bind` IP:Port sein (Hostnamen gehen nur im HTTP-Modus).

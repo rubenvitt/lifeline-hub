@@ -37,6 +37,13 @@ Diese verschieben eine Vertrauensgrenze und werden beim Serverstart mit
 | `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK` | `--download-allow-loopback` | **Schwächt den SSRF-Schutz.** Erlaubt Karten-Downloads zu Loopback-Adressen, auch über http — und zwar auf dem gesamten Download-Pfad einschließlich des öffentlichen Style-/Tile-Proxys. Reiner Dev-Schalter für einen lokalen Object-Store (Garage, siehe `compose.yml`). Gehört in keine erreichbare Umgebung. |
 | `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL` | `--offline-katalog-manifest-url` | **Verbiegt die Trust-Quelle** des Offline-Karten-Katalogs: bestimmt, welchem Manifest — und damit welchen Kartendaten — das System vertraut. Ohne Angabe gilt der einkompilierte Pin (LFH-199). |
 
+Umgekehrt **härtet** einer die Grenze und gehört in jede Umgebung hinter einem
+TLS-terminierenden Reverse-Proxy:
+
+| Variable | Flag | Wirkung |
+|---|---|---|
+| `LIFELINE_COOKIE_SECURE` | `--cookie-secure` | Markiert Sitzungs-, MFA-, OIDC- und WebAuthn-Cookies `Secure`, obwohl die App selbst kein TLS bedient (LFH-603). Default aus, damit lokaler HTTP-Betrieb funktioniert; mit `--tls` ohnehin an. Bewusst kein Ableiten aus `https://`-Origins: wer die App zusätzlich per http erreicht, verlöre sonst still die Anmeldung. Nennt `LIFELINE_WEBAUTHN_RP_ORIGIN` oder `LIFELINE_OIDC_REDIRECT_URL` eine https-Adresse ohne `Secure`-Cookies, warnt der Start. Mehr in `docs/betrieb-tls.md`. |
+
 Geheimnisse, die nie ins Log dürfen (im `Debug` maskiert):
 `LIFELINE_ADMIN_PASSWORD`, `LIFELINE_KARTEN_SERVICE_TOKEN`,
 `LIFELINE_OIDC_CLIENT_SECRET`.
