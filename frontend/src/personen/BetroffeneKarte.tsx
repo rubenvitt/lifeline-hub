@@ -39,7 +39,7 @@ import { personenMarker } from './personenKarte';
  *   spränge die Karte um eine Zeile, sobald die letzte Person live verortet wird.
  * - **Begrenzte Höhe in `dvh`**: das Layout gibt keine Höhe vor, und bei `vh` fräße die
  *   Browserleiste des Handschirms den unteren Rand.
- * - **Schleuse** (LFH-668, `openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`): solange
+ * - **Schleuse** (LFH-668, `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`): solange
  *   Maus oder Stift über der Ansicht liegen, der Fokus darin steht oder ein Bündel aufgefächert ist,
  *   halten die Marker Menge, Folge und Lage — ein Zugang verschmilzt nicht unter dem Zeiger zum
  *   Bündel. Sichtung und Beschriftung fließen weiter. Neu, verlegt und entfallen wartet im

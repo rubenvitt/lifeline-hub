@@ -10,7 +10,7 @@ Prüfliste gilt nicht als fertig. Anlass ist Aufgabe 7.4 in
 | Angabe | Wert |
 | --- | --- |
 | Routen | `/einsaetze/:id/personen` (Zeilen; Karte über `?ansicht=karte`), `/einsaetze/:id/personen/aufnahme`, `/einsaetze/:id/personen/:personId`, `/einsaetze/:id/lage-dashboard` |
-| Stand | Commit `e4665ed3` auf `feat/lfh-613-betroffene-zustand-fundort-verbleib` (nach dem Rebase auf `alpha`); **fortgeschrieben 23.09.2026 durch den Nachzug LFH-650** (Branch `claude/lfh-650-bd2bb0`, Commits `20004120` · `1f84cdd1` · `e148d00d` · `6e71e796` · `df0f2e03`); **Tabelle 4, Nr. 12 (b) fortgeschrieben 01.10.2026 durch LFH-668** (`openspec/changes/lfh-668-betroffenen-karte-schleuse/`) |
+| Stand | Commit `e4665ed3` auf `feat/lfh-613-betroffene-zustand-fundort-verbleib` (nach dem Rebase auf `alpha`); **fortgeschrieben 23.09.2026 durch den Nachzug LFH-650** (Branch `claude/lfh-650-bd2bb0`, Commits `20004120` · `1f84cdd1` · `e148d00d` · `6e71e796` · `df0f2e03`); **Tabelle 4, Nr. 12 (b) fortgeschrieben 01.10.2026 durch LFH-668** (`openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/`) |
 | Zielkontext | Fükw 1366 × 768 px, Tastatur + Maus, Stufe `kompakt`; Führungs-Tablet in `komfortabel`; mobil ~390 px (Leitlinie, vier Kontexte) |
 | Nicht enthalten | Personen als Ebene der Lagekarte (Non-Goal laut `design.md`, Folgetask aus Aufgabe 7.2); Backend-Vertrag (Migrationen, API) — der ist über `cargo test` belegt, nicht über diese Liste |
 

@@ -104,7 +104,7 @@ export function baueSpiderFc(
 /**
  * Hat sich an den clusterbaren Markern nur der INHALT geändert — gleiche Schlüssel in gleicher
  * Folge an gleicher Lage? Dann bildet die Clusterquelle dieselben Bündel, und ein offener Spider
- * darf stehen bleiben (LFH-668, `openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`,
+ * darf stehen bleiben (LFH-668, `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`,
  * D5). Die Folge zählt mit: von ihr hängen die Bündel-Kennungen ab.
  */
 export function nurInhaltGeaendert(

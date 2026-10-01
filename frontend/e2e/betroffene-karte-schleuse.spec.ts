@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Schleuse der Betroffenen-Karte (LFH-668,
- * `openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`): kein Zielwechsel unter dem
+ * `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`): kein Zielwechsel unter dem
  * Zeiger durch fremde Schreibzugriffe. Seeding per `page.request` ist für die Seite ein FREMDER
  * Schreibzugriff — er kommt über den Live-Strom, wie von einer zweiten Stelle.
  *

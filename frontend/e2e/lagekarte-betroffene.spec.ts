@@ -369,7 +369,7 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
   await expect(page.locator('[data-lfh="auswahl"]').getByText('Zug Rand')).toHaveCount(0);
 });
 
-// LFH-668, D5 (`openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`): auf der Lagekarte
+// LFH-668, D5 (`openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`): auf der Lagekarte
 // gibt es keine Schleuse, der Spider-Schutz der Kartenfläche gilt aber auch hier. Eine reine
 // Inhaltsänderung (Sichtung) lässt ein aufgefächertes Bündel offen, ein Zugang klappt es zu.
 test('Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungsänderung, ein Zugang klappt es zu', async ({

@@ -82,7 +82,7 @@ diese Zusage.
   Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
   `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
 - **Ein aufgefächertes Bündel überlebt eine reine Inhaltsänderung** (LFH-668,
-  `openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`, D5): gleiche Schlüssel in gleicher
+  `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`, D5): gleiche Schlüssel in gleicher
   Folge an gleicher Lage (`nurInhaltGeaendert`, `spiderfy.ts`) → Blätter bleiben stehen und nehmen die
   neuen Eigenschaften (`aktualisiereSpiderBlaetter`), die Hülle des neu gebauten Donuts bleibt
   durchlässig; sonst klappt der Spider zu. Verglichen wird mit dem EINGESPIELTEN Stand

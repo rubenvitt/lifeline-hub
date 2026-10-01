@@ -2,7 +2,7 @@ import type { KarteMarker } from '../pages/lagekarte/marker';
 
 /**
  * Die Schleuse der Betroffenen-Karte (LFH-668,
- * `openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`, D1/D3) — rein, damit sie ohne
+ * `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`, D1/D3) — rein, damit sie ohne
  * WebGL prüfbar ist. Gegenstück der Zeilenschleuse in `components/Datensicht.tsx`.
  *
  * - **Gehalten** werden Menge, Folge und Lage der Marker: davon hängt ab, was zu einem Bündel

@@ -13,7 +13,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `parsePlatzierenAuftrag` verwirft Unbrauchbares ganz; die Karte räumt den Parameter und betritt
   den Modus nur mit Schreibrecht. Koordinaten in der Schadens-Erfassung: LFH-453.
 - **Die Kartenansicht hat eine Schleuse** (LFH-668,
-  `openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`): solange Maus/Stift über der
+  `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`): solange Maus/Stift über der
   Ansicht, der Fokus darin oder ein Bündel aufgefächert ist, halten die Marker Menge, Folge und Lage
   (`personen/kartenSchleuse.ts`); Sichtung und Beschriftung fließen, neu/verlegt/entfallen wartet
   im Sammelbanner der Standzeile (feste Höhe). Entfallene bleiben bis dahin stehen. Touch zählt nur

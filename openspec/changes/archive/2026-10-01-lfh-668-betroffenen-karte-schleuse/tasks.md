@@ -33,4 +33,4 @@
 ## 6. Prüfliste und Abschluss
 
 - [x] 6.1 `docs/superpowers/specs/2026-09-22-lfh-613-pruefliste.md`, Tabelle 4, Nr. 12: Teil (b) mit Entscheidung, Messwerten und Testnamen nachtragen, Verdikt nach Beleg (Rest Touch ohne Auffächerung benennen), Zielticket räumen, die Verdikt-Bilanz der Tabelle nachziehen
-- [ ] 6.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs)
+- [x] 6.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs). Lokal am 01.10.2026: Bündel `schnell` grün (Schritte 1–3, 6, 8–13), Vitest voll mit `TZ=Europe/Berlin` grün (576 Dateien, 7898 Tests), e2e der Betroffenen- und Lagekarten-Specs grün. Den vollen Lauf (Rust, ganze e2e-Suite) belegt die CI des PRs. In dieser Umgebung sind 10 Tests aus `fokus-verdeckung`/`gate3` schon auf `alpha` rot (behelfsmäßig verlinkter Browser)
