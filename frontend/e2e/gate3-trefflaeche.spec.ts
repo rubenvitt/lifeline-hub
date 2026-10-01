@@ -1495,6 +1495,100 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Fernmeldeskizze (LFH-625) ────────────────────────────────────────────────────────
+//
+// Darstellung „Skizze“ des Funkplans über dem geteilten Gerüst: Namen als handgebaute
+// Bedienziele (`baumZielStil`), Klappziele, die Werkzeugzeile und der Umschalter
+// (`Segmentleiste`, eigene Knöpfe). Dasselbe Seeding wie der Funkplan: Abschnitt Nord mit
+// 1. Zug (zwei Namen, ein Klappziel).
+
+const SKIZZE_NAMEN = 2;
+const SKIZZE_KLAPPZIELE = 1;
+
+async function messeSkizze(page: Page, soll: number, dichte: string, schreibend: boolean) {
+  const skizze = page.getByRole('region', { name: 'Fernmeldeskizze', exact: true });
+  // Datenanker: der Zug steht erst, wenn Abschnitte und Einheiten geladen sind.
+  await expect(skizze.getByRole('link', { name: '1. Zug' })).toHaveCount(1);
+  if (!schreibend) {
+    await expect(
+      page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+      'Vorbedingung: ohne Schreibrecht keine Übernahme',
+    ).toHaveCount(0);
+  }
+  const namen = await alleHaltenStufe(
+    skizze.getByRole('link'),
+    soll,
+    `Name (${dichte})`,
+    SKIZZE_NAMEN,
+  );
+  const klappen = await alleHaltenStufe(
+    skizze.getByRole('button', { name: /^Unterstellte von / }),
+    soll,
+    `Klappziel (${dichte})`,
+    SKIZZE_KLAPPZIELE,
+  );
+  const umschalter = await alleHaltenStufe(
+    page.getByRole('radiogroup', { name: 'Darstellung' }).getByRole('radio'),
+    soll,
+    `Umschalter (${dichte})`,
+    2,
+  );
+  const alleAuf = await haeltStufe(
+    page.getByRole('button', { name: 'Alle aufklappen', exact: true }),
+    soll,
+    `Alle aufklappen (${dichte})`,
+  );
+  const druck = await haeltStufe(
+    page.getByRole('button', { name: /Drucken/ }),
+    soll,
+    `Drucken (${dichte})`,
+  );
+  return (
+    `${dichte} (Soll ≥ ${soll}): Name ${namen}, Klappziel ${klappen}, Umschalter ${umschalter}, ` +
+    `Alle aufklappen ${alleAuf}, Drucken ${druck}`
+  );
+}
+
+test('Fernmeldeskizze: Namen, Klappziele, Umschalter und Werkzeugknöpfe folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fernmeldeskizze`);
+  await funkplanSaeen(page, einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    await stelleDichte(page, dichte);
+    // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
+    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    gemessen.push(await messeSkizze(page, soll, dichte, true));
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Fernmeldeskizze (Beobachter): Namen, Klappziele, Umschalter und Drucken folgen der Staffel, die Übernahme fehlt', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fernmeldeskizze Lesend`);
+  await funkplanSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    await stelleDichte(page, dichte);
+    await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+    gemessen.push(await messeSkizze(page, soll, dichte, false));
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Organigramm der Führungsorganisation (LFH-626) ───────────────────────────────────
 //
 // Ansicht der Seite Einsatzabschnitte. Die Namen sind handgebaute Bedienziele

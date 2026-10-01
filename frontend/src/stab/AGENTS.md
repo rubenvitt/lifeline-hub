@@ -10,6 +10,16 @@ jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit G
 `stab/luecken.ts` (auch für ST6). Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Eigene Gegenstelle fehlt als benannte Lücke (LFH-849).
 
+**Fernmeldeskizze** (LFH-625, `openspec/changes/lfh-625-fernmeldeskizze/design.md`): zweite
+Darstellung des Funkplans („Tabelle | Skizze“, `?ansicht=skizze` apply-then-clean), kein Modul,
+keine Route. Modell `stab/fernmeldeskizze.ts` nur über `baueFuehrungsorganisation` (kein dritter
+Baum), Funkangaben über dieselben Funktionen wie `baueFunkplan`; Darstellung
+`stab/FernmeldeskizzeBild.tsx` über das Gerüst `components/organigramm/HaengenderBaum`. Die
+Kante (gemeinsame Sprechgruppe zur übergeordneten Stelle) und ihre Lücke nur über
+`verbindungsurteil` in `stab/luecken.ts`; „ohne Urteil“, wenn einer Seite jede Sprechgruppe fehlt.
+Keine Leitung, Stärke, Erreichbarkeit, keine Fahrzeuge; keine eigene Übernahme, eine Druckwurzel
+mit Druckkopf je Darstellung, getrennte Klappmengen.
+
 **Checkliste Arbeitsaufnahme** (LFH-551,
 `openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): unterstes
 Paneel der Stabseite (`stab/ChecklistePaneel.tsx`), sieben feste Punkte als Code-Vorlage

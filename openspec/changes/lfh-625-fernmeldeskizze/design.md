@@ -321,6 +321,24 @@ Trefffläche gefunden (LFH-626 D3, Nachtrag), und der Fix soll nur einmal stehen
     „LFH-625 setzt seine Kommunikationsebene darauf“.
 - **`pruefliste.md`** mit den Kriterien der Prüfliste Einsatztauglichkeit (Vorbild LFH-626).
 
+### Nachträge aus der Umsetzung (01.10.2026)
+
+- **Dateiname der Darstellung:** `stab/FernmeldeskizzeBild.tsx` statt `stab/Fernmeldeskizze.tsx`.
+  Neben `stab/fernmeldeskizze.ts` löste `./Fernmeldeskizze` auf einem Dateisystem ohne
+  Groß-/Kleinunterscheidung (macOS) zuerst die `.ts` auf.
+- **Druckregeln des Gerüsts (D4)** hängen an der Klasse `.haengender-baum` der Gerüst-Region,
+  nicht an `[data-lfh='druckwurzel']`. So bleibt die Zusicherung „keine Mechanik von `druck.css`
+  ein zweites Mal“ (kein `druckwurzel` in Eigenheiten-CSS) bestehen. Die Spezifität (0,2,0) bzw.
+  (0,2,1) schlägt `druck.css` (0,1,1) wie zuvor `.organigramm-print-root`. Der reine Teil
+  (`BaumKnoten`, `klappbareSchluessel`) liegt in `components/organigramm/baum.ts`, damit Modelle
+  das Gerüst nicht laden. Props des Gerüsts: `bezeichnung` (Name der Region), `knotenName`
+  (für das Klappziel), `gruppe` (Sammelknoten als benannte Gruppe).
+- **Ring (D3):** Der Server verhindert Zyklen in Abschnitten und Einheiten
+  (`waere_zyklus` in `src/einsatzabschnitt/repo.rs` und `src/einheit/repo.rs`). Der Test „Zahl der
+  Lücke = Zahl der `keine`-Kanten“ läuft deshalb ohne Ring. Bei korrupten Daten mit Ring bleibt
+  die Skizze zyklussicher (über `baueFuehrungsorganisation`), die Zahl kann dann um die
+  Ring-Kante abweichen.
+
 ## Risks / Trade-offs
 
 - **[Gemeinsame Sprechgruppe ist nicht immer die tatsächliche Verbindung]** Eine Einheit kann ihren
