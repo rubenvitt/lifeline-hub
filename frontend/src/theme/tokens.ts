@@ -81,6 +81,10 @@ export interface Farbrollen {
   achtungText: string;
   /** Text in Alarmfarbe — Gegenstück zu {@link Farbrollen.achtungText}. */
   alarmText: string;
+  /** Gefahrrot unter dem Zeiger und beim Drücken (antds `colorErrorHover`/`colorErrorActive` am
+   *  Knopf, LFH-693). Am Tag DUNKLER als `alarmText`: antd färbt mit demselben Ton auch die
+   *  Schrift umrandeter Gefahrknöpfe, ein hellerer Ton trüge dort den Tagesboden nicht. */
+  alarmHover: string;
   /** Deckende Statusflächen: „Ampel als Fläche, Zahl bleibt lesbar" (Statuszelle/-Chip). */
   normalFlaeche: string;
   achtungFlaeche: string;
@@ -125,6 +129,12 @@ export interface Farbrollen {
  * Geerbter Text (LFH-652, `antdToken`): `bedienText` als Link auf grund 7,04 · flaeche 8,41 ·
  * kopf 7,36 · paneel 7,71; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 7,37. Auf der
  * Hervorhebungsfläche `flaeche3` liegen beide bei 6,59 bzw. 6,60, unter dem Tagesboden (LFH-877).
+ *
+ * Gefahrrot (LFH-693, `antdKomponenten`): als Text `alarmText`, roter Menüeintrag auf flaeche2
+ * 8,29; Weiß auf `alarmText` 8,96 (gefüllter Gefahrknopf in Ruhe, Menüeintrag unter dem Zeiger),
+ * auf `alarmHover` 10,45 (Zeiger und Drücken); `alarmHover` als Schrift des umrandeten Knopfs auf
+ * flaeche 10,45, auf grund 8,75. `alarm` trüge hier nicht: als Text auf flaeche2 6,27, Weiß darauf
+ * 6,78.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -158,6 +168,7 @@ export const farbenHell: Farbrollen = {
   normalText: '#155234',
   achtungText: '#604200',
   alarmText: '#8f1c12',
+  alarmHover: '#7d1810',
   normalFlaeche: '#e3f1e8',
   achtungFlaeche: '#f7efd5',
   alarmFlaeche: '#f9e3e3',
@@ -177,6 +188,9 @@ export const farbenHell: Farbrollen = {
  * 11,60 · 11,10 — gedaempft 7,71 · 7,27 · 6,96 — bedien 6,19 · 5,84 · 5,58 — alarm 7,18 · 6,77 ·
  * 6,48 — achtung 12,45 · 11,75 · 11,24 — normal 8,79 · 8,29 · 7,94 — aufBedien auf bedien 6,19,
  * auf alarm 7,18. Statusflächen: normalText 10,44, achtung 11,18, alarm 6,89, bedienText 9,65.
+ * Gefahrrot (LFH-693): roter Menüeintrag auf flaeche2 6,48; aufBedien auf alarm 7,18 (gefüllter
+ * Gefahrknopf, Menüeintrag unter dem Zeiger — vorher antds Weiß, 2,78), auf alarmHover 7,98
+ * (Zeiger und Drücken, vorher gedrückt 3,74).
  * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
  * Tabellenkopf auf kopf 7,48.
  *
@@ -224,6 +238,7 @@ export const farbenDunkel: Farbrollen = {
   normalText: '#7ddc4a',
   achtungText: '#e8cc3a',
   alarmText: '#ff6b6b',
+  alarmHover: '#e88a87',
   normalFlaeche: '#0d1a0a',
   achtungFlaeche: '#1c1705',
   alarmFlaeche: '#1c0a0d',
@@ -634,10 +649,20 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * (LFH-667; `alarm` lag am Tag bei 5,67 : 1 auf `grund`). Das `Form`-Token färbt nur Feldmeldung,
  * Pflichtsternchen und Rückmeldesymbol; die Felder selbst ziehen ihren Fehlerrand aus dem eigenen
  * Komponententoken.
- * `colorError` global umzustellen träfe auch Gefahrknöpfe und Ränder, und dort ist die Füllfarbe
- * richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein Linkknopf zeigt
- * den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText` darauf 7,11 Tag
- * · 9,65 Nacht).
+ * `colorError` global umzustellen träfe auch Ränder, Ikonen und Feldränder, und dort ist die
+ * Füllfarbe richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein
+ * Linkknopf zeigt den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText`
+ * darauf 7,11 Tag · 9,65 Nacht).
+ *
+ * Gefahrrot (LFH-693, Spec `farbrollen-kontrast`) läuft deshalb über die Komponenten-Tokens.
+ * Das `Dropdown` färbt den roten Eintrag in Ruhe mit `colorError` und hinterlegt ihn unter dem
+ * Zeiger mit `colorError`, die Schrift dort ist `colorTextLightSolid`. Beide liest im Dropdown
+ * nur `dropdown/style/status.js` (antd 6.6.5); `aufBedien` bleibt so auf den Gefahreintrag
+ * begrenzt, wie beim Knopf. Der `Button` nimmt `colorError` als Fläche des gefüllten und als
+ * Schrift des umrandeten und des `text`-Gefahrknopfs, `colorErrorHover`/`colorErrorActive`
+ * ebenso unter dem Zeiger und beim Drücken. Deshalb dunkelt der Gefahrknopf unter dem Zeiger
+ * (`alarmHover`), statt wie der Primärknopf aufzuhellen: ein hellerer Ton hielte als Schrift den
+ * Tagesboden nicht (Herleitung: Change `lfh-693-gefahrtext-alarmtext`, `design.md` E2).
  *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
@@ -653,6 +678,13 @@ export function antdKomponenten(
       defaultHoverColor: farben.bedienText,
       defaultActiveColor: farben.bedienText,
       linkHoverBg: farben.bedienFlaeche,
+      colorError: farben.alarmText,
+      colorErrorHover: farben.alarmHover,
+      colorErrorActive: farben.alarmHover,
+    },
+    Dropdown: {
+      colorError: farben.alarmText,
+      colorTextLightSolid: farben.aufBedien,
     },
     Form: {
       colorError: farben.alarmText,

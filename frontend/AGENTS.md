@@ -147,6 +147,10 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Kein eigener Knopfboden** (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung des
   Primärknopfs hält den Textboden in Ruhe und unter dem Zeiger; Werte und Messung am Wert in
   `theme/tokens.ts`. Ein Kontrast-Spec führt den Primärknopf nie unter einer Ausnahme.
+- **Gefahrrot ebenso** (LFH-693, Spec `farbrollen-kontrast`): roter Menüeintrag und Gefahrknopf
+  lesen `alarmText`, unter dem Zeiger und gedrückt `alarmHover` (am Tag dunkler, nicht heller),
+  über die `Dropdown`-/`Button`-Token in `antdKomponenten`, nie je Menü oder Knopf. Gemessen in
+  `e2e/gefahr-kontrast.spec.ts`; kein Kontrast-Spec führt Rot unter einer Ausnahme.
 - **Tagmodus** (LFH-618, `docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`):
   `achtung`/`alarm` als Text über `achtungText`/`alarmText`; Hervorhebung auf `flaeche3`, nicht
   `flaeche2`; Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
