@@ -8,6 +8,9 @@
 # der kritische Pfad ist die Rust-Suite allein. Sie bleibt EIN Job, weil Compile nur einen
 # kleinen Teil ihrer Laufzeit ausmacht und jeder Shard ihn erneut zahlte. Playwright verteilt
 # nach Testzahl in Dateireihenfolge, mehr als vier Shards würden ungleicher statt schneller.
+# Die e2e-Shards fahren alle drei Playwright-Projekte (Firefox und WebKit nur die Druck-Specs,
+# LFH-729): ein roter Druckfall in Firefox oder WebKit sperrt so den PR über die gepinnten
+# Pflicht-Checks, ohne eigenen Job, der erst im Ruleset eingetragen werden müsste.
 #
 # Coverage steht in coverage.yml: dieser Lauf wird auf einem Kanal-Branch nicht abgebrochen,
 # ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
@@ -254,12 +257,17 @@ jobs:
           restore-keys: pnpm-${{ runner.os }}-
       - name: Frontend-Abhängigkeiten
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
+      # Die Browserliste steht im Schlüssel: ein Eintrag aus der Zeit, als nur Chromium installiert
+      # wurde, darf nicht als Treffer für alle drei gelten.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
-      - name: Playwright-Chromium
-        run: mise exec -- pnpm -C frontend exec playwright install --with-deps chromium
+          key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+      # ALLE DREI in jedem Shard: welcher Shard die Firefox- und WebKit-Fälle bekommt, entscheidet
+      # Playwright nach Testzahl, das steht vorher nicht fest. Die Systempakete (`--with-deps`)
+      # liegen in keinem Cache.
+      - name: Playwright-Browser (Chromium, Firefox, WebKit)
+        run: mise exec -- pnpm -C frontend exec playwright install --with-deps chromium firefox webkit
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: lifeline-hub-debug

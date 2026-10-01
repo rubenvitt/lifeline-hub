@@ -35,6 +35,8 @@ set -euo pipefail
 #                    alle fahren und am Ende einmal rot melden)
 # Geteilt wird über die Umgebung, nicht über weitere Flags:
 #   VITEST_SHARD=1/3   PW_SHARD=2/4
+# Playwright-Projekte (Vorgabe: alle, so auch die CI; Firefox/WebKit fahren nur die Druck-Specs):
+#   PW_PROJEKTE=chromium   PW_PROJEKTE=firefox,webkit
 NUR="alle"
 ABBRECHEN=0
 while [ $# -gt 0 ]; do
@@ -46,12 +48,13 @@ while [ $# -gt 0 ]; do
       ;;
     --nur=*) NUR="${1#--nur=}"; shift ;;
     --abbrechen) ABBRECHEN=1; shift ;;
-    -h|--help) sed -n '/^# Bündel-Auswahl/,/^#   VITEST_SHARD/p' "$0"; exit 0 ;;
+    -h|--help) sed -n '/^# Bündel-Auswahl/,/^#   PW_PROJEKTE/p' "$0"; exit 0 ;;
     *) echo "FEHLER: unbekanntes Argument '$1'." >&2; exit 2 ;;
   esac
 done
 VITEST_SHARD="${VITEST_SHARD:-}"
 PW_SHARD="${PW_SHARD:-}"
+PW_PROJEKTE="${PW_PROJEKTE:-}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -167,8 +170,36 @@ prod_bundle_bereitstellen() {
   $PNPM -C "$FE" run build
 }
 
+# Sind die Browser der gewählten Playwright-Projekte installiert? Ohne diese Prüfung scheiterte
+# JEDER Fall eines fehlenden Browsers einzeln an „Executable doesn't exist" — eine Wand roter
+# Tests, die nach kaputtem Frontend aussieht. Lieber vorher laut und mit der Anweisung abbrechen.
+# Fehlende Browser werden NICHT still übersprungen: dann gäbe das Gate je Maschine eine andere
+# Antwort (LFH-729, design.md D2). Projektname = Browsername (`frontend/playwright.config.ts`).
+pw_browser_pruefen() {
+  local projekte="${PW_PROJEKTE:-chromium,firefox,webkit}" fehlend
+  fehlend="$(PW_PRUEF_PROJEKTE="$projekte" $PNPM -C "$FE" exec node --input-type=module -e "
+    import * as pw from '@playwright/test';
+    import { existsSync } from 'node:fs';
+    const fehlt = [];
+    for (const name of process.env.PW_PRUEF_PROJEKTE.split(',')) {
+      if (!['chromium', 'firefox', 'webkit'].includes(name)) {
+        console.error('Unbekanntes Playwright-Projekt in PW_PROJEKTE: ' + name);
+        process.exit(2);
+      }
+      if (!existsSync(pw[name].executablePath())) fehlt.push(name);
+    }
+    console.log(fehlt.join(' '));
+  ")"
+  if [ -n "$fehlend" ]; then
+    echo "FEHLER: Playwright-Browser fehlen: $fehlend" >&2
+    echo "        Installieren: mise exec -- pnpm -C frontend exec playwright install $fehlend" >&2
+    echo "        Oder eine Teilmenge prüfen, z. B. PW_PROJEKTE=chromium (die CI fährt alle)." >&2
+    return 1
+  fi
+}
+
 schritt_7() {
-  echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)${PW_SHARD:+ (Anteil $PW_SHARD)}"
+  echo "==> [7/$SCHRITTE] e2e-Suite (Playwright, LFH-309)${PW_SHARD:+ (Anteil $PW_SHARD)}${PW_PROJEKTE:+ (Projekte $PW_PROJEKTE)}"
   # Pfad und Bereitschaft des Binarys: lib/backend-binaer.sh (LFH-518). Cargo baut nicht
   # zwingend nach ./target (CARGO_TARGET_DIR, build.target-dir), deshalb wird Cargo gefragt;
   # PW_BINAER übersteuert (ein e2e-Shard der CI lädt das Binary als Artefakt). Der Präfix `PW_`
@@ -187,10 +218,18 @@ schritt_7() {
   # Dev-Stack stört nicht. Die Env-Hygiene macht die Playwright-Config selbst, damit `pnpm e2e`
   # auch ohne diesen Wrapper sauber läuft. Der Prod-Bundle wird erst hier gebaut: ohne Binary
   # liefe keine Suite.
+  pw_browser_pruefen
   prod_bundle_bereitstellen
+  local projekt_args=() projekte=() projekt
+  if [ -n "$PW_PROJEKTE" ]; then
+    IFS=',' read -ra projekte <<< "$PW_PROJEKTE"
+    for projekt in "${projekte[@]}"; do projekt_args+=("--project=$projekt"); done
+  fi
   # Den ermittelten Pfad weitergeben: die Suite nimmt genau das Binary, das hier geprüft wurde,
   # statt Cargo ein zweites Mal (unter `mise exec`, womöglich mit anderer Umgebung) zu fragen.
-  PW_BINAER="$binaer" $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"}
+  # `${a[@]+…}`: ein leeres Array unter `set -u` bricht in Bash 3.2 (macOS) sonst ab.
+  PW_BINAER="$binaer" $PNPM -C "$FE" exec playwright test ${PW_SHARD:+--shard="$PW_SHARD"} \
+    ${projekt_args[@]+"${projekt_args[@]}"}
 }
 
 schritt_8() {

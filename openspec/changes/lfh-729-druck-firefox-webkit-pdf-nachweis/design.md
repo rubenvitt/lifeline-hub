@@ -140,7 +140,8 @@ unabhängige zweite Quelle stehen und muss dasselbe m ergeben.
 
 `pdfjs-dist` muss durch `scripts/check-deps.sh` (GHSA-Audit, Schwelle `high`). Die
 bekannte Lücke CVE-2024-4367 betrifft Versionen < 4.2.67 und das Rendern im Browser. Gepinnt
-wird eine aktuelle 5.x. Das Paket landet nicht im Bundle, weil nur `e2e/` es importiert, und
+ist 6.3.289, die aktuelle Version bei der Umsetzung. Die optionalen `@napi-rs/canvas`-Binärpakete
+kommen mit ins Lockfile, werden aber nie geladen, weil der Auszug nicht rendert. Das Paket landet nicht im Bundle, weil nur `e2e/` es importiert, und
 ein Prüfschritt in Gruppe 1 belegt das am Prod-Build.
 
 ### D5 — Logo-Fall: eigenes PNG mit unverwechselbaren Abmessungen
