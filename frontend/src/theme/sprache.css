@@ -161,7 +161,7 @@
    Prognose drei- bis vierzeilig; mit der ersten Standmeldung bzw. dem Ablauf der Prognose sprang
    das Band samt Paneelen darunter zurück. Eine längere Notiz endet mit „…“, der volle Text bleibt
    im DOM (zugänglicher Name) und im `title`. Herleitung und verworfene Wege:
-   `openspec/changes/lfh-691-kennzahl-notiz-feste-hoehe/design.md`. */
+   `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`. */
 @media (min-width: 768px) {
   .lfh-kennzahlenband--notizfest [data-lfh='kennzahl-notiz'] {
     display: -webkit-box;

@@ -57,7 +57,7 @@ import '../../theme/sprache.css';
  * `md` mit `notizZeilen` Boden UND Deckel (LFH-691). Eine längere Notiz endet dort mit „…“; der
  * volle Text bleibt im DOM, also im zugänglichen Namen, und steht im Zustand `daten` im `title`.
  * Die tragende Aussage einer Notiz steht deshalb vorn. Herleitung:
- * `openspec/changes/lfh-691-kennzahl-notiz-feste-hoehe/design.md`.
+ * `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`.
  *
  * ── STATUSPUNKT ────────────────────────────────────────────────────────────────────
  *
@@ -87,11 +87,11 @@ import '../../theme/sprache.css';
  */
 
 export type KennzahlZustand = 'daten' | 'laden' | 'fehler';
+export type KennzahlTon = 'neutral' | 'normal' | 'bedien' | 'achtung' | 'alarm';
+type KennzahlGroesse = 'klein' | 'mittel' | 'gross';
 
 /** Ob das umgebende Band eine feste Notizhöhe hat (`Kennzahlenband notizZeilen`). */
 const NotizFestKontext = createContext(false);
-export type KennzahlTon = 'neutral' | 'normal' | 'bedien' | 'achtung' | 'alarm';
-type KennzahlGroesse = 'klein' | 'mittel' | 'gross';
 
 const STUFE: Record<KennzahlGroesse, Schriftstufenname> = {
   klein: 'datenwertKlein',

@@ -45,7 +45,9 @@ lang ihr Text ist. Für „Lage in Zahlen“ ist N = 3.
 
 Warum 3: Nach der Messung passt damit jede heute erzeugte Notiz ab 1440 px ganz, auch der
 Pegel mit Prognose und „+1 weitere“ (3 Zeilen bei 186 px). Bei 1200 px braucht diese Notiz
-4 Zeilen; gekürzt wird dann ihr Ende, „+1 weitere“, also die schwächste Angabe. „Evakuiert“
+4 Zeilen; gekürzt wird dann ihr Ende. Der Browserblick der Umsetzung zeigt die dritte Zeile
+bei „Prognose 7,10 m bis…“, Uhrzeit der Prognose und „+1 weitere“ stehen nur im `title` und im
+zugänglichen Namen (am Checkpoint war nur „+1 weitere“ angenommen). „Evakuiert“
 braucht höchstens 2 Zeilen und wird nie gekürzt.
 
 Erwogene Alternativen:

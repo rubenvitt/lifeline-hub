@@ -33,9 +33,11 @@ also auch ohne Evakuierung.
   ihn also ganz. Eine gekürzte Notiz trägt ihn zusätzlich im `title`, für den Mauszeiger.
 - **Drei Zeilen für „Lage in Zahlen“:** Das Lage-Dashboard und Führung · Überblick fordern drei
   Zeilen an (Entscheidung am Checkpoint, 01.10.2026). Damit passen ab 1440 px alle gemessenen
-  Notizen ganz. Bei 1200 px kann nur das Ende der längsten Pegel-Notiz („+n weitere“) in den
-  `title` rutschen. Das Band ist dafür immer drei Notizzeilen hoch, also etwa 15 px höher als
-  heute im Zweizeilenfall.
+  Notizen ganz. Bei 1200 px rutscht das Ende der längsten Pegel-Notiz in den `title`: nach dem
+  Browserblick der Umsetzung schon „14:00 · +1 weitere“, die dritte Zeile endet mit
+  „Prognose 7,10 m bis…“ (Korrektur zur Annahme am Checkpoint, dort hieß es „nur +n weitere“).
+  Das Band ist dafür immer drei Notizzeilen hoch, also etwa 15 px höher als heute im
+  Zweizeilenfall.
 - **Unter `md` bleibt LFH-629:** Dort gilt weiter der Boden von zwei Zeilen
   (`notizZeilenSchmal`).
 - **Nachweis:** Ein Playwright-Spec misst die Bandhöhe bei 1200, 1440 und 1920 px vor und nach

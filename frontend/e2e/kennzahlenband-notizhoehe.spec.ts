@@ -5,7 +5,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * LFH-691 — das Band „Lage in Zahlen“ hält ab `md` seine Höhe, wenn sich die Länge einer Notiz
  * ändert (Spec `einsatztauglichkeit-layout`, „Kennzahlenband hält seine Höhe“; Prüfliste
  * Kriterium 12 aus LFH-607). Herleitung und Messwerte vor dem Fix:
- * `openspec/changes/lfh-691-kennzahl-notiz-feste-hoehe/`.
+ * `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/`.
  *
  * Gemessen bei 1200, 1440 und 1920 px (Viewport-Stufe `xl`, Zellbreite 146 / 186 / 266 px):
  *  - STANDMELDUNG: „von ≈ 1 850 geplant · 1 ohne Meldung“ wird mit der ersten Meldung zu
@@ -18,8 +18,19 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  *    bei 1200 px, und dann tragen `title` und zugänglicher Name den vollen Text.
  *
  * HERMETISCH beim Pegel wie `lagebild-cls-schmal.spec.ts`: die Messung kommt per `page.route`
- * aus einem Literal, der echte Abruf ginge an PEGELONLINE.
+ * aus einem Literal, der echte Abruf ginge an PEGELONLINE. Uhr und Zone stehen fest
+ * ({@link FEST}): eine Prognose über Mitternacht trüge den Tag („bis 02. 00:57“), die Notiz würde
+ * länger, und ob sie bei 1440 px noch in drei Zeilen passt, hinge an der Uhrzeit des Laufs.
+ *
+ * ROLLEN (LFH-435, `e2e/AGENTS.md`): kein Durchgang als Beobachter. Das Inventar führt das
+ * Lage-Dashboard als nicht rollenabhängig; im Überblick wechselt die Rolle nur Link gegen
+ * Zelle und den Notiztext, die Regel greift über `[data-lfh='kennzahl-notiz']` an beiden.
  */
+
+test.use({ timezoneId: 'Europe/Berlin' });
+
+/** Feste Uhr des Pegel-Falls: 09:00 in Berlin, die Prognose fünf Stunden später am selben Tag. */
+const FEST = new Date('2026-10-01T07:00:00Z');
 
 const BREITEN = [1200, 1440, 1920] as const;
 
@@ -32,8 +43,7 @@ const STATION = '47174d8f-1b8e-4599-8a59-b580dd55bc87';
 const wire = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
 
 /** Pegel-Antwort: kurz nur der Leitpegel, lang mit offener Prognose und einem zweiten Pegel. */
-function pegelAntwort(lang: boolean) {
-  const jetzt = new Date();
+function pegelAntwort(lang: boolean, jetzt: Date) {
   const leit = {
     id: 1,
     station_uuid: STATION,
@@ -143,12 +153,15 @@ for (const breite of BREITEN) {
       stationen: [{ station_uuid: STATION, name: 'HANN. MÜNDEN', gewaesser: 'WESER' }],
     });
     await page.setViewportSize({ width: breite, height: 900 });
+    await page.clock.setFixedTime(FEST);
     const notiz = zelle(page, /^Pegel$/).locator('[data-lfh="kennzahl-notiz"]');
 
     const messe = async (lang: boolean) => {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
       await page.route(`**/api/einsaetze/${einsatzId}/pegel`, (r) =>
-        r.request().method() === 'GET' ? r.fulfill({ json: pegelAntwort(lang) }) : r.continue(),
+        r.request().method() === 'GET'
+          ? r.fulfill({ json: pegelAntwort(lang, FEST) })
+          : r.continue(),
       );
       await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
       await geladen(page);
@@ -172,6 +185,9 @@ for (const breite of BREITEN) {
       breite === 1200,
     );
     await expect(notiz).toHaveAttribute('title', langeNotiz!);
+    // Die Kürzung endet mit „…“: das leistet nur `line-clamp`, nicht ein bloßes `max-height`.
+    // (`display` liest Chromium am Flex-Kind als `flow-root` zurück, deshalb nicht geprüft.)
+    expect(await notiz.evaluate((el) => getComputedStyle(el).webkitLineClamp)).toBe('3');
     await expect(zelle(page, /^Pegel$/)).toHaveAccessibleName(/\+1 weitere/);
   });
 
