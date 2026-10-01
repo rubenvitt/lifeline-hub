@@ -41,7 +41,7 @@ export function legeDokumentAb(einsatzId: number, eingabe: DokumentAblage): Prom
  * Body von `PATCH …/dokumente/{did}` (LFH-656, handgepflegt wie jedes Request-DTO). Ein fehlendes
  * Feld bleibt; der Bezug kommt als Paar — beide `null` entfernt ihn, eine Mischung ist 422.
  */
-export interface DokumentAenderung {
+export interface DokumentPatch {
   titel?: string;
   kategorie?: DokumentKategorie;
   bezug_typ?: DokumentBezugTyp | null;
@@ -51,7 +51,7 @@ export interface DokumentAenderung {
 export function aendereDokument(
   einsatzId: number,
   dokumentId: number,
-  aenderung: DokumentAenderung,
+  aenderung: DokumentPatch,
 ): Promise<Dokument> {
   return apiSend<Dokument>(`${basis(einsatzId)}/${dokumentId}`, 'PATCH', aenderung);
 }

@@ -5,7 +5,7 @@ import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzKeys } from '../api/queryKeys';
-import { aendereDokument, type DokumentAenderung } from '../api/dokumente';
+import { aendereDokument, type DokumentPatch } from '../api/dokumente';
 import type { Dokument, DokumentKategorie } from '../api/types';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from './kategorien';
 import { bezugAusWert, bezugWert, useBezugOptionen } from './bezug';
@@ -26,7 +26,7 @@ interface BearbeitenFormular {
 
 /** Formularwerte → PATCH-Body. Immer alle drei Angaben; ein geleerter Bezug geht als
  *  `null`/`null`, damit der Server ihn entfernt (LFH-656, D1/D4). */
-function zuAenderung(werte: BearbeitenFormular): DokumentAenderung {
+function zuAenderung(werte: BearbeitenFormular): DokumentPatch {
   const bezug = bezugAusWert(werte.bezug);
   return {
     titel: werte.titel,
@@ -70,7 +70,7 @@ export default function DokumentBearbeitenModal({ einsatzId, dokument, onSchlies
   }, [dokument, form]);
 
   const mutation = useMutation({
-    mutationFn: ({ id, aenderung }: { id: number; aenderung: DokumentAenderung }) =>
+    mutationFn: ({ id, aenderung }: { id: number; aenderung: DokumentPatch }) =>
       aendereDokument(einsatzId, id, aenderung),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.dokumente(einsatzId) });

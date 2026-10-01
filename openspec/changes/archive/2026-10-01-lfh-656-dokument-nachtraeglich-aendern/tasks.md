@@ -34,7 +34,7 @@
 ## 3. Frontend: API und Bezug-Helfer
 
 - [x] 3.1 `aendereDokument(einsatzId, dokumentId, aenderung)` in `frontend/src/api/dokumente.ts`
-      (`apiSend` mit `PATCH`, Typ `DokumentAenderung` handgepflegt nach D1). Prüfung:
+      (`apiSend` mit `PATCH`, Typ `DokumentPatch` handgepflegt nach D1). Prüfung:
       `tsc --noEmit` grün.
 - [x] 3.2 `frontend/src/dokumente/bezug.ts` anlegen: `bezugWert(dokument)`, `bezugAusWert(wert)`
       und `useBezugOptionen(einsatzId, { offen, etbLaden, aktuell })` samt Ergänzung des
@@ -77,5 +77,8 @@
 - [x] 6.1 Prüfliste `docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md` ist eingefrorenes
       Archiv und bleibt unangetastet. Stattdessen im ClickUp-Task LFH-656 die Belegstellen
       (Tests aus 2–5) nennen. Prüfung: Kommentar am Task vorhanden.
-- [ ] 6.2 `./scripts/check-all.sh` läuft grün (bzw. in der CI des PRs). Prüfung: Ausgabe ohne
-      roten Schritt.
+- [x] 6.2 `./scripts/check-all.sh` läuft grün (bzw. in der CI des PRs). Prüfung: Ausgabe ohne
+      roten Schritt. Lokal: Bündel `schnell` grün, Bündel `frontend` grün nach Umbenennung
+      `DokumentPatch` (API-Response-Typen-Guard), `dokumente.spec.ts` 14/14 grün; vom Bündel `rust`
+      liefen `--lib`, die Routen-Guards und `tests/dokument.rs` grün, der volle Workspace-Lauf
+      passte nicht auf den Sitzungsdatenträger und ist mit der CI des PRs belegt.
