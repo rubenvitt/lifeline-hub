@@ -13,7 +13,7 @@ LFH-606 neu gebaut oder umgebaut hat:
   „maßgeblicher Pegel“ an einem PEGELONLINE-Punkt der Lagekarte
   (`pages/lagekarte/FachebenenInspector.tsx`).
 
-Browsermessungen stehen in `frontend/e2e/pegel-pruefliste.spec.ts` (9 Tests, Chromium) und
+Browsermessungen stehen in `frontend/e2e/pegel-pruefliste.spec.ts` (13 Tests, Chromium) und
 bleiben als Gate-3-/Schmal-Nachweis im Repo. Die Spec ist **hermetisch**: Pegel-Liste und
 Stationsliste kommen per `page.route` aus Literalen. Ein Nachweis, der am Netz von PEGELONLINE
 hängt, misst dessen Erreichbarkeit und nicht die Oberfläche. Die Werte unten stammen aus dem
@@ -23,11 +23,11 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 
 | # | Kriterium | A · Kennzahl | B · Sektion | C · Inspector |
 | --- | --- | --- | --- | --- |
-| 1 | Treffläche | **erfüllt** [M1] | **erfüllt** [M2] | **erfüllt** [T5] |
-| 2 | Handschuh-Modus | **erfüllt** (O4 eingelöst, LFH-630) [M1] | **erfüllt** [M2] | **erfüllt** [T5] |
+| 1 | Treffläche | **erfüllt** [M1] | **erfüllt** [M2] | **erfüllt** (O3 eingelöst, LFH-631) [M8] |
+| 2 | Handschuh-Modus | **erfüllt** (O4 eingelöst, LFH-630) [M1] | **erfüllt** [M2] | **erfüllt** [M8] |
 | 3 | Rückmeldung vor Serverantwort | **nicht anwendbar** | **erfüllt** [T1, B1] | **erfüllt** [T4, B1] |
 | 4 | Zweite Handlung bei kritischer Aktion | **nicht anwendbar** | **nicht anwendbar** | **nicht anwendbar** |
-| 5 | Kontrast in beiden Modi | **erfüllt** [M3] | **erfüllt** [M4] | **erfüllt** [M4, T5] |
+| 5 | Kontrast in beiden Modi | **erfüllt** [M3] | **erfüllt** [M4] | **erfüllt** [M9] |
 | 6 | Kein Status allein über Farbe | **erfüllt** [T2, M3] | **erfüllt** [T1] | **erfüllt** [T4] |
 | 7 | Eine Farbe = eine Bedeutung | **erfüllt** [Q1] | **erfüllt** [Q1] | **erfüllt** [Q1] |
 | 8 | Helligkeits-/Kontrastregler | **offen → O5** | **offen → O5** | **offen → O5** |
@@ -35,7 +35,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 | 10 | Alarmbudget | **nicht anwendbar** | **nicht anwendbar** | **nicht anwendbar** |
 | 11 | Warnverhalten | **erfüllt** [Q1] | **erfüllt** [Q1] | **erfüllt** [Q1] |
 | 12 | Kein Sprung unter dem Cursor | **offen → O1** [M5] | **erfüllt** [M6] | **erfüllt** [T4] |
-| 13 | Fokus nie verdeckt | **erfüllt** [Q2] | **erfüllt** [M7] | **offen → O3** |
+| 13 | Fokus nie verdeckt | **erfüllt** [Q2] | **erfüllt** [M7] | **erfüllt** [M10] |
 | 14 | Tabellenseite vollständig | **nicht anwendbar** | **nicht anwendbar** | **nicht anwendbar** |
 | 15 | Erfassungsmaske vollständig | **nicht anwendbar** | **erfüllt** [T1] | **nicht anwendbar** |
 
@@ -44,9 +44,9 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 - **1 · A:** Die sechs Zellen des Bands, also auch „Pegel“, misst
   `e2e/gate3-trefflaeche.spec.ts` über die Staffel 30 / 48 / 72 px (voller e2e-Lauf grün). Im
   Überblick hat LFH-606 kein neues Ziel gebaut, nur eine Notiz an einer bestehenden Kennzahl.
-- **1 · C:** Der Knopf ist ein antd-`Button` ohne `size`. Dieselbe Bauform ist in B im Browser
-  gemessen („Hinzufügen“, [M2]); `dichte.guard.test.ts` ist grün. Eine eigene Browsermessung
-  am Inspector fehlt (→ O3).
+- **1 · C:** Am Inspector selbst gemessen (LFH-631, [M8]): „Als maßgeblichen Pegel festlegen“
+  und „Schließen“ halten 30 / 48 / 72 px auf 1366 und 390 px. Vorher war C nur über die
+  Bauform-Gleichheit mit B belegt (O3).
 - **2 · A:** Die Zellen erreichen 72 px Höhe. Sie stehen aber im Fugenraster des Neuentwurfs
   (1 px Fuge), der geforderte Abstand von ≥ 16 px fehlt. Das ist Bestand aus dem Band
   selbst und nicht durch LFH-606 entstanden. Weil ein Verdikt die ganze Zeile trägt, war es
@@ -56,6 +56,8 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   Abstände liegen bei 16 px (Auswahl ↔ „Hinzufügen“) sowie 33 bzw. 83 px (Zeilenmenüs
   untereinander); die Spec sichert ≥ 16 px zu. Die Einträge im geöffneten Dreipunkt-Menü
   stehen bündig untereinander (antd-`Dropdown`, im ganzen Bestand so); jeder ist 72 px hoch.
+- **2 · C:** Beide Ziele erreichen im Handschuh-Betrieb 72 px. Das nächste Bedienziel neben dem
+  Knopf ist der Kopf des Paneels darunter, 28 px entfernt; die Spec sichert ≥ 16 px zu [M8].
 - **3 · A:** Die Kennzahl liest nur, es gibt keine Aktion.
 - **3 · B/C:** Die Rückmeldung unter 100 ms ist belegt: Während eines PUT sind die
   Zeilenmenüs gesperrt, „Hinzufügen“ bzw. der Inspector-Knopf zeigen den Ladezustand
@@ -66,9 +68,9 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 - **4:** Keine der Flächen trägt eine kritische Aktion im Sinne des Kriteriums. „Entfernen“
   eines Pegels ist umkehrbar (wieder hinzufügen, derselbe Bildschirm) und löscht keine Daten.
   Nach LFH-378 bekommt eine umkehrbare Aktion keine Rückfrage. „Festlegen“ ist additiv.
-- **5 · C:** Die Marke ist derselbe antd-`Tag` ohne Farbangabe wie die Leitpegel-Marke in B
-  (gemessen 16,94 : 1 / 12,87 : 1), der Knopf ein Standard-`Button`. Die Messung am
-  Inspector selbst fehlt (→ O3).
+- **5 · C:** Am Inspector gemessen [M9]: Titel, Knopftext und die Marke „maßgeblicher Pegel ·
+  Leitpegel“ halten im Tag- und Nachtmodus ≥ 4,5 : 1, der Titel ≥ 7 bzw. 5 : 1. Die Marke ist
+  derselbe antd-`Tag` wie die Leitpegel-Marke in B und misst auch denselben Wert.
 - **6:** „veraltet“ trägt das Wort in der Notiz **und** die 3-px-Achtungskante. Der Trend
   steht als Wort (steigend / fallend / gleichbleibend / Trend unbekannt), der Ausfall als
   „Stand unbekannt“. Die Leitpegel-Marke ist Text. Der gesperrte Inspector-Knopf nennt seinen
@@ -93,6 +95,9 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   eingeschoben.
 - **13 · A:** Das Band liegt im Fluss, ohne `sticky`/`fixed` (Leitlinie, Validierung
   Kriterium 13). LFH-606 fügt keinen fixierten Knoten hinzu [Q2].
+- **13 · C:** Der Inspector steht im Fluss der Kartenleiste, unter `lg` unter der Karte. Der
+  Tabulaturdurchlauf bei 390 × 420 im Handschuh-Betrieb erreicht beide Ziele vorwärts und
+  rückwärts, keins verdeckt, auch nicht von den Kartenaufbauten [M10].
 - **15 · B:** Das Label steht sichtbar über dem Feld (`<label for>`, seit diesem Commit). Die
   Sammelliste hat Umordnen und Entfernen je Zeile. Voller Tastaturweg ist belegt: Tippen,
   Enter wählt, Tab, Enter legt an [T1]. „Speichern und nächsten anlegen“ und Vorbelegungen
@@ -101,7 +106,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 
 ## Belege
 
-**Browsermessungen** (`frontend/e2e/pegel-pruefliste.spec.ts`, 9/9 bestanden):
+**Browsermessungen** (`frontend/e2e/pegel-pruefliste.spec.ts`, 13/13 bestanden):
 
 - **[M1]** `e2e/gate3-trefflaeche.spec.ts`, Test „Lage-Dashboard: Kennzahl-Zellen …“: alle
   sechs Zellen des Bands halten 30 / 48 / 72 px (voller e2e-Lauf 172/172 grün).
@@ -160,6 +165,32 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   markierten Sektionsziele erreicht (Reiter „Pegel“, beide Zeilenmenüs, Auswahl), 0 verdeckt,
   1 fixierter Knoten im Baum. Messkern `e2e/fokus-kern.ts`.
 
+Fachebenen-Inspector (LFH-631, Lauf vom 01.10.2026): der Test schaltet die Ebene „Pegel /
+Hochwasser“ über ihren benannten Schalter ein, springt per Map-Instanz (`window.__lfhKarte`, nur
+im Dev-Build) zur Station und klickt den Punkt mit der echten Maus. Stationen und Pegelliste sind
+gestellt (hermetisch); KASSEL steht nicht in der Liste und trägt den Knopf, HANN. MÜNDEN ist
+Leitpegel und trägt die Marke.
+
+- **[M8]** „Fachebenen-Inspector: Trefflächen über die Staffel, Abstand im Handschuh-Betrieb“:
+
+  | Breite / Dichte | Festlegen | Schließen | Abstand zum nächsten Ziel | Querlauf |
+  | --- | --- | --- | --- | --- |
+  | 1366 / kompakt | 30 | 30 | 13 | 0 |
+  | 1366 / komfortabel | 48 | 48 | 20 | 0 |
+  | 1366 / handschuh | 72 | 72 | 28 | 0 |
+  | 390 / kompakt | 30 | 30 | 13 | 0 |
+  | 390 / komfortabel | 48 | 48 | 20 | 0 |
+  | 390 / handschuh | 72 | 72 | 28 | 0 |
+
+  Nächstes Ziel ist jeweils der Kopf des Paneels „Nicht verortet“. Mutationsprobe
+  `size="small"` am Knopf: rot (24 px gegen ≥ 30).
+- **[M9]** „Fachebenen-Inspector: Kontrast von Titel, Knopf und Pegel-Marke“: Tag 16,93 / 8,15 /
+  16,94, Nacht 16,37 / 15,70 / 12,87. Mutationsprobe Knopftext `#999`: Tag rot (2,84).
+- **[M10]** „Fachebenen-Inspector: Tabulaturdurchlauf ohne verdecktes Fokusziel (390 × 420,
+  Handschuh)“: je 6 Stopps vorwärts ab „Schließen“ und rückwärts ab „Festlegen“, beide Ziele
+  erreicht, 0 verdeckt; Kartenaufbauten als Zusatzkandidaten. Mutationsprobe „fester Block
+  über dem unteren Rand“: rot.
+
 **Komponenten- und Unit-Tests** (Vitest):
 
 - **[T1]** `pages/einstellungen/EinsatzPegel.test.tsx` (27 Tests): Zeilenmenüs während des
@@ -181,6 +212,9 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   keine Nachfrage).
 - **[T5]** `components/dichte.guard.test.ts` (kein punktuelles `size` auf interaktiven
   Elementen) und die Bauform-Gleichheit mit [M2].
+- **[T7]** `pages/lagekarte/Sidebar.test.tsx`, „gibt jedem Fachebenen-Schalter den Ebenennamen als
+  zugänglichen Namen“ (LFH-631): jede Zeile der Fachebenen-Liste trägt genau einen Schalter, der
+  per Rolle und Ebenennamen greifbar ist. Mutationsprobe ohne `aria-label`: rot.
 
 **Backend:**
 
@@ -212,12 +246,11 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   ersten Aufruf „erledigt“ merkt, setzt das kurze Intervall deshalb vor dem Feuern zurück; die
   Regel ist darum idempotent je Datenstand. Belege: [T6]; Mutationsproben „fester Takt“,
   „nicht idempotent“ und „immer kurz“ färben je mindestens einen Test rot.
-- **O3 · Keine Browsermessung am Fachebenen-Inspector:** Im e2e gibt es keinen Klickpfad zu
-  einem Fachebenen-Punkt. Die Karte ist WebGL, und die Fachebenen-Schalter der Leiste
-  (`pages/lagekarte/Sidebar.tsx`, `Switch` in der Fachebenen-Liste) haben **keinen
-  zugänglichen Namen**; ein Test kann sie nicht per Rolle und Name greifen. Kriterien 1, 5
-  und 13 sind am Inspector deshalb über Bauform-Gleichheit belegt, nicht gemessen. Nebenbefund:
-  Der namenlose Schalter ist selbst ein Zugänglichkeitsmangel.
+- **O3 · Keine Browsermessung am Fachebenen-Inspector — eingelöst (LFH-631).** Im e2e gab es
+  keinen Klickpfad zu einem Fachebenen-Punkt, und die Fachebenen-Schalter der Leiste galten als
+  namenlos. Die Schalter tragen den Ebenennamen (`aria-label` in `pages/lagekarte/Sidebar.tsx`,
+  über alle Ebenen abgesichert in `Sidebar.test.tsx`, [T7]); der Klickpfad und die Messungen
+  stehen als [M8]–[M10] oben. Kriterien 1, 2, 5 und 13 sind am Inspector jetzt gemessen.
 - **O4 · Abstand zwischen den Kennzahl-Zellen — eingelöst (LFH-630,
   `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`).** Das Fugenraster des Neuentwurfs setzt 1 px
   zwischen die Zellen des Bands, im Handschuh-Betrieb fordert Kriterium 2 ≥ 16 px. Das betrifft

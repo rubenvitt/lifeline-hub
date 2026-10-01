@@ -20,6 +20,22 @@ Cache-Deckel von 48 h als `status: "ok"` weitergereicht (Stale-Serving). Im Fron
 Ebene mit `status: "offline"` ausgegraut/als „offline" markiert; `status: "leer"` zeigt „keine
 Daten".
 
+**Obergrenze der Warnebenen (LFH-662).** Für NINA und DWD endet das Stale-Serving nach **6 h**
+(`WARN_OBERGRENZE` in `src/karte/quellen.rs`, dieselbe Grenze wie
+`wetter::abruf::OBERGRENZE_WARNUNGEN_S`). Ein älterer Stand gilt als fehlend: Der Server ruft die
+Quelle einmal blockierend ab und antwortet beim Scheitern `status: "offline"`, ohne `abgerufen`.
+Ein sechs Stunden alter Warnstand ist für die Lage keine Aussage mehr. Unter der Grenze bleibt
+alles wie oben, der Stand ist dann nach 15 bzw. 30 min als „veraltet“ gekennzeichnet. Die übrigen
+Ebenen behalten das Stale-Serving bis 48 h.
+
+**Gültigkeit der DWD-Warnungen (LFH-662).** Der Server entfernt bei **jeder Auslieferung**
+Warnungen mit `EXPIRES ≤ jetzt`, auch aus einem Stand aus dem Cache. Der Cache hält den Rohstand.
+Eine Warnung ohne oder mit unlesbarem `EXPIRES` bleibt stehen. Bleibt nichts übrig, ist die
+Antwort `leer` und behält ihr `abgerufen`. Die Lagekarte filtert gehaltene Daten im Minutentakt
+nach derselben Regel (`pages/lagekarte/dwdGueltigkeit.ts`). Warnungen, deren `ONSET` in der
+Zukunft liegt, zeichnet sie als **angekündigt**: gestrichelte Kontur, schwächere Fläche, im
+Inspector „angekündigt · ab <DTG>“. NINA liefert kein Ende und wird deshalb nicht gefiltert.
+
 **Alter des Stands (LFH-591).** Die Zeile jeder zugeschalteten Ebene im Fachebenen-Panel
 zeigt `abgerufen` als „Stand 1430“, an einem Vortag als „Stand 291430“. Überschreitet das Alter
 die Schwelle der Ebene, steht davor „⧖ veraltet ·“ in der Achtung-Textfarbe. Das Wort ist der
@@ -53,8 +69,8 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 
 | Quelle (`quelle`) | Endpoint | Format / Geometrie | Lizenz | Pflicht-Attribution | Cache-TTL / Aktualisierung | Offline |
 |---|---|---|---|---|---|---|
-| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Restriktiv: „nur nicht zu gewerblichen Zwecken".** Nutzung hier als nicht-gewerbliches behördliches/BOS-Lagetool; Quellennennung Pflicht. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s | leer + ausgegraut |
-| **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **GeoNutzV — offen, auch kommerziell**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). | `Datenbasis: Deutscher Wetterdienst` | 300 s | leer + ausgegraut |
+| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Restriktiv: „nur nicht zu gewerblichen Zwecken".** Nutzung hier als nicht-gewerbliches behördliches/BOS-Lagetool; Quellennennung Pflicht. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
+| **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **GeoNutzV — offen, auch kommerziell**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). | `Datenbasis: Deutscher Wetterdienst` | 300 s; abgelaufene Warnungen (`EXPIRES ≤ jetzt`) entfernt der Server bei jeder Auslieferung, der Cache hält den Rohstand; Obergrenze 6 h | leer + ausgegraut |
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
 | **Strahlung / ODL (BfS)** (`odl`) | `https://www.imis.bfs.de/ogc/opendata/ows` (WFS 1.1.0, `opendata:odlinfo_odl_1h_latest`, `outputFormat=application/json`) | GeoJSON-Punkte direkt (~1 676 ortsfeste Sonden, EPSG:4326, Gamma-ODL-Stundenwert in µSv/h) → auf die gelesenen Felder normalisiert, mit Bewertungsstufe | **GeoNutzV bzw. Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0)**, auch kommerziell; Auflage laut BfS-Nutzungsbedingungen: Daten „in sachlicher Art und Weise darzustellen". Kein Schlüssel, keine dokumentierte Abrufgrenze. | `Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0` | 600 s (Quelle im Stundentakt) | leer + ausgegraut |

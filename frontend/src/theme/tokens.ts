@@ -96,12 +96,20 @@ export interface Farbrollen {
 }
 
 /**
- * Tagmodus, aus der Nachtpalette ABGELEITET. Status- und Bedienrollen und die Füllungen
- * behalten ihre LFH-352-Werte; neu gestimmt sind Flächen- und Textstufen.
+ * Tagmodus, aus der Nachtpalette ABGELEITET. Statusrollen und die Füllungen behalten ihre
+ * LFH-352-Werte; neu gestimmt sind Flächen- und Textstufen und `bedien`/`bedienHover`.
  *
  * Kontrast (WCAG; `grund` · `flaeche`): text 15,46 · 18,47 — text2 11,00 · 13,13 —
- * gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; Weiß auf bedien 6,59,
- * auf bedienHover 5,62; normalText/normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
+ * gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; normalText/
+ * normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
+ *
+ * Primärknopf (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung auf satter Bedienfläche
+ * hält den TAGESBODEN 7 : 1, in Ruhe und unter dem Zeiger — KEIN eigener Knopfboden. Die
+ * Knopfschrift misst 13,5 px, der große Anmelde-Knopf 16 px; WCAGs Großtext-Boden 4,5 gilt fett
+ * erst ab 18,66 px. Weiß auf bedien 8,55 (vorher `#1a5fa0`, 6,59), auf bedienHover 7,32 (vorher
+ * `#236aad`, 5,62): gleicher Ton und gleiche Sättigung, nur dunkler; der Zeiger hellt um
+ * denselben Schritt auf wie zuvor (1,17). bedien auf grund 7,16. Gerechnet in
+ * `bedienKontrast.test.ts`, gemessen in `e2e/primaerknopf-kontrast.spec.ts`.
  *
  * `achtung`/`alarm` tragen als TEXT den Tagesboden nicht (auf ihrer Fläche 6,02 bzw. 5,52),
  * dafür stehen `achtungText`/`alarmText` (auf Weiß 9,22 bzw. 8,96, auf ihren Flächen und
@@ -118,7 +126,7 @@ export const farbenHell: Farbrollen = {
   text: '#111418',
   gedaempft: '#474e57',
   schwach: '#58606a',
-  bedien: '#1a5fa0',
+  bedien: '#154e84',
   alarm: '#b02318',
   achtung: '#7a5200',
   normal: '#1c6640',
@@ -134,7 +142,7 @@ export const farbenHell: Farbrollen = {
   flaeche3: '#e1e4e8',
   text2: '#2b3138',
   steuerRahmen: '#79818a',
-  bedienHover: '#236aad',
+  bedienHover: '#185895',
   bedienText: '#164f86',
   aufBedien: '#ffffff',
   normalText: '#155234',
@@ -604,6 +612,12 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * Tooltip, Avatar, Badge, Layout-Kopf u. v. m., und `#08090b` wäre dort nachts dunkel auf
  * dunkel.
  *
+ * Die Feldmeldung (`.ant-form-item-explain-error`) ist roter TEXT und nimmt `alarmText` (LFH-667,
+ * Tagmodus-Regel aus LFH-618): mit antds `colorError` = `alarm` lag sie am Tag bei 5,67 : 1 auf
+ * `grund`. Der Token am `Form` färbt dort nur Feldmeldung, Pflichtsternchen und Rückmeldesymbol;
+ * die Felder selbst ziehen ihren Fehlerrand aus dem eigenen Komponententoken. `colorError`
+ * global umzustellen träfe auch Gefahrknöpfe und Ränder, und dort ist die Füllfarbe richtig.
+ *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
  */
@@ -616,6 +630,7 @@ export function antdKomponenten(
       primaryColor: farben.aufBedien,
       dangerColor: farben.aufBedien,
     },
+    Form: { colorError: farben.alarmText },
     Switch: switchMasse(dichten[dichte]),
   };
 }

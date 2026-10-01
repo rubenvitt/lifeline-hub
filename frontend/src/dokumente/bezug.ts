@@ -5,6 +5,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEtb } from '../api/etb';
 import type { Dokument } from '../api/types';
+import { ETB_BEZUG_DECKEL } from './bezugswahl';
 
 /**
  * Der optionale Bezug eines Dokuments als `Select`-Wert — geteilt von Ablegen und Bearbeiten
@@ -12,9 +13,6 @@ import type { Dokument } from '../api/types';
  * wird beim Absenden.
  */
 
-/** So viele ETB-Einträge stehen als Bezug zur Wahl (die jüngsten). Eigener Filter im Key, damit
- *  die Abfrage nicht das Cache-Fach der Infinite-Query von `EtbPage` teilt. */
-export const ETB_BEZUG_DECKEL = 100;
 const BEZUG_TYPEN: readonly DokumentBezugTyp[] = ['abschnitt', 'einheit', 'etb_eintrag'];
 const kuerze = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
@@ -61,7 +59,7 @@ function mit(optionen: Option[], fehlend: Option | null): Option[] {
 
 /**
  * Gruppierte Optionen für das Bezug-`Select`. Steht der aktuelle Bezug nicht in den geladenen
- * Listen (ETB-Eintrag älter als die jüngsten {@link ETB_BEZUG_DECKEL}, oder die Liste lädt noch),
+ * Listen (ETB-Eintrag älter als die jüngsten `ETB_BEZUG_DECKEL`, oder die Liste lädt noch),
  * kommt er aus dem Dokument selbst dazu — sonst zeigte das `Select` den Rohwert `etb_eintrag:123`.
  */
 export function bezugOptionen({ abschnitte, einheiten, etb, aktuell }: Quellen) {
@@ -131,6 +129,7 @@ export function useBezugOptionen(
     enabled: aktiv,
   });
   const etbQuery = useQuery({
+    // Eigener Filter im Key: nicht das Cache-Fach der Infinite-Query von `EtbPage`.
     queryKey: einsatzKeys.etbListe(einsatzId, { limit: ETB_BEZUG_DECKEL }),
     queryFn: () => listeEtb(einsatzId, { limit: ETB_BEZUG_DECKEL }),
     enabled: aktiv && etbLaden,

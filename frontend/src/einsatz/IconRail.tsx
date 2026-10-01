@@ -55,7 +55,13 @@ export function railZielStil(
   };
 }
 
-/** Das 9-px-Etikett unter der Ikone (Versalien, Sperrung .06em — `schriftskala.railEtikett`). */
+/**
+ * Das 9-px-Etikett unter der Ikone (Versalien, Sperrung .06em — `schriftskala.railEtikett`).
+ *
+ * `maxWidth: '100%'` hält das Etikett in der Zielbreite: ein zu langes Kurzetikett zeigt sich dann
+ * als `scrollWidth > clientWidth` (gemessen in `e2e/rail-etikett.spec.ts`, LFH-644) statt still
+ * links und rechts über die Rail zu ragen.
+ */
 const ETIKETT_STIL: CSSProperties = {
   fontFamily: schrift[schriftskala.railEtikett.familie],
   fontSize: schriftskala.railEtikett.groesse,
@@ -65,6 +71,7 @@ const ETIKETT_STIL: CSSProperties = {
   lineHeight: 1.15,
   textAlign: 'center',
   whiteSpace: 'nowrap',
+  maxWidth: '100%',
 };
 
 /**
@@ -97,7 +104,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
           <Icon size={20} />
         </span>
-        <span aria-hidden="true" style={ETIKETT_STIL}>
+        <span aria-hidden="true" data-lfh="rail-etikett" style={ETIKETT_STIL}>
           {k.kurz}
         </span>
       </button>

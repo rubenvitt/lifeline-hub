@@ -1,8 +1,10 @@
 /**
  * Filter für antds CSS-Variablen im Testlauf (LFH-623).
  *
- * **Problem:** antd 6 hängt an jedes Bedienelement `css-var-root`, dessen Regeln die ganze
- * Token-Tabelle als Custom Properties tragen (~464 `--ant-*` je Element). jsdoms
+ * **Problem:** antd 6 hängt an jedes Bedienelement eine Klasse `css-var-…`, deren Regeln die
+ * ganze Token-Tabelle als Custom Properties tragen (~464 `--ant-*` je Element). Ohne `theme` am
+ * ConfigProvider, wie hier im Test, heißt sie `css-var-root`; in der App heißt sie
+ * `css-var-<useId>` (Browserbefund LFH-641, `theme/rollen.css`). jsdoms
  * `getComputedStyle` zahlt je Eigenschaft, auch aus dem Cache (er klont Eintrag für Eintrag);
  * `*ByRole` ruft es für jedes Element mit Rolle und dessen Vorfahren — auf der Lagekarte
  * kostete ein `getByRole` so über 2 s.
