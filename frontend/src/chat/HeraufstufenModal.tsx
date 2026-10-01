@@ -36,7 +36,7 @@ interface Props {
  * LFH-700: Trägt die Nachricht Anhänge, wählt die Person, welche als Kopie ins Tagebuch gehen.
  * Vorgewählt sind die ersten {@link ETB_ANHAENGE_MAX} nach id, mehr nimmt der Server nicht. Die
  * Auswahl ist nötig, weil das ETB unveränderlich ist: Eine falsch übernommene Datei bleibt bis zur
- * Schwärzung am Eintrag (`openspec/changes/lfh-700-heraufstufen-anhaenge/design.md` D2/D6).
+ * Schwärzung am Eintrag (`openspec/changes/archive/2026-10-01-lfh-700-heraufstufen-anhaenge/design.md` D2/D6).
  */
 export default function HeraufstufenModal({
   offen,

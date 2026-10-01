@@ -64,7 +64,7 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 - **Heraufstufen aus dem Chat kopiert** (LFH-700): `anhang_ids` der Nachricht (explizit, leer =
   keine, ≤ 10, fremd → 400) gehen als neue `anhang`-Zeile an den Eintrag
   (`etb::repo::anhaenge_kopieren_tx`); die Chat-Datei wird nie ans ETB gebunden. Herleitung:
-  `openspec/changes/lfh-700-heraufstufen-anhaenge/design.md`.
+  `openspec/changes/archive/2026-10-01-lfh-700-heraufstufen-anhaenge/design.md`.
 - Offline geht nur der Upload nicht. Während des Sendens ist die ganze Erfassung gesperrt;
   **Entwurfs-id = `client_id`**. **Replay nur bei DEMSELBEN Eintrag** (Typ, getrimmter Inhalt,
   Anhangsmenge; Route UND Transaktion), sonst 409; danach neue id (`entwurfNeuAusweisen`).

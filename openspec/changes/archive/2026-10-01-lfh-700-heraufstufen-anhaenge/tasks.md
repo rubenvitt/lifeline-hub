@@ -16,6 +16,6 @@
 
 ## 3. Integration und Abschluss
 
-- [ ] 3.1 `./scripts/check-all.sh` läuft grün (Backend, Frontend, Prettier, Lint, Typ-Codegen unverändert)
-- [ ] 3.2 Review (`requesting-code-review`), Findings eingearbeitet
-- [ ] 3.3 `/opsx:archive lfh-700-heraufstufen-anhaenge` im selben Branch, Spec-Sync nach `openspec/specs/etb-anhaenge/spec.md`, Verweise geprüft
+- [x] 3.1 `./scripts/check-all.sh` läuft grün (Backend, Frontend, Prettier, Lint, Typ-Codegen unverändert). Lokal in der Cloud-Sitzung: Bündel `schnell` grün; `rust` Workspace grün, nur der Bau der Desktop-Hülle scheitert an der fehlenden Systembibliothek `gdk-3.0`; `frontend` 8109/8113 grün, die vier roten Tests einzeln ohne Last grün (96/96); `e2e` nur mit fremdem Headless-Build (1194 statt 1234), die Chat-Specs 8/8 grün, 12 rote Tests ohne Bezug zum Diff. Den vollen Beleg liefert die CI des PRs
+- [x] 3.2 Review (`requesting-code-review`), Findings eingearbeitet
+- [x] 3.3 `/opsx:archive lfh-700-heraufstufen-anhaenge` im selben Branch, Spec-Sync nach `openspec/specs/etb-anhaenge/spec.md`, Verweise geprüft
