@@ -32,7 +32,7 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in
   `tauri.conf.json`.
 - **Developer ID und Notarisierung (macOS)** trägt nur der Release-Lauf (`artefakte.yml`,
-  `APPLE_*`-Secrets, LFH-722, `openspec/changes/lfh-722-macos-signierung-notarisierung/design.md`).
+  `APPLE_*`-Secrets, LFH-722, `openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md`).
   `bundle.macOS.signingIdentity` bleibt `"-"`, damit lokale Bauten ad hoc ohne Zertifikat gehen.
 - **Schritt 4 testet Server und Hülle getrennt** (`--workspace --exclude lifeline-desktop`, dann
   `-p lifeline-desktop`): in einem Zug vereinigte Cargo die Features, der Server liefe mit zwei

@@ -156,7 +156,7 @@ trotzdem.
 
 Der Release-Lauf signiert die Mac-App mit dem Zertifikat „Developer ID Application: Ruben Vitt
 (H95J852PKP)“ und lässt App und `.dmg` von Apple notarisieren (LFH-722). Herleitung:
-`openspec/changes/lfh-722-macos-signierung-notarisierung/design.md`. Lokale Bauten
+`openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md`. Lokale Bauten
 (`cargo tauri build`) bleiben ad hoc signiert, denn `tauri.conf.json` trägt weiter `"-"`. Die
 Identität setzt nur der Release-Lauf.
 
@@ -277,5 +277,5 @@ scripts/marke/erzeuge-symbole.sh
   Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari direkt
   (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`),
   mit der signierten und notarisierten App erneut Vivaldi als Standardbrowser (LFH-722,
-  `openspec/changes/lfh-722-macos-signierung-notarisierung/design.md`).
+  `openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md`).
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.
