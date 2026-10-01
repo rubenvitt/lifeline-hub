@@ -34,7 +34,8 @@ Stand heute (antd 6.6.5, Dichte über `ThemeModeProvider` → `ConfigProvider`):
 
 - Böden aus der Spec an jeder Stelle auf einmal, ohne Änderung an den Verbrauchern.
 - `kompakt` behält Höhe und Bild des Klappkopfs.
-- Jeder Wert steht in einer reinen, exportierten Funktion und wird mit Literalen geprüft.
+- Jeder Wert ist mit Literalen geprüft: der Klappkopf über eine reine, exportierte Funktion,
+  die Fußfuge über einen Quelltext-Test der Stilregel und die Messung im Browser.
 
 **Non-Goals**
 
@@ -175,9 +176,6 @@ Erwogene Alternativen:
   `grep -n -A6 '<Collapse' frontend/src` auf `styles=` durchsehen und Treffer prüfen.
 - [Rückfragen in `kompakt` sehen anders aus: 11 statt 3 px] → Das ist beabsichtigt (D2). Die
   Knopfhöhe ändert sich nicht.
-- [Popconfirm mit Warnsymbol: 26 px zwischen Symbol und Titel in `handschuh`] → Das ist
-  sichtbar, aber unschädlich und hingenommen (D4). Wenn es stört, folgt ein Nachzug für ein
-  eigenes Symbol-Token.
 
 ## Migration Plan
 

@@ -30,6 +30,8 @@ zurückgebaut.
 - [x] 4.5 (Nachtrag, Lücke im Plan) Neues `e2e/dialogfuss-dichte.spec.ts` für das Spec-Szenario „Dialog mit Standardfuß“: „Neue Ansicht“ auf der Lagekarte, Fuge ≥ 8 / ≥ 16, Knöpfe ≥ Steuerhöhe, Titelabstand unverändert 3 / 5 / 7 (Literale). Gemessen: Fuge 11 / 18 / 26, Knöpfe 30 / 48 / 72, Titelabstand 3 / 5 / 7. `modal.confirm` ist im e2e nicht erreichbar (nur nach 409-Konflikt); sein Selektor ist im Quelltext-Test aus 3.2 festgehalten
 - [x] 4.4 Die übrigen e2e-Specs mit `Collapse` oder Rückfrage im Ablauf laufen lassen (mindestens `dokumente`, `gate3-trefflaeche`, `trefflaeche-tablet`, `personen-aufnahme`, `stab-checkliste`). Prüfen: grün — **Ergebnis 01.10.2026:** 86 von 87 grün (dazu `betreuung-pruefliste`, `lagekarte-leiste-dichte`, `dialogfuss-dichte`). Rot nur `gate3-trefflaeche` „Führungsfunktionen: der Bearbeiten-Knopf je Zeile …“ (0 statt 9 Knöpfe, Liste bleibt im Ladezustand) — **ebenso rot mit `frontend/src` auf `origin/alpha`**, also nicht von dieser Change; Klärung über die CI des PRs
 
+- [ ] 4.6 (Review-Befunde) Kommentar über der Rückfrage-Messung in `e2e/dokumente.spec.ts` auf die Regel in `src/index.css` richten; Spec-Szenario „Kompakt wird nicht gekürzt“ zusichern: Klappkopf in `kompakt` ≥ 36 px (Literal, Stand vor der Änderung). Prüfen: e2e „Dichte-Staffel …“ grün; Mutation `minHeight` 30 + Polsterung auf `controlHeight` gerechnet würde 30 messen und rot werden
+
 ## 5. Regeln und Doku
 
 - [x] 5.1 `frontend/AGENTS.md`: im Abschnitt „Tabelle und Dichte“ den Klappkopf-Boden über `antdKlappkopf` nennen; bei „Rot steht nicht bündig neben Neutralem“ die Fußfuge der Erfassungs-Hülle und der antd-Füße (Stilregel in `index.css`, Modal/`modal.confirm`/Popconfirm) nennen. Prüfen: `prettier --check` auf `frontend/` grün

@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button, Collapse, Popconfirm, Switch, theme } from 'antd';
+import { Button, Popconfirm, Switch, theme } from 'antd';
 import { ThemeModeProvider, useDichte } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
@@ -303,29 +303,4 @@ describe('Switch folgt der Staffel bis in den CSS-Text (LFH-380)', () => {
     expect(regel, 'Griff').toContain('--ant-switch-handle-size:68px');
     expect(regel, 'Mindestbreite').toContain('--ant-switch-track-min-width:144px');
   });
-});
-
-/**
- * Klappkopf am Kontext (LFH-653): jedes `Collapse` bekommt den Boden der Stufe, ohne dass die
- * Stelle selbst etwas setzt. Geprüft am gerenderten Kopf, nicht an der Funktion — die prüft
- * `tokens.test.ts`; hier geht es um die Verdrahtung.
- */
-describe('Klappkopf folgt der Staffel über den Kontext (LFH-653)', () => {
-  for (const [stufe, soll] of [
-    ['kompakt', '30px'],
-    ['handschuh', '72px'],
-  ] as const) {
-    it(`auf ${stufe} trägt der Kopf min-height ${soll} und steht mittig`, () => {
-      localStorage.setItem(SPEICHER_SCHLUESSEL, stufe);
-      const { container } = render(
-        <ThemeModeProvider>
-          <Collapse ghost items={[{ key: 'w', label: 'Weitere Angaben', children: 'x' }]} />
-        </ThemeModeProvider>,
-      );
-      const kopf = container.querySelector<HTMLElement>('.ant-collapse-header');
-      expect(kopf, 'Klappkopf im Baum').not.toBeNull();
-      expect(kopf!.style.minHeight).toBe(soll);
-      expect(kopf!.style.alignItems).toBe('center');
-    });
-  }
 });

@@ -120,7 +120,6 @@ Läufe am Stand `30a8c324` liefen ohne jeden Eingriff.
 | 1 · 5 | Titel-Anker (Linkfarbe) 6,59 / 4,55, Tabellenkopf 5,58 Tag, Sekundärtext 6,37 Tag — app-weite Rollen | LFH-652 |
 | 1 · 5 | Seitenbeschreibung 5,33 Tag (Stufe `schwach`) | LFH-643 |
 | 1 · 8 | Helligkeits-/Kontrastregler (app-weit) | LFH-397 |
-| 2 · 2 | Klappkopf `Collapse` 55 px in `handschuh`; Fuge der Fußknöpfe 7 px statt 16 — Erfassungs-Hülle, app-weit. **Eingelöst** (72 px, 26 px) | LFH-653 |
 | 2 · 3 | Upload bis 25 MiB ohne Fortschrittsanzeige (> 15 s eingeplant); keine Offline-Ablage | LFH-654 |
 | 2 · 5 | Pflichtmeldung in `colorError` 6,27 Tag — app-weit alle Formularmeldungen | LFH-652 |
 | 2 · 8 | Regler (app-weit) | LFH-397 |
