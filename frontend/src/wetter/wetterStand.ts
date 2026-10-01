@@ -75,6 +75,8 @@ export function teilStand(
   return einordnen(teil.zustand, teil.abgerufen_at, name, 'Stand', jetzt, konv);
 }
 
+const UHRVERSATZ_MS = 10 * 60_000;
+
 /**
  * Zustand der aktuellen Bedingungen (LFH-864) an der MESSZEIT `daten.gemessen_at`, nicht am
  * Abruf: ein frischer Abruf kann die alte Messung einer ausgefallenen Station tragen. „Messung
@@ -85,6 +87,12 @@ export function messStand(
   jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): TeilStand {
+  // Eine Messung aus der Zukunft gibt es nicht; bis 10 min gelten als Uhrversatz
+  // (Backend `quelle::UHRVERSATZ_S`).
+  const gemessen = teil.daten ? Date.parse(teil.daten.gemessen_at) : Number.NaN;
+  if (teil.zustand === 'ok' && gemessen - jetzt > UHRVERSATZ_MS) {
+    return { art: 'unbekannt', stand: PEGEL_STAND_UNBEKANNT };
+  }
   return einordnen(teil.zustand, teil.daten?.gemessen_at, 'aktuell', 'Messung', jetzt, konv);
 }
 

@@ -13,7 +13,8 @@
 //!
 //! **Drei Teile, je ein eigener Zustand** (design.md D2): fällt ein Teil aus, bleiben die
 //! anderen stehen, und die Antwort ist trotzdem 200. „veraltet“ entscheidet das Frontend gegen
-//! `abgerufen_at` und seine Uhr; die Obergrenze, ab der ein Stand gar nicht mehr gilt, prüft
+//! seine Uhr — bei Warnungen und Vorhersage an `abgerufen_at`, bei den aktuellen Bedingungen an
+//! der Messzeit `gemessen_at`; die Obergrenze, ab der ein Stand gar nicht mehr gilt, prüft
 //! das Backend, weil nur es das Cache-Alter kennt — dieselbe Arbeitsteilung wie beim Pegel.
 //!
 //! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/`, für die

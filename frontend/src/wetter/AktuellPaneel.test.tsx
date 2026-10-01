@@ -91,8 +91,12 @@ describe('AktuellPaneel (LFH-864)', () => {
   it('die Wetterlage zeigt Wort und Ikone; keine Ikone ist ein eigenes Vorleseziel', () => {
     zeige(ok(messung({ symbol: 'nebel_nacht' })));
     expect(feld('Wetterlage')).toHaveTextContent('Nebel');
-    expect(feld('Wetterlage').querySelector('[data-ikone="nebel-nacht"]')).not.toBeNull();
-    expect(within(paneel()).queryByRole('img')).toBeNull();
+    const ikone = feld('Wetterlage').querySelector('[data-ikone="nebel-nacht"]');
+    expect(ikone).toHaveAttribute('aria-hidden', 'true');
+    // Jede Ikone im Paneel ist stumm: das Wort trägt die Bedeutung.
+    for (const i of paneel().querySelectorAll('[data-ikone]')) {
+      expect(i).toHaveAttribute('aria-hidden', 'true');
+    }
   });
 
   it('ein fehlender Wert ist ein Strich, nie 0 — auch ohne Einheit dahinter', () => {
@@ -114,7 +118,7 @@ describe('AktuellPaneel (LFH-864)', () => {
     expect(kennzahl('Böen')).not.toHaveTextContent('km/h');
   });
 
-  it('ein ergänzter Wert nennt seine Station, ein Wert der Hauptstation nicht', () => {
+  it('ein ergänzter Wert nennt seine Station, ein Wert der Kopf-Station nicht', () => {
     zeige(
       ok(
         messung({
@@ -134,7 +138,12 @@ describe('AktuellPaneel (LFH-864)', () => {
 
   it('eine alte Messung zeigt „veraltet" mit der Messzeit', () => {
     zeige(ok(messung({ gemessen_at: vor(2 * 60 * MIN) })));
-    expect(paneel()).toHaveTextContent('Messung 06:10 · veraltet');
+    const hinweis = paneel().querySelector('[data-lfh="wetter-veraltet"]');
+    // Der Abruf gelang; alt ist die Messung der Station, nicht die Verbindung.
+    expect(hinweis).toHaveTextContent(
+      'Messung 06:10 · veraltet — die Station hat seitdem keine neue Messung geliefert',
+    );
+    expect(hinweis).not.toHaveTextContent('Aktualisierung');
     expect(kennzahl('Temperatur')).toHaveTextContent('14,8');
   });
 
@@ -145,6 +154,8 @@ describe('AktuellPaneel (LFH-864)', () => {
     unmount();
     zeige(ok(messung({ gemessen_at: vor(4 * 60 * MIN) })));
     expect(paneel()).toHaveTextContent('Stand unbekannt');
+    expect(paneel()).toHaveTextContent('Keine Messung aus den letzten drei Stunden');
+    expect(paneel()).not.toHaveTextContent('kein verwertbarer Stand');
     expect(paneel()).not.toHaveTextContent('14,8');
   });
 

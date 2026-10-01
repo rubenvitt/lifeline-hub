@@ -57,7 +57,8 @@ Pegel über die volle Breite und darunter Warnungen und Vorhersage ins Raster
 
 ### D1 Gemessene Werte über `/current_weather`, nicht die laufende Vorhersagestunde
 
-Gewählt ist die Messung der nächsten SYNOP-Station über Bright Sky `/current_weather`.
+Gewählt ist die Messung naher SYNOP-Stationen über Bright Sky `/current_weather` (welche Station
+im Kopf steht: D3).
 
 - Das Paneel heißt „aktuell“. Ein Modellwert unter dieser Überschrift gäbe eine Rechnung als
   Beobachtung aus. Die Spec von LFH-633 verlangt, dass jede Angabe ehrlich ihren Stand trägt.

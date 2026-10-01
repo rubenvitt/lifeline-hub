@@ -4,7 +4,8 @@
  *
  * Jeder Teil trägt seinen Stand: `kein_ort` erklärt, was fehlt; `ausfall` (oder ein Stand über
  * der Obergrenze) zeigt „Stand unbekannt" und KEINE Liste; ein veralteter Stand bleibt sichtbar
- * mit Wort und Abrufzeit. Die Einordnung steht in `wetterStand.ts`.
+ * mit Wort und Abrufzeit, bei den aktuellen Bedingungen mit der Messzeit. Die Einordnung steht
+ * in `wetterStand.ts`.
  * Warnungen und Vorhersage sind Listen zum Lesen; Beschreibung und Handlungsempfehlung einer
  * Warnung stehen inline hinter einem Umschalter, nicht in einem Drawer.
  *
@@ -66,6 +67,11 @@ const KEIN_ORT_AKTUELL =
   'Die aktuellen Bedingungen brauchen einen verorteten Einsatzort. Der Einsatz hat noch keine Koordinate.';
 const AUSFALL_TEXT =
   'Die Wetterquelle antwortet nicht, und es liegt kein verwertbarer Stand vor. Es werden keine Werte gezeigt.';
+const VERALTET_GRUND = 'die Aktualisierung gelingt gerade nicht';
+/** Bei den aktuellen Bedingungen ist der Stand die Messzeit: alt ist die Station, nicht der Abruf. */
+const AUSFALL_AKTUELL =
+  'Keine Messung aus den letzten drei Stunden — die Wetterquelle antwortet nicht, oder die Stationen melden nichts. Es werden keine Werte gezeigt.';
+const VERALTET_AKTUELL = 'die Station hat seitdem keine neue Messung geliefert';
 
 interface TeilProps {
   /** Zustand der HTTP-Abfrage — `daten`, sobald die Antwort da ist, egal welcher Teilzustand. */
@@ -89,10 +95,14 @@ function StandHinweis({
   stand,
   onEinsatzdaten,
   keinOrtText = KEIN_ORT_TEXT,
+  ausfallText = AUSFALL_TEXT,
+  veraltetGrund = VERALTET_GRUND,
 }: {
   stand: TeilStand;
   onEinsatzdaten?: () => void;
   keinOrtText?: string;
+  ausfallText?: string;
+  veraltetGrund?: string;
 }) {
   const { token, rollen } = useRollen();
   const polster = { paddingBlock: token.paddingSM, paddingInline: token.padding } as const;
@@ -121,7 +131,7 @@ function StandHinweis({
         }}
       >
         <b style={{ color: rollen.achtungText, fontSize: 13 }}>{STAND_UNBEKANNT}</b>
-        <span style={{ color: rollen.text2, fontSize: 12 }}>{AUSFALL_TEXT}</span>
+        <span style={{ color: rollen.text2, fontSize: 12 }}>{ausfallText}</span>
       </div>
     );
   }
@@ -131,7 +141,7 @@ function StandHinweis({
         data-lfh="wetter-veraltet"
         style={{ ...polster, color: rollen.achtungText, fontSize: 12, fontWeight: 600 }}
       >
-        {stand.stand} · {VERALTET} — die Aktualisierung gelingt gerade nicht
+        {stand.stand} · {VERALTET} — {veraltetGrund}
       </div>
     );
   }
@@ -496,7 +506,14 @@ export function AktuellPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: Teil
           onNeuladen={onNeuladen}
         >
           {/* Den Weg zu den Einsatzdaten trägt das Warnpaneel, nicht drei gleichnamige Knöpfe. */}
-          {stand && <StandHinweis stand={stand} keinOrtText={KEIN_ORT_AKTUELL} />}
+          {stand && (
+            <StandHinweis
+              stand={stand}
+              keinOrtText={KEIN_ORT_AKTUELL}
+              ausfallText={AUSFALL_AKTUELL}
+              veraltetGrund={VERALTET_AKTUELL}
+            />
+          )}
           {mitInhalt && <Messwerte a={daten} />}
         </PaneelZustand>
       </Paneel>

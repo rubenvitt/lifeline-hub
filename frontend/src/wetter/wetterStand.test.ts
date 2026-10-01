@@ -55,6 +55,11 @@ describe('messStand — aktuelle Bedingungen (LFH-864): der Stand ist die Messze
     expect(messStand({ zustand: 'ok' }, JETZT, BERLIN).art).toBe('unbekannt');
     expect(messStand({ zustand: 'kein_ort' }, JETZT, BERLIN).art).toBe('kein_ort');
   });
+
+  it('Messzeit in der Zukunft: bis 10 min Uhrversatz aktuell, darüber unbekannt', () => {
+    expect(messStand(aktuell(-10 * MIN), JETZT, BERLIN).art).toBe('aktuell');
+    expect(messStand(aktuell(-10 * MIN - 1000), JETZT, BERLIN).art).toBe('unbekannt');
+  });
 });
 
 describe('teilStand', () => {

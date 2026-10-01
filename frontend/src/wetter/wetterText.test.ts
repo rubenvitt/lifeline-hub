@@ -27,6 +27,12 @@ describe('titelSchreibung', () => {
     expect(titelSchreibung('BERLIN-ALEX.')).toBe('Berlin-Alex.');
     expect(titelSchreibung('  ')).toBe('');
   });
+
+  it('lässt gemischte Schreibung der Quelle stehen (SYNOP-Namen)', () => {
+    expect(titelSchreibung('Bremen (Buergerpark)')).toBe('Bremen (Buergerpark)');
+    expect(titelSchreibung('Frankfurt/Main')).toBe('Frankfurt/Main');
+    expect(stationText('Bremen (Buergerpark)', 2520)).toBe('Station Bremen (Buergerpark), 2,5 km');
+  });
 });
 
 describe('entfernungText / stationText', () => {

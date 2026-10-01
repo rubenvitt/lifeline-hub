@@ -20,10 +20,14 @@ const GANZ = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0, useGroup
 const zahl = (fmt: Intl.NumberFormat, v: number) => fmt.format(v).replace(/^-/, MINUS);
 const da = (v: number | null | undefined): v is number => v != null && Number.isFinite(v);
 
-/** Versalien der Quelle („ORKANARTIGE BÖEN", „BREMEN") → „Orkanartige Böen". Rein. */
+/**
+ * Versalien der Quelle („ORKANARTIGE BÖEN", „BREMEN") → „Orkanartige Böen". Gemischte
+ * Schreibung (SYNOP-Namen wie „Bremen (Buergerpark)", „Frankfurt/Main") bleibt stehen. Rein.
+ */
 export function titelSchreibung(text: string): string {
-  return text
-    .trim()
+  const t = text.trim();
+  if (/\p{Ll}/u.test(t)) return t;
+  return t
     .toLocaleLowerCase('de-DE')
     .replace(
       /(^|[\s-])(\p{L})/gu,
@@ -144,8 +148,8 @@ export function wetterSymbolWort(s: WetterSymbol | null | undefined): string {
 }
 
 /**
- * Herkunft eines Werts, den die Quelle aus einer anderen Station ergänzt hat:
- * „Station Hameln, 12,1 km"; stammt er von der Hauptstation, `null`. Rein.
+ * Herkunft eines Werts aus einer anderen als der Station im Kopf: „Station Hameln, 12,1 km";
+ * stammt er von der Kopf-Station, `null`. Rein.
  */
 export function ergaenztVon(
   ergaenzt: readonly WetterErgaenzung[],
