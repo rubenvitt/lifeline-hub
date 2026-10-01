@@ -1165,3 +1165,217 @@ async fn chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle() 
     assert_eq!(s, StatusCode::OK, "nach dem Senden gelten die Chat-Regeln");
     assert_eq!(bytes, b"%PDF");
 }
+
+// --- LFH-700: Anhänge beim Heraufstufen ins ETB kopieren ---
+
+/// Lädt eine Datei hoch und liefert ihre id.
+async fn hochgeladen(app: &axum::Router, einsatz: i64, cookie: &str, name: &str) -> i64 {
+    let (s, up) = upload(app, einsatz, cookie, name, "image/jpeg", b"JPEGDATEN").await;
+    assert_eq!(s, StatusCode::CREATED, "upload: {up:?}");
+    up.as_array().unwrap()[0]["id"].as_i64().unwrap()
+}
+
+/// Stuft eine Nachricht mit der Auswahl `anhang_ids` herauf: (Status, Antwort).
+async fn heraufstufen(
+    app: &axum::Router,
+    einsatz: i64,
+    mid: i64,
+    cookie: &str,
+    anhang_ids: &[i64],
+) -> (StatusCode, Value) {
+    let ids = anhang_ids
+        .iter()
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        cookie,
+        Some(&format!(
+            r#"{{"typ":"meldung","inhalt":"Deich","anhang_ids":[{ids}]}}"#
+        )),
+    )
+    .await
+}
+
+/// Lädt einen ETB-Anhang über die ETB-Route: (Status, Bytes).
+async fn etb_download(
+    app: &axum::Router,
+    einsatz: i64,
+    eintrag: i64,
+    aid: i64,
+    cookie: &str,
+) -> (StatusCode, Vec<u8>) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/einsaetze/{einsatz}/etb/{eintrag}/anhaenge/{aid}"
+                ))
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+    (status, bytes)
+}
+
+/// ETB-Eintrag aus der Liste laden.
+async fn etb_eintrag(app: &axum::Router, einsatz: i64, id: i64, cookie: &str) -> Value {
+    let (s, liste) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "etb laden: {liste:?}");
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == id)
+        .cloned()
+        .expect("Eintrag in der Liste")
+}
+
+/// Spec `etb-anhaenge`, „Das Heraufstufen übernimmt gewählte Chat-Anhänge als Kopie“.
+#[tokio::test]
+async fn heraufstufen_kopiert_das_foto_ins_etb_und_der_chat_behaelt_es() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let foto = hochgeladen(&app, einsatz, &admin, "deich.jpg").await;
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &[foto]).await;
+
+    let (s, hoch) = heraufstufen(&app, einsatz, mid, &admin, &[foto]).await;
+    assert_eq!(s, StatusCode::OK, "{hoch:?}");
+    let etb_id = hoch["etb_eintrag_id"].as_i64().unwrap();
+
+    let eintrag = etb_eintrag(&app, einsatz, etb_id, &admin).await;
+    let anhaenge = eintrag["anhaenge"].as_array().unwrap();
+    assert_eq!(anhaenge.len(), 1);
+    assert_eq!(anhaenge[0]["dateiname"], "deich.jpg");
+    let kopie = anhaenge[0]["id"].as_i64().unwrap();
+    assert_ne!(kopie, foto, "eigene Datei, nicht die Chat-Datei");
+
+    let (s, bytes) = etb_download(&app, einsatz, etb_id, kopie, &admin).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(bytes, b"JPEGDATEN");
+    let (s, _, bytes) = download(&app, einsatz, foto, &admin).await;
+    assert_eq!(s, StatusCode::OK, "der Chat lädt sein Foto weiter");
+    assert_eq!(bytes, b"JPEGDATEN");
+
+    // Die Kopie folgt den ETB-Regeln: generisch weder ladbar noch löschbar.
+    let (s, _, _) = download(&app, einsatz, kopie, &admin).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert_eq!(
+        delete_anhang(&app, einsatz, kopie, &admin).await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+#[tokio::test]
+async fn heraufstufen_ohne_auswahl_uebernimmt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let foto = hochgeladen(&app, einsatz, &admin, "deich.jpg").await;
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &[foto]).await;
+
+    // Ein Body ohne das Feld verhält sich wie bisher.
+    let (s, hoch) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &admin,
+        Some(r#"{"typ":"meldung"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{hoch:?}");
+    let etb_id = hoch["etb_eintrag_id"].as_i64().unwrap();
+    let eintrag = etb_eintrag(&app, einsatz, etb_id, &admin).await;
+    assert_eq!(eintrag["anhaenge"], serde_json::json!([]));
+}
+
+#[tokio::test]
+async fn heraufstufen_mit_datei_einer_anderen_nachricht_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let eigen = hochgeladen(&app, einsatz, &admin, "eigen.jpg").await;
+    let fremd = hochgeladen(&app, einsatz, &admin, "fremd.jpg").await;
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &[eigen]).await;
+    nachricht_senden(&app, einsatz, kid, &admin, &[fremd]).await;
+
+    let (s, _) = heraufstufen(&app, einsatz, mid, &admin, &[eigen, fremd]).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Nichts ist passiert: die Nachricht ist weiter heraufstufbar.
+    let (s, _) = heraufstufen(&app, einsatz, mid, &admin, &[eigen]).await;
+    assert_eq!(s, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn heraufstufen_mit_elf_dateien_ist_400_doppelte_zaehlen_einmal() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let mut ids = Vec::new();
+    for i in 0..11 {
+        ids.push(hochgeladen(&app, einsatz, &admin, &format!("f{i}.jpg")).await);
+    }
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &ids).await;
+
+    let (s, _) = heraufstufen(&app, einsatz, mid, &admin, &ids).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "elf verschiedene Dateien");
+
+    let doppelt = [ids[0], ids[0]];
+    let (s, hoch) = heraufstufen(&app, einsatz, mid, &admin, &doppelt).await;
+    assert_eq!(s, StatusCode::OK, "{hoch:?}");
+    let etb_id = hoch["etb_eintrag_id"].as_i64().unwrap();
+    let eintrag = etb_eintrag(&app, einsatz, etb_id, &admin).await;
+    assert_eq!(eintrag["anhaenge"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn heraufgestufte_kopie_ueberlebt_das_loeschen_der_nachricht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let foto = hochgeladen(&app, einsatz, &admin, "deich.jpg").await;
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &[foto]).await;
+    let (_, hoch) = heraufstufen(&app, einsatz, mid, &admin, &[foto]).await;
+    let etb_id = hoch["etb_eintrag_id"].as_i64().unwrap();
+    let kopie = etb_eintrag(&app, einsatz, etb_id, &admin).await["anhaenge"][0]["id"]
+        .as_i64()
+        .unwrap();
+
+    nachricht_loeschen(&app, einsatz, mid, &admin).await;
+
+    let (s, _, _) = download(&app, einsatz, foto, &admin).await;
+    assert_eq!(
+        s,
+        StatusCode::NOT_FOUND,
+        "Chat-Quelle ist Tombstone (LFH-116)"
+    );
+    let (s, bytes) = etb_download(&app, einsatz, etb_id, kopie, &admin).await;
+    assert_eq!(s, StatusCode::OK, "die Kopie bleibt am Eintrag");
+    assert_eq!(bytes, b"JPEGDATEN");
+}

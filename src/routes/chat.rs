@@ -302,6 +302,11 @@ pub struct HeraufstufenBody {
     pub typ: String,
     /// Optionaler überarbeiteter Text; fehlt er, wird der Nachrichtentext genutzt.
     pub inhalt: Option<String>,
+    /// Anhänge der Nachricht, die als Kopie an den ETB-Eintrag gehen (LFH-700). Fehlt das
+    /// Feld oder ist es leer, wird keine Datei übernommen: Das ETB ist unveränderlich, also
+    /// entscheidet die Person im Dialog, nicht eine Vorgabe „alle".
+    #[serde(default)]
+    pub anhang_ids: Vec<i64>,
 }
 
 /// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb — Nachricht → ETB.
@@ -327,6 +332,18 @@ pub async fn heraufstufen(
         ));
     }
 
+    // Wie Chat-Senden und ETB-Erfassen: doppelte IDs gelten als eine, die Grenze ist die des
+    // ETB-Eintrags (keine zweite Zahl).
+    let mut anhang_ids = req.anhang_ids;
+    anhang_ids.sort_unstable();
+    anhang_ids.dedup();
+    if anhang_ids.len() > crate::routes::etb::MAX_ANHAENGE_JE_EINTRAG {
+        return Err(AppError::Validation(format!(
+            "Höchstens {} Anhänge je Eintrag",
+            crate::routes::etb::MAX_ANHAENGE_JE_EINTRAG
+        )));
+    }
+
     // Quellnachricht laden: liefert Ereigniszeit (Snapshot) + Fallback-Inhalt.
     let quelle = repo::laden(&state.pool, nachricht_id).await?;
     let inhalt = req
@@ -346,6 +363,7 @@ pub async fn heraufstufen(
         typ.as_str(),
         &inhalt,
         &quelle.erstellt_at,
+        &anhang_ids,
     )
     .await?;
 
