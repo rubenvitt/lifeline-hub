@@ -1,8 +1,9 @@
-import { DatePicker, Input, Space } from 'antd';
+import { Input, Space } from 'antd';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
 import { abstand } from '../theme/tokens';
-import { alsBackendZeit, alsOrtszeit } from './filterZeit';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from './filterZeit';
 
 /**
  * Filterleiste des Einsatztagebuchs.
@@ -96,16 +97,15 @@ export default function EtbFilterleiste({ onChange, startWerte, zusatz }: Props)
         style={{ width: 220 }}
         onChange={(e) => aktualisiere({ q: e.target.value }, true)}
       />
-      <DatePicker
-        showTime
+      {/* Zeiten in der Anzeigezone — dieselbe, in der der Druckkopf sie nennt (LFH-692). */}
+      <ZeitpunktEingabe
         placeholder="von"
-        defaultValue={alsOrtszeit(startWerte?.von)}
+        defaultValue={alsZeitpunkt(startWerte?.von)}
         onChange={(d) => aktualisiere({ von: d ? alsBackendZeit(d) : undefined })}
       />
-      <DatePicker
-        showTime
+      <ZeitpunktEingabe
         placeholder="bis"
-        defaultValue={alsOrtszeit(startWerte?.bis)}
+        defaultValue={alsZeitpunkt(startWerte?.bis)}
         onChange={(d) => aktualisiere({ bis: d ? alsBackendZeit(d) : undefined })}
       />
       {zusatz}

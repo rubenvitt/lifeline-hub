@@ -1,8 +1,24 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
+import { zuWerte, type EtbEntwurf } from './entwuerfe/entwurfModell';
 import MetaChip from './MetaChip';
+
+dayjs.extend(utc);
+
+const ENTWURF_LEER: EtbEntwurf = {
+  id: 'a',
+  einsatz_id: 7,
+  inhalt: '',
+  typ: 'meldung',
+  erstellt_at: '2026-07-14T09:00:00.000Z',
+  geaendert_at: '2026-07-14T09:00:00.000Z',
+};
 
 describe('MetaChip', () => {
   it('Text-Feld: Editor offen, Enter committet den Wert', async () => {
@@ -259,5 +275,60 @@ describe('MetaChip', () => {
       aufrufe.every(([opt]) => (opt as FocusOptions | undefined)?.preventScroll === true),
     ).toBe(true);
     fokus.mockRestore();
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`, Szenario „Wiederhergestellter Entwurf“): ein Entwurf stellt seine
+ * Ereigniszeit als UTC-Zeitpunkt wieder her (`entwurfModell.zuWerte`). Der Chip formatierte das
+ * Objekt in SEINEM Modus und zeigte 1000 statt 1200.
+ */
+describe('MetaChip — Ereigniszeit in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  const BERLIN = { zeitzone: 'Europe/Berlin' };
+
+  it('ein wiederhergestellter Entwurf zeigt 1200 für 10:00 UTC', () => {
+    const wert = zuWerte({ ...ENTWURF_LEER, ereigniszeit: '2026-07-14T10:00:00.000Z' }).metadaten
+      .ereigniszeit;
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <MetaChip
+          feld="ereigniszeit"
+          editing={false}
+          wert={wert}
+          onCommit={vi.fn()}
+          onCancel={vi.fn()}
+          onRemove={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    expect(screen.getByText(/1200/)).toBeInTheDocument();
+    expect(screen.queryByText(/1000/)).not.toBeInTheDocument();
+  });
+
+  it('der Editor zeigt die Berliner Uhrzeit und übernimmt mit OK den Zeitpunkt', async () => {
+    const onCommit = vi.fn();
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <MetaChip
+          feld="ereigniszeit"
+          editing
+          wert={dayjs.utc('2026-07-14 10:00:00')}
+          onCommit={onCommit}
+          onCancel={vi.fn()}
+          onRemove={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit' });
+    expect(feld).toHaveValue('2026-07-14 12:00:00');
+    await userEvent.click(feld);
+    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect((onCommit.mock.calls[0][1] as dayjs.Dayjs).toISOString()).toBe(
+      '2026-07-14T10:00:00.000Z',
+    );
   });
 });

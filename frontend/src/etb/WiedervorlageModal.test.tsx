@@ -4,6 +4,8 @@ import { http, HttpResponse } from 'msw';
 import dayjs from 'dayjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
+import { mitProzessZone } from '../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
 import type { EtbEintragAnzeige } from '../api/types';
 import WiedervorlageModal from './WiedervorlageModal';
@@ -185,5 +187,48 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     // Wortlaut nicht kosten — hier steht er in einer beweissichernden Anwendung.
     await waitFor(() => expect(titel).toHaveValue('Kellerpumpe nachfragen'));
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. Feld und
+ * Vorbelegung stehen in der Anzeigezone, gesendet wird derselbe absolute Zeitpunkt.
+ */
+describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  function zeigeBerlin(termin?: string) {
+    return renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <WiedervorlageModal
+          einsatzId={7}
+          eintrag={EINTRAG}
+          onClose={vi.fn()}
+          naechsteLagebesprechungAt={termin}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+  }
+
+  it('die Vorbelegung (+30 min) steht mit der Berliner Uhrzeit im Feld', () => {
+    zeigeBerlin();
+    // 10:00 UTC + 30 min = 12:30 in Berlin (Sommerzeit).
+    expect(faelligFeld().value).toBe('2026-08-21 12:30');
+  });
+
+  it('der Lagebesprechungstermin erscheint in Berlin und geht exakt als UTC hinaus', async () => {
+    let gesendet: Record<string, unknown> | undefined;
+    server.use(
+      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    zeigeBerlin('2026-08-21 13:17:43');
+    await nutzer.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung' }));
+    expect(faelligFeld()).toHaveValue('2026-08-21 15:17');
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
   });
 });

@@ -38,14 +38,14 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
 
 ## 3. ETB
 
-- [ ] 3.1 `etb/EtbFilterleiste.tsx`: von/bis über `ZeitpunktEingabe`. `etb/filterZeit.ts` reicht
+- [x] 3.1 `etb/EtbFilterleiste.tsx`: von/bis über `ZeitpunktEingabe`. `etb/filterZeit.ts` reicht
       nur noch weiter, `filterZeit.test.ts` bleibt grün. Neuer Test: Der Filter von 08:00
       Anzeigezone ergibt denselben Wire-Wert, den `druckAuswahl` als 08:00 druckt.
-- [ ] 3.2 `etb/WiedervorlageModal.tsx`: Feld, Vorbelegung (jetzt + 30 min) und
+- [x] 3.2 `etb/WiedervorlageModal.tsx`: Feld, Vorbelegung (jetzt + 30 min) und
       Termin-Schnellwahl über den Baustein. Das Inline-`utc().format` wird `alsBackendZeit`.
       Ein Test prüft unter abweichender Zone, dass die Schnellwahl auf den Lagebesprechungstermin
       den exakten Wire-Wert setzt.
-- [ ] 3.3 `etb/MetaChip.tsx` und `etb/entwuerfe/entwurfModell.ts`: Chip-Text und Picker
+- [x] 3.3 `etb/MetaChip.tsx` und `etb/entwuerfe/entwurfModell.ts`: Chip-Text und Picker
       laufen über die Zone, der wiederhergestellte Entwurf zeigt 1200 statt 1000 (Szenario
       „Wiederhergestellter Entwurf“). Die Tests von `schnellerfassungModell` und
       `entwurfModell` bleiben grün, dazu kommt ein neuer Test für den Chip.

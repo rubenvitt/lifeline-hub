@@ -52,6 +52,15 @@ export function alsZeitpunkt(s: string | null | undefined): Dayjs | undefined {
   return d.isValid() ? d : undefined;
 }
 
+/**
+ * Wire → Zeitpunkt mit der Wanduhr der BROWSERZONE. Nur für Anzeigen ohne Anzeige-Konventionen
+ * (Admin-Seiten außerhalb eines Einsatzes) und für Testerwartungen; jede Eingabe nimmt
+ * `alsZeitpunkt` und die Bausteine in `ZeitpunktEingabe.tsx`.
+ */
+export function alsOrtszeit(s: string | null | undefined): Dayjs | undefined {
+  return alsZeitpunkt(s)?.local();
+}
+
 /** Zeitpunkt → Wire (UTC ohne Zonenkennung). */
 export function alsBackendZeit(d: Dayjs): string {
   return d.utc().format(WIRE);
