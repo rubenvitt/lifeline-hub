@@ -768,7 +768,7 @@ pub async fn export(
 }
 
 /// GET /api/einsaetze/{id}/personen/druck — Personenliste für die Druckansicht (LFH-727,
-/// `openspec/changes/lfh-727-druck-modul-listen/design.md` D1). Dieselbe Menge und dasselbe Gate
+/// `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/design.md` D1). Dieselbe Menge und dasselbe Gate
 /// wie die Liste, aber **protokolliert**: erst der `druck`-Eintrag (person_id = NULL), dann die
 /// Daten. Scheitert der Eintrag, verlässt keine Person den Server; ein Fehler danach hinterlässt
 /// höchstens einen Eintrag zu viel, nie einen zu wenig. Kein Statusfilter: gefiltert wird im

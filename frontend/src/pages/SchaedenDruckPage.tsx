@@ -13,7 +13,7 @@ import SchaedenDruckTabelle from './schaeden/SchaedenDruckTabelle';
 import { filterSchaeden } from './schaeden/schadenHelfer';
 
 /**
- * Druckansicht der Schadensliste (LFH-727, `openspec/changes/lfh-727-druck-modul-listen/`
+ * Druckansicht der Schadensliste (LFH-727, `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/`
  * design.md D4/D5). Lädt alle nicht stornierten Schäden unter einem eigenen, nicht-live Key (ein
  * Druckbeleg ist ein Schnappschuss) und wählt mit `filterSchaeden` aus, wie die Liste. Typ, Ausmaß
  * und Freitext der `Datensicht` gehen bewusst nicht ein; der Kopf nennt die Auswahl.

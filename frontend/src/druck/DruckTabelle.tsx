@@ -26,7 +26,7 @@ export function druckZeit(wire: string, konventionen: AnzeigeKonventionen): stri
 }
 
 /**
- * Papierform einer Modul-Liste (LFH-727, `openspec/changes/lfh-727-druck-modul-listen/design.md`
+ * Papierform einer Modul-Liste (LFH-727, `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/design.md`
  * D6), nach dem Vorbild `etb/EtbDruckTabelle.tsx`: ein schlichtes HTML-`<table>`, weder
  * `KatalogTabelle` noch `Datensicht` — die Druckansicht ist kein Bedienort. Keine Sortierung, kein
  * Filter, kein Spaltenschalter, keine Links. Den Kopf je Druckseite und „Zeile nicht über den

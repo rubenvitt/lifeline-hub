@@ -28,7 +28,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `lfd_nr`, Vollabruf `etb/druckAbruf.ts` über die bestehende Liste, Drucken erst komplett;
   `einsatzKeys.etbDruck` nicht live, `refetchOnMount: 'always'`.
 - **Modul-Listen-Druck** (LFH-727, Herleitung
-  `openspec/changes/lfh-727-druck-modul-listen/design.md`): `/einsaetze/:id/{personen|tiere|schaeden}/druck`
+  `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/design.md`): `/einsaetze/:id/{personen|tiere|schaeden}/druck`
   über den Rahmen `druck/ListenDruckSeite.tsx` und `druck/DruckTabelle.tsx` (schlichtes `<table>`,
   aufsteigend nach Registriernummer); Einstieg `druck/DruckAnsichtKnopf.tsx` im Kopf der Liste, auch
   ohne Schreibrecht. Der Seitenfilter reist in der Adresse (`personenDruckPfad` usw.), fehlend =

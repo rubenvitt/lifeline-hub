@@ -14,7 +14,7 @@ import { filterPersonen } from '../personen/personenFilter';
 import { parsePersonenDruckAuswahl, personenPfad } from '../routing/deeplinks';
 
 /**
- * Druckansicht der Betroffenenliste (LFH-727, `openspec/changes/lfh-727-druck-modul-listen/`
+ * Druckansicht der Betroffenenliste (LFH-727, `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/`
  * design.md D1/D4).
  *
  * Die Daten kommen AUSSCHLIESSLICH über `GET …/personen/druck`: jeder Abruf schreibt serverseitig

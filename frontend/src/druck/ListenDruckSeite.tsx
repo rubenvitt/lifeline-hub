@@ -50,7 +50,7 @@ interface Props {
 
 /**
  * Seitenrahmen der Druckansichten der Modul-Listen (LFH-727,
- * `openspec/changes/lfh-727-druck-modul-listen/design.md` D3). Vorbild ist `EtbDruckPage`: die
+ * `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/design.md` D3). Vorbild ist `EtbDruckPage`: die
  * Zustände Laden, Fehler, kein Zugriff und leere Auswahl, genau eine Druckwurzel mit dem am
  * Bildschirm sichtbaren Druckkopf, „Drucken" gesperrt, bis der Stand vollständig da ist — ein
  * Teilausdruck wäre eine falsche Übergabeunterlage.

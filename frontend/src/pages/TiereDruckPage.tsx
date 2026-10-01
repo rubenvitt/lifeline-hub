@@ -13,7 +13,7 @@ import TiereDruckTabelle from './tiere/TiereDruckTabelle';
 import { filterTiere } from './tiere/tierHelfer';
 
 /**
- * Druckansicht der Tierliste (LFH-727, `openspec/changes/lfh-727-druck-modul-listen/` design.md
+ * Druckansicht der Tierliste (LFH-727, `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/` design.md
  * D4/D5). Lädt die ganze Liste ohne Serverfilter unter einem eigenen, nicht-live Key (ein
  * Druckbeleg ist ein Schnappschuss) und wählt mit `filterTiere` aus, wie die Liste. Ohne Protokoll:
  * Tiere sind keine besondere Kategorie, wie beim Tier-CSV.
