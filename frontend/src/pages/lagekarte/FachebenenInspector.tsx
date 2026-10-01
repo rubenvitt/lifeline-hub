@@ -117,6 +117,7 @@ const ZUSTAND: Record<string, { label: string; color: string }> = {
 };
 
 function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina' | 'dwd' }) {
+  const { token } = theme.useToken();
   const jetzt = useMinutenTakt();
   const headline = pick(p, 'HEADLINE', 'titel', 'headline');
   const schwere = pick(p, 'SEVERITY', 'schwere', 'severity');
@@ -136,16 +137,16 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
   return (
     <>
       {headline && (
-        <Typography.Paragraph strong style={{ marginBottom: 8 }}>
+        <Typography.Paragraph strong style={{ marginBottom: token.marginSM }}>
           {headline}
         </Typography.Paragraph>
       )}
       {sev ? (
-        <span style={{ display: 'inline-block', marginBottom: 8 }}>
+        <span style={{ display: 'inline-block', marginBottom: token.marginSM }}>
           <StatusTag darstellung={sev} />
         </span>
       ) : schwere ? (
-        <Tag style={{ marginBottom: 8 }}>{schwere}</Tag>
+        <Tag style={{ marginBottom: token.marginSM }}>{schwere}</Tag>
       ) : null}
       <Descriptions column={1}>
         {angekuendigt && (
@@ -167,7 +168,13 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
         <Descriptions.Item label="Quelle">{quelle}</Descriptions.Item>
       </Descriptions>
       {beschreibung && (
-        <Typography.Paragraph style={{ marginTop: 8, marginBottom: hinweis ? 8 : 0, fontSize: 13 }}>
+        <Typography.Paragraph
+          style={{
+            marginTop: token.marginSM,
+            marginBottom: hinweis ? token.marginSM : 0,
+            fontSize: 13,
+          }}
+        >
           {beschreibung}
         </Typography.Paragraph>
       )}
@@ -176,7 +183,9 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
           <Typography.Text strong style={{ fontSize: 12 }}>
             Handlungsempfehlung
           </Typography.Text>
-          <Typography.Paragraph style={{ marginTop: 2, marginBottom: 0, fontSize: 13 }}>
+          <Typography.Paragraph
+            style={{ marginTop: token.marginXS, marginBottom: 0, fontSize: 13 }}
+          >
             {hinweis}
           </Typography.Paragraph>
         </>
@@ -292,7 +301,7 @@ function PegelInhalt({
           {einheit ? ` ${einheit}` : ''} {zust ? <Tag color={zust.color}>{zust.label}</Tag> : null}
         </Typography.Text>
       ) : (
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+        <Typography.Paragraph type="secondary" style={{ marginBottom: token.marginSM }}>
           Kein aktueller Messwert
         </Typography.Paragraph>
       )}
@@ -320,6 +329,7 @@ function PegelInhalt({
 }
 
 function KritisInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
   const kategorie = s(p.kategorie);
   const telefon = s(p.telefon);
   const websiteRoh = s(p.website);
@@ -328,7 +338,7 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       {kategorie && (
-        <Tag color="purple" style={{ marginBottom: 8 }}>
+        <Tag color="purple" style={{ marginBottom: token.marginSM }}>
           {kategorieLabel(kategorie)}
         </Tag>
       )}
@@ -365,9 +375,10 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
  * (`docs/fachebenen-quellen.md`); dafür gibt es die PEGELONLINE-Ebene.
  */
 function HochwasserInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: token.marginSM }}>
         <StatusTag darstellung={hochwasserDarstellung(p.klasse)} />
       </div>
       <Descriptions column={1}>
@@ -411,7 +422,7 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
   const hinweisStil = { fontSize: token.fontSizeSM, marginTop: token.marginXS, marginBottom: 0 };
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: token.marginSM }}>
         <StatusTag darstellung={odlDarstellung(p.stufe)} />
       </div>
       <Descriptions column={1}>
@@ -474,6 +485,7 @@ const LUFT_KOMPONENTEN: [string, string][] = [
  * Farbe: der Index bleibt die amtliche Einstufung.
  */
 function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
   const unbekannt = Object.keys(p)
     .filter((k) => /^wert_k\d+$/.test(k))
     .sort()
@@ -488,7 +500,7 @@ function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
   const art = [s(p.stationstyp), s(p.umgebung)].filter(Boolean).join(' · ');
   return (
     <>
-      <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: token.marginSM }}>
         <StatusTag darstellung={luftqualitaetDarstellung(p.klasse)} />
       </div>
       <Descriptions column={1}>
@@ -529,7 +541,7 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
   const [fehler, setFehler] = useState(false);
   if (fehler) {
     return (
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: token.marginSM }}>
         Standbild nicht abrufbar — es kommt direkt vom Kamera-Betreiber und braucht eine
         Internetverbindung am Gerät.
       </Typography.Paragraph>
@@ -641,6 +653,7 @@ function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
   const kategorie = s(p.kategorie);
   const bild = nurWeb(s(p.bild));
   const link = nurWeb(s(p.link));
@@ -649,7 +662,7 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       {kategorie && (
-        <Tag color="magenta" style={{ marginBottom: 8 }}>
+        <Tag color="magenta" style={{ marginBottom: token.marginSM }}>
           {kategorieLabel(kategorie)}
         </Tag>
       )}
@@ -669,7 +682,12 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           die Gliederung. */}
       {beschreibung && (
         <Typography.Paragraph
-          style={{ marginTop: 8, marginBottom: 0, fontSize: 13, whiteSpace: 'pre-line' }}
+          style={{
+            marginTop: token.marginSM,
+            marginBottom: 0,
+            fontSize: 13,
+            whiteSpace: 'pre-line',
+          }}
         >
           {beschreibung}
         </Typography.Paragraph>
@@ -678,7 +696,7 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           `controlHeight`, ein nackter `<a>` nicht. Die `telefon`/`website`-Anker im KRITIS-Zweig
           bleiben nackt — sie stehen als Wert in einer `Descriptions`-Zeile. */}
       {link && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: token.marginSM }}>
           <Button
             type="link"
             href={link}

@@ -98,6 +98,8 @@ import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 import { zonenPlakette } from './plakette';
 import { useRollen } from '../../components/instrument/rollenwerte';
 import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLayer';
+import { sorgeFuerSuchnadelLayer, suchnadelFc } from './suchnadelLayer';
+import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import type { Eigenposition } from './useEigenposition';
 
 // Worker-URL setzen, bevor die erste Map entsteht (nur diese Datei erzeugt eine). Der Guard deckt
@@ -245,6 +247,11 @@ export interface KartenflaecheProps {
    * Anfliegen übernimmt die Seite über `flyToZiel`.
    */
   eigenposition?: Eigenposition | null;
+  /**
+   * Suchnadel der Ortssuche (LFH-638); `null` = keine. Nur Darstellung, kein Klickziel — das
+   * Anfliegen übernimmt die Seite über `flyToZiel`, die Beschriftung der Fuß.
+   */
+  suchnadel?: GefundenerOrt | null;
 }
 
 /** Imperative Karten-API für die Page: Upload-Platzierung + Auf-Bild-Zentrieren. */
@@ -321,6 +328,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onMessung,
     onZeichnenStandAenderung,
     eigenposition,
+    suchnadel,
     fachebenen,
     onBboxAenderung,
     onZoomAenderung,
@@ -357,6 +365,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   });
   // Eigenposition: zuletzt gezeichnete Daten + Farbe, nach setStyle re-angelegt.
   const eigenpositionRef = useRef({ daten: eigenpositionFc(null), farbe: rollen.bedien });
+  // Suchnadel (LFH-638): wie die Eigenposition nach setStyle re-angelegt, unter ihr.
+  const suchnadelRef = useRef({ daten: suchnadelFc(null), farbe: rollen.bedien });
   // Image-Key → Zeichenquelle; Resolver (`ez|`) und styleimagemissing-Handler (`tz|`) erzeugen
   // daraus lazy die Karten-Icons.
   const zeichenRegistryRef = useRef<Map<string, ZeichenQuelle>>(new Map());
@@ -662,6 +672,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       () => bilderRef.current,
       () => markerDatenRef.current,
       () => einsatzortDatenRef.current,
+    );
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerSuchnadelLayer(map, suchnadelRef.current.daten, suchnadelRef.current.farbe),
     );
     // Zuletzt angemeldet → dieser Poller läuft zuletzt, der Punkt liegt oben.
     wendeKartenDatenAn(map, () =>
@@ -999,6 +1012,16 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // `getClusterLeaves`-Stand → einklappen. Ein reiner Inhaltswechsel klappt nichts zu.
     if (!nurInhalt) schliesseSpiderRef.current?.();
   }, [markers, markerPlakette]);
+
+  // Suchnadel nachführen (LFH-638): über den Markern, unter der Eigenposition (`suchnadelLayer.ts`).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    suchnadelRef.current = { daten: suchnadelFc(suchnadel ?? null), farbe: rollen.bedien };
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerSuchnadelLayer(map, suchnadelRef.current.daten, suchnadelRef.current.farbe),
+    );
+  }, [suchnadel, rollen.bedien]);
 
   // Eigenposition nachführen. Nach dem Marker-Effekt registriert, damit sie über den Markern liegt.
   useEffect(() => {

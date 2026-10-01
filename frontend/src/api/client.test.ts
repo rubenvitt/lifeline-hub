@@ -2,21 +2,26 @@ import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { BENUTZER_PRUEFEN } from '../auth/sitzungsEvent';
+import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 import {
   ApiError,
+  AusgangUnbekannt,
   ERWARTETER_BENUTZER_HEADER,
   NetzFehler,
   OFFLINE_QUEUE_BENUTZER_HEADER,
   apiGet,
   apiSend,
   apiUpload,
+  apiUploadMitFortschritt,
   fehlerText,
+  type UploadFortschritt,
   istKonflikt,
   setzeErwartetenBenutzer,
 } from './client';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   setzeErwartetenBenutzer(null);
 });
 
@@ -266,5 +271,135 @@ describe('ApiError — wer hat geantwortet? (LFH-723, Review Befund 4)', () => {
     expect((eigen as ApiError).vomAnwendungsserver).toBe(true);
     const gateway = await apiGet('/api/gateway').catch((e: unknown) => e);
     expect((gateway as ApiError).vomAnwendungsserver).toBe(false);
+  });
+});
+
+/** LFH-654: Upload mit Byte-Fortschritt über `XMLHttpRequest`, Fehlerformat wie `apiUpload`. */
+describe('apiUploadMitFortschritt (LFH-654)', () => {
+  function starte(optionen: { timeoutMs?: number } = {}) {
+    const anfragen = installiereXhrAttrappe();
+    const meldungen: UploadFortschritt[] = [];
+    const fd = new FormData();
+    fd.append('titel', 'Plan');
+    const ergebnis = apiUploadMitFortschritt<{ id: number }>('/api/upload', fd, {
+      ...optionen,
+      onFortschritt: (f) => meldungen.push(f),
+    });
+    // Ein abgelehntes Versprechen darf vor dem `expect` nicht als unbehandelt gelten.
+    ergebnis.catch(() => undefined);
+    const xhr = anfragen[0];
+    return { xhr, fd, meldungen, ergebnis };
+  }
+
+  it('sendet POST mit Formular, Cookie und 15-s-Standardzeitlimit', () => {
+    const { xhr, fd } = starte();
+    expect(xhr.methode).toBe('POST');
+    expect(xhr.url).toBe('/api/upload');
+    expect(xhr.body).toBe(fd);
+    expect(xhr.withCredentials).toBe(true);
+    expect(xhr.timeout).toBe(15_000);
+  });
+
+  it('übernimmt ein explizites Zeitlimit', () => {
+    expect(starte({ timeoutMs: 120_000 }).xhr.timeout).toBe(120_000);
+  });
+
+  it('setzt den Kopf des erwarteten Benutzers (LFH-387)', () => {
+    setzeErwartetenBenutzer(7);
+    expect(starte().xhr.koepfe[ERWARTETER_BENUTZER_HEADER]).toBe('7');
+  });
+
+  it('meldet den Anteil aus den Bytes, dann die Prüfphase, und liefert das JSON', async () => {
+    const { xhr, meldungen, ergebnis } = starte();
+    xhr.fortschritt(5, 20);
+    xhr.fortschritt(20, 20);
+    xhr.uebertragen();
+    xhr.antworten(201, { id: 4 });
+    await expect(ergebnis).resolves.toEqual({ id: 4 });
+    expect(meldungen).toEqual([
+      { phase: 'senden', anteil: 0.25 },
+      { phase: 'senden', anteil: 1 },
+      { phase: 'pruefen' },
+    ]);
+  });
+
+  it('meldet anteil null, wenn der Browser die Gesamtgröße nicht kennt', () => {
+    const { xhr, meldungen } = starte();
+    xhr.fortschritt(5, 0, false);
+    expect(meldungen).toEqual([{ phase: 'senden', anteil: null }]);
+  });
+
+  it('wirft ApiError mit der Servermeldung und kennzeichnet den eigenen Server', async () => {
+    const { xhr, ergebnis } = starte();
+    xhr.uebertragen();
+    xhr.antworten(400, { error: 'Dateityp nicht erlaubt' });
+    const e = await ergebnis.catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect(e).toMatchObject({ status: 400, message: 'Dateityp nicht erlaubt' });
+    expect((e as ApiError).vomAnwendungsserver).toBe(true);
+  });
+
+  it('löst bei 412 die Benutzerprüfung aus wie jeder Schreibweg', async () => {
+    const pruefen = vi.fn();
+    window.addEventListener(BENUTZER_PRUEFEN, pruefen);
+    try {
+      const { xhr, ergebnis } = starte();
+      xhr.antworten(412, { error: 'fremde Sitzung' });
+      await expect(ergebnis).rejects.toMatchObject({ status: 412 });
+      expect(pruefen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(BENUTZER_PRUEFEN, pruefen);
+    }
+  });
+
+  it('nennt eine Gateway-Seite ohne Umschlag nicht den eigenen Server', async () => {
+    const { xhr, ergebnis } = starte();
+    xhr.antworten(502, '<html>Bad Gateway</html>');
+    const e = (await ergebnis.catch((x: unknown) => x)) as ApiError;
+    expect(e.status).toBe(502);
+    expect(e.vomAnwendungsserver).toBe(false);
+  });
+
+  it('wirft NetzFehler, wenn die Leitung VOR dem letzten Byte abreißt', async () => {
+    const { xhr, ergebnis } = starte();
+    xhr.fortschritt(12, 20);
+    xhr.netzfehler();
+    const e = await ergebnis.catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(NetzFehler);
+    expect(e).not.toBeInstanceOf(AusgangUnbekannt);
+  });
+
+  it('wirft NetzFehler bei Zeitlimit VOR dem letzten Byte', async () => {
+    const { xhr, ergebnis } = starte();
+    xhr.zeitlimit();
+    const e = await ergebnis.catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(NetzFehler);
+    expect(e).not.toBeInstanceOf(AusgangUnbekannt);
+  });
+
+  it.each(['zeitlimit', 'netzfehler'] as const)(
+    'wirft AusgangUnbekannt bei %s NACH dem letzten Byte',
+    async (art) => {
+      const { xhr, ergebnis } = starte();
+      xhr.uebertragen();
+      xhr[art]();
+      await expect(ergebnis).rejects.toBeInstanceOf(AusgangUnbekannt);
+    },
+  );
+});
+
+describe('AusgangUnbekannt (LFH-654)', () => {
+  it('bleibt ein NetzFehler, trägt aber einen eigenen Text', () => {
+    const e = new AusgangUnbekannt();
+    expect(e).toBeInstanceOf(NetzFehler);
+    expect(fehlerText(e)).toMatch(/unklar/);
+    expect(fehlerText(e)).toMatch(/Liste/);
+    expect(fehlerText(e)).not.toMatch(/NICHT abgeschickt/);
+  });
+
+  it('lässt den Text des gewöhnlichen NetzFehlers unverändert', () => {
+    expect(fehlerText(new NetzFehler())).toBe(
+      'Keine Verbindung — die Aktion wurde NICHT abgeschickt',
+    );
   });
 });

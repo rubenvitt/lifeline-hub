@@ -44,6 +44,9 @@ Suchbegriff, wenn einer eingegeben ist. Ist eine Quelle der Suche ausgefallen (e
 „Betroffene“ auch die Personenliste), MUST die Fläche
 statt „Nichts verortet“ bzw. „kein Kartenobjekt“ sagen, dass die Liste unvollständig ist, und
 die Trefferzahlen MUST einen Gedankenstrich statt einer Zahl tragen.
+Steht über den Objektgruppen ein Koordinatentreffer oder die Gruppe „Adresse“ (Ortssuche,
+Spec `lagekarte-ortssuche`), MUST statt des Leerzustands der Fläche nur ein knapper Hinweis
+„Kein Kartenobjekt zu „<Begriff>““ unter diesen Gruppen stehen.
 
 #### Scenario: Suche ohne Treffer
 - **WHEN** die Person „xyz“ sucht und kein Objekt passt
@@ -52,6 +55,10 @@ die Trefferzahlen MUST einen Gedankenstrich statt einer Zahl tragen.
 #### Scenario: Quelle ausgefallen
 - **WHEN** eine Lagebild-Quelle nicht geladen werden konnte
 - **THEN** behauptet die Fläche keine Leere, und Gruppenköpfe zeigen „—“ statt einer Zahl
+
+#### Scenario: Koordinate ohne Objekttreffer
+- **WHEN** die Person eine Koordinate tippt und kein Kartenobjekt passt
+- **THEN** steht die Gruppe „Koordinate“ da und darunter nur der Hinweis „Kein Kartenobjekt zu …“, kein Leerzustand der ganzen Fläche
 
 ### Requirement: Modulsperren
 Die Suche MUST Betreuungsstellen nur enthalten, wenn das Modul Betreuung für die Person frei

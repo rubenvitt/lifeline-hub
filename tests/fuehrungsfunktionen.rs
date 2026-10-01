@@ -710,7 +710,8 @@ async fn mandantenlabel_in_kopf_und_system_etb() {
     let _ = pool;
 }
 
-/// Nach der Schwärzung liefert die Auflösung keinen Namen mehr; Snapshot und Code bleiben.
+/// Nach der Schwärzung liefert die Auflösung keinen Namen mehr; der Code bleibt, der Snapshot
+/// trägt den Platzhalter (Führungs-Freitext, LFH-701 Linie A — das Label steht im ETB).
 #[tokio::test]
 async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
     let (app, pool) = setup_mit_pool().await;
@@ -774,7 +775,7 @@ async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(snap, "S3 Einsatz");
+    assert_eq!(snap, lifeline_hub::einsatz::repo::SCHWAERZUNG_PLATZHALTER);
     assert_eq!(funktion.as_deref(), Some("s3"));
 
     let (code, text): (Option<String>, Option<String>) = sqlx::query_as(

@@ -426,7 +426,8 @@ mod tests {
 
     /// F02/LFH-229: die vormals ungescrubbten Lücken (Einsatz-Kopf, Anhang-BLOB,
     /// Lage-/Gefahren-Freitexte, operative Freitext-Zettel) werden jetzt data-driven aus
-    /// der Registry mit-geschwärzt; Führungs-Doku (ETB/Meldung) + operatives Skelett bleiben.
+    /// der Registry mit-geschwärzt; ETB-Wortlaut + operatives Skelett bleiben, der Meldungs-Freitext
+    /// geht seit LFH-701 mit (die Führungsdokumentation ist das ETB).
     /// Exerziert zugleich alle Generator-Pfade: SelbstId (Kopf), EinsatzId (NullSetzen),
     /// Platzhalter (lage_meldung.text NOT NULL), ZeileLoeschen (anhang), UeberParent
     /// (gefahr_bewertung über gefahrengebiet).
@@ -501,10 +502,10 @@ mod tests {
         .await
         .unwrap();
 
-        // Meldung (Führungs-Doku, RETAIN) + daraus abgeleitetes lage_meldung (text NOT NULL → Platzhalter).
+        // Meldung (Freitext Scrub, LFH-701) + daraus abgeleitetes lage_meldung (text NOT NULL → Platzhalter).
         let meldung: i64 = sqlx::query_scalar(
             "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, eingang_at, erfasst_von_id) \
-             VALUES (?, 1, 'Florian 1', 'funk', 'Lagemeldung Wortlaut bleibt (ETB-Doku)', \
+             VALUES (?, 1, 'Florian 1', 'funk', 'Lagemeldung Wortlaut (nur im ETB erhalten)', \
                 '2026-01-01 09:00:00', '2026-01-01 09:01:00', ?) RETURNING id",
         )
         .bind(e)
@@ -634,15 +635,17 @@ mod tests {
         );
         assert_eq!(ea_bem, None, "operativer Freitext-Zettel gescrubbt");
 
-        // (f) Führungs-Dokumentation (Meldung-Wortlaut) + ETB-Skelett bleiben erhalten.
+        // (f) Führungsdokumentation ist das ETB (LFH-701, Linie A): Der Meldungs-Wortlaut im
+        // Modul wird geschwärzt, das ETB-Skelett bleibt im Wortlaut erhalten.
         let m_inhalt: String = sqlx::query_scalar("SELECT inhalt FROM meldung WHERE id = ?")
             .bind(meldung)
             .fetch_one(&pool)
             .await
             .unwrap();
         assert_eq!(
-            m_inhalt, "Lagemeldung Wortlaut bleibt (ETB-Doku)",
-            "Führungs-Doku (Meldung) bleibt"
+            m_inhalt,
+            crate::einsatz::repo::SCHWAERZUNG_PLATZHALTER,
+            "Meldungs-Freitext im Modul geschwärzt"
         );
         let etb_original: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'ETB ORIGINAL'",

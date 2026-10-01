@@ -92,8 +92,10 @@ Katalogcode schließen, weder beim Speichern noch beim Lesen noch für Bestandsd
 Der Anzeige-Snapshot eines Auftragsempfängers mit Katalogcode SHALL beim Anlegen aus Kürzel und
 wirksamem Label entstehen, bei Führungshilfspersonal und Fachberater als „<Label>: <Bezeichnung>“.
 Beispiele: „S3 Einsatz“, „Fachberater: THW“. Er MUST NOT den Namen der Person enthalten, die die
-Funktion gerade besetzt. Der Snapshot bleibt nach dem Anlegen unverändert. Das `an` des
-ETB-Eintrags zur Anordnung SHALL aus diesen Snapshots entstehen.
+Funktion gerade besetzt. Der Snapshot bleibt nach dem Anlegen unverändert, bis der Einsatz
+geschwärzt wird; die Schwärzung MUST ihn durch den Platzhalter ersetzen. Das `an` des
+ETB-Eintrags zur Anordnung SHALL aus diesen Snapshots entstehen und bleibt über die Schwärzung
+hinweg im Wortlaut erhalten.
 
 #### Scenario: Snapshot ohne Person
 - **WHEN** S3 mit Müller besetzt ist und ein Auftrag an `s3` erteilt wird
@@ -126,7 +128,9 @@ Erinnerungen live aktualisieren.
 
 #### Scenario: Nach der Schwärzung
 - **WHEN** ein Einsatz geschwärzt wurde
-- **THEN** liefert die Auflösung keinen Personennamen mehr, der Snapshot bleibt
+- **THEN** liefert die Auflösung keinen Personennamen mehr
+- **AND** trägt der Snapshot am Auftragsempfänger den Platzhalter, und das `an` des ETB-Eintrags
+  zur Anordnung nennt weiter „S3 Einsatz“
 
 ### Requirement: Führungsstelle als Katalogwert
 Die Einsatzleitung SHALL die Führungsstelle eines Mitglieds als Katalogwert (mit Bezeichnung, wo

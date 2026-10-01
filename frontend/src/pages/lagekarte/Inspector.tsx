@@ -125,10 +125,10 @@ function markerBildUrl(typ: MarkerTyp, tz: TzProps | undefined): string | null {
 
 /** Ein Feld des Datenrasters: Augenbraue über dem Wert; mit Statusrolle als getönter Chip. */
 function RasterZelle({ feld }: { feld: RasterFeld }) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   const ton = feld.rolle ? tonVonRolle(feld.rolle) : null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}>
       <Augenbraue als="dt">{feld.label}</Augenbraue>
       <dd style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
         {ton ? (
@@ -230,7 +230,7 @@ export default function Inspector({
           {marker.lageMeldung.inhalt}
         </Typography.Paragraph>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
         <Augenbraue>Koordinate</Augenbraue>
         {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
             der Tooltip mit dem vollen Wortlaut hängt an Hover/Fokus, und auf Touch muss das
