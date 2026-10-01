@@ -8,8 +8,8 @@ Die rechtsverbindliche Führungsdokumentation eines Einsatzes SHALL das ETB sein
 Datensätze der Führungsmodule (Meldungen, Aufträge samt Empfängern, Nachforderungen,
 Lageberichte, Befehle, Pressemitteilungen, Lagebesprechungen) MUST bei der Schwärzung ihre
 Freitexte verlieren: Absender und Empfänger, Inhalt, Auftragstext und Befehlsgliederung,
-Vollzugsmeldung, Bezeichnungen, Begründungen, Ablehnungsgründe, Titel, Abschnitte und
-Entschluss. Erhalten bleiben MUST laufende Nummer, Art, Meldeweg, Priorität, Status,
+Vollzugsmeldung, Bedarfsart und Bezeichnungen, Begründungen, Ablehnungsgründe, Titel, Abschnitte
+und Entschluss. Erhalten bleiben MUST laufende Nummer, Meldungsart, Meldeweg, Priorität, Status,
 Zeitpunkte und Verweise dieser Datensätze. Ein Freitext, der im Wortlaut eines ETB-Eintrags
 steht, MUST dort erhalten bleiben. Ein Freitext, der nie ins ETB gelangt ist, MUST nach der
 Schwärzung nirgends mehr stehen.

@@ -41,5 +41,10 @@ Jede Aufgabe per TDD: erst der rote Test, dann die Registry-Änderung.
 
 - [x] 4.1 Folgeticket „Presse-Log nach Linie A abwägen“ über `clickup-task-anlegen` anlegen und
   in D5 verlinken (LFH-901).
+- [x] 4.1a Review-Befunde: `nachforderung.art` ist Freitext ohne Katalog und wird gescrubbt;
+  `tests/fuehrungsfunktionen.rs` erwartet den Platzhalter am Snapshot; Delta-Spec
+  `fuehrungsfunktionen`; veraltete Kommentare (`auftrag/repo.rs`, `fuehrung/aufloesung.rs`,
+  `purge_scheduler.rs`, Registry-Abschnitt, `frontend/src/fuehrung/AGENTS.md`). Verifikation:
+  betroffene Tests grün, `openspec validate --strict` gültig.
 - [ ] 4.2 `./scripts/check-all.sh` grün (bzw. die Backend-Schritte lokal, das ganze Gate in der
   CI des PRs).

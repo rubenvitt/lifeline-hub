@@ -22,11 +22,11 @@ offenes „REVIEW“. Die Durchsicht vom 01.10.2026 zeigt: Die Begründung träg
 
 - **Entscheidung (Linie A):** Rechtsverbindliche Führungsdokumentation ist das ETB, und nur das
   ETB. Die Modultabellen sind Arbeitsstand. Jeder Freitext der Führungsmodule wird bei der
-  Schwärzung entfernt (NULL bzw. Platzhalter). Erhalten bleiben laufende Nummern, Status, Art,
+  Schwärzung entfernt (NULL bzw. Platzhalter). Erhalten bleiben laufende Nummern, Status, Meldungsart,
   Priorität, Zeitpunkte und Verweise, und der Wortlaut im ETB.
 - Betroffen sind `meldung` (absender, empfaenger, inhalt), `auftrag` (auftrag_text, absicht, lage,
   ort, zeit, mittel, verbindung, sicherheit, vollzugsmeldung), `auftrag_empfaenger`
-  (funktion_text, extern_bezeichnung, snap_anzeige), `nachforderung` (bezeichnung,
+  (funktion_text, extern_bezeichnung, snap_anzeige), `nachforderung` (art, bezeichnung,
   adressat_bezeichnung, begruendung, abgelehnt_grund), `lagebericht`, `befehl` und
   `pressemitteilung` (titel, abschnitte) sowie `einsatz_lagebesprechung.entschluss`. Der
   Entschluss gehört dazu, weil die Registry ihn ausdrücklich an Lagebericht und Befehl koppelt
@@ -56,12 +56,17 @@ _keine_
 - `aufbewahrung`: neue Anforderung, dass die Schwärzung die Freitexte der Führungsmodule entfernt
   und die Führungsdokumentation allein im ETB-Wortlaut erhalten bleibt. Dazu ein Szenario für den
   Audit-Text.
+- `fuehrungsfunktionen`: Der Anzeige-Snapshot des Auftragsempfängers bleibt nicht mehr über die
+  Schwärzung hinweg stehen; er trägt danach den Platzhalter, das `an` im ETB behält ihn.
 
 ## Impact
 
 - Backend: `src/einsatz/schwaerzung_registry.rs` (Klassifikation, neue Strategie, Begründungen),
   `src/einsatz/repo.rs` (Audit-Text, Doc-Kommentar, Verhaltenstest), `tests/stab.rs`
-  (Entschluss-Test kehrt sich um), `tests/aufbewahrung_e2e.rs` (Ausnahmeliste).
+  (Entschluss-Test kehrt sich um), `tests/fuehrungsfunktionen.rs` (Snapshot nach der Schwärzung),
+  `src/einsatz/purge_scheduler.rs` (Meldungs-Erwartung), `tests/aufbewahrung_e2e.rs`
+  (Ausnahmeliste), Kommentare in `src/auftrag/repo.rs`, `src/fuehrung/aufloesung.rs` und
+  `frontend/src/fuehrung/AGENTS.md`.
 - Keine Migration, keine API-, DTO- oder Frontend-Änderung. Wirkt nur auf Einsätze, die künftig
   geschwärzt werden. Schon geschwärzte Einsätze behalten ihre Modul-Freitexte (die Schwärzung ist
   idempotent und läuft nicht erneut).

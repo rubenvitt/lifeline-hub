@@ -7,14 +7,14 @@ der betroffenen Spalten:
 
 | Spalte | Wörtlich im ETB? | Nullable |
 | --- | --- | --- |
-| `meldung.absender` / `empfaenger` / `inhalt` | ja, als `von` / `an` / `inhalt`, nur bei Auto-ETB an (`meldung/repo.rs`, `anlegen`) | nein / ja / nein |
+| `meldung.absender` / `empfaenger` / `inhalt` | ja, als `von` / `an` / `inhalt`, nur bei Auto-ETB an (`meldung/repo.rs`, `anlegen_mit_client_id_tx`) | nein / ja / nein |
 | `meldung.meldeweg` | ja, Enum | nein |
 | `auftrag.auftrag_text` | ja, Anordnung `inhalt`, nur bei Auto-ETB an (`auftrag/repo.rs`, `anlegen_tx`) | nein |
 | `auftrag.absicht` … `sicherheit` | **nein** | ja |
 | `auftrag.vollzugsmeldung` | ja, immer (`auftrag/repo.rs`, Vollzug) | ja |
 | `auftrag_empfaenger.snap_anzeige` | ja, verkettet in `an` der Anordnung | nein |
 | `auftrag_empfaenger.funktion_text` / `extern_bezeichnung` | ja, über `snap_anzeige` | ja / ja |
-| `nachforderung.bezeichnung` / `adressat_bezeichnung` / `begruendung` | ja, immer (`inhalt` / `an` / `veranlassung`) | nein / ja / ja |
+| `nachforderung.art` / `bezeichnung` / `adressat_bezeichnung` / `begruendung` | ja, immer (`inhalt` / `inhalt` / `an` / `veranlassung`) | nein / nein / ja / ja |
 | `nachforderung.abgelehnt_grund` | **nein** | ja |
 | `lagebericht` / `befehl` / `pressemitteilung` `.titel`, `.abschnitte` | ja, nur freigegebene Versionen (`vorlagendokument`) | nein |
 | `… .zeitstand` | ja, Zeitpunkt | nein |
@@ -72,7 +72,7 @@ Zähler und Verweis.
 | `meldung` | `absender` Platzhalter, `empfaenger` NULL, `inhalt` Platzhalter | `meldeweg` (`G_ENUM`) |
 | `auftrag` | `auftrag_text` Platzhalter; `absicht`, `lage`, `ort`, `zeit`, `mittel`, `verbindung`, `sicherheit`, `vollzugsmeldung` NULL | — |
 | `auftrag_empfaenger` | `snap_anzeige` Platzhalter; `funktion_text`, `extern_bezeichnung` NULL | — |
-| `nachforderung` | `bezeichnung` Platzhalter; `adressat_bezeichnung`, `begruendung`, `abgelehnt_grund` NULL | — |
+| `nachforderung` | `art` (Freitext ohne Katalog, „RTW“, „Dolmetscher“) und `bezeichnung` Platzhalter; `adressat_bezeichnung`, `begruendung`, `abgelehnt_grund` NULL | — |
 | `lagebericht`, `befehl`, `pressemitteilung` | `titel` Platzhalter, `abschnitte` leeres JSON-Array | `zeitstand` (`G_ZEIT`) |
 | `einsatz_lagebesprechung` | `entschluss` Platzhalter | — |
 
@@ -116,8 +116,9 @@ Mit D2 übernehmen diese Schreibwege einen Scrub-Wert in den ETB-Wortlaut und ge
 `AUSNAHMEN_SYSTEM_ETB` (`tests/aufbewahrung_e2e.rs`): Meldung anlegen (absender, empfaenger,
 inhalt), Auftrag anlegen (auftrag_text sowie snap_anzeige, funktion_text, extern_bezeichnung über den
 Empfänger-Snapshot), Vollzug (vollzugsmeldung), Nachforderung
-anlegen (bezeichnung, adressat_bezeichnung, begruendung), Freigabe eines Vorlagendokuments
-(titel, abschnitte der drei Tabellen) und Lagebesprechung abschließen (entschluss). Der
+anlegen (art, bezeichnung, adressat_bezeichnung, begruendung), Freigabe eines Vorlagendokuments
+(titel, abschnitte der drei Tabellen; `vorlagendokument/repo.rs::freigeben_tx`, dort entsteht der
+Snapshot) und Lagebesprechung abschließen (entschluss). Der
 Selbsttest der Liste prüft Funktionsname und Scrub-Klassifikation. Der Selbsttest erkennt
 seit LFH-701 auch generische Funktionen (`fn name<…>`), weil `snapshot_freigeben_tx` eine ist.
 

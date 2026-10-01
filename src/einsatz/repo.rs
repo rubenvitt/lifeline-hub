@@ -2078,6 +2078,26 @@ mod tests {
             .unwrap();
             dokumente.push((tabelle, id));
         }
+        // Freigabe-Snapshot des freigegebenen Lageberichts im ETB (wie `render_snapshot`).
+        let snapshot = "# Lage Fam. Yilmaz\n_Zeitstand: 2026-01-01 12:00:00_\n\n## Lage\nFam. Yilmaz im Keller";
+        let snapshot_etb_id: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit, \
+                lagebericht_id) \
+             VALUES (?, 901, 'lage', ?, ?, '2026-01-01 12:00:00', ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(snapshot)
+        .bind(leit)
+        .bind(dokumente[0].1)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE lagebericht SET etb_eintrag_id = ? WHERE id = ?")
+            .bind(snapshot_etb_id)
+            .bind(dokumente[0].1)
+            .execute(&pool)
+            .await
+            .unwrap();
         let besprechung_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_lagebesprechung (einsatz_id, lfd_nr, abgehalten_at, entschluss, \
                 etb_eintrag_id, erfasst_von_id) \
@@ -2174,14 +2194,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             nachforderung,
-            (
-                "Dolmetscher".into(),
-                p(),
-                None,
-                None,
-                "abgelehnt".into(),
-                None
-            ),
+            (p(), p(), None, None, "abgelehnt".into(), None),
             "Nachforderung: Freitexte weg (auch der nie ins ETB gelangte Ablehnungsgrund)"
         );
 
@@ -2224,6 +2237,16 @@ mod tests {
                 Some("S2 Frau Lang".to_string())
             ),
             "ETB-Eintrag behält den Wortlaut"
+        );
+        let snapshot_nachher: String =
+            sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+                .bind(snapshot_etb_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            snapshot_nachher, snapshot,
+            "Freigabe-Snapshot des Lageberichts bleibt im ETB"
         );
 
         let audit: String = sqlx::query_scalar(

@@ -1247,7 +1247,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("sprechgruppe_id", G_FK),
         ],
     },
-    // ---------- Führungs-Dokumentation (RETAIN — im ETB rechtsverbindlich gesnapshottet) ----------
+    // ---------- Führungsdokumentation: ETB (RETAIN, Wortlaut) und Führungsmodule ----------
+    // Rechtsverbindlich ist allein der ETB-Wortlaut. Die Freitexte der Module darunter werden
+    // gescrubbt, ihre Struktur bleibt (LFH-701, Linie A).
     TabellenRegel {
         tabelle: "etb_eintrag",
         scoping: Scoping::EinsatzId,
@@ -1501,9 +1503,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            retain("art", G_ENUM),
-            // Führungs-Freitexte (LFH-701, Linie A): Bezeichnung, Adressat und Begründung stehen
-            // im ETB-Wortlaut der Anforderung; der Ablehnungsgrund gelangt nie ins ETB.
+            scrub("art", Strategie::Platzhalter), // NOT NULL, Freitext („RTW“, „Dolmetscher“)
+            // Führungs-Freitexte (LFH-701, Linie A): Art, Bezeichnung, Adressat und Begründung
+            // stehen im ETB-Wortlaut der Anforderung; der Ablehnungsgrund gelangt nie ins ETB.
             scrub("bezeichnung", Strategie::Platzhalter), // NOT NULL
             retain("anzahl", G_ZAEHLER),
             retain("adressat_kategorie", G_ENUM),
