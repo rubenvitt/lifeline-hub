@@ -272,3 +272,19 @@ Bedient hat Ruben.
 
 Den Standardbrowser bei der Messung hat niemand festgehalten. In der Umgebung von LFH-818 war
 es Vivaldi.
+
+### Prüflauf in der CI (Task 4.1, 01.10.2026)
+
+`gh workflow run artefakte.yml --ref feat/lfh-722-macos-signierung-notarisierung -f
+tag=v1.0.0-alpha.60 -f desktop=true`, Run 36840664489. Der erste Versuch auf `alpha.61` (Run
+36840478373) wurde abgebrochen, weil er in der Concurrency-Gruppe hinter dem noch wartenden
+Release-Lauf von `alpha.61` hing.
+
+Job `desktop-macos-arm64` grün:
+- Tauri signiert mit „Developer ID Application: Ruben Vitt (H95J852PKP)“ aus dem Wegwerf-
+  Schlüsselbund und notarisiert die App (Einreichung `95a83719-…`, Accepted).
+- DMG-Schritt: Einreichung `668ec992-…` Accepted, gestapelt.
+- Prüfschritt: Gatekeeper ist auf dem Runner an (keine Warnung), App, `.dmg` und App im
+  Update-Archiv je `accepted`, `source=Notarized Developer ID`, Ticket gültig; Abschluss „macOS-
+  Pakete signiert (Developer ID H95J852PKP) und notarisiert.“
+- `desktop-windows-x86_64` grün, unberührt.

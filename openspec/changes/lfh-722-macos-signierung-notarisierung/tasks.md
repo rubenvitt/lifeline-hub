@@ -17,7 +17,7 @@
 
 ## 4. Prüflauf in der CI (nach außen wirksam, nur mit Zustimmung)
 
-- [ ] 4.1 Zustimmung einholen, dann `gh workflow run artefakte.yml --ref feat/lfh-722-macos-signierung-notarisierung -f tag=<jüngster Alpha-Tag> -f desktop=true`. Prüfen: Job `desktop-macos-arm64` grün, Prüfschritt meldet Developer ID, Ticket an App, `.dmg` und App im Archiv.
+- [x] 4.1 Zustimmung einholen, dann `gh workflow run artefakte.yml --ref feat/lfh-722-macos-signierung-notarisierung -f tag=<jüngster Alpha-Tag> -f desktop=true`. Prüfen: Job `desktop-macos-arm64` grün, Prüfschritt meldet Developer ID, Ticket an App, `.dmg` und App im Archiv.
 - [ ] 4.2 Das `.dmg` vom Alpha-Release per Browser laden (Quarantäne gesetzt) und lokal `spctl -a -t open --context context:primary-signature` sowie `stapler validate` ausführen. Prüfen: beides grün, `.sha256` passt.
 
 ## 5. Abnahme von Hand
