@@ -76,15 +76,24 @@ Zu, solange mindestens eine der drei Bedingungen gilt. Sie gelten für den ganze
    einem Wisch hielte den Stand ohne Grund. Auch die erste `pointermove` im Bereich zählt als
    Betreten: Erscheint die Ansicht unter einem ruhenden Zeiger, meldet Chrome beim nächsten
    Bewegen kein `pointerenter` (Befund aus dem e2e-Lauf bei 390 px).
-2. **Fokus:** `focusin`/`focusout` mit der `contains`-Prüfung der Datensicht (Kartenknöpfe,
-   Banner-Aktion).
+2. **Fokus von der Tastatur:** `focusin`/`focusout` mit der `contains`-Prüfung der Datensicht
+   (Kartenknöpfe, Banner-Aktion). Ein Fokus bis 1 s nach einem `pointerdown` im Bereich zählt
+   nicht. MapLibre gibt dem Canvas `tabindex=0`, also fokussiert jeder Klick oder Tipp ihn, und
+   sonst bliebe die Karte nach dem Verlassen gehalten (Review). Bei Touch kommt das kompatible
+   `mousedown` erst nach `pointerup`, deshalb ein Zeitfenster. `:focus-visible` wäre genauer, ist
+   aber in jsdom nicht prüfbar. Entfernt ein Render den fokussierten Knoten (der Knopf
+   „anzeigen“), kommt kein `focusout` an. Ein Layout-Effekt räumt die Bedingung deshalb nach
+   jedem Render, wenn der Fokus nicht mehr im Bereich liegt. „anzeigen“ setzt den Fokus vorher
+   auf die Standzeile (`tabIndex={-1}`, WCAG 2.4.3).
 3. **Auffächerung:** `Kartenflaeche` bekommt die optionale Prop `onSpiderOffen(offen: boolean)`.
    Sie meldet `true`, sobald die Blätter stehen, und `false` beim Zuklappen. Das ist der
    Touch-Fall: wer aufgefächert hat, will gleich ein Blatt treffen.
 
 Der Banner liegt im Bereich, also taut der Weg vom Marker zum Banner nicht auf. Filter und
-Ansichtswechsel liegen außerhalb, also ist die Schleuse offen, wenn sie bedient werden. Eine
-Benutzeraktion braucht deshalb keinen eigenen Zweig.
+Ansichtswechsel liegen außerhalb, also ist die Schleuse offen, wenn sie bedient werden. Die eine
+Ausnahme ist ein aufgefächertes Bündel, denn es hält ohne Zeiger. Ein `pointerdown` außerhalb des
+Bereichs (Capture-Phase) klappt es deshalb über `KartenHandle.klappeSpiderEin()` ein und räumt die
+Bedingung, bevor der Klick wirkt (Review).
 
 ### D3 Gehalten werden Menge, Folge und Lage, nicht der Inhalt
 
@@ -138,6 +147,12 @@ gleiche Koordinaten je Stelle. Ist das so und ein Spider offen:
 - Der Donut des offenen Bündels entsteht im `render`-Abgleich neu. Ist seine Kennung die des
   offenen Spiders, wird die Hülle sofort wieder durchlässig, sonst fingen 72 px Hülle im
   Handschuh-Modus den Tipp auf die Blätter ab (LFH-650-Befund).
+
+Verglichen wird im vertagten Zweig von `wendeKartenDatenAn` mit dem zuletzt EINGESPIELTEN Stand
+(`markerAngewandtRef`), und die Donuts werden dort ein zweites Mal verworfen. Bis zum vertagten
+`setData` baut der `render`-Abgleich sie sonst aus dem alten Quellstand nach. Ein Spider, dessen
+`getClusterLeaves` während einer reinen Inhaltsänderung läuft, gleicht seine Blätter vor dem
+Malen mit dem aktuellen Stand ab (Review).
 
 Sonst schließt der Spider wie bisher. Das gilt unverändert auch auf der Lagekarte. Dort hält
 nichts die Menge, also klappt ein Zugang weiter zu, eine Statusänderung aber nicht mehr.

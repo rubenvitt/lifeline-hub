@@ -15,6 +15,7 @@ const RUHE_MS = 700;
 
 interface KartenHaken {
   loaded(): boolean;
+  triggerRepaint(): void;
   once(ereignis: string, f: () => void): void;
   jumpTo(o: { center: [number, number]; zoom: number }): void;
   project(ll: [number, number]): { x: number; y: number };
@@ -56,6 +57,19 @@ async function karteBei(page: Page, einsatzId: number, center: [number, number],
         k.jumpTo({ center, zoom });
       }),
     { center, zoom },
+  );
+}
+
+/** Bis die Karte nach dem letzten Datenstand gezeichnet hat — erst dann sagt „nichts da" etwas. */
+async function karteRuht(page: Page) {
+  await page.waitForTimeout(RUHE_MS);
+  await page.evaluate(
+    () =>
+      new Promise<void>((fertig) => {
+        const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+        k.once('idle', () => fertig());
+        k.triggerRepaint();
+      }),
   );
 }
 
@@ -119,6 +133,8 @@ test('Karte: ein Live-Zugang neben dem Marker unter dem Zeiger verschmilzt nicht
     antreff_lon: 8.8,
   });
   await expect(banner(page)).toContainText('1 neu', { timeout: 15_000 });
+  // Die negativen Prüfungen erst, wenn die Karte den neuen Stand gezeichnet HÄTTE.
+  await karteRuht(page);
   // Gehalten: A steht als Einzelmarker unter dem Zeiger, kein Donut.
   expect(await einzelSchluessel(page)).toEqual([`person-${a}`]);
   await expect(donut(page)).toHaveCount(0);
@@ -313,3 +329,62 @@ for (const breite of [
     expect(cls).toBe(0);
   });
 }
+
+test.describe('Touch (LFH-668)', () => {
+  test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
+
+  test('Karte: Bündel antippen hält, Tipp auf die leere Karte klappt zu und gibt frei', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await anmelden(page);
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E Touch ${Date.now()}`,
+    });
+    for (const i of [0, 1]) {
+      await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+        name: `Paar ${i}`,
+        antreff_lat: 53.0 + i * 0.0001,
+        antreff_lon: 8.8,
+        // Mit Sichtung trägt der Donut seinen Namen (`role="img"`).
+        sichtung: 'sk3',
+      });
+    }
+    await karteBei(page, einsatzId, [8.8, 53.00005], 12);
+    // Die Maus bleibt aus dem Spiel: nach dem Login steht sie auf (0, 0).
+    await page.mouse.move(0, 0);
+    await expect(standzeile(page)).toHaveText('Live');
+    await expect(donut(page)).toHaveCount(1, { timeout: 20_000 });
+    const k = (await donut(page).boundingBox())!;
+    await page.touchscreen.tap(k.x + k.width / 2, k.y + k.height / 2);
+
+    const blaetter = () =>
+      page.evaluate(() => {
+        const kh = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+        return new Set(kh.querySourceFeatures('spider-leaves').map((f) => f.properties?.schluessel))
+          .size;
+      });
+    await expect.poll(blaetter, { timeout: 10_000 }).toBe(2);
+    // Das aufgefächerte Bündel hält (onSpiderOffen), ohne Zeiger.
+    await expect(standzeile(page)).toHaveText('Live pausiert');
+    await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+      name: 'Zugang',
+      antreff_lat: 53.00015,
+      antreff_lon: 8.8,
+    });
+    await expect(banner(page)).toContainText('1 neu', { timeout: 15_000 });
+    await karteRuht(page);
+    expect(await blaetter()).toBe(2);
+
+    // Tipp auf leere Karte: klappt zu, und der Fokus, den der Tipp dem Canvas gibt, hält NICHT.
+    const leer = await page.evaluate(() => {
+      const kh = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+      const r = kh.getCanvas().getBoundingClientRect();
+      return { x: r.left + 40, y: r.top + r.height / 2 };
+    });
+    await page.touchscreen.tap(leer.x, leer.y);
+    await expect(standzeile(page)).toHaveText('Live', { timeout: 10_000 });
+    await expect(banner(page)).toHaveCount(0);
+    await expect(donut(page)).toHaveAccessibleName(/^3 Personen/, { timeout: 15_000 });
+  });
+});

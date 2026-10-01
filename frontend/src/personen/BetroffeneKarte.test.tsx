@@ -191,19 +191,108 @@ describe('BetroffeneKarte — Schleuse (LFH-668)', () => {
     expect(marker()).toHaveLength(1);
   });
 
+  it('Verlassen bei aufgefächertem Bündel hält weiter', async () => {
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    act(() => screen.getByRole('button', { name: 'stub-auffaechern' }).click());
+    neu([p(1), p(2)]);
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    expect(marker()).toHaveLength(1);
+    expect(banner()).toHaveTextContent('1 neu');
+    act(() => screen.getByRole('button', { name: 'stub-zuklappen' }).click());
+    expect(marker()).toHaveLength(2);
+  });
+
+  it('Verlassen mit Tastaturfokus im Bereich hält weiter', async () => {
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    act(() => screen.getByRole('button', { name: 'stub-auffaechern' }).focus());
+    neu([p(1), p(2)]);
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    expect(marker()).toHaveLength(1);
+  });
+
+  it('ein Fokus durch Klick oder Tipp zählt nicht — nach dem Verlassen ist die Karte live (Review LFH-668)', async () => {
+    // MapLibre gibt dem Canvas `tabindex=0`: ein Klick oder Tipp fokussiert ihn. Zählte das als
+    // Fokus, bliebe die Karte nach dem Verlassen gehalten.
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    const ziel = screen.getByRole('button', { name: 'stub-auffaechern' });
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    fireEvent.pointerDown(ziel, { pointerType: 'mouse' });
+    act(() => ziel.focus());
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    neu([p(1), p(2)]);
+    expect(marker()).toHaveLength(2);
+    // Touch: das kompatible `mousedown` und damit der Fokus kommen erst nach `pointerup`.
+    fireEvent.pointerDown(ziel, { pointerType: 'touch' });
+    fireEvent.pointerUp(ziel, { pointerType: 'touch' });
+    act(() => ziel.blur());
+    act(() => ziel.focus());
+    neu([p(1), p(2), p(3)]);
+    expect(marker()).toHaveLength(3);
+  });
+
+  it('„anzeigen" lässt keine Fokus-Bedingung zurück: nach dem Verlassen ist die Karte live (Review LFH-668)', async () => {
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    fireEvent.pointerEnter(bereich(), { pointerType: 'mouse' });
+    neu([p(1), p(2)]);
+    await userEvent.click(screen.getByRole('button', { name: 'anzeigen' }));
+    fireEvent.pointerLeave(bereich(), { pointerType: 'mouse' });
+    expect(standzeile()).toHaveTextContent(/^Live$/);
+    neu([p(1), p(2), p(3)]);
+    expect(marker()).toHaveLength(3);
+  });
+
+  it('„anzeigen" per Tastatur: der Fokus bleibt im Bereich (Standzeile), Tab hinaus wendet an', async () => {
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    act(() => screen.getByRole('button', { name: 'stub-auffaechern' }).focus());
+    neu([p(1), p(2)]);
+    const knopf = screen.getByRole('button', { name: 'anzeigen' });
+    act(() => knopf.focus());
+    await userEvent.keyboard('{Enter}');
+    expect(banner()).toBeNull();
+    expect(document.activeElement).toBe(standzeile());
+    expect(standzeile()).toHaveTextContent('Live pausiert');
+    act(() => standzeile().blur());
+    neu([p(1), p(2), p(3)]);
+    expect(marker()).toHaveLength(3);
+  });
+
+  it('verschwindet der Fokus aus dem Bereich ohne `focusout`, räumt die Karte die Bedingung', async () => {
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    fireEvent.focus(screen.getByRole('button', { name: 'stub-auffaechern' }));
+    // Der Fokus liegt in Wahrheit auf `body` (entfernter Knoten, Firefox meldet nichts).
+    neu([p(1), p(2)]);
+    expect(marker()).toHaveLength(2);
+  });
+
+  it('ein Druck außerhalb der Ansicht beendet die Bündel-Bedingung (Filter wirkt sofort)', async () => {
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    act(() => screen.getByRole('button', { name: 'stub-auffaechern' }).click());
+    neu([p(1), p(2)]);
+    expect(marker()).toHaveLength(1);
+    fireEvent.pointerDown(document.body, { pointerType: 'touch' });
+    expect(marker()).toHaveLength(2);
+  });
+
   it('Fokus im Bereich hält, Fokus nach außen wendet an', async () => {
     const { neu } = renderKarte([p(1)]);
     await screen.findByTestId('kartenflaeche-stub');
     const innen = screen.getByRole('button', { name: 'stub-auffaechern' });
-    fireEvent.focus(innen);
+    act(() => innen.focus());
     neu([p(1), p(2)]);
     expect(marker()).toHaveLength(1);
     // Wechsel innerhalb des Bereichs taut nicht auf.
-    fireEvent.blur(innen, {
-      relatedTarget: screen.getByRole('button', { name: 'stub-zuklappen' }),
-    });
+    act(() => screen.getByRole('button', { name: 'stub-zuklappen' }).focus());
     expect(marker()).toHaveLength(1);
-    fireEvent.blur(innen, { relatedTarget: document.body });
+    act(() => (document.activeElement as HTMLElement).blur());
     expect(marker()).toHaveLength(2);
   });
 });

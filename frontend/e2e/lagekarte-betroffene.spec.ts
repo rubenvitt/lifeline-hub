@@ -368,3 +368,75 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
     .toBe(3);
   await expect(page.locator('[data-lfh="auswahl"]').getByText('Zug Rand')).toHaveCount(0);
 });
+
+// LFH-668, D5 (`openspec/changes/lfh-668-betroffenen-karte-schleuse/design.md`): auf der Lagekarte
+// gibt es keine Schleuse, der Spider-Schutz der Kartenfläche gilt aber auch hier. Eine reine
+// Inhaltsänderung (Sichtung) lässt ein aufgefächertes Bündel offen, ein Zugang klappt es zu.
+test('Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungsänderung, ein Zugang klappt es zu', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await anmeldenAls(page, ADMIN, PW);
+  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+    bezeichnung: `E2E Spider Lage ${Date.now()}`,
+  });
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const ids: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    ids.push(
+      (
+        await senden(page, 'post', `${basis}/personen`, {
+          antreff_lat: FERN[1] + i * 0.0002,
+          antreff_lon: FERN[0],
+          sichtung: 'sk3',
+        })
+      ).id,
+    );
+  }
+  const ansichten = (await (await page.request.get(`${basis}/karten-ansichten`)).json()) as {
+    id: number;
+    ist_standard: boolean;
+  }[];
+  await senden(
+    page,
+    'patch',
+    `${basis}/karten-ansichten/${ansichten.find((a) => a.ist_standard)!.id}`,
+    {
+      layer_sichtbar: { einsatzort: true, person: true },
+    },
+  );
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await karteBereit(page);
+  await springe(page, FERN, 12);
+  await expect
+    .poll(async () => (await features(page, 'marker-personen')).some((p) => p.cluster), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+
+  const blaetter = async () => {
+    const je = new Map<string, string>();
+    for (const p of await features(page, 'spider-leaves')) {
+      const s = String(p.schluessel ?? '');
+      if (s.startsWith('person-')) je.set(s, String(p.kurzzeichen ?? ''));
+    }
+    return Object.fromEntries([...je.entries()].sort());
+  };
+  await klickeAuf(page, [FERN[0], FERN[1] + 0.0002]);
+  await expect.poll(async () => Object.keys(await blaetter()).length, { timeout: 15_000 }).toBe(3);
+  expect(Object.values(await blaetter())).toEqual(['III', 'III', 'III']);
+
+  // Reine Inhaltsänderung: offen, das Blatt zeigt die neue Sichtung.
+  await senden(page, 'post', `${basis}/personen/${ids[0]}/sichtung`, { kategorie: 'sk1' });
+  await expect
+    .poll(async () => (await blaetter())[`person-${ids[0]}`], { timeout: 15_000 })
+    .toBe('I');
+  expect(Object.keys(await blaetter())).toHaveLength(3);
+
+  // Zugang in der Traube: Menge geändert → der Spider klappt zu.
+  await senden(page, 'post', `${basis}/personen`, {
+    antreff_lat: FERN[1] + 0.0001,
+    antreff_lon: FERN[0],
+  });
+  await expect.poll(async () => Object.keys(await blaetter()).length, { timeout: 15_000 }).toBe(0);
+});

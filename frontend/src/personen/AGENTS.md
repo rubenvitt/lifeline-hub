@@ -17,4 +17,5 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Ansicht, der Fokus darin oder ein Bündel aufgefächert ist, halten die Marker Menge, Folge und Lage
   (`personen/kartenSchleuse.ts`); Sichtung und Beschriftung fließen, neu/verlegt/entfallen wartet
   im Sammelbanner der Standzeile (feste Höhe). Entfallene bleiben bis dahin stehen. Touch zählt nur
-  über `onSpiderOffen`. Nachweis: `e2e/betroffene-karte-schleuse.spec.ts`.
+  über `onSpiderOffen`; Fokus zählt nur von der Tastatur (nicht bis 1 s nach einem Druck im Bereich,
+  der Canvas ist fokussierbar), ein Druck außerhalb klappt das Bündel ein. Nachweis: `e2e/betroffene-karte-schleuse.spec.ts`.

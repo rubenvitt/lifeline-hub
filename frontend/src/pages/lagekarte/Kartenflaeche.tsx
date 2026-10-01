@@ -273,6 +273,8 @@ export interface KartenHandle {
   zoomRaus(): void;
   /** Drehung und Neigung zurücksetzen (Nordung) — der Kompass des alten `NavigationControl`. */
   nachNorden(): void;
+  /** Ein aufgefächertes Bündel einklappen (meldet `onSpiderOffen(false)`); sonst nichts. */
+  klappeSpiderEin(): void;
 }
 
 const klickzielJeTipp = new WeakMap<Event, Klickziel<maplibregl.MapGeoJSONFeature> | null>();
@@ -346,6 +348,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     type: 'FeatureCollection',
     features: [],
   });
+  // Der zuletzt tatsächlich per `setData` eingespielte Stand: `wendeKartenDatenAn` kann vertagen,
+  // und ein Spider kann im Fenster dazwischen aufgehen (LFH-668, Review).
+  const markerAngewandtRef = useRef<MarkerFeatureCollection>(markerDatenRef.current);
   const einsatzortDatenRef = useRef<MarkerFeatureCollection>({
     type: 'FeatureCollection',
     features: [],
@@ -481,6 +486,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       },
       nachNorden() {
         mapRef.current?.resetNorthPitch();
+      },
+      klappeSpiderEin() {
+        schliesseSpiderRef.current();
       },
     };
   }, []);
@@ -958,21 +966,35 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // Registry für styleimagemissing (Key → Zeichenquelle). `markerIconKey` ist die eine Quelle der
     // Key-Bildung, identisch zum icon-Property aus `baueMarkerFc`.
     zeichenRegistryRef.current = baueZeichenRegistry(markers);
+    // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; ein
+    // wiederverwendeter `cluster_id` zeigte sonst veraltete Segmente. Der Donut des offenen
+    // Spiders entsteht im `render`-Abgleich neu, mit durchlässiger Hülle.
+    const verwirfDonuts = () => {
+      for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
+      clusterDomOnScreenRef.current = {};
+      clusterDomRef.current = {};
+    };
     wendeKartenDatenAn(map, () => {
+      // Verglichen wird mit dem EINGESPIELTEN Stand: wurde vertagt, kann der Spider im Fenster
+      // dazwischen auf dem alten Stand aufgegangen sein.
+      const nurInhaltAngewandt = nurInhaltGeaendert(
+        markerAngewandtRef.current,
+        markerDatenRef.current,
+      );
+      markerAngewandtRef.current = markerDatenRef.current;
       reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current);
+      // Auch hier: bis zum vertagten `setData` hat der `render`-Abgleich die Donuts aus dem alten
+      // Quellstand neu gebaut.
+      verwirfDonuts();
       const spider = spiderDatenRef.current;
-      if (nurInhalt && spider) {
+      if (!nurInhaltAngewandt) schliesseSpiderRef.current?.();
+      else if (spider) {
         const leaves = aktualisiereSpiderBlaetter(spider.leaves, markerDatenRef.current);
         spiderDatenRef.current = { leaves, legs: spider.legs };
         setzeSpiderDaten(map, leaves, spider.legs);
       }
     });
-    // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; ein
-    // wiederverwendeter `cluster_id` zeigte sonst veraltete Segmente. Der Donut des offenen
-    // Spiders entsteht im `render`-Abgleich neu, mit durchlässiger Hülle.
-    for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
-    clusterDomOnScreenRef.current = {};
-    clusterDomRef.current = {};
+    verwirfDonuts();
     // Ändern sich Menge, Folge oder Lage, hielte ein offener Spider einen veralteten
     // `getClusterLeaves`-Stand → einklappen. Ein reiner Inhaltswechsel klappt nichts zu.
     if (!nurInhalt) schliesseSpiderRef.current?.();
@@ -1161,7 +1183,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
             unproject: (px) => map.unproject([px.x, px.y]),
           };
           const props = leaves.map((f) => f.properties as MarkerProps);
-          const { leaves: leafFc, legs } = baueSpiderFc(props, center, projektor);
+          // Die Blätter kommen aus dem Worker-Stand der Quelle; kam inzwischen eine reine
+          // Inhaltsänderung (die den Token nicht erhöht), gilt der neuere Inhalt (Review LFH-668).
+          const { leaves: roh, legs } = baueSpiderFc(props, center, projektor);
+          const leafFc = aktualisiereSpiderBlaetter(roh, markerDatenRef.current);
           setzeSpiderDaten(map, leafFc, legs);
           spiderOffenRef.current = schluessel;
           spiderDatenRef.current = { leaves: leafFc, legs };

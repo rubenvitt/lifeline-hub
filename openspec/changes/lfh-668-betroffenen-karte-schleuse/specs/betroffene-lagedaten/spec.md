@@ -3,8 +3,8 @@
 ## ADDED Requirements
 
 ### Requirement: Kartenansicht hält Menge und Lage, solange jemand mit ihr arbeitet
-Solange der Mauszeiger oder ein Stift über der Kartenansicht der Betroffenen liegt, der Fokus in
-ihr steht oder ein Bündel aufgefächert ist, SHALL die Kartenansicht Menge und Lage ihrer
+Solange der Mauszeiger oder ein Stift über der Kartenansicht der Betroffenen liegt, der
+Tastaturfokus in ihr steht oder ein Bündel aufgefächert ist, SHALL die Kartenansicht Menge und Lage ihrer
 Personen-Marker halten. Zugänge, verlegte und entfallene Personen MUST warten. Sichtung und
 Beschriftung der gezeigten Marker MUST weiter live aktualisieren.
 
@@ -19,6 +19,10 @@ Beschriftung der gezeigten Marker MUST weiter live aktualisieren.
 #### Scenario: Entfallene Person bleibt stehen, bis der Stand angewandt wird
 - **WHEN** der Mauszeiger über der Karte liegt und live eine gezeigte Person storniert wird
 - **THEN** bleibt ihr Marker stehen, und der Sammelbanner nennt sie als entfallen
+
+#### Scenario: Ein Klick oder Tipp auf die Karte hält nicht über den Fokus
+- **WHEN** der Mensch auf die Karte klickt oder tippt, die Karte dabei den Fokus bekommt und Zeiger oder Finger die Ansicht danach verlassen
+- **THEN** gilt der Live-Stand, und eine live verortete Person erscheint sofort
 
 #### Scenario: Ohne Zeiger, Fokus und Auffächerung gilt der Live-Stand sofort
 - **WHEN** weder Zeiger noch Fokus in der Kartenansicht liegen, kein Bündel aufgefächert ist und live eine Person verortet wird
@@ -54,6 +58,14 @@ nicht öffnen, weil Banner und Karte in derselben Kartenansicht liegen.
 #### Scenario: Zeiger geht zum Banner
 - **WHEN** Änderungen warten und der Mauszeiger von der Karte auf den Sammelbanner wandert
 - **THEN** bleibt der gehaltene Stand stehen, bis der Mensch „anzeigen“ wählt oder die Kartenansicht verlässt
+
+#### Scenario: Bedienung außerhalb bei aufgefächertem Bündel
+- **WHEN** ein Bündel aufgefächert ist und der Mensch außerhalb der Kartenansicht drückt oder tippt, etwa auf einen Statusfilter
+- **THEN** klappt das Bündel zu, und die Kartenansicht zeigt den Live-Stand, sodass der Filter sofort wirkt
+
+#### Scenario: „anzeigen“ hinterlässt keine gehaltene Karte
+- **WHEN** der Mensch im Sammelbanner „anzeigen“ wählt und die Kartenansicht danach verlässt
+- **THEN** gilt der Live-Stand
 
 #### Scenario: Touch mit aufgefächertem Bündel
 - **WHEN** auf einem Touch-Gerät ein Bündel aufgefächert ist und live eine Person nahe dem Bündel verortet wird

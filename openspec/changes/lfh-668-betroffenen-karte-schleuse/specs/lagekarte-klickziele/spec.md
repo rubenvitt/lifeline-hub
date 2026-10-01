@@ -12,9 +12,9 @@ Menge, Reihenfolge oder Lage, MUST das Bündel wie bisher zuklappen.
 - **WHEN** ein Personen-Bündel aufgefächert ist und live die Sichtung eines seiner Blätter wechselt
 - **THEN** bleibt das Bündel offen, das Blatt steht an derselben Stelle und zeigt die neue Sichtung, und ein Tipp darauf öffnet die Person
 
-#### Scenario: Status eines Fahrzeugs ändert sich bei offenem Bündel der Lagekarte
-- **WHEN** auf der Lagekarte ein Bündel aufgefächert ist und live der Status eines seiner Fahrzeuge wechselt
-- **THEN** bleibt das Bündel offen und zeigt den neuen Status
+#### Scenario: Inhalt ändert sich bei offenem Bündel der Lagekarte
+- **WHEN** auf der Lagekarte ein Bündel der Ebene „Betroffene“ aufgefächert ist und live die Sichtung eines seiner Blätter wechselt
+- **THEN** bleibt das Bündel offen und zeigt die neue Sichtung
 
 #### Scenario: Zugang klappt das Bündel zu
 - **WHEN** ein Bündel aufgefächert ist und live ein Marker hinzukommt oder seine Lage ändert

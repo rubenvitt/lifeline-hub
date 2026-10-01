@@ -22,7 +22,15 @@
 - [x] 4.2 e2e „Karte: ein aufgefächertes Bündel bleibt bei einer Sichtungsänderung offen“ (in `handschuh`): zwei nahe Personen, Bündel auffächern, die Sichtung eines Blatts per `page.request` ändern. Die Spider-Blätter bleiben an derselben Stelle, das Blatt zeigt „I“, ein Tipp innerhalb der neu gebauten Hülle öffnet die Person. Mutationsproben rot: ohne D5 (immer zuklappen), Hülle nach Neubau nicht durchlässig
 - [x] 4.3 e2e Layout: Der Banner erscheint und verschwindet bei 390 × 844 und 1366 × 768. Die Oberkante der Karte bleibt gleich (Δ 0 px), und der CLS-Beitrag nach dem Live-Ereignis ist 0 (Muster `e2e/betroffene-layout.spec.ts`). Die bestehenden Tests in `betroffene-layout.spec.ts`, `betroffene-karte.spec.ts`, `betroffene-kontrast.spec.ts`, `gate3-trefflaeche.spec.ts` (Betroffene Karte), `fokus-verdeckung.spec.ts` (Personenkarte), `lagekarte-smoke.spec.ts` und `lagekarte-touch.spec.ts` bleiben grün (101 grün; die 10 roten aus `fokus-verdeckung`/`gate3` sind auf `alpha` in dieser Umgebung ebenso rot und betreffen andere Flächen). Befund dabei: Erscheint die Ansicht unter einem ruhenden Zeiger, meldet Chrome kein `pointerenter`, also schließt auch die erste `pointermove` im Bereich (Vitest „ein verpasstes Betreten holt die erste Bewegung im Bereich nach“), danach vier Läufe in Folge grün
 
-## 5. Prüfliste und Abschluss
+## 5. Review-Befunde (Review-Workflow, 14 bestätigt)
 
-- [x] 5.1 `docs/superpowers/specs/2026-09-22-lfh-613-pruefliste.md`, Tabelle 4, Nr. 12: Teil (b) mit Entscheidung, Messwerten und Testnamen nachtragen, Verdikt nach Beleg (Rest Touch ohne Auffächerung benennen), Zielticket räumen, die Verdikt-Bilanz der Tabelle nachziehen
-- [ ] 5.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs)
+- [x] 5.0a Fokus nur von der Tastatur: ein Fokus bis 1 s nach einem Druck im Bereich zählt nicht (Canvas `tabindex=0`), Sicherheitsnetz nach jedem Render, „anzeigen“ setzt den Fokus auf die Standzeile. Vitest „ein Fokus durch Klick oder Tipp zählt nicht …“, „„anzeigen“ lässt keine Fokus-Bedingung zurück …“, „„anzeigen“ per Tastatur …“, „verschwindet der Fokus … ohne `focusout` …“, je mit Mutationsprobe rot; e2e Touch „Bündel antippen hält, Tipp auf die leere Karte klappt zu und gibt frei“ (ohne Zeitfenster rot)
+- [x] 5.0b Druck außerhalb bei aufgefächertem Bündel klappt es über `KartenHandle.klappeSpiderEin()` ein und räumt die Bedingung. Vitest „ein Druck außerhalb der Ansicht beendet die Bündel-Bedingung“ (Mutationsprobe rot)
+- [x] 5.0c Kartenflaeche: Blätter eines laufenden `getClusterLeaves` mit dem aktuellen Stand abgleichen; im vertagten Zweig mit dem eingespielten Stand vergleichen und die Donuts erneut verwerfen. e2e `lagekarte-betroffene.spec.ts` „Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungsänderung, ein Zugang klappt es zu“ (ohne D5 rot)
+- [x] 5.0d Tests: Halten beim Verlassen mit offenem Bündel und mit Tastaturfokus (Vitest), Ruhephase vor den Negativprüfungen in e2e 4.1
+- [x] 5.0e Prüfliste Tabelle 4, Nr. 10 nachgezogen (der Sammelbanner ist eine Mitteilung), Spec-Deltas und Design (D2, D5) und Regeln nachgezogen; `openspec validate --strict` grün
+
+## 6. Prüfliste und Abschluss
+
+- [x] 6.1 `docs/superpowers/specs/2026-09-22-lfh-613-pruefliste.md`, Tabelle 4, Nr. 12: Teil (b) mit Entscheidung, Messwerten und Testnamen nachtragen, Verdikt nach Beleg (Rest Touch ohne Auffächerung benennen), Zielticket räumen, die Verdikt-Bilanz der Tabelle nachziehen
+- [ ] 6.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs)
