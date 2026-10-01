@@ -109,6 +109,9 @@ pub async fn anlegen(
 ) -> Result<(StatusCode, Json<LageZoneAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     let geometrie = validiere_neu(&body)?;
+    // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404.
+    crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
+        .await?;
     if let Some(bid) = body.evakuierungsbezirk_id {
         pruefe_bezirk_zuordnung(&state, &ctx, &body.typ, bid).await?;
     }
@@ -239,6 +242,14 @@ pub async fn aktualisieren(
         Some(None) => Some(None), // in neue eigene Gruppe abspalten
         None => None,             // unverändert
     };
+
+    // Ansicht (LFH-738): nur das Setzen wird geprüft, `null` gibt auf alle Ansichten frei.
+    crate::karten_ansicht::repo::pruefe_zugehoerig(
+        &state.pool,
+        einsatz_id,
+        body.ansicht_id.flatten(),
+    )
+    .await?;
 
     // Bezirks-Zuordnung (LFH-673). Nur das SETZEN wird geprüft: Lösen (`null`) und der
     // Wegfall beim Typwechsel legen keine Bezirksangabe offen.
