@@ -25,4 +25,4 @@
 ## 4. Abschluss
 
 - [ ] 4.1 `./scripts/check-all.sh` grün (lokal; Kästchen verweist auf den CI-Lauf des PR).
-- [ ] 4.2 Prüfliste: Gate-Frage im ClickUp-Task beantwortet (gebaut, mit Schuldmenge), Farbverschiebung Gelb → Bedienblau als gewollte Korrektur in PR und Task benannt.
+- [x] 4.2 Prüfliste: Gate-Frage im ClickUp-Task beantwortet (gebaut, mit Schuldmenge), Farbverschiebung Gelb → Bedienblau als gewollte Korrektur in PR und Task benannt.
