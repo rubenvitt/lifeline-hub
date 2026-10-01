@@ -13,9 +13,15 @@
    die zwei Quellen bleiben getrennt, damit handgeschriebenes CSS nicht an antds
    Variablennamen hängt. Dass antd keine Variablen hätte, ist NICHT der Grund:
    antd 6 emittiert `--ant-*` immer, auch ohne `cssVar` am ConfigProvider
-   (gemessen in LFH-623, `test/antdCssVariablen.ts`). Laut derselben Messung gelten
-   sie nur unter antds Klasse `css-var-root`, also an antd-Komponenten und nicht an
-   `<html>`. Und die meisten Rollen hier (Paneel, Kopf, Fläche 3, die deckenden
+   (LFH-623, `test/antdCssVariablen.ts`). Im Browser (Chromium, Prod-Bundle, LFH-641,
+   01.10.2026) gilt: Die Variablen hängen an einer Klasse `css-var-<React-useId>`
+   (gemessen `css-var-_r_0_`; `css-var-root` heißt sie nur ohne `theme` am Provider,
+   wie im jsdom-Test). Die Klasse trägt `.ant-app`, das einzige Kind von `#root`,
+   dazu jede antd-Wurzel, auch Modal- und Dropdown-Portale. `var(--ant-…)` löst also
+   im ganzen App-Baum auf, aber NICHT an `<html>`, `<body>`, `#root` und nicht in
+   einem Portal ohne antd. Darauf baut keine Regel: der Name ist nicht stabil, jeder
+   ConfigProvider mit `theme` vergibt einen eigenen, und vor dem React-Mount gibt es
+   keinen. Und die meisten Rollen hier (Paneel, Kopf, Fläche 3, die deckenden
    Statusflächen) kennt antd gar nicht. Gegen Drift schützt `rollen.guard.test.ts`: er parst
    diese Datei und vergleicht sie Wert für Wert mit `tokens.ts`. Wer hier etwas
    ändert und dort nicht, bricht den Test.
