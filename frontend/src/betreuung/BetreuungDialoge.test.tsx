@@ -2,7 +2,9 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 import { ApiError } from '../api/client';
 import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { alsOrtszeit } from '../etb/filterZeit';
@@ -791,5 +793,45 @@ describe('StornierenDialog', () => {
     expect(onBestaetigen).not.toHaveBeenCalled();
     await userEvent.click(ok);
     expect(onBestaetigen).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin, es ist 30.09.
+ * 23:30 UTC — in Berlin schon der 01.10. 01:30. Eine nachgetragene Meldung von 01:00 Berliner Zeit
+ * liegt in der Vergangenheit und auf dem heutigen Berliner Kalendertag.
+ */
+describe('BelegungMeldenDialog — Zeitpunkt in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('01:00 Berliner Zeit am Berliner „heute“ geht als 23:00 UTC des Vortags hinaus', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-30T23:30:00Z'));
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <BelegungMeldenDialog
+          stelle={stelle()}
+          laeuft={false}
+          fehler={null}
+          onErfassen={onErfassen}
+          onSchliessen={() => {}}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '89');
+    const feld = within(dialog).getByRole('textbox', { name: 'Zeitpunkt' });
+    await userEvent.click(feld);
+    await userEvent.type(feld, '2026-10-01 01:00');
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({ belegt: 89, zeitpunkt_at: '2026-09-30 23:00:00' }),
+    );
   });
 });

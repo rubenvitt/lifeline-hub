@@ -3,6 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
+import { mitProzessZone } from '../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
 import type { Zeitachse } from '../api/types';
 import KraftZeitachse, { ZEITACHSE_RECHTE_TEXT } from './KraftZeitachse';
@@ -276,5 +278,37 @@ describe('KraftZeitachse (LFH-552)', () => {
     expect(within(dialog).getByRole('button', { name: 'Streichen' })).toHaveClass(
       'ant-btn-dangerous',
     );
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`, Szenario „Zukunftstag nach Kalender der Anzeigezone“): Browser auf
+ * UTC, Organisation auf Europe/Berlin, 30.09. 23:30 UTC ist in Berlin schon der 01.10. 01:30.
+ */
+describe('KraftZeitachse — Nachtrag in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('„jetzt“ steht in Berlin, und der Berliner Kalendertag ist wählbar', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-30T23:30:00Z'));
+    server.use(http.get(PFAD, () => HttpResponse.json(ZEITACHSE)));
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <KraftZeitachse einsatzId={1} art="person" id={7} kennung="Anna" darfSchreiben />
+      </AnzeigeKonventionenProvider>,
+    );
+    await waitFor(() => expect(eintraege()).toHaveLength(3));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Nachtragen' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    const feld = within(dialog).getByRole('textbox', { name: 'Zeitpunkt' });
+    await waitFor(() => expect(feld).toHaveValue('2026-10-01 01:30'));
+    await userEvent.click(feld);
+    const zelle = (tag: string) => document.querySelector(`td[title="${tag}"]`);
+    await waitFor(() => expect(zelle('2026-10-01')).not.toBeNull());
+    expect(zelle('2026-10-01')).not.toHaveClass('ant-picker-cell-disabled');
+    expect(zelle('2026-10-02')).toHaveClass('ant-picker-cell-disabled');
   });
 });

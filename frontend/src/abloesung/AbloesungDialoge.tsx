@@ -1,5 +1,6 @@
-import { DatePicker, Form, InputNumber } from 'antd';
+import { Form, InputNumber } from 'antd';
 import type { Dayjs } from 'dayjs';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import type { Abloesung } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
@@ -10,7 +11,8 @@ import { rhythmusText } from './einstufung';
 /**
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog.
  * Der Rhythmus wird in STUNDEN erfasst (0,5er-Schritte) und als Minuten gesendet — die Lage
- * spricht in „6-Stunden-Rhythmus", nicht in 360 Minuten.
+ * spricht in „6-Stunden-Rhythmus", nicht in 360 Minuten. Zeiten stehen in der Anzeigezone
+ * (`ZeitpunktEingabe`, LFH-692).
  */
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
@@ -106,7 +108,7 @@ export function SchichtBeginnenDialog({
         label="Im Einsatz seit"
         extra="Leer: Eintreffen laut Kräfte-Zeitachse, sonst jetzt"
       >
-        <DatePicker showTime format={ZEITFORMAT} style={{ width: '100%' }} />
+        <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
       </Form.Item>
       {rhythmusFeld(
         vorgabe != null
@@ -170,7 +172,7 @@ export function VollzugDialog({
         <Select allowClear placeholder="ohne ablösende Einheit" options={einheiten} />
       </Form.Item>
       <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt" extra="Leer: jetzt">
-        <DatePicker showTime format={ZEITFORMAT} style={{ width: '100%' }} />
+        <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
       </Form.Item>
       <SpeicherFehler fehler={fehler} titel="Ablösung konnte nicht vollzogen werden" />
     </ErfassungsModal>

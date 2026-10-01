@@ -52,14 +52,14 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
 
 ## 4. Kräfte, Ablösung, Betreuung, Personen
 
-- [ ] 4.1 `kraefte/KraftZeitachse.tsx`: `ZeitpunktEingabe keineZukunftstage`. Ein Test prüft
+- [x] 4.1 `kraefte/KraftZeitachse.tsx`: `ZeitpunktEingabe keineZukunftstage`. Ein Test prüft
       das Szenario „Zukunftstag nach Kalender der Anzeigezone“.
-- [ ] 4.2 `abloesung/AbloesungDialoge.tsx`, beide Felder: Test unter abweichender Zone für die
+- [x] 4.2 `abloesung/AbloesungDialoge.tsx`, beide Felder: Test unter abweichender Zone für die
       Eingabe 13:00 und den gesendeten Wert.
-- [ ] 4.3 `betreuung/BetreuungDialoge.tsx`: `zeitpunktFeld()` auf den Baustein mit
+- [x] 4.3 `betreuung/BetreuungDialoge.tsx`: `zeitpunktFeld()` auf den Baustein mit
       `keineZukunftstage` umstellen, `zeitRegel` bleibt am Zeitpunkt. Test unter abweichender
       Zone, die bestehenden Betreuungstests bleiben grün.
-- [ ] 4.4 `personen/LagedatenFelder.tsx` (`VermisstSeitFeld`): `getValueProps`/`normalize`
+- [x] 4.4 `personen/LagedatenFelder.tsx` (`VermisstSeitFeld`): `getValueProps`/`normalize`
       über `alsZeitpunkt`/`alsBackendZeit` und den Baustein. Test: Speichern ohne Änderung
       lässt den Wire-String gleich.
 
