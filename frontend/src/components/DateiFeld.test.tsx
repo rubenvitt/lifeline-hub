@@ -71,6 +71,23 @@ describe('DateiFeld (LFH-21)', () => {
     expect(onDateiWahl).toHaveBeenCalledTimes(1);
   });
 
+  it('macht den Dateinamen ohne Vorschau nicht zum Tab-Stopp (LFH-657)', async () => {
+    // antd ≥ 6.6.5 gibt dem Namen `role="button"`/`tabIndex` nur mit `onPreview`; ohne
+    // Vorschau bediente der Stopp nichts. Wer eine Vorschau anhängt, ändert diese Zusicherung.
+    const { container } = renderMitProviders(<Formular onFinish={vi.fn()} />);
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await userEvent.upload(input, new File(['x'], 'dach.jpg'));
+    const liste = container.querySelector<HTMLElement>('.ant-upload-list')!;
+    const name = await within(liste).findByTitle('dach.jpg');
+    expect(name).not.toHaveAttribute('role');
+    expect(name).not.toHaveAttribute('tabindex');
+    expect(
+      within(liste)
+        .getAllByRole('button')
+        .map((k) => k.getAttribute('title')),
+    ).toEqual([expect.stringMatching(/remove|entfernen/i)]);
+  });
+
   it('markiert „Datei wählen“ als Fokusziel der Erfassungshülle, nicht den versteckten Input', () => {
     // Den Fokus setzt die Hülle (`components/Erfassung.tsx`) beim Öffnen und nach jedem
     // Serien-Speichern; das Feld liefert nur das Ziel. Der Browser-Beleg steht im e2e.
