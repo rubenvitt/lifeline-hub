@@ -6,35 +6,78 @@ import type { EtbEintragAnzeige } from '../api/types';
  *  ist, findet die Suche am Server (LFH-655). */
 export const ETB_BEZUG_DECKEL = 100;
 
+/** Server-Treffer zu genau einem Suchbegriff; `eintraege` ist `null`, wenn die Suche scheiterte. */
+export interface EtbSuchTreffer {
+  begriff: string;
+  eintraege: EtbEintragAnzeige[] | null;
+}
+
+/** Das Präfix „ETB“ trägt jede Option, im Volltext steht es nicht. */
+const ohnePraefix = (suche: string) => suche.replace(/^etb(?=\s|\d|$)\s*/i, '').trim();
+
+/** Die laufende Nummer, wenn der Begriff eine ist („412“ oder „ETB 412“), sonst `null`. */
+function etbNummer(suche: string): number | null {
+  const rest = ohnePraefix(suche);
+  if (!/^\d+$/.test(rest)) return null;
+  const nummer = Number(rest);
+  // Über `Number.MAX_SAFE_INTEGER` liefe `nummer + 1` aus dem i64 des Servers und risse die
+  // ganze Suche in den Fehlerzweig.
+  return Number.isSafeInteger(nummer) && nummer > 0 ? nummer : null;
+}
+
 /**
- * Lädt die ETB-Einträge, die die Bezugswahl für einen Suchbegriff anbietet (LFH-655).
+ * Sucht ETB-Einträge für die Bezugswahl am Server (LFH-655), über den ganzen Einsatz:
  *
- * - Ohne Begriff: die jüngsten {@link ETB_BEZUG_DECKEL} Einträge.
- * - Mit Begriff: die Volltextsuche des Servers (`q`), ebenfalls gedeckelt — sie reicht über
- *   den ganzen Einsatz, nicht nur über das jüngste Fenster.
- * - Ist der Begriff eine laufende Nummer („412“ oder „ETB 412“, so wie die Option sie zeigt),
- *   steht der Eintrag mit genau dieser Nummer vorn. Ihn holt der Cursor (`before_lfd_nr` =
- *   n + 1, `limit` 1) wie den Zahlenzweig der Sprungpalette (`etbNummerSchluessel` in
- *   `command-palette/datensatzAbfrage.ts`); ob die Antwort die gesuchte Nummer trägt, prüft
- *   auch hier der Aufrufer.
+ * - die Volltextsuche (`q`, gedeckelt). Sie trifft nur GANZE Wörter (`fts_query` in
+ *   `src/etb/repo.rs`); Wortanfänge deckt {@link waehleEtbEintraege} über das jüngste Fenster ab.
+ * - bei einer laufenden Nummer den Eintrag mit genau dieser Nummer. Ihn holt der Cursor
+ *   (`before_lfd_nr` = n + 1, `limit` 1) wie den Zahlenzweig der Sprungpalette
+ *   (`etbNummerSchluessel` in `command-palette/datensatzAbfrage.ts`); ob die Antwort die gesuchte
+ *   Nummer trägt, prüft auch hier der Aufrufer.
  */
-export async function ladeEtbBezuege(
+export async function sucheEtbBezuege(
   einsatzId: number,
   suche: string,
 ): Promise<EtbEintragAnzeige[]> {
-  // Das Präfix „ETB“ trägt jede Option, im Volltext steht es nicht.
-  const begriff = suche.replace(/^etb(?=\s|\d|$)\s*/i, '').trim();
-  if (!begriff) return listeEtb(einsatzId, { limit: ETB_BEZUG_DECKEL });
-
-  const nummer = /^\d+$/.test(begriff) ? Number(begriff) : null;
+  const begriff = ohnePraefix(suche);
+  const nummer = etbNummer(suche);
   const [volltext, perNummer] = await Promise.all([
-    listeEtb(einsatzId, { q: begriff, limit: ETB_BEZUG_DECKEL }),
-    nummer != null && nummer > 0
+    begriff ? listeEtb(einsatzId, { q: begriff, limit: ETB_BEZUG_DECKEL }) : Promise.resolve([]),
+    nummer != null
       ? listeEtb(einsatzId, { before_lfd_nr: nummer + 1, limit: 1 })
       : Promise.resolve([]),
   ]);
-  const genau = perNummer.filter((e) => e.lfd_nr === nummer);
-  return [...genau, ...volltext.filter((e) => !genau.some((g) => g.id === e.id))];
+  return [...perNummer.filter((e) => e.lfd_nr === nummer), ...volltext];
+}
+
+/**
+ * Die ETB-Einträge, die die Bezugswahl zu einem getippten Begriff anbietet.
+ *
+ * Das jüngste Fenster filtert immer der Client am sichtbaren Text („ETB 412 · …“): so treffen
+ * Wortanfänge und Teilnummern, und solange die Server-Antwort für GENAU diesen Begriff fehlt
+ * (entprellt, unterwegs, gescheitert), steht nie ein Eintrag zur Wahl, der nicht passt — Enter
+ * nähme sonst den ersten unpassenden. Gehören die Server-Treffer zum Begriff, kommen sie dazu:
+ * der Eintrag mit genau der getippten Nummer vorn, sonst absteigend nach laufender Nummer.
+ */
+export function waehleEtbEintraege(
+  fenster: EtbEintragAnzeige[],
+  treffer: EtbSuchTreffer | null,
+  suche: string,
+): EtbEintragAnzeige[] {
+  const begriff = suche.trim();
+  if (!begriff) return fenster;
+  const klein = begriff.toLowerCase();
+  const lokal = fenster.filter((e) =>
+    `etb ${e.lfd_nr} · ${e.inhalt}`.toLowerCase().includes(klein),
+  );
+  if (treffer?.begriff !== begriff || !treffer.eintraege) return lokal;
+
+  const nummer = etbNummer(begriff);
+  const alle = new Map<number, EtbEintragAnzeige>();
+  for (const e of [...treffer.eintraege, ...lokal]) alle.set(e.id, e);
+  return [...alle.values()].sort(
+    (a, b) => Number(b.lfd_nr === nummer) - Number(a.lfd_nr === nummer) || b.lfd_nr - a.lfd_nr,
+  );
 }
 
 /**

@@ -39,6 +39,20 @@ let etbFenster: EtbStub[] = [];
 /** Der ganze Bestand — auch was außerhalb des Fensters liegt; Suche und Nummer greifen hierauf. */
 let etbBestand: EtbStub[] = [];
 let abschnitte = [{ id: 3, einsatz_id: 1, name: 'EA Nord' }];
+/** Suchbegriffe, auf die der Server mit 400 antwortet. */
+let scheitertBei: string[] = [];
+
+/** Wie `fts_query` in `src/etb/repo.rs`: jedes Wort ist eine Phrase, gefunden werden nur GANZE
+ *  Wörter (unicode61, kein Präfix-`*`). Ein Teilstring-Mock verdeckte, dass „Deich" am Server
+ *  „Deichbruch" nicht trifft. */
+function ftsTrifft(inhalt: string, q: string) {
+  const woerter = inhalt.toLowerCase().split(/[^\p{L}\p{N}]+/u);
+  return q
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((t) => woerter.includes(t));
+}
 
 beforeEach(() => {
   etbAbrufe = 0;
@@ -46,13 +60,15 @@ beforeEach(() => {
   etbFenster = [eintrag(9, 12, 'Lage erkundet')];
   etbBestand = [...etbFenster, eintrag(5, 3, 'Deichbruch gemeldet'), eintrag(7, 412, 'Pumpe 2')];
   abschnitte = [{ id: 3, einsatz_id: 1, name: 'EA Nord' }];
+  scheitertBei = [];
   legeAb.mockReset();
   server.use(
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(abschnitte)),
     http.get('/api/einsaetze/1/einheiten', () =>
       HttpResponse.json([{ id: 4, einsatz_id: 1, name: 'Florian 1' }]),
     ),
-    // Ahmt den Server nach: `q` sucht im Inhalt, `before_lfd_nr` + `limit` schneidet am Cursor.
+    // Ahmt den Server nach: `q` sucht ganze Wörter im Inhalt, `before_lfd_nr` + `limit` schneidet
+    // am Cursor.
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       etbAbrufe += 1;
       const qs = new URL(request.url).searchParams;
@@ -60,8 +76,10 @@ beforeEach(() => {
       const q = qs.get('q');
       const vor = qs.get('before_lfd_nr');
       const limit = Number(qs.get('limit') ?? 50);
+      if (q && scheitertBei.includes(q))
+        return HttpResponse.json({ fehler: 'kaputt' }, { status: 400 });
       let treffer = q || vor ? [...etbBestand] : [...etbFenster];
-      if (q) treffer = treffer.filter((e) => e.inhalt.toLowerCase().includes(q.toLowerCase()));
+      if (q) treffer = treffer.filter((e) => ftsTrifft(e.inhalt, q));
       if (vor) treffer = treffer.filter((e) => e.lfd_nr < Number(vor));
       treffer.sort((a, b) => b.lfd_nr - a.lfd_nr);
       return HttpResponse.json(treffer.slice(0, limit));
@@ -302,8 +320,10 @@ describe('DokumentAblegenModal', () => {
       await oeffneBezugsliste(d);
       expect(optionsLabels()).not.toContain('ETB 3 · Deichbruch gemeldet');
 
-      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Deich');
-      await vi.waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'Deich')).toBe(true));
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Deichbruch');
+      await vi.waitFor(() =>
+        expect(etbAnfragen.some((qs) => qs.get('q') === 'Deichbruch')).toBe(true),
+      );
       await waehleOption('ETB 3 · Deichbruch gemeldet');
       await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
@@ -315,7 +335,7 @@ describe('DokumentAblegenModal', () => {
       rendere();
       const d = await dialog();
       await oeffneBezugsliste(d);
-      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Deich');
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Deichbruch');
       await waehleOption('ETB 3 · Deichbruch gemeldet');
 
       // Nach der Wahl gilt wieder das jüngste Fenster — der Eintrag steht dort nicht. Erst nach
@@ -339,6 +359,104 @@ describe('DokumentAblegenModal', () => {
       await vi.waitFor(() =>
         expect(optionsLabels()).toEqual([expect.stringMatching(/^ETB 4 · Lagemeldung x+…$/)]),
       );
+    });
+
+    it('findet Wortanfänge im jüngsten Fenster, die die Volltextsuche nicht trifft', async () => {
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'erkund');
+      await vi.waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'erkund')).toBe(true));
+      await neuGezeichnet();
+      expect(optionsLabels()).toEqual(['ETB 12 · Lage erkundet']);
+    });
+
+    it('Enter vor der Server-Antwort wählt keinen Eintrag, der nicht passt', async () => {
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      const feld = within(d).getByRole('combobox', { name: 'Bezug' });
+      await userEvent.type(feld, 'Deichbruch');
+      // rc-select liest das legacy `keyCode`/`which`, das `userEvent` nicht setzt.
+      fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+      fireEvent.keyUp(feld, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+      await act(() => new Promise((r) => setTimeout(r, 400)));
+      expect(feld.closest('.ant-select-content')).not.toHaveTextContent('ETB 12');
+    });
+
+    it('schnelles Wiederöffnen zeigt das jüngste Fenster und baut sich danach nicht um', async () => {
+      const { client } = rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      const feld = within(d).getByRole('combobox', { name: 'Bezug' });
+      await userEvent.type(feld, 'Deichbruch');
+      await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
+
+      await schliesseBezugsliste(d);
+      await userEvent.click(feld);
+      await vi.waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'true'));
+      const sofort = optionsLabels();
+      expect(sofort).toContain('ETB 12 · Lage erkundet');
+      expect(sofort).not.toContain('ETB 3 · Deichbruch gemeldet');
+      // Ein Live-Eintrag in der offenen Liste: liefe das Leeren der Suche entprellt nach, nähme
+      // der Stand danach ein neues Bild — samt diesem Eintrag, unter dem Cursor.
+      etbFenster = [eintrag(10, 13, 'Neue Meldung'), ...etbFenster];
+      await client.invalidateQueries({ queryKey: einsatzKeys.etb(1) });
+      await act(() => new Promise((r) => setTimeout(r, 450)));
+      expect(optionsLabels()).toEqual(sofort);
+    });
+
+    it('Treffer eines früheren Begriffs gelten nicht für den weitergetippten', async () => {
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      const feld = within(d).getByRole('combobox', { name: 'Bezug' });
+      await userEvent.type(feld, 'Deichbruch');
+      await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
+      // Innerhalb der Entprellfrist: die Antwort für „Deichbruch Pumpe" steht noch aus.
+      await userEvent.type(feld, ' Pumpe');
+      expect(optionsLabels()).not.toContain('ETB 3 · Deichbruch gemeldet');
+    });
+
+    it('eine gescheiterte Suche lässt keine alten Treffer stehen', async () => {
+      scheitertBei = ['Lage'];
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      const feld = within(d).getByRole('combobox', { name: 'Bezug' });
+      await userEvent.type(feld, 'Deichbruch');
+      await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
+
+      await userEvent.clear(feld);
+      await userEvent.type(feld, 'Lage');
+      await vi.waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'Lage')).toBe(true));
+      await neuGezeichnet();
+      // Ohne Server-Antwort bleibt der Filter über das jüngste Fenster — nie die Treffer von vorhin.
+      expect(optionsLabels()).toEqual(['ETB 12 · Lage erkundet']);
+    });
+
+    it('friert auch ein, wenn eine Quelle verweigert wird (403 ohne Modulrecht)', async () => {
+      server.use(
+        http.get('/api/einsaetze/1/einheiten', () =>
+          HttpResponse.json({ fehler: 'kein Zugriff' }, { status: 403 }),
+        ),
+      );
+      const { client } = rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      const vorher = optionsLabels();
+
+      etbFenster = [eintrag(10, 13, 'Neue Meldung'), ...etbFenster];
+      await client.invalidateQueries({ queryKey: einsatzKeys.etb(1) });
+      await vi.waitFor(() =>
+        expect(
+          client
+            .getQueriesData<EtbStub[]>({ queryKey: einsatzKeys.etb(1) })
+            .some(([, daten]) => daten?.some((e) => e.lfd_nr === 13)),
+        ).toBe(true),
+      );
+      await neuGezeichnet();
+      expect(optionsLabels()).toEqual(vorher);
     });
 
     it('findet einen ETB-Eintrag über seine laufende Nummer', async () => {
