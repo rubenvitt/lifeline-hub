@@ -1,6 +1,6 @@
-import { IkonePunkteSenkrecht, IkoneUhr } from '../ikonen';
-import { Button, Dropdown, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
-import type { MenuProps } from 'antd';
+import { IkoneUhr } from '../ikonen';
+import { Button, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
+import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -157,7 +157,6 @@ export default function MeldungKarte({
   // darunter wäre ein Menü ein Umweg.
   const gesamt = (kannBestaetigen ? 1 : 0) + (naechster ? 1 : 0) + weitere.length;
   const buendeln = gesamt >= 3;
-  const menuItems: MenuProps['items'] = buendeln ? weitere : [];
 
   return (
     // Die Ereigniszeit führt links in Mono, darunter die laufende Nummer; der Rand folgt dem
@@ -272,21 +271,21 @@ export default function MeldungKarte({
             ) : (
               <Button onClick={() => onStatus(m.id, naechster.ziel)}>{naechster.label}</Button>
             ))}
-          {buendeln
-            ? menuItems.length > 0 && (
-                <Dropdown trigger={['click']} menu={{ items: menuItems }}>
-                  <Button
-                    type="text"
-                    aria-label={`Aktionen zu Meldung ${m.lfd_nr}`}
-                    icon={<IkonePunkteSenkrecht />}
-                  />
-                </Dropdown>
-              )
-            : weitere.map((w) => (
-                <Button key={w.key} onClick={w.onClick}>
-                  {w.label}
-                </Button>
-              ))}
+          {buendeln ? (
+            // Die Zuordnung hängt am Menü: die Einträge tragen ihre Handlung, der Baustein
+            // meldet nur den Schlüssel.
+            <MenueAusloeser
+              eintraege={weitere}
+              zugaenglicherName={`Aktionen zu Meldung ${m.lfd_nr}`}
+              onWahl={(key) => weitere.find((w) => w.key === key)?.onClick()}
+            />
+          ) : (
+            weitere.map((w) => (
+              <Button key={w.key} onClick={w.onClick}>
+                {w.label}
+              </Button>
+            ))
+          )}
         </Space>
       )}
       <Modal

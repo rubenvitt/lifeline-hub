@@ -2,12 +2,8 @@ import { Typography, theme } from 'antd';
 import { useMemo } from 'react';
 import type { Evakuierungsbezirk } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import Datensicht, {
-  HERVORGEHOBEN,
-  spaltenFuer,
-  type Kartenplan,
-  type MenueEintrag,
-} from '../components/Datensicht';
+import Datensicht, { HERVORGEHOBEN, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import type { MenueEintrag } from '../components/MenueAusloeser';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { raeumungszustand } from '../theme/statusFarben';
 import { evakuiertText, kennzahlText } from './betreuungText';

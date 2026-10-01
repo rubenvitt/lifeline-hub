@@ -321,3 +321,38 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite
       `(${Math.round(text!.width)}px von ${Math.round(flaeche!.width)}px), Soll ≥ 50 %`,
   ).toBeGreaterThanOrEqual(MINDESTANTEIL);
 });
+
+/**
+ * `autoFocus` am Menüauslöser (LFH-683, `src/components/MenueAusloeser.tsx`): in jsdom bleibt der
+ * Fokus beim Öffnen am Auslöser, belegt wird es deshalb hier. Das ETB steht für alle Aufrufer des
+ * Bausteins: die Mechanik sitzt dort genau einmal.
+ */
+test.describe('LFH-683: Menüauslöser per Tastatur', () => {
+  test('Enter öffnet das Menü, der Fokus liegt darin, Pfeil hebt hervor, Escape schließt', async ({
+    page,
+  }) => {
+    await page.setViewportSize(FUEKW);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Menüfokus ${Date.now()}`);
+    await seedeEintrag(page, einsatzId);
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
+    await expect(sicht.getByText(MELDUNG, { exact: true })).toBeVisible();
+
+    const ausloeser = sicht.getByRole('button', { name: 'Aktionen zu Eintrag 1', exact: true });
+    await ausloeser.focus();
+    await page.keyboard.press('Enter');
+    const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    await expect(menue).toBeVisible();
+    // Der Fokus ist ins Menü gewandert, nicht am Auslöser geblieben.
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.closest('[role="menu"]') != null))
+      .toBe(true);
+
+    await page.keyboard.press('ArrowDown');
+    await expect(menue.locator('.ant-dropdown-menu-item-active')).toHaveCount(1);
+
+    await page.keyboard.press('Escape');
+    await expect(menue).toHaveCount(0);
+  });
+});
