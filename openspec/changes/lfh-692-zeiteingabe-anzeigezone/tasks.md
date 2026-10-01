@@ -24,14 +24,16 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
 
 ## 2. Verpflegung (Referenzfall LFH-634)
 
-- [ ] 2.1 `verpflegung/VerpflegungDialoge.tsx` auf `ZeitraumEingabe` und `ZeitpunktEingabe`
+- [x] 2.1 `verpflegung/VerpflegungDialoge.tsx` auf `ZeitraumEingabe` und `ZeitpunktEingabe`
       umstellen, `alsOrtszeit` wird `alsZeitpunkt`. Integrationstest unter TZ=UTC mit
       Anzeigezone Europe/Berlin prüft die drei Akzeptanzkriterien:
       - der Bearbeiten-Dialog zeigt 12:00–13:30 wie die Karte,
       - Speichern mit nur geändertem Bedarf sendet keinen Zeitraum,
-      - die Korrektur auf 13:00 sendet `11:00:00`.
+      - eine Eingabe von 13:00–14:30 sendet `11:00:00`–`12:30:00` (über das Anlegen: in jsdom
+        übernimmt antds RangePicker eine Tastatur-Korrektur an einem schon belegten Zeitraum
+        nicht ins Formular, auch ohne Baustein gemessen; die Wandlung ist dieselbe).
       Die Mutationsprobe macht den Test rot.
-- [ ] 2.2 `verpflegung/useBedarfsvorschlag.ts`: die Stand-Zeit über die Konventionen
+- [x] 2.2 `verpflegung/useBedarfsvorschlag.ts`: die Stand-Zeit über die Konventionen
       formatieren. Ein Test prüft die Uhrzeit unter abweichender Zone.
 
 ## 3. ETB
