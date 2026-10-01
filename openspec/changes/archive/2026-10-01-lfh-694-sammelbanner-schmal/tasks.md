@@ -51,4 +51,8 @@ relativ zu `frontend/src/`. Kommandos laufen über `mise exec -- pnpm -C fronten
   der Prüfung, Befund in der PR-Beschreibung. Erledigt 01.10.2026: acht Aufnahmen (beide Module,
   390 px `handschuh` Tag/Nacht, 390 px `komfortabel` Nacht, 1366 px `kompakt` Nacht), kein
   Befund.
-- [ ] 5.2 `./scripts/check-all.sh` grün. Prüfen: Lauf ohne Bündelauswahl bzw. die CI dieses PRs.
+- [x] 5.2 `./scripts/check-all.sh` grün. Prüfen: Lauf ohne Bündelauswahl bzw. die CI dieses PRs.
+  Lokal 01.10.2026: Bündel `schnell` grün (Schritt 1 erst nach Entfernen eines nicht
+  committeten Wegwerf-Specs) und `frontend` grün (589 Dateien, 8115 Tests); die betroffenen
+  e2e-Specs (`gate1-ueberlauf` mobil, `abloesung-zufluss`) grün. Bündel `rust` und die volle
+  e2e-Suite belegt die CI dieses PRs (Backend unberührt).
