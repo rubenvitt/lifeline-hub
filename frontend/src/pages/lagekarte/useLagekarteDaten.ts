@@ -578,16 +578,18 @@ export function useLagekarteDaten({
     // Uhrzeit daneben widerspräche ihm.
     datenstand: istSnapshot
       ? undefined
-      : gemeinsamerDatenstand(
+      : // Nur, was die Karte zeigt: eine gesperrte Quelle trägt ihren Altstand im Cache weiter
+        // (abgeschaltete Query), und der wäre sonst der „älteste" Stand (LFH-669).
+        gemeinsamerDatenstand(
           einsatzQuery.dataUpdatedAt,
-          uhsQuery.dataUpdatedAt,
-          schaedenQuery.dataUpdatedAt,
-          einheitenQuery.dataUpdatedAt,
-          fahrzeugeQuery.dataUpdatedAt,
-          abschnitteQuery.dataUpdatedAt,
+          uhsFrei ? uhsQuery.dataUpdatedAt : undefined,
+          schaedenFrei ? schaedenQuery.dataUpdatedAt : undefined,
+          einheitenFrei ? einheitenQuery.dataUpdatedAt : undefined,
+          fahrzeugeFrei ? fahrzeugeQuery.dataUpdatedAt : undefined,
+          abschnitteFrei ? abschnitteQuery.dataUpdatedAt : undefined,
           zonenQuery.dataUpdatedAt,
           freieZeichenQuery.dataUpdatedAt,
-          lageMeldungenQuery.dataUpdatedAt,
+          lageMeldungenFrei ? lageMeldungenQuery.dataUpdatedAt : undefined,
           fkQuery.dataUpdatedAt,
         ),
     // Namen der Lagebild-Quellen, deren Abruf scheiterte (leer = vollständig). Die Kürzung für die

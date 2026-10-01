@@ -57,9 +57,14 @@ function wrapper(client: QueryClient) {
  * geladen/gescheitert“ — als Feld, weil ein Default-Parameter `undefined` verschluckte.
  */
 function starte(
-  { freigaben }: { freigaben: ModulFreigaben | undefined } = { freigaben: freigabenFixture() },
+  {
+    freigaben,
+    freigabenGescheitert = false,
+  }: { freigaben: ModulFreigaben | undefined; freigabenGescheitert?: boolean } = {
+    freigaben: freigabenFixture(),
+  },
 ) {
-  return renderHook(() => useAktiveWarnung({ einsatzId: 7, freigaben }), {
+  return renderHook(() => useAktiveWarnung({ einsatzId: 7, freigaben, freigabenGescheitert }), {
     wrapper: wrapper(neuerQueryClient()),
   });
 }
@@ -123,11 +128,21 @@ describe('useAktiveWarnung', () => {
     expect(result.current).toBe(false);
   });
 
-  it('Freigaben unbekannt (laden noch/gescheitert) → das Gefahrenmodul wird nicht abgefragt', async () => {
+  it('Freigaben laden noch → das Gefahrenmodul wird nicht abgefragt', async () => {
     const abrufe = gebiete('akut');
     const { result } = starte({ freigaben: undefined });
     await takt();
     expect(abrufe.anzahl).toBe(0);
     expect(result.current).toBe(false);
+  });
+
+  it('Freigaben gescheitert → keine Anfrage, aber die Sperre hält (fail-safe, LFH-669)', async () => {
+    // Ohne Freigaben weiß niemand, ob ein Gebiet akut ist. Abgefragt wird trotzdem nicht (Spec
+    // `modul-freigabe`); der Helligkeitsregler hält dafür den Warnboden.
+    const abrufe = gebiete('akut');
+    const { result } = starte({ freigaben: undefined, freigabenGescheitert: true });
+    await takt();
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current).toBe(true);
   });
 });

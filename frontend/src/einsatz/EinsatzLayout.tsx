@@ -203,7 +203,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
   // die Sperre mit — in der Einsatzauswahl gibt es keine Einsatzwarnung.
-  useWarnsperre(useAktiveWarnung({ einsatzId, freigaben: modulFreigaben }));
+  useWarnsperre(
+    useAktiveWarnung({
+      einsatzId,
+      freigaben: modulFreigaben,
+      freigabenGescheitert: modulFreigabenQuery.isError,
+    }),
+  );
 
   /**
    * FRÜHER AUSSTIEG vor dem Haupt-JSX: die Kindseite liest denselben Einsatz aus demselben Cache

@@ -106,7 +106,7 @@ Charakterisierung dafür, dass `zugriff` nichts lockert.
 - `istKeyFreigegeben` und `erstesFreigegebenesModul` entsprechend.
 
 `benutzer` fällt aus allen Signaturen, denn der Server kennt den Admin. Das Registry-Feld
-`benoetigteRolle` fällt weg (`BenoetigteRolle` bleibt als Typ für die Editoren). Der Typ-Checker
+`benoetigteRolle` fällt weg, mit ihm der Typ `BenoetigteRolle`, den sonst niemand mehr nutzt. Der Typ-Checker
 findet jede Aufrufstelle, und ein vergessener Konsument kann nicht still auf den alten Overrides
 weiterlaufen.
 
@@ -139,6 +139,14 @@ folgt `PFAD_KEY`:
 Zeile in `frontend/src/pages/lagekarte/AGENTS.md`. Der Historien-Modus bleibt unberührt, denn
 Schnappschüsse kommen aus dem Dokument.
 
+### D4b — Dieselbe Grenze für Überblick, Lage-Dashboard, Stab-Vorbereitung und Funkplan
+
+Nachtrag aus dem Review: Die Spec verlangt die Grenze von **jeder** Seite, die Daten eines
+fremden Moduls lädt. Neben der Lagekarte tun das der Führungsüberblick (`UeberblickPage.tsx`),
+`useLagebild.ts` (geteilt von Lage-Dashboard und Stab-Vorbereitung) und der Funkplan. Sie
+bekommen dasselbe Muster wie D4: `enabled` je Quelle aus `istKeyFreigegeben`, Daten nur bei
+Freigabe, eine gesperrte Quelle ist kein Ausfall, ein Fehler der Freigaben selbst ist sichtbar.
+
 ### D5 — Query-Key, Live und offline
 
 - `modulFreigaben` steht in `NICHT_LIVE_KEYS`, mit derselben Begründung wie `modulOverrides`.
@@ -170,7 +178,12 @@ nicht, es gibt also keinen Eintrag im Enum-Wire-Kontrakt.
 - **Fehler beim Abruf der Freigaben** → Datenkonsumenten laden nichts, die Navigation bleibt
   bedienbar. Die Lagekarte zeigt dann keine modulgebundenen Quellen. Dass die Freigaben selbst
   fehlen, meldet der Ausfallhinweis als eigene Quelle „Berechtigungen“. Sonst sähe eine leere
-  Karte wie eine ruhige Lage aus.
+  Karte wie eine ruhige Lage aus. Weitere bewusste Folgen, bis ein Neuabruf gelingt: der Rahmen
+  zeigt sein Warnbanner, die Navigationszähler fehlen, ein Rail-Sprung öffnet nur das Panel, und
+  ein Platzier-Deeplink auf eine Betreuungsstelle verfällt. Die Warnsperre des
+  Helligkeitsreglers (LFH-397) bleibt **fail-safe**: ohne Freigaben fragt `useAktiveWarnung`
+  die Gefahrengebiete nicht ab (Spec), meldet aber die Warnung, damit der Regler den Boden
+  hält.
 - **Veraltete Freigaben nach Rechteänderung durch Dritte** → wie heute bei Overrides. Das
   403-Netz der Seiten bleibt, und `staleTime` bleibt beim Standard. Ein Live-Ereignis wäre ein
   eigener Task.

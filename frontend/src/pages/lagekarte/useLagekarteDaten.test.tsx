@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { theme } from 'antd';
 import { http, HttpResponse } from 'msw';
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { server } from '../../test/server';
 import { neuerQueryClient } from '../../test/utils';
@@ -930,6 +930,23 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     const { result } = render();
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Berechtigungen']));
     for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
+  });
+
+  it('gesperrtes Modul mit Altstand im Cache: keine Daten und KEIN alter Datenstand', async () => {
+    handler({ schaeden: { zugriff: false } });
+    // `new QueryClient()`-Verhalten über eigenen Client: der Altstand muss den ersten await
+    // überleben. Literaler Key, nicht die Factory.
+    const client = new QueryClient();
+    client.setQueryData(['einsatz-schaeden', 5], [{ id: 1 }], { updatedAt: 1_000 });
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+    expect(result.current.rohdaten.schaeden).toEqual([]);
+    // Der Datenstand nennt nur, was die Karte zeigt — nicht den Zeitstempel der verdeckten Liste.
+    expect(result.current.datenstand).toBeGreaterThan(1_000);
   });
 
   it('freies Modul mit echtem Ausfall bleibt ein Ausfall', async () => {

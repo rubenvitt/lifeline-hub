@@ -1147,9 +1147,39 @@ mod tests {
         );
     }
 
-    /// Gleichlauf: `zugriff` ist für jede Kombination genau die Entscheidung des Gates.
+    /// Unabhängige Referenz: die Entscheidung von `fordere_modul_zugriff` vor LFH-669, Wort für
+    /// Wort aus dem alten Rumpf (Admin → nicht ausblendbar → versteckt → Rolle aus Einsatz-Override,
+    /// sonst Org-Vorgabe). `fordere_modul_zugriff` delegiert heute an `modul_freigabe`; ein
+    /// Vergleich damit wäre tautologisch.
+    fn alte_entscheidung(
+        overrides: &HashMap<String, EinsatzModulOverride>,
+        org_defaults: &HashMap<String, Option<String>>,
+        key: &str,
+        b: &Benutzer,
+    ) -> bool {
+        if b.ist_admin() {
+            return true;
+        }
+        if !ist_ausblendbar(key) {
+            return true;
+        }
+        let ue = overrides.get(key);
+        if ue.is_some_and(|o| !o.sichtbar) {
+            return false;
+        }
+        let ov = ue.and_then(|o| o.benoetigte_rolle.as_deref());
+        let org = org_defaults.get(key).and_then(|r| r.as_deref());
+        match ov.or(org) {
+            Some("admin") => false,
+            Some("fuehrungskraft") => b.ist_hoehere_berechtigung(),
+            _ => true,
+        }
+    }
+
+    /// Gleichlauf: `zugriff` ist für jede Kombination die alte Entscheidung des Gates, und das
+    /// Gate folgt `zugriff`.
     #[test]
-    fn freigabe_zugriff_ist_die_entscheidung_des_gates() {
+    fn freigabe_zugriff_ist_die_alte_entscheidung_des_gates() {
         let benutzer = [
             benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE),
             benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT),
@@ -1157,16 +1187,24 @@ mod tests {
         ];
         let rollen = [None, Some("fuehrungskraft"), Some("admin")];
         for b in &benutzer {
-            for sichtbar in [true, false] {
+            for ov in [None, Some(true), Some(false)] {
                 for ov_rolle in rollen {
                     for org_rolle in rollen {
                         for key in ["etb", "einsatzdaten"] {
-                            let ov = overrides_mit(vec![override_zeile(key, sichtbar, ov_rolle)]);
+                            let ovs = match ov {
+                                None => overrides_mit(vec![]),
+                                Some(sichtbar) => {
+                                    overrides_mit(vec![override_zeile(key, sichtbar, ov_rolle)])
+                                }
+                            };
                             let org = org_defaults_mit(key, org_rolle);
+                            let fall = format!("{key} ov={ov:?}/{ov_rolle:?} org={org_rolle:?}");
+                            let zugriff = modul_freigabe(&ovs, &org, key, b).zugriff;
+                            assert_eq!(zugriff, alte_entscheidung(&ovs, &org, key, b), "{fall}");
                             assert_eq!(
-                                modul_freigabe(&ov, &org, key, b).zugriff,
-                                fordere_modul_zugriff(&ov, &org, key, b).is_ok(),
-                                "{key} sichtbar={sichtbar} ov={ov_rolle:?} org={org_rolle:?}"
+                                fordere_modul_zugriff(&ovs, &org, key, b).is_ok(),
+                                zugriff,
+                                "{fall}"
                             );
                         }
                     }

@@ -10,6 +10,8 @@ import { istModulFreigegeben, modulRegistry } from './modulRegistry';
 interface Args {
   einsatzId: number;
   freigaben?: ModulFreigaben;
+  /** Der Abruf der Freigaben ist gescheitert (nicht bloß: lädt noch). */
+  freigabenGescheitert?: boolean;
 }
 
 const GEFAHREN_MODUL = modulRegistry.find((m) => m.key === 'gefahrenzonen');
@@ -27,8 +29,12 @@ const GEFAHREN_MODUL = modulRegistry.find((m) => m.key === 'gefahrenzonen');
  * Das Gefahrenmodul wird ohne Freigabe NICHT abgefragt — dieselbe Frage wie die
  * Navigation (`istModulFreigegeben`). Die Meldungs-Hälfte filtert der Server selbst: ohne
  * Meldungsrecht fehlt das Feld.
+ *
+ * FAIL-SAFE ohne Freigaben (LFH-669): scheitert ihr Abruf, weiß niemand, ob ein Gebiet akut
+ * ist. Abgefragt wird trotzdem nicht (Spec `modul-freigabe`); stattdessen meldet der Hook die
+ * Warnung, und der Regler hält den Warnboden, bis die Freigaben wieder da sind.
  */
-export function useAktiveWarnung({ einsatzId, freigaben }: Args): boolean {
+export function useAktiveWarnung({ einsatzId, freigaben, freigabenGescheitert }: Args): boolean {
   const gefahrenFrei =
     GEFAHREN_MODUL !== undefined && istModulFreigegeben(GEFAHREN_MODUL, freigaben);
 
@@ -44,6 +50,8 @@ export function useAktiveWarnung({ einsatzId, freigaben }: Args): boolean {
     queryFn: () => ladeModulZaehler(einsatzId),
     select: (z) => z.meldungen?.bestaetigung_ueberfaellig,
   }).data;
+
+  if (freigabenGescheitert && freigaben === undefined) return true;
 
   return aktiveWarnung({
     // Wird das Modul während der Sitzung ausgeblendet, bliebe der Cache stehen — ohne
