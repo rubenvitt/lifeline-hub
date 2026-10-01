@@ -8,7 +8,7 @@
 //! eines Einsatzes `GET /api/live`), ihre Wire-Namen sind deshalb disjunkt (Guard unten).
 //!
 //! Org-Ereignisse tragen keine `id:` und keinen Replay: sie bedeuten nur „neu laden", und das
-//! Frontend lädt nach jedem Wiederaufbau ohnehin nach (design.md D4). Die Nutzlast ist leer.
+//! Frontend lädt nach jedem Wiederaufbau ohnehin nach (LFH-734, design.md D4). Die Nutzlast ist leer.
 //! Spec `openspec/specs/org-live/`.
 
 use crate::auth::Benutzer;
@@ -34,7 +34,7 @@ wire_enum! {
 /// Einsatz-Lebenszyklus); läuft ein Empfänger über, bekommt er `lagged` und lädt nach.
 pub const ORG_KANAL_KAPAZITAET: usize = 256;
 
-/// Die leere Nutzlast jedes Org-Ereignisses: keine Kennung, keine Daten (design.md D3).
+/// Die leere Nutzlast jedes Org-Ereignisses: keine Kennung, keine Daten (LFH-734, design.md D3).
 pub const ORG_NUTZLAST: &str = "{}";
 
 /// Wer eine Org-Nachricht erhalten darf.

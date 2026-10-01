@@ -23,7 +23,7 @@ export interface LiveVerbindungOptionen {
   /**
    * Läuft nur beim ersten `open`. Beim Wechsel zwischen Einsatz- und Org-Strom (LFH-734) kann
    * ein Org-Ereignis zwischen beiden Verbindungen verloren gehen; der neue Strom gleicht deshalb
-   * gleich zu Beginn die Org-Keys ab (design.md D4 der Change `lfh-734-org-live-ereignis`).
+   * gleich zu Beginn die Org-Keys ab (`openspec/changes/archive/2026-10-01-lfh-734-org-live-ereignis/design.md`, D4).
    */
   beimErstenOpen?: () => void;
 }

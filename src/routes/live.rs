@@ -2,7 +2,7 @@
 //!
 //! Der Einsatz-Feed trägt die Org-Ereignisse (`einsatzliste`, `stammdaten`) mit, damit ein Tab
 //! im Einsatz bei EINER Verbindung bleibt; außerhalb eines Einsatzes öffnet das Frontend den
-//! Org-Strom `GET /api/live` (design.md D1 der Change `lfh-734-org-live-ereignis`).
+//! Org-Strom `GET /api/live` (`openspec/changes/archive/2026-10-01-lfh-734-org-live-ereignis/design.md`, D1).
 //!
 //! EINE Tür (Lesezugriff auf den Einsatz) und ein **Filter je Event** nach den erlaubten
 //! Modulen — sonst läse, wer irgendeinen Stream öffnen darf, jedes Event mit, inkl. ETB- und
@@ -47,7 +47,7 @@ pub async fn stream(
     let stream = crate::routes::support::sse_stream_mit_replay(replay, rx, move |ev| {
         ev.sichtbar_fuer(&erlaubt)
     })
-    // Org-Ereignisse ohne `id:` und ohne Replay (design.md D4); gefiltert gegen den Benutzer,
+    // Org-Ereignisse ohne `id:` und ohne Replay (LFH-734, design.md D4); gefiltert gegen den Benutzer,
     // nicht gegen die Modulrechte des Einsatzes.
     .merge(crate::routes::support::sse_org_stream(
         org_rx,

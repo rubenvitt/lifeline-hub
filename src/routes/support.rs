@@ -276,7 +276,7 @@ pub fn sse_event_stream(
 /// Gefiltert wird hier, pro Verbindung, gegen den Schnappschuss `abonnent`
 /// ([`OrgAbonnent::sieht`]). Org-Ereignisse gehen **ohne** `id:` hinaus: so bleibt die
 /// `Last-Event-ID` des Browsers die des letzten Einsatz-Ereignisses, und der Replay des
-/// Einsatz-Kanals bleibt unberührt (design.md D4). Ein Überlauf wird wie im Einsatz-Kanal zu
+/// Einsatz-Kanals bleibt unberührt (LFH-734, design.md D4). Ein Überlauf wird wie im Einsatz-Kanal zu
 /// `lagged`, der Client lädt dann alles nach.
 pub fn sse_org_stream(
     rx: Receiver<OrgNachricht>,

@@ -231,7 +231,7 @@ struct Kanal {
 pub struct LiveHub {
     kanaele: Arc<RwLock<HashMap<i64, Kanal>>>,
     /// Prozessweiter Org-Kanal (LFH-734): Org-Ereignisse aller Organisationen, gefiltert erst
-    /// beim Abonnenten ([`org::OrgAbonnent::sieht`]). Ohne Ring und ohne Id (design.md D4).
+    /// beim Abonnenten ([`org::OrgAbonnent::sieht`]). Ohne Ring und ohne Id (LFH-734, design.md D4).
     org: broadcast::Sender<org::OrgNachricht>,
     /// Prozess-Epoch (Prozessstart). Teil jeder Nachrichten-Id; ein Neustart erzeugt eine
     /// andere Epoch → Replay über einen Neustart hinweg wird als `Luecke` erkannt.

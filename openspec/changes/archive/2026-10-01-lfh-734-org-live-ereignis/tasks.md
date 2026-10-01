@@ -55,5 +55,13 @@ und `requesting-code-review`.
 
 ## 9. Integration
 
-- [ ] 9.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR` im Scratchpad) vollständig grün, Log nach „ÜBERSPRUNGEN" durchsehen. Belegt durch die CI des Merge-PR (`ci.yml` ruft `check-all.sh`).
-- [ ] 9.2 `/opsx:archive lfh-734-org-live-ereignis` im selben Branch vor dem PR.
+- [x] 9.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR` im Scratchpad) vollständig grün, Log nach „ÜBERSPRUNGEN" durchsehen. Belegt durch die CI des Merge-PR (`ci.yml` ruft `check-all.sh`).
+  Lokaler Lauf 01.10.2026 (Cloud-Container, `CARGO_INCREMENTAL=0`, `CARGO_PROFILE_DEV_DEBUG=0` wegen
+  Plattenkontingent; Chromium-Headless 1194 statt 1234): Schritte 1–3, 5 (604 Dateien, 8271 Tests),
+  6, 8–13 grün. Schritt 4: alle Server-Testbinaries grün, rot nur der Bau der Desktop-Hülle (keine
+  GTK-Bibliotheken im Container). Schritt 7: rot bleiben 16 Fälle (`fokus-verdeckung`,
+  `leisten-flaeche`, `gate3-trefflaeche`, `etb-chronologie`, Anhang-Downloads `etb-anhang`,
+  `schaden-anhaenge`), auf `origin/alpha` mit derselben Umgebung identisch rot, also Umgebung;
+  drei weitere (Chat, Dokumente, Palette) waren nur unter Last rot und laufen einzeln grün.
+  `org-live.spec.ts` und `einsatzkopf-live.spec.ts` grün. „ÜBERSPRUNGEN“: nur `cargo-audit`.
+- [x] 9.2 `/opsx:archive lfh-734-org-live-ereignis` im selben Branch vor dem PR.

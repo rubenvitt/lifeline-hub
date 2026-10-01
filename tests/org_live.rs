@@ -1,8 +1,8 @@
 //! Org-Ereignisse `einsatzliste` und `stammdaten` (LFH-734).
 //!
 //! Transport (Org-Strom `GET /api/live`, Mitführen im Einsatz-Strom), Auslöser und Empfänger.
-//! Spec: `openspec/specs/org-live/`, Herleitung in der Change `lfh-734-org-live-ereignis`,
-//! `design.md`.
+//! Spec: `openspec/specs/org-live/`, Herleitung in
+//! `openspec/changes/archive/2026-10-01-lfh-734-org-live-ereignis/design.md`.
 
 use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
