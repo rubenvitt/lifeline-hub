@@ -327,12 +327,13 @@ function paneel(titel: string): HTMLElement {
 }
 
 /**
- * Die Innenkante der Kennzahl (zweiter Kanal zur Tonfarbe). Sie sitzt an der Rasterzelle: mit
- * Ziel ist das die Hülle um den eingerückten Link (LFH-630), ohne Ziel die Kennzahl selbst.
+ * Die Innenkante der Kennzahl (zweiter Kanal zur Tonfarbe). Mit Ziel liegt sie als Auflage in
+ * der Rasterzelle um den eingerückten Link (LFH-630), ohne Ziel an der Kennzahl selbst.
  */
 function kante(el: HTMLElement): number {
-  const zelle = el.closest<HTMLElement>('[data-lfh="kennzahl-zelle"]') ?? el;
-  const m = zelle.style.boxShadow.match(/inset (\d+)px/);
+  const zelle = el.closest<HTMLElement>('[data-lfh="kennzahl-zelle"]');
+  const traeger = zelle ? zelle.querySelector<HTMLElement>('[data-lfh="kennzahl-kante"]') : el;
+  const m = (traeger?.style.boxShadow ?? '').match(/inset (\d+)px/);
   return m ? Number(m[1]) : 0;
 }
 

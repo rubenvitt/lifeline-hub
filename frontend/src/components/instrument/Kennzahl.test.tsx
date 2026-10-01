@@ -186,12 +186,29 @@ describe('Kennzahl — Abstand zwischen Zielen (LFH-630, Bedien-Leitlinie Kriter
     expect(hoehe('handschuh')).toBe(72);
   });
 
-  it('die Eskalationskante sitzt am Zellrand, nicht an der eingerückten Trefffläche', () => {
-    const { zelle, ziel } = kennzahlZielStil(farbenHell, tokenFuer('handschuh'), 'alarm', 'daten');
-    expect(zelle.boxShadow).toBe(`inset 6px 0 0 0 ${farbenHell.alarm}`);
-    expect(ziel.boxShadow).toBeUndefined();
-    const laden = kennzahlZielStil(farbenHell, tokenFuer('handschuh'), 'alarm', 'laden');
-    expect(laden.zelle.boxShadow).toBeUndefined();
+  it('die Eskalationskante ist eine Auflage am Zellrand — weder Zelle noch Trefffläche tragen sie', () => {
+    for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const { zelle, ziel, kante } = kennzahlZielStil(
+        farbenHell,
+        tokenFuer(stufe),
+        'alarm',
+        'daten',
+      );
+      // Am Zellgrund läge sie UNTER der Hover-Tönung des Links (kompakt: ganz verdeckt).
+      expect(zelle.boxShadow, stufe).toBeUndefined();
+      expect(ziel.boxShadow, stufe).toBeUndefined();
+      expect(zelle.position, stufe).toBe('relative');
+      expect(kante, stufe).toMatchObject({
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        boxShadow: `inset 6px 0 0 0 ${farbenHell.alarm}`,
+      });
+    }
+    const achtung = kennzahlZielStil(farbenHell, tokenFuer('kompakt'), 'achtung', 'daten');
+    expect(achtung.kante?.boxShadow).toBe(`inset 3px 0 0 0 ${farbenHell.achtung}`);
+    expect(kennzahlZielStil(farbenHell, tokenFuer('kompakt'), 'alarm', 'laden').kante).toBeNull();
+    expect(kennzahlZielStil(farbenHell, tokenFuer('kompakt'), 'bedien', 'daten').kante).toBeNull();
   });
 
   const imHandschuh = (ui: ReactElement) =>
@@ -218,8 +235,18 @@ describe('Kennzahl — Abstand zwischen Zielen (LFH-630, Bedien-Leitlinie Kriter
     expect(zelle).toHaveAttribute('data-lfh', 'kennzahl-zelle');
     expect(zelle).toHaveClass('lfh-kennzahl');
     expect(zelle.style.padding).toBe('8px');
-    expect(zelle.style.boxShadow).toMatch(/^inset 3px 0(px)? 0(px)? /);
+    expect(zelle.style.boxShadow).toBe('');
     expect(link.style.boxShadow).toBe('');
+    // Die Kante liegt NACH dem Link im DOM und damit über seiner Hover-Tönung.
+    const kante = zelle.querySelector<HTMLElement>('[data-lfh="kennzahl-kante"]')!;
+    expect(kante).toHaveAttribute('aria-hidden', 'true');
+    expect(kante.previousElementSibling).toBe(link);
+    expect(kante.style.boxShadow).toMatch(/^inset 3px 0(px)? 0(px)? /);
+  });
+
+  it('ohne Eskalationston keine Kantenauflage', () => {
+    imHandschuh(<Kennzahl titel="A" wert={1} ton="bedien" ziel="/x" />);
+    expect(document.querySelector('[data-lfh="kennzahl-kante"]')).toBeNull();
   });
 
   it('auch im Zustand `laden` bleibt die Zelle mit Ziel ein eingerückter Link', () => {

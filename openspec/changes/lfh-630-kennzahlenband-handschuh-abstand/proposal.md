@@ -24,8 +24,8 @@ mit einem leichten Versatz auf „Kräfte“.
 - **Hover und Fokus zeigen die Trefffläche:** Die Hover-Tönung (`flaeche3`) und der
   Fokusrahmen liegen auf dem Link-Block, nicht auf der ganzen Zelle. Im Handschuh-Betrieb sieht
   man damit, wo ein Tippen wirkt.
-- **Eskalationskante bleibt an der Zelle:** Die 3- bzw. 6-px-Innenkante für `achtung`/`alarm`
-  sitzt weiter am Zellrand.
+- **Eskalationskante bleibt am Zellrand:** Die 3- bzw. 6-px-Innenkante für `achtung`/`alarm`
+  sitzt weiter am Zellrand und liegt über der Hover-Tönung, auch in `kompakt`.
 - **Nachweis:** Gate 3 (`e2e/gate3-trefflaeche.spec.ts`) misst auf dem Lage-Dashboard den
   kleinsten Abstand zwischen den sechs Kennzahl-Links: ≥ 16 px in `handschuh`, ≥ 8 px in
   `komfortabel`. Unit-Tests pinnen Einzug und Polsterung mit Literalen.

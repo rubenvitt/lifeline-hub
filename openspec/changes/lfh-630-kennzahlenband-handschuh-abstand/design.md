@@ -80,24 +80,32 @@ derselbe. `kompakt` bleibt bei 0: dort gilt die Spacing-Ausnahme der Leitlinie (
 ### D3 · Aufbau der klickbaren Zelle
 
 ```
-<div class="lfh-kennzahl" data-lfh="kennzahl-zelle"      ← Rasterzelle: flaeche, Kante, padding e
-     style="padding: e; box-shadow: inset …">
+<div class="lfh-kennzahl" data-lfh="kennzahl-zelle"      ← Rasterzelle: flaeche, padding e,
+     style="position: relative; padding: e">                position: relative
   <Link class="lfh-kennzahl__ziel" data-lfh="kennzahl"   ← Trefffläche: Inhalt, minHeight,
         data-ton=… aria-label=…>                            Polsterung − e
     Augenbraue · Zahl · Notiz
   </Link>
+  <span data-lfh="kennzahl-kante" aria-hidden            ← nur bei achtung/alarm: Auflage
+        style="position:absolute; inset:0;                  über dem Link, ohne Treffer
+               pointer-events:none; box-shadow: inset …"/>
 </div>
 ```
 
 - Der **Link behält** `data-lfh="kennzahl"`, `data-ton` und `aria-label`. Alle Selektoren in
   Tests und e2e treffen weiter die Trefffläche; Gate 3 misst also genau das, was man tippt.
-- Die **Zelle** bekommt die Eskalationskante (`boxShadow`), den Grund (`.lfh-kennzahl`) und
-  `padding: e`. Die Kante bleibt so am Zellrand, wo sie heute steht.
+- Die **Zelle** bekommt den Grund (`.lfh-kennzahl`) und `padding: e`.
+- Die **Eskalationskante** wird eine Auflage nach dem Link (`inset: 0`,
+  `pointer-events: none`, derselbe `inset`-Schatten wie bisher). Sie bleibt so am Zellrand,
+  nimmt keinen Treffer und kein Layout. Am Zellgrund selbst ginge das nicht: ein
+  `inset`-Schatten malt unter den Kindern seines Elements, die Hover-Tönung des Links deckte
+  ihn in `kompakt` (Einzug 0) ganz und in `komfortabel` zur Hälfte der Alarmkante zu
+  (Review-Fund während der Umsetzung, im Browser gegengeprüft).
 - Der Link bekommt `kennzahlStil` mit um `e` verringerter Polsterung
   (`paddingBlock: padding − e`, `paddingInline: paddingLG − e`) und unverändert
   `minHeight: controlHeight`. Außenmaß der Zelle = Inhalt + Polsterung wie heute.
-- Die Aufteilung steht in einer zweiten reinen Funktion (`kennzahlZielStil` o. ä., Name bei
-  der Umsetzung), damit Einzug, Restpolsterung und Kante ohne Render prüfbar sind.
+- Die Aufteilung steht in einer zweiten reinen Funktion (`kennzahlZielStil`, liefert
+  `zelle`, `ziel`, `kante`), damit Einzug, Restpolsterung und Kante ohne Render prüfbar sind.
   `kennzahlStil` selbst bleibt für Zellen **ohne** Ziel unverändert.
 - `style` des Aufrufers geht an das Element, das `kennzahlStil` trägt (ohne Ziel die Zelle,
   mit Ziel der Link) — wie heute „überschreibt den Zellstil“. Kein heutiger Aufrufer mit
@@ -109,8 +117,9 @@ derselbe. `kompakt` bleibt bei 0: dort gilt die Spacing-Ausnahme der Leitlinie (
 `sprache.css`: `.lfh-kennzahl--ziel:hover` / `:focus-visible` wandern auf
 `.lfh-kennzahl__ziel` (Hover `flaeche-3`, Fokus 2 px `bedien`, `outline-offset: -2px`,
 `cursor: pointer`). Der Link ist sonst transparent, die Zelle zeigt ihren Grund. In `kompakt`
-deckt der Link die Zelle, das Bild ist gleich wie heute. In `handschuh` tönt der Hover nur die
-Trefffläche: man sieht den 8-px-Rand, auf dem ein Tippen nichts auslöst.
+deckt der Link die Zelle, das Bild ist gleich wie heute; die Kante liegt als Auflage (D3) über
+der Tönung. In `handschuh` tönt der Hover nur die Trefffläche: man sieht den 8-px-Rand, auf dem
+ein Tippen nichts auslöst.
 
 Verworfen: Hover über `:has(> a:hover)` auf die ganze Zelle legen. Das sähe wie heute aus,
 würde aber den Rand als trefferfähig ausgeben.
@@ -124,8 +133,9 @@ würde aber den Rand als trefferfähig ausgeben.
   berechnete Fuge: `getComputedStyle(band).columnGap === '1px'` (die Fuge bleibt eine Fuge).
 - **Unit** (`Kennzahl.test.tsx`): `kennzahlZielEinzug` mit Literalen je Stufe und die
   Ungleichung `2e + 1 ≥ 16` bzw. `≥ 8`; Restpolsterung + Einzug = Polsterung der Zelle ohne
-  Ziel (keine optische Verschiebung); Kante sitzt an der Zelle; Render: mit Ziel ist der Link
-  Kind von `[data-lfh="kennzahl-zelle"]` und trägt `data-ton`.
+  Ziel (keine optische Verschiebung); die Kante ist eine Auflage und weder Zelle noch Link
+  tragen sie; Render: mit Ziel ist der Link Kind von `[data-lfh="kennzahl-zelle"]`, trägt
+  `data-ton`, und die Kantenauflage steht nach ihm im DOM.
 - **Mutationsprobe** statt Abdeckung: Einzug testweise auf 0 → Gate-3-Block rot, danach
   zurück.
 

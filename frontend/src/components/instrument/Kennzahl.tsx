@@ -67,9 +67,10 @@ import '../../theme/sprache.css';
  * ≥ 16 px. Die Fuge bleibt deshalb 1 px, und der Link rückt INNERHALB seiner Rasterzelle um
  * {@link kennzahlZielEinzug} (0 / 4 / 8 px) von jedem Rand ab: zwischen zwei Treffflächen liegen
  * Zellfläche, Fuge, Zellfläche. Die Polsterung des Links sinkt um denselben Betrag, Zahl und
- * Notiz stehen also wie ohne Ziel. Die Zelle (`data-lfh="kennzahl-zelle"`) trägt Grund und
- * Eskalationskante, der Link Inhalt, Treffhöhe und die Prüfanker (`data-lfh="kennzahl"`,
- * `data-ton`). Hover und Fokus liegen als `.lfh-kennzahl__ziel` in `sprache.css` auf dem Link:
+ * Notiz stehen also wie ohne Ziel. Die Zelle (`data-lfh="kennzahl-zelle"`) trägt den Grund, der
+ * Link Inhalt, Treffhöhe und die Prüfanker (`data-lfh="kennzahl"`, `data-ton`), eine Auflage
+ * nach dem Link die Eskalationskante (`data-lfh="kennzahl-kante"`, siehe
+ * {@link kennzahlZielStil}). Hover und Fokus liegen als `.lfh-kennzahl__ziel` in `sprache.css` auf dem Link:
  * die Tönung zeigt, wo ein Tippen wirkt, der Rand bleibt still. Herleitung und verworfene
  * Wege (breitere Fuge, Kacheln):
  * `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`.
@@ -174,30 +175,35 @@ export function kennzahlZielEinzug(token: { controlHeight: number }): number {
 
 /**
  * Stile der klickbaren Zelle — rein und exportiert. `zelle` ist die Fläche im Fugenraster
- * (Einzug als Polsterung, Eskalationskante am Zellrand), `ziel` der Link mit dem Zellstil aus
- * {@link kennzahlStil}, dessen Polsterung um den Einzug sinkt.
+ * (Einzug als Polsterung), `ziel` der Link mit dem Zellstil aus {@link kennzahlStil}, dessen
+ * Polsterung um den Einzug sinkt, `kante` die Eskalationskante als Auflage (`null` ohne Kante).
+ *
+ * WARUM EINE AUFLAGE: ein `inset`-Schatten malt über dem Grund SEINES Elements, aber unter
+ * dessen Kindern. An der Zelle verdeckte ihn die Hover-Tönung des Links — in `kompakt` (Einzug
+ * 0, Maus am Fükw) ganz, in `komfortabel` zur Hälfte der Alarmkante. Die Auflage steht nach dem
+ * Link, deckt die Zelle (`inset: 0`), nimmt keinen Treffer und kein Layout: die Kante bleibt am
+ * Zellrand und über jeder Tönung.
  */
 export function kennzahlZielStil(
   rollen: Pick<Farbrollen, 'text' | 'achtung' | 'alarm'>,
   token: { controlHeight: number; padding: number; paddingLG: number; marginXS: number },
   ton: KennzahlTon,
   zustand: KennzahlZustand,
-): { zelle: CSSProperties; ziel: CSSProperties } {
+): { zelle: CSSProperties; ziel: CSSProperties; kante: CSSProperties | null } {
   const einzug = kennzahlZielEinzug(token);
   const { boxShadow, ...zellstil } = kennzahlStil(rollen, token, ton, zustand);
   return {
-    zelle: {
-      display: 'flex',
-      minWidth: 0,
-      padding: einzug,
-      ...(boxShadow != null ? { boxShadow } : {}),
-    },
+    zelle: { position: 'relative', display: 'flex', minWidth: 0, padding: einzug },
     ziel: {
       ...zellstil,
       flex: '1 1 auto',
       paddingBlock: token.padding - einzug,
       paddingInline: token.paddingLG - einzug,
     },
+    kante:
+      boxShadow != null
+        ? { position: 'absolute', inset: 0, pointerEvents: 'none', boxShadow }
+        : null,
   };
 }
 
@@ -313,7 +319,7 @@ export function Kennzahl({
   // neutral, wie Farbe und Kante.
   const datenTon: KennzahlTon = zustand === 'daten' ? ton : 'neutral';
   if (ziel != null) {
-    const { zelle, ziel: zielStil } = kennzahlZielStil(rollen, token, ton, zustand);
+    const { zelle, ziel: zielStil, kante } = kennzahlZielStil(rollen, token, ton, zustand);
     return (
       <div className="lfh-kennzahl" data-lfh="kennzahl-zelle" style={zelle}>
         <Link
@@ -326,6 +332,7 @@ export function Kennzahl({
         >
           {inhalt}
         </Link>
+        {kante != null && <span aria-hidden="true" data-lfh="kennzahl-kante" style={kante} />}
       </div>
     );
   }
