@@ -165,6 +165,27 @@ describe('Fernmeldeskizze — Kanten', () => {
     expect(knoten.textContent).not.toMatch(/TMO TMO|DMO dmo/i);
   });
 
+  it('zeigt zwei Sprechgruppen gleicher Bezeichnung beide (einsatzlokal und Stammdaten)', () => {
+    const fehler = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stamm = sg(40, 'TMO', '311');
+    const lokal = { ...sg(41, 'TMO', '311'), einsatz_lokal: true };
+    const skizze = baueFernmeldeskizze(
+      [abschnitt(1, { name: 'EA Ost', sprechgruppen: [stamm, lokal] })],
+      [],
+    );
+    renderMitProviders(
+      <FernmeldeskizzeBild
+        einsatzId={1}
+        skizze={skizze}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+    expect(within(knotenVon('EA Ost')).getAllByText('TMO 311')).toHaveLength(2);
+    expect(fehler.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+    fehler.mockRestore();
+  });
+
   it('nennt den fehlenden gemeinsamen Kanal als Wort, das Zeichen ist verborgen', () => {
     bild();
     const k = kante('Gruppe 1')!;

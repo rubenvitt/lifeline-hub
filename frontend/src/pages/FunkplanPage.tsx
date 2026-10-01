@@ -311,14 +311,15 @@ function SkizzenBereich({
 }) {
   const { token, rollen } = useRollen();
   if (abschnitte === 'laden') return <SeitenSkeleton />;
-  if (abschnitte !== 'daten' || skizze == null) {
-    const grund = abschnitte === 'daten' ? ZUSTAND_GRUND.laden : ZUSTAND_GRUND[abschnitte];
+  if (abschnitte !== 'daten') {
     return (
       <Typography.Paragraph style={{ color: rollen.gedaempft }}>
-        {`Keine Skizze darstellbar — Abschnitte: ${grund}`}
+        {`Keine Skizze darstellbar — Abschnitte: ${ZUSTAND_GRUND[abschnitte]}`}
       </Typography.Paragraph>
     );
   }
+  // Mit geladenen Abschnitten und gewählter Skizze ist sie gebaut.
+  if (skizze == null) return null;
   return (
     <>
       {einheiten !== 'daten' && (
@@ -413,13 +414,19 @@ export default function FunkplanPage() {
   const spalten = useMemo(() => funkplanSpalten(druckt), [druckt]);
 
   // ── Darstellung (LFH-625 D1, D6) ────────────────────────────────────────────────────────────
-  const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, FunkplanAnsicht>>({});
+  // Sichtvorgabe ?ansicht= apply-then-clean wie auf der Abschnittsseite. Schon der erste Zustand
+  // liest sie, sonst stünde mit warmem Cache für ein Bild die Tabelle da (Review LFH-625). Geräumt
+  // wird auch ein unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, FunkplanAnsicht>>(
+    () => {
+      const vorgabe = parseFunkplanAnsicht(searchParams);
+      return vorgabe ? { [einsatzId]: vorgabe } : {};
+    },
+  );
   const ansicht = ansichtNachEinsatz[einsatzId] ?? 'tabelle';
   const setzeAnsicht = (a: FunkplanAnsicht) =>
     setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
-  // Sichtvorgabe ?ansicht= apply-then-clean wie auf der Abschnittsseite. Geräumt wird auch ein
-  // unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
-  const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (!searchParams.has('ansicht')) return;
     const vorgabe = parseFunkplanAnsicht(searchParams);
@@ -430,16 +437,17 @@ export default function FunkplanPage() {
   }, [searchParams, setSearchParams, einsatzId]);
 
   // Ohne Abschnitte gibt es keine Skizze: ihre Einheiten stünden sonst fälschlich „Ohne
-  // Abschnitt“ (design.md D5). Fehlen nur die Einheiten, zeigt sie die Abschnitte.
+  // Abschnitt“ (design.md D5). Fehlen nur die Einheiten, zeigt sie die Abschnitte. Gebaut wird
+  // sie nur, solange sie gezeigt wird: das Modell rechnet je Abschnitt die Stärke mit.
   const skizze = useMemo(
     () =>
-      abschnitte.zustand === 'daten'
+      ansicht === 'skizze' && abschnitte.zustand === 'daten'
         ? baueFernmeldeskizze(
             abschnitte.daten,
             einheiten.zustand === 'daten' ? einheiten.daten : null,
           )
         : null,
-    [abschnitte, einheiten],
+    [ansicht, abschnitte, einheiten],
   );
   const [skizzeZugeklappt, setSkizzeZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const skizzeKlappbar = useMemo(
@@ -486,7 +494,11 @@ export default function FunkplanPage() {
     sprechgruppenQuery.dataUpdatedAt,
   );
 
-  const umfang = UMFANG.filter((u) => quellen[u.quelle].zustand === 'daten')
+  // Die Skizze zeigt keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review LFH-625).
+  const umfang = UMFANG.filter(
+    (u) =>
+      quellen[u.quelle].zustand === 'daten' && !(ansicht === 'skizze' && u.quelle === 'fahrzeuge'),
+  )
     .map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`)
     .join(' · ');
 
@@ -494,10 +506,11 @@ export default function FunkplanPage() {
   const fehlend = fehlendeQuellen(quellen).filter((f) => f.zustand !== 'laden');
 
   const abschnittZiel = (aid: number) => einsatzabschnittePfad(einsatzId, { abschnitt: aid });
-  // Eine Verbindung wird an der unteren Stelle gepflegt: dort wird die Sprechgruppe zugeordnet.
+  // Beide Enden stehen da, sonst läse sich der Treffer wie „ohne Sprechgruppe“. Der Verweis führt
+  // zur unteren Stelle: dort wird die Sprechgruppe zugeordnet.
   const verbindungTreffer = (v: Verbindung) => ({
     key: `${v.unten.art}-${v.unten.id}`,
-    name: v.unten.name,
+    name: `${v.unten.name} → ${v.oben.name}`,
     ziel:
       v.unten.art === 'abschnitt'
         ? abschnittZiel(v.unten.id)

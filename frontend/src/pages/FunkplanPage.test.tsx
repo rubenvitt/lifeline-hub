@@ -547,6 +547,27 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     expect(eingabe.abschnitte?.[0].text).toContain('Verbindungen ohne gemeinsame Sprechgruppe');
   });
 
+  it('zeigt mit ?ansicht=skizze die Tabelle nie, auch nicht im ersten Bild', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    const tabellen: number[] = [];
+    const beobachter = new MutationObserver(() =>
+      tabellen.push(container.querySelectorAll('.ant-table').length),
+    );
+    beobachter.observe(container, { childList: true, subtree: true });
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    beobachter.disconnect();
+    expect(Math.max(0, ...tabellen)).toBe(0);
+  });
+
+  it('zählt im Umfang der Skizze keine Fahrzeuge, die sie nicht zeigt', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
+    await screen.findByRole('region', { name: 'Fernmeldeskizze' });
+    expect(druckkopf(container)).toHaveTextContent('2 Abschnitte · 1 Einheiten');
+    expect(druckkopf(container)).not.toHaveTextContent('Fahrzeuge');
+    await userEvent.click(screen.getByRole('radio', { name: 'Tabelle' }));
+    expect(druckkopf(container)).toHaveTextContent('2 Fahrzeuge');
+  });
+
   it('nennt bei gesperrten Abschnitten den Grund statt eines Sammelknotens', async () => {
     vi.mocked(listeAbschnitte).mockRejectedValue(new ApiError(403, 'verboten'));
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
@@ -575,7 +596,8 @@ describe('FunkplanPage — Lücke „Verbindungen ohne gemeinsame Sprechgruppe�
     await screen.findByText('Florian 1/42-1');
     const zeile = lueckenZeile('Verbindungen ohne gemeinsame Sprechgruppe');
     expect(within(zeile).getByText('1')).toBeInTheDocument();
-    expect(within(zeile).getByRole('link', { name: '1. Zug' })).toHaveAttribute(
+    // Beide Enden der Verbindung stehen da, der Verweis führt zur unteren Stelle.
+    expect(within(zeile).getByRole('link', { name: '1. Zug → Abschnitt Nord' })).toHaveAttribute(
       'href',
       '/einsaetze/1/einheiten/10',
     );

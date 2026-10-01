@@ -182,8 +182,10 @@ function KnotenInhalt({
           }}
         >
           <span style={meta}>{knoten.rufname ?? 'kein Rufname'}</span>
-          {sprechgruppenLabels(knoten.tmo, knoten.dmo).map((l) => (
-            <span key={l} style={{ ...meta, color: rollen.text }}>
+          {/* Schlüssel mit Stelle: zwei Sprechgruppen können dieselbe Bezeichnung tragen
+              (einsatzlokal und Stammdaten). */}
+          {sprechgruppenLabels(knoten.tmo, knoten.dmo).map((l, i) => (
+            <span key={`${i}-${l}`} style={{ ...meta, color: rollen.text }}>
               {l}
             </span>
           ))}
