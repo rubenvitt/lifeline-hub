@@ -1,5 +1,5 @@
 use crate::app::AppState;
-use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
+use crate::auth::session::{self, CurrentUser, SichererTransport, SESSION_COOKIE};
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use crate::extract::PfadParam;
@@ -25,7 +25,7 @@ pub struct LoginRequest {
     pub passwort: String,
 }
 
-/// Baut das Session-Cookie; `Secure` folgt dem Transport. Pur, damit beide Zweige ohne den
+/// Baut das Session-Cookie; `Secure` folgt dem Transport (`SichererTransport`, LFH-603). Pur, damit beide Zweige ohne den
 /// prozessweiten OnceLock testbar sind.
 ///
 /// Persistent mit `Max-Age` = Sitzungsdauer (LFH-779): ohne Ablaufangabe verwerfen Webviews
@@ -81,6 +81,7 @@ pub enum LoginAntwort {
 pub async fn login(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<LoginRequest>,
 ) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
@@ -156,7 +157,7 @@ pub async fn login(
         // noch niemand, den Abschluss protokolliert `totp_finish`.
         let key = session::neuer_token();
         crate::auth::totp::state::speichere(key.clone(), benutzer.id);
-        let jar = jar.add(mfa_pending_cookie(key, session::cookie_secure()));
+        let jar = jar.add(mfa_pending_cookie(key, secure));
         return Ok((
             jar,
             Json(LoginAntwort::MfaErforderlich {
@@ -166,7 +167,7 @@ pub async fn login(
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
+    let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,
         benutzername = %benutzer.benutzername,
@@ -465,6 +466,7 @@ fn oidc_state_binding_ok(cookie_state: Option<&str>, state_query: &str) -> bool 
 /// Redirect auf die Login-Seite mit generischem Hinweis. Setzt das `oidc_state`-Binding-Cookie.
 pub async fn oidc_start(
     State(state): State<AppState>,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     Query(query): Query<OidcStartQuery>,
 ) -> Result<(CookieJar, Redirect), AppError> {
@@ -507,10 +509,7 @@ pub async fn oidc_start(
     );
 
     // Binding-Cookie, s. `baue_oidc_state_cookie`.
-    let jar = jar.add(baue_oidc_state_cookie(
-        csrf.secret().clone(),
-        session::cookie_secure(),
-    ));
+    let jar = jar.add(baue_oidc_state_cookie(csrf.secret().clone(), secure));
     Ok((jar, Redirect::to(auth_url.as_str())))
 }
 
@@ -552,6 +551,7 @@ fn oidc_fehler_redirect() -> Redirect {
 /// propagieren als `AppError` (generisches 500, ohne IdP-Details).
 pub async fn oidc_callback(
     State(state): State<AppState>,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     Query(query): Query<OidcCallbackQuery>,
 ) -> Result<(CookieJar, Redirect), AppError> {
@@ -644,7 +644,7 @@ pub async fn oidc_callback(
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
+    let jar = jar.add(session_cookie(token, secure));
     Ok((jar, Redirect::to(&eintrag.ziel_pfad)))
 }
 
@@ -681,6 +681,7 @@ async fn webauthn_aktiv(pool: &SqlitePool) -> Result<bool, AppError> {
 pub async fn webauthn_register_start(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
 ) -> Result<(CookieJar, Json<CreationChallengeResponse>), AppError> {
     if !webauthn_aktiv(&state.pool).await? {
@@ -717,7 +718,7 @@ pub async fn webauthn_register_start(
         crate::auth::webauthn::state::CeremonyZustand::Registrierung(reg),
     );
 
-    let jar = jar.add(webauthn_reg_cookie(key, session::cookie_secure()));
+    let jar = jar.add(webauthn_reg_cookie(key, secure));
     Ok((jar, Json(ccr)))
 }
 
@@ -797,6 +798,7 @@ pub struct WebauthnAuthStartRequest {
 /// discoverable Login hat diesen Tradeoff nicht.
 pub async fn webauthn_auth_start(
     State(state): State<AppState>,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<WebauthnAuthStartRequest>,
 ) -> Result<(CookieJar, Json<RequestChallengeResponse>), AppError> {
@@ -834,7 +836,7 @@ pub async fn webauthn_auth_start(
         crate::auth::webauthn::state::CeremonyZustand::Authentifizierung(auth_state),
     );
 
-    let jar = jar.add(webauthn_auth_cookie(key, session::cookie_secure()));
+    let jar = jar.add(webauthn_auth_cookie(key, secure));
     Ok((jar, Json(rcr)))
 }
 
@@ -863,6 +865,7 @@ pub async fn webauthn_auth_start(
 /// Counter als Vergleichsbasis.
 pub async fn webauthn_auth_finish(
     State(state): State<AppState>,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(body): JsonBody<PublicKeyCredential>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
@@ -932,7 +935,7 @@ pub async fn webauthn_auth_finish(
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    let jar = jar.add(session_cookie(token, secure));
     let jar = jar.remove(
         Cookie::build((WEBAUTHN_AUTH_COOKIE, ""))
             .path("/api/auth/webauthn")
@@ -965,6 +968,7 @@ fn webauthn_disc_cookie(key: String, secure: bool) -> Cookie<'static> {
 /// sichert ein künftiges Frontend ab, das den ganzen Wrapper übergäbe.
 pub async fn webauthn_discoverable_start(
     State(state): State<AppState>,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
 ) -> Result<(CookieJar, Json<RequestChallengeResponse>), AppError> {
     if !webauthn_aktiv(&state.pool).await? {
@@ -984,7 +988,7 @@ pub async fn webauthn_discoverable_start(
         crate::auth::webauthn::state::CeremonyZustand::AuthentifizierungDiscoverable(disc_state),
     );
 
-    let jar = jar.add(webauthn_disc_cookie(key, session::cookie_secure()));
+    let jar = jar.add(webauthn_disc_cookie(key, secure));
     Ok((jar, Json(rcr)))
 }
 
@@ -1004,6 +1008,7 @@ pub async fn webauthn_discoverable_start(
 pub async fn webauthn_discoverable_finish(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(body): JsonBody<PublicKeyCredential>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
@@ -1096,7 +1101,7 @@ pub async fn webauthn_discoverable_finish(
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    let jar = jar.add(session_cookie(token, secure));
     let jar = jar.remove(
         Cookie::build((WEBAUTHN_DISC_COOKIE, ""))
             .path("/api/auth/webauthn")
@@ -1239,6 +1244,7 @@ pub struct TotpFinishRequest {
 /// 4. Erst dann Session und Cookie, `mfa_pending` entfernen, 200 mit `BenutzerAnzeige`.
 pub async fn totp_finish(
     State(state): State<AppState>,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<TotpFinishRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
@@ -1286,7 +1292,7 @@ pub async fn totp_finish(
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    let jar = jar.add(session_cookie(token, secure));
     let jar = jar.remove(
         Cookie::build((MFA_PENDING_COOKIE, ""))
             .path("/api/auth")
@@ -1350,6 +1356,7 @@ pub async fn app_code_ausstellen(
 pub async fn app_code_einloesen(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
+    SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<AppCodeEinloesen>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
@@ -1412,7 +1419,7 @@ pub async fn app_code_einloesen(
         session::loeschen(&state.pool, alt.value()).await?;
     }
     let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,
         benutzername = %benutzer.benutzername,

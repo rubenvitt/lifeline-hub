@@ -189,18 +189,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    // `Secure` für alle Sitzungs- und Anmelde-Cookies: bei eigenem TLS und hinter einem TLS-Proxy
-    // (`--cookie-secure`, LFH-603). Vor beiden Serve-Zweigen, damit der HTTP-Zweig es auch kennt.
+    // `Secure` für alle Sitzungs- und Anmelde-Cookies erzwingen: bei eigenem TLS und mit
+    // `--cookie-secure` (LFH-603). Hinter einem TLS-Proxy mit `X-Forwarded-Proto` entscheidet
+    // ohnehin jede Anfrage selbst (`session::SichererTransport`). Vor beiden Serve-Zweigen.
     lifeline_hub::auth::session::set_cookie_secure(config.cookies_secure());
-    if let Some(variable) = config.https_origin_ohne_secure_cookie() {
-        tracing::warn!(
-            "{variable} nennt eine https-Adresse, aber die Cookies tragen kein `Secure`: weder \
-             --tls noch --cookie-secure (LIFELINE_COOKIE_SECURE) ist gesetzt. Hinter einem \
-             TLS-Proxy gehört --cookie-secure an, sonst geht das Sitzungs-Cookie bei einem \
-             http-Aufruf im Klartext mit."
-        );
-    }
-
     // Demo-Daten: der Schalter reist als Router-Option. Er öffnet einen harten Löschweg und steht
     // deshalb im Log.
     if config.demo_daten {

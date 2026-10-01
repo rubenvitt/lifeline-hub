@@ -11,8 +11,9 @@ use std::sync::OnceLock;
 /// Name des Session-Cookies.
 pub const SESSION_COOKIE: &str = "lifeline_sid";
 
-/// Prozessweiter `Secure`-Cookie-Schalter (`true` bei eigenem TLS oder hinter einem TLS-Proxy,
-/// `Config::cookies_secure`, LFH-603; ungesetzt `false`).
+/// Prozessweit erzwungenes `Secure` (`true` bei eigenem TLS oder `--cookie-secure`,
+/// `Config::cookies_secure`; ungesetzt `false`). Hinter einem TLS-Proxy entscheidet zusätzlich
+/// jede Anfrage selbst, s. [`SichererTransport`].
 /// OnceLock statt AppState-Feld, damit die Inline-Test-Konstruktionen unberührt bleiben.
 static COOKIE_SECURE: OnceLock<bool> = OnceLock::new();
 
@@ -21,9 +22,41 @@ pub fn set_cookie_secure(v: bool) {
     let _ = COOKIE_SECURE.set(v);
 }
 
-/// Ob Session-Cookies `Secure` tragen sollen (Default false → HTTP-Betrieb).
+/// Ob `Secure` prozessweit erzwungen ist (Default false → HTTP-Betrieb). Cookies beziehen
+/// `Secure` über [`SichererTransport`], nicht hierüber.
 pub fn cookie_secure() -> bool {
     *COOKIE_SECURE.get().unwrap_or(&false)
+}
+
+/// Ob ein TLS-terminierender Proxy die Anfrage als https weiterreicht: erster Wert von
+/// `X-Forwarded-Proto` ist `https`. Bei einer Proxy-Kette steht der Transport zum Browser vorn.
+pub fn weitergeleitet_als_https(headers: &axum::http::HeaderMap) -> bool {
+    headers
+        .get("x-forwarded-proto")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .is_some_and(|proto| proto.trim().eq_ignore_ascii_case("https"))
+}
+
+/// Ob die Cookies dieser Antwort `Secure` tragen (LFH-603): prozessweit erzwungen (`--tls`,
+/// `--cookie-secure`) oder weil ein TLS-Proxy (Traefik) die Anfrage als https weiterreicht.
+/// Ein direkter http-Aufruf (LAN, Dev) bekommt kein `Secure`, sonst legte der Browser das Cookie
+/// nicht ab und die Anmeldung schlüge fehl.
+///
+/// Anders als `X-Forwarded-For` (s. `crate::extract::PeerIp`) darf der Kopf hier ungeprüft
+/// gelten: Wer ihn fälscht, ändert nur das Cookie seiner eigenen Antwort. Der Browser eines
+/// anderen schickt ihn nicht, und Traefik überschreibt einen mitgeschickten Wert.
+#[derive(Debug, Clone, Copy)]
+pub struct SichererTransport(pub bool);
+
+impl<S: Send + Sync> FromRequestParts<S> for SichererTransport {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(SichererTransport(
+            cookie_secure() || weitergeleitet_als_https(&parts.headers),
+        ))
+    }
 }
 
 /// Erzeugt einen neuen, kryptografisch zufälligen Session-Token (64 Hex-Zeichen).
@@ -264,6 +297,45 @@ mod tests {
     #[test]
     fn cookie_secure_default_false() {
         assert!(!cookie_secure());
+    }
+
+    /// LFH-603: Nur ein `https` als erster Wert von `X-Forwarded-Proto` zählt. Bei einer
+    /// Proxy-Kette steht der Transport zum Browser vorn.
+    #[test]
+    fn weitergeleitet_als_https_liest_den_ersten_proto_wert() {
+        let kopf = |wert: &str| {
+            let mut h = axum::http::HeaderMap::new();
+            h.insert(
+                "x-forwarded-proto",
+                axum::http::HeaderValue::from_str(wert).unwrap(),
+            );
+            h
+        };
+        for ja in ["https", "HTTPS", " https ", "https, http", "https,http"] {
+            assert!(weitergeleitet_als_https(&kopf(ja)), "{ja:?} ist https");
+        }
+        for nein in ["http", "", "http, https", "wss", "httpsx"] {
+            assert!(
+                !weitergeleitet_als_https(&kopf(nein)),
+                "{nein:?} ist kein https"
+            );
+        }
+        assert!(
+            !weitergeleitet_als_https(&axum::http::HeaderMap::new()),
+            "ohne Kopf kein https"
+        );
+    }
+
+    /// Kein Cookie-Bau liest das prozessweite Flag an [`SichererTransport`] vorbei, sonst fiele
+    /// die Erkennung hinter dem Proxy für dieses Cookie still weg.
+    #[test]
+    fn cookies_nehmen_den_transport_der_anfrage() {
+        let quelle = include_str!("../routes/auth.rs");
+        assert_eq!(
+            quelle.matches(concat!("cookie_", "secure()")).count(),
+            0,
+            "routes/auth.rs: Secure über den Extractor `SichererTransport` beziehen"
+        );
     }
 
     #[test]

@@ -56,6 +56,55 @@ async fn login_cookie_lebt_so_lange_wie_die_serversitzung() {
     );
 }
 
+/// Login mit gesetztem `X-Forwarded-Proto`; liefert den `Set-Cookie`-Header-Wert.
+async fn login_hinter_proxy(app: &axum::Router, proto: &str) -> String {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/login")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header("x-forwarded-proto", proto)
+                .body(Body::from(
+                    r#"{"benutzername":"admin","passwort":"startpw12"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    resp.headers()
+        .get(header::SET_COOKIE)
+        .expect("Set-Cookie erwartet")
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
+/// LFH-603: Hinter einem TLS-Proxy (Traefik) kommt die Anfrage mit `X-Forwarded-Proto: https`;
+/// das Sitzungs-Cookie trägt dann `Secure`, ohne dass jemand einen Schalter setzt. Ein direkter
+/// http-Aufruf (LAN, Dev) bekommt es weiter ohne, sonst legte der Browser es nicht ab.
+#[tokio::test]
+async fn login_cookie_ist_secure_genau_hinter_tls_proxy() {
+    let app = setup().await;
+    let cookie = login_hinter_proxy(&app, "https").await;
+    assert!(cookie.contains("; Secure"), "Secure erwartet: {cookie}");
+
+    let cookie = login_hinter_proxy(&app, "http").await;
+    assert!(
+        !cookie.contains("Secure"),
+        "kein Secure über http: {cookie}"
+    );
+
+    let (_, cookie) = login(&app, "admin", "startpw12").await;
+    let cookie = cookie.expect("Set-Cookie erwartet");
+    assert!(
+        !cookie.contains("Secure"),
+        "kein Secure ohne Proxy: {cookie}"
+    );
+}
+
 #[tokio::test]
 async fn login_mit_falschem_passwort_ist_401() {
     let app = setup().await;
