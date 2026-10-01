@@ -98,6 +98,13 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl`), Kachel selbst nicht
   klickbar; Sortierung Abschnitt → Einheit → Funkrufname, nie Status; `fms_anker` 0–9 nur
   Beschleuniger (Doppelbelegung setzt nichts) (`docs/superpowers/specs/2026-09-23-lfh-642-pruefliste.md`).
+- **Organigramm der Führungsorganisation** (LFH-626, `pages/einsatzabschnitte/Organigramm.tsx`,
+  `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
+  `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
+  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, LFH-625 setzt seine
+  Kommunikationsebene darauf); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
+  „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe; Layout aus CSS, erste Ebene als
+  Spalten-Grid (`SPALTE_MIN_PX`, gemessen), tiefer senkrecht — keine Graph-Bibliothek.
 - `Datensicht` bricht fest bei `md`; die Prop `tabelleAb` hält `datensicht.guard.test.ts` fern.
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
   (`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`).

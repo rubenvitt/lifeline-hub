@@ -435,15 +435,40 @@ export function parseFahrzeugeAnsicht(params: URLSearchParams): FahrzeugeAnsicht
     : undefined;
 }
 
-/** Einsatzabschnitte; `?abschnitt=` selektiert, `?neu=1` öffnet den Entwurf eines neuen. */
+/**
+ * Darstellung der Seite Einsatzabschnitte: Gliederung (Baum + Detail) oder Organigramm der
+ * Führungsorganisation (LFH-626). Das Organigramm ist eine ANSICHT dieses Moduls, kein eigenes —
+ * Daten, Freigabe und Live-Ereignis hängen am Schlüssel `einsatzabschnitte` (Muster FMS-Tableau).
+ */
+export type AbschnitteAnsicht = 'gliederung' | 'organigramm';
+
+/**
+ * Einsatzabschnitte; `?abschnitt=` selektiert, `?neu=1` öffnet den Entwurf eines neuen.
+ * `ansicht` ist ein AUFTRAG wie bei {@link fahrzeugePfad} (apply-then-clean).
+ */
 export function einsatzabschnittePfad(
   einsatzId: number,
-  opts: { abschnitt?: number; neu?: boolean } = {},
+  opts: { abschnitt?: number; neu?: boolean; ansicht?: AbschnitteAnsicht } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'einsatzabschnitte'), {
     abschnitt: opts.abschnitt,
     neu: opts.neu ? 1 : undefined,
+    ansicht: opts.ansicht,
   });
+}
+
+/** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
+const ABSCHNITTE_ANSICHT_ERLAUBT: Record<AbschnitteAnsicht, true> = {
+  gliederung: true,
+  organigramm: true,
+};
+
+/** Umkehr von {@link einsatzabschnittePfad}: ein unbekannter Wert wird GANZ verworfen. */
+export function parseAbschnitteAnsicht(params: URLSearchParams): AbschnitteAnsicht | undefined {
+  const ansicht = params.get('ansicht');
+  return ansicht && Object.prototype.hasOwnProperty.call(ABSCHNITTE_ANSICHT_ERLAUBT, ansicht)
+    ? (ansicht as AbschnitteAnsicht)
+    : undefined;
 }
 
 export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}): string {

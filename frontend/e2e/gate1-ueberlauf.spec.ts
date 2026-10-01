@@ -656,6 +656,23 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
     },
     {
+      // Organigramm der Führungsorganisation (LFH-626): Ansicht der Seite Einsatzabschnitte, über
+      // die Sichtvorgabe geöffnet. Datenanker ist die gesäte Einheit mit langem Namen IM
+      // Organigramm (die Gliederung zeigt sie nicht).
+      pfad: `/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`,
+      anker: (p: Page) =>
+        p.getByRole('region', { name: 'Organigramm' }).getByRole('link', {
+          name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+        }),
+      lesend: {
+        vorbedingung: (p: Page) =>
+          expect(
+            p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+            'Vorbedingung: ohne Schreibrecht keine Übernahme',
+          ).toHaveCount(0),
+      },
+    },
+    {
       // Pressearbeit S5 (LFH-554): die Karte des gesäten Medienkontakts im Presse-Log.
       pfad: `/einsaetze/${einsatzId}/stab/presse`,
       anker: (p: Page) => p.getByText(`${PRESSE_MEDIUM} · ${PRESSE_THEMA}`),

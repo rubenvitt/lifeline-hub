@@ -40,6 +40,7 @@ import {
   fahrzeugePfad,
   parseFahrzeugeAnsicht,
   einsatzabschnittePfad,
+  parseAbschnitteAnsicht,
   meldungenPfad,
   nachforderungenPfad,
   parseNachforderungVorbelegung,
@@ -379,6 +380,18 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('einsatzabschnittePfad mit ?neu=1', () => {
     expect(einsatzabschnittePfad(E, { neu: true })).toBe('/einsaetze/5/einsatzabschnitte?neu=1');
     expect(einsatzabschnittePfad(E, { neu: false })).toBe('/einsaetze/5/einsatzabschnitte');
+  });
+  it('einsatzabschnittePfad mit ?ansicht= (Organigramm, LFH-626)', () => {
+    expect(einsatzabschnittePfad(E, { ansicht: 'organigramm' })).toBe(
+      '/einsaetze/5/einsatzabschnitte?ansicht=organigramm',
+    );
+  });
+  it('parseAbschnitteAnsicht liest beide Ansichten und verwirft einen unbekannten Wert GANZ', () => {
+    expect(parseAbschnitteAnsicht(new URLSearchParams('ansicht=organigramm'))).toBe('organigramm');
+    expect(parseAbschnitteAnsicht(new URLSearchParams('ansicht=gliederung'))).toBe('gliederung');
+    expect(parseAbschnitteAnsicht(new URLSearchParams('ansicht=quatsch'))).toBeUndefined();
+    expect(parseAbschnitteAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();
+    expect(parseAbschnitteAnsicht(new URLSearchParams(''))).toBeUndefined();
   });
   it('meldungenPfad mit ?meldung=', () => {
     expect(meldungenPfad(E, { meldung: 11 })).toBe('/einsaetze/5/meldungen?meldung=11');
