@@ -46,6 +46,7 @@ import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deepli
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
+import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useWarnsperre } from '../theme/ThemeModeProvider';
 
@@ -420,6 +421,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         )}
         <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+            {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
+               Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
+               Zeitzone und Zeitformat des Einsatzes trägt. */}
+            <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} overrides={modulOverrides} />
             <Outlet />
           </EinsatzAnzeigeProvider>
         </Content>

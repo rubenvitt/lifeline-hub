@@ -44,7 +44,8 @@ describe('useModulZaehler (LFH-612)', () => {
     // Ein fehlendes Feld bleibt fehlend — keine erfundene 0.
     expect(result.current.auftraege).toBeUndefined();
     // Genau die eine Zählabfrage für die Serverquellen, nie die Listen. Dazu kommen nur die drei
-    // Browser-Zähler, die ihre eigene Modulliste lesen und nicht in der Serverantwort stehen.
+    // Browser-Zähler, die ihre eigene Modulliste lesen und nicht in der Serverantwort stehen. Das
+    // Wetter fragt erst nach geladenen Overrides (LFH-663, hier fehlen sie).
     await waitFor(() => expect(angefragt).toHaveLength(4));
     expect([...angefragt].sort()).toEqual([
       '/api/einsaetze/7/abloesungen',

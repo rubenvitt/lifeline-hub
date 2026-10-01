@@ -15,6 +15,8 @@ import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { adminFixture } from '../test/fixtures';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
+// Der Unwetter-Wächter hängt am Modulzähler-Modul und hat eigene Tests (`wetter/`, LFH-663).
+vi.mock('../wetter/UnwetterHinweis', () => ({ default: () => null }));
 
 /**
  * Der gemerkte Rahmen-Zustand wird gegen ein HANDGESCHRIEBENES Literal geprüft, sonst prüfte

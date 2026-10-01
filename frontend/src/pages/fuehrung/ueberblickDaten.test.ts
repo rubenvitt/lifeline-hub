@@ -396,6 +396,39 @@ describe('Nächste Marken', () => {
     ]);
   });
 
+  it('führt angekündigte Unwetterwarnungen als Marke bis zu ihrem Beginn (LFH-663)', () => {
+    const iso = (min: number) => JETZT.add(min, 'minute').toISOString();
+    const w = (stufe: 'maessig' | 'schwer' | 'extrem', ereignis: string, beginnMin: number) => ({
+      stufe,
+      ereignis,
+      ueberschrift: ereignis,
+      beginn: iso(beginnMin),
+      ende: iso(beginnMin + 180),
+    });
+    const r = naechsteMarken(
+      [auftrag({ id: 101, auftrag_text: 'Frist', frist_at: nach(45) })],
+      [],
+      null,
+      JETZT,
+      [],
+      [],
+      [
+        w('schwer', 'ORKANBÖEN', 120),
+        // Dieselbe Warnung zweimal (zwei Ausgaben) → eine Marke.
+        w('schwer', 'ORKANBÖEN', 120),
+        w('extrem', 'EXTREMES GEWITTER', 20),
+        w('schwer', 'DAUERREGEN', -10),
+        w('maessig', 'STURMBÖEN', 60),
+      ],
+    );
+    expect(r.marken.map((m) => [m.art, m.text, m.ton, m.wort])).toEqual([
+      ['unwetter', 'Extremes Unwetter: Extremes Gewitter', 'achtung', 'in 20 min'],
+      ['auftrag', 'Frist', 'neutral', 'in 45 min'],
+      ['unwetter', 'Unwetterwarnung: Orkanböen', 'neutral', 'in 2 h 00 min'],
+    ]);
+    expect(r.marken.some((m) => m.ton === 'alarm')).toBe(false);
+  });
+
   it('deckelt auf sechs und zählt den Rest', () => {
     const viele = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => auftrag({ frist_at: nach(i * 10) }));
     const r = naechsteMarken(viele, [], null, JETZT);

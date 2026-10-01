@@ -383,6 +383,102 @@ describe('AlarmZentrale', () => {
   });
 });
 
+describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
+  beforeEach(() => setzeViewportBreite(1366));
+
+  const unwetter = (detail: { schluessel: string; titel: string; beschreibung: string }) =>
+    window.dispatchEvent(new CustomEvent('lfh:unwetter-alarm', { detail }));
+
+  it('zeigt den Hinweis mit Stufenwort und Zeitraum und springt zur Modulseite', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    act(() =>
+      unwetter({
+        schluessel: 'schwer|SCHWERES GEWITTER',
+        titel: 'Unwetterwarnung',
+        beschreibung: 'Schweres Gewitter, ab 17:00 · bis 20:00',
+      }),
+    );
+    expect(await screen.findByText('Unwetterwarnung')).toBeInTheDocument();
+    expect(screen.getByText('Schweres Gewitter, ab 17:00 · bis 20:00')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/wetter-pegel');
+  });
+
+  it('ein neuer Unwetterhinweis ersetzt den sichtbaren älteren — ein Platz im Budget', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    act(() =>
+      unwetter({
+        schluessel: 'schwer|SCHWERES GEWITTER',
+        titel: 'Unwetterwarnung',
+        beschreibung: 'Schweres Gewitter, ab 17:00 · bis 20:00',
+      }),
+    );
+    expect(await screen.findByText('Unwetterwarnung')).toBeInTheDocument();
+    act(() =>
+      unwetter({
+        schluessel: 'extrem|ORKANBÖEN',
+        titel: 'Extremes Unwetter',
+        beschreibung: 'Orkanböen, ab 18:00 · bis 22:00',
+      }),
+    );
+    expect(await screen.findByText('Extremes Unwetter')).toBeInTheDocument();
+    await warteBisNotificationWeg('Unwetterwarnung');
+    expect(screen.getAllByRole('button', { name: 'Öffnen' })).toHaveLength(1);
+  });
+
+  it('unterliegt dem gemeinsamen Budget: drei Sofortmeldungen und ein Unwetter → Zusammenfassung', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    act(() => {
+      for (let id = 1; id <= 3; id += 1) {
+        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: id } }));
+      }
+      unwetter({
+        schluessel: 'schwer|DAUERREGEN',
+        titel: 'Unwetterwarnung',
+        beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
+      });
+    });
+    expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
+    expect(screen.getByText('Unwetterwarnung')).toBeInTheDocument();
+  });
+
+  it('dasselbe Paar erneut, während sein alter Hinweis gebündelt ist: der neue erscheint', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    const detail = {
+      schluessel: 'schwer|DAUERREGEN',
+      titel: 'Unwetterwarnung',
+      beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
+    };
+    act(() => {
+      unwetter(detail);
+      for (let id = 1; id <= 3; id += 1) {
+        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: id } }));
+      }
+    });
+    expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
+    expect(screen.queryByText('Unwetterwarnung')).not.toBeInTheDocument();
+    act(() => unwetter({ ...detail, beschreibung: 'Dauerregen, seit 15:00 · bis 23:00' }));
+    expect(await screen.findByText('Dauerregen, seit 15:00 · bis 23:00')).toBeInTheDocument();
+  });
+
+  it('die Zusammenfassung bietet den Weg zu Wetter & Pegel, wenn ein Unwetter darin steckt', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    act(() => {
+      unwetter({
+        schluessel: 'schwer|DAUERREGEN',
+        titel: 'Unwetterwarnung',
+        beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
+      });
+      for (let id = 1; id <= 3; id += 1) {
+        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: id } }));
+      }
+    });
+    expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Wetter & Pegel' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/wetter-pegel');
+  });
+});
+
 /**
  * Die Kopfzeile auf dem Handschirm: zwei beschriftete Ziele passen auf 390 px nicht (180 px
  * verfügbar, 286 nötig) und brächen um. Die Beschriftung darf nicht zur Ikone werden, deshalb
