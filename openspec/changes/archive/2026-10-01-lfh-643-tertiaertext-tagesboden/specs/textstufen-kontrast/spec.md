@@ -53,16 +53,18 @@ liegen.
 - **WHEN** jemand `schwach` so weit abdunkelt, dass es weniger als 5 ΔL\* von `gedaempft` entfernt liegt
 - **THEN** schlägt der Wächter der Textstufen fehl
 
-### Requirement: Nur Gesperrtes unterschreitet den Textboden
+### Requirement: Eine Textstufe unterschreitet den Boden nur, wenn sie Gesperrtes trägt
 
-Text unter dem Textboden SHALL es nur für gesperrte, nicht bedienbare Einträge geben. Er MUST
+Text in einer Textstufe (`text`, `text2`, `gedaempft`, `schwach`) SHALL den Textboden nur
+unterschreiten, wenn er einen gesperrten, nicht bedienbaren Eintrag beschriftet. Dann MUST er
 mindestens 4,5 : 1 halten, und die Sperre MUST zusätzlich ein Zeichen ohne Farbe tragen. Für
-Tertiärtext gibt es keine Ausnahme.
+Tertiärtext gibt es keine Ausnahme. Text in Status- oder Bedienfarben regelt diese Fähigkeit
+nicht.
 
 #### Scenario: Browser-Gate ohne Tertiär-Ausnahme
 
 - **WHEN** ein Kontrast-Gate einer Seite jeden Text im Inhalt misst
-- **THEN** gilt für Text in der Stufe `schwach` dieselbe Schranke wie für jeden anderen Text (Tag 7, Nacht 5), nicht 4,5
+- **THEN** gilt für Text in der Stufe `schwach` dieselbe Schranke wie für die übrigen Textstufen (Tag 7, Nacht 5), nicht 4,5
 
 #### Scenario: Gesperrter Rahmeneintrag
 

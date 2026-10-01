@@ -59,7 +59,7 @@ Verworfen:
 - **B — eigener Tertiärboden Tag 6 / Nacht 5** (`schwach` Tag `#4c545d`, min. 6,02). Die Leiter
   bliebe heller (L\* 35,3), aber 6 : 1 hat weder in WCAG noch in der Prüfliste eine Grundlage.
   Die Ausnahmelisten in vier Gates blieben dauerhaft. Auch B müsste `gedaempft` abdunkeln
-  (`#3c434c`), sonst lägen die Stufen nur 2,4 ΔL\* auseinander. Die Umstimmung bliebe also
+  (`#3c434c`), sonst lägen die Stufen nur 2,5 ΔL\* auseinander. Die Umstimmung bliebe also
   fast gleich groß, nur ohne einheitliche Regel.
 - **C — Status quo als Boden 4,5 (WCAG AA) festschreiben.** Kein sichtbarer Eingriff. Damit
   würde aber die Ausnahme zur Regel, Platzhalter als einzige Beschriftung blieben bei Tageslicht
@@ -91,9 +91,9 @@ am Tag flacher: der Bereich L\* 6–40 schrumpft auf 6–31. Das ist der Preis f
 ### D3 — Nacht: nur `schwach`, auf `#838b94`
 
 `#7d858e` → `#838b94`: auf jeder deckenden Nachtfläche ≥ 5,11 (`flaeche3`), auf `flaeche2`
-(Dialog) etwa 5,2, auf `grund` 5,77. L\* 57,5, also 8,8 unter `gedaempft` (66,3). Das ist der
-kleinste Schritt der Achse, der den Nachtboden überall hält, und die Nachtpalette bleibt nahe am
-Entwurf.
+(Dialog) etwa 5,2, auf `grund` 5,77. L\* 57,5, also 8,8 unter `gedaempft` (66,3). Der kleinste
+Schritt der Achse, `#828a93`, hielte auf `flaeche3` nur 5,04; `#838b94` lässt eine Stufe Puffer,
+und die Nachtpalette bleibt nahe am Entwurf.
 
 `rahmenFarben.gesperrt` bleibt an `farbenDunkel.schwach` gekoppelt. Die Prüfungen in
 `rahmenKontrast.test.ts` halten weiter (Leistengrund ≥ 4,5, Luminanzabstand zu `gedaempft`

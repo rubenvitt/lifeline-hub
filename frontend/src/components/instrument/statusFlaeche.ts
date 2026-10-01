@@ -25,7 +25,7 @@ import type { Farbrollen } from '../../theme/tokens';
  *
  * `neutral` hat keine Statusfläche — `flaeche3` + `text2`. Seit LFH-643 hielten auch `gedaempft`
  * und `schwach` dort den Boden (Tag 8,62 / 7,05, Nacht 6,83 / 5,11); `text2` bleibt, damit das
- * neutrale Zustandswort nicht schwächer wirkt als die übrigen (alle ≥ 6,89).
+ * neutrale Zustandswort nachts nicht schwächer wirkt als die übrigen (alle ≥ 6,89).
  *
  * `kante` ist die Rollenfarbe für einen Rahmen, der sich vom Grund abhebt (WCAG 1.4.11,
  * ≥ 3 : 1 — `kraefte-kontrast.spec.ts` prüft ihn am `StatusTag`): Tag normal 5,96 · bedien

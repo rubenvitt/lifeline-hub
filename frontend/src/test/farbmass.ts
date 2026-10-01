@@ -1,7 +1,8 @@
 /**
  * Farbmaße für Tests, gerechnet statt behauptet: relative Leuchtdichte und Kontrast nach WCAG 2.x,
- * CIELAB (D65) für Helligkeit L* und Farbabstand ΔE (CIE76). Eine Quelle für die Theme-Tests
- * (`theme/textstufen.test.ts`, `theme/rahmenKontrast.test.ts`, `theme/statusFarben.test.ts`).
+ * CIELAB (D65) für Helligkeit L* und Farbabstand ΔE (CIE76). Eine Quelle für die Farbtests
+ * (`theme/textstufen.test.ts`, `theme/rahmenKontrast.test.ts`, `theme/statusFarben.test.ts`,
+ * `components/instrument/statusFlaeche.test.ts`).
  *
  * Nimmt nur deckende Farben als `#rrggbb`; Durchscheinendes ist kein Textgrund und wird im
  * Browser gegen den tatsächlich gerenderten Grund gemessen (`e2e/kontrast-kern.ts`).

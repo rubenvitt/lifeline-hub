@@ -65,8 +65,9 @@ interface Textknoten {
 }
 
 /** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text, als Locator über eine Messmarke,
- *  dazu ob es im Primärknopf steht (Ausnahme LFH-661). Unsichtbares wird übersprungen (die Dialoge tragen
- *  eingeklappte Felder per `forceRender`), die Bereiche werden deshalb vorher AUFGEKLAPPT. */
+ *  dazu ob es im Primärknopf steht (Ausnahme LFH-661). Unsichtbares wird übersprungen (die
+ *  Dialoge tragen eingeklappte Felder per `forceRender`), die Bereiche werden deshalb vorher
+ *  AUFGEKLAPPT. */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   const funde = await wurzel.evaluate((w) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))

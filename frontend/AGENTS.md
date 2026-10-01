@@ -144,8 +144,9 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `openspec/changes/archive/2026-10-01-lfh-643-tertiaertext-tagesboden/design.md`): `text`,
   `text2`, `gedaempft` und auch Tertiärtext `schwach` (Augenbraue, Meta, Platzhalter,
   Feldhilfe) halten auf jeder deckenden Fläche Tag ≥ 7 : 1, Nacht ≥ 5 : 1; benachbarte Stufen
-  liegen ≥ 5 ΔL\* auseinander (`theme/textstufen.test.ts`). Unter dem Boden nur Gesperrtes
-  (≥ 4,5, Sperre auch ohne Farbe). Kontrast-Gates führen keine Tertiär-Ausnahme.
+  liegen ≥ 5 ΔL\* auseinander (`theme/textstufen.test.ts`). Eine Textstufe unterschreitet
+  den Boden nur für Gesperrtes (≥ 4,5, Sperre auch ohne Farbe); Kontrast-Gates führen keine
+  Tertiär-Ausnahme.
 
 **Lagekarte** (auch `pages/LagekartePage.tsx`): `frontend/src/pages/lagekarte/AGENTS.md`.
 
