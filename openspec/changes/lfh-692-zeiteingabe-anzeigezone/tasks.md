@@ -65,10 +65,10 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
 
 ## 5. Führung, Kommunikation, Stab
 
-- [ ] 5.1 `meldungen/MeldungFormular.tsx`, `erinnerung/ErinnerungFormular.tsx` und
+- [x] 5.1 `meldungen/MeldungFormular.tsx`, `erinnerung/ErinnerungFormular.tsx` und
       `auftraege/AuftragFormular.tsx`: die `dayjsZuWire`-Kopien entfernen, die Felder laufen
       über den Baustein. Je Formular ein Test unter abweichender Zone für den gesendeten Wert.
-- [ ] 5.2 `kommunikation/gruppierung.ts:faelligGruppe` bekommt die Konventionen, die Aufrufer
+- [x] 5.2 `kommunikation/gruppierung.ts:faelligGruppe` bekommt die Konventionen, die Aufrufer
       `AuftraegeListe` und `ErinnerungenPage` reichen sie durch. Ein Test prüft das Szenario
       „Frist heute“.
 - [ ] 5.3 `stab/LagebesprechungModal.tsx` und `stab/lagebesprechungZustand.ts`:

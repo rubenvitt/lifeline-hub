@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 import ErinnerungFormular from './ErinnerungFormular';
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
 vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
@@ -89,5 +91,31 @@ describe('ErinnerungFormular — Serienerfassung', () => {
     await waitFor(() => expect(onAnlegen).toHaveBeenCalled());
     // Ohne `mutateAsync` in der Kette wäre der Wortlaut trotz Fehler-Toast weg.
     expect(screen.getByLabelText('Titel')).toHaveValue('Lagemeldung aller EA');
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. */
+describe('ErinnerungFormular — Fälligkeit in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('eine eingegebene 13:00 Berliner Zeit geht als 11:00 UTC hinaus', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />
+      </AnzeigeKonventionenProvider>,
+    );
+    await userEvent.type(screen.getByLabelText('Titel'), 'Lage');
+    const feld = screen.getByRole('textbox', { name: 'Fällig' });
+    await userEvent.click(feld);
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '2026-09-24 13:00');
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(
+        expect.objectContaining({ faellig_at: '2026-09-24 11:00:00' }),
+      ),
+    );
   });
 });

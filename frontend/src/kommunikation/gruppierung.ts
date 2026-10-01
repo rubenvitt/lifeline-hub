@@ -1,8 +1,6 @@
 /** Fälligkeits-Gruppierung der Kommunikations-Module: Überfällig → Heute → Später → Ohne Frist. */
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-
-dayjs.extend(utc);
+import dayjs, { type Dayjs } from 'dayjs';
+import { alsZeitpunkt, heuteInZone, tagInZone } from '../anzeige/zeitEingabe';
 
 export type FaelligGruppe = 'ueberfaellig' | 'heute' | 'spaeter' | 'ohne_frist';
 
@@ -19,12 +17,21 @@ export const GRUPPE_ORDNUNG: FaelligGruppe[] = ['ueberfaellig', 'heute', 'spaete
 /**
  * Ordnet einen Eintrag einer Fälligkeits-Gruppe zu.
  * `ueberfaellig` (server-/tick-getrieben) hat Vorrang vor der Frist-Auswertung.
- * `frist` ist ein UTC-Wirestring; verglichen wird gegen den lokalen Tag.
+ * `frist` ist ein UTC-Wirestring; verglichen wird der Kalendertag in der Anzeigezone `zone`
+ * (`null` = Browserzone), nicht der des Geräts (LFH-692, Spec `zeiteingabe`).
  */
-export function faelligGruppe(frist?: string | null, ueberfaellig?: boolean): FaelligGruppe {
+export function faelligGruppe(
+  frist?: string | null,
+  ueberfaellig?: boolean,
+  zone: string | null = null,
+  jetzt: Dayjs = dayjs(),
+): FaelligGruppe {
   if (ueberfaellig) return 'ueberfaellig';
-  if (!frist) return 'ohne_frist';
-  const lokal = dayjs.utc(frist).local();
-  if (lokal.isSame(dayjs(), 'day')) return 'heute';
-  return lokal.isBefore(dayjs(), 'day') ? 'ueberfaellig' : 'spaeter';
+  const zeitpunkt = alsZeitpunkt(frist);
+  if (!zeitpunkt) return 'ohne_frist';
+  // `YYYY-MM-DD` vergleicht als String chronologisch.
+  const tag = tagInZone(zeitpunkt, zone);
+  const heute = heuteInZone(zone, jetzt);
+  if (tag === heute) return 'heute';
+  return tag < heute ? 'ueberfaellig' : 'spaeter';
 }

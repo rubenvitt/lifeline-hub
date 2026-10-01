@@ -1,5 +1,7 @@
 import { IkoneBlitz, IkonePapierflieger } from '../ikonen';
-import { Button, Col, DatePicker, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { Button, Col, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
@@ -16,11 +18,6 @@ import type {
 } from '../api/types';
 
 const { TextArea } = Input;
-
-/** Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss'. */
-function dayjsZuWire(d: dayjs.Dayjs): string {
-  return d.utc().format('YYYY-MM-DD HH:mm:ss');
-}
 
 interface MeldungFormWerte {
   /** Strukturierter Absender: `einheit:<id>` bzw. `abschnitt:<id>`, leer = frei. */
@@ -132,7 +129,7 @@ export default function MeldungFormular({
       prioritaet: w.prioritaet,
       richtung: w.richtung,
       // Ereigniszeit Pflicht: leer ⇒ jetzt (Funk-Realität: meist „eben empfangen").
-      ereigniszeit: dayjsZuWire(w.ereigniszeit ?? dayjs()),
+      ereigniszeit: alsBackendZeit(w.ereigniszeit ?? dayjs()),
       bestaetigung_pflicht: w.bestaetigung_pflicht,
       bestaetigung_frist_min:
         w.bestaetigung_pflicht && w.frist_min != null ? w.frist_min : undefined,
@@ -266,8 +263,7 @@ export default function MeldungFormular({
         </Col>
         <Col xs={24} sm={8}>
           <Form.Item name="ereigniszeit" label="Ereigniszeit (≠ Erfassung)">
-            <DatePicker
-              showTime
+            <ZeitpunktEingabe
               style={{ width: '100%' }}
               format="YYYY-MM-DD HH:mm"
               placeholder="leer = jetzt"

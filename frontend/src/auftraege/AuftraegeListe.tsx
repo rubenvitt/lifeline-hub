@@ -1,4 +1,5 @@
 import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Alert, App, Button } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect, useState } from 'react';
@@ -197,6 +198,8 @@ export default function AuftraegeListe({
    * nur bei `in_arbeit`: „Vollzogen" geht ins ETB (append-only) und ist über diese Achse nicht
    * rücknehmbar — ein Knopf dafür liefe in ein 422.
    */
+  // „Heute fällig“ nach dem Kalendertag der Anzeigezone (LFH-692).
+  const { konventionen } = useAnzeigeKonventionen();
   const vollzugMutation = useMutation({
     mutationFn: ({
       auftragId,
@@ -238,7 +241,9 @@ export default function AuftraegeListe({
     (gruppe) => ({
       gruppe,
       auftraege: offene
-        .filter((a) => faelligGruppe(a.frist_at, a.ist_ueberfaellig) === gruppe)
+        .filter(
+          (a) => faelligGruppe(a.frist_at, a.ist_ueberfaellig, konventionen.zeitzone) === gruppe,
+        )
         .sort(vergleicheOffen),
     }),
   ).filter(({ auftraege }) => auftraege.length > 0);

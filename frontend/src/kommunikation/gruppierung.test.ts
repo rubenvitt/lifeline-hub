@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { faelligGruppe, GRUPPE_LABEL, GRUPPE_ORDNUNG } from './gruppierung';
+import { mitProzessZone } from '../test/prozessZone';
 
 dayjs.extend(utc);
 
@@ -43,5 +44,25 @@ describe('GRUPPE_LABEL / GRUPPE_ORDNUNG', () => {
   });
   it('sortiert ueberfaellig < heute < spaeter < ohne_frist', () => {
     expect(GRUPPE_ORDNUNG).toEqual(['ueberfaellig', 'heute', 'spaeter', 'ohne_frist']);
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`, Szenario „Frist heute“): der Kalendertag der Anzeigezone zählt. */
+describe('faelligGruppe — Tag der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  const JETZT = dayjs.utc('2026-07-14 23:30:00'); // Berlin: 15.07. 01:30
+
+  it('Frist 15.07. 08:00 Berliner Zeit ist in Berlin „heute“', () => {
+    expect(faelligGruppe('2026-07-15 06:00:00', false, 'Europe/Berlin', JETZT)).toBe('heute');
+  });
+
+  it('Frist 14.07. 23:00 Berliner Zeit ist dort schon gestern → überfällig', () => {
+    expect(faelligGruppe('2026-07-14 21:00:00', false, 'Europe/Berlin', JETZT)).toBe(
+      'ueberfaellig',
+    );
+  });
+
+  it('ohne Anzeigezone gilt der Tag des Browsers (hier UTC: 15.07. ist morgen)', () => {
+    expect(faelligGruppe('2026-07-15 06:00:00', false, null, JETZT)).toBe('spaeter');
   });
 });
