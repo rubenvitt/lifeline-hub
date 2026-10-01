@@ -262,6 +262,9 @@ pub fn download_client() -> reqwest::Client {
         .user_agent("LifelineHub-Kartendownload/1.0 (+https://github.com/)")
         .redirect(ssrf_redirect_policy())
         .dns_resolver(std::sync::Arc::new(crate::karte::proxy::SichererResolver))
+        // Byte-gleich auf die Platte: Größe, Fortschritt und sha256-Pin gelten den gelieferten
+        // Bytes, nicht einem entpackten Strom (LFH-599).
+        .no_gzip()
         .build()
         .expect("Download-Client baubar")
 }
@@ -538,6 +541,33 @@ mod tests {
             fortschritt.gesamt.load(Ordering::Relaxed),
             body.len() as u64,
             "Content-Length übernommen"
+        );
+    }
+
+    // LFH-599: ein Download landet byte-gleich auf der Platte, auch wenn die Quelle
+    // `Content-Encoding: gzip` meldet — der sha256-Pin gilt den gelieferten Bytes.
+    #[tokio::test]
+    async fn download_client_laedt_gzip_byte_gleich() {
+        use crate::karte::gzip_fixture;
+        let (url_str, mitschrift) = gzip_fixture::spawn().await;
+        let tmp = tempfile::tempdir().unwrap();
+        let ziel = tmp.path().join("gz.part");
+        let erg = lade_datei(
+            &download_client(),
+            Url::parse(&url_str).unwrap(),
+            &ziel,
+            &Fortschritt::default(),
+            Some(&erwarteter_hash(gzip_fixture::GZIP)),
+            MAX_DOWNLOAD_BYTES,
+        )
+        .await
+        .unwrap();
+        assert_eq!(std::fs::read(&ziel).unwrap(), gzip_fixture::GZIP);
+        assert_eq!(erg.groesse, gzip_fixture::GZIP.len() as i64);
+        assert_eq!(
+            *mitschrift.lock().unwrap(),
+            None,
+            "kein Accept-Encoding vom Download-Client"
         );
     }
 

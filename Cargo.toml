@@ -17,7 +17,11 @@ sqlx = { version = "0.9", features = ["runtime-tokio", "sqlite", "migrate", "sql
 libsqlite3-sys = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+# `gzip` (LFH-599): die Fachebenen-Quellen packen auf Anfrage (ODL 890 KB → 81 KB, PEGELONLINE
+# 754 KB → 71 KB). Das Feature schaltet Angebot und Entpacken für JEDEN Client per Vorgabe ein;
+# Clients, die Bytes durchreichen oder pinnen (Kachel-Proxy, Download), setzen `.no_gzip()`.
+# Brotli bot am 01.10.2026 nur Bright Sky an — kein eigenes Feature dafür.
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip"] }
 futures = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
