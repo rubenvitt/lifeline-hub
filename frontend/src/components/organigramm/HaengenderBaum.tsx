@@ -17,7 +17,7 @@ import './haengenderBaumPrint.css';
  * Gates und e2e beider Nutzer.
  *
  * Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`
- * (D3, D6) und `openspec/changes/lfh-625-fernmeldeskizze/design.md` (D4).
+ * (D3, D6) und `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` (D4).
  */
 
 /** Mindestbreite einer Spalte der ersten Ebene; gemessen vor dem Bau (LFH-626 D3, Nachtrag). */

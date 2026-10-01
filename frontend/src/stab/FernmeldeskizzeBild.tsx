@@ -12,7 +12,7 @@ import type { Kante } from './luecken';
 /**
  * Die Fernmeldeskizze des S6 (LFH-625) — die zweite Darstellung des Funkplans. Reine Darstellung
  * über dem geteilten Gerüst `HaengenderBaum`; Klappzustand und Modell kommen von der Seite.
- * Herleitung: `openspec/changes/lfh-625-fernmeldeskizze/design.md` (D5).
+ * Herleitung: `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` (D5).
  *
  * - **Wurzel ohne erfundene Gegenstelle** (LFH-849): „Gegenstelle nicht erfasst“, keine
  *   Stabsstelle — der Stab trägt keine Funkdaten.

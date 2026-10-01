@@ -19,7 +19,7 @@ import { verbindungsurteil, type Kante } from './luecken';
  *   eine Regel, die auch die Lücke im Funkplan zählt. Wurzeln und Kinder des Sammelknotens haben
  *   keine bekannte Gegenstelle: `ohne-urteil` (die eigene Führungsstelle ist kein Datum, LFH-849).
  *
- * Herleitung: `openspec/changes/lfh-625-fernmeldeskizze/design.md` (D2, D3).
+ * Herleitung: `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` (D2, D3).
  */
 
 export type SkizzenKnoten =

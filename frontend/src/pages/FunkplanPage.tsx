@@ -68,7 +68,7 @@ import './funkplanPrint.css';
  *   Zeile führt über ihre Kennung dorthin (D7).
  * - **Erreichbarkeit** ist personenbezogen: am Schirm ab `xl`, im Druck immer, im Lagebericht nie
  *   (D5, Entscheidung 30.09.2026).
- * - **Zwei Darstellungen** (LFH-625, `openspec/changes/lfh-625-fernmeldeskizze/design.md` D1, D6):
+ * - **Zwei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6):
  *   „Tabelle“ und „Skizze“ (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`). Dieselben Quellen,
  *   dasselbe Lücken-Paneel, dieselbe Übernahme; eine Druckwurzel, der Druckkopf nennt die aktive
  *   Darstellung. Die Klappzustände sind getrennt: die Tabelle kennt Fahrzeuge, die Skizze nicht.
