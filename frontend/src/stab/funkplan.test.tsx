@@ -362,11 +362,38 @@ describe('rendereFunkplanMarkdown', () => {
     expect(md).toContain('- Eigene Gegenstelle (Führungsstelle): nicht erfasst');
   });
 
+  it('nennt Verbindungen ohne gemeinsame Sprechgruppe nach den Erreichbarkeiten (LFH-625)', () => {
+    expect(md).toContain('- Verbindungen ohne gemeinsame Sprechgruppe: 0');
+    expect(md.indexOf('- Verbindungen ohne gemeinsame Sprechgruppe')).toBeGreaterThan(
+      md.indexOf('- Einheiten ohne Erreichbarkeit'),
+    );
+    expect(md.indexOf('- Verbindungen ohne gemeinsame Sprechgruppe')).toBeLessThan(
+      md.indexOf('- Einsatzlokale Sprechgruppen ohne Zuordnung'),
+    );
+    const q4 = quellen({
+      abschnitte: daten([
+        abschnitt(1, { name: 'EA_Nord', sprechgruppen: [sg(1, 'TMO', 'TMO 311')] }),
+      ]),
+      einheiten: daten([
+        einheit(10, {
+          name: '1. Zug',
+          abschnitt_id: 1,
+          sprechgruppen: [sg(2, 'DMO', 'DMO 505')],
+        }),
+      ]),
+    });
+    expect(funkplanLuecken(q4).verbindungenOhneGemeinsameSprechgruppe.treffer).toHaveLength(1);
+    expect(rendereFunkplanMarkdown(baueFunkplan(q4), 'X', funkplanLuecken(q4), q4)).toContain(
+      '- Verbindungen ohne gemeinsame Sprechgruppe: 1 (1. Zug → EA\\_Nord)',
+    );
+  });
+
   it('schreibt „—“ mit Grund statt einer Zahl, wenn eine Quelle fehlt', () => {
     const ohne = quellen({ einheiten: { zustand: 'gesperrt', daten: [] } });
     const text = rendereFunkplanMarkdown(baueFunkplan(ohne), 'X', funkplanLuecken(ohne), ohne);
     expect(text).toContain('- Einheiten ohne Sprechgruppe: — (nicht freigegeben)');
     expect(text).toContain('- Einsatzlokale Sprechgruppen ohne Zuordnung: — (nicht freigegeben)');
+    expect(text).toContain('- Verbindungen ohne gemeinsame Sprechgruppe: — (nicht freigegeben)');
   });
 
   it('nimmt die Erreichbarkeit nie mit (personenbezogen)', () => {
