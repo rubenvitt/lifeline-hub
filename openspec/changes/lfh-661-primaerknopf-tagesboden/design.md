@@ -12,8 +12,8 @@ Motivation: `proposal.md`, „Why“. Anforderungen: `specs/farbrollen-kontrast/
   (`outline: … var(--lfh-bedien)` in `sprache.css`, `EinsaetzePage.css`), gefüllte Checkbox,
   Schalter und gewählte Radioscheibe. `bedienHover` färbt zusätzlich den Kachellink der
   Einsatzübersicht unter dem Zeiger (`EinsaetzePage.css`).
-- Die Knopfschrift ist `dichten[…].schriftgroesse`, höchstens 15 px (Komfort- und
-  Handschuhstufe), Gewicht 600.
+- Die Knopfschrift folgt `dichten[…].schriftgroesse` (antds große Knöpfe eine Stufe darüber),
+  Gewicht 600; gemessen in der kompakten Stufe 13,5 px, der große Anmelde-Knopf 16 px.
 - Rechenwerte heute (Tag, WCAG): Weiß auf `bedien` `#1a5fa0` 6,59, auf `bedienHover` `#236aad`
   5,62. Nacht: `aufBedien` `#08090b` auf `bedien` `#4d94d6` 6,19, auf `bedienHover` `#7db3e8`
   höher.
@@ -45,8 +45,9 @@ Motivation: `proposal.md`, „Why“. Anforderungen: `specs/farbrollen-kontrast/
 Die Beschriftung auf Bedienfläche fällt unter den Tagesboden 7 : 1.
 
 - **Verworfen: eigener Boden 4,5 : 1 „wegen 600er-Gewicht“.** WCAG 1.4.3 senkt die Schwelle
-  nur für Großtext: 24 px normal oder 18,66 px fett. Die Knopfschrift erreicht höchstens 15 px
-  und ist damit in keiner Dichtestufe Großtext. Ein eigener Boden wäre eine Hausregel ohne
+  nur für Großtext: 24 px normal oder 18,66 px fett. Die Knopfschrift misst 13,5 px, der große
+  Anmelde-Knopf 16 px; sie ist kein Großtext. Der Browser-Spec sichert die Grenze zu (Schrift
+  < 18,66 px), damit die Begründung nicht still wegfällt. Ein eigener Boden wäre eine Hausregel ohne
   Normgrund, genau für den Text, der die folgenreichste Handlung der Seite trägt.
 - **Verworfen: dunkle Beschriftung auf dem heutigen Blau.** `#111418` auf `#1a5fa0` misst nur
   rund 2,8 : 1; ein Wechsel der Beschriftungsfarbe trägt bei einem mittleren Blau nicht.

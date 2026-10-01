@@ -15,7 +15,8 @@ bei Tageslicht im Freien gelesen.
 - **Entscheidung:** Die Beschriftung auf satter Bedienfläche bekommt **keinen eigenen Boden**;
   sie fällt unter den Textboden aus Kriterium 5 (Tag ≥ 7 : 1, Nacht ≥ 5 : 1), in Ruhe und unter
   dem Zeiger. Ein „Großtext“-Boden (4,5 : 1 nach WCAG 1.4.3) trägt nicht: die Knopfschrift ist
-  höchstens 15 px bei Gewicht 600, WCAG verlangt für fetten Großtext 18,66 px.
+  13,5 px, beim großen Anmelde-Knopf 16 px (Gewicht 600); WCAG verlangt für fetten Großtext
+  18,66 px.
 - **Tagpalette:** `farbenHell.bedien` wird dunkler, `farbenHell.bedienHover` ebenso; beide
   tragen Weiß ≥ 7 : 1, der Hover-Schritt bleibt so groß wie heute. Werte und Boden stehen am
   Wert in `theme/tokens.ts`, gespiegelt in `theme/rollen.css`.
