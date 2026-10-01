@@ -100,3 +100,43 @@ export function baueSpiderFc(
     legs: { type: 'FeatureCollection', features: legFeatures },
   };
 }
+
+/**
+ * Hat sich an den clusterbaren Markern nur der INHALT geändert — gleiche Schlüssel in gleicher
+ * Folge an gleicher Lage? Dann bildet die Clusterquelle dieselben Bündel, und ein offener Spider
+ * darf stehen bleiben (LFH-668, `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`,
+ * D5). Die Folge zählt mit: von ihr hängen die Bündel-Kennungen ab.
+ */
+export function nurInhaltGeaendert(
+  alt: MarkerFeatureCollection,
+  neu: MarkerFeatureCollection,
+): boolean {
+  if (alt.features.length !== neu.features.length) return false;
+  return alt.features.every((a, i) => {
+    const n = neu.features[i];
+    return (
+      a.properties.schluessel === n.properties.schluessel &&
+      a.geometry.coordinates[0] === n.geometry.coordinates[0] &&
+      a.geometry.coordinates[1] === n.geometry.coordinates[1]
+    );
+  });
+}
+
+/**
+ * Schreibt die Eigenschaften aufgefächerter Blätter neu, ohne sie zu bewegen: jedes Blatt behält
+ * seine Lage und nimmt die Eigenschaften des neuen Merkmals mit demselben `schluessel`. Synchron,
+ * damit zwischen altem und neuem Stand kein Bild ohne Blätter liegt (D5).
+ */
+export function aktualisiereSpiderBlaetter(
+  blaetter: MarkerFeatureCollection,
+  neu: MarkerFeatureCollection,
+): MarkerFeatureCollection {
+  const nach = new Map(neu.features.map((f) => [f.properties.schluessel, f.properties]));
+  return {
+    type: 'FeatureCollection',
+    features: blaetter.features.map((f) => {
+      const properties = nach.get(f.properties.schluessel);
+      return properties ? { ...f, properties: { ...properties } } : f;
+    }),
+  };
+}
