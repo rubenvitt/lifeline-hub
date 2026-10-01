@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
+import { mitProzessZone } from '../test/prozessZone';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { setzeViewportBreite } from '../test/viewport';
 import KraefteuebersichtPage, {
   aktiveFilterChips,
@@ -1087,5 +1089,31 @@ describe('KraefteuebersichtPage — Im Einsatz (LFH-552)', () => {
     const zelle = zeile(container, 'eh-20')!.querySelectorAll('td')[spalte];
     await waitFor(() => expect(listeEinheitenPerioden).toHaveBeenCalled());
     expect(zelle.textContent).toBe('');
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`, „Zeit in Texten“): die Stand-DTG im Lagebericht in der Anzeigezone. */
+describe('KraefteuebersichtPage — Stand der Übernahme in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('10:00 UTC steht als „Stand 141200JUL2026“ (Berlin) im Lagebericht', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-07-14T10:00:00Z'));
+    vi.mocked(legeLageberichtAn).mockClear();
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <Routes>
+          <Route path="/einsaetze/:id/kraefteuebersicht" element={<KraefteuebersichtPage />} />
+        </Routes>
+      </AnzeigeKonventionenProvider>,
+      { route: '/einsaetze/1/kraefteuebersicht' },
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
+    await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalled());
+    const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte[0].text;
+    expect(text).toContain('**Stand:** 141200JUL2026');
   });
 });

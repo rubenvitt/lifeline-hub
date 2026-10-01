@@ -39,7 +39,7 @@ import { Select } from '../components/Select';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { kettenKoepfe } from '../lageberichte/ketten';
 import { ART_REIHENFOLGE, MEDIENKONTAKT_ART_LABEL } from '../presse/labels';

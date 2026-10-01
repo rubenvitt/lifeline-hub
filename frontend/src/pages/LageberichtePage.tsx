@@ -3,7 +3,7 @@ import { Breadcrumb, Button, Form, Input, Spin, Typography, theme } from 'antd';
 import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import dayjs, { type Dayjs } from 'dayjs';
 import { Select } from '../components/Select';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
@@ -20,7 +20,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 /**
@@ -109,7 +109,7 @@ function lageberichtSpalten(einsatzId: number) {
   ]);
 }
 
-/** Werte des Anlegedialogs — `zeitstand` als lokale Picker-Zeit, UTC erst beim Senden. */
+/** Werte des Anlegedialogs — `zeitstand` als Zeitpunkt, UTC erst beim Senden (LFH-692). */
 interface AnlegenWerte {
   titel: string;
   vorlage: LageberichtVorlageKey;
@@ -159,7 +159,11 @@ export default function LageberichtePage() {
     // hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
   });
 
+  // Als Ref: der Vorschlag gilt beim ÖFFNEN; eine später geladene Zone darf einen schon getippten
+  // Titel nicht überschreiben (Review LFH-692, Muster `entwurf/useEntwurfVerlustschutz.ts`).
   const { formatiere } = useZeitEingabe();
+  const formatiereRef = useRef(formatiere);
+  formatiereRef.current = formatiere;
   /**
    * Der Titelvorschlag wird beim Öffnen in den Formularspeicher geschrieben, nicht über
    * `initialValues`: der Speicher von rc-field-form überlebt `destroyOnHidden`, und beim nächsten
@@ -173,8 +177,9 @@ export default function LageberichtePage() {
    * der alte Grund sonst ein Bild lang über einem frischen Formular stünde.
    */
   useEffect(() => {
-    if (anlegenOffen) form.setFieldsValue({ titel: titelVorschlag(dayjs(), formatiere) });
-  }, [anlegenOffen, form, formatiere]);
+    if (anlegenOffen)
+      form.setFieldsValue({ titel: titelVorschlag(dayjs(), formatiereRef.current) });
+  }, [anlegenOffen, form]);
 
   if (einsatzQuery.isLoading) {
     return (

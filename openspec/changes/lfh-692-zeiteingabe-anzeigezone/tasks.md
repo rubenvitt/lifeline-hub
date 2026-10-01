@@ -104,6 +104,14 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
       `etb/BausteinPlatzhalterModal.tsx`) schreiben die Gerätezeit in den ETB-Text; jetzt
       Anzeigezone. Test unter TZ=UTC mit Anzeigezone Europe/Berlin über den Tageswechsel.
 
+- [x] 6.7 Review-Findings (Workflow Review-find-verify, alle bestätigt): Picker-Wert mit stabiler
+      Identität (`usePickerWert`; ein Re-Render bei offenem Panel verwarf die unbestätigte Wahl —
+      Regressionstests Einzel und Bereich), Karten Auftrag/Erinnerung/Meldung und
+      `QuittungIndikator` über den gebundenen `formatZeit`, Stand-DTG der Kräfteübersicht mit
+      Konventionen, kein `size="small"` am Jetzt-Knopf (Dichte-Guard), Titelvorschlag über Ref,
+      veraltete Kommentare, Tests „Ungültige Zone“ (Baustein) und „Archivakte mit Einsatz-Zone“.
+      Reine Anzeigen ohne Eingabe → LFH-913.
+
 ## 7. Regel, Guard, Abschluss
 
 - [x] 7.1 `anzeige/zeitEingabe.guard.test.ts` nach D7 schreiben. Er muss auf dem Stand vor

@@ -3,6 +3,9 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import MeldungKarte from './MeldungKarte';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { formatZeit } from '../anzeige/format';
+import { mitProzessZone } from '../test/prozessZone';
 import type { Meldung } from '../api/types';
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
@@ -290,5 +293,53 @@ describe('MeldungKarte · Eingangszustand', () => {
     expect(parseFloat(inhalt.style.fontSize)).toBeGreaterThanOrEqual(15);
     expect(inhalt.style.lineHeight).toBe('1.5');
     expect(parseFloat(absender.style.fontSize)).toBeLessThan(parseFloat(inhalt.style.fontSize));
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`): Ereigniszeit, Frist und Quittung wie im Formular. */
+describe('MeldungKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+  const berlin = { zeitzone: 'Europe/Berlin' };
+
+  it('Ereigniszeit und Bestätigungsfrist stehen als Berliner Zeit da', () => {
+    render(
+      <AnzeigeKonventionenProvider konventionen={berlin}>
+        <MemoryRouter>
+          <MeldungKarte
+            meldung={meldung({
+              bestaetigung_pflicht: true,
+              bestaetigung_frist_at: '2026-06-12 09:30:00',
+            })}
+          />
+        </MemoryRouter>
+      </AnzeigeKonventionenProvider>,
+    );
+    expect(formatZeit('2026-06-12 09:00:00', berlin)).not.toBe(formatZeit('2026-06-12 09:00:00'));
+    expect(
+      screen.getByText(formatZeit('2026-06-12 09:00:00', berlin), { exact: false }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`Bestätigung offen bis ${formatZeit('2026-06-12 09:30:00', berlin)}`),
+    ).toBeInTheDocument();
+  });
+
+  it('die Quittierzeit steht als Berliner Zeit da', () => {
+    render(
+      <AnzeigeKonventionenProvider konventionen={berlin}>
+        <MemoryRouter>
+          <MeldungKarte
+            meldung={meldung({
+              bestaetigung_pflicht: true,
+              ist_bestaetigt: true,
+              bestaetigt_at: '2026-06-12 09:10:00',
+              bestaetigt_von_name: 'Anna',
+            })}
+          />
+        </MemoryRouter>
+      </AnzeigeKonventionenProvider>,
+    );
+    expect(
+      screen.getByText(formatZeit('2026-06-12 09:10:00', berlin), { exact: false }),
+    ).toBeInTheDocument();
   });
 });

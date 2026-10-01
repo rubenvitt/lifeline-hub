@@ -167,7 +167,7 @@ function ZeitpunktAngabe({
   );
 }
 
-/** Werte des Bearbeiten-Formulars (begonnen_at als lokale Picker-Zeit vor der UTC-Wandlung). */
+/** Werte des Bearbeiten-Formulars (`begonnen_at` als Zeitpunkt, vor der UTC-Wandlung; LFH-692). */
 interface FormWerte {
   bezeichnung: string;
   stichwort?: string;

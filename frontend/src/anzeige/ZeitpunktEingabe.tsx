@@ -82,12 +82,27 @@ function PanelFuss({ zone, onJetzt }: { zone: string | null; onJetzt?: () => voi
         <span />
       )}
       {onJetzt && (
-        <Button type="link" size="small" onClick={onJetzt}>
+        <Button type="link" onClick={onJetzt}>
           Jetzt
         </Button>
       )}
     </div>
   );
+}
+
+/**
+ * Picker-Wert mit STABILER Identität: ein neues Objekt nur bei einem anderen Zeitpunkt (Review
+ * LFH-692). rc-picker setzt Kalender- und Übernahmewert zurück, sobald `value` die Identität
+ * wechselt — ein Re-Render bei offenem Panel (Verpflegung: alle 30 s) verwürfe sonst eine noch
+ * nicht bestätigte Wahl. Primitive als Schlüssel, damit `exhaustive-deps` ohne Ausnahme trägt.
+ */
+function usePickerWert(
+  zeitpunkt: Dayjs | null | undefined,
+  zuPicker: (d: Dayjs) => Dayjs,
+): Dayjs | null | undefined {
+  const ms = zeitpunkt ? zeitpunkt.valueOf() : null;
+  const leer = zeitpunkt === null ? null : undefined;
+  return useMemo(() => (ms == null ? leer : zuPicker(dayjs(ms))), [ms, leer, zuPicker]);
 }
 
 type EinzelBasis = Omit<
@@ -139,7 +154,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   const zeitpunkt = gesteuert ? value : intern;
   const [offenIntern, setOffenIntern] = useState(false);
 
-  const pickerWert = zeitpunkt ? z.zuPicker(zeitpunkt) : zeitpunkt;
+  const pickerWert = usePickerWert(zeitpunkt, z.zuPicker);
 
   const melde = (neu: Dayjs | null) => {
     if (!gesteuert) setIntern(neu);
@@ -198,9 +213,14 @@ export interface ZeitraumEingabeProps extends BereichBasis {
 /** Ein Zeitraum (Beginn und Ende, je Datum + Uhrzeit) in der Anzeigezone. */
 export function ZeitraumEingabe({ value, onChange, showTime, ...rest }: ZeitraumEingabeProps) {
   const z = useZeitEingabe();
-  const pickerWert: Zeitraum | null | undefined = value
-    ? [value[0] ? z.zuPicker(value[0]) : null, value[1] ? z.zuPicker(value[1]) : null]
-    : value;
+  const von = usePickerWert(value?.[0], z.zuPicker);
+  const bis = usePickerWert(value?.[1], z.zuPicker);
+  // `null` (geleert) bleibt `null`, sonst hielte antd das Feld für ungesteuert.
+  const leer = value === null ? null : value === undefined ? undefined : 'gesetzt';
+  const pickerWert = useMemo<Zeitraum | null | undefined>(
+    () => (leer === 'gesetzt' ? [von ?? null, bis ?? null] : leer),
+    [leer, von, bis],
+  );
   const hinweis: ReactNode = z.zonenHinweis ? <ZonenText zone={z.zonenHinweis} /> : undefined;
   return (
     <DatePicker.RangePicker

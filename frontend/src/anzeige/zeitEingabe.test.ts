@@ -102,6 +102,9 @@ describe('zeitEingabe — Gegenprobe: Browser Europe/Berlin, Anzeigezone UTC', (
 });
 
 describe('zeitEingabe — Zone und Grenzfälle', () => {
+  // Unter Berlin (≠ UTC): sonst wäre „Browser-Wanduhr“ von einem UTC-Modus-Dayjs nicht zu trennen.
+  mitProzessZone(BERLIN);
+
   it('effektiveZone: gültige IANA-Zone bleibt, leer und ungültig → null', () => {
     expect(effektiveZone(BERLIN)).toBe(BERLIN);
     expect(effektiveZone(null)).toBeNull();
@@ -113,6 +116,8 @@ describe('zeitEingabe — Zone und Grenzfälle', () => {
     const d = alsZeitpunkt('2026-07-14 10:00:00')!;
     expect(() => zuWanduhr(d, 'Mars/Olympus')).not.toThrow();
     expect(zuWanduhr(d, 'Mars/Olympus').valueOf()).toBe(d.valueOf());
+    // Die WANDUHR des Browsers (12:00 Berlin), nicht die UTC-Uhrzeit des Eingangs.
+    expect(zuWanduhr(d, 'Mars/Olympus').format(W)).toBe('2026-07-14 12:00:00');
     expect(ausWanduhr(dayjs('2026-07-14 13:00:00'), 'Mars/Olympus').valueOf()).toBe(
       dayjs('2026-07-14 13:00:00').valueOf(),
     );

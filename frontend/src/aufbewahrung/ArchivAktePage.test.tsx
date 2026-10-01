@@ -245,4 +245,26 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
       '2026-06-01 20:00',
     );
   });
+  it('lesbare Einsatz-Zone sticht die der Organisation (Einsatz New York, Org Berlin)', async () => {
+    zeige('frist_laeuft');
+    server.use(
+      http.get('/api/einsaetze/7/einstellungen', () =>
+        HttpResponse.json({
+          einsatz_id: 7,
+          zeitzone: 'America/New_York',
+          org_defaults: { org_id: 1, zeitzone: 'Europe/Berlin' },
+        }),
+      ),
+      http.get('/api/org-einstellungen', () =>
+        HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
+      ),
+    );
+    // 01.06. 18:00 UTC → 14:00 in New York (EDT).
+    expect(await screen.findByText('011400JUN2026')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Frist ändern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Neue Aufbewahrungsfrist')).toHaveValue(
+      '2026-06-01 14:00',
+    );
+  });
 });

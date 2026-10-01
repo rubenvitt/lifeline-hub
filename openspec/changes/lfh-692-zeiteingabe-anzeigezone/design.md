@@ -41,6 +41,10 @@ Motivation: siehe `proposal.md` (Why). Bestand (Inventur am 01.10.2026):
 - Wire-Format und Backend bleiben unverändert.
 - antds Markierung „heute“ im Kalenderpanel (siehe Risiken).
 - Reine Anzeigestellen, die schon über `inZone` laufen, werden nicht angefasst.
+- Reine Anzeigen OHNE gepaarte Eingabe, die die freien Formatierer ohne Konventionen rufen
+  (Lagekarte-Historie, Chat, Nachforderungen), stehen in LFH-913. Mitgenommen sind nur die Karten
+  zu den hier umgestellten Formularen (Auftrag, Erinnerung, Meldung, Quittung) und Zeiten, die in
+  gespeicherte Texte wandern (Kräfte-Stand im Lagebericht, ETB-Textbausteine).
 
 ## Decisions
 

@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import ErinnerungKarte from './ErinnerungKarte';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { formatZeit } from '../anzeige/format';
+import { mitProzessZone } from '../test/prozessZone';
 import type { Erinnerung } from '../api/types';
 
 function erinnerung(over: Partial<Erinnerung>): Erinnerung {
@@ -95,5 +98,29 @@ describe('ErinnerungKarte — Empfänger (LFH-549)', () => {
     );
     expect(screen.getByText('für: S2')).toBeInTheDocument();
     expect(screen.queryByText(/·/)).not.toBeInTheDocument();
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`): die Karte zeigt die Fälligkeit wie das Formular. */
+describe('ErinnerungKarte — Fälligkeit in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('fällig 10:00 UTC steht als Berliner Zeit da', () => {
+    const berlin = { zeitzone: 'Europe/Berlin' };
+    render(
+      <AnzeigeKonventionenProvider konventionen={berlin}>
+        <MemoryRouter initialEntries={['/einsaetze/7/erinnerungen']}>
+          <Routes>
+            <Route
+              path="/einsaetze/:id/erinnerungen"
+              element={<ErinnerungKarte erinnerung={erinnerung({})} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </AnzeigeKonventionenProvider>,
+    );
+    const erwartet = formatZeit('2026-06-11 10:00:00', berlin);
+    expect(erwartet).not.toBe(formatZeit('2026-06-11 10:00:00'));
+    expect(screen.getByText(`fällig: ${erwartet}`, { exact: false })).toBeInTheDocument();
   });
 });

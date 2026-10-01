@@ -2,6 +2,9 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Auftrag } from '../api/types';
 import { renderMitProviders } from '../test/utils';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { formatZeit } from '../anzeige/format';
+import { mitProzessZone } from '../test/prozessZone';
 import AuftragListe from './AuftragListe';
 
 const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
@@ -150,5 +153,22 @@ describe('AuftragKarte — Eingangszustand', () => {
       'data-ton',
       'achtung',
     );
+  });
+});
+
+/** LFH-692 (Spec `zeiteingabe`): die Karte zeigt die Frist in derselben Zone wie das Formular. */
+describe('AuftragKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('Frist 12:00 UTC steht als Berliner Zeit da', () => {
+    const berlin = { zeitzone: 'Europe/Berlin' };
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={berlin}>
+        <AuftragListe auftraege={[auftrag({ frist_at: '2026-07-14 12:00:00' })]} einsatzId={7} />
+      </AnzeigeKonventionenProvider>,
+    );
+    const erwartet = formatZeit('2026-07-14 12:00:00', berlin);
+    expect(erwartet).not.toBe(formatZeit('2026-07-14 12:00:00'));
+    expect(screen.getByText(`Frist ${erwartet}`)).toBeInTheDocument();
   });
 });

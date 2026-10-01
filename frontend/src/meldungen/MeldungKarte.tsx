@@ -7,7 +7,7 @@ import { Link } from 'react-router';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
 import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge } from '../kommunikation';
-import { formatZeit } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -57,7 +57,7 @@ interface MeldungKarteProps {
  * Bestätigungs-Achse der Sofortmeldung, ORTHOGONAL zum Triage-Status. Bestätigt →
  * QuittungIndikator; unbestätigt mit Frist/Eskalation → eigener Chip mit Frist.
  */
-function bestaetigungsAchse(m: Meldung): ReactNode {
+function bestaetigungsAchse(m: Meldung, formatZeit: (wire?: string | null) => string): ReactNode {
   if (!m.bestaetigung_pflicht) return null;
   if (m.ist_bestaetigt) {
     return <QuittungIndikator quittiert von={m.bestaetigt_von_name} am={m.bestaetigt_at} />;
@@ -90,6 +90,8 @@ export default function MeldungKarte({
   onAuftragErteilen,
 }: MeldungKarteProps) {
   const { rollen } = useRollen();
+  // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
+  const { formatZeit } = useAnzeigeKonventionen();
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
   // Hervorhebung einer unbestätigten überfälligen/eskalierten Sofortmeldung; dieselbe Regel
   // zählt das Kennzahlenband (`meldungKennzahlen.ts`).
@@ -193,7 +195,7 @@ export default function MeldungKarte({
               Alarm
             </Text>
           )}
-          {bestaetigungsAchse(m)}
+          {bestaetigungsAchse(m, formatZeit)}
         </Space>
       </Flex>
 

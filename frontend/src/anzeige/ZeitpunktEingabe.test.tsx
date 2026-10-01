@@ -7,7 +7,7 @@ import utc from 'dayjs/plugin/utc';
 import type { ReactNode } from 'react';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from './AnzeigeKonventionenContext';
-import { ZeitpunktEingabe, ZeitraumEingabe } from './ZeitpunktEingabe';
+import { ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from './ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from './zeitEingabe';
 
 dayjs.extend(utc);
@@ -140,6 +140,25 @@ describe('ZeitpunktEingabe — gleiche Zone', () => {
   });
 });
 
+describe('ZeitpunktEingabe — ungültige Zone (Spec-Szenario „Ungültige Zone“)', () => {
+  mitProzessZone('Europe/Berlin');
+
+  it('rendert ohne Absturz, zeigt die Browser-Wanduhr und keinen Zonenhinweis', () => {
+    render(
+      mitZone(
+        'Mars/Olympus',
+        <ZeitpunktEingabe
+          aria-label="Beginn"
+          format="YYYY-MM-DD HH:mm"
+          value={alsZeitpunkt('2026-07-14 10:00:00')}
+        />,
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'Beginn' })).toHaveValue('2026-07-14 12:00');
+    expect(screen.queryByText('Mars/Olympus')).not.toBeInTheDocument();
+  });
+});
+
 describe('ZeitraumEingabe — Browser UTC, Anzeigezone Europe/Berlin', () => {
   mitProzessZone('UTC');
 
@@ -157,5 +176,84 @@ describe('ZeitraumEingabe — Browser UTC, Anzeigezone Europe/Berlin', () => {
     expect(screen.getByPlaceholderText('Beginn')).toHaveValue('2026-07-14 12:00');
     expect(screen.getByPlaceholderText('Ende')).toHaveValue('2026-07-14 13:30');
     expect(screen.getByText('Europe/Berlin')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Review LFH-692: ein Re-Render bei offenem Panel darf eine noch nicht bestätigte Wahl nicht
+ * verwerfen. rc-picker setzt Kalender- und Übernahmewert zurück, sobald `value` die IDENTITÄT
+ * wechselt; der Baustein gibt deshalb nur bei einem anderen Zeitpunkt ein neues Objekt weiter.
+ * Auslöser in echt: die Verpflegung rendert alle 30 s (`useUhr`).
+ */
+describe('ZeitpunktEingabe/ZeitraumEingabe — stabil über Re-Render', () => {
+  mitProzessZone('UTC');
+  const BERLIN = 'Europe/Berlin';
+
+  it('Einzel: Tag wählen, Elternteil rendert neu, OK — die Wahl kommt an', async () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    const wert = alsZeitpunkt('2026-07-14 10:00:00');
+    function Huelle({ takt }: { takt: number }) {
+      return mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Beginn"
+          format="YYYY-MM-DD HH:mm"
+          value={wert}
+          onChange={onChange}
+          data-takt={takt}
+        />,
+      );
+    }
+    const user = userEvent.setup();
+    const { rerender } = render(<Huelle takt={0} />);
+    await user.click(screen.getByRole('textbox', { name: 'Beginn' }));
+    const zelle = await waitFor(() => {
+      const z = document.querySelector<HTMLElement>('td[title="2026-07-20"]');
+      expect(z).not.toBeNull();
+      return z!;
+    });
+    await user.click(zelle);
+    rerender(<Huelle takt={1} />);
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(alsBackendZeit(onChange.mock.lastCall![0]!)).toBe('2026-07-20 10:00:00');
+  });
+
+  it('Bereich: Beginn mit OK bestätigt, Elternteil rendert neu, Ende gewählt — beide kommen an', async () => {
+    const onChange = vi.fn<(z: Zeitraum | null) => void>();
+    const wert: Zeitraum = [
+      alsZeitpunkt('2026-07-14 10:00:00')!,
+      alsZeitpunkt('2026-07-14 11:30:00')!,
+    ];
+    function Huelle({ takt }: { takt: number }) {
+      return mitZone(
+        BERLIN,
+        <ZeitraumEingabe
+          format="YYYY-MM-DD HH:mm"
+          placeholder={['Beginn', 'Ende']}
+          value={wert}
+          onChange={onChange}
+          data-takt={takt}
+        />,
+      );
+    }
+    const user = userEvent.setup();
+    const { rerender } = render(<Huelle takt={0} />);
+    await user.click(screen.getByPlaceholderText('Beginn'));
+    const zelle = (tag: string) =>
+      waitFor(() => {
+        const z = document.querySelector<HTMLElement>(`td[title="${tag}"]`);
+        expect(z).not.toBeNull();
+        return z!;
+      });
+    await user.click(await zelle('2026-07-15'));
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+    rerender(<Huelle takt={1} />);
+    await user.click(await zelle('2026-07-16'));
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const [von, bis] = onChange.mock.lastCall![0]!;
+    expect(alsBackendZeit(von!)).toBe('2026-07-15 10:00:00');
+    expect(alsBackendZeit(bis!)).toBe('2026-07-16 11:30:00');
   });
 });

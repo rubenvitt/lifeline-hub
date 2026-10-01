@@ -57,8 +57,8 @@ import './lageberichtPrint.css';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
- * Formularwerte des Entwurfs: Titel, Zeitstand (lokale Picker-Zeit, UTC erst beim Senden —
- * `etb/filterZeit.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
+ * Formularwerte des Entwurfs: Titel, Zeitstand (Zeitpunkt, die Anzeigezone nur im Feld, UTC erst
+ * beim Senden — `anzeige/zeitEingabe.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
  */
 type FormWerte = { titel: string; zeitstand?: Dayjs } & Record<string, string | Dayjs | undefined>;
 
@@ -469,7 +469,8 @@ function LageberichtDetail() {
             <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
-            {/* Picker in Ortszeit, Wire in UTC — `etb/filterZeit`. */}
+            {/* Feld in der Anzeigezone, Wire in UTC — frontend/AGENTS.md, „Zeiteingabe in der
+                Anzeigezone“. */}
             <Form.Item label="Zeitstand" name="zeitstand">
               {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
                   würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die
