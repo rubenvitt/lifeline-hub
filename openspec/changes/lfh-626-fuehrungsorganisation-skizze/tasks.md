@@ -71,12 +71,12 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 3. Ansicht auf der Seite Einsatzabschnitte (D1, D7, D9, Spec „Ansicht der Abschnittsseite“, „Deeplinks“, „Quellenzustand“)
 
-- [ ] 3.1 Test zuerst: In `routing/deeplinks.test.ts` gilt:
+- [x] 3.1 Test zuerst: In `routing/deeplinks.test.ts` gilt:
   - `einsatzabschnittePfad(id, {ansicht:'organigramm'})` erzeugt `?ansicht=organigramm`.
   - `parseAbschnitteAnsicht` nimmt nur `gliederung` und `organigramm` an.
 
   Nachweis: rot belegt.
-- [ ] 3.2 Test zuerst: `EinsatzabschnittePage.test.tsx` (neu oder ergänzt) deckt ab:
+- [x] 3.2 Test zuerst: `EinsatzabschnittePage.test.tsx` (neu oder ergänzt) deckt ab:
   - Die Segmentleiste ist ohne Schreibrecht sichtbar.
   - „Organigramm“ ersetzt Baum und Detail.
   - `?ansicht=organigramm` wird angewendet und geräumt, ein unbrauchbarer Wert wird nur geräumt.
@@ -84,7 +84,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Fehlen die Einheiten, steht der Hinweis „Einheiten: nicht geladen“, und die Stärke ist „—“.
 
   Nachweis: rot belegt.
-- [ ] 3.3 Umsetzung:
+- [x] 3.3 Umsetzung:
   - `einsatzabschnittePfad` mit `ansicht`, dazu `parseAbschnitteAnsicht`
   - Ansicht je Einsatz im Zustand der Seite
   - `Segmentleiste` in `aktionen`

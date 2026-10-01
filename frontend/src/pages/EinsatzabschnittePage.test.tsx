@@ -703,3 +703,85 @@ describe('EinsatzabschnittePage', () => {
     expect(gliederung.style.flex).not.toContain('360px');
   });
 });
+
+/**
+ * Ansicht „Organigramm“ (LFH-626): zweite Ansicht derselben Seite, kein Modul. Umschalter im Kopf
+ * auch ohne Schreibrecht, Sichtvorgabe `?ansicht=` apply-then-clean (Muster FMS-Tableau).
+ */
+describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
+  function SuchAnzeige() {
+    return <span data-testid="suche">{useLocation().search}</span>;
+  }
+  function rendereMit(route: string) {
+    return renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+        </Routes>
+        <SuchAnzeige />
+      </>,
+      { route },
+    );
+  }
+  const organigrammHandler = [
+    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/1/stab', () => HttpResponse.json({ besetzung: [] })),
+  ];
+
+  it('schaltet auch ohne Schreibrecht auf das Organigramm um', async () => {
+    server.use(...handlers('beobachter', 'aktiv'), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte');
+    const ansicht = await screen.findByRole('radiogroup', { name: 'Ansicht' });
+    expect(within(ansicht).getByRole('radio', { name: 'Gliederung' })).toBeChecked();
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Organigramm' }));
+    const organigramm = await screen.findByRole('region', { name: 'Organigramm' });
+    expect(within(organigramm).getByRole('link', { name: 'Nord' })).toBeInTheDocument();
+    // Baum und Detail sind weg.
+    expect(screen.queryByText('Wähle einen Abschnitt im Baum')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('abschnitte-gliederung')).not.toBeInTheDocument();
+  });
+
+  it('?ansicht=organigramm öffnet das Organigramm und räumt den Parameter', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    expect(await screen.findByRole('region', { name: 'Organigramm' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Ansicht' })).getByRole('radio', {
+        name: 'Organigramm',
+      }),
+    ).toBeChecked();
+  });
+
+  it('ein unbrauchbarer Wert wird nur geräumt, die Ansicht bleibt Gliederung', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=quatsch');
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(await screen.findByTestId('abschnitte-gliederung')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
+  });
+
+  it('der Name eines Abschnitts führt in die Gliederung mit diesem Abschnitt gewählt', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    const organigramm = await screen.findByRole('region', { name: 'Organigramm' });
+    await userEvent.click(within(organigramm).getByRole('link', { name: 'Nord' }));
+    expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
+  });
+
+  it('nennt fehlende Einheiten als Grund und zeigt keine Stärke', async () => {
+    // Der erste passende Handler gewinnt: der Fehler muss vor der Grundausstattung stehen.
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
+      ...handlers(),
+      ...organigrammHandler,
+    );
+    rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
+    expect(await screen.findByText('Einheiten: nicht geladen')).toBeInTheDocument();
+    const knoten = screen
+      .getByRole('link', { name: 'Nord' })
+      .closest('[data-lfh="org-knoten"]') as HTMLElement;
+    expect(within(knoten).getByText('—')).toBeInTheDocument();
+  });
+});
