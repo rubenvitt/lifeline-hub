@@ -270,7 +270,12 @@ async fn etb_liste_fuehrt_folgeauftraege_am_quell_eintrag() {
 }
 
 /// Erfasst eine Berichtigung von `grund_id`; liefert die Antwort (Status geprüft).
-async fn berichtigung_erfassen(app: &axum::Router, cookie: &str, einsatz: i64, grund_id: i64) -> Value {
+async fn berichtigung_erfassen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    grund_id: i64,
+) -> Value {
     let body = format!(
         r#"{{"typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{grund_id}}}"#
     );
@@ -332,7 +337,11 @@ async fn etb_liste_fuehrt_berichtigungen_am_grundeintrag() {
     );
     for id in [&ohne["id"], &b1["id"], &b2["id"]] {
         let e = eintrag_mit_id(&liste, id.as_i64().unwrap());
-        assert_eq!(e["berichtigt_durch"], serde_json::json!([]), "Presence und leer: {e}");
+        assert_eq!(
+            e["berichtigt_durch"],
+            serde_json::json!([]),
+            "Presence und leer: {e}"
+        );
     }
 }
 
@@ -365,13 +374,19 @@ async fn berichtigt_durch_unabhaengig_von_seite_und_filter() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(seite.as_array().unwrap().len(), 1, "{seite}");
-    assert_eq!(eintrag_mit_id(&seite, grund_id)["berichtigt_durch"], erwartet);
+    assert_eq!(
+        eintrag_mit_id(&seite, grund_id)["berichtigt_durch"],
+        erwartet
+    );
 
     // Filter, zu dem die Berichtigung selbst nicht passt.
     let (status, gefiltert) = etb_abrufen(&app, &admin, einsatz, "typ=meldung").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(gefiltert.as_array().unwrap().len(), 1, "{gefiltert}");
-    assert_eq!(eintrag_mit_id(&gefiltert, grund_id)["berichtigt_durch"], erwartet);
+    assert_eq!(
+        eintrag_mit_id(&gefiltert, grund_id)["berichtigt_durch"],
+        erwartet
+    );
 }
 
 /// Liest die Auftragsliste des Einsatzes (GET, kein Body).
