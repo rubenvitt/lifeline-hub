@@ -70,13 +70,18 @@ async function mitte(page: Page): Promise<[number, number]> {
   });
 }
 
-/** Punkte der Suchnadel-Quelle (`suchnadelLayer.ts`). */
-async function nadelPunkte(page: Page): Promise<unknown[]> {
-  return page.evaluate(() =>
-    (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte
+/**
+ * Punkte der Suchnadel-Quelle (`suchnadelLayer.ts`), auf fünf Stellen und entdoppelt:
+ * `querySourceFeatures` liefert kachelweise (ein Punkt an einer Kachelkante zählt doppelt) und in
+ * Kachelauflösung gerundet.
+ */
+async function nadelPunkte(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const punkte = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte
       .querySourceFeatures('suchnadel')
-      .map((f) => f.geometry.coordinates),
-  );
+      .map((f) => (f.geometry.coordinates as number[]).map((x) => x.toFixed(5)).join(','));
+    return [...new Set(punkte)];
+  });
 }
 
 async function aufSchirm(page: Page, ll: [number, number]) {
@@ -119,7 +124,7 @@ test('Koordinate tippen → Anflug und Suchnadel; Tipp auf den Marker darunter w
   await expect(page.getByRole('region', { name: 'Suchnadel' })).toContainText('53.0775');
   await expect.poll(() => mitte(page), { timeout: 10_000 }).toEqual(PUMPE);
   await ruhe(page);
-  await expect.poll(() => nadelPunkte(page)).toEqual([PUMPE]);
+  await expect.poll(() => nadelPunkte(page)).toEqual(['8.81000,53.07750']);
 
   // Die Nadel liegt genau auf der Pumpe — ein Tipp dort gehört der Pumpe.
   const punkt = await aufSchirm(page, PUMPE);
