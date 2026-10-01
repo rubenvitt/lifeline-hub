@@ -12,7 +12,11 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 
-/** Was der Rahmen von der Abfrage der Seite braucht — eine Teilmenge von `UseQueryResult`. */
+/**
+ * Was der Rahmen von der Abfrage der Seite braucht — eine Teilmenge von `UseQueryResult`. Die
+ * Seite reicht die Felder einzeln weiter, nicht das Ergebnisobjekt: `useQuery` beobachtet nur die
+ * Felder, die die Seite selbst beim Rendern liest.
+ */
 export interface ListenDruckAbfrage {
   isSuccess: boolean;
   isFetching: boolean;

@@ -22,10 +22,10 @@ Code. Vor jedem „fertig“ stehen `superpowers:verification-before-completion`
 
 ## 3. Personen-Druck
 
-- [ ] 3.1 `personen/druckAuswahl.ts:personenDruckAuswahl` (Kopfzeile aus `FILTER_OPTIONEN`, „nur offene Felder“, „alle Personen“). Nachweis: Unit-Test je Kombination
-- [ ] 3.2 `personen/PersonenDruckTabelle.tsx` (D6, Sichtung in Worten ohne Farbe, aufsteigend nach Registriernummer). Nachweis: Test mit Reihenfolge 3,1,2 → 1,2,3, Sichtung als Wort, Verbleib mit UHS-Name und ohne
-- [ ] 3.3 `pages/PersonenDruckPage.tsx` mit Route `personen/druck` in `App.tsx`; Abruf nur über `ladePersonenDruck`, `retry: false`, `refetchOnMount: 'always'`, Filter per `filterPersonen`, Protokoll-Hinweis am Bildschirm. Nachweis: `pages/PersonenDruckPage.test.tsx`: genau ein Druck-Abruf je Öffnung, „Neu laden“ ein weiterer, kein Abruf von `GET …/personen`, kein Retry nach 500, Auswahl aus der Adresse im Kopf
-- [ ] 3.4 Einstieg „Drucken / als PDF“ in `PersonenPage` mit aktivem `filter`/`nurLuecken`. Nachweis: Test in `PersonenPage.test.tsx` analog „verlinkt im Kopf auf die Druckansicht mit dem aktiven Filter“
+- [x] 3.1 `personen/druckAuswahl.ts:personenDruckAuswahl` (Kopfzeile aus `FILTER_OPTIONEN`, „nur offene Felder“, „alle Personen“). Nachweis: Unit-Test je Kombination
+- [x] 3.2 `personen/PersonenDruckTabelle.tsx` (D6, Sichtung in Worten ohne Farbe, aufsteigend nach Registriernummer). Nachweis: Test mit Reihenfolge 3,1,2 → 1,2,3, Sichtung als Wort, Verbleib mit UHS-Name und ohne
+- [x] 3.3 `pages/PersonenDruckPage.tsx` mit Route `personen/druck` in `App.tsx`; Abruf nur über `ladePersonenDruck`, `retry: false`, `refetchOnMount: 'always'`, Filter per `filterPersonen`, Protokoll-Hinweis am Bildschirm. Nachweis: `pages/PersonenDruckPage.test.tsx`: genau ein Druck-Abruf je Öffnung, „Neu laden“ ein weiterer, kein Abruf von `GET …/personen`, kein Retry nach 500, Auswahl aus der Adresse im Kopf
+- [x] 3.4 Einstieg „Drucken / als PDF“ in `PersonenPage` mit aktivem `filter`/`nurLuecken`. Nachweis: Test in `PersonenPage.test.tsx` analog „verlinkt im Kopf auf die Druckansicht mit dem aktiven Filter“
 
 ## 4. Tiere-Druck
 
