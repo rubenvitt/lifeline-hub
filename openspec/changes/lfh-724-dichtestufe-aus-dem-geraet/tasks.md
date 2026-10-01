@@ -2,10 +2,10 @@
 
 ## 1. Ableitungsregel als reine Funktion (D2, D3)
 
-- [ ] 1.1 `theme/dichte.test.ts` mit der Wahrheitstafel anlegen: (`kompakt`, `komfortabel`, `handschuh`, `null`, unbrauchbarer Wert) × (grob, fein). Zuerst rot sehen (Datei `dichte.ts` fehlt), dann `startDichte` in `theme/dichte.ts` schreiben (nur `./tokens` importieren) und grün sehen. `mise exec -- pnpm -C frontend vitest run src/theme/dichte.test.ts`
-- [ ] 1.2 `ThemeModeProvider.tsx` auf `startDichte(localStorage.getItem(…), zeigerIstGrob())` umstellen und die Konstanten `DICHTE_DEFAULT*` nach `dichte.ts` ziehen. Der Dateikopf verweist auf die Spec `bedien-dichte`. Beleg: die bestehenden Blöcke LFH-329 und LFH-361 in `ThemeModeProvider.test.tsx` bleiben grün.
-- [ ] 1.3 Vitest-Fall „ein Zeigerwechsel während der Sitzung ändert die Stufe nicht“ in `ThemeModeProvider.test.tsx`: `change` auf dem gemockten `MediaQueryList` feuern, Stufe bleibt `kompakt`. Mutationsprobe: ein probeweise eingebauter Zuhörer macht den Fall rot (danach entfernen).
-- [ ] 1.4 Wache `theme/dichte.guard.test.ts`: Die Importe von `dichte.ts` sind genau `./tokens`, und `ThemeModeProvider.tsx` importiert nichts aus `api/`, `auth/`, `einsatz/`, `fuehrung/`, `stab/` oder `react-router`. Mutationsprobe: ein probeweiser Import aus `fuehrung/` macht sie rot.
+- [x] 1.1 `theme/dichte.test.ts` mit der Wahrheitstafel anlegen: (`kompakt`, `komfortabel`, `handschuh`, `null`, unbrauchbarer Wert) × (grob, fein). Zuerst rot sehen (Datei `dichte.ts` fehlt), dann `startDichte` in `theme/dichte.ts` schreiben (nur `./tokens` importieren) und grün sehen. `mise exec -- pnpm -C frontend vitest run src/theme/dichte.test.ts`
+- [x] 1.2 `ThemeModeProvider.tsx` auf `startDichte(localStorage.getItem(…), zeigerIstGrob())` umstellen und die Konstanten `DICHTE_DEFAULT*` nach `dichte.ts` ziehen. Der Dateikopf verweist auf die Spec `bedien-dichte`. Beleg: die bestehenden Blöcke LFH-329 und LFH-361 in `ThemeModeProvider.test.tsx` bleiben grün.
+- [x] 1.3 Vitest-Fall „ein Zeigerwechsel während der Sitzung ändert die Stufe nicht“ in `ThemeModeProvider.test.tsx`: `change` auf dem gemockten `MediaQueryList` feuern, Stufe bleibt `kompakt`. Mutationsprobe: ein probeweise eingebauter Zuhörer macht den Fall rot (danach entfernen).
+- [x] 1.4 Wache `theme/dichte.guard.test.ts`: Die Importe von `dichte.ts` sind genau `./tokens`, und `ThemeModeProvider.tsx` importiert nichts aus `api/`, `auth/`, `einsatz/`, `fuehrung/`, `stab/` oder `react-router`. Mutationsprobe: ein probeweiser Import aus `fuehrung/` macht sie rot.
 
 ## 2. Browser-Beleg der Ableitung (D4)
 
