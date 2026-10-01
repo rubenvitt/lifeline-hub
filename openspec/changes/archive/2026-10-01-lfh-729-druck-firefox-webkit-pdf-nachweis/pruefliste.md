@@ -94,4 +94,16 @@ installiert; das prüft der Job „Schnellprüfungen“ der CI. Nach `pnpm run b
 ## CI-Laufzeit der Pflicht-Shards (D1)
 
 Vorher (PR #297, nur Chromium): e2e 1/4 11:25 min, 2/4 22:46 min, 3/4 10:24 min,
-4/4 10:04 min. Nachher: wird nach dem Lauf des PRs eingetragen.
+4/4 10:04 min.
+
+Erster Lauf von PR #338 (Head `2155621`): Die Tests selbst blieben bei rund 11 min je Shard
+(1/4: 145 bestanden in 11,2 min; 3/4: 134 bestanden in 11,1 min). Die Installation der
+Firefox/WebKit-Systempakete (`--with-deps`, 181 neue Pakete, 125 MB) hing aber am
+Ubuntu-Mirror: 28 s in Shard 3/4, **23:53 min** in 1/4 und **33:48 min** in 2/4 (60–90 kB/s).
+2/4 und 4/4 liefen deshalb ins Job-Limit von 40 min und wurden abgebrochen. Die Schätzung „2–4 min
+je Shard“ aus D1 hielt nur bei schnellem Mirror.
+
+Abhilfe im selben PR: Die `.deb`-Pakete liegen im Actions-Cache (`actions/cache/restore` vor,
+`actions/cache/save` direkt nach der Installation, also auch bei rotem Shard), und `apt-get`
+nimmt sie aus `/var/cache/apt/archives`. Das Job-Limit der e2e-Shards steht auf 60 min, für
+Läufe mit leerem Cache. Die Laufzeit mit gefülltem Cache wird nach dem nächsten Lauf eingetragen.

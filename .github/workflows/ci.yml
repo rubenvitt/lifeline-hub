@@ -235,7 +235,10 @@ jobs:
     name: e2e ${{ matrix.shard }}/4
     needs: binaer
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # 60 statt 40 min: die Tests brauchen je Shard rund 11 min. Den Rest der Frist frisst im
+    # schlechtesten Fall die Installation der Firefox/WebKit-Systempakete, solange der apt-Cache
+    # (unten) leer ist — gemessen 34 min bei einem langsamen Ubuntu-Mirror (PR #338).
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       # DIE SHARD-ZAHL IST EIN PIN (s. Frontend-Suite).
@@ -263,11 +266,46 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+      # SYSTEMPAKETE AUS DEM CACHE: Firefox und WebKit brauchen rund 125 MB .deb-Pakete, die das
+      # Runner-Image nicht mitbringt. Der Ubuntu-Mirror lieferte sie im ersten Lauf (PR #338) in
+      # zwei Shards mit 60–90 kB/s, 24 bzw. 34 min, und riss das 40-min-Limit; im dritten Shard in
+      # 28 s. Die Tests selbst blieben bei 11 min. apt-get nimmt Pakete, die passend in
+      # /var/cache/apt/archives liegen, statt sie zu laden. Ein veralteter Eintrag schadet nicht:
+      # was sich geändert hat, lädt apt nach. Der Schlüssel hängt am Lockfile, weil die
+      # Playwright-Version die Paketliste bestimmt.
+      #
+      # Laden und Speichern getrennt (`restore`/`save`): das kombinierte `actions/cache` speichert
+      # erst am Ende eines GRÜNEN Jobs — ein roter oder abgebrochener Shard hinterließe nichts, und
+      # der nächste Lauf stünde wieder am langsamen Mirror.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: apt-cache
+        with:
+          path: ~/.cache/apt-playwright
+          key: apt-playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: apt-playwright-${{ runner.os }}-${{ runner.arch }}-
+      - name: Systempakete aus dem Cache bereitlegen
+        run: |
+          mkdir -p ~/.cache/apt-playwright
+          if compgen -G "$HOME/.cache/apt-playwright/*.deb" > /dev/null; then
+            sudo cp "$HOME"/.cache/apt-playwright/*.deb /var/cache/apt/archives/
+            echo "Aus dem Cache: $(ls "$HOME"/.cache/apt-playwright/*.deb | wc -l) Pakete"
+          fi
       # ALLE DREI in jedem Shard: welcher Shard die Firefox- und WebKit-Fälle bekommt, entscheidet
-      # Playwright nach Testzahl, das steht vorher nicht fest. Die Systempakete (`--with-deps`)
-      # liegen in keinem Cache.
+      # Playwright nach Testzahl, das steht vorher nicht fest.
       - name: Playwright-Browser (Chromium, Firefox, WebKit)
-        run: mise exec -- pnpm -C frontend exec playwright install --with-deps chromium firefox webkit
+        run: |
+          mise exec -- pnpm -C frontend exec playwright install --with-deps chromium firefox webkit
+          # Für den Cache (s. o.): was apt-get geladen hat, liegt danach in seinem Archiv.
+          if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then
+            cp /var/cache/apt/archives/*.deb ~/.cache/apt-playwright/
+          fi
+      # Gleich nach der Installation, nicht erst am Jobende (s. o.). Nur ohne exakten Treffer: ein
+      # bestehender Schlüssel lässt sich nicht überschreiben.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/apt-playwright
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: lifeline-hub-debug
