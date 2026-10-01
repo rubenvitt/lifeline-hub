@@ -56,6 +56,23 @@ export function filterSchaeden(alle: Schaden[], opts: { sicht: SchaedenSicht }):
   return alle.filter((s) => opts.sicht === 'alle' || s.status === opts.sicht);
 }
 
+/**
+ * Geschädigt als reiner Text, ohne Deeplink — für Papier (LFH-727). Dieselbe Rangfolge wie
+ * {@link geschaedigtAnzeige}: Person (R-Nummer, ggf. storniert), Einsatzkraft, eigene Organisation,
+ * freier Kontakt.
+ */
+export function geschaedigtText(s: Schaden): string {
+  if (s.geschaedigt_registrier_nr != null) {
+    const label = registrierNummer('R', s.geschaedigt_registrier_nr);
+    return s.geschaedigt_storniert_at ? `${label} (storniert)` : label;
+  }
+  if (s.geschaedigt_personal_id != null) return s.geschaedigt_personal_name ?? 'Einsatzkraft';
+  if (s.geschaedigt_organisation_id != null) {
+    return s.geschaedigt_organisation_name ?? 'Eigene Organisation';
+  }
+  return s.geschaedigt_kontakt || '—';
+}
+
 /** Kompakte Geschädigt-Anzeige inkl. Deeplinks (Person→Detailseite, Einsatzkraft→Personal-Liste). */
 export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNode {
   if (s.geschaedigt_registrier_nr != null) {

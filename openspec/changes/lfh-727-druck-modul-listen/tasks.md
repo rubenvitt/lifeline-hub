@@ -36,10 +36,10 @@ Code. Vor jedem „fertig“ stehen `superpowers:verification-before-completion`
 
 ## 5. Schäden-Druck
 
-- [ ] 5.1 `pages/schaeden/druckAuswahl.ts:schaedenDruckAuswahl`. Nachweis: Unit-Test
-- [ ] 5.2 `pages/schaeden/SchaedenDruckTabelle.tsx` (D6, Geschädigt als Text). Nachweis: Test zu Reihenfolge, „übergeben an“, Geschädigt ohne Link
-- [ ] 5.3 `pages/SchaedenDruckPage.tsx` mit Route `schaeden/druck`; Abruf `listeSchaeden(einsatzId, {})` unter `schaedenDruck`, Filter per `filterSchaeden`. Nachweis: Seitentest
-- [ ] 5.4 Einstieg in `SchaedenPage` mit `sicht`. Nachweis: Seitentest des Links
+- [x] 5.1 `pages/schaeden/druckAuswahl.ts:schaedenDruckAuswahl`. Nachweis: Unit-Test
+- [x] 5.2 `pages/schaeden/SchaedenDruckTabelle.tsx` (D6, Geschädigt als Text). Nachweis: Test zu Reihenfolge, „übergeben an“, Geschädigt ohne Link
+- [x] 5.3 `pages/SchaedenDruckPage.tsx` mit Route `schaeden/druck`; Abruf `listeSchaeden(einsatzId, {})` unter `schaedenDruck`, Filter per `filterSchaeden`. Nachweis: Seitentest
+- [x] 5.4 Einstieg in `SchaedenPage` mit `sicht`. Nachweis: Seitentest des Links
 
 ## 6. Regeln, e2e und Abschluss
 
