@@ -1468,6 +1468,120 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Organigramm der Führungsorganisation (LFH-626) ───────────────────────────────────
+//
+// Ansicht der Seite Einsatzabschnitte. Die Namen sind handgebaute Bedienziele
+// (`organigrammZielStil`, ein `<a>` erbt keine Steuerhöhe); Klappknöpfe und Werkzeugzeile sind
+// antd-`Button`, gemessen wird trotzdem, weil sie in eigenen Flex-Hüllen stehen.
+
+/** Abschnitt Nord, Unterabschnitt Deich, 1. Zug, Gruppe Deich. */
+const ORGANIGRAMM_NAMEN = 4;
+/** Abschnitt Nord (Kinder: Deich, 1. Zug) und Unterabschnitt Deich (Kind: Gruppe Deich). */
+const ORGANIGRAMM_KLAPPZIELE = 2;
+
+async function organigrammSaeen(page: Page, einsatzId: string) {
+  const post = async (pfad: string, data: unknown) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return ((await antwort.json()) as { id: number }).id;
+  };
+  const nord = await post('abschnitte', { name: 'Abschnitt Nord' });
+  const deich = await post('abschnitte', {
+    name: 'Unterabschnitt Deich',
+    ueber_abschnitt_id: nord,
+  });
+  await post('einheiten', { name: '1. Zug', abschnitt_id: nord });
+  await post('einheiten', { name: 'Gruppe Deich', abschnitt_id: deich });
+}
+
+async function messeOrganigramm(page: Page, soll: number, dichte: string, schreibend: boolean) {
+  const organigramm = page.getByRole('region', { name: 'Organigramm', exact: true });
+  // Datenanker: die Gruppe steht erst, wenn Abschnitte und Einheiten geladen sind.
+  await expect(organigramm.getByRole('link', { name: 'Gruppe Deich' })).toHaveCount(1);
+  if (!schreibend) {
+    await expect(
+      page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+      'Vorbedingung: ohne Schreibrecht keine Übernahme',
+    ).toHaveCount(0);
+  }
+  const namen = await alleHaltenStufe(
+    organigramm.getByRole('link'),
+    soll,
+    `Name (${dichte})`,
+    ORGANIGRAMM_NAMEN,
+  );
+  const klappen = await alleHaltenStufe(
+    organigramm.getByRole('button', { name: /^Unterstellte von / }),
+    soll,
+    `Klappziel (${dichte})`,
+    ORGANIGRAMM_KLAPPZIELE,
+  );
+  const alleAuf = await haeltStufe(
+    page.getByRole('button', { name: 'Alle aufklappen', exact: true }),
+    soll,
+    `Alle aufklappen (${dichte})`,
+  );
+  const druck = await haeltStufe(
+    page.getByRole('button', { name: /Drucken/ }),
+    soll,
+    `Drucken (${dichte})`,
+  );
+  const uebernahme = schreibend
+    ? await haeltStufe(
+        page.getByRole('button', { name: 'In Lagebericht übernehmen', exact: true }),
+        soll,
+        `Übernahme (${dichte})`,
+      )
+    : null;
+  return (
+    `${dichte} (Soll ≥ ${soll}): Name ${namen}, Klappziel ${klappen}, Alle aufklappen ${alleAuf}, ` +
+    `Drucken ${druck}${uebernahme != null ? `, Übernahme ${uebernahme}` : ''}`
+  );
+}
+
+test('Organigramm: Namen, Klappziele und Werkzeugknöpfe folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Organigramm`);
+  await organigrammSaeen(page, einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
+    await stelleDichte(page, dichte);
+    // `stelleDichte` lädt neu; die Sichtvorgabe ist danach verbraucht.
+    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
+    gemessen.push(await messeOrganigramm(page, soll, dichte, true));
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Organigramm (Beobachter): Namen, Klappziele und Drucken folgen der Staffel, die Übernahme fehlt', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Organigramm Lesend`);
+  await organigrammSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
+    await stelleDichte(page, dichte);
+    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
+    gemessen.push(await messeOrganigramm(page, soll, dichte, false));
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Ablösung ─────────────────────────────────────────────────────────────────────────
 //
 // Nur antd-`Button`, gemessen wird trotzdem: die Karte ist eine eigene Flex-Hülle, ein

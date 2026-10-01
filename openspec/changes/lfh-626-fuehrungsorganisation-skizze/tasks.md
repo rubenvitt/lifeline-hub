@@ -125,7 +125,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 5. Ende-zu-Ende und Gates (D10)
 
-- [ ] 5.1 `e2e/fuehrungsorganisation.spec.ts` ausbauen:
+- [x] 5.1 `e2e/fuehrungsorganisation.spec.ts` ausbauen:
   - Fükw 1366 × 768 mit Panel und acht obersten Abschnitten: kein waagerechter Überhang von Seite
     und Organigramm, mehrere Zeilen von Spalten.
   - 1024, 768 und 390 px ebenso.
@@ -136,7 +136,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Übernahme: genau ein `POST …/lageberichte`, danach ist der Bericht offen.
 
   Nachweis: Die Spec läuft grün.
-- [ ] 5.2 Gates aufnehmen:
+- [x] 5.2 Gates aufnehmen:
   - `e2e/gate1-ueberlauf.spec.ts` um die Organigramm-Ansicht ergänzen (über den Umschalter oder
     `?ansicht=organigramm`), als Admin und als Beobachter.
   - `e2e/gate3-trefflaeche.spec.ts` um Klappknöpfe, Namenslinks, „Drucken / als PDF“ und „In

@@ -58,6 +58,16 @@ export const SPALTE_MIN_PX = 300;
 const EINRUECKEN_BIS_TIEFE = 4;
 const ZEICHEN_PX = 22;
 
+/**
+ * Trefffläche der Namenslinks (LFH-365, Muster `bedienzielStil`): ein `<a>` erbt keine
+ * Steuerhöhe, der Boden kommt aus `controlHeight` (30 / 48 / 72). Ohne waagerechte Polsterung:
+ * der Name fluchtet mit dem Zeichen, und die Spalte ist schmal (design.md D3). Rein und
+ * exportiert, damit die Zusicherung ohne Layout prüfbar ist.
+ */
+export function organigrammZielStil(token: { controlHeight: number }): CSSProperties {
+  return { display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight };
+}
+
 export type StabsstelleZustand =
   | { zustand: 'aus' }
   | { zustand: 'fehler' }
@@ -231,7 +241,8 @@ function Zweig({ knoten, tiefe, einsatzId, zugeklappt, onUmschalten }: ZweigProp
         <span
           aria-hidden
           data-lfh="org-klappen-platz"
-          style={{ flex: `0 0 ${token.controlHeightSM}px` }}
+          // Breite des Klappknopfs: ein Icon-Knopf ist so breit wie hoch (`controlHeight`).
+          style={{ flex: `0 0 ${token.controlHeight}px` }}
         />
       )}
       {knoten.art === 'sammel' ? (
@@ -249,7 +260,8 @@ function Zweig({ knoten, tiefe, einsatzId, zugeklappt, onUmschalten }: ZweigProp
         listStyle: 'none',
         margin: 0,
         // Einrückung gedeckelt: tiefe Gliederungen wachsen nach unten, nicht in die Breite.
-        marginInlineStart: tiefe < EINRUECKEN_BIS_TIEFE ? token.controlHeightSM / 2 : 0,
+        // Unabhängig von der Knopfhöhe: im Handschuh wüchse der Einzug sonst je Ebene um 36 px.
+        marginInlineStart: tiefe < EINRUECKEN_BIS_TIEFE ? token.paddingXS : 0,
         paddingInlineStart: tiefe < EINRUECKEN_BIS_TIEFE ? token.paddingSM : token.paddingXXS,
         borderInlineStart: `1px solid ${rollen.linieStark}`,
       }}
@@ -314,6 +326,7 @@ function KnotenInhalt({
         <Link
           to={ziel}
           style={{
+            ...organigrammZielStil(token),
             color: rollen.bedienText,
             fontWeight: knoten.art === 'abschnitt' ? 600 : 400,
             overflowWrap: 'anywhere',

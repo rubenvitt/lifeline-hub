@@ -191,6 +191,13 @@ Am Phase-1-Checkpoint entschieden.
   - Name als Link, darunter in Mono `tabular-nums` Rufname · Leitung · Stärke
   - Lange Werte brechen um (`overflow-wrap: anywhere`) und werden nicht gekürzt, denn eine
     Kürzung versteckte Rufnamen.
+- **Trefffläche (Nachtrag aus Aufgabe 5.2):** Die Namen sind handgebaute Bedienziele. Ein `<a>`
+  erbt keine Steuerhöhe, deshalb tragen sie `organigrammZielStil` (`inline-flex`, `minHeight:
+  controlHeight`, 30/48/72) ohne waagerechte Polsterung, damit der Name mit dem Zeichen fluchtet.
+  Der Einzug je Ebene ist `paddingXS + paddingSM` und damit unabhängig von der Knopfhöhe; im
+  Handschuh wüchse er sonst um 36 px je Ebene. Der Platzhalter der Blätter ist so breit wie der
+  Klappknopf (`controlHeight`). Belegt in `e2e/gate3-trefflaeche.spec.ts` („Organigramm“, Admin
+  und Beobachter).
 - **Rahmen und Farben:** Rahmen aus `rollen` (`linie`/`linieStark`), Radius 0, keine Statusfarbe
   für die Struktur. Nur „Leitung nicht besetzt“ trägt `achtung`, und zwar als Wort, nicht nur als
   Farbe (WCAG 1.4.1, Muster `AbschnittKnoten`).
@@ -268,6 +275,10 @@ Rechteachse und kann mehrere Personen tragen, auch einen Führungsassistenten
     - `break-inside: avoid` je Knoten, nicht je Spalte, sonst verschluckte eine lange Spalte ganze
       Seiten
   - Die Mechanik bleibt in `druck/druck.css`.
+  - Gemessen (Aufgabe 5.1): Bei A4 (680 px) ergibt `auto-fill` mit 300 px Mindestbreite ohnehin
+    zwei Spalten. Die feste Druckregel sichert nur gegen eine spätere Änderung von
+    `SPALTE_MIN_PX` ab. Die Mutationsprobe des Druckpfads trifft deshalb das Ausblenden der
+    Klappziele, nicht die Spaltenzahl.
 - **Gliederung und Organigramm:** In der Ansicht „Gliederung“ gibt es keine Druckwurzel und keinen
   Druckknopf. Damit gilt „eine Druckwurzel je Seite“ in beiden Ansichten.
 

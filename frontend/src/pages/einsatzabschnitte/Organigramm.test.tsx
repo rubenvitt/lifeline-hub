@@ -14,7 +14,8 @@ import type {
   Stabsfunktion,
 } from '../../api/types';
 import type { Quelle } from '../../stab/luecken';
-import Organigramm, { OrganigrammBild } from './Organigramm';
+import Organigramm, { OrganigrammBild, organigrammZielStil } from './Organigramm';
+import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
 
 vi.mock('../../api/einsaetze', () => ({ ladeModulOverrides: vi.fn() }));
@@ -448,5 +449,33 @@ describe('Organigramm — Druck', () => {
     expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
     await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
     drucke.mockRestore();
+  });
+});
+
+/**
+ * Trefffläche der Namenslinks (LFH-365, Muster `bedienzielStil`): ein `<a>` erbt keine
+ * Steuerhöhe. Geprüft wird die reine Stilfunktion gegen die Dichtestufen; die Böden stehen als
+ * LITERALE da, sonst prüfte der Token sich selbst.
+ */
+describe('organigrammZielStil', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+  });
+
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(organigrammZielStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(organigrammZielStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(organigrammZielStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  it('ist ein Block in der Zeile, damit die Höhe greift', () => {
+    expect(organigrammZielStil(tokenFuer('kompakt')).display).toBe('inline-flex');
+  });
+
+  it('hängt an den Namenslinks', () => {
+    bild();
+    const link = screen.getByRole('link', { name: 'EA Nord' });
+    expect(link.style.display).toBe('inline-flex');
+    expect(link.style.minHeight).not.toBe('');
   });
 });
