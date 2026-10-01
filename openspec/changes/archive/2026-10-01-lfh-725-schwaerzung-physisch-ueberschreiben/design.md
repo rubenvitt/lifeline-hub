@@ -18,7 +18,7 @@ Hash in der DB.
 | --- | --- | --- |
 | OFF | gefunden / gefunden | gefunden / leer |
 | FAST | gefunden / gefunden | **gefunden** / leer |
-| ON | gefunden / – | **sauber / leer** |
+| ON | gefunden / sauber | **sauber / leer** |
 
 Unter `ON` liegt der Vorzustand bis zum Checkpoint noch in der Hauptdatei, weil die genullten
 Seiten zunächst nur im WAL stehen. Erst `ON` zusammen mit dem Checkpoint erfüllt das
@@ -60,11 +60,13 @@ Pool-Verbindung, und ein Test pinnt es analog `connect_enables_wal_and_foreign_k
 
 ### 2. `wal_checkpoint(TRUNCATE)` nach erfolgreicher Phase B, mit Nachholen
 
-Neue Hilfe `db::wal_zurueckschreiben(pool) -> Result<bool, AppError>`: Sie führt
-`PRAGMA wal_checkpoint(TRUNCATE)` aus und liefert `true` nur bei `busy = 0`. Der
-Purge-Scheduler ruft sie nach Phase B auf, sobald mindestens ein Einsatz geschwärzt wurde.
+Neue Hilfe `db::wal_zurueckschreiben(pool) -> Result<bool, sqlx::Error>`
+(`src/db/physisch.rs`): Sie führt `PRAGMA wal_checkpoint(TRUNCATE)` aus und liefert `true`
+nur bei `busy = 0`. Der Purge-Scheduler ruft sie nach Phase B auf, sobald mindestens ein
+Einsatz geschwärzt wurde.
 Bleibt der Rückschrieb unvollständig, merkt sich die Scheduler-Schleife das
-(`checkpoint_ausstehend`, im Speicher) und versucht es in jedem Tick erneut, bis es gelingt.
+(`rueckschrieb_ausstehend`, im Speicher, über `tick_mit_rueckschrieb`) und versucht es in jedem
+Tick erneut, bis es gelingt. Die Schleife startet mit `true`, der erste Tick läuft sofort.
 Zusätzlich läuft ein TRUNCATE-Checkpoint beim Serverstart (Entscheidung 3). Das deckt einen
 Absturz zwischen Schwärzung und Rückschrieb ab, denn ein verwaister WAL wird beim Öffnen
 wiederhergestellt und beim Start zurückgeschrieben.
@@ -75,8 +77,9 @@ wiederhergestellt und beim Start zurückgeschrieben.
 - *Warum nicht jeder Tick:* TRUNCATE hält beim Warten auf Lesende die Schreibsperre, bis zu
   `busy_timeout`. Alle 10 Minuten bis zu 5 s Schreibstau im laufenden Einsatz wären ein
   schlechter Tausch. Nach einer Schwärzung passiert das einmal je Einsatz-Lebensdauer.
-- *Warum ein Flag im Speicher statt in der DB:* Nach einem Neustart erledigt der
-  Start-Checkpoint dasselbe, ein persistierter Merker brächte nur Schema.
+- *Warum ein Flag im Speicher statt in der DB:* Nach einem Neustart erledigen der
+  Start-Checkpoint und der erste Tick (Flag startet mit `true`) dasselbe, ein persistierter
+  Merker brächte nur Schema.
 
 ### 3. Einmaliges `VACUUM` beim Serverstart für den Altbestand
 
@@ -100,8 +103,9 @@ Schwärzung in Sicherungen. Gefordert ist, dass sie mit begrenzter Laufzeit hera
 ein Restore die Löschung erneut anwendet. Beides lässt sich hier belegen:
 
 - **Auto-Sicherungen** rotieren nach `--backup-behalten` × `--backup-intervall-minuten` heraus,
-  mit den Vorgaben 7 × 6 h ≈ 42 h. Die Doku nennt die Formel und rät, das Produkt klein zu
-  halten.
+  mit den Vorgaben 7 × 6 h ≈ 42 h. Gezählt wird Betriebszeit mit gelingenden Sicherungen: der
+  Scheduler rotiert erst nach einer erfolgreichen neuen Sicherung, und ein früheres
+  Zielverzeichnis rotiert gar nicht mehr. Die Doku nennt die Formel und diese Grenzen.
 - **Downloads (`/api/backup`, CLI `backup`) und externe Kopien** verwaltet der Betreiber. Die
   Doku sagt, dass solche Kopien nach der Karenz zu vernichten sind.
 - **Restore:** Ist der Einsatz in der Sicherung schon vorgemerkt, schwärzt der nächste
@@ -115,42 +119,53 @@ Altbestand bei Downloads und externen Kopien erreicht es trotzdem nicht.
 
 ### 5. Messung
 
-Ein `#[ignore]`-Test `secure_delete_messung` in `src/db.rs`, aufrufbar mit
-`cargo test --release secure_delete_messung -- --ignored --nocapture`. Er fährt drei Lasten
+Ein `#[ignore]`-Test `secure_delete_messung` in `src/db/physisch.rs`, aufrufbar mit
+`cargo test --release --lib secure_delete_messung -- --ignored --nocapture`. Er fährt drei Lasten
 mit OFF und mit ON auf einem Datei-Pool: ETB-artiges Anhängen, Personen-Scrub mit
 Anhang-Löschung und den Checkpoint danach. Er gibt die geschriebenen WAL-Bytes (Dateigröße vor
 dem Checkpoint) und die Laufzeit aus. Die WAL-Bytes sind die hardwareunabhängige Größe; sie
 übertragen sich auf den Pi über dessen Schreibrate.
 
-**Vormessung (Python/SQLite 3.45, Container, 2 Läufe):**
+**Messung (`secure_delete_messung`, Release-Build, Container mit 4 Xeon-Kernen à 2,1 GHz und
+Cloud-Platte, 01.10.2026):**
 
-| Last | WAL-Bytes OFF | WAL-Bytes ON | Zeit OFF | Zeit ON |
+| Last | WAL OFF | WAL ON | Zeit OFF | Zeit ON |
 | --- | --- | --- | --- | --- |
-| 5000 Anhäng-Transaktionen | 23,2 MB | 23,2 MB | 1,2–2,1 s | 1,5–1,7 s (Rauschen) |
-| Scrub 2000 Personen + 50 MB Anhänge | 0,5 MB | 50,8 MB | 0,02 s | 0,14 s |
-| Checkpoint danach | – | – | 0,003 s | 0,12 s |
+| 5000 Anhäng-Transaktionen | 22,9 MB | 22,9 MB | 2,24 / 2,63 s | 2,63 / 2,35 s |
+| Schwärzung 2000 Personen + 50 MB Anhänge (eine Tx) | 0,5 MB | 50,8 MB | 0,02 s | 0,16 s |
+| Rückschrieb danach (50 MB) | – | – | 0,00 s | 0,15 s |
+| Schwärzung 2000 Personen + 500 MB Anhänge (eine Tx) | 0,9 MB | 504,1 MB | 0,15 s | 1,47 s |
+| Rückschrieb danach (500 MB) | – | – | 0,01 s | 1,21 s |
 
-Einordnung: Auf dem Anhäng-Pfad, also ETB, Meldungen und Lage, kostet `ON` nichts, weil dort
-nichts frei wird. Beim Löschen schreibt `ON` die freigewordenen Bytes einmal genullt nach,
-der Mehraufwand ist proportional zur gelöschten Menge. Auf einer SD-Karte mit ~20 MB/s sind
-das für 50 MB Anhänge rund 2,5 s im Hintergrund-Purge, einmal je Einsatz. Die Rust-Messung
-ersetzt diese Zahlen bei der Umsetzung, und das Ergebnis kommt in diesen Abschnitt.
+Eine Vormessung mit Python/SQLite 3.45 ergab dasselbe Bild.
+
+Einordnung: Auf dem Anhäng-Pfad, also ETB, Meldungen und Lage, kostet `ON` nichts. Die
+WAL-Bytes sind gleich, die Zeiten streuen in beide Richtungen, weil dort nichts frei wird.
+Beim Löschen schreibt `ON` die freigewordenen Bytes einmal genullt nach. Der Mehraufwand ist
+proportional zur gelöschten Menge, rund 1 MB WAL je MB gelöschter Daten. Für den Pi zählt
+seine Schreibrate. Mit einer SD-Karte (~20 MB/s) dauert eine Schwärzung mit 50 MB Anhängen
+geschätzt ~2,5 s, eine mit 500 MB ~25 s, dazu kommt jeweils der Rückschrieb. Mit einer SSD
+über USB 3 (~200 MB/s) bleiben 500 MB unter 3 s. Das passiert einmal je Einsatz, im
+Hintergrund-Purge.
 
 ## Risks / Trade-offs
 
 - [Lange Schreibsperre bei großen Anhangsmengen: Die Schwärzung ist atomar, und unter `ON`
-  wächst ihre Commit-Zeit mit der Anhangsgröße. Bei mehreren hundert MB Fotos auf dem Pi
-  könnte sie `busy_timeout` (5 s) überschreiten, und gleichzeitige Schreiber eines aktiven
-  Einsatzes bekämen 503.] → Die Messung prüft das mit 500 MB. Liegt die Zeit darüber, kommt das
-  als Befund an den Freigabe-Checkpoint der Umsetzung. Die Atomarität aufzugeben, etwa durch
-  BLOBs vorab in Einzeltransaktionen, wäre eine Spec-Änderung.
-- [Erster Start nach dem Update dauert länger und braucht freien Platz in DB-Größe.] → Fehler
-  blockieren den Start nicht. Die Doku nennt den Platzbedarf, und das Log meldet Beginn, Dauer
-  und Ergebnis.
+  wächst ihre Commit-Zeit mit der Anhangsgröße. Gemessen: 500 MB in 1,47 s auf der Cloud-Platte.
+  Hochgerechnet auf einen Pi mit SD-Karte sind es ~25 s. Gleichzeitige Schreibende
+  (`busy_timeout` 5 s, `write_retry!` bis 4 × 5 s) bekämen in der Zeit 503.] → Befund am
+  Review-Checkpoint. Betroffen ist nur ein Pi mit SD-Karte, mit sehr vielen Anhängen an einem
+  geschwärzten Einsatz, und nur, wenn gleichzeitig ein anderer Einsatz schreibt. Abhilfe ohne
+  Spec-Änderung gibt es nicht, denn genullt werden muss jedes Byte. Abhilfe mit Spec-Änderung:
+  die Anhang-BLOBs vor der atomaren Schwärzung in Einzeltransaktionen leeren und so die
+  Atomarität für Anhänge lockern. Das ist ein eigener Task (LFH-905).
+- [Erster Start nach dem Update dauert länger und braucht freien Platz bis zur doppelten
+  DB-Größe (temporäre Kopie und WAL).] → Fehler blockieren den Start nicht. Die Doku nennt den
+  Platzbedarf, und das Log meldet Beginn, Dauer und Ergebnis.
 - [Restore einer Sicherung von **vor** der Vormerkung: Phase A merkt den Einsatz neu vor, und
   die Karenz läuft weitere 30 Tage.] → Die Doku nennt das. Der Fall ist auf manuelle
-  Sicherungen begrenzt, die älter als die Karenz sind (Auto-Sicherungen ≤ 42 h). Ihn zu
-  schließen hieße die Karenz-Semantik zu ändern, das ist ein eigener Task.
+  Sicherungen begrenzt, die älter als die Karenz sind (Auto-Sicherungen im Dauerbetrieb
+  ≈ 42 h). Ihn zu schließen hieße die Karenz-Semantik zu ändern, das ist ein eigener Task (LFH-906).
 - [Spuren unterhalb von SQLite (Dateisystem, SSD).] → Die Doku empfiehlt
   Datenträgerverschlüsselung. Außerhalb dessen, was die Anwendung leisten kann.
 

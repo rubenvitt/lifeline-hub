@@ -7,15 +7,16 @@
 Nach einer erfolgreichen Schwärzung MUST kein geschwärzter Wert mehr als Bytefolge in der
 Datenbankdatei oder ihrem Write-Ahead-Log stehen. Das gilt für jede Scrub-Spalte und für jede
 Zeile, die die Schwärzung löscht, Datei-Anhänge eingeschlossen. Kann der Rückschrieb des Logs
-nicht sofort vollständig erfolgen, etwa weil Lesende aktiv sind, MUST ihn das System spätestens
-im nächsten Purge-Lauf nachholen.
+nicht sofort vollständig erfolgen, etwa weil eine andere Verbindung liest, MUST das System ihn
+in jedem folgenden Purge-Lauf erneut versuchen, bis er gelingt, auch über einen Neustart
+hinweg.
 
 #### Scenario: Gepflanzter Klartext nach der Schwärzung
 - **WHEN** ein Einsatz mit einem eindeutigen Klartext in einer Scrub-Spalte und in einem Datei-Anhang geschwärzt wird
 - **THEN** kommt der Klartext weder in der Datenbankdatei noch im Write-Ahead-Log als Bytefolge vor
 
 #### Scenario: Rückschrieb blockiert
-- **WHEN** der Rückschrieb des Logs nach einer Schwärzung wegen eines aktiven Lesevorgangs unvollständig bleibt
+- **WHEN** der Rückschrieb des Logs nach einer Schwärzung wegen eines aktiven Lesevorgangs unvollständig bleibt und der Lesevorgang danach endet
 - **THEN** führt der nächste Purge-Lauf ihn vollständig aus
 - **AND** kommt der Klartext danach in keiner der beiden Dateien vor
 

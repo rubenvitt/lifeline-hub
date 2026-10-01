@@ -18,13 +18,14 @@ entfernt“. Betroffen sind alle Scrub-Spalten und `ZeileLoeschen`. Das ist ein 
 - Nach einer erfolgreichen Schwärzung schreibt das System den WAL per
   `wal_checkpoint(TRUNCATE)` zurück und kürzt ihn. Erst damit sind die genullten Seiten in der
   Hauptdatei, und der WAL trägt keinen Vorzustand mehr. Bleibt der Checkpoint wegen aktiver
-  Leser unvollständig, holt der nächste Purge-Lauf ihn nach.
+  Leser unvollständig, versucht es jeder folgende Purge-Lauf erneut, bis es gelingt.
 - Altbestand: Datenbanken, die vor dieser Änderung geschwärzt oder sonst bereinigt wurden,
   tragen die Altbytes weiter. Ein einmaliges `VACUUM` beim Serverstart baut die Datei neu auf.
   Eine Markierung in `app_meta` sorgt dafür, dass es genau einmal läuft.
 - Sicherungen: Die Betriebsdoku beschreibt, wie lange PII nach einer Schwärzung noch in
-  Sicherungen liegt. Bei automatischen Sicherungen ist das höchstens Intervall × Anzahl, mit
-  den Vorgaben rund 42 h. Bei Downloads und externen Kopien ist der Betreiber verantwortlich.
+  Sicherungen liegt. Bei automatischen Sicherungen ist das Intervall × Anzahl an Betriebszeit
+  mit gelingenden Sicherungen, mit den Vorgaben rund 42 h. Bei Downloads und externen Kopien
+  ist der Betreiber verantwortlich.
   Spielt jemand eine Sicherung von vor der Schwärzung zurück, schwärzt der nächste Purge-Lauf
   erneut. Ein Test belegt das.
 - Ein Test belegt: Nach der Schwärzung kommt ein gepflanzter Klartext weder in der DB-Datei
@@ -47,12 +48,13 @@ _keine_
 
 ## Impact
 
-- **Backend:** `src/db.rs` (`connect`, `test_pool_datei`, neue Checkpoint-Hilfe, einmaliges
-  Verdichten), `src/einsatz/purge_scheduler.rs` (Checkpoint nach Phase B, Nachholen),
-  `src/main.rs` (Start-Verdichtung), neue Tests in `src/db.rs` und `tests/`.
+- **Backend:** `src/db.rs` (`connect`, `test_pool_datei`), neu `src/db/physisch.rs`
+  (Rückschrieb, einmaliges Verdichten, Messung), `src/einsatz/purge_scheduler.rs` (Rückschrieb
+  nach Phase B, Nachholen, Akzeptanz- und Restore-Test), `src/main.rs` (Start).
 - **Arbeitsanleitung:** `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“.
 - **Doku:** `docs/betrieb/backup-restore.md` (Sicherungen und Schwärzung).
 - Keine API-, DTO- oder Schemaänderung, keine Migration.
 - Laufzeit: Löschungen und Updates schreiben mehr Seiten, Anhänge überwiegend. Der
   Append-Pfad (ETB, Meldungen) bleibt unberührt, Messung in `design.md`. Der erste Start nach
-  dem Update braucht für das `VACUUM` Zeit und vorübergehend Plattenplatz in DB-Größe.
+  dem Update braucht für das `VACUUM` Zeit und vorübergehend Plattenplatz bis zur doppelten
+  DB-Größe.
