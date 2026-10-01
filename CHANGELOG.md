@@ -1,3 +1,49 @@
+## [1.0.0-alpha.64](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.63...v1.0.0-alpha.64) (2026-10-01)
+
+### Wichtige Änderungen
+
+- **Datenbankmigrationen**: Diese Version enthält neue Migrationen für die Verpflegungserfassung und die Protokollierung von Druckvorgängen. Ein Datenbankupgrade ist erforderlich.
+
+### Betroffene und Schadenserfassung
+
+- **Druckansichten**: Die Listen für Betroffene, Tiere und Schäden können jetzt ausgedruckt werden. Der Ausdruck ist gefiltert nach den in der Liste gewählten Kriterien (Status, Spezies, Sichten) und funktioniert auch offline mit den zuletzt geladenen Daten.
+- **Zugriffsprotokolle**: Der Ausdruck der Betroffenenliste wird automatisch im Zugriffsprotokoll vermerkt – auch wenn die Druckfunktion nicht abgeschlossen wird.
+- **Offline-Verhalten**: Druckansichten zeigen jetzt eine Fehlermeldung, wenn keine Verbindung besteht, statt veraltete Daten anzuzeigen.
+
+### Kräfte und Mittel
+
+- **Verpflegungsausgaben offline erfassen**: Ausgaben von Verpflegung können jetzt auch ohne Internetverbindung erfasst werden. Sie werden vorgemerkt und automatisch synchronisiert, sobald die Verbindung wiederhergestellt ist. Vorgemerkte Ausgaben erscheinen als „ausstehend" in der Zeitfenster-Ansicht.
+- **Zeiteingaben**: Uhrzeiten bei Schichtbeginn, Ablösung und Nachträgen in der Kräfte-Zeitachse folgen jetzt der eingestellten Zeitzone des Einsatzes statt der Gerätezeit.
+- **Druckansicht**: Die Kräfteübersicht kann ausgedruckt werden.
+
+### Einsatztagebuch
+
+- **Zeiteingaben**: Ereigniszeiten, Wiedervorlage und Zeitraumfilter im Einsatztagebuch folgen jetzt der eingestellten Zeitzone des Einsatzes. Dies gilt auch für die Textbausteine `{datum}` und `{uhrzeit}`.
+- **Wiederhergestellte Entwürfe**: Die Ereigniszeit wiederhergestellter Einträge wird jetzt in der korrekten Zeitzone angezeigt.
+
+### Kommunikation
+
+- **Zeiteingaben**: Ereigniszeiten bei Meldungen, Fälligkeiten von Aufträgen und Erinnerungen sowie Fristen folgen jetzt der eingestellten Zeitzone des Einsatzes. Die Einteilung „Heute fällig" und „Überfällig" richtet sich nach dem Kalendertag der Einsatzzone, nicht nach der Gerätezeit.
+
+### Führung
+
+- **Lageberichte**: Zeitpunkte und „Zuletzt gespeichert" bei Lageberichten folgen jetzt der Zeitzone des Einsatzes. Der vorgeschlagene Berichtstitel verwendet die korrekte Uhrzeit.
+- **Presse**: Eingangszeitpunkte von Presseanfragen und Veröffentlichungszeiten von Pressemitteilungen folgen der Einsatzzone.
+- **Lagebesprechungen**: Termine, Zeitpunkte und Schnellwahlen für Lagebesprechungen folgen der Einsatzzone.
+- **Infotelefon**: Zeitstände folgen der Einsatzzone.
+
+### Verwaltung
+
+- **Einsatzdaten**: Die Eingabe von Einsatzbeginn, -ende und anderen Zeitangaben folgt jetzt der eingestellten Zeitzone der Organisation bzw. des Einsatzes. Ein Hinweis erscheint, wenn die Browserzone von der Anzeigezone abweicht.
+- **Archivakte**: Die Archivansicht eines Einsatzes verwendet dessen Zeitzone, die Archivliste verwendet die Zeitzone der Organisation.
+- **Aufbewahrungsfristen**: Zeitpunkte bei der Festlegung von Aufbewahrungsfristen folgen der Organisationszone.
+- **Ablösungshinweise**: Die Uhrzeit im Ablösungshinweis der Alarmzentrale folgt der Einsatzzone.
+- **Pegelprognosen**: Zeitpunkte folgen der Einsatzzone.
+
+### Betrieb
+
+- **Live-Updates**: Die Einsatzliste und Stammdaten (z. B. Alarmstichwörter, Einheiten, Fahrzeuge) werden jetzt in Echtzeit aktualisiert, auch wenn kein Einsatz geöffnet ist. Jeder Browser-Tab hält genau eine Verbindung zum Server.
+
 ## [1.0.0-alpha.63](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.62...v1.0.0-alpha.63) (2026-10-01)
 
 ### Wichtige Änderungen
