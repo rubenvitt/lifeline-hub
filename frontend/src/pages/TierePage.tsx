@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
+import { Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
 import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -8,6 +8,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import {
+  ladeTiereExport,
   legeTierAn,
   listeTiere,
   tierRegistrierAnzeige,
@@ -37,6 +38,8 @@ import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { registrierNummer } from '../anzeige/registrierNummer';
+import { useCsvExport } from '../components/useCsvExport';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 
 const STATUS_META = TIER_STATUS;
 
@@ -237,6 +240,7 @@ export default function TierePage() {
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
 
   const fehler = useFehlerMeldung();
+  const csvExport = useCsvExport(einsatzId, 'tiere', ladeTiereExport);
 
   useEffect(() => {
     if (highlight?.einsatzId !== einsatzId) return;
@@ -287,6 +291,7 @@ export default function TierePage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
 
   const alle = frischAngelegt.alle;
   const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
@@ -324,24 +329,38 @@ export default function TierePage() {
         />
       }
       aktionen={
-        darfSchreiben && (
-          <Space wrap style={{ minWidth: 0 }}>
-            <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>
-              Schnellerfassung
-            </Button>
-            <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>
-              Vermisst melden
-            </Button>
-          </Space>
-        )
+        <Space wrap style={{ minWidth: 0 }}>
+          {darfSchreiben && (
+            <>
+              <Button type="primary" onClick={() => setModus({ einsatzId, wert: 'schnell' })}>
+                Schnellerfassung
+              </Button>
+              <Button onClick={() => setModus({ einsatzId, wert: 'vermisst' })}>
+                Vermisst melden
+              </Button>
+            </>
+          )}
+          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (`frontend/AGENTS.md`,
+              Aktionen). Ohne Schreib-Riegel: der Endpunkt verlangt nur den Lesezugriff, den schon
+              die Liste braucht. */}
+          <Button loading={csvExport.laeuft} onClick={csvExport.exportieren}>
+            CSV exportieren
+          </Button>
+        </Space>
       }
       // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
       // Rechte-Riegel wie der Knopf.
       neueZeile={darfSchreiben ? () => setModus({ einsatzId, wert: 'schnell' }) : undefined}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        (nurAnsicht || csvExport.fehler != null) && (
+          <SeitenHinweise
+            rechteText="Einsatz ist abgeschlossen — nur Ansicht."
+            rechteFehlt={nurAnsicht}
+            fehler={csvExport.fehler}
+            fehlerTitel="Export fehlgeschlagen"
+            fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
+          />
         )
       }
     >

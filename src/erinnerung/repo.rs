@@ -200,16 +200,25 @@ pub struct FaelligeErinnerung {
 /// Offene, fällige Erinnerungen (`faellig_at <= jetzt`), die für ihren aktuellen Slot noch nicht
 /// benachrichtigt wurden (`zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at`).
 /// Einsatzübergreifend, der Scheduler läuft global.
+///
+/// Nur aus **aktiven** Einsätzen (LFH-699): ein abgeschlossener Einsatz ist eingefroren
+/// (`fordere_aktiv`), auch in der Nachlauffrist könnte niemand die Erinnerung quittieren.
+/// Soft-gelöschte und geschwärzte Einsätze sind immer abgeschlossen; die beiden Tombstones
+/// stehen trotzdem im WHERE, damit der Riegel nicht an dieser Invariante hängt. Die Erinnerung
+/// bleibt dabei stehen: kein `zuletzt_ausgeloest_at`, kein Weiterrücken.
 pub async fn faellige_zum_ausloesen(
     pool: &SqlitePool,
     jetzt: &str,
 ) -> Result<Vec<FaelligeErinnerung>, AppError> {
     sqlx::query_as::<_, FaelligeErinnerung>(
-        "SELECT id, einsatz_id, faellig_at, intervall_minuten, bezug_typ, bezug_id, titel \
-         FROM erinnerung \
-         WHERE status = 'offen' AND faellig_at <= ? \
-           AND (zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at) \
-         ORDER BY faellig_at, id",
+        "SELECT e.id, e.einsatz_id, e.faellig_at, e.intervall_minuten, e.bezug_typ, \
+                e.bezug_id, e.titel \
+         FROM erinnerung e \
+         JOIN einsatz ei ON ei.id = e.einsatz_id \
+         WHERE e.status = 'offen' AND e.faellig_at <= ? \
+           AND (e.zuletzt_ausgeloest_at IS NULL OR e.zuletzt_ausgeloest_at < e.faellig_at) \
+           AND ei.status = 'aktiv' AND ei.geloescht_at IS NULL AND ei.geschwaerzt_at IS NULL \
+         ORDER BY e.faellig_at, e.id",
     )
     .bind(jetzt)
     .fetch_all(pool)

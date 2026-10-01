@@ -1,5 +1,4 @@
-import { IkonePunkteSenkrecht } from '../ikonen';
-import { Button, Dropdown, Space } from 'antd';
+import { Button, Space } from 'antd';
 import {
   useCallback,
   useId,
@@ -12,6 +11,7 @@ import {
 import { Link } from 'react-router';
 import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import { HERVORGEHOBEN } from '../components/Datensicht';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import Markdown from '../components/Markdown';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import {
@@ -212,47 +212,34 @@ export default function EtbZeitachse({
     // Ausstehend: noch nicht im Tagebuch — nichts zu berichtigen, nichts zu beauftragen.
     if (z.art === 'ausstehend') return null;
     const e = z.eintrag;
-    const items = [
+    const eintraege: MenueEintrag<'berichtigen' | 'wiedervorlage' | 'auftrag'>[] = [
       ...(onBerichtigen && e.typ !== 'berichtigung'
         ? [
             {
-              key: 'berichtigen',
+              key: 'berichtigen' as const,
               label: berichtigenGesperrt ? `Berichtigen (${berichtigenGesperrt})` : 'Berichtigen',
-              disabled: !!berichtigenGesperrt,
+              ...(berichtigenGesperrt ? { gesperrt: true as const } : {}),
             },
           ]
         : []),
-      ...(onWiedervorlage ? [{ key: 'wiedervorlage', label: 'Wiedervorlage' }] : []),
-      ...(onAuftragErteilen ? [{ key: 'auftrag', label: 'Auftrag erteilen' }] : []),
+      ...(onWiedervorlage ? [{ key: 'wiedervorlage' as const, label: 'Wiedervorlage' }] : []),
+      ...(onAuftragErteilen ? [{ key: 'auftrag' as const, label: 'Auftrag erteilen' }] : []),
     ];
-    // Kein Auslöser statt eines leeren oder deaktivierten Menüs.
-    if (items.length === 0) return null;
+    // Auch hier, nicht nur im Baustein: `Zeitachseneintrag` zeigt seine Fußzeile, sobald
+    // `aktionen` nicht `null` ist.
+    if (eintraege.length === 0) return null;
+    // Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
+    // auseinanderzuhalten.
     return (
-      <Dropdown
-        trigger={['click']}
-        autoFocus
-        menu={{
-          items,
-          // Zuordnung am Menü, nicht je Eintrag (Muster `AnsichtSwitcher.tsx`).
-          onClick: ({ key }) => {
-            if (key === 'berichtigen') onBerichtigen?.(e);
-            if (key === 'wiedervorlage') onWiedervorlage?.(e);
-            if (key === 'auftrag') onAuftragErteilen?.(e);
-          },
+      <MenueAusloeser
+        eintraege={eintraege}
+        zugaenglicherName={`Aktionen zu Eintrag ${e.lfd_nr}`}
+        onWahl={(key) => {
+          if (key === 'berichtigen') onBerichtigen?.(e);
+          if (key === 'wiedervorlage') onWiedervorlage?.(e);
+          if (key === 'auftrag') onAuftragErteilen?.(e);
         }}
-      >
-        {/* Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
-           auseinanderzuhalten. Kein `size` — die Höhe kommt aus `controlHeight`. */}
-        <Button
-          type="text"
-          aria-label={`Aktionen zu Eintrag ${e.lfd_nr}`}
-          icon={
-            <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-              <IkonePunkteSenkrecht />
-            </span>
-          }
-        />
-      </Dropdown>
+      />
     );
   }
 

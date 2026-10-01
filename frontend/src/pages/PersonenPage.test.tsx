@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
@@ -27,6 +27,7 @@ import { useOfflineSync } from '../offline/useOfflineSync';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import * as dateiSpeichern from '../components/dateiSpeichern';
 
 /**
  * Die echte Karte braucht WebGL, jsdom hat keins — Stub nach dem Muster von
@@ -1452,6 +1453,64 @@ describe('PersonenPage', () => {
         client_id: expect.any(String),
       });
     });
+  });
+});
+
+/**
+ * CSV-Export (LFH-728). Der Endpunkt verlangt nur Lesezugriff auf das Modul — dasselbe Recht wie
+ * die Liste —, schreibt aber je Abruf einen Audit-Eintrag. Ein Abruf je Klick, nie beim Laden.
+ */
+describe('PersonenPage — CSV-Export (LFH-728)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('lädt erst auf Klick, genau einmal, und speichert unter einem Dateinamen mit Einsatz', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/personen/export', () => {
+        abrufe += 1;
+        return new HttpResponse('registrier_nr;status\nR-001;"erfasst"\n');
+      }),
+    );
+    render(einsatzAktiv, [person]);
+    const knopf = await screen.findByRole('button', { name: 'CSV exportieren' });
+    expect(abrufe).toBe(0);
+
+    await userEvent.click(knopf);
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    expect(abrufe).toBe(1);
+    const [datei, name] = speichern.mock.calls[0];
+    expect(await (datei as Blob).text()).toContain('R-001');
+    expect(name).toMatch(/^personen-einsatz-1-\d{4}-\d{2}-\d{2}-\d{4}\.csv$/);
+  });
+
+  it('steht auch für Beobachter im Kopf', async () => {
+    render(einsatzBeobachter, [person]);
+    const kopf = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(within(kopf).getByRole('button', { name: 'CSV exportieren' })).toBeInTheDocument();
+    expect(within(kopf).queryByRole('button', { name: 'Schnellerfassung' })).toBeNull();
+  });
+
+  it('zeigt den Fehler an der Seite neben dem Abschluss-Hinweis, nicht im Toast', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    server.use(
+      http.get('/api/einsaetze/1/personen/export', () =>
+        HttpResponse.json({ error: 'Kein Zugriff auf das Modul Personen' }, { status: 403 }),
+      ),
+    );
+    render(einsatzFixture({ status: 'abgeschlossen' }), [person]);
+    await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+
+    const meldung = await screen.findByText('Kein Zugriff auf das Modul Personen');
+    expect(meldung.closest('.ant-message')).toBeNull();
+    expect(meldung.closest('.ant-alert')).not.toBeNull();
+    expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Einsatz ist abgeschlossen — nur Ansicht.')).toBeInTheDocument();
+    expect(speichern).not.toHaveBeenCalled();
   });
 });
 

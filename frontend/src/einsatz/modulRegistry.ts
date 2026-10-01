@@ -55,13 +55,14 @@ export type ServerZaehlerQuelle =
   | 'meldungen'
   | 'auftraege'
   | 'erinnerungen'
-  | 'chat';
+  | 'chat'
+  | 'dokumente';
 /**
  * Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet: `abloesung` hängt an der
  * Uhr (Vorwarnzeit), `betreuung` teilt sich die Übersicht mit Seite und Kennzahl,
  * `wetter-pegel` zählt Unwetterwarnungen aus einer externen Quelle ohne Live-Ereignis (LFH-663).
  */
-export type ClientZaehlerQuelle = 'dokumente' | 'abloesung' | 'betreuung' | 'wetter-pegel';
+export type ClientZaehlerQuelle = 'abloesung' | 'betreuung' | 'wetter-pegel';
 export type ModulZaehlerQuelle = ServerZaehlerQuelle | ClientZaehlerQuelle;
 
 export interface Kategorie {

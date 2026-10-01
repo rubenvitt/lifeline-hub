@@ -335,12 +335,12 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Leerzustand Titel`,
       werte,
     );
-    // Der Hinweissatz kommt aus dem geteilten `SeitenLeer` in `schwach` (LFH-643). Gemessen
-    // und notiert, gesichert nur der absolute Boden 4,5 : 1.
+    // Der Hinweissatz kommt aus dem geteilten `SeitenLeer` in `schwach`; seit LFH-643 voller
+    // Boden.
     await misst(
       page.getByText(/Eine Koordinate lässt sich/),
-      4.5,
-      `${modus}/Leerzustand Hinweis (LFH-643)`,
+      minimum,
+      `${modus}/Leerzustand Hinweis`,
       werte,
     );
 

@@ -484,7 +484,9 @@ export default function UeberblickPage() {
             Hinweis nach unten. Das Laden zeigt der Spinner am Einsatznamen der Kopfleiste. */}
         {einsatzQ.isLoading ? null : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
-            <Kennzahlenband beschriftung="Lage in Zahlen" notizZeilenSchmal={2}>
+            {/* Notizplatz wie im Lage-Dashboard: unter `md` Boden (LFH-629), ab `md` drei Zeilen
+              Boden und Deckel (LFH-691). */}
+            <Kennzahlenband beschriftung="Lage in Zahlen" notizZeilenSchmal={2} notizZeilen={3}>
               <Kennzahl
                 titel="Betroffene"
                 groesse="gross"
