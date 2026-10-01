@@ -2,9 +2,13 @@ use super::{Material, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
-/// Spaltenliste für `SELECT` in der Reihenfolge von `Material` (FromRow).
+/// Spaltenliste für `SELECT … FROM material` in der Reihenfolge von `Material` (FromRow).
+/// `ist_demo` liest die Demo-Marke live (LFH-733, design.md D1); `material.id` qualifiziert,
+/// damit der Unterselect an die äußere Zeile bindet.
 const SPALTEN: &str = "id, org_id, bezeichnung, kategorie, bestandsnummer, \
-     traegerorganisation, standort, bemerkung, dienststatus, angelegt_at";
+     traegerorganisation, standort, bemerkung, dienststatus, angelegt_at, \
+     EXISTS(SELECT 1 FROM demo_herkunft dh \
+            WHERE dh.tabelle = 'material' AND dh.datensatz_id = material.id) AS ist_demo";
 
 /// Editierbare Stammfelder. Optional-Strings sind bereits getrimmt; leer → `None`.
 #[derive(Debug)]
@@ -587,5 +591,25 @@ mod tests {
                 .unwrap_err(),
             AppError::Conflict(_)
         ));
+    }
+
+    /// LFH-733: `ist_demo` kommt live aus `demo_herkunft`, in `liste` (beide Filter) und in
+    /// `laden`.
+    #[tokio::test]
+    async fn ist_demo_folgt_der_marke() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let demo = anlegen(&pool, 1, daten("Demo-Decke")).await.unwrap();
+        let echt = anlegen(&pool, 1, daten("Echte Decke")).await.unwrap();
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "material", demo.id).await;
+
+        for nur_im_dienst in [false, true] {
+            let alle = liste(&pool, 1, nur_im_dienst).await.unwrap();
+            let marke = |id| alle.iter().find(|m| m.id == id).unwrap().anzeige().ist_demo;
+            assert!(marke(demo.id), "nur_im_dienst={nur_im_dienst}");
+            assert!(!marke(echt.id), "nur_im_dienst={nur_im_dienst}");
+        }
+        assert!(laden(&pool, 1, demo.id).await.unwrap().ist_demo);
+        assert!(!laden(&pool, 1, echt.id).await.unwrap().ist_demo);
     }
 }

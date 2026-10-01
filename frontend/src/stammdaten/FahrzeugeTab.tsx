@@ -1,4 +1,5 @@
-import { Button, type TableColumnsType } from 'antd';
+import { Button, Space, type TableColumnsType } from 'antd';
+import DemoMarke from '../components/DemoMarke';
 import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
@@ -56,9 +57,12 @@ export default function FahrzeugeTab() {
        * gleichzeitig feuern könnten.
        */
       render: (_, f) => (
-        <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
-          {f.funkrufname}
-        </Link>
+        <Space size={4}>
+          <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
+            {f.funkrufname}
+          </Link>
+          {f.ist_demo && <DemoMarke />}
+        </Space>
       ),
     },
     { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },

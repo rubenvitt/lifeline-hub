@@ -3,9 +3,13 @@ use crate::error::AppError;
 use crate::katalog::{DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
 use sqlx::{SqliteConnection, SqlitePool};
 
-/// Spaltenliste für `SELECT` in der Reihenfolge von `Personal` (FromRow).
+/// Spaltenliste für `SELECT … FROM personal` in der Reihenfolge von `Personal` (FromRow).
+/// `ist_demo` liest die Demo-Marke live (LFH-733, design.md D1); `personal.id` qualifiziert,
+/// damit der Unterselect an die äußere Zeile bindet.
 const SPALTEN: &str = "id, org_id, benutzer_id, name, personalnummer, traegerorganisation, \
-     telefon, staerke_position, bemerkung, dienststatus, angelegt_at";
+     telefon, staerke_position, bemerkung, dienststatus, angelegt_at, \
+     EXISTS(SELECT 1 FROM demo_herkunft dh \
+            WHERE dh.tabelle = 'personal' AND dh.datensatz_id = personal.id) AS ist_demo";
 
 /// Editierbare Stammfelder. Optional-Strings sind bereits getrimmt (leer → `None`),
 /// `staerke_position` bereits gegen das Enum validiert.
@@ -163,6 +167,7 @@ fn zu_anzeige(p: Personal, qualifikationen: Vec<QualifikationRef>) -> PersonalAn
         dienststatus: p.dienststatus,
         angelegt_at: p.angelegt_at,
         qualifikationen,
+        ist_demo: p.ist_demo,
     }
 }
 
@@ -892,5 +897,25 @@ mod tests {
             v.traegerorganisation,
             vec!["DRK".to_string(), "THW".to_string()]
         );
+    }
+
+    /// LFH-733: `ist_demo` kommt live aus `demo_herkunft`, in `liste_anzeige` und
+    /// `laden_anzeige`.
+    #[tokio::test]
+    async fn ist_demo_folgt_der_marke() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let demo = anlegen(&pool, 1, daten("Demo Person"), &[]).await.unwrap();
+        let echt = anlegen(&pool, 1, daten("Echte Person"), &[]).await.unwrap();
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "personal", demo.id).await;
+
+        for nur_im_dienst in [false, true] {
+            let alle = liste_anzeige(&pool, 1, nur_im_dienst).await.unwrap();
+            let marke = |id| alle.iter().find(|p| p.id == id).unwrap().ist_demo;
+            assert!(marke(demo.id), "nur_im_dienst={nur_im_dienst}");
+            assert!(!marke(echt.id), "nur_im_dienst={nur_im_dienst}");
+        }
+        assert!(laden_anzeige(&pool, 1, demo.id).await.unwrap().ist_demo);
+        assert!(!laden_anzeige(&pool, 1, echt.id).await.unwrap().ist_demo);
     }
 }

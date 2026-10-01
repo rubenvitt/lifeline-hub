@@ -3,10 +3,14 @@ use crate::error::AppError;
 use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
 
-/// Spaltenliste für `SELECT` in der Reihenfolge von `Fahrzeug` (FromRow).
+/// Spaltenliste für `SELECT … FROM fahrzeug` in der Reihenfolge von `Fahrzeug` (FromRow).
+/// `ist_demo` liest die Demo-Marke live (LFH-733, design.md D1); `fahrzeug.id` qualifiziert,
+/// damit der Unterselect an die äußere Zeile bindet.
 const SPALTEN: &str = "id, org_id, funkrufname, fahrzeugtyp, traegerorganisation, kennzeichen, \
      opta, standort, fms_issi, sondersignal, tragenkapazitaet, staerke_fuehrer, \
-     staerke_unterfuehrer, staerke_mannschaft, bemerkung, dienststatus, angelegt_at";
+     staerke_unterfuehrer, staerke_mannschaft, bemerkung, dienststatus, angelegt_at, \
+     EXISTS(SELECT 1 FROM demo_herkunft dh \
+            WHERE dh.tabelle = 'fahrzeug' AND dh.datensatz_id = fahrzeug.id) AS ist_demo";
 
 /// Editierbare Stammfelder. Optional-Strings sind bereits getrimmt; leer → `None`.
 /// `staerke` ist bereits validiert (alle drei oder keiner).
@@ -705,5 +709,25 @@ mod tests {
             vec!["Wache Mitte".to_string()],
             "DISTINCT je Feld"
         );
+    }
+
+    /// LFH-733: `ist_demo` kommt live aus `demo_herkunft`, in `liste` (beide Filter) und in
+    /// `laden` — die Antworten auf Ändern und Dienststatus lesen über `laden`.
+    #[tokio::test]
+    async fn ist_demo_folgt_der_marke() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let demo = anlegen(&pool, 1, daten("Florian Demo")).await.unwrap();
+        let echt = anlegen(&pool, 1, daten("Florian Echt")).await.unwrap();
+        crate::demo::test_hilfen::demo_markieren(&pool, 1, "fahrzeug", demo.id).await;
+
+        for nur_im_dienst in [false, true] {
+            let alle = liste(&pool, 1, nur_im_dienst).await.unwrap();
+            let marke = |id| alle.iter().find(|f| f.id == id).unwrap().anzeige().ist_demo;
+            assert!(marke(demo.id), "nur_im_dienst={nur_im_dienst}");
+            assert!(!marke(echt.id), "nur_im_dienst={nur_im_dienst}");
+        }
+        assert!(laden(&pool, 1, demo.id).await.unwrap().ist_demo);
+        assert!(!laden(&pool, 1, echt.id).await.unwrap().ist_demo);
     }
 }
