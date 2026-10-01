@@ -61,23 +61,31 @@ pub fn init_vertraute_proxys(netze: Vec<IpNet>) {
 /// selbst geschrieben und zählt nicht. Ein unlesbarer Eintrag beendet die Suche bei der letzten
 /// bekannten Stufe; besteht die Kette nur aus Vertrauenswürdigem, gilt deren linkester Eintrag.
 ///
-/// IPv4-gemappte IPv6-Adressen (`::ffff:a.b.c.d`, Dual-Stack-Socket) zählen als IPv4, damit
-/// eine IPv4-Liste auch dort greift und die Sperre je Client nur einen Schlüssel kennt.
+/// Mit Liste zählen IPv4-gemappte IPv6-Adressen (`::ffff:a.b.c.d`, Dual-Stack-Socket) als IPv4,
+/// damit eine IPv4-Liste auch dort greift und die Sperre je Client nur einen Schlüssel kennt.
+/// Ohne Liste kommt die Gegenstelle unverändert zurück, wie vor LFH-604.
 pub fn client_ip(gegenstelle: IpAddr, headers: &HeaderMap, vertraut: &[IpNet]) -> IpAddr {
+    if vertraut.is_empty() {
+        return gegenstelle;
+    }
     let ist_vertraut = |ip: &IpAddr| vertraut.iter().any(|netz| netz.contains(ip));
     let mut stufe = gegenstelle.to_canonical();
     if !ist_vertraut(&stufe) {
         return stufe;
     }
-    // Mehrere Headerzeilen gelten als eine Liste in ihrer Reihenfolge (RFC 9110, 5.3). Eine
-    // nicht als Text lesbare Zeile wird ein unlesbarer Eintrag.
-    let eintraege: Vec<&str> = headers
+    // Mehrere Headerzeilen gelten als eine Liste in ihrer Reihenfolge (RFC 9110, 5.3). Getrennt
+    // wird auf Bytes: ein Nicht-UTF-8-Byte macht nur seinen Eintrag unlesbar, nicht die ganze
+    // Zeile — sonst ginge die vom Proxy rechts angehängte Adresse mit verloren.
+    let eintraege: Vec<&[u8]> = headers
         .get_all(X_FORWARDED_FOR)
         .iter()
-        .flat_map(|zeile| zeile.to_str().unwrap_or("").split(','))
+        .flat_map(|zeile| zeile.as_bytes().split(|b| *b == b','))
         .collect();
     for eintrag in eintraege.into_iter().rev() {
-        let Some(ip) = adresse_lesen(eintrag.trim()) else {
+        let Some(ip) = std::str::from_utf8(eintrag)
+            .ok()
+            .and_then(|e| adresse_lesen(e.trim()))
+        else {
             return stufe;
         };
         stufe = ip.to_canonical();
@@ -201,7 +209,7 @@ fn pfad_rejection_zu_app_error(rejection: PathRejection) -> AppError {
 mod tests {
     use super::*;
     use axum::body::{to_bytes, Body};
-    use axum::http::{header, Request, StatusCode};
+    use axum::http::{header, HeaderValue, Request, StatusCode};
     use axum::routing::post;
     use axum::Router;
     use serde::Deserialize;
@@ -407,6 +415,25 @@ mod tests {
             &netze(&["10.9.0.0/16"]),
         );
         assert_eq!(ergebnis, ip("10.9.0.5"));
+    }
+
+    /// Ein Nicht-UTF-8-Byte links in derselben Zeile darf die rechts angehängte Adresse nicht
+    /// mitreißen; sonst zählte der Angreifer nach Wahl auf den Schlüssel des Proxys.
+    #[test]
+    fn nicht_utf8_eintrag_reisst_die_zeile_nicht_mit() {
+        let mut headers = HeaderMap::new();
+        headers.append(
+            "x-forwarded-for",
+            HeaderValue::from_bytes(b"\xff, 203.0.113.50").unwrap(),
+        );
+        let ergebnis = client_ip(ip("10.9.0.2"), &headers, &netze(&["10.9.0.0/16"]));
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+    }
+
+    #[test]
+    fn ohne_proxy_liste_bleibt_eine_gemappte_gegenstelle_unveraendert() {
+        let ergebnis = client_ip(ip("::ffff:192.0.2.9"), &HeaderMap::new(), &[]);
+        assert_eq!(ergebnis, ip("::ffff:192.0.2.9"));
     }
 
     #[test]

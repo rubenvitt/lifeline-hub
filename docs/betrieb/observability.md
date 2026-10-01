@@ -81,4 +81,5 @@ die Gegenstelle ein ausdrücklich genannter Proxy ist (`LIFELINE_TRUSTED_PROXIES
 Einzelheiten in `docs/betrieb/env-registry.md`): von jeder anderen Gegenstelle ist der
 Header frei fälschbar, und ein fälschbares Rate-Limit ist keins. **Hinter einem
 Reverse-Proxy muss die Liste gesetzt sein** — sonst sieht der Server nur die Proxy-IP, und
-zehn Fehlversuche von beliebiger Seite sperren den Passwort-Login für alle.
+zehn Fehlversuche von beliebiger Seite sperren den Passwort-Login für alle. Dieselbe
+Quell-IP gilt für Passwortwechsel, App-Code-Einlösung und `auth_audit`.
