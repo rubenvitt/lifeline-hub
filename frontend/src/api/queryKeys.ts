@@ -90,6 +90,8 @@ export const EINSATZ_KEYS = {
   wetter: 'einsatz-wetter',
   // ETB-Druckansicht: Schnappschuss, eigener Prefix außerhalb von `etb`.
   etbDruck: 'einsatz-etb-druck',
+  // Einsatzbericht: ein Schnappschuss über alle Quellen (LFH-726).
+  einsatzberichtDruck: 'einsatz-einsatzbericht-druck',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -236,6 +238,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `etbDruck`: ein Druckbeleg ist ein Schnappschuss; ein neuer Eintrag darf ihn nicht still
  *   ergänzen („Neu laden“ ist eine ausdrückliche Handlung). Deshalb der eigene Prefix: unter
  *   `etb` zöge ihn das `etb`-Ereignis per Präfix mit.
+ * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
+ *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einstellungen,
@@ -253,6 +257,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.pegel,
   EINSATZ_KEYS.wetter,
   EINSATZ_KEYS.etbDruck,
+  EINSATZ_KEYS.einsatzberichtDruck,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -360,6 +365,9 @@ export const einsatzKeys = {
   // ETB-Druckansicht: Vollabruf einer Auswahl, nicht live (siehe NICHT_LIVE_KEYS).
   etbDruck: <F>(einsatzId: number, filter: F) =>
     [EINSATZ_KEYS.etbDruck, einsatzId, filter] as const,
+  // Einsatzbericht: alle Quellen in einem Abruf, nicht live (siehe NICHT_LIVE_KEYS).
+  einsatzberichtDruck: (einsatzId: number) =>
+    [EINSATZ_KEYS.einsatzberichtDruck, einsatzId] as const,
 
   // Stab: Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,
