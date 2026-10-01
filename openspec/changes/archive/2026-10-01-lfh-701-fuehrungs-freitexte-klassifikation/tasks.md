@@ -46,5 +46,7 @@ Jede Aufgabe per TDD: erst der rote Test, dann die Registry-Änderung.
   `fuehrungsfunktionen`; veraltete Kommentare (`auftrag/repo.rs`, `fuehrung/aufloesung.rs`,
   `purge_scheduler.rs`, Registry-Abschnitt, `frontend/src/fuehrung/AGENTS.md`). Verifikation:
   betroffene Tests grün, `openspec validate --strict` gültig.
-- [ ] 4.2 `./scripts/check-all.sh` grün (bzw. die Backend-Schritte lokal, das ganze Gate in der
-  CI des PRs).
+- [x] 4.2 `./scripts/check-all.sh` grün (bzw. die Backend-Schritte lokal, das ganze Gate in der
+  CI des PRs). Lokal am 01.10.2026: `cargo fmt --check`, `cargo test --no-fail-fast` (ganze
+  Backend-Suite) und Prettier auf `frontend/src/fuehrung/AGENTS.md` grün; das Gesamtgate belegt
+  die CI des PRs.

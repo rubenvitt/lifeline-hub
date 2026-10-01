@@ -1450,7 +1450,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     // Presse-Log: Ansprechperson und Erreichbarkeit sind personenbezogen. Medium (eine
     // Redaktion, keine Person), Thema, Antwort und Freigabeangabe bleiben als Nachweis der
     // Pressearbeit (LFH-554 design.md D9). Anders als die Führungsmodule schreibt das Log kein
-    // ETB; ob es Linie A folgen soll, ist eine eigene Abwägung (LFH-701, design.md D5).
+    // ETB; ob es Linie A folgen soll, ist eine eigene Abwägung (LFH-901; Herleitung
+    // `openspec/changes/archive/2026-10-01-lfh-701-fuehrungs-freitexte-klassifikation/design.md`, D5).
     TabellenRegel {
         tabelle: "medienkontakt",
         scoping: Scoping::EinsatzId,
