@@ -48,7 +48,6 @@ Pegel über die volle Breite und darunter Warnungen und Vorhersage ins Raster
 - **Keine Bewertung der Werte.** Schwellen wie „Wind über Einsatzgrenze der Drehleiter“ oder
   „Glätte möglich“ fehlen, ebenso Färbung oder Alarm. Die Grenzen hängen am Gerät und am
   Hersteller und wären eine eigene Entscheidung über das Alarmbudget (EEMUA 191).
-- **Keine Ikone der Wetterlage** (siehe D5).
 - Kein Radar, keine Messreihe und kein Verlauf der Messwerte, nur die jüngste Messung.
 - Kein Platz im Kennzahlenband des Lage-Dashboards. Lageplätze entstehen nur per Entscheidung
   am Einsatz (LFH-640), nie per Messwert.
@@ -101,7 +100,7 @@ HTTP-Fehler.
 WetterAktuell {
   gemessen_at: String,                 // timestamp der Quelle, RFC 3339 UTC
   station: WetterStation,              // die Quelle aus source_id
-  wetterlage?: WetterLage,             // trocken|nebel|regen|schneeregen|schnee|hagel|gewitter
+  symbol?: WetterSymbol,               // aus `icon`, Nebel mit Sonnenstand (D5)
   temperatur_c?, taupunkt_c?, luftfeuchte_prozent?, luftdruck_hpa?,
   sicht_m?, bewoelkung_prozent?,
   wind_kmh?, windrichtung_grad?,       // wind_speed_10, wind_direction_10
@@ -125,8 +124,12 @@ WetterMessgroesse = wetterlage|temperatur|taupunkt|luftfeuchte|luftdruck|sicht|b
   dann je Wert „Station Hameln, 12,1 km“ statt einer Liste von Quellkennungen. Eine Quelle ohne
   Eintrag in `sources[]` erscheint als Station ohne Namen nicht. Ihr Wert bleibt stehen und wird
   geloggt (lieber zu wenig Herkunft als ein verschwiegener Wert, wie bei LFH-633).
-- **Unbekannte `condition`** wird zu keiner Wetterlage (`None`) und geloggt. Sie wird nie zu
-  „trocken“, denn ein falsches „trocken“ wäre eine erfundene Angabe.
+- **Wetterlage aus `icon`, nicht aus `condition`.** `icon` fasst Niederschlag, Wind, Nebel und
+  Bewölkung samt Tag und Nacht zu einem Wert zusammen. `condition` kennt dagegen nur Niederschlag
+  und „dry“ und sagte bei trockenem Wetter nichts über den Himmel. Ein unbekanntes `icon` wird zu
+  keinem Symbol (`None`) und geloggt. Es wird nie zu „klar“, denn das wäre eine erfundene Angabe.
+  Die Messgröße `wetterlage` der Ergänzung entsteht aus `condition` **oder** `icon` in
+  `fallback_source_ids`.
 - Jeder Messwert ist `Option`, aus `null` wird nie 0 (wie `quelle::zahl`).
 - Die Messgrößen-Liste der Ergänzung ist nach der Reihenfolge der Enum-Varianten sortiert,
   damit Cache und Antwort deterministisch sind.
@@ -160,19 +163,55 @@ WetterMessgroesse = wetterlage|temperatur|taupunkt|luftfeuchte|luftdruck|sicht|b
 die Einordnung eine Funktion bleibt. Für Warnungen und Vorhersage ist der Zeitpunkt weiter
 `abgerufen_at`, für `aktuell` ist es `daten.gemessen_at`.
 
-### D5 Wetterlage als Wort, ohne Ikone
+### D5 Wetterlage als Wort mit Ikone, voller Satz
 
-Die Wetterlage steht als Wort („Regen“, „Gewitter“). Der Ikonensatz (Spec `ikonensatz`) hat
-Gewitterwolke, Regen, Schneeflocke, Nebel und Sonne. Für „trocken und bedeckt“, „teils bewölkt“,
-„klar bei Nacht“, Hagel und Schneeregen fehlt eine Ikone. Ein Teil-Satz wäre ein gemischtes Set,
-und das ist nach LFH-595 schlechter als keins. Ein voller Satz hieße neue Ikonen über Icons8:
-PNG auswählen, Freigabe, SVG abrufen, Kontingent. Das ist ein eigener Schritt mit eigener
-Freigabe und gehört nicht in diese Change.
+**Entscheidung Ruben, 01.10.2026:** Die Wetterlage bekommt eine Ikone, und zwar für jeden Wert
+eine. Ein Teil-Satz wäre nach LFH-595 schlechter als keiner. Das Wort steht immer daneben und
+trägt die Bedeutung, die Ikone ist `aria-hidden` (Spec `ikonensatz`, „Eine Ikone trägt nie
+allein Bedeutung“).
 
-**Alternative**, falls am Checkpoint gewünscht: Die Ikone über das Feld `icon` der Quelle
-(`clear-day`, `partly-cloudy-night`, `cloudy`, `fog`, `wind`, `rain`, `sleet`, `snow`, `hail`,
-`thunderstorm`, zehn Werte), mit Auswahl und Freigabe der fehlenden Icons8-Ikonen als eigene
-Aufgabengruppe. Das kostet eine Freigaberunde mehr.
+`WetterSymbol` hat 13 Werte: die zwölf `icon`-Werte der Quelle, wobei `fog` in Tag und Nacht
+geteilt wird.
+
+| `icon` der Quelle | `WetterSymbol` | Wort | Ikone (Register) | Icons8 | Stand |
+|---|---|---|---|---|---|
+| `clear-day` | `klar_tag` | klar | `sonne` | 648 | vorhanden |
+| `clear-night` | `klar_nacht` | klar | `mond` | 25031 | vorhanden |
+| `partly-cloudy-day` | `teils_bewoelkt_tag` | teils bewölkt | `teils-bewoelkt-tag` | 658 | neu |
+| `partly-cloudy-night` | `teils_bewoelkt_nacht` | teils bewölkt | `teils-bewoelkt-nacht` | 660 | neu |
+| `cloudy` | `bewoelkt` | bewölkt | `wolke` | 2854 | neu |
+| `fog`, Tag | `nebel_tag` | Nebel | `nebel` | 672 | vorhanden |
+| `fog`, Nacht | `nebel_nacht` | Nebel | `nebel-nacht` | 674 | neu |
+| `wind` | `wind` | windig | `wind` | 31842 | vorhanden |
+| `rain` | `regen` | Regen | `regen` | 656 | vorhanden |
+| `sleet` | `schneeregen` | Schneeregen | `schneeregen` | 838 | neu |
+| `snow` | `schnee` | Schnee | `schneewolke` | 664 | neu |
+| `hail` | `hagel` | Hagel | `hagel` | 666 | neu |
+| `thunderstorm` | `gewitter` | Gewitter | `gewitterwolke` | 670 | vorhanden |
+
+- **Schnee als Wolke mit Schnee (664)**, nicht als Schneeflocke (7518). Alle Niederschlags-Ikonen
+  haben eine Wolke als Basis. Die Schneeflocke bleibt für Glätte- und Frostwarnungen in der
+  Fachebene. Entscheidung Ruben, 01.10.2026.
+- **Nebel nach Sonnenstand.** Die Quelle unterscheidet nur bei klar und teils bewölkt zwischen
+  Tag und Nacht. Nebel kommt als `fog` ohne Tageszeit. 672 zeigt eine Sonne, die bei Nacht falsch
+  wäre (Entscheidung Ruben, 01.10.2026). `quelle.rs` rechnet die Sonnenhöhe an der **Station**
+  (`sources[].lat/lon`) zur Messzeit (NOAA-Näherung, rein, ohne Crate). Über −0,833° gilt Tag,
+  so wie Sonnenauf- und -untergang definiert sind. Die Station liegt höchstens 50 km vom
+  Einsatzort, das verschiebt den Wechsel um wenige Minuten. Damit braucht der Parser weder Uhr
+  noch Einsatzort. Fehlt die Stationslage, gilt Tag, und eine Log-Zeile wird geschrieben.
+- **Ablauf wie LFH-595:**
+  1. Auswählen mit PNG. Der Bildbogen `ikonen-bogen.png` liegt in dieser Change, Freigabe am
+     01.10.2026 mit Schnee B und Nebel nach Tageszeit.
+  2. Die sieben SVGs erst nach der Freigabe über den Icons8-MCP nach `scripts/ikonen/quellen/`
+     abrufen.
+  3. Register eintragen, `erzeuge-ikonen.mjs` laufen lassen, `vergleiche-png.mjs` als
+     Abschreibprüfung.
+  4. Der Guard prüft Stempel, Vollständigkeit und Verwendung jeder Ikone.
+- Die Ikone wird über eine reine Zuordnung `wetterSymbolIkone` in `wetter/` gewählt, ein Eintrag
+  je Enum-Wert (`Record<WetterSymbol, Ikone>`, vollständig per Typ).
+
+**Verworfen:** nur Wort, ohne Ikone (Empfehlung am Checkpoint, abgelehnt); 7518 für Schnee;
+672 auch bei Nacht.
 
 ### D6 Darstellung: Kennzahlenband für vier Werte, Datenraster für den Rest
 
@@ -182,7 +221,8 @@ Aufgabengruppe. Das kostet eine Freigaberunde mehr.
   dritt, sonst brechen sie um.
 - **„Zahl führt“:** Ein `Kennzahlenband` trägt vier Kennzahlen: Temperatur, Wind (Richtung als
   Wort in der Notiz), Böen und Niederschlag in 1 h. Darunter stehen in einem `Datenraster`
-  Wetterlage, Sicht, Bewölkung, Luftfeuchte, Taupunkt und Luftdruck. Alle Kennzahlen bleiben
+  Wetterlage (Ikone in `1em` vor dem Wort), Sicht, Bewölkung, Luftfeuchte, Taupunkt und
+  Luftdruck. Alle Kennzahlen bleiben
   ohne Ton und ohne Kante, denn eine Bewertung entfällt (Non-Goal).
 - Ein **ergänzter Wert** trägt in seiner Notiz bzw. seinem Datenfeld „Station Hameln, 12,1 km“.
   Die Notiz ist Text und keine Fußnote mit Zeichen, damit sie vorlesbar ist.

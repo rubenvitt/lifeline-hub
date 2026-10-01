@@ -15,7 +15,9 @@ Je Messung zeigt die Seite:
 - Temperatur in °C;
 - mittleren Wind in km/h mit Richtung und die stärkste Böe der letzten Stunde in km/h;
 - Niederschlag der letzten Stunde in mm;
-- die Wetterlage als Wort (trocken, Nebel, Regen, Schneeregen, Schnee, Hagel, Gewitter);
+- die Wetterlage als Wort mit Ikone (klar, teils bewölkt, bewölkt, Nebel, windig, Regen,
+  Schneeregen, Schnee, Hagel, Gewitter); bei klar, teils bewölkt und Nebel unterscheidet die
+  Ikone Tag und Nacht;
 - Sicht, Bewölkung in %, relative Luftfeuchte in %, Taupunkt in °C, Luftdruck in hPa.
 
 Die Seite MUST den Quellenvermerk „Datenbasis: Deutscher Wetterdienst“ tragen.
@@ -32,6 +34,15 @@ Die Seite MUST den Quellenvermerk „Datenbasis: Deutscher Wetterdienst“ trage
 #### Scenario: Fehlender Messwert
 - **WHEN** die Quelle für die Messung keine Sicht liefert
 - **THEN** steht bei der Sicht ein Strich statt „0 km“
+
+#### Scenario: Nebel bei Nacht
+- **WHEN** die Quelle um 02:00 Uhr Ortszeit für eine Station in Bremen Nebel meldet
+- **THEN** zeigt die Wetterlage „Nebel“ mit der Nacht-Ikone, nicht mit der Sonne
+
+#### Scenario: Unbekannte Wetterlage
+- **WHEN** die Quelle eine Wetterlage meldet, die das System nicht kennt
+- **THEN** steht bei der Wetterlage ein Strich ohne Ikone
+- **AND** die übrigen Werte der Messung stehen unverändert
 
 #### Scenario: Kein Einsatzort
 - **WHEN** der Einsatz keine Koordinate des Einsatzorts hat

@@ -20,8 +20,13 @@ der Drohne. Heute muss die Führung dafür eine fremde Seite öffnen. Ruben hat 
 - Die Modulseite bekommt ein Paneel „Aktuelle Bedingungen“ mit folgenden Angaben:
   - Messzeit und Station samt Entfernung;
   - Temperatur, Wind mit Richtung und Böen;
-  - Niederschlag der letzten Stunde und Wetterlage;
+  - Niederschlag der letzten Stunde;
+  - die Wetterlage als Wort mit Ikone;
   - Sicht, Bewölkung, Luftfeuchte, Taupunkt und Luftdruck.
+- Der Ikonensatz (Spec `ikonensatz`) bekommt sieben Wetterlage-Ikonen aus Icons8
+  „iOS 27 Outlined“: teils bewölkt bei Tag und bei Nacht, Wolke, Schneeregen, Wolke mit Schnee,
+  Hagel, Nebel bei Nacht. Ausgewählt ist nach Bildbogen (`ikonen-bogen.png`), der SVG-Abruf
+  erfolgt erst nach Freigabe.
 - Werte, die die Quelle von einer **anderen** Station ergänzt, sind als solche benannt, samt
   Station und Entfernung.
 - Ein fehlender Messwert erscheint als Strich, nie als 0. Eine zu alte Messung heißt
@@ -52,6 +57,9 @@ Keine.
   `frontend/src/pages/WetterPegelPage.tsx` (Raster, Seitenkopf-Datenstand),
   `frontend/src/api/types.ts`. Dazu kommen die Tests der Seite und `e2e/wetter-pegel.spec.ts`
   mit Querlauf, Trefflächen und Kontrast.
+- **Ikonen:** `scripts/ikonen/ikonen.json` (Register), `scripts/ikonen/quellen/` (sieben neue
+  SVGs), `scripts/ikonen/quellen.sha256` und `frontend/src/ikonen/erzeugt.generated.ts` über
+  `erzeuge-ikonen.mjs`. Das Kontingent des Icons8-Abos sinkt um sieben SVG-Abrufe.
 - **Typ-Codegen:** `scripts/check-typ-codegen.sh`, beide generierten Dateien werden
   mitcommittet.
 - **Kein** Schema- oder Migrationswechsel, denn der Cache ist der vorhandene Nachschlage-Cache.
