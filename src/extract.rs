@@ -7,9 +7,12 @@
 use axum::extract::rejection::{JsonRejection, PathRejection};
 use axum::extract::{ConnectInfo, FromRequest, FromRequestParts, Request};
 use axum::http::request::Parts;
+use axum::http::HeaderMap;
+use ipnet::IpNet;
 use serde::de::DeserializeOwned;
 use std::convert::Infallible;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::OnceLock;
 
 use crate::error::AppError;
 
@@ -20,8 +23,9 @@ use crate::error::AppError;
 /// kein Extractor mehr. Dieser Extractor ist infallible und liefert `None`, wenn die Adresse
 /// unbekannt ist.
 ///
-/// Bewusst nicht aus `X-Forwarded-For`: ohne vertrauenswürdigen Reverse-Proxy ist der Header
-/// frei fälschbar, und ein fälschbares Rate-Limit ist keins.
+/// `X-Forwarded-For` zählt nur, wenn die Gegenstelle ein vertrauenswürdiger Proxy ist
+/// ([`init_vertraute_proxys`], LFH-604); sonst ist der Header frei fälschbar, und ein
+/// fälschbares Rate-Limit ist keins. Ohne Proxy-Liste gilt immer die Gegenstelle.
 #[derive(Debug, Clone, Copy)]
 pub struct PeerIp(pub Option<IpAddr>);
 
@@ -29,14 +33,70 @@ impl<S: Send + Sync> FromRequestParts<S> for PeerIp {
     type Rejection = Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let vertraut = VERTRAUTE_PROXYS.get().map(Vec::as_slice).unwrap_or(&[]);
         Ok(PeerIp(
             parts
                 .extensions
                 .get::<ConnectInfo<SocketAddr>>()
-                .map(|ConnectInfo(adresse)| adresse.ip()),
+                .map(|ConnectInfo(adresse)| client_ip(adresse.ip(), &parts.headers, vertraut)),
         ))
     }
 }
+
+/// Netze der vertrauenswürdigen Reverse-Proxys (`--trusted-proxies`). Prozessweit statt in
+/// `AppState`, damit die Test-Konstruktionen unberührt bleiben; ungesetzt heißt: keinem Proxy
+/// trauen.
+static VERTRAUTE_PROXYS: OnceLock<Vec<IpNet>> = OnceLock::new();
+
+/// Setzt die Proxy-Liste einmal beim Serverstart. Weitere Aufrufe bleiben wirkungslos.
+pub fn init_vertraute_proxys(netze: Vec<IpNet>) {
+    let _ = VERTRAUTE_PROXYS.set(netze);
+}
+
+/// Client-Adresse hinter vertrauenswürdigen Proxys (LFH-604).
+///
+/// Liegt die Gegenstelle nicht in `vertraut`, gilt sie selbst. Sonst wird `X-Forwarded-For`
+/// von rechts gelesen: jeder Proxy hängt die Adresse an, von der er die Anfrage bekam, und der
+/// erste Eintrag außerhalb von `vertraut` ist der Client. Was links davon steht, hat der Client
+/// selbst geschrieben und zählt nicht. Ein unlesbarer Eintrag beendet die Suche bei der letzten
+/// bekannten Stufe; besteht die Kette nur aus Vertrauenswürdigem, gilt deren linkester Eintrag.
+///
+/// IPv4-gemappte IPv6-Adressen (`::ffff:a.b.c.d`, Dual-Stack-Socket) zählen als IPv4, damit
+/// eine IPv4-Liste auch dort greift und die Sperre je Client nur einen Schlüssel kennt.
+pub fn client_ip(gegenstelle: IpAddr, headers: &HeaderMap, vertraut: &[IpNet]) -> IpAddr {
+    let ist_vertraut = |ip: &IpAddr| vertraut.iter().any(|netz| netz.contains(ip));
+    let mut stufe = gegenstelle.to_canonical();
+    if !ist_vertraut(&stufe) {
+        return stufe;
+    }
+    // Mehrere Headerzeilen gelten als eine Liste in ihrer Reihenfolge (RFC 9110, 5.3). Eine
+    // nicht als Text lesbare Zeile wird ein unlesbarer Eintrag.
+    let eintraege: Vec<&str> = headers
+        .get_all(X_FORWARDED_FOR)
+        .iter()
+        .flat_map(|zeile| zeile.to_str().unwrap_or("").split(','))
+        .collect();
+    for eintrag in eintraege.into_iter().rev() {
+        let Some(ip) = adresse_lesen(eintrag.trim()) else {
+            return stufe;
+        };
+        stufe = ip.to_canonical();
+        if !ist_vertraut(&stufe) {
+            return stufe;
+        }
+    }
+    stufe
+}
+
+/// Ein `X-Forwarded-For`-Eintrag: Adresse, auch mit Port (`a.b.c.d:p`, `[v6]:p`).
+fn adresse_lesen(eintrag: &str) -> Option<IpAddr> {
+    eintrag
+        .parse::<IpAddr>()
+        .or_else(|_| eintrag.parse::<SocketAddr>().map(|s| s.ip()))
+        .ok()
+}
+
+const X_FORWARDED_FOR: &str = "x-forwarded-for";
 
 /// Json-Body-Extractor mit deutschsprachiger Rejection im `{error}`-Format; deserialisiert
 /// exakt wie `axum::Json`. Der distinkte Name lässt `tests/json_extractor_guard.rs` Wrapper und
@@ -237,6 +297,174 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let json: Value = serde_json::from_str(&body).expect("Body ist JSON");
         assert!(json["error"].as_str().unwrap().contains("Content-Type"));
+    }
+
+    // ── Client-IP hinter vertrauenswürdigen Proxys (LFH-604) ──
+
+    fn ip(s: &str) -> IpAddr {
+        s.parse().unwrap()
+    }
+
+    fn netze(liste: &[&str]) -> Vec<IpNet> {
+        liste.iter().map(|n| n.parse().unwrap()).collect()
+    }
+
+    fn xff(werte: &[&str]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for w in werte {
+            headers.append("x-forwarded-for", w.parse().unwrap());
+        }
+        headers
+    }
+
+    #[test]
+    fn ohne_proxy_liste_gilt_die_gegenstelle() {
+        let ergebnis = client_ip(ip("10.9.0.2"), &xff(&["203.0.113.50"]), &[]);
+        assert_eq!(
+            ergebnis,
+            ip("10.9.0.2"),
+            "ohne Liste wird der Header nie gelesen"
+        );
+    }
+
+    #[test]
+    fn fremde_gegenstelle_mit_header_bleibt_die_gegenstelle() {
+        let ergebnis = client_ip(
+            ip("192.0.2.66"),
+            &xff(&["203.0.113.50"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("192.0.2.66"));
+    }
+
+    #[test]
+    fn vertrauenswuerdige_gegenstelle_liefert_den_eintrag_aus_dem_header() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["203.0.113.50"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+    }
+
+    #[test]
+    fn vertrauenswuerdige_gegenstelle_ohne_header_bleibt_die_gegenstelle() {
+        let ergebnis = client_ip(ip("10.9.0.2"), &HeaderMap::new(), &netze(&["10.9.0.0/16"]));
+        assert_eq!(ergebnis, ip("10.9.0.2"));
+    }
+
+    /// Von rechts gelesen: was links vom ersten nicht vertrauenswürdigen Eintrag steht, hat der
+    /// Client selbst geschrieben und ist frei erfunden.
+    #[test]
+    fn vom_client_vorangestellte_eintraege_werden_uebergangen() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["1.1.1.1, 198.51.100.9, 203.0.113.50"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+    }
+
+    #[test]
+    fn mehrere_vertrauenswuerdige_stufen_werden_uebersprungen() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["198.51.100.9, 203.0.113.50, 172.20.0.4"]),
+            &netze(&["10.9.0.0/16", "172.20.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+    }
+
+    #[test]
+    fn mehrere_headerzeilen_gelten_als_eine_liste_in_reihenfolge() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["198.51.100.9", "203.0.113.50"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+    }
+
+    /// Steht nur Vertrauenswürdiges in der Kette, kam die Anfrage aus dem eigenen Netz; dann
+    /// gilt der am weitesten entfernte bekannte Absender.
+    #[test]
+    fn nur_vertrauenswuerdige_eintraege_liefern_den_linkesten() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["10.9.0.7, 10.9.0.5"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("10.9.0.7"));
+    }
+
+    /// Ein unlesbarer Eintrag beendet die Suche: links davon ist nichts mehr belastbar. Es gilt
+    /// die letzte bekannte Stufe.
+    #[test]
+    fn unlesbarer_eintrag_beendet_die_suche_bei_der_letzten_stufe() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["203.0.113.50, unbekannt, 10.9.0.5"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("10.9.0.5"));
+    }
+
+    #[test]
+    fn eintraege_mit_port_werden_gelesen() {
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["203.0.113.50:51234"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+        let ergebnis = client_ip(
+            ip("10.9.0.2"),
+            &xff(&["[2001:db8::5]:51234"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("2001:db8::5"));
+    }
+
+    /// Ein Dual-Stack-Socket meldet IPv4-Gegenstellen als `::ffff:a.b.c.d`; die Liste nennt sie
+    /// als IPv4-Netz und muss trotzdem greifen.
+    #[test]
+    fn ipv4_gemappte_adressen_werden_wie_ipv4_behandelt() {
+        let ergebnis = client_ip(
+            ip("::ffff:10.9.0.2"),
+            &xff(&["::ffff:203.0.113.50"]),
+            &netze(&["10.9.0.0/16"]),
+        );
+        assert_eq!(ergebnis, ip("203.0.113.50"));
+    }
+
+    #[test]
+    fn ipv6_proxy_netz_greift() {
+        let ergebnis = client_ip(
+            ip("fd00::2"),
+            &xff(&["2001:db8::7"]),
+            &netze(&["fd00::/64"]),
+        );
+        assert_eq!(ergebnis, ip("2001:db8::7"));
+    }
+
+    /// In diesem Test-Binary setzt niemand die Proxy-Liste; der Extractor liest den Header
+    /// dann nicht (Default wie vor LFH-604).
+    #[tokio::test]
+    async fn extractor_ohne_einstellung_ignoriert_den_header() {
+        let app = Router::new().route(
+            "/ip",
+            axum::routing::get(|PeerIp(ip): PeerIp| async move { format!("{ip:?}") }),
+        );
+        let mut req = Request::builder()
+            .uri("/ip")
+            .header("x-forwarded-for", "203.0.113.50")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut()
+            .insert(ConnectInfo::<SocketAddr>("10.9.0.2:41000".parse().unwrap()));
+        let resp = app.oneshot(req).await.unwrap();
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(String::from_utf8_lossy(&bytes), "Some(10.9.0.2)");
     }
 
     // ── PfadParam ──
