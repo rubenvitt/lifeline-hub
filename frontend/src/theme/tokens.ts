@@ -659,6 +659,14 @@ export function antdKomponenten(
       colorWarning: farben.achtungText,
     },
     Switch: switchMasse(dichten[dichte]),
+    // `colorPrimaryBorder` (= `bedien`, Fokusring LFH-737) ist auch die Ruhefarbe von Spur und
+    // Griff. antd färbt den Griff unter dem Zeiger in `colorPrimary`, also gleich, und die Spur in
+    // der abgeleiteten Hover-Stufe, nachts dunkler als `bedien`. Der Zeiger nimmt deshalb
+    // `bedienHover` wie am Primärknopf.
+    Slider: {
+      trackHoverBg: farben.bedienHover,
+      handleActiveColor: farben.bedienHover,
+    },
   };
 }
 
@@ -694,6 +702,12 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorWarning: farben.achtung,
     colorSuccess: farben.normal,
     colorInfo: farben.bedien,
+    // Der Fokusring (LFH-737): antd zeichnet ihn als `outline` in `colorPrimaryBorder`
+    // (`genFocusOutline`) und leitete ihn als helle Stufe aus `bedien` ab, Tag 2,57–3,28 und Nacht
+    // 1,51–1,70 gegen die Flächen, unter WCAG 1.4.11. Als `bedien` hält er Tag ≥ 6,71, Nacht
+    // ≥ 5,48 auf jeder deckenden Fläche, wie die eigenen Klassen in `sprache.css`. Gerechnet in
+    // `bedienKontrast.test.ts`, gemessen in `e2e/fokusring-kontrast.spec.ts`.
+    colorPrimaryBorder: farben.bedien,
     // Ein Link ist blauer TEXT und trägt die Textrolle, in Ruhe wie unter dem Zeiger (LFH-652):
     // aus `bedien` abgeleitet verdunkelte ihn die Nachtpalette auf 4,55, und antds Hover-Ableitung
     // hellt ihn am Tag auf rund 4,3 auf. Die Rückmeldung unter dem Zeiger ist die Unterstreichung,

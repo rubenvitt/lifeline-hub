@@ -107,6 +107,32 @@ export async function randKontrast(ziel: Locator, seite: 'left' | 'top' = 'left'
   };
 }
 
+/**
+ * Kontrast eines Fokusumrisses (`outline`, WCAG 1.4.11) gegen den Grund, auf dem er steht
+ * (LFH-737). Mit `outline-offset` ≥ 0 liegt der Umriss AUSSERHALB der Border-Box, also auf der
+ * Fläche des Elternteils; ein negativer Versatz legt ihn auf die eigene Fläche.
+ *
+ * Kein Umriss ist ein Fehler, keine Messung: Stil `none` oder Breite 0 hätte sonst den Kontrast
+ * einer Farbe, die niemand sieht (antd zeichnet ihn nur unter `:focus-visible`).
+ */
+export async function umrissKontrast(ziel: Locator) {
+  const umriss = await ziel.evaluate((el) => {
+    const stil = getComputedStyle(el);
+    return {
+      stil: stil.outlineStyle,
+      breite: parseFloat(stil.outlineWidth),
+      versatz: parseFloat(stil.outlineOffset),
+    };
+  });
+  if (umriss.stil === 'none' || !(umriss.breite > 0))
+    throw new Error(`Kein Fokusumriss gezeichnet: ${JSON.stringify(umriss)}`);
+  const m = await messe(ziel, {
+    vordergrund: 'outline-color',
+    grund: umriss.versatz < 0 ? 'selbst' : 'eltern',
+  });
+  return { ...umriss, umriss: m.vordergrund, grund: m.grund, verhaeltnis: m.verhaeltnis };
+}
+
 export async function pruefe(tag: Locator, minimum: number, name: string) {
   await expect(tag, name).toBeVisible();
   // Modal-Einblendung erst abwarten: Opacity-Gruppen liefern keine belastbare Messung.
