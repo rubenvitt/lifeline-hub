@@ -39,6 +39,28 @@ const gitkeepBewahren = (): Plugin => {
   };
 };
 
+// Vite 8 bündelt Pakete immer mit Sourcemap vor und hängt sie beim Ausliefern als Base64 an:
+// `antd.js` wuchs so von 3,2 auf 11,3 MB. An einem String dieser Größe bricht Node 26 den
+// Dev-Server gelegentlich ab („Lazy deopt after a fast API call …“ in `Buffer.byteLength`), und
+// jeder Folgetest der e2e-Suite lief in ERR_CONNECTION_REFUSED (LFH-659). `{ mappings: '' }`
+// verwirft die Kette, und Vite hängt dann keine Map an, auch keine Ersatz-Map. Der Kommentar
+// am Ende ist nötig: bleibt der Code unverändert (Paket ohne Importe, etwa `terra-draw.js`),
+// verwirft Vite das Transform-Ergebnis samt leerer Map und liefert die geladene Map doch aus.
+// Nur im e2e-Lauf (`playwright.config.ts` setzt die Variable): im Entwickeln bleiben die Pakete
+// debugbar. Gemessen wird das in `e2e/dev-server-antwortgroesse.spec.ts`.
+const depsOhneSourcemap = (): Plugin => ({
+  name: 'lifeline-deps-ohne-sourcemap',
+  apply: 'serve',
+  enforce: 'pre',
+  transform: {
+    filter: { id: /\/node_modules\/\.vite\/deps\// },
+    handler: (code) => ({
+      code: `${code}\n// Sourcemap im e2e-Lauf weggelassen (LFH-659)\n`,
+      map: { mappings: '' },
+    }),
+  },
+});
+
 // Dev-Port und Proxy-Ziel kommen aus .env.local und der Umgebung (process.env hat
 // Vorrang), weil Workspaces Ports dynamisch vergeben.
 export default defineConfig(({ mode }) => {
@@ -50,6 +72,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       gitkeepBewahren(),
+      env.LIFELINE_DEPS_OHNE_SOURCEMAP === '1' && depsOhneSourcemap(),
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],

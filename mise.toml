@@ -24,9 +24,11 @@
 #
 # NODE IST EXAKT GEPINNT, sonst prüfte das Gate je Maschine etwas anderes. Die Nachbarn dieser
 # Version fallen aus: 22.x bricht `src/api/kartenbilder.test.ts` (@mswjs/interceptors ruft
-# `.stream()` auf einem Blob), 26.x-Releases teilen einen V8-Abbruch im Vite-Dev-Server
-# („Lazy deopt after a fast API call …"), dessen Abhilfe in `frontend/playwright.config.ts`
-# sitzt (`--no-turbo-fast-api-calls`). Wer die Zahl ändert, prüft Schritt 5 UND 7 von
+# `.stream()` auf einem Blob). Alle 26.x-Releases, auch 26.7.0, teilen einen V8-Abbruch im
+# Vite-Dev-Server („Lazy deopt after a fast API call …"), selten, beim Ausliefern großer
+# Strings. Eine andere Node-Version behebt ihn nicht; die Abhilfe sitzt in
+# `frontend/playwright.config.ts` (LFH-659: Pakete ohne Sourcemap, größte Antwort 3,2 statt
+# 11,3 MB, dazu `--no-turbo-fast-api-calls`). Wer die Zahl ändert, prüft Schritt 5 UND 7 von
 # check-all.sh. pnpm ist gepinnt, weil Prettier und der Lockfile-Stand daran hängen.
 [tools]
 node = "26.7.0"
