@@ -200,6 +200,25 @@ Am Phase-1-Checkpoint entschieden.
 - **Verworfen: eingerückter Baum allein.** Das ist der heutige Gliederungsbaum mit Zeichen, aber
   kein Organigramm.
 
+**Nachtrag „Messung vor dem Bau“ (01.10.2026, `e2e/fuehrungsorganisation.spec.ts`).** Gemessen
+bei 1366 × 768 mit offenem Modulpanel, Grundschrift 16 px, Namen in 600:
+
+| Wert | Laufweite |
+| --- | --- |
+| Contentbreite der Seite Einsatzabschnitte | 1050 px |
+| Abschnittsname „Deichverteidigung Nordwest II“ | 212 px |
+| Einheitsname „Fachgruppe Wasserschaden Musterstadt-Nordwest“ | 350 px |
+| Führer „Kirchgassner-Wohlfahrt, Maximiliane“ | 262 px |
+| Kurzbezeichnung „EA-NORD-2“ (Mono 12) | 63 px |
+| Funkrufname „Florian Musterstadt 1/10“ (Mono 12) | 168 px |
+| Stärke „12/34/156//202“ (Mono 12) | 98 px |
+
+Daraus folgt `SPALTE_MIN_PX = 300`: drei Spalten zu je 339 px bei 1050 px Contentbreite und
+16 px Lücke. Vier Spalten (≈ 250 px) ließen nach Klappknopf und Zeichen keine 200 px für den
+Namen. In der Spalte bleiben auf Tiefe 0 nach Klappknopf, Zeichen und Abständen etwa 270 px für
+den Text. Der lange Abschnittsname steht in einer Zeile, der lange Einheitsname bricht in zwei
+Zeilen um. Die Metazeile (Rufname · Leitung · Stärke) bricht zwischen ihren Teilen um.
+
 ### D4 · Stärke: dieselbe Rechnung, keine Gesamtzahl an der Wurzel
 
 Jeder Abschnittsknoten zeigt `inklUnter` aus `abschnittStaerken`, wie der Gliederungsbaum. Ein
@@ -217,13 +236,13 @@ Meldebild, die bei Einzelpersonal stillschweigend abweicht.
 - **Stabsstelle:**
   - `useStabFreigabe(einsatzId)`. Nur bei `zustand === 'frei'` läuft `useQuery({queryKey:
     einsatzKeys.stab(id), queryFn: ladeStab, enabled})`.
-  - Sie zeigt je besetztem Sachgebiet das Kürzel und die Besetzung:
-    - `personal` und `extern` zeigen den Namen.
-    - `einsatzleitung` zeigt „durch die Einsatzleitung“.
-    - `rueckwaertig` zeigt den Namen mit „rückwärtig“.
+  - Sie zeigt je besetztem Sachgebiet das Kürzel und die Besetzung. Der Text kommt aus
+    `stab/besetzung.ts:besetzungDarstellung`, demselben Wortlaut wie auf der Stabseite (etwa
+    „Einsatzleitung“, „Name (extern)“, „Name (rückwärtig)“, „Name · nicht mehr disponiert“).
   - Unbesetzte Sachgebiete erscheinen nicht. Gibt es keines, steht „Kein Sachgebiet besetzt“ da.
-  - Wortlaut und Kürzel kommen aus `stab/sachgebiete.ts` (`mitWirksamemLabel`), es gibt keine
-    zweite Labelliste.
+  - Kürzel und Reihenfolge kommen aus `stab/sachgebiete.ts:SACHGEBIETE`. Es gibt keine zweite
+    Labelliste und keinen weiteren Abruf des Funktionskatalogs, denn das Organigramm zeigt nur
+    das Kürzel.
 - **Laden, Fehler, gesperrt:** Die Stabsstelle fehlt, und nichts aus dem Stab wird angezeigt.
   Scheitert der Abruf bei freigegebenem Stab, steht in der Stabsstelle „Besetzung nicht geladen“.
 

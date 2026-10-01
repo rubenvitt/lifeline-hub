@@ -34,7 +34,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 2. Darstellung (D3, D5, D6, Spec „Lesbar ohne waagerechtes Scrollen“, „Ein- und Ausklappen“, „Einsatzleitung und Stab“)
 
-- [ ] 2.1 Vor dem Bau messen, Messspec `e2e/fuehrungsorganisation.spec.ts` (Grundgerüst):
+- [x] 2.1 Vor dem Bau messen, Messspec `e2e/fuehrungsorganisation.spec.ts` (Grundgerüst):
   - Bei 1366 × 768 mit offenem Modulpanel die Contentbreite der Seite Einsatzabschnitte messen.
   - Dazu die Laufweite des längsten gesäten Abschnitts- und Einheitsnamens, eines Funkrufnamens in
     Mono und einer Stärke `F/UF/M//Σ`.
@@ -42,7 +42,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
   Nachweis: Die Messwerte und die daraus gewählte Spaltenbreite stehen als Nachtrag in
   `design.md` D3.
-- [ ] 2.2 Test zuerst: `pages/einsatzabschnitte/Organigramm.test.tsx` deckt ab:
+- [x] 2.2 Test zuerst: `pages/einsatzabschnitte/Organigramm.test.tsx` deckt ab:
   - Wurzel „Einsatzleitung“ mit „Leitung nicht erfasst“ und ohne Stärke
   - Knoten mit Name als Link, Rufname bzw. „kein Rufname“, Leitung bzw. „Leitung nicht besetzt“
     als Wort, Stärke über `staerkeText`
@@ -52,7 +52,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - ein neu hinzukommender Knoten (Rerender mit mehr Daten) steht offen
 
   Nachweis: rot belegt.
-- [ ] 2.3 Test zuerst, Stabsstelle:
+- [x] 2.3 Test zuerst, Stabsstelle:
   - Bei `frei` und geladener Besetzung erscheinen die Sachgebiete mit Kürzel und Name, mit
     Wortlaut aus `stab/sachgebiete.ts`, und `einsatzleitung` erscheint als „durch die
     Einsatzleitung“.
@@ -60,7 +60,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Bei einem Fehler steht „Besetzung nicht geladen“.
 
   Nachweis: rot belegt.
-- [ ] 2.4 Umsetzung `pages/einsatzabschnitte/Organigramm.tsx`:
+- [x] 2.4 Umsetzung `pages/einsatzabschnitte/Organigramm.tsx`:
   - Grid der ersten Ebene, senkrechte tiefere Ebenen, Einrückung gedeckelt ab Tiefe 4
   - Stabslinie
   - Farben nur aus `rollen`/Tokens, Mono `tabular-nums`
