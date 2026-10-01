@@ -46,7 +46,7 @@ import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deepli
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useModulZaehler } from './useModulZaehler';
-import { useUnwetterHinweis } from '../wetter/useUnwetterHinweis';
+import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useWarnsperre } from '../theme/ThemeModeProvider';
 
@@ -200,9 +200,6 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   });
   const modulOverrides = modulOverridesQuery.data;
   const modulZaehler = useModulZaehler({ einsatzId, benutzer, overrides: modulOverrides });
-  // Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663). Hier, weil
-  // nur dieser Rahmen für den ganzen Einsatz steht; die Abfrage teilt er mit dem Modulzähler.
-  useUnwetterHinweis({ einsatzId, benutzer, overrides: modulOverrides });
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
   // die Sperre mit — in der Einsatzauswahl gibt es keine Einsatzwarnung.
@@ -424,6 +421,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         )}
         <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+            {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
+               Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
+               Zeitzone und Zeitformat des Einsatzes trägt. */}
+            <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} overrides={modulOverrides} />
             <Outlet />
           </EinsatzAnzeigeProvider>
         </Content>

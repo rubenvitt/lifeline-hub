@@ -442,6 +442,25 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
     expect(screen.getByText('Unwetterwarnung')).toBeInTheDocument();
   });
 
+  it('dasselbe Paar erneut, während sein alter Hinweis gebündelt ist: der neue erscheint', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    const detail = {
+      schluessel: 'schwer|DAUERREGEN',
+      titel: 'Unwetterwarnung',
+      beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
+    };
+    act(() => {
+      unwetter(detail);
+      for (let id = 1; id <= 3; id += 1) {
+        window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id: id } }));
+      }
+    });
+    expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
+    expect(screen.queryByText('Unwetterwarnung')).not.toBeInTheDocument();
+    act(() => unwetter({ ...detail, beschreibung: 'Dauerregen, seit 15:00 · bis 23:00' }));
+    expect(await screen.findByText('Dauerregen, seit 15:00 · bis 23:00')).toBeInTheDocument();
+  });
+
   it('die Zusammenfassung bietet den Weg zu Wetter & Pegel, wenn ein Unwetter darin steckt', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     act(() => {

@@ -126,7 +126,7 @@ Warnstands (`OBERGRENZE_MS.warnungen`). Eine Lücke in der Quelle, etwa eine War
 fehlt und dann neu ausgegeben wird, löst deshalb keinen Hinweis aus.
 
 Je Auswertung entsteht **höchstens ein** Hinweis. Er nennt die höchste neue Warnung, bei
-gleicher Stufe die mit dem frühesten Beginn. Sind mehrere neu, steht im Text „+ n weitere“.
+gleicher Stufe die mit dem frühesten Beginn. Sind mehrere neu, steht im Text „(+ n weitere)“.
 
 **Hingenommener Preis.** Eine *andere* Gefahr der Stufe schwer, die erscheint, während in den
 letzten 6 h schon „extrem“ gemeldet wurde, alarmiert nicht. Die Führung ist dann bereits auf
@@ -148,10 +148,15 @@ Hinweis nie.
 - **Lesen und Schreiben unmittelbar vor dem Melden**, in einem synchronen Zug. Mehrere Tabs
   desselben Browsers teilen das Gedächtnis: Der Tab, der zuerst nachfragt, meldet, und die
   anderen sehen das Paar schon eingetragen. So entsteht kein Hinweis je Tab. Bei verdecktem Tab
-  trägt die Desktop-Meldung den Hinweis.
-- **Ohne `localStorage`** (privater Modus, Kontingent) lesen und schreiben `try/catch` still, und
-  das Gedächtnis fällt auf eine Modul-`Map` im Tab zurück. Dann meldet jedes Neuladen einmal.
-  Das ist laut, aber ehrlich, weil keine Warnung verschluckt wird.
+  trägt die Desktop-Meldung den Hinweis. Damit sie greift, fragt der Hinweis auch im verdeckten
+  Tab nach (`refetchIntervalInBackground`, D6). Ohne das käme der neue Stand erst mit der
+  Rückkehr in den Tab, und dann ist der Tab sichtbar.
+- **Scheitert das Schreiben** (privater Modus, volles Kontingent), laufen Lesen und Schreiben
+  still über `try/catch`, und das Gedächtnis fällt auf eine Modul-`Map` im Tab zurück. Beim
+  Lesen geht dieser Stand vor `localStorage`, denn er ist der jüngere. Sonst läse der Tab bei
+  vollem Kontingent den alten Wert, vergäße das zuletzt gemeldete Paar und alarmierte alle
+  5 min erneut. Ganz ohne `localStorage` meldet jedes Neuladen einmal. Das ist laut, aber
+  ehrlich, weil keine Warnung verschluckt wird.
 - Kein Aufräumen beim Abmelden: Die Einträge sind klein und verfallen nach 6 h inhaltlich von
   selbst. Ein abgelaufener Schlüssel eines alten Einsatzes stört nicht.
 
@@ -160,28 +165,41 @@ Der Hook liest und schreibt nur. So ist die Regel ohne DOM prüfbar.
 
 ### D6 Hinweis über das Fenster-Ereignis `lfh:unwetter-alarm`, ein Platz im Budget
 
-Der Hook `useUnwetterHinweis` liegt im `EinsatzLayout`, neben `useModulZaehler`. Er spielt
-`spieleAlarmTon('dezent')` und löst `lfh:unwetter-alarm` mit
-`{ stufe, ereignis, beginn, ende, weitere }` aus. Das ist dasselbe Muster wie der Live-Stream:
-Ton beim Auslöser, Hinweis in der AlarmZentrale. Die AlarmZentrale bekommt dafür:
+Die Erkennung sitzt im Hook `useUnwetterHinweis`. Die Wächter-Komponente
+`wetter/UnwetterHinweis.tsx` (rendert nichts) montiert ihn im `EinsatzLayout`, und zwar
+**innerhalb** des `EinsatzAnzeigeProvider`. Nur dort kennt `useAnzeigeKonventionen` Zeitzone und
+Zeitformat des Einsatzes. Außerhalb läse der Hook die Vorgabe, und der Zeitraum im Hinweis stünde
+in Browser-Ortszeit. Der Hook wartet zusätzlich auf die Einsatz-Einstellungen (dasselbe
+Cache-Fach wie der Provider, Erfolg oder Fehler). Damit entsteht der Text auch dann nicht mit
+der Vorgabe, wenn die Wetterantwort zuerst eintrifft.
+
+Die Abfrage startet erst, wenn die Modul-Overrides geladen sind. Vorher gälte das Modul als frei,
+und ein ausgeblendetes antwortete mit 403. Der Observer des Hinweises fragt auch im verdeckten
+Tab nach (`refetchIntervalInBackground: true`, siehe D5). Key und Cache-Fach bleiben dieselben.
+
+Der Hook spielt `spieleAlarmTon('dezent')` und löst `lfh:unwetter-alarm` mit
+`{ schluessel, titel, beschreibung }` aus. Die Texte baut `unwetterHinweisText` (D9). Der Titel
+ist die Stufenbezeichnung aus `dwdWarnstufe` („Unwetterwarnung“ / „Extremes Unwetter“). Die
+Beschreibung lautet „<Ereignis in Titelschreibung>, <warnZeitraum>“, bei Bedarf mit
+„ (+ n weitere)“. Das ist dasselbe Muster wie der Live-Stream: Ton beim Auslöser, Hinweis in der
+AlarmZentrale. Die AlarmZentrale zeigt nur an und bekommt dafür:
 
 - `AlarmZiel` `'wetter-pegel'` → `wetterPegelPfad(einsatzId)`. In der Zusammenfassung steht
   der Knopf „Zu Wetter & Pegel“.
-- Einen Listener, der den Hinweis baut. Der Titel ist die Stufenbezeichnung aus
-  `dwdWarnstufe` („Unwetterwarnung“ / „Extremes Unwetter“). Die Beschreibung lautet
-  „<Ereignis in Titelschreibung>, <warnZeitraum>“ und bei Bedarf „ + n weitere“. Die Art ist
-  `warning`, die Aktion „Öffnen“, dazu die Desktop-Meldung.
+- Einen Listener mit Art `warning`, Aktion „Öffnen“ und Desktop-Meldung.
 - **Ersetzen statt stapeln:** Der Scope merkt sich den Key des letzten Unwetterhinweises. Ist
   er noch einzeln sichtbar, wird er zerstört und aus den Listen genommen, bevor der neue über
-  `zeigeAlarmToast` kommt. Der neue bekommt einen eigenen Key (`unwetter-<stufe>-<ereignis>`).
-  Damit verschluckt ihn die Prüfung „schon gebündelt“ nie. Ein bereits gebündelter alter
-  Hinweis bleibt in der Zusammenfassung gezählt.
+  `zeigeAlarmToast` kommt. Jede Auslösung bekommt einen **eigenen** Key
+  (`unwetter-<paar>-<laufende Nummer>`). Ein Key je Paar wäre verschluckt worden, solange ein
+  älterer Hinweis desselben Paars noch gebündelt in der Zusammenfassung hängt. Ein bereits
+  gebündelter alter Hinweis bleibt in der Zusammenfassung gezählt.
 
 ### D7 Zähler als Browser-Zähler `wetter-pegel`
 
 `ClientZaehlerQuelle` wächst um `'wetter-pegel'`. Der Registry-Eintrag des Moduls bekommt
 `zaehlerQuelle: 'wetter-pegel'`. `useModulZaehler` lädt `wetterAbfrage(einsatzId)` mit
-`enabled: darfZaehlerZeigen('wetter-pegel', …)`. Das ist derselbe Key wie bei Modulseite und
+`enabled`, sobald die Overrides geladen sind und `darfZaehlerZeigen('wetter-pegel', …)` gilt.
+Vorher gälte das Modul als frei, siehe D6. Das ist derselbe Key wie bei Modulseite und
 Erkennung, also ein Abruf je 5 min und ein Cache-Fach.
 
 `berechneUnwetterZaehler(anzeige, jetzt)` steht neben den anderen Browser-Zählern und stützt
@@ -192,8 +210,13 @@ sich auf die Ableitung aus D4:
   bei 0 angekündigten.
 - Sonst liefert sie `undefined`. Dann steht keine Zahl da, auch keine 0.
 
-`jetzt` kommt aus `useUhr()` (30 s), wie auf der Modulseite. Damit fällt eine abgelaufene
-Warnung auch zwischen zwei Abrufen heraus.
+`jetzt` kommt aus dem Wecker `useUnwetterUhr`, nach dem Muster von `useEinstufungsUhr`. Er
+liest die Uhr bei jeder neuen Antwort und stellt sich auf den nächsten Wechsel
+(`naechsterUnwetterWechsel`): einen künftigen Beginn, ein Ende oder die Obergrenze des Stands.
+Die Obergrenze ist immer eingeplant, sobald eine Unwetterwarnung vorliegt, auch bei Ende „bis
+auf Weiteres“. So fällt eine abgelaufene Warnung auch zwischen zwei Abrufen heraus, und ein zu
+alter Stand verliert seine Zahl, ohne dass der Rahmen alle 30 s neu zeichnet (`useUhr`
+täte das).
 
 `darfZaehlerZeigen` sucht sein Modul über `zaehlerQuelle`. Mit dem neuen Eintrag findet es das
 Modul `wetter-pegel`. Dashboard und Überblick behalten ihr `istKeyFreigegeben`, eine Umstellung
@@ -225,6 +248,7 @@ Die neue reine Datei enthält:
   Stand);
 - `paarSchluessel(warnung)`;
 - `erkenneNeue(gedaechtnis, warnungen, jetzt)` (D4);
+- `naechsterUnwetterWechsel(teil, jetzt)` für den Wecker des Zählers (D7);
 - Text-Helfer für Hinweis und Marke.
 
 Zähler, Erkennung und Marke nutzen nur diese Datei. Die Stufenbezeichnung kommt aus
@@ -235,7 +259,8 @@ Zähler, Erkennung und Marke nutzen nur diese Datei. Die Stufenbezeichnung kommt
 - **[Mehr Abrufe]** Jeder offene Einsatzrahmen fragt jetzt alle 5 min den Wetter-Endpunkt ab,
   wenn das Modul frei ist. → Der Server-Cache teilt den Abruf je Organisation und Ort
   (TTL 5 min), und Bright Sky sieht höchstens einen Abruf je 5 min und Ort. Ein Einsatz ohne Ort
-  geht nie ins Netz (`kein_ort`).
+  geht nie ins Netz (`kein_ort`). Der Hinweis fragt auch im verdeckten Tab nach (D6). Das kostet
+  Anfragen ans eigene Backend, aber keine zusätzlichen bei Bright Sky.
 - **[Herabstufung gegen neue Gefahr]** Eine neue Gefahr der Stufe schwer bleibt während einer
   extremen Lage still (D4). → Die Lücke ist hingenommen und benannt. Zähler und Modulseite
   zeigen die Gefahr.

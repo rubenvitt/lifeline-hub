@@ -40,13 +40,18 @@ function bereinige(roh: unknown): UnwetterGedaechtnis {
 
 export function ladeGedaechtnis(benutzerId: number, einsatzId: number): UnwetterGedaechtnis {
   const s = schluessel(benutzerId, einsatzId);
+  // Der Rückfall ist der JÜNGERE Stand: er entsteht nur, wenn ein Schreiben scheiterte (etwa bei
+  // vollem Kontingent), und dann läge unter dem Schlüssel noch ein alter Wert — der neu
+  // gemeldete Paare vergäße und alle 5 min erneut alarmierte.
+  const juenger = rueckfall.get(s);
+  if (juenger) return juenger;
   let roh: string | null;
   try {
     roh = localStorage.getItem(s);
   } catch {
-    return rueckfall.get(s) ?? {};
+    return {};
   }
-  if (roh == null) return rueckfall.get(s) ?? {};
+  if (roh == null) return {};
   try {
     return bereinige(JSON.parse(roh));
   } catch {
@@ -62,6 +67,7 @@ export function speichereGedaechtnis(
   const s = schluessel(benutzerId, einsatzId);
   try {
     localStorage.setItem(s, JSON.stringify(gedaechtnis));
+    rueckfall.delete(s);
   } catch {
     rueckfall.set(s, gedaechtnis);
   }

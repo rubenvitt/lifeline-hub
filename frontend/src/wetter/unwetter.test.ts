@@ -28,7 +28,8 @@ function warnung(stufe: WetterWarnstufe, ereignis: string, beginn = -STUNDE, end
   };
 }
 
-function teil(daten: ReturnType<typeof warnung>[], alter = 5 * MIN) {
+type W = Omit<ReturnType<typeof warnung>, 'ende'> & { ende: string | null };
+function teil(daten: W[], alter = 5 * MIN) {
   return { zustand: 'ok' as const, abgerufen_at: um(-alter), daten };
 }
 
@@ -205,6 +206,13 @@ describe('naechsterUnwetterWechsel', () => {
     // Die Obergrenze des Stands (abgerufen vor 5 min + 6 h) kommt vor dem Ende.
     const lang = teil([warnung('schwer', 'DAUERREGEN', -STUNDE, 9 * STUNDE)]);
     expect(naechsterUnwetterWechsel(lang, JETZT)).toBe(JETZT - 5 * MIN + UNWETTER_FENSTER_MS + 1);
+  });
+
+  it('ohne künftiges Datum (Ende „bis auf Weiteres"): die Obergrenze bleibt eingeplant', () => {
+    const offen = { ...warnung('schwer', 'DAUERREGEN'), ende: null };
+    expect(naechsterUnwetterWechsel(teil([offen]), JETZT)).toBe(
+      JETZT - 5 * MIN + UNWETTER_FENSTER_MS + 1,
+    );
   });
 
   it('ohne Unwetter und ohne Stand: kein Wechsel', () => {

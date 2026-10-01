@@ -470,13 +470,15 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   // `openspec/changes/lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
   // der Rahmen erkennt „neu" selbst und meldet es hierher, der Ton spielt dort. Ein neuer Hinweis
   // ERSETZT einen noch einzeln sichtbaren älteren — das Wetter belegt nie mehr als einen der drei
-  // Plätze. Eigener Key je Paar, damit „schon gebündelt" ihn nie verschluckt.
+  // Plätze. Eigener Key je Auslösung, damit „schon gebündelt" ihn nie verschluckt.
   useEffect(() => {
     const onUnwetter = (ev: Event) => {
       const detail = (ev as CustomEvent<UnwetterDetail>).detail ?? {};
-      const key = `${alarmScope.keyPrefix}-unwetter-${detail.schluessel ?? ++alarmScope.zaehler}`;
+      // Je Auslösung ein eigener Key: läge der alte Hinweis desselben Paars noch gebündelt in der
+      // Zusammenfassung, verschluckte „schon gebündelt" sonst den neuen.
+      const key = `${alarmScope.keyPrefix}-unwetter-${detail.schluessel ?? 'ohne'}-${++alarmScope.zaehler}`;
       const vorher = alarmScope.unwetterKey;
-      if (vorher && vorher !== key && alarmScope.einzelneToastKeys.includes(vorher)) {
+      if (vorher && alarmScope.einzelneToastKeys.includes(vorher)) {
         notification.destroy(vorher);
         alarmScope.eigeneToastKeys.delete(vorher);
         alarmScope.einzelneToastZiele.delete(vorher);

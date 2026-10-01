@@ -55,4 +55,14 @@ describe('Unwetter-Gedächtnis', () => {
     expect(ladeGedaechtnis(7, 42)).toEqual(EINTRAG);
     expect(ladeGedaechtnis(7, 43)).toEqual({});
   });
+
+  it('volles Kontingent bei vorhandenem Schlüssel: der neue Stand gilt, nicht der alte', () => {
+    speichereGedaechtnis(7, 42, EINTRAG);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    const neu = { ...EINTRAG, 'schwer|GEWITTER': { stufe: 'schwer' as const, gesehenAt: 2000 } };
+    speichereGedaechtnis(7, 42, neu);
+    expect(ladeGedaechtnis(7, 42)).toEqual(neu);
+  });
 });

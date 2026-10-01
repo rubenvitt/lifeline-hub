@@ -17,14 +17,15 @@ relativ zu `frontend/src/`. Kommandos laufen über `mise exec -- pnpm -C fronten
   Wiederkehr nach > 6 h, Lücke < 6 h, zwei neue zugleich (`weitere: 1`).
 - [x] 1.3 Text-Helfer `unwetterHinweisText(w, weitere, jetzt, konv)` und
   `unwetterMarkenText(w)` über `dwdWarnstufe`, `titelSchreibung` und `warnZeitraum`. Prüfen:
-  Tests auf „Unwetterwarnung“ / „Schweres Gewitter, ab 17:00 · bis 20:00“ und „+ 1 weitere“.
+  Tests auf „Unwetterwarnung“ / „Schweres Gewitter, ab 17:00 · bis 20:00“ und „(+ 1 weitere)“.
 
 ## 2. Gedächtnis (`wetter/unwetterGedaechtnis.ts`, D5)
 
 - [x] 2.1 `ladeGedaechtnis(benutzerId, einsatzId)` / `speichereGedaechtnis(…)` mit dem Schlüssel
   `lifeline-unwetter-gemeldet:<benutzerId>:<einsatzId>`, `try/catch` und Rückfall auf eine
-  Modul-`Map`, unlesbares JSON gilt als leer. Prüfen: Tests mit gesperrtem `localStorage`
-  (wirft), kaputtem JSON und getrennten Personen/Einsätzen.
+  Modul-`Map`, die beim Lesen vorgeht. Unlesbares JSON gilt als leer. Prüfen: Tests mit
+  gesperrtem `localStorage` (wirft), vollem Kontingent bei vorhandenem Schlüssel (nur `setItem`
+  wirft), kaputtem JSON und getrennten Personen/Einsätzen.
 
 ## 3. Modulzähler (D7)
 
@@ -34,24 +35,33 @@ relativ zu `frontend/src/`. Kommandos laufen über `mise exec -- pnpm -C fronten
 - [x] 3.2 `berechneUnwetterZaehler(anzeige, jetzt)` in `einsatz/useModulZaehler.ts` (Wortlaut
   „2 Unwetterwarnungen für den Einsatzort, davon 1 angekündigt“, Singular, ohne „davon“ bei 0,
   `undefined` ohne verwertbaren Stand). Prüfen: Fälle in `einsatz/useModulZaehler.test.ts`.
-- [x] 3.3 `useModulZaehler` lädt `wetterAbfrage` nur bei `darfZaehlerZeigen('wetter-pegel', …)`
-  und rechnet mit `useUhr()`. Prüfen: `useModulZaehler.abruf.test.tsx` zeigt, dass ein
-  ausgeblendetes oder gesperrtes Modul keinen Abruf auslöst und ein freies die Zahl liefert;
-  `ModulPanel.test.tsx` zeigt die Zahl mit zugänglichem Namen.
+- [x] 3.3 `useModulZaehler` lädt `wetterAbfrage` erst bei geladenen Overrides und
+  `darfZaehlerZeigen('wetter-pegel', …)` und rechnet mit dem Wecker `useUnwetterUhr`
+  (`naechsterUnwetterWechsel`). Prüfen: `useModulZaehler.abruf.test.tsx` zeigt: Ein
+  ausgeblendetes Modul und noch ladende Overrides lösen keinen Abruf aus, ein freies Modul
+  liefert die Zahl. `ModulPanel.test.tsx` zeigt die Zahl mit zugänglichem Namen.
+  `unwetter.test.ts` zeigt den Wecker samt Obergrenze bei Ende „bis auf Weiteres“.
 
 ## 4. Hinweis in der AlarmZentrale (D6, D1)
 
-- [x] 4.1 Hook `wetter/useUnwetterHinweis.ts`: dieselbe Abfrage (gegated wie 3.3), bei jedem
-  neuen Datenstand `erkenneNeue` über das Gedächtnis, bei `neu` `spieleAlarmTon('dezent')`
-  und `lfh:unwetter-alarm` auslösen. Im `EinsatzLayout` montieren. Prüfen: Hook-Test, der
-  genau ein Ereignis beim ersten Stand und keines nach erneutem Mount (Neuladen) mit demselben
-  Gedächtnis zeigt, keines bei `Stand unbekannt` und keines bei ausgeblendetem Modul.
+- [x] 4.1 Hook `wetter/useUnwetterHinweis.ts`: dieselbe Abfrage (gegated wie 3.3, dazu
+  `refetchIntervalInBackground`). Er wartet auf die Einsatz-Einstellungen, wertet bei jedem
+  neuen Datenstand `erkenneNeue` über das Gedächtnis aus und löst bei `neu`
+  `spieleAlarmTon('dezent')` und `lfh:unwetter-alarm` mit `{ schluessel, titel, beschreibung }`
+  aus. Er wird über die Wächter-Komponente `wetter/UnwetterHinweis.tsx` im
+  `EinsatzAnzeigeProvider` des `EinsatzLayout` montiert. Prüfen: Hook-Test zeigt genau ein
+  Ereignis beim ersten Stand und keines nach erneutem Mount (Neuladen) mit demselben
+  Gedächtnis. Keines kommt bei `Stand unbekannt`, bei ausgeblendetem Modul und bei noch
+  ladenden Overrides. Der Observer fragt im Hintergrund nach. `UnwetterHinweis.test.tsx` zeigt
+  den Zeitraum in der Zeitzone des Einsatzes, auch wenn die Einstellungen nach dem Wetter
+  eintreffen.
 - [x] 4.2 `AlarmZentrale`: `AlarmZiel` `'wetter-pegel'` mit `wetterPegelPfad`, Knopf „Zu
   Wetter & Pegel“ in der Zusammenfassung, Listener für `lfh:unwetter-alarm` über
-  `zeigeAlarmToast` samt Desktop-Meldung. Ein noch sichtbarer älterer Unwetterhinweis wird
-  ersetzt. Prüfen: `einsatz/AlarmZentrale.test.tsx` zeigt Titel „Unwetterwarnung“, die
+  `zeigeAlarmToast` samt Desktop-Meldung, ein Key je Auslösung. Ein noch sichtbarer älterer
+  Unwetterhinweis wird ersetzt. Prüfen: `einsatz/AlarmZentrale.test.tsx` zeigt Titel „Unwetterwarnung“, die
   Beschreibung, den Sprung zur Modulseite, nur einen sichtbaren Unwetterhinweis nach zwei
   Ereignissen und das Budget (drei Sofortmeldungen plus Unwetter ergibt eine Zusammenfassung).
+  Dazu zeigt er, dass derselbe Paar-Hinweis erneut erscheint, während der alte gebündelt ist.
 
 ## 5. Überblick-Marke (D8)
 

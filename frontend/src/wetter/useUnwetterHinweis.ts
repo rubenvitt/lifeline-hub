@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { ladeEinstellungen } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 import { wetterAbfrage } from '../api/wetter';
 import { darfZaehlerZeigen } from '../einsatz/useModulZaehler';
@@ -26,13 +28,30 @@ interface Args {
  * desselben Browsers nicht doppelt melden.
  */
 export function useUnwetterHinweis({ einsatzId, benutzer, overrides }: Args): void {
-  const aktiv = benutzer != null && darfZaehlerZeigen('wetter-pegel', benutzer, overrides);
-  const { data } = useQuery({ ...wetterAbfrage(einsatzId), enabled: aktiv });
+  // Erst nach geladenen Overrides: vorher gälte das Modul als frei, und ein ausgeblendetes
+  // antwortete mit 403.
+  const aktiv =
+    benutzer != null &&
+    overrides !== undefined &&
+    darfZaehlerZeigen('wetter-pegel', benutzer, overrides);
+  // Auch im verdeckten Tab nachfragen: genau dort trägt die Desktop-Meldung den Hinweis.
+  const { data } = useQuery({
+    ...wetterAbfrage(einsatzId),
+    enabled: aktiv,
+    refetchIntervalInBackground: true,
+  });
+  // Dasselbe Cache-Fach wie der `EinsatzAnzeigeProvider`: der Text entsteht erst, wenn Zeitzone
+  // und Zeitformat des Einsatzes feststehen (oder ihr Abruf gescheitert ist).
+  const einstellungen = useQuery({
+    queryKey: einsatzKeys.einstellungen(einsatzId),
+    queryFn: () => ladeEinstellungen(einsatzId),
+  });
+  const konventionenBereit = einstellungen.isSuccess || einstellungen.isError;
   const { konventionen } = useAnzeigeKonventionen();
   const benutzerId = benutzer?.id;
 
   useEffect(() => {
-    if (!aktiv || benutzerId == null || !data) return;
+    if (!aktiv || benutzerId == null || !data || !konventionenBereit) return;
     const jetzt = Date.now();
     const lage = unwetterLage(data.warnungen, jetzt);
     // Ohne verwertbaren Stand bleibt auch das Gedächtnis unberührt: eine Lücke ist kein „weg".
@@ -55,5 +74,5 @@ export function useUnwetterHinweis({ einsatzId, benutzer, overrides }: Args): vo
     );
     // Die Konventionen formen nur den Text; ein Wechsel ist kein neuer Stand.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aktiv, benutzerId, einsatzId, data]);
+  }, [aktiv, benutzerId, einsatzId, data, konventionenBereit]);
 }

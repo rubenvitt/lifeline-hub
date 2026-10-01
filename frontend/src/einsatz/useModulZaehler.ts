@@ -199,7 +199,10 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   const dokumenteAktiv = darfZaehlerZeigen('dokumente', benutzer, overrides);
   const abloesungAktiv = darfZaehlerZeigen('abloesung', benutzer, overrides);
   const betreuungAktiv = darfZaehlerZeigen('betreuung', benutzer, overrides);
-  const wetterAktiv = darfZaehlerZeigen('wetter-pegel', benutzer, overrides);
+  // Das Wetter erst nach geladenen Overrides (LFH-663): vorher gälte das Modul als frei, und ein
+  // ausgeblendetes antwortete mit 403 — die Spec verlangt dann gar keine Anfrage.
+  const wetterAktiv =
+    overrides !== undefined && darfZaehlerZeigen('wetter-pegel', benutzer, overrides);
 
   const zaehler = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),

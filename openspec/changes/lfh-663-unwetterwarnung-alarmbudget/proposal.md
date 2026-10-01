@@ -46,7 +46,7 @@ Keine.
 - Nur Frontend, Bereich `frontend/src/`:
   - `einsatz/modulRegistry.ts` (neue `ClientZaehlerQuelle`);
   - `einsatz/useModulZaehler.ts` (Browser-Zähler);
-  - `einsatz/EinsatzLayout.tsx` (Erkennung montieren);
+  - `einsatz/EinsatzLayout.tsx` (Wächter der Erkennung im Anzeige-Provider montieren);
   - `einsatz/AlarmZentrale.tsx` (neues Ziel und Ereignis);
   - `wetter/` (reine Ableitungen, Erkennung, Gedächtnis);
   - `pages/fuehrung/ueberblickDaten.ts` und `UeberblickPage.tsx` (Marke).

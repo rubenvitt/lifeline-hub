@@ -155,15 +155,17 @@ export function naechsterUnwetterWechsel(
 ): number | null {
   const lage = unwetterLage(teil, jetzt);
   if (!teil || !lage) return null;
-  const zeiten: number[] = [];
-  for (const w of [...lage.giltJetzt, ...lage.angekuendigt]) {
+  const alle = [...lage.giltJetzt, ...lage.angekuendigt];
+  // Ohne Unwetter wechselt nichts Sichtbares: 0 und „unbekannt" zeigen beide keine Zahl.
+  if (alle.length === 0) return null;
+  // `teilStand` wird erst JENSEITS der Obergrenze unbekannt (`alter > OBERGRENZE`); sie gilt auch,
+  // wenn keine Warnung ein künftiges Datum trägt (Ende „bis auf Weiteres").
+  const zeiten = [Date.parse(teil.abgerufen_at as string) + OBERGRENZE_MS.warnungen + 1];
+  for (const w of alle) {
     for (const z of [w.beginn, w.ende]) {
       const t = z ? Date.parse(z) : Number.NaN;
       if (Number.isFinite(t) && t > jetzt) zeiten.push(t);
     }
   }
-  if (zeiten.length === 0) return null;
-  // `teilStand` wird erst JENSEITS der Obergrenze unbekannt (`alter > OBERGRENZE`).
-  zeiten.push(Date.parse(teil.abgerufen_at as string) + OBERGRENZE_MS.warnungen + 1);
   return Math.min(...zeiten);
 }

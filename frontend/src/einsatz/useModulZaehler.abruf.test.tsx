@@ -173,4 +173,13 @@ describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
     });
     expect(abrufe.anzahl).toBe(1);
   });
+
+  it('solange die Overrides laden → keine Anfrage an …/wetter (kein 403 bei ausgeblendetem Modul)', async () => {
+    const abrufe = zaehleWetterAbrufe();
+    renderHook(() => useModulZaehler({ einsatzId: 7, benutzer, overrides: undefined }), {
+      wrapper: wrapper(neuerQueryClient()),
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(abrufe.anzahl).toBe(0);
+  });
 });
