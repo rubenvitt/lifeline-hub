@@ -404,9 +404,10 @@ for (const modus of ['light', 'dark'] as const) {
 
 /**
  * Kriterium 12 (CLS ≤ 0,1) — gemessen wird der BEITRAG DES PEGEL-NACHLADENS, nicht die
- * Seiten-CLS insgesamt: unter Linux-Chromium bricht die Kopfzeile bei 1024 px nach dem Mount
- * auf eine zweite Reihe um und verschiebt die Fläche auch auf Routen ohne Pegel-Bezug — ein
- * Bestandsbefund der Kopfzeile, den ein Pegel-Test nicht mitzählen darf.
+ * Seiten-CLS insgesamt: der Aufbau der Kopfzeile gehört nicht dem Pegel. Unter Linux-Chromium
+ * brach sie bei 1024 px nach dem Mount auf eine zweite Reihe um (O6, behoben mit LFH-637; den
+ * Seitenstart bewacht `e2e/kopfzeile-start-cls.spec.ts`) — ein Pegel-Test misst nur, was er
+ * selbst verschiebt.
  *
  * Die Spec hält deshalb die Pegel-Antworten ZURÜCK, bis die Seite ruhig steht
  * ({@link RUHE_MS}), setzt eine Marke und gibt sie frei. Gezählt wird nur, was NACH der Marke

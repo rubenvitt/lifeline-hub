@@ -101,6 +101,14 @@ type AlarmScope = {
 
 type DesktopZustand = 'aus' | 'erlaubt' | 'browser-blockiert';
 
+/**
+ * Tonzustand der Anzeige (LFH-637). `prueft` gilt, bis die Audio-Prüfung zum ersten Mal
+ * antwortet: „blockiert" hieße dort etwas, das niemand festgestellt hat, und das Wort brach beim
+ * Start die Kopfzeile bei 1024 px um (CLS 0,46). `prueft` ist keine Störung, steht also wie der
+ * Ruhezustand: gedämpft, ohne durchgestrichene Glocke, zwischen `md` und `xl` ohne Wort.
+ */
+type TonZustand = AlarmTonStatus | 'prueft';
+
 function desktopZustand(permission: NotificationPermission | 'unsupported'): DesktopZustand {
   if (permission === 'granted') return 'erlaubt';
   if (permission === 'default') return 'aus';
@@ -121,7 +129,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   const instanzId = useId();
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
-  const [tonStatus, setTonStatus] = useState<AlarmTonStatus>(alarmTonStatus() ?? 'blockiert');
+  const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
   // Jede Instanz verwaltet pro Einsatz einen eigenen Scope, damit langlebige Notices beim
   // Einsatzwechsel gezielt abgeräumt werden können, ohne fremde Notifications anzutasten.
   const alarmScope = useMemo<AlarmScope>(() => {
@@ -488,7 +496,13 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       : desktop === 'erlaubt'
         ? 'Desktop-Benachrichtigungen sind erlaubt'
         : 'Desktop-Benachrichtigungen sind im Browser blockiert';
-  const tonText = gemutet ? 'Ton stumm' : tonStatus === 'bereit' ? 'Ton bereit' : 'Ton blockiert';
+  const tonText = gemutet
+    ? 'Ton stumm'
+    : tonStatus === 'bereit'
+      ? 'Ton bereit'
+      : tonStatus === 'prueft'
+        ? 'Ton prüft'
+        : 'Ton blockiert';
   const tonHinweis = gemutet
     ? 'Alarmton einschalten'
     : tonStatus === 'blockiert'
@@ -525,7 +539,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     //
     // Zwei Einträge verstoßen nicht gegen „ab drei bündeln": hier bündelt die Breite, nicht die
     // Bequemlichkeit. Der Preis: Stummschalten kostet auf dem Handschirm zwei Tipper.
-    const tonAuffaellig = gemutet || tonStatus !== 'bereit';
+    const tonAuffaellig = gemutet || tonStatus === 'blockiert';
     const zeigtTon = tonAuffaellig || desktop === 'erlaubt';
     const sammelText = zeigtTon ? tonText : desktopText;
 
@@ -572,7 +586,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   }
 
   const desktopAuffaellig = desktop === 'browser-blockiert';
-  const tonAuffaelligBreit = gemutet || tonStatus !== 'bereit';
+  const tonAuffaelligBreit = gemutet || tonStatus === 'blockiert';
   const desktopWort = knapp && !desktopAuffaellig ? null : desktopText;
   const tonWort = knapp && !tonAuffaelligBreit ? null : tonText;
 
