@@ -122,9 +122,10 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
   const schwere = pick(p, 'SEVERITY', 'schwere', 'severity');
   const sev = schwere ? schwereDarstellung(ebene, schwere) : null;
   const dring = pick(p, 'URGENCY', 'dringlichkeit', 'urgency');
-  // Angekündigt (LFH-662): die Markierung der Karte (`dwdGueltigkeit`), sonst aus `ONSET` nach
-  // derselben Regel, damit Karte und Inspector nicht auseinanderlaufen. NINA kennt sie nicht.
-  const angekuendigt = ebene === 'dwd' && (p.angekuendigt === true || istAngekuendigt(p, jetzt));
+  // Angekündigt (LFH-662): aus `ONSET` gegen die laufende Uhr, mit derselben Funktion wie die Karte
+  // (`dwdGueltigkeit`). Nicht aus der Property `angekuendigt`: `p` ist die Momentaufnahme vom Klick
+  // und behielte die Markierung, nachdem die Warnung begonnen hat. NINA kennt keine Ankündigung.
+  const angekuendigt = ebene === 'dwd' && istAngekuendigt(p, jetzt);
   const beginn = fmtZeit(pick(p, 'ONSET'));
   const von = fmtZeit(pick(p, 'ONSET', 'EFFECTIVE', 'beginn'));
   const bis = fmtZeit(pick(p, 'EXPIRES'));

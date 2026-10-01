@@ -135,7 +135,7 @@ const DWD_URL: &str = "https://maps.dwd.de/geoserver/dwd/ows?service=WFS&version
 
 pub async fn fetch_dwd(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
     let (client, pool2) = (s.client.clone(), pool.clone());
-    liefere_dwd(pool, &s.inflight, chrono::Utc::now(), move || {
+    liefere_dwd(pool, &s.inflight, chrono::Utc::now, move || {
         erneuere_dwd(client, pool2)
     })
     .await
@@ -143,11 +143,13 @@ pub async fn fetch_dwd(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwo
 
 /// Kern von [`fetch_dwd`], ohne HTTP prüfbar: SWR mit der Obergrenze der Warnebenen, danach der
 /// Gültigkeitsfilter (LFH-662). Gefiltert wird bei jeder Auslieferung, nicht vor dem Cachen —
-/// sonst blieben Warnungen stehen, die zwischen zwei Abrufen ablaufen.
+/// sonst blieben Warnungen stehen, die zwischen zwei Abrufen ablaufen. `jetzt` ist eine Uhr und
+/// wird erst NACH dem Abruf gelesen: der kalte Weg wartet bis zu 8 s, und „Ende erreicht“ gilt
+/// zum Zeitpunkt der Antwort.
 async fn liefere_dwd<Fut>(
     pool: &SqlitePool,
     inflight: &Arc<Mutex<HashSet<String>>>,
-    jetzt: chrono::DateTime<chrono::Utc>,
+    jetzt: impl FnOnce() -> chrono::DateTime<chrono::Utc>,
     erneuere: impl FnOnce() -> Fut,
 ) -> FachebeneAntwort
 where
@@ -163,7 +165,7 @@ where
         erneuere,
     )
     .await;
-    dwd_gueltige(a, jetzt)
+    dwd_gueltige(a, jetzt())
 }
 
 /// Entfernt DWD-Warnungen, deren Ende (`EXPIRES`) erreicht ist (`ende ≤ jetzt`, wie
@@ -2491,7 +2493,7 @@ mod warnebenen_tests {
         let pool = crate::db::test_pool().await;
         cache::setze(&pool, "dwd", &dwd(vec![warnung("STURM", None)])).await;
         altere(&pool, "dwd", 7).await;
-        let a = liefere_dwd(&pool, &inflight(), Utc::now(), || async { None }).await;
+        let a = liefere_dwd(&pool, &inflight(), Utc::now, || async { None }).await;
         assert_eq!(a.status, FachebeneStatus::Offline);
         assert_eq!(a.abgerufen, None);
         assert!(a.features["features"].as_array().unwrap().is_empty());
@@ -2502,7 +2504,7 @@ mod warnebenen_tests {
         let pool = crate::db::test_pool().await;
         cache::setze(&pool, "dwd", &dwd(vec![warnung("STURM", None)])).await;
         altere(&pool, "dwd", 2).await;
-        let a = liefere_dwd(&pool, &inflight(), Utc::now(), || async { None }).await;
+        let a = liefere_dwd(&pool, &inflight(), Utc::now, || async { None }).await;
         assert_eq!(a.status, FachebeneStatus::Ok);
         assert_eq!(events(&a), vec!["STURM"]);
     }
@@ -2622,6 +2624,30 @@ mod warnebenen_tests {
         assert_eq!(g.status, FachebeneStatus::Offline);
     }
 
+    /// „Zum Zeitpunkt der Antwort“: die Uhr wird erst nach dem (hier kalten, blockierenden) Abruf
+    /// gelesen, sonst ginge eine Warnung raus, deren Ende in die Wartezeit fällt.
+    #[tokio::test]
+    async fn die_uhr_wird_erst_nach_dem_abruf_gelesen() {
+        use std::sync::atomic::AtomicBool;
+        let pool = crate::db::test_pool().await;
+        let geholt = Arc::new(AtomicBool::new(false));
+        let g = geholt.clone();
+        let a = liefere_dwd(
+            &pool,
+            &inflight(),
+            || {
+                assert!(geholt.load(Ordering::SeqCst), "Uhr vor dem Abruf gelesen");
+                um(15)
+            },
+            move || {
+                g.store(true, Ordering::SeqCst);
+                async { Some(dwd(vec![warnung("FROST", Some("2026-09-23T15:00:00Z"))])) }
+            },
+        )
+        .await;
+        assert!(events(&a).is_empty());
+    }
+
     /// Gefiltert wird bei der Auslieferung; der Cache hält den Rohstand.
     #[tokio::test]
     async fn cache_haelt_den_rohstand_und_die_antwort_ist_gefiltert() {
@@ -2635,7 +2661,7 @@ mod warnebenen_tests {
             ]),
         )
         .await;
-        let a = liefere_dwd(&pool, &inflight(), um(15), || async { None }).await;
+        let a = liefere_dwd(&pool, &inflight(), || um(15), || async { None }).await;
         assert_eq!(events(&a), vec!["STURM"]);
         let (roh, _) = cache::eintrag(&pool, "dwd").await.unwrap();
         assert_eq!(events(&roh), vec!["FROST", "STURM"]);

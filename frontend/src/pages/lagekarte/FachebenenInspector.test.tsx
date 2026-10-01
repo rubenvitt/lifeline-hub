@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -92,7 +92,28 @@ describe('FachebenenInspector', () => {
       expect(zeile).toHaveTextContent(`angekündigt · ab ${taktischeDtgVoll(KUENFTIG)}`);
     });
 
-    it('folgt der Markierung der Karte, auch ohne lesbaren Beginn', () => {
+    it('wird bei offenem Inspector geltend, sobald der Beginn erreicht ist', async () => {
+      // Die Properties sind eine Momentaufnahme vom Klick und tragen die Markierung der Karte
+      // (`angekuendigt: true`); maßgeblich ist trotzdem der Beginn gegen die laufende Uhr.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(new Date('2026-09-23T17:58:30Z'));
+      try {
+        render(
+          <FachebenenInspector
+            quelle="dwd"
+            properties={{ EVENT: 'STURMBÖEN', ONSET: '2026-09-23T18:00:00Z', angekuendigt: true }}
+            onSchliessen={() => {}}
+          />,
+        );
+        expect(screen.getByText(/angekündigt/)).toBeInTheDocument();
+        await act(() => vi.advanceTimersByTimeAsync(3 * 60_000));
+        expect(screen.queryByText(/angekündigt/)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('eine Markierung ohne lesbaren Beginn behauptet keine Ankündigung', () => {
       render(
         <FachebenenInspector
           quelle="dwd"
@@ -100,7 +121,7 @@ describe('FachebenenInspector', () => {
           onSchliessen={() => {}}
         />,
       );
-      expect(screen.getByText(/^angekündigt$/)).toBeInTheDocument();
+      expect(screen.queryByText(/angekündigt/)).toBeNull();
     });
 
     it('eine geltende Warnung ist nicht angekündigt', () => {

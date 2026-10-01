@@ -94,7 +94,9 @@ ausblendet. Verworfen: Dann käme ein alter Stand weiter über die API, und jede
 Eine reine Funktion `dwd_gueltige(antwort, jetzt) -> FachebeneAntwort` entfernt Features mit
 lesbarem `EXPIRES ≤ jetzt` und setzt `status` neu (`leer`, wenn nichts bleibt). `abgerufen`,
 `stand` und `attribution` bleiben erhalten. `fetch_dwd` wendet sie auf das Ergebnis von
-`liefere_mit_swr` an, also auf frische, alte und kalte Wege gleich. Der Cache hält den Rohstand.
+`liefere_mit_swr` an, also auf frische, alte und kalte Wege gleich. Die Uhr wird erst nach dem
+Abruf gelesen, weil der kalte Weg bis zu 8 s wartet und „Ende erreicht“ zum Zeitpunkt der Antwort
+gilt. Der Cache hält den Rohstand.
 Würde vor dem Cachen gefiltert, blieben Warnungen stehen, die zwischen zwei Abrufen ablaufen.
 
 Zeitvergleich mit `chrono::DateTime::parse_from_rfc3339`. Ist `EXPIRES` unlesbar oder fehlt es,
@@ -108,7 +110,9 @@ Polls und gehaltene Daten ab.
 
 Die reine Funktion `dwdGueltigkeit(fc, jetztMs)` in `pages/lagekarte/dwdGueltigkeit.ts`:
 
-- entfernt Features mit `EXPIRES ≤ jetzt`, nach derselben Regel wie D2;
+- entfernt Features mit `EXPIRES ≤ jetzt`, nach derselben Regel wie D2. Gelesen wird ebenso
+  streng: nur RFC 3339 mit Offset. `Date.parse` allein nähme auch einen Wert ohne Offset
+  (Ortszeit) oder ein bloßes Datum an, dann entschieden Server und Karte verschieden;
 - setzt auf Features mit lesbarem `ONSET > jetzt` die Property `angekuendigt: true`;
 - gibt die Collection unverändert (gleiche Referenz) zurück, wenn sich nichts ändert, damit
   `setData` nicht ohne Not läuft.
@@ -163,11 +167,15 @@ zurück. Der zweite Kanal ist die Strichelung (WCAG 1.4.1). Die Deckkraft allein
 
 `WarnungInhalt` bekommt `jetzt` (Minutentakt). Für DWD mit `ONSET > jetzt` steht vor „Gültig“
 eine Zeile `Descriptions.Item label="Status"` mit dem Wort „angekündigt“ und „ab <DTG voll>“.
-Die Zeile ist Text, keine Farbe. Grundlage ist die Property `angekuendigt` aus D3, damit Karte
-und Inspector nicht auseinanderlaufen: Der Inspector bekommt die Properties des angeklickten
-Features, und die stammen aus derselben vorbereiteten Collection. Fehlt die Property, etwa bei
-einem Feature aus einem älteren Render, rechnet der Inspector aus `ONSET` selbst nach, mit
-derselben Funktion.
+Die Zeile ist Text, keine Farbe. Grundlage ist allein `istAngekuendigt(p, jetzt)`, dieselbe
+Funktion, mit der D3 die Karte markiert, und **nicht** die Property `angekuendigt`.
+
+*Korrektur nach dem Review (01.10.2026):* Der erste Entwurf nahm die Property als Grundlage und
+rechnete nur ohne sie selbst nach. Die Properties im Inspector sind aber eine Momentaufnahme vom
+Klick (`useKartenInteraktion`). Blieb der Inspector über den Beginn hinaus offen, meldete er
+weiter „angekündigt“, während die Karte die Warnung schon durchgezogen zeichnete. Ohne lesbares
+`ONSET` setzt D3 die Property ohnehin nie. Eine abgelaufene Warnung im offenen Inspector bleibt
+stehen. Das verlangt die Spec nicht, es ist eine eigene Entscheidung.
 
 ## Risks / Trade-offs
 

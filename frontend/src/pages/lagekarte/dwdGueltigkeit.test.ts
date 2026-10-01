@@ -90,9 +90,26 @@ describe('dwdGueltigkeit (LFH-662)', () => {
 
   it('beginnt eine angekündigte Warnung, fällt die Markierung weg', () => {
     const ein = fc(warnung('ABEND', { ONSET: '2026-09-23T18:00:00Z' }));
-    expect(dwdGueltigkeit(ein, UM_15).features[0].properties.angekuendigt).toBe(true);
-    const spaeter = dwdGueltigkeit(ein, Date.parse('2026-09-23T18:01:00Z'));
-    expect(spaeter.features[0].properties.angekuendigt).toBeUndefined();
+    const markiert = dwdGueltigkeit(ein, UM_15);
+    expect(markiert.features[0].properties.angekuendigt).toBe(true);
+    // Auch eine schon markierte Eingabe verliert die Markierung, statt sie mitzuschleppen.
+    const spaeter = dwdGueltigkeit(markiert, Date.parse('2026-09-23T18:01:00Z'));
+    expect(spaeter.features[0].properties).not.toHaveProperty('angekuendigt');
+  });
+
+  it('liest Zeitpunkte so streng wie der Server: ohne Offset gilt die Warnung weiter', () => {
+    // `Date.parse` nähme beides an (Ortszeit bzw. UTC-Mitternacht); der Server liest nur RFC 3339
+    // mit Offset und behält die Warnung als „unlesbar“. Beide Seiten müssen gleich entscheiden.
+    const r = dwdGueltigkeit(
+      fc(
+        warnung('OHNE_OFFSET', { EXPIRES: '2026-09-23T14:00:00' }),
+        warnung('NUR_DATUM', { EXPIRES: '2026-09-23' }),
+        warnung('ANGEKUENDIGT_OHNE_OFFSET', { ONSET: '2026-09-23T18:00:00' }),
+      ),
+      UM_15,
+    );
+    expect(events(r)).toEqual(['OHNE_OFFSET', 'NUR_DATUM', 'ANGEKUENDIGT_OHNE_OFFSET']);
+    expect(r.features[2].properties.angekuendigt).toBeUndefined();
   });
 });
 

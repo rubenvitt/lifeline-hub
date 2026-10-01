@@ -2,9 +2,16 @@ import type { FeatureCollection } from '../../api/fachebenen';
 
 type Feature = FeatureCollection['features'][number];
 
-/** Zeitpunkt einer DWD-Property in ms; fehlend, kein Text oder unlesbar → `null`. */
+/**
+ * RFC 3339 mit Pflicht-Offset — was der Server mit `parse_from_rfc3339` liest. `Date.parse` allein
+ * nähme auch Werte ohne Offset (Ortszeit) oder ein bloßes Datum (UTC-Mitternacht) an, und dann
+ * entschieden Server und Karte verschieden.
+ */
+const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/i;
+
+/** Zeitpunkt einer DWD-Property in ms; fehlend, kein RFC 3339 oder unlesbar → `null`. */
 function zeitpunkt(v: unknown): number | null {
-  if (typeof v !== 'string') return null;
+  if (typeof v !== 'string' || !RFC3339.test(v)) return null;
   const t = Date.parse(v);
   return Number.isFinite(t) ? t : null;
 }
