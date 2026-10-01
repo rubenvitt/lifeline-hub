@@ -86,6 +86,9 @@ impl FachebenenState {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(8))
             .user_agent("LifelineHub-Lagekarte/1.0 (+https://github.com/)")
+            // Die 8 s gelten der ganzen Anfrage: ungepackt bräuchte ODL bei ~1 Mbit/s rund 7 s
+            // (LFH-599). Ausdrücklich, obwohl Vorgabe — Proxy und Download schalten es ab.
+            .gzip(true)
             .build()
             .expect("reqwest-Client baubar");
         FachebenenState {
@@ -117,9 +120,82 @@ impl Default for FachebenenState {
     }
 }
 
+/// Loopback-Quelle, die immer gzip-kodiert antwortet und den `Accept-Encoding`-Kopf der Anfrage
+/// mitschreibt (LFH-599). Geteilt von den Tests des Fachebenen-, Proxy- und Download-Clients.
+#[cfg(test)]
+pub(crate) mod gzip_fixture {
+    use std::sync::{Arc, Mutex};
+
+    /// Entpackter Inhalt von [`GZIP`].
+    pub const ROH: &[u8] = br#"{"ebene":"odl","werte":[1,2,3]}"#;
+
+    /// `ROH`, mit gzip gepackt (`mtime = 0`, damit die Bytes fest sind).
+    pub const GZIP: &[u8] = &[
+        0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0xab, 0x56, 0x4a, 0x4d, 0x4a,
+        0xcd, 0x4b, 0x55, 0xb2, 0x52, 0xca, 0x4f, 0xc9, 0x51, 0xd2, 0x51, 0x2a, 0x4f, 0x2d, 0x2a,
+        0x01, 0xf2, 0xa2, 0x0d, 0x75, 0x8c, 0x74, 0x8c, 0x63, 0x6b, 0x01, 0xff, 0xda, 0xc4, 0xfb,
+        0x1f, 0x00, 0x00, 0x00,
+    ];
+
+    /// `Accept-Encoding` der letzten Anfrage; `None`, solange keine kam oder sie keinen trug.
+    pub type Mitschrift = Arc<Mutex<Option<String>>>;
+
+    /// Startet die Quelle und liefert ihre URL samt Mitschrift.
+    pub async fn spawn() -> (String, Mitschrift) {
+        use axum::{http::HeaderMap, response::Response, routing::get, Router};
+        let mitschrift: Mitschrift = Arc::new(Mutex::new(None));
+        let m = mitschrift.clone();
+        let app = Router::new().route(
+            "/q",
+            get(move |headers: HeaderMap| {
+                let m = m.clone();
+                async move {
+                    *m.lock().unwrap() = headers
+                        .get("accept-encoding")
+                        .and_then(|v| v.to_str().ok())
+                        .map(str::to_string);
+                    Response::builder()
+                        .header("content-type", "application/json")
+                        .header("content-encoding", "gzip")
+                        .body(axum::body::Body::from(GZIP))
+                        .unwrap()
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        (format!("http://127.0.0.1:{}/q", addr.port()), mitschrift)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // LFH-599: die Fachebenen-Quellen liefern gzip (ODL 890 KB → 81 KB), der Client muss es
+    // anbieten und selbst entpacken — die Normalisierer sehen weiter das rohe JSON.
+    #[tokio::test]
+    async fn fachebenen_client_handelt_gzip_aus_und_entpackt() {
+        let (url, mitschrift) = gzip_fixture::spawn().await;
+        let text = FachebenenState::neu()
+            .client
+            .get(&url)
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+        assert_eq!(text.as_bytes(), gzip_fixture::ROH, "Antwort entpackt");
+        let angeboten = mitschrift.lock().unwrap().clone().unwrap_or_default();
+        assert!(
+            angeboten.contains("gzip"),
+            "Accept-Encoding bietet gzip an, war {angeboten:?}"
+        );
+    }
 
     #[test]
     fn wetter_basis_vorgabe_und_setter() {

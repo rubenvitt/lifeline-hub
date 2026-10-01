@@ -483,6 +483,10 @@ pub fn proxy_client() -> &'static reqwest::Client {
             .user_agent("LifelineHub-Kartenproxy/1.0 (+https://github.com/)")
             .dns_resolver(Arc::new(SichererResolver))
             .redirect(crate::karte::download::ssrf_redirect_policy())
+            // Content-Encoding wird verbatim durchgereicht (`AssetAntwort`, Kachel-Cache):
+            // entpackte reqwest, fiele der Kopf weg und Proxy wie Cache lieferten andere Bytes
+            // als die Quelle (LFH-599).
+            .no_gzip()
             .build()
             .expect("Proxy-Client baubar")
     })
@@ -499,7 +503,8 @@ pub struct AssetAntwort {
     /// Content-Type — `text/*` ist auf `application/octet-stream` geklemmt (Anti-XSS; Handler
     /// setzt zusätzlich `X-Content-Type-Options: nosniff`).
     pub content_type: String,
-    /// Verbatim durchgereicht (kein serverseitiges Dekomprimieren — reqwest läuft ohne gzip-Feature).
+    /// Verbatim durchgereicht (kein serverseitiges Dekomprimieren — `proxy_client` läuft mit
+    /// `.no_gzip()`).
     pub content_encoding: Option<String>,
     pub cache_control: Option<String>,
     pub etag: Option<String>,
@@ -1137,9 +1142,10 @@ mod service_tests {
     }
 
     /// Plain-Client (ohne pinnenden Resolver) — der würde Loopback blocken. In Prod nutzt der
-    /// Handler `proxy_client`; die Service-Schicht selbst ist client-agnostisch.
+    /// Handler `proxy_client`; die Service-Schicht selbst ist client-agnostisch. `.no_gzip()` wie
+    /// dort, sonst entpackte der Test-Client, was der Proxy durchreicht.
     fn plain() -> reqwest::Client {
-        reqwest::Client::builder().build().unwrap()
+        reqwest::Client::builder().no_gzip().build().unwrap()
     }
 
     #[tokio::test]
@@ -1189,6 +1195,24 @@ mod service_tests {
         assert_eq!(
             a.bytes, b"ROHGZIP",
             "Bytes unverändert (kein serverseitiges Dekomprimieren)"
+        );
+    }
+
+    // LFH-599: der Proxy reicht Content-Encoding verbatim durch, also darf sein Client weder
+    // gzip anbieten noch entpacken — sonst lieferte er andere Bytes als die Quelle.
+    #[tokio::test]
+    async fn proxy_client_reicht_gzip_byte_gleich_durch() {
+        use crate::karte::gzip_fixture;
+        let (url, mitschrift) = gzip_fixture::spawn().await;
+        let a = hole_asset(proxy_client(), Url::parse(&url).unwrap(), 1024)
+            .await
+            .unwrap();
+        assert_eq!(a.bytes, gzip_fixture::GZIP, "Bytes unverändert");
+        assert_eq!(a.content_encoding.as_deref(), Some("gzip"));
+        assert_eq!(
+            *mitschrift.lock().unwrap(),
+            None,
+            "kein Accept-Encoding vom Proxy-Client"
         );
     }
 
