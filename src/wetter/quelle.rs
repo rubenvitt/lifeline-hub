@@ -233,21 +233,72 @@ fn symbol_aus_icon(icon: Option<&str>, tag: impl FnOnce() -> bool) -> Option<Wet
     })
 }
 
-/// Feld von `/current_weather` → gezeigte Messgröße. Felder, die das Paneel nicht zeigt
-/// (30-min-Werte, Sonnenschein, Strahlung, Böenrichtung), ergeben `None`.
-fn messgroesse(feld: &str) -> Option<WetterMessgroesse> {
-    Some(match feld {
-        "temperature" => WetterMessgroesse::Temperatur,
-        "wind_speed_10" | "wind_direction_10" => WetterMessgroesse::Wind,
-        "wind_gust_speed_60" => WetterMessgroesse::Boeen,
-        "precipitation_60" => WetterMessgroesse::Niederschlag,
-        "icon" | "condition" => WetterMessgroesse::Wetterlage,
-        "visibility" => WetterMessgroesse::Sicht,
-        "cloud_cover" => WetterMessgroesse::Bewoelkung,
-        "relative_humidity" => WetterMessgroesse::Luftfeuchte,
-        "dew_point" => WetterMessgroesse::Taupunkt,
-        "pressure_msl" => WetterMessgroesse::Luftdruck,
-        _ => return None,
+/// Gezeigte Messgröße → ihre Felder in `/current_weather`. Felder, die das Paneel nicht zeigt
+/// (30-min-Werte, Sonnenschein, Strahlung, Böenrichtung), kommen nicht vor.
+const FELDER: [(WetterMessgroesse, &[&str]); 10] = [
+    (WetterMessgroesse::Temperatur, &["temperature"]),
+    (
+        WetterMessgroesse::Wind,
+        &["wind_speed_10", "wind_direction_10"],
+    ),
+    (WetterMessgroesse::Boeen, &["wind_gust_speed_60"]),
+    (WetterMessgroesse::Niederschlag, &["precipitation_60"]),
+    (WetterMessgroesse::Wetterlage, &["icon", "condition"]),
+    (WetterMessgroesse::Sicht, &["visibility"]),
+    (WetterMessgroesse::Bewoelkung, &["cloud_cover"]),
+    (WetterMessgroesse::Luftfeuchte, &["relative_humidity"]),
+    (WetterMessgroesse::Taupunkt, &["dew_point"]),
+    (WetterMessgroesse::Luftdruck, &["pressure_msl"]),
+];
+
+/// Herkunft jeder gezeigten Größe mit Wert: die Quelle aus `fallback_source_ids`, sobald eines
+/// ihrer Felder ergänzt ist, sonst `source_id`. Eine Größe ohne Wert hat keine Herkunft.
+fn herkunft(w: &Value, haupt_id: Option<i64>) -> Vec<(WetterMessgroesse, Option<i64>)> {
+    let rueckgriff = w.get("fallback_source_ids").and_then(Value::as_object);
+    FELDER
+        .iter()
+        .filter(|(_, felder)| {
+            felder
+                .iter()
+                .any(|f| w.get(*f).is_some_and(|v| !v.is_null()))
+        })
+        .map(|(groesse, felder)| {
+            let ergaenzt = felder
+                .iter()
+                .find_map(|f| rueckgriff.and_then(|r| r.get(*f)).and_then(Value::as_i64));
+            (*groesse, ergaenzt.or(haupt_id))
+        })
+        .collect()
+}
+
+/// Die Station im Kopf: die, von der die meisten gezeigten Werte stammen (Entscheidung
+/// 01.10.2026 — Bright Sky nennt mitunter eine Station, die keinen gezeigten Wert trägt).
+/// Gleichstand: die genannte (`source_id`), dann die nähere (`sources` ist nach Entfernung
+/// sortiert). Ohne jeden Wert die genannte, sonst die erste.
+fn kopf_station<'a>(
+    quellen: &'a [Value],
+    herkunft: &[(WetterMessgroesse, Option<i64>)],
+    haupt_id: Option<i64>,
+) -> Option<&'a Value> {
+    let id = |q: &Value| q.get("id").and_then(Value::as_i64);
+    let anteil = |q: &Value| {
+        herkunft
+            .iter()
+            .filter(|(_, h)| *h == id(q) && h.is_some())
+            .count()
+    };
+    let mut beste: Option<(&Value, (usize, bool))> = None;
+    for q in quellen {
+        let rang = (anteil(q), haupt_id.is_some() && id(q) == haupt_id);
+        if rang.0 > 0 && beste.is_none_or(|(_, b)| rang > b) {
+            beste = Some((q, rang));
+        }
+    }
+    beste.map(|(q, _)| q).or_else(|| {
+        quellen
+            .iter()
+            .find(|q| haupt_id.is_some() && id(q) == haupt_id)
+            .or_else(|| quellen.first())
     })
 }
 
@@ -258,48 +309,42 @@ fn wetter_station(q: &Value) -> Option<WetterStation> {
     })
 }
 
-/// `fallback_source_ids` → Ergänzungen je Station, in der Reihenfolge von `sources` (die
-/// Quelle sortiert nach Entfernung), Größen in der Reihenfolge von [`WetterMessgroesse`]. Eine
+/// Werte aus einer anderen als der Kopf-Station → Ergänzungen je Station, in der Reihenfolge
+/// von `sources` (nach Entfernung), Größen in der Reihenfolge von [`WetterMessgroesse`]. Eine
 /// Quelle, die `sources` nicht nennt, fällt heraus (geloggt) — ihr Wert bleibt stehen.
-fn ergaenzungen(w: &Value, quellen: &[Value], haupt_id: Option<i64>) -> Vec<WetterErgaenzung> {
-    let mut je_quelle: std::collections::BTreeMap<
-        i64,
-        std::collections::BTreeSet<WetterMessgroesse>,
-    > = Default::default();
-    if let Some(rueckgriff) = w.get("fallback_source_ids").and_then(Value::as_object) {
-        for (feld, id) in rueckgriff {
-            let (Some(groesse), Some(id)) = (messgroesse(feld), id.as_i64()) else {
-                continue;
-            };
-            if Some(id) != haupt_id {
-                je_quelle.entry(id).or_default().insert(groesse);
-            }
-        }
-    }
-    for id in je_quelle.keys() {
-        if !quellen
-            .iter()
-            .any(|q| q.get("id").and_then(Value::as_i64) == Some(*id))
-        {
-            tracing::warn!(
-                "Bright Sky: Ergänzung aus unbekannter Quelle {id}, ohne Herkunft gezeigt"
-            );
+fn ergaenzungen(
+    quellen: &[Value],
+    herkunft: &[(WetterMessgroesse, Option<i64>)],
+    kopf_id: Option<i64>,
+) -> Vec<WetterErgaenzung> {
+    let id = |q: &Value| q.get("id").and_then(Value::as_i64);
+    for h in herkunft.iter().filter_map(|(_, h)| *h) {
+        if !quellen.iter().any(|q| id(q) == Some(h)) {
+            tracing::warn!("Bright Sky: Wert aus unbekannter Quelle {h}, ohne Herkunft gezeigt");
         }
     }
     quellen
         .iter()
+        .filter(|q| id(q).is_some() && id(q) != kopf_id)
         .filter_map(|q| {
-            let groessen = je_quelle.get(&q.get("id")?.as_i64()?)?;
+            let groessen: Vec<WetterMessgroesse> = herkunft
+                .iter()
+                .filter(|(_, h)| *h == id(q))
+                .map(|(g, _)| *g)
+                .collect();
+            if groessen.is_empty() {
+                return None;
+            }
             Some(WetterErgaenzung {
                 station: wetter_station(q)?,
-                groessen: groessen.iter().copied().collect(),
+                groessen,
             })
         })
         .collect()
 }
 
-/// `/current_weather?lat&lon` → jüngste Messung. Die Station ist die Quelle aus `source_id`
-/// (Rückfall: die erste). `None`, wenn Messung, lesbare Messzeit oder Station fehlen — ohne
+/// `/current_weather?lat&lon` → jüngste Messung. Die Station ist die mit den meisten gezeigten
+/// Werten ([`kopf_station`]). `None`, wenn Messung, lesbare Messzeit oder Station fehlen — ohne
 /// sie gibt es keinen Stand und keine Herkunft.
 pub fn parse_current_weather(roh: &Value) -> Option<WetterAktuell> {
     let w = roh.get("weather").filter(|w| w.is_object())?;
@@ -310,10 +355,9 @@ pub fn parse_current_weather(roh: &Value) -> Option<WetterAktuell> {
         .map(Vec::as_slice)
         .unwrap_or_default();
     let haupt_id = w.get("source_id").and_then(Value::as_i64);
-    let haupt = quellen
-        .iter()
-        .find(|q| haupt_id.is_some() && q.get("id").and_then(Value::as_i64) == haupt_id)
-        .or_else(|| quellen.first())?;
+    let herkunft = herkunft(w, haupt_id);
+    let haupt = kopf_station(quellen, &herkunft, haupt_id)?;
+    let kopf_id = haupt.get("id").and_then(Value::as_i64);
     let tag = || match (zahl(haupt, "lat"), zahl(haupt, "lon")) {
         (Some(lat), Some(lon)) => sonne_ueber_horizont(lat, lon, zeitpunkt),
         _ => {
@@ -335,7 +379,7 @@ pub fn parse_current_weather(roh: &Value) -> Option<WetterAktuell> {
         windrichtung_grad: zahl(w, "wind_direction_10"),
         boeen_kmh: zahl(w, "wind_gust_speed_60"),
         niederschlag_mm: zahl(w, "precipitation_60"),
-        ergaenzt: ergaenzungen(w, quellen, haupt_id),
+        ergaenzt: ergaenzungen(quellen, &herkunft, kopf_id),
     })
 }
 
@@ -629,7 +673,9 @@ mod tests {
     fn current_weather_werte_der_hauptstation() {
         let a = parse_current_weather(&current_weather()).unwrap();
         assert_eq!(a.gemessen_at, "2026-10-01T06:00:00Z");
-        assert_eq!(a.station, station("Ottenstein", 9034.0));
+        // Alfeld trägt vier der zehn gezeigten Größen, Hameln-Hastenbeck drei, Hameln zwei,
+        // das nächste Ottenstein nur den Niederschlag.
+        assert_eq!(a.station, station("Alfeld", 21432.0));
         assert_eq!(a.symbol, Some(WetterSymbol::Bewoelkt));
         assert_eq!(a.temperatur_c, Some(14.8));
         assert_eq!(a.taupunkt_c, Some(11.38));
@@ -670,6 +716,10 @@ mod tests {
             a.ergaenzt,
             vec![
                 WetterErgaenzung {
+                    station: station("Ottenstein", 9034.0),
+                    groessen: vec![M::Niederschlag],
+                },
+                WetterErgaenzung {
                     station: station("Hameln-Hastenbeck", 11086.0),
                     groessen: vec![M::Temperatur, M::Luftfeuchte, M::Taupunkt],
                 },
@@ -677,26 +727,84 @@ mod tests {
                     station: station("Hameln", 12094.0),
                     groessen: vec![M::Wind, M::Boeen],
                 },
-                WetterErgaenzung {
-                    station: station("Alfeld", 21432.0),
-                    groessen: vec![M::Wetterlage, M::Sicht, M::Bewoelkung, M::Luftdruck],
-                },
             ],
-            "Luegde-Paenbruch ergänzt nur Ungezeigtes und erscheint nicht"
+            "Alfeld steht im Kopf; Luegde-Paenbruch ergänzt nur Ungezeigtes und erscheint nicht"
         );
+    }
+
+    /// Bremen am 01.10.2026: Bright Sky nennt den Bürgerpark (2,5 km), jeder gezeigte Wert
+    /// stammt aber aus Bremen (3,9 km). Im Kopf steht Bremen, kein Wert trägt einen Hinweis.
+    #[test]
+    fn station_ohne_eigenen_wert_steht_nicht_im_kopf() {
+        let felder = [
+            "temperature",
+            "wind_speed_10",
+            "wind_direction_10",
+            "wind_gust_speed_60",
+            "precipitation_60",
+            "condition",
+            "visibility",
+            "cloud_cover",
+            "relative_humidity",
+            "dew_point",
+            "pressure_msl",
+        ];
+        let mut roh = current_weather();
+        roh["weather"]["source_id"] = json!(1);
+        roh["weather"]["fallback_source_ids"] =
+            Value::Object(felder.iter().map(|f| (f.to_string(), json!(2))).collect());
+        roh["sources"] = json!([
+            { "id": 1, "station_name": "Bremen (Buergerpark)", "distance": 2520.0,
+              "lat": 53.09, "lon": 8.81 },
+            { "id": 2, "station_name": "Bremen", "distance": 3887.0,
+              "lat": 53.0451, "lon": 8.79808 }
+        ]);
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.station, station("Bremen", 3887.0));
+        assert!(a.ergaenzt.is_empty(), "{:?}", a.ergaenzt);
+    }
+
+    /// Gleichstand: zuerst die Station, die Bright Sky nennt, sonst die nähere.
+    #[test]
+    fn gleichstand_der_stationen() {
+        let mut roh = current_weather();
+        // Ottenstein (genannt): Niederschlag, Wetterlage, Sicht, Bewölkung, Luftdruck = 5;
+        // Hameln-Hastenbeck: Temperatur, Wind, Böen, Luftfeuchte, Taupunkt = 5.
+        roh["weather"]["fallback_source_ids"] = json!({
+            "temperature": 245112, "wind_speed_10": 245112, "wind_gust_speed_60": 245112,
+            "relative_humidity": 245112, "dew_point": 245112
+        });
+        assert_eq!(
+            parse_current_weather(&roh).unwrap().station,
+            station("Ottenstein", 9034.0)
+        );
+        // Ohne Anteil der genannten Station: Hameln-Hastenbeck (11,1 km) vor Alfeld (21,4 km).
+        roh["weather"]["fallback_source_ids"] = json!({
+            "temperature": 245112, "wind_speed_10": 245112, "wind_gust_speed_60": 245112,
+            "relative_humidity": 245112, "dew_point": 245112,
+            "precipitation_60": 80881, "condition": 80881, "visibility": 80881,
+            "cloud_cover": 80881, "pressure_msl": 80881
+        });
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.station, station("Hameln-Hastenbeck", 11086.0));
+        assert_eq!(a.ergaenzt.len(), 1);
+        assert_eq!(a.ergaenzt[0].station, station("Alfeld", 21432.0));
     }
 
     #[test]
     fn current_weather_ohne_rueckgriff_und_unbekannte_quelle() {
         let mut roh = current_weather();
         roh["weather"]["fallback_source_ids"] = json!(null);
-        assert!(parse_current_weather(&roh).unwrap().ergaenzt.is_empty());
+        let a = parse_current_weather(&roh).unwrap();
+        assert_eq!(a.station, station("Ottenstein", 9034.0));
+        assert!(a.ergaenzt.is_empty());
 
         // Eine Quelle, die `sources` nicht nennt: ihr Wert bleibt, ihre Herkunft fehlt.
         roh["weather"]["fallback_source_ids"] =
             json!({ "temperature": 999, "precipitation_60": 277810 });
         let a = parse_current_weather(&roh).unwrap();
         assert_eq!(a.temperatur_c, Some(14.8));
+        assert_eq!(a.station, station("Ottenstein", 9034.0));
         assert_eq!(
             a.ergaenzt,
             vec![WetterErgaenzung {

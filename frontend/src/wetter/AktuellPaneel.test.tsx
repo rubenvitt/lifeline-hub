@@ -81,6 +81,13 @@ describe('AktuellPaneel (LFH-864)', () => {
     expect(feld('Luftdruck')).toHaveTextContent('1021 hPa');
   });
 
+  it('vier Kennzahlen stehen 2 × 2 — drei plus eins ließe eine leere Zelle', () => {
+    zeige(ok(messung()));
+    const band = paneel().querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
+    expect(band.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+    expect(band.querySelectorAll('[data-lfh="kennzahl"]')).toHaveLength(4);
+  });
+
   it('die Wetterlage zeigt Wort und Ikone; keine Ikone ist ein eigenes Vorleseziel', () => {
     zeige(ok(messung({ symbol: 'nebel_nacht' })));
     expect(feld('Wetterlage')).toHaveTextContent('Nebel');

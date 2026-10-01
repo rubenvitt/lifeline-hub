@@ -15,7 +15,8 @@ werden.
   `WetterAktuellTeil`, Feld `aktuell` in `WetterAnzeige`. Doku-Kommentare je Feld mit Fenster
   und Einheit (design.md D3). Nachweis: `cargo build` grün.
 - [x] 1.3 `quelle::parse_current_weather` per TDD (design.md D3):
-  - Hauptstation aus `source_id`;
+  - Station im Kopf: die mit den meisten gezeigten Werten, Gleichstand zuerst `source_id`,
+    dann die nähere (Entscheidung 01.10.2026, design.md D3);
   - Fenster 10/60/60 für Wind, Böen, Niederschlag;
   - `null` und fehlende Werte ergeben `None`, nie 0;
   - jedes der zwölf `icon` der Quelle ergibt sein `WetterSymbol`; ein unbekanntes ergibt
@@ -28,7 +29,7 @@ werden.
   Nachweis: Tests in `quelle.rs` grün. Gegenprobe: Böe auf `wind_gust_speed_10` umgestellt
   macht den Test rot.
 - [x] 1.4 `quelle::sonne_ueber_horizont(lat, lon, zeit)` per TDD (NOAA-Näherung, Schwelle
-  −0,833°) und Nebel nach Tageszeit in `parse_current_weather` aus der Lage der Hauptstation
+  −0,833°) und Nebel nach Tageszeit in `parse_current_weather` aus der Lage der Kopf-Station
   (design.md D5). Ohne Stationslage gilt Tag, und eine Log-Zeile wird geschrieben. Nachweis:
   Bremen am 01.10.2026 (Aufgang etwa 05:24Z, Untergang etwa 17:05Z) um 05:00Z ergibt Nacht,
   um 06:00Z Tag, um 16:30Z Tag und um 17:30Z Nacht (gegen eine Sonnentabelle), dazu Mittag
@@ -103,7 +104,7 @@ werden.
   folgende Fälle:
   - alle Werte vorhanden;
   - ein fehlender Wert zeigt einen Strich;
-  - ein ergänzter Wert nennt seine Station, ein Wert der Hauptstation nicht;
+  - ein ergänzter Wert nennt seine Station, ein Wert der Kopf-Station nicht;
   - veraltet;
   - Stand unbekannt ohne Wert;
   - kein Ort ohne Knopf;
@@ -118,7 +119,7 @@ werden.
   - Szenario „Ausfall reißt die anderen Teile nicht mit“, also `aktuell: ausfall` neben
     Warnungen und Vorhersage `ok`;
   - Reihenfolge der Paneele.
-- [ ] 5.3 `e2e/wetter-pegel.spec.ts`: Literal um `aktuell` ergänzen, mit langem Stationsnamen und
+- [x] 5.3 `e2e/wetter-pegel.spec.ts`: Literal um `aktuell` ergänzen, mit langem Stationsnamen und
   einer Ergänzung. Querlauf bei 1366/1024/390 px und Kontrast in beiden Modi decken das neue
   Paneel mit ab. Nachweis: Die Spec läuft grün (`mise exec -- pnpm -C frontend exec playwright
   test e2e/wetter-pegel.spec.ts`).
@@ -127,6 +128,8 @@ werden.
 
 - [ ] 6.1 Gesamtprüfung: `./scripts/check-all.sh` grün. Belegt wird das durch den lokalen Lauf
   oder die CI des PRs, mit Verweis auf den Lauf.
-- [ ] 6.2 Sichtprüfung im Dev-Stack mit einem verorteten Einsatz: Das Paneel zeigt echte Werte
+- [x] 6.2 Sichtprüfung im Dev-Stack mit einem verorteten Einsatz: Das Paneel zeigt echte Werte
   von Bright Sky. Aufnahme bei 1440 und 390 px, Tag und Nacht, als Anhang am PR. Nachweis:
-  Aufnahmen liegen vor.
+  Aufnahmen liegen vor — `sichtprobe/` (Bremen 01.10.2026 08:00Z, Hameln 390 px). Befunde der
+  ersten Probe: Bright Sky nannte den Bürgerpark ohne eigenen Wert (→ Station im Kopf, design.md
+  D3) und vier Kennzahlen standen 3 + 1 mit leerer Zelle (→ Band fest 2 × 2).

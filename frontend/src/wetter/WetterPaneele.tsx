@@ -8,7 +8,7 @@
  * Warnungen und Vorhersage sind Listen zum Lesen; Beschreibung und Handlungsempfehlung einer
  * Warnung stehen inline hinter einem Umschalter, nicht in einem Drawer.
  *
- * „Aktuelle Bedingungen" zeigt die jüngste MESSUNG der nächsten DWD-Station, keinen Modellwert;
+ * „Aktuelle Bedingungen" zeigt die jüngste MESSUNG naher DWD-Stationen, keinen Modellwert;
  * ihr Stand ist die Messzeit (`wetterStand.ts`). „Zahl führt": vier Kennzahlen ohne Ton — das
  * Paneel bewertet nichts (keine Einsatzgrenzen, kein Alarm, LFH-864 design.md). Ergänzt die
  * Quelle einen Wert aus einer anderen Station, steht diese als Text beim Wert, vorlesbar.
@@ -412,7 +412,8 @@ function Messwerte({ a }: { a: WetterAktuell }) {
   );
   return (
     <div style={{ display: 'grid', gap: token.marginSM, padding: token.padding }}>
-      <Kennzahlenband beschriftung="Messwerte">
+      {/* Fest 2 × 2: im Raster nach Breite stünden vier Werte 3 + 1 mit leerer Zelle. */}
+      <Kennzahlenband beschriftung="Messwerte" spalten={2}>
         <Kennzahl
           titel="Temperatur"
           wert={zahlText(a.temperatur_c, 1)}

@@ -4,11 +4,13 @@
 
 ### Requirement: Aktuelle Bedingungen am Einsatzort
 
-Das System SHALL auf der Modulseite die zuletzt gemessenen Wetterwerte der nächsten
-DWD-Wetterstation zum Einsatzort zeigen. Dazu gehören Messzeit, Station und deren Entfernung.
-Gemessen heißt beobachtet, nicht vorhergesagt. Ein Wert, den die Quelle nicht liefert, MUST
-als fehlend erscheinen und nicht als 0. Ergänzt die Quelle einen Wert aus einer anderen
-Station, MUST die Seite diese Station mit Entfernung bei dem Wert nennen.
+Das System SHALL auf der Modulseite die zuletzt gemessenen Wetterwerte von DWD-Wetterstationen
+nahe dem Einsatzort zeigen. Dazu gehören Messzeit, Station und deren Entfernung. Als Station
+der Messung MUST die Station gelten, von der die meisten gezeigten Werte stammen; bei
+Gleichstand die Station, die die Quelle nennt, sonst die nähere. Gemessen heißt beobachtet,
+nicht vorhergesagt. Ein Wert, den die Quelle nicht liefert, MUST als fehlend erscheinen und
+nicht als 0. Stammt ein Wert aus einer anderen als der Station der Messung, MUST die Seite
+diese Station mit Entfernung bei dem Wert nennen.
 
 Je Messung zeigt die Seite:
 
@@ -22,14 +24,19 @@ Je Messung zeigt die Seite:
 
 Die Seite MUST den Quellenvermerk „Datenbasis: Deutscher Wetterdienst“ tragen.
 
-#### Scenario: Messung der nächsten Station
+#### Scenario: Messung einer Station
 - **WHEN** die Quelle für den Einsatzort eine Messung der Station „Bremen“ in 3,9 km Entfernung von 08:00 Uhr liefert, mit 15,3 °C, Wind aus Südost mit 11 km/h und Böen bis 17 km/h
 - **THEN** zeigt das Paneel „Aktuelle Bedingungen“ diese Werte mit „Station Bremen, 3,9 km“ und der Messzeit 08:00
 
 #### Scenario: Wert aus einer anderen Station ergänzt
-- **WHEN** die nächste Station keine Windmessung hat und die Quelle Wind und Böen aus der Station „Hameln“ in 12,1 km Entfernung ergänzt
+- **WHEN** die Station der Messung keine Windmessung hat und die Quelle Wind und Böen aus der Station „Hameln“ in 12,1 km Entfernung ergänzt
 - **THEN** stehen Wind und Böen mit dem Hinweis „Station Hameln, 12,1 km“
-- **AND** die übrigen Werte stehen ohne diesen Hinweis bei der nächsten Station
+- **AND** die übrigen Werte stehen ohne diesen Hinweis bei der Station der Messung
+
+#### Scenario: Genannte Station ohne eigenen Wert
+- **WHEN** die Quelle die Station „Bremen (Buergerpark)“ in 2,5 km Entfernung nennt, jeder gezeigte Wert aber aus der Station „Bremen“ in 3,9 km Entfernung stammt
+- **THEN** steht im Kopf „Station Bremen, 3,9 km“
+- **AND** kein Wert trägt einen Hinweis auf eine andere Station
 
 #### Scenario: Fehlender Messwert
 - **WHEN** die Quelle für die Messung keine Sicht liefert

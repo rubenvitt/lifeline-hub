@@ -1,6 +1,6 @@
 //! Wetter am Einsatzort (LFH-633): die gültigen DWD-Warnungen der Warnzelle (Gemeinde), in
 //! der der Einsatzort liegt, eine Vorhersage der nächsten 24 Stunden und (LFH-864) die
-//! jüngste Messung der nächsten DWD-Wetterstation.
+//! jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort.
 //!
 //! - `quelle`: reine Auswertung der Bright-Sky-Antworten (`/alerts`, `/weather`,
 //!   `/current_weather`) und der Filter, der bei jeder Antwort abgelaufene Warnungen entfernt.
@@ -199,8 +199,8 @@ pub struct WetterStation {
     pub entfernung_m: Option<f64>,
 }
 
-/// Werte, die die Quelle aus einer anderen als der nächsten Station ergänzt hat
-/// (`fallback_source_ids`), gruppiert je Station.
+/// Werte aus einer anderen als der Station im Kopf (ergänzt über `fallback_source_ids` oder
+/// von der genannten `source_id`), gruppiert je Station.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct WetterErgaenzung {
     pub station: WetterStation,
@@ -208,13 +208,13 @@ pub struct WetterErgaenzung {
     pub groessen: Vec<WetterMessgroesse>,
 }
 
-/// Die jüngste Messung der nächsten DWD-Wetterstation (LFH-864). Jeder Wert, den die Quelle
+/// Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle
 /// nicht liefert, fehlt — er wird nie zu 0.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct WetterAktuell {
     /// Messzeit (`timestamp`), RFC 3339 in UTC (`…Z`). Sie ist der Stand des Teils.
     pub gemessen_at: String,
-    /// Die Station der Messung (`source_id`).
+    /// Die Station der Messung: die, von der die meisten gezeigten Werte stammen.
     pub station: WetterStation,
     /// Wetterlage aus `icon`; fehlt bei einem unbekannten Wert.
     #[serde(skip_serializing_if = "Option::is_none")]

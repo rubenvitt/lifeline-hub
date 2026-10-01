@@ -3651,7 +3651,7 @@ export interface components {
          */
         Warnstufe: "keine" | "niedrig" | "mittel" | "hoch" | "akut";
         /**
-         * @description Die jüngste Messung der nächsten DWD-Wetterstation (LFH-864). Jeder Wert, den die Quelle
+         * @description Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle
          *     nicht liefert, fehlt — er wird nie zu 0.
          */
         WetterAktuell: {
@@ -3689,7 +3689,7 @@ export interface components {
              * @description Sichtweite in Metern.
              */
             sicht_m?: number | null;
-            /** @description Die Station der Messung (`source_id`). */
+            /** @description Die Station der Messung: die, von der die meisten gezeigten Werte stammen. */
             station: components["schemas"]["WetterStation"];
             symbol?: components["schemas"]["WetterSymbol"] | null;
             /**
@@ -3731,8 +3731,8 @@ export interface components {
             warnungen: components["schemas"]["WetterWarnungen"];
         };
         /**
-         * @description Werte, die die Quelle aus einer anderen als der nächsten Station ergänzt hat
-         *     (`fallback_source_ids`), gruppiert je Station.
+         * @description Werte aus einer anderen als der Station im Kopf (ergänzt über `fallback_source_ids` oder
+         *     von der genannten `source_id`), gruppiert je Station.
          */
         WetterErgaenzung: {
             /** @description Die ergänzten gezeigten Größen, in der Reihenfolge von [`WetterMessgroesse`]. */

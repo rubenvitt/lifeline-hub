@@ -9811,7 +9811,7 @@
       },
       "WetterAktuell": {
         "type": "object",
-        "description": "Die jüngste Messung der nächsten DWD-Wetterstation (LFH-864). Jeder Wert, den die Quelle\nnicht liefert, fehlt — er wird nie zu 0.",
+        "description": "Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle\nnicht liefert, fehlt — er wird nie zu 0.",
         "required": [
           "gemessen_at",
           "station",
@@ -9879,7 +9879,7 @@
           },
           "station": {
             "$ref": "#/components/schemas/WetterStation",
-            "description": "Die Station der Messung (`source_id`)."
+            "description": "Die Station der Messung: die, von der die meisten gezeigten Werte stammen."
           },
           "symbol": {
             "oneOf": [
@@ -9989,7 +9989,7 @@
       },
       "WetterErgaenzung": {
         "type": "object",
-        "description": "Werte, die die Quelle aus einer anderen als der nächsten Station ergänzt hat\n(`fallback_source_ids`), gruppiert je Station.",
+        "description": "Werte aus einer anderen als der Station im Kopf (ergänzt über `fallback_source_ids` oder\nvon der genannten `source_id`), gruppiert je Station.",
         "required": [
           "station",
           "groessen"

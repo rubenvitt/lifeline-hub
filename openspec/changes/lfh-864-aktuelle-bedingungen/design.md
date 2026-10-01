@@ -99,7 +99,7 @@ HTTP-Fehler.
 ```
 WetterAktuell {
   gemessen_at: String,                 // timestamp der Quelle, RFC 3339 UTC
-  station: WetterStation,              // die Quelle aus source_id
+  station: WetterStation,              // die Station mit den meisten gezeigten Werten
   symbol?: WetterSymbol,               // aus `icon`, Nebel mit Sonnenstand (D5)
   temperatur_c?, taupunkt_c?, luftfeuchte_prozent?, luftdruck_hpa?,
   sicht_m?, bewoelkung_prozent?,
@@ -118,6 +118,15 @@ WetterMessgroesse = wetterlage|temperatur|taupunkt|luftfeuchte|luftdruck|sicht|b
   Böe gilt das Maximum der letzten 60 min, denn für eine Einsatzentscheidung zählt die stärkste
   Böe der letzten Stunde, nicht die der letzten zehn Minuten. Für den Niederschlag gilt die Summe
   der letzten 60 min. 30-min-Werte, Sonnenschein, Globalstrahlung und Böenrichtung entfallen.
+- **Station im Kopf (Entscheidung 01.10.2026, nach der Sichtprobe):** Bright Sky nennt mit
+  `source_id` die nächste Station, auch wenn sie keinen gezeigten Wert trägt — in Bremen nannte
+  sie den Bürgerpark (2,5 km), und alle zehn Größen kamen aus „Bremen“ (3,9 km). Jede gezeigte
+  Größe mit Wert hat darum eine Herkunft: die Quelle aus `fallback_source_ids`, sobald eines
+  ihrer Felder ergänzt ist, sonst `source_id`. Im Kopf steht die Station mit den meisten
+  Größen; bei Gleichstand die genannte, dann die nähere. Jede Größe aus einer anderen Station
+  ist eine Ergänzung, auch eine aus der genannten Station. Preis: In der Aufzeichnung
+  Ottenstein steht Alfeld (21,4 km, vier Größen) im Kopf, Ottenstein (9,0 km) nur beim
+  Niederschlag. Der Sonnenstand für Nebel (D5) rechnet mit der Lage der Station im Kopf.
 - **Ergänzungen gruppiert je Station:** `fallback_source_ids` bildet Feld auf Quelle ab. Die
   Auswertung übersetzt die gezeigten Felder in `WetterMessgroesse` und gruppiert sie je Station.
   Ein ergänztes Feld, das nicht gezeigt wird, etwa `solar_10`, erscheint nicht. Die Seite nennt

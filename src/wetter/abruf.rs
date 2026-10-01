@@ -155,7 +155,7 @@ pub fn schluessel_aktuell(ort: &GerundeterOrt) -> String {
     schluessel(AKTUELL.praefix, ort)
 }
 
-/// `/current_weather` für den Punkt: die jüngste Messung der nächsten SYNOP-Station, Lücken
+/// `/current_weather` für den Punkt: die jüngste Messung naher SYNOP-Stationen, Lücken
 /// aus Nachbarstationen ergänzt (`fallback_source_ids`). Einheiten in der Vorgabe `dwd`.
 pub fn aktuell_url(basis: &str, ort: &GerundeterOrt) -> String {
     format!(

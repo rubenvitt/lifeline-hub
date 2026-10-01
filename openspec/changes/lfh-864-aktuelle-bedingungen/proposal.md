@@ -12,7 +12,7 @@ der Drohne. Heute muss die Führung dafür eine fremde Seite öffnen. Ruben hat 
 ## What Changes
 
 - Der Wetter-Endpunkt `GET /api/einsaetze/{id}/wetter` liefert einen dritten Teil `aktuell`.
-  Er enthält die **gemessenen** Werte der nächsten DWD-Wetterstation zum Einsatzort,
+  Er enthält die **gemessenen** Werte naher DWD-Wetterstationen zum Einsatzort,
   mit eigenem Teilzustand (`ok | kein_ort | ausfall`) und eigenem Datenstand. Die Antwort wird
   nur erweitert, ist also nicht **BREAKING**.
 - Quelle ist Bright Sky `/current_weather`. Die Wetterdaten kommen bereits von dort, eine neue
