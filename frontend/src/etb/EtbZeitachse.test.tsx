@@ -257,6 +257,31 @@ describe('EtbZeitachse – der Eintrag', () => {
       container.querySelectorAll('[data-lfh="datensicht-karte"].zeile-hervorgehoben'),
     ).toHaveLength(1);
   });
+
+  // LFH-696: die Hervorhebung ist eine Zeilentönung des Bausteins (Grund inline, Rolle
+  // `hervorhebungZeile`), nicht mehr die Bedienfläche. Der Provider ohne `theme` rendert hell.
+  it('tönt die angesteuerte Zeile mit der Rolle der Deeplink-Hervorhebung (LFH-696)', () => {
+    const { container } = renderZeitachse({
+      eintraege: [eintrag({ id: 9 }), eintrag({ id: 8, lfd_nr: 2 })],
+      highlightId: 9,
+    });
+    const z = zeileVon(container, 'eintrag-9');
+    expect(z).toHaveAttribute('data-toenung', 'hervorhebung');
+    expect(z.style.background).toBe('rgb(255, 251, 230)');
+    expect(zeileVon(container, 'eintrag-8')).not.toHaveAttribute('data-toenung');
+  });
+
+  it('die Hervorhebung hat Vorrang vor der Berichtigungstönung, nur solange angesteuert', () => {
+    const { container } = renderZeitachse({
+      eintraege: [
+        eintrag({ id: 2, lfd_nr: 2, typ: 'berichtigung', berichtigt_eintrag_id: 1 }),
+        eintrag({ id: 3, lfd_nr: 3, typ: 'berichtigung', berichtigt_eintrag_id: 1 }),
+      ],
+      highlightId: 2,
+    });
+    expect(zeileVon(container, 'eintrag-2')).toHaveAttribute('data-toenung', 'hervorhebung');
+    expect(zeileVon(container, 'eintrag-3')).toHaveAttribute('data-toenung', 'berichtigung');
+  });
 });
 
 describe('EtbZeitachse – Aktionsmenü (LFH-365 · B5e)', () => {

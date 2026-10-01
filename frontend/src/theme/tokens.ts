@@ -128,7 +128,8 @@ export interface Farbrollen {
  * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696, Werte unverändert aus LFH-25): text 17,76 ·
  * text2 12,63 · gedaempft 8,09 · bedienText 8,09 · achtungText 8,87 · alarmText 8,62 ·
  * normalText 8,82. Abhebung gegen flaeche 1,04, gegen den Hover `flaeche3` 1,23, gegen
- * `lueckeZeile` 1,07. Gemessen in `e2e/hervorhebung-kontrast.spec.ts`.
+ * `lueckeZeile` 1,07. Gerechnet in `bedienKontrast.test.ts`; den Zeilentext einer echten Tabellenzeile
+ * misst `e2e/hervorhebung-kontrast.spec.ts`.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',

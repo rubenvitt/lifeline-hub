@@ -318,9 +318,6 @@ export default function EtbZeitachse({
       'data-zeile': z.schluessel,
       className: klassen || undefined,
       aktionen: aktionen(z),
-      // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
-      // Klassenregel käme dagegen nicht an.
-      style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
     };
 
     if (z.art !== 'eintrag') {
@@ -383,7 +380,13 @@ export default function EtbZeitachse({
         typ={e.typ}
         typwort={etbTyp[e.typ].label}
         meta={vonAn(e.von, e.an)}
-        toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
+        // Die Hervorhebung als Zeilentönung des Bausteins: er setzt seinen Grund inline, die
+        // Klassenregel aus `index.css` käme nicht an. Vorrang vor der Berichtigung, solange
+        // angesteuert — Typwort und Kante tragen die Berichtigung weiter (LFH-696, OpenSpec-Change
+        // `lfh-696-deeplink-hervorhebung-rolle`, design.md, Entscheidung 5).
+        toenung={
+          hervorgehoben ? 'hervorhebung' : e.typ === 'berichtigung' ? 'berichtigung' : undefined
+        }
         hinweis={eintragsHinweis(e)}
         verfasser={verfasserText(e)}
         weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}

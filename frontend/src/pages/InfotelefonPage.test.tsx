@@ -84,6 +84,19 @@ describe('InfotelefonPage (LFH-554)', () => {
     );
   });
 
+  // LFH-696: der Anruf aus dem Deeplink trägt die Zeilentönung der Hervorhebung. Der Baustein
+  // setzt seinen Grund inline; die Klasse allein (`zeile-hervorgehoben`) färbte hier nichts.
+  it('tönt den per ?anruf= angesteuerten Anruf mit der Rolle der Hervorhebung', async () => {
+    const { container } = setup('/einsaetze/1/stab/infotelefon?anruf=1');
+    await screen.findByText('Sperrung B 3');
+    const ziel = container.querySelector<HTMLElement>('[data-anruf="1"]')!;
+    await waitFor(() => expect(ziel).toHaveAttribute('data-toenung', 'hervorhebung'));
+    expect(ziel).toHaveClass('zeile-hervorgehoben');
+    // Der Provider ohne `theme` rendert hell: `hervorhebungZeile` = #fffbe6.
+    expect(ziel.style.background).toBe('rgb(255, 251, 230)');
+    expect(container.querySelector('[data-anruf="2"]')).not.toHaveAttribute('data-toenung');
+  });
+
   it('zeigt ohne geladene Liste keine Zahl', async () => {
     vi.mocked(ladeAnrufe).mockRejectedValue(new ApiError(500, 'kaputt'));
     setup();

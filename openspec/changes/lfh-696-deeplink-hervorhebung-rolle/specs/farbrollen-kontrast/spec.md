@@ -13,6 +13,14 @@ Sie MUST auch in einer Tabelle tatsächlich als Grund der Zellen stehen.
 - **WHEN** eine Seite mit Tabelle über einen Deeplink auf eine Zeile geöffnet wird und kein Zeiger über der Zeile steht
 - **THEN** tragen die Zellen dieser Zeile die Hervorhebungstönung des Modus als Hintergrund
 
+#### Scenario: Angesteuerte Karte einer Zeitachse
+- **WHEN** das Einsatztagebuch oder das Anrufprotokoll des Infotelefons über einen Deeplink auf einen Eintrag geöffnet wird
+- **THEN** trägt die Karte dieses Eintrags die Hervorhebungstönung des Modus als Grund
+
+#### Scenario: Vorrang vor einer anderen Zeilentönung
+- **WHEN** der angesteuerte Eintrag zugleich eine andere Zeilentönung trüge, etwa als Berichtigung
+- **THEN** trägt er die Hervorhebungstönung, solange er angesteuert ist
+
 #### Scenario: Unterscheidbar vom Zeiger
 - **WHEN** im Tag- oder Nachtmodus eine nicht angesteuerte Zeile unter dem Zeiger steht
 - **THEN** hat ihre Fläche eine andere Farbe als die Hervorhebungstönung desselben Modus

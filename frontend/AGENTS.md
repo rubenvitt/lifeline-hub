@@ -18,7 +18,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Rollen** in `theme/tokens.ts` + `theme/rollen.css` (Gate 5), u. a. `kopf`, `paneel`,
   `flaeche3`, `text2`, `steuerRahmen` (= antds `colorBorder`), `bedienText`, Statusflächen,
   `bannerGrund`/`bannerLinie`, Zeilentönungen (darunter `hervorhebungZeile` für die per Deeplink
-  angesteuerte Zeile, LFH-696). Handgeschriebenes CSS außerhalb `theme/` nennt keinen Hex-Wert
+  angesteuerte Zeile, LFH-696; `Zeitachseneintrag` setzt seinen Grund inline und trägt sie über
+  `toenung="hervorhebung"`, nicht über die Klasse). Handgeschriebenes CSS außerhalb `theme/` nennt keinen Hex-Wert
   (Gate 5, Spec `farbrollen-herkunft`). `rahmenFarben` ist modusunabhängig und keine
   `Farbrolle` (`rollen.guard.test.ts`). Eigene Paletten statt `Statusrolle`:
   `etbTypFarben{Dunkel,Hell}` (`etbTypFarbe()`), `warnstufeFarben{Dunkel,Hell}`

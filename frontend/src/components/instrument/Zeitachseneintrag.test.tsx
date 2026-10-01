@@ -65,6 +65,12 @@ describe('Zeitachseneintrag', () => {
     expect(zeilenGrund(farbenDunkel, 'problem')).toBe(farbenDunkel.problemZeile);
   });
 
+  it('die angesteuerte Zeile tönt über die Rolle der Deeplink-Hervorhebung (LFH-696)', () => {
+    // Der Grund steht inline, eine Klassenregel (`.zeile-hervorgehoben`) käme nicht an.
+    expect(zeilenGrund(farbenHell, 'hervorhebung')).toBe(farbenHell.hervorhebungZeile);
+    expect(zeilenGrund(farbenDunkel, 'hervorhebung')).toBe(farbenDunkel.hervorhebungZeile);
+  });
+
   it('reicht Attribute durch — die Datensicht-Marke muss am Eintrag stehen können', () => {
     renderMitProviders(
       <Zeitachseneintrag

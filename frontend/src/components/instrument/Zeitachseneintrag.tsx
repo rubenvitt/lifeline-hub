@@ -19,20 +19,26 @@ import { monoStil, useRollen } from './rollenwerte';
  * Aufrufer (`etbTyp[typ].label` o. ä.), hier steht keine zweite Beschriftungskarte. Für Ströme
  * außerhalb des ETB nimmt `farben` ein eigenes Kante/Wort-Paar, `typ` bleibt dann weg.
  *
- * ZEILENTÖNUNG `berichtigung` / `luecke` / `problem` — ganze Zeile auf der jeweiligen
- * Zeilenrolle. Sie ersetzt das Typwort nicht; sie markiert den Eintrag in der Menge.
+ * ZEILENTÖNUNG `berichtigung` / `luecke` / `problem` / `hervorhebung` — ganze Zeile auf der
+ * jeweiligen Zeilenrolle. Sie ersetzt das Typwort nicht; sie markiert den Eintrag in der Menge.
+ * `hervorhebung` ist die per Deeplink angesteuerte Zeile (LFH-25/LFH-696): der Grund steht inline,
+ * die Klassenregel `.zeile-hervorgehoben` aus `index.css` käme hier nicht an. Wer hervorhebt,
+ * übergibt die Tönung UND die Klasse (`scrolleZurZeile` sucht die Klasse); die Hervorhebung hat
+ * Vorrang vor jeder anderen Tönung (OpenSpec-Change `lfh-696-deeplink-hervorhebung-rolle`,
+ * design.md, Entscheidung 5).
  *
  * Die Hülle reicht HTML-Attribute durch (`data-*`, `id`, `className`): eine Zeile braucht
  * `data-lfh="datensicht-karte"` und ihre Zeilenklasse, sonst findet `scrolleZurZeile` sie nicht.
  */
 
-type Zeilentoenung = 'berichtigung' | 'luecke' | 'problem';
+type Zeilentoenung = 'berichtigung' | 'luecke' | 'problem' | 'hervorhebung';
 type HinweisTon = 'schwach' | 'bedien' | 'alarm';
 
 const TOENUNG: Record<Zeilentoenung, keyof Farbrollen> = {
   berichtigung: 'berichtigungZeile',
   luecke: 'lueckeZeile',
   problem: 'problemZeile',
+  hervorhebung: 'hervorhebungZeile',
 };
 
 /** Hinweisfarbe je Ton — rein. */

@@ -19,11 +19,17 @@ Am 01.10.2026 wurde entschieden, eine neue Zeilentönung einzuführen.
 - Neue Farbrolle **`hervorhebungZeile`** in der Familie der Zeilentönungen (`berichtigungZeile`,
   `lueckeZeile`, `problemZeile`). TS-Seite in `Farbrollen` (`farbenHell`, `farbenDunkel`),
   CSS-Seite `--lfh-hervorhebung-zeile` in `theme/rollen.css`. Die Werte bleiben `#fffbe6` und
-  `#2b2611`, **es gibt also keine Tonverschiebung**.
+  `#2b2611`. **In Tabellen und `Datensicht`-Karten verschiebt sich der Ton also nicht.**
 - `.zeile-hervorgehoben` in `index.css` liest die Rolle über `var(--lfh-hervorhebung-zeile)`. Der
   Nachtblock entfällt, weil die Rolle schon je Modus steht. Der Tabellenselektor wird an die Form
   von `.zeile-luecke` angeglichen, damit die Tönung nicht an der Einfügereihenfolge gegen antds
   Zellregel hängt.
+- **Zeitachsen-Karten** (Baustein `Zeitachseneintrag`, ETB und Infotelefon) setzen ihren Grund
+  inline, die Klassenregel kommt dort nicht an. Der Baustein bekommt deshalb die Zeilentönung
+  `hervorhebung` (→ `hervorhebungZeile`), und beide Seiten nutzen sie. **Benannte
+  Tonverschiebung:** Die angesteuerte ETB-Zeile wechselt von Blau (`bedienFlaeche`) zu Gelb.
+  Infotelefon zeigt erstmals eine Tönung. In Tabellen und `Datensicht`-Karten bleibt der Ton
+  gleich (Entscheidung am 01.10.2026 nach der Review).
 - **Gate 5 bekommt eine zweite CSS-Prüfung:** kein roher Hex-Farbwert in handgeschriebenem `*.css`
   außerhalb von `src/theme/`. Heute trifft sie nur `index.css`, nach dem Fix ist sie also grün
   geboren.
@@ -48,9 +54,11 @@ Am 01.10.2026 wurde entschieden, eine neue Zeilentönung einzuführen.
 - `frontend/src/theme/tokens.ts`, `frontend/src/theme/rollen.css` (neue Rolle, Parität per
   `rollen.guard.test.ts`)
 - `frontend/src/index.css` (`.zeile-hervorgehoben`)
+- `frontend/src/components/instrument/Zeitachseneintrag.tsx` (Tönung `hervorhebung`),
+  `frontend/src/etb/EtbZeitachse.tsx`, `frontend/src/pages/InfotelefonPage.tsx`
 - `frontend/src/theme/gate5.guard.test.ts` (neue Prüfung)
 - e2e: Kontrast- und Grundnachweis der hervorgehobenen Zeile
 - `frontend/AGENTS.md`: Rollenliste und Tagmodus-Absatz nennen die neue Zeilentönung
-- Nutzer der Klasse (Fahrzeuge, Personal, Personen, Tiere, Betreuung, ETB, `Datensicht`): keine
+- Nutzer der Klasse in `Datensicht` (Fahrzeuge, Personal, Personen, Tiere, Betreuung): keine
   Codeänderung, Klasse und Name bleiben
 - Nur Frontend, keine API, keine Migration

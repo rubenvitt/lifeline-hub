@@ -11,6 +11,13 @@ import { pruefe } from './kontrast-kern';
  */
 const ZIEL = { light: 7, dark: 5 } as const;
 const TOENUNG = { light: 'rgb(255, 251, 230)', dark: 'rgb(43, 38, 17)' } as const;
+/*
+ * BENANNTE GRENZE: Text in der Rolle `schwach` misst dieser Spec nicht. Die Zeitachse setzt Nr.,
+ * Meta und Meldeweg in `schwach`, und die Rolle hält den Boden auf KEINEM Grund (am Tag auch auf
+ * `flaeche` nur 6,37). Die Spec `farbrollen-kontrast` zählt sie nicht zum Zeilentext; den
+ * Umzug auf `gedaempft` trägt LFH-898, das diese Ausnahme streicht.
+ */
+const SCHWACH = { light: 'rgb(88, 96, 106)', dark: 'rgb(125, 133, 142)' } as const;
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -40,6 +47,47 @@ async function zellgruende(zeile: Locator): Promise<string[]> {
   return zeile.evaluate((tr) =>
     [...tr.querySelectorAll(':scope > td')].map((td) => getComputedStyle(td).backgroundColor),
   );
+}
+
+/**
+ * Misst jedes Element mit eigenem Text, das AUF der Tönung steht: zwischen ihm und dem nächsten
+ * Vorfahren mit dem Tönungsgrund (die `td`, die Karte) liegt keine eigene Fläche. Dazu zählt der
+ * getönte Träger selbst (antd schreibt einen reinen Textwert direkt in die `td`). Text auf eigener
+ * Fläche (Tag, Chip) steht NICHT auf der Tönung; seinen Boden misst die Spec seiner Fläche
+ * (Folgetask LFH-891 für die blauen Tags).
+ */
+async function pruefeTextAufToenung(traeger: Locator, modus: 'light' | 'dark', name: string) {
+  const anzahl = await traeger.evaluate(
+    (wurzel, { toenung, schwach }) => {
+      let n = 0;
+      for (const el of [wurzel, ...wurzel.querySelectorAll('*')]) {
+        const eigenerText = [...el.childNodes].some(
+          (k) => k.nodeType === Node.TEXT_NODE && k.textContent!.trim() !== '',
+        );
+        if (!eigenerText || (el as HTMLElement).offsetParent === null) continue;
+        if (getComputedStyle(el).color === schwach) continue; // Grenze oben, LFH-898
+        let aufToenung = false;
+        for (let e: Element | null = el; e; e = e.parentElement) {
+          const grund = getComputedStyle(e).backgroundColor;
+          if (grund === toenung) {
+            aufToenung = true;
+            break;
+          }
+          if (grund !== 'rgba(0, 0, 0, 0)') break; // eigene Fläche vor der Tönung
+          if (e === wurzel) break;
+        }
+        if (aufToenung) el.setAttribute('data-lfh-messung', String(n++));
+      }
+      return n;
+    },
+    { toenung: TOENUNG[modus], schwach: SCHWACH[modus] },
+  );
+  expect(anzahl, `${name}: der Träger zeigt messbaren Text auf der Tönung`).toBeGreaterThan(0);
+  for (let i = 0; i < anzahl; i++) {
+    // Seitenweit gesucht: der Träger selbst kann markiert sein. Ein Aufruf je Test.
+    const text = traeger.page().locator(`[data-lfh-messung="${i}"]`);
+    await pruefe(text, ZIEL[modus], `${modus}/${name}/hervorgehoben/${await text.innerText()}`);
+  }
 }
 
 for (const modus of ['light', 'dark'] as const) {
@@ -76,30 +124,8 @@ for (const modus of ['light', 'dark'] as const) {
     expect(gruende.length).toBeGreaterThan(1);
     expect(gruende, `${modus}: Grund der Zellen`).toEqual(gruende.map(() => TOENUNG[modus]));
 
-    // Szenario „Zeilentext hält den Textboden“: jedes Element der Zeile mit eigenem Text, das
-    // auf dem Grund der Zelle steht. Text auf eigener Fläche (Tag, Chip) steht NICHT auf der
-    // Tönung; seinen Boden misst die Spec seiner Fläche, nicht diese (Grenze, LFH-696).
-    const anzahl = await zeile.evaluate((tr) => {
-      let n = 0;
-      for (const el of tr.querySelectorAll('td *')) {
-        const eigenerText = [...el.childNodes].some(
-          (k) => k.nodeType === Node.TEXT_NODE && k.textContent!.trim() !== '',
-        );
-        if (!eigenerText || (el as HTMLElement).offsetParent === null) continue;
-        let eigeneFlaeche = false;
-        for (let e: Element | null = el; e && e.tagName !== 'TD'; e = e.parentElement) {
-          const grund = getComputedStyle(e).backgroundColor;
-          if (grund !== 'rgba(0, 0, 0, 0)' && grund !== 'transparent') eigeneFlaeche = true;
-        }
-        if (!eigeneFlaeche) el.setAttribute('data-lfh-messung', String(n++));
-      }
-      return n;
-    });
-    expect(anzahl, 'die Zeile trägt messbaren Text').toBeGreaterThan(0);
-    for (let i = 0; i < anzahl; i++) {
-      const text = zeile.locator(`[data-lfh-messung="${i}"]`);
-      await pruefe(text, ZIEL[modus], `${modus}/Fahrzeuge/hervorgehoben/${await text.innerText()}`);
-    }
+    // Szenario „Zeilentext hält den Textboden“.
+    await pruefeTextAufToenung(zeile, modus, 'Fahrzeuge');
 
     // Szenario „Unterscheidbar vom Zeiger“: eine NICHT angesteuerte Zeile unter dem Zeiger.
     await andere.locator('td').last().hover();
@@ -108,5 +134,41 @@ for (const modus of ['light', 'dark'] as const) {
     for (const grund of hover) {
       expect(grund, `${modus}: Hover-Grund gleicht der Hervorhebung`).not.toBe(TOENUNG[modus]);
     }
+  });
+}
+
+for (const modus of ['light', 'dark'] as const) {
+  test(`${modus}: angesteuerte ETB-Karte trägt die Hervorhebungstönung und hält den Boden`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await anmelden(page, modus);
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 696 ETB ${modus} ${Date.now()}`,
+    });
+    const basis = `/api/einsaetze/${einsatzId}`;
+    const ziel = await post(page, `${basis}/etb`, { typ: 'meldung', inhalt: 'Ziel 696' });
+    await post(page, `${basis}/etb`, { typ: 'meldung', inhalt: 'Nachbar 696' });
+
+    // Szenario „Angesteuerte Karte einer Zeitachse“: der Baustein setzt seinen Grund inline,
+    // die Klasse allein färbte hier nichts (OpenSpec-Change, design.md, Entscheidung 5).
+    await page.goto(`/einsaetze/${einsatzId}/etb?eintrag=${ziel}`);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    await page.mouse.move(0, 0);
+    const karte = page.locator('[data-testid="etb-ereigniszeile"].zeile-hervorgehoben');
+    await expect(karte).toHaveCount(1);
+    await expect(karte).toContainText('Ziel 696');
+    await expect
+      .poll(() => karte.evaluate((el) => getComputedStyle(el).backgroundColor))
+      .toBe(TOENUNG[modus]);
+    const nachbar = page
+      .locator('[data-testid="etb-ereigniszeile"]')
+      .filter({ hasText: 'Nachbar 696' });
+    expect(await nachbar.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
+      TOENUNG[modus],
+    );
+
+    await pruefeTextAufToenung(karte, modus, 'ETB');
   });
 }

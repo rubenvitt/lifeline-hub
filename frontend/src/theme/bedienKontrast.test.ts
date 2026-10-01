@@ -35,3 +35,27 @@ describe.each([
     expect(farben.bedienHover.toLowerCase()).not.toBe(farben.bedien.toLowerCase());
   });
 });
+
+/**
+ * Zeilentext auf der Deeplink-Hervorhebung (LFH-696, Spec `farbrollen-kontrast`, „Zeilentext hält
+ * den Textboden auf der Hervorhebung“), gerechnet mit derselben Formel. Der Browser-Nachweis in
+ * `e2e/hervorhebung-kontrast.spec.ts` misst nur, was eine Fahrzeugzeile tatsächlich zeigt; die
+ * Textrollen der Status deckt erst diese Rechnung ab. `schwach` fehlt bewusst: die Rolle trägt
+ * keinen Zeilentext (Spec `textkontrast-rollen`).
+ */
+describe.each([
+  ['Tag', farbenHell, 7],
+  ['Nacht', farbenDunkel, 5],
+] as const)('Zeilentext auf hervorhebungZeile — %s (LFH-696)', (_modus, farben, boden) => {
+  it.each([
+    'text',
+    'text2',
+    'gedaempft',
+    'bedienText',
+    'achtungText',
+    'alarmText',
+    'normalText',
+  ] as const)('%s hält den Textboden', (rolle) => {
+    expect(kontrast(farben[rolle], farben.hervorhebungZeile)).toBeGreaterThanOrEqual(boden);
+  });
+});

@@ -53,15 +53,19 @@ Kontrast der Tönung gegen die Zeile `flaeche`, „zum Hover“ = gegen `flaeche
 
 Weitere Werte der gewählten Tönung: Tag text 17,76 · text2 12,63 · achtungText 8,87 ·
 alarmText 8,62 · normalText 8,82. Nacht text 12,64 · text2 9,34 · bedienText 8,01 ·
-achtungText 9,46 · alarmText 5,45 · normalText 8,80. `schwach` liegt bei 6,13 (Tag) bzw. 4,05
-(Nacht). Die Rolle trägt nach `textkontrast-rollen` keinen Zeilentext, Platzhalter und Ikonen
-führt sie, und der leere Wert „—“ liest `gedaempft`. Gegen die Lückentönung hebt sich die Rolle
+achtungText 9,46 · alarmText 5,45 · normalText 8,80. `schwach` liegt bei 6,13 (Tag) bzw. 4,05 (Nacht). Die Spec zählt die Rolle nicht zum Zeilentext.
+Eine Annahme dieses Entwurfs hat sich dabei als falsch erwiesen: Die Zeitachse setzt Nr., Meta und
+Meldeweg in `schwach`. Am Tag hält das auf keinem Grund (auf `flaeche` 6,37), nachts auf der früheren
+ETB-Hervorhebung `bedienFlaeche` 4,87 und auf der neuen Tönung 4,05. Am 01.10.2026 entschieden: Der
+Browsernachweis nimmt `schwach`-Text als benannte Grenze aus, den Umzug auf `gedaempft` trägt
+LFH-898. Gegen die Lückentönung hebt sich die Rolle
 am Tag mit 1,07 ab, nachts mit 1,23.
 
 Die Rolle kommt in die Familie der Zeilentönungen, weil sie dasselbe ist: eine Tönung, die eine
 ganze Zeile auszeichnet, mit eigenem Wert je Modus. Name nach dem Muster `<anlass>Zeile`,
-CSS `--lfh-hervorhebung-zeile`. Die Werte werden 1:1 übernommen. Eine Tonverschiebung gibt es
-nicht, damit erfüllt sich das Akzeptanzkriterium „Tonverschiebung benannt“ als „keine“.
+CSS `--lfh-hervorhebung-zeile`. Die Werte werden 1:1 übernommen. In Tabellen und
+`Datensicht`-Karten gibt es damit keine Tonverschiebung. Die eine benannte Verschiebung betrifft die
+ETB-Zeitachse (Entscheidung 5).
 
 ### Entscheidung 2: Selektor in der Form von `.zeile-luecke`
 
@@ -116,6 +120,38 @@ Welche Seite und welcher Query-Parameter tatsächlich trägt, bestätigt der ers
 Umsetzung am Code (`FahrzeugePage.tsx`, `highlightId`). Passt die Fahrzeugseite nicht, nimmt der
 Test eine andere `Datensicht`-Tabelle mit Deeplink, ohne dass sich Spec oder Schnitt ändern.
 
+### Entscheidung 5: Zeitachsen-Karten tönen über den Baustein (nach der Review, 01.10.2026)
+
+Der Baustein `components/instrument/Zeitachseneintrag.tsx` setzt seinen Grund **inline**
+(`zeilenGrund`, ohne Tönung `transparent`). Ein Inline-Stil schlägt jede Klassenregel, deshalb
+greift `.zeile-hervorgehoben` aus `index.css` auf der Zeitachse nicht. Gefunden hat das die Review:
+
+- Das ETB (`etb/EtbZeitachse.tsx`) setzte für die angesteuerte Zeile inline `bedienFlaeche`, also
+  genau den in Entscheidung 1 verworfenen Kandidaten.
+- Das Infotelefon (`pages/InfotelefonPage.tsx`) setzte nur die Klasse und zeigte keine Tönung.
+
+Lösung: Der Baustein bekommt die vierte Zeilentönung `hervorhebung` → `hervorhebungZeile`
+(`TOENUNG` in `Zeitachseneintrag.tsx`). ETB und Infotelefon übergeben sie für den angesteuerten
+Eintrag, der Inline-Stil des ETB entfällt. Die Klasse `zeile-hervorgehoben` bleibt an der Karte,
+weil `scrolleZurZeile` und Tests sie suchen.
+
+**Vorrang:** Ist der angesteuerte Eintrag zugleich berichtigt oder abgelehnt, gewinnt die
+Hervorhebung. Der Sprung drückt die aktuelle Absicht aus: diesen Eintrag finden. Die Berichtigung
+bleibt am Typwort „Berichtigung“ und an der Typkante erkennbar, die Ablehnung am Chip
+„abgelehnt“.
+
+**Benannte Tonverschiebung:** Die angesteuerte ETB-Zeile wechselt von Blau (`bedienFlaeche`,
+Tag `#e4edf7`, Nacht `#0d1620`) zu Gelb (`hervorhebungZeile`). Das Infotelefon hebt erstmals
+überhaupt hervor. In Tabellen und `Datensicht`-Karten ändert sich der Ton nicht.
+
+*Alternative:* in `index.css` `!important` an der Kartenregel. Verworfen, denn damit überstimmte
+eine Klasse den Baustein per Kaskadenkraft. Der Baustein bliebe dann ohne eigenen Begriff von
+seiner Tönung, und `data-toenung` würde lügen.
+
+Nachweis: Unit-Test für `zeilenGrund(…, 'hervorhebung')`, Render-Tests für ETB und Infotelefon
+(Inline-Grund = Rolle, Vorrang bei Berichtigung), e2e-Kartenfall im ETB je Modus
+(Grund = Literal, Textboden), in `e2e/hervorhebung-kontrast.spec.ts`.
+
 ## Risks / Trade-offs
 
 - [Die Tönung stand in Tabellen bisher gar nicht] → Dann wird sie mit dieser Change zum ersten Mal
@@ -125,9 +161,11 @@ Test eine andere `Datensicht`-Tabelle mit Deeplink, ohne dass sich Spec oder Sch
   treffen auch `#add` oder `#beef`-IDs. Heute gibt es keinen solchen Selektor (Scan am
   01.10.2026: einzige Treffer `index.css:14,20`). Ein künftiger Fehlalarm wird sichtbar rot und
   bekommt dann einen benannten Ausschluss, nicht still.
-- [Neue Rolle ohne Nutzung in TSX] → Die Rolle steht in `Farbrollen`, wird aber nur aus CSS
-  gelesen. Das gilt für `lueckeZeile` und `problemZeile` genauso. Die Parität hält
-  `rollen.guard.test.ts`.
+- [Angesteuerte Berichtigung verliert ihre Tönung] → Nur solange sie angesteuert ist. Typwort und
+  Typkante bleiben, der zweite Kanal trägt (Entscheidung 5).
+- [Zwei Lesewege einer Rolle] → `index.css` liest `--lfh-hervorhebung-zeile`, der Baustein
+  `Farbrollen.hervorhebungZeile`. Die Parität beider Seiten hält `rollen.guard.test.ts`, wie bei
+  `lueckeZeile`.
 
 ## Migration Plan
 

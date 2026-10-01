@@ -266,6 +266,9 @@ export default function InfotelefonPage() {
                   data-anruf={a.id}
                   data-lfh="datensicht-karte"
                   className={a.id === hervorgehoben ? HERVORGEHOBEN : undefined}
+                  // Die Klasse findet die Zeile, färben kann sie den Baustein nicht (Grund
+                  // inline): die Tönung trägt `toenung` (LFH-696).
+                  toenung={a.id === hervorgehoben ? 'hervorhebung' : undefined}
                   zeit={<ZeitAnzeige wert={a.eingang_at} />}
                   typwort={ANLIEGEN_LABEL[a.anliegen]}
                   meta={[a.anrufer_name, a.rueckruf].filter(Boolean).join(' · ') || undefined}
