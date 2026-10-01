@@ -202,4 +202,57 @@ describe('EtbEintragVorschau (LFH-664)', () => {
     await screen.findByText('Deich an Station 4 sichern');
     expect(screen.queryByText(/Grundeintrag/)).not.toBeInTheDocument();
   });
+
+  /**
+   * Die Rückrichtung (LFH-689): ein später berichtigter Eintrag ist überholt und muss das
+   * sagen — je Berichtigung ein eigener Verweis mit Nummer, sonst trügen n Links denselben Namen.
+   */
+  it('nennt jede Berichtigung eines berichtigten Eintrags mit Nummer und Verweis', async () => {
+    etbHandler([
+      eintrag({
+        berichtigt_durch: [
+          { id: 51, lfd_nr: 14 },
+          { id: 58, lfd_nr: 19 },
+        ],
+      }),
+    ]);
+    renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);
+
+    const verweise = await screen.findAllByRole('link', { name: /^berichtigt durch Nr\. \d+$/ });
+    expect(verweise.map((v) => v.textContent)).toEqual([
+      'berichtigt durch Nr. 14 ↗',
+      'berichtigt durch Nr. 19 ↗',
+    ]);
+    expect(verweise[0]).toHaveAttribute('href', '/einsaetze/5/etb?eintrag=51');
+    expect(verweise[1]).toHaveAttribute('href', '/einsaetze/5/etb?eintrag=58');
+    // Kein Grundeintrag: der Eintrag berichtigt selbst nichts.
+    expect(screen.queryByText(/Grundeintrag/)).not.toBeInTheDocument();
+  });
+
+  it('nennt ohne Berichtigung kein „berichtigt durch“', async () => {
+    etbHandler([eintrag()]);
+    renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);
+    await screen.findByText('Deich an Station 4 sichern');
+    expect(screen.queryByText(/berichtigt durch/)).not.toBeInTheDocument();
+  });
+
+  it('trägt an einer selbst berichtigten Berichtigung beide Richtungen', async () => {
+    etbHandler([
+      eintrag({
+        typ: 'berichtigung',
+        berichtigt_eintrag_id: 33,
+        berichtigt_durch: [{ id: 51, lfd_nr: 14 }],
+      }),
+    ]);
+    renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);
+
+    expect(await screen.findByRole('link', { name: /Grundeintrag anzeigen/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/5/etb?eintrag=33',
+    );
+    expect(screen.getByRole('link', { name: 'berichtigt durch Nr. 14' })).toHaveAttribute(
+      'href',
+      '/einsaetze/5/etb?eintrag=51',
+    );
+  });
 });

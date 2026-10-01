@@ -59,7 +59,7 @@ Nur die Zeilen, die für eine Sorte anders lauten als oben; alle übrigen gelten
 | Sorte | Nr. | Verdikt | Beleg / Begründung |
 | --- | --- | --- | --- |
 | ETB-Eintrag | 5 | **offen → LFH-643** | Typwort auf `flaeche2` gerechnet, siehe oben |
-| ETB-Eintrag | 9 | **offen → LFH-689** | Eine Nummernlücke zeigt nicht den nächstälteren Eintrag, sondern „nicht mehr vorhanden“, und eine Berichtigung verweist auf ihren Grundeintrag (`EtbEintragVorschau.test.tsx`). Am berichtigten Grundeintrag fehlt dagegen „berichtigt durch Nr. …“ — ein überholter Eintrag ist in der Vorschau nicht als überholt erkennbar |
+| ETB-Eintrag | 9 | **erfüllt** (LFH-689) | Eine Nummernlücke zeigt nicht den nächstälteren Eintrag, sondern „nicht mehr vorhanden“, und eine Berichtigung verweist auf ihren Grundeintrag. Ein berichtigter Grundeintrag nennt jede Berichtigung als Verweis „berichtigt durch Nr. …“, auch wenn sie nicht in der Trefferliste steht: Der Server liefert sie am Eintrag mit (`berichtigt_durch`, unabhängig von Seite und Filter, `tests/etb.rs`), die Vorschau liest weiter nur das Nummernfach (`EtbEintragVorschau.test.tsx`) |
 | Meldung | 6 | **erfüllt** | Status über `StatusBadge` mit Fachwort, Priorität mit Wort, Alarmzustand der Karte mit „Alarm“ als Text (unveränderte `MeldungKarte`) |
 | Auftrag | 1 | **erfüllt [abgeleitet]** | Kopf „Befehlsdetails“ ist antds `Collapse`-Kopf wie auf der Seite; er klappt nur auf, verändert nichts |
 | Fahrzeug, Personal, Einheit | 6 | **erfüllt** | Mandantenfarbe erzwingt die Rand-Form, das Wort steht immer daneben; Einheit „gemischt“ mit Verteilung als Text |

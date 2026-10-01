@@ -269,6 +269,111 @@ async fn etb_liste_fuehrt_folgeauftraege_am_quell_eintrag() {
     }
 }
 
+/// Erfasst eine Berichtigung von `grund_id`; liefert die Antwort (Status geprüft).
+async fn berichtigung_erfassen(app: &axum::Router, cookie: &str, einsatz: i64, grund_id: i64) -> Value {
+    let body = format!(
+        r#"{{"typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{grund_id}}}"#
+    );
+    let (status, json) = eintrag_erfassen(app, cookie, einsatz, &body).await;
+    assert_eq!(status, StatusCode::CREATED, "{json}");
+    json
+}
+
+/// Der Eintrag mit `id` aus einer ETB-Listenantwort.
+fn eintrag_mit_id(liste: &Value, id: i64) -> &Value {
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == id)
+        .unwrap_or_else(|| panic!("Eintrag {id} fehlt in {liste}"))
+}
+
+#[tokio::test]
+async fn etb_liste_fuehrt_berichtigungen_am_grundeintrag() {
+    // LFH-689: der Grundeintrag trägt die Berichtigungen, die auf ihn zeigen, aufsteigend nach
+    // Nummer; jeder andere Eintrag trägt das Feld als leere Liste, nicht als fehlenden Key.
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let (status, grund) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Pegel 4,20 m"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        grund["berichtigt_durch"],
+        serde_json::json!([]),
+        "auch die Erfassen-Antwort trägt das Feld: {grund}"
+    );
+    let grund_id = grund["id"].as_i64().unwrap();
+    let (_, ohne) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"lage","inhalt":"unberührt"}"#,
+    )
+    .await;
+    let b1 = berichtigung_erfassen(&app, &admin, einsatz, grund_id).await;
+    let b2 = berichtigung_erfassen(&app, &admin, einsatz, grund_id).await;
+    assert_eq!(b1["berichtigt_durch"], serde_json::json!([]));
+
+    let (status, liste) = etb_abrufen(&app, &admin, einsatz, "").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        eintrag_mit_id(&liste, grund_id)["berichtigt_durch"],
+        serde_json::json!([
+            { "id": b1["id"], "lfd_nr": b1["lfd_nr"] },
+            { "id": b2["id"], "lfd_nr": b2["lfd_nr"] },
+        ])
+    );
+    for id in [&ohne["id"], &b1["id"], &b2["id"]] {
+        let e = eintrag_mit_id(&liste, id.as_i64().unwrap());
+        assert_eq!(e["berichtigt_durch"], serde_json::json!([]), "Presence und leer: {e}");
+    }
+}
+
+#[tokio::test]
+async fn berichtigt_durch_unabhaengig_von_seite_und_filter() {
+    // LFH-689: das Feld hängt nicht an der abgefragten Seite und nicht am Listenfilter — die
+    // Palette-Vorschau liest den Grundeintrag allein (`before_lfd_nr`, `limit=1`).
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let (_, grund) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Pegel 4,20 m"}"#,
+    )
+    .await;
+    let grund_id = grund["id"].as_i64().unwrap();
+    let grund_nr = grund["lfd_nr"].as_i64().unwrap();
+    let b = berichtigung_erfassen(&app, &admin, einsatz, grund_id).await;
+    let erwartet = serde_json::json!([{ "id": b["id"], "lfd_nr": b["lfd_nr"] }]);
+
+    // Seite, auf der nur der Grundeintrag steht.
+    let (status, seite) = etb_abrufen(
+        &app,
+        &admin,
+        einsatz,
+        &format!("before_lfd_nr={}&limit=1", grund_nr + 1),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(seite.as_array().unwrap().len(), 1, "{seite}");
+    assert_eq!(eintrag_mit_id(&seite, grund_id)["berichtigt_durch"], erwartet);
+
+    // Filter, zu dem die Berichtigung selbst nicht passt.
+    let (status, gefiltert) = etb_abrufen(&app, &admin, einsatz, "typ=meldung").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(gefiltert.as_array().unwrap().len(), 1, "{gefiltert}");
+    assert_eq!(eintrag_mit_id(&gefiltert, grund_id)["berichtigt_durch"], erwartet);
+}
+
 /// Liest die Auftragsliste des Einsatzes (GET, kein Body).
 async fn get_auftraege(app: &axum::Router, cookie: &str, einsatz: i64) -> (StatusCode, Value) {
     let resp = app
