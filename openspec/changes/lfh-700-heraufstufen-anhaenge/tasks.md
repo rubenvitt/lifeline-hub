@@ -10,9 +10,9 @@
 
 ## 2. Frontend: Auswahl im Dialog (TDD)
 
-- [ ] 2.1 `api/chat.ts` `heraufstufenZuEtb(einsatzId, nachrichtId, typ, inhalt, anhangIds)` sendet `anhang_ids` nur, wenn das Feld nicht leer ist. Vitest prüft den Body in beiden Fällen
-- [ ] 2.2 `chat/HeraufstufenModal.tsx` zieht auf `ErfassungsModal` um (D6). Typ, Text und bei Anhängen eine `Checkbox.Group` „Anhänge übernehmen“ mit Dateiname und Größe, die ersten 10 vorgewählt, mehr als 10 abgelehnt, mit Hinweis zur Unveränderlichkeit. Vitest in `HeraufstufenModal.test.tsx`: bestehender Fall (ohne Anhang keine Auswahl, kein Hinweis), zwei Fotos mit einem abgewählt → `onBestaetigen` mit genau dieser ID, elf Anhänge → zehn vorgewählt, ein elfter wird abgelehnt, Enter im Text sendet (Struktur: kein `.ant-modal-footer`, Knopf im `<form>`)
-- [ ] 2.3 `pages/ChatPage.tsx` reicht `anhangIds` an die Mutation durch. Vitest bzw. bestehender ChatPage-Test bleibt grün, belegt über `mise exec -- pnpm -C frontend test -- chat`
+- [x] 2.1 `api/chat.ts` `heraufstufenZuEtb(einsatzId, nachrichtId, typ, inhalt, anhangIds)` sendet `anhang_ids` nur, wenn das Feld nicht leer ist. Vitest prüft den Body in beiden Fällen
+- [x] 2.2 `chat/HeraufstufenModal.tsx` zieht auf `ErfassungsModal` um (D6). Typ, Text und bei Anhängen eine `Checkbox.Group` „Anhänge übernehmen“ mit Dateiname und Größe, die ersten 10 vorgewählt, mehr als 10 abgelehnt, mit Hinweis zur Unveränderlichkeit. Vitest in `HeraufstufenModal.test.tsx`: bestehender Fall (ohne Anhang keine Auswahl, kein Hinweis), zwei Fotos mit einem abgewählt → `onBestaetigen` mit genau dieser ID, elf Anhänge → zehn vorgewählt, der elfte ist gesperrt, bis ein anderer abgewählt wird; Struktur der Erfassungshülle (kein `.ant-modal-footer`, Knopf im `<form>`, weil der Typ-`Select` Enter schluckt)
+- [x] 2.3 `pages/ChatPage.tsx` reicht `anhangIds` an die Mutation durch. Neuer ChatPage-Test: „Zu ETB“ → Dialog → Heraufstufen sendet `anhang_ids: [31]` (Gegenprobe: ohne Durchreichen rot). Belegt über `mise exec -- pnpm -C frontend test -- chat`
 
 ## 3. Integration und Abschluss
 
