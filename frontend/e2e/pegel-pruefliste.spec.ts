@@ -448,13 +448,14 @@ async function inspectorOeffnen(page: Page, einsatzId: string, station: string) 
     undefined,
     { timeout: 60_000 },
   );
-  // Die Wahl der Ebene übersteht ein Neuladen nicht sicher: geschaltet wird nur, was aus ist.
+  // Unter `md` steht die Leiste per Vorgabe zu.
   const leiste = page.getByRole('complementary', { name: 'Kartenleiste' });
   if (!(await leiste.isVisible())) {
     await page.getByRole('button', { name: 'Leiste einblenden' }).click();
   }
   const kopf = page.locator('section[data-paneel="fachebenen"] button[aria-expanded]').first();
   if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+  // Die Wahl der Ebene übersteht ein Neuladen nicht sicher: geschaltet wird nur, was aus ist.
   const schalter = page.getByRole('switch', { name: 'Pegel / Hochwasser' });
   if ((await schalter.getAttribute('aria-checked')) !== 'true') await schalter.click();
   await expect(schalter).toHaveAttribute('aria-checked', 'true');
