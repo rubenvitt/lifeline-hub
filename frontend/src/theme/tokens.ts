@@ -641,6 +641,24 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
 }
 
 /**
+ * Senkrechtes Polster der Kopfzeile eines `Tabs` (LFH-724).
+ *
+ * antd rechnet den Tab aus der Schrift, nicht aus `controlHeight`: Höhe = `2 × paddingSM` +
+ * Zeilenhöhe der Grundschrift (`fontSize + 8`, `getLineHeight`), also 35,5 / 45 / 55 px. In
+ * `komfortabel` und `handschuh` lag damit jeder Tab (Aufträge/Befehle, UHS-Reiter) unter dem
+ * Boden aus Gate 3. Das Polster wächst genau so weit, dass die Zeile die Steuerhöhe erreicht,
+ * und nie unter `paddingSM`: `kompakt` bleibt unverändert. Kartentabs (`editable-card`) folgen
+ * schon `controlHeightLG` und bleiben unberührt. Den Collapse-Kopf trägt {@link antdKlappkopf}
+ * (LFH-653) am Kontext. Rein und exportiert wie {@link switchMasse}.
+ */
+export function kopfzeilenMasse(
+  stufe: Pick<Dichtestufe, 'zeilenhoehe' | 'schriftgroesse' | 'abstand'>,
+) {
+  const zeile = stufe.schriftgroesse + 8;
+  return { polsterVertikal: Math.max(stufe.abstand.sm, (stufe.zeilenhoehe - zeile) / 2) };
+}
+
+/**
  * Komponenten-Tokens, die aus den Rollen und der Dichte-Stufe folgen.
  *
  * `aufBedien` gehört an den KNOPF, nicht an antds globales `colorTextLightSolid`: das färbt auch
@@ -676,6 +694,8 @@ export function antdKomponenten(
   farben: Farbrollen,
   dichte: Dichte,
 ): NonNullable<ThemeConfig['components']> {
+  const stufe = dichten[dichte];
+  const kopfPolster = kopfzeilenMasse(stufe).polsterVertikal;
   return {
     Button: {
       primaryColor: farben.aufBedien,
@@ -695,7 +715,8 @@ export function antdKomponenten(
       colorError: farben.alarmText,
       colorWarning: farben.achtungText,
     },
-    Switch: switchMasse(dichten[dichte]),
+    Switch: switchMasse(stufe),
+    Tabs: { horizontalItemPadding: `${kopfPolster}px 0` },
     // `colorPrimaryBorder` (= `bedien`, Fokusring LFH-737) ist auch die Ruhefarbe von Spur und
     // Griff. antd färbt den Griff unter dem Zeiger in `colorPrimary`, also gleich, und die Spur in
     // der abgeleiteten Hover-Stufe, nachts dunkler als `bedien`. Der Zeiger nimmt deshalb

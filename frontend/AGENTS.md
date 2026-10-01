@@ -222,6 +222,12 @@ anwendbar), „nicht geprüft" ist keins.
   Schuldmenge `OFFEN` schrumpft nur, im selben Commit wie der Fix; Stand: UHS-Platzkarte in
   `pages/uhs/Grundriss.tsx`, nur in `kompakt`, sonst `platzBedienform`). `Card`/`Descriptions`/
   `Space`/`Liste` dürfen klein bleiben.
+- **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
+  gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
+  `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
+  Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
+  `e2e/dichte-ableitung.spec.ts`; Flächenmessung der Modul-Prüflisten
+  `e2e/trefflaeche-pruefflaechen.spec.ts`, Messhelfer in `e2e/trefflaeche-kern.ts`.
 - **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel
   (`Math.max(48, controlHeight)`, Griffe über `navGriffMass`); die Rail-Spalte wächst mit
   (`railBreite` in `components/Kopfleiste.tsx`, 73 px in `handschuh`).
@@ -437,7 +443,7 @@ Spec `bedien-arbeitsplatz`).
   über einen Einstieg in einer bestehenden Fläche erreicht (Primäraktion im Seitenkopf,
   Sprungmarke, Leeraktion eines Paneels, Sprungpalette) und hat eine Adresse, die als Lesezeichen
   taugt. Was je Standort verschieden ist, trägt die Kontext-Achse **am Gerät**; „Fükw-Arbeitsplatz“
-  in `ThemeModeProvider.tsx` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
+  in `theme/dichte.ts` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
   von Startziel, Primäraktion, Modulreihenfolge oder Dichte je Person; `standard_modul` gilt für
   den ganzen Einsatz. Je Person liegt nur das Palettengedächtnis „Zuletzt“
   (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener Schlüsselraum).
