@@ -25,8 +25,7 @@ export default function EtbAnhaenge({
 }) {
   const { token, rollen } = useRollen();
   if (eintrag.anhaenge.length === 0) return null;
-  // Blauer Bedien-TEXT nimmt `bedienText`, nicht antds `colorLink` (LFH-650): der Linkton hält
-  // auf dem Zeitachsengrund nachts den Boden 5 : 1 nicht.
+  // Blauer Bedien-TEXT nimmt `bedienText` (LFH-650); seit LFH-652 wertgleich mit antds `colorLink`.
   const stil = { ...verweisStil(token), color: rollen.bedienText };
   return (
     <span

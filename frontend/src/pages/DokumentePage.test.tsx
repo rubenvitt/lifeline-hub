@@ -49,6 +49,7 @@ function SuchAnzeige() {
 }
 
 let loeschAufrufe: string[] = [];
+let aenderungen: { id: string; body: unknown }[] = [];
 
 function rendere(
   einsatz: object,
@@ -56,6 +57,7 @@ function rendere(
   { route = '/einsaetze/1/dokumente', listeStatus = 200 } = {},
 ) {
   loeschAufrufe = [];
+  aenderungen = [];
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
@@ -68,8 +70,14 @@ function rendere(
       loeschAufrufe.push(String(params.dokId));
       return new HttpResponse(null, { status: 204 });
     }),
+    http.patch('/api/einsaetze/1/dokumente/:dokId', async ({ params, request }) => {
+      const body = await request.json();
+      aenderungen.push({ id: String(params.dokId), body });
+      return HttpResponse.json(dokument({ ...(body as object), id: Number(params.dokId) }));
+    }),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/etb', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -94,6 +102,24 @@ async function dialogAblegen() {
   const treffer = dialoge.find((d) => within(d).queryByText('Dokument ablegen'));
   expect(treffer).toBeTruthy();
   return treffer!;
+}
+
+async function dialogBearbeiten() {
+  const dialoge = await screen.findAllByRole('dialog');
+  const treffer = dialoge.find((d) => within(d).queryByText('Dokument bearbeiten'));
+  expect(treffer).toBeTruthy();
+  return treffer!;
+}
+
+/** Das offene Menü der gebündelten Kartenaktionen (Muster `Datensicht.test.tsx`). */
+async function offenesMenue() {
+  return vi.waitFor(() => {
+    const m = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(m).not.toBeNull();
+    return m!;
+  });
 }
 
 const kopfAktionen = () => document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
@@ -189,6 +215,50 @@ describe('DokumentePage', () => {
     expect(
       screen.queryByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Dokument Lageplan Nord bearbeiten' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('Beobachter im Kartenzweig: weder Bearbeiten noch Aktionsmenü', async () => {
+    setzeViewportBreite(390);
+    rendere(einsatzBeobachter, [dokument()]);
+    await screen.findByRole('link', { name: 'Lageplan Nord' });
+    expect(screen.queryByRole('button', { name: /bearbeiten/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu / })).not.toBeInTheDocument();
+  });
+
+  it('Schreibrecht: Bearbeiten je Zeile öffnet den vorbelegten Dialog und sendet PATCH', async () => {
+    rendere(einsatzAktiv, [dokument()]);
+    const knopf = await screen.findByRole('button', { name: 'Dokument Lageplan Nord bearbeiten' });
+    expect(knopf).not.toHaveClass('ant-btn-dangerous');
+    // „Rot steht nicht bündig neben Neutralem": beide Knöpfe in einem Space mit Abstand.
+    const zelle = knopf.closest('td')!;
+    expect(
+      within(zelle).getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
+    ).toBeInTheDocument();
+    expect(zelle.querySelector('.ant-space-gap-col-middle, .ant-space-middle')).not.toBeNull();
+    await userEvent.click(knopf);
+
+    const d = await dialogBearbeiten();
+    const titel = within(d).getByRole('textbox', { name: 'Titel' });
+    expect(titel).toHaveValue('Lageplan Nord');
+    await userEvent.clear(titel);
+    await userEvent.type(titel, 'Lageplan Süd');
+    await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() =>
+      expect(aenderungen).toEqual([
+        {
+          id: '5',
+          body: {
+            titel: 'Lageplan Süd',
+            kategorie: 'lagekarte_plan',
+            bezug_typ: 'abschnitt',
+            bezug_id: 3,
+          },
+        },
+      ]),
+    );
   });
 
   it('Schreibrecht: Entfernen je Zeile mit roter Rückfrage ruft das Löschen auf', async () => {
@@ -208,23 +278,41 @@ describe('DokumentePage', () => {
     await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
   });
 
-  it('Kartenzweig: Entfernen mit Zeilennamen, rotem OK und DELETE erst nach Bestätigung', async () => {
+  it('Kartenzweig: Bearbeiten ist die Primäraktion und öffnet den Dialog', async () => {
+    setzeViewportBreite(390);
+    rendere(einsatzAktiv, [dokument(), dokument({ id: 6, titel: 'Foto Einsatzstelle' })]);
+    const knopf = await screen.findByRole('button', {
+      name: 'Dokument Lageplan Nord bearbeiten',
+    });
+    expect(document.querySelector('[data-lfh="datensicht-karte"]')).not.toBeNull();
+    expect(knopf).toHaveTextContent('Bearbeiten');
+    expect(
+      screen.getByRole('button', { name: 'Dokument Foto Einsatzstelle bearbeiten' }),
+    ).toBeInTheDocument();
+    await userEvent.click(knopf);
+    const d = await dialogBearbeiten();
+    expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Lageplan Nord');
+  });
+
+  it('Kartenzweig: Entfernen im Menü mit Zeilennamen, rotem OK und DELETE erst nach Bestätigung', async () => {
     setzeViewportBreite(390);
     rendere(einsatzAktiv, [dokument(), dokument({ id: 6, titel: 'Foto Einsatzstelle' })]);
     const ausloeser = await screen.findByRole('button', {
-      name: 'Dokument Lageplan Nord entfernen',
+      name: 'Aktionen zu Dokument Lageplan Nord',
     });
-    expect(document.querySelector('[data-lfh="datensicht-karte"]')).not.toBeNull();
-    // Der Auslöser bleibt neutral („Rot bedient nichts"), rot ist nur das OK.
-    expect(ausloeser).not.toHaveClass('ant-btn-dangerous');
     expect(
-      screen.getByRole('button', { name: 'Dokument Foto Einsatzstelle entfernen' }),
+      screen.getByRole('button', { name: 'Aktionen zu Dokument Foto Einsatzstelle' }),
     ).toBeInTheDocument();
     await userEvent.click(ausloeser);
+    const eintrag = within(await offenesMenue()).getByRole('menuitem', { name: /Entfernen/ });
+    expect(eintrag).toHaveClass('ant-dropdown-menu-item-danger');
+    await userEvent.click(eintrag);
+
     const rueckfrage = (await screen.findByText('Dokument entfernen?')).closest<HTMLElement>(
-      '.ant-popover',
+      '.ant-modal',
     )!;
-    const ok = within(rueckfrage).getByRole('button', { name: /OK|Entfernen/ });
+    expect(rueckfrage).toHaveTextContent('Lageplan Nord');
+    const ok = within(rueckfrage).getByRole('button', { name: 'Entfernen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(loeschAufrufe).toEqual([]);
     await userEvent.click(ok);

@@ -6,6 +6,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
+import { formatiere } from '../anzeige/koordinaten';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
@@ -58,6 +59,8 @@ vi.mock('./lagekarte/Kartenflaeche', async () => {
           {/* Anflugziel: der Koordinatensprung der Sprungpalette kommt als ?zentrum= an und
               muss hier als Ziel ankommen. */}
           <div data-testid="flyto">{JSON.stringify(props.flyToZiel ?? null)}</div>
+          {/* Suchnadel der Ortssuche (LFH-638): was die Karte als Nadel zeichnen soll. */}
+          <div data-testid="suchnadel">{JSON.stringify(props.suchnadel ?? null)}</div>
           <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
           {/* Die echte Karte meldet Zoom und bbox im selben Zug (`Kartenflaeche.tsx`,
               `verarbeite`) — sonst bliebe eine zoom-gebundene Ebene (Energie) ohne gemeldeten
@@ -1383,6 +1386,108 @@ describe('LagekartePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('zentrum'),
     );
+  });
+
+  it('Deeplink ?zentrum= setzt die Suchnadel mit der Koordinate; „Suchnadel entfernen“ räumt sie (LFH-638)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zentrum=52.52,13.405');
+    const band = await screen.findByRole('region', { name: 'Suchnadel' });
+    // Ohne Einstellung WGS84 — dieselbe Beschriftung wie die Koordinatenanzeige der Karte.
+    expect(band).toHaveTextContent(formatiere(52.52, 13.405, 'wgs84'));
+    expect(JSON.parse(screen.getByTestId('suchnadel').textContent ?? 'null')).toMatchObject({
+      lat: 52.52,
+      lon: 13.405,
+    });
+    await user.click(screen.getByRole('button', { name: 'Suchnadel entfernen' }));
+    expect(screen.getByTestId('suchnadel')).toHaveTextContent('null');
+    expect(screen.queryByRole('region', { name: 'Suchnadel' })).toBeNull();
+    // Entfernen fliegt nirgends hin: das Anflugziel bleibt das des Sprungs.
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":13.405,"lat":52.52}');
+  });
+
+  it('Ortssuche in der Leiste: Koordinate tippen, Treffer wählen → Anflug und Nadel; eine neue ersetzt die alte, Neuladen räumt (LFH-638)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    const { unmount } = renderSeite();
+    const feld = await screen.findByLabelText('Kartenobjekte suchen');
+    await user.type(feld, '52.52194, 13.41321');
+    await user.click(screen.getByRole('button', { name: formatiere(52.52194, 13.41321, 'wgs84') }));
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":13.41321,"lat":52.52194}');
+    expect(screen.getByRole('region', { name: 'Suchnadel' })).toHaveTextContent(
+      formatiere(52.52194, 13.41321, 'wgs84'),
+    );
+
+    await user.clear(feld);
+    await user.type(feld, '48.13743, 11.57549');
+    await user.click(screen.getByRole('button', { name: formatiere(48.13743, 11.57549, 'wgs84') }));
+    expect(screen.getAllByRole('region', { name: 'Suchnadel' })).toHaveLength(1);
+    expect(JSON.parse(screen.getByTestId('suchnadel').textContent ?? 'null')).toMatchObject({
+      lat: 48.13743,
+      lon: 11.57549,
+    });
+
+    // Nicht gespeichert: nach dem Neuladen steht keine Nadel.
+    unmount();
+    renderSeite();
+    await screen.findByLabelText('Kartenobjekte suchen');
+    expect(screen.getByTestId('suchnadel')).toHaveTextContent('null');
+  });
+
+  it('Deeplink ?ort= bei 390 px: Text im Suchfeld, Leiste offen, Adresssuche läuft, Param geräumt (LFH-638)', async () => {
+    setzeViewportBreite(390);
+    const anfragen: string[] = [];
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/ort-suche', ({ request }) => {
+        anfragen.push(new URL(request.url).searchParams.get('q') ?? '');
+        return HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            { lat: 51.1, lon: 10.4, name: 'Hauptstraße 12, A' },
+            { lat: 48.1, lon: 11.5, name: 'Hauptstraße 12, B' },
+          ],
+        });
+      }),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?ort=Hauptstra%C3%9Fe%2012');
+    expect(await screen.findByRole('button', { name: 'Hauptstraße 12, B' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Kartenobjekte suchen')).toHaveValue('Hauptstraße 12');
+    expect(screen.getByRole('heading', { name: 'Adresse' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Kartenleiste' })).toBeVisible();
+    expect(anfragen).toEqual(['Hauptstraße 12']);
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('ort='),
+    );
+  });
+
+  it('Deeplink ?ort= mit genau einem Treffer: Zu- und Aufklappen von „Verortet“ fliegt nicht erneut (LFH-638)', async () => {
+    let anfragen = 0;
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/ort-suche', () => {
+        anfragen += 1;
+        return HttpResponse.json({
+          zustand: 'ok',
+          treffer: [{ lat: 51.1, lon: 10.4, name: 'Rathaus, Musterstadt' }],
+        });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?ort=Rathaus');
+    await waitFor(() =>
+      expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":10.4,"lat":51.1}'),
+    );
+    // Die Person sucht danach selbst weiter …
+    const feld = screen.getByLabelText('Kartenobjekte suchen');
+    await user.clear(feld);
+    await user.type(feld, '48.13743, 11.57549');
+    await user.click(screen.getByRole('button', { name: formatiere(48.13743, 11.57549, 'wgs84') }));
+    // … und klappt „Verortet“ zu und wieder auf: die Suche hängt neu ein.
+    const kopf = screen.getByRole('button', { name: /^Verortet/ });
+    await user.click(kopf);
+    await user.click(kopf);
+    expect(await screen.findByLabelText('Kartenobjekte suchen')).toHaveValue('');
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":11.57549,"lat":48.13743}');
+    expect(anfragen).toBe(1);
   });
 
   it('Deeplink ?zentrum=: ein unbrauchbarer Wert fliegt nichts an und wird trotzdem geräumt', async () => {

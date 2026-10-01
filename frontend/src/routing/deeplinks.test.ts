@@ -202,6 +202,13 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     const pfad = lagekartePfad(E, { zentrum: { lat: 52.520008, lon: 13.404954 } });
     expect(new URL(pfad, 'http://x').searchParams.get('zentrum')).toBe('52.52001,13.40495');
   });
+  it('lagekartePfad trägt einen Suchtext als ?ort= und übersteht den Weg durch die URL (LFH-638)', () => {
+    const text = 'Hauptstraße 12 & Ecke, Musterstadt';
+    const pfad = lagekartePfad(E, { ort: text });
+    expect(new URL(pfad, 'http://x').searchParams.get('ort')).toBe(text);
+    // Ohne Text kein Parameter.
+    expect(lagekartePfad(E, { ort: '' })).not.toContain('ort=');
+  });
   it('der Kartenmittelpunkt überlebt den Weg durch die URL', () => {
     const pfad = lagekartePfad(E, { zentrum: { lat: -33.8688, lon: 151.2093 } });
     const wert = new URL(pfad, 'http://x').searchParams.get('zentrum');

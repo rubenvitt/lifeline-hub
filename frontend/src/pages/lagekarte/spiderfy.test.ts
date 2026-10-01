@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { spiderfyOffsets, baueSpiderFc, SPIDER_LEAF_ABSTAND } from './spiderfy';
-import type { MarkerProps } from './markerLayer';
+import {
+  aktualisiereSpiderBlaetter,
+  baueSpiderFc,
+  nurInhaltGeaendert,
+  spiderfyOffsets,
+  SPIDER_LEAF_ABSTAND,
+} from './spiderfy';
+import type { MarkerFeatureCollection, MarkerProps } from './markerLayer';
 
 // kleinster paarweiser Abstand über alle Offset-Paare
 function minAbstand(offs: { x: number; y: number }[]): number {
@@ -83,5 +89,78 @@ describe('baueSpiderFc', () => {
     const { leaves, legs } = baueSpiderFc([], [0, 0], idProjektor);
     expect(leaves.features).toHaveLength(0);
     expect(legs.features).toHaveLength(0);
+  });
+});
+
+// ── LFH-668: Spider überlebt eine reine Inhaltsänderung ─────────────────────────────────────
+const fc = (
+  ...punkte: [schluessel: string, coords: [number, number], extra?: Partial<MarkerProps>][]
+): MarkerFeatureCollection => ({
+  type: 'FeatureCollection',
+  features: punkte.map(([schluessel, coordinates, extra]) => ({
+    type: 'Feature',
+    properties: props(schluessel, extra),
+    geometry: { type: 'Point', coordinates },
+  })),
+});
+
+describe('nurInhaltGeaendert (LFH-668)', () => {
+  const alt = fc(['person-1', [9, 52]], ['person-2', [9.1, 52.1]]);
+
+  it('true: gleiche Schlüssel in gleicher Folge an gleicher Lage, nur andere Eigenschaften', () => {
+    const neu = fc(
+      ['person-1', [9, 52], { farbe: '#f00', kurzzeichen: 'I' }],
+      ['person-2', [9.1, 52.1]],
+    );
+    expect(nurInhaltGeaendert(alt, neu)).toBe(true);
+  });
+
+  it('false bei Zugang, Wegfall, anderer Folge oder anderer Lage', () => {
+    expect(
+      nurInhaltGeaendert(
+        alt,
+        fc(['person-1', [9, 52]], ['person-2', [9.1, 52.1]], ['person-3', [9, 52]]),
+      ),
+    ).toBe(false);
+    expect(nurInhaltGeaendert(alt, fc(['person-1', [9, 52]]))).toBe(false);
+    expect(nurInhaltGeaendert(alt, fc(['person-2', [9.1, 52.1]], ['person-1', [9, 52]]))).toBe(
+      false,
+    );
+    expect(nurInhaltGeaendert(alt, fc(['person-1', [9, 52]], ['person-2', [9.1, 52.2]]))).toBe(
+      false,
+    );
+  });
+});
+
+describe('aktualisiereSpiderBlaetter (LFH-668)', () => {
+  it('behält die Lage jedes Blatts und übernimmt die Eigenschaften gleichen Schlüssels', () => {
+    const { leaves } = baueSpiderFc(
+      [props('person-1'), props('person-2')],
+      [100, 100],
+      idProjektor,
+    );
+    const neu = fc(
+      ['person-2', [9, 52], { kurzzeichen: 'I', farbe: '#f00' }],
+      ['person-1', [9, 52]],
+    );
+    const r = aktualisiereSpiderBlaetter(leaves, neu);
+    expect(r.features.map((f) => f.geometry.coordinates)).toEqual(
+      leaves.features.map((f) => f.geometry.coordinates),
+    );
+    expect(r.features[1].properties).toMatchObject({
+      schluessel: 'person-2',
+      kurzzeichen: 'I',
+      farbe: '#f00',
+    });
+  });
+
+  it('ein Blatt ohne Gegenstück behält seine Eigenschaften', () => {
+    const { leaves } = baueSpiderFc(
+      [props('person-1', { kurzzeichen: 'III' })],
+      [0, 0],
+      idProjektor,
+    );
+    const r = aktualisiereSpiderBlaetter(leaves, fc(['person-9', [9, 52]]));
+    expect(r.features[0].properties).toEqual(leaves.features[0].properties);
   });
 });

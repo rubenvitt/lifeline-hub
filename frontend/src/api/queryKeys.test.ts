@@ -354,6 +354,7 @@ describe('einsatzKeys (Factory-Output)', () => {
       13.456,
       'uhs:5',
     ]);
+    expect(einsatzKeys.ortSuche(1, 'Hauptstraße 12')).toEqual(['ort-suche', 1, 'Hauptstraße 12']);
     expect(einsatzKeys.ortVorschau(1, null, null, null)).toEqual([
       'ort-vorschau',
       1,

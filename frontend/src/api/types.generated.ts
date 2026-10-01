@@ -2820,6 +2820,23 @@ export interface components {
             name: string;
             tz_organisation?: string | null;
         };
+        OrtSucheAntwort: {
+            treffer: components["schemas"]["OrtTreffer"][];
+            zustand: components["schemas"]["OrtSucheZustand"];
+        };
+        /**
+         * @description Ausgang der Adresssuche. `ok` ohne Treffer heißt „nichts gefunden“.
+         * @enum {string}
+         */
+        OrtSucheZustand: "ok" | "ausgelastet" | "nicht_erreichbar";
+        OrtTreffer: {
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lon: number;
+            /** @description Anzeigename des Geocoders (bei Nominatim `display_name`). */
+            name: string;
+        };
         /**
          * @description LFH-265: beide Felder werden ABSENT statt present-null serialisiert, damit der generierte
          *     `peilung?`/`ortsname?` ehrlich ist. Wire-Änderung — gepinnt per `contains_key` in

@@ -274,7 +274,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}",
-            delete(routes::dokument::entfernen),
+            delete(routes::dokument::entfernen).patch(routes::dokument::aendern),
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}/datei",
@@ -615,6 +615,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/karte/fuehrungskraefte",
             get(routes::einsatz_personal::karte_fuehrungskraefte),
+        )
+        // Adresssuche der Lagekarte (LFH-638): Forward-Geocoding, am Modul Lagekarte (`/karte`).
+        .route(
+            "/api/einsaetze/{id}/karte/ort-suche",
+            get(routes::karte_ort_suche::ort_suche),
         )
         .route(
             "/api/einsaetze/{id}/material",

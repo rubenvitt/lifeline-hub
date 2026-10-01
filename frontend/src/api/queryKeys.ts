@@ -74,6 +74,8 @@ export const EINSATZ_KEYS = {
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
   modulFreigaben: 'einsatz-modul-freigaben',
   ortVorschau: 'ort-vorschau',
+  // Adresssuche der Lagekarte (LFH-638): Suchtext → Treffer des Geocoders.
+  ortSuche: 'ort-suche',
   // Singular-Detail-Keys: der SSE-Fan-out invalidiert die Listen-Prefixe, nicht diese (eigenes
   // erstes Element, kein Prefix-Match). Bewusst NICHT_LIVE.
   uhsDetail: 'einsatz-uhs-detail',
@@ -231,6 +233,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   das 403 der Server-Gates bleibt das Netz.
  * - `ortVorschau`: abgeleiteter Geo-Lookup mit Debounce + Client-Cache; live zu invalidieren
  *   wäre schädlich (Nominatim-ToS).
+ * - `ortSuche`: Adresssuche auf Enter (LFH-638), aus demselben Grund nie live; bewusst auch
+ *   nicht im Lagebild offline (der Suchtext kann eine Personenadresse sein).
  * - `pegel`: kein Live-Ereignis; die Abfrage fragt alle 5 min nach (`PEGEL_ABRUF_MS`), die
  *   Mutationen setzen die Antwort per `setQueryData`.
  * - `wetter`: externe Quelle (Bright Sky), 5-min-Nachfrage.
@@ -245,6 +249,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.modulOverrides,
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.ortVorschau,
+  EINSATZ_KEYS.ortSuche,
   EINSATZ_KEYS.uhsDetail,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
@@ -468,6 +473,9 @@ export const einsatzKeys = {
     lon: number | null,
     exclude: string | null,
   ) => [EINSATZ_KEYS.ortVorschau, einsatzId, lat, lon, exclude] as const,
+  // Der getrimmte Suchtext ist der Key: gleiche Begriffe treffen den Client-Cache (LFH-638).
+  ortSuche: (einsatzId: number, begriff: string) =>
+    [EINSATZ_KEYS.ortSuche, einsatzId, begriff] as const,
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════

@@ -56,6 +56,14 @@ diese Zusage.
   (`pages/lagekarte/objektsuche.ts`) prüft Modulsperre **je Typ**; Enter sendet über `onAbsenden`
   mit Spec; `FreiesZeichenInspector` entprellt (600 ms) mit eigenem Merker, Bezeichnung
   kontrolliert. Enter-Tests über `userEvent.keyboard`.
+- **Ortssuche im Objektsuchfeld** (LFH-638, Spec `lagekarte-ortssuche`,
+  `openspec/changes/archive/2026-10-01-lfh-638-lagekarte-ort-suche/design.md`): `MarkerSuche` erkennt
+  eine Koordinate beim Tippen (`anzeige/koordinatenErkennung.ts`, dieselbe Quelle wie die
+  Sprungpalette) und sucht eine Adresse **nur auf Enter** (`AdressGruppe`, Route `…/karte/ort-suche`;
+  kein Autovervollständigen, Nominatim-Regeln). Die Suchnadel (`suchnadelLayer.ts`) ist **keine
+  Klickebene** (keine Rolle in `ordneKlickebene`, Guard in `suchnadelLayer.test.ts`), liegt unter
+  der Eigenposition, lebt nur im Seitenzustand und trägt Beschriftung und „Suchnadel entfernen“ im
+  Fuß-Band `SuchnadelBand`. `?zentrum=` setzt die Nadel mit, `?ort=` belegt das Suchfeld vor.
 - **Schwebende Bänder werden gestapelt, nicht per `zIndex` gestaffelt** (LFH-355,
   `pages/lagekarte/KartenFuss.tsx`): ein Rahmen (`pointerEvents: 'none'`), Bänder als
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
@@ -97,6 +105,13 @@ diese Zusage.
   selbst keinen (`getSource` vor `isSourceLoaded`).
   Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
   `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
+- **Ein aufgefächertes Bündel überlebt eine reine Inhaltsänderung** (LFH-668,
+  `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`, D5): gleiche Schlüssel in gleicher
+  Folge an gleicher Lage (`nurInhaltGeaendert`, `spiderfy.ts`) → Blätter bleiben stehen und nehmen die
+  neuen Eigenschaften (`aktualisiereSpiderBlaetter`), die Hülle des neu gebauten Donuts bleibt
+  durchlässig; sonst klappt der Spider zu. Verglichen wird mit dem EINGESPIELTEN Stand
+  (`wendeKartenDatenAn` kann vertagen). `onSpiderOffen` meldet nur Wechsel, A→B ohne
+  Zwischen-`false`; `KartenHandle.klappeSpiderEin()` klappt von außen ein.
 - Nachweise: `e2e/lagekarte-smoke.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`,
   `e2e/lagekarte-touch.spec.ts` (LFH-713, `hasTouch`, Trefferwache `elementFromPoint`), `fokus-verdeckung.spec.ts`; Kartenaufbauten sieht
   `e2e/fokus-kern.ts` nur über `zusatzKandidaten`, das Abschneiden der nachgiebigen Zeitachse nur
