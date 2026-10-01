@@ -301,11 +301,11 @@ for (const modus of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Vermisst melden' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
-    // `extra` steht in `colorTextDescription` = `schwach` (LFH-643). Nur der absolute Boden.
+    // `extra` steht in `colorTextDescription` = `schwach`; seit LFH-643 voller Boden.
     await misst(
       dialog.getByText('Ohne Angabe gilt der Zeitpunkt der Meldung.'),
-      4.5,
-      `${modus}/Hinweis vermisst seit (LFH-643)`,
+      minimum,
+      `${modus}/Hinweis vermisst seit`,
       werte,
     );
     const seit = dialog.getByLabel('vermisst seit', { exact: true });
@@ -336,12 +336,12 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Leerzustand Titel`,
       werte,
     );
-    // Der Hinweissatz kommt aus dem geteilten `SeitenLeer` in `schwach` (LFH-643). Gemessen
-    // und notiert, gesichert nur der absolute Boden 4,5 : 1.
+    // Der Hinweissatz kommt aus dem geteilten `SeitenLeer` in `schwach`; seit LFH-643 voller
+    // Boden.
     await misst(
       page.getByText(/Eine Koordinate lässt sich/),
-      4.5,
-      `${modus}/Leerzustand Hinweis (LFH-643)`,
+      minimum,
+      `${modus}/Leerzustand Hinweis`,
       werte,
     );
 

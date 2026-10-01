@@ -100,8 +100,14 @@ export interface Farbrollen {
  * behalten ihre LFH-352-Werte; neu gestimmt sind Flächen- und Textstufen.
  *
  * Kontrast (WCAG; `grund` · `flaeche`): text 15,46 · 18,47 — text2 11,00 · 13,13 —
- * gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; Weiß auf bedien 6,59,
+ * gedaempft 9,20 · 10,99 — schwach 7,53 · 8,99; steuerRahmen 3,30 · 3,95; Weiß auf bedien 6,59,
  * auf bedienHover 5,62; normalText/normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
+ *
+ * TEXTBODEN für JEDE Textstufe, auch den Tertiärtext `schwach` (Augenbraue, Meta, Platzhalter,
+ * Feldhilfe): ≥ 7 : 1 auf jeder deckenden Fläche (LFH-643, Spec `textstufen-kontrast`). Die
+ * dunkelste ist `flaeche3`: gedaempft 8,62, schwach 7,05. Die Rangfolge bleibt sichtbar,
+ * benachbarte Stufen liegen ≥ 5 ΔL* auseinander (L* text 6,2 · text2 20,0 · gedaempft 25,4 ·
+ * schwach 31,1). Gerechnet in `textstufen.test.ts`.
  *
  * `achtung`/`alarm` tragen als TEXT den Tagesboden nicht (auf ihrer Fläche 6,02 bzw. 5,52),
  * dafür stehen `achtungText`/`alarmText` (auf Weiß 9,22 bzw. 8,96, auf ihren Flächen und
@@ -116,8 +122,8 @@ export const farbenHell: Farbrollen = {
   linieStark: '#b9bfc6',
   rasterLinie: 'rgba(26, 95, 160, 0.07)',
   text: '#111418',
-  gedaempft: '#474e57',
-  schwach: '#58606a',
+  gedaempft: '#363d45',
+  schwach: '#424a53',
   bedien: '#1a5fa0',
   alarm: '#b02318',
   achtung: '#7a5200',
@@ -161,9 +167,10 @@ export const farbenHell: Farbrollen = {
  * auf alarm 7,18. Statusflächen: normalText 10,44, achtung 11,18, alarm 6,89, bedienText 9,65.
  *
  * Zwei bewusste Abweichungen vom Entwurf:
- * - `schwach` `#7d858e` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
- *   `colorTextTertiary`/`colorTextDescription` echten Text und 10-px-Augenbrauen (WCAG 1.4.3).
- *   `#7d858e` hält ≥ 4,72 auf allen Flächenstufen.
+ * - `schwach` `#838b94` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
+ *   `colorTextTertiary`/`colorTextDescription` echten Text und 10-px-Augenbrauen und hält
+ *   deshalb den Nachtboden aller Textstufen, ≥ 5 : 1 auf jeder deckenden Fläche (LFH-643;
+ *   5,77 auf `grund`, 5,21 auf `flaeche2` = Dialog, 5,11 auf `flaeche3`).
  * - `steuerRahmen` `#626a73` trägt antds `colorBorder`, nicht `linieStark` (`#2e343a`, 1,49 auf
  *   `flaeche`). `#626a73` hält ≥ 3,21 auf allen Flächenstufen (WCAG 1.4.11).
  *
@@ -179,7 +186,7 @@ export const farbenDunkel: Farbrollen = {
   rasterLinie: 'rgba(77, 148, 214, 0.055)',
   text: '#e8ebee',
   gedaempft: '#9aa2ab',
-  schwach: '#7d858e',
+  schwach: '#838b94',
   bedien: '#4d94d6',
   alarm: '#ff6b6b',
   achtung: '#e8cc3a',
@@ -223,7 +230,7 @@ export const farbenDunkel: Farbrollen = {
  * Kontrast (LFH-434): der Rahmen wird auch bei Tageslicht gelesen, deshalb hält bedienbarer Text
  * die TAG-Schwelle ≥ 7 : 1 auf jedem Rahmengrund (`grund` · `feld` · `aktiv`): text 16,15 ·
  * 15,02 · 14,74 — gedaempft 8,04 · 7,47 · 7,33. Eine schwächere Textstufe gibt es im Rahmen nur
- * für Gesperrtes: `gesperrt` 5,17 auf `grund` (Boden 4,5; WCAG 1.4.3 nimmt inaktive Komponenten
+ * für Gesperrtes: `gesperrt` 5,60 auf `grund` (Boden 4,5; WCAG 1.4.3 nimmt inaktive Komponenten
  * aus), die Sperre trägt zusätzlich ein Zeichen ohne Farbe. Gerechnet in `rahmenKontrast.test.ts`.
  */
 export const rahmenFarben = {
@@ -661,7 +668,7 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorTextSecondary: farben.gedaempft,
     colorTextTertiary: farben.schwach,
     // Der Platzhalter ist bei mehreren Filtern die EINZIGE Beschriftung. antds Ableitung aus
-    // `colorTextQuaternary` lag unter 2,5 : 1; `schwach` hält ≥ 5 : 1.
+    // `colorTextQuaternary` lag unter 2,5 : 1; `schwach` hält den Textboden (Tag ≥ 7, Nacht ≥ 5).
     colorTextPlaceholder: farben.schwach,
 
     // Der Rahmen eines Steuerelements, nicht die dekorative Linie (Messwerte bei `farbenDunkel`).

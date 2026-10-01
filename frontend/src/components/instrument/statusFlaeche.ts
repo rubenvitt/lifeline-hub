@@ -23,13 +23,14 @@ import type { Farbrollen } from '../../theme/tokens';
  * Die Füllfarben von `achtung`/`alarm` tragen als Text den Tagesboden nicht (6,02 bzw. 5,52),
  * deshalb die Textrollen `achtungText`/`alarmText`; die Füllfarbe bleibt die KANTE.
  *
- * `neutral` hat keine Statusfläche — `flaeche3` + `text2`, NICHT `schwach` (4,72 nachts, unter 5)
- * und nicht `gedaempft` (6,60 am Tag, unter 7).
+ * `neutral` hat keine Statusfläche — `flaeche3` + `text2`. Seit LFH-643 hielten auch `gedaempft`
+ * und `schwach` dort den Boden (Tag 8,62 / 7,05, Nacht 6,83 / 5,11); `text2` bleibt, damit das
+ * neutrale Zustandswort nicht schwächer wirkt als die übrigen (alle ≥ 6,89).
  *
  * `kante` ist die Rollenfarbe für einen Rahmen, der sich vom Grund abhebt (WCAG 1.4.11,
  * ≥ 3 : 1 — `kraefte-kontrast.spec.ts` prüft ihn am `StatusTag`): Tag normal 5,96 · bedien
- * 5,57 · achtung 6,02 · alarm 5,52 · neutral (schwach/flaeche3) 4,99; Nacht 7,93 · 5,66 ·
- * 11,18 · 6,89 · 4,72.
+ * 5,57 · achtung 6,02 · alarm 5,52 · neutral (schwach/flaeche3) 7,05; Nacht 7,93 · 5,66 ·
+ * 11,18 · 6,89 · 5,11.
  */
 export type StatusTon = 'normal' | 'achtung' | 'alarm' | 'bedien' | 'neutral';
 

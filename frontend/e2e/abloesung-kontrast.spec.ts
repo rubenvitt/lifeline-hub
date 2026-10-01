@@ -15,31 +15,18 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * Textbaum gefunden (eine Selektorliste übersähe das nächste Textstück). Zustandstragende
  * Kartenränder gegen Seitengrund und Kartenfläche sowie Etikettränder ≥ 3 : 1 (WCAG 1.4.11).
  *
- * ZWEI BENANNTE AUSNAHMEN (geteilte Rollen; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
- *  · Tertiärtext (`schwach`) → LFH-643, beide Modi;
- *  · Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag.
- * Fallen die Ausnahmen, wenn LFH-643/LFH-661 landen.
+ * EINE BENANNTE AUSNAHME (geteilte Rolle; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
+ * Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag. Fällt, wenn LFH-661 landet.
+ * Tertiärtext (`schwach`) trägt seit LFH-643 den vollen Boden (Spec `textstufen-kontrast`).
  *
  * Der Rand der planmäßigen und der abgelösten Karte trägt keinen Zustand (Linienfarbe) —
  * gemessen und angehängt, und zugesichert, dass er sich von den Zustandsrändern unterscheidet.
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die zwei Ausnahmen oben. */
+/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die Ausnahme oben. */
 const BODEN = 4.5;
 const ZUSTAND = 3;
-
-/** Tertiärtext, enumeriert, damit JEDER andere Text den vollen Boden trägt. */
-const TERTIAER = [
-  '[data-lfh="abloesung-zeit"] + span',
-  '.ant-typography-secondary',
-  '[data-lfh="paneel"] > div:first-child > :is(h2, h3, h4, h5, h6)',
-  // Die Feldhilfe der Dialoge („Leer: jetzt") — antds `colorTextDescription`.
-  '.ant-form-item-extra',
-  '.ant-select-placeholder',
-  // Der Ortspfad im Seitenkopf bis auf sein letztes Glied (`schwach`; das letzte ist `text2`).
-  '.lfh-seitenkopf__pfad li:not(:last-child)',
-].join(', ');
 
 const KARTEN = [
   { stufe: 'ueberfaellig', einheit: 'Florian Kontrast 1', beginnVorMin: 400, wort: 'überfällig' },
@@ -71,18 +58,17 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 interface Textknoten {
   ziel: Locator;
   text: string;
-  tertiaer: boolean;
   primaer: boolean;
 }
 
 /** Jedes Element unter `wurzel` mit eigenem, sichtbarem Text, als Locator über eine
- *  Messmarke, dazu ob es zu einer Ausnahme gehört. */
+ *  Messmarke, dazu ob es im Primärknopf steht (Ausnahme LFH-661). */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
-  const funde = await wurzel.evaluate((w, tertiaer) => {
+  const funde = await wurzel.evaluate((w) => {
     // Marken eines früheren Aufrufs räumen, sonst träfe dieselbe Nummer zwei Knoten.
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: { text: string; tertiaer: boolean; primaer: boolean }[] = [];
+    const liste: { text: string; primaer: boolean }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       const eigen = [...el.childNodes]
@@ -94,12 +80,11 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
       el.setAttribute('data-kontrastprobe', String(liste.length));
       liste.push({
         text: eigen,
-        tertiaer: el.closest(tertiaer) != null,
         primaer: el.closest('.ant-btn-primary') != null,
       });
     }
     return liste;
-  }, TERTIAER);
+  });
   return funde.map((f, i) => ({ ...f, ziel: wurzel.locator(`[data-kontrastprobe="${i}"]`) }));
 }
 
@@ -215,14 +200,10 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer, primaer } of knoten) {
+      for (const { ziel, text, primaer } of knoten) {
         const m = await kontrast(ziel);
         const tag = modus === 'light';
-        const ausnahme = tertiaer
-          ? 'Tertiärtext → LFH-643'
-          : tag && primaer
-            ? 'Weiß auf bedien → LFH-661'
-            : null;
+        const ausnahme = tag && primaer ? 'Weiß auf bedien → LFH-661' : null;
         const schranke = ausnahme ? BODEN : TEXT[modus];
         const kontext = `${modus}, ${ansicht}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
         messwerte.push({ modus, ansicht, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
@@ -260,16 +241,15 @@ for (const modus of ['light', 'dark'] as const) {
 
     // Die Probe hat die Texte wirklich gesehen, und die tragenden liefen OHNE Ausnahme — eine
     // zu weit gefasste Ausnahme-Liste senkte sonst still den Boden.
-    const pruefeGesehen = (pflicht: string | RegExp, tragend: boolean) => {
+    const pruefeGesehen = (pflicht: string | RegExp) => {
       const treffer = [...gemessen].filter(([t]) =>
         typeof pflicht === 'string' ? t === pflicht : pflicht.test(t),
       );
       expect(treffer.length, `Text ${String(pflicht)} gemessen`).toBeGreaterThan(0);
-      if (tragend)
-        expect(
-          treffer.filter(([, ausnahme]) => ausnahme),
-          `Text ${String(pflicht)} ohne Ausnahme gemessen`,
-        ).toEqual([]);
+      expect(
+        treffer.filter(([, ausnahme]) => ausnahme),
+        `Text ${String(pflicht)} ohne Ausnahme gemessen`,
+      ).toEqual([]);
     };
     for (const tragend of [
       ...KARTEN.flatMap((k) => [k.einheit, k.wort]),
@@ -283,10 +263,13 @@ for (const modus of ['light', 'dark'] as const) {
       'Zeitpunkt',
       'Ablösung',
       /^4 laufend · 2 fällig$/,
+      // Tertiärtext (`schwach`), bis LFH-643 unter einer Ausnahme.
+      'fällig',
+      'abgelöst',
+      `Abgelöst durch ${FOLGE}`,
+      'Leer: jetzt',
     ])
-      pruefeGesehen(tragend, true);
-    for (const ausnahme of ['fällig', 'abgelöst', `Abgelöst durch ${FOLGE}`, 'Leer: jetzt'])
-      pruefeGesehen(ausnahme, false);
+      pruefeGesehen(tragend);
 
     await test.info().attach('kontrastwerte.json', {
       body: JSON.stringify(messwerte, null, 2),

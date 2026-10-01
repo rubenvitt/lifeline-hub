@@ -426,8 +426,8 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
         cursor: 'not-allowed',
         background: 'transparent',
         borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile und muss am Tag 7 : 1
-        // halten (`schwach` auf `paneel`: 5,8 : 1).
+        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile, keine Beischrift.
+        // (Den Textboden hielte seit LFH-643 auch `schwach`.)
         color: rollen.text2,
       }}
     >

@@ -62,12 +62,14 @@ describe('statusFlaeche — Kontrast', () => {
     expect(statusFlaeche(farbenHell, 'alarm').kante).toBe(farbenHell.alarm);
   });
 
-  it('neutral ist flaeche3 + text2, nicht schwach (nachts unter 5)', () => {
-    expect(statusFlaeche(farbenDunkel, 'neutral')).toMatchObject({
-      grund: farbenDunkel.flaeche3,
-      text: farbenDunkel.text2,
-    });
-    expect(kontrast(farbenDunkel.schwach, farbenDunkel.flaeche3)).toBeLessThan(5);
+  it('neutral ist flaeche3 + text2, die Kante schwach', () => {
+    for (const farben of [farbenDunkel, farbenHell]) {
+      expect(statusFlaeche(farben, 'neutral')).toEqual({
+        grund: farben.flaeche3,
+        text: farben.text2,
+        kante: farben.schwach,
+      });
+    }
   });
 
   it('marke hat keine Statusfläche', () => {
