@@ -26,6 +26,19 @@ import type { Kante } from './luecken';
 
 const ZEICHEN_PX = 22;
 
+/**
+ * Eine Sprechgruppe mit ihrer Betriebsart: „TMO 311“ aus „311“. Trägt die Bezeichnung die
+ * Betriebsart schon („DMO 505“), bleibt sie, wie sie ist — die Tabelle trennt nach Spalten, die
+ * Skizze nach Wort, und „DMO DMO 505“ läse sich wie ein Fehler.
+ */
+function mitBetriebsart(art: 'TMO' | 'DMO', bezeichnung: string): string {
+  return bezeichnung.trim().toUpperCase().startsWith(art) ? bezeichnung : `${art} ${bezeichnung}`;
+}
+
+function sprechgruppenLabels(tmo: readonly string[], dmo: readonly string[]): string[] {
+  return [...tmo.map((b) => mitBetriebsart('TMO', b)), ...dmo.map((b) => mitBetriebsart('DMO', b))];
+}
+
 interface Props {
   einsatzId: number;
   skizze: Fernmeldeskizze;
@@ -103,16 +116,12 @@ function KantenZeile({ kante }: { kante: Kante }) {
       </div>
     );
   }
-  const teile = [
-    kante.tmo.length > 0 ? `TMO ${kante.tmo.join(', ')}` : null,
-    kante.dmo.length > 0 ? `DMO ${kante.dmo.join(', ')}` : null,
-  ].filter((t): t is string => t != null);
   return (
     <div
       data-lfh="skizze-kante"
       style={{ ...monoStil(12), color: rollen.gedaempft, overflowWrap: 'anywhere' }}
     >
-      {`⇄ ${teile.join(' · ')}`}
+      {`⇄ ${sprechgruppenLabels(kante.tmo, kante.dmo).join(' · ')}`}
     </div>
   );
 }
@@ -173,12 +182,11 @@ function KnotenInhalt({
           }}
         >
           <span style={meta}>{knoten.rufname ?? 'kein Rufname'}</span>
-          {knoten.tmo.length > 0 && (
-            <span style={{ ...meta, color: rollen.text }}>{`TMO ${knoten.tmo.join(', ')}`}</span>
-          )}
-          {knoten.dmo.length > 0 && (
-            <span style={{ ...meta, color: rollen.text }}>{`DMO ${knoten.dmo.join(', ')}`}</span>
-          )}
+          {sprechgruppenLabels(knoten.tmo, knoten.dmo).map((l) => (
+            <span key={l} style={{ ...meta, color: rollen.text }}>
+              {l}
+            </span>
+          ))}
           {ohneSprechgruppe && (
             // Als Wort, nicht nur als Farbe (WCAG 1.4.1).
             <span style={{ color: rollen.achtungText }}>keine Sprechgruppe</span>

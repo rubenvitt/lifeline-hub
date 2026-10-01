@@ -323,6 +323,27 @@ Trefffläche gefunden (LFH-626 D3, Nachtrag), und der Fix soll nur einmal stehen
 
 ### Nachträge aus der Umsetzung (01.10.2026)
 
+- **Messung vor dem Bau (Aufgabe 4.1, `e2e/funkplan.spec.ts`, „Skizze am Fükw“).** Bei
+  1366 × 768 mit offenem Modulpanel, Mono 12:
+
+  | Wert | Laufweite |
+  | --- | --- |
+  | Contentbreite der Funkplan-Seite | 1050 px |
+  | Spaltenbreite der ersten Ebene (`auto-fill`, `SPALTE_MIN_PX = 300`) | 343 px, drei Spalten |
+  | Sprechgruppe „TMO 412_F_DRK Nordwest-Reserve“ | 210 px |
+  | Kante „⇄ TMO 412_F_DRK Nordwest-Reserve · DMO 505“ | 295 px |
+  | Funkrufname „Florian Musterstadt 1/10“ | 168 px |
+
+  `SPALTE_MIN_PX = 300` bleibt: Die Contentbreite ist dieselbe wie auf der Abschnittsseite. Nach
+  Klappziel, Zeichen und Abständen bleiben auf Tiefe 0 rund 270 px Text. Die lange Kante bricht
+  zwischen ihren Sprechgruppen in zwei Zeilen um, ohne Überhang (e2e, alle vier Breiten).
+- **Betriebsart vor der Bezeichnung (D5):** Die Bezeichnung einer Sprechgruppe ist frei. Sie
+  kann die Betriebsart schon tragen („DMO 505“) oder nicht („505“). Die Skizze setzt „TMO“/„DMO“
+  nur davor, wenn die Bezeichnung nicht schon damit beginnt (ohne Groß-/Kleinunterscheidung).
+  Sonst stünde „⇄ DMO DMO 505“ da; gefunden im e2e. Jede Sprechgruppe steht am Knoten als eigenes
+  Wort, an der Kante durch „ · “ getrennt. Der Funkplan-Bericht (LFH-548) setzt das Präfix
+  unbedingt; das bleibt außerhalb dieser Change (Nachzug).
+
 - **Dateiname der Darstellung:** `stab/FernmeldeskizzeBild.tsx` statt `stab/Fernmeldeskizze.tsx`.
   Neben `stab/fernmeldeskizze.ts` löste `./Fernmeldeskizze` auf einem Dateisystem ohne
   Groß-/Kleinunterscheidung (macOS) zuerst die `.ts` auf.

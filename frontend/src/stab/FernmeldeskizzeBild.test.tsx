@@ -143,6 +143,28 @@ describe('Fernmeldeskizze — Kanten', () => {
     expect(kante('1. Zug')?.textContent).not.toContain('311');
   });
 
+  it('setzt die Betriebsart nicht doppelt vor eine Bezeichnung, die sie schon trägt', () => {
+    const tmo = sg(7, 'TMO', 'TMO 412_F_DRK');
+    const dmo = sg(8, 'DMO', 'dmo 505');
+    const skizze = baueFernmeldeskizze(
+      [abschnitt(1, { name: 'EA West', sprechgruppen: [tmo, dmo] })],
+      [einheit(30, { name: 'Zug West', abschnitt_id: 1, sprechgruppen: [tmo, dmo] })],
+    );
+    renderMitProviders(
+      <FernmeldeskizzeBild
+        einsatzId={1}
+        skizze={skizze}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+    expect(kante('Zug West')).toHaveTextContent(/^⇄ TMO 412_F_DRK · dmo 505$/);
+    const knoten = knotenVon('EA West');
+    expect(within(knoten).getByText('TMO 412_F_DRK')).toBeInTheDocument();
+    expect(within(knoten).getByText('dmo 505')).toBeInTheDocument();
+    expect(knoten.textContent).not.toMatch(/TMO TMO|DMO dmo/i);
+  });
+
   it('nennt den fehlenden gemeinsamen Kanal als Wort, das Zeichen ist verborgen', () => {
     bild();
     const k = kante('Gruppe 1')!;

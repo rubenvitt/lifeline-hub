@@ -294,7 +294,7 @@ test('die Kennung einer Einheit führt auf ihre Detailseite', async ({ page }) =
 
 /** Eine absichtlich lange, aber reale Bezeichnung (≥ 24 Zeichen). */
 const SG_LANG = 'TMO 412_F_DRK Nordwest-Reserve';
-const KANTE_LANG = `⇄ TMO ${SG_LANG} · DMO 505`;
+const KANTE_LANG = `⇄ ${SG_LANG} · DMO 505`;
 const OHNE_KANAL = 'Gruppe ohne Kanal';
 
 async function seedeSkizze(page: Page, einsatzId: string) {
@@ -395,7 +395,7 @@ test('Skizze am Fükw: Messwerte, Spalten in Zeilen, kein Überhang, Lücken im 
       probe.remove();
       return ergebnis;
     },
-    { werte: { sprechgruppe: `TMO ${SG_LANG}`, kante: KANTE_LANG, einheitRuf: EINHEIT_RUF } },
+    { werte: { sprechgruppe: SG_LANG, kante: KANTE_LANG, einheitRuf: EINHEIT_RUF } },
   );
   for (const [k, v] of Object.entries(messwerte)) {
     test.info().annotations.push({ type: 'messwert', description: `${k}=${v}` });
@@ -490,13 +490,17 @@ test('Skizze im Druck bei A4-Breite: alles offen, Druckkopf, nichts ragt heraus'
         ),
       ).size,
       werkzeuge: getComputedStyle(document.querySelector('.funkplan-no-print')!).display,
-      umschalter: getComputedStyle(document.querySelector('[role="radiogroup"]')!).display,
+      // Der Umschalter sitzt im Seitenkopf, den `funkplanPrint.css` ausblendet: sein eigenes
+      // `display` bleibt `flex`, gezeichnet wird er aber nicht (keine Kästen).
+      umschalterKaesten: document
+        .querySelector('[role="radiogroup"][aria-label="Darstellung"]')!
+        .getClientRects().length,
       klappen: getComputedStyle(bild.querySelector('[data-lfh="org-klappen"]')!).display,
       kopf: document.querySelector('[data-lfh="druckkopf"]')!.textContent!,
     };
   });
   expect(lage.werkzeuge, 'Werkzeugzeile im Druck aus').toBe('none');
-  expect(lage.umschalter, 'Umschalter im Druck aus').toBe('none');
+  expect(lage.umschalterKaesten, 'Umschalter im Druck aus').toBe(0);
   expect(lage.klappen, 'Klappziele im Druck aus').toBe('none');
   expect(lage.kopf, 'Druckkopf „Fernmeldeskizze“').toContain('Fernmeldeskizze');
   expect(lage.spalten, 'A4: zwei feste Spalten').toBe(2);
