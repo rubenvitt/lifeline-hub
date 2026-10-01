@@ -42,14 +42,14 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 2. Regel „gemeinsame Sprechgruppe“ und Lücke (D3, Spec `stab-funkplan` „Lücken“)
 
-- [ ] 2.1 Test zuerst, `stab/luecken.test.ts`, `verbindungsurteil(oben, unten)`:
+- [x] 2.1 Test zuerst, `stab/luecken.test.ts`, `verbindungsurteil(oben, unten)`:
   - gemeinsame TMO und DMO werden getrennt geliefert
   - keine gemeinsame bei zwei nicht leeren Seiten ergibt `keine`
   - eine leere Seite ergibt `ohne-urteil`
   - gleiche Bezeichnung mit verschiedener `id` gilt nicht als gemeinsam
 
   Nachweis: rot belegt.
-- [ ] 2.2 Test zuerst, `verbindungenOhneGemeinsameSprechgruppe(abschnitte, einheiten)`:
+- [x] 2.2 Test zuerst, `verbindungenOhneGemeinsameSprechgruppe(abschnitte, einheiten)`:
   - die drei Paararten (Unterabschnitt → Abschnitt, oberste Einheit → Abschnitt, Untereinheit →
     Einheit)
   - Waise (übergeordnete Stelle unbekannt) ohne Paar
@@ -59,9 +59,9 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Treffer in Reihenfolge der Quelllisten
 
   Nachweis: rot belegt.
-- [ ] 2.3 Umsetzung beider Funktionen in `stab/luecken.ts`. Typ `Kante` und `Verbindung` stehen
+- [x] 2.3 Umsetzung beider Funktionen in `stab/luecken.ts`. Typ `Kante` und `Verbindung` stehen
   dort, damit `fernmeldeskizze.ts` nur aus `luecken.ts` importiert. Nachweis: 2.1 und 2.2 grün.
-- [ ] 2.4 Test zuerst, dann Umsetzung in `stab/funkplan.ts`:
+- [x] 2.4 Test zuerst, dann Umsetzung in `stab/funkplan.ts`:
   - `funkplanLuecken` liefert `verbindungenOhneGemeinsameSprechgruppe`.
   - `rendereFunkplanMarkdown` schreibt die Zeile nach „Einheiten ohne Erreichbarkeit“, als
     `n (unten → oben, …)` bzw. „—“ mit Grund, Namen über `md()`.
