@@ -1300,10 +1300,9 @@ mod energie_tests {
     /// Wartefrist im Test: kurz, aber mit Luft für Cache-Zugriff und Task unter paralleler Last.
     const FRIST: Duration = Duration::from_millis(300);
     /// Äußere Schranke, damit ein Rückfall auf blockierendes Warten rot wird statt zu hängen.
-    /// Nur Hängeschutz, keine Zusicherung: der Rückfall wartet auf ein Tor, das erst nach der
-    /// Antwort aufgeht, und hängt deshalb bei jeder Schranke. Großzügig, weil eine Sekunde unter
-    /// Last (Gate-Lauf, Load ~180) schon gerissen ist (LFH-649).
-    const HALT: Duration = Duration::from_secs(30);
+    /// Unter `ENERGIE_WARTE`, damit eine Antwort nach der echten statt der übergebenen Frist rot
+    /// wird; mit Luft, weil eine Sekunde unter Last (Gate-Lauf, Load ~180) schon riss (LFH-649).
+    const HALT: Duration = Duration::from_secs(5);
 
     /// Die Größengrenze ist energie-eigen (`Bbox::parse` nimmt jede Größe).
     #[test]
@@ -1496,6 +1495,8 @@ mod energie_tests {
     async fn langsamer_mastr_haelt_die_antwort_nicht_auf() {
         let pool = crate::db::test_pool().await;
         let bbox = Bbox::parse(BBOX).unwrap();
+        // OSM warm: sonst liefe auch der kalte OSM-Abruf gegen die Frist (LFH-649).
+        cache::setze(&pool, "energie:osm:6.90,51.45,7.30,51.65", &osm_teil()).await;
         let (tor, offen) = tokio::sync::oneshot::channel::<()>();
         let (fertig, ende) = tokio::sync::oneshot::channel::<()>();
         let p2 = pool.clone();
@@ -1506,7 +1507,7 @@ mod energie_tests {
                 &inflight(),
                 bbox,
                 FRIST,
-                || async { Some(osm_teil()) },
+                || async { None },
                 move || async move {
                     let _ = offen.await;
                     cache::setze(&p2, ENERGIE_MASTR_KEY, &mastr_teil()).await;
@@ -1538,6 +1539,7 @@ mod energie_tests {
     async fn im_hintergrund_scheiternder_mastr_setzt_die_sperre() {
         let pool = crate::db::test_pool().await;
         let bbox = Bbox::parse(BBOX).unwrap();
+        cache::setze(&pool, "energie:osm:6.90,51.45,7.30,51.65", &osm_teil()).await;
         let r = riegel();
         let (tor, offen) = tokio::sync::oneshot::channel::<()>();
         let (fertig, ende) = tokio::sync::oneshot::channel::<()>();
@@ -1549,7 +1551,7 @@ mod energie_tests {
                 &inflight(),
                 bbox,
                 FRIST,
-                || async { Some(osm_teil()) },
+                || async { None },
                 move || {
                     let abruf = erneuere_energie_mastr(p2, r, move || async move {
                         let _ = offen.await;
@@ -1600,7 +1602,7 @@ mod energie_tests {
             &pool,
             &infl,
             bbox,
-            HALT,
+            Duration::from_secs(3600), // reißt nicht vor dem Abbruch, auch unter Last nicht
             || async { None },
             move || async move {
                 let _ = laeuft.send(());
