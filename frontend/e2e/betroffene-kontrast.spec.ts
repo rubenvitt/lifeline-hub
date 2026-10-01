@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { kontrast, pruefe } from './kontrast-kern';
+import { kartenpunktAufSeite, messeKante } from './karten-pixel-kern';
 
 async function vorbereiten(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -160,11 +161,8 @@ interface KartenHaken {
 }
 
 /**
- * Kante eines Markers gegen den Kartengrund, aus Pixeln: ein 64-px-Ausschnitt um die
- * Kreismitte, im Browser dekodiert. Längs eines Strahls nach rechts liegt innen der weiße
- * Rand (Radius 9–11) und außen die schwarze Kante (11–13); der Grund wird diagonal weit
- * außerhalb gelesen. Die Kante hält, wenn EINE der beiden Linien ≥ 3 : 1 gegen den Grund
- * steht — sie liegen nebeneinander, das Auge braucht nur eine.
+ * Kante eines Markers gegen den Kartengrund, aus Pixeln (`karten-pixel-kern.ts`): längs des
+ * Strahls liegt innen der weiße Rand (Radius 9–11) und außen die schwarze Kante (11–13).
  */
 async function markerKante(page: Page, ll: [number, number]) {
   await page.evaluate(
@@ -178,44 +176,7 @@ async function markerKante(page: Page, ll: [number, number]) {
       }),
     ll,
   );
-  const mitte = await page.evaluate((ziel) => {
-    const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
-    const p = k.project(ziel);
-    const r = k.getCanvas().getBoundingClientRect();
-    return { x: Math.round(r.left + p.x), y: Math.round(r.top + p.y) };
-  }, ll);
-  const png = await page.screenshot({
-    clip: { x: mitte.x - 32, y: mitte.y - 32, width: 64, height: 64 },
-  });
-  return page.evaluate(async (b64) => {
-    const bild = await createImageBitmap(
-      await (await fetch(`data:image/png;base64,${b64}`)).blob(),
-    );
-    const c = document.createElement('canvas');
-    c.width = bild.width;
-    c.height = bild.height;
-    const ctx = c.getContext('2d')!;
-    ctx.drawImage(bild, 0, 0);
-    const px = (x: number, y: number) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3));
-    const lum = ([r, g, b]: number[]) => {
-      const l = [r, g, b].map((n) => {
-        const s = n / 255;
-        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-      });
-      return l[0] * 0.2126 + l[1] * 0.7152 + l[2] * 0.0722;
-    };
-    const k = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-    const grund = lum(px(32 + 26, 32 + 26));
-    const strahl = (von: number, bis: number) =>
-      Array.from({ length: bis - von + 1 }, (_, i) => lum(px(32 + von + i, 32)));
-    const rand = Math.max(...strahl(9, 11));
-    const kante = Math.min(...strahl(11, 14));
-    return {
-      rand: k(rand, grund),
-      kante: k(kante, grund),
-      beste: Math.max(k(rand, grund), k(kante, grund)),
-    };
-  }, png.toString('base64'));
+  return messeKante(page, await kartenpunktAufSeite(page, ll), { rand: [9, 11], kante: [11, 14] });
 }
 
 /**

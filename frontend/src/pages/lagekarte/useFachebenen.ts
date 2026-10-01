@@ -199,7 +199,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
               : def.klassenfarben
                 ? def.klassenfarben.faerbe(roh, token)
                 : roh;
-          return { def, daten, farbe: fachebeneFarbe(k, token) };
+          return { def, daten, farbe: fachebeneFarbe(k, token), treffer: token.controlHeight };
         });
 
       const fachebenenStatus: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};

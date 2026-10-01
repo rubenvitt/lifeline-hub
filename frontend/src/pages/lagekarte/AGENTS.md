@@ -17,7 +17,13 @@ diese Zusage.
   rundet vorsichtshalber auf `keine`/Alarm); „keine" = keine Stufe gesetzt. Kollision des
   `zonen-label` ist nicht abgesichert (eigene Entscheidung).
 - **Trefferzone `controlHeight`** an jedem Marker (`KarteMarker.trefferDurchmesser`,
-  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante. Bild-Ziehgriffe
+  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante. **Fachebenen-Punkte
+  und -Bündel ebenso** (LFH-600,
+  `openspec/changes/archive/2026-10-01-lfh-600-fachebenen-punkte-trefferzone/design.md`):
+  `fachebene-<key>-treffer` aus `AktiveFachebene.treffer`, Rolle `fachebeneTreffer`, gleichrangig
+  mit der Marker-Zone (der nächste Punkt gewinnt); der gezeichnete Radius bleibt die Stufe und
+  wächst nie mit der Dichte. Kontur als Doppelkante wie bei Personen (2 px weiß am Kreis, 2 px
+  Schwarz als `-kante` darunter), Nachweis `e2e/fachebenen-kontrast.spec.ts`. Bild-Ziehgriffe
   (`pages/lagekarte/bildGriffe.ts`) in `max(controlHeight, 44)`, je Modus scharf, Moduswechsel
   wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
   Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).

@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ConfigProvider } from 'antd';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { neuerQueryClient } from '../../test/utils';
@@ -213,22 +214,27 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
   };
 });
 
-function wrapper() {
+function wrapper(controlHeight?: number) {
   const client = neuerQueryClient();
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  );
+  return ({ children }: { children: ReactNode }) => {
+    const inhalt = <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    return controlHeight === undefined ? (
+      inhalt
+    ) : (
+      <ConfigProvider theme={{ token: { controlHeight } }}>{inhalt}</ConfigProvider>
+    );
+  };
 }
 
 // Die Sichtbarkeit ist externer State (useKartenAnsicht); im Test hält ihn ein kontrollierter
 // useState, damit onFachebeneToggle den Hook re-rendert.
-function rendere() {
+function rendere(controlHeight?: number) {
   return renderHook(
     () => {
       const [sichtbar, setSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
       return useFachebenen({ fachebenenSichtbar: sichtbar, setFachebenenSichtbar: setSichtbar });
     },
-    { wrapper: wrapper() },
+    { wrapper: wrapper(controlHeight) },
   );
 }
 
@@ -243,6 +249,16 @@ describe('useFachebenen', () => {
     const { result } = rendere();
     expect(result.current.aktiveFachebenen).toHaveLength(0);
     expect(result.current.fachebenenAttribution).toHaveLength(0);
+  });
+
+  it('gibt jeder aktiven Ebene den Staffelwert der Dichte als Trefferzone mit (LFH-600)', async () => {
+    // 72 = Handschuh-Stufe; ein Wert, den der antd-Default (32) nicht hat.
+    const { result } = rendere(72);
+    act(() => result.current.onFachebeneToggle('pegelonline', true));
+    await waitFor(() =>
+      expect(result.current.aktiveFachebenen.map((f) => f.def.key)).toContain('pegelonline'),
+    );
+    for (const fe of result.current.aktiveFachebenen) expect(fe.treffer, fe.def.key).toBe(72);
   });
 
   it('aktiviert nina → Layer-Daten, Status und Attribution aus der Query', async () => {

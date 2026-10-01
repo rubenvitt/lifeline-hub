@@ -506,7 +506,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       for (const fe of fachebenenRef.current) {
-        sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe);
+        sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
       }
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
@@ -896,7 +896,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       // aktive an-/nachlegen + Daten setzen
       for (const fe of aktiv) {
-        sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe);
+        sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
         setzeFachebeneDaten(map, fe.def.key, fe.daten);
       }
       vorherigeFachebenenRef.current = aktivKeys as Set<string>;
@@ -1194,6 +1194,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    // Kreis und Trefferzone (LFH-600) liegen ineinander: wer den Kreis nach außen verlässt, steht
+    // noch in der Zone. Der Zeiger folgt deshalb der Menge der berührten Ebenen, nicht dem letzten
+    // `mouseleave`.
+    const beruehrt = new Set<string>();
     const binds = (fachebenen ?? [])
       .flatMap((fe) => fachebeneClickLayerIds(fe.def).map((id) => ({ id, fe })))
       .map(({ id, fe }) => {
@@ -1239,10 +1243,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           onFachebeneKlick?.(aus.props, quelle, aus.geometrie);
         };
         const enter = () => {
+          beruehrt.add(id);
           map.getCanvas().style.cursor = 'pointer';
         };
         const leave = () => {
-          map.getCanvas().style.cursor = '';
+          beruehrt.delete(id);
+          if (beruehrt.size === 0) map.getCanvas().style.cursor = '';
         };
         map.on('click', id, klick);
         map.on('mouseenter', id, enter);

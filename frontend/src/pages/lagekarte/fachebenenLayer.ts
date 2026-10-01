@@ -23,6 +23,21 @@ const BUENDEL_RADIUS = ['step', ['get', 'anzahl'], 12, 10, 15, 100, 18, 1000, 22
 /** Ein Feature darf seine Farbe selbst mitbringen (`hochwasserStil.ts`); sonst die Ebenenfarbe. */
 const punktFarbe = (farbe: string) => ['coalesce', ['get', 'farbe'], farbe];
 
+/** Ein Feature darf seinen Radius selbst mitbringen — bei Hochwasser, Luftqualität und ODL die Stufe. */
+const PUNKT_RADIUS = ['coalesce', ['get', 'radius'], 5];
+
+/**
+ * Doppelkante (LFH-600) wie bei den Personen-Markern (`KANTE_PAINT` in `markerLayer.ts`): 2 px Weiß
+ * als Rand am Zeichen, darunter 2 px Schwarz als eigene Ebene, also Zeichenradius + 4. Weiß und
+ * Schwarz nebeneinander halten gegen jeden Kartengrund max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58
+ * : 1 (WCAG 1.4.11), auch auf Online-Styles, deren Farben niemand vorher kennt. Bewusst `'#000'`
+ * statt eines Tokens: die Kante ist Kontur, keine Status- oder Ebenenaussage.
+ */
+const RAND_BREITE = 2;
+const KANTE_BREITE = 2;
+const KANTE_FARBE = '#000';
+const mitKante = (radius: unknown) => ['+', radius, RAND_BREITE + KANTE_BREITE];
+
 /**
  * Idempotent: Source + (Polygon: fill/line | Punkt: circle)-Layer je Fachebene. `farbe` ist die
  * Ebenenfarbe des aktiven Modus (`fachebeneFarbe`, LFH-593); an schon bestehenden Layern wird sie
@@ -33,6 +48,7 @@ export function sorgeFuerFachebeneLayer(
   def: FachebeneDef,
   daten: FeatureCollection,
   farbe: string,
+  treffer: number,
 ) {
   const src = fachebeneSourceId(def.key);
   if (!map.getSource(src)) {
@@ -79,6 +95,27 @@ export function sorgeFuerFachebeneLayer(
       });
     }
   } else {
+    // Unsichtbare Trefferzone (LFH-600), zuunterst: Durchmesser = `controlHeight` der Dichtestufe wie
+    // bei den Markern (LFH-711), unabhängig vom gezeichneten Radius, der die Stufe trägt. Ohne Filter
+    // — Einzelpunkt, Client-Bündel und Server-Sammelpunkt tragen sie gleich. MapLibre prüft beim
+    // Klick die Geometrie, nicht die Deckkraft; `klickziel.ts` ordnet sie als `fachebeneTreffer`.
+    if (!map.getLayer(`fachebene-${def.key}-treffer`)) {
+      map.addLayer({
+        id: `fachebene-${def.key}-treffer`,
+        type: 'circle',
+        source: src,
+        paint: { 'circle-radius': treffer / 2, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+      });
+    }
+    if (def.buendeln && !map.getLayer(`fachebene-${def.key}-buendel-kante`)) {
+      map.addLayer({
+        id: `fachebene-${def.key}-buendel-kante`,
+        type: 'circle',
+        source: src,
+        filter: IST_BUENDEL as never,
+        paint: { 'circle-radius': mitKante(BUENDEL_RADIUS) as never, 'circle-color': KANTE_FARBE },
+      });
+    }
     if (def.buendeln && !map.getLayer(`fachebene-${def.key}-buendel`)) {
       map.addLayer({
         id: `fachebene-${def.key}-buendel`,
@@ -89,7 +126,7 @@ export function sorgeFuerFachebeneLayer(
           'circle-color': farbe,
           'circle-radius': BUENDEL_RADIUS as never,
           'circle-stroke-color': farbenHell.flaeche,
-          'circle-stroke-width': 2,
+          'circle-stroke-width': RAND_BREITE,
         },
       });
     }
@@ -118,26 +155,41 @@ export function sorgeFuerFachebeneLayer(
         },
       });
     }
+    // Bei gebündelten Ebenen nur die Einzelobjekte — Bündel zeichnen die Layer oben.
+    const einzelFilter = def.buendeln ? { filter: IST_EINZEL as never } : {};
+    // Größer zeichnet oben: Hochwasser und ODL tragen ihre Stufe im Radius, ohne Schlüssel
+    // deckte ein später gezeichneter kleiner Nachbar einen großen Alarm-Punkt zu. Die Kante
+    // sortiert gleich, sonst läge die schwarze Kante eines großen Punkts unter der eines kleinen.
+    const sortierung = { 'circle-sort-key': ['coalesce', ['get', 'radius'], 0] };
+    if (!map.getLayer(`fachebene-${def.key}-kante`)) {
+      map.addLayer({
+        id: `fachebene-${def.key}-kante`,
+        type: 'circle',
+        source: src,
+        ...einzelFilter,
+        layout: sortierung as never,
+        paint: { 'circle-radius': mitKante(PUNKT_RADIUS) as never, 'circle-color': KANTE_FARBE },
+      });
+    }
     if (!map.getLayer(`fachebene-${def.key}-circle`)) {
       map.addLayer({
         id: `fachebene-${def.key}-circle`,
         type: 'circle',
         source: src,
-        // Bei gebündelten Ebenen nur die Einzelobjekte — Bündel zeichnen die zwei Layer oben.
-        ...(def.buendeln ? { filter: IST_EINZEL as never } : {}),
-        // Größer zeichnet oben: Hochwasser und ODL tragen ihre Stufe im Radius, ohne Schlüssel
-        // deckte ein später gezeichneter kleiner Nachbar einen großen Alarm-Punkt zu.
-        layout: { 'circle-sort-key': ['coalesce', ['get', 'radius'], 0] },
+        ...einzelFilter,
+        layout: sortierung as never,
         paint: {
           // Ein Feature darf Durchmesser und Farbe selbst mitbringen (`hochwasserStil.ts` backt die
           // aufgelösten Tokenwerte ein). Ohne Eigenangabe gilt die Ebenenfarbe.
-          'circle-radius': ['coalesce', ['get', 'radius'], 5],
+          'circle-radius': PUNKT_RADIUS as never,
           'circle-color': punktFarbe(farbe) as never,
           'circle-stroke-color': '#fff',
-          'circle-stroke-width': 1.5,
+          'circle-stroke-width': RAND_BREITE,
         },
       });
     }
+    // Ein Dichtewechsel legt keinen Layer neu an — der Radius der Zone wird nachgezogen.
+    map.setPaintProperty(`fachebene-${def.key}-treffer`, 'circle-radius', treffer / 2);
   }
   zieheEbenenfarbeNach(map, def.key, farbe);
 }
@@ -164,7 +216,10 @@ const layerIds = (key: FachebeneQuelle) => [
   `fachebene-${key}-fill`,
   `fachebene-${key}-line`,
   `fachebene-${key}-circle`,
+  `fachebene-${key}-kante`,
+  `fachebene-${key}-treffer`,
   `fachebene-${key}-buendel`,
+  `fachebene-${key}-buendel-kante`,
   `fachebene-${key}-buendel-zahl`,
 ];
 
@@ -188,13 +243,15 @@ export function setzeFachebeneDaten(
 }
 
 /**
- * Die anklickbaren Layer einer Fachebene (Polygon → Fläche, Punkt → Kreis, gebündelt zusätzlich der
- * Bündel-Kreis). Die Zahl liegt auf dem Kreis und ist kein eigenes Ziel.
+ * Die anklickbaren Layer einer Fachebene (Polygon → Fläche, Punkt → Kreis und Trefferzone, gebündelt
+ * zusätzlich der Bündel-Kreis). Die Zahl liegt auf dem Kreis und ist kein eigenes Ziel, die Kante
+ * ist Kontur.
  */
 export function fachebeneClickLayerIds(def: FachebeneDef): string[] {
   if (def.geometrieTyp === 'polygon') return [`fachebene-${def.key}-fill`];
   const kreis = `fachebene-${def.key}-circle`;
-  return def.buendeln ? [kreis, `fachebene-${def.key}-buendel`] : [kreis];
+  const treffer = `fachebene-${def.key}-treffer`;
+  return def.buendeln ? [kreis, `fachebene-${def.key}-buendel`, treffer] : [kreis, treffer];
 }
 
 /** Was ein Klick auf ein Fachebenen-Feature auslöst (LFH-83). */

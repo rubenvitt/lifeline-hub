@@ -3026,6 +3026,272 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+/**
+ * LFH-600: Die Punkte der Fachebenen tragen eine unsichtbare Trefferzone der Staffel
+ * (`fachebene-<key>-treffer`), getrennt vom gezeichneten Kreis, dessen Radius die Stufe ist.
+ * HERMETISCH: jede Ebene antwortet per `page.route` mit Literalen in der Wire-Form von
+ * `api/types.generated.ts`; der echte Abruf mäße die Erreichbarkeit der Quelle.
+ *
+ * Die Probepunkte tragen die KLEINEN Stufen (Radius ≤ 5, Kante bis 9 px), damit der Versatz in
+ * `kompakt` (13 px, Zone 15) außerhalb alles Gezeichneten liegt. Der Radius-Kanal läuft über
+ * eigene Paare (klein/groß) weiter unten.
+ */
+const FACHEBENEN_PROBE = [
+  { key: 'pegelonline', schalter: 'Pegel / Hochwasser', titel: 'Probe Pegel', props: {} },
+  {
+    key: 'hochwasser',
+    schalter: 'Hochwasser-Meldeklassen (LHP)',
+    titel: 'Probe Hochwasser',
+    props: { klasse: 'kein_hochwasser' },
+  },
+  {
+    key: 'luftqualitaet',
+    schalter: 'Luftqualität (UBA)',
+    titel: 'Probe Luftqualität',
+    props: { klasse: 'gut' },
+  },
+  {
+    key: 'odl',
+    schalter: 'Strahlung / ODL (BfS)',
+    titel: 'Probe ODL',
+    props: { stufe: 'normal' },
+  },
+  {
+    key: 'autobahn',
+    schalter: 'Autobahn-Lage (BAB)',
+    titel: 'Probe Autobahn',
+    props: { kategorie: 'baustelle' },
+  },
+  {
+    key: 'kritis',
+    schalter: 'KRITIS / sensible Objekte',
+    titel: 'Probe KRITIS',
+    props: { kategorie: 'krankenhaus' },
+  },
+  {
+    key: 'energie',
+    schalter: 'Energieanlagen',
+    titel: 'Probe Energie',
+    props: { anlagenart: 'wind' },
+  },
+] as const;
+
+/** Die Probepunkte stehen 0,01° auseinander auf einer Linie — bei Zoom 16 gut 200 px. */
+const probeOrt = (i: number): [number, number] => [9.2 + i * 0.01, 49.4];
+
+/** Paare für den Radius-Kanal: klein und groß derselben Ebene, weit genug auseinander. */
+const STUFENPAARE = [
+  { key: 'hochwasser', klein: { klasse: 'kein_hochwasser' }, gross: { klasse: 'sehr_gross' } },
+  { key: 'luftqualitaet', klein: { klasse: 'sehr_gut' }, gross: { klasse: 'sehr_schlecht' } },
+] as const;
+const paarOrt = (key: string, groesse: 'klein' | 'gross'): [number, number] => [
+  9.2 + (key === 'hochwasser' ? 0 : 0.02) + (groesse === 'gross' ? 0.01 : 0),
+  49.43,
+];
+
+/** Gezeichnete Ebenen aller Punkt-Fachebenen — für „am Versatz ist nichts gezeichnet". */
+const FACHEBENEN_GEZEICHNET = FACHEBENEN_PROBE.flatMap(({ key }) => [
+  `fachebene-${key}-circle`,
+  `fachebene-${key}-kante`,
+  ...(key === 'kritis' ? ['fachebene-kritis-buendel', 'fachebene-kritis-buendel-kante'] : []),
+]);
+
+/** KRITIS als Bündel: vier Objekte an einer Stelle (gesetzt vom Bündel-Test). */
+let kritisBuendelOrt: [number, number] | null = null;
+
+async function fachebenenBeantworten(page: Page) {
+  for (const [i, { key, titel, props }] of FACHEBENEN_PROBE.entries()) {
+    await page.route(`**/api/karte/fachebenen/${key}**`, (route) => {
+      const punkt = (ll: [number, number], p: Record<string, unknown>) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: ll },
+        properties: p,
+      });
+      const features = [punkt(probeOrt(i), { titel, name: titel, ...props })];
+      for (const paar of STUFENPAARE) {
+        if (paar.key !== key) continue;
+        features.push(punkt(paarOrt(key, 'klein'), { titel: `${titel} klein`, ...paar.klein }));
+        features.push(punkt(paarOrt(key, 'gross'), { titel: `${titel} groß`, ...paar.gross }));
+      }
+      if (key === 'kritis' && kritisBuendelOrt) {
+        for (const n of [0, 1, 2, 3]) {
+          features.push(
+            punkt([kritisBuendelOrt[0] + n * 1e-7, kritisBuendelOrt[1]], {
+              name: `Bündel ${n}`,
+              kategorie: 'krankenhaus',
+            }),
+          );
+        }
+      }
+      return route.fulfill({
+        json: {
+          quelle: key,
+          status: 'ok',
+          attribution: `© Probe ${key}`,
+          abgerufen: new Date().toISOString(),
+          features: { type: 'FeatureCollection', features },
+        },
+      });
+    });
+  }
+}
+
+/** Fachebenen-Paneel auf und jede Probe-Ebene sichtbar (die Wahl übersteht den Neuladen nicht
+ *  sicher — geschaltet wird nur, was aus ist). */
+async function fachebenenAn(page: Page) {
+  const kopf = page.locator('section[data-paneel="fachebenen"] button[aria-expanded]').first();
+  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+  await expect(kopf).toHaveAttribute('aria-expanded', 'true');
+  for (const { schalter } of FACHEBENEN_PROBE) {
+    const knopf = page.getByRole('switch', { name: schalter });
+    if ((await knopf.getAttribute('aria-checked')) !== 'true') await knopf.click();
+    await expect(knopf).toHaveAttribute('aria-checked', 'true');
+  }
+}
+
+test('Lagekarte (LFH-600): Punkt-Fachebenen tragen die Trefferzone der Staffel, der Radius bleibt die Stufe', async ({
+  page,
+}) => {
+  test.setTimeout(420_000);
+  await page.setViewportSize(FUEKW);
+  await fachebenenBeantworten(page);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 600 Fachebenen ${Date.now()}`);
+  const auswahl = (name: string) =>
+    page.locator('[data-lfh="auswahl"]').getByRole('heading', { name, exact: true });
+  const gezeichnet = [...GEZEICHNETE_KLICKEBENEN, ...FACHEBENEN_GEZEICHNET];
+  // Versatz je Stufe: innerhalb der Zone (Radius = Boden/2), außerhalb alles Gezeichneten.
+  const VERSATZ = { kompakt: 13, komfortabel: 21, handschuh: 32 } as const;
+  const GEGENPROBE = 23;
+  const gemessen: string[] = [];
+
+  for (const { dichte } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await stelleDichte(page, dichte);
+    await karteBereit(page);
+    await fachebenenAn(page);
+    await page.getByTestId('kartenflaeche').locator('canvas').scrollIntoViewIfNeeded();
+
+    for (const [i, { key, titel }] of FACHEBENEN_PROBE.entries()) {
+      // Zoom 16: über `clusterMaxZoom` (KRITIS steht einzeln) und über den Mindest-Zooms der
+      // bbox-Ebenen (KRITIS, Energie).
+      await springe(page, probeOrt(i), 16);
+      const zone = `fachebene-${key}-treffer`;
+      await expect
+        .poll(async () => merkmaleAm(page, await aufSeite(page, probeOrt(i)), [zone]), {
+          message: `${key}: Punkt erscheint (${dichte})`,
+          timeout: 20_000,
+        })
+        .toBe(1);
+      const mitte = await aufSeite(page, probeOrt(i));
+      const daneben = { x: mitte.x, y: mitte.y - VERSATZ[dichte] };
+      expect(
+        await merkmaleAm(page, daneben, gezeichnet),
+        `${key}: am Versatz ${VERSATZ[dichte]}px liegt nichts Gezeichnetes (${dichte})`,
+      ).toBe(0);
+      expect(
+        await merkmaleAm(page, daneben, [zone]),
+        `${key}: Versatz in der Zone (${dichte})`,
+      ).toBe(1);
+      // Der Mauszeiger kündigt die Zone an: vom Punkt nach außen bleibt er „pointer“, auch wenn
+      // der gezeichnete Kreis verlassen ist (Review LFH-600).
+      await page.mouse.move(mitte.x, mitte.y);
+      await page.mouse.move(daneben.x, daneben.y, { steps: 4 });
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte.getCanvas().style.cursor,
+        ),
+        `${key}: Zeiger über der Zone (${dichte})`,
+      ).toBe('pointer');
+      await page.mouse.click(daneben.x, daneben.y);
+      await expect(
+        auswahl(titel),
+        `${key}: Versatzklick öffnet die Detailansicht (${dichte})`,
+      ).toBeVisible();
+      await kartenRuht(page);
+
+      if (dichte === 'kompakt') {
+        // Gegenprobe: 30-px-Zone, Radius 15 — 23 px liegt außerhalb.
+        await springe(page, probeOrt(i), 16);
+        const m = await aufSeite(page, probeOrt(i));
+        expect(
+          await merkmaleAm(page, { x: m.x, y: m.y - GEGENPROBE }, [zone, ...gezeichnet]),
+          `${key}: kompakt ${GEGENPROBE}px außerhalb`,
+        ).toBe(0);
+      }
+    }
+    gemessen.push(`${dichte}: Versatzklick ${VERSATZ[dichte]}px trifft alle 7 Ebenen`);
+
+    // Radius-Kanal: der gezeichnete Kreis ist in jeder Stufe gleich groß, klein ≠ groß.
+    // Kreis bis Radius + 2 (weißer Rand): klein ≤ 6, groß ≥ 11 — der Abstand 8 trennt.
+    for (const { key } of STUFENPAARE) {
+      await springe(page, paarOrt(key, 'klein'), 16);
+      const kreis = [`fachebene-${key}-circle`];
+      const neben = async (groesse: 'klein' | 'gross') => {
+        const m = await aufSeite(page, paarOrt(key, groesse));
+        return merkmaleAm(page, { x: m.x, y: m.y - 8 }, kreis);
+      };
+      await springe(page, paarOrt(key, 'gross'), 16);
+      expect(await neben('gross'), `${key}: großer Kreis reicht über 8 px (${dichte})`).toBe(1);
+      await springe(page, paarOrt(key, 'klein'), 16);
+      expect(await neben('klein'), `${key}: kleiner Kreis endet vor 8 px (${dichte})`).toBe(0);
+    }
+    gemessen.push(`${dichte}: Stufenkreise klein < 8 px < groß`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Lagekarte (LFH-600): im Handschuh-Modus zoomt ein Tipp neben ein KRITIS-Bündel hinein', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize(FUEKW);
+  await fachebenenBeantworten(page);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 600 Bündel ${Date.now()}`);
+  kritisBuendelOrt = [9.25, 49.46];
+  try {
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await stelleDichte(page, 'handschuh');
+    await karteBereit(page);
+    await fachebenenAn(page);
+    await page.getByTestId('kartenflaeche').locator('canvas').scrollIntoViewIfNeeded();
+    // Zoom 13: unter `clusterMaxZoom` (14), die vier Objekte bündeln sich.
+    await springe(page, kritisBuendelOrt, 13);
+    await expect
+      .poll(
+        async () =>
+          merkmaleAm(page, await aufSeite(page, kritisBuendelOrt!), ['fachebene-kritis-buendel']),
+        { message: 'KRITIS-Bündel erscheint', timeout: 20_000 },
+      )
+      .toBe(1);
+    const mitte = await aufSeite(page, kritisBuendelOrt);
+    // Bündel mit vier Objekten: Radius 12, Kante bis 16 — 30 px liegt außerhalb, in der Zone (36).
+    const daneben = { x: mitte.x - 30, y: mitte.y };
+    expect(
+      await merkmaleAm(page, daneben, [...GEZEICHNETE_KLICKEBENEN, ...FACHEBENEN_GEZEICHNET]),
+      'neben dem Bündel ist nichts gezeichnet',
+    ).toBe(0);
+    expect(await merkmaleAm(page, daneben, ['fachebene-kritis-treffer'])).toBe(1);
+    const zoom = () =>
+      page.evaluate(() =>
+        (window as unknown as { __lfhKarte: { getZoom(): number } }).__lfhKarte.getZoom(),
+      );
+    const vorher = await zoom();
+    await page.mouse.click(daneben.x, daneben.y);
+    await expect
+      .poll(zoom, { message: 'der Tipp neben das Bündel zoomt hinein', timeout: 10_000 })
+      .toBeGreaterThan(vorher + 0.5);
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `handschuh: Tipp 30 px neben dem Bündel zoomt von ${vorher.toFixed(1)} hinein`,
+    });
+  } finally {
+    kritisBuendelOrt = null;
+  }
+});
+
 test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszeilen die Staffel', async ({
   page,
 }) => {

@@ -4,7 +4,8 @@
  * handelt nur als Gewinner. Rangfolge:
  *  1. das oberste GEZEICHNETE Punktziel (Markerzeichen samt Plakette, aufgefächertes Zeichen,
  *     Personen-Cluster, Fachebenen-Punkt oder -Bündel),
- *  2. sonst eine Trefferzone — der Marker, dessen Punkt dem Tipp am nächsten liegt,
+ *  2. sonst eine Trefferzone — die eines Markers oder eines Fachebenen-Punkts (LFH-600); das Ziel,
+ *     dessen Punkt dem Tipp am nächsten liegt, gewinnt, gleich welcher Art,
  *  3. sonst die Flächen (Zone, Abschnitt, Fachebenen-Fläche): genau eine wird direkt gewählt, zwei
  *     oder mehr verschiedene melden sich als `mehrdeutig` — dann wählt der Mensch im Menü (LFH-812),
  *     denn keine Rangfolge unter übereinanderliegenden Flächen trifft immer, was er meint.
@@ -32,6 +33,7 @@ export type Klickebene =
   | 'treffer'
   | 'personenCluster'
   | 'fachebene'
+  | 'fachebeneTreffer'
   | 'zone'
   | 'abschnitt'
   | 'fachebeneFlaeche';
@@ -48,6 +50,9 @@ export function ordneKlickebene(layerId: string): Klickebene | null {
   if (layerId === ABSCHNITT_KLICK_LAYER) return 'abschnitt';
   // Namensschema aus `fachebenenLayer.ts` (`fachebeneClickLayerIds`).
   if (/^fachebene-.+-(circle|buendel)$/.test(layerId)) return 'fachebene';
+  // Unsichtbare Trefferzone eines Fachebenen-Punkts oder -Bündels (LFH-600). Die Kantenebenen
+  // (`-kante`, `-buendel-kante`) sind Kontur und bleiben ohne Rolle.
+  if (/^fachebene-.+-treffer$/.test(layerId)) return 'fachebeneTreffer';
   if (/^fachebene-.+-fill$/.test(layerId)) return 'fachebeneFlaeche';
   return null;
 }
@@ -143,8 +148,14 @@ export function entscheideKlickziel<F extends Merkmal>(
   }
   if (oben?.ebene === 'fachebene') return { art: 'fachebene', merkmal: oben.merkmal };
 
-  const zone = naechster(['treffer']);
-  if (zone) return { art: 'marker', merkmal: zone };
+  // Marker- und Fachebenen-Zonen gleichrangig: der nächste Punkt gewinnt (LFH-600). Oben im
+  // Marker-Zweig zählt eine Fachebenen-Zone bewusst nicht mit — sie käme dort als Marker zurück.
+  const zone = naechster(['treffer', 'fachebeneTreffer']);
+  if (zone) {
+    return ordneKlickebene(zone.layer.id) === 'fachebeneTreffer'
+      ? { art: 'fachebene', merkmal: zone }
+      : { art: 'marker', merkmal: zone };
+  }
 
   const flaechen = flaechenAm(eingeordnet);
   if (flaechen.length === 0) return null;

@@ -122,6 +122,66 @@ describe('entscheideKlickziel', () => {
     });
   });
 
+  // LFH-600: Fachebenen-Punkte tragen eine Trefferzone wie Marker, gleichrangig mit deren Zone.
+  describe('Trefferzone eines Fachebenen-Punkts (LFH-600)', () => {
+    const pegelZone = punkt('fachebene-pegelonline-treffer', 10, { uuid: 'p1' });
+
+    it('allein gewinnt sie als Fachebenen-Ziel', () => {
+      expect(entscheideKlickziel([pegelZone], klick, projiziere)).toEqual({
+        art: 'fachebene',
+        merkmal: pegelZone,
+      });
+    });
+
+    it('überlappend mit einer Marker-Zone gewinnt das nähere Ziel, in beide Richtungen', () => {
+      const fernerMarker = zoneVon('fern', 30);
+      expect(entscheideKlickziel([fernerMarker, pegelZone], klick, projiziere)).toEqual({
+        art: 'fachebene',
+        merkmal: pegelZone,
+      });
+      const naherMarker = zoneVon('nah', 4);
+      expect(entscheideKlickziel([pegelZone, naherMarker], klick, projiziere)).toEqual({
+        art: 'marker',
+        merkmal: naherMarker,
+      });
+    });
+
+    it('ein gezeichnetes Markerzeichen schlägt sie und kommt nie als Fachebene zurück', () => {
+      const nahePegelZone = punkt('fachebene-pegelonline-treffer', 0, { uuid: 'p1' });
+      const fernesZeichen = punkt('marker-symbol', 20, { schluessel: 'einheit-1' });
+      expect(entscheideKlickziel([fernesZeichen, nahePegelZone], klick, projiziere)).toEqual({
+        art: 'marker',
+        merkmal: fernesZeichen,
+      });
+    });
+
+    it('ein gezeichneter Fachebenen-Punkt schlägt sie', () => {
+      const zoneNah = punkt('fachebene-hochwasser-treffer', 0, { uuid: 'h1' });
+      expect(entscheideKlickziel([zoneNah, pegel], klick, projiziere)).toEqual({
+        art: 'fachebene',
+        merkmal: pegel,
+      });
+    });
+
+    it('sie schlägt Flächen ohne Auswahlmenü', () => {
+      expect(
+        entscheideKlickziel(
+          [flaeche('fachebene-dwd-fill', 1), pegelZone, flaeche('zonen-fill', 3)],
+          klick,
+          projiziere,
+        ),
+      ).toEqual({ art: 'fachebene', merkmal: pegelZone });
+    });
+
+    it('ein Bündel trägt seine Zone mit den Bündel-Properties', () => {
+      const buendelZone = punkt('fachebene-kritis-treffer', 10, { cluster: true, cluster_id: 4 });
+      expect(entscheideKlickziel([buendelZone], klick, projiziere)).toEqual({
+        art: 'fachebene',
+        merkmal: buendelZone,
+      });
+    });
+  });
+
   it('Markerzeichen über einer Zone: nur der Marker', () => {
     expect(entscheideKlickziel([einheit, flaeche('zonen-fill', 3)], klick, projiziere)).toEqual({
       art: 'marker',
@@ -297,6 +357,11 @@ describe('ordneKlickebene', () => {
     expect(ordneKlickebene('fachebene-kritis-buendel')).toBe('fachebene');
     expect(ordneKlickebene('fachebene-kritis-circle')).toBe('fachebene');
     expect(ordneKlickebene('fachebene-dwd-fill')).toBe('fachebeneFlaeche');
+    expect(ordneKlickebene('fachebene-pegelonline-treffer')).toBe('fachebeneTreffer');
+    expect(ordneKlickebene('fachebene-kritis-treffer')).toBe('fachebeneTreffer');
+    // Die Doppelkante (LFH-600) ist Kontur, kein Ziel — die Trefferzone deckt sie ab.
+    expect(ordneKlickebene('fachebene-pegelonline-kante')).toBeNull();
+    expect(ordneKlickebene('fachebene-kritis-buendel-kante')).toBeNull();
     expect(ordneKlickebene('zonen-line-gestrichelt')).toBe('zone');
     expect(ordneKlickebene('abschnitte-fill')).toBe('abschnitt');
     expect(ordneKlickebene('irgendwas')).toBeNull();
@@ -322,5 +387,9 @@ describe('Klickebenen-Guard (LFH-764)', () => {
     // Die Fachebenen tragen Punkte UND Flächen — sonst prüfte der Guard nur eine Sorte.
     expect(ebenen.some((id) => ordneKlickebene(id) === 'fachebene')).toBe(true);
     expect(ebenen.some((id) => ordneKlickebene(id) === 'fachebeneFlaeche')).toBe(true);
+    // Jede Punkt-Fachebene hängt ihren Klick-Hörer auch an die Trefferzone (LFH-600).
+    for (const def of Object.values(FACHEBENEN).filter((d) => d.geometrieTyp === 'punkt')) {
+      expect(fachebeneClickLayerIds(def), def.key).toContain(`fachebene-${def.key}-treffer`);
+    }
   });
 });
