@@ -9,6 +9,7 @@ import {
   ERWARTETER_BENUTZER_HEADER,
   NetzFehler,
   OFFLINE_QUEUE_BENUTZER_HEADER,
+  apiDatei,
   apiGet,
   apiSend,
   apiUpload,
@@ -78,6 +79,54 @@ describe('apiGet', () => {
       new DOMException('Verbindung abgebrochen', 'AbortError'),
     );
     await expect(apiGet('/api/abgebrochen')).rejects.toBeInstanceOf(NetzFehler);
+  });
+});
+
+describe('apiDatei', () => {
+  it('liefert den Rumpf als Blob mit dem Inhaltstyp des Servers', async () => {
+    server.use(
+      http.get(
+        '/api/export',
+        () =>
+          new HttpResponse('a;b\n1;2\n', {
+            headers: { 'Content-Type': 'text/csv; charset=utf-8' },
+          }),
+      ),
+    );
+    const datei = await apiDatei('/api/export');
+    expect(await datei.text()).toBe('a;b\n1;2\n');
+    expect(datei.type).toMatch(/^text\/csv/);
+  });
+
+  it('wirft ApiError mit Server-Meldung, statt die Fehlerantwort als Datei zu liefern', async () => {
+    server.use(
+      http.get('/api/export', () => HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 })),
+    );
+    await expect(apiDatei('/api/export')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 403,
+      message: 'Kein Zugriff',
+    });
+  });
+
+  it('fragt am HTTP-Cache vorbei', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('x', { status: 200 }));
+    await apiDatei('/api/export');
+    expect(fetchSpy.mock.calls[0][1]).toMatchObject({ cache: 'no-store' });
+  });
+
+  it('nimmt ein eigenes Zeitlimit statt der 15 s', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    server.use(http.get('/api/export', () => new HttpResponse('x')));
+    await apiDatei('/api/export', { timeoutMs: 120_000 });
+    expect(timeout).toHaveBeenCalledWith(120_000);
+  });
+
+  it('ordnet einen Leitungsfehler als NetzFehler ein', async () => {
+    server.use(http.get('/api/export', () => HttpResponse.error()));
+    await expect(apiDatei('/api/export')).rejects.toBeInstanceOf(NetzFehler);
   });
 });
 

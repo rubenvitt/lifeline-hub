@@ -1,5 +1,6 @@
 import type { Tier, TierStatus, Spezies } from './types';
-import { apiGet, apiSend, mitParametern } from './client';
+import { apiDatei, apiGet, apiSend, mitParametern } from './client';
+import { EXPORT_TIMEOUT_MS } from './exportTimeout';
 import { patchBody } from './patchTriState';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
@@ -55,6 +56,11 @@ export function listeTiere(einsatzId: number, filter: TiereFilter = {}): Promise
       halter_person_id: filter.halterPersonId,
     }),
   );
+}
+
+/** CSV aller nicht stornierten Tiere des Einsatzes (`routes/einsatz_tier.rs`, `export`). */
+export function ladeTiereExport(einsatzId: number): Promise<Blob> {
+  return apiDatei(`/api/einsaetze/${einsatzId}/tiere/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
 }
 
 export function ladeTier(einsatzId: number, tierId: number): Promise<Tier> {

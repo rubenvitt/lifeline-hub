@@ -11,6 +11,7 @@ import TierePage from './TierePage';
 import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import * as dateiSpeichern from '../components/dateiSpeichern';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -233,6 +234,106 @@ describe('TierePage', () => {
     await screen.findByRole('heading', { name: /Tiere/ });
     expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
+  });
+
+  /**
+   * CSV-Export (LFH-728). Der Endpunkt verlangt nur Lesezugriff auf das Modul — dasselbe Recht
+   * wie die Liste. Der Knopf steht deshalb auch für Beobachter und im abgeschlossenen Einsatz.
+   */
+  describe('CSV-Export', () => {
+    it('lädt den Export und speichert ihn unter einem Dateinamen mit Einsatz', async () => {
+      const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+      server.use(
+        http.get(
+          '/api/einsaetze/1/tiere/export',
+          () => new HttpResponse('registrier_nr;status\nT-001;"aktiv"\n'),
+        ),
+      );
+      render(einsatzAktiv, [tierBasis]);
+      await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+
+      await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+      const [datei, name] = speichern.mock.calls[0];
+      expect(await (datei as Blob).text()).toContain('T-001');
+      expect(name).toMatch(/^tiere-einsatz-1-\d{4}-\d{2}-\d{2}-\d{4}\.csv$/);
+    });
+
+    it('steht auch für Beobachter im Kopf', async () => {
+      render(einsatzBeobachter, [tierBasis]);
+      await screen.findByText('T-001');
+      const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(kopf).not.toBeNull();
+      expect(within(kopf!).getByRole('button', { name: 'CSV exportieren' })).toBeInTheDocument();
+    });
+
+    it('zeigt einen Fehler an der Seite, nicht im Toast, und speichert nichts', async () => {
+      const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+      server.use(
+        http.get('/api/einsaetze/1/tiere/export', () =>
+          HttpResponse.json({ error: 'Kein Zugriff auf das Modul Tiere' }, { status: 403 }),
+        ),
+      );
+      render(einsatzAktiv, [tierBasis]);
+      await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+
+      const meldung = await screen.findByText('Kein Zugriff auf das Modul Tiere');
+      expect(meldung.closest('.ant-message')).toBeNull();
+      expect(meldung.closest('.ant-alert')).not.toBeNull();
+      expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
+      expect(speichern).not.toHaveBeenCalled();
+    });
+
+    it('räumt den Fehler beim nächsten Versuch', async () => {
+      vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+      let anfragen = 0;
+      server.use(
+        http.get('/api/einsaetze/1/tiere/export', () => {
+          anfragen += 1;
+          return anfragen === 1
+            ? HttpResponse.json({ error: 'Serverfehler beim Export' }, { status: 500 })
+            : new HttpResponse('registrier_nr\n');
+        }),
+      );
+      render(einsatzAktiv, [tierBasis]);
+      const knopf = await screen.findByRole('button', { name: 'CSV exportieren' });
+      await userEvent.click(knopf);
+      await screen.findByText('Serverfehler beim Export');
+
+      await userEvent.click(knopf);
+      await waitFor(() =>
+        expect(screen.queryByText('Serverfehler beim Export')).not.toBeInTheDocument(),
+      );
+    });
+
+    it('zeigt den Fehler aus Einsatz A nicht über der Liste von Einsatz B', async () => {
+      server.use(
+        http.get('/api/einsaetze/1/tiere/export', () =>
+          HttpResponse.json({ error: 'Export A gescheitert' }, { status: 500 }),
+        ),
+        http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
+        http.get('/api/einsaetze/2/tiere', () => HttpResponse.json([])),
+      );
+      server.use(
+        meHandler(nutzer),
+        http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+        http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([tierBasis])),
+      );
+      renderMitProviders(
+        <>
+          <Routes>
+            <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+          </Routes>
+          <EinsatzWechsel />
+        </>,
+        { route: '/einsaetze/1/tiere' },
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+      await screen.findByText('Export A gescheitert');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+      await screen.findByText('Keine Tiere in dieser Sicht');
+      expect(screen.queryByText('Export A gescheitert')).not.toBeInTheDocument();
+    });
   });
 
   it('Beobachter sieht keine Schreibaktionen', async () => {

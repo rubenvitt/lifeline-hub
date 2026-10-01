@@ -170,6 +170,32 @@ export async function apiGet<T>(pfad: string): Promise<T> {
   }
 }
 
+interface DateiOptionen {
+  /** Abbruch nach dieser Zeit. Default 15 s; ein Vollexport braucht mehr. */
+  timeoutMs?: number;
+}
+
+/**
+ * Lädt eine Datei (CSV-Export u. ä., LFH-728) als `Blob`. Fehler wie bei {@link apiGet}: der
+ * Aufrufer zeigt sie an der Seite, statt eine Fehlerantwort als Datei zu speichern.
+ *
+ * `no-store`, anders als `apiGet`: ein Export ist eine Momentaufnahme (der Personen-Export wird
+ * je Abruf auditiert) und hat im HTTP-Cache des Browsers nichts verloren.
+ */
+export async function apiDatei(pfad: string, optionen: DateiOptionen = {}): Promise<Blob> {
+  try {
+    const res = await fetch(pfad, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
+    });
+    if (!res.ok) return fehlerWerfen(res);
+    return await res.blob();
+  } catch (e) {
+    netzFehlerWerfen(e);
+  }
+}
+
 export interface UploadOptionen {
   /** Abbruch nach dieser Zeit. Default 15 s; große Dateien mit AV-Scan brauchen mehr. */
   timeoutMs?: number;
