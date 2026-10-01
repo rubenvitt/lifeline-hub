@@ -139,6 +139,36 @@ in Zeile 2 (`dichte.spec.ts:57-83`, `einstellungen-schmal.spec.ts:195-230`,
 `verwaltung-vereinheitlicht.spec.ts:66-69`) werden dabei auf Testtitel umgestellt, denn
 Zeilennummern veralten.
 
+### D8 — Befund der Messung und was diese Change davon behebt (01.10.2026)
+
+Eine Erkundung über alle Flächen in `handschuh` (äußere Hüllen, nicht die inneren `input` von
+Select und InputNumber) fand diese Ziele unter 72 px:
+
+| Ziel | gemessen (kompakt / handschuh) | Ursache | Entscheidung |
+| --- | --- | --- | --- |
+| Collapse-Kopf (Lagebericht, Einsatzdaten, Befehlsdetails) | 36 / 55 | antd rechnet `2 × paddingSM + fontSize + 8` | **hier**, Token `kopfzeilenMasse` in `antdKomponenten` |
+| Tab (Aufträge/Befehle) | 35,5 / 55 | wie Collapse | **hier**, dasselbe Token |
+| Raumwechsler (`EinstiegSwitcher`) | 34 / 33 | `height: auto` | **hier**, `wechslerStil` mit `minHeight` |
+| Schließen-× der ETB-Entwurfstabs | 15 × 24 / 15 × 24 | antds Vorgabe | **hier**, `removeIcon` mit `entfernenStil` |
+| beschriftete Checkbox | 21,5 / 36 | kein antd-Token für die Hülle | Folgeticket **LFH-907** |
+| Kennungs-Link in Tabellenzellen | 13–17 / 13–17 | `<a>` erbt keine Steuerhöhe | Folgeticket **LFH-908** |
+| Brotkrume im Seitenkopf | 20 / 20 | 12-px-Ortspfad | Folgeticket **LFH-909** |
+| Löschkreuz eines Select | 12 / 12 | antds Vorgabe | benannte Ausnahme: das Feld ist das gleichwertige Ziel |
+
+Entscheidung des Menschen am 01.10.2026: lokal und über Token beheben, den Rest als Folgetickets.
+Die Token-Korrektur folgt dem Muster `switchMasse` (LFH-380). Sie wirkt app-weit, weil jeder
+Collapse-Kopf und jeder Tab ein Bedienziel ist. Das Polster wächst nur so weit, dass die
+Steuerhöhe erreicht wird, und nie unter `paddingSM`. `kompakt` bleibt unverändert, und
+`komfortabel` steigt von 45 auf 48 px. Für die neuen Ziele gilt in `kompakt` der Boden aus Gate 3
+(24 px), nicht 30, denn ein Baumknoten trägt dort 24 px.
+
+Zwei Annahmen aus D5 trafen nicht zu und sind in den Tests angepasst: Die Segmente der
+`Segmentleiste` sind `radio`/`tab`, nicht `button`. „Einsatz-Vorgaben“ zeigt der Führungskraft
+„Speichern“ gesperrt statt gar nicht, also ist dort „gesperrt“ die Vorbedingung. Der
+Beobachter bekommt den Lagebericht als Leseansicht ohne Akkordeon. Gemessen wird dort die
+Druckaktion. Die „Aktionen der Belegungsliste“ im BR-Detail fallen aus der Delta-Spec heraus,
+weil sie ohne vorherige Zuweisung nicht stehen und die Zuweisung selbst gemessen ist.
+
 ## Risks / Trade-offs
 
 - [Die Suite wird länger: rund 20 neue Tests mit Anmeldung und Seed] → zwei Stufen statt drei
