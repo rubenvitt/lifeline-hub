@@ -12,23 +12,28 @@
 - [x] 2.3 Vor dem Verdrahten `grep -n -A6 '<Collapse' frontend/src` auf lokale `styles=`/`size=` durchsehen und Treffer im Commit vermerken. Prüfen: Liste steht in der Commit-Nachricht
 - [x] 2.4 Test in `theme/ThemeModeProvider.test.tsx`: in `handschuh` gerendertes `Collapse` trägt am Kopf `min-height: 72px` und `align-items: center`. Danach `collapse={…}` im `ThemeModeProvider` neben `button={knopf}` verdrahten (memoisiert wie `knopf`). Prüfen: erst rot, dann grün
 
-## 3. antds eigene Füße (D4)
+## 3. antds eigene Füße (D4, revidiert 01.10.2026)
 
-- [ ] 3.1 Test in `theme/tokens.test.ts`: `antdKomponenten(…).Modal.marginXS` und `.Popconfirm.marginXS` = 11 / 18 / 26, `.Modal.headerMarginBottom` = 3 / 5 / 7 (Literale), dazu die Ungleichungen ≥ 16 in `handschuh` und ≥ 8 in `komfortabel`. Prüfen: rot
-- [ ] 3.2 Test in `theme/ThemeModeProvider.test.tsx` (Muster „Switch folgt der Staffel bis in den CSS-Text“): in `handschuh` ein offenes `<Modal>` mit Standardfuß und ein offenes `Popconfirm` rendern. Das erzeugte CSS ihrer `css-var-…`-Klasse trägt `marginXS` = 26 px. Prüfen: rot
-- [ ] 3.3 `Modal`/`Popconfirm` in `antdKomponenten` ergänzen (Kommentar: welche antd-Regeln das trifft, welche Nebenwirkungen hingenommen sind, warum `headerMarginBottom` gepinnt ist). Prüfen: 3.1 und 3.2 grün. Bleibt 3.2 rot, weil die Überschreibung im cssVar-Modus nicht greift: anhalten, Rückweg D über `/opsx:update` mit dem Menschen klären
+Die erste Fassung (Komponenten-Token `marginXS`) war umgesetzt, griff im Browser aber nicht
+(Blase in `handschuh` 7 px; Begründung in `design.md`, D4, Alternativen). Sie wird hier
+zurückgebaut.
+
+- [x] 3.1 `Modal`/`Popconfirm`-Overrides (`antdFussfuge`) aus `antdKomponenten` in `theme/tokens.ts` entfernen, dazu ihre Tests in `theme/tokens.test.ts` („Fußfuge der antd-Füße …“) und `theme/ThemeModeProvider.test.tsx` („… bis in den CSS-Text“, Fehlbeleg). Prüfen: theme-Suite grün, `grep -n antdFussfuge frontend/src` leer
+- [x] 3.2 Quelltext-Test in `theme/tokens.test.ts` (Muster „Radio-Knopf: Text in bedienText“): `index.css` trägt eine Regel mit den drei Fußselektoren aus D4 (je mit `:root`-Präfix) und `margin-inline-start: var(--ant-padding)`. Prüfen: rot
+- [x] 3.3 Die Regel aus D4 mit Kommentar (warum Stilregel statt Token, warum `:root`) in `frontend/src/index.css` umsetzen. Prüfen: 3.2 grün; e2e „Dichte-Staffel …“ misst die Fuge der Blase ≥ 16 in `handschuh` und ≥ 8 in `komfortabel`
 
 ## 4. Nachweis im Browser
 
-- [ ] 4.1 `e2e/dokumente.spec.ts` „Dichte-Staffel …“: Klappkopf „Bezug (optional)“ ≥ `soll` zusichern; Fuge Abbrechen │ Ablegen ≥ 16 in `handschuh`, ≥ 8 in `komfortabel` zusichern (Böden als Literale in `STAFFEL`), `kompakt` weiter annotiert; den Kommentar „NUR GEMESSEN“ anpassen. Prüfen: die drei Tests grün
-- [ ] 4.2 Im selben Test die Bestätigungsblase „Dokument … entfernen“ öffnen und die Fuge zwischen ihren zwei Knöpfen mit denselben Böden zusichern; Messwert in die Annotation. Prüfen: grün in allen drei Stufen
-- [ ] 4.3 Mutationsprobe „Stufe festgenagelt → rot“: in `antdKlappkopf` und im Fußabstand von `antdKomponenten` `dichten.kompakt` statt `dichten[dichte]` einsetzen, e2e aus 4.1/4.2 und die Unit-Tests laufen lassen. Erwartet: `komfortabel`/`handschuh` rot. Zurückdrehen, Ergebnis hier vermerken
+- [x] 4.1 `e2e/dokumente.spec.ts` „Dichte-Staffel …“: Klappkopf „Bezug (optional)“ ≥ `soll` zusichern; Fuge Abbrechen │ Ablegen ≥ 16 in `handschuh`, ≥ 8 in `komfortabel` zusichern (Böden als Literale in `STAFFEL`), `kompakt` weiter annotiert; den Kommentar „NUR GEMESSEN“ anpassen. Prüfen: die drei Tests grün
+- [x] 4.2 Im selben Test die Bestätigungsblase „Dokument … entfernen“ öffnen und die Fuge zwischen ihren zwei Knöpfen mit denselben Böden zusichern; Messwert in die Annotation. Prüfen: grün in allen drei Stufen
+- [x] 4.3 Mutationsprobe „Stufe festgenagelt → rot“: in `antdKlappkopf` `dichten.kompakt` statt `dichten[dichte]` und in der Regel aus D4 `11px` statt `var(--ant-padding)` einsetzen, e2e aus 4.1/4.2 und die Unit-Tests laufen lassen. Erwartet: `komfortabel`/`handschuh` rot. Zurückdrehen, Ergebnis hier vermerken — **Ergebnis 01.10.2026:** beide Mutationen zusammen: Unit 3 rot (Klappkopf-Literale, Verdrahtung `handschuh`, Quelltext der Fußregel), e2e rot in `dokumente` komfortabel (Klappkopf 45 < 48) und handschuh (55 < 72) sowie im Standardfuß handschuh (Fuge 11 < 16); nur die CSS-Mutation: Rückfrage-Fuge handschuh 11 < 16 rot. `kompakt` blieb grün, wie erwartet. Zurückgedreht, alles wieder grün
+- [x] 4.5 (Nachtrag, Lücke im Plan) Neues `e2e/dialogfuss-dichte.spec.ts` für das Spec-Szenario „Dialog mit Standardfuß“: „Neue Ansicht“ auf der Lagekarte, Fuge ≥ 8 / ≥ 16, Knöpfe ≥ Steuerhöhe, Titelabstand unverändert 3 / 5 / 7 (Literale). Gemessen: Fuge 11 / 18 / 26, Knöpfe 30 / 48 / 72, Titelabstand 3 / 5 / 7. `modal.confirm` ist im e2e nicht erreichbar (nur nach 409-Konflikt); sein Selektor ist im Quelltext-Test aus 3.2 festgehalten
 - [ ] 4.4 Die übrigen e2e-Specs mit `Collapse` oder Rückfrage im Ablauf laufen lassen (mindestens `dokumente`, `gate3-trefflaeche`, `trefflaeche-tablet`, `personen-aufnahme`, `stab-checkliste`). Prüfen: grün
 
 ## 5. Regeln und Doku
 
-- [ ] 5.1 `frontend/AGENTS.md`: im Abschnitt „Tabelle und Dichte“ den Klappkopf-Boden über `antdKlappkopf` nennen; bei „Rot steht nicht bündig neben Neutralem“ die Fußfuge der Erfassungs-Hülle und der antd-Füße (`antdKomponenten`, Modal/Popconfirm) nennen. Prüfen: `prettier --check` auf `frontend/` grün
-- [ ] 5.2 `docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md`: Zeile 2 · 2 und Kriterium 2 der Fläche Dialog auf „erfüllt“ mit den neuen Messwerten und Verweis auf diese Change. Prüfen: die Messwerte stimmen mit der e2e-Annotation aus 4.1/4.2 überein
+- [x] 5.1 `frontend/AGENTS.md`: im Abschnitt „Tabelle und Dichte“ den Klappkopf-Boden über `antdKlappkopf` nennen; bei „Rot steht nicht bündig neben Neutralem“ die Fußfuge der Erfassungs-Hülle und der antd-Füße (Stilregel in `index.css`, Modal/`modal.confirm`/Popconfirm) nennen. Prüfen: `prettier --check` auf `frontend/` grün
+- [x] 5.2 `docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md`: Zeile 2 · 2 und Kriterium 2 der Fläche Dialog auf „erfüllt“ mit den neuen Messwerten und Verweis auf diese Change. Prüfen: die Messwerte stimmen mit der e2e-Annotation aus 4.1/4.2 überein
 
 ## 6. Gate
 

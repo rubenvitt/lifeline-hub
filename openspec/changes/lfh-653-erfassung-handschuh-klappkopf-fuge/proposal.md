@@ -30,11 +30,12 @@ Knopf neben „Abbrechen“; mit Handschuh trifft man leicht den falschen.
   (11 / 18 / 26 px), derselbe Abstand, den die Regel „Rot steht nicht bündig neben
   Neutralem“ schon für Aktionsreihen verlangt. Die Hülle kommt in den Abstands-Guard.
 - **Füße, die antd selbst baut:** Modal-Fuß, `modal.confirm` und `Popconfirm` trennen ihre
-  Knöpfe mit demselben Abstand 11 / 18 / 26 px, ebenfalls über den Kontext. Die
-  Titel-Abstände des Modals bleiben wie heute.
+  Knöpfe mit demselben Abstand 11 / 18 / 26 px, über eine globale Stilregel, die antds eigenes
+  Abstands-Token liest. Titel, Warnsymbol und übrige Abstände bleiben wie heute.
 - **Nachweis:** Playwright misst Klappkopf, Erfassungsfuß und die Bestätigungsblase in allen
-  drei Stufen mit Böden als Literalen. Unit-Tests pinnen die reinen Funktionen und das von
-  antd erzeugte CSS der Modal-Füße. Dazu kommt die Mutationsprobe „Stufe festgenagelt → rot“.
+  drei Stufen mit Böden als Literalen. Unit-Tests pinnen die reine Funktion des Klappkopfs, die
+  Verdrahtung im Kontext und die Stilregel der antd-Füße. Dazu kommt die Mutationsprobe „Stufe
+  festgenagelt → rot“.
 - **Regeln und Doku:** `frontend/AGENTS.md` nennt den Klappkopf-Boden und die Fußfuge. Die
   Prüfliste LFH-632 vermerkt Zeile 2 · 2 als eingelöst.
 
@@ -62,12 +63,12 @@ _Keine._
 
 ## Impact
 
-- **Frontend:** `frontend/src/theme/tokens.ts` (neue reine Funktion für den Klappkopf,
-  Modal- und Popconfirm-Tokens in `antdKomponenten`), `frontend/src/theme/ThemeModeProvider.tsx`
-  (Klappkopf-Stil am `ConfigProvider`), `frontend/src/components/Erfassung.tsx`
+- **Frontend:** `frontend/src/theme/tokens.ts` (neue reine Funktion für den Klappkopf),
+  `frontend/src/theme/ThemeModeProvider.tsx` (Klappkopf-Stil am `ConfigProvider`),
+  `frontend/src/index.css` (Fußfuge der antd-Füße), `frontend/src/components/Erfassung.tsx`
   (Fußabstand).
-- **Tests:** `frontend/src/theme/tokens.test.ts`, `frontend/src/theme/ThemeModeProvider.test.tsx`
-  (CSS-Nachweis der Modal-Füße und des Klappkopfs),
+- **Tests:** `frontend/src/theme/tokens.test.ts` (Klappkopf, Stilregel der Füße),
+  `frontend/src/theme/ThemeModeProvider.test.tsx` (Verdrahtung des Klappkopfs),
   `frontend/src/components/aktionsabstand.guard.test.ts` (Hülle aufgenommen),
   `frontend/e2e/dokumente.spec.ts` (aus „nur gemessen“ wird zugesichert, Rückfrage gemessen).
 - **Verbraucher ohne Änderung im Quelltext:** rund 25 `Collapse`-Stellen, rund 30

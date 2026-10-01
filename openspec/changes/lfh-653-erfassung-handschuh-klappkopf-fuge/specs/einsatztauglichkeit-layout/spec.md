@@ -24,7 +24,8 @@ Kopf, der schon höher ist als der Boden, MUST NOT gekürzt werden.
 In der Fußzeile einer Erfassungsmaske und in jeder Rückfrage (Dialog mit Standardfuß,
 Bestätigungsdialog, Bestätigungsblase) SHALL zwischen zwei benachbarten Knöpfen in der
 Dichtestufe `komfortabel` mindestens 8 px und in `handschuh` mindestens 16 px Abstand liegen.
-Jeder dieser Knöpfe MUST weiterhin die Steuerhöhe der Stufe erreichen.
+Jeder dieser Knöpfe MUST weiterhin mindestens `controlHeightSM` der Stufe erreichen
+(24 / 48 / 72 px).
 
 #### Scenario: Erfassungsfuß im Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und der Dialog „Dokument ablegen“ offen ist

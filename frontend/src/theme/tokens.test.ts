@@ -234,3 +234,35 @@ describe('Klappkopf folgt der Staffel (LFH-653)', () => {
     }
   });
 });
+
+/**
+ * Die Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und `Popconfirm` trennen
+ * ihre Knöpfe mit `marginXS` (3 / 5 / 7 px). Eine globale Regel in `index.css` setzt den zweiten
+ * Knopf auf antds `padding` (11 / 18 / 26) — die Variable löst AM KNOPF auf, wo eine
+ * Komponenten-Überschreibung von `marginXS` nie ankam (`design.md`, D4). Quelltext statt Pixel:
+ * jsdom rechnet kein Layout, die Auflösung misst `e2e/dokumente.spec.ts`.
+ */
+describe('Fußfuge der antd-Füße (LFH-653)', () => {
+  // Ohne Kommentare: sonst fiele der Kommentar über der Regel in die erste Selektorgruppe.
+  const css = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'index.css'),
+    'utf8',
+  ).replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('eine Regel trifft alle drei Füße mit var(--ant-padding)', () => {
+    const regel = /([^{}]*)\{\s*margin-inline-start:\s*var\(--ant-padding\);\s*\}/.exec(css);
+    expect(regel, 'Regel mit margin-inline-start: var(--ant-padding)').not.toBeNull();
+    const selektoren = regel![1].split(',').map((s) => s.replace(/\s+/g, ' ').trim());
+    // `:root` hebt die Regel über antds `:where(…)`-Selektoren (Modal: vier Klassen), egal in
+    // welcher Reihenfolge cssinjs und `index.css` im Dokument stehen.
+    expect(
+      selektoren.filter((s) => s.startsWith(':root ')),
+      'jeder mit :root',
+    ).toHaveLength(3);
+    expect(selektoren).toEqual([
+      ':root .ant-modal .ant-modal-footer > .ant-btn + .ant-btn',
+      ':root .ant-modal-confirm .ant-modal-confirm-btns .ant-btn + .ant-btn',
+      ':root .ant-popconfirm .ant-popconfirm-buttons .ant-btn + .ant-btn',
+    ]);
+  });
+});

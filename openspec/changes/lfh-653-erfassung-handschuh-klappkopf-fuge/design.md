@@ -21,7 +21,8 @@ Stand heute (antd 6.6.5, Dichte über `ThemeModeProvider` → `ConfigProvider`):
   (`modal/style/index.js`). `modal.confirm`: dieselbe Regel unter `-confirm-btns`
   (`modal/style/confirm.js`). `Popconfirm`: `-buttons button { marginInlineStart: marginXS }`.
   `marginXS` ist bei uns `abstand.xs`. Daher die 3 / 5 / 7 px in jeder Rückfrage.
-- **Vorhandene Muster.** `antdKnopf(dichte)` setzt den Knopfboden über den Kontext, weil er so
+- **Vorhandene Muster.** Globale Regeln, die antd-Klassen gezielt treffen, stehen in
+  `index.css` (Radio-Knopf, LFH-677). `antdKnopf(dichte)` setzt den Knopfboden über den Kontext, weil er so
   auch antds selbstgebaute Knöpfe erreicht (LFH-381). `antdKomponenten(farben, dichte)` trägt
   dichteabhängige Komponenten-Tokens (`Switch`, LFH-380), nachgewiesen am erzeugten CSS der
   `css-var-…`-Klasse (`ThemeModeProvider.test.tsx`). Handgebaute Bedienziele nehmen
@@ -93,33 +94,46 @@ aufgenommen. Der Scanner sieht `danger={unumkehrbar}` als destruktiv und zählt 
 Die Zeile „Werte behalten“ darüber (`gap: marginXS`) trägt keine Knopfnachbarschaft und
 bleibt.
 
-### D4 · antds eigene Füße: Komponenten-Token `marginXS` für `Modal` und `Popconfirm`
+### D4 · antds eigene Füße: eine globale Regel mit antds Token `padding`
 
-`antdKomponenten(farben, dichte)` setzt zusätzlich:
+`frontend/src/index.css` (global geladen, Präzedenz LFH-677 Radio-Knopf) setzt für die drei
+Füße, die antd selbst baut, den Abstand des zweiten Knopfs:
 
-- `Modal: { marginXS: abstand.md, headerMarginBottom: abstand.xs }`
-- `Popconfirm: { marginXS: abstand.md }`
+```css
+:root .ant-modal .ant-modal-footer > .ant-btn + .ant-btn,
+:root .ant-modal-confirm .ant-modal-confirm-btns .ant-btn + .ant-btn,
+:root .ant-popconfirm .ant-popconfirm-buttons .ant-btn + .ant-btn {
+  margin-inline-start: var(--ant-padding);
+}
+```
 
-antd erlaubt, ein globales Token je Komponente zu überschreiben. Die Fußregeln von Modal,
-`modal.confirm` (eigener Stil, aber derselbe Komponentenschlüssel `Modal`) und Popconfirm lesen
-dann den weiten Wert. `headerMarginBottom` leitet antd aus `marginXS` ab
-(`prepareComponentToken`). Es wird auf den bisherigen Wert gepinnt, damit der Abstand zwischen
-Titel und Inhalt bleibt (Spec, Szenario „Dialog mit Standardfuß“).
-
-Bewusst hingenommene Nebenwirkungen in diesen Komponenten (gleiche Richtung, mehr Luft):
-`modal.confirm` trennt Titel und Text mit `rowGap: marginXS`. Popconfirm trennt Nachricht und
-Knöpfe sowie Warnsymbol und Titel mit `marginXS`. Der Außenrand eines Modals unter 576 px
-Breite (`margin: marginXS auto`) wächst ebenfalls. Alle drei wachsen in `handschuh` von 7 auf
-26 px.
+- **Warum `var(--ant-padding)`:** Das ist antds Abstands-Token `padding`, bei uns
+  `antdToken().padding` = `abstand.md` = 11 / 18 / 26 (D2). Es ist dieselbe Quelle wie
+  `<Space size="middle">`, eine zweite Variable gibt es nicht. Jeder antd-Knopf trägt die
+  `css-var-…`-Klasse des globalen Themes und deklariert dort alle globalen Tokens. Die Variable
+  löst deshalb **am Knopf** in der gewählten Stufe auf.
+- **Warum `:root`-Präfix:** antds Regeln stehen hinter `:where(.css-…)`, das zählt nichts.
+  Die Modal-Regel bringt es auf vier Klassen (0,4,0). Mit `:root` liegt unsere Regel bei
+  (0,5,0) bzw. höher und gewinnt unabhängig davon, in welcher Reihenfolge cssinjs und
+  `index.css` im Dokument stehen.
+- **Keine Nebenwirkungen:** Nur die Knopffuge ändert sich. Titel, Warnsymbol, Abstand zwischen
+  Nachricht und Knöpfen und der Außenrand des Modals bleiben bei antds `marginXS`. Damit hält
+  auch das Szenario „Dialog mit Standardfuß“ (Titelabstand unverändert) ohne Pinnen.
 
 Erwogene Alternativen:
 
-- **D · CSS-Regel in `theme/sprache.css`** mit einer Dichte-Variable aus `rollen.css`
-  (`[data-dichte] .ant-modal-footer > .ant-btn + .ant-btn { margin-inline-start: … }`). Sie
-  hätte keine Nebenwirkungen, müsste aber die Spezifität der cssinjs-Selektoren schlagen
-  (`:where(.css-var-…)` plus vier Klassen) und ginge am Token-Modell vorbei. Sie bleibt der
-  Rückweg, falls D4 im cssVar-Modus nicht greift (s. Risiken).
-- **E · `ConfigProvider modal.okButtonProps.style.marginInlineStart`.** Popconfirm hat diese
+- **Komponenten-Token `marginXS` für `Modal`/`Popconfirm` in `antdKomponenten`** (ursprünglich
+  D4, umgesetzt und wieder entfernt). Das greift im Browser nicht. antd schreibt die
+  Überschreibung als `--ant-margin-xs: 26px` an die `css-var-…`-Klasse der Blase bzw. der
+  Modal-Wurzel. Der Knopf trägt aber seine eigene Klasse des globalen Themes, setzt die
+  Variable dort auf 7 px zurück, und `var()` löst am Knopf auf. Gemessen in `handschuh`: 7 px
+  (e2e, Sonde der berechneten Stile). Der jsdom-Test „CSS der `css-var`-Klasse trägt 26 px“ war
+  grün, belegte aber nur die Deklaration, nicht die Auflösung (Fehlbeleg). Verworfen, dazu
+  kamen die Nebenwirkungen an Titel und Symbol.
+- **Eigene Dichte-Variable in `rollen.css`** (`[data-dichte] { --lfh-fussfuge: … }`). Das wäre
+  unabhängig von antds Variablennamen, aber eine zweite Quelle neben `antdToken`, die
+  `rollen.guard.test.ts` spiegeln müsste. Verworfen.
+- **`ConfigProvider modal.okButtonProps.style.marginInlineStart`.** Popconfirm hat diese
   Einstellung im Kontext nicht, ob `modal.confirm` sie liest, ist unsicher, und sie hängt an der
   Knopfreihenfolge. Verworfen.
 - **Globales `marginXS` anheben.** Das ändert jede Komponente, die `marginXS` liest. Verworfen.
@@ -127,31 +141,31 @@ Erwogene Alternativen:
 ### D5 · Nachweis
 
 - **Unit, `theme/tokens.test.ts`:** `antdKlappkopf` mit Literalen 30 / 48 / 72 und
-  `alignItems: 'center'`. `antdKomponenten(…).Modal.marginXS` und `.Popconfirm.marginXS` =
-  11 / 18 / 26, `.Modal.headerMarginBottom` = 3 / 5 / 7. Dazu die Ungleichungen ≥ 16
-  (`handschuh`) und ≥ 8 (`komfortabel`).
-- **Unit, `theme/ThemeModeProvider.test.tsx`:** nach dem Muster „Switch folgt der Staffel bis
-  in den CSS-Text“ in `handschuh` ein offenes `<Modal>` mit Standardfuß und ein offenes
-  `Popconfirm` rendern. Das erzeugte CSS ihrer `css-var-…`-Klasse trägt den weiten Abstand.
-  Der Klappkopf eines gerenderten `Collapse` trägt `min-height: 72px` als Stil. Dieser Test
-  belegt zugleich, dass D4 im cssVar-Modus greift.
+  `alignItems: 'center'`. Dazu ein Quelltext-Test der Regel aus D4 in `index.css` (Muster
+  „Radio-Knopf: Text in bedienText“): drei Selektoren mit `:root`-Präfix, Wert
+  `var(--ant-padding)`. jsdom rechnet kein Layout, und die Auflösung am Knopf belegt nur der
+  Browser.
+- **Unit, `theme/ThemeModeProvider.test.tsx`:** Der Klappkopf eines gerenderten `Collapse`
+  trägt in `kompakt`/`handschuh` `min-height` 30 / 72 px und `align-items: center` (Verdrahtung
+  des Kontexts).
 - **Guard:** `aktionsabstand.guard.test.ts` mit der Hülle (D3).
 - **e2e, `e2e/dokumente.spec.ts` „Dichte-Staffel …“:** Aus „nur gemessen“ wird zugesichert.
   Klappkopf ≥ `soll` (30 / 48 / 72). Fuge Abbrechen │ Ablegen ≥ 16 in `handschuh` und ≥ 8 in
   `komfortabel`, in `kompakt` gemessen und annotiert. Neu: die Bestätigungsblase „Entfernen“
-  öffnen und die Fuge zwischen ihren Knöpfen mit denselben Böden messen. Böden stehen als
-  Literale in der Tabelle `STAFFEL`.
-- **Mutationsprobe** „Stufe festgenagelt → rot“: In `antdKlappkopf` und im Fußabstand von
-  `antdKomponenten` testweise `dichten.kompakt` statt `dichten[dichte]` einsetzen. Erwartet
-  wird: e2e `komfortabel`/`handschuh` rot, ebenso die Unit-Literale. Danach zurückdrehen und das
-  Ergebnis in `tasks.md` vermerken.
+  öffnen, ihre Knöpfe ≥ `controlHeightSM` messen und die Fuge zwischen ihnen mit denselben Böden
+  zusichern. Böden stehen als Literale in der Tabelle `STAFFEL`.
+- **Mutationsprobe** „Stufe festgenagelt → rot“: In `antdKlappkopf` testweise `dichten.kompakt`
+  statt `dichten[dichte]`, in der Regel aus D4 `11px` statt `var(--ant-padding)`. Erwartet wird:
+  e2e `komfortabel`/`handschuh` rot, ebenso die Unit-Literale des Klappkopfs. Danach
+  zurückdrehen und das Ergebnis in `tasks.md` vermerken.
 
 ## Risks / Trade-offs
 
-- [Die Komponenten-Überschreibung eines globalen Tokens wirkt im cssVar-Modus nicht] → Der
-  CSS-Nachweis in `ThemeModeProvider.test.tsx` ist der erste TDD-Schritt für D4. Bleibt er rot,
-  gilt Rückweg D. Das wird mit `/opsx:update` in diesem Design nachgezogen, bevor
-  weitergebaut wird.
+- [antd benennt `--ant-padding` um oder ändert die Fußselektoren] → Der Quelltext-Test hält die
+  Regel fest, das e2e misst die Fuge in Rückfrage und Erfassungsfuß. Ein Umbau in antd macht
+  den e2e-Lauf rot, nicht still grün. Der Rückweg wäre die eigene Variable (D4, Alternativen).
+- [Ein künftiger Fuß mit drei Knöpfen] → `.ant-btn + .ant-btn` trifft jeden Folgeknopf, der
+  Abstand gilt zwischen allen Nachbarn.
 - [Höhere Klappköpfe verschieben enge Layouts: Lagekarte-Zeichenwahl, Lagebericht-Akkordeon,
   Auftragkarte] → Das betrifft nur `komfortabel`/`handschuh`, wo der Boden ohnehin gilt. Das
   ganze e2e-Gate läuft mit, darunter Gate 3 und „Fokus nie verdeckt“ im Ablegen-Dialog (der

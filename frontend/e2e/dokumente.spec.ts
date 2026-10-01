@@ -34,10 +34,16 @@ const HANDSCHIRM = { width: 390, height: 844 };
 const SUBPIXEL = 0.5;
 
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+/**
+ * `soll` ist die Steuerhöhe, `sollSM` die kleine (antds Knöpfe der Bestätigungsblase), `fuge` der
+ * Boden zwischen zwei Knöpfen eines Dialogfußes (LFH-653: ≥ 8 im Touch-, ≥ 16 im
+ * Handschuh-Betrieb). In `kompakt` wird die Fuge nur gemessen: die Leitlinie nimmt den Fükw vom
+ * Zielabstand aus.
+ */
 const STAFFEL = [
-  { dichte: 'kompakt', soll: 30 },
-  { dichte: 'komfortabel', soll: 48 },
-  { dichte: 'handschuh', soll: 72 },
+  { dichte: 'kompakt', soll: 30, sollSM: 24, fuge: null },
+  { dichte: 'komfortabel', soll: 48, sollSM: 48, fuge: 8 },
+  { dichte: 'handschuh', soll: 72, sollSM: 72, fuge: 16 },
 ] as const;
 
 const PDF = Buffer.from('%PDF-1.4 e2e');
@@ -288,6 +294,14 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
 });
 
+/** Waagrechter Abstand zwischen zwei nebeneinanderstehenden Zielen, auf eine Nachkommastelle. */
+async function waagrechteFuge(links: Locator, rechts: Locator): Promise<number> {
+  const a = await links.boundingBox();
+  const b = await rechts.boundingBox();
+  expect(a && b, 'keine Kästen messbar').toBeTruthy();
+  return Math.round((b!.x - (a!.x + a!.width)) * 10) / 10;
+}
+
 /** Höhe eines Ziels in CSS-px, auf eine Nachkommastelle. */
 async function hoehe(ziel: Locator): Promise<number> {
   const kasten = await ziel.boundingBox();
@@ -296,7 +310,7 @@ async function hoehe(ziel: Locator): Promise<number> {
 }
 
 test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog', () => {
-  for (const { dichte, soll } of STAFFEL) {
+  for (const { dichte, soll, sollSM, fuge: fugeBoden } of STAFFEL) {
     test(`${dichte}: Anker, Entfernen und die Dialogziele halten ${soll} px`, async ({
       page,
     }, testInfo) => {
@@ -344,6 +358,9 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
         Titel: dialog.getByLabel('Titel'),
         Abbrechen: dialog.getByRole('button', { name: 'Abbrechen' }),
         Ablegen: dialog.getByRole('button', { name: 'Ablegen' }),
+        // antds `Collapse` rechnet den Kopf aus der Schrift; den Boden setzt der Kontext
+        // (`antdKlappkopf`, LFH-653). Vorher 36 / 45 / 55 px.
+        'Klappkopf „Bezug (optional)"': dialog.locator('.ant-collapse-header'),
       };
       const messwerte: string[] = [];
       for (const [name, ziel] of Object.entries(ziele)) {
@@ -354,12 +371,15 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
           `${name} (${dichte}): gemessen ${h} px, Soll ≥ ${soll} px`,
         ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
       }
-      // NUR GEMESSEN, NICHT ZUGESICHERT: der Klappkopf ist antds `Collapse` (kein
-      // `controlHeight`), der Abstand der Fußknöpfe kommt aus der Erfassungs-Hülle.
-      const klappkopf = await hoehe(dialog.locator('.ant-collapse-header'));
-      const abbrechen = (await ziele.Abbrechen.boundingBox())!;
-      const ablegen = (await ziele.Ablegen.boundingBox())!;
-      const fuge = Math.round((ablegen.x - (abbrechen.x + abbrechen.width)) * 10) / 10;
+      // Fuge der Fußknöpfe der Erfassungs-Hülle (LFH-653, `size="middle"`; vorher 3 / 5 / 7 px).
+      const fuge = await waagrechteFuge(ziele.Abbrechen, ziele.Ablegen);
+      messwerte.push(`Fuge Abbrechen|Ablegen: ${fuge} px`);
+      if (fugeBoden !== null) {
+        expect(
+          fuge,
+          `Fuge Abbrechen|Ablegen (${dichte}): ${fuge} px, Soll ≥ ${fugeBoden} px`,
+        ).toBeGreaterThanOrEqual(fugeBoden - SUBPIXEL);
+      }
       // Senkrechte Fuge zwischen den Entfernen-Knöpfen zweier Zeilen (Kriterium 2, ≥ 16 px).
       const zeilenziele = await page
         .getByRole('button', { name: /^Dokument Lageplan .* entfernen$/ })
@@ -375,10 +395,34 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
           `Zeilenfuge im Handschuhbetrieb: ${zeilenfuge} px`,
         ).toBeGreaterThanOrEqual(16);
       }
-      messwerte.push(
-        `Klappkopf „Bezug (optional)": ${klappkopf} px`,
-        `Fuge Abbrechen|Ablegen: ${fuge} px`,
-      );
+
+      // Die Bestätigungsblase baut antd selbst; ihre Fuge kommt aus `antdKomponenten`
+      // (`Popconfirm.marginXS`, LFH-653). Erst den Dialog schließen, dann die Zeilenaktion.
+      await ziele.Abbrechen.click();
+      await expect(dialog).toBeHidden();
+      await page.getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }).click();
+      const blase = page.locator('.ant-popconfirm:not(.ant-popover-hidden)');
+      const blasenKnoepfe = blase.locator('.ant-popconfirm-buttons button');
+      await expect(blasenKnoepfe).toHaveCount(2);
+      // Erst nach der Einblendung messen: währenddessen ist die Blase skaliert.
+      await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
+      for (const [i, knopf] of [blasenKnoepfe.first(), blasenKnoepfe.last()].entries()) {
+        const h = await hoehe(knopf);
+        messwerte.push(`Rückfrage Knopf ${i + 1}: ${h} px`);
+        expect(
+          h,
+          `Rückfrage Knopf ${i + 1} (${dichte}): ${h} px, Soll ≥ ${sollSM} px`,
+        ).toBeGreaterThanOrEqual(sollSM - SUBPIXEL);
+      }
+      const blasenfuge = await waagrechteFuge(blasenKnoepfe.first(), blasenKnoepfe.last());
+      messwerte.push(`Fuge Rückfrage Abbrechen|Entfernen: ${blasenfuge} px`);
+      if (fugeBoden !== null) {
+        expect(
+          blasenfuge,
+          `Fuge der Rückfrage (${dichte}): ${blasenfuge} px, Soll ≥ ${fugeBoden} px`,
+        ).toBeGreaterThanOrEqual(fugeBoden - SUBPIXEL);
+      }
+
       await testInfo.attach('Treffflächen', {
         body: `${dichte} (Soll ≥ ${soll} px)\n${messwerte.join('\n')}`,
         contentType: 'text/plain',
