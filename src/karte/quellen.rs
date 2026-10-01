@@ -1300,7 +1300,9 @@ mod energie_tests {
     /// Wartefrist im Test: kurz, aber mit Luft für Cache-Zugriff und Task unter paralleler Last.
     const FRIST: Duration = Duration::from_millis(300);
     /// Äußere Schranke, damit ein Rückfall auf blockierendes Warten rot wird statt zu hängen.
-    const HALT: Duration = Duration::from_secs(1);
+    /// Unter `ENERGIE_WARTE`, damit eine Antwort nach der echten statt der übergebenen Frist rot
+    /// wird; mit Luft, weil eine Sekunde unter Last (Gate-Lauf, Load ~180) schon riss (LFH-649).
+    const HALT: Duration = Duration::from_secs(5);
 
     /// Die Größengrenze ist energie-eigen (`Bbox::parse` nimmt jede Größe).
     #[test]
@@ -1444,19 +1446,14 @@ mod energie_tests {
         }
     }
 
-    /// Wartet höchstens eine Sekunde (100 × 10 ms) darauf, dass `bedingung` gilt.
-    async fn binnen_einer_sekunde<F, Fut>(bedingung: F) -> bool
-    where
-        F: Fn() -> Fut,
-        Fut: Future<Output = bool>,
-    {
-        for _ in 0..100 {
-            if bedingung().await {
-                return true;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-        false
+    /// Wartet, bis der gelöste Abruf sein Ende meldet. `false`, wenn der Sender ohne Meldung
+    /// wegfiel: dann starb der Abruf mit dem Future, das ihn hielt. Die Zusicherung trägt das
+    /// Signal, nicht die Uhr; `HALT` schützt nur vor dem Hängen (LFH-649).
+    async fn abruf_meldet_ende(ende: tokio::sync::oneshot::Receiver<()>) -> bool {
+        tokio::time::timeout(HALT, ende)
+            .await
+            .expect("der gelöste Abruf hängt")
+            .is_ok()
     }
 
     /// Wer gewartet hat, bekommt den frischen Stand aus dem Cache, ohne selbst abzurufen.
@@ -1498,7 +1495,10 @@ mod energie_tests {
     async fn langsamer_mastr_haelt_die_antwort_nicht_auf() {
         let pool = crate::db::test_pool().await;
         let bbox = Bbox::parse(BBOX).unwrap();
+        // OSM warm: sonst liefe auch der kalte OSM-Abruf gegen die Frist (LFH-649).
+        cache::setze(&pool, "energie:osm:6.90,51.45,7.30,51.65", &osm_teil()).await;
         let (tor, offen) = tokio::sync::oneshot::channel::<()>();
+        let (fertig, ende) = tokio::sync::oneshot::channel::<()>();
         let p2 = pool.clone();
         let a = tokio::time::timeout(
             HALT,
@@ -1507,10 +1507,11 @@ mod energie_tests {
                 &inflight(),
                 bbox,
                 FRIST,
-                || async { Some(osm_teil()) },
+                || async { None },
                 move || async move {
                     let _ = offen.await;
                     cache::setze(&p2, ENERGIE_MASTR_KEY, &mastr_teil()).await;
+                    let _ = fertig.send(());
                     Some(mastr_teil())
                 },
             ),
@@ -1523,10 +1524,11 @@ mod energie_tests {
         assert_eq!(titel(&a), vec!["osm-7.0079".to_string()]);
         let _ = tor.send(());
         assert!(
-            binnen_einer_sekunde(|| async {
-                cache::frisch(&pool, ENERGIE_MASTR_KEY, 60).await.is_some()
-            })
-            .await,
+            abruf_meldet_ende(ende).await,
+            "der gelöste MaStR-Abruf starb mit der Antwort"
+        );
+        assert!(
+            cache::frisch(&pool, ENERGIE_MASTR_KEY, 60).await.is_some(),
             "der gelöste MaStR-Abruf hat seinen Stand nicht in den Cache gelegt"
         );
     }
@@ -1537,8 +1539,10 @@ mod energie_tests {
     async fn im_hintergrund_scheiternder_mastr_setzt_die_sperre() {
         let pool = crate::db::test_pool().await;
         let bbox = Bbox::parse(BBOX).unwrap();
+        cache::setze(&pool, "energie:osm:6.90,51.45,7.30,51.65", &osm_teil()).await;
         let r = riegel();
         let (tor, offen) = tokio::sync::oneshot::channel::<()>();
+        let (fertig, ende) = tokio::sync::oneshot::channel::<()>();
         let p2 = pool.clone();
         let a = tokio::time::timeout(
             HALT,
@@ -1547,12 +1551,18 @@ mod energie_tests {
                 &inflight(),
                 bbox,
                 FRIST,
-                || async { Some(osm_teil()) },
+                || async { None },
                 move || {
-                    erneuere_energie_mastr(p2, r, move || async move {
+                    let abruf = erneuere_energie_mastr(p2, r, move || async move {
                         let _ = offen.await;
                         Err("Upstream gestört".to_string())
-                    })
+                    });
+                    // Gemeldet wird erst nach `erneuere_energie_mastr`, also nach der Sperre.
+                    async move {
+                        let a = abruf.await;
+                        let _ = fertig.send(());
+                        a
+                    }
                 },
             ),
         )
@@ -1565,43 +1575,56 @@ mod energie_tests {
         );
         let _ = tor.send(());
         assert!(
-            binnen_einer_sekunde(|| async { r.fehlschlag.lock().unwrap().is_some() }).await,
+            abruf_meldet_ende(ende).await,
+            "der gelöste MaStR-Abruf starb mit der Antwort"
+        );
+        assert!(
+            r.fehlschlag.lock().unwrap().is_some(),
             "der Fehlschlag im gelösten Abruf hat die Sperre nicht gesetzt"
         );
     }
 
     /// axum verwirft den Handler-Future, wenn der Client abbricht. Der Abruf darf daran
     /// nicht hängen: er schreibt seinen Stand trotzdem zu Ende.
+    ///
+    /// Ohne Wanduhr (LFH-649): die Anfrage fällt weg, sobald der Abruf läuft, und ihre Wartefrist
+    /// liegt dahinter. Sein Ende meldet der Abruf selbst; stirbt er mit der Anfrage, fällt der
+    /// Sender ungemeldet weg.
     #[tokio::test]
     async fn abgebrochene_anfrage_laesst_den_abruf_zu_ende_laufen() {
         let pool = crate::db::test_pool().await;
         let bbox = Bbox::parse(BBOX).unwrap();
+        let (laeuft, gestartet) = tokio::sync::oneshot::channel::<()>();
         let (tor, offen) = tokio::sync::oneshot::channel::<()>();
-        let p2 = pool.clone();
-        let abbruch = tokio::time::timeout(
-            Duration::from_millis(50),
-            energie_kern(
-                &pool,
-                &inflight(),
-                bbox,
-                HALT,
-                || async { None },
-                move || async move {
-                    let _ = offen.await;
-                    cache::setze(&p2, ENERGIE_MASTR_KEY, &mastr_teil()).await;
-                    Some(mastr_teil())
-                },
-            ),
-        )
-        .await;
-        assert!(abbruch.is_err(), "die Anfrage sollte abgebrochen sein");
+        let (fertig, ende) = tokio::sync::oneshot::channel::<()>();
+        let (p2, infl) = (pool.clone(), inflight());
+        let anfrage = energie_kern(
+            &pool,
+            &infl,
+            bbox,
+            Duration::from_secs(3600), // reißt nicht vor dem Abbruch, auch unter Last nicht
+            || async { None },
+            move || async move {
+                let _ = laeuft.send(());
+                let _ = offen.await;
+                cache::setze(&p2, ENERGIE_MASTR_KEY, &mastr_teil()).await;
+                let _ = fertig.send(());
+                Some(mastr_teil())
+            },
+        );
+        // Endet `select!` über `gestartet`, fällt `anfrage` weg wie der verworfene Handler.
+        tokio::select! {
+            _ = anfrage => panic!("die Anfrage endete vor ihrem Abbruch"),
+            _ = gestartet => {}
+        }
         let _ = tor.send(());
         assert!(
-            binnen_einer_sekunde(|| async {
-                cache::frisch(&pool, ENERGIE_MASTR_KEY, 60).await.is_some()
-            })
-            .await,
+            abruf_meldet_ende(ende).await,
             "der Abruf starb mit der abgebrochenen Anfrage"
+        );
+        assert!(
+            cache::frisch(&pool, ENERGIE_MASTR_KEY, 60).await.is_some(),
+            "der Abruf hat seinen Stand nicht in den Cache gelegt"
         );
     }
 

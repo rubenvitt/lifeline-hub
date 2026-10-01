@@ -70,8 +70,8 @@ for (const modus of ['light', 'dark'] as const) {
 }
 
 // Der Titel-Link einer Datensicht ist ein react-router-`Link` ohne eigene Farbe: er erbt antds
-// Linkfarbe. Die trägt seit LFH-652 die Textrolle (Spec `textkontrast-rollen`), vorher lag sie bei
-// 6,59 (Tag) und 4,55 (Nacht).
+// Linkfarbe. Die trägt seit LFH-652 die Textrolle (Spec `textkontrast-rollen`); aus `bedien`
+// abgeleitet lag sie nachts bei 4,55.
 for (const modus of ['light', 'dark'] as const) {
   test(`${modus}: Datensicht-Titel-Link erbt die Linkfarbe und hält den Boden`, async ({
     page,

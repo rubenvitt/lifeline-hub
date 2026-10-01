@@ -5,7 +5,9 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
  * Browser-Nachweise der Prüfliste für den Pegel (LFH-606): Trefflächen über die
  * Dichte-Staffel (Kriterien 1/2), Kontrast der Pegel-Kennzahl in beiden Modi samt
  * Achtungskante (5/6), Querlauf der Einstellungssektion auf 390 px (Gate 1), verdeckte
- * Fokusziele (13) und der CLS-Beitrag des Nachladens (12).
+ * Fokusziele (13) und der CLS-Beitrag des Nachladens (12). Dazu der Fachebenen-Inspector der
+ * Lagekarte (Fläche C, Kriterien 1/2/5/13; LFH-631): erreicht über einen Klick auf den
+ * Pegel-Punkt der Karte.
  *
  * HERMETISCH: Pegel- und Stationsliste kommen per `page.route` aus Literalen in der Wire-Form
  * von `api/types.generated.ts` — der echte Abruf ginge an PEGELONLINE und mäße dessen
@@ -58,13 +60,14 @@ const STATIONEN = {
   attribution: 'WSV',
   features: {
     type: 'FeatureCollection',
+    // Je Station ein eigener Ort: der Inspector-Test wählt sie einzeln auf der Karte.
     features: [
-      ['HANN. MÜNDEN', 'WESER', 0.5, UUID[0]],
-      ['WAHNHAUSEN', 'FULDA', 97.4, UUID[1]],
-      ['KASSEL', 'FULDA', 81.73, UUID[2]],
-    ].map(([titel, gewaesser, km, uuid]) => ({
+      ['HANN. MÜNDEN', 'WESER', 0.5, UUID[0], [9.6, 51.4]],
+      ['WAHNHAUSEN', 'FULDA', 97.4, UUID[1], [9.62, 51.4]],
+      ['KASSEL', 'FULDA', 81.73, UUID[2], [9.64, 51.4]],
+    ].map(([titel, gewaesser, km, uuid, ort]) => ({
       type: 'Feature',
-      geometry: { type: 'Point', coordinates: [9.6, 51.4] },
+      geometry: { type: 'Point', coordinates: ort },
       properties: { titel, gewaesser, km, uuid, kategorie: 'pegel' },
     })),
   },
@@ -403,10 +406,281 @@ for (const modus of ['light', 'dark'] as const) {
 }
 
 /**
+ * Fläche C — der Fachebenen-Inspector der Lagekarte (O3, LFH-631). Erreicht wird er wie vom
+ * Menschen: Ebene „Pegel / Hochwasser“ über ihren benannten Schalter an, Klick auf den Punkt der
+ * Station. Die Karte ist WebGL; den Ort des Punkts auf der Seite liefert die Map-Instanz
+ * (`window.__lfhKarte`, nur im Dev-Build), geklickt wird mit der echten Maus.
+ */
+interface KartenHaken {
+  loaded(): boolean;
+  isMoving(): boolean;
+  once(e: string, f: () => void): void;
+  jumpTo(o: { center: [number, number]; zoom: number }): void;
+  project(ll: [number, number]): { x: number; y: number };
+  getCanvas(): HTMLCanvasElement;
+  queryRenderedFeatures(p: [number, number], o: { layers: string[] }): unknown[];
+}
+
+/** Ort der Station aus {@link STATIONEN} — eine Quelle, sonst klickte der Test daneben. */
+const stationsOrt = (titel: string) =>
+  STATIONEN.features.features.find((f) => f.properties.titel === titel)!.geometry.coordinates as [
+    number,
+    number,
+  ];
+
+/** Kartenaufbauten über der Karte (wie `fokus-verdeckung.spec.ts`). */
+const KARTEN_AUFBAUTEN = [
+  '[data-lfh="karten-fuss"] > *',
+  '[data-lfh="karten-knoepfe"]',
+  '[data-lfh="karten-ueberlagerung-links"]',
+];
+
+const FESTLEGEN = 'Als maßgeblichen Pegel festlegen';
+
+/**
+ * Öffnet die Lagekarte und wählt die Station auf der Karte. Zurück kommt das Paneel der Auswahl.
+ * Vorher gesetzt: Viewport, Dichte (per `localStorage`) und `stellePegel`.
+ */
+async function inspectorOeffnen(page: Page, einsatzId: string, station: string) {
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __lfhKarte?: KartenHaken }).__lfhKarte?.loaded()),
+    undefined,
+    { timeout: 60_000 },
+  );
+  // Unter `md` steht die Leiste per Vorgabe zu.
+  const leiste = page.getByRole('complementary', { name: 'Kartenleiste' });
+  if (!(await leiste.isVisible())) {
+    await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+  }
+  const kopf = page.locator('section[data-paneel="fachebenen"] button[aria-expanded]').first();
+  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+  // Die Wahl der Ebene übersteht ein Neuladen nicht sicher: geschaltet wird nur, was aus ist.
+  const schalter = page.getByRole('switch', { name: 'Pegel / Hochwasser' });
+  if ((await schalter.getAttribute('aria-checked')) !== 'true') await schalter.click();
+  await expect(schalter).toHaveAttribute('aria-checked', 'true');
+
+  const ort = stationsOrt(station);
+  const springen = () =>
+    page.evaluate(
+      (ll) =>
+        new Promise<void>((fertig) => {
+          const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+          k.once('idle', () => fertig());
+          k.jumpTo({ center: ll, zoom: 14 });
+        }),
+      ort,
+    );
+  // Wo ist der Punkt auf der Seite, und trägt die Karte dort die Trefferzone der Ebene?
+  const amPunkt = () =>
+    page.evaluate((ll) => {
+      const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+      const p = k.project(ll);
+      const r = k.getCanvas().getBoundingClientRect();
+      const treffer = k.queryRenderedFeatures([p.x, p.y], {
+        layers: ['fachebene-pegelonline-treffer'],
+      }).length;
+      return { x: r.left + p.x, y: r.top + p.y, treffer };
+    }, ort);
+  await page.getByTestId('kartenflaeche').locator('canvas').scrollIntoViewIfNeeded();
+  await springen();
+  await expect
+    .poll(async () => (await amPunkt()).treffer, {
+      message: `${station}: Punkt erscheint auf der Karte`,
+      timeout: 20_000,
+    })
+    .toBeGreaterThan(0);
+  // Die Leiste kann beim Einschalten den Kartenausschnitt verschoben haben: erst springen, dann
+  // messen.
+  await springen();
+  const punkt = await amPunkt();
+  // Vorbedingung: am Klickpunkt liegt die Karte, kein Aufbau darüber.
+  expect(
+    await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('maplibregl-canvas'),
+      punkt,
+    ),
+    `${station}: am Punkt liegt die Karte frei`,
+  ).toBe(true);
+  await page.mouse.click(punkt.x, punkt.y);
+  const auswahl = page
+    .locator('[data-lfh="auswahl"]')
+    .filter({ has: page.getByRole('heading', { name: station, exact: true }) });
+  await expect(auswahl, `${station}: Klick öffnet den Inspector`).toBeVisible();
+  await page.waitForFunction(
+    () => !(window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte.isMoving(),
+    undefined,
+    { timeout: 15_000 },
+  );
+  return auswahl;
+}
+
+/** Kleinster Abstand vom Ziel zum nächsten anderen sichtbaren Bedienziel der Seite (px). */
+function abstandZumNaechstenZiel(ziel: Locator) {
+  return ziel.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const andere = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        'button, a[href], input, select, textarea, [role="switch"], [role="button"], [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((k) => {
+      if (k === el || k.contains(el) || el.contains(k)) return false;
+      const b = k.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && getComputedStyle(k).visibility !== 'hidden';
+    });
+    let min = Number.POSITIVE_INFINITY;
+    let name = '—';
+    for (const k of andere) {
+      const b = k.getBoundingClientRect();
+      const dx = Math.max(b.left - r.right, r.left - b.right, 0);
+      const dy = Math.max(b.top - r.bottom, r.top - b.bottom, 0);
+      const d = Math.hypot(dx, dy);
+      if (d < min) {
+        min = d;
+        name = k.getAttribute('aria-label') ?? k.textContent?.trim().slice(0, 30) ?? k.tagName;
+      }
+    }
+    return { abstand: min, nachbar: name };
+  });
+}
+
+test('Fachebenen-Inspector: Trefflächen über die Staffel, Abstand im Handschuh-Betrieb (1366 und 390 px)', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Pegel Inspector ${Date.now()}`);
+  await stellePegel(page, einsatzId, pegelListe(10));
+
+  const gemessen: string[] = [];
+  for (const breite of [1366, 390]) {
+    await page.setViewportSize({ width: breite, height: 844 });
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+      await stelleDichte(page, dichte);
+      // KASSEL steht nicht in der Liste: der Inspector trägt den Knopf.
+      const auswahl = await inspectorOeffnen(page, einsatzId, 'KASSEL');
+      const knopf = auswahl.getByRole('button', { name: FESTLEGEN });
+      await expect(knopf, 'Knopf erst nach geladener Liste bedienbar').toBeEnabled();
+      const hKnopf = await haeltStufe(knopf, soll, `Festlegen ${breite}/${dichte}`);
+      const hZu = await haeltStufe(
+        auswahl.getByRole('button', { name: 'Schließen' }),
+        soll,
+        `Schließen ${breite}/${dichte}`,
+      );
+      const { abstand, nachbar } = await abstandZumNaechstenZiel(knopf);
+      if (dichte === 'handschuh') {
+        expect(abstand, `Abstand Festlegen ↔ ${nachbar} ${breite}`).toBeGreaterThanOrEqual(16);
+      }
+      const querlauf = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(querlauf, `Querlauf ${breite}/${dichte}`).toBeLessThanOrEqual(0);
+      gemessen.push(
+        `${breite}/${dichte} (≥${soll}): Festlegen ${hKnopf}, Schließen ${hZu}, ` +
+          `Abstand ${Math.round(abstand)} (${nachbar}), Querlauf ${querlauf}`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+for (const modus of ['light', 'dark'] as const) {
+  test(`Fachebenen-Inspector: Kontrast von Titel, Knopf und Pegel-Marke (${modus})`, async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 1366, height: 844 });
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Pegel Inspector Kontrast ${Date.now()}`);
+    await stellePegel(page, einsatzId, pegelListe(10));
+    await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [THEMA_SCHLUESSEL, modus]);
+    const boden = modus === 'light' ? 7 : 5;
+
+    // Knopf: eine Station außerhalb der Liste.
+    const mitKnopf = await inspectorOeffnen(page, einsatzId, 'KASSEL');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    const knopf = mitKnopf.getByRole('button', { name: FESTLEGEN });
+    await expect(knopf).toBeEnabled();
+    await page.mouse.move(0, 0);
+    const titel = await kontrast(mitKnopf.getByRole('heading', { name: 'KASSEL' }));
+    const text = await kontrast(knopf.locator('span').filter({ hasText: FESTLEGEN }));
+
+    // Marke: der Leitpegel, die erste Station der Liste.
+    const mitMarke = await inspectorOeffnen(page, einsatzId, 'HANN. MÜNDEN');
+    const marke = mitMarke.locator('[data-lfh="pegel-massgeblich"] .ant-tag');
+    await expect(marke).toHaveText('maßgeblicher Pegel · Leitpegel');
+    await page.mouse.move(0, 0);
+    const tag = await kontrast(marke);
+
+    expect.soft(titel.text, `${modus} Titel`).toBeGreaterThanOrEqual(boden);
+    expect.soft(text.text, `${modus} Knopf`).toBeGreaterThanOrEqual(4.5);
+    expect.soft(tag.text, `${modus} Marke`).toBeGreaterThanOrEqual(4.5);
+    test.info().annotations.push({
+      type: 'messwert',
+      description:
+        `${modus}: Titel ${titel.text.toFixed(2)}, Knopf ${text.text.toFixed(2)}, ` +
+        `Marke ${tag.text.toFixed(2)}`,
+    });
+  });
+}
+
+test('Fachebenen-Inspector: Tabulaturdurchlauf ohne verdecktes Fokusziel (390 × 420, Handschuh)', async ({
+  page,
+}) => {
+  test.setTimeout(150_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Pegel Inspector Fokus ${Date.now()}`);
+  await stellePegel(page, einsatzId, pegelListe(10));
+  await page.setViewportSize({ width: 390, height: 420 });
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await stelleDichte(page, 'handschuh');
+  const auswahl = await inspectorOeffnen(page, einsatzId, 'KASSEL');
+  const knopf = auswahl.getByRole('button', { name: FESTLEGEN });
+  await expect(knopf).toBeEnabled();
+
+  const ziele: [string, Locator][] = [
+    ['Schließen', auswahl.getByRole('button', { name: 'Schließen' })],
+    ['Festlegen', knopf],
+  ];
+  for (const [name, ziel] of ziele) {
+    await expect(ziel, name).toHaveCount(1);
+    await ziel.evaluate((el, k) => el.setAttribute('data-e2e-fokus', k), name);
+  }
+
+  // Vorwärts vom Kopf des Inspectors durch ihn hindurch, dann rückwärts zurück: `Tab` rollt Ziele
+  // an den unteren Rand, `Shift+Tab` an den oberen.
+  const befunde: string[] = [];
+  const besucht = new Set<string>();
+  for (const [start, taste] of [
+    ['Schließen', 'Tab'],
+    ['Festlegen', 'Shift+Tab'],
+  ] as const) {
+    await ziele.find(([n]) => n === start)![1].focus();
+    const kern = await pruefeFokusVerdeckung(page, 6, taste, {
+      zusatzKandidaten: KARTEN_AUFBAUTEN,
+      region: '[data-lfh="auswahl"]',
+    });
+    expect(
+      kern.stoppsInRegion,
+      `${taste}: Vorbedingung — der Lauf geht durch den Inspector`,
+    ).toBeGreaterThanOrEqual(1);
+    expect(kern.verdeckt, `${taste}:\n${kern.verdeckt.join('\n')}`).toEqual([]);
+    kern.besuchteZiele.forEach((z) => besucht.add(z));
+    befunde.push(`${taste}: ${kern.stoppsGesamt} Stopps, ${kern.stoppsInRegion} im Inspector`);
+  }
+  expect([...besucht].sort(), 'beide Ziele des Inspectors erreicht').toEqual(
+    ziele.map(([n]) => n).sort(),
+  );
+  test.info().annotations.push({ type: 'messwert', description: befunde.join(' | ') });
+});
+
+/**
  * Kriterium 12 (CLS ≤ 0,1) — gemessen wird der BEITRAG DES PEGEL-NACHLADENS, nicht die
- * Seiten-CLS insgesamt: unter Linux-Chromium bricht die Kopfzeile bei 1024 px nach dem Mount
- * auf eine zweite Reihe um und verschiebt die Fläche auch auf Routen ohne Pegel-Bezug — ein
- * Bestandsbefund der Kopfzeile, den ein Pegel-Test nicht mitzählen darf.
+ * Seiten-CLS insgesamt: der Aufbau der Kopfzeile gehört nicht dem Pegel. Unter Linux-Chromium
+ * brach sie bei 1024 px nach dem Mount auf eine zweite Reihe um (O6, behoben mit LFH-637; den
+ * Seitenstart bewacht `e2e/kopfzeile-start-cls.spec.ts`) — ein Pegel-Test misst nur, was er
+ * selbst verschiebt.
  *
  * Die Spec hält deshalb die Pegel-Antworten ZURÜCK, bis die Seite ruhig steht
  * ({@link RUHE_MS}), setzt eine Marke und gibt sie frei. Gezählt wird nur, was NACH der Marke

@@ -184,8 +184,8 @@ describe('Switch-Maße (LFH-380)', () => {
 });
 
 /**
- * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary`, am Tag
- * 6,59 : 1 und damit unter dem Tagesboden 7 : 1. Blauer Bedien-TEXT nimmt `bedienText`.
+ * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary`, am Tag bis
+ * LFH-661 6,59 : 1 und damit unter dem Tagesboden 7 : 1. Blauer Bedien-TEXT nimmt `bedienText`.
  *
  * Die Regel sitzt im global geladenen `index.css` und trifft NUR den Text. Ein Token
  * `Radio.colorPrimary` färbte auch Scheibe, `solid`-Fläche und Hover-Fläche.
@@ -278,5 +278,30 @@ describe('Geerbte Textfarben auf Textrollen (LFH-652)', () => {
   it('globales colorError bleibt die Füllfarbe — Kante, Badge und Gefahrknopf lesen sie', () => {
     expect(antdToken(farbenHell)?.colorError).toBe(farbenHell.alarm);
     expect(antdToken(farbenDunkel)?.colorError).toBe(farbenDunkel.alarm);
+  });
+});
+
+/**
+ * Die Feldmeldung eines Formulars (`.ant-form-item-explain-error`) schreibt ihren TEXT in antds
+ * `colorError` = `alarm`, am Tag 5,67 : 1 auf `grund` und damit unter dem Tagesboden 7 : 1.
+ * Roter TEXT nimmt `alarmText` (LFH-618). Der Komponententoken trifft nur das Formular;
+ * `colorError` global umzustellen färbte auch Gefahrknöpfe und Ränder, und dort ist die
+ * Füllfarbe richtig.
+ */
+describe('Feldmeldung: Text in alarmText (LFH-667)', () => {
+  it.each([
+    ['Tag', farbenHell],
+    ['Nacht', farbenDunkel],
+  ])('%s: das Formular liest colorError = alarmText', (_modus, farben) => {
+    // `toMatchObject`: LFH-652 setzt am Formular zusätzlich `colorWarning = achtungText`.
+    expect(antdKomponenten(farben, 'kompakt').Form).toMatchObject({ colorError: farben.alarmText });
+  });
+
+  it.each([
+    ['Tag', farbenHell],
+    ['Nacht', farbenDunkel],
+  ])('%s: das globale colorError bleibt die Füllfarbe alarm', (_modus, farben) => {
+    expect(antdToken(farben)?.colorError).toBe(farben.alarm);
+    expect(antdKomponenten(farben, 'kompakt').Button).not.toHaveProperty('colorError');
   });
 });

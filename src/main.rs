@@ -193,6 +193,25 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // `--cookie-secure` (LFH-603). Hinter einem TLS-Proxy mit `X-Forwarded-Proto` entscheidet
     // ohnehin jede Anfrage selbst (`session::SichererTransport`). Vor beiden Serve-Zweigen.
     lifeline_hub::auth::session::set_cookie_secure(config.cookies_secure());
+
+    // Vertrauenswürdige Proxys (LFH-604): verschieben, wer die Quell-IP für Login-Sperre und
+    // Anmelde-Protokoll bestimmt, und gehören deshalb ins Log.
+    if !config.trusted_proxies.is_empty() {
+        let liste = config
+            .trusted_proxies
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        tracing::warn!(
+            "Vertrauenswürdige Proxys gesetzt: --trusted-proxies (LIFELINE_TRUSTED_PROXIES) = \
+             {liste} — von diesen Gegenstellen gilt die Client-Adresse aus X-Forwarded-For. \
+             Nur die Adressen des Reverse-Proxys eintragen; der Server darf an ihm vorbei nicht \
+             erreichbar sein."
+        );
+    }
+    lifeline_hub::extract::init_vertraute_proxys(config.trusted_proxies.clone());
+
     // Demo-Daten: der Schalter reist als Router-Option. Er öffnet einen harten Löschweg und steht
     // deshalb im Log.
     if config.demo_daten {

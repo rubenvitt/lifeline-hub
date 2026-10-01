@@ -96,12 +96,20 @@ export interface Farbrollen {
 }
 
 /**
- * Tagmodus, aus der Nachtpalette ABGELEITET. Status- und Bedienrollen und die Füllungen
- * behalten ihre LFH-352-Werte; neu gestimmt sind Flächen- und Textstufen.
+ * Tagmodus, aus der Nachtpalette ABGELEITET. Statusrollen und die Füllungen behalten ihre
+ * LFH-352-Werte; neu gestimmt sind Flächen- und Textstufen und `bedien`/`bedienHover`.
  *
  * Kontrast (WCAG; `grund` · `flaeche`): text 15,46 · 18,47 — text2 11,00 · 13,13 —
- * gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; Weiß auf bedien 6,59,
- * auf bedienHover 5,62; normalText/normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
+ * gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; normalText/
+ * normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
+ *
+ * Primärknopf (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung auf satter Bedienfläche
+ * hält den TAGESBODEN 7 : 1, in Ruhe und unter dem Zeiger — KEIN eigener Knopfboden. Die
+ * Knopfschrift misst 13,5 px, der große Anmelde-Knopf 16 px; WCAGs Großtext-Boden 4,5 gilt fett
+ * erst ab 18,66 px. Weiß auf bedien 8,55 (vorher `#1a5fa0`, 6,59), auf bedienHover 7,32 (vorher
+ * `#236aad`, 5,62): gleicher Ton und gleiche Sättigung, nur dunkler; der Zeiger hellt um
+ * denselben Schritt auf wie zuvor (1,17). bedien auf grund 7,16. Gerechnet in
+ * `bedienKontrast.test.ts`, gemessen in `e2e/primaerknopf-kontrast.spec.ts`.
  *
  * `achtung`/`alarm` tragen als TEXT den Tagesboden nicht (auf ihrer Fläche 6,02 bzw. 5,52),
  * dafür stehen `achtungText`/`alarmText` (auf Weiß 9,22 bzw. 8,96, auf ihren Flächen und
@@ -122,7 +130,7 @@ export const farbenHell: Farbrollen = {
   text: '#111418',
   gedaempft: '#474e57',
   schwach: '#58606a',
-  bedien: '#1a5fa0',
+  bedien: '#154e84',
   alarm: '#b02318',
   achtung: '#7a5200',
   normal: '#1c6640',
@@ -138,7 +146,7 @@ export const farbenHell: Farbrollen = {
   flaeche3: '#e1e4e8',
   text2: '#2b3138',
   steuerRahmen: '#79818a',
-  bedienHover: '#236aad',
+  bedienHover: '#185895',
   bedienText: '#164f86',
   aufBedien: '#ffffff',
   normalText: '#155234',
@@ -615,11 +623,14 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  *
  * Textrollen statt Füll- und Hover-Tönen, wo antd TEXT färbt (LFH-652, Spec
  * `textkontrast-rollen`): die Beschriftung des Standardknopfs unter dem Zeiger (`bedienHover`
- * läge am Tag bei 5,62) und die Meldung eines Formularfelds samt Pflichtmarke (`alarm` 6,27). Das
- * `Form`-Token wirkt nur auf die Stile des Formulars; Rahmen und Status der Eingabefelder rechnet
- * `Input` selbst und behält die Füllfarbe. Die Kante des Standardknopfs bleibt `bedienHover`
- * (Boden 3 : 1). Ein Linkknopf zeigt den Zeiger als `bedienFlaeche`, denn sein Ton wechselt
- * nicht mehr (`bedienText` darauf 7,11 Tag · 9,65 Nacht).
+ * hält am Tag auf `flaeche2` nur 6,77, auf `grund` 6,13) und die Feldmeldung samt Pflichtmarke
+ * (LFH-667; `alarm` lag am Tag bei 5,67 : 1 auf `grund`). Das `Form`-Token färbt nur Feldmeldung,
+ * Pflichtsternchen und Rückmeldesymbol; die Felder selbst ziehen ihren Fehlerrand aus dem eigenen
+ * Komponententoken.
+ * `colorError` global umzustellen träfe auch Gefahrknöpfe und Ränder, und dort ist die Füllfarbe
+ * richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein Linkknopf zeigt
+ * den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText` darauf 7,11 Tag
+ * · 9,65 Nacht).
  *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
@@ -677,8 +688,9 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorSuccess: farben.normal,
     colorInfo: farben.bedien,
     // Ein Link ist blauer TEXT und trägt die Textrolle, in Ruhe wie unter dem Zeiger (LFH-652):
-    // aus `bedien` abgeleitet lag er bei 6,59 (Tag) und 4,55 (Nacht). Die Rückmeldung unter dem
-    // Zeiger ist die Unterstreichung, kein hellerer Ton (`bedienHover` am Tag 5,62).
+    // aus `bedien` abgeleitet verdunkelte ihn die Nachtpalette auf 4,55, und antds Hover-Ableitung
+    // hellt ihn am Tag auf rund 4,3 auf. Die Rückmeldung unter dem Zeiger ist die Unterstreichung,
+    // kein hellerer Ton (`bedienHover` auf `grund` 6,13).
     colorLink: farben.bedienText,
     colorLinkHover: farben.bedienText,
     colorLinkActive: farben.bedienText,

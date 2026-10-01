@@ -146,9 +146,9 @@ const SOLL = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
  * Zeile ist damit anders gebaut als beim Admin: der Name bleibt lesbar, nichts ragt aus der
  * Leiste, und das verbleibende Ziel hält die Stufe.
  *
- * Nicht erreicht: die Aktion „Als maßgeblichen Pegel festlegen" im Fachebenen-Inspector
- * (`FachebenenInspector.tsx`) — der erscheint erst mit einem gewählten Pegel auf der Karte,
- * also nur mit externen Lagedaten.
+ * Nicht hier: die Aktion „Als maßgeblichen Pegel festlegen" im Fachebenen-Inspector
+ * (`FachebenenInspector.tsx`) — der erscheint erst mit einem gewählten Pegel auf der Karte und
+ * ist in `pegel-pruefliste.spec.ts` gemessen (LFH-631, gestellte Stationen).
  */
 for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
   test(`Lagekarten-Leiste, Stufe ${dichte}: Schalterzeilen bleiben in der Leiste (Beobachter)`, async ({
