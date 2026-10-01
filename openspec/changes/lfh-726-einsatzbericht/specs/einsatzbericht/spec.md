@@ -94,9 +94,9 @@ Helferstunden eingehen.
 
 #### Scenario: Nach dem Einsatzende
 
-- **WHEN** alle Einheiten entlassen sind und der Bericht gedruckt wird
+- **WHEN** das Personal aller Einheiten freigegeben ist und der Bericht gedruckt wird
 - **THEN** zeigt die Stärke zum Druckzeitpunkt 0/0/0//0
-- **AND** „insgesamt eingesetzt“ nennt weiter die entlassenen Einheiten und Personen
+- **AND** „insgesamt eingesetzt“ nennt weiter die Einheiten und Personen mit Zeitachse
 
 #### Scenario: Keine Zeitachse
 
