@@ -155,6 +155,9 @@ export type EtbAnzahl = S['EtbAnzahlAnzeige'];
 /** Wire-Event-Namen des Einsatz-Live-Feeds; Kontrakt gegen `EINSATZ_STREAM_EVENTS`
  *  (queryKeys.ts) via `liveEvent.contract.test.ts`. Wahrheitsquelle: Rust `LiveEvent`. */
 export type LiveEvent = S['LiveEvent'];
+/** Wire-Event-Namen der Org-Ereignisse (LFH-734); Kontrakt gegen `ORG_STREAM_EVENTS`
+ *  (queryKeys.ts) via `orgLiveEvent.contract.test.ts`. Wahrheitsquelle: Rust `OrgLiveEvent`. */
+export type OrgLiveEvent = S['OrgLiveEvent'];
 
 // ============================== Fahrzeuge / Material / Personal ==============================
 export type Dienststatus = S['Dienststatus'];

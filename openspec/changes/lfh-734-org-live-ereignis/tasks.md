@@ -34,15 +34,15 @@ und `requesting-code-review`.
 
 ## 5. Codegen
 
-- [ ] 5.1 `scripts/check-typ-codegen.sh`; `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten.
+- [x] 5.1 `scripts/check-typ-codegen.sh`; `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten.
 
 ## 6. Frontend (D6)
 
-- [ ] 6.1 `api/queryKeys` zuerst: Guard „jeder `GLOBAL_KEYS`-Eintrag in genau einer Klasse (`ORG_STREAM_EVENTS` oder `NICHT_LIVE_GLOBAL_KEYS`)", Literal-Erwartung für beide Einträge von `ORG_STREAM_EVENTS`, neuer Kontrakttest `orgLiveEvent.contract.test.ts` (`OrgLiveEvent` aus den generierten Typen gleich den Schlüsseln von `ORG_STREAM_EVENTS`) und Disjunktheit zu `FeWireEvent`. Rot belegen.
-- [ ] 6.2 `ORG_STREAM_EVENTS` und `NICHT_LIVE_GLOBAL_KEYS` in `api/queryKeys.ts`, Kommentar an `GLOBAL_KEYS` auf die Partition umstellen; `lagebildOffline.guard.test.ts` grün. Tests aus 6.1 grün.
-- [ ] 6.3 Charakterisierungstests für `useEinsatzLiveStream` (Backoff, 401-Probe, Status, Wiederaufbau-Vollabgleich) vervollständigen, dann den Verbindungsbau nach `live/liveVerbindung.ts` auslagern. Bestehende `useEinsatzLiveStream.test.tsx` und `EinsatzLayout.test.tsx` unverändert grün.
-- [ ] 6.4 Test zuerst: Einsatz-Strom invalidiert bei `einsatzliste`/`stammdaten` die einstelligen globalen Prefixe (Literale, auch Sub-Key `['personal','alle']`), `lagged` und Wiederaufbau nehmen die Org-Keys mit. Dann Umsetzung im Einsatz-Hook. Grün.
-- [ ] 6.5 Test zuerst für `useOrgLiveStream`: öffnet `/api/live` nur angemeldet und nur außerhalb `/einsaetze/:id/*`, invalidiert bei jedem `onopen` (auch dem ersten) die Org-Keys, schließt beim Betreten eines Einsatzes; `BetriebsLayout`-Test: auf `/einsaetze` genau eine Verbindung zu `/api/live`, auf `/einsaetze/7/…` genau eine zu `/api/einsaetze/7/live`, auf `/login` keine. Dann Hook und Einbau in `App.tsx`. Grün.
+- [x] 6.1 `api/queryKeys` zuerst: Guard „jeder `GLOBAL_KEYS`-Eintrag in genau einer Klasse (`ORG_STREAM_EVENTS` oder `NICHT_LIVE_GLOBAL_KEYS`)", Literal-Erwartung für beide Einträge von `ORG_STREAM_EVENTS`, neuer Kontrakttest `orgLiveEvent.contract.test.ts` (`OrgLiveEvent` aus den generierten Typen gleich den Schlüsseln von `ORG_STREAM_EVENTS`) und Disjunktheit zu `FeWireEvent`. Rot belegen.
+- [x] 6.2 `ORG_STREAM_EVENTS` und `NICHT_LIVE_GLOBAL_KEYS` in `api/queryKeys.ts`, Kommentar an `GLOBAL_KEYS` auf die Partition umstellen; `lagebildOffline.guard.test.ts` grün. Tests aus 6.1 grün.
+- [x] 6.3 Charakterisierungstests für `useEinsatzLiveStream` (Backoff, 401-Probe, Status, Wiederaufbau-Vollabgleich) vervollständigen, dann den Verbindungsbau nach `live/liveVerbindung.ts` auslagern. Bestehende `useEinsatzLiveStream.test.tsx` und `EinsatzLayout.test.tsx` unverändert grün.
+- [x] 6.4 Test zuerst: Einsatz-Strom invalidiert bei `einsatzliste`/`stammdaten` die einstelligen globalen Prefixe (Literale, auch Sub-Key `['personal','alle']`), `lagged` und Wiederaufbau nehmen die Org-Keys mit. Dann Umsetzung im Einsatz-Hook. Grün.
+- [x] 6.5 Test zuerst für `useOrgLiveStream`: öffnet `/api/live` nur angemeldet und nur, solange kein Einsatz-Strom offen ist (`einsatzStromStore`), invalidiert bei jedem `onopen` (auch dem ersten) die Org-Keys, schließt beim Betreten eines Einsatzes; `BetriebsLayout`-Test: auf `/einsaetze` genau eine Verbindung zu `/api/live`, auf `/einsaetze/7/…` genau eine zu `/api/einsaetze/7/live`, auf `/login` keine. Dann Hook und Einbau in `App.tsx`. Grün.
 
 ## 7. Nachweis Ende zu Ende
 
@@ -51,7 +51,7 @@ und `requesting-code-review`.
 
 ## 8. Doku
 
-- [ ] 8.1 `frontend/AGENTS.md`, Query-Key-Registry: Zeile zu `ORG_STREAM_EVENTS`/`NICHT_LIVE_GLOBAL_KEYS` (XOR, Guard) und „ein Tab, eine Live-Verbindung: der Einsatz-Strom trägt die Org-Ereignisse mit" (LFH-734). `src/AGENTS.md`: Zeile „Katalog-Schreibrouten gehören in den Stammdaten-Teil-Router (Middleware `stammdaten_live`, Guard aus 4.3); `einsatzliste` nur über den Helfer" (LFH-734). Kommentar im Kopf von `useEinsatzLiveStream.ts` nachziehen. Prettier für `frontend/` grün.
+- [x] 8.1 `frontend/AGENTS.md`, Query-Key-Registry: Zeile zu `ORG_STREAM_EVENTS`/`NICHT_LIVE_GLOBAL_KEYS` (XOR, Guard) und „ein Tab, eine Live-Verbindung: der Einsatz-Strom trägt die Org-Ereignisse mit" (LFH-734). `src/AGENTS.md`: Zeile „Katalog-Schreibrouten gehören in den Stammdaten-Teil-Router (Middleware `stammdaten_live`, Guard aus 4.3); `einsatzliste` nur über den Helfer" (LFH-734). Kommentar im Kopf von `useEinsatzLiveStream.ts` nachziehen. Prettier für `frontend/` grün.
 
 ## 9. Integration
 

@@ -74,6 +74,19 @@ Allowlist `ERLAUBTE_MIME_ERFASSUNG` (Spiegel `ERFASSUNG_ACCEPT` in `api/upload.t
 `anhang::pruefe_vor_persist` vor, Anhang + Linker + ETB in EINEM `write_retry!`. Entfernen =
 Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 409.
 
+## Backend — Org-Ereignisse (LFH-734)
+
+Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und
+`stammdaten` (`OrgLiveEvent`), Nutzlast `{}`, ohne `id:` und nie im Ring eines Einsatzes.
+- **`einsatzliste` nur über `live::org::einsatzliste_melden`** nach dem Commit (Leser = org-weite
+  Leser, System-Admins, Mitglieder, dazu eine gerade entfernte Person); ein Löschweg liest die
+  Leser VOR dem `DELETE` (`einsatzleser_lesen`, `Einsatzleser::melden`). Jeder `einsatz`-Emitter
+  läuft über `routes::einsatz::kopf_geaendert`, das beide meldet. Nie ein leeres Ereignis an die
+  ganze Org für etwas Einsatzbezogenes: das ist der Metadaten-Kanal, den F01 geschlossen hat.
+- **Katalog-Schreibrouten liegen unter einem Präfix aus `STAMMDATEN_PFADE`** (Middleware
+  `stammdaten_live`); ein neuer Katalogpfad braucht einen Eintrag, Guard
+  `tests/stammdaten_live_guard.rs`.
+
 ## Backend — Demo-Daten zur Laufzeit (LFH-690)
 
 `src/demo/`, `src/routes/demo_daten.rs`; Schalter `--demo-daten`/`LIFELINE_DEMO_DATEN=true`

@@ -160,6 +160,66 @@ describe('App-Routing', () => {
     });
   });
 
+  // LFH-734: ein Tab, eine Live-Verbindung. Im Einsatz trägt der Einsatz-Strom die
+  // Org-Ereignisse mit, außerhalb öffnet die Betriebszeile den Org-Strom, ohne Anmeldung keiner.
+  describe('Live-Verbindung je Route (LFH-734)', () => {
+    const urls: { url: string; closed: boolean }[] = [];
+    class AufzeichnendeEventSource {
+      eintrag: { url: string; closed: boolean };
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(url: string) {
+        this.eintrag = { url, closed: false };
+        urls.push(this.eintrag);
+      }
+      addEventListener() {}
+      removeEventListener() {}
+      close() {
+        this.eintrag.closed = true;
+      }
+    }
+    const offene = () => urls.filter((u) => !u.closed).map((u) => u.url);
+    afterEach(() => {
+      urls.length = 0;
+      vi.unstubAllGlobals();
+    });
+
+    it('auf der Einsatzliste genau eine Verbindung zum Org-Strom', async () => {
+      vi.stubGlobal('EventSource', AufzeichnendeEventSource);
+      server.use(
+        meHandler(admin),
+        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      );
+      renderApp('/einsaetze');
+      expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
+      await waitFor(() => expect(offene()).toEqual(['/api/live']));
+    });
+
+    it('im Einsatz genau eine Verbindung, die zum Einsatz-Strom', async () => {
+      vi.stubGlobal('EventSource', AufzeichnendeEventSource);
+      server.use(
+        meHandler(admin),
+        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      );
+      renderApp('/einsaetze/7/ueberblick');
+      expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
+      await waitFor(() => expect(offene()).toEqual(['/api/einsaetze/7/live']));
+    });
+
+    it('ohne Anmeldung keine Verbindung', async () => {
+      vi.stubGlobal('EventSource', AufzeichnendeEventSource);
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+        http.get('/api/dev/users', () => HttpResponse.json([])),
+        http.get('/api/auth/providers', () => HttpResponse.json([])),
+      );
+      renderApp('/');
+      expect(await screen.findByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
+      expect(offene()).toEqual([]);
+    });
+  });
+
   it('zeigt auf /einsaetze genau eine globale Betriebszeile, wenn der Browser offline ist', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     server.use(

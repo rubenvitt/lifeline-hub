@@ -7,7 +7,7 @@
  * `useEinsatzLiveStream` meldet weiter über das window-Ereignis; der Store ist nur die
  * Leseseite davor (Vertrag `useSyncExternalStore` wie `pwa/appAktualisierung`).
  */
-import type { LiveVerbindungsStatus } from './useEinsatzLiveStream';
+import type { LiveVerbindungsStatus } from './liveVerbindung';
 
 let stand: LiveVerbindungsStatus = 'idle';
 const horcher = new Set<() => void>();

@@ -168,9 +168,13 @@ fällt keinem Test auf.
   `ORG_STREAM_EVENTS`. Der Einsatz-Hook hängt sie zusätzlich an und nimmt die Org-Keys in
   `lagged` und den Wiederaufbau auf.
 - `live/useOrgLiveStream.ts` (neu), gehostet in `BetriebsLayout`: aktiv nur mit angemeldetem
-  Benutzer und nur, wenn keine Route `/einsaetze/:id/*` passt. Die Bedingung kommt aus derselben
-  Pfadangabe wie die Route in `App.tsx`, damit beide nicht auseinanderlaufen. Statusmeldungen
-  laufen über dasselbe `lfh:live-status`, denn es ist immer nur ein Strom aktiv.
+  Benutzer und nur, solange kein Einsatz-Strom offen ist. Das meldet der Einsatz-Hook selbst
+  über einen kleinen Zähler (`live/einsatzStromStore.ts`, `useSyncExternalStore`). Umgesetzt
+  so statt über einen Pfadabgleich auf `/einsaetze/:id/*`: Der Zähler bildet ab, ob die
+  Einsatz-Verbindung tatsächlich besteht. „Eine Verbindung je Tab" hängt damit nicht an der
+  Routendefinition, auch nicht bei einer verbogenen Einsatz-ID, die auf die Liste umleitet.
+  Statusmeldungen laufen über dasselbe `lfh:live-status`, denn es ist immer nur ein Strom
+  aktiv.
 
 ### D7 Zulassung und Route
 

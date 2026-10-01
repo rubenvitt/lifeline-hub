@@ -2,7 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
-import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
+import { meldeEinsatzStrom } from './einsatzStromStore';
+import { oeffneLiveVerbindung } from './liveVerbindung';
+import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
 
 /**
  * EINE SSE-Verbindung für den gesamten Einsatz-Live-Feed.
@@ -18,24 +20,17 @@ import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
  * Listener, Invalidierung und lagged-Vollabgleich werden aus `EINSATZ_STREAM_EVENTS`
  * (`api/queryKeys.ts`) abgeleitet; ein neues Live-Modul ist ein Map-Eintrag. Nur Ereignisse
  * mit Seiteneffekt (`sofortmeldung`, Erinnerung, Ablösung) und `lagged` stehen explizit hier.
+ *
+ * Der Strom trägt auch die Org-Ereignisse `einsatzliste` und `stammdaten` (LFH-734): im Einsatz
+ * bleibt es bei dieser einen Verbindung, der Org-Strom `/api/live` ruht so lange
+ * (`einsatzStromStore.ts`). `lagged` und jeder Wiederaufbau frischen auch die Org-Keys auf.
+ * Verbindungsbau, Backoff und Status: `liveVerbindung.ts`.
  */
-/**
- * Verbindungsstatus des Live-Feeds, gemeldet per window-CustomEvent `lfh:live-status`, damit
- * der Hook render-state-frei und EINE EventSource bleibt.
- */
-export type LiveVerbindungsStatus = 'idle' | 'open' | 'connecting' | 'lost';
-
-/** Exponentieller Backoff (ms) für den manuellen Reconnect, wenn der Browser aufgibt
-    (readyState CLOSED) und die Session noch gültig ist. */
-const RECONNECT_BACKOFF_MS = [1000, 3000, 10000, 30000];
-
 export function useEinsatzLiveStream(einsatzId: number): void {
   const qc = useQueryClient();
   useEffect(() => {
     const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
     const invalAlle = (keys: readonly string[]) => keys.forEach(inval);
-    const meldeStatus = (status: LiveVerbindungsStatus) =>
-      window.dispatchEvent(new CustomEvent('lfh:live-status', { detail: { status } }));
 
     const listeners: [string, EventListener][] = Object.entries(EINSATZ_STREAM_EVENTS).map(
       ([event, keys]) => [event, () => invalAlle(keys)],
@@ -44,7 +39,13 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // lagged (Reconnect/Overflow) → alle Registry-Keys refetchen. Bewusst OHNE Ton, sonst
     // Fehlalarm ohne neue Sofortmeldung.
     const alleKeys = [...new Set(Object.values(EINSATZ_STREAM_EVENTS).flat())];
-    listeners.push(['lagged', () => invalAlle(alleKeys)]);
+    const vollabgleich = () => {
+      invalAlle(alleKeys);
+      invalidiereOrgLiveKeys(qc);
+    };
+    listeners.push(['lagged', vollabgleich]);
+    // Org-Ereignisse auf derselben Verbindung (LFH-734).
+    listeners.push(...orgListener(qc));
 
     // Sofortmeldung: Listen aktualisieren UND alarmieren (Ton + Toast). Der Toast läuft über ein
     // window-CustomEvent (AlarmZentrale im Layout). NICHT im lagged-Fan-out.
@@ -107,83 +108,16 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['abloesung', onAbloesung as EventListener]);
 
-    // Reconnect-Resync + sichtbarer Fehlerpfad:
-    // - `ersterOpen` ist EFFEKT-lokal (kein useRef), sonst hielte ein StrictMode-Doppelmount den
-    //   Erst-Open des zweiten Mounts für einen Reconnect. Der Erst-Open invalidiert nicht; jeder
-    //   Folge-Open resynct wie `lagged`.
-    // - `onerror` bei CONNECTING → der Browser reconnectet selbst; bei CLOSED hat er aufgegeben
-    //   (typisch 401) → Auth proben, dann Login-Flow (401) oder manueller Reconnect per Backoff.
-    let ersterOpen = true;
-    let abgebrochen = false;
-    let backoffStufe = 0;
-    let backoffTimer: ReturnType<typeof setTimeout> | null = null;
-    let aktuelle: EventSource | null = null;
-
-    const probeUndReconnect = async (tote: EventSource) => {
-      if (abgebrochen) return;
-      let sessionGueltig = true;
-      try {
-        const res = await fetch('/api/auth/me', {
-          credentials: 'same-origin',
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (res.status === 401) sessionGueltig = false;
-      } catch {
-        // Netzfehler bei der Probe → wie gültige Session behandeln und per Backoff weiter versuchen.
-      }
-      if (abgebrochen) return;
-      if (!sessionGueltig) {
-        // Session abgelaufen → die Sitzungswache übernimmt (ein 401-Pfad für SSE und HTTP).
-        meldeSitzungAbgelaufen();
-        return;
-      }
-      tote.close();
-      const wartezeit =
-        RECONNECT_BACKOFF_MS[Math.min(backoffStufe, RECONNECT_BACKOFF_MS.length - 1)];
-      backoffStufe += 1;
-      backoffTimer = setTimeout(() => {
-        if (!abgebrochen) verbinde();
-      }, wartezeit);
-    };
-
-    const verbinde = () => {
-      const quelle = new EventSource(`/api/einsaetze/${einsatzId}/live`);
-      aktuelle = quelle;
-      listeners.forEach(([event, handler]) => quelle.addEventListener(event, handler));
-      quelle.onopen = () => {
-        meldeStatus('open');
-        backoffStufe = 0;
-        if (ersterOpen) {
-          ersterOpen = false;
-        } else {
-          // Reconnect: verpasste Events sind möglich → Voll-Resync wie `lagged`, ohne Ton.
-          invalAlle(alleKeys);
-        }
-      };
-      quelle.onerror = () => {
-        if (quelle.readyState === EventSource.CONNECTING) {
-          meldeStatus('connecting'); // Browser reconnectet selbst
-        } else if (quelle.readyState === EventSource.CLOSED) {
-          meldeStatus('lost');
-          void probeUndReconnect(quelle);
-        }
-      };
-    };
-
-    verbinde();
-
+    // Reconnect-Resync: der Erst-Open invalidiert nicht, jeder Folge-Open gleicht ab wie `lagged`.
+    const schliessen = oeffneLiveVerbindung({
+      url: `/api/einsaetze/${einsatzId}/live`,
+      listeners,
+      beiWiederaufbau: vollabgleich,
+    });
+    const abmelden = meldeEinsatzStrom();
     return () => {
-      abgebrochen = true;
-      if (backoffTimer) clearTimeout(backoffTimer);
-      if (aktuelle) {
-        listeners.forEach(([event, handler]) => aktuelle!.removeEventListener(event, handler));
-        aktuelle.onopen = null;
-        aktuelle.onerror = null;
-        aktuelle.close();
-      }
-      // Die Betriebszeile bleibt global gemountet; ohne `idle` stünde ein früheres `lost` nach
-      // Verlassen des Einsatzes auf `/profil` oder `/admin` weiter da.
-      meldeStatus('idle');
+      schliessen();
+      abmelden();
     };
   }, [einsatzId, qc]);
 }
