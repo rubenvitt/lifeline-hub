@@ -6,7 +6,6 @@ import { modulRegistry } from './modulRegistry';
 import {
   berechneAbloesungZaehler,
   berechneBetreuungZaehler,
-  berechneDokumentZaehler,
   bildeZaehler,
   darfZaehlerZeigen,
   ZAEHLER_QUELLEN,
@@ -47,13 +46,12 @@ describe('Modul-Zähler', () => {
       chat: { wert: 1, beschreibung: '1 ungelesene Chat-Nachricht' },
     });
 
-    expect(berechneDokumentZaehler([{}, {}, {}])).toEqual({
-      wert: 3,
-      beschreibung: '3 abgelegte Dokumente',
+    // Dokumente zählt seit LFH-666 der Server; der Wortlaut bleibt der des Browser-Zählers.
+    expect(bildeZaehler({ dokumente: { gesamt: 3 } })).toEqual({
+      dokumente: { wert: 3, beschreibung: '3 abgelegte Dokumente' },
     });
-    expect(berechneDokumentZaehler([{}])).toEqual({
-      wert: 1,
-      beschreibung: '1 abgelegtes Dokument',
+    expect(bildeZaehler({ dokumente: { gesamt: 1 } })).toEqual({
+      dokumente: { wert: 1, beschreibung: '1 abgelegtes Dokument' },
     });
   });
 

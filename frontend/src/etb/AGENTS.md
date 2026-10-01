@@ -23,7 +23,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
   Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
 - **Modulzähler** (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
-  Abschnitte als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat als Handlungsmenge. Ohne
+  Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat als
+  Handlungsmenge. Ablösung (Uhr) und Betreuung zählt der Browser (`ClientZaehlerQuelle`). Ohne
   Recht **fehlt** das Modul (`berechtigung::erlaubte_module`). Wer eine gezählte Liste invalidiert,
   invalidiert `modulZaehler` mit (`ZAEHLER_LISTEN_KEYS`, `queryKeys.test.ts`).
 - Jede Zeile trägt `data-lfh="datensicht-karte"` und die Zeilenklasse (`scrolleZurZeile`,

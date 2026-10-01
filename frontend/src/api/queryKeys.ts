@@ -189,7 +189,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
   ],
   // Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
-  dokument: [EINSATZ_KEYS.dokumente],
+  dokument: [EINSATZ_KEYS.dokumente, EINSATZ_KEYS.modulZaehler],
   // Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix (Sub-Keys 'liste'/'vorgaben'). Trägt
   // das Ereignis `art`, stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Hook).
   // Der Vollzug beendet die Einsatzperiode der abgelösten Einheit (LFH-552).
