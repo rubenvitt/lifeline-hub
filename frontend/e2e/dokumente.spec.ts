@@ -585,6 +585,9 @@ for (const modus of ['light', 'dark'] as const) {
     // (LFH-652, Nachtrag aus LFH-690).
     const abbrechen = dialog.locator('button.ant-btn', { hasText: 'Abbrechen' });
     await abbrechen.hover();
+    // Erst nach dem Farbübergang messen: mitten in der Transition läge die Beschriftung noch nahe
+    // am Ruheton und bestünde den Boden, egal welchen Hover-Ton antd ansteuert.
+    await abbrechen.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
     await pruefe(abbrechen, KONTRAST_ZIEL[modus], `${modus}/Abbrechen unter dem Zeiger`);
     werte.push(`Abbrechen unter dem Zeiger: ${(await kontrast(abbrechen)).verhaeltnis.toFixed(2)}`);
     await testInfo.attach(`Kontrast ${modus}`, {

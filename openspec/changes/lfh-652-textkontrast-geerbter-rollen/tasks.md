@@ -23,15 +23,15 @@ Test rot macht.
 
 ## 4. Browsermessung (Spec „Böden für geerbten Text“)
 
-- [ ] 4.1 `e2e/dokumente.spec.ts`, Test „Kontrast …“: Der „geerbt“-Block (Tabellenkopf, „—“) und die Pflichtmeldung prüfen gegen `KONTRAST_ZIEL[modus]` statt `KONTRAST_BODEN`. Der Anhang mit den Messwerten bleibt. Verifikation: Vor der Umsetzung 1–3 wäre der Test rot (Tag), nach ihr ist er in beiden Modi grün.
-- [ ] 4.2 Ebenda: „Abbrechen“ im Ablegen-Dialog unter dem Zeiger (`hover()`, Messung mit `pruefe`) gegen `KONTRAST_ZIEL[modus]`. Verifikation: rot mit `defaultHoverColor` zurückgedreht.
-- [ ] 4.3 Titel-Link einer `Datensicht` mit `titel.ziel` ohne lokale Farbe (react-router-`Link`, erbt `colorLink`), etwa in der Schadensliste. Gemessen in beiden Modi gegen 7/5 in einer bestehenden Kontrast-Spec oder in `dokumente.spec.ts`, wenn sich dort ein Datensicht-Link findet. Verifikation: rot mit `colorLink` zurückgedreht.
-- [ ] 4.4 Mutationsproben aus `design.md` E6 einzeln ausführen und das Ergebnis (welcher Test wird rot) im PR-Text festhalten. Verifikation: Jede der fünf Rücknahmen macht mindestens einen Test rot.
+- [x] 4.1 `e2e/dokumente.spec.ts`, Test „Kontrast …“: Der „geerbt“-Block (Tabellenkopf, „—“) und die Pflichtmeldung prüfen gegen `KONTRAST_ZIEL[modus]` statt `KONTRAST_BODEN`. Der Anhang mit den Messwerten bleibt. Verifikation: Vor der Umsetzung 1–3 wäre der Test rot (Tag), nach ihr ist er in beiden Modi grün.
+- [x] 4.2 Ebenda: „Abbrechen“ im Ablegen-Dialog unter dem Zeiger (`hover()`, Messung mit `pruefe`) gegen `KONTRAST_ZIEL[modus]`. Verifikation: rot mit `defaultHoverColor` zurückgedreht.
+- [x] 4.3 Titel-Link einer `Datensicht` mit `titel.ziel` ohne lokale Farbe (react-router-`Link`, erbt `colorLink`), etwa in der Schadensliste. Gemessen in beiden Modi gegen 7/5 in einer bestehenden Kontrast-Spec oder in `dokumente.spec.ts`, wenn sich dort ein Datensicht-Link findet. Verifikation: rot mit `colorLink` zurückgedreht.
+- [x] 4.4 Mutationsproben aus `design.md` E6 einzeln ausführen und das Ergebnis (welcher Test wird rot) im PR-Text festhalten. Verifikation: Jede der fünf Rücknahmen macht mindestens einen Test rot.
 
 ## 5. Regeln und Prüfspur
 
 - [x] 5.1 `frontend/AGENTS.md`, Farbachsen: Die Regel „Blauer Bedien-TEXT nimmt `rollen.bedienText`, nicht `colorLink`“ fortschreiben. `colorLink` ist `bedienText` (`tokens.ts`), ein lokales `style` dafür ist unnötig. Beschreibung und Tabellenkopf lesen `gedaempft`, Formularmeldungen lesen `alarmText`/`achtungText`. Verweis auf diese Change. Verifikation: Prettier über `frontend/` ist grün, die Datei bleibt die einzige Fundstelle der Regel.
-- [ ] 5.2 `docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md`: Die Zeilen 1 · 5 und 2 · 5 (LFH-652) mit den neuen Messwerten aus dem e2e-Anhang nachtragen. Verifikation: Die Werte stimmen mit dem Anhang des Laufs überein.
+- [x] 5.2 `docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md`: Die Zeilen 1 · 5 und 2 · 5 (LFH-652) mit den neuen Messwerten aus dem e2e-Anhang nachtragen. Verifikation: Die Werte stimmen mit dem Anhang des Laufs überein.
 - [x] 5.3 ClickUp: Folgetask „Hervorhebungsfläche `flaeche3` am Tag unter 7 : 1 für `bedienText`/`gedaempft`“ per `clickup-task-anlegen`. Kommentar an LFH-643, dass „Seitenbeschreibung“ hier gelöst ist. Verifikation: Task-ID steht im PR-Text.
 
 ## 6. Abschluss
