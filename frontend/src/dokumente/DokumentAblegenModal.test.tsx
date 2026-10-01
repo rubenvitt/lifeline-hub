@@ -1,11 +1,11 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, isInaccessible, screen, within } from '@testing-library/react';
+import { act, fireEvent, isInaccessible, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { ApiError } from '../api/client';
+import { ApiError, AusgangUnbekannt, NetzFehler, type UploadFortschritt } from '../api/client';
 import DokumentAblegenModal from './DokumentAblegenModal';
 
 vi.mock('../api/dokumente', async (importOriginal) => {
@@ -14,6 +14,7 @@ vi.mock('../api/dokumente', async (importOriginal) => {
 });
 import { legeDokumentAb } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
+import * as queue from '../offline/queue';
 
 const legeAb = vi.mocked(legeDokumentAb);
 
@@ -306,5 +307,169 @@ describe('DokumentAblegenModal', () => {
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
     expect(knopf).toHaveAttribute('type', 'submit');
+  });
+});
+
+/**
+ * LFH-654 (Prüfliste LFH-632, Zeile 2 · 3): Fortschritt, Prüfphase und eine Fehlermeldung, die
+ * die Phase des Abbruchs nennt. `legeDokumentAb` ist gemockt; der Test steuert den Rückruf.
+ */
+describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
+  /** Startet eine Ablage, die erst auf `erfuellen`/`ablehnen` endet. */
+  async function starteAblage() {
+    let melde: ((f: UploadFortschritt) => void) | undefined;
+    let erfuellen!: (wert: unknown) => void;
+    let ablehnen!: (e: unknown) => void;
+    legeAb.mockImplementation((_id, _eingabe, onFortschritt) => {
+      melde = onFortschritt;
+      return new Promise((res, rej) => {
+        erfuellen = res as (wert: unknown) => void;
+        ablehnen = rej;
+      });
+    });
+    rendere();
+    const d = await dialog();
+    await fuellePflicht(d, pdf(), 'Mein Plan');
+    await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
+    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    const fortschritt = (f: UploadFortschritt) => act(() => melde!(f));
+    return { d, fortschritt, erfuellen, ablehnen };
+  }
+
+  it('zeigt den Balken sofort nach dem Absenden, noch vor dem ersten Byte-Ereignis', async () => {
+    const { d } = await starteAblage();
+    const balken = await within(d).findByRole('progressbar', { name: 'Wird hochgeladen' });
+    expect(balken).not.toHaveAttribute('aria-valuenow');
+  });
+
+  it('zeigt den Anteil der übertragenen Bytes in Prozent und sperrt „Ablegen“', async () => {
+    const { d, fortschritt } = await starteAblage();
+    fortschritt({ phase: 'senden', anteil: 0.25 });
+    const balken = await within(d).findByRole('progressbar', { name: 'Wird hochgeladen · 25 %' });
+    expect(balken).toHaveAttribute('aria-valuenow', '25');
+    expect(within(d).getByRole('button', { name: /Ablegen/ })).toHaveClass('ant-btn-loading');
+  });
+
+  it('geht nie zurück: ein kleinerer Stand nach 40 % bleibt bei 40 %', async () => {
+    const { d, fortschritt } = await starteAblage();
+    fortschritt({ phase: 'senden', anteil: 0.4 });
+    fortschritt({ phase: 'senden', anteil: 0.3 });
+    await within(d).findByRole('progressbar', { name: 'Wird hochgeladen · 40 %' });
+    expect(within(d).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
+  });
+
+  it('zeigt ohne bekannte Gesamtgröße einen Balken ohne Zahl', async () => {
+    const { d, fortschritt } = await starteAblage();
+    fortschritt({ phase: 'senden', anteil: null });
+    const balken = await within(d).findByRole('progressbar', { name: 'Wird hochgeladen' });
+    expect(balken).not.toHaveAttribute('aria-valuenow');
+  });
+
+  it('wechselt nach dem letzten Byte auf „Datei wird geprüft“ ohne Zahl', async () => {
+    const { d, fortschritt } = await starteAblage();
+    fortschritt({ phase: 'senden', anteil: 1 });
+    fortschritt({ phase: 'pruefen' });
+    const balken = await within(d).findByRole('progressbar', { name: 'Datei wird geprüft' });
+    expect(balken).not.toHaveAttribute('aria-valuenow');
+    expect(within(d).queryByText(/%/)).not.toBeInTheDocument();
+    // Ein spätes `progress` nach der Prüfphase holt die Prozentzahl nicht zurück.
+    fortschritt({ phase: 'senden', anteil: 1 });
+    expect(within(d).getByRole('progressbar', { name: 'Datei wird geprüft' })).toBeInTheDocument();
+  });
+
+  it('die Ansage-Region spricht in 10-%-Schritten, nicht bei jedem Ereignis', async () => {
+    const { d, fortschritt } = await starteAblage();
+    fortschritt({ phase: 'senden', anteil: 0.21 });
+    const region = await vi.waitFor(() => {
+      const r = d.querySelector('[aria-live="polite"]');
+      expect(r).toHaveTextContent('Wird hochgeladen · 20 %');
+      return r!;
+    });
+    fortschritt({ phase: 'senden', anteil: 0.27 });
+    expect(region).toHaveTextContent('Wird hochgeladen · 20 %');
+  });
+
+  it('räumt den Fortschritt nach Erfolg: beim Wiederöffnen steht keiner mehr', async () => {
+    const { d, fortschritt, erfuellen } = await starteAblage();
+    fortschritt({ phase: 'pruefen' });
+    await within(d).findByRole('progressbar', { name: 'Datei wird geprüft' });
+    await act(async () => erfuellen({}));
+    await warteBisDialogWeg();
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    const neu = await dialog();
+    expect(within(neu).queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(within(neu).queryByText('Datei wird geprüft')).not.toBeInTheDocument();
+  });
+
+  it('ein abgebrochener Lauf schreibt nicht in die Anzeige des nächsten', async () => {
+    const melder: ((f: UploadFortschritt) => void)[] = [];
+    legeAb.mockImplementation((_id, _eingabe, onFortschritt) => {
+      melder.push(onFortschritt!);
+      return new Promise(() => undefined);
+    });
+    rendere();
+    let d = await dialog();
+    await fuellePflicht(d, pdf(), 'Erster');
+    await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
+    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    await warteBisDialogWeg();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    d = await dialog();
+    await fuellePflicht(d, pdf(), 'Zweiter');
+    await userEvent.click(within(d).getByRole('button', { name: /Ablegen/ }));
+    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
+    act(() => melder[1]({ phase: 'senden', anteil: 0.1 }));
+    // Die alte Übertragung läuft serverseitig weiter und meldet noch.
+    act(() => melder[0]({ phase: 'pruefen' }));
+    expect(
+      await within(d).findByRole('progressbar', { name: 'Wird hochgeladen · 10 %' }),
+    ).toBeInTheDocument();
+    expect(within(d).queryByRole('progressbar', { name: 'Datei wird geprüft' })).toBeNull();
+  });
+
+  it('Leitung reißt beim Senden ab: „nichts abgelegt“, Felder bleiben, kein Fortschritt', async () => {
+    const { d, fortschritt, ablehnen } = await starteAblage();
+    fortschritt({ phase: 'senden', anteil: 0.6 });
+    await act(async () => ablehnen(new NetzFehler()));
+    const alarm = await within(d).findByRole('alert');
+    expect(alarm).toHaveTextContent('Nicht abgelegt');
+    expect(alarm).toHaveTextContent('Keine Verbindung');
+    expect(alarm).toHaveTextContent('NICHT abgeschickt');
+    expect(within(d).queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Mein Plan');
+    expect(within(d).getByText('Lageplan Nord.pdf')).toBeInTheDocument();
+    expect(within(d).getByText('Lagekarte/Plan')).toBeInTheDocument();
+  });
+
+  it('Antwort bleibt nach dem letzten Byte aus: „unklar, Liste prüfen“, nicht „nicht abgeschickt“', async () => {
+    const { d, fortschritt, ablehnen } = await starteAblage();
+    fortschritt({ phase: 'pruefen' });
+    await act(async () => ablehnen(new AusgangUnbekannt()));
+    const alarm = await within(d).findByRole('alert');
+    expect(alarm).toHaveTextContent('Ablage unklar');
+    expect(alarm).toHaveTextContent(/unklar/);
+    expect(alarm).toHaveTextContent(/Liste prüfen/);
+    expect(alarm).not.toHaveTextContent('NICHT abgeschickt');
+    expect(alarm).not.toHaveTextContent('Nicht abgelegt');
+    expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Mein Plan');
+  });
+
+  it('ohne Verbindung wird nichts vorgemerkt, und ein zweites „Ablegen“ sendet erneut', async () => {
+    const einreihen = vi.spyOn(queue, 'schreibaktionEinreihen');
+    const { d, ablehnen } = await starteAblage();
+    await act(async () => ablehnen(new NetzFehler()));
+    await within(d).findByRole('alert');
+    expect(einreihen).not.toHaveBeenCalled();
+
+    legeAb.mockResolvedValue({} as never);
+    await userEvent.click(within(d).getByRole('button', { name: /Ablegen/ }));
+    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
+    expect(legeAb.mock.calls[1][1]).toMatchObject({
+      titel: 'Mein Plan',
+      kategorie: 'lagekarte_plan',
+    });
+    expect(einreihen).not.toHaveBeenCalled();
   });
 });

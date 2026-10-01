@@ -46,6 +46,13 @@ import DownloadAnker from '../components/DownloadAnker';
  * Primitiv (`PrimaerAktion` mit `bestaetigung` und `bestaetigungGefahr`): der Auslöser bleibt
  * neutral („Rot bedient nichts"). `zugaenglicherName` trägt den Titel, damit n Karten nicht n
  * gleichnamige „Entfernen"-Knöpfe liefern.
+ *
+ * Zwischen Bestätigung und Serverantwort (LFH-654, Prüfliste LFH-632 Zeile 1 · 3) bleibt die Zeile
+ * stehen: ihr Auslöser lädt (Tabelle und Karte, `PrimaerAktion.laeuft`), und neben dem Titel steht
+ * „wird entfernt“ als Text — NEBEN dem Anker, damit sein zugänglicher Name gleich bleibt. Kein
+ * optimistisches Ausblenden: die Zeilen darunter rückten unter dem Zeiger weg (Kriterium 12).
+ * Die Menge `entferntGerade` räumt erst, wenn die Liste nach dem Erfolg neu geladen ist
+ * (`onSuccess` wartet auf die Invalidierung), sonst stünde die Zeile kurz ohne Zusatz da.
  */
 
 const rechteText = (status: EinsatzStatus) =>
@@ -70,6 +77,7 @@ const dokumentSpalten = (
   einsatzId: number,
   darfSchreiben: boolean,
   onEntfernen: (d: Dokument) => void,
+  entferntGerade: ReadonlySet<number>,
 ) =>
   spaltenFuer<Dokument>()([
     {
@@ -78,13 +86,23 @@ const dokumentSpalten = (
       immerSichtbar: true,
       sortWert: (d) => d.titel,
       suchText: (d) => `${d.titel} ${d.dateiname}`,
-      render: (_, d) => (
-        <DownloadAnker
-          href={dokumentDownloadPfad(einsatzId, d.id)}
-          dateiname={d.dateiname}
-          text={d.titel}
-        />
-      ),
+      render: (_, d) => {
+        const anker = (
+          <DownloadAnker
+            href={dokumentDownloadPfad(einsatzId, d.id)}
+            dateiname={d.dateiname}
+            text={d.titel}
+          />
+        );
+        return entferntGerade.has(d.id) ? (
+          <span>
+            {anker}
+            <span> · wird entfernt</span>
+          </span>
+        ) : (
+          anker
+        );
+      },
     },
     {
       title: 'Kategorie',
@@ -145,11 +163,13 @@ const dokumentSpalten = (
                 okText="Entfernen"
                 okButtonProps={{ danger: true }}
                 onConfirm={() => onEntfernen(d)}
+                disabled={entferntGerade.has(d.id)}
               >
                 <Button
                   danger
                   type="text"
                   icon={<IkoneMuelleimer />}
+                  loading={entferntGerade.has(d.id)}
                   aria-label={`Dokument ${d.titel} entfernen`}
                 />
               </Popconfirm>
@@ -164,6 +184,7 @@ type DokumentSpaltenKey = ReturnType<typeof dokumentSpalten>[number]['key'];
 const dokumentKarte = (
   darfSchreiben: boolean,
   onEntfernen: (d: Dokument) => void,
+  entferntGerade: ReadonlySet<number>,
 ): Kartenplan<Dokument, DokumentSpaltenKey> => ({
   art: 'plan',
   // KEIN `ziel` — siehe Dateikopf: der Download-Anker kommt aus dem Spalten-`render`.
@@ -177,6 +198,7 @@ const dokumentKarte = (
         // Unumkehrbar: OK der Rückfrage rot, der Auslöser bleibt neutral (Datensicht-Vertrag).
         bestaetigungGefahr: true,
         zugaenglicherName: (d) => `Dokument ${d.titel} entfernen`,
+        laeuft: (d) => entferntGerade.has(d.id),
         onKlick: onEntfernen,
       }
     : undefined,
@@ -190,6 +212,7 @@ export default function DokumentePage() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [ablegenOffen, setAblegenOffen] = useState(false);
+  const [entferntGerade, setEntferntGerade] = useState<ReadonlySet<number>>(() => new Set());
 
   // Live gehalten über den Einsatz-Stream (`dokument`-Ereignis → 'einsatz-dokumente').
   const einsatzQuery = useQuery({
@@ -203,22 +226,30 @@ export default function DokumentePage() {
 
   const entfernenMutation = useMutation({
     mutationFn: (dokumentId: number) => entferneDokument(einsatzId, dokumentId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: einsatzKeys.dokumente(einsatzId) });
-      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    // Optionsebene statt Aufruf-Rückruf: bei zwei laufenden Löschungen räumt jede ihre eigene ID.
+    onMutate: (dokumentId) => setEntferntGerade((alt) => new Set(alt).add(dokumentId)),
+    onSettled: (_daten, _fehler, dokumentId) =>
+      setEntferntGerade((alt) => {
+        const neu = new Set(alt);
+        neu.delete(dokumentId);
+        return neu;
+      }),
+    onSuccess: async () => {
       message.success('Dokument entfernt');
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      await qc.invalidateQueries({ queryKey: einsatzKeys.dokumente(einsatzId) });
     },
   });
   const { mutate: entfernen } = entfernenMutation;
 
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
   const spalten = useMemo(
-    () => dokumentSpalten(einsatzId, darfSchreibenRoh, (d) => entfernen(d.id)),
-    [einsatzId, darfSchreibenRoh, entfernen],
+    () => dokumentSpalten(einsatzId, darfSchreibenRoh, (d) => entfernen(d.id), entferntGerade),
+    [einsatzId, darfSchreibenRoh, entfernen, entferntGerade],
   );
   const karte = useMemo(
-    () => dokumentKarte(darfSchreibenRoh, (d) => entfernen(d.id)),
-    [darfSchreibenRoh, entfernen],
+    () => dokumentKarte(darfSchreibenRoh, (d) => entfernen(d.id), entferntGerade),
+    [darfSchreibenRoh, entfernen, entferntGerade],
   );
 
   // Schnellaktion: ?neu=1 öffnet den Dialog (Command-Palette). Param immer löschen, Dialog nur mit

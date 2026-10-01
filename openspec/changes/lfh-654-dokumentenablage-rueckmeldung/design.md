@@ -75,8 +75,10 @@ würde als „nicht angekommen“ gelesen, das Dokument erschiene danach doch.
 
 ### D3 Fortschrittsanzeige im Dialog
 
-`DokumentAblegenModal` hält `fortschritt` als State, setzt ihn in `mutationFn` über
-`onFortschritt` und leert ihn bei Erfolg, Fehler und Schließen. Angezeigt wird er unter dem
+`DokumentAblegenModal` hält `fortschritt` als State, setzt ihn in `mutationFn` sofort auf
+„senden ohne Zahl“ und danach über `onFortschritt`, und leert ihn bei Erfolg, Fehler und
+Schließen. Ein Laufzähler verwirft späte Meldungen eines abgebrochenen Laufs („Abbrechen“ lässt
+die Übertragung weiterlaufen). Angezeigt wird er unter dem
 `SpeicherFehler`-Slot mit antds `Progress` (Linie, kein `size`, Farbe aus dem Theme), Etikett
 „Wird hochgeladen · 42 %“ bzw. „Datei wird geprüft“ und `aria-live="polite"` an einem
 Textknoten, der nur bei Phasenwechsel und in 10-%-Schritten neu spricht (kein Ansagestrom bei
@@ -138,8 +140,13 @@ ein späterer Umbau sie bewusst ändert.
 - [jsdom und msw melden kein echtes `upload.onprogress`] → Transporttest mit einer
   `XMLHttpRequest`-Attrappe (`vi.stubGlobal`), Komponententest über ein gemocktes
   `legeDokumentAb`, das `onFortschritt` aufruft. Der Browserbeleg kommt aus dem e2e mit
-  gedrosselter Strecke (CDP `Network.emulateNetworkConditions`) und einer Route, die erst nach
-  der Übertragung antwortet.
+  gedrosselter Strecke (CDP `Network.emulateNetworkConditions`): wenig Upload-Bandbreite für den
+  Prozentlauf, hohe Latenz für die Prüfphase. **Gemessen beim Umsetzen:** eine Route
+  (`page.route`), die die Antwort festhält, taugt nicht — solange Playwright die Anfrage hält,
+  meldet Chromium kein einziges Upload-Ereignis.
+- [Bis zum ersten Byte-Ereignis kein Balken] → beim Umsetzen gefunden (dieselbe Messung): ohne
+  Ereignis stünde nur der drehende Knopf. Der Dialog setzt deshalb beim Absenden sofort
+  `{ phase: 'senden', anteil: null }` — Balken ohne Zahl, bis Bytes gemeldet werden.
 - [Proxy puffert den Request-Body] → dann springt der Balken früh auf 100 % und die Prüfphase
   dauert länger. Die Anzeige bleibt wahr (Bytes beim nächsten Hop), nur gröber.
 - [Zwei Upload-Wege im Client] → Dateikopf von `apiUploadMitFortschritt` nennt `apiUpload` als

@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import UploadFortschrittAnzeige from '../components/UploadFortschritt';
+import { AusgangUnbekannt, NetzFehler, fehlerText, type UploadFortschritt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import DateiFeld from '../components/DateiFeld';
 import {
@@ -39,6 +41,31 @@ const BEZUG_TYPEN: readonly DokumentBezugTyp[] = ['abschnitt', 'einheit', 'etb_e
 const kuerze = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
+/**
+ * Fortschritt nur vorwärts (Spec `dokumentenablage`, „Fortschritt beim Ablegen“): nach der
+ * Prüfphase zählt kein spätes `progress` mehr, und ein kleinerer Anteil senkt die Zahl nicht.
+ */
+function weiter(alt: UploadFortschritt | null, neu: UploadFortschritt): UploadFortschritt {
+  if (alt?.phase === 'pruefen') return alt;
+  if (neu.phase === 'senden' && alt?.phase === 'senden' && alt.anteil != null) {
+    return { phase: 'senden', anteil: Math.max(alt.anteil, neu.anteil ?? alt.anteil) };
+  }
+  return neu;
+}
+
+/**
+ * Überschrift und Text eines Ablage-Fehlers nach der Phase des Abbruchs (LFH-654): ohne Antwort
+ * VOR dem letzten Byte ist nichts abgelegt, DANACH ist der Ausgang unbekannt. Eine Ablehnung des
+ * Servers trägt dessen Meldung (`SpeicherFehler`).
+ */
+function fehlerKopf(fehler: unknown): { titel: string; fallback?: string } {
+  if (fehler instanceof AusgangUnbekannt)
+    return { titel: 'Ablage unklar', fallback: fehlerText(fehler) };
+  if (fehler instanceof NetzFehler)
+    return { titel: 'Nicht abgelegt', fallback: fehlerText(fehler) };
+  return { titel: 'Nicht abgelegt' };
+}
+
 /** Formularwerte → API-Eingabe. Ein unbekannter Präfix fällt weg, statt einen halben Bezug
  *  zu senden. */
 function zuAblage(werte: AblageFormular): DokumentAblage {
@@ -63,6 +90,12 @@ function zuAblage(werte: AblageFormular): DokumentAblage {
  *
  * `mutateAsync`, damit eine Ablehnung die Felder stehen lässt; der Fehler steht als
  * `SpeicherFehler` im Dialog. Die ETB-Einträge lädt der Dialog erst beim Aufklappen des Bezugs.
+ *
+ * Rückmeldung (LFH-654, Prüfliste LFH-632 Zeile 2 · 3): während der Übertragung Prozent aus den
+ * Bytes, danach „Datei wird geprüft“ (`components/UploadFortschritt`). Ohne Verbindung wird
+ * NICHTS vorgemerkt — kein Blob in IndexedDB, keine Offline-Queue (Entscheidung und Gründe:
+ * Change `lfh-654-dokumentenablage-rueckmeldung`, design.md D5); der Dialog bleibt mit Datei
+ * und Feldern stehen, „Ablegen“ versucht es erneut.
  */
 export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }: Props) {
   const { message } = App.useApp();
@@ -72,6 +105,10 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
   /** Welcher Titel zuletzt AUTOMATISCH gesetzt wurde. Nur solange das Feld genau diesen Wert
    *  trägt, darf eine neue Dateiwahl ihn ersetzen — ein getippter Titel bleibt immer stehen. */
   const autoTitel = useRef<string | null>(null);
+  const [fortschritt, setFortschritt] = useState<UploadFortschritt | null>(null);
+  /** Zählt die Läufe. „Abbrechen“ lässt eine Übertragung serverseitig weiterlaufen; ihre späten
+   *  Meldungen dürfen nicht in die Anzeige eines neuen Laufs schreiben. */
+  const lauf = useRef(0);
 
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
@@ -90,7 +127,16 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
   });
 
   const mutation = useMutation({
-    mutationFn: (eingabe: DokumentAblage) => legeDokumentAb(einsatzId, eingabe),
+    mutationFn: (eingabe: DokumentAblage) => {
+      const dieser = ++lauf.current;
+      // Sofort ein Balken ohne Zahl: bis zum ersten Byte-Ereignis (Verbindungsaufbau über
+      // Mobilfunk) vergeht Zeit, und ≤ 100 ms soll etwas zu sehen sein (MIL 5.4.6.4).
+      setFortschritt({ phase: 'senden', anteil: null });
+      return legeDokumentAb(einsatzId, eingabe, (stand) => {
+        if (dieser === lauf.current) setFortschritt((alt) => weiter(alt, stand));
+      });
+    },
+    onSettled: () => setFortschritt(null),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.dokumente(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
@@ -101,6 +147,8 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
   function schliessen() {
     setBezugOffen(false);
     autoTitel.current = null;
+    lauf.current += 1;
+    setFortschritt(null);
     mutation.reset();
     onSchliessen();
   }
@@ -140,7 +188,8 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
       laeuft={mutation.isPending}
       erfassenText="Ablegen"
     >
-      <SpeicherFehler fehler={mutation.error} titel="Nicht abgelegt" />
+      <SpeicherFehler fehler={mutation.error} {...fehlerKopf(mutation.error)} />
+      <UploadFortschrittAnzeige stand={mutation.isPending ? fortschritt : null} />
       {/* Dateifeld samt Vorab-Größenprüfung und Anfangsfokus: `components/DateiFeld`. */}
       <DateiFeld
         accept={DOKUMENT_ACCEPT}
