@@ -34,4 +34,4 @@
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` grün (lokal, sonst belegt durch die CI des PRs mit Verweis auf den Lauf)
+- [x] 7.1 `./scripts/check-all.sh` grün (lokal, sonst belegt durch die CI des PRs mit Verweis auf den Lauf) — lokal am 01.10.2026: Bündel `schnell` grün, Vitest 565 Dateien / 7781 Tests grün, e2e gezielt grün (`fachebenen-kontrast` 8/8, Gate 3 LFH-600 2/2, `betroffene-kontrast`, `lagekarte-touch`, `lagekarte-kartengrundlage`, `lagekarte-smoke`); Rust (unberührt) und die volle e2e-Suite belegt die CI des PRs
