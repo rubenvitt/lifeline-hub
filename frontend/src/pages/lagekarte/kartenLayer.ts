@@ -20,6 +20,8 @@ export interface AktiveFachebene {
   daten: FeatureCollection;
   /** Ebenenfarbe des aktiven Modus (`fachebeneFarbe`, LFH-593). */
   farbe: string;
+  /** Durchmesser der Trefferzone je Punkt = `token.controlHeight` der Dichtestufe (LFH-600). */
+  treffer: number;
 }
 
 /**
@@ -223,7 +225,7 @@ export function reAnlegenAlles(
   sorgeFuerZonenLayer(map, zonen);
   (map.getSource('zonen') as GeoJSONSource | undefined)?.setData(zonen as never);
   for (const fe of fachebenen) {
-    sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe);
+    sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
     setzeFachebeneDaten(map, fe.def.key, fe.daten);
   }
   // Marker zuletzt (= oberste Layer; sorgeFuerMarkerLayer pinnt sie zusätzlich nach oben).
