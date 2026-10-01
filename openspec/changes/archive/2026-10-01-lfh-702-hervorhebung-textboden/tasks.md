@@ -33,5 +33,5 @@ Test rot macht.
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (lokal, soweit die Umgebung es trägt, sonst die CI des PRs). Verifikation: Ausgabe ohne roten Schritt.
+- [x] 5.1 `./scripts/check-all.sh` grün (lokal, soweit die Umgebung es trägt, sonst die CI des PRs). Verifikation: Ausgabe ohne roten Schritt. Lokal am 01.10.2026: `schnell` grün; `frontend` 8197/8198, der eine rote Test (`BemerkungZelle`, Literal des alten `bedienText`) nachgezogen und grün; `e2e` 496 grün, 19 rot, davon 15 auf unverändertem `alpha` ebenso rot (Umgebung: vorinstallierter Chromium 141 statt Build 1234, Abbrüche „session closed“, Download-Name) und 3 bei Wiederholung 9/9 grün (Last). `etb-chronologie` scheitert auf beiden Ständen am selben Browserabbruch. `rust` lokal nicht gefahren (kein Backend-Code geändert). Der volle Lauf ist die CI dieses PRs.
 - [x] 5.2 Review (`superpowers:requesting-code-review`), Befunde abgearbeitet. Verifikation: Es gibt keine offenen bestätigten Befunde. Review vom 01.10.2026: sechs Befunde, alle umgesetzt (Einschwingen in `messe()`, Vorbedingung `td.ant-table-cell-row-hover`, `bedienFlaeche` im Unit-Test, Tageswert im Gate-5-Guard, Fristfehler mit Animationsname und Klasse, Prüflisten-Nachtrag vollständig).
