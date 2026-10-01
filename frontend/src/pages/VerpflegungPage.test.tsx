@@ -7,7 +7,8 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import { AuthProvider } from '../auth/AuthContext';
-import type { ModulOverrides, VerpflegungZeitfenster } from '../api/types';
+import type { ModulFreigaben, VerpflegungZeitfenster } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
 import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
 import { zeitfensterKennung } from '../verpflegung/verpflegungText';
 import { parseNachforderungVorbelegung } from '../routing/deeplinks';
@@ -16,11 +17,12 @@ dayjs.extend(utc);
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
-  overrides: {} as ModulOverrides,
+  /** Modul-Freigaben des Servers; `beforeEach` setzt „alles frei“. */
+  freigaben: {} as ModulFreigaben,
 }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
-  ladeModulOverrides: vi.fn(() => Promise.resolve(einsatz.overrides)),
+  ladeModulFreigaben: vi.fn(() => Promise.resolve(einsatz.freigaben)),
 }));
 
 const listeNachforderungen = vi.fn();
@@ -142,7 +144,7 @@ describe('VerpflegungPage (LFH-634)', () => {
       status: 'aktiv',
       meine_rolle: 'einsatzleitung',
     };
-    einsatz.overrides = {};
+    einsatz.freigaben = freigabenFixture();
     liefert([fruehstueck(), mittag(), abend()]);
     listeNachforderungen.mockResolvedValue([
       { id: 4, bezeichnung: 'Feldküche', art: 'Verpflegung', status: 'eingetroffen' },
@@ -307,9 +309,7 @@ describe('VerpflegungPage (LFH-634)', () => {
     });
 
     it('Modul ausgeblendet: keine Anfrage, kein „Nachfordern", nur „Nachforderung #n"', async () => {
-      einsatz.overrides = {
-        nachforderungen: { einsatz_id: 1, modul_key: 'nachforderungen', sichtbar: false },
-      };
+      einsatz.freigaben = freigabenFixture({ nachforderungen: { sichtbar: false } });
       liefert([
         zeitfenster({
           id: 1,

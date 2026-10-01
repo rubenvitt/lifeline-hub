@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeEinstellungen, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 import { effektivesKoordinatenformat } from '../anzeige/format';
 import { useKoordinatenSystemOverride } from '../anzeige/koordinatenSystemStore';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
@@ -34,13 +33,12 @@ export function useKoordinatenSprung({
   suche: string;
   navigate: (pfad: string, oeffnung?: Oeffnung) => void;
 }): (rest: string) => Befehl | null {
-  const { benutzer } = useAuth();
   const override = useKoordinatenSystemOverride();
   const aktiv = einsatzId != null && modus === 'alles' && erkenneKoordinate(suche) !== null;
 
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId!),
+  const { data: freigaben } = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId!),
     enabled: aktiv,
     staleTime: FRISCH_MS,
   });
@@ -51,33 +49,21 @@ export function useKoordinatenSprung({
     staleTime: FRISCH_MS,
   });
 
-  // `isFetched` statt `isSuccess`, wie beim Datensatz-Finder: ein Fehlschlag legt den Sprung
-  // nicht dauerhaft still, dann gilt der Registry-Default.
-  const rechteBekannt = overridesQuery.isFetched;
-  const overrides = overridesQuery.data;
+  // Ohne Freigaben (laden, Fehler) kein Sprung: `istModulFreigegeben` gibt Unbekanntes nicht frei
+  // (LFH-669, Spec `modul-freigabe`).
   const einsatzFormat = einstellungenQuery.data?.koordinatenformat;
   const orgFormat = einstellungenQuery.data?.org_defaults?.koordinatenformat;
 
   return useCallback(
     (rest: string) => {
-      if (einsatzId == null || modus !== 'alles' || !rechteBekannt) return null;
+      if (einsatzId == null || modus !== 'alles') return null;
       const lagekarte = modulRegistry.find((m) => m.key === 'lagekarte');
-      if (!lagekarte || !istModulFreigegeben(lagekarte, benutzer, overrides)) return null;
+      if (!lagekarte || !istModulFreigegeben(lagekarte, freigaben)) return null;
       const punkt = erkenneKoordinate(rest);
       if (!punkt) return null;
       const format = effektivesKoordinatenformat(override, einsatzFormat, orgFormat) ?? 'wgs84';
       return koordinatenBefehl({ einsatzId, punkt, format, navigate });
     },
-    [
-      einsatzId,
-      modus,
-      rechteBekannt,
-      benutzer,
-      overrides,
-      einsatzFormat,
-      orgFormat,
-      override,
-      navigate,
-    ],
+    [einsatzId, modus, freigaben, einsatzFormat, orgFormat, override, navigate],
   );
 }

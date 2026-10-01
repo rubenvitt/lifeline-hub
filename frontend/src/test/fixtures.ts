@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
-import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
+import type { BenutzerAnzeige, EinsatzAnzeige, ModulFreigabe, ModulFreigaben } from '../api/types';
+import { modulRegistry } from '../einsatz/modulRegistry';
 import type { useAuth } from '../auth/AuthContext';
 
 /**
@@ -72,4 +73,19 @@ export function authWertFixture(benutzer: BenutzerAnzeige | null): ReturnType<ty
     abmeldenLokal: vi.fn(),
     konflikt: null,
   };
+}
+
+/**
+ * Modulfreigaben wie vom Server (LFH-669): jeder Registry-Key `{ sichtbar: true, zugriff: true }`,
+ * einzelne Module per `abweichend` überschrieben — etwa `{ schaeden: { zugriff: false } }`.
+ */
+export function freigabenFixture(
+  abweichend: Record<string, Partial<ModulFreigabe>> = {},
+): ModulFreigaben {
+  const freigaben: ModulFreigaben = {};
+  for (const m of modulRegistry) freigaben[m.key] = { sichtbar: true, zugriff: true };
+  for (const [key, teil] of Object.entries(abweichend)) {
+    freigaben[key] = { sichtbar: true, zugriff: true, ...teil };
+  }
+  return freigaben;
 }

@@ -40,7 +40,7 @@ export interface ZeitfensterKarteProps {
   jetzt: Dayjs;
   darfSchreiben: boolean;
   /**
-   * Modul Nachforderungen für die Person bedienbar (und Overrides bekannt). Ohne: kein
+   * Modul Nachforderungen für die Person bedienbar (und Freigaben bekannt). Ohne: kein
    * „Nachfordern" und am Verweis nur „Nachforderung #n".
    */
   nachforderungenFrei: boolean;

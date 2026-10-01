@@ -39,12 +39,11 @@ import {
   type Ikone,
   type IkonenPaar,
 } from '../ikonen';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulFreigaben } from '../api/types';
 
 export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
-export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
 /** Module mit Navigationszähler, die der SERVER zählt; die Bedeutung je Quelle legt
     `src/einsatz/zaehler.rs` fest. */
 export type ServerZaehlerQuelle =
@@ -91,8 +90,6 @@ export interface ModulEintrag {
   status: ModulStatus;
   /** Kurztext für die WIP-/Platzhalter-Seite. */
   beschreibung?: string;
-  /** Fehlt sie, ist das Modul für alle frei. */
-  benoetigteRolle?: BenoetigteRolle;
   /**
    * Deep-Link: das Modul leitet auf die `route` eines anderen Moduls um. Heute von keinem Eintrag
    * genutzt, als Infrastruktur erhalten.
@@ -509,51 +506,43 @@ export function istModulAusblendbar(key: string): boolean {
   return !(NICHT_AUSBLENDBARE_MODULE as readonly string[]).includes(key);
 }
 
-/**
- * „Disabled statt versteckt": ist das Modul für den Benutzer rollen-gesperrt? Die effektive
- * Rolle ist die des Overrides, sonst der Registry-Default. Admin ist nie gesperrt.
+/*
+ * Modul-Gate des Clients (LFH-669). Die Regel (Ausblenden, Rolle aus Einsatz-Override, sonst
+ * Org-Vorgabe, Admin-Ausnahme, nicht ausblendbare Module) wertet NUR der Server aus
+ * (`src/einsatz/berechtigung.rs`, `modul_freigabe`); der Client liest das Ergebnis aus
+ * `GET /api/einsaetze/{id}/modul-freigaben` (`einsatzKeys.modulFreigaben`). Eine Kopie der Regel
+ * hier kannte die Org-Vorgaben nicht und hielt gesperrte Module für frei.
  */
-export function istModulGesperrt(
-  modul: ModulEintrag,
-  benutzer: BenutzerAnzeige | null,
-  overrides?: ModulOverrides,
-): boolean {
-  if (benutzer?.system_rolle === 'admin') return false;
-  // Nicht-ausblendbare Module sind nie sperrbar (Selbst-Aussperr-Schutz, wie
-  // `fordere_modul_zugriff` im Backend).
-  if (!istModulAusblendbar(modul.key)) return false;
-  const benoetigt = overrides?.[modul.key]?.benoetigte_rolle ?? modul.benoetigteRolle ?? null;
-  if (!benoetigt) return false;
-  if (benoetigt === 'admin') return true; // Admin ist oben bereits frei.
-  return benutzer?.org_rolle !== 'fuehrungskraft';
+
+/**
+ * „Disabled statt versteckt": verweigert der Server dem Benutzer das Modul? Solange die Freigaben
+ * unbekannt sind, nicht — die Navigation flackerte sonst beim Öffnen jedes Einsatzes; für
+ * Datenabrufe gilt {@link istModulFreigegeben}, das bei Unbekanntem zu bleibt.
+ */
+export function istModulGesperrt(modul: ModulEintrag, freigaben?: ModulFreigaben): boolean {
+  return freigaben?.[modul.key]?.zugriff === false;
 }
 
 /**
- * Sichtbarkeit eines Moduls im Einsatz: nicht-ausblendbare immer; sonst versteckt, wenn der
- * Override `sichtbar=false` setzt. Unabhängig vom Benutzer.
+ * Sichtbarkeit eines Moduls in der Navigation, wie der Server sie meldet (`sichtbar` hängt nicht
+ * am Admin: ein ausgeblendetes Modul steht für niemanden in der Navigation). Unbekannt → sichtbar.
  */
-export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides): boolean {
-  if (!istModulAusblendbar(modul.key)) return true;
-  return overrides?.[modul.key]?.sichtbar !== false;
+export function istModulSichtbar(modul: ModulEintrag, freigaben?: ModulFreigaben): boolean {
+  return freigaben?.[modul.key]?.sichtbar !== false;
 }
 
 /**
- * „Ist dieses Modul bedienbar?" — die EINE Freigabe-Frage (fertig · sichtbar · nicht gesperrt),
- * genutzt hier und in der Kommandopalette, damit die Bedingung nicht an mehreren Stellen driftet.
+ * „Ist dieses Modul bedienbar?" — die EINE Freigabe-Frage (fertig · sichtbar · Zugriff), genutzt
+ * hier, in der Kommandopalette und vor jedem Abruf der Daten eines fremden Moduls. **Unbekannte
+ * Freigaben geben nichts frei** (Laden, Fehler, fehlender Key): sonst ginge eine Anfrage auf
+ * Verdacht an eine Liste, die mit 403 antwortet (Spec `modul-freigabe`).
  * Bewusst NICHT genutzt von `darfZaehlerZeigen` (`useModulZaehler.ts`), das ohne
  * `status === 'fertig'` prüft. Heute unbeobachtbar (alle Module mit Zähler sind fertig); ob ein
  * Zähler an einem unfertigen Modul stehen darf, ist eine offene fachliche Entscheidung.
  */
-export function istModulFreigegeben(
-  modul: ModulEintrag,
-  benutzer: BenutzerAnzeige | null,
-  overrides?: ModulOverrides,
-): boolean {
-  return (
-    modul.status === 'fertig' &&
-    istModulSichtbar(modul, overrides) &&
-    !istModulGesperrt(modul, benutzer, overrides)
-  );
+export function istModulFreigegeben(modul: ModulEintrag, freigaben?: ModulFreigaben): boolean {
+  const freigabe = freigaben?.[modul.key];
+  return modul.status === 'fertig' && !!freigabe && freigabe.sichtbar && freigabe.zugriff;
 }
 
 /**
@@ -561,13 +550,9 @@ export function istModulFreigegeben(
  * unbekannter Key ist nie frei. Bewusst nicht `darfZaehlerZeigen`: das sagte für jedes Modul
  * ohne Zähler still `false`.
  */
-export function istKeyFreigegeben(
-  key: string,
-  benutzer: BenutzerAnzeige | null,
-  overrides?: ModulOverrides,
-): boolean {
+export function istKeyFreigegeben(key: string, freigaben?: ModulFreigaben): boolean {
   const modul = modulRegistry.find((m) => m.key === key);
-  return !!modul && istModulFreigegeben(modul, benutzer, overrides);
+  return !!modul && istModulFreigegeben(modul, freigaben);
 }
 
 /**
@@ -600,13 +585,10 @@ export function aufloeseStandardModul(
  */
 export function erstesFreigegebenesModul(
   kategorie: KategorieKey,
-  benutzer: BenutzerAnzeige | null,
-  overrides?: ModulOverrides,
+  freigaben: ModulFreigaben | undefined,
   register: ModulEintrag[] = modulRegistry,
 ): ModulEintrag | null {
   return (
-    register.find(
-      (m) => m.kategorie === kategorie && istModulFreigegeben(m, benutzer, overrides),
-    ) ?? null
+    register.find((m) => m.kategorie === kategorie && istModulFreigegeben(m, freigaben)) ?? null
   );
 }

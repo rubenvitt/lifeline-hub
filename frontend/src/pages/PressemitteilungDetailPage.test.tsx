@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../test/utils';
-import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import {
   aktualisierePressemitteilung,
   gibPressemitteilungFrei,
@@ -11,8 +11,9 @@ import {
 } from '../api/presse';
 import type { EinsatzAnzeige, Pressemitteilung } from '../api/types';
 import PressemitteilungDetailPage from './PressemitteilungDetailPage';
+import { freigabenFixture } from '../test/fixtures';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulOverrides: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/presse', () => ({
   ladePressemitteilung: vi.fn(),
   aktualisierePressemitteilung: vi.fn(),
@@ -58,7 +59,7 @@ function setup() {
 
 beforeEach(() => {
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
-  vi.mocked(ladeModulOverrides).mockResolvedValue({});
+  vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(ladePressemitteilung).mockResolvedValue(ENTWURF);
   vi.mocked(aktualisierePressemitteilung).mockReset().mockResolvedValue(ENTWURF);
   vi.mocked(gibPressemitteilungFrei)

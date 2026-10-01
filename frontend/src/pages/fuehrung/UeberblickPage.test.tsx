@@ -7,7 +7,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { benutzerFixture } from '../../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../../test/fixtures';
 import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import UeberblickPage from './UeberblickPage';
 
@@ -217,8 +217,8 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
       json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
     ),
     http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
-    // Modul-Overrides (Sichtbarkeit der Ablösung) und laufende Schichten.
-    http.get('/api/einsaetze/1/modul-overrides', json({})),
+    // Laufende Schichten; die Modul-Freigaben (Sichtbarkeit der Ablösung) liefert der
+    // MSW-Default: alles frei.
     http.get('/api/einsaetze/1/abloesungen', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
@@ -599,25 +599,17 @@ describe('UeberblickPage', () => {
     });
 
     it('Modul ausgeblendet → die Marke führt in die Pegel-Einstellungen', async () => {
-      // Vor der Override-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
-      let overridesGeliefert = 0;
+      // Vor der Freigaben-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
+      let freigabenGeliefert = 0;
       stelleBereit(daten(), [
-        http.get('/api/einsaetze/1/modul-overrides', () => {
-          overridesGeliefert += 1;
-          return HttpResponse.json({
-            'wetter-pegel': {
-              einsatz_id: 1,
-              modul_key: 'wetter-pegel',
-              sichtbar: false,
-              benoetigte_rolle: null,
-              geaendert_at: null,
-            },
-          });
+        http.get('/api/einsaetze/1/modul-freigaben', () => {
+          freigabenGeliefert += 1;
+          return HttpResponse.json(freigabenFixture({ 'wetter-pegel': { sichtbar: false } }));
         }),
       ]);
       rendern();
       const { m } = await marke();
-      await waitFor(() => expect(overridesGeliefert).toBeGreaterThan(0));
+      await waitFor(() => expect(freigabenGeliefert).toBeGreaterThan(0));
       await act(async () => {
         await new Promise((r) => setTimeout(r, 20));
       });
@@ -668,16 +660,8 @@ describe('UeberblickPage', () => {
   it('Nächste Marken: ohne sichtbares Modul Ablösung keine Anfrage und keine Marke (LFH-635)', async () => {
     let abgefragt = 0;
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/modul-overrides', () =>
-        HttpResponse.json({
-          abloesung: {
-            einsatz_id: 1,
-            modul_key: 'abloesung',
-            sichtbar: false,
-            benoetigte_rolle: null,
-            geaendert_at: null,
-          },
-        }),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ abloesung: { sichtbar: false } })),
       ),
       http.get('/api/einsaetze/1/abloesungen', () => {
         abgefragt += 1;

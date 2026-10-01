@@ -5,23 +5,11 @@ import { ladeBetreuung } from '../api/betreuung';
 import { listeDokumente } from '../api/dokumente';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { EINSATZ_KEYS, einsatzKeys, type EinsatzKey } from '../api/queryKeys';
-import type {
-  Abloesung,
-  BenutzerAnzeige,
-  Evakuierungsbezirk,
-  ModulOverrides,
-  ModulZaehler,
-} from '../api/types';
+import type { Abloesung, Evakuierungsbezirk, ModulFreigaben, ModulZaehler } from '../api/types';
 import { zaehleFaellige } from '../abloesung/einstufung';
 import { useEinstufungsUhr } from '../abloesung/useUhr';
 import { istAktiverBezirk } from '../betreuung/evakuierungKennzahl';
-import {
-  istModulGesperrt,
-  istModulSichtbar,
-  modulRegistry,
-  type ModulZaehlerQuelle,
-  type ServerZaehlerQuelle,
-} from './modulRegistry';
+import { modulRegistry, type ModulZaehlerQuelle, type ServerZaehlerQuelle } from './modulRegistry';
 
 export interface ModulZaehlerWert {
   wert: number;
@@ -33,8 +21,7 @@ export type ModulZaehlerMap = Partial<Record<ModulZaehlerQuelle, ModulZaehlerWer
 
 interface Args {
   einsatzId: number;
-  benutzer: BenutzerAnzeige | null;
-  overrides?: ModulOverrides;
+  freigaben?: ModulFreigaben;
 }
 
 function plural(anzahl: number, singular: string, pluralText: string): string {
@@ -151,30 +138,26 @@ export function berechneBetreuungZaehler(
 }
 
 /**
- * Ob der Rahmen den Zähler einer Quelle zeigen darf: nur an einem sichtbaren UND freien Modul.
- * Das Laden filtert der Server (ein nicht erlaubtes Modul fehlt); diese Prüfung hält die Anzeige
- * an dieselbe Sicht wie die Navigation. Für die Browser-Zähler ist sie zugleich das Ladegate:
- * kein 403-Rauschen, kein Seitenkanal.
+ * Ob der Rahmen den Zähler einer Quelle zeigen darf: nur an einem sichtbaren UND freien Modul,
+ * nach den Freigaben des Servers (LFH-669). Das Laden filtert der Server (ein nicht erlaubtes
+ * Modul fehlt); diese Prüfung hält die Anzeige an dieselbe Sicht wie die Navigation. Für die
+ * Browser-Zähler ist sie zugleich das Ladegate: kein 403-Rauschen, kein Seitenkanal — deshalb
+ * geben unbekannte Freigaben nichts frei.
  */
-export function darfZaehlerZeigen(
-  quelle: ModulZaehlerQuelle,
-  benutzer: BenutzerAnzeige | null,
-  overrides?: ModulOverrides,
-): boolean {
+export function darfZaehlerZeigen(quelle: ModulZaehlerQuelle, freigaben?: ModulFreigaben): boolean {
   const modul = modulRegistry.find((eintrag) => eintrag.zaehlerQuelle === quelle);
-  return Boolean(
-    modul && istModulSichtbar(modul, overrides) && !istModulGesperrt(modul, benutzer, overrides),
-  );
+  const freigabe = modul ? freigaben?.[modul.key] : undefined;
+  return Boolean(freigabe?.sichtbar && freigabe.zugriff);
 }
 
 /**
  * Die Zähler des Einsatz-Navigationsrahmens: EINE Serverabfrage für die Serverquellen, dazu die
  * Browser-Zähler aus ihren eigenen Modullisten.
  */
-export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): ModulZaehlerMap {
-  const dokumenteAktiv = darfZaehlerZeigen('dokumente', benutzer, overrides);
-  const abloesungAktiv = darfZaehlerZeigen('abloesung', benutzer, overrides);
-  const betreuungAktiv = darfZaehlerZeigen('betreuung', benutzer, overrides);
+export function useModulZaehler({ einsatzId, freigaben }: Args): ModulZaehlerMap {
+  const dokumenteAktiv = darfZaehlerZeigen('dokumente', freigaben);
+  const abloesungAktiv = darfZaehlerZeigen('abloesung', freigaben);
+  const betreuungAktiv = darfZaehlerZeigen('betreuung', freigaben);
 
   const zaehler = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
@@ -202,7 +185,7 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
 
   const karte: ModulZaehlerMap = zaehler.isSuccess ? bildeZaehler(zaehler.data) : {};
   for (const quelle of ZAEHLER_QUELLEN) {
-    if (!darfZaehlerZeigen(quelle, benutzer, overrides)) delete karte[quelle];
+    if (!darfZaehlerZeigen(quelle, freigaben)) delete karte[quelle];
   }
   if (dokumenteAktiv && dokumente.isSuccess) {
     karte.dokumente = berechneDokumentZaehler(dokumente.data);

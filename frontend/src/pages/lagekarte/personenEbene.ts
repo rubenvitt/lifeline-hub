@@ -1,4 +1,4 @@
-import type { BenutzerAnzeige, ModulOverrides } from '../../api/types';
+import type { ModulFreigaben } from '../../api/types';
 import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from '../../einsatz/modulRegistry';
 
 /**
@@ -10,11 +10,11 @@ import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from '../../ein
  * „Personen" an. Gezeichnet wird nur bei `'frei'`; der Schalter wird nicht zurückgeschrieben, sonst
  * überschriebe ein Benutzer ohne Recht beim Speichern die Wahl der Führungskraft.
  *
- * - `'ausgeblendet'`: Modul im Einsatz unsichtbar, nicht fertig, oder die Overrides stehen noch
- *   nicht fest. Keine Zeile und kein Request (in der Ladelücke sagte der Registry-Default „frei").
- * - `'gesperrt'`: Rollen-Schranke im Client oder 403 vom Server (`istModulGesperrt` kennt die
- *   Org-Defaults nicht, das Backend schon). Kein Ausfall einer Lagebild-Quelle. Strukturelle
- *   Lösung: LFH-669.
+ * - `'ausgeblendet'`: Modul im Einsatz unsichtbar, nicht fertig, oder die Freigaben des Servers
+ *   stehen noch nicht fest (Laden, Fehler). Keine Zeile und kein Request.
+ * - `'gesperrt'`: der Server verweigert das Modul (`zugriff: false` in den Freigaben, LFH-669),
+ *   oder die Liste kam trotzdem mit 403 — das Netz für eine Freigabe, die seit dem Abruf veraltet
+ *   ist. Kein Ausfall einer Lagebild-Quelle.
  * - `'rueckblick'`: Historien-Modus. Gesicherte Lagestände tragen keine Personen.
  * - `'frei'`: laden und — bei eingeschaltetem Schalter — zeichnen.
  */
@@ -22,19 +22,17 @@ export type PersonenZugriff = 'frei' | 'gesperrt' | 'ausgeblendet' | 'rueckblick
 
 export function personenZugriffVon(a: {
   istSnapshot: boolean;
-  /** Overrides-Abfrage ist abgeschlossen (Erfolg ODER Fehler — dann gilt der Registry-Default). */
-  rechteBekannt: boolean;
   modul: ModulEintrag | undefined;
-  benutzer: BenutzerAnzeige | null;
-  overrides: ModulOverrides | undefined;
+  /** Freigaben des Servers; `undefined`, solange sie laden oder ihr Abruf gescheitert ist. */
+  freigaben: ModulFreigaben | undefined;
   /** Die Personenliste kam mit 403 zurück. */
   abgelehnt: boolean;
 }): PersonenZugriff {
-  if (!a.rechteBekannt || !a.modul) return 'ausgeblendet';
-  if (a.modul.status !== 'fertig' || !istModulSichtbar(a.modul, a.overrides)) {
+  if (!a.freigaben || !a.modul) return 'ausgeblendet';
+  if (a.modul.status !== 'fertig' || !istModulSichtbar(a.modul, a.freigaben)) {
     return 'ausgeblendet';
   }
-  if (istModulGesperrt(a.modul, a.benutzer, a.overrides)) return 'gesperrt';
+  if (istModulGesperrt(a.modul, a.freigaben)) return 'gesperrt';
   // Rückblick erst nach Sichtbarkeit und Rolle: ein ausgeblendetes Modul zeigt auch im
   // Historien-Modus keine Zeile.
   if (a.istSnapshot) return 'rueckblick';

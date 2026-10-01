@@ -3,13 +3,12 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ModulOverrides } from '../api/types';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useModulZaehler } from './useModulZaehler';
-import { benutzerFixture } from '../test/fixtures';
+import { freigabenFixture } from '../test/fixtures';
 
-const benutzer = benutzerFixture({ anzeigename: 'E' });
+const freigaben = freigabenFixture();
 
 function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={neuerQueryClient()}>{children}</QueryClientProvider>;
@@ -36,7 +35,7 @@ describe('useModulZaehler (LFH-612)', () => {
         }),
       ),
     );
-    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, benutzer }), { wrapper });
+    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben }), { wrapper });
     await waitFor(() =>
       expect(result.current.personen).toEqual({ wert: 248, beschreibung: '248 Betroffene' }),
     );
@@ -60,19 +59,11 @@ describe('useModulZaehler (LFH-612)', () => {
         HttpResponse.json({ personen: { gesamt: 248 }, meldungen: { offen: 3, ungesehen: 1 } }),
       ),
     );
-    const overrides: ModulOverrides = {
-      meldungen: {
-        einsatz_id: 7,
-        modul_key: 'meldungen',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    };
-    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, benutzer, overrides }), {
-      wrapper,
-    });
+    const ausgeblendet = freigabenFixture({ meldungen: { sichtbar: false, zugriff: false } });
+    const { result } = renderHook(
+      () => useModulZaehler({ einsatzId: 7, freigaben: ausgeblendet }),
+      { wrapper },
+    );
     await waitFor(() => expect(result.current.personen?.wert).toBe(248));
     expect(result.current.meldungen).toBeUndefined();
   });
@@ -85,10 +76,33 @@ describe('useModulZaehler (LFH-612)', () => {
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
       }),
     );
-    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, benutzer }), { wrapper });
+    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben }), { wrapper });
     // Erst NACH der Antwort prüfen — vorher wäre `{}` auch ohne Fehlerpfad das Ergebnis.
     await waitFor(() => expect(beantwortet).toBe(true));
     await new Promise((r) => setTimeout(r, 20));
+    expect(result.current).toEqual({});
+  });
+
+  /**
+   * Unbekannte Freigaben (laden noch oder Abruf gescheitert) geben nichts frei (LFH-669): die
+   * Browser-Zähler lesen fremde Modullisten und laden dann nicht — kein 403-Rauschen, kein
+   * Seitenkanal. Die Serverantwort filtert der Server selbst; ihre Anzeige wartet ebenfalls.
+   */
+  it('lädt bei unbekannten Freigaben keine Browser-Zähler und zeigt keine Zahl', async () => {
+    server.events.on('request:start', merke);
+    let beantwortet = false;
+    server.use(
+      http.get('/api/einsaetze/7/modul-zaehler', () => {
+        beantwortet = true;
+        return HttpResponse.json({ personen: { gesamt: 248 } });
+      }),
+    );
+    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: undefined }), {
+      wrapper,
+    });
+    await waitFor(() => expect(beantwortet).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(angefragt).toEqual(['/api/einsaetze/7/modul-zaehler']);
     expect(result.current).toEqual({});
   });
 });

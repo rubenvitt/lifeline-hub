@@ -7,6 +7,8 @@ import type { ReactNode } from 'react';
 import { server } from '../../test/server';
 import { neuerQueryClient } from '../../test/utils';
 import { gefahrengebietStil } from './zonenStil';
+import { freigabenFixture } from '../../test/fixtures';
+import type { ModulFreigabe } from '../../api/types';
 
 // darfSchreiben wird im Snapshot-Modus hart auf false gefahren → benutzer egal.
 vi.mock('../../auth/AuthContext', () => ({
@@ -26,11 +28,11 @@ vi.mock('../../api/lageSnapshot', () => ({
 
 import { useLagekarteDaten } from './useLagekarteDaten';
 
-// Ebene „Betroffene": ohne Benutzer ist das Modul „Personen" im Client frei, die Personen-Query
-// läuft also in jedem Live-Test. Vorgaben hier; ein Test kann sie per `server.use` überlagern.
+// Ebene „Betroffene": der MSW-Default meldet jedes Modul frei (`test/server.ts`), die
+// Personen-Query läuft also in jedem Live-Test. Vorgaben hier; ein Test kann sie per `server.use`
+// überlagern.
 beforeEach(() => {
   server.use(
-    http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/5/personen', () => HttpResponse.json([])),
     // Ebene „Betreuungsstellen": dieselbe Lage, ohne Benutzer ist das Modul frei.
     http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
@@ -403,9 +405,9 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
     storniert_at: null,
   };
 
-  /** Alle Live-Quellen gesund; Overrides und Personen je Fall. Liefert den Personen-Zähler. */
-  function handler(overrides: Record<string, unknown>, personen: () => Response) {
-    const zaehler = { personen: 0, overrides: 0 };
+  /** Alle Live-Quellen gesund; Freigaben und Personen je Fall. Liefert den Personen-Zähler. */
+  function handler(freigaben: Record<string, Partial<ModulFreigabe>>, personen: () => Response) {
+    const zaehler = { personen: 0, freigaben: 0 };
     server.use(
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
@@ -441,9 +443,9 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
       ),
-      http.get('/api/einsaetze/5/modul-overrides', () => {
-        zaehler.overrides += 1;
-        return HttpResponse.json(overrides);
+      http.get('/api/einsaetze/5/modul-freigaben', () => {
+        zaehler.freigaben += 1;
+        return HttpResponse.json(freigabenFixture(freigaben));
       }),
       http.get('/api/einsaetze/5/personen', () => {
         zaehler.personen += 1;
@@ -476,7 +478,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
   });
 
   it('Modul im Einsatz ausgeblendet: „ausgeblendet" und KEIN Request an …/personen', async () => {
-    const z = handler({ personen: { sichtbar: false, benoetigte_rolle: null } }, () =>
+    const z = handler({ personen: { sichtbar: false, zugriff: false } }, () =>
       HttpResponse.json([PERSON]),
     );
     const { result } = render();
@@ -486,18 +488,15 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
     expect(z.personen).toBe(0);
   });
 
-  it('Rollensperre im Client: „gesperrt" und KEIN Request', async () => {
-    // Die Auth ist ohne Benutzer gemockt, eine Führungskraft-Schranke sperrt also.
-    const z = handler({ personen: { sichtbar: true, benoetigte_rolle: 'fuehrungskraft' } }, () =>
-      HttpResponse.json([PERSON]),
-    );
+  it('Server verweigert das Modul (etwa per Org-Vorgabe): „gesperrt" und KEIN Request', async () => {
+    const z = handler({ personen: { zugriff: false } }, () => HttpResponse.json([PERSON]));
     const { result } = render();
     await waitFor(() => expect(result.current.personenZugriff).toBe('gesperrt'));
     expect(result.current.personenVerortet).toEqual([]);
     expect(z.personen).toBe(0);
   });
 
-  it('Server lehnt mit 403 ab (Org-Default-Drift): „gesperrt", keine Marker, KEIN Ausfall', async () => {
+  it('Liste kommt trotz Freigabe mit 403 (veraltete Freigabe): „gesperrt", keine Marker, KEIN Ausfall', async () => {
     const z = handler({}, () => new HttpResponse(null, { status: 403 }));
     const { result } = render();
     await waitFor(() => expect(result.current.personenZugriff).toBe('gesperrt'));
@@ -528,9 +527,9 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
   });
 
   it('Historien-Modus mit ausgeblendetem Modul: keine Zeile, nicht „rueckblick"', async () => {
-    // Die Overrides sind Render-Kontext und laden auch im Rückblick; ohne sie wäre „ausgeblendet"
+    // Die Freigaben sind Render-Kontext und laden auch im Rückblick; ohne sie wäre „ausgeblendet"
     // hier der triviale Ladezustand.
-    const z = handler({ personen: { sichtbar: false, benoetigte_rolle: null } }, () =>
+    const z = handler({ personen: { sichtbar: false, zugriff: false } }, () =>
       HttpResponse.json([PERSON]),
     );
     ladeLageSnapshot.mockResolvedValue(dokument('keine'));
@@ -539,7 +538,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
         useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
-    await waitFor(() => expect(z.overrides).toBe(1));
+    await waitFor(() => expect(z.freigaben).toBe(1));
     await waitFor(() => expect(result.current.ladt).toBe(false));
     await new Promise((r) => setTimeout(r, 50));
     expect(result.current.personenZugriff).toBe('ausgeblendet');
@@ -566,7 +565,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
   };
 
   /** Alle Live-Quellen gesund; Overrides und Betreuung je Fall. Liefert den Abrufzähler. */
-  function handler(overrides: Record<string, unknown>, betreuung: () => Response) {
+  function handler(freigaben: Record<string, Partial<ModulFreigabe>>, betreuung: () => Response) {
     const zaehler = { betreuung: 0 };
     server.use(
       http.get('/api/einsaetze/5', () =>
@@ -603,7 +602,9 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
       ),
-      http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json(overrides)),
+      http.get('/api/einsaetze/5/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture(freigaben)),
+      ),
       http.get('/api/einsaetze/5/betreuung', () => {
         zaehler.betreuung += 1;
         return betreuung();
@@ -638,18 +639,9 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
 
-  it('Rollensperre im Client: „gesperrt" und KEIN Request an …/betreuung', async () => {
-    // Auth ohne Benutzer — eine Führungskraft-Schranke sperrt also.
-    const z = handler(
-      {
-        betreuung: {
-          einsatz_id: 5,
-          modul_key: 'betreuung',
-          sichtbar: true,
-          benoetigte_rolle: 'fuehrungskraft',
-        },
-      },
-      () => HttpResponse.json({ bezirke: [], stellen: [STELLE] }),
+  it('Server verweigert das Modul: „gesperrt" und KEIN Request an …/betreuung', async () => {
+    const z = handler({ betreuung: { zugriff: false } }, () =>
+      HttpResponse.json({ bezirke: [], stellen: [STELLE] }),
     );
     const { result } = render();
     await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
@@ -779,20 +771,13 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(true),
     );
     expect(result.current.bezirke).toHaveLength(1);
-    // Die Leitung sperrt das Modul; die Overrides laden neu, der Betreuungs-Cache bleibt stehen.
+    // Die Leitung sperrt das Modul; die Freigaben laden neu, der Betreuungs-Cache bleibt stehen.
     server.use(
-      http.get('/api/einsaetze/5/modul-overrides', () =>
-        HttpResponse.json({
-          betreuung: {
-            einsatz_id: 5,
-            modul_key: 'betreuung',
-            sichtbar: true,
-            benoetigte_rolle: 'fuehrungskraft',
-          },
-        }),
+      http.get('/api/einsaetze/5/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
       ),
     );
-    await client.invalidateQueries({ queryKey: ['einsatz-modul-overrides', 5] });
+    await client.invalidateQueries({ queryKey: ['einsatz-modul-freigaben', 5] });
     await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
     expect(client.getQueryData(['einsatz-betreuung', 5])).toBeTruthy(); // Vorbedingung: Altstand
     expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
@@ -823,5 +808,133 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
     await waitFor(() => expect(result.current.zonenFeatures[0]?.label).toBe('Evakuierungsbezirk'));
     expect(result.current.bezirke).toEqual([]);
+  });
+});
+
+/**
+ * Modulgrenze der Kartenquellen (LFH-669, Spec `modul-freigabe`): eine Quelle eines fremden Moduls
+ * wird nur bei Freigabe des Servers angefragt. Gesperrt ist kein Ausfall. Die Tests zählen die
+ * Requests mit — „nichts gezeichnet" allein belegte nicht, dass nichts geladen wurde.
+ */
+describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
+  const GEBUNDEN = [
+    '/api/einsaetze/5/uhs',
+    '/api/einsaetze/5/schaeden',
+    '/api/einsaetze/5/einheiten',
+    '/api/einsaetze/5/fahrzeuge',
+    '/api/einsaetze/5/abschnitte',
+    '/api/einsaetze/5/gefahrengebiete',
+    '/api/einsaetze/5/lage/meldungen',
+    '/api/einsaetze/5/meldungen/rueckmeldungen',
+  ];
+
+  /** Alle Quellen gesund; `freigaben` je Fall (`'fehler'` = 500, `'haengt'` = antwortet nie). */
+  function handler(
+    freigaben: Record<string, Partial<ModulFreigabe>> | 'fehler' | 'haengt',
+    schaeden: () => Response = () => HttpResponse.json([]),
+  ) {
+    const aufrufe: Record<string, number> = {};
+    const zaehle = (pfad: string) => {
+      aufrufe[pfad] = (aufrufe[pfad] ?? 0) + 1;
+    };
+    server.use(
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
+      ),
+      ...[
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+        ...GEBUNDEN.filter((p) => !p.endsWith('/schaeden')),
+      ].map((pfad) =>
+        http.get(pfad, () => {
+          zaehle(pfad);
+          return HttpResponse.json([]);
+        }),
+      ),
+      http.get('/api/einsaetze/5/schaeden', () => {
+        zaehle('/api/einsaetze/5/schaeden');
+        return schaeden();
+      }),
+      http.get('/api/einsaetze/5/modul-freigaben', async () => {
+        if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
+        if (freigaben === 'haengt') return new Promise<Response>(() => {});
+        return HttpResponse.json(freigabenFixture(freigaben));
+      }),
+    );
+    return aufrufe;
+  }
+
+  function render() {
+    return renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
+  }
+
+  it('Org-Vorgabe sperrt „Schäden": kein Request, keine Schäden, KEIN Ausfall', async () => {
+    const aufrufe = handler({ schaeden: { zugriff: false } });
+    const { result } = render();
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+    // Vorbedingung: die freien Quellen liefen — sonst wäre „kein Request" trivial.
+    expect(aufrufe['/api/einsaetze/5/uhs']).toBe(1);
+    expect(aufrufe['/api/einsaetze/5/schaeden']).toBeUndefined();
+    expect(result.current.rohdaten.schaeden).toEqual([]);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('ausgeblendete Module werden ebenso wenig angefragt', async () => {
+    const aufrufe = handler({
+      unfallhilfsstellen: { sichtbar: false, zugriff: false },
+      meldungen: { zugriff: false },
+    });
+    const { result } = render();
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+    expect(aufrufe['/api/einsaetze/5/schaeden']).toBe(1);
+    expect(aufrufe['/api/einsaetze/5/uhs']).toBeUndefined();
+    // Rückmeldungen hängen am Modul „Meldungen": ohne Recht keine Anfrage, keine Daten.
+    expect(aufrufe['/api/einsaetze/5/meldungen/rueckmeldungen']).toBeUndefined();
+    expect(result.current.rohdaten.rueckmeldungen).toBeUndefined();
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('solange die Freigaben laden, geht keine modulgebundene Liste raus', async () => {
+    const aufrufe = handler('haengt');
+    const { result } = render();
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    // Die Quellen der Seite selbst laufen; die gebundenen warten.
+    await waitFor(() => expect(aufrufe['/api/einsaetze/5/zonen']).toBe(1));
+    await new Promise((r) => setTimeout(r, 50));
+    for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
+    // Das Markerbild steht noch nicht fest: die Startansicht wartet.
+    expect(result.current.markerLaden).toBe(true);
+  });
+
+  it('scheitern die Freigaben, nennt der Ausfallhinweis „Berechtigungen" — und lädt nichts Gebundenes', async () => {
+    const aufrufe = handler('fehler');
+    const { result } = render();
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Berechtigungen']));
+    for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
+  });
+
+  it('freies Modul mit echtem Ausfall bleibt ein Ausfall', async () => {
+    handler({}, () => new HttpResponse(null, { status: 500 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Schäden']));
   });
 });

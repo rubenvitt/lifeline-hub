@@ -148,9 +148,9 @@ Schnappschüsse kommen aus dem Dokument.
   Platte. `lagebildOffline.guard.test.ts` erzwingt die Entscheidung.
 - Invalidierung: `EinsatzModule.tsx` invalidiert nach dem Setzen zusätzlich
   `einsatzKeys.modulFreigaben(id)`. `EinsatzDefaults.tsx` invalidiert nach einer Org-Vorgabe den
-  argumentlosen Prefix `einsatzKeys.modulFreigaben()`, weil alle Einsätze der Org betroffen sind.
-  Gibt es den argumentlosen Accessor noch nicht, wird er nach der Sub-Key-Regel in
-  `frontend/AGENTS.md` angelegt.
+  Prefix über alle Einsätze, `einsatzKeys.modulFreigabenAlle()`, weil alle Einsätze der Org
+  betroffen sind. Ein eigener Name statt des argumentlosen `modulFreigaben()`: der Accessor nimmt
+  wie `modulOverrides` eine nullbare Einsatz-ID, und `null` ist dort ein eigener Key.
 
 ### D6 — Typ-Codegen
 

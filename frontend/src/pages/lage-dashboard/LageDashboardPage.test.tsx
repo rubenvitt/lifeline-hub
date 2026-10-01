@@ -15,7 +15,7 @@ import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
 import type { EtbEintragAnzeige, GefahrBewertung } from '../../api/types';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
-import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
+import { benutzerFixture, einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import { FakeEventSource } from '../../test/eventSource';
 
@@ -138,10 +138,13 @@ interface Daten {
   /** Maßgebliche Pegel und ein erzwungener Fehlerstatus ihres Abrufs. */
   pegel?: unknown[];
   pegelStatus?: number;
-  /** Modul-Overrides des Einsatzes (entscheiden das Ziel der Pegel-Kennzahl). */
-  overrides?: Record<string, unknown>;
-  /** Zählt die gelieferten Override-Antworten (Test wartet auf die Entscheidung). */
-  overridesGeliefert?: { n: number };
+  /**
+   * Abweichende Modul-Freigaben des Servers (entscheiden das Ziel der Pegel-Kennzahl); alles
+   * übrige ist frei (`freigabenFixture`).
+   */
+  freigaben?: Parameters<typeof freigabenFixture>[0];
+  /** Zählt die gelieferten Freigaben-Antworten (Test wartet auf die Entscheidung). */
+  freigabenGeliefert?: { n: number };
   /**
    * Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild` nichts liefert und
    * das Band seine Plätze selbst stellen muss.
@@ -157,9 +160,9 @@ interface Daten {
   betreuungStatus?: number;
   /** Zählt die Abrufe der Betreuungs-Übersicht (ohne Modulrecht: keiner). */
   betreuungAbrufe?: { n: number };
-  /** Overrides-Abruf hängt bzw. scheitert (Freigaben unbekannt). */
-  overridesLaedt?: boolean;
-  overridesStatus?: number;
+  /** Freigaben-Abruf hängt bzw. scheitert (Freigaben unbekannt). */
+  freigabenLaedt?: boolean;
+  freigabenStatus?: number;
 }
 
 function mockEndpunkte(d: Daten) {
@@ -213,11 +216,11 @@ function mockEndpunkte(d: Daten) {
     }),
     // Ohne diesen Handler scheiterte die Abfrage in jedem Test, und die href-Aussagen belegten nur
     // den Fehlerpfad.
-    http.get('/api/einsaetze/1/modul-overrides', async () => {
-      if (d.overridesLaedt) await delay('infinite');
-      if (d.overridesGeliefert) d.overridesGeliefert.n += 1;
-      if (d.overridesStatus) return new HttpResponse(null, { status: d.overridesStatus });
-      return HttpResponse.json(d.overrides ?? {});
+    http.get('/api/einsaetze/1/modul-freigaben', async () => {
+      if (d.freigabenLaedt) await delay('infinite');
+      if (d.freigabenGeliefert) d.freigabenGeliefert.n += 1;
+      if (d.freigabenStatus) return new HttpResponse(null, { status: d.freigabenStatus });
+      return HttpResponse.json(freigabenFixture(d.freigaben));
     }),
   );
 }
@@ -594,7 +597,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     );
     expect(notiz).not.toContain('veraltet');
     expect(zelle.getAttribute('data-ton')).toBe('neutral');
-    // Modul „Wetter & Pegel" frei (keine Overrides) → die Kennzahl führt dorthin.
+    // Modul „Wetter & Pegel" frei (Freigabe des Servers) → die Kennzahl führt dorthin.
     await waitFor(() => expect(zelle).toHaveAttribute('href', '/einsaetze/1/wetter-pegel'));
   });
 
@@ -661,20 +664,12 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   });
 
   it('Modul „Wetter & Pegel" ausgeblendet → die Pegel-Kennzahl führt in die Pflege (LFH-633)', async () => {
-    // Vor der Override-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
-    const overridesGeliefert = { n: 0 };
+    // Vor der Freigaben-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
+    const freigabenGeliefert = { n: 0 };
     mockEndpunkte({
       pegel: [PEGEL_AUSFALL],
-      overridesGeliefert,
-      overrides: {
-        'wetter-pegel': {
-          einsatz_id: 1,
-          modul_key: 'wetter-pegel',
-          sichtbar: false,
-          benoetigte_rolle: null,
-          geaendert_at: null,
-        },
-      },
+      freigabenGeliefert,
+      freigaben: { 'wetter-pegel': { sichtbar: false } },
     });
     render();
     const zelle = await waitFor(() => {
@@ -682,7 +677,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       expect(z).toHaveTextContent('WESER');
       return z;
     });
-    await waitFor(() => expect(overridesGeliefert.n).toBeGreaterThan(0));
+    await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 20));
     });
@@ -731,25 +726,17 @@ describe('LageDashboardPage — Kennzahlenband', () => {
 
     it('Modul Betreuung ausgeblendet: der Platz bleibt „Evakuiert", ohne Zahl, ohne Link, ohne Abruf', async () => {
       const betreuungAbrufe = { n: 0 };
-      const overridesGeliefert = { n: 0 };
+      const freigabenGeliefert = { n: 0 };
       mockEndpunkte({
         lagekennzahlen: ['evakuiert'],
         bezirke: [bezirk(640, 600)],
         betreuungAbrufe,
-        overridesGeliefert,
-        overrides: {
-          betreuung: {
-            einsatz_id: 1,
-            modul_key: 'betreuung',
-            sichtbar: false,
-            benoetigte_rolle: null,
-            geaendert_at: null,
-          },
-        },
+        freigabenGeliefert,
+        freigaben: { betreuung: { sichtbar: false } },
       });
       render();
       await kennzahlGeladen('Betroffene');
-      await waitFor(() => expect(overridesGeliefert.n).toBeGreaterThan(0));
+      await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
       await waitFor(() =>
         expect(kennzahl('Evakuiert')).toHaveTextContent('Modul Betreuung nicht freigegeben'),
       );
@@ -766,7 +753,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
         lagekennzahlen: ['evakuiert'],
         bezirke: [bezirk(640, 600)],
         betreuungAbrufe,
-        overridesLaedt: true,
+        freigabenLaedt: true,
       });
       render();
       await kennzahlGeladen('Betroffene');
@@ -779,15 +766,15 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       expect(betreuungAbrufe.n).toBe(0);
     });
 
-    it('scheitert der Overrides-Abruf, bleibt das Recht unbekannt: „Stand unbekannt", kein Abruf, kein Link', async () => {
+    it('scheitert der Freigaben-Abruf, bleibt das Recht unbekannt: „Stand unbekannt", kein Abruf, kein Link', async () => {
       const betreuungAbrufe = { n: 0 };
-      const overridesGeliefert = { n: 0 };
+      const freigabenGeliefert = { n: 0 };
       mockEndpunkte({
         lagekennzahlen: ['evakuiert'],
         bezirke: [bezirk(640, 600)],
         betreuungAbrufe,
-        overridesGeliefert,
-        overridesStatus: 500,
+        freigabenGeliefert,
+        freigabenStatus: 500,
       });
       render();
       await kennzahlGeladen('Betroffene');

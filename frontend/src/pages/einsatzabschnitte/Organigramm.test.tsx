@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import { ladeModulOverrides } from '../../api/einsaetze';
+import { ladeModulFreigaben } from '../../api/einsaetze';
+import { freigabenFixture } from '../../test/fixtures';
 import { ladeStab } from '../../api/stab';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { ApiError } from '../../api/client';
@@ -18,7 +19,7 @@ import Organigramm, { OrganigrammBild, organigrammZielStil } from './Organigramm
 import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
 
-vi.mock('../../api/einsaetze', () => ({ ladeModulOverrides: vi.fn() }));
+vi.mock('../../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 vi.mock('../../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 77 })),
@@ -215,9 +216,9 @@ describe('OrganigrammBild — Klappen', () => {
 
 describe('Organigramm — Klappzustand im Container', () => {
   beforeEach(() => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     vi.mocked(ladeStab).mockReset();
   });
 
@@ -283,7 +284,7 @@ describe('Organigramm — Stabsstelle', () => {
   }
 
   it('zeigt bei freigegebenem Stab die besetzten Sachgebiete in S-Folge mit Besetzung', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     vi.mocked(ladeStab).mockResolvedValue({
       besetzung: [
         besetzung({ sachgebiet: 's2', name: 'Clara Lage' }),
@@ -300,7 +301,7 @@ describe('Organigramm — Stabsstelle', () => {
   });
 
   it('sagt „Kein Sachgebiet besetzt“, wenn die Besetzung leer ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     vi.mocked(ladeStab).mockResolvedValue({ besetzung: [] } as unknown as Stab);
     container();
     const stab = await screen.findByRole('group', { name: 'Stab' });
@@ -308,11 +309,11 @@ describe('Organigramm — Stabsstelle', () => {
   });
 
   it('zeigt bei gesperrtem Stab keine Stabsstelle und ruft die Besetzung nicht ab', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     container();
-    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalled());
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
     // Ein Tick für eine etwaige Folgeabfrage.
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
@@ -320,7 +321,7 @@ describe('Organigramm — Stabsstelle', () => {
   });
 
   it('zeigt solange die Freigabe lädt keine Stabsstelle und ruft nichts ab', async () => {
-    vi.mocked(ladeModulOverrides).mockReturnValue(new Promise(() => {}));
+    vi.mocked(ladeModulFreigaben).mockReturnValue(new Promise(() => {}));
     container();
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole('group', { name: 'Stab' })).toBeNull();
@@ -328,7 +329,7 @@ describe('Organigramm — Stabsstelle', () => {
   });
 
   it('sagt „Besetzung nicht geladen“, wenn der Abruf bei freigegebenem Stab scheitert', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     vi.mocked(ladeStab).mockRejectedValue(new Error('kaputt'));
     container();
     const stab = await screen.findByRole('group', { name: 'Stab' });
@@ -340,9 +341,9 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
   beforeEach(() => {
     navigiere.mockReset();
     vi.mocked(legeLageberichtAn).mockClear();
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
     vi.mocked(ladeStab).mockReset();
   });
 
@@ -386,7 +387,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
   });
 
   it('schreibt einen gescheiterten Stababruf in den Bericht', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     vi.mocked(ladeStab).mockRejectedValue(new Error('kaputt'));
     container();
     const stab = await screen.findByRole('group', { name: 'Stab' });
@@ -401,7 +402,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
   });
 
   it('übernimmt den Stab nur, wenn er freigegeben und geladen ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     vi.mocked(ladeStab).mockResolvedValue({
       besetzung: [besetzung({ sachgebiet: 's3', name: 'Dora Einsatz' })],
     } as Stab);
@@ -422,7 +423,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
   });
 
   it('sperrt die Übernahme, solange die freigegebene Stabsbesetzung lädt', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
     vi.mocked(ladeStab).mockReturnValue(new Promise(() => {}));
     container();
     await waitFor(() => expect(ladeStab).toHaveBeenCalled());
@@ -448,12 +449,11 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
   });
 
   it('fehlt, wenn das Modul Lageberichte nicht freigegeben ist', async () => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-      lageberichte: { sichtbar: false, einsatz_id: 1, modul_key: 'lageberichte' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false }, lageberichte: { sichtbar: false } }),
+    );
     container();
-    await waitFor(() => expect(ladeModulOverrides).toHaveBeenCalled());
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();
   });
@@ -461,9 +461,9 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
 
 describe('Organigramm — Druck', () => {
   beforeEach(() => {
-    vi.mocked(ladeModulOverrides).mockResolvedValue({
-      stab: { sichtbar: false, einsatz_id: 1, modul_key: 'stab' },
-    });
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
   });
 
   it('ist eine Druckwurzel mit Druckkopf „Führungsorganisation“', () => {

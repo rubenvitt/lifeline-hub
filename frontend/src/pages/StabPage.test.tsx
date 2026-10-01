@@ -8,13 +8,10 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import StabPage from './StabPage';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
-/** Zählt die Antworten des Overrides-Handlers — Anker gegen das Rennen im Werkzeug-Link-Test. */
-let overrideAufrufe = 0;
 beforeEach(() => {
-  overrideAufrufe = 0;
   vi.stubGlobal('EventSource', FakeEventSource);
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -57,7 +54,7 @@ function rendere({
   einsatzObj = einsatz(),
   stab = leererStab as object,
   stabStatus = 200,
-  overrides = {} as object,
+  freigaben = freigabenFixture(),
   route = '/einsaetze/1/stab',
   post = () => HttpResponse.json(leererStab, { status: 201 }) as Response,
   lage = {} as Lagequellen,
@@ -73,10 +70,7 @@ function rendere({
     http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/stab/checkliste', () => HttpResponse.json([])),
     http.post('/api/einsaetze/1/stab/lagebesprechungen', () => post()),
-    http.get('/api/einsaetze/1/modul-overrides', () => {
-      overrideAufrufe += 1;
-      return HttpResponse.json(overrides);
-    }),
+    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json(lage.personal ?? [])),
     http.get('/api/einsaetze/1/personen', () =>
       lage.personenStatus
@@ -251,7 +245,6 @@ describe('StabPage', () => {
       // Antwort bleibt aus: der Abruf steht dauerhaft auf „lädt".
       http.get('/api/einsaetze/1/stab', () => new Promise<never>(() => {})),
       http.get('/api/einsaetze/1/stab/lagebesprechungen', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
     );
     renderMitProviders(
       <Routes>
@@ -277,7 +270,7 @@ describe('StabPage', () => {
   });
 
   it('Werkzeug-Links zeigen nur freigegebene Module', async () => {
-    rendere({ overrides: { chat: { sichtbar: false } } });
+    rendere({ freigaben: freigabenFixture({ chat: { sichtbar: false } }) });
     await besetzungsSektion();
     const s4 = await screen.findByRole('group', { name: 'Werkzeuge S4' });
     expect(within(s4).getByRole('link', { name: label('nachforderungen') })).toHaveAttribute(
@@ -285,11 +278,13 @@ describe('StabPage', () => {
       '/einsaetze/1/nachforderungen',
     );
     const s6 = screen.getByRole('group', { name: 'Werkzeuge S6' });
-    // Die Gruppen stehen schon vor der Override-Antwort da. Erst positiv auf die Antwort warten —
-    // ein `waitFor` auf `null` wäre sonst sofort und trivial grün.
-    await waitFor(() => expect(overrideAufrufe).toBe(1));
-    await waitFor(() => expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull());
-    expect(within(s6).getByRole('link', { name: label('einsatzabschnitte') })).toBeInTheDocument();
+    // Vor der Antwort der Freigaben zeigt keine Zeile ein Modul-Werkzeug (unbekannt heißt nicht
+    // frei). Erst positiv auf ein freies Werkzeug derselben Zeile warten — die Abwesenheit wäre
+    // sonst trivial.
+    expect(
+      await within(s6).findByRole('link', { name: label('einsatzabschnitte') }),
+    ).toBeInTheDocument();
+    expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull();
   });
 
   it('die S6-Zeile führt zum Funkplan, keine andere Zeile (LFH-548)', async () => {
@@ -320,13 +315,18 @@ describe('StabPage', () => {
   });
 
   it('der Funkplan-Verweis bleibt, auch wenn alle Modul-Werkzeuge der S6 ausgeblendet sind', async () => {
-    rendere({ overrides: { chat: { sichtbar: false }, einsatzabschnitte: { sichtbar: false } } });
+    rendere({
+      freigaben: freigabenFixture({
+        chat: { sichtbar: false },
+        einsatzabschnitte: { sichtbar: false },
+      }),
+    });
     await besetzungsSektion();
-    await waitFor(() => expect(overrideAufrufe).toBe(1));
-    const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
-    await waitFor(() =>
-      expect(within(s6).queryByRole('link', { name: label('einsatzabschnitte') })).toBeNull(),
-    );
+    // Anker: die Freigaben sind angekommen, sobald eine andere Zeile ihr Werkzeug zeigt.
+    const s4 = await screen.findByRole('group', { name: 'Werkzeuge S4' });
+    expect(within(s4).getByRole('link', { name: label('nachforderungen') })).toBeInTheDocument();
+    const s6 = screen.getByRole('group', { name: 'Werkzeuge S6' });
+    expect(within(s6).queryByRole('link', { name: label('einsatzabschnitte') })).toBeNull();
     expect(within(s6).getByRole('link', { name: 'Funkplan' })).toBeInTheDocument();
   });
 
@@ -581,7 +581,7 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
   });
 
   it('ohne Freigabe der Lageberichte fehlt die Übernahme', async () => {
-    rendere({ overrides: { lageberichte: { sichtbar: false } } });
+    rendere({ freigaben: freigabenFixture({ lageberichte: { sichtbar: false } }) });
     const p = await paneel();
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
     expect(within(p).queryByRole('button', { name: 'In Lagebericht übernehmen' })).toBeNull();

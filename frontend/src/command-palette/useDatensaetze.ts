@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeModulOverrides } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { listeEtb, zaehleEtb } from '../api/etb';
 import { datensatzAbfrage, ETB_SUCH_GC_MS, etbNummerAbfrage, FRISCH_MS } from './datensatzAbfrage';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
@@ -34,7 +33,7 @@ import {
  *  1. **Einsatzkontext**: ohne `einsatzId` keine Liste.
  *  2. **Schwelle**: erst ab `DATENSATZ_MINDESTZEICHEN` Zeichen im Rest hinter dem Präfix.
  *  3. **Modus**: was der Modus nicht anzeigt, wird nicht geholt (`PALETTE_MODI[…].quellen`).
- *  4. **Recht**: `istModulFreigegeben` JE MODUL.
+ *  4. **Recht**: `istModulFreigegeben` JE MODUL, über die Freigaben des Servers (LFH-669).
  *
  * Die Entprellung liegt am Eingabefeld (`CommandPalette.tsx`), der Hook bekommt einen entprellten
  * Rest. Keine Adresse entsteht hier von Hand (`routing/inlinePfade.guard.test.ts` trifft auch
@@ -57,7 +56,7 @@ interface DatensatzAbruf {
 
 /**
  * Die drei Riegel vor jedem `enabled`, an EINER Stelle: `useDatensaetze` und
- * `useDatensatzTreffer` brauchen sie beide, sonst liefen die Overrides in einem Zustand los, in
+ * `useDatensatzTreffer` brauchen sie beide, sonst liefen die Freigaben in einem Zustand los, in
  * dem keine Liste folgt.
  */
 function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf): boolean {
@@ -99,45 +98,41 @@ function etbAnzahlSchluessel(einsatzId: number, q: string) {
  * und Render prüfbar.
  */
 export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): DatensatzQuellen {
-  const { benutzer } = useAuth();
   const rest = suche.trim();
   // `?? 0` ist nie eine echte Einsatz-id; ohne Einsatz liefert `datensatzAbrufAktiv` false, der
   // Schlüssel wird nie abgerufen.
   const id = einsatzId ?? 0;
   /**
    * Einsatzkontext, Schwelle und Modus in EINEM Riegel schon HIER, sonst liefe im `>`-Modus der
-   * Sichtbarkeitsabruf darunter als einziger doch.
+   * Freigabenabruf darunter als einziger doch.
    */
   const aktiv = datensatzAbrufAktiv({ einsatzId, modus, suche });
   /** Quellen dieses Modus; `null` = keine Einschränkung. */
   const erlaubterModus = PALETTE_MODI[modus].quellen;
 
   /**
-   * Die Overrides tragen die Sichtbarkeitsachse und kommen VOR den Listen, an derselben Schwelle:
-   * ohne Begriff schweigt der Hook vollständig. `useBefehle` fordert dasselbe Fach ohnehin an,
-   * TanStack führt beide Beobachter zusammen.
+   * Die Modulfreigaben des Servers (LFH-669) tragen die Rechteachse und kommen VOR den Listen, an
+   * derselben Schwelle: ohne Begriff schweigt der Hook vollständig. `useBefehle` fordert dasselbe
+   * Fach ohnehin an, TanStack führt beide Beobachter zusammen.
    */
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId!),
+  const { data: freigaben } = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId!),
     enabled: aktiv,
     staleTime: FRISCH_MS,
   });
 
   /**
-   * Erst wenn die Sichtbarkeit beantwortet ist, dürfen die Listen los; sonst liefen sie in der
-   * Ladelücke gegen den Registry-Default „sichtbar“, obwohl der Einsatz ein Modul ausblenden kann.
-   * `isFetched` statt `isSuccess`: ein Fehlschlag darf die Suche nicht stilllegen, dann gilt der
-   * Registry-Default wie in `useBefehle`.
+   * Erst wenn die Freigaben vorliegen, dürfen die Listen los: `istModulFreigegeben` gibt bei
+   * unbekannten Freigaben (Ladelücke, Fehlschlag) nichts frei. Eine Anfrage auf Verdacht träfe
+   * eine Liste, die mit 403 antwortet (Spec `modul-freigabe`, „Keine Anfrage an ein nicht
+   * freigegebenes Modul“).
    */
-  const rechteBekannt = overridesQuery.isFetched;
-  const overrides = overridesQuery.data;
-
   function darfLaden(quelle: DatensatzQuelle): boolean {
-    if (!aktiv || !rechteBekannt) return false;
+    if (!aktiv) return false;
     if (erlaubterModus !== null && !erlaubterModus.includes(quelle)) return false;
     const eintrag = modulRegistry.find((m) => m.key === QUELLE_MODUL[quelle]);
-    return eintrag != null && istModulFreigegeben(eintrag, benutzer, overrides);
+    return eintrag != null && istModulFreigegeben(eintrag, freigaben);
   }
 
   /**
@@ -270,9 +265,9 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
 
 /**
  * Beschaffung UND reiner Kern in einem Griff, für den `PaletteHost`. HIER statt im Provider, weil
- * auch der Abruf der Sichtbarkeits-Overrides an `datensatzAbrufAktiv` hängen muss; ohne die
- * Riegel feuerte er beim bloßen Öffnen der Palette auf jeder Modulseite. Der zweite Beobachter
- * auf `modulOverrides` kostet keinen zweiten Request.
+ * auch der Abruf der Modulfreigaben an `datensatzAbrufAktiv` hängen muss; ohne die Riegel
+ * feuerte er beim bloßen Öffnen der Palette auf jeder Modulseite. Der zweite Beobachter auf
+ * `modulFreigaben` kostet keinen zweiten Request.
  */
 export function useDatensatzTreffer({
   einsatzId,
@@ -284,11 +279,10 @@ export function useDatensatzTreffer({
   aktuellerModulKey: string | null;
   navigate: DatensatzKontext['navigate'];
 }): Treffer[] {
-  const { benutzer } = useAuth();
   const quellen = useDatensaetze({ einsatzId, modus, suche });
-  const { data: overrides } = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId!),
+  const { data: freigaben } = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId!),
     enabled: datensatzAbrufAktiv({ einsatzId, modus, suche }),
     staleTime: FRISCH_MS,
   });
@@ -303,13 +297,12 @@ export function useDatensatzTreffer({
             einsatzId,
             modus,
             suche,
-            benutzer,
-            overrides,
+            freigaben,
             aktuellerModulKey,
             navigate,
             quellen,
           }),
-    [einsatzId, modus, suche, benutzer, overrides, aktuellerModulKey, navigate, quellen],
+    [einsatzId, modus, suche, freigaben, aktuellerModulKey, navigate, quellen],
   );
 }
 

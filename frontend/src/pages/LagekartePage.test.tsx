@@ -10,7 +10,7 @@ import { offeneRueckfrage } from '../test/rueckfrage';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import LagekartePage, { kopfMeta, quellenMeldung } from './LagekartePage';
-import { einsatzFixture } from '../test/fixtures';
+import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 
 // URL.createObjectURL / revokeObjectURL fehlen in jsdom → Stubs direkt auf URL setzen (spyOn geht
 // nicht, die Methoden existieren nicht).
@@ -374,9 +374,8 @@ function basisHandler(
       HttpResponse.json({ frist_min: 60, einheiten: [], abschnitte: [] }),
     ),
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),
-    // Ebene „Betroffene": ohne Anmeldung (`/auth/me` → 401) ist das Modul im Client frei, die Query
+    // Ebene „Betroffene": der MSW-Default meldet jedes Modul frei (`test/server.ts`), die Query
     // läuft in jedem Test — ohne diese zwei Handler stünde „Betroffene" überall im Ausfallbanner.
-    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
     http.get('/api/organisation', () =>
@@ -1294,10 +1293,8 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=betreuungsstelle: ohne Modul Betreuung kein Platziermodus (LFH-673)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/modul-overrides', () =>
-        HttpResponse.json({
-          betreuung: { einsatz_id: 1, modul_key: 'betreuung', sichtbar: false },
-        }),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ betreuung: { sichtbar: false, zugriff: false } })),
       ),
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
@@ -1988,8 +1985,8 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     let anfragen = 0;
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/modul-overrides', () =>
-        HttpResponse.json({ personen: { sichtbar: false, benoetigte_rolle: null } }),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ personen: { sichtbar: false, zugriff: false } })),
       ),
       http.get('/api/einsaetze/1/personen', () => {
         anfragen += 1;

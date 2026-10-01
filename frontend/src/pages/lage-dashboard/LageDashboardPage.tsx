@@ -57,8 +57,7 @@ import {
   unfallhilfsstellenListePfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
-import { ladeModulOverrides } from '../../api/einsaetze';
-import { useAuth } from '../../auth/AuthContext';
+import { ladeModulFreigaben } from '../../api/einsaetze';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import { ladeMatrix } from '../../api/gefahren';
@@ -178,35 +177,33 @@ export default function LageDashboardPage() {
     queryFn: () => listeEtb(einsatzId, { limit: STROM_ABRUF }),
   });
   // Die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die Pflege.
-  // Bis die Overrides da sind, gilt die Pflege — sonst ein Sprung ins womöglich ausgeblendete
+  // Bis die Freigaben da sind, gilt die Pflege — sonst ein Sprung ins womöglich ausgeblendete
   // Modul.
-  const { benutzer, laedt: authLaedt } = useAuth();
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const pegelZiel = pegelZielPfad(
     einsatzId,
-    overridesQuery.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQuery.data),
+    freigabenQuery.isSuccess && istKeyFreigegeben('wetter-pegel', freigabenQuery.data),
   );
-  // „Evakuiert" erst `bereit`, wenn Benutzer und Overrides feststehen: vorher kein Abruf (sonst 403
+  // „Evakuiert" erst `bereit`, wenn die Modul-Freigaben feststehen: vorher kein Abruf (sonst 403
   // bei ausgeblendetem Modul), kein aufblitzendes „nicht freigegeben", kein Link. Scheitert der
-  // Overrides-Abruf, zeigt die Zelle „Stand unbekannt".
-  const freigabenBekannt = !authLaedt && overridesQuery.isSuccess;
+  // Freigaben-Abruf, zeigt die Zelle „Stand unbekannt".
+  const freigabenBekannt = freigabenQuery.isSuccess;
   const evakuierungZustand = useEvakuierungKennzahl({
     einsatzId,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben: freigabenQuery.data,
     bereit: freigabenBekannt,
   });
-  const freigabenFehler = overridesQuery.isError;
+  const freigabenFehler = freigabenQuery.isError;
   const evakuierung = useMemo(
     (): EvakuierungStand =>
       freigabenFehler ? { zustand: 'fehler' } : evakuierungStand(evakuierungZustand),
     [freigabenFehler, evakuierungZustand],
   );
   const evakuierungZiel =
-    freigabenBekannt && darfZaehlerZeigen('betreuung', benutzer, overridesQuery.data)
+    freigabenBekannt && darfZaehlerZeigen('betreuung', freigabenQuery.data)
       ? betreuungPfad(einsatzId)
       : undefined;
 

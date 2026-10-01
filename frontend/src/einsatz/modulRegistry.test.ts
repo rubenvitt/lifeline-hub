@@ -13,14 +13,10 @@ import {
   modulZuRoute,
   modulAusPfad,
   istKeyFreigegeben,
+  istModulFreigegeben,
   type ModulEintrag,
 } from './modulRegistry';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
-import { adminFixture } from '../test/fixtures';
-
-const admin = adminFixture({ anzeigename: 'A', benutzername: 'a' });
-const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
-const fk: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
+import { freigabenFixture } from '../test/fixtures';
 
 const offen: ModulEintrag = {
   key: 'x',
@@ -30,8 +26,6 @@ const offen: ModulEintrag = {
   route: 'x',
   status: 'geplant',
 };
-const adminModul: ModulEintrag = { ...offen, benoetigteRolle: 'admin' };
-const fkModul: ModulEintrag = { ...offen, benoetigteRolle: 'fuehrungskraft' };
 
 describe('modulRegistry', () => {
   it('enthaelt das fertige ETB-Modul in der Kategorie Erfassung', () => {
@@ -76,82 +70,49 @@ describe('modulRegistry', () => {
     expect(moduleNachKategorie('erfassung').every((m) => m.kategorie === 'erfassung')).toBe(true);
   });
 
-  it('istModulGesperrt: ohne benoetigteRolle nie gesperrt', () => {
-    expect(istModulGesperrt(offen, ohne)).toBe(false);
-    expect(istModulGesperrt(offen, null)).toBe(false);
-  });
-
-  it('istModulGesperrt: admin-Modul nur fuer Admin frei', () => {
-    expect(istModulGesperrt(adminModul, admin)).toBe(false);
-    expect(istModulGesperrt(adminModul, fk)).toBe(true);
-    expect(istModulGesperrt(adminModul, ohne)).toBe(true);
-  });
-
-  it('istModulGesperrt: fuehrungskraft-Modul fuer Admin und Fuehrungskraft frei', () => {
-    expect(istModulGesperrt(fkModul, admin)).toBe(false);
-    expect(istModulGesperrt(fkModul, fk)).toBe(false);
-    expect(istModulGesperrt(fkModul, ohne)).toBe(true);
-  });
-
-  // --- Override-Kontext ---
-
-  const ov = (
-    key: string,
-    sichtbar: boolean,
-    rolle: 'admin' | 'fuehrungskraft' | null = null,
-  ): ModulOverrides => ({
-    [key]: {
-      einsatz_id: 1,
-      modul_key: key,
-      sichtbar,
-      benoetigte_rolle: rolle,
-      geaendert_at: null,
-      geaendert_von: null,
-    },
-  });
-
   it('istModulAusblendbar: Stammdaten + Einstellungen nicht ausblendbar', () => {
     expect(istModulAusblendbar('einsatzdaten')).toBe(false);
     expect(istModulAusblendbar('einsatz-einstellungen')).toBe(false);
     expect(istModulAusblendbar('etb')).toBe(true);
   });
 
-  it('istModulSichtbar: ohne Override sichtbar', () => {
-    expect(istModulSichtbar(offen)).toBe(true);
-    expect(istModulSichtbar(offen, {})).toBe(true);
+  // --- Freigaben des Servers (LFH-669): der Client rechnet keine Rolle nach ---
+
+  const fertig: ModulEintrag = { ...offen, status: 'fertig' };
+
+  it('istModulGesperrt: folgt allein `zugriff` des Servers', () => {
+    expect(istModulGesperrt(offen, freigabenFixture({ x: { zugriff: false } }))).toBe(true);
+    expect(istModulGesperrt(offen, freigabenFixture({ x: { zugriff: true } }))).toBe(false);
   });
 
-  it('istModulSichtbar: Override sichtbar=false versteckt ausblendbares Modul', () => {
-    expect(istModulSichtbar(offen, ov('x', false))).toBe(false);
-    expect(istModulSichtbar(offen, ov('x', true))).toBe(true);
+  it('istModulGesperrt: unbekannte Freigaben sperren die Navigation nicht (kein Flackern)', () => {
+    expect(istModulGesperrt(offen, undefined)).toBe(false);
   });
 
-  it('istModulSichtbar: nicht-ausblendbares Modul bleibt trotz Override sichtbar', () => {
-    const einsatzdaten = modulRegistry.find((m) => m.key === 'einsatzdaten')!;
-    expect(istModulSichtbar(einsatzdaten, ov('einsatzdaten', false))).toBe(true);
+  it('istModulSichtbar: folgt allein `sichtbar` des Servers', () => {
+    expect(istModulSichtbar(offen, freigabenFixture({ x: { sichtbar: false } }))).toBe(false);
+    expect(istModulSichtbar(offen, freigabenFixture({ x: { sichtbar: true } }))).toBe(true);
+    expect(istModulSichtbar(offen, undefined)).toBe(true);
   });
 
-  it('istModulGesperrt: nicht-ausblendbares Modul nie rollen-gesperrt (Selbst-Aussperr-Schutz)', () => {
-    const einstellungen = modulRegistry.find((m) => m.key === 'einsatz-einstellungen')!;
-    // Selbst mit (defensiv ohnehin abgelehntem) Rollen-Override bleibt es frei.
+  it('istModulFreigegeben: fertig, sichtbar und Zugriff', () => {
+    expect(istModulFreigegeben(fertig, freigabenFixture({ x: {} }))).toBe(true);
+    expect(istModulFreigegeben(fertig, freigabenFixture({ x: { zugriff: false } }))).toBe(false);
+    expect(istModulFreigegeben(fertig, freigabenFixture({ x: { sichtbar: false } }))).toBe(false);
+    // Nicht fertig bleibt zu, auch wenn der Server Zugriff gibt.
+    expect(istModulFreigegeben(offen, freigabenFixture({ x: {} }))).toBe(false);
+  });
+
+  it('istModulFreigegeben: ausgeblendet bleibt zu, auch wenn der Server (Admin) Zugriff gibt', () => {
     expect(
-      istModulGesperrt(einstellungen, ohne, ov('einsatz-einstellungen', true, 'fuehrungskraft')),
+      istModulFreigegeben(fertig, freigabenFixture({ x: { sichtbar: false, zugriff: true } })),
     ).toBe(false);
   });
 
-  it('istModulGesperrt: Override-Rolle hat Vorrang vor Registry-Default', () => {
-    // offen hat keinen Registry-Default; Override fordert fuehrungskraft.
-    expect(istModulGesperrt(offen, ohne, ov('x', true, 'fuehrungskraft'))).toBe(true);
-    expect(istModulGesperrt(offen, fk, ov('x', true, 'fuehrungskraft'))).toBe(false);
-    // Admin nie gesperrt, auch bei admin-Override.
-    expect(istModulGesperrt(offen, admin, ov('x', true, 'admin'))).toBe(false);
-  });
-
-  it('istModulGesperrt: Override-Rolle null faellt auf Registry-Default zurueck', () => {
-    // Override setzt nur Sichtbarkeit (Rolle null) — wie im Backend (`or_else(registry_default)`)
-    // greift weiter der Default 'admin'.
-    expect(istModulGesperrt(adminModul, ohne, ov('x', true, null))).toBe(true);
-    expect(istModulGesperrt(adminModul, admin, ov('x', true, null))).toBe(false);
+  it('istModulFreigegeben: unbekannte Freigaben geben nichts frei — keine Anfrage auf Verdacht', () => {
+    expect(istModulFreigegeben(fertig, undefined)).toBe(false);
+    // Bekannte Freigaben ohne Eintrag für den Key: ebenso zu.
+    expect(istModulFreigegeben(fertig, {})).toBe(false);
   });
 
   it('redirectZiel: der Führungsüberblick ist die Startseite (Neuentwurf, 21.09.2026)', () => {
@@ -273,12 +234,11 @@ describe('modulRegistry', () => {
     expect(abschnitte?.status).toBe('fertig');
   });
 
-  it('Lageberichte-Modul ist fertig (Kategorie lage, ohne Rollensperre)', () => {
+  it('Lageberichte-Modul ist fertig (Kategorie lage)', () => {
     const lb = modulRegistry.find((m) => m.key === 'lageberichte');
     expect(lb).toBeDefined();
     expect(lb?.status).toBe('fertig');
     expect(lb?.kategorie).toBe('lage');
-    expect(lb?.benoetigteRolle).toBeUndefined();
   });
 
   it('gefahrenzonen ist eine eigene Seite (kein Deep-Link mehr)', () => {
@@ -304,61 +264,33 @@ describe('modulRegistry', () => {
 });
 
 describe('erstesFreigegebenesModul (LFH-337)', () => {
-  const admin: BenutzerAnzeige = {
-    id: 1,
-    anzeigename: 'A',
-    benutzername: 'a',
-    system_rolle: 'admin',
-    org_rolle: 'keine',
-    aktiv: true,
-    erstellt_at: '2026-05-23 10:00:00',
-    totp_aktiviert: false,
-  };
-
   it('liefert das erste fertige Modul der Kategorie in Registry-Reihenfolge', () => {
-    const m = erstesFreigegebenesModul('fuehrung', admin);
+    const m = erstesFreigegebenesModul('fuehrung', freigabenFixture());
     expect(m?.kategorie).toBe('fuehrung');
     expect(m?.status).toBe('fertig');
   });
 
   it('überspringt ausgeblendete Module', () => {
-    // Kategorie 'kraefte', nicht 'fuehrung': deren erstes Modul 'einsatzdaten' ist nicht
-    // ausblendbar, ein Sichtbarkeits-Override bliebe dort wirkungslos.
-    const erstes = erstesFreigegebenesModul('kraefte', admin)!;
-    const m = erstesFreigegebenesModul('kraefte', admin, {
-      [erstes.key]: {
-        einsatz_id: 1,
-        modul_key: erstes.key,
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    });
-    // Konkretes Folgemodul statt bloßer Ungleichheit: ein Resolver, der bei gesetztem Override
-    // fälschlich `null` liefert, bestünde `not.toBe(erstes.key)` trivial.
-    expect(erstes.key).toBe('kraefteuebersicht');
+    const m = erstesFreigegebenesModul(
+      'kraefte',
+      freigabenFixture({ kraefteuebersicht: { sichtbar: false, zugriff: false } }),
+    );
+    // Konkretes Folgemodul statt bloßer Ungleichheit: ein Resolver, der fälschlich `null`
+    // liefert, bestünde `not.toBe(...)` trivial.
+    expect(erstesFreigegebenesModul('kraefte', freigabenFixture())?.key).toBe('kraefteuebersicht');
     expect(m?.key).toBe('einheiten');
   });
 
-  it('überspringt rollen-gesperrte Module', () => {
-    // Dieselbe Begründung: 'einsatzdaten' ist auch nie rollen-sperrbar; in 'kraefte' greift der
-    // Rollen-Override tatsächlich.
-    const erstes = erstesFreigegebenesModul('kraefte', admin)!;
-    const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
-    const m = erstesFreigegebenesModul('kraefte', ohne, {
-      [erstes.key]: {
-        einsatz_id: 1,
-        modul_key: erstes.key,
-        sichtbar: true,
-        benoetigte_rolle: 'admin',
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    });
-    // Konkretes Folgemodul — dieselbe Begründung wie oben.
-    expect(erstes.key).toBe('kraefteuebersicht');
+  it('überspringt gesperrte Module', () => {
+    const m = erstesFreigegebenesModul(
+      'kraefte',
+      freigabenFixture({ kraefteuebersicht: { zugriff: false } }),
+    );
     expect(m?.key).toBe('einheiten');
+  });
+
+  it('liefert null, solange die Freigaben unbekannt sind', () => {
+    expect(erstesFreigegebenesModul('kraefte', undefined)).toBeNull();
   });
 
   it('liefert null, wenn die Kategorie kein freigegebenes Modul hat', () => {
@@ -366,7 +298,7 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
     const nurGeplant: ModulEintrag[] = [
       { key: 'x', kategorie: 'lage', label: 'X', icon: () => null, route: 'x', status: 'geplant' },
     ];
-    expect(erstesFreigegebenesModul('lage', admin, undefined, nurGeplant)).toBeNull();
+    expect(erstesFreigegebenesModul('lage', freigabenFixture({ x: {} }), nurGeplant)).toBeNull();
   });
 });
 
@@ -405,23 +337,22 @@ describe('modulZuRoute / modulAusPfad', () => {
 });
 
 describe('istKeyFreigegeben (LFH-633)', () => {
-  const versteckt = (key: string): ModulOverrides =>
-    ({
-      [key]: {
-        einsatz_id: 7,
-        modul_key: key,
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-      },
-    }) as unknown as ModulOverrides;
-
   it('Paar: sichtbares Modul ist frei, ausgeblendetes nicht', () => {
-    expect(istKeyFreigegeben('wetter-pegel', ohne, {})).toBe(true);
-    expect(istKeyFreigegeben('wetter-pegel', ohne, versteckt('wetter-pegel'))).toBe(false);
+    expect(istKeyFreigegeben('wetter-pegel', freigabenFixture())).toBe(true);
+    expect(
+      istKeyFreigegeben('wetter-pegel', freigabenFixture({ 'wetter-pegel': { sichtbar: false } })),
+    ).toBe(false);
+  });
+
+  it('Paar: gesperrtes Modul ist nicht frei (Org-Vorgabe, LFH-669)', () => {
+    expect(
+      istKeyFreigegeben('wetter-pegel', freigabenFixture({ 'wetter-pegel': { zugriff: false } })),
+    ).toBe(false);
   });
 
   it('ein unbekannter Key ist nie frei — kein Link auf ein Modul, das es nicht gibt', () => {
-    expect(istKeyFreigegeben('gibt-es-nicht', admin, {})).toBe(false);
+    expect(istKeyFreigegeben('gibt-es-nicht', freigabenFixture({ 'gibt-es-nicht': {} }))).toBe(
+      false,
+    );
   });
 });

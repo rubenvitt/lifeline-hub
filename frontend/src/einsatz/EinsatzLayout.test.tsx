@@ -12,7 +12,8 @@ import EinsatzLayout, { einsatzKennung, navGriffMass } from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
-import { adminFixture } from '../test/fixtures';
+import { adminFixture, freigabenFixture } from '../test/fixtures';
+import type { ModulFreigaben } from '../api/types';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -54,12 +55,13 @@ function pfad(): string {
 }
 
 /**
- * `fehler` schaltet die beiden Abrufe einzeln auf 500: der Einsatz-Abruf ersetzt die ganze
- * Seite, der Overrides-Abruf nur ein Banner darüber.
+ * `freigaben` ist die Antwort des Servers auf `/modul-freigaben` (LFH-669). `fehler` schaltet die
+ * beiden Abrufe einzeln auf 500: der Einsatz-Abruf ersetzt die ganze Seite, der Freigaben-Abruf
+ * nur ein Banner darüber.
  */
 function setup(
-  overrides: Record<string, unknown> = {},
-  fehler: { einsatz?: boolean; overrides?: boolean } = {},
+  freigaben: ModulFreigaben = freigabenFixture(),
+  fehler: { einsatz?: boolean; freigaben?: boolean } = {},
   aktuellerBenutzer: typeof admin = admin,
   route: string = '/einsaetze/7/etb',
 ) {
@@ -69,8 +71,8 @@ function setup(
     http.get('/api/einsaetze/7', () =>
       fehler.einsatz ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(einsatz),
     ),
-    http.get('/api/einsaetze/7/modul-overrides', () =>
-      fehler.overrides ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(overrides),
+    http.get('/api/einsaetze/7/modul-freigaben', () =>
+      fehler.freigaben ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(freigaben),
     ),
     http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
   );
@@ -101,7 +103,6 @@ function setupRoute(route: string, childPath: string) {
     meHandler(admin),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
   );
   return renderMitProviders(
@@ -208,16 +209,7 @@ describe('EinsatzLayout', () => {
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
     // 'personen' ausblenden; das Erfassung-Panel ist via /etb offen.
-    setup({
-      personen: {
-        einsatz_id: 7,
-        modul_key: 'personen',
-        sichtbar: false,
-        benoetigte_rolle: null,
-        geaendert_at: null,
-        geaendert_von: null,
-      },
-    });
+    setup(freigabenFixture({ personen: { sichtbar: false, zugriff: false } }));
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Personen' })).not.toBeInTheDocument();
@@ -277,26 +269,27 @@ describe('EinsatzLayout', () => {
   });
 
   /**
-   * Fehlen die Overrides, blendet `istModulSichtbar` jedes ausgeblendete Modul wieder ein. Keine
-   * Sackgasse, aber eine Navigation, die mehr zeigt als konfiguriert, muss sich dazu bekennen.
+   * Fehlen die Freigaben, zeigt die Navigation jedes ausgeblendete oder gesperrte Modul offen
+   * (LFH-669, D3). Keine Sackgasse, aber eine Navigation, die mehr zeigt als konfiguriert, muss
+   * sich dazu bekennen.
    */
-  it('bei gescheitertem Overrides-Abruf warnt ein Banner, der Rahmen bleibt bedienbar', async () => {
-    setup({}, { overrides: true });
+  it('bei gescheitertem Freigaben-Abruf warnt ein Banner, der Rahmen bleibt bedienbar', async () => {
+    setup(freigabenFixture(), { freigaben: true });
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(
       screen.getByText(
-        'Modul-Sichtbarkeit konnte nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet sind.',
+        'Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
   });
 
-  it('ohne Overrides-Fehler steht kein Warnbanner über dem Rahmen', async () => {
+  it('ohne Freigaben-Fehler steht kein Warnbanner über dem Rahmen', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(
       screen.queryByText(
-        'Modul-Sichtbarkeit konnte nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet sind.',
+        'Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind.',
       ),
     ).not.toBeInTheDocument();
   });
@@ -391,7 +384,6 @@ describe('EinsatzLayout', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_sachgebiete: ['s4'], meine_funktion: 'S2/S3' }),
       ),
-      http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
       http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
     );
     renderMitProviders(
@@ -638,7 +630,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // Der Selbstklick ist der Zuklapp-Umschalter mit Persistenz; ohne diese Gegenaussage färbte
     // auch ein bedingungslos navigierender Klick den Test darüber grün. Startpunkt 'personen',
     // nicht 'etb' (das erste Modul der Kategorie) — sonst änderte ein falscher Sprung den Pfad nicht.
-    setup({}, {}, admin, '/einsaetze/7/personen');
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen');
     await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
     const vorher = pfad();
 
@@ -651,28 +643,45 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     expect(screen.queryByRole('button', { name: 'Personen' })).not.toBeInTheDocument();
   });
 
+  /**
+   * Server sagt `zugriff: false` (LFH-669): das Modul steht gesperrt in der Navigation, und der
+   * Rail-Sprung der Kategorie überspringt es — er landet im nächsten freien Modul.
+   */
+  it('überspringt beim Rail-Sprung ein gesperrtes Modul (LFH-669)', async () => {
+    setup(
+      freigabenFixture({
+        'lage-dashboard': { zugriff: false },
+        personen: { zugriff: false },
+      }),
+    );
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Erst wenn die Freigaben da sind, steht das gesperrte Modul mit Schloss in der Liste.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Personen' })).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Personen' })).toHaveAttribute(
+      'title',
+      'Keine Berechtigung',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lagekarte'));
+    expect(screen.getByRole('button', { name: 'Dashboard' })).toBeDisabled();
+  });
+
   it('öffnet das Panel auch ohne freigegebenes Modul der Kategorie, navigiert aber nicht', async () => {
     // Kategorie 'lage' komplett ausgeblendet: der Resolver liefert `null`, der Fremdklick klappt
     // nur auf — ein Sprung ins Leere wäre schlechter als keiner.
-    const lageVersteckt = Object.fromEntries(
-      [
-        'lage-dashboard',
-        'lagekarte',
-        'lageberichte',
-        'gefahrenzonen',
-        'wetter-pegel',
-        'lagemeldungen',
-      ].map((key) => [
-        key,
-        {
-          einsatz_id: 7,
-          modul_key: key,
-          sichtbar: false,
-          benoetigte_rolle: null,
-          geaendert_at: null,
-          geaendert_von: null,
-        },
-      ]),
+    const lageVersteckt = freigabenFixture(
+      Object.fromEntries(
+        [
+          'lage-dashboard',
+          'lagekarte',
+          'lageberichte',
+          'gefahrenzonen',
+          'wetter-pegel',
+          'lagemeldungen',
+        ].map((key) => [key, { sichtbar: false, zugriff: false }]),
+      ),
     );
     setup(lageVersteckt);
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
@@ -726,7 +735,6 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
       http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
       http.get('/api/einsaetze/7/gefahrengebiete', () =>
         HttpResponse.json([

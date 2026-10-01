@@ -368,12 +368,12 @@ export default function FunkplanPage() {
   if (stabFreigabe.zustand !== 'frei') {
     return stabFreigabeAnzeige(stabFreigabe, FUNKPLAN_SEITE, einsatzId);
   }
-  const overrides = stabFreigabe.overrides;
   // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND das Modul Lageberichte
-  // freigegeben. Solange eine Quelle lädt, stünde „lädt“ im unveränderlichen Bericht.
+  // freigegeben (Freigaben vom Server, LFH-669). Solange eine Quelle lädt, stünde „lädt“ im
+  // unveränderlichen Bericht.
   const darfUebernehmen =
     darfImEinsatzSchreiben(einsatz, benutzer) &&
-    istKeyFreigegeben('lageberichte', benutzer, overrides);
+    istKeyFreigegeben('lageberichte', stabFreigabe.freigaben);
   const quellenLaden = Object.values(quellen).some((q) => q.zustand === 'laden');
 
   const datenstand = gemeinsamerDatenstand(

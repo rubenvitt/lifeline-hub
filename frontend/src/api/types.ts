@@ -126,7 +126,7 @@ export interface EinstellungenUpdate {
 
 export type ModulOverride = S['EinsatzModulOverride'];
 
-/** Map `modul_key → Override`; fehlt ein Key, gilt der Registry-Default (sichtbar, frei).
+/** Map `modul_key → Override` (Rohdaten des Editors „Module"); fehlt ein Key, hat der Einsatz keinen Override.
  *  Kein Backend-Schema, FE-lokal. */
 export type ModulOverrides = Record<string, ModulOverride>;
 

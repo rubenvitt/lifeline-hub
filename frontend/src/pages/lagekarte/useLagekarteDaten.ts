@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
-import { ladeEinsatz, ladeEinstellungen, ladeModulOverrides } from '../../api/einsaetze';
+import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../../api/einsaetze';
 import { ApiError } from '../../api/client';
 import { listePersonen } from '../../api/einsatzPerson';
 import { ladeBetreuung } from '../../api/betreuung';
-import { modulRegistry } from '../../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -104,30 +104,51 @@ export function useLagekarteDaten({
     queryFn: () => ladeEinsatz(einsatzId),
     enabled: liveAn,
   });
+  // Modulgrenze der Kartenquellen (LFH-669, Spec `modul-freigabe`): eine Quelle eines fremden
+  // Moduls läuft nur, wenn der Server das Modul freigibt — ohne bekannte Freigaben (Laden,
+  // Fehler) gar nicht. Gesperrt ist kein Ausfall: ihre Rohdaten bleiben leer, auch mit Altstand
+  // im Cache. Zonen, freie Zeichen und Führungskräfte gehören der Lagekarte selbst. Die Freigaben
+  // sind Render-Kontext und laden auch im Historien-Modus (Ebenen-Zeilen „Betroffene"/„Betreuung").
+  const freigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const freigaben = freigabenQuery.data;
+  // Ausfall nur ohne verwertbaren Stand: scheitert ein Neuabruf, bleiben die alten Freigaben gültig.
+  const freigabenFehler = freigabenQuery.isError && freigaben === undefined;
+  const uhsFrei = liveAn && istKeyFreigegeben('unfallhilfsstellen', freigaben);
+  const schaedenFrei = liveAn && istKeyFreigegeben('schaeden', freigaben);
+  const einheitenFrei = liveAn && istKeyFreigegeben('einheiten', freigaben);
+  const fahrzeugeFrei = liveAn && istKeyFreigegeben('fahrzeuge', freigaben);
+  const abschnitteFrei = liveAn && istKeyFreigegeben('einsatzabschnitte', freigaben);
+  const gebieteFrei = liveAn && istKeyFreigegeben('gefahrenzonen', freigaben);
+  const lageMeldungenFrei = liveAn && istKeyFreigegeben('lagemeldungen', freigaben);
+  const rueckmeldungenFrei = liveAn && istKeyFreigegeben('meldungen', freigaben);
+
   const uhsQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: liveAn,
+    enabled: uhsFrei,
   });
   const schaedenQuery = useQuery({
     queryKey: einsatzKeys.schaeden(einsatzId),
     queryFn: () => listeSchaeden(einsatzId),
-    enabled: liveAn,
+    enabled: schaedenFrei,
   });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: liveAn,
+    enabled: einheitenFrei,
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
-    enabled: liveAn,
+    enabled: fahrzeugeFrei,
   });
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
-    enabled: liveAn,
+    enabled: abschnitteFrei,
   });
   const zonenQuery = useQuery({
     queryKey: einsatzKeys.zonen(einsatzId),
@@ -142,19 +163,19 @@ export function useLagekarteDaten({
   const gebieteQuery = useQuery({
     queryKey: einsatzKeys.gefahrengebiete(einsatzId),
     queryFn: () => ladeGefahrengebiete(einsatzId),
-    enabled: liveAn,
+    enabled: gebieteFrei,
   });
   const lageMeldungenQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
-    enabled: liveAn,
+    enabled: lageMeldungenFrei,
   });
   // Letzte Rückmeldung je Einheit für das Paneel „Ausgewählt". Nur live: der gesicherte Stand trägt
   // keine Rückmeldungen, eine heutige Meldung neben einem eingefrorenen Lagebild wäre falsch.
   const rueckmeldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
     queryFn: () => holeRueckmeldungen(einsatzId),
-    enabled: liveAn,
+    enabled: rueckmeldungenFrei,
   });
   const fkQuery = useQuery({
     queryKey: einsatzKeys.fuehrungskraefte(einsatzId),
@@ -162,21 +183,14 @@ export function useLagekarteDaten({
     enabled: liveAn,
   });
   // Ebene „Betroffene": die Zugriffsgrenze ist diese Query, nicht der Schalter
-  // (`personenEbene.ts`). Sie läuft erst, wenn die Overrides feststehen und das Modul „Personen" im
-  // Client frei ist; ein 403 kippt danach auf „gesperrt". Der Key ist der argumentlose
+  // (`personenEbene.ts`). Sie läuft erst, wenn die Freigaben feststehen und das Modul „Personen"
+  // frei ist; ein 403 kippt danach auf „gesperrt". Der Key ist der argumentlose
   // Bestands-Accessor, dasselbe Fach wie Personenseite, Dashboard, Chat und Palette, live
-  // invalidiert vom `person`-Event (nur an Leser mit „Personen", `src/live/mod.rs`). Overrides sind
-  // Render-Kontext und laden auch im Historien-Modus.
-  const overridesQuery = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
-  });
+  // invalidiert vom `person`-Event (nur an Leser mit „Personen", `src/live/mod.rs`).
   const personenVorab = personenZugriffVon({
     istSnapshot,
-    rechteBekannt: overridesQuery.isFetched,
     modul: PERSONEN_MODUL,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben,
     abgelehnt: false,
   });
   const personenQuery = useQuery({
@@ -186,10 +200,8 @@ export function useLagekarteDaten({
   });
   const personenZugriff = personenZugriffVon({
     istSnapshot,
-    rechteBekannt: overridesQuery.isFetched,
     modul: PERSONEN_MODUL,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben,
     abgelehnt: personenQuery.error instanceof ApiError && personenQuery.error.status === 403,
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt" (Zustand der Zeile), kein Ausfall.
@@ -199,10 +211,8 @@ export function useLagekarteDaten({
   // (`einsatzKeys.betreuung`), live invalidiert vom `betreuung`-Event, das nur Leser mit Modulrecht
   // bekommen. Im Historien-Modus kommen die Stellen aus dem Dokument.
   const betreuungVorab = betreuungZugriffVon({
-    rechteBekannt: overridesQuery.isFetched,
     modul: BETREUUNG_MODUL,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben,
     abgelehnt: false,
   });
   const betreuungQuery = useQuery({
@@ -211,10 +221,8 @@ export function useLagekarteDaten({
     enabled: liveAn && betreuungVorab === 'frei',
   });
   const betreuungZugriff = betreuungZugriffVon({
-    rechteBekannt: overridesQuery.isFetched,
     modul: BETREUUNG_MODUL,
-    benutzer,
-    overrides: overridesQuery.data,
+    freigaben,
     abgelehnt: betreuungQuery.error instanceof ApiError && betreuungQuery.error.status === 403,
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
@@ -236,15 +244,35 @@ export function useLagekarteDaten({
   // dieselbe Form, dieselben Ableiter.
   const snap = istSnapshot ? (snapQuery.data?.daten as SnapshotDaten | undefined) : undefined;
   const einsatz = istSnapshot ? snap?.einsatz : einsatzQuery.data;
-  const uhsRoh = istSnapshot ? snap?.uhs : uhsQuery.data;
-  const schaedenRoh = istSnapshot ? snap?.schaeden : schaedenQuery.data;
-  const einheitenRoh = istSnapshot ? snap?.einheiten : einheitenQuery.data;
-  const fahrzeugeRoh = istSnapshot ? snap?.fahrzeuge : fahrzeugeQuery.data;
-  const abschnitteRoh = istSnapshot ? snap?.abschnitte : abschnitteQuery.data;
+  const uhsRoh = istSnapshot ? snap?.uhs : uhsFrei ? uhsQuery.data : undefined;
+  const schaedenRoh = istSnapshot ? snap?.schaeden : schaedenFrei ? schaedenQuery.data : undefined;
+  const einheitenRoh = istSnapshot
+    ? snap?.einheiten
+    : einheitenFrei
+      ? einheitenQuery.data
+      : undefined;
+  const fahrzeugeRoh = istSnapshot
+    ? snap?.fahrzeuge
+    : fahrzeugeFrei
+      ? fahrzeugeQuery.data
+      : undefined;
+  const abschnitteRoh = istSnapshot
+    ? snap?.abschnitte
+    : abschnitteFrei
+      ? abschnitteQuery.data
+      : undefined;
   const zonenRoh = istSnapshot ? snap?.zonen : zonenQuery.data;
   const freieZeichenRoh = istSnapshot ? snap?.freie_zeichen : freieZeichenQuery.data;
-  const gebieteRoh = istSnapshot ? snap?.gefahrengebiete : gebieteQuery.data;
-  const lageMeldungenRoh = istSnapshot ? snap?.lagemeldungen : lageMeldungenQuery.data;
+  const gebieteRoh = istSnapshot
+    ? snap?.gefahrengebiete
+    : gebieteFrei
+      ? gebieteQuery.data
+      : undefined;
+  const lageMeldungenRoh = istSnapshot
+    ? snap?.lagemeldungen
+    : lageMeldungenFrei
+      ? lageMeldungenQuery.data
+      : undefined;
   const fkRoh = istSnapshot ? snap?.fuehrungskraefte : fkQuery.data;
   // Ohne Modulrecht leer, auch wenn ein früherer Abruf im Cache steht; nach einem Fehler ebenso
   // (react-query lässt `data` stehen).
@@ -405,17 +433,21 @@ export function useLagekarteDaten({
   // Die live/snapshot-Weiche spiegelt `ladt`: im Historien-Modus ist das Dokument die eine Quelle.
   const fehlerhafteQuellen = useMemo<string[]>(() => {
     if (istSnapshot) return snapQuery.isError ? ['Gesicherter Stand'] : [];
+    // Ein gesperrtes Modul ist kein Ausfall (`…Frei`); ohne Freigaben fehlt dagegen jede
+    // modulgebundene Quelle, das nennt „Berechtigungen" (sonst sähe eine leere Karte wie eine
+    // ruhige Lage aus).
     const katalog: [string, boolean][] = [
+      ['Berechtigungen', freigabenFehler],
       ['Einsatzdaten', einsatzQuery.isError],
-      ['Unfallhilfsstellen', uhsQuery.isError],
-      ['Schäden', schaedenQuery.isError],
-      ['Einheiten', einheitenQuery.isError],
-      ['Fahrzeuge', fahrzeugeQuery.isError],
-      ['Einsatzabschnitte', abschnitteQuery.isError],
+      ['Unfallhilfsstellen', uhsFrei && uhsQuery.isError],
+      ['Schäden', schaedenFrei && schaedenQuery.isError],
+      ['Einheiten', einheitenFrei && einheitenQuery.isError],
+      ['Fahrzeuge', fahrzeugeFrei && fahrzeugeQuery.isError],
+      ['Einsatzabschnitte', abschnitteFrei && abschnitteQuery.isError],
       ['Zonen', zonenQuery.isError],
       ['Taktische Zeichen', freieZeichenQuery.isError],
-      ['Gefahrengebiete', gebieteQuery.isError],
-      ['Lagemeldungen', lageMeldungenQuery.isError],
+      ['Gefahrengebiete', gebieteFrei && gebieteQuery.isError],
+      ['Lagemeldungen', lageMeldungenFrei && lageMeldungenQuery.isError],
       ['Personal', fkQuery.isError],
       // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS, ihr Ausfall ist ein
       // Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
@@ -426,15 +458,23 @@ export function useLagekarteDaten({
   }, [
     istSnapshot,
     snapQuery.isError,
+    freigabenFehler,
     einsatzQuery.isError,
+    uhsFrei,
     uhsQuery.isError,
+    schaedenFrei,
     schaedenQuery.isError,
+    einheitenFrei,
     einheitenQuery.isError,
+    fahrzeugeFrei,
     fahrzeugeQuery.isError,
+    abschnitteFrei,
     abschnitteQuery.isError,
     zonenQuery.isError,
     freieZeichenQuery.isError,
+    gebieteFrei,
     gebieteQuery.isError,
+    lageMeldungenFrei,
     lageMeldungenQuery.isError,
     fkQuery.isError,
     betreuungFehler,
@@ -446,6 +486,7 @@ export function useLagekarteDaten({
   const neuLaden = () => {
     for (const q of [
       snapQuery,
+      freigabenQuery,
       einsatzQuery,
       uhsQuery,
       schaedenQuery,
@@ -528,9 +569,9 @@ export function useLagekarteDaten({
         freieZeichenQuery.isLoading ||
         lageMeldungenQuery.isLoading ||
         fkQuery.isLoading ||
-        // Vor feststehenden Rechten weiß niemand, ob Stellen kommen; sie speisen den
-        // Startausschnitt wie die UHS.
-        !overridesQuery.isFetched ||
+        // Vor feststehenden Freigaben weiß niemand, welche Quellen kommen (UHS, Schäden, Stellen
+        // speisen den Startausschnitt).
+        !freigabenQuery.isFetched ||
         betreuungQuery.isLoading,
     // Datenstand der Karte (LFH-723): der älteste geladene Teil der Live-Ebenen, wie beim
     // Meldebild. Im Snapshot-Modus keiner — dort nennt der Historien-Banner den Stand, und eine
@@ -564,7 +605,7 @@ export function useLagekarteDaten({
     zonenAlle: zonenRoh ?? [],
     zonenGeladen: istSnapshot ? !snapQuery.isLoading : zonenQuery.isFetched,
     // Stehen die Modulrechte fest? Der Platzier-Auftrag für eine Stelle wartet darauf.
-    rechteBekannt: overridesQuery.isFetched,
+    rechteBekannt: freigabenQuery.isFetched,
     gebiete: gebieteRoh ?? [],
     // Evakuierungsbezirke für den Zonen-Inspector — leer ohne Modulrecht.
     bezirke: bezirkeRoh ?? [],
@@ -583,7 +624,7 @@ export function useLagekarteDaten({
       betreuungsstellen: stellenRoh ?? [],
       // Nur ein erfolgreicher Live-Abruf; nach Fehler bliebe `data` als stiller Altstand stehen.
       rueckmeldungen:
-        istSnapshot || rueckmeldungenQuery.isError ? undefined : rueckmeldungenQuery.data,
+        !rueckmeldungenFrei || rueckmeldungenQuery.isError ? undefined : rueckmeldungenQuery.data,
     },
     // Abgeleitete Marker/Flächen/Zonen.
     verortet,

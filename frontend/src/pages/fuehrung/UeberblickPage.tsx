@@ -23,7 +23,7 @@ import {
 } from '../../components/instrument';
 import { einsatzKeys } from '../../api/queryKeys';
 import { verfasserText } from '../../etb/verfasser';
-import { ladeEinsatz, ladeModulOverrides } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -252,16 +252,15 @@ export default function UeberblickPage() {
   });
   // Ablösungsmarken nur, wenn das Modul sichtbar und frei ist — sonst 403 und ein Seitenkanal über
   // ausgeblendete Daten (dieselbe Prüfung wie `darfZaehlerZeigen`).
-  const overridesQ = useQuery({
-    queryKey: einsatzKeys.modulOverrides(einsatzId),
-    queryFn: () => ladeModulOverrides(einsatzId),
+  const freigabenQ = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
   });
-  const abloesungSichtbar =
-    overridesQ.isSuccess && darfZaehlerZeigen('abloesung', benutzer, overridesQ.data);
+  const abloesungSichtbar = freigabenQ.isSuccess && darfZaehlerZeigen('abloesung', freigabenQ.data);
   // „Erwarteter Höchststand" führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die
   // Pflege (`pegelZielPfad`).
   const wetterPegelFrei =
-    overridesQ.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQ.data);
+    freigabenQ.isSuccess && istKeyFreigegeben('wetter-pegel', freigabenQ.data);
   const abloesungenQ = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),

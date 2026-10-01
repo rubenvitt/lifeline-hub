@@ -2,15 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { ladeGefahrengebiete } from '../api/gefahren';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulFreigaben } from '../api/types';
 import { verdichteGefahrengebiete } from '../pages/lage-dashboard/lageVerdichtung';
 import { aktiveWarnung } from './aktiveWarnung';
 import { istModulFreigegeben, modulRegistry } from './modulRegistry';
 
 interface Args {
   einsatzId: number;
-  benutzer: BenutzerAnzeige | null;
-  overrides?: ModulOverrides;
+  freigaben?: ModulFreigaben;
 }
 
 const GEFAHREN_MODUL = modulRegistry.find((m) => m.key === 'gefahrenzonen');
@@ -29,9 +28,9 @@ const GEFAHREN_MODUL = modulRegistry.find((m) => m.key === 'gefahrenzonen');
  * Navigation (`istModulFreigegeben`). Die Meldungs-Hälfte filtert der Server selbst: ohne
  * Meldungsrecht fehlt das Feld.
  */
-export function useAktiveWarnung({ einsatzId, benutzer, overrides }: Args): boolean {
+export function useAktiveWarnung({ einsatzId, freigaben }: Args): boolean {
   const gefahrenFrei =
-    GEFAHREN_MODUL !== undefined && istModulFreigegeben(GEFAHREN_MODUL, benutzer, overrides);
+    GEFAHREN_MODUL !== undefined && istModulFreigegeben(GEFAHREN_MODUL, freigaben);
 
   const hoechsteWarnstufe = useQuery({
     queryKey: einsatzKeys.gefahrengebiete(einsatzId),

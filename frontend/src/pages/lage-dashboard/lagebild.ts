@@ -328,7 +328,7 @@ export interface Rohdaten {
   pegel: PegelAnzeige[];
   /**
    * Ziel der Pegel-Kennzahl: „Wetter & Pegel", wenn frei (`pegelZielPfad`), sonst die Pflege in
-   * Einstellungen › Pegel. Entscheidet die Seite — diese Datei kennt weder Benutzer noch Overrides.
+   * Einstellungen › Pegel. Entscheidet die Seite — diese Datei kennt weder Benutzer noch Modulfreigaben.
    */
   pegelZiel?: string;
   /** Stand der Evakuierungskennzahl, siehe {@link evakuierungStand}. */

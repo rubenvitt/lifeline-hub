@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { schlechtesterZustand, type AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
-import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides, Stab } from '../api/types';
+import type { BenutzerAnzeige, EinsatzAnzeige, ModulFreigaben, Stab } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
@@ -37,7 +37,7 @@ interface Props {
   einsatzId: number;
   einsatz: EinsatzAnzeige;
   benutzer: BenutzerAnzeige | null;
-  overrides: ModulOverrides | undefined;
+  freigaben: ModulFreigaben | undefined;
   stab: Stab | undefined;
   stabZustand: AbrufZustand;
   stabStand: number;
@@ -56,7 +56,7 @@ export default function VorbereitungPaneel({
   einsatzId,
   einsatz,
   benutzer,
-  overrides,
+  freigaben,
   stab,
   stabZustand,
   stabStand,
@@ -124,12 +124,11 @@ export default function VorbereitungPaneel({
   const standWire = Number.isFinite(stand) ? alsWire(stand) : null;
   const laedt = quellenLaden(zeilen);
 
-  // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND Modul Lageberichte frei.
+  // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND Modul Lageberichte frei
+  // (Freigabe vom Server; solange sie fehlt, gilt das Modul als nicht frei).
   // Solange eine Quelle lädt, stünde „lädt" im Bericht — der Knopf ist dann gesperrt.
   const darfUebernehmen =
-    darfImEinsatzSchreiben(einsatz, benutzer) &&
-    overrides != null &&
-    istKeyFreigegeben('lageberichte', benutzer, overrides);
+    darfImEinsatzSchreiben(einsatz, benutzer) && istKeyFreigegeben('lageberichte', freigaben);
 
   const uebernehmen = useMutation({
     mutationFn: async () => {

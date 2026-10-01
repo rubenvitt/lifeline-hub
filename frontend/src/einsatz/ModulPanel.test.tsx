@@ -6,25 +6,17 @@ import { dichten, farbenDunkel } from '../theme/tokens';
 import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
 import type { ModulEintrag } from './modulRegistry';
 import type { Sprungmarke } from './sprungmarken';
-import type { ModulOverrides } from '../api/types';
-import { benutzerFixture } from '../test/fixtures';
+import type { ModulFreigaben } from '../api/types';
+import { freigabenFixture } from '../test/fixtures';
 
-const ueberschreibung = (
-  modulKey: string,
-  sichtbar: boolean,
-  benoetigteRolle: 'admin' | 'fuehrungskraft' | null = null,
-): ModulOverrides => ({
-  [modulKey]: {
-    einsatz_id: 1,
-    modul_key: modulKey,
-    sichtbar,
-    benoetigte_rolle: benoetigteRolle,
-    geaendert_at: null,
-    geaendert_von: null,
-  },
-});
-
-const ohne = benutzerFixture({ anzeigename: 'E' });
+/**
+ * Freigaben wie vom Server (LFH-669). Die Liste unten trägt eigene Schlüssel (`sach`, `geheim`),
+ * die die Registry nicht kennt — `freigabenFixture` nimmt jeden Schlüssel aus `abweichend` auf.
+ * `geheim` ist gesperrt: das, was früher der Registry-Default `benoetigteRolle` ausrechnete,
+ * sagt jetzt der Server.
+ */
+const freigaben = (abweichend: Parameters<typeof freigabenFixture>[0] = {}): ModulFreigaben =>
+  freigabenFixture({ geheim: { zugriff: false }, ...abweichend });
 
 const basis = (over: Partial<ModulEintrag>): ModulEintrag => ({
   key: 'k',
@@ -39,16 +31,16 @@ const basis = (over: Partial<ModulEintrag>): ModulEintrag => ({
 const module: ModulEintrag[] = [
   basis({ key: 'etb', label: 'ETB', route: 'etb', status: 'fertig' }),
   basis({ key: 'sach', label: 'Sachschäden', route: 'sach', status: 'wip' }),
-  basis({ key: 'geheim', label: 'Geheim', route: 'geheim', benoetigteRolle: 'admin' }),
+  basis({ key: 'geheim', label: 'Geheim', route: 'geheim' }),
 ];
 
 describe('ModulPanel', () => {
-  it('listet Module, markiert WIP, sperrt rollengeschuetzte', () => {
+  it('listet Module, markiert WIP, sperrt vom Server gesperrte', () => {
     renderMitProviders(
       <ModulPanel
         titel="Erfassung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey="etb"
         onModulKlick={() => {}}
       />,
@@ -72,7 +64,7 @@ describe('ModulPanel', () => {
       <ModulPanel
         titel="Erfassung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
@@ -96,7 +88,7 @@ describe('ModulPanel', () => {
             verweistAuf: 'lagekarte',
           }),
         ]}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
@@ -109,8 +101,7 @@ describe('ModulPanel', () => {
       <ModulPanel
         titel="Erfassung"
         module={module}
-        benutzer={ohne}
-        overrides={ueberschreibung('sach', false)}
+        freigaben={freigaben({ sach: { sichtbar: false, zugriff: false } })}
         aktiverModulKey="etb"
         onModulKlick={() => {}}
       />,
@@ -119,35 +110,28 @@ describe('ModulPanel', () => {
     expect(screen.queryByRole('button', { name: /Sachschäden/ })).not.toBeInTheDocument();
   });
 
-  it('rendert ein nicht-ausblendbares Modul trotz sichtbar=false (LFH-132)', () => {
-    const stamm = [
-      basis({
-        key: 'einsatzdaten',
-        label: 'Einsatzdaten',
-        route: 'einsatzdaten',
-        status: 'fertig',
-      }),
-    ];
-    renderMitProviders(
-      <ModulPanel
-        titel="Führung"
-        module={stamm}
-        benutzer={ohne}
-        overrides={ueberschreibung('einsatzdaten', false)}
-        aktiverModulKey={null}
-        onModulKlick={() => {}}
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Einsatzdaten' })).toBeInTheDocument();
-  });
-
-  it('sperrt ein Modul per Override-Rolle, auch ohne Registry-Default (LFH-132)', () => {
+  it('zeigt Module ungesperrt, solange die Freigaben unbekannt sind (LFH-669, D3)', () => {
+    // Sonst blinkte beim Öffnen jedes Modul kurz als gesperrt; ein Klick in dieser Lücke führt
+    // höchstens auf den 403-Zustand der Modulseite.
     renderMitProviders(
       <ModulPanel
         titel="Erfassung"
         module={module}
-        benutzer={ohne}
-        overrides={ueberschreibung('etb', true, 'fuehrungskraft')}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /ETB/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Sachschäden/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Geheim' })).toBeEnabled();
+  });
+
+  it('sperrt ein Modul, dem der Server den Zugriff verweigert (LFH-132/LFH-669)', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        module={module}
+        freigaben={freigaben({ etb: { zugriff: false } })}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
@@ -161,7 +145,7 @@ describe('ModulPanel', () => {
       <ModulPanel
         titel="Erfassung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={onKlick}
       />,
@@ -183,7 +167,7 @@ describe('ModulPanel', () => {
             zaehlerQuelle: 'meldungen',
           }),
         ]}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
         zaehler={{ meldungen: { wert: 5, beschreibung: '5 offene Meldungen, davon 2 ungesehen' } }}
@@ -209,7 +193,7 @@ describe('ModulPanel', () => {
       <ModulPanel
         titel="Erfassung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
@@ -226,7 +210,7 @@ describe('ModulPanel', () => {
       <ModulPanel
         titel="Erfassung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey="etb"
         onModulKlick={() => {}}
       />,
@@ -249,7 +233,7 @@ describe('ModulPanel', () => {
           ...module,
           basis({ key: 'gz', label: 'Zonen', route: 'gz', verweistAuf: 'lagekarte' }),
         ]}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
@@ -347,7 +331,7 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
       <ModulPanel
         titel="Führung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
         einsatz={{ begonnen_at: '2026-01-01 00:00:00', abgeschlossen_at: '2026-01-01 06:41:00' }}
@@ -362,7 +346,7 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
       <ModulPanel
         titel="Führung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
@@ -375,7 +359,7 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
       <ModulPanel
         titel="Führung"
         module={module}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
@@ -404,12 +388,12 @@ describe('ModulListe — Sprungmarken', () => {
     basis({ key: 'auftraege', kategorie: 'fuehrung', label: 'Aufträge', status: 'fertig' }),
     basis({ key: 'stab', kategorie: 'fuehrung', label: 'Stab', status: 'fertig' }),
   ];
-  const zeige = (props: { overrides?: ModulOverrides; onSprungKlick?: (m: Sprungmarke) => void }) =>
+  const zeige = (props: { freigaben?: ModulFreigaben; onSprungKlick?: (m: Sprungmarke) => void }) =>
     renderMitProviders(
       <ModulPanel
         titel="Führung"
         module={fuehrung}
-        benutzer={ohne}
+        freigaben={freigaben()}
         aktiverModulKey="auftraege"
         onModulKlick={() => {}}
         sprungmarken={[marke]}
@@ -433,17 +417,19 @@ describe('ModulListe — Sprungmarken', () => {
   });
 
   it('verschwindet mit dem ausgeblendeten Zielmodul, nicht mit dem Anker', () => {
-    const { unmount } = zeige({ overrides: ueberschreibung('etb', false) });
+    const { unmount } = zeige({
+      freigaben: freigabenFixture({ etb: { sichtbar: false, zugriff: false } }),
+    });
     expect(screen.queryByRole('button', { name: /Entscheidungen/ })).not.toBeInTheDocument();
     unmount();
     // Gegenprobe: ein ausgeblendeter ANKER nimmt die Marke nicht mit.
-    zeige({ overrides: ueberschreibung('auftraege', false) });
+    zeige({ freigaben: freigabenFixture({ auftraege: { sichtbar: false, zugriff: false } }) });
     expect(screen.getByRole('button', { name: /Entscheidungen/ })).toBeInTheDocument();
   });
 
   it('ist gesperrt, wenn das Zielmodul für den Benutzer gesperrt ist', async () => {
     const klick = vi.fn();
-    zeige({ overrides: ueberschreibung('etb', true, 'fuehrungskraft'), onSprungKlick: klick });
+    zeige({ freigaben: freigabenFixture({ etb: { zugriff: false } }), onSprungKlick: klick });
     const sprung = screen.getByRole('button', { name: /Entscheidungen/ });
     expect(sprung).toBeDisabled();
     expect(sprung).toHaveAttribute('title', 'Keine Berechtigung');
