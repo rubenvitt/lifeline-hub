@@ -958,6 +958,62 @@ async fn patch_verschiebt_zwischen_ansichten() {
     );
 }
 
+/// LFH-738: Eine `ansicht_id` aus einem ANDEREN Einsatz wird abgelehnt, beim Anlegen wie im
+/// PATCH, mit 404 wie eine unbekannte id (kein Existenz-Orakel). Vorher hing die Zone still an
+/// der fremden Ansicht, und deren Löschen setzte die Zuordnung per `ON DELETE SET NULL` zurück.
+#[tokio::test]
+async fn fremde_ansicht_id_ist_404() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let eigene = standard_ansicht_id(&app, &admin, einsatz).await;
+    let fremde = standard_ansicht_id(&app, &admin, anderer).await;
+
+    for aid in [fremde, 999_999_999] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/zonen"),
+            &admin,
+            Some(
+                &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,"ansicht_id":aid})
+                    .to_string(),
+            ),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "POST ansicht_id={aid}: {v:?}");
+    }
+
+    let zid = zone_anlegen(&app, &admin, einsatz, "bleibt", Some(eigene)).await;
+    for aid in [fremde, 999_999_999] {
+        let (s, v) = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+            &admin,
+            Some(&json!({"ansicht_id": aid}).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "PATCH ansicht_id={aid}: {v:?}");
+    }
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &admin,
+        None,
+    )
+    .await;
+    let zonen = liste.as_array().unwrap();
+    assert_eq!(zonen.len(), 1, "keine Zone angelegt: {zonen:?}");
+    assert_eq!(
+        zonen[0]["ansicht_id"], eigene,
+        "Zuordnung unverändert: {zonen:?}"
+    );
+}
+
 // ---------- LFH-673: Zonentyp Evakuierungsbezirk und Zuordnung zum Bezirk ----------
 
 async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {

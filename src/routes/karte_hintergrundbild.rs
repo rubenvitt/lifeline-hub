@@ -96,6 +96,8 @@ pub async fn hochladen(
     bild::pruefe_groesse(bytes.len())?;
     let mime = bild::erkenne_bild_mime(&bytes)?;
     bild::pruefe_ecken(&ecken)?;
+    // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404 — vor dem teuren Scan.
+    crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, ansicht_id).await?;
     // AV-Scan (LFH-238): scan-vor-persist über denselben Seam wie der generische
     // Anhang-Upload (LFH-114) — schließt den bislang umgangenen Scan-Pfad. Ohne
     // konfigurierten clamd ein No-op; fail-closed bei unerreichbarem Scanner.
@@ -188,6 +190,13 @@ pub async fn aktualisieren(
     if let Some(e) = &body.ecken_json {
         bild::pruefe_ecken(e)?;
     }
+    // Ansicht (LFH-738): nur das Setzen wird geprüft, `null` gibt auf alle Ansichten frei.
+    crate::karten_ansicht::repo::pruefe_zugehoerig(
+        &state.pool,
+        einsatz_id,
+        body.ansicht_id.flatten(),
+    )
+    .await?;
 
     let a = bild_repo::aktualisiere(
         &state.pool,
