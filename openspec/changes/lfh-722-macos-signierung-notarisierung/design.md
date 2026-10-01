@@ -288,3 +288,12 @@ Job `desktop-macos-arm64` grün:
   Update-Archiv je `accepted`, `source=Notarized Developer ID`, Ticket gültig; Abschluss „macOS-
   Pakete signiert (Developer ID H95J852PKP) und notarisiert.“
 - `desktop-windows-x86_64` grün, unberührt.
+
+### Paket vom Release (Task 4.2, 01.10.2026)
+
+Der Lauf hat die Pakete samt `latest.json` an `v1.0.0-alpha.60` gehängt. Das `.dmg` per `curl`
+geladen, `.sha256` passt. Die Quarantäne wie bei einem Browser-Download von Hand gesetzt
+(`com.apple.quarantine`, `0083;…;Safari;`). Ergebnis: `.dmg` `accepted`, `source=Notarized
+Developer ID`, Ticket gültig; die App im eingehängten Image ebenso. Den Erststart aus einem
+Browser-Download in einer frischen VM belegt 5.1 mit dem lokal gebauten, gleich entstandenen
+`.dmg`.
