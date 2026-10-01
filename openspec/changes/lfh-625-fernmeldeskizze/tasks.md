@@ -70,7 +70,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 3. Modell der Skizze (D2, Spec „Knotenaufbau“, „Knoteninhalt“, „Kante“, „Lücke“)
 
-- [ ] 3.1 Test zuerst, `stab/fernmeldeskizze.test.ts`:
+- [x] 3.1 Test zuerst, `stab/fernmeldeskizze.test.ts`:
   - Die `key`-Struktur ist gleich `baueFuehrungsorganisation` für einen Datensatz mit
     Unterabschnitt, Untereinheit, Waise, Zyklus und Sammelknoten.
   - Je `key` sind `rufname`, `tmo`, `dmo` und `kommunikationsmittel` gleich der Zeile aus
@@ -81,7 +81,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - `einheiten = null` ergibt nur Abschnitte und `einheitenFehlen`.
 
   Nachweis: rot belegt.
-- [ ] 3.2 Umsetzung `stab/fernmeldeskizze.ts` (`baueFernmeldeskizze`, `SkizzenKnoten`) über
+- [x] 3.2 Umsetzung `stab/fernmeldeskizze.ts` (`baueFernmeldeskizze`, `SkizzenKnoten`) über
   `baueFuehrungsorganisation`, `teileSprechgruppen`, `kommunikationsmittelLabel` und
   `verbindungsurteil`. Dateikopf mit Verweis auf diese Change. Nachweis: 3.1 grün, `tsc -b` grün.
 
