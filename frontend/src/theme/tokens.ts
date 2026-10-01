@@ -140,7 +140,7 @@ export interface Farbrollen {
  * lassen. Gerechnet in `bedienKontrast.test.ts`.
  *
  * Deeplink-Hervorhebung `hervorhebungZeile` (LFH-696, Tagwert unverändert aus LFH-25): text 17,76
- * · text2 12,63 · gedaempft 10,57 · schwach 8,64 · bedienText 8,09 · achtungText 8,87 ·
+ * · text2 12,63 · gedaempft 10,57 · schwach 8,64 · bedienText 9,15 · achtungText 8,87 ·
  * alarmText 8,62 · normalText 8,82. Abhebung gegen flaeche 1,04, gegen den Hover `flaeche3` 1,23,
  * gegen `lueckeZeile` 1,07; zweiter Kanal ist die Kante in `achtung` (6,65 gegen die Tönung,
  * `index.css`). Gerechnet in `bedienKontrast.test.ts`/`textstufen.test.ts`; den Zeilentext einer
