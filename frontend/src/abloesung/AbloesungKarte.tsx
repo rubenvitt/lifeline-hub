@@ -1,9 +1,8 @@
-import { IkonePunkteSenkrecht } from '../ikonen';
-import { Button, Dropdown, Flex, Space, Typography } from 'antd';
-import type { MenuProps } from 'antd';
+import { Button, Flex, Space, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import type { Abloesung } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../stab/lagebesprechungZustand';
@@ -59,10 +58,10 @@ export default function AbloesungKarte({
       ? rollenFarbe(darstellung.rolle, token)
       : rollen.linie;
 
-  const menuItems: MenuProps['items'] = [
-    onAbloeserPlanen && { key: 'abloeser', label: 'Ablösende Einheit planen' },
-    onRhythmusAendern && { key: 'rhythmus', label: 'Rhythmus ändern' },
-  ].filter(Boolean) as MenuProps['items'];
+  const menue: MenueEintrag<'abloeser' | 'rhythmus'>[] = [
+    ...(onAbloeserPlanen ? [{ key: 'abloeser' as const, label: 'Ablösende Einheit planen' }] : []),
+    ...(onRhythmusAendern ? [{ key: 'rhythmus' as const, label: 'Rhythmus ändern' }] : []),
+  ];
 
   return (
     <article
@@ -132,25 +131,14 @@ export default function AbloesungKarte({
               // nähmen der Einstufung am Rand die Aufmerksamkeit.
               <Button onClick={() => onVollziehen(s)}>Ablösung vollziehen</Button>
             )}
-            {menuItems && menuItems.length > 0 && (
-              <Dropdown
-                trigger={['click']}
-                autoFocus
-                menu={{
-                  items: menuItems,
-                  onClick: ({ key }) => {
-                    if (key === 'abloeser') onAbloeserPlanen?.(s);
-                    if (key === 'rhythmus') onRhythmusAendern?.(s);
-                  },
-                }}
-              >
-                <Button
-                  type="text"
-                  aria-label={`Aktionen zu ${s.einheit_name}`}
-                  icon={<IkonePunkteSenkrecht />}
-                />
-              </Dropdown>
-            )}
+            <MenueAusloeser
+              eintraege={menue}
+              zugaenglicherName={`Aktionen zu ${s.einheit_name}`}
+              onWahl={(key) => {
+                if (key === 'abloeser') onAbloeserPlanen?.(s);
+                if (key === 'rhythmus') onRhythmusAendern?.(s);
+              }}
+            />
           </Flex>
         )}
         {darfSchreiben && !laufend && s.ruecknehmbar && onZuruecknehmen && (

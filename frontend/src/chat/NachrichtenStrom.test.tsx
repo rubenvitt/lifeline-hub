@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { formatZeitKurz } from '../anzeige/format';
 import { renderMitProviders } from '../test/utils';
 import NachrichtenStrom from './NachrichtenStrom';
 import type { ChatNachricht } from '../api/types';
@@ -24,6 +25,9 @@ function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
     ...over,
   };
 }
+
+/** Jeder Auslöser trägt Autor und Uhrzeit der Nachricht im Namen (LFH-683). */
+const AKTIONEN = /^Aktionen zu Nachricht von /;
 
 describe('NachrichtenStrom', () => {
   it('zeigt Inhalt und Autor', () => {
@@ -74,7 +78,7 @@ describe('NachrichtenStrom', () => {
     );
     expect(screen.getByText('Nachricht gelöscht')).toBeInTheDocument();
     // Tombstone hat kein Aktions-Dropdown.
-    expect(screen.queryByRole('button', { name: 'Aktionen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: AKTIONEN })).not.toBeInTheDocument();
   });
 
   it('zeigt ETB-Badge bei heraufgestufter Nachricht', () => {
@@ -106,7 +110,7 @@ describe('NachrichtenStrom', () => {
     );
     expect(screen.getByText(/heraufgestuft zu Auftrag/i)).toBeInTheDocument();
     // Dropdown öffnen und prüfen, dass „Zu Auftrag" fehlt.
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
     expect(screen.queryByRole('menuitem', { name: 'Zu Auftrag' })).not.toBeInTheDocument();
   });
 
@@ -123,7 +127,7 @@ describe('NachrichtenStrom', () => {
       />,
     );
     // Ohne Schreibrecht bleibt die Aktionsliste leer → kein Dropdown-Trigger.
-    expect(screen.queryByRole('button', { name: 'Aktionen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: AKTIONEN })).not.toBeInTheDocument();
   });
 
   it('Aktionen nur an eigenen Nachrichten; Heraufstufen löst Callback aus', async () => {
@@ -144,7 +148,7 @@ describe('NachrichtenStrom', () => {
     );
     // Beide Nachrichten haben ein Dropdown (Zu ETB/Auftrag/Bezug brauchen nur darfSchreiben),
     // aber „Löschen" nur die eigene (id 1, erstes Dropdown).
-    const trigger = screen.getAllByRole('button', { name: 'Aktionen' });
+    const trigger = screen.getAllByRole('button', { name: AKTIONEN });
     expect(trigger).toHaveLength(2);
     await userEvent.click(trigger[0]);
     expect(screen.getByRole('menuitem', { name: 'Löschen' })).toBeInTheDocument();
@@ -165,12 +169,36 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={onHeraufstufenAuftrag}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Zu Auftrag' }));
     expect(onHeraufstufenAuftrag).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
   });
 
-  it('„Löschen" verlangt Bestätigung via Popconfirm, bevor onLoeschen feuert', async () => {
+  it('der Auslöser nennt Autor und Uhrzeit der Nachricht wie ihre Kopfzeile', () => {
+    // Zwei Nachrichten, zwei unterscheidbare Namen: „Aktionen" allein wären n gleichnamige Knöpfe.
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[
+          nachricht({ id: 1, autor_name: 'Meier', erstellt_at: '2026-06-10 12:02:00' }),
+          nachricht({ id: 2, autor_name: 'Schulz', erstellt_at: '2026-06-10 12:05:00' }),
+        ]}
+        eigeneBenutzerId={1}
+        darfSchreiben
+        onBearbeiten={vi.fn()}
+        onLoeschen={vi.fn()}
+        onHeraufstufen={vi.fn()}
+        onHeraufstufenAuftrag={vi.fn()}
+      />,
+    );
+    const meier = `Aktionen zu Nachricht von Meier, ${formatZeitKurz('2026-06-10 12:02:00')}`;
+    const schulz = `Aktionen zu Nachricht von Schulz, ${formatZeitKurz('2026-06-10 12:05:00')}`;
+    expect(screen.getByRole('button', { name: meier })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: schulz })).toBeInTheDocument();
+    // Dieselbe Uhrzeit steht sichtbar in der Kopfzeile.
+    expect(screen.getByText(formatZeitKurz('2026-06-10 12:02:00'))).toBeInTheDocument();
+  });
+
+  it('„Löschen" fragt in einem Dialog nach; erst „Ja, löschen" löscht', async () => {
     const onLoeschen = vi.fn();
     renderMitProviders(
       <NachrichtenStrom
@@ -183,13 +211,36 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
-    // Popconfirm-Trigger ist der Text im Menüeintrag (stoppt das Auto-Schließen des Menüs).
-    await userEvent.click(screen.getByText('Löschen'));
-    // Noch nicht gelöscht – erst die Bestätigung.
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
+    const eintrag = screen.getByRole('menuitem', { name: 'Löschen' });
+    expect(eintrag).toHaveClass('ant-dropdown-menu-item-danger');
+    await userEvent.click(eintrag);
+    // Die Rückfrage ist ein Dialog, keine Blase am Menüeintrag.
+    const dialog = await screen.findByRole('dialog', { name: 'Nachricht wirklich löschen?' });
     expect(onLoeschen).not.toHaveBeenCalled();
-    await userEvent.click(await screen.findByRole('button', { name: 'Ja, löschen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ja, löschen' }));
+    expect(onLoeschen).toHaveBeenCalledTimes(1);
     expect(onLoeschen).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
+  });
+
+  it('„Abbrechen" im Lösch-Dialog lässt die Nachricht stehen', async () => {
+    const onLoeschen = vi.fn();
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[nachricht({ id: 5, autor_id: 1 })]}
+        eigeneBenutzerId={1}
+        darfSchreiben
+        onBearbeiten={vi.fn()}
+        onLoeschen={onLoeschen}
+        onHeraufstufen={vi.fn()}
+        onHeraufstufenAuftrag={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Löschen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nachricht wirklich löschen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    expect(onLoeschen).not.toHaveBeenCalled();
   });
 
   it('zeigt den Sachbezug als Tag mit aufgelöstem Label', () => {
@@ -252,7 +303,7 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Bezug' }));
     expect(onBezugSetzen).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }));
 
@@ -270,7 +321,7 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
     expect(screen.getByRole('menuitem', { name: 'Bezug ändern' })).toBeInTheDocument();
   });
 

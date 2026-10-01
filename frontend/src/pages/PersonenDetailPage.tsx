@@ -1,4 +1,3 @@
-import { IkonePunkteSenkrecht } from '../ikonen';
 import { useRollen } from '../components/instrument/rollenwerte';
 import { bezugsDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
@@ -11,7 +10,6 @@ import {
   Col,
   Collapse,
   Descriptions,
-  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -21,9 +19,9 @@ import {
   Spin,
   Tag,
   Typography,
-  type MenuProps,
   type TableColumnsType,
 } from 'antd';
+import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -137,25 +135,16 @@ type Kopfaktion =
       art: 'sichten' | 'verbleib' | 'bearbeiten' | 'stornieren';
       key: string;
       label: string;
-      danger?: boolean;
-      trennerDavor?: boolean;
+      /** Rot und hinter dem einen Trenner des Menüs (`components/MenueAusloeser.tsx`). */
+      gefahr?: true;
     }
   | {
       art: 'status';
       key: string;
       label: string;
       status: PersonStatus;
-      danger?: boolean;
-      trennerDavor?: boolean;
+      gefahr?: true;
     };
-
-/** Kopfaktionen → antd-Menüeinträge, Trenner eingefügt. */
-function menueEintraege(aktionen: Kopfaktion[]): MenuProps['items'] {
-  return aktionen.flatMap((a) => [
-    ...(a.trennerDavor ? [{ type: 'divider' as const, key: `${a.key}:trenner` }] : []),
-    { key: a.key, label: a.label, danger: a.danger },
-  ]);
-}
 
 export default function PersonenDetailPage() {
   const { token, rollen } = useRollen();
@@ -1066,8 +1055,7 @@ export default function PersonenDetailPage() {
       art: 'stornieren',
       key: 'stornieren',
       label: 'Stornieren',
-      danger: true,
-      trennerDavor: true,
+      gefahr: true,
     };
 
     const primaer = p.aktuelle_sichtung == null ? sichten : verbleib;
@@ -1126,28 +1114,17 @@ export default function PersonenDetailPage() {
               {aktionenPlan.primaer.label}
             </Button>
             {aktionenPlan.weitere.length > 0 && (
-              <Dropdown
-                trigger={['click']}
-                menu={{
-                  autoFocus: true,
-                  items: menueEintraege(aktionenPlan.weitere),
-                  // Die Zuordnung hängt am Menü, nicht an jedem Eintrag: eine Stelle für einen
-                  // Riegel, die Einträge bleiben reine Beschreibung.
-                  onClick: ({ key }) => {
-                    const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
-                    if (eintrag) fuehreKopfaktionAus(eintrag);
-                  },
+              <MenueAusloeser
+                eintraege={aktionenPlan.weitere}
+                laeuft={laeuftStatus}
+                // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
+                // gleichnamige Knöpfe kein Ziel.
+                zugaenglicherName={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
+                onWahl={(key) => {
+                  const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
+                  if (eintrag) fuehreKopfaktionAus(eintrag);
                 }}
-              >
-                <Button
-                  type="text"
-                  loading={laeuftStatus}
-                  icon={<IkonePunkteSenkrecht />}
-                  // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
-                  // gleichnamige Knöpfe kein Ziel.
-                  aria-label={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
-                />
-              </Dropdown>
+              />
             )}
           </Space>
         )

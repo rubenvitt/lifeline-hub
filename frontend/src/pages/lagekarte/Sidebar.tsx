@@ -4,13 +4,11 @@ import {
   IkoneHochladen,
   IkoneLupe,
   IkoneMuelleimer,
-  IkonePunkteSenkrecht,
   IkoneSchloss,
   IkoneVollbildEcken,
 } from '../../ikonen';
 import {
   Button,
-  Dropdown,
   Input,
   Modal,
   Radio,
@@ -23,6 +21,7 @@ import {
   Upload,
 } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
+import { MenueAusloeser } from '../../components/MenueAusloeser';
 import { SeitenFehler, SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { monoStil, Segmentleiste, useRollen } from '../../components/instrument';
@@ -1176,54 +1175,37 @@ export default function Sidebar(props: SidebarProps) {
                         eine, dann steht der Zentrieren-Knopf direkt da. */}
                     <div style={{ flexShrink: 0 }}>
                       {darfSchreiben ? (
-                        <Dropdown
-                          trigger={['click']}
-                          // `autoFocus`: ohne ihn klebt der Fokus am Auslöser. In jsdom nicht
-                          // prüfbar.
-                          autoFocus
-                          menu={{
-                            items: [
-                              {
-                                key: 'zentrieren',
-                                icon: <IkoneVollbildEcken />,
-                                label: 'Auf Bild zentrieren',
-                              },
-                              {
-                                key: 'platzieren',
-                                icon: <IkoneFadenkreuz />,
-                                label: imPlatzieren
-                                  ? 'Platzieren beenden'
-                                  : 'Auf der Karte platzieren',
-                              },
-                              /*
-                               * Die Trennung zwischen destruktiver und harmloser Aktion ist im Menü
-                               * der Trenner.
-                               */
-                              { type: 'divider' as const },
-                              {
-                                key: 'loeschen',
-                                icon: <IkoneMuelleimer />,
-                                label: 'Bild entfernen …',
-                                danger: true,
-                              },
-                            ],
-                            // Zuordnung am Menü, nicht je Eintrag: ein Riegel hat dann einen Ort.
-                            onClick: ({ key }) => {
-                              if (key === 'zentrieren') props.onBildZentrieren(b.id);
-                              else if (key === 'platzieren') {
-                                if (imPlatzieren) props.onBildPlatzierenFertig();
-                                else props.onBildPlatzieren(b.id);
-                              } else if (key === 'loeschen') setLoeschBildId(b.id);
+                        <MenueAusloeser
+                          eintraege={[
+                            {
+                              key: 'zentrieren',
+                              ikone: <IkoneVollbildEcken />,
+                              label: 'Auf Bild zentrieren',
                             },
+                            {
+                              key: 'platzieren',
+                              ikone: <IkoneFadenkreuz />,
+                              label: imPlatzieren
+                                ? 'Platzieren beenden'
+                                : 'Auf der Karte platzieren',
+                            },
+                            {
+                              key: 'loeschen',
+                              ikone: <IkoneMuelleimer />,
+                              label: 'Bild entfernen …',
+                              gefahr: true,
+                            },
+                          ]}
+                          // Der Name trägt die Bild-Kennung.
+                          zugaenglicherName={`Aktionen zu ${b.name}`}
+                          onWahl={(key) => {
+                            if (key === 'zentrieren') props.onBildZentrieren(b.id);
+                            else if (key === 'platzieren') {
+                              if (imPlatzieren) props.onBildPlatzierenFertig();
+                              else props.onBildPlatzieren(b.id);
+                            } else if (key === 'loeschen') setLoeschBildId(b.id);
                           }}
-                        >
-                          {/* Der Name trägt die Bild-Kennung. Kein `size`. */}
-                          <Button
-                            type="text"
-                            icon={<IkonePunkteSenkrecht />}
-                            aria-label={`Aktionen zu ${b.name}`}
-                          />
-                        </Dropdown>
+                        />
                       ) : (
                         <Tooltip title="Auf Bild zentrieren">
                           <Button
