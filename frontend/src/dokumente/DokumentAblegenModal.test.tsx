@@ -429,6 +429,33 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     expect(within(d).queryByRole('progressbar', { name: 'Datei wird geprüft' })).toBeNull();
   });
 
+  it('der Abschluss eines abgebrochenen Laufs räumt die Anzeige des nächsten nicht', async () => {
+    const melder: ((f: UploadFortschritt) => void)[] = [];
+    const erfueller: ((wert: unknown) => void)[] = [];
+    legeAb.mockImplementation((_id, _eingabe, onFortschritt) => {
+      melder.push(onFortschritt!);
+      return new Promise((res) => erfueller.push(res as (wert: unknown) => void));
+    });
+    rendere();
+    let d = await dialog();
+    await fuellePflicht(d, pdf(), 'Erster');
+    await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
+    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
+    await warteBisDialogWeg();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    d = await dialog();
+    await fuellePflicht(d, pdf(), 'Zweiter');
+    await userEvent.click(within(d).getByRole('button', { name: /Ablegen/ }));
+    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
+    act(() => melder[1]({ phase: 'pruefen' }));
+    await within(d).findByRole('progressbar', { name: 'Datei wird geprüft' });
+    // Die alte Übertragung endet, während die neue noch geprüft wird.
+    await act(async () => erfueller[0]({}));
+    expect(within(d).getByRole('progressbar', { name: 'Datei wird geprüft' })).toBeInTheDocument();
+  });
+
   it('Leitung reißt beim Senden ab: „nichts abgelegt“, Felder bleiben, kein Fortschritt', async () => {
     const { d, fortschritt, ablehnen } = await starteAblage();
     fortschritt({ phase: 'senden', anteil: 0.6 });

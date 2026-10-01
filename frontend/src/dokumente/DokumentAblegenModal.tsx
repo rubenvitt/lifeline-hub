@@ -127,16 +127,21 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
   });
 
   const mutation = useMutation({
-    mutationFn: (eingabe: DokumentAblage) => {
+    mutationFn: async (eingabe: DokumentAblage) => {
       const dieser = ++lauf.current;
       // Sofort ein Balken ohne Zahl: bis zum ersten Byte-Ereignis (Verbindungsaufbau über
       // Mobilfunk) vergeht Zeit, und ≤ 100 ms soll etwas zu sehen sein (MIL 5.4.6.4).
       setFortschritt({ phase: 'senden', anteil: null });
-      return legeDokumentAb(einsatzId, eingabe, (stand) => {
-        if (dieser === lauf.current) setFortschritt((alt) => weiter(alt, stand));
-      });
+      try {
+        return await legeDokumentAb(einsatzId, eingabe, (stand) => {
+          if (dieser === lauf.current) setFortschritt((alt) => weiter(alt, stand));
+        });
+      } finally {
+        // Nicht über `onSettled`: der läuft auch für einen abgebrochenen Lauf nach `reset()` und
+        // räumte sonst die Anzeige eines neueren.
+        if (dieser === lauf.current) setFortschritt(null);
+      }
     },
-    onSettled: () => setFortschritt(null),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.dokumente(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
