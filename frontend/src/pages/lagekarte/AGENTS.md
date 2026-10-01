@@ -43,7 +43,7 @@ diese Zusage.
   Ort-Vorschau kennt keine Stellen (`src/geocoding/marker.rs`); Verortung ohne ETB, live über
   `Geschrieben::still_geaendert`; Zonentyp `evakuierungsbezirk` (`lage_zone.evakuierungsbezirk_id`).
 - **Kartenquellen eines fremden Moduls laden nur mit Freigabe des Servers** (LFH-669, Spec
-  `modul-freigabe`, `openspec/changes/lfh-669-modulfreigabe-vom-server/design.md` D4):
+  `modul-freigabe`, `openspec/changes/archive/2026-10-01-lfh-669-modulfreigabe-vom-server/design.md` D4):
   `useLagekarteDaten` fragt UHS, Schäden, Einheiten, Fahrzeuge, Abschnitte, Gefahrengebiete,
   Lagemeldungen und Rückmeldungen nur bei `istKeyFreigegeben(<modul>, freigaben)` ab, ohne bekannte
   Freigaben gar nicht. Gesperrt ist kein Ausfall (keine Rohdaten, kein Eintrag im
