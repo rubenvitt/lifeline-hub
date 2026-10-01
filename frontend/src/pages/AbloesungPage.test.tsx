@@ -9,6 +9,7 @@ import { MemoryRouter, Routes, Route } from 'react-router';
 import AbloesungPage from './AbloesungPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung } from '../api/types';
+import { setzeViewportBreite } from '../test/viewport';
 
 dayjs.extend(utc);
 
@@ -377,6 +378,28 @@ describe('AbloesungPage (LFH-635)', () => {
       expect(sammelbanner()!.parentElement).toBe(zeile);
     });
 
+    // ── Handschirm (LFH-694): neben der Segmentleiste trägt nur die Kurzform ──
+    it('auf dem Handschirm ist das Banner ein Knopf „1 neu“, der volle Satz bleibt im Status', async () => {
+      setzeViewportBreite(390);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([fremd(), eins(), zwei(), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+
+      const banner = sammelbanner() as HTMLElement;
+      expect(banner).toHaveTextContent('1 neue Schicht, davon 1 fällig');
+      const knopf = within(banner).getByRole('button', { name: '1 neu anzeigen' });
+      expect(knopf).toHaveTextContent(/^1 neu$/);
+      expect(banner.parentElement).toBe(
+        document.querySelector('[data-lfh="abloesung-werkzeugzeile"]'),
+      );
+
+      await userEvent.click(knopf);
+      expect(kartenNamen()[0]).toBe('Schicht Florian 9');
+      expect(sammelbanner()).toBeNull();
+    });
+
     // ── Eine fremde Änderung von Rhythmus/Beginn ordnet nicht unter dem Cursor um (LFH-660) ──
     // Gezeigt: 1 überfällig, 4 planmäßig (2 h, eigener Rhythmus), 3 planmäßig (4 h, folgt der
     // Vorgabe). Fremd wird 3 auf „seit 30 min überfällig" gezogen — die Server-Ordnung stellte sie
@@ -430,6 +453,19 @@ describe('AbloesungPage (LFH-635)', () => {
         'Schicht Florian 4',
       ]);
       expect(sammelbanner()).toBeNull();
+    });
+
+    it('auf dem Handschirm meldet eine reine Umordnung „umgeordnet“ statt einer Zahl (LFH-694)', async () => {
+      setzeViewportBreite(390);
+      laufendLiefert([eins(), vier(), drei()]);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([dreiVorgezogen(), eins(), vier()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(
+        within(sammelbanner() as HTMLElement).getByRole('button', { name: 'umgeordnet anzeigen' }),
+      ).toHaveTextContent(/^umgeordnet$/);
     });
 
     it('eine fremde Änderung, die die Folge nicht berührt, zeigt kein Banner', async () => {

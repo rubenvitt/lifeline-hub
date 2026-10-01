@@ -1019,4 +1019,128 @@ test.describe('Gate 1', () => {
       await gate1Messen(page, gate1VerwaltungRouten(), 'fuehrungskraft', pruefbreite);
     });
   }
+
+  /*
+   * STEHENDES SAMMELBANNER AUF DEM HANDSCHIRM (LFH-694, Spec `einsatztauglichkeit-layout`): die
+   * Routen oben laufen ohne Banner — es erscheint nur auf ein Live-Ereignis. Ablösung und
+   * Verpflegung stellen es in die Werkzeugzeile neben die Segmentleiste; bei 390 px trug das
+   * nicht (0 px Text, im Handschuh-Betrieb 59 px Überlauf). Gesät werden 12 gezeigte Einträge,
+   * damit die Segmentleiste ihre zweistellige Zahl trägt.
+   *
+   * ROLLEN (LFH-435): nur Admin. Die Werkzeugzeile hat keinen Rollenzweig; der Beobachter sieht
+   * dieselbe Segmentleiste und dasselbe Banner, ein zweiter Lauf bewiese nichts Neues.
+   */
+  for (const modul of ['abloesung', 'verpflegung'] as const) {
+    for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      test(`Gate 1 · mobil (390 px) · ${modul} · ${dichte}: stehendes Sammelbanner läuft nicht über und verschiebt nichts`, async ({
+        page,
+      }) => {
+        test.setTimeout(90_000);
+        await page.setViewportSize({ width: 390, height: 844 });
+        await anmelden(page);
+        const neu = await page.request.post('/api/einsaetze', {
+          data: { bezeichnung: `E2E Banner ${modul} ${dichte} ${Date.now()}` },
+        });
+        expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+        const einsatzId = ((await neu.json()) as { id: number }).id;
+        const post = async (pfad: string, data: unknown, was: string) => {
+          const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+          expect(
+            antwort.ok(),
+            `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+          ).toBeTruthy();
+          return (await antwort.json()) as { id: number };
+        };
+        const jetzt = Date.now();
+        const zeitfenster = (bezeichnung: string, vonMin: number, bisMin: number) =>
+          post(
+            'verpflegung/zeitfenster',
+            {
+              bezeichnung,
+              von_at: new Date(jetzt + vonMin * 60_000).toISOString(),
+              bis_at: new Date(jetzt + bisMin * 60_000).toISOString(),
+              bedarf_kraefte: 10,
+              bedarf_betreute: 0,
+              bedarf_weitere: 0,
+              sonderkost: {},
+            },
+            bezeichnung,
+          );
+        const schicht = async (abschnittId: number, name: string, rhythmus: number) => {
+          const einheit = await post('einheiten', { name, abschnitt_id: abschnittId }, name);
+          await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: rhythmus }, name);
+        };
+        let abschnittId = 0;
+        if (modul === 'abloesung') {
+          abschnittId = (await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt')).id;
+          for (let i = 1; i <= 12; i += 1) await schicht(abschnittId, `Florian Nord ${i}`, 360);
+        } else {
+          for (let i = 1; i <= 12; i += 1) await zeitfenster(`Mittag ${i}`, -60, 180);
+          for (let i = 1; i <= 3; i += 1) await zeitfenster(`Frühstück ${i}`, -300, -240);
+        }
+
+        await page.goto(`/einsaetze/${einsatzId}/${modul}`);
+        await page.evaluate((d) => window.localStorage.setItem('lifeline-hub.dichte', d), dichte);
+        await page.reload();
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const karten = page.locator(`[data-lfh="${modul}-karte"]`);
+        const zeile = page.locator(`[data-lfh="${modul}-werkzeugzeile"]`);
+        const banner = zeile.locator('[data-lfh="sammelbanner"]');
+        await expect(karten).toHaveCount(12);
+        await expect(banner).toHaveCount(0);
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+        });
+        const vorher = {
+          zeile: (await zeile.boundingBox())!.height,
+          oben: (await karten.first().boundingBox())!.y,
+        };
+
+        // Fremd angelegt (am Frontend vorbei), vor den gezeigten einsortiert.
+        if (modul === 'abloesung') await schicht(abschnittId, 'Florian Süd 9', 30);
+        else await zeitfenster('Imbiss', -120, 60);
+
+        await expect(banner).toBeVisible();
+        const knopf = banner.getByRole('button', { name: '1 neu anzeigen' });
+        await expect(knopf).toHaveText('1 neu');
+        const mass = await page.evaluate(() => {
+          const kurz = document.querySelector<HTMLElement>('[data-lfh="sammelbanner-kurz"]')!;
+          const knopf = kurz.closest('button')!;
+          const k = knopf.getBoundingClientRect();
+          return {
+            // Der Text selbst kürzt nicht; zu eng wird es, wenn Ikone und Text über die
+            // Polsterung des Knopfes hinausragen.
+            gekuerzt: kurz.scrollWidth > kurz.clientWidth || knopf.scrollWidth > knopf.clientWidth,
+            knopfLinks: k.left,
+            knopfRechts: k.right,
+            dokument: document.documentElement.scrollWidth,
+          };
+        });
+        const nachher = {
+          zeile: (await zeile.boundingBox())!.height,
+          oben: (await karten.first().boundingBox())!.y,
+        };
+        expect(mass.gekuerzt, '„1 neu“ steht ungekürzt').toBe(false);
+        expect(mass.knopfLinks, 'Knopf links im Fenster').toBeGreaterThanOrEqual(0);
+        expect(mass.knopfRechts, 'Knopf rechts im Fenster').toBeLessThanOrEqual(390);
+        expect(mass.dokument, 'kein waagerechter Überlauf').toBeLessThanOrEqual(390);
+        expect(
+          Math.abs(nachher.zeile - vorher.zeile),
+          `Werkzeugzeile ${vorher.zeile} → ${nachher.zeile} px`,
+        ).toBeLessThanOrEqual(0.5);
+        expect(
+          Math.abs(nachher.oben - vorher.oben),
+          `oberste Karte y ${vorher.oben} → ${nachher.oben}`,
+        ).toBeLessThanOrEqual(0.5);
+
+        await knopf.click();
+        await expect(karten).toHaveCount(13);
+        await expect(banner).toHaveCount(0);
+        test.info().annotations.push({
+          type: 'messwert',
+          description: `${modul}/${dichte}: Knopf ${mass.knopfLinks.toFixed(1)}–${mass.knopfRechts.toFixed(1)} px, Zeile ${vorher.zeile} → ${nachher.zeile} px`,
+        });
+      });
+    }
+  }
 });

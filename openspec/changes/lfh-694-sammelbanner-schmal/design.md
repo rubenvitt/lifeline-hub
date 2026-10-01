@@ -140,6 +140,11 @@ Neues. Diese Freistellung steht mit Rolle im Testkopf.
 - [Antds `Button` kürzt lange Inhalte nicht] → Die Kurzform ist auf höchstens etwa 110 px
   („umgeordnet“) begrenzt. D2 lässt keinen freien Text zu.
 
+- [Wechselt die Breite über `md` (Handschirm ins Querformat, 844 px), während der Knopf der
+  Kurzform den Fokus hat, wird er durch die lange Form ersetzt, und der Fokus geht verloren] →
+  Das ist selten und folgenlos: Das Banner bleibt stehen, und die Freigabe ist einen Griff
+  entfernt. Keine Sonderbehandlung.
+
 ## Migration Plan
 
 Reine Frontend-Änderung ohne Daten. Ein Revert stellt das bisherige Verhalten wieder her.
