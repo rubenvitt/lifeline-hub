@@ -1,7 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import type { ModulFreigaben } from '../api/types';
@@ -504,6 +506,13 @@ describe('AusgabeDialog', () => {
   });
 });
 
+interface RueckfrageTestProps {
+  laeuft: boolean;
+  fehler: unknown;
+  onBestaetigen: () => void;
+  onSchliessen: () => void;
+}
+
 describe('Rückfragen', () => {
   it('Rücknahme: Modal mit rotem Knopf, nennt die Ausgabe; Abbrechen sendet nichts', async () => {
     const onBestaetigen = vi.fn();
@@ -550,5 +559,61 @@ describe('Rückfragen', () => {
       'ant-btn-dangerous',
     );
     expect(within(dialog).getByText('Das Zeitfenster hat gültige Ausgaben')).toBeInTheDocument();
+  });
+
+  /**
+   * Echte Mutation mit hängender Antwort wie auf `VerpflegungPage`: der Dialog steht nur, solange
+   * der Aufrufer ihn offen hält. Schlösse er während des Laufs, ginge ein 422 danach still verloren
+   * (LFH-706, Fehlerbild LFH-535). Escape und Maske hält auch antd unter `confirmLoading` ab;
+   * gesperrtes „Abbrechen“ und fehlendes Kreuz sind unser Teil.
+   */
+  it.each([
+    {
+      art: 'Rücknahme',
+      name: 'Ausgabe zurücknehmen?',
+      ok: 'Zurücknehmen',
+      dialog: (p: RueckfrageTestProps) => (
+        <RuecknahmeDialog ausgabe={ausgabe({ id: 11 })} zeitfenster={zeitfenster()} {...p} />
+      ),
+    },
+    {
+      art: 'Löschen',
+      name: 'Zeitfenster ‚Mittag‘ löschen?',
+      ok: 'Löschen',
+      dialog: (p: RueckfrageTestProps) => <LoeschenDialog zeitfenster={zeitfenster()} {...p} />,
+    },
+  ])('$art: solange die Aktion läuft, lässt sich die Rückfrage nicht schließen', async (fall) => {
+    let scheitere: (e: unknown) => void = () => {};
+    function Aufrufer() {
+      const [offen, setOffen] = useState(true);
+      const mut = useMutation({
+        mutationFn: () => new Promise((_, nein) => (scheitere = nein)),
+      });
+      return offen
+        ? fall.dialog({
+            laeuft: mut.isPending,
+            fehler: mut.error,
+            onBestaetigen: () => mut.mutate(),
+            onSchliessen: () => setOffen(false),
+          })
+        : null;
+    }
+    renderMitProviders(<Aufrufer />);
+    const dialog = await screen.findByRole('dialog', { name: fall.name });
+    await userEvent.click(within(dialog).getByRole('button', { name: fall.ok }));
+    const abbrechen = within(dialog).getByRole('button', { name: 'Abbrechen' });
+    await waitFor(() => expect(abbrechen).toBeDisabled());
+    // Kein Weg hinaus: Escape, Schließkreuz und Maske wirken nicht.
+    await userEvent.keyboard('{Escape}');
+    expect(within(dialog).queryByRole('button', { name: 'Close' })).toBeNull();
+    const maske = document.querySelector('.ant-modal-wrap');
+    if (maske) fireEvent.click(maske);
+    scheitere(new ApiError(422, 'Ausgabe gehört zu einem gelöschten Zeitfenster'));
+    expect(
+      await within(dialog).findByText('Ausgabe gehört zu einem gelöschten Zeitfenster'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: fall.name })).toBe(dialog);
+    // Nach dem Fehlschlag ist der Weg hinaus wieder frei.
+    expect(abbrechen).toBeEnabled();
   });
 });

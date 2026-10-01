@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { listeAbloesungen } from '../api/abloesungen';
 import { ladeBetreuung } from '../api/betreuung';
-import { listeDokumente } from '../api/dokumente';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { wetterAbfrage } from '../api/wetter';
 import { EINSATZ_KEYS, einsatzKeys, type EinsatzKey } from '../api/queryKeys';
@@ -71,6 +70,10 @@ const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWe
     wert: ungelesen,
     beschreibung: plural(ungelesen, 'ungelesene Chat-Nachricht', 'ungelesene Chat-Nachrichten'),
   }),
+  dokumente: ({ gesamt }) => ({
+    wert: gesamt,
+    beschreibung: plural(gesamt, 'abgelegtes Dokument', 'abgelegte Dokumente'),
+  }),
 };
 
 /** Alle Quellen, die der Server zählt — die Schlüssel der Abbildung, nicht eine zweite Liste. */
@@ -90,6 +93,7 @@ export const ZAEHLER_LISTEN_KEYS: Record<ServerZaehlerQuelle, EinsatzKey> = {
   auftraege: EINSATZ_KEYS.auftraege,
   erinnerungen: EINSATZ_KEYS.erinnerungen,
   chat: EINSATZ_KEYS.chatKanaele,
+  dokumente: EINSATZ_KEYS.dokumente,
 };
 
 /** Bildet die Serverantwort auf die Anzeige ab. Ein fehlendes Feld (Modul nicht erlaubt)
@@ -104,15 +108,8 @@ export function bildeZaehler(antwort: ModulZaehler): ModulZaehlerMap {
   return karte;
 }
 
-/**
- * Die Zähler, die der Browser selbst rechnet — nicht in der Serverantwort und damit nicht in
- * {@link ZAEHLER_QUELLEN}/{@link ZAEHLER_LISTEN_KEYS}: ihre Frische hängt an der eigenen
- * Modulliste.
- */
-export function berechneDokumentZaehler(dokumente: readonly unknown[]): ModulZaehlerWert {
-  const n = dokumente.length;
-  return { wert: n, beschreibung: plural(n, 'abgelegtes Dokument', 'abgelegte Dokumente') };
-}
+// Die Zähler, die der Browser selbst rechnet — nicht in der Serverantwort und damit nicht in
+// `ZAEHLER_QUELLEN`/`ZAEHLER_LISTEN_KEYS`: ihre Frische hängt an der eigenen Modulliste.
 
 /** Schichten in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht. */
 export function berechneAbloesungZaehler(
@@ -179,7 +176,6 @@ export function darfZaehlerZeigen(quelle: ModulZaehlerQuelle, freigaben?: ModulF
  * Browser-Zähler aus ihren eigenen Modullisten.
  */
 export function useModulZaehler({ einsatzId, freigaben }: Args): ModulZaehlerMap {
-  const dokumenteAktiv = darfZaehlerZeigen('dokumente', freigaben);
   const abloesungAktiv = darfZaehlerZeigen('abloesung', freigaben);
   const betreuungAktiv = darfZaehlerZeigen('betreuung', freigaben);
   // Das Wetter nur bei bekannter Freigabe (LFH-663, LFH-669): unbekannte Freigaben geben
@@ -189,11 +185,6 @@ export function useModulZaehler({ einsatzId, freigaben }: Args): ModulZaehlerMap
   const zaehler = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
     queryFn: () => ladeModulZaehler(einsatzId),
-  });
-  const dokumente = useQuery({
-    queryKey: einsatzKeys.dokumente(einsatzId),
-    queryFn: () => listeDokumente(einsatzId),
-    enabled: dokumenteAktiv,
   });
   const abloesungen = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
@@ -217,9 +208,6 @@ export function useModulZaehler({ einsatzId, freigaben }: Args): ModulZaehlerMap
   const karte: ModulZaehlerMap = zaehler.isSuccess ? bildeZaehler(zaehler.data) : {};
   for (const quelle of ZAEHLER_QUELLEN) {
     if (!darfZaehlerZeigen(quelle, freigaben)) delete karte[quelle];
-  }
-  if (dokumenteAktiv && dokumente.isSuccess) {
-    karte.dokumente = berechneDokumentZaehler(dokumente.data);
   }
   if (abloesungAktiv && abloesungen.isSuccess) {
     karte.abloesung = berechneAbloesungZaehler(abloesungen.data, jetzt);

@@ -6778,6 +6778,16 @@
               }
             ]
           },
+          "dokumente": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MengenZaehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "einheiten": {
             "oneOf": [
               {

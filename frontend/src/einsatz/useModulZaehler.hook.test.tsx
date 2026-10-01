@@ -32,6 +32,7 @@ describe('useModulZaehler (LFH-612)', () => {
           personen: { gesamt: 248 },
           meldungen: { offen: 3, ungesehen: 1 },
           chat: { ungelesen: 0 },
+          dokumente: { gesamt: 2 },
         }),
       ),
     );
@@ -39,17 +40,18 @@ describe('useModulZaehler (LFH-612)', () => {
     await waitFor(() =>
       expect(result.current.personen).toEqual({ wert: 248, beschreibung: '248 Betroffene' }),
     );
+    expect(result.current.dokumente).toEqual({ wert: 2, beschreibung: '2 abgelegte Dokumente' });
     expect(result.current.meldungen?.beschreibung).toBe('3 offene Meldungen, davon 1 ungesehen');
     // Ein fehlendes Feld bleibt fehlend — keine erfundene 0.
     expect(result.current.auftraege).toBeUndefined();
-    // Genau die eine Zählabfrage für die Serverquellen, nie die Listen. Dazu kommen nur die drei
-    // Browser-Zähler, die ihre eigene Modulliste lesen und nicht in der Serverantwort stehen, und
-    // das Wetter (LFH-663) — alle vier nur bei freigegebenem Modul (LFH-669, hier alle frei).
-    await waitFor(() => expect(angefragt).toHaveLength(5));
+    // Genau die eine Zählabfrage für die Serverquellen, nie die Listen — auch nicht die
+    // Dokumentliste (LFH-666). Dazu kommen nur die zwei Browser-Zähler, die ihre eigene
+    // Modulliste lesen und nicht in der Serverantwort stehen, und das Wetter (LFH-663) — alle drei
+    // nur bei freigegebenem Modul (LFH-669, hier alle frei).
+    await waitFor(() => expect(angefragt).toHaveLength(4));
     expect([...angefragt].sort()).toEqual([
       '/api/einsaetze/7/abloesungen',
       '/api/einsaetze/7/betreuung',
-      '/api/einsaetze/7/dokumente',
       '/api/einsaetze/7/modul-zaehler',
       '/api/einsaetze/7/wetter',
     ]);

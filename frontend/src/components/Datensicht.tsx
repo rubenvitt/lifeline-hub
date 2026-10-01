@@ -55,9 +55,9 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  *   · `form: 'auto'` für Einsatzmodule, in denen ein Datensatz eine Einheit ist.
  *   · `form: 'karte'` für Module, die kartenbasiert gelesen werden (Befehle, Lageberichte).
  *
- * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar: `aufklappzeile` läuft nur im
- * Tabellenzweig, eine Spalte ohne Platz im Kartenplan erscheint dort nicht. `aufklappen` läuft
- * in BEIDEN Zweigen, mit einem Zustand.
+ * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar: eine Spalte ohne Platz im
+ * Kartenplan erscheint dort nicht. Aufgeklappt wird nur über `aufklappen`, in BEIDEN Zweigen mit
+ * einem Zustand (LFH-697).
  *
  * ── FÜNF ZUSICHERUNGEN ──
  *
@@ -222,6 +222,12 @@ export interface WeitereAktionen<T> {
   /** Zugänglicher Name des Auslösers MIT Zeilenkennung („Aktionen zu Bezirk X"). */
   zugaenglicherName: (zeile: T) => string;
   onWahl: (key: string, zeile: T) => void;
+  /**
+   * Läuft eine Aktion aus dem Menü für diese Zeile gerade (z. B. Entfernen bis zur Serverantwort,
+   * LFH-654)? Dann trägt der Auslöser den Ladezustand und öffnet das Menü nicht — keine zweite
+   * Löschung. Die Kennzeichnung der Zeile als Text bleibt Sache des Spalten-`render` (Kriterium 6).
+   */
+  laeuft?: (zeile: T) => boolean;
 }
 
 /** Menüeinträge für antd: die Gefahr hinter einem Trenner, sonst in Lieferreihenfolge. */
@@ -382,7 +388,7 @@ interface DatensichtProps<T extends object, K extends string> {
   /** Freitextsuche über alle Spalten mit `suchText`. Im Baummodus verboten. */
   suche?: { platzhalter: string };
   gruppen?: SichtGruppierung<T>;
-  /** Baumsicht. Schließt `suche`, Spaltenfilter, `gruppen`, `aufklappzeile` und `aufklappen` aus. */
+  /** Baumsicht. Schließt `suche`, Spaltenfilter, `gruppen` und `aufklappen` aus. */
   baum?: BaumSicht<T>;
   /** Default `'sammelbanner'`. */
   zufluss?: Zufluss;
@@ -401,13 +407,7 @@ interface DatensichtProps<T extends object, K extends string> {
   onZeileKlick?: (zeile: T) => void;
   /** Zusatzknöpfe links in der Werkzeugzeile (z. B. „Drucken"). */
   werkzeuge?: ReactNode;
-  /**
-   * Antd-Aufklappzeile, als Allowlist statt durchgereichtem `expandable`. Nur im Tabellenzweig;
-   * schließt `baum` aus. Nur noch für den Bestand (Besatzung der Fahrzeugseite); Neues nimmt
-   * {@link aufklappen}. Streichen: LFH-697.
-   */
-  aufklappzeile?: (zeile: T) => ReactNode;
-  /** Beschrifteter Aufklappbereich in beiden Zweigen; schließt `baum` und `aufklappzeile` aus. */
+  /** Einziger Aufklappweg, beschriftet, in beiden Zweigen (LFH-697); schließt `baum` aus. */
   aufklappen?: Aufklappbereich<T>;
 }
 
@@ -579,18 +579,11 @@ export function scrolleZurZeile(schluessel: Key): void {
 export function pruefeKartenplan<T extends object, K extends string>(
   props: Pick<
     DatensichtProps<T, K>,
-    | 'spalten'
-    | 'karte'
-    | 'suche'
-    | 'baum'
-    | 'gruppen'
-    | 'aufklappzeile'
-    | 'aufklappen'
-    | 'onZeileKlick'
+    'spalten' | 'karte' | 'suche' | 'baum' | 'gruppen' | 'aufklappen' | 'onZeileKlick'
   >,
   bezeichnung: string,
 ): string[] {
-  const { spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick } = props;
+  const { spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick } = props;
   const befunde: string[] = [];
   const bekannt = new Map<string, DatensichtSpalte<T, K>>();
   for (const spalte of spalten) {
@@ -634,15 +627,10 @@ export function pruefeKartenplan<T extends object, K extends string>(
       befunde.push('Spaltenfilter sind im Baummodus verboten (Aggregate der Elternzeilen).');
     }
     if (gruppen) befunde.push('gruppen und baum schließen sich aus.');
-    if (aufklappzeile) befunde.push('aufklappzeile und baum schließen sich aus.');
     if (aufklappen) befunde.push('aufklappen und baum schließen sich aus.');
     // Im Baummodus klappt die ganze Zeile auf; ein zusätzliches `onZeileKlick` wäre eine zweite
     // Wirkung auf demselben Klick.
     if (onZeileKlick) befunde.push('onZeileKlick und baum schließen sich aus.');
-  }
-  // Zwei Aufklappwege an derselben Tabelle: antd kennt nur EINE Aufklappzeile je Zeile.
-  if (aufklappen && aufklappzeile) {
-    befunde.push('aufklappen und aufklappzeile schließen sich aus.');
   }
   // Ein Eigenbau gibt `karte.render(...)` roh zurück: Auslöser und Bereich entstehen nur im
   // Plan-Modus. Ein Opt-in, das still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
@@ -691,7 +679,6 @@ export default function Datensicht<T extends object, const K extends string>(
     zeilenKlasse,
     onZeileKlick,
     werkzeuge,
-    aufklappzeile,
     aufklappen,
   } = props;
 
@@ -981,10 +968,10 @@ export default function Datensicht<T extends object, const K extends string>(
   const befunde = useMemo(
     () =>
       pruefeKartenplan(
-        { spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick },
+        { spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick },
         bezeichnung,
       ),
-    [spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick, bezeichnung],
+    [spalten, karte, suche, baum, gruppen, aufklappen, onZeileKlick, bezeichnung],
   );
   const befundSchluessel = befunde.join(' | ');
   useEffect(() => {
@@ -1303,9 +1290,7 @@ export default function Datensicht<T extends object, const K extends string>(
                 // KEINE eigene Aufklappspalte: der Auslöser steht in der Kennungszelle.
                 showExpandColumn: false,
               }
-            : aufklappzeile
-              ? { expandedRowRender: (zeile) => aufklappzeile(zeile) }
-              : undefined
+            : undefined
       }
     />
   );
@@ -1352,12 +1337,14 @@ export default function Datensicht<T extends object, const K extends string>(
 
     const weitere = karte.weitere;
     const weitereEintraege = weitere?.eintraege(zeile) ?? [];
+    const weitereLaeuft = weitere?.laeuft?.(zeile) ?? false;
     const menueKnopf =
       weitere && weitereEintraege.length > 0 ? (
         <Dropdown
           key="weitere"
           trigger={['click']}
           autoFocus
+          disabled={weitereLaeuft}
           menu={{
             items: menueEintraege(weitereEintraege),
             onClick: ({ key }) => weitere.onWahl(key, zeile),
@@ -1366,6 +1353,7 @@ export default function Datensicht<T extends object, const K extends string>(
           <Button
             type="text"
             aria-label={weitere.zugaenglicherName(zeile)}
+            loading={weitereLaeuft}
             icon={
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
                 <IkonePunkteSenkrecht />

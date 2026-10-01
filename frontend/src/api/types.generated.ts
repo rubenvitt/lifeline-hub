@@ -2509,6 +2509,7 @@ export interface components {
         ModulZaehlerAnzeige: {
             auftraege?: components["schemas"]["AuftragsZaehler"] | null;
             chat?: components["schemas"]["ChatZaehler"] | null;
+            dokumente?: components["schemas"]["MengenZaehler"] | null;
             einheiten?: components["schemas"]["MengenZaehler"] | null;
             einsatzabschnitte?: components["schemas"]["MengenZaehler"] | null;
             erinnerungen?: components["schemas"]["ErinnerungsZaehler"] | null;

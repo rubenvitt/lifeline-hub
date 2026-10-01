@@ -166,6 +166,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
         'auftrag',
         'erinnerung',
         'chat',
+        'dokument',
       ]),
     );
     for (const [ev, keys] of betroffen) {
