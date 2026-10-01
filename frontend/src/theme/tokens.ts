@@ -100,8 +100,8 @@ export interface Farbrollen {
  * LFH-352-Werte; neu gestimmt sind Flächen- und Textstufen und `bedien`/`bedienHover`.
  *
  * Kontrast (WCAG; `grund` · `flaeche`): text 15,46 · 18,47 — text2 11,00 · 13,13 —
- * gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; normalText/
- * normalFlaeche 7,87, bedienText/bedienFlaeche 7,11.
+ * gedaempft 7,98 · 9,53 — schwach 5,33 · 6,37; steuerRahmen 3,30 · 3,95; normalText/
+ * normalFlaeche 7,87, bedienText/bedienFlaeche 8,04.
  *
  * Primärknopf (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung auf satter Bedienfläche
  * hält den TAGESBODEN 7 : 1, in Ruhe und unter dem Zeiger — KEIN eigener Knopfboden. Die
@@ -116,9 +116,13 @@ export interface Farbrollen {
  * Zeilentönungen ≥ 7,31, auf grund 7,72 bzw. 7,51). Die Füllfarben bleiben für Kante, Punkt
  * und Balken.
  *
- * Geerbter Text (LFH-652, `antdToken`): `bedienText` als Link auf grund 7,04 · flaeche 8,41 ·
- * kopf 7,36 · paneel 7,71; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 7,37. Auf der
- * Hervorhebungsfläche `flaeche3` liegen beide bei 6,59 bzw. 6,60, unter dem Tagesboden (LFH-877).
+ * Geerbter Text (LFH-652, `antdToken`): `bedienText` als Link auf grund 7,97 · flaeche 9,51 ·
+ * kopf 8,33 · paneel 8,72; `gedaempft` als Beschreibung und Tabellenkopf auf kopf 8,34. Auch auf
+ * der Hervorhebungsfläche `flaeche3` (Hover- und Aktivzeile) halten beide den Tagesboden: 7,46
+ * bzw. 7,47 (LFH-702/LFH-877, Spec `textkontrast-rollen`). Dafür sind beide gegenüber LFH-652 um
+ * ein Zehntel dunkler (vorher `#164f86` / `#474e57`, auf `flaeche3` 6,59 / 6,60); `flaeche3`
+ * aufzuhellen hätte die Hervorhebung auf `grund` verschwinden lassen. Gerechnet in
+ * `bedienKontrast.test.ts`.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -128,7 +132,7 @@ export const farbenHell: Farbrollen = {
   linieStark: '#b9bfc6',
   rasterLinie: 'rgba(26, 95, 160, 0.07)',
   text: '#111418',
-  gedaempft: '#474e57',
+  gedaempft: '#40464e',
   schwach: '#58606a',
   bedien: '#154e84',
   alarm: '#b02318',
@@ -147,7 +151,7 @@ export const farbenHell: Farbrollen = {
   text2: '#2b3138',
   steuerRahmen: '#79818a',
   bedienHover: '#185895',
-  bedienText: '#164f86',
+  bedienText: '#144779',
   aufBedien: '#ffffff',
   normalText: '#155234',
   achtungText: '#604200',
@@ -629,7 +633,7 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * Komponententoken.
  * `colorError` global umzustellen träfe auch Gefahrknöpfe und Ränder, und dort ist die Füllfarbe
  * richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein Linkknopf zeigt
- * den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText` darauf 7,11 Tag
+ * den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText` darauf 8,04 Tag
  * · 9,65 Nacht).
  *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still

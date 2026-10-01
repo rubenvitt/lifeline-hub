@@ -15,7 +15,7 @@ import type { Farbrollen } from '../../theme/tokens';
  * | Ton      | Text / Grund                 | Tag   | Nacht |
  * |----------|------------------------------|-------|-------|
  * | normal   | normalText / normalFlaeche   | 7,87  | 10,44 |
- * | bedien   | bedienText / bedienFlaeche   | 7,11  |  9,65 |
+ * | bedien   | bedienText / bedienFlaeche   | 8,04  |  9,65 |
  * | achtung  | achtungText / achtungFlaeche | 8,02  | 11,18 |
  * | alarm    | alarmText / alarmFlaeche     | 7,31  |  6,89 |
  * | neutral  | text2 / flaeche3             | 10,30 | 10,89 |
@@ -24,7 +24,7 @@ import type { Farbrollen } from '../../theme/tokens';
  * deshalb die Textrollen `achtungText`/`alarmText`; die Füllfarbe bleibt die KANTE.
  *
  * `neutral` hat keine Statusfläche — `flaeche3` + `text2`, NICHT `schwach` (4,72 nachts, unter 5)
- * und nicht `gedaempft` (6,60 am Tag, unter 7).
+ * und nicht `gedaempft` (bis LFH-702 6,60 am Tag, unter 7; heute 7,47, `text2` hält 10,30).
  *
  * `kante` ist die Rollenfarbe für einen Rahmen, der sich vom Grund abhebt (WCAG 1.4.11,
  * ≥ 3 : 1 — `kraefte-kontrast.spec.ts` prüft ihn am `StatusTag`): Tag normal 5,96 · bedien

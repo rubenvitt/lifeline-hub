@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Person } from '../api/types';
+import { farbenHell } from '../theme/tokens';
 import { bearbeitenWerteAus, bearbeitenZuPatch, verortenLinkStil } from './personBearbeiten';
 
 const basis = {
@@ -62,12 +63,16 @@ describe('bearbeitenWerteAus / bearbeitenZuPatch (LFH-613)', () => {
 describe('verortenLinkStil', () => {
   it('trägt beide Angaben des handgebauten Bedienziels und folgt der Dichtestufe', () => {
     // Literale Böden: kompakt 30, Handschuh 72.
-    expect(verortenLinkStil({ controlHeight: 30, paddingSM: 12 }, '#164f86')).toMatchObject({
+    expect(
+      verortenLinkStil({ controlHeight: 30, paddingSM: 12 }, farbenHell.bedienText),
+    ).toMatchObject({
       minHeight: 30,
       paddingInline: 12,
       // Die übergebene Textrolle, nicht antds `colorLink`.
-      color: '#164f86',
+      color: farbenHell.bedienText,
     });
-    expect(verortenLinkStil({ controlHeight: 72, paddingSM: 12 }, '#164f86').minHeight).toBe(72);
+    expect(
+      verortenLinkStil({ controlHeight: 72, paddingSM: 12 }, farbenHell.bedienText).minHeight,
+    ).toBe(72);
   });
 });

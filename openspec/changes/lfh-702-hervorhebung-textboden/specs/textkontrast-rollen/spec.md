@@ -23,8 +23,8 @@ Zeile unter dem Zeiger oder einer aktiven Zeile.
 #### Scenario: Link-Knopf in einer Tabellenzeile unter dem Zeiger
 - **WHEN** in der Betroffenenliste der Zeiger über dem leeren Knopf „Zustand hinzufügen“ einer
   Zeile steht
-- **THEN** hält seine Beschriftung gegen die Hervorhebungsfläche der Zeile im Tag ≥ 7 : 1 und in
-  der Nacht ≥ 5 : 1
+- **THEN** hält seine Beschriftung gegen den dort komponierten Grund (Knopffläche unter dem Zeiger
+  über der Hervorhebung der Zeile) im Tag ≥ 7 : 1 und in der Nacht ≥ 5 : 1
 
 ### Requirement: Keine Farbe außerhalb der Rollen
 

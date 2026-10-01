@@ -107,11 +107,54 @@ export async function randKontrast(ziel: Locator, seite: 'left' | 'top' = 'left'
   };
 }
 
+/**
+ * Wartet, bis Element und Vorfahren eingeschwungen sind (LFH-702, Spec `textkontrast-rollen`,
+ * „Messung im eingeschwungenen Zustand"). Eine antd-Tabellenzeile geht unter dem Zeiger per
+ * Transition von `flaeche` nach `flaeche3` über; ein Versuch mittendrin las einen helleren Grund,
+ * bestand, und `toPass` beendete die Schleife — der Test war grün oder rot je nach Zeitpunkt.
+ *
+ * `getComputedStyle` stößt die Stilberechnung an, erst danach gibt es die Transition eines gerade
+ * gesetzten `:hover`. Endlose Animationen (Ladekreisel) zählen nicht; eine endliche, die nicht
+ * rechtzeitig endet, ist ein Fehler mit Namen und Ziel, keine Messung.
+ */
+async function eingeschwungen(ziel: Locator) {
+  await ziel.evaluate(async (element) => {
+    const kette = new Set<Element>();
+    for (let e: Element | null = element; e; e = e.parentElement) {
+      kette.add(e);
+      void getComputedStyle(e).backgroundColor;
+    }
+    const laufend = document.getAnimations().filter((a) => {
+      const effekt = a.effect as KeyframeEffect | null;
+      return (
+        a.playState === 'running' &&
+        !!effekt?.target &&
+        kette.has(effekt.target) &&
+        effekt.getComputedTiming().iterations !== Infinity
+      );
+    });
+    const beschreibung = laufend
+      .map((a) => {
+        const t = (a.effect as KeyframeEffect).target as Element;
+        const name = a instanceof CSSTransition ? a.transitionProperty : a.id || a.constructor.name;
+        return `${name} an ${t.tagName}.${t.className}`;
+      })
+      .join(', ');
+    const frist = new Promise<never>((_, nein) =>
+      setTimeout(() => nein(new Error(`Nicht eingeschwungen nach 5 s: ${beschreibung}`)), 5_000),
+    );
+    await Promise.race([Promise.all(laufend.map((a) => a.finished.catch(() => undefined))), frist]);
+  });
+}
+
 export async function pruefe(tag: Locator, minimum: number, name: string) {
   await expect(tag, name).toBeVisible();
   // Modal-Einblendung erst abwarten: Opacity-Gruppen liefern keine belastbare Messung.
   // Ein dauerhaft nicht unterstützter Stil bleibt ein Fehler, statt still zu bestehen.
+  // Jeder Versuch schwingt zuerst ein: schon der erste misst den Endwert, ein Wert unter dem
+  // Boden bleibt in jedem Versuch rot (LFH-702).
   await expect(async () => {
+    await eingeschwungen(tag);
     const messung = await kontrast(tag);
     expect(messung.verhaeltnis, `${name}: ${JSON.stringify(messung)}`).toBeGreaterThanOrEqual(
       minimum,

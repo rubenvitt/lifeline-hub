@@ -60,6 +60,6 @@ halten.
 - Sichtbar am Tag: Jeder Link, jeder Beschreibungstext und jeder Tabellenkopf wird etwas dunkler.
   Nachts ändert sich nichts.
 - Nebenwirkung zum Guten: `bedienText`/`gedaempft` auf `alarmFlaeche` steigen von 6,86 auf 7,76.
-- Nicht betroffen: `schwach` (4,99 auf `flaeche3`, bleibt bei LFH-643) und die ETB-Typfarbe
-  `--lfh-etb-system-wort` (eigene Palette, gleicher Wert wie das alte `gedaempft`, aber eine
-  eigene Rolle).
+- Die ETB-Typfarbe `system.wort` verweist auf `gedaempft` und zieht samt Spiegel
+  `--lfh-etb-system-wort` mit.
+- Nicht betroffen: `schwach` (4,99 auf `flaeche3`, bleibt bei LFH-643).

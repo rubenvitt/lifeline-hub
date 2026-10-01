@@ -38,9 +38,6 @@ Den Anlass beschreibt `proposal.md`. Zum Stand:
 
 **Non-Goals:**
 - `schwach` auf `flaeche3` (4,99): Die tertiäre Stufe gehört zu LFH-643.
-- Die ETB-Typfarbe `--lfh-etb-system-wort`/`etbTypFarbenHell.system.wort` (`#474e57`). Sie ist
-  eine eigene Palette und hat zufällig denselben Wert wie das alte `gedaempft`, ohne dessen Rolle
-  zu sein. Ob sie mitzieht, ist eine Frage der ETB-Palette.
 - Nachtpalette, `flaeche3` selbst und die Hover-Fläche der Tabelle bleiben unverändert.
 - Lokale Überschreibungen mit `bedienText` (`Datensicht`, `InlineAngabe`, `BemerkungZelle`,
   `EtbAnhaenge`, `personBearbeiten`): Sie lesen die Rolle und ziehen von selbst mit.
@@ -80,7 +77,9 @@ deterministisch rot.
 `farbenHell.bedienText` wird `#144779`, `farbenHell.gedaempft` wird `#40464e`. Beide Werte sind
 die alten Kanäle mal 0,9: gleicher Farbton, gleiche Sättigung, nur dunkler. Der Abstand zu 7 : 1
 beträgt auf `flaeche3` knapp 0,5 und deckt Rundung und Kantenglättung ab. `theme/rollen.css`
-spiegelt beide Werte (`--lfh-bedien-text`, `--lfh-gedaempft`, Tagblock).
+spiegelt beide Werte (`--lfh-bedien-text`, `--lfh-gedaempft`, Tagblock). Die ETB-Typfarbe
+`system.wort` zeigt in `etbTypFarbenHell` auf `farbenHell.gedaempft` und zieht mit, also auch ihr
+Spiegel `--lfh-etb-system-wort` (beim Umsetzen festgestellt, `rollen.guard.test.ts`).
 
 Am Phase-1-Checkpoint entschieden (LFH-702, 01.10.2026):
 - **Verworfen: `flaeche3` aufhellen.** Für 7 : 1 mit dem alten `bedienText` müsste `flaeche3` bei
@@ -106,9 +105,14 @@ nehmen wir in Kauf, weil der Boden am Tag die Lesbarkeit im Freien trägt (Krite
 - **Browser:** `e2e/dokumente.spec.ts` misst im Kontrasttest Titel-Link und „—“ zusätzlich mit
   dem Zeiger über der Zeile. `e2e/betroffene-kontrast.spec.ts` behält „Zustand-Knopf
   leer+hover“ unverändert und ist jetzt deterministisch.
-- **Determinismus-Probe:** Mit dem alten `bedienText` und dem neuen Messkern ist
-  `betroffene-kontrast.spec.ts` (light, LFH-650) mit `--repeat-each 3` in 3 von 3 Läufen rot. Mit
-  dem neuen Wert ist er 3 von 3 grün.
+- **Befund beim Umsetzen:** Seit LFH-652 trägt ein Link-Knopf unter dem Zeiger die eigene Fläche
+  `bedienFlaeche` (`Button.linkHoverBg`). Der Zustand-Knopf der Betroffenenliste misst deshalb auf
+  `alpha` schon mit dem alten `bedienText` 7,11. Der Wert 6,59 auf `flaeche3` aus LFH-702 stammt
+  von einem Stand davor. Ohne eigene Fläche stehen Titel-Anker und „—“ einer Tabellenzeile, und
+  an ihnen wird die Zeitabhängigkeit belegt.
+- **Determinismus-Probe:** Mit den alten Werten und dem neuen Messkern ist der Kontrasttest der
+  Dokumentenablage (light) mit `--repeat-each 3` in 3 von 3 Läufen rot (6,59 auf `flaeche3`). Mit
+  den neuen Werten ist er 3 von 3 grün.
 - **Mutationsproben:** (a) Den Einschwing-Schritt in `pruefe()` auskommentieren: Die Probe oben
   wird wieder zeitabhängig (mindestens ein grüner Lauf mit altem Wert, belegt das Problem).
   (b) `bedienText` zurück auf `#164f86`: Der Einheitstest auf `flaeche3` und die Hover-Messung

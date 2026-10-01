@@ -117,10 +117,11 @@ type OhneAntdAusblendung<C> = C extends unknown ? Omit<C, 'responsive' | 'hidden
 /**
  * Die Tabellen-Tokens, rein und exportiert (jsdom rechnet kein CSS-in-JS).
  *
- * Kopfzeile auf `kopf`, Kopftext `gedaempft` (7,37 Tag · 7,48 Nacht; `schwach` lag am Tag bei
+ * Kopfzeile auf `kopf`, Kopftext `gedaempft` (8,34 Tag · 7,48 Nacht; `schwach` lag am Tag bei
  * 5,58, LFH-652), keine senkrechten Trenner im Kopf. Zeilentrenner als
  * Haarlinie: nachts `flaeche2`, am Tag `flaeche3` (`flaeche2` läge dort bei 1,08 : 1 auf Weiß).
- * Hover auf `flaeche3` aus demselben Grund. Die Zellpolsterung folgt der Dichte-Staffel
+ * Hover auf `flaeche3` aus demselben Grund; Link und Beschreibungstext halten darauf den
+ * Tagesboden (7,46 / 7,47, LFH-702). Die Zellpolsterung folgt der Dichte-Staffel
  * (`paddingSM` / `padding`).
  */
 export function tabellenTokens(

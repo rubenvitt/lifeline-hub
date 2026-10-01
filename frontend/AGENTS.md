@@ -150,7 +150,11 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Tagmodus** (LFH-618, `docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`):
   `achtung`/`alarm` als Text über `achtungText`/`alarmText`; Hervorhebung auf `flaeche3`, nicht
   `flaeche2`; Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
-  `e2e/kontrast-kern.ts`).
+  `e2e/kontrast-kern.ts`). **Text auf der Hervorhebung hält den vollen Boden** (LFH-702/LFH-877,
+  Spec `textkontrast-rollen`): Hover- und Aktivzeile sind Grund wie jede Fläche; deshalb sind
+  `bedienText`/`gedaempft` am Tag so dunkel, dass sie auf `flaeche3` ≥ 7 halten — die Fläche wird
+  nicht aufgehellt, die Rolle nicht lokal überschrieben
+  (`openspec/changes/archive/2026-10-01-lfh-702-hervorhebung-textboden/design.md`).
 
 **Lagekarte** (auch `pages/LagekartePage.tsx`): `frontend/src/pages/lagekarte/AGENTS.md`.
 

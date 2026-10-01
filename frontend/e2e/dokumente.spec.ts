@@ -612,6 +612,19 @@ for (const modus of ['light', 'dark'] as const) {
       werte.push(`${name}: ${(await kontrast(ziel)).verhaeltnis.toFixed(2)}`);
     }
 
+    // Dieselben Stellen auf der Hervorhebungsfläche der Zeile unter dem Zeiger (LFH-702/LFH-877):
+    // auch dort gilt der volle Boden. `pruefe` misst erst nach dem Hover-Übergang.
+    await zeile.hover();
+    const unterDemZeiger: Record<string, Locator> = {
+      'Titel-Anker unter dem Zeiger': zeile.locator('[data-lfh="download-anker-name"]'),
+      'Bezug „—" unter dem Zeiger': zeile.getByText('—', { exact: true }),
+    };
+    for (const [name, ziel] of Object.entries(unterDemZeiger)) {
+      await pruefe(ziel, KONTRAST_ZIEL[modus], `${modus}/${name}`);
+      werte.push(`${name}: ${(await kontrast(ziel)).verhaeltnis.toFixed(2)}`);
+    }
+    await page.mouse.move(0, 0);
+
     await page.getByRole('button', { name: 'Dokument ablegen' }).click();
     const dialog = ablegenDialog(page);
     await expect(dialog.locator('button.ant-btn', { hasText: 'Datei wählen' })).toBeFocused();
@@ -635,9 +648,7 @@ for (const modus of ['light', 'dark'] as const) {
     // (LFH-652, Nachtrag aus LFH-690).
     const abbrechen = dialog.locator('button.ant-btn', { hasText: 'Abbrechen' });
     await abbrechen.hover();
-    // Erst nach dem Farbübergang messen: mitten in der Transition läge die Beschriftung noch nahe
-    // am Ruheton und bestünde den Boden, egal welchen Hover-Ton antd ansteuert.
-    await abbrechen.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+    // Den Farbübergang wartet `pruefe` selbst ab (LFH-702, `kontrast-kern.ts`).
     await pruefe(abbrechen, KONTRAST_ZIEL[modus], `${modus}/Abbrechen unter dem Zeiger`);
     werte.push(`Abbrechen unter dem Zeiger: ${(await kontrast(abbrechen)).verhaeltnis.toFixed(2)}`);
     await testInfo.attach(`Kontrast ${modus}`, {

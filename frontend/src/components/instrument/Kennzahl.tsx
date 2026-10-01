@@ -42,7 +42,7 @@ import '../../theme/sprache.css';
  * | Ton     | Rolle der Zahl | Tag (auf #ffffff) | Nacht (auf #0f1215) |
  * |---------|----------------|-------------------|---------------------|
  * | normal  | normalText     | 9,18              | 10,92               |
- * | bedien  | bedienText     | 8,41              |  9,95               |
+ * | bedien  | bedienText     | 9,51              |  9,95               |
  * | achtung | achtungText    | 9,22              | 11,75               |
  * | alarm   | alarmText      | 8,96              |  6,77               |
  *
