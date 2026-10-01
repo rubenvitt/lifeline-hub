@@ -73,7 +73,9 @@ Zu, solange mindestens eine der drei Bedingungen gilt. Sie gelten für den ganze
 
 1. **Zeiger:** `pointerenter`/`pointerleave` mit `pointerType` `mouse` oder `pen`. Touch zählt
    nicht. Ein Tipp erzeugt Ein- und Austritt um den Tipp herum, und ein haftendes „drin“ nach
-   einem Wisch hielte den Stand ohne Grund.
+   einem Wisch hielte den Stand ohne Grund. Auch die erste `pointermove` im Bereich zählt als
+   Betreten: Erscheint die Ansicht unter einem ruhenden Zeiger, meldet Chrome beim nächsten
+   Bewegen kein `pointerenter` (Befund aus dem e2e-Lauf bei 390 px).
 2. **Fokus:** `focusin`/`focusout` mit der `contains`-Prüfung der Datensicht (Kartenknöpfe,
    Banner-Aktion).
 3. **Auffächerung:** `Kartenflaeche` bekommt die optionale Prop `onSpiderOffen(offen: boolean)`.

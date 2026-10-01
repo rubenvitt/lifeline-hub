@@ -150,10 +150,22 @@ describe('BetroffeneKarte — Schleuse (LFH-668)', () => {
     expect(standzeile()).toHaveTextContent(/^Live$/);
   });
 
+  it('ein verpasstes Betreten holt die erste Bewegung im Bereich nach', async () => {
+    // Erscheint die Ansicht unter einem ruhenden Zeiger, meldet der Browser beim nächsten Bewegen
+    // kein `pointerenter` für den Bereich — die Schleuse bliebe sonst offen.
+    const { neu } = renderKarte([p(1)]);
+    await screen.findByTestId('kartenflaeche-stub');
+    fireEvent.pointerMove(bereich(), { pointerType: 'mouse' });
+    expect(standzeile()).toHaveTextContent('Live pausiert');
+    neu([p(1), p(2)]);
+    expect(marker()).toHaveLength(1);
+  });
+
   it('Touch schließt die Schleuse nicht', async () => {
     const { neu } = renderKarte([p(1)]);
     await screen.findByTestId('kartenflaeche-stub');
     fireEvent.pointerEnter(bereich(), { pointerType: 'touch' });
+    fireEvent.pointerMove(bereich(), { pointerType: 'touch' });
     neu([p(1), p(2)]);
     expect(marker()).toHaveLength(2);
   });

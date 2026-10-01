@@ -129,6 +129,11 @@ export default function BetroffeneKarte({
   const zeigerRein = (e: PointerEvent) => {
     if (e.pointerType !== 'touch') setzeBedingung('zeiger', true);
   };
+  // Erscheint die Ansicht unter einem ruhenden Zeiger, meldet der Browser beim nächsten Bewegen kein
+  // `pointerenter` (sein letztes Ziel lag schon „drin"). Die erste Bewegung holt es nach.
+  const zeigerBewegt = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' && !bedingungRef.current.zeiger) setzeBedingung('zeiger', true);
+  };
   const zeigerRaus = (e: PointerEvent) => {
     if (e.pointerType !== 'touch') setzeBedingung('zeiger', false);
   };
@@ -206,6 +211,7 @@ export default function BetroffeneKarte({
     ref: bereichRef,
     'data-testid': 'betroffene-karte-bereich',
     onPointerEnter: zeigerRein,
+    onPointerMove: zeigerBewegt,
     onPointerLeave: zeigerRaus,
     onFocus: () => setzeBedingung('fokus', true),
     onBlur: fokusRaus,
