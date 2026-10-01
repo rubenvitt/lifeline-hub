@@ -120,7 +120,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.59"
+version = "1.0.0-alpha.60"
 
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]

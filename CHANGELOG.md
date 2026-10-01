@@ -1,3 +1,39 @@
+## [1.0.0-alpha.60](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.59...v1.0.0-alpha.60) (2026-10-01)
+
+### Wichtige Änderungen
+
+- **Neue Datenbankmigrationen**: Die Version führt drei neue Datenbank-Migrationen ein (0127 für Presse- und Medienarbeit, 0128 für Führungsfunktionen, 0129 für Kräfte-Zeitachse sowie 0130). Bei der ersten Verwendung dieser Version werden automatisch alle notwendigen Tabellen und Spalten angelegt. Bestehende Einsätze werden dabei nicht beeinträchtigt.
+
+### Kräfte und Mittel
+
+- **Einsatzdauer und Ruhezeit**: Im Meldebild erscheint eine neue Spalte „Im Einsatz", die anzeigt, wie lange eine Einheit oder Person bereits im Einsatz ist. Auf der Personalkarte lässt sich die vollständige Zeitachse mit allen Statuswechseln aufklappen. Die Berechnung erfolgt automatisch aus den markierten Statuswechseln in den Kräfte-Katalogen.
+
+- **Zeitachse für Einheiten und Personal**: Jede Einheit und jede Person führt nun eine Zeitachse, die dokumentiert, wann sie in den Einsatz gekommen ist, Pausen hatte oder abgelöst wurde. Diese Zeitachse kann nachträglich korrigiert werden, falls ein Statuswechsel nicht rechtzeitig erfasst wurde. Streichungen sind nur mit Pflichtangabe eines Grundes möglich.
+
+- **Ablösungen mit Schichtbeginn**: Bei der Ablösung einer Einheit oder Person lässt sich nun festhalten, wann die Ablösung tatsächlich die Arbeit aufgenommen hat. Liegt kein expliziter Schichtbeginn vor, wird das Eintreffen verwendet. Diese Information fließt in die Berechnung der Einsatzdauer ein.
+
+- **Konfigurierbare Zeitachsen-Marke**: In den Kräfte-Katalogen (Personal-Status und Einheiten-Status) kann festgelegt werden, welche Status als „im Einsatz" gelten und für die Zeitachse erfasst werden sollen. So lässt sich die Einsatzdauer-Berechnung an die eigenen Bedürfnisse anpassen.
+
+### Führung und Stab
+
+- **Presse- und Medienarbeit (S5)**: Ein neuer Bereich für das Sachgebiet S5 steht zur Verfügung. Das Presse-Log erfasst alle Medienkontakte (eingehend/ausgehend, Presse/Social Media) mit Status, Antwort und optionaler Freigabeangabe. Pressemitteilungen können als Entwurf angelegt, automatisch gespeichert und nach Freigabe gedruckt werden. Das Informationstelefon protokolliert alle Anrufe mit Zeitachse und Kennzahlen. Die Medienlage erscheint ohne Personenbezug und lässt sich in Lagevorträge übernehmen.
+
+- **Zufluss-Schleuse im Informationstelefon**: Neue Anrufe werden während der Arbeit am Informationstelefon in einem Sammelbanner angezeigt, damit nichts unter dem Cursor einspringt. So bleibt die Arbeit störungsfrei.
+
+- **Vorbereitung der Lagebesprechung**: Lagevorträge enthalten nun einen vorbereiteten Abschnitt „Medienlage", in dem sich aktuelle Informationen aus dem Presse-Log übernehmen lassen.
+
+### Lagekarte
+
+- **Sichtbares Alter der Fachebenen-Daten**: Jede zugeschaltete Fachebene zeigt nun, wann ihr Datenstand zuletzt abgerufen wurde (z. B. „Stand 14:30"). Veraltete Daten werden mit „⧖ veraltet" gekennzeichnet, sobald die Ebene ihre Aktualisierungsschwelle überschreitet. Im Inspector-Werkzeug erscheint der vollständige Abrufzeitpunkt. Die Einstufung altert im Minutentakt mit und bleibt auch bei Offline-Betrieb sichtbar, solange gehaltene Daten angezeigt werden.
+
+- **Optimierter Datenabruf der Fachebenen**: Der Abruf von Fachebenen-Daten nutzt nun gzip-Komprimierung, wodurch die Datenmengen deutlich sinken (z. B. ODL von 892 KB auf 81 KB). Dies verkürzt die Ladezeiten insbesondere bei schwachen Mobilfunkverbindungen erheblich. Kachel-Proxy und Download-Funktion bleiben davon unberührt und liefern Daten unverändert aus.
+
+- **Korrigierte Statusmarken-Darstellung**: Die Statusmarken der Fachebenen in der Seitenleiste erscheinen nun zuverlässig einzeilig, auch bei schmalen Browserfenstern. Zuvor konnte es bei Ebenen mit Geltungszeile (Autobahn, Luftqualität, Strahlung) zu mehrzeiligen Umbrüchen kommen.
+
+### Betrieb und Installation
+
+- **Verbesserte Kontrastmessung**: Die automatisierten Tests zur Barrierefreiheit warten nun ab, bis alle Animationen und Übergänge abgeklungen sind, bevor Kontrastverhältnisse gemessen werden. Dies verhindert falsche Fehlalarme bei der Qualitätssicherung.
+
 ## [1.0.0-alpha.59](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.58...v1.0.0-alpha.59) (2026-09-30)
 
 ### Benutzeroberfläche
