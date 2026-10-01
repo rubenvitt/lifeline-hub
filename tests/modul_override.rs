@@ -10,7 +10,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen_mit, login_cookie, rolle_setzen, setup,
-    sse_anfang_lesen,
+    setup_mit_pool_und_live, sse_anfang_lesen,
 };
 
 // ----------------------------- Test-Harness -----------------------------
@@ -703,6 +703,40 @@ async fn einsatzkopf_erreicht_ein_mitglied_ohne_ausblendbare_module() {
     assert!(
         gelesen.contains("event: einsatz"),
         "der Kopf erreicht auch ein Mitglied ohne Modul: {gelesen:?}"
+    );
+}
+
+/// LFH-734: Org-Ereignisse auf dem Einsatz-Strom gehören keinem Modul. Auch ein Mitglied, dem
+/// JEDES ausblendbare Modul entzogen ist, erfährt eine Katalogänderung seiner Organisation.
+#[tokio::test]
+async fn stammdaten_erreichen_ein_mitglied_ohne_ausblendbare_module() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    for key in MODUL_KEYS.iter().filter(|k| !NICHT_AUSBLENDBAR.contains(k)) {
+        assert_eq!(
+            override_setzen(&app, &admin, eid, key, false, None).await,
+            StatusCode::OK,
+            "Vorbedingung: {key} ausblenden"
+        );
+    }
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE id = ?")
+        .bind(fid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    let feed = live_oeffnen(&app, &frieda, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+    live.publiziere_stammdaten(org);
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: stammdaten\n"),
+        "das Org-Ereignis erreicht auch ein Mitglied ohne Modul: {gelesen:?}"
     );
 }
 

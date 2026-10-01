@@ -15,7 +15,7 @@ import {
   monoStil,
   useRollen,
 } from '../../components/instrument';
-import type { LiveVerbindungsStatus } from '../../live/useEinsatzLiveStream';
+import type { LiveVerbindungsStatus } from '../../live/liveVerbindung';
 import { etbTyp, sichtung, warnstufeBalkenFarbe } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';

@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useEinsatzLiveStream } from './useEinsatzLiveStream';
@@ -482,7 +482,7 @@ describe('useEinsatzLiveStream', () => {
   });
 
   // Reconnect-Resync + sichtbarer Fehlerpfad.
-  it('invalidiert beim ersten open NICHT und meldet Status open (skip-first, F14)', async () => {
+  it('invalidiert beim ersten open keinen Einsatz-Key und meldet Status open (skip-first, F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -497,7 +497,13 @@ describe('useEinsatzLiveStream', () => {
     );
     FakeEventSource.letzte?.emit('open');
     await waitFor(() => expect(status).toContain('open'));
-    expect(spy).not.toHaveBeenCalled(); // erstes open löst KEINEN Voll-Invalidate aus
+    // Erstes open: KEIN Einsatz-Vollabgleich (die Abfragen laden beim Mount ohnehin) …
+    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    expect(keys.filter((k) => typeof k[1] === 'number')).toEqual([]);
+    // … aber die Org-Keys (LFH-734): beim Wechsel aus dem Org-Strom kann ein Org-Ereignis
+    // zwischen beiden Verbindungen verloren gehen.
+    expect(keys).toContainEqual(['einsaetze']);
+    expect(keys).toContainEqual(['fahrzeuge']);
     window.removeEventListener('lfh:live-status', onStatus);
   });
 
@@ -657,5 +663,100 @@ describe('useEinsatzLiveStream', () => {
     window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     window.removeEventListener('lfh:live-status', onStatus);
     setTimeoutSpy.mockRestore();
+  });
+
+  it('baut nach dem Backoff neu auf, steigert ihn und setzt ihn nach open zurück (F14)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/einsaetze/4', () => HttpResponse.json({ id: 4 }, { status: 200 })),
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={4} />
+      </QueryClientProvider>,
+    );
+    const erste = FakeEventSource.letzte!;
+    erste.emit('open');
+
+    /** Löst einen CLOSED-Fehler aus, wartet auf den Backoff-Timer und feuert ihn sofort. */
+    const fehlerUndBackoff = async (quelle: FakeEventSource, erwartet: number) => {
+      setTimeoutSpy.mockClear();
+      const vorher = FakeEventSource.instanzen.length;
+      quelle.emitError(FakeEventSource.CLOSED);
+      await waitFor(() =>
+        expect(setTimeoutSpy.mock.calls.some(([, d]) => d === erwartet)).toBe(true),
+      );
+      const [cb] = setTimeoutSpy.mock.calls.find(([, d]) => d === erwartet)!;
+      (cb as () => void)();
+      expect(FakeEventSource.instanzen.length).toBe(vorher + 1);
+      return FakeEventSource.letzte!;
+    };
+
+    const zweite = await fehlerUndBackoff(erste, 1000);
+    expect(zweite.url).toBe('/api/einsaetze/4/live');
+    const dritte = await fehlerUndBackoff(zweite, 3000);
+    spy.mockClear();
+    dritte.emit('open');
+    expect(spy).toHaveBeenCalled(); // Wiederaufbau → Vollabgleich
+    await fehlerUndBackoff(dritte, 1000); // nach open wieder ab der ersten Stufe
+    setTimeoutSpy.mockRestore();
+  });
+
+  // LFH-734: der Einsatz-Strom trägt die Org-Ereignisse mit. Literale, nicht die Registry.
+  it('invalidiert bei einsatzliste die Einsatzliste und die Admin-Listen (LFH-734)', () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={7} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('einsatzliste', '{}');
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['demo-daten'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['aufbewahrung'] });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ['einsatz', 7] });
+  });
+
+  it('invalidiert bei stammdaten die Kataloge samt Filter-Fächern (LFH-734)', () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = new QueryClient();
+    client.setQueryData(['personal', 'alle'], []);
+    client.setQueryData(['fahrzeuge', 'im-dienst'], []);
+    client.setQueryData(['einsatz-personal', 7], []);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={7} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('stammdaten', '{}');
+    expect(client.getQueryState(['personal', 'alle'])?.isInvalidated).toBe(true);
+    expect(client.getQueryState(['fahrzeuge', 'im-dienst'])?.isInvalidated).toBe(true);
+    expect(client.getQueryState(['einsatz-personal', 7])?.isInvalidated).toBe(false);
+  });
+
+  it('nimmt die Org-Keys in lagged und Wiederaufbau auf (LFH-734)', () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={7} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('lagged');
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['fahrzeuge'] });
+    quelle.emit('open'); // Erst-Open
+    spy.mockClear();
+    quelle.emit('open');
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['organisation'] });
   });
 });

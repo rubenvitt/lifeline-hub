@@ -17,6 +17,7 @@ use crate::app::AppState;
 use crate::auth::session::AdminUser;
 use crate::demo::{entfernen, import, DemoBericht, DemoDatenStatus, DemoImportKopf};
 use crate::error::AppError;
+use crate::live::org::{einsatzleser_lesen, einsatzliste_melden, Einsatzleser};
 use crate::live::LiveEvent;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -72,20 +73,41 @@ fn bericht_lesen(json: &str) -> Result<DemoBericht, AppError> {
         .map_err(|e| AppError::Internal(format!("Demo-Bericht nicht lesbar: {e}")))
 }
 
-/// ID des Demo-Einsatzes des aktiven Kopfes, nur wenn es ihn in der eigenen Org gibt; sonst
-/// löscht `entfernen_tx` keinen Einsatz, und kein Kanal bekommt ein `lagged`.
+/// ID und Leser des Demo-Einsatzes des aktiven Kopfes, nur wenn es ihn in der eigenen Org
+/// gibt; sonst löscht `entfernen_tx` keinen Einsatz, und kein Kanal bekommt ein `lagged`. Die
+/// Leser werden VOR dem `DELETE` gelesen: mit dem Einsatz fallen auch die Mitgliedschaften, und
+/// die Mitglieder sollen das Verschwinden aus ihrer Liste trotzdem erfahren (LFH-734).
 async fn alter_demo_einsatz_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
-) -> Result<Option<i64>, AppError> {
-    Ok(sqlx::query_scalar(
+) -> Result<Option<(i64, Einsatzleser)>, AppError> {
+    let id: Option<i64> = sqlx::query_scalar(
         "SELECT e.id FROM demo_import d \
          JOIN einsatz e ON e.id = d.einsatz_id AND e.org_id = d.org_id \
          WHERE d.org_id = ? AND d.entfernt_at IS NULL",
     )
     .bind(org_id)
     .fetch_optional(&mut *conn)
-    .await?)
+    .await?;
+    let Some(id) = id else { return Ok(None) };
+    Ok(einsatzleser_lesen(conn, id).await?.map(|leser| (id, leser)))
+}
+
+/// Org-Ereignisse nach dem Commit (LFH-734): die Liste verliert den alten und gewinnt den neuen
+/// Demo-Einsatz, die Kataloge Fahrzeuge, Personal und Material ändern sich.
+async fn org_ereignisse_senden(
+    state: &AppState,
+    org_id: i64,
+    alt: Option<Einsatzleser>,
+    neu: Option<i64>,
+) {
+    if let Some(leser) = alt {
+        leser.melden(&state.live);
+    }
+    if let Some(einsatz_id) = neu {
+        einsatzliste_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+    }
+    state.live.publiziere_stammdaten(org_id);
 }
 
 /// Importzeitpunkt: UTC, auf Sekunden gekürzt. Einmal vor `write_retry!` gelesen, damit ein
@@ -120,10 +142,11 @@ pub async fn importieren(
     AdminUser(benutzer): AdminUser,
 ) -> Result<(StatusCode, Json<DemoDatenStatus>), AppError> {
     let (org_id, admin_id, jetzt) = (benutzer.org_id, benutzer.id, jetzt());
-    let status = crate::write_retry!(&state.pool, |conn| {
-        import::importieren_tx(conn, org_id, admin_id, jetzt).await?;
-        status_tx(conn, org_id).await
+    let (neu, status) = crate::write_retry!(&state.pool, |conn| {
+        let neu = import::importieren_tx(conn, org_id, admin_id, jetzt).await?;
+        Ok((neu.einsatz_id, status_tx(conn, org_id).await?))
     })?;
+    org_ereignisse_senden(&state, org_id, None, Some(neu)).await;
     Ok((StatusCode::CREATED, Json(status)))
 }
 
@@ -135,7 +158,7 @@ pub async fn neu_importieren(
     AdminUser(benutzer): AdminUser,
 ) -> Result<Json<DemoDatenStatus>, AppError> {
     let (org_id, admin_id, jetzt) = (benutzer.org_id, benutzer.id, jetzt());
-    let (alt, status) = crate::write_retry!(&state.pool, |conn| {
+    let (alt, neu, status) = crate::write_retry!(&state.pool, |conn| {
         let aktiv: Option<i64> = sqlx::query_scalar(
             "SELECT id FROM demo_import WHERE org_id = ? AND entfernt_at IS NULL",
         )
@@ -149,10 +172,11 @@ pub async fn neu_importieren(
         } else {
             None
         };
-        import::importieren_tx(conn, org_id, admin_id, jetzt).await?;
-        Ok((alt, status_tx(conn, org_id).await?))
+        let neu = import::importieren_tx(conn, org_id, admin_id, jetzt).await?;
+        Ok((alt, neu.einsatz_id, status_tx(conn, org_id).await?))
     })?;
-    resync_senden(&state, alt);
+    resync_senden(&state, alt.as_ref().map(|a| a.0));
+    org_ereignisse_senden(&state, org_id, alt.map(|a| a.1), Some(neu)).await;
     Ok(Json(status))
 }
 
@@ -167,6 +191,7 @@ pub async fn entfernen(
         entfernen::entfernen_tx(conn, org_id).await?;
         Ok((alt, status_tx(conn, org_id).await?))
     })?;
-    resync_senden(&state, alt);
+    resync_senden(&state, alt.as_ref().map(|a| a.0));
+    org_ereignisse_senden(&state, org_id, alt.map(|a| a.1), None).await;
     Ok(Json(status))
 }

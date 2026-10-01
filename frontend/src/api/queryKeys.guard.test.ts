@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS, NICHT_LIVE_KEYS } from './queryKeys';
+import {
+  EINSATZ_KEYS,
+  EINSATZ_STREAM_EVENTS,
+  GLOBAL_KEYS,
+  NICHT_LIVE_GLOBAL_KEYS,
+  NICHT_LIVE_KEYS,
+  ORG_STREAM_EVENTS,
+} from './queryKeys';
 import { ENGE_ARTEN, scanneQueryKeys, type Fund } from './queryKeyScan';
 
 /**
@@ -11,6 +18,8 @@ import { ENGE_ARTEN, scanneQueryKeys, type Fund } from './queryKeyScan';
  * (b) Jeder managed Key ist GENAU einmal klassifiziert: live (EINSATZ_STREAM_EVENTS) oder
  *     bewusst NICHT_LIVE.
  * (d) Das `befehl`-Wire-Event ist live angebunden.
+ * (g) Jeder globale Key ist GENAU einmal klassifiziert: live (ORG_STREAM_EVENTS, LFH-734) oder
+ *     bewusst NICHT_LIVE_GLOBAL_KEYS.
  * (f) Jeder Inline-Query-Key außerhalb des Registry steht auf der Allowlist (die leer ist).
  *
  * Erkennung per TS-AST (`queryKeyScan.ts`, dort auch die Radien WEIT/ENG): mehrzeilige Literale
@@ -198,5 +207,29 @@ describe('queryKeys-Guard (f): Inline-Query-Keys nur laut Allowlist (LFH-312)', 
     // sich nicht überlappen.
     const ueberlappung = QUERY_KEY_ALLOWLIST.filter((p) => VERBOTEN_INLINE.has(p));
     expect(ueberlappung).toEqual([]);
+  });
+});
+
+describe('queryKeys-Guard (g): jeder globale Key ist live ODER bewusst nicht-live (LFH-734)', () => {
+  const liveKeys = new Set<string>(Object.values(ORG_STREAM_EVENTS).flat());
+  const nichtLive = new Set<string>(NICHT_LIVE_GLOBAL_KEYS);
+
+  it('klassifiziert jeden GLOBAL_KEYS-Prefix genau einmal (XOR live/nicht-live)', () => {
+    for (const key of Object.values(GLOBAL_KEYS)) {
+      const istLive = liveKeys.has(key);
+      const istNichtLive = nichtLive.has(key);
+      expect(
+        istLive !== istNichtLive,
+        `${key}: muss GENAU eines von {live via ORG_STREAM_EVENTS, NICHT_LIVE_GLOBAL_KEYS} sein ` +
+          `(live=${istLive}, nicht-live=${istNichtLive})`,
+      ).toBe(true);
+    }
+  });
+
+  it('führt in ORG_STREAM_EVENTS nur bekannte globale Keys', () => {
+    const bekannt = new Set<string>(Object.values(GLOBAL_KEYS));
+    for (const key of [...liveKeys, ...nichtLive]) {
+      expect(bekannt, `unbekannter globaler Key ${key}`).toContain(key);
+    }
   });
 });

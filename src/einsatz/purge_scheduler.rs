@@ -17,6 +17,7 @@
 
 use super::repo;
 use super::retention::{karenz_abgelaufen, KARENZ_TAGE};
+use crate::live::LiveHub;
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use std::time::Duration;
@@ -32,8 +33,11 @@ const TICK_SEKUNDEN: u64 = 600;
 ///
 /// Ohne Gedächtnis für einen ausstehenden WAL-Rückschrieb; der laufende Scheduler nimmt
 /// [`tick_mit_rueckschrieb`].
-pub async fn tick_einmal(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
-    tick_mit_rueckschrieb(pool, jetzt, &mut false).await
+///
+/// Ein Soft-Delete meldet `einsatzliste` an die Leser des Einsatzes (LFH-734): er verschwindet
+/// aus ihrer Liste. Die Schwärzung (Phase B) trifft nur schon gesperrte Einsätze und meldet nichts.
+pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>) -> usize {
+    tick_mit_rueckschrieb(pool, live, jetzt, &mut false).await
 }
 
 /// Wie [`tick_einmal`], schreibt nach einer Schwärzung aber den WAL zurück (LFH-725, Spec
@@ -43,6 +47,7 @@ pub async fn tick_einmal(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
 /// versucht es erneut, bis es gelingt.
 pub async fn tick_mit_rueckschrieb(
     pool: &SqlitePool,
+    live: &LiveHub,
     jetzt: DateTime<Utc>,
     rueckschrieb_ausstehend: &mut bool,
 ) -> usize {
@@ -59,7 +64,10 @@ pub async fn tick_mit_rueckschrieb(
                     "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)"
                 );
                 match repo::soft_delete_einsatz(pool, id, &jetzt_s).await {
-                    Ok(true) => anzahl += 1,
+                    Ok(true) => {
+                        anzahl += 1;
+                        crate::live::org::einsatzliste_melden(pool, live, id, &[]).await;
+                    }
                     Ok(false) => {} // Race: bereits soft-gelöscht.
                     Err(e) => tracing::error!(einsatz_id = id, "Purge Phase A fehlgeschlagen: {e}"),
                 }
@@ -143,7 +151,7 @@ pub async fn tick_mit_rueckschrieb(
 
 /// Startet den Hintergrund-Purge-Scheduler (nur im Produktivlauf aus `main.rs`).
 /// Dünner Wrapper um `tick_einmal`; die Logik selbst ist oben testbar.
-pub fn starte_purge_scheduler(pool: SqlitePool) {
+pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
         // `true`: der erste Tick (sofort) holt einen beim Start blockierten Rückschrieb nach,
@@ -151,7 +159,7 @@ pub fn starte_purge_scheduler(pool: SqlitePool) {
         let mut rueckschrieb_ausstehend = true;
         loop {
             ticker.tick().await;
-            tick_mit_rueckschrieb(&pool, Utc::now(), &mut rueckschrieb_ausstehend).await;
+            tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;
             // Verwaiste Anhänge (hochgeladen-nicht-gesendet) jenseits der Karenz entfernen
             // (LFH-250) — gegen monotones BLOB-Wachstum. Fehler nur loggen, nie den Tick killen.
             match crate::anhang::repo::sweep_verwaiste(&pool, Utc::now()).await {
@@ -204,7 +212,10 @@ mod tests {
         let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
 
         // Vor Fälligkeit: nichts.
-        assert_eq!(tick_einmal(&pool, t("2026-05-01 12:00:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-05-01 12:00:00")).await,
+            0
+        );
         let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
             .bind(id)
             .fetch_one(&pool)
@@ -213,7 +224,10 @@ mod tests {
         assert_eq!(g, None, "vor Ablauf nicht soft-gelöscht");
 
         // Nach Fälligkeit: genau ein Soft-Delete, Tombstone gesetzt.
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            1
+        );
         let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
             .bind(id)
             .fetch_one(&pool)
@@ -222,7 +236,10 @@ mod tests {
         assert_eq!(g.as_deref(), Some("2026-06-02 12:00:00"));
 
         // Zweiter Tick: idempotent, kein erneutes Soft-Delete (noch in Karenz, nicht purge-fällig).
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:05:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:05:00")).await,
+            0
+        );
     }
 
     #[tokio::test]
@@ -242,7 +259,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(tick_einmal(&pool, t("2027-01-01 12:00:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2027-01-01 12:00:00")).await,
+            0
+        );
         let (g, s): (Option<String>, Option<String>) =
             sqlx::query_as("SELECT geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
                 .bind(id)
@@ -327,7 +347,10 @@ mod tests {
         .unwrap();
 
         // Tick nach Ablauf der Karenz → eine Schwärzung.
-        assert_eq!(tick_einmal(&pool, t("2026-06-01 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 12:00:00")).await,
+            1
+        );
 
         // (a) PII genullt/platzhalter — auch die STORNIERTE Person.
         let namen: Vec<Option<String>> = sqlx::query_scalar(
@@ -459,7 +482,10 @@ mod tests {
         assert_eq!(s.as_deref(), Some("2026-06-01 12:00:00"));
 
         // (e) Zweiter Tick: idempotent, kein Doppel-Scrub.
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            0
+        );
         let s2: Option<String> =
             sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
                 .bind(e)
@@ -588,7 +614,10 @@ mod tests {
             .bind(e).bind(b).execute(&pool).await.unwrap();
 
         // Tick nach Ablauf der Karenz → eine Schwärzung.
-        assert_eq!(tick_einmal(&pool, t("2026-06-01 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 12:00:00")).await,
+            1
+        );
 
         // (a) Einsatz-Kopf: PII genullt, operatives Label (bezeichnung) bleibt.
         let (ort, lat, lon, ms, sv, bez): (
@@ -713,7 +742,10 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(s.as_deref(), Some("2026-06-01 12:00:00"));
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            0
+        );
     }
 
     /// LFH-639, Spec-Szenario „Einsatz schwärzen“ — bewusst mit ZWEI aktiven Bezirken und
@@ -1170,9 +1202,15 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
         // Soft-Delete.
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            1
+        );
         // Wenige Tage später (< KARENZ_TAGE): noch keine Schwärzung.
-        assert_eq!(tick_einmal(&pool, t("2026-06-10 12:00:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-10 12:00:00")).await,
+            0
+        );
         let s: Option<String> =
             sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
                 .bind(id)
@@ -1239,7 +1277,10 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let e = ohne_akteur(&pool, "2026-06-01 00:00:00", None).await;
 
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            0
+        );
         let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
             .bind(e)
             .fetch_one(&pool)
@@ -1255,7 +1296,10 @@ mod tests {
         assert!(fehler.contains(&format!("Einsatz {e} (Org 1)")), "{fehler}");
 
         let admin = org_admin_anlegen(&pool).await;
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:10:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:10:00")).await,
+            1
+        );
         let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
             .bind(e)
             .fetch_one(&pool)
@@ -1274,7 +1318,10 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let e = ohne_akteur(&pool, "2026-02-01 00:00:00", Some("2026-02-15 00:00:00")).await;
 
-        assert_eq!(tick_einmal(&pool, t("2026-06-01 12:00:00")).await, 0);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 12:00:00")).await,
+            0
+        );
         let (s, ort): (Option<String>, Option<String>) =
             sqlx::query_as("SELECT geschwaerzt_at, einsatzort FROM einsatz WHERE id = ?")
                 .bind(e)
@@ -1290,7 +1337,10 @@ mod tests {
         assert!(etb_erfasser(&pool, e).await.is_empty());
 
         let admin = org_admin_anlegen(&pool).await;
-        assert_eq!(tick_einmal(&pool, t("2026-06-01 12:10:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 12:10:00")).await,
+            1
+        );
         let (s, ort): (Option<String>, Option<String>) =
             sqlx::query_as("SELECT geschwaerzt_at, einsatzort FROM einsatz WHERE id = ?")
                 .bind(e)
@@ -1309,13 +1359,19 @@ mod tests {
     async fn karenz_ignoriert_verlaengerte_frist() {
         let pool = crate::db::test_pool().await;
         let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
-        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            1
+        );
         sqlx::query("UPDATE einsatz SET retention_bis = '2099-01-01 00:00:00' WHERE id = ?")
             .bind(id)
             .execute(&pool)
             .await
             .unwrap();
-        assert_eq!(tick_einmal(&pool, t("2026-07-02 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-02 12:00:00")).await,
+            1
+        );
         let s: Option<String> =
             sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
                 .bind(id)
@@ -1397,7 +1453,10 @@ mod tests {
             "Vorbedingung: Klartext liegt in der Datei"
         );
 
-        assert_eq!(tick_einmal(&pool, t("2026-03-01 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            1
+        );
 
         let s: Option<String> =
             sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
@@ -1433,7 +1492,13 @@ mod tests {
 
         let mut ausstehend = false;
         assert_eq!(
-            tick_mit_rueckschrieb(&pool, t("2026-03-01 12:00:00"), &mut ausstehend).await,
+            tick_mit_rueckschrieb(
+                &pool,
+                &LiveHub::new(),
+                t("2026-03-01 12:00:00"),
+                &mut ausstehend
+            )
+            .await,
             1
         );
         assert!(ausstehend, "blockierter Rückschrieb bleibt vorgemerkt");
@@ -1446,7 +1511,13 @@ mod tests {
         drop(leser);
 
         assert_eq!(
-            tick_mit_rueckschrieb(&pool, t("2026-03-01 12:10:00"), &mut ausstehend).await,
+            tick_mit_rueckschrieb(
+                &pool,
+                &LiveHub::new(),
+                t("2026-03-01 12:10:00"),
+                &mut ausstehend
+            )
+            .await,
             0,
             "nichts Neues zu schwärzen"
         );
@@ -1465,7 +1536,10 @@ mod tests {
         crate::backup::erzeuge_sicherung(&pool, &sicherung)
             .await
             .unwrap();
-        assert_eq!(tick_einmal(&pool, t("2026-03-01 12:00:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            1
+        );
         pool.close().await;
 
         crate::backup::restore::restore_aus_datei(&sicherung, &pfad, true)
@@ -1488,7 +1562,10 @@ mod tests {
             "Vorbedingung: die Sicherung trägt den Einsatz ungeschwärzt"
         );
 
-        assert_eq!(tick_einmal(&pool, t("2026-03-01 12:10:00")).await, 1);
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:10:00")).await,
+            1
+        );
         assert_eq!(
             geschwaerzt(pool.clone()).await,
             (

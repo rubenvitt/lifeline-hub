@@ -4,10 +4,10 @@
  *
  * Ein Store statt eines Listeners je Anzeige, weil `lfh:live-status` ein Broadcast OHNE
  * Replay ist: wer nach dem Abriss mountet, sähe nie ein Ereignis und bliebe auf `idle`.
- * `useEinsatzLiveStream` meldet weiter über das window-Ereignis; der Store ist nur die
- * Leseseite davor (Vertrag `useSyncExternalStore` wie `pwa/appAktualisierung`).
+ * Gemeldet wird über das window-Ereignis aus `liveVerbindung.ts` (`oeffneLiveVerbindung`), für
+ * den Einsatz- wie für den Org-Strom (LFH-734); der Store ist nur die Leseseite davor (Vertrag `useSyncExternalStore` wie `pwa/appAktualisierung`).
  */
-import type { LiveVerbindungsStatus } from './useEinsatzLiveStream';
+import type { LiveVerbindungsStatus } from './liveVerbindung';
 
 let stand: LiveVerbindungsStatus = 'idle';
 const horcher = new Set<() => void>();

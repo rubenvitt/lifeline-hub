@@ -5,6 +5,7 @@ import {
   EINSATZ_KEYS,
   EINSATZ_STREAM_EVENTS,
   NICHT_LIVE_KEYS,
+  ORG_STREAM_EVENTS,
   einsatzKeys,
   globalKeys,
   istKeyDesEinsatzes,
@@ -503,5 +504,48 @@ describe('einsatzKeys.schadenAnhaenge (LFH-21)', () => {
       qc.getQueryState(['einsatz-schaden-anhaenge', 9, 2])?.isInvalidated,
       'ein anderer Einsatz bleibt unberührt',
     ).toBe(false);
+  });
+});
+
+// LFH-734: Org-Ereignisse → globale Prefixe. Literale, nicht die Konstanten: der Wire-Name und
+// die Prefixe sind der Vertrag (ein still umbenannter Key träfe sonst ein anderes Cache-Fach).
+describe('ORG_STREAM_EVENTS (LFH-734)', () => {
+  it('einsatzliste frischt die Einsatzliste und die Admin-Listen auf', () => {
+    expect(ORG_STREAM_EVENTS.einsatzliste).toEqual(['einsaetze', 'demo-daten', 'aufbewahrung']);
+  });
+
+  it('stammdaten frischt jeden Katalog, die Organisation und die Einsatzliste auf', () => {
+    expect([...ORG_STREAM_EVENTS.stammdaten].sort()).toEqual(
+      [
+        'personal',
+        'personal-status',
+        'personal-vorschlaege',
+        'fahrzeuge',
+        'fahrzeug-status',
+        'fahrzeug-vorschlaege',
+        'material',
+        'material-kategorien',
+        'sprechgruppen',
+        'qualifikationen',
+        'einheit-typen',
+        'etb-bausteine',
+        'stichwort-vorschlaege',
+        'fuehrungsfunktionen',
+        'organisation',
+        // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
+        'einsaetze',
+      ].sort(),
+    );
+  });
+
+  it('trifft per einstelligem Prefix auch die Filter-Fächer', () => {
+    const qc = new QueryClient();
+    qc.setQueryData(['personal', 'alle'], { wert: 1 });
+    qc.setQueryData(['sprechgruppen', 'alle'], { wert: 1 });
+    for (const key of ORG_STREAM_EVENTS.stammdaten) {
+      void qc.invalidateQueries({ queryKey: [key] });
+    }
+    expect(qc.getQueryState(['personal', 'alle'])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['sprechgruppen', 'alle'])?.isInvalidated).toBe(true);
   });
 });

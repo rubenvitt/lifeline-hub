@@ -56,6 +56,8 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // SSE-Dauerverbindung: jede Zeitschranke kappte sie, und jede offene Verbindung bände einen
     // Cap-Slot.
     ("GET", "/api/einsaetze/{id}/live"),
+    // Org-Strom (LFH-734), dieselbe SSE-Dauerverbindung außerhalb eines Einsatzes.
+    ("GET", "/api/live"),
     // Admin-Download der gesamten DB: VACUUM INTO + 64-KiB-Chunk-Stream. Dauer skaliert mit
     // DB-Größe und Leitung des Clients.
     ("GET", "/api/backup"),

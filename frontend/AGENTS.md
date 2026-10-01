@@ -538,6 +538,13 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   `einsatz` und `lagged` zu, Guard `ungegatet_sind_nur_lagged_und_einsatz`), invalidiert Kopf und
   Stab-Anzeige. Es feuern PATCH, Abschluss, Frist und die Lagebesprechung **nur bei geändertem
   Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
+- **Einsatzliste und Stammdaten sind live** (LFH-734, Spec `org-live`): `globalKeys` sind wie die
+  Einsatz-Keys genau einmal klassifiziert — live über `ORG_STREAM_EVENTS` (Ereignisse
+  `einsatzliste`, `stammdaten`) oder `NICHT_LIVE_GLOBAL_KEYS` (Guard (g)). **Ein Tab, eine
+  Live-Verbindung:** der Einsatz-Strom trägt die Org-Ereignisse mit; außerhalb eines Einsatzes
+  öffnet die Betriebszeile `/api/live` (`live/useOrgLiveStream.ts`), der ruht, solange ein
+  Einsatz-Strom offen ist (`live/einsatzStromStore.ts`). Verbindungsbau nur über
+  `live/liveVerbindung.ts`, keine zweite `EventSource`.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

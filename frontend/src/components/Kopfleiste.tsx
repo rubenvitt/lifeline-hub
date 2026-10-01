@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import { useAuth } from '../auth/AuthContext';
 import { Bildmarke } from '../marke/Bildmarke';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
-import type { LiveVerbindungsStatus } from '../live/useEinsatzLiveStream';
+import type { LiveVerbindungsStatus } from '../live/liveVerbindung';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useOnline } from '../offline/useOnline';
 import { useMinutenTakt } from './useMinutenTakt';

@@ -179,6 +179,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // statt
         // als Gate der Route.
         .route("/api/einsaetze/{id}/live", get(routes::live::stream))
+        // Org-Strom für Tabs außerhalb eines Einsatzes (LFH-734); bewusst NICHT unter
+        // `/api/einsaetze/`, damit er weder mit `{id}` noch mit `PFAD_KEY` kollidiert.
+        .route("/api/live", get(routes::live::org_stream))
         // Modulzähler: modul-lose Gate-Route wie `/live`, die Modulrechte filtern die Felder.
         .route(
             "/api/einsaetze/{id}/modul-zaehler",
@@ -1381,6 +1384,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // abzureißen
         // (das hielte das Frontend für „kein Netz“).
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
+        // Stammdaten-Kataloge melden schreibende Erfolge an die eigene Org (LFH-734). Außerhalb
+        // von CatchPanic: nach einer Handler-Panik sieht sie dessen 500 und meldet nichts.
+        // `MatchedPath` ist beim Routing gesetzt.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            routes::live::stammdaten_live,
+        ))
         // Zulassungssteuerung: Zeitbudget und Gleichzeitigkeits-Cap mit Lastabwurf. Muss AUSSERHALB
         // des `CatchPanicLayer` liegen, damit sie dessen 500-Antwort bekommt statt eines Unwinds.
         // `MatchedPath` ist beim Routing gesetzt, die Ausnahmeliste greift also trotzdem.

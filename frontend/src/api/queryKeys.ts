@@ -6,9 +6,10 @@ import type { EtbTyp } from './types';
  * `einsatzId` und `globalKeys` für alles darüber (Mandant, Stammdaten-Kataloge, Instanz,
  * externe Quellen).
  *
- * `useEinsatzLiveStream` leitet Listener, Invalidierung UND den lagged-Vollabgleich
- * ausschließlich aus {@link EINSATZ_STREAM_EVENTS} ab; ein neues Live-Modul ist EIN Eintrag
- * hier. `queryKeys.guard.test.ts` verlangt, dass Prefixe nur hier als Literal vorkommen und
+ * `useEinsatzLiveStream` leitet Listener, Invalidierung UND den lagged-Vollabgleich aus
+ * {@link EINSATZ_STREAM_EVENTS} ab, die Org-Ereignisse und den Org-Abgleich aus
+ * {@link ORG_STREAM_EVENTS}/{@link ORG_LIVE_KEYS} (`live/orgListener.ts`, LFH-734); ein neues
+ * Live-Modul ist EIN Eintrag hier. `queryKeys.guard.test.ts` verlangt, dass Prefixe nur hier als Literal vorkommen und
  * kein Inline-String-Array als Query-Key dient.
  */
 
@@ -510,11 +511,9 @@ export const einsatzKeys = {
  * `ORG_KEYS`: `admin-karte`/`karte-config` sind instanzweit, `fachebene` bezeichnet externe
  * Fremdquellen.
  *
- * Die Gliederung unten ist DOKUMENTATION, keine erzwungene Partition. Der Produktivcode räumt
- * seit LFH-723 an zwei Stellen, keine braucht „alle Org-Keys“ als Menge: `qc.clear()` beim
- * Abmelden räumt alles, der Rechteentzug nur einsatzbezogene Keys (`api/queryClient.ts`). Käme
- * ein Konsument der Gliederung dazu, gehört sie in eine XOR-Partition nach dem Muster von
- * {@link NICHT_LIVE_KEYS}.
+ * Die Gliederung unten ist DOKUMENTATION. Erzwungen ist seit LFH-734 eine andere Partition:
+ * jeder Key ist live über {@link ORG_STREAM_EVENTS} ODER steht in {@link NICHT_LIVE_GLOBAL_KEYS}
+ * (`queryKeys.guard.test.ts`, Guard (g)).
  *
  * Die Wire-Strings sind EINGEFROREN und byte-gepinnt (`queryKeys.test.ts`): ein geänderter Key
  * bricht nichts, er trifft still ein anderes Cache-Fach.
@@ -634,8 +633,8 @@ export const globalKeys = {
   fahrzeugeListe: (filter: Dienstfilter) => [GLOBAL_KEYS.fahrzeuge, filter] as const,
   material: () => [GLOBAL_KEYS.material] as const,
   materialListe: (filter: Dienstfilter) => [GLOBAL_KEYS.material, filter] as const,
-  // sprechgruppen kennt nur den Filterwert 'alle' und KEIN bare-Invalidate, deshalb nur dieser
-  // eine Accessor (siehe queryKeys.prefixmatch.test.ts).
+  // sprechgruppen kennt nur den Filterwert 'alle', deshalb nur dieser eine Accessor (siehe
+  // queryKeys.prefixmatch.test.ts). Den baren Prefix invalidiert `stammdaten` (LFH-734).
   sprechgruppenAlle: () => [GLOBAL_KEYS.sprechgruppen, 'alle'] as const,
 
   /**
@@ -665,6 +664,73 @@ export const globalKeys = {
   fachebeneKritis: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'kritis', bbox] as const,
   fachebeneEnergie: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'energie', bbox] as const,
 } as const;
+
+/**
+ * Org-Ereignis (SSE `type`, LFH-734) → die globalen Prefixe, die es invalidiert. Wie bei
+ * {@link EINSATZ_STREAM_EVENTS} beantwortet die Liste „welcher Cache könnte stale sein", nicht
+ * „wer darf es erfahren" (das entscheidet der Server). Invalidiert wird der EINSTELLIGE Prefix
+ * `[key]`, er trifft auch die Filter-Fächer (`personalListe('alle')`). Ohne aktiven Beobachter
+ * wird nur markiert, nicht abgerufen; die Admin-Listen kosten Nicht-Admins deshalb nichts.
+ *
+ * Beide Ereignisse kommen über den Einsatz-Strom oder, außerhalb eines Einsatzes, über den
+ * Org-Strom `/api/live` (`live/orgListener.ts`). Kontrakt gegen das Rust-`OrgLiveEvent`:
+ * `orgLiveEvent.contract.test.ts`.
+ */
+export const ORG_STREAM_EVENTS = {
+  // Die Liste samt Switcher und Sprungpalette, dazu die Admin-Listen, deren Zeilen an Einsätzen
+  // hängen (Demo-Stand, Aufbewahrung).
+  einsatzliste: [GLOBAL_KEYS.einsaetze, GLOBAL_KEYS.demoDaten, GLOBAL_KEYS.aufbewahrung],
+  stammdaten: [
+    GLOBAL_KEYS.personal,
+    GLOBAL_KEYS.personalStatus,
+    GLOBAL_KEYS.personalVorschlaege,
+    GLOBAL_KEYS.fahrzeuge,
+    GLOBAL_KEYS.fahrzeugStatus,
+    GLOBAL_KEYS.fahrzeugVorschlaege,
+    GLOBAL_KEYS.material,
+    GLOBAL_KEYS.materialKategorien,
+    GLOBAL_KEYS.sprechgruppen,
+    GLOBAL_KEYS.qualifikationen,
+    GLOBAL_KEYS.einheitTypen,
+    GLOBAL_KEYS.etbBausteine,
+    GLOBAL_KEYS.stichwortVorschlaege,
+    GLOBAL_KEYS.fuehrungsfunktionen,
+    GLOBAL_KEYS.organisation,
+    // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
+    GLOBAL_KEYS.einsaetze,
+  ],
+} as const satisfies Record<string, readonly GlobalKey[]>;
+
+export type OrgStreamEvent = keyof typeof ORG_STREAM_EVENTS;
+
+/** Alle live geführten globalen Prefixe, dedupliziert — der Vollabgleich nach `lagged` und
+ *  nach jedem Wiederaufbau einer Live-Verbindung. */
+export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
+  ...new Set(Object.values(ORG_STREAM_EVENTS).flat()),
+];
+
+/**
+ * Globale Keys, die BEWUSST kein Org-Ereignis auffrischt (Spec `org-live`, „Bewusst nicht
+ * live"). `queryKeys.guard.test.ts` verlangt, dass jeder Key aus {@link GLOBAL_KEYS} entweder in
+ * {@link ORG_STREAM_EVENTS} auftaucht ODER hier steht.
+ *
+ * - `benutzer`, `authProvider`: Benutzerverwaltung und Anmeldewege, nur für den Admin.
+ * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
+ *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
+ * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
+ * - `adminKarte`, `karteConfig`: instanzweit, nicht mandantenbezogen.
+ * - `fachebene`: externe Quellen mit eigener Nachfrage.
+ */
+export const NICHT_LIVE_GLOBAL_KEYS = [
+  GLOBAL_KEYS.benutzer,
+  GLOBAL_KEYS.authProvider,
+  GLOBAL_KEYS.orgEinstellungen,
+  GLOBAL_KEYS.orgModulEinstellungen,
+  GLOBAL_KEYS.benutzerEinstellungen,
+  GLOBAL_KEYS.adminKarte,
+  GLOBAL_KEYS.karteConfig,
+  GLOBAL_KEYS.fachebene,
+] as const satisfies readonly GlobalKey[];
 
 /**
  * Was vom Lagebild ohne Netz lesbar bleibt (LFH-723, design.md D3) — die EINE Quelle für

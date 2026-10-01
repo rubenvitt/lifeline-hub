@@ -2837,6 +2837,12 @@ export interface components {
             zeitformat?: components["schemas"]["Zeitformat"] | null;
             zeitzone?: string | null;
         };
+        /**
+         * @description SSE-Wire-Namen der Org-Ereignisse (LFH-734). Das Frontend bildet sie in
+         *     `ORG_STREAM_EVENTS` (`api/queryKeys.ts`) auf die globalen Query-Keys ab.
+         * @enum {string}
+         */
+        OrgLiveEvent: "einsatzliste" | "stammdaten";
         /** @description Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`. */
         OrgLogoAnzeige: {
             geaendert_at: string;

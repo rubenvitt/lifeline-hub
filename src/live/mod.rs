@@ -1,3 +1,5 @@
+pub mod org;
+
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -228,6 +230,9 @@ struct Kanal {
 #[derive(Clone)]
 pub struct LiveHub {
     kanaele: Arc<RwLock<HashMap<i64, Kanal>>>,
+    /// Prozessweiter Org-Kanal (LFH-734): Org-Ereignisse aller Organisationen, gefiltert erst
+    /// beim Abonnenten ([`org::OrgAbonnent::sieht`]). Ohne Ring und ohne Id (LFH-734, design.md D4).
+    org: broadcast::Sender<org::OrgNachricht>,
     /// Prozess-Epoch (Prozessstart). Teil jeder Nachrichten-Id; ein Neustart erzeugt eine
     /// andere Epoch → Replay über einen Neustart hinweg wird als `Luecke` erkannt.
     epoch: u64,
@@ -290,8 +295,42 @@ impl LiveHub {
             .unwrap_or(0);
         Self {
             kanaele: Arc::new(RwLock::new(HashMap::new())),
+            org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
             epoch,
         }
+    }
+
+    /// Abonniert den Org-Kanal (LFH-734). Gefiltert wird beim Abonnenten, nicht hier.
+    pub fn abonniere_org(&self) -> broadcast::Receiver<org::OrgNachricht> {
+        self.org.subscribe()
+    }
+
+    /// Ein Stammdaten-Katalog von `org_id` hat sich geändert; erreicht jeden Abonnenten dieser
+    /// Organisation.
+    pub fn publiziere_stammdaten(&self, org_id: i64) {
+        self.publiziere_org(org::OrgNachricht {
+            org_id,
+            event: org::OrgLiveEvent::Stammdaten,
+            empfaenger: org::OrgEmpfaenger::Organisation,
+        });
+    }
+
+    /// Die Einsatzliste zu einem Einsatz von `org_id` kann sich geändert haben; erreicht die
+    /// Leser des Einsatzes und `benutzer_ids`. Den Normalfall deckt
+    /// [`org::einsatzliste_melden`] ab, das Org und Mitglieder selbst liest.
+    pub fn publiziere_einsatzliste(&self, org_id: i64, benutzer_ids: Vec<i64>) {
+        self.publiziere_org(org::OrgNachricht {
+            org_id,
+            event: org::OrgLiveEvent::Einsatzliste,
+            empfaenger: org::OrgEmpfaenger::Einsatzleser {
+                benutzer_ids: benutzer_ids.into(),
+            },
+        });
+    }
+
+    fn publiziere_org(&self, nachricht: org::OrgNachricht) {
+        // Err heißt nur „kein Empfänger" — dann geht die Nachricht verloren, wie im Einsatz-Kanal.
+        let _ = self.org.send(nachricht);
     }
 
     /// Abonniert den Live-Kanal eines Einsatzes (legt ihn bei Bedarf an) und liefert einen

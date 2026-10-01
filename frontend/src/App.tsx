@@ -83,6 +83,7 @@ import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
 import { EINSTELLUNGEN_SEKTIONEN } from './routing/deeplinks';
 import LiveStatusBanner from './live/LiveStatusBanner';
+import { useOrgLiveStream } from './live/useOrgLiveStream';
 import { abgleichFuer, useOfflineSync } from './offline/useOfflineSync';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
@@ -167,6 +168,8 @@ const EINSTELLUNGEN_ROUTEN = (
 function BetriebsLayout() {
   const { benutzer, konflikt } = useAuth();
   useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
+  // Org-Strom außerhalb eines Einsatzes (LFH-734); im Einsatz ruht er von selbst.
+  useOrgLiveStream(benutzer != null);
   return (
     <>
       <LiveStatusBanner benutzerId={benutzer?.id} />

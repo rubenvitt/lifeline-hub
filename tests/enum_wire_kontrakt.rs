@@ -912,6 +912,17 @@ fn live_event_wire() {
     } in lifeline_hub::live::LiveEvent::ALLE);
 }
 
+/// Org-Ereignisse (LFH-734): eigene Familie neben `LiveEvent`, auf derselben Verbindung. Das
+/// Frontend pinnt dieselbe Menge gegen `ORG_STREAM_EVENTS` (`orgLiveEvent.contract.test.ts`);
+/// die Disjunktheit zu `LiveEvent` prüft `src/live/org.rs`.
+#[test]
+fn org_live_event_wire() {
+    enum_wire!(lifeline_hub::live::org::OrgLiveEvent {
+        Einsatzliste => "einsatzliste",
+        Stammdaten => "stammdaten",
+    } in lifeline_hub::live::org::OrgLiveEvent::ALLE);
+}
+
 // ───────────────────────── Inventar-Guard (LFH-312) ─────────────────────────
 //
 // Die Makro-Exhaustiveness oben erzwingt Vollständigkeit nur JE GELISTETEM Enum. Ein NEU in
