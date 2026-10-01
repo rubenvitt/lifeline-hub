@@ -38,12 +38,13 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
  * `soll` ist die Steuerhöhe, `sollSM` die kleine (antds Knöpfe der Bestätigungsblase), `fuge` der
  * Boden zwischen zwei Knöpfen eines Dialogfußes (LFH-653: ≥ 8 im Touch-, ≥ 16 im
  * Handschuh-Betrieb). In `kompakt` wird die Fuge nur gemessen: die Leitlinie nimmt den Fükw vom
- * Zielabstand aus.
+ * Zielabstand aus. `klappkopf` ist der Boden des Klappkopfs: die Staffel, in `kompakt` aber die
+ * 36 px von vor LFH-653 — der Boden hebt an, er kürzt nie (Spec „Kompakt wird nicht gekürzt“).
  */
 const STAFFEL = [
-  { dichte: 'kompakt', soll: 30, sollSM: 24, fuge: null },
-  { dichte: 'komfortabel', soll: 48, sollSM: 48, fuge: 8 },
-  { dichte: 'handschuh', soll: 72, sollSM: 72, fuge: 16 },
+  { dichte: 'kompakt', soll: 30, sollSM: 24, fuge: null, klappkopf: 36 },
+  { dichte: 'komfortabel', soll: 48, sollSM: 48, fuge: 8, klappkopf: 48 },
+  { dichte: 'handschuh', soll: 72, sollSM: 72, fuge: 16, klappkopf: 72 },
 ] as const;
 
 const PDF = Buffer.from('%PDF-1.4 e2e');
@@ -310,7 +311,7 @@ async function hoehe(ziel: Locator): Promise<number> {
 }
 
 test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog', () => {
-  for (const { dichte, soll, sollSM, fuge: fugeBoden } of STAFFEL) {
+  for (const { dichte, soll, sollSM, fuge: fugeBoden, klappkopf: klappkopfBoden } of STAFFEL) {
     test(`${dichte}: Anker, Entfernen und die Dialogziele halten ${soll} px`, async ({
       page,
     }, testInfo) => {
@@ -358,9 +359,6 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
         Titel: dialog.getByLabel('Titel'),
         Abbrechen: dialog.getByRole('button', { name: 'Abbrechen' }),
         Ablegen: dialog.getByRole('button', { name: 'Ablegen' }),
-        // antds `Collapse` rechnet den Kopf aus der Schrift; den Boden setzt der Kontext
-        // (`antdKlappkopf`, LFH-653). Vorher 36 / 45 / 55 px.
-        'Klappkopf „Bezug (optional)"': dialog.locator('.ant-collapse-header'),
       };
       const messwerte: string[] = [];
       for (const [name, ziel] of Object.entries(ziele)) {
@@ -371,6 +369,14 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
           `${name} (${dichte}): gemessen ${h} px, Soll ≥ ${soll} px`,
         ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
       }
+      // antds `Collapse` rechnet den Kopf aus der Schrift; den Boden setzt der Kontext
+      // (`antdKlappkopf`, LFH-653). Vorher 36 / 45 / 55 px.
+      const klappkopf = await hoehe(dialog.locator('.ant-collapse-header'));
+      messwerte.push(`Klappkopf „Bezug (optional)": ${klappkopf} px`);
+      expect(
+        klappkopf,
+        `Klappkopf (${dichte}): gemessen ${klappkopf} px, Soll ≥ ${klappkopfBoden} px`,
+      ).toBeGreaterThanOrEqual(klappkopfBoden - SUBPIXEL);
       // Fuge der Fußknöpfe der Erfassungs-Hülle (LFH-653, `size="middle"`; vorher 3 / 5 / 7 px).
       const fuge = await waagrechteFuge(ziele.Abbrechen, ziele.Ablegen);
       messwerte.push(`Fuge Abbrechen|Ablegen: ${fuge} px`);
@@ -396,8 +402,8 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
         ).toBeGreaterThanOrEqual(16);
       }
 
-      // Die Bestätigungsblase baut antd selbst; ihre Fuge kommt aus `antdKomponenten`
-      // (`Popconfirm.marginXS`, LFH-653). Erst den Dialog schließen, dann die Zeilenaktion.
+      // Die Bestätigungsblase baut antd selbst; ihre Fuge kommt aus der Regel in `src/index.css`
+      // (`var(--ant-padding)`, LFH-653). Erst den Dialog schließen, dann die Zeilenaktion.
       await ziele.Abbrechen.click();
       await expect(dialog).toBeHidden();
       await page.getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }).click();
