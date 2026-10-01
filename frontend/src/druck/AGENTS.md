@@ -36,8 +36,9 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nicht live, außerhalb des Offline-Lagebilds. Query-Felder einzeln an den Rahmen geben, nie das
   Ergebnisobjekt (`useQuery` beobachtet nur, was die Seite liest).
 - **Personendruck nur über `GET …/personen/druck`**: jeder Abruf schreibt einen `druck`-Eintrag in
-  `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache,
-  `retry: false`, `refetchOnMount: 'always'`. Tiere und Schäden drucken über ihre Liste, ohne Protokoll.
+  `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache;
+  Optionen aus `druck/abfrageOptionen.ts` (`retry: false`, `refetchOnMount: 'always'`,
+  `networkMode: 'always'` — offline scheitern statt den alten Stand druckbar zeigen), `gcTime: 0`. Tiere und Schäden drucken über ihre Liste, ohne Protokoll.
 - **Einsatzbericht** (LFH-726, `pages/EinsatzberichtDruckPage.tsx`, `druck/einsatzbericht/`,
   `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md`): Route `einsatzdaten/bericht` (erbt die
   nie gesperrten Einsatzdaten), Einstieg sekundär auf der Einsatzdaten-Seite und in der Palette.

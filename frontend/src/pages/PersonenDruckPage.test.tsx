@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
-import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, setzeOnline } from '../test/utils';
 import { erzeugeQueryClient } from '../api/queryClient';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person } from '../api/types';
@@ -109,6 +109,39 @@ describe('PersonenDruckPage', () => {
     await waitFor(() => expect(abrufe.druck).toBe(1));
     await fertig();
     expect(nummern()).toEqual(['R-001']);
+  });
+
+  it('druckt ohne Verbindung keinen zwischengespeicherten Stand', async () => {
+    // Offline pausierte TanStack den Abruf (networkMode „online“) und zeigte den Schnappschuss
+    // des letzten Besuchs als druckbar — ohne neuen Protokolleintrag.
+    server_mit([person(1)]);
+    server.use(http.get('/api/einsaetze/7/personen/druck', () => HttpResponse.error()));
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.personenDruck(7), {
+      personen: [person(8)],
+      uhs: [],
+      geladenAt: '2026-09-25T05:00:00Z',
+    });
+    // Den Einsatz hält im echten Layout schon die Einsatzhülle im Cache.
+    client.setQueryData(einsatzKeys.einsatz(7), EINSATZ);
+    setzeOnline(false);
+    rendere('', client);
+    await screen.findByText('Die Liste konnte nicht geladen werden');
+    expect(druckKnopf()).toBeDisabled();
+    expect(nummern()).toEqual([]);
+  });
+
+  it('zeigt den Protokoll-Hinweis schon beim Laden', async () => {
+    server_mit([person(1)]);
+    server.use(
+      http.get('/api/einsaetze/7/personen/druck', async () => {
+        await new Promise((r) => setTimeout(r, 200));
+        return HttpResponse.json([person(1)]);
+      }),
+    );
+    rendere();
+    await screen.findByRole('status');
+    expect(screen.getByTestId('druck-hinweis')).toHaveTextContent('Zugriffsprotokoll');
   });
 
   it('„Neu laden“ ist genau ein weiterer protokollierter Abruf', async () => {

@@ -132,6 +132,15 @@ Rahmen.
 `EtbDruckPage` wird **nicht** auf den Rahmen umgestellt, weil der Gewinn gering und das Risiko
 eine Regression ohne Anlass wäre. Ein Kommentar im Rahmen verweist auf das Vorbild.
 
+Der Hinweis am Bildschirm steht vor dem Zustandsschalter, also auch beim Laden und im
+Fehlerfall, denn der Protokolleintrag entsteht schon beim Abruf. Bei „kein Zugriff“ fehlt er,
+weil dann kein Eintrag entsteht.
+
+„Zurück zu <Modul>“ führt auf die Liste. Mitgenommen wird nur, was die Liste aus der Adresse
+übernimmt, also bei Personen der Status (`personenPfad`). Tiere und Schäden halten ihre Sicht im
+Komponentenzustand und starten auf ihrer Vorgabe. Das ist bewusst so: eine URL-Achse für die
+Listen wäre eine eigene Änderung.
+
 *Verworfen:* drei eigenständige Seiten nach dem Muster von `EtbDruckPage`. Das wären dreimal
 dieselben Zustände und dreimal dieselben Tests für 403, Fehler und Sperre.
 
@@ -152,6 +161,13 @@ protokollierten Abruf auslösen. Die Keys bleiben außerhalb von `LAGEBILD_OFFLI
 ETB-Druck. Für Tiere und Schäden wird bewusst ein eigener Präfix genommen und nicht
 `einsatzKeys.tiere`/`schaeden`, denn diese sind live, und ein SSE-Ereignis schöbe sonst neue
 Zeilen in die offene Druckansicht.
+
+Die Optionen stehen einmal in `druck/abfrageOptionen.ts` (`DRUCK_ABFRAGE`). Dazu gehört
+`networkMode: 'always'` (Nachtrag aus dem Review). Mit TanStacks Vorgabe `online` pausiert ein
+Abruf ohne Verbindung nur. Dann blieb der Schnappschuss des letzten Besuchs stehen und war
+druckbar, beim Personendruck ohne neuen Protokolleintrag. Jetzt scheitert der Abruf, und die
+Ansicht zeigt den Fehler. Der Personendruck setzt zusätzlich `gcTime: 0`, damit nach dem
+Verlassen kein Personen-Schnappschuss im Speicher bleibt.
 
 Personen-Verbleib braucht die UHS-Namen (`verbleibText(p, uhsName)`). Sie gehören zum selben
 Schnappschuss: Der Abruf der Druckseite lädt `listeUhs` neben dem Druck-Abruf. Ein Fehler dort

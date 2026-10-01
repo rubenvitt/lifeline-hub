@@ -5,6 +5,7 @@ import { ladePersonenDruck } from '../api/einsatzPerson';
 import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import ListenDruckSeite from '../druck/ListenDruckSeite';
 import { umfangText } from '../druck/umfang';
 import { personenDruckAuswahl } from '../personen/druckAuswahl';
@@ -18,8 +19,8 @@ import { parsePersonenDruckAuswahl, personenPfad } from '../routing/deeplinks';
  *
  * Die Daten kommen AUSSCHLIESSLICH über `GET …/personen/druck`: jeder Abruf schreibt serverseitig
  * einen `druck`-Eintrag ins Zugriffsprotokoll. Deshalb kein Retry (jeder Versuch wäre ein
- * Eintrag), nicht live, und beim Öffnen immer frisch statt aus dem Cache der Liste oder eines
- * früheren Besuchs. Die UHS-Namen für den Verbleib gehören zum selben Schnappschuss; fehlen sie
+ * Eintrag), nicht live, beim Öffnen immer frisch statt aus dem Cache der Liste oder eines
+ * früheren Besuchs, und ohne Verbindung ein Fehler statt des alten Stands (`DRUCK_ABFRAGE`). Die UHS-Namen für den Verbleib gehören zum selben Schnappschuss; fehlen sie
  * (Modul gesperrt, Fehler), steht „UHS" ohne Namen.
  *
  * Gefiltert wird im Client mit derselben Funktion wie die Liste (`filterPersonen`).
@@ -41,11 +42,9 @@ export default function PersonenDruckPage() {
       ]);
       return { personen, uhs, geladenAt: new Date().toISOString() };
     },
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: 'always',
-    retry: false,
+    ...DRUCK_ABFRAGE,
+    // Kein Personen-Schnappschuss im Speicher, wenn die Ansicht verlassen ist.
+    gcTime: 0,
   });
 
   const daten = druckQuery.data;

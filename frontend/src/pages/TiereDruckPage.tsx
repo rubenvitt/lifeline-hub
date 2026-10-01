@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { listeTiere } from '../api/einsatzTier';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import ListenDruckSeite from '../druck/ListenDruckSeite';
 import { umfangText } from '../druck/umfang';
 import { parseTiereDruckAuswahl, tierePfad } from '../routing/deeplinks';
@@ -31,11 +32,7 @@ export default function TiereDruckPage() {
       tiere: await listeTiere(einsatzId),
       geladenAt: new Date().toISOString(),
     }),
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: 'always',
-    retry: false,
+    ...DRUCK_ABFRAGE,
   });
   const daten = druckQuery.data;
   // Felder hier lesen, nicht erst im Rahmen (Begründung an `ListenDruckAbfrage`).

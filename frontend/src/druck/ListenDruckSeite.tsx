@@ -39,7 +39,10 @@ interface Props {
   auswahl: string;
   /** „3 Personen" — Einzahl und Mehrzahl kennt nur die Seite. */
   umfang: (anzahl: number) => string;
-  /** Hinweis am Bildschirm über der Druckwurzel (Personen: Protokoll). Nie auf Papier. */
+  /**
+   * Hinweis am Bildschirm über der Druckwurzel (Personen: Protokoll), in jedem Zustand außer
+   * „kein Zugriff". Nie auf Papier.
+   */
   hinweis?: ReactNode;
   /** Die Tabelle der Seite; erscheint nur bei mindestens einem Datensatz. */
   children: ReactNode;
@@ -123,6 +126,13 @@ export default function ListenDruckSeite({
         </>
       }
     >
+      {/* Vor dem Zustandsschalter: der Protokolleintrag entsteht beim Abruf, also schon beim Laden
+          und auch dann, wenn danach etwas scheitert. Ohne Zugriff entsteht keiner. */}
+      {hinweis && !keinZugriff && (
+        <Typography.Paragraph type="secondary" data-testid="druck-hinweis">
+          {hinweis}
+        </Typography.Paragraph>
+      )}
       {keinZugriff ? (
         <Alert
           type="info"
@@ -143,34 +153,27 @@ export default function ListenDruckSeite({
           Liste wird geladen …
         </Typography.Text>
       ) : (
-        <>
-          {hinweis && (
-            <Typography.Paragraph type="secondary" data-testid="druck-hinweis">
-              {hinweis}
+        <div data-lfh="druckwurzel">
+          <Druckkopf
+            dokumentart={dokumentart}
+            einsatz={einsatz}
+            sichtbarkeit="immer"
+            // Am Bildschirm steht darüber der Seitenkopf mit dem `h1`.
+            ebene={2}
+            zeilen={[
+              { etikett: 'Auswahl', wert: auswahl },
+              { etikett: 'Umfang', wert: umfang(stand.anzahl) },
+              { etikett: 'Stand', wert: taktischeDtgVoll(stand.geladenAt, konventionen) },
+            ]}
+          />
+          {stand.anzahl === 0 ? (
+            <Typography.Paragraph style={{ marginBlockStart: token.margin }}>
+              Keine Einträge in dieser Auswahl
             </Typography.Paragraph>
+          ) : (
+            children
           )}
-          <div data-lfh="druckwurzel">
-            <Druckkopf
-              dokumentart={dokumentart}
-              einsatz={einsatz}
-              sichtbarkeit="immer"
-              // Am Bildschirm steht darüber der Seitenkopf mit dem `h1`.
-              ebene={2}
-              zeilen={[
-                { etikett: 'Auswahl', wert: auswahl },
-                { etikett: 'Umfang', wert: umfang(stand.anzahl) },
-                { etikett: 'Stand', wert: taktischeDtgVoll(stand.geladenAt, konventionen) },
-              ]}
-            />
-            {stand.anzahl === 0 ? (
-              <Typography.Paragraph style={{ marginBlockStart: token.margin }}>
-                Keine Einträge in dieser Auswahl
-              </Typography.Paragraph>
-            ) : (
-              children
-            )}
-          </div>
-        </>
+        </div>
       )}
     </EinsatzSeite>
   );
