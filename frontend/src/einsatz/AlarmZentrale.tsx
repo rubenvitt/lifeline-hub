@@ -5,6 +5,8 @@ import {
   IkoneMonitor,
   IkoneVerbotsschild,
 } from '../ikonen';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { alsZeitpunkt, zuWanduhr } from '../anzeige/zeitEingabe';
 import { App, Button, Dropdown, Tooltip } from 'antd';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
@@ -56,14 +58,20 @@ type AbloesungAlarmDetail = {
   faellig_at?: string;
 };
 
-/** Toast-Text eines Ablösungshinweises: Einheit und Ortszeit der Fälligkeit (rein, getestet). */
-function abloesungAlarmText(detail: AbloesungAlarmDetail): {
+/**
+ * Toast-Text eines Ablösungshinweises: Einheit und Uhrzeit der Fälligkeit in der Anzeigezone
+ * (LFH-692; `zone` `null` = Browserzone). Rein, getestet.
+ */
+function abloesungAlarmText(
+  detail: AbloesungAlarmDetail,
+  zone: string | null,
+): {
   titel: string;
   beschreibung: string;
 } {
   const einheit = detail.titel?.split(': ').slice(1).join(': ') || 'eine Einheit';
-  const f = detail.faellig_at ? dayjs.utc(detail.faellig_at) : null;
-  const uhrzeit = f?.isValid() ? f.local().format('HH:mm') : null;
+  const f = alsZeitpunkt(detail.faellig_at);
+  const uhrzeit = f ? zuWanduhr(f, zone).format('HH:mm') : null;
   const bei = uhrzeit ? `${einheit}, ${uhrzeit}` : einheit;
   return detail.art === 'vorwarnung'
     ? { titel: 'Ablösung in 30 min', beschreibung: `Ablösung bald fällig: ${bei}` }
@@ -141,6 +149,7 @@ function desktopZustand(permission: NotificationPermission | 'unsupported'): Des
 export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   const { notification } = App.useApp();
   const navigate = useNavigate();
+  const zone = useAnzeigeKonventionen().konventionen.zeitzone ?? null;
   const instanzId = useId();
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
@@ -444,7 +453,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           ? `abloesung-${detail.abloesung_id}-${detail.art ?? 'faellig'}`
           : `abloesung-${++alarmScope.zaehler}`;
       const key = `${alarmScope.keyPrefix}-${fachKey}`;
-      const { titel, beschreibung } = abloesungAlarmText(detail);
+      const { titel, beschreibung } = abloesungAlarmText(detail, zone);
       const ziel = abloesungPfad(einsatzId);
       const oeffnen = () => {
         if (!alarmScope.aktiv) return;
@@ -472,7 +481,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
     window.addEventListener('lfh:abloesung-alarm', onAbloesung);
     return () => window.removeEventListener('lfh:abloesung-alarm', onAbloesung);
-  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
+  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast, zone]);
 
   // Neue Unwetterwarnung am Einsatzort (LFH-663,
   // `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:

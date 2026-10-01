@@ -8,11 +8,10 @@ import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
-import EinsatzdatenPage, {
-  gleicherZeitpunkt,
-  pickerZuWire,
-  wireZuPicker,
-} from './EinsatzdatenPage';
+import EinsatzdatenPage, { gleicherZeitpunkt } from './EinsatzdatenPage';
+import { alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
@@ -52,6 +51,8 @@ const vorschlaege = [
 interface SetupOpts {
   einsatz?: Partial<EinsatzAnzeige>;
   benutzer?: BenutzerAnzeige;
+  /** Anzeigezone; ohne gilt die Browserzone (kein Provider, wie bisher). */
+  zeitzone?: string;
 }
 
 function setup(opts: SetupOpts = {}) {
@@ -67,10 +68,19 @@ function setup(opts: SetupOpts = {}) {
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
   );
-  return renderMitProviders(
+  const routen = (
     <Routes>
       <Route path="/einsaetze/:id/einsatzdaten" element={<EinsatzdatenPage />} />
-    </Routes>,
+    </Routes>
+  );
+  return renderMitProviders(
+    opts.zeitzone ? (
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: opts.zeitzone }}>
+        {routen}
+      </AnzeigeKonventionenProvider>
+    ) : (
+      routen
+    ),
     { route: '/einsaetze/7/einsatzdaten' },
   );
 }
@@ -93,47 +103,21 @@ describe('Führungsstellen-Berechtigung', () => {
   });
 });
 
-describe('Alarmzeit-Wandlung (Wire ↔ Picker)', () => {
-  it('liest den Wirestring als UTC — geprüft am absoluten Instant, nicht an der Wanduhrzeit', () => {
-    // Geprüft wird der Instant, nicht das Format: `Date.UTC(...)` ist in jeder Zeitzone derselbe
-    // Zeitpunkt, `dayjs(wire)` parste den naiven Wirestring als lokale Zeit. Unter TZ=UTC sind
-    // beide Lesarten gleich und der Test trivial grün; scharf ist er unter TZ=Europe/Berlin.
-    expect(wireZuPicker('2026-05-23 09:00:00').valueOf()).toBe(Date.UTC(2026, 4, 23, 9, 0, 0));
-  });
-
-  it('hält den Picker in lokaler Zeit — dieselbe Wanduhrzeit, die ZeitAnzeige daneben rendert', () => {
-    // `format.ts:inZone` rendert ohne konfigurierte Zone `dayjs.utc(x).local()`. Der Picker muss
-    // dieselbe Wanduhrzeit zeigen, sonst stünde im Bearbeiten-Modus eine andere Uhrzeit als in der
-    // Zelle daneben.
-    expect(wireZuPicker('2026-05-23 09:00:00').format('YYYY-MM-DD HH:mm:ss')).toBe(
-      dayjs.utc('2026-05-23 09:00:00').local().format('YYYY-MM-DD HH:mm:ss'),
-    );
-  });
-
-  it('normalisiert die lokale Picker-Zeit zurück auf den UTC-Wirestring', () => {
-    // Fester Instant 09:00 UTC, als Dayjs im Lokal-Modus — so liefert ihn der antd-DatePicker. Ohne
-    // `.utc()` im Helfer formatierte `.format()` die lokale Wanduhrzeit; der local→UTC-Shift wird
-    // echt exerziert.
-    const lokal = dayjs.utc('2026-05-23 09:00:00').local();
-    expect(pickerZuWire(lokal)).toBe('2026-05-23 09:00:00');
-  });
-});
-
 describe('gleicherZeitpunkt (LFH-472)', () => {
   it('vergleicht den Instant, nicht die Objektidentität', () => {
     // Zwei Renders bauen zwei Objekte für denselben Wirestring; „unverändert" muss das bleiben.
     expect(
-      gleicherZeitpunkt(wireZuPicker('2026-05-23 09:00:00'), wireZuPicker('2026-05-23 09:00:00')),
+      gleicherZeitpunkt(alsZeitpunkt('2026-05-23 09:00:00')!, alsZeitpunkt('2026-05-23 09:00:00')!),
     ).toBe(true);
     expect(
-      gleicherZeitpunkt(wireZuPicker('2026-05-23 09:00:00'), wireZuPicker('2026-05-23 09:00:01')),
+      gleicherZeitpunkt(alsZeitpunkt('2026-05-23 09:00:00')!, alsZeitpunkt('2026-05-23 09:00:01')!),
     ).toBe(false);
   });
 
   it('leer ist nur leer gleich', () => {
     expect(gleicherZeitpunkt(null, null)).toBe(true);
-    expect(gleicherZeitpunkt(null, wireZuPicker('2026-05-23 09:00:00'))).toBe(false);
-    expect(gleicherZeitpunkt(wireZuPicker('2026-05-23 09:00:00'), null)).toBe(false);
+    expect(gleicherZeitpunkt(null, alsZeitpunkt('2026-05-23 09:00:00')!)).toBe(false);
+    expect(gleicherZeitpunkt(alsZeitpunkt('2026-05-23 09:00:00')!, null)).toBe(false);
   });
 });
 
@@ -596,20 +580,23 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     expect(bodies).toEqual([]);
   });
 
-  it('Alarmzeit inline: gesendet wird der gewählte absolute Zeitpunkt, beidseits der Sommerzeit-Umstellungen', async () => {
-    /*
-     * Eingetippt wird die LOKALE Wanduhrzeit des Instants, erwartet der UTC-Wirestring desselben
-     * Instants. Unter TZ=UTC wäre das trivial grün; scharf ist es unter TZ=Europe/Berlin
-     * (`check-all.sh`). Die Instants liegen je eine Stunde vor und nach beiden Umstellungen 2026
-     * und meiden die doppelte Stunde im Oktober, die als Wanduhrzeit mehrdeutig ist.
-     */
-    for (const wire of [
-      '2026-03-29 00:30:00',
-      '2026-03-29 01:30:00',
-      '2026-10-24 23:30:00',
-      '2026-10-25 02:30:00',
-    ]) {
-      const { unmount } = setup();
+  /*
+   * Eingetippt wird die LOKALE Wanduhrzeit des Instants, erwartet der UTC-Wirestring desselben
+   * Instants. Unter TZ=UTC wäre das trivial grün; scharf ist es unter TZ=Europe/Berlin
+   * (`check-all.sh`). Die Instants liegen je eine Stunde vor und nach beiden Umstellungen 2026
+   * und meiden die doppelte Stunde im Oktober, die als Wanduhrzeit mehrdeutig ist. Je Instant ein
+   * eigener Fall: als Schleife in EINEM Test lagen vier Seitendurchläufe an der Grenze von
+   * `testTimeout` (gemessen 9,6–13 s, LFH-692).
+   */
+  it.each([
+    '2026-03-29 00:30:00',
+    '2026-03-29 01:30:00',
+    '2026-10-24 23:30:00',
+    '2026-10-25 02:30:00',
+  ])(
+    'Alarmzeit inline: gesendet wird der gewählte absolute Zeitpunkt, beidseits der Sommerzeit-Umstellungen (%s)',
+    async (wire) => {
+      setup();
       const bodies = patchMitschnitt();
       const user = userEvent.setup();
       await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
@@ -620,9 +607,8 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
       fireEvent.keyDown(feld, { key: 'Enter' });
       await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
       await waitFor(() => expect(bodies, wire).toEqual([{ begonnen_at: wire }]));
-      unmount();
-    }
-  });
+    },
+  );
 
   it('Escape bei offenem Kalender schließt erst den Kalender, das zweite verwirft die Zeile', async () => {
     setup();
@@ -776,5 +762,54 @@ describe('EinsatzdatenPage · Live-Refetch des Kopfs (LFH-555)', () => {
     await waitFor(() => expect(abrufe()).toBeGreaterThan(vorher));
 
     expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('LS-42');
+  });
+});
+
+/**
+ * LFH-692 (Delta `einsatzdaten-bearbeitung`, Szenario „Browser in anderer Zone“): Browser auf UTC,
+ * Anzeigezone Europe/Berlin. Vorher zeigte die Zeile die Browser-Wanduhr neben der Berliner
+ * Leseansicht.
+ */
+describe('EinsatzdatenPage — Alarmzeit in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('Zeilenbearbeitung zeigt 12:00 wie die Leseansicht; 13:00 sendet 11:00 UTC', async () => {
+    setup({ zeitzone: 'Europe/Berlin', einsatz: { begonnen_at: '2026-07-14 10:00:00' } });
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json({ ...basisEinsatz, ...body });
+      }),
+    );
+    const user = userEvent.setup();
+    // Leseansicht: taktische DTG in Berlin.
+    expect(await screen.findByText('141200JUL2026')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
+    expect(feld).toHaveValue('2026-07-14 12:00:00');
+    await user.clear(feld);
+    await user.type(feld, '2026-07-14 13:00:00');
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ begonnen_at: '2026-07-14 11:00:00' }]));
+  });
+
+  it('Vollformular: Alarmzeit in Berlin, unverändert gespeichert bleibt der Wire-String gleich', async () => {
+    setup({ zeitzone: 'Europe/Berlin', einsatz: { begonnen_at: '2026-07-14 10:00:00' } });
+    const puts: Record<string, unknown>[] = [];
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        puts.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ ...basisEinsatz, begonnen_at: '2026-07-14 10:00:00' });
+      }),
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByLabelText('Alarmzeit')).toHaveValue('2026-07-14 12:00:00');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]).toMatchObject({ begonnen_at: '2026-07-14 10:00:00' });
   });
 });

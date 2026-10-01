@@ -1,5 +1,5 @@
 import { IkoneOrtsmarke, IkonePlus } from '../ikonen';
-import { Alert, App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme } from 'antd';
+import { Alert, App, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
@@ -8,7 +8,9 @@ import type { Einsatzart, EinsatzAnzeige } from '../api/types';
 import { fehlerText } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
-import { formatZeitKurz } from '../anzeige/format';
+import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
@@ -32,7 +34,7 @@ import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 
-/** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
+/** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
 interface AnlegeWerte {
   bezeichnung: string;
   stichwort?: string;
@@ -110,8 +112,21 @@ function KachelSkelett() {
   );
 }
 
+/**
+ * Die Einsatzliste liegt außerhalb jedes Einsatzes: Anzeige und „Einsatz anlegen“ nehmen die
+ * Zeitzone der Organisation (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines Einsatzes“).
+ */
 export default function EinsaetzePage() {
+  return (
+    <OrgAnzeigeProvider>
+      <EinsaetzeInhalt />
+    </OrgAnzeigeProvider>
+  );
+}
+
+function EinsaetzeInhalt() {
   const navigate = useNavigate();
+  const { formatZeitKurz } = useAnzeigeKonventionen();
   const { token } = theme.useToken();
   const { rollen } = useRollen();
   const { benutzer } = useAuth();
@@ -194,10 +209,9 @@ export default function EinsaetzePage() {
         bezeichnung: werte.bezeichnung,
         stichwort: werte.stichwort,
         einsatzart: werte.einsatzart,
-        // `.utc()` vor dem Formatieren: `begonnen_at` ist ein UTC-Wirestring und wird auch so
-        // gelesen (`anzeige/format.ts` parst mit `dayjs.utc`). Ohne die Umrechnung landete die
-        // lokale Wanduhrzeit als UTC in der Spalte, um den Zonenversatz verschoben.
-        begonnen_at: werte.begonnen_at?.utc().format('YYYY-MM-DD HH:mm:ss'),
+        // `begonnen_at` ist ein UTC-Wirestring und wird auch so gelesen (`anzeige/format.ts` parst
+        // mit `dayjs.utc`); `alsBackendZeit` rechnet den Zeitpunkt nach UTC um.
+        begonnen_at: werte.begonnen_at ? alsBackendZeit(werte.begonnen_at) : undefined,
       }),
     onSuccess: (neuerEinsatz) => {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
@@ -433,7 +447,7 @@ export default function EinsaetzePage() {
           <Select options={EINSATZART_OPTIONEN} />
         </Form.Item>
         <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
-          <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+          <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
         </Form.Item>
       </ErfassungsModal>
     </EinsatzSeite>

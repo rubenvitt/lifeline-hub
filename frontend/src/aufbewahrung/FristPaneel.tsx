@@ -1,4 +1,4 @@
-import { App, Button, DatePicker, Flex, Form, Modal, Typography, theme } from 'antd';
+import { App, Button, Flex, Form, Modal, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -6,11 +6,12 @@ import { setzeAufbewahrungsfrist } from '../api/aufbewahrung';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, FristSetzenBody } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { Datenfeld, Datenraster, Paneel } from '../components/instrument';
-import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import {
   darfFristSetzen,
   fristAusEingabe,
@@ -106,7 +107,7 @@ export function useFristAenderung(
   // behält seinen Speicher über das Abhängen des Dialogs hinweg, und der Wert der VORIGEN
   // Öffnung nähme eine inzwischen bestätigte Verkürzung still zurück.
   useEffect(() => {
-    if (offen) form.setFieldsValue({ frist: alsOrtszeit(basis ?? undefined) ?? null });
+    if (offen) form.setFieldsValue({ frist: alsZeitpunkt(basis) ?? null });
   }, [offen, basis, form]);
 
   /** Fragt bei einer Verkürzung zurück; bei Abbruch lehnt die Zusage ab, die Hülle lässt die
@@ -136,7 +137,7 @@ export function useFristAenderung(
         offen={offen}
         titel="Aufbewahrungsfrist ändern"
         form={form}
-        initialValues={{ frist: alsOrtszeit(basis ?? undefined) ?? null }}
+        initialValues={{ frist: alsZeitpunkt(basis) ?? null }}
         erfassenText="Frist setzen"
         laeuft={mutation.isPending}
         onErfassen={async (werte) => {
@@ -156,7 +157,7 @@ export function useFristAenderung(
           rules={[{ required: true, message: 'Zeitpunkt wählen' }]}
           extra="Ab diesem Zeitpunkt ist der abgeschlossene Einsatz für alle gesperrt und wird zur Löschung vorgemerkt."
         >
-          <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+          <ZeitpunktEingabe format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
         </Form.Item>
         <SpeicherFehler fehler={offen ? mutation.error : null} />
       </ErfassungsModal>

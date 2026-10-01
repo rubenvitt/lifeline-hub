@@ -1,12 +1,13 @@
-import { App, DatePicker, Form, Switch } from 'antd';
+import { App, Form, Switch } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { stelleWiederHer } from '../api/aufbewahrung';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { WiederherstellenBody } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 
 /**
  * „Wiederherstellen" während der Karenz als `ErfassungsModal`.
@@ -94,8 +95,7 @@ export default function WiederherstellenDialog({
         ]}
         dependencies={['unbegrenzt']}
       >
-        <DatePicker
-          showTime
+        <ZeitpunktEingabe
           format="YYYY-MM-DD HH:mm"
           disabled={unbegrenzt}
           style={{ width: '100%' }}

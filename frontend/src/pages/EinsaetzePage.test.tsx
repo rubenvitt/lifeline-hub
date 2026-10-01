@@ -1,11 +1,12 @@
 import { delay, http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { mitProzessZone } from '../test/prozessZone';
 import { formatZeitKurz } from '../anzeige/format';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
@@ -795,5 +796,51 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
     // Dasselbe Fach, das die Verwaltungssektion nach jedem Vorgang invalidiert.
     await client.invalidateQueries({ queryKey: globalKeys.demoDaten() });
     await waitFor(() => expect(hinweisLink()).toBeNull());
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`, Szenario „Einsatz anlegen“): außerhalb eines Einsatzes gilt die
+ * Zeitzone der Organisation. Browser auf UTC, Organisation auf Europe/Berlin.
+ */
+describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('Alarmzeit und Liste stehen in Berlin; gesendet wird der Zeitpunkt in UTC', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-07-14T10:00:00Z'));
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      meHandler(admin),
+      http.get('/api/org-einstellungen', () =>
+        HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
+      ),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+      http.post('/api/einsaetze', async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+      </Routes>,
+    );
+    // Liste: 23.05. 09:00 UTC → 11:00 in Berlin.
+    expect(await screen.findByText('seit 231100')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText('Alarmzeit')).toHaveValue('14.07.2026 12:00'),
+    );
+    expect(within(dialog).getByText('Europe/Berlin')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Sturm Süd');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf!.begonnen_at).toBe('2026-07-14 10:00:00');
   });
 });

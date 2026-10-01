@@ -85,19 +85,19 @@ heißt: den Baustein vorübergehend auf `.local()` zurückdrehen, der Test muss 
 
 ## 6. Einsatz, Einstellungen, Aufbewahrung
 
-- [ ] 6.1 `pages/EinsatzdatenPage.tsx`: `wireZuPicker`/`pickerZuWire` entfallen, Zeile und
+- [x] 6.1 `pages/EinsatzdatenPage.tsx`: `wireZuPicker`/`pickerZuWire` entfallen, Zeile und
       Vollformular laufen über den Baustein. Die bestehenden Tests zu den Umstellungen bleiben
       grün, neu ist das Szenario „Browser in anderer Zone“ (Delta
       `einsatzdaten-bearbeitung`).
-- [ ] 6.2 `pages/EinsaetzePage.tsx` unter `OrgAnzeigeProvider`, die Alarmzeit über den
+- [x] 6.2 `pages/EinsaetzePage.tsx` unter `OrgAnzeigeProvider`, die Alarmzeit über den
       Baustein. Test für das Szenario „Einsatz anlegen“ (Org Europe/Berlin, Browser UTC).
-- [ ] 6.3 `pages/einstellungen/PegelPrognoseModal.tsx` und `pegelPrognoseKern.ts`: Hinweg über
+- [x] 6.3 `pages/einstellungen/PegelPrognoseModal.tsx` und `pegelPrognoseKern.ts`: Hinweg über
       `alsZeitpunkt`, „Übernehmen“ setzt einen Zeitpunkt. `pegelPrognoseKern.test.ts` bleibt
       grün, neuer Test unter abweichender Zone.
-- [ ] 6.4 `aufbewahrung/FristPaneel.tsx` und `WiederherstellenDialog.tsx` über den Baustein,
+- [x] 6.4 `aufbewahrung/FristPaneel.tsx` und `WiederherstellenDialog.tsx` über den Baustein,
       `ArchivAktePage.tsx` unter dem `EinsatzAnzeigeProvider` des Einsatzes. Test für das
       Szenario „Archivakte“, `fristModell.test.ts` bleibt grün.
-- [ ] 6.5 `einsatz/EinsatzLayout.tsx`: `AlarmZentrale` unter den Einsatz-Provider legen. Test:
+- [x] 6.5 `einsatz/EinsatzLayout.tsx`: `AlarmZentrale` unter den Einsatz-Provider legen. Test:
       Die Uhrzeit im Hinweis steht in der Anzeigezone.
 
 ## 7. Regel, Guard, Abschluss

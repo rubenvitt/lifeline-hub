@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArchivAkte, ArchivEtbEintrag, AufbewahrungZustand } from '../api/types';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { mitProzessZone } from '../test/prozessZone';
 import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
 import { adminFixture } from '../test/fixtures';
 
@@ -215,5 +216,33 @@ describe('archivHinweis', () => {
 
   it('ohne Angaben keine Hinweiszeile', () => {
     expect(archivHinweis(eintrag(6), new Map(), zeit)).toBeUndefined();
+  });
+});
+
+/**
+ * LFH-692 (Spec `zeiteingabe`, Szenario „Archivakte“): Anzeige und Eingabe der Frist in derselben
+ * Zone. Browser auf UTC; die Einsatz-Einstellungen sind hier nicht lesbar (403), es greift die
+ * Zone der Organisation (Europe/Berlin).
+ */
+describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
+  mitProzessZone('UTC');
+
+  it('Frist-Anzeige und Frist-Eingabe nennen dieselbe Berliner Uhrzeit', async () => {
+    zeige('frist_laeuft');
+    server.use(
+      http.get('/api/einsaetze/7/einstellungen', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+      http.get('/api/org-einstellungen', () =>
+        HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
+      ),
+    );
+    // 01.06. 18:00 UTC → 20:00 in Berlin (Sommerzeit).
+    expect(await screen.findByText('012000JUN2026')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Frist ändern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Neue Aufbewahrungsfrist')).toHaveValue(
+      '2026-06-01 20:00',
+    );
   });
 });
