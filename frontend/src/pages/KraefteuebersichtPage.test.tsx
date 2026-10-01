@@ -1113,7 +1113,7 @@ describe('KraefteuebersichtPage — Stand der Übernahme in der Anzeigezone (LFH
     );
     fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalled());
-    const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte[0].text;
+    const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte?.[0]?.text;
     expect(text).toContain('**Stand:** 141200JUL2026');
   });
 });

@@ -306,6 +306,7 @@ describe('MeldungKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
       <AnzeigeKonventionenProvider konventionen={berlin}>
         <MemoryRouter>
           <MeldungKarte
+            einsatzId={7}
             meldung={meldung({
               bestaetigung_pflicht: true,
               bestaetigung_frist_at: '2026-06-12 09:30:00',
@@ -328,6 +329,7 @@ describe('MeldungKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
       <AnzeigeKonventionenProvider konventionen={berlin}>
         <MemoryRouter>
           <MeldungKarte
+            einsatzId={7}
             meldung={meldung({
               bestaetigung_pflicht: true,
               ist_bestaetigt: true,
