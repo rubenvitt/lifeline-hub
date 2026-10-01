@@ -1498,7 +1498,7 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
 // ── Organigramm der Führungsorganisation (LFH-626) ───────────────────────────────────
 //
 // Ansicht der Seite Einsatzabschnitte. Die Namen sind handgebaute Bedienziele
-// (`organigrammZielStil`, ein `<a>` erbt keine Steuerhöhe); Klappknöpfe und Werkzeugzeile sind
+// (`baumZielStil`, ein `<a>` erbt keine Steuerhöhe); Klappknöpfe und Werkzeugzeile sind
 // antd-`Button`, gemessen wird trotzdem, weil sie in eigenen Flex-Hüllen stehen.
 
 /** Abschnitt Nord, Unterabschnitt Deich, 1. Zug, Gruppe Deich. */

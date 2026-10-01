@@ -8,7 +8,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 1. Geteiltes Gerüst aus dem Organigramm (D4, ohne Verhaltensänderung)
 
-- [ ] 1.1 Test zuerst: `components/organigramm/HaengenderBaum.test.tsx` deckt ab:
+- [x] 1.1 Test zuerst: `components/organigramm/HaengenderBaum.test.tsx` deckt ab:
   - Wurzeln als Spalten (`data-lfh="org-ebene1"` / `org-spalte`), Kinder senkrecht darunter
   - Klappziel mit `aria-expanded` und `aria-controls` nur, wenn offen
   - Platzhalter `org-klappen-platz` bei Blättern
@@ -17,7 +17,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - `klappbareSchluessel` generisch
 
   Nachweis: rot belegt.
-- [ ] 1.2 Umsetzung `components/organigramm/HaengenderBaum.tsx`:
+- [x] 1.2 Umsetzung `components/organigramm/HaengenderBaum.tsx`:
   - `SPALTE_MIN_PX`, `Zweig`, `baumZielStil` und `klappbareSchluessel` wandern aus
     `pages/einsatzabschnitte/Organigramm.tsx` bzw. `fuehrungsorganisation.ts` hierher.
   - Die alten Exporte (`organigrammZielStil`, `SPALTE_MIN_PX`, `klappbareSchluessel`) bleiben als
@@ -33,9 +33,9 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   `organigrammPrint.css` behält nur `.organigramm-no-print`. `organigrammPrint.test.ts` wird auf
   die neue Datei umgestellt, mit unveränderten Zusicherungen. Nachweis: Vitest grün,
   `e2e/fuehrungsorganisation.spec.ts` (Druck bei 680 px) grün.
-- [ ] 1.4 Weiterexporte abbauen: Importe auf `components/organigramm/` umstellen. Nachweis:
+- [x] 1.4 Weiterexporte abbauen: Importe auf `components/organigramm/` umstellen. Nachweis:
   `grep -rn "organigrammZielStil" frontend/src` ist leer, `tsc -b` und die Lint-Prüfung sind grün.
-- [ ] 1.5 Regel nachziehen: Der Organigramm-Eintrag in `frontend/AGENTS.md` nennt das Gerüst
+- [x] 1.5 Regel nachziehen: Der Organigramm-Eintrag in `frontend/AGENTS.md` nennt das Gerüst
   `components/organigramm/` (Layout und Druckregeln für Organigramm und Fernmeldeskizze) statt
   „LFH-625 setzt seine Kommunikationsebene darauf“. Nachweis: Prettier-Prüfung über `frontend/`
   grün.
