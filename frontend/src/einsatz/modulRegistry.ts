@@ -122,7 +122,9 @@ export const kategorien: Kategorie[] = [
   {
     key: 'erfassung',
     label: 'Erfassung',
-    kurz: 'Erfassung',
+    // Kurzform wie „Komm.“/„Einst.“: „ERFASSUNG“ ist in 9 px Versalien breiter als die 60-px-Rail
+    // (LFH-644). Die Sperrung bleibt Token, keine Ausnahme je Etikett.
+    kurz: 'Erfass.',
     ikone: { umriss: IkoneKlemmbrett, gefuellt: IkoneKlemmbrettGefuellt },
   },
   {

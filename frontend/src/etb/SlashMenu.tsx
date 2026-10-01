@@ -60,9 +60,10 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
     [einheiten, treffer],
   );
   const [aktiv, setAktiv] = useState(0);
-  // Aufgelöste Theme-Tokens statt antd-CSS-Variablen: antd 6 emittiert `--ant-*` nur unter der
-  // Klasse `css-var-root`, nicht an `<html>` (LFH-623). Handgeschriebenes CSS liest `--lfh-*`
-  // aus `theme/rollen.css`, TSX liest useToken(), keines hängt an antds Variablennamen.
+  // Aufgelöste Theme-Tokens statt antd-CSS-Variablen: antd 6 emittiert `--ant-*` nur unter einer
+  // Klasse `css-var-<useId>`, nicht an `<html>` (Browserbefund LFH-641, `theme/rollen.css`).
+  // Handgeschriebenes CSS liest `--lfh-*` aus `theme/rollen.css`, TSX liest useToken(), keines
+  // hängt an antds Variablennamen.
   const { token } = theme.useToken();
 
   useEffect(() => setAktiv(0), [filter, offen]);

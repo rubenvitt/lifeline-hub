@@ -468,6 +468,50 @@ export const dwdWarnstufe: Record<WetterWarnstufe, StatusDarstellung> = {
 };
 
 /**
+ * CAP-Schwere (`SEVERITY` des DWD-WFS) → DWD-Stufe, wie `stufe_aus_severity` im Backend
+ * (`src/wetter/quelle.rs`). Anders als dort wird Unbekanntes NICHT auf `gering` gerundet: der
+ * Inspector zeigt das Objekt selbst, und ein erfundenes Wort wäre eine Aussage, die die Quelle
+ * nicht macht (LFH-662, design.md D5). Unbekannt → `null`.
+ */
+export function dwdStufeAusSeverity(severity: unknown): WetterWarnstufe | null {
+  switch (typeof severity === 'string' ? severity.toLowerCase() : null) {
+    case 'minor':
+      return 'gering';
+    case 'moderate':
+      return 'maessig';
+    case 'severe':
+      return 'schwer';
+    case 'extreme':
+      return 'extrem';
+    default:
+      return null;
+  }
+}
+
+/** Die vier Stufen der CAP-Schwere (Common Alerting Protocol), klein geschrieben. */
+type CapSchwere = 'extreme' | 'severe' | 'moderate' | 'minor';
+
+/**
+ * Schwere einer NINA-Warnung (CAP, LFH-662). Eine eigene Karte neben {@link dwdWarnstufe}, weil
+ * eine NINA-Warnung kein Wetter ist: „Unwetterwarnung“ wäre für eine MoWaS-Gefahrstoffwarnung
+ * falsch. Die Rollen sind dieselben wie dort, damit dieselbe CAP-Stufe überall gleich gefärbt
+ * ist; keine Stufe ist Blau (`bedien`).
+ */
+export const capSchwere: Record<CapSchwere, StatusDarstellung> = {
+  extreme: { rolle: 'alarm', label: 'Extrem' },
+  severe: { rolle: 'alarm', label: 'Schwer' },
+  moderate: { rolle: 'achtung', label: 'Mäßig' },
+  minor: { rolle: 'achtung', label: 'Gering' },
+};
+
+/** Nachschlag in {@link capSchwere} ohne Rücksicht auf die Schreibweise; unbekannt → `null`. */
+export function capSchwereVon(schwere: unknown): StatusDarstellung | null {
+  if (typeof schwere !== 'string') return null;
+  const k = schwere.toLowerCase();
+  return Object.prototype.hasOwnProperty.call(capSchwere, k) ? capSchwere[k as CapSchwere] : null;
+}
+
+/**
  * Die drei Rollen, die eine Kennzahl **stufen** können, als VERENGUNG von {@link Statusrolle}.
  * `Extract<>` statt einer zweiten Literalliste, damit eine Umbenennung im Vertrag die
  * Konsumenten im Typcheck bricht. Drei, weil {@link dringlichkeit} je Stufe ein Formzeichen

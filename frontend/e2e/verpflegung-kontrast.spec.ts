@@ -19,9 +19,9 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * Die drei Paare stehen einzeln und benannt — im Textbaum wären „8" oder „60" nicht zuzuordnen.
  * Nachts ist `alarmText` wertgleich mit `alarm`.
  *
- * EINE BENANNTE AUSNAHME (geteilte Rolle; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
- * Weiß auf `bedien` im Primärknopf → LFH-661, nur am Tag. Fällt, wenn LFH-661 landet.
- * Tertiärtext (`schwach`) trägt seit LFH-643 den vollen Boden (Spec `textstufen-kontrast`).
+ * KEINE AUSNAHME: Tertiärtext (`schwach`, LFH-643) und die Beschriftung des Primärknopfs (Weiß
+ * auf `bedien`, LFH-661) tragen den vollen Boden (Specs `textstufen-kontrast`,
+ * `farbrollen-kontrast`).
  *
  * Der Rand der OFFENEN Karte trägt keinen Zustand (Linienfarbe) — gemessen und angehängt, und
  * zugesichert, dass er sich von den Zustandsrändern unterscheidet. Sichtbarer Text unter
@@ -30,8 +30,6 @@ import { kontrast, randKontrast } from './kontrast-kern';
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die Ausnahme oben. */
-const BODEN = 4.5;
 const ZUSTAND = 3;
 
 const KARTEN = [
@@ -61,18 +59,16 @@ const karteZu = (page: Page, name: string) =>
 interface Textknoten {
   ziel: Locator;
   text: string;
-  primaer: boolean;
 }
 
-/** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text, als Locator über eine Messmarke,
- *  dazu ob es im Primärknopf steht (Ausnahme LFH-661). Unsichtbares wird übersprungen (die
- *  Dialoge tragen eingeklappte Felder per `forceRender`), die Bereiche werden deshalb vorher
- *  AUFGEKLAPPT. */
+/** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text, als Locator über eine Messmarke.
+ *  Unsichtbares wird übersprungen (die Dialoge tragen eingeklappte Felder per `forceRender`),
+ *  die Bereiche werden deshalb vorher AUFGEKLAPPT. */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   const funde = await wurzel.evaluate((w) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: { text: string; primaer: boolean }[] = [];
+    const liste: { text: string }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       if (!el.checkVisibility()) continue;
@@ -83,10 +79,7 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
         .trim();
       if (!eigen) continue;
       el.setAttribute('data-kontrastprobe', String(liste.length));
-      liste.push({
-        text: eigen,
-        primaer: el.closest('.ant-btn-primary') != null,
-      });
+      liste.push({ text: eigen });
     }
     return liste;
   });
@@ -167,7 +160,6 @@ for (const modus of ['light', 'dark'] as const) {
 
     const messwerte: Record<string, unknown>[] = [];
     const raender: Record<string, string> = {};
-    const tag = modus === 'light';
 
     // (1) Ränder und Etikett je Einstufung.
     for (const k of KARTEN) {
@@ -246,7 +238,7 @@ for (const modus of ['light', 'dark'] as const) {
     // (3) Jeder Text — Seitenkopf, Seiteninhalt und die beiden Hauptdialoge.
     const inhalt = page.locator('[data-lfh="seiten-inhalt"]');
     const kopf = page.locator('[data-lfh="seitenkopf"]');
-    const gemessen: [string, string | null][] = [];
+    const gemessen: string[] = [];
     const messeTexte = async (wurzel: Locator, flaeche: string) => {
       await page.mouse.move(0, 0);
       const knoten = await textknoten(wurzel);
@@ -254,14 +246,12 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, primaer } of knoten) {
+      for (const { ziel, text } of knoten) {
         const m = await kontrast(ziel);
-        const ausnahme = tag && primaer ? 'Weiß auf bedien → LFH-661' : null;
-        const schranke = ausnahme ? BODEN : TEXT[modus];
-        const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
-        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
-        gemessen.push([text, ausnahme]);
-        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(schranke);
+        const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Schranke ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`;
+        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ...m });
+        gemessen.push(text);
+        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(TEXT[modus]);
       }
     };
     await messeTexte(kopf, 'kopf');
@@ -294,17 +284,12 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(dialog).toBeHidden();
     }
 
-    // Die Probe hat die Texte wirklich gesehen, und die tragenden liefen OHNE Ausnahme — eine
-    // zu weit gefasste Ausnahme-Liste senkte sonst still den Boden.
+    // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf trivial wahr.
     const pruefeGesehen = (pflicht: string | RegExp) => {
-      const treffer = gemessen.filter(([t]) =>
+      const treffer = gemessen.filter((t) =>
         typeof pflicht === 'string' ? t === pflicht : pflicht.test(t),
       );
       expect(treffer.length, `Text ${String(pflicht)} gemessen`).toBeGreaterThan(0);
-      expect(
-        treffer.filter(([, ausnahme]) => ausnahme),
-        `Text ${String(pflicht)} ohne Ausnahme gemessen`,
-      ).toEqual([]);
     };
     for (const tragend of [
       ...KARTEN.flatMap((k) => [k.name, k.wort]),
@@ -338,6 +323,10 @@ for (const modus of ['light', 'dark'] as const) {
       'Weitere Angaben',
       'Nachforderung',
       'Bemerkung',
+      // Primärknöpfe: Kopfknopf und Absende-Knöpfe der Dialoge (LFH-661).
+      'Zeitfenster anlegen',
+      'Anlegen',
+      'Erfassen',
       // Tertiärtext (`schwach`), bis LFH-643 unter einer Ausnahme.
       'Sonderkost',
       'Bedarf',

@@ -43,7 +43,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle neunundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle dreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -53,6 +53,7 @@ describe('Statusfarb-Vertrag', () => {
       'belegungsArt',
       'betreuungsstelleStatus',
       'brStatus',
+      'capSchwere',
       'dienststatus',
       'dringlichkeit',
       'dwdWarnstufe',
@@ -189,7 +190,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(29);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(30);
   });
 });
 
@@ -207,6 +208,51 @@ describe('dwdWarnstufe (LFH-633)', () => {
     for (const d of Object.values(sf.dwdWarnstufe)) {
       expect(['achtung', 'alarm']).toContain(d.rolle);
     }
+  });
+});
+
+describe('dwdStufeAusSeverity (LFH-662)', () => {
+  it('bildet die CAP-Schwere des DWD-WFS auf die vier DWD-Stufen ab, wie der Server', () => {
+    expect(sf.dwdStufeAusSeverity('Minor')).toBe('gering');
+    expect(sf.dwdStufeAusSeverity('Moderate')).toBe('maessig');
+    expect(sf.dwdStufeAusSeverity('Severe')).toBe('schwer');
+    expect(sf.dwdStufeAusSeverity('Extreme')).toBe('extrem');
+    // Groß-/Kleinschreibung zählt nicht (`stufe_aus_severity` im Backend vergleicht ebenso).
+    expect(sf.dwdStufeAusSeverity('severe')).toBe('schwer');
+  });
+
+  it('erfindet keine Stufe für eine unbekannte Schwere', () => {
+    for (const v of ['Unknown', '', 'x', null, undefined]) {
+      expect(sf.dwdStufeAusSeverity(v)).toBeNull();
+    }
+  });
+});
+
+describe('capSchwere (LFH-662)', () => {
+  // Byte-Pin: das Wort ist der zweite Kanal (WCAG 1.4.1); die Rollen sind dieselben wie bei
+  // `dwdWarnstufe`, damit dieselbe CAP-Stufe überall gleich gefärbt ist.
+  it('bildet die vier CAP-Stufen auf Rolle und Wort ab', () => {
+    expect(sf.capSchwere).toEqual({
+      extreme: { rolle: 'alarm', label: 'Extrem' },
+      severe: { rolle: 'alarm', label: 'Schwer' },
+      moderate: { rolle: 'achtung', label: 'Mäßig' },
+      minor: { rolle: 'achtung', label: 'Gering' },
+    });
+  });
+
+  it('färbt jede CAP-Stufe wie die gleiche DWD-Stufe, keine ist Bedienblau', () => {
+    expect(sf.capSchwere.minor.rolle).toBe(sf.dwdWarnstufe.gering.rolle);
+    expect(sf.capSchwere.moderate.rolle).toBe(sf.dwdWarnstufe.maessig.rolle);
+    expect(sf.capSchwere.severe.rolle).toBe(sf.dwdWarnstufe.schwer.rolle);
+    expect(sf.capSchwere.extreme.rolle).toBe(sf.dwdWarnstufe.extrem.rolle);
+    for (const d of Object.values(sf.capSchwere)) expect(d.rolle).not.toBe('bedien');
+  });
+
+  it('schlägt eine Schwere unabhängig von der Schreibweise nach', () => {
+    expect(sf.capSchwereVon('Severe')).toEqual(sf.capSchwere.severe);
+    expect(sf.capSchwereVon('MINOR')).toEqual(sf.capSchwere.minor);
+    expect(sf.capSchwereVon('Unknown')).toBeNull();
+    expect(sf.capSchwereVon(null)).toBeNull();
   });
 });
 

@@ -136,6 +136,9 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `outline` über `index.css` (`--lfh-bedien-text`), kein `Radio.colorPrimary`
   (`docs/superpowers/specs/2026-09-22-lfh-613-pruefliste.md`).
 - Kontrast: `e2e/betroffene-kontrast.spec.ts` (Tag ≥ 7:1, Nacht ≥ 5:1, Alpha mitgerechnet).
+- **Kein eigener Knopfboden** (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung des
+  Primärknopfs hält den Textboden in Ruhe und unter dem Zeiger; Werte und Messung am Wert in
+  `theme/tokens.ts`. Ein Kontrast-Spec führt den Primärknopf nie unter einer Ausnahme.
 - **Tagmodus** (LFH-618, `docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`):
   `achtung`/`alarm` als Text über `achtungText`/`alarmText`; Hervorhebung auf `flaeche3`, nicht
   `flaeche2`; Kontrast gegen den tatsächlichen Grund (`e2e/hellmodus-kontrast.spec.ts`,
@@ -264,10 +267,11 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 29 am 30.09.2026, LFH-554); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 30 am 01.10.2026, LFH-662); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
-  `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
+  `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4, `capSchwere` in
+  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
   der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
 
 **Farbe und Zeichen**
