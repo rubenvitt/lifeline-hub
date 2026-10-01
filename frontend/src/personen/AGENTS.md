@@ -11,4 +11,5 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
 - **`SK_META`** führt Schlüssel von `sichtungsfarben` oder `null`, keine CSS-Werte.
 - **Verortungsauftrag** per `lagekartePfad(…, { platzieren })` → `?platzieren=<typ>:<id>`;
   `parsePlatzierenAuftrag` verwirft Unbrauchbares ganz; die Karte räumt den Parameter und betritt
-  den Modus nur mit Schreibrecht. Koordinaten in der Schadens-Erfassung: LFH-453.
+  den Modus nur mit Schreibrecht, bei `person` zusätzlich nur mit freigegebenem Modul „Personen“
+  (`personenZugriff === 'frei'`, LFH-670). Koordinaten in der Schadens-Erfassung: LFH-453.
