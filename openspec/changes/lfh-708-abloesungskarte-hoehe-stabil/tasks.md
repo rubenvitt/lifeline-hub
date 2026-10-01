@@ -14,4 +14,4 @@
 ## 3. Prüfliste und Abschluss
 
 - [x] 3.1 `docs/superpowers/specs/2026-09-22-lfh-635-pruefliste.md`, Nr. 12: Befund LFH-708 (Ursache, Reproduktion mit fester Uhr), neue Messwerte Tag/Mitternacht je Kontext, Mutationsproben und die benannten Reste (fremde Beginnänderung, fremd geplante ablösende Einheit, Einstufungswort im Kopf, Inhalt unter 226 px) nachtragen; Verdikt nach Beleg
-- [ ] 3.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs)
+- [x] 3.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs). Lokal am 01.10.2026: Bündel `schnell` grün (Schritte 1–3, 6, 8–13), Bündel `frontend` grün (Vitest, 600 Dateien, 8195 Tests; nach den Review-Korrekturen `AbloesungPage.test.tsx` und `src/abloesung` erneut grün, 51 Tests), e2e `abloesung-zufluss.spec.ts` und `abloesung-kontrast.spec.ts` grün (14). Rust und die volle e2e-Suite belegt die CI des PRs (Browser in dieser Umgebung nur behelfsmäßig verlinkt)
