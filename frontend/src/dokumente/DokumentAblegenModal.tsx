@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { App, Collapse, Form, Input, type UploadFile } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -14,9 +14,19 @@ import {
 } from '../api/dokumente';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import { listeEtb } from '../api/etb';
 import type { DokumentKategorie } from '../api/types';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from './kategorien';
+import { ETB_BEZUG_DECKEL, ladeEtbBezuege, useStandWaehrendOffen } from './bezugswahl';
+
+interface BezugOption {
+  value: string;
+  label: string;
+}
+
+interface BezugGruppe {
+  label: string;
+  options: BezugOption[];
+}
 
 interface Props {
   einsatzId: number;
@@ -32,9 +42,8 @@ interface AblageFormular {
   bezug?: string;
 }
 
-/** So viele ETB-Einträge stehen als Bezug zur Wahl (die jüngsten). Eigener Filter im Key, damit
- *  die Abfrage nicht das Cache-Fach der Infinite-Query von `EtbPage` teilt. */
-const ETB_BEZUG_DECKEL = 100;
+/** Frist, nach der ein getippter Bezug-Suchbegriff an den Server geht. */
+const ENTPRELLUNG_MS = 300;
 const BEZUG_TYPEN: readonly DokumentBezugTyp[] = ['abschnitt', 'einheit', 'etb_eintrag'];
 const kuerze = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
@@ -63,12 +72,19 @@ function zuAblage(werte: AblageFormular): DokumentAblage {
  *
  * `mutateAsync`, damit eine Ablehnung die Felder stehen lässt; der Fehler steht als
  * `SpeicherFehler` im Dialog. Die ETB-Einträge lädt der Dialog erst beim Aufklappen des Bezugs.
+ *
+ * Bezugswahl (LFH-655): Die offene Liste steht still (`useStandWaehrendOffen`) — ein neuer
+ * ETB-Eintrag oder Abschnitt erscheint erst beim nächsten Öffnen. ETB-Einträge sucht der Server
+ * (`ladeEtbBezuege`, auch per laufender Nummer), Abschnitte und Einheiten filtert der Client.
  */
 export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<AblageFormular>();
   const [bezugOffen, setBezugOffen] = useState(false);
+  const [listeOffen, setListeOffen] = useState(false);
+  const [suche, setSuche] = useState('');
+  const [etbSuche, setEtbSuche] = useState('');
   /** Welcher Titel zuletzt AUTOMATISCH gesetzt wurde. Nur solange das Feld genau diesen Wert
    *  trägt, darf eine neue Dateiwahl ihn ersetzen — ein getippter Titel bleibt immer stehen. */
   const autoTitel = useRef<string | null>(null);
@@ -83,10 +99,20 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
     queryFn: () => listeEinheiten(einsatzId),
     enabled: offen,
   });
+  useEffect(() => {
+    const begriff = suche.trim();
+    if (begriff === etbSuche) return;
+    const frist = setTimeout(() => setEtbSuche(begriff), ENTPRELLUNG_MS);
+    return () => clearTimeout(frist);
+  }, [suche, etbSuche]);
+  // Eigener Filter im Key, damit die Abfrage nicht das Cache-Fach der Infinite-Query von
+  // `EtbPage` teilt; unter `einsatzKeys.etb` bleibt sie, damit Live-Updates sie erreichen.
   const etbQuery = useQuery({
-    queryKey: einsatzKeys.etbListe(einsatzId, { limit: ETB_BEZUG_DECKEL }),
-    queryFn: () => listeEtb(einsatzId, { limit: ETB_BEZUG_DECKEL }),
+    queryKey: einsatzKeys.etbListe(einsatzId, { limit: ETB_BEZUG_DECKEL, bezug: etbSuche }),
+    queryFn: () => ladeEtbBezuege(einsatzId, etbSuche),
     enabled: offen && bezugOffen,
+    // Während ein neuer Suchbegriff lädt, bleibt der alte Treffer stehen statt einer leeren Gruppe.
+    placeholderData: keepPreviousData,
   });
 
   const mutation = useMutation({
@@ -100,34 +126,59 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
 
   function schliessen() {
     setBezugOffen(false);
+    setListeOffen(false);
+    setSuche('');
+    setEtbSuche('');
     autoTitel.current = null;
     mutation.reset();
     onSchliessen();
   }
 
-  const bezugOptionen = [
-    {
-      label: 'Abschnitte',
-      options: (abschnitteQuery.data ?? []).map((a) => ({
-        value: `abschnitt:${a.id}`,
-        label: a.name,
-      })),
-    },
-    {
-      label: 'Einheiten',
-      options: (einheitenQuery.data ?? []).map((e) => ({
-        value: `einheit:${e.id}`,
-        label: e.name,
-      })),
-    },
-    {
-      label: 'ETB-Einträge',
-      options: (etbQuery.data ?? []).map((e) => ({
-        value: `etb_eintrag:${e.id}`,
-        label: `ETB ${e.lfd_nr} · ${kuerze(e.inhalt, 60)}`,
-      })),
-    },
-  ];
+  const liveGruppen = useMemo<BezugGruppe[]>(
+    () => [
+      {
+        label: 'Abschnitte',
+        options: (abschnitteQuery.data ?? []).map((a) => ({
+          value: `abschnitt:${a.id}`,
+          label: a.name,
+        })),
+      },
+      {
+        label: 'Einheiten',
+        options: (einheitenQuery.data ?? []).map((e) => ({
+          value: `einheit:${e.id}`,
+          label: e.name,
+        })),
+      },
+      {
+        label: 'ETB-Einträge',
+        options: (etbQuery.data ?? []).map((e) => ({
+          value: `etb_eintrag:${e.id}`,
+          label: `ETB ${e.lfd_nr} · ${kuerze(e.inhalt, 60)}`,
+        })),
+      },
+    ],
+    [abschnitteQuery.data, einheitenQuery.data, etbQuery.data],
+  );
+  const geladen =
+    abschnitteQuery.isSuccess &&
+    einheitenQuery.isSuccess &&
+    etbQuery.isSuccess &&
+    !etbQuery.isPlaceholderData;
+  const gruppen = useStandWaehrendOffen(liveGruppen, listeOffen, geladen ? etbSuche : null);
+
+  // Abschnitte und Einheiten filtert der Client; die ETB-Gruppe IST schon das Suchergebnis des
+  // Servers und wird nicht noch einmal am gekürzten Label gefiltert.
+  const begriff = suche.trim().toLowerCase();
+  const bezugOptionen = gruppen
+    .map((g) =>
+      g.label === 'ETB-Einträge' || !begriff
+        ? g
+        : { ...g, options: g.options.filter((o) => o.label.toLowerCase().includes(begriff)) },
+    )
+    .filter((g) => g.options.length > 0);
+  const etbLaedt =
+    bezugOffen && (etbQuery.isLoading || etbQuery.isPlaceholderData || suche.trim() !== etbSuche);
 
   return (
     <ErfassungsModal<AblageFormular>
@@ -184,8 +235,17 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
               <Form.Item name="bezug" label="Bezug">
                 <Select
                   allowClear
-                  loading={bezugOffen && etbQuery.isLoading}
+                  loading={etbLaedt}
                   options={bezugOptionen}
+                  showSearch={{ filterOption: false, onSearch: setSuche }}
+                  onOpenChange={(auf) => {
+                    setListeOffen(auf);
+                    if (!auf) setSuche('');
+                  }}
+                  // Das Label eines gewählten Suchtreffers hält antd selbst fest, auch wenn er
+                  // nach dem Zurückfallen auf das jüngste Fenster nicht mehr unter den Optionen
+                  // steht (Test „zeigt den gewählten Eintrag weiter …").
+                  onChange={() => setSuche('')}
                 />
               </Form.Item>
             ),
