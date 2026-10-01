@@ -106,9 +106,9 @@ Die Kopfzeile bekommt unter der Hinweiszeile eine **Standzeile**, die immer da i
 Höhe hat: `controlHeight` plus der Innenabstand des Sammelbanners. Damit verschiebt ihr Wechsel
 die Karte nie. Inhalt:
 
-- Schleuse offen: ruhiger Text „Live-Stand“ (`gedaempft`).
-- Schleuse zu, nichts wartet: „Stand gehalten, solange hier gearbeitet wird“ (`gedaempft`). Er
-  sagt, warum gerade nichts springt.
+- Schleuse offen: ruhiger Text „Live“ (`gedaempft`).
+- Schleuse zu, nichts wartet: „Live pausiert“ (`gedaempft`). Er sagt, warum gerade nichts
+  springt (Wortlaut vom Menschen bei der Freigabe gekürzt).
 - Etwas wartet: der `Sammelbanner` mit „2 neu · 1 verlegt · 1 entfallen“ (nur Teile > 0) und
   der Aktion „anzeigen“, einzeilig (`flexWrap: 'nowrap'`, Text mit Ellipse und `title`). Bei
   390 px passt das längste realistische Muster (zwei Ziffern je Teil plus Knopf) in eine Zeile.
