@@ -5,6 +5,8 @@ import { useEffect } from 'react';
  * Formular: sein Mount-Effekt läuft erst, wenn das `<Form>` gerendert ist und die Instanz an sich
  * gebunden hat.
  *
+ * Den Zustand beim Besitzer hält `useFormularEingehaengt`.
+ *
  * Wozu: Eine Formularinstanz anzufassen (`setFieldsValue`, `resetFields` …), solange kein `<Form>`
  * an ihr hängt, meldet rc-field-form einen Makrotask später als „Instance created by `useForm` is
  * not connected to any Form element". Das trifft zwei Lagen, in denen der Besitzer der Instanz

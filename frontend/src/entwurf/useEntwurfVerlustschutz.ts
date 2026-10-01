@@ -1,6 +1,7 @@
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 
 /** Frist des stillen Autosave. */
 export const AUTOSAVE_MS = 30_000;
@@ -98,7 +99,7 @@ export function useEntwurfVerlustschutz<D, W extends object>({
   const [zuletztGespeichert, setZuletztGespeichert] = useState<string | null>(null);
   const [speichertGerade, setSpeichertGerade] = useState(false);
   const [speicherFehler, setSpeicherFehler] = useState<unknown>(null);
-  const [formularDa, setFormularDa] = useState(false);
+  const formular = useFormularEingehaengt();
 
   // Inline-Callbacks in Refs: der Sync-Effekt hängt an `daten` und `ungespeichert`, nicht an der
   // Identität von `werteAus`; `speichern`/`onGespeichert` in Refs, damit `speichereMit` stabil bleibt.
@@ -111,10 +112,10 @@ export function useEntwurfVerlustschutz<D, W extends object>({
 
   useEffect(() => {
     if (!daten) return;
-    if (!formularDa) return; // (4)
+    if (!formular.da) return; // (4)
     if (ungespeichert) return; // DER RIEGEL (1)
     form.setFieldsValue(werteAusRef.current(daten) as Parameters<typeof form.setFieldsValue>[0]);
-  }, [daten, form, formularDa, ungespeichert]);
+  }, [daten, form, formular.da, ungespeichert]);
 
   /**
    * Ein abgebrochener Auftrag (`AbortError` beim Verlassen des Befehlseditors) ist kein
@@ -254,6 +255,6 @@ export function useEntwurfVerlustschutz<D, W extends object>({
     autosaveJetzt,
     speichereJetzt,
     speichertGerade,
-    formularEingehaengt: setFormularDa,
+    formularEingehaengt: formular.melde,
   };
 }
