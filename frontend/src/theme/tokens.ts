@@ -682,6 +682,25 @@ export function antdKnopf(dichte: Dichte = 'kompakt'): NonNullable<ConfigProvide
 }
 
 /**
+ * Der Boden des Klappkopfs für JEDES `Collapse` (LFH-653): `minHeight` = Steuerhöhe der Stufe,
+ * also 30 / 48 / 72 (A1 Gate 3), dazu die Beschriftung senkrecht mittig.
+ *
+ * antd rechnet den Kopf aus Schrift und Polsterung (`fontSize · lineHeight + 2 · paddingSM`,
+ * `collapse/style/index.js`), nicht aus `controlHeight`: gemessen 36 / 45 / 55 px. Das Muster ist
+ * das handgebaute Bedienziel aus LFH-365 — Boden plus Polsterung; die Polsterung bleibt antds
+ * `paddingSM`/`padding`, die schon der Staffel folgen. In `kompakt` liegt der Inhalt mit 36 px
+ * über dem Boden, der Kopf bleibt dort wie er war. Ohne `alignItems` stünde die Beschriftung im
+ * 72-px-Kopf oben (antd: `flex-start`).
+ *
+ * Am Kontext statt je Stelle (rund 25 `Collapse`, kein gemeinsamer Baustein): antd führt
+ * Kontext- und Komponenten-`styles` zusammen. Der Wert kommt aus derselben Zeile von
+ * {@link dichten}, aus der `antdToken` `controlHeight` setzt — der Kontext sieht kein Token.
+ */
+export function antdKlappkopf(dichte: Dichte): NonNullable<ConfigProviderProps['collapse']> {
+  return { styles: { header: { minHeight: dichten[dichte].zeilenhoehe, alignItems: 'center' } } };
+}
+
+/**
  * Leitet die antd-Tokens aus den Rollen ab, eine Richtung, keine zweite Liste. Was antd nicht
  * kennt (Marke, Kartenraster, Versal-Sperrung), lebt allein in `rollen.css`.
  */
