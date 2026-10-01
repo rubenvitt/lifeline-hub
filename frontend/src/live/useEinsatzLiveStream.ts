@@ -108,11 +108,14 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['abloesung', onAbloesung as EventListener]);
 
-    // Reconnect-Resync: der Erst-Open invalidiert nicht, jeder Folge-Open gleicht ab wie `lagged`.
+    // Reconnect-Resync: jeder Folge-Open gleicht ab wie `lagged`. Der Erst-Open lädt nur die
+    // Org-Keys nach (die Einsatz-Abfragen laden beim Mount ohnehin): ein Org-Ereignis kann beim
+    // Wechsel aus dem Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734).
     const schliessen = oeffneLiveVerbindung({
       url: `/api/einsaetze/${einsatzId}/live`,
       listeners,
       beiWiederaufbau: vollabgleich,
+      beimErstenOpen: () => invalidiereOrgLiveKeys(qc),
     });
     const abmelden = meldeEinsatzStrom();
     return () => {

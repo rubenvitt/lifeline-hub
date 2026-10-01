@@ -20,13 +20,16 @@ export function useOrgLiveStream(angemeldet: boolean): void {
   const aktiv = angemeldet && !imEinsatz;
 
   useEffect(() => {
-    if (!aktiv) return;
+    // Frisch nachfragen, nicht nur `aktiv` aus dem Render nehmen: beim Direktaufruf eines
+    // Einsatzes laufen die Effekte des Einsatz-Rahmens (Kind) vor diesem (Eltern), der Zähler
+    // steht dann schon, `aktiv` aber noch auf dem alten Stand.
+    if (!aktiv || einsatzStromOffen()) return;
     const abgleich = () => invalidiereOrgLiveKeys(qc);
     return oeffneLiveVerbindung({
       url: '/api/live',
       listeners: [...orgListener(qc), ['lagged', abgleich]],
       beiWiederaufbau: abgleich,
-      auchBeimErstenOpen: true,
+      beimErstenOpen: abgleich,
     });
   }, [aktiv, qc]);
 }

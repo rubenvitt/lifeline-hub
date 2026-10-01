@@ -6,9 +6,10 @@ import type { EtbTyp } from './types';
  * `einsatzId` und `globalKeys` für alles darüber (Mandant, Stammdaten-Kataloge, Instanz,
  * externe Quellen).
  *
- * `useEinsatzLiveStream` leitet Listener, Invalidierung UND den lagged-Vollabgleich
- * ausschließlich aus {@link EINSATZ_STREAM_EVENTS} ab; ein neues Live-Modul ist EIN Eintrag
- * hier. `queryKeys.guard.test.ts` verlangt, dass Prefixe nur hier als Literal vorkommen und
+ * `useEinsatzLiveStream` leitet Listener, Invalidierung UND den lagged-Vollabgleich aus
+ * {@link EINSATZ_STREAM_EVENTS} ab, die Org-Ereignisse und den Org-Abgleich aus
+ * {@link ORG_STREAM_EVENTS}/{@link ORG_LIVE_KEYS} (`live/orgListener.ts`, LFH-734); ein neues
+ * Live-Modul ist EIN Eintrag hier. `queryKeys.guard.test.ts` verlangt, dass Prefixe nur hier als Literal vorkommen und
  * kein Inline-String-Array als Query-Key dient.
  */
 

@@ -20,9 +20,12 @@ export interface LiveVerbindungOptionen {
    * Vollabgleich wie bei `lagged`, ohne Ton.
    */
   beiWiederaufbau: () => void;
-  /** Läuft `beiWiederaufbau` auch beim ersten `open`? (Org-Strom: Lücke beim Wechsel aus dem
-   *  Einsatz-Strom, design.md D4 der Change `lfh-734-org-live-ereignis`.) */
-  auchBeimErstenOpen?: boolean;
+  /**
+   * Läuft nur beim ersten `open`. Beim Wechsel zwischen Einsatz- und Org-Strom (LFH-734) kann
+   * ein Org-Ereignis zwischen beiden Verbindungen verloren gehen; der neue Strom gleicht deshalb
+   * gleich zu Beginn die Org-Keys ab (design.md D4 der Change `lfh-734-org-live-ereignis`).
+   */
+  beimErstenOpen?: () => void;
 }
 
 /**
@@ -79,10 +82,10 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     quelle.onopen = () => {
       meldeStatus('open');
       backoffStufe = 0;
-      if (ersterOpen && !opt.auchBeimErstenOpen) {
+      if (ersterOpen) {
         ersterOpen = false;
+        opt.beimErstenOpen?.();
       } else {
-        ersterOpen = false;
         opt.beiWiederaufbau();
       }
     };

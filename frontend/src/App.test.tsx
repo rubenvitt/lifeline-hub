@@ -205,9 +205,30 @@ describe('App-Routing', () => {
       renderApp('/einsaetze/7/ueberblick');
       expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
       await waitFor(() => expect(offene()).toEqual(['/api/einsaetze/7/live']));
+      // Auch nicht kurzzeitig: beim Direktaufruf laufen die Effekte des Einsatz-Rahmens vor
+      // denen der Betriebszeile, der Org-Strom darf trotzdem nie aufgehen.
+      expect(urls.map((u) => u.url)).not.toContain('/api/live');
     });
 
-    it('ohne Anmeldung keine Verbindung', async () => {
+    it('beim Verlassen des Einsatzes übernimmt der Org-Strom', async () => {
+      vi.stubGlobal('EventSource', AufzeichnendeEventSource);
+      server.use(
+        meHandler(admin),
+        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      );
+      const { router } = renderApp('/einsaetze/7/ueberblick');
+      await waitFor(() => expect(offene()).toEqual(['/api/einsaetze/7/live']));
+
+      await act(() => router.navigate('/einsaetze'));
+
+      await waitFor(() => expect(offene()).toEqual(['/api/live']));
+      expect(urls.find((u) => u.url === '/api/einsaetze/7/live')?.closed).toBe(true);
+    });
+
+    // Die Betriebszeile steht hinter `RequireAuth`: ohne Anmeldung wird sie gar nicht gerendert.
+    // Die Bedingung im Hook selbst prüft `useOrgLiveStream.test.tsx`.
+    it('ohne Anmeldung wird keine Verbindung geöffnet', async () => {
       vi.stubGlobal('EventSource', AufzeichnendeEventSource);
       server.use(
         http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
@@ -216,7 +237,7 @@ describe('App-Routing', () => {
       );
       renderApp('/');
       expect(await screen.findByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
-      expect(offene()).toEqual([]);
+      expect(urls).toHaveLength(0);
     });
   });
 

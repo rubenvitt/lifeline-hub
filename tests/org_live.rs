@@ -660,3 +660,101 @@ async fn lesen_und_abgelehnte_katalog_anfragen_melden_nichts() {
     let alle = org_eingegangen(&mut rx);
     assert!(alle.is_empty(), "{alle:?}");
 }
+
+// ---------- Empfängerfilter auf der Leitung (`sse_org_stream`, nicht nur `OrgAbonnent::sieht`) ----------
+
+/// Öffnet `/api/live` als `benutzer` (Passwort nach `benutzer_anlegen`/`besetzung`).
+async fn org_strom_als(
+    app: &axum::Router,
+    benutzer: &str,
+    passwort: &str,
+) -> axum::response::Response {
+    let cookie = login_cookie(app, benutzer, passwort).await;
+    let resp = oeffnen(app, "/api/live", Some(&cookie), None).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    resp
+}
+
+#[tokio::test]
+async fn stammdaten_erreichen_auf_der_leitung_nur_die_eigene_org() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    besetzung(&app, &pool, &admin).await;
+    let eigen = org_strom_als(&app, "ohnebezug", "ohnebezugpw1").await;
+    let fremd = org_strom_als(&app, "fremdfk", "fremdfkpw1").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/personal",
+        &admin,
+        Some(r#"{"name":"Leitung"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let eigen = frames(&sse_anfang_lesen(eigen.into_body(), 300).await);
+    let fremd = frames(&sse_anfang_lesen(fremd.into_body(), 300).await);
+    assert_eq!(
+        events(&eigen),
+        vec!["stammdaten"],
+        "Gegenprobe: der Filter lässt die eigene Org durch"
+    );
+    assert!(fremd.is_empty(), "fremde Org: {fremd:?}");
+}
+
+#[tokio::test]
+async fn einsatzliste_erreicht_auf_der_leitung_nur_die_leser() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    besetzung(&app, &pool, &admin).await;
+    let leser = org_strom_als(&app, "fuehrer", "fuehrerpw1").await;
+    let ohne = org_strom_als(&app, "ohnebezug", "ohnebezugpw1").await;
+
+    einsatz_anlegen(&app, &admin).await;
+
+    let leser = frames(&sse_anfang_lesen(leser.into_body(), 300).await);
+    let ohne = frames(&sse_anfang_lesen(ohne.into_body(), 300).await);
+    assert_eq!(
+        events(&leser),
+        vec!["einsatzliste"],
+        "Gegenprobe: Führungskraft der Org"
+    );
+    assert_eq!(leser[0].data, "{}");
+    assert!(ohne.is_empty(), "Org-Benutzer ohne Bezug: {ohne:?}");
+}
+
+/// Spec `org-live`, „Einsatz-Workspace": im Einsatz erreicht eine Listenänderung den Tab über
+/// den Strom des Einsatzes.
+#[tokio::test]
+async fn einsatz_strom_eines_mitglieds_traegt_einsatzliste() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let b = besetzung(&app, &pool, &admin).await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, eid, b.mitglied_id, "beobachter").await;
+    let mitglied = login_cookie(&app, "mitglied", "mitgliedpw1").await;
+    let strom = oeffnen(
+        &app,
+        &format!("/api/einsaetze/{eid}/live"),
+        Some(&mitglied),
+        None,
+    )
+    .await;
+    assert_eq!(strom.status(), StatusCode::OK);
+
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{eid}"),
+        &admin,
+        Some(r#"{"stichwort":"H 3"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let fs = frames(&sse_anfang_lesen(strom.into_body(), 300).await);
+    let liste: Vec<&Frame> = fs.iter().filter(|f| f.event == "einsatzliste").collect();
+    assert_eq!(liste.len(), 1, "{fs:?}");
+    assert_eq!(liste[0].id, None);
+}

@@ -482,7 +482,7 @@ describe('useEinsatzLiveStream', () => {
   });
 
   // Reconnect-Resync + sichtbarer Fehlerpfad.
-  it('invalidiert beim ersten open NICHT und meldet Status open (skip-first, F14)', async () => {
+  it('invalidiert beim ersten open keinen Einsatz-Key und meldet Status open (skip-first, F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -497,7 +497,13 @@ describe('useEinsatzLiveStream', () => {
     );
     FakeEventSource.letzte?.emit('open');
     await waitFor(() => expect(status).toContain('open'));
-    expect(spy).not.toHaveBeenCalled(); // erstes open löst KEINEN Voll-Invalidate aus
+    // Erstes open: KEIN Einsatz-Vollabgleich (die Abfragen laden beim Mount ohnehin) …
+    const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+    expect(keys.filter((k) => typeof k[1] === 'number')).toEqual([]);
+    // … aber die Org-Keys (LFH-734): beim Wechsel aus dem Org-Strom kann ein Org-Ereignis
+    // zwischen beiden Verbindungen verloren gehen.
+    expect(keys).toContainEqual(['einsaetze']);
+    expect(keys).toContainEqual(['fahrzeuge']);
     window.removeEventListener('lfh:live-status', onStatus);
   });
 
@@ -689,9 +695,8 @@ describe('useEinsatzLiveStream', () => {
     quelle.emit('lagged');
     expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['fahrzeuge'] });
+    quelle.emit('open'); // Erst-Open
     spy.mockClear();
-    quelle.emit('open');
-    expect(spy).not.toHaveBeenCalled(); // Erst-Open
     quelle.emit('open');
     expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ['organisation'] });

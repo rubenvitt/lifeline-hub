@@ -119,8 +119,8 @@ Org-Ereignisse gehen **ohne** `id:` hinaus und nicht in den Replay-Ring des Eins
 `Last-Event-ID` des Browsers bleibt damit die des letzten Einsatz-Ereignisses, und die Replay-Logik
 des Einsatz-Kanals bleibt unverändert. Verpasste Org-Ereignisse fängt das Frontend ab: Jeder
 Wiederaufbau (`onopen` nach dem ersten) und jedes `lagged` ruft auch die live geführten globalen
-Keys neu ab. Der Org-Strom ruft sie bei **jedem** `onopen` ab, auch beim ersten. So schließt er
-die Lücke beim Wechsel vom Einsatz-Strom in die Liste. Ein Überlauf des Org-Kanals erzeugt wie beim
+Keys neu ab. Beim ersten `onopen` gleicht jeder der beiden Ströme die Org-Keys ab: so schließt er
+die Lücke beim Wechsel zwischen Einsatz-Strom und Org-Strom, in beide Richtungen. Ein Überlauf des Org-Kanals erzeugt wie beim
 Einsatz `lagged`.
 
 Verworfen: **eigener Ring und Id-Raum:** Zwei Id-Räume auf einer Verbindung vertragen sich nicht
@@ -129,7 +129,7 @@ mit einer einzigen `Last-Event-ID`. Der Gewinn wäre klein, denn das Ereignis be
 
 ### D5 Emitter: `einsatzliste` explizit, `stammdaten` per Middleware
 
-- **`einsatzliste`:** Ein Helfer `live::einsatzliste_melden(pool, live, einsatz_id, extra)`
+- **`einsatzliste`:** Ein Helfer `live::org::einsatzliste_melden(pool, live, einsatz_id, zusaetzlich)`
   ermittelt Org und Mitglieder und publiziert. Jeder bestehende `einsatz`-Emitter (über
   `kopf_geaendert` in `routes/einsatz.rs` und in `routes/stab.rs`) ruft ihn mit auf, denn die Liste
   zeigt dieselben Kopfspalten. Dazu kommen Anlage, Mitglied setzen und entfernen, Wiederherstellen
@@ -192,8 +192,12 @@ Kontext-Guards fällt. Das erste Byte ist wie beim Einsatz-Strom der Kommentar `
 - [Rollen-Schnappschuss: Wer zur Führungskraft wird, bekommt Listen-Ereignisse fremder Einsätze
   erst nach dem Wiederaufbau] → Das ist dieselbe Regel wie bei den Modulrechten. Der Fokus-Refetch
   bleibt als Netz.
-- [Wechsel zwischen Einsatz- und Org-Strom erzeugt kurz zwei Verbindungen oder keine] → Effekte
-  räumen synchron auf. Der Org-Strom lädt bei jedem `onopen` nach (D4).
+- [Wechsel zwischen Einsatz- und Org-Strom: kurz zwei Verbindungen oder keine, ein
+  Org-Ereignis kann dazwischen verloren gehen] → Effekte räumen synchron auf, der Org-Strom fragt
+  den Zähler im Effekt frisch ab (beim Direktaufruf laufen die Kind-Effekte zuerst). In BEIDE
+  Richtungen gleicht der neue Strom beim ersten `onopen` die Org-Keys ab (`beimErstenOpen`,
+  D4); der Einsatz-Strom dabei nur die Org-Keys, seine eigenen Abfragen laden beim Mount ohnehin
+  (Befund aus dem Review, 01.10.2026).
 - [Middleware publiziert auch bei 2xx ohne echte Änderung, etwa einem idempotenten PUT] → Das
   kostet nur einen Refetch. Es verrät nichts, was der Katalog-GET nicht ohnehin zeigt.
 - [Neuer Emitter-Pfad für `einsatzliste` wird vergessen] → Je Auslöser gibt es einen

@@ -7,7 +7,7 @@ und `requesting-code-review`.
 
 ## 1. Org-Kanal im LiveHub (D2, D3)
 
-- [x] 1.1 Unit-Tests in `src/live/` zuerst: `OrgLiveEvent::ALLE == [Einsatzliste, Stammdaten]` mit Wire-Namen `einsatzliste`/`stammdaten`; Wire-Namen disjunkt zu `LiveEvent::ALLE`; Filter `sichtbar_fuer(abonnent)` für `Organisation` (gleiche Org ja, fremde nein) und `Einsatzleser` (org-weiter Leser gleiche Org ja, Führungskraft fremde Org nein, System-Admin fremde Org ja, genanntes Mitglied ja, sonstiges Org-Mitglied nein); Publizieren ohne Abonnent ist harmlos; Org-Nachricht landet nicht im Einsatz-Ring und verändert dessen Id-Folge nicht. Rot belegen.
+- [x] 1.1 Unit-Tests in `src/live/` zuerst: `OrgLiveEvent::ALLE == [Einsatzliste, Stammdaten]` mit Wire-Namen `einsatzliste`/`stammdaten`; Wire-Namen disjunkt zu `LiveEvent::ALLE`; Filter `OrgAbonnent::sieht` für `Organisation` (gleiche Org ja, fremde nein) und `Einsatzleser` (org-weiter Leser gleiche Org ja, Führungskraft fremde Org nein, System-Admin fremde Org ja, genanntes Mitglied ja, sonstiges Org-Mitglied nein); Publizieren ohne Abonnent ist harmlos; Org-Nachricht landet nicht im Einsatz-Ring und verändert dessen Id-Folge nicht. Rot belegen.
 - [x] 1.2 `OrgLiveEvent` (`wire_enum!`, `ToSchema`), `OrgNachricht`, `OrgEmpfaenger`, `OrgAbonnent` (Schnappschuss) und der prozessweite Broadcast-Kanal im `LiveHub` (`abonniere_org`, `publiziere_org`). Tests aus 1.1 grün; die bestehenden `src/live`-Tests (Gate-Pins von `LiveEvent`) unverändert grün.
 - [x] 1.3 `src/api_doc.rs` registriert `OrgLiveEvent`; `tests/enum_wire_kontrakt.rs` bekommt `org_live_event_wire` (`ALLE`-Länge 2, `contains`) und den Eintrag im Inventar-Guard `jedes_toschema_enum_ist_gepinnt`. `cargo test --test enum_wire_kontrakt` grün.
 
@@ -24,7 +24,7 @@ und `requesting-code-review`.
 - [x] 3.3 Tests zuerst: Kopf-PATCH, Abschluss, Fristsetzen, Lagebesprechung mit neuem Termin → je `einsatz` UND `einsatzliste` (Mitglied erhält es); Lagebesprechung ohne Terminänderung und Stab-Besetzung → kein `einsatzliste`. Dann `kopf_geaendert` (und der Stab-Pfad) ruft den Helfer mit auf. Grün; `tests/einsatz_live.rs` unverändert grün.
 - [x] 3.4 Tests zuerst: Mitglied setzen → das neue Mitglied erhält `einsatzliste`; Mitglied entfernen → die entfernte Person erhält es noch. Dann Emitter in `routes/einsatz.rs` (Mitgliedschaft). Grün.
 - [x] 3.5 Tests zuerst: Wiederherstellen (`routes/aufbewahrung.rs`) → `einsatzliste`; Soft-Delete durch `purge_scheduler::tick_einmal` → `einsatzliste`. Dann Emitter; `starte_purge_scheduler(pool, live)` und `main.rs` nachziehen. Grün; `tests/aufbewahrung*.rs` unverändert grün.
-- [x] 3.6 Tests zuerst in `tests/demo_daten.rs`: Import, Neu-Import, Entfernen → `einsatzliste` (Mitglieder vor dem `DELETE` gelesen) und `stammdaten` an die eigene Org, nichts an eine fremde Org; der bestehende `lagged`-Test bleibt. Dann Emitter in `routes/demo_daten.rs` (`entfernen_tx` gibt die Mitglieder zurück). Grün.
+- [x] 3.6 Tests zuerst in `tests/demo_daten.rs`: Import, Neu-Import, Entfernen → `einsatzliste` (Mitglieder vor dem `DELETE` gelesen) und `stammdaten` an die eigene Org, nichts an eine fremde Org; der bestehende `lagged`-Test bleibt. Dann Emitter in `routes/demo_daten.rs` (`alter_demo_einsatz_tx` liest die Leser vor `entfernen_tx`). Grün.
 
 ## 4. Emitter `stammdaten` per Middleware (D5)
 
@@ -51,7 +51,7 @@ und `requesting-code-review`.
 
 ## 8. Doku
 
-- [x] 8.1 `frontend/AGENTS.md`, Query-Key-Registry: Zeile zu `ORG_STREAM_EVENTS`/`NICHT_LIVE_GLOBAL_KEYS` (XOR, Guard) und „ein Tab, eine Live-Verbindung: der Einsatz-Strom trägt die Org-Ereignisse mit" (LFH-734). `src/AGENTS.md`: Zeile „Katalog-Schreibrouten gehören in den Stammdaten-Teil-Router (Middleware `stammdaten_live`, Guard aus 4.3); `einsatzliste` nur über den Helfer" (LFH-734). Kommentar im Kopf von `useEinsatzLiveStream.ts` nachziehen. Prettier für `frontend/` grün.
+- [x] 8.1 `frontend/AGENTS.md`, Query-Key-Registry: Zeile zu `ORG_STREAM_EVENTS`/`NICHT_LIVE_GLOBAL_KEYS` (XOR, Guard) und „ein Tab, eine Live-Verbindung: der Einsatz-Strom trägt die Org-Ereignisse mit" (LFH-734). `src/AGENTS.md`: Zeile „Katalog-Schreibrouten liegen unter einem Präfix aus `STAMMDATEN_PFADE` (Middleware `stammdaten_live`, Guard aus 4.3); `einsatzliste` nur über den Helfer" (LFH-734; Präfixliste statt Teil-Router, design.md D5). Kommentar im Kopf von `useEinsatzLiveStream.ts` nachziehen. Prettier für `frontend/` grün.
 
 ## 9. Integration
 

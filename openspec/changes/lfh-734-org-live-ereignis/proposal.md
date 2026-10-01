@@ -35,7 +35,7 @@ für jede Änderung an Fahrzeugen, Personal, Material und den übrigen Katalogen
   Fahrzeug-Status, Personal, Personal-Status, Material, Material-Kategorien, Qualifikationen,
   Einheit-Typen, Sprechgruppen (Org-Katalog), ETB-Bausteine, Stichwort-Vorschläge,
   Führungsfunktionen, Organisation (Name, Logo), dazu Demo-Import, -Neuimport und -Entfernen.
-  Die Katalog-Routen bekommen das Ereignis über **eine** Middleware an ihrer Routengruppe, nicht
+  Die Katalog-Routen bekommen das Ereignis über **eine** Middleware am Router (Präfixabgleich gegen `STAMMDATEN_PFADE`), nicht
   über Aufrufe in jedem Handler. `stammdaten` frischt im Frontend auch die Einsatzliste auf, weil
   sie Organisationsnamen und Führungsfunktions-Labels zeigt.
 - **Frontend:** neue Registry `ORG_STREAM_EVENTS` (Ereignis → `globalKeys`-Prefixe) und eine
@@ -64,11 +64,10 @@ für jede Änderung an Fahrzeugen, Personal, Material und den übrigen Katalogen
 - Backend: `src/live/` (Org-Kanal, `OrgLiveEvent`, Empfängerfilter), `src/routes/live.rs`
   (Zusammenführen im Einsatz-Strom, neue Route `/api/live`), `src/routes/support.rs`,
   `src/app.rs`, `src/zulassung.rs`, Emitter in `routes/einsatz.rs`, `routes/stab.rs`,
-  `routes/aufbewahrung.rs`, `routes/demo_daten.rs`, `einsatz/purge_scheduler.rs` (+ `main.rs`) und
-  den Katalog-Routen (`fahrzeug`, `fahrzeug_status`, `personal`, `personal_status`, `material`,
-  `qualifikation`, `einheit_typ`, `sprechgruppe`, `etb_baustein`, `stichwort`,
-  `fuehrungsfunktion`, `organisation`), `src/api_doc.rs`, `tests/enum_wire_kontrakt.rs`, neue
-  Integrationstests.
+  `routes/aufbewahrung.rs`, `routes/demo_daten.rs`, `einsatz/purge_scheduler.rs` (+ `main.rs`);
+  `stammdaten` zentral über die Middleware in `src/routes/live.rs`, die Katalog-Routen selbst
+  bleiben unverändert; `src/api_doc.rs`, `tests/enum_wire_kontrakt.rs`, neue Integrationstests
+  und `tests/stammdaten_live_guard.rs`.
 - Codegen: `frontend/src/api/openapi.json`, `frontend/src/api/types.generated.ts`.
 - Frontend: `api/queryKeys.ts` (+ Guard-/Kontrakttests), `live/` (gemeinsamer Verbindungsbau, neuer
   Org-Hook), `App.tsx` (`BetriebsLayout`), `useEinsatzLiveStream.ts`, `frontend/AGENTS.md`.
