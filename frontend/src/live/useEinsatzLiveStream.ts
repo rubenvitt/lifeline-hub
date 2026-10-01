@@ -113,11 +113,27 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     //   Folge-Open resynct wie `lagged`.
     // - `onerror` bei CONNECTING → der Browser reconnectet selbst; bei CLOSED hat er aufgegeben
     //   (typisch 401) → Auth proben, dann Login-Flow (401) oder manueller Reconnect per Backoff.
+    // - Bei gültiger Sitzung fragt eine zweite Probe den Einsatz selbst ab (LFH-732): ein 404 ist
+    //   ein Endzustand (hart gelöscht, etwa beim Entfernen der Demo-Daten, oder vom
+    //   Aufbewahrungs-Purge), kein Netzproblem. Dann kein Reconnect mehr.
     let ersterOpen = true;
     let abgebrochen = false;
     let backoffStufe = 0;
     let backoffTimer: ReturnType<typeof setTimeout> | null = null;
     let aktuelle: EventSource | null = null;
+
+    const einsatzExistiertNicht = async (): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/einsaetze/${einsatzId}`, {
+          credentials: 'same-origin',
+          signal: AbortSignal.timeout(15_000),
+        });
+        return res.status === 404;
+      } catch {
+        // Netzfehler → kein Beleg für einen Endzustand, weiter per Backoff.
+        return false;
+      }
+    };
 
     const probeUndReconnect = async (tote: EventSource) => {
       if (abgebrochen) return;
@@ -135,6 +151,19 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       if (!sessionGueltig) {
         // Session abgelaufen → die Sitzungswache übernimmt (ein 401-Pfad für SSE und HTTP).
         meldeSitzungAbgelaufen();
+        return;
+      }
+      // Die EventSource verrät den Statuscode nicht. Die Detailroute des Einsatzes steht hinter
+      // demselben Lese-Gate wie `/live` (`EinsatzLesezugriff`), ihr 404 ist also der des Feeds.
+      const einsatzWeg = await einsatzExistiertNicht();
+      if (abgebrochen) return;
+      if (einsatzWeg) {
+        tote.close();
+        // `idle` statt `lost`: die Sackgasse des Rahmens sagt den Fehler, die Betriebszeile soll
+        // keine unterbrochene Leitung danebenstellen (LFH-331 · B3). Den Weg dorthin öffnet der
+        // neu geholte Einsatzkopf, dessen 404 `EinsatzLayout` in die Sackgasse führt.
+        meldeStatus('idle');
+        inval(EINSATZ_KEYS.einsatz);
         return;
       }
       tote.close();
