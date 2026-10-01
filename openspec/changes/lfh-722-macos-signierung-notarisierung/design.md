@@ -333,3 +333,20 @@ Risiko nur (D1).
 
 Den CI-Lauf mit dem geänderten Prüfschritt gibt es noch nicht. Der Lauf vom 01.10. (Run
 36840664489) lief mit dem Stand vor dem Review.
+
+### Gate-Lauf (Task 6.1, 01.10.2026)
+
+`./scripts/check-all.sh` auf dem Stand dieses Branches (Basis `f25a52ec`): 11 von 13 Schritten
+grün, rot 7 und 11. Beide liegen außerhalb dieses Diffs, der nur `.github/`, `docs/`,
+`openspec/` und `src-tauri/AGENTS.md` ändert. Frontend, Backend und `scripts/` sind
+byteweise gleich mit der Basis.
+
+- **Schritt 7 (e2e):** 476 grün, 2 rot. `e2e/kopfzeile-schmal.spec.ts:246` im Einzellauf grün
+  (Ausreißer unter Last). `e2e/gate3-trefflaeche.spec.ts:312` („mindestens 9 Knoten erwartet“)
+  auch einzeln rot, also vorbestehend → LFH-885.
+- **Schritt 11 (`backend-binaer.test.sh`, Fälle 1 und 3):** In die geprüfte Ausgabe mischt sich
+  „mise by @jdx – installing 1 tool“. Der Selbsttest setzt ein Wegwerf-`CARGO_HOME`, und der
+  mise-Shim installiert daraufhin Rust neu. Eine Eigenart dieses Rechners, die CI nutzt rustup
+  direkt.
+
+Maßgeblich ist der CI-Lauf des PRs.

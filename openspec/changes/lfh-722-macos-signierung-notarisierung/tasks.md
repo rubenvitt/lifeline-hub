@@ -29,5 +29,5 @@
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh` grün (oder die CI des PRs), Ergebnis in `design.md`.
+- [x] 6.1 `./scripts/check-all.sh` grün (oder die CI des PRs), Ergebnis in `design.md`.
 - [ ] 6.2 LFH-722 in ClickUp: Akzeptanzkriterien mit Verweis auf die Nachweise abhaken.
