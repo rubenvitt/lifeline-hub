@@ -1457,15 +1457,12 @@ describe('PersonenPage', () => {
 });
 
 /**
- * Sichtvorgabe aus der URL — der Anspringweg der Sprungmarken „Patienten" und „Vermisste". Beide
- * Hälften von apply-then-clean: die Sicht steht und die Parameter sind weg. Nur die erste wäre auch
- * grün, wenn die Seite den Filter bloß aus der URL spiegelte.
- */
-/**
  * CSV-Export (LFH-728). Der Endpunkt verlangt nur Lesezugriff auf das Modul — dasselbe Recht wie
  * die Liste —, schreibt aber je Abruf einen Audit-Eintrag. Ein Abruf je Klick, nie beim Laden.
  */
 describe('PersonenPage — CSV-Export (LFH-728)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('lädt erst auf Klick, genau einmal, und speichert unter einem Dateinamen mit Einsatz', async () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     let abrufe = 0;
@@ -1517,6 +1514,11 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
   });
 });
 
+/**
+ * Sichtvorgabe aus der URL — der Anspringweg der Sprungmarken „Patienten" und „Vermisste". Beide
+ * Hälften von apply-then-clean: die Sicht steht und die Parameter sind weg. Nur die erste wäre auch
+ * grün, wenn die Seite den Filter bloß aus der URL spiegelte.
+ */
 describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
   function Suche() {
     return <output data-testid="suche">{useLocation().search}</output>;

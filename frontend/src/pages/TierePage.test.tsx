@@ -7,6 +7,7 @@ import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
+import { onlineManager } from '@tanstack/react-query';
 import TierePage from './TierePage';
 import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
@@ -241,6 +242,11 @@ describe('TierePage', () => {
    * wie die Liste. Der Knopf steht deshalb auch für Beobachter und im abgeschlossenen Einsatz.
    */
   describe('CSV-Export', () => {
+    afterEach(() => {
+      onlineManager.setOnline(true);
+      vi.restoreAllMocks();
+    });
+
     it('lädt den Export und speichert ihn unter einem Dateinamen mit Einsatz', async () => {
       const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
       server.use(
@@ -302,6 +308,56 @@ describe('TierePage', () => {
       await userEvent.click(knopf);
       await waitFor(() =>
         expect(screen.queryByText('Serverfehler beim Export')).not.toBeInTheDocument(),
+      );
+    });
+
+    it('scheitert ohne Netz sofort an der Seite, statt still zu pausieren', async () => {
+      const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+      server.use(http.get('/api/einsaetze/1/tiere/export', () => HttpResponse.error()));
+      render(einsatzAktiv, [tierBasis]);
+      const knopf = await screen.findByRole('button', { name: 'CSV exportieren' });
+      onlineManager.setOnline(false);
+      await userEvent.click(knopf);
+
+      expect(
+        await screen.findByText('Keine Verbindung zum Server — Export nicht möglich'),
+      ).toBeInTheDocument();
+      expect(knopf).not.toHaveClass('ant-btn-loading');
+      // Kein Nachlauf, wenn das Netz zurückkommt.
+      onlineManager.setOnline(true);
+      await act(async () => {});
+      expect(speichern).not.toHaveBeenCalled();
+    });
+
+    it('zeigt einen laufenden Export aus Einsatz A nicht als Ladezustand in B', async () => {
+      server.use(
+        http.get('/api/einsaetze/1/tiere/export', () => new Promise<Response>(() => {})),
+        http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
+        http.get('/api/einsaetze/2/tiere', () => HttpResponse.json([])),
+        meHandler(nutzer),
+        http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+        http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([tierBasis])),
+      );
+      renderMitProviders(
+        <>
+          <Routes>
+            <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+          </Routes>
+          <EinsatzWechsel />
+        </>,
+        { route: '/einsaetze/1/tiere' },
+      );
+      await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /CSV exportieren/ })).toHaveClass(
+          'ant-btn-loading',
+        ),
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
+      await screen.findByText('Keine Tiere in dieser Sicht');
+      expect(screen.getByRole('button', { name: /CSV exportieren/ })).not.toHaveClass(
+        'ant-btn-loading',
       );
     });
 

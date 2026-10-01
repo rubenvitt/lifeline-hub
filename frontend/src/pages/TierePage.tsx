@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Button, Flex, Form, Input, Space, Tag, Typography, theme } from 'antd';
+import { Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
 import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -39,7 +39,7 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { useCsvExport } from '../components/useCsvExport';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 
 const STATUS_META = TIER_STATUS;
 
@@ -241,7 +241,6 @@ export default function TierePage() {
 
   const fehler = useFehlerMeldung();
   const csvExport = useCsvExport(einsatzId, 'tiere', ladeTiereExport);
-  const { token } = theme.useToken();
 
   useEffect(() => {
     if (highlight?.einsatzId !== einsatzId) return;
@@ -341,8 +340,9 @@ export default function TierePage() {
               </Button>
             </>
           )}
-          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (LFH-346). Ohne Schreib-Riegel:
-              der Endpunkt verlangt nur den Lesezugriff, den schon die Liste braucht. */}
+          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (`frontend/AGENTS.md`,
+              Aktionen). Ohne Schreib-Riegel: der Endpunkt verlangt nur den Lesezugriff, den schon
+              die Liste braucht. */}
           <Button loading={csvExport.laeuft} onClick={csvExport.exportieren}>
             CSV exportieren
           </Button>
@@ -354,16 +354,13 @@ export default function TierePage() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (nurAnsicht || csvExport.fehler != null) && (
-          <Flex vertical gap={token.marginSM}>
-            {nurAnsicht && (
-              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-            )}
-            <SpeicherFehler
-              fehler={csvExport.fehler}
-              titel="Export fehlgeschlagen"
-              fallback="Keine Antwort vom Server — bitte erneut versuchen"
-            />
-          </Flex>
+          <SeitenHinweise
+            rechteText="Einsatz ist abgeschlossen — nur Ansicht."
+            rechteFehlt={nurAnsicht}
+            fehler={csvExport.fehler}
+            fehlerTitel="Export fehlgeschlagen"
+            fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
+          />
         )
       }
     >

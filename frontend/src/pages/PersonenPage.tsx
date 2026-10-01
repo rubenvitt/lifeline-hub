@@ -1,5 +1,5 @@
 import { IkoneKreuz } from '../ikonen';
-import { Alert, App, Breadcrumb, Button, Flex, type InputRef } from 'antd';
+import { Alert, App, Breadcrumb, Button, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
@@ -61,7 +61,7 @@ import {
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
 
 /**
  * Betroffene: das Formular wird zur Zeile.
@@ -613,9 +613,9 @@ export default function PersonenPage() {
               </Button>
             </>
           )}
-          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (LFH-346). Ohne Schreib-Riegel:
-              der Endpunkt verlangt nur den Lesezugriff, den schon die Liste braucht. Jeder Klick
-              ist serverseitig ein `export`-Audit-Eintrag. */}
+          {/* Öffnet eine Datei, sendet nichts ab — deshalb im Kopf (`frontend/AGENTS.md`,
+              Aktionen). Ohne Schreib-Riegel: der Endpunkt verlangt nur den Lesezugriff, den schon
+              die Liste braucht. Jeder Klick ist serverseitig ein `export`-Audit-Eintrag. */}
           <Button loading={csvExport.laeuft} onClick={csvExport.exportieren}>
             CSV exportieren
           </Button>
@@ -630,16 +630,13 @@ export default function PersonenPage() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (nurAnsicht || csvExport.fehler != null) && (
-          <Flex vertical gap={token.marginSM}>
-            {nurAnsicht && (
-              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
-            )}
-            <SpeicherFehler
-              fehler={csvExport.fehler}
-              titel="Export fehlgeschlagen"
-              fallback="Keine Antwort vom Server — bitte erneut versuchen"
-            />
-          </Flex>
+          <SeitenHinweise
+            rechteText="Einsatz ist abgeschlossen — nur Ansicht."
+            rechteFehlt={nurAnsicht}
+            fehler={csvExport.fehler}
+            fehlerTitel="Export fehlgeschlagen"
+            fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
+          />
         )
       }
     >
