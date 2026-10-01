@@ -52,6 +52,20 @@ function merkeEingeklappt(wert: boolean): void {
 }
 
 /**
+ * Die Abstände des Bands bleiben fest und wachsen NICHT mit der Dichte-Staffel (LFH-703,
+ * Entscheidung 01.10.2026). Das Band steht schon so im Handschuh-Betrieb am Handschirm bei 49 % der
+ * Karte (Deckel 50 %, `e2e/leisten-flaeche.spec.ts`); mit Lücke und Polsterung aus der Staffel
+ * wuchs es auf 314–362 px und riss den Deckel bei 390 und 1024 px. Der Umbau, nach dem das Band
+ * mitwachsen darf, ist LFH-899. Benannt, damit der Guard
+ * `leistenAbstand.guard.test.ts` jede neue Zahl im Band weiter findet.
+ */
+const BAND_LUECKE = 12;
+const BAND_POLSTER = '8px 12px';
+const STAND_LUECKE = 6;
+const ZEITLEISTE_LUECKE = 8;
+const SCHIEBER_RAND = '0 8px';
+
+/**
  * Die Reihe der gesicherten Stände teilt sich die Zeile mit Sichern und Zeitleiste. Ohne
  * `flex`-Basis und `minWidth: 0` nahm sie ihre volle Inhaltsbreite an, brach in eine zweite Zeile
  * um und verdoppelte die Höhe der Leiste. Jetzt schrumpft sie auf den Rest und rollt waagerecht;
@@ -63,7 +77,7 @@ function merkeEingeklappt(wert: boolean): void {
 export const standLeisteStil: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 6,
+  gap: STAND_LUECKE,
   flex: '1 1 120px',
   minWidth: 0,
   overflowX: 'auto',
@@ -84,7 +98,7 @@ export const zeitleisteStil: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   flexWrap: 'wrap',
-  gap: 8,
+  gap: ZEITLEISTE_LUECKE,
   flex: '1 1 260px',
   minWidth: 0,
 };
@@ -243,9 +257,9 @@ export function SnapshotLeiste({
         ...bandStil('voll', true),
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
+        gap: BAND_LUECKE,
         flexWrap: 'wrap',
-        padding: '8px 12px',
+        padding: BAND_POLSTER,
         borderRadius: token.borderRadiusLG,
         background: token.colorBgElevated,
         boxShadow: token.boxShadow,
@@ -292,7 +306,7 @@ export function SnapshotLeiste({
             />
           </Tooltip>
           <Slider
-            style={{ flex: 1, margin: '0 8px', minWidth: 120 }}
+            style={{ flex: 1, margin: SCHIEBER_RAND, minWidth: 120 }}
             min={0}
             max={Math.max(0, chrono.length - 1)}
             value={aktiverIndex >= 0 ? aktiverIndex : 0}

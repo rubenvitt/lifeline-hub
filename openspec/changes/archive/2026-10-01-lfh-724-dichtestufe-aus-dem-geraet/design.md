@@ -181,6 +181,12 @@ senkrechten Rand von halber Höhe: Die Fläche bleibt 72 × 72, ist für das Lay
 höhenneutral. Gemessen wird die Fläche selbst (das Kind des Knopfs), und der Entwurfstab trägt
 einen Deckel von 1,25 × Steuerhöhe (37,5 / 90 px).
 
+**Nachtrag nach dem Merge mit `alpha` (01.10.2026):** LFH-653 hat den Collapse-Kopf parallel
+über den Kontext an die Staffel gebunden (`antdKlappkopf`, `minHeight` = Steuerhöhe). Damit die
+Regel nur einen Träger hat, fällt der Collapse-Teil von `kopfzeilenMasse` weg. `kopfzeilenMasse`
+trägt nur noch den Tab, die Messung der Collapse-Köpfe in `trefflaeche-pruefflaechen.spec.ts`
+bleibt und belegt jetzt LFH-653 mit.
+
 ## Risks / Trade-offs
 
 - [Die Suite wird länger: rund 20 neue Tests mit Anmeldung und Seed] → zwei Stufen statt drei

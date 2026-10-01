@@ -67,6 +67,9 @@ pub async fn anlegen(
     let funktion = trimme(body.funktion.clone());
     let farbe = trimme(body.farbe.clone());
     let label = trimme(body.label.clone());
+    // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404.
+    crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
+        .await?;
 
     let z = zeichen_repo::anlegen(
         &state.pool,
@@ -146,6 +149,13 @@ pub async fn aktualisieren(
     let funktion = trimme_tri(body.funktion);
     let farbe = trimme_tri(body.farbe);
     let label = trimme_tri(body.label);
+    // Ansicht (LFH-738): nur das Setzen wird geprüft, `null` gibt auf alle Ansichten frei.
+    crate::karten_ansicht::repo::pruefe_zugehoerig(
+        &state.pool,
+        einsatz_id,
+        body.ansicht_id.flatten(),
+    )
+    .await?;
 
     let z = zeichen_repo::patche(
         &state.pool,

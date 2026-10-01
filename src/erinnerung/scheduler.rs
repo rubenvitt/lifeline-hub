@@ -566,4 +566,187 @@ mod tests {
             "kein sofortmeldung-Event für Nicht-Meldungs-Bezug"
         );
     }
+
+    /// Wiederkehrende, fällige Erinnerung (10:00, alle 30 min) im Einsatz `e`.
+    async fn wiederkehrende_um_zehn(pool: &SqlitePool, e: i64, b: i64) -> i64 {
+        repo::anlegen(
+            pool,
+            e,
+            b,
+            ErinnerungDaten {
+                titel: "Lagemeldung",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: Some(30),
+                empfaenger_funktion: None,
+                empfaenger_funktion_code: None,
+                bezug_typ: None,
+                bezug_id: None,
+            },
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
+    /// LFH-699: ein beendeter Einsatz löst keine Erinnerung mehr aus — abgeschlossen (Nachlauf
+    /// eingeschlossen; Schreib-Freeze, niemand könnte quittieren), soft-gelöscht (Karenz) und
+    /// geschwärzt. Kein Live-Ereignis, kein `zuletzt_ausgeloest_at`, kein Weiterrücken der
+    /// wiederkehrenden Erinnerung. Gegenprobe: der aktive Einsatz löst aus.
+    #[tokio::test]
+    async fn beendete_einsaetze_loesen_nicht_aus() {
+        let pool = crate::db::test_pool().await;
+        let (b, aktiv) = setup(&pool).await;
+        let live = LiveHub::new();
+        let mut beendete = Vec::new();
+        // Die letzten beiden Fälle brechen die Invariante „Tombstone ⇒ abgeschlossen“ bewusst:
+        // sie pinnen die Tombstone-Riegel im WHERE, die sonst kein Test sähe.
+        for (bezeichnung, status, geloescht_at, geschwaerzt_at) in [
+            ("Abgeschlossen", "abgeschlossen", None, None),
+            (
+                "Soft-gelöscht",
+                "abgeschlossen",
+                Some("2026-06-11 09:40:00"),
+                None,
+            ),
+            (
+                "Geschwärzt",
+                "abgeschlossen",
+                Some("2026-06-11 09:40:00"),
+                Some("2026-06-11 09:45:00"),
+            ),
+            (
+                "Soft-gelöscht, Status aktiv",
+                "aktiv",
+                Some("2026-06-11 09:40:00"),
+                None,
+            ),
+            (
+                "Geschwärzt, Status aktiv",
+                "aktiv",
+                None,
+                Some("2026-06-11 09:45:00"),
+            ),
+        ] {
+            let e: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, ?) RETURNING id",
+            )
+            .bind(bezeichnung)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let r = wiederkehrende_um_zehn(&pool, e, b).await;
+            // Abschluss nach dem Anlegen der Erinnerung, aber vor ihrer Fälligkeit; 10:01 liegt
+            // in der Nachlauffrist (24 h).
+            sqlx::query(
+                "UPDATE einsatz SET status = ?, abgeschlossen_at = ?, \
+                        abgeschlossen_von = ?, geloescht_at = ?, geschwaerzt_at = ? \
+                 WHERE id = ?",
+            )
+            .bind(status)
+            .bind("2026-06-11 09:30:00")
+            .bind(b)
+            .bind(geloescht_at)
+            .bind(geschwaerzt_at)
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+            beendete.push((bezeichnung, e, r, live.abonniere(e)));
+        }
+        let r_aktiv = wiederkehrende_um_zehn(&pool, aktiv, b).await;
+        let mut rx_aktiv = live.abonniere(aktiv);
+
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
+        let n = rx_aktiv.recv().await.unwrap();
+        let v: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+        assert_eq!(v["erinnerung_id"], r_aktiv);
+
+        for (bezeichnung, _, r, rx) in &mut beendete {
+            assert!(rx.try_recv().is_err(), "{bezeichnung}: kein Live-Ereignis");
+            let (faellig_at, zuletzt): (String, Option<String>) = sqlx::query_as(
+                "SELECT faellig_at, zuletzt_ausgeloest_at FROM erinnerung WHERE id = ?",
+            )
+            .bind(*r)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                faellig_at, "2026-06-11 10:00:00",
+                "{bezeichnung}: nicht weitergerückt"
+            );
+            assert_eq!(zuletzt, None, "{bezeichnung}: nicht als ausgelöst markiert");
+        }
+
+        // Auch Stunden später nichts: die Erinnerung bleibt stehen, statt endlos zu rücken.
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 14:00:00")).await, 1);
+        for (bezeichnung, _, _, rx) in &mut beendete {
+            assert!(rx.try_recv().is_err(), "{bezeichnung}: kein Live-Ereignis");
+        }
+    }
+
+    /// LFH-699: die Frist einer Sofortmeldung in einem abgeschlossenen Einsatz eskaliert nicht
+    /// (LFH-97) — der Scheduler sieht die Auto-Frist-Erinnerung gar nicht erst.
+    #[tokio::test]
+    async fn meldung_im_abgeschlossenen_einsatz_eskaliert_nicht() {
+        use crate::kommunikation::OBJEKT_MELDUNG;
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(e);
+        let m = crate::meldung::repo::anlegen(
+            &pool,
+            e,
+            b,
+            crate::meldung::repo::MeldungDaten {
+                absender: "Florian Nord 1",
+                empfaenger: None,
+                meldeweg: "funk",
+                inhalt: "MANV",
+                meldungsart: crate::meldung::ART_SOFORTMELDUNG,
+                prioritaet: crate::meldung::PRIO_SOFORT,
+                richtung: "intern",
+                ereigniszeit: "2026-06-11 09:55:00",
+                eingang_at: "2026-06-11 09:55:00",
+                bestaetigung_pflicht: true,
+                bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+                einheit_id: None,
+                abschnitt_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        repo::anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            OBJEKT_MELDUNG,
+            m.id,
+            "Nachfass",
+            "2026-06-11 10:00:00",
+            "2026-06-11 09:55:00",
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_at = ?, \
+                    abgeschlossen_von = ? WHERE id = ?",
+        )
+        .bind("2026-06-11 09:58:00")
+        .bind(b)
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 0);
+        assert!(
+            !crate::meldung::repo::laden(&pool, m.id, "2026-06-11 10:01:00")
+                .await
+                .unwrap()
+                .eskaliert
+        );
+        assert!(rx.try_recv().is_err(), "kein Live-Ereignis");
+    }
 }

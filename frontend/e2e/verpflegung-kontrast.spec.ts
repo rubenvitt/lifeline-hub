@@ -19,9 +19,9 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * Die drei Paare stehen einzeln und benannt — im Textbaum wären „8" oder „60" nicht zuzuordnen.
  * Nachts ist `alarmText` wertgleich mit `alarm`.
  *
- * EINE BENANNTE AUSNAHME (geteilte Rolle; bis dahin 4,5 : 1, Zielwert in jeder Meldung):
- *  · Tertiärtext (`schwach`) → LFH-643, beide Modi.
- * Fällt die Ausnahme, wenn LFH-643 landet. Der Primärknopf trägt seit LFH-661 den vollen Boden.
+ * KEINE AUSNAHME: Tertiärtext (`schwach`, LFH-643) und die Beschriftung des Primärknopfs (Weiß
+ * auf `bedien`, LFH-661) tragen den vollen Boden (Specs `textstufen-kontrast`,
+ * `farbrollen-kontrast`).
  *
  * Der Rand der OFFENEN Karte trägt keinen Zustand (Linienfarbe) — gemessen und angehängt, und
  * zugesichert, dass er sich von den Zustandsrändern unterscheidet. Sichtbarer Text unter
@@ -30,29 +30,7 @@ import { kontrast, randKontrast } from './kontrast-kern';
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die Ausnahme oben. */
-const BODEN = 4.5;
 const ZUSTAND = 3;
-
-/**
- * Tertiärtext, enumeriert — nur über Selektoren, die den TRÄGER selbst treffen, nie einen
- * Container: `closest()` senkte sonst still den Boden für alles darin.
- */
-const TERTIAER = [
-  '.ant-typography-secondary',
-  // Augenbraue (`schwach`): Kennzahltitel, „Sonderkost".
-  '.lfh-augenbraue',
-  // Einheit „EP" hinter dem Kennzahlwert (`Kennzahl`, `monoStil(12)` in `schwach`).
-  '[data-lfh="kennzahl-wert"] + span',
-  // Hinweiszeile eines Zeitachseneintrags (Bemerkung der Ausgabe): dritte Zeile der
-  // Inhaltsspalte, `hinweisTon` `schwach` (`Zeitachseneintrag`, Vorgabe).
-  '[data-lfh-eintrag="zeitachse"] > div:nth-child(3) > div:nth-child(3)',
-  // Die Feldhilfe der Dialoge — antds `colorTextDescription`.
-  '.ant-form-item-extra',
-  '.ant-select-placeholder',
-  // Der Ortspfad im Seitenkopf bis auf sein letztes Glied (`EinsatzSeite`).
-  '.lfh-seitenkopf__pfad li:not(:last-child)',
-].join(', ');
 
 const KARTEN = [
   { stufe: 'unterdeckung', name: 'Frühstück Kontrast', wort: 'Unterdeckung' },
@@ -81,17 +59,16 @@ const karteZu = (page: Page, name: string) =>
 interface Textknoten {
   ziel: Locator;
   text: string;
-  tertiaer: boolean;
 }
 
-/** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text, als Locator über eine Messmarke,
- *  dazu ob es zu einer Ausnahme gehört. Unsichtbares wird übersprungen (die Dialoge tragen
- *  eingeklappte Felder per `forceRender`), die Bereiche werden deshalb vorher AUFGEKLAPPT. */
+/** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text, als Locator über eine Messmarke.
+ *  Unsichtbares wird übersprungen (die Dialoge tragen eingeklappte Felder per `forceRender`),
+ *  die Bereiche werden deshalb vorher AUFGEKLAPPT. */
 async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
-  const funde = await wurzel.evaluate((w, tertiaer) => {
+  const funde = await wurzel.evaluate((w) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: { text: string; tertiaer: boolean }[] = [];
+    const liste: { text: string }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       if (!el.checkVisibility()) continue;
@@ -102,13 +79,10 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
         .trim();
       if (!eigen) continue;
       el.setAttribute('data-kontrastprobe', String(liste.length));
-      liste.push({
-        text: eigen,
-        tertiaer: el.closest(tertiaer) != null,
-      });
+      liste.push({ text: eigen });
     }
     return liste;
-  }, TERTIAER);
+  });
   return funde.map((f, i) => ({ ...f, ziel: wurzel.locator(`[data-kontrastprobe="${i}"]`) }));
 }
 
@@ -264,7 +238,7 @@ for (const modus of ['light', 'dark'] as const) {
     // (3) Jeder Text — Seitenkopf, Seiteninhalt und die beiden Hauptdialoge.
     const inhalt = page.locator('[data-lfh="seiten-inhalt"]');
     const kopf = page.locator('[data-lfh="seitenkopf"]');
-    const gemessen: [string, string | null][] = [];
+    const gemessen: string[] = [];
     const messeTexte = async (wurzel: Locator, flaeche: string) => {
       await page.mouse.move(0, 0);
       const knoten = await textknoten(wurzel);
@@ -272,14 +246,12 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer } of knoten) {
+      for (const { ziel, text } of knoten) {
         const m = await kontrast(ziel);
-        const ausnahme = tertiaer ? 'Tertiärtext → LFH-643' : null;
-        const schranke = ausnahme ? BODEN : TEXT[modus];
-        const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
-        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
-        gemessen.push([text, ausnahme]);
-        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(schranke);
+        const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Schranke ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`;
+        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ...m });
+        gemessen.push(text);
+        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(TEXT[modus]);
       }
     };
     await messeTexte(kopf, 'kopf');
@@ -312,18 +284,12 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(dialog).toBeHidden();
     }
 
-    // Die Probe hat die Texte wirklich gesehen, und die tragenden liefen OHNE Ausnahme — eine
-    // zu weit gefasste Ausnahme-Liste senkte sonst still den Boden.
-    const pruefeGesehen = (pflicht: string | RegExp, tragend: boolean) => {
-      const treffer = gemessen.filter(([t]) =>
+    // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf trivial wahr.
+    const pruefeGesehen = (pflicht: string | RegExp) => {
+      const treffer = gemessen.filter((t) =>
         typeof pflicht === 'string' ? t === pflicht : pflicht.test(t),
       );
       expect(treffer.length, `Text ${String(pflicht)} gemessen`).toBeGreaterThan(0);
-      if (tragend)
-        expect(
-          treffer.filter(([, ausnahme]) => ausnahme),
-          `Text ${String(pflicht)} ohne Ausnahme gemessen`,
-        ).toEqual([]);
     };
     for (const tragend of [
       ...KARTEN.flatMap((k) => [k.name, k.wort]),
@@ -361,9 +327,7 @@ for (const modus of ['light', 'dark'] as const) {
       'Zeitfenster anlegen',
       'Anlegen',
       'Erfassen',
-    ])
-      pruefeGesehen(tragend, true);
-    for (const ausnahme of [
+      // Tertiärtext (`schwach`), bis LFH-643 unter einer Ausnahme.
       'Sonderkost',
       'Bedarf',
       'EP',
@@ -371,7 +335,7 @@ for (const modus of ['light', 'dark'] as const) {
       'Leer: jetzt',
       'Sonderkost ist ein Teil der Menge, kein Zuschlag.',
     ])
-      pruefeGesehen(ausnahme, false);
+      pruefeGesehen(tragend);
 
     await test.info().attach('kontrastwerte.json', {
       body: JSON.stringify(messwerte, null, 2),

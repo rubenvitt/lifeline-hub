@@ -211,7 +211,10 @@ describe('EtbEntwurfsTabs', () => {
   async function setzeAnUndMeldeweg(feld: HTMLElement) {
     await userEvent.type(feld, ' /an');
     await userEvent.click(await screen.findByText('An'));
-    await userEvent.type(await screen.findByLabelText('An'), 'Florian 1{Enter}');
+    // Eingefügt statt getippt (LFH-672, Begründung im Test unten); Enter bestätigt wie getippt.
+    await userEvent.click(await screen.findByLabelText('An'));
+    await userEvent.paste('Florian 1');
+    await userEvent.keyboard('{Enter}');
     await userEvent.type(feld, ' /meldeweg');
     await userEvent.click(await screen.findByText('Meldeweg'));
     await userEvent.click(await screen.findByText('Funk'));
@@ -224,7 +227,11 @@ describe('EtbEntwurfsTabs', () => {
     // In `props()` steht der Schalter auf AN.
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).toBeChecked();
 
-    await userEvent.type(feld, 'Erste Meldung');
+    // Meldungstext EINGEFÜGT, nicht getippt: jeder Tastendruck zeichnet die Schnellerfassung neu
+    // (~85 ms in jsdom); mit ~50 Tasten stand der Test bei 3,7 s und riss unter Last die 10 s
+    // (LFH-672). Getippt bleibt, was der Test prüft: die Slash-Befehle und das Absenden.
+    await userEvent.click(feld);
+    await userEvent.paste('Erste Meldung');
     await setzeAnUndMeldeweg(feld);
     await userEvent.type(feld, '{Enter}');
 
@@ -249,7 +256,9 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
 
     // …und sie werden beim nächsten Eintrag ohne erneutes Tippen mitgesendet.
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Zweite Meldung{Enter}');
+    await userEvent.click(screen.getByPlaceholderText(/Inhalt/));
+    await userEvent.paste('Zweite Meldung');
+    await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[1][0]).toMatchObject({
       inhalt: 'Zweite Meldung',

@@ -99,3 +99,43 @@ arbeitet. Vorher sicherstellen, dass der Dienst beendet ist (`systemctl status �
 
 Das Entfernen der `-wal`/`-shm`-Dateien ist wichtig: Eine alte WAL-Datei würde
 sonst mit der zurückgespielten DB vermischt.
+
+## Sicherungen und Schwärzung (LFH-725)
+
+Nach Ablauf von Aufbewahrungsfrist und Karenz schwärzt der Server die Personendaten eines
+Einsatzes. In der **laufenden Datenbank** sind die Werte danach auch physisch weg: SQLite
+überschreibt freigewordenen Platz (`secure_delete = ON`), und nach jeder Schwärzung wird das
+Write-Ahead-Log zurückgeschrieben und geleert.
+
+**Sicherungen von vor der Schwärzung enthalten die Personendaten weiter.** Sie werden nicht
+nachträglich geschwärzt:
+
+- **Automatische Sicherungen** (Variante C) rotieren heraus. Wie lange eine Sicherung mit
+  Personendaten nach der Schwärzung noch liegt, bestimmen `--backup-behalten` ×
+  `--backup-intervall-minuten`, mit den Vorgaben 7 × 360 min ≈ 42 h. Die Zeit zählt nur, solange
+  der Server läuft und Sicherungen gelingen: rotiert wird erst nach einer erfolgreichen neuen
+  Sicherung, und die erste nach dem Start entsteht erst nach einem Intervall. Ein Notebook,
+  das nur stundenweise läuft, oder ein volles Sicherungsmedium hält alte Sicherungen also
+  länger. Ein früheres `--backup-verzeichnis` rotiert nach einem Wechsel gar nicht mehr und
+  ist von Hand zu leeren. Wer die Werte hochsetzt, verlängert die Zeit ebenfalls.
+- **Heruntergeladene Sicherungen und CLI-Sicherungen** (Varianten A und B) sowie Kopien
+  davon verwaltet der Betreiber. Sie sind nach der Karenz zu vernichten. Der Server kann sie
+  nicht erreichen.
+- **Wiederherstellen einer älteren Sicherung:** War ein Einsatz in der Sicherung schon zur
+  Löschung vorgemerkt, schwärzt ihn der nächste Purge-Lauf (alle 10 Minuten) erneut. Die
+  Vormerkung aus der Sicherung gilt dabei, die Karenz beginnt nicht neu. Stammt die
+  Sicherung aus der Zeit **vor** der Vormerkung, merkt der Server den Einsatz neu vor, und
+  die Karenz von 30 Tagen läuft ab dann noch einmal.
+
+**Erster Start nach dem Update auf LFH-725:** Der Server baut die Datenbank einmal per
+`VACUUM` neu auf. Dabei verschwinden auch Reste früherer Schwärzungen und gelöschter Anhänge.
+Das dauert je nach Größe (Anhänge!) Sekunden bis Minuten und braucht vorübergehend freien
+Platz bis zur doppelten Größe der Datenbank (eine temporäre Kopie, meist unter `/var/tmp`,
+und das Write-Ahead-Log neben der Datenbank). Das Log meldet Beginn und Ende. Scheitert es, startet der Server trotzdem, meldet den Fehler im
+Log („Einmaliger Neuaufbau des Altbestands …“) und versucht es beim nächsten Start erneut.
+
+**Unterhalb von SQLite** kann die Anwendung nichts überschreiben: Gibt das Dateisystem Blöcke
+frei, etwa beim Kürzen des Write-Ahead-Logs, beim Schrumpfen der Datenbank oder beim Löschen
+rotierter Sicherungen, bleibt ihr Inhalt bis zur Wiederverwendung auf dem Datenträger. Dazu
+kommen Journal des Dateisystems, Wear-Leveling von SSD und SD-Karte und Swap. Dagegen hilft
+eine Verschlüsselung des Datenträgers, auch des Sicherungsmediums.

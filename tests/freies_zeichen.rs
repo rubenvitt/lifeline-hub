@@ -647,3 +647,58 @@ async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
         "Y-Zeichen NICHT sichtbar auf X: {ids:?}"
     );
 }
+
+/// LFH-738: Eine `ansicht_id` aus einem ANDEREN Einsatz wird abgelehnt, beim Anlegen wie im
+/// PATCH, mit 404 wie eine unbekannte id (kein Existenz-Orakel).
+#[tokio::test]
+async fn fremde_ansicht_id_ist_404() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let eigene = standard_ansicht_id(&app, &admin, einsatz).await;
+    let fremde = standard_ansicht_id(&app, &admin, anderer).await;
+
+    for aid in [fremde, 999_999_999] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+            &admin,
+            Some(
+                &json!({"lat":50.1,"lon":8.6,"grundzeichen":"einheit","ansicht_id":aid})
+                    .to_string(),
+            ),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "POST ansicht_id={aid}: {v:?}");
+    }
+
+    let zid = zeichen_anlegen(&app, &admin, einsatz, Some(eigene)).await;
+    for aid in [fremde, 999_999_999] {
+        let (s, v) = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+            &admin,
+            Some(&json!({"ansicht_id": aid}).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "PATCH ansicht_id={aid}: {v:?}");
+    }
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        None,
+    )
+    .await;
+    let zeichen = liste.as_array().unwrap();
+    assert_eq!(zeichen.len(), 1, "kein Zeichen angelegt: {zeichen:?}");
+    assert_eq!(
+        zeichen[0]["ansicht_id"], eigene,
+        "Zuordnung unverändert: {zeichen:?}"
+    );
+}

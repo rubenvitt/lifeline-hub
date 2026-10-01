@@ -11,7 +11,7 @@ geschlossener Katalog `fuehrung::Fuehrungsfunktion` (EL, S1–S7, Führungshilfs
 Führungsstelle tragen eine **Codespalte neben dem Text** (Text = Freitext ohne Code bzw.
 Bezeichnung bei FHP/FB, Prüfung `fuehrung::pruefe_funktion`); **kein Rückschluss vom Freitext auf
 einen Code**, auch nicht „S3“ (Kodierung `funktion:<code>` nur über `fuehrung/funktionsOptionenKern.ts`).
-Der Snapshot trägt nur das Label, **nie einen Personennamen** (Retain vs. Scrub); die Besetzung löst
+Der Snapshot trägt nur das Label, **nie einen Personennamen** (er steht im ETB); die Besetzung löst
 der Server zur Lesezeit auf (`fuehrung::aufloesung`, nur mit Stab-Recht, `stab`-Ereignis invalidiert
 Aufträge und Erinnerungen). ETB-Vorbelegung „An“: Führungsstelle → erstes eigenes Sachgebiet → nichts
 (`anVorbelegung`); `etb_eintrag.von`/`an` bleiben Freitext.

@@ -7,8 +7,9 @@ import {
   IkoneStift,
 } from '../../ikonen';
 import { useState } from 'react';
-import { Button, Dropdown, Input, Modal, Radio, Space, Typography, theme } from 'antd';
+import { Button, Dropdown, Input, Modal, Radio, Space, Typography } from 'antd';
 import { Select } from '../../components/Select';
+import { useRollen } from '../../components/instrument';
 import type { KartenAnsicht } from '../../api/types';
 
 interface AnsichtSwitcherProps {
@@ -42,7 +43,7 @@ export default function AnsichtSwitcher({
   onStandard,
   onLoeschen,
 }: AnsichtSwitcherProps) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const [nameDialog, setNameDialog] = useState<NameDialog>(null);
   const [nameWert, setNameWert] = useState('');
   const [loeschDialog, setLoeschDialog] = useState<boolean>(false);
@@ -129,7 +130,9 @@ export default function AnsichtSwitcher({
             value: a.id,
             label: (
               <Space size={token.marginXS}>
-                {a.ist_standard && <IkoneSternGefuellt />}
+                {/* Kennzeichnung, keine Warnung: Ikonenrolle `schwach` statt `achtung` (LFH-704).
+                    Zweiter Kanal ist „Als Standard“ im Menü. */}
+                {a.ist_standard && <IkoneSternGefuellt style={{ color: rollen.schwach }} />}
                 {a.name}
               </Space>
             ),

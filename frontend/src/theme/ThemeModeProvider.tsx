@@ -4,6 +4,7 @@ import { ConfigProvider } from 'antd';
 import deDE from 'antd/locale/de_DE';
 import {
   antdAlgorithmus,
+  antdKlappkopf,
   antdKnopf,
   antdKomponenten,
   antdToken,
@@ -161,6 +162,7 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
   }, [helligkeitWirksam]);
 
   const knopf = useMemo(() => antdKnopf(dichte), [dichte]);
+  const klappkopf = useMemo(() => antdKlappkopf(dichte), [dichte]);
 
   const wert = useMemo<ThemeModeWert>(
     () => ({
@@ -196,6 +198,9 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
         // Boden der kurzen Achse (LFH-381): die Breite eines beschrifteten Knopfs folgt der Staffel
         // nur über diesen Kontext-Stil.
         button={knopf}
+        // Boden des Klappkopfs (LFH-653): antd rechnet den Kopf aus der Schrift, nicht aus
+        // `controlHeight`; der Kontext erreicht jedes `Collapse` auf einmal.
+        collapse={klappkopf}
         theme={{
           // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
           // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine

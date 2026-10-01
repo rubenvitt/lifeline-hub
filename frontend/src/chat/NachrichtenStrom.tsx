@@ -1,21 +1,11 @@
-import { IkonePunkteSenkrecht } from '../ikonen';
-import {
-  Button,
-  Dropdown,
-  Popconfirm,
-  Popover,
-  Space,
-  Tag,
-  Tooltip,
-  Typography,
-  theme,
-} from 'antd';
-import type { MenuProps } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { Button, Modal, Popover, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../anzeige/format';
 import DownloadAnker from '../components/DownloadAnker';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { aktionsNamen } from './aktionsNamen';
 import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 import { formatGroesse } from '../karten/formatGroesse';
@@ -96,6 +86,21 @@ export default function NachrichtenStrom({
    * Array; `n.id > markeId` ist gegen beides immun.
    */
   const [markeId, setMarkeId] = useState<number | null>(null);
+  /**
+   * Die Nachricht, deren Löschen gerade nachgefragt wird (über ihre ID). Die Rückfrage ist EIN `<Modal>` außerhalb
+   * der Zeilenschleife (LFH-365): eine Blase am Menüeintrag hielt das Menü per gestopptem Klick
+   * offen und war der Grund für Knoten-Etiketten im Menü (LFH-683).
+   */
+  const [loeschFrageId, setLoeschFrageId] = useState<number | null>(null);
+  /**
+   * Aus der LIVE-Liste gelesen, nicht als Schnappschuss: wird die Nachricht gelöscht (anderer Tab,
+   * Live-Ereignis), während der Dialog offen ist, schließt er, statt ein zweites DELETE zu senden.
+   */
+  const loeschZiel =
+    loeschFrageId == null
+      ? undefined
+      : nachrichten.find((n) => n.id === loeschFrageId && n.geloescht_at === null);
+  const namen = useMemo(() => aktionsNamen(nachrichten), [nachrichten]);
   const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
 
   /** Flankenwechsel am unteren Rand: Marke setzen bzw. räumen. */
@@ -168,62 +173,47 @@ export default function NachrichtenStrom({
           const heraufgestuft = n.etb_eintrag_id !== null;
           const heraufgestuftZuAuftrag = n.auftrag_id !== null;
           const hatBezug = n.bezug_typ !== null && n.bezug_id !== null;
-          // Aktionen im „⋯"-Dropdown; gelöschte Nachrichten zeigen keine.
-          const menuItems: MenuProps['items'] = geloescht
+          // Aktionen im Menü; gelöschte Nachrichten zeigen keine, und ohne Eintrag gibt es keinen
+          // Auslöser.
+          type Aktion = 'hoch' | 'auftrag' | 'bezug' | 'edit' | 'del';
+          const eintraege: MenueEintrag<Aktion>[] = geloescht
             ? []
             : [
                 ...(darfSchreiben && !heraufgestuft
-                  ? [{ key: 'hoch', label: 'Zu ETB', onClick: () => onHeraufstufen(n) }]
+                  ? [{ key: 'hoch' as const, label: 'Zu ETB' }]
                   : []),
                 ...(darfSchreiben && !heraufgestuftZuAuftrag
-                  ? [
-                      {
-                        key: 'auftrag',
-                        label: 'Zu Auftrag',
-                        onClick: () => onHeraufstufenAuftrag(n),
-                      },
-                    ]
+                  ? [{ key: 'auftrag' as const, label: 'Zu Auftrag' }]
                   : []),
                 ...(darfSchreiben && onBezugSetzen
-                  ? [
-                      {
-                        key: 'bezug',
-                        label: hatBezug ? 'Bezug ändern' : 'Bezug',
-                        onClick: () => onBezugSetzen(n),
-                      },
-                    ]
+                  ? [{ key: 'bezug' as const, label: hatBezug ? 'Bezug ändern' : 'Bezug' }]
                   : []),
                 ...(eigene && darfSchreiben
                   ? [
-                      { key: 'edit', label: 'Bearbeiten', onClick: () => onBearbeiten(n) },
-                      {
-                        key: 'del',
-                        danger: true,
-                        // Lösch-Bestätigung: Popconfirm im Label; das gestoppte Klick-Event hält das Menü offen, damit
-                        // die Bestätigungsblase erscheint.
-                        label: (
-                          <Popconfirm
-                            title="Nachricht wirklich löschen?"
-                            okText="Ja, löschen"
-                            cancelText="Abbrechen"
-                            okButtonProps={{ danger: true }}
-                            onConfirm={() => onLoeschen(n)}
-                          >
-                            <span onClick={(e) => e.stopPropagation()}>Löschen</span>
-                          </Popconfirm>
-                        ),
-                      },
+                      { key: 'edit' as const, label: 'Bearbeiten' },
+                      { key: 'del' as const, label: 'Löschen', gefahr: true as const },
                     ]
                   : []),
               ];
+          const waehle = (key: Aktion) => {
+            if (key === 'hoch') onHeraufstufen(n);
+            else if (key === 'auftrag') onHeraufstufenAuftrag(n);
+            else if (key === 'bezug') onBezugSetzen?.(n);
+            else if (key === 'edit') onBearbeiten(n);
+            else if (key === 'del') setLoeschFrageId(n.id);
+          };
           return (
             <ListenEintrag
               actions={
-                menuItems && menuItems.length > 0
+                eintraege.length > 0
                   ? [
-                      <Dropdown key="aktionen" trigger={['click']} menu={{ items: menuItems }}>
-                        <Button type="text" aria-label="Aktionen" icon={<IkonePunkteSenkrecht />} />
-                      </Dropdown>,
+                      // n Nachrichten, n unterscheidbare Auslöser ({@link aktionsNamen}).
+                      <MenueAusloeser
+                        key="aktionen"
+                        eintraege={eintraege}
+                        zugaenglicherName={namen.get(n.id)!}
+                        onWahl={waehle}
+                      />,
                     ]
                   : []
               }
@@ -324,6 +314,20 @@ export default function NachrichtenStrom({
           );
         }}
       />
+      <Modal
+        open={loeschZiel != null}
+        title="Nachricht wirklich löschen?"
+        okText="Ja, löschen"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true }}
+        onOk={() => {
+          if (loeschZiel) onLoeschen(loeschZiel);
+          setLoeschFrageId(null);
+        }}
+        onCancel={() => setLoeschFrageId(null)}
+      >
+        Die Nachricht bleibt als „Nachricht gelöscht“ im Verlauf stehen.
+      </Modal>
       {/* Die Pille klebt am unteren Rand des Scroll-Containers (`sticky`, sie gehört in den Strom).
          Der Wrapper ist reine Positionierschale und lässt Zeiger durch. Die Pille ist ein echter
          antd-`Button`, damit Trefffläche, Fokusring und Tastaturweg vom `ConfigProvider` kommen. */}
