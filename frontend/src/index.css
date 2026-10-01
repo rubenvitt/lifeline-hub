@@ -50,8 +50,9 @@ body {
 }
 
 /* Radio-Knopf (Knopfform): antd schreibt den Text gewählt und unter dem Zeiger in
-   `colorPrimary`, am Tag unter 7 : 1 — deshalb nur der TEXT auf `bedienText`; Rand, Scheibe und
-   Flächen bleiben `bedien` (ein Komponenten-Token hätte sie mitgefärbt).
+   `colorPrimary`/`colorPrimaryHover` — am Tag lag das bis LFH-661 unter 7 : 1. Blauer Bedien-TEXT
+   nimmt `bedienText` (frontend/AGENTS.md, Farbachsen), deshalb nur der TEXT auf `bedienText`;
+   Rand, Scheibe und Flächen bleiben `bedien` (ein Komponenten-Token hätte sie mitgefärbt).
    Hier statt in `theme/sprache.css`, weil die Regel app-weit gilt und `sprache.css` nur mit den
    importierenden Bausteinen lädt. Nur `-outline`: bei `solid` stünde der Text auf `bedien`-Fläche.
    `.ant-radio-group-outline` hebt die Spezifität über antds (0,3,0). */

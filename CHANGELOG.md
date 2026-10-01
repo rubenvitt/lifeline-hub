@@ -1,3 +1,17 @@
+## [1.0.0-alpha.62](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.61...v1.0.0-alpha.62) (2026-10-01)
+
+### Betrieb und Installation
+
+#### Login-Sperre hinter Reverse-Proxy korrigiert
+
+Bei Betrieb hinter einem Reverse-Proxy (z.B. Traefik) wurden Fehlversuche beim Login nicht mehr pro Client, sondern pro Proxy gezählt. Das führte dazu, dass zehn Fehlversuche von beliebigen Clients den Passwort-Login für alle Nutzer sperrten.
+
+**Neu:** Die Anwendung kann nun vertrauenswürdige Proxies über die Umgebungsvariable `LIFELINE_TRUSTED_PROXIES` erkennen (Komma-getrennte Liste von IP-Adressen oder Netzwerk-Bereichen). Liegt die Verbindungsquelle in dieser Liste, wird die tatsächliche Client-Adresse aus dem `X-Forwarded-For`-Header ermittelt. Ohne diese Angabe bleibt es bei der direkten Gegenstelle; der Header wird nicht ausgewertet.
+
+Die aktive Proxy-Liste erscheint beim Start im Log. Weitere Hinweise zur Konfiguration finden sich in der Betriebsdokumentation.
+
+**Hinweis:** Wird die Anwendung über einen Reverse-Proxy mit veröffentlichten Docker-Ports betrieben, sollte geprüft werden, ob die Proxy-Liste konfiguriert werden muss, um die Login-Sperre korrekt pro Client wirksam zu machen.
+
 ## [1.0.0-alpha.61](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.60...v1.0.0-alpha.61) (2026-10-01)
 
 ### Wichtige Änderungen

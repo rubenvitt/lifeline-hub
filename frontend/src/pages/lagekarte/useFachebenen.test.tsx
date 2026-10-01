@@ -632,6 +632,62 @@ describe('useFachebenen', () => {
     }
   });
 
+  it('filtert abgelaufene DWD-Warnungen im Minutentakt und markiert angekündigte (LFH-662)', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    const original = lade.getMockImplementation()!;
+    const warnung = (EVENT: string, p: Record<string, string>) => ({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [] },
+      properties: { EVENT, ...p },
+    });
+    lade.mockImplementation((quelle, bbox) =>
+      quelle !== 'dwd'
+        ? original(quelle, bbox)
+        : Promise.resolve({
+            quelle,
+            status: 'ok',
+            attribution: 'Datenbasis: Deutscher Wetterdienst',
+            stand: null,
+            abgerufen: '2026-09-23T14:55:00Z',
+            features: {
+              type: 'FeatureCollection',
+              features: [
+                warnung('FROST', {
+                  ONSET: '2026-09-23T12:00:00Z',
+                  EXPIRES: '2026-09-23T15:02:00Z',
+                }),
+                warnung('STURM', {
+                  ONSET: '2026-09-23T18:00:00Z',
+                  EXPIRES: '2026-09-23T21:00:00Z',
+                }),
+              ],
+            },
+          }),
+    );
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-23T15:00:30Z'));
+    try {
+      const { result } = rendere();
+      act(() => result.current.onFachebeneToggle('dwd', true));
+      const dwd = () => result.current.aktiveFachebenen.find((f) => f.def.key === 'dwd')?.daten;
+      await waitFor(() => expect(dwd()?.features).toHaveLength(2));
+      expect(dwd()!.features.map((f) => [f.properties.EVENT, f.properties.angekuendigt])).toEqual([
+        ['FROST', undefined],
+        ['STURM', true],
+      ]);
+      // Kein neuer Abruf (Poll alle 5 min), nur der Minutentakt: um 15:03 ist FROST abgelaufen.
+      const rufe = lade.mock.calls.filter(([q]) => q === 'dwd').length;
+      await act(() => vi.advanceTimersByTimeAsync(3 * 60_000));
+      await waitFor(() =>
+        expect(dwd()!.features.map((f) => f.properties.EVENT)).toEqual(['STURM']),
+      );
+      expect(lade.mock.calls.filter(([q]) => q === 'dwd').length).toBe(rufe);
+    } finally {
+      vi.useRealTimers();
+      lade.mockImplementation(original);
+    }
+  });
+
   it('meldet für KRITIS in keiner Zoomstufe einen Zoom-Hinweis (LFH-83)', () => {
     // KRITIS fragt in jeder Zoomstufe den Extrakt-Bestand (gebündelt ab 5000 Objekten); die
     // `BBOX_MIN_ZOOM`-Schwelle gilt nur für Ebenen mit eigenem `minZoom`, KRITIS trägt keinen.

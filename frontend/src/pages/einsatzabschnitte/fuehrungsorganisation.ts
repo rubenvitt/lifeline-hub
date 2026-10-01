@@ -182,13 +182,6 @@ function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined
   return undefined;
 }
 
-/** Schlüssel aller Knoten mit Kindern — „Alle zuklappen“ und der Druck klappen hierüber. */
-export function klappbareSchluessel(knoten: readonly OrgKnoten[]): string[] {
-  return knoten.flatMap((k) =>
-    k.kinder.length > 0 ? [k.key, ...klappbareSchluessel(k.kinder)] : [],
-  );
-}
-
 // ── Markdown für den Lagebericht (D8) ──────────────────────────────────────────────────────────
 
 /** Der Stab in S-Folge mit dem Wortlaut der Stabseite; unbesetzte Sachgebiete fehlen. */

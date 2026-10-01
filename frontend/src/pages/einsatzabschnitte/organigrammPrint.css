@@ -1,33 +1,9 @@
-/* Eigenheiten des Organigramms im Druck (LFH-626, design.md D6). Die Mechanik (Ausblenden des
-   Rahmens, Fluss, Papierfarben, Umbruch der Grundelemente) liegt in `druck/druck.css`;
-   `.organigramm-print-root` trägt dafür `data-lfh="druckwurzel"`. Nachweis der Wirkung:
-   `e2e/fuehrungsorganisation.spec.ts` (ausgelöstes `beforeprint`, A4-Breite). */
+/* Eigenheiten des Organigramms im Druck (LFH-626, design.md D6). Die Mechanik liegt in
+   `druck/druck.css`, die Regeln des hängenden Gerüsts (Spalten, Klappziele, Umbruch) in
+   `components/organigramm/haengenderBaumPrint.css` (LFH-625 D4); `.organigramm-print-root` trägt
+   `data-lfh="druckwurzel"`. Nachweis der Wirkung: `e2e/fuehrungsorganisation.spec.ts`. */
 @media print {
   .organigramm-no-print {
     display: none !important;
-  }
-
-  /* A4 hoch: zwei feste Spalten statt `auto-fill` nach Fensterbreite. */
-  .organigramm-print-root [data-lfh='org-ebene1'] {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    /* Auch das Grid selbst ist ein `ul`, das `druck.css` zusammenhielte: sonst rutschte es ganz
-       auf Seite 2 (Review LFH-626). */
-    break-inside: auto;
-  }
-
-  /* Die Klappknöpfe sind Bedienung. Mit ihnen fällt der Platzhalter der Blätter, damit alle
-     Knoten einer Ebene bündig bleiben. */
-  .organigramm-print-root [data-lfh='org-klappen'],
-  .organigramm-print-root [data-lfh='org-klappen-platz'] {
-    display: none !important;
-  }
-
-  /* `druck.css` hält jede Liste zusammen. Eine lange Spalte ist aber eine verschachtelte Liste
-     und schöbe sonst ganze Seiten leer vor sich her: hier bricht die Liste, der Knoten nicht. */
-  .organigramm-print-root [data-lfh='org-ebene1'] ul {
-    break-inside: auto;
-  }
-  .organigramm-print-root [data-lfh='org-knoten'] {
-    break-inside: avoid;
   }
 }

@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
+use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 use utoipa::ToSchema;
 
 /// Passwort-Wert mit maskierter `Debug`-Ausgabe, damit der Klartext nicht (etwa via
@@ -455,6 +457,46 @@ pub struct Config {
     /// `--webauthn-rp-id`.
     #[arg(long, env = "LIFELINE_WEBAUTHN_RP_ORIGIN")]
     pub webauthn_rp_origin: Option<String>,
+
+    /// Vertrauenswürdige Reverse-Proxys (LFH-604), Komma-Liste aus Netzen und einzelnen
+    /// Adressen, z. B. `172.16.0.0/12,10.0.0.7`. Nur wenn die TCP-Gegenstelle darin liegt, gilt
+    /// die Client-Adresse aus `X-Forwarded-For` (von rechts, erster nicht vertrauenswürdiger
+    /// Eintrag) — für die Anmelde-Bremse und `auth_audit`. **Ohne Angabe** gilt die
+    /// Gegenstelle, und der Header wird nie gelesen.
+    ///
+    /// Verschiebt eine Vertrauensgrenze: wer aus einem gelisteten Netz verbindet, bestimmt die
+    /// Quell-IP selbst. Nur die Adressen des Proxys eintragen, und den Port des Servers nicht
+    /// zusätzlich an ihm vorbei erreichbar machen.
+    #[arg(
+        long,
+        env = "LIFELINE_TRUSTED_PROXIES",
+        value_delimiter = ',',
+        value_parser = proxy_netz_parsen
+    )]
+    pub trusted_proxies: Vec<IpNet>,
+}
+
+/// Ein Eintrag der Proxy-Liste: Netz in CIDR-Form oder einzelne Adresse (dann `/32` bzw.
+/// `/128`). Ein Hostname ist ein Fehler, damit ein Tippfehler den Start abbricht, statt still
+/// jedem Proxy zu misstrauen; ebenso ein leerer Eintrag (leer gesetzte Variable, Komma am Ende).
+///
+/// IPv4-gemappte Netze (`::ffff:…`) sind ein Fehler: `extract::client_ip` vergleicht solche
+/// Adressen als IPv4, der Eintrag griffe also nie.
+fn proxy_netz_parsen(eintrag: &str) -> Result<IpNet, String> {
+    let eintrag = eintrag.trim();
+    let netz = eintrag
+        .parse::<IpNet>()
+        .or_else(|_| eintrag.parse::<IpAddr>().map(IpNet::from))
+        .map(|netz| netz.trunc())
+        .map_err(|_| format!("'{eintrag}' ist weder ein Netz (CIDR) noch eine IP-Adresse"))?;
+    if let IpNet::V6(v6) = netz {
+        if v6.addr().to_ipv4_mapped().is_some() {
+            return Err(format!(
+                "'{eintrag}' ist IPv4-gemappt — das Netz als IPv4 angeben (z. B. 172.16.0.0/12)"
+            ));
+        }
+    }
+    Ok(netz)
 }
 
 impl Config {
@@ -604,6 +646,51 @@ mod tests {
         assert!(
             try_parse_mit_env("LIFELINE_DEMO_DATEN", "1", &["lifeline-hub"]).is_err(),
             "LIFELINE_DEMO_DATEN=1 muss ein Parse-Fehler sein, kein stilles Aus"
+        );
+    }
+
+    /// Ohne Angabe ist die Proxy-Liste leer: dann bleibt die Gegenstelle die Quell-IP (LFH-604).
+    /// Die Env nimmt eine Komma-Liste aus Netzen und einzelnen Adressen, Leerzeichen erlaubt.
+    #[test]
+    fn trusted_proxies_vorgabe_leer_und_als_liste_setzbar() {
+        assert!(parse_hermetisch(["lifeline-hub"])
+            .trusted_proxies
+            .is_empty());
+
+        let c = parse_mit_env(
+            "LIFELINE_TRUSTED_PROXIES",
+            "172.16.0.0/12, 10.0.0.7,fd00::/64",
+            &["lifeline-hub"],
+        );
+        let erwartet: Vec<ipnet::IpNet> = ["172.16.0.0/12", "10.0.0.7/32", "fd00::/64"]
+            .iter()
+            .map(|n| n.parse().unwrap())
+            .collect();
+        assert_eq!(c.trusted_proxies, erwartet);
+
+        let c = parse_hermetisch(["lifeline-hub", "--trusted-proxies", "192.0.2.1"]);
+        assert_eq!(c.trusted_proxies, vec!["192.0.2.1/32".parse().unwrap()]);
+
+        assert!(
+            try_parse_mit_env("LIFELINE_TRUSTED_PROXIES", "traefik", &["lifeline-hub"]).is_err(),
+            "ein Hostname ist kein Netz: laut abbrechen statt still alles zu misstrauen"
+        );
+        assert!(
+            try_parse_mit_env("LIFELINE_TRUSTED_PROXIES", "", &["lifeline-hub"]).is_err(),
+            "leer gesetzt bricht ab — wer keine Liste will, lässt die Variable weg"
+        );
+        assert!(
+            try_parse_mit_env("LIFELINE_TRUSTED_PROXIES", "10.0.0.7,", &["lifeline-hub"]).is_err(),
+            "ein Komma am Ende ist ein leerer Eintrag"
+        );
+        assert!(
+            try_parse_mit_env(
+                "LIFELINE_TRUSTED_PROXIES",
+                "::ffff:172.16.0.0/108",
+                &["lifeline-hub"]
+            )
+            .is_err(),
+            "ein IPv4-gemapptes Netz griffe nie und wird abgewiesen"
         );
     }
 

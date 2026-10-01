@@ -29,6 +29,7 @@ import {
   auftraegePfad,
   erinnerungenPfad,
   meldungenPfad,
+  wetterPegelPfad,
 } from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
@@ -69,6 +70,17 @@ function abloesungAlarmText(detail: AbloesungAlarmDetail): {
     : { titel: 'Ablösung fällig', beschreibung: `Ablösung fällig: ${bei}` };
 }
 
+/**
+ * Payload von `lfh:unwetter-alarm` (`wetter/useUnwetterHinweis.ts`, LFH-663). Die Texte baut der
+ * Auslöser, weil nur er die Anzeige-Konventionen des Einsatzes kennt; `schluessel` ist das Paar
+ * aus Stufe und Ereignis.
+ */
+type UnwetterDetail = {
+  schluessel?: string;
+  titel?: string;
+  beschreibung?: string;
+};
+
 type ErinnerungDetail = {
   erinnerung_id?: number;
   bezug_typ?: 'auftrag' | 'meldung' | 'etb' | null;
@@ -86,7 +98,7 @@ type AlarmToast = {
 
 const MAX_SICHTBARE_TOASTS = 3;
 
-type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen' | 'abloesung';
+type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen' | 'abloesung' | 'wetter-pegel';
 
 type AlarmScope = {
   keyPrefix: string;
@@ -97,9 +109,19 @@ type AlarmScope = {
   einzelneToastZiele: Map<string, AlarmZiel>;
   gebuendelteToastZiele: Map<string, AlarmZiel>;
   eigeneToastKeys: Set<string>;
+  /** Key des zuletzt gezeigten Unwetterhinweises — ein neuer ersetzt ihn (ein Platz im Budget). */
+  unwetterKey: string | null;
 };
 
 type DesktopZustand = 'aus' | 'erlaubt' | 'browser-blockiert';
+
+/**
+ * Tonzustand der Anzeige (LFH-637). `prueft` gilt, bis die Audio-Prüfung zum ersten Mal
+ * antwortet: „blockiert" hieße dort etwas, das niemand festgestellt hat, und das Wort brach beim
+ * Start die Kopfzeile bei 1024 px um (CLS 0,46). `prueft` ist keine Störung, steht also wie der
+ * Ruhezustand: gedämpft, ohne durchgestrichene Glocke, zwischen `md` und `xl` ohne Wort.
+ */
+type TonZustand = AlarmTonStatus | 'prueft';
 
 function desktopZustand(permission: NotificationPermission | 'unsupported'): DesktopZustand {
   if (permission === 'granted') return 'erlaubt';
@@ -109,7 +131,8 @@ function desktopZustand(permission: NotificationPermission | 'unsupported'): Des
 
 /**
  * Einsatzweite Alarm-Zentrale: lauscht auf `lfh:sofortmeldung`, `lfh:erinnerung-alarm` und die
- * Ablösungshinweise (von useEinsatzLiveStream ausgelöst) und zeigt NICHT selbst-schließende
+ * Ablösungshinweise (von useEinsatzLiveStream ausgelöst) sowie auf `lfh:unwetter-alarm` (vom
+ * Rahmen, `wetter/useUnwetterHinweis.ts`) und zeigt NICHT selbst-schließende
  * Toasts mit Deeplink zur Quelle, optional eine Desktop-Benachrichtigung bei Hintergrund-Tab.
  * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
  * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438).
@@ -121,7 +144,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   const instanzId = useId();
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
-  const [tonStatus, setTonStatus] = useState<AlarmTonStatus>(alarmTonStatus() ?? 'blockiert');
+  const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
   // Jede Instanz verwaltet pro Einsatz einen eigenen Scope, damit langlebige Notices beim
   // Einsatzwechsel gezielt abgeräumt werden können, ohne fremde Notifications anzutasten.
   const alarmScope = useMemo<AlarmScope>(() => {
@@ -135,6 +158,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       einzelneToastZiele: new Map(),
       gebuendelteToastZiele: new Map(),
       eigeneToastKeys: new Set(),
+      unwetterKey: null,
     };
   }, [einsatzId, instanzId]);
 
@@ -153,6 +177,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       if (ziel === 'auftraege') return auftraegePfad(einsatzId);
       if (ziel === 'erinnerungen') return erinnerungenPfad(einsatzId);
       if (ziel === 'abloesung') return abloesungPfad(einsatzId);
+      if (ziel === 'wetter-pegel') return wetterPegelPfad(einsatzId);
       return meldungenPfad(einsatzId);
     },
     [einsatzId],
@@ -187,6 +212,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       { ziel: 'auftraege', text: 'Zu Aufträgen' },
       { ziel: 'erinnerungen', text: 'Zu Erinnerungen' },
       { ziel: 'abloesung', text: 'Zu Ablösungen' },
+      { ziel: 'wetter-pegel', text: 'Zu Wetter & Pegel' },
     ];
 
     alarmScope.eigeneToastKeys.add(alarmScope.sammelKey);
@@ -448,6 +474,57 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     return () => window.removeEventListener('lfh:abloesung-alarm', onAbloesung);
   }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
 
+  // Neue Unwetterwarnung am Einsatzort (LFH-663,
+  // `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
+  // der Rahmen erkennt „neu" selbst und meldet es hierher, der Ton spielt dort. Ein neuer Hinweis
+  // ERSETZT einen noch einzeln sichtbaren älteren — das Wetter belegt nie mehr als einen der drei
+  // Plätze. Eigener Key je Auslösung, damit „schon gebündelt" ihn nie verschluckt.
+  useEffect(() => {
+    const onUnwetter = (ev: Event) => {
+      const detail = (ev as CustomEvent<UnwetterDetail>).detail ?? {};
+      // Je Auslösung ein eigener Key: läge der alte Hinweis desselben Paars noch gebündelt in der
+      // Zusammenfassung, verschluckte „schon gebündelt" sonst den neuen.
+      const key = `${alarmScope.keyPrefix}-unwetter-${detail.schluessel ?? 'ohne'}-${++alarmScope.zaehler}`;
+      const vorher = alarmScope.unwetterKey;
+      if (vorher && alarmScope.einzelneToastKeys.includes(vorher)) {
+        notification.destroy(vorher);
+        alarmScope.eigeneToastKeys.delete(vorher);
+        alarmScope.einzelneToastZiele.delete(vorher);
+        alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys.filter((k) => k !== vorher);
+      }
+      alarmScope.unwetterKey = key;
+      const titel = detail.titel ?? 'Unwetterwarnung';
+      const beschreibung =
+        detail.beschreibung ?? 'Für den Einsatzort liegt eine Unwetterwarnung vor.';
+      const ziel = wetterPegelPfad(einsatzId);
+      const oeffnen = () => {
+        if (!alarmScope.aktiv) return;
+        navigate(ziel);
+        notification.destroy(key);
+      };
+      zeigeAlarmToast({
+        key,
+        art: 'warning',
+        titel,
+        beschreibung,
+        aktion: (
+          <Button type="primary" onClick={oeffnen}>
+            Öffnen
+          </Button>
+        ),
+        ziel: 'wetter-pegel',
+      });
+      zeigeDesktopAlarm(titel, {
+        koerper: beschreibung,
+        beiKlick: () => {
+          if (alarmScope.aktiv) navigate(ziel);
+        },
+      });
+    };
+    window.addEventListener('lfh:unwetter-alarm', onUnwetter);
+    return () => window.removeEventListener('lfh:unwetter-alarm', onUnwetter);
+  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
+
   const tonUmschalten = async () => {
     if (gemutet) {
       setzeAlarmMute(false);
@@ -488,7 +565,13 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       : desktop === 'erlaubt'
         ? 'Desktop-Benachrichtigungen sind erlaubt'
         : 'Desktop-Benachrichtigungen sind im Browser blockiert';
-  const tonText = gemutet ? 'Ton stumm' : tonStatus === 'bereit' ? 'Ton bereit' : 'Ton blockiert';
+  const tonText = gemutet
+    ? 'Ton stumm'
+    : tonStatus === 'bereit'
+      ? 'Ton bereit'
+      : tonStatus === 'prueft'
+        ? 'Ton prüft'
+        : 'Ton blockiert';
   const tonHinweis = gemutet
     ? 'Alarmton einschalten'
     : tonStatus === 'blockiert'
@@ -525,7 +608,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     //
     // Zwei Einträge verstoßen nicht gegen „ab drei bündeln": hier bündelt die Breite, nicht die
     // Bequemlichkeit. Der Preis: Stummschalten kostet auf dem Handschirm zwei Tipper.
-    const tonAuffaellig = gemutet || tonStatus !== 'bereit';
+    const tonAuffaellig = gemutet || tonStatus === 'blockiert';
     const zeigtTon = tonAuffaellig || desktop === 'erlaubt';
     const sammelText = zeigtTon ? tonText : desktopText;
 
@@ -572,7 +655,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   }
 
   const desktopAuffaellig = desktop === 'browser-blockiert';
-  const tonAuffaelligBreit = gemutet || tonStatus !== 'bereit';
+  const tonAuffaelligBreit = gemutet || tonStatus === 'blockiert';
   const desktopWort = knapp && !desktopAuffaellig ? null : desktopText;
   const tonWort = knapp && !tonAuffaelligBreit ? null : tonText;
 

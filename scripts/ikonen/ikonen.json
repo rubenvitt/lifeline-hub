@@ -183,7 +183,7 @@
     },
     {
       "name": "gewitterwolke",
-      "bedeutung": "Wetter & Pegel; Gewitterwarnung",
+      "bedeutung": "Wetter & Pegel; Gewitterwarnung; Wetterlage Gewitter (LFH-864)",
       "herkunft": "icons8",
       "icons8": {
         "id": "670",
@@ -215,6 +215,15 @@
       "icons8": {
         "id": "39074",
         "commonName": "no-reminders"
+      }
+    },
+    {
+      "name": "hagel",
+      "bedeutung": "Wetter & Pegel; Wetterlage Hagel (LFH-864)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "666",
+        "commonName": "hail"
       }
     },
     {
@@ -488,7 +497,7 @@
     },
     {
       "name": "mond",
-      "bedeutung": "Darstellung 'Dunkel'",
+      "bedeutung": "Darstellung 'Dunkel'; Wetterlage klar bei Nacht (LFH-864)",
       "herkunft": "icons8",
       "icons8": {
         "id": "25031",
@@ -515,11 +524,20 @@
     },
     {
       "name": "nebel",
-      "bedeutung": "Wetterwarnung Nebel",
+      "bedeutung": "Wetterwarnung Nebel; Wetterlage Nebel bei Tag (LFH-864)",
       "herkunft": "icons8",
       "icons8": {
         "id": "672",
         "commonName": "fog-day"
+      }
+    },
+    {
+      "name": "nebel-nacht",
+      "bedeutung": "Wetter & Pegel; Wetterlage Nebel bei Nacht (LFH-864)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "674",
+        "commonName": "fog-night"
       }
     },
     {
@@ -708,7 +726,7 @@
     },
     {
       "name": "regen",
-      "bedeutung": "Wetterwarnung Regen",
+      "bedeutung": "Wetterwarnung Regen; Wetterlage Regen (LFH-864)",
       "herkunft": "icons8",
       "icons8": {
         "id": "656",
@@ -752,6 +770,24 @@
       }
     },
     {
+      "name": "schneeregen",
+      "bedeutung": "Wetter & Pegel; Wetterlage Schneeregen (LFH-864)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "838",
+        "commonName": "sleet"
+      }
+    },
+    {
+      "name": "schneewolke",
+      "bedeutung": "Wetter & Pegel; Wetterlage Schnee (LFH-864; die Schneeflocke bleibt für Glätte/Frost)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "664",
+        "commonName": "snow"
+      }
+    },
+    {
       "name": "schraubenschluessel",
       "bedeutung": "Defekt; Modul in Arbeit",
       "herkunft": "icons8",
@@ -782,7 +818,7 @@
     },
     {
       "name": "sonne",
-      "bedeutung": "Darstellung 'Hell'; Helligkeit 80 %; UV-Warnung; alle fünf Helligkeitsstufen (Freigabe 30.09.2026: eine Sonne, die Stufe steht als Zahl daneben)",
+      "bedeutung": "Darstellung 'Hell'; Helligkeit 80 %; UV-Warnung; alle fünf Helligkeitsstufen (Freigabe 30.09.2026: eine Sonne, die Stufe steht als Zahl daneben); Wetterlage klar bei Tag (LFH-864)",
       "herkunft": "icons8",
       "icons8": {
         "id": "648",
@@ -849,6 +885,24 @@
       "icons8": {
         "id": "49",
         "commonName": "edit"
+      }
+    },
+    {
+      "name": "teils-bewoelkt-nacht",
+      "bedeutung": "Wetter & Pegel; Wetterlage teils bewölkt bei Nacht (LFH-864)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "660",
+        "commonName": "partly-cloudy-night"
+      }
+    },
+    {
+      "name": "teils-bewoelkt-tag",
+      "bedeutung": "Wetter & Pegel; Wetterlage teils bewölkt bei Tag (LFH-864)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "658",
+        "commonName": "partly-cloudy-day"
       }
     },
     {
@@ -927,7 +981,7 @@
     },
     {
       "name": "wind",
-      "bedeutung": "Wetterwarnung Sturm/Wind",
+      "bedeutung": "Wetterwarnung Sturm/Wind; Wetterlage windig (LFH-864)",
       "herkunft": "icons8",
       "icons8": {
         "id": "31842",
@@ -953,6 +1007,15 @@
         "commonName": "wi-fi-connected"
       },
       "notiz": "WLAN-Paar statt Funkbalken: iOS no-connection hat keine Durchstreichung."
+    },
+    {
+      "name": "wolke",
+      "bedeutung": "Wetter & Pegel; Wetterlage bewölkt (LFH-864)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "2854",
+        "commonName": "cloud"
+      }
     },
     {
       "name": "zahnrad",

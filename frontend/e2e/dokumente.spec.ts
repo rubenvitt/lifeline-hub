@@ -282,15 +282,26 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
   await expect(page.locator('.ant-table'), 'keine Tabelle bei 390 px').toHaveCount(0);
   await keinQuerlauf(page, `${pfad} @390`);
 
-  // Entfernen im Kartenzweig: Auslöser neutral, OK der Rückfrage rot; der zugängliche Name
-  // trägt den Titel.
-  const entfernenKarte = page.getByRole('button', { name: 'Dokument Lageplan Nord entfernen' });
-  await expect(entfernenKarte, 'der Auslöser ist NICHT rot').not.toHaveClass(/ant-btn-dangerous/);
-  await entfernenKarte.click();
-  // Das Primitiv setzt kein `okText` — gegriffen wird der Primärknopf der offenen Rückfrage.
-  const ok = page.locator('.ant-popconfirm:not(.ant-popover-hidden) .ant-btn-primary');
+  // Entfernen im Kartenzweig (LFH-656): Primäraktion ist „Bearbeiten“, Entfernen steht als roter
+  // Eintrag im Aktionsmenü; die Rückfrage ist ein Seiten-Modal mit rotem OK. Der zugängliche
+  // Name trägt den Titel.
+  await expect(
+    page.getByRole('button', { name: 'Dokument Lageplan Nord bearbeiten' }),
+    'Primäraktion der Karte',
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Aktionen zu Dokument Lageplan Nord' }).click();
+  const eintrag = page
+    .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+    .getByRole('menuitem', { name: 'Entfernen' });
+  await expect(eintrag, 'der Menüeintrag ist rot').toHaveClass(/ant-dropdown-menu-item-danger/);
+  await eintrag.click();
+  const rueckfrage = page.getByRole('dialog').filter({ hasText: 'Dokument entfernen?' });
+  const ok = rueckfrage.getByRole('button', { name: 'Entfernen' });
   await expect(ok, 'das OK der Rückfrage ist rot').toHaveClass(/ant-btn-dangerous/);
+  // Erst nach der Zoom-Einblendung klicken: währenddessen nimmt das Modal keinen Klick an.
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
   await ok.click();
+  await expect(rueckfrage, 'die Rückfrage schließt mit dem OK').toBeHidden();
   await expect(page.getByRole('link', { name: 'Lageplan Nord' })).toHaveCount(0);
   await expect(page.getByText('Noch keine Dokumente abgelegt.')).toBeVisible();
 });
@@ -302,6 +313,42 @@ async function waagrechteFuge(links: Locator, rechts: Locator): Promise<number> 
   expect(a && b, 'keine Kästen messbar').toBeTruthy();
   return Math.round((b!.x - (a!.x + a!.width)) * 10) / 10;
 }
+
+test('Bearbeiten: Titel und Kategorie ändern, Datei bleibt, ETB weist die Änderung nach', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Ablage Bearbeiten ${Date.now()}`);
+  await seedeDokument(page, einsatzId, 'Lagepaln Nord', 'sonstiges', 'Lageplan Nord.pdf', PDF);
+  await page.goto(`/einsaetze/${einsatzId}/dokumente`);
+
+  await page.getByRole('button', { name: 'Dokument Lagepaln Nord bearbeiten' }).click();
+  const dialog = page.getByRole('dialog').filter({ hasText: 'Dokument bearbeiten' });
+  await expect(dialog.getByLabel('Titel'), 'vorbelegt mit dem Stand').toHaveValue('Lagepaln Nord');
+  await dialog.getByLabel('Titel').fill('Lageplan Nord');
+  await dialog.getByRole('combobox', { name: 'Kategorie' }).click();
+  await waehleOption(page, 'Lagekarte/Plan');
+  await dialog.getByRole('button', { name: 'Speichern' }).click();
+  await expect(dialog).toBeHidden();
+
+  const zeile = page.getByRole('row', { name: /Lageplan Nord/ });
+  await expect(zeile.getByRole('link', { name: 'Lageplan Nord' })).toBeVisible();
+  await expect(zeile.getByText('Lagekarte/Plan')).toBeVisible();
+  // Die Datei ist dieselbe: Dateiname und Download bleiben.
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    zeile.getByRole('link', { name: 'Lageplan Nord' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('Lageplan Nord.pdf');
+
+  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const eintraege = (await etb.json()) as { typ: string; inhalt: string }[];
+  expect(
+    eintraege.filter((e) => e.typ === 'system' && e.inhalt.startsWith('Dokument geändert:')),
+    'genau ein ETB-Nachweis der Änderung',
+  ).toHaveLength(1);
+});
 
 /** Höhe eines Ziels in CSS-px, auf eine Nachkommastelle. */
 async function hoehe(ziel: Locator): Promise<number> {
@@ -353,6 +400,9 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
 
       const ziele: Record<string, Locator> = {
         'Download-Anker': anker,
+        'Bearbeiten (Zeile)': page.getByRole('button', {
+          name: 'Dokument Lageplan Nord bearbeiten',
+        }),
         'Entfernen (Zeile)': page.getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
         'Datei wählen': dialog.locator('button.ant-btn', { hasText: 'Datei wählen' }),
         'Kategorie (Select)': dialog.locator('.ant-select').first(),
@@ -556,9 +606,9 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await expect(page.getByRole('link', { name: 'Einsatzbefehl 3' })).toBeVisible();
 });
 
-// Kriterium 5: Tag ≥ 7, Nacht ≥ 5, nie < 4,5 — als Literale.
+// Kriterium 5: Tag ≥ 7, Nacht ≥ 5 — als Literale. Seit LFH-652 tragen auch die geerbten Rollen
+// diesen Boden, der absolute Boden 4,5 hat hier keine Stelle mehr.
 const KONTRAST_ZIEL = { light: 7, dark: 5 } as const;
-const KONTRAST_BODEN = 4.5;
 
 for (const modus of ['light', 'dark'] as const) {
   test(`Kontrast ${modus}: Zellen, Dialog und Pflichtmeldung`, async ({ page }, testInfo) => {
@@ -600,15 +650,15 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Titel-Anker (bedienText)`,
     );
 
-    // App-weite Rollen, die das Modul nur ERBT: zugesichert ist der absolute Boden, der
-    // Messwert steht als Anhang.
+    // App-weite Rollen, die das Modul nur ERBT (LFH-652, Spec `textkontrast-rollen`): sie
+    // tragen denselben Boden wie die eigenen Stellen. Der Messwert steht zusätzlich als Anhang.
     const geerbt: Record<string, Locator> = {
       Tabellenkopf: page.locator('.ant-table-thead th').first(),
-      'Bezug „—" (Sekundärtext)': zeile.getByText('—', { exact: true }),
+      'Bezug „—" (Beschreibungstext)': zeile.getByText('—', { exact: true }),
     };
     const werte: string[] = [];
     for (const [name, ziel] of Object.entries(geerbt)) {
-      await pruefe(ziel, KONTRAST_BODEN, `${modus}/${name}`);
+      await pruefe(ziel, KONTRAST_ZIEL[modus], `${modus}/${name}`);
       werte.push(`${name}: ${(await kontrast(ziel)).verhaeltnis.toFixed(2)}`);
     }
 
@@ -626,11 +676,20 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Datei wählen`,
     );
     await pruefe(dialog.getByText('Bezug (optional)'), KONTRAST_ZIEL[modus], `${modus}/Klappkopf`);
-    // Pflichtmeldung: Rot als TEXT ist eine app-weite Rolle, deshalb nur Boden plus Messwert.
+    // Pflichtmeldung: Rot als TEXT liest die Textrolle `alarmText` (LFH-652).
     await dialog.getByRole('button', { name: 'Ablegen' }).click();
     const pflicht = dialog.getByText('Bitte eine Datei wählen');
-    await pruefe(pflicht, KONTRAST_BODEN, `${modus}/Pflichtmeldung`);
-    werte.push(`Pflichtmeldung (colorError): ${(await kontrast(pflicht)).verhaeltnis.toFixed(2)}`);
+    await pruefe(pflicht, KONTRAST_ZIEL[modus], `${modus}/Pflichtmeldung`);
+    werte.push(`Pflichtmeldung: ${(await kontrast(pflicht)).verhaeltnis.toFixed(2)}`);
+    // Standardknopf unter dem Zeiger: die Beschriftung wechselt nicht auf den helleren Hover-Ton
+    // (LFH-652, Nachtrag aus LFH-690).
+    const abbrechen = dialog.locator('button.ant-btn', { hasText: 'Abbrechen' });
+    await abbrechen.hover();
+    // Erst nach dem Farbübergang messen: mitten in der Transition läge die Beschriftung noch nahe
+    // am Ruheton und bestünde den Boden, egal welchen Hover-Ton antd ansteuert.
+    await abbrechen.evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+    await pruefe(abbrechen, KONTRAST_ZIEL[modus], `${modus}/Abbrechen unter dem Zeiger`);
+    werte.push(`Abbrechen unter dem Zeiger: ${(await kontrast(abbrechen)).verhaeltnis.toFixed(2)}`);
     await testInfo.attach(`Kontrast ${modus}`, {
       body: werte.join('\n'),
       contentType: 'text/plain',

@@ -55,6 +55,9 @@ const MIT_NACHBARSCHAFT = [
   // Reihe Speichern + Auflösen(danger) in der sticky Aktionsleiste der Detailroute.
   'pages/EinheitDetailPage.tsx',
   'pages/EinsatzabschnittePage.tsx',
+  // Dokumentenablage (LFH-656): „Bearbeiten“ neben „Entfernen“ (`danger`) in der Aktionsspalte.
+  // Im Kartenzweig steht Entfernen im Menü; dessen Trenner prüft `Datensicht`.
+  'pages/DokumentePage.tsx',
   // ── Kartenverwaltung (LFH-366) ────────────────────────────────────────────
   // Beide tragen „Löschen" neben mindestens einer neutralen Aktion.
   //

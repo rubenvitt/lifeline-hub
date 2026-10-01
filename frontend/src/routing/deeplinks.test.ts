@@ -41,6 +41,7 @@ import {
   parseFahrzeugeAnsicht,
   einsatzabschnittePfad,
   parseAbschnitteAnsicht,
+  parseFunkplanAnsicht,
   meldungenPfad,
   nachforderungenPfad,
   parseNachforderungVorbelegung,
@@ -201,6 +202,13 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     const pfad = lagekartePfad(E, { zentrum: { lat: 52.520008, lon: 13.404954 } });
     expect(new URL(pfad, 'http://x').searchParams.get('zentrum')).toBe('52.52001,13.40495');
   });
+  it('lagekartePfad trägt einen Suchtext als ?ort= und übersteht den Weg durch die URL (LFH-638)', () => {
+    const text = 'Hauptstraße 12 & Ecke, Musterstadt';
+    const pfad = lagekartePfad(E, { ort: text });
+    expect(new URL(pfad, 'http://x').searchParams.get('ort')).toBe(text);
+    // Ohne Text kein Parameter.
+    expect(lagekartePfad(E, { ort: '' })).not.toContain('ort=');
+  });
   it('der Kartenmittelpunkt überlebt den Weg durch die URL', () => {
     const pfad = lagekartePfad(E, { zentrum: { lat: -33.8688, lon: 151.2093 } });
     const wert = new URL(pfad, 'http://x').searchParams.get('zentrum');
@@ -341,6 +349,18 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
 
   it('funkplanPfad liegt unter dem Stab (LFH-548)', () => {
     expect(funkplanPfad(E)).toBe('/einsaetze/5/stab/funkplan');
+  });
+  it('funkplanPfad mit ?ansicht= (Fernmeldeskizze, LFH-625)', () => {
+    expect(funkplanPfad(E, { ansicht: 'skizze' })).toBe(
+      '/einsaetze/5/stab/funkplan?ansicht=skizze',
+    );
+  });
+  it('parseFunkplanAnsicht liest beide Darstellungen und verwirft einen unbekannten Wert GANZ', () => {
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=skizze'))).toBe('skizze');
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=tabelle'))).toBe('tabelle');
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=quatsch'))).toBeUndefined();
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();
+    expect(parseFunkplanAnsicht(new URLSearchParams(''))).toBeUndefined();
   });
   it('stabPfad mit neu hängt ?neu=1 an', () => {
     expect(stabPfad(E, { neu: true })).toBe('/einsaetze/5/stab?neu=1');

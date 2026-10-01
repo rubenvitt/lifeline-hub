@@ -375,17 +375,36 @@ interface KennzahlenbandProps {
   spalten?: number;
   /** Zugänglicher Name der Gruppe („Lage in Zahlen"). */
   beschriftung?: string;
+  /**
+   * Platz jeder Notiz unter `md` in Zeilen, vom ersten Bild an (LFH-629, `sprache.css`): im
+   * Ladezustand ist die Notiz einzeilig, eine längere Daten-Notiz bräche in der halben
+   * Bandbreite um und schöbe alles darunter. Ohne die Prop wächst die Notiz mit ihrem Text.
+   */
+  notizZeilenSchmal?: number;
   style?: CSSProperties;
 }
 
-export function Kennzahlenband({ children, spalten, beschriftung, style }: KennzahlenbandProps) {
+export function Kennzahlenband({
+  children,
+  spalten,
+  beschriftung,
+  notizZeilenSchmal,
+  style,
+}: KennzahlenbandProps) {
   const { rollen } = useRollen();
   return (
     <div
       role={beschriftung ? 'group' : undefined}
       aria-label={beschriftung}
       data-lfh="kennzahlenband"
-      style={{ ...kennzahlenbandStil(rollen, spalten), ...style }}
+      className={notizZeilenSchmal != null ? 'lfh-kennzahlenband--notizzeilen' : undefined}
+      style={{
+        ...kennzahlenbandStil(rollen, spalten),
+        ...(notizZeilenSchmal != null
+          ? ({ '--lfh-kennzahl-notizzeilen': notizZeilenSchmal } as CSSProperties)
+          : {}),
+        ...style,
+      }}
     >
       {children}
     </div>

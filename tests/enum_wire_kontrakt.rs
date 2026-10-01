@@ -452,6 +452,13 @@ fn orphan_enums_wire() {
         Quittiert => "quittiert",
     });
 
+    // Adresssuche der Lagekarte (LFH-638)
+    enum_wire!(lifeline_hub::routes::karte_ort_suche::OrtSucheZustand {
+        Ok => "ok",
+        Ausgelastet => "ausgelastet",
+        NichtErreichbar => "nicht_erreichbar",
+    });
+
     // einsatz::einstellungen
     enum_wire!(lifeline_hub::einsatz::einstellungen::BasemapModus {
         Online => "online",
@@ -647,6 +654,44 @@ fn wetter_teil_zustand_wire() {
         Ok,
         KeinOrt,
         Ausfall,
+    });
+}
+
+/// LFH-864: aktuelle Bedingungen. `WetterSymbol` ist aus `icon` der Quelle abgebildet (Nebel nach
+/// Sonnenstand geteilt, Frontend-Tabellen `wetterSymbolIkone`/`wetterSymbolWort`),
+/// `WetterMessgroesse` benennt die aus Nachbarstationen ergänzten Werte.
+#[test]
+fn wetter_symbol_wire() {
+    enum_wire_as_str!(lifeline_hub::wetter::WetterSymbol {
+        KlarTag,
+        KlarNacht,
+        TeilsBewoelktTag,
+        TeilsBewoelktNacht,
+        Bewoelkt,
+        NebelTag,
+        NebelNacht,
+        Wind,
+        Regen,
+        Schneeregen,
+        Schnee,
+        Hagel,
+        Gewitter,
+    });
+}
+
+#[test]
+fn wetter_messgroesse_wire() {
+    enum_wire_as_str!(lifeline_hub::wetter::WetterMessgroesse {
+        Temperatur,
+        Wind,
+        Boeen,
+        Niederschlag,
+        Wetterlage,
+        Sicht,
+        Bewoelkung,
+        Luftfeuchte,
+        Taupunkt,
+        Luftdruck,
     });
 }
 

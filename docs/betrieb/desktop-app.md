@@ -23,13 +23,16 @@ Neben jeder Datei liegt eine `.sha256`.
 
 ## Installation
 
-Die Pakete sind **noch nicht signiert** (Developer ID, Windows-Zertifikat: LFH-722). Beide
-Systeme warnen deshalb beim ersten Öffnen:
+Das macOS-Paket ist mit Developer ID signiert und von Apple notarisiert (LFH-722). Der
+Windows-Installer ist **noch nicht signiert** (LFH-875).
 
 - **macOS:** `.dmg` öffnen und „Lifeline Hub“ nach „Programme“ ziehen. Beim ersten Start
-  meldet macOS, dass die App nicht geöffnet werden kann. So geht es trotzdem: Rechtsklick auf
-  die App, „Öffnen“, dann „Öffnen“ bestätigen. Ab macOS 15 geht das nicht mehr per Rechtsklick,
-  sondern in den Systemeinstellungen unter „Datenschutz & Sicherheit“ mit „Dennoch öffnen“.
+  fragt macOS einmal sinngemäß, ob die aus dem Internet geladene App geöffnet werden soll, und
+  nennt sie dabei von Apple auf Schadsoftware geprüft. „Öffnen“ bestätigen, mehr ist nicht
+  nötig. Das
+  geht auch ohne Internet, weil das Prüfergebnis im Paket steckt. Die App immer aus
+  „Programme“ starten, nicht direkt aus dem `.dmg` oder aus „Downloads“: Dort führt macOS sie
+  aus einer schreibgeschützten Kopie aus, und ein Update scheitert mit „Read-only file system“.
   Beim ersten Verbinden fragt macOS nach dem Zugriff aufs **lokale Netzwerk**. Ohne diese
   Freigabe erreicht die App `elw.local` nicht.
 - **Windows:** Installer starten. SmartScreen warnt, dann „Weitere Informationen“ →
@@ -130,14 +133,16 @@ installierte App.
 
 **Ablage:** 1Password, Tresor „Dev“, Eintrag „Lifeline Hub – Tauri-Updater-Signaturschlüssel“
 (Passwort im Feld `password`, privater und öffentlicher Schlüssel als Dateien). Die Secrets sind
-gesetzt (29.09.2026). Neu setzen, ohne dass ein Wert im Terminal erscheint:
+gesetzt (29.09.2026). Neu setzen, ohne dass ein Wert im Terminal erscheint. `op` nimmt den
+Gedankenstrich im Eintragsnamen nicht an, die Befehle verweisen deshalb auf die IDs von Eintrag
+und Datei:
 
 ```bash
-op read "op://Dev/Lifeline Hub – Tauri-Updater-Signaturschlüssel/privater Schlüssel" | gh secret set TAURI_SIGNING_PRIVATE_KEY
+op read "op://Dev/jz5254ilixliaoxnlqji5iet7y/fme2d472smc4bmgqywiemt7fte" | gh secret set TAURI_SIGNING_PRIVATE_KEY
 ```
 
 ```bash
-op read --no-newline "op://Dev/Lifeline Hub – Tauri-Updater-Signaturschlüssel/password" | gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+op read --no-newline "op://Dev/jz5254ilixliaoxnlqji5iet7y/password" | gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 ```
 
 **Der 1Password-Eintrag ist die Sicherung.** Geht der private Schlüssel
@@ -146,6 +151,68 @@ Schlüsselpaar (`cargo tauri signer generate`), der neue öffentliche Schlüssel
 `tauri.conf.json` und eine **einmalige Neuinstallation von Hand** auf jedem Gerät. Fehlt das
 Secret im Lauf, bricht der Desktop-Bau mit einer Meldung ab. Die Server-Artefakte entstehen
 trotzdem.
+
+## Signierung und Notarisierung (macOS)
+
+Der Release-Lauf signiert die Mac-App mit dem Zertifikat „Developer ID Application: Ruben Vitt
+(H95J852PKP)“ und lässt App und `.dmg` von Apple notarisieren (LFH-722). Herleitung:
+`openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md`. Lokale Bauten
+(`cargo tauri build`) bleiben ad hoc signiert, denn `tauri.conf.json` trägt weiter `"-"`. Die
+Identität setzt nur der Release-Lauf.
+
+| Secret (GitHub, Repository) | Inhalt |
+|---|---|
+| `APPLE_CERTIFICATE` | `.p12` (Zertifikat samt privatem Schlüssel) als base64, einzeilig |
+| `APPLE_CERTIFICATE_PASSWORD` | Passwort der `.p12` |
+| `APPLE_API_ISSUER` | Issuer-ID des App-Store-Connect-API-Schlüssels |
+| `APPLE_API_KEY` | Schlüssel-ID (`9TM77AJNCQ`) |
+| `APPLE_API_KEY_P8` | Inhalt der `.p8`-Datei des API-Schlüssels |
+
+**Ablage:** 1Password, Tresor „Dev“: „Lifeline Hub – Developer ID Application (.p12)“
+(`baldywovbwvjv3heixiujyb54y`, Datei und `password`) und „Lifeline Hub – Apple Notarisierung
+(App Store Connect API)“ (`aqf66xquxzvnanz7nz4tleiwua`, Datei, `Issuer-ID`, `username` =
+Schlüssel-ID). Die Secrets sind gesetzt (01.10.2026). Neu setzen, ohne dass ein Wert im
+Terminal erscheint. Die Dateien nur über `--out-file` lesen, weil `op read` nach stdout
+Binärdaten verfälscht. Der Block braucht `bash` oder `zsh` (in `fish` vorher `bash` starten):
+
+```bash
+d=$(mktemp -d) && chmod 700 "$d" \
+  && op read --out-file "$d/c.p12" "op://Dev/baldywovbwvjv3heixiujyb54y/developer-id-p12" > /dev/null \
+  && op read --out-file "$d/k.p8" "op://Dev/aqf66xquxzvnanz7nz4tleiwua/sqfd237hljf5wnirpxhkhv4dri" > /dev/null \
+  && base64 -i "$d/c.p12" | tr -d '\n' | gh secret set APPLE_CERTIFICATE \
+  && op read --no-newline "op://Dev/baldywovbwvjv3heixiujyb54y/password" | gh secret set APPLE_CERTIFICATE_PASSWORD \
+  && op read --no-newline "op://Dev/aqf66xquxzvnanz7nz4tleiwua/Issuer-ID" | gh secret set APPLE_API_ISSUER \
+  && op read --no-newline "op://Dev/aqf66xquxzvnanz7nz4tleiwua/username" | gh secret set APPLE_API_KEY \
+  && gh secret set APPLE_API_KEY_P8 < "$d/k.p8"; rm -rf "$d"
+```
+
+Fehlt eines der fünf Secrets, bricht der macOS-Bau mit einer Meldung ab. Tauri selbst würde die
+Notarisierung sonst nur mit einer Warnung überspringen. Ein Prüfschritt belegt danach
+Developer ID, Hardened Runtime und das angeheftete Ticket für App, `.dmg` und die App im
+Update-Archiv. Scheitert macOS, fehlt es im Release und in `latest.json`, Windows bleibt
+unberührt.
+
+**Kosten und Termine** (Stand 01.10.2026):
+
+| Was | Kosten | Termin |
+|---|---|---|
+| Apple Developer Program, Team `H95J852PKP` (Einzelperson) | 99 €/Jahr | verlängert sich automatisch am **06.06.2027** |
+| Zertifikat „Developer ID Application“ | im Programm enthalten | gültig bis **17.09.2031** |
+| API-Schlüssel „Lifeline Hub Notarisierung“ (Rolle Entwickler) | im Programm enthalten | läuft nicht ab, einzeln widerrufbar |
+
+**Wenn die Notarisierung scheitert:**
+
+- **Lizenzvereinbarung:** Apple ändert die Programm-Lizenzvereinbarung gelegentlich. Bis sie
+  unter developer.apple.com/account akzeptiert ist, lehnt Apple jede Einreichung ab.
+- **Mitgliedschaft abgelaufen:** Ohne Verlängerung keine Notarisierung. Bereits ausgelieferte
+  Pakete bleiben gültig.
+- **Zertifikat abgelaufen:** Vor dem 17.09.2031 ein neues „Developer ID Application“-Zertifikat
+  anlegen (developer.apple.com → Certificates), als `.p12` exportieren, in 1Password ablegen
+  und `APPLE_CERTIFICATE` samt Passwort neu setzen. Der Name der Identität bleibt gleich, der
+  Workflow ändert sich nicht.
+- **API-Schlüssel widerrufen oder verloren:** In App Store Connect → Benutzer und
+  Zugriffsrechte → Integrationen einen neuen Team-Schlüssel mit der Rolle „Entwickler“ anlegen.
+  Die `.p8` lässt sich nur einmal laden. Danach die drei `APPLE_API_*`-Secrets neu setzen.
 
 ## Release-Ablauf
 
@@ -196,7 +263,8 @@ scripts/marke/erzeuge-symbole.sh
 
 ## Grenzen (offen)
 
-- **Signierung/Notarisierung:** LFH-722. Bis dahin erscheinen die Warnungen oben.
+- **Signierung unter Windows:** LFH-875. Bis dahin warnt SmartScreen (siehe Installation).
+  macOS ist signiert und notarisiert (LFH-722).
 - **Fremde Seite im Fenster:** Die App hat keinen Zurück-Knopf (siehe „Neue Fenster, fremde
   Links, Dateien“).
 - **Anmeldung über einen Neustart:** LFH-779/780. Nach jedem Neustart der App ist eine neue
@@ -205,7 +273,9 @@ scripts/marke/erzeuge-symbole.sh
   bietet ihn dort deshalb nicht an (LFH-817), sondern „Im Browser anmelden“ (LFH-818, siehe
   unten). Die Einrichtung eines Passkeys geschieht im Browser. Windows und der Browser bleiben
   unverändert.
-- **Anmeldung im Browser, nicht gemessen:** mit Firefox oder Safari als Standardbrowser und mit
-  signierter App (LFH-722). Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari
-  direkt (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`).
+- **Anmeldung im Browser, nicht gemessen:** mit Firefox oder Safari als Standardbrowser.
+  Gemessen ist Vivaldi als Standardbrowser (Chromium) sowie Safari direkt
+  (`openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/belege/macos/messung.md`),
+  mit der signierten und notarisierten App erneut Vivaldi als Standardbrowser (LFH-722,
+  `openspec/changes/archive/2026-10-01-lfh-722-macos-signierung-notarisierung/design.md`).
 - **Linux:** Die Hülle wird dort übersetzt (Tests), aber nicht ausgeliefert.

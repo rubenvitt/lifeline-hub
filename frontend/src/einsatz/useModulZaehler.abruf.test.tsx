@@ -103,3 +103,83 @@ describe('useModulZaehler am Draht — Betreuung (LFH-639)', () => {
     expect(abrufe.anzahl).toBe(1);
   });
 });
+
+describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
+  const WETTER = '/api/einsaetze/7/wetter';
+  const JETZT = Date.now();
+  const um = (ms: number) => new Date(JETZT + ms).toISOString();
+  const ALLE_ANDEREN = [...ANDERE, 'betreuung'];
+
+  function zaehleWetterAbrufe(): { anzahl: number } {
+    const zaehler = { anzahl: 0 };
+    server.use(
+      http.get(WETTER, () => {
+        zaehler.anzahl += 1;
+        return HttpResponse.json({
+          ort: { name: 'Hann. Münden' },
+          warnungen: {
+            zustand: 'ok',
+            abgerufen_at: um(-60_000),
+            daten: [
+              {
+                stufe: 'schwer',
+                ereignis: 'SCHWERES GEWITTER',
+                ueberschrift: 'Amtliche UNWETTERWARNUNG vor SCHWEREM GEWITTER',
+                beginn: um(-3_600_000),
+                ende: um(3_600_000),
+              },
+              {
+                stufe: 'maessig',
+                ereignis: 'STURMBÖEN',
+                ueberschrift: 'Amtliche WARNUNG vor STURMBÖEN',
+                beginn: um(-3_600_000),
+                ende: um(3_600_000),
+              },
+            ],
+          },
+          vorhersage: { zustand: 'ausfall' },
+        });
+      }),
+    );
+    return zaehler;
+  }
+
+  it('Modul ausgeblendet → keine Anfrage an …/wetter, kein Zähler', async () => {
+    const abrufe = zaehleWetterAbrufe();
+    const { result } = renderHook(
+      () =>
+        useModulZaehler({
+          einsatzId: 7,
+          benutzer,
+          overrides: ausgeblendet([...ALLE_ANDEREN, 'wetter-pegel']),
+        }),
+      { wrapper: wrapper(neuerQueryClient()) },
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current['wetter-pegel']).toBeUndefined();
+  });
+
+  it('Modul sichtbar → genau eine Anfrage, Zahl der Unwetterwarnungen ohne „mäßig"', async () => {
+    const abrufe = zaehleWetterAbrufe();
+    const { result } = renderHook(
+      () => useModulZaehler({ einsatzId: 7, benutzer, overrides: ausgeblendet(ALLE_ANDEREN) }),
+      { wrapper: wrapper(neuerQueryClient()) },
+    );
+    await waitFor(() => expect(result.current['wetter-pegel']).toBeDefined());
+    expect(result.current['wetter-pegel']).toEqual({
+      wert: 1,
+      beschreibung: '1 Unwetterwarnung für den Einsatzort',
+    });
+    expect(abrufe.anzahl).toBe(1);
+  });
+
+  it('solange die Overrides laden → keine Anfrage an …/wetter (kein 403 bei ausgeblendetem Modul)', async () => {
+    const abrufe = zaehleWetterAbrufe();
+    renderHook(() => useModulZaehler({ einsatzId: 7, benutzer, overrides: undefined }), {
+      wrapper: wrapper(neuerQueryClient()),
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(abrufe.anzahl).toBe(0);
+  });
+});

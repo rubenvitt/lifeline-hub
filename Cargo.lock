@@ -3326,7 +3326,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-desktop"
-version = "1.0.0-alpha.61"
+version = "1.0.0-alpha.62"
 dependencies = [
  "base64 0.22.1",
  "block2",
@@ -3352,7 +3352,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-hub"
-version = "1.0.0-alpha.61"
+version = "1.0.0-alpha.62"
 dependencies = [
  "anyhow",
  "argon2",
@@ -3368,6 +3368,7 @@ dependencies = [
  "futures",
  "http-body-util",
  "hyper-util",
+ "ipnet",
  "karten-katalog",
  "libsqlite3-sys",
  "mime_guess",

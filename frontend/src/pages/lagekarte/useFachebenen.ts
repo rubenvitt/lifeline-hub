@@ -19,7 +19,9 @@ import {
 import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
+import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { fachebeneFarbe } from '../../theme/statusFarben';
+import { dwdGueltigkeit } from './dwdGueltigkeit';
 
 type Feature = FeatureCollection['features'][number];
 
@@ -56,6 +58,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   // Modus-Token; die Kartenstil-Module haben ihn bewusst nicht, also wird er hier in die Features
   // gebacken.
   const { token } = theme.useToken();
+  // Die DWD-Warnungen altern ohne Abruf: abgelaufene fallen weg, angekündigte werden geltend
+  // (LFH-662, `dwdGueltigkeit`). Derselbe Takt wie die Marke „veraltet“ (`FachebeneStand`).
+  const jetzt = useMinutenTakt();
   // Ein Ausschnitt für alle bbox-abhängigen Ebenen: die Karte hat nur einen Viewport.
   const [viewportBbox, setViewportBbox] = useState<string | null>(null);
   // Zuletzt gesehener Status der Autobahn-Ebene — steuert ihren Poll-Takt (Aufwärmphase).
@@ -190,15 +195,18 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         .map((k) => {
           // Energie aus ihrer Sammlung; Ebenen mit Klassenfarben (Hochwasser, ODL, Luftqualität)
           // mit eingebackener Farbe und Punktgröße — über dieselbe Eigenschaft, die im Panel die
-          // Legende trägt (LFH-592); übrige Quellen direkt aus der Query.
+          // Legende trägt (LFH-592); DWD nach Gültigkeit (LFH-662); übrige Quellen direkt aus der
+          // Query.
           const def = FACHEBENEN[k];
           const roh = byKey[k].data?.features ?? leerFc;
           const daten =
             k === 'energie'
               ? energieAkku
-              : def.klassenfarben
-                ? def.klassenfarben.faerbe(roh, token)
-                : roh;
+              : k === 'dwd'
+                ? dwdGueltigkeit(roh, jetzt)
+                : def.klassenfarben
+                  ? def.klassenfarben.faerbe(roh, token)
+                  : roh;
           return { def, daten, farbe: fachebeneFarbe(k, token), treffer: token.controlHeight };
         });
 

@@ -405,6 +405,7 @@ export default function LageDashboardPage() {
           <Kennzahlenband
             beschriftung="Lage in Zahlen"
             spalten={bandSpalten}
+            notizZeilenSchmal={2}
             style={{ border: 'none' }}
           >
             {lagebild == null

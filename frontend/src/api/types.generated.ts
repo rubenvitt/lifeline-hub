@@ -2803,6 +2803,23 @@ export interface components {
             name: string;
             tz_organisation?: string | null;
         };
+        OrtSucheAntwort: {
+            treffer: components["schemas"]["OrtTreffer"][];
+            zustand: components["schemas"]["OrtSucheZustand"];
+        };
+        /**
+         * @description Ausgang der Adresssuche. `ok` ohne Treffer heißt „nichts gefunden“.
+         * @enum {string}
+         */
+        OrtSucheZustand: "ok" | "ausgelastet" | "nicht_erreichbar";
+        OrtTreffer: {
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lon: number;
+            /** @description Anzeigename des Geocoders (bei Nominatim `display_name`). */
+            name: string;
+        };
         /**
          * @description LFH-265: beide Felder werden ABSENT statt present-null serialisiert, damit der generierte
          *     `peilung?`/`ortsname?` ehrlich ist. Wire-Änderung — gepinnt per `contains_key` in
@@ -3650,12 +3667,102 @@ export interface components {
          * @enum {string}
          */
         Warnstufe: "keine" | "niedrig" | "mittel" | "hoch" | "akut";
+        /**
+         * @description Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle
+         *     nicht liefert, fehlt — er wird nie zu 0.
+         */
+        WetterAktuell: {
+            /**
+             * Format: double
+             * @description Bewölkung in %.
+             */
+            bewoelkung_prozent?: number | null;
+            /**
+             * Format: double
+             * @description Stärkste Böe der letzten 60 Minuten in km/h (`wind_gust_speed_60`).
+             */
+            boeen_kmh?: number | null;
+            /** @description Werte aus anderen Stationen; leer, wenn alles von [`Self::station`] stammt. */
+            ergaenzt: components["schemas"]["WetterErgaenzung"][];
+            /** @description Messzeit (`timestamp`), RFC 3339 in UTC (`…Z`). Sie ist der Stand des Teils. */
+            gemessen_at: string;
+            /**
+             * Format: double
+             * @description Luftdruck auf Meereshöhe in hPa.
+             */
+            luftdruck_hpa?: number | null;
+            /**
+             * Format: double
+             * @description Relative Luftfeuchte in %.
+             */
+            luftfeuchte_prozent?: number | null;
+            /**
+             * Format: double
+             * @description Niederschlag der letzten 60 Minuten in mm (`precipitation_60`).
+             */
+            niederschlag_mm?: number | null;
+            /**
+             * Format: double
+             * @description Sichtweite in Metern.
+             */
+            sicht_m?: number | null;
+            /** @description Die Station der Messung: die, von der die meisten gezeigten Werte stammen. */
+            station: components["schemas"]["WetterStation"];
+            symbol?: components["schemas"]["WetterSymbol"] | null;
+            /**
+             * Format: double
+             * @description Taupunkt in °C.
+             */
+            taupunkt_c?: number | null;
+            /**
+             * Format: double
+             * @description Lufttemperatur in °C.
+             */
+            temperatur_c?: number | null;
+            /**
+             * Format: double
+             * @description Mittlerer Wind der letzten 10 Minuten in km/h (`wind_speed_10`).
+             */
+            wind_kmh?: number | null;
+            /**
+             * Format: double
+             * @description Windrichtung der letzten 10 Minuten in Grad (0 = Nord), woher der Wind weht.
+             */
+            windrichtung_grad?: number | null;
+        };
+        /** @description Teil „Aktuell“ der Wetter-Antwort (LFH-864). */
+        WetterAktuellTeil: {
+            /**
+             * @description Zeitpunkt des letzten erfolgreichen Abrufs, RFC 3339 in UTC. Nur bei `ok`. Den Stand
+             *     trägt `daten.gemessen_at`, nicht der Abruf.
+             */
+            abgerufen_at?: string | null;
+            daten?: components["schemas"]["WetterAktuell"] | null;
+            zustand: components["schemas"]["WetterTeilZustand"];
+        };
         /** @description Antwort von `GET /api/einsaetze/{id}/wetter`. */
         WetterAnzeige: {
+            aktuell: components["schemas"]["WetterAktuellTeil"];
             ort?: components["schemas"]["WetterOrt"] | null;
             vorhersage: components["schemas"]["WetterVorhersageTeil"];
             warnungen: components["schemas"]["WetterWarnungen"];
         };
+        /**
+         * @description Werte aus einer anderen als der Station im Kopf (ergänzt über `fallback_source_ids` oder
+         *     von der genannten `source_id`), gruppiert je Station.
+         */
+        WetterErgaenzung: {
+            /** @description Die ergänzten gezeigten Größen, in der Reihenfolge von [`WetterMessgroesse`]. */
+            groessen: components["schemas"]["WetterMessgroesse"][];
+            station: components["schemas"]["WetterStation"];
+        };
+        /**
+         * @description Eine gezeigte Messgröße der aktuellen Bedingungen — benennt, welche Werte die Quelle aus
+         *     einer anderen Station ergänzt hat. Die Reihenfolge ist die der Anzeige und ordnet
+         *     `WetterErgaenzung::groessen`. Wire == `as_str()`.
+         * @enum {string}
+         */
+        WetterMessgroesse: "temperatur" | "wind" | "boeen" | "niederschlag" | "wetterlage" | "sicht" | "bewoelkung" | "luftfeuchte" | "taupunkt" | "luftdruck";
         /** @description Die Warnzelle (Gemeinde), in der der Einsatzort liegt — `location` der Quelle. */
         WetterOrt: {
             /** @description Kreis bzw. kreisfreie Stadt (`district`). */
@@ -3663,6 +3770,16 @@ export interface components {
             /** @description Bundesland (`state`). */
             land?: string | null;
             /** @description Name der Warnzelle, z. B. „Stadt Bremerhaven“. */
+            name: string;
+        };
+        /** @description Eine Wetterstation, wie die Quelle sie nennt (SYNOP). */
+        WetterStation: {
+            /**
+             * Format: double
+             * @description Entfernung zum (gerundeten) Einsatzort in Metern.
+             */
+            entfernung_m?: number | null;
+            /** @description Stationsname, z. B. „Bremen“ oder „Hameln-Hastenbeck“. */
             name: string;
         };
         /**
@@ -3703,6 +3820,13 @@ export interface components {
             /** @description Beginn der Stunde, RFC 3339 in UTC (`…Z`). */
             zeitpunkt: string;
         };
+        /**
+         * @description Wetterlage der jüngsten Messung, aus `icon` von `/current_weather` (LFH-864, design.md
+         *     D5). Die Quelle trennt Tag und Nacht nur bei klar und teils bewölkt; Nebel teilt
+         *     `quelle` selbst nach dem Sonnenstand an der Station. Wire == `as_str()`.
+         * @enum {string}
+         */
+        WetterSymbol: "klar_tag" | "klar_nacht" | "teils_bewoelkt_tag" | "teils_bewoelkt_nacht" | "bewoelkt" | "nebel_tag" | "nebel_nacht" | "wind" | "regen" | "schneeregen" | "schnee" | "hagel" | "gewitter";
         /**
          * @description Zustand eines Teils der Wetter-Antwort. Wire == `as_str()`.
          * @enum {string}
