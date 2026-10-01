@@ -905,3 +905,60 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
     expect(fuss).not.toHaveTextContent('Panel');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Adresszeile (LFH-638): steht am ENDE und ist nie vorausgewählt — ↵ öffnet weiter den besten
+ * Treffer; nur wer sie wählt, sucht auf der Lagekarte.
+ */
+describe('CommandPalette · Adresszeile (LFH-638)', () => {
+  const karte = vi.fn();
+  const adresse = (rest: string): Befehl | null =>
+    rest.trim().length >= 3
+      ? {
+          id: `adresse:${rest}`,
+          gruppe: 'ortssuche',
+          label: `Adresse auf Lagekarte suchen · „${rest}“`,
+          ausfuehren: karte,
+        }
+      : null;
+
+  it('steht hinter jedem Treffer; ↵ öffnet den ersten, nicht die Adresssuche', async () => {
+    const u = userEvent.setup();
+    karte.mockClear();
+    const modul = vi.fn();
+    renderMitProviders(
+      <CommandPalette
+        befehle={[befehl('m', 'Hauptstraßen-Plan', modul)]}
+        datensatzTreffer={[datensatz('datensatz:personen:1', 'Person Hauptstraße', () => {}, 3)]}
+        adressSprung={adresse}
+        schliesse={() => {}}
+      />,
+    );
+    await u.type(screen.getByRole('combobox'), 'Hauptstraße');
+    const zeilen = screen.getAllByRole('option');
+    expect(zeilen[zeilen.length - 1]).toHaveTextContent(
+      'Adresse auf Lagekarte suchen · „Hauptstraße“',
+    );
+    expect(zeilen.length).toBeGreaterThan(1);
+    await u.keyboard('{Enter}');
+    expect(karte).not.toHaveBeenCalled();
+  });
+
+  it('auch allein ist sie wählbar', async () => {
+    const u = userEvent.setup();
+    karte.mockClear();
+    renderMitProviders(<CommandPalette befehle={[]} adressSprung={adresse} schliesse={() => {}} />);
+    await u.type(screen.getByRole('combobox'), 'Rathausplatz');
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    await u.keyboard('{Enter}');
+    expect(karte).toHaveBeenCalledTimes(1);
+  });
+
+  it('fehlt in einem Präfixmodus', async () => {
+    const u = userEvent.setup();
+    renderMitProviders(<CommandPalette befehle={[]} adressSprung={adresse} schliesse={() => {}} />);
+    await u.type(screen.getByRole('combobox'), '#Rathausplatz');
+    expect(screen.queryByText(/Adresse auf Lagekarte suchen/)).not.toBeInTheDocument();
+  });
+});

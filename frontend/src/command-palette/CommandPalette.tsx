@@ -108,6 +108,11 @@ interface Props {
    */
   koordinatenSprung?: (rest: string) => Befehl | null;
   /**
+   * Adresszeile (LFH-638): liefert für den LEBENDEN Rest „Adresse auf Lagekarte suchen“, wenn er
+   * eine Adresse sein kann, sonst `null`. Steht immer am Ende der Treffer.
+   */
+  adressSprung?: (rest: string) => Befehl | null;
+  /**
    * Kann es hier eine Vorschau geben? Nur im Einsatz. Steuert allein den FUSSHINWEIS; ob eine Zeile
    * eine Vorschau hat, sagt `Befehl.vorschau`.
    */
@@ -123,6 +128,7 @@ export function CommandPalette({
   datensatzTreffer = KEINE_TREFFER,
   onSucheEntprellt,
   koordinatenSprung,
+  adressSprung,
   vorschauVerfuegbar = false,
   userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent,
   schliesse,
@@ -189,14 +195,30 @@ export function CommandPalette({
     return b ? { befehl: b, score: UNBEWERTET + 1, stufe: 0 } : null;
   }, [modus, rest, koordinatenSprung]);
 
+  /**
+   * Die Adresszeile (LFH-638) nur im Vorgabemodus und immer ZULETZT: schlechteste Stufe, ein Score
+   * hinter jedem anderen, die letzte Gruppe. So ist sie nie vorausgewählt — ↵ öffnet weiter den
+   * besten Treffer, und nur wer sie wählt, sucht auf der Karte.
+   */
+  const adresse = useMemo<Treffer | null>(() => {
+    if (modus !== 'alles' || !adressSprung) return null;
+    const b = adressSprung(rest);
+    return b ? { befehl: b, score: UNBEWERTET + 1, stufe: 3 } : null;
+  }, [modus, rest, adressSprung]);
+
   const treffer = useMemo(() => {
     const statisch = filtereBefehle(imModus, rest);
     // Bei LEERER Suche bleiben die Datensatz-Treffer draußen: der entprellte Rest hinkt nach, und
     // die Treffer des vorigen Begriffs erschienen sonst in der kuratierten Startansicht. Die Zeile
     // trennt die zwei Renderzweige.
     if (rest === '') return statisch;
-    return [...(koordinate ? [koordinate] : []), ...statisch, ...anstehendeDatensaetze];
-  }, [imModus, rest, anstehendeDatensaetze, koordinate]);
+    return [
+      ...(koordinate ? [koordinate] : []),
+      ...statisch,
+      ...anstehendeDatensaetze,
+      ...(adresse ? [adresse] : []),
+    ];
+  }, [imModus, rest, anstehendeDatensaetze, koordinate, adresse]);
   /**
    * Zwei Zustände, zwei Ordnungen: bei LEERER Suche die kuratierte Startansicht
    * (`GRUPPEN_REIHENFOLGE` mit Überschriften), bei AKTIVER Suche flach nach Bewertung. Die

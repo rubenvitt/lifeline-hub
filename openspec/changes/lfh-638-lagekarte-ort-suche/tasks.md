@@ -76,15 +76,15 @@
 
 ## 7. Sprungpalette: Adresszeile (TDD)
 
-- [ ] 7.1 Gruppe `ortssuche` in `command-palette/typen.ts` (exhaustive Records), Hook neben
-      `useKoordinatenSprung` mit derselben Rechteprüfung; Zeile am Ende der Treffer, nur ab drei
+- [x] 7.1 Gruppe `ortssuche` in `command-palette/typen.ts` (exhaustive Records), Hook neben
+      `useKoordinatenSprung` mit derselben Rechteprüfung (geteilt über `useLagekarteZugang`); Zeile am Ende der Treffer, nur ab drei
       Zeichen mit Buchstabe und ohne Koordinatenform, `sprungZu(lagekartePfad(id, { ort }))` (D5).
       Tests zuerst: Zeile erscheint/fehlt nach Spec (Recht, Koordinate, zu kurz), ↵ und Strg+↵
       navigieren, nicht merkbar, kein Aufruf der Adresssuche aus der Palette. Prüfung: Tests grün.
 
 ## 8. Regeln und Nachweis im Browser
 
-- [ ] 8.1 `frontend/src/pages/lagekarte/AGENTS.md` Punkt „Ortssuche“ und
+- [x] 8.1 `frontend/src/pages/lagekarte/AGENTS.md` Punkt „Ortssuche“ und
       `frontend/src/command-palette/AGENTS.md` Satz zur Adresszeile (D7), Prettier über
       `frontend/`. Prüfung: `scripts/check-fmt.sh` grün.
 - [ ] 8.2 e2e `frontend/e2e/lagekarte-ortssuche.spec.ts` (Regeln `frontend/e2e/AGENTS.md`):
