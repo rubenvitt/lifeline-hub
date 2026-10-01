@@ -85,6 +85,24 @@ test('vorgemerkte Standmeldung eines vorgehenden Geräts wird nach kurzem Ausfal
     )
     .toBe(200);
 
+  // Nichts liegt als abgelehnt im Wiederherstellungs-Drawer.
+  const abgelehnt = await page.evaluate(
+    () =>
+      new Promise<number>((fertig, fehler) => {
+        const r = indexedDB.open('lifeline-offline');
+        r.onerror = () => fehler(r.error);
+        r.onsuccess = () => {
+          const zaehlen = r.result
+            .transaction('schreibaktionenAbgelehnt')
+            .objectStore('schreibaktionenAbgelehnt')
+            .count();
+          zaehlen.onsuccess = () => fertig(zaehlen.result);
+          zaehlen.onerror = () => fehler(zaehlen.error);
+        };
+      }),
+  );
+  expect(abgelehnt).toBe(0);
+
   // Und mit dem Erfassungszeitpunkt nach der Serveruhr, nicht nach der Geräteuhr.
   const u = (await (await page.request.get(basis)).json()) as Uebersicht;
   const zeitpunkt = Date.parse(

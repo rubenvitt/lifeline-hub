@@ -84,6 +84,32 @@ describe('Versatz zur Serveruhr (LFH-705)', () => {
     expect(Math.abs(abweichung())).toBeLessThanOrEqual(1_000);
   });
 
+  it('nimmt die jüngere Messung eines anderen Tabs aus localStorage', () => {
+    vi.setSystemTime(SERVER + 5 * MINUTE);
+    merkeServerzeit(antwort(SERVER)); // dieser Tab: Versatz −5 min
+    // Eine Minute später misst ein anderer Tab einen anderen Versatz (−2 min).
+    vi.setSystemTime(SERVER + 6 * MINUTE);
+    localStorage.setItem(
+      'lifeline-serveruhr',
+      JSON.stringify({ versatzMs: -2 * MINUTE, gemessenAt: Date.now() }),
+    );
+    expect(serverJetzt().valueOf()).toBe(Date.now() - 2 * MINUTE);
+  });
+
+  it('behält die eigene Messung, wenn localStorage eine ältere trägt', () => {
+    vi.setSystemTime(SERVER + 5 * MINUTE);
+    localStorage.setItem(
+      'lifeline-serveruhr',
+      JSON.stringify({ versatzMs: -2 * MINUTE, gemessenAt: Date.now() - 60_000 }),
+    );
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('QuotaExceeded'); // die eigene Messung landet nur im Speicher
+    });
+    merkeServerzeit(antwort(SERVER));
+    vi.restoreAllMocks();
+    expect(Math.abs(abweichung())).toBeLessThanOrEqual(1_000);
+  });
+
   it('vergisst den Versatz nach 24 h', () => {
     vi.setSystemTime(SERVER + 5 * MINUTE);
     merkeServerzeit(antwort(SERVER));

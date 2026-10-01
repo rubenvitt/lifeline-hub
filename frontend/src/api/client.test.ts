@@ -311,6 +311,26 @@ describe('Versatz zur Serveruhr aus dem Date-Header (LFH-705)', () => {
     expect(korrigiert()).toBe(true);
   });
 
+  it('misst auch an einer Ablehnung aus apiGet', async () => {
+    server.use(
+      http.get('/api/ding', () =>
+        HttpResponse.json({ error: 'x' }, { status: 401, headers: datum }),
+      ),
+    );
+    await expect(apiGet('/api/ding')).rejects.toMatchObject({ status: 401 });
+    expect(korrigiert()).toBe(true);
+  });
+
+  it('misst auch an einer Ablehnung aus apiUpload', async () => {
+    server.use(
+      http.post('/api/upload', () =>
+        HttpResponse.json({ error: 'zu groß' }, { status: 413, headers: datum }),
+      ),
+    );
+    await expect(apiUpload('/api/upload', new FormData())).rejects.toMatchObject({ status: 413 });
+    expect(korrigiert()).toBe(true);
+  });
+
   it('ein Netzfehler misst nichts', async () => {
     server.use(http.get('/api/ding', () => HttpResponse.error()));
     await expect(apiGet('/api/ding')).rejects.toBeInstanceOf(NetzFehler);

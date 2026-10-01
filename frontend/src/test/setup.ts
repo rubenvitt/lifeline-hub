@@ -111,7 +111,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
-  onlineManager.setOnline(true); // ein offline geschalteter Test (`setzeOnline`) leckt sonst
+  // Ein offline geschalteter Test (`setzeOnline`) leckt sonst: beide Hälften zurück, damit
+  // nicht TanStack online und `navigator.onLine` offline meldet.
+  Reflect.deleteProperty(navigator, 'onLine');
+  onlineManager.setOnline(true);
   localStorage.clear(); // Persistenz (z. B. gemerkte Basemap/UHS) nicht zwischen Tests lecken lassen
   setzeViewportZurueck(); // Breite/Zeigerart/Zuhörer zurück auf den Ausgangszustand
   // Vorgehaltenes Lagebild (LFH-723): jeder `AuthProvider` legt bei bestätigter Sitzung einen

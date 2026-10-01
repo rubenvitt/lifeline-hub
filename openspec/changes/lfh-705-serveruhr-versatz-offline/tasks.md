@@ -28,4 +28,5 @@ Code. „Verifiziert“ heißt, der genannte Test läuft grün **und** war vorhe
 ## 5. Abschluss
 
 - [x] 5.1 Nachzug für ETB- und Meldungs-Ereigniszeit aus der Geräteuhr (Non-Goal in `design.md`) per `clickup-task-anlegen` aufs Board. Verifiziert, wenn die Task-ID hier und in `design.md` steht. **Ergebnis:** LFH-895.
-- [ ] 5.2 `./scripts/check-all.sh` vollständig grün. Verifiziert durch Exit-Code 0 ohne `| tail`, Ergebnis hier eintragen.
+- [x] 5.2 Review-Workflow über vier Dimensionen (Fehler, Sicherheit/Daten, Projektregeln, Tests), jeder Befund adversarial geprüft. Verifiziert, wenn jeder bestätigte Befund behoben ist. **Ergebnis:** 10 geprüft, 7 bestätigt und behoben: jüngere Messung aus `localStorage` gewinnt auch gegen eine ältere im Tab (Test rot→grün); Messung an Ablehnungen auch für `apiGet`/`apiUpload` belegt (Probe rot); `setup.ts` setzt auch `navigator.onLine` zurück; e2e prüft, dass nichts als abgelehnt liegt; Regel in `offline/AGENTS.md` auf Stand/Belegung eingegrenzt (LFH-895 offen), Titel und Geltungsbereich erweitert, Verweis in `frontend/AGENTS.md`, Doppelregel in `betreuung/AGENTS.md` auf einen Verweis gekürzt.
+- [ ] 5.3 `./scripts/check-all.sh` vollständig grün. Verifiziert durch Exit-Code 0 ohne `| tail`, Ergebnis hier eintragen.

@@ -79,7 +79,12 @@ export function merkeServerzeit(res: Response, empfangenMs: number = Date.now())
 /** Jetzt nach der Serveruhr, soweit ein frischer Versatz bekannt ist, sonst nach der Geräteuhr. */
 export function serverJetzt(): Dayjs {
   const jetzt = Date.now();
-  const m = imSpeicher ?? ausSpeicherLesen();
+  // Die jüngere Messung gilt (D2), auch wenn sie ein anderer Tab in localStorage gelegt hat.
+  const gespeichert = ausSpeicherLesen();
+  const m =
+    imSpeicher && (!gespeichert || imSpeicher.gemessenAt >= gespeichert.gemessenAt)
+      ? imSpeicher
+      : gespeichert;
   const alter = m ? jetzt - m.gemessenAt : -1;
   // Ein negatives Alter heißt, die Geräteuhr wurde seit der Messung zurückgestellt.
   if (!m || alter < 0 || alter > HALTBARKEIT_MS || Math.abs(m.versatzMs) < RAUSCHGRENZE_MS) {
