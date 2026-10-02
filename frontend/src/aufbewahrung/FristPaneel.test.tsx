@@ -144,6 +144,50 @@ describe('FristPaneel', () => {
     await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
   });
 
+  it('der Schalter „unbegrenzt“ im Dialog hebt die Frist ohne Rückfrage auf (LFH-756)', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
+    const dialog = await dialogOeffnen();
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    // Ohne Zeitpunkt gibt es nichts zu wählen — das Feld ist gesperrt, die Pflicht entfällt.
+    expect(within(dialog).getByRole('textbox')).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Frist aufheben' }));
+    await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
+    expect(rueckfrageOffen()).toBe(false);
+  });
+
+  it('„unbegrenzt“ verlangt keinen Zeitpunkt — auch bei leerem Feld geht null hinaus', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: null });
+    const dialog = await dialogOeffnen();
+    expect(within(dialog).getByRole('textbox')).toHaveValue('');
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Frist aufheben' }));
+    await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
+  });
+
+  it('der Schalter steht beim Öffnen aus, auch ohne bestehende Frist', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: null });
+    const dialog = await dialogOeffnen();
+    expect(
+      within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }),
+    ).not.toBeChecked();
+    expect(within(dialog).getByRole('textbox')).toBeEnabled();
+  });
+
+  it('ein abgebrochenes „unbegrenzt“ steht beim nächsten Öffnen nicht mehr', async () => {
+    // Die Formularinstanz lebt im Hook und überdauert das Schließen des Dialogs.
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
+    let dialog = await dialogOeffnen();
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    dialog = await dialogOeffnen();
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }),
+      ).not.toBeChecked(),
+    );
+    expect(gesendet).toHaveLength(0);
+  });
+
   it('ein Fehler steht am Paneel, nicht im Toast', async () => {
     antwort = () => HttpResponse.json({ error: 'Einsatz ist geschwärzt' }, { status: 409 });
     zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
