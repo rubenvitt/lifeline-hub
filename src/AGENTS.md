@@ -93,6 +93,20 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 - Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
   beim Download mit 422.
 
+**Vorschau (LFH-759)** (Spec `anhang-vorschau`, Herleitung
+`openspec/changes/lfh-759-bildvorschau-anhaenge/design.md`):
+- `?fassung=vorschau` (≤ 256 px) und `grossansicht` (≤ 1600 px) laufen durch dieselbe
+  `anhang_antwort`, mit den Gates der Route und ohne ETB-Vermerk. `anhang::vorschau` kodiert
+  JPEG/PNG/GIF/WebP/TIFF neu (Ausrichtung angewendet, keine Metadaten), in `spawn_blocking` und
+  höchstens `VORSCHAU_PARALLEL` zugleich; gespeichert wird nichts. HEIC/HEIF → 422, das dekodiert
+  der Browser. Wer die Erzeugung ändert, erhöht `VORSCHAU_VERSION` (ETag `"<sha256>.v<n>.<k|g>"`).
+- `inline` und `image/jpeg` nur für diese beiden Fassungen; alles andere bleibt `attachment` mit
+  gespeichertem `mime`. Jede Anhang-Antwort trägt `nosniff` und `ANHANG_CSP`.
+- Frontend: Bild-Anhänge zeigen `components/AnhangVorschau.tsx` (über `DownloadAnker` mit `mime`
+  oder direkt), nie ein `<img>` auf die Download-Adresse und nie `fassung=original` zur Anzeige.
+  Eine künftige App-CSP muss `img-src blob:`, `worker-src 'self'` und `'wasm-unsafe-eval'`
+  erlauben (HEIC-Decoder, `frontend/src/heic/`).
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und

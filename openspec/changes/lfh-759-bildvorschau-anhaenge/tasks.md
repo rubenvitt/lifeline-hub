@@ -5,27 +5,27 @@ Code. Backend-Tests: `cargo test`. Frontend: `mise exec -- pnpm -C frontend test
 
 ## 1. Backend: Fassungen und Schutz-Header
 
-- [ ] 1.1 `Fassung` um `Vorschau` und `Grossansicht` erweitern, `FassungParam::fassung` liest
+- [x] 1.1 `Fassung` um `Vorschau` und `Grossansicht` erweitern, `FassungParam::fassung` liest
   `vorschau` und `grossansicht`, die 400-Meldung nennt alle vier Werte. Belegt durch Unit-Tests in
   `routes/support.rs`: beide neuen Werte, `roh` → 400, doppelt → 400, ohne → `Bereinigt`.
-- [ ] 1.2 `anhang_antwort` setzt an jeder Antwort mit Inhalt `X-Content-Type-Options: nosniff` und
+- [x] 1.2 `anhang_antwort` setzt an jeder Antwort mit Inhalt `X-Content-Type-Options: nosniff` und
   `Content-Security-Policy: default-src 'none'; sandbox`. Belegt durch `tests/anhang_vorschau.rs`:
-  bereinigte Fassung, Original (als Einsatzleitung) und eine HTML-Datei mit `.gif`-Endung tragen
-  beide Header.
+  bereinigte Fassung, Original (als Einsatzleitung), Vorschau, Großansicht und eine Textdatei mit
+  HTML tragen beide Header.
 
 ## 2. Backend: Vorschaubild erzeugen
 
-- [ ] 2.1 `image` 0.25 in `Cargo.toml` mit `default-features = false` und nur `jpeg`, `png`, `gif`,
+- [x] 2.1 `image` 0.25 in `Cargo.toml` mit `default-features = false` und nur `jpeg`, `png`, `gif`,
   `webp` und `tiff` aufnehmen, mit Begründungskommentar (reines Rust, Single-Binary). Belegt durch
   `cargo tree -e normal -i image`, das kein `-sys`-Crate zeigt, und `cargo build` sowie
   `cargo test --no-default-features`, die grün sind.
-- [ ] 2.2 Die Signaturprüfung aus `metadaten::bereinigen` als `pub(crate)`-Funktion freilegen, ohne
+- [x] 2.2 Die Signaturprüfung aus `metadaten::bereinigen` als `pub(crate)`-Funktion freilegen, ohne
   ihr Verhalten zu ändern. Belegt dadurch, dass die bestehenden Tests von `anhang::metadaten` und
   `tests/anhang_metadaten.rs` unverändert grün sind.
-- [ ] 2.3 Modul `src/anhang/vorschau/` mit `erzeugen(&[u8], Groesse) -> Result<Vec<u8>, KeineVorschau>`
+- [x] 2.3 Modul `src/anhang/vorschau/` mit `erzeugen(&[u8], Groesse) -> Result<Vec<u8>, KeineVorschau>`
   nach design.md D4, samt `VORSCHAU_VERSION`. Unit-Tests mit im Test kodierten echten Bildern.
   Belegt durch:
-  - JPEG 4032 × 3024 → 256 × 192 bzw. 1600 × 1200
+  - JPEG 2016 × 1512 (4:3) → 256 × 192 bzw. 1600 × 1200
   - PNG 120 × 80 → 120 × 80, nicht vergrößert
   - JPEG mit EXIF-Ausrichtung 6 und GPS → 192 × 256, ohne EXIF/XMP (Kontrollnetz und Suche nach
     `Exif\0\0`)
@@ -37,7 +37,7 @@ Code. Backend-Tests: `cargo test`. Frontend: `mise exec -- pnpm -C frontend test
     der Kopf)
   - Ein abgeschnittenes PNG → `KeineVorschau`
   - PDF, HEIF (`testbau::heif`) und BigTIFF → `KeineVorschau`
-- [ ] 2.4 Fassungen `Vorschau`/`Grossansicht` in `anhang_antwort` verdrahten nach D5 und D6:
+- [x] 2.4 Fassungen `Vorschau`/`Grossansicht` in `anhang_antwort` verdrahten nach D5 und D6:
   - ETag `"<sha256>.v<n>.<k|g>"` und 304 vor dem BLOB
   - `spawn_blocking` mit Semaphore (`VORSCHAU_PARALLEL = 2`), Panic → 422
   - `Content-Type: image/jpeg`, `Content-Disposition: inline` mit `<stamm>.vorschau.jpg`
@@ -48,22 +48,22 @@ Code. Backend-Tests: `cargo test`. Frontend: `mise exec -- pnpm -C frontend test
   - 200 mit JPEG der erwarteten Größe, `inline`, kein neuer ETB-Eintrag
   - 304 mit dem ETag
   - verschiedene ETags für Vorschau, Großansicht und bereinigt
-  - 404 aus einem fremden Einsatz
+  - ohne Lesezugriff derselbe Fehlerstatus wie beim Download
   - 422 ohne Bytes für PDF und HEIC
-  - Vorschau eines JPEG mit kaputtem Metadaten-Segment (Download 422) → 200
+  - Vorschau eines lesbaren Bildes, das die Bereinigung abweist (Download 422) → 200
   - Der Guard `nur_support_liefert_anhang_bytes_aus` bleibt grün.
-- [ ] 2.5 `static_files.rs`: `wasm` → `application/wasm`. Belegt durch einen Unit-Test neben
+- [x] 2.5 `static_files.rs`: `wasm` → `application/wasm`. Belegt durch einen Unit-Test neben
   `liefert_vorhandenes_asset_mit_content_type_und_cache`.
-- [ ] 2.6 Regelblock „Vorschau (LFH-759)“ in `src/AGENTS.md`, Abschnitt „Anhänge“, nach design.md
+- [x] 2.6 Regelblock „Vorschau (LFH-759)“ in `src/AGENTS.md`, Abschnitt „Anhänge“, nach design.md
   D9. Belegt dadurch, dass `scripts/check-fmt.sh` grün ist und Verweise mit Datei und Abschnitt im
   Code-Kommentar von `anhang_antwort` stehen.
 
 ## 3. Frontend: Vorschau für Bilder vom Server
 
-- [ ] 3.1 In `api/anhangFassung.ts`: `vorschauPfad`, `grossansichtPfad`, `istHeicMime` und
+- [x] 3.1 In `api/anhangFassung.ts`: `vorschauPfad`, `grossansichtPfad`, `istHeicMime` und
   `hatServerVorschau(mime)` (JPEG, PNG, WebP, GIF, TIFF). Belegt durch Unit-Tests in
   `anhangFassung.test.ts`, auch für Adressen, die schon `?` enthalten.
-- [ ] 3.2 `components/AnhangVorschau.tsx` und `AnhangVorschauGruppe` nach design.md D7:
+- [x] 3.2 `components/AnhangVorschau.tsx` und `AnhangVorschauGruppe` nach design.md D7:
   - quadratisch, Kante = Mindesthöhe der Dichtestufe, antd `Image`, `loading="lazy"`
   - Platzhalter mit Dateityp bei `onError`
   - zugänglicher Name „Vorschau: <dateiname>, <kennung>“

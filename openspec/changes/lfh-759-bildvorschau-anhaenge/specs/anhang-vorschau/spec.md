@@ -29,9 +29,9 @@ maßgeblich ist der Inhalt der Datei.
 - **WHEN** ein PNG mit 120 × 80 px mit `fassung=grossansicht` abgerufen wird
 - **THEN** ist das gelieferte JPEG 120 × 80 px groß
 
-#### Scenario: Fremder Einsatz
+#### Scenario: Ohne Lesezugriff
 - **WHEN** eine Person ohne Lesezugriff auf den Einsatz die Vorschau eines seiner Anhänge abruft
-- **THEN** antwortet das System wie beim Download dieser Route mit 404
+- **THEN** antwortet das System mit demselben Fehlerstatus wie beim Download dieser Route und liefert keine Bildbytes
 
 #### Scenario: Erstes Bild einer Folge
 - **WHEN** ein animiertes GIF oder ein mehrseitiges TIFF mit `fassung=vorschau` abgerufen wird
@@ -48,8 +48,8 @@ denn das Vorschaubild übernimmt keine Bytes außer Bildpunkten.
 - **WHEN** ein JPEG mit 4032 × 3024 px, EXIF-Ausrichtung 6 und GPS-Angaben mit `fassung=vorschau` abgerufen wird
 - **THEN** ist das gelieferte JPEG 192 × 256 px groß und trägt weder Ausrichtung noch GPS-Angaben noch einen anderen EXIF-Block
 
-#### Scenario: Nicht bereinigbares Foto
-- **WHEN** der normale Download eines Fotos mit 422 antwortet, weil ein Metadaten-Segment beschädigt ist, die Bilddaten aber lesbar sind
+#### Scenario: Nicht bereinigbares Bild
+- **WHEN** der normale Download eines Bildes mit 422 antwortet, weil die Bereinigung es abweist, die Bilddaten aber lesbar sind
 - **THEN** liefert `fassung=vorschau` ein Vorschaubild ohne Metadaten
 
 ### Requirement: Kein Vorschaubild ohne lesbares Bild
@@ -111,8 +111,8 @@ Jede Antwort einer Anhang-Download-Route mit Dateibytes MUST `X-Content-Type-Opt
 und `Content-Security-Policy: default-src 'none'; sandbox` tragen, gleich welche Fassung. Damit
 führt der Browser keinen Inhalt eines Anhangs aus, auch nicht beim direkten Öffnen der Adresse.
 
-#### Scenario: HTML-Datei mit Bild-Endung
-- **WHEN** eine Datei `foto.gif`, die in Wahrheit HTML mit Skript enthält, ohne Fassung abgerufen wird
+#### Scenario: Textdatei mit HTML
+- **WHEN** eine Textdatei `notiz.txt`, die HTML mit Skript enthält, ohne Fassung abgerufen wird
 - **THEN** trägt die Antwort `X-Content-Type-Options: nosniff` und die CSP `default-src 'none'; sandbox`
 
 #### Scenario: Original

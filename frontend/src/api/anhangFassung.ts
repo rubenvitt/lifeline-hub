@@ -6,9 +6,26 @@
  * `einsatz/schreibrecht.ts`.
  */
 
+function mitFassung(href: string, fassung: string): string {
+  return `${href}${href.includes('?') ? '&' : '?'}fassung=${fassung}`;
+}
+
 /** Download-Adresse des Originals zu einer Download-Adresse der bereinigten Fassung. */
 export function originalPfad(href: string): string {
-  return `${href}${href.includes('?') ? '&' : '?'}fassung=original`;
+  return mitFassung(href, 'original');
+}
+
+/**
+ * Vorschaubild (LFH-759, Spec `anhang-vorschau`): ein JPEG, längste Kante ≤ 256 px, vom Server
+ * aus den Bildpunkten neu kodiert, ohne Metadaten und ohne ETB-Vermerk.
+ */
+export function vorschauPfad(href: string): string {
+  return mitFassung(href, 'vorschau');
+}
+
+/** Großansicht (LFH-759): wie {@link vorschauPfad}, längste Kante ≤ 1600 px. */
+export function grossansichtPfad(href: string): string {
+  return mitFassung(href, 'grossansicht');
 }
 
 /**
@@ -40,4 +57,26 @@ export function originalZugaenglicherName(kennung: string): string {
 /** Ob der Anhang ein Bild ist — nur dort unterscheiden sich Original und bereinigte Fassung. */
 export function istBildMime(mime: string | null | undefined): boolean {
   return mime?.startsWith('image/') ?? false;
+}
+
+/**
+ * Formate, für die der Server ein Vorschaubild erzeugt (LFH-759). Spiegel der Formatwahl in
+ * `src/anhang/vorschau/`; HEIC/HEIF dekodiert die App selbst ({@link istHeicMime}).
+ */
+const SERVER_VORSCHAU_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/tiff',
+]);
+
+/** Ob der Server für diesen Anhang ein Vorschaubild liefert. */
+export function hatServerVorschau(mime: string | null | undefined): boolean {
+  return mime != null && SERVER_VORSCHAU_MIME.has(mime);
+}
+
+/** Ob der Anhang ein HEIC/HEIF-Foto ist, das die App auf dem Gerät dekodiert (LFH-759). */
+export function istHeicMime(mime: string | null | undefined): boolean {
+  return mime === 'image/heic' || mime === 'image/heif';
 }
