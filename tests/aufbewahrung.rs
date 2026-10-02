@@ -618,9 +618,29 @@ fn im_archiv(pfad: &str) -> bool {
     pfad == ARCHIV || pfad.starts_with(&format!("{ARCHIV}/"))
 }
 
-/// Die Methoden-Router, die der Guard in einem `.route(…)` erkennt. `any` und `on` (LFH-754)
-/// sind nie ein GET; bei `on(MethodFilter::…, handler)` steht der Handler hinter dem Komma.
-const METHODEN: [&str; 7] = ["get", "post", "put", "patch", "delete", "any", "on"];
+/// Die Methoden-Router, die der Guard in einem `.route(…)` erkennt (LFH-754). Alles außer
+/// `get` zählt als Schreibweg: `any`, `on`, ein an ein `get(…)` gekettetes `.fallback(…)`
+/// (nimmt jede andere Methode an) und jede `*_service`-Form, auch `get_service` — ein Service
+/// ist kein Handler in `routes::aufbewahrung`. Bei `on(MethodFilter::…, handler)` steht der
+/// Handler hinter dem Komma.
+const METHODEN: [&str; 16] = [
+    "get",
+    "post",
+    "put",
+    "patch",
+    "delete",
+    "any",
+    "on",
+    "fallback",
+    "get_service",
+    "post_service",
+    "put_service",
+    "patch_service",
+    "delete_service",
+    "any_service",
+    "on_service",
+    "fallback_service",
+];
 
 /// Alle `.route(…)`-Aufrufe aus `app.rs` unter dem Archiv-Namensraum mit ihren
 /// `methode(routes::aufbewahrung::x)`-Paaren.
@@ -852,7 +872,8 @@ fn guard_erkennt_zusaetzlichen_schreibweg_und_current_user() {
 }
 
 /// Selbsttest des Guards (LFH-754): auch die Registrierungsformen jenseits von
-/// `.route(…, get(…))` fallen auf — `any`, `on`, `.nest`, `.merge`, `.route_service`.
+/// `.route(…, get(…))` fallen auf — `any`, `on`, `.fallback`, `*_service`, `.nest`, `.merge`,
+/// `.route_service`.
 #[test]
 fn guard_erkennt_any_on_nest_merge_und_route_service() {
     let app_rs = std::fs::read_to_string("src/app.rs").unwrap();
@@ -880,6 +901,23 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
             1,
         ),
         "on /api/aufbewahrung/einsaetze/{id} → akte",
+    );
+    // An ein GET gekettete Schreibwege: `.fallback` nimmt POST, PUT und DELETE an.
+    nicht_get(
+        &app_rs.replacen(
+            anker,
+            "get(routes::aufbewahrung::akte).fallback(routes::aufbewahrung::akte)",
+            1,
+        ),
+        "fallback /api/aufbewahrung/einsaetze/{id} → akte",
+    );
+    nicht_get(
+        &app_rs.replacen(
+            anker,
+            "get(routes::aufbewahrung::akte).post_service(routes::aufbewahrung::akte)",
+            1,
+        ),
+        "post_service /api/aufbewahrung/einsaetze/{id} → akte",
     );
 
     for praefix in ["/api/aufbewahrung/intern", "/api", "/"] {
