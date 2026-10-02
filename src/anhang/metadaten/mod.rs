@@ -4,7 +4,7 @@
 //! standardmäßig eine Fassung ohne EXIF, XMP, IPTC, Kommentare und Vorschaubilder; nur die
 //! Ausrichtung bleibt. Bilddaten und Farbprofil laufen bytegleich durch, nichts wird neu kodiert.
 //!
-//! Drei Regeln (Herleitung: `openspec/changes/lfh-747-exif-bereinigung-auslieferung/design.md`,
+//! Drei Regeln (Herleitung: `openspec/changes/archive/2026-10-02-lfh-747-exif-bereinigung-auslieferung/design.md`,
 //! D3–D5):
 //! - Das Format bestimmen die Magic Bytes, nicht der gespeicherte MIME-Typ.
 //! - Behalten wird nur, was auf einer Positivliste steht.
