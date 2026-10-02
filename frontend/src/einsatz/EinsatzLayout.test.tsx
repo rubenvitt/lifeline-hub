@@ -731,9 +731,10 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
     delete document.documentElement.dataset.helligkeit;
   });
 
-  function mitWarnstufe(stufe: string) {
+  function mitWarnstufe(stufe: string, ...weitere: Parameters<typeof server.use>) {
     localStorage.setItem('lifeline-hub.helligkeit', '40');
     server.use(
+      ...weitere,
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
@@ -772,5 +773,35 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
     // Einen Takt über den Abruf hinaus warten — ein vorzeitiges „40" belegte nichts.
     await new Promise((r) => setTimeout(r, 50));
     expect(document.documentElement.dataset.helligkeit).toBe('40');
+  });
+
+  it('Unwetter „extrem" gilt jetzt: Wahl 40 %, wirksam der Boden 80 % (LFH-774)', async () => {
+    // Dass Sperre und Modulzähler EIN Cache-Fach teilen, belegt `useAktiveWarnung.test.tsx`
+    // (der Modulzähler ist hier weggemockt).
+    const um = (ms: number) => new Date(Date.now() + ms).toISOString();
+    mitWarnstufe(
+      'keine',
+      http.get('/api/einsaetze/7/wetter', () =>
+        HttpResponse.json({
+          warnungen: {
+            zustand: 'ok',
+            abgerufen_at: um(-60_000),
+            daten: [
+              {
+                stufe: 'extrem',
+                ereignis: 'ORKANBÖEN',
+                ueberschrift: 'Amtliche UNWETTERWARNUNG vor EXTREMEN ORKANBÖEN',
+                beginn: um(-3_600_000),
+                ende: um(3_600_000),
+              },
+            ],
+          },
+          vorhersage: { zustand: 'kein_ort' },
+        }),
+      ),
+    );
+    await screen.findByText('ETB-Inhalt');
+    await waitFor(() => expect(document.documentElement.dataset.helligkeit).toBe('80'));
+    expect(localStorage.getItem('lifeline-hub.helligkeit')).toBe('40');
   });
 });

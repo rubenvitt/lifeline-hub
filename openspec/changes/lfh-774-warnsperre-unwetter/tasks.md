@@ -2,14 +2,14 @@
 
 ## 1. Regel: drittes Merkmal in `einsatz/aktiveWarnung.ts`
 
-- [ ] 1.1 Tabelle zuerst (TDD): `einsatz/aktiveWarnung.test.ts` bekommt eine `it.each`-Tabelle
+- [x] 1.1 Tabelle zuerst (TDD): `einsatz/aktiveWarnung.test.ts` bekommt eine `it.each`-Tabelle
   über alle `WetterWarnstufe`-Werte als Literale: `gering` → false, `maessig` → false,
   `schwer` → true, `extrem` → true. Dazu kommen „leere Liste → false“ und
   „`dwdStufenJetzt` fehlt → false“. Rot gegen den Bestand prüfen, dann
   `aktiveWarnung({ …, dwdStufenJetzt })` mit `dwdWarnstufe[s].rolle === 'alarm'` umsetzen (D2).
   Prüfen mit `vitest run src/einsatz/aktiveWarnung.test.ts`: grün. Mutationsprobe: Ist die
   Rolle auf `achtung` gestellt, wird die Tabelle rot.
-- [ ] 1.2 Reine Funktion `dwdStufenJetzt(teil, jetzt)` in `einsatz/aktiveWarnung.ts` (D2), aus
+- [x] 1.2 Reine Funktion `dwdStufenJetzt(teil, jetzt)` in `einsatz/aktiveWarnung.ts` (D2), aus
   `teilStand` und `teileWarnungen` von `wetter/wetterStand.ts`. Tests in derselben Datei:
   - Teil fehlt → `undefined`.
   - `zustand: ausfall` → `undefined`.
@@ -19,10 +19,10 @@
   - angekündigte Warnung fällt heraus, abgelaufene ebenfalls.
   - gilt jetzt → ihre Stufe.
   Prüfen: Vitest grün.
-- [ ] 1.3 Guard aus D2 in `aktiveWarnung.test.ts`: `UNWETTER_STUFEN` (aus `wetter/unwetter.ts`)
+- [x] 1.3 Guard aus D2 in `aktiveWarnung.test.ts`: `UNWETTER_STUFEN` (aus `wetter/unwetter.ts`)
   ist genau die Menge der Stufen, die `dwdWarnstufe` auf `alarm` legt. Prüfen: grün.
   Mutationsprobe: `UNWETTER_STUFEN` nur `['extrem']` → rot.
-- [ ] 1.4 Kopfkommentar von `einsatz/aktiveWarnung.ts` nachziehen:
+- [x] 1.4 Kopfkommentar von `einsatz/aktiveWarnung.ts` nachziehen:
   - DREI Merkmale, (c) mit Verweis auf diese Change.
   - Das „BEWUSST NICHT … DWD-Unwetter (LFH-774)“ entfällt.
   - Neu: nur „gilt jetzt“, Vertrag statt `UNWETTER_STUFEN`.
@@ -31,7 +31,7 @@
 
 ## 2. Quelle: Wetter in `einsatz/useAktiveWarnung.ts`
 
-- [ ] 2.1 Hook-Tests zuerst in `einsatz/useAktiveWarnung.test.tsx`, msw-Handler für
+- [x] 2.1 Hook-Tests zuerst in `einsatz/useAktiveWarnung.test.tsx`, msw-Handler für
   `/api/einsaetze/7/wetter` mit Abrufzähler:
   - Unwetter `schwer` gilt jetzt → `true`.
   - nur `maessig` → `false`.
@@ -40,23 +40,29 @@
   - Abruf 500 → `false`.
   - Modul `wetter-pegel` ausgeblendet → `abrufe.anzahl === 0` und `false`.
   - gesperrt (`zugriff: false`) → `abrufe.anzahl === 0` und `false`.
-  - Unwetter endet: Mit Fake-Timern läuft das Ende ab, danach `false` ohne neuen Abruf.
-  Rot gegen den Bestand prüfen.
-- [ ] 2.2 `useAktiveWarnung` umsetzen (D1, D3, D4):
+  - Unwetter endet: Das Ende liegt 400 ms in der Zukunft (echte Zeit statt Fake-Timer, weil
+    msw und Query echte Timer brauchen). Danach `false`, ohne neuen Abruf.
+  Rot gegen den Bestand geprüft: 6 rot. Die beiden Freigabe-Fälle waren schon grün, weil
+  der Bestand gar nicht abfragt; ihre Belegkraft zeigt die Mutationsprobe in 2.2.
+- [x] 2.2 `useAktiveWarnung` umsetzen (D1, D3, D4):
   - `useQuery({ ...wetterAbfrage(einsatzId), enabled: wetterFrei, select: (w) => w.warnungen })`
     mit `wetterFrei = istModulFreigegeben(<wetter-pegel>, freigaben)`.
   - `jetzt` aus `useUnwetterUhr(wetterFrei ? teil : undefined)`.
   - `dwdStufenJetzt: wetterFrei ? dwdStufenJetzt(teil, jetzt) : undefined`.
   - Den Kommentar „KEIN ZUSATZABRUF“ um das Wetter (`useModulZaehler`, Modulseite) erweitern.
 
-  Prüfen: alle Tests aus 2.1 und die bestehenden Hook-Tests grün.
-- [ ] 2.3 Bestehende Leser des Wetter-Caches bleiben grün: `vitest run src/einsatz
-  src/wetter src/pages/wetter-pegel`. Prüfen: grün. In `EinsatzLayout.test.tsx` kommt es zu
-  keiner zusätzlichen Anfrage an `/wetter`, denn der Schlüssel ist geteilt.
+  Prüfen: alle Tests aus 2.1 und die bestehenden Hook-Tests grün (16/16). Mutationsproben:
+  `enabled: true` → beide Freigabe-Fälle rot; Uhr ohne Teil → „Unwetter endet“ rot.
+- [x] 2.3 Bestehende Leser des Wetter-Caches bleiben grün: `vitest run src/einsatz
+  src/wetter src/theme src/pages/WetterPegelPage*`. Prüfen: grün (52 Dateien, 929 Tests).
+  Kein Zusatzabruf: `useAktiveWarnung.test.tsx` rendert Sperre und `useModulZaehler` auf einem
+  QueryClient → genau eine Anfrage an `/wetter` (Mutation „eigener Schlüssel“ → 2, rot). Der
+  Modulzähler ist in `EinsatzLayout.test.tsx` weggemockt. Dort belegt ein Test den Austritt:
+  Unwetter `extrem` gilt, Wahl 40 %, wirksam 80 %.
 
 ## 3. Regeltext
 
-- [ ] 3.1 `frontend/AGENTS.md`, Absatz „Helligkeit: ein Regler, eine Sperre“: Die Aufzählung
+- [x] 3.1 `frontend/AGENTS.md`, Absatz „Helligkeit: ein Regler, eine Sperre“: Die Aufzählung
   der Merkmale bekommt das jetzt geltende Unwetter mit Rolle `alarm` aus `dwdWarnstufe` dazu,
   nur mit Freigabe `wetter-pegel`. Prüfen: Prettier über `frontend/` grün.
 
