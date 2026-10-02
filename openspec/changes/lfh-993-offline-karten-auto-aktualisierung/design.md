@@ -40,8 +40,8 @@ Motivation: proposal.md. Ausgangslage im Code (Stand 02.10.2026):
   Lauf?
 
 **Non-Goals:**
-- Kein persistenter Wächter-Zustand, keine Migration. Nach einem Neustart sind „zuletzt geprüft“
-  und „letzter Fehler“ leer. Die nächste Prüfung holt jeden verpassten Stand nach, weil sie gegen
+- Kein persistenter Laufzustand des Wächters. Gespeichert wird nur die Einstellung (D10). Nach
+  einem Neustart sind „zuletzt geprüft“ und „letzter Fehler“ leer. Die nächste Prüfung holt jeden verpassten Stand nach, weil sie gegen
   den Katalog vergleicht.
 - Der Cron-Ausdruck des karten-service wird aus dem Hub weder geändert noch angezeigt, außer als
   Text.
@@ -53,9 +53,10 @@ Motivation: proposal.md. Ausgangslage im Code (Stand 02.10.2026):
 
 **D1: Der Hub-Wächter ist ein eigener Tokio-Task nach dem Vorbild `kritis::scheduler`.**
 Neues Modul `src/karte/auto_aktualisierung.rs`. Gestartet in `main.rs` (nur im Server-Lauf),
-mit 60 s Startverzögerung. Der Takt ist das konfigurierte Intervall (Vorgabe 6 h), zusätzlich gilt:
+mit 60 s Startverzögerung. Der Takt ist der eingestellte Prüfabstand (D10), zusätzlich gilt:
 - Solange ein Neubau aussteht, prüft er alle 30 s.
-- Ein `tokio::sync::Notify` weckt ihn sofort, wenn „Jetzt aktualisieren“ einen Bau anstößt.
+- Ein `tokio::sync::Notify` weckt ihn sofort, wenn „Jetzt aktualisieren“ einen Bau anstößt oder
+  die Einstellung sich ändert (D10).
 - Die Logik steckt in `tick_einmal(&Kontext) -> TickErgebnis`, ohne laufenden Task testbar.
 
 Der Zustand liegt in `Arc<Mutex<WaechterZustand>>` im `AppState`:
@@ -87,7 +88,10 @@ Der Zustand liegt in `Arc<Mutex<WaechterZustand>>` im `AppState`:
    „wartet auf Katalog“. Erscheint in der Zeit kein neuerer Stand (CDN-Cache des Manifests), wird
    der Fehler „Neubau fertig, Katalog zeigt noch keinen neuen Stand“ vermerkt.
 
-Ist die Automatik aus, läuft Schritt 3 nur für Karten, die „Jetzt aktualisieren“ ausgelöst hat.
+Die Einstellung (D10) liest jeder Tick frisch aus der DB, eine Änderung braucht keinen Neustart.
+Fällig ist die reguläre Prüfung, wenn `letzte_pruefung_at + intervall <= jetzt` oder noch nie
+geprüft wurde. Ist die Automatik aus, entfallen die regulären Schritte 2 und 3. Sie laufen nur
+für Karten, die „Jetzt aktualisieren“ ausgelöst hat, und `naechste_pruefung_at` bleibt leer.
 Schritt 1 läuft immer. Ein Erfolg (Tausch fertig) löscht den Fehler der Karte.
 
 **D3: Der In-Place-Start wird eine gemeinsame Funktion.**
@@ -148,8 +152,7 @@ Enum `laedt | bau_wartet | baut | aktuell`, gepinnt in `tests/enum_wire_kontrakt
 
 **D7: `GET /api/karte/offline-karten/aktualisierung` (Lesen wie die Liste: `darf_admin_bereich`).**
 Antwort `AktualisierungsStatus`:
-- `automatisch: bool`
-- `intervall_stunden: u64`
+- `automatisch: bool` und `intervall_stunden: u64`, die effektive Einstellung nach D10
 - `letzte_pruefung_at` und `naechste_pruefung_at`, beide `Option<String>`, RFC 3339 UTC
 - `bau_dienst: BauDienst` mit den Werten `nicht_konfiguriert | erreichbar | unerreichbar`
 - `naechster_bau_at: Option<String>`
@@ -186,11 +189,15 @@ Verhalten ändert sich nicht.
 - Polling: alle 2 s, solange eine Karte eine Phase trägt, sonst alle 60 s.
 - Die Liste pollt zusätzlich, solange eine Phase `laedt` meldet. Ein vom Wächter gestarteter
   Download soll seinen Fortschritt zeigen, obwohl ihn kein Klick ausgelöst hat.
-- **Zeile über der Tabelle** (`Typography.Text type="secondary"`, keine Alert-Fläche, es ist
-  Auskunft und keine Warnung): „Automatisch aktualisieren: an · zuletzt geprüft {t} · nächste
-  Prüfung {t} · nächster Kartenbau {t}“. Bei `unerreichbar` steht statt des letzten Teils
-  „Kartenbau-Dienst nicht erreichbar“, bei `nicht_konfiguriert` entfällt er. Ist die Automatik
-  aus: „Automatisch aktualisieren: aus“.
+- **Zeile über der Tabelle** (keine Alert-Fläche, es ist Auskunft und keine Warnung). Für Admins
+  steht vorn ein Schalter „Automatisch aktualisieren“ (`Switch`, klein), dahinter ein Auswahlfeld
+  „alle {n}“ mit 1 h, 3 h, 6 h, 12 h, 24 h und 7 Tagen. Ein gespeicherter Wert außerhalb dieser
+  Liste erscheint als eigene Option. Jede Änderung speichert sofort (`PUT`, Rückmeldung per
+  `message`), bei einem Fehler springt die Anzeige zurück. Für Nicht-Admins steht derselbe Inhalt
+  als Text: „Automatisch aktualisieren: an, alle 6 h“.
+  Dahinter als Sekundärtext: „zuletzt geprüft {t} · nächste Prüfung {t} · nächster Kartenbau {t}“.
+  Bei `unerreichbar` steht statt des letzten Teils „Kartenbau-Dienst nicht erreichbar“, bei
+  `nicht_konfiguriert` entfällt er. Ist die Automatik aus, entfällt „nächste Prüfung“.
 - **Spalte Name:** „Stand {JJJJ-MM-TT} · auf dem Gerät seit {t}“ (`download_at` über
   `anzeige/zeitEingabe.ts`/`anzeige/format.ts`, UTC → Ortszeit).
 - **Spalte Status:**
@@ -208,11 +215,32 @@ Verhalten ändert sich nicht.
 - Zeit- und Leseformen halten sich an `frontend/AGENTS.md`. Wie sie beim Umsetzen geprüft
   werden, steht in tasks.md.
 
-**D10: Konfiguration.**
-`--karten-auto-aktualisierung` / `LIFELINE_KARTEN_AUTO_AKTUALISIERUNG` (bool, Vorgabe `true`,
-`ArgAction::Set` wie `kritis_extrakt`) und `--karten-auto-aktualisierung-intervall-stunden` /
-`LIFELINE_KARTEN_AUTO_AKTUALISIERUNG_INTERVALL_STUNDEN` (Vorgabe 6, mindestens 1). Den Rahmen
-setzt `tests/env_config_guard.rs`. Ins Startup-Log kommen beide Werte.
+**D10: Einstellung in der Verwaltung, Env nur als Vorgabe (Entscheidung 02.10.2026).**
+- **Speicher:** Migration `0134_karte_auto_aktualisierung.sql` legt die Tabelle
+  `karte_auto_aktualisierung (id INTEGER PRIMARY KEY, automatisch INTEGER NOT NULL,
+  intervall_stunden INTEGER NOT NULL, geaendert_at TEXT NOT NULL, geaendert_von INTEGER
+  REFERENCES benutzer(id))` an. Es gibt höchstens eine Zeile mit `id = 1`, das Repo schreibt per
+  `INSERT … ON CONFLICT(id) DO UPDATE`. Es gibt keinen DB-CHECK, validiert wird in Rust wie bei
+  `org_einstellungen`. Die Einstellung gilt serverweit, nicht je Organisation: Auch die
+  Offline-Karten sind serverweit (`karte_offline_karte` hat kein `org_id`). Die Nummer 0134 liegt
+  über der höchsten auf `origin/alpha` (0133, Stand 02.10.2026). Vor dem Merge prüft das
+  `scripts/check-migrationen.sh`.
+- **Effektivwert:** gespeicherte Zeile, sonst Env-Vorgabe. `--karten-auto-aktualisierung` /
+  `LIFELINE_KARTEN_AUTO_AKTUALISIERUNG` (bool, Vorgabe `true`, `ArgAction::Set` wie
+  `kritis_extrakt`) und `--karten-auto-aktualisierung-intervall-stunden` /
+  `LIFELINE_KARTEN_AUTO_AKTUALISIERUNG_INTERVALL_STUNDEN` (Vorgabe 6). Den Rahmen setzt
+  `tests/env_config_guard.rs`. Ins Startup-Log kommen beide Vorgaben, die Hilfe nennt sie
+  ausdrücklich „Vorgabe, solange in der Verwaltung nichts gespeichert ist“.
+- **Schreiben:** `PUT /api/karte/offline-karten/aktualisierung/einstellung` (`AdminUser`,
+  Body `{automatisch: bool, intervall_stunden: u64}`). Ein `intervall_stunden` außerhalb
+  1…168 ergibt 400 (Feld für sich, `src/AGENTS.md`). Die Antwort ist der aktuelle
+  `AktualisierungsStatus` (D7), damit die Oberfläche ihn direkt übernimmt. Danach wird der Wächter
+  geweckt (`Notify`). Er berechnet `naechste_pruefung_at` neu und prüft sofort, wenn die neue
+  Fälligkeit schon erreicht ist.
+- *Verworfen: Feld in `org_einstellungen`.* Die Karten gehören nicht zu einer Organisation. Zwei
+  Organisationen mit verschiedener Einstellung hätten keinen eindeutigen Wächtertakt.
+- *Verworfen: nur Env.* Das widerspricht der Entscheidung, und eine Änderung bräuchte einen
+  Neustart.
 
 ## Risks / Trade-offs
 
@@ -237,9 +265,10 @@ setzt `tests/env_config_guard.rs`. Ins Startup-Log kommen beide Werte.
 
 ## Migration Plan
 
-Ohne Datenmigration. Nach dem Deploy prüft der Wächter 60 s nach dem Start zum ersten Mal und
-lädt dann, was der Katalog Neueres führt. Wer das beim Rollout nicht will, setzt vorher
-`LIFELINE_KARTEN_AUTO_AKTUALISIERUNG=false`. Der karten-service ist unabhängig deploybar: Ein
+Die Migration 0134 legt nur die leere Tabelle an, es gibt keine Datenübernahme. Nach dem Deploy
+prüft der Wächter 60 s nach dem Start zum ersten Mal und lädt dann, was der Katalog Neueres führt.
+Wer das beim Rollout nicht will, setzt vorher `LIFELINE_KARTEN_AUTO_AKTUALISIERUNG=false`. Danach
+schaltet ein Admin die Automatik in der Verwaltung ein, wann es passt. Der karten-service ist unabhängig deploybar: Ein
 älterer Dienst ohne `/zeitplan` liefert 404, der Hub zeigt dann keinen nächsten Kartenbau
-(`naechster_bau_at: null`, `bau_dienst` bleibt `erreichbar`, wenn `/builds` antwortet). Rückweg:
-Automatik ausschalten. Der Code bleibt rückwärtskompatibel, die alten Endpunkte bleiben.
+(`naechster_bau_at: null`, `bau_dienst` bleibt `erreichbar`, wenn `/builds` antwortet). Rückweg: Automatik in der Verwaltung ausschalten. Ein Rollback des Codes lässt die Tabelle
+ungenutzt stehen. Der Code bleibt rückwärtskompatibel, die alten Endpunkte bleiben.

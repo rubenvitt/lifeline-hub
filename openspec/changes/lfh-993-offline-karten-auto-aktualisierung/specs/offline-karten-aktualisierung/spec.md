@@ -10,8 +10,8 @@ aktualisiert wurde und wann der nächste Lauf ansteht.
 
 ### Requirement: Der Hub lädt neuere Katalog-Stände selbst
 
-Ist die automatische Aktualisierung eingeschaltet (Vorgabe), MUST der Hub den Offline-Katalog in
-einem festen Abstand prüfen (Vorgabe 6 Stunden, einstellbar). Für jede heruntergeladene Karte im
+Ist die automatische Aktualisierung eingeschaltet, MUST der Hub den Offline-Katalog im
+eingestellten Abstand prüfen. Für jede heruntergeladene Karte im
 Status `bereit`, für die der Katalog einen neueren lieferbaren Stand führt, MUST er diesen Stand
 ohne Klick laden. Während des Ladens MUST die bisherige Karte ausgeliefert bleiben. Erst nach
 vollständigem und verifiziertem Download SHALL die neue Datei sie ersetzen, unter derselben
@@ -46,9 +46,48 @@ Karte ohne Klick laden.
 
 #### Scenario: Automatik ausgeschaltet
 
-- **WHEN** die automatische Aktualisierung per Konfiguration ausgeschaltet ist
+- **WHEN** die automatische Aktualisierung ausgeschaltet ist
 - **THEN** lädt der Hub keinen neueren Stand ohne Klick, und die Verwaltung zeigt die Automatik
   als aus
+
+### Requirement: Ein Admin stellt die Automatik in der Verwaltung ein
+
+Die Offline-Karten-Verwaltung MUST einem System-Admin erlauben, die automatische Aktualisierung
+an- und auszuschalten und den Prüfabstand in ganzen Stunden zu wählen. Erlaubt sind 1 bis 168
+Stunden. Die Einstellung MUST gespeichert werden, einen Neustart überstehen und ohne Neustart
+wirken. Ist nichts gespeichert, MUST die Vorgabe des Betriebs gelten: Automatik an und 6 Stunden,
+sofern die Server-Konfiguration nichts anderes setzt. Ein Prüfabstand außerhalb des erlaubten
+Bereichs MUST mit 400 abgelehnt werden. Nicht-Admins MUST die Einstellung sehen, aber nicht ändern
+können. Der Server MUST ihren Schreibversuch mit 403 ablehnen.
+
+#### Scenario: Automatik ausschalten
+
+- **WHEN** ein Admin die Automatik in der Verwaltung ausschaltet
+- **THEN** lädt der Hub ab sofort keinen neueren Stand mehr ohne Klick, und nach einem Neustart
+  ist sie weiter aus
+
+#### Scenario: Prüfabstand ändern
+
+- **WHEN** ein Admin den Prüfabstand von 6 auf 1 Stunde ändert und die letzte Prüfung über eine
+  Stunde zurückliegt
+- **THEN** prüft der Hub ohne Neustart sofort, und die nächste Prüfung steht danach eine Stunde
+  später
+
+#### Scenario: Ungültiger Prüfabstand
+
+- **WHEN** ein Prüfabstand von 0 oder über 168 Stunden gespeichert werden soll
+- **THEN** antwortet der Server mit 400, und die bisherige Einstellung bleibt
+
+#### Scenario: Ohne gespeicherte Einstellung
+
+- **WHEN** noch nie eine Einstellung gespeichert wurde
+- **THEN** gelten die Vorgaben aus der Server-Konfiguration
+
+#### Scenario: Führungskraft liest nur
+
+- **WHEN** eine Führungskraft ohne System-Admin-Rolle die Verwaltung öffnet
+- **THEN** sieht sie, ob die Automatik an ist und in welchem Abstand sie prüft, kann beides aber
+  nicht ändern
 
 ### Requirement: Ein Neubau zählt auch bei gleicher URL als neuer Stand
 

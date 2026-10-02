@@ -31,8 +31,13 @@ fehlt. Entscheidungen des Menschen vom 02.10.2026 (LFH-993):
 - **karten-service:** neuer Endpunkt `GET /zeitplan` mit dem nächsten Cron-Lauf.
 - **Verwaltung:** eine Zeile über der Tabelle zur Automatik und zu den Läufen. Je Karte
   „Stand …“ und „auf dem Gerät seit …“, die laufende Phase und ein fehlgeschlagenes Update.
+- **Einstellbar in der Verwaltung** (Entscheidung 02.10.2026): Ein System-Admin schaltet die
+  Automatik an oder aus und wählt den Prüfabstand (1 Stunde bis 7 Tage). Die Einstellung wird
+  gespeichert und wirkt ohne Neustart. Neuer Endpunkt
+  `PUT /api/karte/offline-karten/aktualisierung/einstellung`.
 - **Betrieb:** zwei neue Schalter, `LIFELINE_KARTEN_AUTO_AKTUALISIERUNG` (Vorgabe an) und
-  `LIFELINE_KARTEN_AUTO_AKTUALISIERUNG_INTERVALL_STUNDEN` (Vorgabe 6).
+  `LIFELINE_KARTEN_AUTO_AKTUALISIERUNG_INTERVALL_STUNDEN` (Vorgabe 6). Sie gelten nur, solange in
+  der Verwaltung nichts gespeichert ist.
 
 ## Capabilities
 
@@ -56,13 +61,14 @@ Offline-Karten-Verwaltung bleiben dieselben, neu sind nur Inhalte in „Name“,
 - **Hub-Backend:** neues Modul `src/karte/auto_aktualisierung.rs` (Wächter, Zustand, Tick).
   `src/routes/karte.rs`: In-Place-Start als gemeinsame Funktion, `finde_update_eintrag` mit
   SHA-Vergleich, zwei neue Handler. Außerdem `src/app.rs` (Routen), `src/main.rs` (Start des
-  Wächters), `src/config.rs` (zwei Schalter), `src/api_doc.rs`, Typ-Codegen
-  (`frontend/src/api/types.generated.ts` u. a.) und `tests/enum_wire_kontrakt.rs` (neues
+  Wächters), `src/config.rs` (zwei Schalter), `src/api_doc.rs`, Repo-Funktionen in
+  `src/karte/registry/repo.rs`, Typ-Codegen (`frontend/src/api/types.generated.ts` u. a.) und `tests/enum_wire_kontrakt.rs` (neues
   feldloses Enum).
 - **Frontend:** `frontend/src/karten/OfflineKartenVerwaltung.tsx` samt Test,
   `frontend/src/api/offlineKarten.ts` und `frontend/src/api/queryKeys.ts` (neuer Bereichs-Key).
-- **Keine Migration.** Der Zustand des Wächters liegt im Speicher. Nach einem Neustart steht
-  „zuletzt geprüft“ bis zum ersten Lauf leer.
+- **Migration `0134_karte_auto_aktualisierung.sql`:** eine Tabelle mit höchstens einer Zeile für
+  die gespeicherte Einstellung. Der Laufzustand des Wächters liegt weiter nur im Speicher. Nach
+  einem Neustart steht „zuletzt geprüft“ bis zum ersten Lauf leer.
 - **API:** Das Feld `ersetzt_karte_id` von `POST /offline-karten/download` bleibt, die eigene
   Oberfläche nutzt es nicht mehr. Ob es entfällt, entscheidet ein Folgetask.
 - **Last:** Automatische Downloads ziehen mehrere GB. Es läuft immer nur einer zur Zeit, und vor

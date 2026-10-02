@@ -19,12 +19,15 @@
 
 ## 4. Hub: Wächter (D1, D2, D10)
 
-- [ ] 4.1 Schalter in `src/config.rs` (`karten_auto_aktualisierung`, `…_intervall_stunden`, mindestens 1) mit Tests nach dem Vorbild `kritis_extrakt_default_an_und_abschaltbar`. Beide Werte ins Startup-Log und in den Abschnitt der Karten-Schalter in `docs/betrieb/env-registry.md`, falls dort geführt. Nachweis: `cargo test config` und `cargo test --test env_config_guard` grün.
+- [ ] 4.1 Vorgabe-Schalter in `src/config.rs` (`karten_auto_aktualisierung`, `…_intervall_stunden`, 1…168), Hilfetext „Vorgabe, solange in der Verwaltung nichts gespeichert ist“, Tests nach dem Vorbild `kritis_extrakt_default_an_und_abschaltbar`. Beide Werte ins Startup-Log und in `docs/betrieb/env-registry.md`, falls Karten-Schalter dort geführt werden. Nachweis: `cargo test config` und `cargo test --test env_config_guard` grün.
+- [ ] 4.1a Migration `migrations/0134_karte_auto_aktualisierung.sql` (D10) und Repo-Funktionen `lade_auto_aktualisierung` / `speichere_auto_aktualisierung` in `src/karte/registry/repo.rs`. Tests zuerst: Ohne Zeile kommt `None`, Speichern und Lesen ergeben einen Round-Trip, ein zweites Speichern überschreibt und legt keine zweite Zeile an. Nachweis: Die Tests sind vorher rot und danach grün, `git fetch origin alpha && scripts/check-migrationen.sh` grün.
+- [ ] 4.1b Effektivwert `effektive_einstellung(pool, vorgabe)` (gespeichert, sonst Vorgabe) mit Test für beide Zweige. Nachweis: `cargo test auto_aktualisierung` grün.
 - [ ] 4.2 Modul `src/karte/auto_aktualisierung.rs` mit `WaechterZustand` und `tick_einmal`. Tests zuerst, gegen einen Mock-karten-service (Loopback-Axum wie in `tests/karte.rs`) und einen Mock-Katalog:
   - (a) Ein neuerer Stand startet genau einen Download.
   - (b) Zwei fällige Karten ergeben einen Download je Tick.
   - (c) Eine registrierte Karte wird nie angefasst.
-  - (d) Automatik aus heißt kein Download ohne ausstehenden Bau.
+  - (d) Automatik aus (gespeichert) heißt kein Download ohne ausstehenden Bau und keine `naechste_pruefung_at`.
+  - (d2) Ein verkürzter Prüfabstand macht die Prüfung sofort fällig, ohne Neustart.
   - (e) Bau `done` erzwingt den frischen Katalog und den Download.
   - (f) Bau `failed` oder ein unbekannter Job ergibt einen Fehler an der Karte.
   - (g) Nach 15 Minuten „wartet auf Katalog“ steht der Fehler an der Karte.
@@ -52,14 +55,24 @@
 
   Danach Handler, Route, `api_doc.rs`, Enums `AktualisierungsPhase` und `BauDienst` in `tests/enum_wire_kontrakt.rs`. Nachweis: Die Tests sind vorher rot und danach grün, `scripts/check-typ-codegen.sh` ist grün.
 
+- [ ] 5.3 Tests zuerst für `PUT /api/karte/offline-karten/aktualisierung/einstellung`:
+  - 403 für eine Führungskraft.
+  - 400 für einen Prüfabstand von 0 und von 169, die bisherige Einstellung bleibt.
+  - 200 mit Status, der die neue Einstellung trägt.
+  - Ein anschließendes `GET …/aktualisierung` und ein neu aufgebauter `AppState` mit derselben DB (simulierter Neustart) liefern denselben Wert.
+
+  Danach Handler, Route, `api_doc.rs`, Wecken des Wächters. Nachweis: Die Tests sind vorher rot und danach grün, `scripts/check-typ-codegen.sh` ist grün.
+
 ## 6. Frontend: Offline-Karten-Verwaltung (D9)
 
 Vor dem Start `frontend/AGENTS.md` lesen (Gestaltungssprache, Query-Keys, Zeitformen).
 
-- [ ] 6.1 Seam in `api/offlineKarten.ts` (`ladeAktualisierungsStatus`, `starteJetztAktualisieren`, Typen als Re-Export der generierten Schemas) und Key `globalKeys.adminKarteBereich('aktualisierung')`. Nachweis: `api/offlineKarten.test.ts`, `api/globalKeys.test.ts` und `api/apiResponseTypen.guard.test.ts` grün.
+- [ ] 6.1 Seam in `api/offlineKarten.ts` (`ladeAktualisierungsStatus`, `starteJetztAktualisieren`, `speichereAutoAktualisierung`, Typen als Re-Export der generierten Schemas) und Key `globalKeys.adminKarteBereich('aktualisierung')`. Nachweis: `api/offlineKarten.test.ts`, `api/globalKeys.test.ts` und `api/apiResponseTypen.guard.test.ts` grün.
 - [ ] 6.2 Tests zuerst in `karten/OfflineKartenVerwaltung.test.tsx`:
   - Zeile „Automatisch aktualisieren: an · zuletzt geprüft … · nächste Prüfung … · nächster Kartenbau …“.
   - Varianten „aus“, „Kartenbau-Dienst nicht erreichbar“ und ohne Dienst.
+  - Ein Admin sieht Schalter und Auswahlfeld. Ausschalten und ein anderer Abstand senden je ein `PUT` mit dem erwarteten Body, bei einem Fehler springt die Anzeige zurück. Ein gespeicherter Wert außerhalb der Liste erscheint als Option.
+  - Eine Führungskraft sieht denselben Inhalt als Text, ohne Bedienelemente.
   - Danach die Umsetzung. Nachweis: Die Tests sind vorher rot und danach grün.
 - [ ] 6.3 Tests zuerst: Die Name-Spalte zeigt „Stand …“ und „auf dem Gerät seit …“ in Ortszeit, aus einem `download_at` in UTC. Die Status-Spalte zeigt je Phase „Neubau wartet“, „wird neu gebaut“, „wird veröffentlicht“ und „aktualisiert“ mit Fortschritt, außerdem „Update fehlgeschlagen“ mit dem Grund. Danach die Umsetzung. Nachweis: Die Tests sind vorher rot und danach grün, unter `test/prozessZone.ts`.
 - [ ] 6.4 Tests zuerst: „Jetzt aktualisieren“ erscheint nur für `aktualisierbar` ohne laufende Phase und nur für Admins. „Aktualisieren“ und „Neu laden“ sind weg. Die Rückmeldung je Antwort-Phase stimmt, das Polling ist bei aktiver Phase 2 s, sonst 60 s, und die Liste pollt bei Phase `laedt` mit. Danach die Umsetzung. Nachweis: Die Tests sind vorher rot und danach grün.
