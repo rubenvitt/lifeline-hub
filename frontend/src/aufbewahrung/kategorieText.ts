@@ -7,7 +7,7 @@ import type { Datenkategorie } from '../api/types';
  *
  * **Vorschläge sind Text, keine Werte:** die Oberfläche nennt sie mit Quelle, setzt sie aber nie
  * ein (Spec: keine Vorgabewerte). Belege und Belastbarkeit stehen in der Recherche am Task
- * LFH-749 und in `openspec/changes/…/lfh-749-fristen-je-datenkategorie/design.md`, D9.
+ * LFH-749 und in `openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md`, D9.
  */
 export interface KategorieText {
   /** Bezeichnung, wie sie auch im ETB steht. */

@@ -17,7 +17,7 @@ ist das Frontend, Gruppe 8 schließt ab.
 - [x] 2.1 Migration `0135_aufbewahrung_kategorie.sql` mit beiden Tabellen aus D4. Vorher `git fetch origin alpha` und `scripts/check-migrationen.sh`; die Nummer liegt über jeder auf `origin/alpha`. Registry-Regel für `einsatz_aufbewahrung_kategorie` mit nur Retain-Spalten. Verifiziert durch `scripts/check-migrationen.sh`, `db::tests::migrationsnummern_sind_eindeutig` und die grünen Registry-Guards
 - [x] 2.2 `src/org/einstellungen.rs`: Laden und Speichern von `aufbewahrung_kategorien` (Liste ersetzen, wenn das Feld mitkommt; fehlende Kategorie → Zeile löschen). Validierung nach design.md D8: Dauer außerhalb 0 bis 3650, Rechtsgrundlage fehlend, leer oder über 500 Zeichen und unbekannte Kategorie jeweils 400. Verifiziert durch Repo-Tests für Ersetzen, Löschen und Validierung
 - [x] 2.3 Route der Org-Einstellungen (`src/routes/org_einstellungen.rs`) und Admin-DTO um `aufbewahrung_kategorien` erweitern. Verifiziert durch Routentests: Admin speichert 0 Tage mit Rechtsgrundlage → GET liefert beides. Ohne Rechtsgrundlage → 400 ohne Änderung. Führungskraft → 403. Neue Organisation → leere Liste
-- [ ] 2.4 `scripts/check-typ-codegen.sh` laufen lassen und beide generierten Dateien committen. Verifiziert durch das grüne Skript
+- [x] 2.4 `scripts/check-typ-codegen.sh` laufen lassen und beide generierten Dateien committen. Verifiziert durch das grüne Skript
 
 ## 3. Kategorie-Frist beim Abschluss (Spec „Kategorie-Frist beim Abschluss“)
 
@@ -41,7 +41,7 @@ ist das Frontend, Gruppe 8 schließt ab.
 
 - [x] 6.1 Zustand je Kategorie über `retention::zustand` mit Einsatz-geschwärzt-Vorrang. Verifiziert durch Unit-Tests je Zustand und durch „Einsatz geschwärzt → jede Kategorie `geschwaerzt`“, auch ohne Zeile
 - [x] 6.2 `KategorieAufbewahrungAnzeige` über `GET /api/einsaetze/{id}/aufbewahrung-kategorien` (mit `dauer_tage_vorgabe` bei aktiven Einsätzen, design.md D7) und in `ArchivAkteAnzeige`. Verifiziert durch Routentests: Szenario „Gemischte Zustände“ über die Einsatz-Route; „Kategorien in der Akte“ über die Archiv-Route; die Akte enthält weiter keinen Personennamen (bestehender Test bleibt grün). `jede_archivspalte_ist_retain` bleibt grün
-- [ ] 6.3 `scripts/check-typ-codegen.sh` und beide generierten Dateien committen. Verifiziert durch das grüne Skript
+- [x] 6.3 `scripts/check-typ-codegen.sh` und beide generierten Dateien committen. Verifiziert durch das grüne Skript
 
 ## 7. Frontend (D9)
 
@@ -49,11 +49,11 @@ ist das Frontend, Gruppe 8 schließt ab.
 - [x] 7.2 Org-Einstellungen, Abschnitt Aufbewahrung: Dauer und Rechtsgrundlage je Kategorie, Vorschlag als Text, nicht vorbelegt, Hinweis bei Dauer über der Org-Aufbewahrungsdauer, Rechtsgrundlage Pflicht bei gesetzter Dauer. Verifiziert durch Komponententests zu den Szenarien „Vorschlag wird nicht eingesetzt“ und „Dauer länger als Einsatz-Dauer“ sowie zur Pflichtfeldprüfung
 - [x] 7.3 `FristPaneel`: Kategorie-Zeilen mit Statusetikett (Wort), Frist, Rechtsgrundlage und Aktion mit Rückfrage bei Verkürzung. Bei aktivem Einsatz der Hinweis aus der Vorgabe; ohne Recht gesperrt mit Grund. Verifiziert durch Komponententests zu „Kategorie verlängern“, „Aktiver Einsatz“, Verkürzung mit Rückfrage und „Ohne Recht“
 - [x] 7.4 `ArchivAktePage`: Block „Datenkategorien“, nur lesend. Verifiziert durch einen Komponententest mit geschwärzter Kategorie samt Zeitpunkt und Rechtsgrundlage
-- [ ] 7.5 Frontend-Gates: `mise exec -- pnpm -C frontend lint`, `typecheck` und `test`. Verifiziert durch grüne Läufe
+- [x] 7.5 Frontend-Gates: `mise exec -- pnpm -C frontend lint`, `typecheck` und `test`. Verifiziert durch grüne Läufe
 
 ## 8. Abschluss
 
 - [x] 8.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung“: Regel zur Zuordnung (jede Scrub-Spalte braucht eine `Zuordnung`, Kategorie-Spalten sind im Guard gepinnt, Behandlungsbezug-Guard) mit Verweis auf diese Change. Verifiziert durch Prettier/Format-Gate und Lesen des Abschnitts
-- [ ] 8.2 `./scripts/check-all.sh` grün. Verifiziert durch den Lauf; die CI des PRs belegt ihn erneut
+- [x] 8.2 `./scripts/check-all.sh` grün. Verifiziert durch den Lauf; die CI des PRs belegt ihn erneut. Lokal (Cloud-Sitzung, 02.10.2026): Schritte 1–3, 5, 6, 8–13 grün; Schritt 4 Workspace grün (2245 Lib-Tests, alle Integrationstests), nur die Desktop-Hülle baut hier mangels `gdk-3.0` nicht; Schritt 7 nur Chromium (Firefox/WebKit nicht installierbar), Befund im PR. Abschließender Beleg: CI-Lauf des PRs
 - [x] 8.3 Folgeticket per `clickup-task-anlegen`: Kartenhintergrund (`karte_hintergrundbild.daten`) bei Drohnen-Orthofotos (§ 32b Abs. 3 NKatSG), Klassifikation prüfen. Verifiziert durch die Ticketnummer in der Abschlussmeldung (angelegt: LFH-997)
-- [ ] 8.4 `/opsx:archive lfh-749-fristen-je-datenkategorie` im selben Branch vor dem PR, mit Spec-Sync und nachgezogenen Verweisen. Verifiziert durch `scripts/check-openspec-archiv.sh`
+- [x] 8.4 `/opsx:archive lfh-749-fristen-je-datenkategorie` im selben Branch vor dem PR, mit Spec-Sync und nachgezogenen Verweisen. Verifiziert durch `scripts/check-openspec-archiv.sh`

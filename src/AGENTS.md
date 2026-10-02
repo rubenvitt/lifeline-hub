@@ -162,7 +162,7 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   sich in `behandlungsbezug_kennt_jede_personentabelle` (beide `einsatz/schwaerzung_registry.rs`).
   Eine Kategorie wirkt nur früher als die Einsatz-Frist und sperrt nicht; der Personenstamm geht
   erst, wenn alle Zwecke der Person geschwärzt sind. Herleitung:
-  `openspec/changes/lfh-749-fristen-je-datenkategorie/design.md`.
+  `openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md`.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

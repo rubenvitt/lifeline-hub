@@ -1,6 +1,6 @@
 //! Aufbewahrungsfristen je Datenkategorie (LFH-749, Spec `aufbewahrung-kategorien`).
 //!
-//! Herleitung: `openspec/changes/lfh-749-fristen-je-datenkategorie/design.md`. Welche Spalten
+//! Herleitung: `openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md`. Welche Spalten
 //! eine Kategorie umfasst, sagt allein die Schwärzungs-Registry (`Zuordnung`); hier liegen
 //! Frist, Vormerkung und Schwärzung je Kategorie. Die Zeitrechnung (Karenz, Grenzen) teilt das
 //! Modul mit der Einsatz-Aufbewahrung (`retention`).

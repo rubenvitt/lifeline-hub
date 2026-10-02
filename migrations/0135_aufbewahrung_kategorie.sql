@@ -1,5 +1,5 @@
 -- Aufbewahrungsfristen je Datenkategorie (LFH-749, Spec `aufbewahrung-kategorien`).
--- Herleitung: openspec/changes/lfh-749-fristen-je-datenkategorie/design.md, D4.
+-- Herleitung: openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md, D4.
 --
 -- kategorie: Wire-Wert von `einsatz::retention::Datenkategorie`. Validiert in Rust, kein
 --   CHECK (sqlx-sqlite kann CHECK nicht per Rebuild ändern, vgl. 0069) — eine neue Kategorie
