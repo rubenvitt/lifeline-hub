@@ -277,6 +277,34 @@ async fn replay_nach_nachlauffrist_fuer_fuehrungspersonal_gesperrt() {
     }
 }
 
+/// In der Nachlauffrist liest Führungspersonal weiter: sein Replay kommt nach Einsatzende
+/// unverändert zurück, eine neue Erfassung bleibt 409 (der eigentliche Nutzfall der Queue:
+/// online nach Einsatzende).
+#[tokio::test]
+async fn replay_in_der_nachlauffrist_fuer_fuehrungspersonal_unveraendert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let fuehr = benutzer_anlegen(&app, &admin, "fuehrer1", "keine").await;
+    rolle_setzen(&app, &admin, e, fuehr, "fuehrungspersonal").await;
+    let fuehr_cookie = login_cookie(&app, "fuehrer1", "fuehrer1pw1").await;
+    let faelle = faelle_anlegen(&app, &fuehr_cookie, e).await;
+    abschliessen(&app, &admin, e).await;
+
+    for f in &faelle {
+        let (s, v) = post(&app, &fuehr_cookie, &f.url, &f.body).await;
+        assert_eq!(s, StatusCode::CREATED, "{}: {v:?}", f.route);
+        assert!(v.to_string().contains(f.geheim), "{}: {v:?}", f.route);
+        let (s, v) = post(&app, &fuehr_cookie, &f.url, &f.body_unbekannt).await;
+        assert_eq!(
+            s,
+            StatusCode::CONFLICT,
+            "{}: neue Erfassung: {v:?}",
+            f.route
+        );
+    }
+}
+
 /// Akzeptanzkriterium 2: am aktiven Einsatz bleibt der Replay unverändert — 201 mit demselben
 /// Datensatz, auch für Führungspersonal.
 #[tokio::test]
