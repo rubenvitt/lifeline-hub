@@ -18,7 +18,10 @@ pub fn erwartete_box(region_code: &str) -> Option<(f64, f64, f64, f64)> {
         "PL" => (14.0, 48.9, 24.2, 55.0),
         "DK" => (7.5, 54.3, 15.8, 58.2), // metropolitanes DK (Bornholm inkl.); Färöer = eigene Region
         "NL" => (2.8, 50.6, 7.4, 54.2),  // europäisches NL; Karibische NL = eigene Region
-        "FR" => (-5.3, 41.2, 9.7, 51.2), // France Métropolitaine (inkl. Korsika); DOM-TOM = eigene Regionen
+        // France Métropolitaine (inkl. Korsika); DOM-TOM = eigene Regionen. Das .poly reicht weit
+        // in Atlantik und Ligurisches Meer (gemessen: -6.94/41.24/10.02/51.43) — die Küstenlinie
+        // (-5.15/9.56) ist NICHT das Extrakt-Extent.
+        "FR" => (-7.0, 41.0, 10.1, 51.5),
         // Ganze Welt: degeneriert-global (Web-Mercator-Grenze ±85°) — die Falschregion-Prüfung ist
         // für den Planeten kein sinnvolles Konzept, jedes plausible Planet-Extent passt.
         "WORLD" => (-180.0, -86.0, 180.0, 86.0),
@@ -80,7 +83,8 @@ mod tests {
             ("PL", (14.07, 49.00, 24.15, 54.86)),
             ("DK", (7.70, 54.44, 15.65, 58.06)), // metropolitanes DK (Bornholm), OHNE Färöer
             ("NL", (2.94, 50.75, 7.22, 54.02)),  // europäisches NL, OHNE Karibik
-            ("FR", (-5.15, 41.33, 9.56, 51.09)), // France Métropolitaine inkl. Korsika
+            // Real gebautes france-Extrakt (Geofabrik-.poly-bbox, Bau vom 02.10.2026).
+            ("FR", (-6.937207, 41.238664, 10.016791, 51.428801)),
         ];
         for (code, b) in faelle {
             assert!(
