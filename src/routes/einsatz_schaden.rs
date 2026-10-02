@@ -431,7 +431,7 @@ pub async fn uebergeben(
         registrier_anzeige(vorher.registrier_nr)
     );
     // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
-    // ist aus `vorher` + `adressat` VOR der Tx berechenbar (kein In-Tx-Reload nötig). SSE +
+    // ist aus `vorher` VOR der Tx berechenbar (kein In-Tx-Reload nötig). SSE +
     // Response-Reload erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {

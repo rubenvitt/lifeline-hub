@@ -80,7 +80,7 @@ fn ist_gesperrt(spalte: &str) -> bool {
 /// nicht in den Wortlaut (LFH-752).
 const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     // --- Einsatzkräfte: wer wann in welcher Funktion eingesetzt war (Name, Funktion, Besetzung
-    // ad-hoc externer Kräfte und des Stabs). Bewusst behalten, LFH-752 D2. ---
+    // ad-hoc externer Kräfte und des Stabs). Bewusst behalten, LFH-752 D3. ---
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "disponieren",

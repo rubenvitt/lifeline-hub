@@ -110,8 +110,10 @@ gehören zur Gruppe Lagestruktur und sind nicht Scrub der Dokumentzeile.
   `einsatz_person`, `person_*`, `einsatz_tier`.
 - Die Liste enthält `einsatz_dokument.titel` nicht.
 
-Die Begründungen der behaltenen Einträge nennen ihren Zweck („Führungsdoku: wer führte die
-Einheit“) statt nur die Fundstelle. Der neue Eintrag `dokument/repo.rs::aendern` mit
+Der Zweck eines behaltenen Eintrags steht in seiner `gruppe`: im Doc-Kommentar jeder Variante
+und im Abschnittskommentar der Liste. Die `begruendung` bleibt die Beschreibung der Fundstelle.
+Eine eigene Zweckangabe in jedem der 55 Texte würde nur wiederholen, was die Gruppe schon sagt.
+Der neue Eintrag `dokument/repo.rs::aendern` mit
 `einsatz_dokument.kategorie` gehört zur Gruppe `EnumLabel`.
 
 **Verworfen:** Eine Obergrenze für die Länge der Liste als Zahl im Test. Sie würde bei jedem

@@ -30,7 +30,7 @@ geändert, danach ist der Test grün.
 - [x] 4.1 `AUSNAHMEN_SYSTEM_ETB` in `tests/aufbewahrung_e2e.rs` umbauen:
   - 8 Einträge entfernen: Schaden ort und uebergeben_an, die drei Verbleib-Spalten, UHS-Notiz, Dokumenttitel bei ablegen und entfernen.
   - `dokument/repo.rs::aendern` · `einsatz_dokument.kategorie` ergänzen.
-  - Feld `gruppe` einführen und die Begründungen auf ihren Zweck schärfen.
+  - Feld `gruppe` einführen, das den Zweck trägt: Doc-Kommentar je Variante und Abschnittskommentar je Gruppe. Die Begründungen bleiben Fundstellen (design.md D3).
 
   Verifiziert durch die Zählung 56 und den Selbsttest.
 - [x] 4.2 Selbsttest um die Sperrliste erweitern: keine Spalte aus `einsatz_schaden*`, `einsatz_person`, `person_*`, `einsatz_tier`, nicht `einsatz_dokument.titel`. Zuerst eine gesperrte Spalte probeweise eintragen und den roten Test sehen, dann die Probe wieder entfernen. Verifiziert durch `cargo test --test aufbewahrung_e2e ausnahmeliste`.

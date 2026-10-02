@@ -28,8 +28,8 @@ Entscheidung des Auftraggebers am Checkpoint vom 02.10.2026, je Gruppe:
   neuen Wert. Damit fallen 2 Titel-Einträge aus der Liste. Die bisher fehlende Stelle `aendern`
   kommt nur mit der Kategorie hinein, die ein Enum-Label ohne Personenbezug ist.
 - **Einsatzkräfte: bewusst behalten**, als Führungsdokumentation: Name und Funktion ad-hoc
-  externer Kräfte, die Stab-Besetzung und der Empfänger eines Auftrags. Die Begründungen in der
-  Liste werden geschärft.
+  externer Kräfte, die Stab-Besetzung und der Empfänger eines Auftrags. Jeder Eintrag der Liste
+  trägt dazu seine Gruppe, die den Zweck nennt.
 - **Lage-Labels: bewusst behalten**: Zone, Gefahrengebiet, Evakuierungsbezirk,
   Betreuungsstelle und Streichgrund der Zeitachse.
 - **Führungsmodule: unverändert.** Das hat LFH-701 (Linie A) entschieden.
@@ -50,9 +50,11 @@ Keine.
 
 ### Modified Capabilities
 
-- `aufbewahrung`: Die Anforderung „Pseudonyme Spur im ETB“ verbietet die Werte der Betroffenen
-  und Dokumenttitel in neuen System-Einträgen. Das Szenario „Dokumentierte Ausnahme
-  Schadensort“ kehrt sich um. Für die Ausnahmeliste gilt: wird nie länger.
+- `aufbewahrung`: Die neue Anforderung „Kein Scrub-Wert von Betroffenen und Dokumenten im ETB“
+  verbietet die Werte der Betroffenen und Dokumenttitel in neuen System-Einträgen. Die neue
+  Anforderung „Ausnahmeliste wird nicht länger“ sperrt diese Spalten für die Liste. In
+  „Pseudonyme Spur im ETB“ gilt das Szenario „Dokumentierte Ausnahme Schadensort“ nur noch für
+  ältere Einträge, und das neue Szenario „Schadensort bleibt im Modul“ kommt dazu.
 - `dokumentenablage`: Die Anforderung „Eine wirksame Änderung ist im ETB nachgewiesen“ nennt
   Kategorie und Ablage-Verweis statt des Titels, und eine Titeländerung erscheint ohne Werte.
 
