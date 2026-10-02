@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
 import {
   abgelehntLaden,
+  abgelehntOhneAnhaengeWiederholen,
   abgelehntWiederholen,
   queueAblehnen,
   queueAlleLaden,
@@ -84,6 +85,36 @@ describe('benutzergebundene Offline-Queue (LFH-334)', () => {
     expect(await abgelehntWiederholen(BENUTZER_A, abgelehnt.id!)).toBe(true);
     expect(await abgelehntLaden(BENUTZER_A, 7)).toHaveLength(0);
     expect(await queueLaden(BENUTZER_A, 7)).toHaveLength(1);
+  });
+
+  it('legt einen abgelehnten ETB-Eintrag ohne Anhänge, sonst unverändert zurück (LFH-746)', async () => {
+    await queueEinreihen(BENUTZER_A, 7, {
+      typ: 'meldung',
+      inhalt: 'Lagefoto Brücke',
+      von: 'Florian 1',
+      erfasst_lokal_at: '2026-09-30T08:15:00.000Z',
+      client_id: 'etb-mit-foto',
+      anhang_ids: [41, 42],
+    });
+    const [pending] = await queueLaden(BENUTZER_A, 7);
+    await queueAblehnen(BENUTZER_A, pending, 'Anhang unbekannt oder nicht mehr vorhanden');
+    const [abgelehnt] = await abgelehntLaden(BENUTZER_A, 7);
+
+    expect(await abgelehntOhneAnhaengeWiederholen(BENUTZER_B, abgelehnt.id!)).toBe(false);
+    expect(await abgelehntLaden(BENUTZER_A, 7)).toHaveLength(1);
+
+    expect(await abgelehntOhneAnhaengeWiederholen(BENUTZER_A, abgelehnt.id!)).toBe(true);
+    expect(await abgelehntLaden(BENUTZER_A, 7)).toHaveLength(0);
+    const [zurueck] = await queueLaden(BENUTZER_A, 7);
+    // Dieselbe client_id: die 400 hat nichts committet, ein Replay gibt es nicht.
+    expect(zurueck.eintrag).toEqual({
+      typ: 'meldung',
+      inhalt: 'Lagefoto Brücke',
+      von: 'Florian 1',
+      erfasst_lokal_at: '2026-09-30T08:15:00.000Z',
+      client_id: 'etb-mit-foto',
+    });
+    expect(zurueck.erstellt_at).toBe(pending.erstellt_at);
   });
 
   it('unterstützt Wiederholen und bewusstes Verwerfen abgelehnter Fachaktionen', async () => {

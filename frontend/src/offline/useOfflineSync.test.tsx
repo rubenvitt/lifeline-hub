@@ -18,6 +18,8 @@ import {
 } from './ereignisse';
 import {
   OFFLINE_QUEUE_EVENT,
+  abgelehntLaden,
+  abgelehntOhneAnhaengeWiederholen,
   queueEinreihen,
   queueLeerenFuerTests,
   queueZaehlerLaden,
@@ -128,6 +130,44 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
       }),
     );
     expect(legePersonAn).toHaveBeenCalledOnce();
+  });
+
+  it('sendet einen wegen weggeräumter Anhänge abgelehnten ETB-Eintrag ohne sie (LFH-746)', async () => {
+    // Der Server kennt die Dateien nach der Karenz des Verwaisten-Sweeps nicht mehr: jede
+    // Anfrage, die sie nennt, endet in 400 und legt nichts an.
+    vi.mocked(erfasseEtb).mockImplementation(async (_einsatzId, eintrag) => {
+      if (eintrag.anhang_ids?.length) {
+        throw new ApiError(400, 'Anhang unbekannt oder nicht mehr vorhanden');
+      }
+      return {} as Awaited<ReturnType<typeof erfasseEtb>>;
+    });
+    await queueEinreihen(BENUTZER_A, 7, {
+      typ: 'meldung',
+      inhalt: 'Lagefoto Brücke',
+      client_id: 'etb-mit-foto',
+      anhang_ids: [41],
+    });
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+
+    await waitFor(async () => expect(await abgelehntLaden(BENUTZER_A, 7)).toHaveLength(1));
+    const [abgelehnt] = await abgelehntLaden(BENUTZER_A, 7);
+    expect(abgelehnt.grund).toBe('Anhang unbekannt oder nicht mehr vorhanden');
+
+    expect(await abgelehntOhneAnhaengeWiederholen(BENUTZER_A, abgelehnt.id!)).toBe(true);
+
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toEqual({
+        ausstehend: 0,
+        abgelehnt: 0,
+        nicht_zugeordnet: 0,
+      }),
+    );
+    expect(erfasseEtb).toHaveBeenCalledTimes(2);
+    expect(erfasseEtb).toHaveBeenLastCalledWith(
+      7,
+      { typ: 'meldung', inhalt: 'Lagefoto Brücke', client_id: 'etb-mit-foto' },
+      { offlineQueueBenutzerId: BENUTZER_A },
+    );
   });
 
   it('sendet nach einem Benutzerwechsel ausschließlich die neue Identität', async () => {
