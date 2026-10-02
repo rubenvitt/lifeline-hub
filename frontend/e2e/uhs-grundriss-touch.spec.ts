@@ -171,6 +171,38 @@ async function ziehePerTouch(page: Page, quelle: Locator, ziel: Locator) {
   }, mitte);
 }
 
+/**
+ * Wartet, bis dnd-kit den Klick nach einem Zug wieder durchlässt (LFH-768).
+ *
+ * KLICKSPERRE NACH DEM ZUG: Ab der Aktivierung legt dnd-kits Pointer-Sensor einen `click`-Stopper
+ * in die Capture-Phase von `document`, damit der Klick am Ende des Zuges nichts auslöst. Entfernt
+ * wird er erst per `setTimeout(…, 50)` nach dem Loslassen (`AbstractPointerSensor.detach`). Ein
+ * Klick davor erreicht React nie. Unter Last kam `karte.click()` so in jedem zweiten Lauf in die
+ * Sperre. Kein Mensch klickt 50 ms nach dem Loslassen erneut, deshalb schuldet der Test das
+ * Warten und nicht die Anwendung.
+ *
+ * Gewartet wird auf den Zustand, nicht auf die Zeit: ein Probe-`click` an einem eigenen Knoten
+ * kommt erst an, wenn kein Stopper mehr davorsitzt. Ein Wechsel der Frist in dnd-kit bricht das
+ * nicht. Der Knoten hängt neben der React-Wurzel und blubbert nicht, die App sieht ihn nicht.
+ */
+async function zugKlicksperreAbwarten(page: Page) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const probe = document.createElement('div');
+          let angekommen = false;
+          probe.addEventListener('click', () => (angekommen = true));
+          document.body.append(probe);
+          probe.dispatchEvent(new MouseEvent('click', { bubbles: false }));
+          probe.remove();
+          return angekommen;
+        }),
+      { message: 'dnd-kit lässt den Klick nach dem Zug wieder durch', intervals: [10, 25, 50] },
+    )
+    .toBe(true);
+}
+
 test.describe('UHS-Grundriss unter Touch', () => {
   test('Führungs-Tablet (1024 px): Touch-Drag auf einen Platz — und die Karte steht VOR der Server-Antwort dort', async ({
     page,
@@ -515,7 +547,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(offenesMenue, 'der Personen-Zug hat kein Menü geöffnet').toHaveCount(0);
     await expect(bett1(page)).toHaveAttribute('aria-expanded', 'false');
 
-    // 2) Layout-Zug im Bearbeiten-Modus.
+    // 2) Layout-Zug im Bearbeiten-Modus. Der Knopf-Klick fiele sonst noch in die Klicksperre
+    // des Personen-Zugs, wenn die optimistische Anzeige die Zusicherungen oben sofort erfüllt.
+    await zugKlicksperreAbwarten(page);
     await page.getByRole('button', { name: 'Plätze bearbeiten' }).click();
     const karte = bett1(page);
     const vorher = (await karte.boundingBox())!;
@@ -530,7 +564,9 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(offenesMenue, 'der Layout-Zug hat kein Menü geöffnet').toHaveCount(0);
     await expect(karte).toHaveAttribute('aria-expanded', 'false');
 
-    // Gegenprobe: ein Klick OHNE Bewegung öffnet das Menü im Bearbeiten-Modus weiterhin.
+    // Gegenprobe: ein Klick OHNE Bewegung öffnet das Menü im Bearbeiten-Modus weiterhin. Erst
+    // nach der Klicksperre des Zuges, sonst prüfte sie dnd-kits Frist statt der Karte (LFH-768).
+    await zugKlicksperreAbwarten(page);
     await karte.click();
     await expect(offenesMenue).toHaveCount(1);
     await expect(offenesMenue.getByRole('menuitem').last()).toContainText('Platz löschen');
