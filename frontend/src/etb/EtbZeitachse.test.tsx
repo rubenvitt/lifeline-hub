@@ -570,3 +570,26 @@ describe('EtbZeitachse – Anhänge (LFH-117)', () => {
     expect(zeileVon(container, 'ausstehend-3')).not.toHaveTextContent('Anhang');
   });
 });
+
+describe('EtbZeitachse – Dokumente mit ETB-Bezug (LFH-743)', () => {
+  const plan = { id: 3, titel: 'Lageplan Nord', dateiname: 'plan.pdf', groesse: 2048 };
+
+  it('zeigt am bezogenen Eintrag einen Verweis auf die Dokument-Route', () => {
+    const { container } = renderZeitachse({
+      eintraege: [eintrag(), eintrag({ id: 2, lfd_nr: 2 })],
+      dokumente: new Map([[2, [plan]]]),
+    });
+    const verweis = within(zeileVon(container, 'eintrag-2')).getByRole('link', {
+      name: 'Lageplan Nord, 2.0 KB, Dokument zu Nr. 2 herunterladen',
+    });
+    expect(verweis).toHaveAttribute('href', '/api/einsaetze/1/dokumente/3/datei');
+    expect(within(zeileVon(container, 'eintrag-1')).queryByRole('link')).toBeNull();
+  });
+
+  it('zeigt ohne Zuordnung (kein Modulrecht) keinen Verweis', () => {
+    const { container } = renderZeitachse({ eintraege: [eintrag()] });
+    const z = zeileVon(container, 'eintrag-1');
+    expect(within(z).queryByRole('link')).toBeNull();
+    expect(z.querySelector('[data-lfh="etb-dokumente"]')).toBeNull();
+  });
+});

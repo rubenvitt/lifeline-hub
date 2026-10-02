@@ -28,6 +28,7 @@ import { etbPfad } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import EtbAnhaenge from './EtbAnhaenge';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
+import EtbDokumente, { type EtbDokument } from './EtbDokumente';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { istNachgetragen } from './typFarben';
@@ -78,6 +79,11 @@ interface Props {
   fehler?: boolean;
   /** Was anstelle der Zeilen steht, wenn keine da sind (die Seite kennt Filter und Rechte). */
   leerText?: ReactNode;
+  /**
+   * Dokumente der Ablage je ETB-Eintrag (LFH-743, `dokumenteJeEintrag`). Fehlt ohne
+   * Modulrecht `dokumente` — dann steht an keinem Eintrag ein Dokument-Verweis.
+   */
+  dokumente?: ReadonlyMap<number, readonly EtbDokument[]>;
 }
 
 /** Anzeigewort je Meldeweg — auch die Palettenvorschau liest es von hier (LFH-664). */
@@ -156,6 +162,7 @@ export default function EtbZeitachse({
   ladend,
   fehler,
   leerText,
+  dokumente,
 }: Props) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
@@ -246,6 +253,7 @@ export default function EtbZeitachse({
   function eintragsHinweis(e: EtbEintragAnzeige): ReactNode {
     const grund = index.grundeintrag(e);
     const durch = index.berichtigtDurch(e);
+    const doks = dokumente?.get(e.id);
     const stil = verweisStil(token);
     return hinweisZeile(
       [
@@ -281,6 +289,10 @@ export default function EtbZeitachse({
         // Anhänge sind KEINE Kopplung: eigene Bedingung, nicht über `hatVerknuepfung` — die steuert
         // die Rückverweise.
         e.anhaenge.length > 0 && <EtbAnhaenge key="anhaenge" eintrag={e} einsatzId={einsatzId} />,
+        // Dokumente der Ablage mit Bezug auf diesen Eintrag (LFH-743) — eigene Datei, eigene Route.
+        doks && doks.length > 0 && (
+          <EtbDokumente key="dokumente" einsatzId={einsatzId} lfdNr={e.lfd_nr} dokumente={doks} />
+        ),
       ],
       token.marginXS,
     );

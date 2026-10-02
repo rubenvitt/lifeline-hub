@@ -7,13 +7,13 @@ import { act, type ReactElement } from 'react';
 import { meHandler, server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { neuerQueryClient, renderMitProviders as renderMitBasisProviders } from '../test/utils';
-import { einsatzKeys } from '../api/queryKeys';
+import { EINSATZ_STREAM_EVENTS, einsatzKeys } from '../api/queryKeys';
 import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueEinreihen, queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
-import { adminFixture } from '../test/fixtures';
+import { adminFixture, freigabenFixture } from '../test/fixtures';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -1229,5 +1229,94 @@ describe('EtbPage — Einstieg in den Druck (LFH-22)', () => {
     const link = await within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
     expect(link).not.toHaveClass('ant-btn-primary');
     expect(kopf.querySelectorAll('.ant-btn-primary').length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
+  const plan = {
+    id: 3,
+    einsatz_id: 7,
+    kategorie: 'lagekarte_plan',
+    titel: 'Lageplan Nord',
+    dateiname: 'plan.pdf',
+    mime: 'application/pdf',
+    groesse: 2048,
+    bezug_etb_eintrag_id: 1,
+    bezug_etb_lfd_nr: 1,
+    etb_eintrag_id: 9,
+    abgelegt_von_id: 1,
+    abgelegt_at: '2026-05-23 10:05:00',
+  };
+  // `undefined` fällt beim Serialisieren weg — wie das Feld auf dem Wire (`skip_serializing_if`).
+  const ohneBezug = {
+    ...plan,
+    id: 4,
+    titel: 'Ohne Bezug',
+    bezug_etb_eintrag_id: undefined,
+    bezug_etb_lfd_nr: undefined,
+  };
+
+  function zeileEins(): HTMLElement {
+    const z = document.querySelector<HTMLElement>('[data-zeile="eintrag-1"]');
+    if (!z) throw new Error('Zeile eintrag-1 fehlt');
+    return z;
+  }
+
+  it('zeigt am Eintrag einen Verweis auf die Dokument-Route, mit EINER Sammelabfrage', async () => {
+    let abrufe = 0;
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/dokumente', () => {
+        abrufe += 1;
+        return HttpResponse.json([plan, ohneBezug]);
+      }),
+    ]);
+    const verweis = await within(await waitFor(zeileEins)).findByRole('link', {
+      name: 'Lageplan Nord, 2.0 KB, Dokument zu Nr. 1 herunterladen',
+    });
+    expect(verweis).toHaveAttribute('href', '/api/einsaetze/7/dokumente/3/datei');
+    expect(screen.queryByRole('link', { name: /Ohne Bezug/ })).toBeNull();
+    expect(abrufe).toBe(1);
+  });
+
+  it('fragt ohne Modulrecht `dokumente` keine Dokumente ab und zeigt keinen Verweis', async () => {
+    let abgefragt = false;
+    const { client } = setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ dokumente: { zugriff: false } })),
+      ),
+      http.get('/api/einsaetze/7/dokumente', () => {
+        abgefragt = true;
+        return HttpResponse.json([plan]);
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    // Erst mit geladenen Freigaben wäre ein Abruf erfolgt; danach einen Takt für ihn lassen.
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(7))?.status).toBe('success'),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(abgefragt).toBe(false);
+    expect(zeileEins().querySelector('[data-lfh="etb-dokumente"]')).toBeNull();
+  });
+
+  it('nimmt ein neues Dokument nach dem Live-Ereignis `dokument` auf', async () => {
+    let liste: unknown[] = [];
+    const { client } = setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/dokumente', () => HttpResponse.json(liste)),
+    ]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.dokumente(7))?.status).toBe('success'),
+    );
+    expect(zeileEins().querySelector('[data-lfh="etb-dokumente"]')).toBeNull();
+    liste = [plan];
+    await act(async () => {
+      for (const key of EINSATZ_STREAM_EVENTS.dokument) {
+        await client.invalidateQueries({ queryKey: [key] });
+      }
+    });
+    expect(
+      await within(zeileEins()).findByRole('link', { name: /Dokument zu Nr\. 1/ }),
+    ).toBeInTheDocument();
   });
 });
