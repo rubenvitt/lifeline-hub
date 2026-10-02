@@ -51,7 +51,8 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote T
 ## 9. Regeln und Abschluss
 
 - [x] 9.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“: Antrag, Personenbezüge (`PERSONENBEZUEGE`, Guard), neue Archivrouten und Herleitung auf das spätere Archiv dieser Change. Beleg: `prettier`/Längenregel der Wurzel-`AGENTS.md` unberührt, Verweise per grep geprüft.
-- [ ] 9.2 Folgeticket über `clickup-task-anlegen`: Live-Invalidierung und Offline-Caches nach einem Personen-Vollzug. Beleg: Task-Link im PR-Text.
+- [x] 9.2 Folgeticket über `clickup-task-anlegen`: Live-Invalidierung und Offline-Caches nach einem Personen-Vollzug. Beleg: Task-Link im PR-Text.
+  - Angelegt: LFH-996 „Schwärzung: offene Clients und Offline-Lagebild nach dem Vollzug räumen“.
 - [ ] 9.3 `./scripts/check-all.sh` lokal (soweit die Umgebung es trägt) und in der CI des PRs grün. Beleg: Lauf im PR.
 - [ ] 9.4 Prüfung im laufenden Stack (`cargo run --features dev-seeds`, Vite): Personensuche, Antrag, Rücknahme, Antrag mit vorgestellter Uhr bzw. per Test-Tick vollzogen, Akte danach. Beleg: Befund in dieser Datei.
 - [ ] 9.5 `requesting-code-review` und bestätigte Findings abarbeiten. Beleg: Findings und Umgang im PR.

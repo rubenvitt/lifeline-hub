@@ -49,7 +49,7 @@ dem der Entwurf aufsetzt:
 - **Stammkräfte und Benutzerkonten.** Deren Daten sind Stammdaten der Organisation, nicht
   einsatz-scoped; ein Löschersuchen dort ist ein eigener Prozess.
 - **Geräte-Caches und Live-Aktualisierung.** Offline-Lagebild (LFH-723) und offene Clients
-  erfahren vom Vollzug nichts, wie heute bei der fristbasierten Schwärzung. Folgeticket.
+  erfahren vom Vollzug nichts, wie heute bei der fristbasierten Schwärzung. Folgeticket LFH-996.
 - Vier-Augen-Prinzip, Antrag an laufenden Einsätzen, Export oder Druck der Anträge.
 
 ## Decisions
@@ -234,7 +234,7 @@ Scrub-Wert und steht deshalb nicht in `AUSNAHMEN_SYSTEM_ETB`.
 - [Suche verrät, ob jemand im Einsatz erfasst ist] → nur System-Admin der Org, nur ganze Wörter,
   Antwort pseudonym, kein Logging des Suchtexts. Der Admin hat ohnehin Archivzugriff.
 - [Person-Vollzug an einem noch lesbaren Einsatz, offene Clients zeigen den Namen bis zum
-  Neuladen] → Non-Goal mit Folgeticket (Live-Invalidierung, Offline-Caches).
+  Neuladen] → Non-Goal mit Folgeticket LFH-996 (Live-Invalidierung, Offline-Caches).
 - [Vollzug bis zu 10 Minuten nach Fälligkeit] → Spec sagt „spätestens im ersten Purge-Lauf
   danach“; die Akte zeigt die Fälligkeit, nicht einen exakten Zeitpunkt.
 - [Rücknahme und Vollzug gleichzeitig] → beide bewacht über `faellig_at` und den offenen Stand
