@@ -115,7 +115,7 @@ Code. Backend-Tests: `cargo test`. Frontend: `mise exec -- pnpm -C frontend test
 
 ## 5. Integration
 
-- [ ] 5.1 e2e `frontend/e2e/anhang-vorschau.spec.ts`, Regeln in `frontend/e2e/AGENTS.md` beachten
+- [x] 5.1 e2e `frontend/e2e/anhang-vorschau.spec.ts`, Regeln in `frontend/e2e/AGENTS.md` beachten
   (kein `networkidle`, klicken statt `toBeVisible`, Rollen über `rollen-kern.ts`):
   - Ein Schaden mit echtem JPEG zeigt als Beobachter das Vorschaubild.
   - Ein Klick öffnet die Großansicht, Escape schließt sie.
