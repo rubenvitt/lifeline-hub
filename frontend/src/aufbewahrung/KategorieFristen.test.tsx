@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import FristPaneel from './FristPaneel';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige, KategorieAufbewahrung } from '../api/types';

@@ -123,9 +123,11 @@ describe('Feldbreiten im Verwaltungsteil', () => {
       'pages/einstellungen/EinsatzDefaults.tsx',
       // LFH-617: „Präfix Einsatznummer“ neben den drei übrigen Präfixen.
       'pages/einstellungen/EinsatzDefaults.tsx',
+      // LFH-750: Skelett-Frist neben der Aufbewahrungs-Dauer.
+      'pages/einstellungen/EinsatzDefaults.tsx',
     ];
     const erwartet: Record<string, number> = {
-      'pages/einstellungen/EinsatzDefaults.tsx': 8,
+      'pages/einstellungen/EinsatzDefaults.tsx': 9,
       'stammdaten/QualifikationenTab.tsx': 1,
       'stammdaten/EtbBausteinFormModal.tsx': 1,
       'stammdaten/PersonalStatusTab.tsx': 1,

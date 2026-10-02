@@ -603,6 +603,10 @@ pub fn kategorie_zustand(
         z.frist_bis.as_deref(),
         z.vorgemerkt_at.as_deref(),
         z.geschwaerzt_at.as_deref(),
+        // Eine Kategorie hat keine eigene endgültige Löschung (LFH-750); die betrifft nur den
+        // ganzen Einsatz und steht an dessen Zustand.
+        None,
+        None,
         jetzt,
     )
 }

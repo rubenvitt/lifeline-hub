@@ -59,6 +59,13 @@ vi.mock('./lagekarte/Kartenflaeche', async () => {
           {/* Anflugziel: der Koordinatensprung der Sprungpalette kommt als ?zentrum= an und
               muss hier als Ziel ankommen. */}
           <div data-testid="flyto">{JSON.stringify(props.flyToZiel ?? null)}</div>
+          {/* Eigenposition (LFH-766): gezeichneter Punkt, eigener Anflug und eine Bedienung der
+              Kamera, wie die echte Karte sie aus `movestart` meldet. */}
+          <div data-testid="eigenposition">{JSON.stringify(props.eigenposition ?? null)}</div>
+          <div data-testid="eigenposition-anflug">
+            {JSON.stringify(props.eigenpositionAnflug ?? null)}
+          </div>
+          <button onClick={() => props.onBedienung?.()}>karte-bedienen</button>
           {/* Suchnadel der Ortssuche (LFH-638): was die Karte als Nadel zeichnen soll. */}
           <div data-testid="suchnadel">{JSON.stringify(props.suchnadel ?? null)}</div>
           <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
@@ -2363,7 +2370,8 @@ describe('LFH-712: Eigenposition', () => {
     else delete (navigator as { geolocation?: unknown }).geolocation;
   });
 
-  it('erster Standort fliegt an, ein weiterer verschiebt die Karte nicht', async () => {
+  /** Standortquelle, deren Meldungen der Test selbst auslöst. */
+  function steuerbareOrtung() {
     let melde: ((p: GeolocationPosition) => void) | null = null;
     const watchPosition = vi.fn((ok: (p: GeolocationPosition) => void) => {
       melde = ok;
@@ -2374,9 +2382,15 @@ describe('LFH-712: Eigenposition', () => {
       configurable: true,
       value: { watchPosition, clearWatch: vi.fn() },
     });
-    const position = (lat: number, lon: number) =>
-      ({ coords: { latitude: lat, longitude: lon, accuracy: 20 }, timestamp: 0 }) as never;
+    const meldePosition = (lat: number, lon: number, accuracy = 20) =>
+      act(() =>
+        melde?.({ coords: { latitude: lat, longitude: lon, accuracy }, timestamp: 0 } as never),
+      );
+    return { watchPosition, meldePosition };
+  }
 
+  it('erster Standort fliegt an, ein weiterer verschiebt die Karte nicht', async () => {
+    const { watchPosition, meldePosition } = steuerbareOrtung();
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
@@ -2385,12 +2399,64 @@ describe('LFH-712: Eigenposition', () => {
     expect(knopf).toHaveAttribute('aria-pressed', 'true');
     expect(watchPosition).toHaveBeenCalled();
 
-    act(() => melde?.(position(52.1, 9.3)));
+    // LFH-766: eigener Anflug mit Genauigkeit (Kreis ins Bild), nicht das Ziel der Auswahl.
+    meldePosition(52.1, 9.3, 2000);
     await waitFor(() =>
-      expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":9.3,"lat":52.1}'),
+      expect(screen.getByTestId('eigenposition-anflug')).toHaveTextContent(
+        '{"lat":52.1,"lon":9.3,"genauigkeit":2000}',
+      ),
     );
-    act(() => melde?.(position(52.2, 9.4)));
-    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":9.3,"lat":52.1}');
+    expect(screen.getByTestId('flyto')).toHaveTextContent('null');
+    meldePosition(52.2, 9.4);
+    expect(screen.getByTestId('eigenposition-anflug')).toHaveTextContent('"lat":52.1');
+    expect(screen.getByTestId('eigenposition')).toHaveTextContent('"lat":52.2');
+  });
+
+  it('LFH-766: Bedienung vor dem ersten Standort → kein Anflug, der Punkt erscheint', async () => {
+    const { meldePosition } = steuerbareOrtung();
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Eigenposition' }));
+    await user.click(screen.getByRole('button', { name: 'karte-bedienen' }));
+
+    meldePosition(52.1, 9.3);
+    await waitFor(() => expect(screen.getByTestId('eigenposition')).toHaveTextContent('52.1'));
+    expect(screen.getByTestId('eigenposition-anflug')).toHaveTextContent('null');
+  });
+
+  it('LFH-766: Kartenmodus vor dem ersten Standort, schon wieder beendet → kein Anflug', async () => {
+    const { meldePosition } = steuerbareOrtung();
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Eigenposition' }));
+    await user.click(screen.getByRole('button', { name: 'Messen' }));
+    expect(screen.getByTestId('messen')).toHaveTextContent('strecke');
+    await user.click(screen.getByRole('button', { name: 'Messen' }));
+    expect(screen.getByTestId('messen')).toHaveTextContent('aus');
+
+    meldePosition(52.1, 9.3);
+    await waitFor(() => expect(screen.getByTestId('eigenposition')).toHaveTextContent('52.1'));
+    expect(screen.getByTestId('eigenposition-anflug')).toHaveTextContent('null');
+  });
+
+  it('LFH-766: Aus- und wieder Einschalten vergisst die Bedienung → Anflug', async () => {
+    const { meldePosition } = steuerbareOrtung();
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    const knopf = await screen.findByRole('button', { name: 'Eigenposition' });
+    await user.click(knopf);
+    await user.click(screen.getByRole('button', { name: 'karte-bedienen' }));
+    await user.click(knopf);
+    expect(knopf).toHaveAttribute('aria-pressed', 'false');
+    await user.click(knopf);
+
+    meldePosition(52.1, 9.3);
+    await waitFor(() =>
+      expect(screen.getByTestId('eigenposition-anflug')).toHaveTextContent('"lat":52.1'),
+    );
   });
 
   it('ohne sicheren Kontext gesperrt, der Grund steht am Knopf', async () => {

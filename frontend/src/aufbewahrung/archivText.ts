@@ -20,7 +20,7 @@ export const VERBLEIB_STATUS: Record<VerbleibStatus, string> = {
 
 /**
  * Rang der Zustände entlang der Lebenslinie eines Einsatzes — ein exhaustiver Record: ein
- * siebter Zustand bricht den Typcheck, statt still in Auswahl und Sortierung zu fehlen.
+ * neuer Zustand bricht den Typcheck, statt still in Auswahl und Sortierung zu fehlen.
  */
 export const ZUSTAND_RANG: Record<AufbewahrungZustand, number> = {
   ohne_frist: 0,
@@ -29,6 +29,8 @@ export const ZUSTAND_RANG: Record<AufbewahrungZustand, number> = {
   vorgemerkt: 3,
   schwaerzung_ausstehend: 4,
   geschwaerzt: 5,
+  loeschung_ausstehend: 6,
+  endgueltig_geloescht: 7,
 };
 
 /** Die Zustände in Rangfolge — abgeleitet, nicht handgepflegt. */
@@ -69,6 +71,8 @@ export function primaeraktion(zustand: AufbewahrungZustand): AktePrimaeraktion {
       return 'wiederherstellen';
     case 'schwaerzung_ausstehend':
     case 'geschwaerzt':
+    case 'loeschung_ausstehend':
+    case 'endgueltig_geloescht':
       return null;
   }
 }

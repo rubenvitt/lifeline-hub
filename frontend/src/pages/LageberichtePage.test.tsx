@@ -11,7 +11,7 @@ import LageberichtePage from './LageberichtePage';
 import LageberichtDetailPage from './LageberichtDetailPage';
 import type { LageberichtAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
-import { alsOrtszeit } from '../etb/filterZeit';
+import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { mitProzessZone } from '../test/prozessZone';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { adminFixture, einsatzFixture } from '../test/fixtures';

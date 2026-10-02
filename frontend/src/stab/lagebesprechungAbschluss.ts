@@ -1,6 +1,6 @@
 import type { Dayjs } from 'dayjs';
 import type { Lagebesprechung, LagebesprechungAbschlussBody, Stab } from '../api/types';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { terminZeitpunkt } from './lagebesprechungZustand';
 
 /** Werte der Maske „Lagebesprechung abschließen". */

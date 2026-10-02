@@ -16,7 +16,7 @@ import type {
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { istAdmin } from '../einsatz/schreibrecht';
-import { alsOrtszeit } from '../etb/filterZeit';
+import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { verweisStil } from '../etb/zeitachseModell';
 import { einsatzPfad } from '../routing/deeplinks';
 import { invalidiereNachDemoVorgang, useDemoDatenStatus } from './useDemoDaten';

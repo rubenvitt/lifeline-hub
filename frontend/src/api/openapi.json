@@ -825,10 +825,9 @@
       },
       "AufbewahrungEintragAnzeige": {
         "type": "object",
-        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen.",
+        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im\nZustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine\nBezeichnung.",
         "required": [
           "einsatz_id",
-          "bezeichnung",
           "zustand"
         ],
         "properties": {
@@ -839,7 +838,11 @@
             ]
           },
           "bezeichnung": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fehlt nur bei einem endgültig gelöschten Einsatz."
           },
           "einsatz_id": {
             "type": "integer",
@@ -850,6 +853,13 @@
               "string",
               "null"
             ]
+          },
+          "endgueltig_geloescht_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`."
           },
           "geloescht_at": {
             "type": [
@@ -871,6 +881,13 @@
             ],
             "description": "Ende der Karenz (`geloescht_at` + 30 Tage); fehlt ohne Vormerkung."
           },
+          "loeschung_am": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der endgültigen Löschung des Skeletts (später aus Abschluss + Skelett-Frist\nund Schwärzung); fehlt ohne Skelett-Frist der Org und bei gelöschten Einsätzen."
+          },
           "retention_bis": {
             "type": [
               "string",
@@ -885,14 +902,16 @@
       },
       "AufbewahrungZustand": {
         "type": "string",
-        "description": "Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben\nkeinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an\n[`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`.",
+        "description": "Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23) oder — nur\n`EndgueltigGeloescht` — einer Zeile des Löschprotokolls (LFH-750). Aktive Einsätze haben\nkeinen ([`zustand`] liefert `None`). Genau ein Wert; die Rangfolge steht an [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`.",
         "enum": [
           "ohne_frist",
           "frist_laeuft",
           "faellig",
           "vorgemerkt",
           "schwaerzung_ausstehend",
-          "geschwaerzt"
+          "geschwaerzt",
+          "loeschung_ausstehend",
+          "endgueltig_geloescht"
         ]
       },
       "AuftragAnzeige": {
@@ -7772,6 +7791,14 @@
             ],
             "format": "int64",
             "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
+          },
+          "skelett_dauer_tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt."
           },
           "zeitformat": {
             "oneOf": [

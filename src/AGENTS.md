@@ -148,7 +148,8 @@ Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzlis
   WHERE, Stammdaten je Zeile im `SAVEPOINT`). Voraussetzung: FKs auf
   `fahrzeug`/`personal`/`material` `NO ACTION`/`RESTRICT`, nie `DEFERRABLE`
   (`src/demo/schema_tests.rs`).
-- Einsatz-IDs werden nie wiederverwendet (`einsatz::repo::anlegen_tx`). Die Szenariouhr setzt
+- Einsatz-IDs werden nie wiederverwendet (`einsatz::repo::anlegen_tx`, über `demo_import` und
+  `aufbewahrung_loeschprotokoll`). Die Szenariouhr setzt
   `received_at = ereigniszeit` nur am Demo-Einsatz; nie eine FTS-Spalte per UPDATE ändern.
 - **„Ist Demo“ hat eine Quelle: die Marke** (LFH-733). `ist_demo` in Stamm- und
   Dispositions-Antworten liest `demo_herkunft` live per `EXISTS` (Stamm-`SPALTEN`,
@@ -202,6 +203,15 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Eine Kategorie wirkt nur früher als die Einsatz-Frist und sperrt nicht; der Personenstamm geht
   erst, wenn alle Zwecke der Person geschwärzt sind. Herleitung:
   `openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md`.
+- **Endgültige Löschung des Skeletts** (LFH-750, Spec `aufbewahrung`): Phase D des Purge-Laufs
+  (`einsatz/skelett_loeschung.rs`) löscht einen geschwärzten Einsatz samt ETB, sobald die
+  Org-Einstellung `skelett_dauer_tage` (ab Abschluss, frühestens die Schwärzung) abgelaufen ist;
+  ohne Einstellung bleibt das Skelett. Einzige Spur ist `aufbewahrung_loeschprotokoll` (keine
+  Bezeichnung, kein Ort, kein ETB-Text), geschrieben in derselben Transaktion, Akteur
+  fail-closed wie beim Purge-Audit. Erstmaliges Setzen und Verkürzen der Frist ohne
+  `skelett_dauer_bestaetigt` → 409. Das Protokoll sperrt ID und Einsatznummer
+  (`einsatz::repo::anlegen_tx`). Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md`.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
