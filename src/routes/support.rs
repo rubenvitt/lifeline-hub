@@ -236,7 +236,8 @@ pub const ANHANG_CSP: &str = "default-src 'none'; sandbox";
 /// Jede Antwort trägt `X-Content-Type-Options: nosniff` und [`ANHANG_CSP`].
 ///
 /// Geteilt von allen Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden, Tier, UHS,
-/// Person); **der einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in `tests/anhang_metadaten.rs`).
+/// Person); **der einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in
+/// `tests/anhang_metadaten.rs`).
 /// Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit, Linker-Sperre, Modul-Gate) macht der
 /// Aufrufer VORHER — dieser Helfer prüft nichts. Der Karten-Hintergrundbild-Download bleibt
 /// außen vor: er liest aus einer eigenen Tabelle. Regeln: `src/AGENTS.md`, „Anhänge“.
