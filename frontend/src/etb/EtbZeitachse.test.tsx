@@ -598,7 +598,13 @@ describe('EtbZeitachse – Anhänge (LFH-117)', () => {
 });
 
 describe('EtbZeitachse – Dokumente mit ETB-Bezug (LFH-743)', () => {
-  const plan = { id: 3, titel: 'Lageplan Nord', dateiname: 'plan.pdf', groesse: 2048 };
+  const plan = {
+    id: 3,
+    titel: 'Lageplan Nord',
+    dateiname: 'plan.pdf',
+    groesse: 2048,
+    mime: 'application/pdf',
+  };
 
   it('zeigt am bezogenen Eintrag einen Verweis auf die Dokument-Route', () => {
     const { container } = renderZeitachse({

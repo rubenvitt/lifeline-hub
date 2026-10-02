@@ -294,6 +294,9 @@ Reihenfolge im Handler:
   hält. Fehlt er, ist die Antwort `false`, also nur der bereinigte Download.
   `etb/EtbAnhaenge.tsx` bleibt bei seinem eigenen Anker und bekommt `darfOriginal` als Prop,
   damit es ohne Provider renderbar bleibt.
+- Nach dem Rebase auf `alpha` kam `etb/EtbDokumente.tsx` hinzu (LFH-743: Dokumente mit
+  ETB-Bezug an der Zeitachse). Es bekommt denselben Zweitverweis und dieselbe Prop wie
+  `EtbAnhaenge`; der Hauptverweis lief schon über die Dokument-Route und ist damit bereinigt.
 - **Admin-Org im Frontend:** Die UI-Schranke prüft nur `istAdmin`. Ein fremder Admin sähe die
   Aktion, bekäme aber 403. Das Backend ist verbindlich, und der Fall ist selten, deshalb kein
   zusätzliches Feld im DTO.

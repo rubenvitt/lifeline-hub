@@ -300,7 +300,13 @@ export default function EtbZeitachse({
         ),
         // Dokumente der Ablage mit Bezug auf diesen Eintrag (LFH-743) — eigene Datei, eigene Route.
         doks && doks.length > 0 && (
-          <EtbDokumente key="dokumente" einsatzId={einsatzId} lfdNr={e.lfd_nr} dokumente={doks} />
+          <EtbDokumente
+            key="dokumente"
+            einsatzId={einsatzId}
+            lfdNr={e.lfd_nr}
+            dokumente={doks}
+            darfOriginal={darfOriginal}
+          />
         ),
       ],
       token.marginXS,
