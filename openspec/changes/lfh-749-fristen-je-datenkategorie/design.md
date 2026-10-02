@@ -51,7 +51,7 @@ So arbeitet die Aufbewahrung heute (LFH-135, LFH-229, LFH-23):
 - **Kartenhintergrund als Bildaufnahme.** `karte_hintergrundbild.daten` bleibt Retain
   (Kartografie-Skelett, LFH-229). Ein hochgeladenes Drohnen-Orthofoto fiele in Niedersachsen
   unter die Zwei-Monats-Frist (§ 32b Abs. 3 NKatSG). Das ist eine Klassifikationsfrage für
-  ein Folgeticket (Aufgabe 8.3), keine Kategoriefrage.
+  ein Folgeticket (LFH-997), keine Kategoriefrage.
 - **Rückwirkende Kategorie-Fristen für schon abgeschlossene Einsätze.** Sie lassen sich am
   Einsatz manuell setzen (Requirement „Kategorie-Frist am Einsatz ändern“).
 - **Endgültige Löschung des Skeletts.** Das bleibt ein eigenes Thema aus LFH-23.

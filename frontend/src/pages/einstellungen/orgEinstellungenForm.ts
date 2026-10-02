@@ -1,10 +1,13 @@
 import type {
+  Datenkategorie,
   EinheitenSystem,
+  KategorieVorgabe,
   Koordinatenformat,
   OrgEinstellungen,
   OrgEinstellungenUpdate,
   Zeitformat,
 } from '../../api/types';
+import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
 
 /**
  * Geteilte Form-Logik der Org-Einstellungs-Sektionen. KRITISCH: `PUT /api/org-einstellungen` ist
@@ -32,6 +35,14 @@ export interface FormWerteEinsatz {
   auftrag_quittierung_frist_min?: number;
   rueckmeldung_frist_min?: number;
   auto_etb_eintraege: boolean;
+  /** Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leere Dauer = keine eigene Frist. */
+  kategorien?: Partial<Record<Datenkategorie, KategorieFormWert>>;
+}
+
+/** Formularwert einer Datenkategorie. */
+export interface KategorieFormWert {
+  dauer_tage?: number | null;
+  rechtsgrundlage?: string;
 }
 
 /** Voller Update-Payload aus dem geladenen Zustand — Basis für den Vollersatz-Merge-Save. */
@@ -85,6 +96,7 @@ export function normalisiereEinsatz(
   | 'auftrag_quittierung_frist_min'
   | 'rueckmeldung_frist_min'
   | 'auto_etb_eintraege'
+  | 'aufbewahrung_kategorien'
 > {
   return {
     retention_dauer_tage: w.retention_dauer_tage ?? null,
@@ -96,7 +108,24 @@ export function normalisiereEinsatz(
     auftrag_quittierung_frist_min: w.auftrag_quittierung_frist_min ?? null,
     rueckmeldung_frist_min: w.rueckmeldung_frist_min ?? null,
     auto_etb_eintraege: w.auto_etb_eintraege,
+    aufbewahrung_kategorien: kategorieVorgaben(w.kategorien),
   };
+}
+
+/** Die Kategorie-Vorgaben aus dem Formular: nur Kategorien mit Dauer, Rechtsgrundlage getrimmt,
+ *  in fester Reihenfolge. Eine fehlende Kategorie hat am Server keine eigene Frist. */
+export function kategorieVorgaben(kategorien: FormWerteEinsatz['kategorien']): KategorieVorgabe[] {
+  return KATEGORIEN.flatMap((kategorie) => {
+    const wert = kategorien?.[kategorie];
+    if (wert?.dauer_tage == null) return [];
+    return [
+      {
+        kategorie,
+        dauer_tage: wert.dauer_tage,
+        rechtsgrundlage: wert.rechtsgrundlage?.trim() ?? '',
+      },
+    ];
+  });
 }
 
 /** Initial-Form-Werte der Anzeige-Sektion aus dem geladenen Zustand. */
@@ -122,5 +151,11 @@ export function initialEinsatz(e: OrgEinstellungen): FormWerteEinsatz {
     auftrag_quittierung_frist_min: e.auftrag_quittierung_frist_min ?? undefined,
     rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? undefined,
     auto_etb_eintraege: e.auto_etb_eintraege !== 0,
+    kategorien: Object.fromEntries(
+      (e.aufbewahrung_kategorien ?? []).map((v) => [
+        v.kategorie,
+        { dauer_tage: v.dauer_tage, rechtsgrundlage: v.rechtsgrundlage },
+      ]),
+    ),
   };
 }

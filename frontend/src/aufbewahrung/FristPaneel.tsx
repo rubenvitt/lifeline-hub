@@ -11,6 +11,7 @@ import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { Datenfeld, Datenraster, Paneel } from '../components/instrument';
+import KategorieFristen from './KategorieFristen';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import {
   darfFristSetzen,
@@ -247,6 +248,8 @@ export default function FristPaneel({ einsatzId, einsatz }: FristPaneelProps) {
             </Button>
           )}
         </Flex>
+        {/* LFH-749: Fristen je Datenkategorie — sie wirken nur früher als die Einsatz-Frist. */}
+        <KategorieFristen einsatzId={einsatzId} status={einsatz.status} darf={darf} />
       </Flex>
       {aenderung.dialoge}
     </Paneel>

@@ -317,6 +317,10 @@ export const einsatzKeys = {
   // Einsatzkontext (enabled-Guard).
   einsatz: (einsatzId: number | null) => [EINSATZ_KEYS.einsatz, einsatzId] as const,
   einstellungen: (einsatzId: number) => [EINSATZ_KEYS.einstellungen, einsatzId] as const,
+  /** Aufbewahrung je Datenkategorie (LFH-749) — Unter-Key der Einstellungen: dieselbe Seite,
+   *  dieselbe Invalidierung, kein Live-Ereignis, kein Personenbezug. */
+  aufbewahrungKategorien: (einsatzId: number) =>
+    [EINSATZ_KEYS.einstellungen, einsatzId, 'aufbewahrung-kategorien'] as const,
   mitglieder: (einsatzId: number) => [EINSATZ_KEYS.mitglieder, einsatzId] as const,
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.

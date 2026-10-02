@@ -49,6 +49,8 @@ import {
 } from '../theme/statusFarben';
 import { ETB_TYPEN, VERBLEIB_ART, VERBLEIB_STATUS, primaeraktion } from './archivText';
 import { FristWert, useFristAenderung } from './FristPaneel';
+import { KategorieWert } from './KategorieFristen';
+import { KATEGORIE_TEXT } from './kategorieText';
 import WiederherstellenDialog from './WiederherstellenDialog';
 
 /**
@@ -400,6 +402,17 @@ function AkteInhalt({ einsatzId, akte }: { einsatzId: number; akte: ArchivAkte }
           <div style={{ marginTop: token.marginSM }}>
             <SpeicherFehler fehler={frist.fehlerAussen} />
           </div>
+        </Paneel>
+
+        {/* LFH-749: Aufbewahrung je Datenkategorie, nur lesend — ändern geht am Einsatz. */}
+        <Paneel titel="Datenkategorien" koerperPolster>
+          <Datenraster spalten={3} beschriftung="Datenkategorien">
+            {akte.kategorien.map((k) => (
+              <Datenfeld key={k.kategorie} label={KATEGORIE_TEXT[k.kategorie].bezeichnung}>
+                <KategorieWert eintrag={k} aktiv={false} />
+              </Datenfeld>
+            ))}
+          </Datenraster>
         </Paneel>
 
         <Paneel titel="Register" koerperPolster>

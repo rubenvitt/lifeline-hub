@@ -45,15 +45,15 @@ ist das Frontend, Gruppe 8 schließt ab.
 
 ## 7. Frontend (D9)
 
-- [ ] 7.1 `aufbewahrung/kategorieText.ts`: Bezeichnung, Datenbeschreibung, Vorschlag und Quelle je Kategorie. Verifiziert durch einen Test, der alle drei Kategorien des generierten Typs abdeckt
-- [ ] 7.2 Org-Einstellungen, Abschnitt Aufbewahrung: Dauer und Rechtsgrundlage je Kategorie, Vorschlag als Text, nicht vorbelegt, Hinweis bei Dauer über der Org-Aufbewahrungsdauer, Rechtsgrundlage Pflicht bei gesetzter Dauer. Verifiziert durch Komponententests zu den Szenarien „Vorschlag wird nicht eingesetzt“ und „Dauer länger als Einsatz-Dauer“ sowie zur Pflichtfeldprüfung
-- [ ] 7.3 `FristPaneel`: Kategorie-Zeilen mit Statusetikett (Wort), Frist, Rechtsgrundlage und Aktion mit Rückfrage bei Verkürzung. Bei aktivem Einsatz der Hinweis aus der Vorgabe; ohne Recht gesperrt mit Grund. Verifiziert durch Komponententests zu „Kategorie verlängern“, „Aktiver Einsatz“, Verkürzung mit Rückfrage und „Ohne Recht“
-- [ ] 7.4 `ArchivAktePage`: Block „Datenkategorien“, nur lesend. Verifiziert durch einen Komponententest mit geschwärzter Kategorie samt Zeitpunkt und Rechtsgrundlage
+- [x] 7.1 `aufbewahrung/kategorieText.ts`: Bezeichnung, Datenbeschreibung, Vorschlag und Quelle je Kategorie. Verifiziert durch einen Test, der alle drei Kategorien des generierten Typs abdeckt
+- [x] 7.2 Org-Einstellungen, Abschnitt Aufbewahrung: Dauer und Rechtsgrundlage je Kategorie, Vorschlag als Text, nicht vorbelegt, Hinweis bei Dauer über der Org-Aufbewahrungsdauer, Rechtsgrundlage Pflicht bei gesetzter Dauer. Verifiziert durch Komponententests zu den Szenarien „Vorschlag wird nicht eingesetzt“ und „Dauer länger als Einsatz-Dauer“ sowie zur Pflichtfeldprüfung
+- [x] 7.3 `FristPaneel`: Kategorie-Zeilen mit Statusetikett (Wort), Frist, Rechtsgrundlage und Aktion mit Rückfrage bei Verkürzung. Bei aktivem Einsatz der Hinweis aus der Vorgabe; ohne Recht gesperrt mit Grund. Verifiziert durch Komponententests zu „Kategorie verlängern“, „Aktiver Einsatz“, Verkürzung mit Rückfrage und „Ohne Recht“
+- [x] 7.4 `ArchivAktePage`: Block „Datenkategorien“, nur lesend. Verifiziert durch einen Komponententest mit geschwärzter Kategorie samt Zeitpunkt und Rechtsgrundlage
 - [ ] 7.5 Frontend-Gates: `mise exec -- pnpm -C frontend lint`, `typecheck` und `test`. Verifiziert durch grüne Läufe
 
 ## 8. Abschluss
 
-- [ ] 8.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung“: Regel zur Zuordnung (jede Scrub-Spalte braucht eine `Zuordnung`, Kategorie-Spalten sind im Guard gepinnt, Behandlungsbezug-Guard) mit Verweis auf diese Change. Verifiziert durch Prettier/Format-Gate und Lesen des Abschnitts
+- [x] 8.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung“: Regel zur Zuordnung (jede Scrub-Spalte braucht eine `Zuordnung`, Kategorie-Spalten sind im Guard gepinnt, Behandlungsbezug-Guard) mit Verweis auf diese Change. Verifiziert durch Prettier/Format-Gate und Lesen des Abschnitts
 - [ ] 8.2 `./scripts/check-all.sh` grün. Verifiziert durch den Lauf; die CI des PRs belegt ihn erneut
-- [ ] 8.3 Folgeticket per `clickup-task-anlegen`: Kartenhintergrund (`karte_hintergrundbild.daten`) bei Drohnen-Orthofotos (§ 32b Abs. 3 NKatSG), Klassifikation prüfen. Verifiziert durch die Ticketnummer in der Abschlussmeldung
+- [x] 8.3 Folgeticket per `clickup-task-anlegen`: Kartenhintergrund (`karte_hintergrundbild.daten`) bei Drohnen-Orthofotos (§ 32b Abs. 3 NKatSG), Klassifikation prüfen. Verifiziert durch die Ticketnummer in der Abschlussmeldung (angelegt: LFH-997)
 - [ ] 8.4 `/opsx:archive lfh-749-fristen-je-datenkategorie` im selben Branch vor dem PR, mit Spec-Sync und nachgezogenen Verweisen. Verifiziert durch `scripts/check-openspec-archiv.sh`
