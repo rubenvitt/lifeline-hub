@@ -18,6 +18,7 @@ import {
   type PaneelDatenzustand,
 } from '../../components/instrument';
 import DownloadAnker from '../../components/DownloadAnker';
+import { AnhangVorschauGruppe } from '../../components/AnhangVorschau';
 import { istBildMime, originalPfad } from '../../api/anhangFassung';
 import { useDarfOriginalLaden } from '../../einsatz/useDarfOriginalLaden';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -135,6 +136,8 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
                 : undefined
             }
             originalKennung={`${a.dateiname}, Schaden ${nr}`}
+            mime={a.mime}
+            vorschauKennung={`Schaden ${nr}`}
             dateiname={a.dateiname}
             groesse={a.groesse}
             zusatz={
@@ -201,7 +204,10 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
         leerText="Noch keine Fotos oder Dateien"
         onNeuladen={() => void query.refetch()}
       >
-        <div ref={listeRef}>{liste.map(zeile)}</div>
+        <div ref={listeRef}>
+          {/* Eine Gruppe je Schaden: die Großansicht blättert durch seine Fotos (LFH-759). */}
+          <AnhangVorschauGruppe>{liste.map(zeile)}</AnhangVorschauGruppe>
+        </div>
       </PaneelZustand>
       {aktionen && (
         <SchadenAnhangAblegenModal

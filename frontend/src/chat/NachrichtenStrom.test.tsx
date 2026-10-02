@@ -519,6 +519,22 @@ describe('NachrichtenStrom', () => {
       rendere();
       expect(screen.queryByText(ORIGINAL_TEXT)).toBeNull();
     });
+
+    it('zeigt am Foto ein Vorschaubild, am PDF nicht (LFH-759)', () => {
+      rendere();
+      const knopf = screen.getByRole('button', {
+        name: 'Vorschau: lage.jpg, Anhang der Nachricht von Max',
+      });
+      expect(knopf.querySelector('img')).toHaveAttribute(
+        'src',
+        '/api/einsaetze/7/anhaenge/43?fassung=vorschau',
+      );
+      expect(screen.queryByRole('button', { name: /^Vorschau: lage\.pdf/ })).toBeNull();
+      expect(screen.getByRole('link', { name: /^lage\.pdf/ })).toHaveAttribute(
+        'href',
+        '/api/einsaetze/7/anhaenge/44',
+      );
+    });
   });
 });
 

@@ -75,13 +75,13 @@ Code. Backend-Tests: `cargo test`. Frontend: `mise exec -- pnpm -C frontend test
     wieder auf dem Vorschaubild.
   - In einer Gruppe mit drei Bildern lässt sich blättern.
   - Keine Adresse enthält `fassung=original`.
-- [ ] 3.3 `DownloadAnker` bekommt `mime`, mit Vorschaubild vor dem Verweis bei Bildern. Durchreichen
+- [x] 3.3 `DownloadAnker` bekommt `mime`, mit Vorschaubild vor dem Verweis bei Bildern. Durchreichen
   in `pages/schaeden/SchadenAnhaenge.tsx`, `pages/DokumentePage.tsx` und
   `chat/NachrichtenStrom.tsx`, mit Gruppen je Schaden bzw. Nachricht. Belegt durch die
   bestehenden Tests dieser Komponenten, die grün bleiben (Download-Verweis und Original-Aktion
   unverändert), und neue Fälle „Foto hat Vorschau, PDF nicht“. Die Fokuslogik nach dem Löschen in
   `SchadenAnhaenge` (`a[download]`) prüft ein Test.
-- [ ] 3.4 `etb/EtbAnhaenge.tsx` und `etb/EtbDokumente.tsx` zeigen das Vorschaubild neben dem Verweis,
+- [x] 3.4 `etb/EtbAnhaenge.tsx` und `etb/EtbDokumente.tsx` zeigen das Vorschaubild neben dem Verweis,
   gruppiert je Eintrag. Damit hat es auch `EtbEintragVorschau`. Belegt durch Tests: ein Eintrag Nr. 4
   mit Foto hat ein Vorschaubild, dessen Name „Nr. 4“ enthält. Die bestehenden Tests der
   Hinweiszeile bleiben grün (Mindesthöhe der Dichtestufe, ETB-Route statt generischer Route).

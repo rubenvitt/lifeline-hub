@@ -196,6 +196,15 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(naechste));
   });
 
+  it('setzt den Fokus nach dem Entfernen auf den Verweis der nächsten Zeile, nicht auf ihr Vorschaubild (LFH-759)', async () => {
+    entferne.mockResolvedValue(undefined);
+    rendere([[anhang(5, 'dach.jpg'), anhang(6, 'giebel.jpg')], [anhang(6, 'giebel.jpg')]]);
+    await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
+    await vi.waitFor(() => expect(screen.queryByRole('link', { name: /^dach\.jpg/ })).toBeNull());
+    const naechste = screen.getByRole('link', { name: /^giebel\.jpg/ });
+    await vi.waitFor(() => expect(document.activeElement).toBe(naechste));
+  });
+
   it('setzt den Fokus nach dem Entfernen der letzten Datei auf „Datei ablegen“', async () => {
     entferne.mockResolvedValue(undefined);
     rendere([[anhang(5, 'dach.jpg')], []]);
@@ -236,5 +245,23 @@ describe('SchadenAnhaenge — Original (LFH-747)', () => {
       name: 'dach.jpg, 2.0 MB, Datei von Schaden S-003 herunterladen',
     });
     expect(screen.queryByText(ORIGINAL_TEXT)).toBeNull();
+  });
+});
+
+describe('SchadenAnhaenge — Vorschau (LFH-759)', () => {
+  it('zeigt am Foto ein Vorschaubild, am PDF nicht; die Verweise bleiben', async () => {
+    rendere([anhang(5, 'dach.jpg'), anhang(6, 'gutachten.pdf', 'application/pdf')], {
+      darfSchreiben: false,
+    });
+    const knopf = await within(paneel()).findByRole('button', {
+      name: 'Vorschau: dach.jpg, Schaden S-003',
+    });
+    expect(knopf.querySelector('img')).toHaveAttribute('src', `${PFAD}/5/datei?fassung=vorschau`);
+    expect(within(paneel()).getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
+    expect(
+      within(paneel()).getByRole('link', {
+        name: 'gutachten.pdf, 2.0 MB, Datei von Schaden S-003 herunterladen',
+      }),
+    ).toHaveAttribute('href', `${PFAD}/6/datei`);
   });
 });
