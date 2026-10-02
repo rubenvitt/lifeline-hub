@@ -22,9 +22,16 @@ interface HeifBild {
   free(): void;
 }
 
+/** Ein Decoder; `decoder` ist sein libheif-Kontext, den nur das nächste `decode` freigäbe. */
+interface HeifDecoder {
+  decode(daten: Uint8Array): HeifBild[];
+  decoder: unknown;
+}
+
 /** Das geladene libheif-Modul (Ausschnitt). */
 export interface Libheif {
-  HeifDecoder: new () => { decode(daten: Uint8Array): HeifBild[] };
+  HeifDecoder: new () => HeifDecoder;
+  heif_context_free(kontext: unknown): void;
 }
 
 export interface HeicPixel {
@@ -44,8 +51,18 @@ export class HeicZuGross extends Error {
 
 /** Dekodiert das Hauptbild von `daten` zu RGBA. Wirft bei kaputten Daten oder zu großen Bildern. */
 export async function dekodiereHeicPixel(daten: Uint8Array, libheif: Libheif): Promise<HeicPixel> {
-  const bilder = new libheif.HeifDecoder().decode(daten);
-  if (bilder.length === 0) throw new Error('HEIC nicht lesbar');
+  const decoder = new libheif.HeifDecoder();
+  const bilder = decoder.decode(daten);
+  // libheif-js gibt den Kontext (samt Kopie der Datei) erst beim NÄCHSTEN `decode` desselben
+  // Decoders frei; ohne dieses `free` wüchse der WASM-Speicher des Workers mit jedem Foto.
+  const kontextFrei = () => {
+    if (decoder.decoder) libheif.heif_context_free(decoder.decoder);
+    decoder.decoder = null;
+  };
+  if (bilder.length === 0) {
+    kontextFrei();
+    throw new Error('HEIC nicht lesbar');
+  }
   const bild = bilder.find((b) => b.is_primary()) ?? bilder[0]!;
   try {
     const breite = bild.get_width();
@@ -61,7 +78,23 @@ export async function dekodiereHeicPixel(daten: Uint8Array, libheif: Libheif): P
     return { breite, hoehe, daten: ziel.data };
   } finally {
     for (const b of bilder) b.free();
+    kontextFrei();
   }
+}
+
+/**
+ * Lädt etwas genau einmal, aber nicht für immer falsch: scheitert das Laden (etwa die WASM-Datei
+ * ohne Netz), versucht es der nächste Aufruf neu.
+ */
+export function einmalLaden<T>(laden: () => Promise<T>): () => Promise<T> {
+  let laufend: Promise<T> | null = null;
+  return () => {
+    laufend ??= laden().catch((fehler: unknown) => {
+      laufend = null;
+      throw fehler;
+    });
+    return laufend;
+  };
 }
 
 /** Maße, mit denen die längste Kante in `kante` passt; nie vergrößert. */

@@ -35,10 +35,13 @@ export default function EtbAnhaenge({
   einsatzId,
   eintrag,
   darfOriginal = false,
+  grossansicht = true,
 }: {
   einsatzId: number;
   eintrag: Pick<EtbEintragAnzeige, 'id' | 'lfd_nr' | 'anhaenge'>;
   darfOriginal?: boolean;
+  /** `false` in der Palettenvorschau: Vorschaubild ohne Großansicht (LFH-759). */
+  grossansicht?: boolean;
 }) {
   const { token, rollen } = useRollen();
   if (eintrag.anhaenge.length === 0) return null;
@@ -65,6 +68,7 @@ export default function EtbAnhaenge({
                 mime={a.mime}
                 dateiname={a.dateiname}
                 kennung={`Anhang zu Nr. ${eintrag.lfd_nr}`}
+                grossansicht={grossansicht}
               />
               <a
                 href={href}

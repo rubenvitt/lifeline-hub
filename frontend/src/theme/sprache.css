@@ -145,6 +145,12 @@
   outline-offset: -2px;
 }
 
+/* Vorschaubild eines Anhangs (LFH-759): handgebautes Bedienziel, Fokusring in `bedien` wie oben. */
+.lfh-anhang-vorschau:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+
 /* Notizplatz eines Bandes auf schmalem Schirm (LFH-629, `Kennzahlenband notizZeilenSchmal`): im
    Ladezustand steht einzeilig „wird abgerufen“, mit den Daten brach eine Notiz wie die des
    Pegels in der halben Bandbreite zweizeilig um, und die Reihe wuchs 16 px. Der Platz steht

@@ -64,12 +64,14 @@ describe('AnhangVorschau', () => {
 
   it('zeigt bei einem Ladefehler einen Platzhalter gleicher Größe und bleibt still', () => {
     renderMitProviders(<AnhangVorschau href={HREF} mime="image/jpeg" dateiname="dach.jpg" />);
-    const img = screen.getByRole('button', { name: /^Vorschau: dach\.jpg/ }).querySelector('img')!;
-    fireEvent.error(img);
+    const knopf = screen.getByRole('button', { name: /^Vorschau: dach\.jpg/ });
+    const vorher = { breite: knopf.style.width, hoehe: knopf.style.height };
+    expect(vorher.breite).toMatch(/^\d+px$/);
+    fireEvent.error(knopf.querySelector('img')!);
     expect(screen.queryByRole('button', { name: /^Vorschau/ })).not.toBeInTheDocument();
     const platzhalter = screen.getByRole('img', { name: 'Keine Vorschau: dach.jpg' });
     expect(platzhalter).toHaveTextContent('JPG');
-    expect(platzhalter.style.width).toBe(platzhalter.style.height);
+    expect({ breite: platzhalter.style.width, hoehe: platzhalter.style.height }).toEqual(vorher);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -114,6 +116,49 @@ describe('AnhangVorschau', () => {
     // rc-image liest `keyCode`, das user-event nicht setzt; ein Browser setzt es.
     fireEvent.keyDown(window, { key: 'ArrowRight', keyCode: 39 });
     await waitFor(() => expect(bildMit('/a/3?fassung=grossansicht')).toBe(true));
+  });
+
+  it('blättert in der Reihenfolge der Anzeige, auch wenn ein Bild später dazukommt', async () => {
+    const user = userEvent.setup();
+    const bilder = (namen: string[]) => (
+      <AnhangVorschauGruppe>
+        {namen.map((n) => (
+          <AnhangVorschau key={n} href={`/a/${n}`} mime="image/jpeg" dateiname={`${n}.jpg`} />
+        ))}
+      </AnhangVorschauGruppe>
+    );
+    const { rerender } = renderMitProviders(bilder(['zwei', 'drei']));
+    // Ein neues Bild erscheint oben (neueste zuerst), meldet sich aber als letztes an.
+    rerender(bilder(['eins', 'zwei', 'drei']));
+    await user.click(screen.getByRole('button', { name: /^Vorschau: zwei\.jpg/ }));
+    const dialog = await screen.findByRole('dialog');
+    const zeigt = (src: string) =>
+      within(dialog)
+        .queryAllByRole('img')
+        .some((i) => i.getAttribute('src') === src);
+    expect(zeigt('/a/zwei?fassung=grossansicht')).toBe(true);
+    fireEvent.keyDown(window, { key: 'ArrowLeft', keyCode: 37 });
+    await waitFor(() => expect(zeigt('/a/eins?fassung=grossansicht')).toBe(true));
+  });
+
+  it('trägt den Fokusring der Bedienfarbe über seine Klasse', () => {
+    renderMitProviders(<AnhangVorschau href={HREF} mime="image/png" dateiname="plan.png" />);
+    expect(screen.getByRole('button', { name: /^Vorschau: plan\.png/ })).toHaveClass(
+      'lfh-anhang-vorschau',
+    );
+    const css = readFileSync(join(process.cwd(), 'src/theme/sprache.css'), 'utf8');
+    expect(css).toMatch(
+      /\.lfh-anhang-vorschau:focus-visible \{\s*outline: 2px solid var\(--lfh-bedien\)/,
+    );
+  });
+
+  it('zeigt ohne Großansicht nur das Bild, ohne Bedienziel', () => {
+    renderMitProviders(
+      <AnhangVorschau href={HREF} mime="image/jpeg" dateiname="dach.jpg" grossansicht={false} />,
+    );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    const bild = screen.getByRole('img', { name: 'Vorschau: dach.jpg' });
+    expect(bild.querySelector('img')).toHaveAttribute('src', `${HREF}?fassung=vorschau`);
   });
 
   it('fordert nie das Original an', () => {

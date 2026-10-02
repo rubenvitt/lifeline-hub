@@ -258,3 +258,20 @@ describe('erzeugeQueryClient — Object-URLs der HEIC-Vorschau (LFH-759)', () =>
     freigeben.mockRestore();
   });
 });
+
+describe('erzeugeQueryClient — Object-URLs bei Datenwechsel (LFH-759)', () => {
+  it('gibt die alten URLs frei, wenn die Daten wechseln, und jede nur einmal', () => {
+    const freigeben = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const client = erzeugeQueryClient();
+    const key = einsatzKeys.anhangHeicVorschau(7, '/a/1');
+    client.setQueryData(key, { klein: 'blob:k1', gross: 'blob:g1' });
+    // Rechteentzug setzt die Daten einer beobachteten Query auf undefined.
+    client.getQueryCache().find({ queryKey: key })!.setState({ data: undefined });
+    expect(freigeben.mock.calls.flat()).toEqual(['blob:k1', 'blob:g1']);
+    client.setQueryData(key, { klein: 'blob:k2', gross: 'blob:g2' });
+    client.setQueryData(key, { fehler: true });
+    client.clear();
+    expect(freigeben.mock.calls.flat()).toEqual(['blob:k1', 'blob:g1', 'blob:k2', 'blob:g2']);
+    freigeben.mockRestore();
+  });
+});

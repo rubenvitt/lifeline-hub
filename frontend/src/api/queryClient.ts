@@ -85,6 +85,35 @@ function raeumeNachRechteentzug(
   });
 }
 
+/**
+ * Die HEIC-Vorschau (LFH-759) hält Object-URLs im Cache. Sie werden freigegeben, sobald die Query
+ * den Cache verlässt (gcTime, Abmelden) oder ihre Daten wechseln (Rechteentzug setzt sie auf
+ * `undefined`, ein Neuversuch ersetzt sie). Gemerkt wird je Query, welche URLs sie zuletzt trug.
+ */
+function heicVorschauFreigeben(client: QueryClient): void {
+  const gehalten = new Map<string, { klein: string; gross: string }>();
+  const freigeben = (hash: string) => {
+    const alt = gehalten.get(hash);
+    if (!alt) return;
+    URL.revokeObjectURL(alt.klein);
+    URL.revokeObjectURL(alt.gross);
+    gehalten.delete(hash);
+  };
+  client.getQueryCache().subscribe((ereignis) => {
+    const { query } = ereignis;
+    if (query.queryKey[0] !== EINSATZ_KEYS.anhangHeicVorschau) return;
+    if (ereignis.type === 'removed') {
+      freigeben(query.queryHash);
+      return;
+    }
+    const daten = query.state.data as { klein?: string; gross?: string } | undefined;
+    const jetzt = daten?.klein && daten.gross ? { klein: daten.klein, gross: daten.gross } : null;
+    if (gehalten.get(query.queryHash)?.klein === jetzt?.klein) return;
+    freigeben(query.queryHash);
+    if (jetzt) gehalten.set(query.queryHash, jetzt);
+  });
+}
+
 /** Einziger Bauplan für den QueryClient, von `main.tsx` UND `test/utils.tsx` genutzt, damit der
  *  globale Handler auch in Tests wirkt. */
 export function erzeugeQueryClient(
@@ -123,17 +152,7 @@ export function erzeugeQueryClient(
       meldeServerErreichbar(false);
     }
   });
-  // Die HEIC-Vorschau (LFH-759) hält Object-URLs im Cache; verlässt eine solche Query den Cache
-  // (gcTime, Abmelden, Rechteentzug), gibt sie ihre Blobs frei.
-  client.getQueryCache().subscribe((ereignis) => {
-    if (ereignis.type !== 'removed') return;
-    if (ereignis.query.queryKey[0] !== EINSATZ_KEYS.anhangHeicVorschau) return;
-    const urls = ereignis.query.state.data as { klein: string; gross: string } | undefined;
-    if (urls) {
-      URL.revokeObjectURL(urls.klein);
-      URL.revokeObjectURL(urls.gross);
-    }
-  });
+  heicVorschauFreigeben(client);
   if (defaultOptions === queryClientDefaults) lagebildLiegezeitSetzen(client);
   return client;
 }

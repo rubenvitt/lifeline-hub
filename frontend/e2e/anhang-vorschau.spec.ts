@@ -101,6 +101,9 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   await expect(ansicht).toBeHidden();
   await expect(knopf).toBeFocused();
 
+  // Bis hier war kein HEIC zu sehen: weder Decoder-Modul noch Worker noch WASM sind geladen.
+  expect(anfragen.filter((u) => /libheif|heicWorker|dekodiereHeic/.test(u))).toEqual([]);
+
   // ── 3 · HEIC, auf dem Gerät dekodiert ───────────────────────────────────────────────
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   const heicKnopf = page.getByRole('button', { name: /^Vorschau: IMG_0001\.HEIC, Anhang zu Nr\./ });
@@ -116,5 +119,9 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   ]);
   expect(hoehe, 'Drehung aus irot angewendet: hochkant').toBeGreaterThan(breite);
 
+  expect(
+    anfragen.some((u) => /libheif.*\.wasm/.test(u)),
+    'der Decoder kam erst jetzt',
+  ).toBe(true);
   expect(anfragen.filter((u) => u.includes('fassung=original'))).toEqual([]);
 });

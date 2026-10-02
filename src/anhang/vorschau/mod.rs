@@ -11,6 +11,7 @@ use std::io::Cursor;
 
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits, RgbImage};
+use tokio::sync::{Semaphore, SemaphorePermit};
 
 use super::metadaten::{self, Format};
 
@@ -61,19 +62,39 @@ impl Groesse {
 /// belegen zusammen rund 400 MB. Weitere Abrufe warten.
 pub const VORSCHAU_PARALLEL: usize = 2;
 
-static DEKODIERER: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(VORSCHAU_PARALLEL);
+static DEKODIERER: Semaphore = Semaphore::const_new(VORSCHAU_PARALLEL);
 
-/// [`erzeugen`] außerhalb der Async-Worker (`spawn_blocking`) und begrenzt auf
-/// [`VORSCHAU_PARALLEL`] gleichzeitige Läufe. Ein Panic im Decoder endet als
-/// [`KeineVorschau::Unmoeglich`], der Prozess läuft weiter.
-pub async fn erzeugen_begrenzt(daten: Vec<u8>, groesse: Groesse) -> Result<Vec<u8>, KeineVorschau> {
-    let _platz = DEKODIERER
+/// Holt einen der [`VORSCHAU_PARALLEL`] Plätze. Der Aufrufer holt ihn, BEVOR er den BLOB lädt:
+/// sonst lägen beliebig viele Dateien im Speicher und warteten auf einen Platz.
+pub async fn platz_holen() -> SemaphorePermit<'static> {
+    DEKODIERER
         .acquire()
         .await
-        .map_err(|_| unmoeglich("Dekodierer geschlossen"))?;
-    tokio::task::spawn_blocking(move || erzeugen(&daten, groesse))
-        .await
-        .unwrap_or_else(|_| Err(unmoeglich("Panic im Decoder")))
+        .expect("die Semaphore der Vorschau wird nie geschlossen")
+}
+
+/// [`erzeugen`] außerhalb der Async-Worker (`spawn_blocking`). Der Platz wandert in die
+/// Hintergrundarbeit und wird erst mit ihrem Ende frei: bricht der Abruf ab (Zeitbudget der
+/// Zulassung, Client weg), läuft die Dekodierung weiter, und ihr Platz bleibt belegt. Ein Panic
+/// im Decoder endet als [`KeineVorschau::Unmoeglich`], der Prozess läuft weiter.
+pub async fn erzeugen_mit_platz(
+    platz: SemaphorePermit<'static>,
+    daten: Vec<u8>,
+    groesse: Groesse,
+) -> Result<Vec<u8>, KeineVorschau> {
+    im_hintergrund(platz, move || erzeugen(&daten, groesse)).await
+}
+
+async fn im_hintergrund<T: Send + 'static>(
+    platz: SemaphorePermit<'static>,
+    arbeit: impl FnOnce() -> Result<T, KeineVorschau> + Send + 'static,
+) -> Result<T, KeineVorschau> {
+    tokio::task::spawn_blocking(move || {
+        let _platz = platz;
+        arbeit()
+    })
+    .await
+    .unwrap_or_else(|_| Err(unmoeglich("Panic im Decoder")))
 }
 
 /// Warum es kein Vorschaubild gibt.
@@ -130,19 +151,21 @@ pub fn erzeugen(daten: &[u8], groesse: Groesse) -> Result<Vec<u8>, KeineVorschau
         .reserve(decoder.total_bytes())
         .map_err(|_| unmoeglich("Speicherbedarf zu groß"))?;
 
-    // 3./4. Dekodieren (erstes Bild einer Folge, erste TIFF-Seite) und ausrichten.
+    // 3. Dekodieren (erstes Bild einer Folge, erste TIFF-Seite).
     let ausrichtung = decoder
         .orientation()
         .map_err(|_| unmoeglich("Ausrichtung nicht lesbar"))?;
     let mut bild =
         DynamicImage::from_decoder(decoder).map_err(|_| unmoeglich("Bilddaten nicht lesbar"))?;
-    bild.apply_orientation(ausrichtung);
 
-    // 5. Verkleinern, nie vergrößern.
+    // 4. Verkleinern, nie vergrößern. 5. Danach ausrichten: am kleinen Bild kostet die Drehung
+    //    keine zweite volle Kopie. Die Zielkante ist ein Quadrat, die Reihenfolge ändert die Maße
+    //    nicht.
     let kante = groesse.kante();
     if bild.width() > kante || bild.height() > kante {
         bild = bild.thumbnail(kante, kante);
     }
+    bild.apply_orientation(ausrichtung);
 
     // 6. Alpha auf Weiß verrechnen (JPEG kennt kein Alpha). 7. Kodieren.
     let rgb = auf_weiss(&bild);

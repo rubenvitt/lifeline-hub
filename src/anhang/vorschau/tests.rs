@@ -222,3 +222,32 @@ fn formate_ohne_server_vorschau() {
 fn etag_kuerzel_unterscheiden_die_groessen() {
     assert_ne!(Groesse::Klein.kuerzel(), Groesse::Gross.kuerzel());
 }
+
+/// Der Platz bleibt belegt, bis die Hintergrundarbeit endet, auch wenn der Abruf vorher
+/// abbricht (Review LFH-759): sonst ließe sich die Grenze gleichzeitiger Dekodierungen umgehen.
+#[tokio::test]
+async fn platz_bleibt_belegt_bis_die_arbeit_endet_auch_wenn_der_abruf_abbricht() {
+    let semaphore: &'static Semaphore = Box::leak(Box::new(Semaphore::new(1)));
+    let platz = semaphore.acquire().await.unwrap();
+    let (los, warte_auf_los) = std::sync::mpsc::channel::<()>();
+    let abruf = tokio::spawn(im_hintergrund(platz, move || {
+        warte_auf_los.recv().ok();
+        Ok(())
+    }));
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    abruf.abort();
+    assert!(abruf.await.unwrap_err().is_cancelled());
+    assert_eq!(
+        semaphore.available_permits(),
+        0,
+        "der abgebrochene Abruf gibt den Platz nicht frei, solange dekodiert wird"
+    );
+    los.send(()).unwrap();
+    for _ in 0..100 {
+        if semaphore.available_permits() == 1 {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    panic!("nach dem Ende der Arbeit ist der Platz wieder frei");
+}

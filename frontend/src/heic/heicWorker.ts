@@ -9,26 +9,36 @@
  */
 import fabrik from 'libheif-js/libheif-wasm/libheif.js';
 import wasmUrl from 'libheif-js/libheif-wasm/libheif.wasm?url';
-import { dekodiereHeicPixel, zielmasse, type Libheif } from './heicDekodieren';
+import { dekodiereHeicPixel, einmalLaden, zielmasse, type Libheif } from './heicDekodieren';
 
 const KANTE_KLEIN = 256;
 const KANTE_GROSS = 1600;
 const JPEG_QUALITAET = 0.8;
 
-let libheif: Promise<Libheif> | null = null;
+const ladeLibheif = einmalLaden(
+  () =>
+    new Promise<Libheif>((fertig, fehler) => {
+      // Emscripten füllt das übergebene Objekt selbst zum Modul aus.
+      const modul: Record<string, unknown> = {
+        locateFile: () => wasmUrl,
+        onRuntimeInitialized: () => fertig(modul as unknown as Libheif),
+        onAbort: (grund: unknown) => fehler(new Error(`libheif: ${String(grund)}`)),
+      };
+      fabrik(modul);
+    }),
+);
 
-function ladeLibheif(): Promise<Libheif> {
-  libheif ??= new Promise<Libheif>((fertig, fehler) => {
-    // Emscripten füllt das übergebene Objekt selbst zum Modul aus.
-    const modul: Record<string, unknown> = {
-      locateFile: () => wasmUrl,
-      onRuntimeInitialized: () => fertig(modul as unknown as Libheif),
-      onAbort: (grund: unknown) => fehler(new Error(`libheif: ${String(grund)}`)),
-    };
-    fabrik(modul);
-  });
-  return libheif;
-}
+/** Der Auftrag, der gerade dekodiert wird (der Client schickt einen nach dem anderen). */
+let laufend: number | null = null;
+
+// Ein Absturz im WASM (etwa Speicher erschöpft) kommt aus einem Timer von libheif-js als
+// unbehandelte Ablehnung: weder als Antwort noch als `error` am Worker. Sie wird hier zur
+// Fehlerantwort; `tot` lässt den Client den Worker ersetzen, denn das WASM ist danach unbrauchbar.
+self.onunhandledrejection = (e: PromiseRejectionEvent) => {
+  if (laufend == null) return;
+  self.postMessage({ id: laufend, fehler: String(e.reason), tot: true });
+  laufend = null;
+};
 
 async function verkleinere(quelle: OffscreenCanvas, kante: number): Promise<Blob> {
   const [breite, hoehe] = zielmasse(quelle.width, quelle.height, kante);
@@ -42,6 +52,7 @@ async function verkleinere(quelle: OffscreenCanvas, kante: number): Promise<Blob
 
 self.onmessage = async (e: MessageEvent<{ id: number; daten: ArrayBuffer }>) => {
   const { id, daten } = e.data;
+  laufend = id;
   try {
     const bild = await dekodiereHeicPixel(new Uint8Array(daten), await ladeLibheif());
     const voll = new OffscreenCanvas(bild.breite, bild.hoehe);
@@ -54,8 +65,12 @@ self.onmessage = async (e: MessageEvent<{ id: number; daten: ArrayBuffer }>) => 
     );
     const klein = await verkleinere(voll, KANTE_KLEIN);
     const gross = await verkleinere(voll, KANTE_GROSS);
-    self.postMessage({ id, klein, gross });
+    if (laufend === id) self.postMessage({ id, klein, gross });
   } catch (fehler) {
-    self.postMessage({ id, fehler: fehler instanceof Error ? fehler.message : String(fehler) });
+    if (laufend === id) {
+      self.postMessage({ id, fehler: fehler instanceof Error ? fehler.message : String(fehler) });
+    }
+  } finally {
+    if (laufend === id) laufend = null;
   }
 };

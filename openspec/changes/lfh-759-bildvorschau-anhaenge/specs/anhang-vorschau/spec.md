@@ -74,7 +74,8 @@ nicht dekodierbare Bilddaten und für Bilder über den Grenzen der Dekodierung.
 
 Ein Bild mit mehr als 50 Millionen Bildpunkten oder einer Kante über 16 384 px MUST ohne
 Dekodieren der Bilddaten mit 422 abgewiesen werden. Die Größe liest das System aus dem Kopf
-der Datei. Der Speicherbedarf einer einzelnen Dekodierung MUST begrenzt sein.
+der Datei. Der Speicherbedarf einer einzelnen Dekodierung und die Zahl gleichzeitiger
+Dekodierungen MUST begrenzt sein, auch wenn Abrufe abbrechen.
 
 #### Scenario: Riesiges PNG
 - **WHEN** ein PNG von wenigen Kilobyte, das 20 000 × 20 000 px angibt, mit `fassung=vorschau` abgerufen wird
@@ -140,7 +141,8 @@ Download-Verweis und die Original-Aktion MUST unverändert bleiben.
 Ein Klick oder Enter auf ein Vorschaubild SHALL die Großansicht des Bildes in einer Überlagerung
 der App öffnen, nie in einem neuen Fenster oder Tab. Escape SHALL sie schließen, und der Fokus
 MUST danach auf dem Vorschaubild stehen. Trägt dieselbe Nachricht, derselbe Eintrag oder
-derselbe Schaden mehrere Bilder, SHALL die Großansicht zwischen ihnen blättern lassen.
+derselbe Schaden mehrere Bilder, SHALL die Großansicht zwischen ihnen in der Reihenfolge der
+Anzeige blättern lassen. Die Vorschau eines Eintrags in der Sprungpalette ist ausgenommen.
 
 #### Scenario: Großansicht in der Desktop-Hülle
 - **WHEN** jemand in der Desktop-Hülle auf das Vorschaubild eines Chat-Fotos klickt
@@ -149,6 +151,10 @@ derselbe Schaden mehrere Bilder, SHALL die Großansicht zwischen ihnen blättern
 #### Scenario: Blättern
 - **WHEN** ein Schaden drei Fotos trägt und die Großansicht des ersten offen ist
 - **THEN** lässt sich ohne Schließen zum zweiten und dritten Foto wechseln
+
+#### Scenario: Vorschau in der Sprungpalette
+- **WHEN** die Sprungpalette die Vorschau eines ETB-Eintrags mit Foto zeigt
+- **THEN** steht dort das Vorschaubild als Bild ohne Bedienziel, und die Vorschau trägt weiterhin keine Bedienelemente
 
 ### Requirement: HEIC-Vorschau auf dem Gerät
 

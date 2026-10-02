@@ -272,8 +272,10 @@ pub async fn anhang_antwort(
             ))
             .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
         );
+        // Erst der Platz, dann der BLOB: wartende Abrufe halten keine Dateien im Speicher.
+        let platz = anhang::vorschau::platz_holen().await;
         let (_, _, daten) = anhang::repo::laden_bytes(pool, anhang_id).await?;
-        let jpeg = match anhang::vorschau::erzeugen_begrenzt(daten, groesse).await {
+        let jpeg = match anhang::vorschau::erzeugen_mit_platz(platz, daten, groesse).await {
             Ok(jpeg) => jpeg,
             Err(anhang::vorschau::KeineVorschau::Unmoeglich(grund)) => {
                 tracing::info!(anhang_id, grund, "Kein Vorschaubild");

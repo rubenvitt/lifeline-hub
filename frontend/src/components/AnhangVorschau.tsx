@@ -32,6 +32,9 @@ import { einsatzKeys } from '../api/queryKeys';
  *   Tab: die Desktop-Hülle machte aus jeder `/api/`-Navigation einen Download.
  * - Kann das Bild nicht laden (ohne Netz, 422, Decoder-Fehler), steht ein stiller Platzhalter da.
  * - Nie `fassung=original`: die Anzeige nimmt die Vorschau-Fassungen bzw. bei HEIC die bereinigte.
+ * - `grossansicht={false}` (Vorschau eines ETB-Eintrags in der Sprungpalette): nur das Bild, kein
+ *   Bedienziel. Die Palette ist selbst eine Überlagerung ohne Bedienelemente, und Escape aus einer
+ *   Großansicht darin träfe ihre eigenen Tasten-Handler.
  */
 
 /**
@@ -54,11 +57,21 @@ interface Quellen {
 }
 
 interface GruppenKontext {
-  registriere: (id: string, gross: string) => () => void;
+  registriere: (id: string, gross: string, element: HTMLElement) => () => void;
   oeffne: (id: string, ausloeser: HTMLElement) => void;
 }
 
 const Gruppe = createContext<GruppenKontext | null>(null);
+
+interface Eintrag {
+  id: string;
+  gross: string;
+  element: HTMLElement;
+}
+
+function nachAnzeige(a: Eintrag, b: Eintrag): number {
+  return a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+}
 
 /**
  * Fasst die Bilder einer Nachricht, eines Eintrags oder eines Schadens zusammen: die
@@ -66,26 +79,23 @@ const Gruppe = createContext<GruppenKontext | null>(null);
  * Vorschaubild seine eigene Großansicht.
  */
 export function AnhangVorschauGruppe({ children }: { children: ReactNode }) {
-  const [eintraege, setEintraege] = useState<{ id: string; gross: string }[]>([]);
+  const [eintraege, setEintraege] = useState<Eintrag[]>([]);
   const [offen, setOffen] = useState(false);
   const [aktuell, setAktuell] = useState(0);
   const ausloeserRef = useRef<HTMLElement | null>(null);
-  const eintraegeRef = useRef(eintraege);
-  eintraegeRef.current = eintraege;
+  // Die Großansicht blättert in der Reihenfolge der Anzeige, nicht der Anmeldung: ein HEIC meldet
+  // sich erst nach dem Dekodieren an, ein neuer Eintrag kommt oben dazu.
+  const sortiert = useMemo(() => [...eintraege].sort(nachAnzeige), [eintraege]);
+  const sortiertRef = useRef(sortiert);
+  sortiertRef.current = sortiert;
 
-  const registriere = useCallback((id: string, gross: string) => {
-    setEintraege((alt) => {
-      const i = alt.findIndex((e) => e.id === id);
-      if (i < 0) return [...alt, { id, gross }];
-      const neu = alt.slice();
-      neu[i] = { id, gross };
-      return neu;
-    });
+  const registriere = useCallback((id: string, gross: string, element: HTMLElement) => {
+    setEintraege((alt) => [...alt.filter((e) => e.id !== id), { id, gross, element }]);
     return () => setEintraege((alt) => alt.filter((e) => e.id !== id));
   }, []);
 
   const oeffne = useCallback((id: string, ausloeser: HTMLElement) => {
-    const i = eintraegeRef.current.findIndex((e) => e.id === id);
+    const i = sortiertRef.current.findIndex((e) => e.id === id);
     if (i < 0) return;
     ausloeserRef.current = ausloeser;
     setAktuell(i);
@@ -108,7 +118,7 @@ export function AnhangVorschauGruppe({ children }: { children: ReactNode }) {
       {children}
       {eintraege.length > 0 && (
         <Image.PreviewGroup
-          items={eintraege.map((e) => e.gross)}
+          items={sortiert.map((e) => e.gross)}
           preview={{
             open: offen,
             current: aktuell,
@@ -129,6 +139,8 @@ interface Props {
   dateiname: string;
   /** Zeilenkennung für den zugänglichen Namen („Nr. 4“, „Schaden S-003“). */
   kennung?: string;
+  /** `false`: nur das Bild, ohne Großansicht und ohne Bedienziel (Palettenvorschau). */
+  grossansicht?: boolean;
 }
 
 /** Dateityp-Kürzel für den Platzhalter (`dach.jpg` → `JPG`). */
@@ -145,7 +157,7 @@ function hatVorschau(mime: string | null | undefined): boolean {
 
 export default function AnhangVorschau(props: Props) {
   const gruppe = useContext(Gruppe);
-  if (gruppe == null && hatVorschau(props.mime)) {
+  if (gruppe == null && hatVorschau(props.mime) && props.grossansicht !== false) {
     return (
       <AnhangVorschauGruppe>
         <Kachel {...props} />
@@ -266,37 +278,58 @@ function HeicKachel(props: Props) {
   return <KachelAnzeige {...props} quellen={daten} />;
 }
 
-function KachelAnzeige({ mime, dateiname, kennung, quellen }: Props & { quellen: Quellen }) {
+function KachelAnzeige({
+  mime,
+  dateiname,
+  kennung,
+  grossansicht = true,
+  quellen,
+}: Props & { quellen: Quellen }) {
   const gruppe = useContext(Gruppe);
-  const { kachel } = useKachelStil();
+  const { kachel, rollen } = useKachelStil();
   const id = useId();
+  const knopf = useRef<HTMLButtonElement>(null);
   const [fehler, setFehler] = useState(false);
   const gross = quellen.gross;
 
   useEffect(() => {
-    if (gruppe == null || fehler) return;
-    return gruppe.registriere(id, gross);
-  }, [gruppe, id, gross, fehler]);
+    if (gruppe == null || fehler || !grossansicht || knopf.current == null) return;
+    return gruppe.registriere(id, gross, knopf.current);
+  }, [gruppe, id, gross, fehler, grossansicht]);
 
   if (fehler) return <Platzhalter dateiname={dateiname} mime={mime} />;
 
-  const name = kennung ? `${dateiname}, ${kennung}` : dateiname;
+  const name = `Vorschau: ${kennung ? `${dateiname}, ${kennung}` : dateiname}`;
+  const bild = (
+    <img
+      src={quellen.klein}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => setFehler(true)}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+    />
+  );
+  if (!grossansicht) {
+    return (
+      <span role="img" aria-label={name} data-lfh="anhang-vorschau-bild" style={kachel}>
+        {bild}
+      </span>
+    );
+  }
   return (
     <button
+      ref={knopf}
       type="button"
-      aria-label={`Vorschau: ${name}`}
+      aria-label={name}
       data-lfh="anhang-vorschau"
+      // Fokusring in `bedien` über `sprache.css` (Frontend-Regeln, „Farbe und Zeichen“).
+      className="lfh-anhang-vorschau"
       onClick={(e) => gruppe?.oeffne(id, e.currentTarget)}
-      style={{ ...kachel, cursor: 'zoom-in' }}
+      // Ein Bedienziel trägt den Steuerrahmen, Platzhalter und Ladeplatz die ruhige Linie.
+      style={{ ...kachel, borderColor: rollen.steuerRahmen, cursor: 'zoom-in' }}
     >
-      <img
-        src={quellen.klein}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        onError={() => setFehler(true)}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-      />
+      {bild}
     </button>
   );
 }

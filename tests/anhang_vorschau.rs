@@ -315,6 +315,32 @@ async fn etag_der_vorschau_ist_eigen_und_traegt_304() {
 }
 
 #[tokio::test]
+async fn passendes_etag_antwortet_304_ohne_zu_lesen_oder_zu_dekodieren() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Ein PDF hat keine Vorschau: würde gelesen und dekodiert, käme 422. `schaden_datei` setzt
+    // sha256 `feedface`, also kennt der Test den ETag, ohne je eine Vorschau bekommen zu haben.
+    let pfad = schaden_datei(
+        &pool,
+        einsatz,
+        "gutachten.pdf",
+        "application/pdf",
+        b"%PDF-1.4",
+    )
+    .await;
+    let (s, _, bytes) = laden(
+        &app,
+        &mit(&pfad, "vorschau"),
+        &admin,
+        Some("\"feedface.v1.k\""),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_MODIFIED);
+    assert!(bytes.is_empty());
+}
+
+#[tokio::test]
 async fn ohne_lesezugriff_antwortet_die_vorschau_wie_der_download() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", ADMIN_PW).await;
@@ -450,11 +476,18 @@ async fn echtes_heic_wird_bereinigt_ausgeliefert_und_hat_keine_server_vorschau()
 
     let (s, _, bytes) = laden(&app, &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(bytes, HEIC_BEREINIGT, "Fixture der bereinigten Fassung ist aktuell");
+    assert_eq!(
+        bytes, HEIC_BEREINIGT,
+        "Fixture der bereinigten Fassung ist aktuell"
+    );
     assert!(!enthaelt(&bytes, b"MARKER"));
     assert!(!enthaelt(&bytes, b"xmpmeta"));
     assert!(enthaelt(&bytes, b"irot"), "die Drehung bleibt");
 
     let (s, _, _) = laden(&app, &mit(&pfad, "vorschau"), &admin, None).await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "HEIC dekodiert der Browser");
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "HEIC dekodiert der Browser"
+    );
 }

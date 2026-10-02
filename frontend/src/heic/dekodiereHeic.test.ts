@@ -20,11 +20,16 @@ class FalscherWorker {
 
 const warte = () => new Promise((r) => setTimeout(r, 0));
 
-function aufbau() {
+function aufbau(zeitlimitMs?: number) {
   const worker = new FalscherWorker();
   const neuerWorker = vi.fn(() => worker as unknown as Worker);
   const laden = vi.fn(async (href: string) => new TextEncoder().encode(href).buffer as ArrayBuffer);
-  return { worker, neuerWorker, laden, dekodiere: erzeugeHeicDekodierer(neuerWorker, laden) };
+  return {
+    worker,
+    neuerWorker,
+    laden,
+    dekodiere: erzeugeHeicDekodierer(neuerWorker, laden, zeitlimitMs),
+  };
 }
 
 describe('erzeugeHeicDekodierer (LFH-759)', () => {
@@ -72,6 +77,30 @@ describe('erzeugeHeicDekodierer (LFH-759)', () => {
     await warte();
     worker.onerror?.({ message: 'abgestürzt' } as ErrorEvent);
     await expect(lauf).rejects.toThrow();
+    expect(worker.beendet).toBe(true);
+    void dekodiere('/a/2');
+    await warte();
+    expect(neuerWorker).toHaveBeenCalledTimes(2);
+  });
+
+  it('lässt einen hängenden Auftrag nach dem Zeitlimit scheitern und ersetzt den Worker', async () => {
+    const { worker, neuerWorker, dekodiere } = aufbau(20);
+    const haengt = dekodiere('/a/1');
+    const danach = dekodiere('/a/2');
+    await expect(haengt).rejects.toThrow('Zeitlimit');
+    expect(worker.beendet).toBe(true);
+    await warte();
+    expect(neuerWorker).toHaveBeenCalledTimes(2);
+    worker.antworte({ id: worker.auftraege[1]!.id, klein: new Blob(), gross: new Blob() });
+    await expect(danach).resolves.toBeDefined();
+  });
+
+  it('ersetzt den Worker, wenn er einen Absturz meldet', async () => {
+    const { worker, neuerWorker, dekodiere } = aufbau();
+    const lauf = dekodiere('/a/1');
+    await warte();
+    worker.antworte({ id: worker.auftraege[0]!.id, fehler: 'RuntimeError: abort', tot: true });
+    await expect(lauf).rejects.toThrow('abort');
     expect(worker.beendet).toBe(true);
     void dekodiere('/a/2');
     await warte();

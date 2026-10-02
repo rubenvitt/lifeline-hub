@@ -116,10 +116,12 @@ Das Modul `src/anhang/vorschau/` arbeitet in dieser Reihenfolge:
 3. **Dekodieren** mit `image::Limits` (`max_alloc` 512 MiB, Kanten wie oben). Bei GIF und TIFF
    zählt nur das erste Bild bzw. die erste Seite. Das ist das Standardverhalten von
    `ImageReader::decode`.
-4. **Ausrichtung** über `ImageDecoder::orientation()` und `DynamicImage::apply_orientation`. Das
-   deckt EXIF-Ausrichtung in JPEG, PNG `eXIf`, WebP und das TIFF-Tag 274 ab.
-5. **Verkleinern** mit `DynamicImage::thumbnail` (Flächenmittel, schnell, ohne Aliasing beim
+4. **Verkleinern** mit `DynamicImage::thumbnail` (Flächenmittel, schnell, ohne Aliasing beim
    Verkleinern). Ist die Kante schon kleiner, wird nicht verkleinert und nie vergrößert.
+5. **Ausrichtung** über `ImageDecoder::orientation()` und `DynamicImage::apply_orientation`, erst
+   am verkleinerten Bild. Am vollen Bild legte die Drehung eine zweite volle Kopie an, außerhalb
+   von `max_alloc` (Review). Weil die Zielkante ein Quadrat ist, ändert die Reihenfolge die Maße
+   nicht. Das deckt EXIF-Ausrichtung in JPEG, PNG `eXIf`, WebP und das TIFF-Tag 274 ab.
 6. **Alpha** wird auf Weiß verrechnet, denn JPEG kennt kein Alpha. Transparente Screenshots und
    Pläne bleiben so lesbar.
 7. **Kodieren** als JPEG, Qualität 80, `Rgb8`. Der Encoder schreibt nur JFIF-`APP0`.
@@ -145,6 +147,11 @@ Metadaten sich nicht bereinigen lassen, bekommt trotzdem eine Vorschau (Spec, Sz
   prozessweit). Weitere Abrufe warten. Das Spitzenmaß liegt bei rund 2 × 200 MB für zwei
   48-MP-Fotos. Das `ConcurrencyLimitLayer(16)` der Routen und die Zulassungsgrenze bleiben
   darüber.
+- **Der Platz kommt vor dem BLOB und geht mit der Arbeit** (Review): `platz_holen` vor
+  `laden_bytes`, damit wartende Abrufe keine Dateien im Speicher halten. Der Platz wandert in die
+  `spawn_blocking`-Closure. Ein abgebrochener Abruf (Zeitbudget der Zulassung, Client weg) lässt
+  die Dekodierung weiterlaufen, deren Platz bleibt aber belegt. Hielte das Future den Platz,
+  ließe sich die Grenze durch Abbrüche umgehen.
 - Der Abruf mit passendem ETag liest weder BLOB noch Semaphore.
 
 ### D6 — Header: inline nur für eigene Bilder, Schutz für alle
@@ -183,8 +190,16 @@ Metadaten sich nicht bereinigen lassen, bekommt trotzdem eine Vorschau (Spec, Sz
   - `EtbAnhaenge` und `EtbDokumente` binden `AnhangVorschau` selbst ein. Damit hat auch die
     Vorschau in der Sprungpalette (`EtbEintragVorschau`) die Bilder.
 - **Großansicht** ist die Überlagerung von antd `Image`, also kein Tab und keine Navigation. Das
-  funktioniert in der Desktop-Hülle. Schließen mit Escape und Fokus zurück prüft ein Test. Gibt
-  antd den Fokus nicht zurück, setzt die Komponente ihn in `onVisibleChange`.
+  funktioniert in der Desktop-Hülle. Den Fokus gibt die Gruppe zurück, sobald die Großansicht zu
+  ist (Effekt auf `offen`), nicht erst nach der Ausblend-Animation.
+- **Reihenfolge der Anzeige:** Die Gruppe sortiert ihre Einträge nach der Lage im DOM. Ein HEIC
+  meldet sich erst nach dem Dekodieren an, ein neuer Eintrag erscheint oben (Review).
+- **Bedienziel:** Rahmen `steuerRahmen`, Fokusring in `bedien` über `.lfh-anhang-vorschau` in
+  `sprache.css`, wie `.lfh-kennzahl__ziel`.
+- **Ausnahme Sprungpalette** (Review): Die Palettenvorschau eines ETB-Eintrags sichert „keine
+  Bedienelemente“ zu und ist selbst eine Überlagerung. Escape und die Pfeiltasten aus einer
+  Großansicht darin landeten über das React-Portal bei ihren Tasten-Handlern. Dort zeigt
+  `grossansicht={false}` nur das Bild.
 - **Verworfen: eigene Lightbox.** antd bringt Zoom, Drehen, Blättern und Tastaturbedienung schon
   mit. Die Gestaltungssprache (Radius 0, Rollenfarben) greift über das Theme.
 
@@ -204,14 +219,26 @@ Metadaten sich nicht bereinigen lassen, bekommt trotzdem eine Vorschau (Spec, Sz
 - **Zeitpunkt:** Worker und WASM entstehen beim ersten HEIC, das sichtbar wird
   (`IntersectionObserver`), per `import()`. Ein Worker arbeitet eine Warteschlange der Reihe nach
   ab. So belegt ein schwaches Tablet nie zwei Dekodierungen auf einmal.
+- **Robustheit** (Review):
+  - libheif-js gibt den Kontext eines Decoders erst beim nächsten `decode` desselben Objekts
+    frei. `dekodiereHeicPixel` ruft deshalb `heif_context_free` selbst auf, sonst wüchse der
+    WASM-Speicher mit jedem Foto.
+  - Ein Absturz im WASM kommt als unbehandelte Ablehnung aus einem Timer, weder als Antwort noch
+    als `error`. Der Worker übersetzt sie in eine Fehlerantwort mit `tot`, und der Client
+    ersetzt ihn.
+  - Jeder Auftrag hat ein Zeitlimit (`ZEITLIMIT_MS`, 60 s), danach wird der Worker ersetzt. So
+    hängt die Warteschlange nie.
+  - Ein gescheitertes Laden der WASM wird nicht zwischengespeichert (`einmalLaden`).
 - **Cache:**
   - Die Object-URLs liegen im Query-Cache unter einem neuen Prefix in `api/queryKeys.ts`
     (`einsatzKeys.anhangHeicVorschau(einsatzId, href)`), mit `staleTime: Infinity` und `gcTime`
     5 min.
   - Klassifikation: `NICHT_LIVE_KEYS`, denn ein Anhang ändert sich nie, die Schwärzung löscht ihn
     nur. Nicht in `LAGEBILD_OFFLINE`.
-  - Ein Abonnent des `QueryCache` gibt die URL bei `removed` frei (`URL.revokeObjectURL`). Das
-    Abmelden leert den Cache und gibt damit alle frei.
+  - Ein Abonnent des `QueryCache` gibt die URLs frei (`URL.revokeObjectURL`), sobald die Query
+    den Cache verlässt (`removed`, auch beim Abmelden) oder ihre Daten wechseln. Ein
+    Rechteentzug setzt sie auf `undefined`, ein Neuversuch ersetzt sie. Dazu merkt er sich je
+    Query die zuletzt gehaltenen URLs.
 - **Precache:** Workbox nimmt die WASM-Datei nicht auf (Standardmuster `js,css,html`). Das ist
   gewollt, denn ohne Netz gibt es auch keine HEIC-Bytes.
 - **`static_files.rs`:** `wasm` → `application/wasm`. Sonst scheitert
