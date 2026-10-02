@@ -3,7 +3,8 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../../test/utils';
+import { einsatzKeys } from '../../api/queryKeys';
 import UhsAnhaenge, { UHS_ABLAGE_HINWEIS } from './UhsAnhaenge';
 
 // LFH-758, Spec `uhs-anhaenge`: Reiter „Dateien“ samt Zugriffsprotokoll der Einsatzleitung.
@@ -112,5 +113,39 @@ describe('UhsAnhaenge (LFH-758)', () => {
     await userEvent.click(await screen.findByText('Zugriffe'));
     expect(await screen.findByText('Zugriffe konnten nicht geladen werden')).toBeInTheDocument();
     expect(r.abrufe(), 'keine Wiederholung').toBe(1);
+  });
+});
+
+// Prüfliste Kriterium 12 (LFH-760, im gemeinsamen Baustein): eine fremde Ablage schiebt sich
+// auch an der UHS nicht unter den Cursor, sondern wartet hinter dem Sammelbanner.
+describe('UhsAnhaenge — Live-Zufluss', () => {
+  it('hält eine fremde Ablage hinter dem Sammelbanner zurück', async () => {
+    const client = neuerQueryClient();
+    let abruf = 0;
+    const neu = { ...anhang, id: 7, dateiname: 'fremd.jpg', mime: 'image/jpeg' };
+    server.use(
+      http.get(LISTE, () => {
+        abruf += 1;
+        return HttpResponse.json(abruf === 1 ? [anhang] : [neu, anhang]);
+      }),
+    );
+    renderMitProviders(
+      <UhsAnhaenge
+        einsatzId={1}
+        uhs={{ id: 9, bezeichnung: 'BHP 50', storniert_at: null }}
+        darfSchreiben
+        zeigeZugriffe={false}
+      />,
+      { client },
+    );
+    await screen.findByRole('link', { name: /^grundriss_halle\.pdf, / });
+
+    await client.invalidateQueries({ queryKey: einsatzKeys.uhsAnhaenge(1, 9) });
+    const banner = await screen.findByRole('status');
+    expect(banner).toHaveTextContent('1 neue Datei');
+    expect(screen.queryByRole('link', { name: /^fremd\.jpg, / })).toBeNull();
+
+    await userEvent.click(within(banner).getByRole('button', { name: 'anzeigen' }));
+    expect(await screen.findByRole('link', { name: /^fremd\.jpg, / })).toBeInTheDocument();
   });
 });

@@ -13,7 +13,9 @@ interface Props {
   bezug: string;
   /** Anhangliste des Besitzers; wird nach jeder Ablage neu geladen. */
   queryKey: QueryKey;
-  ablegen: (datei: File) => Promise<unknown>;
+  ablegen: (datei: File) => Promise<{ id: number }>;
+  /** Gerufen VOR der Invalidierung: die Liste merkt die eigene Ablage vor (LFH-760). */
+  onAbgelegt?: (anhang: { id: number }) => void;
   /** Zusatzzeile über dem Dateifeld (UHS: Hinweis auf das Zugriffsprotokoll). */
   hinweis?: ReactNode;
   offen: boolean;
@@ -40,6 +42,7 @@ export default function ErfassungsAnhangAblegenModal({
   hinweis,
   offen,
   onSchliessen,
+  onAbgelegt,
 }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -47,7 +50,8 @@ export default function ErfassungsAnhangAblegenModal({
 
   const mutation = useMutation({
     mutationFn: (datei: File) => ablegen(datei),
-    onSuccess: () => {
+    onSuccess: (anhang) => {
+      onAbgelegt?.(anhang);
       void qc.invalidateQueries({ queryKey });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       message.success('Datei abgelegt');

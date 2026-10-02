@@ -7,6 +7,7 @@ import {
   Paneel,
   PaneelZeile,
   PaneelZustand,
+  Sammelbanner,
   useRollen,
   type PaneelDatenzustand,
 } from '../instrument';
@@ -17,6 +18,15 @@ import { SpeicherFehler } from '../SpeicherHinweis';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import { formatGroesse } from '../../karten/formatGroesse';
 import ErfassungsAnhangAblegenModal from './ErfassungsAnhangAblegenModal';
+import {
+  freigegeben,
+  nachgefuehrt,
+  OFFENER_ZUFLUSS,
+  teileZufluss,
+  vorgemerkt,
+  zuflussText,
+  type AnhangZufluss,
+} from './anhangZufluss';
 
 /** Was die Liste von einem Anhang braucht — Schnittmenge der DTOs von Schaden, Tier und UHS. */
 export interface ErfassungsAnhangEintrag {
@@ -36,7 +46,7 @@ export interface ErfassungsAnhangEintrag {
 export interface ErfassungsAnhangQuelle {
   queryKey: QueryKey;
   liste: () => Promise<ErfassungsAnhangEintrag[]>;
-  ablegen: (datei: File) => Promise<unknown>;
+  ablegen: (datei: File) => Promise<{ id: number }>;
   entfernen: (anhangId: number) => Promise<unknown>;
   downloadPfad: (anhangId: number) => string;
 }
@@ -74,6 +84,11 @@ const TITEL = 'Fotos und Dateien';
  *
  * „Datei ablegen“ steht nur im Paneelkopf, auch im Leerzustand: zwei gleichnamige Ziele wären für
  * Vorlesende nicht unterscheidbar. Ohne Schreibrecht und gesperrt bleibt die Liste nur lesbar.
+ *
+ * Live-Zufluss (LFH-760, `anhangZufluss.ts`): eine Ablage aus einer anderen Sitzung wartet hinter
+ * dem Sammelbanner, statt oben einzuschieben. Das Banner liegt als Überlagerung mit Nullhöhe über
+ * der Liste (Muster `InfotelefonPage`) und verschiebt keine Zeile; „anzeigen“ gibt frei und setzt
+ * den Fokus auf die oberste Zeile, statt ihn mit dem Banner auf `<body>` fallen zu lassen.
  */
 export default function ErfassungsAnhaenge({
   einsatzId,
@@ -94,6 +109,15 @@ export default function ErfassungsAnhaenge({
    *  aktuellen Liste bestimmt, nach dem Refetch eingelöst. */
   const fokusNach = useRef<{ entfernt: number; ziel: number | 'kopf' } | null>(null);
   const [ablegenOffen, setAblegenOffen] = useState(false);
+  /** Die Schleuse gehört zu EINEM Besitzer (Schlüssel = Query-Key der Liste): wechselt er ohne
+   *  Neumontage, beginnt sie offen. */
+  const besitzer = JSON.stringify(quelle.queryKey);
+  const [zuflussZustand, setZuflussZustand] = useState<AnhangZufluss & { besitzer: string }>({
+    besitzer,
+    ...OFFENER_ZUFLUSS,
+  });
+  /** Nach „anzeigen“ auf die oberste Zeile — erst nach dem Render mit der freigegebenen Liste. */
+  const fokusNachFreigabe = useRef(false);
   const aktionen = darfSchreiben && !gesperrt;
   const darfOriginal = useDarfOriginalLaden(einsatzId);
 
@@ -110,7 +134,26 @@ export default function ErfassungsAnhaenge({
     },
   });
 
-  const liste = query.data ?? [];
+  const zufluss: AnhangZufluss =
+    zuflussZustand.besitzer === besitzer ? zuflussZustand : OFFENER_ZUFLUSS;
+  const { sichtbar: liste, zurueckgehalten } = teileZufluss(query.data ?? [], zufluss);
+  // Nachführen im Render (Muster `AbloesungPage`), nicht im Effekt: der ließe einen Bildaufbau
+  // mit veraltetem Stand durch. `nachgefuehrt` liefert `null`, wenn nichts zu tun ist.
+  if (query.data) {
+    const neu = nachgefuehrt(zufluss, liste);
+    if (neu || zuflussZustand.besitzer !== besitzer) {
+      setZuflussZustand({ besitzer, ...(neu ?? zufluss) });
+    }
+  }
+  const aendereZufluss = (f: (z: AnhangZufluss) => AnhangZufluss) =>
+    setZuflussZustand((z) => ({
+      besitzer,
+      ...f(z.besitzer === besitzer ? z : OFFENER_ZUFLUSS),
+    }));
+  function zeigeZurueckgehaltene() {
+    fokusNachFreigabe.current = true;
+    aendereZufluss((z) => freigegeben(z, query.data ?? []));
+  }
 
   function entferneMitFokus(id: number) {
     const i = liste.findIndex((a) => a.id === id);
@@ -133,6 +176,12 @@ export default function ErfassungsAnhaenge({
           );
     (anker ?? kopfKnopf.current)?.focus();
   }, [query.data]);
+
+  useEffect(() => {
+    if (!fokusNachFreigabe.current) return;
+    fokusNachFreigabe.current = false;
+    listeRef.current?.querySelector<HTMLElement>('a[download]')?.focus();
+  }, [zuflussZustand]);
 
   const fehlerId = entfernen.isError ? entfernen.variables : undefined;
   const fehlerName = liste.find((a) => a.id === fehlerId)?.dateiname;
@@ -232,7 +281,20 @@ export default function ErfassungsAnhaenge({
         leerText="Noch keine Fotos oder Dateien"
         onNeuladen={() => void query.refetch()}
       >
-        <div ref={listeRef}>{liste.map(zeile)}</div>
+        <div ref={listeRef} style={{ position: 'relative' }}>
+          {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
+          <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
+            {zurueckgehalten.length > 0 && (
+              <Sammelbanner
+                aktion={{ label: 'anzeigen', onKlick: zeigeZurueckgehaltene }}
+                style={{ position: 'absolute', insetInline: 0, top: 0 }}
+              >
+                {zuflussText(zurueckgehalten.length)} — oben einsortiert
+              </Sammelbanner>
+            )}
+          </div>
+          {liste.map(zeile)}
+        </div>
       </PaneelZustand>
       {children}
       {aktionen && (
@@ -244,6 +306,7 @@ export default function ErfassungsAnhaenge({
           hinweis={hinweis}
           offen={ablegenOffen}
           onSchliessen={() => setAblegenOffen(false)}
+          onAbgelegt={(a) => aendereZufluss((z) => vorgemerkt(z, a.id))}
         />
       )}
     </Paneel>
