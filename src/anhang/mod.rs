@@ -4,6 +4,7 @@
 //! `chat_nachricht_anhang`) leben im jeweiligen Modul. Dateien liegen als BLOB in der SQLite-DB
 //! und sind damit automatisch im Backup.
 
+pub mod metadaten;
 pub mod repo;
 
 use crate::error::AppError;
@@ -182,6 +183,19 @@ pub async fn hochladen_multipart(
         return Err(AppError::Validation("Keine Datei im Upload".into()));
     }
     Ok(angelegt)
+}
+
+/// Dateiname des Originals (LFH-747): `.original` vor der Endung (`dach.jpg` →
+/// `dach.original.jpg`), damit Original und bereinigte Fassung nicht als `dach.jpg` und
+/// `dach (1).jpg` nebeneinander liegen. Spiegel im Frontend: `originalDateiname` in
+/// `api/anhangFassung.ts`.
+pub fn original_dateiname(dateiname: &str) -> String {
+    match dateiname.rfind('.') {
+        Some(punkt) if punkt > 0 => {
+            format!("{}.original{}", &dateiname[..punkt], &dateiname[punkt..])
+        }
+        _ => format!("{dateiname}.original"),
+    }
 }
 
 /// Sicherer `Content-Disposition`-Wert: ASCII-Fallback plus RFC-5987 `filename*` mit
@@ -541,6 +555,25 @@ mod tests {
     }
 
     // --- clamd-Antwort-Klassifikation (nur mit `clamav`-Feature) ---
+
+    #[test]
+    fn original_dateiname_wie_im_frontend() {
+        assert_eq!(original_dateiname("dach.jpg"), "dach.original.jpg");
+        assert_eq!(
+            original_dateiname("IMG_0001.HEIC"),
+            "IMG_0001.original.HEIC"
+        );
+        assert_eq!(
+            original_dateiname("foto.final.png"),
+            "foto.final.original.png"
+        );
+        assert_eq!(original_dateiname("ohneendung"), "ohneendung.original");
+        assert_eq!(original_dateiname(".versteckt"), ".versteckt.original");
+        assert_eq!(
+            original_dateiname("Müller Süd.jpg"),
+            "Müller Süd.original.jpg"
+        );
+    }
 
     #[cfg(feature = "clamav")]
     #[test]

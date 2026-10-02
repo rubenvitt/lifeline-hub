@@ -85,4 +85,30 @@ describe('EtbAnhaenge (LFH-117)', () => {
     );
     expect(screen.getByRole('link')).toHaveStyle({ minHeight: '72px' });
   });
+
+  describe('Original-Verweis (LFH-747)', () => {
+    const eintrag = {
+      id: 40,
+      lfd_nr: 42,
+      anhaenge: [anhang(), anhang({ id: 10, dateiname: 'fax.pdf', mime: 'application/pdf' })],
+    };
+
+    it('steht mit darfOriginal hinter jedem Bild, nicht hinter dem PDF', () => {
+      render(<EtbAnhaenge einsatzId={5} eintrag={eintrag} darfOriginal />);
+      const original = screen.getByRole('link', {
+        name: 'Original (mit Standort) herunterladen: IMG_0412.HEIC, Anhang zu Nr. 42',
+      });
+      expect(original).toHaveAttribute(
+        'href',
+        '/api/einsaetze/5/etb/40/anhaenge/9?fassung=original',
+      );
+      expect(original).toHaveAttribute('download', 'IMG_0412.original.HEIC');
+      expect(screen.getAllByRole('link')).toHaveLength(3);
+    });
+
+    it('fehlt ohne darfOriginal', () => {
+      render(<EtbAnhaenge einsatzId={5} eintrag={eintrag} />);
+      expect(screen.getAllByRole('link')).toHaveLength(2);
+    });
+  });
 });

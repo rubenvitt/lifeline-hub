@@ -43,6 +43,7 @@ import {
   verweisStil,
   zuflussText,
 } from './zeitachseModell';
+import { useDarfOriginalLaden } from '../einsatz/useDarfOriginalLaden';
 
 interface Props {
   /** Gesendete und gepufferte Einträge als EINE Chronologie (`etb/etbZeile.ts`). */
@@ -166,6 +167,7 @@ export default function EtbZeitachse({
 }: Props) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
+  const darfOriginal = useDarfOriginalLaden(einsatzId);
   const wurzel = useRef<HTMLDivElement>(null);
   const kopfIdBasis = useId();
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
@@ -288,10 +290,23 @@ export default function EtbZeitachse({
         hatVerknuepfung(e) && <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />,
         // Anhänge sind KEINE Kopplung: eigene Bedingung, nicht über `hatVerknuepfung` — die steuert
         // die Rückverweise.
-        e.anhaenge.length > 0 && <EtbAnhaenge key="anhaenge" eintrag={e} einsatzId={einsatzId} />,
+        e.anhaenge.length > 0 && (
+          <EtbAnhaenge
+            key="anhaenge"
+            eintrag={e}
+            einsatzId={einsatzId}
+            darfOriginal={darfOriginal}
+          />
+        ),
         // Dokumente der Ablage mit Bezug auf diesen Eintrag (LFH-743) — eigene Datei, eigene Route.
         doks && doks.length > 0 && (
-          <EtbDokumente key="dokumente" einsatzId={einsatzId} lfdNr={e.lfd_nr} dokumente={doks} />
+          <EtbDokumente
+            key="dokumente"
+            einsatzId={einsatzId}
+            lfdNr={e.lfd_nr}
+            dokumente={doks}
+            darfOriginal={darfOriginal}
+          />
         ),
       ],
       token.marginXS,

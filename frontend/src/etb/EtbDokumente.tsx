@@ -1,11 +1,18 @@
 import type { Dokument } from '../api/types';
 import { dokumentDownloadPfad } from '../api/dokumente';
+import {
+  istBildMime,
+  originalDateiname,
+  originalPfad,
+  originalZugaenglicherName,
+} from '../api/anhangFassung';
+import { ORIGINAL_TEXT } from '../components/DownloadAnker';
 import { useRollen } from '../components/instrument';
 import { formatGroesse } from '../karten/formatGroesse';
 import { verweisStil } from './zeitachseModell';
 
 /** Was der Verweis von einem Dokument braucht — die Zeitachse reicht die Listenzeilen durch. */
-export type EtbDokument = Pick<Dokument, 'id' | 'titel' | 'dateiname' | 'groesse'>;
+export type EtbDokument = Pick<Dokument, 'id' | 'titel' | 'dateiname' | 'groesse' | 'mime'>;
 
 /**
  * Dokumente der Ablage, deren Bezug dieser ETB-Eintrag ist, als Download-Verweise (LFH-743) —
@@ -18,15 +25,20 @@ export type EtbDokument = Pick<Dokument, 'id' | 'titel' | 'dateiname' | 'groesse
  * Der Verweis zeigt auf die modul-gegatete Dokument-Route (`dokumentDownloadPfad`), nie auf die
  * ETB- oder die generische Route. Ohne Modulrecht `dokumente` bekommt die Zeitachse keine
  * Dokumente (die Seite fragt sie dann gar nicht ab), also erscheint auch kein Verweis.
+ *
+ * Mit `darfOriginal` steht hinter jedem Bild der Verweis auf das Original samt Standort
+ * (LFH-747), wie in `EtbAnhaenge`; der Hauptverweis lädt die bereinigte Fassung.
  */
 export default function EtbDokumente({
   einsatzId,
   lfdNr,
   dokumente,
+  darfOriginal = false,
 }: {
   einsatzId: number;
   lfdNr: number;
   dokumente: readonly EtbDokument[];
+  darfOriginal?: boolean;
 }) {
   const { token, rollen } = useRollen();
   if (dokumente.length === 0) return null;
@@ -38,16 +50,30 @@ export default function EtbDokumente({
     >
       {dokumente.map((d) => {
         const groesse = formatGroesse(d.groesse);
+        const href = dokumentDownloadPfad(einsatzId, d.id);
         return (
-          <a
-            key={d.id}
-            href={dokumentDownloadPfad(einsatzId, d.id)}
-            download={d.dateiname}
-            aria-label={`Dokument „${d.titel}“, ${groesse}, zu Nr. ${lfdNr} herunterladen`}
-            style={stil}
-          >
-            Dokument „{d.titel}“ · {groesse}
-          </a>
+          // Dokument und Original bleiben als Paar zusammen (wie in `EtbAnhaenge`).
+          <span key={d.id} style={{ display: 'inline-flex', columnGap: token.marginSM }}>
+            <a
+              href={href}
+              download={d.dateiname}
+              aria-label={`Dokument „${d.titel}“, ${groesse}, zu Nr. ${lfdNr} herunterladen`}
+              style={stil}
+            >
+              Dokument „{d.titel}“ · {groesse}
+            </a>
+            {darfOriginal && istBildMime(d.mime) && (
+              <a
+                href={originalPfad(href)}
+                download={originalDateiname(d.dateiname)}
+                aria-label={originalZugaenglicherName(`Dokument „${d.titel}“, zu Nr. ${lfdNr}`)}
+                data-lfh="etb-dokument-original"
+                style={stil}
+              >
+                {ORIGINAL_TEXT}
+              </a>
+            )}
+          </span>
         );
       })}
     </span>

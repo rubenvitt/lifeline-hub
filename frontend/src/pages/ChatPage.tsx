@@ -29,7 +29,7 @@ import { listeAuftraege } from '../api/auftraege';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BezugTyp, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
 import KanalListe, { sortiereKanaele } from '../chat/KanalListe';
 import NachrichtenStrom from '../chat/NachrichtenStrom';
 import NachrichtEingabe from '../chat/NachrichtEingabe';
@@ -480,6 +480,7 @@ export default function ChatPage() {
             eigeneSendungen={eigeneSendungen}
             eigeneBenutzerId={benutzer?.id ?? null}
             darfSchreiben={darfSchreiben}
+            darfOriginal={darfOriginalLaden(einsatz, benutzer)}
             onBearbeiten={(n) => setBearbeitenAuswahl({ einsatzId, nachricht: n })}
             onLoeschen={(n) => loeschenMutation.mutate(n.id)}
             onHeraufstufen={(n) => setHeraufstufenAuswahl({ einsatzId, nachricht: n })}

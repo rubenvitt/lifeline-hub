@@ -4,7 +4,14 @@ import { describe, expect, it } from 'vitest';
 import EtbDokumente, { type EtbDokument } from './EtbDokumente';
 
 function dokument(over: Partial<EtbDokument> = {}): EtbDokument {
-  return { id: 3, titel: 'Lageplan Nord', dateiname: 'plan.pdf', groesse: 2048, ...over };
+  return {
+    id: 3,
+    titel: 'Lageplan Nord',
+    dateiname: 'plan.pdf',
+    groesse: 2048,
+    mime: 'application/pdf',
+    ...over,
+  };
 }
 
 describe('EtbDokumente (LFH-743)', () => {
@@ -45,5 +52,27 @@ describe('EtbDokumente (LFH-743)', () => {
       </ConfigProvider>,
     );
     expect(screen.getByRole('link')).toHaveStyle({ minHeight: '72px' });
+  });
+
+  describe('Original-Verweis (LFH-747)', () => {
+    const foto = dokument({ id: 4, titel: 'Lagefoto', dateiname: 'lage.jpg', mime: 'image/jpeg' });
+
+    it('steht mit darfOriginal hinter dem Foto, nicht hinter dem PDF', () => {
+      render(<EtbDokumente einsatzId={5} lfdNr={42} dokumente={[dokument(), foto]} darfOriginal />);
+      const original = screen.getByRole('link', {
+        name: 'Original (mit Standort) herunterladen: Dokument „Lagefoto“, zu Nr. 42',
+      });
+      expect(original).toHaveAttribute(
+        'href',
+        '/api/einsaetze/5/dokumente/4/datei?fassung=original',
+      );
+      expect(original).toHaveAttribute('download', 'lage.original.jpg');
+      expect(screen.getAllByRole('link')).toHaveLength(3);
+    });
+
+    it('fehlt ohne darfOriginal', () => {
+      render(<EtbDokumente einsatzId={5} lfdNr={42} dokumente={[foto]} />);
+      expect(screen.getAllByRole('link')).toHaveLength(1);
+    });
   });
 });

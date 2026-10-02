@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import { dichten } from '../theme/tokens';
-import DownloadAnker, { downloadAnkerStil } from './DownloadAnker';
+import DownloadAnker, { downloadAnkerStil, ORIGINAL_TEXT } from './DownloadAnker';
 
 /**
  * Trefflächenboden des handgebauten Bedienziels (LFH-365, Muster `bedienzielStil`). Geprüft
@@ -58,5 +58,59 @@ describe('DownloadAnker', () => {
     renderMitProviders(<DownloadAnker href="/d" dateiname="plan.pdf" text="Lageplan Nord" />);
     const a = screen.getByRole('link', { name: 'Lageplan Nord' });
     expect(a).toHaveAttribute('download', 'plan.pdf');
+  });
+});
+
+describe('DownloadAnker — Original-Verweis (LFH-747)', () => {
+  it('steht nicht da, solange originalHref fehlt', () => {
+    renderMitProviders(<DownloadAnker href="/api/x/datei" dateiname="dach.jpg" />);
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.queryByText(ORIGINAL_TEXT)).toBeNull();
+  });
+
+  it('steht mit originalHref neben dem Hauptverweis, mit Download und eigenem Namen', () => {
+    renderMitProviders(
+      <DownloadAnker
+        href="/api/x/datei"
+        dateiname="dach.jpg"
+        originalHref="/api/x/datei?fassung=original"
+      />,
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+    const haupt = screen.getByRole('link', { name: 'dach.jpg' });
+    expect(haupt).toHaveAttribute('href', '/api/x/datei');
+    const original = screen.getByRole('link', {
+      name: 'Original (mit Standort) herunterladen: dach.jpg',
+    });
+    expect(original).toHaveAttribute('href', '/api/x/datei?fassung=original');
+    expect(original).toHaveAttribute('download', 'dach.original.jpg');
+    expect(original).toHaveTextContent(ORIGINAL_TEXT);
+  });
+
+  it('trägt die Zeilenkennung im zugänglichen Namen', () => {
+    renderMitProviders(
+      <DownloadAnker
+        href="/d"
+        dateiname="IMG_0001.jpg"
+        originalHref="/d?fassung=original"
+        originalKennung="IMG_0001.jpg, Schaden S-003"
+      />,
+    );
+    expect(
+      screen.getByRole('link', {
+        name: 'Original (mit Standort) herunterladen: IMG_0001.jpg, Schaden S-003',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('hält denselben Trefflächenboden wie der Hauptverweis', () => {
+    renderMitProviders(
+      <DownloadAnker href="/d" dateiname="a.jpg" originalHref="/d?fassung=original" />,
+    );
+    const original = screen.getByText(ORIGINAL_TEXT);
+    const haupt = screen.getByRole('link', { name: 'a.jpg' });
+    expect(original.style.minHeight).not.toBe('');
+    expect(original.style.minHeight).toBe(haupt.style.minHeight);
+    expect(original.style.paddingBlock).toBe(haupt.style.paddingBlock);
   });
 });

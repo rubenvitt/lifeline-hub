@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
+import { ORIGINAL_TEXT, originalDateiname, originalZugaenglicherName } from '../api/anhangFassung';
 
 /**
  * Stil des Download-Ankers (LFH-21). Ein `<a>` ist ein handgebautes Bedienziel und erbt keine
@@ -49,7 +50,22 @@ interface Props {
    * herunterladen“) — n Zeilen liefern sonst n gleich klingende Verweise.
    */
   zugaenglicherName?: string;
+  /**
+   * Adresse des Originals (`originalPfad(href)`, LFH-747). Gesetzt nur, wenn der Benutzer
+   * Originale laden darf (`darfOriginalLaden`) UND die Datei ein Bild ist: dann steht neben dem
+   * Hauptverweis (bereinigte Fassung) ein zweiter Verweis „Original (mit Standort)“.
+   */
+  originalHref?: string;
+  /**
+   * Zeilenkennung für den zugänglichen Namen des Original-Verweises („dach.jpg, Schaden S-003“),
+   * wie beim Hauptverweis: n Zeilen mit `IMG_0001.jpg` klängen sonst gleich. Fehlt sie, steht
+   * der Dateiname da.
+   */
+  originalKennung?: string;
 }
+
+/** Sichtbarer Text des Original-Verweises; die Quelle steht in `api/anhangFassung.ts`. */
+export { ORIGINAL_TEXT };
 
 /**
  * Nativer Download-Verweis (`<a href download>`), geteilt von Dokumentenablage, Chat und
@@ -63,13 +79,15 @@ export default function DownloadAnker({
   groesse,
   zusatz,
   zugaenglicherName,
+  originalHref,
+  originalKennung,
 }: Props) {
   const { token, rollen } = useRollen();
   // Das `aria-label` ersetzt den Inhalt im zugänglichen Namen; die Zusatzzeile (wer, wann) bleibt
   // über `aria-describedby` erreichbar. Ohne `aria-label` steht sie ohnehin im Namen.
   const zusatzId = useId();
   const beschrieben = zugaenglicherName != null && zusatz != null;
-  return (
+  const anker = (
     <a
       href={href}
       download={dateiname}
@@ -99,5 +117,32 @@ export default function DownloadAnker({
         </span>
       )}
     </a>
+  );
+  if (originalHref == null) return anker;
+  return (
+    <span
+      data-lfh="download-anker-mit-original"
+      style={{
+        display: 'inline-flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        columnGap: token.marginSM,
+      }}
+    >
+      {anker}
+      <a
+        href={originalHref}
+        download={originalDateiname(dateiname)}
+        aria-label={originalZugaenglicherName(originalKennung ?? dateiname)}
+        data-lfh="download-anker-original"
+        style={{
+          ...downloadAnkerStil(token),
+          fontWeight: 'normal',
+          color: rollen.bedienText,
+        }}
+      >
+        {ORIGINAL_TEXT}
+      </a>
+    </span>
   );
 }

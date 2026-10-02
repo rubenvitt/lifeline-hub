@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../anzeige/format';
 import DownloadAnker from '../components/DownloadAnker';
+import { istBildMime, originalPfad } from '../api/anhangFassung';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { aktionsNamen } from './aktionsNamen';
@@ -42,6 +43,8 @@ interface Props {
   bezugInfo?: (typ: BezugTyp, id: number) => BezugKurzinfo | null;
   /** Zähler der EIGENEN Absendungen. Jede Erhöhung holt die Sicht ans Ende zurück. */
   eigeneSendungen?: number;
+  /** Ob an Bild-Anhängen der Original-Verweis steht (`darfOriginalLaden`, LFH-747). */
+  darfOriginal?: boolean;
 }
 
 /**
@@ -63,6 +66,7 @@ export default function NachrichtenStrom({
   bezugLabel,
   bezugInfo,
   eigeneSendungen = 0,
+  darfOriginal = false,
 }: Props) {
   const behaelter = useRef<HTMLDivElement>(null);
   const { token } = theme.useToken();
@@ -297,15 +301,22 @@ export default function NachrichtenStrom({
                       {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
                       {/* Nativer Download wie ETB und Schaden, kein neuer Tab: `target="_blank"`
                          läuft in der Desktop-Hülle ins Leere (LFH-782). */}
-                      {n.anhaenge.map((a) => (
-                        <DownloadAnker
-                          key={a.id}
-                          href={`/api/einsaetze/${n.einsatz_id}/anhaenge/${a.id}`}
-                          dateiname={a.dateiname}
-                          groesse={a.groesse}
-                          zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Anhang der Nachricht von ${n.autor_name} herunterladen`}
-                        />
-                      ))}
+                      {n.anhaenge.map((a) => {
+                        const href = `/api/einsaetze/${n.einsatz_id}/anhaenge/${a.id}`;
+                        return (
+                          <DownloadAnker
+                            key={a.id}
+                            href={href}
+                            dateiname={a.dateiname}
+                            groesse={a.groesse}
+                            zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Anhang der Nachricht von ${n.autor_name} herunterladen`}
+                            originalHref={
+                              darfOriginal && istBildMime(a.mime) ? originalPfad(href) : undefined
+                            }
+                            originalKennung={`${a.dateiname}, Anhang der Nachricht von ${n.autor_name}`}
+                          />
+                        );
+                      })}
                     </Space>
                   )
                 }

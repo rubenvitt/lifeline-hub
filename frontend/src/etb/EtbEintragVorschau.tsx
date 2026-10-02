@@ -17,6 +17,7 @@ import { istNachgetragen } from './typFarben';
 import { verweisStil } from './zeitachseModell';
 import { etbPfad } from '../routing/deeplinks';
 import { verfasserText } from './verfasser';
+import { useDarfOriginalLaden } from '../einsatz/useDarfOriginalLaden';
 
 /**
  * Lese-Vorschau eines ETB-Eintrags in der Sprungpalette (LFH-664).
@@ -74,6 +75,7 @@ function EintragInhalt({
 }) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
+  const darfOriginal = useDarfOriginalLaden(einsatzId);
   const farbe = etbTypFarbe(e.typ, token);
   const vonAn = e.von || e.an ? `${e.von || '—'} → ${e.an || '—'}` : null;
 
@@ -156,7 +158,7 @@ function EintragInhalt({
       {/* Rendert nichts ohne Verknüpfung. */}
       <EtbBacklinkBadges eintrag={e} einsatzId={einsatzId} />
       {/* Dasselbe Bauteil wie in der Zeitachse; rendert nichts ohne Anhang. */}
-      <EtbAnhaenge eintrag={e} einsatzId={einsatzId} />
+      <EtbAnhaenge eintrag={e} einsatzId={einsatzId} darfOriginal={darfOriginal} />
     </div>
   );
 }

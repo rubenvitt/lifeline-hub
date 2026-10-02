@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
+import { MINI_JPEG } from './bildFixture';
 
 /**
  * Fotos und Dateien an einem Schaden im Browser: der Download (ob aus `<a href download>` ein
@@ -23,7 +24,8 @@ const STAFFEL = [
   { dichte: 'handschuh', soll: 72 },
 ] as const;
 
-const JPG = Buffer.from('\xff\xd8\xff\xe0 e2e schaden', 'binary');
+// Echte Bildbytes: ein Foto-Download wird bereinigt (LFH-747).
+const JPG = MINI_JPEG;
 
 async function anmelden(page: Page, modus?: 'light' | 'dark') {
   // Der Modus muss VOR dem ersten Laden stehen — der Bootstrap in `index.html` liest ihn.
@@ -284,7 +286,11 @@ test('Fokus nie verdeckt: Tab-Durchlauf durch die Anhangliste unter der Kopfzeil
   const schadenId = await schadenAnlegen(page, einsatzId);
   for (let i = 1; i <= 12; i += 1) await seedeAnhang(page, einsatzId, schadenId, `foto-${i}.jpg`);
   await page.goto(`/einsaetze/${einsatzId}/schaeden/${schadenId}`);
-  await expect(paneel(page).locator('a[download]')).toHaveCount(12);
+  // Gezählt werden die Hauptverweise; der Admin sieht an jedem Foto zusätzlich das Original
+  // (LFH-747), das ist ein weiterer Tab-Stopp in derselben Zeile.
+  await expect(
+    paneel(page).locator('a[download]:not([data-lfh="download-anker-original"])'),
+  ).toHaveCount(12);
 
   const reserve = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
   expect(reserve, 'Vorbedingung: die Seite muss scrollen').toBeGreaterThan(200);

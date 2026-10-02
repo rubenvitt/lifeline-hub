@@ -61,6 +61,17 @@ export function darfImEinsatzSchreiben(
   );
 }
 
+/** Original eines Bild-Anhangs mit Standort- und Gerätedaten laden (LFH-747, Spec
+    `anhang-metadaten`): Einsatzleitung ODER System-Admin, unabhängig vom Einsatzstatus (auch im
+    abgeschlossenen Einsatz). Reine UI-Schranke: das Backend verlangt beim Admin zusätzlich die
+    Org des Einsatzes und vermerkt jeden Abruf im ETB. */
+export function darfOriginalLaden(
+  einsatz?: EinsatzSchreibkontext,
+  benutzer?: BenutzerSchreibkontext,
+): boolean {
+  return istEinsatzLeitung(einsatz) || istAdmin(benutzer);
+}
+
 // ─── ORG-Achse ─────────────────────────────────────────────────────────────────────────────
 //
 // `darfVerwaltung` fragt „darf er die Organisation verwalten?" — ohne `einsatz`, `status` oder

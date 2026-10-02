@@ -7,7 +7,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { dokumentDownloadPfad, entferneDokument, listeDokumente } from '../api/dokumente';
 import type { Dokument, EinsatzStatus } from '../api/types';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
+import { istBildMime, originalPfad } from '../api/anhangFassung';
 import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
@@ -89,6 +90,7 @@ const dokumentSpalten = (
   onBearbeiten: (d: Dokument) => void,
   onEntfernen: (d: Dokument) => void,
   entferntGerade: ReadonlySet<number>,
+  darfOriginal: boolean,
 ) =>
   spaltenFuer<Dokument>()([
     {
@@ -103,6 +105,12 @@ const dokumentSpalten = (
             href={dokumentDownloadPfad(einsatzId, d.id)}
             dateiname={d.dateiname}
             text={d.titel}
+            originalHref={
+              darfOriginal && istBildMime(d.mime)
+                ? originalPfad(dokumentDownloadPfad(einsatzId, d.id))
+                : undefined
+            }
+            originalKennung={`${d.dateiname}, Dokument ${d.titel}`}
           />
         );
         return entferntGerade.has(d.id) ? (
@@ -270,6 +278,7 @@ export default function DokumentePage() {
   const { mutate: entfernen } = entfernenMutation;
 
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  const darfOriginal = darfOriginalLaden(einsatzQuery.data, benutzer);
   const spalten = useMemo(
     () =>
       dokumentSpalten(
@@ -278,8 +287,9 @@ export default function DokumentePage() {
         setInBearbeitung,
         (d) => entfernen(d.id),
         entferntGerade,
+        darfOriginal,
       ),
-    [einsatzId, darfSchreibenRoh, entfernen, entferntGerade],
+    [einsatzId, darfSchreibenRoh, entfernen, entferntGerade, darfOriginal],
   );
   const karte = useMemo(
     () => dokumentKarte(darfSchreibenRoh, setInBearbeitung, setZuEntfernen, entferntGerade),

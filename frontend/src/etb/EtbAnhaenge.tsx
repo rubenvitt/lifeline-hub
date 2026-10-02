@@ -1,5 +1,12 @@
 import type { EtbEintragAnzeige } from '../api/types';
 import { etbAnhangPfad } from '../api/etb';
+import {
+  istBildMime,
+  originalDateiname,
+  originalPfad,
+  originalZugaenglicherName,
+} from '../api/anhangFassung';
+import { ORIGINAL_TEXT } from '../components/DownloadAnker';
 import { useRollen } from '../components/instrument';
 import { formatGroesse } from '../karten/formatGroesse';
 import { verweisStil } from './zeitachseModell';
@@ -15,13 +22,19 @@ import { verweisStil } from './zeitachseModell';
  *
  * Der Verweis zeigt auf die ETB-Route (`etbAnhangPfad`), nie auf die generische — dort
  * antwortet der Server für ETB-Anhänge 404.
+ *
+ * Mit `darfOriginal` (der Aufrufer fragt `useDarfOriginalLaden`, LFH-747) steht hinter jedem
+ * Bild ein zweiter Verweis auf das Original samt Standort; der Hauptverweis lädt die bereinigte
+ * Fassung. Als Prop statt Hook, damit das Bauteil ohne Provider renderbar bleibt.
  */
 export default function EtbAnhaenge({
   einsatzId,
   eintrag,
+  darfOriginal = false,
 }: {
   einsatzId: number;
   eintrag: Pick<EtbEintragAnzeige, 'id' | 'lfd_nr' | 'anhaenge'>;
+  darfOriginal?: boolean;
 }) {
   const { token, rollen } = useRollen();
   if (eintrag.anhaenge.length === 0) return null;
@@ -34,16 +47,33 @@ export default function EtbAnhaenge({
     >
       {eintrag.anhaenge.map((a) => {
         const groesse = formatGroesse(a.groesse);
+        const href = etbAnhangPfad(einsatzId, eintrag.id, a.id);
         return (
-          <a
-            key={a.id}
-            href={etbAnhangPfad(einsatzId, eintrag.id, a.id)}
-            download={a.dateiname}
-            aria-label={`${a.dateiname}, ${groesse}, Anhang zu Nr. ${eintrag.lfd_nr} herunterladen`}
-            style={stil}
-          >
-            {a.dateiname} · {groesse}
-          </a>
+          // Bild und Original bleiben als Paar zusammen: beim Umbruch stünde „Original“ sonst vor
+          // dem nächsten Bild.
+          <span key={a.id} style={{ display: 'inline-flex', columnGap: token.marginSM }}>
+            <a
+              href={href}
+              download={a.dateiname}
+              aria-label={`${a.dateiname}, ${groesse}, Anhang zu Nr. ${eintrag.lfd_nr} herunterladen`}
+              style={stil}
+            >
+              {a.dateiname} · {groesse}
+            </a>
+            {darfOriginal && istBildMime(a.mime) && (
+              <a
+                href={originalPfad(href)}
+                download={originalDateiname(a.dateiname)}
+                aria-label={originalZugaenglicherName(
+                  `${a.dateiname}, Anhang zu Nr. ${eintrag.lfd_nr}`,
+                )}
+                data-lfh="etb-anhang-original"
+                style={stil}
+              >
+                {ORIGINAL_TEXT}
+              </a>
+            )}
+          </span>
         );
       })}
     </span>

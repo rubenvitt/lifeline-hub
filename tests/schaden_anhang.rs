@@ -86,7 +86,7 @@ async fn ablegen(
 
 /// Legt ab und liefert die Linker-id.
 async fn abgelegt(app: &axum::Router, einsatz: i64, schaden: i64, cookie: &str, name: &str) -> i64 {
-    let (s, v) = ablegen(app, einsatz, schaden, cookie, name, b"BILDDATEN").await;
+    let (s, v) = ablegen(app, einsatz, schaden, cookie, name, MINI_JPEG).await;
     assert_eq!(s, StatusCode::CREATED, "Ablage {name}: {v}");
     v["id"].as_i64().unwrap()
 }
@@ -364,7 +364,7 @@ async fn beobachter_liest_und_laedt_herunter_schreibt_aber_nicht() {
     );
     let (s, h, bytes) = download(&app, einsatz, schaden, id, &erika, None).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(bytes, b"BILDDATEN");
+    assert_eq!(bytes, MINI_JPEG);
     assert!(h[header::CONTENT_DISPOSITION]
         .to_str()
         .unwrap()
@@ -631,7 +631,7 @@ async fn download_traegt_anlage_und_etag_und_antwortet_304() {
     let id = abgelegt(&app, einsatz, schaden, &admin, "Dach Süd.jpg").await;
     let (s, h, bytes) = download(&app, einsatz, schaden, id, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(bytes, b"BILDDATEN");
+    assert_eq!(bytes, MINI_JPEG);
     let cd = h[header::CONTENT_DISPOSITION].to_str().unwrap();
     assert!(cd.starts_with("attachment"), "{cd}");
     assert!(cd.contains("filename*=UTF-8''Dach%20S%C3%BCd.jpg"), "{cd}");
