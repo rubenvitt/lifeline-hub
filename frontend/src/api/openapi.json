@@ -404,6 +404,45 @@
           }
         }
       },
+      "AnhangZugriffAnzeige": {
+        "type": "object",
+        "description": "Ein Protokolleintrag für die Einsicht. `anhang_id` ist die **Linker-id** (wie auf dem Wire\nder Anhangliste), damit die Oberfläche die Zeile der Datei zuordnen kann.",
+        "required": [
+          "id",
+          "anhang_id",
+          "dateiname",
+          "benutzer_id",
+          "benutzer_name",
+          "fassung",
+          "zugriff_at"
+        ],
+        "properties": {
+          "anhang_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "benutzer_name": {
+            "type": "string"
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "fassung": {
+            "$ref": "#/components/schemas/ZugriffFassung"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zugriff_at": {
+            "type": "string"
+          }
+        }
+      },
       "AppCode": {
         "type": "object",
         "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.",
@@ -9767,6 +9806,53 @@
           "keiner"
         ]
       },
+      "TierAnhangAnzeige": {
+        "type": "object",
+        "description": "Ein Anhang eines Tieres. `id` ist die **Linker-id** (`einsatz_tier_anhang.id`), nicht\n`anhang.id`: die Datei ist nur über die Tier-Route ladbar.",
+        "required": [
+          "id",
+          "tier_id",
+          "dateiname",
+          "mime",
+          "groesse",
+          "abgelegt_von_id",
+          "abgelegt_at"
+        ],
+        "properties": {
+          "abgelegt_at": {
+            "type": "string"
+          },
+          "abgelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abgelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert."
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "tier_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "TierAnzeige": {
         "type": "object",
         "description": "Serialisierbarer Tier-Datensatz (1:1 zur Tabelle `einsatz_tier`). Die beiden\n`halter_*`-Felder kommen aus einem LEFT JOIN auf `einsatz_person` und sind\nread-only (NULL bei Freitext-Halter oder unbekannt) — die UI zeigt damit\n`R-nnn` bzw. \"Halter (storniert): R-nnn\" ohne Zweit-Request.",
@@ -9969,6 +10055,53 @@
           },
           "secret_base32": {
             "type": "string"
+          }
+        }
+      },
+      "UhsAnhangAnzeige": {
+        "type": "object",
+        "description": "Ein Anhang einer UHS. `id` ist die **Linker-id** (`uhs_anhang.id`), nicht `anhang.id`: die\nDatei ist nur über die UHS-Route ladbar.",
+        "required": [
+          "id",
+          "uhs_id",
+          "dateiname",
+          "mime",
+          "groesse",
+          "abgelegt_von_id",
+          "abgelegt_at"
+        ],
+        "properties": {
+          "abgelegt_at": {
+            "type": "string"
+          },
+          "abgelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abgelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert."
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "uhs_id": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -11008,6 +11141,14 @@
           "export",
           "druck",
           "anhang"
+        ]
+      },
+      "ZugriffFassung": {
+        "type": "string",
+        "description": "Welche Fassung abgerufen wurde. Wire = DB-CHECK `fassung IN ('bereinigt','original')`.",
+        "enum": [
+          "bereinigt",
+          "original"
         ]
       }
     }

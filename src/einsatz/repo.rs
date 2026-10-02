@@ -1602,6 +1602,235 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn schwaerzung_loescht_tier_anhaenge_und_haelt_den_etb_nachweis() {
+        // LFH-758: wie Schäden — `anhang` geht (CASCADE nimmt den Linker), `einsatz_tier_anhang`
+        // ist ZeileLoeschen, die pseudonymen Nachweise „Tier T-001: …“ bleiben.
+        use crate::anhang::erfassung::Ablage;
+        use crate::tier::anhang as ta;
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let tier = crate::tier::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            "aktiv",
+            crate::tier::repo::NeueDaten {
+                spezies: "hund",
+                rasse_beschreibung: None,
+                rufname: None,
+                geschlecht: None,
+                alter_geschaetzt: None,
+                farbe_beschreibung: None,
+                kennzeichnung: None,
+                groesse_gewicht: None,
+                halter_person_id: None,
+                halter_kontakt: None,
+                antreff_ort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        let startwert = crate::einsatz::einstellungen::laden_oder_default(&pool, einsatz.id)
+            .await
+            .unwrap()
+            .etb_startwert();
+        let mut etb_ids = Vec::new();
+        let mut linker_ids = Vec::new();
+        for (name, mime) in [
+            ("Müller_Bello.jpg", "image/jpeg"),
+            ("impfpass.pdf", "application/pdf"),
+        ] {
+            let (id, etb) = ta::ablegen(
+                &pool,
+                einsatz.id,
+                tier.id,
+                leit,
+                startwert,
+                &Ablage {
+                    dateiname: name,
+                    mime,
+                    daten: b"ABC",
+                },
+            )
+            .await
+            .unwrap();
+            linker_ids.push(id);
+            etb_ids.push(etb);
+        }
+        etb_ids.push(
+            ta::entfernen(&pool, einsatz.id, tier.id, linker_ids[1], leit, startwert)
+                .await
+                .unwrap(),
+        );
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        for sql in [
+            "SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?",
+            "SELECT COUNT(*) FROM einsatz_tier_anhang WHERE einsatz_id = ?",
+        ] {
+            let n: i64 = sqlx::query_scalar(sql)
+                .bind(einsatz.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            assert_eq!(n, 0, "{sql}");
+        }
+        let mut inhalte = Vec::new();
+        for id in etb_ids {
+            let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            inhalte.push(inhalt);
+        }
+        assert_eq!(
+            inhalte,
+            vec![
+                "Tier T-001: Foto abgelegt",
+                "Tier T-001: PDF abgelegt",
+                "Tier T-001: PDF entfernt",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_loescht_uhs_anhaenge_und_haelt_etb_und_audit() {
+        // LFH-758: `uhs_anhang` ist ZeileLoeschen (Datei und Linker gehen, auch entfernte), die
+        // pseudonymen Nachweise „UHS BHP 50: …“ und das Lese-Audit `anhang_zugriff_audit`
+        // bleiben — Letzteres mit `ablage`, obwohl `anhang_id` danach ins Leere zeigt.
+        use crate::anhang::audit_repo::{self, ZugriffFassung};
+        use crate::anhang::erfassung::Ablage;
+        use crate::uhs::anhang as ua;
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let uhs = crate::uhs::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            crate::uhs::repo::NeueDaten {
+                typ: "behandlungsplatz",
+                bezeichnung: "BHP 50",
+                abschnitt_id: None,
+                standort: Some("Turnhalle Nord"),
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        let startwert = crate::einsatz::einstellungen::laden_oder_default(&pool, einsatz.id)
+            .await
+            .unwrap()
+            .etb_startwert();
+        let mut etb_ids = Vec::new();
+        let mut linker_ids = Vec::new();
+        for (name, mime) in [
+            ("Patient_Liege3.jpg", "image/jpeg"),
+            ("plan.pdf", "application/pdf"),
+        ] {
+            let (id, etb) = ua::ablegen(
+                &pool,
+                einsatz.id,
+                uhs.id,
+                leit,
+                startwert,
+                &Ablage {
+                    dateiname: name,
+                    mime,
+                    daten: b"ABC",
+                },
+            )
+            .await
+            .unwrap();
+            linker_ids.push(id);
+            etb_ids.push(etb);
+        }
+        let aid = ua::anhang_id_fuer_download(&pool, einsatz.id, uhs.id, linker_ids[0])
+            .await
+            .unwrap();
+        audit_repo::anlegen(
+            &pool,
+            einsatz.id,
+            aid,
+            "UHS BHP 50",
+            leit,
+            ZugriffFassung::Bereinigt,
+        )
+        .await
+        .unwrap();
+        etb_ids.push(
+            ua::entfernen(&pool, einsatz.id, uhs.id, linker_ids[1], leit, startwert)
+                .await
+                .unwrap(),
+        );
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        for sql in [
+            "SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?",
+            "SELECT COUNT(*) FROM uhs_anhang WHERE einsatz_id = ?",
+        ] {
+            let n: i64 = sqlx::query_scalar(sql)
+                .bind(einsatz.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            assert_eq!(n, 0, "{sql}");
+        }
+        let protokoll: Vec<(i64, String, String)> = sqlx::query_as(
+            "SELECT anhang_id, ablage, fassung FROM anhang_zugriff_audit WHERE einsatz_id = ?",
+        )
+        .bind(einsatz.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            protokoll,
+            vec![(aid, "UHS BHP 50".to_string(), "bereinigt".to_string())],
+            "das Lese-Audit bleibt"
+        );
+        let mut inhalte = Vec::new();
+        for id in etb_ids {
+            let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            inhalte.push(inhalt);
+        }
+        assert_eq!(
+            inhalte,
+            vec![
+                "UHS BHP 50: Foto abgelegt",
+                "UHS BHP 50: PDF abgelegt",
+                "UHS BHP 50: PDF entfernt",
+            ]
+        );
+    }
+
     /// LFH-22 (design.md D8): das Logo ist keine Einsatzunterlage. Schwärzen eines
     /// Einsatzes lässt die Logo-Bytes der Organisation unverändert.
     #[tokio::test]

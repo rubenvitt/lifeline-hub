@@ -61,7 +61,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
 import { zugriffArtText } from '../personen/zugriffArt';
-import { ANHAENGE_TITEL } from '../components/anhaenge/ObjektAnhaenge';
+import { ANHAENGE_TITEL } from '../components/erfassungsAnhaenge/ErfassungsAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import VerbleibErfassung from '../personen/VerbleibErfassung';

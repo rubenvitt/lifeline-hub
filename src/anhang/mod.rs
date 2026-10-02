@@ -4,6 +4,8 @@
 //! `chat_nachricht_anhang`) leben im jeweiligen Modul. Dateien liegen als BLOB in der SQLite-DB
 //! und sind damit automatisch im Backup.
 
+pub mod audit_repo;
+pub mod erfassung;
 pub mod metadaten;
 pub mod repo;
 pub mod vorschau;
@@ -78,7 +80,7 @@ pub const ERLAUBTE_MIME_DOKUMENT: &[&str] = &[
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
 
-/// Allowlist der Erfassungsmodule (Schäden LFH-21, Personen LFH-757; modulneutral benannt):
+/// Allowlist der Erfassungsmodule (Schäden, Tiere, UHS, Personen; modulneutral benannt):
 /// Kamerabilder und PDF.
 /// - HEIC/HEIF ist das Standardformat der iPhone-Kamera.
 /// - JPEG/PNG/WebP decken Android-Kameras, Screenshots und Messenger-Weiterleitungen.
@@ -95,36 +97,6 @@ pub const ERLAUBTE_MIME_ERFASSUNG: &[&str] = &[
     "image/heif",
     "application/pdf",
 ];
-
-/// Vorgang des pseudonymen ETB-Nachweises eines Erfassungs-Anhangs (Schaden LFH-21, Person
-/// LFH-757): „{Objekt}: {Art} abgelegt|entfernt“.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Vorgang {
-    Abgelegt,
-    Entfernt,
-}
-
-impl Vorgang {
-    pub fn wort(self) -> &'static str {
-        match self {
-            Vorgang::Abgelegt => "abgelegt",
-            Vorgang::Entfernt => "entfernt",
-        }
-    }
-}
-
-/// Art eines Erfassungs-Anhangs für den ETB-Nachweis, aus dem **serverseitig ermittelten** MIME,
-/// nie aus einer Eingabe: „Foto“ (Bild), „PDF“, sonst „Datei“. Der letzte Zweig hält den Text
-/// auch dann pseudonym, wenn [`ERLAUBTE_MIME_ERFASSUNG`] einmal wächst.
-pub fn erfassung_art(mime: &str) -> &'static str {
-    if mime == "application/pdf" {
-        "PDF"
-    } else if mime.starts_with("image/") {
-        "Foto"
-    } else {
-        "Datei"
-    }
-}
 
 /// Leitet den MIME-Typ aus der Dateiendung ab und prüft ihn gegen [`ERLAUBTE_MIME`]. Der vom
 /// Client gemeldete Content-Type ist manipulierbar und wird nicht herangezogen.

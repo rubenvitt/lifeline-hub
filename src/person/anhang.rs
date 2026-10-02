@@ -1,26 +1,38 @@
-//! Fotos und Dateien an einer betroffenen Person (LFH-757, Muster LFH-21).
+//! Fotos und Dateien an einer betroffenen Person (LFH-757, Spec `personen-anhaenge`).
 //!
-//! Die Bytes liegen in `anhang`; `einsatz_person_anhang` ist der fünfte Linker darauf und steht
-//! im Register `anhang::repo::MODUL_LINKER`. Damit ist eine Personen-Datei nur über die
-//! Personenroute erreichbar — und nur dort schreibt jeder Download eine Zeile ins
-//! Zugriffsprotokoll (`routes::person_anhang::datei`, design.md D3). Generischer Download 404,
-//! generischer DELETE 422, Chat 400, ETB 422, der Sweep hält sie.
+//! `einsatz_person_anhang` ist ein modulgebundener Linker auf `anhang` (Register
+//! `anhang::repo::MODUL_LINKER`); Liste, Ablage und Soft-Delete stehen im Kern
+//! `anhang::erfassung` (LFH-758). Hier bleiben Deskriptor, Wire-DTO und das Laden der Person in
+//! der Transaktion. Damit ist eine Personen-Datei nur über die Personenroute erreichbar — und
+//! nur dort schreibt jeder Download eine Zeile ins Zugriffsprotokoll
+//! (`routes::person_anhang::datei`, design.md D3). Generischer Download 404, generischer DELETE
+//! 422, Chat 400, ETB 422, der Sweep hält sie.
 //!
-//! Ablegen und Entfernen laufen je in EINER Transaktion mit dem pseudonymen System-ETB-Eintrag:
-//! Datei, Verknüpfung und Nachweis entstehen gemeinsam oder gar nicht. Der Nachweis nennt nur
-//! Registriernummer und Art ([`etb_text`]), nie Dateinamen oder Namen.
+//! Der ETB-Nachweis nennt nur die Registriernummer und die Art („Person R-007: Foto abgelegt“),
+//! nie Dateinamen oder Namen.
 
-use crate::anhang::{erfassung_art, Vorgang};
+use crate::anhang::erfassung::{
+    self as kern, BesitzerKopf, ErfassungsAblage, ErfassungsAnhangZeile,
+};
+pub use crate::anhang::erfassung::{Ablage, Vorgang};
 use crate::error::AppError;
 use crate::person::{registrier_anzeige, repo as person_repo};
 use serde::Serialize;
-use sqlx::{FromRow, SqlitePool};
+use sqlx::SqlitePool;
 use utoipa::ToSchema;
+
+/// Deskriptor des Personen-Linkers für den Kern.
+pub const PERSON_ABLAGE: ErfassungsAblage = ErfassungsAblage {
+    linker: "einsatz_person_anhang",
+    besitzer_spalte: "person_id",
+    besitzer_tabelle: "einsatz_person",
+    storniert_meldung: "Person ist storniert",
+};
 
 /// Ein Anhang einer Person. `id` ist die **Linker-id** (`einsatz_person_anhang.id`), nicht
 /// `anhang.id` — die Datei ist nur über die Personenroute ladbar (mit Lese-Audit); eine
 /// `anhang_id` auf dem Wire wäre nur ein Anreiz, den gesperrten generischen Weg zu probieren.
-#[derive(Debug, Clone, Serialize, FromRow, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonAnhangAnzeige {
     pub id: i64,
     pub person_id: i64,
@@ -34,24 +46,35 @@ pub struct PersonAnhangAnzeige {
     pub abgelegt_at: String,
 }
 
-/// Wortlaut des pseudonymen ETB-Nachweises (design.md D4): „Person R-007: Foto abgelegt“. Die
-/// Art kommt aus dem serverseitig ermittelten MIME; kein Dateiname, kein Name, kein Freitext.
-pub fn etb_text(registrier_nr: i64, mime: &str, vorgang: Vorgang) -> String {
-    format!(
-        "Person {}: {} {}",
-        registrier_anzeige(registrier_nr),
-        erfassung_art(mime),
-        vorgang.wort()
-    )
+impl From<ErfassungsAnhangZeile> for PersonAnhangAnzeige {
+    fn from(z: ErfassungsAnhangZeile) -> Self {
+        Self {
+            id: z.id,
+            person_id: z.besitzer_id,
+            dateiname: z.dateiname,
+            mime: z.mime,
+            groesse: z.groesse,
+            abgelegt_von_id: z.abgelegt_von_id,
+            abgelegt_von_name: z.abgelegt_von_name,
+            abgelegt_at: z.abgelegt_at,
+        }
+    }
 }
 
-/// Lebende Anhänge je Person samt Anzeige-Joins.
-const SELECT: &str = "SELECT l.id, l.person_id, a.dateiname, a.mime, a.groesse, \
-        l.abgelegt_von_id, b.anzeigename AS abgelegt_von_name, l.abgelegt_at \
-     FROM einsatz_person_anhang l \
-     JOIN anhang a ON a.id = l.anhang_id \
-     LEFT JOIN benutzer b ON b.id = l.abgelegt_von_id \
-     WHERE l.einsatz_id = ? AND l.person_id = ? AND l.geloescht_at IS NULL";
+/// Name der Person im ETB-Nachweis und im Vermerk eines Original-Abrufs: „Person R-007“.
+pub fn ablage_name(registrier_nr: i64) -> String {
+    format!("Person {}", registrier_anzeige(registrier_nr))
+}
+
+/// Wortlaut des pseudonymen ETB-Nachweises (design.md D4): „Person R-007: Foto abgelegt“.
+pub fn etb_text(registrier_nr: i64, mime: &str, vorgang: Vorgang) -> String {
+    kern::etb_text(&ablage_name(registrier_nr), mime, vorgang)
+}
+
+/// Der 409 an einer stornierten Person — auch für die Vorprüfung im Handler.
+pub(crate) fn storniert() -> AppError {
+    AppError::Conflict(PERSON_ABLAGE.storniert_meldung.into())
+}
 
 /// Lebende Anhänge einer Person dieses Einsatzes, neueste zuerst. Eine Person eines anderen
 /// Einsatzes → `NotFound`; eine stornierte bleibt lesbar. Schreibt bewusst KEIN Audit (Spec
@@ -61,16 +84,11 @@ pub async fn liste(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<PersonAnhangAnzeige>, AppError> {
-    person_repo::laden(pool, einsatz_id, person_id).await?;
-    Ok(
-        sqlx::query_as::<_, PersonAnhangAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT} ORDER BY l.abgelegt_at DESC, l.id DESC"
-        )))
-        .bind(einsatz_id)
-        .bind(person_id)
-        .fetch_all(pool)
-        .await?,
-    )
+    Ok(kern::liste(pool, &PERSON_ABLAGE, einsatz_id, person_id)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect())
 }
 
 /// Ein lebender Anhang; fremd, unbekannt, andere Person oder entfernt → `NotFound`.
@@ -80,13 +98,9 @@ pub async fn laden(
     person_id: i64,
     id: i64,
 ) -> Result<PersonAnhangAnzeige, AppError> {
-    sqlx::query_as::<_, PersonAnhangAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT} AND l.id = ?")))
-        .bind(einsatz_id)
-        .bind(person_id)
-        .bind(id)
-        .fetch_optional(pool)
+    Ok(kern::laden(pool, &PERSON_ABLAGE, einsatz_id, person_id, id)
         .await?
-        .ok_or(AppError::NotFound)
+        .into())
 }
 
 /// `anhang_id` eines lebenden Anhangs für den Download. Der Lookup IST die Zugriffsprüfung
@@ -97,33 +111,26 @@ pub async fn anhang_id_fuer_download(
     person_id: i64,
     id: i64,
 ) -> Result<i64, AppError> {
-    sqlx::query_scalar(
-        "SELECT anhang_id FROM einsatz_person_anhang \
-         WHERE id = ? AND person_id = ? AND einsatz_id = ? AND geloescht_at IS NULL",
-    )
-    .bind(id)
-    .bind(person_id)
-    .bind(einsatz_id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or(AppError::NotFound)
+    kern::anhang_id_fuer_download(pool, &PERSON_ABLAGE, einsatz_id, person_id, id).await
 }
 
-/// Eingabe für [`ablegen`] — vom Handler geprüft (Typ, Größe, Scan).
-pub struct Ablage<'a> {
-    pub dateiname: &'a str,
-    pub mime: &'a str,
-    pub daten: &'a [u8],
-}
-
-pub(crate) fn storniert() -> AppError {
-    AppError::Conflict("Person ist storniert".into())
+/// Lädt die Person in der offenen Transaktion (fremd/unbekannt → `NotFound`). Der Status der
+/// Person (vermisst, abgemeldet, verstorben) sperrt nichts, nur der Storno.
+async fn kopf(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<BesitzerKopf, AppError> {
+    let person = person_repo::laden_tx(conn, einsatz_id, person_id).await?;
+    Ok(BesitzerKopf {
+        storniert: person.storniert_at.is_some(),
+        etb_name: ablage_name(person.registrier_nr),
+    })
 }
 
 /// Legt Anhang, Linker und System-ETB-Eintrag in EINER Transaktion an. Person fremd oder
-/// unbekannt → `NotFound`, storniert → `Conflict` (409), dann ohne jede Zeile. Der Status der
-/// Person (vermisst, abgemeldet, verstorben) sperrt nichts. Liefert `(linker_id, etb_id)`; SSE
-/// macht der Aufrufer NACH dem Commit.
+/// unbekannt → `NotFound`, storniert → `Conflict` (409), dann ohne jede Zeile. Liefert
+/// `(linker_id, etb_id)`; SSE macht der Aufrufer NACH dem Commit.
 pub async fn ablegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -133,35 +140,18 @@ pub async fn ablegen(
     ablage: &Ablage<'_>,
 ) -> Result<(i64, i64), AppError> {
     crate::write_retry!(pool, |conn| {
-        let person = person_repo::laden_tx(conn, einsatz_id, person_id).await?;
-        if person.storniert_at.is_some() {
-            return Err(storniert());
-        }
-        let anhang_id = crate::anhang::repo::anlegen_tx(
+        let kopf = kopf(conn, einsatz_id, person_id).await?;
+        kern::ablegen_tx(
             conn,
+            &PERSON_ABLAGE,
             einsatz_id,
+            person_id,
             benutzer_id,
-            ablage.dateiname,
-            ablage.mime,
-            ablage.daten,
+            etb_startwert,
+            &kopf,
+            ablage,
         )
-        .await?;
-        let id: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_person_anhang \
-               (einsatz_id, person_id, anhang_id, abgelegt_von_id) \
-             VALUES (?, ?, ?, ?) RETURNING id",
-        )
-        .bind(einsatz_id)
-        .bind(person_id)
-        .bind(anhang_id)
-        .bind(benutzer_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        let text = etb_text(person.registrier_nr, ablage.mime, Vorgang::Abgelegt);
-        let etb_id =
-            crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &text)
-                .await?;
-        Ok((id, etb_id))
+        .await
     })
 }
 
@@ -177,31 +167,19 @@ pub async fn entfernen(
     etb_startwert: i64,
 ) -> Result<i64, AppError> {
     crate::write_retry!(pool, |conn| {
-        let mime: String = sqlx::query_scalar(
-            "SELECT a.mime FROM einsatz_person_anhang l JOIN anhang a ON a.id = l.anhang_id \
-             WHERE l.id = ? AND l.person_id = ? AND l.einsatz_id = ? \
-               AND l.geloescht_at IS NULL",
+        let mime = kern::lebender_mime_tx(conn, &PERSON_ABLAGE, einsatz_id, person_id, id).await?;
+        let kopf = kopf(conn, einsatz_id, person_id).await?;
+        kern::entfernen_tx(
+            conn,
+            &PERSON_ABLAGE,
+            id,
+            &mime,
+            benutzer_id,
+            etb_startwert,
+            &kopf,
+            einsatz_id,
         )
-        .bind(id)
-        .bind(person_id)
-        .bind(einsatz_id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .ok_or(AppError::NotFound)?;
-        let person = person_repo::laden_tx(conn, einsatz_id, person_id).await?;
-        if person.storniert_at.is_some() {
-            return Err(storniert());
-        }
-        sqlx::query(
-            "UPDATE einsatz_person_anhang \
-             SET geloescht_at = datetime('now'), geloescht_von_id = ? WHERE id = ?",
-        )
-        .bind(benutzer_id)
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
-        let text = etb_text(person.registrier_nr, &mime, Vorgang::Entfernt);
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &text).await
+        .await
     })
 }
 

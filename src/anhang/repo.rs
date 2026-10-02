@@ -155,10 +155,9 @@ pub async fn gehoert_anhang_zu_einsatz(
 /// Abfrage, die das Rennen wieder öffnete. Im Rennfall antwortet die Route also 404.
 ///
 /// **Dasselbe gilt für jeden modulgebundenen Linker** ([`MODUL_LINKER`]): ETB-Anhänge
-/// (LFH-117) sind bis zur Schwärzung unveränderlich wie der Eintrag, Schaden- und
-/// Personen-Anhänge (LFH-21, LFH-757) werden an ihrem Objekt mit Nachweis entfernt; die
-/// CASCADE nähme sonst still die Verknüpfung mit. Der Chat steht nicht im Riegel — seine
-/// Verknüpfungen räumt die CASCADE bewusst.
+/// (LFH-117) sind bis zur Schwärzung unveränderlich wie der Eintrag, Schaden-Anhänge (LFH-21)
+/// werden am Schaden mit Nachweis entfernt; die CASCADE nähme sonst still die Verknüpfung
+/// mit. Der Chat steht nicht im Riegel — seine Verknüpfungen räumt die CASCADE bewusst.
 pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM anhang WHERE id = ? AND einsatz_id = ? AND NOT {}",
@@ -215,6 +214,16 @@ pub const MODUL_LINKER: &[ModulLinker] = &[
         tabelle: "einsatz_schaden_anhang",
         loesch_meldung: "Anhang gehört zu einem Schaden und wird dort entfernt",
         ort: "Schaden",
+    },
+    ModulLinker {
+        tabelle: "einsatz_tier_anhang",
+        loesch_meldung: "Anhang gehört zu einem Tier und wird dort entfernt",
+        ort: "Tier",
+    },
+    ModulLinker {
+        tabelle: "uhs_anhang",
+        loesch_meldung: "Anhang gehört zu einer Unfallhilfsstelle und wird dort entfernt",
+        ort: "Unfallhilfsstelle",
     },
     // LFH-757: Personen-Anhänge. Ohne diesen Eintrag wäre eine Personen-Datei für die ablegende
     // Person generisch ladbar — am Lese-Audit der Personenroute vorbei.
@@ -359,7 +368,7 @@ pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerSta
 /// **Jeder Linker gehört in diese Bedingung** — der Chat (LFH-102) als eigenes `NOT EXISTS`,
 /// alle modulgebundenen über das Register ([`MODUL_LINKER`], LFH-21). Ein fehlender Linker
 /// macht keinen Fehler, sondern löscht dort gebundene Dateien nach der Karenz still — die
-/// Tests `sweep_verwaiste_haelt_{dokument,etb,schaden,person}_gebundene_anhaenge` pinnen das.
+/// Tests `sweep_verwaiste_haelt_{dokument,etb,schaden}_gebundene_anhaenge` pinnen das.
 /// Ein soft-gelöschtes Dokument ist bewusst KEIN Orphan (Beweissicherung, LFH-632 E1).
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let grenze = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN));
@@ -965,35 +974,56 @@ mod tests {
                 .unwrap();
         assert_eq!(links, 1, "die Verknüpfung bleibt (keine CASCADE)");
     }
-    // --- LFH-757: `einsatz_person_anhang` als fünfter Linker ---
 
-    /// Hängt einen Anhang an eine frische Person (direkter INSERT); optional soft-gelöscht.
-    async fn als_person(
+    // --- LFH-758: Tier- und UHS-Linker (Erfassungs-Anhänge) ---
+
+    /// Legt einen frischen Besitzer im Einsatz an und liefert seine id.
+    async fn besitzer(pool: &SqlitePool, tabelle: &str, einsatz_id: i64, von: i64) -> i64 {
+        let sql = match tabelle {
+            "einsatz_tier" => {
+                "INSERT INTO einsatz_tier \
+                   (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
+                 VALUES (?1, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_tier \
+                              WHERE einsatz_id = ?1), 'hund', ?2, ?2) RETURNING id"
+            }
+            "uhs" => {
+                "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+                 VALUES (?1, 'behandlungsplatz', 'BHP ' || (SELECT COUNT(*) + 1 FROM uhs), ?2, ?2) \
+                 RETURNING id"
+            }
+            "einsatz_person" => {
+                "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+                 VALUES (?1, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_person \
+                              WHERE einsatz_id = ?1), ?2, ?2) RETURNING id"
+            }
+            andere => panic!("kein Besitzer-Fixture für {andere}"),
+        };
+        sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+            .bind(einsatz_id)
+            .bind(von)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// Hängt einen Anhang an einen frischen Besitzer der Ablage `d`; optional soft-gelöscht.
+    async fn als_erfassung(
         pool: &SqlitePool,
+        d: &crate::anhang::erfassung::ErfassungsAblage,
         einsatz_id: i64,
         von: i64,
         anhang_id: i64,
         geloescht: bool,
     ) {
-        let person_id: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
-             VALUES (?, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_person \
-                         WHERE einsatz_id = ?), ?, ?) RETURNING id",
-        )
-        .bind(einsatz_id)
-        .bind(einsatz_id)
-        .bind(von)
-        .bind(von)
-        .fetch_one(pool)
-        .await
-        .unwrap();
-        sqlx::query(
-            "INSERT INTO einsatz_person_anhang \
-               (einsatz_id, person_id, anhang_id, abgelegt_von_id, geloescht_at, geloescht_von_id) \
+        let besitzer_id = besitzer(pool, d.besitzer_tabelle, einsatz_id, von).await;
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO {} \
+               (einsatz_id, {}, anhang_id, abgelegt_von_id, geloescht_at, geloescht_von_id) \
              VALUES (?, ?, ?, ?, CASE WHEN ? THEN datetime('now') END, CASE WHEN ? THEN ? END)",
-        )
+            d.linker, d.besitzer_spalte
+        )))
         .bind(einsatz_id)
-        .bind(person_id)
+        .bind(besitzer_id)
         .bind(anhang_id)
         .bind(von)
         .bind(geloescht)
@@ -1004,74 +1034,56 @@ mod tests {
         .unwrap();
     }
 
-    #[tokio::test]
-    async fn linker_stand_erkennt_person_linker() {
-        let pool = crate::db::test_pool().await;
-        let (von, einsatz) = setup(&pool).await;
-        let lebend = anhang_mit_zeit(&pool, einsatz, von, "foto.jpg", "2026-01-01 00:00:00").await;
-        let entfernt = anhang_mit_zeit(&pool, einsatz, von, "alt.jpg", "2026-01-01 00:00:00").await;
-        als_person(&pool, einsatz, von, lebend, false).await;
-        als_person(&pool, einsatz, von, entfernt, true).await;
-
-        // Auch ein entfernter Linker bindet (wie am Schaden): sonst wäre die Datei für die
-        // ablegende Person generisch ladbar — ohne Lese-Audit (D12, LFH-757).
-        for (a, fall) in [(lebend, "lebend"), (entfernt, "entfernt")] {
-            let s = linker_stand(&pool, a).await.unwrap();
-            assert_eq!(
-                s.modul.map(|l| l.tabelle),
-                Some("einsatz_person_anhang"),
-                "{fall}"
-            );
-            assert!(s.ist_modul_gebunden(), "{fall}");
-            assert!(!s.ist_ungebunden(), "{fall}");
-            assert!(s.generischer_download_gesperrt(), "{fall}");
-        }
-    }
-
-    #[tokio::test]
-    async fn sweep_verwaiste_haelt_person_gebundene_anhaenge() {
+    /// Die drei Linker-Aussagen (LinkerStand, Sweep, generisches Löschen) für eine Ablage —
+    /// auch ein ENTFERNTER Linker bindet (Beweis bis zur Schwärzung).
+    async fn pruefe_erfassungs_linker(d: &crate::anhang::erfassung::ErfassungsAblage) {
         let pool = crate::db::test_pool().await;
         let (von, einsatz) = setup(&pool).await;
         let lebend = anhang_mit_zeit(&pool, einsatz, von, "a.jpg", "2026-01-01 00:00:00").await;
         let entfernt = anhang_mit_zeit(&pool, einsatz, von, "b.jpg", "2026-01-01 00:00:00").await;
         let frei = anhang_mit_zeit(&pool, einsatz, von, "c.jpg", "2026-01-01 00:00:00").await;
-        als_person(&pool, einsatz, von, lebend, false).await;
-        als_person(&pool, einsatz, von, entfernt, true).await;
+        als_erfassung(&pool, d, einsatz, von, lebend, false).await;
+        als_erfassung(&pool, d, einsatz, von, entfernt, true).await;
 
+        for (a, fall) in [(lebend, "lebend"), (entfernt, "entfernt")] {
+            let s = linker_stand(&pool, a).await.unwrap();
+            assert_eq!(s.modul.map(|l| l.tabelle), Some(d.linker), "{fall}");
+            assert!(s.ist_modul_gebunden(), "{fall}");
+            assert!(!s.ist_ungebunden(), "{fall}");
+            assert!(s.generischer_download_gesperrt(), "{fall}");
+        }
+
+        assert!(matches!(
+            loeschen(&pool, einsatz, lebend).await.unwrap_err(),
+            AppError::NotFound
+        ));
         let geloescht = sweep_verwaiste(&pool, t("2026-06-16 00:00:00"))
             .await
             .unwrap();
-
-        assert_eq!(geloescht, 1, "nur der nie gebundene Anhang geht");
-        assert!(anzeige_laden(&pool, lebend).await.is_ok());
-        assert!(
-            anzeige_laden(&pool, entfernt).await.is_ok(),
-            "ein entfernter Personen-Anhang bleibt als Beweis bis zur Schwärzung"
+        assert_eq!(
+            geloescht, 1,
+            "{}: nur der nie gebundene Anhang geht",
+            d.linker
         );
+        assert!(anzeige_laden(&pool, lebend).await.is_ok());
+        assert!(anzeige_laden(&pool, entfernt).await.is_ok());
         assert!(anzeige_laden(&pool, frei).await.is_err());
     }
 
     #[tokio::test]
-    async fn loeschen_verweigert_person_gebundene_anhaenge() {
-        let pool = crate::db::test_pool().await;
-        let (von, einsatz) = setup(&pool).await;
-        let a = anhang_mit_zeit(&pool, einsatz, von, "foto.jpg", "2026-01-01 00:00:00").await;
-        als_person(&pool, einsatz, von, a, false).await;
+    async fn tier_linker_bindet_haelt_im_sweep_und_verweigert_loeschen() {
+        pruefe_erfassungs_linker(&crate::tier::anhang::TIER_ABLAGE).await;
+    }
 
-        assert!(matches!(
-            loeschen(&pool, einsatz, a).await.unwrap_err(),
-            AppError::NotFound
-        ));
-        assert!(
-            anzeige_laden(&pool, a).await.is_ok(),
-            "Personen-Anhang bleibt"
-        );
-        let links: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person_anhang WHERE anhang_id = ?")
-                .bind(a)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(links, 1, "die Verknüpfung bleibt (keine CASCADE)");
+    #[tokio::test]
+    async fn uhs_linker_bindet_haelt_im_sweep_und_verweigert_loeschen() {
+        pruefe_erfassungs_linker(&crate::uhs::anhang::UHS_ABLAGE).await;
+    }
+
+    // Auch ein entfernter Personen-Linker bindet: sonst wäre die Datei für die ablegende Person
+    // generisch ladbar — ohne Lese-Audit (LFH-757, design.md D12).
+    #[tokio::test]
+    async fn person_linker_bindet_haelt_im_sweep_und_verweigert_loeschen() {
+        pruefe_erfassungs_linker(&crate::person::anhang::PERSON_ABLAGE).await;
     }
 }

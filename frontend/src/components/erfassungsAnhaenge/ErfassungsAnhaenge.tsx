@@ -1,7 +1,7 @@
 import { IconHochladen, IconMuelleimer } from '../../icons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Button, Popconfirm, Space } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   Paneel,
@@ -19,7 +19,7 @@ import { useDarfOriginalLaden } from '../../einsatz/useDarfOriginalLaden';
 import { SpeicherFehler } from '../SpeicherHinweis';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import { formatGroesse } from '../../karten/formatGroesse';
-import AnhangAblegenModal from './AnhangAblegenModal';
+import ErfassungsAnhangAblegenModal from './ErfassungsAnhangAblegenModal';
 import {
   freigegeben,
   nachgefuehrt,
@@ -30,11 +30,9 @@ import {
   type AnhangZufluss,
 } from './anhangZufluss';
 
-export const ANHAENGE_TITEL = 'Fotos und Dateien';
-
-/** Was der Block von einem Anhang braucht — Schaden- und Personen-DTO tragen es beide. */
-export interface ErfassungsAnhang {
-  /** Linker-id, nie `anhang.id`. */
+/** Was die Liste von einem Anhang braucht — Schnittmenge der DTOs von Schaden, Tier,
+ *  UHS und Person. */
+export interface ErfassungsAnhangEintrag {
   id: number;
   dateiname: string;
   mime: string;
@@ -44,42 +42,52 @@ export interface ErfassungsAnhang {
 }
 
 /**
- * Die Routen eines Fachmoduls für seine Anhänge. Jede Datei ist nur über die modul-gegatete Route
- * ladbar (nie `/anhaenge/{aid}` des Einsatzes, dort ist sie 404).
+ * Die Modulroute einer Erfassungs-Ablage (LFH-758). Jede Funktion hängt schon an Einsatz und
+ * Besitzer; `anhangId` ist die Linker-id. Der Download-Pfad zeigt nie auf `/anhaenge/{aid}` des
+ * Einsatzes — dort ist die Datei 404.
  */
-export interface AnhangQuelle {
-  queryKey: readonly unknown[];
-  liste: () => Promise<ErfassungsAnhang[]>;
+export interface ErfassungsAnhangQuelle {
+  queryKey: QueryKey;
+  liste: () => Promise<ErfassungsAnhangEintrag[]>;
   ablegen: (datei: File) => Promise<{ id: number }>;
-  entfernen: (id: number) => Promise<void>;
-  downloadPfad: (id: number) => string;
-  /** Kennung des Objekts für zugängliche Namen und Titel: „Schaden S-003“, „Person R-007“. */
-  kennung: string;
-  /**
-   * Vorschaubild und Großansicht an Bild-Anhängen (LFH-759). Aus an der Person: jeder Abruf
-   * dort schreibt eine Zeile ins Zugriffsprotokoll (LFH-757), ein Vorschaubild je Zeile täte
-   * das schon beim Aufklappen.
-   */
-  vorschau: boolean;
+  entfernen: (anhangId: number) => Promise<unknown>;
+  downloadPfad: (anhangId: number) => string;
 }
 
 interface Props {
   einsatzId: number;
-  quelle: AnhangQuelle;
-  /** Ablegen und Entfernen erlaubt — Schreibrecht und nicht storniert, vom Aufrufer bestimmt. */
+  /** Der Besitzer, wie er in zugänglichen Namen und im Dialogtitel steht: „Schaden S-003“,
+   *  „Tier T-007“, „UHS BHP 50“. */
+  bezug: string;
+  quelle: ErfassungsAnhangQuelle;
+  /** Schreibrecht im Einsatz (Rolle + aktiver Einsatz), wie die übrigen Aktionen der Seite. */
   darfSchreiben: boolean;
+  /** Storniert: nur lesen. */
+  gesperrt: boolean;
+  /** Zusatzzeile im Ablegen-Dialog (UHS: „Jeder Abruf … wird protokolliert.“). */
+  hinweis?: ReactNode;
+  /** Vorschaubild und Großansicht an Fotos (LFH-759); Standard an. Die UHS schaltet sie ab:
+   *  ihre Route liefert keine Vorschau, weil jeder Abruf ins Zugriffsprotokoll gehört. */
+  vorschau?: boolean;
+  /** `data-lfh` der Zeilen (Testanker je Modul). */
+  zeilenKennung?: string;
+  /** Unter der Liste, im selben Paneel (UHS: Zugriffsprotokoll der Einsatzleitung). */
+  children?: ReactNode;
   /**
-   * `paneel` (Vorgabe): eigenes `Paneel` mit „Datei ablegen“ im Kopf (Schaden-Detailseite).
+   * `paneel` (Vorgabe): eigenes `Paneel` mit „Datei ablegen“ im Kopf (Schaden, Tier, UHS).
    * `abschnitt`: ohne eigenen Rahmen, „Datei ablegen“ über der Liste — für einen Abschnitt, dessen
-   * Kopf einem anderen Baustein gehört (aufklappbarer Abschnitt der Personen-Detailseite).
+   * Kopf einem anderen Baustein gehört (aufklappbarer Abschnitt der Personen-Detailseite, LFH-757).
    */
   huelle?: 'paneel' | 'abschnitt';
 }
 
+/** Titel des Blocks; die Personen-Detailseite trägt ihn als Kopf ihres Abschnitts (LFH-757). */
+export const ANHAENGE_TITEL = 'Fotos und Dateien';
+
 /**
- * Block „Fotos und Dateien“ eines Erfassungsobjekts (Schaden LFH-21, Person LFH-757) — eine Liste,
- * keine Tabelle. Jede Zeile ist ein nativer Download-Anker auf die Route des Fachmoduls, mit
- * Zeilenkennung im zugänglichen Namen.
+ * Paneel „Fotos und Dateien“ einer Erfassungs-Ablage (Schaden LFH-21, Tier und UHS LFH-758,
+ * Person LFH-757) — eine Liste, keine Tabelle. Jede Zeile ist ein nativer Download-Anker auf die modul-gegatete
+ * Route, mit Zeilenkennung im zugänglichen Namen.
  *
  * Entfernen ist serverseitig ein Soft-Delete ohne Rückweg in der Oberfläche, also Rückfrage mit
  * rotem OK-Knopf und kein Rückgängig-Toast. Scheitert es, trägt die Zeile `data-fehler` und der
@@ -87,46 +95,53 @@ interface Props {
  * aus; der Fokus geht auf den Anker der nächsten (sonst vorigen) Zeile bzw. auf „Datei ablegen“,
  * statt auf `<body>` zu fallen.
  *
- * „Datei ablegen“ steht genau einmal, auch im Leerzustand: zwei gleichnamige Ziele wären für
- * Vorlesende nicht unterscheidbar. Ohne Schreibrecht bleibt die Liste nur lesbar.
+ * „Datei ablegen“ steht nur im Paneelkopf, auch im Leerzustand: zwei gleichnamige Ziele wären für
+ * Vorlesende nicht unterscheidbar. Ohne Schreibrecht und gesperrt bleibt die Liste nur lesbar.
  *
  * Live-Zufluss (LFH-760, `anhangZufluss.ts`): eine Ablage aus einer anderen Sitzung wartet hinter
  * dem Sammelbanner, statt oben einzuschieben. Das Banner liegt als Überlagerung mit Nullhöhe über
  * der Liste (Muster `InfotelefonPage`) und verschiebt keine Zeile; „anzeigen“ gibt frei und setzt
  * den Fokus auf die oberste Zeile, statt ihn mit dem Banner auf `<body>` fallen zu lassen.
  */
-export default function ObjektAnhaenge({
+export default function ErfassungsAnhaenge({
   einsatzId,
+  bezug,
   quelle,
   darfSchreiben,
+  gesperrt,
+  hinweis,
+  vorschau = true,
+  zeilenKennung = 'erfassung-anhang-zeile',
+  children,
   huelle = 'paneel',
 }: Props) {
   const { message } = App.useApp();
   const { rollen } = useRollen();
   const qc = useQueryClient();
   const listeRef = useRef<HTMLDivElement>(null);
-  const ablegenKnopf = useRef<HTMLButtonElement>(null);
+  const kopfKnopf = useRef<HTMLButtonElement>(null);
   /** Wohin der Fokus nach einem erfolgreichen Entfernen geht — vor dem Abschicken aus der
    *  aktuellen Liste bestimmt, nach dem Refetch eingelöst. */
   const fokusNach = useRef<{ entfernt: number; ziel: number | 'kopf' } | null>(null);
   const [ablegenOffen, setAblegenOffen] = useState(false);
-  const { kennung } = quelle;
-  /** Die Schleuse gehört zu EINEM Objekt: wechselt es ohne Neumontage, beginnt sie offen. */
-  const objekt = JSON.stringify(quelle.queryKey);
-  const [zuflussZustand, setZuflussZustand] = useState<AnhangZufluss & { objekt: string }>({
-    objekt,
+  /** Die Schleuse gehört zu EINEM Besitzer (Schlüssel = Query-Key der Liste): wechselt er ohne
+   *  Neumontage, beginnt sie offen. */
+  const besitzer = JSON.stringify(quelle.queryKey);
+  const [zuflussZustand, setZuflussZustand] = useState<AnhangZufluss & { besitzer: string }>({
+    besitzer,
     ...OFFENER_ZUFLUSS,
   });
   /** Nach „anzeigen“ auf die oberste Zeile — erst nach dem Render mit der freigegebenen Liste. */
   const fokusNachFreigabe = useRef(false);
+  const aktionen = darfSchreiben && !gesperrt;
   const darfOriginal = useDarfOriginalLaden(einsatzId);
-  const invalidieren = [quelle.queryKey, einsatzKeys.etb(einsatzId)] as const;
 
   const query = useQuery({ queryKey: quelle.queryKey, queryFn: quelle.liste });
   const entfernen = useMutation({
-    mutationFn: (id: number) => quelle.entfernen(id),
+    mutationFn: (anhangId: number) => quelle.entfernen(anhangId),
     onSuccess: () => {
-      for (const queryKey of invalidieren) void qc.invalidateQueries({ queryKey });
+      void qc.invalidateQueries({ queryKey: quelle.queryKey });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       message.success('Datei entfernt');
     },
     onError: () => {
@@ -135,18 +150,21 @@ export default function ObjektAnhaenge({
   });
 
   const zufluss: AnhangZufluss =
-    zuflussZustand.objekt === objekt ? zuflussZustand : OFFENER_ZUFLUSS;
+    zuflussZustand.besitzer === besitzer ? zuflussZustand : OFFENER_ZUFLUSS;
   const { sichtbar: liste, zurueckgehalten } = teileZufluss(query.data ?? [], zufluss);
   // Nachführen im Render (Muster `AbloesungPage`), nicht im Effekt: der ließe einen Bildaufbau
   // mit veraltetem Stand durch. `nachgefuehrt` liefert `null`, wenn nichts zu tun ist.
   if (query.data) {
     const neu = nachgefuehrt(zufluss, liste);
-    if (neu || zuflussZustand.objekt !== objekt) {
-      setZuflussZustand({ objekt, ...(neu ?? zufluss) });
+    if (neu || zuflussZustand.besitzer !== besitzer) {
+      setZuflussZustand({ besitzer, ...(neu ?? zufluss) });
     }
   }
   const aendereZufluss = (f: (z: AnhangZufluss) => AnhangZufluss) =>
-    setZuflussZustand((z) => ({ objekt, ...f(z.objekt === objekt ? z : OFFENER_ZUFLUSS) }));
+    setZuflussZustand((z) => ({
+      besitzer,
+      ...f(z.besitzer === besitzer ? z : OFFENER_ZUFLUSS),
+    }));
   function zeigeZurueckgehaltene() {
     fokusNachFreigabe.current = true;
     aendereZufluss((z) => freigegeben(z, query.data ?? []));
@@ -171,7 +189,7 @@ export default function ObjektAnhaenge({
         : listeRef.current?.querySelector<HTMLElement>(
             `[data-anhang-id="${plan.ziel}"] a[download]`,
           );
-    (anker ?? ablegenKnopf.current)?.focus();
+    (anker ?? kopfKnopf.current)?.focus();
   }, [query.data]);
 
   useEffect(() => {
@@ -190,10 +208,10 @@ export default function ObjektAnhaenge({
         ? 'leer'
         : 'daten';
 
-  const zeile = (a: ErfassungsAnhang) => (
+  const zeile = (a: ErfassungsAnhangEintrag) => (
     <div
       key={a.id}
-      data-lfh="anhang-zeile"
+      data-lfh={zeilenKennung}
       data-anhang-id={a.id}
       data-fehler={a.id === fehlerId ? '' : undefined}
       style={a.id === fehlerId ? { borderInlineStart: `3px solid ${rollen.alarm}` } : undefined}
@@ -211,9 +229,9 @@ export default function ObjektAnhaenge({
                 ? originalPfad(quelle.downloadPfad(a.id))
                 : undefined
             }
-            originalKennung={`${a.dateiname}, ${kennung}`}
-            mime={quelle.vorschau ? a.mime : undefined}
-            vorschauKennung={kennung}
+            originalKennung={`${a.dateiname}, ${bezug}`}
+            mime={vorschau ? a.mime : undefined}
+            vorschauKennung={bezug}
             dateiname={a.dateiname}
             groesse={a.groesse}
             zusatz={
@@ -221,9 +239,9 @@ export default function ObjektAnhaenge({
                 {a.abgelegt_von_name ?? 'unbekannt'} · <ZeitAnzeige wert={a.abgelegt_at} />
               </>
             }
-            zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Datei von ${kennung} herunterladen`}
+            zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Datei von ${bezug} herunterladen`}
           />
-          {darfSchreiben && (
+          {aktionen && (
             <Popconfirm
               title="Datei entfernen?"
               description="Sie verschwindet aus der Liste; der ETB-Nachweis bleibt."
@@ -236,7 +254,7 @@ export default function ObjektAnhaenge({
                 type="text"
                 danger
                 loading={entfernen.isPending && entfernen.variables === a.id}
-                aria-label={`Datei ${a.dateiname} von ${kennung} entfernen`}
+                aria-label={`Datei ${a.dateiname} von ${bezug} entfernen`}
                 icon={
                   <span aria-hidden="true">
                     <IconMuelleimer />
@@ -250,9 +268,9 @@ export default function ObjektAnhaenge({
     </div>
   );
 
-  const ablegenAktion = darfSchreiben ? (
+  const ablegenAktion = aktionen ? (
     <Button
-      ref={ablegenKnopf}
+      ref={kopfKnopf}
       onClick={() => setAblegenOffen(true)}
       icon={
         <span aria-hidden="true">
@@ -267,7 +285,7 @@ export default function ObjektAnhaenge({
     ? `${liste.length} ${liste.length === 1 ? 'Datei' : 'Dateien'}`
     : undefined;
 
-  const koerper: ReactNode = (
+  const koerper = (
     <>
       <SpeicherFehler
         fehler={entfernen.error}
@@ -291,15 +309,18 @@ export default function ObjektAnhaenge({
               </Sammelbanner>
             )}
           </div>
-          {/* Eine Gruppe je Objekt: die Großansicht blättert durch seine Fotos (LFH-759). */}
+          {/* Eine Gruppe je Besitzer: die Großansicht blättert durch seine Fotos (LFH-759). */}
           <AnhangVorschauGruppe>{liste.map(zeile)}</AnhangVorschauGruppe>
         </div>
       </PaneelZustand>
-      {darfSchreiben && (
-        <AnhangAblegenModal
-          kennung={kennung}
+      {children}
+      {aktionen && (
+        <ErfassungsAnhangAblegenModal
+          einsatzId={einsatzId}
+          bezug={bezug}
+          queryKey={quelle.queryKey}
           ablegen={quelle.ablegen}
-          invalidieren={invalidieren}
+          hinweis={hinweis}
           offen={ablegenOffen}
           onSchliessen={() => setAblegenOffen(false)}
           onAbgelegt={(a) => aendereZufluss((z) => vorgemerkt(z, a.id))}

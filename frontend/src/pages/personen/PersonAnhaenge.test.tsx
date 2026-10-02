@@ -1,23 +1,16 @@
 import { http, HttpResponse } from 'msw';
 import { screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import ObjektAnhaenge, { type AnhangQuelle } from './ObjektAnhaenge';
+import PersonAnhaenge from './PersonAnhaenge';
 
 const PFAD = '/api/einsaetze/1/personen/10/anhaenge';
-const quelle: AnhangQuelle = {
-  queryKey: ['einsatz-person-anhaenge', 1, 10],
-  liste: () => fetch(PFAD).then((r) => r.json()),
-  ablegen: vi.fn(),
-  entfernen: vi.fn(),
-  downloadPfad: (id) => `${PFAD}/${id}/datei`,
-  kennung: 'Person R-007',
-  vorschau: false,
-};
+const PERSON = { id: 10, registrier_nr: 7, storniert_at: null };
 
-// Die Paneel-Form deckt `pages/schaeden/SchadenAnhaenge.test.tsx` ab; hier die zweite Hülle.
-describe('ObjektAnhaenge — Hülle „abschnitt“ (LFH-757)', () => {
+// Die Paneel-Form deckt `pages/schaeden/SchadenAnhaenge.test.tsx` ab; hier die Hülle
+// „abschnitt“ des Bausteins `ErfassungsAnhaenge` an der Person.
+describe('PersonAnhaenge (LFH-757)', () => {
   it('rendert ohne eigenes Paneel, „Datei ablegen“ über der Liste, Kennung im Namen', async () => {
     server.use(
       http.get(PFAD, () =>
@@ -34,7 +27,7 @@ describe('ObjektAnhaenge — Hülle „abschnitt“ (LFH-757)', () => {
       ),
     );
     renderMitProviders(
-      <ObjektAnhaenge einsatzId={1} quelle={quelle} darfSchreiben huelle="abschnitt" />,
+      <PersonAnhaenge einsatzId={1} person={PERSON} darfSchreiben />,
     );
     const bereich = screen.getByRole('region', { name: 'Fotos und Dateien' });
     const link = await within(bereich).findByRole('link', {
@@ -47,12 +40,12 @@ describe('ObjektAnhaenge — Hülle „abschnitt“ (LFH-757)', () => {
       'der Knopf steht vor der Liste',
     ).toBeTruthy();
     expect(within(bereich).getByText('1 Datei')).toBeInTheDocument();
-    expect(link.closest('[data-lfh="anhang-zeile"]')).not.toBeNull();
+    expect(link.closest('[data-lfh="person-anhang-zeile"]')).not.toBeNull();
   });
 
   // LFH-757 × LFH-759: jeder Abruf an der Person ist ein protokollierter Zugriff. Ein
   // Vorschaubild je Zeile schriebe schon beim Aufklappen eine Audit-Zeile je Foto.
-  it('vorschau: false — kein Vorschaubild, auch nicht an einem Foto', async () => {
+  it('kein Vorschaubild, auch nicht an einem Foto', async () => {
     const abrufe: string[] = [];
     server.use(
       http.get(PFAD, () =>
@@ -73,7 +66,7 @@ describe('ObjektAnhaenge — Hülle „abschnitt“ (LFH-757)', () => {
       }),
     );
     renderMitProviders(
-      <ObjektAnhaenge einsatzId={1} quelle={quelle} darfSchreiben huelle="abschnitt" />,
+      <PersonAnhaenge einsatzId={1} person={PERSON} darfSchreiben />,
     );
     await screen.findByRole('link', { name: /^verletzung\.jpg, / });
     expect(document.querySelector('[data-lfh="download-anker-mit-vorschau"]')).toBeNull();
@@ -81,10 +74,13 @@ describe('ObjektAnhaenge — Hülle „abschnitt“ (LFH-757)', () => {
     expect(abrufe, 'kein Abruf der Datei ohne Klick').toEqual([]);
   });
 
-  it('ohne Schreibrecht: weder Ablegen noch Entfernen', async () => {
+  it.each([
+    ['ohne Schreibrecht', PERSON, false],
+    ['storniert', { ...PERSON, storniert_at: '2026-10-02 10:00:00' }, true],
+  ])('%s: weder Ablegen noch Entfernen', async (_fall, person, darfSchreiben) => {
     server.use(http.get(PFAD, () => HttpResponse.json([])));
     renderMitProviders(
-      <ObjektAnhaenge einsatzId={1} quelle={quelle} darfSchreiben={false} huelle="abschnitt" />,
+      <PersonAnhaenge einsatzId={1} person={person} darfSchreiben={darfSchreiben} />,
     );
     const bereich = screen.getByRole('region', { name: 'Fotos und Dateien' });
     await within(bereich).findByText('Noch keine Fotos oder Dateien');

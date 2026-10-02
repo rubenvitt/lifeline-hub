@@ -1,21 +1,25 @@
-import { App, Form, type UploadFile } from 'antd';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { App, Form, Typography, type UploadFile } from 'antd';
+import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { ErfassungsModal } from '../Erfassung';
 import DateiFeld from '../DateiFeld';
 import { SpeicherFehler } from '../SpeicherHinweis';
+import { einsatzKeys } from '../../api/queryKeys';
 import { ERFASSUNG_ACCEPT } from '../../api/upload';
 
 interface Props {
-  /** Kennung des Erfassungsobjekts für den Titel („Schaden S-003“, „Person R-007“). */
-  kennung: string;
-  /** Legt genau eine Datei ab (die Route des Fachmoduls); liefert die neue Linker-id. */
+  einsatzId: number;
+  /** „Schaden S-003“, „Tier T-007“, „UHS BHP 50“ — steht im Titel. */
+  bezug: string;
+  /** Anhangliste des Besitzers; wird nach jeder Ablage neu geladen. */
+  queryKey: QueryKey;
   ablegen: (datei: File) => Promise<{ id: number }>;
-  /** Keys, die nach einer erfolgreichen Ablage neu laden (Anhangliste, ETB). */
-  invalidieren: readonly (readonly unknown[])[];
-  offen: boolean;
-  onSchliessen: () => void;
   /** Gerufen VOR der Invalidierung: die Liste merkt die eigene Ablage vor (LFH-760). */
   onAbgelegt?: (anhang: { id: number }) => void;
+  /** Zusatzzeile über dem Dateifeld (UHS: Hinweis auf das Zugriffsprotokoll). */
+  hinweis?: ReactNode;
+  offen: boolean;
+  onSchliessen: () => void;
 }
 
 interface AblageFormular {
@@ -23,17 +27,19 @@ interface AblageFormular {
 }
 
 /**
- * Ablegen-Dialog der Erfassungs-Anhänge (Schaden LFH-21, Person LFH-757) auf der
- * Erfassungs-Hülle. Ein Feld, eine Datei je Ablage — mehrere Fotos über den Serienmodus, jedes mit
- * eigenem ETB-Nachweis (pseudonym: nur Registriernummer und Art).
+ * Ablegen-Dialog einer Erfassungs-Ablage auf der Erfassungs-Hülle (LFH-21, LFH-758). Ein Feld,
+ * eine Datei je Ablage — mehrere Fotos über den Serienmodus, jedes mit eigenem pseudonymem
+ * ETB-Nachweis.
  *
  * `mutateAsync`: eine Ablehnung (400, 409) lässt die Auswahl stehen, der Grund steht als
  * `SpeicherFehler` im Dialog.
  */
-export default function AnhangAblegenModal({
-  kennung,
+export default function ErfassungsAnhangAblegenModal({
+  einsatzId,
+  bezug,
+  queryKey,
   ablegen,
-  invalidieren,
+  hinweis,
   offen,
   onSchliessen,
   onAbgelegt,
@@ -46,7 +52,8 @@ export default function AnhangAblegenModal({
     mutationFn: (datei: File) => ablegen(datei),
     onSuccess: (anhang) => {
       onAbgelegt?.(anhang);
-      for (const queryKey of invalidieren) void qc.invalidateQueries({ queryKey });
+      void qc.invalidateQueries({ queryKey });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       message.success('Datei abgelegt');
     },
   });
@@ -59,7 +66,7 @@ export default function AnhangAblegenModal({
   return (
     <ErfassungsModal<AblageFormular>
       offen={offen}
-      titel={`Datei ablegen · ${kennung}`}
+      titel={`Datei ablegen · ${bezug}`}
       form={form}
       onErfassen={(werte) => mutation.mutateAsync(werte.datei?.[0]?.originFileObj as File)}
       onFertig={schliessen}
@@ -69,6 +76,11 @@ export default function AnhangAblegenModal({
       serie
     >
       <SpeicherFehler fehler={mutation.error} titel="Nicht abgelegt" />
+      {hinweis && (
+        <Typography.Paragraph type="secondary" data-lfh="ablage-hinweis">
+          {hinweis}
+        </Typography.Paragraph>
+      )}
       <DateiFeld accept={ERFASSUNG_ACCEPT} />
     </ErfassungsModal>
   );

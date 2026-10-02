@@ -1,5 +1,6 @@
-import type { Tier, TierStatus, Spezies } from './types';
-import { apiDatei, apiGet, apiSend, mitParametern } from './client';
+import type { Tier, TierAnhang, TierStatus, Spezies } from './types';
+import { apiDatei, apiGet, apiSend, apiUpload, mitParametern } from './client';
+import { UPLOAD_TIMEOUT_MS } from './upload';
 import { EXPORT_TIMEOUT_MS } from './exportTimeout';
 import { patchBody } from './patchTriState';
 import { registrierNummer } from '../anzeige/registrierNummer';
@@ -106,4 +107,48 @@ export function storniereTier(einsatzId: number, tierId: number): Promise<void> 
 /** Registriernummer-Anzeige wie im Backend (T-042). */
 export function tierRegistrierAnzeige(nr: number): string {
   return registrierNummer('T', nr);
+}
+
+// ---------- Fotos und Dateien (LFH-758) ----------
+
+const anhangBasis = (einsatzId: number, tierId: number) =>
+  `/api/einsaetze/${einsatzId}/tiere/${tierId}/anhaenge`;
+
+/** Lebende Anhänge eines Tieres, neueste zuerst. */
+export function listeTierAnhaenge(einsatzId: number, tierId: number): Promise<TierAnhang[]> {
+  return apiGet<TierAnhang[]>(anhangBasis(einsatzId, tierId));
+}
+
+/** Legt EINE Datei am Tier ab (Feld `datei`); Timeout wie die übrigen Uploads. */
+export function legeTierAnhangAb(
+  einsatzId: number,
+  tierId: number,
+  datei: File,
+): Promise<TierAnhang> {
+  const fd = new FormData();
+  fd.append('datei', datei);
+  return apiUpload<TierAnhang>(anhangBasis(einsatzId, tierId), fd, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+  });
+}
+
+/** Entfernt einen Anhang (Soft-Delete mit ETB-Nachweis); `anhangId` ist die Linker-id. */
+export function entferneTierAnhang(
+  einsatzId: number,
+  tierId: number,
+  anhangId: number,
+): Promise<void> {
+  return apiSend<void>(`${anhangBasis(einsatzId, tierId)}/${anhangId}`, 'DELETE');
+}
+
+/**
+ * Download über die modul-gegatete Tier-Route, nie über `/anhaenge/{aid}` des Einsatzes (dort
+ * 404). Ein API-Pfad, keine Navigation, deshalb nicht in `routing/deeplinks.ts`.
+ */
+export function tierAnhangDownloadPfad(
+  einsatzId: number,
+  tierId: number,
+  anhangId: number,
+): string {
+  return `${anhangBasis(einsatzId, tierId)}/${anhangId}/datei`;
 }

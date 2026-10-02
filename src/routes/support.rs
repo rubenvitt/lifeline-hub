@@ -177,6 +177,41 @@ pub async fn original_freigeben(
     Ok(())
 }
 
+/// Liest genau eine Datei aus dem Multipart einer Erfassungs-Ablage (Schaden, Tier, UHS, Person):
+/// `(dateiname, bytes)`. Die Datei steht im Feld `datei` (API-Vertrag, wie die
+/// Dokumentenablage); eine Datei unter einem anderen Feldnamen ist 400, statt still einen
+/// undokumentierten Vertrag anzunehmen (Code-Review C2). Ein zweites Datei-Feld ist 400 (eine
+/// Datei je Ablage, LFH-21 design.md D5), keines ebenfalls; Felder ohne Dateinamen werden
+/// ignoriert. Der Typ wird vor dem Lesen der Bytes geprüft (wie `anhang::hochladen_multipart`),
+/// damit ein verbotener Typ nicht erst gelesen wird.
+pub async fn genau_eine_datei(multipart: &mut Multipart) -> Result<(String, Vec<u8>), AppError> {
+    let mut datei: Option<(String, Vec<u8>)> = None;
+    while let Some(feld) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
+    {
+        let Some(dateiname) = feld.file_name().map(str::to_string) else {
+            continue;
+        };
+        if feld.name() != Some("datei") {
+            return Err(AppError::Validation(
+                "Die Datei gehört in das Feld „datei“".into(),
+            ));
+        }
+        if datei.is_some() {
+            return Err(AppError::Validation("Genau eine Datei je Ablage".into()));
+        }
+        anhang::ermittle_mime_aus(&dateiname, anhang::ERLAUBTE_MIME_ERFASSUNG)?;
+        let daten = feld
+            .bytes()
+            .await
+            .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
+        datei = Some((dateiname, daten.to_vec()));
+    }
+    datei.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))
+}
+
 /// Meldung des 422, wenn es für einen Anhang kein Vorschaubild gibt (Spec `anhang-vorschau`).
 pub const KEINE_VORSCHAU_MELDUNG: &str = "Für diese Datei gibt es keine Vorschau.";
 
@@ -200,8 +235,8 @@ pub const ANHANG_CSP: &str = "default-src 'none'; sandbox";
 ///
 /// Jede Antwort trägt `X-Content-Type-Options: nosniff` und [`ANHANG_CSP`].
 ///
-/// Geteilt von allen fünf Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden, Person); **der
-/// einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in `tests/anhang_metadaten.rs`).
+/// Geteilt von allen Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden, Tier, UHS,
+/// Person); **der einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in `tests/anhang_metadaten.rs`).
 /// Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit, Linker-Sperre, Modul-Gate) macht der
 /// Aufrufer VORHER — dieser Helfer prüft nichts. Der Karten-Hintergrundbild-Download bleibt
 /// außen vor: er liest aus einer eigenen Tabelle. Regeln: `src/AGENTS.md`, „Anhänge“.
@@ -524,43 +559,6 @@ pub fn sse_stream_mit_replay(
             .data("resync"))],
     };
     tokio_stream::iter(prefix).chain(sse_event_stream(rx, erlaubt))
-}
-
-/// Liest genau eine Datei einer Erfassungs-Ablage (Schaden LFH-21, Person LFH-757) aus dem
-/// Multipart: `(dateiname, bytes)`. Die Datei steht im Feld
-/// `datei` (API-Vertrag, wie die Dokumentenablage); eine Datei unter einem anderen Feldnamen
-/// ist 400, statt still einen undokumentierten Vertrag anzunehmen (Code-Review C2). Ein
-/// zweites Datei-Feld ist 400 (eine Datei je Ablage, design.md D5), keines ebenfalls; Felder
-/// ohne Dateinamen werden ignoriert. Der Typ wird vor dem Lesen der Bytes geprüft (wie
-/// `anhang::hochladen_multipart`), damit ein verbotener Typ nicht erst gelesen wird.
-pub(crate) async fn genau_eine_datei(
-    multipart: &mut Multipart,
-) -> Result<(String, Vec<u8>), AppError> {
-    let mut datei: Option<(String, Vec<u8>)> = None;
-    while let Some(feld) = multipart
-        .next_field()
-        .await
-        .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
-    {
-        let Some(dateiname) = feld.file_name().map(str::to_string) else {
-            continue;
-        };
-        if feld.name() != Some("datei") {
-            return Err(AppError::Validation(
-                "Die Datei gehört in das Feld „datei“".into(),
-            ));
-        }
-        if datei.is_some() {
-            return Err(AppError::Validation("Genau eine Datei je Ablage".into()));
-        }
-        anhang::ermittle_mime_aus(&dateiname, anhang::ERLAUBTE_MIME_ERFASSUNG)?;
-        let daten = feld
-            .bytes()
-            .await
-            .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
-        datei = Some((dateiname, daten.to_vec()));
-    }
-    datei.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))
 }
 
 #[cfg(test)]

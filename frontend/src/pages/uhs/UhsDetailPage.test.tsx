@@ -18,6 +18,13 @@ vi.mock('./Grundriss', () => ({ default: () => <div>GRUNDRISS</div> }));
 vi.mock('./MaterialTab', () => ({ default: () => <div>MATERIAL-TAB</div> }));
 vi.mock('./BewegungenTab', () => ({ default: () => <div>BEWEGUNGEN-TAB</div> }));
 vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
+vi.mock('./UhsAnhaenge', () => ({
+  default: (p: { darfSchreiben: boolean; zeigeZugriffe: boolean }) => (
+    <div>
+      DATEIEN-TAB schreiben={String(p.darfSchreiben)} zugriffe={String(p.zeigeZugriffe)}
+    </div>
+  ),
+}));
 
 /** Macht Pfad+Query im DOM sichtbar — `window.location` ist unter einem `MemoryRouter` falsch. */
 function LocationProbe() {
@@ -90,6 +97,40 @@ describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () =
     // Tab-Wechsel zeigt die Bewegungen inline.
     await userEvent.click(screen.getByRole('tab', { name: 'Bewegungen' }));
     expect(await screen.findByText('BEWEGUNGEN-TAB')).toBeInTheDocument();
+  });
+});
+
+describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {
+  const uhs = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'BHP 50',
+    typ: 'behandlungsplatz',
+    status: 'aktiv',
+    standort: 'Halle 1',
+    notiz: null,
+  };
+
+  it.each([
+    ['einsatzleitung', 'schreiben=true zugriffe=true'],
+    ['fuehrungspersonal', 'schreiben=true zugriffe=false'],
+    ['beobachter', 'schreiben=false zugriffe=false'],
+  ])('%s: der dritte Reiter zeigt die Dateien (%s)', async (rolle, erwartet) => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: rolle,
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    const leiste = await screen.findByRole('tablist', { name: 'Material, Bewegungen und Dateien' });
+    expect(leiste).toBeInTheDocument();
+    expect(screen.queryByText(/DATEIEN-TAB/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Dateien' }));
+    expect(await screen.findByText(`DATEIEN-TAB ${erwartet}`)).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel', { name: 'Dateien' })).toBeInTheDocument();
   });
 });
 

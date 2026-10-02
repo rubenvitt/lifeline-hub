@@ -180,7 +180,9 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     expect(alarm).toHaveTextContent('Schaden ist storniert');
     expect(document.querySelector('.ant-message')?.textContent ?? '').not.toMatch(/storniert/);
     const zeile = (n: string) =>
-      screen.getByRole('link', { name: new RegExp(`^${n}`) }).closest('[data-lfh="anhang-zeile"]');
+      screen
+        .getByRole('link', { name: new RegExp(`^${n}`) })
+        .closest('[data-lfh="schaden-anhang-zeile"]');
     expect(zeile('dach\\.jpg')).toHaveAttribute('data-fehler');
     expect(zeile('gutachten\\.pdf')).not.toHaveAttribute('data-fehler');
   });

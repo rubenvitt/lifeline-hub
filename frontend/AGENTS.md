@@ -123,8 +123,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 
 **ETB** (Zeitachse, Erfassung, Zähler, Entwürfe): `frontend/src/etb/AGENTS.md` — gilt auch für
 `pages/EtbPage.tsx`, `pages/EtbDruckPage.tsx` und `pages/LagemeldungenPage.tsx`.
-**ETB-, Schaden- und Personen-Anhänge** stehen beim Server: `src/AGENTS.md`; Schaden und
-Person teilen den Block `components/anhaenge/ObjektAnhaenge`.
+**ETB-, Schaden-, Tier-, UHS- und Personen-Anhänge** stehen beim Server: `src/AGENTS.md`; die
+Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhaenge`.
 
 **Farbachsen** (Vertrag `theme/statusFarben.ts`)
 

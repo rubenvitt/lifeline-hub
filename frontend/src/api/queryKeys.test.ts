@@ -37,6 +37,9 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.infotelefon).toBe('einsatz-infotelefon');
     expect(EINSATZ_KEYS.schadenAnhaenge).toBe('einsatz-schaden-anhaenge');
     expect(EINSATZ_KEYS.personAnhaenge).toBe('einsatz-person-anhaenge');
+    expect(EINSATZ_KEYS.tierAnhaenge).toBe('einsatz-tier-anhaenge');
+    expect(EINSATZ_KEYS.uhsAnhaenge).toBe('einsatz-uhs-anhaenge');
+    expect(EINSATZ_KEYS.uhsAnhangZugriffe).toBe('einsatz-uhs-anhang-zugriffe');
   });
 });
 
@@ -111,8 +114,6 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   });
 
   it('bildet die 1:1-Events auf genau einen Key ab', () => {
-    expect(EINSATZ_STREAM_EVENTS.uhs).toEqual([EINSATZ_KEYS.uhs]);
-    expect(EINSATZ_STREAM_EVENTS.tier).toEqual([EINSATZ_KEYS.tiere]);
     expect(EINSATZ_STREAM_EVENTS.karte_bild).toEqual([EINSATZ_KEYS.kartenbilder]);
     // Das DTO trägt keine Nachforderungsdaten, also kein Fan-out.
     expect(EINSATZ_STREAM_EVENTS.verpflegung).toEqual([EINSATZ_KEYS.verpflegung]);
@@ -123,6 +124,13 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   // Ablegen und Entfernen einer Datei verteilen `schaden`.
   it('schaden invalidiert Schadensliste und Anhanglisten', () => {
     expect(EINSATZ_STREAM_EVENTS.schaden).toEqual(['einsatz-schaeden', 'einsatz-schaden-anhaenge']);
+  });
+
+  // LFH-758: dasselbe an Tieren und UHS; das UHS-Zugriffsprotokoll bleibt draußen.
+  it('tier und uhs invalidieren ihre Listen und Anhanglisten, nie das Zugriffsprotokoll', () => {
+    expect(EINSATZ_STREAM_EVENTS.tier).toEqual(['einsatz-tiere', 'einsatz-tier-anhaenge']);
+    expect(EINSATZ_STREAM_EVENTS.uhs).toEqual(['einsatz-uhs', 'einsatz-uhs-anhaenge']);
+    expect(NICHT_LIVE_KEYS).toContain('einsatz-uhs-anhang-zugriffe');
   });
 
   it('bildet die Cross-Modul-Fan-outs korrekt ab', () => {
@@ -242,6 +250,9 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.schaden(1, 2)).toEqual(['einsatz-schaden', 1, 2]);
     expect(einsatzKeys.schadenAnhaenge(1, 2)).toEqual(['einsatz-schaden-anhaenge', 1, 2]);
     expect(einsatzKeys.personAnhaenge(1, 2)).toEqual(['einsatz-person-anhaenge', 1, 2]);
+    expect(einsatzKeys.tierAnhaenge(1, 2)).toEqual(['einsatz-tier-anhaenge', 1, 2]);
+    expect(einsatzKeys.uhsAnhaenge(1, 2)).toEqual(['einsatz-uhs-anhaenge', 1, 2]);
+    expect(einsatzKeys.uhsAnhangZugriffe(1, 2)).toEqual(['einsatz-uhs-anhang-zugriffe', 1, 2]);
     expect(einsatzKeys.tier(1, 2)).toEqual(['einsatz-tier', 1, 2]);
     expect(einsatzKeys.brDetail(1, 2)).toEqual(['einsatz-br-detail', 1, 2]);
     expect(einsatzKeys.befehl(1, 2)).toEqual(['einsatz-befehl', 1, 2]);
@@ -529,6 +540,27 @@ describe('einsatzKeys.personAnhaenge (LFH-757)', () => {
 
   it('steht nicht im Lagebild offline', () => {
     expect(istLagebildOfflineKey(einsatzKeys.personAnhaenge(1, 2))).toBe(false);
+  });
+});
+
+describe('einsatzKeys.tierAnhaenge / uhsAnhaenge (LFH-758)', () => {
+  it.each([
+    ['tier', 'einsatz-tier-anhaenge'],
+    ['uhs', 'einsatz-uhs-anhaenge'],
+  ] as const)('das %s-Ereignis invalidiert die Anhangliste per Prefix', async (ereignis, key) => {
+    const qc = new QueryClient();
+    qc.setQueryData([key, 1, 2], []);
+    qc.setQueryData([key, 9, 2], []);
+    qc.setQueryData(['einsatz-uhs-anhang-zugriffe', 1, 2], []);
+    for (const prefix of EINSATZ_STREAM_EVENTS[ereignis]) {
+      await qc.invalidateQueries({ queryKey: [prefix, 1] });
+    }
+    expect(qc.getQueryState([key, 1, 2])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState([key, 9, 2])?.isInvalidated, 'anderer Einsatz').toBe(false);
+    expect(
+      qc.getQueryState(['einsatz-uhs-anhang-zugriffe', 1, 2])?.isInvalidated,
+      'das Zugriffsprotokoll bleibt',
+    ).toBe(false);
   });
 });
 

@@ -61,6 +61,8 @@ pub mod sprechgruppe;
 pub mod stab;
 pub mod stichwort;
 pub mod support;
+pub mod tier_anhang;
+pub mod uhs_anhang;
 pub mod verpflegung;
 pub mod vorlagendokument;
 pub mod wetter;

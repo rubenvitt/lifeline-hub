@@ -1,4 +1,5 @@
-//! Routen der Personen-Anhänge (LFH-757, Muster `routes::schaden_anhang`). Gates strukturell über
+//! Routen der Personen-Anhänge (LFH-757, Muster `routes::tier_anhang`; Liste, Ablage und
+//! Soft-Delete im Kern `anhang::erfassung`). Gates strukturell über
 //! die Extractor-Typen: `EinsatzLesezugriff<Personen>` (alle Mitglieder inkl. Beobachter, Modul
 //! Personen frei — wie die Detailansicht), `EinsatzSchreibzugriff<Personen>` (Schreibrecht +
 //! aktiver Einsatz).
@@ -22,7 +23,7 @@ use crate::einsatz::modul::Personen;
 use crate::error::AppError;
 use crate::extract::PfadParam;
 use crate::person::anhang::{self as person_anhang, Ablage, PersonAnhangAnzeige};
-use crate::person::{audit_repo, registrier_anzeige, repo as person_repo};
+use crate::person::{audit_repo, repo as person_repo};
 
 use super::einsatz_person::sse_person;
 use super::support::{anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam};
@@ -97,7 +98,7 @@ pub async fn datei(
         person_anhang::anhang_id_fuer_download(&state.pool, einsatz_id, person_id, id).await?;
     if fassung == Fassung::Original {
         let person = person_repo::laden(&state.pool, einsatz_id, person_id).await?;
-        let ablage = format!("Person {}", registrier_anzeige(person.registrier_nr));
+        let ablage = person_anhang::ablage_name(person.registrier_nr);
         original_freigeben(&state, &ctx, anhang_id, &ablage).await?;
     }
     audit_repo::anlegen(

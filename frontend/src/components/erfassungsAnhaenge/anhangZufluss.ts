@@ -1,7 +1,7 @@
 /**
- * Live-Zufluss der Anhänge eines Erfassungsobjekts ohne Sprung unter dem Cursor (LFH-760, für
- * Schaden und Person über `ObjektAnhaenge`; Bedien-Leitlinie Festlegung 6, CLS ≤ 0,1, WCAG 3.2.5;
- * Prüfliste LFH-21, Kriterium 12).
+ * Live-Zufluss der Erfassungs-Anhänge (Schaden, Tier, UHS) ohne Sprung unter dem Cursor
+ * (LFH-760, in LFH-758 in den gemeinsamen Baustein gehoben; Bedien-Leitlinie Festlegung 6,
+ * CLS ≤ 0,1, WCAG 3.2.5; Prüfliste Kriterium 12).
  *
  * Die Liste steht neueste zuerst: eine Ablage aus einer anderen Sitzung landete oben und schöbe
  * die Zeilen darunter. Fremde Neuzugänge warten deshalb hinter dem Sammelbanner, bis „anzeigen“
