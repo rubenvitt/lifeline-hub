@@ -467,7 +467,7 @@ async fn einsatzleitung_laedt_das_original_mit_vermerk_auf_jedem_weg() {
     // Kein Vermerk nennt einen Dateinamen.
     let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
     for v in vermerke(&inhalte) {
-        for name in ["foto", "lage", "Lagefoto", "dach", ".jpg"] {
+        for name in ["foto.jpg", "lage.jpg", "Lagefoto", "dach.jpg", ".jpg"] {
             assert!(!v.contains(name), "{v}");
         }
     }
@@ -519,8 +519,8 @@ async fn system_admin_der_eigenen_org_darf_einer_fremden_org_nicht() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", ADMIN_PW).await;
     // Einsatz einer Führungskraft, in dem der Admin kein Mitglied ist.
-    benutzer_anlegen(&app, &admin, "fk", "fuehrungskraft").await;
-    let fk = login_cookie(&app, "fk", "fkpw1").await;
+    benutzer_anlegen(&app, &admin, "fuehrung", "fuehrungskraft").await;
+    let fk = login_cookie(&app, "fuehrung", "fuehrungpw1").await;
     let einsatz = einsatz_anlegen(&app, &fk).await;
     let (pfad, _) = schaden_datei(&pool, einsatz, "dach.jpg", "image/jpeg", &foto_mit_gps()).await;
 

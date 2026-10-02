@@ -63,7 +63,7 @@ fn zeichenkette(d: &[u8], pos: usize, ende: usize) -> Result<(&[u8], usize), Unb
 }
 
 /// Die IDs der Items, die Metadaten tragen: `Exif` und `mime` mit XMP-Inhaltstyp.
-fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<u32>, Unbereinigbar> {
+fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<Item>, Unbereinigbar> {
     let version = *d.get(iinf.nutzlast).ok_or_else(kurz)?;
     let kopf = if version == 0 { 6 } else { 8 };
     let mut ids = Vec::new();
@@ -79,7 +79,7 @@ fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<u32>, Unbereinigbar> {
             let (_, p) = zeichenkette(d, p + 4, infe.ende)?;
             let (inhaltstyp, _) = zeichenkette(d, p, infe.ende)?;
             if ist_xmp(inhaltstyp) {
-                ids.push(id);
+                ids.push(Item { id, exif: false });
             }
             continue;
         }
@@ -89,11 +89,11 @@ fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<u32>, Unbereinigbar> {
         let typ = d.get(p..p + 4).ok_or_else(kurz)?;
         let (_, p) = zeichenkette(d, p + 4, infe.ende)?;
         match typ {
-            b"Exif" => ids.push(id),
+            b"Exif" => ids.push(Item { id, exif: true }),
             b"mime" => {
                 let (inhaltstyp, _) = zeichenkette(d, p, infe.ende)?;
                 if ist_xmp(inhaltstyp) {
-                    ids.push(id);
+                    ids.push(Item { id, exif: false });
                 }
             }
             _ => {}
@@ -107,18 +107,34 @@ fn ist_xmp(inhaltstyp: &[u8]) -> bool {
     t.contains("rdf+xml") || t.contains("xmp")
 }
 
-/// Ein Bereich der Datei, der genullt wird.
+/// Ein Metadaten-Item: EXIF oder XMP.
+#[derive(Clone, Copy)]
+struct Item {
+    id: u32,
+    exif: bool,
+}
+
+/// Ein Bereich der Datei, der genullt wird. `leeres_exif`: hier beginnt der erste Extent eines
+/// Exif-Items, dort kommt ein gültiger leerer TIFF-Block hin.
 struct Bereich {
     start: usize,
     laenge: usize,
+    leeres_exif: bool,
 }
+
+/// Inhalt eines leeren Exif-Items: `exif_tiff_header_offset` 0, dann ein TIFF-Kopf (II) mit einem
+/// IFD ohne Einträge und ohne Nachfolger. Ein genulltes Item ist kein gültiger TIFF-Block, und
+/// Leser wie Pillow brechen beim EXIF-Lesen daran ab (Praxistest LFH-747).
+const LEERES_EXIF: [u8; 18] = [
+    0, 0, 0, 0, b'I', b'I', b'*', 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
 
 /// Liest `iloc` und liefert die Dateibereiche der Items `ids`.
 fn bereiche(
     d: &[u8],
     iloc: &Box4,
     idat: Option<&Box4>,
-    ids: &[u32],
+    items: &[Item],
 ) -> Result<Vec<Bereich>, Unbereinigbar> {
     let version = *d.get(iloc.nutzlast).ok_or_else(kurz)?;
     if version > 2 {
@@ -173,14 +189,15 @@ fn bereiche(
         p += basis_groesse;
         let extents = be(d, p, 2)?;
         p += 2;
-        let gesucht = ids.contains(&id);
+        let item = items.iter().find(|i| i.id == id).copied();
+        let gesucht = item.is_some();
         if gesucht {
             gefunden.push(id);
             if datenreferenz != 0 {
                 return Err(Unbereinigbar("HEIF: Metadaten in externer Datei"));
             }
         }
-        for _ in 0..extents {
+        for extent in 0..extents {
             p += index_groesse;
             let offset = be(d, p, offset_groesse)?;
             p += offset_groesse;
@@ -208,13 +225,14 @@ fn bereiche(
             v.push(Bereich {
                 start: start as usize,
                 laenge: laenge as usize,
+                leeres_exif: extent == 0 && item.is_some_and(|i| i.exif),
             });
         }
     }
     if p > iloc.ende {
         return Err(kurz());
     }
-    if ids.iter().any(|id| !gefunden.contains(id)) {
+    if items.iter().any(|i| !gefunden.contains(&i.id)) {
         return Err(Unbereinigbar("HEIF: Metadaten-Item ohne Ort"));
     }
     Ok(v)
@@ -227,16 +245,20 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
         // `meta` ist eine FullBox: 4 Bytes Version und Flags vor den Kindern.
         let kinder = boxen(d, meta.nutzlast + 4, meta.ende)?;
         let finde = |t: &[u8; 4]| kinder.iter().find(|b| &b.typ == t);
-        let ids = match finde(b"iinf") {
+        let items = match finde(b"iinf") {
             Some(iinf) => metadaten_items(d, iinf)?,
             None => continue,
         };
-        if ids.is_empty() {
+        if items.is_empty() {
             continue;
         }
         let iloc = finde(b"iloc").ok_or(Unbereinigbar("HEIF: iloc fehlt"))?;
-        for b in bereiche(d, iloc, finde(b"idat"), &ids)? {
-            aus[b.start..b.start + b.laenge].fill(0);
+        for b in bereiche(d, iloc, finde(b"idat"), &items)? {
+            let ziel = &mut aus[b.start..b.start + b.laenge];
+            ziel.fill(0);
+            if b.leeres_exif && ziel.len() >= LEERES_EXIF.len() {
+                ziel[..LEERES_EXIF.len()].copy_from_slice(&LEERES_EXIF);
+            }
         }
     }
     Ok(Bereinigt::ohne_exif(aus))
@@ -257,9 +279,17 @@ mod tests {
         assert!(!enthaelt(&aus, b"Exif\0\0II*\0"));
         assert!(!enthaelt(&aus, b"xmpmeta"));
         assert!(enthaelt(&aus, HEVC));
-        // Alles außer den genullten Bytes ist gleich.
+        // Das Exif-Item trägt jetzt einen gültigen leeren TIFF-Block.
+        assert!(enthaelt(&aus, &LEERES_EXIF));
+        // Alles außer den genullten Bytes und dem leeren TIFF-Block ist gleich.
+        let stelle = aus
+            .windows(LEERES_EXIF.len())
+            .position(|w| w == LEERES_EXIF)
+            .unwrap();
         let geaendert: Vec<usize> = (0..h.len()).filter(|&i| h[i] != aus[i]).collect();
-        assert!(geaendert.iter().all(|&i| aus[i] == 0));
+        assert!(geaendert
+            .iter()
+            .all(|&i| aus[i] == 0 || (stelle..stelle + LEERES_EXIF.len()).contains(&i)));
     }
 
     #[test]
