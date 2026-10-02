@@ -34,11 +34,11 @@ pub fn baue_manifest(versionen: &[PublishedVersion]) -> Vec<OfflineKatalogEintra
         .collect()
 }
 
-/// Rekonstruiert eine PublishedVersion aus einem Manifest-Eintrag (Slug = Dateiname-Präfix vor dem
-/// ersten '.'; Slugs enthalten keinen Punkt). `None`, wenn kein sha256 oder Slug unbekannt.
+/// Rekonstruiert eine PublishedVersion aus einem Manifest-Eintrag (Slug per
+/// `karten_katalog::slug_aus_url`, dieselbe Regel nutzt der Hub für Karte ↔ Region). `None`,
+/// wenn kein sha256 oder Slug unbekannt.
 pub fn published_aus_eintrag(e: &OfflineKatalogEintrag) -> Option<PublishedVersion> {
-    let datei = e.url.rsplit('/').next()?;
-    let slug = datei.split('.').next()?.to_string();
+    let slug = karten_katalog::slug_aus_url(&e.url)?;
     regions::finde(&slug)?;
     let sha256 = e.sha256.clone()?;
     Some(PublishedVersion {

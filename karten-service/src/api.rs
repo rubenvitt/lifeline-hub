@@ -11,8 +11,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use karten_katalog::Zeitplan;
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
+use tokio_cron_scheduler::JobScheduler;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -21,6 +23,15 @@ pub struct AppState {
     pub storage: Arc<dyn Storage>,
     pub runner: Arc<dyn BuildRunner>,
     pub bestand: Arc<Mutex<Vec<PublishedVersion>>>,
+    pub zeitplan: ZeitplanQuelle,
+}
+
+/// Woraus `GET /zeitplan` antwortet (LFH-993): der Cron-Ausdruck und, im Modus `serve`, der
+/// laufende Scheduler samt Job-ID. Ohne Scheduler fehlt der nächste Lauf.
+#[derive(Clone)]
+pub struct ZeitplanQuelle {
+    pub cron: String,
+    pub scheduler: Option<(JobScheduler, uuid::Uuid)>,
 }
 #[derive(Deserialize)]
 struct BuildReq {
@@ -41,6 +52,7 @@ pub fn router(state: AppState) -> Router {
         .route("/regions", get(regions_liste))
         .route("/builds", post(trigger).get(liste))
         .route("/builds/{id}", get(einzeln))
+        .route("/zeitplan", get(zeitplan))
         .with_state(state)
 }
 
@@ -92,6 +104,28 @@ async fn einzeln(
     }
     st.registry.get(id).map(Json).ok_or(StatusCode::NOT_FOUND)
 }
+async fn zeitplan(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Zeitplan>, StatusCode> {
+    if !auth(&headers, &st.token) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    let naechster_lauf = match st.zeitplan.scheduler {
+        // `next_tick_for_job` will `&mut self`; der Klon teilt sich den Scheduler-Kontext.
+        Some((mut sched, id)) => sched
+            .next_tick_for_job(id)
+            .await
+            .ok()
+            .flatten()
+            .map(|t| t.to_rfc3339()),
+        None => None,
+    };
+    Ok(Json(Zeitplan {
+        naechster_lauf,
+        cron: st.zeitplan.cron.clone(),
+    }))
+}
 async fn regions_liste(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -110,6 +144,10 @@ pub fn test_state() -> AppState {
         storage: Arc::new(crate::storage::FakeStorage::neu("https://cdn.example/maps")),
         runner: Arc::new(TestRunner),
         bestand: Arc::new(Mutex::new(Vec::new())),
+        zeitplan: ZeitplanQuelle {
+            cron: "0 0 3 1 1,4,7,10 *".into(),
+            scheduler: None,
+        },
     }
 }
 #[cfg(test)]
@@ -186,6 +224,60 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(r.status(), StatusCode::ACCEPTED);
+        }
+        fn get(uri: &str, token: Option<&str>) -> Request<Body> {
+            let mut b = Request::builder().method("GET").uri(uri);
+            if let Some(t) = token {
+                b = b.header("authorization", format!("Bearer {t}"));
+            }
+            b.body(Body::empty()).unwrap()
+        }
+        async fn json(r: axum::response::Response) -> serde_json::Value {
+            let bytes = axum::body::to_bytes(r.into_body(), 1 << 20).await.unwrap();
+            serde_json::from_slice(&bytes).unwrap()
+        }
+        // LFH-993: `GET /zeitplan` nennt den nächsten Cron-Lauf.
+        #[tokio::test]
+        async fn zeitplan_ohne_token_401() {
+            let app = super::super::router(super::super::test_state());
+            let r = app.oneshot(get("/zeitplan", None)).await.unwrap();
+            assert_eq!(r.status(), StatusCode::UNAUTHORIZED);
+            let app = super::super::router(super::super::test_state());
+            let r = app.oneshot(get("/zeitplan", Some("falsch"))).await.unwrap();
+            assert_eq!(r.status(), StatusCode::UNAUTHORIZED);
+        }
+        #[tokio::test]
+        async fn zeitplan_ohne_scheduler_hat_keinen_lauf() {
+            let app = super::super::router(super::super::test_state());
+            let r = app.oneshot(get("/zeitplan", Some("t"))).await.unwrap();
+            assert_eq!(r.status(), StatusCode::OK);
+            let v = json(r).await;
+            assert_eq!(v["cron"], "0 0 3 1 1,4,7,10 *");
+            assert!(
+                v.get("naechster_lauf").is_none(),
+                "ohne Scheduler kein Lauf: {v}"
+            );
+        }
+        #[tokio::test]
+        async fn zeitplan_mit_scheduler_nennt_naechsten_lauf() {
+            let cron = "0 0 3 1 1,4,7,10 *";
+            let (sched, id) = crate::scheduler::starte(cron, || {}).await.unwrap();
+            let mut st = super::super::test_state();
+            st.zeitplan = super::super::ZeitplanQuelle {
+                cron: cron.into(),
+                scheduler: Some((sched, id)),
+            };
+            let r = super::super::router(st)
+                .oneshot(get("/zeitplan", Some("t")))
+                .await
+                .unwrap();
+            assert_eq!(r.status(), StatusCode::OK);
+            let v = json(r).await;
+            let lauf = v["naechster_lauf"]
+                .as_str()
+                .expect("naechster_lauf gesetzt");
+            let lauf = chrono::DateTime::parse_from_rfc3339(lauf).expect("RFC 3339");
+            assert!(lauf > chrono::Utc::now());
         }
         #[tokio::test]
         async fn regions_listet_baubare() {

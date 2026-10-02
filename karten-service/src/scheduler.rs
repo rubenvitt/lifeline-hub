@@ -8,7 +8,10 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 /// + Send + 'static` gefordert) nicht automatisch erfüllt, weil eine Closure nur dann `Sync` ist,
 /// wenn ihr gesamtes gefangenes Environment `Sync` ist. Deshalb `enqueue_all` in `Arc<Mutex<_>>`
 /// kapseln (macht es unabhängig von `F: Sync` zu `Sync`, solange `F: Send`) und pro Tick sperren.
-pub async fn starte<F>(cron: &str, enqueue_all: F) -> anyhow::Result<JobScheduler>
+///
+/// Gibt neben dem Scheduler die Job-ID zurück: `JobScheduler::next_tick_for_job` braucht sie für
+/// `GET /zeitplan` (LFH-993). Der Cron läuft in UTC (`Job::new_async` = `new_async_tz(…, Utc, …)`).
+pub async fn starte<F>(cron: &str, enqueue_all: F) -> anyhow::Result<(JobScheduler, uuid::Uuid)>
 where
     F: FnMut() + Send + 'static,
 {
@@ -24,7 +27,20 @@ where
             (enqueue_all.lock().unwrap_or_else(|e| e.into_inner()))();
         })
     })?;
-    sched.add(job).await?;
+    let id = sched.add(job).await?;
     sched.start().await?;
-    Ok(sched)
+    Ok((sched, id))
+}
+
+#[cfg(test)]
+mod tests {
+    /// LFH-993: Die Job-ID bleibt erhalten, damit `GET /zeitplan` den nächsten Lauf nennen kann.
+    #[tokio::test]
+    async fn naechster_tick_liegt_in_der_zukunft() {
+        let (mut sched, id) = super::starte("0 0 3 1 1,4,7,10 *", || {}).await.unwrap();
+        let naechster = sched.next_tick_for_job(id).await.unwrap();
+        let naechster = naechster.expect("ein quartalsweiser Ausdruck hat einen nächsten Lauf");
+        assert!(naechster > chrono::Utc::now());
+        sched.shutdown().await.unwrap();
+    }
 }

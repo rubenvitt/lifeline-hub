@@ -2,14 +2,14 @@
 
 ## 1. Geteilter Vertrag (`crates/karten-katalog`)
 
-- [ ] 1.1 Test zuerst: `slug_aus_url` liefert für `https://cdn/x/bayern.20260705.shortbread.mbtiles` den Wert `bayern`. Für eine URL ohne Dateinamen oder mit leerem Präfix liefert es `None`. Danach die Funktion umsetzen, und `karten-service/src/manifest.rs:published_aus_eintrag` nutzt sie. Nachweis: `cargo test -p karten-katalog` und `cargo test -p karten-service` grün.
-- [ ] 1.2 Typ `Zeitplan { naechster_lauf: Option<String>, cron: String }` (Serde, `schema`-Feature) mit Round-Trip-Test. Nachweis: `cargo test -p karten-katalog` grün.
+- [x] 1.1 Test zuerst: `slug_aus_url` liefert für `https://cdn/x/bayern.20260705.shortbread.mbtiles` den Wert `bayern`. Für eine URL ohne Dateinamen oder mit leerem Präfix liefert es `None`. Danach die Funktion umsetzen, und `karten-service/src/manifest.rs:published_aus_eintrag` nutzt sie. Nachweis: `cargo test -p karten-katalog` und `cargo test -p karten-service` grün.
+- [x] 1.2 Typ `Zeitplan { naechster_lauf: Option<String>, cron: String }` (Serde, `schema`-Feature) mit Round-Trip-Test. Nachweis: `cargo test -p karten-katalog` grün.
 
 ## 2. karten-service: `GET /zeitplan` (D8)
 
-- [ ] 2.1 `scheduler::starte` gibt `(JobScheduler, Uuid)` zurück. Test: Für einen 6-Feld-Ausdruck liefert `next_tick_for_job` einen Zeitpunkt in der Zukunft. Nachweis: `cargo test -p karten-service scheduler` grün.
-- [ ] 2.2 Tests zuerst in `api.rs`: `GET /zeitplan` ohne Token gibt 401. Mit Token kommen 200, `cron` und ein RFC-3339-`naechster_lauf`. Im Modus ohne Scheduler kommt `naechster_lauf: null`. Danach Route und `AppState`-Feld `zeitplan`, `main.rs` reicht Scheduler, UUID und Ausdruck durch. Nachweis: Die Tests sind ohne Route rot und danach grün.
-- [ ] 2.3 Runbook `docs/ops/lfh-204-karten-service-ops-runbook.md` korrigieren: Der Cron läuft in UTC (Tabelle `--schedule` und Abschnitt In-Service-Cron), `GET /zeitplan` nennen. Nachweis: `grep -n "Zeitzone des Server-Prozesses"` findet nichts mehr.
+- [x] 2.1 `scheduler::starte` gibt `(JobScheduler, Uuid)` zurück. Test: Für einen 6-Feld-Ausdruck liefert `next_tick_for_job` einen Zeitpunkt in der Zukunft. Nachweis: `cargo test -p karten-service scheduler` grün.
+- [x] 2.2 Tests zuerst in `api.rs`: `GET /zeitplan` ohne Token gibt 401. Mit Token kommen 200, `cron` und ein RFC-3339-`naechster_lauf`. Im Modus ohne Scheduler kommt `naechster_lauf: null`. Danach Route und `AppState`-Feld `zeitplan`, `main.rs` reicht Scheduler, UUID und Ausdruck durch. Nachweis: Die Tests sind ohne Route rot und danach grün.
+- [x] 2.3 Runbook `docs/ops/lfh-204-karten-service-ops-runbook.md` korrigieren: Der Cron läuft in UTC (Tabelle `--schedule` und Abschnitt In-Service-Cron), `GET /zeitplan` nennen. Nachweis: `grep -n "Zeitzone des Server-Prozesses"` findet nichts mehr.
 
 ## 3. Hub: Update-Erkennung und gemeinsamer In-Place-Start (D3, D4)
 

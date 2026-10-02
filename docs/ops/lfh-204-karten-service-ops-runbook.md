@@ -177,10 +177,10 @@ Flag und Env-Var sind austauschbar.
 | CLI-Flag | Env-Var | Default | Zweck |
 |---|---|---|---|
 | `--bind` | `KS_BIND` | `0.0.0.0:8088` | HTTP-Bind-Adresse (kein TLS, s. Abschnitt 4) |
-| `--token` | `KS_TOKEN` | `""` (leer) | Bearer-Token für `/builds`, `/regions`. **Leer = jeder authentifizierte Request scheitert mit 401** (`auth()` in `api.rs` verlangt ein nicht-leeres Token) |
+| `--token` | `KS_TOKEN` | `""` (leer) | Bearer-Token für `/builds`, `/regions`, `/zeitplan`. **Leer = jeder authentifizierte Request scheitert mit 401** (`auth()` in `api.rs` verlangt ein nicht-leeres Token) |
 | `--base-url` | `KS_BASE_URL` | `""` | Öffentliche Basis-URL des Object-Storage **ohne** End-Slash — wird sowohl für `.mbtiles`- als auch für die Manifest-URL verwendet (`public_url()` in `storage/s3.rs`) |
 | `--karten-build-dir` | `KS_KARTEN_BUILD_DIR` | `karten-build` (relativ!) | Pfad zum `karten-build/`-Checkout |
-| `--schedule` | `KS_SCHEDULE` | `"0 0 3 1 1,4,7,10 *"` | 6-Feld-Cron (inkl. Sekunden): quartalsweise, 03:00 am 1. Jan/Apr/Jul/Okt, **in der Zeitzone des Server-Prozesses** (`TZ`-Env beachten) |
+| `--schedule` | `KS_SCHEDULE` | `"0 0 3 1 1,4,7,10 *"` | 6-Feld-Cron (inkl. Sekunden): quartalsweise, 03:00 am 1. Jan/Apr/Jul/Okt, **in UTC** (`Job::new_async` in `scheduler.rs`, die `TZ`-Env wirkt nicht; in Deutschland also 04:00 bzw. 05:00) |
 | `--storage-bucket` | `KS_STORAGE_BUCKET` | `""` | Bucket-Name (S3/R2) |
 | Subkommando | — | — | `serve` (Dauerbetrieb: API+Worker+Scheduler) oder `build --slug <x>` / `build --all` (einmaliger Lauf ohne HTTP) |
 
@@ -304,6 +304,9 @@ unberührt weiter. Sind beide gesetzt, proxyt lifeline-hub server-side:
   verlässt den Server nie zum Browser)
 - `GET /api/karte/offline-karten/baubare-regionen` → `GET {url}/regions`
 - `GET /api/karte/offline-karten/bau-status` → `GET {url}/builds`
+- `GET /api/karte/offline-karten/aktualisierung` → `GET {url}/builds` und `GET {url}/zeitplan`
+  (LFH-993, nächster Cron-Lauf für die Verwaltung; ein älterer Service ohne `/zeitplan` liefert
+  404, der Hub zeigt dann keinen nächsten Kartenbau)
 
 Diese drei Endpunkte sind bereits fertig verdrahtet (LFH-203) — dieser Runbook-Schritt ist
 reines Ops (Werte setzen + Service erreichbar machen), kein Code.
@@ -357,10 +360,13 @@ gerade publizierte Manifest zurück, sodass der Bestand nicht verloren geht.
 ### 6.2 Scheduler-Kadenz
 
 In-Service-Cron (`KS_SCHEDULE`, Default `"0 0 3 1 1,4,7,10 *"` = **quartalsweise**, 03:00 am
-1. Januar/April/Juli/Oktober) — läuft nur im `serve`-Prozess, enqueued dieselbe Build-Queue
+1. Januar/April/Juli/Oktober, **UTC**) — läuft nur im `serve`-Prozess, enqueued dieselbe Build-Queue
 wie On-Demand-Trigger (ein Lock, kein Cross-Prozess-Race, `main.rs`/`scheduler.rs`). Das
 deckt sich mit der Aufgabenvorgabe „quartalsweise" — Default muss i.d.R. **nicht** verändert
-werden. Anpassung nur über `KS_SCHEDULE` (6-Feld-Cron inkl. Sekunden).
+werden. Anpassung nur über `KS_SCHEDULE` (6-Feld-Cron inkl. Sekunden, Felder in UTC). Den
+nächsten Lauf nennt `GET /zeitplan` (`{"naechster_lauf": "<RFC 3339, UTC>", "cron": "…"}`,
+Bearer wie `/builds`); die Offline-Karten-Verwaltung des Hubs zeigt ihn als „nächster
+Kartenbau“ (LFH-993).
 
 Fallback ohne Dauerbetrieb (falls 24/7-Hosting zu schwer wiegt, Design-Doc „Severability"):
 `karten-service build --all` unter System-Cron aufrufen — dann existiert kein On-Demand-
