@@ -66,6 +66,17 @@ Erfassungsmasken), MUST das System auch beim Sitzungsende löschen.
 - **WHEN** die Sitzung einer Person mit ungelesener Personen-Erfassungsquittung mit 401 endet
 - **THEN** enthält der geräteseitige Speicher danach keine Quittung mehr
 
+#### Scenario: Sitzungsende erst beim Start bemerkt
+
+- **WHEN** die App startet und der Server die Sitzungsprüfung ablehnt (etwa mit 401)
+- **THEN** löscht das System Quittungen, Ortscache und Erfassungswerte und behält die
+  ETB-Entwürfe
+
+#### Scenario: Netzfehler beim Start ist kein Sitzungsende
+
+- **WHEN** die App startet und die Sitzungsprüfung an einem Netzfehler scheitert
+- **THEN** löscht das System keine Gerätedaten
+
 ### Requirement: Höchstliegezeit von 24 Stunden ohne angemeldeten Besitzer
 
 Entwürfe und Erfassungsquittungen, deren Besitzer nicht angemeldet ist, MUST das System

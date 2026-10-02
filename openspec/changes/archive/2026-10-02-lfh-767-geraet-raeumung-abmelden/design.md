@@ -76,6 +76,24 @@ Schlüsselvergleich bräuchte einen Parser, die Datei genügt.
   alle `sessionStorage`-Schlüssel `lfh:erfassung:*` dieses Tabs entfernen.
 - **nur `'abmelden'`:** alle ETB-Entwürfe samt Vorlauf und `etb-entwurf-aktiv-*` entfernen.
 
+Eine **Ablehnung beim Start** (`me()` → `abgelehnt`: jede Antwort des Servers außer
+502/503/504, dieselbe Grenze, an der LFH-723 das Lagebild verwirft) ist ein Sitzungsende, das erst beim nächsten
+Öffnen bemerkt wird, etwa weil der Browser über den Ablauf hinweg geschlossen war. Sie läuft
+nicht durch `abmeldenLokal`, weil noch niemand angemeldet war. Der Start ruft deshalb selbst
+`geraetRaeumen('sitzungsende')`, an derselben Stelle, an der LFH-723 das Lagebild verwirft. Ein
+Netzfehler beim Start räumt nichts.
+
+**Nicht abgewartet** (Review-Befund): Ein Tab mit älterem Bundle hält die Entwurfs-DB in v1
+offen und gibt sie nicht frei. Das Upgrade auf v2 bleibt dann `blocked`, jeder Zugriff hängt.
+Anmelden, Start und Abmelden rufen das Räumen deshalb mit `void` auf. IndexedDB führt die
+Transaktionen trotzdem in Auftragsreihenfolge aus, und die Entwürfe anderer blendet der Index bis
+dahin aus. Nachweis: `auth/geraetRaeumung.haengt.test.tsx`.
+
+**Andere Tabs** (Review-Befund): Die Kanalmeldung `abgemeldet` trägt den Anlass. Hat ein anderer
+Tab freiwillig abgemeldet, räumt die folgende 401 hier ebenfalls mit `'abmelden'`. Sonst schriebe
+ein noch offenes ETB den Entwurf zurück. Ein Tab ohne Netz bleibt angemeldet (LFH-387) und
+schreibt weiter, bis er den Server erreicht.
+
 Fehler beim Räumen werden wie beim Lagebild geloggt und halten die Abmeldung nicht auf. Der
 Benutzer ist zu diesem Zeitpunkt schon `null`. Jeder Ort wird einzeln versucht: Ein Fehler in
 einer DB darf die anderen nicht stehen lassen.
@@ -112,8 +130,10 @@ Umsetzung:
   `by-benutzer-einsatz` (`['benutzer_id', 'einsatz_id']`). `entwuerfeLaden(benutzerId,
   einsatzId)` liest nur über diesen Index. Der Vorlauf trägt den vollen Entwurf und damit auch
   `benutzer_id`. Beim Nachtragen gilt dieselbe Bindung, weil der Index den Besitzer prüft.
-- `useEtbEntwuerfe` liest die Person aus `useAuth()`. Ohne Person (abgemeldet) lädt und
-  speichert der Hook nichts. `RequireAuth` lässt die Seite in diesem Zustand ohnehin nicht zu.
+- `useEtbEntwuerfe(benutzerId, einsatzId, …)` bekommt die Person von `EtbEntwurfsTabs`, das sie
+  über `useAuth()` liest. Als Parameter bleibt der Hook ohne Provider testbar. Ohne Person
+  (abgemeldet) lädt und speichert der Hook nichts. `RequireAuth` lässt die Seite in diesem
+  Zustand ohnehin nicht zu.
 - `etb-entwurf-aktiv-<einsatz>` wird zu `etb-entwurf-aktiv-<benutzer>-<einsatz>`. Ein alter
   Schlüssel ohne Benutzer verweist auf eine id, die der Index nicht mehr liefert. Er wird nur
   nicht mehr gelesen und beim Abmelden mitgeräumt (Präfix `etb-entwurf-aktiv-`).
@@ -169,9 +189,11 @@ Antreffort des ersten vorbelegt.
   der Hinweis „offline erfasst, jetzt registriert“.
 - [Ein Räumfehler in einer DB (Kontingent, gesperrte Transaktion) lässt Daten liegen] → Jeder
   Ort wird einzeln versucht. Der nächste Start räumt fremde und abgelaufene Daten nach (D4).
-- [Ein offener zweiter Tab hält eine Verbindung zur Entwurfs-DB, und das Upgrade auf v2
-  blockiert] → `openDB` mit `blocking`-Handler, der die alte Verbindung schließt. So macht es
-  `queue.ts` sinngemäß über seine versionsgeguardeten Upgrades. Wird beim Umsetzen gemessen.
+- [Ein offener Tab mit altem Bundle hält die Entwurfs-DB in v1, und das Upgrade auf v2 bleibt
+  `blocked`] → Der Auth-Pfad wartet nie auf das Räumen (D2). Die ETB-Seite des neuen Tabs wartet,
+  bis der alte schließt. Das gilt für jedes IndexedDB-Upgrade, auch für `lifeline-offline`. Ab v2
+  gibt ein `blocking`-Handler die Verbindung für künftige Upgrades frei, `blocked` wird
+  protokolliert.
 - [Ein Test prüft den Speicher-Cache statt der Platte und bleibt grün] → Die Akzeptanztests
   öffnen die IndexedDB mit eigener Verbindung über `openDB` bzw. `indexedDB.open` und lesen
   roh, nicht über die Modulfunktionen.
