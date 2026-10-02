@@ -30,9 +30,9 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 5. Purge-Lauf Phase D (D3)
 
-- [ ] 5.1 Phase D in `tick_mit_rueckschrieb` nach Phase C, Rückschrieb auch bei `geloescht > 0`. Den Modul-Doc-Kommentar um Phase D ergänzen. Verifikation: Tests in `purge_scheduler::tests`: „Fällig“ (Einsatz samt ETB, Personen, Tieren, Schäden, Anhängen weg), „Noch nicht fällig“, „Fremde Organisation“, „Frist abgelaufen, aber noch nicht geschwärzt“ (vorgemerkt mit abgelaufener Skelett-Frist: kein Löschen vor dem Lauf, der ihn schwärzt; im Schwärzungslauf geschwärzt und danach gelöscht), zweiter Lauf idempotent (liefert 0), „Ohne Skelett-Frist“ bleibt das Skelett
-- [ ] 5.2 Akzeptanztest `skelett_loeschung_hinterlaesst_keine_altbytes` (Datei-Pool über `db::connect` wie `schwaerzung_hinterlaesst_keine_altbytes`): eindeutiger Text im ETB eines geschwärzten Einsatzes, Löschung über `tick_mit_rueckschrieb`, danach DB-Datei und `-wal` byteweise durchsuchen → nicht gefunden. Mutationsprobe: ohne Rückschrieb nach Phase D gefunden, im PR-Text dokumentieren
-- [ ] 5.3 Restore-Test analog `restore_von_vor_der_schwaerzung_wird_erneut_geschwaerzt`: Sicherung vor der Löschung, löschen, zurückspielen, `tick_einmal` → wieder gelöscht, genau eine Protokollzeile
+- [x] 5.1 Phase D in `tick_mit_rueckschrieb` nach Phase C, Rückschrieb auch bei `geloescht > 0`. Den Modul-Doc-Kommentar um Phase D ergänzen. Verifikation: Tests in `purge_scheduler::tests`: „Fällig“ (Einsatz samt ETB, Personen, Tieren, Schäden, Anhängen weg), „Noch nicht fällig“, „Fremde Organisation“, „Frist abgelaufen, aber noch nicht geschwärzt“ (vorgemerkt mit abgelaufener Skelett-Frist: kein Löschen vor dem Lauf, der ihn schwärzt; im Schwärzungslauf geschwärzt und danach gelöscht), zweiter Lauf idempotent (liefert 0), „Ohne Skelett-Frist“ bleibt das Skelett
+- [x] 5.2 Akzeptanztest `skelett_loeschung_hinterlaesst_keine_altbytes` (Datei-Pool über `db::connect` wie `schwaerzung_hinterlaesst_keine_altbytes`): eindeutiger Text im ETB eines geschwärzten Einsatzes, Löschung über `tick_mit_rueckschrieb`, danach DB-Datei und `-wal` byteweise durchsuchen → nicht gefunden. Mutationsprobe: ohne Rückschrieb nach Phase D gefunden, im PR-Text dokumentieren
+- [x] 5.3 Restore-Test analog `restore_von_vor_der_schwaerzung_wird_erneut_geschwaerzt`: Sicherung vor der Löschung, löschen, zurückspielen, `tick_einmal` → wieder gelöscht, genau eine Protokollzeile
 
 ## 6. Übersicht „Aufbewahrung“ (D6)
 
