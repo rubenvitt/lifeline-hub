@@ -155,9 +155,10 @@ pub async fn gehoert_anhang_zu_einsatz(
 /// Abfrage, die das Rennen wieder öffnete. Im Rennfall antwortet die Route also 404.
 ///
 /// **Dasselbe gilt für jeden modulgebundenen Linker** ([`MODUL_LINKER`]): ETB-Anhänge
-/// (LFH-117) sind bis zur Schwärzung unveränderlich wie der Eintrag, Schaden-Anhänge (LFH-21)
-/// werden am Schaden mit Nachweis entfernt; die CASCADE nähme sonst still die Verknüpfung
-/// mit. Der Chat steht nicht im Riegel — seine Verknüpfungen räumt die CASCADE bewusst.
+/// (LFH-117) sind bis zur Schwärzung unveränderlich wie der Eintrag, Schaden- und
+/// Personen-Anhänge (LFH-21, LFH-757) werden an ihrem Objekt mit Nachweis entfernt; die
+/// CASCADE nähme sonst still die Verknüpfung mit. Der Chat steht nicht im Riegel — seine
+/// Verknüpfungen räumt die CASCADE bewusst.
 pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM anhang WHERE id = ? AND einsatz_id = ? AND NOT {}",
@@ -358,7 +359,7 @@ pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerSta
 /// **Jeder Linker gehört in diese Bedingung** — der Chat (LFH-102) als eigenes `NOT EXISTS`,
 /// alle modulgebundenen über das Register ([`MODUL_LINKER`], LFH-21). Ein fehlender Linker
 /// macht keinen Fehler, sondern löscht dort gebundene Dateien nach der Karenz still — die
-/// Tests `sweep_verwaiste_haelt_{dokument,etb,schaden}_gebundene_anhaenge` pinnen das.
+/// Tests `sweep_verwaiste_haelt_{dokument,etb,schaden,person}_gebundene_anhaenge` pinnen das.
 /// Ein soft-gelöschtes Dokument ist bewusst KEIN Orphan (Beweissicherung, LFH-632 E1).
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let grenze = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN));

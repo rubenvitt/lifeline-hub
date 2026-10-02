@@ -180,7 +180,7 @@ pub async fn original_freigeben(
 /// - [`Fassung::Original`]: die gespeicherten Bytes, ohne ETag und mit `no-store`, damit jeder
 ///   Abruf neu über [`original_freigeben`] läuft und vermerkt wird.
 ///
-/// Geteilt von allen vier Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden); **der
+/// Geteilt von allen fünf Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden, Person); **der
 /// einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in `tests/anhang_metadaten.rs`).
 /// Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit, Linker-Sperre, Modul-Gate) macht der
 /// Aufrufer VORHER — dieser Helfer prüft nichts. Der Karten-Hintergrundbild-Download bleibt

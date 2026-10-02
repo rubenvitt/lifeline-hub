@@ -7,6 +7,7 @@ import {
   Paneel,
   PaneelZeile,
   PaneelZustand,
+  paneelMetaStil,
   useRollen,
   type PaneelDatenzustand,
 } from '../instrument';
@@ -248,7 +249,8 @@ export default function ObjektAnhaenge({
             style={{ width: '100%', justifyContent: 'space-between' }}
           >
             {ablegenAktion ?? <span />}
-            {meta && <span style={{ color: rollen.text2 }}>{meta}</span>}
+            {/* Dieselbe Meta wie im Paneelkopf: Mono, `tabular-nums`. */}
+            {meta && <span style={paneelMetaStil(rollen)}>{meta}</span>}
           </Space>
         )}
         {koerper}

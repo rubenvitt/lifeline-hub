@@ -4,7 +4,13 @@
  * jede Datei trägt im Kopf, wofür sie da ist und welche Regel sie hält.
  */
 export { default as Augenbraue, augenbraueStil } from './Augenbraue';
-export { default as Paneel, PaneelZeile, paneelKopfStil, paneelZeileStil } from './Paneel';
+export {
+  default as Paneel,
+  PaneelZeile,
+  paneelKopfStil,
+  paneelMetaStil,
+  paneelZeileStil,
+} from './Paneel';
 export { default as Formularpaneel } from './Formularpaneel';
 export {
   Kennzahl,

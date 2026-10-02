@@ -1,7 +1,7 @@
 //! LFH-747, Spec `anhang-metadaten`: Bild-Anhänge werden über jeden Weg (Chat/generisch,
-//! Dokumentenablage, ETB, Schaden, Person — LFH-757) bereinigt ausgeliefert; das Original bleibt gespeichert und
-//! ist nur für Einsatzleitung und System-Admin der Einsatz-Org abrufbar, jeweils mit
-//! ETB-Vermerk. Dazu der Guard, dass nur `routes/support.rs` Anhang-Bytes ausliefert.
+//! Dokumentenablage, ETB, Schaden, Person — LFH-757) bereinigt ausgeliefert; das Original
+//! bleibt gespeichert und ist nur für Einsatzleitung und System-Admin der Einsatz-Org abrufbar,
+//! jeweils mit ETB-Vermerk. Dazu der Guard, dass nur `routes/support.rs` Anhang-Bytes ausliefert.
 //!
 //! Die Bereinigung je Format prüfen die Unit-Tests in `src/anhang/metadaten/`; hier steht, dass
 //! die Routen sie anwenden.

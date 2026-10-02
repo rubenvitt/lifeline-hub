@@ -28,6 +28,7 @@ Begründung). Gerechnetes und aus Quelltext Geschlossenes trägt im Beleg **[abg
 | `e2e/personen-anhaenge.spec.ts` „Person: aufklappen, ablegen …“ | Beim Öffnen der Person **kein** Abruf der Anhangliste → Aufklappen → Leerzustand → Dialog „Datei ablegen · Person R-001“ → `Erika_Mueller.jpg` → Zeile mit `href` auf die Personenroute → Klick löst `download` mit dem Dateinamen aus → Zugriffs-Audit zeigt „Datei geladen“ → ETB zeigt „Person R-001: Foto abgelegt“, kein Text mit „Mueller“ oder „Erika“ → Entfernen mit Rückfrage → Leerzustand → Liste über die Adresse eines zweiten Einsatzes 404 |
 | derselbe Spec, Tab-Folge (1280 px, Admin) | **gemessen:** Kopf „Fotos und Dateien“ (Enter klappt auf, Fokus bleibt am Kopf) → `Datei ablegen` → Anker „arm.jpg, 36 B, Datei von Person R-001 herunterladen“ → „Original (mit Standort) herunterladen: arm.jpg, Person R-001“ → „Datei arm.jpg von Person R-001 entfernen“ |
 | derselbe Spec, Dichte-Staffel (1280 px) | **kompakt:** Kopf 36 · Ablegen 30 · Anker 46,6 · Entfernen 30 px. **komfortabel:** 48 · 48 · 51,4 · 48 px. **handschuh:** 72 · 72 · 72 · 72 px (Boden je Stufe 30 / 48 / 72 als Literale) |
+| derselbe Spec, Dichte-Staffel als **Beobachter** (LFH-435, `rollen-kern.ts`) | Vorbedingung: im Abschnitt kein Knopf und kein Original-Verweis; Kopf und Anker ≥ 30 / 48 / 72 px |
 | `e2e/schaden-anhaenge.spec.ts` (geteilter Block und Dialog) | Dialog-Tabfolge `Datei wählen → Abbrechen → Speichern und nächste → Ablegen` ohne zweiten Stopp; Serien-Fokus zurück auf „Datei wählen“; Kontrast Tag 8,72 / 12,04, Nacht 10,38 / 12,10; Fokus-Verdeckung 60 Stopps, 31 in den Zeilen, 0 verdeckt. Lokal mit dem vorinstallierten Chromium 1194 gemessen; der Download-Dateiname mit Umlaut (`Müller_Hauswand.jpg`) kommt dort als „download“ an — auch mit dem `alpha`-Stand der Schadensdateien, also ein Befund der Browser-Version, kein Befund dieses Changes (die CI fährt den gepinnten Browser) |
 | Vitest | `ObjektAnhaenge.test.tsx` (Hülle „abschnitt“: kein Paneel, „Datei ablegen“ vor der Liste, Kennung „Person R-007“ im Namen; ohne Schreibrecht keine Knöpfe), `AnhangAblegenModal.test.tsx` (Erfassungs-Norm, `accept`, Serie, Ablehnung im Dialog, zu große Datei sendet nicht), `SchadenAnhaenge.test.tsx` unverändert grün über den Adapter, `PersonenDetailPage.test.tsx` (Liste erst beim Aufklappen und genau einmal; Beobachter ohne Aktionen; stornierte Person ohne Aktionen; kein `<form>` im `<form>`; Audit „Datei geladen“ statt Rohwert), `zugriffArt.test.ts`, `queryKeys.test.ts` (`person` invalidiert die Anhangliste, nicht das auditierte Detail; nicht offline) |
 | Grep über die neuen/geänderten Quellen (ohne Tests) | Farbliterale 0 (Rollen) · `animation`/`blink`/`keyframes` 0 · neues `size=` 0 (`dichte.guard.test.ts` grün) · Emoji 0 (Ikonen in `aria-hidden`-Hülle) · Rot neben Neutralem mit `Space size="middle"` (`aktionsabstand.guard.test.ts` grün) |
@@ -63,8 +64,15 @@ Derselbe Baustein wie am Schaden (`AnhangAblegenModal`); die Verdikte aus
 4 nicht anwendbar). Hier zusätzlich gemessen: der Titel nennt die Person („Datei ablegen · Person
 R-001“, e2e), und die Ablage aus dem Abschnitt invalidiert Anhangliste und ETB (Baustein-Vitest).
 
-## Grenze des Lese-Audits (benannt, kein Kriterium)
+## Grenzen (benannt, kein Kriterium)
 
-Jeder Abruf der Datei schreibt eine Zeile ins Zugriffsprotokoll, auch ein 304 aus dem
+**Scan-Fund (422):** Ein echter clamd-Fund ist im Testlauf nicht herstellbar (wie an Schäden,
+LFH-21 Risks). Die Personenroute ruft dieselbe Prüfkette `anhang::pruefe_vor_persist` wie Schaden
+und Dokumentenablage; `anhang::entscheide` ist unit-getestet, die Reihenfolge „Scan vor jeder
+Schreiboperation“ belegt der 503-Test in `tests/person_anhang_scan.rs`.
+
+**Lese-Audit:** Jeder Abruf der Datei schreibt eine Zeile ins Zugriffsprotokoll, auch ein 304 aus dem
 Browser-Cache und das Original. Was nach dem Download mit der gespeicherten Datei auf dem Gerät
 geschieht, sieht kein Audit; der Ausgleich ist die bereinigte Fassung ohne Standort (LFH-747).
+Ein `HEAD` auf die Datei-Route schreibt ebenfalls eine Zeile (axums `get` beantwortet ihn), ohne
+Bytes zu liefern — Über-Protokollierung, kein Leck.

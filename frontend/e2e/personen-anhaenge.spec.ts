@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Fotos und Dateien an einer Person (LFH-757) im Browser: der Abschnitt der Detailseite lädt
@@ -216,6 +217,44 @@ test.describe('Dichte-Staffel: Abschnitt „Fotos und Dateien“ an der Person',
         body: `${dichte} (Soll ≥ ${soll} px)\n${messwerte.join('\n')}`,
         contentType: 'text/plain',
       });
+    });
+  }
+});
+
+// LFH-435: das Layout-Gate misst auch den nicht-privilegierten Zustand. Der Beobachter sieht nur
+// den Anker (kein Ablegen, kein Entfernen, kein Original) — die Zeile hat dann kein zweites Ziel,
+// das ihre Höhe trüge.
+test.describe('Dichte-Staffel als Beobachter: nur der Download-Anker', () => {
+  for (const { dichte, soll } of STAFFEL) {
+    test(`${dichte}: Kopf und Anker halten ${soll} px`, async ({ page }) => {
+      test.setTimeout(60_000);
+      await anmelden(page);
+      const einsatzId = await einsatzAnlegen(page, `E2E Hochwasser Beob ${dichte} ${Date.now()}`);
+      const personId = await personAnlegen(page, einsatzId);
+      await seedeAnhang(page, einsatzId, personId, 'arm.jpg');
+      await wechsleZuRolle(page, 'beobachter', einsatzId);
+      await page.setViewportSize(FUEKW);
+      await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
+      await stelleDichte(page, dichte);
+      await klappeAuf(page);
+
+      const anker = bereich(page).getByRole('link', { name: /^arm\.jpg, / });
+      await expect(anker).toBeVisible();
+      // Vorbedingung: der Rollenzweig greift.
+      await expect(bereich(page).getByRole('button')).toHaveCount(0);
+      await expect(bereich(page).getByRole('link', { name: /^Original/ })).toHaveCount(0);
+
+      const ziele: Record<string, Locator> = {
+        Abschnittskopf: page.getByRole('button', { name: /Fotos und Dateien/ }),
+        'Download-Anker': anker,
+      };
+      for (const [name, ziel] of Object.entries(ziele)) {
+        const h = await hoehe(ziel);
+        expect(
+          h,
+          `${name} (${dichte}, Beobachter): ${h} px, Soll ≥ ${soll}`,
+        ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+      }
     });
   }
 });
