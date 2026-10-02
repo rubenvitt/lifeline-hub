@@ -41,6 +41,7 @@ function eintrag(lfd_nr: number, over: Record<string, unknown> = {}) {
     erfasst_lokal_at: null,
     berichtigt_eintrag_id: null,
     folgeauftraege: [],
+    anhaenge: [],
     ...over,
   };
 }
@@ -257,6 +258,41 @@ describe('EtbDruckPage', () => {
     expect(
       within(zeileNr(20)).getByText('berichtigt einen Eintrag außerhalb dieser Auswahl'),
     ).toBeInTheDocument();
+  });
+
+  it('nennt die Anhänge eines Eintrags mit Name und Größe, als Text und nicht als Verweis', async () => {
+    const anhang = (id: number, dateiname: string, groesse: number) => ({
+      id,
+      einsatz_id: 7,
+      dateiname,
+      mime: 'application/pdf',
+      groesse,
+      hochgeladen_von: 1,
+      erstellt_at: '2026-09-25 06:00:20',
+    });
+    tagebuch([
+      eintrag(1),
+      eintrag(2, {
+        anhaenge: [anhang(1, 'Lageskizze.pdf', 1536), anhang(2, 'IMG_0001.jpg', 2 * 1024 * 1024)],
+      }),
+      eintrag(3, { anhaenge: [anhang(3, 'Funkspruch.txt', 512)] }),
+    ]);
+    rendere();
+    await fertig();
+    const liste = within(zeileNr(2)).getByRole('list', { name: 'Anhänge zu Nr. 2' });
+    expect(
+      within(liste)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Lageskizze.pdf · 1.5 KB', 'IMG_0001.jpg · 2.0 MB']);
+    expect(within(zeileNr(2)).getByText('Anhänge')).toBeInTheDocument();
+    expect(within(zeileNr(3)).getByText('Anhang')).toBeInTheDocument();
+    expect(within(zeileNr(3)).getByRole('listitem')).toHaveTextContent('Funkspruch.txt · 512 B');
+    // Auf Papier führt ein Verweis nirgendwohin.
+    expect(zeileNr(2).querySelector('a')).toBeNull();
+    // Ein Eintrag ohne Anhänge nennt keine.
+    expect(within(zeileNr(1)).queryByRole('list')).toBeNull();
+    expect(within(zeileNr(1)).queryByText(/Anh(a|ä)ng/)).toBeNull();
   });
 
   it('sperrt Drucken, solange geladen wird, und nennt den Fortschritt', async () => {
