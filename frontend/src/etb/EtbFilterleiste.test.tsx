@@ -117,7 +117,7 @@ describe('EtbFilterleiste', () => {
     );
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
     // Der Zeitwert kommt als UTC-Wire-String und muss als ORTSZEIT im Feld stehen; ohne die Umkehr
-    // aus `filterZeit.ts` stünde er um den Zonenversatz verschoben.
+    // aus `anzeige/zeitEingabe.ts` stünde er um den Zonenversatz verschoben.
     expect(screen.getByPlaceholderText('von')).toHaveValue('2026-08-21 08:00:00');
   });
 

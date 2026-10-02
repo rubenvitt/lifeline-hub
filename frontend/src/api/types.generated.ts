@@ -266,31 +266,41 @@ export interface components {
         };
         /**
          * @description Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine
-         *     personenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen.
+         *     personenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im
+         *     Zustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine
+         *     Bezeichnung.
          */
         AufbewahrungEintragAnzeige: {
             abgeschlossen_at?: string | null;
-            bezeichnung: string;
+            /** @description Fehlt nur bei einem endgültig gelöschten Einsatz. */
+            bezeichnung?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             einsatznummer_intern?: string | null;
+            /** @description Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`. */
+            endgueltig_geloescht_at?: string | null;
             /** @description Zeitpunkt der Löschvormerkung (Beginn der Karenz). */
             geloescht_at?: string | null;
             geschwaerzt_at?: string | null;
             /** @description Ende der Karenz (`geloescht_at` + 30 Tage); fehlt ohne Vormerkung. */
             karenz_ende?: string | null;
+            /**
+             * @description Zeitpunkt der endgültigen Löschung des Skeletts (später aus Abschluss + Skelett-Frist
+             *     und Schwärzung); fehlt ohne Skelett-Frist der Org und bei gelöschten Einsätzen.
+             */
+            loeschung_am?: string | null;
             /** @description Aufbewahrungsfrist (UTC, DB-Format); fehlt = keine Frist. */
             retention_bis?: string | null;
             zustand: components["schemas"]["AufbewahrungZustand"];
         };
         /**
-         * @description Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
-         *     keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
-         *     [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
+         * @description Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23) oder — nur
+         *     `EndgueltigGeloescht` — einer Zeile des Löschprotokolls (LFH-750). Aktive Einsätze haben
+         *     keinen ([`zustand`] liefert `None`). Genau ein Wert; die Rangfolge steht an [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
          *     `tests/enum_wire_kontrakt.rs`.
          * @enum {string}
          */
-        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt";
+        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "loeschung_ausstehend" | "endgueltig_geloescht";
         /**
          * @description Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus
          *     dem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate
@@ -2902,6 +2912,11 @@ export interface components {
              * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
              */
             rueckmeldung_frist_min?: number | null;
+            /**
+             * Format: int64
+             * @description Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt.
+             */
+            skelett_dauer_tage?: number | null;
             zeitformat?: components["schemas"]["Zeitformat"] | null;
             zeitzone?: string | null;
         };

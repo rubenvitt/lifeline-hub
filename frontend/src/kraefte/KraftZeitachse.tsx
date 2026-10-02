@@ -13,7 +13,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { PaneelZustand, Zeitachseneintrag, monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import {
   ART_WORT,
   HERKUNFT_WORT,

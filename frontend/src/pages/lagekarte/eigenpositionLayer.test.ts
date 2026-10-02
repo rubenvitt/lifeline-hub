@@ -3,9 +3,11 @@ import {
   EIGENPOSITION_LAYER,
   EIGENPOSITION_QUELLE,
   eigenpositionFc,
+  eigenpositionRahmen,
   genauigkeitsKreis,
   sorgeFuerEigenpositionLayer,
 } from './eigenpositionLayer';
+import { pinneMarkerLayerNachOben } from './markerLayer';
 
 /** Haversine — unabhängig vom Rechenweg der Kreisfunktion, sonst prüfte sie sich selbst. */
 function abstandM([lon1, lat1]: [number, number], [lon2, lat2]: [number, number]) {
@@ -30,6 +32,30 @@ describe('genauigkeitsKreis (LFH-712)', () => {
   });
 });
 
+describe('eigenpositionRahmen (LFH-766)', () => {
+  it('umschließt bei 2 km jeden Punkt des Kreises und liegt symmetrisch um den Standort', () => {
+    const pos = { lat: 52.37, lon: 9.73, genauigkeit: 2000 };
+    const [[west, sued], [ost, nord]] = eigenpositionRahmen(pos);
+    for (const [lon, lat] of genauigkeitsKreis(pos.lat, pos.lon, pos.genauigkeit)) {
+      expect(lon).toBeGreaterThanOrEqual(west);
+      expect(lon).toBeLessThanOrEqual(ost);
+      expect(lat).toBeGreaterThanOrEqual(sued);
+      expect(lat).toBeLessThanOrEqual(nord);
+    }
+    // Nord-Süd-Ausdehnung = Durchmesser (±1 %), unabhängig gerechnet.
+    expect(Math.abs(abstandM([pos.lon, sued], [pos.lon, nord]) - 4000) / 4000).toBeLessThan(0.01);
+    expect(ost - pos.lon).toBeCloseTo(pos.lon - west, 6);
+    expect(nord - pos.lat).toBeCloseTo(pos.lat - sued, 3);
+  });
+
+  it('fällt bei Radius 0 auf den Punkt zusammen', () => {
+    expect(eigenpositionRahmen({ lat: 52, lon: 9, genauigkeit: 0 })).toEqual([
+      [9, 52],
+      [9, 52],
+    ]);
+  });
+});
+
 describe('eigenpositionFc (LFH-712)', () => {
   it('ohne Position leer, mit Position Kreis und Punkt', () => {
     expect(eigenpositionFc(null).features).toHaveLength(0);
@@ -39,19 +65,36 @@ describe('eigenpositionFc (LFH-712)', () => {
   });
 });
 
-function fakeMap() {
+/** Karte mit echter Ebenenfolge: `addLayer`/`moveLayer` ordnen wie MapLibre (ohne `vor` ans Ende). */
+function fakeMap(vorhanden: string[] = []) {
   const quellen = new Map<string, { setData: ReturnType<typeof vi.fn> }>();
   const layers = new Map<string, Record<string, unknown>>();
+  const folge = [...vorhanden];
+  for (const id of vorhanden) layers.set(id, { id });
   const moves: string[] = [];
+  const einordnen = (id: string, vor?: string) => {
+    const alt = folge.indexOf(id);
+    if (alt >= 0) folge.splice(alt, 1);
+    const ziel = vor ? folge.indexOf(vor) : -1;
+    if (ziel >= 0) folge.splice(ziel, 0, id);
+    else folge.push(id);
+  };
   const map = {
     getSource: (id: string) => quellen.get(id),
     addSource: vi.fn((id: string) => quellen.set(id, { setData: vi.fn() })),
     getLayer: (id: string) => layers.get(id),
-    addLayer: vi.fn((l: Record<string, unknown>) => layers.set(l.id as string, l)),
+    getStyle: () => ({ layers: folge.map((id) => ({ id })) }),
+    addLayer: vi.fn((l: Record<string, unknown>, vor?: string) => {
+      layers.set(l.id as string, l);
+      einordnen(l.id as string, vor);
+    }),
     setPaintProperty: vi.fn(),
-    moveLayer: vi.fn((id: string) => moves.push(id)),
+    moveLayer: vi.fn((id: string, vor?: string) => {
+      moves.push(id);
+      einordnen(id, vor);
+    }),
   };
-  return { map, quellen, layers, moves };
+  return { map, quellen, layers, moves, folge };
 }
 
 describe('sorgeFuerEigenpositionLayer (LFH-712)', () => {
@@ -72,6 +115,49 @@ describe('sorgeFuerEigenpositionLayer (LFH-712)', () => {
     expect([...layers.keys()]).toEqual([...EIGENPOSITION_LAYER]);
     // Punkt zuletzt = oben, Kante direkt darunter.
     expect(moves.slice(-2)).toEqual(['eigenposition-kante', 'eigenposition-punkt']);
+  });
+
+  it('LFH-766: liegt unter der laufenden Zeichnung, auch nach weiteren Meldungen', () => {
+    const { map, folge } = fakeMap([
+      'marker-punkte',
+      'suchnadel-punkt',
+      'td-zone-polygon',
+      'td-zone-point',
+    ]);
+    const pos = eigenpositionFc({ lat: 52, lon: 9, genauigkeit: 30 });
+    sorgeFuerEigenpositionLayer(map as never, pos, '#1677ff');
+    sorgeFuerEigenpositionLayer(map as never, pos, '#1677ff');
+    expect(folge).toEqual([
+      'marker-punkte',
+      'suchnadel-punkt',
+      ...EIGENPOSITION_LAYER,
+      'td-zone-polygon',
+      'td-zone-point',
+    ]);
+  });
+
+  it('LFH-766: ohne Zeichnung ganz oben, über später angelegten Lagedaten', () => {
+    const { map, folge } = fakeMap(['marker-punkte']);
+    const pos = eigenpositionFc({ lat: 52, lon: 9, genauigkeit: 30 });
+    sorgeFuerEigenpositionLayer(map as never, pos, '#1677ff');
+    map.addLayer({ id: 'zonen-flaeche' });
+    sorgeFuerEigenpositionLayer(map as never, pos, '#1677ff');
+    expect(folge).toEqual(['marker-punkte', 'zonen-flaeche', ...EIGENPOSITION_LAYER]);
+  });
+
+  it('LFH-766: bleibt über den Markern, wenn sie nach einer neuen Datenebene nach oben rücken', () => {
+    const { map, folge } = fakeMap(['marker-kreis', 'marker-label']);
+    const pos = eigenpositionFc({ lat: 52, lon: 9, genauigkeit: 30 });
+    sorgeFuerEigenpositionLayer(map as never, pos, '#1677ff');
+    // Neue Fachebene, danach pinnt die Karte die Marker — ohne neue Standortmeldung.
+    map.addLayer({ id: 'fachebene-kritis-punkte' });
+    pinneMarkerLayerNachOben(map as never);
+    expect(folge).toEqual([
+      'fachebene-kritis-punkte',
+      'marker-kreis',
+      'marker-label',
+      ...EIGENPOSITION_LAYER,
+    ]);
   });
 
   it('spielt neue Daten per setData ein und färbt beim Moduswechsel nach', () => {

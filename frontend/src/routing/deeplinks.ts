@@ -389,7 +389,7 @@ export function etbDruckPfad(
  *
  * Verwirft Unbrauchbares GANZ: ein unbekannter Typ ergibt gar keinen Filter, sonst entstünde
  * ein Query-Key, den der Server mit 400 quittiert, während die Leiste einen gültigen Stand
- * zeigt. Die Zeitwerte gehen ungeprüft durch; ihre Umkehr macht `etb/filterZeit.ts`.
+ * zeigt. Die Zeitwerte gehen ungeprüft durch; ihre Umkehr macht `anzeige/zeitEingabe.ts`.
  */
 export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
   const werte: EtbFilterWerte = {};

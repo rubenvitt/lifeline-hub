@@ -126,6 +126,10 @@ nachträglich geschwärzt:
   Vormerkung aus der Sicherung gilt dabei, die Karenz beginnt nicht neu. Stammt die
   Sicherung aus der Zeit **vor** der Vormerkung, merkt der Server den Einsatz neu vor, und
   die Karenz von 30 Tagen läuft ab dann noch einmal.
+- **Endgültig gelöschte Skelette** (LFH-750, nur mit einer Skelett-Frist der Organisation):
+  Eine Sicherung von vor der Löschung bringt das Skelett samt ETB zurück. Der nächste
+  Purge-Lauf löscht es erneut, denn die Frist ergibt sich aus Abschluss und Org-Einstellung.
+  Hat jemand die Skelett-Frist inzwischen geleert, bleibt das zurückgespielte Skelett erhalten.
 
 **Erster Start nach dem Update auf LFH-725:** Der Server baut die Datenbank einmal per
 `VACUUM` neu auf. Dabei verschwinden auch Reste früherer Schwärzungen und gelöschter Anhänge.

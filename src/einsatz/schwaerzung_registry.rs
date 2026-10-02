@@ -1818,6 +1818,33 @@ pub const TABELLEN: &[TabellenRegel] = &[
             ),
         ],
     },
+    // ---------- Löschprotokoll der endgültigen Löschung (LFH-750) ----------
+    // Wird über die Spalte `einsatz_id` entdeckt (wie `demo_import`, ohne FK). Die Zeile entsteht
+    // erst, wenn der Einsatz gelöscht wird; zur Schwärzung eines Einsatzes gibt es sie nie. Kein
+    // Scrub: Nummer, Zeitpunkte und Frist, ohne Bezeichnung, Stichwort, Ort und ETB-Text.
+    TabellenRegel {
+        tabelle: "aufbewahrung_loeschprotokoll",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("org_id", G_FK),
+            retain(
+                "einsatz_id",
+                "ID des endgültig gelöschten Einsatzes, bewusst ohne FK: sperrt ID und \
+                 Einsatznummer gegen die Wiedervergabe (LFH-750 D5), kein Personenbezug",
+            ),
+            retain("einsatznummer_intern", G_ZAEHLER),
+            retain("nummer_jahr", G_ZAEHLER),
+            retain("nummer_lfd", G_ZAEHLER),
+            retain("abgeschlossen_at", G_ZEIT),
+            retain("geschwaerzt_at", G_ZEIT),
+            retain("geloescht_at", G_ZEIT),
+            retain("skelett_dauer_tage", G_KONFIG),
+            retain("akteur_id", G_FK),
+        ],
+    },
     // Die Marke kommt über die CASCADE-Hülle (`import_id` → `demo_import`) mit; sie zeigt auf
     // Stammdaten der Org, nie auf Einsatzzeilen.
     TabellenRegel {

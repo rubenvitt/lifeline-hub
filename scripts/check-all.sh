@@ -75,7 +75,7 @@ SCHRITTE=13
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
-# ist die Zielumgebung, die Anzeigezone ist Ortszeit (etb/filterZeit.ts). Ein alleinstehendes
+# ist die Zielumgebung, die Anzeigezone ist Ortszeit (anzeige/zeitEingabe.ts). Ein alleinstehendes
 # `pnpm test`/`pnpm e2e` läuft nicht durch diesen Wrapper.
 export TZ="${TZ_ERZWUNGEN:-Europe/Berlin}"
 echo "==> Zeitzone für den Lauf: $TZ"

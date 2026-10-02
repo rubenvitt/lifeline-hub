@@ -1126,3 +1126,59 @@ async fn frist_put_fremder_admin_traegt_nur_eine_rolle_als_einsatzleitung() {
     assert_eq!(s, StatusCode::OK, "fremder Admin als Einsatzleitung: {v}");
     assert_eq!(v["retention_bis"].as_str(), Some(neu.as_str()));
 }
+
+/// LFH-750, Spec `aufbewahrung` und `aufbewahrung-archiv`: mit Skelett-Frist löscht der Lauf
+/// den geschwärzten Einsatz endgültig; die Archivakte liefert danach 404 (unbekannter
+/// Einsatz), die Übersicht zeigt nur noch die Protokollzeile ohne Bezeichnung.
+#[tokio::test]
+async fn nach_endgueltiger_loeschung_akte_404_und_protokollzeile_in_der_uebersicht() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        "/api/org-einstellungen",
+        &admin,
+        Some(r#"{"skelett_dauer_tage": 1, "skelett_dauer_bestaetigt": true}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let id = abgeschlossen(&app, &admin).await;
+    let _aid = anhang(&pool, id).await;
+    sqlx::query("UPDATE einsatz SET abgeschlossen_at = ? WHERE id = ?")
+        .bind(vor_tagen(60))
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    setze(&pool, id, Some(&vor_tagen(50)), Some(&vor_tagen(31)), None).await;
+
+    assert_eq!(
+        lifeline_hub::einsatz::purge_scheduler::tick_einmal(
+            &pool,
+            &lifeline_hub::live::LiveHub::new(),
+            Utc::now()
+        )
+        .await,
+        2,
+        "Tick schwärzt und löscht endgültig"
+    );
+    for uri in [
+        format!("/api/aufbewahrung/einsaetze/{id}"),
+        format!("/api/aufbewahrung/einsaetze/{id}/etb"),
+    ] {
+        let (s, v) = anfrage(&app, "GET", &uri, &admin, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{uri}: {v}");
+    }
+    let (s, v) = anfrage(&app, "GET", "/api/aufbewahrung", &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zeile = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|z| z["einsatz_id"] == id)
+        .unwrap_or_else(|| panic!("Protokollzeile fehlt: {v}"));
+    assert_eq!(zeile["zustand"], "endgueltig_geloescht");
+    assert!(zeile.get("bezeichnung").is_none(), "{zeile}");
+    assert!(zeile["endgueltig_geloescht_at"].is_string(), "{zeile}");
+}

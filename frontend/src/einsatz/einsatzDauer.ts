@@ -8,7 +8,7 @@ dayjs.extend(utc);
  * ein Zeitraum, keine Uhrzeit, der beim Tageswechsel nicht zurückspringen darf.
  *
  * `beginn`/`ende` sind UTC-Wirestrings OHNE Zonenkennung und werden ausdrücklich als UTC
- * gelesen; `dayjs(s)` verschöbe die Dauer still um den Zonenversatz (wie `etb/filterZeit.ts`).
+ * gelesen; `dayjs(s)` verschöbe die Dauer still um den Zonenversatz (wie `anzeige/zeitEingabe.ts`).
  *
  * Abgeschlossen zählt bis `ende`. Ein Beginn in der Zukunft ergibt `00:00 h`, ein unlesbarer
  * Beginn `null` — der Aufrufer lässt die Anzeige dann weg.
