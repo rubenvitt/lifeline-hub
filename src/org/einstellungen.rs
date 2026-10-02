@@ -124,7 +124,8 @@ pub struct OrgEinstellungenAnzeige {
     #[schema(value_type = Option<crate::einsatz::einstellungen::Koordinatenformat>)]
     pub koordinatenformat: Option<String>,
     pub retention_dauer_tage: Option<i64>,
-    /// Skelett-Frist in Tagen ab Abschluss (LFH-750); `null` = das Skelett bleibt unbegrenzt.
+    /// Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub skelett_dauer_tage: Option<i64>,
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,

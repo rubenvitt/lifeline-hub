@@ -204,7 +204,7 @@ beide Mengen. Die Archivakte eines gelöschten Einsatzes liefert über `fordere_
 404 (unbekannter Einsatz), daran ändert sich nichts.
 
 Frontend (`AufbewahrungUebersicht.tsx`): Statusetiketten und Filter für die zwei neuen
-Zustände, eine Spalte „Löschung am“ (über `filterZeit`, wie die übrigen Zeitspalten), keine
+Zustände, eine Spalte „Löschung am“ (über `ZeitAnzeige`, wie die übrigen Zeitspalten), keine
 Zeilenaktion und kein Link bei `endgueltig_geloescht`. Anstelle der Bezeichnung steht dort
 „endgültig gelöscht“. Die Gestaltungsregeln (Statusetikett mit Wort, Farbrollen) stehen in
 `frontend/AGENTS.md`.
@@ -218,6 +218,25 @@ Tage. Leer = das pseudonyme Skelett bleibt unbegrenzt erhalten.“ `orgEinstellu
 dem Absenden ein Bestätigungsdialog („Skelette, deren Frist danach abgelaufen ist, werden
 binnen 10 Minuten unwiderruflich gelöscht.“). Erst dann geht der PUT mit
 `skelett_dauer_bestaetigt: true` raus.
+
+### D8. ETB-Suchindex mit `secure-delete` (aus dem Review)
+
+Das ETB hat einen FTS5-Index mit externem Inhalt (`etb_eintrag_fts`, `migrations/0004_etb.sql`).
+Bei einer Löschung setzt der Trigger `etb_eintrag_fts_ad` das FTS5-Kommando `'delete'` ab.
+Ohne die FTS5-Option `secure-delete` schreibt dieses Kommando nur Löschmarken in ein neues
+Segment. Die alten Tokens bleiben in `etb_eintrag_fts_data` stehen, und weil diese Seiten
+belegt bleiben, nullt `PRAGMA secure_delete` sie nicht. Bis LFH-725 fiel das nicht auf, denn
+dort ist das ETB Retain. Erst mit der endgültigen Löschung verschwindet das ETB tatsächlich.
+Migration 0135 setzt deshalb einmalig `INSERT INTO etb_eintrag_fts(etb_eintrag_fts, rank)
+VALUES('secure-delete', 1)` (dauerhaft in `etb_eintrag_fts_config`) und führt danach
+`'optimize'` aus, das auch Reste früherer Löschungen wie die der Demo-Daten wegräumt.
+
+Nachweis: `skelett_loeschung_hinterlaesst_keine_altbytes` pflanzt ein einzelnes
+kleingeschriebenes Wort, so wie es der Tokenizer `unicode61` ablegt. Ohne die beiden Zeilen
+wird der Test rot.
+
+- *Verworfen: `'optimize'` nach jeder Löschung in Phase D.* Das schreibt bei jedem Lauf den
+  ganzen Index neu. `secure-delete` entfernt dagegen genau die Tokens der gelöschten Zeilen.
 
 ## Risks / Trade-offs
 

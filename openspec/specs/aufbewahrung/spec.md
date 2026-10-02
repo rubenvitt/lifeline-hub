@@ -3,8 +3,10 @@
 ## Purpose
 Personenbezogene Daten abgeschlossener Einsätze werden nach einer festgelegten Frist gesperrt
 und nach einer Karenz unwiderruflich geschwärzt. Die rechtsverbindliche Einsatzdokumentation
-bleibt dabei als pseudonymes Skelett erhalten, und jeder Schritt steht nachvollziehbar im
-Einsatztagebuch.
+bleibt dabei als pseudonymes Skelett erhalten, bis eine von der Organisation festgelegte
+Skelett-Frist abläuft; dann wird der Einsatz endgültig gelöscht. Jeder Schritt bis zur
+Schwärzung steht nachvollziehbar im Einsatztagebuch, die endgültige Löschung im Löschprotokoll
+der Organisation.
 
 ## Requirements
 

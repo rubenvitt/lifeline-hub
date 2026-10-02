@@ -1,5 +1,5 @@
 -- LFH-750: Endgültige Löschung des pseudonymen Skeletts geschwärzter Einsätze.
--- Herleitung: openspec/changes/lfh-750-skelett-endgueltig-loeschen/design.md (D1, D4, D5).
+-- Herleitung: openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md (D1, D4, D5).
 
 -- Skelett-Frist der Organisation in Tagen ab Abschluss; NULL = das Skelett bleibt unbegrenzt
 -- erhalten. Validierung (1…36500) in Rust, kein DB-CHECK — wie retention_dauer_tage.
@@ -23,3 +23,12 @@ CREATE TABLE aufbewahrung_loeschprotokoll (
 );
 
 CREATE INDEX idx_aufbewahrung_loeschprotokoll_org ON aufbewahrung_loeschprotokoll(org_id);
+
+-- Der ETB-Suchindex soll Gelöschtes wirklich entfernen. Ohne die FTS5-Option `secure-delete`
+-- schreibt ein 'delete' (Trigger `etb_eintrag_fts_ad`) nur Löschmarken in ein neues Segment:
+-- die Wörter des ETB blieben als Tokens in `etb_eintrag_fts_data` stehen, auch nach der
+-- endgültigen Löschung, und `PRAGMA secure_delete` erreicht sie nicht, weil diese Seiten
+-- belegt bleiben. Die Option steht in `etb_eintrag_fts_config` und gilt damit dauerhaft;
+-- `optimize` führt die Segmente einmal zusammen und räumt Reste früherer Löschungen weg.
+INSERT INTO etb_eintrag_fts(etb_eintrag_fts, rank) VALUES('secure-delete', 1);
+INSERT INTO etb_eintrag_fts(etb_eintrag_fts) VALUES('optimize');

@@ -289,9 +289,9 @@ export interface components {
             zustand: components["schemas"]["AufbewahrungZustand"];
         };
         /**
-         * @description Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
-         *     keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
-         *     [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
+         * @description Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23) oder — nur
+         *     `EndgueltigGeloescht` — einer Zeile des Löschprotokolls (LFH-750). Aktive Einsätze haben
+         *     keinen ([`zustand`] liefert `None`). Genau ein Wert; die Rangfolge steht an [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
          *     `tests/enum_wire_kontrakt.rs`.
          * @enum {string}
          */
@@ -2860,7 +2860,7 @@ export interface components {
             rueckmeldung_frist_min?: number | null;
             /**
              * Format: int64
-             * @description Skelett-Frist in Tagen ab Abschluss (LFH-750); `null` = das Skelett bleibt unbegrenzt.
+             * @description Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt.
              */
             skelett_dauer_tage?: number | null;
             zeitformat?: components["schemas"]["Zeitformat"] | null;

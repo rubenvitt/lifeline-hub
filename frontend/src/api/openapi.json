@@ -855,7 +855,7 @@
       },
       "AufbewahrungZustand": {
         "type": "string",
-        "description": "Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben\nkeinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an\n[`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`.",
+        "description": "Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23) oder — nur\n`EndgueltigGeloescht` — einer Zeile des Löschprotokolls (LFH-750). Aktive Einsätze haben\nkeinen ([`zustand`] liefert `None`). Genau ein Wert; die Rangfolge steht an [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`.",
         "enum": [
           "ohne_frist",
           "frist_laeuft",
@@ -7643,7 +7643,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "Skelett-Frist in Tagen ab Abschluss (LFH-750); `null` = das Skelett bleibt unbegrenzt."
+            "description": "Skelett-Frist in Tagen ab Abschluss (LFH-750); fehlt = das Skelett bleibt unbegrenzt."
           },
           "zeitformat": {
             "oneOf": [

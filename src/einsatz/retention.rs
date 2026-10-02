@@ -40,9 +40,9 @@ pub fn karenz_abgelaufen(geloescht_at: Option<&str>, jetzt: DateTime<Utc>) -> bo
 }
 
 wire_enum! {
-    /// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
-    /// keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
-    /// [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
+    /// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23) oder — nur
+    /// `EndgueltigGeloescht` — einer Zeile des Löschprotokolls (LFH-750). Aktive Einsätze haben
+    /// keinen ([`zustand`] liefert `None`). Genau ein Wert; die Rangfolge steht an [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
     /// `tests/enum_wire_kontrakt.rs`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AufbewahrungZustand {

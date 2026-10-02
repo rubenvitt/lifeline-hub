@@ -63,8 +63,9 @@ _keine_
 - **Backend:** Migration (Spalte `org_einstellungen.skelett_dauer_tage`, Tabelle
   `aufbewahrung_loeschprotokoll`). Dazu `src/org/einstellungen.rs`,
   `src/routes/org_einstellungen.rs` (Validierung, Bestätigung, 409), `src/einsatz/retention.rs`
-  (Zustände, Löschtermin), `src/einsatz/repo.rs` (Kandidaten, Löschung,
-  ID-/Nummernvergabe), `src/einsatz/purge_scheduler.rs` (neue Phase, Rückschrieb),
+  (Zustände, Löschtermin), neu `src/einsatz/skelett_loeschung.rs` (Kandidaten, Löschung),
+  `src/einsatz/repo.rs` (ID-/Nummernvergabe), `src/einsatz/purge_scheduler.rs` (neue Phase,
+  Rückschrieb), `migrations/0135` auch für `secure-delete` am ETB-Suchindex (design.md D8),
   `src/aufbewahrung/{mod,repo}.rs` (Übersicht), `src/einsatz/schwaerzung_registry.rs`
   (Klassifikation der neuen Tabelle).
 - **API/DTO:** `GET /api/aufbewahrung` bekommt neue Felder, und `bezeichnung` wird optional.

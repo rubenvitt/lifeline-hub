@@ -165,7 +165,7 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   fail-closed wie beim Purge-Audit. Erstmaliges Setzen und Verkürzen der Frist ohne
   `skelett_dauer_bestaetigt` → 409. Das Protokoll sperrt ID und Einsatznummer
   (`einsatz::repo::anlegen_tx`). Herleitung:
-  `openspec/changes/lfh-750-skelett-endgueltig-loeschen/design.md`.
+  `openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md`.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

@@ -501,7 +501,10 @@ async fn skelett_dauer_erstmals_ohne_bestaetigung_ist_409() {
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
     let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
-    assert!(body["skelett_dauer_tage"].is_null(), "body={body}");
+    assert!(
+        !body.as_object().unwrap().contains_key("skelett_dauer_tage"),
+        "body={body}"
+    );
 }
 
 /// Erstmaliges Setzen mit Bestätigung → 200 und persistiert.
@@ -591,7 +594,10 @@ async fn skelett_dauer_leeren_ohne_bestaetigung() {
     .await;
     assert_eq!(status, StatusCode::OK);
     let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
-    assert!(body["skelett_dauer_tage"].is_null(), "body={body}");
+    assert!(
+        !body.as_object().unwrap().contains_key("skelett_dauer_tage"),
+        "body={body}"
+    );
 }
 
 /// Außerhalb 1..=36500 → 400, auch mit Bestätigung.

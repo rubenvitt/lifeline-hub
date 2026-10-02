@@ -51,6 +51,14 @@ Entscheidungen: `design.md` D1–D7.
 - [x] 8.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“: Bullet zu LFH-750 (Phase D, Löschprotokoll als einzige Spur, fail-closed, ID- und Nummernsperre über das Protokoll, Bestätigung 409, Herleitung dieser Change). Dazu im Abschnitt Demo-Daten die Regel „Einsatz-IDs werden nie wiederverwendet“ um das Protokoll ergänzen. Verifikation: `grep -n "LFH-750" src/AGENTS.md`
 - [x] 8.2 `docs/betrieb/backup-restore.md`: Ein Restore bringt endgültig gelöschte Skelette bis zum nächsten Purge-Lauf zurück. Verifikation: Der Absatz steht im Abschnitt „Sicherungen und Schwärzung“
 
-## 9. Abschluss
+## 9. Review-Befunde (Review-Workflow, 11 von 14 bestätigt)
 
-- [ ] 9.1 `cargo test --workspace --exclude lifeline-desktop`, Vitest und `./scripts/check-all.sh` grün (bzw. mit Verweis auf den CI-Lauf des PRs abhaken)
+- [x] 9.1 ETB-Suchindex: `secure-delete` und `optimize` in Migration 0135 (design.md D8). Verifikation: `skelett_loeschung_hinterlaesst_keine_altbytes` pflanzt ein kleingeschriebenes Einzelwort; ohne die beiden Zeilen rot, mit ihnen grün
+- [x] 9.2 Fixture von `skelett_loeschung` um Tier, Schaden mit Geschädigten-Bezug und Berichtigung erweitert (Spec-Szenario „Fällig“). Verifikation: `loeschen_entfernt_jede_zeile_und_schreibt_genau_eine_protokollzeile` grün, `PRAGMA foreign_key_check` leer
+- [x] 9.3 Test `scheitert_das_delete_rollt_die_protokollzeile_mit_zurueck` (Atomarität in Gegenrichtung) und `geloeschter_nummerntext_ohne_zahlenspalten_wird_nicht_wieder_vergeben` (Mutationsprobe ohne Text-Klausel rot)
+- [x] 9.4 Doku: Modulkopf des Purge-Schedulers (vier Phasen, Audit je Phase), Enum-Doku `AufbewahrungZustand`, `skip_serializing_if` an `skelett_dauer_tage` mit Typ-Codegen, Herleitungspfade auf das Archiv, `proposal.md`/`design.md` nachgezogen
+- [x] 9.5 Purpose der Spec `aufbewahrung` beim Archivieren angepasst (Skelett bis zur Skelett-Frist, Löschprotokoll). Verifikation: `openspec/specs/aufbewahrung/spec.md`, Abschnitt Purpose
+
+## 10. Abschluss
+
+- [ ] 10.1 `cargo test --workspace --exclude lifeline-desktop`, Vitest und `./scripts/check-all.sh` grün (bzw. mit Verweis auf den CI-Lauf des PRs abhaken)

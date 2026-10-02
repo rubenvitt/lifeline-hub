@@ -3,7 +3,7 @@
 //! `tick_einmal`; die Logik selbst ist mit injiziertem `jetzt` deterministisch
 //! testbar. Idempotent über WHERE-Guards in den Repo-Queries.
 //!
-//! Zwei Phasen:
+//! Vier Phasen:
 //! - **Phase A** (reversibel): Einsätze mit abgelaufener Aufbewahrungsfrist werden
 //!   soft-gelöscht (`geloescht_at` gesetzt = Karenz-Start). Ab da am Datenzugriff
 //!   gesperrt (`darf_lesen`).
@@ -15,9 +15,10 @@
 //!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
 //!   einzige Spur ist das Löschprotokoll der Org. Ohne Org-Frist bleibt das Skelett.
 //!
-//! DATENVERLUST-kritisch: jede Mutation wird zuvor mit `tracing` protokolliert und
-//! mit einem ETB-System-Audit begleitet; aktive Einsätze sind durch
-//! `status='abgeschlossen'` in jeder Purge-Query hart ausgeschlossen.
+//! DATENVERLUST-kritisch: jede Mutation wird zuvor mit `tracing` protokolliert. Phase A und B
+//! begleitet ein ETB-System-Audit; Phase D schreibt ihren Audit in derselben Transaktion ins
+//! `aufbewahrung_loeschprotokoll` (das ETB geht mit); Phase C betrifft keinen Einsatz. Aktive
+//! Einsätze sind durch `status='abgeschlossen'` in jeder Einsatz-Purge-Query hart ausgeschlossen.
 
 use super::repo;
 use super::retention::{karenz_abgelaufen, KARENZ_TAGE};
@@ -1612,7 +1613,10 @@ mod tests {
 
     // ---------- LFH-750: endgültige Löschung des Skeletts (Phase D) ----------
 
-    const ETB_KLARTEXT: &str = "LFH750-Gepflanzter-ETB-Wortlaut";
+    /// Ein einzelnes, kleingeschriebenes Wort: so legt es auch der FTS5-Tokenizer (`unicode61`)
+    /// in `etb_eintrag_fts_data` ab. Ein Text mit Bindestrichen und Großbuchstaben stünde dort nur
+    /// zerlegt, und die Bytesuche sähe die Reste im Suchindex nicht.
+    const ETB_KLARTEXT: &str = "lfh750gepflanztwortlaut";
 
     async fn skelett_frist(pool: &SqlitePool, tage: Option<i64>) {
         sqlx::query(
@@ -1760,8 +1764,9 @@ mod tests {
 
     /// Spec `aufbewahrung`, „Keine Altbytes“: der ETB-Wortlaut überlebt die Schwärzung (Retain)
     /// und verschwindet erst mit der Löschung — danach steht er weder in der DB-Datei noch im
-    /// WAL. Schwärzung und Löschung liegen in getrennten Läufen, damit der Rückschrieb der
-    /// Löschung selbst geprüft ist. Mutationsprobe: ohne Rückschrieb nach Phase D wird er rot.
+    /// WAL, auch nicht als Token im FTS5-Suchindex. Schwärzung und Löschung liegen in getrennten
+    /// Läufen, damit der Rückschrieb der Löschung selbst geprüft ist. Mutationsproben: ohne
+    /// Rückschrieb nach Phase D und ohne `secure-delete` am FTS-Index wird er rot.
     #[tokio::test]
     async fn skelett_loeschung_hinterlaesst_keine_altbytes() {
         let (_dir, pfad, pool) = produktions_pool().await;

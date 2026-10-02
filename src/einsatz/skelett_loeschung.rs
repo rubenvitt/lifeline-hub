@@ -1,5 +1,5 @@
 //! Endgültige Löschung des pseudonymen Skeletts geschwärzter Einsätze (LFH-750, Spec
-//! `aufbewahrung`, Herleitung `openspec/changes/lfh-750-skelett-endgueltig-loeschen/design.md`).
+//! `aufbewahrung`, Herleitung `openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md`).
 //!
 //! Phase D des Purge-Laufs ([`super::purge_scheduler`]): Ein geschwärzter Einsatz, dessen
 //! Skelett-Frist abgelaufen ist (`retention::skelett_loeschung_faellig`), wird samt allen
@@ -185,7 +185,8 @@ mod tests {
         .unwrap()
     }
 
-    /// Geschwärzter Einsatz der Org `org_id` mit ETB-Eintrag, Person und Anhang. `akteur`:
+    /// Geschwärzter Einsatz der Org `org_id` mit ETB-Eintrag samt Berichtigung, Person, Tier,
+    /// Schaden mit Geschädigten-Bezug auf die Person und Anhang. `akteur`:
     /// abschließende Person (oder keine). Einsatznummer `E-<jahr>-<lfd>` aus `abgeschlossen_at`.
     async fn geschwaerzt(
         pool: &SqlitePool,
@@ -219,21 +220,56 @@ mod tests {
         .fetch_one(pool)
         .await
         .unwrap();
-        sqlx::query(
+        let etb: i64 = sqlx::query_scalar(
             "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
-             VALUES (?, 1, 'meldung', 'ETB-Wortlaut', ?, ?)",
+             VALUES (?, 1, 'meldung', 'ETB-Wortlaut', ?, ?) RETURNING id",
         )
         .bind(e)
         .bind(erfasser)
         .bind(abgeschlossen_at)
-        .execute(pool)
+        .fetch_one(pool)
         .await
         .unwrap();
         sqlx::query(
-            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, \
-                geaendert_von) VALUES (?, 1, 'betroffen', ?, ?)",
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit, \
+                berichtigt_eintrag_id) VALUES (?, 2, 'berichtigung', 'Berichtigt', ?, ?, ?)",
         )
         .bind(e)
+        .bind(erfasser)
+        .bind(abgeschlossen_at)
+        .bind(etb)
+        .execute(pool)
+        .await
+        .unwrap();
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, \
+                geaendert_von) VALUES (?, 1, 'betroffen', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(erfasser)
+        .bind(erfasser)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, \
+                geaendert_von) VALUES (?, 1, 'hund', ?, ?)",
+        )
+        .bind(e)
+        .bind(erfasser)
+        .bind(erfasser)
+        .execute(pool)
+        .await
+        .unwrap();
+        // `geschaedigt_person_id` zeigt OHNE ON DELETE auf die Person: die Kaskade muss beide
+        // Zeilen im selben Statement entfernen, sonst scheitert die Löschung.
+        sqlx::query(
+            "INSERT INTO einsatz_schaden (einsatz_id, registrier_nr, status, typ, ausmass, ort, \
+                geschaedigt_person_id, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'offen', 'sachschaden', 'gering', 'Hauptstr', ?, ?, ?)",
+        )
+        .bind(e)
+        .bind(person)
         .bind(erfasser)
         .bind(erfasser)
         .execute(pool)
@@ -550,5 +586,87 @@ mod tests {
             (2026, 6),
             "Nummer 5 des gelöschten Einsatzes kam wieder"
         );
+    }
+
+    /// Spec `aufbewahrung`, „Scheitern der Löschung“, Gegenrichtung: scheitert das DELETE NACH
+    /// der Protokollzeile, rollt auch die Protokollzeile zurück — keine Spur einer Löschung, die
+    /// nicht stattfand.
+    #[tokio::test]
+    async fn scheitert_das_delete_rollt_die_protokollzeile_mit_zurueck() {
+        let pool = crate::db::test_pool().await;
+        org_frist(&pool, 1, Some(3650)).await;
+        let a = benutzer(&pool, 1, "leit", "keiner").await;
+        let e = geschwaerzt(
+            &pool,
+            1,
+            "2016-01-01 00:00:00",
+            "2016-03-01 00:00:00",
+            Some(a),
+            1,
+        )
+        .await;
+        sqlx::query(
+            "CREATE TRIGGER test_delete_scheitert BEFORE DELETE ON einsatz \
+             BEGIN SELECT RAISE(ABORT, 'test'); END",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(loeschen(&pool, e, t(JETZT)).await.is_err());
+        assert_eq!(
+            protokoll_zeilen(&pool, e).await,
+            0,
+            "Protokollzeile rollt mit zurück"
+        );
+        assert!(!reste(&pool, e).await.is_empty(), "Einsatz bleibt");
+    }
+
+    /// Nummernsperre über den TEXT: ein Altbestand ohne Zahlenspalten trägt nur
+    /// `einsatznummer_intern`. Nach seiner Löschung darf der Text nicht wieder vergeben werden.
+    #[tokio::test]
+    async fn geloeschter_nummerntext_ohne_zahlenspalten_wird_nicht_wieder_vergeben() {
+        let pool = crate::db::test_pool().await;
+        org_frist(&pool, 1, Some(1)).await;
+        let a = benutzer(&pool, 1, "leit", "keiner").await;
+        let e = geschwaerzt(
+            &pool,
+            1,
+            "2026-01-01 00:00:00",
+            "2026-03-01 00:00:00",
+            Some(a),
+            1,
+        )
+        .await;
+        sqlx::query(
+            "UPDATE einsatz SET einsatznummer_intern = 'E-2026-0001', nummer_jahr = NULL, \
+                nummer_lfd = NULL WHERE id = ?",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(loeschen(&pool, e, t(JETZT)).await.unwrap());
+
+        let neu = super::super::repo::anlegen_zum(
+            &pool,
+            super::super::repo::NeuerEinsatzDaten {
+                bezeichnung: "Neu",
+                stichwort: None,
+                einsatzart: None,
+                begonnen_at: None,
+            },
+            a,
+            t("2026-07-01 08:00:00"),
+        )
+        .await
+        .unwrap();
+        let nummer: String =
+            sqlx::query_scalar("SELECT einsatznummer_intern FROM einsatz WHERE id = ?")
+                .bind(neu.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(nummer, "E-2026-0002");
     }
 }
