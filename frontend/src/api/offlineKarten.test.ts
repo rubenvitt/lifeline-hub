@@ -1,7 +1,65 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
-import { starteRegionBau, ladeBaubareRegionen, ladeBauStatus } from './offlineKarten';
+import {
+  starteRegionBau,
+  ladeBaubareRegionen,
+  ladeBauStatus,
+  ladeAktualisierungsStatus,
+  speichereAutoAktualisierung,
+  starteJetztAktualisieren,
+} from './offlineKarten';
+
+// LFH-993: automatische Aktualisierung der Offline-Karten.
+describe('Aktualisierung', () => {
+  it('lädt den Status', async () => {
+    server.use(
+      http.get('/api/karte/offline-karten/aktualisierung', () =>
+        HttpResponse.json({
+          automatisch: true,
+          intervall_stunden: 6,
+          bau_dienst: 'erreichbar',
+          naechster_bau_at: '2027-01-01T03:00:00+00:00',
+          karten: [{ karte_id: 1, phase: 'baut' }],
+        }),
+      ),
+    );
+    const s = await ladeAktualisierungsStatus();
+    expect(s.bau_dienst).toBe('erreichbar');
+    expect(s.karten[0].phase).toBe('baut');
+  });
+
+  it('stößt die Aktualisierung einer Karte an', async () => {
+    let getroffen = false;
+    server.use(
+      http.post('/api/karte/offline-karten/7/jetzt-aktualisieren', () => {
+        getroffen = true;
+        return HttpResponse.json({ phase: 'bau_wartet' }, { status: 202 });
+      }),
+    );
+    const a = await starteJetztAktualisieren(7);
+    expect(getroffen).toBe(true);
+    expect(a.phase).toBe('bau_wartet');
+  });
+
+  it('speichert die Einstellung', async () => {
+    let body: unknown;
+    server.use(
+      http.put('/api/karte/offline-karten/aktualisierung/einstellung', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({
+          automatisch: false,
+          intervall_stunden: 12,
+          bau_dienst: 'nicht_konfiguriert',
+          karten: [],
+        });
+      }),
+    );
+    const s = await speichereAutoAktualisierung({ automatisch: false, intervall_stunden: 12 });
+    expect(body).toEqual({ automatisch: false, intervall_stunden: 12 });
+    expect(s.intervall_stunden).toBe(12);
+  });
+});
 
 describe('starteRegionBau', () => {
   it('postet den slug an /api/karte/offline-karten/bauen und liefert die job_id', async () => {

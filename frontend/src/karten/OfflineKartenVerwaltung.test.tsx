@@ -2,6 +2,8 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import type { AktualisierungsStatus } from '../api/offlineKarten';
+import { mitProzessZone } from '../test/prozessZone';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -64,9 +66,13 @@ function mockBasis(
   benutzer: typeof admin,
   karten: OfflineKarte[] = [karte],
   katalog: OfflineKatalogEintrag[] = [katalogEintrag],
-  optionen: { bauVerfuegbar?: boolean; bauJobs?: BauJob[] } = {},
+  optionen: {
+    bauVerfuegbar?: boolean;
+    bauJobs?: BauJob[];
+    status?: Partial<AktualisierungsStatus>;
+  } = {},
 ) {
-  const { bauVerfuegbar = false, bauJobs = [] } = optionen;
+  const { bauVerfuegbar = false, bauJobs = [], status = {} } = optionen;
   server.use(
     meHandler(benutzer),
     http.get('/api/karte/offline-karten', () => HttpResponse.json(karten)),
@@ -83,8 +89,19 @@ function mockBasis(
     ),
     http.get('/api/karte/offline-karten/baubare-regionen', () => HttpResponse.json([])),
     http.get('/api/karte/offline-karten/bau-status', () => HttpResponse.json(bauJobs)),
+    // LFH-993: Status der Automatik — per Vorgabe an, ohne Kartenbau-Dienst, nichts läuft.
+    http.get('/api/karte/offline-karten/aktualisierung', () =>
+      HttpResponse.json({ ...STATUS_VORGABE, ...status }),
+    ),
   );
 }
+
+const STATUS_VORGABE: AktualisierungsStatus = {
+  automatisch: true,
+  intervall_stunden: 6,
+  bau_dienst: 'nicht_konfiguriert',
+  karten: [],
+};
 
 function render() {
   return renderMitProviders(<OfflineKartenVerwaltung />);
@@ -129,9 +146,10 @@ describe('OfflineKartenVerwaltung', () => {
     const { container } = render();
     await screen.findByText('Deutschland – Bremen');
     const namen = () =>
-      Array.from(container.querySelectorAll('tr.ant-table-row td:first-child')).map(
-        (z) => z.textContent,
-      );
+      // Nur die Namenszeile der Zelle: darunter stehen „Stand …“ und „auf dem Gerät seit …“.
+      Array.from(
+        container.querySelectorAll('tr.ant-table-row td:first-child > div > div:first-child'),
+      ).map((z) => z.textContent);
 
     // Voreinstellung ist die gelieferte Reihenfolge (Backend: ORDER BY sortier, id) — die Vorgabe
     // steht bewusst weder nach Größe noch alphabetisch, sonst bliebe ein versehentliches
@@ -278,7 +296,7 @@ describe('OfflineKartenVerwaltung', () => {
     expect(await screen.findByText('50%')).toBeInTheDocument();
   });
 
-  it('Update verfügbar: zeigt Hinweis + Datenstand + Aktualisieren-Button', async () => {
+  it('Update verfügbar: zeigt Hinweis und Datenstand', async () => {
     mockBasis(admin, [
       {
         ...karte,
@@ -291,66 +309,6 @@ describe('OfflineKartenVerwaltung', () => {
     await screen.findByText('Deutschland – Bremen');
     expect(screen.getByText('Update verfügbar')).toBeInTheDocument();
     expect(screen.getByText('Stand 2025-01-01')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Aktualisieren' })).toBeInTheDocument();
-  });
-
-  it('Aktualisieren lädt die neuere Katalog-URL (One-Click: Pin + ersetzt_karte_id)', async () => {
-    let postBody: unknown = null;
-    mockBasis(admin, [
-      {
-        ...karte,
-        quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
-        update_verfuegbar: true,
-        katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
-        katalog_sha256: 'cafef00d',
-      },
-    ]);
-    server.use(
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
-        postBody = await request.json();
-        return HttpResponse.json({ ...karte, status: 'laedt' }, { status: 202 });
-      }),
-    );
-    render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Aktualisieren' }));
-    await waitFor(() => expect(postBody).not.toBeNull());
-    expect(postBody).toMatchObject({
-      name: 'Deutschland – Bremen',
-      url: 'https://example.test/de_bremen_20260320.mbtiles',
-      sha256_erwartet: 'cafef00d',
-      ersetzt_karte_id: 1,
-      groesse_erwartet: 44040192,
-    });
-  });
-
-  it('aktive Karte mit Update: In-Place „Neu laden" statt „Aktualisieren" (POST /{id}/neu-laden)', async () => {
-    let postBody: unknown = null;
-    mockBasis(admin, [
-      {
-        ...karte,
-        aktiv_basemap: true,
-        quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
-        update_verfuegbar: true,
-        katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
-        katalog_sha256: 'cafef00d',
-      },
-    ]);
-    server.use(
-      http.post('/api/karte/offline-karten/1/neu-laden', async ({ request }) => {
-        postBody = await request.json();
-        return HttpResponse.json({ ...karte, aktiv_basemap: true }, { status: 202 });
-      }),
-    );
-    render();
-    // Aktive Karte → In-Place-„Neu laden", NICHT „Aktualisieren" (neue Zeile).
-    await userEvent.click(await screen.findByRole('button', { name: 'Neu laden' }));
-    expect(screen.queryByRole('button', { name: 'Aktualisieren' })).not.toBeInTheDocument();
-    await waitFor(() => expect(postBody).not.toBeNull());
-    expect(postBody).toEqual({
-      url: 'https://example.test/de_bremen_20260320.mbtiles',
-      sha256_erwartet: 'cafef00d',
-      groesse_erwartet: 44040192,
-    });
   });
 
   it('In-Place-Reload: aktive „bereit"-Zeile zeigt Balken + „aktualisiert", nur Abbrechen (laeuft-Guard)', async () => {
@@ -374,7 +332,7 @@ describe('OfflineKartenVerwaltung', () => {
     expect(screen.getByText('aktualisiert')).toBeInTheDocument();
     // Während des Reloads: nur Abbrechen — kein Neu laden/Löschen/Aktivieren (laeuft-Guard).
     expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Neu laden' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Jetzt aktualisieren/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
   });
 
@@ -567,4 +525,202 @@ describe('OfflineKartenVerwaltung · Spaltenschalter', () => {
     expect(kopf(container)).toContain('Attribution');
     expect(screen.getByRole('button', { name: 'Spalten — Offline-Karten' })).toBeInTheDocument();
   });
+});
+
+// ── LFH-993: automatische Aktualisierung ─────────────────────────────────────────────
+describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () => {
+  // Erwartungen in Ortszeit Berlin: 02.10. ist Sommerzeit (+2), 01.01. Winterzeit (+1).
+  mitProzessZone('Europe/Berlin');
+
+  const zeile = () => screen.findByTestId('auto-aktualisierung');
+
+  it('zeigt Automatik, letzte und nächste Prüfung und den nächsten Kartenbau', async () => {
+    mockBasis(admin, [karte], undefined, {
+      status: {
+        letzte_pruefung_at: '2026-10-02T08:00:00+00:00',
+        naechste_pruefung_at: '2026-10-02T14:00:00+00:00',
+        bau_dienst: 'erreichbar',
+        naechster_bau_at: '2027-01-01T03:00:00+00:00',
+      },
+    });
+    render();
+    const z = await zeile();
+    expect(
+      await within(z).findByRole('switch', { name: 'Automatisch aktualisieren' }),
+    ).toBeChecked();
+    expect(within(z).getByText('alle 6 h')).toBeInTheDocument();
+    expect(within(z).getByText(/zuletzt geprüft 02\.10\.2026 10:00/)).toBeInTheDocument();
+    expect(within(z).getByText(/nächste Prüfung 02\.10\.2026 16:00/)).toBeInTheDocument();
+    expect(within(z).getByText(/nächster Kartenbau 01\.01\.2027 04:00/)).toBeInTheDocument();
+  });
+
+  it('Automatik aus: keine nächste Prüfung', async () => {
+    mockBasis(admin, [karte], undefined, {
+      status: { automatisch: false, letzte_pruefung_at: '2026-10-02T08:00:00+00:00' },
+    });
+    render();
+    const z = await zeile();
+    expect(
+      await within(z).findByRole('switch', { name: 'Automatisch aktualisieren' }),
+    ).not.toBeChecked();
+    expect(within(z).queryByText(/nächste Prüfung/)).not.toBeInTheDocument();
+  });
+
+  it('Kartenbau-Dienst nicht erreichbar bzw. nicht konfiguriert', async () => {
+    mockBasis(admin, [karte], undefined, { status: { bau_dienst: 'unerreichbar' } });
+    const { unmount } = render();
+    expect(
+      await within(await zeile()).findByText(/Kartenbau-Dienst nicht erreichbar/),
+    ).toBeInTheDocument();
+    unmount();
+
+    mockBasis(admin, [karte]);
+    render();
+    const z = await zeile();
+    await within(z).findByRole('switch', { name: 'Automatisch aktualisieren' });
+    expect(within(z).queryByText(/Kartenbau/)).not.toBeInTheDocument();
+  });
+
+  it('Ausschalten und ein anderer Abstand speichern je per PUT', async () => {
+    const bodies: unknown[] = [];
+    mockBasis(admin);
+    server.use(
+      http.put('/api/karte/offline-karten/aktualisierung/einstellung', async ({ request }) => {
+        const b = (await request.json()) as { automatisch: boolean; intervall_stunden: number };
+        bodies.push(b);
+        return HttpResponse.json({ ...STATUS_VORGABE, ...b });
+      }),
+    );
+    render();
+    const z = await zeile();
+    await userEvent.click(
+      await within(z).findByRole('switch', { name: 'Automatisch aktualisieren' }),
+    );
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ automatisch: false, intervall_stunden: 6 });
+
+    await userEvent.click(within(z).getByRole('combobox', { name: 'Prüfabstand' }));
+    await userEvent.click(await screen.findByTitle('alle 12 h'));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1]).toEqual({ automatisch: false, intervall_stunden: 12 });
+  });
+
+  it('ein gescheitertes Speichern lässt den Schalter stehen', async () => {
+    mockBasis(admin);
+    server.use(
+      http.put('/api/karte/offline-karten/aktualisierung/einstellung', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    render();
+    const schalter = await within(await zeile()).findByRole('switch', {
+      name: 'Automatisch aktualisieren',
+    });
+    await userEvent.click(schalter);
+    expect(await screen.findByText(/Einstellung nicht gespeichert/)).toBeInTheDocument();
+    expect(schalter).toBeChecked();
+  });
+
+  it('ein gespeicherter Abstand außerhalb der Liste erscheint als eigene Option', async () => {
+    mockBasis(admin, [karte], undefined, { status: { intervall_stunden: 5 } });
+    render();
+    expect(await within(await zeile()).findByText('alle 5 h')).toBeInTheDocument();
+  });
+
+  it('Führungskraft liest die Einstellung nur', async () => {
+    mockBasis(fuehrungskraft);
+    render();
+    const z = await zeile();
+    expect(
+      await within(z).findByText(/Automatisch aktualisieren: an, alle 6 h/),
+    ).toBeInTheDocument();
+    expect(within(z).queryByRole('switch')).not.toBeInTheDocument();
+    expect(within(z).queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('Name: Stand und „auf dem Gerät seit“ in Ortszeit', async () => {
+    mockBasis(admin, [{ ...karte, quell_url: 'https://example.test/de_bremen_20250101.mbtiles' }]);
+    render();
+    await screen.findByText('Deutschland – Bremen');
+    expect(screen.getByText('Stand 2025-01-01')).toBeInTheDocument();
+    // download_at '2026-06-26 11:00:00' ist UTC ohne Zone.
+    expect(screen.getByText('auf dem Gerät seit 26.06.2026 13:00')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['bau_wartet', 'Neubau wartet'],
+    ['baut', 'wird neu gebaut'],
+    ['wartet_auf_katalog', 'wird veröffentlicht'],
+  ] as const)('Phase %s zeigt „%s“ statt der Aktion', async (phase, etikett) => {
+    mockBasis(admin, [karte], undefined, { status: { karten: [{ karte_id: 1, phase }] } });
+    render();
+    expect(await screen.findByText(etikett)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Jetzt aktualisieren/ })).not.toBeInTheDocument();
+  });
+
+  it('Phase lädt ohne Fortschritt in der Liste zeigt „aktualisiert“', async () => {
+    mockBasis(admin, [karte], undefined, {
+      status: { karten: [{ karte_id: 1, phase: 'laedt' }] },
+    });
+    render();
+    expect(await screen.findByText('aktualisiert')).toBeInTheDocument();
+  });
+
+  it('ein Fehler steht an der Karte, mit dem Grund im Tooltip', async () => {
+    mockBasis(admin, [karte], undefined, {
+      status: { karten: [{ karte_id: 1, fehler: 'SHA256 stimmt nicht' }] },
+    });
+    render();
+    const tag = await screen.findByText('Update fehlgeschlagen');
+    await userEvent.hover(tag);
+    expect(await screen.findByText('SHA256 stimmt nicht')).toBeInTheDocument();
+  });
+
+  it('„Jetzt aktualisieren“ nur für aktualisierbare Karten und nur für Admins', async () => {
+    const registriert: OfflineKarte = {
+      ...karte,
+      id: 5,
+      name: 'Eigene Karte',
+      pfad: 'eigen.mbtiles',
+      aktualisierbar: false,
+    };
+    mockBasis(admin, [karte, registriert]);
+    const { unmount } = render();
+    await screen.findByText('Eigene Karte');
+    const knoepfe = screen.getAllByRole('button', { name: /Jetzt aktualisieren/ });
+    expect(knoepfe).toHaveLength(1);
+    expect(knoepfe[0]).toHaveAccessibleName('Jetzt aktualisieren: Deutschland – Bremen');
+    expect(screen.queryByRole('button', { name: 'Aktualisieren' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Neu laden' })).not.toBeInTheDocument();
+    unmount();
+
+    mockBasis(fuehrungskraft, [karte]);
+    render();
+    await screen.findByText('Deutschland – Bremen');
+    expect(screen.queryByRole('button', { name: /Jetzt aktualisieren/ })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['bau_wartet', 202, /Neubau angestoßen/],
+    ['laedt', 202, /Update lädt/],
+    ['aktuell', 200, /Die Karte ist aktuell/],
+  ] as const)(
+    '„Jetzt aktualisieren“ mit Antwort %s meldet sich passend',
+    async (phase, code, text) => {
+      let getroffen = false;
+      mockBasis(admin);
+      server.use(
+        http.post('/api/karte/offline-karten/1/jetzt-aktualisieren', () => {
+          getroffen = true;
+          return HttpResponse.json({ phase }, { status: code });
+        }),
+      );
+      render();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Jetzt aktualisieren: Deutschland – Bremen' }),
+      );
+      expect(await screen.findByText(text)).toBeInTheDocument();
+      expect(getroffen).toBe(true);
+    },
+  );
 });
