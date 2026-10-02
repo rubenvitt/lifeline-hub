@@ -8,7 +8,9 @@ use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-use crate::routes::support::{parse_enum_opt, pflicht};
+use crate::routes::support::{
+    anhang_antwort, original_freigeben, parse_enum_opt, pflicht, Fassung, FassungParam,
+};
 use crate::zeit::jetzt;
 use axum::extract::{Multipart, Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -218,13 +220,19 @@ pub async fn anhang_herunterladen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Etb>,
     PfadParam((_eid, eintrag_id, anhang_id)): PfadParam<(i64, i64, i64)>,
+    Query(param): Query<FassungParam>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    let fassung = param.fassung()?;
     let einsatz_id = ctx.einsatz.id;
     if !repo::anhang_am_eintrag(&state.pool, einsatz_id, eintrag_id, anhang_id).await? {
         return Err(AppError::NotFound);
     }
-    crate::routes::support::anhang_antwort(&state.pool, anhang_id, &req_headers).await
+    if fassung == Fassung::Original {
+        let nr = repo::lfd_nr(&state.pool, einsatz_id, eintrag_id).await?;
+        original_freigeben(&state, &ctx, anhang_id, &format!("ETB-Eintrag Nr. {nr}")).await?;
+    }
+    anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
 /// POST /api/einsaetze/{id}/etb/{eintrag_id}/auftrag — aus einem ETB-Eintrag direkt einen

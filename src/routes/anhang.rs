@@ -3,12 +3,12 @@ use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
 use crate::extract::PfadParam;
-use axum::extract::{Multipart, State};
+use axum::extract::{Multipart, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
 
-use super::support::anhang_antwort;
+use super::support::{anhang_antwort, original_freigeben, Fassung, FassungParam};
 
 /// Ein UNGEBUNDENER Anhang gehört vorerst der Person, die ihn hochgeladen hat: wem er gehören
 /// wird (Chat oder ein modulgebundener Linker aus `anhang::repo::MODUL_LINKER`), steht erst mit
@@ -64,8 +64,10 @@ pub async fn herunterladen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
     PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
+    Query(param): Query<FassungParam>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    let fassung = param.fassung()?;
     // fordere_lesezugriff erledigt der Extractor.
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -77,9 +79,12 @@ pub async fn herunterladen(
         return Err(AppError::NotFound);
     }
     fordere_hochladende_bei_ungebunden(&state.pool, &linker, anhang_id, ctx.benutzer.id).await?;
+    if fassung == Fassung::Original {
+        original_freigeben(&state, &ctx, anhang_id, "Chat").await?;
+    }
 
-    // Cache-Kurzschluss und Header-Sequenz, geteilt mit dem Dokument-Download.
-    anhang_antwort(&state.pool, anhang_id, &req_headers).await
+    // Fassung, Cache-Kurzschluss und Header-Sequenz, geteilt mit den Modul-Downloads.
+    anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
 /// DELETE /api/einsaetze/{id}/anhaenge/{aid} — Anhang hart löschen. Schreibrecht und aktiver

@@ -18,6 +18,8 @@ import {
   type PaneelDatenzustand,
 } from '../../components/instrument';
 import DownloadAnker from '../../components/DownloadAnker';
+import { istBildMime, originalPfad } from '../../api/anhangFassung';
+import { useDarfOriginalLaden } from '../../einsatz/useDarfOriginalLaden';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import { formatGroesse } from '../../karten/formatGroesse';
@@ -59,6 +61,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
   const [ablegenOffen, setAblegenOffen] = useState(false);
   const nr = schadenRegistrierAnzeige(schaden.registrier_nr);
   const aktionen = darfSchreiben && !schaden.storniert_at;
+  const darfOriginal = useDarfOriginalLaden(einsatzId);
 
   const query = useQuery({
     queryKey: einsatzKeys.schadenAnhaenge(einsatzId, schaden.id),
@@ -126,6 +129,11 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
         >
           <DownloadAnker
             href={schadenAnhangDownloadPfad(einsatzId, schaden.id, a.id)}
+            originalHref={
+              darfOriginal && istBildMime(a.mime)
+                ? originalPfad(schadenAnhangDownloadPfad(einsatzId, schaden.id, a.id))
+                : undefined
+            }
             dateiname={a.dateiname}
             groesse={a.groesse}
             zusatz={

@@ -2,7 +2,7 @@
 //! `EinsatzLesezugriff<Dokumente>` (alle Mitglieder inkl. Beobachter),
 //! `EinsatzSchreibzugriff<Dokumente>` (Schreibrecht + aktiver Einsatz).
 
-use axum::extract::{Multipart, State};
+use axum::extract::{Multipart, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
@@ -19,7 +19,7 @@ use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
 use crate::routes::support::{deserialize_optional_field, pflicht};
 
-use super::support::anhang_antwort;
+use super::support::{anhang_antwort, original_freigeben, Fassung, FassungParam};
 
 fn sse(state: &AppState, einsatz_id: i64) {
     state
@@ -167,12 +167,17 @@ pub async fn datei(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Dokumente>,
     PfadParam((_einsatz_id, dokument_id)): PfadParam<(i64, i64)>,
+    Query(param): Query<FassungParam>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    let fassung = param.fassung()?;
     // Der Dokument-Lookup IST die Zugriffsprüfung: fremder Einsatz, unbekannte oder
     // soft-gelöschte id → 404. Danach dieselbe Header-Sequenz wie der Anhang-Download.
     let anhang_id = repo::anhang_id(&state.pool, ctx.einsatz.id, dokument_id).await?;
-    anhang_antwort(&state.pool, anhang_id, &req_headers).await
+    if fassung == Fassung::Original {
+        original_freigeben(&state, &ctx, anhang_id, "Dokumentenablage").await?;
+    }
+    anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
 /// Body von PATCH. `titel`/`kategorie`: fehlt oder `null` = bleibt (Pflichtangaben lassen sich

@@ -3,7 +3,11 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../../test/utils';
+import { einsatzFixture } from '../../test/fixtures';
+import { einsatzKeys } from '../../api/queryKeys';
+import type { EinsatzRolle } from '../../api/types';
+import { ORIGINAL_TEXT } from '../../components/DownloadAnker';
 import { ApiError } from '../../api/client';
 import SchadenAnhaenge from './SchadenAnhaenge';
 
@@ -199,5 +203,38 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     await within(paneel()).findByText('Noch keine Fotos oder Dateien');
     const kopf = within(paneel()).getByRole('button', { name: 'Datei ablegen' });
     await vi.waitFor(() => expect(document.activeElement).toBe(kopf));
+  });
+});
+
+describe('SchadenAnhaenge — Original (LFH-747)', () => {
+  function rendereAls(rolle: EinsatzRolle) {
+    server.use(
+      http.get(PFAD, () =>
+        HttpResponse.json([anhang(5, 'dach.jpg'), anhang(6, 'gutachten.pdf', 'application/pdf')]),
+      ),
+    );
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.einsatz(1), einsatzFixture({ id: 1, meine_rolle: rolle }));
+    return renderMitProviders(
+      <SchadenAnhaenge einsatzId={1} schaden={schaden} darfSchreiben={false} />,
+      { client },
+    );
+  }
+
+  it('zeigt der Einsatzleitung am Foto den Original-Verweis, am PDF nicht', async () => {
+    rendereAls('einsatzleitung');
+    const original = await screen.findByRole('link', {
+      name: 'dach.jpg: Original mit Standort- und Gerätedaten herunterladen',
+    });
+    expect(original).toHaveAttribute('href', `${PFAD}/5/datei?fassung=original`);
+    expect(screen.getAllByText(ORIGINAL_TEXT)).toHaveLength(1);
+  });
+
+  it.each(['fuehrungspersonal', 'beobachter'] as const)('verbirgt ihn vor %s', async (rolle) => {
+    rendereAls(rolle);
+    await screen.findByRole('link', {
+      name: 'dach.jpg, 2.0 MB, Datei von Schaden S-003 herunterladen',
+    });
+    expect(screen.queryByText(ORIGINAL_TEXT)).toBeNull();
   });
 });

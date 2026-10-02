@@ -525,6 +525,17 @@ pub async fn anhang_am_eintrag(
     Ok(treffer.is_some())
 }
 
+/// Laufende Nummer eines Eintrags dieses Einsatzes (für den Vermerk eines Original-Abrufs,
+/// LFH-747); unbekannt oder fremd → `NotFound`.
+pub async fn lfd_nr(pool: &SqlitePool, einsatz_id: i64, eintrag_id: i64) -> Result<i64, AppError> {
+    sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE id = ? AND einsatz_id = ?")
+        .bind(eintrag_id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
 /// Prüft, ob ein Eintrag mit `eintrag_id` zum angegebenen `einsatz_id` gehört.
 /// Für die Validierung von Berichtigungs-Verweisen.
 pub async fn gehoert_zu_einsatz(

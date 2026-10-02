@@ -6,7 +6,7 @@
 //!
 //! `{aid}` ist die Linker-id (`einsatz_schaden_anhang.id`), nicht `anhang.id`.
 
-use axum::extract::{Multipart, State};
+use axum::extract::{Multipart, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
@@ -22,7 +22,7 @@ use crate::schaden::anhang::{self as schaden_anhang, Ablage, SchadenAnhangAnzeig
 use crate::schaden::repo as schaden_repo;
 
 use super::einsatz_schaden::sse_schaden;
-use super::support::anhang_antwort;
+use super::support::{anhang_antwort, original_freigeben, Fassung, FassungParam};
 
 /// GET /api/einsaetze/{id}/schaeden/{sid}/anhaenge — lebende Anhänge, neueste zuerst.
 /// Ein stornierter Schaden bleibt lesbar; ein Schaden eines anderen Einsatzes ist 404.
@@ -119,12 +119,22 @@ pub async fn datei(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Schaeden>,
     PfadParam((_einsatz_id, schaden_id, id)): PfadParam<(i64, i64, i64)>,
+    Query(param): Query<FassungParam>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    let fassung = param.fassung()?;
     let anhang_id =
         schaden_anhang::anhang_id_fuer_download(&state.pool, ctx.einsatz.id, schaden_id, id)
             .await?;
-    anhang_antwort(&state.pool, anhang_id, &req_headers).await
+    if fassung == Fassung::Original {
+        let schaden = schaden_repo::laden(&state.pool, ctx.einsatz.id, schaden_id).await?;
+        let ablage = format!(
+            "Schaden {}",
+            crate::schaden::registrier_anzeige(schaden.registrier_nr)
+        );
+        original_freigeben(&state, &ctx, anhang_id, &ablage).await?;
+    }
+    anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
 /// DELETE /api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid} — Soft-Delete mit

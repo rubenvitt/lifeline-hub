@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { formatZeitKurz } from '../anzeige/format';
 import { renderMitProviders } from '../test/utils';
+import { ORIGINAL_TEXT } from '../components/DownloadAnker';
 import NachrichtenStrom from './NachrichtenStrom';
 import type { ChatNachricht } from '../api/types';
 
@@ -477,6 +478,47 @@ describe('NachrichtenStrom', () => {
     expect(link).not.toHaveAttribute('target');
     expect(within(link).getByText('lage.pdf')).toBeInTheDocument();
     expect(within(link).getByText(/2\.0 KB/)).toBeInTheDocument();
+  });
+
+  describe('Original-Verweis (LFH-747)', () => {
+    const foto = {
+      id: 43,
+      einsatz_id: 7,
+      dateiname: 'lage.jpg',
+      mime: 'image/jpeg',
+      groesse: 2048,
+      hochgeladen_von: 1,
+      erstellt_at: '2026-06-10 10:00:00',
+    };
+    const pdf = { ...foto, id: 44, dateiname: 'lage.pdf', mime: 'application/pdf' };
+    function rendere(darfOriginal?: boolean) {
+      renderMitProviders(
+        <NachrichtenStrom
+          nachrichten={[nachricht({ anhaenge: [foto, pdf] })]}
+          eigeneBenutzerId={1}
+          darfSchreiben
+          darfOriginal={darfOriginal}
+          onBearbeiten={vi.fn()}
+          onLoeschen={vi.fn()}
+          onHeraufstufen={vi.fn()}
+          onHeraufstufenAuftrag={vi.fn()}
+        />,
+      );
+    }
+
+    it('steht mit darfOriginal am Foto, nicht am PDF', () => {
+      rendere(true);
+      const original = screen.getByRole('link', {
+        name: 'lage.jpg: Original mit Standort- und Gerätedaten herunterladen',
+      });
+      expect(original).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/43?fassung=original');
+      expect(screen.getAllByText(ORIGINAL_TEXT)).toHaveLength(1);
+    });
+
+    it('fehlt ohne darfOriginal', () => {
+      rendere();
+      expect(screen.queryByText(ORIGINAL_TEXT)).toBeNull();
+    });
   });
 });
 

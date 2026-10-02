@@ -554,3 +554,22 @@ describe('DokumentePage', () => {
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 });
+
+describe('DokumentePage — Original-Verweis (LFH-747)', () => {
+  const foto = dokument({ id: 6, titel: 'Lagefoto', dateiname: 'lage.jpg', mime: 'image/jpeg' });
+
+  it('zeigt der Einsatzleitung am Foto den Original-Verweis, am PDF nicht', async () => {
+    rendere(einsatzAktiv, [dokument(), foto]);
+    const original = await screen.findByRole('link', {
+      name: 'lage.jpg: Original mit Standort- und Gerätedaten herunterladen',
+    });
+    expect(original).toHaveAttribute('href', `${dokumentDownloadPfad(1, 6)}?fassung=original`);
+    expect(screen.getAllByText('Original (mit Standort)')).toHaveLength(1);
+  });
+
+  it('verbirgt ihn vor Beobachtern', async () => {
+    rendere(einsatzBeobachter, [foto]);
+    await screen.findByRole('link', { name: 'Lagefoto' });
+    expect(screen.queryByText('Original (mit Standort)')).toBeNull();
+  });
+});

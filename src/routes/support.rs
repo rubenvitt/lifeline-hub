@@ -7,6 +7,8 @@
 //! Wrapper steht einmal, im Modul, dem das Ereignis gehört.
 
 use crate::anhang;
+use crate::app::AppState;
+use crate::einsatz::kontext::EinsatzKontext;
 use crate::error::AppError;
 use crate::live::org::{OrgAbonnent, OrgNachricht, ORG_NUTZLAST};
 use crate::live::{LiveEvent, LiveNachricht, Replay};
@@ -15,6 +17,7 @@ use axum::response::sse::Event;
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use sqlx::SqlitePool;
+use std::borrow::Cow;
 use std::convert::Infallible;
 use tokio::sync::broadcast::Receiver;
 use tokio_stream::wrappers::BroadcastStream;
@@ -83,35 +86,110 @@ pub fn if_none_match_matcht(headers: &HeaderMap, etag: &str) -> bool {
         })
 }
 
-/// Liefert einen `anhang`-BLOB als Download-Antwort (LFH-258/LFH-632): ETag aus dem sha256,
-/// `Cache-Control` nach [`ASSET_CACHE_CONTROL`], 304-Kurzschluss bei passendem
-/// `If-None-Match` OHNE den BLOB zu lesen, sonst `Content-Type` + `attachment` und die Bytes.
+/// Welche Fassung eines Anhangs ausgeliefert wird (LFH-747, Spec `anhang-metadaten`).
+/// `Bereinigt` ist der Standard jeder Download-Route; `Original` gibt es nur nach
+/// [`original_freigeben`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fassung {
+    Bereinigt,
+    Original,
+}
+
+/// Query `?fassung=` der vier Anhang-Download-Routen. Als `Option<String>` statt als Enum, damit
+/// ein unbekannter Wert als 400 im `{error}`-Format ankommt und nicht als Rejection von axum.
+#[derive(Debug, Deserialize)]
+pub struct FassungParam {
+    pub fassung: Option<String>,
+}
+
+impl FassungParam {
+    /// Fehlt oder `bereinigt` → [`Fassung::Bereinigt`], `original` → [`Fassung::Original`],
+    /// alles andere 400 (das Feld scheitert für sich).
+    pub fn fassung(&self) -> Result<Fassung, AppError> {
+        match self.fassung.as_deref() {
+            None | Some("bereinigt") => Ok(Fassung::Bereinigt),
+            Some("original") => Ok(Fassung::Original),
+            Some(w) => Err(AppError::Validation(format!(
+                "Unbekannte Fassung «{w}» (erlaubt: bereinigt, original)"
+            ))),
+        }
+    }
+}
+
+/// Meldung des 422, wenn sich ein Bild nicht bereinigen lässt (Spec `anhang-metadaten`).
+pub const UNBEREINIGBAR_MELDUNG: &str = "Die Datei lässt sich nicht von Metadaten bereinigen. \
+     Das Original kann die Einsatzleitung abrufen.";
+
+/// Gate und Vermerk vor jedem Original-Abruf (LFH-747, design.md D7): nur die Einsatzleitung
+/// oder ein System-Admin der Einsatz-Org, sonst 403. Danach ein System-Eintrag im ETB, der die
+/// Ablage und die Anhang-id nennt, nie den Dateinamen. Scheitert der Vermerk, scheitert der
+/// Abruf: ohne Vermerk kein Original. Die übrigen Gates der Route (Lesezugriff, Modul,
+/// Bindung) macht der Handler VORHER.
+pub async fn original_freigeben(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    anhang_id: i64,
+    ablage: &str,
+) -> Result<(), AppError> {
+    let einsatzleitung = ctx.rolle.is_some_and(|r| r.ist_einsatzleitung());
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !einsatzleitung && !admin_der_org {
+        return Err(AppError::Forbidden);
+    }
+    let inhalt = format!(
+        "Originaldatei mit Metadaten (Standort, Gerät) abgerufen: {ablage}, Anhang #{anhang_id}"
+    );
+    let eintrag =
+        crate::etb::system_audit(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &inhalt).await?;
+    state.live.publiziere(ctx.einsatz.id, eintrag.id);
+    Ok(())
+}
+
+/// Liefert einen `anhang`-BLOB als Download-Antwort (LFH-258/LFH-632, Fassungen LFH-747).
 ///
-/// Geteilt vom generischen Anhang-Download und vom Dokument-Download, damit beide Pfade
-/// dieselbe Header-Sequenz tragen. Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit,
-/// Linker-Sperre, Modul-Gate) macht der Aufrufer VORHER — dieser Helfer prüft nichts.
-/// Der Karten-Hintergrundbild-Download bleibt außen vor: er liest aus einer eigenen Tabelle.
+/// - [`Fassung::Bereinigt`]: ETag aus sha256 und Version der Bereinigung, `Cache-Control` nach
+///   [`ASSET_CACHE_CONTROL`], 304-Kurzschluss bei passendem `If-None-Match` OHNE den BLOB zu
+///   lesen, sonst die Bytes nach [`anhang::metadaten::bereinigen`]. Lässt sich ein Bild nicht
+///   bereinigen → 422, nie das Original.
+/// - [`Fassung::Original`]: die gespeicherten Bytes, ohne ETag und mit `no-store`, damit jeder
+///   Abruf neu über [`original_freigeben`] läuft und vermerkt wird.
+///
+/// Geteilt von allen vier Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden); **der
+/// einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in `tests/anhang_metadaten.rs`).
+/// Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit, Linker-Sperre, Modul-Gate) macht der
+/// Aufrufer VORHER — dieser Helfer prüft nichts. Der Karten-Hintergrundbild-Download bleibt
+/// außen vor: er liest aus einer eigenen Tabelle.
 pub async fn anhang_antwort(
     pool: &SqlitePool,
     anhang_id: i64,
     req_headers: &HeaderMap,
+    fassung: Fassung,
 ) -> Result<Response, AppError> {
     let (dateiname, mime, sha256) = anhang::repo::meta_fuer_download(pool, anhang_id).await?;
-    let etag = etag_von(&sha256);
 
     let mut headers = HeaderMap::new();
-    headers.insert(
-        header::ETAG,
-        HeaderValue::from_str(&etag)
-            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
-    );
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static(ASSET_CACHE_CONTROL),
-    );
-
-    if if_none_match_matcht(req_headers, &etag) {
-        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
+    match fassung {
+        Fassung::Bereinigt => {
+            let etag = etag_von(&format!(
+                "{sha256}.b{}",
+                anhang::metadaten::BEREINIGUNG_VERSION
+            ));
+            headers.insert(
+                header::ETAG,
+                HeaderValue::from_str(&etag)
+                    .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
+            );
+            headers.insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static(ASSET_CACHE_CONTROL),
+            );
+            if if_none_match_matcht(req_headers, &etag) {
+                return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
+            }
+        }
+        Fassung::Original => {
+            headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        }
     }
 
     headers.insert(
@@ -127,6 +205,17 @@ pub async fn anhang_antwort(
             .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
     );
     let (_, _, daten) = anhang::repo::laden_bytes(pool, anhang_id).await?;
+    let daten = match fassung {
+        Fassung::Original => daten,
+        Fassung::Bereinigt => match anhang::metadaten::bereinigen(&daten, &mime) {
+            Ok(Cow::Owned(neu)) => neu,
+            Ok(Cow::Borrowed(_)) => daten,
+            Err(anhang::metadaten::Unbereinigbar(grund)) => {
+                tracing::warn!(anhang_id, grund, "Anhang lässt sich nicht bereinigen");
+                return Err(AppError::UnprocessableEntity(UNBEREINIGBAR_MELDUNG.into()));
+            }
+        },
+    };
     Ok((headers, daten).into_response())
 }
 

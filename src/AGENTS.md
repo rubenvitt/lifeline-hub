@@ -79,6 +79,20 @@ Allowlist `ERLAUBTE_MIME_ERFASSUNG` (Spiegel `ERFASSUNG_ACCEPT` in `api/upload.t
 `anhang::pruefe_vor_persist` vor, Anhang + Linker + ETB in EINEM `write_retry!`. Entfernen =
 Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 409.
 
+**Auslieferung (LFH-747)** (Spec `anhang-metadaten`, Herleitung
+`openspec/changes/archive/2026-10-02-lfh-747-exif-bereinigung-auslieferung/design.md`):
+gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
+- Jeder Anhang-Download läuft über `routes::support::anhang_antwort` mit einer `Fassung`; nur dort
+  steht `anhang::repo::laden_bytes` (Guard `nur_support_liefert_anhang_bytes_aus`,
+  `tests/anhang_metadaten.rs`). Ein neuer Linker liest `?fassung=` über `FassungParam` und ruft
+  vor `Fassung::Original` `support::original_freigeben` (Einsatzleitung oder System-Admin der
+  Einsatz-Org, sonst 403; System-ETB-Vermerk ohne Dateinamen, ohne Vermerk kein Original).
+- Bereinigung in `anhang::metadaten`: Format aus den Magic Bytes, Positivlisten, fail-closed (422,
+  nie das Original), Kontrollnetz nach jedem Format. Wer sie ändert, erhöht
+  `BEREINIGUNG_VERSION` (steht im ETag `"<sha256>.b<n>"`).
+- Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
+  beim Download mit 422.
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und

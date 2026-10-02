@@ -162,8 +162,12 @@ der folgenden Signaturen, wird das Ergebnis verworfen und es gilt `Unbereinigbar
 - `http://ns.adobe.com/xap/1.0/`
 - `<x:xmpmeta`
 - `Photoshop 3.0`
-- `Exif\0\0`, außer an der Stelle des eigenen Mini-EXIF
-- ein GPS-IFD-Tag (34853) im Mini-EXIF
+- `Exif\0\0` mit folgendem TIFF-Kopf (`II*\0`/`MM\0*`), außer an der Stelle des eigenen
+  Mini-EXIF, das dort genau einen Eintrag (Ausrichtung) tragen muss
+
+Beim Umsetzen gefunden: Die Kennung `Exif\0\0` allein steht in jedem HEIC im `infe` (Item-Typ
+`Exif`, leerer Name, dann die Nullbytes der nächsten Box). Ohne den TIFF-Kopf als Teil der
+Signatur hätte das Kontrollnetz jedes iPhone-Foto abgewiesen.
 
 Das fängt einen Parser-Fehler ab, der sonst still Metadaten durchließe. Ein Fehlalarm ist
 denkbar, wenn Bilddaten zufällig eine dieser Zeichenketten enthalten. Er ist praktisch
@@ -249,6 +253,13 @@ Reihenfolge im Handler:
     verlangt.
 - Die vier Aufrufer setzen `originalHref` nur, wenn `darfOriginalLaden` gilt und `istBildMime`
   zutrifft. Für Nicht-Bilder gibt es keinen Zweitverweis, die Spec verlangt das so.
+- Wie die Aufrufer an die Rolle kommen (beim Umsetzen entschieden): Chat und Dokumentenablage
+  haben Einsatz und Benutzer schon und rufen `darfOriginalLaden` direkt. Schaden-Paneel,
+  ETB-Zeitachse und Palettenvorschau fragen den Hook `einsatz/useDarfOriginalLaden.ts`. Er liest
+  den Einsatz nur aus dem Cache (`enabled: false`), den `EinsatzLayout` auf jeder Einsatzseite
+  hält. Fehlt er, ist die Antwort `false`, also nur der bereinigte Download.
+  `etb/EtbAnhaenge.tsx` bleibt bei seinem eigenen Anker und bekommt `darfOriginal` als Prop,
+  damit es ohne Provider renderbar bleibt.
 - **Admin-Org im Frontend:** Die UI-Schranke prüft nur `istAdmin`. Ein fremder Admin sähe die
   Aktion, bekäme aber 403. Das Backend ist verbindlich, und der Fall ist selten, deshalb kein
   zusätzliches Feld im DTO.

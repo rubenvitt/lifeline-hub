@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
+  darfOriginalLaden,
   darfVerwaltung,
   istAdmin,
   istBeobachter,
@@ -119,5 +120,22 @@ describe('darfVerwaltung', () => {
     expect(darfVerwaltung({ system_rolle: 'keiner', org_rolle: 'keine' })).toBe(false);
     expect(darfVerwaltung(undefined)).toBe(false);
     expect(darfVerwaltung(null)).toBe(false);
+  });
+});
+
+describe('darfOriginalLaden (LFH-747)', () => {
+  it('erlaubt die Einsatzleitung, auch im abgeschlossenen Einsatz', () => {
+    expect(darfOriginalLaden({ ...aktiv, meine_rolle: 'einsatzleitung' })).toBe(true);
+    expect(darfOriginalLaden({ ...zu, meine_rolle: 'einsatzleitung' })).toBe(true);
+  });
+
+  it('erlaubt den System-Admin ohne Einsatz-Rolle', () => {
+    expect(darfOriginalLaden({ ...zu, meine_rolle: null }, admin)).toBe(true);
+  });
+
+  it('verweigert Führungspersonal, Beobachter und Unbekannte', () => {
+    expect(darfOriginalLaden({ ...aktiv, meine_rolle: 'fuehrungspersonal' }, keiner)).toBe(false);
+    expect(darfOriginalLaden({ ...aktiv, meine_rolle: 'beobachter' }, keiner)).toBe(false);
+    expect(darfOriginalLaden(undefined, undefined)).toBe(false);
   });
 });

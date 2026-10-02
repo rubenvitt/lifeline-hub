@@ -49,7 +49,16 @@ interface Props {
    * herunterladen“) — n Zeilen liefern sonst n gleich klingende Verweise.
    */
   zugaenglicherName?: string;
+  /**
+   * Adresse des Originals (`originalPfad(href)`, LFH-747). Gesetzt nur, wenn der Benutzer
+   * Originale laden darf (`darfOriginalLaden`) UND die Datei ein Bild ist: dann steht neben dem
+   * Hauptverweis (bereinigte Fassung) ein zweiter Verweis „Original (mit Standort)“.
+   */
+  originalHref?: string;
 }
+
+/** Sichtbarer Text des Original-Verweises (Spec `anhang-metadaten`). */
+export const ORIGINAL_TEXT = 'Original (mit Standort)';
 
 /**
  * Nativer Download-Verweis (`<a href download>`), geteilt von Dokumentenablage, Chat und
@@ -63,13 +72,14 @@ export default function DownloadAnker({
   groesse,
   zusatz,
   zugaenglicherName,
+  originalHref,
 }: Props) {
   const { token, rollen } = useRollen();
   // Das `aria-label` ersetzt den Inhalt im zugänglichen Namen; die Zusatzzeile (wer, wann) bleibt
   // über `aria-describedby` erreichbar. Ohne `aria-label` steht sie ohnehin im Namen.
   const zusatzId = useId();
   const beschrieben = zugaenglicherName != null && zusatz != null;
-  return (
+  const anker = (
     <a
       href={href}
       download={dateiname}
@@ -99,5 +109,32 @@ export default function DownloadAnker({
         </span>
       )}
     </a>
+  );
+  if (originalHref == null) return anker;
+  return (
+    <span
+      data-lfh="download-anker-mit-original"
+      style={{
+        display: 'inline-flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        columnGap: token.marginSM,
+      }}
+    >
+      {anker}
+      <a
+        href={originalHref}
+        download={dateiname}
+        aria-label={`${dateiname}: Original mit Standort- und Gerätedaten herunterladen`}
+        data-lfh="download-anker-original"
+        style={{
+          ...downloadAnkerStil(token),
+          fontWeight: 'normal',
+          color: rollen.bedienText,
+        }}
+      >
+        {ORIGINAL_TEXT}
+      </a>
+    </span>
   );
 }
