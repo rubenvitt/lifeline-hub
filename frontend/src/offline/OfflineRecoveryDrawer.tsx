@@ -15,6 +15,7 @@ import {
   OFFLINE_QUEUE_EVENT,
   abgelehntEntfernen,
   abgelehntLaden,
+  abgelehntOhneAnhaengeWiederholen,
   abgelehntWiederholen,
   queueNichtZugeordnetAlleVerwerfen,
   queueNichtZugeordnetZaehlen,
@@ -65,11 +66,20 @@ function vollstaendigerInhalt(daten: unknown): ReactNode {
   );
 }
 
+const dateien = (anzahl: number) => (anzahl === 1 ? '1 Datei' : `${anzahl} Dateien`);
+
+function ohneAnhaengeHinweis(anzahl: number): string {
+  const fehlt =
+    anzahl === 1 ? 'Die angehängte Datei geht' : `Die ${anzahl} angehängten Dateien gehen`;
+  return `${fehlt} nicht mit. Der Eintrag entsteht nur mit seinem Text und lässt sich danach nur per Berichtigung ergänzen.`;
+}
+
 function RecoveryCard({
   titel,
   einsatzId,
   zeitpunkt,
   grund,
+  anhaenge = 0,
   daten,
   aktionen,
 }: {
@@ -77,6 +87,8 @@ function RecoveryCard({
   einsatzId: number;
   zeitpunkt?: string;
   grund: string;
+  /** Anzahl der `anhang_ids` eines ETB-Eintrags (LFH-746). */
+  anhaenge?: number;
   daten: unknown;
   aktionen: ReactNode;
 }) {
@@ -93,6 +105,15 @@ function RecoveryCard({
             label: 'Grund',
             children: <Typography.Text type="danger">{grund}</Typography.Text>,
           },
+          ...(anhaenge > 0
+            ? [
+                {
+                  key: 'anhaenge',
+                  label: 'Anhänge',
+                  children: `${dateien(anhaenge)}, gehen beim Senden ohne Anhänge nicht mit`,
+                },
+              ]
+            : []),
           { key: 'inhalt', label: 'Vollständiger Inhalt', children: vollstaendigerInhalt(daten) },
         ]}
       />
@@ -172,9 +193,9 @@ export default function OfflineRecoveryDrawer({
     schluessel: string,
     wiederholen: () => Promise<boolean>,
     verwerfen: () => Promise<boolean>,
-    wiederholenText = 'Erneut versuchen',
+    ohneAnhaenge?: { anzahl: number; senden: () => Promise<boolean> },
   ) => (
-    <Space size="small">
+    <Space size="middle">
       <Button
         type="primary"
         loading={aktionLaeuft === `${schluessel}:retry`}
@@ -182,8 +203,30 @@ export default function OfflineRecoveryDrawer({
           void ausfuehren(`${schluessel}:retry`, wiederholen, 'Aktion erneut vorgemerkt')
         }
       >
-        {wiederholenText}
+        Erneut versuchen
       </Button>
+      {ohneAnhaenge && (
+        // LFH-746: Nach der Karenz des Verwaisten-Sweeps sind die Dateien weg, „Erneut versuchen“
+        // liefe wieder in dieselbe 400. Die Rückfrage sagt, was fehlen wird; der Eintrag ist
+        // danach append-only.
+        <Popconfirm
+          title="Ohne Anhänge senden?"
+          description={ohneAnhaengeHinweis(ohneAnhaenge.anzahl)}
+          okText="Nur den Text senden"
+          cancelText="Abbrechen"
+          onConfirm={() =>
+            ausfuehren(
+              `${schluessel}:ohne-anhaenge`,
+              ohneAnhaenge.senden,
+              'Eintrag ohne Anhänge erneut vorgemerkt',
+            )
+          }
+        >
+          <Button loading={aktionLaeuft === `${schluessel}:ohne-anhaenge`}>
+            Ohne Anhänge senden
+          </Button>
+        </Popconfirm>
+      )}
       <Popconfirm
         title="Offline-Aktion endgültig verwerfen?"
         description="Der lokal gespeicherte Inhalt kann danach nicht wiederhergestellt werden."
@@ -257,23 +300,35 @@ export default function OfflineRecoveryDrawer({
           />
         )}
 
-        {sichtbareEtb.map((eintrag) =>
-          eintrag.id == null ? null : (
+        {sichtbareEtb.map((eintrag) => {
+          if (eintrag.id == null) return null;
+          const anhaenge = eintrag.eintrag.anhang_ids?.length ?? 0;
+          return (
             <RecoveryCard
               key={`etb:${eintrag.id}`}
               titel="Abgelehnter ETB-Eintrag"
               einsatzId={eintrag.einsatz_id}
               zeitpunkt={eintrag.erstellt_at}
               grund={eintrag.grund}
+              anhaenge={anhaenge}
               daten={eintrag.eintrag}
               aktionen={knoepfe(
                 `etb:${eintrag.id}`,
                 () => alsAktuellerBenutzer((id) => abgelehntWiederholen(id, eintrag.id!)),
                 () => alsAktuellerBenutzer((id) => abgelehntEntfernen(id, eintrag.id!)),
+                anhaenge > 0
+                  ? {
+                      anzahl: anhaenge,
+                      senden: () =>
+                        alsAktuellerBenutzer((id) =>
+                          abgelehntOhneAnhaengeWiederholen(id, eintrag.id!),
+                        ),
+                    }
+                  : undefined,
               )}
             />
-          ),
-        )}
+          );
+        })}
 
         {sichtbareSchreibaktionen.map((eintrag) =>
           eintrag.id == null ? null : (
