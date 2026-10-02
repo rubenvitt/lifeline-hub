@@ -68,6 +68,10 @@ diese Zusage.
   `pages/lagekarte/KartenFuss.tsx`): ein Rahmen (`pointerEvents: 'none'`), Bänder als
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
+- **Jeder Kamera-Aufruf sagt, wer bewegt** (LFH-766, `lagekarte/kamera.ts`, D2 der Change
+  `lfh-766-eigenposition-anflug-genauigkeit`): letztes Argument `BEDIENUNG` (Knopf, Tipp,
+  `flyToZiel`) oder `AUTOMATISCH` (Startansicht, Eigenpositions-Anflug); Wächter
+  `kamera.guard.test.ts`. Daran entfällt der erste Anflug der Eigenposition nach einer Bedienung.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
 - **Fachebenen nennen ihr Alter** (LFH-591,
   `openspec/changes/archive/2026-09-30-lfh-591-fachebenen-datenalter/design.md`): `abgerufen` im
@@ -121,7 +125,10 @@ diese Zusage.
 
 - **Messwerkzeug**: exklusiver Modus in `useKartenInteraktion`, ohne Schreibrecht, per Escape
   beendbar, Stand über `messQuelle.ts`; `messZeichnung.ts` nimmt nur die gewählte Geometrie.
-  **Jede terra-draw-Instanz eigener `prefixId`** (`td-abschnitt`/`td-zone`/`td-mess`);
+  **Jede terra-draw-Instanz eigener `prefixId`** (`td-abschnitt`/`td-zone`/`td-mess`), **immer
+  mit `td-`** (Wächter `zeichnungPraefix.guard.test.ts`): die Eigenposition liegt über den
+  Lagedaten, aber unter der ersten `td-*`-Ebene (LFH-766,
+  `openspec/changes/lfh-766-eigenposition-anflug-genauigkeit/design.md` D3);
   Messung vor `setStyle` räumen, nach `style.load` neu.
 - **Esc beim Zeichnen ist zweistufig** (LFH-712, Entscheidung 28.09.2026): erstes Esc verwirft
   die Figur mit Quittung, der Modus bleibt; Esc ohne Figur beendet ihn (Messen: ein Esc). Stufe

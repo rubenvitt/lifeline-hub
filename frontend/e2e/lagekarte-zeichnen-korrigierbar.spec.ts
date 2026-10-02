@@ -11,8 +11,21 @@ const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 interface MapHaken {
-  getStyle(): { sources?: Record<string, unknown> } | undefined;
+  getStyle(): { sources?: Record<string, unknown>; layers?: { id: string }[] } | undefined;
   getCenter(): { lng: number; lat: number };
+  getZoom(): number;
+  getBounds(): { getWest(): number; getEast(): number; getSouth(): number; getNorth(): number };
+  isMoving(): boolean;
+}
+
+/** Punkt und Kreis der Eigenposition stehen auf der Karte (Quelle trägt Daten). */
+function eigenpositionGezeichnet(page: Page) {
+  return page.evaluate(() => {
+    const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+    const q = map?.getStyle()?.sources?.['eigenposition'] as
+      { data?: { features?: unknown[] } } | undefined;
+    return q?.data?.features?.length ?? 0;
+  });
 }
 
 async function anmelden(page: Page) {
@@ -161,6 +174,17 @@ test.describe('Eigenposition', () => {
         { timeout: 10_000 },
       )
       .toBe(true);
+    // LFH-766: genaue Ortung zoomt nicht näher als die übrigen Kartenziele (Zoom 15).
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.isMoving()),
+      )
+      .toBe(false);
+    expect(
+      await page.evaluate(() =>
+        (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.getZoom(),
+      ),
+    ).toBeLessThanOrEqual(15.001);
 
     // Grundlagenwechsel (`setStyle` mit `diff: false`) wirft eigene Quellen weg — die
     // Eigenposition muss danach wieder stehen. Grenze: „Hell" ändert auch die Bedienfarbe, dann
@@ -191,5 +215,147 @@ test.describe('Eigenposition', () => {
       .toBe(0);
 
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
+  });
+});
+
+test.describe('Eigenposition: Anflug an die Genauigkeit (LFH-766)', () => {
+  // WLAN-Ortung am Fükw: 2 km Unschärfe.
+  const GROB = { latitude: 52.3759, longitude: 9.732, accuracy: 2000 };
+  test.use({ geolocation: GROB, permissions: ['geolocation'] });
+
+  test('erster Standort mit 2 km Genauigkeit: der Kreis steht vollständig im Bild', async ({
+    page,
+  }) => {
+    const seitenFehler: Error[] = [];
+    page.on('pageerror', (f) => seitenFehler.push(f));
+    await lagekarteOeffnen(page);
+    await page.getByRole('button', { name: 'Eigenposition' }).click();
+    await expect.poll(() => eigenpositionGezeichnet(page), { timeout: 10_000 }).toBeGreaterThan(0);
+
+    // Rahmen des Kreises unabhängig vom Code gerechnet: 2 km in Grad Breite bzw. Länge.
+    const dLat = (GROB.accuracy / 6_371_008.8) * (180 / Math.PI);
+    const dLon = dLat / Math.cos((GROB.latitude * Math.PI) / 180);
+    const kreisImBild = () =>
+      page.evaluate(
+        ({ lat, lon, dLat, dLon }) => {
+          const map = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+          if (map.isMoving()) return false;
+          const b = map.getBounds();
+          return (
+            b.getWest() <= lon - dLon &&
+            b.getEast() >= lon + dLon &&
+            b.getSouth() <= lat - dLat &&
+            b.getNorth() >= lat + dLat
+          );
+        },
+        { lat: GROB.latitude, lon: GROB.longitude, dLat, dLon },
+      );
+    await expect.poll(kreisImBild, { timeout: 10_000 }).toBe(true);
+    expect(seitenFehler.map((f) => f.message)).toEqual([]);
+  });
+
+  test('beim Zeichnen am eigenen Standort liegt die Zeichnung über dem Punkt', async ({
+    page,
+    context,
+  }) => {
+    const { canvas } = await lagekarteOeffnen(page);
+    await page.getByRole('button', { name: 'Eigenposition' }).click();
+    await expect.poll(() => eigenpositionGezeichnet(page), { timeout: 10_000 }).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.isMoving()),
+      )
+      .toBe(false);
+
+    await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+    const zaehler = page.locator('[data-lfh="zeichnen-punkte"]');
+    // Mitten im Genauigkeitskreis, über der Bildmitte (darunter liegt die Steuerung im Fuß).
+    const box = (await canvas.boundingBox())!;
+    for (const [dx, dy] of [
+      [-30, -60],
+      [30, -60],
+    ]) {
+      await page.mouse.click(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy);
+    }
+    await expect(zaehler).toHaveText('2 Punkte');
+
+    // Ein neuer Standort während des Zeichnens zieht die Eigenposition nach — aber nicht über die
+    // Zeichnung.
+    await context.setGeolocation({ latitude: 52.3761, longitude: 9.7322, accuracy: 2000 });
+    const folge = () =>
+      page.evaluate(() => {
+        const map = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+        const ids = (map.getStyle()?.layers ?? []).map((l) => l.id);
+        const q = map.getStyle()?.sources?.['eigenposition'] as
+          | { data?: { features?: { geometry: { type: string; coordinates: number[] } }[] } }
+          | undefined;
+        const punkt = q?.data?.features?.find((f) => f.geometry.type === 'Point');
+        return {
+          nachgefuehrt: punkt?.geometry.coordinates[1] === 52.3761,
+          letzteEigenposition: Math.max(
+            ...ids.map((id, i) => (id.startsWith('eigenposition-') ? i : -1)),
+          ),
+          ersteZeichnung: ids.findIndex((id) => id.startsWith('td-')),
+        };
+      });
+    await expect.poll(async () => (await folge()).nachgefuehrt, { timeout: 10_000 }).toBe(true);
+    const stand = await folge();
+    expect(stand.ersteZeichnung).toBeGreaterThanOrEqual(0);
+    expect(stand.letzteEigenposition).toBeLessThan(stand.ersteZeichnung);
+  });
+
+  test('Karte vor dem ersten Standort verschoben: kein Anflug, der Punkt erscheint', async ({
+    page,
+  }) => {
+    // Ortung, die erst auf Freigabe des Tests meldet — wie ein GPS-Kaltstart, nur steuerbar.
+    await page.addInitScript(() => {
+      const geo = navigator.geolocation;
+      const echt = geo.watchPosition.bind(geo);
+      let frei = false;
+      const warten: (() => void)[] = [];
+      (window as unknown as { __ortungFreigeben: () => void }).__ortungFreigeben = () => {
+        frei = true;
+        for (const f of warten.splice(0)) f();
+      };
+      geo.watchPosition = (ok, fehler, optionen) =>
+        echt(
+          (p) => {
+            if (frei) ok(p);
+            else warten.push(() => ok(p));
+          },
+          fehler,
+          optionen,
+        );
+    });
+    const { canvas } = await lagekarteOeffnen(page);
+    await page.getByRole('button', { name: 'Eigenposition' }).click();
+
+    // Die Einsatzkraft zieht die Karte, bevor der Standort da ist.
+    const box = (await canvas.boundingBox())!;
+    const mx = box.x + box.width / 2;
+    const my = box.y + box.height / 2 - 60;
+    await page.mouse.move(mx, my);
+    await page.mouse.down();
+    await page.mouse.move(mx + 120, my + 40, { steps: 8 });
+    await page.mouse.up();
+    const karte = () =>
+      page.evaluate(() => {
+        const map = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+        return { bewegt: map.isMoving(), mitte: map.getCenter(), zoom: map.getZoom() };
+      });
+    await expect.poll(async () => (await karte()).bewegt).toBe(false);
+    const vorher = await karte();
+
+    await page.evaluate(() =>
+      (window as unknown as { __ortungFreigeben: () => void }).__ortungFreigeben(),
+    );
+    await expect.poll(() => eigenpositionGezeichnet(page), { timeout: 10_000 }).toBeGreaterThan(0);
+    // Der Anflug liefe im selben Zug an, in dem der Punkt erscheint: jetzt stünde die Karte in
+    // Bewegung oder anderswo.
+    const nachher = await karte();
+    expect(nachher.bewegt).toBe(false);
+    expect(nachher.mitte.lng).toBeCloseTo(vorher.mitte.lng, 6);
+    expect(nachher.mitte.lat).toBeCloseTo(vorher.mitte.lat, 6);
+    expect(nachher.zoom).toBeCloseTo(vorher.zoom, 6);
   });
 });

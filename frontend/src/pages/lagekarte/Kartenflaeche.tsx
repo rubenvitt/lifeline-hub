@@ -101,6 +101,13 @@ import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLay
 import { sorgeFuerSuchnadelLayer, suchnadelFc } from './suchnadelLayer';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import type { Eigenposition } from './useEigenposition';
+import {
+  ANFLUG_ZOOM,
+  AUTOMATISCH,
+  BEDIENUNG,
+  fliegeEigenpositionAn,
+  hoereAufBedienung,
+} from './kamera';
 
 // Worker-URL setzen, bevor die erste Map entsteht (nur diese Datei erzeugt eine). Der Guard deckt
 // eine Bruchlinie ab: maplibre nimmt `config.WORKER_URL || defaultWorkerUrl()`. Bei einem falsy
@@ -153,8 +160,22 @@ export interface KartenflaecheProps {
   onKarteKlick?: (lngLat: { lng: number; lat: number }) => void;
   /** Marker-Klick → Inspector öffnen. */
   onMarkerKlick?: (schluessel: string) => void;
-  /** Beim Setzen sanft hinfliegen. */
+  /**
+   * Beim Setzen sanft hinfliegen. Zählt als Bedienung (`onBedienung`): die Seite setzt es nur auf
+   * eine Handlung hin (Auswahl, Deeplink, Ortssuche).
+   */
   flyToZiel?: { lng: number; lat: number } | null;
+  /**
+   * Erster Anflug der Eigenposition (LFH-766): rahmt den Genauigkeitskreis ein, höchstens bis
+   * `ANFLUG_ZOOM`. Je Anflug ein neues Objekt. Keine Bedienung — er sperrt sich nicht selbst.
+   */
+  eigenpositionAnflug?: Eigenposition | null;
+  /**
+   * Die Einsatzkraft hat die Kamera bewegt: Geste, Rad, Tastatur oder ein Bedienweg der Karte
+   * (Zoom-Knöpfe, Nordung, Bild einpassen, Bündel-Tipp, `flyToZiel`). Automatische Bewegungen
+   * (Startansicht, Eigenpositions-Anflug, Größenänderung) melden nicht (`kamera.ts`).
+   */
+  onBedienung?: () => void;
   /**
    * Startansicht aus den Einsatzdaten (`startAnsicht.ts`). `undefined` = noch nicht entschieden,
    * `null` = nichts verortet, Übersicht behalten. Greift genau einmal je Karte: danach gehört der
@@ -244,7 +265,7 @@ export interface KartenflaecheProps {
   massstabZiel?: HTMLElement | null;
   /**
    * Eigener Gerätestandort als Punkt mit Genauigkeitskreis; `null` = aus. Nur Darstellung — das
-   * Anfliegen übernimmt die Seite über `flyToZiel`.
+   * Anfliegen übernimmt die Seite über `eigenpositionAnflug`.
    */
   eigenposition?: Eigenposition | null;
   /**
@@ -312,6 +333,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onKarteKlick,
     onMarkerKlick,
     flyToZiel,
+    eigenpositionAnflug,
+    onBedienung,
     onStyleFehler,
     attribution,
     flaechen,
@@ -467,7 +490,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         if (!map) return;
         const b = new maplibregl.LngLatBounds();
         for (const e of ecken) b.extend(e as [number, number]);
-        map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 });
+        map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 }, BEDIENUNG);
       },
       zoneAbschliessen() {
         return zoneDrawRef.current?.abschliessen() ?? false;
@@ -489,13 +512,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         if (form) messRef.current?.starten(form);
       },
       zoomRein() {
-        mapRef.current?.zoomIn();
+        mapRef.current?.zoomIn(undefined, BEDIENUNG);
       },
       zoomRaus() {
-        mapRef.current?.zoomOut();
+        mapRef.current?.zoomOut(undefined, BEDIENUNG);
       },
       nachNorden() {
-        mapRef.current?.resetNorthPitch();
+        mapRef.current?.resetNorthPitch(undefined, BEDIENUNG);
       },
       klappeSpiderEin() {
         schliesseSpiderRef.current();
@@ -764,7 +787,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     startAufKarteRef.current = map;
     if (startAnsicht === null) return;
     if (startAnsicht.art === 'punkt') {
-      map.jumpTo({ center: [startAnsicht.lng, startAnsicht.lat], zoom: startAnsicht.zoom });
+      map.jumpTo(
+        { center: [startAnsicht.lng, startAnsicht.lat], zoom: startAnsicht.zoom },
+        AUTOMATISCH,
+      );
     } else {
       map.fitBounds(
         [
@@ -772,6 +798,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           [startAnsicht.ost, startAnsicht.nord],
         ],
         { padding: 60, maxZoom: PUNKT_ZOOM, duration: 0 },
+        AUTOMATISCH,
       );
     }
   }, [startAnsicht]);
@@ -781,9 +808,31 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const map = mapRef.current;
     if (map && flyToZiel) {
       startAufKarteRef.current = map;
-      map.flyTo({ center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: 15 });
+      map.flyTo(
+        { center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: ANFLUG_ZOOM },
+        BEDIENUNG,
+      );
     }
   }, [flyToZiel]);
+
+  // Erster Anflug der Eigenposition (LFH-766): Kreis im Bild statt festem Zoom. Ob er überhaupt
+  // fliegt, entscheidet die Seite (Bedienung seit dem Einschalten).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && eigenpositionAnflug) {
+      startAufKarteRef.current = map;
+      fliegeEigenpositionAn(map, eigenpositionAnflug);
+    }
+  }, [eigenpositionAnflug]);
+
+  // Bedienung der Kamera melden (LFH-766, `kamera.ts`). Der Rückruf der Seite ist je Render neu.
+  const onBedienungRef = useRef(onBedienung);
+  onBedienungRef.current = onBedienung;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    return hoereAufBedienung(map, () => onBedienungRef.current?.());
+  }, []);
 
   // Abschnittsflächen-Daten in die Source spielen (und für setStyle-Re-Anlage merken).
   useEffect(() => {
@@ -1190,7 +1239,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         melde(false);
         src
           .getClusterExpansionZoom(clusterId)
-          .then((zoom) => map.easeTo({ center, zoom }))
+          .then((zoom) => map.easeTo({ center, zoom }, BEDIENUNG))
           .catch(() => {
             /* Cluster nach Daten-Update weg → ignorieren */
           });
@@ -1327,12 +1376,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
               const src = map.getSource(fachebeneSourceId(quelle)) as GeoJSONSource | undefined;
               src
                 ?.getClusterExpansionZoom(ziel.clusterId)
-                .then((zoom) => map.easeTo({ center, zoom }))
+                .then((zoom) => map.easeTo({ center, zoom }, BEDIENUNG))
                 .catch(() => {
                   /* Bündel nach Daten-Update weg → ignorieren */
                 });
             } else {
-              map.easeTo({ center, zoom: map.getZoom() + ziel.zoomSchritt });
+              map.easeTo({ center, zoom: map.getZoom() + ziel.zoomSchritt }, BEDIENUNG);
             }
             return;
           }
