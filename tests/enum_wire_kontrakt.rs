@@ -446,6 +446,7 @@ fn orphan_enums_wire() {
         Detail => "detail",
         Export => "export",
         Druck => "druck",
+        Anhang => "anhang",
     });
     enum_wire!(lifeline_hub::erinnerung::ErinnerungStatus {
         Offen => "offen",
