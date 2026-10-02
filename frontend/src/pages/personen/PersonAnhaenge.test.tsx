@@ -26,9 +26,7 @@ describe('PersonAnhaenge (LFH-757)', () => {
         ]),
       ),
     );
-    renderMitProviders(
-      <PersonAnhaenge einsatzId={1} person={PERSON} darfSchreiben />,
-    );
+    renderMitProviders(<PersonAnhaenge einsatzId={1} person={PERSON} darfSchreiben />);
     const bereich = screen.getByRole('region', { name: 'Fotos und Dateien' });
     const link = await within(bereich).findByRole('link', {
       name: /^verletzung\.jpg, .*Datei von Person R-007 herunterladen$/,
@@ -65,9 +63,7 @@ describe('PersonAnhaenge (LFH-757)', () => {
         return new HttpResponse(null, { status: 200 });
       }),
     );
-    renderMitProviders(
-      <PersonAnhaenge einsatzId={1} person={PERSON} darfSchreiben />,
-    );
+    renderMitProviders(<PersonAnhaenge einsatzId={1} person={PERSON} darfSchreiben />);
     await screen.findByRole('link', { name: /^verletzung\.jpg, / });
     expect(document.querySelector('[data-lfh="download-anker-mit-vorschau"]')).toBeNull();
     expect(screen.queryByRole('button', { name: /Vorschau|Großansicht/ })).toBeNull();

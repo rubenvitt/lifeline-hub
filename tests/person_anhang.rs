@@ -658,7 +658,7 @@ async fn jeder_download_schreibt_eine_zeile_anhang_auch_304() {
 
 // LFH-757 × LFH-759: die Vorschau-Fassungen laufen über dieselbe Route und dieselbe Reihenfolge
 // (Audit vor `anhang_antwort`) — auch ein Vorschaubild zeigt die Person, also ist es ein Zugriff.
-// Die Personen-Detailseite fordert keins an (`ObjektAnhaenge`, `vorschau: false`).
+// Die Personen-Detailseite fordert keins an (`ErfassungsAnhaenge`, `vorschau={false}`).
 #[tokio::test]
 async fn vorschau_fassungen_sind_ebenfalls_protokollierte_zugriffe() {
     let (app, pool, admin, einsatz, person) = start().await;

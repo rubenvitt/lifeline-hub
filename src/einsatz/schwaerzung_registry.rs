@@ -2636,6 +2636,7 @@ mod tests {
             "einsatz_schaden_anhang",
             "einsatz_tier_anhang",
             "uhs_anhang",
+            "einsatz_person_anhang",
         ] {
             anhaenge.extend(spalten_von(t));
         }

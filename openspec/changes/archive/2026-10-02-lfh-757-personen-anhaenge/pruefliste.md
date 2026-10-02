@@ -11,12 +11,12 @@ verlangt diese Liste an jeder umgebauten Seite. Sie liegt bei Planung und Spec d
 | Route | `/einsaetze/:id/personen/:personId` (neuer aufklappbarer Abschnitt „Fotos und Dateien“ zwischen „Zuordnungen“ und „Zugriffs-Audit“, Dialog „Datei ablegen · Person R-nnn“) |
 | Stand | Branch `claude/ecstatic-archimedes-elt6t1`, 02.10.2026 |
 | Zielkontext | Fükw (1280–1366 px) und Führungs-Tablet in „Handschuh“; ortsfeste Stelle (BHP/UHS) zum Ablegen eines Fotos zur Identifikation oder Übergabe |
-| Nicht enthalten | Bildvorschau an der Person (LFH-759 kam vor dem Merge; an der Person bewusst aus, `vorschau: false`, weil jedes Vorschaubild eine Audit-Zeile schriebe — Guard-Test in `ObjektAnhaenge.test.tsx`), Offline-Ablage, Anhänge im Personendruck/CSV — Nicht-Ziele aus design.md |
+| Nicht enthalten | Bildvorschau an der Person (LFH-759 kam vor dem Merge; an der Person bewusst aus, `vorschau: false`, weil jedes Vorschaubild eine Audit-Zeile schriebe — Guard-Test in `pages/personen/PersonAnhaenge.test.tsx`), Offline-Ablage, Anhänge im Personendruck/CSV — Nicht-Ziele aus design.md |
 
 | Fläche | Stellvertreter | Browser-Messung |
 | --- | --- | --- |
-| **1 · Abschnitt** (Liste, Download-Anker, Entfernen, Leer/Laden/Fehler) | `pages/personen/PersonAnhaenge.tsx` → `components/anhaenge/ObjektAnhaenge.tsx` (`huelle="abschnitt"`) | ja: `e2e/personen-anhaenge.spec.ts` |
-| **2 · Ablegen-Dialog** | `components/anhaenge/AnhangAblegenModal.tsx` — derselbe Baustein wie am Schaden | ja: `e2e/schaden-anhaenge.spec.ts` (geteilter Dialog), Titel hier gemessen |
+| **1 · Abschnitt** (Liste, Download-Anker, Entfernen, Leer/Laden/Fehler) | `pages/personen/PersonAnhaenge.tsx` → `components/erfassungsAnhaenge/ErfassungsAnhaenge.tsx` (`huelle="abschnitt"`) | ja: `e2e/personen-anhaenge.spec.ts` |
+| **2 · Ablegen-Dialog** | `components/erfassungsAnhaenge/ErfassungsAnhangAblegenModal.tsx` — derselbe Baustein wie am Schaden | ja: `e2e/schaden-anhaenge.spec.ts` (geteilter Dialog), Titel hier gemessen |
 
 **Verdikte:** **erfüllt** (mit Beleg) · **offen → Ticket** · **nicht anwendbar** (mit
 Begründung). Gerechnetes und aus Quelltext Geschlossenes trägt im Beleg **[abgeleitet]**.
@@ -30,7 +30,7 @@ Begründung). Gerechnetes und aus Quelltext Geschlossenes trägt im Beleg **[abg
 | derselbe Spec, Dichte-Staffel (1280 px) | **kompakt:** Kopf 36 · Ablegen 30 · Anker 46,6 · Entfernen 30 px. **komfortabel:** 48 · 48 · 51,4 · 48 px. **handschuh:** 72 · 72 · 72 · 72 px (Boden je Stufe 30 / 48 / 72 als Literale) |
 | derselbe Spec, Dichte-Staffel als **Beobachter** (LFH-435, `rollen-kern.ts`) | Vorbedingung: im Abschnitt kein Knopf und kein Original-Verweis; Kopf und Anker ≥ 30 / 48 / 72 px |
 | `e2e/schaden-anhaenge.spec.ts` (geteilter Block und Dialog) | Dialog-Tabfolge `Datei wählen → Abbrechen → Speichern und nächste → Ablegen` ohne zweiten Stopp; Serien-Fokus zurück auf „Datei wählen“; Kontrast Tag 8,72 / 12,04, Nacht 10,38 / 12,10; Fokus-Verdeckung 60 Stopps, 31 in den Zeilen, 0 verdeckt. Lokal mit dem vorinstallierten Chromium 1194 gemessen; der Download-Dateiname mit Umlaut (`Müller_Hauswand.jpg`) kommt dort als „download“ an — auch mit dem `alpha`-Stand der Schadensdateien, also ein Befund der Browser-Version, kein Befund dieses Changes (die CI fährt den gepinnten Browser) |
-| Vitest | `ObjektAnhaenge.test.tsx` (Hülle „abschnitt“: kein Paneel, „Datei ablegen“ vor der Liste, Kennung „Person R-007“ im Namen; ohne Schreibrecht keine Knöpfe), `AnhangAblegenModal.test.tsx` (Erfassungs-Norm, `accept`, Serie, Ablehnung im Dialog, zu große Datei sendet nicht), `SchadenAnhaenge.test.tsx` unverändert grün über den Adapter, `PersonenDetailPage.test.tsx` (Liste erst beim Aufklappen und genau einmal; Beobachter ohne Aktionen; stornierte Person ohne Aktionen; kein `<form>` im `<form>`; Audit „Datei geladen“ statt Rohwert), `zugriffArt.test.ts`, `queryKeys.test.ts` (`person` invalidiert die Anhangliste, nicht das auditierte Detail; nicht offline) |
+| Vitest | `pages/personen/PersonAnhaenge.test.tsx` (Hülle „abschnitt“: kein Paneel, „Datei ablegen“ vor der Liste, Kennung „Person R-007“ im Namen; ohne Schreibrecht keine Knöpfe), `AnhangAblegenModal.test.tsx` (Erfassungs-Norm, `accept`, Serie, Ablehnung im Dialog, zu große Datei sendet nicht), `SchadenAnhaenge.test.tsx` unverändert grün über den Adapter, `PersonenDetailPage.test.tsx` (Liste erst beim Aufklappen und genau einmal; Beobachter ohne Aktionen; stornierte Person ohne Aktionen; kein `<form>` im `<form>`; Audit „Datei geladen“ statt Rohwert), `zugriffArt.test.ts`, `queryKeys.test.ts` (`person` invalidiert die Anhangliste, nicht das auditierte Detail; nicht offline) |
 | Grep über die neuen/geänderten Quellen (ohne Tests) | Farbliterale 0 (Rollen) · `animation`/`blink`/`keyframes` 0 · neues `size=` 0 (`dichte.guard.test.ts` grün) · Emoji 0 (Ikonen in `aria-hidden`-Hülle) · Rot neben Neutralem mit `Space size="middle"` (`aktionsabstand.guard.test.ts` grün) |
 
 ---
@@ -50,7 +50,7 @@ Begründung). Gerechnetes und aus Quelltext Geschlossenes trägt im Beleg **[abg
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Lade- und Entfernen-Fehler als `role="alert"` im Abschnitt, die betroffene Zeile trägt `data-fehler` (geteilter Block, Vitest am Schaden-Adapter) | — |
 | 10 | **Alarmbudget** | **nicht anwendbar** | Keine Alarme | — |
 | 11 | **Warnverhalten** | **erfüllt** | Kein Blinken, kein Ton (Grep) | — |
-| 12 | **Kein Sprung unter dem Cursor** | **erfüllt** (nach Merge von LFH-760) | Eine Ablage aus einer anderen Sitzung wartet hinter dem Sammelbanner, statt oben einzuschieben; eigene Ablagen stehen sofort. Der geteilte Block `ObjektAnhaenge` trägt das für Schaden und Person, belegt über `pages/schaeden/SchadenAnhaenge.test.tsx` (LFH-760) und `components/anhaenge/anhangZufluss.test.ts` | — |
+| 12 | **Kein Sprung unter dem Cursor** | **erfüllt** (nach Merge von LFH-760) | Eine Ablage aus einer anderen Sitzung wartet hinter dem Sammelbanner, statt oben einzuschieben; eigene Ablagen stehen sofort. Der geteilte Block `ErfassungsAnhaenge` trägt das für Schaden und Person, belegt über `pages/schaeden/SchadenAnhaenge.test.tsx` (LFH-760) und `components/erfassungsAnhaenge/anhangZufluss.test.ts` | — |
 | 13 | **Fokus nie verdeckt** | **erfüllt** | Nach dem Entfernen fällt der Fokus auf die nächste Zeile bzw. „Datei ablegen“ (geteilter Block, Vitest); Tab-Durchlauf des Blocks unter der Kopfzeile am Schaden gemessen (0 verdeckt) [abgeleitet für den Abschnitt: dieselbe Kopfzeile, der Abschnitt hat keinen eigenen Scrollbereich] | — |
 | 14 | **Tabellenseite vollständig** | **nicht anwendbar** | Liste, keine Tabelle („was ist mit dieser Person?“, LFH-330) | — |
 | 15 | **Erfassungsmaske vollständig** | **nicht anwendbar** | Lese- und Aktionsfläche; die Maske ist Tabelle 2 | — |
@@ -59,7 +59,7 @@ Begründung). Gerechnetes und aus Quelltext Geschlossenes trägt im Beleg **[abg
 
 ## Tabelle 2 — Ablegen-Dialog
 
-Derselbe Baustein wie am Schaden (`AnhangAblegenModal`); die Verdikte aus
+Derselbe Baustein wie am Schaden (`ErfassungsAnhangAblegenModal`); die Verdikte aus
 `2026-09-25-lfh-21-pruefliste.md`, Tabelle 2, gelten unverändert (10 erfüllt · 1 offen → LFH-397 ·
 4 nicht anwendbar). Hier zusätzlich gemessen: der Titel nennt die Person („Datei ablegen · Person
 R-001“, e2e), und die Ablage aus dem Abschnitt invalidiert Anhangliste und ETB (Baustein-Vitest).

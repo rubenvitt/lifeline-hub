@@ -292,3 +292,14 @@ brauchen es — deshalb kommen sie später“ steht nur im Archiv von LFH-21 und
 
 Keine, die Spec oder Aufgabenschnitt ändern. Die vier Grundsatzfragen (Audit-Takt, Dateibezug,
 Leserecht, Frontend-Schnitt) hat der Mensch am 02.10.2026 entschieden.
+
+## Nachtrag 02.10.2026 — Merge mit LFH-758
+
+LFH-758 (Anhänge an Tier und UHS) hat den Schaden-Block parallel verallgemeinert und landete
+zuerst auf `alpha`: Backend-Kern `anhang::erfassung` (Deskriptor `ErfassungsAblage`, Register
+`ERFASSUNGS_ABLAGEN`), Frontend-Baustein `components/erfassungsAnhaenge/ErfassungsAnhaenge`.
+Beim Merge hängt die Person als vierte Ablage an diesem Kern (`person::anhang::PERSON_ABLAGE`),
+der eigene Baustein `ObjektAnhaenge` aus D6 entfällt, ebenso die Kopie von Domäne und Kern aus D4. `ErfassungsAnhaenge` bekam dafür die Hülle
+`abschnitt`; die Person setzt `vorschau={false}` (D3 unverändert). Das Lese-Audit bleibt in
+`person_zugriff_audit` (D2): `0138_anhang_zugriff_audit.sql` aus LFH-758 hält ihr Protokoll
+ausdrücklich getrennt, weil an der UHS keine Person hängt. Migrationen damit 0139/0140.
