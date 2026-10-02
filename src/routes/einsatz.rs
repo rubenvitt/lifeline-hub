@@ -252,6 +252,35 @@ pub async fn aufbewahrungsfrist_setzen(
     )))
 }
 
+/// GET /api/einsaetze/{id}/aufbewahrung-kategorien — Aufbewahrung je Datenkategorie (LFH-749,
+/// Spec `aufbewahrung-kategorien`, „Zustand je Kategorie“): alle drei Kategorien mit Frist,
+/// Zustand und Rechtsgrundlage, bei einem aktiven Einsatz mit der Dauer der Org-Vorgabe. Kein
+/// Personenbezug; lesen darf, wer den Einsatz lesen darf, dazu Einsatzleitung und System-Admin
+/// auch an einem gesperrten Einsatz (wie der Frist-PUT, damit das Paneel dort nicht leer bleibt).
+pub async fn kategorien_lesen(
+    State(state): State<AppState>,
+    ctx: EinsatzKontext,
+) -> Result<Json<Vec<KategorieAufbewahrungAnzeige>>, AppError> {
+    if !ctx.benutzer.ist_admin() && ctx.fordere_einsatzleitung().is_err() {
+        ctx.fordere_lesezugriff()?;
+    }
+    let id = ctx.einsatz.id;
+    let (_, geschwaerzt_at) = crate::aufbewahrung::repo::tombstones(&state.pool, id).await?;
+    Ok(Json(
+        crate::einsatz::aufbewahrung_kategorie::anzeige(
+            &state.pool,
+            crate::einsatz::aufbewahrung_kategorie::EinsatzStand {
+                einsatz_id: id,
+                org_id: ctx.einsatz.org_id,
+                status: ctx.einsatz.status.as_str(),
+                geschwaerzt_at: geschwaerzt_at.as_deref(),
+            },
+            chrono::Utc::now(),
+        )
+        .await?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct KategorieFristSetzen {
     /// Neue Frist der Kategorie (ISO-8601/RFC3339 oder SQLite-Format); `null`/leer hebt sie

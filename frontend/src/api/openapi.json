@@ -422,6 +422,7 @@
         "required": [
           "kopf",
           "zustand",
+          "kategorien",
           "personen",
           "tiere",
           "schaeden"
@@ -432,6 +433,13 @@
               "string",
               "null"
             ]
+          },
+          "kategorien": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KategorieAufbewahrungAnzeige"
+            },
+            "description": "Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,\nRechtsgrundlage und Zustand; alle drei Kategorien."
           },
           "kopf": {
             "$ref": "#/components/schemas/ArchivKopfAnzeige"
@@ -5870,6 +5878,70 @@
           "light",
           "dark"
         ]
+      },
+      "KategorieAufbewahrungAnzeige": {
+        "type": "object",
+        "description": "Aufbewahrung einer Datenkategorie am Einsatz (Spec „Zustand je Kategorie“, design.md D7).\nKein Personenbezug: Zeitpunkte, Zustand und der Org-Text der Rechtsgrundlage.",
+        "required": [
+          "kategorie"
+        ],
+        "properties": {
+          "dauer_tage_vorgabe": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur bei einem aktiven Einsatz: die Dauer der Org-Vorgabe, aus der die Frist beim\nAbschluss entsteht; fehlt = die Kategorie folgt der Einsatz-Frist."
+          },
+          "frist_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Frist der Kategorie; fehlt = keine eigene Frist (folgt der Einsatz-Frist)."
+          },
+          "geschwaerzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "karenz_ende": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Karenz (`vorgemerkt_at + 30 Tage`)."
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/Datenkategorie"
+          },
+          "rechtsgrundlage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Rechtsgrundlage der Frist; bei einem aktiven Einsatz die der Org-Vorgabe."
+          },
+          "vorgemerkt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustand": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AufbewahrungZustand",
+                "description": "Zustand nach derselben Rangfolge wie der Einsatz; fehlt bei einem aktiven Einsatz."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "KategorieVorgabe": {
         "type": "object",

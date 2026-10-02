@@ -915,6 +915,16 @@ pub async fn schwaerze_einsatz(
         super::schwaerzung_registry::Umfang::Alles,
     )
     .await?;
+    // LFH-749: die Einsatz-Schwärzung nimmt jede Datenkategorie mit; ihre Tombstones stehen
+    // dann auch in der Datenbank (design.md D5), nicht nur in der Zustandsableitung.
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET geschwaerzt_at = ? \
+         WHERE einsatz_id = ? AND geschwaerzt_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
 
     system_audit_tx(
         &mut tx,

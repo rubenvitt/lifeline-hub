@@ -1169,6 +1169,469 @@ mod tests {
         assert_eq!(zeile(&pool, aktiv, Datenkategorie::Anhaenge).await, None);
     }
 
+    // ---------- Vormerkung (K1) und Schwärzung (K2) ----------
+
+    /// Setzt Frist und optional Vormerkung einer Kategorie direkt (Zeile muss nicht existieren).
+    async fn kategorie_stand(
+        pool: &SqlitePool,
+        einsatz: i64,
+        k: Datenkategorie,
+        frist: &str,
+        vorgemerkt: Option<&str>,
+    ) {
+        sqlx::query(
+            "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
+                rechtsgrundlage, vorgemerkt_at) VALUES (?, ?, ?, 'RG ' || ?, ?) \
+             ON CONFLICT(einsatz_id, kategorie) DO UPDATE SET frist_bis = excluded.frist_bis, \
+                vorgemerkt_at = excluded.vorgemerkt_at",
+        )
+        .bind(einsatz)
+        .bind(k.as_str())
+        .bind(frist)
+        .bind(k.as_str())
+        .bind(vorgemerkt)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn abgeschlossen(pool: &SqlitePool) -> (i64, i64) {
+        let (einsatz, leit) = einsatz_mit_leitung(pool).await;
+        // Personen vor dem Abschluss (danach ist der Einsatz schreibgeschützt).
+        (einsatz, leit)
+    }
+
+    async fn schliessen(pool: &SqlitePool, einsatz: i64, leit: i64) {
+        super::super::repo::abschliessen(pool, einsatz, leit)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn vormerken_ist_idempotent_und_laesst_einsatz_lesbar() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        schliessen(&pool, einsatz, leit).await;
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Personenauskunft,
+            "2026-06-01 00:00:00",
+            None,
+        )
+        .await;
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Anhaenge,
+            "2026-12-01 00:00:00",
+            None,
+        )
+        .await;
+
+        let faellig = faellige_vormerkung(&pool, JETZT).await.unwrap();
+        assert_eq!(faellig, vec![(einsatz, Datenkategorie::Personenauskunft)]);
+        assert!(
+            vormerken(&pool, einsatz, Datenkategorie::Personenauskunft, JETZT)
+                .await
+                .unwrap()
+        );
+        let z = zeile(&pool, einsatz, Datenkategorie::Personenauskunft)
+            .await
+            .unwrap();
+        assert_eq!(z.vorgemerkt_at.as_deref(), Some(JETZT));
+        let etb = etb_texte(&pool, einsatz).await;
+        assert!(etb
+            .last()
+            .unwrap()
+            .contains("„Personenauskunft“ abgelaufen"));
+        // Der Einsatz selbst bleibt unberührt (lesbar).
+        let (geloescht, _) = crate::aufbewahrung::repo::tombstones(&pool, einsatz)
+            .await
+            .unwrap();
+        assert_eq!(geloescht, None);
+
+        // Zweiter Lauf: nichts.
+        let n = etb.len();
+        assert!(faellige_vormerkung(&pool, JETZT).await.unwrap().is_empty());
+        assert!(
+            !vormerken(&pool, einsatz, Datenkategorie::Personenauskunft, JETZT)
+                .await
+                .unwrap()
+        );
+        assert_eq!(etb_texte(&pool, einsatz).await.len(), n);
+    }
+
+    #[tokio::test]
+    async fn aktiver_einsatz_wird_nie_vorgemerkt() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, _) = einsatz_mit_leitung(&pool).await;
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Anhaenge,
+            "2026-01-01 00:00:00",
+            None,
+        )
+        .await;
+        assert!(faellige_vormerkung(&pool, JETZT).await.unwrap().is_empty());
+        assert!(!vormerken(&pool, einsatz, Datenkategorie::Anhaenge, JETZT)
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn vormerken_ohne_akteur_unterbleibt_und_holt_es_mit_admin_nach() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at) \
+             VALUES (1, 'Lage', 'abgeschlossen', '2026-01-01 00:00:00') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Anhaenge,
+            "2026-06-01 00:00:00",
+            None,
+        )
+        .await;
+        assert!(vormerken(&pool, einsatz, Datenkategorie::Anhaenge, JETZT)
+            .await
+            .is_err());
+        assert_eq!(
+            zeile(&pool, einsatz, Datenkategorie::Anhaenge)
+                .await
+                .unwrap()
+                .vorgemerkt_at,
+            None
+        );
+        assert!(etb_texte(&pool, einsatz).await.is_empty());
+
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
+             VALUES (1, 'a', 'a', 'h', 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(vormerken(&pool, einsatz, Datenkategorie::Anhaenge, JETZT)
+            .await
+            .unwrap());
+    }
+
+    async fn sichtung(pool: &SqlitePool, einsatz: i64, person: i64, von: i64) {
+        sqlx::query(
+            "INSERT INTO person_sichtung (einsatz_id, person_id, kategorie, notiz, gesichtet_von) \
+             VALUES (?, ?, 'sk2', 'Sichtungsnotiz', ?)",
+        )
+        .bind(einsatz)
+        .bind(person)
+        .bind(von)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    type Behandlungsfelder = (Option<String>, Option<String>);
+
+    /// `(zustand, sichtungsnotiz)` einer Person.
+    async fn behandlungsfelder(pool: &SqlitePool, person: i64) -> Behandlungsfelder {
+        let zustand: Option<String> =
+            sqlx::query_scalar("SELECT zustand FROM einsatz_person WHERE id = ?")
+                .bind(person)
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        let notiz: Option<String> =
+            sqlx::query_scalar("SELECT notiz FROM person_sichtung WHERE person_id = ? LIMIT 1")
+                .bind(person)
+                .fetch_optional(pool)
+                .await
+                .unwrap()
+                .flatten();
+        (zustand, notiz)
+    }
+
+    /// Spec „Nur registriert“, „Behandelt, Auskunft abgelaufen“, „Beide Zwecke abgelaufen“.
+    #[tokio::test]
+    async fn personenstamm_folgt_den_zwecken() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let registriert = volle_person(&pool, einsatz, 1, leit).await;
+        let behandelt = volle_person(&pool, einsatz, 2, leit).await;
+        sqlx::query("UPDATE einsatz_person SET zustand = 'unterkühlt' WHERE id = ?")
+            .bind(behandelt)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sichtung(&pool, einsatz, behandelt, leit).await;
+        sqlx::query(
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, ziel, transportmittel, \
+                status, erfasst_von) VALUES (?, ?, 'transport', 'KH Mitte', 'RTW', 'angemeldet', ?)",
+        )
+        .bind(einsatz)
+        .bind(registriert)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        schliessen(&pool, einsatz, leit).await;
+        let vor_31 = "2026-05-30 12:00:00";
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Personenauskunft,
+            "2026-05-01 00:00:00",
+            Some(vor_31),
+        )
+        .await;
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Behandlung,
+            "2026-12-01 00:00:00",
+            None,
+        )
+        .await;
+
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+
+        // Nur registriert: Stamm und Auskunft weg, Verbleib weg.
+        let (name, geb, adresse, kontakt, ort, ziel) = person_felder(&pool, registriert).await;
+        assert_eq!(
+            (name, geb, adresse, kontakt, ort, ziel),
+            (None, None, None, None, None, None)
+        );
+        let verbleib: (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT ziel, transportmittel FROM person_verbleib WHERE person_id = ?")
+                .bind(registriert)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(verbleib, (None, None));
+
+        // Behandelt: nur Adresse und Kontakt weg.
+        let (name, geb, adresse, kontakt, ort, ziel) = person_felder(&pool, behandelt).await;
+        assert_eq!((adresse, kontakt), (None, None));
+        assert_eq!(name.as_deref(), Some("Mustermann"));
+        assert_eq!(geb.as_deref(), Some("1970-01-01"));
+        assert_eq!(ort.as_deref(), Some("Marktplatz"));
+        assert_eq!(ziel.as_deref(), Some("KH Mitte"));
+        assert_eq!(
+            behandlungsfelder(&pool, behandelt).await,
+            (Some("unterkühlt".into()), Some("Sichtungsnotiz".into()))
+        );
+        let etb = etb_texte(&pool, einsatz).await;
+        let eintrag = etb.last().unwrap();
+        assert!(
+            eintrag.contains("„Personenauskunft“ unwiderruflich geschwärzt"),
+            "{eintrag}"
+        );
+        assert!(eintrag.contains("RG personenauskunft"));
+        assert!(eintrag.contains("ohne Behandlungsbezug"));
+
+        // Beide Zwecke abgelaufen: auch der Stamm der behandelten Person.
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Behandlung,
+            "2026-05-01 00:00:00",
+            Some(vor_31),
+        )
+        .await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Behandlung, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let (name, geb, _, _, ort, ziel) = person_felder(&pool, behandelt).await;
+        assert_eq!((name, geb, ort, ziel), (None, None, None, None));
+        assert_eq!(behandlungsfelder(&pool, behandelt).await, (None, None));
+        assert!(etb_texte(&pool, einsatz)
+            .await
+            .last()
+            .unwrap()
+            .contains("aller Personen"));
+
+        // Sichtungskategorie und Registriernummer bleiben.
+        let (kat, nr): (String, i64) = sqlx::query_as(
+            "SELECT s.kategorie, p.registrier_nr FROM person_sichtung s \
+             JOIN einsatz_person p ON p.id = s.person_id WHERE p.id = ?",
+        )
+        .bind(behandelt)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((kat.as_str(), nr), ("sk2", 2));
+
+        let verstoesse: Vec<(String,)> =
+            sqlx::query_as("SELECT \"table\" FROM pragma_foreign_key_check")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(verstoesse.is_empty(), "{verstoesse:?}");
+    }
+
+    /// Jede Bezugsart hält den Stamm, wenn nur die Personenauskunft geschwärzt wird —
+    /// auch an einer stornierten Person (design.md, Risiko „Prädikat erfasst einen Bezug nicht“).
+    #[tokio::test]
+    async fn jede_bezugsart_haelt_den_stamm() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let mit_sichtung = volle_person(&pool, einsatz, 1, leit).await;
+        sichtung(&pool, einsatz, mit_sichtung, leit).await;
+        let mit_verlauf = volle_person(&pool, einsatz, 2, leit).await;
+        sqlx::query(
+            "INSERT INTO person_verlaufsnotiz (einsatz_id, person_id, text, erfasst_von) \
+             VALUES (?, ?, 'RR 120/80', ?)",
+        )
+        .bind(einsatz)
+        .bind(mit_verlauf)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mit_uhs = volle_person(&pool, einsatz, 3, leit).await;
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'patientenablage', 'PA 1', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(leit)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO person_uhs_belegung (einsatz_id, person_id, uhs_id, art, erfasst_von) \
+             VALUES (?, ?, ?, 'eintritt', ?)",
+        )
+        .bind(einsatz)
+        .bind(mit_uhs)
+        .bind(uhs)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mit_zustand = volle_person(&pool, einsatz, 4, leit).await;
+        sqlx::query("UPDATE einsatz_person SET zustand = 'gehfähig' WHERE id = ?")
+            .bind(mit_zustand)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let storniert = volle_person(&pool, einsatz, 5, leit).await;
+        sichtung(&pool, einsatz, storniert, leit).await;
+        sqlx::query("UPDATE einsatz_person SET storniert_at = '2026-01-01 00:00:00' WHERE id = ?")
+            .bind(storniert)
+            .execute(&pool)
+            .await
+            .unwrap();
+        schliessen(&pool, einsatz, leit).await;
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Personenauskunft,
+            "2026-05-01 00:00:00",
+            Some("2026-05-30 12:00:00"),
+        )
+        .await;
+
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+        for p in [mit_sichtung, mit_verlauf, mit_uhs, mit_zustand, storniert] {
+            let (name, _, adresse, _, _, _) = person_felder(&pool, p).await;
+            assert_eq!(
+                name.as_deref(),
+                Some("Mustermann"),
+                "Person {p} behält ihren Stamm"
+            );
+            assert_eq!(adresse, None, "Person {p}: Adresse weg");
+        }
+    }
+
+    #[tokio::test]
+    async fn anhaenge_schwaerzung_laesst_anderes_stehen_und_ist_idempotent() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let person = volle_person(&pool, einsatz, 1, leit).await;
+        sqlx::query(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, \
+                hochgeladen_von) VALUES (?, 'foto.jpg', 'image/jpeg', 3, 'x', X'010203', ?)",
+        )
+        .bind(einsatz)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        schliessen(&pool, einsatz, leit).await;
+
+        // Karenz läuft noch (29 Tage): nichts.
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Anhaenge,
+            "2026-05-01 00:00:00",
+            Some("2026-06-01 12:00:00"),
+        )
+        .await;
+        assert!(
+            !schwaerzen(&pool, einsatz, Datenkategorie::Anhaenge, t(JETZT))
+                .await
+                .unwrap()
+        );
+
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Anhaenge,
+            "2026-05-01 00:00:00",
+            Some("2026-05-31 12:00:00"),
+        )
+        .await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Anhaenge, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let anhaenge: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(anhaenge, 0);
+        let (name, _, adresse, _, _, _) = person_felder(&pool, person).await;
+        assert_eq!(name.as_deref(), Some("Mustermann"));
+        assert_eq!(adresse.as_deref(), Some("Hauptstr. 5"));
+        let n = etb_texte(&pool, einsatz).await.len();
+        assert!(etb_texte(&pool, einsatz)
+            .await
+            .last()
+            .unwrap()
+            .contains("„Anhänge“"));
+
+        // Zweiter Lauf: nichts, kein Eintrag.
+        assert!(
+            !schwaerzen(&pool, einsatz, Datenkategorie::Anhaenge, t(JETZT))
+                .await
+                .unwrap()
+        );
+        assert_eq!(etb_texte(&pool, einsatz).await.len(), n);
+    }
+
     // ---------- Zustand je Kategorie ----------
 
     #[test]

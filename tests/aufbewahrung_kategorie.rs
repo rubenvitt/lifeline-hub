@@ -231,3 +231,116 @@ async fn einsatz_zustand_aktiv_vorgemerkt_geschwaerzt() {
     assert_eq!(status, StatusCode::CONFLICT, "geschwärzt");
     assert_eq!(stand(&pool, aktiv).await, vorher);
 }
+
+async fn kategorien_lesen(app: &axum::Router, cookie: &str, id: i64) -> (StatusCode, Value) {
+    anfrage_json(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{id}/aufbewahrung-kategorien"),
+        cookie,
+        None,
+    )
+    .await
+}
+
+fn finde<'a>(liste: &'a Value, kategorie: &str) -> &'a Value {
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|k| k["kategorie"] == kategorie)
+        .unwrap()
+}
+
+/// Spec „Aktiver Einsatz“: an einem aktiven Einsatz steht die Dauer der Org-Vorgabe samt
+/// Rechtsgrundlage, die übrigen Kategorien folgen der Einsatz-Frist; kein Zustand.
+#[tokio::test]
+async fn aktiver_einsatz_zeigt_die_vorgabe() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    org_vorgabe(
+        &app,
+        &admin,
+        json!([{ "kategorie": "personenauskunft", "dauer_tage": 0,
+                 "rechtsgrundlage": "§ 46 Abs. 5 BHKG NRW" }]),
+    )
+    .await;
+    let id = einsatz_anlegen(&app, &admin).await;
+    let beob = benutzer_anlegen(&app, &admin, "bertold", "keine").await;
+    rolle_setzen(&app, &admin, id, beob, "beobachter").await;
+    let bert = login_cookie(&app, "bertold", "bertoldpw1").await;
+
+    let (status, liste) = kategorien_lesen(&app, &bert, id).await;
+    assert_eq!(status, StatusCode::OK, "{liste}");
+    let auskunft = finde(&liste, "personenauskunft");
+    assert_eq!(auskunft["dauer_tage_vorgabe"], 0);
+    assert_eq!(auskunft["rechtsgrundlage"], "§ 46 Abs. 5 BHKG NRW");
+    assert!(auskunft.get("zustand").is_none());
+    let behandlung = finde(&liste, "behandlung");
+    assert!(behandlung.get("dauer_tage_vorgabe").is_none());
+    assert!(behandlung.get("frist_bis").is_none());
+}
+
+/// Spec „Gemischte Zustände“ über die Einsatz-Route und „Kategorien in der Akte“ über die
+/// Archiv-Route.
+#[tokio::test]
+async fn gemischte_zustaende_am_einsatz_und_in_der_akte() {
+    let (app, pool) = setup_mit_pool().await;
+    let (admin, id) = abgeschlossener_einsatz(&app).await;
+    // personenauskunft: seit 3 Tagen vorgemerkt; anhaenge: künftige Frist; behandlung: keine.
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET frist_bis = ?, vorgemerkt_at = ? \
+         WHERE einsatz_id = ? AND kategorie = 'personenauskunft'",
+    )
+    .bind(vor_tagen(3))
+    .bind(vor_tagen(3))
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (status, _) = kategorie_frist(
+        &app,
+        &admin,
+        id,
+        "anhaenge",
+        json!({ "retention_bis": "2099-01-01 00:00:00", "bestaetigt": true,
+                "rechtsgrundlage": "§ 32b Abs. 3 NKatSG" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, liste) = kategorien_lesen(&app, &admin, id).await;
+    assert_eq!(status, StatusCode::OK, "{liste}");
+    assert_eq!(finde(&liste, "personenauskunft")["zustand"], "vorgemerkt");
+    assert!(finde(&liste, "personenauskunft")["karenz_ende"].is_string());
+    assert_eq!(finde(&liste, "anhaenge")["zustand"], "frist_laeuft");
+    assert_eq!(finde(&liste, "behandlung")["zustand"], "ohne_frist");
+
+    // Archivakte: dieselben Kategorien; nach Schwärzung der Personenauskunft mit Zeitpunkt
+    // und Rechtsgrundlage.
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET geschwaerzt_at = ? \
+         WHERE einsatz_id = ? AND kategorie = 'personenauskunft'",
+    )
+    .bind(vor_tagen(0))
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (status, akte) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/aufbewahrung/einsaetze/{id}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{akte}");
+    let kategorien = &akte["kategorien"];
+    let auskunft = finde(kategorien, "personenauskunft");
+    assert_eq!(auskunft["zustand"], "geschwaerzt");
+    assert!(auskunft["geschwaerzt_at"].is_string());
+    assert_eq!(auskunft["rechtsgrundlage"], "§ 46 Abs. 5 BHKG NRW");
+    assert_eq!(finde(kategorien, "anhaenge")["zustand"], "frist_laeuft");
+    assert_eq!(finde(kategorien, "behandlung")["zustand"], "ohne_frist");
+}

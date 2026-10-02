@@ -170,6 +170,11 @@ export interface components {
          */
         ArchivAkteAnzeige: {
             karenz_ende?: string | null;
+            /**
+             * @description Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,
+             *     Rechtsgrundlage und Zustand; alle drei Kategorien.
+             */
+            kategorien: components["schemas"]["KategorieAufbewahrungAnzeige"][];
             kopf: components["schemas"]["ArchivKopfAnzeige"];
             personen: components["schemas"]["ArchivPersonAnzeige"][];
             schaeden: components["schemas"]["ArchivSchadenAnzeige"][];
@@ -2167,6 +2172,28 @@ export interface components {
          * @enum {string}
          */
         KartenTheme: "auto" | "light" | "dark";
+        /**
+         * @description Aufbewahrung einer Datenkategorie am Einsatz (Spec „Zustand je Kategorie“, design.md D7).
+         *     Kein Personenbezug: Zeitpunkte, Zustand und der Org-Text der Rechtsgrundlage.
+         */
+        KategorieAufbewahrungAnzeige: {
+            /**
+             * Format: int64
+             * @description Nur bei einem aktiven Einsatz: die Dauer der Org-Vorgabe, aus der die Frist beim
+             *     Abschluss entsteht; fehlt = die Kategorie folgt der Einsatz-Frist.
+             */
+            dauer_tage_vorgabe?: number | null;
+            /** @description Frist der Kategorie; fehlt = keine eigene Frist (folgt der Einsatz-Frist). */
+            frist_bis?: string | null;
+            geschwaerzt_at?: string | null;
+            /** @description Ende der Karenz (`vorgemerkt_at + 30 Tage`). */
+            karenz_ende?: string | null;
+            kategorie: components["schemas"]["Datenkategorie"];
+            /** @description Rechtsgrundlage der Frist; bei einem aktiven Einsatz die der Org-Vorgabe. */
+            rechtsgrundlage?: string | null;
+            vorgemerkt_at?: string | null;
+            zustand?: components["schemas"]["AufbewahrungZustand"] | null;
+        };
         /** @description Gespeicherte Vorgabe einer Kategorie. */
         KategorieVorgabe: {
             /** Format: int64 */

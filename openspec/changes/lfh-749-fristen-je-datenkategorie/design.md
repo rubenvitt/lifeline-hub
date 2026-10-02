@@ -239,10 +239,17 @@ vorgemerkten Kategorie bis zur Schwärzung über alle Routen lesbar.
 gilt `geschwaerzt` ohne Ausnahme. Ohne Zeile gilt `ohne_frist`.
 
 Ein DTO `KategorieAufbewahrungAnzeige { kategorie, frist_bis, vorgemerkt_at, karenz_ende,
-geschwaerzt_at, rechtsgrundlage, zustand, dauer_tage_vorgabe }` erscheint an zwei Stellen:
+geschwaerzt_at, rechtsgrundlage, zustand, dauer_tage_vorgabe }` erscheint an drei Stellen:
 
-- im Einsatz-DTO, das `FristPaneel` liest, als Liste `aufbewahrung_kategorien`;
-- in `ArchivAkteAnzeige`.
+- als Antwort von `GET /api/einsaetze/{id}/aufbewahrung-kategorien`, die `FristPaneel` liest;
+- als Antwort des Kategorie-PUT (D8);
+- in `ArchivAkteAnzeige` als Liste `kategorien`.
+
+Eine eigene Route statt eines Felds im Einsatz-DTO: `EinsatzAnzeige` entsteht synchron an
+vielen Stellen (Detail, Liste, Patch, Frist-PUT), die Kategorie-Liste braucht aber eigene
+Abfragen (Zeilen, Org-Vorgabe). Rechte wie der Frist-PUT, ergänzt um jeden, der den Einsatz
+lesen darf; beide Routen stehen begründet in `ORG_FLOOR_AUSNAHME`
+(`tests/einsatz_kontext_guard.rs`).
 
 `dauer_tage_vorgabe` trägt bei aktiven Einsätzen die Org-Vorgabe für den Hinweis aus der Spec.
 Die Übersicht bleibt unverändert, denn eine Zeile je Einsatz reicht dort, und die Akte führt
