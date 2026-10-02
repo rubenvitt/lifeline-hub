@@ -4,7 +4,7 @@
 //! einen neueren Stand per In-Place-Tausch (die alte Datei bleibt bis zum Tausch ausgeliefert).
 //! „Jetzt aktualisieren“ stößt bei Bedarf einen Neubau im karten-service an; der Wächter lädt das
 //! Ergebnis danach selbst. Herleitung:
-//! `openspec/changes/lfh-993-offline-karten-auto-aktualisierung/design.md` (D1–D10).
+//! `openspec/changes/archive/2026-10-02-lfh-993-offline-karten-auto-aktualisierung/design.md` (D1–D10).
 //!
 //! Der Laufzustand (letzte Prüfung, ausstehende Bauten, Fehler) liegt nur im Speicher; gespeichert
 //! wird allein die Einstellung (`karte_auto_aktualisierung`, D10).

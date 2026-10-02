@@ -1859,8 +1859,8 @@ pub async fn offline_bau_status(
 
 // ===== Automatische Aktualisierung (LFH-993) =====
 //
-// Herleitung: `openspec/changes/lfh-993-offline-karten-auto-aktualisierung/design.md` (D6, D7,
-// D10). Der Wächter selbst liegt in `karte::auto_aktualisierung`.
+// Herleitung (D6, D7, D10):
+// `openspec/changes/archive/2026-10-02-lfh-993-offline-karten-auto-aktualisierung/design.md`. Der Wächter selbst liegt in `karte::auto_aktualisierung`.
 
 /// Antwort-Phase von „Jetzt aktualisieren“.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
