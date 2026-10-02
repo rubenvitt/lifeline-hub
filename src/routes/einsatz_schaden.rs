@@ -12,7 +12,7 @@ use crate::routes::support::{
     pruefe_koordinate, trimme,
 };
 use crate::schaden::{
-    darf_uebergehen, ort_kurz, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
+    darf_uebergehen, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
     SchadenAnzeige, SchadenStatus, SchadenTyp,
 };
 use axum::extract::{Query, State};
@@ -191,12 +191,13 @@ pub async fn anlegen(
         )
         .await?;
         let schaden = schaden_repo::laden_tx(conn, einsatz_id, id).await?;
+        // Ohne Ort: er ist Scrub der Schadenszeile und bliebe sonst über die Schwärzung hinaus
+        // im ETB stehen (LFH-752, Spec `aufbewahrung`).
         let text = format!(
-            "Schaden {} angelegt: {} ({}) — {}",
+            "Schaden {} angelegt: {} ({})",
             registrier_anzeige(schaden.registrier_nr),
             typ.as_str(),
             ausmass.as_str(),
-            ort_kurz(&ort),
         );
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(schaden)
@@ -424,10 +425,10 @@ pub async fn uebergeben(
         )));
     }
 
+    // Ohne Adressat: Scrub der Schadenszeile (LFH-752); er steht im Schaden selbst.
     let text = format!(
-        "Schaden {} übergeben an {}",
-        registrier_anzeige(vorher.registrier_nr),
-        adressat
+        "Schaden {} übergeben",
+        registrier_anzeige(vorher.registrier_nr)
     );
     // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
     // ist aus `vorher` + `adressat` VOR der Tx berechenbar (kein In-Tx-Reload nötig). SSE +

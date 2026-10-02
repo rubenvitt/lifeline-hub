@@ -592,14 +592,9 @@ async fn formatiere_belegungs_etb(
                 )
             }
         }
-        BelegungsArt::Austritt => {
-            let suffix = event
-                .notiz
-                .as_deref()
-                .map(|n| format!(" ({n})"))
-                .unwrap_or_default();
-            format!("Person {r}: verlässt {}{}", ziel_uhs.bezeichnung, suffix)
-        }
+        // Ohne Notiz: sie ist Scrub der Belegung (LFH-752). Der automatische Austritt
+        // (`uhs::hooks`) nennt seinen festen Anlass, das ist kein Scrub-Wert.
+        BelegungsArt::Austritt => format!("Person {r}: verlässt {}", ziel_uhs.bezeichnung),
     };
     Ok(Some(text))
 }

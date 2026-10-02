@@ -529,10 +529,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     TabellenRegel {
         // Ganze Zeile löschen wie `anhang`: der Titel ist Freitext, und die Datei ist ohnehin weg
-        // (CASCADE; `anhang` steht deshalb VOR dieser Regel). Der Titel überlebt im Wortlaut der
-        // System-ETB-Einträge „Dokument abgelegt/entfernt: {titel} ({kategorie})“ — ETB-Freitext
-        // ist
-        // Führungsdokumentation und bleibt (G_ETB). Gepinnt in
+        // (CASCADE; `anhang` steht deshalb VOR dieser Regel). Seit LFH-752 nennen die
+        // System-ETB-Einträge den Titel nicht mehr, nur die Kategorie und den Ablage-Eintrag
+        // („Dokument abgelegt (Foto)“, „Dokument entfernt: Ablage ETB 12 (Foto)“). Ältere
+        // Einträge mit Titel bleiben, ETB-Freitext ist Führungsdokumentation (G_ETB). Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis`.
         tabelle: "einsatz_dokument",
         scoping: Scoping::EinsatzId,

@@ -148,8 +148,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
 - Purge-Audit ist fail-closed (Akteurskette abschließende Person → Einsatzleitung → System-Admin
   der Einsatz-Org; ohne Akteur liefert `system_audit_tx` einen Fehler → Rollback, sichtbar nur
   per `tracing::error!`).
-- **Scrub-Werte in System-ETB-Texten** stehen in `AUSNAHMEN_SYSTEM_ETB`
-  (`tests/aufbewahrung_e2e.rs`) — kein Test bemerkt einen fehlenden Eintrag.
+- **Scrub-Werte in System-ETB-Texten** (LFH-752): Werte von Betroffenen (Schaden, Person, Tier,
+  UHS-Belegung: Ort, Adressat, Verbleib-Ziel, Notiz) und Dokumenttitel gehören nie in den
+  Wortlaut — nur Registriernummer, Enum, Kategorie, Ablage-Verweis (`Ablage ETB 12`). Bewusst
+  behalten werden Einsatzkräfte, Lagestruktur, Führungsmodule und Enum-Labels; jede solche Stelle
+  steht mit `gruppe` in `AUSNAHMEN_SYSTEM_ETB` (`tests/aufbewahrung_e2e.rs`), die Liste wird nie
+  um eine Spalte aus `GESPERRT` länger. Kein Test bemerkt einen fehlenden Eintrag. Herleitung:
+  `openspec/changes/lfh-752-system-etb-ohne-scrub-werte/design.md`.
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
   stehen), und nach einer Schwärzung schreibt der Purge-Lauf den WAL per

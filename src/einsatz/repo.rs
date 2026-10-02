@@ -1245,6 +1245,8 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
+        // Wortlaut aus der Zeit vor LFH-752: Seitdem nennt die Ablage keinen Titel mehr. Ein
+        // solcher Bestandseintrag bleibt über die Schwärzung hinweg unverändert.
         let inhalt = "Dokument abgelegt: Foto Familie Müller (Foto)";
         let etb_id: i64 = sqlx::query_scalar(
             "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
@@ -1300,7 +1302,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             etb_inhalt, inhalt,
-            "ETB-Nachweis bleibt im Wortlaut (G_ETB), auch der Titel darin"
+            "ETB-Nachweis bleibt im Wortlaut (G_ETB), auch ein Bestandseintrag mit Titel"
         );
     }
 
