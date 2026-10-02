@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../anzeige/format';
 import DownloadAnker from '../components/DownloadAnker';
+import { AnhangVorschauGruppe } from '../components/AnhangVorschau';
 import { istBildMime, originalPfad } from '../api/anhangFassung';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -292,32 +293,38 @@ export default function NachrichtenStrom({
                       Nachricht gelöscht
                     </Typography.Text>
                   ) : (
-                    <Space
-                      orientation="vertical"
-                      size={4}
-                      data-lfh="chat-nachricht-text"
-                      style={{ width: '100%', maxWidth: NACHRICHT_LESEBREITE }}
-                    >
-                      {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
-                      {/* Nativer Download wie ETB und Schaden, kein neuer Tab: `target="_blank"`
+                    // Eine Gruppe je Nachricht: die Großansicht blättert durch ihre Bilder
+                    // (LFH-759).
+                    <AnhangVorschauGruppe>
+                      <Space
+                        orientation="vertical"
+                        size={4}
+                        data-lfh="chat-nachricht-text"
+                        style={{ width: '100%', maxWidth: NACHRICHT_LESEBREITE }}
+                      >
+                        {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
+                        {/* Nativer Download wie ETB und Schaden, kein neuer Tab: `target="_blank"`
                          läuft in der Desktop-Hülle ins Leere (LFH-782). */}
-                      {n.anhaenge.map((a) => {
-                        const href = `/api/einsaetze/${n.einsatz_id}/anhaenge/${a.id}`;
-                        return (
-                          <DownloadAnker
-                            key={a.id}
-                            href={href}
-                            dateiname={a.dateiname}
-                            groesse={a.groesse}
-                            zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Anhang der Nachricht von ${n.autor_name} herunterladen`}
-                            originalHref={
-                              darfOriginal && istBildMime(a.mime) ? originalPfad(href) : undefined
-                            }
-                            originalKennung={`${a.dateiname}, Anhang der Nachricht von ${n.autor_name}`}
-                          />
-                        );
-                      })}
-                    </Space>
+                        {n.anhaenge.map((a) => {
+                          const href = `/api/einsaetze/${n.einsatz_id}/anhaenge/${a.id}`;
+                          return (
+                            <DownloadAnker
+                              key={a.id}
+                              href={href}
+                              dateiname={a.dateiname}
+                              groesse={a.groesse}
+                              zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Anhang der Nachricht von ${n.autor_name} herunterladen`}
+                              originalHref={
+                                darfOriginal && istBildMime(a.mime) ? originalPfad(href) : undefined
+                              }
+                              originalKennung={`${a.dateiname}, Anhang der Nachricht von ${n.autor_name}`}
+                              mime={a.mime}
+                              vorschauKennung={`Anhang der Nachricht von ${n.autor_name}`}
+                            />
+                          );
+                        })}
+                      </Space>
+                    </AnhangVorschauGruppe>
                   )
                 }
               />
