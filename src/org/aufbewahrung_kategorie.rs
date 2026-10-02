@@ -35,10 +35,11 @@ pub struct KategorieVorgabeEingabe {
     pub rechtsgrundlage: Option<String>,
 }
 
-/// Prüft die Eingabe nach design.md D8: unbekannte oder doppelte Kategorie, Dauer außerhalb
-/// `0..=DAUER_MAX_TAGE` und zu lange Rechtsgrundlage sind 400 (das Feld für sich), eine leere
-/// Rechtsgrundlage bei gesetzter Dauer ist 422 (der Zusammenhang). Liefert die bereinigte,
-/// nach Kategorie sortierte Liste.
+/// Prüft die Eingabe nach design.md D8 und der Statuscode-Konvention (`src/AGENTS.md`): jeder
+/// Eintrag trägt eine Dauer, die Rechtsgrundlage ist darin ein Pflichtfeld. Unbekannte oder
+/// doppelte Kategorie, Dauer außerhalb `0..=DAUER_MAX_TAGE`, fehlende, leere oder zu lange
+/// Rechtsgrundlage sind deshalb 400 (das Feld für sich). Liefert die bereinigte, nach Kategorie
+/// sortierte Liste.
 pub fn pruefe(eingaben: Vec<KategorieVorgabeEingabe>) -> Result<Vec<KategorieVorgabe>, AppError> {
     let mut vorgaben: Vec<KategorieVorgabe> = Vec::with_capacity(eingaben.len());
     for e in eingaben {
@@ -69,7 +70,7 @@ pub fn pruefe(eingaben: Vec<KategorieVorgabeEingabe>) -> Result<Vec<KategorieVor
             )));
         }
         if rechtsgrundlage.is_empty() {
-            return Err(AppError::UnprocessableEntity(format!(
+            return Err(AppError::Validation(format!(
                 "Eine Dauer für „{}“ braucht eine Rechtsgrundlage",
                 kategorie.as_str()
             )));
@@ -200,11 +201,11 @@ mod tests {
         );
         assert_eq!(
             status(pruefe(vec![e("anhaenge", 30, None)])),
-            StatusCode::UNPROCESSABLE_ENTITY
+            StatusCode::BAD_REQUEST
         );
         assert_eq!(
             status(pruefe(vec![e("anhaenge", 30, Some("   "))])),
-            StatusCode::UNPROCESSABLE_ENTITY
+            StatusCode::BAD_REQUEST
         );
         // Grenzen sind gültig.
         assert!(pruefe(vec![e("anhaenge", 0, Some("x"))]).is_ok());

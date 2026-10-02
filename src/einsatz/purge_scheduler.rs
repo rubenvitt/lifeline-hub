@@ -1573,6 +1573,45 @@ mod tests {
         assert_eq!(geschwaerzt, None);
     }
 
+    /// Spec „Zusammenspiel mit der Einsatz-Frist“: auch die Vormerkung (K1) läuft an einem
+    /// gesperrten Einsatz; dessen Vormerkung bleibt unverändert.
+    #[tokio::test]
+    async fn kategorie_vormerkung_an_gesperrtem_einsatz() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2026-06-20 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-06-20 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        kategorie_mit_frist(&pool, e, "anhaenge", "2026-06-25 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 12:00:00")).await,
+            1
+        );
+        let (v, g) = kategorie_tombstones(&pool, e, "anhaenge").await;
+        assert_eq!(v.as_deref(), Some("2026-06-30 12:00:00"));
+        assert_eq!(g, None);
+        let geloescht: Option<String> =
+            sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geloescht.as_deref(), Some("2026-06-20 00:00:00"));
+        let etb: Vec<String> =
+            sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(
+            etb.iter().any(|x| x.contains("„Anhänge“ abgelaufen")),
+            "{etb:?}"
+        );
+    }
+
     /// Spec „Einsatz-Frist kürzer als Kategorie-Frist“: die Einsatz-Schwärzung nimmt die
     /// Kategorie mit und setzt ihren Tombstone.
     #[tokio::test]

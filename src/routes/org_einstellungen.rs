@@ -150,7 +150,8 @@ pub async fn setzen(
         }
     }
 
-    // Kategorie-Vorgaben (LFH-749): 400 je Feld, 422 bei Dauer ohne Rechtsgrundlage.
+    // Kategorie-Vorgaben (LFH-749): 400 je Feld, auch bei fehlender Rechtsgrundlage (Pflichtfeld
+    // jedes Eintrags).
     let kategorien = req
         .aufbewahrung_kategorien
         .map(aufbewahrung_kategorie::pruefe)

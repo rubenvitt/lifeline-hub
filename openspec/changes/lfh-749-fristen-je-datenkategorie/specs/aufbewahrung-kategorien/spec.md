@@ -32,7 +32,8 @@ Kategorie angehören.
 ### Requirement: Personenstamm folgt den Zwecken der Person
 
 Name, Vorname, Geschlecht, Geburtsdatum, geschätztes Alter, Antreffort samt Koordinate,
-Personennotiz und Verbleib (Art, Ziel, Transportmittel, Notiz) einer Person SHALL das System
+Personennotiz und Verbleib (Ziel, Transportmittel, Notiz; die Art bleibt als Statuskategorie)
+einer Person SHALL das System
 erst schwärzen, wenn alle Zwecke dieser Person geschwärzt sind. Eine Person mit
 Behandlungsbezug MUST die Zwecke `behandlung` und `personenauskunft` tragen, jede andere nur
 `personenauskunft`. Behandlungsbezug MUST bestehen, sobald eine Sichtung, eine Verlaufsnotiz,
@@ -55,7 +56,7 @@ eine UHS-Belegung oder ein Zustand vorliegt, auch storniert.
 
 Der System-Admin SHALL je Kategorie für seine Organisation eine Dauer in Tagen und eine
 Rechtsgrundlage festlegen und wieder entfernen können. Die Dauer MUST zwischen 0 und 3650
-liegen, sonst 400. Eine Dauer ohne nicht-leere Rechtsgrundlage MUST mit 422 abgewiesen werden.
+liegen, sonst 400. Eine Dauer ohne nicht-leere Rechtsgrundlage MUST mit 400 abgewiesen werden.
 Andere Personen MUST 403 erhalten. Ohne Dauer MUST die Kategorie der Einsatz-Frist folgen.
 Vorgabewerte MUST es nicht geben.
 
@@ -65,7 +66,7 @@ Vorgabewerte MUST es nicht geben.
 
 #### Scenario: Dauer ohne Rechtsgrundlage
 - **WHEN** der Admin eine Dauer ohne Rechtsgrundlage speichert
-- **THEN** antwortet das System mit 422 und ändert nichts
+- **THEN** antwortet das System mit 400 und ändert nichts
 
 #### Scenario: Neue Organisation
 - **WHEN** eine Organisation ihre Einstellungen noch nie gespeichert hat

@@ -274,6 +274,11 @@ pub async fn frist_setzen(
                 ));
             }
         } else {
+            // Ohne Frist vorher und nachher gibt es nichts zu ändern — auch eine mitgeschickte
+            // Rechtsgrundlage legt keine Zeile an (sie gehört zu einer Frist, Review LFH-749).
+            if alt.is_none() && aenderung.neue_frist.is_none() {
+                return Ok(FristErgebnis::Unveraendert);
+            }
             let rg_unveraendert = rechtsgrundlage_neu
                 .is_none_or(|r| zeile.as_ref().is_some_and(|z| z.rechtsgrundlage == r));
             if alt.as_deref() == aenderung.neue_frist && rg_unveraendert {
@@ -319,13 +324,19 @@ pub async fn frist_setzen(
         .await?;
 
         let name = k.bezeichnung();
+        // Alter und neuer Wert stehen im ETB (Spec „Kategorie-Frist am Einsatz ändern“), für die
+        // Frist wie für die Rechtsgrundlage.
         let mut audit = match (alt.as_deref(), aenderung.neue_frist) {
-            (_, None) => format!(
-                "Aufbewahrungsfrist der Datenkategorie „{name}“ aufgehoben (folgt der Frist des \
-                 Einsatzes)"
+            (Some(a), None) => format!(
+                "Aufbewahrungsfrist der Datenkategorie „{name}“ aufgehoben (bisher {a}; folgt \
+                 jetzt der Frist des Einsatzes)"
             ),
+            (None, None) => format!("Aufbewahrungsfrist der Datenkategorie „{name}“ unverändert"),
             (None, Some(neu)) => {
                 format!("Aufbewahrungsfrist der Datenkategorie „{name}“ gesetzt auf {neu}")
+            }
+            (Some(a), Some(neu)) if a == neu => {
+                format!("Aufbewahrungsfrist der Datenkategorie „{name}“ unverändert {neu}")
             }
             (Some(a), Some(neu)) => {
                 format!("Aufbewahrungsfrist der Datenkategorie „{name}“ geändert von {a} auf {neu}")
@@ -336,7 +347,12 @@ pub async fn frist_setzen(
                 ". Löschvormerkung vom {v} aufgehoben (Wiederherstellung während der Karenz)"
             ));
         }
-        audit.push_str(&format!(". Rechtsgrundlage: {rechtsgrundlage}"));
+        match zeile.as_ref().map(|z| z.rechtsgrundlage.as_str()) {
+            Some(bisher) if bisher != rechtsgrundlage => audit.push_str(&format!(
+                ". Rechtsgrundlage geändert von „{bisher}“ auf „{rechtsgrundlage}“"
+            )),
+            _ => audit.push_str(&format!(". Rechtsgrundlage: {rechtsgrundlage}")),
+        }
         etb_eintrag(conn, einsatz_id, erfasser_id, etb_startwert, &audit).await?;
         Ok(FristErgebnis::Geaendert)
     })
@@ -406,8 +422,8 @@ pub async fn vormerken(
     .await?;
     let inhalt = format!(
         "Aufbewahrungsfrist der Datenkategorie „{}“ abgelaufen — zur Löschung vorgemerkt. Die \
-         Karenz bis zur unwiderruflichen Schwärzung läuft; der Einsatz bleibt lesbar \
-         (Rechtsgrundlage: {rechtsgrundlage})",
+         Karenz bis zur unwiderruflichen Schwärzung läuft; die Vormerkung der Kategorie sperrt \
+         den Einsatz nicht (Rechtsgrundlage: {rechtsgrundlage})",
         kategorie.bezeichnung()
     );
     system_audit_tx(&mut tx, einsatz_id, etb_startwert, &inhalt).await?;
@@ -470,7 +486,9 @@ pub async fn schwaerzen(
 
     scrubbe_aus_registry(&mut tx, einsatz_id, Umfang::Kategorie(kategorie)).await?;
 
-    // Personenstamm (design.md D3): erst wenn alle Zwecke der Person geschwärzt sind.
+    // Personenstamm (design.md D3): erst wenn alle Zwecke der Person geschwärzt sind. Nur die
+    // Kategorie dieses Laufs kann daran etwas ändern; der ETB-Eintrag nennt den Stamm deshalb
+    // nur, wenn dieser Lauf ihn tatsächlich (weiter) schwärzt (Review LFH-749).
     let geschwaerzt: Vec<String> = sqlx::query_scalar(
         "SELECT kategorie FROM einsatz_aufbewahrung_kategorie \
          WHERE einsatz_id = ? AND geschwaerzt_at IS NOT NULL",
@@ -479,13 +497,15 @@ pub async fn schwaerzen(
     .fetch_all(&mut *tx)
     .await?;
     let ist_weg = |k: Datenkategorie| geschwaerzt.iter().any(|g| g == k.as_str());
-    let stamm = match (
-        ist_weg(Datenkategorie::Personenauskunft),
-        ist_weg(Datenkategorie::Behandlung),
-    ) {
-        (true, true) => Some((false, "aller Personen")),
-        (true, false) => Some((true, "der Personen ohne Behandlungsbezug")),
-        (false, _) => None,
+    let stamm = match kategorie {
+        Datenkategorie::Personenauskunft if ist_weg(Datenkategorie::Behandlung) => {
+            Some((false, "aller Personen"))
+        }
+        Datenkategorie::Personenauskunft => Some((true, "der Personen ohne Behandlungsbezug")),
+        Datenkategorie::Behandlung if ist_weg(Datenkategorie::Personenauskunft) => {
+            Some((false, "der Personen mit Behandlungsbezug"))
+        }
+        Datenkategorie::Behandlung | Datenkategorie::Anhaenge => None,
     };
     if let Some((nur_ohne_behandlungsbezug, _)) = stamm {
         scrubbe_aus_registry(
@@ -519,8 +539,8 @@ pub async fn schwaerzen(
         ));
     }
     inhalt.push_str(
-        ". Der Einsatz bleibt lesbar; das ETB im Wortlaut, Registriernummern sowie Sichtungs- \
-         und Statuskategorien bleiben erhalten.",
+        ". Die Schwärzung der Kategorie sperrt den Einsatz nicht; das ETB im Wortlaut, \
+         Registriernummern sowie Sichtungs- und Statuskategorien bleiben erhalten.",
     );
     system_audit_tx(&mut tx, einsatz_id, etb_startwert, &inhalt).await?;
     tx.commit().await?;
@@ -946,7 +966,29 @@ mod tests {
             Some("2026-08-01 00:00:00")
         );
 
-        // Aufheben: folgt der Einsatz-Frist.
+        // Gleiche Frist, neue Rechtsgrundlage: Änderung mit altem und neuem Wert im ETB.
+        let r = frist_setzen(
+            &pool,
+            einsatz,
+            leit,
+            aend(
+                auskunft,
+                Some("2026-08-01 00:00:00"),
+                Some("§ 152 StPO"),
+                false,
+            ),
+            t(JETZT),
+        )
+        .await
+        .unwrap();
+        assert_eq!(r, FristErgebnis::Geaendert);
+        let letzter = etb_texte(&pool, einsatz).await.last().unwrap().clone();
+        assert!(
+            letzter.contains("„RG“") && letzter.contains("„§ 152 StPO“"),
+            "{letzter}"
+        );
+
+        // Aufheben: folgt der Einsatz-Frist; das ETB nennt den alten Wert.
         frist_setzen(
             &pool,
             einsatz,
@@ -960,11 +1002,26 @@ mod tests {
             zeile(&pool, einsatz, auskunft).await.unwrap().frist_bis,
             None
         );
-        assert!(etb_texte(&pool, einsatz)
-            .await
-            .last()
-            .unwrap()
-            .contains("aufgehoben"));
+        let letzter = etb_texte(&pool, einsatz).await.last().unwrap().clone();
+        assert!(
+            letzter.contains("aufgehoben (bisher 2026-08-01 00:00:00"),
+            "{letzter}"
+        );
+
+        // Ohne Frist vorher und nachher: eine Rechtsgrundlage allein schreibt nichts.
+        let vorher = n_etb().await;
+        let r = frist_setzen(
+            &pool,
+            einsatz,
+            leit,
+            aend(Datenkategorie::Anhaenge, None, Some("X"), false),
+            t(JETZT),
+        )
+        .await
+        .unwrap();
+        assert_eq!(r, FristErgebnis::Unveraendert);
+        assert_eq!(n_etb().await, vorher);
+        assert_eq!(zeile(&pool, einsatz, Datenkategorie::Anhaenge).await, None);
     }
 
     #[tokio::test]
@@ -1462,7 +1519,26 @@ mod tests {
             .await
             .last()
             .unwrap()
-            .contains("aller Personen"));
+            .contains("der Personen mit Behandlungsbezug"));
+
+        // Eine spätere Kategorie, die den Stamm nicht betrifft, nennt ihn nicht (Review LFH-749):
+        // das ETB hielte sonst eine zweite Stamm-Schwärzung unter fremder Rechtsgrundlage fest.
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Anhaenge,
+            "2026-05-01 00:00:00",
+            Some(vor_31),
+        )
+        .await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Anhaenge, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let letzter = etb_texte(&pool, einsatz).await.last().unwrap().clone();
+        assert!(letzter.contains("„Anhänge“"), "{letzter}");
+        assert!(!letzter.contains("Personenstamm"), "{letzter}");
 
         // Sichtungskategorie und Registriernummer bleiben.
         let (kat, nr): (String, i64) = sqlx::query_as(
@@ -1568,15 +1644,78 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (einsatz, leit) = abgeschlossen(&pool).await;
         let person = volle_person(&pool, einsatz, 1, leit).await;
+        let anhang = |name: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, \
+                        hochgeladen_von) VALUES (?, ?, 'image/jpeg', 3, 'x', X'010203', ?) \
+                     RETURNING id",
+                )
+                .bind(einsatz)
+                .bind(name)
+                .bind(leit)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        // Dokumentablage samt ETB-Nachweis, Schaden mit Anhang, Meldung.
+        let dok_anhang = anhang("lageplan.png").await;
+        let etb: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 900, 'system', 'Dokument abgelegt', ?, '2026-01-01 09:00:00') RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         sqlx::query(
-            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, \
-                hochgeladen_von) VALUES (?, 'foto.jpg', 'image/jpeg', 3, 'x', X'010203', ?)",
+            "INSERT INTO einsatz_dokument (einsatz_id, anhang_id, kategorie, titel, \
+                etb_eintrag_id, abgelegt_von_id) VALUES (?, ?, 'lagekarte_plan', 'Plan', ?, ?)",
+        )
+        .bind(einsatz)
+        .bind(dok_anhang)
+        .bind(etb)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let schaden: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_schaden (einsatz_id, registrier_nr, typ, ausmass, ort, \
+                erfasst_von, geaendert_von) VALUES (?, 1, 'sachschaden', 'gering', \
+                'Hauptstr. 1', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(leit)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let schaden_anhang = anhang("dach.jpg").await;
+        sqlx::query(
+            "INSERT INTO einsatz_schaden_anhang (einsatz_id, schaden_id, anhang_id, \
+                abgelegt_von_id) VALUES (?, ?, ?, ?)",
+        )
+        .bind(einsatz)
+        .bind(schaden)
+        .bind(schaden_anhang)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, \
+                ereigniszeit, eingang_at, erfasst_von_id) VALUES (?, 1, 'Nord 1', 'funk', \
+                'Dach abgedeckt', '2026-01-01 09:00:00', '2026-01-01 09:00:00', ?)",
         )
         .bind(einsatz)
         .bind(leit)
         .execute(&pool)
         .await
         .unwrap();
+        anhang("foto.jpg").await;
         schliessen(&pool, einsatz, leit).await;
 
         // Karenz läuft noch (29 Tage): nichts.
@@ -1613,15 +1752,49 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(anhaenge, 0);
+        for tabelle in ["einsatz_dokument", "einsatz_schaden_anhang"] {
+            let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT COUNT(*) FROM {tabelle} WHERE einsatz_id = ?"
+            )))
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(n, 0, "{tabelle}: Dokumentablage weg");
+        }
+        // Personen, Schäden, Meldungen und ETB tragen ihre Angaben unverändert.
         let (name, _, adresse, _, _, _) = person_felder(&pool, person).await;
         assert_eq!(name.as_deref(), Some("Mustermann"));
         assert_eq!(adresse.as_deref(), Some("Hauptstr. 5"));
-        let n = etb_texte(&pool, einsatz).await.len();
+        let ort: String = sqlx::query_scalar("SELECT ort FROM einsatz_schaden WHERE id = ?")
+            .bind(schaden)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(ort, "Hauptstr. 1");
+        let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM meldung WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(inhalt, "Dach abgedeckt");
         assert!(etb_texte(&pool, einsatz)
             .await
-            .last()
-            .unwrap()
-            .contains("„Anhänge“"));
+            .contains(&"Dokument abgelegt".to_string()));
+        let verstoesse: Vec<(String,)> =
+            sqlx::query_as("SELECT \"table\" FROM pragma_foreign_key_check")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(verstoesse.is_empty(), "{verstoesse:?}");
+        let n = etb_texte(&pool, einsatz).await.len();
+        let letzter = etb_texte(&pool, einsatz).await.last().unwrap().clone();
+        assert!(letzter.contains("„Anhänge“"), "{letzter}");
+        assert!(letzter.contains("RG anhaenge"), "{letzter}");
+        assert!(
+            !letzter.contains("Personenstamm"),
+            "Anhänge ändern den Stamm nicht: {letzter}"
+        );
 
         // Zweiter Lauf: nichts, kein Eintrag.
         assert!(
@@ -1630,6 +1803,68 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(etb_texte(&pool, einsatz).await.len(), n);
+    }
+
+    /// Spec „Zusammenspiel mit der Einsatz-Frist“: das Wiederherstellen des Einsatzes bringt
+    /// eine geschwärzte Kategorie nicht zurück.
+    #[tokio::test]
+    async fn wiederherstellen_des_einsatzes_laesst_geschwaerzte_kategorie_geschwaerzt() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        schliessen(&pool, einsatz, leit).await;
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Personenauskunft,
+            "2026-05-01 00:00:00",
+            Some("2026-05-30 12:00:00"),
+        )
+        .await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let vorher = zeile(&pool, einsatz, Datenkategorie::Personenauskunft)
+            .await
+            .unwrap();
+
+        let jetzt = Utc::now();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind(crate::zeit::formatiere_utc(
+                jetzt - chrono::Duration::days(1),
+            ))
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        super::super::repo::wiederherstellen(&pool, einsatz, leit, 1, None, jetzt)
+            .await
+            .unwrap();
+
+        let nachher = zeile(&pool, einsatz, Datenkategorie::Personenauskunft)
+            .await
+            .unwrap();
+        assert_eq!(nachher, vorher);
+        assert_eq!(
+            kategorie_zustand(STATUS_ABGESCHLOSSEN, None, Some(&nachher), jetzt),
+            Some(AufbewahrungZustand::Geschwaerzt)
+        );
+        let err = frist_setzen(
+            &pool,
+            einsatz,
+            leit,
+            aend(
+                Datenkategorie::Personenauskunft,
+                Some("2099-01-01 00:00:00"),
+                None,
+                false,
+            ),
+            jetzt,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.status(), axum::http::StatusCode::CONFLICT);
     }
 
     // ---------- Zustand je Kategorie ----------

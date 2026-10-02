@@ -539,8 +539,8 @@ async fn kategorie_vorgabe_speichern_und_lesen() {
     assert_eq!(gelesen["aufbewahrung_kategorien"], serde_json::json!([]));
 }
 
-/// „Dauer ohne Rechtsgrundlage“ → 422 und nichts geändert; Dauer außerhalb 0..=3650 und
-/// unbekannte Kategorie → 400 (Statuscode-Konvention, `src/AGENTS.md`).
+/// „Dauer ohne Rechtsgrundlage“, Dauer außerhalb 0..=3650 und unbekannte Kategorie → 400 und
+/// nichts geändert (Statuscode-Konvention, `src/AGENTS.md`: fehlendes Pflichtfeld).
 #[tokio::test]
 async fn kategorie_vorgabe_ungueltig() {
     let app = setup().await;
@@ -554,7 +554,7 @@ async fn kategorie_vorgabe_ungueltig() {
         ]}),
     )
     .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     let (_, gelesen) = get_einstellungen(&app, Some(&admin_cookie)).await;
     assert_eq!(gelesen["aufbewahrung_kategorien"], serde_json::json!([]));
     assert_eq!(gelesen["zeitzone"], Value::Null, "nichts geändert");

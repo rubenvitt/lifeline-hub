@@ -259,12 +259,16 @@ in die Details.
 
 - **Org-Einstellungen:** Das Admin-DTO bekommt `aufbewahrung_kategorien: [{kategorie,
   dauer_tage, rechtsgrundlage}]`.
-  - `PUT` ersetzt die Liste, wenn das Feld mitkommt. Fehlt das Feld, bleibt alles, wie es ist
-    (Muster der übrigen Felder).
+  - `PUT` ersetzt die Liste, wenn das Feld mitkommt. Fehlt das Feld, bleibt die Liste, wie sie
+    ist. Das ist eine bewusste **Ausnahme vom Vollersatz** der übrigen Felder (dort wird ein
+    fehlendes Feld zu NULL): ein älterer Client oder eine andere Sektion der Org-Einstellungen
+    löscht die Vorgaben so nicht still.
   - Eine Kategorie fehlt in der Liste → ihre Zeile wird gelöscht.
-  - Die Validierung erfolgt je Eintrag nach der Statuscode-Konvention (`src/AGENTS.md`): Dauer
-    außerhalb 0 bis 3650 oder Rechtsgrundlage über 500 Zeichen → 400 (das Feld für sich); leere
-    Rechtsgrundlage bei gesetzter Dauer → 422 (der Zusammenhang).
+  - Die Validierung erfolgt je Eintrag nach der Statuscode-Konvention (`src/AGENTS.md`). Jeder
+    Eintrag trägt eine Dauer, die Rechtsgrundlage ist darin ein Pflichtfeld. Deshalb ist alles
+    400 (das Feld für sich): Dauer außerhalb 0 bis 3650, Rechtsgrundlage fehlend, leer oder über
+    500 Zeichen. 422 bleibt dem Kategorie-PUT am Einsatz vorbehalten, wo die Rechtsgrundlage nur
+    bei der ersten Frist Pflicht ist (der Zusammenhang).
   - Unbekannte Kategorie → 400 (Muster unbekannter Enum-Werte).
 - **Einsatz:** `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}` mit `{ retention_bis,
   bestaetigt, rechtsgrundlage? }`.

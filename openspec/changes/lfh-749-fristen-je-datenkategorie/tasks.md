@@ -15,8 +15,8 @@ ist das Frontend, Gruppe 8 schließt ab.
 ## 2. Migration und Org-Vorgabe (D4, D8)
 
 - [x] 2.1 Migration `0135_aufbewahrung_kategorie.sql` mit beiden Tabellen aus D4. Vorher `git fetch origin alpha` und `scripts/check-migrationen.sh`; die Nummer liegt über jeder auf `origin/alpha`. Registry-Regel für `einsatz_aufbewahrung_kategorie` mit nur Retain-Spalten. Verifiziert durch `scripts/check-migrationen.sh`, `db::tests::migrationsnummern_sind_eindeutig` und die grünen Registry-Guards
-- [x] 2.2 `src/org/einstellungen.rs`: Laden und Speichern von `aufbewahrung_kategorien` (Liste ersetzen, wenn das Feld mitkommt; fehlende Kategorie → Zeile löschen). Validierung nach design.md D8: Dauer außerhalb 0 bis 3650 oder Rechtsgrundlage über 500 Zeichen 400; leere Rechtsgrundlage 422; unbekannte Kategorie 400. Verifiziert durch Repo-Tests für Ersetzen, Löschen und Validierung
-- [x] 2.3 Route der Org-Einstellungen (`src/routes/org_einstellungen.rs`) und Admin-DTO um `aufbewahrung_kategorien` erweitern. Verifiziert durch Routentests: Admin speichert 0 Tage mit Rechtsgrundlage → GET liefert beides. Ohne Rechtsgrundlage → 422 ohne Änderung. Führungskraft → 403. Neue Organisation → leere Liste
+- [x] 2.2 `src/org/einstellungen.rs`: Laden und Speichern von `aufbewahrung_kategorien` (Liste ersetzen, wenn das Feld mitkommt; fehlende Kategorie → Zeile löschen). Validierung nach design.md D8: Dauer außerhalb 0 bis 3650, Rechtsgrundlage fehlend, leer oder über 500 Zeichen und unbekannte Kategorie jeweils 400. Verifiziert durch Repo-Tests für Ersetzen, Löschen und Validierung
+- [x] 2.3 Route der Org-Einstellungen (`src/routes/org_einstellungen.rs`) und Admin-DTO um `aufbewahrung_kategorien` erweitern. Verifiziert durch Routentests: Admin speichert 0 Tage mit Rechtsgrundlage → GET liefert beides. Ohne Rechtsgrundlage → 400 ohne Änderung. Führungskraft → 403. Neue Organisation → leere Liste
 - [ ] 2.4 `scripts/check-typ-codegen.sh` laufen lassen und beide generierten Dateien committen. Verifiziert durch das grüne Skript
 
 ## 3. Kategorie-Frist beim Abschluss (Spec „Kategorie-Frist beim Abschluss“)
@@ -27,7 +27,7 @@ ist das Frontend, Gruppe 8 schließt ab.
 ## 4. Kategorie-Frist am Einsatz (Spec „Kategorie-Frist am Einsatz ändern“, „Kategorie-Vormerkung und Wiederherstellen“)
 
 - [x] 4.1 Repo-Funktion `kategorie_frist_setzen` im Muster von `frist_setzen`. In der Karenz hebt eine künftige Frist `vorgemerkt_at` auf. Fehlt die Zeile, wird sie mit der mitgegebenen Rechtsgrundlage angelegt. Der ETB-Eintrag nennt alt und neu. Verifiziert durch Repo-Tests für Setzen, Verlängern, Aufheben, Wiederherstellen in der Karenz und die unveränderte Frist (kein Schreibvorgang, kein Eintrag)
-- [x] 4.2 Route `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}`. Rechte wie `aufbewahrungsfrist_setzen`. Antworten: aktiver Einsatz 409; Einsatz vorgemerkt 422; Einsatz geschwärzt 409; Kategorie nach der Karenz bzw. geschwärzt 409; Verkürzung ohne Bestätigung 409; erste Frist ohne Rechtsgrundlage 422; unbekannte Kategorie 400. Verifiziert durch `tests/einsatz.rs` mit je einem Test pro Antwort, jeder Fehlerfall mit unveränderter Zeile und ETB-Zahl
+- [x] 4.2 Route `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}`. Rechte wie `aufbewahrungsfrist_setzen`. Antworten: aktiver Einsatz 409; Einsatz vorgemerkt 422; Einsatz geschwärzt 409; Kategorie nach der Karenz bzw. geschwärzt 409; Verkürzung ohne Bestätigung 409; erste Frist ohne Rechtsgrundlage 422; unbekannte Kategorie 400. Verifiziert durch `tests/aufbewahrung_kategorie.rs` mit Tests je Antwort, jeder Fehlerfall mit unveränderter Zeile und ETB-Zahl
 
 ## 5. Purge-Lauf K1 und K2 mit Personenstamm (D3, D5)
 
