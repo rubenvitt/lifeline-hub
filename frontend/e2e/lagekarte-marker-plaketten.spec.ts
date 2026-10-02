@@ -15,6 +15,7 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 interface MapHaken {
   loaded(): boolean;
   jumpTo(o: { center: [number, number]; zoom: number }): void;
+  once(ereignis: 'idle', f: () => void): void;
   setStyle(s: unknown, o?: { diff: boolean }): void;
   getLayer(id: string): unknown;
   getLayoutProperty(layer: string, name: string): unknown;
@@ -36,6 +37,17 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 const MITTE: [number, number] = [8.8, 53.0775];
+
+/*
+ * Breites Fenster, damit jede Plakette IM Bild liegt (LFH-742). Bei Zoom 12,5 stehen die äußeren
+ * Einheiten ±330 px neben der Mitte; bei 1280 px Fensterbreite ist die Karte zwischen Navigation
+ * und Ebenenleiste nur 712 px breit, die äußeren Zeichen sitzen 26 px vor dem Rand. Die Plakette
+ * hat variable Anker, und MapLibre nimmt den ersten, der ins Kollisionsraster passt — auch neben
+ * dem Bild (Raster mit Randzone), bevorzugt den der vorigen Platzierung. Stand sie rechts
+ * außerhalb, fand `queryRenderedFeatures` nur zwei (unter Last 1 von 30 rot). Mit 1920 px ist die
+ * Karte rund 1350 px breit, jede Plakette hält ~200 px Abstand zum Rand.
+ */
+test.use({ viewport: { width: 1920, height: 1080 } });
 
 /** Ein Einsatz mit drei verorteten Einheiten, je rund 2,7 km auseinander. Das Clustering
  *  rechnet bei Zoom 11,5 mit Stufe 11: dort liegen die Einheiten knapp 60 px auseinander, über
@@ -59,18 +71,18 @@ async function einsatzMitEinheiten(page: Page): Promise<{ einsatzId: number; ers
 }
 
 async function plakettenBeiZoom(page: Page, zoom: number): Promise<number> {
+  // Platzvergabe und Einblendung laufen nach dem Rendern; gezählt wird erst bei `idle` (nichts
+  // mehr zu laden, zu platzieren oder überzublenden), nicht nach einer festen Zeit (LFH-742).
+  // Jeder `jumpTo` feuert `move` und damit einen Frame, also kommt `idle` auch beim selben Ziel.
   await page.evaluate(
-    ([center, z]) => {
-      const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
-      k.jumpTo({ center: center as [number, number], zoom: z as number });
-    },
+    ([center, z]) =>
+      new Promise<void>((fertig) => {
+        const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+        k.once('idle', () => fertig());
+        k.jumpTo({ center: center as [number, number], zoom: z as number });
+      }),
     [MITTE, zoom] as const,
   );
-  // Platzvergabe läuft asynchron nach dem Rendern; erst warten, bis sie sich gesetzt hat.
-  await page.waitForFunction(() =>
-    (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.loaded(),
-  );
-  await page.waitForTimeout(500);
   return page.evaluate(
     () =>
       (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.queryRenderedFeatures({
