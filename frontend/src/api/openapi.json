@@ -1704,6 +1704,7 @@
         "description": "Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten.",
         "required": [
           "id",
+          "org_id",
           "anzeigename",
           "benutzername",
           "system_rolle",
@@ -1728,6 +1729,11 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "org_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Organisation des Benutzers (LFH-753): der Client spiegelt damit Rechte, die an der\nEinsatz-Org hängen (Frist nur für den Admin der Einsatz-Org)."
           },
           "org_rolle": {
             "$ref": "#/components/schemas/OrgRolle"

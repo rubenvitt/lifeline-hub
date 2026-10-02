@@ -1,4 +1,4 @@
-import { IkonePerson } from '../ikonen';
+import { IconPerson } from '../icons';
 import {
   Alert,
   App,
@@ -52,7 +52,7 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
  * und macht die Gliederung deeplink-fähig. Ein `onSelect` am Baum allein wäre für die Tastatur ein
  * Umweg und für „im neuen Tab öffnen" gar kein Weg.
  *
- * Der Führer ist eine Ikone, kein Emoji. Die Ikone des Satzes ist selbst `aria-hidden` (LFH-595);
+ * Der Führer ist ein Icon, kein Emoji. Das Icon des Satzes ist selbst `aria-hidden` (LFH-595);
  * die Hülle bleibt als zweite Sicherung gegen ein Vorleseziel in jeder Zeile.
  */
 function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: string): TreeDataNode[] {
@@ -83,7 +83,7 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
           {e.fuehrer_name && (
             <span style={{ color: sekundaerFarbe }}>
               <span aria-hidden="true">
-                <IkonePerson />
+                <IconPerson />
               </span>{' '}
               {e.fuehrer_name}
             </span>

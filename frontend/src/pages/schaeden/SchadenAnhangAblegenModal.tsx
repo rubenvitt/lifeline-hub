@@ -6,6 +6,7 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { legeSchadenAnhangAb, schadenRegistrierAnzeige } from '../../api/einsatzSchaden';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ERFASSUNG_ACCEPT } from '../../api/upload';
+import type { SchadenAnhang } from '../../api/types';
 
 interface Props {
   einsatzId: number;
@@ -13,6 +14,8 @@ interface Props {
   registrierNr: number;
   offen: boolean;
   onSchliessen: () => void;
+  /** Gerufen VOR der Invalidierung: die Liste merkt die eigene Ablage vor (LFH-760). */
+  onAbgelegt?: (anhang: SchadenAnhang) => void;
 }
 
 interface AblageFormular {
@@ -33,6 +36,7 @@ export default function SchadenAnhangAblegenModal({
   registrierNr,
   offen,
   onSchliessen,
+  onAbgelegt,
 }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -40,7 +44,8 @@ export default function SchadenAnhangAblegenModal({
 
   const mutation = useMutation({
     mutationFn: (datei: File) => legeSchadenAnhangAb(einsatzId, schadenId, datei),
-    onSuccess: () => {
+    onSuccess: (anhang) => {
+      onAbgelegt?.(anhang);
       void qc.invalidateQueries({ queryKey: einsatzKeys.schadenAnhaenge(einsatzId, schadenId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       message.success('Datei abgelegt');

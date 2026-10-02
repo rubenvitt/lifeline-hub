@@ -1,4 +1,4 @@
-import { IkoneMuelleimer, IkonePfeilHoch, IkonePfeilRunter, IkoneStift } from '../../ikonen';
+import { IconMuelleimer, IconPfeilHoch, IconPfeilRunter, IconStift } from '../../icons';
 import { useId, useMemo, useState } from 'react';
 import { Alert, App, Button, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -282,26 +282,26 @@ export default function EinsatzPegel() {
                         eintraege={[
                           {
                             key: 'hoch',
-                            ikone: <IkonePfeilHoch />,
+                            icon: <IconPfeilHoch />,
                             label: 'Nach oben',
                             ...(index === 0 ? { gesperrt: true as const } : {}),
                           },
                           {
                             key: 'runter',
-                            ikone: <IkonePfeilRunter />,
+                            icon: <IconPfeilRunter />,
                             label: 'Nach unten',
                             ...(index === liste.length - 1 ? { gesperrt: true as const } : {}),
                           },
                           {
                             key: 'prognose',
-                            ikone: <IkoneStift />,
+                            icon: <IconStift />,
                             label: p.prognose ? 'Prognose ändern …' : 'Prognose erfassen …',
                           },
                           ...(p.prognose
                             ? [
                                 {
                                   key: 'prognose-loeschen',
-                                  ikone: <IkoneMuelleimer />,
+                                  icon: <IconMuelleimer />,
                                   label: 'Prognose löschen',
                                   gefahr: true as const,
                                 },
@@ -309,7 +309,7 @@ export default function EinsatzPegel() {
                             : []),
                           {
                             key: 'entfernen',
-                            ikone: <IkoneMuelleimer />,
+                            icon: <IconMuelleimer />,
                             label: 'Entfernen',
                             gefahr: true,
                           },

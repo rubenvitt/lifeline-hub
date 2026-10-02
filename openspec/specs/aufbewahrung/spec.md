@@ -52,7 +52,10 @@ und Dauer nennt.
 ### Requirement: Manuelle Frist
 
 Einsatzleitung und System-Admin SHALL die Frist eines Einsatzes setzen, ändern und aufheben
-können, vor und nach dem Abschluss. Andere Personen MUST 403 erhalten. Eine Verkürzung MUST
+können, vor und nach dem Abschluss. Als System-Admin MUST er das nur an Einsätzen seiner
+eigenen Organisation können; eine Mitgliedschaft als Einsatzleitung trägt unabhängig von der
+Organisation. Andere Personen MUST 403 erhalten, auch der System-Admin einer fremden
+Organisation ohne diese Mitgliedschaft, und dabei MUST sich weder Frist noch ETB ändern. Eine Verkürzung MUST
 ausdrücklich bestätigt werden, sonst antwortet das System mit 409. Als Verkürzung gilt ein
 früherer Zeitpunkt oder das erstmalige Setzen einer Frist an einem Einsatz ohne Frist. Eine
 unveränderte Frist MUST ohne Schreibvorgang und ohne ETB-Eintrag bleiben. Jede wirksame
@@ -61,7 +64,9 @@ Löschung vorgemerkten Einsatz, dessen Karenz noch läuft, MUST die Änderung mi
 werden, mit dem Hinweis auf das Wiederherstellen. Ist die Karenz abgelaufen, der Einsatz aber
 noch nicht geschwärzt, MUST sie mit 409 abgewiesen werden, ohne Hinweis auf das
 Wiederherstellen, denn auch das ist dann ausgeschlossen. An einem geschwärzten Einsatz MUST sie
-mit 409 abgewiesen werden.
+mit 409 abgewiesen werden. Nach Fristablauf bietet die Oberfläche der Einsatzleitung keinen
+eigenen Weg zum Verlängern; bis zur Vormerkung bleibt die Änderung für sie zulässig. Ist der
+Einsatz vorgemerkt, MUST das Wiederherstellen des Org-Admins der einzige Weg bleiben.
 
 #### Scenario: Verlängern ohne Bestätigung
 - **WHEN** die Einsatzleitung die Frist eines abgeschlossenen Einsatzes auf einen späteren Zeitpunkt setzt
@@ -70,6 +75,19 @@ mit 409 abgewiesen werden.
 #### Scenario: Verkürzen ohne Bestätigung
 - **WHEN** eine Frist auf einen früheren Zeitpunkt gesetzt wird, ohne Bestätigung
 - **THEN** antwortet das System mit 409 und ändert nichts
+
+#### Scenario: Admin einer fremden Organisation
+- **WHEN** der System-Admin einer anderen Organisation ohne Mitgliedschaft die Frist eines aktiven oder eines abgeschlossenen Einsatzes ändern will
+- **THEN** antwortet das System mit 403
+- **AND** bleiben Frist und ETB unverändert
+
+#### Scenario: Admin einer fremden Organisation als Einsatzleitung
+- **WHEN** der System-Admin einer anderen Organisation, der im Einsatz Einsatzleitung ist, die Frist ändert
+- **THEN** gilt die neue Frist
+
+#### Scenario: Admin der eigenen Organisation nach Fristablauf
+- **WHEN** der System-Admin der Einsatz-Org ohne Mitgliedschaft die abgelaufene Frist eines abgeschlossenen, noch nicht vorgemerkten Einsatzes in die Zukunft verlegt
+- **THEN** gilt die neue Frist
 
 #### Scenario: Vorgemerkter Einsatz
 - **WHEN** an einem zur Löschung vorgemerkten Einsatz die Frist geändert werden soll
@@ -259,9 +277,54 @@ Stelle ohne Eintrag in der Liste ist ein Fehler.
 - **THEN** findet er einen Scrub-Wert nur an den Stellen, die die Ausnahmeliste führt
 
 #### Scenario: Dokumentierte Ausnahme Schadensort
+- **WHEN** ein Einsatz einen System-Eintrag enthält, der vor LFH-752 bei der Anlage eines Schadens dessen Ortskurzform in den Wortlaut geschrieben hat, und der Einsatz geschwärzt wird
+- **THEN** ist der Ort in der Schadenszeile geschwärzt
+- **AND** bleibt dieser ältere System-Eintrag unverändert, die Ortskurzform eingeschlossen
+
+#### Scenario: Schadensort bleibt im Modul
 - **WHEN** ein Schaden mit Ort angelegt und der Einsatz später geschwärzt wird
 - **THEN** ist der Ort in der Schadenszeile geschwärzt
-- **AND** steht die Ortskurzform weiter im System-Eintrag der Anlage
+- **AND** nennt der System-Eintrag der Anlage nur Registriernummer, Typ und Ausmaß
+- **AND** steht der Ort in keinem ETB-Eintrag
+
+### Requirement: Kein Scrub-Wert von Betroffenen und Dokumenten im ETB
+
+System-Einträge zu Schäden, Personen, UHS-Belegungen und Dokumenten SHALL keinen Wert in ihren
+Wortlaut übernehmen, den die Klassifikation in der Quellzeile als Scrub führt. Das betrifft
+Schadensort, Übergabe-Adressat, Verbleib-Ziel, Notiz der Belegung und Dokumenttitel. Eine
+Kategorie als Enum-Label ist zulässig. Einträge, die schon geschrieben sind, MUST unverändert
+bleiben.
+
+#### Scenario: Schaden übergeben
+- **WHEN** ein Schaden an „Eigentümer Ruehl“ übergeben wird
+- **THEN** nennt der System-Eintrag die Registriernummer des Schadens und die Übergabe
+- **AND** steht „Eigentümer Ruehl“ in keinem ETB-Eintrag
+
+#### Scenario: Verbleib mit Ziel
+- **WHEN** für eine Person ein Transport nach „Klinikum Nordstadt“ oder eine Notunterkunft „Turnhalle Ost“ erfasst wird
+- **THEN** lautet der System-Eintrag „Person R-…: abtransportiert“ bzw. „Person R-…: in Notunterkunft“
+- **AND** führen Verbleib und Personenzeile das Ziel weiter bis zur Schwärzung
+
+#### Scenario: Austritt aus der UHS mit Notiz
+- **WHEN** eine Person mit der Notiz „an Hausarzt übergeben“ eine UHS verlässt
+- **THEN** nennt der System-Eintrag Registriernummer und UHS, aber nicht die Notiz
+
+#### Scenario: Dokument ablegen, ändern und entfernen
+- **WHEN** ein Dokument mit dem Titel „Personenliste NU Turnhalle“ abgelegt, umbenannt und entfernt wird
+- **THEN** nennen die drei System-Einträge die Kategorie
+- **AND** steht weder der alte noch der neue Titel in einem ETB-Eintrag
+
+### Requirement: Ausnahmeliste wird nicht länger
+
+Die Ausnahmeliste der ETB-Spur MUST NOT einen Eintrag für einen Wert von Betroffenen (Schaden,
+Person, Tier, Belegung) oder für einen Dokumenttitel erhalten. Ein neuer Eintrag SHALL nur in
+den bewusst behaltenen Gruppen entstehen: Name und Funktion von Einsatzkräften, Bezeichnungen
+der Lagestruktur, Wortlaut der Führungsmodule und Enum-Labels. Jeder Eintrag MUST seine
+Begründung tragen.
+
+#### Scenario: Gesperrte Spalte in der Liste
+- **WHEN** jemand der Ausnahmeliste eine Spalte einer Tabelle von Schäden, Personen, Tieren, Belegungen oder den Dokumenttitel hinzufügt
+- **THEN** schlägt der Selbsttest der Liste fehl
 
 ### Requirement: Führungsdokumentation steht allein im ETB
 

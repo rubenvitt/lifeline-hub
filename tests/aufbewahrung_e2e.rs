@@ -3,12 +3,15 @@
 //! ETB-Spur, die Fremdschlüssel, die Pseudonyme und die Lesbarkeit der Archivakte durch den
 //! Admin — während der Karenz und nach der Schwärzung.
 //!
-//! **Ausnahmeliste (Annahme A2):** Einige System-Einträge übernehmen einen Wert, den die
-//! Schwärzungs-Registry in der Quellzeile als Scrub führt, in ihren Wortlaut. Im ETB bleibt er
-//! als Führungsdokumentation erhalten (G_ETB), auch über die Schwärzung hinweg. Diese Stellen
-//! stehen abschließend in [`AUSNAHMEN_SYSTEM_ETB`]; eine neue solche Stelle ohne Eintrag ist ein
-//! Fehler. Ob künftige Einträge den Wert weglassen, entscheidet LFH-752 — hier wird nur
-//! dokumentiert und gepinnt.
+//! **Ausnahmeliste (Annahme A2, entschieden in LFH-752):** Einige System-Einträge übernehmen
+//! einen Wert, den die Schwärzungs-Registry in der Quellzeile als Scrub führt, in ihren Wortlaut.
+//! Im ETB bleibt er als Führungsdokumentation erhalten (G_ETB), auch über die Schwärzung hinweg.
+//! Diese Stellen stehen abschließend in [`AUSNAHMEN_SYSTEM_ETB`]; eine neue solche Stelle ohne
+//! Eintrag ist ein Fehler. LFH-752 hat je Gruppe entschieden: Werte von Betroffenen (Schaden,
+//! Person, Tier, Belegung) und Dokumenttitel stehen in neuen Einträgen nicht mehr, Einsatzkräfte,
+//! Lagestruktur, Führungsmodule und Enum-Labels bleiben bewusst. Die Liste wird nie länger um
+//! eine gesperrte Spalte ([`GESPERRT`]); ältere ETB-Einträge behalten ihren Wortlaut.
+//! Herleitung: `openspec/changes/archive/2026-10-02-lfh-752-system-etb-ohne-scrub-werte/design.md`.
 
 use axum::http::StatusCode;
 use chrono::{Duration, NaiveDateTime, Utc};
@@ -25,7 +28,44 @@ struct Ausnahme {
     funktion: &'static str,
     /// Scrub-Spalte der Quellzeile (`tabelle.spalte`) laut `schwaerzung_registry`.
     spalte: &'static str,
+    /// Warum der Wert bewusst im ETB bleibt (LFH-752).
+    gruppe: Gruppe,
     begruendung: &'static str,
+}
+
+/// Die Gruppen, deren Scrub-Werte LFH-752 bewusst im ETB-Wortlaut behält. Werte von Betroffenen
+/// und Dokumenttitel haben keine Gruppe: sie gehören nie in die Liste ([`GESPERRT`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Gruppe {
+    /// Wer wann in welcher Funktion eingesetzt war — Kern der Führungsdokumentation.
+    Einsatzkraft,
+    /// Bezeichnungen der Lagestruktur (Zonen, Gebiete, Bezirke, Stellen), Streichgrund.
+    Lagestruktur,
+    /// Führungsmodule nach Linie A (LFH-701): der Wortlaut ist der Eintrag.
+    Fuehrungsmodul,
+    /// Enum-Label ohne Personenbezug, Scrub nur wegen Zeilenlöschung.
+    EnumLabel,
+}
+
+/// Spalten, die nie in die Ausnahmeliste dürfen (Spec `aufbewahrung`, „Ausnahmeliste wird nicht
+/// länger“): `tabelle` exakt oder mit `*` als Präfix, `spalte` exakt oder `*` für alle.
+const GESPERRT: &[(&str, &str)] = &[
+    ("einsatz_schaden*", "*"),
+    ("einsatz_person", "*"),
+    ("person_*", "*"),
+    ("einsatz_tier", "*"),
+    ("einsatz_dokument", "titel"),
+];
+
+fn ist_gesperrt(spalte: &str) -> bool {
+    let (t, s) = spalte.split_once('.').unwrap();
+    GESPERRT.iter().any(|(gt, gs)| {
+        let tabelle = match gt.strip_suffix('*') {
+            Some(praefix) => t.starts_with(praefix),
+            None => t == *gt,
+        };
+        tabelle && (*gs == "*" || s == *gs)
+    })
 }
 
 /// Ergebnis einer vollständigen DURCHSICHT aller ETB-Schreibwege (`etb::system_audit_tx`,
@@ -33,394 +73,410 @@ struct Ausnahme {
 /// systematisch gegen jede Scrub-Spalte abgeglichen. Der Nutzerfreitext des ETB selbst
 /// (`routes/etb.rs::erfassen`) ist keine Übernahme und steht nicht hier.
 ///
-/// **Die Vollständigkeit ist eine Durchsicht, kein Guard.** Maschinell gehalten sind nur die
-/// drei Werte, die der Ablauf unten pflanzt, und der Selbsttest (Funktion existiert, Spalte ist
-/// Scrub). Eine NEUE Übernahme bemerkt kein Test — wer einen ETB-Text aus einer Scrub-Spalte
-/// baut, trägt ihn hier ein (LFH-752 entscheidet über den Wortlaut).
+/// **Die Vollständigkeit ist eine Durchsicht, kein Guard.** Maschinell gehalten sind nur der
+/// Wert, den der Ablauf unten pflanzt, und der Selbsttest (Funktion existiert, Spalte ist Scrub,
+/// Spalte ist nicht gesperrt). Eine NEUE Übernahme bemerkt kein Test — wer einen ETB-Text aus
+/// einer Scrub-Spalte baut, trägt ihn mit Gruppe hier ein; ein Wert aus [`GESPERRT`] gehört gar
+/// nicht in den Wortlaut (LFH-752).
 const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
-    // --- vom Ablauf dieses Tests berührt (Wert gepflanzt und gepinnt) ---
-    Ausnahme {
-        datei: "src/routes/einsatz_schaden.rs",
-        funktion: "anlegen",
-        spalte: "einsatz_schaden.ort",
-        begruendung: "Kurzform des Schadensorts (max. 40 Zeichen) im Anlage-Eintrag",
-    },
-    Ausnahme {
-        datei: "src/routes/einsatz_schaden.rs",
-        funktion: "uebergeben",
-        spalte: "einsatz_schaden.uebergeben_an",
-        begruendung: "Übergabe-Adressat im Übergabe-Eintrag",
-    },
-    Ausnahme {
-        datei: "src/routes/einsatz_person.rs",
-        funktion: "verbleib",
-        spalte: "person_verbleib.ziel",
-        begruendung: "Verbleib-Ziel über VerbleibArt::etb_sachverhalt (Transport, Notunterkunft)",
-    },
-    // --- vom Ablauf nicht berührt (Fundstelle dokumentiert) ---
-    Ausnahme {
-        datei: "src/routes/einsatz_uhs.rs",
-        funktion: "belegung",
-        spalte: "person_uhs_belegung.notiz",
-        begruendung: "Notiz beim UHS-Austritt über formatiere_belegungs_etb",
-    },
+    // --- Einsatzkräfte: wer wann in welcher Funktion eingesetzt war (Name, Funktion, Besetzung
+    // ad-hoc externer Kräfte und des Stabs). Bewusst behalten, LFH-752 D3. ---
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "disponieren",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name und Funktion ad-hoc externer Kräfte (personal_id IS NULL)",
     },
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "aktualisieren",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name ad-hoc externer Kräfte beim Statuswechsel",
     },
-    // LFH-552 Kräfte-Zeitachse: Nachtrag und Streichung nennen die Kraft und den Grund.
     Ausnahme {
         datei: "src/routes/zeitachse.rs",
         funktion: "nachtragen",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name ad-hoc externer Kräfte im Nachtrag der Zeitachse (kraft_name_tx)",
     },
     Ausnahme {
         datei: "src/routes/zeitachse.rs",
         funktion: "streichen",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name ad-hoc externer Kräfte in der Streichung der Zeitachse",
-    },
-    Ausnahme {
-        datei: "src/routes/zeitachse.rs",
-        funktion: "streichen",
-        spalte: "einsatz_kraft_zeitachse.streichgrund",
-        begruendung: "Streichgrund im ETB-Eintrag der Streichung",
     },
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "entfernen",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name und Funktion ad-hoc externer Kräfte beim Entfernen",
     },
     Ausnahme {
         datei: "src/routes/einsatz_einheit.rs",
         funktion: "aktualisieren",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "alter und neuer Einheitsführer, wenn ad-hoc extern",
     },
     Ausnahme {
         datei: "src/routes/einsatz_einheit.rs",
         funktion: "personal_zuordnen",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "zugeordnete ad-hoc externe Kraft",
     },
     Ausnahme {
         datei: "src/routes/einsatz_einheit.rs",
         funktion: "personal_freigeben",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "freigegebene ad-hoc externe Kraft",
     },
     Ausnahme {
         datei: "src/routes/einsatz_fahrzeug.rs",
         funktion: "besatzung_zuordnen",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Besatzungsmitglied, wenn ad-hoc extern",
     },
     Ausnahme {
         datei: "src/routes/einsatz_fahrzeug.rs",
         funktion: "besatzung_freigeben",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "freigegebenes Besatzungsmitglied, wenn ad-hoc extern",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",
         funktion: "setzen",
         spalte: "einsatz_stabsfunktion.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Besetzung einer Stabsfunktion (neu und vorher), ohne Zeilenfilter",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",
         funktion: "entfernen",
         spalte: "einsatz_stabsfunktion.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "vorheriger Inhaber einer Stabsfunktion",
     },
     Ausnahme {
         datei: "src/auftrag/repo.rs",
         funktion: "anlegen_tx",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Feld `an` des Anordnungs-Eintrags nennt eine ad-hoc externe Empfängerperson",
     },
-    Ausnahme {
-        datei: "src/dokument/repo.rs",
-        funktion: "ablegen",
-        spalte: "einsatz_dokument.titel",
-        begruendung: "Dokumenttitel (Zeile wird geschwärzt gelöscht, LFH-632 E9)",
-    },
-    Ausnahme {
-        datei: "src/dokument/repo.rs",
-        funktion: "entfernen",
-        spalte: "einsatz_dokument.titel",
-        begruendung: "Dokumenttitel beim Entfernen",
-    },
-    Ausnahme {
-        datei: "src/routes/lage_zone.rs",
-        funktion: "anlegen",
-        spalte: "lage_zone.label",
-        begruendung: "Zonen-Label (Präzedenz LFH-60 Welle A)",
-    },
-    Ausnahme {
-        datei: "src/routes/lage_zone.rs",
-        funktion: "aktualisieren",
-        spalte: "lage_zone.label",
-        begruendung: "neues Zonen-Label",
-    },
-    Ausnahme {
-        datei: "src/routes/lage_zone.rs",
-        funktion: "aufloesen",
-        spalte: "lage_zone.label",
-        begruendung: "altes Zonen-Label",
-    },
-    Ausnahme {
-        datei: "src/routes/gefahr.rs",
-        funktion: "bewerten",
-        spalte: "gefahrengebiet.label",
-        begruendung: "Gebietslabel beim Warnstufenwechsel",
-    },
-    Ausnahme {
-        datei: "src/routes/chat.rs",
-        funktion: "heraufstufen",
-        spalte: "chat_nachricht.inhalt",
-        begruendung: "heraufgestufte Chat-Nachricht im Wortlaut (vom Menschen ausgelöst, LFH-290)",
-    },
-    Ausnahme {
-        datei: "src/betreuung/repo.rs",
-        funktion: "bezirk_anlegen_tx",
-        spalte: "evakuierungsbezirk.bezeichnung",
-        begruendung: "Bezeichnung des Evakuierungsbezirks",
-    },
-    Ausnahme {
-        datei: "src/betreuung/repo.rs",
-        funktion: "stelle_anlegen_tx",
-        spalte: "betreuungsstelle.bezeichnung",
-        begruendung: "Bezeichnung der Betreuungsstelle",
-    },
-    // --- vom Ablauf nicht berührt, aus der zweiten Durchsicht ---
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "disponieren",
         spalte: "einsatz_personal.snap_funktion",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Funktion ad-hoc externer Kräfte über etb_text_disponiert, „Name (Funktion)“",
     },
     Ausnahme {
         datei: "src/routes/einsatz_personal.rs",
         funktion: "entfernen",
         spalte: "einsatz_personal.snap_funktion",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Funktion ad-hoc externer Kräfte über person_bezeichnung",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",
         funktion: "setzen",
         spalte: "einsatz_stabsfunktion.bezeichnung",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name/Stelle einer externen oder rückwärtigen Besetzung (neu und vorher) über zustand_text",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",
         funktion: "entfernen",
         spalte: "einsatz_stabsfunktion.bezeichnung",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "Name/Stelle der vorherigen externen oder rückwärtigen Besetzung",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",
         funktion: "setzen",
         spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
         begruendung: "neuer Inhaber über snap_name_von, wenn ad-hoc extern (derselbe Wert wie einsatz_stabsfunktion.snap_name)",
     },
+    // --- Lagestruktur: Bezeichnungen der Ordnung des Raums und der Betreuung (Zonen, Gebiete,
+    // Bezirke, Stellen) und der Streichgrund der Kräfte-Zeitachse. Bewusst behalten, LFH-752. ---
     Ausnahme {
-        datei: "src/routes/einsatz_person.rs",
-        funktion: "verbleib",
-        spalte: "einsatz_person.aktuelles_verbleib_ziel",
-        begruendung: "derselbe Wert wie person_verbleib.ziel, gespiegelt in den Cache der Personenzeile",
+        datei: "src/routes/zeitachse.rs",
+        funktion: "streichen",
+        spalte: "einsatz_kraft_zeitachse.streichgrund",
+        gruppe: Gruppe::Lagestruktur,
+        begruendung: "Streichgrund im ETB-Eintrag der Streichung",
     },
     Ausnahme {
-        datei: "src/routes/einsatz_person.rs",
-        funktion: "verbleib",
-        spalte: "einsatz_person.aktueller_verbleib",
-        begruendung: "Kurzform „Transport → {ziel}“ enthält das Verbleib-Ziel",
+        datei: "src/routes/lage_zone.rs",
+        funktion: "anlegen",
+        spalte: "lage_zone.label",
+        gruppe: Gruppe::Lagestruktur,
+        begruendung: "Zonen-Label (Präzedenz LFH-60 Welle A)",
+    },
+    Ausnahme {
+        datei: "src/routes/lage_zone.rs",
+        funktion: "aktualisieren",
+        spalte: "lage_zone.label",
+        gruppe: Gruppe::Lagestruktur,
+        begruendung: "neues Zonen-Label",
+    },
+    Ausnahme {
+        datei: "src/routes/lage_zone.rs",
+        funktion: "aufloesen",
+        spalte: "lage_zone.label",
+        gruppe: Gruppe::Lagestruktur,
+        begruendung: "altes Zonen-Label",
+    },
+    Ausnahme {
+        datei: "src/routes/gefahr.rs",
+        funktion: "bewerten",
+        spalte: "gefahrengebiet.label",
+        gruppe: Gruppe::Lagestruktur,
+        begruendung: "Gebietslabel beim Warnstufenwechsel",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "bezirk_anlegen_tx",
+        spalte: "evakuierungsbezirk.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
+        begruendung: "Bezeichnung des Evakuierungsbezirks",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "stelle_anlegen_tx",
+        spalte: "betreuungsstelle.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
+        begruendung: "Bezeichnung der Betreuungsstelle",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "bezirk_aendern_tx",
         spalte: "evakuierungsbezirk.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung des Evakuierungsbezirks (bei Umbenennung auch die alte)",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "bezirk_stornieren_tx",
         spalte: "evakuierungsbezirk.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung des Evakuierungsbezirks",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "stand_melden_tx",
         spalte: "evakuierungsbezirk.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung des Evakuierungsbezirks",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "stand_zuruecknehmen_tx",
         spalte: "evakuierungsbezirk.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung des Evakuierungsbezirks",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "stelle_aendern_tx",
         spalte: "betreuungsstelle.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung der Betreuungsstelle (bei Umbenennung auch die alte)",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "stelle_stornieren_tx",
         spalte: "betreuungsstelle.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung der Betreuungsstelle",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "belegung_melden_tx",
         spalte: "betreuungsstelle.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung der Betreuungsstelle",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "belegung_zuruecknehmen_tx",
         spalte: "betreuungsstelle.bezeichnung",
+        gruppe: Gruppe::Lagestruktur,
         begruendung: "Bezeichnung der Betreuungsstelle",
     },
+    // --- Führungsmodule (LFH-701, Linie A): Der Wortlaut IST der ETB-Eintrag. Die Freitexte der
+    // Modulzeilen werden geschwärzt, die Führungsdokumentation steht im ETB. ---
     Ausnahme {
-        datei: "src/dokument/repo.rs",
-        funktion: "ablegen",
-        spalte: "einsatz_dokument.kategorie",
-        begruendung: "Kategorie als Enum-Label, kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
+        datei: "src/routes/chat.rs",
+        funktion: "heraufstufen",
+        spalte: "chat_nachricht.inhalt",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "heraufgestufte Chat-Nachricht im Wortlaut (vom Menschen ausgelöst, LFH-290)",
     },
-    Ausnahme {
-        datei: "src/dokument/repo.rs",
-        funktion: "entfernen",
-        spalte: "einsatz_dokument.kategorie",
-        begruendung: "Kategorie als Enum-Label, kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
-    },
-    // --- LFH-701, Linie A: Führungsmodule. Die Führungsdokumentation ist der ETB-Wortlaut,
-    // die Freitexte der Modulzeilen werden geschwärzt. ---
     Ausnahme {
         datei: "src/meldung/repo.rs",
         funktion: "anlegen_mit_client_id_tx",
         spalte: "meldung.absender",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Absender als `von` der Auto-ETB-Meldung",
     },
     Ausnahme {
         datei: "src/meldung/repo.rs",
         funktion: "anlegen_mit_client_id_tx",
         spalte: "meldung.empfaenger",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Empfänger als `an` der Auto-ETB-Meldung",
     },
     Ausnahme {
         datei: "src/meldung/repo.rs",
         funktion: "anlegen_mit_client_id_tx",
         spalte: "meldung.inhalt",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Meldungswortlaut als `inhalt` der Auto-ETB-Meldung",
     },
     Ausnahme {
         datei: "src/auftrag/repo.rs",
         funktion: "anlegen_tx",
         spalte: "auftrag.auftrag_text",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Auftragstext als `inhalt` der Auto-ETB-Anordnung",
     },
     Ausnahme {
         datei: "src/auftrag/repo.rs",
         funktion: "anlegen_tx",
         spalte: "auftrag_empfaenger.snap_anzeige",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Empfänger-Snapshots verkettet als `an` der Anordnung",
     },
     Ausnahme {
         datei: "src/auftrag/repo.rs",
         funktion: "anlegen_tx",
         spalte: "auftrag_empfaenger.funktion_text",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Funktionsbezeichnung über den Empfänger-Snapshot in `an`",
     },
     Ausnahme {
         datei: "src/auftrag/repo.rs",
         funktion: "anlegen_tx",
         spalte: "auftrag_empfaenger.extern_bezeichnung",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Klartext der externen Stelle über den Empfänger-Snapshot in `an`",
     },
     Ausnahme {
         datei: "src/auftrag/repo.rs",
         funktion: "melde_vollzug_tx",
         spalte: "auftrag.vollzugsmeldung",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Vollzugsmeldung als `inhalt` einer ETB-Meldung",
     },
     Ausnahme {
         datei: "src/nachforderung/repo.rs",
         funktion: "anlegen_tx",
         spalte: "nachforderung.art",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Bedarfsart (Freitext) im `inhalt` der Anforderung",
     },
     Ausnahme {
         datei: "src/nachforderung/repo.rs",
         funktion: "anlegen_tx",
         spalte: "nachforderung.bezeichnung",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Bedarf im `inhalt` der Anforderung („Nachforderung: …× … — …“)",
     },
     Ausnahme {
         datei: "src/nachforderung/repo.rs",
         funktion: "anlegen_tx",
         spalte: "nachforderung.adressat_bezeichnung",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Adressat als `an` der Anforderung",
     },
     Ausnahme {
         datei: "src/nachforderung/repo.rs",
         funktion: "anlegen_tx",
         spalte: "nachforderung.begruendung",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Begründung als `veranlassung` der Anforderung",
     },
     Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "lagebericht.titel",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Titel als Überschrift des Freigabe-Snapshots",
     },
     Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "lagebericht.abschnitte",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Abschnittstexte als Markdown im Freigabe-Snapshot",
     },
     Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "befehl.titel",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Titel als Überschrift des Freigabe-Snapshots",
     },
     Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "befehl.abschnitte",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Abschnittstexte als Markdown im Freigabe-Snapshot",
     },
     Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "pressemitteilung.titel",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Titel als Überschrift des Freigabe-Snapshots",
     },
     Ausnahme {
         datei: "src/vorlagendokument/repo.rs",
         funktion: "freigeben_tx",
         spalte: "pressemitteilung.abschnitte",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Abschnittstexte als Markdown im Freigabe-Snapshot",
     },
     Ausnahme {
         datei: "src/stab/repo.rs",
         funktion: "lagebesprechung_abschliessen",
         spalte: "einsatz_lagebesprechung.entschluss",
+        gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Entschluss im ETB-Eintrag (Entscheidung) der Lagebesprechung",
+    },
+    // --- Enum-Labels ohne Personenbezug, Scrub nur, weil die Quellzeile ganz gelöscht wird. ---
+    Ausnahme {
+        datei: "src/dokument/repo.rs",
+        funktion: "ablegen",
+        spalte: "einsatz_dokument.kategorie",
+        gruppe: Gruppe::EnumLabel,
+        begruendung: "Kategorie als Enum-Label, kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
+    },
+    Ausnahme {
+        datei: "src/dokument/repo.rs",
+        funktion: "entfernen",
+        spalte: "einsatz_dokument.kategorie",
+        gruppe: Gruppe::EnumLabel,
+        begruendung: "Kategorie als Enum-Label, kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
+    },
+    Ausnahme {
+        datei: "src/dokument/repo.rs",
+        funktion: "aendern",
+        spalte: "einsatz_dokument.kategorie",
+        gruppe: Gruppe::EnumLabel,
+        begruendung: "Kategorie als Enum-Label (alt und neu), kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
     },
 ];
 
@@ -446,7 +502,41 @@ fn ausnahmeliste_zeigt_auf_existierende_scrub_stellen() {
             "{} ist keine Scrub-Spalte — gehört nicht in die Ausnahmeliste",
             a.spalte
         );
+        assert!(
+            !ist_gesperrt(a.spalte),
+            "{} ({}::{}, {:?}) ist gesperrt: Werte von Betroffenen und Dokumenttitel gehören \
+             nicht in den ETB-Wortlaut (LFH-752)",
+            a.spalte,
+            a.datei,
+            a.funktion,
+            a.gruppe
+        );
         assert!(!a.begruendung.is_empty());
+    }
+}
+
+/// Die Sperrliste greift auf die gemeinten Spalten und nur auf diese.
+#[test]
+fn sperrliste_trifft_betroffene_und_dokumenttitel() {
+    for gesperrt in [
+        "einsatz_schaden.ort",
+        "einsatz_schaden.uebergeben_an",
+        "einsatz_schaden_anhang.titel",
+        "einsatz_person.aktuelles_verbleib_ziel",
+        "person_verbleib.ziel",
+        "person_uhs_belegung.notiz",
+        "einsatz_tier.halter_kontakt",
+        "einsatz_dokument.titel",
+    ] {
+        assert!(ist_gesperrt(gesperrt), "{gesperrt} muss gesperrt sein");
+    }
+    for frei in [
+        "einsatz_personal.snap_name",
+        "einsatz_dokument.kategorie",
+        "lage_zone.label",
+        "meldung.inhalt",
+    ] {
+        assert!(!ist_gesperrt(frei), "{frei} darf nicht gesperrt sein");
     }
 }
 
@@ -479,15 +569,16 @@ const GEHEIM: &[&str] = &[
     // Schaden
     "Dachschaden-Beschreibung",
     "Eigentuemer-0173-1234",
+    // Bis LFH-752 Ausnahmen, seitdem nicht mehr im Wortlaut: Schadensort, Übergabe-Adressat,
+    // Verbleib-Ziel.
+    "Birkenallee-9",
+    "Dachdecker-Ruehl",
+    "Klinikum-Nordstadt",
 ];
 
 /// Werte der Ausnahmeliste, die dieser Ablauf berührt: `(wert, erwarteter Textbaustein
 /// des einen zugehörigen System-Eintrags)`.
-const AUSNAHME_WERTE: &[(&str, &str)] = &[
-    ("Birkenallee-9", "Schaden S-001 angelegt"),
-    ("Dachdecker-Ruehl", "übergeben an"),
-    ("Klinikum-Nordstadt", "abtransportiert →"),
-];
+const AUSNAHME_WERTE: &[(&str, &str)] = &[("Sperrzone-Lindenplatz", "eingerichtet")];
 
 fn zeit(s: &str) -> chrono::DateTime<Utc> {
     NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
@@ -850,6 +941,19 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         "POST",
         &format!("{basis}/schaeden/{sid}/abschliessen"),
         json!({ "abschluss_grund": "behoben" }),
+    )
+    .await;
+
+    // Zone mit Label: ein bewusst behaltener Wert (Gruppe Lagestruktur, LFH-752).
+    ok(
+        &app,
+        &admin,
+        "POST",
+        &format!("{basis}/zonen"),
+        json!({
+            "typ": "absperrbereich", "geometrie_typ": "Polygon", "label": "Sperrzone-Lindenplatz",
+            "geometrie": r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#
+        }),
     )
     .await;
 

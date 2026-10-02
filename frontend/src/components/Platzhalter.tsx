@@ -1,4 +1,4 @@
-import { IkoneBaustelle } from '../ikonen';
+import { IconBaustelle } from '../icons';
 import { Button } from 'antd';
 import { useNavigate } from 'react-router';
 import Paneel from './instrument/Paneel';
@@ -45,7 +45,7 @@ const ERWARTUNGSHORIZONT_EINSATZ = ' Der Einsatz läuft davon unberührt weiter.
  * einen gibt — dem Rückweg als EINER Primäraktion. Die Breite ist gedeckelt
  * (`flaeche.seiteSchmal`), damit der Satz auf dem Fükw nicht über 1400 px läuft.
  *
- * Der Marker vor dem Titel ist die Ikone „Baustelle“ des Satzes (LFH-595; vorher das Emoji 🚧).
+ * Der Marker vor dem Titel ist das Icon „Baustelle“ des Satzes (LFH-595; vorher das Emoji 🚧).
  * Tests finden den Titel über `data-lfh="platzhalter-titel"`, nicht über ein Zeichen im Text.
  */
 export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
@@ -74,7 +74,7 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
             gap: token.marginXS,
           }}
         >
-          <IkoneBaustelle />
+          <IconBaustelle />
           {titel}
         </div>
         {beschreibung && (

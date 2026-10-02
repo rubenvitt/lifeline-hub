@@ -43,6 +43,7 @@ export function benutzerFixture(overrides: Partial<BenutzerAnzeige> = {}): Benut
     id: 1,
     anzeigename: 'Nutzer',
     benutzername: 'nutzer',
+    org_id: 1,
     system_rolle: 'keiner',
     org_rolle: 'keine',
     aktiv: true,

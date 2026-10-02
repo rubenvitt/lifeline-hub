@@ -1,5 +1,5 @@
 // Sprachbausteine werden dort eingebunden, wo sie gebraucht werden, nicht global.
-import { IkoneAuto, IkonePerson } from '../ikonen';
+import { IconAuto, IconPerson } from '../icons';
 import '../theme/sprache.css';
 import type { ReactNode } from 'react';
 import { verteilungFelder } from './statusAchse';
@@ -8,12 +8,12 @@ import type { StatusVerteilung } from './kraeftebild';
 /**
  * Die Zierde je Achse — ein Piktogramm, KEIN Emoji (Zeichnung, Farbe und Breite eines Emojis
  * kommen aus der Systemschrift). Die Zuordnung liegt HIER über das String-Union der Achse: eine
- * Prop, die eine Zeichenkette nimmt, nähme auch wieder ein Emoji. `IkonePerson`, weil die
+ * Prop, die eine Zeichenkette nimmt, nähme auch wieder ein Emoji. `IconPerson`, weil die
  * Spalte einzelne Kräfte zählt.
  */
-const IKONE: Record<'Personal' | 'Fahrzeuge', ReactNode> = {
-  Personal: <IkonePerson />,
-  Fahrzeuge: <IkoneAuto />,
+const ICON: Record<'Personal' | 'Fahrzeuge', ReactNode> = {
+  Personal: <IconPerson />,
+  Fahrzeuge: <IconAuto />,
 };
 
 /**
@@ -23,7 +23,7 @@ const IKONE: Record<'Personal' | 'Fahrzeuge', ReactNode> = {
  * Zweiter Kanal: `.lfh-feld--alarm .lfh-zahl` färbt nur die ZAHL, deshalb ist jedes Feld ein
  * Verbund aus `.lfh-etikett` (Kurztext) und `.lfh-zahl`.
  *
- * Die Ikone ist Zierde: die Ikone des Satzes ist selbst `aria-hidden` (LFH-595), die Hülle bleibt
+ * Das Icon ist Zierde: das Icon des Satzes ist selbst `aria-hidden` (LFH-595), die Hülle bleibt
  * als zweite Sicherung (früher brachte antd `role="img"` mit englischem `aria-label` mit). Der
  * Test prüft, dass in der Gruppe keine `img`-Rolle überlebt.
  *
@@ -43,7 +43,7 @@ export default function AmpelZelle({
   if (felder.length === 0) return null;
   return (
     <span className="lfh-ampel" role="group" aria-label={bezeichnung}>
-      <span aria-hidden="true">{IKONE[bezeichnung]}</span>
+      <span aria-hidden="true">{ICON[bezeichnung]}</span>
       {felder.map((f) => (
         <span
           key={f.etikett}

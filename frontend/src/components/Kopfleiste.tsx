@@ -1,4 +1,4 @@
-import { IkoneWlanVerbunden, IkoneWlanGetrennt } from '../ikonen';
+import { IconWlanVerbunden, IconWlanGetrennt } from '../icons';
 import { useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { theme } from 'antd';
 import { Link } from 'react-router';
@@ -280,16 +280,16 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
 };
 
 /**
- * SYNC-Anzeige: WLAN-Ikone (Haken verbunden, Kreuz getrennt; LFH-595) + Wort (Mono 11). Eine
+ * SYNC-Anzeige: WLAN-Icon (Haken verbunden, Kreuz getrennt; LFH-595) + Wort (Mono 11). Eine
  * ANZEIGE, kein Bedienziel — die Handlungen trägt die Betriebszeile (`LiveStatusBanner`) aus
  * demselben Store (LFH-336 · M3).
  *
  * `liveErwartet`: nur der Einsatz-Workspace hält einen SSE-Strom. Auf der Einsatzliste erscheint
  * die Zelle nur bei Netzverlust oder offener Queue.
  *
- * `kompakt` (unter `md`): nur Ikone, das Wort wandert in den zugänglichen Namen und `title`.
+ * `kompakt` (unter `md`): nur Icon, das Wort wandert in den zugänglichen Namen und `title`.
  *
- * `ruheOhneWort` (zwischen `md` und `xl`): nur der RUHEZUSTAND „SYNC" steht als Ikone. Jede
+ * `ruheOhneWort` (zwischen `md` und `xl`): nur der RUHEZUSTAND „SYNC" steht als Icon. Jede
  * Störung (VERBINDE, QUEUE, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort — Farbe allein wäre ein
  * Kanal (WCAG 1.4.1).
  */
@@ -319,7 +319,7 @@ export function SyncAnzeige({
   const zustand = syncZustand({ online, live, liveErwartet, queue });
   if (zustand === 'ruhe') return null;
   const d = SYNC_DARSTELLUNG[zustand];
-  const Icon = d.getrennt ? IkoneWlanGetrennt : IkoneWlanVerbunden;
+  const Icon = d.getrennt ? IconWlanGetrennt : IconWlanVerbunden;
   const satz = d.satz(queue);
   const wort = zustand === 'ausstehend' ? `${d.wort} ${queue.ausstehend}` : d.wort;
   return (
@@ -342,7 +342,7 @@ export function SyncAnzeige({
           style={{
             fontFamily: schrift.zahl,
             fontSize: 11,
-            // Verbunden bleibt das Wort gedämpft wie im Entwurf — die grüne Ikone trägt den
+            // Verbunden bleibt das Wort gedämpft wie im Entwurf — das grüne Icon trägt den
             // Zustand. Jede Störung färbt auch das Wort: dann soll es auffallen.
             color: zustand === 'verbunden' ? rahmenFarben.gedaempft : d.farbe,
           }}

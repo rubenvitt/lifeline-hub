@@ -76,7 +76,7 @@ export function filtereNachModus(befehle: Befehl[], modus: PaletteModus): Befehl
 /**
  * Bei AKTIVER Suche entfallen die ORDNUNGSKOPIEN (`zuletzt`, `ausgefuehrt`).
  *
- * Jeder `zuletzt:`-Eintrag hat zwingend einen `modul:`-Zwilling mit gleichem Label, Ikone und
+ * Jeder `zuletzt:`-Eintrag hat zwingend einen `modul:`-Zwilling mit gleichem Label, Icon und
  * Ziel, ein `ausgefuehrt:`-Eintrag ist eine Kopie seines Originals. Im Gruppenzweig trennen die
  * Überschriften die Zwillinge; flach blieben zwei ununterscheidbare Zeilen („Lagekarte,
  * Lagekarte“), für Vorlesende zweimal derselbe Name.

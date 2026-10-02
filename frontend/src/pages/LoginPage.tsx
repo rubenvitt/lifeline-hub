@@ -1,4 +1,4 @@
-import { IkoneAnmelden, IkoneGlobus, IkoneSchluessel } from '../ikonen';
+import { IconAnmelden, IconGlobus, IconSchluessel } from '../icons';
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -370,7 +370,7 @@ export default function LoginPage() {
                     key={p.id}
                     size="large"
                     block
-                    icon={<IkoneAnmelden />}
+                    icon={<IconAnmelden />}
                     onClick={starteOidcAnmeldung}
                   >
                     Mit {p.anzeigename} anmelden
@@ -434,7 +434,7 @@ export default function LoginPage() {
                   <Button
                     size="large"
                     block
-                    icon={<IkoneSchluessel />}
+                    icon={<IconSchluessel />}
                     style={passwortAktiv ? { marginTop: 12 } : undefined}
                     loading={laedt === 'passkey'}
                     onClick={mitPasskeyAnmelden}
@@ -450,7 +450,7 @@ export default function LoginPage() {
                 <Button
                   size="large"
                   block
-                  icon={<IkoneGlobus />}
+                  icon={<IconGlobus />}
                   loading={laedt === 'browser'}
                   disabled={laedt !== null && laedt !== 'browser'}
                   onClick={imBrowserStarten}

@@ -9,6 +9,7 @@ import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
 import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
 import { adminFixture } from '../test/fixtures';
+import { globalKeys } from '../api/queryKeys';
 
 /** Archivakte. */
 
@@ -266,5 +267,88 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
     expect(within(dialog).getByLabelText('Neue Aufbewahrungsfrist')).toHaveValue(
       '2026-06-01 14:00',
     );
+  });
+});
+
+describe('ArchivAktePage — Frist aufheben (LFH-756)', () => {
+  it('im Zustand „fällig“ hebt der Schalter „unbegrenzt“ die Frist ohne Rückfrage auf', async () => {
+    // Fällig sperrt den Einsatz, die Einstellungen liefern 403: die Akte ist der einzige Weg.
+    const gesendet: unknown[] = [];
+    zeige('faellig');
+    server.use(
+      http.put('/api/einsaetze/7/aufbewahrungsfrist', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ id: 7 });
+      }),
+    );
+    const [knopf] = await kopfAktionen();
+    await userEvent.click(knopf);
+    const dialog = await screen.findByRole('dialog', { name: 'Aufbewahrungsfrist ändern' });
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Frist aufheben' }));
+    await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
+    expect(screen.queryByText('Aufbewahrungsfrist verkürzen?')).toBeNull();
+  });
+});
+
+describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
+  it.each([403, 404, 409])(
+    'nach %i verschwindet die gecachte Akte — der Stand gilt nicht mehr',
+    async (status) => {
+      const { client } = zeige('vorgemerkt');
+      expect(await screen.findByText('R-001')).toBeInTheDocument();
+      server.use(
+        http.get('/api/aufbewahrung/einsaetze/7', () =>
+          HttpResponse.json({ error: 'Kein Zugriff' }, { status }),
+        ),
+      );
+      await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungAkte(7) });
+      expect(await screen.findByText('Archivakte nicht ladbar')).toBeInTheDocument();
+      expect(screen.queryByText('R-001')).toBeNull();
+      expect(screen.queryByText('Hochwasser Nord', { exact: false })).toBeNull();
+    },
+  );
+
+  it('ein anderer Fehler lässt die Akte stehen und meldet den veralteten Stand', async () => {
+    const { client } = zeige('vorgemerkt');
+    expect(await screen.findByText('R-001')).toBeInTheDocument();
+    server.use(
+      http.get('/api/aufbewahrung/einsaetze/7', () =>
+        HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungAkte(7) });
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('R-001')).toBeInTheDocument();
+  });
+
+  it('ein gescheiterter Neuabruf des Tagebuchs meldet den veralteten Stand über der Liste', async () => {
+    const { client } = zeige('geschwaerzt');
+    expect(await screen.findByText('Eintrag 3')).toBeInTheDocument();
+    server.use(
+      http.get('/api/aufbewahrung/einsaetze/7/etb', () =>
+        HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungEtb(7, undefined) });
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Eintrag 3')).toBeInTheDocument();
+  });
+
+  it('ein 403 beim Neuabruf des Tagebuchs räumt die Einträge', async () => {
+    const { client } = zeige('geschwaerzt');
+    expect(await screen.findByText('Eintrag 3')).toBeInTheDocument();
+    server.use(
+      http.get('/api/aufbewahrung/einsaetze/7/etb', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungEtb(7, undefined) });
+    expect(await screen.findByText('Einsatztagebuch nicht ladbar')).toBeInTheDocument();
+    expect(screen.queryByText('Eintrag 3')).toBeNull();
   });
 });

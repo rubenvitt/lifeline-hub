@@ -50,7 +50,7 @@ describe('ModulStub', () => {
     renderMitProviders(<ModulStub modul={wipModul} />);
     const kopf = document.querySelector('[data-lfh="platzhalter-titel"]');
     expect(kopf).toHaveTextContent('WIP-Probe');
-    expect(kopf?.querySelector('[data-ikone="baustelle"]')).not.toBeNull();
+    expect(kopf?.querySelector('[data-lfh-icon="baustelle"]')).not.toBeNull();
     expect(screen.getByText(wipModul.beschreibung!)).toBeInTheDocument();
   });
 

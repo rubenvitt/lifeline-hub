@@ -70,7 +70,7 @@ describe('EtbAnhaenge (LFH-117)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('trägt keine Ikone als eigenes Vorleseziel im Verweis', () => {
+  it('trägt kein Icon als eigenes Vorleseziel im Verweis', () => {
     render(<EtbAnhaenge einsatzId={5} eintrag={{ id: 40, lfd_nr: 42, anhaenge: [anhang()] }} />);
     expect(within(screen.getByRole('link')).queryByRole('img')).toBeNull();
   });

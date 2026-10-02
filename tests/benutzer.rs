@@ -113,6 +113,52 @@ async fn admin_benutzerliste_enthaelt_totp_aktiviert() {
 }
 
 #[tokio::test]
+async fn benutzeranzeige_traegt_org_id() {
+    // LFH-753: der Client spiegelt Rechte, die an der Org hängen (Frist-PUT nur für den Admin
+    // der Einsatz-Org) — dafür trägt jede `BenutzerAnzeige` die `org_id`: das eigene Profil, die
+    // Liste und die Antworten von Anlegen und Ändern.
+    let (app, pool) = setup_mit_pool().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    let (status, me) = anfrage(&app, "GET", "/api/auth/me", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(me["org_id"], org, "me: {me}");
+
+    let (status, angelegt) = anfrage(
+        &app,
+        "POST",
+        "/api/benutzer",
+        &admin_cookie,
+        Some(r#"{"benutzername":"olga","anzeigename":"Olga","passwort":"olgapw123"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{angelegt}");
+    assert_eq!(angelegt["org_id"], org, "anlegen: {angelegt}");
+
+    let id = angelegt["id"].as_i64().unwrap();
+    let (status, geaendert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{id}"),
+        &admin_cookie,
+        Some(r#"{"anzeigename":"Olga O."}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{geaendert}");
+    assert_eq!(geaendert["org_id"], org, "patch: {geaendert}");
+
+    let (status, liste) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    for b in liste.as_array().unwrap() {
+        assert_eq!(b["org_id"], org, "liste: {b}");
+    }
+}
+
+#[tokio::test]
 async fn doppelter_benutzername_ist_409() {
     let app = setup().await;
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;

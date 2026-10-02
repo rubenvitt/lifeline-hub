@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 // LFH-595: Jede SVG-Quelle gegen das PNG prüfen, das Icons8 für dieselbe Kennung ausliefert.
 //
-//   mise exec -- node scripts/ikonen/vergleiche-png.mjs [name …]
+//   mise exec -- node scripts/icons/vergleiche-png.mjs [name …]
 //
 // Warum: Der Icons8-MCP gibt das SVG als Text in die Sitzung, abgelegt wird es durch Abschreiben.
-// Ein vertauschtes Zeichen in den Pfaddaten bliebe unsichtbar, bis jemand die Ikone ansieht. Das
+// Ein vertauschtes Zeichen in den Pfaddaten bliebe unsichtbar, bis jemand das Icon ansieht. Das
 // PNG (frei, `img.icons8.com/?id=…&format=png`) kommt dagegen byte-genau vom Server. Beide werden
 // in Chromium auf 100 × 100 px gerendert und über die Deckkraft verglichen.
 //
 // Urteil je Quelle: mittlere Abweichung der Deckkraft und Anteil der Pixel mit mehr als 50 %
 // Abweichung. Kantenglättung liefert kleine Werte, ein Abschreibfehler einen zusammenhängenden
-// Fleck. Ohne Namen werden alle Quellen aus `ikonen.json` geprüft; eigene Zeichnungen haben kein
+// Fleck. Ohne Namen werden alle Quellen aus `icons.json` geprüft; eigene Zeichnungen haben kein
 // Icons8-PNG und werden übersprungen. Exit 1, wenn eine Quelle die Schwelle reißt.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -25,9 +25,9 @@ const KANTE = 100;
 /** Mittlere Abweichung der Deckkraft (0…1) und Anteil stark abweichender Pixel (0…1). */
 const SCHWELLE = { mittel: 0.01, stark: 0.01 };
 
-const register = JSON.parse(readFileSync(join(hier, 'ikonen.json'), 'utf8'));
+const register = JSON.parse(readFileSync(join(hier, 'icons.json'), 'utf8'));
 const wahl = new Set(process.argv.slice(2));
-const auftraege = register.ikonen
+const auftraege = register.icons
   .filter((e) => e.herkunft !== 'eigen')
   .flatMap((e) => [
     { datei: `${e.name}.svg`, id: e.icons8.id },

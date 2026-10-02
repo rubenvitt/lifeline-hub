@@ -849,6 +849,8 @@ pub async fn faellige_purge(
 ///
 /// Idempotent: der `geschwaerzt_at IS NULL`-Guard liefert `false`, wenn der Einsatz
 /// schon geschwärzt (oder nicht soft-gelöscht/abgeschlossen) ist — kein Doppel-Scrub.
+/// Ebenso `false`, solange die Karenz zu `jetzt` noch läuft (LFH-754): das UPDATE prüft sie
+/// selbst, der Aufrufer muss sich nicht auf seine Kandidatenliste verlassen.
 ///
 /// **Welche Spalte gescrubbt oder erhalten wird, entscheidet die zentrale Registry
 /// `super::schwaerzung_registry`** (F02/LFH-229): sie taggt JEDE Spalte JEDER einsatz-
@@ -861,18 +863,27 @@ pub async fn schwaerze_einsatz(
     einsatz_id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
+    // Ohne gültiges `jetzt` keine Grenze, also auch keine Schwärzung (fail-closed).
+    let karenz_grenze = crate::zeit::parse_utc(jetzt)
+        .map(super::retention::karenz_grenze)
+        .ok_or_else(|| AppError::Internal(format!("Schwärzung: ungültiges jetzt {jetzt:?}")))?;
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
 
     // Idempotenz-/Sicherheits-Guard: nur abgeschlossene, soft-gelöschte, noch nicht
     // geschwärzte Einsätze. Setzt zugleich den Tombstone. rows_affected==0 → fertig.
+    // Die Karenz wird im UPDATE selbst noch einmal geprüft (LFH-754, dieselbe Grenze wie
+    // `retention::karenz_abgelaufen`): wurde der Einsatz zwischen Kandidatenliste und diesem
+    // Schreibvorgang wiederhergestellt und neu vorgemerkt, gewinnt die frische Vormerkung.
     let res = sqlx::query(
         "UPDATE einsatz SET geschwaerzt_at = ? \
-         WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL",
+         WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL \
+           AND geloescht_at <= ?",
     )
     .bind(jetzt)
     .bind(einsatz_id)
     .bind(STATUS_ABGESCHLOSSEN)
+    .bind(&karenz_grenze)
     .execute(&mut *tx)
     .await?;
     if res.rows_affected() == 0 {
@@ -1245,6 +1256,8 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
+        // Wortlaut aus der Zeit vor LFH-752: Seitdem nennt die Ablage keinen Titel mehr. Ein
+        // solcher Bestandseintrag bleibt über die Schwärzung hinweg unverändert.
         let inhalt = "Dokument abgelegt: Foto Familie Müller (Foto)";
         let etb_id: i64 = sqlx::query_scalar(
             "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
@@ -1300,7 +1313,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             etb_inhalt, inhalt,
-            "ETB-Nachweis bleibt im Wortlaut (G_ETB), auch der Titel darin"
+            "ETB-Nachweis bleibt im Wortlaut (G_ETB), auch ein Bestandseintrag mit Titel"
         );
     }
 
@@ -3659,5 +3672,54 @@ mod tests {
             .unwrap());
         let (_, g, _, etb) = stand(&pool, e).await;
         assert_eq!((g, etb), (None, 0));
+    }
+
+    /// Das Rennen aus LFH-754: der Purge-Lauf hat seine Kandidatenliste schon gelesen (alte
+    /// Vormerkung, Karenz abgelaufen), dann wird der Einsatz wiederhergestellt und neu
+    /// vorgemerkt. Die Schwärzung prüft die Karenz im UPDATE selbst noch einmal und lässt
+    /// die frische Vormerkung stehen.
+    #[tokio::test]
+    async fn schwaerzung_prueft_die_karenz_im_update_noch_einmal() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let admin = benutzer_anlegen(&pool, "admin").await;
+        let jetzt = zeit("2026-06-30 12:00:00");
+        let jetzt_s = crate::zeit::formatiere_utc(jetzt);
+        let e = archiv_einsatz(&pool, leit, Some("2026-05-20 12:00:00"), None).await;
+        let kandidaten = faellige_purge(&pool, super::super::retention::KARENZ_TAGE)
+            .await
+            .unwrap();
+        assert_eq!(kandidaten, vec![(e, "2026-05-20 12:00:00".to_string())]);
+
+        // Zwischen Kandidatenliste und Schwärzung: wiederhergestellt (in der Karenz) mit
+        // einer Frist, die abläuft, und neu vorgemerkt — die Karenz beginnt von vorn.
+        wiederherstellen(
+            &pool,
+            e,
+            admin,
+            1,
+            Some("2026-06-01 00:00:00"),
+            zeit("2026-05-25 12:00:00"),
+        )
+        .await
+        .unwrap();
+        assert!(soft_delete_einsatz(&pool, e, "2026-06-29 12:00:00")
+            .await
+            .unwrap());
+
+        assert!(
+            super::super::retention::karenz_abgelaufen(Some(&kandidaten[0].1), jetzt),
+            "der Purge-Lauf hält den Kandidaten nach seiner Liste für fällig"
+        );
+        let vorher = stand(&pool, e).await;
+        assert!(!schwaerze_einsatz(&pool, e, &jetzt_s).await.unwrap());
+        assert_eq!(stand(&pool, e).await, vorher, "nichts geschwärzt, kein ETB");
+        assert_eq!(vorher.1.as_deref(), Some("2026-06-29 12:00:00"));
+
+        // Grenze wie `karenz_abgelaufen`: genau 30 Tage → schwärzen, eine Sekunde jünger nicht.
+        let knapp = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:01"), None).await;
+        assert!(!schwaerze_einsatz(&pool, knapp, &jetzt_s).await.unwrap());
+        let grenze = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:00"), None).await;
+        assert!(schwaerze_einsatz(&pool, grenze, &jetzt_s).await.unwrap());
     }
 }

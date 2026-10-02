@@ -37,8 +37,8 @@ describe('FunkErreichbarkeit', () => {
     expect(box).toHaveTextContent('DMO: DMO 31');
     expect(box).toHaveTextContent('Digitalfunk'); // Label statt Roh-Schlüssel
     expect(box).toHaveTextContent('0151 23456');
-    // Telefonikone des Satzes statt ☎ (LFH-595).
-    expect(box.querySelector('[data-ikone="telefon"]')).not.toBeNull();
+    // Telefonicon des Satzes statt ☎ (LFH-595).
+    expect(box.querySelector('[data-lfh-icon="telefon"]')).not.toBeNull();
     expect(box.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 

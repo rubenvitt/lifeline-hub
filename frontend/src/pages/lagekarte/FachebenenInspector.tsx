@@ -1,14 +1,14 @@
 import {
-  IkoneGewitterwolke,
-  IkoneNebel,
-  IkoneRegen,
-  IkoneSchneeflocke,
-  IkoneSonne,
-  IkoneThermometer,
-  IkoneWarndreieck,
-  IkoneWind,
-  type Ikone,
-} from '../../ikonen';
+  IconGewitterwolke,
+  IconNebel,
+  IconRegen,
+  IconSchneeflocke,
+  IconSonne,
+  IconThermometer,
+  IconWarndreieck,
+  IconWind,
+  type Icon,
+} from '../../icons';
 import { useState } from 'react';
 import { App, Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -74,20 +74,20 @@ function fmtZeit(v: string | null): string | null {
 }
 
 /**
- * Ikone zum Wetter-Ereignis (DWD EC_GROUP / EVENT) aus dem Ikonensatz (LFH-595; vorher Emojis,
- * die kein Ikonensatz sind und je System anders aussehen). Unbekanntes Ereignis: Warndreieck.
+ * Icon zum Wetter-Ereignis (DWD EC_GROUP / EVENT) aus dem Iconsatz (LFH-595; vorher Emojis,
+ * die kein Iconsatz sind und je System anders aussehen). Unbekanntes Ereignis: Warndreieck.
  */
-function wetterIkone(group: string | null, event: string | null): Ikone {
+function wetterIcon(group: string | null, event: string | null): Icon {
   const t = `${group ?? ''} ${event ?? ''}`.toUpperCase();
-  if (/GEWITTER|THUNDER/.test(t)) return IkoneGewitterwolke;
-  if (/REGEN|RAIN/.test(t)) return IkoneRegen;
-  if (/STURM|ORKAN|WIND|BÖ/.test(t)) return IkoneWind;
+  if (/GEWITTER|THUNDER/.test(t)) return IconGewitterwolke;
+  if (/REGEN|RAIN/.test(t)) return IconRegen;
+  if (/STURM|ORKAN|WIND|BÖ/.test(t)) return IconWind;
   if (/SCHNEE|SNOW|GLATT|GLÄTTE|EIS|GLAZE|ICE|FROST|TAUWETTER|THAW/.test(t))
-    return IkoneSchneeflocke;
-  if (/NEBEL|FOG/.test(t)) return IkoneNebel;
-  if (/HITZE|HEAT/.test(t)) return IkoneThermometer;
-  if (/UV/.test(t)) return IkoneSonne;
-  return IkoneWarndreieck;
+    return IconSchneeflocke;
+  if (/NEBEL|FOG/.test(t)) return IconNebel;
+  if (/HITZE|HEAT/.test(t)) return IconThermometer;
+  if (/UV/.test(t)) return IconSonne;
+  return IconWarndreieck;
 }
 
 /**
@@ -727,17 +727,17 @@ export default function FachebenenInspector({
   // Fläche/Umfang/Länge rein clientseitig aus der (auch Multi-*) Geometrie.
   const kennzahlen = geometrie ? geoKennzahlen(geometrie) : null;
 
-  // Der Text kommt aus `fachebeneTitel` (auch für das Flächen-Auswahlmenü); nur hier eine Ikone.
+  // Der Text kommt aus `fachebeneTitel` (auch für das Flächen-Auswahlmenü); nur hier ein Icon.
   const titelText = fachebeneTitel(quelle, p);
-  const TitelIkone =
+  const TitelIcon =
     quelle === 'dwd'
-      ? wetterIkone(pick(p, 'EC_GROUP'), pick(p, 'EVENT', 'event'))
+      ? wetterIcon(pick(p, 'EC_GROUP'), pick(p, 'EVENT', 'event'))
       : quelle === 'nina'
-        ? IkoneWarndreieck
+        ? IconWarndreieck
         : null;
-  const titel = TitelIkone ? (
+  const titel = TitelIcon ? (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
-      <TitelIkone />
+      <TitelIcon />
       {titelText}
     </span>
   ) : (

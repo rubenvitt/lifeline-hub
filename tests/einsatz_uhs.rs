@@ -315,6 +315,48 @@ async fn auto_aufbereitung_und_etb_text_inbox() {
     );
 }
 
+/// LFH-752: Die Notiz beim manuellen Austritt ist Scrub der Belegung und bleibt aus dem ETB
+/// (Spec `aufbewahrung`, „Kein Scrub-Wert von Betroffenen und Dokumenten im ETB“).
+#[tokio::test]
+async fn manueller_austritt_nennt_die_notiz_nicht_im_etb() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
+        &cookie,
+        Some(&json!({"art": "eintritt", "uhs_id": uhs})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, austritt) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
+        &cookie,
+        Some(&json!({"art": "austritt", "notiz": "an Hausarzt Dr. Geheim"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(
+        austritt["notiz"], "an Hausarzt Dr. Geheim",
+        "die Belegung führt die Notiz weiter"
+    );
+    let inhalte = etb_inhalte(&app, &cookie, einsatz).await;
+    assert!(
+        inhalte.iter().any(|s| s == "Person R-001: verlässt BHP 50"),
+        "Austritt-ETB-Text ohne Notiz, fand: {inhalte:?}"
+    );
+    assert!(
+        inhalte.iter().all(|s| !s.contains("Hausarzt")),
+        "Leak: Belegungsnotiz im ETB: {inhalte:?}"
+    );
+}
+
 #[tokio::test]
 async fn reservierte_person_belegt_loest_reservierung() {
     let (app, pool) = setup_mit_pool().await;

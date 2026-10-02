@@ -1,4 +1,4 @@
-import { IkoneLupe } from '../ikonen';
+import { IconLupe } from '../icons';
 import type { CSSProperties } from 'react';
 import { Button, theme } from 'antd';
 import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
@@ -30,7 +30,7 @@ export function suchKuerzelFuerUserAgent(userAgent: string): string {
  *
  * ZWEI Angaben (LFH-365): `minHeight` aus `controlHeight` (30 / 48 / 72) plus Polsterung.
  * Grund `flaeche2`, Rahmen `linieStark` — beides Nachtwerte, weil die Kommandoleiste in
- * beiden Modi dunkel ist. Der Rahmen ist hier DEKORATION: das Ziel ist über Grund, Ikone
+ * beiden Modi dunkel ist. Der Rahmen ist hier DEKORATION: das Ziel ist über Grund, Icon
  * und Text erkennbar, nicht allein über die Linie (WCAG 1.4.11 zielt auf die
  * identifizierende Grafik).
  */
@@ -60,12 +60,12 @@ export function suchfeldStil(token: {
 /**
  * Einheitlicher Zugang zur Kommandopalette in beiden Kopfzeilen.
  *
- * Ab `lg` in Suchfeld-Gestalt (Neuentwurf): Suchikone, Hinweistext, Kürzelmarke. Es BLEIBT
+ * Ab `lg` in Suchfeld-Gestalt (Neuentwurf): Suchicon, Hinweistext, Kürzelmarke. Es BLEIBT
  * ein Knopf — die Palette ist ein Dialog mit eigenem Eingabefeld, ein zweites Eingabefeld im
  * Kopf wäre ein zweiter Ort derselben Eingabe. Der zugängliche Name bleibt „Suchen": der
  * Hinweistext ist Beiwerk, und an „Suchen" hängen die Abfragen der e2e-Suiten.
  *
- * Unterhalb von `lg` nur die Ikone; die A1-Trefffläche bleibt der Mindestwert. Die
+ * Unterhalb von `lg` nur das Icon; die A1-Trefffläche bleibt der Mindestwert. Die
  * Handschuh-Stufe darf darüber wachsen (LFH-460), weil dies der sichtbare Suchzugang ist.
  */
 export default function CommandPaletteTrigger() {
@@ -84,7 +84,7 @@ export default function CommandPaletteTrigger() {
         type="text"
         aria-label="Suchen"
         aria-keyshortcuts={kuerzel === '⌘K' ? 'Meta+K' : 'Control+K'}
-        icon={<IkoneLupe size={20} />}
+        icon={<IconLupe size={20} />}
         onClick={toggle}
         style={{
           color: rahmenFarben.text,
@@ -107,7 +107,7 @@ export default function CommandPaletteTrigger() {
       style={suchfeldStil(token)}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
-        <IkoneLupe size={15} />
+        <IconLupe size={15} />
       </span>
       {/* Eine Flex-Zeile, kein Fragment: JSX verschluckt den Zeilenumbruch zwischen zwei
           Elementen ersatzlos — so stand bis zum 08.08.2026 „Suchen⌘K" in einem Zug. */}
