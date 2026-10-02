@@ -35,7 +35,7 @@ import {
  * Fehler-Toast; der Erfolg quittiert per Toast.
  */
 
-type FristEinsatz = Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'retention_bis'>;
+type FristEinsatz = Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'retention_bis' | 'org_id'>;
 
 interface FristFormWerte {
   frist?: Dayjs | null;
@@ -49,7 +49,7 @@ interface Rueckfrage {
 
 /** Text des Rechte-Hinweises — eine Stelle für Paneel und Akte. */
 const FRIST_RECHTE_TEXT =
-  'Nur die Einsatzleitung oder ein System-Admin darf die Aufbewahrungsfrist ändern — die Frist steht hier zum Nachlesen.';
+  'Nur die Einsatzleitung oder ein System-Admin der Organisation des Einsatzes darf die Aufbewahrungsfrist ändern — die Frist steht hier zum Nachlesen.';
 
 interface FristAenderung {
   /** Öffnet den Dialog „Frist ändern". */

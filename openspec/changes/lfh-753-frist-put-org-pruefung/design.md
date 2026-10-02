@@ -55,8 +55,10 @@ an allen ~200 Einsatzrouten.
 
 `BenutzerAnzeige` bekommt `org_id` (additiv, Typ-Codegen). `darfFristSetzen` vergleicht sie
 mit `einsatz.org_id`: `istEinsatzLeitung(einsatz) || (istAdmin(benutzer) && benutzer.org_id === einsatz.org_id)`.
-`BenutzerSchreibkontext` und der Einsatzkontext von `darfFristSetzen` nehmen die beiden Felder
-auf. Der Rechte-Hinweis nennt „System-Admin der Organisation“.
+`darfFristSetzen` bekommt eigene Kontexttypen mit `org_id` (`FristEinsatzKontext`,
+`FristBenutzerKontext`); die geteilten `…Schreibkontext`-Typen bleiben unberührt, weil viele
+andere Rechte-Helfer sie nutzen. Der Rechte-Hinweis nennt den „System-Admin der Organisation
+des Einsatzes“.
 
 **Verworfen:** Client unverändert lassen. Der fremde Admin sähe die Aktion offen und bekäme
 erst beim Speichern 403. Das widerspricht der Spec („Ohne Recht MUST die Aktion gesperrt

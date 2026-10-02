@@ -50,9 +50,8 @@ Keine.
   (`BenutzerAnzeige`, `Benutzer::anzeige`), `src/routes/benutzer.rs` (SELECTs auf
   `BenutzerAnzeige`), Tests in `tests/aufbewahrung.rs`.
 - Typ-Codegen: `scripts/check-typ-codegen.sh`, beide generierten Dateien.
-- Frontend: `frontend/src/aufbewahrung/fristModell.ts` (+ Test), Typ
-  `BenutzerSchreibkontext` in `frontend/src/einsatz/schreibrecht.ts`, Rechte-Hinweistext im
-  `FristPaneel`.
+- Frontend: `frontend/src/aufbewahrung/fristModell.ts` (+ Test), Rechte-Hinweistext und
+  Einsatztyp im `FristPaneel` (+ Test), Test-Fixtures mit `BenutzerAnzeige`.
 - Regeln: `src/AGENTS.md`.
 - API: Der Frist-PUT antwortet dem Admin einer fremden Org jetzt mit 403 statt 200. Die
   Antwort von `GET /api/auth/me` und der Benutzerverwaltung bekommt ein zusätzliches Feld
