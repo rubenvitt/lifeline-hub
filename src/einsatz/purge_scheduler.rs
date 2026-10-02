@@ -59,12 +59,14 @@ pub async fn tick_mit_rueckschrieb(
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
         Ok(ids) => {
             for id in ids {
-                tracing::info!(
-                    einsatz_id = id,
-                    "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)"
-                );
+                // Gemeldet wird erst der Erfolg (LFH-756): ein fail-closed gescheiterter Versuch
+                // stünde sonst bei jeder Blockade alle 10 min als Erfolg neben dem `error!`.
                 match repo::soft_delete_einsatz(pool, id, &jetzt_s).await {
                     Ok(true) => {
+                        tracing::info!(
+                            einsatz_id = id,
+                            "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)"
+                        );
                         anzahl += 1;
                         crate::live::org::einsatzliste_melden(pool, live, id, &[]).await;
                     }
@@ -85,12 +87,13 @@ pub async fn tick_mit_rueckschrieb(
                 if !karenz_abgelaufen(Some(&geloescht_at), jetzt) {
                     continue;
                 }
-                tracing::warn!(
-                    einsatz_id = id,
-                    "Purge Phase B: PII-SCHWÄRZUNG (irreversibel) — Karenz abgelaufen"
-                );
+                // Wie Phase A: erst nach dem Erfolg melden (LFH-756).
                 match repo::schwaerze_einsatz(pool, id, &jetzt_s).await {
                     Ok(true) => {
+                        tracing::warn!(
+                            einsatz_id = id,
+                            "Purge Phase B: PII-SCHWÄRZUNG (irreversibel) — Karenz abgelaufen"
+                        );
                         anzahl += 1;
                         geschwaerzt += 1;
                     }
@@ -240,6 +243,144 @@ mod tests {
             tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:05:00")).await,
             0
         );
+    }
+
+    thread_local! {
+        /// Ziel der Log-Ausgabe dieses Test-Threads, solange ein [`LogPuffer`] einfängt.
+        static LOG_ZIEL: std::cell::RefCell<Option<LogPuffer>> = const { std::cell::RefCell::new(None) };
+    }
+
+    /// Fängt die Log-Ausgabe eines Tests ein.
+    ///
+    /// Über EINEN globalen Subscriber, dessen Writer nur in den Puffer des eigenen Threads schreibt
+    /// (ein `#[tokio::test]` läuft auf genau einem). Ein thread-lokaler (`set_default`) fing unter
+    /// parallelen Tests mal alles, mal nichts: `tracing` speichert je Meldestelle zwischen, ob sie
+    /// jemand hören will, und das über alle Threads hinweg.
+    #[derive(Clone, Default)]
+    struct LogPuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    /// Hebt das Einfangen beim Verlassen des Tests auf.
+    struct LogWaechter;
+
+    impl Drop for LogWaechter {
+        fn drop(&mut self) {
+            LOG_ZIEL.with(|z| z.borrow_mut().take());
+        }
+    }
+
+    impl LogPuffer {
+        fn einfangen() -> (Self, LogWaechter) {
+            static GLOBAL: std::sync::Once = std::sync::Once::new();
+            GLOBAL.call_once(|| {
+                let _ = tracing::subscriber::set_global_default(
+                    tracing_subscriber::fmt()
+                        .with_writer(|| ThreadLog)
+                        .with_ansi(false)
+                        .with_max_level(tracing::Level::INFO)
+                        .finish(),
+                );
+            });
+            // Eine Meldestelle, die ein anderer Thread gerade während des Setzens registriert
+            // hat, kann sonst als „hört niemand“ stehen bleiben.
+            tracing::callsite::rebuild_interest_cache();
+            let puffer = Self::default();
+            LOG_ZIEL.with(|z| *z.borrow_mut() = Some(puffer.clone()));
+            (puffer, LogWaechter)
+        }
+
+        fn text(&self) -> String {
+            String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
+        }
+    }
+
+    /// Writer des globalen Test-Subscribers: schreibt in den Puffer des Threads oder verwirft.
+    struct ThreadLog;
+
+    impl std::io::Write for ThreadLog {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            LOG_ZIEL.with(|z| {
+                if let Some(puffer) = z.borrow().as_ref() {
+                    puffer.0.lock().unwrap().extend_from_slice(buf);
+                }
+            });
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Jeder Audit-Eintrag scheitert — Soft-Delete und Schwärzung brechen fail-closed ab.
+    async fn audit_scheitern_lassen(pool: &SqlitePool) {
+        sqlx::query(
+            "CREATE TRIGGER test_audit_scheitert BEFORE INSERT ON etb_eintrag \
+             BEGIN SELECT RAISE(ABORT, 'simulierter Audit-Fehler'); END",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn audit_wieder_zulassen(pool: &SqlitePool) {
+        sqlx::query("DROP TRIGGER test_audit_scheitert")
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn phase_a_meldet_den_soft_delete_erst_nach_dem_erfolg() {
+        // LFH-756: Scheitert das Soft-Delete fail-closed (hier am Audit-Eintrag), darf neben dem
+        // `error!` keine Erfolgsmeldung stehen — bei einer Blockade sonst alle 10 min.
+        let (puffer, _log) = LogPuffer::einfangen();
+        let pool = crate::db::test_pool().await;
+        abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        audit_scheitern_lassen(&pool).await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            0
+        );
+        let log = puffer.text();
+        assert!(log.contains("Purge Phase A fehlgeschlagen"), "{log}");
+        assert!(
+            !log.contains("Soft-Delete"),
+            "Erfolgsmeldung trotz Fehlschlag: {log}"
+        );
+
+        audit_wieder_zulassen(&pool).await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:10:00")).await,
+            1
+        );
+        let log = puffer.text();
+        assert_eq!(log.matches("Soft-Delete").count(), 1, "{log}");
+    }
+
+    #[tokio::test]
+    async fn phase_b_meldet_die_schwaerzung_erst_nach_dem_erfolg() {
+        let pool = crate::db::test_pool().await;
+        abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            1
+        );
+        let (puffer, _log) = LogPuffer::einfangen();
+        audit_scheitern_lassen(&pool).await;
+        let nach_karenz = t("2026-08-01 12:00:00");
+
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), nach_karenz).await, 0);
+        let log = puffer.text();
+        assert!(log.contains("Purge Phase B fehlgeschlagen"), "{log}");
+        assert!(
+            !log.contains("PII-SCHWÄRZUNG"),
+            "Erfolgsmeldung trotz Fehlschlag: {log}"
+        );
+
+        audit_wieder_zulassen(&pool).await;
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), nach_karenz).await, 1);
+        let log = puffer.text();
+        assert_eq!(log.matches("PII-SCHWÄRZUNG").count(), 1, "{log}");
     }
 
     #[tokio::test]

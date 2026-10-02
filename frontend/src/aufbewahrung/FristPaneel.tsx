@@ -1,4 +1,4 @@
-import { App, Button, Flex, Form, Modal, Typography, theme } from 'antd';
+import { App, Button, Flex, Form, Modal, Switch, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -26,7 +26,9 @@ import {
  * über `PUT …/aufbewahrungsfrist` gesetzt. Deshalb steht das Paneel ÜBER und AUSSERHALB des
  * Vollersatz-`<Form>` der Einstellungen.
  *
- * **Umkehrbarkeit entscheidet die Rückfrage:** Verlängern und Aufheben fragen nicht. Eine
+ * **Umkehrbarkeit entscheidet die Rückfrage:** Verlängern und Aufheben fragen nicht. Aufheben
+ * geht über den Knopf des Paneels oder den Schalter „Unbegrenzt aufbewahren“ im Dialog; der
+ * Schalter ist der Weg der Archivakte, die nur EINE Primäraktion trägt (LFH-756). Eine
  * Verkürzung (auch das erstmalige Setzen) verlegt die Sperre vor; vor ihr steht eine
  * `danger`-Rückfrage mit altem und neuem Zeitpunkt, erst dann geht `bestaetigt: true` hinaus.
  * Die 409 des Servers bleibt Sicherheitsnetz.
@@ -39,6 +41,8 @@ type FristEinsatz = Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'retention_b
 
 interface FristFormWerte {
   frist?: Dayjs | null;
+  /** „Unbegrenzt“: hebt die Frist auf, statt einen Zeitpunkt zu setzen. */
+  unbegrenzt?: boolean;
 }
 
 interface Rueckfrage {
@@ -106,9 +110,12 @@ export function useFristAenderung(
   // Vorbelegen per `setFieldsValue` beim Öffnen, nicht über `initialValues`: rc-field-form
   // behält seinen Speicher über das Abhängen des Dialogs hinweg, und der Wert der VORIGEN
   // Öffnung nähme eine inzwischen bestätigte Verkürzung still zurück.
+  // Der Schalter steht beim Öffnen immer aus, auch ohne bestehende Frist: er ist eine Handlung,
+  // keine Anzeige des Ist-Zustands.
   useEffect(() => {
-    if (offen) form.setFieldsValue({ frist: alsZeitpunkt(basis) ?? null });
+    if (offen) form.setFieldsValue({ frist: alsZeitpunkt(basis) ?? null, unbegrenzt: false });
   }, [offen, basis, form]);
+  const unbegrenzt = Form.useWatch('unbegrenzt', form) === true;
 
   /** Fragt bei einer Verkürzung zurück; bei Abbruch lehnt die Zusage ab, die Hülle lässt die
       Felder stehen und sendet nichts. */
@@ -137,10 +144,15 @@ export function useFristAenderung(
         offen={offen}
         titel="Aufbewahrungsfrist ändern"
         form={form}
-        initialValues={{ frist: alsZeitpunkt(basis) ?? null }}
-        erfassenText="Frist setzen"
+        initialValues={{ frist: alsZeitpunkt(basis) ?? null, unbegrenzt: false }}
+        erfassenText={unbegrenzt ? 'Frist aufheben' : 'Frist setzen'}
         laeuft={mutation.isPending}
         onErfassen={async (werte) => {
+          // Aufheben ist umkehrbar und fragt deshalb nicht zurück.
+          if (werte.unbegrenzt) {
+            await mutation.mutateAsync({ retention_bis: null });
+            return;
+          }
           if (!werte.frist) throw new Error('keine Frist');
           const neu = fristAusEingabe(alsBackendZeit(werte.frist), basis);
           const mitBestaetigung = await bestaetigt(neu);
@@ -151,13 +163,27 @@ export function useFristAenderung(
         onFertig={schliessen}
         onAbbrechen={schliessen}
       >
+        {/* Dieselbe Form wie im Wiederherstellen-Dialog: Zeitpunkt, darunter der Schalter, der ihn
+           sperrt. Die Pflicht hängt am Schalter, nicht am Feld. */}
         <Form.Item
           label="Neue Aufbewahrungsfrist"
           name="frist"
-          rules={[{ required: true, message: 'Zeitpunkt wählen' }]}
-          extra="Ab diesem Zeitpunkt ist der abgeschlossene Einsatz für alle gesperrt und wird zur Löschung vorgemerkt."
+          rules={[{ required: !unbegrenzt, message: 'Zeitpunkt wählen' }]}
+          dependencies={['unbegrenzt']}
+          extra={
+            unbegrenzt
+              ? 'Ohne Frist wird der abgeschlossene Einsatz nie automatisch gesperrt oder zur Löschung vorgemerkt.'
+              : 'Ab diesem Zeitpunkt ist der abgeschlossene Einsatz für alle gesperrt und wird zur Löschung vorgemerkt.'
+          }
         >
-          <ZeitpunktEingabe format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+          <ZeitpunktEingabe
+            format="YYYY-MM-DD HH:mm"
+            disabled={unbegrenzt}
+            style={{ width: '100%' }}
+          />
+        </Form.Item>
+        <Form.Item label="Unbegrenzt aufbewahren" name="unbegrenzt" valuePropName="checked">
+          <Switch />
         </Form.Item>
         <SpeicherFehler fehler={offen ? mutation.error : null} />
       </ErfassungsModal>
