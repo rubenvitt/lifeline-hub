@@ -160,6 +160,22 @@ export interface components {
             id: number;
             mime: string;
         };
+        /**
+         * @description Ein Protokolleintrag für die Einsicht. `anhang_id` ist die **Linker-id** (wie auf dem Wire
+         *     der Anhangliste), damit die Oberfläche die Zeile der Datei zuordnen kann.
+         */
+        AnhangZugriffAnzeige: {
+            /** Format: int64 */
+            anhang_id: number;
+            /** Format: int64 */
+            benutzer_id: number;
+            benutzer_name: string;
+            dateiname: string;
+            fassung: components["schemas"]["ZugriffFassung"];
+            /** Format: int64 */
+            id: number;
+            zugriff_at: string;
+        };
         /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App. */
         AppCode: {
             code: string;
@@ -3664,6 +3680,25 @@ export interface components {
          */
         SystemRolle: "admin" | "keiner";
         /**
+         * @description Ein Anhang eines Tieres. `id` ist die **Linker-id** (`einsatz_tier_anhang.id`), nicht
+         *     `anhang.id`: die Datei ist nur über die Tier-Route ladbar.
+         */
+        TierAnhangAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            /** @description Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert. */
+            abgelegt_von_name?: string | null;
+            dateiname: string;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            mime: string;
+            /** Format: int64 */
+            tier_id: number;
+        };
+        /**
          * @description Serialisierbarer Tier-Datensatz (1:1 zur Tabelle `einsatz_tier`). Die beiden
          *     `halter_*`-Felder kommen aus einem LEFT JOIN auf `einsatz_person` und sind
          *     read-only (NULL bei Freitext-Halter oder unbekannt) — die UI zeigt damit
@@ -3733,6 +3768,25 @@ export interface components {
         TotpEnrollStart: {
             otpauth_url: string;
             secret_base32: string;
+        };
+        /**
+         * @description Ein Anhang einer UHS. `id` ist die **Linker-id** (`uhs_anhang.id`), nicht `anhang.id`: die
+         *     Datei ist nur über die UHS-Route ladbar.
+         */
+        UhsAnhangAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            /** @description Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert. */
+            abgelegt_von_name?: string | null;
+            dateiname: string;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            mime: string;
+            /** Format: int64 */
+            uhs_id: number;
         };
         /** @description Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder). */
         UhsAnzeige: {
@@ -4158,6 +4212,11 @@ export interface components {
          * @enum {string}
          */
         ZugriffArt: "detail" | "export" | "druck";
+        /**
+         * @description Welche Fassung abgerufen wurde. Wire = DB-CHECK `fassung IN ('bereinigt','original')`.
+         * @enum {string}
+         */
+        ZugriffFassung: "bereinigt" | "original";
     };
     responses: never;
     parameters: never;

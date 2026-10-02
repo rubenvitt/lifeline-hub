@@ -215,6 +215,16 @@ pub const MODUL_LINKER: &[ModulLinker] = &[
         loesch_meldung: "Anhang gehört zu einem Schaden und wird dort entfernt",
         ort: "Schaden",
     },
+    ModulLinker {
+        tabelle: "einsatz_tier_anhang",
+        loesch_meldung: "Anhang gehört zu einem Tier und wird dort entfernt",
+        ort: "Tier",
+    },
+    ModulLinker {
+        tabelle: "uhs_anhang",
+        loesch_meldung: "Anhang gehört zu einer Unfallhilfsstelle und wird dort entfernt",
+        ort: "Unfallhilfsstelle",
+    },
 ];
 
 /// Positiver SQL-Baustein: „der Anhang `{alias}` hängt an einem modulgebundenen Linker" —
@@ -956,5 +966,105 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(links, 1, "die Verknüpfung bleibt (keine CASCADE)");
+    }
+
+    // --- LFH-758: Tier- und UHS-Linker (Erfassungs-Anhänge) ---
+
+    /// Legt einen frischen Besitzer im Einsatz an und liefert seine id.
+    async fn besitzer(pool: &SqlitePool, tabelle: &str, einsatz_id: i64, von: i64) -> i64 {
+        let sql = match tabelle {
+            "einsatz_tier" => {
+                "INSERT INTO einsatz_tier \
+                   (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
+                 VALUES (?1, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_tier \
+                              WHERE einsatz_id = ?1), 'hund', ?2, ?2) RETURNING id"
+            }
+            "uhs" => {
+                "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+                 VALUES (?1, 'behandlungsplatz', 'BHP ' || (SELECT COUNT(*) + 1 FROM uhs), ?2, ?2) \
+                 RETURNING id"
+            }
+            andere => panic!("kein Besitzer-Fixture für {andere}"),
+        };
+        sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+            .bind(einsatz_id)
+            .bind(von)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// Hängt einen Anhang an einen frischen Besitzer der Ablage `d`; optional soft-gelöscht.
+    async fn als_erfassung(
+        pool: &SqlitePool,
+        d: &crate::anhang::erfassung::ErfassungsAblage,
+        einsatz_id: i64,
+        von: i64,
+        anhang_id: i64,
+        geloescht: bool,
+    ) {
+        let besitzer_id = besitzer(pool, d.besitzer_tabelle, einsatz_id, von).await;
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO {} \
+               (einsatz_id, {}, anhang_id, abgelegt_von_id, geloescht_at, geloescht_von_id) \
+             VALUES (?, ?, ?, ?, CASE WHEN ? THEN datetime('now') END, CASE WHEN ? THEN ? END)",
+            d.linker, d.besitzer_spalte
+        )))
+        .bind(einsatz_id)
+        .bind(besitzer_id)
+        .bind(anhang_id)
+        .bind(von)
+        .bind(geloescht)
+        .bind(geloescht)
+        .bind(von)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Die drei Linker-Aussagen (LinkerStand, Sweep, generisches Löschen) für eine Ablage —
+    /// auch ein ENTFERNTER Linker bindet (Beweis bis zur Schwärzung).
+    async fn pruefe_erfassungs_linker(d: &crate::anhang::erfassung::ErfassungsAblage) {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let lebend = anhang_mit_zeit(&pool, einsatz, von, "a.jpg", "2026-01-01 00:00:00").await;
+        let entfernt = anhang_mit_zeit(&pool, einsatz, von, "b.jpg", "2026-01-01 00:00:00").await;
+        let frei = anhang_mit_zeit(&pool, einsatz, von, "c.jpg", "2026-01-01 00:00:00").await;
+        als_erfassung(&pool, d, einsatz, von, lebend, false).await;
+        als_erfassung(&pool, d, einsatz, von, entfernt, true).await;
+
+        for (a, fall) in [(lebend, "lebend"), (entfernt, "entfernt")] {
+            let s = linker_stand(&pool, a).await.unwrap();
+            assert_eq!(s.modul.map(|l| l.tabelle), Some(d.linker), "{fall}");
+            assert!(s.ist_modul_gebunden(), "{fall}");
+            assert!(!s.ist_ungebunden(), "{fall}");
+            assert!(s.generischer_download_gesperrt(), "{fall}");
+        }
+
+        assert!(matches!(
+            loeschen(&pool, einsatz, lebend).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        let geloescht = sweep_verwaiste(&pool, t("2026-06-16 00:00:00"))
+            .await
+            .unwrap();
+        assert_eq!(
+            geloescht, 1,
+            "{}: nur der nie gebundene Anhang geht",
+            d.linker
+        );
+        assert!(anzeige_laden(&pool, lebend).await.is_ok());
+        assert!(anzeige_laden(&pool, entfernt).await.is_ok());
+        assert!(anzeige_laden(&pool, frei).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn tier_linker_bindet_haelt_im_sweep_und_verweigert_loeschen() {
+        pruefe_erfassungs_linker(&crate::tier::anhang::TIER_ABLAGE).await;
+    }
+
+    #[tokio::test]
+    async fn uhs_linker_bindet_haelt_im_sweep_und_verweigert_loeschen() {
+        pruefe_erfassungs_linker(&crate::uhs::anhang::UHS_ABLAGE).await;
     }
 }

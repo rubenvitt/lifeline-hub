@@ -13,8 +13,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, schaden_anhang,
-    setup_mit_pool_und_live, MINI_JPEG,
+    anfrage, benutzer_anlegen, einsatz_anlegen, erfassungs_anhang, login_cookie, rolle_setzen,
+    schaden_anhang, setup_mit_pool_und_live, Erfassung, MINI_JPEG,
 };
 
 const ADMIN_PW: &str = "startpw12";
@@ -369,7 +369,7 @@ async fn gebundener_anhang_ist_422() {
     // jeden Ort, an dem eine Datei gebunden sein kann.
     assert_eq!(
         v["error"],
-        "Anhang ist bereits gebunden (Chat-Nachricht, Dokumentenablage, ETB-Eintrag oder Schaden)"
+        "Anhang ist bereits gebunden (Chat-Nachricht, Dokumentenablage, ETB-Eintrag, Schaden, Tier oder Unfallhilfsstelle)"
     );
     assert_eq!(
         zaehle(
@@ -1046,4 +1046,57 @@ async fn gleiche_client_id_mit_anderen_anhaengen_ist_409_ohne_bindung() {
         .await,
         1
     );
+}
+
+/// LFH-758: Tier- und UHS-Dateien sind gebunden — als die ablegende Person 422 „bereits
+/// gebunden“, kein Eintrag, keine Verknüpfung.
+#[tokio::test]
+async fn tier_und_uhs_anhang_nicht_an_etb_verknuepfbar() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    for art in Erfassung::ALLE {
+        let aid = erfassungs_anhang(&pool, einsatz, art).await;
+        let vorher = zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+            einsatz,
+        )
+        .await;
+        let (s, v) = erfassen(
+            &app,
+            &admin,
+            einsatz,
+            &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{art:?}: {v}");
+        assert!(
+            v["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("Anhang ist bereits gebunden"),
+            "{art:?}: {v}"
+        );
+        assert_eq!(
+            zaehle(
+                &pool,
+                "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+                einsatz
+            )
+            .await,
+            vorher,
+            "{art:?}: kein Eintrag"
+        );
+        assert_eq!(
+            zaehle(
+                &pool,
+                "SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?",
+                aid
+            )
+            .await,
+            0,
+            "{art:?}: keine Verknüpfung"
+        );
+    }
 }

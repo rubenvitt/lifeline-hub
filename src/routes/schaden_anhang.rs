@@ -22,7 +22,7 @@ use crate::schaden::anhang::{self as schaden_anhang, Ablage, SchadenAnhangAnzeig
 use crate::schaden::repo as schaden_repo;
 
 use super::einsatz_schaden::sse_lebenszyklus;
-use super::support::{anhang_antwort, original_freigeben, Fassung, FassungParam};
+use super::support::{anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam};
 
 /// GET /api/einsaetze/{id}/schaeden/{sid}/anhaenge — lebende Anhänge, neueste zuerst.
 /// Ein stornierter Schaden bleibt lesbar; ein Schaden eines anderen Einsatzes ist 404.
@@ -34,40 +34,6 @@ pub async fn liste(
     Ok(Json(
         schaden_anhang::liste(&state.pool, ctx.einsatz.id, schaden_id).await?,
     ))
-}
-
-/// Liest genau eine Datei aus dem Multipart: `(dateiname, bytes)`. Die Datei steht im Feld
-/// `datei` (API-Vertrag, wie die Dokumentenablage); eine Datei unter einem anderen Feldnamen
-/// ist 400, statt still einen undokumentierten Vertrag anzunehmen (Code-Review C2). Ein
-/// zweites Datei-Feld ist 400 (eine Datei je Ablage, design.md D5), keines ebenfalls; Felder
-/// ohne Dateinamen werden ignoriert. Der Typ wird vor dem Lesen der Bytes geprüft (wie
-/// `anhang::hochladen_multipart`), damit ein verbotener Typ nicht erst gelesen wird.
-async fn genau_eine_datei(multipart: &mut Multipart) -> Result<(String, Vec<u8>), AppError> {
-    let mut datei: Option<(String, Vec<u8>)> = None;
-    while let Some(feld) = multipart
-        .next_field()
-        .await
-        .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
-    {
-        let Some(dateiname) = feld.file_name().map(str::to_string) else {
-            continue;
-        };
-        if feld.name() != Some("datei") {
-            return Err(AppError::Validation(
-                "Die Datei gehört in das Feld „datei“".into(),
-            ));
-        }
-        if datei.is_some() {
-            return Err(AppError::Validation("Genau eine Datei je Ablage".into()));
-        }
-        anhang::ermittle_mime_aus(&dateiname, anhang::ERLAUBTE_MIME_ERFASSUNG)?;
-        let daten = feld
-            .bytes()
-            .await
-            .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
-        datei = Some((dateiname, daten.to_vec()));
-    }
-    datei.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))
 }
 
 /// POST /api/einsaetze/{id}/schaeden/{sid}/anhaenge — eine Datei ablegen (Multipart, Feld

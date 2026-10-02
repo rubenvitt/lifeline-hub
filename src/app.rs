@@ -735,6 +735,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/tiere/{tid}",
             delete(routes::einsatz_tier::stornieren),
         )
+        // Tier-Anhänge (LFH-758): Modul-Gate `tiere`; Upload/Download wie die Schaden-Anhänge.
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
+            get(routes::tier_anhang::liste)
+                .post(routes::tier_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}",
+            delete(routes::tier_anhang::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei",
+            get(routes::tier_anhang::datei).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
         .route(
             "/api/einsaetze/{id}/schaeden",
             get(routes::einsatz_schaden::liste),
@@ -800,6 +817,27 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/uhs/{uid}",
             delete(routes::einsatz_uhs::stornieren),
+        )
+        // UHS-Anhänge (LFH-758): Modul-Gate `unfallhilfsstellen`; jeder Download im Lese-Audit.
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
+            get(routes::uhs_anhang::liste)
+                .post(routes::uhs_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/anhaenge/zugriffe",
+            get(routes::uhs_anhang::zugriffe),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}",
+            delete(routes::uhs_anhang::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei",
+            get(routes::uhs_anhang::datei).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plaetze",

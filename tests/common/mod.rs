@@ -609,3 +609,132 @@ pub const MINI_PNG: &[u8] = b"\x89PNG\r\n\x1a\n\
 \x00\x00\x00\x0DIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90\x77\x53\xDE\
 \x00\x00\x00\x07IDATPNGDATA\x00\x00\x00\x00\
 \x00\x00\x00\x00IEND\xAE\x42\x60\x82";
+
+/// LFH-758: die zwei Erfassungs-Ablagen neben Schäden, für Abschottungs- und Metadatentests,
+/// die für Tier und UHS dieselbe Aussage treffen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Erfassung {
+    Tier,
+    Uhs,
+}
+
+impl Erfassung {
+    pub const ALLE: [Erfassung; 2] = [Erfassung::Tier, Erfassung::Uhs];
+
+    pub fn linker(self) -> &'static str {
+        match self {
+            Erfassung::Tier => "einsatz_tier_anhang",
+            Erfassung::Uhs => "uhs_anhang",
+        }
+    }
+
+    pub fn besitzer_spalte(self) -> &'static str {
+        match self {
+            Erfassung::Tier => "tier_id",
+            Erfassung::Uhs => "uhs_id",
+        }
+    }
+
+    /// Pfadsegment unter `/api/einsaetze/{id}/`.
+    pub fn segment(self) -> &'static str {
+        match self {
+            Erfassung::Tier => "tiere",
+            Erfassung::Uhs => "uhs",
+        }
+    }
+
+    /// Modul-Key für `modul-overrides/{key}`.
+    pub fn modul_key(self) -> &'static str {
+        match self {
+            Erfassung::Tier => "tiere",
+            Erfassung::Uhs => "unfallhilfsstellen",
+        }
+    }
+
+    /// 422-Wortlaut des generischen DELETE (Registereintrag in `MODUL_LINKER`).
+    pub fn loesch_meldung(self) -> &'static str {
+        match self {
+            Erfassung::Tier => "Anhang gehört zu einem Tier und wird dort entfernt",
+            Erfassung::Uhs => "Anhang gehört zu einer Unfallhilfsstelle und wird dort entfernt",
+        }
+    }
+
+    /// Name im ETB-Vermerk eines Original-Abrufs für den ersten Besitzer eines Einsatzes.
+    pub fn erster_ablage_name(self) -> &'static str {
+        match self {
+            Erfassung::Tier => "Tier T-001",
+            Erfassung::Uhs => "UHS BHP 1",
+        }
+    }
+}
+
+/// Eine Datei an einem frischen Besitzer der Ablage `art` (direktes SQL, **hochgeladen und
+/// abgelegt von `admin`** — Abschottungstests laufen als die ablegende Person, LFH-117 D12).
+/// Liefert `(anhang_id, besitzer_id, linker_id)`.
+pub async fn erfassungs_datei(
+    pool: &sqlx::SqlitePool,
+    einsatz: i64,
+    art: Erfassung,
+    dateiname: &str,
+    mime: &str,
+    daten: &[u8],
+) -> (i64, i64, i64) {
+    let von: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let besitzer_sql = match art {
+        Erfassung::Tier => {
+            "INSERT INTO einsatz_tier \
+               (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
+             VALUES (?1, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_tier \
+                          WHERE einsatz_id = ?1), 'hund', ?2, ?2) RETURNING id"
+        }
+        Erfassung::Uhs => {
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?1, 'behandlungsplatz', \
+                     'BHP ' || (SELECT COUNT(*) + 1 FROM uhs WHERE einsatz_id = ?1), ?2, ?2) \
+             RETURNING id"
+        }
+    };
+    let besitzer: i64 = sqlx::query_scalar(besitzer_sql)
+        .bind(einsatz)
+        .bind(von)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let aid: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, ?, ?, ?, 'feedface', ?, ?) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(dateiname)
+    .bind(mime)
+    .bind(daten.len() as i64)
+    .bind(daten)
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let linker: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "INSERT INTO {} (einsatz_id, {}, anhang_id, abgelegt_von_id) VALUES (?, ?, ?, ?) \
+         RETURNING id",
+        art.linker(),
+        art.besitzer_spalte()
+    )))
+    .bind(einsatz)
+    .bind(besitzer)
+    .bind(aid)
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    (aid, besitzer, linker)
+}
+
+/// Kurzform: `dach.jpg` mit Fantasie-Bytes; liefert die `anhang.id`.
+pub async fn erfassungs_anhang(pool: &sqlx::SqlitePool, einsatz: i64, art: Erfassung) -> i64 {
+    erfassungs_datei(pool, einsatz, art, "dach.jpg", "image/jpeg", b"ABC")
+        .await
+        .0
+}

@@ -4,7 +4,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import {
   parseRouteId,
@@ -23,14 +23,21 @@ import { merkeLetzteUhs } from './uhsAuswahl';
 import Grundriss from './Grundriss';
 import MaterialTab from './MaterialTab';
 import BewegungenTab from './BewegungenTab';
+import UhsAnhaenge from './UhsAnhaenge';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+
+const REITER_NAME = {
+  material: 'Material',
+  bewegungen: 'Bewegungen',
+  dateien: 'Dateien',
+} as const;
 
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
   // Material/Bewegungen als Segmentleiste; nur das aktive Feld ist gebaut.
-  const [reiter, setReiter] = useState<'material' | 'bewegungen'>('material');
+  const [reiter, setReiter] = useState<'material' | 'bewegungen' | 'dateien'>('material');
   const reiterFeld = useId();
   const { benutzer } = useAuth();
   const uhsId = Number(uhsIdParam);
@@ -182,28 +189,33 @@ export default function UhsDetailPage() {
         inhalt: <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
       }}
     >
-      {/* Der Seitenkopf teilt die Resthöhe mit dem Grundriss; Material/Bewegungen folgen im
-          Seitenfluss. */}
+      {/* Der Seitenkopf teilt die Resthöhe mit dem Grundriss; Material/Bewegungen/Dateien folgen
+          im Seitenfluss. */}
       <Segmentleiste
         rolle="tablist"
-        beschriftung="Material und Bewegungen"
+        beschriftung="Material, Bewegungen und Dateien"
         wert={reiter}
         onWechsel={setReiter}
         optionen={[
           { wert: 'material', label: 'Material', steuert: reiterFeld },
           { wert: 'bewegungen', label: 'Bewegungen', steuert: reiterFeld },
+          // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
+          { wert: 'dateien', label: 'Dateien', steuert: reiterFeld },
         ]}
         style={{ marginTop: 16, marginBottom: 12 }}
       />
-      <div
-        role="tabpanel"
-        id={reiterFeld}
-        aria-label={reiter === 'material' ? 'Material' : 'Bewegungen'}
-      >
+      <div role="tabpanel" id={reiterFeld} aria-label={REITER_NAME[reiter]}>
         {reiter === 'material' ? (
           <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
-        ) : (
+        ) : reiter === 'bewegungen' ? (
           <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />
+        ) : (
+          <UhsAnhaenge
+            einsatzId={einsatzId}
+            uhs={uhs}
+            darfSchreiben={!schreibgeschuetzt}
+            zeigeZugriffe={istEinsatzLeitung(einsatz)}
+          />
         )}
       </div>
     </EinsatzSeite>

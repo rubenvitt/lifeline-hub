@@ -1008,3 +1008,54 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND, "generischer Download");
 }
+
+// ---------- LFH-758: Abschottung der Tier- und UHS-Anhänge ----------
+
+/// Fotos und Pläne an Tieren und UHS stehen nicht in der Dokumentenablage, und wer Dokumente
+/// sieht, aber nicht das Fachmodul, bekommt an der Modulroute 403.
+#[tokio::test]
+async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nicht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    for art in Erfassung::ALLE {
+        let (_, besitzer, lid) =
+            erfassungs_datei(&pool, einsatz, art, "plan.jpg", "image/jpeg", MINI_JPEG).await;
+        let (status, json) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json.as_array().unwrap().len(), 0, "{art:?}: {json:?}");
+
+        let (s, _) = anfrage(
+            &app,
+            "PUT",
+            &format!(
+                "/api/einsaetze/{einsatz}/modul-overrides/{}",
+                art.modul_key()
+            ),
+            &admin,
+            Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{art:?}: Override");
+        let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
+        assert_eq!(s, StatusCode::OK, "{art:?}: Dokumente sieht sie");
+        let modul_pfad = format!(
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge",
+            art.segment()
+        );
+        let (s, _) = anfrage(&app, "GET", &modul_pfad, &frieda, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{art:?}: Liste");
+        let (s, _) = anfrage(
+            &app,
+            "GET",
+            &format!("{modul_pfad}/{lid}/datei"),
+            &frieda,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{art:?}: Download");
+    }
+}

@@ -24,7 +24,7 @@ use serde::Deserialize;
 
 /// Dediziertes `tier`-SSE-Event OHNE sensible Payload (nur einsatz_id + tier_id);
 /// Clients refetchen.
-fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
+pub(crate) fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Tier, "tier_id", tier_id);
