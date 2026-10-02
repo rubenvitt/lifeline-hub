@@ -5,26 +5,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { ApiError } from '../../api/client';
 import { UPLOAD_MAX_GROESSE } from '../../api/upload';
-import SchadenAnhangAblegenModal from './SchadenAnhangAblegenModal';
+import ErfassungsAnhangAblegenModal from './ErfassungsAnhangAblegenModal';
 
-vi.mock('../../api/einsatzSchaden', async (importOriginal) => {
-  const echt = await importOriginal<typeof import('../../api/einsatzSchaden')>();
-  return { ...echt, legeSchadenAnhangAb: vi.fn() };
-});
-import { legeSchadenAnhangAb } from '../../api/einsatzSchaden';
-
-const legeAb = vi.mocked(legeSchadenAnhangAb);
+const legeAb = vi.fn<(datei: File) => Promise<unknown>>();
 afterEach(() => vi.clearAllMocks());
 
-function Rahmen() {
+function Rahmen({ hinweis }: { hinweis?: string }) {
   const [offen, setOffen] = useState(true);
   return (
     <>
       <button onClick={() => setOffen(true)}>Öffnen</button>
-      <SchadenAnhangAblegenModal
+      <ErfassungsAnhangAblegenModal
         einsatzId={1}
-        schadenId={3}
-        registrierNr={3}
+        bezug="Schaden S-003"
+        queryKey={['einsatz-schaden-anhaenge', 1, 3]}
+        ablegen={legeAb}
+        hinweis={hinweis}
         offen={offen}
         onSchliessen={() => setOffen(false)}
       />
@@ -33,8 +29,8 @@ function Rahmen() {
 }
 
 /** Der Dialog, NACHDEM sein Anfangsfokus sitzt (Muster `DokumentAblegenModal.test.tsx`). */
-async function dialog() {
-  renderMitProviders(<Rahmen />);
+async function dialog(hinweis?: string) {
+  renderMitProviders(<Rahmen hinweis={hinweis} />);
   const d = (await screen.findAllByRole('dialog'))[0];
   const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
   await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
@@ -44,13 +40,28 @@ async function dialog() {
 const dateiInput = (d: HTMLElement) => d.querySelector<HTMLInputElement>('input[type="file"]')!;
 const foto = (name = 'dach.jpg') => new File(['x'], name, { type: 'image/jpeg' });
 
-describe('SchadenAnhangAblegenModal (LFH-21)', () => {
+describe('ErfassungsAnhangAblegenModal (LFH-21, LFH-758)', () => {
   it('Struktur der Erfassungs-Norm: Absendeknopf im <form>, keine Modal-Fußzeile', async () => {
     const d = await dialog();
     const knopf = within(d).getByRole('button', { name: 'Ablegen' });
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
     expect(knopf.closest('form')).not.toBeNull();
     expect(knopf).toHaveAttribute('type', 'submit');
+  });
+
+  it('nennt den Besitzer im Titel', async () => {
+    const d = await dialog();
+    expect(within(d).getByText('Datei ablegen · Schaden S-003')).toBeInTheDocument();
+  });
+
+  it('zeigt einen Hinweis nur, wenn die Ablage einen trägt (UHS: Zugriffsprotokoll)', async () => {
+    const d = await dialog('Jeder Abruf einer Datei wird protokolliert.');
+    expect(within(d).getByText('Jeder Abruf einer Datei wird protokolliert.')).toBeInTheDocument();
+  });
+
+  it('ohne Hinweis keine leere Hinweiszeile', async () => {
+    const d = await dialog();
+    expect(d.querySelector('[data-lfh="ablage-hinweis"]')).toBeNull();
   });
 
   it('filtert den Dateidialog auf die Erfassungs-Allowlist', async () => {
@@ -65,7 +76,7 @@ describe('SchadenAnhangAblegenModal (LFH-21)', () => {
     await userEvent.click(within(d).getByRole('button', { name: /Speichern und nächste/ }));
 
     await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
-    expect(legeAb).toHaveBeenCalledWith(1, 3, expect.objectContaining({ name: 'erstes.jpg' }));
+    expect(legeAb).toHaveBeenCalledWith(expect.objectContaining({ name: 'erstes.jpg' }));
     await vi.waitFor(() => expect(within(d).queryByText('erstes.jpg')).not.toBeInTheDocument());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });

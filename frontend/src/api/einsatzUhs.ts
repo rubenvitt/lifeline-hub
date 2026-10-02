@@ -8,8 +8,11 @@ import type {
   PlatzTyp,
   Verfuegbarkeit,
   BelegungsArt,
+  UhsAnhang,
+  AnhangZugriff,
 } from './types';
-import { apiGet, apiSend, mitParametern } from './client';
+import { apiGet, apiSend, apiUpload, mitParametern } from './client';
+import { UPLOAD_TIMEOUT_MS } from './upload';
 
 // ---------- UHS ----------
 
@@ -139,4 +142,46 @@ export function aenderePersonBelegung(
     'POST',
     daten,
   );
+}
+
+// ---------- Fotos, Pläne und Dateien (LFH-758) ----------
+
+const anhangBasis = (einsatzId: number, uhsId: number) =>
+  `/api/einsaetze/${einsatzId}/uhs/${uhsId}/anhaenge`;
+
+/** Lebende Anhänge einer UHS, neueste zuerst. Die Liste selbst wird nicht protokolliert. */
+export function listeUhsAnhaenge(einsatzId: number, uhsId: number): Promise<UhsAnhang[]> {
+  return apiGet<UhsAnhang[]>(anhangBasis(einsatzId, uhsId));
+}
+
+/** Legt EINE Datei an der UHS ab (Feld `datei`); Timeout wie die übrigen Uploads. */
+export function legeUhsAnhangAb(einsatzId: number, uhsId: number, datei: File): Promise<UhsAnhang> {
+  const fd = new FormData();
+  fd.append('datei', datei);
+  return apiUpload<UhsAnhang>(anhangBasis(einsatzId, uhsId), fd, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+  });
+}
+
+/** Entfernt einen Anhang (Soft-Delete mit ETB-Nachweis); `anhangId` ist die Linker-id. */
+export function entferneUhsAnhang(
+  einsatzId: number,
+  uhsId: number,
+  anhangId: number,
+): Promise<void> {
+  return apiSend<void>(`${anhangBasis(einsatzId, uhsId)}/${anhangId}`, 'DELETE');
+}
+
+/**
+ * Download über die modul-gegatete UHS-Route; **jeder Abruf steht im Zugriffsprotokoll** (auch
+ * ein 304). Ein API-Pfad, keine Navigation, deshalb nicht in `routing/deeplinks.ts`.
+ */
+export function uhsAnhangDownloadPfad(einsatzId: number, uhsId: number, anhangId: number): string {
+  return `${anhangBasis(einsatzId, uhsId)}/${anhangId}/datei`;
+}
+
+/** Zugriffsprotokoll der Dateien einer UHS, neueste zuerst — nur für die Einsatzleitung (sonst
+ *  403). Die Einsicht selbst wird nicht protokolliert. */
+export function ladeUhsAnhangZugriffe(einsatzId: number, uhsId: number): Promise<AnhangZugriff[]> {
+  return apiGet<AnhangZugriff[]>(`${anhangBasis(einsatzId, uhsId)}/zugriffe`);
 }
