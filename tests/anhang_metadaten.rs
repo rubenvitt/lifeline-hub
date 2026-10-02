@@ -1,5 +1,5 @@
 //! LFH-747, Spec `anhang-metadaten`: Bild-Anhänge werden über jeden Weg (Chat/generisch,
-//! Dokumentenablage, ETB, Schaden) bereinigt ausgeliefert; das Original bleibt gespeichert und
+//! Dokumentenablage, ETB, Schaden, Person — LFH-757) bereinigt ausgeliefert; das Original bleibt gespeichert und
 //! ist nur für Einsatzleitung und System-Admin der Einsatz-Org abrufbar, jeweils mit
 //! ETB-Vermerk. Dazu der Guard, dass nur `routes/support.rs` Anhang-Bytes ausliefert.
 //!
@@ -744,4 +744,69 @@ fn guard_wird_bei_einem_zweiten_aufrufer_rot() {
     )
     .unwrap();
     assert_eq!(verbotene_aufrufer(tmp.path()).len(), 1);
+}
+
+// ── LFH-757: Personen-Anhänge ───────────────────────────────────────────────────────────
+
+/// Ein Foto mit GPS an einer Person: die Personenroute liefert bereinigt, das Original bleibt
+/// gespeichert und ist für die Einsatzleitung abrufbar (mit Vermerk „Person R-001“), für
+/// Führungspersonal nicht.
+#[tokio::test]
+async fn personen_foto_ist_bereinigt_und_das_original_nur_fuer_die_leitung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, p) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    let person = p["id"].as_i64().unwrap();
+    let foto = foto_mit_gps();
+    let (s, v) = multipart_post(
+        &app,
+        &format!("/api/einsaetze/{einsatz}/personen/{person}/anhaenge"),
+        &admin,
+        Some(("verletzung.jpg", &foto)),
+        &[],
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let pfad = format!(
+        "/api/einsaetze/{einsatz}/personen/{person}/anhaenge/{}/datei",
+        v["id"]
+    );
+
+    let (s, _, bytes) = laden(&app, &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    ist_bereinigt(&bytes);
+    let aid: i64 =
+        sqlx::query_scalar("SELECT anhang_id FROM einsatz_person_anhang WHERE person_id = ?")
+            .bind(person)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        gespeichert(&pool, aid).await.0,
+        foto,
+        "gespeichert bleibt das Original"
+    );
+
+    let frieda = mitglied(&app, &admin, einsatz, "frieda", "fuehrungspersonal").await;
+    assert_eq!(
+        laden(&app, &original(&pfad), &frieda, None).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let (s, _, bytes) = laden(&app, &original(&pfad), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(bytes, foto, "das Original bytegleich");
+    let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
+    let v = vermerke(&inhalte);
+    assert_eq!(v.len(), 1, "{inhalte:?}");
+    assert!(v[0].contains("Person R-001"), "{}", v[0]);
+    assert!(!v[0].contains("verletzung"), "{}", v[0]);
 }

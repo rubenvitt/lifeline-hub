@@ -51,6 +51,7 @@ pub mod org_einstellungen;
 pub mod organisation;
 pub mod ort_vorschau;
 pub mod pegel;
+pub mod person_anhang;
 pub mod personal;
 pub mod personal_status;
 pub mod presse;

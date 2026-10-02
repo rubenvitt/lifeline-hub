@@ -13,8 +13,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, schaden_anhang,
-    setup_mit_pool_und_live, MINI_JPEG,
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, person_anhang, rolle_setzen,
+    schaden_anhang, setup_mit_pool_und_live, MINI_JPEG,
 };
 
 const ADMIN_PW: &str = "startpw12";
@@ -365,11 +365,11 @@ async fn gebundener_anhang_ist_422() {
     assert_eq!(erst, StatusCode::CREATED);
     let (zweit, v) = erfassen(&app, &admin, einsatz, &body).await;
     assert_eq!(zweit, StatusCode::UNPROCESSABLE_ENTITY);
-    // LFH-21: der Wortlaut entsteht aus dem Linker-Register (`gebunden_meldung()`) und nennt
+    // LFH-21/LFH-757: der Wortlaut entsteht aus dem Linker-Register (`gebunden_meldung()`) und nennt
     // jeden Ort, an dem eine Datei gebunden sein kann.
     assert_eq!(
         v["error"],
-        "Anhang ist bereits gebunden (Chat-Nachricht, Dokumentenablage, ETB-Eintrag oder Schaden)"
+        "Anhang ist bereits gebunden (Chat-Nachricht, Dokumentenablage, ETB-Eintrag, Schaden oder Person)"
     );
     assert_eq!(
         zaehle(
@@ -1045,5 +1045,52 @@ async fn gleiche_client_id_mit_anderen_anhaengen_ist_409_ohne_bindung() {
         )
         .await,
         1
+    );
+}
+
+// ---------- LFH-757: Personen-Anhänge ----------
+
+/// ETB-Eintrag verknüpft Personen-Datei (LFH-757): als die ablegende Person 422 „bereits
+/// gebunden“, kein Eintrag, keine Verknüpfung.
+#[tokio::test]
+async fn person_anhang_nicht_an_etb_verknuepfbar() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = person_anhang(&pool, einsatz).await;
+    let vorher = zaehle(
+        &pool,
+        "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+        einsatz,
+    )
+    .await;
+
+    let (s, v) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+            einsatz
+        )
+        .await,
+        vorher,
+        "kein Eintrag"
+    );
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?",
+            aid
+        )
+        .await,
+        0,
+        "keine Verknüpfung"
     );
 }

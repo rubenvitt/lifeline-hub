@@ -79,6 +79,12 @@ Allowlist `ERLAUBTE_MIME_ERFASSUNG` (Spiegel `ERFASSUNG_ACCEPT` in `api/upload.t
 `anhang::pruefe_vor_persist` vor, Anhang + Linker + ETB in EINEM `write_retry!`. Entfernen =
 Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 409.
 
+**Personen-Anhänge (LFH-757)** (Spec `personen-anhaenge`): `einsatz_person_anhang` im Register;
+`routes::person_anhang`, sonst wie Schaden-Anhänge (Linker-id, `ERLAUBTE_MIME_ERFASSUNG`, eine
+Transaktion, Soft-Delete, ETB „Person R-007: Foto abgelegt“). **Lese-Audit:** `datei` schreibt
+nach Fassung-, Linker- und Original-Prüfung und VOR `anhang_antwort` eine Zeile `anhang` in
+`person_zugriff_audit`, auch bei 304 und Original; scheitert sie, keine Bytes. Liste ohne Audit.
+
 **Auslieferung (LFH-747)** (Spec `anhang-metadaten`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-747-exif-bereinigung-auslieferung/design.md`):
 gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.

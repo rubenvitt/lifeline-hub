@@ -545,6 +545,52 @@ pub async fn schaden_anhang(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
     aid
 }
 
+/// LFH-757: legt per direktem SQL eine Person (R-00n) samt Anhang (echte JPEG-Bytes) und Linker
+/// `einsatz_person_anhang` an und liefert die `anhang.id`. **Hochgeladen von `admin`** — die
+/// Abschottungstests laufen als die ablegende Person (D12, wie [`schaden_anhang`]).
+pub async fn person_anhang(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
+    let von: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let person: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+         VALUES (?, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_person \
+                     WHERE einsatz_id = ?), ?, ?) \
+         RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(einsatz)
+    .bind(von)
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let aid: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'verletzung.jpg', 'image/jpeg', ?, 'deadbeef', ?, ?) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(MINI_JPEG.len() as i64)
+    .bind(MINI_JPEG)
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_person_anhang (einsatz_id, person_id, anhang_id, abgelegt_von_id) \
+         VALUES (?, ?, ?, ?)",
+    )
+    .bind(einsatz)
+    .bind(person)
+    .bind(aid)
+    .bind(von)
+    .execute(pool)
+    .await
+    .unwrap();
+    aid
+}
+
 /// Multipart-POST mit Datei (Feld `datei`) und beliebigen Textfeldern; `datei = None` lässt das
 /// Dateifeld weg.
 pub async fn multipart_post(

@@ -699,6 +699,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/personen/{pid}",
             delete(routes::einsatz_person::stornieren),
         )
+        // Personen-Anhänge (LFH-757): Modul-Gate `personen`; Upload/Download wie am Schaden,
+        // der Download schreibt je Abruf eine Zeile ins Zugriffsprotokoll der Person.
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/anhaenge",
+            get(routes::person_anhang::liste)
+                .post(routes::person_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}",
+            delete(routes::person_anhang::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei",
+            get(routes::person_anhang::datei).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
         .route(
             "/api/einsaetze/{id}/tiere",
             get(routes::einsatz_tier::liste),

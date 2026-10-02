@@ -33,31 +33,18 @@ pub struct SchadenAnhangAnzeige {
     pub abgelegt_at: String,
 }
 
-/// Vorgang für den ETB-Nachweis.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Vorgang {
-    Abgelegt,
-    Entfernt,
-}
+pub use crate::anhang::Vorgang;
 
 /// Wortlaut des pseudonymen ETB-Nachweises (design.md D6): „Schaden S-003: Foto abgelegt“.
-/// Die Art kommt aus dem **serverseitig ermittelten** MIME, nie aus einer Eingabe; kein
-/// Dateiname, kein Ort, keine Beschreibung.
+/// Die Art kommt aus dem **serverseitig ermittelten** MIME ([`crate::anhang::erfassung_art`]),
+/// nie aus einer Eingabe; kein Dateiname, kein Ort, keine Beschreibung.
 pub fn etb_text(registrier_nr: i64, mime: &str, vorgang: Vorgang) -> String {
-    let art = if mime == "application/pdf" {
-        "PDF"
-    } else if mime.starts_with("image/") {
-        "Foto"
-    } else {
-        // Die Erfassungs-Allowlist lässt nur Bilder und PDF zu; der Zweig hält den Text auch
-        // dann pseudonym, wenn sie einmal wächst.
-        "Datei"
-    };
-    let tat = match vorgang {
-        Vorgang::Abgelegt => "abgelegt",
-        Vorgang::Entfernt => "entfernt",
-    };
-    format!("Schaden {}: {art} {tat}", registrier_anzeige(registrier_nr))
+    format!(
+        "Schaden {}: {} {}",
+        registrier_anzeige(registrier_nr),
+        crate::anhang::erfassung_art(mime),
+        vorgang.wort()
+    )
 }
 
 /// Lebende Anhänge je Schaden samt Anzeige-Joins.

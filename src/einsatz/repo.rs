@@ -1425,6 +1425,122 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn schwaerzung_loescht_personen_anhaenge_und_haelt_etb_und_audit() {
+        // LFH-757, design.md D5: `einsatz_person_anhang` ist ZeileLoeschen (auch der entfernte
+        // Anhang geht), die pseudonymen ETB-Nachweise und das Zugriffsprotokoll (Art `anhang`)
+        // bleiben.
+        use crate::person::anhang::{self as pa, Ablage};
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person \
+               (einsatz_id, registrier_nr, name, vorname, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'Müller', 'Erika', ?, ?) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(leit)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let startwert = crate::einsatz::einstellungen::laden_oder_default(&pool, einsatz.id)
+            .await
+            .unwrap()
+            .etb_startwert();
+        let mut etb_ids = Vec::new();
+        let mut linker_ids = Vec::new();
+        for (name, mime) in [
+            ("Erika_Mueller.jpg", "image/jpeg"),
+            ("protokoll.pdf", "application/pdf"),
+        ] {
+            let (id, etb) = pa::ablegen(
+                &pool,
+                einsatz.id,
+                person,
+                leit,
+                startwert,
+                &Ablage {
+                    dateiname: name,
+                    mime,
+                    daten: b"ABC",
+                },
+            )
+            .await
+            .unwrap();
+            linker_ids.push(id);
+            etb_ids.push(etb);
+        }
+        // Ein Download hinterlässt seine Protokollzeile (die Route schreibt sie, hier direkt).
+        crate::person::audit_repo::anlegen(&pool, einsatz.id, Some(person), leit, "anhang")
+            .await
+            .unwrap();
+        etb_ids.push(
+            pa::entfernen(&pool, einsatz.id, person, linker_ids[1], leit, startwert)
+                .await
+                .unwrap(),
+        );
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let zaehle = |sql: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sql)
+                    .bind(einsatz.id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?").await,
+            0,
+            "Dateien weg, auch die entfernte"
+        );
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz_person_anhang WHERE einsatz_id = ?").await,
+            0,
+            "Linker-Zeilen weg"
+        );
+        assert_eq!(
+            zaehle(
+                "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'anhang'"
+            )
+            .await,
+            1,
+            "das Zugriffsprotokoll bleibt"
+        );
+        let mut inhalte = Vec::new();
+        for id in etb_ids {
+            let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            inhalte.push(inhalt);
+        }
+        assert_eq!(
+            inhalte,
+            vec![
+                "Person R-001: Foto abgelegt",
+                "Person R-001: PDF abgelegt",
+                "Person R-001: PDF entfernt",
+            ],
+            "die drei pseudonymen Nachweise bleiben"
+        );
+    }
+
     /// LFH-22 (design.md D8): das Logo ist keine Einsatzunterlage. Schwärzen eines
     /// Einsatzes lässt die Logo-Bytes der Organisation unverändert.
     #[tokio::test]
