@@ -36,6 +36,7 @@ function akte(zustand: AufbewahrungZustand): ArchivAkte {
         aktuelle_sichtung: 'sk2',
         aktuelle_verbleib_art: 'transport',
         erfasst_at: '2026-05-01 09:00:00',
+        auf_antrag_geschwaerzt_at: zustand === 'frist_laeuft' ? '2026-05-20 08:00:00' : undefined,
       },
     ],
     tiere: [],
@@ -82,6 +83,7 @@ function zeige(
   server.use(
     meHandler(ME_ADMIN),
     http.get('/api/aufbewahrung/einsaetze/7', () => HttpResponse.json(akte(zustand))),
+    http.get('/api/aufbewahrung/einsaetze/7/schwaerzungsantraege', () => HttpResponse.json([])),
     http.get('/api/aufbewahrung/einsaetze/7/etb', ({ request }) => {
       const url = new URL(request.url);
       etbAufrufe.push(url.search);
@@ -266,5 +268,23 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
     expect(within(dialog).getByLabelText('Neue Aufbewahrungsfrist')).toHaveValue(
       '2026-06-01 14:00',
     );
+  });
+});
+
+describe('ArchivAktePage — Löschersuchen (LFH-751)', () => {
+  it('führt das Paneel und kennzeichnet eine auf Antrag geschwärzte Person im Register', async () => {
+    zeige('frist_laeuft');
+    expect(await screen.findByText('Löschersuchen (Art. 17)')).toBeInTheDocument();
+    const marke = await waitFor(() => {
+      const m = document.querySelector('[data-lfh="auf-antrag-geschwaerzt"]');
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    expect(marke.textContent).toContain('auf Antrag geschwärzt');
+  });
+
+  it('bei offenem Einsatz-Antrag keine Primäraktion im Kopf', async () => {
+    zeige('schwaerzung_beantragt');
+    expect(await kopfAktionen()).toEqual([]);
   });
 });

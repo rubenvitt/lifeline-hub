@@ -38,19 +38,19 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote T
 
 - [x] 7.1 Vier Routen aus D7 mit `AdminUser`, `fordere_archivzugriff`, `JsonBody`/`PfadParam`; Request-DTOs, Response-DTOs mit `ToSchema`, `no-store` an der Suche. Beleg: Integrationstests in `tests/loeschersuchen.rs` für jedes Szenario von `aufbewahrung-loeschersuchen` mit Statuscode (201, 400, 403, 404, 409, 422) und für „Personensuche durch die Einsatzleitung“ (403).
 - [x] 7.2 Guard `archiv_namensraum_nur_lesend_und_admin` auf acht Routen und die benannte Nicht-GET-Menge umstellen, plus Prüfung „Personensuche schreibt nicht“. Beleg: Guard grün; Selbsttests (zusätzliche Nicht-GET-Route, `write_retry!` in der Suche) machen ihn rot.
-- [ ] 7.3 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/openapi.json` sowie `types.generated.ts` mitcommitten. Beleg: Skript grün.
+- [x] 7.3 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/openapi.json` sowie `types.generated.ts` mitcommitten. Beleg: Skript grün.
 - [x] 7.4 Ende-zu-Ende in `tests/loeschersuchen.rs` (`personen_antrag_bis_zum_vollzug`): Personen-Antrag über die Route, Uhr +24 h, Purge, dann ETB-Spur (zwei Einträge mit Aktenzeichen und `R-042`, ohne Namen) und Szenario „Name im ETB-Wortlaut bleibt“. Beleg: Test grün; `AUSNAHMEN_SYSTEM_ETB` unverändert.
 
 ## 8. Frontend
 
-- [ ] 8.1 API-Funktionen und Query-Keys in `frontend/src/api/aufbewahrung.ts` und `queryKeys.ts`; Farbe und Wort für `schwaerzung_beantragt` in `theme/statusFarben.ts`. Beleg: vitest für die Zustandsabbildung, `tsc --noEmit`.
-- [ ] 8.2 `SchwaerzungsantragDialog` (Rückfrage nach D9; Absenden erst bei Aktenzeichen und passender Kennung). Beleg: vitest „Kennung `R-04` für `R-042` → Absenden gesperrt“, „Hinweis auf Freitexte nur beim Personen-Antrag“.
-- [ ] 8.3 `PersonensucheDialog` (Suchfeld ≥ 3 Zeichen, Treffertabelle pseudonym, Antrag je Treffer). Beleg: vitest mit gemockter Antwort.
-- [ ] 8.4 Paneel „Löschersuchen (Art. 17)“ in `ArchivAktePage.tsx` mit Antragsliste, „Zurücknehmen“ nur bei offenem Antrag innerhalb von 24 h, Aktionen nur an nicht geschwärzten Einsätzen, Etikett „auf Antrag geschwärzt“ im Register. Beleg: vitest für die Szenarien „Offener Antrag“ und „Geschwärzter Einsatz“.
+- [x] 8.1 API-Funktionen und Query-Keys in `frontend/src/api/aufbewahrung.ts` und `queryKeys.ts`; Farbe und Wort für `schwaerzung_beantragt` in `theme/statusFarben.ts`. Beleg: vitest für die Zustandsabbildung, `tsc --noEmit`.
+- [x] 8.2 `SchwaerzungsantragDialog` (Rückfrage nach D9; Absenden erst bei Aktenzeichen und passender Kennung). Beleg: vitest „Kennung `R-04` für `R-042` → Absenden gesperrt“, „Hinweis auf Freitexte nur beim Personen-Antrag“.
+- [x] 8.3 `PersonensucheDialog` (Suchfeld ≥ 3 Zeichen, Treffertabelle pseudonym, Antrag je Treffer). Beleg: vitest mit gemockter Antwort.
+- [x] 8.4 Paneel „Löschersuchen (Art. 17)“ in `ArchivAktePage.tsx` mit Antragsliste, „Zurücknehmen“ nur bei offenem Antrag innerhalb von 24 h, Aktionen nur an nicht geschwärzten Einsätzen, Etikett „auf Antrag geschwärzt“ im Register. Beleg: vitest für die Szenarien „Offener Antrag“ und „Geschwärzter Einsatz“.
 
 ## 9. Regeln und Abschluss
 
-- [ ] 9.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“: Antrag, Personenbezüge (`PERSONENBEZUEGE`, Guard), neue Archivrouten und Herleitung auf das spätere Archiv dieser Change. Beleg: `prettier`/Längenregel der Wurzel-`AGENTS.md` unberührt, Verweise per grep geprüft.
+- [x] 9.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“: Antrag, Personenbezüge (`PERSONENBEZUEGE`, Guard), neue Archivrouten und Herleitung auf das spätere Archiv dieser Change. Beleg: `prettier`/Längenregel der Wurzel-`AGENTS.md` unberührt, Verweise per grep geprüft.
 - [ ] 9.2 Folgeticket über `clickup-task-anlegen`: Live-Invalidierung und Offline-Caches nach einem Personen-Vollzug. Beleg: Task-Link im PR-Text.
 - [ ] 9.3 `./scripts/check-all.sh` lokal (soweit die Umgebung es trägt) und in der CI des PRs grün. Beleg: Lauf im PR.
 - [ ] 9.4 Prüfung im laufenden Stack (`cargo run --features dev-seeds`, Vite): Personensuche, Antrag, Rücknahme, Antrag mit vorgestellter Uhr bzw. per Test-Tick vollzogen, Akte danach. Beleg: Befund in dieser Datei.

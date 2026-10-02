@@ -49,14 +49,16 @@ import {
 } from '../theme/statusFarben';
 import { ETB_TYPEN, VERBLEIB_ART, VERBLEIB_STATUS, primaeraktion } from './archivText';
 import { FristWert, useFristAenderung } from './FristPaneel';
+import Loeschersuchen from './Loeschersuchen';
 import WiederherstellenDialog from './WiederherstellenDialog';
 
 /**
  * Pseudonyme Archivakte eines abgeschlossenen Einsatzes — `/admin/aufbewahrung/:einsatzId`,
  * nur für den System-Admin der eigenen Organisation.
  *
- * Drei Paneele: **Aufbewahrung** (Zustand, Fristen, Schwärzung, Kopf ohne Ort und
- * Sachverhalt), **Register** (Personen, Tiere, Schäden ohne Namen, Kontakte oder Orte) und
+ * Vier Paneele: **Aufbewahrung** (Zustand, Fristen, Schwärzung, Kopf ohne Ort und
+ * Sachverhalt), **Löschersuchen** (Art. 17, LFH-751: Anträge, Rücknahme, Personensuche),
+ * **Register** (Personen, Tiere, Schäden ohne Namen, Kontakte oder Orte) und
  * **Einsatztagebuch** (lesende Zeitachse). Jede Angabe stammt aus einer Retain-Spalte, die
  * Akte sieht deshalb vor und nach der Schwärzung gleich aus.
  *
@@ -114,6 +116,20 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
     width: 150,
     zahl: true,
     render: (_, p) => (p.storniert_at ? <ZeitAnzeige wert={p.storniert_at} /> : leer),
+  },
+  {
+    // LFH-751: eine auf Antrag geschwärzte Person ist als solche gekennzeichnet.
+    key: 'loeschersuchen',
+    title: 'Löschersuchen',
+    width: 260,
+    render: (_, p) =>
+      p.auf_antrag_geschwaerzt_at ? (
+        <span data-lfh="auf-antrag-geschwaerzt">
+          auf Antrag geschwärzt · <ZeitAnzeige wert={p.auf_antrag_geschwaerzt_at} />
+        </span>
+      ) : (
+        leer
+      ),
   },
 ];
 
@@ -385,6 +401,11 @@ function AkteInhalt({ einsatzId, akte }: { einsatzId: number; akte: ArchivAkte }
             <Datenfeld label="Geschwärzt" mono>
               {kopf.geschwaerzt_at ? <ZeitAnzeige wert={kopf.geschwaerzt_at} /> : leer}
             </Datenfeld>
+            {akte.antrag_faellig_at && (
+              <Datenfeld label="Schwärzung auf Antrag ab" mono>
+                <ZeitAnzeige wert={akte.antrag_faellig_at} />
+              </Datenfeld>
+            )}
             <Datenfeld label="Stichwort">{kopf.stichwort ?? leer}</Datenfeld>
             <Datenfeld label="Leitstellen-Nr." mono>
               {kopf.leitstellen_nr ?? leer}
@@ -401,6 +422,8 @@ function AkteInhalt({ einsatzId, akte }: { einsatzId: number; akte: ArchivAkte }
             <SpeicherFehler fehler={frist.fehlerAussen} />
           </div>
         </Paneel>
+
+        <Loeschersuchen einsatzId={einsatzId} akte={akte} />
 
         <Paneel titel="Register" koerperPolster>
           <Registerteil

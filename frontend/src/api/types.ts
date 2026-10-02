@@ -756,7 +756,7 @@ export interface NeueNachforderung {
 }
 
 // ============================== Aufbewahrung (Archiv des Org-Admins) ==============================
-/** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sechs Werte, `retention::zustand`). */
+/** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sieben Werte, `retention::zustand`). */
 export type AufbewahrungZustand = S['AufbewahrungZustand'];
 /** Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). */
 export type AufbewahrungEintrag = S['AufbewahrungEintragAnzeige'];
@@ -780,6 +780,25 @@ export interface WiederherstellenBody {
 export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
+}
+
+// ---- Löschersuchen nach Art. 17 (LFH-751) ----
+/** Personenart eines Löschersuchens: Betroffene, externe Kraft, Anruf, Medienkontakt. */
+export type PersonenArt = S['PersonenArt'];
+/** Zielart eines Antrags: `einsatz` oder eine {@link PersonenArt}. */
+export type AntragZielArt = S['AntragZielArt'];
+export type AntragStand = S['AntragStand'];
+/** Ein Schwärzungsantrag der Archivakte — Ziel nur als Art und pseudonyme Kennung. */
+export type Schwaerzungsantrag = S['SchwaerzungsantragAnzeige'];
+/** Treffer der pseudonymen Personensuche — ohne Name oder Kontakt. */
+export type PersonTreffer = S['PersonTrefferAnzeige'];
+
+/** Body von `POST …/schwaerzungsantraege`. Kein Backend-Schema, FE-lokal. `ziel.id` fehlt beim
+ *  Einsatz und ist bei einer Person Pflicht; `bestaetigung` ist die eingetippte Kennung. */
+export interface NeuerSchwaerzungsantrag {
+  ziel: { art: AntragZielArt; id?: number };
+  aktenzeichen: string;
+  bestaetigung: string;
 }
 
 // ============================== LFH-554 Presse- und Medienarbeit S5 ==============================

@@ -150,6 +150,22 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   per `tracing::error!`).
 - **Scrub-Werte in System-ETB-Texten** stehen in `AUSNAHMEN_SYSTEM_ETB`
   (`tests/aufbewahrung_e2e.rs`) — kein Test bemerkt einen fehlenden Eintrag.
+- **Löschersuchen nach Art. 17** (LFH-751, Spec `aufbewahrung-loeschersuchen`, Herleitung
+  `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md`): Antrag
+  für Einsatz oder genau eine Person (`aufbewahrung::antrag`, Tabelle `schwaerzung_antrag`), nur
+  System-Admin der Einsatz-Org, nur abgeschlossen; 24 h zurücknehmbar, dann Vollzug in Phase A2
+  des Purge-Laufs (`vollziehe_faellige`, zählt für den WAL-Rückschrieb). Kein Sofort-Auslöser
+  ohne diese 24 h.
+- **Personen-Scrub nur über `PERSONENBEZUEGE`** (`einsatz/schwaerzung_person.rs`): je
+  Personenart Bezug und `Mit`/`Ohne(Grund)` je Scrub-Spalte; Strategie kommt aus `TABELLEN`, nie
+  eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal`,
+  `infotelefon_anruf` oder `medienkontakt` braucht dort einen Eintrag (Guard
+  `jeder_personenverweis_ist_als_bezug_deklariert`). Freitexte, die eine Person nur erwähnen,
+  bleiben bis zur Einsatz-Schwärzung.
+- **Die Personensuche (`aufbewahrung::suche`) ist die einzige Archiv-Stelle, die Scrub-Spalten
+  liest**: nur ganze Wörter bzw. ≥ 6 Ziffern, Antwort pseudonym, `no-store`, Suchtext nie
+  geloggt, schreibt nichts (Guard `archiv_namensraum_nur_lesend_und_admin`, benannte
+  Nicht-GET-Menge).
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
   stehen), und nach einer Schwärzung schreibt der Purge-Lauf den WAL per

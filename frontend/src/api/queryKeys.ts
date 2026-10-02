@@ -571,8 +571,8 @@ type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
  */
 type Dienstfilter = 'alle' | 'im-dienst';
 
-/** Die zwei adressierten Bereiche unter dem `aufbewahrung`-Prefix. */
-type AufbewahrungBereich = 'akte' | 'etb';
+/** Die drei adressierten Bereiche unter dem `aufbewahrung`-Prefix. */
+type AufbewahrungBereich = 'akte' | 'etb' | 'antraege';
 
 /** Die sieben Bereiche unter dem `admin-karte`-Prefix. */
 type AdminKarteBereich =
@@ -615,6 +615,9 @@ export const globalKeys = {
       einsatzId,
       typ ?? 'alle',
     ] as const,
+  /** Löschersuchen nach Art. 17 eines Einsatzes (LFH-751). */
+  aufbewahrungAntraege: (einsatzId: number) =>
+    [GLOBAL_KEYS.aufbewahrung, 'antraege' satisfies AufbewahrungBereich, einsatzId] as const,
 
   // Stammdaten-Kataloge ohne Filter
   qualifikationen: () => [GLOBAL_KEYS.qualifikationen] as const,

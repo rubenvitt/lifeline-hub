@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aufbewahrungZustand, etbTyp } from '../theme/statusFarben';
-import { ETB_TYPEN, ZUSTAENDE, primaeraktion } from './archivText';
+import { ETB_TYPEN, ZIEL_ART, ZUSTAENDE, primaeraktion } from './archivText';
 
 describe('archivText', () => {
   it('die Zustände sind vollständig und in der Lebenslinie geordnet', () => {
@@ -10,6 +10,7 @@ describe('archivText', () => {
       'faellig',
       'vorgemerkt',
       'schwaerzung_ausstehend',
+      'schwaerzung_beantragt',
       'geschwaerzt',
     ]);
     expect([...ZUSTAENDE].sort()).toEqual(Object.keys(aufbewahrungZustand).sort());
@@ -26,7 +27,19 @@ describe('archivText', () => {
       'frist',
       'wiederherstellen',
       null,
+      // LFH-751: bei offenem Einsatz-Antrag steht die Rücknahme am Antrag, nicht im Kopf.
       null,
+      null,
+    ]);
+  });
+
+  it('jede Zielart eines Löschersuchens hat ein Wort (LFH-751)', () => {
+    expect(Object.keys(ZIEL_ART).sort()).toEqual([
+      'betroffene',
+      'einsatz',
+      'externe_kraft',
+      'infotelefon_anruf',
+      'medienkontakt',
     ]);
   });
 });
