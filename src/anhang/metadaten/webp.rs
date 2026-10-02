@@ -11,21 +11,53 @@ const BEHALTEN: &[&[u8; 4]] = &[
 const FLAG_EXIF: u8 = 0x08;
 const FLAG_XMP: u8 = 0x04;
 
+fn kurz() -> Unbereinigbar {
+    Unbereinigbar("WebP: Chunk bricht ab")
+}
+
+fn le32(d: &[u8], at: usize) -> Result<usize, Unbereinigbar> {
+    let b: [u8; 4] = d
+        .get(at..at.checked_add(4).ok_or_else(kurz)?)
+        .ok_or_else(kurz)?
+        .try_into()
+        .map_err(|_| kurz())?;
+    Ok(u32::from_le_bytes(b) as usize)
+}
+
+/// Ein `ANMF`-Frame trägt hinter 16 Bytes Kopf eigene Chunks. Erlaubt sind nur Bilddaten; ein
+/// darin geschachteltes `EXIF` oder `XMP ` liefe sonst bytegleich durch (Review LFH-747).
+fn pruefe_anmf(daten: &[u8]) -> Result<(), Unbereinigbar> {
+    const IM_FRAME: &[&[u8; 4]] = &[b"ALPH", b"VP8 ", b"VP8L"];
+    let mut pos = 16usize;
+    if daten.len() < pos {
+        return Err(kurz());
+    }
+    while pos < daten.len() {
+        let typ = daten.get(pos..pos + 4).ok_or_else(kurz)?;
+        if !IM_FRAME.iter().any(|t| typ == &t[..]) {
+            return Err(Unbereinigbar("WebP: unbekannter Chunk im ANMF-Frame"));
+        }
+        let laenge = le32(daten, pos + 4)?;
+        let daten_ende = (pos + 8).checked_add(laenge).ok_or_else(kurz)?;
+        if daten_ende > daten.len() {
+            return Err(kurz());
+        }
+        pos = daten_ende + (laenge & 1);
+    }
+    Ok(())
+}
+
 pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
-    let kurz = || Unbereinigbar("WebP: Chunk bricht ab");
-    let riff_laenge = u32::from_le_bytes(
-        d.get(4..8)
-            .ok_or_else(kurz)?
-            .try_into()
-            .map_err(|_| kurz())?,
-    ) as usize;
-    let riff_ende = riff_laenge.checked_add(8).ok_or_else(kurz)?;
+    let riff_ende = le32(d, 4)?.checked_add(8).ok_or_else(kurz)?;
     if riff_ende > d.len() {
         return Err(kurz());
     }
-    let mut chunks: Vec<Vec<u8>> = Vec::new();
+    // Direkt in den Ausgabepuffer, nie ein Vektor je Chunk (Speicher-Verstärkung, Review
+    // LFH-747). RIFF-Länge und VP8X-Flags werden am Ende nachgetragen.
+    let mut aus = Vec::with_capacity(riff_ende);
+    aus.extend_from_slice(b"RIFF\0\0\0\0WEBP");
     let mut ausrichtung = None;
-    let mut vp8x_index = None;
+    let mut vp8x_flags = None;
     let mut pos = 12usize;
     while pos < riff_ende {
         let typ: &[u8; 4] = d
@@ -33,18 +65,13 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
             .ok_or_else(kurz)?
             .try_into()
             .map_err(|_| kurz())?;
-        let laenge = u32::from_le_bytes(
-            d.get(pos + 4..pos + 8)
-                .ok_or_else(kurz)?
-                .try_into()
-                .map_err(|_| kurz())?,
-        ) as usize;
+        let laenge = le32(d, pos + 4)?;
         let daten_ende = (pos + 8).checked_add(laenge).ok_or_else(kurz)?;
-        // Auffüllbyte bei ungerader Länge; am Dateiende darf es fehlen.
-        let ende = (daten_ende + (laenge & 1)).min(riff_ende);
         if daten_ende > riff_ende {
             return Err(kurz());
         }
+        // Auffüllbyte bei ungerader Länge; am Dateiende darf es fehlen.
+        let ende = (daten_ende + (laenge & 1)).min(riff_ende);
         let daten = &d[pos + 8..daten_ende];
         if typ == b"EXIF" && ausrichtung.is_none() {
             let tiff = daten.strip_prefix(b"Exif\0\0").unwrap_or(daten);
@@ -55,38 +82,31 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
                 if laenge < 10 {
                     return Err(Unbereinigbar("WebP: VP8X zu kurz"));
                 }
-                vp8x_index = Some(chunks.len());
+                vp8x_flags = Some(aus.len() + 8);
             }
-            let mut c = d[pos..ende].to_vec();
-            if c.len() < 8 + laenge + (laenge & 1) {
-                c.push(0);
+            if typ == b"ANMF" {
+                pruefe_anmf(daten)?;
             }
-            chunks.push(c);
+            aus.extend_from_slice(&d[pos..ende]);
+            if ende < daten_ende + (laenge & 1) {
+                aus.push(0);
+            }
         }
         pos = ende;
     }
-    match vp8x_index {
-        Some(i) => {
-            let flags = &mut chunks[i][8];
-            *flags &= !(FLAG_EXIF | FLAG_XMP);
-            if let Some((wert, l)) = ausrichtung {
-                *flags |= FLAG_EXIF;
-                let mini = exif::mini_tiff(wert, l);
-                let mut c = b"EXIF".to_vec();
-                c.extend_from_slice(&(mini.len() as u32).to_le_bytes());
-                c.extend(mini);
-                chunks.push(c);
-            }
+    // Einfaches Format (ohne VP8X): kann keine Metadaten tragen und keine Ausrichtung ausdrücken.
+    if let Some(i) = vp8x_flags {
+        aus[i] &= !(FLAG_EXIF | FLAG_XMP);
+        if let Some((wert, l)) = ausrichtung {
+            aus[i] |= FLAG_EXIF;
+            let mini = exif::mini_tiff(wert, l);
+            aus.extend_from_slice(b"EXIF");
+            aus.extend_from_slice(&(mini.len() as u32).to_le_bytes());
+            aus.extend(mini);
         }
-        // Einfaches Format: kann keine Metadaten tragen und keine Ausrichtung ausdrücken.
-        None => {}
     }
-    let inhalt = chunks.concat();
-    let mut aus = Vec::with_capacity(inhalt.len() + 12);
-    aus.extend_from_slice(b"RIFF");
-    aus.extend_from_slice(&((inhalt.len() + 4) as u32).to_le_bytes());
-    aus.extend_from_slice(b"WEBP");
-    aus.extend(inhalt);
+    let riff = (aus.len() - 8) as u32;
+    aus[4..8].copy_from_slice(&riff.to_le_bytes());
     Ok(Bereinigt::ohne_exif(aus))
 }
 
@@ -154,6 +174,24 @@ mod tests {
             .expect("WebP")
             .daten;
         assert_eq!(bereinigen(&einmal).expect("WebP").daten, einmal);
+    }
+
+    #[test]
+    fn anmf_mit_geschachteltem_exif_ist_unbereinigbar() {
+        let mut frame = vec![0u8; 16];
+        frame.extend(riff_chunk(b"VP8 ", VP8));
+        let sauber = riff(&[
+            riff_chunk(b"VP8X", &[0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            riff_chunk(b"ANIM", &[0; 6]),
+            riff_chunk(b"ANMF", &frame),
+        ]);
+        assert_eq!(bereinigen(&sauber).expect("ANMF").daten, sauber);
+        frame.extend(riff_chunk(b"EXIF", &exif_tiff(false, Some(6))));
+        let mit_exif = riff(&[
+            riff_chunk(b"VP8X", &[0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            riff_chunk(b"ANMF", &frame),
+        ]);
+        assert!(bereinigen(&mit_exif).is_err());
     }
 
     #[test]

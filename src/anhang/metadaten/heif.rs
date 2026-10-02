@@ -71,6 +71,9 @@ fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<Item>, Unbereinigbar> {
         if &infe.typ != b"infe" {
             continue;
         }
+        if ids.len() > MAX_METADATEN_ITEMS {
+            return Err(Unbereinigbar("HEIF: zu viele Metadaten-Items"));
+        }
         let v = *d.get(infe.nutzlast).ok_or_else(kurz)?;
         let p = infe.nutzlast + 4;
         if v < 2 {
@@ -87,15 +90,11 @@ fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<Item>, Unbereinigbar> {
         let id = be(d, p, id_laenge)? as u32;
         let p = p + id_laenge + 2;
         let typ = d.get(p..p + 4).ok_or_else(kurz)?;
-        let (_, p) = zeichenkette(d, p + 4, infe.ende)?;
         match typ {
             b"Exif" => ids.push(Item { id, exif: true }),
-            b"mime" => {
-                let (inhaltstyp, _) = zeichenkette(d, p, infe.ende)?;
-                if ist_xmp(inhaltstyp) {
-                    ids.push(Item { id, exif: false });
-                }
-            }
+            // Jedes `mime`-Item (XMP und alles andere Beschreibende) und jedes `uri `-Item: keins
+            // davon ist Bildinhalt.
+            b"mime" | b"uri " => ids.push(Item { id, exif: false }),
             _ => {}
         }
     }
@@ -107,7 +106,15 @@ fn ist_xmp(inhaltstyp: &[u8]) -> bool {
     t.contains("rdf+xml") || t.contains("xmp")
 }
 
-/// Ein Metadaten-Item: EXIF oder XMP.
+/// Obergrenze für Metadaten-Items; echte Dateien tragen eines bis drei. Schützt die lineare Suche
+/// je `iloc`-Eintrag vor quadratischer Laufzeit.
+const MAX_METADATEN_ITEMS: usize = 64;
+
+/// Top-Level-Boxen, die bleiben dürfen. Alles andere (etwa `moov` einer Bildfolge mit
+/// `udta/©xyz`-Standort) ist ein unbekannter Aufbau und damit `Unbereinigbar` (design.md D3).
+const OBEN_ERLAUBT: &[&[u8; 4]] = &[b"ftyp", b"meta", b"mdat", b"free", b"skip"];
+
+/// Ein Metadaten-Item: EXIF, XMP oder ein anderes beschreibendes Item.
 #[derive(Clone, Copy)]
 struct Item {
     id: u32,
@@ -170,6 +177,7 @@ fn bereiche(
     let id_laenge = if version < 2 { 2 } else { 4 };
     let mut gefunden = Vec::new();
     let mut v = Vec::new();
+    let mut summe = 0u64;
     for _ in 0..anzahl {
         if p >= iloc.ende {
             return Err(kurz());
@@ -190,22 +198,32 @@ fn bereiche(
         let extents = be(d, p, 2)?;
         p += 2;
         let item = items.iter().find(|i| i.id == id).copied();
-        let gesucht = item.is_some();
-        if gesucht {
+        let Some(item) = item else {
+            // Nicht gesucht: Extents ohne Schleife überspringen. Mit Feldgrößen 0 rückte eine
+            // Schleife `p` nie vor, 65535 Extents je Item ließen sich dann beliebig oft
+            // wiederholen (CPU-DoS, Review LFH-747).
+            let extent_groesse = index_groesse + offset_groesse + laengen_groesse;
+            p = (extents as usize)
+                .checked_mul(extent_groesse)
+                .and_then(|n| p.checked_add(n))
+                .ok_or_else(kurz)?;
+            continue;
+        };
+        if !gefunden.contains(&id) {
             gefunden.push(id);
-            if datenreferenz != 0 {
-                return Err(Unbereinigbar("HEIF: Metadaten in externer Datei"));
-            }
+        }
+        if datenreferenz != 0 {
+            return Err(Unbereinigbar("HEIF: Metadaten in externer Datei"));
         }
         for extent in 0..extents {
+            if p >= iloc.ende {
+                return Err(kurz());
+            }
             p += index_groesse;
             let offset = be(d, p, offset_groesse)?;
             p += offset_groesse;
             let laenge = be(d, p, laengen_groesse)?;
             p += laengen_groesse;
-            if !gesucht {
-                continue;
-            }
             let anfang = match methode {
                 0 => 0u64,
                 1 => idat.ok_or(Unbereinigbar("HEIF: idat fehlt"))?.nutzlast as u64,
@@ -222,10 +240,18 @@ fn bereiche(
             if laenge == 0 || start.checked_add(laenge).is_none_or(|e| e > grenze) {
                 return Err(Unbereinigbar("HEIF: Metadaten-Extent außerhalb der Datei"));
             }
+            // Mehr zu nullen als die Datei groß ist, geht nur mit sich wiederholenden Extents:
+            // das wäre ein quadratisches memset (Review LFH-747).
+            summe = summe.saturating_add(laenge);
+            if summe > d.len() as u64 {
+                return Err(Unbereinigbar(
+                    "HEIF: Metadaten-Extents größer als die Datei",
+                ));
+            }
             v.push(Bereich {
                 start: start as usize,
                 laenge: laenge as usize,
-                leeres_exif: extent == 0 && item.is_some_and(|i| i.exif),
+                leeres_exif: extent == 0 && item.exif,
             });
         }
     }
@@ -240,10 +266,19 @@ fn bereiche(
 
 pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
     let oben = boxen(d, 0, d.len())?;
+    if oben.iter().any(|b| !OBEN_ERLAUBT.contains(&&b.typ)) {
+        return Err(Unbereinigbar("HEIF: unbekannte Top-Level-Box"));
+    }
     let mut aus = d.to_vec();
     for meta in oben.iter().filter(|b| &b.typ == b"meta") {
         // `meta` ist eine FullBox: 4 Bytes Version und Flags vor den Kindern.
         let kinder = boxen(d, meta.nutzlast + 4, meta.ende)?;
+        // Eine zweite `iinf`/`iloc`/`idat` sähe `finde` nicht; sie trüge ungeprüfte Items.
+        for t in [b"iinf", b"iloc", b"idat"] {
+            if kinder.iter().filter(|b| &b.typ == t).count() > 1 {
+                return Err(Unbereinigbar("HEIF: doppelte iinf/iloc/idat"));
+            }
+        }
         let finde = |t: &[u8; 4]| kinder.iter().find(|b| &b.typ == t);
         let items = match finde(b"iinf") {
             Some(iinf) => metadaten_items(d, iinf)?,
@@ -296,6 +331,64 @@ mod tests {
     fn idempotent() {
         let einmal = bereinigen(&heif(&HeifBau::default())).expect("HEIF").daten;
         assert_eq!(bereinigen(&einmal).expect("HEIF").daten, einmal);
+    }
+
+    #[test]
+    fn unbekannte_top_level_box_ist_unbereinigbar() {
+        let mut h = heif(&HeifBau::default());
+        h.extend(boxe(b"moov", b"udta\xA9xyz+52.5+013.4/"));
+        assert!(bereinigen(&h).is_err());
+    }
+
+    #[test]
+    fn doppelte_iinf_ist_unbereinigbar() {
+        // Eine zweite `iinf` direkt hinter der `meta`-FullBox-Kopfzeile einschieben.
+        let h = heif(&HeifBau::default());
+        let meta = h.windows(4).position(|w| w == b"meta").unwrap() - 4;
+        let groesse = u32::from_be_bytes(h[meta..meta + 4].try_into().unwrap());
+        let zweite = vollbox(b"iinf", 0, &0u16.to_be_bytes());
+        let mut neu = h[..meta].to_vec();
+        neu.extend_from_slice(&(groesse + zweite.len() as u32).to_be_bytes());
+        neu.extend_from_slice(&h[meta + 4..meta + 12]);
+        neu.extend(&zweite);
+        neu.extend_from_slice(&h[meta + 12..]);
+        // Die Offsets im `iloc` zeigen jetzt verschoben; das Ergebnis muss trotzdem ein Fehler
+        // sein, bevor sie überhaupt gelesen werden.
+        assert!(bereinigen(&neu).is_err());
+    }
+
+    /// Review LFH-747: `iloc` mit Feldgrößen 0 und 65535 Extents je Item darf keine Schleife
+    /// über alle Extents auslösen. 50 000 solcher Items müssen sofort durchlaufen.
+    #[test]
+    fn iloc_mit_null_feldgroessen_ist_schnell() {
+        let mut iloc = vec![0x00, 0x00];
+        let anzahl: u16 = 50_000;
+        iloc.extend_from_slice(&anzahl.to_be_bytes());
+        for i in 0..anzahl {
+            iloc.extend_from_slice(&(i + 10).to_be_bytes());
+            iloc.extend_from_slice(&0u16.to_be_bytes());
+            iloc.extend_from_slice(&u16::MAX.to_be_bytes());
+        }
+        // Ein Exif-Item (id 1), damit `iloc` überhaupt gelesen wird; es steht in keinem Eintrag.
+        let mut iinf_inhalt = 1u16.to_be_bytes().to_vec();
+        iinf_inhalt.extend(infe(1, b"Exif", None));
+        let meta = vollbox(
+            b"meta",
+            0,
+            &[
+                vollbox(b"iinf", 0, &iinf_inhalt),
+                vollbox(b"iloc", 0, &iloc),
+            ]
+            .concat(),
+        );
+        let h = [boxe(b"ftyp", b"heic\0\0\0\0mif1heic"), meta].concat();
+        let t = std::time::Instant::now();
+        let _ = bereinigen(&h);
+        assert!(
+            t.elapsed() < std::time::Duration::from_secs(1),
+            "{:?}",
+            t.elapsed()
+        );
     }
 
     #[test]

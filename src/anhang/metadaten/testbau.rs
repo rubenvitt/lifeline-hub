@@ -417,7 +417,7 @@ pub fn vollbox(typ: &[u8; 4], version: u8, inhalt: &[u8]) -> Vec<u8> {
     boxe(typ, &i)
 }
 
-fn infe(id: u16, typ: &[u8; 4], inhaltstyp: Option<&str>) -> Vec<u8> {
+pub fn infe(id: u16, typ: &[u8; 4], inhaltstyp: Option<&str>) -> Vec<u8> {
     let mut i = id.to_be_bytes().to_vec();
     i.extend_from_slice(&[0, 0]);
     i.extend_from_slice(typ);
@@ -507,6 +507,7 @@ pub fn tiff_datei(be: bool) -> Vec<u8> {
         Ifd(vec![
             (256, Wert::Short(1)),
             (257, Wert::Short(1)),
+            (269, Wert::Ascii("MARKER_DOKUMENT")),
             (270, Wert::Ascii("MARKER_BESCHREIBUNG")),
             (271, Wert::Ascii("MARKER_MAKE")),
             (272, Wert::Ascii("MARKER_MODEL")),
@@ -520,6 +521,12 @@ pub fn tiff_datei(be: bool) -> Vec<u8> {
             (33723, Wert::Undefined(b"MARKER_IPTC".to_vec())),
             (34665, Wert::Unter(1)),
             (34853, Wert::Unter(2)),
+            (
+                40092,
+                Wert::Undefined(b"M\0A\0R\0K\0E\0R\0MARKER_XPCOMMENT".to_vec()),
+            ),
+            (42016, Wert::Ascii("MARKER_UNIQUE_ID")),
+            (50735, Wert::Ascii("MARKER_KAMERASERIE")),
         ]),
         Ifd(vec![
             (36867, Wert::Ascii("MARKER_AUFNAHME")),

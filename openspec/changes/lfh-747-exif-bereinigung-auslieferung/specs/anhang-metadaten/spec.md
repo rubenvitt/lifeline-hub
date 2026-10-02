@@ -32,9 +32,10 @@ nicht ihre Endung.
 ### Requirement: Was die Bereinigung entfernt und was sie erhält
 
 Die bereinigte Fassung MUST alle EXIF-Angaben entfernen, ebenso XMP, IPTC/Photoshop-Blöcke,
-Textkommentare und eingebettete Vorschaubilder. Zu den EXIF-Angaben gehören GPS, Gerät,
-Seriennummer und Zeiten. Die Ausrichtung des Bildes MUST erhalten bleiben. Bilddaten und
-Farbprofil MUST bytegleich übernommen werden. Das Bild MUST NOT neu kodiert werden.
+Textkommentare und die Vorschaubilder in EXIF und JFIF. Zu den EXIF-Angaben gehören GPS, Gerät,
+Seriennummer und Zeiten. Die Ausrichtung MUST erhalten bleiben. Bilddaten und Farbprofil MUST
+bytegleich übernommen werden, ohne Neukodierung. Vorschauen als eigene Bilder des Containers
+(HEIF, TIFF) gelten als Bildinhalt.
 
 #### Scenario: Ausrichtung bleibt
 - **WHEN** ein hochkant aufgenommenes JPEG mit EXIF-Ausrichtung 6 bereinigt ausgeliefert wird
@@ -75,8 +76,9 @@ PDF, Text, CSV und Office-Dokumente.
 ### Requirement: Cache-Kennung der bereinigten Fassung
 
 Der Download der bereinigten Fassung SHALL einen ETag tragen, der sich vom ETag des Originals
-unterscheidet. Ändert sich die Bereinigung, MUST sich auch der ETag ändern. Ein passendes
-`If-None-Match` MUST weiterhin mit 304 beantwortet werden, ohne die Datei zu lesen.
+unterscheidet. Ändert sich die Bereinigung, MUST sich auch der ETag ändern. Die Antwort MUST vor
+jeder Wiederverwendung revalidiert werden (kein `immutable`). Ein passendes `If-None-Match` MUST
+weiterhin mit 304 beantwortet werden, ohne die Datei zu lesen.
 
 #### Scenario: Bedingter Abruf
 - **WHEN** ein Browser die bereinigte Fassung mit dem zuvor gelieferten ETag erneut anfragt
@@ -105,6 +107,10 @@ mit 400 abgewiesen werden.
 #### Scenario: Unbekannte Fassung
 - **WHEN** ein Download mit `fassung=roh` angefragt wird
 - **THEN** antwortet das System mit 400
+
+#### Scenario: Doppelte Fassung
+- **WHEN** ein Download mit `fassung=original&fassung=bereinigt` angefragt wird
+- **THEN** antwortet das System mit 400 und vermerkt nichts
 
 ### Requirement: Jeder Original-Abruf wird im ETB vermerkt
 

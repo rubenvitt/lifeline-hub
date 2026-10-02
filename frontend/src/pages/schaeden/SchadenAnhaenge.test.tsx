@@ -224,7 +224,7 @@ describe('SchadenAnhaenge — Original (LFH-747)', () => {
   it('zeigt der Einsatzleitung am Foto den Original-Verweis, am PDF nicht', async () => {
     rendereAls('einsatzleitung');
     const original = await screen.findByRole('link', {
-      name: 'dach.jpg: Original mit Standort- und Gerätedaten herunterladen',
+      name: 'dach.jpg, Schaden S-003: Original mit Standort- und Gerätedaten herunterladen',
     });
     expect(original).toHaveAttribute('href', `${PFAD}/5/datei?fassung=original`);
     expect(screen.getAllByText(ORIGINAL_TEXT)).toHaveLength(1);

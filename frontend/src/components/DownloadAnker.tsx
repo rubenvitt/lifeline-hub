@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
+import { originalDateiname, originalZugaenglicherName } from '../api/anhangFassung';
 
 /**
  * Stil des Download-Ankers (LFH-21). Ein `<a>` ist ein handgebautes Bedienziel und erbt keine
@@ -55,6 +56,12 @@ interface Props {
    * Hauptverweis (bereinigte Fassung) ein zweiter Verweis „Original (mit Standort)“.
    */
   originalHref?: string;
+  /**
+   * Zeilenkennung für den zugänglichen Namen des Original-Verweises („dach.jpg, Schaden S-003“),
+   * wie beim Hauptverweis: n Zeilen mit `IMG_0001.jpg` klängen sonst gleich. Fehlt sie, steht
+   * der Dateiname da.
+   */
+  originalKennung?: string;
 }
 
 /** Sichtbarer Text des Original-Verweises (Spec `anhang-metadaten`). */
@@ -73,6 +80,7 @@ export default function DownloadAnker({
   zusatz,
   zugaenglicherName,
   originalHref,
+  originalKennung,
 }: Props) {
   const { token, rollen } = useRollen();
   // Das `aria-label` ersetzt den Inhalt im zugänglichen Namen; die Zusatzzeile (wer, wann) bleibt
@@ -124,8 +132,8 @@ export default function DownloadAnker({
       {anker}
       <a
         href={originalHref}
-        download={dateiname}
-        aria-label={`${dateiname}: Original mit Standort- und Gerätedaten herunterladen`}
+        download={originalDateiname(dateiname)}
+        aria-label={originalZugaenglicherName(originalKennung ?? dateiname)}
         data-lfh="download-anker-original"
         style={{
           ...downloadAnkerStil(token),

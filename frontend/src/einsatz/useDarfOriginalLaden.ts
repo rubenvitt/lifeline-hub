@@ -8,9 +8,10 @@ import { darfOriginalLaden } from './schreibrecht';
  * Ob der angemeldete Benutzer in diesem Einsatz Originale von Bild-Anhängen laden darf (LFH-747).
  *
  * Liest den Einsatz nur aus dem Cache (`enabled: false` schaltet das Nachladen ab, nicht die
- * Auslieferung): `EinsatzLayout` hält ihn auf jeder Einsatzseite geladen. Fehlt er doch, ist die
- * Antwort `false` — dann steht nur der bereinigte Download da, nie ein Verweis, der mit 403
- * endet. Ohne `AuthProvider` (Testflächen) ebenso `false`.
+ * Auslieferung): `EinsatzLayout` hält ihn auf jeder Einsatzseite geladen. Fehlt er, entscheidet
+ * nur noch die System-Rolle: der System-Admin sieht den Verweis, alle anderen nicht. Ein Admin
+ * einer fremden Org sieht ihn ebenfalls und bekommt beim Abruf 403 — die Org-Grenze zieht nur
+ * der Server (design.md D8). Ohne `AuthProvider` (Testflächen) ist die Antwort `false`.
  */
 export function useDarfOriginalLaden(einsatzId: number): boolean {
   const auth = useAuthOptional();

@@ -220,7 +220,7 @@ pub async fn anhang_herunterladen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Etb>,
     PfadParam((_eid, eintrag_id, anhang_id)): PfadParam<(i64, i64, i64)>,
-    Query(param): Query<FassungParam>,
+    param: FassungParam,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
     let fassung = param.fassung()?;

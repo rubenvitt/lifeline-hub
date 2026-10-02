@@ -102,7 +102,7 @@ describe('EtbAnhaenge (LFH-117)', () => {
         'href',
         '/api/einsaetze/5/etb/40/anhaenge/9?fassung=original',
       );
-      expect(original).toHaveAttribute('download', 'IMG_0412.HEIC');
+      expect(original).toHaveAttribute('download', 'IMG_0412.original.HEIC');
       expect(screen.getAllByRole('link')).toHaveLength(3);
     });
 

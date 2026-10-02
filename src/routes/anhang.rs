@@ -3,7 +3,7 @@ use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
 use crate::extract::PfadParam;
-use axum::extract::{Multipart, Query, State};
+use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
@@ -64,7 +64,7 @@ pub async fn herunterladen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
     PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
-    Query(param): Query<FassungParam>,
+    param: FassungParam,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
     let fassung = param.fassung()?;
@@ -80,7 +80,13 @@ pub async fn herunterladen(
     }
     fordere_hochladende_bei_ungebunden(&state.pool, &linker, anhang_id, ctx.benutzer.id).await?;
     if fassung == Fassung::Original {
-        original_freigeben(&state, &ctx, anhang_id, "Chat").await?;
+        // Ein ungebundener Anhang ist noch an keiner Nachricht: so steht es auch im Vermerk.
+        let ablage = if linker.ist_ungebunden() {
+            "noch nicht versendeter Anhang"
+        } else {
+            "Chat"
+        };
+        original_freigeben(&state, &ctx, anhang_id, ablage).await?;
     }
 
     // Fassung, Cache-Kurzschluss und Header-Sequenz, geteilt mit den Modul-Downloads.

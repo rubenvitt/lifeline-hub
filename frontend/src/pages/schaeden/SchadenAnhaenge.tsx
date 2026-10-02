@@ -134,6 +134,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
                 ? originalPfad(schadenAnhangDownloadPfad(einsatzId, schaden.id, a.id))
                 : undefined
             }
+            originalKennung={`${a.dateiname}, Schaden ${nr}`}
             dateiname={a.dateiname}
             groesse={a.groesse}
             zusatz={

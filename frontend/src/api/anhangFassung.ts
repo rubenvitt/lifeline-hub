@@ -11,6 +11,24 @@ export function originalPfad(href: string): string {
   return `${href}${href.includes('?') ? '&' : '?'}fassung=original`;
 }
 
+/**
+ * Dateiname des Originals: `.original` vor der Endung (`dach.jpg` → `dach.original.jpg`). Sonst
+ * lägen Original und bereinigte Fassung als `dach.jpg` und `dach (1).jpg` nebeneinander, und
+ * niemand sähe mehr, welche Datei den Standort trägt. Der Server setzt denselben Namen in
+ * `Content-Disposition` (`anhang::original_dateiname`).
+ */
+export function originalDateiname(dateiname: string): string {
+  const punkt = dateiname.lastIndexOf('.');
+  return punkt > 0
+    ? `${dateiname.slice(0, punkt)}.original${dateiname.slice(punkt)}`
+    : `${dateiname}.original`;
+}
+
+/** Zugänglicher Name des Original-Verweises; `kennung` ist die Zeilenkennung des Aufrufers. */
+export function originalZugaenglicherName(kennung: string): string {
+  return `${kennung}: Original mit Standort- und Gerätedaten herunterladen`;
+}
+
 /** Ob der Anhang ein Bild ist — nur dort unterscheiden sich Original und bereinigte Fassung. */
 export function istBildMime(mime: string | null | undefined): boolean {
   return mime?.startsWith('image/') ?? false;

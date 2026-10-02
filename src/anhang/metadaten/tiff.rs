@@ -1,14 +1,21 @@
 //! TIFF (LFH-747, design.md D4): auf jedem IFD der Kette (jeder Seite eines Scans) an Ort und
-//! Stelle Textwerte nullen und die Unter-IFDs für Exif, GPS und Interop leeren. Keine Länge und
-//! kein Offset ändern sich, die sortierte Tag-Reihenfolge bleibt; Ausrichtung und Bild-Tags
-//! bleiben unberührt.
+//! Stelle die Werte aller Tags nullen, die nicht auf der Bild-Positivliste stehen, und die
+//! Unter-IFDs für Exif, GPS und Interop leeren. Keine Länge und kein Offset ändern sich, die
+//! sortierte Tag-Reihenfolge bleibt; Ausrichtung und Bild-Tags bleiben unberührt.
 
 use super::exif::Leser;
 use super::{Bereinigt, Unbereinigbar};
 
-/// Tags, deren Wert genullt wird: Beschreibung, Gerät, Software, Zeit, Urheber, Rechner,
-/// Copyright, XMP, IPTC, Photoshop.
-const NULLEN: &[u16] = &[270, 271, 272, 305, 306, 315, 316, 33432, 700, 33723, 34377];
+/// Tags, die das Bild beschreiben und bleiben (Baseline und Erweiterungen der TIFF-6.0-Spec,
+/// dazu das ICC-Profil). Jeder andere Tag wird genullt — eine Positivliste, damit auch
+/// Hersteller-Tags wie CameraSerialNumber (50735), DNGPrivateData (50740) oder XPComment
+/// (40092) fallen (Review LFH-747).
+const BILD: &[u16] = &[
+    254, 255, 256, 257, 258, 259, 262, 263, 264, 265, 266, 273, 274, 277, 278, 279, 280, 281, 282,
+    283, 284, 286, 287, 290, 291, 292, 293, 296, 297, 301, 317, 318, 319, 320, 321, 322, 323, 324,
+    325, 332, 334, 338, 339, 340, 341, 347, 512, 513, 514, 515, 517, 518, 519, 520, 521, 529, 530,
+    531, 532, 34675,
+];
 
 /// Zeiger auf Unter-IFDs, die geleert werden: Exif, GPS, Interop.
 const LEEREN: &[u16] = &[34665, 34853, 40965];
@@ -38,6 +45,7 @@ struct Lauf<'a> {
     aus: Vec<u8>,
     l: Leser,
     besucht: Vec<usize>,
+    genullt: usize,
 }
 
 impl Lauf<'_> {
@@ -82,8 +90,16 @@ impl Lauf<'_> {
         Ok((ort, groesse))
     }
 
-    fn nullen(&mut self, ort: usize, laenge: usize) {
+    /// Nullt einen Bereich. Mehr zu nullen als die Datei groß ist, geht nur mit Einträgen, die
+    /// immer wieder auf dieselben Bytes zeigen: das wäre ein quadratisches memset (Review
+    /// LFH-747), also `Unbereinigbar`.
+    fn nullen(&mut self, ort: usize, laenge: usize) -> Result<(), Unbereinigbar> {
+        self.genullt = self.genullt.saturating_add(laenge);
+        if self.genullt > self.d.len() {
+            return Err(Unbereinigbar("TIFF: Metadaten größer als die Datei"));
+        }
         self.aus[ort..ort + laenge].fill(0);
+        Ok(())
     }
 
     /// Die Zeiger eines Eintrags (LONG oder IFD, Anzahl ≥ 1).
@@ -99,18 +115,17 @@ impl Lauf<'_> {
             .collect()
     }
 
-    /// Eine Seite: Metadaten-Tags nullen, Metadaten-Unter-IFDs leeren, Unter-Bilder ebenso
-    /// behandeln.
+    /// Eine Seite: Metadaten-Unter-IFDs leeren, Unter-Bilder wie Seiten behandeln, Bild-Tags
+    /// behalten und die Werte aller übrigen Tags nullen. Ein Eintrag vom Typ IFD (13) zeigt auf
+    /// ein unbekanntes Unter-IFD; es wird geleert.
     fn seite(&mut self, ifd: usize) -> Result<(), Unbereinigbar> {
         self.besuche(ifd)?;
         let (n, _) = self.kopf(ifd)?;
         for i in 0..n {
             let e = ifd + 2 + 12 * i;
             let tag = self.l.u16(self.d, e).ok_or_else(kurz)?;
-            if NULLEN.contains(&tag) {
-                let (ort, groesse) = self.wert(e)?;
-                self.nullen(ort, groesse);
-            } else if LEEREN.contains(&tag) {
+            let typ = self.l.u16(self.d, e + 2).ok_or_else(kurz)?;
+            if LEEREN.contains(&tag) || (typ == 13 && tag != UNTERBILDER) {
                 for unter in self.zeiger(e)? {
                     self.leeren(unter)?;
                 }
@@ -118,6 +133,9 @@ impl Lauf<'_> {
                 for unter in self.zeiger(e)? {
                     self.seite(unter)?;
                 }
+            } else if !BILD.contains(&tag) {
+                let (ort, groesse) = self.wert(e)?;
+                self.nullen(ort, groesse)?;
             }
         }
         Ok(())
@@ -141,14 +159,14 @@ impl Lauf<'_> {
             if typgroesse(typ).is_some() {
                 let (ort, groesse) = self.wert(e)?;
                 if groesse > 4 {
-                    self.nullen(ort, groesse);
+                    self.nullen(ort, groesse)?;
                 }
             } else {
                 // Unbekannter Typ in einem Metadaten-IFD: Lage unbekannt, also nicht sicher.
                 return Err(Unbereinigbar("TIFF: unbekannter Typ im Metadaten-IFD"));
             }
         }
-        self.nullen(ifd, nach + 4 - ifd);
+        self.nullen(ifd, nach + 4 - ifd)?;
         // Zähler 0, Nachfolger 0 (durch das Nullen schon gesetzt).
         self.l
             .schreibe_u16(&mut self.aus, ifd, 0)
@@ -164,6 +182,7 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
         aus: d.to_vec(),
         l,
         besucht: Vec::new(),
+        genullt: 0,
     };
     let mut ifd = l.u32(d, 4).ok_or_else(kurz)? as usize;
     while ifd != 0 {
@@ -202,7 +221,7 @@ mod tests {
             let erste = l.u32(&aus, 4).unwrap() as usize;
             let (tags1, zweite) = ifd(&aus, l, erste);
             // Alle Tags bleiben (sortiert), nur ihre Werte sind genullt.
-            assert_eq!(tags1.len(), 15);
+            assert_eq!(tags1.len(), 19);
             assert!(tags1.windows(2).all(|w| w[0] < w[1]));
             assert!(zweite != 0, "Seite 2 bleibt verkettet");
             let (tags2, danach) = ifd(&aus, l, zweite);
@@ -226,6 +245,29 @@ mod tests {
     fn idempotent() {
         let einmal = bereinigen(&tiff_datei(false)).expect("TIFF").daten;
         assert_eq!(bereinigen(&einmal).expect("TIFF").daten, einmal);
+    }
+
+    /// Review LFH-747: 65535 Einträge, die alle auf dieselben großen Bytes zeigen, dürfen kein
+    /// quadratisches memset auslösen.
+    #[test]
+    fn wiederholte_eintraege_sind_unbereinigbar_und_schnell() {
+        let l = Leser { be: false };
+        let n: u16 = 65_535;
+        let groesse = 8 + 2 + 12 * n as usize + 4 + 4096;
+        let mut t = vec![0u8; groesse];
+        t[..4].copy_from_slice(b"II*\0");
+        t[4..8].copy_from_slice(&8u32.to_le_bytes());
+        l.schreibe_u16(&mut t, 8, n).unwrap();
+        for i in 0..n as usize {
+            let e = 10 + 12 * i;
+            t[e..e + 2].copy_from_slice(&270u16.to_le_bytes());
+            t[e + 2..e + 4].copy_from_slice(&7u16.to_le_bytes());
+            t[e + 4..e + 8].copy_from_slice(&((groesse - 8) as u32).to_le_bytes());
+            t[e + 8..e + 12].copy_from_slice(&8u32.to_le_bytes());
+        }
+        let start = std::time::Instant::now();
+        assert!(bereinigen(&t).is_err());
+        assert!(start.elapsed() < std::time::Duration::from_secs(1));
     }
 
     #[test]

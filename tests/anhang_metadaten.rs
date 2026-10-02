@@ -404,6 +404,7 @@ async fn etag_der_bereinigten_fassung_unterscheidet_sich_und_traegt_304() {
     );
     assert_eq!(etag, format!("\"{sha256}.b1\""));
 
+    assert_eq!(h[header::CACHE_CONTROL], "private, no-cache");
     let (s, _, bytes) = laden(&app, &etb.pfad, &admin, Some(&etag)).await;
     assert_eq!(s, StatusCode::NOT_MODIFIED);
     assert!(bytes.is_empty());
@@ -427,7 +428,24 @@ async fn unbekannte_fassung_ist_400_im_fehlerformat() {
         let v: Value = serde_json::from_slice(&bytes).unwrap();
         assert!(v["error"].as_str().unwrap().contains("Fassung"), "{v}");
     }
+    // Doppelte Angabe: ebenfalls 400 im Fehlerformat, keine Klartext-Rejection.
+    let (s, _, bytes) = laden(
+        &app,
+        &format!(
+            "{}?fassung=original&fassung=bereinigt",
+            etb_pfad_fuer_400(&app, &admin, einsatz).await
+        ),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(serde_json::from_slice::<Value>(&bytes).unwrap()["error"].is_string());
     assert!(vermerke(&system_etb_inhalte(&app, &admin, einsatz).await).is_empty());
+}
+
+async fn etb_pfad_fuer_400(app: &axum::Router, admin: &str, einsatz: i64) -> String {
+    etb_foto(app, admin, einsatz).await.pfad
 }
 
 // ── Original nur mit Recht und Vermerk ──────────────────────────────────────────────────
@@ -444,7 +462,7 @@ async fn einsatzleitung_laedt_das_original_mit_vermerk_auf_jedem_weg() {
         schaden_datei(&pool, einsatz, "dach.jpg", "image/jpeg", &foto_mit_gps()).await;
 
     for (pfad, aid, ablage) in [
-        (chat, chat_aid, "Chat".to_string()),
+        (chat, chat_aid, "noch nicht versendeter Anhang".to_string()),
         (dokument, dok_aid, "Dokumentenablage".to_string()),
         (
             etb.pfad,
@@ -458,6 +476,11 @@ async fn einsatzleitung_laedt_das_original_mit_vermerk_auf_jedem_weg() {
         assert_eq!(bytes, foto_mit_gps(), "Original bytegleich, samt GPS");
         assert!(h.get(header::ETAG).is_none());
         assert_eq!(h[header::CACHE_CONTROL], "no-store");
+        let cd = h[header::CONTENT_DISPOSITION].to_str().unwrap();
+        assert!(
+            cd.contains(".original."),
+            "eigener Name fürs Original: {cd}"
+        );
         let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
         let erwartet = format!(
             "Originaldatei mit Metadaten (Standort, Gerät) abgerufen: {ablage}, Anhang #{aid}"

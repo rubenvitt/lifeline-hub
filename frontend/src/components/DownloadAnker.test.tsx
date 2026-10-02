@@ -83,8 +83,24 @@ describe('DownloadAnker — Original-Verweis (LFH-747)', () => {
       name: 'dach.jpg: Original mit Standort- und Gerätedaten herunterladen',
     });
     expect(original).toHaveAttribute('href', '/api/x/datei?fassung=original');
-    expect(original).toHaveAttribute('download', 'dach.jpg');
+    expect(original).toHaveAttribute('download', 'dach.original.jpg');
     expect(original).toHaveTextContent(ORIGINAL_TEXT);
+  });
+
+  it('trägt die Zeilenkennung im zugänglichen Namen', () => {
+    renderMitProviders(
+      <DownloadAnker
+        href="/d"
+        dateiname="IMG_0001.jpg"
+        originalHref="/d?fassung=original"
+        originalKennung="IMG_0001.jpg, Schaden S-003"
+      />,
+    );
+    expect(
+      screen.getByRole('link', {
+        name: 'IMG_0001.jpg, Schaden S-003: Original mit Standort- und Gerätedaten herunterladen',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('hält denselben Trefflächenboden wie der Hauptverweis', () => {

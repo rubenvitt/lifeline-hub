@@ -110,6 +110,7 @@ const dokumentSpalten = (
                 ? originalPfad(dokumentDownloadPfad(einsatzId, d.id))
                 : undefined
             }
+            originalKennung={`${d.dateiname}, Dokument ${d.titel}`}
           />
         );
         return entferntGerade.has(d.id) ? (

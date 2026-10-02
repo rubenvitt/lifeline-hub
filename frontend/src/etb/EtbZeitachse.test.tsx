@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { einsatzFixture } from '../test/fixtures';
+import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
 import { baueZeilen, type EtbZeile } from './etbZeile';
 import EtbZeitachse from './EtbZeitachse';
@@ -545,6 +547,30 @@ describe('EtbZeitachse – Anhänge (LFH-117)', () => {
     });
     expect(verweis).toHaveAttribute('href', '/api/einsaetze/1/etb/1/anhaenge/9');
   });
+
+  it.each([
+    ['einsatzleitung', 1],
+    ['fuehrungspersonal', 0],
+  ] as const)(
+    'fragt die Rolle aus dem Einsatz-Cache: %s sieht %i Original-Verweis (LFH-747)',
+    (rolle, anzahl) => {
+      const client = neuerQueryClient();
+      client.setQueryData(einsatzKeys.einsatz(1), einsatzFixture({ id: 1, meine_rolle: rolle }));
+      const { container } = renderMitProviders(
+        <EtbZeitachse
+          einsatzId={1}
+          zeilen={baueZeilen({
+            eintraege: [eintrag({ anhaenge: [foto] })],
+            ausstehend: [],
+            abgelehnt: [],
+          })}
+        />,
+        { client },
+      );
+      const z = zeileVon(container, 'eintrag-1');
+      expect(within(z).queryAllByText('Original (mit Standort)')).toHaveLength(anzahl);
+    },
+  );
 
   it('lässt einen Eintrag ohne Anhang unverändert', () => {
     const { container } = renderZeitachse({ eintraege: [eintrag()] });

@@ -6,7 +6,7 @@
 //!
 //! `{aid}` ist die Linker-id (`einsatz_schaden_anhang.id`), nicht `anhang.id`.
 
-use axum::extract::{Multipart, Query, State};
+use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
@@ -119,7 +119,7 @@ pub async fn datei(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Schaeden>,
     PfadParam((_einsatz_id, schaden_id, id)): PfadParam<(i64, i64, i64)>,
-    Query(param): Query<FassungParam>,
+    param: FassungParam,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
     let fassung = param.fassung()?;

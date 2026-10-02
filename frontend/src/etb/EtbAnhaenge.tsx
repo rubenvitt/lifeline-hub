@@ -1,7 +1,11 @@
-import { Fragment } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
 import { etbAnhangPfad } from '../api/etb';
-import { istBildMime, originalPfad } from '../api/anhangFassung';
+import {
+  istBildMime,
+  originalDateiname,
+  originalPfad,
+  originalZugaenglicherName,
+} from '../api/anhangFassung';
 import { ORIGINAL_TEXT } from '../components/DownloadAnker';
 import { useRollen } from '../components/instrument';
 import { formatGroesse } from '../karten/formatGroesse';
@@ -45,7 +49,9 @@ export default function EtbAnhaenge({
         const groesse = formatGroesse(a.groesse);
         const href = etbAnhangPfad(einsatzId, eintrag.id, a.id);
         return (
-          <Fragment key={a.id}>
+          // Bild und Original bleiben als Paar zusammen: beim Umbruch stünde „Original“ sonst vor
+          // dem nächsten Bild.
+          <span key={a.id} style={{ display: 'inline-flex', columnGap: token.marginSM }}>
             <a
               href={href}
               download={a.dateiname}
@@ -57,15 +63,17 @@ export default function EtbAnhaenge({
             {darfOriginal && istBildMime(a.mime) && (
               <a
                 href={originalPfad(href)}
-                download={a.dateiname}
-                aria-label={`${a.dateiname}, Anhang zu Nr. ${eintrag.lfd_nr}: Original mit Standort- und Gerätedaten herunterladen`}
+                download={originalDateiname(a.dateiname)}
+                aria-label={originalZugaenglicherName(
+                  `${a.dateiname}, Anhang zu Nr. ${eintrag.lfd_nr}`,
+                )}
                 data-lfh="etb-anhang-original"
-                style={{ ...stil, fontWeight: 'normal' }}
+                style={stil}
               >
                 {ORIGINAL_TEXT}
               </a>
             )}
-          </Fragment>
+          </span>
         );
       })}
     </span>

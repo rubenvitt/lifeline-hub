@@ -63,7 +63,8 @@ Download läuft.
 - **Warum nicht zusätzlich speichern** (Spalte `daten_bereinigt`): Die DB und jedes Backup
   würden doppelt so groß. Eine korrigierte Bereinigung erreichte schon gespeicherte Fassungen
   nicht. Und die Schwärzungs-Registry bekäme eine Spalte mehr, die sie kennen muss.
-- **Kosten:** Ein Durchlauf über höchstens 25 MiB, linear. Für Bilder ist das ein
+- **Kosten:** Ein Durchlauf über höchstens 25 MiB, linear (die Grenzen in D4 halten das auch
+  für bösartige Dateien). Für Bilder ist das ein
   Segment-Walk mit Kopie, ohne Dekodieren, also im Millisekundenbereich. `spawn_blocking` ist
   dafür nicht nötig.
 
@@ -122,8 +123,13 @@ beschreibende Teile fallen weg. Unbekannte Teile, die für das Bild wesentlich s
   `pHYs`, `sPLT`, `acTL`, `fcTL`, `fdAT`. Weg sind `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME` und
   unbekannte Hilfs-Chunks. Ein unbekannter kritischer Chunk führt zu `Unbereinigbar`. Die CRCs
   vorhandener Chunks bleiben, wie sie sind.
+- **Speicher:** JPEG und WebP schreiben direkt in einen Ausgabepuffer, nie einen Vektor je
+  Segment oder Chunk. 13 Mio. eigenständige `FFD0` in 25 MiB ergaben sonst ein Vielfaches der
+  Datei im Speicher (Review). Das Mini-EXIF kommt über eine gemerkte Einfügestelle hinein.
 - **WebP:**
-  - Behalten: `VP8 `, `VP8L`, `VP8X`, `ALPH`, `ANIM`, `ANMF`, `ICCP`.
+  - Behalten: `VP8 `, `VP8L`, `VP8X`, `ALPH`, `ANIM`, `ANMF`, `ICCP`. Ein `ANMF`-Frame darf
+    selbst nur `ALPH`, `VP8 ` und `VP8L` tragen, sonst `Unbereinigbar` (ein darin geschachteltes
+    `EXIF` liefe sonst durch).
   - Weg: `EXIF`, `XMP ` und unbekannte Chunks.
   - In `VP8X` werden die Flags für XMP (`0x04`) und EXIF (`0x08`) gelöscht. Wird das Mini-EXIF
     geschrieben, wird das EXIF-Flag wieder gesetzt.
@@ -133,17 +139,31 @@ beschreibende Teile fallen weg. Unbekannte Teile, die für das Bild wesentlich s
   Graphic Control und Plain Text bleiben, weil sie dargestellt werden.
 - **HEIF/HEIC:** Der Code liest die Boxen `ftyp` → `meta` → `iinf`/`infe` und `iloc` (Version
   0–2, `construction_method` 0 oder 1 mit `idat`).
-  - Items vom Typ `Exif` und `mime`-Items mit XMP-Inhaltstyp (`application/rdf+xml`) werden
-    **an Ort und Stelle mit Nullen überschrieben**. Alle Offsets bleiben dadurch gültig, nichts
-    muss umgebaut werden.
+  - Items vom Typ `Exif`, jedes `mime`-Item (XMP und anderes Beschreibendes) und jedes
+    `uri `-Item werden **an Ort und Stelle mit Nullen überschrieben**. Alle Offsets bleiben
+    dadurch gültig, nichts muss umgebaut werden.
+  - Das Exif-Item bekommt statt reiner Nullen einen gültigen leeren TIFF-Block (Offset 0, IFD
+    ohne Einträge). Ein genulltes Item ließ Leser beim EXIF-Lesen abbrechen (Praxistest mit
+    pillow-heif).
+  - Top-Level-Boxen nur `ftyp`, `meta`, `mdat`, `free`, `skip`. Alles andere, etwa `moov` einer
+    Bildfolge mit `udta/©xyz`-Standort, ist `Unbereinigbar`. Ebenso eine zweite
+    `iinf`/`iloc`/`idat` in derselben `meta`.
+  - Schutz vor Überlast (Review): Extents nicht gesuchter Items werden ohne Schleife
+    übersprungen (mit Feldgrößen 0 rückte die Schleife nie vor), höchstens 64 Metadaten-Items,
+    und die Summe der genullten Bytes darf die Dateigröße nicht übersteigen.
   - Die Ausrichtung trägt HEIF über die Properties `irot`/`imir`, nicht über EXIF. Sie bleibt
     also ohne Mini-EXIF erhalten.
   - `construction_method` 2 oder ein Verweis ins Leere führt zu `Unbereinigbar`.
 - **TIFF:** Die IFD-Kette wird gelesen, und auf jedem IFD (also jeder Seite eines Scans)
   geschieht dasselbe an Ort und Stelle:
-  - **Textwerte nullen:** ImageDescription 270, Make 271, Model 272, Software 305,
-    DateTime 306, Artist 315, HostComputer 316, Copyright 33432, XMP 700, IPTC 33723,
-    Photoshop 34377.
+  - **Positivliste der Bild-Tags** (Baseline und Erweiterungen der TIFF-6.0-Spec, ICC 34675,
+    Ausrichtung 274). **Die Werte aller übrigen Tags werden genullt**, darunter
+    ImageDescription, Make, Model, Software, DateTime, Artist, XMP, IPTC, Photoshop und auch
+    Hersteller-Tags wie CameraSerialNumber 50735, DNGPrivateData 50740 oder XPComment 40092.
+    Zuerst stand hier eine Negativliste; das Review fand die Hersteller-Tags.
+  - Ein Eintrag vom Typ IFD (13) zeigt auf ein unbekanntes Unter-IFD; es wird geleert. Die
+    Summe der genullten Bytes darf die Dateigröße nicht übersteigen (sonst quadratisches
+    memset).
   - **Unter-IFDs leeren:** ExifIFD 34665, GPSIFD 34853, InteropIFD 40965. Zuerst werden die
     Werte ihrer Einträge genullt, dann wird ihr Eintragszähler auf 0 gesetzt und ein
     Nachfolger-Offset 0 geschrieben, der Rest der alten Tabelle wird genullt.
@@ -185,6 +205,9 @@ anhang_antwort(pool, anhang_id, req_headers, fassung)
 ```
 
 - **`Bereinigt`:**
+  - `Cache-Control: private, no-cache` statt `ASSET_CACHE_CONTROL` (immutable): Sonst böte ein
+    Browser nach einer korrigierten Bereinigung ein Jahr lang die alte Fassung an (Review).
+    Revalidieren kostet nur ein 304 ohne BLOB.
   - Der ETag ist `"<sha256>.b<BEREINIGUNG_VERSION>"` (Konstante in `metadaten/mod.rs`, Start
     bei 1). Er gilt für jeden Dateityp, damit der 304-Kurzschluss den BLOB weiter nicht lesen
     muss.
@@ -200,12 +223,13 @@ anhang_antwort(pool, anhang_id, req_headers, fassung)
 
 ### D7 — `?fassung=original` an den vier bestehenden Routen statt einer eigenen Route
 
-Die Handler lesen `Query<FassungParam { fassung: Option<String> }>`.
+Die Handler ziehen den eigenen Extractor `FassungParam` (liest die Query als Liste von Paaren).
 
-- `None` oder `bereinigt` ergibt `Bereinigt`.
+- Keine Angabe oder `bereinigt` ergibt `Bereinigt`.
 - `original` ergibt `Original`.
-- Jeder andere Wert ergibt 400 über `AppError::Validation`. Wir nutzen nicht die
-  Enum-Deserialisierung von axum, weil deren Rejection nicht im `{error}`-Format ankäme.
+- Jeder andere Wert und eine doppelte Angabe ergeben 400 über `AppError::Validation`. Ein
+  eigener Extractor statt `Query<…>`, weil axums Rejection (etwa „duplicate field“) nicht im
+  `{error}`-Format ankäme.
 
 Reihenfolge im Handler:
 
@@ -224,8 +248,8 @@ Reihenfolge im Handler:
   („Einsatzleitung + Admin“) und wird am Freigabe-Checkpoint ausdrücklich vorgelegt.
 - **Vermerk:** Text „Originaldatei mit Metadaten (Standort, Gerät) abgerufen: <Ablage>,
   Anhang #<anhang_id>“.
-  - `<Ablage>` ist „Chat“, „Dokumentenablage“, „ETB-Eintrag Nr. <lfd_nr>“ oder
-    „Schaden <kennung>“.
+  - `<Ablage>` ist „Chat“ (bzw. „noch nicht versendeter Anhang“, solange der Anhang an keiner
+    Nachricht hängt), „Dokumentenablage“, „ETB-Eintrag Nr. <lfd_nr>“ oder „Schaden <kennung>“.
   - Nie der Dateiname, wie die Regel in `src/AGENTS.md` zu Schaden-Anhängen es verlangt.
   - Die abrufende Person steht als Erfasser im Eintrag (pseudonym wie jeder System-Eintrag).
 - **Verworfen: eigene Route `…/anhaenge/{aid}/original`.** Sie müsste die vier Linker-Gates
@@ -238,19 +262,25 @@ Reihenfolge im Handler:
 
 ### D8 — Frontend: zweiter Verweis am bestehenden Anker, Sichtbarkeit beim Aufrufer
 
-- `DownloadAnker` bekommt das optionale Prop `originalHref`. Ist es gesetzt, steht unter dem
-  Hauptverweis ein zweiter nativer Verweis „Original (mit Standort)“ mit `download`. Sein
-  zugänglicher Name lautet „<dateiname>: Original mit Standort- und Gerätedaten
-  herunterladen“. Zielgröße und Farben kommen aus demselben Stil (`downloadAnkerStil`,
+- `DownloadAnker` bekommt die optionalen Props `originalHref` und `originalKennung`. Ist
+  `originalHref` gesetzt, steht neben dem Hauptverweis ein zweiter nativer Verweis „Original (mit
+  Standort)“. Sein zugänglicher Name trägt die Zeilenkennung des Aufrufers („dach.jpg, Schaden
+  S-003: Original mit Standort- und Gerätedaten herunterladen“).
+- **Eigener Dateiname für das Original** (Review): `dach.original.jpg`, im `download`-Attribut
+  (`originalDateiname`) und in der `Content-Disposition` des Servers
+  (`anhang::original_dateiname`). Sonst lägen `dach.jpg` und `dach (1).jpg` nebeneinander, und
+  niemand sähe, welche Datei den Standort trägt. Zielgröße und Farben kommen aus demselben Stil (`downloadAnkerStil`,
   Rollen), es gibt keinen neuen Farbton.
 - `etb/EtbAnhaenge.tsx` stellt auf `DownloadAnker` um oder bekommt denselben Zweitverweis. Die
   Wahl fällt beim Umsetzen nach dem dortigen Layout, der Wortlaut bleibt gleich.
-- Neue reine Helfer in `api/anhangFassung.ts`:
-  - `originalPfad(href)` hängt `?fassung=original` an.
-  - `istBildMime(mime)` prüft auf `image/`.
-  - `darfOriginalLaden(einsatz, benutzer)` ist `istEinsatzLeitung(einsatz) || istAdmin(benutzer)`
-    und steht in `einsatz/schreibrecht.ts`, weil der Rollen-Guard dort jeden Vergleich
-    verlangt.
+- Neue reine Helfer in `api/anhangFassung.ts`: `originalPfad(href)` hängt
+  `?fassung=original` an, `istBildMime(mime)` prüft auf `image/`, `originalDateiname` und
+  `originalZugaenglicherName` bauen Name und zugänglichen Namen.
+- `darfOriginalLaden(einsatz, benutzer)` ist `istEinsatzLeitung(einsatz) || istAdmin(benutzer)`
+  und steht in `einsatz/schreibrecht.ts`, weil der Rollen-Guard dort jeden Vergleich verlangt.
+- Bewusste Grenze: Die Oberfläche erkennt Bilder am MIME aus der Endung, der Server am Inhalt.
+  Ein JPEG namens `scan.pdf` wird bereinigt ausgeliefert, der Original-Verweis fehlt aber in der
+  Oberfläche. Die Einsatzleitung kommt dann nur über die Adresse ans Original.
 - Die vier Aufrufer setzen `originalHref` nur, wenn `darfOriginalLaden` gilt und `istBildMime`
   zutrifft. Für Nicht-Bilder gibt es keinen Zweitverweis, die Spec verlangt das so.
 - Wie die Aufrufer an die Rolle kommen (beim Umsetzen entschieden): Chat und Dokumentenablage
@@ -295,8 +325,23 @@ unverändert.
 - **[Das Original steht weiter in DB und Backup]**
   → So entschieden (Beweismittel). Die Schwärzung löscht es physisch (LFH-725).
 - **[Schon heruntergeladene Originale auf Endgeräten]**
-  → Liegen außerhalb der Reichweite. Der neue ETag sorgt nur dafür, dass Browser-Caches nicht
-    weiter das Original anbieten.
+  → Liegen außerhalb der Reichweite.
+- **[Vorschauen als eigene Bilder in HEIF und TIFF bleiben]**
+  → Die Spec nennt nur die Vorschaubilder in EXIF und JFIF (die verschwinden mit dem EXIF).
+    HEIF-`thmb`-Items und TIFF-Seiten mit reduzierter Auflösung sind Bildinhalt. Genullt zeigten
+    Betrachter eine kaputte Vorschau. Ein beschnittenes Foto mit unbeschnittener
+    Container-Vorschau bleibt damit ein Restrisiko, das ein Folgeticket klären kann.
+- **[Private TIFF-Unter-IFDs über LONG-Zeiger]**
+  → Ein unbekannter Tag vom Typ LONG, der auf ein privates Unter-IFD zeigt, verliert seinen
+    Zeiger (genullt). Die Bytes dahinter bleiben aber unreferenziert in der Datei stehen. Echte
+    Scanner-TIFFs tragen so etwas kaum. Das Kontrollnetz fängt XMP und EXIF, keinen Freitext.
+- **[Genulltes XMP-Item in HEIF]**
+  → Leser sehen ein XMP aus Nullbytes (Pillow liest es als Bytes, ohne Fehler). Ein gültiges
+    leeres XMP-Paket würde das Kontrollnetz auslösen.
+- **[Vor dem Deploy im Browser-Cache liegende Originale]**
+  → Bisher lieferte dieselbe Adresse das Original mit `immutable`. Ein Browser, der es schon
+    hält, fragt nicht nach, bis der Cache verfällt. Das betrifft nur Geräte, die die Datei schon
+    geladen haben, und auf denen liegt sie ohnehin als Download.
 - **[ETB-Rauschen durch wiederholte Original-Abrufe]**
   → Gewollt: Jeder Abruf von Standortdaten ist ein Zugriff auf personenbezogene Daten und
     soll einzeln nachvollziehbar sein.

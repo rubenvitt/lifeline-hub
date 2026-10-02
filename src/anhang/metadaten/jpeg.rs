@@ -45,9 +45,14 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
     if d.get(..2) != Some(&[0xFF, SOI]) {
         return Err(Unbereinigbar("JPEG: kein SOI"));
     }
-    // Erst sammeln, dann zusammensetzen: die Ausrichtung steht im APP1, das Mini-EXIF gehört
-    // aber vor alle übrigen Segmente (direkt hinter SOI bzw. JFIF-APP0).
-    let mut teile: Vec<Vec<u8>> = Vec::new();
+    // Direkt in den Ausgabepuffer schreiben, nie ein Vektor je Teil: 13 Mio. eigenständige
+    // `FFD0` in 25 MiB ergäben sonst ein Vielfaches der Datei im Speicher (Review LFH-747). Die
+    // Ausrichtung steht erst im APP1, das Mini-EXIF gehört aber direkt hinter SOI bzw. ein
+    // führendes JFIF-APP0; es kommt am Ende an der gemerkten Stelle hinein.
+    let mut aus = Vec::with_capacity(d.len());
+    aus.extend_from_slice(&[0xFF, SOI]);
+    let mut einfuegestelle = aus.len();
+    let mut erster_teil = true;
     let mut ausrichtung = None;
     let mut exif_gesehen = false;
     let mut pos = 2usize;
@@ -63,12 +68,13 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
         pos += 1;
         match marker {
             EOI => {
-                teile.push(vec![0xFF, EOI]);
+                // Alles nach dem ersten EOI fällt weg (MPF-Zweitbilder, Hersteller-Trailer).
+                aus.extend_from_slice(&[0xFF, EOI]);
                 break;
             }
             SOI | 0x00 => return Err(Unbereinigbar("JPEG: SOI oder Stopfbyte an Markerstelle")),
             // Standalone: TEM und RSTn außerhalb eines Scans.
-            0x01 | 0xD0..=0xD7 => teile.push(vec![0xFF, marker]),
+            0x01 | 0xD0..=0xD7 => aus.extend_from_slice(&[0xFF, marker]),
             _ => {
                 let laenge = u16::from_be_bytes(
                     d.get(pos..pos + 2)
@@ -86,45 +92,42 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
                     exif_gesehen = true;
                     ausrichtung = exif::ausrichtung(&nutzlast[6..]);
                 }
+                let vorher = aus.len();
                 match umgang(marker, nutzlast)? {
-                    Umgang::Behalten => teile.push(segment.to_vec()),
+                    Umgang::Behalten => aus.extend_from_slice(segment),
                     Umgang::JfifOhneVorschau => {
-                        let mut s = vec![0xFF, APP0, 0x00, 0x10];
-                        s.extend_from_slice(&nutzlast[..12]);
-                        s.extend_from_slice(&[0, 0]);
-                        teile.push(s);
+                        aus.extend_from_slice(&[0xFF, APP0, 0x00, 0x10]);
+                        aus.extend_from_slice(&nutzlast[..12]);
+                        aus.extend_from_slice(&[0, 0]);
                     }
                     Umgang::Weg => {}
+                }
+                if aus.len() > vorher {
+                    if erster_teil && marker == APP0 {
+                        einfuegestelle = aus.len();
+                    }
+                    erster_teil = false;
                 }
                 pos = ende;
                 if marker == SOS {
                     let scan_ende = ende_der_entropiedaten(d, pos)?;
-                    teile.push(d[pos..scan_ende].to_vec());
+                    aus.extend_from_slice(&d[pos..scan_ende]);
                     pos = scan_ende;
                 }
+                continue;
             }
         }
-    }
-    // Zusammensetzen; alles nach dem EOI fällt weg.
-    let mut aus = Vec::with_capacity(d.len());
-    aus.extend_from_slice(&[0xFF, SOI]);
-    let mut rest = teile.into_iter().peekable();
-    if let Some(erstes) = rest.peek() {
-        if erstes.get(1) == Some(&APP0) {
-            aus.extend(rest.next().unwrap_or_default());
-        }
+        erster_teil = false;
     }
     let mut exif_stelle = None;
     if let Some((wert, l)) = ausrichtung {
         let mini = exif::mini_tiff(wert, l);
-        aus.extend_from_slice(&[0xFF, APP1]);
-        aus.extend_from_slice(&((2 + 6 + mini.len()) as u16).to_be_bytes());
-        exif_stelle = Some(aus.len());
-        aus.extend_from_slice(b"Exif\0\0");
-        aus.extend(mini);
-    }
-    for t in rest {
-        aus.extend(t);
+        let mut app1 = vec![0xFF, APP1];
+        app1.extend_from_slice(&((2 + 6 + mini.len()) as u16).to_be_bytes());
+        app1.extend_from_slice(b"Exif\0\0");
+        app1.extend(mini);
+        exif_stelle = Some(einfuegestelle + 4);
+        aus.splice(einfuegestelle..einfuegestelle, app1);
     }
     Ok(Bereinigt {
         daten: aus,

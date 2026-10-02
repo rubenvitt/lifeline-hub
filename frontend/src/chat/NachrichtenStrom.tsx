@@ -313,6 +313,7 @@ export default function NachrichtenStrom({
                             originalHref={
                               darfOriginal && istBildMime(a.mime) ? originalPfad(href) : undefined
                             }
+                            originalKennung={`${a.dateiname}, Anhang der Nachricht von ${n.autor_name}`}
                           />
                         );
                       })}

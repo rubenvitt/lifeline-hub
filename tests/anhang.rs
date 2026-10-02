@@ -715,7 +715,12 @@ async fn download_setzt_etag_und_cache_control() {
         .to_str()
         .unwrap();
     assert!(cc.contains("private"), "private (auth-gated): {cc}");
-    assert!(cc.contains("immutable"), "immutable: {cc}");
+    // LFH-747: die bereinigte Fassung wird revalidiert statt ein Jahr festgehalten, damit
+    // eine korrigierte Bereinigung (neuer ETag) ankommt.
+    assert!(
+        cc.contains("no-cache") && !cc.contains("immutable"),
+        "no-cache: {cc}"
+    );
 }
 
 /// G04: `If-None-Match` mit passendem ETag → 304 ohne Body (BLOB wird nicht gelesen);

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { istBildMime, originalPfad } from './anhangFassung';
+import {
+  istBildMime,
+  originalDateiname,
+  originalPfad,
+  originalZugaenglicherName,
+} from './anhangFassung';
 
 describe('anhangFassung (LFH-747)', () => {
   it('hängt die Fassung an die Download-Adresse', () => {
@@ -10,6 +15,20 @@ describe('anhangFassung (LFH-747)', () => {
 
   it('ergänzt einen vorhandenen Query-String', () => {
     expect(originalPfad('/api/x?a=1')).toBe('/api/x?a=1&fassung=original');
+  });
+
+  it('benennt das Original unterscheidbar', () => {
+    expect(originalDateiname('dach.jpg')).toBe('dach.original.jpg');
+    expect(originalDateiname('IMG_0001.HEIC')).toBe('IMG_0001.original.HEIC');
+    expect(originalDateiname('foto.final.png')).toBe('foto.final.original.png');
+    expect(originalDateiname('ohneendung')).toBe('ohneendung.original');
+    expect(originalDateiname('.versteckt')).toBe('.versteckt.original');
+  });
+
+  it('baut den zugänglichen Namen aus der Zeilenkennung', () => {
+    expect(originalZugaenglicherName('dach.jpg, Schaden S-003')).toBe(
+      'dach.jpg, Schaden S-003: Original mit Standort- und Gerätedaten herunterladen',
+    );
   });
 
   it('erkennt Bilder am MIME-Typ', () => {

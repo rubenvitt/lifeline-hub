@@ -95,26 +95,51 @@ pub enum Fassung {
     Original,
 }
 
-/// Query `?fassung=` der vier Anhang-Download-Routen. Als `Option<String>` statt als Enum, damit
-/// ein unbekannter Wert als 400 im `{error}`-Format ankommt und nicht als Rejection von axum.
-#[derive(Debug, Deserialize)]
-pub struct FassungParam {
-    pub fassung: Option<String>,
+/// Query `?fassung=` der vier Anhang-Download-Routen, als eigener Extractor: jede Ablehnung
+/// (unbekannter Wert, doppelte Angabe, kaputte Kodierung) kommt als 400 im `{error}`-Format an,
+/// nie als Klartext-Rejection von axum (`src/AGENTS.md`, Extractor-Vertrag).
+#[derive(Debug)]
+pub struct FassungParam(Vec<String>);
+
+impl<S: Send + Sync> axum::extract::FromRequestParts<S> for FassungParam {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, AppError> {
+        let axum::extract::Query(paare) =
+            axum::extract::Query::<Vec<(String, String)>>::from_request_parts(parts, state)
+                .await
+                .map_err(|e| AppError::Validation(format!("Ungültige Query: {e}")))?;
+        Ok(FassungParam(
+            paare
+                .into_iter()
+                .filter(|(k, _)| k == "fassung")
+                .map(|(_, v)| v)
+                .collect(),
+        ))
+    }
 }
 
 impl FassungParam {
     /// Fehlt oder `bereinigt` → [`Fassung::Bereinigt`], `original` → [`Fassung::Original`],
-    /// alles andere 400 (das Feld scheitert für sich).
+    /// alles andere 400 (das Feld scheitert für sich), auch eine doppelte Angabe.
     pub fn fassung(&self) -> Result<Fassung, AppError> {
-        match self.fassung.as_deref() {
-            None | Some("bereinigt") => Ok(Fassung::Bereinigt),
-            Some("original") => Ok(Fassung::Original),
-            Some(w) => Err(AppError::Validation(format!(
+        match self.0.as_slice() {
+            [] => Ok(Fassung::Bereinigt),
+            [w] if w == "bereinigt" => Ok(Fassung::Bereinigt),
+            [w] if w == "original" => Ok(Fassung::Original),
+            [w] => Err(AppError::Validation(format!(
                 "Unbekannte Fassung «{w}» (erlaubt: bereinigt, original)"
             ))),
+            _ => Err(AppError::Validation("Fassung mehrfach angegeben".into())),
         }
     }
 }
+
+/// `Cache-Control` der bereinigten Fassung (LFH-747): privat und vor jeder Nutzung revalidiert.
+pub const BEREINIGT_CACHE_CONTROL: &str = "private, no-cache";
 
 /// Meldung des 422, wenn sich ein Bild nicht bereinigen lässt (Spec `anhang-metadaten`).
 pub const UNBEREINIGBAR_MELDUNG: &str = "Die Datei lässt sich nicht von Metadaten bereinigen. \
@@ -148,7 +173,7 @@ pub async fn original_freigeben(
 /// Liefert einen `anhang`-BLOB als Download-Antwort (LFH-258/LFH-632, Fassungen LFH-747).
 ///
 /// - [`Fassung::Bereinigt`]: ETag aus sha256 und Version der Bereinigung, `Cache-Control` nach
-///   [`ASSET_CACHE_CONTROL`], 304-Kurzschluss bei passendem `If-None-Match` OHNE den BLOB zu
+///   [`BEREINIGT_CACHE_CONTROL`], 304-Kurzschluss bei passendem `If-None-Match` OHNE den BLOB zu
 ///   lesen, sonst die Bytes nach [`anhang::metadaten::bereinigen`]. Lässt sich ein Bild nicht
 ///   bereinigen → 422, nie das Original.
 /// - [`Fassung::Original`]: die gespeicherten Bytes, ohne ETag und mit `no-store`, damit jeder
@@ -179,9 +204,12 @@ pub async fn anhang_antwort(
                 HeaderValue::from_str(&etag)
                     .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
             );
+            // Nicht `ASSET_CACHE_CONTROL` (immutable): die bereinigte Fassung hängt an
+            // `BEREINIGUNG_VERSION`, und ein Browser soll nach einer korrigierten Bereinigung
+            // nicht ein Jahr lang die alte anbieten. Revalidieren kostet nur ein 304 ohne BLOB.
             headers.insert(
                 header::CACHE_CONTROL,
-                HeaderValue::from_static(ASSET_CACHE_CONTROL),
+                HeaderValue::from_static(BEREINIGT_CACHE_CONTROL),
             );
             if if_none_match_matcht(req_headers, &etag) {
                 return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
@@ -199,9 +227,15 @@ pub async fn anhang_antwort(
     );
     // Content-Disposition mit ASCII-Fallback + RFC-5987 filename* (Umlaute etc.);
     // geteilte Infrastruktur in `anhang::content_disposition` (LFH-238).
+    // Das Original trägt einen eigenen Namen (`dach.original.jpg`), damit es neben der
+    // bereinigten Fassung erkennbar bleibt.
+    let name = match fassung {
+        Fassung::Bereinigt => dateiname,
+        Fassung::Original => anhang::original_dateiname(&dateiname),
+    };
     headers.insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&anhang::content_disposition(&dateiname))
+        HeaderValue::from_str(&anhang::content_disposition(&name))
             .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
     );
     let (_, _, daten) = anhang::repo::laden_bytes(pool, anhang_id).await?;
