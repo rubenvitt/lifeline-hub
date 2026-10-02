@@ -7,6 +7,7 @@ import {
   originalZugaenglicherName,
 } from '../api/anhangFassung';
 import { ORIGINAL_TEXT } from '../components/DownloadAnker';
+import AnhangVorschau, { AnhangVorschauGruppe } from '../components/AnhangVorschau';
 import { useRollen } from '../components/instrument';
 import { formatGroesse } from '../karten/formatGroesse';
 import { verweisStil } from './zeitachseModell';
@@ -26,15 +27,21 @@ import { verweisStil } from './zeitachseModell';
  * Mit `darfOriginal` (der Aufrufer fragt `useDarfOriginalLaden`, LFH-747) steht hinter jedem
  * Bild ein zweiter Verweis auf das Original samt Standort; der Hauptverweis lädt die bereinigte
  * Fassung. Als Prop statt Hook, damit das Bauteil ohne Provider renderbar bleibt.
+ *
+ * Vor jedem Bild steht ein Vorschaubild (LFH-759, `AnhangVorschau`); die Großansicht blättert
+ * durch die Bilder dieses Eintrags.
  */
 export default function EtbAnhaenge({
   einsatzId,
   eintrag,
   darfOriginal = false,
+  grossansicht = true,
 }: {
   einsatzId: number;
   eintrag: Pick<EtbEintragAnzeige, 'id' | 'lfd_nr' | 'anhaenge'>;
   darfOriginal?: boolean;
+  /** `false` in der Palettenvorschau: Vorschaubild ohne Großansicht (LFH-759). */
+  grossansicht?: boolean;
 }) {
   const { token, rollen } = useRollen();
   if (eintrag.anhaenge.length === 0) return null;
@@ -45,37 +52,49 @@ export default function EtbAnhaenge({
       data-lfh="etb-anhaenge"
       style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: token.marginSM }}
     >
-      {eintrag.anhaenge.map((a) => {
-        const groesse = formatGroesse(a.groesse);
-        const href = etbAnhangPfad(einsatzId, eintrag.id, a.id);
-        return (
-          // Bild und Original bleiben als Paar zusammen: beim Umbruch stünde „Original“ sonst vor
-          // dem nächsten Bild.
-          <span key={a.id} style={{ display: 'inline-flex', columnGap: token.marginSM }}>
-            <a
-              href={href}
-              download={a.dateiname}
-              aria-label={`${a.dateiname}, ${groesse}, Anhang zu Nr. ${eintrag.lfd_nr} herunterladen`}
-              style={stil}
+      <AnhangVorschauGruppe>
+        {eintrag.anhaenge.map((a) => {
+          const groesse = formatGroesse(a.groesse);
+          const href = etbAnhangPfad(einsatzId, eintrag.id, a.id);
+          return (
+            // Bild und Original bleiben als Paar zusammen: beim Umbruch stünde „Original“ sonst vor
+            // dem nächsten Bild.
+            <span
+              key={a.id}
+              style={{ display: 'inline-flex', alignItems: 'center', columnGap: token.marginSM }}
             >
-              {a.dateiname} · {groesse}
-            </a>
-            {darfOriginal && istBildMime(a.mime) && (
+              <AnhangVorschau
+                href={href}
+                mime={a.mime}
+                dateiname={a.dateiname}
+                kennung={`Anhang zu Nr. ${eintrag.lfd_nr}`}
+                grossansicht={grossansicht}
+              />
               <a
-                href={originalPfad(href)}
-                download={originalDateiname(a.dateiname)}
-                aria-label={originalZugaenglicherName(
-                  `${a.dateiname}, Anhang zu Nr. ${eintrag.lfd_nr}`,
-                )}
-                data-lfh="etb-anhang-original"
+                href={href}
+                download={a.dateiname}
+                aria-label={`${a.dateiname}, ${groesse}, Anhang zu Nr. ${eintrag.lfd_nr} herunterladen`}
                 style={stil}
               >
-                {ORIGINAL_TEXT}
+                {a.dateiname} · {groesse}
               </a>
-            )}
-          </span>
-        );
-      })}
+              {darfOriginal && istBildMime(a.mime) && (
+                <a
+                  href={originalPfad(href)}
+                  download={originalDateiname(a.dateiname)}
+                  aria-label={originalZugaenglicherName(
+                    `${a.dateiname}, Anhang zu Nr. ${eintrag.lfd_nr}`,
+                  )}
+                  data-lfh="etb-anhang-original"
+                  style={stil}
+                >
+                  {ORIGINAL_TEXT}
+                </a>
+              )}
+            </span>
+          );
+        })}
+      </AnhangVorschauGruppe>
     </span>
   );
 }

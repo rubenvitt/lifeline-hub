@@ -38,9 +38,13 @@ async fn schwaerzung_entfernt_fuehrungsstelle_nur_im_betroffenen_einsatz() {
         ids.push(id);
     }
     let mut tx = pool.begin().await.unwrap();
-    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, ids[0])
-        .await
-        .unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        ids[0],
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     let stellen: Vec<Option<String>> = sqlx::query_scalar(
         "SELECT fuehrungsstelle FROM einsatz_mitgliedschaft ORDER BY einsatz_id",

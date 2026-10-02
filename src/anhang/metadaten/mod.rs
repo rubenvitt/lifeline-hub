@@ -47,8 +47,9 @@ impl Bereinigt {
     }
 }
 
+/// Erkanntes Bildformat; auch die Vorschau (`anhang::vorschau`, LFH-759) wählt danach.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Format {
+pub(crate) enum Format {
     Jpeg,
     Png,
     Webp,
@@ -63,7 +64,7 @@ const HEIF_MARKEN: &[&[u8; 4]] = &[
     b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx", b"mif1", b"msf1",
 ];
 
-fn erkenne(d: &[u8]) -> Option<Format> {
+pub(crate) fn erkenne(d: &[u8]) -> Option<Format> {
     if d.starts_with(&[0xFF, 0xD8, 0xFF]) {
         return Some(Format::Jpeg);
     }
@@ -126,7 +127,12 @@ pub fn bereinigen<'a>(daten: &'a [u8], mime: &str) -> Result<Cow<'a, [u8]>, Unbe
 /// Ein EXIF-Block ist `Exif\0\0` **mit folgendem TIFF-Kopf**: die Kennung allein steht in jedem
 /// HEIC als Item-Typ im `infe` (Typ `Exif`, leerer Name, dann die Nullbytes der nächsten Box)
 /// und hätte jedes iPhone-Foto abgewiesen.
-fn pruefe_kontrollnetz(d: &[u8], exif_stelle: Option<usize>) -> Result<(), Unbereinigbar> {
+///
+/// Auch die Vorschau prüft ihre Ausgabe damit (`anhang::vorschau`, LFH-759), ohne `exif_stelle`.
+pub(crate) fn pruefe_kontrollnetz(
+    d: &[u8],
+    exif_stelle: Option<usize>,
+) -> Result<(), Unbereinigbar> {
     const XMP: &[u8] = b"http://ns.adobe.com/xap/1.0/";
     const XMP_ERWEITERT: &[u8] = b"http://ns.adobe.com/xmp/extension/";
     const XMPMETA: &[u8] = b"<x:xmpmeta";
@@ -151,6 +157,12 @@ fn pruefe_kontrollnetz(d: &[u8], exif_stelle: Option<usize>) -> Result<(), Unber
         }
     }
     Ok(())
+}
+
+/// BigTIFF (`II+\0`/`MM\0+`): [`erkenne`] meldet es als TIFF, Bereinigung und Vorschau weisen
+/// es ab.
+pub(crate) fn ist_bigtiff(d: &[u8]) -> bool {
+    matches!(d.get(..4), Some(b"II+\0" | b"MM\0+"))
 }
 
 fn ist_tiff_kopf(d: &[u8]) -> bool {

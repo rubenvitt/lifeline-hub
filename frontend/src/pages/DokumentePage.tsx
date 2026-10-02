@@ -111,6 +111,8 @@ const dokumentSpalten = (
                 : undefined
             }
             originalKennung={`${d.dateiname}, Dokument ${d.titel}`}
+            mime={d.mime}
+            vorschauKennung={`Dokument ${d.titel}`}
           />
         );
         return entferntGerade.has(d.id) ? (

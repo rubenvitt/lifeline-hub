@@ -44,7 +44,10 @@ export function useEigenposition({
 }: {
   /** Meldung, wenn die Standortermittlung scheitert; der Hook schaltet dabei aus. */
   onFehler: (text: string) => void;
-  /** Erster Standort nach dem Einschalten — die Seite fliegt einmal hin, danach nicht mehr. */
+  /**
+   * Erster Standort nach dem Einschalten — die Seite fliegt höchstens einmal hin, danach nicht
+   * mehr; wurde seit dem Einschalten bedient, gar nicht (LFH-766, `LagekartePage`).
+   */
   onErsterFix: (position: Eigenposition) => void;
 }) {
   const verfuegbarkeit = eigenpositionVerfuegbarkeit();

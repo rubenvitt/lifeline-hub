@@ -417,6 +417,10 @@ pub async fn abschliessen(
         .await?;
     let org_einstellungen =
         crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
+    // LFH-749: Kategorie-Vorgaben der Org; daraus entstehen im selben Vorgang die
+    // Kategorie-Fristen (Spec `aufbewahrung-kategorien`, „Kategorie-Frist beim Abschluss“).
+    let kategorie_vorgaben =
+        crate::org::aufbewahrung_kategorie::laden(pool, org_id.unwrap_or(0)).await?;
 
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
@@ -480,6 +484,24 @@ pub async fn abschliessen(
                     )
                     .await?;
                 }
+            }
+        }
+        if !kategorie_vorgaben.is_empty() {
+            let abgeschlossen_at: Option<String> =
+                sqlx::query_scalar("SELECT abgeschlossen_at FROM einsatz WHERE id = ?")
+                    .bind(einsatz_id)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            if let Some(abgeschlossen_at) = abgeschlossen_at {
+                super::aufbewahrung_kategorie::fristen_beim_abschluss(
+                    &mut tx,
+                    einsatz_id,
+                    von_benutzer_id,
+                    einstellungen.etb_startwert(),
+                    &abgeschlossen_at,
+                    &kategorie_vorgaben,
+                )
+                .await?;
             }
         }
     }
@@ -604,7 +626,7 @@ async fn ermittle_system_akteur(
 /// Der Aufrufer rollt damit seine Transaktion zurück — Vormerkung bzw. Schwärzung
 /// unterbleiben und werden im nächsten Purge-Lauf erneut versucht. Eine
 /// Aufbewahrungs-Mutation ohne ETB-Eintrag gibt es nicht.
-async fn system_audit_tx(
+pub(super) async fn system_audit_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     etb_startwert: i64,
@@ -898,7 +920,22 @@ pub async fn schwaerze_einsatz(
     // zwischen Guard und tatsächlichem Scrub (siehe schwaerzung_registry). Die LFH-108-
     // Funk-Erreichbarkeit (einsatz_einheit/einsatzabschnitt.erreichbarkeit) ist dort als
     // Scrub klassifiziert; die handgepflegten UPDATEs von LFH-108 sind damit obsolet.
-    super::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz_id).await?;
+    super::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        einsatz_id,
+        super::schwaerzung_registry::Umfang::Alles,
+    )
+    .await?;
+    // LFH-749: die Einsatz-Schwärzung nimmt jede Datenkategorie mit; ihre Tombstones stehen
+    // dann auch in der Datenbank (design.md D5), nicht nur in der Zustandsableitung.
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET geschwaerzt_at = ? \
+         WHERE einsatz_id = ? AND geschwaerzt_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
 
     system_audit_tx(
         &mut tx,

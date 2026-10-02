@@ -491,9 +491,13 @@ async fn schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut() {
     .unwrap();
 
     let mut tx = pool.begin().await.unwrap();
-    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz)
-        .await
-        .unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        einsatz,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
 
     let (label, notiz, geometrie): (Option<String>, Option<String>, String) =
