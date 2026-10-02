@@ -11135,7 +11135,7 @@
       },
       "ZugriffArt": {
         "type": "string",
-        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck','anhang')` (migrations/0138_person_zugriff_audit_anhang.sql,\nzuvor 0132 und 0021).",
+        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck','anhang')` (migrations/0140_person_zugriff_audit_anhang.sql,\nzuvor 0132 und 0021).",
         "enum": [
           "detail",
           "export",
