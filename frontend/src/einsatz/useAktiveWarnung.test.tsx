@@ -6,9 +6,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { freigabenFixture } from '../test/fixtures';
@@ -30,26 +31,31 @@ interface DwdWarnung {
   ende: number;
 }
 
-/** Wetter am Einsatzort mit Abrufzähler; `zustand` wie vom Server (Ausfall ist kein HTTP-Fehler). */
+/** Antwort von `/wetter`; `zustand` wie vom Server (Ausfall ist kein HTTP-Fehler). */
+function wetterAntwort(warnungen: DwdWarnung[], zustand: 'ok' | 'ausfall' = 'ok') {
+  return {
+    warnungen: {
+      zustand,
+      abgerufen_at: um(-60_000),
+      daten: warnungen.map((w) => ({
+        stufe: w.stufe,
+        ereignis: 'ORKANBÖEN',
+        ueberschrift: 'Amtliche UNWETTERWARNUNG vor ORKANBÖEN',
+        beginn: um(w.beginn),
+        ende: um(w.ende),
+      })),
+    },
+    vorhersage: { zustand: 'kein_ort' as const },
+  };
+}
+
+/** Wetter am Einsatzort mit Abrufzähler. */
 function wetter(warnungen: DwdWarnung[], zustand: 'ok' | 'ausfall' = 'ok') {
   const zaehler = { anzahl: 0 };
   server.use(
     http.get(WETTER, () => {
       zaehler.anzahl += 1;
-      return HttpResponse.json({
-        warnungen: {
-          zustand,
-          abgerufen_at: um(-60_000),
-          daten: warnungen.map((w) => ({
-            stufe: w.stufe,
-            ereignis: 'ORKANBÖEN',
-            ueberschrift: 'Amtliche UNWETTERWARNUNG vor ORKANBÖEN',
-            beginn: um(w.beginn),
-            ende: um(w.ende),
-          })),
-        },
-        vorhersage: { zustand: 'kein_ort' },
-      });
+      return HttpResponse.json(wetterAntwort(warnungen, zustand));
     }),
   );
   return zaehler;
@@ -251,7 +257,11 @@ describe('useAktiveWarnung', () => {
 
     it('kein Zusatzabruf: Sperre und Modulzähler teilen EIN Cache-Fach (D1)', async () => {
       const abrufe = wetter([{ stufe: 'schwer', beginn: -STUNDE, ende: STUNDE }]);
-      const freigaben = freigabenFixture();
+      // Die übrigen Browser-Zähler aus: ihre Abrufe gehören nicht zu dieser Frage.
+      const freigaben = freigabenFixture({
+        abloesung: { sichtbar: false },
+        betreuung: { sichtbar: false },
+      });
       const { result } = renderHook(
         () => ({
           warnung: useAktiveWarnung({ einsatzId: 7, freigaben }),
@@ -266,12 +276,54 @@ describe('useAktiveWarnung', () => {
     });
 
     it('Unwetter endet → die Warnung fällt ohne neuen Abruf weg', async () => {
-      // Ende in 400 ms: die Unwetter-Uhr weckt am Ende, nicht der 5-min-Abruf.
-      const abrufe = wetter([{ stufe: 'schwer', beginn: -STUNDE, ende: 400 }]);
+      // Ende in 1 s: die Unwetter-Uhr weckt am Ende, nicht der 5-min-Abruf.
+      const abrufe = wetter([{ stufe: 'schwer', beginn: -STUNDE, ende: 1000 }]);
       const { result } = starte();
       await waitFor(() => expect(result.current).toBe(true));
-      await waitFor(() => expect(result.current).toBe(false), { timeout: 2000 });
+      await waitFor(() => expect(result.current).toBe(false), { timeout: 3000 });
       expect(abrufe.anzahl).toBe(1);
+    });
+
+    it('angekündigtes Unwetter beginnt → die Warnung greift ohne neuen Abruf', async () => {
+      const abrufe = wetter([{ stufe: 'extrem', beginn: 1000, ende: STUNDE }]);
+      const { result } = starte();
+      await waitFor(() => expect(abrufe.anzahl).toBe(1));
+      await takt();
+      expect(result.current).toBe(false);
+      await waitFor(() => expect(result.current).toBe(true), { timeout: 3000 });
+      expect(abrufe.anzahl).toBe(1);
+    });
+
+    it('Folgeabruf scheitert → die alte Unwetterwarnung trägt nicht mehr bei', async () => {
+      // Query behält die alten Daten neben dem Fehler; der Modulzähler zeigt dann nichts mehr
+      // (`isSuccess`), also darf auch die Sperre nicht ohne sichtbaren Beleg weiter greifen.
+      wetter([{ stufe: 'schwer', beginn: -STUNDE, ende: STUNDE }]);
+      const client = neuerQueryClient();
+      const freigaben = freigabenFixture();
+      const { result } = renderHook(() => useAktiveWarnung({ einsatzId: 7, freigaben }), {
+        wrapper: wrapper(client),
+      });
+      await waitFor(() => expect(result.current).toBe(true));
+      server.use(http.get(WETTER, () => HttpResponse.json({ error: 'weg' }, { status: 500 })));
+      await act(() => client.refetchQueries({ queryKey: einsatzKeys.wetter(7) }));
+      await waitFor(() => expect(result.current).toBe(false));
+    });
+
+    it('Modul während der Sitzung ausgeblendet → ein noch gefüllter Cache zählt nicht', async () => {
+      const client = neuerQueryClient();
+      client.setQueryData(
+        einsatzKeys.wetter(7),
+        wetterAntwort([{ stufe: 'extrem', beginn: -STUNDE, ende: STUNDE }]),
+      );
+      const abrufe = wetter([{ stufe: 'extrem', beginn: -STUNDE, ende: STUNDE }]);
+      const freigaben = freigabenFixture({ 'wetter-pegel': { sichtbar: false } });
+      const { result } = renderHook(() => useAktiveWarnung({ einsatzId: 7, freigaben }), {
+        wrapper: wrapper(client),
+      });
+      await takt();
+      expect(client.getQueryData(einsatzKeys.wetter(7))).toBeDefined();
+      expect(abrufe.anzahl).toBe(0);
+      expect(result.current).toBe(false);
     });
   });
 });

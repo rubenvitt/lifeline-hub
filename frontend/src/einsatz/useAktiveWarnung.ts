@@ -29,7 +29,8 @@ const WETTER_MODUL = modulRegistry.find((m) => m.key === 'wetter-pegel');
  * Gefahrenseite; beim Wetter `wetterAbfrage` wie Modulzähler und Modulseite, LFH-774 D1).
  * Gefahren und Meldungen sind live über `EINSATZ_STREAM_EVENTS` (`meldung`, `gefahr`,
  * `lage_zone`); das Wetter kommt alle 5 min, Beginn und Ende einer Warnung weckt
- * `useUnwetterUhr` ohne neuen Abruf (D3). `select` zieht nur das eine Merkmal heraus.
+ * `useUnwetterUhr` ohne neuen Abruf (D3). `select` zieht bei Gefahren und Meldungen nur das
+ * eine Merkmal heraus, beim Wetter den Teil `warnungen`; das Merkmal bildet `dwdStufenJetzt`.
  *
  * Gefahren- und Wettermodul werden ohne Freigabe NICHT abgefragt — dieselbe Frage wie die
  * Navigation (`istModulFreigegeben`). Die Meldungs-Hälfte filtert der Server selbst: ohne
@@ -57,11 +58,15 @@ export function useAktiveWarnung({ einsatzId, freigaben, freigabenGescheitert }:
     select: (z) => z.meldungen?.bestaetigung_ueberfaellig,
   }).data;
 
-  const dwdWarnungen = useQuery({
+  const wetter = useQuery({
     ...wetterAbfrage(einsatzId),
     enabled: wetterFrei,
     select: (w) => w.warnungen,
-  }).data;
+  });
+  // Nur ein gelungener Abruf trägt: scheitert ein Folgeabruf, behält Query die alten Daten
+  // neben dem Fehler. Der Modulzähler zeigt dann nichts mehr (`isSuccess`), und eine Sperre
+  // ohne sichtbaren Beleg soll es nicht geben (Spec `bedien-helligkeit`, „Aktive Warnung“).
+  const dwdWarnungen = wetter.isSuccess ? wetter.data : undefined;
   // Ohne Freigabe auch keine Uhr: sie weckte sonst an Wechseln eines Caches, der nicht zählt.
   const jetzt = useUnwetterUhr(wetterFrei ? dwdWarnungen : undefined);
 
