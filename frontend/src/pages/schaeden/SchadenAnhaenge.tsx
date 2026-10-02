@@ -14,6 +14,7 @@ import {
   Paneel,
   PaneelZeile,
   PaneelZustand,
+  Sammelbanner,
   useRollen,
   type PaneelDatenzustand,
 } from '../../components/instrument';
@@ -24,6 +25,15 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import { formatGroesse } from '../../karten/formatGroesse';
 import SchadenAnhangAblegenModal from './SchadenAnhangAblegenModal';
+import {
+  freigegeben,
+  nachgefuehrt,
+  OFFENER_ZUFLUSS,
+  teileZufluss,
+  vorgemerkt,
+  zuflussText,
+  type AnhangZufluss,
+} from './anhangZufluss';
 
 const TITEL = 'Fotos und Dateien';
 
@@ -48,6 +58,11 @@ interface Props {
  * „Datei ablegen“ steht nur im Paneelkopf, auch im Leerzustand: zwei gleichnamige Ziele wären für
  * Vorlesende nicht unterscheidbar. Ohne Schreibrecht und am stornierten Schaden bleibt die Liste
  * nur lesbar.
+ *
+ * Live-Zufluss (LFH-760, `anhangZufluss.ts`): eine Ablage aus einer anderen Sitzung wartet hinter
+ * dem Sammelbanner, statt oben einzuschieben. Das Banner liegt als Überlagerung mit Nullhöhe über
+ * der Liste (Muster `InfotelefonPage`) und verschiebt keine Zeile; „anzeigen“ gibt frei und setzt
+ * den Fokus auf die oberste Zeile, statt ihn mit dem Banner auf `<body>` fallen zu lassen.
  */
 export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: Props) {
   const { message } = App.useApp();
@@ -59,6 +74,13 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
    *  aktuellen Liste bestimmt, nach dem Refetch eingelöst. */
   const fokusNach = useRef<{ entfernt: number; ziel: number | 'kopf' } | null>(null);
   const [ablegenOffen, setAblegenOffen] = useState(false);
+  /** Die Schleuse gehört zu EINEM Schaden: wechselt er ohne Neumontage, beginnt sie offen. */
+  const [zuflussZustand, setZuflussZustand] = useState<AnhangZufluss & { schadenId: number }>({
+    schadenId: schaden.id,
+    ...OFFENER_ZUFLUSS,
+  });
+  /** Nach „anzeigen“ auf die oberste Zeile — erst nach dem Render mit der freigegebenen Liste. */
+  const fokusNachFreigabe = useRef(false);
   const nr = schadenRegistrierAnzeige(schaden.registrier_nr);
   const aktionen = darfSchreiben && !schaden.storniert_at;
   const darfOriginal = useDarfOriginalLaden(einsatzId);
@@ -79,7 +101,26 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
     },
   });
 
-  const liste = query.data ?? [];
+  const zufluss: AnhangZufluss =
+    zuflussZustand.schadenId === schaden.id ? zuflussZustand : OFFENER_ZUFLUSS;
+  const { sichtbar: liste, zurueckgehalten } = teileZufluss(query.data ?? [], zufluss);
+  // Nachführen im Render (Muster `AbloesungPage`), nicht im Effekt: der ließe einen Bildaufbau
+  // mit veraltetem Stand durch. `nachgefuehrt` liefert `null`, wenn nichts zu tun ist.
+  if (query.data) {
+    const neu = nachgefuehrt(zufluss, liste);
+    if (neu || zuflussZustand.schadenId !== schaden.id) {
+      setZuflussZustand({ schadenId: schaden.id, ...(neu ?? zufluss) });
+    }
+  }
+  const aendereZufluss = (f: (z: AnhangZufluss) => AnhangZufluss) =>
+    setZuflussZustand((z) => ({
+      schadenId: schaden.id,
+      ...f(z.schadenId === schaden.id ? z : OFFENER_ZUFLUSS),
+    }));
+  function zeigeZurueckgehaltene() {
+    fokusNachFreigabe.current = true;
+    aendereZufluss((z) => freigegeben(z, query.data ?? []));
+  }
 
   function entferneMitFokus(id: number) {
     const i = liste.findIndex((a) => a.id === id);
@@ -102,6 +143,12 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
           );
     (anker ?? kopfKnopf.current)?.focus();
   }, [query.data]);
+
+  useEffect(() => {
+    if (!fokusNachFreigabe.current) return;
+    fokusNachFreigabe.current = false;
+    listeRef.current?.querySelector<HTMLElement>('a[download]')?.focus();
+  }, [zuflussZustand]);
 
   const fehlerId = entfernen.isError ? entfernen.variables : undefined;
   const fehlerName = liste.find((a) => a.id === fehlerId)?.dateiname;
@@ -201,7 +248,20 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
         leerText="Noch keine Fotos oder Dateien"
         onNeuladen={() => void query.refetch()}
       >
-        <div ref={listeRef}>{liste.map(zeile)}</div>
+        <div ref={listeRef} style={{ position: 'relative' }}>
+          {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
+          <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
+            {zurueckgehalten.length > 0 && (
+              <Sammelbanner
+                aktion={{ label: 'anzeigen', onKlick: zeigeZurueckgehaltene }}
+                style={{ position: 'absolute', insetInline: 0, top: 0 }}
+              >
+                {zuflussText(zurueckgehalten.length)} — oben einsortiert
+              </Sammelbanner>
+            )}
+          </div>
+          {liste.map(zeile)}
+        </div>
       </PaneelZustand>
       {aktionen && (
         <SchadenAnhangAblegenModal
@@ -210,6 +270,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
           registrierNr={schaden.registrier_nr}
           offen={ablegenOffen}
           onSchliessen={() => setAblegenOffen(false)}
+          onAbgelegt={(a) => aendereZufluss((z) => vorgemerkt(z, a.id))}
         />
       )}
     </Paneel>

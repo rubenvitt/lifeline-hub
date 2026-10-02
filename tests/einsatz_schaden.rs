@@ -3,8 +3,8 @@ use serde_json::{json, Value};
 
 mod common;
 use common::{
-    anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, person_anlegen, rolle_setzen,
-    setup, setup_mit_pool, system_etb_inhalte,
+    anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, live_oeffnen, login_cookie,
+    person_anlegen, rolle_setzen, setup, setup_mit_pool, sse_anfang_lesen, system_etb_inhalte,
 };
 
 // ---------- Domänen-Helfer ----------
@@ -799,6 +799,84 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
     assert!(schaden_eintraege
         .iter()
         .any(|i| i.contains("S-001 storniert")));
+}
+
+/// Führt eine Schadensroute bei offenem Live-Feed aus und liefert, was der Feed danach
+/// zeigt. Der Feed ist vor der Anfrage offen, sonst bewiese ein fehlendes Ereignis nichts.
+async fn live_bei(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    methode: &str,
+    pfad: &str,
+    body: Option<&Value>,
+) -> String {
+    let feed = live_oeffnen(app, cookie, einsatz).await;
+    let (s, v) = anfrage_json(app, methode, pfad, cookie, body).await;
+    assert!(s.is_success(), "{methode} {pfad}: {s} {v:?}");
+    sse_anfang_lesen(feed.into_body(), 400).await
+}
+
+/// Id des System-ETB-Eintrags, dessen Inhalt `teil` enthält (genau einer).
+async fn etb_id_mit(app: &axum::Router, cookie: &str, einsatz: i64, teil: &str) -> i64 {
+    let (_, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    let treffer: Vec<i64> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "system" && e["inhalt"].as_str().unwrap().contains(teil))
+        .map(|e| e["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        treffer.len(),
+        1,
+        "genau ein ETB-Eintrag mit {teil:?}: {json}"
+    );
+    treffer[0]
+}
+
+/// LFH-760: Anlegen, Übergeben, Abschließen und Stornieren schreiben einen System-ETB-Eintrag
+/// und melden ihn live (`etb` mit seiner Id) neben `schaden` — sonst sehen andere Sitzungen
+/// das Tagebuch erst nach dem Neuladen. Gegenstück: `tests/schaden_anhang.rs`, Live (4.3).
+#[tokio::test]
+async fn lifecycle_meldet_etb_und_schaden_live() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{e}/schaeden");
+
+    let schritte: [(&str, String, Option<Value>, &str); 4] = [
+        ("POST", basis.clone(), Some(gueltig()), "S-001 angelegt"),
+        (
+            "POST",
+            format!("{basis}/1/uebergeben"),
+            Some(json!({"uebergeben_an":"Bauhof"})),
+            "S-001 übergeben an Bauhof",
+        ),
+        (
+            "POST",
+            format!("{basis}/1/abschliessen"),
+            Some(json!({"abschluss_grund":"behoben"})),
+            "S-001 abgeschlossen",
+        ),
+        ("DELETE", format!("{basis}/1"), None, "S-001 storniert"),
+    ];
+    for (methode, pfad, body, etb_text) in &schritte {
+        let feed = live_bei(&app, &admin, e, methode, pfad, body.as_ref()).await;
+        let etb_id = etb_id_mit(&app, &admin, e, etb_text).await;
+        assert!(feed.contains("event: schaden"), "{etb_text}: {feed:?}");
+        assert!(
+            feed.contains("event: etb") && feed.contains(&format!(r#""etb_id":{etb_id}}}"#)),
+            "{etb_text}: etb-Ereignis mit der Id des neuen Eintrags fehlt: {feed:?}"
+        );
+    }
 }
 
 // ---------- Tests: Rechte-Matrix + Org-Isolation + Read-only ----------
