@@ -3,6 +3,7 @@ import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import Markdown from '../components/Markdown';
 import { monoStil } from '../components/instrument';
 import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { formatGroesse } from '../karten/formatGroesse';
 import { etbTyp } from '../theme/statusFarben';
 import { istNachgetragen } from './typFarben';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
@@ -22,6 +23,8 @@ import { berichtigungsindex } from './zeitachseModell';
  * - Ordnung AUFSTEIGEND nach `lfd_nr`, nicht nach Ereigniszeit: auf Papier beweist die
  *   lückenlose Nummernfolge die Vollständigkeit, und ein Nachtrag steht an seiner Nummer.
  * Das Typwort steht ohne Farbe: Farbe trägt auf Papier nichts, das Wort ist der zweite Kanal.
+ * Anhänge (LFH-744) stehen als Text unter dem Inhalt, „Name · Größe" wie in der Zeitachse, aber
+ * ohne Verweis: auf Papier führt er nirgendwohin, er soll nur zeigen, dass es Dateien gibt.
  *
  * Wer hier Sortierung oder Filter nachrüstet, baut einen zweiten Bedienort für das ETB und
  * gehört auf `Datensicht` zurück — mit Begründung gegen die Zeitachse.
@@ -120,6 +123,22 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
                 <Markdown variante="dokument" unterEbene={2}>
                   {e.inhalt}
                 </Markdown>
+                {e.anhaenge.length > 0 && (
+                  <div style={hinweis} data-lfh="etb-druck-anhaenge">
+                    <div>{e.anhaenge.length === 1 ? 'Anhang' : 'Anhänge'}</div>
+                    <ul
+                      aria-label={`Anhänge zu Nr. ${e.lfd_nr}`}
+                      style={{ margin: 0, padding: 0, listStyle: 'none' }}
+                    >
+                      {e.anhaenge.map((a) => (
+                        // Ein langer Dateiname ohne Leerzeichen bricht um, statt über A4 zu ragen.
+                        <li key={a.id} style={{ overflowWrap: 'anywhere' }}>
+                          {a.dateiname} · {formatGroesse(a.groesse)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {grund && (
                   <div style={hinweis}>
                     {/* Die Nummer des Grundeintrags ist nur bekannt, wenn er geladen ist
