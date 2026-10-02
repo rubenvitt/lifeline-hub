@@ -102,7 +102,7 @@ describe('UhsAnhaenge (LFH-758)', () => {
     expect(r.abrufe()).toBe(1);
   });
 
-  it('Einsatzleitung: leeres Protokoll und Fehler werden benannt', async () => {
+  it('Einsatzleitung: ein leeres Protokoll wird benannt', async () => {
     rendere({}, []);
     await userEvent.click(await screen.findByText('Zugriffe'));
     expect(await screen.findByText('Noch keine Zugriffe')).toBeInTheDocument();

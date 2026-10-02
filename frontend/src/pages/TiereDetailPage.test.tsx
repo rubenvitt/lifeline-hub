@@ -390,7 +390,9 @@ describe('TiereDetailPage — Fotos und Dateien', () => {
     render(einsatzAktiv, { ...tierBasis, storniert_at: '2026-05-29 11:00:00' }, [
       http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
     ]);
-    expect(await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Datei ablegen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /entfernen/ })).toBeNull();
   });
@@ -399,7 +401,9 @@ describe('TiereDetailPage — Fotos und Dateien', () => {
     render(einsatzBeobachter, tierBasis, [
       http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
     ]);
-    expect(await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Datei ablegen' })).toBeNull();
   });
 });

@@ -221,12 +221,16 @@ Datei protokolliert wird.
 Das System MUST nach erfolgreichem Ablegen und Entfernen das Ereignis `uhs` und das
 ETB-Ereignis an die Abonnenten des Einsatzes verteilen, beide nur mit Kennungen. Das
 Ereignis `uhs` MUST nur Personen mit Zugriff auf das Modul Unfallhilfsstellen erreichen.
-Andere Sitzungen MUST die Anhangliste der UHS daraufhin ohne Neuladen der Seite
-aktualisieren.
+Andere Sitzungen MUST die neue Datei ohne Neuladen anbieten, ohne gezeigte Zeilen zu
+verschieben.
 
-#### Scenario: Zweite Sitzung sieht die neue Datei
-- **WHEN** Person A an „BHP 50“ eine Datei ablegt, während Person B den Reiter „Dateien“ von „BHP 50“ geöffnet hat
-- **THEN** erscheint die Datei bei B ohne Neuladen, und das Tagebuch zeigt den neuen Eintrag
+#### Scenario: Zweite Sitzung erfährt von der neuen Datei
+- **WHEN** Person A an „BHP 50“ eine Datei ablegt, während Person B den Reiter „Dateien“ von „BHP 50“ mit mindestens einer Datei geöffnet hat
+- **THEN** zeigt B ohne Neuladen den Hinweis „1 neue Datei“, die gezeigten Zeilen bleiben stehen, nach „anzeigen“ steht die Datei oben in der Liste, und das Tagebuch zeigt den neuen Eintrag
+
+#### Scenario: Leere Liste nimmt die Datei direkt auf
+- **WHEN** Person A an „BHP 50“ eine Datei ablegt, während die Liste bei Person B noch leer ist
+- **THEN** erscheint die Datei bei B ohne Neuladen und ohne Hinweis
 
 #### Scenario: Nutzlast ohne Inhalt
 - **WHEN** das System nach einer Ablage die Ereignisse verteilt

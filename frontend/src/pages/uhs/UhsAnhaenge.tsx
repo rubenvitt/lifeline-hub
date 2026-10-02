@@ -16,7 +16,7 @@ import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 
 /** Steht im Ablegen-Dialog (Spec `uhs-anhaenge`, „Hinweis auf die Protokollierung“). */
 export const UHS_ABLAGE_HINWEIS =
-  'Jeder Abruf einer Datei wird mit Person und Zeitpunkt protokolliert. Fotos von Patienten gehören an die Person, nicht an die UHS.';
+  'Jeder Abruf einer Datei wird mit Person und Zeitpunkt protokolliert.';
 
 const FASSUNG: Record<AnhangZugriff['fassung'], string> = {
   bereinigt: 'bereinigt',
@@ -55,7 +55,9 @@ export default function UhsAnhaenge({ einsatzId, uhs, darfSchreiben, zeigeZugrif
         downloadPfad: (id) => uhsAnhangDownloadPfad(einsatzId, uhs.id, id),
       }}
     >
-      {zeigeZugriffe && <UhsAnhangZugriffe einsatzId={einsatzId} uhsId={uhs.id} />}
+      {/* `key`: beim Wechsel der UHS (Switcher, gleiche Route) beginnt der Bereich zugeklappt —
+          das Protokoll der nächsten UHS lädt erst auf ihren eigenen Klick. */}
+      {zeigeZugriffe && <UhsAnhangZugriffe key={uhs.id} einsatzId={einsatzId} uhsId={uhs.id} />}
     </ErfassungsAnhaenge>
   );
 }

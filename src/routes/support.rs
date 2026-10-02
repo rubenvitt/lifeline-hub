@@ -171,12 +171,13 @@ pub async fn original_freigeben(
     Ok(())
 }
 
-/// Liest genau eine Datei aus dem Multipart einer Erfassungs-Ablage (Schaden, Tier, UHS): `(dateiname, bytes)`. Die Datei steht im Feld
-/// `datei` (API-Vertrag, wie die Dokumentenablage); eine Datei unter einem anderen Feldnamen
-/// ist 400, statt still einen undokumentierten Vertrag anzunehmen (Code-Review C2). Ein
-/// zweites Datei-Feld ist 400 (eine Datei je Ablage, LFH-21 design.md D5), keines ebenfalls; Felder
-/// ohne Dateinamen werden ignoriert. Der Typ wird vor dem Lesen der Bytes geprüft (wie
-/// `anhang::hochladen_multipart`), damit ein verbotener Typ nicht erst gelesen wird.
+/// Liest genau eine Datei aus dem Multipart einer Erfassungs-Ablage (Schaden, Tier, UHS):
+/// `(dateiname, bytes)`. Die Datei steht im Feld `datei` (API-Vertrag, wie die
+/// Dokumentenablage); eine Datei unter einem anderen Feldnamen ist 400, statt still einen
+/// undokumentierten Vertrag anzunehmen (Code-Review C2). Ein zweites Datei-Feld ist 400 (eine
+/// Datei je Ablage, LFH-21 design.md D5), keines ebenfalls; Felder ohne Dateinamen werden
+/// ignoriert. Der Typ wird vor dem Lesen der Bytes geprüft (wie `anhang::hochladen_multipart`),
+/// damit ein verbotener Typ nicht erst gelesen wird.
 pub async fn genau_eine_datei(multipart: &mut Multipart) -> Result<(String, Vec<u8>), AppError> {
     let mut datei: Option<(String, Vec<u8>)> = None;
     while let Some(feld) = multipart

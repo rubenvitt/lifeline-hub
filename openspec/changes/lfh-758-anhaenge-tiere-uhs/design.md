@@ -311,13 +311,13 @@ Die Klassen werden an der Registry gegen die vorhandenen Konstanten abgeglichen.
 ```ts
 interface ErfassungsAnhaengeProps {
   einsatzId: number;
-  kennung: string;               // „S-003“, „T-007“, „BHP 50“ (zugänglicher Name, Dialogtitel)
-  gesperrt: boolean;             // storniert → nur lesen
+  bezug: string;                 // „Schaden S-003“, „Tier T-007“, „UHS BHP 50“ (Namen, Dialogtitel)
+  quelle: ErfassungsAnhangQuelle;// queryKey, liste, ablegen, entfernen, downloadPfad des Moduls
   darfSchreiben: boolean;
-  queryKey: QueryKey;
-  api: { liste; ablegen; entfernen; downloadPfad };   // je Modul aus api/einsatz*.ts
-  hinweis?: ReactNode;           // UHS: „Jeder Abruf wird protokolliert.“
-  titel?: string;                // Vorgabe „Fotos und Dateien“
+  gesperrt: boolean;             // storniert → nur lesen
+  hinweis?: ReactNode;           // UHS: „Jeder Abruf einer Datei wird … protokolliert.“
+  zeilenKennung?: string;        // `data-lfh` der Zeilen je Modul
+  children?: ReactNode;          // UHS: Bereich „Zugriffe“ im selben Paneel
 }
 ```
 

@@ -35,7 +35,11 @@ pub struct ErfassungsAblage {
 
 /// Alle Erfassungs-Ablagen. Ein neues Modul trägt seinen Deskriptor hier ein; die Guards
 /// unten prüfen SQL und Registereintrag für jeden.
-pub const ERFASSUNGS_ABLAGEN: &[&ErfassungsAblage] = &[&crate::schaden::anhang::SCHADEN_ABLAGE];
+pub const ERFASSUNGS_ABLAGEN: &[&ErfassungsAblage] = &[
+    &crate::schaden::anhang::SCHADEN_ABLAGE,
+    &crate::tier::anhang::TIER_ABLAGE,
+    &crate::uhs::anhang::UHS_ABLAGE,
+];
 
 /// Ein lebender Anhang eines Besitzers. `id` ist die **Linker-id**, nicht `anhang.id`.
 #[derive(Debug, Clone, FromRow)]
