@@ -1361,6 +1361,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::karte::offline_bau_status),
         )
         .route(
+            "/api/karte/offline-karten/aktualisierung",
+            get(routes::karte::offline_aktualisierung_status),
+        )
+        .route(
+            "/api/karte/offline-karten/aktualisierung/einstellung",
+            put(routes::karte::offline_aktualisierung_einstellen),
+        )
+        .route(
+            "/api/karte/offline-karten/{id}/jetzt-aktualisieren",
+            post(routes::karte::offline_jetzt_aktualisieren),
+        )
+        .route(
             "/api/karte/offline-karten/{id}/aktivieren",
             post(routes::karte::offline_aktivieren),
         )

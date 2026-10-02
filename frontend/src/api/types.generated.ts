@@ -118,6 +118,22 @@ export interface components {
          * @enum {string}
          */
         AdressatKategorie: "leitstelle" | "nachbar_ea" | "uebergeordnet" | "andere_bos";
+        /**
+         * @description Laufende Phase einer Karte in der Verwaltung.
+         * @enum {string}
+         */
+        AktualisierungsPhase: "bau_wartet" | "baut" | "wartet_auf_katalog" | "laedt";
+        /** @description Status der automatischen Aktualisierung für die Verwaltung (D7). Zeiten RFC 3339, UTC. */
+        AktualisierungsStatus: {
+            automatisch: boolean;
+            bau_dienst: components["schemas"]["BauDienst"];
+            /** Format: int64 */
+            intervall_stunden: number;
+            karten: components["schemas"]["KarteAktualisierung"][];
+            letzte_pruefung_at?: string | null;
+            naechste_pruefung_at?: string | null;
+            naechster_bau_at?: string | null;
+        };
         /** @description Die aktuelle Besetzung eines Sachgebiets, zur Lesezeit. */
         AktuelleBesetzung: {
             /**
@@ -435,6 +451,11 @@ export interface components {
          * @enum {string}
          */
         BasemapModus: "online" | "offline" | "blind";
+        /**
+         * @description Erreichbarkeit des karten-service aus Sicht des Hubs.
+         * @enum {string}
+         */
+        BauDienst: "nicht_konfiguriert" | "erreichbar" | "unerreichbar";
         /** @description Erfasster Bedarf eines Zeitfensters. `gesamt` ist die Summe der drei Teile. */
         Bedarf: {
             /** Format: int64 */
@@ -2054,6 +2075,21 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
+        JetztAktualisierenAntwort: {
+            phase: components["schemas"]["JetztPhase"];
+        };
+        /**
+         * @description Antwort-Phase von „Jetzt aktualisieren“.
+         * @enum {string}
+         */
+        JetztPhase: "laedt" | "bau_wartet" | "baut" | "aktuell";
+        /** @description Phase und letzter Fehler einer Karte; nur Karten mit einem von beiden stehen in der Liste. */
+        KarteAktualisierung: {
+            fehler?: string | null;
+            /** Format: int64 */
+            karte_id: number;
+            phase?: components["schemas"]["AktualisierungsPhase"] | null;
+        };
         /**
          * @description Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
          *     NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
@@ -2656,6 +2692,12 @@ export interface components {
          *     Fortschrittsbalken.
          */
         OfflineKarteAntwort: components["schemas"]["OfflineKarte"] & {
+            /**
+             * @description LFH-993: Heruntergeladene Karte (gemanagter Pfad) mit Quell-URL — nur sie kann „Jetzt
+             *     aktualisieren“ und die automatische Aktualisierung. Registrierte Karten fasst der Hub nicht
+             *     an.
+             */
+            aktualisierbar: boolean;
             /** Format: int64 */
             geladen?: number | null;
             /** Format: int64 */

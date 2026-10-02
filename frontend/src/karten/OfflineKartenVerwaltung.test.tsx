@@ -33,6 +33,8 @@ const karte: OfflineKarte = {
   aktiv_basemap: false,
   sortier: 0,
   update_verfuegbar: false,
+  // LFH-993: heruntergeladen (gemanagter Pfad) mit Quell-URL.
+  aktualisierbar: true,
 };
 
 const karteLaedt: OfflineKarte = {

@@ -15,7 +15,7 @@
 
 - [x] 3.1 Tests zuerst in `update_check_tests` (`src/routes/karte.rs`): Gleiche URL mit anderem Pin trifft. Gleiche URL mit gleichem Pin trifft nicht. Gleiche URL mit installiertem `sha256 = None` trifft nicht. Ein Platzhalter trifft weiter nicht. Danach die Signatur `finde_update_eintrag(name, quell_url, sha256_installiert, katalog)` umsetzen und `offline_liste` anpassen. Nachweis: Die neuen Tests sind vorher rot, alle in `update_check_tests` danach grün.
 - [x] 3.2 Den Körper von `offline_neu_laden` in `starte_in_place_reload` herausziehen. `verarbeite_in_place_ergebnis` gibt `Result<(), String>` zurück, der Spawn meldet das Ergebnis an den Wächterzustand. Nachweis: Die bestehenden In-Place-Tests in `src/routes/karte.rs` und `tests/karte.rs` bleiben unverändert grün.
-- [ ] 3.3 Listenfeld `aktualisierbar: bool` in `OfflineKarteAntwort` (gemanagter Pfad und Quell-URL), Test in `tests/karte.rs` für eine heruntergeladene und eine registrierte Karte. Nachweis: Der Test ist grün, `scripts/check-typ-codegen.sh` ist grün und die generierten Dateien sind mitcommittet.
+- [x] 3.3 Listenfeld `aktualisierbar: bool` in `OfflineKarteAntwort` (gemanagter Pfad und Quell-URL), Test in `tests/karte.rs` für eine heruntergeladene und eine registrierte Karte. Nachweis: Der Test ist grün, `scripts/check-typ-codegen.sh` ist grün und die generierten Dateien sind mitcommittet.
 
 ## 4. Hub: Wächter (D1, D2, D10)
 
@@ -40,14 +40,14 @@
 
 ## 5. Hub: Endpunkte (D6, D7)
 
-- [ ] 5.1 Tests zuerst in `tests/karte.rs` für `POST /api/karte/offline-karten/{id}/jetzt-aktualisieren`:
+- [x] 5.1 Tests zuerst in `tests/karte.rs` für `POST /api/karte/offline-karten/{id}/jetzt-aktualisieren`:
   - 403 für einen Nicht-Admin, 422 für eine registrierte Karte, 422 bei laufendem Download.
   - `laedt`, wenn der Katalog einen neueren Stand führt (kein `POST /builds` am Mock).
   - `bau_wartet` mit genau einem `POST /builds`. Bei aktivem Job für den Slug kommt kein zweiter.
   - `aktuell` ohne karten-service, 502 bei einem unerreichbaren Dienst.
 
   Danach Handler, Route in `src/app.rs`, `api_doc.rs`, Enum `JetztPhase` in `tests/enum_wire_kontrakt.rs`. Nachweis: Die Tests sind vorher rot und danach grün, `scripts/check-typ-codegen.sh` ist grün.
-- [ ] 5.2 Tests zuerst für `GET /api/karte/offline-karten/aktualisierung`:
+- [x] 5.2 Tests zuerst für `GET /api/karte/offline-karten/aktualisierung`:
   - Lesbar für Führungskraft und Admin, 403 sonst.
   - `bau_dienst` ist `nicht_konfiguriert`, `erreichbar` oder `unerreichbar` (Mock antwortet nicht → 200 mit `unerreichbar`).
   - Ein Cron-Bau eines passenden Slugs ergibt `baut` an der Karte.
@@ -55,7 +55,7 @@
 
   Danach Handler, Route, `api_doc.rs`, Enums `AktualisierungsPhase` und `BauDienst` in `tests/enum_wire_kontrakt.rs`. Nachweis: Die Tests sind vorher rot und danach grün, `scripts/check-typ-codegen.sh` ist grün.
 
-- [ ] 5.3 Tests zuerst für `PUT /api/karte/offline-karten/aktualisierung/einstellung`:
+- [x] 5.3 Tests zuerst für `PUT /api/karte/offline-karten/aktualisierung/einstellung`:
   - 403 für eine Führungskraft.
   - 400 für einen Prüfabstand von 0 und von 169, die bisherige Einstellung bleibt.
   - 200 mit Status, der die neue Einstellung trägt.

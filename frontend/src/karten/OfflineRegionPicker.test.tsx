@@ -95,6 +95,7 @@ describe('OfflineRegionPicker', () => {
       aktiv_basemap: false,
       sortier: 0,
       update_verfuegbar: false,
+      aktualisierbar: true,
     };
     mockPicker({ karten: [bremenAufGeraet], katalog: [bremenEintrag] });
     render();

@@ -532,6 +532,24 @@ fn orphan_enums_wire() {
         Bereit => "bereit",
         Fehler => "fehler",
     });
+    // LFH-993: automatische Aktualisierung der Offline-Karten.
+    enum_wire!(lifeline_hub::routes::karte::JetztPhase {
+        Laedt => "laedt",
+        BauWartet => "bau_wartet",
+        Baut => "baut",
+        Aktuell => "aktuell",
+    });
+    enum_wire!(lifeline_hub::routes::karte::AktualisierungsPhase {
+        BauWartet => "bau_wartet",
+        Baut => "baut",
+        WartetAufKatalog => "wartet_auf_katalog",
+        Laedt => "laedt",
+    });
+    enum_wire!(lifeline_hub::routes::karte::BauDienst {
+        NichtKonfiguriert => "nicht_konfiguriert",
+        Erreichbar => "erreichbar",
+        Unerreichbar => "unerreichbar",
+    });
 }
 
 /// LFH-46: Führungsorganisation. `Sachgebiet` trägt die DB-CHECK-Werte `'s1'..'s6'` aus

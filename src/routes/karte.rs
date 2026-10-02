@@ -4,7 +4,7 @@ use crate::config::{default_online_styles, OfflineKatalogEintrag, OnlineStyle, O
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::karte::auto_aktualisierung::LadeFehler;
+use crate::karte::auto_aktualisierung::{AusstehenderBau, BauStand, LadeFehler};
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
 use crate::karte::quellen;
@@ -19,6 +19,7 @@ use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use karten_katalog::{JobStatus, Zeitplan};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path as FsPath};
@@ -1852,6 +1853,367 @@ pub async fn offline_bau_status(
     _admin: AdminUser,
 ) -> Result<Json<Vec<BuildJob>>, AppError> {
     Ok(Json(service_get_liste::<BuildJob>(&st, "/builds").await?))
+}
+
+// ===== Automatische Aktualisierung (LFH-993) =====
+//
+// Herleitung: `openspec/changes/lfh-993-offline-karten-auto-aktualisierung/design.md` (D6, D7,
+// D10). Der Wächter selbst liegt in `karte::auto_aktualisierung`.
+
+/// Antwort-Phase von „Jetzt aktualisieren“.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum JetztPhase {
+    /// Ein neuerer Stand lag schon im Katalog und lädt.
+    Laedt,
+    /// Neubau eingereiht.
+    BauWartet,
+    /// Ein Bau der Region lief schon; der Hub hängt sich an.
+    Baut,
+    /// Nichts Neueres, kein Bau möglich.
+    Aktuell,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct JetztAktualisierenAntwort {
+    pub phase: JetztPhase,
+}
+
+/// Laufende Phase einer Karte in der Verwaltung.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AktualisierungsPhase {
+    BauWartet,
+    Baut,
+    WartetAufKatalog,
+    Laedt,
+}
+
+/// Erreichbarkeit des karten-service aus Sicht des Hubs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BauDienst {
+    NichtKonfiguriert,
+    Erreichbar,
+    Unerreichbar,
+}
+
+/// Phase und letzter Fehler einer Karte; nur Karten mit einem von beiden stehen in der Liste.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct KarteAktualisierung {
+    pub karte_id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<AktualisierungsPhase>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fehler: Option<String>,
+}
+
+/// Status der automatischen Aktualisierung für die Verwaltung (D7). Zeiten RFC 3339, UTC.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AktualisierungsStatus {
+    pub automatisch: bool,
+    pub intervall_stunden: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letzte_pruefung_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub naechste_pruefung_at: Option<String>,
+    pub bau_dienst: BauDienst,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub naechster_bau_at: Option<String>,
+    pub karten: Vec<KarteAktualisierung>,
+}
+
+/// Body zum Speichern der Einstellung (Admin).
+#[derive(Debug, Deserialize)]
+pub struct AutoAktualisierungBody {
+    pub automatisch: bool,
+    pub intervall_stunden: u64,
+}
+
+/// Läuft der Job noch (eingereiht, baut, lädt hoch, veröffentlicht)?
+fn job_aktiv(s: &JobStatus) -> bool {
+    matches!(
+        s,
+        JobStatus::Queued | JobStatus::Building | JobStatus::Uploading | JobStatus::Publishing
+    )
+}
+
+/// Kurzer Lese-Aufruf an den karten-service für die Statusanzeige: 3 s statt 10 s, damit ein
+/// hängender Dienst die Verwaltung nicht aufhält. `Ok(None)` bei 404 (älterer Dienst ohne die
+/// Route), `Err` bei Netzfehler oder anderem Status.
+async fn service_get_kurz<T: serde::de::DeserializeOwned>(
+    url: &str,
+    token: &str,
+    pfad: &str,
+) -> Result<Option<T>, String> {
+    let resp = KARTEN_SERVICE_CLIENT
+        .get(format!("{}{}", url.trim_end_matches('/'), pfad))
+        .bearer_auth(token)
+        .timeout(std::time::Duration::from_secs(3))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if resp.status() == StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    resp.json::<T>().await.map(Some).map_err(|e| e.to_string())
+}
+
+/// Stößt beim karten-service einen Bau an und gibt die Job-ID zurück (`502` bei Fehlern).
+async fn bau_anstossen(url: &str, token: &str, slug: &str) -> Result<u64, AppError> {
+    let resp = KARTEN_SERVICE_CLIENT
+        .post(format!("{}/builds", url.trim_end_matches('/')))
+        .bearer_auth(token)
+        .json(&serde_json::json!({ "slug": slug }))
+        .send()
+        .await
+        .map_err(|e| AppError::BadGateway(format!("karten-service unerreichbar: {e}")))?;
+    let status = resp.status();
+    let antwort: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({}));
+    if !status.is_success() {
+        return Err(AppError::BadGateway(format!(
+            "karten-service {status}: {antwort}"
+        )));
+    }
+    antwort["job_id"]
+        .as_u64()
+        .ok_or_else(|| AppError::BadGateway(format!("karten-service ohne job_id: {antwort}")))
+}
+
+/// POST /api/karte/offline-karten/{id}/jetzt-aktualisieren — Aktualisierung sofort anstoßen
+/// (Admin, D6). Neuerer Katalogstand → sofort laden (`202 laedt`); sonst Neubau beim
+/// karten-service, dessen Ergebnis der Wächter lädt (`202 bau_wartet|baut`); ohne Dienst oder
+/// baubare Region `200 aktuell`. `422` bei registrierter Karte oder laufender Aktualisierung,
+/// `502` bei unerreichbarem Dienst.
+pub async fn offline_jetzt_aktualisieren(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    PfadParam(id): PfadParam<i64>,
+) -> Result<(StatusCode, Json<JetztAktualisierenAntwort>), AppError> {
+    let karte = repo::finde_offline_karte(&state.pool, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let Some(quell_url) = karte.quell_url.clone().filter(|_| ist_gemanagt(&karte)) else {
+        return Err(AppError::UnprocessableEntity(
+            "Nur heruntergeladene Karten mit Quell-URL lassen sich aktualisieren".into(),
+        ));
+    };
+    let auto = &state.auto_aktualisierung;
+    let laeuft = download::lies_fortschritt(&state.download_fortschritt).contains_key(&id)
+        || auto.zustand().ausstehende_bauten.contains_key(&id);
+    if laeuft {
+        return Err(AppError::UnprocessableEntity(
+            "Für diese Karte läuft bereits eine Aktualisierung".into(),
+        ));
+    }
+
+    let katalog = auto.katalog_frisch().await;
+    if let Some(e) = finde_update_eintrag(
+        &karte.name,
+        Some(&quell_url),
+        karte.sha256.as_deref(),
+        &katalog,
+    ) {
+        // Der ausdrückliche Anstoß hebt eine Sperre nach Prüfsummenfehler auf (D4).
+        auto.zustand().gesperrt.remove(&id);
+        auto.lade(&state, &karte, e).await?;
+        return Ok((
+            StatusCode::ACCEPTED,
+            Json(JetztAktualisierenAntwort {
+                phase: JetztPhase::Laedt,
+            }),
+        ));
+    }
+
+    let dienst = state
+        .karten_service_url
+        .as_deref()
+        .zip(state.karten_service_token.as_deref());
+    let slug = karten_katalog::slug_aus_url(&quell_url);
+    if let (Some((url, token)), Some(slug)) = (dienst, slug) {
+        let regionen = service_get_liste::<RegionDto>(&state, "/regions").await?;
+        if regionen.iter().any(|r| r.slug == slug) {
+            let jobs = service_get_liste::<BuildJob>(&state, "/builds").await?;
+            let laufend = jobs
+                .iter()
+                .filter(|j| j.slug == slug && job_aktiv(&j.status))
+                .max_by_key(|j| j.id);
+            let (job_id, stand, phase) = match laufend {
+                Some(j) if matches!(j.status, JobStatus::Queued) => {
+                    (j.id, BauStand::Wartet, JetztPhase::BauWartet)
+                }
+                Some(j) => (j.id, BauStand::Baut, JetztPhase::Baut),
+                None => (
+                    bau_anstossen(url, token, &slug).await?,
+                    BauStand::Wartet,
+                    JetztPhase::BauWartet,
+                ),
+            };
+            {
+                let mut z = auto.zustand();
+                z.gesperrt.remove(&id);
+                z.fehler.remove(&id);
+                z.ausstehende_bauten.insert(
+                    id,
+                    AusstehenderBau {
+                        slug,
+                        job_id,
+                        stand,
+                    },
+                );
+            }
+            auto.wecken();
+            return Ok((
+                StatusCode::ACCEPTED,
+                Json(JetztAktualisierenAntwort { phase }),
+            ));
+        }
+    }
+    Ok((
+        StatusCode::OK,
+        Json(JetztAktualisierenAntwort {
+            phase: JetztPhase::Aktuell,
+        }),
+    ))
+}
+
+/// Baut den Status aus Einstellung, Wächterzustand, Downloads und (live) dem karten-service.
+async fn aktualisierungs_status(state: &AppState) -> Result<AktualisierungsStatus, AppError> {
+    let auto = &state.auto_aktualisierung;
+    let einst = auto.einstellung(&state.pool).await;
+    let jetzt = chrono::Utc::now();
+
+    // karten-service: Jobs und Zeitplan, beide mit kurzem Timeout; ein Fehler ist „unerreichbar“.
+    let (bau_dienst, jobs, naechster_bau_at) = match state
+        .karten_service_url
+        .as_deref()
+        .zip(state.karten_service_token.as_deref())
+    {
+        None => (BauDienst::NichtKonfiguriert, Vec::new(), None),
+        Some((url, token)) => {
+            let jobs = service_get_kurz::<Vec<BuildJob>>(url, token, "/builds").await;
+            let zeitplan = service_get_kurz::<Zeitplan>(url, token, "/zeitplan").await;
+            match (jobs, zeitplan) {
+                (Ok(j), Ok(z)) => (
+                    BauDienst::Erreichbar,
+                    j.unwrap_or_default(),
+                    z.and_then(|z| z.naechster_lauf),
+                ),
+                _ => (BauDienst::Unerreichbar, Vec::new(), None),
+            }
+        }
+    };
+
+    let karten_db = repo::liste_offline_karten(&state.pool).await?;
+    let laufend: HashSet<i64> = download::lies_fortschritt(&state.download_fortschritt)
+        .keys()
+        .copied()
+        .collect();
+    let (ausstehend, fehler, letzte) = {
+        let z = auto.zustand();
+        (
+            z.ausstehende_bauten.clone(),
+            z.fehler.clone(),
+            z.letzte_pruefung_at,
+        )
+    };
+    let phase_aus_job = |s: &JobStatus| match s {
+        JobStatus::Queued => Some(AktualisierungsPhase::BauWartet),
+        JobStatus::Building | JobStatus::Uploading | JobStatus::Publishing => {
+            Some(AktualisierungsPhase::Baut)
+        }
+        JobStatus::Done => Some(AktualisierungsPhase::WartetAufKatalog),
+        JobStatus::Failed(_) => None,
+    };
+    let mut karten = Vec::new();
+    for k in &karten_db {
+        let phase = if laufend.contains(&k.id) {
+            Some(AktualisierungsPhase::Laedt)
+        } else if let Some(bau) = ausstehend.get(&k.id) {
+            // Live-Stand des Jobs, sonst der zuletzt vom Wächter gesehene.
+            match (&bau.stand, jobs.iter().find(|j| j.id == bau.job_id)) {
+                (BauStand::WartetAufKatalog { .. }, _) => {
+                    Some(AktualisierungsPhase::WartetAufKatalog)
+                }
+                (_, Some(j)) => phase_aus_job(&j.status),
+                (BauStand::Wartet, None) => Some(AktualisierungsPhase::BauWartet),
+                (BauStand::Baut, None) => Some(AktualisierungsPhase::Baut),
+            }
+        } else if k.status == "bereit" {
+            // Auch Bauten, die der Zeitplan des karten-service ausgelöst hat (D7.3).
+            k.quell_url
+                .as_deref()
+                .and_then(karten_katalog::slug_aus_url)
+                .and_then(|slug| {
+                    jobs.iter()
+                        .filter(|j| j.slug == slug && job_aktiv(&j.status))
+                        .max_by_key(|j| j.id)
+                })
+                .and_then(|j| phase_aus_job(&j.status))
+        } else {
+            None
+        };
+        let fehler = fehler.get(&k.id).cloned();
+        if phase.is_some() || fehler.is_some() {
+            karten.push(KarteAktualisierung {
+                karte_id: k.id,
+                phase,
+                fehler,
+            });
+        }
+    }
+
+    Ok(AktualisierungsStatus {
+        automatisch: einst.automatisch,
+        intervall_stunden: einst.intervall_stunden,
+        letzte_pruefung_at: letzte.map(|t| t.to_rfc3339()),
+        naechste_pruefung_at: auto.naechste_pruefung(einst, jetzt).map(|t| t.to_rfc3339()),
+        bau_dienst,
+        naechster_bau_at,
+        karten,
+    })
+}
+
+/// GET /api/karte/offline-karten/aktualisierung — Status der automatischen Aktualisierung (D7).
+/// Lesen: admin ODER Führungskraft, wie die Liste. Ein unerreichbarer karten-service ist
+/// `bau_dienst: unerreichbar`, kein Fehler der Seite.
+pub async fn offline_aktualisierung_status(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<AktualisierungsStatus>, AppError> {
+    if !benutzer.darf_admin_bereich() {
+        return Err(AppError::Forbidden);
+    }
+    Ok(Json(aktualisierungs_status(&state).await?))
+}
+
+/// PUT /api/karte/offline-karten/aktualisierung/einstellung — Automatik an/aus und Prüfabstand
+/// speichern (Admin, D10). Wirkt ohne Neustart (der Wächter wird geweckt). `400` bei einem
+/// Prüfabstand außerhalb 1…168 Stunden. Antwort: der aktuelle Status.
+pub async fn offline_aktualisierung_einstellen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    JsonBody(body): JsonBody<AutoAktualisierungBody>,
+) -> Result<Json<AktualisierungsStatus>, AppError> {
+    if !crate::karte::auto_aktualisierung::intervall_ist_gueltig(body.intervall_stunden) {
+        return Err(AppError::Validation(format!(
+            "Prüfabstand muss zwischen {} und {} Stunden liegen",
+            crate::karte::auto_aktualisierung::INTERVALL_STUNDEN_MIN,
+            crate::karte::auto_aktualisierung::INTERVALL_STUNDEN_MAX
+        )));
+    }
+    repo::speichere_auto_aktualisierung(
+        &state.pool,
+        body.automatisch,
+        body.intervall_stunden,
+        Some(admin.id),
+    )
+    .await?;
+    state.auto_aktualisierung.wecken();
+    Ok(Json(aktualisierungs_status(&state).await?))
 }
 
 // ===== Style-/Tile-Proxy (LFH-182, öffentlich — wie /config & /tiles) =====
