@@ -1,7 +1,9 @@
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben, schliesseEinsatzAb } from '../api/einsaetze';
+import { listeDokumente } from '../api/dokumente';
+import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
@@ -31,6 +33,7 @@ import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
+import { useEntwurfsVersand } from '../etb/entwuerfe/useEntwurfsVersand';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { baueZeilen } from '../etb/etbZeile';
 import { scrolleZurZeile } from '../components/Datensicht';
@@ -43,6 +46,7 @@ import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabsta
 import { useViewport } from '../components/useViewport';
 import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
+  dokumenteJeEintrag,
   filterZusammenfuehren,
   kopfMeta,
   pufferZustand,
@@ -190,6 +194,26 @@ export default function EtbPage() {
     queryFn: () => ladeEtbZaehler(einsatzId, filter),
   });
 
+  // Dokumente der Ablage mit ETB-Bezug (LFH-743): EINE Sammelabfrage über die Dokumentenliste,
+  // nach Eintrag zugeordnet. Das Modulrecht `dokumente` bleibt maßgeblich — ohne Freigabe (auch
+  // solange sie lädt oder scheitert) geht keine Anfrage und es erscheint kein Verweis. Live über
+  // das Ereignis `dokument` (derselbe Key wie die Dokumentenseite).
+  const modulFreigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+  const dokumenteFrei = istKeyFreigegeben('dokumente', modulFreigabenQuery.data);
+  const dokumenteQuery = useQuery({
+    queryKey: einsatzKeys.dokumente(einsatzId),
+    queryFn: () => listeDokumente(einsatzId),
+    enabled: dokumenteFrei,
+  });
+  const dokumenteListe = dokumenteFrei ? dokumenteQuery.data : undefined;
+  const dokumenteZuEintrag = useMemo(
+    () => (dokumenteListe ? dokumenteJeEintrag(dokumenteListe) : undefined),
+    [dokumenteListe],
+  );
+
   // Die leere Ersatzliste bleibt, die Chronologie braucht ein Array. Lade- und Fehler-Gate stehen
   // in `leerInhalt` weiter unten.
   const eintraege = etbQuery.data?.pages.flat() ?? [];
@@ -214,6 +238,8 @@ export default function EtbPage() {
   const [entwurfSendet, setEntwurfSendet] = useState(false);
   /** Gewählte Anhänge je Entwurf — hier, damit sie eine Berichtigung überleben. */
   const entwurfsDateien = useEntwurfsDateien();
+  /** Sendezustand je Entwurf — hier, damit der Grund eines gescheiterten Uploads sie überlebt. */
+  const entwurfsVersand = useEntwurfsVersand();
   const [wiedervorlageZu, setWiedervorlageZu] = useState<{
     eintrag: EtbEintragAnzeige;
     termin?: string | null;
@@ -473,6 +499,7 @@ export default function EtbPage() {
           onWerteBehaltenChange={setWerteBehalten}
           onSendetChange={setEntwurfSendet}
           dateien={entwurfsDateien}
+          versand={entwurfsVersand}
         />
       )}
     </div>
@@ -637,6 +664,7 @@ export default function EtbPage() {
               ladend={etbQuery.isLoading}
               fehler={etbQuery.isError}
               leerText={leerInhalt}
+              dokumente={dokumenteZuEintrag}
               onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
               berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
               onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}

@@ -28,7 +28,10 @@ interface Props {
   onCancel: (feld: MetaFeld) => void;
   onRemove: (feld: MetaFeld) => void;
   onEdit: (feld: MetaFeld) => void;
-  /** Während des Sendens: kein Schnellweg, kein Aktionsmenü. */
+  /**
+   * Während des Sendens: kein Schnellweg, kein Aktionsmenü — und ein offener Editor nimmt nichts
+   * an (LFH-748). Er bleibt sichtbar stehen; nach einem Fehler geht es mit seinem Wert weiter.
+   */
   gesperrt?: boolean;
 }
 
@@ -84,6 +87,7 @@ export default function MetaChip({
           <AutoComplete
             ref={fokusOhneRollen}
             aria-label={d.label}
+            disabled={gesperrt}
             style={{ width: 200 }}
             value={text}
             onChange={(v) => setText(v)}
@@ -103,6 +107,7 @@ export default function MetaChip({
           <Input
             ref={fokusOhneRollen}
             aria-label={d.label}
+            disabled={gesperrt}
             style={{ width: 160 }}
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -132,7 +137,8 @@ export default function MetaChip({
       return (
         <Select
           ref={fokusOhneRollen}
-          defaultOpen
+          defaultOpen={!gesperrt}
+          disabled={gesperrt}
           aria-label={d.label}
           style={{ width: 160 }}
           placeholder="Meldeweg"
@@ -150,6 +156,7 @@ export default function MetaChip({
       <ZeitpunktEingabe
         ref={fokusOhneRollen}
         aria-label={d.label}
+        disabled={gesperrt}
         defaultValue={dayjs.isDayjs(wert) ? wert : dayjs()}
         onOk={(v) => {
           if (v) onCommit(feld, v);

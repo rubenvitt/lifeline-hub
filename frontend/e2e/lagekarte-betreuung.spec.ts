@@ -51,6 +51,19 @@ async function karteBereit(page: Page) {
   );
 }
 
+/**
+ * Wartet, bis der Live-Strom der Seite steht (LFH-741). Eine Karte, die erst nach dem Ereignis
+ * verbindet, bekommt es nie: der Strom spielt nichts nach. Das Merkmal ist die Sync-Anzeige im
+ * Einsatzkopf, die den Zustand aus `liveStatusStore` liest.
+ */
+async function liveOffen(page: Page) {
+  await expect(page.locator('header [data-lfh="kopf-sync"]')).toHaveAttribute(
+    'data-zustand',
+    'verbunden',
+    { timeout: 30_000 },
+  );
+}
+
 async function springe(page: Page, center: [number, number], zoom: number) {
   await page.evaluate(
     ({ c, z }) =>
@@ -128,6 +141,7 @@ test('Betreuungsstelle: aus dem Modul verorten, Marker live auf einer zweiten Ka
   const andere = await zweiteSitzung(browser);
   await andere.goto(`/einsaetze/${e}/lagekarte`);
   await karteBereit(andere);
+  await liveOffen(andere);
   await springe(andere, STELLE_ORT, 15);
   expect(await schluessel(andere)).not.toContain(`betreuungsstelle-${sid}`);
 
@@ -226,6 +240,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   await page.screenshot({ path: info.outputPath('bezirk-nacht.png') });
 
   // Räumung aus einer anderen Sitzung → die Beschriftung folgt live.
+  await liveOffen(page);
   const andere = await zweiteSitzung(browser);
   await senden(andere, 'patch', `${basis}/betreuung/bezirke/${bid}`, { raeumung: 'laeuft' });
   await expect
@@ -242,7 +257,9 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
     .toContain('Uferstraße 12–40 · Räumung: läuft');
   await page.screenshot({ path: info.outputPath('bezirk-tag.png') });
 
-  // Storno löst die Fläche; sie bleibt als nicht zugeordnete Bezirksfläche stehen.
+  // Storno löst die Fläche; sie bleibt als nicht zugeordnete Bezirksfläche stehen. Nach dem
+  // Neuladen verbindet der Strom neu, das Storno darf ihm nicht zuvorkommen.
+  await liveOffen(page);
   await senden(andere, 'post', `${basis}/betreuung/bezirke/${bid}/stornieren`);
   await expect.poll(() => zonenLabel(page), { timeout: 30_000 }).toEqual(['Evakuierungsbezirk']);
   await andere.context().close();

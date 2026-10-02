@@ -353,7 +353,27 @@ export async function abgelehntEntfernen(benutzerId: number, id: number): Promis
 }
 
 /** Legt einen bewusst erneut versuchten ETB-Eintrag atomar zurück in die Pending-Queue. */
-export async function abgelehntWiederholen(benutzerId: number, id: number): Promise<boolean> {
+export function abgelehntWiederholen(benutzerId: number, id: number): Promise<boolean> {
+  return abgelehntZurueckreihen(benutzerId, id, (eintrag) => eintrag);
+}
+
+/**
+ * Wie {@link abgelehntWiederholen}, aber ohne `anhang_ids` (LFH-746). Lag der Eintrag länger
+ * als die Karenz des Verwaisten-Sweeps in der Queue, sind seine Dateien weg, und jeder Versuch
+ * mit ihnen endet wieder in 400. Die `client_id` bleibt: Die 400 hat nichts committet.
+ */
+export function abgelehntOhneAnhaengeWiederholen(benutzerId: number, id: number): Promise<boolean> {
+  return abgelehntZurueckreihen(benutzerId, id, ({ anhang_ids, ...ohneAnhaenge }) => {
+    void anhang_ids;
+    return ohneAnhaenge;
+  });
+}
+
+async function abgelehntZurueckreihen(
+  benutzerId: number,
+  id: number,
+  anpassen: (eintrag: NeuerEintrag) => NeuerEintrag,
+): Promise<boolean> {
   const d = await db();
   const tx = d.transaction(['abgelehnt', 'ausstehend'], 'readwrite');
   const abgelehnt = await tx.objectStore('abgelehnt').get(id);
@@ -364,7 +384,7 @@ export async function abgelehntWiederholen(benutzerId: number, id: number): Prom
   await tx.objectStore('ausstehend').add({
     benutzer_id: abgelehnt.benutzer_id,
     einsatz_id: abgelehnt.einsatz_id,
-    eintrag: abgelehnt.eintrag,
+    eintrag: anpassen(abgelehnt.eintrag),
     erstellt_at: abgelehnt.erstellt_at,
   });
   await tx.objectStore('abgelehnt').delete(id);

@@ -92,6 +92,10 @@ const MIT_NACHBARSCHAFT = [
   // Der Primärknopf trägt `danger={unumkehrbar}` und steht neben „Abbrechen" (und im Serienmodus
   // „Speichern und nächste"). Der Fuß jeder Erfassungsmaske hängt an dieser einen Reihe.
   'components/Erfassung.tsx',
+  // ── Offline-Wiederherstellung (LFH-746) ───────────────────────────────────
+  // „Verwerfen" (`danger`) neben „Erneut versuchen" und, bei einem ETB-Eintrag mit Anhängen,
+  // „Ohne Anhänge senden" — eine Reihe je abgelehnter Karte.
+  'offline/OfflineRecoveryDrawer.tsx',
 ];
 
 /**
