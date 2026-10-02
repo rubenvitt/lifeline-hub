@@ -76,3 +76,26 @@ describe('EtbDokumente (LFH-743)', () => {
     });
   });
 });
+
+describe('EtbDokumente — Vorschau (LFH-759)', () => {
+  it('zeigt am Foto-Dokument ein Vorschaubild, am PDF nicht', () => {
+    render(
+      <EtbDokumente
+        einsatzId={5}
+        lfdNr={4}
+        dokumente={[
+          dokument(),
+          dokument({ id: 4, titel: 'Funkskizze', dateiname: 'f.png', mime: 'image/png' }),
+        ]}
+      />,
+    );
+    const knopf = screen.getByRole('button', {
+      name: 'Vorschau: f.png, Dokument „Funkskizze“, zu Nr. 4',
+    });
+    expect(knopf.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/einsaetze/5/dokumente/4/datei?fassung=vorschau',
+    );
+    expect(screen.getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
+  });
+});

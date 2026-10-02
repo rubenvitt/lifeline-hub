@@ -112,3 +112,31 @@ describe('EtbAnhaenge (LFH-117)', () => {
     });
   });
 });
+
+describe('EtbAnhaenge — Vorschau (LFH-759)', () => {
+  it('zeigt am Foto ein Vorschaubild mit der Nummer des Eintrags, am PDF nicht', () => {
+    render(
+      <EtbAnhaenge
+        einsatzId={5}
+        eintrag={{
+          id: 40,
+          lfd_nr: 4,
+          anhaenge: [
+            anhang({ dateiname: 'dach.jpg', mime: 'image/jpeg' }),
+            anhang({ id: 10, dateiname: 'fax.pdf', mime: 'application/pdf' }),
+          ],
+        }}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Vorschau: dach.jpg, Anhang zu Nr. 4' });
+    expect(knopf.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/einsaetze/5/etb/40/anhaenge/9?fassung=vorschau',
+    );
+    expect(screen.getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
+    // Die Verweise bleiben, wie sie sind: ETB-Route, Name und Größe.
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
+  });
+});

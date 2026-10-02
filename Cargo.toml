@@ -44,6 +44,11 @@ tempfile = "3"
 sha2 = "0.11"
 base64 = "0.22"
 mime_guess = "2"
+# Vorschaubilder der Anhänge (LFH-759, `src/anhang/vorschau/`): nur die Decoder für JPEG, PNG,
+# GIF, WebP und TIFF plus den JPEG-Encoder. Alle reines Rust (zune-jpeg, png, gif, image-webp,
+# tiff), kein `-sys`-Crate, damit das Single-Binary ohne C-Bibliothek bleibt; ohne `rayon`, die
+# Last begrenzt `anhang::vorschau` selbst. HEIC dekodiert der Browser (design.md D3/D8).
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "tiff"] }
 # fontstack-/Pfadsegment-Encoding für den Style-/Tile-Proxy.
 percent-encoding = "2"
 rust-embed = "8"

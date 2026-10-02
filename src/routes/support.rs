@@ -86,13 +86,16 @@ pub fn if_none_match_matcht(headers: &HeaderMap, etag: &str) -> bool {
         })
 }
 
-/// Welche Fassung eines Anhangs ausgeliefert wird (LFH-747, Spec `anhang-metadaten`).
-/// `Bereinigt` ist der Standard jeder Download-Route; `Original` gibt es nur nach
-/// [`original_freigeben`].
+/// Welche Fassung eines Anhangs ausgeliefert wird (LFH-747, Spec `anhang-metadaten`; Vorschau
+/// LFH-759, Spec `anhang-vorschau`). `Bereinigt` ist der Standard jeder Download-Route;
+/// `Original` gibt es nur nach [`original_freigeben`]. `Vorschau`/`Grossansicht` sind neu
+/// kodierte JPEGs ohne Metadaten, mit den Gates der Route und ohne Vermerk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Fassung {
     Bereinigt,
     Original,
+    Vorschau,
+    Grossansicht,
 }
 
 /// Query `?fassung=` der vier Anhang-Download-Routen, als eigener Extractor: jede Ablehnung
@@ -124,14 +127,17 @@ impl<S: Send + Sync> axum::extract::FromRequestParts<S> for FassungParam {
 
 impl FassungParam {
     /// Fehlt oder `bereinigt` → [`Fassung::Bereinigt`], `original` → [`Fassung::Original`],
-    /// alles andere 400 (das Feld scheitert für sich), auch eine doppelte Angabe.
+    /// `vorschau`/`grossansicht` → [`Fassung::Vorschau`]/[`Fassung::Grossansicht`], alles andere
+    /// 400 (das Feld scheitert für sich), auch eine doppelte Angabe.
     pub fn fassung(&self) -> Result<Fassung, AppError> {
         match self.0.as_slice() {
             [] => Ok(Fassung::Bereinigt),
             [w] if w == "bereinigt" => Ok(Fassung::Bereinigt),
             [w] if w == "original" => Ok(Fassung::Original),
+            [w] if w == "vorschau" => Ok(Fassung::Vorschau),
+            [w] if w == "grossansicht" => Ok(Fassung::Grossansicht),
             [w] => Err(AppError::Validation(format!(
-                "Unbekannte Fassung «{w}» (erlaubt: bereinigt, original)"
+                "Unbekannte Fassung «{w}» (erlaubt: bereinigt, original, vorschau, grossansicht)"
             ))),
             _ => Err(AppError::Validation("Fassung mehrfach angegeben".into())),
         }
@@ -170,7 +176,16 @@ pub async fn original_freigeben(
     Ok(())
 }
 
-/// Liefert einen `anhang`-BLOB als Download-Antwort (LFH-258/LFH-632, Fassungen LFH-747).
+/// Meldung des 422, wenn es für einen Anhang kein Vorschaubild gibt (Spec `anhang-vorschau`).
+pub const KEINE_VORSCHAU_MELDUNG: &str = "Für diese Datei gibt es keine Vorschau.";
+
+/// CSP jeder Anhang-Antwort (LFH-759, Spec `anhang-vorschau`): wer eine Anhang-Adresse direkt
+/// öffnet, bekommt ein Dokument, das nichts ausführt und nichts nachlädt. Für ein `<img>` gilt
+/// die CSP der Bildantwort nicht, die Vorschau in der App wirkt also weiter.
+pub const ANHANG_CSP: &str = "default-src 'none'; sandbox";
+
+/// Liefert einen `anhang`-BLOB als Download-Antwort (LFH-258/LFH-632, Fassungen LFH-747,
+/// Vorschau LFH-759).
 ///
 /// - [`Fassung::Bereinigt`]: ETag aus sha256 und Version der Bereinigung, `Cache-Control` nach
 ///   [`BEREINIGT_CACHE_CONTROL`], 304-Kurzschluss bei passendem `If-None-Match` OHNE den BLOB zu
@@ -178,12 +193,17 @@ pub async fn original_freigeben(
 ///   bereinigen → 422, nie das Original.
 /// - [`Fassung::Original`]: die gespeicherten Bytes, ohne ETag und mit `no-store`, damit jeder
 ///   Abruf neu über [`original_freigeben`] läuft und vermerkt wird.
+/// - [`Fassung::Vorschau`]/[`Fassung::Grossansicht`]: ein JPEG aus [`anhang::vorschau`], ETag
+///   aus sha256, [`anhang::vorschau::VORSCHAU_VERSION`] und Größe, 304 ohne BLOB und ohne
+///   Dekodieren, `inline` mit `image/jpeg`; kein Vorschaubild möglich → 422.
+///
+/// Jede Antwort trägt `X-Content-Type-Options: nosniff` und [`ANHANG_CSP`].
 ///
 /// Geteilt von allen vier Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden); **der
 /// einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in `tests/anhang_metadaten.rs`).
 /// Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit, Linker-Sperre, Modul-Gate) macht der
 /// Aufrufer VORHER — dieser Helfer prüft nichts. Der Karten-Hintergrundbild-Download bleibt
-/// außen vor: er liest aus einer eigenen Tabelle.
+/// außen vor: er liest aus einer eigenen Tabelle. Regeln: `src/AGENTS.md`, „Anhänge“.
 pub async fn anhang_antwort(
     pool: &SqlitePool,
     anhang_id: i64,
@@ -193,20 +213,42 @@ pub async fn anhang_antwort(
     let (dateiname, mime, sha256) = anhang::repo::meta_fuer_download(pool, anhang_id).await?;
 
     let mut headers = HeaderMap::new();
-    match fassung {
-        Fassung::Bereinigt => {
-            let etag = etag_von(&format!(
-                "{sha256}.b{}",
-                anhang::metadaten::BEREINIGUNG_VERSION
-            ));
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(ANHANG_CSP),
+    );
+    let vorschau = match fassung {
+        Fassung::Vorschau => Some(anhang::vorschau::Groesse::Klein),
+        Fassung::Grossansicht => Some(anhang::vorschau::Groesse::Gross),
+        Fassung::Bereinigt | Fassung::Original => None,
+    };
+    let etag = match (fassung, vorschau) {
+        (Fassung::Original, _) => None,
+        (_, Some(groesse)) => Some(format!(
+            "{sha256}.v{}.{}",
+            anhang::vorschau::VORSCHAU_VERSION,
+            groesse.kuerzel()
+        )),
+        (_, None) => Some(format!(
+            "{sha256}.b{}",
+            anhang::metadaten::BEREINIGUNG_VERSION
+        )),
+    };
+    match etag {
+        Some(etag) => {
+            let etag = etag_von(&etag);
             headers.insert(
                 header::ETAG,
                 HeaderValue::from_str(&etag)
                     .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
             );
-            // Nicht `ASSET_CACHE_CONTROL` (immutable): die bereinigte Fassung hängt an
-            // `BEREINIGUNG_VERSION`, und ein Browser soll nach einer korrigierten Bereinigung
-            // nicht ein Jahr lang die alte anbieten. Revalidieren kostet nur ein 304 ohne BLOB.
+            // Nicht `ASSET_CACHE_CONTROL` (immutable): bereinigte Fassung und Vorschau hängen an
+            // ihrer Version, und ein Browser soll nach einer Korrektur nicht ein Jahr lang die
+            // alte anbieten. Revalidieren kostet nur ein 304 ohne BLOB.
             headers.insert(
                 header::CACHE_CONTROL,
                 HeaderValue::from_static(BEREINIGT_CACHE_CONTROL),
@@ -215,9 +257,37 @@ pub async fn anhang_antwort(
                 return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
             }
         }
-        Fassung::Original => {
+        None => {
             headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         }
+    }
+
+    if let Some(groesse) = vorschau {
+        // Fester Typ, nie der gespeicherte `mime`: ausgeliefert wird das eigene JPEG.
+        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("image/jpeg"));
+        headers.insert(
+            header::CONTENT_DISPOSITION,
+            HeaderValue::from_str(&anhang::content_disposition_inline(
+                &anhang::vorschau_dateiname(&dateiname),
+            ))
+            .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
+        );
+        // Erst der Platz, dann der BLOB: wartende Abrufe halten keine Dateien im Speicher.
+        let platz = anhang::vorschau::platz_holen().await;
+        let (_, _, daten) = anhang::repo::laden_bytes(pool, anhang_id).await?;
+        let jpeg = match anhang::vorschau::erzeugen_mit_platz(platz, daten, groesse).await {
+            Ok(jpeg) => jpeg,
+            Err(anhang::vorschau::KeineVorschau::Unmoeglich(grund)) => {
+                tracing::info!(anhang_id, grund, "Kein Vorschaubild");
+                return Err(AppError::UnprocessableEntity(KEINE_VORSCHAU_MELDUNG.into()));
+            }
+            Err(anhang::vorschau::KeineVorschau::Kontrollnetz) => {
+                return Err(AppError::Internal(
+                    "Kontrollnetz: Metadaten-Signatur im Vorschaubild".into(),
+                ));
+            }
+        };
+        return Ok((headers, jpeg).into_response());
     }
 
     headers.insert(
@@ -230,8 +300,8 @@ pub async fn anhang_antwort(
     // Das Original trägt einen eigenen Namen (`dach.original.jpg`), damit es neben der
     // bereinigten Fassung erkennbar bleibt.
     let name = match fassung {
-        Fassung::Bereinigt => dateiname,
         Fassung::Original => anhang::original_dateiname(&dateiname),
+        _ => dateiname,
     };
     headers.insert(
         header::CONTENT_DISPOSITION,
@@ -241,7 +311,7 @@ pub async fn anhang_antwort(
     let (_, _, daten) = anhang::repo::laden_bytes(pool, anhang_id).await?;
     let daten = match fassung {
         Fassung::Original => daten,
-        Fassung::Bereinigt => match anhang::metadaten::bereinigen(&daten, &mime) {
+        _ => match anhang::metadaten::bereinigen(&daten, &mime) {
             Ok(Cow::Owned(neu)) => neu,
             Ok(Cow::Borrowed(_)) => daten,
             Err(anhang::metadaten::Unbereinigbar(grund)) => {
@@ -459,6 +529,36 @@ pub fn sse_stream_mit_replay(
 mod tests {
     use super::*;
     use serde::Deserialize;
+
+    fn fassung_aus(werte: &[&str]) -> Result<Fassung, AppError> {
+        FassungParam(werte.iter().map(|w| w.to_string()).collect()).fassung()
+    }
+
+    #[test]
+    fn fassung_kennt_vorschau_und_grossansicht() {
+        assert_eq!(fassung_aus(&[]).unwrap(), Fassung::Bereinigt);
+        assert_eq!(fassung_aus(&["bereinigt"]).unwrap(), Fassung::Bereinigt);
+        assert_eq!(fassung_aus(&["original"]).unwrap(), Fassung::Original);
+        assert_eq!(fassung_aus(&["vorschau"]).unwrap(), Fassung::Vorschau);
+        assert_eq!(
+            fassung_aus(&["grossansicht"]).unwrap(),
+            Fassung::Grossansicht
+        );
+    }
+
+    #[test]
+    fn unbekannte_oder_doppelte_fassung_ist_400_und_nennt_alle_werte() {
+        let AppError::Validation(m) = fassung_aus(&["roh"]).unwrap_err() else {
+            panic!("400 erwartet");
+        };
+        for wert in ["bereinigt", "original", "vorschau", "grossansicht"] {
+            assert!(m.contains(wert), "{m}");
+        }
+        assert!(matches!(
+            fassung_aus(&["vorschau", "grossansicht"]),
+            Err(AppError::Validation(_))
+        ));
+    }
 
     #[test]
     fn trimme_macht_leer_und_whitespace_zu_none() {

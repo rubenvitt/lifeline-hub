@@ -157,8 +157,14 @@ function EintragInhalt({
       </Markdown>
       {/* Rendert nichts ohne Verknüpfung. */}
       <EtbBacklinkBadges eintrag={e} einsatzId={einsatzId} />
-      {/* Dasselbe Bauteil wie in der Zeitachse; rendert nichts ohne Anhang. */}
-      <EtbAnhaenge eintrag={e} einsatzId={einsatzId} darfOriginal={darfOriginal} />
+      {/* Dasselbe Bauteil wie in der Zeitachse; rendert nichts ohne Anhang. Vorschaubilder ohne
+          Großansicht: die Palette ist selbst eine Überlagerung ohne Bedienelemente (LFH-759). */}
+      <EtbAnhaenge
+        eintrag={e}
+        einsatzId={einsatzId}
+        darfOriginal={darfOriginal}
+        grossansicht={false}
+      />
     </div>
   );
 }

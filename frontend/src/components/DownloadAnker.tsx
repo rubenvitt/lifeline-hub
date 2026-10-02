@@ -1,7 +1,13 @@
 import { useId, type ReactNode } from 'react';
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
-import { ORIGINAL_TEXT, originalDateiname, originalZugaenglicherName } from '../api/anhangFassung';
+import {
+  istBildMime,
+  ORIGINAL_TEXT,
+  originalDateiname,
+  originalZugaenglicherName,
+} from '../api/anhangFassung';
+import AnhangVorschau from './AnhangVorschau';
 
 /**
  * Stil des Download-Ankers (LFH-21). Ein `<a>` ist ein handgebautes Bedienziel und erbt keine
@@ -62,6 +68,13 @@ interface Props {
    * der Dateiname da.
    */
   originalKennung?: string;
+  /**
+   * MIME-Typ des Anhangs (LFH-759). Ist es ein Bild, steht vor dem Verweis ein Vorschaubild
+   * (`AnhangVorschau`), das die Großansicht in der App öffnet. Fehlt er, gibt es keins.
+   */
+  mime?: string | null;
+  /** Zeilenkennung für den zugänglichen Namen des Vorschaubilds („Schaden S-003“). */
+  vorschauKennung?: string;
 }
 
 /** Sichtbarer Text des Original-Verweises; die Quelle steht in `api/anhangFassung.ts`. */
@@ -81,6 +94,8 @@ export default function DownloadAnker({
   zugaenglicherName,
   originalHref,
   originalKennung,
+  mime,
+  vorschauKennung,
 }: Props) {
   const { token, rollen } = useRollen();
   // Das `aria-label` ersetzt den Inhalt im zugänglichen Namen; die Zusatzzeile (wer, wann) bleibt
@@ -118,31 +133,43 @@ export default function DownloadAnker({
       )}
     </a>
   );
-  if (originalHref == null) return anker;
-  return (
-    <span
-      data-lfh="download-anker-mit-original"
-      style={{
-        display: 'inline-flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        columnGap: token.marginSM,
-      }}
-    >
-      {anker}
-      <a
-        href={originalHref}
-        download={originalDateiname(dateiname)}
-        aria-label={originalZugaenglicherName(originalKennung ?? dateiname)}
-        data-lfh="download-anker-original"
+  const verweise =
+    originalHref == null ? (
+      anker
+    ) : (
+      <span
+        data-lfh="download-anker-mit-original"
         style={{
-          ...downloadAnkerStil(token),
-          fontWeight: 'normal',
-          color: rollen.bedienText,
+          display: 'inline-flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          columnGap: token.marginSM,
         }}
       >
-        {ORIGINAL_TEXT}
-      </a>
+        {anker}
+        <a
+          href={originalHref}
+          download={originalDateiname(dateiname)}
+          aria-label={originalZugaenglicherName(originalKennung ?? dateiname)}
+          data-lfh="download-anker-original"
+          style={{
+            ...downloadAnkerStil(token),
+            fontWeight: 'normal',
+            color: rollen.bedienText,
+          }}
+        >
+          {ORIGINAL_TEXT}
+        </a>
+      </span>
+    );
+  if (!istBildMime(mime)) return verweise;
+  return (
+    <span
+      data-lfh="download-anker-mit-vorschau"
+      style={{ display: 'inline-flex', alignItems: 'center', columnGap: token.marginSM }}
+    >
+      <AnhangVorschau href={href} mime={mime} dateiname={dateiname} kennung={vorschauKennung} />
+      {verweise}
     </span>
   );
 }
