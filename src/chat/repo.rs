@@ -292,19 +292,23 @@ pub async fn anlegen_mit_anhaengen(
             // Rechte-Semantik aushebeln („eine Datei, ein Lebenszyklus"). Die Bedingung kommt
             // aus dem Linker-Register `anhang::repo::MODUL_LINKER` (src/AGENTS.md „ETB-Anhänge"):
             // ein neuer Linker braucht dort einen Eintrag, hier keine Handarbeit.
-            let treffer: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                "SELECT 1 FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? AND NOT {}",
+            let mime: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT a.mime FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? AND NOT {}",
                 crate::anhang::repo::modul_gebunden_sql("a")
             )))
             .bind(aid)
             .bind(einsatz_id)
             .fetch_optional(&mut *conn)
             .await?;
-            if treffer.is_none() {
+            let Some(mime) = mime else {
                 return Err(AppError::Validation(
                     "Unbekannter oder fremder Anhang".into(),
                 ));
-            }
+            };
+            // LFH-745: Ein ungebundener Upload eines anderen Moduls (ETB nimmt die Dokument-
+            // Allowlist, also auch HEIC/TIFF) fällt durch die Kreuzsperre. Der Chat prüft deshalb
+            // beim Verknüpfen selbst gegen seine Allowlist, mit dem Wortlaut seines Uploads.
+            crate::anhang::pruefe_mime(&mime, crate::anhang::ERLAUBTE_MIME)?;
         }
 
         let id: i64 = sqlx::query_scalar(

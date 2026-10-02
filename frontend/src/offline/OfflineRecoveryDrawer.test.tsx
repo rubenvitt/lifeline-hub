@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import OfflineRecoveryDrawer from './OfflineRecoveryDrawer';
 import {
+  abgelehntLaden,
+  queueAblehnen,
+  queueEinreihen,
+  queueLaden,
   queueLegacyEinreihenFuerTests,
   queueLeerenFuerTests,
   queueNichtZugeordnetZaehlen,
@@ -89,6 +93,68 @@ describe('OfflineRecoveryDrawer: abgelehnte Betreuungsmeldungen (LFH-675)', () =
     expect(screen.getByText(/ist storniert/)).toBeInTheDocument();
     expect(screen.getByText(/"client_id": "stand-abgelehnt"/)).toBeInTheDocument();
     expect(screen.getByText(/"belegt": 37/)).toBeInTheDocument();
+  });
+});
+
+describe('OfflineRecoveryDrawer: ETB-Eintrag mit weggeräumten Anhängen (LFH-746)', () => {
+  async function abgelehnterEtbEintrag(anhangIds?: number[]): Promise<void> {
+    await queueEinreihen(11, 7, {
+      typ: 'meldung',
+      inhalt: 'Lagefoto Brücke',
+      client_id: 'etb-mit-foto',
+      ...(anhangIds ? { anhang_ids: anhangIds } : {}),
+    });
+    const [pending] = await queueLaden(11, 7);
+    await queueAblehnen(11, pending, 'Anhang unbekannt oder nicht mehr vorhanden');
+  }
+
+  it('nennt die fehlenden Dateien und sendet erst nach Rückfrage nur den Text', async () => {
+    await abgelehnterEtbEintrag([41, 42]);
+    const user = userEvent.setup();
+
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+      </App>,
+    );
+
+    expect(await screen.findByText('Abgelehnter ETB-Eintrag')).toBeInTheDocument();
+    expect(
+      screen.getByText('2 Dateien, gehen beim Senden ohne Anhänge nicht mit'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Ohne Anhänge senden' }));
+    expect(await screen.findByText('Ohne Anhänge senden?')).toBeInTheDocument();
+    expect(screen.getByText(/Die 2 angehängten Dateien gehen nicht mit/)).toBeInTheDocument();
+    // Vor der Bestätigung bleibt alles, wie es ist.
+    expect(await abgelehntLaden(11, 7)).toHaveLength(1);
+    expect(await queueLaden(11, 7)).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Nur den Text senden' }));
+
+    await waitFor(async () => expect(await queueLaden(11, 7)).toHaveLength(1));
+    expect(await abgelehntLaden(11, 7)).toHaveLength(0);
+    const [zurueck] = await queueLaden(11, 7);
+    expect(zurueck.eintrag).toEqual({
+      typ: 'meldung',
+      inhalt: 'Lagefoto Brücke',
+      client_id: 'etb-mit-foto',
+    });
+  });
+
+  it('bietet das Senden ohne Anhänge nur an, wenn der Eintrag welche trägt', async () => {
+    await abgelehnterEtbEintrag();
+
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+      </App>,
+    );
+
+    expect(await screen.findByText('Abgelehnter ETB-Eintrag')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ohne Anhänge senden' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Anhänge')).not.toBeInTheDocument();
   });
 });
 

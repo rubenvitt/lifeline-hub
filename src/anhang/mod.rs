@@ -106,12 +106,20 @@ pub fn ermittle_mime_aus(dateiname: &str, erlaubt: &[&str]) -> Result<String, Ap
     let mime = mime_guess::from_path(dateiname)
         .first_raw()
         .ok_or_else(|| AppError::Validation("Dateityp nicht erkennbar".into()))?;
+    pruefe_mime(mime, erlaubt)?;
+    Ok(mime.to_string())
+}
+
+/// Prüft einen bereits ermittelten MIME-Typ gegen `erlaubt` — die Ablehnung beim Upload und
+/// beim Verknüpfen einer schon gespeicherten Datei (`chat::repo::anlegen_mit_anhaengen`,
+/// LFH-745) klingt damit gleich.
+pub fn pruefe_mime(mime: &str, erlaubt: &[&str]) -> Result<(), AppError> {
     if !erlaubt.contains(&mime) {
         return Err(AppError::Validation(format!(
             "Dateityp {mime} ist nicht erlaubt"
         )));
     }
-    Ok(mime.to_string())
+    Ok(())
 }
 
 /// **Die eine Prüfkette vor jedem Persistieren:** Typ aus der Endung gegen `erlaubt`, Größe,
