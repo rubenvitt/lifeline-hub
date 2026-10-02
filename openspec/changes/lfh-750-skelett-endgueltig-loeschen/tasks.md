@@ -61,4 +61,4 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 10. Abschluss
 
-- [ ] 10.1 `cargo test --workspace --exclude lifeline-desktop`, Vitest und `./scripts/check-all.sh` grün (bzw. mit Verweis auf den CI-Lauf des PRs abhaken)
+- [x] 10.1 `cargo test --workspace --exclude lifeline-desktop`, Vitest und `./scripts/check-all.sh` grün (bzw. mit Verweis auf den CI-Lauf des PRs abhaken) — lokal: `cargo test` 3829 grün (119 Binaries), `cargo fmt --check`, Typecheck, ESLint, Prettier und `check-migrationen.sh` grün; Vitest 8874 grün, 10 rot in fünf Dateien, die auf `origin/alpha` identisch rot sind (lokal Node 22 statt der gepinnten 26, Zahlen-/Datumsformate); `check-all.sh` belegt der CI-Lauf des PRs (lokal fehlt `mise`)
