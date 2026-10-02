@@ -1,3 +1,23 @@
+## [1.0.0-alpha.66](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.65...v1.0.0-alpha.66) (2026-10-02)
+
+### Lagekarte
+
+- Offline-Karten aktualisieren sich jetzt automatisch im Hintergrund, wenn eine neue Version im Katalog verfügbar ist. Die Funktion ist über die Kartenverwaltung ein- und ausschaltbar, der Prüfabstand kann angepasst werden.
+- In der Kartenverwaltung wird angezeigt, seit wann eine Karte auf dem Gerät liegt, welche Phase gerade läuft (z. B. Download, Kartenbau), wann die letzte und nächste Prüfung stattfindet und ob ein Update fehlgeschlagen ist.
+- Ein neuer Button „Jetzt aktualisieren" ersetzt die bisherigen Funktionen „Aktualisieren" und „Neu laden" und stößt sofort eine Aktualisierung an.
+
+### Einsatztagebuch und Anhänge
+
+- Fotos werden beim Download standardmäßig von Standort- und Metadaten bereinigt (EXIF, GPS, Geräteinformationen). Nur die Bildausrichtung bleibt erhalten, damit Fotos korrekt dargestellt werden.
+- Das Original mit allen Metadaten bleibt als Beweismittel gespeichert und kann von Einsatzleitung und Systemadministratoren über einen separaten Verweis „Original (mit Standort)" heruntergeladen werden. Der Download wird im Einsatztagebuch vermerkt.
+- Die Metadaten-Bereinigung funktioniert für JPEG, PNG, WebP, GIF, HEIF und TIFF.
+- Auch Dokumente, die in der Zeitachse des Einsatztagebuchs angezeigt werden, erhalten den Verweis auf das Original, sofern es sich um Bilder handelt.
+
+### Betrieb und Installation
+
+- Die Offline-Karten-Aktualisierung läuft als Hintergrunddienst und prüft in regelmäßigen Abständen (einstellbar), ob neue Kartenstände verfügbar sind. Der nächste geplante Lauf wird in der Verwaltung angezeigt.
+- Der Kartenbau für Frankreich läuft jetzt korrekt durch, nachdem die Prüfung der erwarteten geografischen Ausdehnung an die tatsächliche Katalog-Bounding-Box angepasst wurde.
+
 ## [1.0.0-alpha.65](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.64...v1.0.0-alpha.65) (2026-10-02)
 
 ### Einsatztagebuch
