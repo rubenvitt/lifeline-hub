@@ -59,6 +59,7 @@ pub const KOPF: Projektion = Projektion {
 pub const PERSON: Projektion = Projektion {
     tabelle: "einsatz_person",
     spalten: &[
+        "id",
         "registrier_nr",
         "status",
         "aktuelle_sichtung",
@@ -116,8 +117,27 @@ pub const ETB: Projektion = Projektion {
     ],
 };
 
+/// Schwärzungsanträge (LFH-751): der Antrag ist selbst der Nachweis, jede Spalte ist Retain.
+/// `aufbewahrung::antrag` liest daraus Liste, Zustand und Register-Kennzeichen.
+pub const ANTRAG: Projektion = Projektion {
+    tabelle: "schwaerzung_antrag",
+    spalten: &[
+        "id",
+        "einsatz_id",
+        "ziel_art",
+        "ziel_id",
+        "aktenzeichen",
+        "beantragt_von",
+        "beantragt_at",
+        "faellig_at",
+        "zurueckgenommen_at",
+        "zurueckgenommen_von",
+        "vollzogen_at",
+    ],
+};
+
 /// Alle Projektionen der Archivakte — Iterationsbasis des Guards.
-pub const ALLE: &[Projektion] = &[KOPF, PERSON, TIER, SCHADEN, ETB];
+pub const ALLE: &[Projektion] = &[KOPF, PERSON, TIER, SCHADEN, ETB, ANTRAG];
 
 /// Der einzige JOIN außerhalb der Registry: Anzeigename des Erfassers aus der
 /// Stammdatentabelle `benutzer` (nicht einsatzbezogen, nicht Gegenstand der Schwärzung).

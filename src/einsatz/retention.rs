@@ -52,7 +52,7 @@ pub fn karenz_abgelaufen(geloescht_at: Option<&str>, jetzt: DateTime<Utc>) -> bo
 
 wire_enum! {
     /// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
-    /// keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
+    /// keinen ([`zustand`] liefert `None`). Genau einer von sieben Werten; die Rangfolge steht an
     /// [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
     /// `tests/enum_wire_kontrakt.rs`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -69,11 +69,14 @@ wire_enum! {
         SchwaerzungAusstehend => "schwaerzung_ausstehend",
         /// Personendaten unwiderruflich geschwärzt.
         Geschwaerzt => "geschwaerzt",
+        /// Offener Einsatz-Antrag (Löschersuchen nach Art. 17, LFH-751), noch nicht vollzogen.
+        SchwaerzungBeantragt => "schwaerzung_beantragt",
     }
 }
 
 /// Leitet den Aufbewahrungszustand ab (LFH-23, design.md D4). `None` für jeden nicht
-/// abgeschlossenen Einsatz. Rangfolge: geschwärzt → Schwärzung ausstehend (Karenz
+/// abgeschlossenen Einsatz. `antrag_faellig_at` ist die Fälligkeit eines offenen Einsatz-Antrags
+/// (LFH-751). Rangfolge: geschwärzt → Schwärzung beantragt → Schwärzung ausstehend (Karenz
 /// abgelaufen, [`karenz_abgelaufen`]) → vorgemerkt → fällig (Frist abgelaufen, dieselbe
 /// Grenze wie die Lesesperre: `jetzt >= retention_bis`) → Frist läuft → ohne Frist.
 ///
@@ -85,6 +88,7 @@ pub fn zustand(
     retention_bis: Option<&str>,
     geloescht_at: Option<&str>,
     geschwaerzt_at: Option<&str>,
+    antrag_faellig_at: Option<&str>,
     jetzt: DateTime<Utc>,
 ) -> Option<AufbewahrungZustand> {
     if status != crate::einsatz::STATUS_ABGESCHLOSSEN {
@@ -93,6 +97,8 @@ pub fn zustand(
     let gesetzt = |s: Option<&str>| s.is_some_and(|v| !v.is_empty());
     Some(if gesetzt(geschwaerzt_at) {
         AufbewahrungZustand::Geschwaerzt
+    } else if gesetzt(antrag_faellig_at) {
+        AufbewahrungZustand::SchwaerzungBeantragt
     } else if gesetzt(geloescht_at) {
         if karenz_abgelaufen(geloescht_at, jetzt) {
             AufbewahrungZustand::SchwaerzungAusstehend
@@ -179,6 +185,7 @@ mod tests {
             frist,
             geloescht,
             geschwaerzt,
+            None,
             t("2026-06-30 12:00:00"),
         )
     }
@@ -245,6 +252,49 @@ mod tests {
             ),
             Some(Vorgemerkt)
         );
+    }
+
+    /// LFH-751: ein offener Einsatz-Antrag steht direkt nach „geschwärzt“, vor jeder
+    /// Fristlage; ein aktiver Einsatz hat weiter keinen Zustand.
+    #[test]
+    fn zustand_beantragt_rangfolge() {
+        use AufbewahrungZustand::*;
+        let jetzt = t("2026-06-30 12:00:00");
+        let f = Some("2026-07-01 12:00:00");
+        assert_eq!(
+            zustand(
+                "abgeschlossen",
+                Some("2099-01-01 00:00:00"),
+                None,
+                None,
+                f,
+                jetzt
+            ),
+            Some(SchwaerzungBeantragt)
+        );
+        assert_eq!(
+            zustand(
+                "abgeschlossen",
+                None,
+                Some("2026-01-01 00:00:00"),
+                None,
+                f,
+                jetzt
+            ),
+            Some(SchwaerzungBeantragt)
+        );
+        assert_eq!(
+            zustand(
+                "abgeschlossen",
+                None,
+                Some("2026-01-01 00:00:00"),
+                Some("2026-02-01 00:00:00"),
+                f,
+                jetzt
+            ),
+            Some(Geschwaerzt)
+        );
+        assert_eq!(zustand("aktiv", None, None, None, f, jetzt), None);
     }
 
     #[test]

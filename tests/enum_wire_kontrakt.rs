@@ -364,6 +364,25 @@ fn serde_wire_gleich_as_str() {
         Vorgemerkt,
         SchwaerzungAusstehend,
         Geschwaerzt,
+        SchwaerzungBeantragt,
+    });
+    enum_wire_as_str!(lifeline_hub::einsatz::schwaerzung_person::PersonenArt {
+        Betroffene,
+        ExterneKraft,
+        InfotelefonAnruf,
+        Medienkontakt,
+    });
+    enum_wire_as_str!(lifeline_hub::aufbewahrung::antrag::AntragZielArt {
+        Einsatz,
+        Betroffene,
+        ExterneKraft,
+        InfotelefonAnruf,
+        Medienkontakt,
+    });
+    enum_wire_as_str!(lifeline_hub::aufbewahrung::antrag::AntragStand {
+        Offen,
+        Zurueckgenommen,
+        Vollzogen,
     });
     enum_wire_as_str!(lifeline_hub::einsatz::Einsatzart {
         Realeinsatz,

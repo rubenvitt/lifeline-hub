@@ -27,19 +27,19 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote T
 
 ## 5. Zustand und Übersicht
 
-- [ ] 5.1 `AufbewahrungZustand::SchwaerzungBeantragt` und neuer Parameter in `retention::zustand` (D8); Übersicht und Akte lesen die Fälligkeit des offenen Einsatz-Antrags. Beleg: Unit-Test der Rangfolge, `tests/enum_wire_kontrakt.rs` erweitert, Szenarien „Offener Einsatz-Antrag“ und „Zurückgenommener Antrag“ der Übersicht in `tests/aufbewahrung.rs`.
+- [x] 5.1 `AufbewahrungZustand::SchwaerzungBeantragt` und neuer Parameter in `retention::zustand` (D8); Übersicht und Akte lesen die Fälligkeit des offenen Einsatz-Antrags. Beleg: Unit-Test der Rangfolge, `tests/enum_wire_kontrakt.rs` erweitert, Szenarien „Offener Einsatz-Antrag“ und „Zurückgenommener Antrag“ der Übersicht in `tests/aufbewahrung.rs`.
 
 ## 6. Personensuche
 
-- [ ] 6.1 Normalisierung und Abgleich (ganze Wörter, Ziffern ≥ 6) als reine Funktion mit Unit-Tests (Umlaute, Reihenfolge der Wörter, kein Teilwort-Treffer, Rufnummer mit Leerzeichen). Beleg: Unit-Tests.
-- [ ] 6.2 Repo-Funktion `personensuche` (nur lesend) über alle vier Personenarten mit Kennungen aus D6 und Antragsstand. Beleg: Repo-Test „Erika Mustermann“ liefert `R-001`, die Antwort-Serialisierung enthält weder „Erika“ noch „Mustermann“; geschwärzte Person wird nicht gefunden.
+- [x] 6.1 Normalisierung und Abgleich (ganze Wörter, Ziffern ≥ 6) als reine Funktion mit Unit-Tests (Umlaute, Reihenfolge der Wörter, kein Teilwort-Treffer, Rufnummer mit Leerzeichen). Beleg: Unit-Tests.
+- [x] 6.2 Repo-Funktion `personensuche` (nur lesend) über alle vier Personenarten mit Kennungen aus D6 und Antragsstand. Beleg: Repo-Test „Erika Mustermann“ liefert `R-001`, die Antwort-Serialisierung enthält weder „Erika“ noch „Mustermann“; geschwärzte Person wird nicht gefunden.
 
 ## 7. Routen, Guard und Codegen
 
-- [ ] 7.1 Vier Routen aus D7 mit `AdminUser`, `fordere_archivzugriff`, `JsonBody`/`PfadParam`; Request-DTOs, Response-DTOs mit `ToSchema`, `no-store` an der Suche. Beleg: Integrationstests in `tests/aufbewahrung.rs` für jedes Szenario von `aufbewahrung-loeschersuchen` mit Statuscode (201, 400, 403, 404, 409, 422) und für „Personensuche durch die Einsatzleitung“ (403).
-- [ ] 7.2 Guard `archiv_namensraum_nur_lesend_und_admin` auf acht Routen und die benannte Nicht-GET-Menge umstellen, plus Prüfung „Personensuche schreibt nicht“. Beleg: Guard grün; Selbsttests (zusätzliche Nicht-GET-Route, `write_retry!` in der Suche) machen ihn rot.
+- [x] 7.1 Vier Routen aus D7 mit `AdminUser`, `fordere_archivzugriff`, `JsonBody`/`PfadParam`; Request-DTOs, Response-DTOs mit `ToSchema`, `no-store` an der Suche. Beleg: Integrationstests in `tests/loeschersuchen.rs` für jedes Szenario von `aufbewahrung-loeschersuchen` mit Statuscode (201, 400, 403, 404, 409, 422) und für „Personensuche durch die Einsatzleitung“ (403).
+- [x] 7.2 Guard `archiv_namensraum_nur_lesend_und_admin` auf acht Routen und die benannte Nicht-GET-Menge umstellen, plus Prüfung „Personensuche schreibt nicht“. Beleg: Guard grün; Selbsttests (zusätzliche Nicht-GET-Route, `write_retry!` in der Suche) machen ihn rot.
 - [ ] 7.3 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/openapi.json` sowie `types.generated.ts` mitcommitten. Beleg: Skript grün.
-- [ ] 7.4 Ende-zu-Ende in `tests/aufbewahrung_e2e.rs`: Personen-Antrag über die Route, Uhr +24 h, Purge, dann ETB-Spur (zwei Einträge mit Aktenzeichen und `R-042`, ohne Namen) und Szenario „Name im ETB-Wortlaut bleibt“. Beleg: Test grün; `AUSNAHMEN_SYSTEM_ETB` unverändert.
+- [x] 7.4 Ende-zu-Ende in `tests/loeschersuchen.rs` (`personen_antrag_bis_zum_vollzug`): Personen-Antrag über die Route, Uhr +24 h, Purge, dann ETB-Spur (zwei Einträge mit Aktenzeichen und `R-042`, ohne Namen) und Szenario „Name im ETB-Wortlaut bleibt“. Beleg: Test grün; `AUSNAHMEN_SYSTEM_ETB` unverändert.
 
 ## 8. Frontend
 

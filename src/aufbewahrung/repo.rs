@@ -1,7 +1,7 @@
 //! Lesende Abfragen der Aufbewahrung (LFH-23). Jedes SELECT entsteht aus den Konstanten in
 //! [`super::projektion`] — eine Spalte, die dort nicht steht, liest dieses Modul nicht.
 
-use super::projektion::{ETB, ETB_ERFASSER_JOIN, KOPF, PERSON, SCHADEN, TIER};
+use super::projektion::{ANTRAG, ETB, ETB_ERFASSER_JOIN, KOPF, PERSON, SCHADEN, TIER};
 use super::{
     ArchivAkteAnzeige, ArchivEtbEintragAnzeige, ArchivKopfAnzeige, ArchivPersonAnzeige,
     ArchivSchadenAnzeige, ArchivTierAnzeige, AufbewahrungEintragAnzeige,
@@ -32,6 +32,8 @@ pub struct KopfZeile {
     pub retention_bis: Option<String>,
     pub geloescht_at: Option<String>,
     pub geschwaerzt_at: Option<String>,
+    /// Fälligkeit eines offenen Einsatz-Antrags (LFH-751), aus [`super::projektion::ANTRAG`].
+    pub antrag_faellig_at: Option<String>,
 }
 
 impl KopfZeile {
@@ -42,6 +44,7 @@ impl KopfZeile {
             self.retention_bis.as_deref(),
             self.geloescht_at.as_deref(),
             self.geschwaerzt_at.as_deref(),
+            self.antrag_faellig_at.as_deref(),
             jetzt,
         )
     }
@@ -66,6 +69,7 @@ impl KopfZeile {
 
 #[derive(sqlx::FromRow)]
 struct PersonZeile {
+    id: i64,
     registrier_nr: i64,
     #[sqlx(try_from = "String")]
     status: PersonStatus,
@@ -115,9 +119,19 @@ struct EtbZeile {
     berichtigt_eintrag_id: Option<i64>,
 }
 
-/// `SELECT <KOPF> FROM einsatz k` — Basis für Übersicht und Akte.
+/// `SELECT <KOPF>, <offener Einsatz-Antrag> FROM einsatz k` — Basis für Übersicht und Akte.
+/// Die Fälligkeit des offenen Einsatz-Antrags (LFH-751) kommt als Unterabfrage über Spalten
+/// aus [`ANTRAG`] (alle Retain).
 fn kopf_select() -> String {
-    format!("SELECT {} FROM {} k", KOPF.select_liste("k"), KOPF.tabelle)
+    format!(
+        "SELECT {}, (SELECT a.faellig_at FROM {} a WHERE a.einsatz_id = k.id \
+           AND a.ziel_art = 'einsatz' AND a.zurueckgenommen_at IS NULL \
+           AND a.vollzogen_at IS NULL) AS antrag_faellig_at \
+         FROM {} k",
+        KOPF.select_liste("k"),
+        ANTRAG.tabelle,
+        KOPF.tabelle
+    )
 }
 
 /// Lädt den Kopf eines Einsatzes; `None`, wenn es ihn nicht gibt (→ 404).
@@ -158,6 +172,7 @@ pub async fn uebersicht(
                 retention_bis: k.retention_bis,
                 geloescht_at: k.geloescht_at,
                 geschwaerzt_at: k.geschwaerzt_at,
+                antrag_faellig_at: k.antrag_faellig_at,
                 zustand,
             })
         })
@@ -183,12 +198,25 @@ pub async fn akte(
     let zustand = kopf
         .zustand(jetzt)
         .ok_or_else(|| AppError::Conflict("Einsatz ist nicht abgeschlossen".into()))?;
+    // Auf Antrag geschwärzte Betroffene (LFH-751): Personen-ID → Zeitpunkt des Vollzugs.
+    let auf_antrag: std::collections::HashMap<i64, String> =
+        sqlx::query_as::<_, (i64, String)>(AssertSqlSafe(format!(
+            "SELECT a.ziel_id, a.vollzogen_at FROM {} a WHERE a.einsatz_id = ? \
+               AND a.ziel_art = 'betroffene' AND a.vollzogen_at IS NOT NULL",
+            ANTRAG.tabelle
+        )))
+        .bind(kopf.id)
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .collect();
     let personen = sqlx::query_as::<_, PersonZeile>(AssertSqlSafe(register_sql(&PERSON)))
         .bind(kopf.id)
         .fetch_all(pool)
         .await?
         .into_iter()
         .map(|p| ArchivPersonAnzeige {
+            auf_antrag_geschwaerzt_at: auf_antrag.get(&p.id).cloned(),
             registrier_anzeige: crate::person::registrier_anzeige(p.registrier_nr),
             registrier_nr: p.registrier_nr,
             status: p.status,
@@ -234,6 +262,7 @@ pub async fn akte(
         kopf: kopf.anzeige(),
         zustand,
         karenz_ende: karenz_ende(kopf.geloescht_at.as_deref()),
+        antrag_faellig_at: kopf.antrag_faellig_at.clone(),
         personen,
         tiere,
         schaeden,

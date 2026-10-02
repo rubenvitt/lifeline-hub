@@ -4,8 +4,9 @@
 //! unverändert, auch für den System-Admin. Daneben gibt es einen eigenen, lesenden Pfad
 //! (`/api/aufbewahrung`, `routes::aufbewahrung`): eine Übersicht der abgeschlossenen Einsätze
 //! der eigenen Organisation mit Aufbewahrungszustand und eine pseudonyme Archivakte (Kopf,
-//! Register, ETB) nur aus Retain-Spalten ([`projektion`]). Einzige Schreibaktion ist das
-//! Wiederherstellen während der Karenz (`einsatz::repo::wiederherstellen`).
+//! Register, ETB) nur aus Retain-Spalten ([`projektion`]). Schreibaktionen sind das
+//! Wiederherstellen während der Karenz (`einsatz::repo::wiederherstellen`) sowie Stellen und
+//! Rücknahme eines Schwärzungsantrags nach Art. 17 ([`antrag`], LFH-751).
 //!
 //! **„Org-Admin“ ist der System-Admin derselben Organisation** — enger als sonst beim
 //! System-Admin. Die Prüfung steht in [`fordere_archivzugriff`].
@@ -18,6 +19,7 @@ pub mod projektion;
 pub mod repo;
 #[cfg(test)]
 mod repo_tests;
+pub mod suche;
 
 use crate::auth::Benutzer;
 use crate::einsatz::retention::AufbewahrungZustand;
@@ -49,6 +51,9 @@ pub struct AufbewahrungEintragAnzeige {
     pub karenz_ende: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub geschwaerzt_at: Option<String>,
+    /// Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antrag_faellig_at: Option<String>,
     pub zustand: AufbewahrungZustand,
 }
 
@@ -93,6 +98,9 @@ pub struct ArchivPersonAnzeige {
     pub erfasst_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storniert_at: Option<String>,
+    /// Zeitpunkt, zu dem ein Löschersuchen für diese Person vollzogen wurde (LFH-751).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auf_antrag_geschwaerzt_at: Option<String>,
 }
 
 /// Registereintrag eines Tiers — Registriernummer, Tierart, Status.
@@ -134,6 +142,9 @@ pub struct ArchivAkteAnzeige {
     pub zustand: AufbewahrungZustand,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub karenz_ende: Option<String>,
+    /// Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antrag_faellig_at: Option<String>,
     pub personen: Vec<ArchivPersonAnzeige>,
     pub tiere: Vec<ArchivTierAnzeige>,
     pub schaeden: Vec<ArchivSchadenAnzeige>,
