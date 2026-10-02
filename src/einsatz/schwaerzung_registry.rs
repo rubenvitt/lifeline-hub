@@ -139,6 +139,9 @@ const G_ABGLEICH: &str =
      werden selbst gescrubbt)";
 const G_AUDIT: &str =
     "Zugriffs-Audit (Nachweis-Struktur; benutzer=System-Nutzer, kein Betroffenen-Freitext)";
+const G_ANTRAG: &str =
+    "Aktenzeichen des Löschersuchens (Art. 17): Nachweis der Erfüllung, kein Personenwert \
+     (der Dialog verlangt ein Zeichen ohne Namen, LFH-751 design.md D10)";
 // REVIEW: operativer Freitext-Zettel, konservativ gescrubbt — Begründung im Scrub-Kommentar.
 
 /// Die vollständige Registry aller einsatz-scoped Tabellen (Menge S). Reihenfolge =
@@ -1706,6 +1709,28 @@ pub const TABELLEN: &[TabellenRegel] = &[
             ),
         ],
     },
+    // ---------- Schwärzungsanträge (LFH-751) ----------
+    // Der Antrag ist der Nachweis, dass die Organisation einem Löschersuchen nach Art. 17
+    // nachgekommen ist (Rechenschaftspflicht, Art. 5 Abs. 2) — er überdauert die Schwärzung.
+    // Das Ziel steht nur als Art + ID darin, nie mit Namen.
+    TabellenRegel {
+        tabelle: "schwaerzung_antrag",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("ziel_art", G_ENUM),
+            retain("ziel_id", G_POLY),
+            retain("aktenzeichen", G_ANTRAG),
+            retain("beantragt_von", G_FK),
+            retain("beantragt_at", G_ZEIT),
+            retain("faellig_at", G_ZEIT),
+            retain("zurueckgenommen_at", G_ZEIT),
+            retain("zurueckgenommen_von", G_FK),
+            retain("vollzogen_at", G_ZEIT),
+        ],
+    },
 ];
 
 /// Sucht die Klassifikation einer Spalte in der Registry (`None`, wenn nicht erfasst).
@@ -1721,7 +1746,7 @@ pub fn klassifikation_von(tabelle: &str, spalte: &str) -> Option<Klassifikation>
 
 /// Baut die WHERE-Klausel (ohne führendes `WHERE`) für eine Tabellenregel; der einzige
 /// Bind-Parameter ist stets die `einsatz_id`.
-fn where_klausel(regel: &TabellenRegel) -> String {
+pub(super) fn where_klausel(regel: &TabellenRegel) -> String {
     let basis = match regel.scoping {
         Scoping::SelbstId => "id = ?".to_string(),
         Scoping::EinsatzId => "einsatz_id = ?".to_string(),
@@ -1733,6 +1758,36 @@ fn where_klausel(regel: &TabellenRegel) -> String {
         Some(filter) => format!("{basis} AND {filter}"),
         None => basis,
     }
+}
+
+/// SET-Zuweisungen eines Spalten-Scrubs in Spaltenreihenfolge und die Zahl der Platzhalter-Binds.
+/// Platzhalter-Strategien binden [`SCHWAERZUNG_PLATZHALTER`] in genau dieser Reihenfolge VOR den
+/// Bind-Parametern der WHERE-Klausel. `ZeileLoeschen` ist kein Spalten-Scrub (Aufrufer fängt ab).
+pub(super) fn set_zuweisungen(scrubs: &[(&'static str, Strategie)]) -> (Vec<String>, usize) {
+    let mut sets: Vec<String> = Vec::with_capacity(scrubs.len());
+    let mut platzhalter_binds = 0usize;
+    for (spalte, strategie) in scrubs {
+        match strategie {
+            Strategie::NullSetzen => sets.push(format!("{spalte} = NULL")),
+            Strategie::Platzhalter => {
+                sets.push(format!("{spalte} = ?"));
+                platzhalter_binds += 1;
+            }
+            Strategie::PlatzhalterWennGesetzt => {
+                sets.push(format!(
+                    "{spalte} = CASE WHEN {spalte} IS NULL THEN NULL ELSE ? END"
+                ));
+                platzhalter_binds += 1;
+            }
+            Strategie::PlatzhalterMitId => {
+                sets.push(format!("{spalte} = ? || ' ' || id"));
+                platzhalter_binds += 1;
+            }
+            Strategie::LeeresJsonArray => sets.push(format!("{spalte} = '[]'")),
+            Strategie::ZeileLoeschen => unreachable!("ZeileLoeschen ist kein Spalten-Scrub"),
+        }
+    }
+    (sets, platzhalter_binds)
 }
 
 /// Treibt den PII-Scrub data-driven aus [`TABELLEN`]: je Tabelle mit `Scrub`-Spalten genau ein
@@ -1774,31 +1829,7 @@ pub async fn scrubbe_aus_registry(
             continue;
         }
 
-        // SET-Zuweisungen in Spaltenreihenfolge; Platzhalter-Strategien binden
-        // SCHWAERZUNG_PLATZHALTER in genau dieser Reihenfolge VOR der einsatz_id.
-        let mut sets: Vec<String> = Vec::with_capacity(scrubs.len());
-        let mut platzhalter_binds = 0usize;
-        for (spalte, strategie) in &scrubs {
-            match strategie {
-                Strategie::NullSetzen => sets.push(format!("{spalte} = NULL")),
-                Strategie::Platzhalter => {
-                    sets.push(format!("{spalte} = ?"));
-                    platzhalter_binds += 1;
-                }
-                Strategie::PlatzhalterWennGesetzt => {
-                    sets.push(format!(
-                        "{spalte} = CASE WHEN {spalte} IS NULL THEN NULL ELSE ? END"
-                    ));
-                    platzhalter_binds += 1;
-                }
-                Strategie::PlatzhalterMitId => {
-                    sets.push(format!("{spalte} = ? || ' ' || id"));
-                    platzhalter_binds += 1;
-                }
-                Strategie::LeeresJsonArray => sets.push(format!("{spalte} = '[]'")),
-                Strategie::ZeileLoeschen => unreachable!("oben abgefangen"),
-            }
-        }
+        let (sets, platzhalter_binds) = set_zuweisungen(&scrubs);
         let sql = format!(
             "UPDATE {} SET {} WHERE {where_teil}",
             regel.tabelle,

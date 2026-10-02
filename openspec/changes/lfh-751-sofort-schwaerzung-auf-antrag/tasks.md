@@ -5,14 +5,14 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote T
 ## 1. Datenmodell und Registry-Eintrag
 
 - [ ] 1.1 Migration mit der nächsten freien Nummer über `origin/alpha` (D1): Tabelle `schwaerzung_antrag` mit CHECKs (Zielart, `ziel_id` genau bei `einsatz` NULL, höchstens einer von zurückgenommen/vollzogen) und dem Ausdrucks-Unique-Index für offene Anträge. Beleg: `scripts/check-migrationen.sh` grün, `db::tests::migrationsnummern_sind_eindeutig` grün, ein Repo-Test zeigt, dass ein zweiter offener Antrag für dasselbe Ziel an der Datenbank scheitert und ein Einsatz-Antrag neben einem Personen-Antrag geht.
-- [ ] 1.2 `schwaerzung_antrag` in `TABELLEN` klassifizieren (alle Spalten `Retain` mit Begründung, `ziel_id` als `G_POLY`). Beleg: die bestehenden Registry-Guards sind grün und werden ohne den Eintrag rot (Mutationsprobe).
-- [ ] 1.3 `ANTRAG_KARENZ_STUNDEN` und `antrag_faellig_at` in `src/einsatz/retention.rs` mit Grenztests (23:59 offen, 24:00 fällig). Beleg: Unit-Tests in `retention::tests`.
+- [x] 1.2 `schwaerzung_antrag` in `TABELLEN` klassifizieren (alle Spalten `Retain` mit Begründung, `ziel_id` als `G_POLY`). Beleg: die bestehenden Registry-Guards sind grün und werden ohne den Eintrag rot (Mutationsprobe).
+- [x] 1.3 `ANTRAG_KARENZ_STUNDEN` und `antrag_faellig_at` in `src/einsatz/retention.rs` mit Grenztests (23:59 offen, 24:00 fällig). Beleg: Unit-Tests in `retention::tests`.
 
 ## 2. Personenbezüge in der Registry
 
-- [ ] 2.1 `PersonenArt`, `PersonenBezug` und `PERSONENBEZUEGE` mit den Markierungen aus D5 anlegen. Beleg: kompiliert, Guards aus 2.2 grün.
-- [ ] 2.2 Guards 1–3 aus D5 über `pragma_foreign_key_list` und Selbsttest 4 mit Sonden-Tabelle. Beleg: Guards grün; Mutationsproben (Bezug `einsatz_tier.halter_person_id` entfernen, eine Scrub-Spalte unmarkiert lassen, eine Retain-Spalte als `Mit` markieren) machen je einen Guard rot.
-- [ ] 2.3 `scrubbe_person(conn, einsatz_id, art, id)` aus `PERSONENBEZUEGE` mit Strategien aus `TABELLEN`, eingegrenzt auf Bezug, Einsatz-Scoping und Zeilenfilter. Beleg: Repo-Tests je Personenart mit einer Nachbarzeile derselben Art im selben Einsatz und einer Zeile mit derselben id-Spalte in einem anderen Einsatz; nur die Zielzeilen ändern sich; Retain-Spalten bleiben; `PRAGMA foreign_key_check` leer.
+- [x] 2.1 `PersonenArt`, `PersonenBezug` und `PERSONENBEZUEGE` mit den Markierungen aus D5 anlegen. Beleg: kompiliert, Guards aus 2.2 grün.
+- [x] 2.2 Guards 1–3 aus D5 über `pragma_foreign_key_list` und Selbsttest 4 mit Sonden-Tabelle. Beleg: Guards grün; Mutationsproben (Bezug `einsatz_tier.halter_person_id` entfernen, eine Scrub-Spalte unmarkiert lassen, eine Retain-Spalte als `Mit` markieren) machen je einen Guard rot.
+- [x] 2.3 `scrubbe_person(conn, einsatz_id, art, id)` aus `PERSONENBEZUEGE` mit Strategien aus `TABELLEN`, eingegrenzt auf Bezug, Einsatz-Scoping und Zeilenfilter. Beleg: Repo-Tests je Personenart mit einer Nachbarzeile derselben Art im selben Einsatz und einer Zeile mit derselben id-Spalte in einem anderen Einsatz; nur die Zielzeilen ändern sich; Retain-Spalten bleiben; `PRAGMA foreign_key_check` leer.
 
 ## 3. Antrag, Rücknahme und Vollzug im Repo
 

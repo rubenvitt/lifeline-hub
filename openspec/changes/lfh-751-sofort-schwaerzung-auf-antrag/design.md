@@ -132,8 +132,11 @@ PERSONENBEZUEGE: &[PersonenBezug]
   - Externe Kraft: Wurzel alle; `auftrag_empfaenger` über `person_id`: alle;
     `einsatz_stabsfunktion` über `personal_id`: alle; `einsatz_kraft_zeitachse` über
     `personal_id`: alle; `einsatz_schaden` über `geschaedigt_personal_id` wie bei Betroffenen;
-    Leiter- und Führerverweise (`einsatzabschnitt`, `einsatz_einheit`): `Ohne` (ihre Freitexte
-    beschreiben Abschnitt bzw. Einheit).
+    Leiter- und Führerverweise (`einsatzabschnitt`, `einsatz_einheit`): `erreichbarkeit` ist
+    `Mit` (oft die Rufnummer der führenden Person), Bemerkung und Abschnittsauftrag `Ohne` (sie
+    beschreiben Abschnitt bzw. Einheit). Umgesetzt in `src/einsatz/schwaerzung_person.rs`.
+  - `halter_kontakt` und `geschaedigt_kontakt` sind per CHECK nur ohne Personenverweis gesetzt;
+    ihre `Mit`-Markierung ist deshalb wirkungslos, aber vom Guard verlangt und unschädlich.
   - Anruf und Medienkontakt: nur die Wurzel.
 - Guards (in `schwaerzung_registry::tests`, gleiche Mechanik wie GUARD 5 über
   `pragma_foreign_key_list`):

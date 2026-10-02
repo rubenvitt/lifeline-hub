@@ -16,6 +16,17 @@ use utoipa::ToSchema;
 /// bevor die Daten endgültig gescrubbt werden.
 pub const KARENZ_TAGE: i64 = 30;
 
+/// Karenz eines Schwärzungsantrags (Art. 17, LFH-751): so lange ist der Antrag zurücknehmbar,
+/// danach vollzieht ihn der Purge-Lauf. Systemweit fest wie [`KARENZ_TAGE`].
+pub const ANTRAG_KARENZ_STUNDEN: i64 = 24;
+
+/// Fälligkeit eines Schwärzungsantrags (`beantragt + ANTRAG_KARENZ_STUNDEN`) im DB-Format.
+/// Sie wird beim Antrag gespeichert; Rücknahme (`faellig_at > jetzt`) und Vollzug
+/// (`faellig_at <= jetzt`) vergleichen sie lexikografisch in SQL.
+pub fn antrag_faellig_at(beantragt: DateTime<Utc>) -> String {
+    crate::zeit::formatiere_utc(beantragt + Duration::hours(ANTRAG_KARENZ_STUNDEN))
+}
+
 /// Berechnet den Aufbewahrungs-Zeitpunkt `retention_bis = abschluss + dauer_tage`.
 /// `None`, wenn `abschluss` unparsebar ist (defensiv — kein Auto-Fill auf Müll).
 /// Das Ergebnis ist im kanonischen DB-Format formatiert.
@@ -264,6 +275,28 @@ mod tests {
                 "Grenzfall {g}"
             );
         }
+    }
+
+    // ---------- LFH-751: Karenz eines Schwärzungsantrags ----------
+
+    #[test]
+    fn antrag_faellig_at_addiert_24_stunden() {
+        assert_eq!(
+            antrag_faellig_at(t("2026-06-30 12:00:00")),
+            "2026-07-01 12:00:00"
+        );
+    }
+
+    /// Rücknahme (`faellig_at > jetzt`) und Vollzug (`faellig_at <= jetzt`) vergleichen in SQL;
+    /// die Grenze liegt genau 24 Stunden nach dem Antrag.
+    #[test]
+    fn antrag_grenze_23_59_offen_24_00_faellig() {
+        let antrag = t("2026-06-30 12:00:00");
+        let faellig = antrag_faellig_at(antrag);
+        let offen = crate::zeit::formatiere_utc(antrag + Duration::seconds(24 * 3600 - 1));
+        let genau = crate::zeit::formatiere_utc(antrag + Duration::hours(24));
+        assert!(faellig.as_str() > offen.as_str());
+        assert!(faellig.as_str() <= genau.as_str());
     }
 
     #[test]
