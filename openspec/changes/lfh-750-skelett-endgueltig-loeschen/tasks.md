@@ -48,8 +48,8 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 8. Regeln und Betriebsdoku
 
-- [ ] 8.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“: Bullet zu LFH-750 (Phase D, Löschprotokoll als einzige Spur, fail-closed, ID- und Nummernsperre über das Protokoll, Bestätigung 409, Herleitung dieser Change). Dazu im Abschnitt Demo-Daten die Regel „Einsatz-IDs werden nie wiederverwendet“ um das Protokoll ergänzen. Verifikation: `grep -n "LFH-750" src/AGENTS.md`
-- [ ] 8.2 `docs/betrieb/backup-restore.md`: Ein Restore bringt endgültig gelöschte Skelette bis zum nächsten Purge-Lauf zurück. Verifikation: Der Absatz steht im Abschnitt „Sicherungen und Schwärzung“
+- [x] 8.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“: Bullet zu LFH-750 (Phase D, Löschprotokoll als einzige Spur, fail-closed, ID- und Nummernsperre über das Protokoll, Bestätigung 409, Herleitung dieser Change). Dazu im Abschnitt Demo-Daten die Regel „Einsatz-IDs werden nie wiederverwendet“ um das Protokoll ergänzen. Verifikation: `grep -n "LFH-750" src/AGENTS.md`
+- [x] 8.2 `docs/betrieb/backup-restore.md`: Ein Restore bringt endgültig gelöschte Skelette bis zum nächsten Purge-Lauf zurück. Verifikation: Der Absatz steht im Abschnitt „Sicherungen und Schwärzung“
 
 ## 9. Abschluss
 
