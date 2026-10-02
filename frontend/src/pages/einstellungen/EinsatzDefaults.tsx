@@ -1,4 +1,4 @@
-import { App, Button, Form, Input, InputNumber, Switch, theme } from 'antd';
+import { App, Button, Form, Input, InputNumber, Modal, Switch, Typography, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
@@ -18,9 +18,11 @@ import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
+  istSkelettVerkuerzung,
   normalisiereEinsatz,
   zuUpdate,
 } from './orgEinstellungenForm';
+import type { OrgEinstellungenUpdate } from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
 
 /** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Modulzeile. */
@@ -34,6 +36,10 @@ const RECHTE_TEXT =
  *
  * Die ungespeicherte Fassung ist ein eigener State, nicht `form.isFieldsTouched()`: antd setzt das
  * Flag beim Speichern nicht zurück.
+ *
+ * Skelett-Frist (LFH-750): erstmaliges Setzen und Verkürzen fragen VOR dem Absenden zurück, erst
+ * dann geht `skelett_dauer_bestaetigt: true` hinaus (der Server lehnt sonst mit 409 ab). Eine
+ * kontrollierte `Modal` wie in `aufbewahrung/FristPaneel.tsx`, kein `modal.confirm`.
  */
 export default function EinsatzDefaults() {
   const { benutzer } = useAuth();
@@ -44,6 +50,7 @@ export default function EinsatzDefaults() {
   const speicherLeiste = useSpeicherLeiste();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const [hatFassung, setHatFassung] = useState(false);
+  const [rueckfrage, setRueckfrage] = useState<OrgEinstellungenUpdate | null>(null);
 
   const einstellungenQuery = useQuery({
     queryKey: globalKeys.orgEinstellungen(),
@@ -107,7 +114,12 @@ export default function EinsatzDefaults() {
   const orgModul = modulQuery.data ?? {};
 
   function speichern(werte: FormWerteEinsatz) {
-    speichernMutation.mutate({ ...zuUpdate(einstellungen), ...normalisiereEinsatz(werte) });
+    const daten = { ...zuUpdate(einstellungen), ...normalisiereEinsatz(werte) };
+    if (istSkelettVerkuerzung(einstellungen.skelett_dauer_tage, daten.skelett_dauer_tage)) {
+      setRueckfrage(daten);
+      return;
+    }
+    speichernMutation.mutate(daten);
   }
 
   return (
@@ -148,6 +160,18 @@ export default function EinsatzDefaults() {
               max={3650}
               style={{ width: '100%', maxWidth: 200 }}
               placeholder="keine"
+            />
+          </Form.Item>
+          <Form.Item
+            label="Skelett endgültig löschen nach (Tage ab Abschluss)"
+            name="skelett_dauer_tage"
+            tooltip="1 bis 36500 Tage. Nach der Schwärzung bleibt ein pseudonymes Skelett (ETB, Registriernummern, Kategorien); nach dieser Frist wird es samt ETB endgültig gelöscht, frühestens mit der Schwärzung. Gilt für alle Einsätze der Organisation. Leer = das Skelett bleibt unbegrenzt erhalten."
+          >
+            <InputNumber
+              min={1}
+              max={36500}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="unbegrenzt"
             />
           </Form.Item>
         </Formularpaneel>
@@ -275,6 +299,35 @@ export default function EinsatzDefaults() {
           />
         </Formularpaneel>
       </div>
+      <Modal
+        open={rueckfrage != null}
+        title="Skelett-Frist bestätigen?"
+        okText="Skelette löschen lassen"
+        okButtonProps={{ danger: true }}
+        cancelText="Abbrechen"
+        onOk={() => {
+          if (rueckfrage)
+            speichernMutation.mutate({ ...rueckfrage, skelett_dauer_bestaetigt: true });
+          setRueckfrage(null);
+        }}
+        onCancel={() => setRueckfrage(null)}
+        destroyOnHidden
+      >
+        {rueckfrage && (
+          <Typography.Paragraph>
+            Die Skelett-Frist wird von{' '}
+            <strong>
+              {einstellungen.skelett_dauer_tage != null
+                ? `${einstellungen.skelett_dauer_tage} Tagen`
+                : 'unbegrenzt'}
+            </strong>{' '}
+            auf <strong>{rueckfrage.skelett_dauer_tage} Tage</strong> ab Abschluss gesetzt. Jedes
+            geschwärzte Skelett, dessen Frist danach abgelaufen ist, wird mit dem nächsten
+            Purge-Lauf (spätestens in 10 Minuten) samt ETB unwiderruflich gelöscht. Nur eine Zeile
+            im Löschprotokoll bleibt.
+          </Typography.Paragraph>
+        )}
+      </Modal>
     </AdminPage>
   );
 }

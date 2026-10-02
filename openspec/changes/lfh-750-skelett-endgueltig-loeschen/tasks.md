@@ -43,8 +43,8 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 7. Einstellungsseite (D7)
 
-- [ ] 7.1 `orgEinstellungenForm.ts` übernimmt `skelett_dauer_tage` in den Voll-PUT, `skelett_dauer_bestaetigt` nur nach der Bestätigung. Verifikation: `orgEinstellungenForm.test.ts` (Feld wird gesendet, Leerwert wird zu `null`)
-- [ ] 7.2 `EinsatzDefaults.tsx`: Feld im Abschnitt „Aufbewahrung“ mit Tooltip und Bestätigungsdialog beim Setzen oder Verkürzen (kein Dialog beim Verlängern oder Leeren). Verifikation: `EinsatzDefaults.test.tsx` für Setzen mit Dialog → PUT mit `true`, Abbrechen → kein PUT, Verlängern ohne Dialog
+- [x] 7.1 `orgEinstellungenForm.ts` übernimmt `skelett_dauer_tage` in den Voll-PUT, `skelett_dauer_bestaetigt` nur nach der Bestätigung. Verifikation: `orgEinstellungenForm.test.ts` (Feld wird gesendet, Leerwert wird zu `null`)
+- [x] 7.2 `EinsatzDefaults.tsx`: Feld im Abschnitt „Aufbewahrung“ mit Tooltip und Bestätigungsdialog beim Setzen oder Verkürzen (kein Dialog beim Verlängern oder Leeren). Verifikation: `EinsatzDefaults.test.tsx` für Setzen mit Dialog → PUT mit `true`, Abbrechen → kein PUT, Verlängern ohne Dialog
 
 ## 8. Regeln und Betriebsdoku
 

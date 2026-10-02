@@ -24,6 +24,7 @@ export interface FormWerteAnzeige {
 /** Einsatz-Defaults-Sektion: Aufbewahrung, Nummernkreise, Fristen, Auto-ETB. */
 export interface FormWerteEinsatz {
   retention_dauer_tage?: number;
+  skelett_dauer_tage?: number;
   etb_nummer_praefix?: string;
   meldung_nummer_praefix?: string;
   auftrag_nummer_praefix?: string;
@@ -42,6 +43,7 @@ export function zuUpdate(e: OrgEinstellungen): OrgEinstellungenUpdate {
     einheiten: e.einheiten ?? null,
     koordinatenformat: e.koordinatenformat ?? null,
     retention_dauer_tage: e.retention_dauer_tage ?? null,
+    skelett_dauer_tage: e.skelett_dauer_tage ?? null,
     etb_nummer_praefix: e.etb_nummer_praefix ?? null,
     meldung_nummer_praefix: e.meldung_nummer_praefix ?? null,
     auftrag_nummer_praefix: e.auftrag_nummer_praefix ?? null,
@@ -77,6 +79,7 @@ export function normalisiereEinsatz(
 ): Pick<
   OrgEinstellungenUpdate,
   | 'retention_dauer_tage'
+  | 'skelett_dauer_tage'
   | 'etb_nummer_praefix'
   | 'meldung_nummer_praefix'
   | 'auftrag_nummer_praefix'
@@ -88,6 +91,7 @@ export function normalisiereEinsatz(
 > {
   return {
     retention_dauer_tage: w.retention_dauer_tage ?? null,
+    skelett_dauer_tage: w.skelett_dauer_tage ?? null,
     etb_nummer_praefix: w.etb_nummer_praefix?.trim() || null,
     meldung_nummer_praefix: w.meldung_nummer_praefix?.trim() || null,
     auftrag_nummer_praefix: w.auftrag_nummer_praefix?.trim() || null,
@@ -114,6 +118,7 @@ export function initialAnzeige(e: OrgEinstellungen): FormWerteAnzeige {
 export function initialEinsatz(e: OrgEinstellungen): FormWerteEinsatz {
   return {
     retention_dauer_tage: e.retention_dauer_tage ?? undefined,
+    skelett_dauer_tage: e.skelett_dauer_tage ?? undefined,
     etb_nummer_praefix: e.etb_nummer_praefix ?? undefined,
     meldung_nummer_praefix: e.meldung_nummer_praefix ?? undefined,
     auftrag_nummer_praefix: e.auftrag_nummer_praefix ?? undefined,
@@ -123,4 +128,17 @@ export function initialEinsatz(e: OrgEinstellungen): FormWerteEinsatz {
     rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? undefined,
     auto_etb_eintraege: e.auto_etb_eintraege !== 0,
   };
+}
+
+/**
+ * Ob eine neue Skelett-Frist zu bestätigen ist (LFH-750): erstmaliges Setzen oder Verkürzen.
+ * Spiegel von `routes::org_einstellungen::setzen`, das ohne Bestätigung mit 409 ablehnt — eine
+ * kürzere Frist löscht im nächsten Purge-Lauf unumkehrbar jedes Skelett, das danach fällig ist.
+ */
+export function istSkelettVerkuerzung(
+  alt: number | null | undefined,
+  neu: number | null | undefined,
+): boolean {
+  if (neu == null) return false;
+  return alt == null || neu < alt;
 }

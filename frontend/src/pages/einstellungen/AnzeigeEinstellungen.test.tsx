@@ -25,6 +25,7 @@ const VOLL = {
   einheiten: 'imperial',
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
+  skelett_dauer_tage: 3650,
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
@@ -63,6 +64,8 @@ describe('AnzeigeEinstellungen', () => {
         koordinatenformat: 'mgrs',
         // Einsatz-Default-Spalten NICHT genullt (aus geladenen Daten gemerged):
         retention_dauer_tage: 90,
+        // LFH-750: ein Anzeige-Save darf die Skelett-Frist weder nullen noch verkürzen.
+        skelett_dauer_tage: 3650,
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
