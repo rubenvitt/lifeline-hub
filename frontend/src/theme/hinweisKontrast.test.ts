@@ -47,15 +47,13 @@ describe.each([
     });
   });
 
-  // Der Override gilt im Teilbaum des Hinweises (design.md E2): ein Gefahrknopf ohne Rahmen im
-  // Fehlerhinweis (Live-Banner) steht in Ruhe auf der Fehlerfläche und nimmt sie unter dem Zeiger
-  // als Tönung (`colorErrorBg`).
-  it.each(['colorError', 'colorErrorHover'])(
-    'Gefahrknopf ohne Rahmen im Fehlerhinweis: Beschriftung %s',
-    (schrift) => {
-      expect(kontrast(token(Button, schrift), token(Alert, 'colorErrorBg'))).toBeGreaterThanOrEqual(
-        textboden,
-      );
-    },
-  );
+  // Ein Gefahrknopf ohne Rahmen im Fehlerhinweis (Live-Banner) steht in Ruhe auf der Fehlerfläche.
+  // Unter dem Zeiger zeichnet er antds GLOBALE Tönung `colorErrorBg`, nicht die des Hinweises: der
+  // Override endet an der Wurzel des Knopfs, die die globalen Variablen neu setzt (design.md E2,
+  // im Browser belegt). Dieses Paar rechnet `gefahrKontrast.test.ts`.
+  it('Gefahrknopf ohne Rahmen im Fehlerhinweis: Beschriftung in Ruhe auf der Fehlerfläche', () => {
+    expect(
+      kontrast(token(Button, 'colorError'), token(Alert, 'colorErrorBg')),
+    ).toBeGreaterThanOrEqual(textboden);
+  });
 });

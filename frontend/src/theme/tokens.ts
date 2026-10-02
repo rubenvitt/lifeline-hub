@@ -698,11 +698,11 @@ export function kopfzeilenMasse(
  * `colorWarningBg`, `colorErrorBg` und `colorSuccessBg` (`alert/style/index.js`), und diese vier
  * tragen die Statusflächen. Angepasst wird die FLÄCHE, nicht der Rand: `steuerRahmen` hält auf den
  * Statusflächen ≥ 3 : 1, ein eigener Knopfrand je Hinweistyp wäre eine zweite Randfarbe. Global
- * gesetzt träfen die vier Tokens auch Knopf, Eingabefeld, Menü, Select und Schritte. GRENZE wie
- * oben: ein globaler Token im Komponenten-Override landet ohne Komponentenpräfix als
- * `--ant-color-error-bg` usw. auf der Wurzel des Hinweises (`@ant-design/cssinjs-utils`,
- * `genCSSVarRegister`) und gilt im Teilbaum. Der Gefahrknopf ohne Rahmen im Live-Banner nimmt
- * deshalb `alarmFlaeche` als Tönung unter dem Zeiger (gerechnet in `hinweisKontrast.test.ts`).
+ * gesetzt träfen die vier Tokens auch Knopf, Eingabefeld, Menü, Select und Schritte. Der Override
+ * landet ohne Komponentenpräfix als `--ant-color-error-bg` usw. auf der Wurzel des Hinweises,
+ * reicht aber NICHT in antd-Bausteine darin: jeder trägt selbst die `css-var-…`-Klasse, die die
+ * globalen Variablen neu setzt (im Browser belegt, antd 6.6.5). Ein Gefahrknopf ohne Rahmen im
+ * Live-Banner steht in Ruhe auf `alarmFlaeche`, unter dem Zeiger auf antds globaler Tönung.
  *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.

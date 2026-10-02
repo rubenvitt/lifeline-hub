@@ -81,14 +81,18 @@ Verworfene Alternativen:
 
 ### E2 — Reichweite des Overrides im Teilbaum
 
-antd setzt Komponenten-Overrides als CSS-Variablen auf die Wurzel der Komponente, sie gelten im
-ganzen Teilbaum (dieselbe Grenze ist am `Dropdown` dokumentiert, LFH-693). Im `Alert` liest damit
-auch ein Knopf darin die neuen Flächen. Für den Gefahr-`text`-Knopf im Live-Banner
-(`live/LiveStatusBanner.tsx`, ein Fehlerhinweis) wird `colorErrorBg` zur Tönung unter dem Zeiger,
-also `alarmFlaeche`. Seine Schrift `alarmHover` muss darauf den Textboden halten (Tag ≥ 7,
-Nacht ≥ 5). Der Unit-Test rechnet dieses Paar mit, und Aufgabe 1.3 belegt per Browser, dass die
-Variable tatsächlich im Teilbaum ankommt. Kommt sie nicht an, ist das kein Fehler dieser Change:
-dann gilt für den Knopf weiter die bisher gerechnete Tönung.
+antd setzt Komponenten-Overrides als CSS-Variablen auf die Wurzel der Komponente
+(`.css-var-….ant-alert { --ant-color-error-bg: … }`, ohne Komponentenpräfix). Angenommen war,
+dass sie damit im ganzen Teilbaum gelten, wie am `Dropdown` dokumentiert (LFH-693). Der Browser
+zeigt etwas anderes (Aufgabe 1.3): Jeder antd-Baustein trägt selbst die `css-var-…`-Klasse, die
+die globalen Variablen neu setzt. Ein Knopf im Hinweis sieht deshalb weiter antds globale Fläche
+(`--ant-color-error-bg` am Knopf `#f0e5e1`, am Hinweis `#f9e3e3`). Der Override färbt allein die
+Fläche des Hinweises.
+
+Für den Gefahrknopf ohne Rahmen im Live-Banner (`live/LiveStatusBanner.tsx`, ein Fehlerhinweis)
+heißt das: In Ruhe steht er auf `alarmFlaeche`, und seine Schrift `alarmText` hält dort den
+Textboden (Tag 7,31, Nacht 6,89). Das rechnet `hinweisKontrast.test.ts`. Unter dem Zeiger zeichnet
+er antds globale Tönung, wie bisher, und dieses Paar rechnet weiter `gefahrKontrast.test.ts`.
 
 ### E3 — Nachweis an zwei echten Stellen
 
@@ -104,5 +108,5 @@ mit Knopf. Sie werden im Unit-Test gerechnet, nicht im Browser gemessen.
   Statusflächen. Nachts liegen die Rollen nahe an antds Ableitung.
 - [antd liest in einer künftigen Version die Fläche über ein anderes Token] → Der Browser-Spec
   misst die gezeichnete Farbe und fällt dann rot.
-- [Der Override erreicht Bausteine im Teilbaum, die heute niemand prüft] → Grenze im Kommentar an
-  `antdKomponenten` nennen, wie beim `Dropdown`.
+- [Ein Baustein im Hinweis zeichnet eine Fläche aus den vier Tokens und erwartet die Hinweisfläche]
+  → Er bekommt antds globale Fläche (E2). Das ist im Kommentar an `antdKomponenten` vermerkt.

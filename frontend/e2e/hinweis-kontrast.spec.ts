@@ -41,9 +41,9 @@ async function randHaelt(knopf: Locator, flaeche: string, name: string) {
   await expect(knopf, name).toBeVisible();
   const m = await randKontrast(knopf, 'top');
   const beschreibung = `${name}: ${JSON.stringify(m)}`;
-  expect(m.aussen, `${beschreibung} — Grund außen ist die Statusfläche`).toEqual(rgb(flaeche));
   expect(m.gegenAussen, `${beschreibung} — gegen die Hinweisfläche`).toBeGreaterThanOrEqual(BODEN);
   expect(m.gegenInnen, `${beschreibung} — gegen die Knopffläche`).toBeGreaterThanOrEqual(BODEN);
+  expect(m.aussen, `${beschreibung} — Grund außen ist die Statusfläche`).toEqual(rgb(flaeche));
 }
 
 for (const modus of ['light', 'dark'] as const) {
