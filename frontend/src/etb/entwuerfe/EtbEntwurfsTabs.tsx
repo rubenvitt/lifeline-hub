@@ -10,7 +10,7 @@ import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
 import { useEntwurfsVersand, type EntwurfsVersand } from './useEntwurfsVersand';
 import { anVorbelegung } from '../../fuehrung/funktionsOptionenKern';
-import { IkoneKreuz } from '../../ikonen';
+import { IconKreuz } from '../../icons';
 
 interface EtbEntwurfsTabsProps {
   einsatzId: number;
@@ -230,7 +230,7 @@ export default function EtbEntwurfsTabs({
       type="editable-card"
       removeIcon={
         <span style={entfernenStil(token)}>
-          <IkoneKreuz />
+          <IconKreuz />
         </span>
       }
       activeKey={aktiverId ?? undefined}

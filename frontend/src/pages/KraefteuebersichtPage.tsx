@@ -1,4 +1,4 @@
-import { IkonePlus, IkoneTrichter } from '../ikonen';
+import { IconPlus, IconTrichter } from '../icons';
 import { App as AntApp, Button, Input, Segmented, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
@@ -173,7 +173,7 @@ export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOp
 /** Menüwert für „Handstatus löschen" — eine Katalog-ID ist nie negativ. */
 export const KEIN_HANDSTATUS = -1;
 
-/** Kurzwort der Mittelart — Satz, kein Piktogramm (Regel „Ein Emoji ist keine Ikone"). */
+/** Kurzwort der Mittelart — Satz, kein Piktogramm (Regel „Ein Emoji ist kein Icon"). */
 const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as const;
 
 /**
@@ -897,7 +897,7 @@ export default function KraefteuebersichtPage() {
               placeholder="Abschnitt"
               prefix={
                 <span aria-hidden style={{ display: 'inline-flex' }}>
-                  <IkoneTrichter />
+                  <IconTrichter />
                 </span>
               }
               allowClear
@@ -914,7 +914,7 @@ export default function KraefteuebersichtPage() {
                 type="primary"
                 icon={
                   <span aria-hidden style={{ display: 'inline-flex' }}>
-                    <IkonePlus />
+                    <IconPlus />
                   </span>
                 }
                 title="Einheit anlegen (Einheiten-Seite)"

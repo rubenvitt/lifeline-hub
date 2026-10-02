@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
+import { neueClientId } from './clientId';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import type {
   AusgabeEingabe,
@@ -260,7 +261,7 @@ export async function queueEinreihen(
   // dieselbe Id tragen; hier nur Fallback, ein vorhandener wird NIE überschrieben.
   const mitId: NeuerEintrag = {
     ...eintrag,
-    client_id: eintrag.client_id ?? crypto.randomUUID(),
+    client_id: eintrag.client_id ?? neueClientId(),
   };
   await d.add('ausstehend', {
     benutzer_id: benutzerId,

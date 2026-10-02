@@ -54,7 +54,7 @@ describe('ModulPanel', () => {
     expect(geheim).toBeDisabled();
     // Das Schloss trägt bewusst KEINEN Titel (er verdrängte den des Knopfes), deshalb der
     // antd-Klassenselektor.
-    expect(geheim.querySelector('[data-ikone="schloss"]')).not.toBeNull();
+    expect(geheim.querySelector('[data-lfh-icon="schloss"]')).not.toBeNull();
   });
 
   // Der WIP-Marker ist Dekoration und darf nicht im Accessible Name des Knopfes landen,
@@ -243,10 +243,10 @@ describe('ModulPanel', () => {
     expect(container.querySelectorAll('[aria-current]')).toHaveLength(1);
   });
 
-  it('traegt die Marker als Ikone in aria-hidden-Huelle, nicht als Emoji', () => {
+  it('traegt die Marker als Icon in aria-hidden-Huelle, nicht als Emoji', () => {
     /**
-     * „Ein Emoji ist keine Ikone": zwei Hälften, beide Pflicht. Die erste hält die
-     * `role="img"`-Knoten der Ikonen (englisches `aria-label`) aus dem Vorlesebaum, die
+     * „Ein Emoji ist kein Icon": zwei Hälften, beide Pflicht. Die erste hält die
+     * `role="img"`-Knoten der Icons (englisches `aria-label`) aus dem Vorlesebaum, die
      * zweite schließt aus, dass Emojis daneben stehen bleiben.
      */
     const { container } = renderMitProviders(
@@ -263,7 +263,7 @@ describe('ModulPanel', () => {
     );
     for (const name of ['Sachschäden', 'Geheim', 'Zonen']) {
       const knopf = screen.getByRole('button', { name });
-      expect(within(knopf).queryByRole('img'), `${name}: Ikone ist kein Vorleseziel`).toBeNull();
+      expect(within(knopf).queryByRole('img'), `${name}: Icon ist kein Vorleseziel`).toBeNull();
     }
     expect(container.textContent, 'kein Emoji mehr im Baum').not.toMatch(/🚧|🔒|↗/);
   });
@@ -433,7 +433,7 @@ describe('ModulListe — Sprungmarken', () => {
       name: 'Entscheidungen, springt zu ETB, Typ Entscheidung',
     });
     expect(sprung).not.toHaveAttribute('aria-current');
-    // Die Ikone ist Dekoration: kein eigenes Vorleseziel (englisches `aria-label` „export").
+    // Das Icon ist Dekoration: kein eigenes Vorleseziel (englisches `aria-label` „export").
     expect(within(sprung).queryByRole('img')).not.toBeInTheDocument();
     await userEvent.click(sprung);
     expect(klick).toHaveBeenCalledWith(marke);

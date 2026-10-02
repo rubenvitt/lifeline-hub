@@ -114,3 +114,51 @@ describe('DownloadAnker — Original-Verweis (LFH-747)', () => {
     expect(original.style.paddingBlock).toBe(haupt.style.paddingBlock);
   });
 });
+
+describe('DownloadAnker mit Vorschau (LFH-759)', () => {
+  it('zeigt bei einem Foto ein Vorschaubild vor dem unveränderten Verweis', () => {
+    renderMitProviders(
+      <DownloadAnker
+        href="/api/x/datei"
+        dateiname="dach.jpg"
+        mime="image/jpeg"
+        vorschauKennung="Schaden S-003"
+        zugaenglicherName="dach.jpg herunterladen"
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Vorschau: dach.jpg, Schaden S-003' });
+    expect(knopf.querySelector('img')).toHaveAttribute('src', '/api/x/datei?fassung=vorschau');
+    const a = screen.getByRole('link', { name: 'dach.jpg herunterladen' });
+    expect(a).toHaveAttribute('href', '/api/x/datei');
+    expect(a).toHaveAttribute('download', 'dach.jpg');
+    // Das Vorschaubild steht vor dem Verweis.
+    expect(knopf.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('zeigt bei einem PDF kein Vorschaubild', () => {
+    renderMitProviders(
+      <DownloadAnker href="/api/x/datei" dateiname="gutachten.pdf" mime="application/pdf" />,
+    );
+    expect(screen.queryByRole('button', { name: /^Vorschau/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'gutachten.pdf' })).toHaveAttribute(
+      'href',
+      '/api/x/datei',
+    );
+  });
+
+  it('behält die Original-Aktion neben der Vorschau', () => {
+    renderMitProviders(
+      <DownloadAnker
+        href="/d"
+        dateiname="dach.jpg"
+        mime="image/jpeg"
+        originalHref="/d?fassung=original"
+      />,
+    );
+    expect(screen.getByRole('button', { name: /^Vorschau: dach\.jpg/ })).toBeInTheDocument();
+    expect(screen.getByText(ORIGINAL_TEXT).closest('a')).toHaveAttribute(
+      'href',
+      '/d?fassung=original',
+    );
+  });
+});

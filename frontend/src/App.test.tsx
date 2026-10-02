@@ -70,7 +70,7 @@ function renderApp(route: string) {
   };
 }
 
-/** Titel der Platzhalterseite (LFH-595: Ikone „Baustelle“ statt 🚧 im Text). */
+/** Titel der Platzhalterseite (LFH-595: Icon „Baustelle“ statt 🚧 im Text). */
 const platzhalterTitel = () => document.querySelector('[data-lfh="platzhalter-titel"]');
 
 describe('App-Routing', () => {

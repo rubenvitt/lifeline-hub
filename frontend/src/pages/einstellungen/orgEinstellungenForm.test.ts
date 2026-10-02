@@ -86,7 +86,24 @@ describe('normalisiereEinsatz', () => {
       auftrag_quittierung_frist_min: null,
       rueckmeldung_frist_min: null,
       auto_etb_eintraege: false,
+      aufbewahrung_kategorien: [],
     });
+  });
+
+  it('LFH-749: nur Kategorien mit Dauer gehen hinaus, Rechtsgrundlage getrimmt, feste Reihenfolge', () => {
+    expect(
+      normalisiereEinsatz({
+        auto_etb_eintraege: true,
+        kategorien: {
+          anhaenge: { dauer_tage: 30, rechtsgrundlage: ' § 32b NKatSG ' },
+          behandlung: { dauer_tage: null, rechtsgrundlage: 'ohne Dauer' },
+          personenauskunft: { dauer_tage: 0, rechtsgrundlage: 'BHKG' },
+        },
+      }).aufbewahrung_kategorien,
+    ).toEqual([
+      { kategorie: 'personenauskunft', dauer_tage: 0, rechtsgrundlage: 'BHKG' },
+      { kategorie: 'anhaenge', dauer_tage: 30, rechtsgrundlage: '§ 32b NKatSG' },
+    ]);
   });
 
   it('LFH-617: trimmt das Einsatznummer-Präfix', () => {

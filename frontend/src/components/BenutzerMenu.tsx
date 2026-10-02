@@ -1,4 +1,4 @@
-import { IkoneAbmelden, IkoneChevronRunter, IkonePerson, type Ikone } from '../ikonen';
+import { IconAbmelden, IconChevronRunter, IconPerson, type Icon } from '../icons';
 import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
@@ -35,13 +35,7 @@ const HELLIGKEIT_PRAEFIX = 'helligkeit:';
  * Beschriftung eines Umschalt-Eintrags. Die aktive Stufe trägt ihren Zustand im TEXT — zweiter
  * Kanal nach WCAG 1.4.1 und über den zugänglichen Namen prüfbar.
  */
-function umschaltEintrag(
-  praefix: string,
-  wert: string,
-  titel: string,
-  Icon: Ikone,
-  aktiv: boolean,
-) {
+function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Icon, aktiv: boolean) {
   return {
     key: `${praefix}${wert}`,
     icon: <Icon size={16} />,
@@ -197,8 +191,8 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
       }),
     },
     { type: 'divider' },
-    { key: 'profil', icon: <IkonePerson />, label: 'Profil' },
-    { key: 'abmelden', icon: <IkoneAbmelden />, label: 'Abmelden', danger: true },
+    { key: 'profil', icon: <IconPerson />, label: 'Profil' },
+    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
@@ -265,7 +259,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
             >
               {funktion ?? benutzer.anzeigename}
             </span>
-            <IkoneChevronRunter style={{ fontSize: 10, opacity: 0.65 }} />
+            <IconChevronRunter style={{ fontSize: 10, opacity: 0.65 }} />
           </>
         )}
       </Button>

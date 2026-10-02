@@ -1,4 +1,4 @@
-import { IkonePfeilZurueckGebogen } from '../../ikonen';
+import { IconPfeilZurueckGebogen } from '../../icons';
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
 import { monoStil } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
@@ -149,7 +149,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
                   title="Letzten Punkt zurück"
                   icon={
                     <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                      <IkonePfeilZurueckGebogen size={18} />
+                      <IconPfeilZurueckGebogen size={18} />
                     </span>
                   }
                   disabled={props.punktZurueckMoeglich === false}

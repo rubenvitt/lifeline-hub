@@ -133,6 +133,9 @@ pub struct ArchivAkteAnzeige {
     pub zustand: AufbewahrungZustand,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub karenz_ende: Option<String>,
+    /// Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,
+    /// Rechtsgrundlage und Zustand; alle drei Kategorien.
+    pub kategorien: Vec<crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige>,
     pub personen: Vec<ArchivPersonAnzeige>,
     pub tiere: Vec<ArchivTierAnzeige>,
     pub schaeden: Vec<ArchivSchadenAnzeige>,

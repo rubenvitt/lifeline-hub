@@ -111,13 +111,13 @@ describe('MenueAusloeser', () => {
     expect(menue.querySelector('.ant-dropdown-menu-item-divider')).toBeNull();
   });
 
-  it('ein gesperrter Eintrag steht deaktiviert da und löst nichts aus; die Ikone steht am Eintrag', async () => {
+  it('ein gesperrter Eintrag steht deaktiviert da und löst nichts aus; das Icon steht am Eintrag', async () => {
     const onWahl = vi.fn();
     renderMitProviders(
       <MenueAusloeser
         eintraege={[
           { key: 'hoch', label: 'Nach oben', gesperrt: true },
-          { key: 'runter', label: 'Nach unten', ikone: <span data-testid="ikone-runter" /> },
+          { key: 'runter', label: 'Nach unten', icon: <span data-testid="icon-runter" /> },
         ]}
         zugaenglicherName="Zeile 1"
         onWahl={onWahl}
@@ -129,7 +129,7 @@ describe('MenueAusloeser', () => {
     await userEvent.click(hoch);
     expect(onWahl).not.toHaveBeenCalled();
     const runter = within(menue).getByRole('menuitem', { name: /Nach unten/ });
-    expect(within(runter).getByTestId('ikone-runter')).toBeInTheDocument();
+    expect(within(runter).getByTestId('icon-runter')).toBeInTheDocument();
   });
 
   it('die Wahl meldet genau einmal den Schlüssel', async () => {

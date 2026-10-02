@@ -88,13 +88,13 @@ describe('AktuellPaneel (LFH-864)', () => {
     expect(band.querySelectorAll('[data-lfh="kennzahl"]')).toHaveLength(4);
   });
 
-  it('die Wetterlage zeigt Wort und Ikone; keine Ikone ist ein eigenes Vorleseziel', () => {
+  it('die Wetterlage zeigt Wort und Icon; kein Icon ist ein eigenes Vorleseziel', () => {
     zeige(ok(messung({ symbol: 'nebel_nacht' })));
     expect(feld('Wetterlage')).toHaveTextContent('Nebel');
-    const ikone = feld('Wetterlage').querySelector('[data-ikone="nebel-nacht"]');
-    expect(ikone).toHaveAttribute('aria-hidden', 'true');
-    // Jede Ikone im Paneel ist stumm: das Wort trägt die Bedeutung.
-    for (const i of paneel().querySelectorAll('[data-ikone]')) {
+    const icon = feld('Wetterlage').querySelector('[data-lfh-icon="nebel-nacht"]');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    // Jedes Icon im Paneel ist stumm: das Wort trägt die Bedeutung.
+    for (const i of paneel().querySelectorAll('[data-lfh-icon]')) {
       expect(i).toHaveAttribute('aria-hidden', 'true');
     }
   });
@@ -112,7 +112,7 @@ describe('AktuellPaneel (LFH-864)', () => {
     );
     expect(feld('Sicht')).toHaveTextContent(/^—$/);
     expect(feld('Wetterlage')).toHaveTextContent(/^—$/);
-    expect(feld('Wetterlage').querySelector('[data-ikone]')).toBeNull();
+    expect(feld('Wetterlage').querySelector('[data-lfh-icon]')).toBeNull();
     expect(kennzahl('Temperatur')).not.toHaveTextContent('°C');
     expect(kennzahl('Temperatur')).toHaveTextContent('—');
     expect(kennzahl('Böen')).not.toHaveTextContent('km/h');

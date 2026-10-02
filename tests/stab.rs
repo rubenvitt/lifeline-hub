@@ -754,9 +754,13 @@ async fn schwaerzung_nullt_namen_nur_im_betroffenen_einsatz() {
     }
 
     let mut tx = pool.begin().await.unwrap();
-    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, a)
-        .await
-        .unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        a,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
 
     let gescrubbt: Option<String> = sqlx::query_scalar(
@@ -1184,9 +1188,13 @@ async fn schwaerzung_ersetzt_den_entschluss_und_haelt_den_etb_wortlaut() {
     .await;
 
     let mut tx = pool.begin().await.unwrap();
-    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz)
-        .await
-        .unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        einsatz,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
 
     let (entschluss, etb_inhalt): (String, String) = sqlx::query_as(

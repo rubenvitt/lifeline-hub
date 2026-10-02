@@ -21,6 +21,8 @@ fn content_type(pfad: &str) -> &'static str {
         Some("json") | Some("map") => "application/json",
         Some("webmanifest") => "application/manifest+json",
         Some("woff2") => "font/woff2",
+        // HEIC-Decoder (LFH-759): `instantiateStreaming` verlangt genau diesen Typ.
+        Some("wasm") => "application/wasm",
         Some("txt") => "text/plain; charset=utf-8",
         _ => "application/octet-stream",
     }
@@ -121,6 +123,19 @@ mod tests {
         assert_eq!(
             resp.headers().get(header::CACHE_CONTROL).unwrap(),
             "public, max-age=31536000, immutable"
+        );
+    }
+
+    /// LFH-759: der HEIC-Decoder lädt `libheif-*.wasm`; ohne `application/wasm` scheitert
+    /// `WebAssembly.instantiateStreaming`, und Emscripten fällt auf den langsamen Weg zurück.
+    #[test]
+    fn webassembly_hat_seinen_typ() {
+        let get = getter(vec![("assets/libheif-abc123.wasm", b"\0asm")]);
+        let resp = statische_antwort("/assets/libheif-abc123.wasm", get);
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/wasm"
         );
     }
 

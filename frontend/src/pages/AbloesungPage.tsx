@@ -1,4 +1,4 @@
-import { IkoneStift } from '../ikonen';
+import { IconStift } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -444,7 +444,7 @@ export default function AbloesungPage() {
                 {darfSchreiben && (
                   <Button
                     type="text"
-                    icon={<IkoneStift />}
+                    icon={<IconStift />}
                     aria-label={`Rhythmus-Vorgabe ${v.abschnitt_name} ändern`}
                     onClick={() => {
                       vorgabeMut.reset();

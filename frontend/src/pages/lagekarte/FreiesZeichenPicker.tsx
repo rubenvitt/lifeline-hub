@@ -1,4 +1,4 @@
-import { IkoneMinus } from '../../ikonen';
+import { IconMinus } from '../../icons';
 import {
   memo,
   useEffect,
@@ -217,7 +217,7 @@ const Kachel = memo(function Kachel(p: KachelProps) {
     >
       <span aria-hidden style={{ display: 'flex', height: KACHEL_BILD, alignItems: 'center' }}>
         {p.id == null ? (
-          <IkoneMinus style={{ fontSize: KACHEL_BILD / 2 }} />
+          <IconMinus style={{ fontSize: KACHEL_BILD / 2 }} />
         ) : (
           <TaktischesZeichen
             {...(p.art === 'grundzeichen'

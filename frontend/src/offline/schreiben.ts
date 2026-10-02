@@ -16,6 +16,7 @@ import type {
 import { erfasseAusgabe } from '../api/verpflegung';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { neueClientId } from './clientId';
 import { istOfflineTransient } from './fehler';
 import { schreibaktionEinreihen } from './queue';
 import { serverJetzt } from './serveruhr';
@@ -24,7 +25,7 @@ type OfflineSchreibErgebnis<T> =
   { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
 
 function clientId(vorgegeben?: string): string {
-  return vorgegeben ?? crypto.randomUUID();
+  return vorgegeben ?? neueClientId();
 }
 
 async function vormerken(
