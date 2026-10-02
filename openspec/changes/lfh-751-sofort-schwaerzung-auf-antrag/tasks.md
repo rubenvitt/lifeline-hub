@@ -1,0 +1,57 @@
+# Tasks
+
+Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote Test, dann der Code.
+
+## 1. Datenmodell und Registry-Eintrag
+
+- [ ] 1.1 Migration mit der nächsten freien Nummer über `origin/alpha` (D1): Tabelle `schwaerzung_antrag` mit CHECKs (Zielart, `ziel_id` genau bei `einsatz` NULL, höchstens einer von zurückgenommen/vollzogen) und dem Ausdrucks-Unique-Index für offene Anträge. Beleg: `scripts/check-migrationen.sh` grün, `db::tests::migrationsnummern_sind_eindeutig` grün, ein Repo-Test zeigt, dass ein zweiter offener Antrag für dasselbe Ziel an der Datenbank scheitert und ein Einsatz-Antrag neben einem Personen-Antrag geht.
+- [ ] 1.2 `schwaerzung_antrag` in `TABELLEN` klassifizieren (alle Spalten `Retain` mit Begründung, `ziel_id` als `G_POLY`). Beleg: die bestehenden Registry-Guards sind grün und werden ohne den Eintrag rot (Mutationsprobe).
+- [ ] 1.3 `ANTRAG_KARENZ_STUNDEN` und `antrag_faellig_at` in `src/einsatz/retention.rs` mit Grenztests (23:59 offen, 24:00 fällig). Beleg: Unit-Tests in `retention::tests`.
+
+## 2. Personenbezüge in der Registry
+
+- [ ] 2.1 `PersonenArt`, `PersonenBezug` und `PERSONENBEZUEGE` mit den Markierungen aus D5 anlegen. Beleg: kompiliert, Guards aus 2.2 grün.
+- [ ] 2.2 Guards 1–3 aus D5 über `pragma_foreign_key_list` und Selbsttest 4 mit Sonden-Tabelle. Beleg: Guards grün; Mutationsproben (Bezug `einsatz_tier.halter_person_id` entfernen, eine Scrub-Spalte unmarkiert lassen, eine Retain-Spalte als `Mit` markieren) machen je einen Guard rot.
+- [ ] 2.3 `scrubbe_person(conn, einsatz_id, art, id)` aus `PERSONENBEZUEGE` mit Strategien aus `TABELLEN`, eingegrenzt auf Bezug, Einsatz-Scoping und Zeilenfilter. Beleg: Repo-Tests je Personenart mit einer Nachbarzeile derselben Art im selben Einsatz und einer Zeile mit derselben id-Spalte in einem anderen Einsatz; nur die Zielzeilen ändern sich; Retain-Spalten bleiben; `PRAGMA foreign_key_check` leer.
+
+## 3. Antrag, Rücknahme und Vollzug im Repo
+
+- [ ] 3.1 Repo-Funktion `antrag_stellen` (`write_retry!`): Zustandsprüfung des Einsatzes (aktiv 409, geschwärzt 409), Zielprüfung (anderer Einsatz 404, Stammkraft 422, Bestätigung 422, offener oder vollzogener Antrag 409), Insert und System-ETB-Eintrag des Admins (D10). Beleg: Repo-Tests je Ablehnungsfall ohne Schreibvorgang (ETB-Zähler unverändert) und ein Erfolgsfall mit Audit-Text ohne Namen.
+- [ ] 3.2 Repo-Funktion `antrag_zuruecknehmen` mit bewachtem UPDATE (D2) und ETB-Eintrag. Beleg: Tests für 3 h (Erfolg), 25 h, zurückgenommen und vollzogen (je 409, nichts geändert), fremder Einsatz (404).
+- [ ] 3.3 `schwaerze_einsatz` in Kern und zwei Hüllen teilen (D4); Antragshülle setzt Vormerkung und `geschwaerzt_at`, markiert alle offenen Anträge des Einsatzes als vollzogen. Beleg: die bestehenden Tests in `purge_scheduler::tests` bleiben unverändert grün; neuer Test „Einsatz mit Frist in 5 Jahren auf Antrag geschwärzt“ zeigt denselben Scrub wie die fristbasierte Schwärzung.
+- [ ] 3.4 Vollzug eines Personen-Antrags (`scrubbe_person` + Kennzeichen + ETB-Eintrag mit Akteur aus dem Antrag, Fallback Akteurskette) in einer Transaktion; Antrag an inzwischen geschwärztem Einsatz ohne Scrub als vollzogen. Beleg: Repo-Tests inklusive Rollback bei erzwungenem Fehler im Audit.
+
+## 4. Purge-Lauf
+
+- [ ] 4.1 Neue Phase für fällige Anträge zwischen A und B in `tick_mit_rueckschrieb`; Vollzug zählt für den WAL-Rückschrieb. Beleg: Scheduler-Tests „23 h nichts, 24 h vollzogen, zweiter Lauf ändert nichts“, „Rücknahme verhindert Vollzug“, „Antrag während der 30-Tage-Karenz“ und eine Variante von `schwaerzung_hinterlaesst_keine_altbytes` für einen Personen-Vollzug (Klartext der Person weder in DB noch WAL, Klartext der Nachbarperson weiter vorhanden).
+
+## 5. Zustand und Übersicht
+
+- [ ] 5.1 `AufbewahrungZustand::SchwaerzungBeantragt` und neuer Parameter in `retention::zustand` (D8); Übersicht und Akte lesen die Fälligkeit des offenen Einsatz-Antrags. Beleg: Unit-Test der Rangfolge, `tests/enum_wire_kontrakt.rs` erweitert, Szenarien „Offener Einsatz-Antrag“ und „Zurückgenommener Antrag“ der Übersicht in `tests/aufbewahrung.rs`.
+
+## 6. Personensuche
+
+- [ ] 6.1 Normalisierung und Abgleich (ganze Wörter, Ziffern ≥ 6) als reine Funktion mit Unit-Tests (Umlaute, Reihenfolge der Wörter, kein Teilwort-Treffer, Rufnummer mit Leerzeichen). Beleg: Unit-Tests.
+- [ ] 6.2 Repo-Funktion `personensuche` (nur lesend) über alle vier Personenarten mit Kennungen aus D6 und Antragsstand. Beleg: Repo-Test „Erika Mustermann“ liefert `R-001`, die Antwort-Serialisierung enthält weder „Erika“ noch „Mustermann“; geschwärzte Person wird nicht gefunden.
+
+## 7. Routen, Guard und Codegen
+
+- [ ] 7.1 Vier Routen aus D7 mit `AdminUser`, `fordere_archivzugriff`, `JsonBody`/`PfadParam`; Request-DTOs, Response-DTOs mit `ToSchema`, `no-store` an der Suche. Beleg: Integrationstests in `tests/aufbewahrung.rs` für jedes Szenario von `aufbewahrung-loeschersuchen` mit Statuscode (201, 400, 403, 404, 409, 422) und für „Personensuche durch die Einsatzleitung“ (403).
+- [ ] 7.2 Guard `archiv_namensraum_nur_lesend_und_admin` auf acht Routen und die benannte Nicht-GET-Menge umstellen, plus Prüfung „Personensuche schreibt nicht“. Beleg: Guard grün; Selbsttests (zusätzliche Nicht-GET-Route, `write_retry!` in der Suche) machen ihn rot.
+- [ ] 7.3 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/openapi.json` sowie `types.generated.ts` mitcommitten. Beleg: Skript grün.
+- [ ] 7.4 Ende-zu-Ende in `tests/aufbewahrung_e2e.rs`: Personen-Antrag über die Route, Uhr +24 h, Purge, dann ETB-Spur (zwei Einträge mit Aktenzeichen und `R-042`, ohne Namen) und Szenario „Name im ETB-Wortlaut bleibt“. Beleg: Test grün; `AUSNAHMEN_SYSTEM_ETB` unverändert.
+
+## 8. Frontend
+
+- [ ] 8.1 API-Funktionen und Query-Keys in `frontend/src/api/aufbewahrung.ts` und `queryKeys.ts`; Farbe und Wort für `schwaerzung_beantragt` in `theme/statusFarben.ts`. Beleg: vitest für die Zustandsabbildung, `tsc --noEmit`.
+- [ ] 8.2 `SchwaerzungsantragDialog` (Rückfrage nach D9; Absenden erst bei Aktenzeichen und passender Kennung). Beleg: vitest „Kennung `R-04` für `R-042` → Absenden gesperrt“, „Hinweis auf Freitexte nur beim Personen-Antrag“.
+- [ ] 8.3 `PersonensucheDialog` (Suchfeld ≥ 3 Zeichen, Treffertabelle pseudonym, Antrag je Treffer). Beleg: vitest mit gemockter Antwort.
+- [ ] 8.4 Paneel „Löschersuchen (Art. 17)“ in `ArchivAktePage.tsx` mit Antragsliste, „Zurücknehmen“ nur bei offenem Antrag innerhalb von 24 h, Aktionen nur an nicht geschwärzten Einsätzen, Etikett „auf Antrag geschwärzt“ im Register. Beleg: vitest für die Szenarien „Offener Antrag“ und „Geschwärzter Einsatz“.
+
+## 9. Regeln und Abschluss
+
+- [ ] 9.1 `src/AGENTS.md`, Abschnitt „Backend — Aufbewahrung (LFH-23)“: Antrag, Personenbezüge (`PERSONENBEZUEGE`, Guard), neue Archivrouten und Herleitung auf das spätere Archiv dieser Change. Beleg: `prettier`/Längenregel der Wurzel-`AGENTS.md` unberührt, Verweise per grep geprüft.
+- [ ] 9.2 Folgeticket über `clickup-task-anlegen`: Live-Invalidierung und Offline-Caches nach einem Personen-Vollzug. Beleg: Task-Link im PR-Text.
+- [ ] 9.3 `./scripts/check-all.sh` lokal (soweit die Umgebung es trägt) und in der CI des PRs grün. Beleg: Lauf im PR.
+- [ ] 9.4 Prüfung im laufenden Stack (`cargo run --features dev-seeds`, Vite): Personensuche, Antrag, Rücknahme, Antrag mit vorgestellter Uhr bzw. per Test-Tick vollzogen, Akte danach. Beleg: Befund in dieser Datei.
+- [ ] 9.5 `requesting-code-review` und bestätigte Findings abarbeiten. Beleg: Findings und Umgang im PR.
