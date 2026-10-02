@@ -345,7 +345,9 @@ async fn personensuche_pseudonym_ohne_cache_und_nur_fuer_den_admin() {
         Some(&json!({"suchtext": "0171-2345678"})),
     )
     .await;
-    assert_eq!(v.as_array().unwrap().len(), 1);
+    // Die Rufnummer ist der Melderkontakt — sie gehört der meldenden Person, nicht der
+    // Betroffenen, und trifft deshalb nicht (Review LFH-751).
+    assert_eq!(v.as_array().unwrap().len(), 0);
     let (_, v) = anfrage_json(
         &l.app,
         "POST",
