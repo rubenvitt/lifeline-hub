@@ -154,7 +154,7 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   behalten werden Einsatzkräfte, Lagestruktur, Führungsmodule und Enum-Labels; jede solche Stelle
   steht mit `gruppe` in `AUSNAHMEN_SYSTEM_ETB` (`tests/aufbewahrung_e2e.rs`), die Liste wird nie
   um eine Spalte aus `GESPERRT` länger. Kein Test bemerkt einen fehlenden Eintrag. Herleitung:
-  `openspec/changes/lfh-752-system-etb-ohne-scrub-werte/design.md`.
+  `openspec/changes/archive/2026-10-02-lfh-752-system-etb-ohne-scrub-werte/design.md`.
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
   stehen), und nach einer Schwärzung schreibt der Purge-Lauf den WAL per

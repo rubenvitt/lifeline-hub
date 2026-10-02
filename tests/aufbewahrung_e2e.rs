@@ -11,7 +11,7 @@
 //! Person, Tier, Belegung) und Dokumenttitel stehen in neuen Einträgen nicht mehr, Einsatzkräfte,
 //! Lagestruktur, Führungsmodule und Enum-Labels bleiben bewusst. Die Liste wird nie länger um
 //! eine gesperrte Spalte ([`GESPERRT`]); ältere ETB-Einträge behalten ihren Wortlaut.
-//! Herleitung: `openspec/changes/lfh-752-system-etb-ohne-scrub-werte/design.md`.
+//! Herleitung: `openspec/changes/archive/2026-10-02-lfh-752-system-etb-ohne-scrub-werte/design.md`.
 
 use axum::http::StatusCode;
 use chrono::{Duration, NaiveDateTime, Utc};
