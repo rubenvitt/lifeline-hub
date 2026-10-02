@@ -71,17 +71,18 @@ fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<Item>, Unbereinigbar> {
         if &infe.typ != b"infe" {
             continue;
         }
-        if ids.len() > MAX_METADATEN_ITEMS {
+        if ids.len() >= MAX_METADATEN_ITEMS {
             return Err(Unbereinigbar("HEIF: zu viele Metadaten-Items"));
         }
         let v = *d.get(infe.nutzlast).ok_or_else(kurz)?;
         let p = infe.nutzlast + 4;
         if v < 2 {
-            // Alte Form ohne item_type: nur XMP über den Inhaltstyp erkennbar.
+            // Alte Form ohne item_type: jedes Item mit Inhaltstyp ist beschreibend (wie `mime`
+            // ab Version 2), Bilder tragen hier keinen.
             let id = be(d, p, 2)? as u32;
             let (_, p) = zeichenkette(d, p + 4, infe.ende)?;
             let (inhaltstyp, _) = zeichenkette(d, p, infe.ende)?;
-            if ist_xmp(inhaltstyp) {
+            if !inhaltstyp.is_empty() {
                 ids.push(Item { id, exif: false });
             }
             continue;
@@ -101,11 +102,6 @@ fn metadaten_items(d: &[u8], iinf: &Box4) -> Result<Vec<Item>, Unbereinigbar> {
     Ok(ids)
 }
 
-fn ist_xmp(inhaltstyp: &[u8]) -> bool {
-    let t = String::from_utf8_lossy(inhaltstyp).to_ascii_lowercase();
-    t.contains("rdf+xml") || t.contains("xmp")
-}
-
 /// Obergrenze für Metadaten-Items; echte Dateien tragen eines bis drei. Schützt die lineare Suche
 /// je `iloc`-Eintrag vor quadratischer Laufzeit.
 const MAX_METADATEN_ITEMS: usize = 64;
@@ -113,6 +109,32 @@ const MAX_METADATEN_ITEMS: usize = 64;
 /// Top-Level-Boxen, die bleiben dürfen. Alles andere (etwa `moov` einer Bildfolge mit
 /// `udta/©xyz`-Standort) ist ein unbekannter Aufbau und damit `Unbereinigbar` (design.md D3).
 const OBEN_ERLAUBT: &[&[u8; 4]] = &[b"ftyp", b"meta", b"mdat", b"free", b"skip"];
+
+/// Kinder von `meta`, die bleiben dürfen (HEIF-Struktur). Ein `xml `/`bxml` (XML-Metadaten) oder
+/// etwas Unbekanntes ist `Unbereinigbar` (Review LFH-747).
+const META_ERLAUBT: &[&[u8; 4]] = &[
+    b"hdlr", b"dinf", b"pitm", b"iinf", b"iref", b"iprp", b"iloc", b"idat", b"grpl", b"free",
+    b"skip",
+];
+
+/// Nullt die Nutzlast jeder `udes`-Property (Titel, Beschreibung, Schlagworte im Klartext) in
+/// `iprp/ipco`. Genullt sind es leere Zeichenketten; die Struktur bleibt gültig.
+fn udes_nullen(d: &[u8], aus: &mut [u8], iprp: &Box4) -> Result<(), Unbereinigbar> {
+    for ipco in boxen(d, iprp.nutzlast, iprp.ende)?
+        .into_iter()
+        .filter(|b| &b.typ == b"ipco")
+    {
+        for udes in boxen(d, ipco.nutzlast, ipco.ende)?
+            .into_iter()
+            .filter(|b| &b.typ == b"udes")
+        {
+            // FullBox: Version und Flags bleiben.
+            let start = (udes.nutzlast + 4).min(udes.ende);
+            aus[start..udes.ende].fill(0);
+        }
+    }
+    Ok(())
+}
 
 /// Ein Metadaten-Item: EXIF, XMP oder ein anderes beschreibendes Item.
 #[derive(Clone, Copy)]
@@ -273,6 +295,9 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
     for meta in oben.iter().filter(|b| &b.typ == b"meta") {
         // `meta` ist eine FullBox: 4 Bytes Version und Flags vor den Kindern.
         let kinder = boxen(d, meta.nutzlast + 4, meta.ende)?;
+        if kinder.iter().any(|b| !META_ERLAUBT.contains(&&b.typ)) {
+            return Err(Unbereinigbar("HEIF: unbekannte Box in meta"));
+        }
         // Eine zweite `iinf`/`iloc`/`idat` sähe `finde` nicht; sie trüge ungeprüfte Items.
         for t in [b"iinf", b"iloc", b"idat"] {
             if kinder.iter().filter(|b| &b.typ == t).count() > 1 {
@@ -280,6 +305,9 @@ pub(super) fn bereinigen(d: &[u8]) -> Result<Bereinigt, Unbereinigbar> {
             }
         }
         let finde = |t: &[u8; 4]| kinder.iter().find(|b| &b.typ == t);
+        for iprp in kinder.iter().filter(|b| &b.typ == b"iprp") {
+            udes_nullen(d, &mut aus, iprp)?;
+        }
         let items = match finde(b"iinf") {
             Some(iinf) => metadaten_items(d, iinf)?,
             None => continue,
@@ -331,6 +359,25 @@ mod tests {
     fn idempotent() {
         let einmal = bereinigen(&heif(&HeifBau::default())).expect("HEIF").daten;
         assert_eq!(bereinigen(&einmal).expect("HEIF").daten, einmal);
+    }
+
+    #[test]
+    fn udes_wird_genullt_und_xml_in_meta_ist_unbereinigbar() {
+        let udes = vollbox(b"udes", 0, b"de\0MARKER_TITEL\0MARKER_BESCHREIBUNG\0\0");
+        let iprp = boxe(b"iprp", &boxe(b"ipco", &udes));
+        let meta = vollbox(b"meta", 0, &iprp);
+        let h = [boxe(b"ftyp", b"heic\0\0\0\0mif1heic"), meta].concat();
+        let aus = bereinigen(&h).expect("HEIF").daten;
+        assert_eq!(aus.len(), h.len());
+        assert!(!enthaelt(&aus, MARKER));
+        assert!(enthaelt(&aus, b"udes"));
+
+        let mit_xml = [
+            boxe(b"ftyp", b"heic\0\0\0\0mif1heic"),
+            vollbox(b"meta", 0, &vollbox(b"xml ", 0, &xmp_paket())),
+        ]
+        .concat();
+        assert!(bereinigen(&mit_xml).is_err());
     }
 
     #[test]

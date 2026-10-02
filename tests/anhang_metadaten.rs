@@ -496,6 +496,50 @@ async fn einsatzleitung_laedt_das_original_mit_vermerk_auf_jedem_weg() {
     }
 }
 
+/// Ein an eine Nachricht gebundener Chat-Anhang: bereinigt für alle, das Original mit dem
+/// Vermerk „Chat“.
+#[tokio::test]
+async fn chat_anhang_an_einer_nachricht_vermerkt_chat() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (pfad, aid) = chat_foto(&app, &admin, einsatz).await;
+    let (_, kanaele) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &admin,
+        None,
+    )
+    .await;
+    let kid = kanaele[0]["id"].as_i64().unwrap();
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        Some(&format!(r#"{{"inhalt":"Foto","anhang_ids":[{aid}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    let fritz = mitglied(&app, &admin, einsatz, "fritz", "fuehrungspersonal").await;
+    let (s, _, bytes) = laden(&app, &pfad, &fritz, None).await;
+    assert_eq!(s, StatusCode::OK);
+    ist_bereinigt(&bytes);
+    let (s, _, _) = laden(&app, &original(&pfad), &fritz, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _, bytes) = laden(&app, &original(&pfad), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(bytes, foto_mit_gps());
+    let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        inhalte.contains(&format!(
+            "Originaldatei mit Metadaten (Standort, Gerät) abgerufen: Chat, Anhang #{aid}"
+        )),
+        "{inhalte:?}"
+    );
+}
+
 #[tokio::test]
 async fn zweiter_abruf_liefert_erneut_und_vermerkt_erneut() {
     let (app, pool) = setup_mit_pool().await;

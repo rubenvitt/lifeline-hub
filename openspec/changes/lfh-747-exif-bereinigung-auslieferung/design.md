@@ -145,6 +145,10 @@ beschreibende Teile fallen weg. Unbekannte Teile, die für das Bild wesentlich s
   - Das Exif-Item bekommt statt reiner Nullen einen gültigen leeren TIFF-Block (Offset 0, IFD
     ohne Einträge). Ein genulltes Item ließ Leser beim EXIF-Lesen abbrechen (Praxistest mit
     pillow-heif).
+  - In `meta` nur die HEIF-Struktur (`hdlr`, `dinf`, `pitm`, `iinf`, `iref`, `iprp`, `iloc`,
+    `idat`, `grpl`); ein `xml `/`bxml` oder Unbekanntes ist `Unbereinigbar`. Die Property `udes`
+    (Titel, Beschreibung, Schlagworte) wird genullt. Alte `infe` (Version 0/1) zählen jedes Item
+    mit Inhaltstyp als Metadaten.
   - Top-Level-Boxen nur `ftyp`, `meta`, `mdat`, `free`, `skip`. Alles andere, etwa `moov` einer
     Bildfolge mit `udta/©xyz`-Standort, ist `Unbereinigbar`. Ebenso eine zweite
     `iinf`/`iloc`/`idat` in derselben `meta`.
@@ -332,9 +336,15 @@ unverändert.
     Betrachter eine kaputte Vorschau. Ein beschnittenes Foto mit unbeschnittener
     Container-Vorschau bleibt damit ein Restrisiko, das ein Folgeticket klären kann.
 - **[Private TIFF-Unter-IFDs über LONG-Zeiger]**
-  → Ein unbekannter Tag vom Typ LONG, der auf ein privates Unter-IFD zeigt, verliert seinen
-    Zeiger (genullt). Die Bytes dahinter bleiben aber unreferenziert in der Datei stehen. Echte
-    Scanner-TIFFs tragen so etwas kaum. Das Kontrollnetz fängt XMP und EXIF, keinen Freitext.
+  → Ein unbekannter Tag vom Typ LONG, der auf ein privates Unter-IFD zeigt (etwa 400
+    GlobalParametersIFD oder ein Hersteller-IFD), verliert seinen Zeiger (genullt). Die Bytes
+    dahinter bleiben unreferenziert stehen und sind mit `strings` lesbar. Den Zeiger zu verfolgen
+    hieße zu raten, ob ein LONG ein Offset ist; ein Fehlgriff nullte Bilddaten. Echte
+    Scanner-TIFFs tragen so etwas kaum, das Kontrollnetz fängt XMP und EXIF, keinen Freitext.
+- **[HEIF mit eigenen Boxen der Kamera]**
+  → Kameras, die oben `uuid`-Boxen schreiben (etwa Canon-HIF mit CMT-Metadaten), bekommen beim
+    normalen Download 422; die Einsatzleitung lädt das Original. Fail-closed und gewollt; häufen
+    sich solche Fälle, wird der Parser erweitert und `BEREINIGUNG_VERSION` erhöht.
 - **[Genulltes XMP-Item in HEIF]**
   → Leser sehen ein XMP aus Nullbytes (Pillow liest es als Bytes, ohne Fehler). Ein gültiges
     leeres XMP-Paket würde das Kontrollnetz auslösen.
