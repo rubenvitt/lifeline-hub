@@ -15,7 +15,7 @@
 //! **Nur ganze Wörter:** jedes Wort des Suchtexts muss als ganzes Wort im Namen stehen, sonst
 //! wäre die Suche ein Orakel für Namensanfänge. Eine Rufnummer trifft, wenn der Suchtext
 //! mindestens [`MIN_ZIFFERN`] Ziffern hat und sie gleich den Ziffern eines Kontaktfelds sind.
-//! Herleitung: `openspec/changes/lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D6.
+//! Herleitung: `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D6.
 
 use super::antrag::{AntragStand, AntragZielArt};
 use crate::einsatz::schwaerzung_person::PersonenArt;

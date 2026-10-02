@@ -2,7 +2,7 @@
 -- genau eine Person. Eine Zeile = ein Ersuchen mit eigenem Lebenszyklus: offen → zurückgenommen
 -- (innerhalb von 24 h) oder vollzogen (Purge-Lauf ab faellig_at). Die Zeile bleibt nach Rücknahme
 -- und Vollzug stehen: sie ist der Nachweis, dass die Organisation dem Ersuchen nachgekommen ist.
--- Herleitung: openspec/changes/lfh-751-sofort-schwaerzung-auf-antrag/design.md, D1.
+-- Herleitung: openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md, D1.
 --
 -- ziel_id ist polymorph (je nach ziel_art einsatz_person, einsatz_personal, infotelefon_anruf
 -- oder medienkontakt) und deshalb ohne Fremdschlüssel; bei ziel_art = 'einsatz' ist es NULL.

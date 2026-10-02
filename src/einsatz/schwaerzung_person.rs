@@ -16,7 +16,7 @@
 //! Bezug steht und jede ihrer Scrub-Spalten genau eine Markierung trägt. Eine neue Tabelle mit
 //! Personenverweis und Freitext macht damit einen Test rot, statt still durchzurutschen.
 //!
-//! Herleitung: `openspec/changes/lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D5.
+//! Herleitung: `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D5.
 
 use super::repo::SCHWAERZUNG_PLATZHALTER;
 use super::schwaerzung_registry::{

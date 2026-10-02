@@ -10,7 +10,7 @@
 //! Alle Schreibvorgänge laufen in `write_retry!` (BEGIN IMMEDIATE) und prüfen den Zustand in
 //! derselben Transaktion: Rücknahme und Vollzug sind über `faellig_at` und den offenen Stand
 //! bewacht, genau einer gewinnt. Herleitung:
-//! `openspec/changes/lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D1–D4 und D10.
+//! `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D1–D4 und D10.
 
 use crate::einsatz::retention::antrag_faellig_at;
 use crate::einsatz::schwaerzung_person::{scrubbe_person, PersonenArt};

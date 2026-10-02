@@ -54,6 +54,16 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote T
 - [x] 9.2 Folgeticket über `clickup-task-anlegen`: Live-Invalidierung und Offline-Caches nach einem Personen-Vollzug. Beleg: Task-Link im PR-Text.
   - Angelegt: LFH-996 „Schwärzung: offene Clients und Offline-Lagebild nach dem Vollzug räumen“.
 - [x] 9.0 Prüfliste Einsatztauglichkeit (15 Kriterien) an Akte, Suche und Rückfrage (Review LFH-751, `frontend/AGENTS.md`). Beleg: `pruefliste.md` in dieser Change; `e2e/aufbewahrung.spec.ts` misst sieben Zustandsetiketten und 390 px ohne Überlauf.
-- [ ] 9.3 `./scripts/check-all.sh` lokal (soweit die Umgebung es trägt) und in der CI des PRs grün. Beleg: Lauf im PR.
-- [ ] 9.4 Prüfung im laufenden Stack (`cargo run --features dev-seeds`, Vite): Personensuche, Antrag, Rücknahme, Antrag mit vorgestellter Uhr bzw. per Test-Tick vollzogen, Akte danach. Beleg: Befund in dieser Datei.
-- [ ] 9.5 `requesting-code-review` und bestätigte Findings abarbeiten. Beleg: Findings und Umgang im PR.
+- [x] 9.3 `./scripts/check-all.sh` lokal (soweit die Umgebung es trägt) und in der CI des PRs grün. Beleg: Lauf im PR.
+  - Lokal (02.10.2026, Cloud-Sitzung, `PW_PROJEKTE=chromium`, ohne Debug-Info wegen des Speicherkontingents): Schritte 1–3, 5, 6, 8–13 grün; Vitest 644 Dateien / 8893 Tests grün; Rust-Workspace 120 Testläufe ohne Fehler.
+  - Rot nur aus der Umgebung: die Desktop-Hülle (`src-tauri`) baut ohne GTK-Systembibliotheken nicht (`gdk-sys`), und zehn e2e-Fälle (`fokus-verdeckung`, `etb-anhang` u. a.) scheitern an der vorinstallierten, älteren Chromium-Fassung — dieselben zehn Fälle scheitern mit dem Frontend-Stand von `origin/alpha` identisch. Alle Aufbewahrungs-Specs grün.
+  - Beleg für das ganze Gate: die CI des PRs.
+- [x] 9.4 Prüfung im laufenden Stack (`cargo run --features dev-seeds`, Vite): Personensuche, Antrag, Rücknahme, Antrag mit vorgestellter Uhr bzw. per Test-Tick vollzogen, Akte danach. Beleg: Befund in dieser Datei.
+  - Laufender Stack über Playwright (Chromium, `e2e/aufbewahrung.spec.ts`, „Löschersuchen (LFH-751) …“): Suche „ayse yilmaz“ → ein Treffer ohne Namen → Rückfrage, Absenden gesperrt bis zur Kennung → Antrag „offen“, kein Name auf der Seite, System-Eintrag mit Aktenzeichen und `R-001` im Archiv-ETB → Rücknahme → „zurückgenommen“. Screenshots von Rückfrage und Akte gesichtet.
+  - Vollzug mit verstellter Uhr: `tests/loeschersuchen.rs` (`personen_antrag_bis_zum_vollzug`) über Route und Purge-Lauf; die Uhr des laufenden Servers lässt sich nicht vorstellen.
+- [x] 9.5 `requesting-code-review` und bestätigte Findings abarbeiten. Beleg: Findings und Umgang im PR.
+  - Zwei Reviewer (Backend/Sicherheit, Frontend/Konventionen), Findings am Code verifiziert. Kein Blocker.
+  - Behoben (Backend): Suche ohne Melderkontakt und ohne auf Antrag Geschwärzte (Platzhalter-Treffer), Einsatz-Vollzug nennt die Einsatznummer im Audit und meldet die Einsatzliste live, die fristbasierte Schwärzung schließt offene Anträge.
+  - Behoben (Frontend): Aktionen im Paneelkörper statt im schrumpffesten Kopf (390 px), zurücknehmende Person und Fälligkeit sichtbar, Neuladen nach abgelehnter Rücknahme, Suchtext mit `gcTime: 0`, `aria-live` an der Trefferzahl, Prüfliste Einsatztauglichkeit (9.0), Tests für Query-Key, Refetch, 409, Übersicht, Akte.
+  - Bewusst offen: verwaiste Namens-Schnappschüsse entfernter Dispositionen findet die Suche nicht (Hinweis im Dialog, design.md), Live-Räumung offener Clients und Offline-Caches → LFH-996.
+  - Mutationsproben: Einsatzgrenze im Personen-Scrub, WAL-Rückschrieb nach Vollzug, Invalidierung nach Rücknahme — je ein Test wird rot.
