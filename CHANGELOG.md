@@ -1,3 +1,28 @@
+## [1.0.0-alpha.65](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.64...v1.0.0-alpha.65) (2026-10-02)
+
+### Einsatztagebuch
+
+- Dokumente der Ablage, die einen ETB-Eintrag als Bezug haben, werden jetzt direkt am Eintrag in der Zeitachse als Download-Verweise angezeigt
+- Die Druckansicht des Einsatztagebuchs führt unter jedem Eintrag dessen Anhänge mit Dateiname und Größe auf
+- Bei abgelehnten ETB-Einträgen, deren Anhänge bereits durch die automatische Bereinigung entfernt wurden, kann der Eintrag jetzt ohne die Anhänge erneut gesendet werden
+- Beim Absenden eines ETB-Eintrags werden Eingabefelder für Schlagworte während des Sendevorgangs gesperrt
+- Entwürfe mit ausgewählten Dateien bleiben auch dann gespeichert, wenn der Eintragstext vollständig gelöscht wird
+- Fehlermeldungen zu fehlgeschlagenen Uploads bleiben auch nach einer Berichtigung des Eintrags sichtbar
+- Anhänge anderer Nutzer werden beim Erfassen jetzt einheitlich als "unbekannt" abgelehnt, auch wenn sie bereits an einen anderen Eintrag gebunden sind
+- Die Schaltfläche "Berichtigen" wird nicht mehr blockiert, wenn ein Entwurf in einem anderen Einsatz noch gesendet wird
+
+### Kommunikation
+
+- Der Chat lehnt Anhänge im Format HEIC, HEIF und TIFF ab, auch wenn diese über die ETB-Upload-Funktion hochgeladen wurden
+
+### Benutzeroberfläche
+
+- Die Hintergründe von Hinweisflächen (Info, Warnung, Fehler, Erfolg) wurden angepasst, sodass Schaltflächen-Ränder darauf sowohl im Tag- als auch im Nachtmodus ausreichend Kontrast aufweisen (mindestens 3:1)
+
+### Lagekarte
+
+- Die Anzeige von Live-Aktualisierungen auf mehreren gleichzeitig geöffneten Lagekarten wurde stabilisiert
+
 ## [1.0.0-alpha.64](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.63...v1.0.0-alpha.64) (2026-10-01)
 
 ### Wichtige Änderungen
