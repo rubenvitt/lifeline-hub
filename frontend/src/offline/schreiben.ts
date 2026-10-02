@@ -15,7 +15,7 @@ import type {
 } from '../api/types';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { istOfflineTransient } from './fehler';
 import { schreibaktionEinreihen } from './queue';
 import { serverJetzt } from './serveruhr';

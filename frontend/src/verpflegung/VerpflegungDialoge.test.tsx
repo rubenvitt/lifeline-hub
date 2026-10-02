@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import type { ModulFreigaben } from '../api/types';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { alsOrtszeit } from '../etb/filterZeit';
+import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { freigabenFixture } from '../test/fixtures';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';

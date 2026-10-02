@@ -7,7 +7,7 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import { mitProzessZone } from '../test/prozessZone';
 import { ApiError } from '../api/client';
 import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
-import { alsOrtszeit } from '../etb/filterZeit';
+import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { renderMitProviders } from '../test/utils';
 import {
   BelegungMeldenDialog,
