@@ -19,4 +19,5 @@
 - [x] 3.2 Übrige Kontrast-Specs gegen die neuen Tokens laufen lassen (`hellmodus-`, `gefahr-`, `primaerknopf-`, `fokusring-kontrast.spec.ts`). Dazu den Nachzug `colorPrimaryBg` (Auswahl in Menü und Select am Tag `#b9c1c4`, design.md Non-Goals) auf dem Entwicklungsboard erfassen und die Ticketnummer hier eintragen. Prüfen: Specs grün, Nachzug angelegt
   **Ergebnis:** 16 Tests grün (Hinweis, Hellmodus, Gefahr, Primärknopf, Fokusring; Chromium). Nachzug **LFH-984**
 - [x] 3.3 Prüfliste LFH-690 (`openspec/changes/archive/2026-09-29-lfh-690-demo-daten-laufzeit-import/pruefliste.md`) bleibt als Archiv unverändert. Den neuen Messwert trägt nur der Spec. Prüfen: `git diff --stat` zeigt keine Änderung unter `archive/`
-- [ ] 3.4 `./scripts/check-all.sh` grün (bzw. die Bündel, die in der Umgebung laufen; der volle Lauf wird mit der CI des PRs belegt). Prüfen: Ausgabe ohne roten Schritt
+- [x] 3.4 `./scripts/check-all.sh` grün (bzw. die Bündel, die in der Umgebung laufen; der volle Lauf wird mit der CI des PRs belegt). Prüfen: Ausgabe ohne roten Schritt
+  **Ergebnis lokal (Cloud-Sitzung, mise nachinstalliert):** Bündel `schnell` grün (10/10 gefahrene Schritte), Bündel `frontend` grün (Vitest 640 Dateien, 8808 Tests). Bündel `rust` nicht gefahren (kein Backend-Code berührt); e2e lokal nur die Kontrast-Specs (16 grün, Chromium). Voller Lauf: CI des PRs
