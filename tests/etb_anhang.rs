@@ -799,6 +799,68 @@ async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
     assert_eq!(anhang_ids(&v), vec![a]);
 }
 
+/// Sendet eine Chat-Nachricht „x" mit `anhang_ids` in den Standardkanal; (Status, JSON).
+async fn chat_senden(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    anhang_ids: &[i64],
+) -> (StatusCode, Value) {
+    let (s, kanaele) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let kid = kanaele[0]["id"].as_i64().unwrap();
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        cookie,
+        Some(&format!(r#"{{"inhalt":"x","anhang_ids":{anhang_ids:?}}}"#)),
+    )
+    .await
+}
+
+/// LFH-745: Der ETB-Upload nimmt die Dokument-Allowlist an. Eine so hochgeladene HEIC, die
+/// nie erfasst wurde, ist ungebunden — die Kreuzsperre greift nicht. Der Chat prüft beim
+/// Verknüpfen deshalb selbst gegen seine Allowlist: 400 wie beim Chat-Upload, keine
+/// Nachricht, keine Verknüpfung.
+#[tokio::test]
+async fn ungebundene_heic_aus_dem_etb_upload_ist_im_chat_400() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let heic = hochgeladen(&app, einsatz, &admin, "IMG_0412.HEIC").await;
+
+    let (s, v) = chat_senden(&app, &admin, einsatz, &[heic]).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(v["error"], "Dateityp image/heic ist nicht erlaubt");
+    let (nachrichten, links): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM chat_nachricht WHERE einsatz_id = ?1 AND inhalt = 'x'), \
+                (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?2)",
+    )
+    .bind(einsatz)
+    .bind(heic)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (nachrichten, links),
+        (0, 0),
+        "keine Nachricht, keine Verknüpfung"
+    );
+
+    // Gegenprobe: ein Typ der Chat-Allowlist aus demselben Upload geht weiter durch.
+    let jpg = hochgeladen(&app, einsatz, &admin, "foto.jpg").await;
+    let (s, v) = chat_senden(&app, &admin, einsatz, &[jpg]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}
+
 // ---------------------- client_id: Replay nur bei gleichem Inhalt ----------------------
 
 /// Zwei Browser-Tabs mit demselben Entwurf X: Tab 1 sendet, Tab 2 bearbeitet X weiter und
