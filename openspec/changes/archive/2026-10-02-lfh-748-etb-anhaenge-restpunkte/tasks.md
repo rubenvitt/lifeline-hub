@@ -25,5 +25,5 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (Frontend-Lint, Prettier, Vitest, Rust-Tests). Wo die Umgebung einen Schritt nicht ausführen kann, ist die CI des PRs der Nachweis.
-- [ ] 5.2 Review (`requesting-code-review`), Findings abarbeiten, dann `/opsx:archive` im selben Branch und Verweise auf den Change-Pfad nachziehen.
+- [x] 5.1 `./scripts/check-all.sh` grün (Frontend-Lint, Prettier, Vitest, Rust-Tests). Wo die Umgebung einen Schritt nicht ausführen kann, ist die CI des PRs der Nachweis. Lokal: rustfmt, Prettier, ESLint, `tsc`, Archiv-Gate grün; `cargo test --workspace --exclude lifeline-desktop` 3689/3689; Vitest 8782/8783 — rot nur `api/kartenbilder.test.ts` (`object.stream`, Node 22 statt der gepinnten 26.7, Datei unberührt). Gesamtnachweis: CI des PRs.
+- [x] 5.2 Review (`requesting-code-review`), Findings abarbeiten, dann `/opsx:archive` im selben Branch und Verweise auf den Change-Pfad nachziehen.

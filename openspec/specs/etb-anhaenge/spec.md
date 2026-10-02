@@ -43,10 +43,12 @@ gibt es nicht. Eine Berichtigung SHALL Anhänge tragen dürfen wie jeder andere 
 Typ.
 
 Die Statuscodes folgen der Projektkonvention:
-- Eine unbekannte ID oder eine ID eines fremden Einsatzes SHALL 400 ergeben.
+- Eine unbekannte ID, eine ID eines fremden Einsatzes oder die ID eines Anhangs, den eine
+  andere Person hochgeladen hat, SHALL 400 mit demselben Wortlaut ergeben, gleich ob dieser
+  Anhang gebunden ist.
 - Mehr als 10 Anhänge SHALL 400 ergeben.
-- Ein Anhang, der schon an einen ETB-Eintrag, eine Chat-Nachricht oder ein Dokument
-  gebunden ist, SHALL 422 ergeben.
+- Ein selbst hochgeladener Anhang, der schon an einen ETB-Eintrag, eine Chat-Nachricht oder
+  ein Dokument gebunden ist, SHALL 422 ergeben.
 
 #### Scenario: Eintrag mit zwei Fotos
 - **WHEN** ein Schreibberechtigter zwei zuvor über den ETB-Upload hochgeladene Dateien mit `anhang_ids` beim Erfassen nennt
@@ -58,12 +60,16 @@ Die Statuscodes folgen der Projektkonvention:
 - **AND** es entsteht kein Eintrag, keine laufende Nummer wird verbraucht, und die übrigen genannten Dateien bleiben ungebunden
 
 #### Scenario: Schon gebundene Datei
-- **WHEN** `anhang_ids` eine Datei enthält, die bereits an einem anderen ETB-Eintrag hängt
+- **WHEN** `anhang_ids` eine selbst hochgeladene Datei enthält, die bereits an einem anderen ETB-Eintrag hängt
 - **THEN** antwortet das System mit 422, und es entsteht kein Eintrag
 
 #### Scenario: Chat-Datei ist nicht übernehmbar
-- **WHEN** `anhang_ids` eine Datei enthält, die an einer Chat-Nachricht hängt
+- **WHEN** `anhang_ids` eine selbst hochgeladene Datei enthält, die an einer Chat-Nachricht hängt
 - **THEN** antwortet das System mit 422
+
+#### Scenario: Gebundene Datei einer anderen Person
+- **WHEN** `anhang_ids` eine Datei enthält, die eine andere Person hochgeladen hat und die schon an einem ETB-Eintrag, einer Chat-Nachricht oder einem Dokument hängt
+- **THEN** antwortet das System mit 400 und demselben Wortlaut wie für eine unbekannte ID, und es entsteht kein Eintrag
 
 #### Scenario: Nur Datei, kein Text
 - **WHEN** ein Eintrag mit leerem Inhalt und einem Anhang erfasst wird
@@ -136,7 +142,8 @@ gebundenen Anhang nie löschen, gleich wie alt er ist. Ein hochgeladener, noch
 ungebundener Anhang SHALL wie bisher nach der Karenz von 24 Stunden als verwaist gelten.
 Die generischen Routen zum Laden und Löschen SHALL einen ungebundenen Anhang nur für die
 Person bedienen, die ihn hochgeladen hat, und allen anderen mit 404 antworten. Das
-Erfassen SHALL einen freien Anhang einer anderen Person wie eine unbekannte ID abweisen.
+Erfassen SHALL jeden Anhang einer anderen Person, frei oder gebunden, wie eine unbekannte
+ID abweisen.
 
 #### Scenario: Chat will eine ETB-Datei verknüpfen
 - **WHEN** eine Chat-Nachricht mit der ID eines ETB-gebundenen Anhangs gesendet wird
@@ -152,7 +159,7 @@ Erfassen SHALL einen freien Anhang einer anderen Person wie eine unbekannte ID a
 - **AND** die hochladende Person kann ihn über dieselbe Route laden und verwerfen
 
 #### Scenario: Fremder Upload beim Erfassen
-- **WHEN** jemand einen ETB-Eintrag mit der ID eines freien Anhangs erfasst, den eine andere Person hochgeladen hat
+- **WHEN** jemand einen ETB-Eintrag mit der ID eines freien oder gebundenen Anhangs erfasst, den eine andere Person hochgeladen hat
 - **THEN** antwortet das System mit 400 und demselben Wortlaut wie für eine unbekannte ID, und es entsteht kein Eintrag
 
 #### Scenario: Aufräumlauf nach Tagen
@@ -196,15 +203,30 @@ Beim Absenden SHALL das System erst die Dateien hochladen und dann den Eintrag e
 Scheitert der Upload oder lehnt der Server den Eintrag ab, SHALL der Wortlaut samt
 Dateiliste stehen bleiben. Nach erfolgreichem Erfassen SHALL die Dateiliste geleert
 werden, auch wenn „Werte behalten“ an ist. Während des Uploads SHALL die Erfassung
-sichtbar zurückmelden, dass sie hochlädt.
+sichtbar zurückmelden, dass sie hochlädt. Während des Sendens SHALL keine Eingabe der
+Erfassung bedienbar sein, auch kein Feld-Editor, der beim Absenden schon offen war.
 
-Gewählte Dateien SHALL einen Wechsel zwischen den Entwurfs-Tabs überleben. Nach einem
-Neuladen der Seite SHALL der Entwurfstext erhalten sein, die Dateiliste aber nicht. Der
-Entwurfsspeicher SHALL keine Dateien aufnehmen.
+Gewählte Dateien und der Hinweis eines gescheiterten Uploads SHALL einen Wechsel zwischen
+den Entwurfs-Tabs und eine gestartete oder abgebrochene Berichtigung überleben. Das gilt
+auch für einen Entwurf, dessen Text nach dem Wählen getippt und wieder ganz gelöscht wurde.
+Nach einem Neuladen der Seite SHALL der Entwurfstext erhalten sein, die Dateiliste aber
+nicht. Der Entwurfsspeicher SHALL keine Dateien aufnehmen.
 
 #### Scenario: Tab-Wechsel
 - **WHEN** im Entwurf A eine Datei gewählt, zu Entwurf B und zurück zu A gewechselt wird
 - **THEN** steht die Datei wieder in der Liste von Entwurf A und nicht in der von Entwurf B
+
+#### Scenario: Entwurf nur mit Dateien und geleertem Text
+- **WHEN** in einem Entwurf eine Datei gewählt, Text getippt und wieder ganz gelöscht und danach eine Berichtigung gestartet und abgebrochen wird
+- **THEN** steht der Entwurf weiter als Reiter da, und die Datei steht in seiner Liste
+
+#### Scenario: Upload-Hinweis über eine Berichtigung
+- **WHEN** der Upload beim Absenden scheitert und danach eine Berichtigung gestartet und abgebrochen wird
+- **THEN** steht am Entwurf wieder der Hinweis mit dem Grund, und Wortlaut und Dateiliste stehen unverändert
+
+#### Scenario: Offener Feld-Editor beim Absenden
+- **WHEN** ein Feld-Editor (etwa „Von“) offen ist und „Erfassen“ einen Eintrag mit Anhang sendet
+- **THEN** ist der Editor gesperrt, solange der Versand läuft
 
 #### Scenario: Offline
 - **WHEN** die Schnellerfassung ohne Netzverbindung angezeigt wird
