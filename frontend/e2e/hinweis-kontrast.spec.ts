@@ -17,8 +17,9 @@ import { randKontrast } from './kontrast-kern';
  *  · Fehler: „Erneut abrufen“ im Ladefehler der Einsatzliste (Knopf im `action`-Slot).
  *    `GET /api/einsaetze` antwortet 500.
  *
- * Dass der Grund außen die Statusfläche IST, sichert der Spec vor der Messung zu; sonst wäre
- * „gegen die Hinweisfläche“ gegen irgendeinen Grund gemessen.
+ * Dass der Grund außen die Statusfläche IST, sichert der Spec nach den Kontrastwerten zu (eine
+ * Regression scheitert so zuerst am Befund); sonst wäre „gegen die Hinweisfläche“ gegen
+ * irgendeinen Grund gemessen.
  */
 
 const BODEN = 3;

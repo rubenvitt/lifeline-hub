@@ -10,7 +10,7 @@ Motivation und Messwerte: `proposal.md`. Hier nur, was den Weg bestimmt.
   (`bedien` `#154e84`, `achtung` `#7a5200`, `normal` `#1c6640`) ergibt das trübe Grautöne statt
   heller Tönungen. Zum Vergleich: antds Standardblau `#1677ff` ergibt `#e6f4ff`.
 - Der Knopfrand ist `steuerRahmen` (= antds `colorBorder`). Er ist gegen `grund`, `flaeche`,
-  `paneel`, `flaeche2` und `flaeche3` abgestimmt (Tag ≥ 3,30, Nacht ≥ 3,21) und hält dort.
+  `paneel`, `flaeche2` und `flaeche3` abgestimmt (Tag ≥ 3,09 auf `flaeche3`, Nacht ≥ 3,21) und hält dort.
 - Das Projekt hat die passenden Flächen schon als Rollen: die deckenden Statusflächen
   `bedienFlaeche`, `achtungFlaeche`, `alarmFlaeche`, `normalFlaeche` („Ampel als Fläche, Zahl
   bleibt lesbar“). Nachgerechnet hält `steuerRahmen` darauf:

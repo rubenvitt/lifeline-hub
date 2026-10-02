@@ -6,8 +6,8 @@ Ein Knopf auf einem Hinweis (antds `Alert`) hat am Tag einen Rand unter 3 : 1 ge
 Hinweisfläche (WCAG 1.4.11, Kriterium 5). Die Prüfliste zu LFH-690 maß am Demo-Hinweis der
 Einsatzliste 2,84. Seit LFH-661 ist es schlechter: antd leitet die Hinweisflächen aus den
 Signalfarben ab, und das dunklere `bedien` macht die Info-Fläche am Tag trüb (`#b9c1c4`). Der
-Rand `steuerRahmen` misst darauf nachgerechnet nur noch **2,16**. Es trifft jeden Hinweistyp
-mit Knopf, auch nachts:
+Rand `steuerRahmen` misst darauf nachgerechnet nur noch **2,16**. Es trifft drei der vier
+Hinweistypen, nachts Warnung und Erfolg:
 
 | Hinweistyp | Fläche heute (Tag) | Rand Tag | Rand Nacht |
 | --- | --- | --- | --- |
