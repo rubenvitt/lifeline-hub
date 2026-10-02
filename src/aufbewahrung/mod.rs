@@ -13,6 +13,7 @@
 //! Eigene DTOs statt `EinsatzAnzeige`/`EtbEintragAnzeige`/`PersonAnzeige`: die wachsen mit
 //! anderen Modulen, und das Archiv lieferte neue Felder still mit.
 
+pub mod antrag;
 pub mod projektion;
 pub mod repo;
 #[cfg(test)]

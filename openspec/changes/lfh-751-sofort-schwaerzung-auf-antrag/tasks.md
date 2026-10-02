@@ -4,7 +4,7 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote T
 
 ## 1. Datenmodell und Registry-Eintrag
 
-- [ ] 1.1 Migration mit der nächsten freien Nummer über `origin/alpha` (D1): Tabelle `schwaerzung_antrag` mit CHECKs (Zielart, `ziel_id` genau bei `einsatz` NULL, höchstens einer von zurückgenommen/vollzogen) und dem Ausdrucks-Unique-Index für offene Anträge. Beleg: `scripts/check-migrationen.sh` grün, `db::tests::migrationsnummern_sind_eindeutig` grün, ein Repo-Test zeigt, dass ein zweiter offener Antrag für dasselbe Ziel an der Datenbank scheitert und ein Einsatz-Antrag neben einem Personen-Antrag geht.
+- [x] 1.1 Migration mit der nächsten freien Nummer über `origin/alpha` (D1): Tabelle `schwaerzung_antrag` mit CHECKs (Zielart, `ziel_id` genau bei `einsatz` NULL, höchstens einer von zurückgenommen/vollzogen) und dem Ausdrucks-Unique-Index für offene Anträge. Beleg: `scripts/check-migrationen.sh` grün, `db::tests::migrationsnummern_sind_eindeutig` grün, ein Repo-Test zeigt, dass ein zweiter offener Antrag für dasselbe Ziel an der Datenbank scheitert und ein Einsatz-Antrag neben einem Personen-Antrag geht.
 - [x] 1.2 `schwaerzung_antrag` in `TABELLEN` klassifizieren (alle Spalten `Retain` mit Begründung, `ziel_id` als `G_POLY`). Beleg: die bestehenden Registry-Guards sind grün und werden ohne den Eintrag rot (Mutationsprobe).
 - [x] 1.3 `ANTRAG_KARENZ_STUNDEN` und `antrag_faellig_at` in `src/einsatz/retention.rs` mit Grenztests (23:59 offen, 24:00 fällig). Beleg: Unit-Tests in `retention::tests`.
 
@@ -16,14 +16,14 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der rote T
 
 ## 3. Antrag, Rücknahme und Vollzug im Repo
 
-- [ ] 3.1 Repo-Funktion `antrag_stellen` (`write_retry!`): Zustandsprüfung des Einsatzes (aktiv 409, geschwärzt 409), Zielprüfung (anderer Einsatz 404, Stammkraft 422, Bestätigung 422, offener oder vollzogener Antrag 409), Insert und System-ETB-Eintrag des Admins (D10). Beleg: Repo-Tests je Ablehnungsfall ohne Schreibvorgang (ETB-Zähler unverändert) und ein Erfolgsfall mit Audit-Text ohne Namen.
-- [ ] 3.2 Repo-Funktion `antrag_zuruecknehmen` mit bewachtem UPDATE (D2) und ETB-Eintrag. Beleg: Tests für 3 h (Erfolg), 25 h, zurückgenommen und vollzogen (je 409, nichts geändert), fremder Einsatz (404).
-- [ ] 3.3 `schwaerze_einsatz` in Kern und zwei Hüllen teilen (D4); Antragshülle setzt Vormerkung und `geschwaerzt_at`, markiert alle offenen Anträge des Einsatzes als vollzogen. Beleg: die bestehenden Tests in `purge_scheduler::tests` bleiben unverändert grün; neuer Test „Einsatz mit Frist in 5 Jahren auf Antrag geschwärzt“ zeigt denselben Scrub wie die fristbasierte Schwärzung.
-- [ ] 3.4 Vollzug eines Personen-Antrags (`scrubbe_person` + Kennzeichen + ETB-Eintrag mit Akteur aus dem Antrag, Fallback Akteurskette) in einer Transaktion; Antrag an inzwischen geschwärztem Einsatz ohne Scrub als vollzogen. Beleg: Repo-Tests inklusive Rollback bei erzwungenem Fehler im Audit.
+- [x] 3.1 Repo-Funktion `antrag_stellen` (`write_retry!`): Zustandsprüfung des Einsatzes (aktiv 409, geschwärzt 409), Zielprüfung (anderer Einsatz 404, Stammkraft 422, Bestätigung 422, offener oder vollzogener Antrag 409), Insert und System-ETB-Eintrag des Admins (D10). Beleg: Repo-Tests je Ablehnungsfall ohne Schreibvorgang (ETB-Zähler unverändert) und ein Erfolgsfall mit Audit-Text ohne Namen.
+- [x] 3.2 Repo-Funktion `antrag_zuruecknehmen` mit bewachtem UPDATE (D2) und ETB-Eintrag. Beleg: Tests für 3 h (Erfolg), 25 h, zurückgenommen und vollzogen (je 409, nichts geändert), fremder Einsatz (404).
+- [x] 3.3 `schwaerze_einsatz` in Kern und zwei Hüllen teilen (D4); Antragshülle setzt Vormerkung und `geschwaerzt_at`, markiert alle offenen Anträge des Einsatzes als vollzogen. Beleg: die bestehenden Tests in `purge_scheduler::tests` bleiben unverändert grün; neuer Test „Einsatz mit Frist in 5 Jahren auf Antrag geschwärzt“ zeigt denselben Scrub wie die fristbasierte Schwärzung.
+- [x] 3.4 Vollzug eines Personen-Antrags (`scrubbe_person` + Kennzeichen + ETB-Eintrag mit Akteur aus dem Antrag, Fallback Akteurskette) in einer Transaktion; Antrag an inzwischen geschwärztem Einsatz ohne Scrub als vollzogen. Beleg: Repo-Tests inklusive Rollback bei erzwungenem Fehler im Audit.
 
 ## 4. Purge-Lauf
 
-- [ ] 4.1 Neue Phase für fällige Anträge zwischen A und B in `tick_mit_rueckschrieb`; Vollzug zählt für den WAL-Rückschrieb. Beleg: Scheduler-Tests „23 h nichts, 24 h vollzogen, zweiter Lauf ändert nichts“, „Rücknahme verhindert Vollzug“, „Antrag während der 30-Tage-Karenz“ und eine Variante von `schwaerzung_hinterlaesst_keine_altbytes` für einen Personen-Vollzug (Klartext der Person weder in DB noch WAL, Klartext der Nachbarperson weiter vorhanden).
+- [x] 4.1 Neue Phase für fällige Anträge zwischen A und B in `tick_mit_rueckschrieb`; Vollzug zählt für den WAL-Rückschrieb. Beleg: Scheduler-Tests „23 h nichts, 24 h vollzogen, zweiter Lauf ändert nichts“, „Rücknahme verhindert Vollzug“, „Antrag während der 30-Tage-Karenz“ und eine Variante von `schwaerzung_hinterlaesst_keine_altbytes` für einen Personen-Vollzug (Klartext der Person weder in DB noch WAL, Klartext der Nachbarperson weiter vorhanden).
 
 ## 5. Zustand und Übersicht
 

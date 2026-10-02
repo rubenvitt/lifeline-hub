@@ -7,6 +7,8 @@
 //! - **Phase A** (reversibel): Einsätze mit abgelaufener Aufbewahrungsfrist werden
 //!   soft-gelöscht (`geloescht_at` gesetzt = Karenz-Start). Ab da am Datenzugriff
 //!   gesperrt (`darf_lesen`).
+//! - **Phase A2** (IRREVERSIBEL, LFH-751): fällige Schwärzungsanträge (Löschersuchen nach
+//!   Art. 17) werden vollzogen (`aufbewahrung::antrag::vollziehe_faellige`).
 //! - **Phase B** (IRREVERSIBEL): nach Ablauf der Karenz (`KARENZ_TAGE`) werden die
 //!   Personendaten gescrubbt (`repo::schwaerze_einsatz`), das operative Skelett
 //!   (Einsatz, ETB, Zähler) bleibt erhalten. `geschwaerzt_at`-Tombstone = Idempotenz.
@@ -75,6 +77,13 @@ pub async fn tick_mit_rueckschrieb(
         }
         Err(e) => tracing::warn!("Purge Phase A: Abfrage fehlgeschlagen: {e}"),
     }
+
+    // --- Phase A2: fällige Schwärzungsanträge (Art. 17, LFH-751, IRREVERSIBEL) ---
+    // Vor Phase B, damit ein Einsatz-Antrag mit seinem Aktenzeichen im Audit schwärzt, wenn
+    // im selben Lauf auch die Karenz abliefe. Ein Vollzug zählt für den WAL-Rückschrieb.
+    let vollzogen = crate::aufbewahrung::antrag::vollziehe_faellige(pool, jetzt).await;
+    anzahl += vollzogen;
+    geschwaerzt += vollzogen;
 
     // --- Phase B: PII-Schwärzung nach Ablauf der Karenz (IRREVERSIBEL) ---
     match repo::faellige_purge(pool, KARENZ_TAGE).await {
@@ -1385,6 +1394,113 @@ mod tests {
 
     const NAME_KLARTEXT: &str = "LFH725-Gepflanzter-Name";
     const ANHANG_KLARTEXT: &[u8] = b"LFH725-GEPFLANZTER-ANHANG";
+
+    // ---------- LFH-751: Schwärzungsanträge im Purge-Lauf ----------
+
+    use crate::aufbewahrung::antrag::{self as antrag, AntragZiel};
+    use crate::einsatz::schwaerzung_person::{testdaten, PersonenArt};
+
+    async fn antrag_r001(pool: &SqlitePool, b: &testdaten::Bestand, jetzt: &str) -> i64 {
+        antrag::stellen(
+            pool,
+            b.e1,
+            b.admin,
+            b.org_id,
+            AntragZiel::Person(PersonenArt::Betroffene, b.p1),
+            "DS-2026-014",
+            "R-001",
+            t(jetzt),
+        )
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn antrag_23h_nichts_24h_vollzogen_zweiter_lauf_nichts() {
+        let pool = crate::db::test_pool().await;
+        let b = testdaten::anlegen(&pool).await;
+        antrag_r001(&pool, &b, "2026-10-02 08:00:00").await;
+        let live = LiveHub::new();
+        assert_eq!(tick_einmal(&pool, &live, t("2026-10-03 07:59:59")).await, 0);
+        assert!(testdaten::alle_texte(&pool).await.contains("Yilmaz"));
+        assert_eq!(tick_einmal(&pool, &live, t("2026-10-03 08:00:00")).await, 1);
+        assert!(!testdaten::alle_texte(&pool).await.contains("Yilmaz"));
+        assert_eq!(tick_einmal(&pool, &live, t("2026-10-03 08:10:00")).await, 0);
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_verhindert_vollzug_im_purge_lauf() {
+        let pool = crate::db::test_pool().await;
+        let b = testdaten::anlegen(&pool).await;
+        let a = antrag_r001(&pool, &b, "2026-10-02 08:00:00").await;
+        antrag::zuruecknehmen(&pool, b.e1, a, b.admin, t("2026-10-02 11:00:00"))
+            .await
+            .unwrap();
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-10-04 08:00:00")).await,
+            0
+        );
+        assert!(testdaten::alle_texte(&pool).await.contains("Yilmaz"));
+    }
+
+    /// Ein Einsatz-Antrag schwärzt auch während der laufenden 30-Tage-Karenz.
+    #[tokio::test]
+    async fn einsatz_antrag_waehrend_der_karenz() {
+        let pool = crate::db::test_pool().await;
+        let b = testdaten::anlegen(&pool).await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-09-29 08:00:00' WHERE id = ?")
+            .bind(b.e1)
+            .execute(&pool)
+            .await
+            .unwrap();
+        antrag::stellen(
+            &pool,
+            b.e1,
+            b.admin,
+            b.org_id,
+            AntragZiel::Einsatz,
+            "DS-2026-015",
+            "E-2026-0751",
+            t("2026-10-02 08:00:00"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-10-03 08:00:00")).await,
+            1
+        );
+        let (g, s): (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(b.e1)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        // Die frühere Vormerkung bleibt der Zeitpunkt der Vormerkung.
+        assert_eq!(g.as_deref(), Some("2026-09-29 08:00:00"));
+        assert_eq!(s.as_deref(), Some("2026-10-03 08:00:00"));
+    }
+
+    /// Wie `schwaerzung_hinterlaesst_keine_altbytes`, für den Vollzug eines Personen-Antrags:
+    /// der Klartext der Person steht weder in der Datei noch im WAL, der der Nachbarperson
+    /// steht weiter in der Datenbank.
+    #[tokio::test]
+    async fn personen_vollzug_hinterlaesst_keine_altbytes() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let b = testdaten::anlegen(&pool).await;
+        antrag_r001(&pool, &b, "2026-10-02 08:00:00").await;
+        assert!(crate::db::datei_oder_wal_enthaelt(&pfad, b"Gartenweg 7"));
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-10-03 08:00:00")).await,
+            1
+        );
+        for k in ["Yilmaz", "Gartenweg 7", "Hund-Chip-276", "0171 2345678"] {
+            assert!(
+                !crate::db::datei_oder_wal_enthaelt(&pfad, k.as_bytes()),
+                "{k} steht noch in DB-Datei oder WAL"
+            );
+        }
+        assert!(testdaten::alle_texte(&pool).await.contains("Mustermann"));
+    }
 
     /// Pool mit den Produktionsoptionen (`db::connect`) auf einer Datei — nur dort gibt es eine
     /// Hauptdatei und einen WAL, in denen Altbytes stehen bleiben können.
