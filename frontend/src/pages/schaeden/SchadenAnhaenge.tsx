@@ -1,4 +1,4 @@
-import { IkoneHochladen, IkoneMuelleimer } from '../../ikonen';
+import { IconHochladen, IconMuelleimer } from '../../icons';
 import { useEffect, useRef, useState } from 'react';
 import { App, Button, Popconfirm, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -160,7 +160,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
                 aria-label={`Datei ${a.dateiname} von Schaden ${nr} entfernen`}
                 icon={
                   <span aria-hidden="true">
-                    <IkoneMuelleimer />
+                    <IconMuelleimer />
                   </span>
                 }
               />
@@ -182,7 +182,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
             onClick={() => setAblegenOffen(true)}
             icon={
               <span aria-hidden="true">
-                <IkoneHochladen />
+                <IconHochladen />
               </span>
             }
           >

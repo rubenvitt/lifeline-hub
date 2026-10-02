@@ -11,7 +11,7 @@
  */
 import { Button, Dropdown, type MenuProps } from 'antd';
 import type { ReactNode } from 'react';
-import { IkonePunkteSenkrecht } from '../ikonen';
+import { IconPunkteSenkrecht } from '../icons';
 
 /** Ein Eintrag des gebündelten Menüs. */
 export interface MenueEintrag<K extends string = string> {
@@ -26,7 +26,7 @@ export interface MenueEintrag<K extends string = string> {
    * die in einer Knopfreihe der Abstand wäre.
    */
   gefahr?: true;
-  ikone?: ReactNode;
+  icon?: ReactNode;
   /** Gerade nicht möglich, aber sein Fehlen verwirrte (oberster Pegel: „Nach oben"). */
   gesperrt?: true;
 }
@@ -36,7 +36,7 @@ export function menueEintraege(eintraege: readonly MenueEintrag[]): MenuProps['i
   const eintrag = (e: MenueEintrag) => ({
     key: e.key,
     label: e.label,
-    ...(e.ikone != null ? { icon: e.ikone } : {}),
+    ...(e.icon != null ? { icon: e.icon } : {}),
     ...(e.gesperrt ? { disabled: true } : {}),
     ...(e.gefahr ? { danger: true } : {}),
   });
@@ -109,7 +109,7 @@ export function MenueAusloeser<K extends string = string>({
           aria-label={zugaenglicherName}
           icon={
             <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-              <IkonePunkteSenkrecht />
+              <IconPunkteSenkrecht />
             </span>
           }
         />

@@ -373,18 +373,18 @@ anwendbar), „nicht geprüft" ist keins.
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",
   „Deaktivieren", eine gelöste Zuordnung) → Abstand + `danger`, keine Rückfrage; Unumkehrbares →
   Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}`.
-- **Ein Ikonensatz** (LFH-595, Spec `ikonensatz`,
+- **Ein Iconsatz** (LFH-595, Spec `iconsatz`,
   `openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/design.md`): Icons8
-  „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IkonenPaar`, heute Rail und Stern).
-  Import nur über `ikonen/index.ts`; Register, SVG-Quellen und Stempel in `scripts/ikonen/`
-  (`erzeuge-ikonen.mjs`, Abschreibprüfung gegen das Icons8-PNG `vergleiche-png.mjs`). Auswählen
+  „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IconPaar`, heute Rail und Stern).
+  Import nur über `icons/index.ts`; Register, SVG-Quellen und Stempel in `scripts/icons/`
+  (`erzeuge-icons.mjs`, Abschreibprüfung gegen das Icons8-PNG `vergleiche-png.mjs`). Auswählen
   mit PNG, SVG erst nach Freigabe abrufen (Kontingent des Abos). Lücke: Ersatz aus demselben Stil,
-  sonst eigene Zeichnung im 50er-Raster mit Vermerk; **nie ein zweiter Katalog**. Jede Ikone ist
+  sonst eigene Zeichnung im 50er-Raster mit Vermerk; **nie ein zweiter Katalog**. Jedes Icon ist
   `aria-hidden`, `1em`, `currentColor`, Hülle `anticon` (antds Ausrichtung); antds eigene
-  Bauteil-Ikonen (Auswahlpfeil, Schließkreuz, `loading`) bleiben. Taktische Zeichen und die
-  Bildmarke sind keine Ikonen.
-- **Ein Emoji ist keine Ikone:** Guard `ikonen/ikonen.guard.test.ts` (kein Import aus
-  `@ant-design/icons`/`react-icons`, Stempel, keine unbenutzte Ikone, kein Emoji im Code); in
+  Bauteil-Icons (Auswahlpfeil, Schließkreuz, `loading`) bleiben. Taktische Zeichen und die
+  Bildmarke sind keine Icons.
+- **Ein Emoji ist kein Icon:** Guard `icons/icons.guard.test.ts` (kein Import aus
+  `@ant-design/icons`/`react-icons`, Stempel, kein unbenutztes Icon, kein Emoji im Code); in
   Text-/Druckausgaben ein Kurzwort (`Pers.`/`Fzg.`/`Mtl.`). Erlaubt als Textzeichen: ⧖ und ↗
   (`aria-hidden` neben einem Wort), ✓ im Wortlaut, © in Quellenangaben.
 

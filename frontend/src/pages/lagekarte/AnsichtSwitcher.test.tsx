@@ -110,7 +110,7 @@ function kontrast(a: string, b: string): number {
 
 /**
  * Der Stern kennzeichnet die Standardansicht (LFH-704). Er ist Zusatz, keine Warnung: „Als
- * Standard“ steht im Menü. Er trägt deshalb die Ikonenrolle `schwach` (LFH-643), nicht `achtung`,
+ * Standard“ steht im Menü. Er trägt deshalb die Iconrolle `schwach` (LFH-643), nicht `achtung`,
  * und folgt dem Modus. Boden ist der Nicht-Text-Kontrast ≥ 3 : 1 gegen jeden Grund, auf dem er im
  * Auswahlfeld steht: Feld, Klappliste, Option unter dem Zeiger, gewählte Option.
  */
@@ -124,7 +124,7 @@ describe.each([
     components: antdKomponenten(farben, 'kompakt'),
   };
 
-  it('trägt die Ikonenrolle schwach statt einer festen Farbe', () => {
+  it('trägt die Iconrolle schwach statt einer festen Farbe', () => {
     render(
       <ConfigProvider theme={themeConfig}>
         <AnsichtSwitcher
@@ -139,7 +139,7 @@ describe.each([
         />
       </ConfigProvider>,
     );
-    const stern = document.querySelector('[data-ikone="stern.gefuellt"]');
+    const stern = document.querySelector('[data-lfh-icon="stern.gefuellt"]');
     expect(stern).not.toBeNull();
     expect(stern).toHaveStyle({ color: farben.schwach });
   });

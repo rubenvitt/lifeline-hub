@@ -1,14 +1,14 @@
 /**
- * Ikonen-Guard (LFH-595, Spec `ikonensatz`): EIN Ikonensatz, EIN Importort, keine Emojis.
+ * Icons-Guard (LFH-595, Spec `iconsatz`): EIN Iconsatz, EIN Importort, keine Emojis.
  *
  * ── Drei Prüfungen ─────────────────────────────────────────────────────────────
- *  1. Kein Fremdimport: außerhalb von `ikonen/` importiert keine Datei aus `@ant-design/icons`
+ *  1. Kein Fremdimport: außerhalb von `icons/` importiert keine Datei aus `@ant-design/icons`
  *     oder `react-icons`. Der Bestand steht in der Schuldmenge {@link OFFEN}; sie schrumpft nur.
  *     Ein Eintrag ohne Fund ist eine tote Ausnahme und macht den Guard rot.
- *  2. Register, Quellen, Ausgabe und Stempel stimmen überein (`scripts/ikonen/`): jede Datei im
- *     Stempel hat ihre Summe, jede Quelle steht im Stempel, jede Ikone wird außerhalb von
- *     `ikonen/` und außerhalb von Tests verwendet, eigene Zeichnungen tragen ihren Vermerk.
- *  3. Kein Emoji als Ikone: `\p{Extended_Pictographic}` im Code (ohne Kommentare, ohne Tests).
+ *  2. Register, Quellen, Ausgabe und Stempel stimmen überein (`scripts/icons/`): jede Datei im
+ *     Stempel hat ihre Summe, jede Quelle steht im Stempel, jedes Icon wird außerhalb von
+ *     `icons/` und außerhalb von Tests verwendet, eigene Zeichnungen tragen ihren Vermerk.
+ *  3. Kein Emoji als Icon: `\p{Extended_Pictographic}` im Code (ohne Kommentare, ohne Tests).
  *     Erlaubt sind die Textzeichen in {@link ERLAUBTE_ZEICHEN}; der Bestand steht in
  *     {@link OFFEN_EMOJI}.
  *
@@ -18,13 +18,13 @@
  * Danach sperrt zusätzlich pnpm den Import, weil beide Pakete aus `package.json` fallen.
  *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
- *  • einen Import über einen Umweg (eigenes Re-Export-Modul außerhalb von `ikonen/`, `require`
+ *  • einen Import über einen Umweg (eigenes Re-Export-Modul außerhalb von `icons/`, `require`
  *    mit berechnetem Namen);
  *  • ein Emoji hinter `//` in einer Zeichenkette oder in JSX-Text (`"https://…"`): der
  *    Kommentarschnitt ist zeilenbasiert und kennt keine Zeichenketten;
- *  • Ikonen, die antd in seinen eigenen Bauteilen zeichnet (Auswahlpfeil, Schließkreuz,
+ *  • Icons, die antd in seinen eigenen Bauteilen zeichnet (Auswahlpfeil, Schließkreuz,
  *    Sortierpfeile, Spinner von `loading`) — die nimmt die Spec ausdrücklich aus;
- *  • ob eine Ikone zu ihrer Bedeutung passt (das prüft die Zuordnungstabelle der Change).
+ *  • ob ein Icon zu seiner Bedeutung passt (das prüft die Zuordnungstabelle der Change).
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -34,11 +34,11 @@ import { describe, expect, it } from 'vitest';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WURZEL = join(SRC, '..', '..');
-const SKRIPTE = join(WURZEL, 'scripts', 'ikonen');
+const SKRIPTE = join(WURZEL, 'scripts', 'icons');
 const QUELLEN = join(SKRIPTE, 'quellen');
-const AUSGABE = join(SRC, 'ikonen', 'erzeugt.generated.ts');
+const AUSGABE = join(SRC, 'icons', 'erzeugt.generated.ts');
 
-/** Muss mit `EIGEN_VERMERK` in `scripts/ikonen/erzeuge-ikonen.mjs` übereinstimmen. */
+/** Muss mit `EIGEN_VERMERK` in `scripts/icons/erzeuge-icons.mjs` übereinstimmen. */
 const EIGEN_VERMERK = '<!-- eigene Zeichnung (LFH-595) im Raster von iOS 27 Outlined -->';
 
 /**
@@ -47,10 +47,10 @@ const EIGEN_VERMERK = '<!-- eigene Zeichnung (LFH-595) im Raster von iOS 27 Outl
  */
 const OFFEN = new Set<string>([]);
 
-/** Textzeichen, die keine Ikone vertreten (Spec „Ein Emoji ist keine Ikone“). */
+/** Textzeichen, das kein Icon vertreten (Spec „Ein Emoji ist kein Icon“). */
 const ERLAUBTE_ZEICHEN = new Set(['↗', '↔', '©']);
 
-/** SCHULDMENGE Emojis: Dateien, die noch ein Emoji als Ikone zeigen. Leer seit 30.09.2026. */
+/** SCHULDMENGE Emojis: Dateien, die noch ein Emoji als Icon zeigen. Leer seit 30.09.2026. */
 const OFFEN_EMOJI = new Set<string>([]);
 
 const FREMDIMPORT =
@@ -70,7 +70,7 @@ const ALLE = dateien(SRC).map((pfad) => ({
 }));
 
 const istTest = (rel: string) => /\.test\.[jt]sx?$/.test(rel);
-const imIkonenOrdner = (rel: string) => rel.startsWith('ikonen/');
+const imIconOrdner = (rel: string) => rel.startsWith('icons/');
 
 /** Zeilenbasierter Kommentarschnitt wie in `dichte.guard.test.ts`. */
 function ohneKommentare(inhalt: string): string {
@@ -125,16 +125,15 @@ function pascal(name: string): string {
     .join('');
 }
 
-describe('Ikonen-Guard — ein Satz, ein Importort (LFH-595)', () => {
-  it('kein Fremdimport außerhalb von ikonen/ — außer der Schuldmenge', () => {
-    const funde = ALLE.filter((d) => !imIkonenOrdner(d.rel) && FREMDIMPORT.test(d.inhalt)).map(
+describe('Icons-Guard — ein Satz, ein Importort (LFH-595)', () => {
+  it('kein Fremdimport außerhalb von icons/ — außer der Schuldmenge', () => {
+    const funde = ALLE.filter((d) => !imIconOrdner(d.rel) && FREMDIMPORT.test(d.inhalt)).map(
       (d) => d.rel,
     );
     const neu = funde.filter((rel) => !OFFEN.has(rel));
-    expect(
-      neu,
-      'neuer Import aus @ant-design/icons/react-icons — über ikonen/ importieren',
-    ).toEqual([]);
+    expect(neu, 'neuer Import aus @ant-design/icons/react-icons — über icons/ importieren').toEqual(
+      [],
+    );
   });
 
   it('die Schuldmenge enthält keine tote Ausnahme', () => {
@@ -148,13 +147,13 @@ describe('Ikonen-Guard — ein Satz, ein Importort (LFH-595)', () => {
     expect(FREMDIMPORT.test("import { TbX } from 'react-icons/tb';")).toBe(true);
     expect(FREMDIMPORT.test("import type { IconType } from 'react-icons';")).toBe(true);
     expect(FREMDIMPORT.test("const m = await import('react-icons/fi');")).toBe(true);
-    expect(FREMDIMPORT.test("import { IkonePlus } from '../ikonen';")).toBe(false);
+    expect(FREMDIMPORT.test("import { IconPlus } from '../icons';")).toBe(false);
   });
 });
 
-describe('Ikonen-Guard — Register, Quellen, Ausgabe, Stempel (scripts/ikonen)', () => {
-  const register = JSON.parse(readFileSync(join(SKRIPTE, 'ikonen.json'), 'utf8')) as {
-    ikonen: Registereintrag[];
+describe('Icons-Guard — Register, Quellen, Ausgabe, Stempel (scripts/icons)', () => {
+  const register = JSON.parse(readFileSync(join(SKRIPTE, 'icons.json'), 'utf8')) as {
+    icons: Registereintrag[];
   };
   const ausgabe = readFileSync(AUSGABE, 'utf8');
 
@@ -167,43 +166,43 @@ describe('Ikonen-Guard — Register, Quellen, Ausgabe, Stempel (scripts/ikonen)'
       }),
     );
     const erwartet = [
-      'scripts/ikonen/ikonen.json',
+      'scripts/icons/icons.json',
       ...readdirSync(QUELLEN)
         .filter((d) => d.endsWith('.svg'))
-        .map((d) => `scripts/ikonen/quellen/${d}`),
-      'frontend/src/ikonen/erzeugt.generated.ts',
+        .map((d) => `scripts/icons/quellen/${d}`),
+      'frontend/src/icons/erzeugt.generated.ts',
     ];
     expect([...gestempelt.keys()].sort(), 'Skript laufen lassen').toEqual([...erwartet].sort());
     for (const pfad of erwartet) {
       const summe = createHash('sha256')
         .update(readFileSync(join(WURZEL, pfad)))
         .digest('hex');
-      expect(summe, `${pfad} seit dem letzten Lauf geändert — erzeuge-ikonen.mjs`).toBe(
+      expect(summe, `${pfad} seit dem letzten Lauf geändert — erzeuge-icons.mjs`).toBe(
         gestempelt.get(pfad),
       );
     }
   });
 
   it('jeder Eintrag hat seine Komponente, und es gibt keine ohne Eintrag', () => {
-    const erwartet = register.ikonen.flatMap((e) => [
-      `Ikone${pascal(e.name)}`,
-      ...(e.gefuellt ? [`Ikone${pascal(e.name)}Gefuellt`] : []),
+    const erwartet = register.icons.flatMap((e) => [
+      `Icon${pascal(e.name)}`,
+      ...(e.gefuellt ? [`Icon${pascal(e.name)}Gefuellt`] : []),
     ]);
-    const vorhanden = [...ausgabe.matchAll(/export const (Ikone\w+)/g)].map((m) => m[1]);
+    const vorhanden = [...ausgabe.matchAll(/export const (Icon\w+)/g)].map((m) => m[1]);
     expect([...vorhanden].sort()).toEqual([...erwartet].sort());
   });
 
-  it('jede Ikone wird außerhalb von ikonen/ und außerhalb von Tests verwendet', () => {
-    const code = ALLE.filter((d) => !imIkonenOrdner(d.rel) && !istTest(d.rel))
+  it('jedes Icon wird außerhalb von icons/ und außerhalb von Tests verwendet', () => {
+    const code = ALLE.filter((d) => !imIconOrdner(d.rel) && !istTest(d.rel))
       .map((d) => d.inhalt)
       .join('\n');
-    const namen = [...ausgabe.matchAll(/export const (Ikone\w+)/g)].map((m) => m[1]);
+    const namen = [...ausgabe.matchAll(/export const (Icon\w+)/g)].map((m) => m[1]);
     const tot = namen.filter((n) => !new RegExp(`\\b${n}\\b`).test(code));
-    expect(tot, 'Ikone ohne Verwendung — aus dem Register streichen').toEqual([]);
+    expect(tot, 'Icon ohne Verwendung — aus dem Register streichen').toEqual([]);
   });
 
   it('eigene Zeichnungen tragen ihren Vermerk, Icons8-Quellen nicht', () => {
-    for (const e of register.ikonen) {
+    for (const e of register.icons) {
       const quelle = join(QUELLEN, `${e.name}.svg`);
       expect(existsSync(quelle), `Quelle fehlt: ${e.name}.svg`).toBe(true);
       const hatVermerk = readFileSync(quelle, 'utf8').includes(EIGEN_VERMERK);
@@ -214,13 +213,13 @@ describe('Ikonen-Guard — Register, Quellen, Ausgabe, Stempel (scripts/ikonen)'
   });
 });
 
-describe('Ikonen-Guard — ein Emoji ist keine Ikone', () => {
+describe('Icons-Guard — ein Emoji ist kein Icon', () => {
   it('kein Emoji im Code außerhalb der Schuldmenge', () => {
     const funde = ALLE.filter((d) => !istTest(d.rel) && emojisIn(d.inhalt).length > 0);
     const neu = funde
       .filter((d) => !OFFEN_EMOJI.has(d.rel))
       .map((d) => `${d.rel}: ${emojisIn(d.inhalt).join(' ')}`);
-    expect(neu, 'Emoji als Ikone — eine Ikone des Satzes nehmen').toEqual([]);
+    expect(neu, 'Emoji als Icon — ein Icon des Satzes nehmen').toEqual([]);
   });
 
   it('die Emoji-Schuldmenge enthält keine tote Ausnahme', () => {

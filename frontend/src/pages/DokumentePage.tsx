@@ -1,4 +1,4 @@
-import { IkoneMuelleimer, IkoneStift } from '../ikonen';
+import { IconMuelleimer, IconStift } from '../icons';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -179,7 +179,7 @@ const dokumentSpalten = (
               <Space size="middle">
                 <Button
                   type="text"
-                  icon={<IkoneStift />}
+                  icon={<IconStift />}
                   aria-label={`Dokument ${d.titel} bearbeiten`}
                   onClick={() => onBearbeiten(d)}
                 />
@@ -194,7 +194,7 @@ const dokumentSpalten = (
                   <Button
                     danger
                     type="text"
-                    icon={<IkoneMuelleimer />}
+                    icon={<IconMuelleimer />}
                     loading={entferntGerade.has(d.id)}
                     aria-label={`Dokument ${d.titel} entfernen`}
                   />

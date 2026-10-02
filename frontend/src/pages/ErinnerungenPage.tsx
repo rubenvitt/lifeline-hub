@@ -1,4 +1,4 @@
-import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
+import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { useState } from 'react';
@@ -162,7 +162,7 @@ export default function ErinnerungenPage() {
         darfSchreiben && (
           <Button
             type="primary"
-            icon={formOffen ? <IkoneChevronHoch /> : <IkonePlus />}
+            icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
             onClick={() => setFormOffen((o) => !o)}
           >
             {formOffen ? 'Formular schließen' : 'Erinnerung anlegen'}
@@ -178,7 +178,7 @@ export default function ErinnerungenPage() {
           aktion={
             <Button
               type="text"
-              icon={<IkoneKreuz />}
+              icon={<IconKreuz />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />

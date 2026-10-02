@@ -1,4 +1,4 @@
-import { IkoneOrtsmarke } from '../ikonen';
+import { IconOrtsmarke } from '../icons';
 import { formatiere, type LatLon } from '../anzeige/koordinaten';
 import type { Koordinatenformat } from '../api/types';
 import { lagekartePfad } from '../routing/deeplinks';
@@ -46,7 +46,7 @@ export function koordinatenBefehl({
     gruppe: 'koordinate',
     label: `Auf Lagekarte zeigen · ${formatiere(punkt.lat, punkt.lon, format)}`,
     kontext: 'Koordinate',
-    icon: IkoneOrtsmarke,
+    icon: IconOrtsmarke,
     ...sprungZu(lagekartePfad(einsatzId, { zentrum: punkt }), navigate),
   };
 }

@@ -1,4 +1,4 @@
-import { IkoneAuge, IkoneBueroklammer, IkoneKreuz, IkonePlus } from '../ikonen';
+import { IconAuge, IconBueroklammer, IconKreuz, IconPlus } from '../icons';
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 import {
@@ -662,7 +662,7 @@ export default function Schnellerfassung({
       disabled={sendet}
       icon={
         <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-          <IkonePlus />
+          <IconPlus />
         </span>
       }
       onClick={() => {
@@ -689,7 +689,7 @@ export default function Schnellerfassung({
         disabled={!online || sendet || anGrenze}
         icon={
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-            <IkoneBueroklammer />
+            <IconBueroklammer />
           </span>
         }
         onClick={() => dateiEingabe.current?.click()}
@@ -745,7 +745,7 @@ export default function Schnellerfassung({
                 type="text"
                 icon={
                   <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <IkoneAuge />
+                    <IconAuge />
                   </span>
                 }
                 aria-pressed={vorschauOffen}
@@ -893,7 +893,7 @@ export default function Schnellerfassung({
                 }
                 icon={
                   <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <IkoneKreuz />
+                    <IconKreuz />
                   </span>
                 }
                 onClick={() => setzeDateien(dateien.filter((x) => x !== d))}

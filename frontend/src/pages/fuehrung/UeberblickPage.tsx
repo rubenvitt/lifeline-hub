@@ -1,4 +1,4 @@
-import { IkoneBericht, IkonePlus } from '../../ikonen';
+import { IconBericht, IconPlus } from '../../icons';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -161,8 +161,8 @@ function useJetzt(intervallMs = 30_000): Dayjs {
   return jetzt;
 }
 
-/** Ikone mit `aria-hidden`-Hülle (Bedien-Leitlinie: der Name kommt aus dem Text). */
-function Ikone({ children }: { children: ReactNode }) {
+/** Icon mit `aria-hidden`-Hülle (Bedien-Leitlinie: der Name kommt aus dem Text). */
+function Icon({ children }: { children: ReactNode }) {
   return (
     <span aria-hidden="true" style={{ display: 'inline-flex' }}>
       {children}
@@ -549,9 +549,9 @@ export default function UeberblickPage() {
           <>
             <Button
               icon={
-                <Ikone>
-                  <IkoneBericht size={14} />
-                </Ikone>
+                <Icon>
+                  <IconBericht size={14} />
+                </Icon>
               }
               onClick={() => waehle(lageberichtePfad(einsatzId))}
             >
@@ -562,9 +562,9 @@ export default function UeberblickPage() {
               type="primary"
               disabled={!darfSchreiben}
               icon={
-                <Ikone>
-                  <IkonePlus size={14} />
-                </Ikone>
+                <Icon>
+                  <IconPlus size={14} />
+                </Icon>
               }
               onClick={() => waehle(etbPfad(einsatzId, { neu: true }))}
             >

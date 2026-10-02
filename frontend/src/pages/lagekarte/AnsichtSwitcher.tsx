@@ -1,11 +1,11 @@
 import {
-  IkoneMuelleimer,
-  IkonePlus,
-  IkonePunkteSenkrecht,
-  IkoneStern,
-  IkoneSternGefuellt,
-  IkoneStift,
-} from '../../ikonen';
+  IconMuelleimer,
+  IconPlus,
+  IconPunkteSenkrecht,
+  IconStern,
+  IconSternGefuellt,
+  IconStift,
+} from '../../icons';
 import { useState } from 'react';
 import { Button, Dropdown, Input, Modal, Radio, Space, Typography } from 'antd';
 import { Select } from '../../components/Select';
@@ -85,18 +85,18 @@ export default function AnsichtSwitcher({
   const loeschenGesperrt = nurEineAnsicht || aktiveIstStandard;
 
   const menuItems = [
-    { key: 'neu', icon: <IkonePlus />, label: 'Neue Ansicht …' },
-    { key: 'umbenennen', icon: <IkoneStift />, label: 'Umbenennen …', disabled: !aktive },
+    { key: 'neu', icon: <IconPlus />, label: 'Neue Ansicht …' },
+    { key: 'umbenennen', icon: <IconStift />, label: 'Umbenennen …', disabled: !aktive },
     {
       key: 'standard',
-      icon: <IkoneStern />,
+      icon: <IconStern />,
       label: 'Als Standard',
       disabled: !aktive || aktiveIstStandard,
     },
     { type: 'divider' as const },
     {
       key: 'loeschen',
-      icon: <IkoneMuelleimer />,
+      icon: <IconMuelleimer />,
       label: 'Löschen …',
       danger: true,
       disabled: loeschenGesperrt,
@@ -130,9 +130,9 @@ export default function AnsichtSwitcher({
             value: a.id,
             label: (
               <Space size={token.marginXS}>
-                {/* Kennzeichnung, keine Warnung: Ikonenrolle `schwach` statt `achtung` (LFH-704).
+                {/* Kennzeichnung, keine Warnung: Iconrolle `schwach` statt `achtung` (LFH-704).
                     Zweiter Kanal ist „Als Standard“ im Menü. */}
-                {a.ist_standard && <IkoneSternGefuellt style={{ color: rollen.schwach }} />}
+                {a.ist_standard && <IconSternGefuellt style={{ color: rollen.schwach }} />}
                 {a.name}
               </Space>
             ),
@@ -143,7 +143,7 @@ export default function AnsichtSwitcher({
             trigger={['click']}
             menu={{ items: menuItems, onClick: ({ key }) => onMenu(key) }}
           >
-            <Button icon={<IkonePunkteSenkrecht />} aria-label="Ansichts-Aktionen" loading={busy} />
+            <Button icon={<IconPunkteSenkrecht />} aria-label="Ansichts-Aktionen" loading={busy} />
           </Dropdown>
         )}
       </Space.Compact>

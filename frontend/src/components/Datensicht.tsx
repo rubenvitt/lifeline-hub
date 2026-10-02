@@ -1,4 +1,4 @@
-import { IkoneChevronRechts, IkoneChevronRunter } from '../ikonen';
+import { IconChevronRechts, IconChevronRunter } from '../icons';
 import { Button, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { TableColumnType } from 'antd';
@@ -843,10 +843,10 @@ export default function Datensicht<T extends object, const K extends string>(
           umschalten(k);
         }}
         icon={
-          // antds Ikone bringt `role="img"` mit englischem Namen mit; die Hülle nimmt sie aus dem
+          // antds Icon bringt `role="img"` mit englischem Namen mit; die Hülle nimmt es aus dem
           // Vorlesebaum.
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-            {offen ? <IkoneChevronRunter /> : <IkoneChevronRechts />}
+            {offen ? <IconChevronRunter /> : <IconChevronRechts />}
           </span>
         }
       >

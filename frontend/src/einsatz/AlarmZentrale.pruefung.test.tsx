@@ -110,7 +110,7 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     stubAngehalteneAudioPruefung();
     stubNotification('default');
 
-    // Führungs-Tablet: der Zustand steht wie der Ruhezustand nur als Ikone — die Kopfzeile bekommt
+    // Führungs-Tablet: der Zustand steht wie der Ruhezustand nur als Icon — die Kopfzeile bekommt
     // beim Start keine Breite, die sie gleich wieder abgibt (CLS 0,46 bei 1024 px).
     setzeViewportBreite(1024);
     const tablet = renderAlarm();

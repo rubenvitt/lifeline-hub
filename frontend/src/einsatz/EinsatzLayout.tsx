@@ -1,4 +1,4 @@
-import { IkoneMenue } from '../ikonen';
+import { IconMenue } from '../icons';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
@@ -161,7 +161,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const breit = abBreite('lg');
   const mittel = abBreite('md');
   // Ab `xl` trägt der Kopf alle Wörter; darunter (Führungs-Tablet) stehen Ruhezustände nur als
-  // Ikone, damit er einzeilig bleibt.
+  // Icon, damit er einzeilig bleibt.
   const weit = abBreite('xl');
   const { token } = theme.useToken();
   // Unter `md` rücken die Zellen zusammen, sonst bräche die rechte Gruppe auf 390 px in eine
@@ -312,7 +312,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                   flexShrink: 0,
                   color: rahmenFarben.text,
                 }}
-                icon={<IkoneMenue size={22} />}
+                icon={<IconMenue size={22} />}
                 onClick={() => setNavOffen(true)}
               />
             </div>
@@ -369,7 +369,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         )}
         {/* RECHTE GRUPPE: Zellen mit Haarlinien. Die Alarmzentrale steht in EIGENER Zelle — sie ZEIGT
            einen Zustand — auf JEDER Breite und nennt ihn im Text: „blockiert" oder „stumm" darf im
-           Einsatz nicht nur über eine Ikone laufen. */}
+           Einsatz nicht nur über ein Icon laufen. */}
         <KopfRechts>
           <div data-lfh="kopf-alarm" style={kopfZelleStil(zellToken)}>
             {/* Eigener Provider (geteilter Query-Key, kein zweiter Abruf): der Kopf liegt außerhalb

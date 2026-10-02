@@ -1,44 +1,44 @@
 import {
-  IkoneArzttasche,
-  IkoneBericht,
-  IkoneBesteck,
-  IkoneDokument,
-  IkoneDokumente,
-  IkoneGebaeudegruppe,
-  IkoneGewitterwolke,
-  IkoneGlocke,
-  IkoneHaus,
-  IkoneHausHerz,
-  IkoneHierarchie,
-  IkoneHierarchieGefuellt,
-  IkoneKacheln,
-  IkoneKachelraster,
-  IkoneKarte,
-  IkoneKarteGefuellt,
-  IkoneKistenstapel,
-  IkoneKlemmbrett,
-  IkoneKlemmbrettGefuellt,
-  IkoneKlemmbrettListe,
-  IkoneLagerhalle,
-  IkoneListeDetails,
-  IkoneLkw,
-  IkoneLkwGefuellt,
-  IkoneOrganigramm,
-  IkonePerson,
-  IkonePersonen,
-  IkonePersonengruppe,
-  IkonePfeileGegenlaeufig,
-  IkonePfote,
-  IkonePosteingang,
-  IkoneSprechblase,
-  IkoneSprechblaseGefuellt,
-  IkoneSprechblaseRund,
-  IkoneWarndreieck,
-  IkoneZahnrad,
-  IkoneZahnradGefuellt,
-  type Ikone,
-  type IkonenPaar,
-} from '../ikonen';
+  IconArzttasche,
+  IconBericht,
+  IconBesteck,
+  IconDokument,
+  IconDokumente,
+  IconGebaeudegruppe,
+  IconGewitterwolke,
+  IconGlocke,
+  IconHaus,
+  IconHausHerz,
+  IconHierarchie,
+  IconHierarchieGefuellt,
+  IconKacheln,
+  IconKachelraster,
+  IconKarte,
+  IconKarteGefuellt,
+  IconKistenstapel,
+  IconKlemmbrett,
+  IconKlemmbrettGefuellt,
+  IconKlemmbrettListe,
+  IconLagerhalle,
+  IconListeDetails,
+  IconLkw,
+  IconLkwGefuellt,
+  IconOrganigramm,
+  IconPerson,
+  IconPersonen,
+  IconPersonengruppe,
+  IconPfeileGegenlaeufig,
+  IconPfote,
+  IconPosteingang,
+  IconSprechblase,
+  IconSprechblaseGefuellt,
+  IconSprechblaseRund,
+  IconWarndreieck,
+  IconZahnrad,
+  IconZahnradGefuellt,
+  type Icon,
+  type IconPaar,
+} from '../icons';
 import type { ModulFreigaben } from '../api/types';
 
 export type ModulStatus = 'fertig' | 'geplant' | 'wip';
@@ -69,12 +69,12 @@ export interface Kategorie {
   /** Voller Name — zugänglicher Name des Rail-Ziels, Kopf des Modulpanels, Drawer-Zeile. */
   label: string;
   /**
-   * Sichtbares Kurzetikett unter der Rail-Ikone: 9 px Versalien in 60 px tragen „Kommunikation"
+   * Sichtbares Kurzetikett unter dem Rail-Icon: 9 px Versalien in 60 px tragen „Kommunikation"
    * nicht. Der volle Name bleibt `aria-label` und `title`.
    */
   kurz: string;
-  /** Umriss inaktiv, Füllung aktiv (LFH-595, Spec `ikonensatz`). */
-  ikone: IkonenPaar;
+  /** Umriss inaktiv, Füllung aktiv (LFH-595, Spec `iconsatz`). */
+  icon: IconPaar;
   /**
    * Steht abgesetzt am FUSS der Rail. Ein Flag statt einer zweiten Liste: `kategorien` bleibt die
    * EINE Aufzählung für Rail, Drawer, Rahmen und Kommandopalette.
@@ -86,7 +86,7 @@ export interface ModulEintrag {
   key: string;
   kategorie: KategorieKey;
   label: string;
-  icon: Ikone;
+  icon: Icon;
   /** Relativer Pfad-Abschnitt unter /einsaetze/:id (z. B. 'etb'). */
   route: string;
   status: ModulStatus;
@@ -102,7 +102,7 @@ export interface ModulEintrag {
 }
 
 /**
- * Reihenfolge der Icon-Rail (eine Zeile je Kategorie; `fuss` unten abgesetzt). Ikonen aus dem
+ * Reihenfolge der Icon-Rail (eine Zeile je Kategorie; `fuss` unten abgesetzt). Icons aus dem
  * Satz (LFH-595): Hierarchie, Lkw, Klemmbrett, Karte, Sprechblase, Zahnrad — je als Paar.
  */
 export const kategorien: Kategorie[] = [
@@ -110,13 +110,13 @@ export const kategorien: Kategorie[] = [
     key: 'fuehrung',
     label: 'Führung',
     kurz: 'Führung',
-    ikone: { umriss: IkoneHierarchie, gefuellt: IkoneHierarchieGefuellt },
+    icon: { umriss: IconHierarchie, gefuellt: IconHierarchieGefuellt },
   },
   {
     key: 'kraefte',
     label: 'Kräfte & Mittel',
     kurz: 'Kräfte',
-    ikone: { umriss: IkoneLkw, gefuellt: IkoneLkwGefuellt },
+    icon: { umriss: IconLkw, gefuellt: IconLkwGefuellt },
   },
   {
     key: 'erfassung',
@@ -124,25 +124,25 @@ export const kategorien: Kategorie[] = [
     // Kurzform wie „Komm.“/„Einst.“: „ERFASSUNG“ ist in 9 px Versalien breiter als die 60-px-Rail
     // (LFH-644). Die Sperrung bleibt Token, keine Ausnahme je Etikett.
     kurz: 'Erfass.',
-    ikone: { umriss: IkoneKlemmbrett, gefuellt: IkoneKlemmbrettGefuellt },
+    icon: { umriss: IconKlemmbrett, gefuellt: IconKlemmbrettGefuellt },
   },
   {
     key: 'lage',
     label: 'Lage',
     kurz: 'Lage',
-    ikone: { umriss: IkoneKarte, gefuellt: IkoneKarteGefuellt },
+    icon: { umriss: IconKarte, gefuellt: IconKarteGefuellt },
   },
   {
     key: 'kommunikation',
     label: 'Kommunikation',
     kurz: 'Komm.',
-    ikone: { umriss: IkoneSprechblase, gefuellt: IkoneSprechblaseGefuellt },
+    icon: { umriss: IconSprechblase, gefuellt: IconSprechblaseGefuellt },
   },
   {
     key: 'einstellungen',
     label: 'Einstellungen',
     kurz: 'Einst.',
-    ikone: { umriss: IkoneZahnrad, gefuellt: IkoneZahnradGefuellt },
+    icon: { umriss: IconZahnrad, gefuellt: IconZahnradGefuellt },
     fuss: true,
   },
 ];
@@ -154,7 +154,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'ueberblick',
     kategorie: 'fuehrung',
     label: 'Überblick',
-    icon: IkoneKacheln,
+    icon: IconKacheln,
     route: 'ueberblick',
     status: 'fertig',
     beschreibung: 'Führungsüberblick des Einsatzes — Startseite des Einsatz-Workspace.',
@@ -163,7 +163,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'einsatzdaten',
     kategorie: 'fuehrung',
     label: 'Einsatzdaten',
-    icon: IkoneDokument,
+    icon: IconDokument,
     route: 'einsatzdaten',
     status: 'fertig',
     beschreibung: 'Stammdaten des Einsatzes: Bezeichnung, Stichwort, Zeiten, Leitung.',
@@ -172,7 +172,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'einsatzabschnitte',
     kategorie: 'fuehrung',
     label: 'Einsatzabschnitte',
-    icon: IkoneOrganigramm,
+    icon: IconOrganigramm,
     route: 'einsatzabschnitte',
     status: 'fertig',
     beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.',
@@ -182,7 +182,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'auftraege',
     kategorie: 'fuehrung',
     label: 'Aufträge/Befehle',
-    icon: IkoneKlemmbrettListe,
+    icon: IconKlemmbrettListe,
     route: 'auftraege',
     status: 'fertig',
     beschreibung: 'Aufträge und Befehle mit Quittierung.',
@@ -192,7 +192,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'stab',
     kategorie: 'fuehrung',
     label: 'Stab',
-    icon: IkoneGebaeudegruppe,
+    icon: IconGebaeudegruppe,
     route: 'stab',
     status: 'fertig',
     beschreibung: 'Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung',
@@ -201,7 +201,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'dokumente',
     kategorie: 'fuehrung',
     label: 'Dokumente',
-    icon: IkoneDokumente,
+    icon: IconDokumente,
     route: 'dokumente',
     status: 'fertig',
     beschreibung: 'Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos.',
@@ -213,7 +213,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'kraefteuebersicht',
     kategorie: 'kraefte',
     label: 'Meldebild',
-    icon: IkoneListeDetails,
+    icon: IconListeDetails,
     route: 'kraefteuebersicht',
     status: 'fertig',
     beschreibung: 'Meldebild der eingesetzten Kräfte: Status, Stärke und Gliederung.',
@@ -222,7 +222,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'einheiten',
     kategorie: 'kraefte',
     label: 'Einheiten',
-    icon: IkonePersonengruppe,
+    icon: IconPersonengruppe,
     route: 'einheiten',
     status: 'fertig',
     beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.',
@@ -232,7 +232,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'personal',
     kategorie: 'kraefte',
     label: 'Personal',
-    icon: IkonePerson,
+    icon: IconPerson,
     route: 'personal',
     status: 'fertig',
     beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.',
@@ -241,7 +241,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'fahrzeuge',
     kategorie: 'kraefte',
     label: 'Fahrzeuge',
-    icon: IkoneLkw,
+    icon: IconLkw,
     route: 'fahrzeuge',
     status: 'fertig',
     beschreibung: 'Disponierte Fahrzeuge des Einsatzes.',
@@ -250,7 +250,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'material',
     kategorie: 'kraefte',
     label: 'Material',
-    icon: IkoneKistenstapel,
+    icon: IconKistenstapel,
     route: 'material',
     status: 'fertig',
     beschreibung: 'Material und Verbrauchsgüter im Einsatz.',
@@ -261,7 +261,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'verpflegung',
     kategorie: 'kraefte',
     label: 'Verpflegung',
-    icon: IkoneBesteck,
+    icon: IconBesteck,
     route: 'verpflegung',
     status: 'fertig',
     beschreibung:
@@ -271,7 +271,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'bereitstellungsraeume',
     kategorie: 'kraefte',
     label: 'Bereitstellungsräume',
-    icon: IkoneLagerhalle,
+    icon: IconLagerhalle,
     route: 'bereitstellungsraeume',
     status: 'fertig',
     beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.',
@@ -282,7 +282,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'abloesung',
     kategorie: 'kraefte',
     label: 'Ablösung',
-    icon: IkonePfeileGegenlaeufig,
+    icon: IconPfeileGegenlaeufig,
     route: 'abloesung',
     status: 'fertig',
     beschreibung: 'Schichten der Einheiten: Rhythmus, fällige Ablösungen, Vollzug.',
@@ -293,7 +293,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'etb',
     kategorie: 'erfassung',
     label: 'ETB',
-    icon: IkoneKlemmbrett,
+    icon: IconKlemmbrett,
     route: 'etb',
     status: 'fertig',
     beschreibung: 'Einsatztagebuch.',
@@ -303,7 +303,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'personen',
     kategorie: 'erfassung',
     label: 'Personen',
-    icon: IkonePersonen,
+    icon: IconPersonen,
     route: 'personen',
     status: 'fertig',
     beschreibung:
@@ -314,7 +314,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'unfallhilfsstellen',
     kategorie: 'erfassung',
     label: 'Unfallhilfsstellen',
-    icon: IkoneArzttasche,
+    icon: IconArzttasche,
     route: 'unfallhilfsstellen',
     status: 'fertig',
     beschreibung:
@@ -327,7 +327,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'betreuung',
     kategorie: 'erfassung',
     label: 'Betreuung',
-    icon: IkoneHausHerz,
+    icon: IconHausHerz,
     route: 'betreuung',
     status: 'fertig',
     beschreibung: 'Evakuierungsbezirke mit Stand „evakuiert" und Betreuungsstellen mit Belegung.',
@@ -337,7 +337,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'tiere',
     kategorie: 'erfassung',
     label: 'Tiere',
-    icon: IkonePfote,
+    icon: IconPfote,
     route: 'tiere',
     status: 'fertig',
     beschreibung: 'Betroffene Tiere, getrennt vom Personenstamm.',
@@ -346,7 +346,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'schaeden',
     kategorie: 'erfassung',
     label: 'Schäden',
-    icon: IkoneHaus,
+    icon: IconHaus,
     route: 'schaeden',
     status: 'fertig',
     beschreibung: 'Sach-/Infrastruktur-/Umweltschäden mit Bearbeitungs-Workflow.',
@@ -356,7 +356,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'lage-dashboard',
     kategorie: 'lage',
     label: 'Dashboard',
-    icon: IkoneKachelraster,
+    icon: IconKachelraster,
     route: 'lage-dashboard',
     status: 'fertig',
     beschreibung: 'Verdichtete Lageübersicht des Einsatzes.',
@@ -365,7 +365,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'lagekarte',
     kategorie: 'lage',
     label: 'Lagekarte',
-    icon: IkoneKarte,
+    icon: IconKarte,
     route: 'lagekarte',
     status: 'fertig',
     beschreibung:
@@ -375,7 +375,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'lageberichte',
     kategorie: 'lage',
     label: 'Lageberichte',
-    icon: IkoneBericht,
+    icon: IconBericht,
     route: 'lageberichte',
     status: 'fertig',
     beschreibung: 'Strukturierte Lageberichte.',
@@ -384,7 +384,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'gefahrenzonen',
     kategorie: 'lage',
     label: 'Gefahren',
-    icon: IkoneWarndreieck,
+    icon: IconWarndreieck,
     route: 'gefahren',
     status: 'fertig',
     beschreibung:
@@ -394,7 +394,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'wetter-pegel',
     kategorie: 'lage',
     label: 'Wetter & Pegel',
-    icon: IkoneGewitterwolke,
+    icon: IconGewitterwolke,
     route: 'wetter-pegel',
     status: 'fertig',
     // Gültige Unwetterwarnungen (schwer/extrem) am Einsatzort, neutral (LFH-663).
@@ -406,7 +406,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'lagemeldungen',
     kategorie: 'lage',
     label: 'Lagemeldungen',
-    icon: IkonePosteingang,
+    icon: IconPosteingang,
     route: 'lagemeldungen',
     status: 'fertig',
     beschreibung: 'Lagerelevante Meldungen, die an die Lage übergeben wurden.',
@@ -416,7 +416,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'chat',
     kategorie: 'kommunikation',
     label: 'Chat',
-    icon: IkoneSprechblaseRund,
+    icon: IconSprechblaseRund,
     route: 'chat',
     status: 'fertig',
     beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).',
@@ -426,7 +426,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'erinnerungen',
     kategorie: 'kommunikation',
     label: 'Erinnerungen',
-    icon: IkoneGlocke,
+    icon: IconGlocke,
     route: 'erinnerungen',
     status: 'fertig',
     beschreibung: 'Terminierte Erinnerungen.',
@@ -436,7 +436,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'meldungen',
     kategorie: 'kommunikation',
     label: 'Meldungen (eingehend)',
-    icon: IkonePosteingang,
+    icon: IconPosteingang,
     route: 'meldungen',
     status: 'fertig',
     beschreibung: 'Eingehende Meldungen zur Bearbeitung.',
@@ -446,7 +446,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'nachforderungen',
     kategorie: 'kommunikation',
     label: 'Nachforderung',
-    icon: IkoneKistenstapel,
+    icon: IconKistenstapel,
     route: 'nachforderungen',
     status: 'fertig',
     beschreibung:
@@ -457,7 +457,7 @@ export const modulRegistry: ModulEintrag[] = [
     key: 'einsatz-einstellungen',
     kategorie: 'einstellungen',
     label: 'Einstellungen',
-    icon: IkoneZahnrad,
+    icon: IconZahnrad,
     route: 'einstellungen',
     status: 'fertig',
     beschreibung: 'Einsatzbezogene Einstellungen.',
