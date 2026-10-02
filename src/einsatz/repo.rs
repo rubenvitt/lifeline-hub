@@ -92,8 +92,14 @@ pub(crate) async fn anlegen_tx(
     .await?
     .unwrap_or((None, None));
     let jahr = super::nummer::jahr_in_zone(jetzt, zeitzone.as_deref());
+    // Das Löschprotokoll zählt mit (LFH-750, design.md D5): die Nummer eines endgültig
+    // gelöschten Einsatzes kommt nicht wieder.
     let max_lfd: Option<i64> = sqlx::query_scalar(
-        "SELECT MAX(nummer_lfd) FROM einsatz WHERE org_id = ? AND nummer_jahr = ?",
+        "SELECT MAX(lfd) FROM ( \
+             SELECT nummer_lfd AS lfd FROM einsatz WHERE org_id = ?1 AND nummer_jahr = ?2 \
+             UNION ALL \
+             SELECT nummer_lfd FROM aufbewahrung_loeschprotokoll \
+             WHERE org_id = ?1 AND nummer_jahr = ?2)",
     )
     .bind(org_id)
     .bind(jahr)
@@ -109,7 +115,9 @@ pub(crate) async fn anlegen_tx(
         let kandidat = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
         let belegt: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM einsatz \
-             WHERE org_id = ? AND einsatznummer_intern = ?)",
+                           WHERE org_id = ?1 AND einsatznummer_intern = ?2) \
+                 OR EXISTS(SELECT 1 FROM aufbewahrung_loeschprotokoll \
+                           WHERE org_id = ?1 AND einsatznummer_intern = ?2)",
         )
         .bind(org_id)
         .bind(&kandidat)
@@ -126,7 +134,8 @@ pub(crate) async fn anlegen_tx(
     // Default und verletzte die Bedingung — COALESCE lässt den Default greifen.
     //
     // Die ID wird ausdrücklich vergeben (LFH-690, design.md D6): über allen bestehenden
-    // Einsätzen UND über jeder ID, die ein Demo-Import je getragen hat. `demo_import`
+    // Einsätzen UND über jeder ID, die ein Demo-Import je getragen hat oder die das
+    // Löschprotokoll der endgültigen Löschung führt (LFH-750, design.md D5). `demo_import`
     // behält die ID nach dem Entfernen als Sperre; ohne sie bekäme der nächste echte
     // Einsatz die ID des gelöschten Demo-Einsatzes, und Offline-Queues oder offene Tabs
     // schrieben still in ihn. Das gilt für JEDE Anlage, instanzweit (IDs sind nicht je Org).
@@ -136,7 +145,9 @@ pub(crate) async fn anlegen_tx(
         "INSERT INTO einsatz (id, org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
                               einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at) \
          VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM einsatz), 0), \
-                             COALESCE((SELECT MAX(einsatz_id) FROM demo_import), 0)) + 1), \
+                             COALESCE((SELECT MAX(einsatz_id) FROM demo_import), 0), \
+                             COALESCE((SELECT MAX(einsatz_id) FROM aufbewahrung_loeschprotokoll), 0)) \
+                         + 1), \
                  ?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
                  ?, ?, datetime('now')) RETURNING id",
     )
@@ -562,7 +573,7 @@ pub async fn frist_setzen(
 /// die Org kommt aus `einsatz.org_id`, nie aus der Zeilenreihenfolge der Organisationen).
 /// `None`, wenn keiner auffindbar ist; dann bricht [`system_audit_tx`] die Mutation ab.
 /// Läuft auf der übergebenen tx-Verbindung.
-async fn ermittle_system_akteur(
+pub(super) async fn ermittle_system_akteur(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
 ) -> Result<Option<i64>, AppError> {

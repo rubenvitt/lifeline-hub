@@ -101,8 +101,10 @@ kennt, und schickt dann `true`. Die 409 ist das Netz für andere Clients.
 ### D3. Phase D im Purge-Lauf, nach Phase C, vor dem Rückschrieb
 
 Ein neuer Schritt `--- Phase D: endgültige Löschung geschwärzter Skelette ---` ruft
-`repo::faellige_skelett_loeschung(pool, jetzt)` auf und löscht je Kandidat mit
-`repo::skelett_loeschen(pool, id, jetzt)`. Der Rückschrieb läuft, wenn
+`skelett_loeschung::faellige(pool, jetzt)` auf und löscht je Kandidat mit
+`skelett_loeschung::loeschen(pool, id, jetzt)`. Beides liegt in einem eigenen Modul
+`src/einsatz/skelett_loeschung.rs`, weil `repo.rs` schon über 3600 Zeilen hat;
+`repo::ermittle_system_akteur` wird dafür `pub(super)`. Der Rückschrieb läuft, wenn
 `geschwaerzt + geloescht > 0 || rueckschrieb_ausstehend`. Phase B und C behalten ihre Namen,
 Log-Zeilen werden nicht umbenannt.
 
@@ -112,7 +114,8 @@ Das Fälligkeitsdatum wird in Rust geprüft (`retention::skelett_loeschung_am`,
 `skelett_loeschung_faellig`), genau wie die Karenz in Phase B. Ein unparsebarer Zeitstempel
 zählt dort defensiv als nicht fällig.
 
-`skelett_loeschen` arbeitet in **einer** Transaktion:
+`loeschen` arbeitet in **einer** `BEGIN IMMEDIATE`-Transaktion (`write_retry!`, denn der erste
+Zugriff liest):
 1. Den Einsatz erneut mit allen Bedingungen laden (geschwärzt, abgeschlossen, Org-Frist
    gesetzt und fällig). Fehlt er, gibt es `Ok(false)` (Race, oder ein Admin hat die Frist
    inzwischen geleert).
@@ -121,7 +124,7 @@ zählt dort defensiv als nicht fällig.
 3. Die Protokollzeile einfügen (D4).
 4. Die FK-Prüfung sicherstellen: `demo::entfernen::fk_pruefung_sicherstellen` wird dafür nach
    `crate::db` gehoben und bekommt den Zweck als Parameter für die Fehlermeldung. Dann
-   `DELETE FROM einsatz WHERE id = ? AND org_id = ? AND geschwaerzt_at IS NOT NULL`. Erwartet
+   `DELETE FROM einsatz WHERE id = ? AND status = 'abgeschlossen' AND geschwaerzt_at IS NOT NULL`. Erwartet
    wird genau 1, sonst Fehler und Rollback.
 5. Commit.
 
@@ -225,7 +228,7 @@ binnen 10 Minuten unwiderruflich gelöscht.“). Erst dann geht der PUT mit
 - [Die Akteurskette findet nach Jahren nur deaktivierte Benutzer] → `ermittle_system_akteur`
   bevorzugt aktive Admins (`ORDER BY b.aktiv DESC`), nimmt aber auch inaktive. Das ist für
   einen Audit-Akteur ausreichend und entspricht Phase A/B.
-- [Ein Admin leert die Frist kurz vor dem Lauf] → `skelett_loeschen` prüft die Fälligkeit in
+- [Ein Admin leert die Frist kurz vor dem Lauf] → `loeschen` prüft die Fälligkeit in
   der Transaktion erneut (D3, Schritt 1).
 - [Das Löschprotokoll wächst unbegrenzt] → Eine Zeile je gelöschtem Einsatz, ohne Freitext.
   Mengenmäßig vernachlässigbar. Eine eigene Frist dafür ist ein Non-Goal.

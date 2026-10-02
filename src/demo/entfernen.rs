@@ -12,7 +12,7 @@
 //!   Fremdschlüsselfehler (787) heißt „behalten“. Das trägt nur, solange kein Fremdschlüssel auf
 //!   `fahrzeug`/`personal`/`material` kaskadiert oder aufgeschoben ist (Guard
 //!   `kein_fk_kaskadiert_in_stammdaten` in `schema_tests.rs`) und die Verbindung Fremdschlüssel
-//!   sofort prüft ([`fk_pruefung_sicherstellen`]).
+//!   sofort prüft ([`crate::db::fk_pruefung_sicherstellen`]).
 //!
 //! Die Funktion committet nicht; der Aufrufer fährt sie in `write_retry!` (allein oder beim
 //! Neu-Import vor `importieren_tx` in derselben Transaktion).
@@ -93,7 +93,9 @@ pub async fn entfernen_tx(
         AppError::Conflict("Für diese Organisation sind keine Demo-Daten importiert.".into())
     })?;
 
-    fk_pruefung_sicherstellen(conn).await?;
+    // Der Savepoint erkennt „noch verwiesen“ nur, wenn die Verbindung Fremdschlüssel sofort
+    // prüft; ohne Prüfung zeigten Dispositionen echter Einsätze ins Leere.
+    crate::db::fk_pruefung_sicherstellen(conn, "Demo-Daten entfernen").await?;
 
     // Die ID kommt aus dem Kopf, und die Org steht in BEIDEN WHERE. Ohne die zweite Bedingung
     // löschte ein Kopf mit fremder `einsatz_id` einen echten Einsatz einer anderen Org samt ETB.
@@ -247,25 +249,6 @@ async fn zeile_loeschen(
 /// `SQLITE_CONSTRAINT_FOREIGNKEY` (787) auf `ErrorKind::ForeignKeyViolation` ab.
 pub(crate) fn ist_fk_verletzung(fehler: &sqlx::Error) -> bool {
     matches!(fehler, sqlx::Error::Database(db) if db.is_foreign_key_violation())
-}
-
-/// Der Savepoint erkennt „noch verwiesen“ nur, wenn die Verbindung Fremdschlüssel **sofort**
-/// prüft. Ohne Prüfung gelänge jedes DELETE und ließe Dispositionen echter Einsätze ins Leere
-/// zeigen; aufgeschoben käme der Fehler erst beim COMMIT und bräche alles ab. Beides ist heute
-/// ausgeschlossen — diese Prüfung hält es zur Laufzeit fest, statt es anzunehmen.
-async fn fk_pruefung_sicherstellen(conn: &mut SqliteConnection) -> Result<(), AppError> {
-    let an: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
-        .fetch_one(&mut *conn)
-        .await?;
-    let aufgeschoben: i64 = sqlx::query_scalar("PRAGMA defer_foreign_keys")
-        .fetch_one(&mut *conn)
-        .await?;
-    if an != 1 || aufgeschoben != 0 {
-        return Err(AppError::Internal(format!(
-            "Demo-Daten entfernen verweigert: foreign_keys={an}, defer_foreign_keys={aufgeschoben}"
-        )));
-    }
-    Ok(())
 }
 
 /// Je Art eine Zeile, immer alle drei, in Enum-Reihenfolge, auch mit Nullen. `angelegt` und
