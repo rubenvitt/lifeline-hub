@@ -157,6 +157,12 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Tag dunkler, nicht heller), über die `Dropdown`-/`Button`-Token in `antdKomponenten`, nie je
   Menü oder Knopf. Gemessen in `e2e/gefahr-kontrast.spec.ts`; kein Kontrast-Spec führt Rot unter
   einer Ausnahme.
+- **Hinweisflächen sind Statusflächen** (LFH-739, Spec `farbrollen-kontrast`,
+  `openspec/changes/lfh-739-hinweisflaeche-statusrollen/design.md`): `Alert` Info/Warnung/Fehler/
+  Erfolg lesen `bedienFlaeche`/`achtungFlaeche`/`alarmFlaeche`/`normalFlaeche` über das
+  `Alert`-Token in `antdKomponenten`, nie je Hinweis; antds Ableitung aus den Signalfarben ist am
+  Tag trüb. Ein Knopf darauf behält `steuerRahmen` (≥ 3 : 1, `theme/hinweisKontrast.test.ts`,
+  `e2e/hinweis-kontrast.spec.ts`).
 - **Deeplink-Hervorhebung** (LFH-698, Spec `deeplink-hervorhebung`; `.zeile-hervorgehoben` an
   Datensicht und Zeitachse): `bedienFlaeche` plus Ober- und Unterlinie in `bedien` (`box-shadow`,
   `index.css`); ein `Zeitachseneintrag` setzt die Fläche inline mit. Nie `flaeche3` (das ist der
