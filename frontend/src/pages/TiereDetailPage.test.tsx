@@ -70,6 +70,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tier)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
+    http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([])),
   );
   // extra-Handler separat voranstellen, damit sie Vorrang vor den Defaults haben.
   if (extra.length > 0) server.use(...extra);
@@ -347,6 +348,63 @@ describe('TiereDetailPage — Status/Abschluss', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
     await vi.waitFor(() => expect(body.abschluss_grund).toBe('freilauf'));
     expect(body.status).toBe('abgeschlossen');
+  });
+});
+
+// LFH-758: Fotos und Dateien am Tier.
+describe('TiereDetailPage — Fotos und Dateien', () => {
+  const anhang = {
+    id: 4,
+    tier_id: 10,
+    dateiname: 'hund.jpg',
+    mime: 'image/jpeg',
+    groesse: 1024,
+    abgelegt_von_id: 1,
+    abgelegt_von_name: 'Leitung',
+    abgelegt_at: '2026-05-29 10:00:00',
+  };
+
+  it('zeigt das Paneel mit Anker auf die Tier-Route, außerhalb jedes Formulars', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
+    ]);
+    const anker = await screen.findByRole('link', {
+      name: /hund\.jpg, .*Datei von Tier T-001 herunterladen/,
+    });
+    expect(anker).toHaveAttribute('href', '/api/einsaetze/1/tiere/10/anhaenge/4/datei');
+    expect(anker.closest('form')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Datei ablegen' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Datei hund.jpg von Tier T-001 entfernen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('bleibt im Bearbeiten-Modus sichtbar und steckt in keinem Formular', async () => {
+    render(einsatzAktiv, tierBasis);
+    await userEvent.click(await screen.findByRole('button', { name: /Bearbeiten/ }));
+    const knopf = await screen.findByRole('button', { name: 'Datei ablegen' });
+    expect(knopf.closest('form')).toBeNull();
+  });
+
+  it('am stornierten Tier: lesbar, aber ohne Ablegen und Entfernen', async () => {
+    render(einsatzAktiv, { ...tierBasis, storniert_at: '2026-05-29 11:00:00' }, [
+      http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
+    ]);
+    expect(
+      await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Datei ablegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /entfernen/ })).toBeNull();
+  });
+
+  it('Beobachter: lesbar, ohne Aktionen', async () => {
+    render(einsatzBeobachter, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
+    ]);
+    expect(
+      await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Datei ablegen' })).toBeNull();
   });
 });
 

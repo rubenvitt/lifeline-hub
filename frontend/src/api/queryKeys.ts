@@ -20,6 +20,11 @@ export const EINSATZ_KEYS = {
   // Fotos und Dateien an einem Schaden: eigener Prefix neben der Schadensliste, live über das
   // `schaden`-Ereignis.
   schadenAnhaenge: 'einsatz-schaden-anhaenge',
+  // LFH-758: dasselbe an Tieren und UHS, live über `tier` bzw. `uhs`.
+  tierAnhaenge: 'einsatz-tier-anhaenge',
+  uhsAnhaenge: 'einsatz-uhs-anhaenge',
+  // Zugriffsprotokoll der UHS-Dateien (nur Einsatzleitung), bewusst nicht live.
+  uhsAnhangZugriffe: 'einsatz-uhs-anhang-zugriffe',
   fahrzeuge: 'einsatz-fahrzeuge',
   material: 'einsatz-material',
   tiere: 'einsatz-tiere',
@@ -118,7 +123,8 @@ export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
  * - `lagged`: rein abgeleitet (Union aller Keys hier, dedupliziert) → im Hook.
  */
 export const EINSATZ_STREAM_EVENTS = {
-  uhs: [EINSATZ_KEYS.uhs],
+  // Ablegen und Entfernen einer UHS-Datei verteilen `uhs` (LFH-758).
+  uhs: [EINSATZ_KEYS.uhs, EINSATZ_KEYS.uhsAnhaenge],
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Anhangliste der Detailseite hängt
   // deshalb mit daran.
   schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenAnhaenge],
@@ -131,7 +137,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.kraefteZeitachse,
   ],
   material: [EINSATZ_KEYS.material],
-  tier: [EINSATZ_KEYS.tiere],
+  // Ablegen und Entfernen einer Tier-Datei verteilen `tier` (LFH-758).
+  tier: [EINSATZ_KEYS.tiere, EINSATZ_KEYS.tierAnhaenge],
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],
   freies_zeichen: [EINSATZ_KEYS.freieZeichen],
   gefahr: [EINSATZ_KEYS.gefahrenmatrix, EINSATZ_KEYS.gefahrengebiete],
@@ -254,6 +261,9 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `personenDruck`/`tiereDruck`/`schaedenDruck` (LFH-727): dieselbe Begründung wie `etbDruck`
  *   für die Druckansichten der Modul-Listen. Beim Personendruck kommt hinzu: jeder Abruf ist ein
  *   Eintrag im Zugriffsprotokoll, ein Live-Refetch schriebe also Protokollzeilen ohne Handlung.
+ * - `uhsAnhangZugriffe` (LFH-758): das Zugriffsprotokoll der UHS-Dateien lädt erst beim
+ *   Aufklappen, wie `personAudit`; ein Live-Refetch zeigte Abrufe anderer ohne Handlung der
+ *   Einsatzleitung und liefe bei jedem `uhs`-Ereignis mit.
  * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
@@ -281,6 +291,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.tiereDruck,
   EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
+  EINSATZ_KEYS.uhsAnhangZugriffe,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -356,6 +367,10 @@ export const einsatzKeys = {
   uhs: (einsatzId: number) => [EINSATZ_KEYS.uhs, einsatzId] as const,
   uhsDetail: (einsatzId: number, uhsId: number) =>
     [EINSATZ_KEYS.uhsDetail, einsatzId, uhsId] as const,
+  uhsAnhaenge: (einsatzId: number, uhsId: number) =>
+    [EINSATZ_KEYS.uhsAnhaenge, einsatzId, uhsId] as const,
+  uhsAnhangZugriffe: (einsatzId: number, uhsId: number) =>
+    [EINSATZ_KEYS.uhsAnhangZugriffe, einsatzId, uhsId] as const,
 
   // Schäden / Tiere (inkl. personenbezogener Kontext-Filter)
   schaeden: (einsatzId: number) => [EINSATZ_KEYS.schaeden, einsatzId] as const,
@@ -369,6 +384,8 @@ export const einsatzKeys = {
   tiereHalter: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.tiere, einsatzId, 'halter', personId] as const,
   tier: (einsatzId: number, tierId: number) => [EINSATZ_KEYS.tier, einsatzId, tierId] as const,
+  tierAnhaenge: (einsatzId: number, tierId: number) =>
+    [EINSATZ_KEYS.tierAnhaenge, einsatzId, tierId] as const,
 
   // Lage
   zonen: (einsatzId: number) => [EINSATZ_KEYS.zonen, einsatzId] as const,
@@ -762,7 +779,9 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Fahrzeugstatus-Katalog). Von den Meldungen nur die Rückmeldungen, nicht die Liste.
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente, die
- * HEIC-Vorschau (Object-URLs, nur im Speicher, LFH-759),
+ * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
+ * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
+ * (Object-URLs, nur im Speicher, LFH-759),
  * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,

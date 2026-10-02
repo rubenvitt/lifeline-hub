@@ -37,6 +37,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
+import TierAnhaenge from './tiere/TierAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { registrierNummer } from '../anzeige/registrierNummer';
@@ -424,6 +425,11 @@ export default function TiereDetailPage() {
             </Datenraster>
           </Paneel>
         )}
+
+        {/* Fotos und Dateien (LFH-758): außerhalb des Bearbeiten-<Form> — der Ablegen-Dialog
+            trägt ein eigenes Formular, verschachtelt schickte es beim Absenden das äußere nativ
+            ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
+        <TierAnhaenge einsatzId={einsatzId} tier={t} darfSchreiben={darfSchreiben} />
       </Space>
 
       <Modal

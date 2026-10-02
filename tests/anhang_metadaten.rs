@@ -745,3 +745,73 @@ fn guard_wird_bei_einem_zweiten_aufrufer_rot() {
     .unwrap();
     assert_eq!(verbotene_aufrufer(tmp.path()).len(), 1);
 }
+
+// ── LFH-758: Tier und UHS ───────────────────────────────────────────────────────────────
+
+/// Tier und UHS sind weitere Wege (Spec `anhang-metadaten`, Delta LFH-758): der normale
+/// Download liefert bereinigt, das Original nur mit ETB-Vermerk, der Tier bzw. UHS nennt.
+#[tokio::test]
+async fn tier_und_uhs_liefern_bereinigt_und_das_original_mit_vermerk() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    for art in Erfassung::ALLE {
+        let foto = foto_mit_gps();
+        let (aid, besitzer, linker) =
+            erfassungs_datei(&pool, einsatz, art, "dach.jpg", "image/jpeg", &foto).await;
+        let pfad = format!(
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge/{linker}/datei",
+            art.segment()
+        );
+
+        let (s, _, bytes) = laden(&app, &pfad, &admin, None).await;
+        assert_eq!(s, StatusCode::OK, "{art:?}");
+        ist_bereinigt(&bytes);
+        assert_eq!(
+            gespeichert(&pool, aid).await.0,
+            foto,
+            "{art:?}: Original bleibt"
+        );
+
+        let (s, h, bytes) = laden(&app, &original(&pfad), &admin, None).await;
+        assert_eq!(s, StatusCode::OK, "{art:?}");
+        assert_eq!(bytes, foto, "{art:?}: Original bytegleich");
+        assert_eq!(h[header::CACHE_CONTROL], "no-store");
+        let erwartet = format!(
+            "Originaldatei mit Metadaten (Standort, Gerät) abgerufen: {}, Anhang #{aid}",
+            art.erster_ablage_name()
+        );
+        let inhalte = system_etb_inhalte(&app, &admin, einsatz).await;
+        assert!(inhalte.contains(&erwartet), "{art:?}: {inhalte:?}");
+    }
+}
+
+/// Führungspersonal bekommt an Tier und UHS kein Original (403) und hinterlässt keinen Vermerk.
+#[tokio::test]
+async fn tier_und_uhs_original_nur_fuer_die_einsatzleitung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = mitglied(&app, &admin, einsatz, "frieda", "fuehrungspersonal").await;
+    for art in Erfassung::ALLE {
+        let (_, besitzer, linker) = erfassungs_datei(
+            &pool,
+            einsatz,
+            art,
+            "dach.jpg",
+            "image/jpeg",
+            &foto_mit_gps(),
+        )
+        .await;
+        let pfad = format!(
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge/{linker}/datei",
+            art.segment()
+        );
+        let (s, _, _) = laden(&app, &original(&pfad), &frieda, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{art:?}");
+        let (s, _, bytes) = laden(&app, &pfad, &frieda, None).await;
+        assert_eq!(s, StatusCode::OK, "{art:?}: bereinigt darf sie");
+        ist_bereinigt(&bytes);
+    }
+    assert!(vermerke(&system_etb_inhalte(&app, &admin, einsatz).await).is_empty());
+}

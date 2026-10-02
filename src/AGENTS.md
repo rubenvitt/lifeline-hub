@@ -73,11 +73,25 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   (`useEntwurfsDateien`), ≤ 10, Dubletten prüft die Dateiwahl. Ungebundener Anhang gehört der
   hochladenden Person (sonst 404).
 
-**Schaden-Anhänge (LFH-21)** (`docs/superpowers/specs/2026-09-25-lfh-21-pruefliste.md`):
-`einsatz_schaden_anhang` im Register; `routes::schaden_anhang`; **`{aid}` ist die Linker-id**;
-Allowlist `ERLAUBTE_MIME_ERFASSUNG` (Spiegel `ERFASSUNG_ACCEPT` in `api/upload.ts`);
-`anhang::pruefe_vor_persist` vor, Anhang + Linker + ETB in EINEM `write_retry!`. Entfernen =
-Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 409.
+**Erfassungs-Anhänge (LFH-21, LFH-758)** (Specs `schaden-anhaenge`, `tier-anhaenge`,
+`uhs-anhaenge`; Herleitung `openspec/changes/archive/2026-10-02-lfh-758-anhaenge-tiere-uhs/design.md`): Liste, Ablage, Soft-Delete und Download-Lookup stehen EINMAL im Kern
+`anhang::erfassung`; ein Modul bringt nur einen `ErfassungsAblage`-Deskriptor (in
+`ERFASSUNGS_ABLAGEN`), lädt seinen Besitzer im `write_retry!` (`BesitzerKopf`) und mappt die Zeile
+auf sein DTO. Ein neues Modul braucht: Linker-Migration (Muster `0126`), Eintrag in `MODUL_LINKER`
+(Guard `jede_erfassungs_ablage_steht_im_linker_register`), Schwärzungsregel `ZeileLoeschen` nach
+`anhang`, Routendatei mit typisiertem Gate und `support::genau_eine_datei`, DTO samt Codegen.
+**`{aid}` ist die Linker-id**; Allowlist `ERLAUBTE_MIME_ERFASSUNG` (Spiegel `ERFASSUNG_ACCEPT` in
+`api/upload.ts`); `anhang::pruefe_vor_persist` vor, Anhang + Linker + ETB in EINEM
+`write_retry!`. Entfernen = Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen;
+storniert → 409 (Route und, gegen das Rennen, in der Transaktion). Tier-Anhänge ohne
+Lese-Audit (wie Tiere insgesamt).
+- **UHS-Lese-Audit (LFH-758):** jeder zugelassene Download einer UHS-Datei schreibt VOR der
+  Antwort eine Zeile in `anhang_zugriff_audit` (`anhang::audit_repo`, auch bei 304), nach
+  `original_freigeben`; scheitert sie, geht nichts hinaus. Abgewiesene Anfragen, Liste und
+  Ablegen protokollieren nichts. `anhang_id` dort **ohne FK** (sonst wäre die Tabelle für den
+  Linker-Guard ein Linker, und die Schwärzung nähme das Protokoll mit); `ablage` hält den Ort
+  lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
+  protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
 
 **Auslieferung (LFH-747)** (Spec `anhang-metadaten`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-747-exif-bereinigung-auslieferung/design.md`):

@@ -253,7 +253,7 @@ Scrub-Wert und steht deshalb nicht in `AUSNAHMEN_SYSTEM_ETB`.
 
 ## Migration Plan
 
-Eine neue Migration mit der nächsten freien Nummer über `alpha` (`0137`: `0135` und `0136` belegten zuvor LFH-749 und LFH-750 auf `alpha`; vor dem Commit
+Eine neue Migration mit der nächsten freien Nummer über `alpha` (`0139`: `0135` bis `0138` belegten zuvor LFH-749, LFH-750 und LFH-758 auf `alpha`; vor dem Commit
 `scripts/check-migrationen.sh` gegen frisch geholtes `origin/alpha`). Sie legt nur die Tabelle
 und den Index an; Bestandsdaten ändern sich nicht. Ein Rückbau entfernt die Routen; die Tabelle
 bleibt (Migrationen werden nie geändert).

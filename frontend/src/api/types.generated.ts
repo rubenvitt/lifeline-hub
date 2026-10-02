@@ -161,16 +161,21 @@ export interface components {
             mime: string;
         };
         /**
-         * @description Stand eines Antrags.
-         * @enum {string}
+         * @description Ein Protokolleintrag für die Einsicht. `anhang_id` ist die **Linker-id** (wie auf dem Wire
+         *     der Anhangliste), damit die Oberfläche die Zeile der Datei zuordnen kann.
          */
-        AntragStand: "offen" | "zurueckgenommen" | "vollzogen";
-        /**
-         * @description Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die vier
-         *     Personenarten tragen dieselben Werte wie [`PersonenArt`].
-         * @enum {string}
-         */
-        AntragZielArt: "einsatz" | "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
+        AnhangZugriffAnzeige: {
+            /** Format: int64 */
+            anhang_id: number;
+            /** Format: int64 */
+            benutzer_id: number;
+            benutzer_name: string;
+            dateiname: string;
+            fassung: components["schemas"]["ZugriffFassung"];
+            /** Format: int64 */
+            id: number;
+            zugriff_at: string;
+        };
         /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App. */
         AppCode: {
             code: string;
@@ -180,8 +185,6 @@ export interface components {
          *     Schwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.
          */
         ArchivAkteAnzeige: {
-            /** @description Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751). */
-            antrag_faellig_at?: string | null;
             karenz_ende?: string | null;
             /**
              * @description Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,
@@ -244,8 +247,6 @@ export interface components {
             aktuelle_sichtung?: components["schemas"]["Sichtungskategorie"] | null;
             aktuelle_verbleib_art?: components["schemas"]["VerbleibArt"] | null;
             aktueller_verbleib_status?: components["schemas"]["VerbleibStatus"] | null;
-            /** @description Zeitpunkt, zu dem ein Löschersuchen für diese Person vollzogen wurde (LFH-751). */
-            auf_antrag_geschwaerzt_at?: string | null;
             erfasst_at: string;
             /** @description Anzeigeform, z. B. `R-042`. */
             registrier_anzeige: string;
@@ -287,8 +288,6 @@ export interface components {
          */
         AufbewahrungEintragAnzeige: {
             abgeschlossen_at?: string | null;
-            /** @description Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751). */
-            antrag_faellig_at?: string | null;
             /** @description Fehlt nur bei einem endgültig gelöschten Einsatz. */
             bezeichnung?: string | null;
             /** Format: int64 */
@@ -317,7 +316,7 @@ export interface components {
          *     `tests/enum_wire_kontrakt.rs`.
          * @enum {string}
          */
-        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "schwaerzung_beantragt" | "loeschung_ausstehend" | "endgueltig_geloescht";
+        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "loeschung_ausstehend" | "endgueltig_geloescht";
         /**
          * @description Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus
          *     dem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate
@@ -3227,18 +3226,6 @@ export interface components {
          * @enum {string}
          */
         PersonStatus: "erfasst" | "vermisst" | "betroffen" | "verstorben" | "abgemeldet";
-        /** @description Ein Treffer der Personensuche — ohne Name, Kontakt oder Freitext. */
-        PersonTrefferAnzeige: {
-            antrag?: components["schemas"]["AntragStand"] | null;
-            art: components["schemas"]["PersonenArt"];
-            /** @description Erfassung bzw. Eingang (UTC, DB-Format). */
-            erfasst_at: string;
-            /** Format: int64 */
-            id: number;
-            /** @description `R-042`, `EK-17`, `IT-5`, `MK-3` — dieselbe Kennung bestätigt den Antrag. */
-            kennung: string;
-            person_status?: components["schemas"]["PersonStatus"] | null;
-        };
         /** @description Öffentliche Personal-Darstellung (ohne `org_id`), inkl. aufgelöster Qualifikationen. */
         PersonalAnzeige: {
             angelegt_at: string;
@@ -3275,13 +3262,6 @@ export interface components {
         PersonalVorschlaege: {
             traegerorganisation: string[];
         };
-        /**
-         * @description Art einer Person, die ein Löschersuchen nach Art. 17 betreffen kann (LFH-751). Wire ==
-         *     [`PersonenArt::as_str`] == `schwaerzung_antrag.ziel_art`, gepinnt in
-         *     `tests/enum_wire_kontrakt.rs`.
-         * @enum {string}
-         */
-        PersonenArt: "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
         /** @description Serialisierbare Platz-Anzeige (1:1 zur Tabelle). */
         PlatzAnzeige: {
             bezeichnung: string;
@@ -3502,30 +3482,6 @@ export interface components {
          * @enum {string}
          */
         Schutzobjekt: "menschen" | "tiere" | "umwelt" | "sachwerte" | "einsatzkraefte";
-        /**
-         * @description Ein Antrag in der Archivakte (`GET …/schwaerzungsantraege`). Das Ziel steht nur als Art und
-         *     pseudonyme Kennung darin.
-         */
-        SchwaerzungsantragAnzeige: {
-            aktenzeichen: string;
-            beantragt_at: string;
-            beantragt_von_name: string;
-            /** @description Ab hier vollzieht der Purge-Lauf; bis dahin ist der Antrag zurücknehmbar. */
-            faellig_at: string;
-            /** Format: int64 */
-            id: number;
-            stand: components["schemas"]["AntragStand"];
-            vollzogen_at?: string | null;
-            ziel_art: components["schemas"]["AntragZielArt"];
-            /** Format: int64 */
-            ziel_id?: number | null;
-            /** @description Einsatznummer bzw. Kennung der Person (`R-042`, `EK-17`, `IT-5`, `MK-3`). */
-            ziel_kennung: string;
-            zurueckgenommen_at?: string | null;
-            zurueckgenommen_von_name?: string | null;
-            /** @description Offen und noch nicht fällig. */
-            zuruecknehmbar: boolean;
-        };
         /** @description Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`). */
         SichtungAnzeige: {
             /** Format: int64 */
@@ -3724,6 +3680,25 @@ export interface components {
          */
         SystemRolle: "admin" | "keiner";
         /**
+         * @description Ein Anhang eines Tieres. `id` ist die **Linker-id** (`einsatz_tier_anhang.id`), nicht
+         *     `anhang.id`: die Datei ist nur über die Tier-Route ladbar.
+         */
+        TierAnhangAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            /** @description Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert. */
+            abgelegt_von_name?: string | null;
+            dateiname: string;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            mime: string;
+            /** Format: int64 */
+            tier_id: number;
+        };
+        /**
          * @description Serialisierbarer Tier-Datensatz (1:1 zur Tabelle `einsatz_tier`). Die beiden
          *     `halter_*`-Felder kommen aus einem LEFT JOIN auf `einsatz_person` und sind
          *     read-only (NULL bei Freitext-Halter oder unbekannt) — die UI zeigt damit
@@ -3793,6 +3768,25 @@ export interface components {
         TotpEnrollStart: {
             otpauth_url: string;
             secret_base32: string;
+        };
+        /**
+         * @description Ein Anhang einer UHS. `id` ist die **Linker-id** (`uhs_anhang.id`), nicht `anhang.id`: die
+         *     Datei ist nur über die UHS-Route ladbar.
+         */
+        UhsAnhangAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            /** @description Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert. */
+            abgelegt_von_name?: string | null;
+            dateiname: string;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            mime: string;
+            /** Format: int64 */
+            uhs_id: number;
         };
         /** @description Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder). */
         UhsAnzeige: {
@@ -4218,6 +4212,11 @@ export interface components {
          * @enum {string}
          */
         ZugriffArt: "detail" | "export" | "druck";
+        /**
+         * @description Welche Fassung abgerufen wurde. Wire = DB-CHECK `fassung IN ('bereinigt','original')`.
+         * @enum {string}
+         */
+        ZugriffFassung: "bereinigt" | "original";
     };
     responses: never;
     parameters: never;

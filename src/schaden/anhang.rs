@@ -1,25 +1,37 @@
 //! Fotos und Dateien an einem Schaden (LFH-21).
 //!
-//! Die Bytes liegen in `anhang`; `einsatz_schaden_anhang` ist der vierte Linker darauf und
-//! steht im Register `anhang::repo::MODUL_LINKER`. Damit ist eine Schaden-Datei nur über die
+//! Die Bytes liegen in `anhang`; `einsatz_schaden_anhang` ist ein modulgebundener Linker darauf
+//! und steht im Register `anhang::repo::MODUL_LINKER`. Damit ist eine Schaden-Datei nur über die
 //! Schadensroute erreichbar: generischer Download 404, generischer DELETE 422, Chat 400,
 //! ETB 422, der Sweep hält sie.
 //!
-//! Ablegen und Entfernen laufen je in EINER Transaktion mit dem pseudonymen System-ETB-
-//! Eintrag (Pattern B): Datei, Verknüpfung und Nachweis entstehen gemeinsam oder gar nicht,
-//! eine Schaden-Datei ist nie ungebunden (design.md D4). Der Nachweis nennt nur
-//! Registriernummer und Art, nie den Dateinamen ([`etb_text`], D6).
+//! Liste, Ablage und Soft-Delete stehen im gemeinsamen Kern `anhang::erfassung` (LFH-758); hier
+//! bleiben der Deskriptor [`SCHADEN_ABLAGE`], das Wire-DTO und das Laden des Schadens in der
+//! Transaktion. Datei, Verknüpfung und ETB-Nachweis entstehen gemeinsam oder gar nicht; der
+//! Nachweis nennt nur Registriernummer und Art, nie den Dateinamen (LFH-21 D4, D6).
 
+use crate::anhang::erfassung::{
+    self as kern, BesitzerKopf, ErfassungsAblage, ErfassungsAnhangZeile,
+};
+pub use crate::anhang::erfassung::{Ablage, Vorgang};
 use crate::error::AppError;
 use crate::schaden::{registrier_anzeige, repo as schaden_repo};
 use serde::Serialize;
-use sqlx::{FromRow, SqlitePool};
+use sqlx::SqlitePool;
 use utoipa::ToSchema;
+
+/// Deskriptor des Schaden-Linkers für den Kern.
+pub const SCHADEN_ABLAGE: ErfassungsAblage = ErfassungsAblage {
+    linker: "einsatz_schaden_anhang",
+    besitzer_spalte: "schaden_id",
+    besitzer_tabelle: "einsatz_schaden",
+    storniert_meldung: "Schaden ist storniert",
+};
 
 /// Ein Anhang eines Schadens. `id` ist die **Linker-id** (`einsatz_schaden_anhang.id`),
 /// nicht `anhang.id` — die Datei ist ohnehin nur über die Schadensroute ladbar, eine
 /// `anhang_id` auf dem Wire wäre nur ein Anreiz, den gesperrten generischen Weg zu probieren.
-#[derive(Debug, Clone, Serialize, FromRow, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SchadenAnhangAnzeige {
     pub id: i64,
     pub schaden_id: i64,
@@ -33,54 +45,28 @@ pub struct SchadenAnhangAnzeige {
     pub abgelegt_at: String,
 }
 
-/// Vorgang für den ETB-Nachweis.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Vorgang {
-    Abgelegt,
-    Entfernt,
+impl From<ErfassungsAnhangZeile> for SchadenAnhangAnzeige {
+    fn from(z: ErfassungsAnhangZeile) -> Self {
+        Self {
+            id: z.id,
+            schaden_id: z.besitzer_id,
+            dateiname: z.dateiname,
+            mime: z.mime,
+            groesse: z.groesse,
+            abgelegt_von_id: z.abgelegt_von_id,
+            abgelegt_von_name: z.abgelegt_von_name,
+            abgelegt_at: z.abgelegt_at,
+        }
+    }
 }
 
-/// Wortlaut des pseudonymen ETB-Nachweises (design.md D6): „Schaden S-003: Foto abgelegt“.
-/// Die Art kommt aus dem **serverseitig ermittelten** MIME, nie aus einer Eingabe; kein
-/// Dateiname, kein Ort, keine Beschreibung.
+/// Wortlaut des pseudonymen ETB-Nachweises: „Schaden S-003: Foto abgelegt“.
 pub fn etb_text(registrier_nr: i64, mime: &str, vorgang: Vorgang) -> String {
-    let art = if mime == "application/pdf" {
-        "PDF"
-    } else if mime.starts_with("image/") {
-        "Foto"
-    } else {
-        // Die Erfassungs-Allowlist lässt nur Bilder und PDF zu; der Zweig hält den Text auch
-        // dann pseudonym, wenn sie einmal wächst.
-        "Datei"
-    };
-    let tat = match vorgang {
-        Vorgang::Abgelegt => "abgelegt",
-        Vorgang::Entfernt => "entfernt",
-    };
-    format!("Schaden {}: {art} {tat}", registrier_anzeige(registrier_nr))
+    kern::etb_text(&etb_name(registrier_nr), mime, vorgang)
 }
 
-/// Lebende Anhänge je Schaden samt Anzeige-Joins.
-const SELECT: &str = "SELECT l.id, l.schaden_id, a.dateiname, a.mime, a.groesse, \
-        l.abgelegt_von_id, b.anzeigename AS abgelegt_von_name, l.abgelegt_at \
-     FROM einsatz_schaden_anhang l \
-     JOIN anhang a ON a.id = l.anhang_id \
-     LEFT JOIN benutzer b ON b.id = l.abgelegt_von_id \
-     WHERE l.einsatz_id = ? AND l.schaden_id = ? AND l.geloescht_at IS NULL";
-
-/// Prüft, dass der Schaden zu diesem Einsatz gehört (sonst 404) — auch storniert.
-async fn fordere_schaden(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    schaden_id: i64,
-) -> Result<(), AppError> {
-    let treffer: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM einsatz_schaden WHERE id = ? AND einsatz_id = ?")
-            .bind(schaden_id)
-            .bind(einsatz_id)
-            .fetch_optional(pool)
-            .await?;
-    treffer.map(|_| ()).ok_or(AppError::NotFound)
+fn etb_name(registrier_nr: i64) -> String {
+    format!("Schaden {}", registrier_anzeige(registrier_nr))
 }
 
 /// Lebende Anhänge eines Schadens dieses Einsatzes, neueste zuerst. Ein Schaden eines
@@ -90,16 +76,11 @@ pub async fn liste(
     einsatz_id: i64,
     schaden_id: i64,
 ) -> Result<Vec<SchadenAnhangAnzeige>, AppError> {
-    fordere_schaden(pool, einsatz_id, schaden_id).await?;
-    Ok(
-        sqlx::query_as::<_, SchadenAnhangAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT} ORDER BY l.abgelegt_at DESC, l.id DESC"
-        )))
-        .bind(einsatz_id)
-        .bind(schaden_id)
-        .fetch_all(pool)
-        .await?,
-    )
+    Ok(kern::liste(pool, &SCHADEN_ABLAGE, einsatz_id, schaden_id)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect())
 }
 
 /// Ein lebender Anhang; fremd, unbekannt, anderer Schaden oder entfernt → `NotFound`.
@@ -109,13 +90,11 @@ pub async fn laden(
     schaden_id: i64,
     id: i64,
 ) -> Result<SchadenAnhangAnzeige, AppError> {
-    sqlx::query_as::<_, SchadenAnhangAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT} AND l.id = ?")))
-        .bind(einsatz_id)
-        .bind(schaden_id)
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+    Ok(
+        kern::laden(pool, &SCHADEN_ABLAGE, einsatz_id, schaden_id, id)
+            .await?
+            .into(),
+    )
 }
 
 /// `anhang_id` eines lebenden Anhangs für den Download. Der Lookup IST die Zugriffsprüfung
@@ -126,27 +105,20 @@ pub async fn anhang_id_fuer_download(
     schaden_id: i64,
     id: i64,
 ) -> Result<i64, AppError> {
-    sqlx::query_scalar(
-        "SELECT anhang_id FROM einsatz_schaden_anhang \
-         WHERE id = ? AND schaden_id = ? AND einsatz_id = ? AND geloescht_at IS NULL",
-    )
-    .bind(id)
-    .bind(schaden_id)
-    .bind(einsatz_id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or(AppError::NotFound)
+    kern::anhang_id_fuer_download(pool, &SCHADEN_ABLAGE, einsatz_id, schaden_id, id).await
 }
 
-/// Eingabe für [`ablegen`] — vom Handler geprüft (Typ, Größe, Scan).
-pub struct Ablage<'a> {
-    pub dateiname: &'a str,
-    pub mime: &'a str,
-    pub daten: &'a [u8],
-}
-
-fn storniert() -> AppError {
-    AppError::Conflict("Schaden ist storniert".into())
+/// Lädt den Schaden in der offenen Transaktion (fremd/unbekannt → `NotFound`).
+async fn kopf(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    schaden_id: i64,
+) -> Result<BesitzerKopf, AppError> {
+    let schaden = schaden_repo::laden_tx(conn, einsatz_id, schaden_id).await?;
+    Ok(BesitzerKopf {
+        storniert: schaden.storniert_at.is_some(),
+        etb_name: etb_name(schaden.registrier_nr),
+    })
 }
 
 /// Legt Anhang, Linker und System-ETB-Eintrag in EINER Transaktion an. Schaden fremd oder
@@ -161,35 +133,18 @@ pub async fn ablegen(
     ablage: &Ablage<'_>,
 ) -> Result<(i64, i64), AppError> {
     crate::write_retry!(pool, |conn| {
-        let schaden = schaden_repo::laden_tx(conn, einsatz_id, schaden_id).await?;
-        if schaden.storniert_at.is_some() {
-            return Err(storniert());
-        }
-        let anhang_id = crate::anhang::repo::anlegen_tx(
+        let kopf = kopf(conn, einsatz_id, schaden_id).await?;
+        kern::ablegen_tx(
             conn,
+            &SCHADEN_ABLAGE,
             einsatz_id,
+            schaden_id,
             benutzer_id,
-            ablage.dateiname,
-            ablage.mime,
-            ablage.daten,
+            etb_startwert,
+            &kopf,
+            ablage,
         )
-        .await?;
-        let id: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_schaden_anhang \
-               (einsatz_id, schaden_id, anhang_id, abgelegt_von_id) \
-             VALUES (?, ?, ?, ?) RETURNING id",
-        )
-        .bind(einsatz_id)
-        .bind(schaden_id)
-        .bind(anhang_id)
-        .bind(benutzer_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        let text = etb_text(schaden.registrier_nr, ablage.mime, Vorgang::Abgelegt);
-        let etb_id =
-            crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &text)
-                .await?;
-        Ok((id, etb_id))
+        .await
     })
 }
 
@@ -205,31 +160,20 @@ pub async fn entfernen(
     etb_startwert: i64,
 ) -> Result<i64, AppError> {
     crate::write_retry!(pool, |conn| {
-        let mime: String = sqlx::query_scalar(
-            "SELECT a.mime FROM einsatz_schaden_anhang l JOIN anhang a ON a.id = l.anhang_id \
-             WHERE l.id = ? AND l.schaden_id = ? AND l.einsatz_id = ? \
-               AND l.geloescht_at IS NULL",
+        let mime =
+            kern::lebender_mime_tx(conn, &SCHADEN_ABLAGE, einsatz_id, schaden_id, id).await?;
+        let kopf = kopf(conn, einsatz_id, schaden_id).await?;
+        kern::entfernen_tx(
+            conn,
+            &SCHADEN_ABLAGE,
+            id,
+            &mime,
+            benutzer_id,
+            etb_startwert,
+            &kopf,
+            einsatz_id,
         )
-        .bind(id)
-        .bind(schaden_id)
-        .bind(einsatz_id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .ok_or(AppError::NotFound)?;
-        let schaden = schaden_repo::laden_tx(conn, einsatz_id, schaden_id).await?;
-        if schaden.storniert_at.is_some() {
-            return Err(storniert());
-        }
-        sqlx::query(
-            "UPDATE einsatz_schaden_anhang \
-             SET geloescht_at = datetime('now'), geloescht_von_id = ? WHERE id = ?",
-        )
-        .bind(benutzer_id)
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
-        let text = etb_text(schaden.registrier_nr, &mime, Vorgang::Entfernt);
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, etb_startwert, &text).await
+        .await
     })
 }
 
