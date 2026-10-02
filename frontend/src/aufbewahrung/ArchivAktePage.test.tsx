@@ -28,6 +28,7 @@ function akte(zustand: AufbewahrungZustand): ArchivAkte {
     },
     zustand,
     karenz_ende: zustand === 'vorgemerkt' ? '2026-07-01 18:10:00' : undefined,
+    antrag_faellig_at: zustand === 'schwaerzung_beantragt' ? '2026-10-03 08:00:00' : undefined,
     personen: [
       {
         registrier_nr: 1,
@@ -283,8 +284,9 @@ describe('ArchivAktePage — Löschersuchen (LFH-751)', () => {
     expect(marke.textContent).toContain('auf Antrag geschwärzt');
   });
 
-  it('bei offenem Einsatz-Antrag keine Primäraktion im Kopf', async () => {
+  it('bei offenem Einsatz-Antrag keine Primäraktion im Kopf, aber die Fälligkeit', async () => {
     zeige('schwaerzung_beantragt');
     expect(await kopfAktionen()).toEqual([]);
+    expect(screen.getByText('Schwärzung auf Antrag ab')).toBeInTheDocument();
   });
 });

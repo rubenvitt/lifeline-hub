@@ -935,6 +935,16 @@ pub async fn schwaerze_einsatz(
     // Funk-Erreichbarkeit (einsatz_einheit/einsatzabschnitt.erreichbarkeit) ist dort als
     // Scrub klassifiziert; die handgepflegten UPDATEs von LFH-108 sind damit obsolet.
     super::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz_id).await?;
+    // Offene Löschersuchen (LFH-751) sind mit der Schwärzung erfüllt; zurücknehmbar bleibt
+    // danach keines, sonst stünde im ETB eine Rücknahme bereits gelöschter Daten.
+    sqlx::query(
+        "UPDATE schwaerzung_antrag SET vollzogen_at = ? \
+         WHERE einsatz_id = ? AND zurueckgenommen_at IS NULL AND vollzogen_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
 
     system_audit_tx(
         &mut tx,

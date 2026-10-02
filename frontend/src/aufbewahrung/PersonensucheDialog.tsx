@@ -40,6 +40,8 @@ export default function PersonensucheDialog({
   const [form] = Form.useForm<{ suchtext?: string }>();
   const suche = useMutation({
     mutationFn: (suchtext: string) => suchePersonen(einsatzId, suchtext),
+    // Der Suchtext (ein Name) bleibt nicht im Mutations-Cache liegen.
+    gcTime: 0,
   });
 
   const spalten: KatalogSpalte<PersonTreffer>[] = [
@@ -64,14 +66,14 @@ export default function PersonensucheDialog({
       title: 'Löschersuchen',
       width: 150,
       render: (_, t) =>
-        t.antrag ? <StatusTag darstellung={schwaerzungsantragStand[t.antrag]} /> : leer,
+        t.antrag != null ? <StatusTag darstellung={schwaerzungsantragStand[t.antrag]} /> : leer,
     },
     {
       key: 'aktion',
       title: 'Aktion',
       width: 170,
       render: (_, t) =>
-        t.antrag ? (
+        t.antrag === 'offen' || t.antrag === 'vollzogen' ? (
           leer
         ) : (
           <Button
@@ -127,7 +129,7 @@ export default function PersonensucheDialog({
       <SpeicherFehler fehler={suche.error} titel="Suche fehlgeschlagen" />
       {suche.data && (
         <Flex vertical gap={token.marginXS} data-lfh="personensuche-treffer">
-          <Typography.Text type="secondary">
+          <Typography.Text type="secondary" aria-live="polite">
             {suche.data.length === 1 ? '1 Treffer' : `${suche.data.length} Treffer`}
           </Typography.Text>
           <KatalogTabelle<PersonTreffer>

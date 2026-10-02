@@ -1,4 +1,4 @@
-import { Button, Space, Typography } from 'antd';
+import { Button, Space, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeSchwaerzungsantraege, nimmSchwaerzungsantragZurueck } from '../api/aufbewahrung';
@@ -19,7 +19,8 @@ import SchwaerzungsantragDialog, { type AntragZielWahl } from './Schwaerzungsant
  * Paneel „Löschersuchen (Art. 17)“ der Archivakte (LFH-751, Spec `aufbewahrung-loeschersuchen`,
  * „Anträge in der Archivakte“).
  *
- * Liste aller Anträge (Ziel nur als Kennung, Aktenzeichen, Stand, Fälligkeit) mit
+ * Liste aller Anträge (Ziel nur als Kennung, Aktenzeichen, Stand, Fälligkeit, beteiligte
+ * Personen) mit
  * „Zurücknehmen“ an jedem offenen, noch nicht fälligen Antrag. Darüber die zwei Wege zu einem
  * neuen Antrag: „Person suchen und schwärzen“ und „Einsatz sofort schwärzen“. An einem
  * geschwärzten Einsatz fehlen beide (der Server lehnte mit 409 ab), bei einem offenen
@@ -48,6 +49,7 @@ export default function Loeschersuchen({
   akte: ArchivAkte;
 }) {
   const qc = useQueryClient();
+  const { token } = theme.useToken();
   const [sucheOffen, setSucheOffen] = useState(false);
   const [ziel, setZiel] = useState<AntragZielWahl | null>(null);
   const wege = antragswege(akte);
@@ -59,7 +61,9 @@ export default function Loeschersuchen({
   });
   const ruecknahme = useMutation({
     mutationFn: (antragId: number) => nimmSchwaerzungsantragZurueck(einsatzId, antragId),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: globalKeys.aufbewahrung() }),
+    // Auch nach einer Ablehnung (409, z. B. Frist inzwischen abgelaufen) neu laden, sonst
+    // bliebe „Zurücknehmen“ an einem nicht mehr zurücknehmbaren Antrag stehen.
+    onSettled: () => void qc.invalidateQueries({ queryKey: globalKeys.aufbewahrung() }),
   });
 
   const spalten: KatalogSpalte<Schwaerzungsantrag>[] = [
@@ -104,11 +108,17 @@ export default function Loeschersuchen({
     {
       key: 'erledigt',
       title: 'Erledigt',
-      width: 160,
-      zahl: true,
+      width: 240,
       render: (_, a) => {
-        const zeit = a.vollzogen_at ?? a.zurueckgenommen_at;
-        return zeit ? <ZeitAnzeige wert={zeit} /> : leer;
+        if (a.vollzogen_at) return <ZeitAnzeige wert={a.vollzogen_at} />;
+        if (a.zurueckgenommen_at) {
+          return (
+            <>
+              <ZeitAnzeige wert={a.zurueckgenommen_at} /> · {a.zurueckgenommen_von_name ?? leer}
+            </>
+          );
+        }
+        return leer;
       },
     },
     {
@@ -167,13 +177,11 @@ export default function Loeschersuchen({
   }
 
   return (
-    <Paneel
-      titel="Löschersuchen (Art. 17)"
-      meta="Vollzug 24 Stunden nach dem Antrag, bis dahin zurücknehmbar"
-      aktion={aktionen}
-      koerperPolster
-    >
+    <Paneel titel="Löschersuchen (Art. 17)" meta="24 h zurücknehmbar" koerperPolster>
       <div data-lfh="loeschersuchen">
+        {/* Die Aktionen stehen im Körper, nicht im Paneelkopf: dessen Aktionsslot schrumpft nie,
+            und zwei Knöpfe liefen bei 390 px über (Review LFH-751). */}
+        {aktionen && <div style={{ marginBottom: token.marginSM }}>{aktionen}</div>}
         {inhalt}
         <SpeicherFehler fehler={ruecknahme.error} titel="Rücknahme fehlgeschlagen" />
         {!wege.person && (

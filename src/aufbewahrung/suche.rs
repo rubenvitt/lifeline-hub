@@ -7,6 +7,11 @@
 //! ab und liefert nur pseudonyme Treffer zurück: Art, Kennung, Erfassungszeitpunkt, Status, Stand
 //! eines Antrags. Sie schreibt nichts und loggt den Suchtext nicht.
 //!
+//! Betroffene werden nur über den Namen gefunden; `melder_kontakt` gehört der meldenden Person.
+//! Kein Treffer heißt nicht „keine Daten“: Namens-Schnappschüsse entfernter Dispositionen
+//! (`auftrag_empfaenger.snap_anzeige`, `einsatz_stabsfunktion.snap_name` mit verwaistem Verweis)
+//! findet die Suche nicht — dafür ist der Einsatz-Antrag da.
+//!
 //! **Nur ganze Wörter:** jedes Wort des Suchtexts muss als ganzes Wort im Namen stehen, sonst
 //! wäre die Suche ein Orakel für Namensanfänge. Eine Rufnummer trifft, wenn der Suchtext
 //! mindestens [`MIN_ZIFFERN`] Ziffern hat und sie gleich den Ziffern eines Kontaktfelds sind.
@@ -124,28 +129,18 @@ pub async fn personensuche(
     };
     let mut treffer = Vec::new();
 
-    type BetroffenerZeile = (
-        i64,
-        i64,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        String,
-        String,
-    );
+    type BetroffenerZeile = (i64, i64, Option<String>, Option<String>, String, String);
     let betroffene: Vec<BetroffenerZeile> = sqlx::query_as(
-        "SELECT id, registrier_nr, vorname, name, melder_kontakt, erfasst_at, status \
+        "SELECT id, registrier_nr, vorname, name, erfasst_at, status \
          FROM einsatz_person WHERE einsatz_id = ? ORDER BY registrier_nr",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    for (id, nr, vorname, name, kontakt, erfasst_at, status) in betroffene {
-        if trifft(
-            suchtext,
-            &[vorname.as_deref(), name.as_deref()],
-            &[kontakt.as_deref()],
-        ) {
+    // Kein Abgleich über `melder_kontakt`: das ist die Rufnummer der MELDENDEN Person, nicht der
+    // betroffenen — ein Treffer darüber führte zum Antrag gegen eine Dritte.
+    for (id, nr, vorname, name, erfasst_at, status) in betroffene {
+        if trifft(suchtext, &[vorname.as_deref(), name.as_deref()], &[]) {
             let art = PersonenArt::Betroffene;
             treffer.push(PersonTrefferAnzeige {
                 art,
@@ -206,6 +201,9 @@ pub async fn personensuche(
             }
         }
     }
+    // Auf Antrag Geschwärzte erscheinen nicht mehr: ihr Platzhalter („[geschwärzt]“) träfe
+    // sonst die Suche nach „geschwärzt“.
+    treffer.retain(|t| t.antrag != Some(AntragStand::Vollzogen));
     Ok(treffer)
 }
 

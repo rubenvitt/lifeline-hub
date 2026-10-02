@@ -1,10 +1,12 @@
 import { Alert, App, Form, Input, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { stelleSchwaerzungsantrag } from '../api/aufbewahrung';
 import { globalKeys } from '../api/queryKeys';
 import type { AntragZielArt, NeuerSchwaerzungsantrag } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZIEL_ART } from './archivText';
 
 /**
@@ -35,6 +37,12 @@ interface AntragWerte {
   bestaetigung?: string;
 }
 
+/** Frühester Vollzug, gerechnet ab dem Öffnen der Rückfrage (UTC, DB-Format). Der Server
+ *  rechnet ab dem Antrag; die Anzeige liegt also höchstens um die Bedenkzeit davor. */
+export function vollzugAb(jetzt: Date): string {
+  return new Date(jetzt.getTime() + 24 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
 /** Ob die eingetippte Kennung passt — wie der Server: getrimmt, exakt. */
 export function kennungPasst(eingabe: string | undefined, kennung: string): boolean {
   return (eingabe ?? '').trim() === kennung;
@@ -62,6 +70,7 @@ export default function SchwaerzungsantragDialog({
 }: SchwaerzungsantragDialogProps) {
   const qc = useQueryClient();
   const { token } = theme.useToken();
+  const [faellig] = useState(() => vollzugAb(new Date()));
   const { message } = App.useApp();
   const [form] = Form.useForm<AntragWerte>();
   const aktenzeichen = Form.useWatch('aktenzeichen', form);
@@ -99,7 +108,11 @@ export default function SchwaerzungsantragDialog({
         type="warning"
         showIcon
         style={{ marginBottom: token.margin }}
-        title="Nach 24 Stunden unwiderruflich"
+        title={
+          <span data-lfh="antrag-faellig">
+            Nach 24 Stunden unwiderruflich — Vollzug ab etwa <ZeitAnzeige wert={faellig} />
+          </span>
+        }
         description={
           istEinsatz
             ? 'Der Purge-Lauf schwärzt 24 Stunden nach dem Antrag alle personenbezogenen Angaben des Einsatzes, unabhängig von Frist und Karenz. Bis dahin lässt sich der Antrag zurücknehmen. Das Einsatztagebuch bleibt im Wortlaut erhalten.'

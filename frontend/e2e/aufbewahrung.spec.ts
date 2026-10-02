@@ -48,6 +48,27 @@ function tombstones(
   }
 }
 
+/**
+ * Offener Einsatz-Antrag (LFH-751) direkt in der Lauf-Datenbank — fällig morgen, also im Lauf
+ * nie vollzogen. Idempotent: legt nur an, wenn keiner offen ist.
+ */
+function einsatzAntragSetzen(einsatzId: number) {
+  const db = new DatabaseSync(datenbank());
+  try {
+    db.exec('PRAGMA busy_timeout = 5000');
+    db.prepare(
+      `INSERT INTO schwaerzung_antrag (einsatz_id, ziel_art, ziel_id, aktenzeichen, beantragt_von,
+         beantragt_at, faellig_at)
+       SELECT ?, 'einsatz', NULL, 'DS-E2E', (SELECT id FROM benutzer WHERE benutzername = 'admin'),
+         ?, ?
+       WHERE NOT EXISTS (SELECT 1 FROM schwaerzung_antrag WHERE einsatz_id = ?
+         AND zurueckgenommen_at IS NULL AND vollzogen_at IS NULL)`,
+    ).run(einsatzId, utc(0), utc(1), einsatzId);
+  } finally {
+    db.close();
+  }
+}
+
 async function anmelden(page: Page, benutzer = 'admin', passwort = PW) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(benutzer);
@@ -152,8 +173,66 @@ test.describe('Aufbewahrung (LFH-23)', () => {
     }
   });
 
+  test('Löschersuchen (LFH-751): Person suchen, Antrag stellen, zurücknehmen', async ({
+    page,
+  }, testInfo) => {
+    await anmelden(page);
+    const stempel = Date.now();
+    const r = await page.request.post('/api/einsaetze', {
+      data: { bezeichnung: `Löschersuchen ${stempel}` },
+    });
+    expect(r.ok(), await r.text()).toBeTruthy();
+    const e = (await r.json()) as { id: number };
+    const p = await page.request.post(`/api/einsaetze/${e.id}/personen`, {
+      data: { name: 'Yilmaz', vorname: 'Ayse' },
+    });
+    expect(p.ok(), await p.text()).toBeTruthy();
+    const z = await page.request.post(`/api/einsaetze/${e.id}/abschliessen`);
+    expect(z.ok(), await z.text()).toBeTruthy();
+
+    await page.goto(`/admin/aufbewahrung/${e.id}`);
+    await page.getByRole('button', { name: 'Person suchen und schwärzen' }).click();
+    const suche = page.getByRole('dialog', { name: 'Person suchen' });
+    await suche.getByRole('textbox').fill('ayse yilmaz');
+    await suche.getByRole('textbox').press('Enter');
+    await expect(suche.getByText('1 Treffer')).toBeVisible();
+    // Pseudonym: der Name steht nirgends im Dialog.
+    await expect(suche).not.toContainText('Yilmaz');
+    await suche.getByRole('button', { name: 'Antrag stellen für R-001' }).click();
+
+    const rueckfrage = page.getByRole('dialog', { name: 'Löschersuchen: Betroffene Person R-001' });
+    const absenden = rueckfrage.getByRole('button', { name: 'Person schwärzen lassen' });
+    await expect(absenden).toBeDisabled();
+    await rueckfrage.getByLabel('Aktenzeichen des Löschersuchens').fill('DS-E2E-1');
+    await rueckfrage.getByLabel('Zur Bestätigung „R-001“ eintippen').fill('R-001');
+    await expect(absenden).toBeEnabled();
+    await testInfo.attach('rueckfrage.png', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await absenden.click();
+    await expect(rueckfrage).toBeHidden();
+
+    const liste = page.locator('[data-lfh="loeschersuchen"]');
+    await expect(liste.getByText('DS-E2E-1')).toBeVisible();
+    await expect(liste.getByText('offen', { exact: true })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Yilmaz');
+    await testInfo.attach('akte-mit-antrag.png', {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+    await liste.getByRole('button', { name: 'Antrag für R-001 zurücknehmen' }).click();
+    await expect(liste.getByText('zurückgenommen', { exact: true })).toBeVisible();
+    await expect(liste.getByRole('button', { name: 'Antrag für R-001 zurücknehmen' })).toHaveCount(
+      0,
+    );
+  });
+
   for (const modus of ['dark', 'light'] as const) {
     test(`Kontrast der Zustandsetiketten und Durchstich (${modus})`, async ({ page }, testInfo) => {
+      // Sieben Zustände messen und vier Seiten in zwei Breiten durchstechen (LFH-751: Akte mit
+      // offenem Antrag dazu) — das passt nicht in das Standardbudget.
+      test.slow();
       await anmelden(page);
       const stempel = Date.now();
       const faelle = {
@@ -163,6 +242,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         vorgemerkt: await abgeschlossen(page, `Kontrast vorgemerkt ${stempel}`, utc(-6)),
         schwaerzung_ausstehend: await abgeschlossen(page, `Kontrast aus ${stempel}`, utc(-40)),
         geschwaerzt: await abgeschlossen(page, `Kontrast schwarz ${stempel}`, utc(-70)),
+        schwaerzung_beantragt: await abgeschlossen(page, `Kontrast Antrag ${stempel}`, utc(30)),
       };
       /*
        * Die Zustände werden VOR JEDER Anzeige neu gesetzt: fiele ein Purge-Tick zwischen
@@ -183,6 +263,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
           geloescht: utc(-65),
           geschwaerzt: utc(-30),
         });
+        einsatzAntragSetzen(faelle.schwaerzung_beantragt.id);
       };
       /** Übersicht öffnen und sicherstellen, dass jede Zeile den gesetzten Zustand zeigt. */
       const uebersichtImGesetztenStand = async () => {
@@ -203,6 +284,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         vorgemerkt: 'zur Löschung vorgemerkt',
         schwaerzung_ausstehend: 'Schwärzung steht aus',
         geschwaerzt: 'geschwärzt',
+        schwaerzung_beantragt: 'Schwärzung beantragt',
       } as const;
 
       await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -224,7 +306,8 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         if (
           zustand === 'faellig' ||
           zustand === 'vorgemerkt' ||
-          zustand === 'schwaerzung_ausstehend'
+          zustand === 'schwaerzung_ausstehend' ||
+          zustand === 'schwaerzung_beantragt'
         ) {
           const rand = await randKontrast(etikett);
           messwerte[`${zustand}-rand`] = rand;
@@ -256,10 +339,31 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         });
         await page.goto(`/admin/aufbewahrung/${faelle.vorgemerkt.id}`);
         await expect(page.getByRole('button', { name: 'Wiederherstellen' })).toBeVisible();
+        // LFH-751: beide Antragswege stehen im Paneel „Löschersuchen“, auch bei 390 px ohne
+        // Überlauf.
+        await expect(page.getByRole('button', { name: 'Einsatz sofort schwärzen' })).toBeVisible();
+        // Nach dem Scrollen ganz im Blick — also auch nicht seitlich abgeschnitten.
+        for (const name of ['Person suchen und schwärzen', 'Einsatz sofort schwärzen']) {
+          const knopf = page.getByRole('button', { name });
+          await knopf.scrollIntoViewIfNeeded();
+          await expect(knopf).toBeInViewport({ ratio: 1 });
+        }
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           breite,
         );
         await testInfo.attach(`akte-${modus}-${breite}.png`, {
+          body: await page.screenshot({ fullPage: true }),
+          contentType: 'image/png',
+        });
+        // Akte mit offenem Einsatz-Antrag: Antragsliste mit „Zurücknehmen“, kein Überlauf.
+        await page.goto(`/admin/aufbewahrung/${faelle.schwaerzung_beantragt.id}`);
+        await expect(
+          page.getByRole('button', { name: /Antrag für .* zurücknehmen/ }),
+        ).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          breite,
+        );
+        await testInfo.attach(`akte-antrag-${modus}-${breite}.png`, {
           body: await page.screenshot({ fullPage: true }),
           contentType: 'image/png',
         });

@@ -546,6 +546,15 @@ pub async fn vollziehen(
     antrag_id: i64,
     jetzt: DateTime<Utc>,
 ) -> Result<bool, AppError> {
+    Ok(vollziehen_ergebnis(pool, antrag_id, jetzt).await? != Vollzug::Nichts)
+}
+
+/// Wie [`vollziehen`], mit der Art des Vollzugs.
+pub async fn vollziehen_ergebnis(
+    pool: &SqlitePool,
+    antrag_id: i64,
+    jetzt: DateTime<Utc>,
+) -> Result<Vollzug, AppError> {
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let Some(einsatz_id): Option<i64> =
         sqlx::query_scalar("SELECT einsatz_id FROM schwaerzung_antrag WHERE id = ?")
@@ -553,7 +562,7 @@ pub async fn vollziehen(
             .fetch_optional(pool)
             .await?
     else {
-        return Ok(false);
+        return Ok(Vollzug::Nichts);
     };
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     crate::write_retry!(pool, |conn| {
@@ -568,7 +577,7 @@ pub async fn vollziehen(
         .fetch_optional(&mut *conn)
         .await?;
         let Some(z) = zeile else {
-            return Ok(false);
+            return Ok(Vollzug::Nichts);
         };
         let art = z.ziel_art()?;
         let kennung = gespeicherte_kennung(&mut *conn, art, z.ziel_id, z.einsatz_id).await?;
@@ -599,7 +608,7 @@ pub async fn vollziehen(
                      bereits geschwärzt.",
                     z.aktenzeichen
                 ),
-                false,
+                Vollzug::Nichts,
             )
         } else {
             match art.person() {
@@ -628,10 +637,10 @@ pub async fn vollziehen(
                     .await?;
                     (
                         crate::einsatz::repo::schwaerzungs_audit(&format!(
-                            "Löschersuchen nach Art. 17 DSGVO, Aktenzeichen {}",
+                            "Löschersuchen nach Art. 17 DSGVO für {ziel}, Aktenzeichen {}",
                             z.aktenzeichen
                         )),
-                        true,
+                        Vollzug::Einsatz(z.einsatz_id),
                     )
                 }
                 Some(p) => {
@@ -646,7 +655,7 @@ pub async fn vollziehen(
                              Freitexten und im ETB bleiben bis zur Schwärzung des Einsatzes.",
                             z.aktenzeichen
                         ),
-                        true,
+                        Vollzug::Person,
                     )
                 }
             }
@@ -663,9 +672,26 @@ pub async fn vollziehen(
     })
 }
 
+/// Was ein Vollzug geschwärzt hat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Vollzug {
+    /// Nichts (nicht mehr offen bzw. fällig, oder der Einsatz war schon geschwärzt).
+    Nichts,
+    /// Die Werte einer Person.
+    Person,
+    /// Der ganze Einsatz — er ist danach gesperrt und verschwindet aus den Einsatzlisten.
+    Einsatz(i64),
+}
+
 /// Vollzieht alle fälligen Anträge (Phase des Purge-Laufs). Liefert die Zahl der Vollzüge, die
-/// etwas geschwärzt haben. Ein Fehler bei einem Antrag hält die übrigen nicht auf.
-pub async fn vollziehe_faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
+/// etwas geschwärzt haben. Ein Fehler bei einem Antrag hält die übrigen nicht auf. Ein
+/// geschwärzter Einsatz ist danach gesperrt und wird wie in Phase A aus den Einsatzlisten
+/// seiner Leser gemeldet (LFH-734).
+pub async fn vollziehe_faellige(
+    pool: &SqlitePool,
+    live: &crate::live::LiveHub,
+    jetzt: DateTime<Utc>,
+) -> usize {
     let ids = match faellige(pool, jetzt).await {
         Ok(ids) => ids,
         Err(e) => {
@@ -679,9 +705,13 @@ pub async fn vollziehe_faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usiz
             antrag_id = id,
             "Purge: Schwärzungsantrag fällig — Vollzug (irreversibel)"
         );
-        match vollziehen(pool, id, jetzt).await {
-            Ok(true) => geschwaerzt += 1,
-            Ok(false) => {}
+        match vollziehen_ergebnis(pool, id, jetzt).await {
+            Ok(Vollzug::Einsatz(einsatz_id)) => {
+                geschwaerzt += 1;
+                crate::live::org::einsatzliste_melden(pool, live, einsatz_id, &[]).await;
+            }
+            Ok(Vollzug::Person) => geschwaerzt += 1,
+            Ok(Vollzug::Nichts) => {}
             Err(e) => tracing::error!(antrag_id = id, "Vollzug des Antrags fehlgeschlagen: {e}"),
         }
     }

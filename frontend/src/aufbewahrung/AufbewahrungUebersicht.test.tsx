@@ -34,6 +34,16 @@ const EINTRAEGE: AufbewahrungEintrag[] = [
     zustand: 'ohne_frist',
   },
   {
+    // LFH-751: offener Einsatz-Antrag.
+    einsatz_id: 9105,
+    einsatznummer_intern: 'E-2026-0009',
+    bezeichnung: 'Starkregen Mitte',
+    abgeschlossen_at: '2026-05-03 10:00:00',
+    retention_bis: '2031-05-03 10:00:00',
+    antrag_faellig_at: '2026-10-03 08:00:00',
+    zustand: 'schwaerzung_beantragt',
+  },
+  {
     // Altbestand ohne Einsatznummer (migrations/0115: „bleibt ohne Nummer“).
     einsatz_id: 9104,
     bezeichnung: 'Altlage Ost',
@@ -94,6 +104,17 @@ describe('AufbewahrungUebersicht', () => {
     expect(t).not.toHaveTextContent('2026-07-01 10:10:00');
     // Keine DB-id im sichtbaren Text.
     for (const id of ['9101', '9102', '9103', '9104']) expect(t).not.toHaveTextContent(id);
+  });
+
+  it('LFH-751: offener Einsatz-Antrag mit Zustand und Fälligkeit', async () => {
+    zeige();
+    const t = await tabelle();
+    await within(t).findByText('E-2026-0009');
+    expect(within(t).getByText('Schwärzung beantragt')).toBeInTheDocument();
+    expect(
+      within(t).getByRole('columnheader', { name: /Schwärzung auf Antrag ab/ }),
+    ).toBeInTheDocument();
+    expect(within(t).getByText(formatZeit('2026-10-03 08:00:00'))).toBeInTheDocument();
   });
 
   it('filtert je Zustand über die Segmentleiste', async () => {

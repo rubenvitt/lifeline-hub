@@ -2,8 +2,9 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArchivAkte, PersonTreffer, Schwaerzungsantrag } from '../api/types';
+import { formatZeit } from '../anzeige/format';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import Loeschersuchen, { antragswege } from './Loeschersuchen';
@@ -12,6 +13,7 @@ import SchwaerzungsantragDialog, {
   type AntragZielWahl,
   antragBody,
   kennungPasst,
+  vollzugAb,
 } from './SchwaerzungsantragDialog';
 
 /** Löschersuchen nach Art. 17 (LFH-751): Rückfrage, Personensuche, Paneel der Akte. */
@@ -44,10 +46,12 @@ describe('SchwaerzungsantragDialog', () => {
         return HttpResponse.json({}, { status: 201 });
       }),
     );
-    renderMitProviders(<DialogHarness ziel={PERSON} />);
+    const { client } = renderMitProviders(<DialogHarness ziel={PERSON} />);
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
     const dialog = await screen.findByRole('dialog', {
       name: 'Löschersuchen: Betroffene Person R-042',
     });
+    expect(dialog.querySelector('[data-lfh="antrag-faellig"]')).not.toBeNull();
     const knopf = within(dialog).getByRole('button', { name: 'Person schwärzen lassen' });
     expect(knopf).toBeDisabled();
     expect(knopf).toHaveClass('ant-btn-dangerous');
@@ -66,6 +70,8 @@ describe('SchwaerzungsantragDialog', () => {
       bestaetigung: 'R-042',
     });
     expect(await screen.findByLabelText('zu')).toBeInTheDocument();
+    // Präfix: Übersicht, Akte und Antragsliste in einem Zug.
+    expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['aufbewahrung'] });
   });
 
   it('nennt die Freitext-Erwähnungen nur beim Personen-Antrag', async () => {
@@ -103,7 +109,8 @@ describe('SchwaerzungsantragDialog', () => {
     expect(az).toHaveValue('DS-1');
   });
 
-  it('Body und Kennungsvergleich sind rein', () => {
+  it('Body, Kennungsvergleich und Fälligkeit sind rein', () => {
+    expect(vollzugAb(new Date('2026-10-02T08:00:00Z'))).toBe('2026-10-03 08:00:00');
     expect(kennungPasst(' R-042 ', 'R-042')).toBe(true);
     expect(kennungPasst('r-042', 'R-042')).toBe(false);
     expect(kennungPasst(undefined, 'R-042')).toBe(false);
@@ -208,34 +215,72 @@ function akte(zustand: ArchivAkte['zustand']): ArchivAkte {
 }
 
 describe('Loeschersuchen', () => {
-  it('Offener Antrag: Fälligkeit und „Zurücknehmen“; die Rücknahme geht ohne Rückfrage hinaus', async () => {
+  it('Offener Antrag: Fälligkeit und „Zurücknehmen“; nach der Rücknahme lädt die Liste neu', async () => {
     let zurueck = 0;
+    let stand: Schwaerzungsantrag[] = [
+      antrag(),
+      antrag({
+        id: 2,
+        ziel_kennung: 'IT-5',
+        ziel_art: 'infotelefon_anruf',
+        stand: 'vollzogen',
+        zuruecknehmbar: false,
+        vollzogen_at: '2026-10-01 08:00:00',
+      }),
+    ];
     server.use(
-      http.get(`${BASIS}/schwaerzungsantraege`, () =>
-        HttpResponse.json([
-          antrag(),
-          antrag({
-            id: 2,
-            ziel_kennung: 'IT-5',
-            ziel_art: 'infotelefon_anruf',
-            stand: 'vollzogen',
-            zuruecknehmbar: false,
-            vollzogen_at: '2026-10-01 08:00:00',
-          }),
-        ]),
-      ),
+      http.get(`${BASIS}/schwaerzungsantraege`, () => HttpResponse.json(stand)),
       http.post(`${BASIS}/schwaerzungsantraege/1/zuruecknehmen`, () => {
         zurueck += 1;
-        return HttpResponse.json([antrag({ stand: 'zurueckgenommen', zuruecknehmbar: false })]);
+        stand = [
+          antrag({
+            stand: 'zurueckgenommen',
+            zuruecknehmbar: false,
+            zurueckgenommen_at: '2026-10-02 09:00:00',
+            zurueckgenommen_von_name: 'Admin Zwei',
+          }),
+        ];
+        return HttpResponse.json(stand);
       }),
     );
     renderMitProviders(<Loeschersuchen einsatzId={7} akte={akte('frist_laeuft')} />);
     const knopf = await screen.findByRole('button', { name: 'Antrag für R-042 zurücknehmen' });
     expect(screen.queryByRole('button', { name: 'Antrag für IT-5 zurücknehmen' })).toBeNull();
     expect(screen.getAllByText('DS-2026-014')).toHaveLength(2);
+    // „Vollzug ab“ beider Zeilen (gleiche Fälligkeit im Fixture).
+    expect(screen.getAllByText(formatZeit('2026-10-03 08:00:00'))).toHaveLength(2);
     await userEvent.setup().click(knopf);
     await waitFor(() => expect(zurueck).toBe(1));
     expect(screen.queryByRole('dialog')).toBeNull();
+    // Neu geladen: kein Knopf mehr, die zurücknehmende Person steht da.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Antrag für R-042 zurücknehmen' })).toBeNull(),
+    );
+    expect(screen.getByText('Admin Zwei', { exact: false })).toBeInTheDocument();
+  });
+
+  it('Rücknahme zu spät (409): Fehler am Paneel, Liste lädt neu', async () => {
+    let gets = 0;
+    server.use(
+      http.get(`${BASIS}/schwaerzungsantraege`, () => {
+        gets += 1;
+        return HttpResponse.json([antrag()]);
+      }),
+      http.post(`${BASIS}/schwaerzungsantraege/1/zuruecknehmen`, () =>
+        HttpResponse.json(
+          {
+            error:
+              'Die 24 Stunden sind abgelaufen — der Antrag wird im nächsten Purge-Lauf vollzogen',
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    renderMitProviders(<Loeschersuchen einsatzId={7} akte={akte('frist_laeuft')} />);
+    const knopf = await screen.findByRole('button', { name: 'Antrag für R-042 zurücknehmen' });
+    await userEvent.setup().click(knopf);
+    expect(await screen.findByText(/24 Stunden sind abgelaufen/)).toBeInTheDocument();
+    await waitFor(() => expect(gets).toBeGreaterThanOrEqual(2));
   });
 
   it('Geschwärzter Einsatz: keine Antragsaktion', async () => {

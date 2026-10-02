@@ -156,8 +156,8 @@ LFH-229 abgeschafft hat). Den Personenbezug in `SpaltenRegel` selbst kodieren (b
 steht im Body, damit kein Name in Zugriffsprotokollen oder Browser-Verlauf landet; Antwort mit
 `Cache-Control: no-store`; der Suchtext wird nicht geloggt.
 
-- Abgleich in Rust über die Kandidaten des einen Einsatzes (Betroffene: `vorname`, `name`,
-  `melder_kontakt`; externe Kräfte: `snap_name`; Anrufe: `anrufer_name`, `rueckruf`;
+- Abgleich in Rust über die Kandidaten des einen Einsatzes (Betroffene: `vorname`, `name`;
+  externe Kräfte: `snap_name`; Anrufe: `anrufer_name`, `rueckruf`;
   Medienkontakte: `kontakt_name`, `kontakt_erreichbarkeit`). Normalisierung: Kleinschreibung,
   `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`, Satzzeichen zu Leerraum. Treffer, wenn **jedes** Wort des
   Suchtexts als ganzes Wort im Namen steht, oder wenn der Suchtext mindestens 6 Ziffern hat und
@@ -167,6 +167,13 @@ steht im Body, damit kein Name in Zugriffsprotokollen oder Browser-Verlauf lande
   eines offenen oder vollzogenen Antrags). Kennungen: Betroffene `R-042`
   (`person::registrier_anzeige`), externe Kraft `EK-<id>`, Anruf `IT-<id>`, Medienkontakt
   `MK-<id>`. Dieselbe Kennung dient der Bestätigung des Antrags.
+
+Betroffene findet die Suche nur über den Namen: `melder_kontakt` ist die Rufnummer der meldenden
+Person, ein Treffer darüber führte zum Antrag gegen eine Dritte (Review). Auf Antrag Geschwärzte
+erscheinen nicht mehr (ihr Platzhalter träfe sonst die Suche nach „geschwärzt“). **Kein Treffer
+heißt nicht „keine Daten“:** Namens-Schnappschüsse entfernter Dispositionen
+(`auftrag_empfaenger.snap_anzeige`, `einsatz_stabsfunktion.snap_name` mit verwaistem Verweis) und
+Erwähnungen in Freitexten findet sie nicht; der Dialog nennt dafür den Einsatz-Antrag.
 
 *Verworfen:* SQL-`LIKE` (Umlaute, Teilwort-Treffer), GET mit Query-Parameter (Name in Logs), die
 Akte um Namen erweitern (bricht „Pseudonyme Archivakte“).
@@ -229,6 +236,8 @@ Scrub-Wert und steht deshalb nicht in `AUSNAHMEN_SYSTEM_ETB`.
 
 ## Risks / Trade-offs
 
+- [Namen entfernter Dispositionen in Schnappschüssen ohne Verweis] → die Suche findet sie nicht;
+  Hinweis im Suchdialog, Weg ist der Einsatz-Antrag.
 - [Aktenzeichen enthält einen Namen] → Hinweis im Dialog, Länge ≤ 64, keine Prüfung auf Namen
   möglich. Bleibt als Restrisiko dokumentiert.
 - [Suche verrät, ob jemand im Einsatz erfasst ist] → nur System-Admin der Org, nur ganze Wörter,

@@ -336,14 +336,24 @@ async fn vollzug_person_23h_nichts_24h_geschwaerzt_zweiter_lauf_nichts() {
         .await
         .unwrap();
     assert_eq!(
-        vollziehe_faellige(&pool, t(T0) + Duration::hours(23)).await,
+        vollziehe_faellige(
+            &pool,
+            &crate::live::LiveHub::new(),
+            t(T0) + Duration::hours(23)
+        )
+        .await,
         0
     );
     assert!(testdaten::alle_texte(&pool).await.contains("Yilmaz"));
 
     let etb0 = etb_anzahl(&pool, b.e1).await;
     assert_eq!(
-        vollziehe_faellige(&pool, t(T0) + Duration::hours(24)).await,
+        vollziehe_faellige(
+            &pool,
+            &crate::live::LiveHub::new(),
+            t(T0) + Duration::hours(24)
+        )
+        .await,
         1
     );
     let texte = testdaten::alle_texte(&pool).await;
@@ -377,7 +387,12 @@ async fn vollzug_person_23h_nichts_24h_geschwaerzt_zweiter_lauf_nichts() {
     assert_eq!(erfasser, b.admin);
 
     assert_eq!(
-        vollziehe_faellige(&pool, t(T0) + Duration::hours(25)).await,
+        vollziehe_faellige(
+            &pool,
+            &crate::live::LiveHub::new(),
+            t(T0) + Duration::hours(25)
+        )
+        .await,
         0
     );
     assert_eq!(etb_anzahl(&pool, b.e1).await, etb0 + 1);
@@ -436,7 +451,7 @@ async fn vollzug_einsatz_mit_frist_in_5_jahren_wie_fristbasiert() {
         .unwrap());
     let audit = etb_texte(&pool, b.e1).await.join("\n");
     assert!(audit.contains(
-        "PII-Schwärzung durchgeführt (Löschersuchen nach Art. 17 DSGVO, Aktenzeichen DS-2026-014)"
+        "PII-Schwärzung durchgeführt (Löschersuchen nach Art. 17 DSGVO für Einsatz E-2026-0751, Aktenzeichen DS-2026-014)"
     ));
 }
 
@@ -467,7 +482,12 @@ async fn vollzug_rollt_bei_fehler_im_audit_zurueck() {
         .await
         .unwrap();
     assert_eq!(
-        vollziehe_faellige(&pool, t(T0) + Duration::hours(25)).await,
+        vollziehe_faellige(
+            &pool,
+            &crate::live::LiveHub::new(),
+            t(T0) + Duration::hours(25)
+        )
+        .await,
         1
     );
     assert!(!testdaten::alle_texte(&pool).await.contains("Yilmaz"));
@@ -522,4 +542,32 @@ async fn offener_einsatz_antrag_liefert_faelligkeit() {
     zuruecknehmen(&pool, b.e1, a, b.admin, t(T0)).await.unwrap();
     assert_eq!(offener_einsatz_antrag(&pool, b.e1).await.unwrap(), None);
     let _ = b.leitung;
+}
+
+/// Review LFH-751: die fristbasierte Schwärzung erfüllt offene Anträge mit — danach ist keiner
+/// mehr zurücknehmbar.
+#[tokio::test]
+async fn fristbasierte_schwaerzung_schliesst_offene_antraege() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    let a = stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE einsatz SET geloescht_at = '2026-01-01 00:00:00' WHERE id = ?")
+        .bind(b.e1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(
+        crate::einsatz::repo::schwaerze_einsatz(&pool, b.e1, "2026-10-02 09:00:00")
+            .await
+            .unwrap()
+    );
+    let l = liste(&pool, b.e1, t(T0)).await.unwrap();
+    assert_eq!(l[0].stand, AntragStand::Vollzogen);
+    assert!(!l[0].zuruecknehmbar);
+    assert!(matches!(
+        zuruecknehmen(&pool, b.e1, a, b.admin, t(T0)).await,
+        Err(AppError::Conflict(_))
+    ));
 }

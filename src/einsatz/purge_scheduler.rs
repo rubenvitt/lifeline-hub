@@ -81,7 +81,7 @@ pub async fn tick_mit_rueckschrieb(
     // --- Phase A2: fällige Schwärzungsanträge (Art. 17, LFH-751, IRREVERSIBEL) ---
     // Vor Phase B, damit ein Einsatz-Antrag mit seinem Aktenzeichen im Audit schwärzt, wenn
     // im selben Lauf auch die Karenz abliefe. Ein Vollzug zählt für den WAL-Rückschrieb.
-    let vollzogen = crate::aufbewahrung::antrag::vollziehe_faellige(pool, jetzt).await;
+    let vollzogen = crate::aufbewahrung::antrag::vollziehe_faellige(pool, live, jetzt).await;
     anzahl += vollzogen;
     geschwaerzt += vollzogen;
 
