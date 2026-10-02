@@ -339,7 +339,7 @@ test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit gesperrten
   await keinQuerlauf(page, `${basis}/aufbewahrung`, /Aufbewahrungs-Dauer/, async (p) => {
     await expect(
       rechteHinweis(p, HINWEIS_FRIST),
-      'Vorbedingung: die Frist setzen nur Einsatzleitung und Admin',
+      'Vorbedingung: die Frist setzen nur Einsatzleitung und Admin der Einsatz-Org',
     ).toBeVisible();
     await expect(p.getByRole('button', { name: 'Frist ändern', exact: true })).toBeDisabled();
   });

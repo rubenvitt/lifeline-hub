@@ -32,26 +32,54 @@ describe('istFristverkuerzung (Spiegel des Servers)', () => {
   });
 });
 
-describe('darfFristSetzen (Einsatzleitung oder System-Admin, unabhängig vom Status)', () => {
-  const admin = { system_rolle: 'admin' as const };
-  const keiner = { system_rolle: 'keiner' as const };
+describe('darfFristSetzen (Einsatzleitung oder System-Admin der Einsatz-Org, unabhängig vom Status)', () => {
+  const admin = { system_rolle: 'admin' as const, org_id: 1 };
+  const fremderAdmin = { system_rolle: 'admin' as const, org_id: 2 };
+  const keiner = { system_rolle: 'keiner' as const, org_id: 1 };
 
   it('Einsatzleitung darf — auch am abgeschlossenen Einsatz', () => {
-    expect(darfFristSetzen({ status: 'aktiv', meine_rolle: 'einsatzleitung' }, keiner)).toBe(true);
     expect(
-      darfFristSetzen({ status: 'abgeschlossen', meine_rolle: 'einsatzleitung' }, keiner),
+      darfFristSetzen({ status: 'aktiv', meine_rolle: 'einsatzleitung', org_id: 1 }, keiner),
+    ).toBe(true);
+    expect(
+      darfFristSetzen(
+        { status: 'abgeschlossen', meine_rolle: 'einsatzleitung', org_id: 1 },
+        keiner,
+      ),
     ).toBe(true);
   });
 
-  it('System-Admin darf, auch ohne Mitgliedschaft', () => {
-    expect(darfFristSetzen({ status: 'abgeschlossen', meine_rolle: null }, admin)).toBe(true);
-    expect(darfFristSetzen(null, admin)).toBe(true);
+  it('System-Admin der Einsatz-Org darf, auch ohne Mitgliedschaft', () => {
+    expect(darfFristSetzen({ status: 'abgeschlossen', meine_rolle: null, org_id: 1 }, admin)).toBe(
+      true,
+    );
+  });
+
+  // LFH-753: Spiegel der Org-Prüfung am Frist-PUT — der Server antwortet dort 403.
+  it('System-Admin einer fremden Org darf ohne Mitgliedschaft nicht', () => {
+    expect(darfFristSetzen({ status: 'aktiv', meine_rolle: null, org_id: 1 }, fremderAdmin)).toBe(
+      false,
+    );
+    expect(
+      darfFristSetzen({ status: 'abgeschlossen', meine_rolle: null, org_id: 1 }, fremderAdmin),
+    ).toBe(false);
+    expect(darfFristSetzen(null, admin)).toBe(false);
+  });
+
+  it('Einsatzleitung einer fremden Org darf weiter', () => {
+    expect(
+      darfFristSetzen({ status: 'aktiv', meine_rolle: 'einsatzleitung', org_id: 1 }, fremderAdmin),
+    ).toBe(true);
   });
 
   it('Führungspersonal und Beobachter dürfen nicht', () => {
     for (const rolle of ['fuehrungspersonal', 'beobachter'] as const) {
-      expect(darfFristSetzen({ status: 'aktiv', meine_rolle: rolle }, keiner)).toBe(false);
-      expect(darfFristSetzen({ status: 'abgeschlossen', meine_rolle: rolle }, keiner)).toBe(false);
+      expect(darfFristSetzen({ status: 'aktiv', meine_rolle: rolle, org_id: 1 }, keiner)).toBe(
+        false,
+      );
+      expect(
+        darfFristSetzen({ status: 'abgeschlossen', meine_rolle: rolle, org_id: 1 }, keiner),
+      ).toBe(false);
     }
     expect(darfFristSetzen(undefined, undefined)).toBe(false);
   });

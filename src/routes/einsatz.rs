@@ -158,7 +158,7 @@ pub struct FristSetzen {
 }
 
 /// PUT /api/einsaetze/{id}/aufbewahrungsfrist — Aufbewahrungsfrist setzen, ändern
-/// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin. Eine Verkürzung
+/// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin der Einsatz-Org. Eine Verkürzung
 /// (inkl. erstmaligem Setzen auf einen bislang unbegrenzten Einsatz) erfordert
 /// `bestaetigt=true`. Schreibt einen ETB-System-Eintrag als Audit. Die Frist greift
 /// erst ab Einsatzabschluss (reaktive Lese-Sperre), nie auf aktive Einsätze.
@@ -168,8 +168,11 @@ pub async fn aufbewahrungsfrist_setzen(
     JsonBody(req): JsonBody<FristSetzen>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let id = ctx.einsatz.id;
-    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
-    if !ctx.benutzer.ist_admin() {
+    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin der Einsatz-Org —
+    // derselbe Org-Schnitt wie am Archiv (`aufbewahrung::fordere_archivzugriff`, LFH-753).
+    // Der Extractor-Floor allein ließe den Admin einer fremden Org serverweit durch.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
         ctx.fordere_einsatzleitung()?;
     }
 

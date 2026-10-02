@@ -134,8 +134,12 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   eintragen, nicht lockern. Frontend: Verwaltung → „Aufbewahrung" (`admin/adminNav.tsx`), Akte
   unter `/admin/aufbewahrung/:einsatzId`.
 - Archivzugriff nur für den System-Admin der eigenen Org (`fordere_archivzugriff`: fremd 403,
-  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` prüft die Org nicht (bekannte
-  Inkonsistenz).
+  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` schneidet gleich (LFH-753): Admin nur
+  der Einsatz-Org, sonst Einsatzleitung (auch org-fremd); der Client spiegelt das über
+  `BenutzerAnzeige.org_id`. Nach Fristablauf hat die Einsatzleitung bewusst keinen **UI**-Weg;
+  der PUT bleibt ihr bis zur Vormerkung (≤ 10 min) offen, danach nur das Wiederherstellen des
+  Org-Admins — kein Lesegate nachrüsten (Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-753-frist-put-org-pruefung/design.md`, D3).
 - **Akte ist eine Retain-Projektion** (`aufbewahrung/projektion.rs`, Guard
   `jede_archivspalte_ist_retain` über `klassifikation_von`), eigene DTOs.
 - **Wiederherstellen braucht die neue Frist** (`einsatz::repo::wiederherstellen`, `retention_bis`

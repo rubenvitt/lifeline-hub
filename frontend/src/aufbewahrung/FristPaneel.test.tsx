@@ -41,13 +41,14 @@ function zeige(
     status: 'aktiv' | 'abgeschlossen';
     meine_rolle?: string | null;
     retention_bis?: string | null;
+    org_id?: number;
   },
 ) {
   server.use(meHandler(me));
   return renderMitProviders(
     <FristPaneel
       einsatzId={1}
-      einsatz={{ meine_rolle: null, retention_bis: null, ...einsatz } as never}
+      einsatz={{ meine_rolle: null, retention_bis: null, org_id: 1, ...einsatz } as never}
     />,
   );
 }
@@ -219,12 +220,26 @@ describe('FristPaneel', () => {
     expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
   });
 
+  it('Admin einer fremden Org: Knöpfe gesperrt, Hinweis nennt den Grund (LFH-753)', async () => {
+    zeige(ME_ADMIN, {
+      status: 'abgeschlossen',
+      meine_rolle: null,
+      retention_bis: '2030-10-01 10:00:00',
+      org_id: 2,
+    });
+    expect(
+      await screen.findByText(/System-Admin der Organisation des Einsatzes/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Frist ändern' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
+  });
+
   it('befüllt den Dialog bei jedem Öffnen mit der AKTUELLEN Frist', async () => {
     // Die Formularinstanz lebt im Hook; überlebte `initialValues` einer früheren Öffnung, nähme
     // ein Absenden eine bestätigte Verkürzung still zurück.
     server.use(meHandler(ME_ADMIN));
     const einsatz = (retention_bis: string) =>
-      ({ status: 'abgeschlossen', meine_rolle: null, retention_bis }) as never;
+      ({ status: 'abgeschlossen', meine_rolle: null, retention_bis, org_id: 1 }) as never;
     const { rerender } = renderMitProviders(
       <FristPaneel einsatzId={1} einsatz={einsatz('2030-10-01 10:00:00')} />,
     );

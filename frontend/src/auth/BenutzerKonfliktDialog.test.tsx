@@ -10,6 +10,7 @@ const anna: BenutzerAnzeige = {
   id: 1,
   anzeigename: 'Anna Admin',
   benutzername: 'anna',
+  org_id: 1,
   system_rolle: 'admin',
   org_rolle: 'keine',
   aktiv: true,
