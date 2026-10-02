@@ -39,7 +39,11 @@ import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
 import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
 import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
-import { EIGENPOSITION_SPERRGRUND, useEigenposition } from './lagekarte/useEigenposition';
+import {
+  EIGENPOSITION_SPERRGRUND,
+  useEigenposition,
+  type Eigenposition,
+} from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import SuchnadelBand from './lagekarte/SuchnadelBand';
 import type { GefundenerOrt } from '../anzeige/ortssuche';
@@ -533,6 +537,27 @@ export default function LagekartePage() {
     return () => window.removeEventListener('keydown', taste);
   }, [messForm, onMessenBeenden]);
 
+  // Eigenposition: nur auf dem Gerät, beim ersten Standort einmal anfliegen; danach folgt die Karte
+  // nicht, der Ausschnitt bleibt frei verschiebbar. Der Anflug rahmt den Genauigkeitskreis ein und
+  // entfällt, wenn seit dem Einschalten bedient wurde: Kamera bewegt (`onBedienung`, auch jedes
+  // `flyToZiel`) oder ein Kartenmodus (LFH-766, design.md D2).
+  const [eigenpositionAnflug, setEigenpositionAnflug] = useState<Eigenposition | null>(null);
+  const bedientSeitEinschaltenRef = useRef(false);
+  const eigenposition = useEigenposition({
+    onFehler: (text) => message.warning(text),
+    onErsterFix: (p) => {
+      if (!bedientSeitEinschaltenRef.current) setEigenpositionAnflug(p);
+    },
+  });
+  const eigenpositionUmschalten = () => {
+    if (!eigenposition.an) bedientSeitEinschaltenRef.current = false;
+    eigenposition.umschalten();
+  };
+  // Ein Modus zählt auch, wenn er beim ersten Standort schon wieder beendet ist.
+  useEffect(() => {
+    if (eigenposition.an && exklusiverModusAktiv) bedientSeitEinschaltenRef.current = true;
+  }, [eigenposition.an, exklusiverModusAktiv]);
+
   /**
    * Esc beim Zeichnen ist zweistufig (LFH-712): erst die Figur, dann der Modus. Die Stufe
    * entscheidet `escStufe`; hier wird nur ausgeführt. terra-draw hat seine Abbruchtaste abgegeben
@@ -543,13 +568,6 @@ export default function LagekartePage() {
    * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler sind je
    * Render neu, der Zuhörer soll nur am Modus hängen.
    */
-  // Eigenposition: nur auf dem Gerät, beim ersten Standort einmal anfliegen; danach folgt die Karte
-  // nicht, der Ausschnitt bleibt frei verschiebbar.
-  const eigenposition = useEigenposition({
-    onFehler: (text) => message.warning(text),
-    onErsterFix: (p) => setFlyToZiel({ lng: p.lon, lat: p.lat }),
-  });
-
   const zeichenmodusAktiv = zoneEntwurf != null || zeichneAbschnittId != null;
   const escAusfuehrenRef = useRef<() => void>(() => {});
   escAusfuehrenRef.current = () => {
@@ -980,6 +998,10 @@ export default function LagekartePage() {
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
         eigenposition={eigenposition.position}
+        eigenpositionAnflug={eigenpositionAnflug}
+        onBedienung={() => {
+          bedientSeitEinschaltenRef.current = true;
+        }}
         suchnadel={suchnadel}
       />
       <KartenUeberlagerung
@@ -996,7 +1018,7 @@ export default function LagekartePage() {
             eigenposition.verfuegbarkeit === 'bereit'
               ? null
               : EIGENPOSITION_SPERRGRUND[eigenposition.verfuegbarkeit],
-          onUmschalten: eigenposition.umschalten,
+          onUmschalten: eigenpositionUmschalten,
         }}
         leiste={
           breit

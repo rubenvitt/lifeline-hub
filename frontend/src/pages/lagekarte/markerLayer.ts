@@ -11,6 +11,7 @@ import { SK_DRINGLICHKEIT, clusterTypProperties, skFarbe } from './clusterDonut'
 import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
+import { ordneEigenpositionEin } from './eigenpositionLayer';
 
 // Felder, die eine Layer-Expression, ein Filter, der Klick-Handler oder die Cluster-Aggregation
 // liest: schluessel (Klick → Inspector), typ (Donut-Segmente), farbe (marker-kreis), icon
@@ -694,12 +695,13 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
  *
  * Muss nach jeder dynamischen Layer-Anlage einer anderen Ebene erneut laufen — jene landen sonst
  * über den Markern und fangen deren Klicks ab. Beim Mount macht das Pinnen die Reihenfolge
- * unabhängig vom Rennen der Render-Poller.
+ * unabhängig vom Rennen der Render-Poller. Die Eigenposition bleibt darüber (LFH-766).
  */
 export function pinneMarkerLayerNachOben(map: MapLibreMap) {
   for (const id of MARKER_LAYER_REIHENFOLGE) {
     if (map.getLayer(id)) map.moveLayer(id);
   }
+  ordneEigenpositionEin(map);
 }
 
 /** Marker-Sources + Layer idempotent anlegen UND die aktuellen Daten einspielen (setData). */

@@ -48,6 +48,27 @@ export function genauigkeitsKreis(
   return ring;
 }
 
+/**
+ * Rahmen des Genauigkeitskreises als `[[west, süd], [ost, nord]]` für `fitBounds` (LFH-766, D1):
+ * der erste Anflug zeigt den ganzen Kreis statt eines festen Zooms. Aus demselben Ring wie die
+ * Fläche, damit Rahmen und Zeichnung nicht auseinanderlaufen.
+ */
+export function eigenpositionRahmen(position: Eigenposition): [[number, number], [number, number]] {
+  if (!(position.genauigkeit > 0)) {
+    return [
+      [position.lon, position.lat],
+      [position.lon, position.lat],
+    ];
+  }
+  const ring = genauigkeitsKreis(position.lat, position.lon, position.genauigkeit);
+  const lons = ring.map(([lon]) => lon);
+  const lats = ring.map(([, lat]) => lat);
+  return [
+    [Math.min(...lons), Math.min(...lats)],
+    [Math.max(...lons), Math.max(...lats)],
+  ];
+}
+
 type EigenpositionFc = {
   type: 'FeatureCollection';
   features: {
@@ -83,9 +104,30 @@ export function eigenpositionFc(position: Eigenposition | null): EigenpositionFc
 }
 
 /**
- * Quelle und Layer idempotent anlegen, Daten einspielen, nach oben ziehen. `farbe` ist die
- * Bedienrolle: die Eigenposition ist eine aktive Beziehung des Geräts. Rand und Kante sind Kontur
- * (Weiß plus Schwarz halten gegen jeden Grund, wie am Personen-Marker).
+ * Präfix aller terra-draw-Ebenen der Lagekarte (`prefixId` je Instanz, Regel in
+ * `pages/lagekarte/AGENTS.md`, Zeichnen und Messen).
+ */
+export const ZEICHNUNG_PRAEFIX = 'td-';
+
+/**
+ * Eigenposition über alle Lagedaten ziehen, aber unter die laufende Zeichnung (LFH-766,
+ * design.md D3): sonst deckte der Punkt beim Zeichnen am eigenen Standort die Stützpunkte. Läuft
+ * bei jeder Meldung und nach jedem Pinnen der Marker (`pinneMarkerLayerNachOben`) — sonst lägen
+ * Marker bis zur nächsten Standortmeldung über dem Punkt. Ohne angelegte Ebenen tut sie nichts.
+ */
+export function ordneEigenpositionEin(map: MapLibreMap): void {
+  if (!EIGENPOSITION_LAYER.some((id) => map.getLayer(id))) return;
+  // Vor die erste Zeichenebene der Style-Reihenfolge; ohne Zeichnung ganz nach oben.
+  const vor = map.getStyle()?.layers?.find((l) => l.id.startsWith(ZEICHNUNG_PRAEFIX))?.id;
+  for (const id of EIGENPOSITION_LAYER) {
+    if (map.getLayer(id)) map.moveLayer(id, vor);
+  }
+}
+
+/**
+ * Quelle und Layer idempotent anlegen, Daten einspielen, einordnen (`ordneEigenpositionEin`).
+ * `farbe` ist die Bedienrolle: die Eigenposition ist eine aktive Beziehung des Geräts. Rand und
+ * Kante sind Kontur (Weiß plus Schwarz halten gegen jeden Grund, wie am Personen-Marker).
  */
 export function sorgeFuerEigenpositionLayer(
   map: MapLibreMap,
@@ -139,6 +181,6 @@ export function sorgeFuerEigenpositionLayer(
     } else if (id === 'eigenposition-kreisrand') {
       map.setPaintProperty(id, 'line-color', farbe);
     }
-    map.moveLayer(id);
   }
+  ordneEigenpositionEin(map);
 }
