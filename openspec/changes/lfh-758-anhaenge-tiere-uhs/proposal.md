@@ -128,7 +128,7 @@ Schaden-Routen und ihr DTO bleiben gleich.
 - **Keine neuen Abhängigkeiten.**
 - **Nicht enthalten:**
   - ein Bild als Hintergrund des Platz-Layouts (`Grundriss.tsx`, Spec `uhs-grundriss`) →
-    Folgeticket;
+    **LFH-999**;
   - Anhänge an Personen samt Lese-Audit in `person_zugriff_audit` → **LFH-757**;
   - Bildvorschau und Thumbnails → **LFH-759**;
   - eine Anhangzahl in den Listen von Tieren und UHS.

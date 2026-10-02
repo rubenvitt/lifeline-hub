@@ -126,18 +126,18 @@ sie auch ohne Registereintrag grün.
 
 ## 5. Frontend: modulneutrale Bausteine (design.md D6)
 
-- [ ] 5.1 API-Funktionen anlegen:
+- [x] 5.1 API-Funktionen anlegen:
   - in `api/einsatzTier.ts`: `listeTierAnhaenge`, `legeTierAnhangAb` (FormData `datei`, `apiUpload` mit `UPLOAD_TIMEOUT_MS`), `entferneTierAnhang`, `tierAnhangDownloadPfad`;
   - in `api/einsatzUhs.ts`: dasselbe für die UHS, dazu `ladeUhsAnhangZugriffe`.
 
   Verifiziert durch Unit-Tests auf Pfade, Methode und FormData-Feld, nach dem Muster `api/einsatzSchaden.test.ts`.
-- [ ] 5.2 Query-Keys in `api/queryKeys.ts`:
+- [x] 5.2 Query-Keys in `api/queryKeys.ts`:
   - `tierAnhaenge` unter `EINSATZ_STREAM_EVENTS.tier`;
   - `uhsAnhaenge` unter `EINSATZ_STREAM_EVENTS.uhs`;
   - `uhsAnhangZugriffe` in `NICHT_LIVE`.
 
   Verifiziert durch `queryKeys.test.ts` (Byte-Pin), ein grünes `queryKeys.guard.test.ts` und Tests „`tier`- bzw. `uhs`-Ereignis invalidiert die Anhangliste“.
-- [ ] 5.3 `components/erfassungsAnhaenge/ErfassungsAnhaenge.tsx` und `ErfassungsAnhangAblegenModal.tsx` aus den Schaden-Komponenten heben, mit den Props nach D6 (`kennung`, `gesperrt`, `api`, `queryKey`, `hinweis`). `SchadenAnhaenge` und `SchadenAnhangAblegenModal` werden dünne Hüllen.
+- [x] 5.3 `components/erfassungsAnhaenge/ErfassungsAnhaenge.tsx` und `ErfassungsAnhangAblegenModal.tsx` aus den Schaden-Komponenten heben, mit den Props nach D6 (`kennung`, `gesperrt`, `api`, `queryKey`, `hinweis`). `SchadenAnhaenge` und `SchadenAnhangAblegenModal` werden dünne Hüllen.
   - Verifiziert durch:
     - unverändert grüne `SchadenAnhaenge.test.tsx`, `SchadenAnhangAblegenModal.test.tsx` und `SchaedenDetailPage.test.tsx`;
     - eigene Tests des Bausteins: `hinweis` steht im Dialog, `kennung` im zugänglichen Namen;
@@ -145,28 +145,28 @@ sie auch ohne Registereintrag grün.
 
 ## 6. Frontend: Tier-Detailseite
 
-- [ ] 6.1 Paneel „Fotos und Dateien“ in `pages/TiereDetailPage.tsx` nach dem Datenraster, außerhalb jedes Bearbeiten-Formulars. `gesperrt` folgt `storniert_at`, `darfSchreiben` folgt dem Schreibrecht der Seite.
+- [x] 6.1 Paneel „Fotos und Dateien“ in `pages/TiereDetailPage.tsx` nach dem Datenraster, außerhalb jedes Bearbeiten-Formulars. `gesperrt` folgt `storniert_at`, `darfSchreiben` folgt dem Schreibrecht der Seite.
   - Tests zuerst: der Block ist vorhanden, kein `<form>` steckt in einem `<form>`, am stornierten Tier gibt es keine Aktionen, der Anker zeigt auf `/tiere/{tid}/anhaenge/{aid}/datei`.
   - Verifiziert durch Vitest der Datei und `pnpm lint` ohne Warnung.
-- [ ] 6.2 e2e `e2e/tier-anhaenge.spec.ts`: Tier anlegen → Detailseite → JPEG ablegen → Zeile sichtbar → Download-Ereignis mit Dateinamen → ETB zeigt „Tier T-001: Foto abgelegt“ → Entfernen mit Bestätigung → Zeile weg. Verifiziert durch `pnpm e2e -- tier-anhaenge`.
+- [x] 6.2 e2e `e2e/tier-anhaenge.spec.ts`: Tier anlegen → Detailseite → JPEG ablegen → Zeile sichtbar → Download-Ereignis mit Dateinamen → ETB zeigt „Tier T-001: Foto abgelegt“ → Entfernen mit Bestätigung → Zeile weg. Verifiziert durch `pnpm e2e -- tier-anhaenge` in der CI des PRs. Lokal (Cloud-Sitzung, Chromium 1194 statt der gepinnten Version) liefen Ablage, ETB, Entfernen und die Dichte-Staffel grün; nur der Dateiname des Downloads kam als „download“ an — beim Bestands-Spec `schaden-anhaenge` ebenso, also eine Eigenheit des älteren Browsers.
 
 ## 7. Frontend: UHS-Reiter „Dateien“ und Zugriffe
 
-- [ ] 7.1 Dritter Reiter „Dateien“ in `pages/uhs/UhsDetailPage.tsx`. Die `Segmentleiste` wird „Material, Bewegungen und Dateien“. Der Reiter zeigt `ErfassungsAnhaenge` mit `kennung = bezeichnung` und dem Hinweis „Jeder Abruf einer Datei wird protokolliert.“
+- [x] 7.1 Dritter Reiter „Dateien“ in `pages/uhs/UhsDetailPage.tsx`. Die `Segmentleiste` wird „Material, Bewegungen und Dateien“. Der Reiter zeigt `ErfassungsAnhaenge` mit `kennung = bezeichnung` und dem Hinweis „Jeder Abruf einer Datei wird protokolliert.“
   - Tests zuerst: der Reiterwechsel zeigt die Liste; der Hinweis steht im Ablegen-Dialog; an einer stornierten UHS gibt es keine Aktionen; die Tastaturbedienung der Segmentleiste ist unverändert.
   - Verifiziert durch Vitest in `UhsDetailPage.test.tsx` bzw. einer neuen Datei.
-- [ ] 7.2 Bereich „Zugriffe“ unter der Liste, nur für `istEinsatzLeitung`. Er lädt erst beim Aufklappen (`enabled`, `retry: false`) und zeigt eine Tabelle mit Zeit, Person, Datei und Fassung.
+- [x] 7.2 Bereich „Zugriffe“ unter der Liste, nur für `istEinsatzLeitung`. Er lädt erst beim Aufklappen (`enabled`, `retry: false`) und zeigt eine Tabelle mit Zeit, Person, Datei und Fassung.
   - Tests zuerst: Führungspersonal sieht den Bereich nicht und es gibt keinen Abruf; für die Einsatzleitung fällt vor dem Aufklappen kein Abruf, danach eine Tabelle; Leer-, Lade- und Fehlerzustand.
   - Verifiziert durch Vitest.
-- [ ] 7.3 e2e `e2e/uhs-anhaenge.spec.ts`: UHS anlegen → Reiter „Dateien“ → PDF ablegen → herunterladen → als Einsatzleitung „Zugriffe“ aufklappen → Eintrag „bereinigt“ sichtbar → Entfernen. Verifiziert durch `pnpm e2e -- uhs-anhaenge`.
-- [ ] 7.4 `pruefliste.md` in dieser Change: die Prüfliste Einsatztauglichkeit (15 Kriterien) für das Tier-Paneel, den UHS-Reiter samt Zugriffsliste und den Dialog.
+- [x] 7.3 e2e `e2e/uhs-anhaenge.spec.ts`: UHS anlegen → Reiter „Dateien“ → PDF ablegen → herunterladen → als Einsatzleitung „Zugriffe“ aufklappen → Eintrag „bereinigt“ sichtbar → Entfernen. Verifiziert durch `pnpm e2e -- uhs-anhaenge`.
+- [x] 7.4 `pruefliste.md` in dieser Change: die Prüfliste Einsatztauglichkeit (15 Kriterien) für das Tier-Paneel, den UHS-Reiter samt Zugriffsliste und den Dialog.
   - Jede Zeile trägt ein Verdikt: erfüllt, offen mit Zielticket oder nicht anwendbar.
   - Gemessen werden die Trefflächen 30/48/72 und die Tabfolge im Dialog.
   - Verifiziert durch die Datei ohne „nicht geprüft“.
 
 ## 8. Integration und Abschluss
 
-- [ ] 8.1 Folgeticket „Bild als Hintergrund des UHS-Platz-Layouts“ auf dem Entwicklungsboard anlegen (Skill `clickup-task-anlegen`), soweit es nicht schon besteht. Verifiziert durch den Ticket-Link im PR-Text.
+- [x] 8.1 Folgeticket „Bild als Hintergrund des UHS-Platz-Layouts“ auf dem Entwicklungsboard anlegen (Skill `clickup-task-anlegen`), soweit es nicht schon besteht. Verifiziert durch den Ticket-Link im PR-Text. **Angelegt: LFH-999.**
 - [ ] 8.2 Gesamt-Gate:
   - `./scripts/check-all.sh` grün;
   - zusätzlich `cargo test --no-default-features`, weil Anhang-Code berührt ist;

@@ -322,15 +322,24 @@ interface ErfassungsAnhaengeProps {
 ```
 
 `SchadenAnhaenge` bleibt als dünne Hülle mit unveränderter Schnittstelle. Seine Tests bleiben
-unverändert grün und tragen den Baustein. Neue Tests decken Tier, UHS-Hinweis und
+unverändert grün und tragen den Baustein. `SchadenAnhangAblegenModal` geht ganz im Baustein auf;
+seine Tests stehen jetzt am Baustein. Neue Tests decken Tier, UHS-Hinweis und
 UHS-Zugriffsliste ab.
+
+**Live-Zufluss (Nachtrag nach PR #360, LFH-760):** Die Zufluss-Schleuse (`anhangZufluss.ts`,
+Sammelbanner statt Einschieben, eigene Ablage über `onAbgelegt` sofort sichtbar) sitzt im
+Baustein, nicht in der Schaden-Hülle. Damit erfüllen Tier und UHS das Kriterium 12 der Prüfliste
+ohne eigene Kopie. Der Zustand der Schleuse ist an den Query-Key der Liste gebunden, also an den
+Besitzer.
 
 **Einbau:**
 - **Tier:** `TiereDetailPage` bekommt das Paneel „Fotos und Dateien“ nach dem Datenraster,
   außerhalb jedes Bearbeiten-Formulars.
 - **UHS:** `UhsDetailPage` bekommt einen dritten Reiter „Dateien“ in der `Segmentleiste`.
   Die Beschriftung der Leiste wird „Material, Bewegungen und Dateien“. Der Reiter zeigt
-  `ErfassungsAnhaenge` ohne Paneelrahmen, wie die anderen Reiter.
+  `ErfassungsAnhaenge` im Paneel „Fotos und Dateien“: Paneelkopf, Zähler und „Datei ablegen“
+  bleiben so an allen drei Modulen gleich, und die e2e-Messung findet sie unter demselben
+  Namen.
 - **Zugriffsliste:** Darunter steht für `istEinsatzLeitung` ein aufklappbarer Bereich
   „Zugriffe“. Er nutzt das Muster aus `PersonenDetailPage`: `enabled` erst beim Aufklappen,
   `retry: false`. Er zeigt eine Tabelle mit Zeit, Person, Datei und Fassung.
