@@ -112,6 +112,12 @@ pub fn ist_gueltige_retention_dauer(tage: i64) -> bool {
     (1..=3650).contains(&tage)
 }
 
+/// Ob `n` eine gültige Skelett-Frist in Tagen ab Abschluss ist (1..=36500 = hundert Jahre,
+/// LFH-750). `None` (das Skelett bleibt unbegrenzt) behandelt der Aufrufer separat.
+pub fn ist_gueltige_skelett_dauer(tage: i64) -> bool {
+    (1..=36500).contains(&tage)
+}
+
 /// Ob `s` eine pragmatisch gültige Zeitzone ist. Volle IANA-TZ-DB-Prüfung wäre
 /// Over-Engineering (siehe Plan-Risiken) — Backend prüft nur „nicht-leer"; die UI
 /// bietet eine kuratierte Liste + Freitext.
@@ -634,6 +640,17 @@ mod tests {
         assert!(ist_gueltige_frist_min(10_080));
         assert!(!ist_gueltige_frist_min(0));
         assert!(!ist_gueltige_frist_min(10_081));
+    }
+
+    #[test]
+    fn skelett_dauer_validator_grenzen() {
+        // LFH-750: 1..=36500 Tage (100 Jahre) ab Abschluss.
+        assert!(ist_gueltige_skelett_dauer(1));
+        assert!(ist_gueltige_skelett_dauer(3650));
+        assert!(ist_gueltige_skelett_dauer(36500));
+        assert!(!ist_gueltige_skelett_dauer(0));
+        assert!(!ist_gueltige_skelett_dauer(-1));
+        assert!(!ist_gueltige_skelett_dauer(36501));
     }
 
     #[test]

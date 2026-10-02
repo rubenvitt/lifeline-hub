@@ -151,6 +151,119 @@ async fn uebersicht_nur_abgeschlossene_der_org_mit_zustand() {
     assert!(!text.contains("eingeschlossen"), "{text}");
 }
 
+async fn skelett_frist(pool: &SqlitePool, org: i64, tage: Option<i64>) {
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, skelett_dauer_tage) VALUES (?, ?) \
+         ON CONFLICT(org_id) DO UPDATE SET skelett_dauer_tage = excluded.skelett_dauer_tage",
+    )
+    .bind(org)
+    .bind(tage)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// Spec `aufbewahrung-archiv`, „Löschung am“ und „Löschung ausstehend“ (LFH-750).
+#[tokio::test]
+async fn uebersicht_loeschung_am_nur_mit_skelett_frist() {
+    let pool = crate::db::test_pool().await;
+    grundlage(&pool).await;
+    let ohne = einsatz(&pool, 1, "ohne", "abgeschlossen", None, None, None).await;
+    let geschwaerzt = einsatz(
+        &pool,
+        1,
+        "geschwaerzt",
+        "abgeschlossen",
+        Some("2026-03-01 00:00:00"),
+        Some("2026-03-02 00:00:00"),
+        Some("2026-04-01 00:00:00"),
+    )
+    .await;
+    let zeile = |liste: &[super::AufbewahrungEintragAnzeige], id: i64| {
+        liste.iter().find(|e| e.einsatz_id == id).unwrap().clone()
+    };
+
+    // Ohne Skelett-Frist: kein Löschtermin, geschwärzt bleibt geschwärzt.
+    let liste = repo::uebersicht(&pool, 1, t(JETZT)).await.unwrap();
+    assert_eq!(zeile(&liste, ohne).loeschung_am, None);
+    assert_eq!(zeile(&liste, geschwaerzt).loeschung_am, None);
+    assert_eq!(
+        zeile(&liste, geschwaerzt).zustand,
+        AufbewahrungZustand::Geschwaerzt
+    );
+
+    // Mit 30 Tagen: Abschluss 2026-01-01 + 30 = 2026-01-31; geschwärzt erst am 2026-04-01.
+    skelett_frist(&pool, 1, Some(30)).await;
+    let liste = repo::uebersicht(&pool, 1, t(JETZT)).await.unwrap();
+    assert_eq!(
+        zeile(&liste, ohne).loeschung_am.as_deref(),
+        Some("2026-01-31 00:00:00")
+    );
+    assert_eq!(zeile(&liste, ohne).zustand, AufbewahrungZustand::OhneFrist);
+    assert_eq!(
+        zeile(&liste, geschwaerzt).loeschung_am.as_deref(),
+        Some("2026-04-01 00:00:00"),
+        "nie vor der Schwärzung"
+    );
+    assert_eq!(
+        zeile(&liste, geschwaerzt).zustand,
+        AufbewahrungZustand::LoeschungAusstehend
+    );
+    assert_eq!(
+        zeile(&liste, geschwaerzt).bezeichnung.as_deref(),
+        Some("geschwaerzt")
+    );
+}
+
+/// Spec `aufbewahrung-archiv`, „Endgültig gelöscht“ und „Löschprotokoll einer fremden
+/// Organisation“ (LFH-750): Protokollzeilen der eigenen Org erscheinen ohne Bezeichnung.
+#[tokio::test]
+async fn uebersicht_zeigt_protokollzeilen_nur_der_eigenen_org() {
+    let pool = crate::db::test_pool().await;
+    let admin = grundlage(&pool).await;
+    let fremd_admin: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
+         VALUES (2,'Fremd','fremd','h','admin') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let neuer = einsatz(&pool, 1, "neu", "abgeschlossen", None, None, None).await;
+    for (org, id, akteur) in [(1, 900, admin), (2, 901, fremd_admin)] {
+        sqlx::query(
+            "INSERT INTO aufbewahrung_loeschprotokoll (org_id, einsatz_id, einsatznummer_intern, \
+                nummer_jahr, nummer_lfd, abgeschlossen_at, geschwaerzt_at, geloescht_at, \
+                skelett_dauer_tage, akteur_id) \
+             VALUES (?, ?, 'E-2016-0003', 2016, 3, '2016-01-01 00:00:00', \
+                '2016-03-01 00:00:00', '2026-01-01 00:00:00', 3650, ?)",
+        )
+        .bind(org)
+        .bind(id)
+        .bind(akteur)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    let liste = repo::uebersicht(&pool, 1, t(JETZT)).await.unwrap();
+    let ids: Vec<i64> = liste.iter().map(|e| e.einsatz_id).collect();
+    assert_eq!(
+        ids,
+        vec![neuer, 900],
+        "neuester Abschluss zuerst, fremde Org fehlt"
+    );
+    let g = &liste[1];
+    assert_eq!(g.zustand, AufbewahrungZustand::EndgueltigGeloescht);
+    assert_eq!(g.bezeichnung, None);
+    assert_eq!(g.einsatznummer_intern.as_deref(), Some("E-2016-0003"));
+    assert_eq!(g.abgeschlossen_at.as_deref(), Some("2016-01-01 00:00:00"));
+    assert_eq!(g.geschwaerzt_at.as_deref(), Some("2016-03-01 00:00:00"));
+    assert_eq!(
+        g.endgueltig_geloescht_at.as_deref(),
+        Some("2026-01-01 00:00:00")
+    );
+}
+
 #[tokio::test]
 async fn akte_waehrend_karenz_traegt_keine_personendaten() {
     let pool = crate::db::test_pool().await;

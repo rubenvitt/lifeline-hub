@@ -3,7 +3,7 @@
 //! `tick_einmal`; die Logik selbst ist mit injiziertem `jetzt` deterministisch
 //! testbar. Idempotent über WHERE-Guards in den Repo-Queries.
 //!
-//! Zwei Phasen:
+//! Vier Phasen:
 //! - **Phase A** (reversibel): Einsätze mit abgelaufener Aufbewahrungsfrist werden
 //!   soft-gelöscht (`geloescht_at` gesetzt = Karenz-Start). Ab da am Datenzugriff
 //!   gesperrt (`darf_lesen`).
@@ -12,14 +12,20 @@
 //! - **Phase B** (IRREVERSIBEL): nach Ablauf der Karenz (`KARENZ_TAGE`) werden die
 //!   Personendaten gescrubbt (`repo::schwaerze_einsatz`), das operative Skelett
 //!   (Einsatz, ETB, Zähler) bleibt erhalten. `geschwaerzt_at`-Tombstone = Idempotenz.
+//! - **Phase C**: abgelaufene Einträge des Auth-Audits (eigene Frist, an keinem Einsatz).
+//! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
+//!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
+//!   einzige Spur ist das Löschprotokoll der Org. Ohne Org-Frist bleibt das Skelett.
 //!
-//! DATENVERLUST-kritisch: jede Mutation wird zuvor mit `tracing` protokolliert und
-//! mit einem ETB-System-Audit begleitet; aktive Einsätze sind durch
-//! `status='abgeschlossen'` in jeder Purge-Query hart ausgeschlossen.
+//! DATENVERLUST-kritisch: jede Mutation wird zuvor mit `tracing` protokolliert. Phase A und B
+//! begleitet ein ETB-System-Audit; Phase D schreibt ihren Audit in derselben Transaktion ins
+//! `aufbewahrung_loeschprotokoll` (das ETB geht mit); Phase C betrifft keinen Einsatz. Aktive
+//! Einsätze sind durch `status='abgeschlossen'` in jeder Einsatz-Purge-Query hart ausgeschlossen.
 
 use super::aufbewahrung_kategorie as kategorie;
 use super::repo;
 use super::retention::{karenz_abgelaufen, KARENZ_TAGE};
+use super::skelett_loeschung;
 use crate::live::{LiveEvent, LiveHub};
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
@@ -29,8 +35,9 @@ use std::time::Duration;
 /// kein Sekunden-Druck wie bei Erinnerungen).
 const TICK_SEKUNDEN: u64 = 600;
 
-/// Ein Purge-Durchlauf für den Zeitpunkt `jetzt`. Führt Phase A (Soft-Delete) und
-/// Phase B (PII-Schwärzung) aus und liefert die Gesamtzahl der mutierten Einsätze.
+/// Ein Purge-Durchlauf für den Zeitpunkt `jetzt`. Führt Phase A (Soft-Delete), Phase B
+/// (PII-Schwärzung), Phase C (Auth-Audit) und Phase D (endgültige Löschung) aus und liefert
+/// die Gesamtzahl der Mutationen.
 /// Async + injiziertes `jetzt` = deterministisch testbar. Idempotent: ein zweiter
 /// Tick ohne neue Fälligkeiten liefert 0.
 ///
@@ -43,7 +50,8 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
     tick_mit_rueckschrieb(pool, live, jetzt, &mut false).await
 }
 
-/// Wie [`tick_einmal`], schreibt nach einer Schwärzung aber den WAL zurück (LFH-725, Spec
+/// Wie [`tick_einmal`], schreibt nach einer Schwärzung oder endgültigen Löschung (LFH-750) aber
+/// den WAL zurück (LFH-725, Spec
 /// `aufbewahrung`, „Physische Entfernung geschwärzter Werte“): erst damit sind die genullten
 /// Seiten in der Hauptdatei und der Vorzustand aus dem WAL getilgt. Blockiert eine andere
 /// Verbindung den Rückschrieb, bleibt `rueckschrieb_ausstehend` gesetzt, und jeder folgende Tick
@@ -57,6 +65,7 @@ pub async fn tick_mit_rueckschrieb(
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let mut anzahl = 0;
     let mut geschwaerzt = 0;
+    let mut geloescht = 0;
 
     // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start) ---
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
@@ -193,9 +202,34 @@ pub async fn tick_mit_rueckschrieb(
         Err(e) => tracing::warn!("Purge Phase C: Auth-Audit-Purge fehlgeschlagen: {e}"),
     }
 
-    // --- Rückschrieb nach der Schwärzung (LFH-725) ---
+    // --- Phase D: endgültige Löschung geschwärzter Skelette (UNUMKEHRBAR, LFH-750) ---
+    // Läuft nach Phase B: fallen Karenz-Ende und Skelett-Frist in denselben Lauf, löscht er
+    // direkt nach der Schwärzung. Wie Phase B meldet sie nichts live — der Einsatz ist seit der
+    // Vormerkung gesperrt und steht in keiner Einsatzliste.
+    match skelett_loeschung::faellige(pool, jetzt).await {
+        Ok(ids) => {
+            for id in ids {
+                tracing::warn!(
+                    einsatz_id = id,
+                    "Purge Phase D: ENDGÜLTIGE LÖSCHUNG des Skeletts (unumkehrbar) — \
+                     Skelett-Frist abgelaufen"
+                );
+                match skelett_loeschung::loeschen(pool, id, jetzt).await {
+                    Ok(true) => {
+                        anzahl += 1;
+                        geloescht += 1;
+                    }
+                    Ok(false) => {} // Race: Frist geleert/verlängert oder schon gelöscht.
+                    Err(e) => tracing::error!(einsatz_id = id, "Purge Phase D fehlgeschlagen: {e}"),
+                }
+            }
+        }
+        Err(e) => tracing::warn!("Purge Phase D: Abfrage fehlgeschlagen: {e}"),
+    }
+
+    // --- Rückschrieb nach Schwärzung oder Löschung (LFH-725, LFH-750) ---
     // Nicht in jedem Tick: TRUNCATE hält beim Warten auf Lesende die Schreibsperre.
-    if geschwaerzt > 0 || *rueckschrieb_ausstehend {
+    if geschwaerzt > 0 || geloescht > 0 || *rueckschrieb_ausstehend {
         match crate::db::wal_zurueckschreiben(pool).await {
             Ok(true) => {
                 if *rueckschrieb_ausstehend {
@@ -2069,5 +2103,230 @@ mod tests {
             "erneut geschwärzt, Vormerkung aus der Sicherung unverändert"
         );
         assert!(!enthaelt_klartext(&pfad));
+    }
+
+    // ---------- LFH-750: endgültige Löschung des Skeletts (Phase D) ----------
+
+    /// Ein einzelnes, kleingeschriebenes Wort: so legt es auch der FTS5-Tokenizer (`unicode61`)
+    /// in `etb_eintrag_fts_data` ab. Ein Text mit Bindestrichen und Großbuchstaben stünde dort nur
+    /// zerlegt, und die Bytesuche sähe die Reste im Suchindex nicht.
+    const ETB_KLARTEXT: &str = "lfh750gepflanztwortlaut";
+
+    async fn skelett_frist(pool: &SqlitePool, tage: Option<i64>) {
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, skelett_dauer_tage) VALUES (1, ?) \
+             ON CONFLICT(org_id) DO UPDATE SET skelett_dauer_tage = excluded.skelett_dauer_tage",
+        )
+        .bind(tage)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Abgeschlossen am 2026-01-01, Frist abgelaufen, vorgemerkt am 2026-01-02 (Karenz endet am
+    /// 2026-02-01), mit ETB-Eintrag (Retain — überlebt die Schwärzung) und Person.
+    async fn vorgemerkt_mit_etb(pool: &SqlitePool) -> i64 {
+        let e = abgeschlossen_mit_frist(pool, "2026-01-01 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-01-02 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar("SELECT abgeschlossen_von FROM einsatz WHERE id = ?")
+            .bind(e)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'meldung', ?, ?, '2026-01-01 00:00:00')",
+        )
+        .bind(e)
+        .bind(ETB_KLARTEXT)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, \
+                geaendert_von) VALUES (?, 1, 'betroffen', ?, ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+        e
+    }
+
+    async fn existiert(pool: &SqlitePool, e: i64) -> bool {
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM einsatz WHERE id = ?)")
+            .bind(e)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn reste_im_etb_und_register(pool: &SqlitePool, e: i64) -> i64 {
+        sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?1) \
+                  + (SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?1)",
+        )
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn protokoll_zeilen(pool: &SqlitePool, e: i64) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM aufbewahrung_loeschprotokoll WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// Spec `aufbewahrung`, „Frist abgelaufen, aber noch nicht geschwärzt“ und „Fällig“: die
+    /// Skelett-Frist (Abschluss + 30 Tage = 2026-01-31) ist vor der Schwärzung abgelaufen; der
+    /// Lauf löscht erst in dem Lauf, der schwärzt — dann samt ETB und Register.
+    #[tokio::test]
+    async fn phase_d_loescht_erst_im_schwaerzungslauf_und_dann_vollstaendig() {
+        let pool = crate::db::test_pool().await;
+        let e = vorgemerkt_mit_etb(&pool).await;
+        skelett_frist(&pool, Some(30)).await;
+
+        // Skelett-Frist abgelaufen, Karenz noch nicht: weder geschwärzt noch gelöscht.
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-31 12:00:00")).await,
+            0
+        );
+        assert!(existiert(&pool, e).await);
+        assert_eq!(reste_im_etb_und_register(&pool, e).await, 2);
+
+        // Karenz abgelaufen: derselbe Lauf schwärzt (B) und löscht (D).
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-02-01 12:00:00")).await,
+            2
+        );
+        assert!(!existiert(&pool, e).await, "Skelett endgültig gelöscht");
+        assert_eq!(reste_im_etb_und_register(&pool, e).await, 0);
+        assert_eq!(protokoll_zeilen(&pool, e).await, 1);
+
+        // Zweiter Lauf: nichts mehr zu tun.
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-02-01 12:10:00")).await,
+            0
+        );
+        assert_eq!(protokoll_zeilen(&pool, e).await, 1);
+    }
+
+    /// Spec `aufbewahrung`, „Ohne Skelett-Frist“, „Noch nicht fällig“ und „Skelett-Frist ohne
+    /// Eingriff“: ohne Org-Frist bleibt das Skelett auch nach Jahrzehnten; mit Frist löscht der
+    /// nächste Lauf nach ihrem Ablauf, nicht vorher.
+    #[tokio::test]
+    async fn phase_d_ohne_frist_bleibt_mit_frist_erst_nach_ablauf() {
+        let pool = crate::db::test_pool().await;
+        let e = vorgemerkt_mit_etb(&pool).await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-02-01 12:00:00")).await,
+            1,
+            "nur geschwärzt"
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2046-02-01 12:00:00")).await,
+            0
+        );
+        assert!(
+            existiert(&pool, e).await,
+            "ohne Skelett-Frist bleibt das Skelett"
+        );
+
+        // Abschluss 2026-01-01 + 3650 Tage = 2035-12-30 00:00:00.
+        skelett_frist(&pool, Some(3650)).await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2035-12-29 23:59:59")).await,
+            0
+        );
+        assert!(existiert(&pool, e).await, "noch nicht fällig");
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2035-12-30 00:00:00")).await,
+            1
+        );
+        assert!(!existiert(&pool, e).await);
+    }
+
+    /// Spec `aufbewahrung`, „Keine Altbytes“: der ETB-Wortlaut überlebt die Schwärzung (Retain)
+    /// und verschwindet erst mit der Löschung — danach steht er weder in der DB-Datei noch im
+    /// WAL, auch nicht als Token im FTS5-Suchindex. Schwärzung und Löschung liegen in getrennten
+    /// Läufen, damit der Rückschrieb der Löschung selbst geprüft ist. Mutationsproben: ohne
+    /// Rückschrieb nach Phase D und ohne `secure-delete` am FTS-Index wird er rot.
+    #[tokio::test]
+    async fn skelett_loeschung_hinterlaesst_keine_altbytes() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let e = vorgemerkt_mit_etb(&pool).await;
+        skelett_frist(&pool, Some(100)).await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-02-01 12:00:00")).await,
+            1,
+            "nur geschwärzt"
+        );
+        assert!(
+            crate::db::datei_oder_wal_enthaelt(&pfad, ETB_KLARTEXT.as_bytes()),
+            "Vorbedingung: der ETB-Wortlaut überlebt die Schwärzung"
+        );
+
+        // Abschluss + 100 Tage = 2026-04-11.
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-04-11 12:00:00")).await,
+            1
+        );
+        assert!(!existiert(&pool, e).await);
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, ETB_KLARTEXT.as_bytes()),
+            "ETB-Wortlaut steht nach der Löschung noch in DB-Datei oder WAL"
+        );
+    }
+
+    /// Spec `aufbewahrung`, „Rückspielen einer älteren Sicherung“: eine Sicherung von vor der
+    /// Löschung bringt das Skelett zurück; der nächste Lauf löscht es erneut, mit genau einer
+    /// Protokollzeile.
+    #[tokio::test]
+    async fn restore_von_vor_der_loeschung_wird_erneut_geloescht() {
+        let (dir, pfad, pool) = produktions_pool().await;
+        let e = vorgemerkt_mit_etb(&pool).await;
+        skelett_frist(&pool, Some(100)).await;
+        tick_einmal(&pool, &LiveHub::new(), t("2026-02-01 12:00:00")).await;
+        let sicherung = dir.path().join("vorher.sqlite");
+        crate::backup::erzeuge_sicherung(&pool, &sicherung)
+            .await
+            .unwrap();
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-04-11 12:00:00")).await,
+            1
+        );
+        pool.close().await;
+
+        crate::backup::restore::restore_aus_datei(&sicherung, &pfad, true)
+            .await
+            .unwrap();
+        let pool = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        assert!(
+            existiert(&pool, e).await,
+            "Vorbedingung: die Sicherung trägt das Skelett"
+        );
+        assert_eq!(protokoll_zeilen(&pool, e).await, 0);
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-04-11 12:10:00")).await,
+            1
+        );
+        assert!(!existiert(&pool, e).await);
+        assert_eq!(protokoll_zeilen(&pool, e).await, 1);
+        assert!(!crate::db::datei_oder_wal_enthaelt(
+            &pfad,
+            ETB_KLARTEXT.as_bytes()
+        ));
     }
 }
