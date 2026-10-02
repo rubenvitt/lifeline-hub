@@ -352,8 +352,10 @@ anwendbar), „nicht geprüft" ist keins.
   `ThemeModeProvider` (`useHelligkeit`, Stufen 100/80/60/40/20, `lifeline-hub.helligkeit`,
   **gespiegelt in `index.html`**), wirkt nur über die Deckschicht `html::after` in `rollen.css`
   (`--lfh-abdunkelung`, `@media screen`), nie über Paletten. Bei aktiver Warnung
-  (`einsatz/aktiveWarnung.ts`: Warnstufe mit Rolle `alarm` oder
-  `meldungen.bestaetigung_ueberfaellig`) gilt `HELLIGKEIT_BODEN_WARNUNG` (abgeleitet über
+  (`einsatz/aktiveWarnung.ts`: Warnstufe mit Rolle `alarm`,
+  `meldungen.bestaetigung_ueberfaellig` oder eine jetzt geltende DWD-Warnung mit Rolle `alarm`
+  aus `dwdWarnstufe`, nur mit Freigabe `wetter-pegel` und ohne eigenen Abruf, LFH-774) gilt
+  `HELLIGKEIT_BODEN_WARNUNG` (abgeleitet über
   Kriterium 5, Guard `theme/helligkeit.test.ts`); Quellen melden sich nur über `useWarnsperre`
   (heute allein `EinsatzLayout`). Die Sperre ändert nie die Wahl.
 - **Der dauerdunkle Rahmen hält die Tag-Schwelle** (LFH-434): die Schwelle aus Kriterium 5
