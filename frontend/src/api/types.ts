@@ -254,6 +254,10 @@ export type SchadenAbschlussGrund = S['SchadenAbschlussGrund'];
 export type Schaden = S['SchadenAnzeige'];
 /** LFH-21: Foto/Datei an einem Schaden; `id` ist die Linker-id, nicht `anhang.id`. */
 export type SchadenAnhang = S['SchadenAnhangAnzeige'];
+export type TierAnhang = S['TierAnhangAnzeige'];
+export type UhsAnhang = S['UhsAnhangAnzeige'];
+/** LFH-758: Lese-Audit je Abruf einer UHS-Datei (nur Einsatzleitung). */
+export type AnhangZugriff = S['AnhangZugriffAnzeige'];
 
 // ============================== E‑4 Tiere ==============================
 export type TierStatus = S['TierStatus'];

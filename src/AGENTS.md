@@ -83,7 +83,15 @@ auf sein DTO. Ein neues Modul braucht: Linker-Migration (Muster `0126`), Eintrag
 **`{aid}` ist die Linker-id**; Allowlist `ERLAUBTE_MIME_ERFASSUNG` (Spiegel `ERFASSUNG_ACCEPT` in
 `api/upload.ts`); `anhang::pruefe_vor_persist` vor, Anhang + Linker + ETB in EINEM
 `write_retry!`. Entfernen = Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen;
-storniert → 409 (Route und, gegen das Rennen, in der Transaktion).
+storniert → 409 (Route und, gegen das Rennen, in der Transaktion). Tier-Anhänge ohne
+Lese-Audit (wie Tiere insgesamt).
+- **UHS-Lese-Audit (LFH-758):** jeder zugelassene Download einer UHS-Datei schreibt VOR der
+  Antwort eine Zeile in `anhang_zugriff_audit` (`anhang::audit_repo`, auch bei 304), nach
+  `original_freigeben`; scheitert sie, geht nichts hinaus. Abgewiesene Anfragen, Liste und
+  Ablegen protokollieren nichts. `anhang_id` dort **ohne FK** (sonst wäre die Tabelle für den
+  Linker-Guard ein Linker, und die Schwärzung nähme das Protokoll mit); `ablage` hält den Ort
+  lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
+  protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
 
 **Auslieferung (LFH-747)** (Spec `anhang-metadaten`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-747-exif-bereinigung-auslieferung/design.md`):

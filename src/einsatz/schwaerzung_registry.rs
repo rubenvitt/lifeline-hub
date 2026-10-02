@@ -328,6 +328,26 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zugriff_at", G_ZEIT),
         ],
     },
+    TabellenRegel {
+        // LFH-758: Lese-Audit je Abruf einer UHS-Datei — bleibt wie `person_zugriff_audit`
+        // (Nachweis, wer wann eine Datei mit möglichem Patientenbezug abgerufen hat). `anhang_id`
+        // zeigt nach der Schwärzung ins Leere (bewusst ohne FK, 0137); `ablage` nennt nur die
+        // UHS-Bezeichnung, die selbst bleibt (G_OP_LABEL). Kein Dateiname in der Tabelle.
+        // Gepinnt in
+        // `einsatz::repo::tests::schwaerzung_loescht_uhs_anhaenge_und_haelt_etb_und_audit`.
+        tabelle: "anhang_zugriff_audit",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("anhang_id", G_FK),
+            retain("ablage", G_OP_LABEL),
+            retain("benutzer_id", G_FK),
+            retain("fassung", G_AUDIT),
+            retain("zugriff_at", G_ZEIT),
+        ],
+    },
     // ---------- Tiere ----------
     TabellenRegel {
         tabelle: "einsatz_tier",
@@ -510,8 +530,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     TabellenRegel {
         // Ganze Zeile löschen: `daten` sind Fotos/Dateien Betroffener, kein Kartografie-Skelett.
-        // CASCADE räumt die Linker chat_nachricht_anhang, einsatz_dokument, etb_eintrag_anhang und
-        // einsatz_schaden_anhang mit.
+        // CASCADE räumt die Linker chat_nachricht_anhang, einsatz_dokument, etb_eintrag_anhang,
+        // einsatz_schaden_anhang, einsatz_tier_anhang und uhs_anhang (LFH-758) mit.
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -565,6 +585,45 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("id", Strategie::ZeileLoeschen),
             scrub("einsatz_id", Strategie::ZeileLoeschen),
             scrub("schaden_id", Strategie::ZeileLoeschen),
+            scrub("anhang_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+        ],
+    },
+    TabellenRegel {
+        // LFH-758, wie `einsatz_schaden_anhang`: ganze Zeile löschen, die Datei ist weg (CASCADE;
+        // `anhang` steht VOR dieser Regel). Die System-ETB-Einträge nennen nur „Tier T-007“ und
+        // die Art, nie Dateiname, Kennzeichnung oder Halter. Gepinnt in
+        // `einsatz::repo::tests::schwaerzung_loescht_tier_anhaenge_und_haelt_den_etb_nachweis`.
+        tabelle: "einsatz_tier_anhang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen),
+            scrub("einsatz_id", Strategie::ZeileLoeschen),
+            scrub("tier_id", Strategie::ZeileLoeschen),
+            scrub("anhang_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+        ],
+    },
+    TabellenRegel {
+        // LFH-758, wie `einsatz_schaden_anhang`: ganze Zeile löschen, die Datei ist weg (CASCADE;
+        // `anhang` steht VOR dieser Regel). Die System-ETB-Einträge nennen nur „UHS {bezeichnung}“
+        // (die Bezeichnung bleibt ohnehin, G_OP_LABEL) und die Art, nie den Dateinamen. Das
+        // Lese-Audit `anhang_zugriff_audit` bleibt stehen. Gepinnt in
+        // `einsatz::repo::tests::schwaerzung_loescht_uhs_anhaenge_und_haelt_etb_und_audit`.
+        tabelle: "uhs_anhang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen),
+            scrub("einsatz_id", Strategie::ZeileLoeschen),
+            scrub("uhs_id", Strategie::ZeileLoeschen),
             scrub("anhang_id", Strategie::ZeileLoeschen),
             scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
             scrub("abgelegt_at", Strategie::ZeileLoeschen),

@@ -5,8 +5,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, schaden_anhang, setup,
-    setup_mit_pool, MINI_JPEG, MINI_PNG,
+    anfrage, benutzer_anlegen, einsatz_anlegen, erfassungs_datei, login_cookie, rolle_setzen,
+    schaden_anhang, setup, setup_mit_pool, Erfassung, MINI_JPEG, MINI_PNG,
 };
 
 async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
@@ -1436,4 +1436,111 @@ async fn heraufstufen_einer_reinen_foto_nachricht_ohne_text_ist_400() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+// --- LFH-758: Tier- und UHS-Linker (Erfassungs-Anhänge) ---
+//
+// Wie bei Schäden laufen alle Aussagen als `admin`, die ablegende Person — für sie wäre eine
+// Datei ohne Registereintrag „ungebunden“ und damit generisch ladbar und hart löschbar.
+
+/// Generischer Download 404, generisches Löschen 422 mit dem Wortlaut des Registereintrags
+/// (Datei und Verknüpfung bleiben), Chat-Verknüpfung 400 ohne Nachricht und Verknüpfung.
+#[tokio::test]
+async fn tier_und_uhs_anhang_sind_generisch_und_im_chat_gesperrt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    for art in Erfassung::ALLE {
+        let (aid, _, _) =
+            erfassungs_datei(&pool, einsatz, art, "dach.jpg", "image/jpeg", b"ABC").await;
+
+        let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{art:?}: generischer Download");
+
+        let (s, v) = anfrage(
+            &app,
+            "DELETE",
+            &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{art:?}");
+        assert_eq!(v["error"], art.loesch_meldung(), "{art:?}");
+        let (datei, link): (i64, i64) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT (SELECT COUNT(*) FROM anhang WHERE id = ?1), \
+                    (SELECT COUNT(*) FROM {} WHERE anhang_id = ?1 AND geloescht_at IS NULL)",
+            art.linker()
+        )))
+        .bind(aid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            (datei, link),
+            (1, 1),
+            "{art:?}: Datei und Verknüpfung bleiben"
+        );
+
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+            &admin,
+            Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{art:?}: Chat");
+        assert_eq!(v["error"], "Unbekannter oder fremder Anhang");
+        let (nachrichten, links): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM chat_nachricht WHERE einsatz_id = ?1 AND inhalt = 'x'), \
+                    (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?2)",
+        )
+        .bind(einsatz)
+        .bind(aid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((nachrichten, links), (0, 0), "{art:?}");
+    }
+}
+
+/// Eine ENTFERNTE Tier- oder UHS-Datei bleibt generisch gesperrt (Download 404, DELETE 422)
+/// für die Person, die sie abgelegt und entfernt hat; die Datei bleibt gespeichert.
+#[tokio::test]
+async fn entfernte_tier_und_uhs_datei_bleibt_generisch_gesperrt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    for art in Erfassung::ALLE {
+        let (aid, besitzer, lid) =
+            erfassungs_datei(&pool, einsatz, art, "dach.jpg", "image/jpeg", MINI_JPEG).await;
+        let modul_pfad = format!(
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge/{lid}",
+            art.segment()
+        );
+        let (s, _) = anfrage(&app, "DELETE", &modul_pfad, &admin, None).await;
+        assert_eq!(
+            s,
+            StatusCode::NO_CONTENT,
+            "{art:?}: über die Modulroute entfernt"
+        );
+
+        let (s, _) = anfrage(&app, "GET", &format!("{modul_pfad}/datei"), &admin, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{art:?}: Modulroute");
+        let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{art:?}: generischer Download");
+        assert_eq!(
+            delete_anhang(&app, einsatz, aid, &admin).await,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{art:?}: generisches Löschen"
+        );
+        let datei: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE id = ?")
+            .bind(aid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(datei, 1, "{art:?}: Beweis bis zur Schwärzung");
+    }
 }

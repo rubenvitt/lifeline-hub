@@ -39,7 +39,7 @@ pub struct UhsDetail {
 
 // ---------- ETB-/SSE-Helfer (lokales Muster wie in anderen Routen) ----------
 
-fn sse_uhs(state: &AppState, einsatz_id: i64, uhs_id: i64) {
+pub(crate) fn sse_uhs(state: &AppState, einsatz_id: i64, uhs_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", uhs_id);

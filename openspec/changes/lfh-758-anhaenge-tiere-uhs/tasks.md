@@ -38,27 +38,27 @@ sie auch ohne Registereintrag grün.
 
 ## 2. Backend: Tier-Anhänge
 
-- [ ] 2.1 Migration `0135_einsatz_tier_anhang.sql` nach design.md D1.
+- [x] 2.1 Migration `0135_einsatz_tier_anhang.sql` nach design.md D1.
   - Vorher `git fetch origin alpha` und `scripts/check-migrationen.sh`.
   - Kopfkommentar wie `0126`.
   - Verifiziert dadurch, dass `anhang::repo::tests::jeder_fremdschluessel_auf_anhang_ist_registriert` rot ist und `db::tests::migrationsnummern_sind_eindeutig` grün.
-- [ ] 2.2 Registereintrag `einsatz_tier_anhang` in `MODUL_LINKER` (`ort: "Tier"`).
+- [x] 2.2 Registereintrag `einsatz_tier_anhang` in `MODUL_LINKER` (`ort: "Tier"`).
   - Repo-Tests zuerst, nach dem Muster der Schaden-Gegenstücke: `linker_stand_erkennt_tier_linker`, `sweep_verwaiste_haelt_tier_gebundene_anhaenge` (auch soft-gelöscht und älter als 24 h), `loeschen_verweigert_tier_gebundene_anhaenge`.
   - Den neuen Wortlaut von `gebunden_meldung()` in `tests/etb_anhang.rs` pinnen.
   - Verifiziert durch rot → grün und den grünen Guard aus 2.1.
-- [ ] 2.3 Schwärzungsregel `einsatz_tier_anhang` (`Scoping::EinsatzId`, alle Spalten `ZeileLoeschen`, nach `anhang`). Der Kommentar der `anhang`-Regel nennt den Linker.
+- [x] 2.3 Schwärzungsregel `einsatz_tier_anhang` (`Scoping::EinsatzId`, alle Spalten `ZeileLoeschen`, nach `anhang`). Der Kommentar der `anhang`-Regel nennt den Linker.
   - Verhaltenstest `schwaerzung_loescht_tier_anhaenge_und_haelt_den_etb_nachweis` in `src/einsatz/repo.rs`.
   - Verifiziert dadurch, dass `entdeckte_tabellen_gleich_registry_tabellen` und der Verhaltenstest erst rot, dann grün sind.
-- [ ] 2.4 `src/tier/anhang.rs` anlegen: `TIER_ABLAGE`, `TierAnhangAnzeige` (`tier_id`), `ablegen`/`entfernen` über `tier::repo::laden_tx` und den Kern. Dazu `pub mod anhang;` in `src/tier/mod.rs`.
+- [x] 2.4 `src/tier/anhang.rs` anlegen: `TIER_ABLAGE`, `TierAnhangAnzeige` (`tier_id`), `ablegen`/`entfernen` über `tier::repo::laden_tx` und den Kern. Dazu `pub mod anhang;` in `src/tier/mod.rs`.
   - Repo-Tests zuerst: Einsatzgleichheit von Tier, Linker und Anhang; ETB-Text „Tier T-001: Foto abgelegt“; storniert → 409.
   - Verifiziert durch `cargo test --lib tier::anhang`.
-- [ ] 2.5 `src/routes/tier_anhang.rs` anlegen, nach design.md D3.
+- [x] 2.5 `src/routes/tier_anhang.rs` anlegen, nach design.md D3.
   - Gates `EinsatzLesezugriff<Tiere>` und `EinsatzSchreibzugriff<Tiere>`.
   - Download mit `FassungParam` und `original_freigeben(…, "Tier T-007")`.
   - `sse_tier` wird `pub(crate)`.
   - Registrierung in `src/routes/mod.rs` und in `src/app.rs` (Body-Limit, `ConcurrencyLimitLayer`).
   - Verifiziert durch grüne `cargo test --test einsatz_kontext_guard --test json_extractor_guard --test path_extractor_guard`.
-- [ ] 2.6 `tests/tier_anhang.rs` zuerst schreiben, je Szenario aus `specs/tier-anhaenge/spec.md` ein Test, nach dem Muster `tests/schaden_anhang.rs`:
+- [x] 2.6 `tests/tier_anhang.rs` zuerst schreiben, je Szenario aus `specs/tier-anhaenge/spec.md` ein Test, nach dem Muster `tests/schaden_anhang.rs`:
   - 201 plus Liste; HEIC und PDF angenommen;
   - 400er ohne `anhang`-, Linker- und ETB-Zeile;
   - Beobachter liest, schreibt aber nicht (403);
@@ -70,46 +70,46 @@ sie auch ohne Registereintrag grün.
   - SSE `tier` und `etb` ohne Dateinamen, kein `tier` ohne Modul.
 
   Eine Hilfe `tier_anhang(pool, einsatz)` kommt in `tests/common/mod.rs`. Verifiziert durch `cargo test --test tier_anhang`.
-- [ ] 2.7 Abschottung als ablegende Person:
+- [x] 2.7 Abschottung als ablegende Person:
   - in `tests/anhang.rs`: generischer Download 404, generisches Löschen 422 mit dem Tier-Wortlaut, Chat 400;
   - in `tests/etb_anhang.rs`: ETB 422;
   - in `tests/dokument.rs`: nicht in der Ablage;
   - in `tests/anhang_metadaten.rs`: bereinigte Fassung und Original mit ETB-Vermerk am Tier.
 
   Ein eigenes Binary `tests/tier_anhang_scan.rs` prüft fail-closed 503 ohne jede Zeile. Mutationsprobe: der Registereintrag aus 2.2 ist auskommentiert → die Download-, Lösch-, Chat- und ETB-Tests sind rot. Verifiziert durch `cargo test --test anhang --test etb_anhang --test dokument --test anhang_metadaten --test tier_anhang_scan`, `cargo test --no-default-features --test tier_anhang_scan` und das Ergebnis der Probe im Commit-Text.
-- [ ] 2.8 Codegen: `TierAnhangAnzeige` in `src/api_doc.rs` aufnehmen, `scripts/check-typ-codegen.sh` laufen lassen und `openapi.json` sowie `types.generated.ts` mitcommitten. Im Barrel `api/types.ts` steht `TierAnhang`. Verifiziert durch das grüne Skript.
+- [x] 2.8 Codegen: `TierAnhangAnzeige` in `src/api_doc.rs` aufnehmen, `scripts/check-typ-codegen.sh` laufen lassen und `openapi.json` sowie `types.generated.ts` mitcommitten. Im Barrel `api/types.ts` steht `TierAnhang`. Verifiziert durch das grüne Skript.
 
 ## 3. Backend: UHS-Anhänge
 
-- [ ] 3.1 Migration `0136_uhs_anhang.sql` (FK `uhs_id → uhs(id) ON DELETE CASCADE`). Verifiziert wie 2.1.
-- [ ] 3.2 Registereintrag `uhs_anhang` (`ort: "Unfallhilfsstelle"`). Die Repo-Tests entsprechen 2.2, der Wortlaut-Pin wird erweitert. Verifiziert wie 2.2.
-- [ ] 3.3 Schwärzungsregel `uhs_anhang` samt Verhaltenstest `schwaerzung_loescht_uhs_anhaenge_und_haelt_den_etb_nachweis`. Verifiziert wie 2.3.
-- [ ] 3.4 `src/uhs/anhang.rs` anlegen: `UHS_ABLAGE`, `UhsAnhangAnzeige` (`uhs_id`), `ablegen`/`entfernen` über `uhs::repo::laden_tx`. Der `etb_name` ist `UHS {bezeichnung}`.
+- [x] 3.1 Migration `0136_uhs_anhang.sql` (FK `uhs_id → uhs(id) ON DELETE CASCADE`). Verifiziert wie 2.1.
+- [x] 3.2 Registereintrag `uhs_anhang` (`ort: "Unfallhilfsstelle"`). Die Repo-Tests entsprechen 2.2, der Wortlaut-Pin wird erweitert. Verifiziert wie 2.2.
+- [x] 3.3 Schwärzungsregel `uhs_anhang` samt Verhaltenstest `schwaerzung_loescht_uhs_anhaenge_und_haelt_den_etb_nachweis`. Verifiziert wie 2.3.
+- [x] 3.4 `src/uhs/anhang.rs` anlegen: `UHS_ABLAGE`, `UhsAnhangAnzeige` (`uhs_id`), `ablegen`/`entfernen` über `uhs::repo::laden_tx`. Der `etb_name` ist `UHS {bezeichnung}`.
   - Repo-Tests zuerst: ETB-Text „UHS BHP 50: Foto abgelegt“; storniert → 409; eine aufgelöste UHS nimmt an.
   - Verifiziert durch `cargo test --lib uhs::anhang`.
-- [ ] 3.5 `src/routes/uhs_anhang.rs` mit `liste`, `ablegen`, `datei` und `entfernen`, ohne Audit; das kommt in Gruppe 4.
+- [x] 3.5 `src/routes/uhs_anhang.rs` mit `liste`, `ablegen`, `datei` und `entfernen`, ohne Audit; das kommt in Gruppe 4.
   - Gates `<Unfallhilfsstellen>`, `sse_uhs` wird `pub(crate)`, Registrierung in `mod.rs` und `app.rs`.
   - Verifiziert durch die Struktur-Guards wie in 2.5.
-- [ ] 3.6 `tests/uhs_anhang.rs` je Szenario aus `specs/uhs-anhaenge/spec.md`, ohne die Audit-Anforderungen, nach dem Muster aus 2.6. Leak-Test mit `Patient_Mueller_Liege3.jpg`. Hilfe `uhs_anhang` in `tests/common/mod.rs`. Verifiziert durch `cargo test --test uhs_anhang`.
-- [ ] 3.7 Abschottung, Metadaten und Scan-Binary `tests/uhs_anhang_scan.rs` wie in 2.7, samt Mutationsprobe am Registereintrag. Verifiziert wie 2.7.
-- [ ] 3.8 Codegen für `UhsAnhangAnzeige`, im Barrel als `UhsAnhang`. Verifiziert durch `scripts/check-typ-codegen.sh`.
+- [x] 3.6 `tests/uhs_anhang.rs` je Szenario aus `specs/uhs-anhaenge/spec.md`, ohne die Audit-Anforderungen, nach dem Muster aus 2.6. Leak-Test mit `Patient_Mueller_Liege3.jpg`. Hilfe `uhs_anhang` in `tests/common/mod.rs`. Verifiziert durch `cargo test --test uhs_anhang`.
+- [x] 3.7 Abschottung, Metadaten und Scan-Binary `tests/uhs_anhang_scan.rs` wie in 2.7, samt Mutationsprobe am Registereintrag. Verifiziert wie 2.7.
+- [x] 3.8 Codegen für `UhsAnhangAnzeige`, im Barrel als `UhsAnhang`. Verifiziert durch `scripts/check-typ-codegen.sh`.
 
 ## 4. Backend: UHS-Lese-Audit (design.md D5)
 
-- [ ] 4.1 Migration `0137_anhang_zugriff_audit.sql` nach D5. Der Kopfkommentar begründet, warum es keinen FK auf `anhang` gibt (Guard und Schwärzung), und dass die Tabelle append-only ist.
+- [x] 4.1 Migration `0137_anhang_zugriff_audit.sql` nach D5. Der Kopfkommentar begründet, warum es keinen FK auf `anhang` gibt (Guard und Schwärzung), und dass die Tabelle append-only ist.
   - Schwärzungsregel `anhang_zugriff_audit`: alle Spalten bleiben erhalten, die Klassen werden gegen die Konstanten der Registry abgeglichen.
   - Verifiziert durch:
     - rot → grün von `entdeckte_tabellen_gleich_registry_tabellen`;
     - den grünen Guard `jeder_fremdschluessel_auf_anhang_ist_registriert` (die Tabelle ist kein Linker);
     - einen Verhaltenstest: Nach der Schwärzung stehen die Audit-Zeilen mit `ablage` noch da.
-- [ ] 4.2 `src/anhang/audit_repo.rs` mit `Fassung`-Abbildung, `anlegen` und `liste_je_linker` (JOIN über den Deskriptor, einschließlich soft-gelöschter Linker, neueste zuerst), DTO `AnhangZugriffAnzeige`. Es gibt keine Update- und keine Delete-Funktion.
+- [x] 4.2 `src/anhang/audit_repo.rs` mit `Fassung`-Abbildung, `anlegen` und `liste_je_linker` (JOIN über den Deskriptor, einschließlich soft-gelöschter Linker, neueste zuerst), DTO `AnhangZugriffAnzeige`. Es gibt keine Update- und keine Delete-Funktion.
   - Repo-Tests zuerst:
     - Einträge zweier UHS werden getrennt;
     - ein entfernter Anhang bleibt sichtbar;
     - eine fremde `einsatz_id` liefert nichts;
     - die Reihenfolge stimmt.
   - Verifiziert durch `cargo test --lib anhang::audit_repo`.
-- [ ] 4.3 Audit in `uhs_anhang::datei` einbauen, Reihenfolge nach D5: Lookup → bei Original `original_freigeben` → `audit_repo::anlegen` → `anhang_antwort`. Das Audit wird auch bei 304 geschrieben.
+- [x] 4.3 Audit in `uhs_anhang::datei` einbauen, Reihenfolge nach D5: Lookup → bei Original `original_freigeben` → `audit_repo::anlegen` → `anhang_antwort`. Das Audit wird auch bei 304 geschrieben.
   - Integrationstests in `tests/uhs_anhang.rs` zuerst:
     - Download → genau ein Eintrag „bereinigt“ mit Person und Anhang;
     - Original durch die Einsatzleitung → ein Eintrag „original“ plus ETB-Vermerk;
@@ -118,11 +118,11 @@ sie auch ohne Registereintrag grün.
     - 403 (Modul gesperrt, Original für Führungspersonal) und 404 (anderer UHS, entfernt, generischer Pfad) → kein Eintrag;
     - fail-closed: `anhang_zugriff_audit` per Trigger `RAISE(ABORT)` in der Test-DB gesperrt → Fehlerantwort ohne Bytes.
   - Verifiziert durch `cargo test --test uhs_anhang`.
-- [ ] 4.4 Einsicht `GET /api/einsaetze/{id}/uhs/{uid}/anhaenge/zugriffe` mit `ctx.fordere_einsatzleitung()`, UHS im Einsatz (404). Die Einsicht schreibt selbst keinen Eintrag.
+- [x] 4.4 Einsicht `GET /api/einsaetze/{id}/uhs/{uid}/anhaenge/zugriffe` mit `ctx.fordere_einsatzleitung()`, UHS im Einsatz (404). Die Einsicht schreibt selbst keinen Eintrag.
   - Tests zuerst: Einsatzleitung 200 mit Dateiname, Person, Fassung und Zeit; Führungspersonal und Beobachter 403; fremde UHS 404; die Einsicht erzeugt keinen Eintrag.
   - Codegen für `AnhangZugriffAnzeige`, Barrel `AnhangZugriff`.
   - Verifiziert durch `cargo test --test uhs_anhang` und `scripts/check-typ-codegen.sh`.
-- [ ] 4.5 `src/AGENTS.md`, Absatz zu den Erfassungs-Anhängen: das UHS-Audit ergänzen (Tabelle, fail-closed, kein FK auf `anhang` mit Grund, Einsicht nur für die Einsatzleitung, kein Audit an Tieren). Verifiziert durch Lesen des Absatzes gegen D5 und `scripts/check-fmt.sh`.
+- [x] 4.5 `src/AGENTS.md`, Absatz zu den Erfassungs-Anhängen: das UHS-Audit ergänzen (Tabelle, fail-closed, kein FK auf `anhang` mit Grund, Einsicht nur für die Einsatzleitung, kein Audit an Tieren). Verifiziert durch Lesen des Absatzes gegen D5 und `scripts/check-fmt.sh`.
 
 ## 5. Frontend: modulneutrale Bausteine (design.md D6)
 
