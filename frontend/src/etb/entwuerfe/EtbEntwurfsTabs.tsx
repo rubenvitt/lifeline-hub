@@ -8,6 +8,7 @@ import type { MetadatenWerte } from '../schnellerfassungModell';
 import { entwurfLabel, zuWerte } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
+import { useEntwurfsVersand, type EntwurfsVersand } from './useEntwurfsVersand';
 import { anVorbelegung } from '../../fuehrung/funktionsOptionenKern';
 import { IkoneKreuz } from '../../ikonen';
 
@@ -29,6 +30,8 @@ interface EtbEntwurfsTabsProps {
   onSendetChange?: (sendet: boolean) => void;
   /** Gewählte Anhänge je Entwurf; fehlt es, führt der Container sie selbst. */
   dateien?: EntwurfsDateien;
+  /** Sendezustand je Entwurf; fehlt es, führt der Container ihn selbst (LFH-748). */
+  versand?: EntwurfsVersand;
 }
 
 /** Stabile leere Liste: ein frisches `[]` je Render wäre für die Schnellerfassung jedes Mal neu. */
@@ -65,6 +68,7 @@ export default function EtbEntwurfsTabs({
   onWerteBehaltenChange,
   onSendetChange,
   dateien: dateienVonAussen,
+  versand: versandVonAussen,
 }: EtbEntwurfsTabsProps) {
   const { token } = theme.useToken();
   const {
@@ -102,27 +106,25 @@ export default function EtbEntwurfsTabs({
   const dateienVerwerfen = dateien.verwerfen;
 
   /**
-   * Sendezustand je Entwurf — aus demselben Grund hier wie die Dateien: ein Tabwechsel während
-   * des Uploads montierte sonst eine entsperrte Schnellerfassung, deren Eingaben der laufende
-   * Versand still verwarf. Ein Eintrag im Ruhezustand fällt weg, damit geschlossene Entwürfe
-   * nicht liegen bleiben.
+   * Sendezustand je Entwurf — aus demselben Grund über den Reitern wie die Dateien: ein
+   * Tabwechsel während des Uploads montierte sonst eine entsperrte Schnellerfassung, deren
+   * Eingaben der laufende Versand still verwarf. Vorzugsweise vom Aufrufer geführt (`EtbPage`),
+   * damit der Grund eines gescheiterten Uploads auch eine Berichtigung überlebt (LFH-748).
    */
-  const [versandJe, setVersandJe] = useState<Record<string, Versand>>({});
+  const eigenerVersand = useEntwurfsVersand();
+  const versand = versandVonAussen ?? eigenerVersand;
+  const versandJe = versand.je;
+  const { aendern: versandSetzen, umhaengen: versandUmhaengen } = versand;
   /**
    * Umgezogene Entwurfs-ids (alt → neu): der laufende Versand schreibt seinen Zustand aus einer
    * alten Closure unter der ALTEN id weiter — nach einem 409 gehört er dem Entwurf unter der neuen.
    */
   const umgezogen = useRef(new Map<string, string>());
-  const versandAendern = useCallback((idAlt: string, aenderung: Partial<Versand>) => {
-    const id = umgezogen.current.get(idAlt) ?? idAlt;
-    setVersandJe((alt) => {
-      const neu = { ...(alt[id] ?? VERSAND_RUHE), ...aenderung };
-      const rest = { ...alt };
-      if (!neu.sendet && neu.fortschritt == null && neu.hinweis == null) delete rest[id];
-      else rest[id] = neu;
-      return rest;
-    });
-  }, []);
+  const versandAendern = useCallback(
+    (idAlt: string, aenderung: Partial<Versand>) =>
+      versandSetzen(umgezogen.current.get(idAlt) ?? idAlt, aenderung),
+    [versandSetzen],
+  );
   const irgendeinerSendet = Object.values(versandJe).some((v) => v.sendet);
   useEffect(() => {
     onSendetChange?.(irgendeinerSendet);
@@ -175,12 +177,7 @@ export default function EtbEntwurfsTabs({
                 if (neu) {
                   umgezogen.current.set(e.id, neu);
                   dateien.umhaengen(e.id, neu);
-                  setVersandJe((alt) => {
-                    if (!(e.id in alt)) return alt;
-                    const rest = { ...alt, [neu]: alt[e.id] };
-                    delete rest[e.id];
-                    return rest;
-                  });
+                  versandUmhaengen(e.id, neu);
                 }
               }
               throw err;
@@ -202,7 +199,10 @@ export default function EtbEntwurfsTabs({
           bausteine={bausteine}
           einsatz={einsatz}
           initialWerte={zuWerte(e)}
-          onWerteChange={(w) => entwurfAktualisieren(e.id, w)}
+          // Mit Dateien bleibt auch ein geleerter Entwurf gespeichert (LFH-748, D2).
+          onWerteChange={(w) =>
+            entwurfAktualisieren(e.id, w, { festhalten: (dateien.je[e.id]?.length ?? 0) > 0 })
+          }
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={onWerteBehaltenChange}
           // Die Entwurfs-id ist der Idempotenzschlüssel: sie überlebt den Remount beim

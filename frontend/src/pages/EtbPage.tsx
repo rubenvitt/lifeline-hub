@@ -31,6 +31,7 @@ import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
+import { useEntwurfsVersand } from '../etb/entwuerfe/useEntwurfsVersand';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { baueZeilen } from '../etb/etbZeile';
 import { scrolleZurZeile } from '../components/Datensicht';
@@ -214,6 +215,8 @@ export default function EtbPage() {
   const [entwurfSendet, setEntwurfSendet] = useState(false);
   /** Gewählte Anhänge je Entwurf — hier, damit sie eine Berichtigung überleben. */
   const entwurfsDateien = useEntwurfsDateien();
+  /** Sendezustand je Entwurf — hier, damit der Grund eines gescheiterten Uploads sie überlebt. */
+  const entwurfsVersand = useEntwurfsVersand();
   const [wiedervorlageZu, setWiedervorlageZu] = useState<{
     eintrag: EtbEintragAnzeige;
     termin?: string | null;
@@ -473,6 +476,7 @@ export default function EtbPage() {
           onWerteBehaltenChange={setWerteBehalten}
           onSendetChange={setEntwurfSendet}
           dateien={entwurfsDateien}
+          versand={entwurfsVersand}
         />
       )}
     </div>

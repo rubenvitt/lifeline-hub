@@ -105,6 +105,31 @@ describe('useEtbEntwuerfe', () => {
     expect((await entwuerfeLaden(7))[0].inhalt).toBe('Pumpe');
   });
 
+  it('LFH-748: ein geleerter Entwurf mit `festhalten` bleibt gespeichert, ohne fällt er weg', async () => {
+    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    const id = result.current.entwuerfe[0].id;
+    const leer = { inhalt: '', typ: 'meldung' as const, metadaten: {} };
+
+    await act(async () => {
+      result.current.entwurfAktualisieren(id, { ...leer, inhalt: 'Pumpe' });
+    });
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+
+    // Trägt der Entwurf Dateien, reicht der Aufrufer `festhalten`: der geleerte Stand wird
+    // gespeichert — nicht entfernt und nicht mit dem alten Text.
+    await act(async () => {
+      result.current.entwurfAktualisieren(id, leer, { festhalten: true });
+    });
+    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe(''));
+    expect(await entwuerfeLaden(7)).toHaveLength(1);
+
+    await act(async () => {
+      result.current.entwurfAktualisieren(id, leer);
+    });
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
+  });
+
   it('neuerEntwurf öffnet einen weiteren Tab und aktiviert ihn', async () => {
     const { result } = renderHook(() => useEtbEntwuerfe(7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));

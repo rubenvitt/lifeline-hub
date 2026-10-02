@@ -102,21 +102,29 @@ export function useEtbEntwuerfe(
     [einsatzId, aktivenSetzen],
   );
 
-  const entwurfAktualisieren = useCallback((id: string, werte: EntwurfWerte) => {
-    const patch = werteZuPatch(werte);
-    const geaendert_at = new Date().toISOString();
-    const bestand = entwuerfeRef.current.find((e) => e.id === id);
-    setEntwuerfe((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch, geaendert_at } : e)));
-    // Persistenz NACH dem seiteneffektfreien Updater. Der nächste Zustand wird aus Bestand +
-    // patch gebildet und hängt nicht vom Updater-Ergebnis ab (id/einsatz_id/erstellt_at sind über
-    // die Lebensdauer konstant). So läuft der Write unter React.StrictMode genau einmal (LFH-216).
-    if (!bestand) return;
-    if (istLeer(werte)) {
-      if (!bestand.an_vorbelegung_geprueft) void entwurfEntfernen(id);
-    } else {
-      void entwurfSpeichern({ ...bestand, ...patch, geaendert_at });
-    }
-  }, []);
+  /**
+   * `festhalten`: der Entwurf trägt gewählte Dateien (LFH-748). Dann wird auch ein geleerter
+   * Stand gespeichert statt entfernt — sonst fehlte seine id nach dem nächsten Remount der
+   * Reiter (Berichtigung), und die Dateien hingen an keinem Entwurf mehr.
+   */
+  const entwurfAktualisieren = useCallback(
+    (id: string, werte: EntwurfWerte, { festhalten = false }: { festhalten?: boolean } = {}) => {
+      const patch = werteZuPatch(werte);
+      const geaendert_at = new Date().toISOString();
+      const bestand = entwuerfeRef.current.find((e) => e.id === id);
+      setEntwuerfe((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch, geaendert_at } : e)));
+      // Persistenz NACH dem seiteneffektfreien Updater. Der nächste Zustand wird aus Bestand +
+      // patch gebildet und hängt nicht vom Updater-Ergebnis ab (id/einsatz_id/erstellt_at sind über
+      // die Lebensdauer konstant). So läuft der Write unter React.StrictMode genau einmal (LFH-216).
+      if (!bestand) return;
+      if (istLeer(werte) && !festhalten) {
+        if (!bestand.an_vorbelegung_geprueft) void entwurfEntfernen(id);
+      } else {
+        void entwurfSpeichern({ ...bestand, ...patch, geaendert_at });
+      }
+    },
+    [],
+  );
 
   /**
    * Sichert einen Entwurf auch ohne Wert: trägt er gewählte Dateien, muss seine id einen Remount

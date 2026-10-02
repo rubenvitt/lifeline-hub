@@ -587,4 +587,29 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
     await act(async () => freigeben());
   });
+
+  // LFH-748 (D4): ein beim Absenden offener Chip-Editor war nicht gesperrt — man tippte, und die
+  // Übernahme stieg nur still aus.
+  it('sperrt einen beim Absenden offenen Feld-Editor; nach einem Fehler geht es mit seinem Wert weiter', async () => {
+    let scheitern: (grund: Error) => void = () => {};
+    hochladen.mockImplementationOnce(() => new Promise((_, r) => (scheitern = r)));
+    const p = props();
+    const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waehle(container, datei('a.jpg'));
+    await userEvent.type(feld(), 'Foto');
+    await userEvent.click(screen.getByRole('button', { name: /Feld/ }));
+    await userEvent.click(await screen.findByText('Von'));
+    const von = await screen.findByLabelText('Von');
+    await userEvent.type(von, 'ELW');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await screen.findByText('Lädt hoch (1/1) …');
+    expect(screen.getByLabelText('Von')).toBeDisabled();
+
+    await act(async () => scheitern(new Error('Netz weg')));
+    await screen.findByText(/a\.jpg konnte nicht hochgeladen werden/);
+    expect(screen.getByLabelText('Von')).toBeEnabled();
+    expect(screen.getByLabelText('Von')).toHaveValue('ELW');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
 });
