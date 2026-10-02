@@ -94,7 +94,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   beim Download mit 422.
 
 **Vorschau (LFH-759)** (Spec `anhang-vorschau`, Herleitung
-`openspec/changes/lfh-759-bildvorschau-anhaenge/design.md`):
+`openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`):
 - `?fassung=vorschau` (≤ 256 px) und `grossansicht` (≤ 1600 px) laufen durch dieselbe
   `anhang_antwort`, mit den Gates der Route und ohne ETB-Vermerk. `anhang::vorschau` kodiert
   JPEG/PNG/GIF/WebP/TIFF neu (Ausrichtung angewendet, keine Metadaten), in `spawn_blocking` und

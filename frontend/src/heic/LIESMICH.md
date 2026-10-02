@@ -1,7 +1,7 @@
 # HEIC-Vorschau — Herkunft und Lizenz
 
 HEIC/HEIF-Fotos (iPhone) bekommen ihre Vorschau auf dem Gerät (LFH-759, Spec `anhang-vorschau`,
-Herleitung `openspec/changes/lfh-759-bildvorschau-anhaenge/design.md`, D8). Der Server dekodiert
+Herleitung `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`, D8). Der Server dekodiert
 kein HEIC: dafür bräuchte er HEVC in C (libheif, libde265), und das Binary bleibt reines Rust.
 
 | Datei               | Rolle                                                                                     |

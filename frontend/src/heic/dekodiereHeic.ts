@@ -1,6 +1,6 @@
 /**
  * HEIC/HEIF-Vorschau auf dem Gerät (LFH-759, Spec `anhang-vorschau`, Herleitung
- * `openspec/changes/lfh-759-bildvorschau-anhaenge/design.md` D8).
+ * `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md` D8).
  *
  * Lädt die BEREINIGTE Fassung (nie `fassung=original`) und lässt sie im Worker
  * (`heicWorker.ts`, libheif als WASM) zu zwei JPEG-Blobs dekodieren: klein für die Kachel, groß

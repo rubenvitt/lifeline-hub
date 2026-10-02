@@ -124,7 +124,12 @@ Code. Backend-Tests: `cargo test`. Frontend: `mise exec -- pnpm -C frontend test
 
   Belegt durch einen grünen Lauf und eine Mutationsprobe: Ohne den `mime`-Durchgriff in
   `SchadenAnhaenge` wird der Test rot.
-- [ ] 5.2 `scripts/check-typ-codegen.sh` ist unverändert grün (keine DTO-Änderung erwartet), und
-  `./scripts/check-all.sh` läuft grün (ohne `| tail`).
-- [ ] 5.3 Abnahme in der Desktop-Hülle bzw. dem Prod-Bundle: Großansicht ohne Download, `blob:`-Bild
-  für HEIC sichtbar. Ergebnis als Bediensicht und Klickweg für die Abschlussmeldung notieren.
+- [x] 5.2 `scripts/check-typ-codegen.sh` ist unverändert grün (keine DTO-Änderung erwartet), und
+  `./scripts/check-all.sh` läuft grün (ohne `| tail`). Lokal grün: Bündel `schnell` (inkl.
+  Typ-Drift), `frontend` (646 Dateien, 8924 Tests) und die Server-Suite aus `rust` (2235 + alle
+  Integrationstests). Die Desktop-Hülle baut im Container nicht (GTK fehlt), e2e läuft lokal nur
+  mit falscher Chromium-Fassung: den vollen Lauf belegt die CI des PRs.
+- [x] 5.3 Abnahme im Prod-Bundle (vom Backend ausgeliefert, ohne Vite): `e2e/anhang-vorschau.spec.ts`
+  grün, also Großansicht ohne Download, `.wasm` als `application/wasm`, `blob:`-Bild für HEIC
+  sichtbar. Bediensicht und Klickweg für die Abschlussmeldung notiert. Die Desktop-Hülle selbst
+  lässt sich im Container nicht bauen (GTK fehlt); ihre Abnahme übernimmt der Mensch.

@@ -24,7 +24,7 @@ import { einsatzKeys } from '../api/queryKeys';
 
 /**
  * Vorschaubild an Bild-Anhängen (LFH-759, Spec `anhang-vorschau`, Herleitung
- * `openspec/changes/lfh-759-bildvorschau-anhaenge/design.md` D7).
+ * `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md` D7).
  *
  * - Ein quadratisches Bedienziel in der Mindesthöhe der Dichte mit dem Vorschaubild; der Platz
  *   steht vor dem Laden fest, nichts springt.

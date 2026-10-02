@@ -5,7 +5,7 @@
 //! übernommen werden. Es entsteht bei jedem Abruf neu und wird nie gespeichert; den Cache trägt
 //! der ETag mit [`VORSCHAU_VERSION`]. HEIC/HEIF dekodiert der Browser (WASM), nicht der Server.
 //!
-//! Herleitung: `openspec/changes/lfh-759-bildvorschau-anhaenge/design.md`, D2–D5.
+//! Herleitung: `openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`, D2–D5.
 
 use std::io::Cursor;
 
