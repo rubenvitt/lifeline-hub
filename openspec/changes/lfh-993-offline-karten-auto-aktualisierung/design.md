@@ -71,6 +71,10 @@ Der Zustand liegt in `Arc<Mutex<WaechterZustand>>` im `AppState`:
   sich einen Dienst, und der Hub ist oft nicht von außen erreichbar.
 
 **D2: Ein Tick in festen Schritten.**
+0. **Abräumen** (Review-Fund): Ausstehende Bauten zu Karten, die nicht `bereit` sind, entfallen.
+   Fehler und Sperren zu Karten, die es nicht mehr gibt, entfallen ebenfalls. SQLite vergibt die
+   id ohne AUTOINCREMENT neu, eine neue Karte erbte sie sonst. Das Löschen einer Karte vergisst
+   ihren Zustand zusätzlich sofort (`AutoAktualisierung::vergiss`).
 1. **Ausstehende Bauten auflösen.** `GET /builds` und je ausstehendem Eintrag den Job mit
    passender ID suchen:
    - `done`: Der Eintrag wechselt auf „wartet auf Katalog“ und erzwingt Schritt 2 frisch.
@@ -83,7 +87,10 @@ Der Zustand liegt in `Arc<Mutex<WaechterZustand>>` im `AppState`:
    die erste fällige Karte nach `sortier, id` geladen. Fällig ist eine gemanagte, bereite Karte
    mit neuerem Stand (D4). Gestartet wird über die gemeinsame Startfunktion (D3), nach dem
    Plattenplatz-Check gegen die Katalog-Größe. Die übrigen fälligen Karten kommen in den nächsten
-   Ticks dran: Solange eine weitere wartet, gilt der kurze Takt.
+   Ticks dran: Solange eine weitere wartet, gilt der kurze Takt (`nachholen`, damit nach dem
+   laufenden Download nicht erst die nächste reguläre Prüfung kommt). Ein gescheiterter Start
+   (etwa zu wenig Platz) steht als Fehler an der Karte, löst ihren ausstehenden Bau auf und wartet
+   bis zur nächsten regulären Prüfung, nicht 30 s.
 4. **Warten auf den Katalog.** Eine Karte bleibt nach einem fertigen Bau höchstens 15 Minuten in
    „wartet auf Katalog“. Erscheint in der Zeit kein neuerer Stand (CDN-Cache des Manifests), wird
    der Fehler „Neubau fertig, Katalog zeigt noch keinen neuen Stand“ vermerkt.
@@ -101,6 +108,11 @@ Plattenplatz, Slot-Reservierung und Spawn bleiben gleich. Neu meldet der Spawn s
 den Wächterzustand: Er setzt oder löscht `fehler[id]` und räumt `auto_laeuft`. Dazu gibt
 `verarbeite_in_place_ergebnis` ein `Result<(), String>` zurück, statt nur zu loggen. Handler,
 „Jetzt aktualisieren“ und Wächter rufen dieselbe Funktion.
+- *Testnähte:* Katalog (`KatalogQuelle`) und Lader (`Lader`) sind im `AutoAktualisierung`
+  austauschbar. Der prozessweite Manifest-Cache lässt sich nicht je Test befüllen, und der
+  SSRF-Guard verwehrt Loopback-Downloads. Die Tests unter `tests/` nehmen deshalb
+  `testhilfen::{FesterKatalog, AufzeichnenderLader}`, der End-to-End-Fall im Modul einen Lader
+  ohne SSRF-Prüfung gegen einen Loopback-Server.
 - *Warum In-Place auch für inaktive Karten:* Die Kennung bleibt stabil, die alte Datei wird bis
   zum Tausch ausgeliefert, und es gibt nur einen Fehlerpfad. Die Unterscheidung „aktiv → Neu
   laden, inaktiv → Aktualisieren“ im Frontend stammt aus der Zeit vor dem Multi-Vektor-Style (alle
@@ -120,7 +132,8 @@ Die Liste und der Wächter nutzen dieselbe Funktion.
 - *Risiko:* Ein Katalogeintrag, dessen Pin nicht zur ausgelieferten Datei passt, böte sich bei
   jeder Prüfung erneut an. Der Download scheitert dann an der Prüfsumme, und der Fehler steht an
   der Karte. Damit nicht alle 6 h mehrere GB fließen, sperrt ein Prüfsummenfehler die Karte für
-  dieselbe (URL, Pin)-Kombination: `gesperrt[id] = (url, sha256)` im Speicher, bis der Katalog
+  dieselbe (URL, Pin)-Kombination. Ein Abbruch durch den Admin sperrt ebenso, sonst startete der
+  Wächter den abgebrochenen Download gleich wieder: `gesperrt[id] = (url, sha256)` im Speicher, bis der Katalog
   etwas anderes führt oder ein Admin „Jetzt aktualisieren“ wählt.
 
 **D5: Karte ↔ Region über den Dateinamen der Quell-URL.**
@@ -132,7 +145,8 @@ damit beide Seiten dieselbe Funktion nutzen.
 
 **D6: `POST /api/karte/offline-karten/{id}/jetzt-aktualisieren` (Admin).**
 Ablauf:
-1. Die Karte muss gemanagt sein und eine Quell-URL tragen, sonst 422 (Zusammenhang).
+1. Die Karte muss gemanagt und `bereit` sein und eine Quell-URL tragen, sonst 422
+   (Zusammenhang).
 2. Läuft schon etwas (Fortschritts-Slot belegt oder Bau ausstehend), ebenfalls 422 (Zustand).
 3. Frischer Katalog.
 4. Gibt es einen neueren Stand (D4, eine Sperre aus D4 wird aufgehoben), startet D3. Antwort

@@ -127,7 +127,8 @@ Die Verwaltung MUST einem System-Admin je heruntergeladener Karte mit Quell-URL 
   frisch prüfen und, wenn nichts Neueres vorliegt, „aktuell“ melden.
 
 Läuft für die Karte schon eine Aktualisierung, MUST der Server mit 422 antworten. Für eine Karte
-ohne Quell-URL oder eine registrierte Karte MUST er ebenfalls mit 422 antworten. Für Nicht-Admins
+ohne Quell-URL, eine registrierte oder eine nicht bereite Karte MUST er ebenfalls mit 422
+antworten. Für Nicht-Admins
 MUST er mit 403 antworten.
 
 #### Scenario: Neubau und automatisches Laden
