@@ -6,15 +6,15 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 1. Schema und Klassifikation
 
-- [ ] 1.1 `git fetch origin alpha`, dann Migration `migrations/0135_aufbewahrung_skelett_loeschung.sql` nach design.md D4 (Spalte `org_einstellungen.skelett_dauer_tage`, Tabelle `aufbewahrung_loeschprotokoll` mit Index). Verifikation: `scripts/check-migrationen.sh` grün, und `db::tests::migrationsnummern_sind_eindeutig` grün
-- [ ] 1.2 Registry-Eintrag `aufbewahrung_loeschprotokoll` in `src/einsatz/schwaerzung_registry.rs` (`Scoping::EinsatzId`, alle Spalten Retain mit Begründung nach dem Präzedenzfall `demo_import`). Verifikation: Die Guard-Tests der Registry (`entdeckte_tabellen_gleich_registry_tabellen` u. a.) sind ohne Eintrag rot und mit Eintrag grün
+- [x] 1.1 `git fetch origin alpha`, dann Migration `migrations/0135_aufbewahrung_skelett_loeschung.sql` nach design.md D4 (Spalte `org_einstellungen.skelett_dauer_tage`, Tabelle `aufbewahrung_loeschprotokoll` mit Index). Verifikation: `scripts/check-migrationen.sh` grün, und `db::tests::migrationsnummern_sind_eindeutig` grün
+- [x] 1.2 Registry-Eintrag `aufbewahrung_loeschprotokoll` in `src/einsatz/schwaerzung_registry.rs` (`Scoping::EinsatzId`, alle Spalten Retain mit Begründung nach dem Präzedenzfall `demo_import`). Verifikation: Die Guard-Tests der Registry (`entdeckte_tabellen_gleich_registry_tabellen` u. a.) sind ohne Eintrag rot und mit Eintrag grün
 
 ## 2. Org-Einstellung `skelett_dauer_tage` (D1, D2)
 
-- [ ] 2.1 `ist_gueltige_skelett_dauer` (1..=36500) neben `ist_gueltige_retention_dauer` in `src/einsatz/einstellungen.rs`, mit Grenztest (0, 1, 36500, 36501)
-- [ ] 2.2 Feld in `OrgEinstellungen`, `OrgEinstellungenAnzeige`, `OrgEinstellungenDaten`, SELECT/UPSERT von `src/org/einstellungen.rs` und in `OrgEinstellungenUpdate`. Verifikation: Ein Repo-Test schreibt den Wert, liest ihn zurück und erhält `None` als Vorgabe
-- [ ] 2.3 `routes::org_einstellungen::setzen`: 400 außerhalb des Bereichs, 409 ohne `skelett_dauer_bestaetigt` beim erstmaligen Setzen oder Verkürzen, ohne Bestätigung beim Gleichlassen, Verlängern und Leeren, 403 für eine Führungskraft. Verifikation: Integrationstests in `tests/` für jedes Szenario aus „Frist für die endgültige Löschung“ (die 409 schreibt nichts, also den Wert danach lesen)
-- [ ] 2.4 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/types.generated.ts` samt zweiter generierter Datei mitcommitten (`src/AGENTS.md`, Typ-Codegen). Verifikation: Das Skript ist danach grün
+- [x] 2.1 `ist_gueltige_skelett_dauer` (1..=36500) neben `ist_gueltige_retention_dauer` in `src/einsatz/einstellungen.rs`, mit Grenztest (0, 1, 36500, 36501)
+- [x] 2.2 Feld in `OrgEinstellungen`, `OrgEinstellungenAnzeige`, `OrgEinstellungenDaten`, SELECT/UPSERT von `src/org/einstellungen.rs` und in `OrgEinstellungenUpdate`. Verifikation: Ein Repo-Test schreibt den Wert, liest ihn zurück und erhält `None` als Vorgabe
+- [x] 2.3 `routes::org_einstellungen::setzen`: 400 außerhalb des Bereichs, 409 ohne `skelett_dauer_bestaetigt` beim erstmaligen Setzen oder Verkürzen, ohne Bestätigung beim Gleichlassen, Verlängern und Leeren, 403 für eine Führungskraft. Verifikation: Integrationstests in `tests/` für jedes Szenario aus „Frist für die endgültige Löschung“ (die 409 schreibt nichts, also den Wert danach lesen)
+- [x] 2.4 `scripts/check-typ-codegen.sh` laufen lassen und `frontend/src/api/types.generated.ts` samt zweiter generierter Datei mitcommitten (`src/AGENTS.md`, Typ-Codegen). Verifikation: Das Skript ist danach grün
 
 ## 3. Zeitrechnung und Zustand (D1, D6)
 

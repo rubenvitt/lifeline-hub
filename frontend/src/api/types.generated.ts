@@ -2848,6 +2848,11 @@ export interface components {
              * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
              */
             rueckmeldung_frist_min?: number | null;
+            /**
+             * Format: int64
+             * @description Skelett-Frist in Tagen ab Abschluss (LFH-750); `null` = das Skelett bleibt unbegrenzt.
+             */
+            skelett_dauer_tage?: number | null;
             zeitformat?: components["schemas"]["Zeitformat"] | null;
             zeitzone?: string | null;
         };

@@ -484,3 +484,145 @@ async fn einsatz_nummer_praefix_ungueltig_ist_400() {
     let (_, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
     assert_eq!(get_body["einsatz_nummer_praefix"], "WF-");
 }
+
+// ------------------ Skelett-Frist (LFH-750, Spec `aufbewahrung`) ------------------
+
+/// Erstmaliges Setzen ohne Bestätigung → 409, die Einstellung bleibt leer.
+#[tokio::test]
+async fn skelett_dauer_erstmals_ohne_bestaetigung_ist_409() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 3650}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert!(body["skelett_dauer_tage"].is_null(), "body={body}");
+}
+
+/// Erstmaliges Setzen mit Bestätigung → 200 und persistiert.
+#[tokio::test]
+async fn skelett_dauer_erstmals_mit_bestaetigung_persistiert() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 3650, "skelett_dauer_bestaetigt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(body["skelett_dauer_tage"], 3650);
+}
+
+/// Verlängern und Gleichlassen brauchen keine Bestätigung, Verkürzen schon.
+#[tokio::test]
+async fn skelett_dauer_verlaengern_ohne_verkuerzen_mit_bestaetigung() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 3650, "skelett_dauer_bestaetigt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 3650}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Gleichlassen ohne Bestätigung");
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 4000}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Verlängern ohne Bestätigung");
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 365}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "Verkürzen ohne Bestätigung");
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(body["skelett_dauer_tage"], 4000, "409 schreibt nichts");
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 365, "skelett_dauer_bestaetigt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(body["skelett_dauer_tage"], 365);
+}
+
+/// Leeren gilt ohne Bestätigung.
+#[tokio::test]
+async fn skelett_dauer_leeren_ohne_bestaetigung() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": 3650, "skelett_dauer_bestaetigt": true}),
+    )
+    .await;
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"skelett_dauer_tage": null}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert!(body["skelett_dauer_tage"].is_null(), "body={body}");
+}
+
+/// Außerhalb 1..=36500 → 400, auch mit Bestätigung.
+#[tokio::test]
+async fn skelett_dauer_ausserhalb_des_bereichs_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    for v in [0, 36501] {
+        let (status, _) = put_einstellungen(
+            &app,
+            &admin_cookie,
+            serde_json::json!({"skelett_dauer_tage": v, "skelett_dauer_bestaetigt": true}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "Wert {v}");
+    }
+}
+
+/// Eine org-weite Führungskraft darf die Skelett-Frist nicht ändern → 403.
+#[tokio::test]
+async fn skelett_dauer_als_fuehrungskraft_ist_403() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin_cookie, "fk", "fkpw1234", "fuehrungskraft").await;
+    let fk_cookie = login_cookie(&app, "fk", "fkpw1234").await;
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &fk_cookie,
+        serde_json::json!({"skelett_dauer_tage": 3650, "skelett_dauer_bestaetigt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

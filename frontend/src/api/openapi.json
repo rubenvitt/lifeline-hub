@@ -7618,6 +7618,14 @@
             "format": "int64",
             "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
           },
+          "skelett_dauer_tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Skelett-Frist in Tagen ab Abschluss (LFH-750); `null` = das Skelett bleibt unbegrenzt."
+          },
           "zeitformat": {
             "oneOf": [
               {
