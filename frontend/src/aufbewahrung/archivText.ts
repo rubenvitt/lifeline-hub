@@ -35,7 +35,7 @@ export const VERBLEIB_STATUS: Record<VerbleibStatus, string> = {
 
 /**
  * Rang der Zustände entlang der Lebenslinie eines Einsatzes — ein exhaustiver Record: ein
- * siebter Zustand bricht den Typcheck, statt still in Auswahl und Sortierung zu fehlen.
+ * neuer Zustand bricht den Typcheck, statt still in Auswahl und Sortierung zu fehlen.
  */
 export const ZUSTAND_RANG: Record<AufbewahrungZustand, number> = {
   ohne_frist: 0,
@@ -46,6 +46,8 @@ export const ZUSTAND_RANG: Record<AufbewahrungZustand, number> = {
   // LFH-751: offener Einsatz-Antrag — der letzte Schritt vor „geschwärzt“.
   schwaerzung_beantragt: 5,
   geschwaerzt: 6,
+  loeschung_ausstehend: 7,
+  endgueltig_geloescht: 8,
 };
 
 /** Die Zustände in Rangfolge — abgeleitet, nicht handgepflegt. */
@@ -89,6 +91,8 @@ export function primaeraktion(zustand: AufbewahrungZustand): AktePrimaeraktion {
     case 'schwaerzung_ausstehend':
     case 'schwaerzung_beantragt':
     case 'geschwaerzt':
+    case 'loeschung_ausstehend':
+    case 'endgueltig_geloescht':
       return null;
   }
 }

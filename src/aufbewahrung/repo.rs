@@ -6,7 +6,7 @@ use super::{
     ArchivAkteAnzeige, ArchivEtbEintragAnzeige, ArchivKopfAnzeige, ArchivPersonAnzeige,
     ArchivSchadenAnzeige, ArchivTierAnzeige, AufbewahrungEintragAnzeige,
 };
-use crate::einsatz::retention::{karenz_ende, zustand, AufbewahrungZustand};
+use crate::einsatz::retention::{karenz_ende, skelett_loeschung_am, zustand, AufbewahrungZustand};
 use crate::einsatz::{Einsatzart, STATUS_ABGESCHLOSSEN};
 use crate::error::AppError;
 use crate::etb::{EtbTyp, MeldeWeg};
@@ -37,14 +37,21 @@ pub struct KopfZeile {
 }
 
 impl KopfZeile {
-    /// Aufbewahrungszustand zu `jetzt`; `None` für aktive Einsätze.
-    pub fn zustand(&self, jetzt: DateTime<Utc>) -> Option<AufbewahrungZustand> {
+    /// Aufbewahrungszustand zu `jetzt` unter der Skelett-Frist der Org (LFH-750); `None` für
+    /// aktive Einsätze.
+    pub fn zustand(
+        &self,
+        skelett_dauer_tage: Option<i64>,
+        jetzt: DateTime<Utc>,
+    ) -> Option<AufbewahrungZustand> {
         zustand(
             &self.status,
             self.retention_bis.as_deref(),
             self.geloescht_at.as_deref(),
             self.geschwaerzt_at.as_deref(),
             self.antrag_faellig_at.as_deref(),
+            self.abgeschlossen_at.as_deref(),
+            skelett_dauer_tage,
             jetzt,
         )
     }
@@ -150,6 +157,7 @@ pub async fn uebersicht(
     org_id: i64,
     jetzt: DateTime<Utc>,
 ) -> Result<Vec<AufbewahrungEintragAnzeige>, AppError> {
+    let skelett_dauer_tage = skelett_dauer_tage(pool, org_id).await?;
     let sql = format!(
         "{} WHERE k.org_id = ? AND k.status = ? ORDER BY k.abgeschlossen_at DESC, k.id DESC",
         kopf_select()
@@ -159,24 +167,72 @@ pub async fn uebersicht(
         .bind(STATUS_ABGESCHLOSSEN)
         .fetch_all(pool)
         .await?;
-    Ok(zeilen
+    let mut liste: Vec<AufbewahrungEintragAnzeige> = zeilen
         .into_iter()
         .filter_map(|k| {
-            let zustand = k.zustand(jetzt)?;
+            let zustand = k.zustand(skelett_dauer_tage, jetzt)?;
             Some(AufbewahrungEintragAnzeige {
                 einsatz_id: k.id,
                 einsatznummer_intern: k.einsatznummer_intern,
-                bezeichnung: k.bezeichnung,
-                abgeschlossen_at: k.abgeschlossen_at,
+                bezeichnung: Some(k.bezeichnung),
                 karenz_ende: karenz_ende(k.geloescht_at.as_deref()),
+                loeschung_am: skelett_loeschung_am(
+                    k.abgeschlossen_at.as_deref(),
+                    k.geschwaerzt_at.as_deref(),
+                    skelett_dauer_tage,
+                ),
+                abgeschlossen_at: k.abgeschlossen_at,
                 retention_bis: k.retention_bis,
                 geloescht_at: k.geloescht_at,
                 geschwaerzt_at: k.geschwaerzt_at,
                 antrag_faellig_at: k.antrag_faellig_at,
+                endgueltig_geloescht_at: None,
                 zustand,
             })
         })
-        .collect())
+        .collect();
+
+    // Endgültig gelöschte Einsätze (LFH-750): nur das Löschprotokoll der eigenen Org, ohne
+    // Bezeichnung.
+    let geloescht = sqlx::query_as::<_, ProtokollZeile>(
+        "SELECT einsatz_id, einsatznummer_intern, abgeschlossen_at, geschwaerzt_at, geloescht_at \
+         FROM aufbewahrung_loeschprotokoll WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+    liste.extend(geloescht.into_iter().map(|p| AufbewahrungEintragAnzeige {
+        einsatz_id: p.einsatz_id,
+        einsatznummer_intern: p.einsatznummer_intern,
+        bezeichnung: None,
+        abgeschlossen_at: p.abgeschlossen_at,
+        retention_bis: None,
+        geloescht_at: None,
+        karenz_ende: None,
+        geschwaerzt_at: Some(p.geschwaerzt_at),
+        loeschung_am: None,
+        endgueltig_geloescht_at: Some(p.geloescht_at),
+        // Ein gelöschter Einsatz hat keine Anträge mehr (CASCADE mit dem Einsatz, LFH-750).
+        antrag_faellig_at: None,
+        zustand: AufbewahrungZustand::EndgueltigGeloescht,
+    }));
+    // Neuester Abschluss zuerst über beide Mengen (kanonisches Format sortiert lexikografisch).
+    liste.sort_by(|a, b| {
+        b.abgeschlossen_at
+            .cmp(&a.abgeschlossen_at)
+            .then(b.einsatz_id.cmp(&a.einsatz_id))
+    });
+    Ok(liste)
+}
+
+/// Zeile des Löschprotokolls für die Übersicht (LFH-750).
+#[derive(Debug, sqlx::FromRow)]
+struct ProtokollZeile {
+    einsatz_id: i64,
+    einsatznummer_intern: Option<String>,
+    abgeschlossen_at: Option<String>,
+    geschwaerzt_at: String,
+    geloescht_at: String,
 }
 
 /// Register-SELECT einer Quelle, stornierte eingeschlossen, nach Registriernummer.
@@ -188,6 +244,13 @@ fn register_sql(p: &super::projektion::Projektion) -> String {
     )
 }
 
+/// Skelett-Frist der Org in Tagen ab Abschluss (LFH-750); `None` = das Skelett bleibt.
+async fn skelett_dauer_tage(pool: &SqlitePool, org_id: i64) -> Result<Option<i64>, AppError> {
+    Ok(crate::org::einstellungen::laden_oder_default(pool, org_id)
+        .await?
+        .skelett_dauer_tage)
+}
+
 /// Baut die Archivakte zu einem bereits geladenen, zugriffsgeprüften Kopf.
 /// Fehler, wenn der Einsatz aktiv ist (kein Aufbewahrungszustand).
 pub async fn akte(
@@ -195,8 +258,9 @@ pub async fn akte(
     kopf: &KopfZeile,
     jetzt: DateTime<Utc>,
 ) -> Result<ArchivAkteAnzeige, AppError> {
+    let skelett_dauer_tage = skelett_dauer_tage(pool, kopf.org_id).await?;
     let zustand = kopf
-        .zustand(jetzt)
+        .zustand(skelett_dauer_tage, jetzt)
         .ok_or_else(|| AppError::Conflict("Einsatz ist nicht abgeschlossen".into()))?;
     // Auf Antrag geschwärzte Betroffene (LFH-751): Personen-ID → Zeitpunkt des Vollzugs.
     let auf_antrag: std::collections::HashMap<i64, String> =

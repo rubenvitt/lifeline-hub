@@ -13,6 +13,7 @@ pub mod repo;
 pub mod retention;
 pub mod schwaerzung_person;
 pub mod schwaerzung_registry;
+pub mod skelett_loeschung;
 pub mod zaehler;
 
 use crate::stab::Sachgebiet;

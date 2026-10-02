@@ -60,7 +60,17 @@ const EINTRAEGE: AufbewahrungEintrag[] = [
     geloescht_at: '2025-02-01 10:10:00',
     karenz_ende: '2025-03-03 10:10:00',
     geschwaerzt_at: '2025-03-03 10:20:00',
+    loeschung_am: '2035-01-02 10:00:00',
     zustand: 'geschwaerzt',
+  },
+  {
+    // Endgültig gelöscht (LFH-750): nur noch die Zeile des Löschprotokolls, ohne Bezeichnung.
+    einsatz_id: 9105,
+    einsatznummer_intern: 'E-2016-0003',
+    abgeschlossen_at: '2016-01-01 10:00:00',
+    geschwaerzt_at: '2016-03-01 10:00:00',
+    endgueltig_geloescht_at: '2026-01-01 10:00:00',
+    zustand: 'endgueltig_geloescht',
   },
 ];
 
@@ -152,6 +162,30 @@ describe('AufbewahrungUebersicht', () => {
     const ohneNummer = within(t).getByRole('link', { name: 'ohne Nr. · Altlage Ost' });
     expect(ohneNummer).toHaveAttribute('href', '/admin/aufbewahrung/9104');
     expect(within(t).queryByRole('link', { name: '—' })).toBeNull();
+  });
+
+  it('zeigt den Löschtermin des Skeletts und beim gelöschten Einsatz den Löschzeitpunkt', async () => {
+    zeige();
+    const t = await tabelle();
+    await within(t).findByText('E-2025-0001');
+    expect(within(t).getByRole('columnheader', { name: /Löschung am/ })).toBeInTheDocument();
+    expect(within(t).getByText(formatZeit('2035-01-02 10:00:00'))).toBeInTheDocument();
+    expect(within(t).getByText(formatZeit('2026-01-01 10:00:00'))).toBeInTheDocument();
+  });
+
+  it('ein endgültig gelöschter Einsatz führt in keine Akte und nennt statt der Bezeichnung die Löschung', async () => {
+    zeige();
+    const t = await tabelle();
+    const nummer = await within(t).findByText('E-2016-0003');
+    expect(within(t).queryByRole('link', { name: 'E-2016-0003' })).toBeNull();
+    expect(within(t).getAllByText('endgültig gelöscht').length).toBeGreaterThanOrEqual(2);
+    await userEvent.click(nummer);
+    expect(screen.queryByLabelText('Ort')).toBeNull();
+    // Die übrigen Zeilen führen weiter in die Akte.
+    expect(within(t).getByRole('link', { name: 'E-2025-0001' })).toHaveAttribute(
+      'href',
+      '/admin/aufbewahrung/9103',
+    );
   });
 });
 

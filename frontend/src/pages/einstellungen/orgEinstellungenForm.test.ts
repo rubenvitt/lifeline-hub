@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { zuUpdate, normalisiereAnzeige, normalisiereEinsatz } from './orgEinstellungenForm';
+import {
+  istSkelettVerkuerzung,
+  zuUpdate,
+  normalisiereAnzeige,
+  normalisiereEinsatz,
+} from './orgEinstellungenForm';
 import type { OrgEinstellungen } from '../../api/types';
 
 const VOLL = {
@@ -9,6 +14,7 @@ const VOLL = {
   einheiten: 'imperial',
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
+  skelett_dauer_tage: 3650,
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
@@ -23,13 +29,15 @@ const VOLL = {
 } as unknown as OrgEinstellungen;
 
 describe('zuUpdate', () => {
-  it('mappt alle 13 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
+  it('mappt alle 14 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
     expect(zuUpdate(VOLL)).toEqual({
       zeitzone: 'Europe/Berlin',
       zeitformat: '12h',
       einheiten: 'imperial',
       koordinatenformat: 'mgrs',
       retention_dauer_tage: 90,
+      // Fehlte es hier, leerte jedes Speichern einer anderen Sektion die Skelett-Frist (LFH-750).
+      skelett_dauer_tage: 3650,
       etb_nummer_praefix: 'EB-',
       meldung_nummer_praefix: 'M-',
       auftrag_nummer_praefix: 'A-',
@@ -78,6 +86,7 @@ describe('normalisiereEinsatz', () => {
       }),
     ).toEqual({
       retention_dauer_tage: null,
+      skelett_dauer_tage: null,
       etb_nummer_praefix: null,
       meldung_nummer_praefix: null,
       auftrag_nummer_praefix: null,
@@ -111,5 +120,17 @@ describe('normalisiereEinsatz', () => {
       normalisiereEinsatz({ einsatz_nummer_praefix: ' WF- ', auto_etb_eintraege: true })
         .einsatz_nummer_praefix,
     ).toBe('WF-');
+  });
+});
+
+describe('istSkelettVerkuerzung (LFH-750, Spiegel von routes::org_einstellungen::setzen)', () => {
+  it('erstmaliges Setzen und Verkürzen sind zu bestätigen, Gleichlassen, Verlängern, Leeren nicht', () => {
+    expect(istSkelettVerkuerzung(null, 3650)).toBe(true);
+    expect(istSkelettVerkuerzung(undefined, 3650)).toBe(true);
+    expect(istSkelettVerkuerzung(3650, 365)).toBe(true);
+    expect(istSkelettVerkuerzung(3650, 3650)).toBe(false);
+    expect(istSkelettVerkuerzung(3650, 4000)).toBe(false);
+    expect(istSkelettVerkuerzung(3650, null)).toBe(false);
+    expect(istSkelettVerkuerzung(null, null)).toBe(false);
   });
 });

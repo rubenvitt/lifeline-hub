@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { theme } from 'antd';
+import { theme, Typography } from 'antd';
 import { ladeAufbewahrung } from '../api/aufbewahrung';
 import { globalKeys } from '../api/queryKeys';
 import type { AufbewahrungEintrag, AufbewahrungZustand } from '../api/types';
@@ -29,11 +29,25 @@ import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
  * Die Bezeichnung fließt (`mindestBreite`), alle übrigen Spalten tragen eine Zahlbreite, sonst
  * bliebe das Opt-in wirkungslos. Der Zustand steht neben der fixierten Nummer, damit er bei
  * 390 px ohne Querscrollen lesbar ist.
+ *
+ * Ein endgültig gelöschter Einsatz (LFH-750) ist nur noch eine Zeile des Löschprotokolls: ohne
+ * Bezeichnung und ohne Akte, also ohne Link und ohne Zeilenklick.
  */
 
 type Filter = AufbewahrungZustand | 'alle';
 
 const leer = '—';
+
+const GELOESCHT = 'endgültig gelöscht';
+
+function istGeloescht(e: Pick<AufbewahrungEintrag, 'zustand'>): boolean {
+  return e.zustand === 'endgueltig_geloescht';
+}
+
+/** Löschtermin des Skeletts, beim gelöschten Einsatz der Zeitpunkt der Löschung. */
+function loeschung(e: AufbewahrungEintrag): string | undefined {
+  return e.endgueltig_geloescht_at ?? e.loeschung_am ?? undefined;
+}
 
 /**
  * Kennung der fixierten Spalte. Altbestand ohne Einsatznummer (gerade die Aufbewahrungsfälle)
@@ -41,7 +55,7 @@ const leer = '—';
  * zu unterscheiden.
  */
 function kennung(e: Pick<AufbewahrungEintrag, 'einsatznummer_intern' | 'bezeichnung'>) {
-  return e.einsatznummer_intern ?? `ohne Nr. · ${e.bezeichnung}`;
+  return e.einsatznummer_intern ?? `ohne Nr. · ${e.bezeichnung ?? GELOESCHT}`;
 }
 
 const spalten = spaltenFuer<AufbewahrungEintrag>()([
@@ -65,9 +79,10 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     key: 'bezeichnung',
     title: 'Bezeichnung',
     mindestBreite: 200,
-    sortWert: (e) => e.bezeichnung,
-    suchText: (e) => e.bezeichnung,
-    render: (_, e) => e.bezeichnung,
+    sortWert: (e) => e.bezeichnung ?? GELOESCHT,
+    suchText: (e) => e.bezeichnung ?? GELOESCHT,
+    render: (_, e) =>
+      e.bezeichnung ?? <Typography.Text type="secondary">{GELOESCHT}</Typography.Text>,
   },
   {
     key: 'abgeschlossen',
@@ -118,6 +133,17 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     sortWert: (e) => e.geschwaerzt_at,
     render: (_, e) => (e.geschwaerzt_at ? <ZeitAnzeige wert={e.geschwaerzt_at} /> : leer),
   },
+  {
+    key: 'loeschung',
+    title: 'Löschung am',
+    width: 160,
+    zahl: true,
+    sortWert: (e) => loeschung(e),
+    render: (_, e) => {
+      const wert = loeschung(e);
+      return wert ? <ZeitAnzeige wert={wert} /> : leer;
+    },
+  },
 ]);
 
 type Spalte = (typeof spalten)[number]['key'];
@@ -129,7 +155,10 @@ type Spalte = (typeof spalten)[number]['key'];
  */
 const KARTE: Kartenplan<AufbewahrungEintrag, Spalte> = {
   art: 'plan',
-  titel: { spalte: 'nummer', ziel: (e) => adminAufbewahrungAktePfad(e.einsatz_id) },
+  titel: {
+    spalte: 'nummer',
+    ziel: (e) => (istGeloescht(e) ? null : adminAufbewahrungAktePfad(e.einsatz_id)),
+  },
   status: (e) => aufbewahrungZustand[e.zustand],
   sekundaer: ['bezeichnung', 'frist', 'karenz'],
 };
@@ -164,7 +193,7 @@ export default function AufbewahrungUebersicht() {
   return (
     <AdminPage
       titel="Aufbewahrung"
-      beschreibung="Abgeschlossene Einsätze der eigenen Organisation mit ihrer Aufbewahrungsfrist. Nach Fristablauf ist ein Einsatz gesperrt und zur Löschung vorgemerkt; nach 30 Tagen Karenz werden die Personendaten unwiderruflich geschwärzt. Eine Zeile öffnet die pseudonyme Archivakte."
+      beschreibung="Abgeschlossene Einsätze der eigenen Organisation mit ihrer Aufbewahrungsfrist. Nach Fristablauf ist ein Einsatz gesperrt und zur Löschung vorgemerkt; nach 30 Tagen Karenz werden die Personendaten unwiderruflich geschwärzt. Mit einer Skelett-Frist der Organisation wird das pseudonyme Skelett danach endgültig gelöscht. Eine Zeile öffnet die pseudonyme Archivakte."
       hinweis={
         ohneStand ? (
           <SeitenFehler
@@ -202,7 +231,9 @@ export default function AufbewahrungUebersicht() {
                 : `Kein Einsatz im Zustand „${aufbewahrungZustand[filter].label}“`
             }
             karte={KARTE}
-            onZeileKlick={(e) => navigate(adminAufbewahrungAktePfad(e.einsatz_id))}
+            onZeileKlick={(e) => {
+              if (!istGeloescht(e)) navigate(adminAufbewahrungAktePfad(e.einsatz_id));
+            }}
           />
         </>
       )}

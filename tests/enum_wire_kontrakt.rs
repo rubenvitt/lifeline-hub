@@ -364,6 +364,8 @@ fn serde_wire_gleich_as_str() {
         Vorgemerkt,
         SchwaerzungAusstehend,
         Geschwaerzt,
+        LoeschungAusstehend,
+        EndgueltigGeloescht,
         SchwaerzungBeantragt,
     });
     enum_wire_as_str!(lifeline_hub::einsatz::schwaerzung_person::PersonenArt {

@@ -78,6 +78,10 @@ export interface OrgEinstellungenUpdate {
   einheiten: EinheitenSystem | null;
   koordinatenformat: Koordinatenformat | null;
   retention_dauer_tage: number | null;
+  /** Skelett-Frist in Tagen ab Abschluss (LFH-750); null = das Skelett bleibt unbegrenzt. */
+  skelett_dauer_tage: number | null;
+  /** Bestätigt das erstmalige Setzen oder Verkürzen der Skelett-Frist; ohne → 409. */
+  skelett_dauer_bestaetigt?: boolean;
   etb_nummer_praefix: string | null;
   meldung_nummer_praefix: string | null;
   auftrag_nummer_praefix: string | null;

@@ -33,6 +33,7 @@ const VOLL = {
   einheiten: 'imperial',
   koordinatenformat: 'mgrs',
   retention_dauer_tage: 90,
+  skelett_dauer_tage: null as number | null,
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
@@ -74,6 +75,7 @@ describe('EinsatzDefaults', () => {
         koordinatenformat: 'mgrs',
         geocoder_url: 'https://geo.example',
         retention_dauer_tage: 90,
+        skelett_dauer_tage: null,
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
@@ -140,6 +142,69 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />);
     expect(await screen.findByLabelText('Dauer Anhänge (Tage)')).toHaveValue('30');
     expect(screen.getByLabelText('Rechtsgrundlage Anhänge')).toHaveValue('§ 32b Abs. 3 NKatSG');
+  });
+
+  describe('Skelett-Frist (LFH-750)', () => {
+    const FELD = 'Skelett endgültig löschen nach (Tage ab Abschluss)';
+
+    it('fragt beim erstmaligen Setzen zurück und sendet erst nach der Bestätigung', async () => {
+      renderMitProviders(<EinsatzDefaults />);
+      await userEvent.type(await screen.findByLabelText(FELD), '3650');
+      fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+      // Kein `name`-Filter: in der Testumgebung heißen alle Titel-IDs `test-id`, und die Seite
+      // trägt weitere — `aria-labelledby` zeigte auf das falsche Element.
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('Skelett-Frist bestätigen?');
+      expect(dialog).toHaveTextContent('unwiderruflich');
+      expect(speichereOrgEinstellungen).not.toHaveBeenCalled();
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Skelette löschen lassen' }),
+      );
+
+      await waitFor(() =>
+        expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+          expect.objectContaining({ skelett_dauer_tage: 3650, skelett_dauer_bestaetigt: true }),
+        ),
+      );
+    });
+
+    it('Abbrechen sendet nichts', async () => {
+      renderMitProviders(<EinsatzDefaults />);
+      await userEvent.type(await screen.findByLabelText(FELD), '3650');
+      fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('Skelett-Frist bestätigen?');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+
+      // antd räumt den Knoten erst am Ende der Zoom-Animation ab, jsdom feuert kein
+      // `transitionend` — daher `ant-zoom-leave` (wie `aufbewahrung/FristPaneel.test.tsx`).
+      await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+      expect(speichereOrgEinstellungen).not.toHaveBeenCalled();
+    });
+
+    it('Verlängern geht ohne Rückfrage und ohne Bestätigung hinaus', async () => {
+      vi.mocked(ladeOrgEinstellungen).mockResolvedValue({
+        ...VOLL,
+        skelett_dauer_tage: 3650,
+      } as never);
+      renderMitProviders(<EinsatzDefaults />);
+      const feld = await screen.findByLabelText(FELD);
+      expect(feld).toHaveValue('3650');
+      await userEvent.clear(feld);
+      await userEvent.type(feld, '4000');
+      fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+      await waitFor(() =>
+        expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+          expect.objectContaining({ skelett_dauer_tage: 4000 }),
+        ),
+      );
+      expect(vi.mocked(speichereOrgEinstellungen).mock.calls[0][0]).not.toHaveProperty(
+        'skelett_dauer_bestaetigt',
+      );
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
   });
 
   it('invalidiert nach dem Speichern die Rückmeldungen aller Einsätze, sonst nichts (LFH-610)', async () => {

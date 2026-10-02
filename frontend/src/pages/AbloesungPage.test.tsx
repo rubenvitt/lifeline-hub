@@ -149,8 +149,23 @@ describe('AbloesungPage (LFH-635)', () => {
       k.querySelector<HTMLElement>('[data-lfh="abloesung-rhythmus"]');
     expect(rhythmus(bald)).toHaveTextContent(/^Rhythmus 6 h \(Vorgabe\)$/);
     expect(rhythmus(plan)).toHaveTextContent(/^Rhythmus 6 h \(eigen\)$/);
-    const herkunft = within(bald).getByText(/^Deichwache Nord · im Einsatz seit \d{4,6}$/);
+    const herkunft = within(bald).getByText(/^Deichwache Nord · im Einsatz seit$/);
+    expect(herkunft).toHaveTextContent(/^Deichwache Nord · im Einsatz seit \d{4,6}$/);
     expect(herkunft).not.toContainElement(rhythmus(bald));
+  });
+
+  it('der Beginn steht in Mono mit festen Ziffern (LFH-771)', async () => {
+    // Zeiten sind immer Mono mit `tabular-nums` (`frontend/AGENTS.md`, Gestaltungssprache).
+    // In der Textschrift hing die Breite von `seit HHmm` an den Ziffern (Archivo hat
+    // proportionale Ziffern): dieselbe Karte brach je nach Beginn anders um.
+    renderPage();
+    const karten = await screen.findAllByRole('article');
+    for (const k of karten) {
+      const beginn = k.querySelector<HTMLElement>('[data-lfh="abloesung-beginn"]')!;
+      expect(beginn).toHaveTextContent(/^\d{4,6}$/);
+      expect(beginn.style.fontFamily).toContain('JetBrains Mono');
+      expect(beginn.style.fontVariantNumeric).toBe('tabular-nums');
+    }
   });
 
   it('die Zeit trägt die Mindestbreite von sechs Ziffern (6ch)', async () => {

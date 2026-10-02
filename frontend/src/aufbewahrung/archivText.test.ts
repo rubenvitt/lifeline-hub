@@ -12,6 +12,8 @@ describe('archivText', () => {
       'schwaerzung_ausstehend',
       'schwaerzung_beantragt',
       'geschwaerzt',
+      'loeschung_ausstehend',
+      'endgueltig_geloescht',
     ]);
     expect([...ZUSTAENDE].sort()).toEqual(Object.keys(aufbewahrungZustand).sort());
   });
@@ -28,6 +30,8 @@ describe('archivText', () => {
       'wiederherstellen',
       null,
       // LFH-751: bei offenem Einsatz-Antrag steht die Rücknahme am Antrag, nicht im Kopf.
+      null,
+      null,
       null,
       null,
     ]);

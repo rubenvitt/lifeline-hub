@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
 import { abstand } from '../theme/tokens';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import { alsBackendZeit, alsZeitpunkt } from './filterZeit';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 
 /**
  * Filterleiste des Einsatztagebuchs.
@@ -18,7 +18,7 @@ import { alsBackendZeit, alsZeitpunkt } from './filterZeit';
  * setzt die Leiste deshalb per `key` neu auf (`pages/EtbPage.tsx`).
  *
  * **Warum nicht kontrolliert:** die Umkehr von {@link alsBackendZeit} existiert
- * (`etb/filterZeit.ts`), aber eine laufende Zwei-Wege-Bindung bleibt unerwünscht. Die Leiste
+ * (`anzeige/zeitEingabe.ts`), aber eine laufende Zwei-Wege-Bindung bleibt unerwünscht. Die Leiste
  * nimmt ihren ANFANGSSTAND aus `startWerte` (einmalig, über `defaultValue`) und ist danach die
  * Quelle des sichtbaren Standes.
  *

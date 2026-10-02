@@ -7,6 +7,7 @@ import StatusTag from '../components/StatusTag';
 import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../stab/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
+import { schrift } from '../theme/tokens';
 import { abloesungZeit, einstufungVon, rhythmusText } from './einstufung';
 
 const { Text } = Typography;
@@ -117,7 +118,15 @@ export default function AbloesungKarte({
           {laufend && <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>}
           <Text type="secondary">
             {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}
-            im Einsatz seit <ZeitAnzeige wert={s.beginn_at} format="kurz" />
+            im Einsatz seit{' '}
+            {/* Zeiten in Mono mit festen Ziffern, in der Größe der Zeile (LFH-771): in der
+                Textschrift hinge die Breite und damit der Umbruch an den Ziffern. */}
+            <span
+              data-lfh="abloesung-beginn"
+              style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}
+            >
+              <ZeitAnzeige wert={s.beginn_at} format="kurz" />
+            </span>
           </Text>
           {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
               Zeile darf sie berühren. Die kurzen Quellenwörter halten auch 167 h 59 min als

@@ -270,7 +270,7 @@ describe('abloesungEinstufung (LFH-635)', () => {
 
 describe('aufbewahrungZustand (LFH-23, design.md D4)', () => {
   // Byte-Pin gegen handgeschriebene Literale: das Wort ist der zweite Kanal (WCAG 1.4.1).
-  it('bildet die sieben Zustände auf Rolle und Wort ab', () => {
+  it('bildet die neun Zustände auf Rolle und Wort ab', () => {
     expect(sf.aufbewahrungZustand).toEqual({
       ohne_frist: { rolle: 'neutral', label: 'ohne Frist' },
       frist_laeuft: { rolle: 'neutral', label: 'Frist läuft' },
@@ -279,6 +279,9 @@ describe('aufbewahrungZustand (LFH-23, design.md D4)', () => {
       schwaerzung_ausstehend: { rolle: 'alarm', label: 'Schwärzung steht aus' },
       geschwaerzt: { rolle: 'neutral', label: 'geschwärzt' },
       schwaerzung_beantragt: { rolle: 'achtung', label: 'Schwärzung beantragt' },
+      // LFH-750: endgültige Löschung des Skeletts.
+      loeschung_ausstehend: { rolle: 'alarm', label: 'Löschung steht aus' },
+      endgueltig_geloescht: { rolle: 'neutral', label: 'endgültig gelöscht' },
     });
   });
 

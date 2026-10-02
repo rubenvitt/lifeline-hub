@@ -51,9 +51,9 @@ pub fn karenz_abgelaufen(geloescht_at: Option<&str>, jetzt: DateTime<Utc>) -> bo
 }
 
 wire_enum! {
-    /// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
-    /// keinen ([`zustand`] liefert `None`). Genau einer von sieben Werten; die Rangfolge steht an
-    /// [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
+    /// Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23) oder — nur
+    /// `EndgueltigGeloescht` — einer Zeile des Löschprotokolls (LFH-750). Aktive Einsätze haben
+    /// keinen ([`zustand`] liefert `None`). Genau ein Wert; die Rangfolge steht an [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
     /// `tests/enum_wire_kontrakt.rs`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AufbewahrungZustand {
@@ -67,10 +67,15 @@ wire_enum! {
         Vorgemerkt => "vorgemerkt",
         /// Karenz abgelaufen, noch nicht geschwärzt (der nächste Purge-Lauf schwärzt).
         SchwaerzungAusstehend => "schwaerzung_ausstehend",
-        /// Personendaten unwiderruflich geschwärzt.
+        /// Personendaten unwiderruflich geschwärzt; die Skelett-Frist läuft oder fehlt.
         Geschwaerzt => "geschwaerzt",
         /// Offener Einsatz-Antrag (Löschersuchen nach Art. 17, LFH-751), noch nicht vollzogen.
         SchwaerzungBeantragt => "schwaerzung_beantragt",
+        /// Geschwärzt, Skelett-Frist abgelaufen, noch nicht endgültig gelöscht (LFH-750; der
+        /// nächste Purge-Lauf löscht, ohne Akteur bleibt es hier stehen).
+        LoeschungAusstehend => "loeschung_ausstehend",
+        /// Endgültig gelöscht — nur eine Zeile des Löschprotokolls; [`zustand`] liefert ihn nie.
+        EndgueltigGeloescht => "endgueltig_geloescht",
     }
 }
 
@@ -93,7 +98,9 @@ wire_enum! {
 
 /// Leitet den Aufbewahrungszustand ab (LFH-23, design.md D4). `None` für jeden nicht
 /// abgeschlossenen Einsatz. `antrag_faellig_at` ist die Fälligkeit eines offenen Einsatz-Antrags
-/// (LFH-751). Rangfolge: geschwärzt → Schwärzung beantragt → Schwärzung ausstehend (Karenz
+/// (LFH-751). Rangfolge: Löschung ausstehend (geschwärzt und Skelett-Frist abgelaufen,
+/// [`skelett_loeschung_faellig`], LFH-750) → geschwärzt → Schwärzung beantragt → Schwärzung
+/// ausstehend (Karenz
 /// abgelaufen, [`karenz_abgelaufen`]) → vorgemerkt → fällig (Frist abgelaufen, dieselbe
 /// Grenze wie die Lesesperre: `jetzt >= retention_bis`) → Frist läuft → ohne Frist.
 ///
@@ -106,6 +113,8 @@ pub fn zustand(
     geloescht_at: Option<&str>,
     geschwaerzt_at: Option<&str>,
     antrag_faellig_at: Option<&str>,
+    abgeschlossen_at: Option<&str>,
+    skelett_dauer_tage: Option<i64>,
     jetzt: DateTime<Utc>,
 ) -> Option<AufbewahrungZustand> {
     if status != crate::einsatz::STATUS_ABGESCHLOSSEN {
@@ -113,7 +122,11 @@ pub fn zustand(
     }
     let gesetzt = |s: Option<&str>| s.is_some_and(|v| !v.is_empty());
     Some(if gesetzt(geschwaerzt_at) {
-        AufbewahrungZustand::Geschwaerzt
+        if skelett_loeschung_faellig(abgeschlossen_at, geschwaerzt_at, skelett_dauer_tage, jetzt) {
+            AufbewahrungZustand::LoeschungAusstehend
+        } else {
+            AufbewahrungZustand::Geschwaerzt
+        }
     } else if gesetzt(antrag_faellig_at) {
         AufbewahrungZustand::SchwaerzungBeantragt
     } else if gesetzt(geloescht_at) {
@@ -129,6 +142,48 @@ pub fn zustand(
     } else {
         AufbewahrungZustand::OhneFrist
     })
+}
+
+/// Zeitpunkt der endgültigen Löschung des Skeletts (LFH-750, design.md D1): der spätere aus
+/// `abgeschlossen_at + skelett_dauer_tage` und `geschwaerzt_at` — gelöscht wird nie vor der
+/// Schwärzung. Ohne Schwärzung `abgeschlossen_at + skelett_dauer_tage` (Vorschau in der
+/// Übersicht). `None` ohne Skelett-Frist oder bei einem unparsebaren Zeitstempel.
+pub fn skelett_loeschung_am(
+    abgeschlossen_at: Option<&str>,
+    geschwaerzt_at: Option<&str>,
+    skelett_dauer_tage: Option<i64>,
+) -> Option<String> {
+    let am = parse_skelett_loeschung_am(abgeschlossen_at, geschwaerzt_at, skelett_dauer_tage)?;
+    Some(crate::zeit::formatiere_utc(am))
+}
+
+/// Ob das Skelett zu `jetzt` endgültig zu löschen ist: geschwärzt und
+/// `jetzt >= skelett_loeschung_am`. Ein nicht geschwärzter Einsatz, eine fehlende Frist oder
+/// ein unparsebarer Zeitstempel → `false` (dieselbe defensive Lesart wie
+/// [`karenz_abgelaufen`]: im Zweifel bleibt das Skelett).
+pub fn skelett_loeschung_faellig(
+    abgeschlossen_at: Option<&str>,
+    geschwaerzt_at: Option<&str>,
+    skelett_dauer_tage: Option<i64>,
+    jetzt: DateTime<Utc>,
+) -> bool {
+    if geschwaerzt_at.is_none_or(str::is_empty) {
+        return false;
+    }
+    parse_skelett_loeschung_am(abgeschlossen_at, geschwaerzt_at, skelett_dauer_tage)
+        .is_some_and(|am| jetzt >= am)
+}
+
+fn parse_skelett_loeschung_am(
+    abgeschlossen_at: Option<&str>,
+    geschwaerzt_at: Option<&str>,
+    skelett_dauer_tage: Option<i64>,
+) -> Option<DateTime<Utc>> {
+    let frist = crate::zeit::parse_utc(abgeschlossen_at?)? + Duration::days(skelett_dauer_tage?);
+    match geschwaerzt_at {
+        None => Some(frist),
+        Some(g) => Some(frist.max(crate::zeit::parse_utc(g)?)),
+    }
 }
 
 /// Ende der Karenz (`geloescht_at + KARENZ_TAGE`) im DB-Format; `None` ohne oder bei
@@ -203,8 +258,141 @@ mod tests {
             geloescht,
             geschwaerzt,
             None,
+            Some("2016-01-01 00:00:00"),
+            None,
             t("2026-06-30 12:00:00"),
         )
+    }
+
+    // ---------- LFH-750: endgültige Löschung des Skeletts ----------
+
+    #[test]
+    fn skelett_loeschung_am_ist_spaeter_aus_abschluss_plus_frist_und_schwaerzung() {
+        // Abschluss + N liegt nach der Schwärzung → Abschluss + N.
+        assert_eq!(
+            skelett_loeschung_am(
+                Some("2016-01-01 10:00:00"),
+                Some("2016-03-01 00:00:00"),
+                Some(3650)
+            )
+            .as_deref(),
+            Some("2025-12-29 10:00:00")
+        );
+        // Schwärzung nach Abschluss + N → Schwärzung.
+        assert_eq!(
+            skelett_loeschung_am(
+                Some("2026-01-01 10:00:00"),
+                Some("2026-03-01 00:00:00"),
+                Some(1)
+            )
+            .as_deref(),
+            Some("2026-03-01 00:00:00")
+        );
+        // Noch nicht geschwärzt → Abschluss + N.
+        assert_eq!(
+            skelett_loeschung_am(Some("2026-01-01 10:00:00"), None, Some(30)).as_deref(),
+            Some("2026-01-31 10:00:00")
+        );
+    }
+
+    #[test]
+    fn skelett_loeschung_am_ohne_frist_oder_unparsebar_ist_none() {
+        assert_eq!(
+            skelett_loeschung_am(Some("2016-01-01 10:00:00"), None, None),
+            None
+        );
+        assert_eq!(skelett_loeschung_am(None, None, Some(30)), None);
+        assert_eq!(skelett_loeschung_am(Some("kaputt"), None, Some(30)), None);
+        assert_eq!(
+            skelett_loeschung_am(Some("2016-01-01 10:00:00"), Some("kaputt"), Some(30)),
+            None
+        );
+    }
+
+    #[test]
+    fn skelett_loeschung_faellig_grenzen() {
+        let jetzt = t("2026-06-30 12:00:00");
+        let abschluss = Some("2026-05-31 12:00:00");
+        let geschwaerzt = Some("2026-06-01 00:00:00");
+        // Genau Abschluss + 30 Tage = jetzt → fällig; eine Sekunde später nicht.
+        assert!(skelett_loeschung_faellig(
+            abschluss,
+            geschwaerzt,
+            Some(30),
+            jetzt
+        ));
+        assert!(!skelett_loeschung_faellig(
+            Some("2026-05-31 12:00:01"),
+            geschwaerzt,
+            Some(30),
+            jetzt
+        ));
+        // Nicht geschwärzt → nie fällig, auch wenn Abschluss + N vergangen ist.
+        assert!(!skelett_loeschung_faellig(abschluss, None, Some(1), jetzt));
+        // Ohne Frist oder mit unparsebaren Werten → nie fällig.
+        assert!(!skelett_loeschung_faellig(
+            abschluss,
+            geschwaerzt,
+            None,
+            jetzt
+        ));
+        assert!(!skelett_loeschung_faellig(
+            Some("kaputt"),
+            geschwaerzt,
+            Some(1),
+            jetzt
+        ));
+        assert!(!skelett_loeschung_faellig(
+            abschluss,
+            Some("kaputt"),
+            Some(1),
+            jetzt
+        ));
+        // Schwärzung in der Zukunft (Uhr) → erst ab der Schwärzung.
+        assert!(!skelett_loeschung_faellig(
+            abschluss,
+            Some("2026-06-30 12:00:01"),
+            Some(1),
+            jetzt
+        ));
+    }
+
+    #[test]
+    fn zustand_loeschung_ausstehend_nur_mit_abgelaufener_skelett_frist() {
+        use AufbewahrungZustand::*;
+        let jetzt = t("2026-06-30 12:00:00");
+        let geschwaerzt = Some("2016-03-01 00:00:00");
+        let abschluss = Some("2016-01-01 00:00:00");
+        let mit = |frist: Option<i64>| {
+            zustand(
+                "abgeschlossen",
+                None,
+                Some("2016-02-01 00:00:00"),
+                geschwaerzt,
+                None,
+                abschluss,
+                frist,
+                jetzt,
+            )
+        };
+        assert_eq!(mit(Some(3650)), Some(LoeschungAusstehend));
+        // Frist noch nicht abgelaufen bzw. ohne Org-Frist → geschwärzt.
+        assert_eq!(mit(Some(36500)), Some(Geschwaerzt));
+        assert_eq!(mit(None), Some(Geschwaerzt));
+        // Nicht geschwärzt: die Skelett-Frist ändert den Zustand nicht.
+        assert_eq!(
+            zustand(
+                "abgeschlossen",
+                Some("2016-01-02 00:00:00"),
+                None,
+                None,
+                None,
+                abschluss,
+                Some(1),
+                jetzt
+            ),
+            Some(Faellig)
+        );
     }
 
     #[test]
@@ -285,6 +473,8 @@ mod tests {
                 None,
                 None,
                 f,
+                None,
+                None,
                 jetzt
             ),
             Some(SchwaerzungBeantragt)
@@ -296,6 +486,8 @@ mod tests {
                 Some("2026-01-01 00:00:00"),
                 None,
                 f,
+                None,
+                None,
                 jetzt
             ),
             Some(SchwaerzungBeantragt)
@@ -307,11 +499,16 @@ mod tests {
                 Some("2026-01-01 00:00:00"),
                 Some("2026-02-01 00:00:00"),
                 f,
+                None,
+                None,
                 jetzt
             ),
             Some(Geschwaerzt)
         );
-        assert_eq!(zustand("aktiv", None, None, None, f, jetzt), None);
+        assert_eq!(
+            zustand("aktiv", None, None, None, f, None, None, jetzt),
+            None
+        );
     }
 
     #[test]
@@ -371,6 +568,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(AufbewahrungZustand::SchwaerzungAusstehend).unwrap(),
             serde_json::json!("schwaerzung_ausstehend")
+        );
+        assert_eq!(
+            serde_json::to_value(AufbewahrungZustand::LoeschungAusstehend).unwrap(),
+            serde_json::json!("loeschung_ausstehend")
+        );
+        assert_eq!(
+            serde_json::to_value(AufbewahrungZustand::EndgueltigGeloescht).unwrap(),
+            serde_json::json!("endgueltig_geloescht")
         );
     }
 }

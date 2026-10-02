@@ -47,6 +47,29 @@ pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
         .await
 }
 
+/// Stellt sicher, dass die Verbindung Fremdschlüssel **sofort** prüft, bevor ein Löschweg sich
+/// auf `ON DELETE CASCADE` oder auf eine FK-Verletzung verlässt. Ohne Prüfung liefe die Kaskade
+/// nicht, und abhängige Zeilen blieben verwaist stehen; aufgeschoben käme ein Fehler erst beim
+/// COMMIT. Beides ist heute ausgeschlossen — die Prüfung hält es zur Laufzeit fest, statt es
+/// anzunehmen. `zweck` steht in der Fehlermeldung (Demo-Daten entfernen, endgültige Löschung).
+pub(crate) async fn fk_pruefung_sicherstellen(
+    conn: &mut sqlx::SqliteConnection,
+    zweck: &str,
+) -> Result<(), crate::error::AppError> {
+    let an: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+        .fetch_one(&mut *conn)
+        .await?;
+    let aufgeschoben: i64 = sqlx::query_scalar("PRAGMA defer_foreign_keys")
+        .fetch_one(&mut *conn)
+        .await?;
+    if an != 1 || aufgeschoben != 0 {
+        return Err(crate::error::AppError::Internal(format!(
+            "{zweck} verweigert: foreign_keys={an}, defer_foreign_keys={aufgeschoben}"
+        )));
+    }
+    Ok(())
+}
+
 /// Spielt alle eingebetteten Migrationen aus `./migrations` ein.
 pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateError> {
     sqlx::migrate!("./migrations").run(pool).await

@@ -1,18 +1,19 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import { alsBackendZeit, alsOrtszeit } from './filterZeit';
+import { alsBackendZeit, alsOrtszeit } from './zeitEingabe';
 
 dayjs.extend(utc);
 
 /**
- * Die Zeitachse der ETB-Filterleiste, beide Richtungen.
+ * Wire ↔ Zeitpunkt, beide Richtungen (`alsOrtszeit`/`alsBackendZeit`). Zuerst für die Zeitachse
+ * der ETB-Filterleiste geschrieben, aus `etb/filterZeit.test.ts` hierher gezogen (LFH-755).
  *
  * Eigener Test, weil der Fehlermodus der Rückrichtung eine STILLE Verschiebung um den
  * Zonenversatz ist — kein roter Test, kein Fehlerbild, nur ein falscher Zeitraum in einer
  * beweissichernden Unterlage.
  */
-describe('filterZeit', () => {
+describe('zeitEingabe — Wire-Rundweg', () => {
   it('Round-Trip erhält den Zeitpunkt — auch beidseits der Sommerzeit-Grenzen', () => {
     // Beide mitteleuropäischen Umstellungen 2026, je eine Stunde davor und danach.
     for (const wire of [

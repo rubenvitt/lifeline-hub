@@ -606,6 +606,10 @@ pub fn kategorie_zustand(
         // Ein Löschersuchen (LFH-751) betrifft den Einsatz oder eine Person, keine Kategorie;
         // sein Zustand steht am Einsatz.
         None,
+        // Eine Kategorie hat keine eigene endgültige Löschung (LFH-750); die betrifft nur den
+        // ganzen Einsatz und steht an dessen Zustand.
+        None,
+        None,
         jetzt,
     )
 }

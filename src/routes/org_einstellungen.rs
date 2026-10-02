@@ -12,8 +12,8 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::einstellungen::{
     ist_gueltige_frist_min, ist_gueltige_geocoder_url, ist_gueltige_retention_dauer,
-    ist_gueltige_zeitzone, ist_gueltiges_einheiten_system, ist_gueltiges_koordinatenformat,
-    ist_gueltiges_nummer_praefix, ist_gueltiges_zeitformat,
+    ist_gueltige_skelett_dauer, ist_gueltige_zeitzone, ist_gueltiges_einheiten_system,
+    ist_gueltiges_koordinatenformat, ist_gueltiges_nummer_praefix, ist_gueltiges_zeitformat,
 };
 use crate::einsatz::modul::{ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key};
 use crate::error::AppError;
@@ -38,6 +38,11 @@ pub struct OrgEinstellungenUpdate {
     pub koordinatenformat: Option<String>,
     // Aufbewahrung.
     pub retention_dauer_tage: Option<i64>,
+    /// Skelett-Frist in Tagen ab Abschluss (LFH-750); `None` = das Skelett bleibt unbegrenzt.
+    pub skelett_dauer_tage: Option<i64>,
+    /// Bestätigt das erstmalige Setzen oder Verkürzen der Skelett-Frist; ohne → 409.
+    #[serde(default)]
+    pub skelett_dauer_bestaetigt: bool,
     /// Dauer und Rechtsgrundlage je Datenkategorie (LFH-749). Fehlt das Feld, bleiben die
     /// Vorgaben unverändert; eine Liste ersetzt sie (fehlende Kategorie = keine eigene Frist).
     pub aufbewahrung_kategorien: Option<Vec<KategorieVorgabeEingabe>>,
@@ -150,6 +155,28 @@ pub async fn setzen(
         }
     }
 
+    // Skelett-Frist (LFH-750, Spec `aufbewahrung`, „Frist für die endgültige Löschung“):
+    // 400 außerhalb des Bereichs; erstmaliges Setzen oder Verkürzen nur bestätigt, sonst 409 —
+    // wie die Verkürzung der Einsatzfrist. Eine kürzere Frist löscht im nächsten Purge-Lauf
+    // (≤ 10 min) unumkehrbar jedes Skelett, dessen Frist danach abgelaufen ist.
+    if let Some(v) = req.skelett_dauer_tage {
+        if !ist_gueltige_skelett_dauer(v) {
+            return Err(AppError::Validation(
+                "Skelett-Frist muss zwischen 1 und 36500 Tagen liegen".into(),
+            ));
+        }
+        let alt = einstellungen::laden_oder_default(&state.pool, benutzer.org_id)
+            .await?
+            .skelett_dauer_tage;
+        let verkuerzt = alt.is_none_or(|a| v < a);
+        if verkuerzt && !req.skelett_dauer_bestaetigt {
+            return Err(AppError::Conflict(
+                "Eine neue oder kürzere Skelett-Frist löscht Skelette endgültig und muss \
+                 bestätigt werden"
+                    .into(),
+            ));
+        }
+    }
     // Kategorie-Vorgaben (LFH-749): 400 je Feld, auch bei fehlender Rechtsgrundlage (Pflichtfeld
     // jedes Eintrags).
     let kategorien = req
@@ -177,6 +204,7 @@ pub async fn setzen(
             einheiten: einheiten.as_deref(),
             koordinatenformat: koordinatenformat.as_deref(),
             retention_dauer_tage: req.retention_dauer_tage,
+            skelett_dauer_tage: req.skelett_dauer_tage,
             etb_nummer_praefix: etb_nummer_praefix.as_deref(),
             meldung_nummer_praefix: meldung_nummer_praefix.as_deref(),
             auftrag_nummer_praefix: auftrag_nummer_praefix.as_deref(),
