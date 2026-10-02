@@ -527,7 +527,7 @@ describe('EinsatzLayout', () => {
       expect(screen.queryByRole('button', { name: 'Alarmton durch Klick entsperren' })).toBeNull();
     });
 
-    it('zeigt unter lg die Suche als Ikone und keine Wortmarke', async () => {
+    it('zeigt unter lg die Suche als Icon und keine Wortmarke', async () => {
       // Auf 390 px kein Suchfeld, und die Wortmarke weicht dem Griff der Navigation.
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());

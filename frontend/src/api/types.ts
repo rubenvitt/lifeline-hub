@@ -89,6 +89,9 @@ export interface OrgEinstellungenUpdate {
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
   geocoder_url: string | null;
+  /** Kategorie-Vorgaben (LFH-749). Fehlt das Feld, bleiben sie am Server unverändert — nur die
+   *  Sektion „Einsatz-Defaults“ schickt es mit. */
+  aufbewahrung_kategorien?: KategorieVorgabe[];
 }
 
 /** Org-weite Modul-Rollen-Defaults (GET /api/org-modul-einstellungen).
@@ -784,6 +787,24 @@ export interface WiederherstellenBody {
 export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
+}
+
+// ============================== LFH-749 Fristen je Datenkategorie ==============================
+/** Datenkategorie mit eigener Aufbewahrungsfrist (`behandlung`, `personenauskunft`, `anhaenge`). */
+export type Datenkategorie = S['Datenkategorie'];
+/** Org-Vorgabe einer Kategorie: Dauer in Tagen und Rechtsgrundlage. */
+export type KategorieVorgabe = S['KategorieVorgabe'];
+/** Aufbewahrung einer Kategorie am Einsatz bzw. in der Archivakte (Frist, Zustand, Rechtsgrundlage). */
+export type KategorieAufbewahrung = S['KategorieAufbewahrungAnzeige'];
+
+/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}`. `null` hebt die Frist auf
+ *  (die Kategorie folgt der Einsatz-Frist); eine Verkürzung braucht `bestaetigt: true`, sonst 409;
+ *  die erste Frist einer Kategorie braucht eine Rechtsgrundlage, sonst 422. Kein Backend-Schema,
+ *  FE-lokal. */
+export interface KategorieFristBody {
+  retention_bis: string | null;
+  bestaetigt?: boolean;
+  rechtsgrundlage?: string;
 }
 
 // ============================== LFH-554 Presse- und Medienarbeit S5 ==============================

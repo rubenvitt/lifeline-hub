@@ -175,6 +175,10 @@ Browser aber der sichere Kontext:
 - keine Eigenposition auf der Lagekarte: der Browser gibt den Gerätestandort nur im sicheren
   Kontext heraus, der Knopf steht dann gesperrt da und nennt den Grund.
 
+Die Erfassung selbst bleibt dort bedienbar: Idempotenzschlüssel und Entwurfskennungen entstehen
+über `neueClientId()` (`frontend/src/offline/clientId.ts`), das ohne `crypto.randomUUID`
+auskommt, denn das fehlt ohne sicheren Kontext (LFH-762).
+
 Die Adresse sollte außerdem **stabil** bleiben. Die Offline-Warteschlange, lokal gemerkte
 Einstellungen (etwa die Bediendichte) und eine installierte PWA hängen an der Adresse, mit
 der das Gerät die Seite geöffnet hat. Wer erst über die IP und später über den Hostnamen

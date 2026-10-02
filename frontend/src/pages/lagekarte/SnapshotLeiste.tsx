@@ -1,10 +1,10 @@
 import {
-  IkoneChevronRunter,
-  IkoneKamera,
-  IkonePause,
-  IkonePlayKreis,
-  IkoneUhrRueckwaerts,
-} from '../../ikonen';
+  IconChevronRunter,
+  IconKamera,
+  IconPause,
+  IconPlayKreis,
+  IconUhrRueckwaerts,
+} from '../../icons';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { App, Button, Input, Slider, Space, theme, Tooltip } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
@@ -229,7 +229,7 @@ export function SnapshotLeiste({
     return (
       <Tooltip title="Zeitachse einblenden">
         <Button
-          icon={<IkoneUhrRueckwaerts />}
+          icon={<IconUhrRueckwaerts />}
           aria-label="Zeitachse einblenden"
           onClick={() => klappeUm(false)}
           style={{
@@ -280,7 +280,7 @@ export function SnapshotLeiste({
             // Hülle `aria-hidden`: das Symbol brächte sonst „camera" in den zugänglichen Namen.
             icon={
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <IkoneKamera />
+                <IconKamera />
               </span>
             }
             loading={sichertGerade}
@@ -298,7 +298,7 @@ export function SnapshotLeiste({
           </Button>
           <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
             <Button
-              icon={spielt ? <IkonePause /> : <IkonePlayKreis />}
+              icon={spielt ? <IconPause /> : <IconPlayKreis />}
               onClick={aufPlayPause}
               disabled={chrono.length < 2}
               aria-label={spielt ? 'Pause' : 'Abspielen'}
@@ -353,7 +353,7 @@ export function SnapshotLeiste({
       <Tooltip title="Zeitachse ausblenden">
         <Button
           type="text"
-          icon={<IkoneChevronRunter />}
+          icon={<IconChevronRunter />}
           aria-label="Zeitachse ausblenden"
           onClick={() => klappeUm(true)}
           style={{ marginLeft: 'auto' }}

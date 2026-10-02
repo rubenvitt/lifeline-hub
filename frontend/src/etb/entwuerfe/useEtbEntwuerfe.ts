@@ -3,6 +3,7 @@ import type { EntwurfWerte, EtbEntwurf } from './entwurfModell';
 import { istLeer, werteZuPatch, zuWerte } from './entwurfModell';
 import { entwuerfeLaden, entwurfEntfernen, entwurfSpeichern } from './entwurfStore';
 import type { MetadatenWerte } from '../schnellerfassungModell';
+import { neueClientId } from '../../offline/clientId';
 
 function aktivKey(einsatzId: number): string {
   return `etb-entwurf-aktiv-${einsatzId}`;
@@ -15,7 +16,7 @@ function leererEntwurf(
 ): EtbEntwurf {
   const jetzt = new Date().toISOString();
   return {
-    id: crypto.randomUUID(),
+    id: neueClientId(),
     einsatz_id: einsatzId,
     ...werteZuPatch({ inhalt: '', typ: 'meldung', metadaten }),
     ...(vorbelegungGeprueft ? { an_vorbelegung_geprueft: true as const } : {}),
@@ -147,7 +148,7 @@ export function useEtbEntwuerfe(
       if (!bestand) return null;
       const neu: EtbEntwurf = {
         ...bestand,
-        id: crypto.randomUUID(),
+        id: neueClientId(),
         geaendert_at: new Date().toISOString(),
       };
       setEntwuerfe((prev) => prev.map((e) => (e.id === id ? neu : e)));

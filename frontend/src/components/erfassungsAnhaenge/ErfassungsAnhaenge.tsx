@@ -1,4 +1,4 @@
-import { IkoneHochladen, IkoneMuelleimer } from '../../ikonen';
+import { IconHochladen, IconMuelleimer } from '../../icons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Button, Popconfirm, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import {
   type PaneelDatenzustand,
 } from '../instrument';
 import DownloadAnker from '../DownloadAnker';
+import { AnhangVorschauGruppe } from '../AnhangVorschau';
 import { istBildMime, originalPfad } from '../../api/anhangFassung';
 import { useDarfOriginalLaden } from '../../einsatz/useDarfOriginalLaden';
 import { SpeicherFehler } from '../SpeicherHinweis';
@@ -63,6 +64,9 @@ interface Props {
   gesperrt: boolean;
   /** Zusatzzeile im Ablegen-Dialog (UHS: „Jeder Abruf … wird protokolliert.“). */
   hinweis?: ReactNode;
+  /** Vorschaubild und Großansicht an Fotos (LFH-759); Standard an. Die UHS schaltet sie ab:
+   *  ihre Route liefert keine Vorschau, weil jeder Abruf ins Zugriffsprotokoll gehört. */
+  vorschau?: boolean;
   /** `data-lfh` der Zeilen (Testanker je Modul). */
   zeilenKennung?: string;
   /** Unter der Liste, im selben Paneel (UHS: Zugriffsprotokoll der Einsatzleitung). */
@@ -97,6 +101,7 @@ export default function ErfassungsAnhaenge({
   darfSchreiben,
   gesperrt,
   hinweis,
+  vorschau = true,
   zeilenKennung = 'erfassung-anhang-zeile',
   children,
 }: Props) {
@@ -215,6 +220,8 @@ export default function ErfassungsAnhaenge({
                 : undefined
             }
             originalKennung={`${a.dateiname}, ${bezug}`}
+            mime={vorschau ? a.mime : undefined}
+            vorschauKennung={bezug}
             dateiname={a.dateiname}
             groesse={a.groesse}
             zusatz={
@@ -240,7 +247,7 @@ export default function ErfassungsAnhaenge({
                 aria-label={`Datei ${a.dateiname} von ${bezug} entfernen`}
                 icon={
                   <span aria-hidden="true">
-                    <IkoneMuelleimer />
+                    <IconMuelleimer />
                   </span>
                 }
               />
@@ -262,7 +269,7 @@ export default function ErfassungsAnhaenge({
             onClick={() => setAblegenOffen(true)}
             icon={
               <span aria-hidden="true">
-                <IkoneHochladen />
+                <IconHochladen />
               </span>
             }
           >
@@ -293,7 +300,8 @@ export default function ErfassungsAnhaenge({
               </Sammelbanner>
             )}
           </div>
-          {liste.map(zeile)}
+          {/* Eine Gruppe je Besitzer: die Großansicht blättert durch seine Fotos (LFH-759). */}
+          <AnhangVorschauGruppe>{liste.map(zeile)}</AnhangVorschauGruppe>
         </div>
       </PaneelZustand>
       {children}

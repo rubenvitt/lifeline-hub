@@ -26,7 +26,10 @@ use crate::uhs::anhang::{self as uhs_anhang, UhsAnhangAnzeige, UHS_ABLAGE};
 use crate::uhs::repo as uhs_repo;
 
 use super::einsatz_uhs::sse_uhs;
-use super::support::{anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam};
+use super::support::{
+    anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam,
+    KEINE_VORSCHAU_MELDUNG,
+};
 
 /// GET /api/einsaetze/{id}/uhs/{uid}/anhaenge — lebende Anhänge, neueste zuerst.
 /// Eine stornierte UHS bleibt lesbar; eine UHS eines anderen Einsatzes ist 404.
@@ -97,6 +100,17 @@ pub async fn datei(
     let anhang_id =
         uhs_anhang::anhang_id_fuer_download(&state.pool, ctx.einsatz.id, uhs_id, id).await?;
     let uhs = uhs_repo::laden(&state.pool, ctx.einsatz.id, uhs_id).await?;
+    let zugriff = match fassung {
+        Fassung::Bereinigt => ZugriffFassung::Bereinigt,
+        Fassung::Original => ZugriffFassung::Original,
+        // Vorschau und Großansicht (LFH-759) zeigen den Inhalt, liefen aber bei jedem
+        // Listenaufbau ohne Handlung — an der UHS gibt es sie nicht, bis entschieden ist, ob und
+        // wie sie ins Protokoll gehören. Abgewiesen vor Audit und Antwort: nichts protokolliert,
+        // nichts ausgeliefert.
+        Fassung::Vorschau | Fassung::Grossansicht => {
+            return Err(AppError::UnprocessableEntity(KEINE_VORSCHAU_MELDUNG.into()));
+        }
+    };
     let ablage = uhs_anhang::ablage_name(&uhs.bezeichnung);
     if fassung == Fassung::Original {
         original_freigeben(&state, &ctx, anhang_id, &ablage).await?;
@@ -107,10 +121,7 @@ pub async fn datei(
         anhang_id,
         &ablage,
         ctx.benutzer.id,
-        match fassung {
-            Fassung::Bereinigt => ZugriffFassung::Bereinigt,
-            Fassung::Original => ZugriffFassung::Original,
-        },
+        zugriff,
     )
     .await?;
     anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await

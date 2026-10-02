@@ -150,13 +150,20 @@ async fn ablegen_schreibt_system_etb_eintrag() {
         .iter()
         .filter(|e| {
             e["typ"] == "system"
-                && e["inhalt"].as_str().is_some_and(|i| {
-                    i.contains("Dokument abgelegt: Lageplan Nord (Lagekarte/Plan)")
-                })
+                && e["inhalt"]
+                    .as_str()
+                    .is_some_and(|i| i == "Dokument abgelegt (Lagekarte/Plan)")
         })
         .collect();
     assert_eq!(treffer.len(), 1, "{eintraege:?}");
     assert_eq!(json["etb_eintrag_id"], treffer[0]["id"]);
+    // LFH-752: Der Titel ist Scrub der Dokumentzeile und bleibt aus dem ETB.
+    assert!(
+        eintraege
+            .iter()
+            .all(|e| !e["inhalt"].as_str().unwrap_or("").contains("Lageplan Nord")),
+        "{eintraege:?}"
+    );
 }
 
 // ---------- Validierung ----------
@@ -388,6 +395,7 @@ async fn entfernen_ist_soft_delete() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
+    ids_verschieben(&app, &admin).await;
     let (_, json) = ablegen(&app, einsatz, &admin, Some(PDF), STANDARD).await;
     let did = json["id"].as_i64().unwrap();
     let loeschpfad = format!("{}/{did}", pfad(einsatz));
@@ -403,14 +411,24 @@ async fn entfernen_ist_soft_delete() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     let eintraege = etb(&app, &admin, einsatz).await;
+    // LFH-752: Die Entfernung nennt den Ablage-Eintrag statt des Titels.
+    let ablage_nr = ablage_lfd_nr(&eintraege, &json);
+    nummer_ist_eindeutig(ablage_nr, &json);
+    let erwartet = format!("Dokument entfernt: Ablage ETB {ablage_nr} (Lagekarte/Plan)");
     assert!(
-        eintraege.iter().any(|e| e["typ"] == "system"
-            && e["inhalt"]
-                .as_str()
-                .is_some_and(|i| i.contains("Dokument entfernt: Lageplan Nord (Lagekarte/Plan)"))),
-        "{eintraege:?}"
+        eintraege
+            .iter()
+            .any(|e| e["typ"] == "system" && e["inhalt"].as_str() == Some(erwartet.as_str())),
+        "{erwartet} fehlt: {eintraege:?}"
     );
-    let anhaenge: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang")
+    assert!(
+        eintraege
+            .iter()
+            .all(|e| !e["inhalt"].as_str().unwrap_or("").contains("Lageplan Nord")),
+        "Leak: Dokumenttitel im ETB: {eintraege:?}"
+    );
+    let anhaenge: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?")
+        .bind(einsatz)
         .fetch_one(&pool)
         .await
         .unwrap();
@@ -554,6 +572,41 @@ async fn standard_ablegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64
     let (status, json) = ablegen(app, einsatz, cookie, Some(PDF), STANDARD).await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
     json["id"].as_i64().unwrap()
+}
+
+/// Laufende Nummer des ETB-Eintrags, mit dem das Dokument `dokument` (Antwort der Ablage)
+/// abgelegt wurde — darüber bezeichnen Änderung und Entfernung das Dokument (LFH-752).
+fn ablage_lfd_nr(eintraege: &[Value], dokument: &Value) -> i64 {
+    eintraege
+        .iter()
+        .find(|e| e["id"] == dokument["etb_eintrag_id"])
+        .and_then(|e| e["lfd_nr"].as_i64())
+        .unwrap_or_else(|| panic!("Ablage-Eintrag fehlt: {eintraege:?}"))
+}
+
+/// Legt in einem fremden Einsatz zwei Dokumente ab, damit ETB-id, Dokument-id und laufende
+/// Nummer im Prüfling auseinanderfallen. Sonst bestünde ein Test, der „Ablage ETB {lfd_nr}“
+/// erwartet, auch mit der id im Text.
+async fn ids_verschieben(app: &axum::Router, cookie: &str) {
+    let fremd = einsatz_anlegen(app, cookie).await;
+    for _ in 0..2 {
+        let (status, json) = ablegen(app, fremd, cookie, Some(PDF), STANDARD).await;
+        assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    }
+}
+
+/// Die laufende Nummer, die der Text nennen soll, ist weder die ETB-id noch die Dokument-id.
+fn nummer_ist_eindeutig(ablage_nr: i64, dokument: &Value) {
+    assert_ne!(
+        Some(ablage_nr),
+        dokument["etb_eintrag_id"].as_i64(),
+        "lfd_nr = ETB-id"
+    );
+    assert_ne!(
+        Some(ablage_nr),
+        dokument["id"].as_i64(),
+        "lfd_nr = Dokument-id"
+    );
 }
 
 async fn aendern(
@@ -783,7 +836,12 @@ async fn aendern_entferntes_oder_fremdes_dokument_ist_404() {
 async fn aendern_schreibt_etb_nachweis_mit_alt_und_neu() {
     let (app, admin, einsatz) = start().await;
     let nord = abschnitt_anlegen(&app, &admin, einsatz, "Nord").await;
-    let did = standard_ablegen(&app, &admin, einsatz).await;
+    ids_verschieben(&app, &admin).await;
+    let (status, dokument) = ablegen(&app, einsatz, &admin, Some(PDF), STANDARD).await;
+    assert_eq!(status, StatusCode::CREATED, "{dokument:?}");
+    let did = dokument["id"].as_i64().unwrap();
+    let ablage_nr = ablage_lfd_nr(&etb(&app, &admin, einsatz).await, &dokument);
+    nummer_ist_eindeutig(ablage_nr, &dokument);
 
     let (status, _) = aendern(
         &app,
@@ -797,12 +855,16 @@ async fn aendern_schreibt_etb_nachweis_mit_alt_und_neu() {
     let eintraege = aenderungs_eintraege(&app, &admin, einsatz).await;
     assert_eq!(eintraege.len(), 1, "{eintraege:?}");
     let text = &eintraege[0];
-    assert!(
-        text.starts_with("Dokument geändert: Befehl 1 – Nachtrag (Befehl)"),
-        "{text}"
+    // LFH-752: Titel weder alt noch neu, nur „Titel geändert“; Kategorie mit alt und neu.
+    assert_eq!(
+        text,
+        &format!(
+            "Dokument geändert: Ablage ETB {ablage_nr} (Befehl) — Titel geändert; \
+             Kategorie: Lagekarte/Plan → Befehl"
+        ),
     );
-    assert!(text.contains("„Lageplan Nord“"), "{text}");
-    assert!(text.contains("Lagekarte/Plan → Befehl"), "{text}");
+    assert!(!text.contains("Lageplan Nord"), "{text}");
+    assert!(!text.contains("Nachtrag"), "{text}");
     assert!(!text.contains("Bezug:"), "nur Geändertes: {text}");
 
     let (status, _) = aendern(
@@ -819,8 +881,43 @@ async fn aendern_schreibt_etb_nachweis_mit_alt_und_neu() {
     assert!(
         eintraege
             .iter()
-            .any(|t| t.contains("Bezug: ohne → Abschnitt Nord") && !t.contains("Titel:")),
+            .any(|t| t.contains("Bezug: ohne → Abschnitt Nord") && !t.contains("Titel")),
         "{eintraege:?}"
+    );
+}
+
+/// LFH-752: Eine reine Kategorieänderung nennt alt und neu, aber keinen Titel.
+#[tokio::test]
+async fn aendern_nur_kategorie_nennt_alt_und_neu_ohne_titel() {
+    let (app, admin, einsatz) = start().await;
+    ids_verschieben(&app, &admin).await;
+    let (status, dokument) = ablegen(
+        &app,
+        einsatz,
+        &admin,
+        Some(PDF),
+        &[("titel", "Personenliste NU"), ("kategorie", "sonstiges")],
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{dokument:?}");
+    let did = dokument["id"].as_i64().unwrap();
+    let ablage_nr = ablage_lfd_nr(&etb(&app, &admin, einsatz).await, &dokument);
+    nummer_ist_eindeutig(ablage_nr, &dokument);
+
+    let (status, _) = aendern(&app, &admin, einsatz, did, r#"{"kategorie":"befehl"}"#).await;
+    assert_eq!(status, StatusCode::OK);
+    let eintraege = aenderungs_eintraege(&app, &admin, einsatz).await;
+    assert_eq!(
+        eintraege,
+        vec![format!(
+            "Dokument geändert: Ablage ETB {ablage_nr} (Befehl) — Kategorie: Sonstiges → Befehl"
+        )]
+    );
+    let alle = etb(&app, &admin, einsatz).await;
+    assert!(
+        alle.iter()
+            .all(|e| !e["inhalt"].as_str().unwrap_or("").contains("Personenliste")),
+        "Leak: Dokumenttitel im ETB: {alle:?}"
     );
 }
 

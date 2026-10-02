@@ -1,14 +1,14 @@
 import {
-  IkoneFadenkreuz,
-  IkoneKompass,
-  IkoneLineal,
-  IkoneMinus,
-  IkonePlus,
-  IkoneSeitenleisteAuf,
-  IkoneSeitenleisteZu,
-  IkoneStandortZiel,
-  IkoneStift,
-} from '../../ikonen';
+  IconFadenkreuz,
+  IconKompass,
+  IconLineal,
+  IconMinus,
+  IconPlus,
+  IconSeitenleisteAuf,
+  IconSeitenleisteZu,
+  IconStandortZiel,
+  IconStift,
+} from '../../icons';
 import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Popover } from 'antd';
 import { naechsterIndex, monoStil, segmentStil, useRollen } from '../../components/instrument';
@@ -173,7 +173,7 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
       }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
-        <IkoneFadenkreuz size={14} />
+        <IconFadenkreuz size={14} />
       </span>
       {lage ? formatKoordinate(lage.lat, lage.lon) : '—'}
     </div>
@@ -339,7 +339,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           kante={kante}
           farbe={rollen.gedaempft}
         >
-          <IkonePlus size={16} />
+          <IconPlus size={16} />
         </Kartenknopf>
         <Kartenknopf
           beschriftung="Herauszoomen"
@@ -347,7 +347,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           kante={kante}
           farbe={rollen.gedaempft}
         >
-          <IkoneMinus size={16} />
+          <IconMinus size={16} />
         </Kartenknopf>
         <Kartenknopf
           beschriftung="Nach Norden ausrichten"
@@ -355,7 +355,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           kante={kante}
           farbe={rollen.gedaempft}
         >
-          <IkoneKompass size={16} />
+          <IconKompass size={16} />
         </Kartenknopf>
         {/* Eigenposition gehört zur Navigation (wohin schaue ich?), deshalb vor den Werkzeugen. */}
         {props.eigenposition && (
@@ -367,7 +367,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             gedrueckt={props.eigenposition.an}
             sperrGrund={props.eigenposition.sperrGrund}
           >
-            <IkoneStandortZiel size={16} />
+            <IconStandortZiel size={16} />
           </Kartenknopf>
         )}
         {/* Reihenfolge wie im Entwurf S5: Lineal vor Stift. */}
@@ -379,7 +379,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             farbe={props.messenAktiv ? rollen.bedien : rollen.gedaempft}
             gedrueckt={props.messenAktiv ?? false}
           >
-            <IkoneLineal size={16} />
+            <IconLineal size={16} />
           </Kartenknopf>
         )}
         {props.onZeichnen && (
@@ -389,7 +389,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             kante={kante}
             farbe={rollen.bedien}
           >
-            <IkoneStift size={16} />
+            <IconStift size={16} />
           </Kartenknopf>
         )}
         {props.leiste && (
@@ -403,9 +403,9 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             sperrGrund={props.leiste.sperrGrund}
           >
             {props.leiste.sichtbar ? (
-              <IkoneSeitenleisteZu size={16} />
+              <IconSeitenleisteZu size={16} />
             ) : (
-              <IkoneSeitenleisteAuf size={16} />
+              <IconSeitenleisteAuf size={16} />
             )}
           </Kartenknopf>
         )}

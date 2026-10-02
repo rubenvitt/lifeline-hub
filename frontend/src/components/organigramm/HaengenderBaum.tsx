@@ -1,7 +1,7 @@
 import { Button } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import { useRollen } from '../instrument';
-import { IkoneChevronRechts, IkoneChevronRunter } from '../../ikonen';
+import { IconChevronRechts, IconChevronRunter } from '../../icons';
 import type { BaumKnoten } from './baum';
 import './haengenderBaumPrint.css';
 
@@ -113,7 +113,7 @@ function Zweig<K extends BaumKnoten<K>>(props: Props<K> & { knoten: K; tiefe: nu
           aria-expanded={offen}
           // Zugeklappt ist die Liste nicht im DOM; ein Verweis zeigte ins Leere.
           aria-controls={offen ? kinderId : undefined}
-          icon={offen ? <IkoneChevronRunter /> : <IkoneChevronRechts />}
+          icon={offen ? <IconChevronRunter /> : <IconChevronRechts />}
           onClick={() => onUmschalten(knoten.key)}
         />
       ) : (

@@ -38,7 +38,7 @@ sie auch ohne Registereintrag grün.
 
 ## 2. Backend: Tier-Anhänge
 
-- [x] 2.1 Migration `0135_einsatz_tier_anhang.sql` nach design.md D1.
+- [x] 2.1 Migration `0136_einsatz_tier_anhang.sql` nach design.md D1.
   - Vorher `git fetch origin alpha` und `scripts/check-migrationen.sh`.
   - Kopfkommentar wie `0126`.
   - Verifiziert dadurch, dass `anhang::repo::tests::jeder_fremdschluessel_auf_anhang_ist_registriert` rot ist und `db::tests::migrationsnummern_sind_eindeutig` grün.
@@ -81,7 +81,7 @@ sie auch ohne Registereintrag grün.
 
 ## 3. Backend: UHS-Anhänge
 
-- [x] 3.1 Migration `0136_uhs_anhang.sql` (FK `uhs_id → uhs(id) ON DELETE CASCADE`). Verifiziert wie 2.1.
+- [x] 3.1 Migration `0137_uhs_anhang.sql` (FK `uhs_id → uhs(id) ON DELETE CASCADE`). Verifiziert wie 2.1.
 - [x] 3.2 Registereintrag `uhs_anhang` (`ort: "Unfallhilfsstelle"`). Die Repo-Tests entsprechen 2.2, der Wortlaut-Pin wird erweitert. Verifiziert wie 2.2.
 - [x] 3.3 Schwärzungsregel `uhs_anhang` samt Verhaltenstest `schwaerzung_loescht_uhs_anhaenge_und_haelt_den_etb_nachweis`. Verifiziert wie 2.3.
 - [x] 3.4 `src/uhs/anhang.rs` anlegen: `UHS_ABLAGE`, `UhsAnhangAnzeige` (`uhs_id`), `ablegen`/`entfernen` über `uhs::repo::laden_tx`. Der `etb_name` ist `UHS {bezeichnung}`.
@@ -96,7 +96,7 @@ sie auch ohne Registereintrag grün.
 
 ## 4. Backend: UHS-Lese-Audit (design.md D5)
 
-- [x] 4.1 Migration `0137_anhang_zugriff_audit.sql` nach D5. Der Kopfkommentar begründet, warum es keinen FK auf `anhang` gibt (Guard und Schwärzung), und dass die Tabelle append-only ist.
+- [x] 4.1 Migration `0138_anhang_zugriff_audit.sql` nach D5. Der Kopfkommentar begründet, warum es keinen FK auf `anhang` gibt (Guard und Schwärzung), und dass die Tabelle append-only ist.
   - Schwärzungsregel `anhang_zugriff_audit`: alle Spalten bleiben erhalten, die Klassen werden gegen die Konstanten der Registry abgeglichen.
   - Verifiziert durch:
     - rot → grün von `entdeckte_tabellen_gleich_registry_tabellen`;

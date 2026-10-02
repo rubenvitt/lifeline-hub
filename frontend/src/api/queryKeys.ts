@@ -80,6 +80,9 @@ export const EINSATZ_KEYS = {
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
   modulFreigaben: 'einsatz-modul-freigaben',
   ortVorschau: 'ort-vorschau',
+  // Auf dem Gerät dekodierte HEIC-Vorschau eines Anhangs (LFH-759): Object-URLs, die
+  // `erzeugeQueryClient` beim Verlassen des Caches freigibt.
+  anhangHeicVorschau: 'einsatz-anhang-heic-vorschau',
   // Adresssuche der Lagekarte (LFH-638): Suchtext → Treffer des Geocoders.
   ortSuche: 'ort-suche',
   // Singular-Detail-Keys: der SSE-Fan-out invalidiert die Listen-Prefixe, nicht diese (eigenes
@@ -263,6 +266,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   Einsatzleitung und liefe bei jedem `uhs`-Ereignis mit.
  * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
+ * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
+ *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einstellungen,
@@ -272,6 +277,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.ortSuche,
+  EINSATZ_KEYS.anhangHeicVorschau,
   EINSATZ_KEYS.uhsDetail,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
@@ -328,6 +334,10 @@ export const einsatzKeys = {
   // Einsatzkontext (enabled-Guard).
   einsatz: (einsatzId: number | null) => [EINSATZ_KEYS.einsatz, einsatzId] as const,
   einstellungen: (einsatzId: number) => [EINSATZ_KEYS.einstellungen, einsatzId] as const,
+  /** Aufbewahrung je Datenkategorie (LFH-749) — Unter-Key der Einstellungen: dieselbe Seite,
+   *  dieselbe Invalidierung, kein Live-Ereignis, kein Personenbezug. */
+  aufbewahrungKategorien: (einsatzId: number) =>
+    [EINSATZ_KEYS.einstellungen, einsatzId, 'aufbewahrung-kategorien'] as const,
   mitglieder: (einsatzId: number) => [EINSATZ_KEYS.mitglieder, einsatzId] as const,
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
@@ -517,6 +527,9 @@ export const einsatzKeys = {
   // Der getrimmte Suchtext ist der Key: gleiche Begriffe treffen den Client-Cache (LFH-638).
   ortSuche: (einsatzId: number, begriff: string) =>
     [EINSATZ_KEYS.ortSuche, einsatzId, begriff] as const,
+  // Download-Adresse der bereinigten Fassung ist der Key: ein Anhang ändert sich nie (LFH-759).
+  anhangHeicVorschau: (einsatzId: number, href: string) =>
+    [EINSATZ_KEYS.anhangHeicVorschau, einsatzId, href] as const,
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -764,7 +777,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente, die
  * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
- * keine Datei, und Dateinamen an einer UHS können Patienten nennen),
+ * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
+ * (Object-URLs, nur im Speicher, LFH-759),
  * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,

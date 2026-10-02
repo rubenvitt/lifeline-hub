@@ -33,10 +33,11 @@ const zugriff = {
 function rendere(
   props: { zeigeZugriffe?: boolean; darfSchreiben?: boolean; storniert?: boolean } = {},
   zugriffe: 'fehler' | unknown[] = [zugriff],
+  liste: unknown[] = [anhang],
 ) {
   let abrufe = 0;
   server.use(
-    http.get(LISTE, () => HttpResponse.json([anhang])),
+    http.get(LISTE, () => HttpResponse.json(liste)),
     http.get(ZUGRIFFE, () => {
       abrufe += 1;
       return zugriffe === 'fehler'
@@ -66,6 +67,13 @@ describe('UhsAnhaenge (LFH-758)', () => {
       name: /grundriss_halle\.pdf, .*Datei von UHS BHP 50 herunterladen/,
     });
     expect(anker).toHaveAttribute('href', '/api/einsaetze/1/uhs/9/anhaenge/4/datei');
+  });
+
+  it('zeigt an Fotos kein Vorschaubild: jeder Abruf gehört ins Protokoll (LFH-759)', async () => {
+    rendere({}, [zugriff], [{ ...anhang, dateiname: 'halle.jpg', mime: 'image/jpeg' }]);
+    await screen.findByRole('link', { name: /^halle\.jpg, .*Datei von UHS BHP 50 herunterladen/ });
+    expect(screen.queryByRole('button', { name: /^Vorschau:/ })).toBeNull();
+    expect(document.querySelector('img')).toBeNull();
   });
 
   it('der Ablegen-Dialog weist auf das Zugriffsprotokoll hin', async () => {

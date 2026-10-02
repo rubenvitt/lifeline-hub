@@ -461,6 +461,7 @@
         "required": [
           "kopf",
           "zustand",
+          "kategorien",
           "personen",
           "tiere",
           "schaeden"
@@ -471,6 +472,13 @@
               "string",
               "null"
             ]
+          },
+          "kategorien": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KategorieAufbewahrungAnzeige"
+            },
+            "description": "Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,\nRechtsgrundlage und Zustand; alle drei Kategorien."
           },
           "kopf": {
             "$ref": "#/components/schemas/ArchivKopfAnzeige"
@@ -1743,6 +1751,7 @@
         "description": "Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten.",
         "required": [
           "id",
+          "org_id",
           "anzeigename",
           "benutzername",
           "system_rolle",
@@ -1767,6 +1776,11 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "org_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Organisation des Benutzers (LFH-753): der Client spiegelt damit Rechte, die an der\nEinsatz-Org hängen (Frist nur für den Admin der Einsatz-Org)."
           },
           "org_rolle": {
             "$ref": "#/components/schemas/OrgRolle"
@@ -2579,6 +2593,15 @@
           "sprechgruppen",
           "etb_eroeffnet",
           "leitstelle_gemeldet"
+        ]
+      },
+      "Datenkategorie": {
+        "type": "string",
+        "description": "Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,\ndesign.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry\n(`Zuordnung::Kategorie`). Wire == [`Datenkategorie::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`; zugleich der Schlüssel in `org_aufbewahrung_kategorie` und\n`einsatz_aufbewahrung_kategorie`.",
+        "enum": [
+          "behandlung",
+          "personenauskunft",
+          "anhaenge"
         ]
       },
       "DemoBericht": {
@@ -5901,6 +5924,91 @@
           "dark"
         ]
       },
+      "KategorieAufbewahrungAnzeige": {
+        "type": "object",
+        "description": "Aufbewahrung einer Datenkategorie am Einsatz (Spec „Zustand je Kategorie“, design.md D7).\nKein Personenbezug: Zeitpunkte, Zustand und der Org-Text der Rechtsgrundlage.",
+        "required": [
+          "kategorie"
+        ],
+        "properties": {
+          "dauer_tage_vorgabe": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur bei einem aktiven Einsatz: die Dauer der Org-Vorgabe, aus der die Frist beim\nAbschluss entsteht; fehlt = die Kategorie folgt der Einsatz-Frist."
+          },
+          "frist_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Frist der Kategorie; fehlt = keine eigene Frist (folgt der Einsatz-Frist)."
+          },
+          "geschwaerzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "karenz_ende": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Karenz (`vorgemerkt_at + 30 Tage`)."
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/Datenkategorie"
+          },
+          "rechtsgrundlage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Rechtsgrundlage der Frist; bei einem aktiven Einsatz die der Org-Vorgabe."
+          },
+          "vorgemerkt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zustand": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AufbewahrungZustand",
+                "description": "Zustand nach derselben Rangfolge wie der Einsatz; fehlt bei einem aktiven Einsatz."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "KategorieVorgabe": {
+        "type": "object",
+        "description": "Gespeicherte Vorgabe einer Kategorie.",
+        "required": [
+          "kategorie",
+          "dauer_tage",
+          "rechtsgrundlage"
+        ],
+        "properties": {
+          "dauer_tage": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/Datenkategorie"
+          },
+          "rechtsgrundlage": {
+            "type": "string"
+          }
+        }
+      },
       "Koordinatenformat": {
         "type": "string",
         "description": "Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.",
@@ -7551,9 +7659,17 @@
         "type": "object",
         "description": "API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert).",
         "required": [
-          "org_id"
+          "org_id",
+          "aufbewahrung_kategorien"
         ],
         "properties": {
+          "aufbewahrung_kategorien": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KategorieVorgabe"
+            },
+            "description": "Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leer = keine Kategorie hat eine\neigene Frist."
+          },
           "auftrag_nummer_praefix": {
             "type": [
               "string",

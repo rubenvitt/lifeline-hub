@@ -342,7 +342,7 @@ describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
     const zeile = zeileVon('ETB');
     expect(within(zeile).queryByText('nur Einsatzleitung')).toBeNull();
     expect(within(zeile).queryByText('nur lesen')).toBeNull();
-    // Der zugängliche Name bleibt stehen: das `aria-label` schlägt die Lade-Ikone.
+    // Der zugängliche Name bleibt stehen: das `aria-label` schlägt das Lade-Icon.
     const schalter = screen.getByRole('switch', { name: 'Sichtbar: ETB' });
     expect(schalter).toHaveClass('ant-switch-loading');
     // Gegenaussage: eine ruhende Zeile lädt nicht.

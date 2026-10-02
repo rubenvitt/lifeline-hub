@@ -700,7 +700,7 @@ async fn liste_filtert_nach_status_typ_ausmass() {
 // ---------- Tests: ETB-Leak ----------
 
 #[tokio::test]
-async fn anlegen_etb_nennt_ort_aber_nicht_geschaedigt_oder_beschreibung() {
+async fn anlegen_etb_nennt_weder_ort_noch_geschaedigt_oder_beschreibung() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -719,10 +719,10 @@ async fn anlegen_etb_nennt_ort_aber_nicht_geschaedigt_oder_beschreibung() {
     assert!(inhalte[0].contains("S-001"), "ETB nennt Registriernummer");
     assert!(inhalte[0].contains("umweltschaden"), "ETB nennt Typ");
     assert!(inhalte[0].contains("gross"), "ETB nennt Ausmaß");
-    assert!(
-        inhalte[0].contains("Hauptstr. 17"),
-        "ETB nennt den Ort (Lagebild)"
-    );
+    // LFH-752: Der Ort ist Scrub der Schadenszeile und bleibt aus dem ETB (Spec `aufbewahrung`,
+    // „Kein Scrub-Wert von Betroffenen und Dokumenten im ETB“).
+    assert_eq!(inhalte[0], "Schaden S-001 angelegt: umweltschaden (gross)");
+    assert!(!inhalte[0].contains("Hauptstr"), "ETB-Leak: Schadensort");
     assert!(
         !inhalte[0].contains("GEHEIM"),
         "ETB-Leak: weder beschreibung noch geschaedigt_kontakt"
@@ -790,9 +790,14 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
             "Leak: Geschädigt-R-Nr im Schaden-ETB: {i}"
         );
     }
+    // LFH-752: Die Übergabe nennt keinen Adressaten (Scrub `einsatz_schaden.uebergeben_an`).
     assert!(schaden_eintraege
         .iter()
-        .any(|i| i.contains("übergeben an Bauhof")));
+        .any(|i| i.as_str() == "Schaden S-001 übergeben"));
+    for i in &schaden_eintraege {
+        assert!(!i.contains("Bauhof"), "Leak: Übergabe-Adressat im ETB: {i}");
+        assert!(!i.contains("Müllers Hof"), "Leak: Schadensort im ETB: {i}");
+    }
     assert!(schaden_eintraege
         .iter()
         .any(|i| i.contains("abgeschlossen (behoben)")));
@@ -858,7 +863,7 @@ async fn lifecycle_meldet_etb_und_schaden_live() {
             "POST",
             format!("{basis}/1/uebergeben"),
             Some(json!({"uebergeben_an":"Bauhof"})),
-            "S-001 übergeben an Bauhof",
+            "S-001 übergeben",
         ),
         (
             "POST",

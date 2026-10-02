@@ -53,7 +53,7 @@ lassen.
 
 Text, den antd als Beschreibung oder sekundär auszeichnet (darunter `Typography` vom Typ
 `secondary`, die Seitenbeschreibung des Seitenkopfs, ein leerer Wert „—“), MUST die zweite
-Textstufe tragen. Die tertiäre Stufe für Augenbraue, Platzhalter und Ikonen MUST dafür nicht
+Textstufe tragen. Die tertiäre Stufe für Augenbraue, Platzhalter und Icons MUST dafür nicht
 verwendet werden.
 
 #### Scenario: Leerer Wert in der Tabelle
@@ -72,7 +72,7 @@ der Spec halten.
 ### Requirement: Formularmeldung in der Textrolle des Status
 
 Fehler- und Warnmeldungen eines Formularfelds und die Pflichtmarke MUST die Textrolle des Status
-tragen (`alarm` beziehungsweise `achtung` als Text), nicht deren Füllfarbe. Rahmen und Ikonen des
+tragen (`alarm` beziehungsweise `achtung` als Text), nicht deren Füllfarbe. Rahmen und Icons des
 Eingabefelds bleiben bei der Füllfarbe.
 
 #### Scenario: Pflichtmeldung im Ablegen-Dialog

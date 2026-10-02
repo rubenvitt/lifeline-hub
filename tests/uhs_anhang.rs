@@ -902,6 +902,26 @@ async fn abgewiesene_downloads_protokollieren_nichts() {
     assert!(audit(&pool, einsatz).await.is_empty());
 }
 
+/// Vorschau und Großansicht (LFH-759) gibt es an der UHS nicht: 422 vor Audit und Antwort,
+/// auch für die Einsatzleitung — kein Bild ohne Protokollzeile.
+#[tokio::test]
+async fn vorschau_und_grossansicht_sind_422_und_protokollieren_nichts() {
+    let (app, pool, admin, einsatz, uhs) = start().await;
+    let id = abgelegt(&app, einsatz, uhs, &admin, "grundriss.jpg").await;
+    for fassung in ["vorschau", "grossansicht"] {
+        let (s, body) = anfrage(
+            &app,
+            "GET",
+            &format!("{}/{id}/datei?fassung={fassung}", pfad(einsatz, uhs)),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{fassung}: {body}");
+    }
+    assert!(audit(&pool, einsatz).await.is_empty());
+}
+
 /// Fail-closed: lässt sich die Protokollzeile nicht schreiben, gehen keine Bytes hinaus.
 #[tokio::test]
 async fn ohne_protokolleintrag_keine_auslieferung() {

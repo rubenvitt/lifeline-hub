@@ -122,8 +122,8 @@ der jeweils höchsten Zeile wieder vergeben werden.
 ### D1 Zwei Linker-Tabellen nach dem Muster von `0126`
 
 Die beiden Tabellen kommen in je einer Migration:
-- `0135_einsatz_tier_anhang.sql` mit `tier_id → einsatz_tier(id) ON DELETE CASCADE`;
-- `0136_uhs_anhang.sql` mit `uhs_id → uhs(id) ON DELETE CASCADE`.
+- `0136_einsatz_tier_anhang.sql` mit `tier_id → einsatz_tier(id) ON DELETE CASCADE`;
+- `0137_uhs_anhang.sql` mit `uhs_id → uhs(id) ON DELETE CASCADE`.
 
 Sonst haben beide dieselben Spalten wie `einsatz_schaden_anhang`, also `einsatz_id`,
 `anhang_id UNIQUE … CASCADE`, `abgelegt_*`, `geloescht_*` und das Paar-CHECK. Dazu kommt
@@ -231,7 +231,7 @@ Die Art („Foto“/„PDF“/„Datei“) kommt wie bisher aus dem serverseitig
 
 ### D5 UHS-Lese-Audit in `anhang_zugriff_audit`
 
-Migration `0137_anhang_zugriff_audit.sql`:
+Migration `0138_anhang_zugriff_audit.sql`:
 
 ```sql
 CREATE TABLE anhang_zugriff_audit (
@@ -384,7 +384,7 @@ LFH-600 und LFH-625. `docs/superpowers/` ist eingefroren.
 - **[Hinweis statt Verbot]** → Der Dialog verbietet keine Patientenfotos, er macht nur die
   Protokollierung sichtbar. Patientenfotos gehören an die Person (LFH-757). Das ist eine
   Frage der Arbeitsanweisung, nicht des Systems.
-- **[Migrationsnummern]** → `0135`–`0137` sind Stand 02.10.2026. Vor dem PR läuft
+- **[Migrationsnummern]** → `0136`–`0138` nach dem Abgleich mit `alpha` (dort kam `0135_aufbewahrung_kategorie` hinzu; ursprünglich `0135`–`0137`). Vor dem PR läuft
   `scripts/check-migrationen.sh` gegen frisches `origin/alpha`, bei Bedarf mit
   `--umnummerieren`.
 

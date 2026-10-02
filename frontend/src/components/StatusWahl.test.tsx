@@ -112,7 +112,7 @@ describe('StatusWahl', () => {
   it('macht den Farbpunkt für Screenreader unsichtbar — er wiederholte nur das Etikett', async () => {
     aufbauen();
     const menue = await oeffneMenue();
-    // Eine Ikone mit eigener `img`-Rolle stünde in jeder Zeile als eigenes Vorleseziel. Die Ikonen
+    // Ein Icon mit eigener `img`-Rolle stünde in jeder Zeile als eigenes Vorleseziel. Die Icons
     // des Satzes sind `aria-hidden` (LFH-595); früher brachte antd ein englisches `aria-label` mit.
     expect(within(menue).queryByRole('img')).toBeNull();
   });

@@ -1,4 +1,4 @@
-import { IkonePlus } from '../ikonen';
+import { IconPlus } from '../icons';
 import { Button, Form, Input, Modal } from 'antd';
 import { Select } from '../components/Select';
 import { useState } from 'react';
@@ -131,7 +131,7 @@ export default function BefehlListe({
             // sonst hieße der Knopf „plus Befehl erteilen".
             <Button
               type="primary"
-              icon={<IkonePlus />}
+              icon={<IconPlus />}
               aria-label="Befehl erteilen"
               onClick={() => setAnlegenOffen(true)}
             >

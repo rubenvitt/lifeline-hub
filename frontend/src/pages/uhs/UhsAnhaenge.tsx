@@ -47,6 +47,7 @@ export default function UhsAnhaenge({ einsatzId, uhs, darfSchreiben, zeigeZugrif
       gesperrt={!!uhs.storniert_at}
       zeilenKennung="uhs-anhang-zeile"
       hinweis={UHS_ABLAGE_HINWEIS}
+      vorschau={false}
       quelle={{
         queryKey: einsatzKeys.uhsAnhaenge(einsatzId, uhs.id),
         liste: () => listeUhsAnhaenge(einsatzId, uhs.id),

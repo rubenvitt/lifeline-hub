@@ -38,7 +38,7 @@
  * freigegebenes Modul (LFH-669, `useLagebild`) wird nicht angefragt und steht als „—" bzw. Satz mit
  * Grund da, nie als Ausfall und nie als 0.
  */
-import { IkoneWarndreieck } from '../../ikonen';
+import { IconWarndreieck } from '../../icons';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -384,7 +384,7 @@ export default function LageDashboardPage() {
                 }}
               >
                 <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                  <IkoneWarndreieck size={14} />
+                  <IconWarndreieck size={14} />
                 </span>
                 Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
               </span>

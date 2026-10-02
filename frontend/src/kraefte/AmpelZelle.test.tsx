@@ -10,7 +10,7 @@ function verteilung(v: Partial<StatusVerteilung> = {}): StatusVerteilung {
 describe('AmpelZelle', () => {
   it('trägt die Bezeichnung an der ZÄHLGRUPPE und blendet die Zierde für Vorleser aus', () => {
     /**
-     * `aria-hidden` und `aria-label` sind zwei Knoten: die Ikone ist Zierde, die Bedeutung hängt am
+     * `aria-hidden` und `aria-label` sind zwei Knoten: das Icon ist Zierde, die Bedeutung hängt am
      * Etikett der Gruppe.
      */
     const { container } = render(
@@ -23,7 +23,7 @@ describe('AmpelZelle', () => {
     // stünde es in jeder Tabellenzeile als eigenes Ziel.
     expect(within(gruppe).queryByRole('img')).toBeNull();
     const zierde = container.querySelector('[aria-hidden="true"]');
-    // Eine Ikone des Satzes mit echtem SVG (Hülle `anticon`, LFH-595) — rot, wenn die Zierde
+    // Ein Icon des Satzes mit echtem SVG (Hülle `anticon`, LFH-595) — rot, wenn die Zierde
     // wieder als Zeichenkette käme ODER die Hülle fehlte.
     expect(zierde?.querySelector('.anticon svg')).not.toBeNull();
     expect(zierde?.textContent).toBe('');
