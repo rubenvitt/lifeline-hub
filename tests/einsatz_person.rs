@@ -885,9 +885,14 @@ async fn verbleib_transport_setzt_cache_und_etb_mit_ziel() {
     assert_eq!(detail["aktueller_verbleib"], "Transport → KH Mitte");
     assert_eq!(detail["verbleib"].as_array().unwrap().len(), 1);
     let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    // LFH-752: Das Ziel ist Scrub des Verbleibs und bleibt aus dem ETB.
     assert!(inhalte
         .iter()
-        .any(|i| i.contains("R-001") && i.contains("abtransportiert → KH Mitte")));
+        .any(|i| i.as_str() == "Person R-001: abtransportiert"));
+    assert!(
+        inhalte.iter().all(|i| !i.contains("KH Mitte")),
+        "Leak: Verbleib-Ziel im ETB: {inhalte:?}"
+    );
 }
 
 #[tokio::test]
@@ -1893,9 +1898,14 @@ async fn verbleib_notunterkunft_setzt_struktur_kurzform_und_etb() {
         "ohne Status kein Status-Key"
     );
     let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    // LFH-752: Das Ziel ist Scrub des Verbleibs und bleibt aus dem ETB.
     assert!(inhalte
         .iter()
-        .any(|i| i.contains("R-001") && i.contains("in Notunterkunft → Turnhalle Ost")));
+        .any(|i| i.as_str() == "Person R-001: in Notunterkunft"));
+    assert!(
+        inhalte.iter().all(|i| !i.contains("Turnhalle Ost")),
+        "Leak: Verbleib-Ziel im ETB: {inhalte:?}"
+    );
 }
 
 #[tokio::test]
