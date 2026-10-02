@@ -4,6 +4,7 @@ use crate::config::{default_online_styles, OfflineKatalogEintrag, OnlineStyle, O
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::karte::auto_aktualisierung::LadeFehler;
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
 use crate::karte::quellen;
@@ -930,6 +931,10 @@ pub struct OfflineKarteAntwort {
     pub katalog_url: Option<String>,
     /// SHA256-Pin der aktuellen Katalog-URL (für den verifizierten Re-Download beim Update).
     pub katalog_sha256: Option<String>,
+    /// LFH-993: Heruntergeladene Karte (gemanagter Pfad) mit Quell-URL — nur sie kann „Jetzt
+    /// aktualisieren“ und die automatische Aktualisierung. Registrierte Karten fasst der Hub nicht
+    /// an.
+    pub aktualisierbar: bool,
 }
 
 /// Extrahiert `(geladen, gesamt)`-Bytes aus einem Download-Fortschritt für die Liste. `gesamt` ist
@@ -947,15 +952,24 @@ fn fortschritt_werte(f: &Fortschritt) -> (i64, Option<i64>) {
 /// **vollständig gepinnt/lieferbar** (echte URL + sha256). Ein ungebauter Platzhalter (TODO-URL)
 /// wird NIE als Update angeboten, sonst liefe „Aktualisieren" auf eine nicht-ladbare URL
 /// (LFH-206-Bugfix). Karten ohne `quell_url` (z. B. per eigener URL registriert) gelten als aktuell.
-fn finde_update_eintrag<'a>(
+///
+/// LFH-993: Auch bei GLEICHER URL ist ein Eintrag neuer, wenn sein Pin von der Prüfsumme der
+/// installierten Datei abweicht — die Dateinamen tragen nur das Datum, ein zweiter Bau am selben
+/// Tag behält die URL. Ohne installierte Prüfsumme lässt sich das nicht belegen → aktuell.
+pub(crate) fn finde_update_eintrag<'a>(
     name: &str,
     quell_url: Option<&str>,
+    sha256_installiert: Option<&str>,
     katalog: &'a [OfflineKatalogEintrag],
 ) -> Option<&'a OfflineKatalogEintrag> {
     let qu = quell_url?;
-    katalog
-        .iter()
-        .find(|e| e.name == name && e.url != qu && crate::config::eintrag_ist_lieferbar(e))
+    katalog.iter().find(|e| {
+        let neuer_pin = matches!(
+            (e.sha256.as_deref(), sha256_installiert),
+            (Some(pin), Some(ist)) if pin != ist
+        );
+        e.name == name && (e.url != qu || neuer_pin) && crate::config::eintrag_ist_lieferbar(e)
+    })
 }
 
 #[cfg(test)]
@@ -988,6 +1002,7 @@ mod update_check_tests {
         assert!(finde_update_eintrag(
             "Schweiz",
             Some("https://mirror.example/switzerland.20260701.mbtiles"),
+            None,
             &katalog,
         )
         .is_none());
@@ -1003,6 +1018,7 @@ mod update_check_tests {
         let hit = finde_update_eintrag(
             "Schweiz",
             Some("https://mirror.example/switzerland.20260701.mbtiles"),
+            None,
             &katalog,
         );
         assert_eq!(
@@ -1022,11 +1038,38 @@ mod update_check_tests {
         assert!(finde_update_eintrag(
             "Schweiz",
             Some("https://mirror.example/switzerland.20260706.mbtiles"),
+            None,
             &katalog
         )
         .is_none());
         // Keine quell_url (eigene URL registriert) → gilt als aktuell.
-        assert!(finde_update_eintrag("Schweiz", None, &katalog).is_none());
+        assert!(finde_update_eintrag("Schweiz", None, None, &katalog).is_none());
+    }
+
+    #[test]
+    fn zweiter_bau_am_selben_tag_mit_anderem_pin_ist_update() {
+        // LFH-993: Der Dateiname trägt nur das Datum; ein zweiter Bau am selben Tag behält die URL.
+        let url = "https://mirror.example/switzerland.20260706.mbtiles";
+        let katalog = vec![eintrag("Schweiz", url, Some("b".repeat(64)))];
+        let hit = finde_update_eintrag("Schweiz", Some(url), Some(&"a".repeat(64)), &katalog);
+        assert_eq!(hit.map(|e| e.url.as_str()), Some(url));
+    }
+
+    #[test]
+    fn gleiche_url_und_gleicher_pin_ist_aktuell() {
+        let url = "https://mirror.example/switzerland.20260706.mbtiles";
+        let katalog = vec![eintrag("Schweiz", url, Some("a".repeat(64)))];
+        assert!(
+            finde_update_eintrag("Schweiz", Some(url), Some(&"a".repeat(64)), &katalog).is_none()
+        );
+    }
+
+    #[test]
+    fn gleiche_url_ohne_installierte_pruefsumme_ist_aktuell() {
+        // Ohne eigene Prüfsumme (registrierte Karte) lässt sich ein Neubau nicht belegen.
+        let url = "https://mirror.example/switzerland.20260706.mbtiles";
+        let katalog = vec![eintrag("Schweiz", url, Some("b".repeat(64)))];
+        assert!(finde_update_eintrag("Schweiz", Some(url), None, &katalog).is_none());
     }
 }
 
@@ -1063,8 +1106,15 @@ pub async fn offline_liste(
             // compiled-in Platzhalter (TODO-URL) sich als „Update" an und „Aktualisieren" liefe
             // auf eine nicht-ladbare URL (LFH-206-Bugfix; tritt v.a. mit leerem Katalog-Cache nach
             // Neustart auf, wo nur die compiled-in Platzhalter greifen).
-            let neuere = finde_update_eintrag(&k.name, k.quell_url.as_deref(), &katalog);
+            let neuere = finde_update_eintrag(
+                &k.name,
+                k.quell_url.as_deref(),
+                k.sha256.as_deref(),
+                &katalog,
+            );
+            let aktualisierbar = ist_gemanagt(&k) && k.quell_url.is_some();
             OfflineKarteAntwort {
+                aktualisierbar,
                 karte: k,
                 geladen,
                 gesamt,
@@ -1352,13 +1402,16 @@ async fn finalisiere_in_place_download(
 /// Metadaten-Update; bei Fehler NUR `.part`-Cleanup — bewusst KEIN `status='fehler'`, denn die alte
 /// Datei ist intakt und bleibt aktiv+ausgeliefert (ein Downgrade würde die Live-Karte grundlos
 /// abschalten). In den Handler-Task ausgelagert, damit der Fehlerpfad ohne AppState testbar ist.
+///
+/// LFH-993: Das Ergebnis geht an den Wächter (`AutoAktualisierung::melde_ergebnis`), damit ein
+/// Fehler an der Karte sichtbar wird. Prüfsummenfehler und Abbruch sperren die Kombination.
 async fn verarbeite_in_place_ergebnis(
     pool: &sqlx::SqlitePool,
     karten_dir: &FsPath,
     id: i64,
     neue_quell_url: &str,
     ergebnis: Result<download::DownloadErgebnis, download::DownloadFehler>,
-) {
+) -> Result<(), LadeFehler> {
     let part = karten_dir.join(format!("karte-{id}.mbtiles.part"));
     match ergebnis {
         Ok(erg) => match finalisiere_in_place_download(
@@ -1375,17 +1428,31 @@ async fn verarbeite_in_place_ergebnis(
                 tracing::info!(
                     "Offline-Karte {id}: In-Place-Reload fertig ({} Bytes)",
                     erg.groesse
-                )
+                );
+                Ok(())
             }
             Err(e) => {
                 tracing::error!("In-Place-Swap {id} fehlgeschlagen: {e}");
                 // .part aufräumen (bei erfolgtem Rename ein No-op); alte Karte bleibt aktiv.
                 let _ = tokio::fs::remove_file(&part).await;
+                Err(LadeFehler {
+                    text: format!("Tausch fehlgeschlagen: {e}"),
+                    sperren: false,
+                })
             }
         },
         Err(fehler) => {
             tracing::warn!("In-Place-Reload der Karte {id} fehlgeschlagen: {fehler}");
             let _ = tokio::fs::remove_file(&part).await;
+            let sperren = matches!(
+                fehler,
+                download::DownloadFehler::HashMismatch { .. }
+                    | download::DownloadFehler::Abgebrochen
+            );
+            Err(LadeFehler {
+                text: fehler.to_string(),
+                sperren,
+            })
         }
     }
 }
@@ -1401,33 +1468,39 @@ pub struct OfflineNeuLadenBody {
     pub sha256_erwartet: Option<String>,
 }
 
-/// POST /api/karte/offline-karten/{id}/neu-laden — In-Place-Hot-Swap (B3, LFH-187).
-///
-/// Lädt ein Update der bestehenden GEMANAGTEN Karte in DIESELBE Zeile/Datei. Anders als
-/// `offline_download` (neue Zeile) wird KEINE neue Zeile angelegt: die alte Datei bleibt während
-/// des Downloads `bereit`+aktiv und wird ausgeliefert; erst nach vollständigem Download erfolgt der
-/// atomare Swap + Cache-Bust. Bei Download-Fehler bleibt die alte Karte unangetastet aktiv (KEIN
-/// Status-Downgrade). `404` unbekannt; `422` bei extern registrierter Karte oder laufendem Download.
-pub async fn offline_neu_laden(
-    State(state): State<AppState>,
-    _admin: AdminUser,
-    PfadParam(id): PfadParam<i64>,
-    JsonBody(body): JsonBody<OfflineNeuLadenBody>,
-) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
-    let karte = repo::finde_offline_karte(&state.pool, id)
-        .await?
-        .ok_or(AppError::NotFound)?;
-    // Nur unsere gemanagten Downloads (`karte-{id}.mbtiles`) dürfen in-place ersetzt werden —
-    // extern registrierte Karten (beliebiger admin-gelieferter Pfad) verwalten wir nicht.
-    if karte.pfad != format!("karte-{id}.mbtiles") {
-        return Err(AppError::UnprocessableEntity(
+/// Nur unsere gemanagten Downloads (`karte-{id}.mbtiles`) dürfen in-place ersetzt werden —
+/// extern registrierte Karten (beliebiger admin-gelieferter Pfad) verwalten wir nicht.
+pub(crate) fn ist_gemanagt(karte: &OfflineKarte) -> bool {
+    karte.pfad == format!("karte-{}.mbtiles", karte.id)
+}
+
+fn pruefe_gemanagt(karte: &OfflineKarte) -> Result<(), AppError> {
+    if ist_gemanagt(karte) {
+        Ok(())
+    } else {
+        Err(AppError::UnprocessableEntity(
             "In-Place-Neu-Laden nur für heruntergeladene Karten (nicht extern registrierte)".into(),
-        ));
+        ))
     }
-    let url = download::validiere_download_url(&body.url).map_err(AppError::Validation)?;
+}
+
+/// Gemeinsamer In-Place-Start (D3, LFH-993) für „Neu laden“, „Jetzt aktualisieren“ und den
+/// Wächter: Plattenplatz prüfen, Fortschritts-Slot atomar reservieren, Download im Hintergrund,
+/// danach Tausch oder Aufräumen und Meldung an den Wächter. Die `url` ist bereits geprüft
+/// (`validiere_download_url`). `422` bei registrierter Karte, zu wenig Platz oder laufendem
+/// Download.
+pub(crate) async fn starte_in_place_reload(
+    state: &AppState,
+    karte: &OfflineKarte,
+    url: reqwest::Url,
+    sha256_erwartet: Option<String>,
+    groesse_erwartet: Option<i64>,
+) -> Result<(), AppError> {
+    pruefe_gemanagt(karte)?;
+    let id = karte.id;
     // Sofortiger Plattenplatz-Check bei bekannter Größe (der Per-URL-Content-Length-Check in
     // lade_datei bleibt der Backstop).
-    if let Some(erwartet) = body.groesse_erwartet.filter(|g| *g > 0) {
+    if let Some(erwartet) = groesse_erwartet.filter(|g| *g > 0) {
         if let Ok(frei) = fs4::available_space(&state.karten_dir) {
             if !download::genug_platz(frei, erwartet as u64) {
                 let benoetigt = (erwartet as u64).saturating_add(erwartet as u64 / 10);
@@ -1454,7 +1527,7 @@ pub async fn offline_neu_laden(
     let client = state.download_client.clone();
     let karten_dir = state.karten_dir.clone();
     let fortschritt_map = state.download_fortschritt.clone();
-    let sha256_erwartet = body.sha256_erwartet.clone();
+    let auto = state.auto_aktualisierung.clone();
     let neue_quell_url = url.to_string();
     tokio::spawn(async move {
         let part = karten_dir.join(format!("karte-{id}.mbtiles.part"));
@@ -1468,10 +1541,40 @@ pub async fn offline_neu_laden(
             download::MAX_DOWNLOAD_BYTES,
         )
         .await;
-        verarbeite_in_place_ergebnis(&pool, &karten_dir, id, &neue_quell_url, ergebnis).await;
+        let ausgang =
+            verarbeite_in_place_ergebnis(&pool, &karten_dir, id, &neue_quell_url, ergebnis).await;
         download::schreibe_fortschritt(&fortschritt_map).remove(&id);
+        auto.melde_ergebnis(id, &neue_quell_url, sha256_erwartet.as_deref(), ausgang);
     });
+    Ok(())
+}
 
+/// POST /api/karte/offline-karten/{id}/neu-laden — In-Place-Hot-Swap (B3, LFH-187).
+///
+/// Lädt ein Update der bestehenden GEMANAGTEN Karte in DIESELBE Zeile/Datei. Anders als
+/// `offline_download` (neue Zeile) wird KEINE neue Zeile angelegt: die alte Datei bleibt während
+/// des Downloads `bereit`+aktiv und wird ausgeliefert; erst nach vollständigem Download erfolgt der
+/// atomare Swap + Cache-Bust. Bei Download-Fehler bleibt die alte Karte unangetastet aktiv (KEIN
+/// Status-Downgrade). `404` unbekannt; `422` bei extern registrierter Karte oder laufendem Download.
+pub async fn offline_neu_laden(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    PfadParam(id): PfadParam<i64>,
+    JsonBody(body): JsonBody<OfflineNeuLadenBody>,
+) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
+    let karte = repo::finde_offline_karte(&state.pool, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    pruefe_gemanagt(&karte)?;
+    let url = download::validiere_download_url(&body.url).map_err(AppError::Validation)?;
+    starte_in_place_reload(
+        &state,
+        &karte,
+        url,
+        body.sha256_erwartet.clone(),
+        body.groesse_erwartet,
+    )
+    .await?;
     Ok((StatusCode::ACCEPTED, Json(karte)))
 }
 
@@ -1705,7 +1808,7 @@ pub async fn offline_bauen(
 /// `karten-katalog`) statt roh als `serde_json::Value` durchgereicht — der Cross-Service-Vertrag
 /// läuft damit durch den Typ-Codegen. Die Wire-Form ist byte-identisch (Deserialisieren →
 /// Re-Serialisieren derselben Felder), die Admin-UI-Konsumenten bleiben unverändert.
-async fn service_get_liste<T: serde::de::DeserializeOwned>(
+pub(crate) async fn service_get_liste<T: serde::de::DeserializeOwned>(
     st: &AppState,
     pfad: &str,
 ) -> Result<Vec<T>, AppError> {
@@ -2064,7 +2167,7 @@ mod finalisierung_tests {
         // .part-Rest, den der Cleanup entfernen muss.
         std::fs::write(tmp.path().join(format!("karte-{id}.mbtiles.part")), b"halb").unwrap();
 
-        verarbeite_in_place_ergebnis(
+        let ausgang = verarbeite_in_place_ergebnis(
             &pool,
             tmp.path(),
             id,
@@ -2072,6 +2175,14 @@ mod finalisierung_tests {
             Err(download::DownloadFehler::Abgebrochen),
         )
         .await;
+        assert_eq!(
+            ausgang,
+            Err(LadeFehler {
+                text: "Download abgebrochen".into(),
+                sperren: true
+            }),
+            "Abbruch sperrt die Kombination (LFH-993, D4)"
+        );
 
         let nachher = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
         assert_eq!(nachher.status, "bereit", "kein Status-Downgrade bei Fehler");

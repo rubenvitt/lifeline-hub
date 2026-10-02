@@ -703,10 +703,78 @@ pub async fn offline_karte_pfad_und_format(
     .await
 }
 
+/// Gespeicherte Einstellung der automatischen Aktualisierung (LFH-993): `(automatisch,
+/// intervall_stunden)`, `None` ohne gespeicherte Zeile (dann gilt die Vorgabe).
+pub async fn lade_auto_aktualisierung(
+    pool: &SqlitePool,
+) -> Result<Option<(bool, u64)>, sqlx::Error> {
+    let zeile: Option<(bool, i64)> = sqlx::query_as(
+        "SELECT automatisch, intervall_stunden FROM karte_auto_aktualisierung WHERE id = 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(zeile.map(|(a, h)| (a, h.max(0) as u64)))
+}
+
+/// Speichert die Einstellung (Upsert auf die eine Zeile `id = 1`). Validiert wird im Handler.
+pub async fn speichere_auto_aktualisierung(
+    pool: &SqlitePool,
+    automatisch: bool,
+    intervall_stunden: u64,
+    geaendert_von: Option<i64>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO karte_auto_aktualisierung \
+             (id, automatisch, intervall_stunden, geaendert_at, geaendert_von) \
+         VALUES (1, ?, ?, datetime('now'), ?) \
+         ON CONFLICT(id) DO UPDATE SET automatisch = excluded.automatisch, \
+             intervall_stunden = excluded.intervall_stunden, \
+             geaendert_at = excluded.geaendert_at, geaendert_von = excluded.geaendert_von",
+    )
+    .bind(automatisch)
+    .bind(intervall_stunden as i64)
+    .bind(geaendert_von)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::test_pool;
+
+    // ── LFH-993: gespeicherte Einstellung der automatischen Aktualisierung ──
+
+    #[tokio::test]
+    async fn auto_aktualisierung_ohne_zeile_ist_none() {
+        let pool = test_pool().await;
+        assert_eq!(lade_auto_aktualisierung(&pool).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn auto_aktualisierung_round_trip_und_ueberschreiben() {
+        let pool = test_pool().await;
+        speichere_auto_aktualisierung(&pool, false, 12, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            lade_auto_aktualisierung(&pool).await.unwrap(),
+            Some((false, 12))
+        );
+        speichere_auto_aktualisierung(&pool, true, 1, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            lade_auto_aktualisierung(&pool).await.unwrap(),
+            Some((true, 1))
+        );
+        let zeilen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM karte_auto_aktualisierung")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(zeilen, 1, "höchstens eine Zeile");
+    }
 
     #[tokio::test]
     async fn aktive_online_quellen_fuer_config_nur_aktive_sortiert() {

@@ -34,6 +34,9 @@ pub struct AppState {
     pub karten_service_url: Option<String>,
     /// Bearer-Token für den karten-service; bleibt serverseitig. `None` = Feature aus.
     pub karten_service_token: Option<String>,
+    /// Automatische Aktualisierung der Offline-Karten (LFH-993): Vorgabe, Laufzustand des
+    /// Wächters, Katalogquelle und Lader.
+    pub auto_aktualisierung: crate::karte::auto_aktualisierung::AutoAktualisierung,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).

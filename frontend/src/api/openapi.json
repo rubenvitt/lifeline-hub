@@ -7158,9 +7158,14 @@
           {
             "type": "object",
             "required": [
-              "update_verfuegbar"
+              "update_verfuegbar",
+              "aktualisierbar"
             ],
             "properties": {
+              "aktualisierbar": {
+                "type": "boolean",
+                "description": "LFH-993: Heruntergeladene Karte (gemanagter Pfad) mit Quell-URL — nur sie kann „Jetzt\naktualisieren“ und die automatische Aktualisierung. Registrierte Karten fasst der Hub nicht\nan."
+              },
               "geladen": {
                 "type": [
                   "integer",

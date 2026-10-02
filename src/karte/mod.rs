@@ -4,6 +4,7 @@
 //! Einsatz-Nachschlagequellen (Pegel, Wetter).
 
 pub mod assets;
+pub mod auto_aktualisierung;
 pub mod cache;
 pub mod download;
 pub mod katalog;

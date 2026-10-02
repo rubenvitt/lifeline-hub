@@ -13,16 +13,16 @@
 
 ## 3. Hub: Update-Erkennung und gemeinsamer In-Place-Start (D3, D4)
 
-- [ ] 3.1 Tests zuerst in `update_check_tests` (`src/routes/karte.rs`): Gleiche URL mit anderem Pin trifft. Gleiche URL mit gleichem Pin trifft nicht. Gleiche URL mit installiertem `sha256 = None` trifft nicht. Ein Platzhalter trifft weiter nicht. Danach die Signatur `finde_update_eintrag(name, quell_url, sha256_installiert, katalog)` umsetzen und `offline_liste` anpassen. Nachweis: Die neuen Tests sind vorher rot, alle in `update_check_tests` danach grün.
-- [ ] 3.2 Den Körper von `offline_neu_laden` in `starte_in_place_reload` herausziehen. `verarbeite_in_place_ergebnis` gibt `Result<(), String>` zurück, der Spawn meldet das Ergebnis an den Wächterzustand. Nachweis: Die bestehenden In-Place-Tests in `src/routes/karte.rs` und `tests/karte.rs` bleiben unverändert grün.
+- [x] 3.1 Tests zuerst in `update_check_tests` (`src/routes/karte.rs`): Gleiche URL mit anderem Pin trifft. Gleiche URL mit gleichem Pin trifft nicht. Gleiche URL mit installiertem `sha256 = None` trifft nicht. Ein Platzhalter trifft weiter nicht. Danach die Signatur `finde_update_eintrag(name, quell_url, sha256_installiert, katalog)` umsetzen und `offline_liste` anpassen. Nachweis: Die neuen Tests sind vorher rot, alle in `update_check_tests` danach grün.
+- [x] 3.2 Den Körper von `offline_neu_laden` in `starte_in_place_reload` herausziehen. `verarbeite_in_place_ergebnis` gibt `Result<(), String>` zurück, der Spawn meldet das Ergebnis an den Wächterzustand. Nachweis: Die bestehenden In-Place-Tests in `src/routes/karte.rs` und `tests/karte.rs` bleiben unverändert grün.
 - [ ] 3.3 Listenfeld `aktualisierbar: bool` in `OfflineKarteAntwort` (gemanagter Pfad und Quell-URL), Test in `tests/karte.rs` für eine heruntergeladene und eine registrierte Karte. Nachweis: Der Test ist grün, `scripts/check-typ-codegen.sh` ist grün und die generierten Dateien sind mitcommittet.
 
 ## 4. Hub: Wächter (D1, D2, D10)
 
-- [ ] 4.1 Vorgabe-Schalter in `src/config.rs` (`karten_auto_aktualisierung`, `…_intervall_stunden`, 1…168), Hilfetext „Vorgabe, solange in der Verwaltung nichts gespeichert ist“, Tests nach dem Vorbild `kritis_extrakt_default_an_und_abschaltbar`. Beide Werte ins Startup-Log und in `docs/betrieb/env-registry.md`, falls Karten-Schalter dort geführt werden. Nachweis: `cargo test config` und `cargo test --test env_config_guard` grün.
-- [ ] 4.1a Migration `migrations/0134_karte_auto_aktualisierung.sql` (D10) und Repo-Funktionen `lade_auto_aktualisierung` / `speichere_auto_aktualisierung` in `src/karte/registry/repo.rs`. Tests zuerst: Ohne Zeile kommt `None`, Speichern und Lesen ergeben einen Round-Trip, ein zweites Speichern überschreibt und legt keine zweite Zeile an. Nachweis: Die Tests sind vorher rot und danach grün, `git fetch origin alpha && scripts/check-migrationen.sh` grün.
-- [ ] 4.1b Effektivwert `effektive_einstellung(pool, vorgabe)` (gespeichert, sonst Vorgabe) mit Test für beide Zweige. Nachweis: `cargo test auto_aktualisierung` grün.
-- [ ] 4.2 Modul `src/karte/auto_aktualisierung.rs` mit `WaechterZustand` und `tick_einmal`. Tests zuerst, gegen einen Mock-karten-service (Loopback-Axum wie in `tests/karte.rs`) und einen Mock-Katalog:
+- [x] 4.1 Vorgabe-Schalter in `src/config.rs` (`karten_auto_aktualisierung`, `…_intervall_stunden`, 1…168), Hilfetext „Vorgabe, solange in der Verwaltung nichts gespeichert ist“, Tests nach dem Vorbild `kritis_extrakt_default_an_und_abschaltbar`. Beide Werte ins Startup-Log und in `docs/betrieb/env-registry.md`, falls Karten-Schalter dort geführt werden. Nachweis: `cargo test config` und `cargo test --test env_config_guard` grün.
+- [x] 4.1a Migration `migrations/0134_karte_auto_aktualisierung.sql` (D10) und Repo-Funktionen `lade_auto_aktualisierung` / `speichere_auto_aktualisierung` in `src/karte/registry/repo.rs`. Tests zuerst: Ohne Zeile kommt `None`, Speichern und Lesen ergeben einen Round-Trip, ein zweites Speichern überschreibt und legt keine zweite Zeile an. Nachweis: Die Tests sind vorher rot und danach grün, `git fetch origin alpha && scripts/check-migrationen.sh` grün.
+- [x] 4.1b Effektivwert `effektive_einstellung(pool, vorgabe)` (gespeichert, sonst Vorgabe) mit Test für beide Zweige. Nachweis: `cargo test auto_aktualisierung` grün.
+- [x] 4.2 Modul `src/karte/auto_aktualisierung.rs` mit `WaechterZustand` und `tick_einmal`. Tests zuerst, gegen einen Mock-karten-service (Loopback-Axum wie in `tests/karte.rs`) und einen Mock-Katalog:
   - (a) Ein neuerer Stand startet genau einen Download.
   - (b) Zwei fällige Karten ergeben einen Download je Tick.
   - (c) Eine registrierte Karte wird nie angefasst.
@@ -35,8 +35,8 @@
   - (i) Ein Erfolg löscht den Fehler.
 
   Nachweis: Jeder Fall ist vor seiner Umsetzung rot und danach grün (`cargo test auto_aktualisierung`).
-- [ ] 4.3 Task-Start in `src/main.rs` (Startverzögerung 60 s, Takt nach D1, `Notify`), Zustand im `AppState`. Nachweis: Ein Integrationstest in `tests/karte.rs` mit kurzem Takt per Test-Konstruktor zeigt, dass ein neuerer Katalogstand ohne Request auf dem Gerät landet.
-- [ ] 4.4 Mutationsprobe: Ohne die Sperre `auto_laeuft` färbt sich Fall 4.2 (b) rot, ohne den SHA-Vergleich der Fall aus 3.1. Ergebnis im PR-Text vermerken.
+- [x] 4.3 Task-Start in `src/main.rs` (Startverzögerung 60 s, Takt nach D1, `Notify`), Zustand im `AppState`. Nachweis: `neuerer_stand_landet_ohne_request_auf_dem_geraet` (Unit-Test im Wächter-Modul statt in `tests/karte.rs`): Ein neuerer Katalogstand landet ohne Request auf dem Gerät, mit echtem Download von einem Loopback-Server und echtem Tausch derselben Zeile. Ein Test unter `tests/` könnte das nicht, weil der SSRF-Guard Loopback-Downloads prozessweit verwehrt.
+- [x] 4.4 Mutationsprobe: Ohne die Sperre `auto_laeuft` färbt sich Fall 4.2 (b) rot, ohne den SHA-Vergleich der Fall aus 3.1. Ergebnis im PR-Text vermerken. Ergebnis 02.10.2026: Ohne `z.auto_laeuft = Some(..)` werden `zwei_faellige_karten_nacheinander` und der End-to-End-Fall rot. Mit `&& false` im SHA-Vergleich wird `zweiter_bau_am_selben_tag_mit_anderem_pin_ist_update` rot.
 
 ## 5. Hub: Endpunkte (D6, D7)
 
