@@ -88,25 +88,25 @@ Code. Backend-Tests: `cargo test`. Frontend: `mise exec -- pnpm -C frontend test
 
 ## 4. Frontend: HEIC/HEIF auf dem Gerät
 
-- [ ] 4.1 `libheif-js@1.23.2` als Abhängigkeit aufnehmen (`mise exec -- pnpm -C frontend add`).
+- [x] 4.1 `libheif-js@1.23.2` als Abhängigkeit aufnehmen (`mise exec -- pnpm -C frontend add`).
   Lizenztexte von libheif-js, libheif und libde265 nach `frontend/public/lizenzen/`, dazu
   `frontend/src/heic/LIESMICH.md` (Herkunft, Version, Lizenz, Pflichten). Belegt durch
   `mise exec -- pnpm -C frontend build`: `dist/` enthält eine eigene `libheif-*.wasm` und die
   Lizenztexte, und das Haupt-Chunk wächst nicht um die WASM.
-- [ ] 4.2 HEIC-Fixture `frontend/src/heic/__fixtures__/hochkant.heic` (klein, mit `irot`, mit EXIF
+- [x] 4.2 HEIC-Fixture `frontend/src/heic/__fixtures__/hochkant.heic` (klein, mit `irot`, mit EXIF
   und GPS) erzeugen, etwa mit pillow-heif. Herkunft und Befehl stehen in `LIESMICH.md`. Belegt
   dadurch, dass `anhang::metadaten::bereinigen` die Datei bereinigt (Backend-Test, der die Fixture
   liest) und `heif-info` bzw. pillow-heif `irot` zeigen.
-- [ ] 4.3 `heic/heicWorker.ts` und `heic/dekodiereHeic.ts` nach design.md D8 (Modul-Worker,
+- [x] 4.3 `heic/heicWorker.ts` und `heic/dekodiereHeic.ts` nach design.md D8 (Modul-Worker,
   Warteschlange, 50-MP-Grenze, zwei JPEG-Blobs, Ausrichtung angewendet). Belegt durch einen
   Vitest-Test, der die Dekodierfunktion des Workers mit der Fixture in Node ausführt: Die
   Abmessungen sind hochkant, beide Kanten passen zu den Größen. Die Warteschlange prüft ein Test
   mit gemocktem Worker: zwei Aufträge laufen nacheinander.
-- [ ] 4.4 Query-Key `einsatzKeys.anhangHeicVorschau` in `api/queryKeys.ts`, in `NICHT_LIVE_KEYS`,
+- [x] 4.4 Query-Key `einsatzKeys.anhangHeicVorschau` in `api/queryKeys.ts`, in `NICHT_LIVE_KEYS`,
   nicht in `LAGEBILD_OFFLINE`, und ein `QueryCache`-Abonnent, der Object-URLs bei `removed`
   freigibt. Belegt dadurch, dass `lagebildOffline.guard.test.ts` und der Live-Guard grün sind, und
   durch einen Test: `queryClient.clear()` ruft `URL.revokeObjectURL` für jede URL.
-- [ ] 4.5 HEIC-Zweig in `AnhangVorschau`: lädt erst, wenn sichtbar (`IntersectionObserver`), und
+- [x] 4.5 HEIC-Zweig in `AnhangVorschau`: lädt erst, wenn sichtbar (`IntersectionObserver`), und
   importiert den Decoder dynamisch. Bei Fehler steht der Platzhalter. Belegt durch Tests:
   - Ein HEIC zeigt nach der Dekodierung ein `img` mit `blob:`-Adresse.
   - Eine Liste nur mit JPEG/PDF ruft den dynamischen Import nie auf.

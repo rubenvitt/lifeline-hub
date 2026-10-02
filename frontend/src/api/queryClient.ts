@@ -123,6 +123,17 @@ export function erzeugeQueryClient(
       meldeServerErreichbar(false);
     }
   });
+  // Die HEIC-Vorschau (LFH-759) hält Object-URLs im Cache; verlässt eine solche Query den Cache
+  // (gcTime, Abmelden, Rechteentzug), gibt sie ihre Blobs frei.
+  client.getQueryCache().subscribe((ereignis) => {
+    if (ereignis.type !== 'removed') return;
+    if (ereignis.query.queryKey[0] !== EINSATZ_KEYS.anhangHeicVorschau) return;
+    const urls = ereignis.query.state.data as { klein: string; gross: string } | undefined;
+    if (urls) {
+      URL.revokeObjectURL(urls.klein);
+      URL.revokeObjectURL(urls.gross);
+    }
+  });
   if (defaultOptions === queryClientDefaults) lagebildLiegezeitSetzen(client);
   return client;
 }

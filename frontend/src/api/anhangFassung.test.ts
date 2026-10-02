@@ -8,6 +8,7 @@ import {
   originalPfad,
   originalZugaenglicherName,
   vorschauPfad,
+  einsatzIdAusPfad,
 } from './anhangFassung';
 
 describe('anhangFassung (LFH-747)', () => {
@@ -73,5 +74,13 @@ describe('anhangFassung — Vorschau (LFH-759)', () => {
     expect(istHeicMime('image/heif')).toBe(true);
     expect(istHeicMime('image/jpeg')).toBe(false);
     expect(istHeicMime(null)).toBe(false);
+  });
+});
+
+describe('einsatzIdAusPfad (LFH-759)', () => {
+  it('liest die Einsatz-ID aus jedem Anhang-Weg', () => {
+    expect(einsatzIdAusPfad('/api/einsaetze/5/etb/40/anhaenge/9')).toBe(5);
+    expect(einsatzIdAusPfad('/api/einsaetze/12/schaeden/3/anhaenge/9/datei')).toBe(12);
+    expect(einsatzIdAusPfad('/a/1')).toBeNull();
   });
 });

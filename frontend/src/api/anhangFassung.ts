@@ -80,3 +80,12 @@ export function hatServerVorschau(mime: string | null | undefined): boolean {
 export function istHeicMime(mime: string | null | undefined): boolean {
   return mime === 'image/heic' || mime === 'image/heif';
 }
+
+/**
+ * Einsatz-ID aus einer Anhang-Download-Adresse (`/api/einsaetze/{id}/…`); alle vier Wege
+ * beginnen so. Für den Query-Key der HEIC-Vorschau, damit ein Rechteentzug ihn mit räumt.
+ */
+export function einsatzIdAusPfad(href: string): number | null {
+  const treffer = /^\/api\/einsaetze\/(\d+)\//.exec(href);
+  return treffer ? Number(treffer[1]) : null;
+}

@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { dichten } from '../theme/tokens';
 import AnhangVorschau, { AnhangVorschauGruppe, vorschauKachelStil } from './AnhangVorschau';
+
+// Der HEIC-Decoder (Worker + WASM) ist hier eine Attrappe; `geladen` zählt, ob das Modul
+// überhaupt importiert wurde (es soll nur bei einem HEIC nachgeladen werden).
+const heic = vi.hoisted(() => ({ geladen: 0, dekodiere: vi.fn() }));
+vi.mock('../heic/dekodiereHeic', () => {
+  heic.geladen += 1;
+  return { dekodiereHeic: heic.dekodiere };
+});
 
 /**
  * Vorschaubild an Bild-Anhängen (LFH-759, Spec `anhang-vorschau`). Die Kantenlänge prüft die
@@ -111,5 +121,103 @@ describe('AnhangVorschau', () => {
       <AnhangVorschau href={HREF} mime="image/webp" dateiname="foto.webp" />,
     );
     expect(container.innerHTML).not.toContain('fassung=original');
+  });
+});
+
+describe('AnhangVorschau — HEIC auf dem Gerät (LFH-759)', () => {
+  let beobachtet: Element[] = [];
+  beforeEach(() => {
+    beobachtet = [];
+    // jsdom kennt keinen IntersectionObserver: dieser meldet jedes Element sofort als sichtbar.
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(private rueckruf: IntersectionObserverCallback) {}
+        observe(el: Element) {
+          beobachtet.push(el);
+          this.rueckruf(
+            [{ isIntersecting: true, target: el } as IntersectionObserverEntry],
+            this as unknown as IntersectionObserver,
+          );
+        }
+        disconnect() {}
+        unobserve() {}
+      },
+    );
+    let n = 0;
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:vorschau-${++n}`);
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    heic.dekodiere.mockReset();
+  });
+
+  const ETB = '/api/einsaetze/5/etb/40/anhaenge/9';
+
+  it('dekodiert die bereinigte Fassung und zeigt das Ergebnis', async () => {
+    heic.dekodiere.mockResolvedValue({ klein: new Blob(['k']), gross: new Blob(['g']) });
+    renderMitProviders(
+      <AnhangVorschau href={ETB} mime="image/heic" dateiname="IMG_0412.HEIC" kennung="Nr. 4" />,
+    );
+    const knopf = await screen.findByRole('button', { name: 'Vorschau: IMG_0412.HEIC, Nr. 4' });
+    expect(knopf.querySelector('img')).toHaveAttribute('src', 'blob:vorschau-1');
+    expect(heic.dekodiere).toHaveBeenCalledWith(ETB);
+    expect(heic.dekodiere.mock.calls.flat().join()).not.toContain('fassung=original');
+  });
+
+  it('zeigt bei einem Decoder-Fehler still den Platzhalter', async () => {
+    heic.dekodiere.mockRejectedValue(new Error('HEIC nicht dekodierbar'));
+    renderMitProviders(<AnhangVorschau href={ETB} mime="image/heif" dateiname="scan.heif" />);
+    expect(await screen.findByRole('img', { name: 'Keine Vorschau: scan.heif' })).toHaveTextContent(
+      'HEIF',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('reserviert den Platz, solange dekodiert wird', () => {
+    heic.dekodiere.mockReturnValue(new Promise(() => {}));
+    renderMitProviders(<AnhangVorschau href={ETB} mime="image/heic" dateiname="IMG_1.HEIC" />);
+    const platz = document.querySelector<HTMLElement>('[data-lfh="anhang-vorschau-laedt"]');
+    expect(platz).not.toBeNull();
+    expect(platz!.style.width).toBe(platz!.style.height);
+  });
+
+  it('dekodiert ein HEIC erst, wenn seine Kachel sichtbar wird', async () => {
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      },
+    );
+    heic.dekodiere.mockResolvedValue({ klein: new Blob(['k']), gross: new Blob(['g']) });
+    renderMitProviders(<AnhangVorschau href={ETB} mime="image/heic" dateiname="IMG_2.HEIC" />);
+    // Der Decoder käme über `import()`, also asynchron: erst warten, dann prüfen.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.querySelector('[data-lfh="anhang-vorschau-laedt"]')).not.toBeNull();
+    expect(heic.dekodiere).not.toHaveBeenCalled();
+  });
+
+  it('bindet den Decoder nur über import() ein, nie statisch', () => {
+    // Ein statischer Import zöge Worker-Glue und WASM-Verweis in jedes Bündel mit der Kachel.
+    const quelle = readFileSync(join(process.cwd(), 'src/components/AnhangVorschau.tsx'), 'utf8');
+    expect(quelle).toContain("import('../heic/dekodiereHeic')");
+    expect(quelle).not.toMatch(/from '\.\.\/heic\//);
+  });
+
+  it('lädt den Decoder nicht, solange kein HEIC zu sehen ist', async () => {
+    const vorher = heic.geladen;
+    renderMitProviders(
+      <AnhangVorschauGruppe>
+        <AnhangVorschau href="/a/1" mime="image/jpeg" dateiname="dach.jpg" />
+        <AnhangVorschau href="/a/2" mime="application/pdf" dateiname="plan.pdf" />
+      </AnhangVorschauGruppe>,
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    expect(heic.geladen).toBe(vorher);
+    expect(heic.dekodiere).not.toHaveBeenCalled();
   });
 });

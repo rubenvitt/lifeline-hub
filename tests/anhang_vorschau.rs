@@ -429,3 +429,32 @@ async fn jede_anhang_antwort_traegt_die_schutz_header() {
         .unwrap()
         .starts_with("attachment;"));
 }
+
+// ── Echtes HEIC (Fixture des Frontends) ─────────────────────────────────────────────────
+
+/// HEIC aus `frontend/src/heic/__fixtures__/mach_heic.py` (pillow-heif): 64 × 48 quer kodiert,
+/// zur Anzeige über `irot` hochkant, mit EXIF (Gerät, GPS) und XMP.
+const HEIC: &[u8] = include_bytes!("../frontend/src/heic/__fixtures__/hochkant.heic");
+/// Was der Server davon ausliefert; der HEIC-Decoder im Browser dekodiert genau diese Bytes
+/// (`frontend/src/heic/heicDekodieren.test.ts`).
+const HEIC_BEREINIGT: &[u8] =
+    include_bytes!("../frontend/src/heic/__fixtures__/hochkant.bereinigt.heic");
+
+#[tokio::test]
+async fn echtes_heic_wird_bereinigt_ausgeliefert_und_hat_keine_server_vorschau() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    assert!(enthaelt(HEIC, b"MARKER"), "Fixture trägt Metadaten");
+    let pfad = schaden_datei(&pool, einsatz, "IMG_0001.HEIC", "image/heic", HEIC).await;
+
+    let (s, _, bytes) = laden(&app, &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(bytes, HEIC_BEREINIGT, "Fixture der bereinigten Fassung ist aktuell");
+    assert!(!enthaelt(&bytes, b"MARKER"));
+    assert!(!enthaelt(&bytes, b"xmpmeta"));
+    assert!(enthaelt(&bytes, b"irot"), "die Drehung bleibt");
+
+    let (s, _, _) = laden(&app, &mit(&pfad, "vorschau"), &admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "HEIC dekodiert der Browser");
+}
