@@ -529,3 +529,48 @@ async fn einstellung_wirkt_und_uebersteht_neustart() {
     assert_eq!(v["automatisch"], false);
     assert_eq!(v["intervall_stunden"], 12);
 }
+
+// ===== Review-Funde =====
+
+#[tokio::test]
+async fn jetzt_aktualisieren_fehlerhafte_karte_ist_422() {
+    let d = Dienst::default();
+    let a = aufbau_mit_dienst(dienst_starten(&d, true).await).await;
+    let id = heruntergeladene_karte(&a.pool, "Bremen", "bremen").await;
+    repo::setze_status(&a.pool, id, "fehler").await.unwrap();
+    let res = anfrage(&a.app, "POST", &jetzt_uri(id), Some(&a.admin), None).await;
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        d.posts().is_empty(),
+        "kein Bau für eine nicht bereite Karte"
+    );
+}
+
+#[tokio::test]
+async fn geloeschte_karte_vererbt_keinen_fehler() {
+    let a = aufbau().await;
+    let id = heruntergeladene_karte(&a.pool, "Bremen", "bremen").await;
+    a.state
+        .auto_aktualisierung
+        .zustand()
+        .fehler
+        .insert(id, "SHA256 stimmt nicht".into());
+    let res = anfrage(
+        &a.app,
+        "DELETE",
+        &format!("/api/karte/offline-karten/{id}"),
+        Some(&a.admin),
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    // SQLite vergibt ohne AUTOINCREMENT die höchste id neu.
+    let neu = heruntergeladene_karte(&a.pool, "Hamburg", "hamburg").await;
+    assert_eq!(neu, id, "Vorbedingung: id wiederverwendet");
+
+    let v = json(anfrage(&a.app, "GET", STATUS_URI, Some(&a.admin), None).await).await;
+    assert!(
+        v["karten"].as_array().unwrap().is_empty(),
+        "kein geerbter Fehler: {v}"
+    );
+}

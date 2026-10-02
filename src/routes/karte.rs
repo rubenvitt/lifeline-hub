@@ -1210,6 +1210,8 @@ pub async fn offline_loeschen(
     if !repo::loesche_offline_karte(&state.pool, id).await? {
         return Err(AppError::NotFound);
     }
+    // LFH-993: Laufzustand des Wächters vergessen — die id kann neu vergeben werden.
+    state.auto_aktualisierung.vergiss(id);
     if let Some(k) = karte {
         // Gemanagt = von uns heruntergeladen: download_at gesetzt, Pfad-Platzhalter (Download lief
         // bzw. scheiterte vor markiere_bereit) oder der abgeleitete Download-Dateiname.
@@ -1996,9 +1998,13 @@ pub async fn offline_jetzt_aktualisieren(
     let karte = repo::finde_offline_karte(&state.pool, id)
         .await?
         .ok_or(AppError::NotFound)?;
-    let Some(quell_url) = karte.quell_url.clone().filter(|_| ist_gemanagt(&karte)) else {
+    let Some(quell_url) = karte
+        .quell_url
+        .clone()
+        .filter(|_| ist_gemanagt(&karte) && karte.status == "bereit")
+    else {
         return Err(AppError::UnprocessableEntity(
-            "Nur heruntergeladene Karten mit Quell-URL lassen sich aktualisieren".into(),
+            "Nur bereite, heruntergeladene Karten mit Quell-URL lassen sich aktualisieren".into(),
         ));
     };
     let auto = &state.auto_aktualisierung;

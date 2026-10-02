@@ -200,6 +200,18 @@ impl AutoAktualisierung {
         self.zustand.lock().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// Vergisst den Laufzustand einer Karte (beim Löschen): SQLite vergibt die id ohne
+    /// AUTOINCREMENT neu, eine neue Karte erbte sonst Fehler, Sperre und ausstehenden Bau.
+    pub fn vergiss(&self, id: i64) {
+        let mut z = self.zustand();
+        z.fehler.remove(&id);
+        z.gesperrt.remove(&id);
+        z.ausstehende_bauten.remove(&id);
+        if z.auto_laeuft == Some(id) {
+            z.auto_laeuft = None;
+        }
+    }
+
     /// Weckt den Wächter sofort (neuer Bau, geänderte Einstellung).
     pub fn wecken(&self) {
         self.wecker.notify_one();
@@ -333,6 +345,29 @@ pub async fn tick_einmal(state: &AppState, jetzt: DateTime<Utc>) -> TickBericht 
         }
     }
 
+    let karten = match repo::liste_offline_karten(&state.pool).await {
+        Ok(k) => k,
+        Err(e) => {
+            tracing::warn!("Offline-Karten nicht lesbar: {e}");
+            return bericht;
+        }
+    };
+    // Zustand zu Karten, die fehlen oder nicht bereit sind, abräumen: ein ausstehender Bau löste
+    // sich sonst nie auf (Takt ohne Ende), und eine neue Karte mit wiederverwendeter id erbte
+    // Fehler und Sperre.
+    {
+        let alle: std::collections::HashSet<i64> = karten.iter().map(|k| k.id).collect();
+        let bereit: std::collections::HashSet<i64> = karten
+            .iter()
+            .filter(|k| k.status == "bereit")
+            .map(|k| k.id)
+            .collect();
+        let mut z = auto.zustand();
+        z.ausstehende_bauten.retain(|id, _| bereit.contains(id));
+        z.fehler.retain(|id, _| alle.contains(id));
+        z.gesperrt.retain(|id, _| alle.contains(id));
+    }
+
     // 1. Ausstehende Bauten auflösen.
     let erzwingen = loese_bauten_auf(state, jetzt).await;
 
@@ -352,13 +387,6 @@ pub async fn tick_einmal(state: &AppState, jetzt: DateTime<Utc>) -> TickBericht 
     auto.zustand().letzte_pruefung_at = Some(jetzt);
 
     // 3. Fällige Karten bestimmen (sortier, id) und höchstens eine laden.
-    let karten = match repo::liste_offline_karten(&state.pool).await {
-        Ok(k) => k,
-        Err(e) => {
-            tracing::warn!("Offline-Karten nicht lesbar: {e}");
-            return bericht;
-        }
-    };
     let belegt: Vec<i64> = crate::karte::download::lies_fortschritt(&state.download_fortschritt)
         .keys()
         .copied()
@@ -404,8 +432,12 @@ pub async fn tick_einmal(state: &AppState, jetzt: DateTime<Utc>) -> TickBericht 
     }
 
     let mut gestartet = None;
+    // Versuchte Karten — gestartet oder gescheitert — warten nicht mehr; ein gescheiterter Start
+    // (etwa zu wenig Platz) wartet bis zur nächsten regulären Prüfung, nicht 30 s.
+    let mut versucht = 0;
     if !laeuft {
         for (k, e) in &faellige {
+            versucht += 1;
             match auto.lade(state, k, e).await {
                 Ok(()) => {
                     let mut z = auto.zustand();
@@ -424,13 +456,15 @@ pub async fn tick_einmal(state: &AppState, jetzt: DateTime<Utc>) -> TickBericht 
                         "Automatische Aktualisierung der Karte {} scheitert: {err}",
                         k.id
                     );
-                    auto.zustand().fehler.insert(k.id, fehlertext(&err));
+                    let mut z = auto.zustand();
+                    z.fehler.insert(k.id, fehlertext(&err));
+                    z.ausstehende_bauten.remove(&k.id);
                 }
             }
         }
     }
     bericht.gestartet = gestartet;
-    let weitere = faellige.len() > usize::from(gestartet.is_some());
+    let weitere = faellige.len() > versucht.max(usize::from(laeuft));
     let mut z = auto.zustand();
     z.nachholen = weitere;
     bericht.kurzer_takt = weitere || !z.ausstehende_bauten.is_empty();
@@ -1042,6 +1076,96 @@ mod tests {
         let z = u.state.auto_aktualisierung.zustand();
         assert!(z.fehler.is_empty());
         assert_eq!(z.auto_laeuft, None);
+    }
+
+    /// Lader, dessen Start immer scheitert (etwa zu wenig Platz).
+    struct ScheiternderLader;
+
+    impl Lader for ScheiternderLader {
+        fn starte<'a>(
+            &'a self,
+            _state: &'a AppState,
+            _karte: &'a OfflineKarte,
+            _eintrag: &'a OfflineKatalogEintrag,
+        ) -> BoxFuture<'a, Result<(), AppError>> {
+            Box::pin(async {
+                Err(AppError::UnprocessableEntity(
+                    "Nicht genug Speicherplatz".into(),
+                ))
+            })
+        }
+    }
+
+    // Review: Ein scheiternder Start ist kein „weitere Karten warten“ — kein 30-s-Takt ohne Ende,
+    // und ein ausstehender Bau der Karte löst sich mit dem Fehler auf.
+    #[tokio::test]
+    async fn scheiternder_start_haelt_keinen_kurzen_takt() {
+        let katalog = Arc::new(FesterKatalog::default());
+        let auto = AutoAktualisierung::mit(
+            Einstellung::default(),
+            katalog.clone(),
+            Arc::new(ScheiternderLader),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(crate::db::test_pool().await, tmp.path().into(), auto);
+        let id = karte(&state.pool, "bremen", 0).await;
+        katalog.setze(vec![eintrag("bremen", SHA_NEU)]);
+        state
+            .auto_aktualisierung
+            .zustand()
+            .ausstehende_bauten
+            .insert(
+                id,
+                AusstehenderBau {
+                    slug: "bremen".into(),
+                    job_id: 7,
+                    stand: BauStand::WartetAufKatalog { seit: jetzt() },
+                },
+            );
+
+        let b = tick_einmal(&state, jetzt()).await;
+
+        assert_eq!(b.gestartet, None);
+        assert!(
+            !b.kurzer_takt,
+            "kein Dauertakt nach einem gescheiterten Start"
+        );
+        let z = state.auto_aktualisierung.zustand();
+        assert_eq!(z.fehler[&id], "Nicht genug Speicherplatz");
+        assert!(z.ausstehende_bauten.is_empty());
+        assert!(!z.nachholen);
+    }
+
+    // Review: Zustand zu Karten, die nicht (mehr) bereit sind oder fehlen, räumt der Tick ab —
+    // sonst erbte eine neue Karte mit wiederverwendeter id Fehler und Sperre.
+    #[tokio::test]
+    async fn tick_raeumt_zustand_fremder_karten() {
+        let u = umgebung().await;
+        let fehlerhaft = karte(&u.state.pool, "bremen", 0).await;
+        repo::setze_status(&u.state.pool, fehlerhaft, "fehler")
+            .await
+            .unwrap();
+        {
+            let mut z = u.state.auto_aktualisierung.zustand();
+            z.ausstehende_bauten.insert(
+                fehlerhaft,
+                AusstehenderBau {
+                    slug: "bremen".into(),
+                    job_id: 7,
+                    stand: BauStand::WartetAufKatalog { seit: jetzt() },
+                },
+            );
+            z.fehler.insert(4711, "alt".into());
+            z.gesperrt.insert(4711, ("u".into(), None));
+        }
+
+        let b = tick_einmal(&u.state, jetzt()).await;
+
+        assert!(!b.kurzer_takt);
+        let z = u.state.auto_aktualisierung.zustand();
+        assert!(z.ausstehende_bauten.is_empty(), "nicht bereite Karte");
+        assert!(!z.fehler.contains_key(&4711), "gelöschte Karte");
+        assert!(!z.gesperrt.contains_key(&4711));
     }
 
     /// Lader wie [`InPlaceLader`], aber ohne SSRF-Prüfung — für den Loopback-Fixture-Server.
