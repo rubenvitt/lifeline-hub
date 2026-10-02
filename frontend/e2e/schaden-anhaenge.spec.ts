@@ -297,7 +297,7 @@ test('Fokus nie verdeckt: Tab-Durchlauf durch die Anhangliste unter der Kopfzeil
   await page.evaluate((z) => window.scrollTo(0, z), Math.round(reserve / 2));
 
   const befund = await pruefeFokusVerdeckung(page, 60, 'Tab', {
-    region: '[data-lfh="schaden-anhang-zeile"]',
+    region: '[data-lfh="anhang-zeile"]',
   });
   expect(befund.fixierteKandidaten, 'Vorbedingung: es gibt einen fixierten Knoten').toBeGreaterThan(
     0,

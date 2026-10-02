@@ -1,5 +1,6 @@
 import type {
   Person,
+  PersonAnhang,
   PersonDetail,
   PersonStatus,
   PersonZugriff,
@@ -11,7 +12,8 @@ import type {
   Verlaufsnotiz,
   Abgleich,
 } from './types';
-import { apiDatei, apiGet, apiSend, type ApiSendOptionen } from './client';
+import { apiDatei, apiGet, apiSend, apiUpload, type ApiSendOptionen } from './client';
+import { UPLOAD_TIMEOUT_MS } from './upload';
 import { EXPORT_TIMEOUT_MS } from './exportTimeout';
 import { patchBody } from './patchTriState';
 import { registrierNummer } from '../anzeige/registrierNummer';
@@ -210,4 +212,49 @@ export function entscheideAbgleich(
     'POST',
     { entscheidung },
   );
+}
+
+// ---------- Fotos und Dateien (LFH-757) ----------
+
+const anhangBasis = (einsatzId: number, personId: number) =>
+  `/api/einsaetze/${einsatzId}/personen/${personId}/anhaenge`;
+
+/** Lebende Anhänge einer Person, neueste zuerst. Die Liste schreibt serverseitig KEIN Audit. */
+export function listePersonAnhaenge(einsatzId: number, personId: number): Promise<PersonAnhang[]> {
+  return apiGet<PersonAnhang[]>(anhangBasis(einsatzId, personId));
+}
+
+/** Legt EINE Datei an der Person ab (Feld `datei`), Timeout wie die übrigen Uploads. */
+export function legePersonAnhangAb(
+  einsatzId: number,
+  personId: number,
+  datei: File,
+): Promise<PersonAnhang> {
+  const fd = new FormData();
+  fd.append('datei', datei);
+  return apiUpload<PersonAnhang>(anhangBasis(einsatzId, personId), fd, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+  });
+}
+
+/** Entfernt einen Anhang (Soft-Delete mit ETB-Nachweis); `anhangId` ist die Linker-id. */
+export function entfernePersonAnhang(
+  einsatzId: number,
+  personId: number,
+  anhangId: number,
+): Promise<void> {
+  return apiSend<void>(`${anhangBasis(einsatzId, personId)}/${anhangId}`, 'DELETE');
+}
+
+/**
+ * Download über die Personenroute, nie über `/anhaenge/{aid}` des Einsatzes (dort 404). Jeder
+ * Abruf — auch die Revalidierung mit 304 — schreibt serverseitig eine Zeile ins Zugriffsprotokoll
+ * der Person; deshalb nur als Verweis, den eine Person bewusst auslöst, nie als Vorschau.
+ */
+export function personAnhangDownloadPfad(
+  einsatzId: number,
+  personId: number,
+  anhangId: number,
+): string {
+  return `${anhangBasis(einsatzId, personId)}/${anhangId}/datei`;
 }

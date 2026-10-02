@@ -1,16 +1,17 @@
 import { App, Form, type UploadFile } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ErfassungsModal } from '../../components/Erfassung';
-import DateiFeld from '../../components/DateiFeld';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { legeSchadenAnhangAb, schadenRegistrierAnzeige } from '../../api/einsatzSchaden';
-import { einsatzKeys } from '../../api/queryKeys';
+import { ErfassungsModal } from '../Erfassung';
+import DateiFeld from '../DateiFeld';
+import { SpeicherFehler } from '../SpeicherHinweis';
 import { ERFASSUNG_ACCEPT } from '../../api/upload';
 
 interface Props {
-  einsatzId: number;
-  schadenId: number;
-  registrierNr: number;
+  /** Kennung des Erfassungsobjekts für den Titel („Schaden S-003“, „Person R-007“). */
+  kennung: string;
+  /** Legt genau eine Datei ab (die Route des Fachmoduls). */
+  ablegen: (datei: File) => Promise<unknown>;
+  /** Keys, die nach einer erfolgreichen Ablage neu laden (Anhangliste, ETB). */
+  invalidieren: readonly (readonly unknown[])[];
   offen: boolean;
   onSchliessen: () => void;
 }
@@ -20,17 +21,17 @@ interface AblageFormular {
 }
 
 /**
- * Ablegen-Dialog der Schaden-Anhänge auf der Erfassungs-Hülle. Ein Feld, eine Datei je Ablage —
- * mehrere Fotos über den Serienmodus, jedes mit eigenem ETB-Nachweis (pseudonym: nur
- * Registriernummer und Art).
+ * Ablegen-Dialog der Erfassungs-Anhänge (Schaden LFH-21, Person LFH-757) auf der
+ * Erfassungs-Hülle. Ein Feld, eine Datei je Ablage — mehrere Fotos über den Serienmodus, jedes mit
+ * eigenem ETB-Nachweis (pseudonym: nur Registriernummer und Art).
  *
  * `mutateAsync`: eine Ablehnung (400, 409) lässt die Auswahl stehen, der Grund steht als
  * `SpeicherFehler` im Dialog.
  */
-export default function SchadenAnhangAblegenModal({
-  einsatzId,
-  schadenId,
-  registrierNr,
+export default function AnhangAblegenModal({
+  kennung,
+  ablegen,
+  invalidieren,
   offen,
   onSchliessen,
 }: Props) {
@@ -39,10 +40,9 @@ export default function SchadenAnhangAblegenModal({
   const [form] = Form.useForm<AblageFormular>();
 
   const mutation = useMutation({
-    mutationFn: (datei: File) => legeSchadenAnhangAb(einsatzId, schadenId, datei),
+    mutationFn: (datei: File) => ablegen(datei),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: einsatzKeys.schadenAnhaenge(einsatzId, schadenId) });
-      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      for (const queryKey of invalidieren) void qc.invalidateQueries({ queryKey });
       message.success('Datei abgelegt');
     },
   });
@@ -55,7 +55,7 @@ export default function SchadenAnhangAblegenModal({
   return (
     <ErfassungsModal<AblageFormular>
       offen={offen}
-      titel={`Datei ablegen · Schaden ${schadenRegistrierAnzeige(registrierNr)}`}
+      titel={`Datei ablegen · ${kennung}`}
       form={form}
       onErfassen={(werte) => mutation.mutateAsync(werte.datei?.[0]?.originFileObj as File)}
       onFertig={schliessen}

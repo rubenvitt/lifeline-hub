@@ -1363,3 +1363,100 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     expect(koerper[0]).not.toHaveProperty('vermisst_seit');
   });
 });
+
+/**
+ * LFH-757: „Fotos und Dateien“ ist ein aufklappbarer Abschnitt. Die Liste lädt erst mit ihm, und
+ * der Download-Verweis zeigt auf die Personenroute (jeder Abruf steht dort im Zugriffsprotokoll).
+ */
+describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
+  const ANHAENGE = '/api/einsaetze/1/personen/10/anhaenge';
+  const anhang = {
+    id: 5,
+    person_id: 10,
+    dateiname: 'verletzung.jpg',
+    mime: 'image/jpeg',
+    groesse: 2048,
+    abgelegt_von_id: 1,
+    abgelegt_von_name: 'Leitung',
+    abgelegt_at: '2026-10-02 10:30:00',
+  };
+
+  function zaehleListe(): { abrufe: () => number; loesen: () => void } {
+    let n = 0;
+    const horcher = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname === ANHAENGE) n += 1;
+    };
+    server.events.on('request:start', horcher);
+    return {
+      abrufe: () => n,
+      loesen: () => server.events.removeListener('request:start', horcher),
+    };
+  }
+
+  async function klappeAnhaengeAuf() {
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(screen.getByRole('button', { name: /Fotos und Dateien/ }));
+    return screen.findByRole('region', { name: 'Fotos und Dateien' });
+  }
+
+  it('lädt die Anhangliste erst beim Aufklappen, genau einmal', async () => {
+    const { abrufe, loesen } = zaehleListe();
+    try {
+      render(einsatzAktiv, detail, [http.get(ANHAENGE, () => HttpResponse.json([anhang]))]);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      expect(abrufe()).toBe(0);
+      const bereich = await klappeAnhaengeAuf();
+      const link = await within(bereich).findByRole('link', {
+        name: /^verletzung\.jpg, .*Datei von Person R-001 herunterladen$/,
+      });
+      expect(link).toHaveAttribute('href', `${ANHAENGE}/5/datei`);
+      expect(abrufe()).toBe(1);
+      expect(within(bereich).getByRole('button', { name: 'Datei ablegen' })).toBeInTheDocument();
+      expect(
+        within(bereich).getByRole('button', {
+          name: 'Datei verletzung.jpg von Person R-001 entfernen',
+        }),
+      ).toBeInTheDocument();
+      expect(document.querySelector('form form')).toBeNull();
+    } finally {
+      loesen();
+    }
+  });
+
+  it('Beobachter sieht die Liste ohne Aktionen', async () => {
+    render(einsatzBeobachter, detail, [http.get(ANHAENGE, () => HttpResponse.json([anhang]))]);
+    const bereich = await klappeAnhaengeAuf();
+    await within(bereich).findByRole('link', { name: /^verletzung\.jpg/ });
+    expect(within(bereich).queryByRole('button')).toBeNull();
+  });
+
+  it('an einer stornierten Person bleibt die Liste nur lesbar', async () => {
+    render(einsatzAktiv, { ...detail, storniert_at: '2026-10-02 11:00:00' }, [
+      http.get(ANHAENGE, () => HttpResponse.json([anhang])),
+    ]);
+    const bereich = await klappeAnhaengeAuf();
+    await within(bereich).findByRole('link', { name: /^verletzung\.jpg/ });
+    expect(within(bereich).queryByRole('button', { name: /Datei ablegen|entfernen/ })).toBeNull();
+  });
+
+  it('das Zugriffs-Audit nennt den Datei-Download im Klartext', async () => {
+    render(einsatzFixture({ meine_rolle: 'einsatzleitung' }), detail, [
+      http.get('/api/einsaetze/1/personen/10/audit', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            person_id: 10,
+            benutzer_id: 1,
+            benutzer_name: 'Leitung',
+            art: 'anhang',
+            zugriff_at: '2026-10-02 10:31:00',
+          },
+        ]),
+      ),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
+    expect(await screen.findByText('Datei geladen')).toBeInTheDocument();
+    expect(screen.queryByText('anhang')).toBeNull();
+  });
+});

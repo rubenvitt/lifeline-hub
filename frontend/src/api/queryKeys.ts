@@ -82,6 +82,9 @@ export const EINSATZ_KEYS = {
   uhsDetail: 'einsatz-uhs-detail',
   person: 'einsatz-person',
   personAudit: 'einsatz-person-audit',
+  // Fotos und Dateien an einer Person (LFH-757): live über das `person`-Ereignis. Nicht im
+  // Lagebild offline (Patientenfotos und ihre Dateinamen bleiben vom Gerät fern, LFH-767).
+  personAnhaenge: 'einsatz-person-anhaenge',
   tier: 'einsatz-tier',
   schaden: 'einsatz-schaden',
   // Snapshot-Dokument: eigener Prefix, damit die Listen-Invalidierung (`lage_snapshot`) die
@@ -160,7 +163,15 @@ export const EINSATZ_STREAM_EVENTS = {
   // Betreuungsübersicht trägt „davon namentlich n“ je Stelle, das sich mit jedem Verbleib ändert.
   // Kein zweites Server-Ereignis: `person` erreicht nur Leser mit Personenrecht, und nur die sehen
   // die Zahl.
-  person: [EINSATZ_KEYS.personen, EINSATZ_KEYS.modulZaehler, EINSATZ_KEYS.betreuung],
+  // Ablegen und Entfernen einer Datei an einer Person verteilen `person` (LFH-757); die
+  // Anhangliste hängt mit daran. Das Detail (`person`) bleibt NICHT live: jeder Abruf schreibt
+  // eine Audit-Zeile, die Liste der Anhänge schreibt keine.
+  person: [
+    EINSATZ_KEYS.personen,
+    EINSATZ_KEYS.modulZaehler,
+    EINSATZ_KEYS.betreuung,
+    EINSATZ_KEYS.personAnhaenge,
+  ],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
   personal: [
@@ -333,6 +344,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.person, einsatzId, personId] as const,
   personAudit: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAudit, einsatzId, personId] as const,
+  personAnhaenge: (einsatzId: number, personId: number) =>
+    [EINSATZ_KEYS.personAnhaenge, einsatzId, personId] as const,
   personal: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId] as const,
   fuehrungskraefte: (einsatzId: number) => [EINSATZ_KEYS.fuehrungskraefte, einsatzId] as const,
 

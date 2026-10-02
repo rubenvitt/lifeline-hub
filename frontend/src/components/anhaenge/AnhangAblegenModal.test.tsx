@@ -5,15 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { ApiError } from '../../api/client';
 import { UPLOAD_MAX_GROESSE } from '../../api/upload';
-import SchadenAnhangAblegenModal from './SchadenAnhangAblegenModal';
+import AnhangAblegenModal from './AnhangAblegenModal';
 
-vi.mock('../../api/einsatzSchaden', async (importOriginal) => {
-  const echt = await importOriginal<typeof import('../../api/einsatzSchaden')>();
-  return { ...echt, legeSchadenAnhangAb: vi.fn() };
-});
-import { legeSchadenAnhangAb } from '../../api/einsatzSchaden';
-
-const legeAb = vi.mocked(legeSchadenAnhangAb);
+const legeAb = vi.fn<(datei: File) => Promise<unknown>>();
 afterEach(() => vi.clearAllMocks());
 
 function Rahmen() {
@@ -21,10 +15,10 @@ function Rahmen() {
   return (
     <>
       <button onClick={() => setOffen(true)}>Öffnen</button>
-      <SchadenAnhangAblegenModal
-        einsatzId={1}
-        schadenId={3}
-        registrierNr={3}
+      <AnhangAblegenModal
+        kennung="Schaden S-003"
+        ablegen={legeAb}
+        invalidieren={[['einsatz-schaden-anhaenge', 1, 3]]}
         offen={offen}
         onSchliessen={() => setOffen(false)}
       />
@@ -44,7 +38,7 @@ async function dialog() {
 const dateiInput = (d: HTMLElement) => d.querySelector<HTMLInputElement>('input[type="file"]')!;
 const foto = (name = 'dach.jpg') => new File(['x'], name, { type: 'image/jpeg' });
 
-describe('SchadenAnhangAblegenModal (LFH-21)', () => {
+describe('AnhangAblegenModal (LFH-21, LFH-757)', () => {
   it('Struktur der Erfassungs-Norm: Absendeknopf im <form>, keine Modal-Fußzeile', async () => {
     const d = await dialog();
     const knopf = within(d).getByRole('button', { name: 'Ablegen' });
@@ -65,7 +59,7 @@ describe('SchadenAnhangAblegenModal (LFH-21)', () => {
     await userEvent.click(within(d).getByRole('button', { name: /Speichern und nächste/ }));
 
     await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
-    expect(legeAb).toHaveBeenCalledWith(1, 3, expect.objectContaining({ name: 'erstes.jpg' }));
+    expect(legeAb).toHaveBeenCalledWith(expect.objectContaining({ name: 'erstes.jpg' }));
     await vi.waitFor(() => expect(within(d).queryByText('erstes.jpg')).not.toBeInTheDocument());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
