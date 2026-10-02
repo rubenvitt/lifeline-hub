@@ -1,24 +1,29 @@
 import { IkoneChevronRunter, IkoneLadekreis } from '../ikonen';
-import { App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Typography } from 'antd';
+import { App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Tooltip, Typography } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { fehlerText } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
   brecheOfflineDownloadAb,
+  ladeAktualisierungsStatus,
   ladeBauStatus,
   listeOfflineKarten,
   loescheOfflineKarte,
-  neuLadeOfflineKarte,
-  starteOfflineDownload,
+  starteJetztAktualisieren,
+  type AktualisierungsPhase,
   type BauJob,
   type BauStatus,
+  type KarteAktualisierung,
   type OfflineKarte,
   type OfflineKarteStatus,
 } from '../api/offlineKarten';
+import AutoAktualisierungZeile from './AutoAktualisierungZeile';
+import { listenTakt, statusTakt } from './aktualisierungTakt';
+import { ortszeit } from './ortszeit';
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
@@ -43,6 +48,16 @@ const STATUS_TAG: Record<OfflineKarteStatus, { color: string; label: string }> =
   laedt: { color: 'processing', label: 'lädt' },
   bereit: { color: 'green', label: 'bereit' },
   fehler: { color: 'red', label: 'Fehler' },
+};
+
+/**
+ * Etikett einer laufenden Aktualisierung vor dem Download (LFH-993). „laedt“ fehlt: dann zeigt die
+ * Zeile den Fortschritt wie jeder Download.
+ */
+const PHASE_ETIKETT: Record<Exclude<AktualisierungsPhase, 'laedt'>, string> = {
+  bau_wartet: 'Neubau wartet',
+  baut: 'wird neu gebaut',
+  wartet_auf_katalog: 'wird veröffentlicht',
 };
 
 /** Datenstand aus der Quell-URL (datums-stempel YYYYMMDD) → „YYYY-MM-DD", sonst null. */
@@ -86,15 +101,41 @@ export default function OfflineKartenVerwaltung() {
     [bauStatusQuery.data],
   );
 
+  // LFH-993: Status der automatischen Aktualisierung (Einstellung, Prüfungen, Phase je Karte).
+  const statusQuery = useQuery({
+    queryKey: globalKeys.adminKarteBereich('aktualisierung'),
+    queryFn: ladeAktualisierungsStatus,
+    refetchInterval: (query) => statusTakt(query.state.data),
+  });
+  const aktualisierungJe = useMemo(
+    () =>
+      new Map<number, KarteAktualisierung>(
+        (statusQuery.data?.karten ?? []).map((k) => [k.karte_id, k]),
+      ),
+    [statusQuery.data],
+  );
+
   const kartenQuery = useQuery({
     queryKey: globalKeys.adminKarteBereich('offline-karten'),
     queryFn: listeOfflineKarten,
-    // Polling alle 2 s, solange eine Karte lädt ODER in-place aktualisiert (Zeile bleibt 'bereit',
-    // trägt aber Fortschritt) — sonst aus.
-    refetchInterval: (query) =>
-      query.state.data?.some((k) => k.status === 'laedt' || k.geladen != null) ? 2000 : false,
+    // Polling alle 2 s, solange eine Karte lädt, in-place aktualisiert oder der Wächter für sie
+    // lädt — sonst aus (`aktualisierungTakt.ts`).
+    refetchInterval: (query) => listenTakt(query.state.data, statusQuery.data),
   });
   const karten = useMemo(() => kartenQuery.data ?? [], [kartenQuery.data]);
+
+  // Endet eine Phase, trägt die Liste den neuen Stand („Stand …“, „auf dem Gerät seit …“) erst
+  // nach dem nächsten Abruf — deshalb bei jedem Wechsel der laufenden Phasen neu laden.
+  const phasenSignatur = (statusQuery.data?.karten ?? [])
+    .filter((k) => k.phase != null)
+    .map((k) => `${k.karte_id}:${k.phase}`)
+    .join(',');
+  const letzteSignatur = useRef(phasenSignatur);
+  useEffect(() => {
+    if (letzteSignatur.current === phasenSignatur) return;
+    letzteSignatur.current = phasenSignatur;
+    void qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-karten') });
+  }, [phasenSignatur, qc]);
 
   const abbrechenMutation = useMutation({
     mutationFn: (id: number) => brecheOfflineDownloadAb(id),
@@ -106,45 +147,18 @@ export default function OfflineKartenVerwaltung() {
     onSuccess: () => invalidiereKarte(qc),
     onError: (e) => message.error(fehlerText(e, 'Löschen fehlgeschlagen')),
   });
-  // „Aktualisieren" = One-Click-Update: neueren Katalog-Stand laden; das Backend aktiviert die
-  // neue Version nach Erfolg und entfernt die alte (`ersetzt_karte_id`). Der Katalog-Pin
-  // (`katalog_sha256`) geht zur verifizierten Prüfung mit.
-  const aktualisierenMutation = useMutation({
-    mutationFn: (k: OfflineKarte) =>
-      starteOfflineDownload({
-        name: k.name,
-        url: k.katalog_url!,
-        lizenz: k.lizenz ?? '',
-        kachel_schema: k.kachel_schema,
-        sha256_erwartet: k.katalog_sha256 ?? undefined,
-        ersetzt_karte_id: k.id,
-        // Während des Updates liegen alt+neu gleichzeitig auf der Platte → ~2× Peak.
-        groesse_erwartet: k.groesse ?? undefined,
-      }),
-    onSuccess: () => {
+  // „Jetzt aktualisieren“ (LFH-993): lädt einen vorhandenen neueren Stand sofort oder stößt einen
+  // Neubau an, dessen Ergebnis der Server danach selbst ohne Ausfall eintauscht.
+  const jetztMutation = useMutation({
+    mutationFn: (k: OfflineKarte) => starteJetztAktualisieren(k.id),
+    onSuccess: ({ phase }) => {
       invalidiereKarte(qc);
-      message.success('Update lädt — wird nach Abschluss automatisch aktiviert');
+      if (phase === 'aktuell') message.info('Die Karte ist aktuell');
+      else if (phase === 'laedt')
+        message.success('Update lädt — die Karte bleibt in Betrieb und wird danach getauscht');
+      else message.success('Neubau angestoßen — die Karte wird danach automatisch getauscht');
     },
     onError: (e) => message.error(fehlerText(e, 'Aktualisieren fehlgeschlagen')),
-  });
-  // „Neu laden" = In-Place-Hot-Swap der AKTIVEN Karte in dieselbe Zeile/Datei; die alte bleibt
-  // bis zum atomaren Swap ausgeliefert (downtime-frei, stabile id). Inaktive nutzen
-  // „Aktualisieren".
-  const neuLadenMutation = useMutation({
-    mutationFn: (k: OfflineKarte) =>
-      neuLadeOfflineKarte(k.id, {
-        url: k.katalog_url!,
-        sha256_erwartet: k.katalog_sha256 ?? undefined,
-        // .part + alte Datei koexistieren während des Downloads → ~2× Peak.
-        groesse_erwartet: k.groesse ?? undefined,
-      }),
-    onSuccess: () => {
-      invalidiereKarte(qc);
-      message.success(
-        'Aktualisierung lädt — die Karte bleibt aktiv und wird nach Abschluss getauscht',
-      );
-    },
-    onError: (e) => message.error(fehlerText(e, 'Neu laden fehlgeschlagen')),
   });
 
   const spalten: KatalogSpalte<OfflineKarte>[] = [
@@ -161,14 +175,21 @@ export default function OfflineKartenVerwaltung() {
       sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
       render: (name: string, k: OfflineKarte) => {
         const stand = standAusUrl(k.quell_url);
+        // LFH-993: seit wann die aktuelle Datei auf dem Gerät liegt (letzter erfolgreicher Download).
+        const seit = k.status === 'bereit' ? ortszeit(k.download_at) : '';
         return (
           <div>
             <div>{name}</div>
-            {(stand || k.update_verfuegbar) && (
-              <Space size={6} style={{ marginTop: 2 }}>
+            {(stand || seit || k.update_verfuegbar) && (
+              <Space size={6} wrap style={{ marginTop: 2 }}>
                 {stand && (
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     Stand {stand}
+                  </Typography.Text>
+                )}
+                {seit && (
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    auf dem Gerät seit {seit}
                   </Typography.Text>
                 )}
                 {k.update_verfuegbar && (
@@ -207,11 +228,43 @@ export default function OfflineKartenVerwaltung() {
       onFilter: (wert, k) => k.status === String(wert),
       render: (_: unknown, k: OfflineKarte) => {
         const s = k.status;
-        // Ein Download läuft bei status 'laedt' (neue Zeile) ODER aktivem In-Place-Reload.
-        const laeuft = s === 'laedt' || k.geladen != null;
+        const akt = aktualisierungJe.get(k.id);
+        // LFH-993: Ein fehlgeschlagenes Update steht neben dem Status, der Grund im Tooltip.
+        const fehler = akt?.fehler ? (
+          <Tooltip title={akt.fehler}>
+            <Tag color="red" style={{ marginInlineEnd: 0 }}>
+              Update fehlgeschlagen
+            </Tag>
+          </Tooltip>
+        ) : null;
+        // Vor dem Download (Neubau, Veröffentlichung) ein Etikett mit Ladekreis.
+        if (akt?.phase && akt.phase !== 'laedt' && s !== 'laedt' && k.geladen == null) {
+          return (
+            <Space size={8} wrap>
+              <Tag
+                icon={<IkoneLadekreis drehen />}
+                color="processing"
+                style={{ marginInlineEnd: 0 }}
+              >
+                {PHASE_ETIKETT[akt.phase]}
+              </Tag>
+              {fehler}
+            </Space>
+          );
+        }
+        // Ein Download läuft bei status 'laedt' (neue Zeile), aktivem In-Place-Reload ODER wenn
+        // der Wächter lädt und die Liste den Fortschritt noch nicht trägt.
+        const laeuft = s === 'laedt' || k.geladen != null || akt?.phase === 'laedt';
         if (!laeuft) {
           const t = STATUS_TAG[s];
-          return <Tag color={t.color}>{t.label}</Tag>;
+          return (
+            <Space size={8} wrap>
+              <Tag color={t.color} style={{ marginInlineEnd: 0 }}>
+                {t.label}
+              </Tag>
+              {fehler}
+            </Space>
+          );
         }
         // Live-Fortschritt (geladen/gesamt); ohne Content-Length geladene Bytes statt Prozent.
         const prozent =
@@ -225,11 +278,11 @@ export default function OfflineKartenVerwaltung() {
             </Tag>
             {prozent != null ? (
               <Progress percent={prozent} size="small" style={{ width: 120, marginBottom: 0 }} />
-            ) : (
+            ) : k.geladen != null ? (
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {formatGroesse(k.geladen)}
               </Typography.Text>
-            )}
+            ) : null}
           </Space>
         );
       },
@@ -287,30 +340,26 @@ export default function OfflineKartenVerwaltung() {
             render: (_, k: OfflineKarte) => {
               // Läuft ein Download, gibt es nur Abbrechen — keine Aktivieren/Update/Löschen-Aktionen.
               const laeuft = k.status === 'laedt' || k.geladen != null;
+              // LFH-993: Neubau oder Veröffentlichung laufen — dann weder „Jetzt aktualisieren“
+              // noch Löschen.
+              const phase = aktualisierungJe.get(k.id)?.phase;
               return (
                 // `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
                 // (`components/aktionsabstand.guard.test.ts`).
                 <Space size="middle">
-                  {k.status === 'bereit' &&
-                    k.update_verfuegbar &&
-                    k.katalog_url &&
-                    !laeuft &&
-                    // Aktive Karte → In-Place-„Neu laden"; inaktive → „Aktualisieren" (neue Zeile, Auto-Aktivieren,
-                    // Alt-Löschung).
-                    (k.aktiv_basemap ? (
-                      <Button
-                        loading={neuLadenMutation.isPending}
-                        onClick={() => neuLadenMutation.mutate(k)}
-                      >
-                        Neu laden
-                      </Button>
-                    ) : (
-                      <Button onClick={() => aktualisierenMutation.mutate(k)}>Aktualisieren</Button>
-                    ))}
+                  {k.status === 'bereit' && k.aktualisierbar && !laeuft && !phase && (
+                    <Button
+                      aria-label={`Jetzt aktualisieren: ${k.name}`}
+                      loading={jetztMutation.isPending && jetztMutation.variables?.id === k.id}
+                      onClick={() => jetztMutation.mutate(k)}
+                    >
+                      Jetzt aktualisieren
+                    </Button>
+                  )}
                   {laeuft && (
                     <Button onClick={() => abbrechenMutation.mutate(k.id)}>Abbrechen</Button>
                   )}
-                  {!laeuft && (
+                  {!laeuft && !phase && (
                     <Popconfirm
                       title="Offline-Karte löschen?"
                       okText="Löschen"
@@ -354,6 +403,9 @@ export default function OfflineKartenVerwaltung() {
             </Button>
           </Dropdown>
         </Space>
+      )}
+      {statusQuery.data && (
+        <AutoAktualisierungZeile status={statusQuery.data} istAdmin={istAdmin} />
       )}
       {istAdmin && bauVerfuegbar && aktiveBauten.length > 0 && (
         <Space size={6} wrap style={{ marginBottom: 12 }}>

@@ -62,7 +62,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.sprechgruppenAlle()).toEqual(['sprechgruppen', 'alle']);
   });
 
-  it('Karte: barer Prefix und alle sieben Bereiche', () => {
+  it('Karte: barer Prefix und alle acht Bereiche', () => {
     expect(globalKeys.adminKarte()).toEqual(['admin-karte']);
     expect(globalKeys.karteConfig()).toEqual(['karte-config']);
     for (const b of [
@@ -73,6 +73,8 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
       'offline-katalog',
       'offline-vorhandene',
       'online-quellen',
+      // LFH-993: Status der automatischen Aktualisierung.
+      'aktualisierung',
     ] as const) {
       expect(globalKeys.adminKarteBereich(b)).toEqual(['admin-karte', b]);
     }

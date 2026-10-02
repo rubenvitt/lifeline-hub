@@ -24,6 +24,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 object_store = { version = "0.14", features = ["aws"] }
 tokio-cron-scheduler = "0.15"
+# LFH-993: Job-ID des Crons für `next_tick_for_job` (schon im Lock, transitiv über den Scheduler).
+uuid = "1"
 async-trait = "0.1"
 bytes = "1"
 

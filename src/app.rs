@@ -34,6 +34,9 @@ pub struct AppState {
     pub karten_service_url: Option<String>,
     /// Bearer-Token für den karten-service; bleibt serverseitig. `None` = Feature aus.
     pub karten_service_token: Option<String>,
+    /// Automatische Aktualisierung der Offline-Karten (LFH-993): Vorgabe, Laufzustand des
+    /// Wächters, Katalogquelle und Lader.
+    pub auto_aktualisierung: crate::karte::auto_aktualisierung::AutoAktualisierung,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -1356,6 +1359,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/karte/offline-karten/bau-status",
             get(routes::karte::offline_bau_status),
+        )
+        .route(
+            "/api/karte/offline-karten/aktualisierung",
+            get(routes::karte::offline_aktualisierung_status),
+        )
+        .route(
+            "/api/karte/offline-karten/aktualisierung/einstellung",
+            put(routes::karte::offline_aktualisierung_einstellen),
+        )
+        .route(
+            "/api/karte/offline-karten/{id}/jetzt-aktualisieren",
+            post(routes::karte::offline_jetzt_aktualisieren),
         )
         .route(
             "/api/karte/offline-karten/{id}/aktivieren",

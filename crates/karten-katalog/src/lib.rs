@@ -71,6 +71,27 @@ pub struct RegionDto {
     pub gruppe: String,
 }
 
+/// Zeitplan des zentralen karten-service (LFH-993): wann der Cron alle Regionen das nächste Mal
+/// neu baut. `naechster_lauf` ist ein absoluter Zeitpunkt (RFC 3339, UTC) und fehlt, wenn kein
+/// Scheduler läuft (Modus `build`) oder der Ausdruck keinen weiteren Lauf ergibt.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(utoipa::ToSchema))]
+pub struct Zeitplan {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub naechster_lauf: Option<String>,
+    pub cron: String,
+}
+
+/// Region-Slug aus einer Karten-URL (LFH-993): das Präfix des Dateinamens vor dem ersten Punkt
+/// (`…/bayern.20260705.shortbread.mbtiles` → `bayern`). Slugs enthalten keinen Punkt; dieselbe
+/// Regel benennt im karten-service die veröffentlichten Dateien (`manifest::datei_key`).
+pub fn slug_aus_url(url_str: &str) -> Option<String> {
+    let u = url::Url::parse(url_str).ok()?;
+    let datei = u.path_segments()?.next_back()?;
+    let slug = datei.split('.').next()?;
+    (!slug.is_empty()).then(|| slug.to_string())
+}
+
 /// Merged den kompilierten Default-Katalog mit einem optionalen Remote-Manifest (Hybrid, LFH-199).
 /// Override per `name`: ein gültiger Remote-Eintrag mit gleichem Namen ersetzt den compiled-in
 /// Eintrag; neue Namen werden angehängt. Der compiled-in Katalog ist immer die Baseline
@@ -268,6 +289,45 @@ mod tests {
         let zurueck: BuildJob = serde_json::from_value(v).unwrap();
         assert!(matches!(zurueck.status, JobStatus::Building));
         assert_eq!(zurueck.beendet, None);
+    }
+
+    // ── LFH-993: Karte ↔ Region über den Dateinamen, Zeitplan des karten-service. ──
+
+    #[test]
+    fn slug_aus_url_nimmt_das_praefix_des_dateinamens() {
+        assert_eq!(
+            slug_aus_url("https://cdn.example/maps/bayern.20260705.shortbread.mbtiles"),
+            Some("bayern".to_string())
+        );
+        assert_eq!(
+            slug_aus_url("http://127.0.0.1:9000/maps/germany.20260101.shortbread.mbtiles?x=1"),
+            Some("germany".to_string())
+        );
+    }
+
+    #[test]
+    fn slug_aus_url_ohne_dateinamen_ist_none() {
+        assert_eq!(slug_aus_url("https://cdn.example/maps/"), None);
+        assert_eq!(slug_aus_url("https://cdn.example/maps/.mbtiles"), None);
+        assert_eq!(slug_aus_url("kein url"), None);
+    }
+
+    #[test]
+    fn zeitplan_round_trip() {
+        let z = Zeitplan {
+            naechster_lauf: Some("2027-01-01T03:00:00+00:00".into()),
+            cron: "0 0 3 1 1,4,7,10 *".into(),
+        };
+        let v = serde_json::to_value(&z).unwrap();
+        assert_eq!(
+            v,
+            serde_json::json!({"naechster_lauf": "2027-01-01T03:00:00+00:00", "cron": "0 0 3 1 1,4,7,10 *"}),
+        );
+        let zurueck: Zeitplan = serde_json::from_value(v).unwrap();
+        assert_eq!(zurueck.cron, z.cron);
+        // Ohne Scheduler (Modus `build`) fehlt der Lauf.
+        let ohne: Zeitplan = serde_json::from_value(serde_json::json!({"cron": "x"})).unwrap();
+        assert_eq!(ohne.naechster_lauf, None);
     }
 
     #[test]

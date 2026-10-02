@@ -288,6 +288,63 @@
           "andere_bos"
         ]
       },
+      "AktualisierungsPhase": {
+        "type": "string",
+        "description": "Laufende Phase einer Karte in der Verwaltung.",
+        "enum": [
+          "bau_wartet",
+          "baut",
+          "wartet_auf_katalog",
+          "laedt"
+        ]
+      },
+      "AktualisierungsStatus": {
+        "type": "object",
+        "description": "Status der automatischen Aktualisierung für die Verwaltung (D7). Zeiten RFC 3339, UTC.",
+        "required": [
+          "automatisch",
+          "intervall_stunden",
+          "bau_dienst",
+          "karten"
+        ],
+        "properties": {
+          "automatisch": {
+            "type": "boolean"
+          },
+          "bau_dienst": {
+            "$ref": "#/components/schemas/BauDienst"
+          },
+          "intervall_stunden": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "karten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KarteAktualisierung"
+            }
+          },
+          "letzte_pruefung_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "naechste_pruefung_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "naechster_bau_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "AktuelleBesetzung": {
         "type": "object",
         "description": "Die aktuelle Besetzung eines Sachgebiets, zur Lesezeit.",
@@ -1268,6 +1325,15 @@
           "online",
           "offline",
           "blind"
+        ]
+      },
+      "BauDienst": {
+        "type": "string",
+        "description": "Erreichbarkeit des karten-service aus Sicht des Hubs.",
+        "enum": [
+          "nicht_konfiguriert",
+          "erreichbar",
+          "unerreichbar"
         ]
       },
       "Bedarf": {
@@ -5578,6 +5644,56 @@
           "erledigt"
         ]
       },
+      "JetztAktualisierenAntwort": {
+        "type": "object",
+        "required": [
+          "phase"
+        ],
+        "properties": {
+          "phase": {
+            "$ref": "#/components/schemas/JetztPhase"
+          }
+        }
+      },
+      "JetztPhase": {
+        "type": "string",
+        "description": "Antwort-Phase von „Jetzt aktualisieren“.",
+        "enum": [
+          "laedt",
+          "bau_wartet",
+          "baut",
+          "aktuell"
+        ]
+      },
+      "KarteAktualisierung": {
+        "type": "object",
+        "description": "Phase und letzter Fehler einer Karte; nur Karten mit einem von beiden stehen in der Liste.",
+        "required": [
+          "karte_id"
+        ],
+        "properties": {
+          "fehler": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "karte_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "phase": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AktualisierungsPhase"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "KarteConfigAntwort": {
         "type": "object",
         "description": "Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —\nNICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,\n`frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.",
@@ -7158,9 +7274,14 @@
           {
             "type": "object",
             "required": [
-              "update_verfuegbar"
+              "update_verfuegbar",
+              "aktualisierbar"
             ],
             "properties": {
+              "aktualisierbar": {
+                "type": "boolean",
+                "description": "LFH-993: Heruntergeladene Karte (gemanagter Pfad) mit Quell-URL — nur sie kann „Jetzt\naktualisieren“ und die automatische Aktualisierung. Registrierte Karten fasst der Hub nicht\nan."
+              },
               "geladen": {
                 "type": [
                   "integer",

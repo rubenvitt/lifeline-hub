@@ -43,7 +43,9 @@ async fn main() -> anyhow::Result<()> {
             let reg_for_cron = registry.clone();
             // Finding (Task 11/13): benannt binden und über die gesamte serve-Dauer halten —
             // `let _ = ...` würde den JobScheduler sofort droppen und den Cron stoppen.
-            let _scheduler = scheduler::starte(&cfg.schedule, move || {
+            // LFH-993: Scheduler + Job-ID wandern zusätzlich in den AppState (`GET /zeitplan`); die
+            // Bindung hier hält ihn trotzdem über die ganze serve-Dauer.
+            let (cron_scheduler, cron_job) = scheduler::starte(&cfg.schedule, move || {
                 for r in regions::alle() {
                     let _ = reg_for_cron.enqueue(r.slug);
                 }
@@ -56,6 +58,10 @@ async fn main() -> anyhow::Result<()> {
                 storage,
                 runner,
                 bestand,
+                zeitplan: api::ZeitplanQuelle {
+                    cron: cfg.schedule.clone(),
+                    scheduler: Some((cron_scheduler.clone(), cron_job)),
+                },
             };
             axum::serve(listener, api::router(state)).await?;
             Ok(())

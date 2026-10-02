@@ -357,6 +357,27 @@ pub struct Config {
     )]
     pub kritis_extrakt: bool,
 
+    /// Vorgabe der automatischen Aktualisierung der Offline-Karten (LFH-993): lädt neuere
+    /// Katalog-Stände heruntergeladener Karten ohne Klick. **Vorgabe, solange in der
+    /// Verwaltung nichts gespeichert ist** — dort schaltet ein Admin sie ohne Neustart um.
+    #[arg(
+        long,
+        env = "LIFELINE_KARTEN_AUTO_AKTUALISIERUNG",
+        default_value_t = true,
+        action = clap::ArgAction::Set
+    )]
+    pub karten_auto_aktualisierung: bool,
+
+    /// Vorgabe des Prüfabstands der automatischen Aktualisierung in Stunden (1…168, LFH-993).
+    /// Gilt, solange in der Verwaltung nichts gespeichert ist.
+    #[arg(
+        long,
+        env = "LIFELINE_KARTEN_AUTO_AKTUALISIERUNG_INTERVALL_STUNDEN",
+        default_value_t = 6,
+        value_parser = clap::value_parser!(u64).range(1..=168)
+    )]
+    pub karten_auto_aktualisierung_intervall_stunden: u64,
+
     /// Quelle des KRITIS-Extrakts (eine `.osm.pbf`, nur https). Ein eigener Spiegel nimmt
     /// Geofabrik die Last, wenn viele Instanzen laufen.
     #[arg(
@@ -714,6 +735,44 @@ mod tests {
             &["lifeline-hub"],
         );
         assert_eq!(c.kritis_extrakt_intervall_stunden, 24);
+    }
+
+    /// LFH-993: Die Automatik der Offline-Karten ist per Vorgabe an (alle 6 h), auf beiden Wegen
+    /// abschaltbar, und der Prüfabstand bleibt in 1…168 Stunden.
+    #[test]
+    fn karten_auto_aktualisierung_vorgabe_an_und_abschaltbar() {
+        let c = parse_hermetisch(["lifeline-hub"]);
+        assert!(c.karten_auto_aktualisierung);
+        assert_eq!(c.karten_auto_aktualisierung_intervall_stunden, 6);
+        assert!(
+            !parse_hermetisch(["lifeline-hub", "--karten-auto-aktualisierung", "false"])
+                .karten_auto_aktualisierung
+        );
+        assert!(
+            !parse_mit_env(
+                "LIFELINE_KARTEN_AUTO_AKTUALISIERUNG",
+                "false",
+                &["lifeline-hub"]
+            )
+            .karten_auto_aktualisierung
+        );
+        let c = parse_mit_env(
+            "LIFELINE_KARTEN_AUTO_AKTUALISIERUNG_INTERVALL_STUNDEN",
+            "24",
+            &["lifeline-hub"],
+        );
+        assert_eq!(c.karten_auto_aktualisierung_intervall_stunden, 24);
+        for falsch in ["0", "169"] {
+            assert!(
+                try_parse_mit_env(
+                    "LIFELINE_KARTEN_AUTO_AKTUALISIERUNG_INTERVALL_STUNDEN",
+                    falsch,
+                    &["lifeline-hub"]
+                )
+                .is_err(),
+                "Prüfabstand {falsch} h liegt außerhalb 1…168"
+            );
+        }
     }
 
     #[test]

@@ -97,6 +97,10 @@ pub fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
+        auto_aktualisierung: lifeline_hub::karte::auto_aktualisierung::AutoAktualisierung::neu(
+            Default::default(),
+            lifeline_hub::karte::FachebenenState::neu().client,
+        ),
     }
 }
 

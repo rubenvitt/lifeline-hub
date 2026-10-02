@@ -253,20 +253,42 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
              Einsatzumgebung gehört der Schalter ausgeschaltet."
         );
     }
+    // LFH-993: Wächter der Offline-Karten; die Vorgabe gilt, solange in der Verwaltung nichts
+    // gespeichert ist.
+    let auto_vorgabe = lifeline_hub::karte::auto_aktualisierung::Einstellung {
+        automatisch: config.karten_auto_aktualisierung,
+        intervall_stunden: config.karten_auto_aktualisierung_intervall_stunden,
+    };
+    tracing::info!(
+        automatisch = auto_vorgabe.automatisch,
+        intervall_stunden = auto_vorgabe.intervall_stunden,
+        "Offline-Karten: Vorgabe der automatischen Aktualisierung (gilt, solange in der \
+         Verwaltung nichts gespeichert ist)"
+    );
+    let fachebenen = lifeline_hub::karte::FachebenenState::neu();
+    // Der kurz getimeboxte Fachebenen-Client holt auch das Katalog-Manifest (wie `offline_katalog`).
+    let auto_aktualisierung = lifeline_hub::karte::auto_aktualisierung::AutoAktualisierung::neu(
+        auto_vorgabe,
+        fachebenen.client.clone(),
+    );
+    let state = AppState {
+        pool,
+        live,
+        fachebenen,
+        karten_dir,
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: config.karten_service_url.clone(),
+        karten_service_token: config
+            .karten_service_token
+            .as_ref()
+            .map(|t| t.als_str().to_string()),
+        auto_aktualisierung,
+    };
+    // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
+    lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());
     let app = build_router_mit(
-        AppState {
-            pool,
-            live,
-            fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-            karten_dir,
-            download_client: lifeline_hub::karte::download::download_client(),
-            download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-            karten_service_url: config.karten_service_url.clone(),
-            karten_service_token: config
-                .karten_service_token
-                .as_ref()
-                .map(|t| t.als_str().to_string()),
-        },
+        state,
         RouterOptionen {
             demo_daten: config.demo_daten,
         },

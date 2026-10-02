@@ -582,7 +582,9 @@ type AdminKarteBereich =
   | 'baubare-regionen'
   | 'offline-katalog'
   | 'offline-vorhandene'
-  | 'online-quellen';
+  | 'online-quellen'
+  // LFH-993: Status der automatischen Aktualisierung der Offline-Karten.
+  | 'aktualisierung';
 
 /**
  * Typisierte Key-Factory für alle nicht-einsatz-scoped Queries. Wie bei {@link einsatzKeys} ist

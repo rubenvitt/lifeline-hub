@@ -40,19 +40,6 @@ interface OfflineDownloadBody {
   ersetzt_karte_id?: number;
 }
 
-/**
- * Body für den In-Place-Reload: lädt ein Update der bestehenden Karte in DIESELBE Zeile/Datei.
- * Name/Lizenz bleiben; anders als `ersetzt_karte_id` (neue Zeile) bleibt die id stabil, und die
- * alte Datei wird bis zum atomaren Swap weiter ausgeliefert.
- */
-interface OfflineNeuLadenBody {
-  url: string;
-  /** Erwartete Größe (Bytes) — Plattenplatz-Vorabcheck. */
-  groesse_erwartet?: number;
-  /** Erwarteter SHA256 (hex) aus dem Katalog-Pin — Backend verifiziert beim Download. */
-  sha256_erwartet?: string;
-}
-
 /** Ein kuratierter, herunterladbarer Vorschlag (Server-autoritativ). */
 export type OfflineKatalogEintrag = S['OfflineKatalogEintrag'];
 
@@ -62,14 +49,6 @@ export function listeOfflineKarten(): Promise<OfflineKarte[]> {
 
 export function starteOfflineDownload(body: OfflineDownloadBody): Promise<OfflineKarteZeile> {
   return apiSend<OfflineKarteZeile>('/api/karte/offline-karten/download', 'POST', body);
-}
-
-/** In-Place-Hot-Swap: Update der aktiven Karte in dieselbe Zeile, downtime-frei. */
-export function neuLadeOfflineKarte(
-  id: number,
-  body: OfflineNeuLadenBody,
-): Promise<OfflineKarteZeile> {
-  return apiSend<OfflineKarteZeile>(`/api/karte/offline-karten/${id}/neu-laden`, 'POST', body);
 }
 
 export function brecheOfflineDownloadAb(id: number): Promise<void> {
@@ -138,4 +117,48 @@ export function ladeBaubareRegionen(): Promise<BaubareRegion[]> {
 /** Lädt den Build-Status (u.a. laufende/abgeschlossene Jobs) zum Polling im Admin-UI. */
 export function ladeBauStatus(): Promise<BauJob[]> {
   return apiGet<BauJob[]>('/api/karte/offline-karten/bau-status');
+}
+
+// ===== Automatische Aktualisierung (LFH-993) =====
+
+/** Status der Automatik: Einstellung, letzte/nächste Prüfung, nächster Kartenbau, Phase je Karte. */
+export type AktualisierungsStatus = S['AktualisierungsStatus'];
+
+/** Phase und letzter Fehler einer Karte (nur Karten mit einem von beiden stehen im Status). */
+export type KarteAktualisierung = S['KarteAktualisierung'];
+
+/** Laufende Phase einer Karte: Neubau wartet, baut, wird veröffentlicht, lädt. */
+export type AktualisierungsPhase = S['AktualisierungsPhase'];
+
+/** Antwort-Phase von „Jetzt aktualisieren“. */
+export type JetztPhase = S['JetztPhase'];
+
+/** Body der Einstellung (Admin): an/aus und Prüfabstand in Stunden (1…168). */
+export interface AutoAktualisierungBody {
+  automatisch: boolean;
+  intervall_stunden: number;
+}
+
+export function ladeAktualisierungsStatus(): Promise<AktualisierungsStatus> {
+  return apiGet<AktualisierungsStatus>('/api/karte/offline-karten/aktualisierung');
+}
+
+/** Lädt einen vorhandenen neueren Stand oder stößt einen Neubau an, dessen Ergebnis der Server
+ *  danach selbst lädt. */
+export function starteJetztAktualisieren(id: number): Promise<S['JetztAktualisierenAntwort']> {
+  return apiSend<S['JetztAktualisierenAntwort']>(
+    `/api/karte/offline-karten/${id}/jetzt-aktualisieren`,
+    'POST',
+  );
+}
+
+/** Speichert die Einstellung; die Antwort ist der aktuelle Status. */
+export function speichereAutoAktualisierung(
+  body: AutoAktualisierungBody,
+): Promise<AktualisierungsStatus> {
+  return apiSend<AktualisierungsStatus>(
+    '/api/karte/offline-karten/aktualisierung/einstellung',
+    'PUT',
+    body,
+  );
 }
