@@ -358,9 +358,9 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
         name: 'Verbleib / Entlassung erfassen — R-006 · unbekannt',
       });
       expect(ausloeser, `Wartebereich, Breite ${breite}`).toBeInTheDocument();
-      // Die Ikone darf kein eigenes Vorleseziel sein (antd-Icons bringen `role="img"` mit
+      // Das Icon darf kein eigenes Vorleseziel sein (antd-Icons bringen `role="img"` mit
       // englischem `aria-label`); die `aria-hidden`-Hülle nimmt sie aus dem Baum.
-      expect(within(ausloeser).queryByRole('img'), `Ikone stumm, Breite ${breite}`).toBeNull();
+      expect(within(ausloeser).queryByRole('img'), `Icon stumm, Breite ${breite}`).toBeNull();
       expect(
         screen.getByRole('button', { name: 'Verbleib / Entlassung erfassen — R-005 · unbekannt' }),
         `Noch nicht aufgenommen, Breite ${breite}`,

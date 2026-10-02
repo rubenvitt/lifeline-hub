@@ -44,7 +44,7 @@ import {
   teilStand,
   type TeilStand,
 } from './wetterStand';
-import { wetterSymbolIkone } from './wetterSymbol';
+import { wetterSymbolIcon } from './wetterSymbol';
 import {
   druckText,
   ergaenztVon,
@@ -412,7 +412,7 @@ function Messwerte({ a }: { a: WetterAktuell }) {
   const { token, rollen } = useRollen();
   const von = (g: Parameters<typeof ergaenztVon>[1]) => ergaenztVon(a.ergaenzt, g);
   const richtung = himmelsrichtung(a.windrichtung_grad);
-  const SymbolIkone = wetterSymbolIkone(a.symbol);
+  const SymbolIcon = wetterSymbolIcon(a.symbol);
   /** Wert eines Datenfelds, bei Ergänzung mit der Station darunter. */
   const wert = (text: ReactNode, herkunft: string | null) => (
     <span style={{ display: 'grid', gap: 2 }}>
@@ -453,7 +453,7 @@ function Messwerte({ a }: { a: WetterAktuell }) {
         <Datenfeld label="Wetterlage">
           {wert(
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
-              {SymbolIkone && <SymbolIkone />}
+              {SymbolIcon && <SymbolIcon />}
               {wetterSymbolWort(a.symbol)}
             </span>,
             von('wetterlage'),

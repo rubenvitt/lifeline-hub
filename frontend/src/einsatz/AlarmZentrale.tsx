@@ -1,10 +1,10 @@
 import {
-  IkoneGlocke,
-  IkoneGlockeAus,
-  IkoneHakenKreis,
-  IkoneMonitor,
-  IkoneVerbotsschild,
-} from '../ikonen';
+  IconGlocke,
+  IconGlockeAus,
+  IconHakenKreis,
+  IconMonitor,
+  IconVerbotsschild,
+} from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { alsZeitpunkt, zuWanduhr } from '../anzeige/zeitEingabe';
 import { App, Button, Dropdown, Tooltip } from 'antd';
@@ -551,7 +551,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
 
   // Die Breitenfrage stellt `useViewport`. Unter `md` bündelt die Zentrale zu EINEM Ziel (siehe
   // unten). Zwischen `md` und `xl` (Führungs-Tablet) bleiben es zwei Knöpfe, der RUHEZUSTAND steht
-  // aber nur als Ikone — die Wörter brachen die Kopfzeile bei 1024 px auf zwei Zeilen. Eine
+  // aber nur als Icon — die Wörter brachen die Kopfzeile bei 1024 px auf zwei Zeilen. Eine
   // STÖRUNG („Ton stumm/blockiert", „Desktop blockiert") trägt ihr Wort auf jeder Breite; Wort und
   // Warnfarbe hängen an derselben Bedingung.
   const { istSchmal, abBreite } = useViewport();
@@ -588,26 +588,26 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       : 'Alarmton stummschalten';
 
   // Einmal abgeleitet, von BEIDEN Bauformen benutzt, damit dasselbe Zeichen an zwei Orten dasselbe
-  // heißt. `aria-hidden` bleibt als zweite Sicherung, obwohl die Ikone des Satzes selbst
+  // heißt. `aria-hidden` bleibt als zweite Sicherung, obwohl das Icon des Satzes selbst
   // `aria-hidden` ist (LFH-595): antds Menü hängt keins davor, und mit einem Namen hieße der
   // Eintrag „stop Desktop blockiert".
-  const desktopIkone =
+  const desktopIcon =
     desktop === 'erlaubt' ? (
-      <IkoneHakenKreis />
+      <IconHakenKreis />
     ) : desktop === 'browser-blockiert' ? (
-      <IkoneVerbotsschild />
+      <IconVerbotsschild />
     ) : (
-      <IkoneMonitor />
+      <IconMonitor />
     );
   // Die Glocke trägt KEINEN Marker (LFH-513): ein roter Punkt an „Ton bereit" verbrauchte die
   // Alarmfarbe für eine Nichtmeldung. Die Störung trägt Form (durchgestrichen) und Wort, die
-  // Farbe erbt die Ikone vom Knopf (`alarmKnopfFarbe`) bzw. vom Menüeintrag.
-  const tonIkone = gemutet || tonStatus === 'blockiert' ? <IkoneGlockeAus /> : <IkoneGlocke />;
+  // Farbe erbt das Icon vom Knopf (`alarmKnopfFarbe`) bzw. vom Menüeintrag.
+  const tonIcon = gemutet || tonStatus === 'blockiert' ? <IconGlockeAus /> : <IconGlocke />;
 
   if (istSchmal) {
     // ── EIN Ziel statt zwei auf dem Handschirm ────────────────────────────────
     // Auf 390 px bekommt die Aktionsreihe 180 px, zwei beschriftete Knöpfe brauchen 286 und brächen
-    // um. Nur-Ikone ist gesperrt („blockiert"/„stumm" muss benannt bleiben), `nowrap` ebenso. Also
+    // um. Nur-Icon ist gesperrt („blockiert"/„stumm" muss benannt bleiben), `nowrap` ebenso. Also
     // bündeln: die Marke NENNT den Zustand, beide Steuerungen liegen beschriftet im Menü.
     //
     // Der hörbare Kanal geht vor: ein stummer Alarm ist schwerer zu bemerken als eine fehlende
@@ -632,12 +632,12 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           items: [
             {
               key: 'desktop',
-              icon: desktopIkone,
+              icon: desktopIcon,
               label: desktopHinweis,
               // Wie am breiten Knopf: nur `aus` ist vom Browser aus änderbar.
               disabled: desktop !== 'aus',
             },
-            { key: 'ton', icon: tonIkone, label: tonHinweis },
+            { key: 'ton', icon: tonIcon, label: tonHinweis },
           ],
           // Die Zuordnung hängt am MENÜ, nicht je Eintrag — ein Ort für einen etwaigen Riegel.
           onClick: ({ key }) => {
@@ -650,7 +650,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           type="text"
           // Der zugängliche Name trägt Gruppe UND Zustand.
           aria-label={`Alarmzentrale: ${sammelText}`}
-          icon={zeigtTon ? tonIkone : desktopIkone}
+          icon={zeigtTon ? tonIcon : desktopIcon}
           style={{
             color: alarmKnopfFarbe(zeigtTon ? tonAuffaellig : desktop === 'browser-blockiert'),
             fontSize: 12,
@@ -676,7 +676,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
           aria-label={`Desktop-Benachrichtigungen: ${desktopText.replace('Desktop ', '')}`}
           aria-disabled={desktop !== 'aus'}
           onClick={desktop === 'aus' ? desktopAktivieren : undefined}
-          icon={desktopIkone}
+          icon={desktopIcon}
           style={{ color: alarmKnopfFarbe(desktopAuffaellig), fontSize: 12 }}
         >
           {desktopWort}
@@ -692,7 +692,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
             color: alarmKnopfFarbe(tonAuffaelligBreit),
             fontSize: 12,
           }}
-          icon={tonIkone}
+          icon={tonIcon}
         >
           {tonWort}
         </Button>

@@ -1,4 +1,4 @@
-import { IkoneBueroklammer } from '../ikonen';
+import { IconBueroklammer } from '../icons';
 import { Button, Input, Space, Upload } from 'antd';
 import type { UploadFile } from 'antd';
 import { useState } from 'react';
@@ -52,7 +52,7 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
         onChange={({ fileList }) => setDateien(fileList)}
         style={{ marginTop: 8 }}
       >
-        <Button type="text" icon={<IkoneBueroklammer />}>
+        <Button type="text" icon={<IconBueroklammer />}>
           Anhang
         </Button>
       </Upload>

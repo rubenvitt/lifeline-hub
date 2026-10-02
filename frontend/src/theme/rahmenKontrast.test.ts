@@ -9,7 +9,7 @@ import { farbenDunkel, rahmenFarben } from './tokens';
  * gelesen. Die Schwelle aus Kriterium 5 folgt dem Umgebungslicht, nicht dem Farbtoken: bedienbarer
  * Text auf dem Rahmen hält die TAG-Schwelle ≥ 7 : 1 auf jedem Rahmengrund. Gesperrte Einträge
  * (WCAG 1.4.3 nimmt inaktive Komponenten aus) halten den Boden ≥ 4,5 : 1 und tragen die Sperre
- * zusätzlich ohne Farbe (Schloss-Ikone, `AppLayout.tsx`). Böden als Literale.
+ * zusätzlich ohne Farbe (Schloss-Icon, `AppLayout.tsx`). Böden als Literale.
  */
 
 /** Jeder Grund, auf dem im Rahmen Text steht: Leiste/Rail, Suchfeld, aktive Rail-Zeile. */

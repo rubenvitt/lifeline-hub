@@ -1,7 +1,7 @@
 /**
  * Titel einer Fachebenen-Meldung als reiner Text (LFH-812): dieselbe Ableitung für den Kopf des
  * `FachebenenInspector` und die Einträge des Flächen-Auswahlmenüs. Ohne Zeichen — ein Emoji ist
- * keine Ikone; der Inspector setzt sein Wetterzeichen selbst davor.
+ * kein Icon; der Inspector setzt sein Wetterzeichen selbst davor.
  */
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import { FACHEBENEN } from './fachebenen';

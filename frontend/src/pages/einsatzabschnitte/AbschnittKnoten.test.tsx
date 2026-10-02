@@ -87,9 +87,9 @@ describe('AbschnittKnoten', () => {
     expect(normalisiere(punkt.style.backgroundColor)).toBe(normalisiere(sonde.dataset.achtung));
   });
 
-  it('versteckt die Ikonen vor dem Vorleser — die Gruppe heißt nach dem Namen, nicht nach „user"', () => {
+  it('versteckt die Icons vor dem Vorleser — die Gruppe heißt nach dem Namen, nicht nach „user"', () => {
     renderKnoten(nord);
-    // Genau EIN role=img: der Führungspunkt. Die antd-Ikonen (user/phone) dürfen keinen eigenen liefern.
+    // Genau EIN role=img: der Führungspunkt. Die antd-Icons (user/phone) dürfen keinen eigenen liefern.
     expect(screen.getAllByRole('img')).toHaveLength(1);
   });
 });

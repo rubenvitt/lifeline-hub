@@ -1,4 +1,4 @@
-import { IkoneHaus } from '../ikonen';
+import { IconHaus } from '../icons';
 import { describe, expect, it } from 'vitest';
 import type { ModulFreigaben } from '../api/types';
 import type { ModulEintrag } from '../einsatz/modulRegistry';
@@ -12,7 +12,7 @@ const stub = (over: Partial<ModulEintrag>): ModulEintrag => ({
   key: 'x',
   kategorie: 'fuehrung',
   label: 'X',
-  icon: IkoneHaus,
+  icon: IconHaus,
   route: 'x',
   status: 'fertig',
   ...over,

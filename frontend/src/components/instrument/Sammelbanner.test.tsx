@@ -27,9 +27,9 @@ describe('Sammelbanner', () => {
     expect(screen.getByText('3 neue Meldungen')).toHaveStyle({ color: farbenHell.bedienText });
   });
 
-  it('die Ikone ist kein eigenes Vorleseziel', () => {
+  it('das Icon ist kein eigenes Vorleseziel', () => {
     renderMitProviders(<Sammelbanner>1 neue Meldung</Sammelbanner>);
-    // antds Ikone bringt role="img" mit englischem Namen — die Hülle blendet sie aus.
+    // antds Icon bringt role="img" mit englischem Namen — die Hülle blendet es aus.
     expect(screen.queryByRole('img')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
   });
@@ -73,7 +73,7 @@ describe('Sammelbanner', () => {
       expect(satz.closest('button')).toBeNull();
     });
 
-    it('Grund, Kante und Ikone wie die lange Form', () => {
+    it('Grund, Kante und Icon wie die lange Form', () => {
       renderMitProviders(
         <Sammelbanner kurz="umgeordnet" aktion={{ label: 'anzeigen', onKlick: vi.fn() }}>
           Reihenfolge geändert

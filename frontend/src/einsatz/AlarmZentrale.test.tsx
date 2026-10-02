@@ -483,7 +483,7 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
 
 /**
  * Die Kopfzeile auf dem Handschirm: zwei beschriftete Ziele passen auf 390 px nicht (180 px
- * verfügbar, 286 nötig) und brächen um. Die Beschriftung darf nicht zur Ikone werden, deshalb
+ * verfügbar, 286 nötig) und brächen um. Die Beschriftung darf nicht zum Icon werden, deshalb
  * EIN Ziel mit Sammelbeschriftung, die den nötigen Zustand nennt, und beide Steuerungen
  * beschriftet im Menü. Ab `md` bleiben es zwei Knöpfe; `test/viewport.ts` steht per Vorgabe auf
  * 1024 px.
@@ -539,7 +539,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(menue, 'das Menü muss offen sein').not.toBeNull();
 
     const eintrag = within(menue).getByRole('menuitem', { name: /aktivieren/ });
-    // Kein antd-Ikonenname im zugänglichen Namen (antds Menü hängt kein `aria-hidden` davor).
+    // Kein antd-Iconname im zugänglichen Namen (antds Menü hängt kein `aria-hidden` davor).
     expect(eintrag.textContent).not.toMatch(/desktop-outlined|check-circle|^stop/i);
     await userEvent.click(eintrag);
     expect(NotificationMock.requestPermission).toHaveBeenCalledOnce();
@@ -610,7 +610,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
  * ihr Wort, das genügt WCAG 1.4.1 ohne Farbe. Mutationsprobe: den `<Badge dot status="error">` um
  * die gesunde Glocke zurücklegen → die Marker-Aussagen hier werden rot.
  */
-describe('AlarmZentrale: Ton-Ikone ohne Marker im Ruhezustand (LFH-513)', () => {
+describe('AlarmZentrale: Ton-Icon ohne Marker im Ruhezustand (LFH-513)', () => {
   afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
 
   /** Jeder antd-Badge-Marker, gleich welcher Status — nicht nur der rote. */
@@ -618,9 +618,9 @@ describe('AlarmZentrale: Ton-Ikone ohne Marker im Ruhezustand (LFH-513)', () => 
     return wurzel.querySelectorAll('.ant-badge, .ant-badge-dot, .ant-badge-status-dot');
   }
 
-  function ikone(knopf: HTMLElement): string {
+  function icon(knopf: HTMLElement): string {
     const svg = knopf.querySelector('svg');
-    expect(svg, 'der Knopf trägt eine Ikone').not.toBeNull();
+    expect(svg, 'der Knopf trägt ein Icon').not.toBeNull();
     return svg!.innerHTML;
   }
 
@@ -635,12 +635,12 @@ describe('AlarmZentrale: Ton-Ikone ohne Marker im Ruhezustand (LFH-513)', () => 
       const bereit = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
       await waitFor(() => expect(bereit).toHaveAttribute('aria-pressed', 'false'));
       expect(marker(bereit)).toHaveLength(0);
-      const formBereit = ikone(bereit);
+      const formBereit = icon(bereit);
 
       await userEvent.click(bereit);
       const stumm = screen.getByRole('button', { name: 'Alarmton einschalten' });
       // Zwei Kanäle ohne Farbe: die Form wechselt, das Wort steht auf jeder Breite.
-      expect(ikone(stumm)).not.toBe(formBereit);
+      expect(icon(stumm)).not.toBe(formBereit);
       expect(stumm).toHaveTextContent('Ton stumm');
       expect(marker(stumm)).toHaveLength(0);
     },
@@ -667,7 +667,7 @@ describe('AlarmZentrale: Ton-Ikone ohne Marker im Ruhezustand (LFH-513)', () => 
 });
 
 /**
- * Führungs-Tablet zwischen `md` und `xl`: zwei Knöpfe, der RUHEZUSTAND nur als Ikone, eine
+ * Führungs-Tablet zwischen `md` und `xl`: zwei Knöpfe, der RUHEZUSTAND nur als Icon, eine
  * STÖRUNG nennt ihr Wort weiter. Beide Hälften als Paar.
  */
 describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {

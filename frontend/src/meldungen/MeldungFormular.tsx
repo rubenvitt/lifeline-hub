@@ -1,4 +1,4 @@
-import { IkoneBlitz, IkonePapierflieger } from '../ikonen';
+import { IconBlitz, IconPapierflieger } from '../icons';
 import { Button, Col, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
@@ -170,10 +170,10 @@ export default function MeldungFormular({
     >
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       <Space style={{ marginBottom: 16 }} wrap>
-        <Button danger icon={<IkoneBlitz />} onClick={sofortVorbelegen}>
+        <Button danger icon={<IconBlitz />} onClick={sofortVorbelegen}>
           Sofortmeldung
         </Button>
-        <Button icon={<IkonePapierflieger />} onClick={lagemeldungVorbelegen}>
+        <Button icon={<IconPapierflieger />} onClick={lagemeldungVorbelegen}>
           Lagemeldung (extern)
         </Button>
       </Space>

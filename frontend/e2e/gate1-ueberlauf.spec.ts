@@ -15,7 +15,7 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
       await page.goto(`/einsaetze/${einsatzId}/etb`);
       await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
       // Name = Einsatzname. Bis LFH-595 hängte antds DownOutlined sein `aria-label` („down“) an;
-      // die Ikonen des Satzes sind `aria-hidden`.
+      // die Icons des Satzes sind `aria-hidden`.
       const wechsler = page.locator('header').getByRole('button', { name: 'A', exact: true });
       await expect(wechsler).toBeVisible();
       expect
@@ -129,7 +129,7 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
               stufe === 'handschuh' ? 288 : stufe === 'komfortabel' ? 192 : 120,
             );
             /*
-             * Einzeilig auf dem Führungs-Tablet: bei 1024 px stehen Ruhezustände nur als Ikone.
+             * Einzeilig auf dem Führungs-Tablet: bei 1024 px stehen Ruhezustände nur als Icon.
              * Geprüft nur in `kompakt`, dem einzigen deterministischen Fall: headless meldet der
              * Browser „Desktop blockiert" und der Strom oft „VERBINDE" — Störungen, die ihr
              * Wort behalten und den Kopf in größeren Stufen umbrechen dürfen. Den Ruhezustand
@@ -1108,7 +1108,7 @@ test.describe('Gate 1', () => {
           const knopf = kurz.closest('button')!;
           const k = knopf.getBoundingClientRect();
           return {
-            // Der Text selbst kürzt nicht; zu eng wird es, wenn Ikone und Text über die
+            // Der Text selbst kürzt nicht; zu eng wird es, wenn Icon und Text über die
             // Polsterung des Knopfes hinausragen.
             gekuerzt: kurz.scrollWidth > kurz.clientWidth || knopf.scrollWidth > knopf.clientWidth,
             knopfLinks: k.left,

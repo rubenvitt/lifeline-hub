@@ -110,7 +110,7 @@ describe('BemerkungZelle', () => {
     expect(knopf).not.toHaveClass('ant-btn-sm');
     expect(knopf).toHaveAccessibleDescription('gehfähig');
     expect(knopf).toHaveTextContent('gehfähig');
-    // Die Stift-Ikone ist kein eigenes Vorleseziel (`role="img"` mit englischem Namen).
+    // Das Stift-Icon ist kein eigenes Vorleseziel (`role="img"` mit englischem Namen).
     expect(within(knopf).queryByRole('img')).toBeNull();
     // Der Klick auf den WERT öffnet — nicht nur ein Ikonknopf daneben.
     await userEvent.click(within(knopf).getByText('gehfähig'));
