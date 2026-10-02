@@ -18,8 +18,8 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 3. Zeitrechnung und Zustand (D1, D6)
 
-- [ ] 3.1 `retention::skelett_loeschung_am(abgeschlossen_at, geschwaerzt_at, skelett_dauer_tage) -> Option<String>` (Maximum aus Abschluss + N und Schwärzung, `None` ohne N oder bei unparsebarem Abschluss) und `skelett_loeschung_faellig(…, jetzt) -> bool` (nur geschwärzt, defensiv `false` bei unparsebaren Werten). Verifikation: Unit-Tests für Grenze genau bei `jetzt`, für eine Schwärzung nach Abschluss + N und für fehlende Werte
-- [ ] 3.2 `AufbewahrungZustand` um `LoeschungAusstehend`/`EndgueltigGeloescht` erweitern, und `retention::zustand` bekommt die Skelett-Frist (`loeschung_ausstehend` vor `geschwaerzt`). Alle Aufrufer nachziehen (`aufbewahrung::repo`). Verifikation: Die bestehenden Zustandstests bleiben grün, und neue Tests für `loeschung_ausstehend` sowie „ohne Org-Frist bleibt `geschwaerzt`“ sind grün
+- [x] 3.1 `retention::skelett_loeschung_am(abgeschlossen_at, geschwaerzt_at, skelett_dauer_tage) -> Option<String>` (Maximum aus Abschluss + N und Schwärzung, `None` ohne N oder bei unparsebarem Abschluss) und `skelett_loeschung_faellig(…, jetzt) -> bool` (nur geschwärzt, defensiv `false` bei unparsebaren Werten). Verifikation: Unit-Tests für Grenze genau bei `jetzt`, für eine Schwärzung nach Abschluss + N und für fehlende Werte
+- [x] 3.2 `AufbewahrungZustand` um `LoeschungAusstehend`/`EndgueltigGeloescht` erweitern, und `retention::zustand` bekommt die Skelett-Frist (`loeschung_ausstehend` vor `geschwaerzt`). Alle Aufrufer nachziehen (`aufbewahrung::repo`). Verifikation: Die bestehenden Zustandstests bleiben grün, und neue Tests für `loeschung_ausstehend` sowie „ohne Org-Frist bleibt `geschwaerzt`“ sind grün
 
 ## 4. Löschung, Protokoll und Sperren (D3, D4, D5)
 

@@ -35,13 +35,20 @@ pub struct KopfZeile {
 }
 
 impl KopfZeile {
-    /// Aufbewahrungszustand zu `jetzt`; `None` für aktive Einsätze.
-    pub fn zustand(&self, jetzt: DateTime<Utc>) -> Option<AufbewahrungZustand> {
+    /// Aufbewahrungszustand zu `jetzt` unter der Skelett-Frist der Org (LFH-750); `None` für
+    /// aktive Einsätze.
+    pub fn zustand(
+        &self,
+        skelett_dauer_tage: Option<i64>,
+        jetzt: DateTime<Utc>,
+    ) -> Option<AufbewahrungZustand> {
         zustand(
             &self.status,
             self.retention_bis.as_deref(),
             self.geloescht_at.as_deref(),
             self.geschwaerzt_at.as_deref(),
+            self.abgeschlossen_at.as_deref(),
+            skelett_dauer_tage,
             jetzt,
         )
     }
@@ -136,6 +143,7 @@ pub async fn uebersicht(
     org_id: i64,
     jetzt: DateTime<Utc>,
 ) -> Result<Vec<AufbewahrungEintragAnzeige>, AppError> {
+    let skelett_dauer_tage = skelett_dauer_tage(pool, org_id).await?;
     let sql = format!(
         "{} WHERE k.org_id = ? AND k.status = ? ORDER BY k.abgeschlossen_at DESC, k.id DESC",
         kopf_select()
@@ -148,7 +156,7 @@ pub async fn uebersicht(
     Ok(zeilen
         .into_iter()
         .filter_map(|k| {
-            let zustand = k.zustand(jetzt)?;
+            let zustand = k.zustand(skelett_dauer_tage, jetzt)?;
             Some(AufbewahrungEintragAnzeige {
                 einsatz_id: k.id,
                 einsatznummer_intern: k.einsatznummer_intern,
@@ -173,6 +181,13 @@ fn register_sql(p: &super::projektion::Projektion) -> String {
     )
 }
 
+/// Skelett-Frist der Org in Tagen ab Abschluss (LFH-750); `None` = das Skelett bleibt.
+async fn skelett_dauer_tage(pool: &SqlitePool, org_id: i64) -> Result<Option<i64>, AppError> {
+    Ok(crate::org::einstellungen::laden_oder_default(pool, org_id)
+        .await?
+        .skelett_dauer_tage)
+}
+
 /// Baut die Archivakte zu einem bereits geladenen, zugriffsgeprüften Kopf.
 /// Fehler, wenn der Einsatz aktiv ist (kein Aufbewahrungszustand).
 pub async fn akte(
@@ -180,8 +195,9 @@ pub async fn akte(
     kopf: &KopfZeile,
     jetzt: DateTime<Utc>,
 ) -> Result<ArchivAkteAnzeige, AppError> {
+    let skelett_dauer_tage = skelett_dauer_tage(pool, kopf.org_id).await?;
     let zustand = kopf
-        .zustand(jetzt)
+        .zustand(skelett_dauer_tage, jetzt)
         .ok_or_else(|| AppError::Conflict("Einsatz ist nicht abgeschlossen".into()))?;
     let personen = sqlx::query_as::<_, PersonZeile>(AssertSqlSafe(register_sql(&PERSON)))
         .bind(kopf.id)
