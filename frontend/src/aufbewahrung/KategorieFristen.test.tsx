@@ -125,6 +125,25 @@ describe('KategorieFristen', () => {
       },
     });
     zeige(ME_ADMIN, 'abgeschlossen');
+    // Antwort des Servers: die Kategorie läuft wieder mit der neuen Frist.
+    server.use(
+      http.put('/api/einsaetze/1/aufbewahrungsfrist/:kategorie', async ({ request, params }) => {
+        gesendet.push({
+          kategorie: String(params.kategorie),
+          body: (await request.json()) as Record<string, unknown>,
+        });
+        return HttpResponse.json(
+          liste({
+            anhaenge: {
+              zustand: 'frist_laeuft',
+              frist_bis: wire('2099-01-01 12:00'),
+              rechtsgrundlage: 'RG',
+            },
+          }),
+        );
+      }),
+    );
+    expect(await screen.findByText(/Karenz bis/)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Frist Anhänge ändern' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(/nimmt die Vormerkung zurück/)).toBeInTheDocument();
@@ -135,6 +154,10 @@ describe('KategorieFristen', () => {
       body: { retention_bis: wire('2099-01-01 12:00'), rechtsgrundlage: 'RG' },
     });
     expect(screen.queryByText('Frist der Datenkategorie verkürzen?')).not.toBeInTheDocument();
+    // Spec: danach `frist_laeuft` mit der neuen Frist, Vormerkung und Karenz sind weg.
+    expect(await screen.findByText('Frist läuft')).toBeInTheDocument();
+    expect(screen.queryByText('zur Löschung vorgemerkt')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Karenz bis/)).not.toBeInTheDocument();
   });
 
   it('Verkürzen fragt zuerst und sendet dann bestaetigt: true', async () => {

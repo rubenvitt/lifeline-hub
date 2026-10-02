@@ -11,7 +11,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
-import { Datenfeld, Datenraster } from '../components/instrument';
+import { Datenfeld, Datenraster, monoStil } from '../components/instrument';
 import { aufbewahrungZustand } from '../theme/statusFarben';
 import { fristAusEingabe, istFristverkuerzung } from './fristModell';
 import { KATEGORIE_TEXT, vorgabeSatz } from './kategorieText';
@@ -55,6 +55,8 @@ export function KategorieWert({
   aktiv: boolean;
 }) {
   const { token } = theme.useToken();
+  // Zeiten immer Mono mit `tabular-nums` (frontend/AGENTS.md, Gestaltungssprache).
+  const zeitStil = monoStil(13);
   return (
     <Flex vertical gap={token.marginXXS}>
       <Flex gap={token.marginXS} wrap align="center">
@@ -63,15 +65,24 @@ export function KategorieWert({
           <span>{vorgabeSatz(eintrag.dauer_tage_vorgabe)}</span>
         ) : eintrag.geschwaerzt_at ? (
           <span>
-            geschwärzt am <ZeitAnzeige wert={eintrag.geschwaerzt_at} />
+            geschwärzt am{' '}
+            <span style={zeitStil}>
+              <ZeitAnzeige wert={eintrag.geschwaerzt_at} />
+            </span>
           </span>
         ) : eintrag.frist_bis ? (
           <span>
-            Frist <ZeitAnzeige wert={eintrag.frist_bis} />
+            Frist{' '}
+            <span style={zeitStil}>
+              <ZeitAnzeige wert={eintrag.frist_bis} />
+            </span>
             {eintrag.karenz_ende && (
               <>
                 {' '}
-                · Karenz bis <ZeitAnzeige wert={eintrag.karenz_ende} />
+                · Karenz bis{' '}
+                <span style={zeitStil}>
+                  <ZeitAnzeige wert={eintrag.karenz_ende} />
+                </span>
               </>
             )}
           </span>
@@ -169,7 +180,6 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
                 {!aktiv && aenderbar(eintrag) && (
                   <Flex gap={token.marginSM} wrap>
                     <Button
-                      size="small"
                       disabled={!darf}
                       aria-label={`Frist ${text.bezeichnung} ändern`}
                       onClick={() => {
@@ -181,7 +191,6 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
                     </Button>
                     {eintrag.frist_bis && (
                       <Button
-                        size="small"
                         disabled={!darf || mutation.isPending}
                         aria-label={`Frist ${text.bezeichnung} aufheben`}
                         onClick={() =>

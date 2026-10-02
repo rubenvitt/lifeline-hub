@@ -13,6 +13,10 @@ import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
  * Geteilte Form-Logik der Org-Einstellungs-Sektionen. KRITISCH: `PUT /api/org-einstellungen` ist
  * Vollersatz. Jede Sektion speichert `{ ...zuUpdate(geladeneDaten), ...normalisiere<Sektion>(form)
  * }` — so nullt ein Anzeige-Save nie die Einsatz-Default-Spalten.
+ *
+ * **Ausnahme `aufbewahrung_kategorien`** (LFH-749, design.md D8): die Liste ist KEIN Vollersatz —
+ * fehlt das Feld, bleibt sie am Server unverändert. `zuUpdate` lässt sie deshalb weg; nur die
+ * Sektion „Einsatz-Defaults“ schickt sie über {@link normalisiereEinsatz} mit.
  */
 
 /** Anzeige-Sektion: Darstellungs-Defaults + Geocoder. */
@@ -45,7 +49,8 @@ export interface KategorieFormWert {
   rechtsgrundlage?: string;
 }
 
-/** Voller Update-Payload aus dem geladenen Zustand — Basis für den Vollersatz-Merge-Save. */
+/** Voller Update-Payload aus dem geladenen Zustand — Basis für den Vollersatz-Merge-Save. Ohne
+ *  `aufbewahrung_kategorien` (kein Vollersatz, siehe Dateikopf). */
 export function zuUpdate(e: OrgEinstellungen): OrgEinstellungenUpdate {
   return {
     zeitzone: e.zeitzone ?? null,
