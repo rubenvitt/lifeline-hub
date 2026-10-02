@@ -4,7 +4,7 @@ import type { Eigenposition } from './useEigenposition';
 
 /**
  * Kamerabewegungen der Lagekarte: wer hat bewegt? (LFH-766,
- * `openspec/changes/lfh-766-eigenposition-anflug-genauigkeit/design.md` D1/D2)
+ * `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md` D1/D2)
  *
  * MapLibre setzt `originalEvent` nur bei Gesten, Rad und Tastatur. Die Knöpfe der Überlagerung,
  * „Bild einpassen“ und der Bündel-Tipp rufen die Kamera programmatisch — für MapLibre sähen sie aus

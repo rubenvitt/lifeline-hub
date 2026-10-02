@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * Jeder Kamera-Aufruf der Lagekarte sagt, wer bewegt (LFH-766, D2 in
- * `openspec/changes/lfh-766-eigenposition-anflug-genauigkeit/design.md`): letztes Argument ist
+ * `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md`): letztes Argument ist
  * `BEDIENUNG` oder `AUTOMATISCH` aus `kamera.ts`. Fehlt die Markierung an einem Bedienweg, flöge
  * die Eigenposition nach einer Bedienung doch noch an.
  *

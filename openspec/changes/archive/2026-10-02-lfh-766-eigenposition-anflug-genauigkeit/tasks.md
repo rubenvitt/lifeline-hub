@@ -23,4 +23,4 @@
 - [x] 4.1 `e2e/lagekarte-zeichnen-korrigierbar.spec.ts`, Block „Eigenposition“: erster Standort mit `accuracy: 2000` → alle vier Ecken des Kreisrahmens liegen in `map.getBounds()`; bestehender Anflugtest bleibt grün
 - [x] 4.2 Ebenda: Eigenposition an, Zonenzeichnen am eigenen Standort starten, zwei Punkte setzen, neuen Standort melden (`context.setGeolocation`) → in `map.getStyle().layers` steht jede `eigenposition-*`-Ebene vor der ersten `td-*`-Ebene
 - [x] 4.3 Ebenda: Ortung verzögert (Init-Skript hält `watchPosition` an, bis der Test sie freigibt), Karte vor dem ersten Standort ziehen → nach dem Standort ist der Mittelpunkt unverändert und der Punkt da
-- [ ] 4.4 `./scripts/check-all.sh` grün (lokal bzw. im CI-Lauf des PRs)
+- [x] 4.4 `./scripts/check-all.sh` grün (lokal bzw. im CI-Lauf des PRs) — lokal Bündel `schnell` grün; `frontend` und `e2e` belegt der CI-Lauf des PRs (Sammel-Gate, `.github/workflows/ci.yml`)

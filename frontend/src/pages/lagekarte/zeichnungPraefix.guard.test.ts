@@ -7,7 +7,7 @@ import { ZEICHNUNG_PRAEFIX } from './eigenpositionLayer';
 
 /**
  * Jede terra-draw-Instanz der Lagekarte trägt einen `prefixId`, der mit `td-` beginnt (LFH-766,
- * D3 in `openspec/changes/lfh-766-eigenposition-anflug-genauigkeit/design.md`): daran legt sich
+ * D3 in `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md`): daran legt sich
  * die Eigenposition unter die laufende Zeichnung. Ein Präfix ohne `td-` ließe den Punkt wieder die
  * Stützpunkte verdecken.
  *
