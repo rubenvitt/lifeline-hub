@@ -12,11 +12,11 @@ sie auch ohne Registereintrag grün.
 
 ## 1. Gemeinsamer Erfassungs-Anhang-Kern, Schaden zieht um (design.md D2, D3)
 
-- [ ] 1.1 Ausgangsstand sichern.
+- [x] 1.1 Ausgangsstand sichern.
   - `cargo test --test schaden_anhang --test schaden_anhang_scan --test anhang --test etb_anhang --test dokument --test anhang_metadaten` und `cargo test --lib schaden::anhang anhang::` grün laufen lassen.
   - Die Testnamen notieren. Sie sind das Netz für den Umzug.
   - Verifiziert durch die Exit-Codes (ohne `| tail`).
-- [ ] 1.2 `src/anhang/erfassung.rs` anlegen.
+- [x] 1.2 `src/anhang/erfassung.rs` anlegen.
   - Inhalt: `ErfassungsAblage` (Deskriptor), `ErfassungsAnhangZeile`, `BesitzerKopf`, `Vorgang`, `etb_text(etb_name, mime, vorgang)`, `liste`, `laden`, `anhang_id_fuer_download`, `ablegen_tx`, `entfernen_tx`. Das SQL entsteht aus den Deskriptor-Konstanten über `AssertSqlSafe`.
   - Unit-Tests zuerst:
     - `etb_text` für Bild, PDF und sonstigen Typ in beiden Vorgängen;
@@ -26,13 +26,13 @@ sie auch ohne Registereintrag grün.
     - `BesitzerKopf { storniert: true }` → 409 ohne `anhang`-, Linker- und ETB-Zeile;
     - doppeltes Entfernen → 404 ohne zweiten ETB-Eintrag.
   - Verifiziert durch `cargo test --lib anhang::erfassung`.
-- [ ] 1.3 `src/schaden/anhang.rs` auf den Kern umstellen.
+- [x] 1.3 `src/schaden/anhang.rs` auf den Kern umstellen.
   - Es bleiben `SCHADEN_ABLAGE` (Deskriptor), `SchadenAnhangAnzeige` (unverändert, `From<ErfassungsAnhangZeile>`) sowie `ablegen` und `entfernen`. Diese laden den Besitzer mit `schaden_repo::laden_tx` und rufen den Kern.
   - Die übrigen Funktionen delegieren. `genau_eine_datei` wandert von `routes/schaden_anhang.rs` nach `routes/support.rs`.
   - Verifiziert durch:
     - unverändert grüne Tests aus 1.1, ohne Änderung an ihren Erwartungen;
-    - eine Mutationsprobe: die Storno-Prüfung im Kern auskommentiert → `tests/schaden_anhang.rs` rot. Das Ergebnis steht im Commit-Text.
-- [ ] 1.4 `src/AGENTS.md`, Abschnitt Anhänge: den Absatz „Schaden-Anhänge (LFH-21)“ zu „Erfassungs-Anhänge (LFH-21, LFH-758)“ umschreiben.
+    - eine Mutationsprobe: die Storno-Prüfung im Kern auskommentiert → `schaden::anhang::tests::storniert_ist_409_ohne_jede_zeile_und_bleibt_lesbar` und `anhang::erfassung::tests::storniert_ist_409_vor_jeder_zeile` rot. `tests/schaden_anhang.rs` bleibt dabei grün, weil die Route den Storno schon vor der Transaktion prüft; die Prüfung im Kern deckt das Rennen. Das Ergebnis steht im Commit-Text.
+- [x] 1.4 `src/AGENTS.md`, Abschnitt Anhänge: den Absatz „Schaden-Anhänge (LFH-21)“ zu „Erfassungs-Anhänge (LFH-21, LFH-758)“ umschreiben.
   - Inhalt: Kern `anhang::erfassung`, Deskriptor je Modul, was ein neues Modul braucht.
   - Verifiziert durch `scripts/check-fmt.sh` und einen `rg -n "schaden/anhang.rs|schaden_anhang" src/AGENTS.md`, der keinen veralteten Pfad mehr findet.
 

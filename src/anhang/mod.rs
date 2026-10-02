@@ -4,6 +4,7 @@
 //! `chat_nachricht_anhang`) leben im jeweiligen Modul. Dateien liegen als BLOB in der SQLite-DB
 //! und sind damit automatisch im Backup.
 
+pub mod erfassung;
 pub mod metadaten;
 pub mod repo;
 
