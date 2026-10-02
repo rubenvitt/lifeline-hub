@@ -863,7 +863,7 @@ async fn lifecycle_meldet_etb_und_schaden_live() {
             "POST",
             format!("{basis}/1/uebergeben"),
             Some(json!({"uebergeben_an":"Bauhof"})),
-            "S-001 übergeben an Bauhof",
+            "S-001 übergeben",
         ),
         (
             "POST",
