@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import HaengenderBaum, { baumZielStil } from '../components/organigramm/HaengenderBaum';
 import { monoStil, useRollen } from '../components/instrument';
-import { IkoneWarndreieck } from '../ikonen';
+import { IconWarndreieck } from '../icons';
 import { einheitDetailPfad, einsatzabschnittePfad } from '../routing/deeplinks';
 import EinsatzZeichen from '../zeichen/EinsatzZeichen';
 import { fachobjektZeichen } from '../zeichen/fachobjektZeichen';
@@ -110,7 +110,7 @@ function KantenZeile({ kante }: { kante: Kante }) {
         }}
       >
         <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-          <IkoneWarndreieck />
+          <IconWarndreieck />
         </span>
         <span>keine gemeinsame Sprechgruppe</span>
       </div>

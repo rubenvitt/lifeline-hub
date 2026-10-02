@@ -137,7 +137,7 @@ describe('BenutzerMenu — unter lg', () => {
     zeige();
     await oeffne();
     // Regex, nicht exakt: aus der Zeit, als antds Symbol-Span ein eigenes `aria-label` (`user`,
-    // `logout`) trug. Die Ikonen des Satzes sind `aria-hidden` (LFH-595); die Einträge der zwei
+    // `logout`) trug. Die Icons des Satzes sind `aria-hidden` (LFH-595); die Einträge der zwei
     // Gruppen werden exakt geprüft.
     expect(await screen.findByRole('menuitem', { name: /Profil/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Abmelden/ })).toBeInTheDocument();

@@ -13,6 +13,7 @@ const quelle: AnhangQuelle = {
   entfernen: vi.fn(),
   downloadPfad: (id) => `${PFAD}/${id}/datei`,
   kennung: 'Person R-007',
+  vorschau: false,
 };
 
 // Die Paneel-Form deckt `pages/schaeden/SchadenAnhaenge.test.tsx` ab; hier die zweite Hülle.
@@ -47,6 +48,37 @@ describe('ObjektAnhaenge — Hülle „abschnitt“ (LFH-757)', () => {
     ).toBeTruthy();
     expect(within(bereich).getByText('1 Datei')).toBeInTheDocument();
     expect(link.closest('[data-lfh="anhang-zeile"]')).not.toBeNull();
+  });
+
+  // LFH-757 × LFH-759: jeder Abruf an der Person ist ein protokollierter Zugriff. Ein
+  // Vorschaubild je Zeile schriebe schon beim Aufklappen eine Audit-Zeile je Foto.
+  it('vorschau: false — kein Vorschaubild, auch nicht an einem Foto', async () => {
+    const abrufe: string[] = [];
+    server.use(
+      http.get(PFAD, () =>
+        HttpResponse.json([
+          {
+            id: 5,
+            dateiname: 'verletzung.jpg',
+            mime: 'image/jpeg',
+            groesse: 2048,
+            abgelegt_von_name: 'Leitung',
+            abgelegt_at: '2026-10-02 10:30:00',
+          },
+        ]),
+      ),
+      http.get(`${PFAD}/5/datei`, ({ request }) => {
+        abrufe.push(request.url);
+        return new HttpResponse(null, { status: 200 });
+      }),
+    );
+    renderMitProviders(
+      <ObjektAnhaenge einsatzId={1} quelle={quelle} darfSchreiben huelle="abschnitt" />,
+    );
+    await screen.findByRole('link', { name: /^verletzung\.jpg, / });
+    expect(document.querySelector('[data-lfh="download-anker-mit-vorschau"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Vorschau|Großansicht/ })).toBeNull();
+    expect(abrufe, 'kein Abruf der Datei ohne Klick').toEqual([]);
   });
 
   it('ohne Schreibrecht: weder Ablegen noch Entfernen', async () => {

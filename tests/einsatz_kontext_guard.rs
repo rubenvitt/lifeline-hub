@@ -47,6 +47,13 @@ const ORG_FLOOR_AUSNAHME: &[(&str, &str)] = &[
     // Admin ODER Einsatzleitung, auch an einem Einsatz mit abgelaufener Frist, den das
     // Lese-Gate hart sperrt. Die Prüfung steht im Rumpf.
     ("einsatz", "aufbewahrungsfrist_setzen"),
+    // LFH-749: dasselbe je Datenkategorie — Admin ODER Einsatzleitung, auch an einem Einsatz
+    // mit abgelaufener Frist; die Zustandsprüfungen stehen im Repo.
+    ("einsatz", "kategorie_frist_setzen"),
+    // LFH-749: Lesen der Kategorie-Fristen — wer den Einsatz lesen darf, dazu Admin ODER
+    // Einsatzleitung auch an einem gesperrten Einsatz (wie der Frist-PUT); kein Personenbezug.
+    // Die Prüfung steht im Rumpf.
+    ("einsatz", "kategorien_lesen"),
     // Admin ODER Einsatzleitung plus aktiver Einsatz; kein Gate-Typ bildet das ab, die
     // Prüfung steht im Rumpf.
     ("einsatz", "modul_override_setzen"),

@@ -19,8 +19,8 @@ interface Props {
 
 /**
  * Paneel „Fotos und Dateien“ auf der Schaden-Detailseite (LFH-21): die Schadensrouten als Quelle
- * des geteilten Blocks `components/anhaenge/ObjektAnhaenge` (LFH-757). Am stornierten Schaden
- * bleibt die Liste nur lesbar.
+ * des geteilten Blocks `components/anhaenge/ObjektAnhaenge` (LFH-757), mit Vorschaubild (LFH-759)
+ * und Sammelbanner für fremden Zufluss (LFH-760). Am stornierten Schaden bleibt die Liste nur lesbar.
  */
 export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: Props) {
   const quelle = useMemo<AnhangQuelle>(
@@ -31,6 +31,7 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
       entfernen: (id) => entferneSchadenAnhang(einsatzId, schaden.id, id),
       downloadPfad: (id) => schadenAnhangDownloadPfad(einsatzId, schaden.id, id),
       kennung: `Schaden ${schadenRegistrierAnzeige(schaden.registrier_nr)}`,
+      vorschau: true,
     }),
     [einsatzId, schaden.id, schaden.registrier_nr],
   );

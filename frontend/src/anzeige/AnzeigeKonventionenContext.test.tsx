@@ -70,6 +70,7 @@ function einstellungenMock(partial: Partial<EinsatzEinstellungen> = {}): Einsatz
 function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellungen {
   return {
     org_id: 1,
+    aufbewahrung_kategorien: [],
     zeitzone: null,
     zeitformat: null,
     einheiten: null,

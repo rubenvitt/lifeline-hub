@@ -1,4 +1,4 @@
-import { IkoneSchloss } from '../ikonen';
+import { IconSchloss } from '../icons';
 import { Layout, Tag, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { Link, Outlet } from 'react-router';
@@ -78,7 +78,7 @@ function GlobalLink({
         {/* Die Sperre trägt auf JEDER Breite ein Zeichen ohne Farbe (LFH-434, WCAG 1.4.1):
             `cursor: not-allowed` sieht auf Touch niemand, und der Tag steht erst ab `lg`. */}
         <span aria-hidden="true" data-lfh="sperr-schloss" style={{ display: 'inline-flex' }}>
-          <IkoneSchloss size={13} />
+          <IconSchloss size={13} />
         </span>
         {label}
         {/* Der Grund steht als TEXT da, nicht nur im `title`: auf dem Führungs-Tablet gibt es kein
@@ -115,12 +115,12 @@ function GlobalLink({
 export default function AppLayout() {
   const { benutzer } = useAuth();
   // Dieselbe Schwelle wie im Einsatz-Workspace. Sie trägt drei Fragen: ob der Sperrgrund als Tag
-  // danebensteht, ob die Suche als Feld oder als Ikone steht, und (ab `md`) ob die Uhr Platz hat.
+  // danebensteht, ob die Suche als Feld oder als Icon steht, und (ab `md`) ob die Uhr Platz hat.
   // Die Frage stellt ausschließlich `useViewport` (`useViewport.guard.test.ts`).
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
-  // Wie im Einsatz-Kopf: unter `xl` steht der Ruhezustand der SYNC-Anzeige nur als Ikone.
+  // Wie im Einsatz-Kopf: unter `xl` steht der Ruhezustand der SYNC-Anzeige nur als Icon.
   const weit = abBreite('xl');
   const { token } = theme.useToken();
   // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite

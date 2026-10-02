@@ -7,7 +7,7 @@ import { ApiError } from '../../api/client';
 import { UPLOAD_MAX_GROESSE } from '../../api/upload';
 import AnhangAblegenModal from './AnhangAblegenModal';
 
-const legeAb = vi.fn<(datei: File) => Promise<unknown>>();
+const legeAb = vi.fn<(datei: File) => Promise<{ id: number }>>();
 afterEach(() => vi.clearAllMocks());
 
 function Rahmen() {
@@ -53,7 +53,7 @@ describe('AnhangAblegenModal (LFH-21, LFH-757)', () => {
   });
 
   it('Serien-Speichern hält den Dialog offen und leert das Feld', async () => {
-    legeAb.mockResolvedValue({} as never);
+    legeAb.mockResolvedValue({ id: 1 });
     const d = await dialog();
     await userEvent.upload(dateiInput(d), foto('erstes.jpg'));
     await userEvent.click(within(d).getByRole('button', { name: /Speichern und nächste/ }));

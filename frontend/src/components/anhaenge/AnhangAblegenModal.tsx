@@ -8,12 +8,14 @@ import { ERFASSUNG_ACCEPT } from '../../api/upload';
 interface Props {
   /** Kennung des Erfassungsobjekts für den Titel („Schaden S-003“, „Person R-007“). */
   kennung: string;
-  /** Legt genau eine Datei ab (die Route des Fachmoduls). */
-  ablegen: (datei: File) => Promise<unknown>;
+  /** Legt genau eine Datei ab (die Route des Fachmoduls); liefert die neue Linker-id. */
+  ablegen: (datei: File) => Promise<{ id: number }>;
   /** Keys, die nach einer erfolgreichen Ablage neu laden (Anhangliste, ETB). */
   invalidieren: readonly (readonly unknown[])[];
   offen: boolean;
   onSchliessen: () => void;
+  /** Gerufen VOR der Invalidierung: die Liste merkt die eigene Ablage vor (LFH-760). */
+  onAbgelegt?: (anhang: { id: number }) => void;
 }
 
 interface AblageFormular {
@@ -34,6 +36,7 @@ export default function AnhangAblegenModal({
   invalidieren,
   offen,
   onSchliessen,
+  onAbgelegt,
 }: Props) {
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -41,7 +44,8 @@ export default function AnhangAblegenModal({
 
   const mutation = useMutation({
     mutationFn: (datei: File) => ablegen(datei),
-    onSuccess: () => {
+    onSuccess: (anhang) => {
+      onAbgelegt?.(anhang);
       for (const queryKey of invalidieren) void qc.invalidateQueries({ queryKey });
       message.success('Datei abgelegt');
     },

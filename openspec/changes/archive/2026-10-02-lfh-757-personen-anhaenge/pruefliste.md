@@ -11,7 +11,7 @@ verlangt diese Liste an jeder umgebauten Seite. Sie liegt bei Planung und Spec d
 | Route | `/einsaetze/:id/personen/:personId` (neuer aufklappbarer Abschnitt „Fotos und Dateien“ zwischen „Zuordnungen“ und „Zugriffs-Audit“, Dialog „Datei ablegen · Person R-nnn“) |
 | Stand | Branch `claude/ecstatic-archimedes-elt6t1`, 02.10.2026 |
 | Zielkontext | Fükw (1280–1366 px) und Führungs-Tablet in „Handschuh“; ortsfeste Stelle (BHP/UHS) zum Ablegen eines Fotos zur Identifikation oder Übergabe |
-| Nicht enthalten | Bildvorschau (LFH-759), Offline-Ablage, Anhänge im Personendruck/CSV — Nicht-Ziele aus design.md |
+| Nicht enthalten | Bildvorschau an der Person (LFH-759 kam vor dem Merge; an der Person bewusst aus, `vorschau: false`, weil jedes Vorschaubild eine Audit-Zeile schriebe — Guard-Test in `ObjektAnhaenge.test.tsx`), Offline-Ablage, Anhänge im Personendruck/CSV — Nicht-Ziele aus design.md |
 
 | Fläche | Stellvertreter | Browser-Messung |
 | --- | --- | --- |
@@ -50,12 +50,12 @@ Begründung). Gerechnetes und aus Quelltext Geschlossenes trägt im Beleg **[abg
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Lade- und Entfernen-Fehler als `role="alert"` im Abschnitt, die betroffene Zeile trägt `data-fehler` (geteilter Block, Vitest am Schaden-Adapter) | — |
 | 10 | **Alarmbudget** | **nicht anwendbar** | Keine Alarme | — |
 | 11 | **Warnverhalten** | **erfüllt** | Kein Blinken, kein Ton (Grep) | — |
-| 12 | **Kein Sprung unter dem Cursor** | **offen → LFH-760** | Das `person`-Ereignis lädt die aufgeklappte Liste neu; eine Ablage aus einer anderen Sitzung erscheint oben und schiebt die Zeilen. Gleicher Befund wie am Schaden, der geteilte Block zieht mit dem Sammelbanner aus LFH-760 nach | LFH-760 |
+| 12 | **Kein Sprung unter dem Cursor** | **erfüllt** (nach Merge von LFH-760) | Eine Ablage aus einer anderen Sitzung wartet hinter dem Sammelbanner, statt oben einzuschieben; eigene Ablagen stehen sofort. Der geteilte Block `ObjektAnhaenge` trägt das für Schaden und Person, belegt über `pages/schaeden/SchadenAnhaenge.test.tsx` (LFH-760) und `components/anhaenge/anhangZufluss.test.ts` | — |
 | 13 | **Fokus nie verdeckt** | **erfüllt** | Nach dem Entfernen fällt der Fokus auf die nächste Zeile bzw. „Datei ablegen“ (geteilter Block, Vitest); Tab-Durchlauf des Blocks unter der Kopfzeile am Schaden gemessen (0 verdeckt) [abgeleitet für den Abschnitt: dieselbe Kopfzeile, der Abschnitt hat keinen eigenen Scrollbereich] | — |
 | 14 | **Tabellenseite vollständig** | **nicht anwendbar** | Liste, keine Tabelle („was ist mit dieser Person?“, LFH-330) | — |
 | 15 | **Erfassungsmaske vollständig** | **nicht anwendbar** | Lese- und Aktionsfläche; die Maske ist Tabelle 2 | — |
 
-**Bilanz:** 10 erfüllt · 2 offen · 3 nicht anwendbar.
+**Bilanz:** 11 erfüllt · 1 offen (LFH-397) · 3 nicht anwendbar.
 
 ## Tabelle 2 — Ablegen-Dialog
 

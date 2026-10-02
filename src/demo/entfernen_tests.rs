@@ -687,7 +687,8 @@ async fn geschwaerzter_demo_einsatz_wird_entfernt() {
             .unwrap()
     );
     assert!(
-        crate::einsatz::repo::schwaerze_einsatz(&pool, demo.einsatz, "2026-09-25 10:00:00")
+        // Nach der Karenz von 30 Tagen: früher schwärzt das UPDATE nicht (LFH-754).
+        crate::einsatz::repo::schwaerze_einsatz(&pool, demo.einsatz, "2026-10-24 10:00:00")
             .await
             .unwrap(),
         "Vorbedingung: geschwärzt"

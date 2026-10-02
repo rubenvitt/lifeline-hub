@@ -1,4 +1,4 @@
-import { IkoneUhr } from '../ikonen';
+import { IconUhr } from '../icons';
 import { Button, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
@@ -189,7 +189,7 @@ export default function MeldungKarte({
           {alarmiert && (
             <Text type="danger" strong style={{ fontSize: 12 }}>
               <span aria-hidden="true">
-                <IkoneUhr />
+                <IconUhr />
               </span>{' '}
               Alarm
             </Text>

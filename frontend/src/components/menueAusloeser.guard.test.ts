@@ -9,7 +9,7 @@
  *
  * ── Was er zählt ────────────────────────────────────────────────────────────────
  * Eine Quelldatei, die `<Dropdown` UND das Dreipunkt-Zeichen enthält. Grob, aber ohne Lücke für
- * den Fall, der wiederkäme: ein `Dropdown` mit `IkonePunkteSenkrecht` am Auslöser.
+ * den Fall, der wiederkäme: ein `Dropdown` mit `IconPunkteSenkrecht` am Auslöser.
  *
  * ── Was er NICHT sieht ──────────────────────────────────────────────────────────
  *   • ein Dropdown, dessen Zeichen aus einer anderen Datei kommt (als Prop gereicht);
@@ -48,7 +48,7 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
 
 /** Baut die Datei einen eigenen Dreipunkt-Auslöser? */
 function bautDreipunktMenue(quelle: string): boolean {
-  return /<Dropdown\b/.test(quelle) && /\bIkonePunkteSenkrecht\b/.test(quelle);
+  return /<Dropdown\b/.test(quelle) && /\bIconPunkteSenkrecht\b/.test(quelle);
 }
 
 describe('Menüauslöser-Guard (LFH-683)', () => {
@@ -66,7 +66,7 @@ describe('Menüauslöser-Guard (LFH-683)', () => {
   });
 
   it('der Baustein selbst ist das, was der Guard sucht', () => {
-    // Gegenprobe: stimmte das Suchmuster nicht mehr (Ikone umbenannt), wären die Tests oben trivial
+    // Gegenprobe: stimmte das Suchmuster nicht mehr (Icon umbenannt), wären die Tests oben trivial
     // grün.
     expect(bautDreipunktMenue(quellen[BAUSTEIN])).toBe(true);
   });
@@ -74,7 +74,7 @@ describe('Menüauslöser-Guard (LFH-683)', () => {
   it('erkennt einen Nachbau und lässt einen Aufrufer des Bausteins in Ruhe', () => {
     expect(
       bautDreipunktMenue(
-        `<Dropdown menu={{ items }}><Button icon={<IkonePunkteSenkrecht />} /></Dropdown>`,
+        `<Dropdown menu={{ items }}><Button icon={<IconPunkteSenkrecht />} /></Dropdown>`,
       ),
     ).toBe(true);
     expect(

@@ -1,4 +1,4 @@
-import { IkonePlus } from '../ikonen';
+import { IconPlus } from '../icons';
 import { App, Button, Input, Space, theme } from 'antd';
 import { Select } from './Select';
 import { useState } from 'react';
@@ -90,7 +90,7 @@ export default function SprechgruppenPicker({
       {!anlegenOffen && (
         <Button
           type="link"
-          icon={<IkonePlus />}
+          icon={<IconPlus />}
           style={{ padding: 0, marginTop: token.marginSM }}
           onClick={() => setAnlegenOffen(true)}
         >

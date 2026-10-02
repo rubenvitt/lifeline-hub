@@ -1,4 +1,4 @@
-import { IkonePerson, IkoneTelefon } from '../../ikonen';
+import { IconPerson, IconTelefon } from '../../icons';
 import { Space, theme } from 'antd';
 import { monoStil } from '../../components/instrument';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
@@ -19,7 +19,7 @@ interface Props {
  *
  * Farben nur aus Tokens, damit der Dunkelmodus den Kontrast hält. Der Führungspunkt ist Statusfarbe
  * als Punkt und trägt sein Wort im `aria-label` (WCAG 1.4.1); „Führungslage" heißt: ein
- * Abschnittsleiter ist gesetzt. Ikonen in `aria-hidden`-Hülle, weil antd-Icons `role="img"` mit
+ * Abschnittsleiter ist gesetzt. Icons in `aria-hidden`-Hülle, weil antd-Icons `role="img"` mit
  * englischem Namen mitbringen.
  */
 export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }: Props) {
@@ -49,7 +49,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
       {abschnitt.leiter_name && (
         <span style={{ color: token.colorTextSecondary }}>
           <span aria-hidden="true">
-            <IkonePerson />
+            <IconPerson />
           </span>{' '}
           {abschnitt.leiter_name}
         </span>
@@ -60,7 +60,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
           title="Erreichbarkeit hinterlegt"
           style={{ color: token.colorTextSecondary }}
         >
-          <IkoneTelefon />
+          <IconTelefon />
         </span>
       )}
     </Space>

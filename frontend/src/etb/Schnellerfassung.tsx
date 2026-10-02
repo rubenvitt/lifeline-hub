@@ -1,4 +1,4 @@
-import { IkoneAuge, IkoneBueroklammer, IkoneKreuz, IkonePlus } from '../ikonen';
+import { IconAuge, IconBueroklammer, IconKreuz, IconPlus } from '../icons';
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 import {
@@ -50,6 +50,7 @@ import {
   type SlashEintrag,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
+import { neueClientId } from '../offline/clientId';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
@@ -240,7 +241,7 @@ export default function Schnellerfassung({
   const setAnhangHinweis = (hinweis: string | null) => aendereVersand({ hinweis });
   const setFortschritt = (f: Versand['fortschritt']) => aendereVersand({ fortschritt: f });
   /** Eigener Schlüssel ohne Aufrufer-id: stabil über Fehlversuche, neu nach jedem Erfolg. */
-  const eigeneClientId = useRef<string>(crypto.randomUUID());
+  const eigeneClientId = useRef<string>(neueClientId());
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
 
@@ -550,12 +551,12 @@ export default function Schnellerfassung({
         // nächste Versuch nimmt einen neuen Schlüssel; mit Aufrufer-id gibt `EtbEntwurfsTabs` dem
         // Entwurf eine neue.
         if (e instanceof ApiError && e.status === 409) {
-          eigeneClientId.current = crypto.randomUUID();
+          eigeneClientId.current = neueClientId();
           setAnhangHinweis(e.message);
         }
         throw e;
       }
-      eigeneClientId.current = crypto.randomUUID();
+      eigeneClientId.current = neueClientId();
       setInhalt('');
       // Die Dateiliste geht immer — auch mit „Werte behalten": eine Datei gehört zu genau
       // einem Eintrag (`nurUebernahme` kennt keine Dateien).
@@ -662,7 +663,7 @@ export default function Schnellerfassung({
       disabled={sendet}
       icon={
         <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-          <IkonePlus />
+          <IconPlus />
         </span>
       }
       onClick={() => {
@@ -689,7 +690,7 @@ export default function Schnellerfassung({
         disabled={!online || sendet || anGrenze}
         icon={
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-            <IkoneBueroklammer />
+            <IconBueroklammer />
           </span>
         }
         onClick={() => dateiEingabe.current?.click()}
@@ -745,7 +746,7 @@ export default function Schnellerfassung({
                 type="text"
                 icon={
                   <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <IkoneAuge />
+                    <IconAuge />
                   </span>
                 }
                 aria-pressed={vorschauOffen}
@@ -893,7 +894,7 @@ export default function Schnellerfassung({
                 }
                 icon={
                   <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <IkoneKreuz />
+                    <IconKreuz />
                   </span>
                 }
                 onClick={() => setzeDateien(dateien.filter((x) => x !== d))}

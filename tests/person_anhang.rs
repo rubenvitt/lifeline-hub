@@ -656,6 +656,30 @@ async fn jeder_download_schreibt_eine_zeile_anhang_auch_304() {
     );
 }
 
+// LFH-757 × LFH-759: die Vorschau-Fassungen laufen über dieselbe Route und dieselbe Reihenfolge
+// (Audit vor `anhang_antwort`) — auch ein Vorschaubild zeigt die Person, also ist es ein Zugriff.
+// Die Personen-Detailseite fordert keins an (`ObjektAnhaenge`, `vorschau: false`).
+#[tokio::test]
+async fn vorschau_fassungen_sind_ebenfalls_protokollierte_zugriffe() {
+    let (app, pool, admin, einsatz, person) = start().await;
+    let id = abgelegt(&app, einsatz, person, &admin, "verletzung.jpg").await;
+    let basis = format!("{}/{id}/datei", pfad(einsatz, person));
+    for (n, fassung) in [(1, "vorschau"), (2, "grossansicht")] {
+        let (s, _, _) =
+            download_mit(&app, format!("{basis}?fassung={fassung}"), &admin, None).await;
+        assert_ne!(
+            s,
+            StatusCode::BAD_REQUEST,
+            "{fassung} ist eine bekannte Fassung"
+        );
+        assert_eq!(
+            audit_anhang(&pool, person).await,
+            n,
+            "{fassung} schreibt eine Zeile"
+        );
+    }
+}
+
 #[tokio::test]
 async fn liste_schreibt_keinen_protokolleintrag() {
     let (app, pool, admin, einsatz, person) = start().await;

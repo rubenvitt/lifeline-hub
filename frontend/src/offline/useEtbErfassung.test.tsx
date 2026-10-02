@@ -4,6 +4,7 @@ import { act } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
+import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import type { NeuerEintrag } from '../api/etb';
@@ -55,6 +56,38 @@ describe('useEtbErfassung – Anhänge (LFH-117)', () => {
     expect(gesehen).toHaveLength(2);
     expect(gesehen[1].anhang_ids).toEqual([4, 5]);
     expect(gesehen[1].client_id).toBe(gesehen[0].client_id);
+  });
+
+  it('LFH-762: merkt ohne sicheren Kontext vor und sendet beim Flush mit derselben client_id', async () => {
+    const zuruecknehmen = ohneSicherenKontext();
+    try {
+      const gesehen: NeuerEintrag[] = [];
+      let versuch = 0;
+      server.use(
+        http.post('/api/einsaetze/9/etb', async ({ request }) => {
+          gesehen.push((await request.json()) as NeuerEintrag);
+          versuch += 1;
+          return versuch === 1
+            ? HttpResponse.error()
+            : HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+        }),
+      );
+      const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+      // Ohne client_id vom Aufrufer: der Hook vergibt sie selbst.
+      await act(async () => {
+        await result.current.erfassen(eintrag);
+      });
+      await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+      await act(async () => {
+        await result.current.flush();
+      });
+      await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+      expect(gesehen).toHaveLength(2);
+      expect(gesehen[0].client_id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(gesehen[1].client_id).toBe(gesehen[0].client_id);
+    } finally {
+      zuruecknehmen();
+    }
   });
 
   it('sendet eine Queue-Zeile ohne anhang_ids (Altbestand) weiter', async () => {

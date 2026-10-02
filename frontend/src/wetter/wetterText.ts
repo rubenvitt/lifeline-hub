@@ -125,7 +125,7 @@ export function druckText(hpa: number | null | undefined): string {
   return da(hpa) ? `${GANZ.format(hpa)} hPa` : FEHLT;
 }
 
-/** Ein Wort je Wetterlage; Tag und Nacht unterscheidet nur die Ikone (design.md D5). */
+/** Ein Wort je Wetterlage; Tag und Nacht unterscheidet nur das Icon (design.md D5). */
 const SYMBOL_WORT: Record<WetterSymbol, string> = {
   klar_tag: 'klar',
   klar_nacht: 'klar',

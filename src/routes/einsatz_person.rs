@@ -887,7 +887,7 @@ pub async fn verbleib(
         &format!(
             "Person {}: {}",
             registrier_anzeige(person.registrier_nr),
-            art.etb_sachverhalt(ziel.as_deref())
+            art.etb_sachverhalt()
         ),
     )
     .await;

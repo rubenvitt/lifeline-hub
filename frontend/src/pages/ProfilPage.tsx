@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
 import { QRCodeSVG } from 'qrcode.react';
+import KopierbarerText from '../components/KopierbarerText';
 import OtpEingabe from '../components/OtpEingabe';
 import { fehlerText } from '../api/client';
 import { providerListe } from '../api/auth';
@@ -57,7 +58,7 @@ export default function ProfilPage() {
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const [provider, setProvider] = useState<AuthProvider[]>([]);
-  // Die Organisation steht nicht an `BenutzerAnzeige` — eigener Abruf. Nicht-blockierend und ohne
+  // Der Name der Organisation steht nicht an `BenutzerAnzeige` (nur `org_id`) — eigener Abruf. Nicht-blockierend und ohne
   // Fehlerzweig: schlägt er fehl, zeigt die Kopfsektion „—", die Sicherheits-Abschnitte bleiben
   // bedienbar.
   const { data: organisation } = useQuery({
@@ -337,9 +338,15 @@ export default function ProfilPage() {
                   >
                     <QRCodeSVG value={totpEnrollment.otpauthUrl} size={200} marginSize={4} />
                   </div>
-                  <Typography.Paragraph copyable={{ text: totpEnrollment.secretBase32 }}>
-                    Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>
-                  </Typography.Paragraph>
+                  {/* Kopieren über einen Knopf der Dichte-Staffel statt `copyable` (LFH-763). */}
+                  <div style={{ marginBottom: token.marginSM }}>
+                    <KopierbarerText
+                      text={totpEnrollment.secretBase32}
+                      bezeichnung="TOTP-Geheimnis"
+                    >
+                      Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>
+                    </KopierbarerText>
+                  </div>
                   <Form
                     layout="vertical"
                     form={totpForm}

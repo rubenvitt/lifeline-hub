@@ -29,7 +29,7 @@ const MARKE_BREITE = 2;
  *
  * DIE AKTIVE MARKE IST ROT (umsetzung.md, Entscheidung 2): 2 px in `marke` am linken Rand. Sie
  * bedient nichts — die Fläche des aktiven Ziels ist `flaeche3` (neutral). Als `boxShadow`
- * innen, weil ein Rand Ikone und Etikett beim Aktivieren verschöbe.
+ * innen, weil ein Rand Icon und Etikett beim Aktivieren verschöbe.
  */
 export function railZielStil(
   token: { controlHeight: number; paddingXS: number },
@@ -56,7 +56,7 @@ export function railZielStil(
 }
 
 /**
- * Das 9-px-Etikett unter der Ikone (Versalien, Sperrung .06em — `schriftskala.railEtikett`).
+ * Das 9-px-Etikett unter dem Icon (Versalien, Sperrung .06em — `schriftskala.railEtikett`).
  *
  * `maxWidth: '100%'` hält das Etikett in der Zielbreite: ein zu langes Kurzetikett zeigt sich dann
  * als `scrollWidth > clientWidth` (gemessen in `e2e/rail-etikett.spec.ts`, LFH-644) statt still
@@ -87,7 +87,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
-    const Icon = aktiv ? k.ikone.gefuellt : k.ikone.umriss;
+    const Icon = aktiv ? k.icon.gefuellt : k.icon.umriss;
     return (
       <button
         key={k.key}
@@ -99,7 +99,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         // Fokusabstand zum klebenden Fuß (WCAG 2.4.11) — neben, nicht in `railZielStil`.
         style={{ ...railZielStil(token, { aktiv }), ...fussFokusabstandStil }}
       >
-        {/* `flexShrink: 0`, sonst gibt die Ikone statt des Etiketts nach. `aria-hidden`: der Name steht
+        {/* `flexShrink: 0`, sonst gibt das Icon statt des Etiketts nach. `aria-hidden`: der Name steht
            am Knopf. */}
         <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
           <Icon size={20} />

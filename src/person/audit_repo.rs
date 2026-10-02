@@ -4,7 +4,7 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-/// `art IN ('detail','export','druck','anhang')` (migrations/0136_person_zugriff_audit_anhang.sql,
+/// `art IN ('detail','export','druck','anhang')` (migrations/0137_person_zugriff_audit_anhang.sql,
 /// zuvor 0132 und 0021).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]

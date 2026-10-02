@@ -241,3 +241,37 @@ describe('erzeugeQueryClient — Rechteentzug räumt das Lagebild (LFH-723, desi
     expect(client.getQueryData(einsatzKeys.personen(7))).toEqual([{ id: 1 }]);
   });
 });
+
+describe('erzeugeQueryClient — Object-URLs der HEIC-Vorschau (LFH-759)', () => {
+  it('gibt beide URLs frei, sobald die Query den Cache verlässt (auch beim Abmelden)', () => {
+    const freigeben = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const client = erzeugeQueryClient();
+    client.setQueryData(einsatzKeys.anhangHeicVorschau(7, '/a/1'), {
+      klein: 'blob:klein-1',
+      gross: 'blob:gross-1',
+    });
+    client.setQueryData(einsatzKeys.etb(7), []);
+    client.clear();
+    expect(freigeben).toHaveBeenCalledWith('blob:klein-1');
+    expect(freigeben).toHaveBeenCalledWith('blob:gross-1');
+    expect(freigeben).toHaveBeenCalledTimes(2);
+    freigeben.mockRestore();
+  });
+});
+
+describe('erzeugeQueryClient — Object-URLs bei Datenwechsel (LFH-759)', () => {
+  it('gibt die alten URLs frei, wenn die Daten wechseln, und jede nur einmal', () => {
+    const freigeben = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const client = erzeugeQueryClient();
+    const key = einsatzKeys.anhangHeicVorschau(7, '/a/1');
+    client.setQueryData(key, { klein: 'blob:k1', gross: 'blob:g1' });
+    // Rechteentzug setzt die Daten einer beobachteten Query auf undefined.
+    client.getQueryCache().find({ queryKey: key })!.setState({ data: undefined });
+    expect(freigeben.mock.calls.flat()).toEqual(['blob:k1', 'blob:g1']);
+    client.setQueryData(key, { klein: 'blob:k2', gross: 'blob:g2' });
+    client.setQueryData(key, { fehler: true });
+    client.clear();
+    expect(freigeben.mock.calls.flat()).toEqual(['blob:k1', 'blob:g1', 'blob:k2', 'blob:g2']);
+    freigeben.mockRestore();
+  });
+});

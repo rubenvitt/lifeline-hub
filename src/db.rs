@@ -3133,21 +3133,21 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
-    const MIGRATION_0136: &str = include_str!("../migrations/0136_person_zugriff_audit_anhang.sql");
+    const MIGRATION_0137: &str = include_str!("../migrations/0137_person_zugriff_audit_anhang.sql");
 
     /// Alt-DB im 0132-Stand: die 0021-Alt-DB aus [`alt_db_person_zugriff_audit`], dazu die echte
-    /// 0132 — der Ausgangspunkt, auf den 0136 in Produktion trifft.
+    /// 0132 — der Ausgangspunkt, auf den 0137 in Produktion trifft.
     async fn alt_db_person_zugriff_audit_0132() -> SqlitePool {
         let pool = alt_db_person_zugriff_audit().await;
         sqlx::raw_sql(MIGRATION_0132).execute(&pool).await.unwrap();
         pool
     }
 
-    // --- Migration 0136: Leaf-Rebuild von person_zugriff_audit mit Art 'anhang' (LFH-757) ---
+    // --- Migration 0137: Leaf-Rebuild von person_zugriff_audit mit Art 'anhang' (LFH-757) ---
     //
-    // Befüllt mit allen drei Bestandsarten, höchste Zeile gelöscht, dann die echte 0136.
+    // Befüllt mit allen drei Bestandsarten, höchste Zeile gelöscht, dann die echte 0137.
     #[tokio::test]
-    async fn migration_0136_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+    async fn migration_0137_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
         let pool = alt_db_person_zugriff_audit_0132().await;
         sqlx::query(
             "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art, zugriff_at) \
@@ -3163,11 +3163,11 @@ mod tests {
             .await
             .unwrap();
 
-        pruefe_audit_rebuild(&pool, MIGRATION_0136, "anhang").await;
+        pruefe_audit_rebuild(&pool, MIGRATION_0137, "anhang").await;
     }
 
     #[tokio::test]
-    async fn migration_0136_erhaelt_sequenz_auch_bei_leerer_tabelle() {
+    async fn migration_0137_erhaelt_sequenz_auch_bei_leerer_tabelle() {
         let pool = alt_db_person_zugriff_audit_0132().await;
         sqlx::query(
             "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
@@ -3180,7 +3180,7 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        sqlx::raw_sql(MIGRATION_0136).execute(&pool).await.unwrap();
+        sqlx::raw_sql(MIGRATION_0137).execute(&pool).await.unwrap();
         let neue_id: i64 = sqlx::query_scalar(
             "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
              VALUES (1, 1, 1, 'anhang') RETURNING id",
@@ -3336,7 +3336,7 @@ mod tests {
     }
 
     /// Gemeinsamer Nachweis eines Leaf-Rebuilds von `person_zugriff_audit`, der nur den art-CHECK
-    /// um `neue_art` erweitert (0132 `druck`, 0136 `anhang`). Erwartet eine befüllte Alt-DB, deren
+    /// um `neue_art` erweitert (0132 `druck`, 0137 `anhang`). Erwartet eine befüllte Alt-DB, deren
     /// Zeile id 3 gelöscht ist (Sequenz > MAX(id)): Zeilen samt ids, Schema, DDL bis auf den
     /// CHECK, keine Reste der Zwischentabelle, Sequenz, CHECK-Grenze, keine FK-Verletzung.
     async fn pruefe_audit_rebuild(pool: &SqlitePool, migration: &'static str, neue_art: &str) {

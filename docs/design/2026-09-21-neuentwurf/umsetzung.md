@@ -91,13 +91,13 @@ Desktop-Symbole: `frontend/src/marke/bildmarkeGeometrie.ts`, Quellen und Erzeugu
 `scripts/marke/`, Guard `frontend/src/marke/marke.guard.test.ts`. Titelleiste und Startbildschirm
 der PWA sind Kopf-Schwarz.
 
-## Ikonensatz (LFH-595, Entscheidung 30.09.2026)
+## Iconsatz (LFH-595, Entscheidung 30.09.2026)
 
-Eine Ikone stammt aus Icons8 „iOS 27 Outlined“, der aktive Zustand (Rail) aus „iOS 27 Filled“.
+Ein Icon stammt aus Icons8 „iOS 27 Outlined“, der aktive Zustand (Rail) aus „iOS 27 Filled“.
 Linien sind im 50-px-Raster 2 Einheiten breit, bei 20 px also 0,8 px; das ist nach der Stilprobe
 angenommen (`openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/stilprobe/`). Chevrons sind einfache Striche (`expand-arrow`,
 `collapse-arrow`, `forward`), die Verbindungsanzeige ist das WLAN-Paar mit Haken/Kreuz. Die
-Ikonen des Entwurfs (Tabler) gelten nur noch als Bildidee, nicht als Quelle.
+Icons des Entwurfs (Tabler) gelten nur noch als Bildidee, nicht als Quelle.
 
 ## Form & Typografie
 
@@ -116,7 +116,7 @@ Ikonen des Entwurfs (Tabler) gelten nur noch als Bildidee, nicht als Quelle.
   `lifeline-hub` Mono 12 · Statuspunkt + Einsatznummer (Mono) + Einsatzname ·
   Suchfeld (max 520, „Modul, Einheit, Meldung, Koordinate …“, ⌘K) · SYNC-Anzeige ·
   Uhr Mono 14 · Initialen + Funktion.
-- Rail 60 px: Ikone 20 + Etikett 9 px Versalien darunter, Zeile 62 px; aktiv: Fläche
+- Rail 60 px: Icon 20 + Etikett 9 px Versalien darunter, Zeile 62 px; aktiv: Fläche
   `#16191d`, Text hell, 2-px-Marke links in **marke**. Einstellungen unten abgesetzt.
 - Modulpanel 208 px `#0a0c0e`: Kopf 42 px Augenbraue; Zeilen 34 px (Dichte-Boden
   beachten), 2×16-px-Marke in bedien bei aktiv, Zähler Mono rechts; Fuß „Einsatzdauer“
@@ -124,7 +124,7 @@ Ikonen des Entwurfs (Tabler) gelten nur noch als Bildidee, nicht als Quelle.
 - Seitenkopf 44 px, Rinne 24: links Breadcrumb bzw. Titel 14/600 + Mono-Meta, rechts
   Aktionen (sekundär umrandet, primär blau gefüllt, 28 px Skizze → Staffel).
 - Sprungpalette (⌘K): Maske `rgba(5,6,8,.72)`, 640 breit, 120 px von oben, Rahmen
-  bedien, Kopf 52 mit Suchikone blau + ESC, Gruppen-Augenbraue, Zeile 38 mit Ikone ·
+  bedien, Kopf 52 mit Suchicon blau + ESC, Gruppen-Augenbraue, Zeile 38 mit Icon ·
   Label · Kontext · Taste, Fußzeile mit Hinweisen.
 
 ## Bausteine (S1 „Neue Bausteine“ + wiederkehrende Muster)
@@ -142,7 +142,7 @@ Ikonen des Entwurfs (Tabler) gelten nur noch als Bildidee, nicht als Quelle.
 - **Schnellerfassungszeile**: Feld mit Rahmen bedien, Mono-Befehl `/typ` in bedien,
   Hinweiszeile Mono darunter; `@` Einheit, `#` Koordinate. Die Erfassungs-Norm
   (Enter sendet, Offline-Queue mit `client_id`, Sichtung im selben POST) gilt weiter.
-- **Sammelbanner**: Grund bedien-dunkel, Pfeilikone, Text, rechts Mono-Aktion.
+- **Sammelbanner**: Grund bedien-dunkel, Pfeilicon, Text, rechts Mono-Aktion.
 
 ## Module aus dem Entwurf ohne Gegenstück (LFH-620, 22.09.2026)
 

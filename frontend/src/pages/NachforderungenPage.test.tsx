@@ -268,7 +268,7 @@ describe('NachforderungenPage', () => {
       renderPage(deeplink);
       expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
       // Zwei Knöpfe schließen die Erfassung: der im Seitenkopf und das Kreuz am Paneel. Bis
-      // LFH-595 schob antds Ikone `aria-label="up"` in den Namen des Kopfknopfs; die Ikonen des
+      // LFH-595 schob antds Icon `aria-label="up"` in den Namen des Kopfknopfs; die Icons des
       // Satzes sind `aria-hidden`, beide heißen jetzt gleich. Geklickt wird der Kopfknopf.
       const schliessen = screen.getAllByRole('button', { name: 'Formular schließen' });
       expect(schliessen).toHaveLength(2);

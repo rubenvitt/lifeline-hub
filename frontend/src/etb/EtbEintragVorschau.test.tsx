@@ -140,6 +140,32 @@ describe('EtbEintragVorschau (LFH-664)', () => {
     ).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
   });
 
+  it('zeigt ein Foto als Vorschaubild ohne Bedienziel (LFH-759)', async () => {
+    etbHandler([
+      eintrag({
+        anhaenge: [
+          {
+            id: 9,
+            einsatz_id: 5,
+            dateiname: 'dach.jpg',
+            mime: 'image/jpeg',
+            groesse: 2048,
+            hochgeladen_von: 1,
+            erstellt_at: '2026-05-23 10:00:00',
+          },
+        ],
+      }),
+    ]);
+    renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);
+
+    const bild = await screen.findByRole('img', { name: 'Vorschau: dach.jpg, Anhang zu Nr. 12' });
+    expect(bild.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/einsaetze/5/etb/40/anhaenge/9?fassung=vorschau',
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
   it('trägt keine Bedienelemente', async () => {
     etbHandler([eintrag()]);
     renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);

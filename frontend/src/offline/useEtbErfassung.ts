@@ -15,6 +15,7 @@ import {
   type AbgelehnterEintrag,
   type AusstehenderEintrag,
 } from './queue';
+import { neueClientId } from './clientId';
 import { istOfflineTransient } from './fehler';
 
 /**
@@ -203,7 +204,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       // erzeugt ein Timeout-nach-Commit beim Retry ein Duplikat mit neuer lfd_nr.
       const mitId: NeuerEintrag = {
         ...eintrag,
-        client_id: eintrag.client_id ?? crypto.randomUUID(),
+        client_id: eintrag.client_id ?? neueClientId(),
       };
       if (benutzerId == null) throw new Error('Nicht angemeldet');
       try {

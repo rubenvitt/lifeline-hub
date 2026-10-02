@@ -1,4 +1,4 @@
-import { IkoneChevronRechts, IkoneChevronRunter } from '../../ikonen';
+import { IconChevronRechts, IconChevronRunter } from '../../icons';
 import { useCallback, useId, useState, type CSSProperties, type ReactNode } from 'react';
 import { augenbraueStil, monoStil, paneelKopfStil, useRollen } from '../../components/instrument';
 
@@ -44,7 +44,7 @@ interface AbschnittProps {
   titel: string;
   /** Mono-Meta rechts im Kopf (Zähler). */
   meta?: ReactNode;
-  /** Zeichen rechts im Kopf (z. B. eine Ikone). */
+  /** Zeichen rechts im Kopf (z. B. ein Icon). */
   zeichen?: ReactNode;
   /** Kennung für Tests und Sprungziele (`data-paneel`). */
   kennung: string;
@@ -116,7 +116,7 @@ export function KlappPaneel({
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingSM }}>
             {meta != null && <span style={{ ...monoStil(11), color: rollen.schwach }}>{meta}</span>}
             <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
-              {offen ? <IkoneChevronRunter size={14} /> : <IkoneChevronRechts size={14} />}
+              {offen ? <IconChevronRunter size={14} /> : <IconChevronRechts size={14} />}
             </span>
           </span>
         </button>

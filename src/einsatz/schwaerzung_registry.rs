@@ -18,6 +18,7 @@
 //! ist `sqlx::AssertSqlSafe` hier injektionssicher; Werte werden gebunden.
 
 use super::repo::SCHWAERZUNG_PLATZHALTER;
+use super::retention::Datenkategorie;
 
 /// Wie eine als PII eingestufte Spalte gescrubbt wird.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,11 +45,32 @@ pub enum Strategie {
     ZeileLoeschen,
 }
 
+/// Welcher Frist eine Scrub-Spalte folgt (LFH-749, Spec `aufbewahrung-kategorien`, design.md
+/// D1/D2). Jede Scrub-Spalte trägt genau eine Zuordnung — im Typ, damit eine neue Spalte ohne
+/// Zuordnung nicht kompiliert. Gepinnt in `tests::kategorie_zuordnung_ist_gepinnt`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Zuordnung {
+    /// Eigene Kategorie-Frist: wird mit der Kategorie geschwärzt.
+    Kategorie(Datenkategorie),
+    /// Personenstamm: wird erst geschwärzt, wenn alle Zwecke der Person geschwärzt sind
+    /// (design.md D3); die Tabelle nennt dafür ihren [`TabellenRegel::person_bezug`].
+    Personenstamm,
+    /// Folgt der Frist des Einsatzes: nur die Einsatz-Schwärzung nimmt sie mit.
+    Einsatz,
+}
+
+const Z_EINSATZ: Zuordnung = Zuordnung::Einsatz;
+const Z_STAMM: Zuordnung = Zuordnung::Personenstamm;
+const Z_BEHANDLUNG: Zuordnung = Zuordnung::Kategorie(Datenkategorie::Behandlung);
+const Z_AUSKUNFT: Zuordnung = Zuordnung::Kategorie(Datenkategorie::Personenauskunft);
+const Z_ANHAENGE: Zuordnung = Zuordnung::Kategorie(Datenkategorie::Anhaenge);
+
 /// Klassifikation einer einzelnen Spalte.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Klassifikation {
-    /// PII → wird bei der Schwärzung nach [`Strategie`] entfernt.
-    Scrub(Strategie),
+    /// PII → wird bei der Schwärzung nach [`Strategie`] entfernt, zu der Frist, die die
+    /// [`Zuordnung`] nennt.
+    Scrub(Strategie, Zuordnung),
     /// Bleibt erhalten. Der `&'static str` begründet, warum (Struktur, Führungs-Doku,
     /// anonymisiertes Statistik-Skelett …).
     Retain(&'static str),
@@ -76,10 +98,10 @@ pub struct SpaltenRegel {
     pub klassifikation: Klassifikation,
 }
 
-const fn scrub(spalte: &'static str, strategie: Strategie) -> SpaltenRegel {
+const fn scrub(spalte: &'static str, strategie: Strategie, zuordnung: Zuordnung) -> SpaltenRegel {
     SpaltenRegel {
         spalte,
-        klassifikation: Klassifikation::Scrub(strategie),
+        klassifikation: Klassifikation::Scrub(strategie, zuordnung),
     }
 }
 
@@ -98,6 +120,9 @@ pub struct TabellenRegel {
     /// Optionaler zusätzlicher Zeilenfilter (SQL-Fragment ohne `WHERE`/`AND`, z. B.
     /// `"personal_id IS NULL"`). Compile-time-Konstante → injektionssicher.
     pub zeilenfilter: Option<&'static str>,
+    /// Spalte, über die eine Zeile ihre Person (`einsatz_person.id`) erreicht. Pflicht, sobald
+    /// die Tabelle eine [`Zuordnung::Personenstamm`]-Spalte trägt (design.md D3).
+    pub person_bezug: Option<&'static str>,
     pub spalten: &'static [SpaltenRegel],
 }
 
@@ -149,6 +174,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz",
         scoping: Scoping::SelbstId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("org_id", G_FK),
@@ -177,11 +203,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Meldebild, Adresse/GPS und meldende Stelle sind Betroffenen-/Melder-PII. GPS
             // mit-nullen,
             // sonst verriete der Fix die Adresse.
-            scrub("einsatzort", Strategie::NullSetzen),
-            scrub("einsatzort_lat", Strategie::NullSetzen),
-            scrub("einsatzort_lon", Strategie::NullSetzen),
-            scrub("meldende_stelle", Strategie::NullSetzen),
-            scrub("sachverhalt", Strategie::NullSetzen),
+            scrub("einsatzort", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("einsatzort_lat", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("einsatzort_lon", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("meldende_stelle", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("sachverhalt", Strategie::NullSetzen, Z_EINSATZ),
             retain("anzahl_betroffene_initial", G_ZAEHLER),
             retain("retention_bis", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
@@ -193,21 +219,22 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_person",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: Some("id"),
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("client_id", G_IDEMPOTENZ),
             retain("registrier_nr", G_ZAEHLER),
             retain("status", G_TRIAGE),
-            scrub("name", Strategie::NullSetzen),
-            scrub("vorname", Strategie::NullSetzen),
-            scrub("geschlecht", Strategie::NullSetzen),
-            scrub("geburtsdatum", Strategie::NullSetzen),
-            scrub("alter_geschaetzt", Strategie::NullSetzen),
-            scrub("herkunft_adresse", Strategie::NullSetzen),
-            scrub("antreff_ort", Strategie::NullSetzen),
-            scrub("melder_kontakt", Strategie::NullSetzen),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("name", Strategie::NullSetzen, Z_STAMM),
+            scrub("vorname", Strategie::NullSetzen, Z_STAMM),
+            scrub("geschlecht", Strategie::NullSetzen, Z_STAMM),
+            scrub("geburtsdatum", Strategie::NullSetzen, Z_STAMM),
+            scrub("alter_geschaetzt", Strategie::NullSetzen, Z_STAMM),
+            scrub("herkunft_adresse", Strategie::NullSetzen, Z_AUSKUNFT),
+            scrub("antreff_ort", Strategie::NullSetzen, Z_STAMM),
+            scrub("melder_kontakt", Strategie::NullSetzen, Z_AUSKUNFT),
+            scrub("notiz", Strategie::NullSetzen, Z_STAMM),
             retain("erfasst_at", G_ZEIT),
             retain("erfasst_von", G_FK),
             retain("geaendert_at", G_ZEIT),
@@ -216,18 +243,18 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("aktuelle_sichtung", G_TRIAGE),
             retain("aktuelle_sichtung_at", G_ZEIT),
             // Denormalisierter Cache: trägt bei Transporten „Transport → {Klinik}“ im Klartext.
-            scrub("aktueller_verbleib", Strategie::NullSetzen),
+            scrub("aktueller_verbleib", Strategie::NullSetzen, Z_STAMM),
             retain("aktuelle_uhs_id", G_FK),
             retain("aktueller_platz_id", G_FK),
             // Zustand ist ein Gesundheitsdatum, die Fundort-Koordinate ein Aufenthaltsort. Das
             // Verbleib-Ziel spiegelt `person_verbleib.ziel` und wird wie dort gescrubbt.
-            scrub("zustand", Strategie::NullSetzen),
-            scrub("antreff_lat", Strategie::NullSetzen),
-            scrub("antreff_lon", Strategie::NullSetzen),
+            scrub("zustand", Strategie::NullSetzen, Z_BEHANDLUNG),
+            scrub("antreff_lat", Strategie::NullSetzen, Z_STAMM),
+            scrub("antreff_lon", Strategie::NullSetzen, Z_STAMM),
             retain("vermisst_seit", G_ZEIT),
             // Art/Status spiegeln die CHECK-Enums von person_verbleib (dort ebenfalls retain).
             retain("aktuelle_verbleib_art", G_TRIAGE),
-            scrub("aktuelles_verbleib_ziel", Strategie::NullSetzen),
+            scrub("aktuelles_verbleib_ziel", Strategie::NullSetzen, Z_STAMM),
             retain("aktueller_verbleib_status", G_TRIAGE),
             // Kennung der Betreuungsstelle, kein Personenbezug (der Name hängt an der Stelle).
             retain("aktuelle_verbleib_betreuungsstelle_id", G_FK),
@@ -237,12 +264,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "person_sichtung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("person_id", G_FK),
             retain("kategorie", G_TRIAGE),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("notiz", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("gesichtet_at", G_ZEIT),
             retain("gesichtet_von", G_FK),
         ],
@@ -251,12 +279,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "person_verlaufsnotiz",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("person_id", G_FK),
             // text ist NOT NULL → Platzhalter statt NULL.
-            scrub("text", Strategie::Platzhalter),
+            scrub("text", Strategie::Platzhalter, Z_BEHANDLUNG),
             retain("erfasst_at", G_ZEIT),
             retain("erfasst_von", G_FK),
         ],
@@ -265,6 +294,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "person_verbleib",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: Some("person_id"),
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -272,11 +302,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("art", G_TRIAGE),
             // Freitext wie ziel/notiz → gescrubbt; G_TRIAGE gilt nur für die CHECK-Enums
             // art/status.
-            scrub("transportmittel", Strategie::NullSetzen),
+            scrub("transportmittel", Strategie::NullSetzen, Z_STAMM),
             // Klartext-Verbringungsort (Klinikname/Adresse) → PII.
-            scrub("ziel", Strategie::NullSetzen),
+            scrub("ziel", Strategie::NullSetzen, Z_STAMM),
             retain("status", G_TRIAGE),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("notiz", Strategie::NullSetzen, Z_STAMM),
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_von", G_FK),
             // Kennung der Betreuungsstelle eines Notunterkunft-Verbleibs.
@@ -287,6 +317,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "person_uhs_belegung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -294,7 +325,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("uhs_id", G_FK),
             retain("platz_id", G_FK),
             retain("art", G_TRIAGE),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("notiz", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_von", G_FK),
         ],
@@ -303,6 +334,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "person_abgleich",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -319,6 +351,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "person_zugriff_audit",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -333,6 +366,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_tier",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -346,14 +380,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("farbe_beschreibung", G_TIER),
             // Chip-/Tätowierungsnummer ist im Haustierregister auf den Halter registriert →
             // personenverknüpfend.
-            scrub("kennzeichnung", Strategie::NullSetzen),
+            scrub("kennzeichnung", Strategie::NullSetzen, Z_EINSATZ),
             retain("groesse_gewicht", G_TIER),
             retain("halter_person_id", G_FK),
-            scrub("halter_kontakt", Strategie::NullSetzen),
-            scrub("antreff_ort", Strategie::NullSetzen),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("halter_kontakt", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("antreff_ort", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
             retain("abschluss_grund", G_ENUM),
-            scrub("abschluss_ziel", Strategie::NullSetzen),
+            scrub("abschluss_ziel", Strategie::NullSetzen, Z_EINSATZ),
             retain("erfasst_at", G_ZEIT),
             retain("erfasst_von", G_FK),
             retain("geaendert_at", G_ZEIT),
@@ -366,6 +400,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_schaden",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -374,15 +409,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("typ", G_ENUM),
             retain("ausmass", G_ENUM),
             // Schadensort ist faktisch die Adresse Betroffener → gescrubbt; NOT NULL → Platzhalter.
-            scrub("ort", Strategie::Platzhalter),
+            scrub("ort", Strategie::Platzhalter, Z_EINSATZ),
             // Unstrukturierter Freitext, kann dieselbe PII tragen wie `ort` → gescrubbt.
-            scrub("beschreibung", Strategie::Platzhalter),
+            scrub("beschreibung", Strategie::Platzhalter, Z_EINSATZ),
             retain("geschaedigt_person_id", G_FK),
-            scrub("geschaedigt_kontakt", Strategie::NullSetzen),
+            scrub("geschaedigt_kontakt", Strategie::NullSetzen, Z_EINSATZ),
             retain("geschaedigt_personal_id", G_FK),
             retain("geschaedigt_organisation_id", G_FK),
             // CHECK status='uebergeben' ⇒ NOT NULL → Platzhalter nur, wenn gesetzt.
-            scrub("uebergeben_an", Strategie::PlatzhalterWennGesetzt),
+            scrub("uebergeben_an", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
             retain("uebergeben_at", G_ZEIT),
             retain("abschluss_grund", G_ENUM),
             retain("abschluss_at", G_ZEIT),
@@ -403,6 +438,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         // Nur Ad-hoc-externe sind einsatz-scoped PII; Dispositionen von Stamm-Kräften sind
         // Stammdaten.
         zeilenfilter: Some("personal_id IS NULL"),
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -410,10 +446,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status_id", G_FK),
             retain("staerke_position", G_ENUM),
             // snap_name ist NOT NULL → Platzhalter.
-            scrub("snap_name", Strategie::Platzhalter),
-            scrub("snap_funktion", Strategie::NullSetzen),
-            scrub("snap_traegerorganisation", Strategie::NullSetzen),
-            scrub("bemerkung", Strategie::NullSetzen),
+            scrub("snap_name", Strategie::Platzhalter, Z_EINSATZ),
+            scrub("snap_funktion", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("snap_traegerorganisation", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ),
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
             retain("einheit_id", G_FK),
@@ -429,12 +465,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "karte_hintergrundbild",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             // Der Dateiname kann PII tragen („Lageplan Familie Müller.png“) → Platzhalter (NOT
             // NULL).
-            scrub("name", Strategie::Platzhalter),
+            scrub("name", Strategie::Platzhalter, Z_EINSATZ),
             // BLOB bleibt: georeferenziertes Kartografie-Skelett, kein Foto Betroffener (≠ anhang).
             retain(
                 "daten",
@@ -462,11 +499,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "karten_ansicht",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             // Meist thematisch („Verkehr“), kann aber PII tragen → Platzhalter (NOT NULL).
-            scrub("name", Strategie::Platzhalter),
+            scrub("name", Strategie::Platzhalter, Z_EINSATZ),
             retain("reihenfolge", G_KONFIG),
             retain("ist_standard", G_KONFIG),
             retain("basemap_modus", G_ENUM),
@@ -487,6 +525,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "freies_zeichen",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -500,7 +539,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("funktion", G_ENUM),
             retain("farbe", G_ENUM),
             // Freitext-Label (kann PII tragen, „ELW Fam. Müller“) → NULL (nullable).
-            scrub("label", Strategie::NullSetzen),
+            scrub("label", Strategie::NullSetzen, Z_EINSATZ),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
@@ -515,42 +554,44 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
-            scrub("id", Strategie::ZeileLoeschen),
-            scrub("einsatz_id", Strategie::ZeileLoeschen),
-            scrub("dateiname", Strategie::ZeileLoeschen),
-            scrub("mime", Strategie::ZeileLoeschen),
-            scrub("groesse", Strategie::ZeileLoeschen),
-            scrub("sha256", Strategie::ZeileLoeschen),
-            scrub("daten", Strategie::ZeileLoeschen),
-            scrub("hochgeladen_von", Strategie::ZeileLoeschen),
-            scrub("erstellt_at", Strategie::ZeileLoeschen),
+            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("dateiname", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("mime", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("groesse", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("sha256", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("daten", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("hochgeladen_von", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("erstellt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
         // Ganze Zeile löschen wie `anhang`: der Titel ist Freitext, und die Datei ist ohnehin weg
-        // (CASCADE; `anhang` steht deshalb VOR dieser Regel). Der Titel überlebt im Wortlaut der
-        // System-ETB-Einträge „Dokument abgelegt/entfernt: {titel} ({kategorie})“ — ETB-Freitext
-        // ist
-        // Führungsdokumentation und bleibt (G_ETB). Gepinnt in
+        // (CASCADE; `anhang` steht deshalb VOR dieser Regel). Seit LFH-752 nennen die
+        // System-ETB-Einträge den Titel nicht mehr, nur die Kategorie und den Ablage-Eintrag
+        // („Dokument abgelegt (Foto)“, „Dokument entfernt: Ablage ETB 12 (Foto)“). Ältere
+        // Einträge mit Titel bleiben, ETB-Freitext ist Führungsdokumentation (G_ETB). Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis`.
         tabelle: "einsatz_dokument",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
-            scrub("id", Strategie::ZeileLoeschen),
-            scrub("einsatz_id", Strategie::ZeileLoeschen),
-            scrub("anhang_id", Strategie::ZeileLoeschen),
-            scrub("kategorie", Strategie::ZeileLoeschen),
-            scrub("titel", Strategie::ZeileLoeschen),
-            scrub("bezug_abschnitt_id", Strategie::ZeileLoeschen),
-            scrub("bezug_einheit_id", Strategie::ZeileLoeschen),
-            scrub("bezug_etb_eintrag_id", Strategie::ZeileLoeschen),
-            scrub("etb_eintrag_id", Strategie::ZeileLoeschen),
-            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
-            scrub("abgelegt_at", Strategie::ZeileLoeschen),
-            scrub("geloescht_at", Strategie::ZeileLoeschen),
-            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("anhang_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("kategorie", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("titel", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("bezug_abschnitt_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("bezug_einheit_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("bezug_etb_eintrag_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("etb_eintrag_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
@@ -561,15 +602,16 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_schaden_anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
-            scrub("id", Strategie::ZeileLoeschen),
-            scrub("einsatz_id", Strategie::ZeileLoeschen),
-            scrub("schaden_id", Strategie::ZeileLoeschen),
-            scrub("anhang_id", Strategie::ZeileLoeschen),
-            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
-            scrub("abgelegt_at", Strategie::ZeileLoeschen),
-            scrub("geloescht_at", Strategie::ZeileLoeschen),
-            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("schaden_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("anhang_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
@@ -582,15 +624,16 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_person_anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
-            scrub("id", Strategie::ZeileLoeschen),
-            scrub("einsatz_id", Strategie::ZeileLoeschen),
-            scrub("person_id", Strategie::ZeileLoeschen),
-            scrub("anhang_id", Strategie::ZeileLoeschen),
-            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
-            scrub("abgelegt_at", Strategie::ZeileLoeschen),
-            scrub("geloescht_at", Strategie::ZeileLoeschen),
-            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("person_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("anhang_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
@@ -601,16 +644,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "lage_snapshot",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
-            scrub("id", Strategie::ZeileLoeschen),
-            scrub("einsatz_id", Strategie::ZeileLoeschen),
-            scrub("bezeichnung", Strategie::ZeileLoeschen),
-            scrub("notiz", Strategie::ZeileLoeschen),
-            scrub("stand_at", Strategie::ZeileLoeschen),
-            scrub("schema_version", Strategie::ZeileLoeschen),
-            scrub("daten", Strategie::ZeileLoeschen),
-            scrub("erstellt_von", Strategie::ZeileLoeschen),
-            scrub("erstellt_at", Strategie::ZeileLoeschen),
+            scrub("id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("bezeichnung", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("notiz", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("stand_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("schema_version", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erstellt_von", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erstellt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     // ---------- Lage / Gefahren (Freitext-Labels der „ELW Fam. Müller“-Klasse) ----------
@@ -618,6 +662,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "lage_zone",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -628,9 +673,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // ETB-Politik
             // G_ETB. Gepinnt in
             // `tests/gefahr.rs::schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut`.
-            scrub("label", Strategie::NullSetzen),
+            scrub("label", Strategie::NullSetzen, Z_EINSATZ),
             retain("farbe", G_ENUM),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
@@ -646,12 +691,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "gefahrengebiet",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             // Wie `lage_zone.label`: das Gebietslabel bleibt im System-ETB des Warnstufenwechsels
             // (G_ETB), gepinnt im selben Test.
-            scrub("label", Strategie::NullSetzen),
+            scrub("label", Strategie::NullSetzen, Z_EINSATZ),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
@@ -665,6 +711,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "gefahrengebiet",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("gefahrengebiet_id", G_FK),
@@ -672,9 +719,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("schutzobjekt", G_ENUM),
             retain("warnstufe", G_ENUM),
             // Unstrukturierter Freitext, kann Betroffenen-PII tragen → gescrubbt.
-            scrub("beschreibung", Strategie::NullSetzen),
+            scrub("beschreibung", Strategie::NullSetzen, Z_EINSATZ),
             // `gemeldet_von` ist Klartext-Name des Melders (nicht der Benutzer-FK) → NULL.
-            scrub("gemeldet_von", Strategie::NullSetzen),
+            scrub("gemeldet_von", Strategie::NullSetzen, Z_EINSATZ),
             retain("aktualisiert_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
@@ -684,12 +731,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "lage_meldung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("meldung_id", G_FK),
             // text ist NOT NULL → Platzhalter.
-            scrub("text", Strategie::Platzhalter),
+            scrub("text", Strategie::Platzhalter, Z_EINSATZ),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
             retain("erstellt_von_id", G_FK),
@@ -705,13 +753,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatzabschnitt",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("ueber_abschnitt_id", G_FK),
             retain("name", G_OP_LABEL),
             retain("leiter_id", G_FK),
-            scrub("bemerkung", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
+            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),
             retain("flaeche_geojson", G_GEO),
@@ -729,14 +778,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             // Mögliche Rufnummer der Führung → PII.
-            scrub("erreichbarkeit", Strategie::NullSetzen),
+            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             // Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN). Der
             // Abschnittsauftrag
             // ist nullabler Freitext und wird, anders als `auftrag.auftrag_text`, nicht ins ETB
             // gesnapshottet.
             retain("kurzbezeichnung", G_OP_LABEL),
             retain("lagezustand", G_ENUM),
-            scrub("abschnittsauftrag", Strategie::NullSetzen), // REVIEW: operativer Freitext
+            scrub("abschnittsauftrag", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext
             retain("fortschritt", G_ZAEHLER),
             // Rhythmus-Vorgabe der Ablösung in Minuten.
             retain("abloesung_rhythmus_minuten", G_KONFIG),
@@ -746,6 +795,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_einheit",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -757,7 +807,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("soll_fuehrer", G_ZAEHLER),
             retain("soll_unterfuehrer", G_ZAEHLER),
             retain("soll_mannschaft", G_ZAEHLER),
-            scrub("bemerkung", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
+            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             // Funk-Felder: kommunikationsmittel ist Kategorie-Schlüssel (RETAIN), erreichbarkeit
             // eine
             // mögliche Rufnummer (Scrub).
@@ -765,7 +815,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
-            scrub("erreichbarkeit", Strategie::NullSetzen),
+            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             // Der Rufname benennt ein operatives Objekt, keine Person (wie fahrzeug.funkrufname).
             retain("funkrufname", G_OP_LABEL),
             retain("sortier", G_KONFIG),
@@ -784,6 +834,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_fahrzeug",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -795,7 +846,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("snap_fahrzeugtyp", G_OP_SNAP),
             retain("snap_opta", G_OP_SNAP),
             retain("snap_traegerorganisation", G_OP_SNAP),
-            scrub("bemerkung", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
+            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
             retain("einheit_id", G_FK),
@@ -810,6 +861,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_material",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -821,7 +873,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("snap_kategorie", G_OP_SNAP),
             retain("snap_bestandsnummer", G_OP_SNAP),
             retain("snap_traegerorganisation", G_OP_SNAP),
-            scrub("bemerkung", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
+            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("disponiert_at", G_ZEIT),
             retain("disponiert_von", G_FK),
             retain("uhs_id", G_FK),
@@ -831,11 +883,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_mitgliedschaft",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("einsatz_id", G_SCOPE),
             retain("benutzer_id", G_FK),
             retain("einsatz_rolle", G_ENUM),
-            scrub("fuehrungsstelle", Strategie::NullSetzen),
+            scrub("fuehrungsstelle", Strategie::NullSetzen, Z_EINSATZ),
             // Katalogcode (LFH-549) — kein Personenbezug; die Bezeichnung steht in
             // `fuehrungsstelle` und wird oben genullt.
             retain("fuehrungsfunktion", G_ENUM),
@@ -849,14 +902,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_stabsfunktion",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("sachgebiet", G_ENUM),
             retain("besetzung_art", G_ENUM),
             retain("personal_id", G_FK),
-            scrub("snap_name", Strategie::NullSetzen), // REVIEW: Name der disponierten Person
-            scrub("bezeichnung", Strategie::NullSetzen), // REVIEW: Name/Stelle extern bzw. rückwärtig
+            scrub("snap_name", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name der disponierten Person
+            scrub("bezeichnung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name/Stelle extern bzw. rückwärtig
             retain("gesetzt_von_id", G_FK),
             retain("gesetzt_at", G_ZEIT),
         ],
@@ -867,6 +921,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_abloesung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -894,6 +949,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_kraft_zeitachse",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -903,12 +959,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zeitpunkt_at", G_ZEIT),
             retain("quelle", G_ENUM),
             retain("ursprung_id", G_FK),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
             retain("erfasst_von", G_FK),
             retain("erfasst_at", G_ZEIT),
             retain("gestrichen_at", G_ZEIT),
             retain("gestrichen_von", G_FK),
-            scrub("streichgrund", Strategie::PlatzhalterWennGesetzt),
+            scrub("streichgrund", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
         ],
     },
     // Betreuung: Mengen, keine Personen — Anzahlen, Kapazitäten, Zustände und Zeitpunkte bleiben
@@ -919,17 +975,18 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "evakuierungsbezirk",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("abschnitt_id", G_FK),
             // NOT NULL unter partiellem UNIQUE-Index → je Zeile eigener Platzhalter.
-            scrub("bezeichnung", Strategie::PlatzhalterMitId),
+            scrub("bezeichnung", Strategie::PlatzhalterMitId, Z_EINSATZ),
             retain("plan_personen", G_ZAEHLER),
             retain("plan_erhebung", G_ENUM),
             retain("raeumung", G_ENUM),
-            scrub("sammelstelle", Strategie::NullSetzen),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("sammelstelle", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
             retain("stand_id", G_FK),
             retain("storniert_at", G_ZEIT),
             retain("storniert_von_id", G_FK),
@@ -942,6 +999,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "evakuierung_stand",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("bezirk_id", G_FK),
@@ -962,17 +1020,18 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "betreuungsstelle",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("abschnitt_id", G_FK),
             // NOT NULL unter partiellem UNIQUE-Index → je Zeile eigener Platzhalter.
-            scrub("bezeichnung", Strategie::PlatzhalterMitId),
+            scrub("bezeichnung", Strategie::PlatzhalterMitId, Z_EINSATZ),
             retain("art", G_ENUM),
             retain("kapazitaet_personen", G_ZAEHLER),
             retain("status", G_ENUM),
-            scrub("standort", Strategie::NullSetzen),
-            scrub("notiz", Strategie::NullSetzen),
+            scrub("standort", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
             // Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
             retain("lat", G_GEO),
             retain("lon", G_GEO),
@@ -988,6 +1047,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "betreuungsstelle_belegung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("stelle_id", G_FK),
@@ -1010,6 +1070,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "verpflegung_zeitfenster",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -1033,14 +1094,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "verpflegung_ausgabe",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("zeitfenster_id", G_FK),
             retain("zeitpunkt_at", G_ZEIT),
             retain("menge", G_ZAEHLER),
-            scrub("ort", Strategie::NullSetzen),
-            scrub("bemerkung", Strategie::NullSetzen),
+            scrub("ort", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ),
             retain("sk_vegetarisch", G_ZAEHLER),
             retain("sk_vegan", G_ZAEHLER),
             retain("sk_ohne_schwein", G_ZAEHLER),
@@ -1061,12 +1123,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_lagebesprechung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("lfd_nr", G_ZAEHLER),
             retain("abgehalten_at", G_ZEIT),
-            scrub("entschluss", Strategie::Platzhalter), // NOT NULL
+            scrub("entschluss", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("naechste_at", G_ZEIT),
             retain("etb_eintrag_id", G_FK),
             retain("erfasst_von_id", G_FK),
@@ -1080,6 +1143,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_stab_checkliste",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -1087,7 +1151,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erledigt", G_ENUM),
             retain("erledigt_at", G_ZEIT),
             retain("erledigt_von_id", G_FK),
-            scrub("bemerkung", Strategie::NullSetzen), // REVIEW: Freitext am Punkt
+            scrub("bemerkung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Freitext am Punkt
             retain("geaendert_von_id", G_FK),
             retain("geaendert_at", G_ZEIT),
         ],
@@ -1097,6 +1161,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_pegel",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -1117,6 +1182,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_einstellungen",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("einsatz_id", G_SCOPE),
             retain("standard_modul", G_KONFIG),
@@ -1146,6 +1212,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "einsatz_modul_override",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("einsatz_id", G_SCOPE),
             retain("modul_key", G_ENUM),
@@ -1155,17 +1222,37 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_von", G_FK),
         ],
     },
+    // Kategorie-Fristen (LFH-749): Aufbewahrungsstruktur, die die Schwärzung überleben muss,
+    // damit Archivakte und Zustand sie zeigen.
+    TabellenRegel {
+        tabelle: "einsatz_aufbewahrung_kategorie",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("kategorie", G_ENUM),
+            retain("frist_bis", G_ZEIT),
+            retain(
+                "rechtsgrundlage",
+                "Rechtsgrundlage der Frist (Org-Text zur Rechenschaft, kein Personenbezug)",
+            ),
+            retain("vorgemerkt_at", G_ZEIT),
+            retain("geschwaerzt_at", G_ZEIT),
+        ],
+    },
     TabellenRegel {
         tabelle: "bereitstellungsraum",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("abschnitt_id", G_FK),
             retain("bezeichnung", G_OP_LABEL),
-            scrub("standort", Strategie::NullSetzen), // REVIEW: Freitext-Standort (Adresse möglich)
-            scrub("notiz", Strategie::NullSetzen),    // REVIEW: operativer Freitext-Zettel
+            scrub("standort", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Freitext-Standort (Adresse möglich)
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),    // REVIEW: operativer Freitext-Zettel
             retain("status", G_ENUM),
             retain("erfasst_at", G_ZEIT),
             retain("erfasst_von", G_FK),
@@ -1178,6 +1265,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "br_belegung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -1185,7 +1273,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("objekt_typ", G_POLY),
             retain("objekt_id", G_POLY),
             retain("art", G_ENUM),
-            scrub("notiz", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_von", G_FK),
         ],
@@ -1194,14 +1282,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "uhs",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("abschnitt_id", G_FK),
             retain("typ", G_ENUM),
             retain("bezeichnung", G_OP_LABEL),
-            scrub("standort", Strategie::NullSetzen), // REVIEW: „Adresse/Hinweis“-Freitext
-            scrub("notiz", Strategie::NullSetzen),    // REVIEW: operativer Freitext-Zettel
+            scrub("standort", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: „Adresse/Hinweis“-Freitext
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),    // REVIEW: operativer Freitext-Zettel
             retain("status", G_ENUM),
             retain("erfasst_at", G_ZEIT),
             retain("erfasst_von", G_FK),
@@ -1220,6 +1309,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "uhs",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("uhs_id", G_FK),
@@ -1236,13 +1326,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "sprechgruppe",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("org_id", G_FK),
             retain("einsatz_id", G_SCOPE),
             retain("bezeichnung", G_OP_LABEL),
             retain("betriebsart", G_ENUM),
-            scrub("hinweis", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
+            scrub("hinweis", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext-Zettel
             retain("aktiv", G_KONFIG),
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),
@@ -1255,6 +1346,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "einsatz_einheit",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[retain("einheit_id", G_FK), retain("sprechgruppe_id", G_FK)],
     },
     TabellenRegel {
@@ -1264,6 +1356,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "einsatzabschnitt",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("abschnitt_id", G_FK),
             retain("sprechgruppe_id", G_FK),
@@ -1276,6 +1369,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "etb_eintrag",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -1307,6 +1401,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "meldung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
@@ -1314,10 +1409,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lfd_nr", G_ZAEHLER),
             // Führungs-Freitexte (LFH-701, Linie A): Die Führungsdokumentation ist der
             // ETB-Wortlaut (`etb_eintrag.von`/`an`/`inhalt`, G_ETB); die Meldung ist Arbeitsstand.
-            scrub("absender", Strategie::Platzhalter), // NOT NULL
-            scrub("empfaenger", Strategie::NullSetzen),
+            scrub("absender", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("empfaenger", Strategie::NullSetzen, Z_EINSATZ),
             retain("meldeweg", G_ENUM),
-            scrub("inhalt", Strategie::Platzhalter), // NOT NULL
+            scrub("inhalt", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("meldungsart", G_ENUM),
             retain("prioritaet", G_ENUM),
             retain("status", G_ENUM),
@@ -1343,24 +1438,25 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "auftrag",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             // Führungs-Freitexte (LFH-701, Linie A): `auftrag_text` und `vollzugsmeldung` stehen
             // im ETB-Wortlaut; die Fünf-Punkte-Felder gelangen nie ins ETB und gehen ganz.
-            scrub("auftrag_text", Strategie::Platzhalter), // NOT NULL
-            scrub("absicht", Strategie::NullSetzen),
-            scrub("lage", Strategie::NullSetzen),
-            scrub("ort", Strategie::NullSetzen),
-            scrub("zeit", Strategie::NullSetzen),
-            scrub("mittel", Strategie::NullSetzen),
-            scrub("verbindung", Strategie::NullSetzen),
-            scrub("sicherheit", Strategie::NullSetzen),
+            scrub("auftrag_text", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("absicht", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("lage", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("ort", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("zeit", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("mittel", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("verbindung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("sicherheit", Strategie::NullSetzen, Z_EINSATZ),
             retain("prioritaet", G_ENUM),
             retain("frist_at", G_ZEIT),
             retain("erteilt_at", G_ZEIT),
             retain("in_arbeit_at", G_ZEIT),
-            scrub("vollzugsmeldung", Strategie::NullSetzen),
+            scrub("vollzugsmeldung", Strategie::NullSetzen, Z_EINSATZ),
             retain("abgenommen_at", G_ZEIT),
             retain("abgenommen_von_id", G_FK),
             retain("etb_anordnung_id", G_FK),
@@ -1378,6 +1474,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "auftrag",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("auftrag_id", G_FK),
@@ -1390,12 +1487,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // bei Typ `person` `einsatz_personal.snap_name`, das selbst gescrubbt wird). Er steht
             // verkettet in `etb_eintrag.an` der Anordnung (LFH-701, Linie A); die Bezeichnung
             // von Einheit/Abschnitt/Fahrzeug bleibt zudem über den Verweis erhalten.
-            scrub("funktion_text", Strategie::NullSetzen),
+            scrub("funktion_text", Strategie::NullSetzen, Z_EINSATZ),
             // Katalogcode (LFH-549) — kein Personenbezug.
             retain("funktion", G_ENUM),
             retain("extern_kategorie", G_ENUM),
-            scrub("extern_bezeichnung", Strategie::NullSetzen),
-            scrub("snap_anzeige", Strategie::Platzhalter), // NOT NULL
+            scrub("extern_bezeichnung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("snap_anzeige", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("quittiert_at", G_ZEIT),
             retain("quittiert_von_id", G_FK),
         ],
@@ -1404,14 +1501,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "lagebericht",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("vorlage", G_ENUM),
-            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            scrub("titel", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("zeitstand", G_ZEIT),
             retain("status", G_ENUM),
-            scrub("abschnitte", Strategie::LeeresJsonArray), // NOT NULL, JSON
+            scrub("abschnitte", Strategie::LeeresJsonArray, Z_EINSATZ), // NOT NULL, JSON
             retain("version", G_ZAEHLER),
             retain("vorgaenger_id", G_FK),
             retain("ersteller_id", G_FK),
@@ -1426,14 +1524,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "befehl",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("vorlage", G_ENUM),
-            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            scrub("titel", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("zeitstand", G_ZEIT),
             retain("status", G_ENUM),
-            scrub("abschnitte", Strategie::LeeresJsonArray), // NOT NULL, JSON
+            scrub("abschnitte", Strategie::LeeresJsonArray, Z_EINSATZ), // NOT NULL, JSON
             retain("version", G_ZAEHLER),
             retain("vorgaenger_id", G_FK),
             retain("ersteller_id", G_FK),
@@ -1451,14 +1550,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "pressemitteilung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("vorlage", G_ENUM),
-            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            scrub("titel", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("zeitstand", G_ZEIT),
             retain("status", G_ENUM),
-            scrub("abschnitte", Strategie::LeeresJsonArray), // NOT NULL, JSON
+            scrub("abschnitte", Strategie::LeeresJsonArray, Z_EINSATZ), // NOT NULL, JSON
             retain("version", G_ZAEHLER),
             retain("vorgaenger_id", G_FK),
             retain("ersteller_id", G_FK),
@@ -1478,14 +1578,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "medienkontakt",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("art", G_ENUM),
             retain("medium", G_PRESSE_LOG),
             retain("thema", G_PRESSE_LOG),
-            scrub("kontakt_name", Strategie::NullSetzen),
-            scrub("kontakt_erreichbarkeit", Strategie::NullSetzen),
+            scrub("kontakt_name", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("kontakt_erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             retain("eingang_at", G_ZEIT),
             retain("status", G_ENUM),
             retain("antwort", G_PRESSE_LOG),
@@ -1504,13 +1605,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "infotelefon_anruf",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("anliegen", G_ENUM),
-            scrub("notiz", Strategie::NullSetzen),
-            scrub("anrufer_name", Strategie::NullSetzen),
-            scrub("rueckruf", Strategie::PlatzhalterWennGesetzt),
+            scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("anrufer_name", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("rueckruf", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
             retain("status", G_ENUM),
             retain("eingang_at", G_ZEIT),
             retain("erledigt_von_id", G_FK),
@@ -1523,24 +1625,25 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "nachforderung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            scrub("art", Strategie::Platzhalter), // NOT NULL, Freitext („RTW“, „Dolmetscher“)
+            scrub("art", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL, Freitext („RTW“, „Dolmetscher“)
             // Führungs-Freitexte (LFH-701, Linie A): Art, Bezeichnung, Adressat und Begründung
             // stehen im ETB-Wortlaut der Anforderung; der Ablehnungsgrund gelangt nie ins ETB.
-            scrub("bezeichnung", Strategie::Platzhalter), // NOT NULL
+            scrub("bezeichnung", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("anzahl", G_ZAEHLER),
             retain("adressat_kategorie", G_ENUM),
-            scrub("adressat_bezeichnung", Strategie::NullSetzen),
-            scrub("begruendung", Strategie::NullSetzen),
+            scrub("adressat_bezeichnung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("begruendung", Strategie::NullSetzen, Z_EINSATZ),
             retain("prioritaet", G_ENUM),
             retain("status", G_ENUM),
             retain("zugesagt_at", G_ZEIT),
             retain("unterwegs_at", G_ZEIT),
             retain("eingetroffen_at", G_ZEIT),
             retain("abgelehnt_at", G_ZEIT),
-            scrub("abgelehnt_grund", Strategie::NullSetzen),
+            scrub("abgelehnt_grund", Strategie::NullSetzen, Z_EINSATZ),
             retain("angefordert_at", G_ZEIT),
             retain("etb_nachforderung_id", G_FK),
             retain("erstellt_von_id", G_FK),
@@ -1557,11 +1660,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "chat_kanal",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            scrub("name", Strategie::Platzhalter), // NOT NULL
-            scrub("beschreibung", Strategie::NullSetzen),
+            scrub("name", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("beschreibung", Strategie::NullSetzen, Z_EINSATZ),
             retain("erstellt_von_id", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("archiviert_at", G_ZEIT),
@@ -1571,12 +1675,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "chat_nachricht",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("kanal_id", G_FK),
             retain("autor_id", G_FK),
-            scrub("inhalt", Strategie::Platzhalter), // NOT NULL
+            scrub("inhalt", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("erstellt_at", G_ZEIT),
             retain("bearbeitet_at", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
@@ -1595,6 +1700,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "chat_nachricht",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[retain("nachricht_id", G_FK), retain("anhang_id", G_FK)],
     },
     TabellenRegel {
@@ -1607,22 +1713,24 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "etb_eintrag",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[retain("eintrag_id", G_FK), retain("anhang_id", G_FK)],
     },
     TabellenRegel {
         tabelle: "erinnerung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            scrub("titel", Strategie::Platzhalter), // NOT NULL
-            scrub("beschreibung", Strategie::NullSetzen),
+            scrub("titel", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("beschreibung", Strategie::NullSetzen, Z_EINSATZ),
             retain("faellig_at", G_ZEIT),
             retain("intervall_minuten", G_KONFIG),
             // Freitext-Empfänger ohne FK, kann einen Personennamen tragen — kein reines
             // Funktionslabel.
-            scrub("empfaenger_funktion", Strategie::NullSetzen),
+            scrub("empfaenger_funktion", Strategie::NullSetzen, Z_EINSATZ),
             // Katalogcode (LFH-549) — kein Personenbezug, überlebt die Schwärzung.
             retain("empfaenger_funktion_code", G_ENUM),
             retain("bezug_typ", G_POLY),
@@ -1640,6 +1748,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "kommunikation_status",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("org_id", G_FK),
@@ -1657,6 +1766,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "kommunikation_zustellung",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("org_id", G_FK),
@@ -1673,6 +1783,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "etb_lesemarke",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("einsatz_id", G_SCOPE),
             retain("benutzer_id", G_FK),
@@ -1688,6 +1799,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         tabelle: "demo_import",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("id", G_PK),
             retain("org_id", G_FK),
@@ -1715,6 +1827,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             parent: "demo_import",
         },
         zeilenfilter: None,
+        person_bezug: None,
         spalten: &[
             retain("import_id", G_FK),
             retain(
@@ -1756,28 +1869,96 @@ fn where_klausel(regel: &TabellenRegel) -> String {
     }
 }
 
-/// Treibt den PII-Scrub data-driven aus [`TABELLEN`]: je Tabelle mit `Scrub`-Spalten genau ein
-/// `UPDATE` (bzw. `DELETE` bei `ZeileLoeschen`), auf der Transaktions-Verbindung des Aufrufers,
-/// damit der Scrub atomar bleibt. `AssertSqlSafe` ist sicher, weil alle Namen compile-time-
-/// Konstanten sind; Platzhalter und `einsatz_id` werden gebunden.
+/// Tabellen, deren Zeilen einer Person einen Behandlungsbezug geben (design.md D3), jeweils
+/// über `person_id`. Dazu kommt `einsatz_person.zustand` selbst. Ohne `storniert_at`-Filter: auch
+/// eine stornierte Sichtung war eine medizinische Einschätzung. Gepinnt in
+/// `tests::behandlungsbezug_kennt_jede_personentabelle`.
+pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
+    "person_sichtung",
+    "person_verlaufsnotiz",
+    "person_uhs_belegung",
+];
+
+/// `SELECT` der Personen-IDs mit Behandlungsbezug (ohne Einsatz-Eingrenzung; der Aufrufer grenzt
+/// über die Tabellenregel ein).
+fn behandlungsbezug_sql() -> String {
+    let mut teile = vec!["p.zustand IS NOT NULL".to_string()];
+    for t in BEHANDLUNGSBEZUG_TABELLEN {
+        teile.push(format!(
+            "EXISTS (SELECT 1 FROM {t} x WHERE x.person_id = p.id)"
+        ));
+    }
+    format!(
+        "SELECT p.id FROM einsatz_person p WHERE {}",
+        teile.join(" OR ")
+    )
+}
+
+/// Was ein Scrub-Lauf erfasst (LFH-749, design.md D2/D3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Umfang {
+    /// Alle Scrub-Spalten, gleich welcher Zuordnung: die Einsatz-Schwärzung.
+    Alles,
+    /// Nur die Spalten dieser Datenkategorie.
+    Kategorie(Datenkategorie),
+    /// Der Personenstamm; mit `nur_ohne_behandlungsbezug` nur der Personen ohne
+    /// Behandlungsbezug (die Personenauskunft ist geschwärzt, die Behandlung nicht).
+    Personenstamm { nur_ohne_behandlungsbezug: bool },
+}
+
+impl Umfang {
+    fn erfasst(self, zuordnung: Zuordnung) -> bool {
+        match self {
+            Umfang::Alles => true,
+            Umfang::Kategorie(k) => zuordnung == Zuordnung::Kategorie(k),
+            Umfang::Personenstamm { .. } => zuordnung == Zuordnung::Personenstamm,
+        }
+    }
+}
+
+/// Treibt den PII-Scrub data-driven aus [`TABELLEN`]: je Tabelle mit `Scrub`-Spalten im
+/// [`Umfang`] genau ein `UPDATE` (bzw. `DELETE` bei `ZeileLoeschen`), auf der
+/// Transaktions-Verbindung des Aufrufers, damit der Scrub atomar bleibt. `AssertSqlSafe` ist
+/// sicher, weil alle Namen compile-time-Konstanten sind; Platzhalter und `einsatz_id` werden
+/// gebunden.
 pub async fn scrubbe_aus_registry(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
+    umfang: Umfang,
 ) -> Result<(), sqlx::Error> {
     for regel in TABELLEN {
         let scrubs: Vec<(&'static str, Strategie)> = regel
             .spalten
             .iter()
             .filter_map(|s| match s.klassifikation {
-                Klassifikation::Scrub(strategie) => Some((s.spalte, strategie)),
-                Klassifikation::Retain(_) => None,
+                Klassifikation::Scrub(strategie, zuordnung) if umfang.erfasst(zuordnung) => {
+                    Some((s.spalte, strategie))
+                }
+                Klassifikation::Scrub(..) | Klassifikation::Retain(_) => None,
             })
             .collect();
         if scrubs.is_empty() {
             continue;
         }
 
-        let where_teil = where_klausel(regel);
+        let mut where_teil = where_klausel(regel);
+        if let Umfang::Personenstamm {
+            nur_ohne_behandlungsbezug: true,
+        } = umfang
+        {
+            // Der Guard `kategorie_zuordnung_ist_gepinnt` sichert, dass jede Personenstamm-Tabelle
+            // ihren Personenbezug nennt; fehlt er doch, schwärzte ein Lauf ohne Filter zu viel.
+            let Some(bezug) = regel.person_bezug else {
+                return Err(sqlx::Error::Protocol(format!(
+                    "Personenstamm-Tabelle {} ohne person_bezug",
+                    regel.tabelle
+                )));
+            };
+            where_teil = format!(
+                "{where_teil} AND {bezug} NOT IN ({})",
+                behandlungsbezug_sql()
+            );
+        }
 
         // ZeileLoeschen muss für alle Scrub-Spalten der Tabelle gelten, sonst mischte die Registry
         // Zeilenlöschung mit Spalten-Scrub.
@@ -2301,6 +2482,176 @@ mod tests {
         );
     }
 
+    /// Pinnt die Zuordnung aus design.md D1 (LFH-749): Jede Spalte mit eigener Kategorie oder im
+    /// Personenstamm steht hier namentlich, damit eine stille Umhängung — etwa eines
+    /// Gesundheitsdatums auf die Einsatz-Frist — rot wird. Dazu: Personenstamm-Tabellen nennen
+    /// ihren Personenbezug, und `ZeileLoeschen`-Tabellen gehören geschlossen einer Zuordnung an.
+    #[test]
+    fn kategorie_zuordnung_ist_gepinnt() {
+        use std::collections::BTreeMap;
+        let mut ist: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for regel in TABELLEN {
+            let mut zuordnungen = BTreeSet::new();
+            let mut hat_stamm = false;
+            let mut hat_loeschen = false;
+            for s in regel.spalten {
+                let Klassifikation::Scrub(strategie, zuordnung) = s.klassifikation else {
+                    continue;
+                };
+                hat_loeschen |= strategie == Strategie::ZeileLoeschen;
+                zuordnungen.insert(format!("{zuordnung:?}"));
+                let schluessel = match zuordnung {
+                    Zuordnung::Einsatz => continue,
+                    Zuordnung::Personenstamm => {
+                        hat_stamm = true;
+                        "personenstamm".to_string()
+                    }
+                    Zuordnung::Kategorie(k) => k.as_str().to_string(),
+                };
+                ist.entry(schluessel)
+                    .or_default()
+                    .insert(format!("{}.{}", regel.tabelle, s.spalte));
+            }
+            assert_eq!(
+                regel.person_bezug.is_some(),
+                hat_stamm,
+                "{}: person_bezug genau dann, wenn die Tabelle Personenstamm-Spalten trägt",
+                regel.tabelle
+            );
+            if hat_loeschen {
+                assert_eq!(
+                    zuordnungen.len(),
+                    1,
+                    "{}: ZeileLoeschen-Tabelle mit gemischter Zuordnung {zuordnungen:?}",
+                    regel.tabelle
+                );
+            }
+        }
+
+        let menge = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<BTreeSet<_>>();
+        let spalten_von = |tabelle: &str| {
+            TABELLEN
+                .iter()
+                .find(|t| t.tabelle == tabelle)
+                .unwrap()
+                .spalten
+                .iter()
+                .map(|s| format!("{tabelle}.{}", s.spalte))
+                .collect::<Vec<_>>()
+        };
+        let mut anhaenge = BTreeSet::new();
+        for t in [
+            "anhang",
+            "einsatz_dokument",
+            "einsatz_schaden_anhang",
+            "einsatz_person_anhang",
+        ] {
+            anhaenge.extend(spalten_von(t));
+        }
+        let soll: BTreeMap<String, BTreeSet<String>> = [
+            (
+                "behandlung".to_string(),
+                menge(&[
+                    "einsatz_person.zustand",
+                    "person_sichtung.notiz",
+                    "person_uhs_belegung.notiz",
+                    "person_verlaufsnotiz.text",
+                ]),
+            ),
+            (
+                "personenauskunft".to_string(),
+                menge(&[
+                    "einsatz_person.herkunft_adresse",
+                    "einsatz_person.melder_kontakt",
+                ]),
+            ),
+            ("anhaenge".to_string(), anhaenge),
+            (
+                "personenstamm".to_string(),
+                menge(&[
+                    "einsatz_person.aktueller_verbleib",
+                    "einsatz_person.aktuelles_verbleib_ziel",
+                    "einsatz_person.alter_geschaetzt",
+                    "einsatz_person.antreff_lat",
+                    "einsatz_person.antreff_lon",
+                    "einsatz_person.antreff_ort",
+                    "einsatz_person.geburtsdatum",
+                    "einsatz_person.geschlecht",
+                    "einsatz_person.name",
+                    "einsatz_person.notiz",
+                    "einsatz_person.vorname",
+                    "person_verbleib.notiz",
+                    "person_verbleib.transportmittel",
+                    "person_verbleib.ziel",
+                ]),
+            ),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(ist, soll, "Zuordnung weicht von design.md D1 ab");
+    }
+
+    /// Jede einsatzbezogene Tabelle mit FK auf `einsatz_person` steht im Behandlungsbezug
+    /// ([`BEHANDLUNGSBEZUG_TABELLEN`]) oder begründet in `KEIN_BEHANDLUNGSBEZUG` (design.md D3,
+    /// Risiko „Prädikat erfasst einen Behandlungsbezug nicht“). Eine neue Personentabelle muss
+    /// sich damit entscheiden, statt still als „nur registriert“ zu gelten.
+    #[tokio::test]
+    async fn behandlungsbezug_kennt_jede_personentabelle() {
+        const KEIN_BEHANDLUNGSBEZUG: &[(&str, &str)] = &[
+            (
+                "person_verbleib",
+                "Verbleib: Personenstamm, dient beiden Zwecken",
+            ),
+            (
+                "person_abgleich",
+                "Vermisst-/Gefunden-Abgleich: Personenauskunft",
+            ),
+            (
+                "person_zugriff_audit",
+                "Zugriffsprotokoll, kein Bezug zur Person selbst",
+            ),
+            (
+                "einsatz_schaden",
+                "Geschädigte Person eines Sachschadens: Personenauskunft",
+            ),
+            ("einsatz_tier", "Halter eines Tiers: Personenauskunft"),
+            (
+                "einsatz_person_anhang",
+                "Fotos und Dateien (LFH-757): Kategorie anhaenge, die Zeilen gehen mit ihr und \
+                 taugen nicht als stabiles Prädikat; eine Ablage ist kein Behandlungsnachweis",
+            ),
+            (
+                "uhs_platz",
+                "Reservierung ohne Belegung ist kein Behandlungsnachweis; eine Belegung steht in \
+                 person_uhs_belegung",
+            ),
+        ];
+        let pool = crate::db::test_pool().await;
+        let mut ist = BTreeSet::new();
+        for t in alle_tabellen(&pool).await {
+            let fks: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT \"table\" FROM pragma_foreign_key_list('{t}')"
+            )))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            if t != "einsatz_person" && fks.iter().any(|z| z == "einsatz_person") {
+                ist.insert(t);
+            }
+        }
+        let soll: BTreeSet<String> = BEHANDLUNGSBEZUG_TABELLEN
+            .iter()
+            .copied()
+            .chain(KEIN_BEHANDLUNGSBEZUG.iter().map(|(t, _)| *t))
+            .map(String::from)
+            .collect();
+        assert_eq!(
+            ist, soll,
+            "Tabellen mit FK auf einsatz_person: in BEHANDLUNGSBEZUG_TABELLEN oder \
+             KEIN_BEHANDLUNGSBEZUG eintragen"
+        );
+    }
+
     /// `ZeileLoeschen` gilt (wenn überhaupt) für ALLE Scrub-Spalten einer Tabelle.
     #[test]
     fn zeile_loeschen_ist_kohaerent() {
@@ -2308,14 +2659,14 @@ mod tests {
             let hat_loeschen = regel.spalten.iter().any(|s| {
                 matches!(
                     s.klassifikation,
-                    Klassifikation::Scrub(Strategie::ZeileLoeschen)
+                    Klassifikation::Scrub(Strategie::ZeileLoeschen, _)
                 )
             });
             if hat_loeschen {
                 assert!(
                     regel.spalten.iter().all(|s| matches!(
                         s.klassifikation,
-                        Klassifikation::Scrub(Strategie::ZeileLoeschen)
+                        Klassifikation::Scrub(Strategie::ZeileLoeschen, _)
                     )),
                     "Tabelle {} mischt ZeileLoeschen mit anderen Strategien",
                     regel.tabelle

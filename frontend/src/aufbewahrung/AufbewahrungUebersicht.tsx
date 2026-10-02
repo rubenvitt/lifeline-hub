@@ -10,11 +10,12 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
-import { SeitenFehler } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StatusTag from '../components/StatusTag';
 import { Segmentleiste } from '../components/instrument';
 import { istAdmin } from '../einsatz/schreibrecht';
 import { aufbewahrungZustand } from '../theme/statusFarben';
+import { standVerworfen } from './archivAbruf';
 import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
 
 /**
@@ -143,10 +144,11 @@ export default function AufbewahrungUebersicht() {
     queryFn: ladeAufbewahrung,
     enabled: admin,
   });
-  const daten = useMemo(
-    () => filtereAufbewahrung(abfrage.data ?? [], filter),
-    [abfrage.data, filter],
-  );
+  // Ein abgelehnter Abruf verwirft den gecachten Stand; ohne Stand behauptet die Seite nichts
+  // über den Bestand — kein Leertext unter dem Fehler (LFH-756, Prinzip aus LFH-612).
+  const eintraege = abfrage.isError && standVerworfen(abfrage.error) ? undefined : abfrage.data;
+  const ohneStand = abfrage.isError && eintraege === undefined;
+  const daten = useMemo(() => filtereAufbewahrung(eintraege ?? [], filter), [eintraege, filter]);
 
   if (!authLaedt && !admin) return <Navigate to={defaultAdminPfad()} replace />;
 
@@ -155,40 +157,46 @@ export default function AufbewahrungUebersicht() {
       titel="Aufbewahrung"
       beschreibung="Abgeschlossene Einsätze der eigenen Organisation mit ihrer Aufbewahrungsfrist. Nach Fristablauf ist ein Einsatz gesperrt und zur Löschung vorgemerkt; nach 30 Tagen Karenz werden die Personendaten unwiderruflich geschwärzt. Eine Zeile öffnet die pseudonyme Archivakte."
       hinweis={
-        abfrage.isError ? (
+        ohneStand ? (
           <SeitenFehler
             text="Aufbewahrung nicht ladbar"
             ursache={abfrage.error}
             onWiederholen={() => void abfrage.refetch()}
           />
+        ) : abfrage.isRefetchError ? (
+          <SeitenStandVeraltet onWiederholen={() => void abfrage.refetch()} />
         ) : undefined
       }
     >
-      <Segmentleiste<Filter>
-        beschriftung="Zustand"
-        wert={filter}
-        onWechsel={setFilter}
-        optionen={[
-          { wert: 'alle', label: 'alle' },
-          ...ZUSTAENDE.map((z) => ({ wert: z, label: aufbewahrungZustand[z].label })),
-        ]}
-        style={{ marginBottom: token.marginSM }}
-      />
-      <Datensicht
-        bezeichnung="Aufbewahrung"
-        form="tabelle"
-        spalten={spalten}
-        daten={daten}
-        zeilenSchluessel={(e) => `einsatz-${e.einsatz_id}`}
-        ladend={abfrage.isLoading}
-        leerText={
-          filter === 'alle'
-            ? 'Keine abgeschlossenen Einsätze'
-            : `Kein Einsatz im Zustand „${aufbewahrungZustand[filter].label}“`
-        }
-        karte={KARTE}
-        onZeileKlick={(e) => navigate(adminAufbewahrungAktePfad(e.einsatz_id))}
-      />
+      {!ohneStand && (
+        <>
+          <Segmentleiste<Filter>
+            beschriftung="Zustand"
+            wert={filter}
+            onWechsel={setFilter}
+            optionen={[
+              { wert: 'alle', label: 'alle' },
+              ...ZUSTAENDE.map((z) => ({ wert: z, label: aufbewahrungZustand[z].label })),
+            ]}
+            style={{ marginBottom: token.marginSM }}
+          />
+          <Datensicht
+            bezeichnung="Aufbewahrung"
+            form="tabelle"
+            spalten={spalten}
+            daten={daten}
+            zeilenSchluessel={(e) => `einsatz-${e.einsatz_id}`}
+            ladend={abfrage.isLoading}
+            leerText={
+              filter === 'alle'
+                ? 'Keine abgeschlossenen Einsätze'
+                : `Kein Einsatz im Zustand „${aufbewahrungZustand[filter].label}“`
+            }
+            karte={KARTE}
+            onZeileKlick={(e) => navigate(adminAufbewahrungAktePfad(e.einsatz_id))}
+          />
+        </>
+      )}
     </AdminPage>
   );
 }

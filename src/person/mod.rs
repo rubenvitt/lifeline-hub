@@ -152,21 +152,16 @@ impl VerbleibArt {
         }
     }
 
-    /// Pseudonymer ETB-Sachverhalt (ohne Reg.-Nr.-Präfix; der Handler stellt es voran).
-    pub fn etb_sachverhalt(&self, ziel: Option<&str>) -> String {
+    /// Pseudonymer ETB-Sachverhalt (ohne Reg.-Nr.-Präfix; der Handler stellt es voran). Kennt
+    /// bewusst kein Ziel: das ist Scrub des Verbleibs und bliebe sonst über die Schwärzung hinaus
+    /// im ETB stehen (LFH-752, Spec `aufbewahrung`).
+    pub fn etb_sachverhalt(&self) -> &'static str {
         match self {
-            VerbleibArt::Transport => match ziel {
-                Some(z) => format!("abtransportiert → {z}"),
-                None => "abtransportiert".to_string(),
-            },
-            VerbleibArt::Entlassung => "entlassen".to_string(),
-            VerbleibArt::VorOrt => "verbleibt vor Ort".to_string(),
-            VerbleibArt::Verstorben => "Verbleib des Leichnams".to_string(),
-            // Ohne Ziel „in Notunterkunft" (LFH-613), analog zum Transport-Zweig.
-            VerbleibArt::Notunterkunft => match ziel {
-                Some(z) => format!("in Notunterkunft → {z}"),
-                None => "in Notunterkunft".to_string(),
-            },
+            VerbleibArt::Transport => "abtransportiert",
+            VerbleibArt::Entlassung => "entlassen",
+            VerbleibArt::VorOrt => "verbleibt vor Ort",
+            VerbleibArt::Verstorben => "Verbleib des Leichnams",
+            VerbleibArt::Notunterkunft => "in Notunterkunft",
         }
     }
 }
@@ -425,11 +420,9 @@ mod tests {
             "Notunterkunft → Turnhalle Ost"
         );
         assert_eq!(n.kurzform(None), "Notunterkunft");
-        assert_eq!(
-            n.etb_sachverhalt(Some("Turnhalle Ost")),
-            "in Notunterkunft → Turnhalle Ost"
-        );
-        assert_eq!(n.etb_sachverhalt(None), "in Notunterkunft");
+        // LFH-752: Der ETB-Sachverhalt kennt kein Ziel (Scrub des Verbleibs).
+        assert_eq!(n.etb_sachverhalt(), "in Notunterkunft");
+        assert_eq!(VerbleibArt::Transport.etb_sachverhalt(), "abtransportiert");
     }
 
     #[test]

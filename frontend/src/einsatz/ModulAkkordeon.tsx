@@ -101,8 +101,8 @@ export default function ModulAkkordeon({
       {kategorien.map((k) => {
         const offen = k.key === offeneKategorie;
         // Umriss auch aufgeklappt: „offen“ ist kein aktiver Zustand, die Füllung trägt allein die
-        // Rail (LFH-595, Spec `ikonensatz`).
-        const Icon = k.ikone.umriss;
+        // Rail (LFH-595, Spec `iconsatz`).
+        const Icon = k.icon.umriss;
         return (
           <div key={k.key}>
             <button

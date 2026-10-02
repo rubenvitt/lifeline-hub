@@ -32,6 +32,8 @@ export default function PersonAnhaenge({ einsatzId, person, darfSchreiben }: Pro
       entfernen: (id) => entfernePersonAnhang(einsatzId, person.id, id),
       downloadPfad: (id) => personAnhangDownloadPfad(einsatzId, person.id, id),
       kennung: `Person ${registrierAnzeige(person.registrier_nr)}`,
+      // Kein Vorschaubild: jeder Abruf hier ist ein protokollierter Zugriff (LFH-757).
+      vorschau: false,
     }),
     [einsatzId, person.id, person.registrier_nr],
   );

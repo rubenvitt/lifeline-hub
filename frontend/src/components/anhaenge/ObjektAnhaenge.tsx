@@ -1,4 +1,4 @@
-import { IkoneHochladen, IkoneMuelleimer } from '../../ikonen';
+import { IconHochladen, IconMuelleimer } from '../../icons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Button, Popconfirm, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,16 +8,27 @@ import {
   PaneelZeile,
   PaneelZustand,
   paneelMetaStil,
+  Sammelbanner,
   useRollen,
   type PaneelDatenzustand,
 } from '../instrument';
 import DownloadAnker from '../DownloadAnker';
+import { AnhangVorschauGruppe } from '../AnhangVorschau';
 import { istBildMime, originalPfad } from '../../api/anhangFassung';
 import { useDarfOriginalLaden } from '../../einsatz/useDarfOriginalLaden';
 import { SpeicherFehler } from '../SpeicherHinweis';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import { formatGroesse } from '../../karten/formatGroesse';
 import AnhangAblegenModal from './AnhangAblegenModal';
+import {
+  freigegeben,
+  nachgefuehrt,
+  OFFENER_ZUFLUSS,
+  teileZufluss,
+  vorgemerkt,
+  zuflussText,
+  type AnhangZufluss,
+} from './anhangZufluss';
 
 export const ANHAENGE_TITEL = 'Fotos und Dateien';
 
@@ -39,11 +50,17 @@ export interface ErfassungsAnhang {
 export interface AnhangQuelle {
   queryKey: readonly unknown[];
   liste: () => Promise<ErfassungsAnhang[]>;
-  ablegen: (datei: File) => Promise<unknown>;
+  ablegen: (datei: File) => Promise<{ id: number }>;
   entfernen: (id: number) => Promise<void>;
   downloadPfad: (id: number) => string;
   /** Kennung des Objekts für zugängliche Namen und Titel: „Schaden S-003“, „Person R-007“. */
   kennung: string;
+  /**
+   * Vorschaubild und Großansicht an Bild-Anhängen (LFH-759). Aus an der Person: jeder Abruf
+   * dort schreibt eine Zeile ins Zugriffsprotokoll (LFH-757), ein Vorschaubild je Zeile täte
+   * das schon beim Aufklappen.
+   */
+  vorschau: boolean;
 }
 
 interface Props {
@@ -72,6 +89,11 @@ interface Props {
  *
  * „Datei ablegen“ steht genau einmal, auch im Leerzustand: zwei gleichnamige Ziele wären für
  * Vorlesende nicht unterscheidbar. Ohne Schreibrecht bleibt die Liste nur lesbar.
+ *
+ * Live-Zufluss (LFH-760, `anhangZufluss.ts`): eine Ablage aus einer anderen Sitzung wartet hinter
+ * dem Sammelbanner, statt oben einzuschieben. Das Banner liegt als Überlagerung mit Nullhöhe über
+ * der Liste (Muster `InfotelefonPage`) und verschiebt keine Zeile; „anzeigen“ gibt frei und setzt
+ * den Fokus auf die oberste Zeile, statt ihn mit dem Banner auf `<body>` fallen zu lassen.
  */
 export default function ObjektAnhaenge({
   einsatzId,
@@ -89,6 +111,14 @@ export default function ObjektAnhaenge({
   const fokusNach = useRef<{ entfernt: number; ziel: number | 'kopf' } | null>(null);
   const [ablegenOffen, setAblegenOffen] = useState(false);
   const { kennung } = quelle;
+  /** Die Schleuse gehört zu EINEM Objekt: wechselt es ohne Neumontage, beginnt sie offen. */
+  const objekt = JSON.stringify(quelle.queryKey);
+  const [zuflussZustand, setZuflussZustand] = useState<AnhangZufluss & { objekt: string }>({
+    objekt,
+    ...OFFENER_ZUFLUSS,
+  });
+  /** Nach „anzeigen“ auf die oberste Zeile — erst nach dem Render mit der freigegebenen Liste. */
+  const fokusNachFreigabe = useRef(false);
   const darfOriginal = useDarfOriginalLaden(einsatzId);
   const invalidieren = [quelle.queryKey, einsatzKeys.etb(einsatzId)] as const;
 
@@ -104,7 +134,23 @@ export default function ObjektAnhaenge({
     },
   });
 
-  const liste = query.data ?? [];
+  const zufluss: AnhangZufluss =
+    zuflussZustand.objekt === objekt ? zuflussZustand : OFFENER_ZUFLUSS;
+  const { sichtbar: liste, zurueckgehalten } = teileZufluss(query.data ?? [], zufluss);
+  // Nachführen im Render (Muster `AbloesungPage`), nicht im Effekt: der ließe einen Bildaufbau
+  // mit veraltetem Stand durch. `nachgefuehrt` liefert `null`, wenn nichts zu tun ist.
+  if (query.data) {
+    const neu = nachgefuehrt(zufluss, liste);
+    if (neu || zuflussZustand.objekt !== objekt) {
+      setZuflussZustand({ objekt, ...(neu ?? zufluss) });
+    }
+  }
+  const aendereZufluss = (f: (z: AnhangZufluss) => AnhangZufluss) =>
+    setZuflussZustand((z) => ({ objekt, ...f(z.objekt === objekt ? z : OFFENER_ZUFLUSS) }));
+  function zeigeZurueckgehaltene() {
+    fokusNachFreigabe.current = true;
+    aendereZufluss((z) => freigegeben(z, query.data ?? []));
+  }
 
   function entferneMitFokus(id: number) {
     const i = liste.findIndex((a) => a.id === id);
@@ -127,6 +173,12 @@ export default function ObjektAnhaenge({
           );
     (anker ?? ablegenKnopf.current)?.focus();
   }, [query.data]);
+
+  useEffect(() => {
+    if (!fokusNachFreigabe.current) return;
+    fokusNachFreigabe.current = false;
+    listeRef.current?.querySelector<HTMLElement>('a[download]')?.focus();
+  }, [zuflussZustand]);
 
   const fehlerId = entfernen.isError ? entfernen.variables : undefined;
   const fehlerName = liste.find((a) => a.id === fehlerId)?.dateiname;
@@ -160,6 +212,8 @@ export default function ObjektAnhaenge({
                 : undefined
             }
             originalKennung={`${a.dateiname}, ${kennung}`}
+            mime={quelle.vorschau ? a.mime : undefined}
+            vorschauKennung={kennung}
             dateiname={a.dateiname}
             groesse={a.groesse}
             zusatz={
@@ -185,7 +239,7 @@ export default function ObjektAnhaenge({
                 aria-label={`Datei ${a.dateiname} von ${kennung} entfernen`}
                 icon={
                   <span aria-hidden="true">
-                    <IkoneMuelleimer />
+                    <IconMuelleimer />
                   </span>
                 }
               />
@@ -202,7 +256,7 @@ export default function ObjektAnhaenge({
       onClick={() => setAblegenOffen(true)}
       icon={
         <span aria-hidden="true">
-          <IkoneHochladen />
+          <IconHochladen />
         </span>
       }
     >
@@ -225,7 +279,21 @@ export default function ObjektAnhaenge({
         leerText="Noch keine Fotos oder Dateien"
         onNeuladen={() => void query.refetch()}
       >
-        <div ref={listeRef}>{liste.map(zeile)}</div>
+        <div ref={listeRef} style={{ position: 'relative' }}>
+          {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
+          <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
+            {zurueckgehalten.length > 0 && (
+              <Sammelbanner
+                aktion={{ label: 'anzeigen', onKlick: zeigeZurueckgehaltene }}
+                style={{ position: 'absolute', insetInline: 0, top: 0 }}
+              >
+                {zuflussText(zurueckgehalten.length)} — oben einsortiert
+              </Sammelbanner>
+            )}
+          </div>
+          {/* Eine Gruppe je Objekt: die Großansicht blättert durch seine Fotos (LFH-759). */}
+          <AnhangVorschauGruppe>{liste.map(zeile)}</AnhangVorschauGruppe>
+        </div>
       </PaneelZustand>
       {darfSchreiben && (
         <AnhangAblegenModal
@@ -234,6 +302,7 @@ export default function ObjektAnhaenge({
           invalidieren={invalidieren}
           offen={ablegenOffen}
           onSchliessen={() => setAblegenOffen(false)}
+          onAbgelegt={(a) => aendereZufluss((z) => vorgemerkt(z, a.id))}
         />
       )}
     </>
