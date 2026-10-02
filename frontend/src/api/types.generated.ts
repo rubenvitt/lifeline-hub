@@ -4174,7 +4174,7 @@ export interface components {
         };
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-         *     `art IN ('detail','export','druck','anhang')` (migrations/0137_person_zugriff_audit_anhang.sql,
+         *     `art IN ('detail','export','druck','anhang')` (migrations/0138_person_zugriff_audit_anhang.sql,
          *     zuvor 0132 und 0021).
          * @enum {string}
          */
