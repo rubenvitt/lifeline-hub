@@ -7,6 +7,7 @@ import {
   genauigkeitsKreis,
   sorgeFuerEigenpositionLayer,
 } from './eigenpositionLayer';
+import { pinneMarkerLayerNachOben } from './markerLayer';
 
 /** Haversine — unabhängig vom Rechenweg der Kreisfunktion, sonst prüfte sie sich selbst. */
 function abstandM([lon1, lat1]: [number, number], [lon2, lat2]: [number, number]) {
@@ -142,6 +143,21 @@ describe('sorgeFuerEigenpositionLayer (LFH-712)', () => {
     map.addLayer({ id: 'zonen-flaeche' });
     sorgeFuerEigenpositionLayer(map as never, pos, '#1677ff');
     expect(folge).toEqual(['marker-punkte', 'zonen-flaeche', ...EIGENPOSITION_LAYER]);
+  });
+
+  it('LFH-766: bleibt über den Markern, wenn sie nach einer neuen Datenebene nach oben rücken', () => {
+    const { map, folge } = fakeMap(['marker-kreis', 'marker-label']);
+    const pos = eigenpositionFc({ lat: 52, lon: 9, genauigkeit: 30 });
+    sorgeFuerEigenpositionLayer(map as never, pos, '#1677ff');
+    // Neue Fachebene, danach pinnt die Karte die Marker — ohne neue Standortmeldung.
+    map.addLayer({ id: 'fachebene-kritis-punkte' });
+    pinneMarkerLayerNachOben(map as never);
+    expect(folge).toEqual([
+      'fachebene-kritis-punkte',
+      'marker-kreis',
+      'marker-label',
+      ...EIGENPOSITION_LAYER,
+    ]);
   });
 
   it('spielt neue Daten per setData ein und färbt beim Moduswechsel nach', () => {

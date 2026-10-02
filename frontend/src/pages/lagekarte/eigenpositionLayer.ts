@@ -110,11 +110,24 @@ export function eigenpositionFc(position: Eigenposition | null): EigenpositionFc
 export const ZEICHNUNG_PRAEFIX = 'td-';
 
 /**
- * Quelle und Layer idempotent anlegen, Daten einspielen, nach oben ziehen — aber unter die
- * laufende Zeichnung (LFH-766, design.md D3): sonst deckte der Punkt beim Zeichnen am eigenen
- * Standort die Stützpunkte. `farbe` ist die
- * Bedienrolle: die Eigenposition ist eine aktive Beziehung des Geräts. Rand und Kante sind Kontur
- * (Weiß plus Schwarz halten gegen jeden Grund, wie am Personen-Marker).
+ * Eigenposition über alle Lagedaten ziehen, aber unter die laufende Zeichnung (LFH-766,
+ * design.md D3): sonst deckte der Punkt beim Zeichnen am eigenen Standort die Stützpunkte. Läuft
+ * bei jeder Meldung und nach jedem Pinnen der Marker (`pinneMarkerLayerNachOben`) — sonst lägen
+ * Marker bis zur nächsten Standortmeldung über dem Punkt. Ohne angelegte Ebenen tut sie nichts.
+ */
+export function ordneEigenpositionEin(map: MapLibreMap): void {
+  if (!EIGENPOSITION_LAYER.some((id) => map.getLayer(id))) return;
+  // Vor die erste Zeichenebene der Style-Reihenfolge; ohne Zeichnung ganz nach oben.
+  const vor = map.getStyle()?.layers?.find((l) => l.id.startsWith(ZEICHNUNG_PRAEFIX))?.id;
+  for (const id of EIGENPOSITION_LAYER) {
+    if (map.getLayer(id)) map.moveLayer(id, vor);
+  }
+}
+
+/**
+ * Quelle und Layer idempotent anlegen, Daten einspielen, einordnen (`ordneEigenpositionEin`).
+ * `farbe` ist die Bedienrolle: die Eigenposition ist eine aktive Beziehung des Geräts. Rand und
+ * Kante sind Kontur (Weiß plus Schwarz halten gegen jeden Grund, wie am Personen-Marker).
  */
 export function sorgeFuerEigenpositionLayer(
   map: MapLibreMap,
@@ -157,8 +170,6 @@ export function sorgeFuerEigenpositionLayer(
       },
     },
   };
-  // Vor die erste Zeichenebene der Style-Reihenfolge; ohne Zeichnung ganz nach oben.
-  const vor = map.getStyle()?.layers?.find((l) => l.id.startsWith(ZEICHNUNG_PRAEFIX))?.id;
   for (const id of EIGENPOSITION_LAYER) {
     if (!map.getLayer(id)) {
       map.addLayer({ id, source: EIGENPOSITION_QUELLE, ...layer[id] } as never);
@@ -170,6 +181,6 @@ export function sorgeFuerEigenpositionLayer(
     } else if (id === 'eigenposition-kreisrand') {
       map.setPaintProperty(id, 'line-color', farbe);
     }
-    map.moveLayer(id, vor);
   }
+  ordneEigenpositionEin(map);
 }

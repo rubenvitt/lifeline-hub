@@ -251,6 +251,16 @@ test.describe('Eigenposition: Anflug an die Genauigkeit (LFH-766)', () => {
         { lat: GROB.latitude, lon: GROB.longitude, dLat, dLon },
       );
     await expect.poll(kreisImBild, { timeout: 10_000 }).toBe(true);
+    // …und eingerahmt, nicht bloß von der Übersicht mit umfasst: Mitte am Standort, der Kreis füllt
+    // das Bild (2 km Radius bei 1280×720 ≈ Zoom 13–14, die Übersicht steht bei Zoom 5).
+    const ansicht = await page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+      return { mitte: map.getCenter(), zoom: map.getZoom() };
+    });
+    expect(Math.abs(ansicht.mitte.lat - GROB.latitude)).toBeLessThan(0.005);
+    expect(Math.abs(ansicht.mitte.lng - GROB.longitude)).toBeLessThan(0.005);
+    expect(ansicht.zoom).toBeGreaterThan(12);
+    expect(ansicht.zoom).toBeLessThan(15);
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
   });
 
@@ -292,16 +302,16 @@ test.describe('Eigenposition: Anflug an die Genauigkeit (LFH-766)', () => {
         const punkt = q?.data?.features?.find((f) => f.geometry.type === 'Point');
         return {
           nachgefuehrt: punkt?.geometry.coordinates[1] === 52.3761,
-          letzteEigenposition: Math.max(
-            ...ids.map((id, i) => (id.startsWith('eigenposition-') ? i : -1)),
-          ),
+          eigenposition: ids.flatMap((id, i) => (id.startsWith('eigenposition-') ? [i] : [])),
           ersteZeichnung: ids.findIndex((id) => id.startsWith('td-')),
         };
       });
     await expect.poll(async () => (await folge()).nachgefuehrt, { timeout: 10_000 }).toBe(true);
     const stand = await folge();
+    // Alle vier Ebenen (Kreis, Rand, Kante, Punkt) stehen — sonst wäre „darunter“ leer wahr.
+    expect(stand.eigenposition).toHaveLength(4);
     expect(stand.ersteZeichnung).toBeGreaterThanOrEqual(0);
-    expect(stand.letzteEigenposition).toBeLessThan(stand.ersteZeichnung);
+    expect(Math.max(...stand.eigenposition)).toBeLessThan(stand.ersteZeichnung);
   });
 
   test('Karte vor dem ersten Standort verschoben: kein Anflug, der Punkt erscheint', async ({

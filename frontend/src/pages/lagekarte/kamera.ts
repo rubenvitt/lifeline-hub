@@ -24,6 +24,8 @@ export const AUTOMATISCH = { bedienung: false } as const;
 /** Rand um den Genauigkeitskreis beim Anflug, in Pixeln. */
 const ANFLUG_RAND = 48;
 
+/** Geste, Rad, Tastatur (`originalEvent`) oder markierter Bedienweg (`BEDIENUNG`); `resize` und
+ *  `AUTOMATISCH` zählen nicht. */
 export function istBedienung(e: { originalEvent?: unknown; bedienung?: unknown }): boolean {
   return e.originalEvent != null || e.bedienung === true;
 }
@@ -46,7 +48,9 @@ export function hoereAufBedienung(map: MapLibreMap, onBedienung: () => void): ()
 export function fliegeEigenpositionAn(map: MapLibreMap, position: Eigenposition): void {
   map.fitBounds(
     eigenpositionRahmen(position),
-    { padding: ANFLUG_RAND, maxZoom: ANFLUG_ZOOM },
+    // Ohne `bearing` richtete `fitBounds` die Karte nach Norden aus — eine Bewegung, die niemand
+    // ausgelöst hat; der alte `flyTo` behielt die Drehung.
+    { padding: ANFLUG_RAND, maxZoom: ANFLUG_ZOOM, bearing: map.getBearing() },
     AUTOMATISCH,
   );
 }

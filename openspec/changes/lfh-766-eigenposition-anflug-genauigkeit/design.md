@@ -42,7 +42,9 @@ das Risiko, das hier geschlossen wird):
 `Kartenflaeche` bekommt eine eigene Prop für den Eigenpositions-Anflug (Position samt
 Genauigkeit, je Anflug ein neues Objekt). Der Effekt rahmt den Kreis per `fitBounds` ein, mit
 festem Rand (Größenordnung 48 px) und `maxZoom: 15`, demselben Wert wie der `flyTo` der übrigen
-Ziele; der Wert wird dafür eine benannte Konstante, die beide nutzen. Der Rahmen ist die
+Ziele; der Wert wird dafür eine benannte Konstante, die beide nutzen. Die Drehung der Karte
+wird mitgegeben (`bearing: map.getBearing()`): ohne sie richtete `fitBounds` eine per Pinch
+gedrehte Karte nach Norden aus, was der alte `flyTo` nicht tat (Befund aus dem Review). Der Rahmen ist die
 Ausdehnung des Rings aus `genauigkeitsKreis` (eine reine Funktion in `eigenpositionLayer.ts`,
 unit-getestet). Wie `flyToZiel` verbraucht der Anflug die Startansicht.
 
@@ -86,7 +88,10 @@ Alternativen:
 
 `sorgeFuerEigenpositionLayer` zieht die Ebenen weiterhin bei jeder Meldung, aber vor die erste
 Ebene der Style-Reihenfolge, deren Id mit `td-` beginnt (`moveLayer(id, vor)`). Gibt es keine,
-nach ganz oben wie bisher. Die Suchnadel bleibt unverändert unter `eigenposition-kreis`. Startet
+nach ganz oben wie bisher. Dasselbe Einordnen (`ordneEigenpositionEin`) läuft am Ende von
+`pinneMarkerLayerNachOben`, das nach jeder neuen Datenebene die Marker nach oben zieht; sonst lägen
+Marker und Fachebenen bis zur nächsten Standortmeldung über dem Punkt (Befund aus dem Review). Die
+Suchnadel bleibt unverändert unter `eigenposition-kreis`. Startet
 ein Zeichenmodus erst nach der Eigenposition, legt terra-draw seine Ebenen ohnehin darüber; die
 nächste Meldung hält die Folge.
 

@@ -179,7 +179,8 @@ export interface KartenflaecheProps {
   /**
    * Startansicht aus den Einsatzdaten (`startAnsicht.ts`). `undefined` = noch nicht entschieden,
    * `null` = nichts verortet, Übersicht behalten. Greift genau einmal je Karte: danach gehört der
-   * Ausschnitt der Bedienung. Ein früherer `flyToZiel` (Deeplink) verbraucht sie ebenfalls.
+   * Ausschnitt der Bedienung. Ein früherer `flyToZiel` (Deeplink) oder Eigenpositions-Anflug
+   * (`eigenpositionAnflug`) verbraucht sie ebenfalls.
    */
   startAnsicht?: StartAnsicht | null;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */
@@ -777,8 +778,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [massstabZiel]);
 
-  // Startansicht einmalig anwenden, vor dem fly-to-Effekt (kommen beide in derselben Runde, gewinnt
-  // das fly-to). „Verbraucht" hängt an der Karteninstanz, nicht an einem Boolean: unter StrictMode
+  // Startansicht einmalig anwenden, vor den Anflug-Effekten (`flyToZiel`, `eigenpositionAnflug`;
+  // kommen sie in derselben Runde, gewinnt der Anflug). „Verbraucht" hängt an der Karteninstanz, nicht an einem Boolean: unter StrictMode
   // wird die erste Karte entfernt, ein Boolean-Ref ließe die zweite auf der Übersicht stehen.
   const startAufKarteRef = useRef<maplibregl.Map | null>(null);
   useEffect(() => {

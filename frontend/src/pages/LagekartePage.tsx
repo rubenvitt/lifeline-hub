@@ -537,16 +537,6 @@ export default function LagekartePage() {
     return () => window.removeEventListener('keydown', taste);
   }, [messForm, onMessenBeenden]);
 
-  /**
-   * Esc beim Zeichnen ist zweistufig (LFH-712): erst die Figur, dann der Modus. Die Stufe
-   * entscheidet `escStufe`; hier wird nur ausgeführt. terra-draw hat seine Abbruchtaste abgegeben
-   * (`zeichnen.ts`). `keydown`, nicht `keyup`: ein `keyup`-Zuhörer liefe nach terra-draws Abbruch
-   * und sähe eine leere Figur. Am Fenster: auch mit Fokus auf einem Knopf der Steuerung wirkt die
-   * Taste.
-   *
-   * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler sind je
-   * Render neu, der Zuhörer soll nur am Modus hängen.
-   */
   // Eigenposition: nur auf dem Gerät, beim ersten Standort einmal anfliegen; danach folgt die Karte
   // nicht, der Ausschnitt bleibt frei verschiebbar. Der Anflug rahmt den Genauigkeitskreis ein und
   // entfällt, wenn seit dem Einschalten bedient wurde: Kamera bewegt (`onBedienung`, auch jedes
@@ -568,6 +558,16 @@ export default function LagekartePage() {
     if (eigenposition.an && exklusiverModusAktiv) bedientSeitEinschaltenRef.current = true;
   }, [eigenposition.an, exklusiverModusAktiv]);
 
+  /**
+   * Esc beim Zeichnen ist zweistufig (LFH-712): erst die Figur, dann der Modus. Die Stufe
+   * entscheidet `escStufe`; hier wird nur ausgeführt. terra-draw hat seine Abbruchtaste abgegeben
+   * (`zeichnen.ts`). `keydown`, nicht `keyup`: ein `keyup`-Zuhörer liefe nach terra-draws Abbruch
+   * und sähe eine leere Figur. Am Fenster: auch mit Fokus auf einem Knopf der Steuerung wirkt die
+   * Taste.
+   *
+   * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler sind je
+   * Render neu, der Zuhörer soll nur am Modus hängen.
+   */
   const zeichenmodusAktiv = zoneEntwurf != null || zeichneAbschnittId != null;
   const escAusfuehrenRef = useRef<() => void>(() => {});
   escAusfuehrenRef.current = () => {

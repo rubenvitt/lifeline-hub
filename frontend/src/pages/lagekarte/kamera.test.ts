@@ -22,6 +22,7 @@ function fakeMap() {
       for (const f of hoerer.get(typ) ?? []) f({ type: typ, ...eventData });
     },
     fitBounds: vi.fn(),
+    getBearing: vi.fn(() => 0),
   };
 }
 
@@ -67,6 +68,13 @@ describe('fliegeEigenpositionAn (LFH-766, D1)', () => {
     expect(optionen.padding).toBeGreaterThan(0);
     // Der eigene Anflug ist keine Bedienung — sonst sperrte er sich selbst.
     expect(istBedienung(eventData ?? {})).toBe(false);
+  });
+
+  it('behält die Drehung der Karte (Pinch-Drehung bleibt erlaubt)', () => {
+    const map = fakeMap();
+    map.getBearing.mockReturnValue(37);
+    fliegeEigenpositionAn(map as never, { lat: 52, lon: 9, genauigkeit: 500 });
+    expect(map.fitBounds.mock.calls[0][1]).toMatchObject({ bearing: 37 });
   });
 
   it('der Anflugzoom bleibt der bisherige feste Zoom', () => {
