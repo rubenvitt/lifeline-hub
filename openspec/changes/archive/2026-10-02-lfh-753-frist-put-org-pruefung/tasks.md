@@ -19,4 +19,4 @@
 
 ## 4. Abschluss
 
-- [ ] 4.1 `cargo test` (Backend), Frontend-Tests und `./scripts/check-all.sh` grün (bzw. mit Verweis auf den CI-Lauf des PRs abhaken, falls lokal Werkzeuge fehlen)
+- [x] 4.1 `cargo test` (Backend), Frontend-Tests und `./scripts/check-all.sh` grün (bzw. mit Verweis auf den CI-Lauf des PRs abhaken, falls lokal Werkzeuge fehlen) — `cargo test --workspace --exclude lifeline-desktop` lokal grün (119 Testbinaries, 3805 Tests, 0 Fehlschläge), `cargo fmt --check` grün; Frontend `vitest run`: 8871 grün, 10 rot in 5 fremden Dateien (Zeitzone/Node 22 statt 26), identisch auf `origin/alpha`; `typecheck`, `lint`, `prettier --check` grün; `check-all.sh` belegt der CI-Lauf des PRs (lokal fehlt `mise`)
