@@ -328,3 +328,22 @@ export function hatVerknuepfung(
     e.folgeauftraege.length > 0
   );
 }
+
+/**
+ * Dokumente der Ablage nach dem ETB-Eintrag, auf den sie sich beziehen (LFH-743). Eine
+ * Sammelabfrage (`GET …/dokumente`) statt eines Abrufs je Eintrag; Dokumente ohne ETB-Bezug
+ * fallen heraus. Die Reihenfolge innerhalb eines Eintrags ist die der Liste.
+ */
+export function dokumenteJeEintrag<D extends { bezug_etb_eintrag_id?: number | null }>(
+  dokumente: readonly D[],
+): ReadonlyMap<number, readonly D[]> {
+  const je = new Map<number, D[]>();
+  for (const d of dokumente) {
+    const bezug = d.bezug_etb_eintrag_id;
+    if (bezug == null) continue;
+    const liste = je.get(bezug);
+    if (liste) liste.push(d);
+    else je.set(bezug, [d]);
+  }
+  return je;
+}

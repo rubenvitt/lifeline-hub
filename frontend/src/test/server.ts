@@ -49,6 +49,12 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/gefahrengebiete', () => HttpResponse.json([])),
   /**
+   * Dokumentenablage — leere Liste als Default (LFH-743). Die ETB-Seite fragt sie mit Freigabe
+   * `dokumente` beim Mount ab, um Dokumente mit ETB-Bezug am Eintrag zu zeigen; `[]` ist ein
+   * echter Serverzustand. Tests mit Dokumenten überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/dokumente', () => HttpResponse.json([])),
+  /**
    * Wetter — „kein Ort" als Default (LFH-663). Der Rahmen fragt es für Modulzähler und
    * Unwetterhinweis ab (`einsatz/useModulZaehler.ts`, `wetter/useUnwetterHinweis.ts`); „kein
    * Ort" ist ein echter Serverzustand ohne Zahl und ohne Hinweis. Tests mit Warnungen

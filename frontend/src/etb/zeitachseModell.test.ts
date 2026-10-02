@@ -4,6 +4,7 @@ import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
 import { baueZeilen } from './etbZeile';
 import {
   berichtigungsindex,
+  dokumenteJeEintrag,
   einfrieren,
   filterMitTyp,
   filterZusammenfuehren,
@@ -291,5 +292,21 @@ describe('hatVerknuepfung (LFH-636)', () => {
     expect(hatVerknuepfung(e({ lagebericht_id: 1 }))).toBe(true);
     expect(hatVerknuepfung(e({ auftrag_id: 1 }))).toBe(true);
     expect(hatVerknuepfung(e({ folgeauftraege: [{ id: 3, lfd_nr: 1 }] }))).toBe(true);
+  });
+});
+
+describe('dokumenteJeEintrag (LFH-743)', () => {
+  const dok = (id: number, bezug?: number) => ({ id, bezug_etb_eintrag_id: bezug });
+
+  it('ordnet die Dokumente ihrem ETB-Bezug zu und lässt die übrigen weg', () => {
+    const je = dokumenteJeEintrag([dok(1, 40), dok(2), dok(3, 41), dok(4, 40)]);
+    expect([...je.keys()].sort()).toEqual([40, 41]);
+    expect(je.get(40)?.map((d) => d.id)).toEqual([1, 4]);
+    expect(je.get(41)?.map((d) => d.id)).toEqual([3]);
+  });
+
+  it('liefert ohne Dokument mit ETB-Bezug eine leere Zuordnung', () => {
+    expect(dokumenteJeEintrag([dok(1), dok(2)]).size).toBe(0);
+    expect(dokumenteJeEintrag([]).size).toBe(0);
   });
 });
