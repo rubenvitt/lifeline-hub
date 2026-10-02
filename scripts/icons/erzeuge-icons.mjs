@@ -1,21 +1,21 @@
 #!/usr/bin/env node
-// LFH-595: Die Ikonen der App aus ihren Quellen erzeugen.
+// LFH-595: Die Icons der App aus ihren Quellen erzeugen.
 //
-//   mise exec -- node scripts/ikonen/erzeuge-ikonen.mjs
+//   mise exec -- node scripts/icons/erzeuge-icons.mjs
 //
-// Quellen (alle eingecheckt, Spec `ikonensatz`):
-//   ikonen.json                    Register: Name, Bedeutung, Icons8-Kennung, Herkunft
+// Quellen (alle eingecheckt, Spec `iconsatz`):
+//   icons.json                    Register: Name, Bedeutung, Icons8-Kennung, Herkunft
 //   quellen/<name>.svg             Icons8 „iOS 27 Outlined“ (herkunft icons8/ersatz) oder eigene
 //                                  Zeichnung im selben Raster (herkunft eigen, Vermerk im Kopf)
 //   quellen/<name>.gefuellt.svg    Zwilling aus „iOS 27 Filled“, nur wenn `gefuellt` gesetzt ist
 //
 // Ausgabe:
-//   frontend/src/ikonen/erzeugt.generated.ts   eine Komponente je Quelle (Prettier-formatiert)
-//   scripts/ikonen/quellen.sha256               Stempel über Register, Quellen und Ausgabe
+//   frontend/src/icons/erzeugt.generated.ts   eine Komponente je Quelle (Prettier-formatiert)
+//   scripts/icons/quellen.sha256               Stempel über Register, Quellen und Ausgabe
 //
-// Neue Ikonen holt der Agent über den Icons8-MCP (Konto mit Abo) als SVG nach `quellen/`; das
-// Skript selbst geht nicht ins Netz. `frontend/src/ikonen/ikonen.guard.test.ts` prüft Stempel,
-// Vollständigkeit und dass jede Ikone verwendet wird.
+// Neue Icons holt der Agent über den Icons8-MCP (Konto mit Abo) als SVG nach `quellen/`; das
+// Skript selbst geht nicht ins Netz. `frontend/src/icons/icons.guard.test.ts` prüft Stempel,
+// Vollständigkeit und dass jedes Icon verwendet wird.
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -25,16 +25,16 @@ import { fileURLToPath } from 'node:url';
 const hier = dirname(fileURLToPath(import.meta.url));
 const wurzel = join(hier, '..', '..');
 const frontend = join(wurzel, 'frontend');
-const ausgabe = join(frontend, 'src', 'ikonen', 'erzeugt.generated.ts');
+const ausgabe = join(frontend, 'src', 'icons', 'erzeugt.generated.ts');
 const quellen = join(hier, 'quellen');
-const register = join(hier, 'ikonen.json');
+const register = join(hier, 'icons.json');
 const stempel = join(hier, 'quellen.sha256');
 
 export const EIGEN_VERMERK = '<!-- eigene Zeichnung (LFH-595) im Raster von iOS 27 Outlined -->';
 const NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 function fehler(meldung) {
-  console.error(`erzeuge-ikonen: ${meldung}`);
+  console.error(`erzeuge-icons: ${meldung}`);
   process.exit(1);
 }
 
@@ -103,14 +103,14 @@ function komponente(exportName, name, quelle, kommentar) {
   const pfade = quelle.pfade
     .map((p) => `{ d: ${literal(p.d)}${p.fillRule ? `, fillRule: '${p.fillRule}'` : ''} }`)
     .join(', ');
-  return `/** ${kommentar} */\nexport const ${exportName} = ikone(${literal(name)}, ${literal(quelle.viewBox)}, [${pfade}]);\n`;
+  return `/** ${kommentar} */\nexport const ${exportName} = icon(${literal(name)}, ${literal(quelle.viewBox)}, [${pfade}]);\n`;
 }
 
 export function erzeugeModul(eintraege, lies) {
   const teile = [
-    '// ERZEUGT von scripts/ikonen/erzeuge-ikonen.mjs aus scripts/ikonen/ (LFH-595).',
+    '// ERZEUGT von scripts/icons/erzeuge-icons.mjs aus scripts/icons/ (LFH-595).',
     '// Nicht von Hand ändern: Quellen und Register dort, dann das Skript laufen lassen.',
-    "import { ikone } from './IkonenRahmen';",
+    "import { icon } from './IconRahmen';",
     '',
   ];
   for (const e of eintraege) {
@@ -122,12 +122,12 @@ export function erzeugeModul(eintraege, lies) {
     if (e.herkunft === 'eigen' && !lies(`${e.name}.svg`).includes(EIGEN_VERMERK)) {
       throw new Error(`${e.name}.svg: eigene Zeichnung ohne Vermerk`);
     }
-    teile.push(komponente(`Ikone${pascal(e.name)}`, e.name, umriss, `${e.bedeutung} · ${herkunft}`));
+    teile.push(komponente(`Icon${pascal(e.name)}`, e.name, umriss, `${e.bedeutung} · ${herkunft}`));
     if (e.gefuellt) {
       const voll = zerlegeSvg(lies(`${e.name}.gefuellt.svg`), `${e.name}.gefuellt.svg`);
       teile.push(
         komponente(
-          `Ikone${pascal(e.name)}Gefuellt`,
+          `Icon${pascal(e.name)}Gefuellt`,
           `${e.name}.gefuellt`,
           voll,
           `${e.bedeutung}, aktiv · Icons8 „${e.gefuellt.commonName}“ (${e.gefuellt.id})`,
@@ -139,9 +139,9 @@ export function erzeugeModul(eintraege, lies) {
 }
 
 export function pruefeRegister(daten, vorhandeneDateien) {
-  if (!daten || !Array.isArray(daten.ikonen)) throw new Error('ikonen.json: Feld `ikonen` fehlt');
+  if (!daten || !Array.isArray(daten.icons)) throw new Error('icons.json: Feld `icons` fehlt');
   const namen = new Set();
-  for (const e of daten.ikonen) {
+  for (const e of daten.icons) {
     if (!NAME.test(e.name ?? '')) throw new Error(`Name ungültig: ${JSON.stringify(e.name)}`);
     if (namen.has(e.name)) throw new Error(`Name doppelt: ${e.name}`);
     namen.add(e.name);
@@ -152,7 +152,7 @@ export function pruefeRegister(daten, vorhandeneDateien) {
     if (!e.bedeutung) throw new Error(`${e.name}: bedeutung fehlt`);
   }
   const erwartet = new Set(
-    daten.ikonen.flatMap((e) => [`${e.name}.svg`, ...(e.gefuellt ? [`${e.name}.gefuellt.svg`] : [])]),
+    daten.icons.flatMap((e) => [`${e.name}.svg`, ...(e.gefuellt ? [`${e.name}.gefuellt.svg`] : [])]),
   );
   for (const d of erwartet) if (!vorhandeneDateien.includes(d)) throw new Error(`Quelle fehlt: ${d}`);
   for (const d of vorhandeneDateien) if (!erwartet.has(d)) throw new Error(`Quelle ohne Eintrag: ${d}`);
@@ -166,7 +166,7 @@ async function main() {
   } catch (e) {
     fehler(e.message);
   }
-  const eintraege = [...daten.ikonen].sort((a, b) => a.name.localeCompare(b.name));
+  const eintraege = [...daten.icons].sort((a, b) => a.name.localeCompare(b.name));
   let modul;
   try {
     modul = erzeugeModul(eintraege, (datei) => readFileSync(join(quellen, datei), 'utf8'));
@@ -183,7 +183,7 @@ async function main() {
     return `${summe}  ${relative(wurzel, pfad)}`;
   });
   writeFileSync(stempel, `${zeilen.join('\n')}\n`);
-  console.log(`erzeuge-ikonen: ${eintraege.length} Einträge, ${dateien.length} Quellen`);
+  console.log(`erzeuge-icons: ${eintraege.length} Einträge, ${dateien.length} Quellen`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();

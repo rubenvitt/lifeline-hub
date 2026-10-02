@@ -59,7 +59,7 @@ function zeige(
   return renderMitProviders(
     <FristPaneel
       einsatzId={1}
-      einsatz={{ status, meine_rolle: rolle, retention_bis: null } as never}
+      einsatz={{ status, meine_rolle: rolle, retention_bis: null, org_id: 1 } as never}
     />,
   );
 }

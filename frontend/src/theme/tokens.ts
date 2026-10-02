@@ -578,7 +578,7 @@ export const schriftskala = {
   textKlein: { groesse: 12, gewicht: 400, familie: 'text' },
   /** Augenbraue: 10 px, 600, Versalien, Sperrung .14em, Farbe `schwach`. */
   augenbraue: { groesse: 10, gewicht: 600, familie: 'text', sperrung: '0.14em', versal: true },
-  /** Etikett unter der Rail-Ikone: 9 px Versalien. */
+  /** Etikett unter dem Rail-Icon: 9 px Versalien. */
   railEtikett: { groesse: 9, gewicht: 500, familie: 'text', sperrung: '0.06em', versal: true },
   /** Mono-Meta: Zeiten, Nummern, Zähler neben Text. */
   meta: { groesse: 11, gewicht: 400, familie: 'zahl' },
@@ -678,7 +678,7 @@ export function kopfzeilenMasse(
  * (LFH-667; `alarm` lag am Tag bei 5,67 : 1 auf `grund`). Das `Form`-Token färbt nur Feldmeldung,
  * Pflichtsternchen und Rückmeldesymbol; die Felder selbst ziehen ihren Fehlerrand aus dem eigenen
  * Komponententoken.
- * `colorError` global umzustellen träfe auch Ränder, Ikonen und Feldränder, und dort ist die
+ * `colorError` global umzustellen träfe auch Ränder, Icons und Feldränder, und dort ist die
  * Füllfarbe richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein
  * Linkknopf zeigt den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText`
  * darauf 8,04 Tag · 9,65 Nacht).
@@ -828,7 +828,7 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorTextSecondary: farben.gedaempft,
     // Beschreibung ist Text (`Typography` `secondary`, Seitenbeschreibung, „—“). antd leitete sie
     // aus der tertiären Stufe ab, `schwach` läge am Tag bei 5,33–6,37 (LFH-652). `schwach` bleibt
-    // Augenbraue, Platzhalter und Ikonen (LFH-643).
+    // Augenbraue, Platzhalter und Icons (LFH-643).
     colorTextDescription: farben.gedaempft,
     colorTextTertiary: farben.schwach,
     // Der Platzhalter ist bei mehreren Filtern die EINZIGE Beschriftung. antds Ableitung aus

@@ -12,6 +12,7 @@ import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import Schnellerfassung, { chipZeileStil, rolleWaagerechtInsBild } from './Schnellerfassung';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { einsatzFixture } from '../test/fixtures';
+import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
 // onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
@@ -140,6 +141,30 @@ describe('Schnellerfassung', () => {
     expect(arg).toMatchObject({ typ: 'meldung', inhalt: 'Pumpe läuft' });
     expect(arg.erfasst_lokal_at).toBeTruthy();
     expect(feld).toHaveValue('');
+  });
+
+  it('LFH-762: rendert und erfasst ohne sicheren Kontext (Klartext-HTTP im LAN)', async () => {
+    const zuruecknehmen = ohneSicherenKontext();
+    try {
+      const p = props();
+      renderMitProviders(<Schnellerfassung {...p} />);
+      const feld = screen.getByPlaceholderText(/Inhalt/);
+      await userEvent.type(feld, 'Erste{Enter}');
+      await waitFor(() => expect(feld).toHaveValue(''));
+      await userEvent.type(feld, 'Zweite{Enter}');
+      await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
+      const [erste, zweite] = (p.erfassen as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([e]) => e as NeuerEintrag,
+      );
+      expect(erste).toMatchObject({ inhalt: 'Erste' });
+      expect(erste.client_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+      // Nach dem Erfolg ein neuer Schlüssel, sonst hielte der Server den zweiten für den ersten.
+      expect(zweite.client_id).not.toBe(erste.client_id);
+    } finally {
+      zuruecknehmen();
+    }
   });
 
   it('Shift+Enter sendet nicht (Zeilenumbruch)', async () => {

@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { EtbEntwurf } from './entwurfModell';
+import { neueClientId } from '../../offline/clientId';
 
 interface EntwurfDB extends DBSchema {
   entwuerfe: {
@@ -53,7 +54,7 @@ function vorlaufIds(): string[] {
 
 /** Synchron — muss vor dem ersten `await` des Schreibauftrags stehen. */
 function vormerken(id: string, entwurf: EtbEntwurf | null): string {
-  const stand = crypto.randomUUID();
+  const stand = neueClientId();
   try {
     localStorage.setItem(VORLAUF_PRAEFIX + id, JSON.stringify({ stand, entwurf }));
   } catch {

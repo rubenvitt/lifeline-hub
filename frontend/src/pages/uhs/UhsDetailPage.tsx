@@ -1,4 +1,4 @@
-import { IkonePersonPlus } from '../../ikonen';
+import { IconPersonPlus } from '../../icons';
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -139,7 +139,7 @@ export default function UhsDetailPage() {
                dort steht „In Betrieb nehmen" als Primäraktion. */
             <Button
               type="primary"
-              icon={<IkonePersonPlus />}
+              icon={<IconPersonPlus />}
               onClick={() => navigate(personenAufnahmePfad(einsatzId, { uhs: uhs.id }))}
             >
               Patient aufnehmen

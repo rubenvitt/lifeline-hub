@@ -682,7 +682,7 @@ fn wetter_teil_zustand_wire() {
 }
 
 /// LFH-864: aktuelle Bedingungen. `WetterSymbol` ist aus `icon` der Quelle abgebildet (Nebel nach
-/// Sonnenstand geteilt, Frontend-Tabellen `wetterSymbolIkone`/`wetterSymbolWort`),
+/// Sonnenstand geteilt, Frontend-Tabellen `wetterSymbolIcon`/`wetterSymbolWort`),
 /// `WetterMessgroesse` benennt die aus Nachbarstationen ergänzten Werte.
 #[test]
 fn wetter_symbol_wire() {

@@ -1,4 +1,4 @@
-import { IkoneChevronRunter, IkoneLadekreis } from '../ikonen';
+import { IconChevronRunter, IconLadekreis } from '../icons';
 import { App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Tooltip, Typography } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -242,7 +242,7 @@ export default function OfflineKartenVerwaltung() {
           return (
             <Space size={8} wrap>
               <Tag
-                icon={<IkoneLadekreis drehen />}
+                icon={<IconLadekreis drehen />}
                 color="processing"
                 style={{ marginInlineEnd: 0 }}
               >
@@ -273,7 +273,7 @@ export default function OfflineKartenVerwaltung() {
         const label = s === 'laedt' ? 'lädt' : 'aktualisiert';
         return (
           <Space size={8}>
-            <Tag icon={<IkoneLadekreis drehen />} color="processing" style={{ marginInlineEnd: 0 }}>
+            <Tag icon={<IconLadekreis drehen />} color="processing" style={{ marginInlineEnd: 0 }}>
               {label}
             </Tag>
             {prozent != null ? (
@@ -399,7 +399,7 @@ export default function OfflineKartenVerwaltung() {
             }}
           >
             <Button>
-              Erweitert <IkoneChevronRunter />
+              Erweitert <IconChevronRunter />
             </Button>
           </Dropdown>
         </Space>

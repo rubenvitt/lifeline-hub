@@ -1,4 +1,4 @@
-import { IkoneLupe } from '../ikonen';
+import { IconLupe } from '../icons';
 import { adressBegriff } from '../anzeige/ortssuche';
 import { lagekartePfad } from '../routing/deeplinks';
 import { sprungZu, type Befehl, type Oeffnung } from './typen';
@@ -43,7 +43,7 @@ export function adressBefehl({
     gruppe: 'ortssuche',
     label: `Adresse auf Lagekarte suchen · „${begriff}“`,
     kontext: 'Adresse',
-    icon: IkoneLupe,
+    icon: IconLupe,
     ...sprungZu(lagekartePfad(einsatzId, { ort: begriff }), navigate),
   };
 }

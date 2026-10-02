@@ -1,12 +1,12 @@
 import {
-  IkoneEbenen,
-  IkoneFadenkreuz,
-  IkoneHochladen,
-  IkoneLupe,
-  IkoneMuelleimer,
-  IkoneSchloss,
-  IkoneVollbildEcken,
-} from '../../ikonen';
+  IconEbenen,
+  IconFadenkreuz,
+  IconHochladen,
+  IconLupe,
+  IconMuelleimer,
+  IconSchloss,
+  IconVollbildEcken,
+} from '../../icons';
 import {
   Button,
   Input,
@@ -457,7 +457,7 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
           color: rollen.schwach,
         }}
       >
-        <IkoneSchloss />
+        <IconSchloss />
       </span>
       <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
       <span style={{ fontSize: 11 }}>{grund}</span>
@@ -700,7 +700,7 @@ export default function Sidebar(props: SidebarProps) {
         </div>
       )}
 
-      <LeistenAbschnitt titel="Ebenen" kennung="ebenen" zeichen={<IkoneEbenen size={16} />}>
+      <LeistenAbschnitt titel="Ebenen" kennung="ebenen" zeichen={<IconEbenen size={16} />}>
         <div role="group" aria-label="Ebenen ein- und ausblenden">
           {ebenen.map((z) => (
             <EbenenZeilenKnopf
@@ -749,7 +749,7 @@ export default function Sidebar(props: SidebarProps) {
             {nvSucheZeigen && (
               <div style={{ marginBlockEnd: token.marginXS }}>
                 {/* Schlichtes Eingabefeld statt Suchvariante: gefiltert wird live, deren
-                    Suchknopf wäre ein Tab-Ziel ohne Wirkung. Die Ikone in `aria-hidden`-Hülle
+                    Suchknopf wäre ein Tab-Ziel ohne Wirkung. Das Icon in `aria-hidden`-Hülle
                     (sonst ein englisches „search"). */}
                 <Input
                   aria-label="Nicht verortete Objekte durchsuchen"
@@ -757,7 +757,7 @@ export default function Sidebar(props: SidebarProps) {
                   allowClear
                   prefix={
                     <span aria-hidden="true" style={{ color: rollen.schwach }}>
-                      <IkoneLupe />
+                      <IconLupe />
                     </span>
                   }
                   value={nvSuche}
@@ -1203,19 +1203,19 @@ export default function Sidebar(props: SidebarProps) {
                           eintraege={[
                             {
                               key: 'zentrieren',
-                              ikone: <IkoneVollbildEcken />,
+                              icon: <IconVollbildEcken />,
                               label: 'Auf Bild zentrieren',
                             },
                             {
                               key: 'platzieren',
-                              ikone: <IkoneFadenkreuz />,
+                              icon: <IconFadenkreuz />,
                               label: imPlatzieren
                                 ? 'Platzieren beenden'
                                 : 'Auf der Karte platzieren',
                             },
                             {
                               key: 'loeschen',
-                              ikone: <IkoneMuelleimer />,
+                              icon: <IconMuelleimer />,
                               label: 'Bild entfernen …',
                               gefahr: true,
                             },
@@ -1233,7 +1233,7 @@ export default function Sidebar(props: SidebarProps) {
                       ) : (
                         <Tooltip title="Auf Bild zentrieren">
                           <Button
-                            icon={<IkoneVollbildEcken />}
+                            icon={<IconVollbildEcken />}
                             onClick={() => props.onBildZentrieren(b.id)}
                             aria-label={`${b.name} zentrieren`}
                           />
@@ -1339,7 +1339,7 @@ export default function Sidebar(props: SidebarProps) {
                 return false;
               }}
             >
-              <Button icon={<IkoneHochladen />}>Bild hochladen</Button>
+              <Button icon={<IconHochladen />}>Bild hochladen</Button>
             </Upload>
           )}
         </Space>

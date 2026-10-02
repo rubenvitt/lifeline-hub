@@ -134,8 +134,12 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   eintragen, nicht lockern. Frontend: Verwaltung → „Aufbewahrung" (`admin/adminNav.tsx`), Akte
   unter `/admin/aufbewahrung/:einsatzId`.
 - Archivzugriff nur für den System-Admin der eigenen Org (`fordere_archivzugriff`: fremd 403,
-  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` prüft die Org nicht (bekannte
-  Inkonsistenz).
+  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` schneidet gleich (LFH-753): Admin nur
+  der Einsatz-Org, sonst Einsatzleitung (auch org-fremd); der Client spiegelt das über
+  `BenutzerAnzeige.org_id`. Nach Fristablauf hat die Einsatzleitung bewusst keinen **UI**-Weg;
+  der PUT bleibt ihr bis zur Vormerkung (≤ 10 min) offen, danach nur das Wiederherstellen des
+  Org-Admins — kein Lesegate nachrüsten (Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-753-frist-put-org-pruefung/design.md`, D3).
 - **Akte ist eine Retain-Projektion** (`aufbewahrung/projektion.rs`, Guard
   `jede_archivspalte_ist_retain` über `klassifikation_von`), eigene DTOs.
 - **Wiederherstellen braucht die neue Frist** (`einsatz::repo::wiederherstellen`, `retention_bis`
@@ -148,8 +152,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
 - Purge-Audit ist fail-closed (Akteurskette abschließende Person → Einsatzleitung → System-Admin
   der Einsatz-Org; ohne Akteur liefert `system_audit_tx` einen Fehler → Rollback, sichtbar nur
   per `tracing::error!`).
-- **Scrub-Werte in System-ETB-Texten** stehen in `AUSNAHMEN_SYSTEM_ETB`
-  (`tests/aufbewahrung_e2e.rs`) — kein Test bemerkt einen fehlenden Eintrag.
+- **Scrub-Werte in System-ETB-Texten** (LFH-752): Werte von Betroffenen (Schaden, Person, Tier,
+  UHS-Belegung: Ort, Adressat, Verbleib-Ziel, Notiz) und Dokumenttitel gehören nie in den
+  Wortlaut — nur Registriernummer, Enum, Kategorie, Ablage-Verweis (`Ablage ETB 12`). Bewusst
+  behalten werden Einsatzkräfte, Lagestruktur, Führungsmodule und Enum-Labels; jede solche Stelle
+  steht mit `gruppe` in `AUSNAHMEN_SYSTEM_ETB` (`tests/aufbewahrung_e2e.rs`), die Liste wird nie
+  um eine Spalte aus `GESPERRT` länger. Kein Test bemerkt einen fehlenden Eintrag. Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-752-system-etb-ohne-scrub-werte/design.md`.
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
   stehen), und nach einer Schwärzung schreibt der Purge-Lauf den WAL per

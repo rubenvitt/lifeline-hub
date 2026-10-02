@@ -1,19 +1,19 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ikone, ikonenHuelleStil } from './IkonenRahmen';
+import { icon, iconHuelleStil } from './IconRahmen';
 
-const Probe = ikone('probe', '0 0 50 50', [
+const Probe = icon('probe', '0 0 50 50', [
   { d: 'M 0 0 L 50 50 Z' },
   { d: 'M 1 1', fillRule: 'evenodd' },
 ]);
 
 function huelle(container: HTMLElement): HTMLElement {
-  const el = container.querySelector<HTMLElement>('[data-ikone="probe"]');
+  const el = container.querySelector<HTMLElement>('[data-lfh-icon="probe"]');
   if (!el) throw new Error('Hülle fehlt');
   return el;
 }
 
-describe('IkonenRahmen — eine Ikone des Satzes (LFH-595)', () => {
+describe('IconRahmen — ein Icon des Satzes (LFH-595)', () => {
   it('wächst ohne Größenangabe mit der Schrift: 1em', () => {
     const { container } = render(<Probe />);
     const svg = huelle(container).querySelector('svg');
@@ -48,22 +48,22 @@ describe('IkonenRahmen — eine Ikone des Satzes (LFH-595)', () => {
     expect(el.querySelector('svg')?.getAttribute('role')).toBeNull();
   });
 
-  it('trägt die Klassen, über die antd Ikonen in seinen Bauteilen ausrichtet', () => {
+  it('trägt die Klassen, über die antd Icons in seinen Bauteilen ausrichtet', () => {
     const { container } = render(<Probe className="extra" />);
     const el = huelle(container);
     expect(el.classList.contains('anticon')).toBe(true);
-    expect(el.classList.contains('lfh-ikone')).toBe(true);
+    expect(el.classList.contains('lfh-icon')).toBe(true);
     expect(el.classList.contains('extra')).toBe(true);
-    expect(el.classList.contains('lfh-ikone-dreht')).toBe(false);
+    expect(el.classList.contains('lfh-icon-dreht')).toBe(false);
   });
 
   it('dreht nur auf Wunsch (Ladeanzeige)', () => {
     const { container } = render(<Probe drehen />);
-    expect(huelle(container).classList.contains('lfh-ikone-dreht')).toBe(true);
+    expect(huelle(container).classList.contains('lfh-icon-dreht')).toBe(true);
   });
 
-  it('richtet sich aus wie eine antd-Ikone und lässt eigene Stile zu', () => {
-    expect(ikonenHuelleStil).toMatchObject({
+  it('richtet sich aus wie ein antd-Icon und lässt eigene Stile zu', () => {
+    expect(iconHuelleStil).toMatchObject({
       display: 'inline-flex',
       alignItems: 'center',
       color: 'inherit',
@@ -76,6 +76,6 @@ describe('IkonenRahmen — eine Ikone des Satzes (LFH-595)', () => {
   });
 
   it('nennt sich im React-Baum nach ihrem Registernamen', () => {
-    expect(Probe.displayName).toBe('Ikone(probe)');
+    expect(Probe.displayName).toBe('Icon(probe)');
   });
 });

@@ -52,7 +52,7 @@ test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste a
     await page.setViewportSize(SCHMAL);
     await expect(kopf, route).toHaveCSS('padding-left', '0px');
     await expect(kopf, route).toHaveCSS('padding-right', '0px');
-    // Unter `lg` gibt es kein Suchfeld — die Suche steht als Ikone in der rechten Gruppe.
+    // Unter `lg` gibt es kein Suchfeld — die Suche steht als Icon in der rechten Gruppe.
     await expect(suche, route).toHaveCount(0);
   }
 });
@@ -276,7 +276,7 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
   /**
    * Der RUHEZUSTAND, für den die Verdichtung gebaut ist (die Störungswörter misst
    * `gate1-ueberlauf.spec.ts`): Benachrichtigungen erlaubt (headless nachgebildet), Strom
-   * verbunden, Ton bereit. Dann stehen die Zustände nur als Ikone, und auch die breiteste
+   * verbunden, Ton bereit. Dann stehen die Zustände nur als Icon, und auch die breiteste
    * Stufe hält eine Zeile.
    */
   test.setTimeout(60_000);

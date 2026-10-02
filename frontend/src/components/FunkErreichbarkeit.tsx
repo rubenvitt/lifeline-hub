@@ -1,4 +1,4 @@
-import { IkoneTelefon } from '../ikonen';
+import { IconTelefon } from '../icons';
 import { Space, Tag, Typography } from 'antd';
 import type { Sprechgruppe } from '../api/types';
 import { kommunikationsmittelLabel, teileSprechgruppen } from './kommunikationsmittel';
@@ -46,7 +46,7 @@ export default function FunkErreichbarkeit({
           </Tag>
         ))}
         {kommunikationsmittel && <Tag>{kommunikationsmittelLabel(kommunikationsmittel)}</Tag>}
-        {erreichbarkeit && <Tag icon={<IkoneTelefon />}>{erreichbarkeit}</Tag>}
+        {erreichbarkeit && <Tag icon={<IconTelefon />}>{erreichbarkeit}</Tag>}
       </Space>
     </div>
   );

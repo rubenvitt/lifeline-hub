@@ -154,11 +154,10 @@ pub async fn ablegen(
     ablage: &Ablage<'_>,
 ) -> Result<(i64, i64), AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
-    let inhalt = format!(
-        "Dokument abgelegt: {} ({})",
-        ablage.titel,
-        ablage.kategorie.label()
-    );
+    // Ohne Titel: er ist Scrub der Dokumentzeile und bliebe sonst über die Schwärzung hinaus im
+    // ETB stehen (LFH-752, Spec `aufbewahrung`). Änderung und Entfernung verweisen auf diesen
+    // Eintrag ([`ablage_verweis`]).
+    let inhalt = format!("Dokument abgelegt ({})", ablage.kategorie.label());
     crate::write_retry!(pool, |conn| {
         if let Some(b) = ablage.bezug {
             bezug_pruefen(conn, einsatz_id, b).await?;
@@ -200,6 +199,13 @@ pub async fn ablegen(
         .await?;
         Ok((id, etb_id))
     })
+}
+
+/// Bezeichnet ein Dokument im ETB über den Eintrag seiner Ablage („Ablage ETB 12“), nicht über
+/// den Titel. Die laufende Nummer ist Retain und überdauert die Schwärzung, die `id` der
+/// Dokumentzeile nicht (LFH-752, design.md D2).
+fn ablage_verweis(lfd_nr: i64) -> String {
+    format!("Ablage ETB {lfd_nr}")
 }
 
 /// Eingabe für [`aendern`] — vom Handler validiert. `None` = Feld bleibt; beim Bezug ist
@@ -257,15 +263,18 @@ pub async fn aendern(
 ) -> Result<Option<i64>, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     crate::write_retry!(pool, |conn| {
-        let (titel_alt, kategorie_alt, ab, eh, et): (
+        let (titel_alt, kategorie_alt, ab, eh, et, ablage_nr): (
             String,
             String,
             Option<i64>,
             Option<i64>,
             Option<i64>,
+            i64,
         ) = sqlx::query_as(
-            "SELECT titel, kategorie, bezug_abschnitt_id, bezug_einheit_id, bezug_etb_eintrag_id \
-             FROM einsatz_dokument WHERE id = ? AND einsatz_id = ? AND geloescht_at IS NULL",
+            "SELECT d.titel, d.kategorie, d.bezug_abschnitt_id, d.bezug_einheit_id, \
+               d.bezug_etb_eintrag_id, e.lfd_nr \
+             FROM einsatz_dokument d JOIN etb_eintrag e ON e.id = d.etb_eintrag_id \
+             WHERE d.id = ? AND d.einsatz_id = ? AND d.geloescht_at IS NULL",
         )
         .bind(id)
         .bind(einsatz_id)
@@ -290,8 +299,9 @@ pub async fn aendern(
         let bezug = aenderung.bezug.unwrap_or(bezug_alt);
 
         let mut teile = Vec::new();
+        // Weder alter noch neuer Titel im ETB (LFH-752), nur dass er sich geändert hat.
         if titel != titel_alt {
-            teile.push(format!("Titel: „{titel_alt}“ → „{titel}“"));
+            teile.push("Titel geändert".to_string());
         }
         if kategorie != kategorie_alt {
             teile.push(format!(
@@ -329,7 +339,8 @@ pub async fn aendern(
         .execute(&mut *conn)
         .await?;
         let inhalt = format!(
-            "Dokument geändert: {titel} ({}) — {}",
+            "Dokument geändert: {} ({}) — {}",
+            ablage_verweis(ablage_nr),
             kategorie.label(),
             teile.join("; ")
         );
@@ -349,9 +360,10 @@ pub async fn entfernen(
 ) -> Result<i64, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     crate::write_retry!(pool, |conn| {
-        let (titel, kategorie): (String, String) = sqlx::query_as(
-            "SELECT titel, kategorie FROM einsatz_dokument \
-             WHERE id = ? AND einsatz_id = ? AND geloescht_at IS NULL",
+        let (kategorie, ablage_nr): (String, i64) = sqlx::query_as(
+            "SELECT d.kategorie, e.lfd_nr \
+             FROM einsatz_dokument d JOIN etb_eintrag e ON e.id = d.etb_eintrag_id \
+             WHERE d.id = ? AND d.einsatz_id = ? AND d.geloescht_at IS NULL",
         )
         .bind(id)
         .bind(einsatz_id)
@@ -374,7 +386,7 @@ pub async fn entfernen(
             einsatz_id,
             benutzer_id,
             etb_startwert,
-            &format!("Dokument entfernt: {titel} ({label})"),
+            &format!("Dokument entfernt: {} ({label})", ablage_verweis(ablage_nr)),
         )
         .await
     })

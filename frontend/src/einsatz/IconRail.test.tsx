@@ -34,22 +34,22 @@ describe('IconRail', () => {
     expect(screen.getByRole('button', { name: 'Führung' })).not.toHaveAttribute('aria-current');
   });
 
-  // LFH-595 (Spec `ikonensatz`, „Aktiver Zustand über die gefüllte Ikone“): die Füllung ist ein
-  // ZUSÄTZLICHER Kanal neben Fläche und Marke. Geprüft über `data-ikone` (Registername, die
+  // LFH-595 (Spec `iconsatz`, „Aktiver Zustand über das gefüllte Icon“): die Füllung ist ein
+  // ZUSÄTZLICHER Kanal neben Fläche und Marke. Geprüft über `data-lfh-icon` (Registername, die
   // gefüllte Fassung trägt `.gefuellt`), nicht über Pfaddaten.
   it('zeigt die aktive Kategorie gefüllt und alle anderen als Umriss', () => {
     renderMitProviders(
       <IconRail kategorien={kategorien} aktiveKategorie="lage" onKategorieKlick={() => {}} />,
     );
-    const ikoneIn = (name: string) =>
+    const iconIn = (name: string) =>
       screen
         .getByRole('button', { name })
-        .querySelector('[data-ikone]')
-        ?.getAttribute('data-ikone');
-    expect(ikoneIn('Lage')).toMatch(/\.gefuellt$/);
+        .querySelector('[data-lfh-icon]')
+        ?.getAttribute('data-lfh-icon');
+    expect(iconIn('Lage')).toMatch(/\.gefuellt$/);
     for (const k of kategorien.filter((k) => k.key !== 'lage')) {
-      expect(ikoneIn(k.label), k.label).toBeDefined();
-      expect(ikoneIn(k.label), k.label).not.toMatch(/\.gefuellt$/);
+      expect(iconIn(k.label), k.label).toBeDefined();
+      expect(iconIn(k.label), k.label).not.toMatch(/\.gefuellt$/);
     }
   });
 
@@ -60,8 +60,8 @@ describe('IconRail', () => {
     const namen = kategorien.map((k) =>
       screen
         .getByRole('button', { name: k.label })
-        .querySelector('[data-ikone]')
-        ?.getAttribute('data-ikone'),
+        .querySelector('[data-lfh-icon]')
+        ?.getAttribute('data-lfh-icon'),
     );
     expect(namen.every((n) => n && !n.endsWith('.gefuellt'))).toBe(true);
   });

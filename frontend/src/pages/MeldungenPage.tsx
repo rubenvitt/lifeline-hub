@@ -1,4 +1,4 @@
-import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
+import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -306,7 +306,7 @@ export default function MeldungenPage() {
         darfSchreiben && (
           <Button
             type="primary"
-            icon={formOffen ? <IkoneChevronHoch /> : <IkonePlus />}
+            icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
             onClick={() => setFormOffen((o) => !o)}
           >
             {formOffen ? 'Formular schließen' : 'Meldung erfassen'}
@@ -356,7 +356,7 @@ export default function MeldungenPage() {
           aktion={
             <Button
               type="text"
-              icon={<IkoneKreuz />}
+              icon={<IconKreuz />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />

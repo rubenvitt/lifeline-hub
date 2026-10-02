@@ -332,3 +332,12 @@ in die Details.
 
 - Die Texte der Vorschläge in D9 sind Arbeitsstand und dürfen sich bis zum Merge ändern. Sie
   belegen keine Vorgabe und ändern weder Spec noch Aufgabenschnitt.
+
+## Nachtrag beim Merge von `alpha` (02.10.2026)
+
+LFH-753 hat den Frist-PUT auf den System-Admin der Einsatz-Org beschränkt. Kategorie-PUT und
+`GET …/aufbewahrung-kategorien` übernehmen denselben Org-Schnitt (`admin_der_org` in
+`routes/einsatz.rs`). Der Admin einer fremden Organisation erhält 403 bzw. braucht das reguläre
+Lese-Gate. Spec `aufbewahrung-kategorien`, „Kategorie-Frist am Einsatz ändern“, trägt dafür das
+Szenario „Admin einer fremden Organisation“; der Konflikt in `aufbewahrung-archiv` ist zu einer
+Fassung mit beiden Szenarien zusammengeführt.

@@ -170,11 +170,13 @@ Zeitpunkt in der Anzeigezone, „keine Frist“ oder bei einem aktiven Einsatz d
 die Frist beim Abschluss aus der Dauer entsteht. Darunter MUST je Datenkategorie ihre Frist,
 ihr Zustand und ihre Rechtsgrundlage stehen, bei einem aktiven Einsatz die Dauer, aus der die
 Kategorie-Frist beim Abschluss entsteht, oder der Hinweis, dass sie der Einsatz-Frist folgt.
-Einsatzleitung und System-Admin MUST die Frist des Einsatzes dort setzen, verlängern und
-aufheben können, auch wenn der Einsatz abgeschlossen ist und die übrigen Einstellungen
-eingefroren sind; die Frist jeder Kategorie ebenso, sobald der Einsatz abgeschlossen ist. Vor einer Verkürzung MUST eine Rückfrage stehen, die den neuen
-und den alten Zeitpunkt nennt. Ohne Recht MUST die Aktion gesperrt dastehen und ein Hinweis
-den Grund nennen. Die Archivakte MUST dieselbe Frist-Aktion für nicht vorgemerkte Einsätze
+Einsatzleitung und System-Admin der Einsatz-Org MUST die Frist des Einsatzes dort setzen,
+verlängern und aufheben können, auch wenn der Einsatz abgeschlossen ist und die übrigen
+Einstellungen eingefroren sind; die Frist jeder Kategorie ebenso, sobald der Einsatz
+abgeschlossen ist. Vor einer Verkürzung MUST eine Rückfrage stehen, die den neuen und den alten
+Zeitpunkt nennt. Ohne Recht MUST die Aktion gesperrt dastehen und ein Hinweis den Grund nennen;
+das gilt auch für den System-Admin einer fremden Organisation. Die Archivakte MUST dieselbe
+Frist-Aktion für nicht vorgemerkte Einsätze
 anbieten und für vorgemerkte, noch in der Karenz liegende das Wiederherstellen. Die Übersicht
 führt in die Archivakte und trägt selbst keine Aktion.
 
@@ -188,6 +190,10 @@ führt in die Archivakte und trägt selbst keine Aktion.
 
 #### Scenario: Ohne Recht
 - **WHEN** ein Beobachter die Aufbewahrung öffnet
+- **THEN** sieht er die Frist, die Aktion ist gesperrt, und ein Hinweis nennt den Grund
+
+#### Scenario: Admin einer fremden Organisation
+- **WHEN** der System-Admin einer anderen Organisation die Aufbewahrung eines Einsatzes öffnet, in dem er kein Mitglied ist
 - **THEN** sieht er die Frist, die Aktion ist gesperrt, und ein Hinweis nennt den Grund
 
 #### Scenario: Kategorie verlängern

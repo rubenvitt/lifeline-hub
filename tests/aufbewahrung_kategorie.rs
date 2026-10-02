@@ -344,3 +344,31 @@ async fn gemischte_zustaende_am_einsatz_und_in_der_akte() {
     assert_eq!(finde(kategorien, "anhaenge")["zustand"], "frist_laeuft");
     assert_eq!(finde(kategorien, "behandlung")["zustand"], "ohne_frist");
 }
+
+/// Spec „Admin einer fremden Organisation“ (Org-Schnitt wie LFH-753): der System-Admin einer
+/// anderen Organisation ohne Mitgliedschaft darf keine Kategorie-Frist ändern.
+#[tokio::test]
+async fn admin_einer_fremden_org_ist_403() {
+    let (app, pool) = setup_mit_pool().await;
+    let (_, id) = abgeschlossener_einsatz(&app).await;
+    let (_, fremd) =
+        common::fremde_org_anlegen(&pool, "Fremd", "fremdadmin", "fremdpw12", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
+        .bind(fremd)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let fremd_cookie = login_cookie(&app, "fremdadmin", "fremdpw12").await;
+    let vorher = stand(&pool, id).await;
+
+    let (status, _) = kategorie_frist(
+        &app,
+        &fremd_cookie,
+        id,
+        "personenauskunft",
+        json!({ "retention_bis": "2099-01-01 00:00:00" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(stand(&pool, id).await, vorher);
+}

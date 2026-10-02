@@ -1,4 +1,4 @@
-import { IkoneHaken } from '../ikonen';
+import { IconHaken } from '../icons';
 import { Link } from 'react-router';
 import type { EtbEintragAnzeige, EtbZaehler } from '../api/types';
 import {
@@ -187,7 +187,7 @@ export default function EtbBilanz({
 }
 
 /**
- * Zustand der Offline-Warteschlange mit zweitem Kanal: Wort + Zahl + Ikone bzw. Fläche.
+ * Zustand der Offline-Warteschlange mit zweitem Kanal: Wort + Zahl + Icon bzw. Fläche.
  * Die Einzelheiten (Wortlaut je Eintrag, Erneut senden / Verwerfen) stehen in den
  * Hinweisen über der Zeitachse und in den Zeilen selbst — hier nur der Stand.
  */
@@ -201,7 +201,7 @@ function Pufferanzeige({ puffer }: { puffer: PufferZustand }) {
         style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}
       >
         <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.normalText }}>
-          <IkoneHaken />
+          <IconHaken />
         </span>
         <span style={{ fontSize: 11, color: rollen.gedaempft }}>Alle Einträge übertragen</span>
       </span>

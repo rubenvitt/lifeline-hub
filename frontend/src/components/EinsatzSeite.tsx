@@ -1,4 +1,4 @@
-import { IkoneChevronRechts } from '../ikonen';
+import { IconChevronRechts } from '../icons';
 import { ConfigProvider, Typography, theme } from 'antd';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
@@ -88,7 +88,7 @@ function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrolle
       breadcrumb={{
         separator: (
           <span aria-hidden="true" style={{ display: 'inline-flex', verticalAlign: 'middle' }}>
-            <IkoneChevronRechts size={13} />
+            <IconChevronRechts size={13} />
           </span>
         ),
       }}

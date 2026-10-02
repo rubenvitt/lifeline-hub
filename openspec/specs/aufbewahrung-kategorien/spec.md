@@ -97,8 +97,9 @@ einem System-Eintrag im ETB, der Kategorie, Frist und Rechtsgrundlage nennt. Ein
 
 ### Requirement: Kategorie-Frist am Einsatz ändern
 
-Einsatzleitung und System-Admin SHALL die Frist einer Kategorie an einem abgeschlossenen
-Einsatz setzen, verlängern und aufheben können. Andere MUST 403 erhalten. Eine Verkürzung,
+Einsatzleitung und System-Admin der Einsatz-Org SHALL die Frist einer Kategorie an einem
+abgeschlossenen Einsatz setzen, verlängern und aufheben können. Andere MUST 403 erhalten, auch
+der System-Admin einer fremden Organisation. Eine Verkürzung,
 auch das erstmalige Setzen, MUST bestätigt werden, sonst 409. Eine unveränderte Frist MUST
 ohne Schreibvorgang bleiben. Jede wirksame Änderung MUST alten und neuen Wert ins ETB
 schreiben. Bei aktivem oder geschwärztem Einsatz MUST 409 folgen, bei vorgemerktem 422.
@@ -114,6 +115,10 @@ schreiben. Bei aktivem oder geschwärztem Einsatz MUST 409 folgen, bei vorgemerk
 #### Scenario: Beobachter
 - **WHEN** ein Mitglied ohne Leitungsrolle eine Kategorie-Frist ändert
 - **THEN** antwortet das System mit 403
+
+#### Scenario: Admin einer fremden Organisation
+- **WHEN** der System-Admin einer anderen Organisation ohne Mitgliedschaft eine Kategorie-Frist ändert
+- **THEN** antwortet das System mit 403 und ändert nichts
 
 #### Scenario: Erste Frist ohne Rechtsgrundlage
 - **WHEN** an einer Kategorie ohne bisherige Frist eine Frist ohne Rechtsgrundlage gesetzt werden soll

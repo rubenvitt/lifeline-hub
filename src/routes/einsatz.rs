@@ -159,7 +159,7 @@ pub struct FristSetzen {
 }
 
 /// PUT /api/einsaetze/{id}/aufbewahrungsfrist — Aufbewahrungsfrist setzen, ändern
-/// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin. Eine Verkürzung
+/// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin der Einsatz-Org. Eine Verkürzung
 /// (inkl. erstmaligem Setzen auf einen bislang unbegrenzten Einsatz) erfordert
 /// `bestaetigt=true`. Schreibt einen ETB-System-Eintrag als Audit. Die Frist greift
 /// erst ab Einsatzabschluss (reaktive Lese-Sperre), nie auf aktive Einsätze.
@@ -169,8 +169,11 @@ pub async fn aufbewahrungsfrist_setzen(
     JsonBody(req): JsonBody<FristSetzen>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let id = ctx.einsatz.id;
-    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
-    if !ctx.benutzer.ist_admin() {
+    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin der Einsatz-Org —
+    // derselbe Org-Schnitt wie am Archiv (`aufbewahrung::fordere_archivzugriff`, LFH-753).
+    // Der Extractor-Floor allein ließe den Admin einer fremden Org serverweit durch.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
         ctx.fordere_einsatzleitung()?;
     }
 
@@ -261,7 +264,10 @@ pub async fn kategorien_lesen(
     State(state): State<AppState>,
     ctx: EinsatzKontext,
 ) -> Result<Json<Vec<KategorieAufbewahrungAnzeige>>, AppError> {
-    if !ctx.benutzer.ist_admin() && ctx.fordere_einsatzleitung().is_err() {
+    // Org-Schnitt wie beim Frist-PUT (LFH-753): der Admin einer fremden Org braucht das reguläre
+    // Lese-Gate.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org && ctx.fordere_einsatzleitung().is_err() {
         ctx.fordere_lesezugriff()?;
     }
     let id = ctx.einsatz.id;
@@ -309,7 +315,9 @@ pub async fn kategorie_frist_setzen(
 ) -> Result<Json<Vec<KategorieAufbewahrungAnzeige>>, AppError> {
     use crate::einsatz::aufbewahrung_kategorie as kat;
     let id = ctx.einsatz.id;
-    if !ctx.benutzer.ist_admin() {
+    // Org-Schnitt wie beim Frist-PUT (LFH-753): Admin nur der Einsatz-Org, sonst Einsatzleitung.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
         ctx.fordere_einsatzleitung()?;
     }
     let Some(kategorie) = crate::einsatz::retention::Datenkategorie::parse(&kategorie) else {

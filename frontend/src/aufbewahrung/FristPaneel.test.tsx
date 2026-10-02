@@ -41,13 +41,14 @@ function zeige(
     status: 'aktiv' | 'abgeschlossen';
     meine_rolle?: string | null;
     retention_bis?: string | null;
+    org_id?: number;
   },
 ) {
   server.use(meHandler(me));
   return renderMitProviders(
     <FristPaneel
       einsatzId={1}
-      einsatz={{ meine_rolle: null, retention_bis: null, ...einsatz } as never}
+      einsatz={{ meine_rolle: null, retention_bis: null, org_id: 1, ...einsatz } as never}
     />,
   );
 }
@@ -144,6 +145,50 @@ describe('FristPaneel', () => {
     await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
   });
 
+  it('der Schalter „unbegrenzt“ im Dialog hebt die Frist ohne Rückfrage auf (LFH-756)', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
+    const dialog = await dialogOeffnen();
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    // Ohne Zeitpunkt gibt es nichts zu wählen — das Feld ist gesperrt, die Pflicht entfällt.
+    expect(within(dialog).getByRole('textbox')).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Frist aufheben' }));
+    await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
+    expect(rueckfrageOffen()).toBe(false);
+  });
+
+  it('„unbegrenzt“ verlangt keinen Zeitpunkt — auch bei leerem Feld geht null hinaus', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: null });
+    const dialog = await dialogOeffnen();
+    expect(within(dialog).getByRole('textbox')).toHaveValue('');
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Frist aufheben' }));
+    await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
+  });
+
+  it('der Schalter steht beim Öffnen aus, auch ohne bestehende Frist', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: null });
+    const dialog = await dialogOeffnen();
+    expect(
+      within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }),
+    ).not.toBeChecked();
+    expect(within(dialog).getByRole('textbox')).toBeEnabled();
+  });
+
+  it('ein abgebrochenes „unbegrenzt“ steht beim nächsten Öffnen nicht mehr', async () => {
+    // Die Formularinstanz lebt im Hook und überdauert das Schließen des Dialogs.
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
+    let dialog = await dialogOeffnen();
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    dialog = await dialogOeffnen();
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }),
+      ).not.toBeChecked(),
+    );
+    expect(gesendet).toHaveLength(0);
+  });
+
   it('ein Fehler steht am Paneel, nicht im Toast', async () => {
     antwort = () => HttpResponse.json({ error: 'Einsatz ist geschwärzt' }, { status: 409 });
     zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
@@ -175,12 +220,26 @@ describe('FristPaneel', () => {
     expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
   });
 
+  it('Admin einer fremden Org: Knöpfe gesperrt, Hinweis nennt den Grund (LFH-753)', async () => {
+    zeige(ME_ADMIN, {
+      status: 'abgeschlossen',
+      meine_rolle: null,
+      retention_bis: '2030-10-01 10:00:00',
+      org_id: 2,
+    });
+    expect(
+      await screen.findByText(/System-Admin der Organisation des Einsatzes/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Frist ändern' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
+  });
+
   it('befüllt den Dialog bei jedem Öffnen mit der AKTUELLEN Frist', async () => {
     // Die Formularinstanz lebt im Hook; überlebte `initialValues` einer früheren Öffnung, nähme
     // ein Absenden eine bestätigte Verkürzung still zurück.
     server.use(meHandler(ME_ADMIN));
     const einsatz = (retention_bis: string) =>
-      ({ status: 'abgeschlossen', meine_rolle: null, retention_bis }) as never;
+      ({ status: 'abgeschlossen', meine_rolle: null, retention_bis, org_id: 1 }) as never;
     const { rerender } = renderMitProviders(
       <FristPaneel einsatzId={1} einsatz={einsatz('2030-10-01 10:00:00')} />,
     );

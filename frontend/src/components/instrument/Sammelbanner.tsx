@@ -1,4 +1,4 @@
-import { IkonePfeilRunter } from '../../ikonen';
+import { IconPfeilRunter } from '../../icons';
 import { Button } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import { monoStil, useRollen } from './rollenwerte';
@@ -8,7 +8,7 @@ import { monoStil, useRollen } from './rollenwerte';
  * Bedien-Leitlinie Festlegung 6: Live-Updates springen nicht unter dem Cursor, CLS ≤ 0,1,
  * WCAG 3.2.5).
  *
- * Grund `bannerGrund`, Kante `bannerLinie`, Pfeilikone in `bedien`, Text 12 in
+ * Grund `bannerGrund`, Kante `bannerLinie`, Pfeilicon in `bedien`, Text 12 in
  * `bedienText` (Kontrast Tag 7,19 · Nacht 9,71), rechts die Aktion Mono in `bedien`.
  * Blau, nicht Rot: ein neuer Eintrag ist eine Bedienaufforderung, keine Gefahr.
  *
@@ -17,14 +17,14 @@ import { monoStil, useRollen } from './rollenwerte';
  *
  * Die Aktion ist ein antd-`Button type="link"`: er erbt `controlHeight` vom
  * `ConfigProvider` und schuldet damit nicht die zwei Angaben eines handgebauten
- * Bedienziels (LFH-365). Die Ikone steht in einer `aria-hidden`-Hülle — antds Ikonen
+ * Bedienziels (LFH-365). Das Icon steht in einer `aria-hidden`-Hülle — antds Icons
  * bringen ein eigenes englisches `aria-label` mit.
  *
  * KURZFORM für den Handschirm (LFH-694,
  * `openspec/changes/archive/2026-10-01-lfh-694-sammelbanner-schmal/`): steht das Banner in einer
  * Werkzeugzeile neben einer Segmentleiste, bleibt ihm bei 390 px zu wenig Breite für Satz UND
  * Knopf (gemessen: Text 0 px, bis 59 px Überlauf). Mit `kurz` (und einer
- * `aktion`) wird das GANZE Banner ein Knopf: Ikone plus „1 neu" ({@link sammelbannerKurz}),
+ * `aktion`) wird das GANZE Banner ein Knopf: Icon plus „1 neu" ({@link sammelbannerKurz}),
  * eine Polsterung statt zwei, die ganze Fläche Trefffläche. Der Name lautet „1 neu anzeigen"
  * (sichtbarer Text im Namen, WCAG 2.5.3); der volle Satz bleibt visuell verborgen im
  * Statusbereich und wird wie bisher angesagt. Ob die Kurzform gilt, entscheidet der Aufrufer
@@ -85,7 +85,7 @@ export default function Sammelbanner({ children, aktion, kurz, style }: Sammelba
           }}
         >
           <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
-            <IkonePfeilRunter />
+            <IconPfeilRunter />
           </span>
           <span data-lfh="sammelbanner-kurz" style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
             {kurz}
@@ -111,7 +111,7 @@ export default function Sammelbanner({ children, aktion, kurz, style }: Sammelba
       }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
-        <IkonePfeilRunter />
+        <IconPfeilRunter />
       </span>
       <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, color: rollen.bedienText }}>
         {children}

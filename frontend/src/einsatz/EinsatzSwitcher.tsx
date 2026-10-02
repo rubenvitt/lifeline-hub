@@ -1,4 +1,4 @@
-import { IkoneChevronRunter } from '../ikonen';
+import { IconChevronRunter } from '../icons';
 import { Button, Dropdown, theme, type MenuProps } from 'antd';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -62,7 +62,7 @@ export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }
         </span>
         {/* Eigenes Geschwister und nicht schrumpfend: der Pfeil ist das Signal
             „hier lässt sich wechseln" und darf als Erstes nicht verschwinden. */}
-        <IkoneChevronRunter style={{ flexShrink: 0 }} />
+        <IconChevronRunter style={{ flexShrink: 0 }} />
       </Button>
     </Dropdown>
   );

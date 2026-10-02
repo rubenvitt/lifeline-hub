@@ -611,6 +611,12 @@ export interface components {
             erstellt_at: string;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description Organisation des Benutzers (LFH-753): der Client spiegelt damit Rechte, die an der
+             *     Einsatz-Org hängen (Frist nur für den Admin der Einsatz-Org).
+             */
+            org_id: number;
             org_rolle: components["schemas"]["OrgRolle"];
             system_rolle: components["schemas"]["SystemRolle"];
             /**

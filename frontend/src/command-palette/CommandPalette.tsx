@@ -1,4 +1,4 @@
-import { IkoneChevronRechts, IkoneLupe, IkonePfeilLinks } from '../ikonen';
+import { IconChevronRechts, IconLupe, IconPfeilLinks } from '../icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
@@ -418,7 +418,7 @@ export function CommandPalette({
         onClick={(e: MouseEvent) => (e.ctrlKey || e.metaKey ? oeffneImNeuenTab(b) : fuehreAus(b))}
         style={{
           ...palettenZeilenStil(token),
-          // Aktive Zeile: Grund `flaeche3`, Ikone in Bedienfarbe. Der Text bleibt `text`; die Auswahl
+          // Aktive Zeile: Grund `flaeche3`, Icon in Bedienfarbe. Der Text bleibt `text`; die Auswahl
           // trägt die Fläche plus `aria-selected`.
           background: istAktiv ? farben.flaeche3 : 'transparent',
           color: token.colorText,
@@ -478,7 +478,7 @@ export function CommandPalette({
               color: istAktiv ? token.colorPrimary : farben.schwach,
             }}
           >
-            <IkoneChevronRechts size={16} />
+            <IconChevronRechts size={16} />
           </span>
         )}
       </div>
@@ -523,7 +523,7 @@ export function CommandPalette({
           }}
         >
           <span aria-hidden="true" style={{ display: 'inline-flex', color: token.colorPrimary }}>
-            <IkoneLupe size={18} />
+            <IconLupe size={18} />
           </span>
           <Input
             ref={inputRef}
@@ -592,7 +592,7 @@ export function CommandPalette({
                 borderBottom: `1px solid ${token.colorBorderSecondary}`,
               }}
             >
-              <Button type="text" icon={<IkonePfeilLinks />} onClick={zurueckZurListe}>
+              <Button type="text" icon={<IconPfeilLinks />} onClick={zurueckZurListe}>
                 Zurück
               </Button>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{vorschau.label}</span>

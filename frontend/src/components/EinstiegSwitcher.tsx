@@ -1,4 +1,4 @@
-import { IkoneChevronRunter } from '../ikonen';
+import { IconChevronRunter } from '../icons';
 import { Button, Dropdown, Space, theme, Typography, type MenuProps } from 'antd';
 import StatusTag from './StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
@@ -64,7 +64,7 @@ export default function EinstiegSwitcher({
     <Dropdown menu={{ items, onClick }} trigger={['click']}>
       <Button type="text" style={wechslerStil(token)}>
         <Typography.Text strong style={{ fontSize: 20 }}>
-          {aktuell.bezeichnung} <IkoneChevronRunter style={{ fontSize: 14 }} />
+          {aktuell.bezeichnung} <IconChevronRunter style={{ fontSize: 14 }} />
         </Typography.Text>
       </Button>
     </Dropdown>

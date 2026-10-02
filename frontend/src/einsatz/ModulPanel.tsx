@@ -1,4 +1,4 @@
-import { IkoneExternPfeil, IkoneSchloss, IkoneSchraubenschluessel } from '../ikonen';
+import { IconExternPfeil, IconSchloss, IconSchraubenschluessel } from '../icons';
 import type { CSSProperties } from 'react';
 import { theme } from 'antd';
 import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
@@ -177,18 +177,18 @@ export function ModulListe({
             >
               <span aria-hidden="true" style={modulMarkeStil(farben, false)} />
               <span style={{ minWidth: 0, flex: 1 }}>{marke.label}</span>
-              {/* Dieselbe Ikone wie am `verweistAuf`-Eintrag; Dekoration in `aria-hidden`-Hülle. */}
+              {/* Dasselbe Icon wie am `verweistAuf`-Eintrag; Dekoration in `aria-hidden`-Hülle. */}
               {!gesperrt && (
                 <span
                   aria-hidden
                   style={{ display: 'inline-flex', flexShrink: 0, color: farben.schwach }}
                 >
-                  <IkoneExternPfeil />
+                  <IconExternPfeil />
                 </span>
               )}
               {gesperrt && (
                 <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
-                  <IkoneSchloss />
+                  <IconSchloss />
                 </span>
               )}
             </button>
@@ -216,7 +216,7 @@ export function ModulListe({
               ...fussFokusabstandStil,
             }}
           >
-            {/* Keine Modulikone: die Zeile trägt Marke · Etikett · Zähler. Die Ikonen bleiben in der
+            {/* Keine Modulicon: die Zeile trägt Marke · Etikett · Zähler. Die Icons bleiben in der
                Kommandopalette, wo sie Module, Aktionen und Datensätze unterscheiden. */}
             <span aria-hidden="true" style={modulMarkeStil(farben, aktiv)} />
             <span style={{ minWidth: 0, flex: 1 }}>{m.label}</span>
@@ -238,12 +238,12 @@ export function ModulListe({
                 {modulZaehler.wert > 999 ? '999+' : modulZaehler.wert}
               </span>
             )}
-            {/* Dekoration; `aria-hidden` an der HÜLLE bleibt als zweite Sicherung, obwohl die Ikone
+            {/* Dekoration; `aria-hidden` an der HÜLLE bleibt als zweite Sicherung, obwohl das Icon
                des Satzes selbst `aria-hidden` ist (LFH-595): im Namen des Knopfes hat sie nichts
                verloren. */}
             {m.status === 'wip' && (
               <span title="In Arbeit" aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
-                <IkoneSchraubenschluessel />
+                <IconSchraubenschluessel />
               </span>
             )}
             {m.verweistAuf && (
@@ -252,14 +252,14 @@ export function ModulListe({
                 aria-hidden
                 style={{ display: 'inline-flex', flexShrink: 0 }}
               >
-                <IkoneExternPfeil />
+                <IconExternPfeil />
               </span>
             )}
             {/* Ebenfalls Dekoration, OHNE `title`: die Sperre trägt der Knopf über `disabled` und
                `title="Keine Berechtigung"`. */}
             {gesperrt && (
               <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
-                <IkoneSchloss />
+                <IconSchloss />
               </span>
             )}
           </button>
