@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
 import { QRCodeSVG } from 'qrcode.react';
+import KopierbarerText from '../components/KopierbarerText';
 import OtpEingabe from '../components/OtpEingabe';
 import { fehlerText } from '../api/client';
 import { providerListe } from '../api/auth';
@@ -337,9 +338,15 @@ export default function ProfilPage() {
                   >
                     <QRCodeSVG value={totpEnrollment.otpauthUrl} size={200} marginSize={4} />
                   </div>
-                  <Typography.Paragraph copyable={{ text: totpEnrollment.secretBase32 }}>
-                    Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>
-                  </Typography.Paragraph>
+                  {/* Kopieren über einen Knopf der Dichte-Staffel statt `copyable` (LFH-763). */}
+                  <div style={{ marginBottom: token.marginSM }}>
+                    <KopierbarerText
+                      text={totpEnrollment.secretBase32}
+                      bezeichnung="TOTP-Geheimnis"
+                    >
+                      Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>
+                    </KopierbarerText>
+                  </div>
                   <Form
                     layout="vertical"
                     form={totpForm}

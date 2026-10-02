@@ -373,6 +373,15 @@
       }
     },
     {
+      "name": "kopieren",
+      "bedeutung": "In die Zwischenablage kopieren",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "30",
+        "commonName": "copy"
+      }
+    },
+    {
       "name": "kreispfeile",
       "bedeutung": "Platz in Aufbereitung",
       "herkunft": "icons8",
