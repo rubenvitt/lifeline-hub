@@ -501,6 +501,20 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(() => expect(onSendetChange).toHaveBeenLastCalledWith(false));
   });
 
+  // LFH-748: der Sendezustand liegt in `EtbPage` und überlebt den Einsatzwechsel. Ein Entwurf
+  // eines ANDEREN Einsatzes, der noch sendet, sperrt hier nichts.
+  it('LFH-748: ein sendender Entwurf eines anderen Einsatzes meldet hier kein Senden', async () => {
+    const onSendetChange = vi.fn();
+    const versand = {
+      je: { 'entwurf-aus-einsatz-8': { sendet: true, fortschritt: null, hinweis: null } },
+      aendern: vi.fn(),
+      umhaengen: vi.fn(),
+    };
+    renderMitProviders(<EtbEntwurfsTabs {...props({ onSendetChange, versand })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    expect(onSendetChange).not.toHaveBeenCalledWith(true);
+  });
+
   it('LFH-117: nach einem Erfolg geht der nächste Eintrag mit der id des NEUEN Entwurfs raus', async () => {
     const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined);
     renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);

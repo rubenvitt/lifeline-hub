@@ -1129,6 +1129,53 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     );
   });
 
+  // LFH-748 (D2): getippter und wieder ganz gelöschter Text entfernte den nur-Dateien-Entwurf aus
+  // dem Speicher; nach der Berichtigung kam ein neuer Reiter, die Dateien hingen an keinem.
+  it('hält einen Entwurf mit Dateien auch, nachdem sein Text getippt und ganz gelöscht wurde', async () => {
+    setup();
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.upload(dateiEingabe(), new File(['x'], 'foto-c.jpg', { type: 'image/jpeg' }));
+    await user.type(feld, 'Deich');
+    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Deich'));
+    await user.clear(feld);
+    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe(''));
+
+    await waehleZeilenaktion(user, 'Berichtigen');
+    await screen.findByText(/Berichtigung zu Nr\./);
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull());
+
+    expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
+      'foto-c.jpg',
+    );
+  });
+
+  // LFH-748 (D3): der Sendezustand lag in den Entwurfs-Reitern und ging mit der Berichtigung.
+  it('lässt den Grund eines gescheiterten Uploads über eine Berichtigung stehen', async () => {
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/etb/anhaenge', () =>
+        HttpResponse.json({ error: 'Speicher des Servers ist voll' }, { status: 507 }),
+      ),
+    ]);
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.upload(dateiEingabe(), new File(['x'], 'foto-d.jpg', { type: 'image/jpeg' }));
+    await user.type(feld, 'Foto{Enter}');
+    expect(await screen.findByText(/Speicher des Servers ist voll/)).toBeInTheDocument();
+
+    await waehleZeilenaktion(user, 'Berichtigen');
+    await screen.findByText(/Berichtigung zu Nr\./);
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull());
+
+    expect(await screen.findByText(/Speicher des Servers ist voll/)).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('Foto');
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-d.jpg');
+  });
+
   /**
    * Ein Queue-Eintrag, dessen client_id schon für einen anderen Eintrag steht, landet mit dem
    * Wortlaut des Servers unter „abgelehnt". „Erneut senden" nimmt einen neuen Schlüssel — mit dem

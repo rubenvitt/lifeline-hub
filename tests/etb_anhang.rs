@@ -799,6 +799,59 @@ async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
     assert_eq!(anhang_ids(&v), vec![a]);
 }
 
+/// LFH-748: auch ein schon GEBUNDENER fremder Anhang ist beim Erfassen „unbekannt“ — am
+/// ETB-Eintrag wie an einem Schaden, also auch hinter einem Modul, das die Person nicht
+/// sehen muss. Ein 422 „bereits gebunden“ verriete bei fortlaufenden IDs, was im Einsatz
+/// woran hängt. Die eigene gebundene Datei bleibt 422 (`gebundener_anhang_ist_422`).
+#[tokio::test]
+async fn fremder_gebundener_anhang_ist_beim_erfassen_unbekannt() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    let a = hochgeladen(&app, einsatz, &admin, "a.jpg").await;
+    let (s, v) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"admin","anhang_ids":[{a}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let schaden = schaden_anhang(&pool, einsatz).await;
+
+    let (_, v_unbekannt) = erfassen(
+        &app,
+        &frieda,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"x","anhang_ids":[987654]}"#,
+    )
+    .await;
+    for (ort, aid) in [("ETB-Eintrag", a), ("Schaden", schaden)] {
+        let (s, v) = erfassen(
+            &app,
+            &frieda,
+            einsatz,
+            &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{ort}: {v}");
+        assert_eq!(
+            v["error"], v_unbekannt["error"],
+            "{ort}: kein Unterschied zu „unbekannt“"
+        );
+    }
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'x'",
+            einsatz
+        )
+        .await,
+        0
+    );
+}
+
 /// Sendet eine Chat-Nachricht „x" mit `anhang_ids` in den Standardkanal; (Status, JSON).
 async fn chat_senden(
     app: &axum::Router,

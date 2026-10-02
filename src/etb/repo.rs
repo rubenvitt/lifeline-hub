@@ -153,8 +153,8 @@ pub fn ist_derselbe_eintrag(
 /// `write_retry!` (`BEGIN IMMEDIATE`):
 /// 1. mit `client_id`: bestehenden Eintrag suchen → Rückgabe ohne Anhangsprüfung (seine
 ///    Anhänge sind ja gebunden);
-/// 2. Anhänge klassifizieren: nicht im Einsatz → `Validation` (400), an ETB, Chat oder
-///    Dokument gebunden → `UnprocessableEntity` (422);
+/// 2. Anhänge klassifizieren: nicht im Einsatz oder von einer anderen Person hochgeladen →
+///    `Validation` (400), eigener an ETB, Chat oder Dokument gebunden → `UnprocessableEntity` (422);
 /// 3. Eintrag einfügen; 4. Verknüpfungen einfügen.
 ///
 /// `BEGIN IMMEDIATE` serialisiert die Schreiber — damit ist Schritt 1 gegen einen
@@ -228,9 +228,12 @@ pub async fn anlegen_idempotent(
 /// (sonst 400) und darf an KEINEM Linker hängen — Chat oder Register (sonst 422) — „eine Datei, ein
 /// Lebenszyklus". Erst alle prüfen, dann schreiben: so bindet ein Fehler hinten nichts vorn.
 ///
-/// Ein freier Anhang, den eine ANDERE Person hochgeladen hat, gilt als unbekannt (Review C1,
-/// design.md D12): gleiche Antwort, gleicher Wortlaut. Sonst holte man sich einen fremden
-/// Upload über den eigenen Eintrag, oder läse aus 400/201 ab, welche IDs frei herumliegen.
+/// Ein Anhang, den eine ANDERE Person hochgeladen hat, gilt als unbekannt, frei wie gebunden
+/// (Review C1, design.md D12 von LFH-117; LFH-748, D1): gleiche Antwort, gleicher Wortlaut. Sonst
+/// holte man sich einen fremden freien Upload über den eigenen Eintrag, oder läse aus 400/201/422
+/// ab, welche IDs frei herumliegen und welche woran hängen — auch hinter einem gesperrten Modul.
+/// „Schon gebunden" (422) gibt es nur für die eigene Datei: nur dort ist es ein Zustand, den die
+/// Person kennt (Statuscode-Konvention, `src/AGENTS.md`).
 /// Der Replay (Schritt 1) prüft nichts, und die Offline-Queue sendet nur unter dem Benutzer,
 /// unter dem sie entstand (`fordere_offline_queue_benutzer`) — also unter der Hochladenden.
 async fn pruefe_anhaenge(
@@ -255,7 +258,7 @@ async fn pruefe_anhaenge(
         .fetch_optional(&mut *conn)
         .await?;
         let gebunden = match stand {
-            Some((false, von)) if von != erfasser_id => None,
+            Some((_, von)) if von != erfasser_id => None,
             anders => anders.map(|(gebunden, _)| gebunden),
         };
         match gebunden {

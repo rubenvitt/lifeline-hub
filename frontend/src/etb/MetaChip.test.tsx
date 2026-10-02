@@ -276,6 +276,40 @@ describe('MetaChip', () => {
     ).toBe(true);
     fokus.mockRestore();
   });
+
+  /**
+   * LFH-748: ein Editor, der beim Absenden schon offen war, nimmt während des Sendens nichts an —
+   * wie jede andere Eingabe der Erfassung. Vorher blieb er bedienbar, und die Übernahme stieg
+   * nur still aus.
+   */
+  it.each([
+    ['von', ['ELW 1', 'Leitstelle'], 'Von'],
+    ['von', undefined, 'Von'],
+    ['meldeweg', undefined, 'Meldeweg'],
+    ['ereigniszeit', undefined, 'Ereigniszeit'],
+  ] as const)(
+    '%s (Vorschläge: %s): gesperrt ist der offene Editor nicht bedienbar',
+    async (feld, optionen, name) => {
+      const onCommit = vi.fn();
+      renderMitProviders(
+        <MetaChip
+          feld={feld}
+          editing
+          gesperrt
+          wert={undefined}
+          optionen={optionen ? [...optionen] : undefined}
+          onCommit={onCommit}
+          onCancel={vi.fn()}
+          onRemove={vi.fn()}
+          onEdit={vi.fn()}
+        />,
+      );
+      const eingabe = screen.getByLabelText(name);
+      expect(eingabe).toBeDisabled();
+      await userEvent.type(eingabe, 'ELW 1{Enter}');
+      expect(onCommit).not.toHaveBeenCalled();
+    },
+  );
 });
 
 /**

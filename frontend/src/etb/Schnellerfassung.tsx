@@ -838,6 +838,8 @@ export default function Schnellerfassung({
               }}
               onRemove={() => setEditFeld(null)}
               onEdit={() => {}}
+              // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
+              gesperrt={sendet}
             />
           )}
           {!istSchmal && feldKnopf}
