@@ -139,6 +139,11 @@ export interface Farbrollen {
  * auf `alarmHover` 10,45 (Zeiger und Drücken); `alarmHover` als Schrift des umrandeten Knopfs auf
  * flaeche 10,45, auf grund 8,75. `alarm` trüge hier nicht: als Text auf flaeche2 6,27, Weiß darauf
  * 6,78.
+ *
+ * Hinweisflächen (LFH-739, `antdKomponenten`: `Alert`) sind die Statusflächen; `steuerRahmen` als
+ * Rand eines Knopfs darauf: bedienFlaeche 3,34 · achtungFlaeche 3,43 · alarmFlaeche 3,22 ·
+ * normalFlaeche 3,39 (antds Ableitung lag bei 2,16 · 1,96 · 3,20 · 1,57). Gerechnet in
+ * `hinweisKontrast.test.ts`.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -197,6 +202,8 @@ export const farbenHell: Farbrollen = {
  * (Zeiger und Drücken, vorher gedrückt 3,74).
  * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
  * Tabellenkopf auf kopf 7,48.
+ * Hinweisflächen (LFH-739): `steuerRahmen` auf bedienFlaeche 3,32 · achtungFlaeche 3,26 ·
+ * alarmFlaeche 3,48 · normalFlaeche 3,27 (antds Ableitung: 3,09 · 2,83 · 3,01 · 2,98).
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#838b94` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
@@ -687,6 +694,16 @@ export function kopfzeilenMasse(
  * (`dropdown/style/status.js`) bzw. der Knopf selbst sie (antd 6.6.5). Wer Badge, gefüllten Tag,
  * Switch oder Spin in ein Dropdown oder einen Gefahrknopf legt, prüft deren Farbe.
  *
+ * Hinweisflächen (LFH-739, Spec `farbrollen-kontrast`): der `Alert` liest `colorInfoBg`,
+ * `colorWarningBg`, `colorErrorBg` und `colorSuccessBg` (`alert/style/index.js`), und diese vier
+ * tragen die Statusflächen. Angepasst wird die FLÄCHE, nicht der Rand: `steuerRahmen` hält auf den
+ * Statusflächen ≥ 3 : 1, ein eigener Knopfrand je Hinweistyp wäre eine zweite Randfarbe. Global
+ * gesetzt träfen die vier Tokens auch Knopf, Eingabefeld, Menü, Select und Schritte. Der Override
+ * landet ohne Komponentenpräfix als `--ant-color-error-bg` usw. auf der Wurzel des Hinweises,
+ * reicht aber NICHT in antd-Bausteine darin: jeder trägt selbst die `css-var-…`-Klasse, die die
+ * globalen Variablen neu setzt (im Browser belegt, antd 6.6.5). Ein Gefahrknopf ohne Rahmen im
+ * Live-Banner steht in Ruhe auf `alarmFlaeche`, unter dem Zeiger auf antds globaler Tönung.
+ *
  * Die Dichte ist PFLICHT: eine Vorgabe ließe den Schalter bei einem vergessenen Argument still
  * auf der kompakten Stufe stehen.
  */
@@ -714,6 +731,15 @@ export function antdKomponenten(
     Form: {
       colorError: farben.alarmText,
       colorWarning: farben.achtungText,
+    },
+    // Hinweisflächen tragen die Statusflächen ihrer Bedeutung (LFH-739). antd leitete sie aus den
+    // Signalfarben ab, bei den dunklen Tagesrollen trübe Grautöne (Info `#b9c1c4`, Erfolg
+    // `#9ca69f`), auf denen der Rand eines Knopfs (`steuerRahmen`) bis auf 1,57 : 1 fiel.
+    Alert: {
+      colorInfoBg: farben.bedienFlaeche,
+      colorWarningBg: farben.achtungFlaeche,
+      colorErrorBg: farben.alarmFlaeche,
+      colorSuccessBg: farben.normalFlaeche,
     },
     Switch: switchMasse(stufe),
     Tabs: { horizontalItemPadding: `${kopfPolster}px 0` },
