@@ -365,6 +365,11 @@ fn serde_wire_gleich_as_str() {
         SchwaerzungAusstehend,
         Geschwaerzt,
     });
+    enum_wire_as_str!(lifeline_hub::einsatz::retention::Datenkategorie {
+        Behandlung,
+        Personenauskunft,
+        Anhaenge,
+    });
     enum_wire_as_str!(lifeline_hub::einsatz::Einsatzart {
         Realeinsatz,
         Uebung,

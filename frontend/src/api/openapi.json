@@ -2542,6 +2542,15 @@
           "leitstelle_gemeldet"
         ]
       },
+      "Datenkategorie": {
+        "type": "string",
+        "description": "Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,\ndesign.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry\n(`Zuordnung::Kategorie`). Wire == [`Datenkategorie::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`; zugleich der Schlüssel in `org_aufbewahrung_kategorie` und\n`einsatz_aufbewahrung_kategorie`.",
+        "enum": [
+          "behandlung",
+          "personenauskunft",
+          "anhaenge"
+        ]
+      },
       "DemoBericht": {
         "type": "object",
         "description": "Ergebnis eines Imports oder eines Entfernens, je Stammdatenart.",
@@ -5862,6 +5871,27 @@
           "dark"
         ]
       },
+      "KategorieVorgabe": {
+        "type": "object",
+        "description": "Gespeicherte Vorgabe einer Kategorie.",
+        "required": [
+          "kategorie",
+          "dauer_tage",
+          "rechtsgrundlage"
+        ],
+        "properties": {
+          "dauer_tage": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/Datenkategorie"
+          },
+          "rechtsgrundlage": {
+            "type": "string"
+          }
+        }
+      },
       "Koordinatenformat": {
         "type": "string",
         "description": "Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.",
@@ -7512,9 +7542,17 @@
         "type": "object",
         "description": "API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert).",
         "required": [
-          "org_id"
+          "org_id",
+          "aufbewahrung_kategorien"
         ],
         "properties": {
+          "aufbewahrung_kategorien": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KategorieVorgabe"
+            },
+            "description": "Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leer = keine Kategorie hat eine\neigene Frist."
+          },
           "auftrag_nummer_praefix": {
             "type": [
               "string",

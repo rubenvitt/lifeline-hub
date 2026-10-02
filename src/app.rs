@@ -150,6 +150,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
         .route(
+            "/api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}",
+            put(routes::einsatz::kategorie_frist_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/einstellungen",
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )

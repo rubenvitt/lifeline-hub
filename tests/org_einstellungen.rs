@@ -484,3 +484,111 @@ async fn einsatz_nummer_praefix_ungueltig_ist_400() {
     let (_, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
     assert_eq!(get_body["einsatz_nummer_praefix"], "WF-");
 }
+
+// ------------------- Kategorie-Vorgaben (LFH-749) -------------------
+
+/// Spec `aufbewahrung-kategorien`, „Dauer mit Rechtsgrundlage“ und „Neue Organisation“: eine
+/// neue Organisation hat keine Kategorie-Dauer; der Admin speichert Dauer und Rechtsgrundlage,
+/// GET liefert beides; ein PUT ohne das Feld lässt sie stehen.
+#[tokio::test]
+async fn kategorie_vorgabe_speichern_und_lesen() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (_, leer) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(leer["aufbewahrung_kategorien"], serde_json::json!([]));
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"aufbewahrung_kategorien": [
+            {"kategorie": "personenauskunft", "dauer_tage": 0,
+             "rechtsgrundlage": "§ 46 Abs. 5 BHKG NRW"}
+        ]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+
+    let (_, gelesen) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    let erwartet = serde_json::json!([
+        {"kategorie": "personenauskunft", "dauer_tage": 0,
+         "rechtsgrundlage": "§ 46 Abs. 5 BHKG NRW"}
+    ]);
+    assert_eq!(gelesen["aufbewahrung_kategorien"], erwartet);
+
+    // PUT ohne das Feld: die Vorgaben bleiben.
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"zeitzone": "Europe/Berlin"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, gelesen) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(gelesen["aufbewahrung_kategorien"], erwartet);
+
+    // Leere Liste: alle Vorgaben weg.
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"aufbewahrung_kategorien": []}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, gelesen) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(gelesen["aufbewahrung_kategorien"], serde_json::json!([]));
+}
+
+/// „Dauer ohne Rechtsgrundlage“ → 422 und nichts geändert; Dauer außerhalb 0..=3650 und
+/// unbekannte Kategorie → 400 (Statuscode-Konvention, `src/AGENTS.md`).
+#[tokio::test]
+async fn kategorie_vorgabe_ungueltig() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"zeitzone": "Europe/Berlin", "aufbewahrung_kategorien": [
+            {"kategorie": "anhaenge", "dauer_tage": 30}
+        ]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (_, gelesen) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(gelesen["aufbewahrung_kategorien"], serde_json::json!([]));
+    assert_eq!(gelesen["zeitzone"], Value::Null, "nichts geändert");
+
+    for falsch in [
+        serde_json::json!({"kategorie": "anhaenge", "dauer_tage": 3651, "rechtsgrundlage": "x"}),
+        serde_json::json!({"kategorie": "anhaenge", "dauer_tage": -1, "rechtsgrundlage": "x"}),
+        serde_json::json!({"kategorie": "einsatzkraefte", "dauer_tage": 5, "rechtsgrundlage": "x"}),
+    ] {
+        let (status, _) = put_einstellungen(
+            &app,
+            &admin_cookie,
+            serde_json::json!({"aufbewahrung_kategorien": [falsch]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{falsch}");
+    }
+}
+
+/// „Führungskraft“: eine org-weite Führungskraft darf keine Kategorie-Dauer speichern.
+#[tokio::test]
+async fn kategorie_vorgabe_als_fuehrungskraft_ist_403() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin_cookie, "fk", "fkpw1234", "fuehrungskraft").await;
+    let fk_cookie = login_cookie(&app, "fk", "fkpw1234").await;
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &fk_cookie,
+        serde_json::json!({"aufbewahrung_kategorien": [
+            {"kategorie": "anhaenge", "dauer_tage": 30, "rechtsgrundlage": "x"}
+        ]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

@@ -442,7 +442,7 @@ fn ausnahmeliste_zeigt_auf_existierende_scrub_stellen() {
         );
         let (t, s) = a.spalte.split_once('.').unwrap();
         assert!(
-            matches!(klassifikation_von(t, s), Some(Klassifikation::Scrub(_))),
+            matches!(klassifikation_von(t, s), Some(Klassifikation::Scrub(..))),
             "{} ist keine Scrub-Spalte — gehört nicht in die Ausnahmeliste",
             a.spalte
         );
@@ -570,7 +570,7 @@ async fn scrub_inhalt(pool: &SqlitePool, einsatz_id: i64) -> String {
             None => basis,
         };
         for spalte in regel.spalten {
-            if !matches!(spalte.klassifikation, Klassifikation::Scrub(_)) {
+            if !matches!(spalte.klassifikation, Klassifikation::Scrub(..)) {
                 continue;
             }
             let werte: Vec<Option<Vec<u8>>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(

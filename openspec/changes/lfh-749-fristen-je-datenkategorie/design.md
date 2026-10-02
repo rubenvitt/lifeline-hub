@@ -255,8 +255,9 @@ in die Details.
   - `PUT` ersetzt die Liste, wenn das Feld mitkommt. Fehlt das Feld, bleibt alles, wie es ist
     (Muster der übrigen Felder).
   - Eine Kategorie fehlt in der Liste → ihre Zeile wird gelöscht.
-  - Die Validierung erfolgt je Eintrag: Dauer 0 bis 3650; Rechtsgrundlage nicht leer, höchstens
-    500 Zeichen (422).
+  - Die Validierung erfolgt je Eintrag nach der Statuscode-Konvention (`src/AGENTS.md`): Dauer
+    außerhalb 0 bis 3650 oder Rechtsgrundlage über 500 Zeichen → 400 (das Feld für sich); leere
+    Rechtsgrundlage bei gesetzter Dauer → 422 (der Zusammenhang).
   - Unbekannte Kategorie → 400 (Muster unbekannter Enum-Werte).
 - **Einsatz:** `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}` mit `{ retention_bis,
   bestaetigt, rechtsgrundlage? }`.

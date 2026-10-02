@@ -19,6 +19,7 @@ use crate::einsatz::modul::{ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_k
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::org::aufbewahrung_kategorie::{self, KategorieVorgabeEingabe};
 use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenDaten};
 use crate::org::modul_einstellung;
 use axum::extract::State;
@@ -37,6 +38,9 @@ pub struct OrgEinstellungenUpdate {
     pub koordinatenformat: Option<String>,
     // Aufbewahrung.
     pub retention_dauer_tage: Option<i64>,
+    /// Dauer und Rechtsgrundlage je Datenkategorie (LFH-749). Fehlt das Feld, bleiben die
+    /// Vorgaben unverändert; eine Liste ersetzt sie (fehlende Kategorie = keine eigene Frist).
+    pub aufbewahrung_kategorien: Option<Vec<KategorieVorgabeEingabe>>,
     // Nummernkreis-Präfixe (display-only).
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
@@ -64,7 +68,8 @@ pub async fn lesen(
         return Err(AppError::Forbidden);
     }
     let einst = einstellungen::laden_oder_default(&state.pool, benutzer.org_id).await?;
-    Ok(Json(einst.anzeige()))
+    let kategorien = aufbewahrung_kategorie::laden(&state.pool, benutzer.org_id).await?;
+    Ok(Json(einst.anzeige(kategorien)))
 }
 
 /// PUT /api/org-einstellungen — Org-weite Einstellungen setzen (Vollersatz).
@@ -145,6 +150,12 @@ pub async fn setzen(
         }
     }
 
+    // Kategorie-Vorgaben (LFH-749): 400 je Feld, 422 bei Dauer ohne Rechtsgrundlage.
+    let kategorien = req
+        .aufbewahrung_kategorien
+        .map(aufbewahrung_kategorie::pruefe)
+        .transpose()?;
+
     // Geocoder-URL validieren (400): nur http/https zulässig.
     let geocoder_url = bereinige(req.geocoder_url);
     if let Some(u) = geocoder_url.as_deref() {
@@ -175,10 +186,12 @@ pub async fn setzen(
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),
+            aufbewahrung_kategorien: kategorien.as_deref(),
         },
     )
     .await?;
-    Ok(Json(gespeichert.anzeige()))
+    let kategorien = aufbewahrung_kategorie::laden(&state.pool, benutzer.org_id).await?;
+    Ok(Json(gespeichert.anzeige(kategorien)))
 }
 
 /// Trimmt und filtert leere Strings (None bei leerem Wert).

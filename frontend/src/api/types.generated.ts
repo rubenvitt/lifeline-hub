@@ -928,6 +928,15 @@ export interface components {
          * @enum {string}
          */
         ChecklistenPunkt: "aufstellort" | "einweisung" | "lageskizze" | "funkarbeitsplaetze" | "sprechgruppen" | "etb_eroeffnet" | "leitstelle_gemeldet";
+        /**
+         * @description Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,
+         *     design.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry
+         *     (`Zuordnung::Kategorie`). Wire == [`Datenkategorie::as_str`], gepinnt in
+         *     `tests/enum_wire_kontrakt.rs`; zugleich der Schlüssel in `org_aufbewahrung_kategorie` und
+         *     `einsatz_aufbewahrung_kategorie`.
+         * @enum {string}
+         */
+        Datenkategorie: "behandlung" | "personenauskunft" | "anhaenge";
         /** @description Ergebnis eines Imports oder eines Entfernens, je Stammdatenart. */
         DemoBericht: {
             je_art: components["schemas"]["DemoBerichtZeile"][];
@@ -2158,6 +2167,13 @@ export interface components {
          * @enum {string}
          */
         KartenTheme: "auto" | "light" | "dark";
+        /** @description Gespeicherte Vorgabe einer Kategorie. */
+        KategorieVorgabe: {
+            /** Format: int64 */
+            dauer_tage: number;
+            kategorie: components["schemas"]["Datenkategorie"];
+            rechtsgrundlage: string;
+        };
         /**
          * @description Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
          * @enum {string}
@@ -2823,6 +2839,11 @@ export interface components {
         OnlineStyleTyp: "vektor" | "raster";
         /** @description API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert). */
         OrgEinstellungenAnzeige: {
+            /**
+             * @description Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leer = keine Kategorie hat eine
+             *     eigene Frist.
+             */
+            aufbewahrung_kategorien: components["schemas"]["KategorieVorgabe"][];
             auftrag_nummer_praefix?: string | null;
             /** Format: int64 */
             auftrag_quittierung_frist_min?: number | null;

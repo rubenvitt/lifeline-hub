@@ -55,7 +55,7 @@ eine UHS-Belegung oder ein Zustand vorliegt, auch storniert.
 
 Der System-Admin SHALL je Kategorie für seine Organisation eine Dauer in Tagen und eine
 Rechtsgrundlage festlegen und wieder entfernen können. Die Dauer MUST zwischen 0 und 3650
-liegen, sonst 422. Eine Dauer ohne nicht-leere Rechtsgrundlage MUST mit 422 abgewiesen werden.
+liegen, sonst 400. Eine Dauer ohne nicht-leere Rechtsgrundlage MUST mit 422 abgewiesen werden.
 Andere Personen MUST 403 erhalten. Ohne Dauer MUST die Kategorie der Einsatz-Frist folgen.
 Vorgabewerte MUST es nicht geben.
 
