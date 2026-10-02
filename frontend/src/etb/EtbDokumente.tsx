@@ -12,8 +12,8 @@ export type EtbDokument = Pick<Dokument, 'id' | 'titel' | 'dateiname' | 'groesse
  * Gegenstück zu `EtbAnhaenge`.
  *
  * Sichtbar steht „Dokument „Titel“ · Größe": das Wort trennt es vom Anhang, der seinen
- * Dateinamen zeigt. Der zugängliche Name trägt die laufende Nummer und die Handlung, wie beim
- * Anhang. Mindesthöhe aus `verweisStil`, Farbe aus `bedienText`.
+ * Dateinamen zeigt. Der zugängliche Name beginnt mit dem sichtbaren Text (WCAG 2.5.3, Sprach-
+ * steuerung) und trägt dazu die laufende Nummer und die Handlung, wie beim Anhang. Mindesthöhe aus `verweisStil`, Farbe aus `bedienText`.
  *
  * Der Verweis zeigt auf die modul-gegatete Dokument-Route (`dokumentDownloadPfad`), nie auf die
  * ETB- oder die generische Route. Ohne Modulrecht `dokumente` bekommt die Zeitachse keine
@@ -43,7 +43,7 @@ export default function EtbDokumente({
             key={d.id}
             href={dokumentDownloadPfad(einsatzId, d.id)}
             download={d.dateiname}
-            aria-label={`${d.titel}, ${groesse}, Dokument zu Nr. ${lfdNr} herunterladen`}
+            aria-label={`Dokument „${d.titel}“, ${groesse}, zu Nr. ${lfdNr} herunterladen`}
             style={stil}
           >
             Dokument „{d.titel}“ · {groesse}

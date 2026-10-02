@@ -28,7 +28,7 @@ describe('EtbDokumente (LFH-743)', () => {
     render(<EtbDokumente einsatzId={5} lfdNr={42} dokumente={[dokument()]} />);
     expect(
       screen.getByRole('link', {
-        name: 'Lageplan Nord, 2.0 KB, Dokument zu Nr. 42 herunterladen',
+        name: 'Dokument „Lageplan Nord“, 2.0 KB, zu Nr. 42 herunterladen',
       }),
     ).toBeInTheDocument();
   });

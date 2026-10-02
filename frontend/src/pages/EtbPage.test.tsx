@@ -1271,7 +1271,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
       }),
     ]);
     const verweis = await within(await waitFor(zeileEins)).findByRole('link', {
-      name: 'Lageplan Nord, 2.0 KB, Dokument zu Nr. 1 herunterladen',
+      name: 'Dokument „Lageplan Nord“, 2.0 KB, zu Nr. 1 herunterladen',
     });
     expect(verweis).toHaveAttribute('href', '/api/einsaetze/7/dokumente/3/datei');
     expect(screen.queryByRole('link', { name: /Ohne Bezug/ })).toBeNull();
@@ -1297,6 +1297,14 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
     await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(abgefragt).toBe(false);
     expect(zeileEins().querySelector('[data-lfh="etb-dokumente"]')).toBeNull();
+    // Auch ein Bestand im Cache (Dokumentenseite vor dem Entzug offen) zeigt sich nicht:
+    // `enabled: false` hält nur den Abruf an, nicht die Daten.
+    act(() => {
+      client.setQueryData(einsatzKeys.dokumente(7), [plan]);
+    });
+    // Der Query-Client benachrichtigt gebündelt im nächsten Takt.
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(zeileEins().querySelector('[data-lfh="etb-dokumente"]')).toBeNull();
   });
 
   it('nimmt ein neues Dokument nach dem Live-Ereignis `dokument` auf', async () => {
@@ -1316,7 +1324,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
       }
     });
     expect(
-      await within(zeileEins()).findByRole('link', { name: /Dokument zu Nr\. 1/ }),
+      await within(zeileEins()).findByRole('link', { name: /^Dokument .*zu Nr\. 1 / }),
     ).toBeInTheDocument();
   });
 });
