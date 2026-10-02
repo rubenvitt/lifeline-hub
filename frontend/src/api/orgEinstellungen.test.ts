@@ -11,6 +11,7 @@ import type { OrgEinstellungen, OrgEinstellungenUpdate } from './types';
 
 const beispielAnzeige: OrgEinstellungen = {
   org_id: 1,
+  aufbewahrung_kategorien: [],
   zeitzone: 'Europe/Berlin',
   zeitformat: '24h',
   einheiten: 'metrisch',
@@ -36,6 +37,7 @@ describe('ladeOrgEinstellungen', () => {
   it('liefert auch Objekte mit null-Feldern korrekt', async () => {
     const leer: OrgEinstellungen = {
       org_id: 1,
+      aufbewahrung_kategorien: [],
       zeitzone: null,
       zeitformat: null,
       einheiten: null,

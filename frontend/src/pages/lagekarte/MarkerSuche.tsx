@@ -1,4 +1,4 @@
-import { IkoneLupe } from '../../ikonen';
+import { IconLupe } from '../../icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -168,7 +168,7 @@ export default function MarkerSuche({
         // Die Hülle nimmt dem Icon sein englisches `aria-label` („search").
         prefix={
           <span aria-hidden="true">
-            <IkoneLupe />
+            <IconLupe />
           </span>
         }
         style={{ marginBottom: token.marginXS }}

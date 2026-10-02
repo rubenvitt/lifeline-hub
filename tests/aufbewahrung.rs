@@ -569,6 +569,9 @@ async fn wiederherstellen_statuscodes_ohne_schreibvorgang() {
 
 // ───────────────────────────── Struktur-Guard des Namensraums ─────────────────────────────
 
+/// Der Archiv-Namensraum.
+const ARCHIV: &str = "/api/aufbewahrung";
+
 /// Eine Route unter `/api/aufbewahrung` aus `src/app.rs`: Pfad plus Methoden-Handler.
 #[derive(Debug)]
 struct Route {
@@ -576,16 +579,16 @@ struct Route {
     handler: Vec<(String, String)>,
 }
 
-/// Schneidet alle `.route(…)`-Aufrufe aus `app.rs` (auch mehrzeilige) und liefert die unter
-/// dem Archiv-Namensraum mit ihren `get(routes::aufbewahrung::x)`-Paaren.
-fn archivrouten(app_rs: &str) -> Vec<Route> {
-    let mut routen = Vec::new();
-    let mut rest = app_rs;
-    while let Some(start) = rest.find(".route(") {
-        let nach = &rest[start + ".route(".len()..];
-        // Klammerzählung bis zum schließenden `)` des route-Aufrufs.
+/// Die Argumente jedes `.name(…)`-Aufrufs in `quelle` (auch mehrzeilige), per Klammerzählung
+/// bis zur schließenden Klammer des Aufrufs.
+fn aufrufe<'a>(quelle: &'a str, name: &str) -> Vec<&'a str> {
+    let muster = format!(".{name}(");
+    let mut gefunden = Vec::new();
+    let mut rest = quelle;
+    while let Some(start) = rest.find(&muster) {
+        let nach = &rest[start + muster.len()..];
         let mut tiefe = 1usize;
-        let mut ende = 0usize;
+        let mut ende = nach.len();
         for (i, c) in nach.char_indices() {
             match c {
                 '(' => tiefe += 1,
@@ -599,26 +602,68 @@ fn archivrouten(app_rs: &str) -> Vec<Route> {
                 _ => {}
             }
         }
-        let aufruf = &nach[..ende];
+        gefunden.push(&nach[..ende]);
         rest = &nach[ende..];
-        let Some(p0) = aufruf.find('"') else { continue };
-        let Some(p1) = aufruf[p0 + 1..].find('"') else {
+    }
+    gefunden
+}
+
+/// Der Pfad eines Aufrufs, wenn sein erstes Argument ein String-Literal ist.
+fn pfad_literal(aufruf: &str) -> Option<&str> {
+    let nach = aufruf.trim_start().strip_prefix('"')?;
+    Some(&nach[..nach.find('"')?])
+}
+
+fn im_archiv(pfad: &str) -> bool {
+    pfad == ARCHIV || pfad.starts_with(&format!("{ARCHIV}/"))
+}
+
+/// Die Methoden-Router, die der Guard in einem `.route(…)` erkennt (LFH-754). Alles außer
+/// `get` zählt als Schreibweg: `any`, `on`, ein an ein `get(…)` gekettetes `.fallback(…)`
+/// (nimmt jede andere Methode an) und jede `*_service`-Form, auch `get_service` — ein Service
+/// ist kein Handler in `routes::aufbewahrung`. Bei `on(MethodFilter::…, handler)` steht der
+/// Handler hinter dem Komma.
+const METHODEN: [&str; 16] = [
+    "get",
+    "post",
+    "put",
+    "patch",
+    "delete",
+    "any",
+    "on",
+    "fallback",
+    "get_service",
+    "post_service",
+    "put_service",
+    "patch_service",
+    "delete_service",
+    "any_service",
+    "on_service",
+    "fallback_service",
+];
+
+/// Alle `.route(…)`-Aufrufe aus `app.rs` unter dem Archiv-Namensraum mit ihren
+/// `methode(routes::aufbewahrung::x)`-Paaren.
+fn archivrouten(app_rs: &str) -> Vec<Route> {
+    let mut routen = Vec::new();
+    for aufruf in aufrufe(app_rs, "route") {
+        let Some(pfad) = pfad_literal(aufruf) else {
             continue;
         };
-        let pfad = &aufruf[p0 + 1..p0 + 1 + p1];
-        if !(pfad == "/api/aufbewahrung" || pfad.starts_with("/api/aufbewahrung/")) {
+        if !im_archiv(pfad) {
             continue;
         }
         let mut handler = Vec::new();
-        for methode in ["get", "post", "put", "patch", "delete"] {
+        for methode in METHODEN {
             let muster = format!("{methode}(");
             let mut such = aufruf;
             while let Some(i) = such.find(&muster) {
                 let vor = such[..i].chars().last();
                 let nach_m = &such[i + muster.len()..];
                 if vor.is_none_or(|c| !c.is_alphanumeric() && c != '_') {
-                    let name_ende = nach_m.find(')').unwrap_or(nach_m.len());
-                    handler.push((methode.to_string(), nach_m[..name_ende].trim().to_string()));
+                    let argumente = &nach_m[..nach_m.find(')').unwrap_or(nach_m.len())];
+                    let name = argumente.rsplit(',').next().unwrap_or(argumente);
+                    handler.push((methode.to_string(), name.trim().to_string()));
                 }
                 such = nach_m;
             }
@@ -631,6 +676,85 @@ fn archivrouten(app_rs: &str) -> Vec<Route> {
     routen
 }
 
+/// `.nest`/`.nest_service` in `app.rs`, deren Präfix den Archiv-Namensraum überdeckt oder in
+/// ihm liegt (LFH-754): die Routen darin tragen ihren vollen Pfad nirgends als Literal, der
+/// Guard sähe sie nicht. Ein Präfix ohne Literal ist nicht prüfbar und zählt auch.
+fn verschachtelungen(app_rs: &str) -> Vec<String> {
+    let mut verstoesse = Vec::new();
+    for name in ["nest", "nest_service"] {
+        for aufruf in aufrufe(app_rs, name) {
+            let Some(pfad) = pfad_literal(aufruf) else {
+                verstoesse.push(format!(".{name}(…) ohne Pfad-Literal — nicht prüfbar"));
+                continue;
+            };
+            let praefix = pfad.trim_end_matches('/');
+            if praefix.is_empty()
+                || im_archiv(praefix)
+                || ARCHIV.starts_with(&format!("{praefix}/"))
+            {
+                verstoesse.push(format!(
+                    ".{name}(\"{pfad}\", …) überdeckt den Archiv-Namensraum — Archivrouten nur \
+                     als .route in app.rs"
+                ));
+            }
+        }
+    }
+    verstoesse
+}
+
+/// Archivpfad-Literale, die zu keiner erkannten `.route` in `app.rs` gehören (LFH-754): ein
+/// `.route_service`, eine Pfad-Konstante oder ein Router aus einer anderen Datei, den
+/// `app.rs` per `.merge` oder `.nest` einbindet. Ein relatives `"/aufbewahrung…` gehört zu
+/// einem verschachtelten Router.
+fn fremde_archivpfade(app_rs: &str, erkannt: usize, weitere: &[(String, String)]) -> Vec<String> {
+    let literale = |q: &str| {
+        ["\"/api/aufbewahrung", "\"/aufbewahrung"]
+            .iter()
+            .flat_map(|p| [format!("{p}\""), format!("{p}/")])
+            .map(|muster| q.matches(&muster).count())
+            .sum::<usize>()
+    };
+    let mut verstoesse = Vec::new();
+    if literale(app_rs) != erkannt {
+        verstoesse.push(format!(
+            "app.rs: {} Archivpfad-Literale, aber {erkannt} erkannte Routen — Archivpfad \
+             außerhalb eines erkannten .route(…)",
+            literale(app_rs)
+        ));
+    }
+    for (datei, inhalt) in weitere {
+        if literale(inhalt) > 0 {
+            verstoesse.push(format!(
+                "{datei}: Archivpfad außerhalb eines erkannten .route(…) in app.rs (per .merge \
+                 oder .nest eingebunden?)"
+            ));
+        }
+    }
+    verstoesse
+}
+
+/// Alle `.rs` unter `src/` außer `app.rs`, als `(Pfad, Inhalt)`.
+fn weitere_quellen() -> Vec<(String, String)> {
+    fn sammeln(verzeichnis: &std::path::Path, aus: &mut Vec<(String, String)>) {
+        let mut pfade: Vec<_> = std::fs::read_dir(verzeichnis)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        pfade.sort();
+        for p in pfade {
+            if p.is_dir() {
+                sammeln(&p, aus);
+            } else if p.extension().is_some_and(|x| x == "rs") && !p.ends_with("src/app.rs") {
+                let inhalt = std::fs::read_to_string(&p).unwrap();
+                aus.push((p.display().to_string(), inhalt));
+            }
+        }
+    }
+    let mut aus = Vec::new();
+    sammeln(std::path::Path::new("src"), &mut aus);
+    aus
+}
+
 /// Die Signatur eines `pub async fn name(` bis zur schließenden Parameterklammer.
 fn signatur<'a>(quelle: &'a str, name: &str) -> Option<&'a str> {
     let kopf = format!("pub async fn {name}(");
@@ -639,9 +763,12 @@ fn signatur<'a>(quelle: &'a str, name: &str) -> Option<&'a str> {
     Some(&quelle[start..start + ende])
 }
 
-fn pruefe_namensraum(app_rs: &str, routen_rs: &str) -> Vec<String> {
-    let mut verstoesse = Vec::new();
+/// `weitere`: die übrigen Quellen unter `src/` (`weitere_quellen`), für Router aus anderen
+/// Dateien.
+fn pruefe_namensraum(app_rs: &str, routen_rs: &str, weitere: &[(String, String)]) -> Vec<String> {
+    let mut verstoesse = verschachtelungen(app_rs);
     let routen = archivrouten(app_rs);
+    verstoesse.extend(fremde_archivpfade(app_rs, routen.len(), weitere));
     if routen.is_empty() {
         verstoesse.push("keine Route unter /api/aufbewahrung gefunden — Schnitt kaputt?".into());
     }
@@ -692,7 +819,14 @@ fn archiv_namensraum_nur_lesend_und_admin() {
     let routen_rs = std::fs::read_to_string("src/routes/aufbewahrung.rs").unwrap();
     let routen = archivrouten(&app_rs);
     assert_eq!(routen.len(), 4, "vier Archivrouten erwartet: {routen:?}");
-    let v = pruefe_namensraum(&app_rs, &routen_rs);
+    let weitere = weitere_quellen();
+    assert!(
+        weitere
+            .iter()
+            .any(|(p, _)| p.ends_with("routes/aufbewahrung.rs")),
+        "Verzeichnislauf über src/ kaputt"
+    );
+    let v = pruefe_namensraum(&app_rs, &routen_rs, &weitere);
     assert!(
         v.is_empty(),
         "Archiv-Namensraum (LFH-23, design.md D2):\n{}",
@@ -713,7 +847,7 @@ fn guard_erkennt_zusaetzlichen_schreibweg_und_current_user() {
     );
     assert_ne!(mit_post, app_rs);
     assert!(
-        pruefe_namensraum(&mit_post, &routen_rs)
+        pruefe_namensraum(&mit_post, &routen_rs, &[])
             .iter()
             .any(|v| v.contains("genau ein Nicht-GET")),
         "zusätzliche post-Route muss auffallen"
@@ -725,7 +859,7 @@ fn guard_erkennt_zusaetzlichen_schreibweg_und_current_user() {
         1,
     );
     assert_ne!(mit_current, routen_rs, "Mutationsanker nicht gefunden");
-    let v = pruefe_namensraum(&app_rs, &mit_current);
+    let v = pruefe_namensraum(&app_rs, &mit_current, &[]);
     assert!(
         v.iter().any(|x| x.contains("akte: Handler ohne AdminUser")),
         "{v:?}"
@@ -735,6 +869,117 @@ fn guard_erkennt_zusaetzlichen_schreibweg_und_current_user() {
             .any(|x| x.contains("akte: Handler mit CurrentUser")),
         "{v:?}"
     );
+}
+
+/// Selbsttest des Guards (LFH-754): auch die Registrierungsformen jenseits von
+/// `.route(…, get(…))` fallen auf — `any`, `on`, `.fallback`, `*_service`, `.nest`, `.merge`,
+/// `.route_service`.
+#[test]
+fn guard_erkennt_any_on_nest_merge_und_route_service() {
+    let app_rs = std::fs::read_to_string("src/app.rs").unwrap();
+    let routen_rs = std::fs::read_to_string("src/routes/aufbewahrung.rs").unwrap();
+    let anker = "get(routes::aufbewahrung::akte)";
+    let uebersicht = ".route(\"/api/aufbewahrung\", get(routes::aufbewahrung::uebersicht))";
+    assert!(app_rs.contains(uebersicht), "Mutationsanker nicht gefunden");
+    let nicht_get = |app: &str, methode: &str| {
+        let v = pruefe_namensraum(app, &routen_rs, &[]);
+        assert!(
+            v.iter()
+                .any(|x| x.contains("genau ein Nicht-GET") && x.contains(methode)),
+            "{methode} muss als Schreibweg auffallen: {v:?}"
+        );
+    };
+
+    nicht_get(
+        &app_rs.replacen(anker, "any(routes::aufbewahrung::akte)", 1),
+        "any /api/aufbewahrung/einsaetze/{id} → akte",
+    );
+    nicht_get(
+        &app_rs.replacen(
+            anker,
+            "get(routes::aufbewahrung::akte).on(MethodFilter::POST, routes::aufbewahrung::akte)",
+            1,
+        ),
+        "on /api/aufbewahrung/einsaetze/{id} → akte",
+    );
+    // An ein GET gekettete Schreibwege: `.fallback` nimmt POST, PUT und DELETE an.
+    nicht_get(
+        &app_rs.replacen(
+            anker,
+            "get(routes::aufbewahrung::akte).fallback(routes::aufbewahrung::akte)",
+            1,
+        ),
+        "fallback /api/aufbewahrung/einsaetze/{id} → akte",
+    );
+    nicht_get(
+        &app_rs.replacen(
+            anker,
+            "get(routes::aufbewahrung::akte).post_service(routes::aufbewahrung::akte)",
+            1,
+        ),
+        "post_service /api/aufbewahrung/einsaetze/{id} → akte",
+    );
+
+    for praefix in ["/api/aufbewahrung/intern", "/api", "/"] {
+        let mit_nest = app_rs.replacen(
+            uebersicht,
+            &format!(
+                "{uebersicht}\n        .nest(\"{praefix}\", Router::new().route(\"/x\", \
+                 post(routes::aufbewahrung::akte)))"
+            ),
+            1,
+        );
+        let v = pruefe_namensraum(&mit_nest, &routen_rs, &[]);
+        assert!(
+            v.iter()
+                .any(|x| x.contains(".nest") && x.contains(&format!("\"{praefix}\""))),
+            "nest unter {praefix} muss auffallen: {v:?}"
+        );
+    }
+    // Ein `.nest` neben dem Namensraum bleibt erlaubt.
+    let daneben = app_rs.replacen(
+        uebersicht,
+        &format!("{uebersicht}\n        .nest(\"/api/aufbewahrungx\", Router::new())"),
+        1,
+    );
+    let v = pruefe_namensraum(&daneben, &routen_rs, &[]);
+    assert!(v.is_empty(), "{v:?}");
+
+    let mit_service = app_rs.replacen(
+        uebersicht,
+        &format!(
+            "{uebersicht}\n        .route_service(\"/api/aufbewahrung/datei\", ServeDir::new(\"x\"))"
+        ),
+        1,
+    );
+    let v = pruefe_namensraum(&mit_service, &routen_rs, &[]);
+    assert!(
+        v.iter().any(|x| x.contains("außerhalb eines erkannten")),
+        "route_service muss auffallen: {v:?}"
+    );
+
+    // Ein per `.merge` eingebundener Router aus einer anderen Datei, mit vollem oder (unter
+    // einem `.nest("/api", …)` gedacht) relativem Pfad.
+    let mit_merge = app_rs.replacen(
+        uebersicht,
+        &format!("{uebersicht}\n        .merge(routes::aufbewahrung_intern::router())"),
+        1,
+    );
+    for pfad in ["/api/aufbewahrung/loeschen", "/aufbewahrung/loeschen"] {
+        let weitere = vec![(
+            "src/routes/aufbewahrung_intern.rs".to_string(),
+            format!(
+                "pub fn router() -> Router<AppState> {{\n    Router::new().route(\"{pfad}\", \
+                 post(loeschen))\n}}\n"
+            ),
+        )];
+        let v = pruefe_namensraum(&mit_merge, &routen_rs, &weitere);
+        assert!(
+            v.iter()
+                .any(|x| x.starts_with("src/routes/aufbewahrung_intern.rs:")),
+            "merge mit {pfad} muss auffallen: {v:?}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -759,6 +1004,127 @@ async fn fremde_org_darf_nicht_wiederherstellen() {
             .unwrap();
     assert_eq!((f, g), (Some(frist), Some(vormerkung)), "nichts geändert");
     assert_eq!(etb_anzahl(&pool, id).await, vorher, "kein ETB-Eintrag");
+}
+
+async fn frist_put(app: &axum::Router, cookie: &str, id: i64, frist: &str) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{id}/aufbewahrungsfrist"),
+        cookie,
+        Some(&format!(
+            r#"{{"retention_bis":"{frist}","bestaetigt":true}}"#
+        )),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn frist_put_nur_fuer_den_admin_der_eigenen_org() {
+    // LFH-753: derselbe Org-Schnitt wie am Archiv (`fordere_archivzugriff`). Der Admin einer
+    // FREMDEN Org bekommt am Frist-PUT 403 — am aktiven wie am abgelaufenen Einsatz — und es
+    // ändert sich nichts. Der Admin der eigenen Org verlängert eine abgelaufene, noch nicht
+    // vorgemerkte Frist weiter reaktiv.
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fremd = fremder_admin(&app, &pool).await;
+
+    let aktiv = einsatz_anlegen(&app, &admin).await;
+    let abgelaufen = abgeschlossen(&app, &admin).await;
+    let alte_frist = vor_tagen(1);
+    setze(&pool, abgelaufen, Some(&alte_frist), None, None).await;
+
+    for id in [aktiv, abgelaufen] {
+        let frist_vorher: Option<String> =
+            sqlx::query_scalar("SELECT retention_bis FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let etb_vorher = etb_anzahl(&pool, id).await;
+        let (s, v) = frist_put(&app, &fremd, id, &in_tagen(30)).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "fremde Org, Einsatz {id}: {v}");
+        let frist_nachher: Option<String> =
+            sqlx::query_scalar("SELECT retention_bis FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            frist_nachher, frist_vorher,
+            "Frist unverändert, Einsatz {id}"
+        );
+        assert_eq!(
+            etb_anzahl(&pool, id).await,
+            etb_vorher,
+            "kein ETB-Eintrag, Einsatz {id}"
+        );
+    }
+
+    // Der Anleger ist Einsatzleitung — ohne diese Mitgliedschaft trägt allein der Admin-Zweig
+    // (sonst bestünde der Test auch ohne ihn).
+    mitgliedschaft_entfernen(&pool, abgelaufen, "admin").await;
+    let etb_vorher = etb_anzahl(&pool, abgelaufen).await;
+    let neu = in_tagen(30);
+    let (s, v) = frist_put(&app, &admin, abgelaufen, &neu).await;
+    assert_eq!(s, StatusCode::OK, "eigene Org verlängert reaktiv: {v}");
+    assert_eq!(v["retention_bis"].as_str(), Some(neu.as_str()));
+    assert_eq!(
+        etb_anzahl(&pool, abgelaufen).await,
+        etb_vorher + 1,
+        "ein ETB-Eintrag"
+    );
+}
+
+async fn mitgliedschaft_entfernen(pool: &SqlitePool, einsatz: i64, benutzername: &str) {
+    sqlx::query(
+        "DELETE FROM einsatz_mitgliedschaft WHERE einsatz_id = ? \
+         AND benutzer_id = (SELECT id FROM benutzer WHERE benutzername = ?)",
+    )
+    .bind(einsatz)
+    .bind(benutzername)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn mitglied_per_sql(pool: &SqlitePool, einsatz: i64, benutzername: &str, rolle: &str) {
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         SELECT ?, id, ? FROM benutzer WHERE benutzername = ?",
+    )
+    .bind(einsatz)
+    .bind(rolle)
+    .bind(benutzername)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn frist_put_fremder_admin_traegt_nur_eine_rolle_als_einsatzleitung() {
+    // LFH-753, design.md D1: eine Mitgliedschaft als Einsatzleitung ist ein ausdrücklich
+    // erteiltes Recht am Einsatz und trägt auch über die Org-Grenze. Eine andere Rolle trägt
+    // den fremden Admin nicht.
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fremd = fremder_admin(&app, &pool).await;
+
+    let als_fuehrung = einsatz_anlegen(&app, &admin).await;
+    mitglied_per_sql(&pool, als_fuehrung, "fremdadmin", "fuehrungspersonal").await;
+    let (s, v) = frist_put(&app, &fremd, als_fuehrung, &in_tagen(30)).await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "fremder Admin als Führungspersonal: {v}"
+    );
+
+    let als_leitung = einsatz_anlegen(&app, &admin).await;
+    mitglied_per_sql(&pool, als_leitung, "fremdadmin", "einsatzleitung").await;
+    let neu = in_tagen(30);
+    let (s, v) = frist_put(&app, &fremd, als_leitung, &neu).await;
+    assert_eq!(s, StatusCode::OK, "fremder Admin als Einsatzleitung: {v}");
+    assert_eq!(v["retention_bis"].as_str(), Some(neu.as_str()));
 }
 
 /// LFH-750, Spec `aufbewahrung` und `aufbewahrung-archiv`: mit Skelett-Frist löscht der Lauf

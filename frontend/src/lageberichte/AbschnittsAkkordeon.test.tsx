@@ -39,7 +39,7 @@ describe('AbschnittsAkkordeon', () => {
     expect(
       screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
     ).toBeInTheDocument();
-    // Unsere Ikonen sind dekorativ; auch der Pfeil ist verborgen, eine Kopfzeile trägt also gar
+    // Unsere Icons sind dekorativ; auch der Pfeil ist verborgen, eine Kopfzeile trägt also gar
     // kein zugängliches `img`.
     expect(screen.queryByRole('img', { name: /check-circle|minus-circle/ })).toBeNull();
     for (const tab of screen.getAllByRole('tab'))

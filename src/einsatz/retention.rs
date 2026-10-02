@@ -7,7 +7,7 @@
 
 use crate::wire_enum::wire_enum;
 use chrono::{DateTime, Duration, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Karenz zwischen Soft-Delete (`geloescht_at`, reversibel) und der irreversiblen
@@ -63,6 +63,23 @@ wire_enum! {
         LoeschungAusstehend => "loeschung_ausstehend",
         /// Endgültig gelöscht — nur eine Zeile des Löschprotokolls; [`zustand`] liefert ihn nie.
         EndgueltigGeloescht => "endgueltig_geloescht",
+    }
+}
+
+wire_enum! {
+    /// Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,
+    /// design.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry
+    /// (`Zuordnung::Kategorie`). Wire == [`Datenkategorie::as_str`], gepinnt in
+    /// `tests/enum_wire_kontrakt.rs`; zugleich der Schlüssel in `org_aufbewahrung_kategorie` und
+    /// `einsatz_aufbewahrung_kategorie`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+    pub enum Datenkategorie {
+        /// Zustand und Notizen zu Sichtung, Verlauf und UHS-Belegung.
+        Behandlung => "behandlung",
+        /// Herkunftsadresse und Melderkontakt.
+        Personenauskunft => "personenauskunft",
+        /// Datei-Anhänge samt ihrer Ablage als Dokument.
+        Anhaenge => "anhaenge",
     }
 }
 

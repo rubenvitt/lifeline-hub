@@ -261,6 +261,17 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
+        // Kategorie-Frist (LFH-749): geht per Kaskade mit dem Einsatz.
+        sqlx::query(
+            "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
+                rechtsgrundlage, geschwaerzt_at) VALUES (?, 'anhaenge', ?, 'x', ?)",
+        )
+        .bind(e)
+        .bind(geschwaerzt_at)
+        .bind(geschwaerzt_at)
+        .execute(pool)
+        .await
+        .unwrap();
         // `geschaedigt_person_id` zeigt OHNE ON DELETE auf die Person: die Kaskade muss beide
         // Zeilen im selben Statement entfernen, sonst scheitert die Löschung.
         sqlx::query(

@@ -140,7 +140,7 @@ Phase B.
 
 ### D4. Löschprotokoll `aufbewahrung_loeschprotokoll`
 
-Migration `0135_aufbewahrung_skelett_loeschung.sql`. Die Nummer bleibt größer als jede auf
+Migration `0136_aufbewahrung_skelett_loeschung.sql`. Die Nummer bleibt größer als jede auf
 `origin/alpha`, vor dem PR prüft das `scripts/check-migrationen.sh`.
 
 ```sql
@@ -227,7 +227,7 @@ Ohne die FTS5-Option `secure-delete` schreibt dieses Kommando nur Löschmarken i
 Segment. Die alten Tokens bleiben in `etb_eintrag_fts_data` stehen, und weil diese Seiten
 belegt bleiben, nullt `PRAGMA secure_delete` sie nicht. Bis LFH-725 fiel das nicht auf, denn
 dort ist das ETB Retain. Erst mit der endgültigen Löschung verschwindet das ETB tatsächlich.
-Migration 0135 setzt deshalb einmalig `INSERT INTO etb_eintrag_fts(etb_eintrag_fts, rank)
+Migration 0136 setzt deshalb einmalig `INSERT INTO etb_eintrag_fts(etb_eintrag_fts, rank)
 VALUES('secure-delete', 1)` (dauerhaft in `etb_eintrag_fts_config`) und führt danach
 `'optimize'` aus, das auch Reste früherer Löschungen wie die der Demo-Daten wegräumt.
 
@@ -263,7 +263,7 @@ wird der Test rot.
 
 ## Migration Plan
 
-1. Die Migration `0135` fügt die Spalte (NULL) und die leere Tabelle hinzu. Ohne Einstellung
+1. Die Migration `0136` fügt die Spalte (NULL) und die leere Tabelle hinzu. Ohne Einstellung
    gibt es keine Verhaltensänderung, und es läuft keine Datenmigration.
 2. Rollback: Die alte Binary ignoriert Spalte und Tabelle. Schon gelöschte Skelette bleiben
    gelöscht, das ist gewollt und unumkehrbar.

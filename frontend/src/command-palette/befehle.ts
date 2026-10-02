@@ -1,19 +1,19 @@
 import {
-  IkoneAbmelden,
-  IkoneDokument,
-  IkoneGlobus,
-  IkoneHandStopp,
-  IkoneListe,
-  IkoneMond,
-  IkoneMonitor,
-  IkonePerson,
-  IkonePfeileAuswaerts,
-  IkonePfeileEinwaerts,
-  IkonePlus,
-  IkoneSonne,
-  IkoneZahnrad,
-  type Ikone,
-} from '../ikonen';
+  IconAbmelden,
+  IconDokument,
+  IconGlobus,
+  IconHandStopp,
+  IconListe,
+  IconMond,
+  IconMonitor,
+  IconPerson,
+  IconPfeileAuswaerts,
+  IconPfeileEinwaerts,
+  IconPlus,
+  IconSonne,
+  IconZahnrad,
+  type Icon,
+} from '../icons';
 import {
   kategorien,
   modulRegistry,
@@ -134,24 +134,24 @@ export const SCHNELLAKTIONEN: {
   },
 ];
 
-const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: Ikone }[] = [
-  { id: 'theme:system', label: 'Darstellung: System', modus: 'system', icon: IkoneMonitor },
-  { id: 'theme:light', label: 'Darstellung: Hell', modus: 'light', icon: IkoneSonne },
-  { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: IkoneMond },
+const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: Icon }[] = [
+  { id: 'theme:system', label: 'Darstellung: System', modus: 'system', icon: IconMonitor },
+  { id: 'theme:light', label: 'Darstellung: Hell', modus: 'light', icon: IconSonne },
+  { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: IconMond },
 ];
 
 /** Bediendichte über die Palette, die schnelle Abkürzung neben der Umschaltgruppe im
  *  Benutzermenü. Kein Ersatz: ein `Befehl` trägt kein Zustandsfeld, die Palette zeigt die
  *  aktive Stufe nicht an. */
-const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: Ikone }[] = [
-  { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: IkonePfeileEinwaerts },
+const DICHTE_BEFEHLE: { id: string; label: string; stufe: Dichte; icon: Icon }[] = [
+  { id: 'dichte:kompakt', label: 'Dichte: Kompakt', stufe: 'kompakt', icon: IconPfeileEinwaerts },
   {
     id: 'dichte:komfortabel',
     label: 'Dichte: Komfortabel',
     stufe: 'komfortabel',
-    icon: IkonePfeileAuswaerts,
+    icon: IconPfeileAuswaerts,
   },
-  { id: 'dichte:handschuh', label: 'Dichte: Handschuh', stufe: 'handschuh', icon: IkoneHandStopp },
+  { id: 'dichte:handschuh', label: 'Dichte: Handschuh', stufe: 'handschuh', icon: IconHandStopp },
 ];
 
 const KOORD_BEFEHLE: { format: Koordinatenformat; label: string }[] = [
@@ -333,7 +333,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         gruppe: 'module',
         label: 'Einsatzbericht drucken',
         kontext: kategorieKontext('fuehrung'),
-        icon: IkoneDokument,
+        icon: IconDokument,
         schlagworte: ['einsatzbericht', 'abschlussbericht', 'nachbereitung', 'pdf', 'drucken'],
         ...sprungZu(einsatzberichtPfad(k.einsatzId), k.navigate),
       });
@@ -351,7 +351,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
           id: `aktion:${a.modulKey}`,
           gruppe: 'schnellaktionen',
           label: a.label,
-          icon: IkonePlus,
+          icon: IconPlus,
           schlagworte: a.schlagworte,
           // Gemerkt wird das MODUL der Aktion (LFH-436): ein Griff, ein Modul.
           ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(a.modulKey)),
@@ -367,7 +367,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: `einsatz:${e.id}`,
       gruppe: 'einsaetze',
       label: e.bezeichnung,
-      icon: IkoneListe,
+      icon: IconListe,
       schlagworte: e.stichwort ? [e.stichwort] : undefined,
       ...sprungZu(einsatzPfad(e.id), k.navigate),
     });
@@ -410,7 +410,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: `koord:${c.format}`,
       gruppe: 'einstellungen',
       label: `Koordinaten: ${c.label}`,
-      icon: IkoneGlobus,
+      icon: IconGlobus,
       schlagworte: ['koordinaten', 'format', c.format],
       ausfuehren: () => k.setKoordinaten(c.format),
     });
@@ -421,14 +421,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     id: 'nav:einsaetze',
     gruppe: 'navigation',
     label: 'Alle Einsätze',
-    icon: IkoneListe,
+    icon: IconListe,
     ...sprungZu(einsaetzePfad(), k.navigate),
   });
   befehle.push({
     id: 'nav:profil',
     gruppe: 'navigation',
     label: 'Profil',
-    icon: IkonePerson,
+    icon: IconPerson,
     ...sprungZu('/profil', k.navigate),
   });
   // Verwaltungsbereich und Stammdaten hängen am AdminLayout-Gate `darfVerwaltung`, wie Topbar und
@@ -438,14 +438,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: 'nav:stammdaten',
       gruppe: 'navigation',
       label: 'Stammdaten',
-      icon: IkoneListe,
+      icon: IconListe,
       ...sprungZu('/stammdaten', k.navigate),
     });
     befehle.push({
       id: 'nav:admin',
       gruppe: 'navigation',
       label: 'Administration',
-      icon: IkoneZahnrad,
+      icon: IconZahnrad,
       ...sprungZu('/admin', k.navigate),
     });
   }
@@ -456,7 +456,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       id: 'nav:benutzer',
       gruppe: 'navigation',
       label: 'Benutzerverwaltung',
-      icon: IkonePerson,
+      icon: IconPerson,
       ...sprungZu('/benutzer', k.navigate),
     });
   }
@@ -466,7 +466,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     id: 'nav:abmelden',
     gruppe: 'navigation',
     label: 'Abmelden',
-    icon: IkoneAbmelden,
+    icon: IconAbmelden,
     nichtMerkbar: true,
     ausfuehren: () => k.logout(),
   });

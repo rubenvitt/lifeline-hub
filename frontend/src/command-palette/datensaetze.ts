@@ -606,7 +606,7 @@ export function sichtbareDatensaetze(
 
 /**
  * Ein Datensatz-Treffer ist ein gewöhnlicher `Befehl` in derselben `role="option"`-Schleife; nur
- * so erbt er den Bedienziel-Boden aus `palettenZeilenStil`. Ikone und Modulherkunft kommen aus
+ * so erbt er den Bedienziel-Boden aus `palettenZeilenStil`. Icon und Modulherkunft kommen aus
  * der `modulRegistry`, keine zweite Namensquelle.
  */
 function befehlFuer(kand: Kandidat, navigate: DatensatzKontext['navigate']): Befehl {

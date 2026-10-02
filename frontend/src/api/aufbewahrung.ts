@@ -3,8 +3,11 @@ import type {
   ArchivEtbEintrag,
   AufbewahrungEintrag,
   EinsatzAnzeige,
+  Datenkategorie,
   EtbTyp,
   FristSetzenBody,
+  KategorieAufbewahrung,
+  KategorieFristBody,
   WiederherstellenBody,
 } from './types';
 import { apiGet, apiSend, mitParametern } from './client';
@@ -66,4 +69,23 @@ export function setzeAufbewahrungsfrist(
   body: FristSetzenBody,
 ): Promise<EinsatzAnzeige> {
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/aufbewahrungsfrist`, 'PUT', body);
+}
+
+/** `GET /api/einsaetze/{id}/aufbewahrung-kategorien` — Aufbewahrung je Datenkategorie (LFH-749). */
+export function ladeKategorieAufbewahrung(einsatzId: number): Promise<KategorieAufbewahrung[]> {
+  return apiGet<KategorieAufbewahrung[]>(`/api/einsaetze/${einsatzId}/aufbewahrung-kategorien`);
+}
+
+/** `PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie}` — Frist einer Datenkategorie setzen,
+ *  ändern oder aufheben; in der Karenz nimmt eine künftige Frist die Vormerkung zurück. */
+export function setzeKategorieFrist(
+  einsatzId: number,
+  kategorie: Datenkategorie,
+  body: KategorieFristBody,
+): Promise<KategorieAufbewahrung[]> {
+  return apiSend<KategorieAufbewahrung[]>(
+    `/api/einsaetze/${einsatzId}/aufbewahrungsfrist/${kategorie}`,
+    'PUT',
+    body,
+  );
 }

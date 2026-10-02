@@ -24,6 +24,7 @@ import {
 } from './orgEinstellungenForm';
 import type { OrgEinstellungenUpdate } from '../../api/types';
 import { Formularpaneel } from '../../components/instrument';
+import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
 
 /** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Modulzeile. */
 const RECHTE_TEXT =
@@ -175,6 +176,8 @@ export default function EinsatzDefaults() {
             />
           </Form.Item>
         </Formularpaneel>
+
+        <KategorieVorgabenPaneel />
 
         <Formularpaneel
           titel="Verhalten & Automatik"

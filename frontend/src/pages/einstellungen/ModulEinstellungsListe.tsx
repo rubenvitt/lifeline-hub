@@ -145,7 +145,7 @@ interface ModulEinstellungsListeProps {
  * gedämpftes Kurzwort, die Begründung steht im Tooltip darüber (Tablet: kein Hover). Das Kurzwort
  * steht auch dann, wenn der `RechteHinweis` dasselbe sagt — ein grauer Schalter ohne Wort ist eine
  * Ein-Kanal-Aussage. Der Schreibvorgang zeigt sich nur als `loading` am Steuerelement; das
- * `aria-label` des Schalters schlägt die Lade-Ikone.
+ * `aria-label` des Schalters schlägt das Lade-Icon.
  */
 export default function ModulEinstellungsListe({
   rollenSpalte,

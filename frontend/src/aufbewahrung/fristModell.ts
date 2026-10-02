@@ -1,11 +1,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import {
-  istAdmin,
-  istEinsatzLeitung,
-  type BenutzerSchreibkontext,
-  type EinsatzSchreibkontext,
-} from '../einsatz/schreibrecht';
+import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
+import { istAdmin, istEinsatzLeitung } from '../einsatz/schreibrecht';
 
 dayjs.extend(utc);
 
@@ -28,12 +24,25 @@ export function istFristverkuerzung(
   return neu < alt;
 }
 
-/** Einsatzleitung (Mitgliedschaft) oder System-Admin — wie der Server, unabhängig vom Status. */
+/** Einsatz-Kontext des Frist-Rechts: Rolle und Org des Einsatzes. */
+export type FristEinsatzKontext =
+  Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'org_id'> | null | undefined;
+
+/** Benutzer-Kontext des Frist-Rechts: System-Rolle und eigene Org. */
+export type FristBenutzerKontext =
+  Pick<BenutzerAnzeige, 'system_rolle' | 'org_id'> | null | undefined;
+
+/**
+ * Einsatzleitung (Mitgliedschaft) oder System-Admin der Einsatz-Org — wie der Server
+ * (`aufbewahrungsfrist_setzen`, LFH-753), unabhängig vom Status. Der Admin einer fremden Org
+ * bekäme dort 403, die Aktion steht für ihn deshalb gesperrt.
+ */
 export function darfFristSetzen(
-  einsatz: EinsatzSchreibkontext,
-  benutzer: BenutzerSchreibkontext,
+  einsatz: FristEinsatzKontext,
+  benutzer: FristBenutzerKontext,
 ): boolean {
-  return istEinsatzLeitung(einsatz) || istAdmin(benutzer);
+  if (istEinsatzLeitung(einsatz)) return true;
+  return istAdmin(benutzer) && einsatz != null && benutzer?.org_id === einsatz.org_id;
 }
 
 /**

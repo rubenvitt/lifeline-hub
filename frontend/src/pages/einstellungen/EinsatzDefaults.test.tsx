@@ -43,6 +43,7 @@ const VOLL = {
   rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
   geocoder_url: 'https://geo.example',
+  aufbewahrung_kategorien: [],
   geaendert_at: null,
   geaendert_von: null,
 };
@@ -83,8 +84,64 @@ describe('EinsatzDefaults', () => {
         auftrag_quittierung_frist_min: 45,
         rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
+        aufbewahrung_kategorien: [],
       }),
     );
+  });
+
+  // ---------- LFH-749: Dauer und Rechtsgrundlage je Datenkategorie ----------
+
+  it('Spec „Vorschlag wird nicht eingesetzt“: Dauerfelder leer, je Kategorie Vorschlag mit Quelle', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+    for (const name of ['Behandlung', 'Personenauskunft', 'Anhänge']) {
+      const feld = await screen.findByLabelText(`Dauer ${name} (Tage)`);
+      expect(feld).toHaveValue('');
+    }
+    expect(screen.getByText(/Vorschlag: 0 Tage — § 46 Abs\. 5 BHKG NRW/)).toBeInTheDocument();
+    expect(screen.getByText(/Vorschlag: 3650 Tage — § 630f Abs\. 3 BGB/)).toBeInTheDocument();
+    expect(screen.getByText(/Vorschlag: 30 Tage — § 32b Abs\. 3 NKatSG/)).toBeInTheDocument();
+  });
+
+  it('Spec „Dauer länger als Einsatz-Dauer“: Hinweis, dass die Einsatz-Frist zuerst greift', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+    const feld = await screen.findByLabelText('Dauer Behandlung (Tage)');
+    expect(screen.queryByText(/greift die Einsatz-Frist zuerst/)).not.toBeInTheDocument();
+    await userEvent.type(feld, '3650');
+    expect(await screen.findByText(/greift die Einsatz-Frist zuerst/)).toBeInTheDocument();
+  });
+
+  it('verlangt bei gesetzter Dauer eine Rechtsgrundlage und speichert nichts ohne sie', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+    await userEvent.type(await screen.findByLabelText('Dauer Anhänge (Tage)'), '30');
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Rechtsgrundlage angeben')).toBeInTheDocument();
+    expect(speichereOrgEinstellungen).not.toHaveBeenCalled();
+  });
+
+  it('schickt Dauer und Rechtsgrundlage je Kategorie mit; leere Kategorien fehlen in der Liste', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+    await userEvent.type(await screen.findByLabelText('Dauer Personenauskunft (Tage)'), '0');
+    await userEvent.type(
+      screen.getByLabelText('Rechtsgrundlage Personenauskunft'),
+      ' § 46 Abs. 5 BHKG NRW ',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(speichereOrgEinstellungen).toHaveBeenCalled());
+    expect(vi.mocked(speichereOrgEinstellungen).mock.calls[0][0].aufbewahrung_kategorien).toEqual([
+      { kategorie: 'personenauskunft', dauer_tage: 0, rechtsgrundlage: '§ 46 Abs. 5 BHKG NRW' },
+    ]);
+  });
+
+  it('belegt die Felder aus den gespeicherten Vorgaben vor', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue({
+      ...VOLL,
+      aufbewahrung_kategorien: [
+        { kategorie: 'anhaenge', dauer_tage: 30, rechtsgrundlage: '§ 32b Abs. 3 NKatSG' },
+      ],
+    } as never);
+    renderMitProviders(<EinsatzDefaults />);
+    expect(await screen.findByLabelText('Dauer Anhänge (Tage)')).toHaveValue('30');
+    expect(screen.getByLabelText('Rechtsgrundlage Anhänge')).toHaveValue('§ 32b Abs. 3 NKatSG');
   });
 
   describe('Skelett-Frist (LFH-750)', () => {

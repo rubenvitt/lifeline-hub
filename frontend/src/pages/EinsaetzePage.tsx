@@ -1,4 +1,4 @@
-import { IkoneOrtsmarke, IkonePlus } from '../ikonen';
+import { IconOrtsmarke, IconPlus } from '../icons';
 import { Alert, App, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
@@ -296,12 +296,12 @@ function EinsaetzeInhalt() {
             <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
             {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
           </div>
-          {/* Ort und Beginn beantworten „welcher ist meiner?". Die Ikone trägt eine
+          {/* Ort und Beginn beantworten „welcher ist meiner?". Das Icon trägt eine
               `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}
           {e.einsatzort && (
             <span data-testid="einsatz-ort" style={{ color: rollen.text2 }}>
               <span aria-hidden="true">
-                <IkoneOrtsmarke />{' '}
+                <IconOrtsmarke />{' '}
               </span>
               {e.einsatzort}
             </span>
@@ -390,7 +390,7 @@ function EinsaetzeInhalt() {
             {darfAnlegen && (
               <Button
                 type="dashed"
-                icon={<IkonePlus />}
+                icon={<IconPlus />}
                 onClick={() => setDialogOffen(true)}
                 style={{ height: '100%', width: '100%', minHeight: KACHEL_MIN_HOEHE }}
               >

@@ -1,4 +1,4 @@
-import { IkoneChevronHoch, IkoneChevronRunter } from '../ikonen';
+import { IconChevronHoch, IconChevronRunter } from '../icons';
 import { useState } from 'react';
 import { Button, ConfigProvider, Layout, Menu, Spin, theme } from 'antd';
 import { Augenbraue, useRollen } from '../components/instrument';
@@ -154,7 +154,7 @@ export default function AdminLayout() {
               Verwaltung{aktuell ? `: ${aktuell}` : ''}
             </span>
             <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-              {navOffen ? <IkoneChevronHoch /> : <IkoneChevronRunter />}
+              {navOffen ? <IconChevronHoch /> : <IconChevronRunter />}
             </span>
           </Button>
           {navOffen && (

@@ -1,4 +1,4 @@
-import { IkoneLautsprecher } from '../ikonen';
+import { IconLautsprecher } from '../icons';
 import { useState } from 'react';
 import { Button, Popover, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
 import { buchstabiere, type Buchstabiertafel } from './buchstabieren';
@@ -69,7 +69,7 @@ export default function BuchstabierHilfe({ text }: { text: string }) {
 
          Kein `size`-Prop am Knopf: die Trefffläche kommt aus `controlHeight`. */}
       <Tooltip title={tafelOffen ? '' : 'Buchstabierhilfe'}>
-        <Button type="text" aria-label="Buchstabierhilfe" icon={<IkoneLautsprecher />} />
+        <Button type="text" aria-label="Buchstabierhilfe" icon={<IconLautsprecher />} />
       </Tooltip>
     </Popover>
   );

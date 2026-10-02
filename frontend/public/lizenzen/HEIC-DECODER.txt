@@ -1,0 +1,20 @@
+HEIC-Decoder der Bildvorschau (LFH-759)
+
+Lifeline Hub zeigt iPhone-Fotos im HEIC/HEIF-Format, indem der Browser sie auf dem Gerät
+dekodiert. Dazu liefert die Anwendung eine eigene, unveränderte WebAssembly-Datei aus
+(assets/libheif-*.wasm). Sie wird getrennt vom übrigen Programmcode geladen und lässt sich
+durch eine andere Fassung derselben Bibliothek ersetzen.
+
+Enthaltene Bibliotheken
+- libheif-js 1.23.2 (Emscripten-Fassung von libheif)
+  https://github.com/catdad-experiments/libheif-js
+  Lizenz: GNU LGPL 3.0, Text: libheif-js-LGPL-3.0.txt
+- libheif 1.23 (strukturag)
+  https://github.com/strukturag/libheif
+  Lizenz: GNU LGPL 3.0, Text: libheif-LGPL-3.0.txt
+- libde265 (HEVC-Decoder, strukturag), in die WebAssembly-Datei einkompiliert
+  https://github.com/strukturag/libde265
+  Lizenz: GNU LGPL 3.0, Text wie libheif-LGPL-3.0.txt
+
+Den Quelltext dieser Bibliotheken gibt es unter den genannten Adressen; die verwendete Fassung
+ist die des npm-Pakets libheif-js@1.23.2.

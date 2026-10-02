@@ -1,4 +1,4 @@
-import { IkoneStift } from '../ikonen';
+import { IconStift } from '../icons';
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button, Space } from 'antd';
 import { useRollen } from './instrument/rollenwerte';
@@ -241,9 +241,9 @@ export function InlineAngabe<T>({
         onClick={oeffnen}
       >
         <span id={wertId}>{anzeige}</span>
-        {/* Ikone ohne eigenes Vorleseziel (frontend/AGENTS.md, „Ein Emoji ist keine Ikone"). */}
+        {/* Icon ohne eigenes Vorleseziel (frontend/AGENTS.md, „Ein Emoji ist kein Icon"). */}
         <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
-          <IkoneStift />
+          <IconStift />
         </span>
       </Button>
       {hinweis}

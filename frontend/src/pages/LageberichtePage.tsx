@@ -1,4 +1,4 @@
-import { IkonePlus } from '../ikonen';
+import { IconPlus } from '../icons';
 import { Breadcrumb, Button, Form, Input, Spin, Typography, theme } from 'antd';
 import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -224,7 +224,7 @@ export default function LageberichtePage() {
           // („plus Neuer Bericht").
           <Button
             type="primary"
-            icon={<IkonePlus />}
+            icon={<IconPlus />}
             aria-label="Neuer Bericht"
             onClick={() => {
               anlegenMutation.reset();

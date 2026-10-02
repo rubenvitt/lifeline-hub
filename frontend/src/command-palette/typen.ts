@@ -1,4 +1,4 @@
-import type { Ikone } from '../ikonen';
+import type { Icon } from '../icons';
 import type {
   BenutzerAnzeige,
   EinsatzAnzeige,
@@ -38,7 +38,7 @@ export interface Befehl {
   gruppe: BefehlGruppe;
   label: string;
   schlagworte?: string[];
-  icon?: Ikone;
+  icon?: Icon;
   /**
    * Kontext rechts neben dem Label: wo der Treffer wohnt (Kategorie eines Moduls, Modul eines
    * Datensatzes).
@@ -285,7 +285,7 @@ export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
 /**
  * Ist die Gruppe eine reine ORDNUNGSKOPIE, die bei aktiver Suche entfällt? Ausdrücklich NICHT
  * die Negation von {@link GRUPPE_MERKBAR} (`module` ist nicht merkbar und bleibt stehen). Gemeint
- * ist: jeder Eintrag hat anderswo in derselben Liste einen Zwilling mit gleichem Label, Ikone und
+ * ist: jeder Eintrag hat anderswo in derselben Liste einen Zwilling mit gleichem Label, Icon und
  * Ziel. Begründung an `ohneOrdnungsdubletten` in `fuzzy.ts`.
  */
 export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {

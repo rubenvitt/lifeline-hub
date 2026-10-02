@@ -125,7 +125,7 @@ describe('AppAnmeldungPage (LFH-818)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'In der App anmelden' }));
     expect(await screen.findByText('Dienst derzeit nicht verfügbar')).toBeInTheDocument();
     expect(navigiere).not.toHaveBeenCalled();
-    // antd lässt die ausgeblendete Lade-Ikone im Namen stehen; bedienbar ist der Knopf trotzdem.
+    // antd lässt das ausgeblendete Lade-Icon im Namen stehen; bedienbar ist der Knopf trotzdem.
     const knopf = screen.getByRole('button', { name: /In der App anmelden/ });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
     expect(knopf).toBeEnabled();

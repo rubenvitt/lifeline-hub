@@ -87,6 +87,9 @@ export default defineConfig(({ mode }) => {
         workbox: {
           // Der Haupt-Chunk überschreitet das 2-MiB-Precache-Limit, solange es kein Code-Splitting gibt.
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+          // Der HEIC-Decoder (LFH-759, 1,4 MB) kommt nicht in den Vorrat: ohne Netz gibt es auch
+          // keine HEIC-Bytes zu dekodieren, und jeder Client lüde ihn sonst bei jedem Update vor.
+          globIgnores: ['**/libheif-*.wasm'],
           // Seitenwechsel auf /api/ MÜSSEN zum Server: der OIDC-Login ist ein Full-Page-Redirect
           // über `/api/auth/oidc/…`. Sonst antwortet der Service Worker mit dem gecachten
           // `index.html`, und der Login endet stumm wieder auf der Login-Seite.

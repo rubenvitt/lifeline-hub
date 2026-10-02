@@ -1,5 +1,6 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
+use crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige;
 use crate::einsatz::berechtigung::ist_fristverkuerzung;
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLeitungszugriff, EinsatzLesezugriff, EinsatzVerwaltungszugriff,
@@ -158,7 +159,7 @@ pub struct FristSetzen {
 }
 
 /// PUT /api/einsaetze/{id}/aufbewahrungsfrist — Aufbewahrungsfrist setzen, ändern
-/// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin. Eine Verkürzung
+/// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin der Einsatz-Org. Eine Verkürzung
 /// (inkl. erstmaligem Setzen auf einen bislang unbegrenzten Einsatz) erfordert
 /// `bestaetigt=true`. Schreibt einen ETB-System-Eintrag als Audit. Die Frist greift
 /// erst ab Einsatzabschluss (reaktive Lese-Sperre), nie auf aktive Einsätze.
@@ -168,8 +169,11 @@ pub async fn aufbewahrungsfrist_setzen(
     JsonBody(req): JsonBody<FristSetzen>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let id = ctx.einsatz.id;
-    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
-    if !ctx.benutzer.ist_admin() {
+    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin der Einsatz-Org —
+    // derselbe Org-Schnitt wie am Archiv (`aufbewahrung::fordere_archivzugriff`, LFH-753).
+    // Der Extractor-Floor allein ließe den Admin einer fremden Org serverweit durch.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
         ctx.fordere_einsatzleitung()?;
     }
 
@@ -249,6 +253,121 @@ pub async fn aufbewahrungsfrist_setzen(
         &ctx.benutzer,
         ctx.rolle,
     )))
+}
+
+/// GET /api/einsaetze/{id}/aufbewahrung-kategorien — Aufbewahrung je Datenkategorie (LFH-749,
+/// Spec `aufbewahrung-kategorien`, „Zustand je Kategorie“): alle drei Kategorien mit Frist,
+/// Zustand und Rechtsgrundlage, bei einem aktiven Einsatz mit der Dauer der Org-Vorgabe. Kein
+/// Personenbezug; lesen darf, wer den Einsatz lesen darf, dazu Einsatzleitung und System-Admin
+/// auch an einem gesperrten Einsatz (wie der Frist-PUT, damit das Paneel dort nicht leer bleibt).
+pub async fn kategorien_lesen(
+    State(state): State<AppState>,
+    ctx: EinsatzKontext,
+) -> Result<Json<Vec<KategorieAufbewahrungAnzeige>>, AppError> {
+    // Org-Schnitt wie beim Frist-PUT (LFH-753): der Admin einer fremden Org braucht das reguläre
+    // Lese-Gate.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org && ctx.fordere_einsatzleitung().is_err() {
+        ctx.fordere_lesezugriff()?;
+    }
+    let id = ctx.einsatz.id;
+    let (_, geschwaerzt_at) = crate::aufbewahrung::repo::tombstones(&state.pool, id).await?;
+    Ok(Json(
+        crate::einsatz::aufbewahrung_kategorie::anzeige(
+            &state.pool,
+            crate::einsatz::aufbewahrung_kategorie::EinsatzStand {
+                einsatz_id: id,
+                org_id: ctx.einsatz.org_id,
+                status: ctx.einsatz.status.as_str(),
+                geschwaerzt_at: geschwaerzt_at.as_deref(),
+            },
+            chrono::Utc::now(),
+        )
+        .await?,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KategorieFristSetzen {
+    /// Neue Frist der Kategorie (ISO-8601/RFC3339 oder SQLite-Format); `null`/leer hebt sie
+    /// auf (die Kategorie folgt der Frist des Einsatzes).
+    pub retention_bis: Option<String>,
+    /// Pflicht-Bestätigung bei Verkürzung (sonst 409).
+    #[serde(default)]
+    pub bestaetigt: bool,
+    /// Rechtsgrundlage; Pflicht bei der ersten Frist einer Kategorie (sonst 422), sonst ersetzt
+    /// sie die bisherige.
+    #[serde(default)]
+    pub rechtsgrundlage: Option<String>,
+}
+
+/// PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie} — Frist einer Datenkategorie am
+/// abgeschlossenen Einsatz setzen, verlängern oder aufheben, in der Karenz auch die Vormerkung
+/// zurücknehmen (LFH-749, Spec `aufbewahrung-kategorien`). Rechte wie
+/// [`aufbewahrungsfrist_setzen`]: Einsatzleitung oder System-Admin; kein Lesegate (die Antwort
+/// trägt keinen Personenbezug). Die Zustandsprüfungen laufen im Repo in der schreibenden
+/// Transaktion.
+pub async fn kategorie_frist_setzen(
+    State(state): State<AppState>,
+    ctx: EinsatzKontext,
+    PfadParam((_eid, kategorie)): PfadParam<(i64, String)>,
+    JsonBody(req): JsonBody<KategorieFristSetzen>,
+) -> Result<Json<Vec<KategorieAufbewahrungAnzeige>>, AppError> {
+    use crate::einsatz::aufbewahrung_kategorie as kat;
+    let id = ctx.einsatz.id;
+    // Org-Schnitt wie beim Frist-PUT (LFH-753): Admin nur der Einsatz-Org, sonst Einsatzleitung.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
+        ctx.fordere_einsatzleitung()?;
+    }
+    let Some(kategorie) = crate::einsatz::retention::Datenkategorie::parse(&kategorie) else {
+        return Err(AppError::Validation(format!(
+            "Unbekannte Datenkategorie: {kategorie}"
+        )));
+    };
+    let neue_frist = match req
+        .retention_bis
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(s) => Some(crate::etb::normalisiere_zeit(s)?),
+        None => None,
+    };
+    let rechtsgrundlage = req.rechtsgrundlage.as_deref().map(str::trim);
+    let jetzt = chrono::Utc::now();
+    let ergebnis = kat::frist_setzen(
+        &state.pool,
+        id,
+        ctx.benutzer.id,
+        kat::FristAenderung {
+            kategorie,
+            neue_frist: neue_frist.as_deref(),
+            rechtsgrundlage,
+            bestaetigt: req.bestaetigt,
+        },
+        jetzt,
+    )
+    .await?;
+    if ergebnis == kat::FristErgebnis::Geaendert {
+        kopf_geaendert(&state, id).await;
+        state.live.publiziere_einsatz(id, LiveEvent::Etb);
+    }
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let (_, geschwaerzt_at) = crate::aufbewahrung::repo::tombstones(&state.pool, id).await?;
+    Ok(Json(
+        kat::anzeige(
+            &state.pool,
+            kat::EinsatzStand {
+                einsatz_id: id,
+                org_id: einsatz.org_id,
+                status: einsatz.status.as_str(),
+                geschwaerzt_at: geschwaerzt_at.as_deref(),
+            },
+            jetzt,
+        )
+        .await?,
+    ))
 }
 
 /// Der Frist-PUT hat bewusst kein Lesegate (eine abgelaufene Frist soll reaktiv verlängert

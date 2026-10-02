@@ -367,6 +367,11 @@ fn serde_wire_gleich_as_str() {
         LoeschungAusstehend,
         EndgueltigGeloescht,
     });
+    enum_wire_as_str!(lifeline_hub::einsatz::retention::Datenkategorie {
+        Behandlung,
+        Personenauskunft,
+        Anhaenge,
+    });
     enum_wire_as_str!(lifeline_hub::einsatz::Einsatzart {
         Realeinsatz,
         Uebung,
@@ -679,7 +684,7 @@ fn wetter_teil_zustand_wire() {
 }
 
 /// LFH-864: aktuelle Bedingungen. `WetterSymbol` ist aus `icon` der Quelle abgebildet (Nebel nach
-/// Sonnenstand geteilt, Frontend-Tabellen `wetterSymbolIkone`/`wetterSymbolWort`),
+/// Sonnenstand geteilt, Frontend-Tabellen `wetterSymbolIcon`/`wetterSymbolWort`),
 /// `WetterMessgroesse` benennt die aus Nachbarstationen ergänzten Werte.
 #[test]
 fn wetter_symbol_wire() {

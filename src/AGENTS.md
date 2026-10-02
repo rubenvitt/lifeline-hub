@@ -93,6 +93,22 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 - Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
   beim Download mit 422.
 
+**Vorschau (LFH-759)** (Spec `anhang-vorschau`, Herleitung
+`openspec/changes/archive/2026-10-02-lfh-759-bildvorschau-anhaenge/design.md`):
+- `?fassung=vorschau` (≤ 256 px) und `grossansicht` (≤ 1600 px) laufen durch dieselbe
+  `anhang_antwort`, mit den Gates der Route und ohne ETB-Vermerk. `anhang::vorschau` kodiert
+  JPEG/PNG/GIF/WebP/TIFF neu (Ausrichtung angewendet, keine Metadaten), in `spawn_blocking` und
+  höchstens `VORSCHAU_PARALLEL` zugleich: `platz_holen` vor dem BLOB, der Platz geht mit der
+  Arbeit (`erzeugen_mit_platz`), ein Abbruch gibt ihn nicht frei; gespeichert wird nichts. HEIC/HEIF → 422, das dekodiert
+  der Browser. Wer die Erzeugung ändert, erhöht `VORSCHAU_VERSION` (ETag `"<sha256>.v<n>.<k|g>"`).
+- `inline` und `image/jpeg` nur für diese beiden Fassungen; alles andere bleibt `attachment` mit
+  gespeichertem `mime`. Jede Anhang-Antwort trägt `nosniff` und `ANHANG_CSP`.
+- Frontend: Bild-Anhänge zeigen `components/AnhangVorschau.tsx` (über `DownloadAnker` mit `mime`
+  oder direkt), nie ein `<img>` auf die Download-Adresse und nie `fassung=original` zur Anzeige.
+  In einer Überlagerung ohne Bedienelemente (Palettenvorschau) `grossansicht={false}`.
+  Eine künftige App-CSP muss `img-src blob:`, `worker-src 'self'` und `'wasm-unsafe-eval'`
+  erlauben (HEIC-Decoder, `frontend/src/heic/`).
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und
@@ -135,8 +151,12 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   eintragen, nicht lockern. Frontend: Verwaltung → „Aufbewahrung" (`admin/adminNav.tsx`), Akte
   unter `/admin/aufbewahrung/:einsatzId`.
 - Archivzugriff nur für den System-Admin der eigenen Org (`fordere_archivzugriff`: fremd 403,
-  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` prüft die Org nicht (bekannte
-  Inkonsistenz).
+  unbekannt 404, aktiv 409). `PUT …/aufbewahrungsfrist` schneidet gleich (LFH-753): Admin nur
+  der Einsatz-Org, sonst Einsatzleitung (auch org-fremd); der Client spiegelt das über
+  `BenutzerAnzeige.org_id`. Nach Fristablauf hat die Einsatzleitung bewusst keinen **UI**-Weg;
+  der PUT bleibt ihr bis zur Vormerkung (≤ 10 min) offen, danach nur das Wiederherstellen des
+  Org-Admins — kein Lesegate nachrüsten (Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-753-frist-put-org-pruefung/design.md`, D3).
 - **Akte ist eine Retain-Projektion** (`aufbewahrung/projektion.rs`, Guard
   `jede_archivspalte_ist_retain` über `klassifikation_von`), eigene DTOs.
 - **Wiederherstellen braucht die neue Frist** (`einsatz::repo::wiederherstellen`, `retention_bis`
@@ -149,14 +169,26 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
 - Purge-Audit ist fail-closed (Akteurskette abschließende Person → Einsatzleitung → System-Admin
   der Einsatz-Org; ohne Akteur liefert `system_audit_tx` einen Fehler → Rollback, sichtbar nur
   per `tracing::error!`).
-- **Scrub-Werte in System-ETB-Texten** stehen in `AUSNAHMEN_SYSTEM_ETB`
-  (`tests/aufbewahrung_e2e.rs`) — kein Test bemerkt einen fehlenden Eintrag.
+- **Scrub-Werte in System-ETB-Texten** (LFH-752): Werte von Betroffenen (Schaden, Person, Tier,
+  UHS-Belegung: Ort, Adressat, Verbleib-Ziel, Notiz) und Dokumenttitel gehören nie in den
+  Wortlaut — nur Registriernummer, Enum, Kategorie, Ablage-Verweis (`Ablage ETB 12`). Bewusst
+  behalten werden Einsatzkräfte, Lagestruktur, Führungsmodule und Enum-Labels; jede solche Stelle
+  steht mit `gruppe` in `AUSNAHMEN_SYSTEM_ETB` (`tests/aufbewahrung_e2e.rs`), die Liste wird nie
+  um eine Spalte aus `GESPERRT` länger. Kein Test bemerkt einen fehlenden Eintrag. Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-752-system-etb-ohne-scrub-werte/design.md`.
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
   stehen), und nach einer Schwärzung schreibt der Purge-Lauf den WAL per
   `db::wal_zurueckschreiben` zurück. Die Haupt-DB nur über `db::connect` öffnen. Netz:
   `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler.rs`). Herleitung und
   Messung: `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
+- **Fristen je Datenkategorie** (LFH-749, Spec `aufbewahrung-kategorien`): jede Scrub-Spalte
+  trägt im Typ eine `Zuordnung` (Kategorie, Personenstamm, Einsatz); die Kategorie-Spalten pinnt
+  `kategorie_zuordnung_ist_gepinnt`, eine neue Tabelle mit FK auf `einsatz_person` entscheidet
+  sich in `behandlungsbezug_kennt_jede_personentabelle` (beide `einsatz/schwaerzung_registry.rs`).
+  Eine Kategorie wirkt nur früher als die Einsatz-Frist und sperrt nicht; der Personenstamm geht
+  erst, wenn alle Zwecke der Person geschwärzt sind. Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md`.
 - **Endgültige Löschung des Skeletts** (LFH-750, Spec `aufbewahrung`): Phase D des Purge-Laufs
   (`einsatz/skelett_loeschung.rs`) löscht einen geschwärzten Einsatz samt ETB, sobald die
   Org-Einstellung `skelett_dauer_tage` (ab Abschluss, frühestens die Schwärzung) abgelaufen ist;

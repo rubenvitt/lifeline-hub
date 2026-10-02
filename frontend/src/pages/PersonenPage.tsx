@@ -1,4 +1,4 @@
-import { IkoneKreuz } from '../ikonen';
+import { IconKreuz } from '../icons';
 import { Alert, App, Breadcrumb, Button, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -663,7 +663,7 @@ export default function PersonenPage() {
             dokumentSichtbar
               ? {
                   onClose: quittungSchliessen,
-                  closeIcon: <IkoneKreuz />,
+                  closeIcon: <IconKreuz />,
                   'aria-label': 'Bestätigung schließen',
                 }
               : false

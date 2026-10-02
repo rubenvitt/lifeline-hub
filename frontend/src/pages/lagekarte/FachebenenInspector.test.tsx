@@ -24,12 +24,11 @@ describe('FachebenenInspector', () => {
         onSchliessen={() => {}}
       />,
     );
-    // Ereignis im Titel, davor die Ikone des Satzes statt eines Emojis (LFH-595).
+    // Ereignis im Titel, davor das Icon des Satzes statt eines Emojis (LFH-595).
     const titel = screen.getByText('Dauerregen');
-    expect(titel.closest('*:has([data-ikone])')?.querySelector('[data-ikone]')).toHaveAttribute(
-      'data-ikone',
-      'regen',
-    );
+    expect(
+      titel.closest('*:has([data-lfh-icon])')?.querySelector('[data-lfh-icon]'),
+    ).toHaveAttribute('data-lfh-icon', 'regen');
     expect(document.body.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(screen.getByText('Amtliche Warnung vor Dauerregen')).toBeInTheDocument(); // volle Headline im Body
     // Schwere mit der amtlichen DWD-Bezeichnung aus dem Vertrag (LFH-662), nicht „Mäßig“.
@@ -528,11 +527,11 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     ['HITZE', 'thermometer'],
     ['UV-INDEX', 'sonne'],
     ['UNBEKANNT', 'warndreieck'],
-  ])('Warnung (DWD) %s trägt die Wetterikone %s, kein Emoji (LFH-595)', (event, ikone) => {
+  ])('Warnung (DWD) %s trägt die Wettericon %s, kein Emoji (LFH-595)', (event, icon) => {
     const { container } = render(
       <FachebenenInspector quelle="dwd" properties={{ EVENT: event }} onSchliessen={() => {}} />,
     );
-    expect(container.querySelector(`[data-ikone="${ikone}"]`)).not.toBeNull();
+    expect(container.querySelector(`[data-lfh-icon="${icon}"]`)).not.toBeNull();
     expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
@@ -544,7 +543,7 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
         onSchliessen={() => {}}
       />,
     );
-    expect(container.querySelector('[data-ikone="warndreieck"]')).not.toBeNull();
+    expect(container.querySelector('[data-lfh-icon="warndreieck"]')).not.toBeNull();
     expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 

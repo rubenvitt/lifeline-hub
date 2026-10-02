@@ -1,4 +1,4 @@
-import { IkoneHochladen } from '../ikonen';
+import { IconHochladen } from '../icons';
 import { Button, Form, Upload, type UploadFile } from 'antd';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
 
@@ -64,7 +64,7 @@ export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props
             // `aria-hidden`-Hülle: der Icon-Knoten brächte `role="img"` mit englischem Namen
             // („upload“) in den zugänglichen Namen des Knopfs.
             <span aria-hidden="true">
-              <IkoneHochladen />
+              <IconHochladen />
             </span>
           }
         >

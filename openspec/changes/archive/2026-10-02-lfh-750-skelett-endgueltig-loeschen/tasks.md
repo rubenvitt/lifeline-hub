@@ -6,7 +6,7 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 1. Schema und Klassifikation
 
-- [x] 1.1 `git fetch origin alpha`, dann Migration `migrations/0135_aufbewahrung_skelett_loeschung.sql` nach design.md D4 (Spalte `org_einstellungen.skelett_dauer_tage`, Tabelle `aufbewahrung_loeschprotokoll` mit Index). Verifikation: `scripts/check-migrationen.sh` grün, und `db::tests::migrationsnummern_sind_eindeutig` grün
+- [x] 1.1 `git fetch origin alpha`, dann Migration `migrations/0136_aufbewahrung_skelett_loeschung.sql` nach design.md D4 (Spalte `org_einstellungen.skelett_dauer_tage`, Tabelle `aufbewahrung_loeschprotokoll` mit Index). Verifikation: `scripts/check-migrationen.sh` grün, und `db::tests::migrationsnummern_sind_eindeutig` grün
 - [x] 1.2 Registry-Eintrag `aufbewahrung_loeschprotokoll` in `src/einsatz/schwaerzung_registry.rs` (`Scoping::EinsatzId`, alle Spalten Retain mit Begründung nach dem Präzedenzfall `demo_import`). Verifikation: Die Guard-Tests der Registry (`entdeckte_tabellen_gleich_registry_tabellen` u. a.) sind ohne Eintrag rot und mit Eintrag grün
 
 ## 2. Org-Einstellung `skelett_dauer_tage` (D1, D2)
@@ -53,7 +53,7 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 9. Review-Befunde (Review-Workflow, 11 von 14 bestätigt)
 
-- [x] 9.1 ETB-Suchindex: `secure-delete` und `optimize` in Migration 0135 (design.md D8). Verifikation: `skelett_loeschung_hinterlaesst_keine_altbytes` pflanzt ein kleingeschriebenes Einzelwort; ohne die beiden Zeilen rot, mit ihnen grün
+- [x] 9.1 ETB-Suchindex: `secure-delete` und `optimize` in Migration 0136 (design.md D8). Verifikation: `skelett_loeschung_hinterlaesst_keine_altbytes` pflanzt ein kleingeschriebenes Einzelwort; ohne die beiden Zeilen rot, mit ihnen grün
 - [x] 9.2 Fixture von `skelett_loeschung` um Tier, Schaden mit Geschädigten-Bezug und Berichtigung erweitert (Spec-Szenario „Fällig“). Verifikation: `loeschen_entfernt_jede_zeile_und_schreibt_genau_eine_protokollzeile` grün, `PRAGMA foreign_key_check` leer
 - [x] 9.3 Test `scheitert_das_delete_rollt_die_protokollzeile_mit_zurueck` (Atomarität in Gegenrichtung) und `geloeschter_nummerntext_ohne_zahlenspalten_wird_nicht_wieder_vergeben` (Mutationsprobe ohne Text-Klausel rot)
 - [x] 9.4 Doku: Modulkopf des Purge-Schedulers (vier Phasen, Audit je Phase), Enum-Doku `AufbewahrungZustand`, `skip_serializing_if` an `skelett_dauer_tage` mit Typ-Codegen, Herleitungspfade auf das Archiv, `proposal.md`/`design.md` nachgezogen

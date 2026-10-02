@@ -545,9 +545,13 @@ async fn schwaerzung_nullt_die_bemerkung_und_behaelt_den_haken() {
     .await;
 
     let mut tx = pool.begin().await.unwrap();
-    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz)
-        .await
-        .unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        einsatz,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
 
     let (erledigt, erledigt_at, bemerkung): (i64, Option<String>, Option<String>) = sqlx::query_as(

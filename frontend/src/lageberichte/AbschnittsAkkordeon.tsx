@@ -1,4 +1,4 @@
-import { IkoneHakenKreis, IkoneMinusKreis } from '../ikonen';
+import { IconHakenKreis, IconMinusKreis } from '../icons';
 import { Collapse, Typography, theme } from 'antd';
 import { memo, type ReactNode } from 'react';
 import type { AbschnittDef } from './vorlagen';
@@ -64,7 +64,7 @@ interface AbschnittsAkkordeonProps {
  * Zwei Zusicherungen, beide getestet:
  *  · `forceRender`: alle Editoren stehen im DOM, sonst schickte ein Speichern die zugeklappten
  *    Abschnitte leer.
- *  · Die Leer-Marke trägt zwei Kanäle (WCAG 1.4.1): Ikone in `aria-hidden`-Hülle und das Wort
+ *  · Die Leer-Marke trägt zwei Kanäle (WCAG 1.4.1): Icon in `aria-hidden`-Hülle und das Wort
  *    „(leer)".
  *
  * `memo`, weil die Detailseite über `Form.useWatch([], form)` je Anschlag neu rendert und acht
@@ -102,7 +102,7 @@ export const AbschnittsAkkordeon = memo(function AbschnittsAkkordeon({
                 aria-hidden
                 style={{ color: voll ? token.colorSuccess : token.colorTextSecondary }}
               >
-                {voll ? <IkoneHakenKreis /> : <IkoneMinusKreis />}
+                {voll ? <IconHakenKreis /> : <IconMinusKreis />}
               </span>
               <Typography.Text strong={voll} type={voll ? undefined : 'secondary'}>
                 {a.label}

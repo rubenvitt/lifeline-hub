@@ -246,7 +246,7 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
     expect(feld()).toHaveValue('Foto');
     expect(within(liste()).getByText('a.jpg · 3 B')).toBeInTheDocument();
 
-    // Name per Muster: antds Ladeikone bleibt in jsdom am Knopf hängen (kein transitionend).
+    // Name per Muster: antds Ladeicon bleibt in jsdom am Knopf hängen (kein transitionend).
     const knopf = screen.getByRole('button', { name: /Erfassen$/ });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
     fireEvent.click(knopf);
@@ -270,7 +270,7 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
     await screen.findByText(/b\.jpg konnte nicht hochgeladen werden/);
     expect(p.erfassen).not.toHaveBeenCalled();
 
-    // Name per Muster: antds Ladeikone bleibt in jsdom am Knopf hängen (kein transitionend).
+    // Name per Muster: antds Ladeicon bleibt in jsdom am Knopf hängen (kein transitionend).
     const knopf = screen.getByRole('button', { name: /Erfassen$/ });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
     fireEvent.click(knopf);
