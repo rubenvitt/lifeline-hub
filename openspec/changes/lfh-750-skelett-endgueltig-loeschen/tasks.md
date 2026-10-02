@@ -36,10 +36,10 @@ Entscheidungen: `design.md` D1–D7.
 
 ## 6. Übersicht „Aufbewahrung“ (D6)
 
-- [ ] 6.1 `AufbewahrungEintragAnzeige`: `bezeichnung: Option<String>`, neu `loeschung_am` und `endgueltig_geloescht_at`. `aufbewahrung::repo::uebersicht` lädt Org-Frist und Protokollzeilen der Org. Verifikation: Repo-Tests für die Szenarien „Löschung am“, „Löschung ausstehend“, „Endgültig gelöscht“ und „Löschprotokoll einer fremden Organisation“. Der bestehende Test „Zustände“ bleibt grün
-- [ ] 6.2 Guard `archiv_namensraum_nur_lesend_und_admin` (`tests/aufbewahrung.rs`) bleibt grün (keine neue Route). Neuer Integrationstest: Die Archivakte eines endgültig gelöschten Einsatzes liefert 404
-- [ ] 6.3 `scripts/check-typ-codegen.sh` erneut laufen lassen und die generierten Dateien mitcommitten. Verifikation: Das Skript ist grün
-- [ ] 6.4 `frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx`: Etiketten und Filter für `loeschung_ausstehend`/`endgueltig_geloescht`, Spalte „Löschung am“, bei gelöschten Zeilen kein Sprung in die Akte und der Hinweis „endgültig gelöscht“ statt der Bezeichnung (Regeln aus `frontend/AGENTS.md`). Verifikation: Vitest in `AufbewahrungUebersicht.test.tsx` für die Szenarien „Gelöschter Einsatz“ und „Sprung in die Akte“
+- [x] 6.1 `AufbewahrungEintragAnzeige`: `bezeichnung: Option<String>`, neu `loeschung_am` und `endgueltig_geloescht_at`. `aufbewahrung::repo::uebersicht` lädt Org-Frist und Protokollzeilen der Org. Verifikation: Repo-Tests für die Szenarien „Löschung am“, „Löschung ausstehend“, „Endgültig gelöscht“ und „Löschprotokoll einer fremden Organisation“. Der bestehende Test „Zustände“ bleibt grün
+- [x] 6.2 Guard `archiv_namensraum_nur_lesend_und_admin` (`tests/aufbewahrung.rs`) bleibt grün (keine neue Route). Neuer Integrationstest: Die Archivakte eines endgültig gelöschten Einsatzes liefert 404
+- [x] 6.3 `scripts/check-typ-codegen.sh` erneut laufen lassen und die generierten Dateien mitcommitten. Verifikation: Das Skript ist grün
+- [x] 6.4 `frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx`: Etiketten und Filter für `loeschung_ausstehend`/`endgueltig_geloescht`, Spalte „Löschung am“, bei gelöschten Zeilen kein Sprung in die Akte und der Hinweis „endgültig gelöscht“ statt der Bezeichnung (Regeln aus `frontend/AGENTS.md`). Verifikation: Vitest in `AufbewahrungUebersicht.test.tsx` für die Szenarien „Gelöschter Einsatz“ und „Sprung in die Akte“
 
 ## 7. Einstellungsseite (D7)
 

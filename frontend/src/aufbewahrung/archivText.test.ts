@@ -11,6 +11,8 @@ describe('archivText', () => {
       'vorgemerkt',
       'schwaerzung_ausstehend',
       'geschwaerzt',
+      'loeschung_ausstehend',
+      'endgueltig_geloescht',
     ]);
     expect([...ZUSTAENDE].sort()).toEqual(Object.keys(aufbewahrungZustand).sort());
   });
@@ -25,6 +27,8 @@ describe('archivText', () => {
       'frist',
       'frist',
       'wiederherstellen',
+      null,
+      null,
       null,
       null,
     ]);

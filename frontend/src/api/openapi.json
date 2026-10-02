@@ -778,10 +778,9 @@
       },
       "AufbewahrungEintragAnzeige": {
         "type": "object",
-        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen.",
+        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im\nZustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine\nBezeichnung.",
         "required": [
           "einsatz_id",
-          "bezeichnung",
           "zustand"
         ],
         "properties": {
@@ -792,7 +791,11 @@
             ]
           },
           "bezeichnung": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fehlt nur bei einem endgültig gelöschten Einsatz."
           },
           "einsatz_id": {
             "type": "integer",
@@ -803,6 +806,13 @@
               "string",
               "null"
             ]
+          },
+          "endgueltig_geloescht_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`."
           },
           "geloescht_at": {
             "type": [
@@ -823,6 +833,13 @@
               "null"
             ],
             "description": "Ende der Karenz (`geloescht_at` + 30 Tage); fehlt ohne Vormerkung."
+          },
+          "loeschung_am": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der endgültigen Löschung des Skeletts (später aus Abschluss + Skelett-Frist\nund Schwärzung); fehlt ohne Skelett-Frist der Org und bei gelöschten Einsätzen."
           },
           "retention_bis": {
             "type": [
@@ -845,7 +862,9 @@
           "faellig",
           "vorgemerkt",
           "schwaerzung_ausstehend",
-          "geschwaerzt"
+          "geschwaerzt",
+          "loeschung_ausstehend",
+          "endgueltig_geloescht"
         ]
       },
       "AuftragAnzeige": {

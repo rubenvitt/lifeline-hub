@@ -28,13 +28,17 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine
-/// personenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen.
+/// personenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im
+/// Zustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine
+/// Bezeichnung.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct AufbewahrungEintragAnzeige {
     pub einsatz_id: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatznummer_intern: Option<String>,
-    pub bezeichnung: String,
+    /// Fehlt nur bei einem endgültig gelöschten Einsatz.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bezeichnung: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abgeschlossen_at: Option<String>,
     /// Aufbewahrungsfrist (UTC, DB-Format); fehlt = keine Frist.
@@ -48,6 +52,13 @@ pub struct AufbewahrungEintragAnzeige {
     pub karenz_ende: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub geschwaerzt_at: Option<String>,
+    /// Zeitpunkt der endgültigen Löschung des Skeletts (später aus Abschluss + Skelett-Frist
+    /// und Schwärzung); fehlt ohne Skelett-Frist der Org und bei gelöschten Einsätzen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loeschung_am: Option<String>,
+    /// Zeitpunkt der endgültigen Löschung; nur im Zustand `endgueltig_geloescht`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endgueltig_geloescht_at: Option<String>,
     pub zustand: AufbewahrungZustand,
 }
 

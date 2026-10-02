@@ -367,6 +367,8 @@ export type VerpflegungDeckung = 'gedeckt' | 'offen' | 'unterdeckung';
  * Akte. `faellig` und `vorgemerkt` teilen sich `achtung` (nur während `vorgemerkt` ist
  * Wiederherstellen möglich); `schwaerzung_ausstehend` ist `alarm`, weil dort jede Rücknahme
  * verloren ist. Kein `bedien`: Wiederherstellen ist eine Aktion, kein Zustand.
+ * `loeschung_ausstehend` ist aus demselben Grund `alarm` (der nächste Lauf löscht das Skelett
+ * endgültig); `endgueltig_geloescht` ist ein Endzustand und `neutral` (LFH-750).
  */
 export const aufbewahrungZustand: Record<AufbewahrungZustand, StatusDarstellung> = {
   ohne_frist: { rolle: 'neutral', label: 'ohne Frist' },
@@ -375,6 +377,8 @@ export const aufbewahrungZustand: Record<AufbewahrungZustand, StatusDarstellung>
   vorgemerkt: { rolle: 'achtung', label: 'zur Löschung vorgemerkt' },
   schwaerzung_ausstehend: { rolle: 'alarm', label: 'Schwärzung steht aus' },
   geschwaerzt: { rolle: 'neutral', label: 'geschwärzt' },
+  loeschung_ausstehend: { rolle: 'alarm', label: 'Löschung steht aus' },
+  endgueltig_geloescht: { rolle: 'neutral', label: 'endgültig gelöscht' },
 };
 
 /**
