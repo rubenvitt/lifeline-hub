@@ -57,7 +57,7 @@ export default function ProfilPage() {
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const [provider, setProvider] = useState<AuthProvider[]>([]);
-  // Die Organisation steht nicht an `BenutzerAnzeige` — eigener Abruf. Nicht-blockierend und ohne
+  // Der Name der Organisation steht nicht an `BenutzerAnzeige` (nur `org_id`) — eigener Abruf. Nicht-blockierend und ohne
   // Fehlerzweig: schlägt er fehl, zeigt die Kopfsektion „—", die Sicherheits-Abschnitte bleiben
   // bedienbar.
   const { data: organisation } = useQuery({

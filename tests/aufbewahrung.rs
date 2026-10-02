@@ -816,8 +816,68 @@ async fn frist_put_nur_fuer_den_admin_der_eigenen_org() {
         );
     }
 
+    // Der Anleger ist Einsatzleitung — ohne diese Mitgliedschaft trägt allein der Admin-Zweig
+    // (sonst bestünde der Test auch ohne ihn).
+    mitgliedschaft_entfernen(&pool, abgelaufen, "admin").await;
+    let etb_vorher = etb_anzahl(&pool, abgelaufen).await;
     let neu = in_tagen(30);
     let (s, v) = frist_put(&app, &admin, abgelaufen, &neu).await;
     assert_eq!(s, StatusCode::OK, "eigene Org verlängert reaktiv: {v}");
+    assert_eq!(v["retention_bis"].as_str(), Some(neu.as_str()));
+    assert_eq!(
+        etb_anzahl(&pool, abgelaufen).await,
+        etb_vorher + 1,
+        "ein ETB-Eintrag"
+    );
+}
+
+async fn mitgliedschaft_entfernen(pool: &SqlitePool, einsatz: i64, benutzername: &str) {
+    sqlx::query(
+        "DELETE FROM einsatz_mitgliedschaft WHERE einsatz_id = ? \
+         AND benutzer_id = (SELECT id FROM benutzer WHERE benutzername = ?)",
+    )
+    .bind(einsatz)
+    .bind(benutzername)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn mitglied_per_sql(pool: &SqlitePool, einsatz: i64, benutzername: &str, rolle: &str) {
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         SELECT ?, id, ? FROM benutzer WHERE benutzername = ?",
+    )
+    .bind(einsatz)
+    .bind(rolle)
+    .bind(benutzername)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn frist_put_fremder_admin_traegt_nur_eine_rolle_als_einsatzleitung() {
+    // LFH-753, design.md D1: eine Mitgliedschaft als Einsatzleitung ist ein ausdrücklich
+    // erteiltes Recht am Einsatz und trägt auch über die Org-Grenze. Eine andere Rolle trägt
+    // den fremden Admin nicht.
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fremd = fremder_admin(&app, &pool).await;
+
+    let als_fuehrung = einsatz_anlegen(&app, &admin).await;
+    mitglied_per_sql(&pool, als_fuehrung, "fremdadmin", "fuehrungspersonal").await;
+    let (s, v) = frist_put(&app, &fremd, als_fuehrung, &in_tagen(30)).await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "fremder Admin als Führungspersonal: {v}"
+    );
+
+    let als_leitung = einsatz_anlegen(&app, &admin).await;
+    mitglied_per_sql(&pool, als_leitung, "fremdadmin", "einsatzleitung").await;
+    let neu = in_tagen(30);
+    let (s, v) = frist_put(&app, &fremd, als_leitung, &neu).await;
+    assert_eq!(s, StatusCode::OK, "fremder Admin als Einsatzleitung: {v}");
     assert_eq!(v["retention_bis"].as_str(), Some(neu.as_str()));
 }

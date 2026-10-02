@@ -48,10 +48,12 @@ Keine.
 
 - Backend: `src/routes/einsatz.rs` (`aufbewahrungsfrist_setzen`), `src/auth/mod.rs`
   (`BenutzerAnzeige`, `Benutzer::anzeige`), `src/routes/benutzer.rs` (SELECTs auf
-  `BenutzerAnzeige`), Tests in `tests/aufbewahrung.rs`.
+  `BenutzerAnzeige`), Tests in `tests/aufbewahrung.rs` und `tests/benutzer.rs`.
 - Typ-Codegen: `scripts/check-typ-codegen.sh`, beide generierten Dateien.
 - Frontend: `frontend/src/aufbewahrung/fristModell.ts` (+ Test), Rechte-Hinweistext und
-  Einsatztyp im `FristPaneel` (+ Test), Test-Fixtures mit `BenutzerAnzeige`.
+  Einsatztyp im `FristPaneel` (+ Test), Test-Fixtures mit `BenutzerAnzeige`
+  (`src/test/fixtures.ts`, `BenutzerKonfliktDialog.test.tsx`), Kommentare, die das Frist-Recht
+  oder `BenutzerAnzeige` beschreiben.
 - Regeln: `src/AGENTS.md`.
 - API: Der Frist-PUT antwortet dem Admin einer fremden Org jetzt mit 403 statt 200. Die
   Antwort von `GET /api/auth/me` und der Benutzerverwaltung bekommt ein zusätzliches Feld
