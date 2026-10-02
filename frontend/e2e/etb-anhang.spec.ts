@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { MINI_JPEG } from './bildFixture';
 
 /**
  * ETB-Anhänge Ende zu Ende: Datei wählen → Text → Enter → der Eintrag steht mit
@@ -15,7 +16,8 @@ import { expect, test, type Page } from '@playwright/test';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const FUEKW = { width: 1366, height: 768 };
-const JPG = Buffer.from('JPEGDATEN-LFH-117');
+// Echte Bildbytes: ein Foto-Download wird bereinigt (LFH-747).
+const JPG = MINI_JPEG;
 
 async function anmelden(page: Page) {
   await page.goto('/login');

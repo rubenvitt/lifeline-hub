@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
-import { originalDateiname, originalZugaenglicherName } from '../api/anhangFassung';
+import { ORIGINAL_TEXT, originalDateiname, originalZugaenglicherName } from '../api/anhangFassung';
 
 /**
  * Stil des Download-Ankers (LFH-21). Ein `<a>` ist ein handgebautes Bedienziel und erbt keine
@@ -64,8 +64,8 @@ interface Props {
   originalKennung?: string;
 }
 
-/** Sichtbarer Text des Original-Verweises (Spec `anhang-metadaten`). */
-export const ORIGINAL_TEXT = 'Original (mit Standort)';
+/** Sichtbarer Text des Original-Verweises; die Quelle steht in `api/anhangFassung.ts`. */
+export { ORIGINAL_TEXT };
 
 /**
  * Nativer Download-Verweis (`<a href download>`), geteilt von Dokumentenablage, Chat und

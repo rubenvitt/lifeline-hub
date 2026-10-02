@@ -1,6 +1,7 @@
 import { expect, test, type FileChooser, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
+import { MINI_JPEG } from './bildFixture';
 
 /**
  * Dokumentenablage im Browser — was jsdom nicht tragen kann:
@@ -48,7 +49,8 @@ const STAFFEL = [
 ] as const;
 
 const PDF = Buffer.from('%PDF-1.4 e2e');
-const JPG = Buffer.from('\xff\xd8\xff\xe0 e2e', 'binary');
+// Echte Bildbytes: ein Foto-Download wird bereinigt (LFH-747).
+const JPG = MINI_JPEG;
 
 async function anmelden(page: Page, modus?: 'light' | 'dark') {
   // Der Modus muss VOR dem ersten Laden stehen — der Bootstrap in `index.html` liest ihn.
@@ -230,7 +232,7 @@ test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im
 
   // ── 2 · Zweites Dokument ──────────────────────────────────────────────────────────────
   await legeAb(page, 'Foto Zufahrt.jpg', JPG, 'image/jpeg', 'Foto', 'Foto Zufahrt');
-  const foto = page.getByRole('link', { name: 'Foto Zufahrt' });
+  const foto = page.getByRole('link', { name: 'Foto Zufahrt', exact: true });
   await expect(foto).toBeVisible();
   await expect(zaehler).toHaveText('2');
 
@@ -393,7 +395,7 @@ test('Rückmeldung: Fortschritt, Prüfphase und Entfernen-Zustand (LFH-654)', as
 
   // ── 2 · Entfernen: Zeile steht mit „wird entfernt“ bis zur Serverantwort ─────────────
   await seedeDokument(page, einsatzId, 'Foto Zufahrt', 'foto', 'Foto Zufahrt.jpg', JPG);
-  await expect(page.getByRole('link', { name: 'Foto Zufahrt' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Foto Zufahrt', exact: true })).toBeVisible();
   let loeschFrei!: () => void;
   const loeschen = new Promise<void>((res) => (loeschFrei = res));
   await page.route(`**/api/einsaetze/${einsatzId}/dokumente/*`, async (route) => {
@@ -406,7 +408,9 @@ test('Rückmeldung: Fortschritt, Prüfphase und Entfernen-Zustand (LFH-654)', as
     .locator('.ant-popconfirm:not(.ant-popover-hidden)')
     .getByRole('button', { name: 'Entfernen' })
     .click();
-  const zeile = page.locator('tr', { has: page.getByRole('link', { name: 'Foto Zufahrt' }) });
+  const zeile = page.locator('tr', {
+    has: page.getByRole('link', { name: 'Foto Zufahrt', exact: true }),
+  });
   await expect(zeile, 'die Zeile steht und trägt den Zusatz').toContainText('wird entfernt');
   await expect(zeile.getByRole('button', { name: 'Dokument Foto Zufahrt entfernen' })).toHaveClass(
     /ant-btn-loading/,
@@ -414,7 +418,7 @@ test('Rückmeldung: Fortschritt, Prüfphase und Entfernen-Zustand (LFH-654)', as
   const andere = page.locator('tr', { has: page.getByRole('link', { name: 'Lageplan Gross' }) });
   await expect(andere).not.toContainText('wird entfernt');
   loeschFrei();
-  await expect(page.getByRole('link', { name: 'Foto Zufahrt' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Foto Zufahrt', exact: true })).toHaveCount(0);
   await expect(page.getByText('wird entfernt')).toHaveCount(0);
 });
 

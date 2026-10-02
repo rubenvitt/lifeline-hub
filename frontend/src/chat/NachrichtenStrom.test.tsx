@@ -509,7 +509,7 @@ describe('NachrichtenStrom', () => {
     it('steht mit darfOriginal am Foto, nicht am PDF', () => {
       rendere(true);
       const original = screen.getByRole('link', {
-        name: 'lage.jpg, Anhang der Nachricht von Max: Original mit Standort- und Gerätedaten herunterladen',
+        name: 'Original (mit Standort) herunterladen: lage.jpg, Anhang der Nachricht von Max',
       });
       expect(original).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/43?fassung=original');
       expect(screen.getAllByText(ORIGINAL_TEXT)).toHaveLength(1);

@@ -60,7 +60,7 @@ describe('EtbDokumente (LFH-743)', () => {
     it('steht mit darfOriginal hinter dem Foto, nicht hinter dem PDF', () => {
       render(<EtbDokumente einsatzId={5} lfdNr={42} dokumente={[dokument(), foto]} darfOriginal />);
       const original = screen.getByRole('link', {
-        name: 'Dokument „Lagefoto“, zu Nr. 42: Original mit Standort- und Gerätedaten herunterladen',
+        name: 'Original (mit Standort) herunterladen: Dokument „Lagefoto“, zu Nr. 42',
       });
       expect(original).toHaveAttribute(
         'href',

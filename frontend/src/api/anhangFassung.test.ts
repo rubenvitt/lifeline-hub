@@ -27,7 +27,7 @@ describe('anhangFassung (LFH-747)', () => {
 
   it('baut den zugänglichen Namen aus der Zeilenkennung', () => {
     expect(originalZugaenglicherName('dach.jpg, Schaden S-003')).toBe(
-      'dach.jpg, Schaden S-003: Original mit Standort- und Gerätedaten herunterladen',
+      'Original (mit Standort) herunterladen: dach.jpg, Schaden S-003',
     );
   });
 

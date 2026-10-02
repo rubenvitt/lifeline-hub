@@ -268,8 +268,10 @@ Reihenfolge im Handler:
 
 - `DownloadAnker` bekommt die optionalen Props `originalHref` und `originalKennung`. Ist
   `originalHref` gesetzt, steht neben dem Hauptverweis ein zweiter nativer Verweis „Original (mit
-  Standort)“. Sein zugänglicher Name trägt die Zeilenkennung des Aufrufers („dach.jpg, Schaden
-  S-003: Original mit Standort- und Gerätedaten herunterladen“).
+  Standort)“. Sein zugänglicher Name beginnt mit dem sichtbaren Text, die Zeilenkennung des Aufrufers
+  steht am Ende („Original (mit Standort) herunterladen: dach.jpg, Schaden S-003“). So trifft
+  eine Suche nach dem Hauptverweis weder über dessen Anfang (Dateiname) noch über sein Ende
+  („…, Anhang zu Nr. 1 herunterladen“) auch das Original (Befund der e2e-Suite im PR).
 - **Eigener Dateiname für das Original** (Review): `dach.original.jpg`, im `download`-Attribut
   (`originalDateiname`) und in der `Content-Disposition` des Servers
   (`anhang::original_dateiname`). Sonst lägen `dach.jpg` und `dach (1).jpg` nebeneinander, und

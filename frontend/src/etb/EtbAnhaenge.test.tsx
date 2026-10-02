@@ -96,7 +96,7 @@ describe('EtbAnhaenge (LFH-117)', () => {
     it('steht mit darfOriginal hinter jedem Bild, nicht hinter dem PDF', () => {
       render(<EtbAnhaenge einsatzId={5} eintrag={eintrag} darfOriginal />);
       const original = screen.getByRole('link', {
-        name: 'IMG_0412.HEIC, Anhang zu Nr. 42: Original mit Standort- und Gerätedaten herunterladen',
+        name: 'Original (mit Standort) herunterladen: IMG_0412.HEIC, Anhang zu Nr. 42',
       });
       expect(original).toHaveAttribute(
         'href',

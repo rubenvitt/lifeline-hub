@@ -80,7 +80,7 @@ describe('DownloadAnker — Original-Verweis (LFH-747)', () => {
     const haupt = screen.getByRole('link', { name: 'dach.jpg' });
     expect(haupt).toHaveAttribute('href', '/api/x/datei');
     const original = screen.getByRole('link', {
-      name: 'dach.jpg: Original mit Standort- und Gerätedaten herunterladen',
+      name: 'Original (mit Standort) herunterladen: dach.jpg',
     });
     expect(original).toHaveAttribute('href', '/api/x/datei?fassung=original');
     expect(original).toHaveAttribute('download', 'dach.original.jpg');
@@ -98,7 +98,7 @@ describe('DownloadAnker — Original-Verweis (LFH-747)', () => {
     );
     expect(
       screen.getByRole('link', {
-        name: 'IMG_0001.jpg, Schaden S-003: Original mit Standort- und Gerätedaten herunterladen',
+        name: 'Original (mit Standort) herunterladen: IMG_0001.jpg, Schaden S-003',
       }),
     ).toBeInTheDocument();
   });

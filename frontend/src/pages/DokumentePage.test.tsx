@@ -561,7 +561,7 @@ describe('DokumentePage — Original-Verweis (LFH-747)', () => {
   it('zeigt der Einsatzleitung am Foto den Original-Verweis, am PDF nicht', async () => {
     rendere(einsatzAktiv, [dokument(), foto]);
     const original = await screen.findByRole('link', {
-      name: 'lage.jpg, Dokument Lagefoto: Original mit Standort- und Gerätedaten herunterladen',
+      name: 'Original (mit Standort) herunterladen: lage.jpg, Dokument Lagefoto',
     });
     expect(original).toHaveAttribute('href', `${dokumentDownloadPfad(1, 6)}?fassung=original`);
     expect(screen.getAllByText('Original (mit Standort)')).toHaveLength(1);

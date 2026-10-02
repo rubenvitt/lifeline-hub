@@ -24,9 +24,17 @@ export function originalDateiname(dateiname: string): string {
     : `${dateiname}.original`;
 }
 
-/** Zugänglicher Name des Original-Verweises; `kennung` ist die Zeilenkennung des Aufrufers. */
+/** Sichtbarer Text des Original-Verweises (Spec `anhang-metadaten`). */
+export const ORIGINAL_TEXT = 'Original (mit Standort)';
+
+/**
+ * Zugänglicher Name des Original-Verweises; `kennung` ist die Zeilenkennung des Aufrufers. Er
+ * beginnt mit dem sichtbaren Text (WCAG 2.5.3, Sprachsteuerung), die Kennung steht am Ende. So
+ * trifft eine Suche nach dem Hauptverweis weder über dessen Namensanfang (Dateiname) noch über
+ * sein Ende („…, Anhang zu Nr. 1 herunterladen“) auch das Original (Befund e2e, LFH-747).
+ */
 export function originalZugaenglicherName(kennung: string): string {
-  return `${kennung}: Original mit Standort- und Gerätedaten herunterladen`;
+  return `${ORIGINAL_TEXT} herunterladen: ${kennung}`;
 }
 
 /** Ob der Anhang ein Bild ist — nur dort unterscheiden sich Original und bereinigte Fassung. */
