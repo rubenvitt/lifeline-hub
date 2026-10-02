@@ -6,7 +6,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, schaden_anhang, setup,
-    setup_mit_pool,
+    setup_mit_pool, MINI_JPEG, MINI_PNG,
 };
 
 async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
@@ -307,7 +307,7 @@ async fn mehrere_anhaenge_an_einer_nachricht() {
     let kid = default_kanal(&app, einsatz, &admin).await;
 
     let (_, a1) = upload(&app, einsatz, &admin, "eins.pdf", "application/pdf", b"AAA").await;
-    let (_, a2) = upload(&app, einsatz, &admin, "zwei.png", "image/png", b"BBBB").await;
+    let (_, a2) = upload(&app, einsatz, &admin, "zwei.png", "image/png", MINI_PNG).await;
     let id1 = a1[0]["id"].as_i64().unwrap();
     let id2 = a2[0]["id"].as_i64().unwrap();
 
@@ -330,7 +330,7 @@ async fn mehrere_anhaenge_an_einer_nachricht() {
     let (s2, _, b2) = download(&app, einsatz, id2, &admin).await;
     assert_eq!((s1, s2), (StatusCode::OK, StatusCode::OK));
     assert_eq!(b1, b"AAA");
-    assert_eq!(b2, b"BBBB");
+    assert_eq!(b2, MINI_PNG);
 }
 
 /// Eine im Request doppelt genannte anhang_id wird dedupliziert (genau eine
@@ -702,11 +702,13 @@ async fn download_setzt_etag_und_cache_control() {
         etag.starts_with('"') && etag.ends_with('"'),
         "starker ETag (quoted): {etag}"
     );
-    assert_eq!(
-        etag.trim_matches('"').len(),
-        64,
-        "sha256-Hex als ETag: {etag}"
-    );
+    // Bereinigte Fassung (LFH-747): sha256-Hex und Version der Bereinigung.
+    let (hex, version) = etag
+        .trim_matches('"')
+        .split_once(".b")
+        .expect("ETag der bereinigten Fassung");
+    assert_eq!(hex.len(), 64, "sha256-Hex im ETag: {etag}");
+    assert_eq!(version, "1", "BEREINIGUNG_VERSION im ETag: {etag}");
     let cc = headers
         .get(header::CACHE_CONTROL)
         .expect("Cache-Control gesetzt")
@@ -1170,7 +1172,7 @@ async fn chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle() 
 
 /// Lädt eine Datei hoch und liefert ihre id.
 async fn hochgeladen(app: &axum::Router, einsatz: i64, cookie: &str, name: &str) -> i64 {
-    let (s, up) = upload(app, einsatz, cookie, name, "image/jpeg", b"JPEGDATEN").await;
+    let (s, up) = upload(app, einsatz, cookie, name, "image/jpeg", MINI_JPEG).await;
     assert_eq!(s, StatusCode::CREATED, "upload: {up:?}");
     up.as_array().unwrap()[0]["id"].as_i64().unwrap()
 }
@@ -1273,10 +1275,10 @@ async fn heraufstufen_kopiert_das_foto_ins_etb_und_der_chat_behaelt_es() {
 
     let (s, bytes) = etb_download(&app, einsatz, etb_id, kopie, &admin).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(bytes, b"JPEGDATEN");
+    assert_eq!(bytes, MINI_JPEG);
     let (s, _, bytes) = download(&app, einsatz, foto, &admin).await;
     assert_eq!(s, StatusCode::OK, "der Chat lädt sein Foto weiter");
-    assert_eq!(bytes, b"JPEGDATEN");
+    assert_eq!(bytes, MINI_JPEG);
 
     // Die Kopie folgt den ETB-Regeln: generisch weder ladbar noch löschbar.
     let (s, _, _) = download(&app, einsatz, kopie, &admin).await;
@@ -1377,7 +1379,7 @@ async fn heraufgestufte_kopie_ueberlebt_das_loeschen_der_nachricht() {
     );
     let (s, bytes) = etb_download(&app, einsatz, etb_id, kopie, &admin).await;
     assert_eq!(s, StatusCode::OK, "die Kopie bleibt am Eintrag");
-    assert_eq!(bytes, b"JPEGDATEN");
+    assert_eq!(bytes, MINI_JPEG);
 }
 
 /// Grenze von beiden Seiten: zehn verschiedene Dateien gehen durch (Review LFH-700 B6).

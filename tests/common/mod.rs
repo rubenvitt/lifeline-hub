@@ -589,3 +589,19 @@ pub async fn multipart_post(
         serde_json::from_slice(&bytes).unwrap_or(Value::Null),
     )
 }
+
+/// Ein gültiges JPEG ohne Metadaten (LFH-747): läuft bytegleich durch die Bereinigung der
+/// Auslieferung. Testdaten mit Bild-Endung brauchen echte Bildbytes, sonst antwortet der
+/// Download mit 422 (`src/AGENTS.md`, „Anhänge“).
+pub const MINI_JPEG: &[u8] = b"\xFF\xD8\
+\xFF\xC0\x00\x0B\x08\x00\x10\x00\x10\x01\x01\x11\x00\
+\xFF\xDA\x00\x08\x01\x01\x00\x00\x3F\x00\
+JPEGDATEN\
+\xFF\xD9";
+
+/// Ein gültiges PNG ohne Metadaten (LFH-747), Gegenstück zu [`MINI_JPEG`]. Die CRCs prüft die
+/// Bereinigung nicht; die Bytes laufen unverändert durch.
+pub const MINI_PNG: &[u8] = b"\x89PNG\r\n\x1a\n\
+\x00\x00\x00\x0DIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90\x77\x53\xDE\
+\x00\x00\x00\x07IDATPNGDATA\x00\x00\x00\x00\
+\x00\x00\x00\x00IEND\xAE\x42\x60\x82";

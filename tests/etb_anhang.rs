@@ -14,7 +14,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, schaden_anhang,
-    setup_mit_pool_und_live,
+    setup_mit_pool_und_live, MINI_JPEG,
 };
 
 const ADMIN_PW: &str = "startpw12";
@@ -64,7 +64,7 @@ async fn etb_upload(
 
 /// Lädt hoch und liefert die id der (einzigen) angelegten Datei.
 async fn hochgeladen(app: &axum::Router, einsatz: i64, cookie: &str, name: &str) -> i64 {
-    let (s, v) = etb_upload(app, einsatz, cookie, name, b"JPEGDATEN").await;
+    let (s, v) = etb_upload(app, einsatz, cookie, name, MINI_JPEG).await;
     assert_eq!(s, StatusCode::CREATED, "Upload {name}: {v}");
     v[0]["id"].as_i64().unwrap()
 }
@@ -589,7 +589,7 @@ async fn replay_nach_commit_liefert_bestand_samt_anhaengen_und_ein_live_ereignis
 /// Einsatz mit einem Eintrag samt Anhang; liefert (einsatz, eintrag_id, anhang_id).
 async fn eintrag_mit_foto(app: &axum::Router, admin: &str) -> (i64, i64, i64) {
     let einsatz = einsatz_anlegen(app, admin).await;
-    let (s, v) = etb_upload(app, einsatz, admin, "Lagefoto Süd.jpg", b"JPEGDATEN").await;
+    let (s, v) = etb_upload(app, einsatz, admin, "Lagefoto Süd.jpg", MINI_JPEG).await;
     assert_eq!(s, StatusCode::CREATED);
     let aid = v[0]["id"].as_i64().unwrap();
     let (s, e) = erfassen(
@@ -616,7 +616,7 @@ async fn beobachter_laedt_den_anhang() {
 
     let (s, h, bytes) = download(&app, &pfad(einsatz, eintrag, aid), &erika, None).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(bytes, b"JPEGDATEN");
+    assert_eq!(bytes, MINI_JPEG);
     assert_eq!(h[header::CONTENT_TYPE], "image/jpeg");
     let cd = h[header::CONTENT_DISPOSITION].to_str().unwrap();
     assert!(cd.contains("attachment"), "{cd}");
@@ -736,7 +736,7 @@ async fn ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person()
 
     let (s, _, bytes) = download(&app, &generisch, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "die Hochladende lädt ihre Datei");
-    assert_eq!(bytes, b"JPEGDATEN");
+    assert_eq!(bytes, MINI_JPEG);
     let (s, _) = anfrage(&app, "DELETE", &generisch, &admin, None).await;
     assert_eq!(
         s,
