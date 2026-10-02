@@ -1,7 +1,7 @@
 import type { EtbFilterWerte } from '../api/etb';
 import type { EtbTyp } from '../api/types';
 import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
-import { alsZeitpunkt } from './filterZeit';
+import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 
 interface AuswahlOptionen {
   /** Anzeigezone der Organisation bzw. des Einsatzes (`useAnzeigeKonventionen`). */

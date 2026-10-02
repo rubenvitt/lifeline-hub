@@ -6,7 +6,7 @@ import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import LagemeldungenPage from './LagemeldungenPage';
 import type { LageMeldung } from '../api/types';
-import { alsOrtszeit } from '../etb/filterZeit';
+import { alsOrtszeit } from '../anzeige/zeitEingabe';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
