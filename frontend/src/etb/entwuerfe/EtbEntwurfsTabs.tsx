@@ -125,7 +125,9 @@ export default function EtbEntwurfsTabs({
       versandSetzen(umgezogen.current.get(idAlt) ?? idAlt, aenderung),
     [versandSetzen],
   );
-  const irgendeinerSendet = Object.values(versandJe).some((v) => v.sendet);
+  // Nur über die eigenen Entwürfe: der gehobene Zustand überlebt den Einsatzwechsel (`EtbPage`
+  // montiert dabei nicht neu), ein noch sendender Entwurf des alten Einsatzes sperrte sonst hier.
+  const irgendeinerSendet = entwuerfe.some((e) => versandJe[e.id]?.sendet);
   useEffect(() => {
     onSendetChange?.(irgendeinerSendet);
     // Hängt der Container ab (Einsatzwechsel), sperrt ein verwaister Wert sonst „Berichtigen".
