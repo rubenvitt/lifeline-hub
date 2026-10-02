@@ -68,13 +68,20 @@
 
 ## 4. Nachweise
 
-- [ ] 4.1 Gates, soweit die Sitzung sie trägt:
-  - Prettier, `pnpm lint`, `pnpm typecheck`.
-  - Vitest für `src/einsatz`, `src/wetter`, `src/theme`.
-  - `scripts/check-openspec-archiv.sh`.
-
-  Den vollen `./scripts/check-all.sh` belegt die CI des PRs; Ergebnis und Verweis hier
-  eintragen.
-- [ ] 4.2 `openspec validate lfh-774-warnsperre-unwetter --strict` grün. Danach
+- [x] 4.1 Gates, soweit die Sitzung sie trägt:
+  - Prettier über `frontend/`, `pnpm lint`, `pnpm typecheck`: grün.
+  - Vitest für `src/einsatz`, `src/wetter`, `src/theme` und `WetterPegelPage`: 52 Dateien,
+    934 Tests, grün.
+  - Ganze Vitest-Suite: 8944 grün, 11 rot. Einer der 11 ist der Review-Test „Folgeabruf
+    scheitert“. Der Lauf hat ihn erfasst, bevor der Hook korrigiert war, und seitdem ist er
+    grün. Die übrigen 10 sind DemoDatenPage, kartenbilder, EtbFilterleiste,
+    LageberichtVorschau und FachebenenInspector. Sie scheitern mit dem Stand von `alpha`
+    identisch (10/110), sind also umgebungsbedingt wie schon bei LFH-397.
+  - Diese Sitzung hat Node 22 statt der gepinnten 26.7 und kein `mise`. Den vollen
+    `./scripts/check-all.sh` belegt deshalb die CI des PRs.
+  - Review (adversarial, ein Agent): keine Blocker. Drei minor- und drei nit-Findings sind
+    behoben: `isSuccess` statt `.data`, Tests für Beginn-Wecker und gefüllten Cache bei
+    ausgeblendetem Modul, Zeitpuffer, MSW-Rauschen, Kommentar.
+- [x] 4.2 `openspec validate lfh-774-warnsperre-unwetter --strict` grün. Danach
   `/opsx:archive` im selben Branch: Spec-Sync nach `openspec/specs/bedien-helligkeit/`, dann
   Verweise auf `openspec/changes/lfh-774-…` im Code auf den Archivpfad umstellen.

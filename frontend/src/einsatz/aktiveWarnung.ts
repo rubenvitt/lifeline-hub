@@ -1,7 +1,7 @@
 /**
  * Was „aktive Warnung" für die Warnsperre des Helligkeitsreglers heißt (LFH-397,
  * `openspec/changes/archive/2026-09-29-lfh-397-helligkeitsregler-warnsperre/design.md` D3;
- * drittes Merkmal LFH-774, `openspec/changes/lfh-774-warnsperre-unwetter/design.md` D2/D3).
+ * drittes Merkmal LFH-774, `openspec/changes/archive/2026-10-02-lfh-774-warnsperre-unwetter/design.md` D2/D3).
  *
  * DREI MERKMALE, alle im geöffneten Einsatz:
  *  (a) die höchste Warnstufe der Gefahrengebiete ist eine, die der Statusvertrag

@@ -45,6 +45,9 @@ der folgenden Merkmale gilt:
 `warnstufeKennzahl` auf die Rolle `alarm` legt.
 (b) Mindestens eine Meldung hat eine überfällige Bestätigungspflicht (pflichtig, unbestätigt
 und Frist abgelaufen oder eskaliert).
+(c) Für den Einsatzort gilt jetzt eine amtliche Wetterwarnung, deren Stufe der Statusvertrag
+`dwdWarnstufe` auf die Rolle `alarm` legt, aus einem verwertbaren Stand (aktuell oder
+veraltet). Angekündigte Warnungen zählen nicht.
 Außerhalb eines Einsatzes MUST keine Warnung aktiv sein. Ein Lade- oder Fehlerzustand einer
 Quelle MUST NOT als Warnung zählen. Fehlt das Recht auf ein Modul, MUST die zugehörige Quelle
 nichts beitragen.
@@ -70,6 +73,32 @@ nichts beitragen.
 #### Scenario: Einsatz verlassen
 - **WHEN** der Einsatz mit aktiver Warnung verlassen und die Einsatzauswahl geöffnet wird
 - **THEN** ist keine Warnung mehr aktiv
+
+#### Scenario: Unwetter gilt jetzt
+- **WHEN** für den Einsatzort eine Warnung der Stufe `schwer` gilt, deren Beginn erreicht und deren Ende nicht verstrichen ist
+- **THEN** ist eine Warnung aktiv
+
+#### Scenario: Markantes Wetter
+- **WHEN** für den Einsatzort nur Warnungen der Stufen `gering` oder `maessig` gelten und kein anderes Merkmal zutrifft
+- **THEN** ist keine Warnung aktiv
+
+#### Scenario: Unwetter angekündigt
+- **WHEN** eine Warnung der Stufe `extrem` erst in zwei Stunden beginnt und kein anderes Merkmal zutrifft
+- **THEN** ist keine Warnung aktiv
+- **AND** mit Erreichen des Beginns wird die Warnung aktiv, ohne dass ein neuer Abruf nötig ist
+
+#### Scenario: Unwetter endet
+- **WHEN** das Ende der einzigen geltenden Unwetterwarnung verstreicht und kein anderes Merkmal zutrifft
+- **THEN** ist keine Warnung mehr aktiv, ohne dass ein neuer Abruf nötig ist
+
+#### Scenario: Wetterquelle ausgefallen
+- **WHEN** der Wetterdienst ausgefallen ist, der Abruf scheitert oder kein Netz besteht
+- **THEN** trägt das Wetter nichts zur aktiven Warnung bei
+
+#### Scenario: Wettermodul ausgeblendet
+- **WHEN** das Modul „Wetter & Pegel“ für den Einsatz ausgeblendet oder gesperrt ist
+- **THEN** wird das Wetter für die Warnung nicht abgefragt
+- **AND** eine Unwetterwarnung trägt nichts zur aktiven Warnung bei
 
 ### Requirement: Warnsperre
 
