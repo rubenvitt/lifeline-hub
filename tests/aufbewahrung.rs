@@ -760,3 +760,64 @@ async fn fremde_org_darf_nicht_wiederherstellen() {
     assert_eq!((f, g), (Some(frist), Some(vormerkung)), "nichts geändert");
     assert_eq!(etb_anzahl(&pool, id).await, vorher, "kein ETB-Eintrag");
 }
+
+async fn frist_put(app: &axum::Router, cookie: &str, id: i64, frist: &str) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{id}/aufbewahrungsfrist"),
+        cookie,
+        Some(&format!(
+            r#"{{"retention_bis":"{frist}","bestaetigt":true}}"#
+        )),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn frist_put_nur_fuer_den_admin_der_eigenen_org() {
+    // LFH-753: derselbe Org-Schnitt wie am Archiv (`fordere_archivzugriff`). Der Admin einer
+    // FREMDEN Org bekommt am Frist-PUT 403 — am aktiven wie am abgelaufenen Einsatz — und es
+    // ändert sich nichts. Der Admin der eigenen Org verlängert eine abgelaufene, noch nicht
+    // vorgemerkte Frist weiter reaktiv.
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fremd = fremder_admin(&app, &pool).await;
+
+    let aktiv = einsatz_anlegen(&app, &admin).await;
+    let abgelaufen = abgeschlossen(&app, &admin).await;
+    let alte_frist = vor_tagen(1);
+    setze(&pool, abgelaufen, Some(&alte_frist), None, None).await;
+
+    for id in [aktiv, abgelaufen] {
+        let frist_vorher: Option<String> =
+            sqlx::query_scalar("SELECT retention_bis FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let etb_vorher = etb_anzahl(&pool, id).await;
+        let (s, v) = frist_put(&app, &fremd, id, &in_tagen(30)).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "fremde Org, Einsatz {id}: {v}");
+        let frist_nachher: Option<String> =
+            sqlx::query_scalar("SELECT retention_bis FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            frist_nachher, frist_vorher,
+            "Frist unverändert, Einsatz {id}"
+        );
+        assert_eq!(
+            etb_anzahl(&pool, id).await,
+            etb_vorher,
+            "kein ETB-Eintrag, Einsatz {id}"
+        );
+    }
+
+    let neu = in_tagen(30);
+    let (s, v) = frist_put(&app, &admin, abgelaufen, &neu).await;
+    assert_eq!(s, StatusCode::OK, "eigene Org verlängert reaktiv: {v}");
+    assert_eq!(v["retention_bis"].as_str(), Some(neu.as_str()));
+}
