@@ -136,7 +136,7 @@ mod tests {
             for s in p.spalten {
                 match klassifikation_von(p.tabelle, s) {
                     Some(Klassifikation::Retain(_)) => {}
-                    Some(Klassifikation::Scrub(st)) => {
+                    Some(Klassifikation::Scrub(st, _)) => {
                         verstoesse.push(format!("{}.{s} ist Scrub ({st:?})", p.tabelle))
                     }
                     None => verstoesse.push(format!(

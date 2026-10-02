@@ -230,10 +230,22 @@ pub async fn akte(
             storniert_at: s.storniert_at,
         })
         .collect();
+    let kategorien = crate::einsatz::aufbewahrung_kategorie::anzeige(
+        pool,
+        crate::einsatz::aufbewahrung_kategorie::EinsatzStand {
+            einsatz_id: kopf.id,
+            org_id: kopf.org_id,
+            status: &kopf.status,
+            geschwaerzt_at: kopf.geschwaerzt_at.as_deref(),
+        },
+        jetzt,
+    )
+    .await?;
     Ok(ArchivAkteAnzeige {
         kopf: kopf.anzeige(),
         zustand,
         karenz_ende: karenz_ende(kopf.geloescht_at.as_deref()),
+        kategorien,
         personen,
         tiere,
         schaeden,

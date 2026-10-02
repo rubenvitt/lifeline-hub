@@ -181,6 +181,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   `db::wal_zurueckschreiben` zurück. Die Haupt-DB nur über `db::connect` öffnen. Netz:
   `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler.rs`). Herleitung und
   Messung: `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
+- **Fristen je Datenkategorie** (LFH-749, Spec `aufbewahrung-kategorien`): jede Scrub-Spalte
+  trägt im Typ eine `Zuordnung` (Kategorie, Personenstamm, Einsatz); die Kategorie-Spalten pinnt
+  `kategorie_zuordnung_ist_gepinnt`, eine neue Tabelle mit FK auf `einsatz_person` entscheidet
+  sich in `behandlungsbezug_kennt_jede_personentabelle` (beide `einsatz/schwaerzung_registry.rs`).
+  Eine Kategorie wirkt nur früher als die Einsatz-Frist und sperrt nicht; der Personenstamm geht
+  erst, wenn alle Zwecke der Person geschwärzt sind. Herleitung:
+  `openspec/changes/archive/2026-10-02-lfh-749-fristen-je-datenkategorie/design.md`.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

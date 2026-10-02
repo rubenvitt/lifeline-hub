@@ -498,7 +498,7 @@ fn ausnahmeliste_zeigt_auf_existierende_scrub_stellen() {
         );
         let (t, s) = a.spalte.split_once('.').unwrap();
         assert!(
-            matches!(klassifikation_von(t, s), Some(Klassifikation::Scrub(_))),
+            matches!(klassifikation_von(t, s), Some(Klassifikation::Scrub(..))),
             "{} ist keine Scrub-Spalte — gehört nicht in die Ausnahmeliste",
             a.spalte
         );
@@ -661,7 +661,7 @@ async fn scrub_inhalt(pool: &SqlitePool, einsatz_id: i64) -> String {
             None => basis,
         };
         for spalte in regel.spalten {
-            if !matches!(spalte.klassifikation, Klassifikation::Scrub(_)) {
+            if !matches!(spalte.klassifikation, Klassifikation::Scrub(..)) {
                 continue;
             }
             let werte: Vec<Option<Vec<u8>>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
@@ -816,6 +816,12 @@ fn ohne_tombstone(mut akte: Value) -> Value {
         .unwrap()
         .remove("geschwaerzt_at");
     akte.as_object_mut().unwrap().remove("zustand");
+    // LFH-749: auch jede Datenkategorie wird mitgeschwärzt.
+    for k in akte["kategorien"].as_array_mut().unwrap() {
+        let k = k.as_object_mut().unwrap();
+        k.remove("zustand");
+        k.remove("geschwaerzt_at");
+    }
     akte
 }
 
@@ -827,6 +833,19 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     let basis = format!("/api/einsaetze/{e}");
 
     // 1. Dauer vor dem Abschluss (danach sind die Einstellungen eingefroren) + Kopf-PII.
+    // LFH-749: eine Kategorie-Vorgabe, die erst nach der Einsatz-Frist fällig wäre — ihre
+    // System-Einträge laufen so durch dieselbe Prüfung auf Scrub-Werte, und die
+    // Einsatz-Schwärzung nimmt die Kategorie mit.
+    ok(
+        &app,
+        &admin,
+        "PUT",
+        "/api/org-einstellungen",
+        json!({ "aufbewahrung_kategorien": [
+            { "kategorie": "anhaenge", "dauer_tage": 3650, "rechtsgrundlage": "§ 32b Abs. 3 NKatSG" }
+        ] }),
+    )
+    .await;
     ok(
         &app,
         &admin,
@@ -1066,6 +1085,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         .collect();
     for baustein in [
         "Aufbewahrungsfrist automatisch gesetzt",
+        "Aufbewahrungsfrist der Datenkategorie „Anhänge“ automatisch gesetzt",
         "zur Löschung vorgemerkt",
         "PII-Schwärzung durchgeführt",
     ] {

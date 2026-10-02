@@ -29,6 +29,7 @@ function akte(zustand: AufbewahrungZustand): ArchivAkte {
     },
     zustand,
     karenz_ende: zustand === 'vorgemerkt' ? '2026-07-01 18:10:00' : undefined,
+    kategorien: [],
     personen: [
       {
         registrier_nr: 1,
@@ -74,6 +75,7 @@ function zeige(
   zustand: AufbewahrungZustand,
   seiten?: ArchivEtbEintrag[][],
   route = '/admin/aufbewahrung/7',
+  akteWert: ArchivAkte = akte(zustand),
 ) {
   etbAufrufe = [];
   const vorgabe = [
@@ -82,7 +84,7 @@ function zeige(
   const liste = seiten ?? vorgabe;
   server.use(
     meHandler(ME_ADMIN),
-    http.get('/api/aufbewahrung/einsaetze/7', () => HttpResponse.json(akte(zustand))),
+    http.get('/api/aufbewahrung/einsaetze/7', () => HttpResponse.json(akteWert)),
     http.get('/api/aufbewahrung/einsaetze/7/etb', ({ request }) => {
       const url = new URL(request.url);
       etbAufrufe.push(url.search);
@@ -143,6 +145,35 @@ describe('ArchivAktePage — Inhalt', () => {
     expect(screen.getByText('S-001')).toBeInTheDocument();
     expect(screen.getByText('Keine Tiere erfasst')).toBeInTheDocument();
     expect(screen.getAllByText('zur Löschung vorgemerkt').length).toBeGreaterThan(0);
+  });
+
+  it('LFH-749: Block „Datenkategorien“ zeigt Zustand, Zeitpunkt und Rechtsgrundlage, nur lesend', async () => {
+    zeige('frist_laeuft', undefined, undefined, {
+      ...akte('frist_laeuft'),
+      kategorien: [
+        { kategorie: 'behandlung', zustand: 'ohne_frist' },
+        {
+          kategorie: 'personenauskunft',
+          zustand: 'geschwaerzt',
+          geschwaerzt_at: '2026-06-02 10:00:00',
+          rechtsgrundlage: '§ 46 Abs. 5 BHKG NRW',
+        },
+        {
+          kategorie: 'anhaenge',
+          zustand: 'frist_laeuft',
+          frist_bis: '2099-01-01 00:00:00',
+          rechtsgrundlage: 'RG',
+        },
+      ],
+    });
+    const titel = await screen.findByText('Datenkategorien', { selector: 'h2, h3, h4, span, div' });
+    const paneel = titel.closest<HTMLElement>('[data-lfh="paneel"]') ?? document.body;
+    expect(
+      await within(paneel).findByText('Rechtsgrundlage: § 46 Abs. 5 BHKG NRW'),
+    ).toBeInTheDocument();
+    expect(within(paneel).getByText(/geschwärzt am/)).toBeInTheDocument();
+    expect(within(paneel).getByText('Frist läuft')).toBeInTheDocument();
+    expect(within(paneel).queryAllByRole('button')).toEqual([]);
   });
 
   it('die Zeitachse trägt keine Links, der Berichtigungsverweis steht als Text', async () => {
