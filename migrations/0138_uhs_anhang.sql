@@ -12,9 +12,10 @@
 -- DELETE CASCADE: eine UHS wird nur storniert; hart verschwindet sie allein mit dem Einsatz.
 --
 -- Soft-Delete am Linker: die Datei verschwindet aus der Liste, bleibt aber bis zur Schwärzung.
--- Jeder Abruf einer UHS-Datei steht im Lese-Audit `anhang_zugriff_audit` (0138), weil Fotos
--- und Listen einer Behandlungsstelle Patienten zeigen können. Gleicher Einsatz für UHS, Linker
--- und Anhang gilt durch Bau; ein Repo-Test pinnt das.
+-- Jeder Abruf einer UHS-Datei steht im Lese-Audit `anhang_zugriff_audit`
+-- (`0139_anhang_zugriff_audit.sql`), weil Fotos und Listen einer Behandlungsstelle Patienten
+-- zeigen können. Gleicher Einsatz für UHS, Linker und Anhang gilt durch Bau; ein Repo-Test pinnt
+-- das.
 CREATE TABLE uhs_anhang (
     id               INTEGER PRIMARY KEY,
     einsatz_id       INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

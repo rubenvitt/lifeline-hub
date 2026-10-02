@@ -364,8 +364,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
     TabellenRegel {
         // LFH-758: Lese-Audit je Abruf einer UHS-Datei — bleibt wie `person_zugriff_audit`
         // (Nachweis, wer wann eine Datei mit möglichem Patientenbezug abgerufen hat). `anhang_id`
-        // zeigt nach der Schwärzung ins Leere (bewusst ohne FK, 0138); `ablage` nennt nur die
-        // UHS-Bezeichnung, die selbst bleibt (G_OP_LABEL). Kein Dateiname in der Tabelle.
+        // zeigt nach der Schwärzung ins Leere (bewusst ohne FK, `0139_anhang_zugriff_audit.sql`);
+        // `ablage` nennt nur die UHS-Bezeichnung, die selbst bleibt (G_OP_LABEL). Kein Dateiname
+        // in der Tabelle.
         // Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_uhs_anhaenge_und_haelt_etb_und_audit`.
         tabelle: "anhang_zugriff_audit",
