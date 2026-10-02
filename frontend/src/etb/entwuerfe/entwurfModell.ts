@@ -8,6 +8,8 @@ dayjs.extend(utc);
 /** Serialisierbarer Entwurf, wie er in IndexedDB liegt. `ereigniszeit` ist ISO-String. */
 export interface EtbEntwurf {
   id: string;
+  /** Wer den Entwurf geschrieben hat (LFH-767): nur diese Person sieht ihn. */
+  benutzer_id: number;
   einsatz_id: number;
   inhalt: string;
   typ: EtbTyp;

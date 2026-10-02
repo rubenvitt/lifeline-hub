@@ -23,11 +23,12 @@ export function useSitzungsWache(): void {
       // NUR lokal abmelden (LFH-387): ein Server-Logout liefe mit dem Cookie von JETZT und
       // beendete eine inzwischen in einem anderen Tab angelegte Sitzung. Die Umleitung hängt
       // nicht am Abmelden — an diesem Seam soll kein hängender Nutzer entstehen.
-      // Der Benutzer ist sofort weg, das Lagebild (LFH-723) räumt im Hintergrund nach.
+      // Der Benutzer ist sofort weg, das Lagebild (LFH-723) und die übrigen Gerätedaten (LFH-767)
+      // räumen im Hintergrund nach; ETB-Entwürfe überleben das Sitzungsende.
       const fehler = (e: unknown) =>
         console.error('Lokales Abmelden nach Sitzungsablauf fehlgeschlagen', e);
       try {
-        abmeldenLokal().catch(fehler);
+        abmeldenLokal('sitzungsende').catch(fehler);
       } catch (e) {
         fehler(e);
       }

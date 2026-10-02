@@ -13,6 +13,7 @@ dayjs.extend(utc);
 
 const ENTWURF_LEER: EtbEntwurf = {
   id: 'a',
+  benutzer_id: 1,
   einsatz_id: 7,
   inhalt: '',
   typ: 'meldung',

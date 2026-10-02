@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EntwurfWerte, EtbEntwurf } from './entwurfModell';
 import { istLeer, werteZuPatch, zuWerte } from './entwurfModell';
-import { entwuerfeLaden, entwurfEntfernen, entwurfSpeichern } from './entwurfStore';
+import {
+  aktivSchluessel,
+  entwuerfeLaden,
+  entwurfEntfernen,
+  entwurfSpeichern,
+} from './entwurfStore';
 import type { MetadatenWerte } from '../schnellerfassungModell';
 import { neueClientId } from '../../offline/clientId';
 
-function aktivKey(einsatzId: number): string {
-  return `etb-entwurf-aktiv-${einsatzId}`;
-}
-
 function leererEntwurf(
+  benutzerId: number,
   einsatzId: number,
   metadaten: MetadatenWerte = {},
   vorbelegungGeprueft = false,
@@ -17,6 +19,7 @@ function leererEntwurf(
   const jetzt = new Date().toISOString();
   return {
     id: neueClientId(),
+    benutzer_id: benutzerId,
     einsatz_id: einsatzId,
     ...werteZuPatch({ inhalt: '', typ: 'meldung', metadaten }),
     ...(vorbelegungGeprueft ? { an_vorbelegung_geprueft: true as const } : {}),
@@ -25,8 +28,13 @@ function leererEntwurf(
   };
 }
 
-/** Der Aufrufer montiert je Einsatz neu (key=einsatzId). */
+/**
+ * Der Aufrufer montiert je Einsatz neu (key=einsatzId). `benutzerId` ist die angemeldete Person
+ * (LFH-767): Sie sieht und schreibt nur ihre eigenen Entwürfe. Ohne Person lädt und speichert
+ * der Hook nichts — `RequireAuth` lässt die Seite dann ohnehin nicht zu.
+ */
 export function useEtbEntwuerfe(
+  benutzerId: number | null,
   einsatzId: number,
   /** Vorbelegung „An“ nach der Vorrangregel (`fuehrung/funktionsOptionenKern.ts:anVorbelegung`). */
   fuehrungsstelle?: string | null,
@@ -45,15 +53,16 @@ export function useEtbEntwuerfe(
   entwuerfeRef.current = entwuerfe;
 
   useEffect(() => {
-    if (initialisiert.current || kontextLaedt) return;
+    if (initialisiert.current || kontextLaedt || benutzerId === null) return;
     let abgebrochen = false;
     void (async () => {
-      const geladen = await entwuerfeLaden(einsatzId);
+      const geladen = await entwuerfeLaden(benutzerId, einsatzId);
       if (abgebrochen || initialisiert.current) return;
       initialisiert.current = true;
       anfangsEmpfaenger.current = fuehrungsstelle?.trim();
       if (geladen.length === 0) {
         const leer = leererEntwurf(
+          benutzerId,
           einsatzId,
           anfangsEmpfaenger.current ? { an: anfangsEmpfaenger.current } : {},
           !!anfangsEmpfaenger.current,
@@ -63,14 +72,14 @@ export function useEtbEntwuerfe(
         return;
       }
       setEntwuerfe(geladen);
-      const gemerkt = localStorage.getItem(aktivKey(einsatzId));
+      const gemerkt = localStorage.getItem(aktivSchluessel(benutzerId, einsatzId));
       const gueltig = gemerkt && geladen.some((e) => e.id === gemerkt);
       setAktiverId(gueltig ? gemerkt! : geladen[0].id);
     })();
     return () => {
       abgebrochen = true;
     };
-  }, [einsatzId, fuehrungsstelle, kontextLaedt]);
+  }, [benutzerId, einsatzId, fuehrungsstelle, kontextLaedt]);
 
   // Bewusst leere Zustände nach Entfernen/Absenden/+ bleiben erhalten. Unberührte
   // Anfangsdefaults haben An und werden weiterhin NICHT beim Mount gespeichert.
@@ -89,18 +98,19 @@ export function useEtbEntwuerfe(
   const aktivenSetzen = useCallback(
     (id: string) => {
       setAktiverId(id);
-      localStorage.setItem(aktivKey(einsatzId), id);
+      if (benutzerId !== null) localStorage.setItem(aktivSchluessel(benutzerId, einsatzId), id);
     },
-    [einsatzId],
+    [benutzerId, einsatzId],
   );
 
   const neuerEntwurf = useCallback(
     (metadaten: MetadatenWerte = {}) => {
-      const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
+      if (benutzerId === null) return;
+      const leer = leererEntwurf(benutzerId, einsatzId, metadaten, !!anfangsEmpfaenger.current);
       setEntwuerfe((prev) => [...prev, leer]);
       aktivenSetzen(leer.id);
     },
-    [einsatzId, aktivenSetzen],
+    [benutzerId, einsatzId, aktivenSetzen],
   );
 
   /**
@@ -154,7 +164,7 @@ export function useEtbEntwuerfe(
       setEntwuerfe((prev) => prev.map((e) => (e.id === id ? neu : e)));
       setAktiverId((aktuell) => {
         if (aktuell !== id) return aktuell;
-        localStorage.setItem(aktivKey(einsatzId), neu.id);
+        localStorage.setItem(aktivSchluessel(neu.benutzer_id, einsatzId), neu.id);
         return neu.id;
       });
       await entwurfEntfernen(id);
@@ -166,13 +176,14 @@ export function useEtbEntwuerfe(
 
   const entwurfSchliessen = useCallback(
     async (id: string, metadaten: MetadatenWerte = {}) => {
+      if (benutzerId === null) return;
       await entwurfEntfernen(id);
       // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode laufen
       // Updater doppelt, eine darin erzeugte randomUUID divergierte zwischen entwuerfe und
       // aktiverId (LFH-214). Beide Setter bleiben FUNKTIONAL (lesen den frisch committeten State)
       // und sind damit immun gegen Änderungen während des vorausgehenden await — ein
       // Closure-Snapshot ließe einen Zombie-Tab zurück.
-      const leer = leererEntwurf(einsatzId, metadaten, !!anfangsEmpfaenger.current);
+      const leer = leererEntwurf(benutzerId, einsatzId, metadaten, !!anfangsEmpfaenger.current);
       let naechsteListe: EtbEntwurf[] = [];
       setEntwuerfe((prev) => {
         const rest = prev.filter((e) => e.id !== id);
@@ -183,11 +194,11 @@ export function useEtbEntwuerfe(
         if (aktuell !== id) return aktuell; // nicht-aktiven Tab geschlossen → aktiven behalten
         // aktiven Tab geschlossen → auf den letzten der neuen Liste wechseln.
         const naechster = naechsteListe[naechsteListe.length - 1].id;
-        localStorage.setItem(aktivKey(einsatzId), naechster);
+        localStorage.setItem(aktivSchluessel(benutzerId, einsatzId), naechster);
         return naechster;
       });
     },
-    [einsatzId],
+    [benutzerId, einsatzId],
   );
 
   return {

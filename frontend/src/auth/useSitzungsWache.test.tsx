@@ -50,6 +50,7 @@ describe('useSitzungsWache', () => {
     window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
     await waitFor(() => expect(getByTestId('ort').textContent).toMatch(/^\/login\|/));
     expect(abmeldenLokal).toHaveBeenCalledTimes(1);
+    expect(abmeldenLokal).toHaveBeenCalledWith('sitzungsende');
   });
 
   it('ruft keinen Server-Logout — er träfe eine inzwischen neue Sitzung (LFH-387)', async () => {

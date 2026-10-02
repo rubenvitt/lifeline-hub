@@ -6,18 +6,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EtbBaustein } from '../../api/types';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './entwurfStore';
+import {
+  aktivSchluessel,
+  entwuerfeLaden,
+  entwuerfeLeerenFuerTests,
+  entwurfSpeichern,
+} from './entwurfStore';
 import EtbEntwurfsTabs, { entfernenStil } from './EtbEntwurfsTabs';
-import { einsatzFixture } from '../../test/fixtures';
+import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
+/** Angemeldete Person (LFH-767): Die Reiter zeigen nur ihre Entwürfe. */
+const ich = benutzerFixture();
 
 beforeEach(async () => {
   await entwuerfeLeerenFuerTests();
   localStorage.clear();
   server.use(
+    meHandler(ich),
     http.get('/api/einsaetze/:id/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/:id/einheiten', () => HttpResponse.json([])),
   );
@@ -54,7 +62,7 @@ describe('EtbEntwurfsTabs', () => {
     expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe(''));
+    await waitFor(async () => expect((await entwuerfeLaden(ich.id, 7))[0]?.inhalt).toBe(''));
     ersteAnsicht.unmount();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
     expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('');
@@ -67,7 +75,7 @@ describe('EtbEntwurfsTabs', () => {
     expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+    await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(1));
     ersteAnsicht.unmount();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
     expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('');
@@ -111,6 +119,7 @@ describe('EtbEntwurfsTabs', () => {
 
   it('LFH-461: Wertübernahme befüllt keinen bereits vorhandenen Entwurf mit bewusst leerem An', async () => {
     const basis = {
+      benutzer_id: ich.id,
       einsatz_id: 7,
       typ: 'meldung' as const,
       erstellt_at: '2026-06-22T10:00:00Z',
@@ -118,7 +127,7 @@ describe('EtbEntwurfsTabs', () => {
     };
     await entwurfSpeichern({ ...basis, id: 'a', inhalt: 'Erster', an: 'Florian Leitung' });
     await entwurfSpeichern({ ...basis, id: 'b', inhalt: 'Zweiter' });
-    localStorage.setItem('etb-entwurf-aktiv-7', 'a');
+    localStorage.setItem(aktivSchluessel(ich.id, 7), 'a');
     renderMitProviders(
       <EtbEntwurfsTabs
         {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Standard' } })}
@@ -139,7 +148,7 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Lagemeldung');
     await waitFor(async () => {
-      const liste = await entwuerfeLaden(7);
+      const liste = await entwuerfeLaden(ich.id, 7);
       expect(liste[0]?.inhalt).toBe('Lagemeldung');
     });
   });
@@ -149,7 +158,7 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Fertig{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
+    await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
   });
 
   it('behält das Erfassungsfeld nach dem Absenden — auch unter StrictMode (LFH-214)', async () => {
@@ -190,7 +199,7 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     // Entwurf wurde durch das Tippen persistiert und bleibt nach Reject erhalten.
     await waitFor(async () => {
-      const liste = await entwuerfeLaden(7);
+      const liste = await entwuerfeLaden(ich.id, 7);
       expect(liste[0]?.inhalt).toBe('Bleibt');
     });
 
@@ -253,7 +262,7 @@ describe('EtbEntwurfsTabs', () => {
     // nicht wieder in den Speicher schreiben. Die Schnellerfassung setzt nach dem Erfassen
     // metadaten auf die Übernahme — träfe dieser Autosave noch den ALTEN Entwurf, wäre
     // `istLeer` wegen der gesetzten Metadaten falsch und der Entwurf käme leer zurück.
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
+    await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
 
     // …und sie werden beim nächsten Eintrag ohne erneutes Tippen mitgesendet.
     await userEvent.click(screen.getByPlaceholderText(/Inhalt/));
@@ -333,8 +342,8 @@ describe('EtbEntwurfsTabs', () => {
     await screen.findByPlaceholderText(/Inhalt/);
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-b.jpg', { type: 'image/jpeg' }));
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto');
-    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Foto'));
-    expect(JSON.stringify(await entwuerfeLaden(7))).not.toContain('foto-b.jpg');
+    await waitFor(async () => expect((await entwuerfeLaden(ich.id, 7))[0]?.inhalt).toBe('Foto'));
+    expect(JSON.stringify(await entwuerfeLaden(ich.id, 7))).not.toContain('foto-b.jpg');
   });
 
   it('LFH-117: ein geschlossener Entwurf nimmt seine Dateien mit', async () => {
@@ -574,7 +583,9 @@ describe('EtbEntwurfsTabs', () => {
     expect(screen.getAllByRole('tab')).toHaveLength(1);
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Wortlaut aus Tab 2');
     expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto.jpg');
-    await waitFor(async () => expect((await entwuerfeLaden(7)).map((e) => e.id)).toEqual([neueId]));
+    await waitFor(async () =>
+      expect((await entwuerfeLaden(ich.id, 7)).map((e) => e.id)).toEqual([neueId]),
+    );
 
     // Der nächste Versuch geht mit der NEUEN id raus und kann gelingen.
     await waitFor(() =>
