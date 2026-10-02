@@ -1,4 +1,4 @@
-import { IkoneAuge } from '../ikonen';
+import { IconAuge } from '../icons';
 import { Button, Input, Tabs, Typography } from 'antd';
 import type { GetRef } from 'antd';
 import { forwardRef, useState, type KeyboardEvent } from 'react';
@@ -115,7 +115,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
         {textfeld}
         {!umschalterAussen && (
           <div style={{ marginTop: 4 }}>
-            <Button type="text" icon={<IkoneAuge />} onClick={() => setVorschauOffen((v) => !v)}>
+            <Button type="text" icon={<IconAuge />} onClick={() => setVorschauOffen((v) => !v)}>
               Vorschau
             </Button>
           </div>

@@ -13,11 +13,12 @@ import SchadenAnhaenge from './SchadenAnhaenge';
 
 vi.mock('../../api/einsatzSchaden', async (importOriginal) => {
   const echt = await importOriginal<typeof import('../../api/einsatzSchaden')>();
-  return { ...echt, entferneSchadenAnhang: vi.fn() };
+  return { ...echt, entferneSchadenAnhang: vi.fn(), legeSchadenAnhangAb: vi.fn() };
 });
-import { entferneSchadenAnhang } from '../../api/einsatzSchaden';
+import { entferneSchadenAnhang, legeSchadenAnhangAb } from '../../api/einsatzSchaden';
 
 const entferne = vi.mocked(entferneSchadenAnhang);
+const legeAb = vi.mocked(legeSchadenAnhangAb);
 afterEach(() => vi.clearAllMocks());
 
 const PFAD = '/api/einsaetze/1/schaeden/10/anhaenge';
@@ -37,6 +38,7 @@ const anhang = (id: number, dateiname: string, mime = 'image/jpeg') => ({
 function rendere(
   liste: unknown[] | unknown[][] | 'fehler' | 'haengt',
   props: { darfSchreiben?: boolean; storniert?: boolean } = {},
+  client = neuerQueryClient(),
 ) {
   let abruf = 0;
   server.use(
@@ -55,6 +57,7 @@ function rendere(
       schaden={{ ...schaden, storniert_at: props.storniert ? '2026-09-25 11:00:00' : null }}
       darfSchreiben={props.darfSchreiben ?? true}
     />,
+    { client },
   );
 }
 
@@ -196,6 +199,15 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(naechste));
   });
 
+  it('setzt den Fokus nach dem Entfernen auf den Verweis der nächsten Zeile, nicht auf ihr Vorschaubild (LFH-759)', async () => {
+    entferne.mockResolvedValue(undefined);
+    rendere([[anhang(5, 'dach.jpg'), anhang(6, 'giebel.jpg')], [anhang(6, 'giebel.jpg')]]);
+    await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
+    await vi.waitFor(() => expect(screen.queryByRole('link', { name: /^dach\.jpg/ })).toBeNull());
+    const naechste = screen.getByRole('link', { name: /^giebel\.jpg/ });
+    await vi.waitFor(() => expect(document.activeElement).toBe(naechste));
+  });
+
   it('setzt den Fokus nach dem Entfernen der letzten Datei auf „Datei ablegen“', async () => {
     entferne.mockResolvedValue(undefined);
     rendere([[anhang(5, 'dach.jpg')], []]);
@@ -203,6 +215,60 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     await within(paneel()).findByText('Noch keine Fotos oder Dateien');
     const kopf = within(paneel()).getByRole('button', { name: 'Datei ablegen' });
     await vi.waitFor(() => expect(document.activeElement).toBe(kopf));
+  });
+});
+
+describe('SchadenAnhaenge — Live-Zufluss (LFH-760)', () => {
+  const LISTE = einsatzKeys.schadenAnhaenge(1, 10);
+  const zeilen = () =>
+    within(paneel())
+      .queryAllByRole('link', { name: /herunterladen$/ })
+      .map((l) => l.getAttribute('download'));
+
+  it('hält eine fremde Ablage hinter dem Sammelbanner zurück und zeigt sie auf „anzeigen“', async () => {
+    const client = neuerQueryClient();
+    rendere([[anhang(5, 'dach.jpg')], [anhang(7, 'fremd.jpg'), anhang(5, 'dach.jpg')]], {}, client);
+    await screen.findByRole('link', { name: /^dach\.jpg/ });
+
+    // Das `schaden`-Ereignis einer anderen Sitzung invalidiert die Liste.
+    await client.invalidateQueries({ queryKey: LISTE });
+    const banner = await within(paneel()).findByRole('status');
+    expect(banner).toHaveTextContent('1 neue Datei');
+    expect(zeilen()).toEqual(['dach.jpg']);
+    expect(within(paneel()).getByText('1 Datei')).toBeInTheDocument();
+
+    await userEvent.click(within(banner).getByRole('button', { name: 'anzeigen' }));
+    expect(zeilen()).toEqual(['fremd.jpg', 'dach.jpg']);
+    expect(within(paneel()).queryByRole('status')).toBeNull();
+    // Der Fokus fällt nicht mit dem Banner auf <body>, sondern geht auf die oberste neue Zeile.
+    await vi.waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('link', { name: /^fremd\.jpg/ })),
+    );
+  });
+
+  it('zeigt die eigene Ablage sofort, eine gleichzeitige fremde bleibt zurück', async () => {
+    legeAb.mockResolvedValue(anhang(8, 'eigen.jpg') as never);
+    rendere([
+      [anhang(5, 'dach.jpg')],
+      [anhang(8, 'eigen.jpg'), anhang(7, 'fremd.jpg'), anhang(5, 'dach.jpg')],
+    ]);
+    await userEvent.click(await within(paneel()).findByRole('button', { name: 'Datei ablegen' }));
+    const d = (await screen.findAllByRole('dialog'))[0];
+    const input = d.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await userEvent.upload(input, new File(['x'], 'eigen.jpg', { type: 'image/jpeg' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
+
+    await vi.waitFor(() => expect(zeilen()).toEqual(['eigen.jpg', 'dach.jpg']));
+    expect(within(paneel()).getByRole('status')).toHaveTextContent('1 neue Datei');
+  });
+
+  it('zeigt bei leerer Liste die fremde Ablage ohne Banner', async () => {
+    const client = neuerQueryClient();
+    rendere([[], [anhang(7, 'fremd.jpg')]], {}, client);
+    await within(paneel()).findByText('Noch keine Fotos oder Dateien');
+    await client.invalidateQueries({ queryKey: LISTE });
+    await screen.findByRole('link', { name: /^fremd\.jpg/ });
+    expect(within(paneel()).queryByRole('status')).toBeNull();
   });
 });
 
@@ -236,5 +302,23 @@ describe('SchadenAnhaenge — Original (LFH-747)', () => {
       name: 'dach.jpg, 2.0 MB, Datei von Schaden S-003 herunterladen',
     });
     expect(screen.queryByText(ORIGINAL_TEXT)).toBeNull();
+  });
+});
+
+describe('SchadenAnhaenge — Vorschau (LFH-759)', () => {
+  it('zeigt am Foto ein Vorschaubild, am PDF nicht; die Verweise bleiben', async () => {
+    rendere([anhang(5, 'dach.jpg'), anhang(6, 'gutachten.pdf', 'application/pdf')], {
+      darfSchreiben: false,
+    });
+    const knopf = await within(paneel()).findByRole('button', {
+      name: 'Vorschau: dach.jpg, Schaden S-003',
+    });
+    expect(knopf.querySelector('img')).toHaveAttribute('src', `${PFAD}/5/datei?fassung=vorschau`);
+    expect(within(paneel()).getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
+    expect(
+      within(paneel()).getByRole('link', {
+        name: 'gutachten.pdf, 2.0 MB, Datei von Schaden S-003 herunterladen',
+      }),
+    ).toHaveAttribute('href', `${PFAD}/6/datei`);
   });
 });

@@ -1,15 +1,15 @@
 import {
-  IkoneAbmelden,
-  IkoneAuto,
-  IkoneHakenKreis,
-  IkoneKreispfeile,
-  IkoneMuelleimer,
-  IkonePerson,
-  IkonePersonPlus,
-  IkonePfeilZurueckGebogen,
-  IkoneSchloss,
-  IkoneSchraubenschluessel,
-} from '../../ikonen';
+  IconAbmelden,
+  IconAuto,
+  IconHakenKreis,
+  IconKreispfeile,
+  IconMuelleimer,
+  IconPerson,
+  IconPersonPlus,
+  IconPfeilZurueckGebogen,
+  IconSchloss,
+  IconSchraubenschluessel,
+} from '../../icons';
 import {
   App,
   Button,
@@ -140,10 +140,10 @@ interface PlatzMenueLage {
 }
 
 const VERFUEGBARKEIT_EINTRAEGE = [
-  { key: 'frei', label: 'als frei markieren', icon: <IkoneHakenKreis /> },
-  { key: 'defekt', label: 'als defekt markieren', icon: <IkoneSchraubenschluessel /> },
-  { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <IkoneKreispfeile /> },
-  { key: 'gesperrt', label: 'als gesperrt markieren', icon: <IkoneSchloss /> },
+  { key: 'frei', label: 'als frei markieren', icon: <IconHakenKreis /> },
+  { key: 'defekt', label: 'als defekt markieren', icon: <IconSchraubenschluessel /> },
+  { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <IconKreispfeile /> },
+  { key: 'gesperrt', label: 'als gesperrt markieren', icon: <IconSchloss /> },
 ];
 
 /**
@@ -171,7 +171,7 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
         {
           key: 'zuweisen',
           label: 'Patient zuweisen',
-          icon: <IkonePersonPlus />,
+          icon: <IconPersonPlus />,
           disabled: belegungLaeuft,
         },
       ]
@@ -182,13 +182,13 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
           {
             key: 'verbleib',
             label: 'Verbleib / Entlassung erfassen',
-            icon: <IkoneAuto />,
+            icon: <IconAuto />,
             disabled: belegungLaeuft,
           },
         ]
       : [];
   const person =
-    karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <IkonePerson /> }] : [];
+    karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <IconPerson /> }] : [];
   // Rückweg in den Wartebereich: der Drag auf `drop-inbox` ist unter `lg` strukturell weg (anderer
   // Reiter, `destroyOnHidden`).
   const rueckweg = wartebereich
@@ -196,7 +196,7 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
         {
           key: 'wartebereich',
           label: 'Zurück in den Wartebereich',
-          icon: <IkonePfeilZurueckGebogen />,
+          icon: <IconPfeilZurueckGebogen />,
           disabled: belegungLaeuft,
         },
       ]
@@ -207,14 +207,14 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
           {
             key: 'zurueckweisen',
             label: 'zurückweisen',
-            icon: <IkoneAbmelden />,
+            icon: <IconAbmelden />,
             danger: true,
             disabled: belegungLaeuft,
           },
         ]
       : []),
     ...(bearbeitbar
-      ? [{ key: 'storno', label: 'Platz löschen', icon: <IkoneMuelleimer />, danger: true }]
+      ? [{ key: 'storno', label: 'Platz löschen', icon: <IconMuelleimer />, danger: true }]
       : []),
   ];
   const kopf = [...zuweisen, ...verbleib, ...person, ...rueckweg];
@@ -608,7 +608,7 @@ function PlatzKarte({
                 <Button
                   size="small"
                   aria-label="Verbleib / Entlassung erfassen"
-                  icon={<IkoneAuto />}
+                  icon={<IconAuto />}
                   disabled={belegungLaeuft}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={onTransport}
@@ -619,7 +619,7 @@ function PlatzKarte({
                   size="small"
                   danger
                   aria-label="zurückweisen"
-                  icon={<IkoneAbmelden />}
+                  icon={<IconAbmelden />}
                   disabled={belegungLaeuft}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={onAustritt}
@@ -634,7 +634,7 @@ function PlatzKarte({
               <Button
                 size="small"
                 aria-label="als frei markieren"
-                icon={<IkoneHakenKreis />}
+                icon={<IconHakenKreis />}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => onVerfuegbarkeit('frei')}
               />
@@ -740,7 +740,7 @@ function PersonenSpalte({
                 {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in
                     keinem klickbaren Vorfahren und braucht keinen
                     `stopPropagation`-/`onPointerDown`-Riegel. Ein antd-`Button` ohne `size` erbt
-                    `controlHeight`. Der Name trägt die Zeilenkennung; die Ikone steckt in einer
+                    `controlHeight`. Der Name trägt die Zeilenkennung; das Icon steckt in einer
                     `aria-hidden`-Hülle, weil antd-Icons ein eigenes englisches `aria-label`
                     mitbringen. */}
                 <Button
@@ -748,7 +748,7 @@ function PersonenSpalte({
                   aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
                   icon={
                     <span aria-hidden="true">
-                      <IkoneAuto />
+                      <IconAuto />
                     </span>
                   }
                   onClick={() => onVerbleib(p)}

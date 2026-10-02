@@ -1,3 +1,51 @@
+## [1.0.0-alpha.67](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.66...v1.0.0-alpha.67) (2026-10-02)
+
+### Wichtige Änderungen
+
+- **Aufbewahrungsfristen können jetzt unbegrenzt gesetzt werden:** Der Dialog zur Aufbewahrungsfrist bietet einen Schalter „Unbegrenzt aufbewahren", der eine gesetzte Frist ohne Rückfrage aufhebt. Diese Option steht auch in der Archivakte zur Verfügung.
+
+- **Organisationsprüfung bei Aufbewahrungsfristen:** Nur Administratoren der Organisation, zu der ein Einsatz gehört, können die Aufbewahrungsfrist ändern. Administratoren fremder Organisationen erhalten keinen Zugriff mehr, auch wenn sie als Einsatzleitung eingetragen sind.
+
+### Einsatztagebuch
+
+- **Weniger personenbezogene Daten im System-Tagebuch:** Neu angelegte System-Einträge enthalten künftig keine Informationen mehr, die nach einer Schwärzung im Tagebuch verbleiben würden. Betroffen sind Schadensorte bei Anlage, Adressaten bei Schadenübergaben, Ziele bei Verbleibseinträgen, Notizen bei manuellen Austritten und Dokumenttitel. Bestehende Einträge bleiben unverändert.
+
+- **Einsatztagebuch-Aktualisierung bei Schadensänderungen:** Wenn in einer anderen Sitzung ein Schaden angelegt, übergeben, abgeschlossen oder storniert wird, erscheint der neue Einsatztagebuch-Eintrag automatisch in allen geöffneten Sitzungen, ohne die Seite neu laden zu müssen.
+
+- **Client-IDs auch ohne verschlüsselte Verbindung:** Die Schnellerfassung und alle Tagebuch-Funktionen arbeiten jetzt auch, wenn der Server im Einsatz-LAN über unverschlüsseltes HTTP erreicht wird.
+
+### Schäden
+
+- **Bildvorschau bei Anhängen:** An jedem Foto erscheint jetzt eine Vorschau. Mit einem Klick öffnet sich eine Großansicht in der App, in der Sie mit Tastatur oder Maus zwischen den Bildern blättern können. Die Vorschau funktioniert auch bei HEIC-Bildern (iPhone-Fotos), die der Browser direkt auf dem Gerät umwandelt.
+
+- **Ruhigere Anzeige neuer Anhänge:** Wenn in einer anderen Sitzung Fotos oder Dateien zu einem Schaden hinzugefügt werden, erscheint ein Banner „1 neue Datei — anzeigen" statt die Liste sofort zu verändern. Ein Klick auf „anzeigen" zeigt die neuen Einträge an.
+
+### Dokumente
+
+- **Klarere Benennung im Einsatztagebuch:** Änderungen und Löschungen von Dokumenten in der Ablage werden im Einsatztagebuch künftig mit „Ablage ETB {laufende Nummer}" statt mit dem Dokumenttitel vermerkt. Bei Titeländerungen steht nur noch „Titel geändert".
+
+- **Bildvorschau in der Dokumentenablage:** Auch Bilddokumente zeigen jetzt eine Vorschau mit Großansicht.
+
+### Benutzer und Profil
+
+- **Bessere Kopierfunktion für TOTP-Geheimnis:** Der Knopf zum Kopieren des TOTP-Geheimnisses im Benutzerprofil ist jetzt in allen Dichtestufen gut bedienbar und erfüllt die Anforderungen an Bedienelemente (mindestens 30 × 30 px).
+
+### Archiv und Aufbewahrung
+
+- **Veraltete Archivansicht erkennbar:** Wenn der Server einen Neuabruf der Archivakte oder des Archiv-Tagebuchs ablehnt (wegen fehlender Berechtigung oder gelöschtem Einsatz), wird der gecachte Stand verworfen. Bei anderen Fehlern bleibt der Stand sichtbar mit dem Hinweis „Stand veraltet".
+
+- **Übersichtstabelle ohne veraltete Daten:** Die Archivübersicht zeigt bei Ladefehlern entweder eine leere Tabelle (bei fehlender Berechtigung) oder eine Fehlermeldung mit Hinweis auf veraltete Daten. Kein Leertext mehr unter Fehlermeldungen.
+
+- **Schwärzung berücksichtigt Karenzzeit korrekt:** Ein Einsatz, der zwischen Löschung und Schwärzung wiederhergestellt und erneut zum Löschen vorgemerkt wurde, wird erst nach erneutem Ablauf der Karenzzeit geschwärzt.
+
+### Technik
+
+- **Verbesserte Sicherheit bei Anhängen:** Alle Anhang-Antworten tragen jetzt Schutz-Header, die verhindern, dass Browser den Inhalt als ausführbaren Code interpretieren.
+
+- **Umbenennung Icon-Dateien:** Alle Bezeichner und Pfade für Icons wurden von „Ikone" auf „Icon" vereinheitlicht. Dies betrifft nur den Quellcode, nicht die Bedienung.
+
+- **Bessere Erkennung von Schreibzugriffen im Archiv:** Die Prüfung, ob Routen unerlaubt auf das Archiv schreiben, erkennt jetzt auch verschachtelte und zusammengeführte Router.
+
 ## [1.0.0-alpha.66](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.65...v1.0.0-alpha.66) (2026-10-02)
 
 ### Lagekarte

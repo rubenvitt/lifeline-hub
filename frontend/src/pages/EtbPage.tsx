@@ -44,6 +44,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
+import { neueClientId } from '../offline/clientId';
 import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
   dokumenteJeEintrag,
@@ -294,7 +295,7 @@ export default function EtbPage() {
       // Mit neuer client_id: ein abgelehnter Eintrag ist nie erfasst worden, ein neuer Schlüssel
       // legt also keine Dublette an. Mit dem alten liefe ein client_id-Konflikt (409) endlos in
       // dieselbe Ablehnung.
-      await erfassen({ ...puffer.eintrag, client_id: crypto.randomUUID() });
+      await erfassen({ ...puffer.eintrag, client_id: neueClientId() });
       if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
     } catch (err) {
       message.error(fehlerText(err, 'Erneut senden fehlgeschlagen'));

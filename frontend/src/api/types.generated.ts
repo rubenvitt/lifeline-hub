@@ -183,6 +183,11 @@ export interface components {
             /** @description Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751). */
             antrag_faellig_at?: string | null;
             karenz_ende?: string | null;
+            /**
+             * @description Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,
+             *     Rechtsgrundlage und Zustand; alle drei Kategorien.
+             */
+            kategorien: components["schemas"]["KategorieAufbewahrungAnzeige"][];
             kopf: components["schemas"]["ArchivKopfAnzeige"];
             personen: components["schemas"]["ArchivPersonAnzeige"][];
             schaeden: components["schemas"]["ArchivSchadenAnzeige"][];
@@ -623,6 +628,12 @@ export interface components {
             erstellt_at: string;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description Organisation des Benutzers (LFH-753): der Client spiegelt damit Rechte, die an der
+             *     Einsatz-Org hängen (Frist nur für den Admin der Einsatz-Org).
+             */
+            org_id: number;
             org_rolle: components["schemas"]["OrgRolle"];
             system_rolle: components["schemas"]["SystemRolle"];
             /**
@@ -945,6 +956,15 @@ export interface components {
          * @enum {string}
          */
         ChecklistenPunkt: "aufstellort" | "einweisung" | "lageskizze" | "funkarbeitsplaetze" | "sprechgruppen" | "etb_eroeffnet" | "leitstelle_gemeldet";
+        /**
+         * @description Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,
+         *     design.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry
+         *     (`Zuordnung::Kategorie`). Wire == [`Datenkategorie::as_str`], gepinnt in
+         *     `tests/enum_wire_kontrakt.rs`; zugleich der Schlüssel in `org_aufbewahrung_kategorie` und
+         *     `einsatz_aufbewahrung_kategorie`.
+         * @enum {string}
+         */
+        Datenkategorie: "behandlung" | "personenauskunft" | "anhaenge";
         /** @description Ergebnis eines Imports oder eines Entfernens, je Stammdatenart. */
         DemoBericht: {
             je_art: components["schemas"]["DemoBerichtZeile"][];
@@ -2176,6 +2196,35 @@ export interface components {
          */
         KartenTheme: "auto" | "light" | "dark";
         /**
+         * @description Aufbewahrung einer Datenkategorie am Einsatz (Spec „Zustand je Kategorie“, design.md D7).
+         *     Kein Personenbezug: Zeitpunkte, Zustand und der Org-Text der Rechtsgrundlage.
+         */
+        KategorieAufbewahrungAnzeige: {
+            /**
+             * Format: int64
+             * @description Nur bei einem aktiven Einsatz: die Dauer der Org-Vorgabe, aus der die Frist beim
+             *     Abschluss entsteht; fehlt = die Kategorie folgt der Einsatz-Frist.
+             */
+            dauer_tage_vorgabe?: number | null;
+            /** @description Frist der Kategorie; fehlt = keine eigene Frist (folgt der Einsatz-Frist). */
+            frist_bis?: string | null;
+            geschwaerzt_at?: string | null;
+            /** @description Ende der Karenz (`vorgemerkt_at + 30 Tage`). */
+            karenz_ende?: string | null;
+            kategorie: components["schemas"]["Datenkategorie"];
+            /** @description Rechtsgrundlage der Frist; bei einem aktiven Einsatz die der Org-Vorgabe. */
+            rechtsgrundlage?: string | null;
+            vorgemerkt_at?: string | null;
+            zustand?: components["schemas"]["AufbewahrungZustand"] | null;
+        };
+        /** @description Gespeicherte Vorgabe einer Kategorie. */
+        KategorieVorgabe: {
+            /** Format: int64 */
+            dauer_tage: number;
+            kategorie: components["schemas"]["Datenkategorie"];
+            rechtsgrundlage: string;
+        };
+        /**
          * @description Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
          * @enum {string}
          */
@@ -2840,6 +2889,11 @@ export interface components {
         OnlineStyleTyp: "vektor" | "raster";
         /** @description API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert). */
         OrgEinstellungenAnzeige: {
+            /**
+             * @description Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leer = keine Kategorie hat eine
+             *     eigene Frist.
+             */
+            aufbewahrung_kategorien: components["schemas"]["KategorieVorgabe"][];
             auftrag_nummer_praefix?: string | null;
             /** Format: int64 */
             auftrag_quittierung_frist_min?: number | null;

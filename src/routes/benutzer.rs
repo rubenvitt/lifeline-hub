@@ -80,8 +80,8 @@ pub async fn liste(
     _admin: AdminUser,
 ) -> Result<Json<Vec<BenutzerAnzeige>>, AppError> {
     let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
-                totp_aktiviert \
+        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
+                erstellt_at, totp_aktiviert \
          FROM benutzer ORDER BY id",
     )
     .fetch_all(&state.pool)
@@ -135,8 +135,8 @@ pub async fn anlegen(
     let id = ergebnis?.last_insert_rowid();
 
     let angelegt = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
-                totp_aktiviert \
+        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
+                erstellt_at, totp_aktiviert \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)
@@ -220,8 +220,8 @@ pub async fn deaktivieren(
     tx.commit().await?;
 
     let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
-                totp_aktiviert \
+        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
+                erstellt_at, totp_aktiviert \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)
@@ -303,8 +303,8 @@ pub async fn bearbeiten(
     tx.commit().await?;
 
     let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
-                totp_aktiviert \
+        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
+                erstellt_at, totp_aktiviert \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)
@@ -347,8 +347,8 @@ pub async fn totp_reset(
     tx.commit().await?;
 
     let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
-                totp_aktiviert \
+        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
+                erstellt_at, totp_aktiviert \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)

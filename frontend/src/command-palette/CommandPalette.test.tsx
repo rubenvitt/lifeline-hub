@@ -219,7 +219,7 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
 
 /**
  * Der label-gleiche Zwilling: `baueBefehle` erzeugt für ein zuletzt besuchtes Modul ZWEI Befehle
- * mit gleichem Label, Ikone und Ziel. Die Startansicht MUSS die Dopplung behalten (Abkürzung),
+ * mit gleichem Label, Icon und Ziel. Die Startansicht MUSS die Dopplung behalten (Abkürzung),
  * die Trefferliste darf sie nicht zeigen.
  */
 const zwillingsKorpus: Befehl[] = [

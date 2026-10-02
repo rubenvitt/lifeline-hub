@@ -1,4 +1,4 @@
-import { IkoneUhr } from '../ikonen';
+import { IconUhr } from '../icons';
 import { Button, Collapse, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -157,7 +157,7 @@ export default function AuftragKarte({
           {ueberfaellig && (
             <Text type="danger" strong style={{ fontSize: 12 }}>
               <span aria-hidden="true">
-                <IkoneUhr />
+                <IconUhr />
               </span>{' '}
               Überfällig
             </Text>

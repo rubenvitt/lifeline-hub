@@ -34,6 +34,18 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
   /**
+   * Aufbewahrung je Datenkategorie (LFH-749) — alle drei Kategorien ohne eigene Frist und ohne
+   * Org-Vorgabe als Default (echter Zustand eines aktiven Einsatzes ohne Vorgaben). Das
+   * Frist-Paneel fragt sie ab; Tests der Kategorien überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/aufbewahrung-kategorien', () =>
+    HttpResponse.json([
+      { kategorie: 'behandlung' },
+      { kategorie: 'personenauskunft' },
+      { kategorie: 'anhaenge' },
+    ]),
+  ),
+  /**
    * Modulfreigaben (LFH-669) — jedes Modul sichtbar und frei als Default: der echte Zustand eines
    * Einsatzes ohne Overrides und ohne Org-Vorgaben. Rahmen und jede Seite, die Daten eines
    * fremden Moduls lädt, fragen sie ab; Tests mit Sperren überschreiben per `server.use()`.

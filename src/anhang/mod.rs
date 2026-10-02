@@ -6,6 +6,7 @@
 
 pub mod metadaten;
 pub mod repo;
+pub mod vorschau;
 
 use crate::error::AppError;
 use serde::Serialize;
@@ -198,10 +199,30 @@ pub fn original_dateiname(dateiname: &str) -> String {
     }
 }
 
+/// Dateiname eines Vorschaubilds (LFH-759): `.vorschau.jpg` statt der Endung (`dach.png` →
+/// `dach.vorschau.jpg`), denn die Vorschau ist immer ein JPEG.
+pub fn vorschau_dateiname(dateiname: &str) -> String {
+    let stamm = match dateiname.rfind('.') {
+        Some(punkt) if punkt > 0 => &dateiname[..punkt],
+        _ => dateiname,
+    };
+    format!("{stamm}.vorschau.jpg")
+}
+
 /// Sicherer `Content-Disposition`-Wert: ASCII-Fallback plus RFC-5987 `filename*` mit
 /// prozent-kodiertem UTF-8, damit Umlaute ankommen, ohne dass `HeaderValue::from_str` scheitert.
 /// Geteilt von Anhang- und Hintergrundbild-Download.
 pub fn content_disposition(dateiname: &str) -> String {
+    disposition("attachment", dateiname)
+}
+
+/// Wie [`content_disposition`], aber `inline`: NUR für Vorschaubilder, die der Server selbst
+/// kodiert hat (LFH-759, Spec `anhang-vorschau`, „Inline nur für Vorschaubilder“).
+pub fn content_disposition_inline(dateiname: &str) -> String {
+    disposition("inline", dateiname)
+}
+
+fn disposition(art: &str, dateiname: &str) -> String {
     let ascii: String = dateiname
         .chars()
         .map(|c| {
@@ -213,7 +234,7 @@ pub fn content_disposition(dateiname: &str) -> String {
         })
         .collect();
     format!(
-        "attachment; filename=\"{ascii}\"; filename*=UTF-8''{}",
+        "{art}; filename=\"{ascii}\"; filename*=UTF-8''{}",
         prozent_kodiere(dateiname)
     )
 }

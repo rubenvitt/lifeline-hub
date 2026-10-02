@@ -95,7 +95,7 @@ fn befund_markierungen(bezuege: &[PersonenBezug]) -> Vec<String> {
         let scrub: BTreeSet<&str> = regel
             .spalten
             .iter()
-            .filter(|s| matches!(s.klassifikation, Klassifikation::Scrub(_)))
+            .filter(|s| matches!(s.klassifikation, Klassifikation::Scrub(..)))
             .map(|s| s.spalte)
             .collect();
         let mut markiert = BTreeSet::new();
@@ -104,11 +104,11 @@ fn befund_markierungen(bezuege: &[PersonenBezug]) -> Vec<String> {
                 befund.push(format!("{}.{spalte} doppelt markiert", b.tabelle));
             }
             match klassifikation_von(b.tabelle, spalte) {
-                Some(Klassifikation::Scrub(Strategie::ZeileLoeschen)) => befund.push(format!(
+                Some(Klassifikation::Scrub(Strategie::ZeileLoeschen, _)) => befund.push(format!(
                     "{}.{spalte}: ZeileLoeschen gehört nicht in einen Personen-Scrub",
                     b.tabelle
                 )),
-                Some(Klassifikation::Scrub(_)) => {}
+                Some(Klassifikation::Scrub(..)) => {}
                 Some(Klassifikation::Retain(_)) => befund.push(format!(
                     "{}.{spalte} ist Retain und darf nicht markiert sein",
                     b.tabelle

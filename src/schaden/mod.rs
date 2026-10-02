@@ -175,15 +175,6 @@ pub fn registrier_anzeige(nr: i64) -> String {
     format!("S-{nr:03}")
 }
 
-/// Ort-Kurzform für die pseudonyme ETB-Spur (max. 40 Zeichen, char-sicher).
-pub fn ort_kurz(ort: &str) -> String {
-    let mut kurz: String = ort.trim().chars().take(40).collect();
-    if ort.trim().chars().count() > 40 {
-        kurz.push('…');
-    }
-    kurz
-}
-
 // ---------- Anzeige-DTO ----------
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
@@ -274,11 +265,8 @@ mod tests {
     }
 
     #[test]
-    fn registrier_und_ort_kurz() {
+    fn registrier_anzeige_dreistellig() {
         assert_eq!(registrier_anzeige(7), "S-007");
         assert_eq!(registrier_anzeige(123), "S-123");
-        assert_eq!(ort_kurz("Hauptstr. 17"), "Hauptstr. 17");
-        let lang = "A".repeat(50);
-        assert_eq!(ort_kurz(&lang).chars().count(), 41); // 40 + Ellipsis
     }
 }

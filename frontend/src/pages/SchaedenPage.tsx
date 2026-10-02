@@ -1,4 +1,4 @@
-import { IkoneOrtsmarke } from '../ikonen';
+import { IconOrtsmarke } from '../icons';
 import StatusTag from '../components/StatusTag';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -124,7 +124,7 @@ const schaedenSpalten = (einsatzId: number) =>
       /**
        * Welche Schäden stehen auf der Karte? Die Frage, mit der man vor der Karte sitzt.
        *
-       * Als Ikone, nicht als Emoji. Die Ikone des Satzes ist selbst `aria-hidden` (LFH-595); die
+       * Als Icon, nicht als Emoji. Das Icon des Satzes ist selbst `aria-hidden` (LFH-595); die
        * Hülle bleibt als zweite Sicherung gegen ein Vorleseziel in jeder Zeile.
        *
        * Filterachse statt Sortierung: „zeig mir die Unverorteten" ist die Arbeitsfrage.
@@ -140,7 +140,7 @@ const schaedenSpalten = (einsatzId: number) =>
       render: (_, s) =>
         s.lat != null && s.lon != null ? (
           <span aria-label="verortet" role="img">
-            <IkoneOrtsmarke />
+            <IconOrtsmarke />
           </span>
         ) : (
           <Typography.Text type="secondary" aria-label="nicht verortet" role="img">

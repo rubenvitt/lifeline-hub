@@ -13,10 +13,13 @@ Einsatztagebuch.
 Das System SHALL für jede Spalte jeder Tabelle, die an einem Einsatz hängt, genau eine
 Klassifikation führen: **Scrub** (personenbezogen, wird geschwärzt, mit einer Strategie:
 leeren, Platzhalter, Platzhalter nur wenn gesetzt, Platzhalter mit Zeilenkennung, Zeile
-löschen) oder **Retain** (bleibt erhalten, mit Begründung). Diese Klassifikation MUST die
-einzige Quelle sein, aus der die Schwärzung ihre Anweisungen bildet. Eine einsatzbezogene
-Spalte oder Tabelle ohne Klassifikation MUST die Testsuite scheitern lassen. Ein
-Klassifikationseintrag ohne zugehörige Spalte MUST die Testsuite ebenfalls scheitern lassen.
+löschen) oder **Retain** (bleibt erhalten, mit Begründung). Jede Scrub-Spalte MUST zusätzlich
+genau einer Zuordnung angehören: einer Datenkategorie der Capability
+`aufbewahrung-kategorien`, dem Personenstamm oder der Einsatz-Frist. Diese Klassifikation MUST
+die einzige Quelle sein, aus der die Schwärzung des Einsatzes und jeder Kategorie ihre
+Anweisungen bildet. Eine einsatzbezogene Spalte oder Tabelle ohne Klassifikation MUST die
+Testsuite scheitern lassen. Ein Klassifikationseintrag ohne zugehörige Spalte MUST die
+Testsuite ebenfalls scheitern lassen.
 
 #### Scenario: Neue Spalte ohne Klassifikation
 - **WHEN** eine Migration einer einsatzbezogenen Tabelle eine Spalte hinzufügt und die Klassifikation sie nicht führt
@@ -24,8 +27,12 @@ Klassifikationseintrag ohne zugehörige Spalte MUST die Testsuite ebenfalls sche
 
 #### Scenario: Schwärzung folgt der Klassifikation
 - **WHEN** ein Einsatz geschwärzt wird
-- **THEN** ist jede als Scrub geführte Spalte nach ihrer Strategie behandelt
+- **THEN** ist jede als Scrub geführte Spalte nach ihrer Strategie behandelt, gleich welcher Zuordnung sie angehört
 - **AND** trägt jede als Retain geführte Spalte ihren vorherigen Wert
+
+#### Scenario: Kategorie-Schwärzung folgt derselben Klassifikation
+- **WHEN** eine Datenkategorie eines Einsatzes geschwärzt wird
+- **THEN** ist genau jede Scrub-Spalte dieser Kategorie nach ihrer Strategie behandelt
 
 ### Requirement: Frist aus der Aufbewahrungsdauer beim Abschluss
 
@@ -52,7 +59,10 @@ und Dauer nennt.
 ### Requirement: Manuelle Frist
 
 Einsatzleitung und System-Admin SHALL die Frist eines Einsatzes setzen, ändern und aufheben
-können, vor und nach dem Abschluss. Andere Personen MUST 403 erhalten. Eine Verkürzung MUST
+können, vor und nach dem Abschluss. Als System-Admin MUST er das nur an Einsätzen seiner
+eigenen Organisation können; eine Mitgliedschaft als Einsatzleitung trägt unabhängig von der
+Organisation. Andere Personen MUST 403 erhalten, auch der System-Admin einer fremden
+Organisation ohne diese Mitgliedschaft, und dabei MUST sich weder Frist noch ETB ändern. Eine Verkürzung MUST
 ausdrücklich bestätigt werden, sonst antwortet das System mit 409. Als Verkürzung gilt ein
 früherer Zeitpunkt oder das erstmalige Setzen einer Frist an einem Einsatz ohne Frist. Eine
 unveränderte Frist MUST ohne Schreibvorgang und ohne ETB-Eintrag bleiben. Jede wirksame
@@ -61,7 +71,9 @@ Löschung vorgemerkten Einsatz, dessen Karenz noch läuft, MUST die Änderung mi
 werden, mit dem Hinweis auf das Wiederherstellen. Ist die Karenz abgelaufen, der Einsatz aber
 noch nicht geschwärzt, MUST sie mit 409 abgewiesen werden, ohne Hinweis auf das
 Wiederherstellen, denn auch das ist dann ausgeschlossen. An einem geschwärzten Einsatz MUST sie
-mit 409 abgewiesen werden.
+mit 409 abgewiesen werden. Nach Fristablauf bietet die Oberfläche der Einsatzleitung keinen
+eigenen Weg zum Verlängern; bis zur Vormerkung bleibt die Änderung für sie zulässig. Ist der
+Einsatz vorgemerkt, MUST das Wiederherstellen des Org-Admins der einzige Weg bleiben.
 
 #### Scenario: Verlängern ohne Bestätigung
 - **WHEN** die Einsatzleitung die Frist eines abgeschlossenen Einsatzes auf einen späteren Zeitpunkt setzt
@@ -70,6 +82,19 @@ mit 409 abgewiesen werden.
 #### Scenario: Verkürzen ohne Bestätigung
 - **WHEN** eine Frist auf einen früheren Zeitpunkt gesetzt wird, ohne Bestätigung
 - **THEN** antwortet das System mit 409 und ändert nichts
+
+#### Scenario: Admin einer fremden Organisation
+- **WHEN** der System-Admin einer anderen Organisation ohne Mitgliedschaft die Frist eines aktiven oder eines abgeschlossenen Einsatzes ändern will
+- **THEN** antwortet das System mit 403
+- **AND** bleiben Frist und ETB unverändert
+
+#### Scenario: Admin einer fremden Organisation als Einsatzleitung
+- **WHEN** der System-Admin einer anderen Organisation, der im Einsatz Einsatzleitung ist, die Frist ändert
+- **THEN** gilt die neue Frist
+
+#### Scenario: Admin der eigenen Organisation nach Fristablauf
+- **WHEN** der System-Admin der Einsatz-Org ohne Mitgliedschaft die abgelaufene Frist eines abgeschlossenen, noch nicht vorgemerkten Einsatzes in die Zukunft verlegt
+- **THEN** gilt die neue Frist
 
 #### Scenario: Vorgemerkter Einsatz
 - **WHEN** an einem zur Löschung vorgemerkten Einsatz die Frist geändert werden soll
@@ -221,11 +246,12 @@ Sicherung MUST dabei gelten, die Karenz beginnt nicht neu.
 ### Requirement: Auslöser der Aufbewahrung
 
 Das System SHALL die Aufbewahrung ausschließlich über diese Auslöser bewegen: den Abschluss
-(Frist aus der Dauer), die manuelle Frist, einen periodischen Purge-Lauf höchstens alle
-10 Minuten (Vormerkung, Schwärzung und Vollzug fälliger Schwärzungsanträge), das
-Wiederherstellen durch den Org-Admin und den Schwärzungsantrag des Org-Admins samt Rücknahme
-(Capability `aufbewahrung-loeschersuchen`). Einen Auslöser, der ohne 24 Stunden Rücknahmefrist
-schwärzt, MUST es nicht geben.
+(Frist aus der Dauer, Kategorie-Fristen aus der Org-Vorgabe), die manuelle Frist, die
+manuelle Kategorie-Frist, einen periodischen Purge-Lauf höchstens alle 10 Minuten
+(Vormerkung und Schwärzung von Einsatz und Kategorien, Vollzug fälliger Schwärzungsanträge),
+das Wiederherstellen durch den Org-Admin und den Schwärzungsantrag des Org-Admins samt
+Rücknahme (Capability `aufbewahrung-loeschersuchen`). Einen Auslöser, der ohne 24 Stunden
+Rücknahmefrist schwärzt, MUST es nicht geben.
 
 #### Scenario: Fristablauf ohne Eingriff
 - **WHEN** die Frist eines abgeschlossenen Einsatzes abläuft und niemand eingreift
@@ -235,13 +261,19 @@ schwärzt, MUST es nicht geben.
 - **WHEN** der Org-Admin einen Einsatz-Antrag stellt
 - **THEN** ist der Einsatz unmittelbar danach nicht geschwärzt
 
+#### Scenario: Kategorie-Frist läuft ohne Eingriff ab
+- **WHEN** die Frist einer Kategorie eines abgeschlossenen Einsatzes abläuft und niemand eingreift
+- **THEN** ist die Kategorie spätestens nach dem nächsten Purge-Lauf vorgemerkt
+
 ### Requirement: Lückenloser Audit im ETB
 
 Jede Mutation der Aufbewahrung (Frist aus Dauer, manuelle Frist, Vormerkung, Schwärzung,
-Wiederherstellen, Schwärzungsantrag, Rücknahme und Vollzug eines Antrags) SHALL im selben
-atomaren Vorgang einen System-Eintrag im ETB des Einsatzes schreiben. Bei einer handelnden
-Person MUST sie als Erfasser stehen. Beim Purge-Lauf MUST der Erfasser in dieser Reihenfolge
-bestimmt werden: beim Vollzug eines Antrags zuerst die Person, die ihn gestellt hat; sonst die
+Wiederherstellen, ebenso Kategorie-Frist aus der Org-Vorgabe, manuelle Kategorie-Frist,
+Kategorie-Vormerkung und Kategorie-Schwärzung, Schwärzungsantrag, Rücknahme und Vollzug eines
+Antrags) SHALL im selben atomaren Vorgang einen System-Eintrag im ETB des Einsatzes schreiben.
+Bei einer handelnden Person MUST sie als Erfasser stehen. Beim Purge-Lauf MUST der Erfasser in
+dieser Reihenfolge bestimmt werden: beim Vollzug eines Antrags zuerst die Person, die ihn
+gestellt hat; sonst die
 Person, die den Einsatz abgeschlossen hat, dann eine Einsatzleitung des Einsatzes, dann ein
 System-Admin der Organisation des Einsatzes. Ist keiner auffindbar, MUST die Mutation
 unterbleiben, als Fehler protokolliert und im nächsten Lauf erneut versucht werden. Eine
@@ -259,6 +291,10 @@ Aufbewahrungs-Mutation ohne ETB-Eintrag MUST es nicht geben.
 #### Scenario: Vollzug eines Antrags
 - **WHEN** der Purge-Lauf einen Antrag vollzieht
 - **THEN** trägt der System-Eintrag die Person als Erfasser, die den Antrag gestellt hat
+
+#### Scenario: Kategorie ohne Akteur
+- **WHEN** eine fällige Kategorie an einem Einsatz ohne auffindbaren Akteur hängt
+- **THEN** bleibt die Kategorie unvorgemerkt, und kein ETB-Eintrag entsteht
 
 ### Requirement: Pseudonyme Spur im ETB
 
@@ -281,9 +317,54 @@ Stelle ohne Eintrag in der Liste ist ein Fehler.
 - **THEN** findet er einen Scrub-Wert nur an den Stellen, die die Ausnahmeliste führt
 
 #### Scenario: Dokumentierte Ausnahme Schadensort
+- **WHEN** ein Einsatz einen System-Eintrag enthält, der vor LFH-752 bei der Anlage eines Schadens dessen Ortskurzform in den Wortlaut geschrieben hat, und der Einsatz geschwärzt wird
+- **THEN** ist der Ort in der Schadenszeile geschwärzt
+- **AND** bleibt dieser ältere System-Eintrag unverändert, die Ortskurzform eingeschlossen
+
+#### Scenario: Schadensort bleibt im Modul
 - **WHEN** ein Schaden mit Ort angelegt und der Einsatz später geschwärzt wird
 - **THEN** ist der Ort in der Schadenszeile geschwärzt
-- **AND** steht die Ortskurzform weiter im System-Eintrag der Anlage
+- **AND** nennt der System-Eintrag der Anlage nur Registriernummer, Typ und Ausmaß
+- **AND** steht der Ort in keinem ETB-Eintrag
+
+### Requirement: Kein Scrub-Wert von Betroffenen und Dokumenten im ETB
+
+System-Einträge zu Schäden, Personen, UHS-Belegungen und Dokumenten SHALL keinen Wert in ihren
+Wortlaut übernehmen, den die Klassifikation in der Quellzeile als Scrub führt. Das betrifft
+Schadensort, Übergabe-Adressat, Verbleib-Ziel, Notiz der Belegung und Dokumenttitel. Eine
+Kategorie als Enum-Label ist zulässig. Einträge, die schon geschrieben sind, MUST unverändert
+bleiben.
+
+#### Scenario: Schaden übergeben
+- **WHEN** ein Schaden an „Eigentümer Ruehl“ übergeben wird
+- **THEN** nennt der System-Eintrag die Registriernummer des Schadens und die Übergabe
+- **AND** steht „Eigentümer Ruehl“ in keinem ETB-Eintrag
+
+#### Scenario: Verbleib mit Ziel
+- **WHEN** für eine Person ein Transport nach „Klinikum Nordstadt“ oder eine Notunterkunft „Turnhalle Ost“ erfasst wird
+- **THEN** lautet der System-Eintrag „Person R-…: abtransportiert“ bzw. „Person R-…: in Notunterkunft“
+- **AND** führen Verbleib und Personenzeile das Ziel weiter bis zur Schwärzung
+
+#### Scenario: Austritt aus der UHS mit Notiz
+- **WHEN** eine Person mit der Notiz „an Hausarzt übergeben“ eine UHS verlässt
+- **THEN** nennt der System-Eintrag Registriernummer und UHS, aber nicht die Notiz
+
+#### Scenario: Dokument ablegen, ändern und entfernen
+- **WHEN** ein Dokument mit dem Titel „Personenliste NU Turnhalle“ abgelegt, umbenannt und entfernt wird
+- **THEN** nennen die drei System-Einträge die Kategorie
+- **AND** steht weder der alte noch der neue Titel in einem ETB-Eintrag
+
+### Requirement: Ausnahmeliste wird nicht länger
+
+Die Ausnahmeliste der ETB-Spur MUST NOT einen Eintrag für einen Wert von Betroffenen (Schaden,
+Person, Tier, Belegung) oder für einen Dokumenttitel erhalten. Ein neuer Eintrag SHALL nur in
+den bewusst behaltenen Gruppen entstehen: Name und Funktion von Einsatzkräften, Bezeichnungen
+der Lagestruktur, Wortlaut der Führungsmodule und Enum-Labels. Jeder Eintrag MUST seine
+Begründung tragen.
+
+#### Scenario: Gesperrte Spalte in der Liste
+- **WHEN** jemand der Ausnahmeliste eine Spalte einer Tabelle von Schäden, Personen, Tieren, Belegungen oder den Dokumenttitel hinzufügt
+- **THEN** schlägt der Selbsttest der Liste fehl
 
 ### Requirement: Führungsdokumentation steht allein im ETB
 

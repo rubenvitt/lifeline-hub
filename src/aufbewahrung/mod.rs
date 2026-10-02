@@ -145,6 +145,9 @@ pub struct ArchivAkteAnzeige {
     /// Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub antrag_faellig_at: Option<String>,
+    /// Aufbewahrung je Datenkategorie (LFH-749): Frist, Vormerkung, Schwärzung,
+    /// Rechtsgrundlage und Zustand; alle drei Kategorien.
+    pub kategorien: Vec<crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige>,
     pub personen: Vec<ArchivPersonAnzeige>,
     pub tiere: Vec<ArchivTierAnzeige>,
     pub schaeden: Vec<ArchivSchadenAnzeige>,

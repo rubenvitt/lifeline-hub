@@ -23,8 +23,8 @@ import FristPaneel from '../../aufbewahrung/FristPaneel';
  * Karten-Defaults mit.
  *
  * Die Frist steht daneben, nicht darin: die Dauer ist eine Einstellung und friert mit dem Abschluss
- * ein, die Frist ist ein Zeitpunkt am Einsatz, den Einsatzleitung und System-Admin auch danach
- * setzen. `FristPaneel` steht deshalb außerhalb des Vollersatz-`<Form>` — sein PUT trägt keinen
+ * ein, die Frist ist ein Zeitpunkt am Einsatz, den Einsatzleitung und System-Admin der
+ * Einsatz-Org auch danach setzen. `FristPaneel` steht deshalb außerhalb des Vollersatz-`<Form>` — sein PUT trägt keinen
  * Einstellungs-Payload, und `disabled` des Formulars sperrt es nicht mit.
  */
 export default function EinsatzAufbewahrung() {

@@ -8,6 +8,7 @@ import { formatZeit } from '../anzeige/format';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import AufbewahrungUebersicht from './AufbewahrungUebersicht';
+import { globalKeys } from '../api/queryKeys';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 
 /** Übersicht. */
@@ -151,5 +152,52 @@ describe('AufbewahrungUebersicht', () => {
     const ohneNummer = within(t).getByRole('link', { name: 'ohne Nr. · Altlage Ost' });
     expect(ohneNummer).toHaveAttribute('href', '/admin/aufbewahrung/9104');
     expect(within(t).queryByRole('link', { name: '—' })).toBeNull();
+  });
+});
+
+describe('AufbewahrungUebersicht — gescheiterter Abruf (LFH-756)', () => {
+  it('ein Ladefehler behauptet keinen leeren Bestand', async () => {
+    server.use(
+      meHandler(ME_ADMIN),
+      http.get('/api/aufbewahrung', () =>
+        HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
+      ),
+    );
+    renderMitProviders(<AufbewahrungUebersicht />, { route: '/admin/aufbewahrung' });
+    expect(await screen.findByText('Aufbewahrung nicht ladbar')).toBeInTheDocument();
+    expect(screen.queryByText('Keine abgeschlossenen Einsätze')).toBeNull();
+    expect(screen.queryByText('Keine Daten')).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('ein gescheiterter Neuabruf lässt die Zeilen stehen und meldet den veralteten Stand', async () => {
+    const { client } = zeige();
+    const t = await tabelle();
+    await within(t).findByText('E-2026-0007');
+    server.use(
+      http.get('/api/aufbewahrung', () =>
+        HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrung() });
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Aufbewahrung nicht ladbar')).toBeNull();
+    expect(within(t).getByText('E-2026-0007')).toBeInTheDocument();
+  });
+
+  it('ein 403 beim Neuabruf räumt die Zeilen', async () => {
+    const { client } = zeige();
+    const t = await tabelle();
+    await within(t).findByText('E-2026-0007');
+    server.use(
+      http.get('/api/aufbewahrung', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrung() });
+    expect(await screen.findByText('Aufbewahrung nicht ladbar')).toBeInTheDocument();
+    expect(screen.queryByText('E-2026-0007')).toBeNull();
   });
 });

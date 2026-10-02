@@ -5,6 +5,7 @@
 //! Effektivwert = Einsatz-Override ?? Org-Default ?? fester Fallback. Die Validatoren kommen aus
 //! `einsatz::einstellungen`.
 
+use super::aufbewahrung_kategorie::KategorieVorgabe;
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -64,9 +65,14 @@ impl OrgEinstellungen {
         }
     }
 
-    /// API-Darstellung: flache 1:1-Spiegelung aller Felder inkl. Audit (Admin-Endpunkt).
-    pub fn anzeige(&self) -> OrgEinstellungenAnzeige {
+    /// API-Darstellung: flache 1:1-Spiegelung aller Felder inkl. Audit (Admin-Endpunkt), dazu
+    /// die Kategorie-Vorgaben aus eigener Tabelle (LFH-749).
+    pub fn anzeige(
+        &self,
+        aufbewahrung_kategorien: Vec<KategorieVorgabe>,
+    ) -> OrgEinstellungenAnzeige {
         OrgEinstellungenAnzeige {
+            aufbewahrung_kategorien,
             org_id: self.org_id,
             zeitzone: self.zeitzone.clone(),
             zeitformat: self.zeitformat.clone(),
@@ -120,6 +126,9 @@ pub struct OrgEinstellungenAnzeige {
     #[schema(value_type = Option<crate::einsatz::einstellungen::Koordinatenformat>)]
     pub koordinatenformat: Option<String>,
     pub retention_dauer_tage: Option<i64>,
+    /// Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leer = keine Kategorie hat eine
+    /// eigene Frist.
+    pub aufbewahrung_kategorien: Vec<KategorieVorgabe>,
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
     pub auftrag_nummer_praefix: Option<String>,
@@ -176,6 +185,10 @@ pub struct OrgEinstellungenDaten<'a> {
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     pub geocoder_url: Option<&'a str>,
+    /// Kategorie-Vorgaben (LFH-749), bereits geprüft: `Some` ersetzt die Liste, `None` lässt sie
+    /// unverändert (anders als die übrigen Felder kein Vollersatz, damit ein älterer Client sie
+    /// nicht still löscht).
+    pub aufbewahrung_kategorien: Option<&'a [KategorieVorgabe]>,
 }
 
 /// Lädt die Org-Einstellungen; ohne Zeile Defaults (alle `None`). Strikt per `org_id`.
@@ -199,13 +212,15 @@ pub async fn laden_oder_default(
 }
 
 /// Speichert die Org-Einstellungen (UPSERT auf `org_id`); setzt die Audit-Felder.
-/// Vollersatz-Semantik: alle Felder werden überschrieben (leer = None).
+/// Vollersatz-Semantik: alle Felder werden überschrieben (leer = None), außer den
+/// Kategorie-Vorgaben (s. [`OrgEinstellungenDaten::aufbewahrung_kategorien`]). Eine Transaktion.
 pub async fn speichern(
     pool: &SqlitePool,
     org_id: i64,
     erfasser_id: i64,
     daten: OrgEinstellungenDaten<'_>,
 ) -> Result<OrgEinstellungen, AppError> {
+    let mut tx = pool.begin().await?;
     sqlx::query(
         "INSERT INTO org_einstellungen \
             (org_id, zeitzone, zeitformat, einheiten, koordinatenformat, \
@@ -248,8 +263,12 @@ pub async fn speichern(
     .bind(daten.auto_etb_eintraege)
     .bind(daten.geocoder_url)
     .bind(erfasser_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+    if let Some(vorgaben) = daten.aufbewahrung_kategorien {
+        super::aufbewahrung_kategorie::ersetzen(&mut tx, org_id, erfasser_id, vorgaben).await?;
+    }
+    tx.commit().await?;
     laden_oder_default(pool, org_id).await
 }
 
@@ -303,6 +322,11 @@ mod tests {
         let bid = fixture(&pool).await;
 
         // Erster Speichervorgang: alle Felder setzen.
+        let vorgaben = vec![KategorieVorgabe {
+            kategorie: crate::einsatz::retention::Datenkategorie::Personenauskunft,
+            dauer_tage: 0,
+            rechtsgrundlage: "§ 46 Abs. 5 BHKG NRW".into(),
+        }];
         let g = speichern(
             &pool,
             1,
@@ -322,6 +346,7 @@ mod tests {
                 rueckmeldung_frist_min: Some(90),
                 auto_etb_eintraege: Some(0),
                 geocoder_url: Some("https://nominatim.example.org"),
+                aufbewahrung_kategorien: Some(&vorgaben),
             },
         )
         .await
@@ -354,7 +379,7 @@ mod tests {
         assert_eq!(g.geaendert_von, Some(bid));
 
         // Anzeige spiegelt alle Felder.
-        let a = g.anzeige();
+        let a = g.anzeige(Vec::new());
         assert_eq!(a.org_id, 1);
         assert_eq!(a.retention_dauer_tage, Some(365));
         assert_eq!(a.auto_etb_eintraege, Some(0));
@@ -390,5 +415,14 @@ mod tests {
 
         // geaendert_von ist gesetzt.
         assert_eq!(zweite.geaendert_von, Some(bid));
+
+        // LFH-749: Kategorie-Vorgaben stehen nach dem ersten Speichern; das zweite ohne Feld
+        // lässt sie stehen (kein Vollersatz für die Liste).
+        assert_eq!(
+            super::super::aufbewahrung_kategorie::laden(&pool, 1)
+                .await
+                .unwrap(),
+            vorgaben
+        );
     }
 }

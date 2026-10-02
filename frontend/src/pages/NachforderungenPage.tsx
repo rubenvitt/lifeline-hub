@@ -1,4 +1,4 @@
-import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
+import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Input, Modal, Spin } from 'antd';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -220,7 +220,7 @@ export default function NachforderungenPage() {
         darfSchreiben && (
           <Button
             type="primary"
-            icon={formOffen ? <IkoneChevronHoch /> : <IkonePlus />}
+            icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
             onClick={() => (formOffen ? schliesseFormular() : setFormOffen(true))}
           >
             {formOffen ? 'Formular schließen' : 'Nachforderung anlegen'}
@@ -236,7 +236,7 @@ export default function NachforderungenPage() {
           aktion={
             <Button
               type="text"
-              icon={<IkoneKreuz />}
+              icon={<IconKreuz />}
               onClick={schliesseFormular}
               aria-label="Formular schließen"
             />

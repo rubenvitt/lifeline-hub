@@ -415,6 +415,16 @@ async fn vollzug_einsatz_mit_frist_in_5_jahren_wie_fristbasiert() {
     let a = stelle(&pool, &b, b.e1, AntragZiel::Einsatz, "E-2026-0751", T0)
         .await
         .unwrap();
+    // Eine Datenkategorie mit eigener Frist (LFH-749): die Schwärzung auf Antrag nimmt sie mit
+    // wie die fristbasierte.
+    sqlx::query(
+        "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
+         rechtsgrundlage) VALUES (?, 'behandlung', '2036-10-01 00:00:00', 'Test')",
+    )
+    .bind(b.e1)
+    .execute(&pool)
+    .await
+    .unwrap();
     // Vollzug nur des Einsatz-Antrags (der Personen-Antrag hat dieselbe Fälligkeit; hier
     // gezielt der Einsatz-Antrag zuerst).
     assert!(vollziehen(&pool, a, t(T0) + Duration::hours(24))
@@ -428,6 +438,14 @@ async fn vollzug_einsatz_mit_frist_in_5_jahren_wie_fristbasiert() {
             .unwrap();
     assert_eq!(g.as_deref(), Some("2026-10-03 08:00:00"));
     assert_eq!(s.as_deref(), Some("2026-10-03 08:00:00"));
+    let k: Option<String> = sqlx::query_scalar(
+        "SELECT geschwaerzt_at FROM einsatz_aufbewahrung_kategorie WHERE einsatz_id = ?",
+    )
+    .bind(b.e1)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(k.as_deref(), Some("2026-10-03 08:00:00"));
     let texte = testdaten::alle_texte(&pool).await;
     for k in ZIEL_KLARTEXTE.iter().chain(
         NACHBAR_KLARTEXTE

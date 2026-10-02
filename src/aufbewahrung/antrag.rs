@@ -625,16 +625,8 @@ pub async fn vollziehen_ergebnis(
                             z.einsatz_id
                         )));
                     }
-                    // Jeder andere offene Antrag dieses Einsatzes ist damit erledigt.
-                    sqlx::query(
-                        "UPDATE schwaerzung_antrag SET vollzogen_at = ? \
-                         WHERE einsatz_id = ? AND zurueckgenommen_at IS NULL \
-                           AND vollzogen_at IS NULL",
-                    )
-                    .bind(&jetzt_s)
-                    .bind(z.einsatz_id)
-                    .execute(&mut *conn)
-                    .await?;
+                    // Jeder andere offene Antrag dieses Einsatzes ist damit erledigt (im Scrub des
+                    // ganzen Einsatzes, `einsatz::repo`).
                     (
                         crate::einsatz::repo::schwaerzungs_audit(&format!(
                             "Löschersuchen nach Art. 17 DSGVO für {ziel}, Aktenzeichen {}",

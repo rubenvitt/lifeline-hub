@@ -208,6 +208,7 @@ function akte(zustand: ArchivAkte['zustand']): ArchivAkte {
       begonnen_at: '2026-05-01 08:00:00',
     },
     zustand,
+    kategorien: [],
     personen: [],
     tiere: [],
     schaeden: [],

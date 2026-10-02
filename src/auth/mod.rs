@@ -136,6 +136,7 @@ impl Benutzer {
     pub fn anzeige(&self, totp_aktiviert: bool) -> BenutzerAnzeige {
         BenutzerAnzeige {
             id: self.id,
+            org_id: self.org_id,
             anzeigename: self.anzeigename.clone(),
             benutzername: self.benutzername.clone(),
             system_rolle: self.system_rolle,
@@ -151,6 +152,9 @@ impl Benutzer {
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BenutzerAnzeige {
     pub id: i64,
+    /// Organisation des Benutzers (LFH-753): der Client spiegelt damit Rechte, die an der
+    /// Einsatz-Org hängen (Frist nur für den Admin der Einsatz-Org).
+    pub org_id: i64,
     pub anzeigename: String,
     pub benutzername: String,
     #[sqlx(try_from = "String")]

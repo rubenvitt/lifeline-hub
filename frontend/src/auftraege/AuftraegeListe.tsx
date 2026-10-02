@@ -1,4 +1,4 @@
-import { IkoneChevronHoch, IkoneKreuz, IkonePlus } from '../ikonen';
+import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Alert, App, Button } from 'antd';
 import { Select } from '../components/Select';
@@ -293,7 +293,7 @@ export default function AuftraegeListe({
           darfSchreiben && (
             <Button
               type="primary"
-              icon={formOffen ? <IkoneChevronHoch /> : <IkonePlus />}
+              icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
               onClick={() => setFormOffen((o) => !o)}
             >
               {formOffen ? 'Formular schließen' : 'Auftrag erteilen'}
@@ -310,7 +310,7 @@ export default function AuftraegeListe({
           aktion={
             <Button
               type="text"
-              icon={<IkoneKreuz />}
+              icon={<IconKreuz />}
               onClick={() => setFormOffen(false)}
               aria-label="Formular schließen"
             />

@@ -305,7 +305,9 @@ pub async fn scrubbe_person(
             .iter()
             .filter(|(_, m)| *m == Mit)
             .map(|(spalte, _)| match klassifikation_von(b.tabelle, spalte) {
-                Some(Klassifikation::Scrub(st)) if st != Strategie::ZeileLoeschen => (*spalte, st),
+                Some(Klassifikation::Scrub(st, _)) if st != Strategie::ZeileLoeschen => {
+                    (*spalte, st)
+                }
                 // Die Guards halten das aus; ein Verstoß ist ein Programmierfehler.
                 k => unreachable!("{}.{spalte} als Mit markiert, aber {k:?}", b.tabelle),
             })

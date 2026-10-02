@@ -7,6 +7,7 @@ import {
   originalZugaenglicherName,
 } from '../api/anhangFassung';
 import { ORIGINAL_TEXT } from '../components/DownloadAnker';
+import AnhangVorschau, { AnhangVorschauGruppe } from '../components/AnhangVorschau';
 import { useRollen } from '../components/instrument';
 import { formatGroesse } from '../karten/formatGroesse';
 import { verweisStil } from './zeitachseModell';
@@ -27,7 +28,8 @@ export type EtbDokument = Pick<Dokument, 'id' | 'titel' | 'dateiname' | 'groesse
  * Dokumente (die Seite fragt sie dann gar nicht ab), also erscheint auch kein Verweis.
  *
  * Mit `darfOriginal` steht hinter jedem Bild der Verweis auf das Original samt Standort
- * (LFH-747), wie in `EtbAnhaenge`; der Hauptverweis lädt die bereinigte Fassung.
+ * (LFH-747), wie in `EtbAnhaenge`; der Hauptverweis lädt die bereinigte Fassung. Vor jedem Bild
+ * steht ein Vorschaubild (LFH-759), wie in `EtbAnhaenge`.
  */
 export default function EtbDokumente({
   einsatzId,
@@ -48,34 +50,45 @@ export default function EtbDokumente({
       data-lfh="etb-dokumente"
       style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: token.marginSM }}
     >
-      {dokumente.map((d) => {
-        const groesse = formatGroesse(d.groesse);
-        const href = dokumentDownloadPfad(einsatzId, d.id);
-        return (
-          // Dokument und Original bleiben als Paar zusammen (wie in `EtbAnhaenge`).
-          <span key={d.id} style={{ display: 'inline-flex', columnGap: token.marginSM }}>
-            <a
-              href={href}
-              download={d.dateiname}
-              aria-label={`Dokument „${d.titel}“, ${groesse}, zu Nr. ${lfdNr} herunterladen`}
-              style={stil}
+      <AnhangVorschauGruppe>
+        {dokumente.map((d) => {
+          const groesse = formatGroesse(d.groesse);
+          const href = dokumentDownloadPfad(einsatzId, d.id);
+          return (
+            // Dokument und Original bleiben als Paar zusammen (wie in `EtbAnhaenge`).
+            <span
+              key={d.id}
+              style={{ display: 'inline-flex', alignItems: 'center', columnGap: token.marginSM }}
             >
-              Dokument „{d.titel}“ · {groesse}
-            </a>
-            {darfOriginal && istBildMime(d.mime) && (
+              <AnhangVorschau
+                href={href}
+                mime={d.mime}
+                dateiname={d.dateiname}
+                kennung={`Dokument „${d.titel}“, zu Nr. ${lfdNr}`}
+              />
               <a
-                href={originalPfad(href)}
-                download={originalDateiname(d.dateiname)}
-                aria-label={originalZugaenglicherName(`Dokument „${d.titel}“, zu Nr. ${lfdNr}`)}
-                data-lfh="etb-dokument-original"
+                href={href}
+                download={d.dateiname}
+                aria-label={`Dokument „${d.titel}“, ${groesse}, zu Nr. ${lfdNr} herunterladen`}
                 style={stil}
               >
-                {ORIGINAL_TEXT}
+                Dokument „{d.titel}“ · {groesse}
               </a>
-            )}
-          </span>
-        );
-      })}
+              {darfOriginal && istBildMime(d.mime) && (
+                <a
+                  href={originalPfad(href)}
+                  download={originalDateiname(d.dateiname)}
+                  aria-label={originalZugaenglicherName(`Dokument „${d.titel}“, zu Nr. ${lfdNr}`)}
+                  data-lfh="etb-dokument-original"
+                  style={stil}
+                >
+                  {ORIGINAL_TEXT}
+                </a>
+              )}
+            </span>
+          );
+        })}
+      </AnhangVorschauGruppe>
     </span>
   );
 }

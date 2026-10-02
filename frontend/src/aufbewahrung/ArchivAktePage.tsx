@@ -20,7 +20,7 @@ import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import Markdown from '../components/Markdown';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import SichtungsTag from '../components/SichtungsTag';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
@@ -47,8 +47,11 @@ import {
   schadenAusmass,
   schadenStatus,
 } from '../theme/statusFarben';
+import { standVerworfen } from './archivAbruf';
 import { ETB_TYPEN, VERBLEIB_ART, VERBLEIB_STATUS, primaeraktion } from './archivText';
 import { FristWert, useFristAenderung } from './FristPaneel';
+import { KategorieWert } from './KategorieFristen';
+import { KATEGORIE_TEXT } from './kategorieText';
 import Loeschersuchen from './Loeschersuchen';
 import WiederherstellenDialog from './WiederherstellenDialog';
 
@@ -67,6 +70,10 @@ import WiederherstellenDialog from './WiederherstellenDialog';
  *
  * Das Tagebuch ist bewusst NICHT `EtbZeitachse`: deren Aktionen und Deeplinks zielen auf im
  * Archiv nicht lesbare Ziele. Ein Berichtigungsverweis steht als Text, nicht als Link.
+ *
+ * **Ein gescheiterter Neuabruf zeigt den Zwischenstand nicht wie frisch** (LFH-756): TanStack
+ * behält die Daten auch nach einem Fehler. Lehnt der Server ab (`standVerworfen`), verschwindet
+ * der Stand; jeder andere Fehler lässt ihn stehen und meldet ihn als veraltet.
  */
 
 const leer = '—';
@@ -274,7 +281,8 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
     getNextPageParam: (letzte) =>
       letzte.length < ETB_SEITE ? undefined : letzte[letzte.length - 1]?.lfd_nr,
   });
-  const eintraege = abfrage.data?.pages.flat() ?? [];
+  const verworfen = abfrage.isError && standVerworfen(abfrage.error);
+  const eintraege = verworfen ? [] : (abfrage.data?.pages.flat() ?? []);
   const nrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
 
   let inhalt: ReactNode;
@@ -329,10 +337,15 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
           ]}
           style={{ marginBottom: token.marginSM }}
         />
+        {abfrage.isRefetchError && eintraege.length > 0 && (
+          <div style={{ marginBottom: token.marginSM }}>
+            <SeitenStandVeraltet onWiederholen={() => void abfrage.refetch()} />
+          </div>
+        )}
         {inhalt}
         {/* Ein gescheitertes Nachladen meldet sich hier, sonst wäre es von „nichts Älteres“ nicht zu
            unterscheiden. Die geladenen Seiten bleiben stehen. */}
-        {abfrage.isFetchNextPageError && (
+        {abfrage.isFetchNextPageError && !verworfen && (
           <div style={{ marginTop: token.marginSM }}>
             <SeitenFehler text="Ältere Einträge nicht ladbar" ursache={abfrage.error} />
           </div>
@@ -352,7 +365,16 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
   );
 }
 
-function AkteInhalt({ einsatzId, akte }: { einsatzId: number; akte: ArchivAkte }) {
+function AkteInhalt({
+  einsatzId,
+  akte,
+  veraltet,
+}: {
+  einsatzId: number;
+  akte: ArchivAkte;
+  /** Der Neuabruf ist gescheitert, ohne dass der Server abgelehnt hätte: Stand bleibt, als alt. */
+  veraltet?: { onWiederholen: () => void };
+}) {
   const { token } = theme.useToken();
   const [wiederherstellenOffen, setWiederherstellenOffen] = useState(false);
   const frist = useFristAenderung(einsatzId, akte.kopf.retention_bis);
@@ -368,6 +390,7 @@ function AkteInhalt({ einsatzId, akte }: { einsatzId: number; akte: ArchivAkte }
           : kopf.bezeichnung
       }
       beschreibung="Pseudonyme Archivakte — Namen, Kontakte, Orte und der Sachverhalt erscheinen hier nicht, auch nicht während der Karenz."
+      hinweis={veraltet && <SeitenStandVeraltet onWiederholen={veraltet.onWiederholen} />}
       aktionen={
         aktion === 'frist' ? (
           <Button type="primary" onClick={frist.oeffnen}>
@@ -423,6 +446,17 @@ function AkteInhalt({ einsatzId, akte }: { einsatzId: number; akte: ArchivAkte }
           </div>
         </Paneel>
 
+        {/* LFH-749: Aufbewahrung je Datenkategorie, nur lesend — ändern geht am Einsatz. */}
+        <Paneel titel="Datenkategorien" koerperPolster>
+          <Datenraster spalten={3} beschriftung="Datenkategorien">
+            {akte.kategorien.map((k) => (
+              <Datenfeld key={k.kategorie} label={KATEGORIE_TEXT[k.kategorie].bezeichnung}>
+                <KategorieWert eintrag={k} aktiv={false} />
+              </Datenfeld>
+            ))}
+          </Datenraster>
+        </Paneel>
+
         <Loeschersuchen einsatzId={einsatzId} akte={akte} />
 
         <Paneel titel="Register" koerperPolster>
@@ -474,7 +508,7 @@ export default function ArchivAktePage() {
   if (!authLaedt && !admin) return <Navigate to={defaultAdminPfad()} replace />;
   if (einsatzId == null) return <Navigate to={adminAufbewahrungPfad()} replace />;
   if (abfrage.isLoading || authLaedt) return <SeitenSkeleton />;
-  if (!abfrage.data) {
+  if (!abfrage.data || (abfrage.isError && standVerworfen(abfrage.error))) {
     return (
       <AdminPage titel="Archivakte">
         <SeitenFehler
@@ -490,7 +524,13 @@ export default function ArchivAktePage() {
   return (
     <OrgAnzeigeProvider>
       <EinsatzAnzeigeProvider einsatzId={einsatzId}>
-        <AkteInhalt einsatzId={einsatzId} akte={abfrage.data} />
+        <AkteInhalt
+          einsatzId={einsatzId}
+          akte={abfrage.data}
+          veraltet={
+            abfrage.isRefetchError ? { onWiederholen: () => void abfrage.refetch() } : undefined
+          }
+        />
       </EinsatzAnzeigeProvider>
     </OrgAnzeigeProvider>
   );

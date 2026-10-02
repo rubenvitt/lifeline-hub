@@ -1,4 +1,4 @@
-import { IkoneStift } from '../ikonen';
+import { IconStift } from '../icons';
 import { useId, useState, type CSSProperties } from 'react';
 import { Button, Typography } from 'antd';
 import { useRollen } from './instrument/rollenwerte';
@@ -34,7 +34,7 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *
  * ── DER GEFÜLLTE WERT IST SELBST DAS ZIEL (LFH-650) ────────────────────────────────────
  *
- * Der Wert ist ein `Button type="text"` mit Stift-Ikone: dieselbe Bauform wie der Platzhalter,
+ * Der Wert ist ein `Button type="text"` mit Stift-Icon: dieselbe Bauform wie der Platzhalter,
  * also dieselbe Höhe in beiden Zuständen (keine Zeile schrumpft nach dem Speichern) und die
  * ganze Zelle als Trefffläche. `text` statt `link`, weil der Wert Inhalt ist — blau läse er sich
  * als Verweis. Er darf umbrechen (`height: auto`) und schuldet damit die ZWEI Angaben eines
@@ -153,7 +153,7 @@ export function BemerkungZelle({
       <Button
         ref={knopfRef}
         type="text"
-        // `loading` sperrt den zweiten Klick, solange der erste schreibt, und ersetzt die Stift-Ikone
+        // `loading` sperrt den zweiten Klick, solange der erste schreibt, und ersetzt das Stift-Icon
         // durch antds Ladeanzeige.
         loading={laeuft}
         aria-label={
@@ -164,11 +164,11 @@ export function BemerkungZelle({
         onClick={() => setBearbeitet(true)}
       >
         <span id={wertId}>{wert}</span>
-        {/* Ikone ohne eigenes Vorleseziel: die Ikone des Satzes ist selbst `aria-hidden`
+        {/* Icon ohne eigenes Vorleseziel: das Icon des Satzes ist selbst `aria-hidden`
             (LFH-595), die Hülle bleibt als zweite Sicherung (früher: antds `role="img"` „edit"). */}
         {!laeuft && (
           <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
-            <IkoneStift />
+            <IconStift />
           </span>
         )}
       </Button>

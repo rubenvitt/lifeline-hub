@@ -9,6 +9,8 @@
 //!   gesperrt (`darf_lesen`).
 //! - **Phase A2** (IRREVERSIBEL, LFH-751): fällige Schwärzungsanträge (Löschersuchen nach
 //!   Art. 17) werden vollzogen (`aufbewahrung::antrag::vollziehe_faellige`).
+//! - **Phasen K1/K2** (LFH-749): dasselbe je Datenkategorie — Vormerkung nach Ablauf der
+//!   Kategorie-Frist, Schwärzung nur ihrer Daten nach der Karenz. Der Einsatz bleibt lesbar.
 //! - **Phase B** (IRREVERSIBEL): nach Ablauf der Karenz (`KARENZ_TAGE`) werden die
 //!   Personendaten gescrubbt (`repo::schwaerze_einsatz`), das operative Skelett
 //!   (Einsatz, ETB, Zähler) bleibt erhalten. `geschwaerzt_at`-Tombstone = Idempotenz.
@@ -17,9 +19,10 @@
 //! mit einem ETB-System-Audit begleitet; aktive Einsätze sind durch
 //! `status='abgeschlossen'` in jeder Purge-Query hart ausgeschlossen.
 
+use super::aufbewahrung_kategorie as kategorie;
 use super::repo;
 use super::retention::{karenz_abgelaufen, KARENZ_TAGE};
-use crate::live::LiveHub;
+use crate::live::{LiveEvent, LiveHub};
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use std::time::Duration;
@@ -61,12 +64,14 @@ pub async fn tick_mit_rueckschrieb(
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
         Ok(ids) => {
             for id in ids {
-                tracing::info!(
-                    einsatz_id = id,
-                    "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)"
-                );
+                // Gemeldet wird erst der Erfolg (LFH-756): ein fail-closed gescheiterter Versuch
+                // stünde sonst bei jeder Blockade alle 10 min als Erfolg neben dem `error!`.
                 match repo::soft_delete_einsatz(pool, id, &jetzt_s).await {
                     Ok(true) => {
+                        tracing::info!(
+                            einsatz_id = id,
+                            "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)"
+                        );
                         anzahl += 1;
                         crate::live::org::einsatzliste_melden(pool, live, id, &[]).await;
                     }
@@ -85,6 +90,73 @@ pub async fn tick_mit_rueckschrieb(
     anzahl += vollzogen;
     geschwaerzt += vollzogen;
 
+    // --- Phase K1: Vormerkung fälliger Datenkategorien (LFH-749, reversibel) ---
+    // Auch an einem gesperrten Einsatz: eine Kategorie bleibt nicht liegen, nur weil der Einsatz
+    // vorgemerkt wurde (Spec `aufbewahrung-kategorien`, „Zusammenspiel mit der Einsatz-Frist“).
+    match kategorie::faellige_vormerkung(pool, &jetzt_s).await {
+        Ok(faellig) => {
+            for (id, k) in faellig {
+                tracing::info!(
+                    einsatz_id = id,
+                    kategorie = k.as_str(),
+                    "Purge Phase K1: Datenkategorie vorgemerkt (Frist abgelaufen)"
+                );
+                match kategorie::vormerken(pool, id, k, &jetzt_s).await {
+                    Ok(true) => {
+                        anzahl += 1;
+                        live.publiziere_einsatz(id, LiveEvent::Etb);
+                    }
+                    Ok(false) => {}
+                    Err(e) => tracing::error!(
+                        einsatz_id = id,
+                        kategorie = k.as_str(),
+                        "Purge Phase K1 fehlgeschlagen: {e}"
+                    ),
+                }
+            }
+        }
+        Err(e) => tracing::warn!("Purge Phase K1: Abfrage fehlgeschlagen: {e}"),
+    }
+
+    // --- Phase K2: Schwärzung einer Datenkategorie nach ihrer Karenz (IRREVERSIBEL) ---
+    match kategorie::faellige_schwaerzung(pool).await {
+        Ok(kandidaten) => {
+            for (id, k, vorgemerkt_at) in kandidaten {
+                if !karenz_abgelaufen(Some(&vorgemerkt_at), jetzt) {
+                    continue;
+                }
+                tracing::warn!(
+                    einsatz_id = id,
+                    kategorie = k.as_str(),
+                    "Purge Phase K2: Schwärzung einer Datenkategorie (irreversibel)"
+                );
+                match kategorie::schwaerzen(pool, id, k, jetzt).await {
+                    Ok(true) => {
+                        anzahl += 1;
+                        geschwaerzt += 1;
+                        // Offene Clients laden neu und tragen keinen Altstand weiter (design.md D5).
+                        for event in [
+                            LiveEvent::Person,
+                            LiveEvent::Dokument,
+                            LiveEvent::Schaden,
+                            LiveEvent::Chat,
+                            LiveEvent::Etb,
+                        ] {
+                            live.publiziere_einsatz(id, event);
+                        }
+                    }
+                    Ok(false) => {}
+                    Err(e) => tracing::error!(
+                        einsatz_id = id,
+                        kategorie = k.as_str(),
+                        "Purge Phase K2 fehlgeschlagen: {e}"
+                    ),
+                }
+            }
+        }
+        Err(e) => tracing::warn!("Purge Phase K2: Abfrage fehlgeschlagen: {e}"),
+    }
+
     // --- Phase B: PII-Schwärzung nach Ablauf der Karenz (IRREVERSIBEL) ---
     match repo::faellige_purge(pool, KARENZ_TAGE).await {
         Ok(kandidaten) => {
@@ -94,12 +166,13 @@ pub async fn tick_mit_rueckschrieb(
                 if !karenz_abgelaufen(Some(&geloescht_at), jetzt) {
                     continue;
                 }
-                tracing::warn!(
-                    einsatz_id = id,
-                    "Purge Phase B: PII-SCHWÄRZUNG (irreversibel) — Karenz abgelaufen"
-                );
+                // Wie Phase A: erst nach dem Erfolg melden (LFH-756).
                 match repo::schwaerze_einsatz(pool, id, &jetzt_s).await {
                     Ok(true) => {
+                        tracing::warn!(
+                            einsatz_id = id,
+                            "Purge Phase B: PII-SCHWÄRZUNG (irreversibel) — Karenz abgelaufen"
+                        );
                         anzahl += 1;
                         geschwaerzt += 1;
                     }
@@ -249,6 +322,144 @@ mod tests {
             tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:05:00")).await,
             0
         );
+    }
+
+    thread_local! {
+        /// Ziel der Log-Ausgabe dieses Test-Threads, solange ein [`LogPuffer`] einfängt.
+        static LOG_ZIEL: std::cell::RefCell<Option<LogPuffer>> = const { std::cell::RefCell::new(None) };
+    }
+
+    /// Fängt die Log-Ausgabe eines Tests ein.
+    ///
+    /// Über EINEN globalen Subscriber, dessen Writer nur in den Puffer des eigenen Threads schreibt
+    /// (ein `#[tokio::test]` läuft auf genau einem). Ein thread-lokaler (`set_default`) fing unter
+    /// parallelen Tests mal alles, mal nichts: `tracing` speichert je Meldestelle zwischen, ob sie
+    /// jemand hören will, und das über alle Threads hinweg.
+    #[derive(Clone, Default)]
+    struct LogPuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    /// Hebt das Einfangen beim Verlassen des Tests auf.
+    struct LogWaechter;
+
+    impl Drop for LogWaechter {
+        fn drop(&mut self) {
+            LOG_ZIEL.with(|z| z.borrow_mut().take());
+        }
+    }
+
+    impl LogPuffer {
+        fn einfangen() -> (Self, LogWaechter) {
+            static GLOBAL: std::sync::Once = std::sync::Once::new();
+            GLOBAL.call_once(|| {
+                let _ = tracing::subscriber::set_global_default(
+                    tracing_subscriber::fmt()
+                        .with_writer(|| ThreadLog)
+                        .with_ansi(false)
+                        .with_max_level(tracing::Level::INFO)
+                        .finish(),
+                );
+            });
+            // Eine Meldestelle, die ein anderer Thread gerade während des Setzens registriert
+            // hat, kann sonst als „hört niemand“ stehen bleiben.
+            tracing::callsite::rebuild_interest_cache();
+            let puffer = Self::default();
+            LOG_ZIEL.with(|z| *z.borrow_mut() = Some(puffer.clone()));
+            (puffer, LogWaechter)
+        }
+
+        fn text(&self) -> String {
+            String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
+        }
+    }
+
+    /// Writer des globalen Test-Subscribers: schreibt in den Puffer des Threads oder verwirft.
+    struct ThreadLog;
+
+    impl std::io::Write for ThreadLog {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            LOG_ZIEL.with(|z| {
+                if let Some(puffer) = z.borrow().as_ref() {
+                    puffer.0.lock().unwrap().extend_from_slice(buf);
+                }
+            });
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Jeder Audit-Eintrag scheitert — Soft-Delete und Schwärzung brechen fail-closed ab.
+    async fn audit_scheitern_lassen(pool: &SqlitePool) {
+        sqlx::query(
+            "CREATE TRIGGER test_audit_scheitert BEFORE INSERT ON etb_eintrag \
+             BEGIN SELECT RAISE(ABORT, 'simulierter Audit-Fehler'); END",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn audit_wieder_zulassen(pool: &SqlitePool) {
+        sqlx::query("DROP TRIGGER test_audit_scheitert")
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn phase_a_meldet_den_soft_delete_erst_nach_dem_erfolg() {
+        // LFH-756: Scheitert das Soft-Delete fail-closed (hier am Audit-Eintrag), darf neben dem
+        // `error!` keine Erfolgsmeldung stehen — bei einer Blockade sonst alle 10 min.
+        let (puffer, _log) = LogPuffer::einfangen();
+        let pool = crate::db::test_pool().await;
+        abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        audit_scheitern_lassen(&pool).await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            0
+        );
+        let log = puffer.text();
+        assert!(log.contains("Purge Phase A fehlgeschlagen"), "{log}");
+        assert!(
+            !log.contains("Soft-Delete"),
+            "Erfolgsmeldung trotz Fehlschlag: {log}"
+        );
+
+        audit_wieder_zulassen(&pool).await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:10:00")).await,
+            1
+        );
+        let log = puffer.text();
+        assert_eq!(log.matches("Soft-Delete").count(), 1, "{log}");
+    }
+
+    #[tokio::test]
+    async fn phase_b_meldet_die_schwaerzung_erst_nach_dem_erfolg() {
+        let pool = crate::db::test_pool().await;
+        abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-02 12:00:00")).await,
+            1
+        );
+        let (puffer, _log) = LogPuffer::einfangen();
+        audit_scheitern_lassen(&pool).await;
+        let nach_karenz = t("2026-08-01 12:00:00");
+
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), nach_karenz).await, 0);
+        let log = puffer.text();
+        assert!(log.contains("Purge Phase B fehlgeschlagen"), "{log}");
+        assert!(
+            !log.contains("PII-SCHWÄRZUNG"),
+            "Erfolgsmeldung trotz Fehlschlag: {log}"
+        );
+
+        audit_wieder_zulassen(&pool).await;
+        assert_eq!(tick_einmal(&pool, &LiveHub::new(), nach_karenz).await, 1);
+        let log = puffer.text();
+        assert_eq!(log.matches("PII-SCHWÄRZUNG").count(), 1, "{log}");
     }
 
     #[tokio::test]
@@ -1361,6 +1572,218 @@ mod tests {
         assert_eq!(etb_erfasser(&pool, e).await, vec![admin]);
     }
 
+    // ---------- LFH-749: Phasen K1/K2 (Datenkategorien) ----------
+
+    async fn kategorie_mit_frist(pool: &SqlitePool, e: i64, k: &str, frist: &str) {
+        sqlx::query(
+            "INSERT INTO einsatz_aufbewahrung_kategorie (einsatz_id, kategorie, frist_bis, \
+                rechtsgrundlage) VALUES (?, ?, ?, 'RG')",
+        )
+        .bind(e)
+        .bind(k)
+        .bind(frist)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn kategorie_tombstones(
+        pool: &SqlitePool,
+        e: i64,
+        k: &str,
+    ) -> (Option<String>, Option<String>) {
+        sqlx::query_as(
+            "SELECT vorgemerkt_at, geschwaerzt_at FROM einsatz_aufbewahrung_kategorie \
+             WHERE einsatz_id = ? AND kategorie = ?",
+        )
+        .bind(e)
+        .bind(k)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn adresse_und_name(pool: &SqlitePool, e: i64) -> (Option<String>, Option<String>) {
+        sqlx::query_as("SELECT herkunft_adresse, name FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn person_mit_adresse(pool: &SqlitePool, e: i64) {
+        let von: i64 = sqlx::query_scalar("SELECT abgeschlossen_von FROM einsatz WHERE id = ?")
+            .bind(e)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, name, \
+                herkunft_adresse, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'betroffen', 'Mustermann', 'Hauptstr. 5', ?, ?)",
+        )
+        .bind(e)
+        .bind(von)
+        .bind(von)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// Spec `aufbewahrung-kategorien`, „Fällig“ und „Kategorie-Schwärzung“ über den Tick: Frist
+    /// abgelaufen → vorgemerkt (Einsatz bleibt unberührt), 29 Tage später nichts, 30 Tage später
+    /// geschwärzt samt Live-Meldung.
+    #[tokio::test]
+    async fn kategorie_ablauf_ueber_den_tick() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        person_mit_adresse(&pool, e).await;
+        kategorie_mit_frist(&pool, e, "personenauskunft", "2026-06-01 00:00:00").await;
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(e);
+
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-01 00:00:00")).await, 1);
+        let (v, g) = kategorie_tombstones(&pool, e, "personenauskunft").await;
+        assert_eq!(v.as_deref(), Some("2026-06-01 00:00:00"));
+        assert_eq!(g, None);
+        let geloescht: Option<String> =
+            sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geloescht, None, "der Einsatz bleibt unberührt");
+
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-30 00:00:00")).await, 0);
+        assert_eq!(
+            adresse_und_name(&pool, e).await.0.as_deref(),
+            Some("Hauptstr. 5")
+        );
+
+        while rx.try_recv().is_ok() {}
+        assert_eq!(tick_einmal(&pool, &live, t("2026-07-01 00:00:00")).await, 1);
+        assert_eq!(
+            kategorie_tombstones(&pool, e, "personenauskunft")
+                .await
+                .1
+                .as_deref(),
+            Some("2026-07-01 00:00:00")
+        );
+        assert_eq!(
+            adresse_und_name(&pool, e).await,
+            (None, None),
+            "nur registriert: Stamm mit"
+        );
+        let mut events = Vec::new();
+        while let Ok(n) = rx.try_recv() {
+            events.push(n.event);
+        }
+        assert!(events.contains(&LiveEvent::Person), "{events:?}");
+        assert!(events.contains(&LiveEvent::Dokument), "{events:?}");
+    }
+
+    /// Spec „Gesperrter Einsatz“: eine Kategorie mit abgelaufener Karenz wird auch an einem
+    /// vorgemerkten Einsatz geschwärzt; dessen Vormerkung bleibt.
+    #[tokio::test]
+    async fn kategorie_an_gesperrtem_einsatz() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2026-06-20 00:00:00").await;
+        person_mit_adresse(&pool, e).await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-06-20 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        kategorie_mit_frist(&pool, e, "personenauskunft", "2026-05-01 00:00:00").await;
+        sqlx::query(
+            "UPDATE einsatz_aufbewahrung_kategorie SET vorgemerkt_at = '2026-05-01 00:00:00' \
+             WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 12:00:00")).await,
+            1
+        );
+        assert!(kategorie_tombstones(&pool, e, "personenauskunft")
+            .await
+            .1
+            .is_some());
+        assert_eq!(adresse_und_name(&pool, e).await.0, None);
+        let (geloescht, geschwaerzt): (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geloescht.as_deref(), Some("2026-06-20 00:00:00"));
+        assert_eq!(geschwaerzt, None);
+    }
+
+    /// Spec „Zusammenspiel mit der Einsatz-Frist“: auch die Vormerkung (K1) läuft an einem
+    /// gesperrten Einsatz; dessen Vormerkung bleibt unverändert.
+    #[tokio::test]
+    async fn kategorie_vormerkung_an_gesperrtem_einsatz() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2026-06-20 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-06-20 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        kategorie_mit_frist(&pool, e, "anhaenge", "2026-06-25 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 12:00:00")).await,
+            1
+        );
+        let (v, g) = kategorie_tombstones(&pool, e, "anhaenge").await;
+        assert_eq!(v.as_deref(), Some("2026-06-30 12:00:00"));
+        assert_eq!(g, None);
+        let geloescht: Option<String> =
+            sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geloescht.as_deref(), Some("2026-06-20 00:00:00"));
+        let etb: Vec<String> =
+            sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(
+            etb.iter().any(|x| x.contains("„Anhänge“ abgelaufen")),
+            "{etb:?}"
+        );
+    }
+
+    /// Spec „Einsatz-Frist kürzer als Kategorie-Frist“: die Einsatz-Schwärzung nimmt die
+    /// Kategorie mit und setzt ihren Tombstone.
+    #[tokio::test]
+    async fn einsatz_schwaerzung_setzt_kategorie_tombstones() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2026-05-01 00:00:00").await;
+        kategorie_mit_frist(&pool, e, "behandlung", "2099-01-01 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-05-01 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 12:00:00")).await,
+            1
+        );
+        let (v, g) = kategorie_tombstones(&pool, e, "behandlung").await;
+        assert_eq!(v, None);
+        assert_eq!(g.as_deref(), Some("2026-06-30 12:00:00"));
+    }
+
     /// LFH-23, Anforderung „Karenz“: Phase B liest `retention_bis` nicht. Ein vorgemerkter
     /// Einsatz, dessen Frist direkt in der DB verlängert wurde, wird nach der Karenz trotzdem
     /// geschwärzt — maßgeblich ist allein `geloescht_at`.
@@ -1589,6 +2012,77 @@ mod tests {
             !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
             "Anhang-Bytes stehen noch in DB-Datei oder WAL"
         );
+    }
+
+    /// LFH-749, Spec `aufbewahrung-kategorien`, „Klartext ist physisch weg“: dasselbe für eine
+    /// Kategorie-Schwärzung an einem lesbaren Einsatz — Klartext in `herkunft_adresse`
+    /// (`personenauskunft`) und in einem Anhang (`anhaenge`), beide mit abgelaufener Karenz.
+    #[tokio::test]
+    async fn kategorie_schwaerzung_hinterlaesst_keine_altbytes() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, herkunft_adresse, \
+                erfasst_von, geaendert_von) VALUES (?, 1, 'betroffen', ?, ?, ?)",
+        )
+        .bind(e)
+        .bind(NAME_KLARTEXT)
+        .bind(b)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let daten = ANHANG_KLARTEXT.repeat(1000);
+        sqlx::query(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'foto.jpg', 'image/jpeg', ?, 'x', ?, ?)",
+        )
+        .bind(e)
+        .bind(daten.len() as i64)
+        .bind(&daten)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        for k in ["personenauskunft", "anhaenge"] {
+            kategorie_mit_frist(&pool, e, k, "2026-01-01 00:00:00").await;
+        }
+        sqlx::query(
+            "UPDATE einsatz_aufbewahrung_kategorie SET vorgemerkt_at = '2026-01-02 00:00:00' \
+             WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            enthaelt_klartext(&pfad),
+            "Vorbedingung: Klartext liegt in der Datei"
+        );
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            2
+        );
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, NAME_KLARTEXT.as_bytes()),
+            "Adresse aus der Kategorie-Spalte steht noch in DB-Datei oder WAL"
+        );
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
+            "Anhang-Bytes stehen noch in DB-Datei oder WAL"
+        );
+        let geschwaerzt: Option<String> =
+            sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geschwaerzt, None, "der Einsatz selbst ist nicht geschwärzt");
     }
 
     /// Spec `aufbewahrung`, Szenario „Rückschrieb blockiert“: ein Lesender mit älterem Stand

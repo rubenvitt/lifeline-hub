@@ -1,11 +1,11 @@
 import {
-  IkoneGebaeudegruppe,
-  IkonePersonen,
-  IkonePfote,
-  IkoneSchild,
-  IkoneSpross,
-  type Ikone,
-} from '../../ikonen';
+  IconGebaeudegruppe,
+  IconPersonen,
+  IconPfote,
+  IconSchild,
+  IconSpross,
+  type Icon,
+} from '../../icons';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Button, Dropdown, Space, Table, Tooltip, Typography, theme } from 'antd';
 import type { GlobalToken, TableColumnsType, TableRef } from 'antd';
@@ -72,12 +72,12 @@ interface Zellkennung {
  * Symbol + Kurzform je Schutzobjekt; das Kurzwort ist der zweite Kanal. Exportiert für den
  * Matrixauszug der Palettenvorschau.
  */
-export const SPALTENKOPF: Record<Schutzobjekt, { icon: Ikone; kurz: string }> = {
-  menschen: { icon: IkonePersonen, kurz: 'Mensch' },
-  tiere: { icon: IkonePfote, kurz: 'Tier' },
-  umwelt: { icon: IkoneSpross, kurz: 'Umwelt' },
-  sachwerte: { icon: IkoneGebaeudegruppe, kurz: 'Sache' },
-  einsatzkraefte: { icon: IkoneSchild, kurz: 'Kraft' },
+export const SPALTENKOPF: Record<Schutzobjekt, { icon: Icon; kurz: string }> = {
+  menschen: { icon: IconPersonen, kurz: 'Mensch' },
+  tiere: { icon: IconPfote, kurz: 'Tier' },
+  umwelt: { icon: IconSpross, kurz: 'Umwelt' },
+  sachwerte: { icon: IconGebaeudegruppe, kurz: 'Sache' },
+  einsatzkraefte: { icon: IconSchild, kurz: 'Kraft' },
 };
 
 /** Balken einer Matrixzelle — rein; ohne Warnstufe kein Balken. */

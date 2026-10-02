@@ -9,6 +9,7 @@ import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
 import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
 import { adminFixture } from '../test/fixtures';
+import { globalKeys } from '../api/queryKeys';
 
 /** Archivakte. */
 
@@ -29,6 +30,7 @@ function akte(zustand: AufbewahrungZustand): ArchivAkte {
     zustand,
     karenz_ende: zustand === 'vorgemerkt' ? '2026-07-01 18:10:00' : undefined,
     antrag_faellig_at: zustand === 'schwaerzung_beantragt' ? '2026-10-03 08:00:00' : undefined,
+    kategorien: [],
     personen: [
       {
         registrier_nr: 1,
@@ -75,6 +77,7 @@ function zeige(
   zustand: AufbewahrungZustand,
   seiten?: ArchivEtbEintrag[][],
   route = '/admin/aufbewahrung/7',
+  akteWert: ArchivAkte = akte(zustand),
 ) {
   etbAufrufe = [];
   const vorgabe = [
@@ -83,7 +86,7 @@ function zeige(
   const liste = seiten ?? vorgabe;
   server.use(
     meHandler(ME_ADMIN),
-    http.get('/api/aufbewahrung/einsaetze/7', () => HttpResponse.json(akte(zustand))),
+    http.get('/api/aufbewahrung/einsaetze/7', () => HttpResponse.json(akteWert)),
     http.get('/api/aufbewahrung/einsaetze/7/schwaerzungsantraege', () => HttpResponse.json([])),
     http.get('/api/aufbewahrung/einsaetze/7/etb', ({ request }) => {
       const url = new URL(request.url);
@@ -145,6 +148,35 @@ describe('ArchivAktePage — Inhalt', () => {
     expect(screen.getByText('S-001')).toBeInTheDocument();
     expect(screen.getByText('Keine Tiere erfasst')).toBeInTheDocument();
     expect(screen.getAllByText('zur Löschung vorgemerkt').length).toBeGreaterThan(0);
+  });
+
+  it('LFH-749: Block „Datenkategorien“ zeigt Zustand, Zeitpunkt und Rechtsgrundlage, nur lesend', async () => {
+    zeige('frist_laeuft', undefined, undefined, {
+      ...akte('frist_laeuft'),
+      kategorien: [
+        { kategorie: 'behandlung', zustand: 'ohne_frist' },
+        {
+          kategorie: 'personenauskunft',
+          zustand: 'geschwaerzt',
+          geschwaerzt_at: '2026-06-02 10:00:00',
+          rechtsgrundlage: '§ 46 Abs. 5 BHKG NRW',
+        },
+        {
+          kategorie: 'anhaenge',
+          zustand: 'frist_laeuft',
+          frist_bis: '2099-01-01 00:00:00',
+          rechtsgrundlage: 'RG',
+        },
+      ],
+    });
+    const titel = await screen.findByText('Datenkategorien', { selector: 'h2, h3, h4, span, div' });
+    const paneel = titel.closest<HTMLElement>('[data-lfh="paneel"]') ?? document.body;
+    expect(
+      await within(paneel).findByText('Rechtsgrundlage: § 46 Abs. 5 BHKG NRW'),
+    ).toBeInTheDocument();
+    expect(within(paneel).getByText(/geschwärzt am/)).toBeInTheDocument();
+    expect(within(paneel).getByText('Frist läuft')).toBeInTheDocument();
+    expect(within(paneel).queryAllByRole('button')).toEqual([]);
   });
 
   it('die Zeitachse trägt keine Links, der Berichtigungsverweis steht als Text', async () => {
@@ -288,5 +320,88 @@ describe('ArchivAktePage — Löschersuchen (LFH-751)', () => {
     zeige('schwaerzung_beantragt');
     expect(await kopfAktionen()).toEqual([]);
     expect(screen.getByText('Schwärzung auf Antrag ab')).toBeInTheDocument();
+  });
+});
+
+describe('ArchivAktePage — Frist aufheben (LFH-756)', () => {
+  it('im Zustand „fällig“ hebt der Schalter „unbegrenzt“ die Frist ohne Rückfrage auf', async () => {
+    // Fällig sperrt den Einsatz, die Einstellungen liefern 403: die Akte ist der einzige Weg.
+    const gesendet: unknown[] = [];
+    zeige('faellig');
+    server.use(
+      http.put('/api/einsaetze/7/aufbewahrungsfrist', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ id: 7 });
+      }),
+    );
+    const [knopf] = await kopfAktionen();
+    await userEvent.click(knopf);
+    const dialog = await screen.findByRole('dialog', { name: 'Aufbewahrungsfrist ändern' });
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Unbegrenzt aufbewahren' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Frist aufheben' }));
+    await waitFor(() => expect(gesendet).toEqual([{ retention_bis: null }]));
+    expect(screen.queryByText('Aufbewahrungsfrist verkürzen?')).toBeNull();
+  });
+});
+
+describe('ArchivAktePage — gescheiterter Neuabruf (LFH-756)', () => {
+  it.each([403, 404, 409])(
+    'nach %i verschwindet die gecachte Akte — der Stand gilt nicht mehr',
+    async (status) => {
+      const { client } = zeige('vorgemerkt');
+      expect(await screen.findByText('R-001')).toBeInTheDocument();
+      server.use(
+        http.get('/api/aufbewahrung/einsaetze/7', () =>
+          HttpResponse.json({ error: 'Kein Zugriff' }, { status }),
+        ),
+      );
+      await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungAkte(7) });
+      expect(await screen.findByText('Archivakte nicht ladbar')).toBeInTheDocument();
+      expect(screen.queryByText('R-001')).toBeNull();
+      expect(screen.queryByText('Hochwasser Nord', { exact: false })).toBeNull();
+    },
+  );
+
+  it('ein anderer Fehler lässt die Akte stehen und meldet den veralteten Stand', async () => {
+    const { client } = zeige('vorgemerkt');
+    expect(await screen.findByText('R-001')).toBeInTheDocument();
+    server.use(
+      http.get('/api/aufbewahrung/einsaetze/7', () =>
+        HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungAkte(7) });
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('R-001')).toBeInTheDocument();
+  });
+
+  it('ein gescheiterter Neuabruf des Tagebuchs meldet den veralteten Stand über der Liste', async () => {
+    const { client } = zeige('geschwaerzt');
+    expect(await screen.findByText('Eintrag 3')).toBeInTheDocument();
+    server.use(
+      http.get('/api/aufbewahrung/einsaetze/7/etb', () =>
+        HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungEtb(7, undefined) });
+    expect(
+      await screen.findByText(/Angezeigter Stand konnte nicht aktualisiert werden/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Eintrag 3')).toBeInTheDocument();
+  });
+
+  it('ein 403 beim Neuabruf des Tagebuchs räumt die Einträge', async () => {
+    const { client } = zeige('geschwaerzt');
+    expect(await screen.findByText('Eintrag 3')).toBeInTheDocument();
+    server.use(
+      http.get('/api/aufbewahrung/einsaetze/7/etb', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: globalKeys.aufbewahrungEtb(7, undefined) });
+    expect(await screen.findByText('Einsatztagebuch nicht ladbar')).toBeInTheDocument();
+    expect(screen.queryByText('Eintrag 3')).toBeNull();
   });
 });

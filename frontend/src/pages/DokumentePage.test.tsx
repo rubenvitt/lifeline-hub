@@ -572,4 +572,20 @@ describe('DokumentePage — Original-Verweis (LFH-747)', () => {
     await screen.findByRole('link', { name: 'Lagefoto' });
     expect(screen.queryByText('Original (mit Standort)')).toBeNull();
   });
+
+  it('zeigt auch Beobachtern am Foto ein Vorschaubild, am PDF nicht (LFH-759)', async () => {
+    rendere(einsatzBeobachter, [dokument(), foto]);
+    const knopf = await screen.findByRole('button', {
+      name: 'Vorschau: lage.jpg, Dokument Lagefoto',
+    });
+    expect(knopf.querySelector('img')).toHaveAttribute(
+      'src',
+      `${dokumentDownloadPfad(1, 6)}?fassung=vorschau`,
+    );
+    expect(screen.getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Lagefoto' })).toHaveAttribute(
+      'href',
+      dokumentDownloadPfad(1, 6),
+    );
+  });
 });

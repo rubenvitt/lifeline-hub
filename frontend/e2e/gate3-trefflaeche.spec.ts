@@ -217,6 +217,32 @@ test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px',
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// Profil → „2FA einrichten“ (LFH-763): die Kopieraktion neben dem TOTP-Geheimnis. antds
+// `Typography copyable` maß hier 15 × 13 px in jeder Stufe; `KopierbarerText` trägt einen echten
+// Knopf. Eigenes Konto, damit das unbestätigte Geheimnis nicht am Admin hängt.
+test('Profil: die Kopieraktion des TOTP-Geheimnisses hält 30 / 48 / 72 px in beiden Achsen', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  await wechsleZu(page, await benutzerAnlegen(page, 'fuehrungskraft'));
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto('/profil');
+    await stelleDichte(page, dichte);
+    await page.getByRole('button', { name: '2FA einrichten' }).click();
+    const knopf = page.getByRole('button', { name: 'TOTP-Geheimnis kopieren', exact: true });
+    const hoehe = await haeltStufe(knopf, soll, `TOTP-Geheimnis kopieren (${dichte})`);
+    const breite = (await knopf.boundingBox())!.width;
+    expect(
+      breite,
+      `TOTP-Geheimnis kopieren (${dichte}, ${breite}px breit, Soll ≥ ${soll})`,
+    ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${breite} × ${hoehe}px`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // Sichtbare Feldhüllen, Zuordnungszeilen und Aktionsabstände, im Browser gemessen.
 
 test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und den Aktionsabstand', async ({
