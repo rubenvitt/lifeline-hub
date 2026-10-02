@@ -74,7 +74,7 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   hochladenden Person (sonst 404).
 
 **Erfassungs-Anhänge (LFH-21, LFH-758)** (Specs `schaden-anhaenge`, `tier-anhaenge`,
-`uhs-anhaenge`): Liste, Ablage, Soft-Delete und Download-Lookup stehen EINMAL im Kern
+`uhs-anhaenge`; Herleitung `openspec/changes/archive/2026-10-02-lfh-758-anhaenge-tiere-uhs/design.md`): Liste, Ablage, Soft-Delete und Download-Lookup stehen EINMAL im Kern
 `anhang::erfassung`; ein Modul bringt nur einen `ErfassungsAblage`-Deskriptor (in
 `ERFASSUNGS_ABLAGEN`), lädt seinen Besitzer im `write_retry!` (`BesitzerKopf`) und mappt die Zeile
 auf sein DTO. Ein neues Modul braucht: Linker-Migration (Muster `0126`), Eintrag in `MODUL_LINKER`

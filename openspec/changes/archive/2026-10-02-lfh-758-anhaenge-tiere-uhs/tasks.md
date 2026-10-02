@@ -167,9 +167,12 @@ sie auch ohne Registereintrag grün.
 ## 8. Integration und Abschluss
 
 - [x] 8.1 Folgeticket „Bild als Hintergrund des UHS-Platz-Layouts“ auf dem Entwicklungsboard anlegen (Skill `clickup-task-anlegen`), soweit es nicht schon besteht. Verifiziert durch den Ticket-Link im PR-Text. **Angelegt: LFH-999.**
-- [ ] 8.2 Gesamt-Gate:
+- [x] 8.2 Gesamt-Gate:
   - `./scripts/check-all.sh` grün;
   - zusätzlich `cargo test --no-default-features`, weil Anhang-Code berührt ist;
   - `scripts/check-migrationen.sh` unmittelbar vor dem PR gegen frisches `origin/alpha`.
 
   Verifiziert durch die Exit-Codes (ohne `| tail`).
+
+  **Stand 02.10.2026 (Cloud-Sitzung):** Bündel `schnell` grün (alle zehn Schritte, Migrationen 0135–0137 über `origin/alpha` 0134). Rust-Workspace grün (123 Test-Binaries ohne Fehler); die Desktop-Hülle baut in dieser Sitzung nicht (`gdk-sys`, GTK fehlt im Container) und ist unberührt. `cargo test --no-default-features` für die drei Scan-Binaries grün. Vitest: 9 Fehlschläge in vier unberührten Dateien (`DemoDatenPage`, `EtbFilterleiste`, `LageberichtVorschau`, `FachebenenInspector`), auf sauberem `origin/alpha` identisch — Zeitzone/Locale des Containers. e2e lokal nur mit Chromium 1194 (s. 6.2). Der volle Lauf ohne `--nur` belegt die CI dieses PRs.
+
