@@ -193,6 +193,9 @@ fn b64url(bytes: &[u8]) -> String {
 
 // ----- Passwort mit TOTP -----
 
+/// Startpasswort des Test-Admins aus `common::setup_mit_pool` (`bootstrap_admin`).
+const ADMIN_PASSWORT: &str = "startpw12";
+
 fn jetzt_unix() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -202,7 +205,7 @@ fn jetzt_unix() -> u64 {
 
 /// Aktiviert TOTP für den Admin über den regulären Enroll-Flow; liefert das Secret.
 async fn totp_fuer_admin_aktivieren(app: &axum::Router) -> String {
-    let admin = common::login_cookie(app, "admin", "startpw12").await;
+    let admin = common::login_cookie(app, "admin", ADMIN_PASSWORT).await;
     let (status, json) =
         common::anfrage(app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
@@ -230,7 +233,8 @@ async fn passwort_schritt(app: &axum::Router, ip: &str) -> String {
                 .uri("/api/auth/login")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
-                    r#"{"benutzername":"admin","passwort":"startpw12"}"#,
+                    serde_json::json!({ "benutzername": "admin", "passwort": ADMIN_PASSWORT })
+                        .to_string(),
                 ))
                 .unwrap(),
             ip,
