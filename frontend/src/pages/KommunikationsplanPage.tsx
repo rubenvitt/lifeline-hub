@@ -317,7 +317,10 @@ export default function KommunikationsplanPage() {
   const stellen = useQuelle(stellenQuery);
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
-  const stabZustand: AbrufZustand = stabQuery.data != null ? 'daten' : abrufZustand(stabQuery);
+  // Ohne Netz pausiert die Abfrage und bliebe für immer „lädt“; die Besetzung ist dann schlicht
+  // nicht geladen (D9: der Stab außer dem Plan liegt nicht auf der Platte).
+  const stabZustand: AbrufZustand =
+    stabQuery.data != null ? 'daten' : ohneVerbindung ? 'fehler' : abrufZustand(stabQuery);
   const plan = useMemo(
     () =>
       baueKommunikationsplan({
@@ -339,6 +342,11 @@ export default function KommunikationsplanPage() {
           g.zeilen.length > 0 ? g.zeilen.map((z) => ({ key: z.schluessel, zeile: z })) : undefined,
       })),
     [plan],
+  );
+
+  const flach = useMemo(
+    () => zeilen.flatMap((g) => [{ key: g.key, gruppe: g.gruppe }, ...(g.children ?? [])]),
+    [zeilen],
   );
 
   // Zugeklappt statt aufgeklappt gemerkt: der Plan wird gelesen, also steht er offen.
@@ -511,7 +519,7 @@ export default function KommunikationsplanPage() {
           wrap
           style={{ marginBlockEnd: token.margin }}
         >
-          <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
+          <DruckKnopf />
         </Space>
         {entfernFehler != null && (
           <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
@@ -523,15 +531,20 @@ export default function KommunikationsplanPage() {
           bezeichnung="Kommunikationsplan"
           form="tabelle"
           spalten={spalten}
-          daten={zeilen}
+          // Im Druck flach: alles steht da, und kein Aufklappsymbol landet auf dem Papier.
+          daten={druckt ? flach : zeilen}
           zeilenSchluessel="key"
           ladend={stellen.zustand === 'laden'}
-          baum={{
-            kinder: 'children',
-            aufgeklappt,
-            onAufgeklappt: (offen) =>
-              setZugeklappt(new Set(aufklappbar.filter((k) => !offen.includes(k)))),
-          }}
+          baum={
+            druckt
+              ? undefined
+              : {
+                  kinder: 'children',
+                  aufgeklappt,
+                  onAufgeklappt: (offen) =>
+                    setZugeklappt(new Set(aufklappbar.filter((k) => !offen.includes(k)))),
+                }
+          }
           karte={{
             art: 'plan',
             titel: {

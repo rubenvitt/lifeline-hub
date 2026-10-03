@@ -1,6 +1,6 @@
 # Stab — Regeln
 
-Gilt für `frontend/src/stab/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
+Gilt für `frontend/src/stab/`, `pages/StabPage.tsx`, `pages/FunkplanPage.tsx`, `pages/KommunikationsplanPage.tsx`, die S5-Seiten (`pages/PressePage.tsx`, `pages/PressemitteilungDetailPage.tsx`, `pages/InfotelefonPage.tsx`, `presse/`, `infotelefon/`) und `src/stab/`, `src/presse/`, `src/infotelefon/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
 **Funkplan S6** (LFH-548, `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md`):
 Unterroute `stab/funkplan` (`funkplanPfad`), kein Modul, Einstieg in der S6-Zeile; die Seite
@@ -19,6 +19,26 @@ Kante (gemeinsame Sprechgruppe zur übergeordneten Stelle) und ihre Lücke nur �
 `verbindungsurteil` in `stab/luecken.ts`; „ohne Urteil“, wenn einer Seite jede Sprechgruppe fehlt.
 Keine Leitung, Stärke, Erreichbarkeit, keine Fahrzeuge; keine eigene Übernahme, eine Druckwurzel
 mit Druckkopf je Darstellung, getrennte Klappmengen.
+
+**Sprechgruppen** (LFH-848 D8): dritte Darstellung des Funkplans („Tabelle | Skizze |
+Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
+`stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen`: zugeordnete plus einsatzlokale
+Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Fehlt eine Strukturquelle, steht „—“ bzw.
+„unvollständig“ mit Grund, nie „keine“. Eigene `key` je `Datensicht` (zwei Sichten in einer Datei).
+
+**Kommunikationsplan S6** (LFH-848,
+`openspec/changes/archive/2026-10-03-lfh-848-kommunikationsplan/design.md`): Unterroute
+`stab/kommunikationsplan` (`kommunikationsplanPfad`), zweiter S6-Eintrag in `stab/unterseiten.ts`,
+`useStabFreigabe` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
+dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/stab/kommunikation.rs`,
+zwei Tabellen, eine Funktion je Einsatz, FHP/FB je Bezeichnung); **Abschnitte und Einheiten werden
+abgeleitet** (Kommunikationsmittel/Erreichbarkeit, Zeile führt zum Datensatz, keine zweite
+Datenhaltung). Die Besetzung ist nur Nebentext, **Kontaktangaben des Personals kommen nie vor**.
+Kern `stab/kommunikationsplan.ts`, Lücke „Leitstelle“ nur über `stab/luecken.ts`. `tel:` nur
+Festnetz/Mobil, `mailto:` nur mit `@`. **Kein Lagebericht**, Druck ja (im Druck flach, ohne
+Aktionsspalte). **Offline lesbar** als einziger Stab-Unter-Key in `LAGEBILD_OFFLINE`; ohne Netz
+Bedienung gesperrt, nicht versteckt, Besetzung „nicht geladen“. Schreibantworten tragen den ganzen
+Plan (`setQueryData`). Die eigene Führungsstelle fehlt, bis LFH-849 sie liefert.
 
 **Checkliste Arbeitsaufnahme** (LFH-551,
 `openspec/changes/archive/2026-09-30-lfh-551-stab-checkliste-arbeitsaufnahme/design.md`): unterstes

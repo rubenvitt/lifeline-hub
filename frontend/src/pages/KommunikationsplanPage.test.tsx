@@ -306,6 +306,19 @@ describe('KommunikationsplanPage — Schreibrecht und Netz', () => {
   });
 });
 
+describe('KommunikationsplanPage — Besetzung ohne Netz', () => {
+  it('sagt „nicht geladen“ statt ewig „lädt“, wenn die Besetzung ohne Netz fehlt', async () => {
+    vi.mocked(ladeStab).mockReturnValue(new Promise(() => {}));
+    const { container } = setup();
+    await screen.findByText('Polizei PI Nord');
+    expect(within(zeile(container, 'st-1')).getByText('Besetzung lädt')).toBeInTheDocument();
+    setzeOnline(false);
+    expect(
+      await within(zeile(container, 'st-1')).findByText('Besetzung nicht geladen'),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('KommunikationsplanPage — Bearbeiten', () => {
   it('legt eine Leitstelle an und übernimmt die Antwort des Servers', async () => {
     vi.mocked(legeKommunikationsStelleAn).mockResolvedValue([S2, POLIZEI, ILS]);

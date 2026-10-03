@@ -281,3 +281,19 @@ abgeleitete erste Zeile zeigen (Kommunikationsmittel, Erreichbarkeit), ohne eige
 - Neue Migration mit zwei Tabellen, nur additiv. Rückweg: Einstieg entfernen; die Tabellen bleiben
   (Migrationen werden nicht zurückgenommen).
 - Kein Datenübernahme-Schritt: Abschnitte und Einheiten werden gelesen, nicht kopiert.
+
+## Nachträge (Bau)
+
+- **D5, Messung vor dem Bau** (`e2e/kommunikationsplan.spec.ts`, 1366 × 768, Panel offen):
+  Contentbreite 1050 px, Zellpolster 22 px. Längste Funktion („Führungshilfspersonal ·
+  Lagekartenführer“) 262 px, Rufnummer `+49 421 361-12345` in Mono 14 136 px, Hinweis mit 60
+  Zeichen 388 px. Gewählt: Stelle 260 · Besetzung 180 · Aktionen 160 (Zahlbreiten, Σ 600) plus
+  Verbindungen `mindestBreite` 300 = 900 px. Die längste Funktion und der Hinweis brechen um, statt
+  die Summe zu sprengen; kein Überhang am Fükw und bei 390 px (5 × 2 Läufe grün).
+- **D5, Rückfrage beim Entfernen einer Stelle:** ein Dialog statt `Popconfirm`, weil der Auslöser
+  ein Menüeintrag ist, an dem kein Popover hängen kann. Ohne Verbindungen entfällt sie.
+- **D5, Gruppen als Baumknoten**, im Druck flach: so steht kein Aufklappsymbol auf dem Papier.
+- **D5, wählbare Nummern** tragen `stabZeilenzielStil` (Höhe aus `controlHeight`, Gate 3).
+- **D9, Besetzung ohne Netz:** die Stab-Abfrage pausiert offline und stünde sonst für immer auf
+  „lädt“; ohne Verbindung gilt sie als „nicht geladen“.
+- **D7:** LFH-849 ist nicht auf `alpha`; Kommentar mit dem Nachzug steht in LFH-849.

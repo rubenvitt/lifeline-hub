@@ -1530,6 +1530,96 @@ test('Funkplan (Beobachter): Titel-Links, Lücken-Verweise und Drucken folgen de
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Kommunikationsplan S6 (LFH-848) ──────────────────────────────────────────────────
+//
+// Wählbare Nummern (`tel:`) als handgebaute Bedienziele (`stabZeilenzielStil`), die Titel-Links
+// abgeleiteter Zeilen, „+ Verbindung“, der Menüauslöser und die Seitenknöpfe. Der Beobachter
+// misst ohne Aktionsspalte und ohne „Stelle hinzufügen“.
+
+async function kommunikationsplanSaeen(page: Page, einsatzId: string) {
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const plan = await page.request.post(`${basis}/stab/kommunikationsplan/stellen`, {
+    data: { stellenart: 'leitstelle', bezeichnung: 'ILS Nord' },
+  });
+  expect(plan.ok(), `Seeding Stelle: ${await plan.text()}`).toBeTruthy();
+  const [stelle] = (await plan.json()) as { id: number }[];
+  const verbindung = await page.request.post(
+    `${basis}/stab/kommunikationsplan/stellen/${stelle.id}/verbindungen`,
+    { data: { mittel: 'festnetz', wert: '0421 112' } },
+  );
+  expect(verbindung.ok(), `Seeding Verbindung: ${await verbindung.text()}`).toBeTruthy();
+  const abschnitt = await page.request.post(`${basis}/abschnitte`, {
+    data: { name: 'Abschnitt Nord', kommunikationsmittel: 'mobil', erreichbarkeit: '0170 1' },
+  });
+  expect(abschnitt.ok(), `Seeding Abschnitt: ${await abschnitt.text()}`).toBeTruthy();
+}
+
+async function messeKommunikationsplan(
+  page: Page,
+  soll: number,
+  dichte: string,
+  schreibend: boolean,
+) {
+  const tabelle = page.getByRole('region', { name: 'Kommunikationsplan', exact: true });
+  // Datenanker: Nummer der Leitstelle und Titel-Link des Abschnitts stehen beide.
+  await expect(tabelle.getByRole('link', { name: '0421 112' })).toHaveCount(1);
+  await expect(tabelle.getByRole('link', { name: 'Abschnitt Nord' })).toHaveCount(1);
+  if (!schreibend) {
+    await expect(
+      page.getByRole('button', { name: 'Stelle hinzufügen' }),
+      'Vorbedingung: ohne Schreibrecht kein „Stelle hinzufügen“',
+    ).toHaveCount(0);
+  }
+  // Zwei Nummern (Leitstelle, Abschnitt) und ein Titel-Link (Abschnitt).
+  const links = await alleHaltenStufe(tabelle.getByRole('link'), soll, `Link (${dichte})`, 3);
+  const druck = await haeltStufe(
+    page.getByRole('button', { name: /Drucken/ }),
+    soll,
+    `Drucken (${dichte})`,
+  );
+  let schreiben = '';
+  if (schreibend) {
+    const neu = await haeltStufe(
+      page.getByRole('button', { name: 'Stelle hinzufügen', exact: true }),
+      soll,
+      `Stelle hinzufügen (${dichte})`,
+    );
+    const verbindung = await haeltStufe(
+      tabelle.getByRole('button', { name: 'Verbindung zu ILS Nord hinzufügen' }),
+      soll,
+      `+ Verbindung (${dichte})`,
+    );
+    const menue = await haeltStufe(
+      tabelle.getByRole('button', { name: 'Weitere Aktionen zu ILS Nord' }),
+      soll,
+      `Menü (${dichte})`,
+    );
+    schreiben = `, Stelle hinzufügen ${neu}, + Verbindung ${verbindung}, Menü ${menue}`;
+  }
+  return `${dichte} (Soll ≥ ${soll}): Link ${links}, Drucken ${druck}${schreiben}`;
+}
+
+for (const schreibend of [true, false]) {
+  test(`Kommunikationsplan (${schreibend ? 'Admin' : 'Beobachter'}): Bedienziele folgen der Dichte-Staffel 30 / 48 / 72 px`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize(FUEKW);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Kommunikationsplan`);
+    await kommunikationsplanSaeen(page, einsatzId);
+    if (!schreibend) await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+    const gemessen: string[] = [];
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(`/einsaetze/${einsatzId}/stab/kommunikationsplan`);
+      await stelleDichte(page, dichte);
+      gemessen.push(await messeKommunikationsplan(page, soll, dichte, schreibend));
+    }
+    test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+  });
+}
+
 // ── Fernmeldeskizze (LFH-625) ────────────────────────────────────────────────────────
 //
 // Darstellung „Skizze“ des Funkplans über dem geteilten Gerüst: Namen als handgebaute
