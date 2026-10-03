@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +15,7 @@ import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
 import type { ModulFreigaben } from '../api/types';
+import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 // Der Unwetter-Wächter hängt am Modulzähler-Modul und hat eigene Tests (`wetter/`, LFH-663).
@@ -49,6 +51,23 @@ function PfadAnzeige() {
       {pathname}
     </span>
   );
+}
+
+/**
+ * Sonde für die Modulfreigaben (LFH-788): erscheint erst, wenn die Server-Antwort im Cache steht.
+ * Sie hängt am selben Key wie der Rahmen und rendert deshalb im selben Durchgang mit ihm; ein
+ * eigener Abruf (`skipToken`) entsteht nicht. Ohne sie gibt es bei den vollen Freigaben kein
+ * Zeichen, dass sie angekommen sind — bis dahin zeigt die Navigation jedes Modul offen und der
+ * Rail-Sprung geht ins Leere.
+ */
+function FreigabenSonde() {
+  const { data } = useQuery({ queryKey: einsatzKeys.modulFreigaben(7), queryFn: skipToken });
+  return data ? <span data-testid="freigaben-da" /> : null;
+}
+
+/** Wartet, bis der Rahmen mit den Freigaben des Servers gerendert hat (Anker vor einem Klick). */
+async function freigabenAngekommen() {
+  expect(await screen.findByTestId('freigaben-da')).toBeInTheDocument();
 }
 
 /** Liest den aktuellen Pfad aus der `PfadAnzeige`-Sonde. */
@@ -95,6 +114,7 @@ function setup(
         </Route>
       </Routes>
       <PfadAnzeige />
+      <FreigabenSonde />
     </CommandPaletteProvider>,
     { route },
   );
@@ -212,9 +232,12 @@ describe('EinsatzLayout', () => {
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
     // 'personen' ausblenden; das Erfassung-Panel ist via /etb offen.
     setup(freigabenFixture({ personen: { sichtbar: false, zugriff: false } }));
-    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Personen' })).not.toBeInTheDocument();
+    // Erst der Panel-Anker, dann die Abwesenheit ABWARTEN: bis die Freigaben ankommen, steht
+    // „Personen" offen da (LFH-788). Der ETB-Inhalt allein sagt darüber nichts.
+    expect(await screen.findByRole('button', { name: 'ETB' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Personen' })).not.toBeInTheDocument(),
+    );
   });
 
   it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
@@ -278,8 +301,9 @@ describe('EinsatzLayout', () => {
   it('bei gescheitertem Freigaben-Abruf warnt ein Banner, der Rahmen bleibt bedienbar', async () => {
     setup(freigabenFixture(), { freigaben: true });
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Der Banner folgt dem Freigaben-Abruf, nicht dem Einsatz: abwarten (LFH-788).
     expect(
-      screen.getByText(
+      await screen.findByText(
         'Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind.',
       ),
     ).toBeInTheDocument();
@@ -289,6 +313,8 @@ describe('EinsatzLayout', () => {
   it('ohne Freigaben-Fehler steht kein Warnbanner über dem Rahmen', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Erst wenn der Abruf entschieden ist, ist die Abwesenheit eine Aussage (LFH-788).
+    await freigabenAngekommen();
     expect(
       screen.queryByText(
         'Modulfreigaben konnten nicht geladen werden — die Navigation zeigt womöglich Module, die für diesen Einsatz ausgeblendet oder gesperrt sind.',
@@ -604,6 +630,8 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
   it('springt beim Klick auf eine ANDERE Kategorie in deren erstes Modul', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Ohne Freigaben gibt der Resolver nichts frei, der Klick spränge nirgends hin (LFH-788).
+    await freigabenAngekommen();
 
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
 
@@ -621,6 +649,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     localStorage.clear();
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
 
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
 
@@ -687,6 +716,8 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     );
     setup(lageVersteckt);
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Sonst bliebe der Pfad schon deshalb stehen, weil noch keine Freigaben da sind (LFH-788).
+    await freigabenAngekommen();
     const vorher = pfad();
 
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
