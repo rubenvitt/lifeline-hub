@@ -595,7 +595,7 @@ pub async fn frist_setzen(
 /// die Org kommt aus `einsatz.org_id`, nie aus der Zeilenreihenfolge der Organisationen).
 /// `None`, wenn keiner auffindbar ist; dann bricht [`system_audit_tx`] die Mutation ab.
 /// Läuft auf der übergebenen tx-Verbindung.
-pub(super) async fn ermittle_system_akteur(
+pub(crate) async fn ermittle_system_akteur(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
 ) -> Result<Option<i64>, AppError> {
@@ -637,7 +637,7 @@ pub(super) async fn ermittle_system_akteur(
 /// Der Aufrufer rollt damit seine Transaktion zurück — Vormerkung bzw. Schwärzung
 /// unterbleiben und werden im nächsten Purge-Lauf erneut versucht. Eine
 /// Aufbewahrungs-Mutation ohne ETB-Eintrag gibt es nicht.
-pub(super) async fn system_audit_tx(
+pub(crate) async fn system_audit_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     etb_startwert: i64,
@@ -868,6 +868,87 @@ pub async fn faellige_purge(
     Ok(rows)
 }
 
+/// Audit-Text einer Schwärzung des ganzen Einsatzes; `grund` steht in der Klammer
+/// (Frist und Karenz bzw. das Löschersuchen mit Aktenzeichen, LFH-751).
+pub(crate) fn schwaerzungs_audit(grund: &str) -> String {
+    format!(
+        "PII-Schwärzung durchgeführt ({grund}). \
+         Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
+         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
+         die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
+         Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
+         Befehle, Pressemitteilungen, Lagebesprechungen)) wurden unwiderruflich entfernt. \
+         Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
+         operative Objekte, die Struktur von Chat, Erinnerungen und Führungsmodulen mit \
+         Nummern, Zeitpunkten, Verfassern und Status), die Führungsdokumentation im ETB im \
+         Wortlaut (auch ins ETB heraufgestufte Chat-Nachrichten) und anonymisierte \
+         Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/statistische \
+         Aufbewahrung."
+    )
+}
+
+/// Schwärzt einen abgeschlossenen, nicht geschwärzten Einsatz auf Antrag (Art. 17, LFH-751) —
+/// auf der Transaktion des Aufrufers, unabhängig von Frist und Vormerkung. Setzt die
+/// Vormerkung (falls noch nicht gesetzt) und `geschwaerzt_at` im selben bewachten UPDATE, damit
+/// der Einsatz danach dieselbe Lesesperre und denselben Zustand trägt wie nach der
+/// fristbasierten Schwärzung, und scrubbt aus derselben Registry. Den ETB-Eintrag schreibt der
+/// Aufrufer (er kennt Aktenzeichen und Akteur). `false`, wenn der Guard keine Zeile trifft
+/// (aktiv oder schon geschwärzt).
+pub(crate) async fn schwaerze_einsatz_auf_antrag_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let res = sqlx::query(
+        "UPDATE einsatz SET geloescht_at = COALESCE(geloescht_at, ?1), geschwaerzt_at = ?1 \
+         WHERE id = ?2 AND status = ?3 AND geschwaerzt_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .execute(&mut *conn)
+    .await?;
+    if res.rows_affected() == 0 {
+        return Ok(false);
+    }
+    scrubbe_einsatz_ganz_tx(conn, einsatz_id, jetzt).await?;
+    Ok(true)
+}
+
+/// Der Scrub einer Schwärzung des ganzen Einsatzes — für den fristbasierten Weg (Phase B) und den
+/// Antrag (LFH-751) derselbe: alle Scrub-Spalten gleich welcher Zuordnung, die Tombstones jeder
+/// Datenkategorie (LFH-749, design.md D5) und jeder offene Löschersuchen-Antrag als erfüllt, damit
+/// im ETB keine Rücknahme bereits gelöschter Daten erscheint.
+async fn scrubbe_einsatz_ganz_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    super::schwaerzung_registry::scrubbe_aus_registry(
+        &mut *conn,
+        einsatz_id,
+        super::schwaerzung_registry::Umfang::Alles,
+    )
+    .await?;
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET geschwaerzt_at = ? \
+         WHERE einsatz_id = ? AND geschwaerzt_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "UPDATE schwaerzung_antrag SET vollzogen_at = ? \
+         WHERE einsatz_id = ? AND zurueckgenommen_at IS NULL AND vollzogen_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// IRREVERSIBLE PII-Schwärzung eines Einsatzes (Phase B, LFH-135). Scrubbt die
 /// Personendaten in allen einsatz-scoped PII-Tabellen (strikt einsatz-scoped, OHNE
 /// `storniert_at`-Filter — auch stornierte Zeilen tragen reale PII), setzt den
@@ -931,39 +1012,13 @@ pub async fn schwaerze_einsatz(
     // zwischen Guard und tatsächlichem Scrub (siehe schwaerzung_registry). Die LFH-108-
     // Funk-Erreichbarkeit (einsatz_einheit/einsatzabschnitt.erreichbarkeit) ist dort als
     // Scrub klassifiziert; die handgepflegten UPDATEs von LFH-108 sind damit obsolet.
-    super::schwaerzung_registry::scrubbe_aus_registry(
-        &mut tx,
-        einsatz_id,
-        super::schwaerzung_registry::Umfang::Alles,
-    )
-    .await?;
-    // LFH-749: die Einsatz-Schwärzung nimmt jede Datenkategorie mit; ihre Tombstones stehen
-    // dann auch in der Datenbank (design.md D5), nicht nur in der Zustandsableitung.
-    sqlx::query(
-        "UPDATE einsatz_aufbewahrung_kategorie SET geschwaerzt_at = ? \
-         WHERE einsatz_id = ? AND geschwaerzt_at IS NULL",
-    )
-    .bind(jetzt)
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await?;
+    scrubbe_einsatz_ganz_tx(&mut tx, einsatz_id, jetzt).await?;
 
     system_audit_tx(
         &mut tx,
         einsatz_id,
         etb_startwert,
-        "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
-         Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
-         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
-         die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
-         Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
-         Befehle, Pressemitteilungen, Lagebesprechungen)) wurden unwiderruflich entfernt. \
-         Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
-         operative Objekte, die Struktur von Chat, Erinnerungen und Führungsmodulen mit \
-         Nummern, Zeitpunkten, Verfassern und Status), die Führungsdokumentation im ETB im \
-         Wortlaut (auch ins ETB heraufgestufte Chat-Nachrichten) und anonymisierte \
-         Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/statistische \
-         Aufbewahrung.",
+        &schwaerzungs_audit("Aufbewahrungsfrist + Karenz abgelaufen"),
     )
     .await?;
 

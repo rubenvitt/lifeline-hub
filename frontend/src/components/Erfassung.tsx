@@ -137,6 +137,12 @@ interface ErfassungsFormularProps<T> {
    */
   unumkehrbar?: boolean;
   /**
+   * Sperrt den Primär-Knopf, solange eine Voraussetzung fehlt, die die Feldregeln nicht
+   * ausdrücken (LFH-751: die eingetippte Kennung stimmt noch nicht). Nur zusätzlich zu den
+   * Feldregeln, nie statt ihrer — die Prüfung beim Absenden bleibt.
+   */
+  gesperrt?: boolean;
+  /**
    * Serienmodus: zeigt „Speichern und nächste" und den Zähler. Für Masken, an
    * denen im Minutentakt erfasst wird.
    */
@@ -167,6 +173,7 @@ export function ErfassungsFormular<T extends object>({
   laeuft = false,
   erfassenText = 'Erfassen',
   unumkehrbar = false,
+  gesperrt = false,
   serie = false,
   uebernahme,
   initialValues,
@@ -297,7 +304,10 @@ export function ErfassungsFormular<T extends object>({
     name: 'Erfassungsformular',
     wurzel,
     aktionen: {
-      speichern: () => form.submit(),
+      // Ein gesperrter Primär-Knopf sperrt auch sein Kürzel.
+      speichern: () => {
+        if (!gesperrt) form.submit();
+      },
       verwerfen: abbrechen,
     },
   });
@@ -365,7 +375,13 @@ export function ErfassungsFormular<T extends object>({
                 </span>
               </Button>
             )}
-            <Button type="primary" htmlType="submit" loading={laeuft} danger={unumkehrbar}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={laeuft}
+              danger={unumkehrbar}
+              disabled={gesperrt}
+            >
               {erfassenText}
             </Button>
           </Space>

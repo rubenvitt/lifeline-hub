@@ -24,6 +24,9 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.aufbewahrungAkte(7)).toEqual(['aufbewahrung', 'akte', 7]);
     expect(globalKeys.aufbewahrungEtb(7, undefined)).toEqual(['aufbewahrung', 'etb', 7, 'alle']);
     expect(globalKeys.aufbewahrungEtb(7, 'system')).toEqual(['aufbewahrung', 'etb', 7, 'system']);
+    // Löschersuchen (LFH-751) unter demselben Prefix: Antrag und Rücknahme treffen Liste, Akte und
+    // Übersicht mit einem Invalidate.
+    expect(globalKeys.aufbewahrungAntraege(7)).toEqual(['aufbewahrung', 'antraege', 7]);
     // Der Stand liegt serverseitig unter einem festen Schlüssel; ein anderer Query-Key träfe ein
     // leeres Cache-Fach.
     expect(globalKeys.benutzerEinstellungenVon(7)).toEqual(['benutzer-einstellungen', 7]);

@@ -801,24 +801,73 @@ fn pruefe_namensraum(app_rs: &str, routen_rs: &str, weitere: &[(String, String)]
             }
         }
     }
-    if nicht_get
-        != vec![
-            "post /api/aufbewahrung/einsaetze/{id}/wiederherstellen → wiederherstellen".to_string(),
-        ]
-    {
+    // Benannte Menge der Nicht-GET (LFH-751): Wiederherstellen, Antrag, Rücknahme und die
+    // Suche (POST nur wegen des Bodys; dass sie nicht schreibt, prüft `pruefe_suche_liest_nur`).
+    let mut erlaubt = vec![
+        "post /api/aufbewahrung/einsaetze/{id}/wiederherstellen → wiederherstellen".to_string(),
+        "post /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege → antrag_stellen".to_string(),
+        "post /api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen → antrag_zuruecknehmen".to_string(),
+        "post /api/aufbewahrung/einsaetze/{id}/personensuche → personensuche".to_string(),
+    ];
+    erlaubt.sort();
+    nicht_get.sort();
+    if nicht_get != erlaubt {
         verstoesse.push(format!(
-            "genau ein Nicht-GET (wiederherstellen) erlaubt, gefunden: {nicht_get:?}"
+            "genau diese Nicht-GET erlaubt (wiederherstellen, antrag_stellen, \
+             antrag_zuruecknehmen, personensuche), gefunden: {nicht_get:?}"
         ));
     }
     verstoesse
+}
+
+/// Die Personensuche ist ein POST, schreibt aber nichts (LFH-751, design.md D7): weder ihr
+/// Handler noch das Suchmodul (ohne Tests) öffnet eine Schreibtransaktion oder ändert Zeilen.
+fn pruefe_suche_liest_nur(routen_rs: &str, suche_rs: &str) -> Vec<String> {
+    let handler = routen_rs
+        .split("pub async fn personensuche(")
+        .nth(1)
+        .map(|r| r.split("\npub ").next().unwrap_or(r))
+        .unwrap_or("");
+    let modul = suche_rs.split("#[cfg(test)]").next().unwrap_or(suche_rs);
+    let mut v = Vec::new();
+    if handler.is_empty() {
+        v.push("personensuche: Handler nicht gefunden".into());
+    }
+    for (wo, quelle) in [
+        ("Handler personensuche", handler),
+        ("aufbewahrung::suche", modul),
+    ] {
+        for verboten in [
+            "write_retry!",
+            ".begin(",
+            "INSERT ",
+            "UPDATE ",
+            "DELETE ",
+            "antrag::stellen",
+            "antrag::zuruecknehmen",
+        ] {
+            if quelle.contains(verboten) {
+                v.push(format!(
+                    "{wo} enthält {verboten} — die Suche darf nicht schreiben"
+                ));
+            }
+        }
+    }
+    v
 }
 
 #[test]
 fn archiv_namensraum_nur_lesend_und_admin() {
     let app_rs = std::fs::read_to_string("src/app.rs").unwrap();
     let routen_rs = std::fs::read_to_string("src/routes/aufbewahrung.rs").unwrap();
+    let suche_rs = std::fs::read_to_string("src/aufbewahrung/suche.rs").unwrap();
     let routen = archivrouten(&app_rs);
-    assert_eq!(routen.len(), 4, "vier Archivrouten erwartet: {routen:?}");
+    assert_eq!(routen.len(), 7, "sieben Archivpfade erwartet: {routen:?}");
+    assert_eq!(
+        routen.iter().map(|r| r.handler.len()).sum::<usize>(),
+        8,
+        "acht Archivrouten erwartet: {routen:?}"
+    );
     let weitere = weitere_quellen();
     assert!(
         weitere
@@ -826,7 +875,8 @@ fn archiv_namensraum_nur_lesend_und_admin() {
             .any(|(p, _)| p.ends_with("routes/aufbewahrung.rs")),
         "Verzeichnislauf über src/ kaputt"
     );
-    let v = pruefe_namensraum(&app_rs, &routen_rs, &weitere);
+    let mut v = pruefe_namensraum(&app_rs, &routen_rs, &weitere);
+    v.extend(pruefe_suche_liest_nur(&routen_rs, &suche_rs));
     assert!(
         v.is_empty(),
         "Archiv-Namensraum (LFH-23, design.md D2):\n{}",
@@ -849,9 +899,22 @@ fn guard_erkennt_zusaetzlichen_schreibweg_und_current_user() {
     assert!(
         pruefe_namensraum(&mit_post, &routen_rs, &[])
             .iter()
-            .any(|v| v.contains("genau ein Nicht-GET")),
+            .any(|v| v.contains("genau diese Nicht-GET")),
         "zusätzliche post-Route muss auffallen"
     );
+
+    // LFH-751: eine schreibende Suche fällt auf.
+    let suche_rs = std::fs::read_to_string("src/aufbewahrung/suche.rs").unwrap();
+    assert!(pruefe_suche_liest_nur(&routen_rs, &suche_rs).is_empty());
+    let schreibend = suche_rs.replacen(
+        "pub async fn personensuche(",
+        "async fn x(p: &SqlitePool) { crate::write_retry!(p, |c| { Ok(()) }); }\npub async fn personensuche(",
+        1,
+    );
+    assert_ne!(schreibend, suche_rs);
+    assert!(pruefe_suche_liest_nur(&routen_rs, &schreibend)
+        .iter()
+        .any(|v| v.contains("write_retry!")));
 
     let mit_current = routen_rs.replacen(
         "pub async fn akte(\n    State(state): State<AppState>,\n    AdminUser(benutzer): AdminUser,",
@@ -885,7 +948,7 @@ fn guard_erkennt_any_on_nest_merge_und_route_service() {
         let v = pruefe_namensraum(app, &routen_rs, &[]);
         assert!(
             v.iter()
-                .any(|x| x.contains("genau ein Nicht-GET") && x.contains(methode)),
+                .any(|x| x.contains("genau diese Nicht-GET") && x.contains(methode)),
             "{methode} muss als Schreibweg auffallen: {v:?}"
         );
     };

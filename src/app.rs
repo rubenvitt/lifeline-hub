@@ -1040,8 +1040,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::gefahr::bewerten),
         )
         // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf
-        // das
-        // Wiederherstellen (Guard in tests/aufbewahrung.rs).
+        // Wiederherstellen und Löschersuchen (Antrag, Rücknahme; die Suche ist POST, liest aber
+        // nur). Guard in tests/aufbewahrung.rs.
         .route("/api/aufbewahrung", get(routes::aufbewahrung::uebersicht))
         .route(
             "/api/aufbewahrung/einsaetze/{id}",
@@ -1054,6 +1054,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/aufbewahrung/einsaetze/{id}/wiederherstellen",
             post(routes::aufbewahrung::wiederherstellen),
+        )
+        .route(
+            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege",
+            get(routes::aufbewahrung::antraege).post(routes::aufbewahrung::antrag_stellen),
+        )
+        .route(
+            "/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen",
+            post(routes::aufbewahrung::antrag_zuruecknehmen),
+        )
+        .route(
+            "/api/aufbewahrung/einsaetze/{id}/personensuche",
+            post(routes::aufbewahrung::personensuche),
         )
         .route("/api/organisation", get(routes::organisation::lesen))
         .route(

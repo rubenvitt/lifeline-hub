@@ -1,4 +1,10 @@
-import type { AufbewahrungZustand, EtbTyp, VerbleibArt, VerbleibStatus } from '../api/types';
+import type {
+  AntragZielArt,
+  AufbewahrungZustand,
+  EtbTyp,
+  VerbleibArt,
+  VerbleibStatus,
+} from '../api/types';
 
 /**
  * Wörter der Archivakte, die es an keiner exportierten Stelle gibt. Exhaustiv über die
@@ -11,6 +17,15 @@ export const VERBLEIB_ART: Record<VerbleibArt, string> = {
   entlassung: 'entlassen',
   vor_ort: 'vor Ort',
   verstorben: 'verstorben',
+};
+
+/** Zielart eines Löschersuchens (LFH-751) — dieselben Wörter wie im ETB-Eintrag des Servers. */
+export const ZIEL_ART: Record<AntragZielArt, string> = {
+  einsatz: 'Einsatz',
+  betroffene: 'Betroffene Person',
+  externe_kraft: 'Externe Kraft',
+  infotelefon_anruf: 'Anruf am Informationstelefon',
+  medienkontakt: 'Medienkontakt',
 };
 
 export const VERBLEIB_STATUS: Record<VerbleibStatus, string> = {
@@ -28,9 +43,11 @@ export const ZUSTAND_RANG: Record<AufbewahrungZustand, number> = {
   faellig: 2,
   vorgemerkt: 3,
   schwaerzung_ausstehend: 4,
-  geschwaerzt: 5,
-  loeschung_ausstehend: 6,
-  endgueltig_geloescht: 7,
+  // LFH-751: offener Einsatz-Antrag — der letzte Schritt vor „geschwärzt“.
+  schwaerzung_beantragt: 5,
+  geschwaerzt: 6,
+  loeschung_ausstehend: 7,
+  endgueltig_geloescht: 8,
 };
 
 /** Die Zustände in Rangfolge — abgeleitet, nicht handgepflegt. */
@@ -57,7 +74,9 @@ export const ETB_TYPEN: readonly EtbTyp[] = (Object.keys(ETB_TYP_RANG) as EtbTyp
 
 /**
  * Welche EINE Primäraktion die Akte im Kopf trägt. Nach Karenz-Ende und Schwärzung keine:
- * ein Knopf, der nur mit 409 abgelehnt werden kann, ist schlechter als keiner.
+ * ein Knopf, der nur mit 409 abgelehnt werden kann, ist schlechter als keiner. Bei einem offenen
+ * Einsatz-Antrag (LFH-751) auch keine: die Rücknahme steht am Antrag im Paneel „Löschersuchen“,
+ * eine Frist änderte am bevorstehenden Vollzug nichts.
  */
 type AktePrimaeraktion = 'frist' | 'wiederherstellen' | null;
 
@@ -70,6 +89,7 @@ export function primaeraktion(zustand: AufbewahrungZustand): AktePrimaeraktion {
     case 'vorgemerkt':
       return 'wiederherstellen';
     case 'schwaerzung_ausstehend':
+    case 'schwaerzung_beantragt':
     case 'geschwaerzt':
     case 'loeschung_ausstehend':
     case 'endgueltig_geloescht':

@@ -16,6 +16,17 @@ use utoipa::ToSchema;
 /// bevor die Daten endgültig gescrubbt werden.
 pub const KARENZ_TAGE: i64 = 30;
 
+/// Karenz eines Schwärzungsantrags (Art. 17, LFH-751): so lange ist der Antrag zurücknehmbar,
+/// danach vollzieht ihn der Purge-Lauf. Systemweit fest wie [`KARENZ_TAGE`].
+pub const ANTRAG_KARENZ_STUNDEN: i64 = 24;
+
+/// Fälligkeit eines Schwärzungsantrags (`beantragt + ANTRAG_KARENZ_STUNDEN`) im DB-Format.
+/// Sie wird beim Antrag gespeichert; Rücknahme (`faellig_at > jetzt`) und Vollzug
+/// (`faellig_at <= jetzt`) vergleichen sie lexikografisch in SQL.
+pub fn antrag_faellig_at(beantragt: DateTime<Utc>) -> String {
+    crate::zeit::formatiere_utc(beantragt + Duration::hours(ANTRAG_KARENZ_STUNDEN))
+}
+
 /// Berechnet den Aufbewahrungs-Zeitpunkt `retention_bis = abschluss + dauer_tage`.
 /// `None`, wenn `abschluss` unparsebar ist (defensiv — kein Auto-Fill auf Müll).
 /// Das Ergebnis ist im kanonischen DB-Format formatiert.
@@ -58,6 +69,8 @@ wire_enum! {
         SchwaerzungAusstehend => "schwaerzung_ausstehend",
         /// Personendaten unwiderruflich geschwärzt; die Skelett-Frist läuft oder fehlt.
         Geschwaerzt => "geschwaerzt",
+        /// Offener Einsatz-Antrag (Löschersuchen nach Art. 17, LFH-751), noch nicht vollzogen.
+        SchwaerzungBeantragt => "schwaerzung_beantragt",
         /// Geschwärzt, Skelett-Frist abgelaufen, noch nicht endgültig gelöscht (LFH-750; der
         /// nächste Purge-Lauf löscht, ohne Akteur bleibt es hier stehen).
         LoeschungAusstehend => "loeschung_ausstehend",
@@ -84,8 +97,10 @@ wire_enum! {
 }
 
 /// Leitet den Aufbewahrungszustand ab (LFH-23, design.md D4). `None` für jeden nicht
-/// abgeschlossenen Einsatz. Rangfolge: Löschung ausstehend (geschwärzt und Skelett-Frist
-/// abgelaufen, [`skelett_loeschung_faellig`], LFH-750) → geschwärzt → Schwärzung ausstehend (Karenz
+/// abgeschlossenen Einsatz. `antrag_faellig_at` ist die Fälligkeit eines offenen Einsatz-Antrags
+/// (LFH-751). Rangfolge: Löschung ausstehend (geschwärzt und Skelett-Frist abgelaufen,
+/// [`skelett_loeschung_faellig`], LFH-750) → geschwärzt → Schwärzung beantragt → Schwärzung
+/// ausstehend (Karenz
 /// abgelaufen, [`karenz_abgelaufen`]) → vorgemerkt → fällig (Frist abgelaufen, dieselbe
 /// Grenze wie die Lesesperre: `jetzt >= retention_bis`) → Frist läuft → ohne Frist.
 ///
@@ -97,6 +112,7 @@ pub fn zustand(
     retention_bis: Option<&str>,
     geloescht_at: Option<&str>,
     geschwaerzt_at: Option<&str>,
+    antrag_faellig_at: Option<&str>,
     abgeschlossen_at: Option<&str>,
     skelett_dauer_tage: Option<i64>,
     jetzt: DateTime<Utc>,
@@ -111,6 +127,8 @@ pub fn zustand(
         } else {
             AufbewahrungZustand::Geschwaerzt
         }
+    } else if gesetzt(antrag_faellig_at) {
+        AufbewahrungZustand::SchwaerzungBeantragt
     } else if gesetzt(geloescht_at) {
         if karenz_abgelaufen(geloescht_at, jetzt) {
             AufbewahrungZustand::SchwaerzungAusstehend
@@ -239,6 +257,7 @@ mod tests {
             frist,
             geloescht,
             geschwaerzt,
+            None,
             Some("2016-01-01 00:00:00"),
             None,
             t("2026-06-30 12:00:00"),
@@ -350,6 +369,7 @@ mod tests {
                 None,
                 Some("2016-02-01 00:00:00"),
                 geschwaerzt,
+                None,
                 abschluss,
                 frist,
                 jetzt,
@@ -364,6 +384,7 @@ mod tests {
             zustand(
                 "abgeschlossen",
                 Some("2016-01-02 00:00:00"),
+                None,
                 None,
                 None,
                 abschluss,
@@ -438,6 +459,58 @@ mod tests {
         );
     }
 
+    /// LFH-751: ein offener Einsatz-Antrag steht direkt nach „geschwärzt“, vor jeder
+    /// Fristlage; ein aktiver Einsatz hat weiter keinen Zustand.
+    #[test]
+    fn zustand_beantragt_rangfolge() {
+        use AufbewahrungZustand::*;
+        let jetzt = t("2026-06-30 12:00:00");
+        let f = Some("2026-07-01 12:00:00");
+        assert_eq!(
+            zustand(
+                "abgeschlossen",
+                Some("2099-01-01 00:00:00"),
+                None,
+                None,
+                f,
+                None,
+                None,
+                jetzt
+            ),
+            Some(SchwaerzungBeantragt)
+        );
+        assert_eq!(
+            zustand(
+                "abgeschlossen",
+                None,
+                Some("2026-01-01 00:00:00"),
+                None,
+                f,
+                None,
+                None,
+                jetzt
+            ),
+            Some(SchwaerzungBeantragt)
+        );
+        assert_eq!(
+            zustand(
+                "abgeschlossen",
+                None,
+                Some("2026-01-01 00:00:00"),
+                Some("2026-02-01 00:00:00"),
+                f,
+                None,
+                None,
+                jetzt
+            ),
+            Some(Geschwaerzt)
+        );
+        assert_eq!(
+            zustand("aktiv", None, None, None, f, None, None, jetzt),
+            None
+        );
+    }
+
     #[test]
     fn karenz_ende_addiert_karenz() {
         assert_eq!(
@@ -466,6 +539,28 @@ mod tests {
                 "Grenzfall {g}"
             );
         }
+    }
+
+    // ---------- LFH-751: Karenz eines Schwärzungsantrags ----------
+
+    #[test]
+    fn antrag_faellig_at_addiert_24_stunden() {
+        assert_eq!(
+            antrag_faellig_at(t("2026-06-30 12:00:00")),
+            "2026-07-01 12:00:00"
+        );
+    }
+
+    /// Rücknahme (`faellig_at > jetzt`) und Vollzug (`faellig_at <= jetzt`) vergleichen in SQL;
+    /// die Grenze liegt genau 24 Stunden nach dem Antrag.
+    #[test]
+    fn antrag_grenze_23_59_offen_24_00_faellig() {
+        let antrag = t("2026-06-30 12:00:00");
+        let faellig = antrag_faellig_at(antrag);
+        let offen = crate::zeit::formatiere_utc(antrag + Duration::seconds(24 * 3600 - 1));
+        let genau = crate::zeit::formatiere_utc(antrag + Duration::hours(24));
+        assert!(faellig.as_str() > offen.as_str());
+        assert!(faellig.as_str() <= genau.as_str());
     }
 
     #[test]

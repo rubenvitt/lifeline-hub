@@ -603,6 +603,9 @@ pub fn kategorie_zustand(
         z.frist_bis.as_deref(),
         z.vorgemerkt_at.as_deref(),
         z.geschwaerzt_at.as_deref(),
+        // Ein Löschersuchen (LFH-751) betrifft den Einsatz oder eine Person, keine Kategorie;
+        // sein Zustand steht am Einsatz.
+        None,
         // Eine Kategorie hat keine eigene endgültige Löschung (LFH-750); die betrifft nur den
         // ganzen Einsatz und steht an dessen Zustand.
         None,

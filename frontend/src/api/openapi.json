@@ -443,6 +443,26 @@
           }
         }
       },
+      "AntragStand": {
+        "type": "string",
+        "description": "Stand eines Antrags.",
+        "enum": [
+          "offen",
+          "zurueckgenommen",
+          "vollzogen"
+        ]
+      },
+      "AntragZielArt": {
+        "type": "string",
+        "description": "Zielart eines Schwärzungsantrags. Wire == `schwaerzung_antrag.ziel_art`; die vier\nPersonenarten tragen dieselben Werte wie [`PersonenArt`].",
+        "enum": [
+          "einsatz",
+          "betroffene",
+          "externe_kraft",
+          "infotelefon_anruf",
+          "medienkontakt"
+        ]
+      },
       "AppCode": {
         "type": "object",
         "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.",
@@ -467,6 +487,13 @@
           "schaeden"
         ],
         "properties": {
+          "antrag_faellig_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751)."
+          },
           "karenz_ende": {
             "type": [
               "string",
@@ -705,6 +732,13 @@
               }
             ]
           },
+          "auf_antrag_geschwaerzt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt, zu dem ein Löschersuchen für diese Person vollzogen wurde (LFH-751)."
+          },
           "erfasst_at": {
             "type": "string"
           },
@@ -837,6 +871,13 @@
               "null"
             ]
           },
+          "antrag_faellig_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fälligkeit eines offenen Einsatz-Antrags (Art. 17, LFH-751)."
+          },
           "bezeichnung": {
             "type": [
               "string",
@@ -910,6 +951,7 @@
           "vorgemerkt",
           "schwaerzung_ausstehend",
           "geschwaerzt",
+          "schwaerzung_beantragt",
           "loeschung_ausstehend",
           "endgueltig_geloescht"
         ]
@@ -8566,6 +8608,55 @@
           "abgemeldet"
         ]
       },
+      "PersonTrefferAnzeige": {
+        "type": "object",
+        "description": "Ein Treffer der Personensuche — ohne Name, Kontakt oder Freitext.",
+        "required": [
+          "art",
+          "id",
+          "kennung",
+          "erfasst_at"
+        ],
+        "properties": {
+          "antrag": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AntragStand",
+                "description": "Stand eines offenen oder vollzogenen Antrags für diese Person."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "art": {
+            "$ref": "#/components/schemas/PersonenArt"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Erfassung bzw. Eingang (UTC, DB-Format)."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kennung": {
+            "type": "string",
+            "description": "`R-042`, `EK-17`, `IT-5`, `MK-3` — dieselbe Kennung bestätigt den Antrag."
+          },
+          "person_status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonStatus",
+                "description": "Status der Person (nur bei Betroffenen)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "PersonalAnzeige": {
         "type": "object",
         "description": "Öffentliche Personal-Darstellung (ohne `org_id`), inkl. aufgelöster Qualifikationen.",
@@ -8701,6 +8792,16 @@
             }
           }
         }
+      },
+      "PersonenArt": {
+        "type": "string",
+        "description": "Art einer Person, die ein Löschersuchen nach Art. 17 betreffen kann (LFH-751). Wire ==\n[`PersonenArt::as_str`] == `schwaerzung_antrag.ziel_art`, gepinnt in\n`tests/enum_wire_kontrakt.rs`.",
+        "enum": [
+          "betroffene",
+          "externe_kraft",
+          "infotelefon_anruf",
+          "medienkontakt"
+        ]
       },
       "PlatzAnzeige": {
         "type": "object",
@@ -9308,6 +9409,79 @@
           "sachwerte",
           "einsatzkraefte"
         ]
+      },
+      "SchwaerzungsantragAnzeige": {
+        "type": "object",
+        "description": "Ein Antrag in der Archivakte (`GET …/schwaerzungsantraege`). Das Ziel steht nur als Art und\npseudonyme Kennung darin.",
+        "required": [
+          "id",
+          "ziel_art",
+          "ziel_kennung",
+          "aktenzeichen",
+          "beantragt_von_name",
+          "beantragt_at",
+          "faellig_at",
+          "stand",
+          "zuruecknehmbar"
+        ],
+        "properties": {
+          "aktenzeichen": {
+            "type": "string"
+          },
+          "beantragt_at": {
+            "type": "string"
+          },
+          "beantragt_von_name": {
+            "type": "string"
+          },
+          "faellig_at": {
+            "type": "string",
+            "description": "Ab hier vollzieht der Purge-Lauf; bis dahin ist der Antrag zurücknehmbar."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stand": {
+            "$ref": "#/components/schemas/AntragStand"
+          },
+          "vollzogen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ziel_art": {
+            "$ref": "#/components/schemas/AntragZielArt"
+          },
+          "ziel_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "ziel_kennung": {
+            "type": "string",
+            "description": "Einsatznummer bzw. Kennung der Person (`R-042`, `EK-17`, `IT-5`, `MK-3`)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zurueckgenommen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zuruecknehmbar": {
+            "type": "boolean",
+            "description": "Offen und noch nicht fällig."
+          }
+        }
       },
       "SichtungAnzeige": {
         "type": "object",

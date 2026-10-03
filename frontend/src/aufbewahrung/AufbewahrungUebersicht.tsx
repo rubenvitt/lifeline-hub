@@ -117,6 +117,15 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     render: (_, e) => (e.karenz_ende ? <ZeitAnzeige wert={e.karenz_ende} /> : leer),
   },
   {
+    // LFH-751: Fälligkeit eines offenen Einsatz-Antrags (Löschersuchen nach Art. 17).
+    key: 'antrag',
+    title: 'Schwärzung auf Antrag ab',
+    width: 190,
+    zahl: true,
+    sortWert: (e) => e.antrag_faellig_at,
+    render: (_, e) => (e.antrag_faellig_at ? <ZeitAnzeige wert={e.antrag_faellig_at} /> : leer),
+  },
+  {
     key: 'geschwaerzt',
     title: 'Geschwärzt am',
     width: 160,

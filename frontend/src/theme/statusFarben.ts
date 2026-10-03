@@ -17,6 +17,7 @@ import {
 import type {
   AbloesungEinstufung,
   AbschnittLagezustand,
+  AntragStand,
   AufbewahrungZustand,
   BelegungsArt,
   BetreuungsstelleStatus,
@@ -377,8 +378,22 @@ export const aufbewahrungZustand: Record<AufbewahrungZustand, StatusDarstellung>
   vorgemerkt: { rolle: 'achtung', label: 'zur Löschung vorgemerkt' },
   schwaerzung_ausstehend: { rolle: 'alarm', label: 'Schwärzung steht aus' },
   geschwaerzt: { rolle: 'neutral', label: 'geschwärzt' },
+  // LFH-751: offener Einsatz-Antrag — wie `vorgemerkt` noch zurücknehmbar, deshalb `achtung`.
+  schwaerzung_beantragt: { rolle: 'achtung', label: 'Schwärzung beantragt' },
   loeschung_ausstehend: { rolle: 'alarm', label: 'Löschung steht aus' },
   endgueltig_geloescht: { rolle: 'neutral', label: 'endgültig gelöscht' },
+};
+
+/**
+ * Stand eines Löschersuchens nach Art. 17 (LFH-751, design.md D9). Nur `offen` ist
+ * hervorgehoben (`achtung`): bis zur Fälligkeit läuft die Rücknahmefrist. Zurückgenommen und
+ * vollzogen sind Endzustände, `neutral`. Eigene Karte statt `aufbewahrungZustand`, weil der
+ * Antrag an einer Person hängen kann und den Zustand des Einsatzes nicht ändert.
+ */
+export const schwaerzungsantragStand: Record<AntragStand, StatusDarstellung> = {
+  offen: { rolle: 'achtung', label: 'offen' },
+  zurueckgenommen: { rolle: 'neutral', label: 'zurückgenommen' },
+  vollzogen: { rolle: 'neutral', label: 'vollzogen' },
 };
 
 /**

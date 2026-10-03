@@ -43,7 +43,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle dreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle einunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -70,6 +70,7 @@ describe('Statusfarb-Vertrag', () => {
       'raeumungszustand',
       'schadenAusmass',
       'schadenStatus',
+      'schwaerzungsantragStand',
       'statusKategorie',
       'uhsStatus',
       'uhsTyp',
@@ -190,7 +191,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(30);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(31);
   });
 });
 
@@ -269,7 +270,7 @@ describe('abloesungEinstufung (LFH-635)', () => {
 
 describe('aufbewahrungZustand (LFH-23, design.md D4)', () => {
   // Byte-Pin gegen handgeschriebene Literale: das Wort ist der zweite Kanal (WCAG 1.4.1).
-  it('bildet die acht Zustände auf Rolle und Wort ab', () => {
+  it('bildet die neun Zustände auf Rolle und Wort ab', () => {
     expect(sf.aufbewahrungZustand).toEqual({
       ohne_frist: { rolle: 'neutral', label: 'ohne Frist' },
       frist_laeuft: { rolle: 'neutral', label: 'Frist läuft' },
@@ -277,9 +278,18 @@ describe('aufbewahrungZustand (LFH-23, design.md D4)', () => {
       vorgemerkt: { rolle: 'achtung', label: 'zur Löschung vorgemerkt' },
       schwaerzung_ausstehend: { rolle: 'alarm', label: 'Schwärzung steht aus' },
       geschwaerzt: { rolle: 'neutral', label: 'geschwärzt' },
+      schwaerzung_beantragt: { rolle: 'achtung', label: 'Schwärzung beantragt' },
       // LFH-750: endgültige Löschung des Skeletts.
       loeschung_ausstehend: { rolle: 'alarm', label: 'Löschung steht aus' },
       endgueltig_geloescht: { rolle: 'neutral', label: 'endgültig gelöscht' },
+    });
+  });
+
+  it('Stand eines Löschersuchens (LFH-751): nur „offen“ ist hervorgehoben', () => {
+    expect(sf.schwaerzungsantragStand).toEqual({
+      offen: { rolle: 'achtung', label: 'offen' },
+      zurueckgenommen: { rolle: 'neutral', label: 'zurückgenommen' },
+      vollzogen: { rolle: 'neutral', label: 'vollzogen' },
     });
   });
 
