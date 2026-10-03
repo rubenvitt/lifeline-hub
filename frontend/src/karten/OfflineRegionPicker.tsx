@@ -307,6 +307,9 @@ export default function OfflineRegionPicker({
               {gruppe}
             </Typography.Title>
             <Liste
+              // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): eine
+              // Auswahlliste („welche Region?“). Als Überschrift stünde der Eintrag zudem über
+              // seiner Gruppenüberschrift (h5).
               dataSource={items}
               renderItem={(z) => (
                 <ListenEintrag actions={[<span key="a">{aktion(z)}</span>]}>

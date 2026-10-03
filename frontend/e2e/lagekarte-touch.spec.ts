@@ -531,10 +531,17 @@ for (const viewport of [
       }
       // Die Box erst jetzt holen: die Werkzeugwahl ändert Kartenhöhe und Fuß.
       const m = await kartenMitte(page);
+      // Oben links liegen Kartengrundlage und Zeigerkoordinate über der Karte. Bei 1024 px endete
+      // das Band 1 px rechts der linken oberen Ecke und 6 px über ihr, ein paar Pixel mehr Höhe
+      // legten es auf den Zeichenpunkt (LFH-823). Die oberen Ecken bleiben deshalb mindestens
+      // 8 px darunter; `kartenMitte` selbst bleibt, die Gesten hängen an ihrer Lage.
+      const links = await page.locator('[data-lfh="karten-ueberlagerung-links"]').boundingBox();
+      expect(links, 'Überlagerung oben links hat keine Box').not.toBeNull();
+      const tiefer = Math.max(0, links!.y + links!.height + 8 - (m.y - 30));
       const ecken = [
-        { x: m.x - 50, y: m.y - 30 },
-        { x: m.x + 50, y: m.y - 30 },
-        { x: m.x, y: m.y + 25 },
+        { x: m.x - 50, y: m.y - 30 + tiefer },
+        { x: m.x + 50, y: m.y - 30 + tiefer },
+        { x: m.x, y: m.y + 25 + tiefer },
       ];
       await aufKarte(page, ecken, 'Zeichnen');
       for (const p of ecken) {
@@ -608,6 +615,21 @@ for (const viewport of [
         await expect
           .poll(async () => (await rollen()).oben, { message: 'Zeitachse rollt per Finger' })
           .toBeGreaterThan(0);
+        // Der Wisch rollt nach. Ein Tipp in den Nachlauf hält in Chromium nur das Rollen an:
+        // `touchend` kommt am Schalter an, `click` nicht; in allen roten Läufen kam `scrollend`
+        // erst rund 30 ms nach dem Tipp (LFH-823). Getippt wird deshalb erst, wenn die Zeitachse
+        // steht: bei `scrollend` oder nach 150 ms ohne `scroll`.
+        await zeitachseEl.evaluate(
+          (e) =>
+            new Promise<void>((fertig) => {
+              let uhr = setTimeout(fertig, 150);
+              e.addEventListener('scroll', () => {
+                clearTimeout(uhr);
+                uhr = setTimeout(fertig, 150);
+              });
+              e.addEventListener('scrollend', () => fertig(), { once: true });
+            }),
+        );
         // In genau diesem Zustand bleiben das oberste Band und der Seitenkopf bedienbar —
         // getippt: der Serien-Schalter, dann „Leiste ausblenden".
         const serie = page.getByRole('switch', { name: 'Weitere zeichnen' });

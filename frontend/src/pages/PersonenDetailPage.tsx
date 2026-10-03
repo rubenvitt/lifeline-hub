@@ -38,7 +38,6 @@ import { useAuth } from '../auth/AuthContext';
 import {
   aktualisierePerson,
   entscheideAbgleich,
-  erfasseSichtung,
   ladePerson,
   ladePersonAudit,
   legeNotizAn,
@@ -56,7 +55,7 @@ import {
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
+import { STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
@@ -65,6 +64,13 @@ import { ANHAENGE_TITEL } from '../components/erfassungsAnhaenge/ErfassungsAnhae
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
+import SichtungDialog from '../personen/SichtungDialog';
+import {
+  SchadenZuweisenDialog,
+  TierZuweisenDialog,
+  UhsZuweisenDialog,
+} from '../personen/ZuweisungsDialoge';
+import { SPEZIES_META } from './tiere/tierHelfer';
 import KatalogTabelle from '../components/KatalogTabelle';
 import type {
   Person,
@@ -72,8 +78,6 @@ import type {
   PersonStatus,
   PersonZugriff,
   Schaden,
-  Sichtungskategorie,
-  Spezies,
   Tier,
 } from '../api/types';
 import {
@@ -94,16 +98,6 @@ import {
 } from '../personen/personBearbeiten';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { registrierNummer } from '../anzeige/registrierNummer';
-
-const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
-  hund: 'Hund',
-  katze: 'Katze',
-  grosstier: 'Großtier',
-  nutzgefluegel: 'Nutzgeflügel',
-  kleintier: 'Kleintier',
-  wildtier: 'Wildtier',
-  sonstige: 'Sonstige',
-};
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
@@ -344,19 +338,8 @@ export default function PersonenDetailPage() {
   const [statusDialog, setStatusDialog] = useState<PersonStatus | null>(null);
   const [stornoOffen, setStornoOffen] = useState(false);
 
-  // Sichtung
+  // Sichtung (Dialog in `personen/SichtungDialog.tsx`)
   const [reSichtenOffen, setReSichtenOffen] = useState(false);
-  const [sichtungForm] = Form.useForm<{ kategorie: Sichtungskategorie; notiz?: string }>();
-  const sichtungMutation = useMutation({
-    mutationFn: (v: { kategorie: Sichtungskategorie; notiz?: string }) =>
-      erfasseSichtung(einsatzId, personId, v.kategorie, v.notiz ?? null),
-    onSuccess: () => {
-      invalidateDetail();
-      setReSichtenOffen(false);
-      sichtungForm.resetFields();
-    },
-    onError: fehler,
-  });
 
   // Verlaufsnotiz
   const [notizForm] = Form.useForm<{ text: string }>();
@@ -372,40 +355,21 @@ export default function PersonenDetailPage() {
   // Verbleib (Dialog in `personen/VerbleibErfassung.tsx`)
   const [verbleibOffen, setVerbleibOffen] = useState(false);
 
-  // UHS-Zuweisung von der Personen-Seite (Gegenrichtung zum Grundriss). art spiegelt die
-  // belegMut-Logik: bereits belegt → wechsel, sonst eintritt. Austragen = austritt.
-  const [uhsForm] = Form.useForm<{ uhs_id: number; notiz?: string }>();
+  // UHS-Zuweisung (Dialog in `personen/ZuweisungsDialoge.tsx`). Austragen = austritt.
   function invalidateUhs() {
     invalidateDetail();
     qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
   }
-  const belegungMutation = useMutation({
-    mutationFn: (v: { uhs_id: number; notiz?: string }) =>
-      aenderePersonBelegung(einsatzId, personId, {
-        art: detailQuery.data?.aktuelle_uhs_id ? 'wechsel' : 'eintritt',
-        uhs_id: v.uhs_id,
-        notiz: v.notiz ?? null,
-      }),
-    onSuccess: () => {
-      invalidateUhs();
-      setUhsModalOffen(false);
-      uhsForm.resetFields();
-    },
-    onError: fehler,
-  });
   const austrittMutation = useMutation({
     mutationFn: () => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
     onSuccess: invalidateUhs,
     onError: fehler,
   });
 
-  // Tiere (Halter) / Schäden (Geschädigte) von der Personen-Seite zuweisen und lösen. Picker-Listen
-  // lazy (nur bei offenem Modal); Zuweisen leert die konkurrierenden XOR-Slots im selben PATCH
-  // (sonst 500 durch den Mehrspalten-CHECK).
+  // Tiere (Halter) / Schäden (Geschädigte) von der Personen-Seite zuweisen und lösen. Die
+  // Zuweisungsdialoge (Picker-Listen, XOR-Leerung) stehen in `personen/ZuweisungsDialoge.tsx`.
   const [tierModalOffen, setTierModalOffen] = useState(false);
   const [schadenModalOffen, setSchadenModalOffen] = useState(false);
-  const [tierForm] = Form.useForm<{ tier_id: number }>();
-  const [schadenForm] = Form.useForm<{ schaden_id: number }>();
   function invalidateZuordnung() {
     invalidateDetail();
     qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
@@ -413,44 +377,9 @@ export default function PersonenDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.tiereHalter(einsatzId, personId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId) });
   }
-  const freieTiereQuery = useQuery({
-    queryKey: einsatzKeys.tiere(einsatzId),
-    queryFn: () => listeTiere(einsatzId),
-    enabled: idGueltig && tierModalOffen,
-  });
-  const freieSchaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId, { inklStorniert: false }),
-    enabled: idGueltig && schadenModalOffen,
-  });
-  const tierZuweisenMut = useMutation({
-    mutationFn: (tierId: number) =>
-      aktualisiereTier(einsatzId, tierId, { halter_person_id: personId, halter_kontakt: null }),
-    onSuccess: () => {
-      invalidateZuordnung();
-      setTierModalOffen(false);
-      tierForm.resetFields();
-    },
-    onError: fehler,
-  });
   const tierLoesenMut = useMutation({
     mutationFn: (tierId: number) => aktualisiereTier(einsatzId, tierId, { halter_person_id: null }),
     onSuccess: invalidateZuordnung,
-    onError: fehler,
-  });
-  const schadenZuweisenMut = useMutation({
-    mutationFn: (schadenId: number) =>
-      aktualisiereSchaden(einsatzId, schadenId, {
-        geschaedigt_person_id: personId,
-        geschaedigt_personal_id: null,
-        geschaedigt_organisation_id: null,
-        geschaedigt_kontakt: null,
-      }),
-    onSuccess: () => {
-      invalidateZuordnung();
-      setSchadenModalOffen(false);
-      schadenForm.resetFields();
-    },
     onError: fehler,
   });
   const schadenLoesenMut = useMutation({
@@ -510,21 +439,6 @@ export default function PersonenDetailPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
-
-  // Picker-Kandidaten = freie Ziele (kein Halter/Geschädigter, nicht storniert, Schaden nicht
-  // abgeschlossen). Kein stilles Überschreiben fremder Zuordnungen.
-  const freieTiere = (freieTiereQuery.data ?? []).filter(
-    (t) => t.halter_person_id == null && t.halter_kontakt == null && t.storniert_at == null,
-  );
-  const freieSchaeden = (freieSchaedenQuery.data ?? []).filter(
-    (s) =>
-      s.geschaedigt_person_id == null &&
-      s.geschaedigt_personal_id == null &&
-      s.geschaedigt_organisation_id == null &&
-      s.geschaedigt_kontakt == null &&
-      s.storniert_at == null &&
-      s.status !== 'abgeschlossen',
-  );
 
   const auditSpalten: TableColumnsType<PersonZugriff> = [
     {
@@ -841,14 +755,7 @@ export default function PersonenDetailPage() {
                         Zugeordnete Tiere
                       </Typography.Text>
                       {darfZuordnen && (
-                        <Button
-                          onClick={() => {
-                            tierForm.resetFields();
-                            setTierModalOffen(true);
-                          }}
-                        >
-                          Tier zuweisen
-                        </Button>
+                        <Button onClick={() => setTierModalOffen(true)}>Tier zuweisen</Button>
                       )}
                     </Space>
                     {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
@@ -865,7 +772,7 @@ export default function PersonenDetailPage() {
                               onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
                             >
                               {tierRegistrierAnzeige(t.registrier_nr)}{' '}
-                              {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
+                              {SPEZIES_META[t.spezies] ?? t.spezies}
                               {t.rufname ? ` „${t.rufname}"` : ''}
                             </Tag>
                             {darfZuordnen && (
@@ -888,14 +795,7 @@ export default function PersonenDetailPage() {
                         Als Geschädigte bei Schäden
                       </Typography.Text>
                       {darfZuordnen && (
-                        <Button
-                          onClick={() => {
-                            schadenForm.resetFields();
-                            setSchadenModalOffen(true);
-                          }}
-                        >
-                          Schaden zuweisen
-                        </Button>
+                        <Button onClick={() => setSchadenModalOffen(true)}>Schaden zuweisen</Button>
                       )}
                     </Space>
                     {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
@@ -944,14 +844,7 @@ export default function PersonenDetailPage() {
                           />
                           {darfSchreiben && !person.storniert_at && (
                             <>
-                              <Button
-                                onClick={() => {
-                                  uhsForm.resetFields();
-                                  setUhsModalOffen(true);
-                                }}
-                              >
-                                UHS ändern
-                              </Button>
+                              <Button onClick={() => setUhsModalOffen(true)}>UHS ändern</Button>
                               <Button danger onClick={() => austrittMutation.mutate()}>
                                 Austragen
                               </Button>
@@ -962,14 +855,7 @@ export default function PersonenDetailPage() {
                         <Space wrap>
                           <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
                           {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
-                            <Button
-                              onClick={() => {
-                                uhsForm.resetFields();
-                                setUhsModalOffen(true);
-                              }}
-                            >
-                              UHS zuweisen
-                            </Button>
+                            <Button onClick={() => setUhsModalOffen(true)}>UHS zuweisen</Button>
                           )}
                         </Space>
                       )}
@@ -1199,32 +1085,13 @@ export default function PersonenDetailPage() {
         Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
       </Modal>
 
-      <Modal
-        open={reSichtenOffen}
-        title="Sichtung erfassen"
-        okText="Übernehmen"
-        confirmLoading={sichtungMutation.isPending}
-        onOk={() => sichtungForm.submit()}
-        onCancel={() => {
-          setReSichtenOffen(false);
-          sichtungForm.resetFields();
-        }}
-        destroyOnHidden
-      >
-        <Form form={sichtungForm} layout="vertical" onFinish={sichtungMutation.mutate}>
-          <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
-            <Select
-              options={(Object.keys(SK_META) as Sichtungskategorie[]).map((k) => ({
-                value: k,
-                label: SK_META[k].label,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item label="Kurzbegründung (optional)" name="notiz">
-            <Input />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <SichtungDialog
+        einsatzId={einsatzId}
+        personId={personId}
+        offen={reSichtenOffen}
+        onErfasst={invalidateDetail}
+        onSchliessen={() => setReSichtenOffen(false)}
+      />
 
       {verbleibOffen && (
         <VerbleibErfassung
@@ -1235,102 +1102,31 @@ export default function PersonenDetailPage() {
         />
       )}
 
-      <Modal
-        open={uhsModalOffen}
-        title="UHS zuweisen"
-        okText="Zuweisen"
-        confirmLoading={belegungMutation.isPending}
-        onOk={() => uhsForm.submit()}
-        onCancel={() => {
-          setUhsModalOffen(false);
-          uhsForm.resetFields();
-        }}
-        destroyOnHidden
-      >
-        <Form form={uhsForm} layout="vertical" onFinish={(v) => belegungMutation.mutate(v)}>
-          <Form.Item
-            label="Unfallhilfsstelle"
-            name="uhs_id"
-            rules={[{ required: true, message: 'Bitte UHS wählen' }]}
-          >
-            <Select
-              placeholder="aktive UHS wählen"
-              options={(uhsListeQuery.data ?? [])
-                .filter((u) => u.status === 'aktiv')
-                .map((u) => ({ value: u.id, label: u.bezeichnung }))}
-            />
-          </Form.Item>
-          <Form.Item label="Notiz (optional)" name="notiz">
-            <Input />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <UhsZuweisenDialog
+        einsatzId={einsatzId}
+        personId={personId}
+        offen={uhsModalOffen}
+        belegt={p.aktuelle_uhs_id != null}
+        uhsListe={uhsListeQuery.data ?? []}
+        onZugewiesen={invalidateUhs}
+        onSchliessen={() => setUhsModalOffen(false)}
+      />
 
-      <Modal
-        open={tierModalOffen}
-        title="Tier als Halter zuweisen"
-        okText="Zuweisen"
-        confirmLoading={tierZuweisenMut.isPending}
-        onOk={() => tierForm.submit()}
-        onCancel={() => {
-          setTierModalOffen(false);
-          tierForm.resetFields();
-        }}
-        destroyOnHidden
-      >
-        <Form form={tierForm} layout="vertical" onFinish={(v) => tierZuweisenMut.mutate(v.tier_id)}>
-          <Form.Item
-            label="Tier"
-            name="tier_id"
-            rules={[{ required: true, message: 'Bitte Tier wählen' }]}
-          >
-            <Select
-              placeholder="freies Tier wählen"
-              loading={freieTiereQuery.isLoading}
-              notFoundContent={freieTiereQuery.isLoading ? '…' : 'keine freien Tiere'}
-              options={freieTiere.map((t) => ({
-                value: t.id,
-                label: `${tierRegistrierAnzeige(t.registrier_nr)} ${TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}${t.rufname ? ` „${t.rufname}"` : ''}`,
-              }))}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <TierZuweisenDialog
+        einsatzId={einsatzId}
+        personId={personId}
+        offen={tierModalOffen}
+        onZugewiesen={invalidateZuordnung}
+        onSchliessen={() => setTierModalOffen(false)}
+      />
 
-      <Modal
-        open={schadenModalOffen}
-        title="Schaden zuweisen (Geschädigte)"
-        okText="Zuweisen"
-        confirmLoading={schadenZuweisenMut.isPending}
-        onOk={() => schadenForm.submit()}
-        onCancel={() => {
-          setSchadenModalOffen(false);
-          schadenForm.resetFields();
-        }}
-        destroyOnHidden
-      >
-        <Form
-          form={schadenForm}
-          layout="vertical"
-          onFinish={(v) => schadenZuweisenMut.mutate(v.schaden_id)}
-        >
-          <Form.Item
-            label="Schaden"
-            name="schaden_id"
-            rules={[{ required: true, message: 'Bitte Schaden wählen' }]}
-          >
-            <Select
-              placeholder="freien Schaden wählen"
-              loading={freieSchaedenQuery.isLoading}
-              notFoundContent={freieSchaedenQuery.isLoading ? '…' : 'keine freien Schäden'}
-              options={freieSchaeden.map((s) => ({
-                value: s.id,
-                label: `${schadenRegistrierAnzeige(s.registrier_nr)} ${s.typ} (${s.ausmass})`,
-              }))}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <SchadenZuweisenDialog
+        einsatzId={einsatzId}
+        personId={personId}
+        offen={schadenModalOffen}
+        onZugewiesen={invalidateZuordnung}
+        onSchliessen={() => setSchadenModalOffen(false)}
+      />
     </EinsatzSeite>
   );
 }

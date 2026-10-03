@@ -265,6 +265,8 @@ export default function EinsatzPegel() {
         dataUpdatedAt={pegelQ.dataUpdatedAt}
       >
         <Liste<PegelAnzeige>
+          // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): eine
+          // Einstellungsliste (Auswahl und Reihenfolge der Pegel), keine eigenen Gegenstände.
           bordered
           dataSource={liste}
           rowKey={(p) => p.station_uuid}

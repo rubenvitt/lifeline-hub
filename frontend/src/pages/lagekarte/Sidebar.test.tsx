@@ -18,6 +18,7 @@ import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
 import { hochwasserRadius } from './hochwasserStil';
+import { FREIE_SKIZZE_VORGABEFARBE } from './zonenStil';
 
 const basisProps: SidebarProps = {
   einsatzId: 1,
@@ -1346,6 +1347,18 @@ describe('Sidebar: einklappbare Paneele', () => {
     ).not.toBeInTheDocument();
     rerender(<Sidebar {...basisProps} zeichnenAnfrage={1} />);
     expect(screen.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeInTheDocument();
+  });
+
+  it('startet die freie Skizze mit der gemeinsamen Vorgabefarbe (LFH-825)', () => {
+    localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ zeichnen: true }));
+    const onZoneZeichnenStart = vi.fn();
+    renderMitProviders(<Sidebar {...basisProps} onZoneZeichnenStart={onZoneZeichnenStart} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Fläche' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Linie' }));
+    expect(onZoneZeichnenStart.mock.calls).toEqual([
+      [{ typ: 'freie_skizze', modus: 'polygon', farbe: FREIE_SKIZZE_VORGABEFARBE }],
+      [{ typ: 'freie_skizze', modus: 'linie', farbe: FREIE_SKIZZE_VORGABEFARBE }],
+    ]);
   });
 
   it('ohne Schreibrecht gibt es kein Paneel „Zeichnen"', () => {

@@ -133,6 +133,20 @@ version = "1.0.0-alpha.69"
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]
 
+# Debuginfo im Dev- und Testprofil (LFH-845): eigener Code nur Zeilentabellen, Abhängigkeiten
+# keine. Unter Linux linkt jedes der ~130 Binaries in target/debug/deps die Debuginfo neu mit;
+# das Testbinary `einsatz` wog voll 501 MB, so 142 MB. Ein voller Testbau des Workspace passt
+# damit in 21,6 GB statt hochgerechnet über 60, kalt 14 % schneller. Backtraces nennen weiter Datei und
+# Zeile, auch für Fremdcode, der durch eigene Generics läuft. Die CI liest dieselbe Einstellung.
+# Preis: lldb zeigt keine Variablen. Für eine solche Sitzung ohne Dateiänderung:
+#   CARGO_PROFILE_DEV_DEBUG=true cargo test --test <name>
+#   (plus --config 'profile.dev.package."*".debug=true' für Variablen in Abhängigkeiten)
+# Messung: openspec/changes/archive/2026-10-03-lfh-845-debuginfo-testbinaries/design.md
+[profile.dev]
+debug = "line-tables-only"
+[profile.dev.package."*"]
+debug = false
+
 # Der KRITIS-Import liest einen 4–5 GB großen PBF-Extrakt, auch im Dev-Stack. Nur diese
 # Abhängigkeiten werden im Dev-Build optimiert; der eigene Code bleibt debugbar.
 [profile.dev.package.osmpbf]

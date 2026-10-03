@@ -1,5 +1,5 @@
 import { IconPlus } from '../icons';
-import { Button, Form, Input, Modal } from 'antd';
+import { Button, Form, Input } from 'antd';
 import { Select } from '../components/Select';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import Bereichskopf from '../kommunikation/Bereichskopf';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { ErfassungsModal } from '../components/Erfassung';
 
 /**
  * Befehlsliste des Aufträge/Befehle-Tabs.
@@ -104,11 +105,8 @@ export default function BefehlListe({
 
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeuerBefehl) => legeBefehlAn(einsatzId, daten),
-    onSuccess: () => {
-      invalidate();
-      setAnlegenOffen(false);
-      form.resetFields();
-    },
+    // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`).
+    onSuccess: invalidate,
     onError: fehler,
   });
 
@@ -166,33 +164,31 @@ export default function BefehlListe({
         }}
       />
 
-      <Modal
-        open={anlegenOffen}
-        title="Neuen Befehl anlegen"
-        okText="Anlegen"
-        confirmLoading={anlegenMutation.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => setAnlegenOffen(false)}
-        destroyOnHidden
+      {/* Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm): sie setzt auf JEDEM Weg hinaus
+          zurück. Ein handgebautes `onCancel` ohne Reset liess Titel und Schema eines verworfenen
+          Befehls im Formularspeicher stehen, der nächste Befehl wurde damit angelegt (LFH-796). */}
+      <ErfassungsModal<NeuerBefehl>
+        offen={anlegenOffen}
+        titel="Neuen Befehl anlegen"
+        form={form}
+        erfassenText="Anlegen"
+        laeuft={anlegenMutation.isPending}
+        initialValues={{ vorlage: 'befehl_lad' }}
+        onErfassen={(w) => anlegenMutation.mutateAsync(w)}
+        onFertig={() => setAnlegenOffen(false)}
+        onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Form<NeuerBefehl>
-          form={form}
-          layout="vertical"
-          initialValues={{ vorlage: 'befehl_lad' }}
-          onFinish={(w) => anlegenMutation.mutate(w)}
+        <Form.Item label="Schema" name="vorlage" rules={[{ required: true }]}>
+          <Select options={VORLAGEN.map((v) => ({ value: v.schluessel, label: v.label }))} />
+        </Form.Item>
+        <Form.Item
+          label="Titel"
+          name="titel"
+          rules={[{ required: true, message: 'Titel erforderlich' }]}
         >
-          <Form.Item label="Schema" name="vorlage" rules={[{ required: true }]}>
-            <Select options={VORLAGEN.map((v) => ({ value: v.schluessel, label: v.label }))} />
-          </Form.Item>
-          <Form.Item
-            label="Titel"
-            name="titel"
-            rules={[{ required: true, message: 'Titel erforderlich' }]}
-          >
-            <Input placeholder="z. B. Befehl an 2. Zug 10:30" />
-          </Form.Item>
-        </Form>
-      </Modal>
+          <Input placeholder="z. B. Befehl an 2. Zug 10:30" />
+        </Form.Item>
+      </ErfassungsModal>
     </div>
   );
 }

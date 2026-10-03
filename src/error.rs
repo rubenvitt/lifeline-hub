@@ -38,8 +38,9 @@ pub enum AppError {
     /// Der Dienst kann die Anfrage vorübergehend nicht bedienen (503), z. B. weil der Virenscanner
     /// fail-closed nicht erreichbar ist. Signalisiert „später erneut versuchen“.
     ServiceUnavailable(String),
-    /// Zu viele Anfragen aus derselben Quelle (429), heute nur die Anmelde-Bremse. Anders als 503:
-    /// dieser eine Aufrufer darf gerade nicht, vorübergehend und selbstheilend.
+    /// Zu viele Anfragen (429), heute nur die Anmelde-Bremsen: je Quelle (`auth::rate_limit`) und
+    /// je Konto am zweiten Faktor (`auth::totp::schutz`). Anders als 503: dieser eine Aufrufer
+    /// darf gerade nicht, vorübergehend und selbstheilend.
     TooManyRequests(String),
 }
 

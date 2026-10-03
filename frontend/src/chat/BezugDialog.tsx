@@ -1,6 +1,7 @@
-import { Form, Modal } from 'antd';
+import { Form } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
+import { ErfassungsModal } from '../components/Erfassung';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { BEZUG_TYP_OPTIONEN, type BezugOptionen } from './bezug';
 
@@ -16,11 +17,12 @@ interface Props {
   optionen: BezugOptionen;
   senden: boolean;
   onAbbrechen: () => void;
-  onBestaetigen: (typ: BezugTyp, zielId: number) => void;
+  /** Speichern. Muss bei Ablehnung ablehnen (`mutateAsync`), sonst leert die Hülle. */
+  onBestaetigen: (typ: BezugTyp, zielId: number) => Promise<unknown>;
 }
 
 /** Dialog zum nachträglichen Setzen/Ändern des polymorphen Sachbezugs: Typ wählen, dann ein
-    Objekt dieses Typs. */
+    Objekt dieses Typs. Auf der Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). */
 export default function BezugDialog({
   offen,
   nachricht,
@@ -32,7 +34,8 @@ export default function BezugDialog({
   const [form] = Form.useForm<FormWerte>();
   const typ = Form.useWatch('typ', form);
 
-  // Beim Öffnen mit dem bestehenden Bezug vorbefüllen (Ändern-Fall) bzw. leeren.
+  // VORBELEGUNG beim Öffnen (Ändern-Fall), kein Zurücksetzen: das tut die Hülle auf jedem Weg
+  // hinaus.
   useEffect(() => {
     if (offen) {
       form.setFieldsValue({
@@ -45,41 +48,39 @@ export default function BezugDialog({
   const objektOptionen = typ ? optionen[typ] : [];
 
   return (
-    <Modal
-      open={offen}
-      title="Bezug setzen"
-      okText="Speichern"
-      confirmLoading={senden}
-      onOk={() => form.submit()}
-      onCancel={onAbbrechen}
-      destroyOnHidden
+    <ErfassungsModal<FormWerte>
+      offen={offen}
+      titel="Bezug setzen"
+      form={form}
+      erfassenText="Speichern"
+      laeuft={senden}
+      // Die Pflichtregeln sichern beide Felder; der Typ von `FormWerte` kennt sie nur optional.
+      onErfassen={(w) =>
+        w.typ && w.ziel_id != null
+          ? onBestaetigen(w.typ, w.ziel_id)
+          : Promise.reject(new Error('Typ und Objekt fehlen'))
+      }
+      onFertig={onAbbrechen}
+      onAbbrechen={onAbbrechen}
     >
-      <Form<FormWerte>
-        form={form}
-        layout="vertical"
-        onFinish={(w) => {
-          if (w.typ && w.ziel_id != null) onBestaetigen(w.typ, w.ziel_id);
-        }}
+      <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
+        <Select
+          options={BEZUG_TYP_OPTIONEN}
+          // Objekt-Auswahl bei Typ-Wechsel zurücksetzen (sie ist typ-spezifisch).
+          onChange={() => form.setFieldsValue({ ziel_id: undefined })}
+        />
+      </Form.Item>
+      <Form.Item
+        label="Objekt"
+        name="ziel_id"
+        rules={[{ required: true, message: 'Objekt wählen' }]}
       >
-        <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
-          <Select
-            options={BEZUG_TYP_OPTIONEN}
-            // Objekt-Auswahl bei Typ-Wechsel zurücksetzen (sie ist typ-spezifisch).
-            onChange={() => form.setFieldsValue({ ziel_id: undefined })}
-          />
-        </Form.Item>
-        <Form.Item
-          label="Objekt"
-          name="ziel_id"
-          rules={[{ required: true, message: 'Objekt wählen' }]}
-        >
-          <Select
-            options={objektOptionen}
-            disabled={!typ}
-            notFoundContent={typ ? 'Keine Objekte' : 'Zuerst Typ wählen'}
-          />
-        </Form.Item>
-      </Form>
-    </Modal>
+        <Select
+          options={objektOptionen}
+          disabled={!typ}
+          notFoundContent={typ ? 'Keine Objekte' : 'Zuerst Typ wählen'}
+        />
+      </Form.Item>
+    </ErfassungsModal>
   );
 }

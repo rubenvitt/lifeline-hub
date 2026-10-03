@@ -18,6 +18,7 @@ import {
   meldeSitzungAbgelaufen,
   sitzungsMeldungZuruecksetzen,
 } from './sitzungsEvent';
+import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
 import {
   lagebildAnmelden,
   lagebildBeenden,
@@ -117,11 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Einziger Weg, den Benutzer zu setzen: hält den erwarteten Benutzer der Schreibanfragen
    *  (`api/client.ts`) synchron mit dem Zustand — ein Effekt ließe ein Render-Fenster offen,
-   *  in dem der Tab schon B zeigt, aber noch als A schreibt (oder umgekehrt). */
+   *  in dem der Tab schon B zeigt, aber noch als A schreibt (oder umgekehrt). Aus demselben
+   *  Grund hier gebunden: die behaltenen Erfassungswerte (LFH-785), die eine Maske von B sonst
+   *  mit denen von A vorbelegte. */
   const uebernimm = useCallback((b: BenutzerAnzeige | null) => {
     generation.current++;
     benutzerRef.current = b;
     setzeErwartetenBenutzer(b?.id ?? null);
+    erfassungsSitzungBinden(b?.id ?? null);
     setBenutzer(b);
   }, []);
 
