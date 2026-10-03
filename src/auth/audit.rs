@@ -44,10 +44,12 @@ wire_enum! {
     }
 }
 
-/// Ein Audit-Ereignis. `benutzer_id` ist beim Login nur bei Erfolg bekannt; `benutzername`
-/// trägt bei einem Fehlschlag den VERSUCHTEN Namen (der womöglich gar nicht existiert — genau
-/// das ist die interessante Information einer Brute-Force-Spur). Die Passwort-Ereignisse
-/// entstehen in einer angemeldeten Sitzung und tragen deshalb immer beides.
+/// Ein Audit-Ereignis. `benutzername` trägt beim Passwort-Fehlschlag den VERSUCHTEN Namen (der
+/// womöglich gar nicht existiert — genau das ist die interessante Information einer
+/// Brute-Force-Spur). `benutzer_id` steht bei Erfolg und bei einem Fehlschlag, dessen Benutzer
+/// der Server schon selbst festgestellt hat, etwa am Zweitfaktor nach bestandenem Passwort
+/// (LFH-792). Die Passwort-Ereignisse entstehen in einer angemeldeten Sitzung und tragen deshalb
+/// immer beides.
 #[derive(Debug, Clone)]
 pub struct AuditEintrag<'a> {
     pub ereignis: Ereignis,

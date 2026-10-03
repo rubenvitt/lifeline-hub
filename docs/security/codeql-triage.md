@@ -15,7 +15,7 @@ nächste Sichtung nicht bei null anfängt.
 gedeckt: gedeckt ist die hier benannte Zeile mit der hier benannten Ursache. Wer eine neue
 Fundstelle einträgt, schreibt die Messung dazu, nicht den Verweis auf einen Nachbareintrag.
 
-Stand: 22.09.2026 · Alerts #1–#25.
+Stand: 03.10.2026 · Alerts #1–#25, dazu #20/#29/#33 aus PR #403 (LFH-792).
 
 ---
 
@@ -69,6 +69,17 @@ die Sitzung käme nie zustande.
 Ein Teil der zwölf Fundstellen sind zudem **Removal-Cookies** (`jar.remove(Cookie::build((NAME,
 ""))…)`, Zeilen 242 · 380 · 767 · 984 · 1167 · 1390): leerer Wert, kein Geheimnis, und Browser
 matchen die Löschung über Name/Pfad/Domain, nicht über `Secure`.
+
+**#20, #29, #33 (PR #403, LFH-792): dieselben Removal-Cookies, verschoben.** Der Umbau
+fürs Anmelde-Audit hat die Löschung von `WEBAUTHN_AUTH_COOKIE` (`webauthn_auth_finish`),
+`WEBAUTHN_DISC_COOKIE` (`webauthn_discoverable_finish`) und `MFA_PENDING_COOKIE`
+(`totp_finish`) aus dem Prüfteil in den äußeren Handler gezogen; Name, Pfad und leerer Wert sind
+unverändert, CodeQL sieht sie nur an neuer Stelle. Ein `.secure(secure)` an der Löschung
+räumte den Alert nicht (abgeleitet, nicht mit CodeQL nachgemessen): `auth::session::cookie_secure()`
+endet in `unwrap_or(&false)`, und dieses Literal erreicht das Argument genauso wie bei den
+Settern, die trotz `.secure(secure)` in dieser Liste stehen. Ein fest verdrahtetes
+`.secure(true)` an der Löschung wiese sie über `http://` ab (Browser lehnen `Secure` von einer
+unsicheren Herkunft ab) und ließe das Cookie stehen. Damit gilt die Begründung oben unverändert.
 
 Gepinnt ist das Verhalten in `session_cookie_secure_folgt_parameter` und
 `oidc_state_cookie_secure_folgt_parameter` — beide Zweige, damit der Schalter nicht still auf
