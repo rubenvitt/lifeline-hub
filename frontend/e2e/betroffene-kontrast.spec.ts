@@ -222,9 +222,19 @@ for (const modus of ['light', 'dark'] as const) {
       [leer, 'Zustand-Knopf leer'],
       [voll, 'Zustandswert'],
     ] as const) {
+      // Den Zeilen-Hover setzt antd per Klasse aus `onMouseEnter`, nicht per `:hover`; der
+      // Messkern wartet ihn deshalb nicht ab. Beide Zustände sichert der Test vor der Messung zu
+      // (LFH-840, `e2e/AGENTS.md`, „Kontrast misst eingeschwungen“): ohne Zeiger ruht die Zeile,
+      // unter dem Zeiger steht sie auf `flaeche3`, der Knopf darüber auf seiner Hoverfläche.
+      const zeilenHover = page
+        .locator('tr.ant-table-row')
+        .filter({ has: ziel })
+        .locator('td.ant-table-cell-row-hover');
       await page.mouse.move(0, 0);
+      await expect(zeilenHover).toHaveCount(0);
       await misst(ziel, minimum, `${modus}/${name}`, werte);
       await ziel.hover();
+      await expect(zeilenHover.first()).toBeAttached();
       await misst(ziel, minimum, `${modus}/${name}+hover`, werte);
     }
     await page.mouse.move(0, 0);
