@@ -9,6 +9,7 @@ dayjs.extend(utc);
 function entwurf(over: Partial<EtbEntwurf> = {}): EtbEntwurf {
   return {
     id: 'a',
+    benutzer_id: 1,
     einsatz_id: 7,
     inhalt: '',
     typ: 'meldung',

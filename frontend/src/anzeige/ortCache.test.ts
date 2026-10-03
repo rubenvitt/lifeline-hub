@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { ortKeyVon, holeOrt, setzeOrt, leereOrtCache } from './ortCache';
+import { rohLesen } from '../test/rohIdb';
+import { ortKeyVon, holeOrt, setzeOrt, ortCacheRaeumen } from './ortCache';
 
 describe('ortCache', () => {
-  afterEach(() => leereOrtCache());
+  afterEach(() => ortCacheRaeumen());
 
   it('rundet den Key auf 3 Nachkommastellen (~100 m)', () => {
     expect(ortKeyVon(51.1604, 10.4514)).toBe('51.160,10.451');
@@ -21,5 +22,14 @@ describe('ortCache', () => {
     await setzeOrt(key, 'Alt');
     await setzeOrt(key, 'Neu');
     expect(await holeOrt(key)).toBe('Neu');
+  });
+
+  it('räumt beim Ausgang die Platte (LFH-767)', async () => {
+    await setzeOrt(ortKeyVon(51.1604, 10.4514), 'Hauptstr. 5, Musterstadt');
+    expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toHaveLength(1);
+
+    await ortCacheRaeumen();
+
+    expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
   });
 });

@@ -26,6 +26,11 @@ import {
 } from '../offline/lagebildSitzung';
 import type { MeErgebnis } from '../offline/lagebildStart';
 import {
+  geraetFuerBenutzerRaeumen,
+  geraetRaeumen,
+  type AusgangsAnlass,
+} from '../offline/geraetRaeumung';
+import {
   GATEWAY_NICHT_ERREICHBAR,
   istVerbindungsfehler,
   meldeServerErreichbar,
@@ -54,10 +59,11 @@ interface AuthWert {
   /** Meldet über den Server ab. `false`, wenn der Server mit 412 ablehnte (die Sitzung gehört
    *  inzwischen einem anderen Benutzer, LFH-387): dann bleibt der Tab angemeldet. */
   logout: () => Promise<boolean>;
-  /** Räumt nur den Zustand dieses Tabs und das Lagebild, ohne Server-Logout (LFH-387) — für
-   *  einen erkannten Sitzungsablauf; ein Server-Logout träfe eine inzwischen neu angelegte
-   *  Sitzung. Wirft nie. */
-  abmeldenLokal: () => Promise<void>;
+  /** Räumt nur den Zustand dieses Tabs, das Lagebild und die übrigen Gerätedaten (LFH-767),
+   *  ohne Server-Logout (LFH-387) — für einen erkannten Sitzungsablauf; ein Server-Logout träfe
+   *  eine inzwischen neu angelegte Sitzung. Der Anlass entscheidet über die ETB-Entwürfe: ein
+   *  Sitzungsende behält sie, gebunden und befristet. Wirft nie. */
+  abmeldenLokal: (anlass: AusgangsAnlass) => Promise<void>;
   /** Steht, solange die Sitzung einem anderen Benutzer gehört (LFH-387). Aufgelöst per Neuladen
    *  (`BenutzerKonfliktDialog`), nie im laufenden Baum. */
   konflikt: BenutzerKonflikt | null;
@@ -105,6 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  wurde (Erstladen oder Prüfung, parallel zu Login/`aktualisiere`), ist veraltet und wird
    *  verworfen — statt einen frischen Login zurückzurollen oder einen Schein-Konflikt zu melden. */
   const generation = useRef(0);
+  /** Ein anderer Tab hat FREIWILLIG abgemeldet (LFH-767): die nächste 401 der Prüfung räumt dann
+   *  auch hier wie ein Abmelden, samt ETB-Entwürfen — sonst schriebe dieser Tab sie zurück. */
+  const abmeldenAngekuendigt = useRef(false);
 
   /** Einziger Weg, den Benutzer zu setzen: hält den erwarteten Benutzer der Schreibanfragen
    *  (`api/client.ts`) synchron mit dem Zustand — ein Effekt ließe ein Render-Fenster offen,
@@ -116,22 +125,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBenutzer(b);
   }, []);
 
-  /** Der Benutzer zuerst, das Lagebild (LFH-723, Speicher UND Platte) danach: ein Fehler beim
-   *  Löschen darf die Abmeldung nicht aufhalten — sonst ließe `RequireAuth` geschützte Routen
-   *  passieren und die Sitzungswache meldete wegen ihrer Sperre keinen Ablauf mehr. */
-  const abmeldenLokal = useCallback(async () => {
-    const warAngemeldet = benutzerRef.current !== null;
-    uebernimm(null);
-    setKonflikt(null);
-    // Nur ein echter Wechsel wird gemeldet — sonst schaukelten sich die Tabs mit
-    // „abgemeldet“ gegenseitig auf.
-    if (warAngemeldet) meldeAuthWechsel({ art: 'abgemeldet' });
-    try {
-      await lagebildLoeschen(queryClient);
-    } catch (e) {
-      console.error('Lagebild konnte beim Abmelden nicht gelöscht werden', e);
-    }
-  }, [queryClient, uebernimm]);
+  /** Der Benutzer zuerst, das Lagebild (LFH-723, Speicher UND Platte) und die übrigen
+   *  Gerätedaten (LFH-767) danach: ein Fehler beim Löschen darf die Abmeldung nicht aufhalten —
+   *  sonst ließe `RequireAuth` geschützte Routen passieren und die Sitzungswache meldete wegen
+   *  ihrer Sperre keinen Ablauf mehr. Der einzige Weg hinaus für beide. */
+  const abmeldenLokal = useCallback(
+    async (anlass: AusgangsAnlass) => {
+      const warAngemeldet = benutzerRef.current !== null;
+      uebernimm(null);
+      setKonflikt(null);
+      // Nur ein echter Wechsel wird gemeldet — sonst schaukelten sich die Tabs mit
+      // „abgemeldet“ gegenseitig auf.
+      if (warAngemeldet) meldeAuthWechsel({ art: 'abgemeldet', anlass });
+      try {
+        await lagebildLoeschen(queryClient);
+      } catch (e) {
+        console.error('Lagebild konnte beim Abmelden nicht gelöscht werden', e);
+      }
+      // Wirft nie; jeder Ort wird einzeln geräumt und protokolliert (offline/geraetRaeumung.ts).
+      // NICHT abgewartet: hält ein Tab mit altem Bundle die Entwurfs-DB in v1 offen, hinge das
+      // Upgrade — und mit ihm die Abmeldung. IndexedDB führt die Transaktionen trotzdem in
+      // Auftragsreihenfolge aus, ein späteres Anmelden räumt erst danach.
+      void geraetRaeumen(anlass);
+    },
+    [queryClient, uebernimm],
+  );
+
+  /** Nach jeder geklärten Anmeldung (LFH-767, design.md D4): Entwürfe und Quittungen anderer
+   *  Personen gehen von der Platte. Das Räumen wird nicht abgewartet (s. `abmeldenLokal`) — die
+   *  Entwürfe anderer blendet der Index bis dahin ohnehin aus. */
+  const vorhaltungAnmelden = useCallback(
+    async (b: BenutzerAnzeige) => {
+      await lagebildAnmelden(queryClient, b);
+      void geraetFuerBenutzerRaeumen(b.id);
+    },
+    [queryClient],
+  );
 
   /** Prüft, wem die Sitzung gehört (LFH-387). Die Wahrheit ist `GET /api/auth/me`; Anstöße
    *  (Kanal, 412, Sichtbarkeit) tragen keine Daten. Anstöße während eines Laufs lösen genau
@@ -160,17 +189,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Keine gültige Sitzung: lokal abmelden, die Sitzungswache leitet mit Rückkehrziel zur
           // Anmeldung. Server nicht erreichbar (offline) oder sonstiger Fehler: nichts ändern.
           if (e instanceof ApiError && e.status === 401 && benutzerRef.current) {
-            void abmeldenLokal();
+            void abmeldenLokal(abmeldenAngekuendigt.current ? 'abmelden' : 'sitzungsende');
+            abmeldenAngekuendigt.current = false;
             meldeSitzungAbgelaufen();
           }
           return;
         }
+        abmeldenAngekuendigt.current = false;
         if (veraltet()) return;
         const lokal = benutzerRef.current;
         if (!lokal) {
           // In einem anderen Tab angemeldet, dieser Tab war anonym: übernehmen — wie ein Login,
           // mit dem Lagebild der neuen Person (LFH-723).
-          await lagebildAnmelden(queryClient, aufServer);
+          await vorhaltungAnmelden(aufServer);
           if (veraltet()) return;
           uebernimm(aufServer);
           sitzungsMeldungZuruecksetzen();
@@ -187,7 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       laufendePruefung.current = lauf;
       return lauf;
     },
-    [abmeldenLokal, queryClient, uebernimm],
+    [abmeldenLokal, uebernimm, vorhaltungAnmelden],
   );
 
   /**
@@ -229,11 +260,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return { art: 'ok', benutzer: b };
       }, meFehlerEinordnen)
-      .then((me) => lagebildStarten(queryClient, me, { abgebrochen: () => !aktuell() }))
-      .then((b) => {
+      .then(async (me) => {
+        const b = await lagebildStarten(queryClient, me, { abgebrochen: () => !aktuell() });
         // Serverbestätigt kommt derselbe Benutzer zurück; ohne Server ist es die Identität des
         // vorgehaltenen Stands oder niemand.
-        if (aktuell() && b?.id !== benutzerRef.current?.id) setze(b);
+        if (!aktuell()) return;
+        if (b?.id !== benutzerRef.current?.id) setze(b);
+        // Gerätedaten (LFH-767). Lehnt der Server die Sitzung beim Start ab, ist das ein
+        // Sitzungsende, das erst jetzt bemerkt wird — wie beim Lagebild geht dann, was der
+        // Server wieder liefert. Ein Netzfehler sagt über die Sitzung nichts. Danach Fremdes
+        // bzw. ohne Person Abgelaufenes (design.md D4). Wirft nie und wird nicht abgewartet
+        // (s. `abmeldenLokal`).
+        void (async () => {
+          if (me.art === 'abgelehnt') await geraetRaeumen('sitzungsende');
+          await geraetFuerBenutzerRaeumen(b?.id ?? null);
+        })();
       })
       .catch((e: unknown) => {
         // Die Vorhaltung fängt ihre Speicherfehler selbst; was hier ankommt, ist unerwartet.
@@ -263,7 +304,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const beiSichtbarkeit = () => {
       if (document.visibilityState === 'visible') anstossen();
     };
-    const abbestellen = abonniereAuthWechsel(anstossen);
+    const abbestellen = abonniereAuthWechsel((wechsel) => {
+      if (wechsel.art === 'abgemeldet' && wechsel.anlass === 'abmelden') {
+        abmeldenAngekuendigt.current = true;
+      }
+      anstossen();
+    });
     window.addEventListener(BENUTZER_PRUEFEN, anstossen);
     document.addEventListener('visibilitychange', beiSichtbarkeit);
     return () => {
@@ -281,8 +327,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if ('mfa_erforderlich' in antwort) {
         return { status: 'mfa_erforderlich' };
       }
-      // Eine andere Person als die vorherige räumt deren Lagebild, bevor der Benutzer wechselt.
-      await lagebildAnmelden(queryClient, antwort);
+      // Eine andere Person als die vorherige räumt deren Lagebild und Gerätedaten (LFH-767),
+      // bevor der Benutzer wechselt.
+      await vorhaltungAnmelden(antwort);
       uebernimm(antwort);
       setKonflikt(null);
       // Neue gültige Sitzung → Melde-Sperre lösen, damit ein späterer Ablauf wieder gemeldet wird.
@@ -290,7 +337,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       meldeAuthWechsel({ art: 'angemeldet' });
       return { status: 'ok' };
     },
-    [queryClient, uebernimm],
+    [uebernimm, vorhaltungAnmelden],
   );
 
   /**
@@ -308,19 +355,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (e instanceof ApiError && e.status === 412) return false;
       console.error('Server-Abmeldung fehlgeschlagen — es wird trotzdem lokal abgemeldet', e);
     }
-    await abmeldenLokal();
+    await abmeldenLokal('abmelden');
     return true;
   }, [abmeldenLokal]);
 
   const aktualisiere = useCallback(async () => {
     const b = await authApi.me();
-    await lagebildAnmelden(queryClient, b);
+    await vorhaltungAnmelden(b);
     uebernimm(b);
     setKonflikt(null);
     // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber.
     sitzungsMeldungZuruecksetzen();
     meldeAuthWechsel({ art: 'angemeldet' });
-  }, [queryClient, uebernimm]);
+  }, [uebernimm, vorhaltungAnmelden]);
 
   const wert = useMemo<AuthWert>(
     () => ({ benutzer, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt }),

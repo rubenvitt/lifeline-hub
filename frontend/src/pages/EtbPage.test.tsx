@@ -473,7 +473,7 @@ describe('EtbPage', () => {
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
     await user.type(feld, 'Offline-Eintrag{Enter}');
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
+    await waitFor(async () => expect(await entwuerfeLaden(admin.id, 7)).toHaveLength(0));
   });
 
   it('legt aus einem ETB-Eintrag eine Wiedervorlage mit ETB-Bezug an', async () => {
@@ -1095,7 +1095,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     await user.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
     expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
     await waitFor(async () =>
-      expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Zwei Fotos vom Deich'),
+      expect((await entwuerfeLaden(admin.id, 7))[0]?.inhalt).toBe('Zwei Fotos vom Deich'),
     );
 
     await waehleZeilenaktion(user, 'Berichtigen');
@@ -1117,7 +1117,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     await user.upload(dateiEingabe(), new File(['x'], 'foto-b.jpg', { type: 'image/jpeg' }));
     // Ein Entwurf ohne Text läge sonst nur im Speicher: nach dem Abbrechen käme ein neuer mit neuer
     // id, und die Dateien hingen an keinem Reiter mehr.
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+    await waitFor(async () => expect(await entwuerfeLaden(admin.id, 7)).toHaveLength(1));
 
     await waehleZeilenaktion(user, 'Berichtigen');
     await screen.findByText(/Berichtigung zu Nr\./);
@@ -1138,9 +1138,9 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     const feld = await screen.findByPlaceholderText(/Inhalt/);
     await user.upload(dateiEingabe(), new File(['x'], 'foto-c.jpg', { type: 'image/jpeg' }));
     await user.type(feld, 'Deich');
-    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Deich'));
+    await waitFor(async () => expect((await entwuerfeLaden(admin.id, 7))[0]?.inhalt).toBe('Deich'));
     await user.clear(feld);
-    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe(''));
+    await waitFor(async () => expect((await entwuerfeLaden(admin.id, 7))[0]?.inhalt).toBe(''));
 
     await waehleZeilenaktion(user, 'Berichtigen');
     await screen.findByText(/Berichtigung zu Nr\./);

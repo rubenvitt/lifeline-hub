@@ -521,6 +521,36 @@ export async function personErfassungsQuittungEntfernen(
   return geloescht;
 }
 
+/** Höchstliegezeit für Daten ohne angemeldeten Besitzer (LFH-767, design.md D4). */
+const HOECHSTLIEGEZEIT_OHNE_BESITZER_MS = 24 * 60 * 60 * 1000;
+
+/** Abmelden und Sitzungsende (LFH-767, design.md D2): alle Quittungen gehen, die Person liegt
+ * nach dem Replay ohnehin auf dem Server. Die vier Queue-Stores bleiben unberührt. */
+export async function personErfassungsQuittungenRaeumen(): Promise<void> {
+  const d = await db();
+  await d.clear('personErfassungsQuittungen');
+}
+
+/** Start und Anmeldung (LFH-767, design.md D4): Mit bestätigter Person gehen die Quittungen
+ * aller anderen; ohne Person nur die, die älter als 24 h sind. */
+export async function personErfassungsQuittungenAufraeumen(
+  benutzerId: number | null,
+  jetzt: number,
+): Promise<void> {
+  const grenze = jetzt - HOECHSTLIEGEZEIT_OHNE_BESITZER_MS;
+  const d = await db();
+  const tx = d.transaction('personErfassungsQuittungen', 'readwrite');
+  let cursor = await tx.store.openCursor();
+  while (cursor) {
+    const q = cursor.value;
+    const verwaist =
+      benutzerId === null ? Date.parse(q.erstellt_at) < grenze : q.benutzer_id !== benutzerId;
+    if (verwaist) await cursor.delete();
+    cursor = await cursor.continue();
+  }
+  await tx.done;
+}
+
 export async function schreibaktionAblehnen(
   benutzerId: number,
   eintrag: AusstehendeSchreibaktion,

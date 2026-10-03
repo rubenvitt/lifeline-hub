@@ -13,13 +13,18 @@ import {
   queueNichtZugeordnetAlleVerwerfen,
   queueNichtZugeordnetZaehlen,
   queueZaehlerLaden,
+  personErfassungsQuittungenAufraeumen,
+  personErfassungsQuittungenRaeumen,
   schreibaktionAblehnen,
   schreibaktionAbgelehntVerwerfen,
   schreibaktionAbgelehntWiederholen,
   schreibaktionEinreihen,
   schreibaktionenAbgelehntLaden,
   schreibaktionenLaden,
+  schreibaktionPersonAbschliessen,
 } from './queue';
+import type { Person } from '../api/types';
+import { rohLesen } from '../test/rohIdb';
 
 const BENUTZER_A = 11;
 const BENUTZER_B = 22;
@@ -170,5 +175,57 @@ describe('benutzergebundene Offline-Queue (LFH-334)', () => {
     expect(await queueNichtZugeordnetAlleVerwerfen()).toBe(0);
     expect(await queueNichtZugeordnetZaehlen()).toBe(0);
     expect((await queueLaden(BENUTZER_B, 7))[0].eintrag.client_id).toBe('bleibt-erhalten');
+  });
+});
+
+describe('Personen-Erfassungsquittungen räumen (LFH-767)', () => {
+  async function quittungAnlegen(benutzerId: number, clientId: string): Promise<void> {
+    await schreibaktionEinreihen(benutzerId, 7, {
+      art: 'person',
+      daten: { name: 'Muster', status: 'erfasst', client_id: clientId },
+    });
+    const offen = await schreibaktionenLaden(benutzerId, 7);
+    const zeile = offen.find(
+      (z) => z.aktion.art === 'person' && z.aktion.daten.client_id === clientId,
+    )!;
+    const person = { id: 1, name: 'Muster', status: 'erfasst' } as unknown as Person;
+    expect(await schreibaktionPersonAbschliessen(benutzerId, zeile, person)).not.toBeNull();
+  }
+
+  it('leert die Quittungen auf der Platte und lässt die Queue unberührt', async () => {
+    await quittungAnlegen(BENUTZER_A, 'q-a');
+    await quittungAnlegen(BENUTZER_B, 'q-b');
+    await queueEinreihen(BENUTZER_A, 7, { ...eintrag, client_id: 'etb-a' });
+    await schreibaktionEinreihen(BENUTZER_A, 7, {
+      art: 'person',
+      daten: { name: 'Noch offen', status: 'vermisst', client_id: 'offen-a' },
+    });
+    await queueAblehnen(BENUTZER_A, (await queueLaden(BENUTZER_A, 7))[0], 'abgelehnt');
+    await queueEinreihen(BENUTZER_A, 7, { ...eintrag, client_id: 'etb-a-2' });
+
+    await personErfassungsQuittungenRaeumen();
+
+    expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
+    expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
+    expect(await rohLesen('lifeline-offline', 'abgelehnt')).toHaveLength(1);
+    expect(await rohLesen('lifeline-offline', 'schreibaktionen')).toHaveLength(1);
+  });
+
+  it('räumt mit bestätigter Person fremde Quittungen, ohne Person nur die über 24 h', async () => {
+    await quittungAnlegen(BENUTZER_A, 'q-a');
+    await quittungAnlegen(BENUTZER_B, 'q-b');
+    const tag = 24 * 60 * 60 * 1000;
+
+    await personErfassungsQuittungenAufraeumen(null, Date.now() + tag - 60_000);
+    expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toHaveLength(2);
+
+    await personErfassungsQuittungenAufraeumen(BENUTZER_A, Date.now());
+    const rest = (await rohLesen('lifeline-offline', 'personErfassungsQuittungen')) as {
+      benutzer_id: number;
+    }[];
+    expect(rest.map((q) => q.benutzer_id)).toEqual([BENUTZER_A]);
+
+    await personErfassungsQuittungenAufraeumen(null, Date.now() + tag + 60_000);
+    expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
   });
 });
