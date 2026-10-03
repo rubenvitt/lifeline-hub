@@ -36,9 +36,7 @@ function benutzerBody(totpAktiviert: boolean, passwortGesetzt = true) {
  *  Benutzer kommt aus der `/api/auth/me`-Antwort. */
 function setup(totpAktiviert = false, providerListe: unknown[] = [], passwortGesetzt = true) {
   server.use(
-    http.get('/api/auth/me', () =>
-      HttpResponse.json(benutzerBody(totpAktiviert, passwortGesetzt)),
-    ),
+    http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(totpAktiviert, passwortGesetzt))),
     http.get('/api/auth/providers', () => HttpResponse.json(providerListe)),
     // Die Organisation steht nicht am Benutzer; die Kopfsektion holt sie aus `GET
     // /api/organisation`.

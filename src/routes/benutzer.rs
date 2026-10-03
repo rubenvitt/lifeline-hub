@@ -85,11 +85,13 @@ const ANZEIGE_SPALTEN: &str = "SELECT id, org_id, anzeigename, benutzername, sys
 /// Lädt die öffentliche Darstellung eines Benutzers nach einer Änderung durch den Admin.
 async fn anzeige_laden(pool: &sqlx::SqlitePool, id: i64) -> Result<BenutzerAnzeige, AppError> {
     let sql = format!("{ANZEIGE_SPALTEN} WHERE id = ?");
-    Ok(sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
-        .bind(PASSWORT_HASH_SSO_ONLY)
-        .bind(id)
-        .fetch_one(pool)
-        .await?)
+    Ok(
+        sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
+            .bind(PASSWORT_HASH_SSO_ONLY)
+            .bind(id)
+            .fetch_one(pool)
+            .await?,
+    )
 }
 
 /// GET /api/benutzer — Liste aller Benutzer (ohne Passwort-Hashes). Admin-only. Enthält den
@@ -102,7 +104,7 @@ pub async fn liste(
     let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
         .bind(PASSWORT_HASH_SSO_ONLY)
         .fetch_all(&state.pool)
-    .await?;
+        .await?;
     Ok(Json(benutzer))
 }
 

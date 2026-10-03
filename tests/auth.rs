@@ -1197,6 +1197,8 @@ async fn login_ohne_totp_liefert_weiterhin_die_nackte_benutzeranzeige() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["benutzername"], "admin");
     assert_eq!(json["system_rolle"], "admin");
+    // Auch der Login-Weg trägt das Feld (LFH-828), der `AuthContext` übernimmt diese Antwort.
+    assert_eq!(json["passwort_gesetzt"], true, "{json}");
     assert!(
         json.get("mfa_erforderlich").is_none(),
         "ein Nicht-TOTP-Login darf KEIN mfa_erforderlich-Feld tragen: {json}"
@@ -1389,7 +1391,10 @@ async fn me_liefert_passwort_gesetzt_false_fuer_sso_only_konto() {
     let (status, json) = anfrage(&app, "GET", "/api/auth/me", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["passwort_gesetzt"], false, "SSO-only-Konto: {json}");
-    assert!(json.get("passwort_hash").is_none(), "Hash ausgeliefert: {json}");
+    assert!(
+        json.get("passwort_hash").is_none(),
+        "Hash ausgeliefert: {json}"
+    );
     assert!(
         !json
             .to_string()

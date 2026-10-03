@@ -168,10 +168,12 @@ pub struct BenutzerAnzeige {
     /// aktiviert hat. Zeigt sowohl der Admin-Benutzerliste als auch dem eigenen Profil
     /// (`GET /api/auth/me`) den Status an.
     pub totp_aktiviert: bool,
-    /// `true`, wenn das Konto ein lokales Passwort hat; ein SSO-only-Konto (Sentinel
-    /// [`PASSWORT_HASH_SSO_ONLY`]) hat keins (LFH-828). Das Profil bietet den Passwortwechsel nur
-    /// dann an. Hash und Sentinel selbst verlassen den Server nie. Die SQL-Abfragen in
-    /// `routes::benutzer` leiten das Feld mit gebundenem Sentinel ab.
+    // Herleitung: `anzeige()` vergleicht den Hash mit `PASSWORT_HASH_SSO_ONLY`, die SQL-Abfragen
+    // in `routes::benutzer` tun es mit gebundenem Sentinel (`ANZEIGE_SPALTEN`). Der `///`-Text
+    // landet im API-Vertrag (openapi.json), deshalb steht das hier und nicht dort.
+    /// `true`, wenn das Konto ein lokales Passwort hat; ein SSO-only-Konto hat keins (LFH-828).
+    /// Das Profil bietet den Passwortwechsel nur dann an. Hash und Sentinel verlassen den Server
+    /// nie.
     pub passwort_gesetzt: bool,
 }
 
