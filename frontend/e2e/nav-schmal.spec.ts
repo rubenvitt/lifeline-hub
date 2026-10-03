@@ -215,7 +215,7 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
 });
 
 /**
- * Modulsperre per Override (LFH-820, `openspec/changes/lfh-820-layout-gates-modulsperre-override/`):
+ * Modulsperre per Override (LFH-820, `openspec/changes/archive/2026-10-03-lfh-820-layout-gates-modulsperre-override/`):
  * eine Mandanten-, keine Rollenachse. Für den Admin ist kein Modul gesperrt (Admin-Ausnahme in
  * `src/einsatz/berechtigung.rs`); die gesperrten Zeilen (Schloss, „Keine Berechtigung") sieht nur
  * ein Benutzer ohne die verlangte Rolle — hier der Beobachter.
@@ -281,6 +281,8 @@ test('Navigationsrahmen: auf 390 px hält der Drawer gesperrte Zeilen (Beobachte
   haeltTreffflaeche(kasten.width, 'Hamburger-Breite');
   haeltTreffflaeche(kasten.height, 'Hamburger-Höhe');
 
+  // Gegenmessung ohne Sperrbezug: bei geschlossenem Drawer hängt am Rahmen nichts an der Sperre.
+  // Der Sperrzweig wird erst im offenen Drawer zugesichert und gemessen.
   const zu = await messeUeberlauf(page);
   expect(
     zu.rahmen,
@@ -339,8 +341,8 @@ test('Navigationsrahmen: auf 1024 px hält die Liste gesperrte Zeilen (Beobachte
     `Der Navigationsrahmen ragt auf 1024 px über:\n${messung.rahmen.join('\n')}`,
   ).toEqual([]);
   meldeFremdenUeberlauf('Sperre, 1024 px', messung);
-  // Das Panel selbst läuft nicht in sich über (es klippt, statt die Seite aufzuschieben —
-  // `messeUeberlauf` sähe das nicht), die gesperrten Zeilen ebenso wenig.
+  // Zusätzliche Absicherung neben `messeUeberlauf`: weder das Panel noch eine gesperrte Zeile
+  // läuft in sich über (ein Knopf mit `width: 100%` wächst nicht mit seinem Inhalt).
   await keinInnererUeberlauf(panel, 'Modulpanel');
   for (const name of [GESPERRT_ZEILE, GESPERRT_SPRUNG]) {
     await keinInnererUeberlauf(panel.getByRole('button', { name, exact: true }), `„${name}"`);

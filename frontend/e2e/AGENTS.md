@@ -14,7 +14,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   deshalb sät der Admin die Sperre per Einsatz-Override (`benoetigte_rolle: 'admin'`, nie
   `sichtbar: false`, keine Org-Vorgabe) und der Beobachter misst; Vorbedingung „gesperrte Zeile
   bzw. ‚—‘ mit Grund steht“. Träger `nav-schmal`, `lage-dashboard-schmal`; Inventar:
-  `openspec/changes/lfh-820-layout-gates-modulsperre-override/pruefliste.md`.
+  `openspec/changes/archive/2026-10-03-lfh-820-layout-gates-modulsperre-override/pruefliste.md`.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.

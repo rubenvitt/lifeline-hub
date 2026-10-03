@@ -77,7 +77,8 @@ async function messen(page: Page, viewportBreite: number, einsatz = einsatzId) {
       `Viewport ${viewportBreite} px → Fläche ${flaecheBreite} px ` +
       `→ Band ${band.spalten} Spalten (${band.scrollWidth}/${band.clientWidth} px), ` +
       `Paneele ${paneelSpalten} Spalten, ` +
-      // Belegt, dass alle drei Tests DIESELBE Vorbedingung teilen.
+      // Belegt, dass die drei Admin-Tests DIESELBE Vorbedingung teilen (die Sperr-Tests legen je
+      // einen eigenen Einsatz an).
       `Einsatz ${einsatz}`,
   });
 
@@ -160,7 +161,7 @@ test.describe('Lage-Dashboard auf den drei Prüfbreiten', () => {
 });
 
 /**
- * Modulsperre per Override (LFH-820, `openspec/changes/lfh-820-layout-gates-modulsperre-override/`):
+ * Modulsperre per Override (LFH-820, `openspec/changes/archive/2026-10-03-lfh-820-layout-gates-modulsperre-override/`):
  * für den Admin ist kein Modul gesperrt (Admin-Ausnahme), die Plätze „—" mit Grund und die
  * Sperrsätze der Paneele sieht nur ein Benutzer ohne die verlangte Rolle. Gesperrt werden
  * Personen (Plätze „Verbleib offen", Betroffene, Vermisste und das Sichtungspaneel), Gefahren
@@ -213,6 +214,9 @@ async function sperrzweigSteht(page: Page) {
     );
   }
   await expect(BAND(page).locator('a[data-lfh="kennzahl"]')).toHaveCount(3);
+  // Ein Link bleibt auch im Zustand `laden` ein Link: erst messen, wenn die freien Plätze ihre
+  // Zahl tragen.
+  await expect(BAND(page).getByText('wird abgerufen')).toHaveCount(0);
   for (const satz of [
     'Modul Gefahren nicht freigegeben.',
     'Modul Personen nicht freigegeben.',
