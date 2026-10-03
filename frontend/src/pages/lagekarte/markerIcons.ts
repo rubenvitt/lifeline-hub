@@ -6,7 +6,7 @@ import type { TzProps } from './taktischesZeichen';
 /**
  * Deterministischer, eindeutiger MapLibre-Image-Key für ein taktisches Zeichen.
  * Gleicher TZ → gleicher Key (Icon wird genau einmal registriert und mehrfach genutzt).
- * Das `tz|`-Präfix erlaubt dem `styleimagemissing`-Handler, fremde Image-IDs zu ignorieren.
+ * Am `tz|`-Präfix erkennt der Bild-Resolver (`kartenbildResolver.ts`) den Weg über das Altpaket.
  */
 export function tzIconKey(tz: TzProps): string {
   return [
@@ -23,7 +23,7 @@ export function tzIconKey(tz: TzProps): string {
 
 /**
  * Der Bildschlüssel eines Markers — die eine Quelle für die Feature-Property `icon` und die Registry
- * des `styleimagemissing`-Handlers (LFH-835, design.md D5). Freie Zeichen zeichnet bis LFH-836 das
+ * des Bild-Resolvers (`kartenbildResolver.ts`; LFH-835, design.md D5). Freie Zeichen zeichnet bis LFH-836 das
  * Altpaket (`tz|`), alle übrigen Marker @einsatzzeichen (`ez|` + wirksame Spec). Ohne `tz` oder
  * ohne darstellbaren Körper kein Schlüssel: der Marker bleibt ein Kreis.
  */
@@ -33,7 +33,7 @@ export function markerIconKey(mk: Pick<KarteMarker, 'typ' | 'tz'>): string | und
   return fachobjektZeichen(mk.tz)?.schluessel;
 }
 
-/** Woraus der `styleimagemissing`-Handler ein Kartenbild erzeugt. */
+/** Woraus der Bild-Resolver (`kartenbildResolver.ts`) ein Kartenbild erzeugt. */
 export type ZeichenQuelle = { art: 'ez'; drawing: Drawing } | { art: 'tz'; tz: TzProps };
 
 /** Bildschlüssel → Quelle, für alle Marker mit Zeichen; gleiche Zeichen einmal. */
