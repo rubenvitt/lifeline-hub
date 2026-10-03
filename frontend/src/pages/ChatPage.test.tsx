@@ -90,6 +90,46 @@ describe('ChatPage', () => {
     expect(await screen.findByText('Neue Meldung')).toBeInTheDocument();
   });
 
+  it('behält die Nachricht im Feld, wenn der Server das Senden ablehnt (LFH-795)', async () => {
+    setup();
+    server.use(
+      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', () =>
+        HttpResponse.json({ error: 'Zu groß' }, { status: 413 }),
+      ),
+    );
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, 'Geht verloren?');
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Senden' })).not.toHaveClass('ant-btn-loading'),
+    );
+    expect(feld).toHaveValue('Geht verloren?');
+  });
+
+  it('behält Name und Beschreibung, wenn der Server die Kanalanlage ablehnt (LFH-795)', async () => {
+    const user = userEvent.setup();
+    let versucht = 0;
+    setup();
+    server.use(
+      http.post('/api/einsaetze/7/chat/kanaele', () => {
+        versucht += 1;
+        return HttpResponse.json({ error: 'Name vergeben' }, { status: 409 });
+      }),
+    );
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
+    await user.type(await screen.findByLabelText('Name'), 'Allgemein');
+    await user.type(screen.getByLabelText('Beschreibung (optional)'), 'Zweiter Versuch');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(versucht).toBe(1));
+    // Die Ablehnung ist verarbeitet, sobald die Fehlermeldung steht.
+    expect(await screen.findByText('Name vergeben')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).not.toHaveClass('ant-zoom-leave');
+    expect(screen.getByLabelText('Name')).toHaveValue('Allgemein');
+    expect(screen.getByLabelText('Beschreibung (optional)')).toHaveValue('Zweiter Versuch');
+  });
+
   it('markiert den erfolgreich geöffneten Kanal persistent gelesen', async () => {
     let markiert = 0;
     setup(1, () => {
