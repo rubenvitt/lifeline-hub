@@ -276,7 +276,7 @@ brauchen es — deshalb kommen sie später“ steht nur im Archiv von LFH-21 und
 ## Migration Plan
 
 1. `git fetch origin alpha`, `scripts/check-migrationen.sh` — `0140`/`0141` sind frei.
-2. `0140_einsatz_person_anhang.sql` (additiv) und `0141_person_zugriff_audit_anhang.sql`
+2. `0142_einsatz_person_anhang.sql` (additiv) und `0141_person_zugriff_audit_anhang.sql`
    (Rebuild, `-- no-transaction` als erste Zeile).
 3. Rollback: eingespielte Migrationen werden nicht editiert. Eine Rücknahme braucht eine
    Folgemigration (Linker und zugehörige `anhang`-Zeilen entfernen; der erweiterte CHECK kann
