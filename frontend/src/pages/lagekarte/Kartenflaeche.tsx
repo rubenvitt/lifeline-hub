@@ -46,6 +46,7 @@ import {
   ZEICHEN_KARTEN_PX,
   type ZeichenQuelle,
 } from './markerIcons';
+import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
 import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
@@ -662,12 +663,23 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         },
       }),
     );
+    // Wechselt die Pixeldichte (anderer Monitor, Browser-Zoom), rastern die schon angelegten
+    // Fachobjekt-Zeichen neu, sonst blieben sie bis zum nächsten Stilwechsel unscharf (LFH-842).
+    // Nur bei einer anderen Rasterdichte: 1,25 → 1,5 bleibt bei 2.
+    let zeichenDichte = kartenPixelRatio(window.devicePixelRatio);
+    const pixeldichteAbmelden = beobachtePixeldichte(window, (dpr) => {
+      const neu = kartenPixelRatio(dpr);
+      if (neu === zeichenDichte) return;
+      zeichenDichte = neu;
+      rastereZeichenNeu(map, zeichenRegistryRef.current, neu);
+    });
     mapRef.current = map;
     // Testhaken für den Browser-Smoke (e2e/lagekarte-smoke.spec.ts): die Karte lebt in WebGL, ein
     // toter Tile-Worker lässt das DOM unverändert, nur `map.loaded()` kippt. Im Prod-Build ist die
     // Zeile weg.
     if (import.meta.env.DEV) (window as unknown as { __lfhKarte?: unknown }).__lfhKarte = map;
     return () => {
+      pixeldichteAbmelden();
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
       // Die Merker gehören zu DIESER Karte: eine neue (Remount, Fast Refresh) lädt ihren Style

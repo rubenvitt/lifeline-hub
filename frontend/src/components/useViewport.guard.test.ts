@@ -59,6 +59,9 @@ const MARKE = /matchMedia|\buseBreakpoint\b/;
 const ALLOWLIST = [
   // Dunkelmodus-Frage (`prefers-color-scheme`), keine Breiten-/Zeigerfrage.
   '/src/theme/ThemeModeProvider.tsx',
+  // Pixeldichte-Frage (`resolution: …dppx`, LFH-842): Kartenzeichen neu rastern, keine
+  // Breiten-/Zeigerfrage.
+  '/src/pages/lagekarte/zeichenDichte.ts',
   // Das Primitiv selbst — es stellt die Zeigerabfrage, die es allen anderen abnimmt.
   '/src/components/useViewport.ts',
   // Der jsdom-Stub: installiert die API, statt sie zu nutzen.
