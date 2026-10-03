@@ -79,6 +79,9 @@ export function blindStyle(theme: KartenTheme): StyleSpecification {
 /** Glyphen-Vorlage des Offline-Stils: der eigene, eingebettete Server (`assets/karten/fonts/`). */
 export const OFFLINE_GLYPHS = '/api/karte/offline/fonts/{fontstack}/{range}.pbf';
 
+/** Sprite des Offline-Stils, ebenfalls vom eigenen Server (`assets/karten/sprites/`). */
+const OFFLINE_SPRITE = '/api/karte/offline/sprites/basemap';
+
 /**
  * Offline-Vektor-Style über die selbst-servierten Shortbread-MBTiles-Kacheln. Je Region eine eigene
  * Vector-Source `basemap-{karte_id}` plus ein Layer-Set mit region-suffixierten IDs; alle Regionen
@@ -112,7 +115,10 @@ export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): Sty
   return {
     version: 8,
     glyphs: OFFLINE_GLYPHS,
-    sprite: '/api/karte/offline/sprites/basemap',
+    // Absolut, anders als Glyphen und Kacheln (LFH-781): MapLibre parst die Sprite-URL vor jedem
+    // `transformRequest` mit `new URL(url)` ohne Basis (`normalizeSpriteURL`). Root-relativ meldet
+    // es „Invalid sprite URL … must be absolute" als `error` und lädt kein Sprite.
+    sprite: absolutiereProxyAnfrage(OFFLINE_SPRITE).url,
     sources,
     layers,
   } as StyleSpecification;

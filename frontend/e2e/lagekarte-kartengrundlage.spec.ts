@@ -6,7 +6,7 @@ import {
 } from './kartenFixture';
 
 // Die Kartengrundlage der Lagekarte im Browser (LFH-558, Spec `lagekarte-kartengrundlage`).
-// Beide Tests stellen ihre Grundlage selbst (`kartenFixture.ts`): kein Netz, keine echten Kacheln.
+// Alle drei Tests stellen ihre Grundlage selbst (`kartenFixture.ts`): kein Netz, keine echten Kacheln.
 //
 // (1) WECHSEL ZWISCHEN ZWEI ONLINE-VEKTORKARTEN über die Grundlage-Leiste, also über den
 //     `[style]`-Effekt von `Kartenflaeche.tsx` (`setStyle` mit `diff: false`, dann die Neuanlage
@@ -21,6 +21,8 @@ import {
 //     Wahl bleibt „online" (die Abstufung ändert nur die Anzeige). Die Stufe offline → blind ist
 //     im Browser nicht herstellbar (Offline-Styles sind inline, `style.load` feuert sofort) und
 //     bleibt beim Unit-Test.
+//
+// (3) ERSTSTIL OFFLINE (LFH-781): frische Seite mit nur einer Offline-Karte, s. dort.
 //
 // „Gelesen" heißt DEKODIERT (`querySourceFeatures`), nicht `loaded()` — s. `kartenFixture.ts`.
 
@@ -343,5 +345,127 @@ test('Style-JSON der Online-Karte liefert 404: Anzeige weicht auf die Offline-Re
   // stünde dort eine zweite Warnung und die Offline-Quelle wäre weg. Eine spätere kann nicht mehr
   // kommen: die dekodierte Offline-Quelle setzt das `style.load` voraus, das das Fenster schließt.
   expect(abstufungen).toHaveLength(1);
+  expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
+
+/** Offline-Region des Erststils: eigene Karten-Id, damit sich die Routen nicht überschneiden. */
+const OFFLINE_ERST = {
+  kartenId: 8,
+  kachelPraefix: '/api/karte/offline/8/tiles/',
+  layer: 'streets',
+} as const;
+
+/** Stand der Offline-Grundlage als ein Wort (wie oben), `null`-frei für `expect.poll`. */
+function offlineStand(page: Page, quelle: string, layer: string) {
+  return page.evaluate(
+    ({ quelle, layer }) => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+      if (!map?.isStyleLoaded()) return 'Style lädt nicht (noch nicht, oder gar nicht)';
+      const quellen = Object.keys(map.getStyle()?.sources ?? {});
+      if (!quellen.includes(quelle)) return `keine Offline-Quelle im Style: ${quellen}`;
+      return map.querySourceFeatures(quelle, { sourceLayer: layer }).length > 0
+        ? 'offline dekodiert'
+        : 'Offline-Quelle da, aber keine Kachel gelesen';
+    },
+    { quelle, layer },
+  );
+}
+
+/** Ein Bild aus `assets/karten/sprites/basemap.json`: steht es in der Karte, ist das Sprite da. */
+const SPRITE_BILD = 'icon-airfield';
+
+/** MapLibre-Fehler ohne Kachel seit dem Bau der Karte (`window.__lfhKartenFehler`, nur DEV). */
+function kartenFehler(page: Page) {
+  return page.evaluate(
+    () => (window as unknown as { __lfhKartenFehler?: string[] }).__lfhKartenFehler ?? null,
+  );
+}
+
+// (3) ERSTSTIL OFFLINE (LFH-781): nur eine Offline-Karte, keine Online-Views. Die frische Seite
+//     zeigt sofort Kacheln — kein Wechsel Blind → Offline nötig —, und weder der Erststil noch ein
+//     späterer Wechsel meldet einen MapLibre-Fehler (Sprite-URL root-relativ, `isSourceLoaded`
+//     auf `marker-cluster` vor der Neuanlage). Jeder Fehler ohne `tile` im ersten Fenster stufte
+//     die Anzeige still auf „Blind", während die Leiste „Offline" zeigt. Mutationsprobe: ohne
+//     `getSource` vor `isSourceLoaded` im Cluster-Poller (Stand vor LFH-558) bleibt die frische
+//     Seite ohne Offline-Quelle — der Befund des Spikes LFH-720.
+test('frische Seite mit aktiver Offline-Karte zeigt sofort Kacheln, ohne Kartenfehler, auch nach Blind → Offline', async ({
+  page,
+}) => {
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (f) => seitenFehler.push(f));
+  const abstufungen: string[] = [];
+  page.on('console', (m) => {
+    if (m.text().includes('Basemap-Style nicht ladbar')) abstufungen.push(m.text());
+  });
+
+  await kartenConfigBeantworten(page, {
+    offline_regionen: [
+      {
+        karte_id: OFFLINE_ERST.kartenId,
+        name: 'Fixture-Region',
+        tiles_url: `${OFFLINE_ERST.kachelPraefix}{z}/{x}/{y}?v=1`,
+        format: 'vektor',
+        maxzoom: 14,
+      },
+    ],
+  });
+  const kacheln = await kachelnBeantworten(page, OFFLINE_ERST.kachelPraefix, OFFLINE_ERST.layer);
+
+  await anmelden(page);
+  const eid = await einsatzMitOrt(page, `E2E Erststil ${Date.now()}`);
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+    1,
+  );
+
+  const quelle = `basemap-${OFFLINE_ERST.kartenId}`;
+  const grundlage = page.getByRole('radiogroup', { name: 'Kartengrundlage' });
+  await expect(grundlage.getByRole('radio', { name: 'Offline' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect
+    .poll(() => offlineStand(page, quelle, OFFLINE_ERST.layer), {
+      timeout: 20_000,
+      message: 'die frische Seite zeigt die Offline-Karte nicht',
+    })
+    .toBe('offline dekodiert');
+  expect(kacheln.length).toBeGreaterThan(0);
+  // Das Sprite lädt (oder scheitert) erst nach `style.load`: warten, bis es in der Karte steht.
+  await expect
+    .poll(
+      () =>
+        page.evaluate((bild) => {
+          const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+          const fehler = (window as unknown as { __lfhKartenFehler?: string[] }).__lfhKartenFehler;
+          return !!map?.listImages().includes(bild) || (fehler?.length ?? 0) > 0;
+        }, SPRITE_BILD),
+      { timeout: 10_000, message: 'das Sprite der Offline-Karte kommt nicht an' },
+    )
+    .toBe(true);
+  expect(await kartenFehler(page)).toEqual([]);
+
+  // Wechsel von Hand: Blind, dann wieder Offline — dieselbe Grundlage, wieder ohne Fehler.
+  await grundlage.getByRole('radio', { name: 'Blind' }).click();
+  await expect
+    .poll(() => offlineStand(page, quelle, OFFLINE_ERST.layer), { timeout: 10_000 })
+    .toMatch(/^keine Offline-Quelle im Style/);
+  await grundlage.getByRole('radio', { name: 'Offline' }).click();
+  await expect
+    .poll(() => offlineStand(page, quelle, OFFLINE_ERST.layer), { timeout: 20_000 })
+    .toBe('offline dekodiert');
+  await expect
+    .poll(
+      () =>
+        page.evaluate((bild) => {
+          const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+          return !!map?.listImages().includes(bild);
+        }, SPRITE_BILD),
+      { timeout: 10_000, message: 'das Sprite fehlt nach dem Wechsel' },
+    )
+    .toBe(true);
+  expect(await kartenFehler(page)).toEqual([]);
+
+  expect(abstufungen).toEqual([]);
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
