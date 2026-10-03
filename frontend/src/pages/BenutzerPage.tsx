@@ -1,5 +1,5 @@
-import { App, Button, Collapse, Form, Input, Popconfirm, Space, type TableColumnsType } from 'antd';
-import KatalogTabelle from '../components/KatalogTabelle';
+import { App, Button, Collapse, Form, Input, Popconfirm, Space } from 'antd';
+import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
@@ -92,26 +92,42 @@ export default function BenutzerPage() {
     return <Navigate to="/einsaetze" replace />;
   }
 
-  const spalten: TableColumnsType<BenutzerAnzeige> = [
+  /**
+   * Breiten nach der Regel „Fließende Spalte" (LFH-523, `frontend/AGENTS.md`): genau eine Spalte
+   * fließt, alle übrigen tragen eine Zahl, sonst bleibt die Tabelle inhaltsgetrieben.
+   *
+   * Die fixierte Namensspalte ist gedeckelt (LFH-819). Ohne Zahl wuchs sie mit dem längsten
+   * Anzeigenamen; auf 390 px blieb rechts daneben zu wenig Raum, und beim Tabben lag
+   * „Bearbeiten" vollständig unter ihr (WCAG 2.4.11, `e2e/fokus-verdeckung.spec.ts`). Die Zahl ist
+   * gegen die schmalste Fläche (mobil, 390 px) gewählt; der Name bricht um, statt gekürzt zu
+   * werden — die menschenlesbare Kennung bleibt ganz lesbar.
+   */
+  const spalten: KatalogSpalte<BenutzerAnzeige>[] = [
     {
       title: 'Name',
       dataIndex: 'anzeigename',
       key: 'anzeigename',
+      width: 136,
       // Leitspalte: am Anzeigenamen sucht ein Mensch das Konto. Ein Angebot, keine Voreinstellung —
       // `routes/benutzer.rs` liefert ORDER BY id.
       sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
+      render: (t: string) => <span style={{ overflowWrap: 'anywhere' }}>{t}</span>,
     },
     // Die Suche liest den Rohwert der Spalte: das führende „@" ist Darstellung, gesucht wird „eva".
     {
       title: 'Benutzername',
       dataIndex: 'benutzername',
       key: 'benutzername',
+      // Die Fließspalte: ein Benutzername ist ein Wort ohne Bruchstelle und bricht notfalls
+      // mitten im Wort, statt die Summe zu sprengen.
+      mindestBreite: 160,
       // Kennung in Mono.
-      render: (t) => <span style={monoStil(13)}>@{t}</span>,
+      render: (t) => <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>@{t}</span>,
     },
     {
       title: 'Rollen',
       key: 'rollen',
+      width: 140,
       render: (_, b) => (
         // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage (Blau
         // hieße Bedienung).
@@ -127,6 +143,7 @@ export default function BenutzerPage() {
     {
       title: 'Status',
       key: 'status',
+      width: 128,
       // Bewusst ohne `dataIndex`: `onFilter` bekommt den ganzen Datensatz, und ohne Datenbezug
       // fällt das Feld nicht in den Suchkorpus — sonst träfe die Suche nach „true"/„false" jede
       // aktive bzw. deaktivierte Zeile.
@@ -145,6 +162,7 @@ export default function BenutzerPage() {
     {
       title: 'Aktionen',
       key: 'aktionen',
+      width: 256,
       render: (_, b) => (
         <Space size="middle">
           <Button onClick={() => setZuBearbeiten(b)}>Bearbeiten</Button>

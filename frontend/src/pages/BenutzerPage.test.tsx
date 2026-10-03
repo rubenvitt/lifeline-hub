@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -343,6 +343,45 @@ describe('BenutzerPage', () => {
 
     expect(await screen.findByText('Noch keine Benutzer')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die fixierte Namensspalte ist gedeckelt (LFH-819). Ohne Zahlbreite wuchs sie mit dem längsten
+   * Anzeigenamen, und auf 390 px lag „Bearbeiten" beim Tabben vollständig unter ihr (WCAG 2.4.11,
+   * Nachweis im Browser: `e2e/fokus-verdeckung.spec.ts`). Hier steht die Verdrahtung: genau eine
+   * Fließspalte, alle übrigen mit Zahl (Regel „Fließende Spalte", LFH-523), also eine Tabellenbreite
+   * als Zahl statt `max-content`, und der lange Name bricht in seiner Zelle um.
+   */
+  it('deckelt die fixierte Namensspalte, ein langer Name bricht um', async () => {
+    const warnung = vi.spyOn(console, 'warn');
+    const langerName = 'Maximiliane Kirchgassner-Wohlfahrt';
+    server.use(
+      meHandler(benutzer()),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([benutzer({ id: 2, anzeigename: langerName, benutzername: 'mkw' })]),
+      ),
+    );
+    const { container } = renderMitProviders(
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
+      { route: '/admin/benutzer' },
+    );
+    const name = await screen.findByText(langerName);
+
+    const koerper = container.querySelector<HTMLTableElement>('.ant-table-body table')!;
+    // Σ der Zahlbreiten + Mindestmaß der Fließspalte, als Literal (zurückgerechnet prüfte die Zahl
+    // die Rechnung gegen sich selbst).
+    expect(koerper.style.width).toBe('820px');
+    expect(koerper.style.tableLayout).toBe('auto');
+    // Spalte 0 trägt ihre Zahl; unter `auto` ist sie Vorzugsbreite, der Umbruch hält sie dort.
+    expect(koerper.querySelector('col')).toHaveStyle({ width: '136px' });
+    expect(name.closest('td')).toHaveClass('ant-table-cell-fix');
+    expect(name).toHaveStyle({ overflowWrap: 'anywhere' });
+    // Ein Opt-in, das nicht trägt, meldet sich in DEV — hier darf es das nicht.
+    expect(warnung).not.toHaveBeenCalledWith(expect.stringContaining('[KatalogTabelle]'));
+    warnung.mockRestore();
   });
 
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {
