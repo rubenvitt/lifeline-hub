@@ -131,6 +131,15 @@ diese Zusage.
   Lagedaten, aber unter der ersten `td-*`-Ebene (LFH-766,
   `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md` D3);
   Messung vor `setStyle` räumen, nach `style.load` neu.
+- **Zeichnen per Link** (LFH-825, Spec `lagekarte-zeichnen`,
+  `openspec/changes/archive/2026-10-03-lfh-825-zeichnen-deeplink-lagekarte/design.md`): `?zeichnen=<zonentyp>[:flaeche|:linie]`
+  liest `LagekartePage` als **Literal** (Guard der Sprungpalette), wartet auf `ladt`, startet nur
+  mit `darfSchreiben` über `onZoneZeichnenStart` (stabil per `useCallback`) und räumt immer.
+  Typ und Form prüft `parseZeichnenAuftrag` (`routing/deeplinks.ts`), die Geometrie
+  `zeichenAuftragZuEntwurf` über `ZONE_TYPEN`; die Farbe der freien Skizze ist
+  `FREIE_SKIZZE_VORGABEFARBE`, für Paneel und Link dieselbe. Das Zonen-Zeichnen startet in
+  `Kartenflaeche` erst mit angewandtem Style-JSON (Merker ab `style.load`, nie
+  `isStyleLoaded()` — das wartet auf Kacheln) und beginnt nach `setStyle` neu wie die Messung.
 - **Esc beim Zeichnen ist zweistufig** (LFH-712, Entscheidung 28.09.2026): erstes Esc verwirft
   die Figur mit Quittung, der Modus bleibt; Esc ohne Figur beendet ihn (Messen: ein Esc). Stufe
   aus `lagekarte/zeichnenEsc.ts`, **ein** `keydown`-Zuhörer der Seite, terra-draw-Modi mit
