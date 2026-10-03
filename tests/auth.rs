@@ -1078,6 +1078,24 @@ async fn totp_enroll_start_ohne_session_ist_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
+/// Abschluss ohne vorherigen Start ist ein Zustand, kein kaputtes Feld → 422
+/// (`src/AGENTS.md`, Statuscode-Konvention).
+#[tokio::test]
+async fn totp_enroll_finish_ohne_start_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(r#"{"code":"123456"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 /// LFH-794: Wer nur eine Session hat (unbeaufsichtigter Fükw, entwendetes Tablet), darf den
 /// aktiven Zweitfaktor nicht per `enroll/start` still abschalten oder austauschen. Neu
 /// einrichten geht nur nach einem Admin-Reset.

@@ -200,7 +200,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Re-Enroll: neue Codes ersetzen die alten.
+        // Erneutes Speichern (Admin-Reset, dann neue Einrichtung): neue Codes ersetzen die alten.
         speichere(&pool, benutzer_id, &["neu-code".to_string()])
             .await
             .unwrap();
@@ -210,7 +210,7 @@ mod tests {
             .unwrap();
         assert!(
             !alter_code_noch_gueltig,
-            "alter Code muss durch Re-Enroll invalidiert sein"
+            "alter Code muss durch erneutes Speichern ungültig sein"
         );
 
         let neuer_code_gueltig = verbrauche_recovery_code(&pool, benutzer_id, "neu-code")
@@ -218,7 +218,7 @@ mod tests {
             .unwrap();
         assert!(
             neuer_code_gueltig,
-            "neuer Code muss nach Re-Enroll gültig sein"
+            "neuer Code muss nach erneutem Speichern gültig sein"
         );
     }
 

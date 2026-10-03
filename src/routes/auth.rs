@@ -1205,7 +1205,7 @@ pub async fn totp_enroll_start(
 /// POST /api/auth/totp/enroll/finish — schließt ein Enrollment ab. `totp_secret` wird frisch
 /// gelesen, weil `CurrentUser` die `totp_*`-Spalten nicht trägt.
 ///
-/// Ohne `totp_secret` → 400 „Kein TOTP-Enrollment gestartet“. Schon aktives TOTP → 422, ohne
+/// Ohne `totp_secret` → 422 „Kein TOTP-Enrollment gestartet“. Schon aktives TOTP → 422, ohne
 /// neue Recovery-Codes (ein zweiter Abschluss ersetzte sonst die gerade angezeigten). Ein
 /// falscher Code → 422, MFA wird nie ohne gültigen Code aktiviert. Ein gültiger Code aktiviert
 /// MFA, erzeugt zehn Klartext-Recovery-Codes und ersetzt alte.
@@ -1231,8 +1231,9 @@ pub async fn totp_enroll_finish(
                 TOTP_BEREITS_AKTIV.to_string(),
             ));
         }
-        let secret = secret
-            .ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
+        let secret = secret.ok_or_else(|| {
+            AppError::UnprocessableEntity("Kein TOTP-Enrollment gestartet".to_string())
+        })?;
 
         if !crate::auth::totp::pruefe_code(&secret, &req.code, jetzt) {
             return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
