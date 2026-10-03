@@ -149,6 +149,18 @@ function transformiereKartenAnfrage(url: string): { url: string } {
   return ergebnis;
 }
 
+/**
+ * DEV-Mitschnitt der MapLibre-`error`-Events unter `window.__lfhKartenFehler` (LFH-781). Mit einem
+ * eigenen `error`-Hörer schreibt MapLibre nichts mehr in die Konsole: ein Sprite- oder Quellenfehler
+ * bliebe für jeden Browser-Test unsichtbar. Kachel-Fehler bleiben draußen, sie sind Netzlage.
+ */
+function schneideKartenFehlerMit(e: { error?: { message?: string }; tile?: unknown }) {
+  if (!import.meta.env.DEV || e.tile !== undefined) return;
+  const w = window as unknown as { __lfhKartenFehler?: string[] };
+  const liste = (w.__lfhKartenFehler ??= []);
+  if (liste.length < ANFRAGEN_DECKEL) liste.push(e.error?.message ?? String(e.error));
+}
+
 // Re-Export: LagekartePage importiert ZoneFeature aus Kartenflaeche.
 export type { ZoneFeature };
 
@@ -531,8 +543,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!containerRef.current) return;
     // Mitschnitt vor dem Konstruktor leeren: `transformRequest` feuert schon für Style und Glyphs,
     // während `new maplibregl.Map` läuft. Sonst läse ein Test Einträge einer entfernten Karte.
-    if (import.meta.env.DEV)
+    if (import.meta.env.DEV) {
       (window as unknown as { __lfhKartenAnfragen?: KartenAnfrage[] }).__lfhKartenAnfragen = [];
+      (window as unknown as { __lfhKartenFehler?: string[] }).__lfhKartenFehler = [];
+    }
     const map = new maplibregl.Map({
       container: containerRef.current,
       style,
@@ -564,6 +578,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     map.on('style.load', () => {
       stilWaechterRef.current.stilGeladen();
     });
+    if (import.meta.env.DEV) map.on('error', schneideKartenFehlerMit);
     map.on('load', () => {
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
@@ -614,6 +629,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
         // Mitschnitt mit abräumen, aus demselben Grund.
         delete (window as unknown as { __lfhKartenAnfragen?: unknown }).__lfhKartenAnfragen;
+        delete (window as unknown as { __lfhKartenFehler?: unknown }).__lfhKartenFehler;
       }
       // Ref nullen: sonst ruft der Attribution-Effekt nach StrictMode-Remount `removeControl` auf
       // der entfernten Map.
