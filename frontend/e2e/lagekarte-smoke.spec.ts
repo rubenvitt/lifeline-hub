@@ -412,10 +412,27 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
   });
 
   // LFH-842: Wandert das Fenster auf einen Monitor anderer Dichte (oder ändert sich der Zoom),
-  // rastern die schon angelegten Zeichen neu: Breite 34 × ceil(dpr). Den Wechsel löst die
-  // Geräte-Emulation über CDP aus, wie ihn der Browser beim Monitorwechsel meldet (die
-  // `resolution`-Abfrage kippt). Zweimal, damit auch der zweite Wechsel ankommt.
+  // rastern die schon angelegten Zeichen neu: Breite 34 × ceil(dpr). Den Wechsel stellt der Test
+  // so nach, wie ihn der Browser meldet: `devicePixelRatio` springt, und die `resolution`-Abfrage
+  // auf die alte Dichte meldet `change`. Nicht über CDP-Emulation
+  // (`Emulation.setDeviceMetricsOverride` aus einer zweiten Sitzung): unter dem Chromium der CI
+  // rasterte danach nichts neu, lokal schon — der Test hinge an der Emulation statt an der Karte.
+  // Zweimal, damit auch der zweite Wechsel ankommt (die Karte meldet sich je Wechsel neu an).
   test('Zeichen rastern nach einem Wechsel der Pixeldichte neu', async ({ page }) => {
+    await page.addInitScript(() => {
+      const echt = window.matchMedia.bind(window);
+      const abfragen: { media: string; mql: MediaQueryList }[] = [];
+      window.matchMedia = (media: string) => {
+        const mql = echt(media);
+        abfragen.push({ media, mql });
+        return mql;
+      };
+      (window as unknown as { __lfhDichte: (neu: number) => void }).__lfhDichte = (neu) => {
+        const alt = `(resolution: ${window.devicePixelRatio}dppx)`;
+        Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: neu });
+        for (const a of abfragen) if (a.media === alt) a.mql.dispatchEvent(new Event('change'));
+      };
+    });
     await anmelden(page);
     const eid = await einsatzAnlegenUndOeffnen(page);
     await einsatzortSetzen(page, eid, { lat: 49.3519, lon: 9.1457 });
@@ -428,18 +445,14 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
       .poll(() => einsatzortZeichen(page), { timeout: 15_000 })
       .toEqual([{ id, breite: 68, gezeichnet: 1 }]);
 
-    const cdp = await page.context().newCDPSession(page);
-    const { width, height } = page.viewportSize()!;
     for (const [dichte, breite] of [
       [1, 34],
       [1.5, 68],
     ]) {
-      await cdp.send('Emulation.setDeviceMetricsOverride', {
-        width,
-        height,
-        deviceScaleFactor: dichte,
-        mobile: false,
-      });
+      await page.evaluate(
+        (d) => (window as unknown as { __lfhDichte: (neu: number) => void }).__lfhDichte(d),
+        dichte,
+      );
       await expect
         .poll(() => einsatzortZeichen(page), {
           timeout: 15_000,
