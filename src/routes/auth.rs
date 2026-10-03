@@ -529,6 +529,37 @@ fn oidc_fehler_redirect() -> Redirect {
     Redirect::to("/login?fehler=oidc")
 }
 
+/// Fehler-Redirect für einen Rückweg, den dieser Server selbst begonnen hat (der `state` war
+/// gebunden und im Store), mit `login_fehlgeschlagen` im Audit (LFH-846).
+///
+/// Davor gescheiterte Rückwege (IdP-Abbruch, fehlender oder fremder `state`, falsches Cookie)
+/// protokolliert der Callback nicht: sie gehören zu keinem Anmeldeversuch dieses Servers, und
+/// ein öffentlicher GET ohne Rate-Limit füllte sonst die Tabelle. `benutzer` ist nur beim
+/// deaktivierten Konto bekannt; sonst ist nicht einmal der versuchte Name sicher.
+async fn oidc_fehlschlag(
+    pool: &SqlitePool,
+    peer_ip: Option<std::net::IpAddr>,
+    benutzer: Option<&Benutzer>,
+) -> Redirect {
+    tracing::warn!(
+        benutzer_id = benutzer.map(|b| b.id),
+        peer_ip = ?peer_ip,
+        "OIDC-Anmeldung fehlgeschlagen"
+    );
+    crate::auth::audit::schreibe(
+        pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::LoginFehlgeschlagen,
+            benutzername: benutzer.map(|b| b.benutzername.as_str()),
+            benutzer_id: benutzer.map(|b| b.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_OIDC,
+        },
+    )
+    .await;
+    oidc_fehler_redirect()
+}
+
 /// GET /api/auth/oidc/callback — Token-Tausch, `id_token`-Validierung, JIT-Provisioning,
 /// Session. **Security-kritisch**, die Reihenfolge ist bewusst:
 ///
@@ -545,12 +576,15 @@ fn oidc_fehler_redirect() -> Redirect {
 /// 7. JIT-Provisioning (Match nur über `(issuer, sub)`).
 /// 8. `finde_oder_provisioniere` ignoriert `benutzer.aktiv` — ein deaktiviertes Konto wird HIER
 ///    abgewiesen.
-/// 9. Session, Cookie, Redirect auf den bereits geprüften `ziel_pfad`.
+/// 9. Session, Cookie, `login_ok` (Anbieter `oidc`), Redirect auf den bereits geprüften
+///    `ziel_pfad`.
 ///
 /// Jeder Fehler ab Schritt 2 endet im selben generischen Redirect; nur Datenbankfehler
-/// propagieren als `AppError` (generisches 500, ohne IdP-Details).
+/// propagieren als `AppError` (generisches 500, ohne IdP-Details). Scheitert der Rückweg nach
+/// Schritt 4, steht zusätzlich `login_fehlgeschlagen` im Audit ([`oidc_fehlschlag`]).
 pub async fn oidc_callback(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     Query(query): Query<OidcCallbackQuery>,
@@ -601,23 +635,23 @@ pub async fn oidc_callback(
 
     let Ok(client) = crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await
     else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Ok((jar, oidc_fehlschlag(&state.pool, peer_ip, None).await));
     };
 
     let Ok(token_response) =
         crate::auth::oidc::tausche_code_gegen_token(&client, code, eintrag.pkce_verifier).await
     else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Ok((jar, oidc_fehlschlag(&state.pool, peer_ip, None).await));
     };
 
     let Some(id_token) = token_response.id_token() else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Ok((jar, oidc_fehlschlag(&state.pool, peer_ip, None).await));
     };
 
     // Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — s. Punkt 6.
     let Ok(claims) = id_token.claims(&client.id_token_verifier(), &Nonce::new(eintrag.nonce))
     else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Ok((jar, oidc_fehlschlag(&state.pool, peer_ip, None).await));
     };
 
     // `name` ist ein lokalisierter Claim; ohne Sprachpräferenz der Default-Wert, sonst der erste.
@@ -640,11 +674,31 @@ pub async fn oidc_callback(
 
     // Punkt 8 oben.
     if !benutzer.aktiv {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Ok((
+            jar,
+            oidc_fehlschlag(&state.pool, peer_ip, Some(&benutzer)).await,
+        ));
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token, secure));
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        benutzername = %benutzer.benutzername,
+        peer_ip = ?peer_ip,
+        "OIDC-Anmeldung erfolgreich"
+    );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::LoginOk,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_OIDC,
+        },
+    )
+    .await;
     Ok((jar, Redirect::to(&eintrag.ziel_pfad)))
 }
 
@@ -850,7 +904,8 @@ pub async fn webauthn_auth_start(
 /// 4. Counter-Writeback: gespeicherten Passkey laden, `update_credential`, per
 ///    `storage::aktualisiere_counter` persistieren.
 /// 5. Ein inzwischen deaktiviertes Konto bekommt trotz gültiger Signatur keine Session.
-/// 6. Session anlegen, Cookie setzen, `webauthn_auth`-Cookie entfernen, 200.
+/// 6. Session anlegen, Cookie setzen, `webauthn_auth`-Cookie entfernen, `login_ok` (Anbieter
+///    `webauthn`, wie der discoverable Weg), 200.
 ///
 /// # Counter-Prüfung in webauthn-rs 0.5
 ///
@@ -865,6 +920,7 @@ pub async fn webauthn_auth_start(
 /// Counter als Vergleichsbasis.
 pub async fn webauthn_auth_finish(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(body): JsonBody<PublicKeyCredential>,
@@ -941,6 +997,25 @@ pub async fn webauthn_auth_finish(
             .path("/api/auth/webauthn")
             .build(),
     );
+
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        benutzername = %benutzer.benutzername,
+        peer_ip = ?peer_ip,
+        "WebAuthn-Anmeldung erfolgreich"
+    );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::LoginOk,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_WEBAUTHN,
+        },
+    )
+    .await;
+
     Ok((jar, StatusCode::OK))
 }
 
@@ -1240,10 +1315,14 @@ pub struct TotpFinishRequest {
 /// 2. `benutzer` frisch per `id` laden. Deaktiviertes Konto oder fehlendes `totp_secret` (etwa
 ///    nach einem Admin-Reset zwischen `login` und `finish`) → 401.
 /// 3. `totp::pruefe_code`, nur bei Fehlschlag EIN atomarer `verbrauche_recovery_code`. Beides
-///    `false` → 401, ohne zu verraten, welcher Weg scheiterte.
-/// 4. Erst dann Session und Cookie, `mfa_pending` entfernen, 200 mit `BenutzerAnzeige`.
+///    `false` → 401, ohne zu verraten, welcher Weg scheiterte. Der falsche Code steht als
+///    `login_fehlgeschlagen` im Audit (LFH-846): das Passwort war richtig, der Versuch gehört
+///    also einem bekannten Konto.
+/// 4. Erst dann Session und Cookie, `mfa_pending` entfernen, `login_ok` (Anbieter `passwort`),
+///    200 mit `BenutzerAnzeige`.
 pub async fn totp_finish(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<TotpFinishRequest>,
@@ -1288,6 +1367,23 @@ pub async fn totp_finish(
         )
         .await?;
     if !gueltig {
+        tracing::warn!(
+            benutzer_id = benutzer.id,
+            benutzername = %benutzer.benutzername,
+            peer_ip = ?peer_ip,
+            "Anmeldung fehlgeschlagen: TOTP-Code ungültig"
+        );
+        crate::auth::audit::schreibe(
+            &state.pool,
+            crate::auth::audit::AuditEintrag {
+                ereignis: crate::auth::audit::Ereignis::LoginFehlgeschlagen,
+                benutzername: Some(&benutzer.benutzername),
+                benutzer_id: Some(benutzer.id),
+                peer_ip: peer_ip.map(|ip| ip.to_string()),
+                provider: crate::auth::provider::ID_PASSWORT,
+            },
+        )
+        .await;
         return Err(AppError::Unauthorized);
     }
 
@@ -1298,6 +1394,24 @@ pub async fn totp_finish(
             .path("/api/auth")
             .build(),
     );
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        benutzername = %benutzer.benutzername,
+        peer_ip = ?peer_ip,
+        "Anmeldung mit TOTP erfolgreich"
+    );
+    // Anbieter `passwort`: TOTP ist der zweite Faktor des Passwort-Logins, kein eigener Weg.
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::LoginOk,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_PASSWORT,
+        },
+    )
+    .await;
     // Der Pending-State entsteht nur im TOTP-Zweig von `login`; der Status ist hier sicher `true`.
     Ok((jar, Json(benutzer.anzeige(true))))
 }

@@ -109,6 +109,10 @@ totp-rs = { version = "6", features = ["otpauth", "gen_secret"] }
 # bekommt das Feature nicht.
 webauthn-rs = { version = "0.5", features = ["danger-credential-internals"] }
 webauthn-rs-core = "=0.5.5"
+# Signiert im OIDC-Integrationstest das `id_token` eines Test-IdP (RS256, LFH-846): `rcgen` läuft
+# hier auf `ring`, das keine RSA-Schlüssel erzeugt. Dieselbe Version wie über rustls im Baum,
+# ohne Default-Features, also keine neue Crate und kein neues Feature.
+aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"] }
 # SSE-Body eines OFFENEN Streams frameweise lesen: `to_bytes` wartet auf ein Stream-Ende, das
 # bei einem Live-Feed nie kommt.
 http-body-util = "0.1"

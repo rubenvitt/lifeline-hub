@@ -47,6 +47,10 @@ pub struct AuditEintrag<'a> {
     pub benutzername: Option<&'a str>,
     pub benutzer_id: Option<i64>,
     pub peer_ip: Option<String>,
+    /// Anmeldeweg, immer eine Provider-Kennung: `passwort` (auch mit TOTP), `oidc`, `webauthn`
+    /// (Passkey, benutzergebunden wie discoverable) oder `systembrowser`
+    /// (`auth::huelle::PROVIDER`). Der Spaltenkommentar in `migrations/0091_auth_audit.sql`
+    /// nennt noch `passkey`; geschrieben wurde der Wert nie (LFH-846).
     pub provider: &'a str,
 }
 

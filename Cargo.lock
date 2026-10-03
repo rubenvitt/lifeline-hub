@@ -3414,6 +3414,7 @@ version = "1.0.0-alpha.69"
 dependencies = [
  "anyhow",
  "argon2",
+ "aws-lc-rs",
  "axum",
  "axum-extra",
  "axum-server",
