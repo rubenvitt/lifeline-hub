@@ -11,7 +11,8 @@ interface Props {
   aktiverKanalId: number | null;
   onWechsel: (kanalId: number) => void;
   darfSchreiben: boolean;
-  onKanalAnlegen: (name: string, beschreibung?: string) => void;
+  /** Lehnt bei Ablehnung ab (`mutateAsync`); dann bleibt der Dialog mit den Eingaben offen. */
+  onKanalAnlegen: (name: string, beschreibung?: string) => Promise<unknown>;
 }
 
 /** Visuell verborgen, für Vorleser da (dieselbe Clip-Bauform wie `instrument/Status.tsx`). */
@@ -153,9 +154,7 @@ export default function KanalListe({
         titel="Neuer Kanal"
         form={form}
         erfassenText="Anlegen"
-        onErfassen={async (w) => {
-          onKanalAnlegen(w.name.trim(), w.beschreibung?.trim() || undefined);
-        }}
+        onErfassen={(w) => onKanalAnlegen(w.name.trim(), w.beschreibung?.trim() || undefined)}
         onFertig={() => setOffen(false)}
         onAbbrechen={() => setOffen(false)}
       >

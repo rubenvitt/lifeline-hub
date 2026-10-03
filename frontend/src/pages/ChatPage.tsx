@@ -440,7 +440,9 @@ export default function ChatPage() {
                 })
               }
               darfSchreiben={darfSchreiben}
-              onKanalAnlegen={(name, beschreibung) => kanalMutation.mutate({ name, beschreibung })}
+              onKanalAnlegen={(name, beschreibung) =>
+                kanalMutation.mutateAsync({ name, beschreibung })
+              }
             />
           </Col>
         )}
@@ -497,7 +499,7 @@ export default function ChatPage() {
           />
           {darfSchreiben && kanalId !== null && (
             <NachrichtEingabe
-              onSenden={(t, d) => sendenMutation.mutate({ text: t, dateien: d })}
+              onSenden={(t, d) => sendenMutation.mutateAsync({ text: t, dateien: d })}
               senden={sendenMutation.isPending}
             />
           )}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import NachrichtEingabe from './NachrichtEingabe';
@@ -12,6 +12,49 @@ describe('NachrichtEingabe', () => {
     await userEvent.type(feld, '  Lagebild aktualisiert  ');
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(onSenden).toHaveBeenCalledWith('Lagebild aktualisiert', []);
+  });
+
+  it('leert Text und Anhänge erst nach erfolgreichem Senden (LFH-795)', async () => {
+    let erfuellen!: () => void;
+    const onSenden = vi.fn(() => new Promise<void>((r) => (erfuellen = r)));
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, 'Lagebild');
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, new File(['PDF'], 'lage.pdf', { type: 'application/pdf' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    // Solange das Senden läuft, steht alles noch da.
+    expect(feld).toHaveValue('Lagebild');
+    expect(screen.getByTitle('lage.pdf')).toBeInTheDocument();
+    await act(async () => erfuellen());
+    expect(feld).toHaveValue('');
+    await waitFor(() => expect(screen.queryByTitle('lage.pdf')).not.toBeInTheDocument());
+  });
+
+  it('behält Text und Anhänge, wenn das Senden abgelehnt wird (LFH-795)', async () => {
+    const onSenden = vi.fn(() => Promise.reject(new Error('413')));
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, 'Lagebild');
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, new File(['PDF'], 'lage.pdf', { type: 'application/pdf' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(onSenden).toHaveBeenCalledTimes(1));
+    expect(feld).toHaveValue('Lagebild');
+    expect(screen.getByTitle('lage.pdf')).toBeInTheDocument();
+  });
+
+  it('sendet nicht doppelt, solange das Senden läuft (LFH-795)', async () => {
+    // Der Text bleibt bis zum Erfolg stehen; ein zweites Enter darf ihn nicht erneut schicken.
+    let erfuellen!: () => void;
+    const onSenden = vi.fn(() => new Promise<void>((r) => (erfuellen = r)));
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    await userEvent.type(feld, 'Lagebild{Enter}');
+    await userEvent.type(feld, '{Enter}');
+    expect(onSenden).toHaveBeenCalledTimes(1);
+    await act(async () => erfuellen());
+    expect(feld).toHaveValue('');
   });
 
   it('sendet nicht bei leerem Text ohne Anhang', async () => {
