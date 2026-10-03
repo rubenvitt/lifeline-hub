@@ -165,7 +165,7 @@ export function entscheideKlickziel<F extends Merkmal>(
 
 /**
  * Gehört die Stelle keinem Objekt? Dann ist sie ein Ort, an dem das Kontextmenü öffnen darf
- * (LFH-776, `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D2): freie Karte und Flächen,
+ * (LFH-776, `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D2): freie Karte und Flächen,
  * nicht Punktziele und Trefferzonen. Die Art `fachebene` steht für Punkt, Bündel, Trefferzone UND
  * Fläche, darum entscheidet dort die Ebene des Merkmals.
  */

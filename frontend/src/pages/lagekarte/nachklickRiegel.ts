@@ -1,6 +1,6 @@
 /**
  * Nachklick-Riegel für den langen Druck (LFH-776, Spec `lagekarte-kontextmenue`, „Loslassen nach dem
- * langen Druck ist kein Tipp“; `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D3).
+ * langen Druck ist kein Tipp“; `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D3).
  *
  * maplibre (ab 6.11) feuert `contextmenu` nach 500 ms Halten, der Finger liegt dann NOCH. Was danach
  * kommt — das native `contextmenu` von Android-Chrome, die Kompatibilitäts-Mausereignisse und der

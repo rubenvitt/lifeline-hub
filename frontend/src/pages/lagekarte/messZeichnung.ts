@@ -138,7 +138,7 @@ export function createMessung(
       // Keine öffentliche API für einen Punkt in einer laufenden Zeichnung (`addFeatures` nimmt nur
       // fertige Figuren) — derselbe Weg wie ein Klick: primärer Zeiger am Kartenelement des
       // Adapters (Canvas), Lage über das Rechteck des Containers, aus dem terra-draw zurückrechnet.
-      // LFH-776, `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D6.
+      // LFH-776, `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D6.
       const p = map.project([lng, lat]);
       const rahmen = map.getContainer().getBoundingClientRect();
       const init: PointerEventInit = {

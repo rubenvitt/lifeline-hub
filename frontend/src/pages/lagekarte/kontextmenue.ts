@@ -1,6 +1,6 @@
 /**
  * Einträge des Kontextmenüs an der Kartenstelle (LFH-776, Spec `lagekarte-kontextmenue`,
- * `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D4). Rein, ohne Karte prüfbar.
+ * `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D4). Rein, ohne Karte prüfbar.
  *
  * Der Rechte-Riegel sitzt HIER, an der Ableitung (`frontend/AGENTS.md`, „Aktionen“): ohne
  * Schreibrecht (auch im Snapshot) fehlt „Hier Zeichen setzen“, statt gesperrt zu stehen. Die

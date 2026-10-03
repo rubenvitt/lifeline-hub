@@ -1,6 +1,6 @@
 /**
  * Menü an einem Punkt der Lagekarte — die gemeinsame Schale des Flächen-Auswahlmenüs (LFH-812) und
- * des Kontextmenüs (LFH-776, `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D1).
+ * des Kontextmenüs (LFH-776, `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D1).
  *
  * Bedienung nach Leitlinie „Datensatz-Aktionen": antds `Dropdown` im Portal mit `autoFocus`
  * (Pfeile, Enter, Esc bringt das Menü mit), Einträge in der Steuerhöhe der Dichtestufe

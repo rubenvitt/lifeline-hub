@@ -929,7 +929,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!flaechenwahl) setOffeneWahl(null);
   }, [flaechenwahl]);
 
-  // Kontextmenü an der Kartenstelle (LFH-776, `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md`
+  // Kontextmenü an der Kartenstelle (LFH-776, `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md`
   // D2/D3): maplibre meldet Rechtsklick UND langen Druck (ab 6.11) als `contextmenu`. Es öffnet nur
   // an einem Ort (`istOrtsziel`: freie Karte, Fläche), nicht auf Punktziel oder Trefferzone. Der
   // Nachklick-Riegel hängt VOR jedem Dropdown am `window`: nach einem langen Druck schlössen die

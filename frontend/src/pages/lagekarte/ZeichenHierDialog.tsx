@@ -1,6 +1,6 @@
 /**
  * „Hier Zeichen setzen“ aus dem Kontextmenü der Lagekarte (LFH-776, Spec `lagekarte-kontextmenue`,
- * `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D7): die Zeichenwahl der Leiste in
+ * `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D7): die Zeichenwahl der Leiste in
  * einem Dialog; „Setzen“ (oder Enter im Picker) legt das Zeichen an der Stelle an, ohne zweiten
  * Tipp auf die Karte. Kein `<Form>` — wie in der Leiste gehört das Absenden dem Aufrufer.
  *

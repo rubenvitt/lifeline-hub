@@ -135,7 +135,7 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
 
 ## 7. Prüfliste, Regeln, Integration
 
-- [x] 7.1 `openspec/changes/lfh-776-lagekarte-kontextmenue/pruefliste.md`: 15 Kriterien der
+- [x] 7.1 `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/pruefliste.md`: 15 Kriterien der
   Einsatztauglichkeit (Festlegung 7, `docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`),
   je Zeile ein Verdikt mit Beleg. Dazu die Mutationsproben aus 6.6 und die offene Abnahme am
   echten Android-Tablet (natives `contextmenu`).
@@ -143,6 +143,18 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
   (Träger `contextmenu` in `Kartenflaeche`, `istOrtsziel`, `nachklickRiegel.ts`, Sperre über die
   Prop `kontextmenue`, Schale `PunktankerMenue`, Verweis auf die Change und später das Archiv).
   Prettier ist grün (`scripts/check-fmt.sh`).
-- [ ] 7.3 `./scripts/check-all.sh` vollständig grün, mit eigenem `CARGO_TARGET_DIR` im
+- [x] 7.3 `./scripts/check-all.sh` vollständig grün, mit eigenem `CARGO_TARGET_DIR` im
   Scratchpad. Das Log nach „ÜBERSPRUNGEN“ durchsehen. Ist die Umgebung lokal nicht vollständig
   (Node-Pin, mise), mit Verweis auf die CI des PRs abhaken (`ci.yml` ruft `check-all.sh`).
+  Stand 03.10.2026 (Cloud-Sitzung, mise mit Node 26.7.0):
+  - `--nur schnell` grün.
+  - `--nur frontend` grün: 670 Dateien, 9176 Tests.
+  - `--nur rust` lokal nicht belegbar, weil das Plattenkontingent der Sitzung beim Linken
+    ausging (`ld` Bus error). Kein Rust-Code geändert.
+  - e2e Chromium mit dem vorinstallierten Browser (1194 statt 1234): 599 grün, 24 rot, alle
+    außerhalb der Lagekarte. Gegen `origin/alpha` im selben Aufbau sind 21 davon ebenso rot.
+    Von den drei übrigen sind ETB-Chronologie und UHS-Grundriss einzeln grün. Stab-Vorbereitung
+    wackelt und ist auf `alpha` 3 von 3 rot.
+  - Die fünf LFH-776-Fälle sind grün.
+
+  Vollständig belegt durch die CI des PRs.

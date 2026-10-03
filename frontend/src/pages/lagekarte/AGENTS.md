@@ -38,7 +38,7 @@ diese Zusage.
   eigene vor Fachebenen, Kennung aus `flaechenwahl.ts`; Wahl über dieselben Callbacks, aus im
   exklusiven Modus (Prop `flaechenwahl`). Geschlossen wird nur über `onOpenChange`.
 - **Kontextmenü an der Kartenstelle** (LFH-776, Spec `lagekarte-kontextmenue`,
-  `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md`): Rechtsklick und langer Druck kommen
+  `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md`): Rechtsklick und langer Druck kommen
   als EIN maplibre-Ereignis `contextmenu` (`Kartenflaeche.tsx`); offen nur an einem Ort
   (`istOrtsziel` in `klickziel.ts`: freie Karte, Fläche — nie Punktziel oder Trefferzone), gesperrt
   über die Prop `kontextmenue` (`null` im exklusiven Modus). Nach dem langen Druck liegt der Finger
