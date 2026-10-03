@@ -78,6 +78,8 @@ export default function AusKatalogModal({
         </div>
       ) : (
         <Liste
+          // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): eine
+          // Auswahlliste („welche Quelle?“), keine eigenen Gegenstände mit Inhalt darunter.
           dataSource={katalogQuery.data ?? []}
           emptyText="Katalog ist leer"
           renderItem={(eintrag) => {

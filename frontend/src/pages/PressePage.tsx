@@ -395,6 +395,9 @@ export default function PressePage() {
         </Paneel>
         <Paneel titel="Pressemitteilungen" meta={`${freigegeben.length} freigegeben`}>
           <Liste
+            // Unter dem Paneel (h2): jede Mitteilung ein Gegenstand mit Status und Verlauf
+            // darunter, ihr Titel h3 (LFH-826).
+            unterEbene={2}
             dataSource={ketten}
             rowKey={(k) => k.kopf.id}
             loading={mitteilungenQuery.isLoading}

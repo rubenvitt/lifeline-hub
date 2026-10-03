@@ -160,7 +160,7 @@ describe('StabPage', () => {
     const sektion = await besetzungsSektion();
     expect(
       await within(sektion).findByRole('heading', {
-        level: 4,
+        level: 3,
         name: /S4 · Versorgung \(Logistik\)/,
       }),
     ).toBeInTheDocument();
@@ -172,7 +172,7 @@ describe('StabPage', () => {
     await waitFor(() =>
       expect(
         within(sektion)
-          .getAllByRole('heading', { level: 4 })
+          .getAllByRole('heading', { level: 3 })
           .map((h) => h.textContent),
       ).toEqual([
         expect.stringContaining('S1 · Personal'),
@@ -277,7 +277,7 @@ describe('StabPage', () => {
       { route: '/einsaetze/1/stab' },
     );
     const sektion = await besetzungsSektion();
-    expect(within(sektion).getAllByRole('heading', { level: 4 })).toHaveLength(6);
+    expect(within(sektion).getAllByRole('heading', { level: 3 })).toHaveLength(6);
     expect(within(sektion).queryByText('nicht vergeben')).toBeNull();
     expect(within(sektion).queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
     // Ohne Stand fehlte der Termin zur Vorbelegung — gesperrt (Gegenfall: Kopfaktion-Test unten).

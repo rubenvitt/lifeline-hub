@@ -77,6 +77,8 @@ export default function OfflineVorhandeneModal({
         </div>
       ) : (
         <Liste
+          // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): der
+          // Titel ist ein Eingabefeld, und ein Bedienelement gehört nicht in eine Überschrift.
           dataSource={vorhandeneQuery.data ?? []}
           emptyText="Keine neuen Dateien im Karten-Verzeichnis"
           renderItem={(v) => (
