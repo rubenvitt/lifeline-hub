@@ -405,7 +405,9 @@ fn laenge_hoechstens(text: &str, feld: &str) -> Result<(), AppError> {
 }
 
 fn hinweis_aus(hinweis: Option<String>) -> Result<Option<String>, AppError> {
-    let h = hinweis.map(|h| h.trim().to_string()).filter(|h| !h.is_empty());
+    let h = hinweis
+        .map(|h| h.trim().to_string())
+        .filter(|h| !h.is_empty());
     if let Some(h) = &h {
         laenge_hoechstens(h, "hinweis")?;
     }
@@ -417,7 +419,9 @@ pub async fn kommunikationsplan_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Stab>,
 ) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
-    Ok(Json(kommunikation::laden(&state.pool, ctx.einsatz.id).await?))
+    Ok(Json(
+        kommunikation::laden(&state.pool, ctx.einsatz.id).await?,
+    ))
 }
 
 /// POST /api/einsaetze/{id}/stab/kommunikationsplan/stellen — Stelle anlegen.
@@ -436,17 +440,29 @@ pub async fn kommunikationsplan_stelle_anlegen(
             req.stellenart
         ),
     )?;
-    let funktion_roh = req.funktion.as_deref().map(str::trim).filter(|f| !f.is_empty());
+    let funktion_roh = req
+        .funktion
+        .as_deref()
+        .map(str::trim)
+        .filter(|f| !f.is_empty());
     let eingabe = if stellenart.ist_extern() {
-        let bezeichnung =
-            kommunikation::pruefe_bezeichnung_fuer(stellenart, None, req.bezeichnung.as_deref(), false)?;
+        let bezeichnung = kommunikation::pruefe_bezeichnung_fuer(
+            stellenart,
+            None,
+            req.bezeichnung.as_deref(),
+            false,
+        )?;
         // Erst das Feld (Bezeichnung, 400), dann der Zusammenhang (Funktion an externer Stelle, 422).
         if funktion_roh.is_some() {
             return Err(AppError::UnprocessableEntity(
                 "Eine externe Stelle trägt keine Funktion".into(),
             ));
         }
-        kommunikation::StelleEingabe { stellenart, funktion: None, bezeichnung }
+        kommunikation::StelleEingabe {
+            stellenart,
+            funktion: None,
+            bezeichnung,
+        }
     } else {
         let Some(code) = funktion_roh else {
             return Err(AppError::Validation(
@@ -459,7 +475,8 @@ pub async fn kommunikationsplan_stelle_anlegen(
                 .await?
                 .s7_aktiv
         };
-        let angabe = crate::fuehrung::pruefe_funktion(Some(code), req.bezeichnung.as_deref(), s7_aktiv)?;
+        let angabe =
+            crate::fuehrung::pruefe_funktion(Some(code), req.bezeichnung.as_deref(), s7_aktiv)?;
         kommunikation::StelleEingabe {
             stellenart,
             funktion: angabe.funktion,
@@ -573,7 +590,6 @@ pub async fn kommunikationsplan_verbindung_entfernen(
     sse(&state, einsatz_id);
     Ok(Json(plan))
 }
-
 
 #[cfg(test)]
 mod tests {

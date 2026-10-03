@@ -43,7 +43,14 @@ async fn stelle_neu(
     einsatz: i64,
     body: Value,
 ) -> (StatusCode, Value) {
-    anfrage(app, "POST", &stellen_pfad(einsatz), cookie, Some(&body.to_string())).await
+    anfrage(
+        app,
+        "POST",
+        &stellen_pfad(einsatz),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await
 }
 
 /// Legt eine Stelle an (201 erwartet) und gibt ihre id zurück.
@@ -115,17 +122,60 @@ async fn reihenfolge_katalog_dann_extern_nach_art() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
     // Absichtlich durcheinander angelegt.
-    stelle(&app, &admin, einsatz, json!({"stellenart":"behoerde","bezeichnung":"Polizei PI Nord"})).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"fachberater","bezeichnung":"THW"})).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s4"})).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"leitstelle","bezeichnung":"ILS Nord"})).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"el"})).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"behoerde","bezeichnung":"Ordnungsamt"})).await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"behoerde","bezeichnung":"Polizei PI Nord"}),
+    )
+    .await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"fachberater","bezeichnung":"THW"}),
+    )
+    .await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s4"}),
+    )
+    .await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"leitstelle","bezeichnung":"ILS Nord"}),
+    )
+    .await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"el"}),
+    )
+    .await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"behoerde","bezeichnung":"Ordnungsamt"}),
+    )
+    .await;
 
     let plan = laden(&app, &admin, einsatz).await;
     assert_eq!(
         kennungen(&plan),
-        ["el", "s4", "fachberater", "ILS Nord", "Polizei PI Nord", "Ordnungsamt"],
+        [
+            "el",
+            "s4",
+            "fachberater",
+            "ILS Nord",
+            "Polizei PI Nord",
+            "Ordnungsamt"
+        ],
         "Funktionen in Katalogfolge, dann Leitstelle vor Behörde, Behörden in Anlagefolge"
     );
 }
@@ -144,7 +194,13 @@ async fn funktion_label_traegt_das_mandantenlabel() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s4"})).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s4"}),
+    )
+    .await;
 
     let plan = laden(&app, &admin, einsatz).await;
     let s = stelle_mit_id(&plan, sid);
@@ -162,16 +218,42 @@ async fn doppelte_funktion_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s3"})).await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s3"}),
+    )
+    .await;
 
-    let (status, _) =
-        stelle_neu(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s3"})).await;
+    let (status, _) = stelle_neu(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s3"}),
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT);
-    assert_eq!(laden(&app, &admin, einsatz).await.as_array().unwrap().len(), 1);
+    assert_eq!(
+        laden(&app, &admin, einsatz).await.as_array().unwrap().len(),
+        1
+    );
 
     // Fachberater mehrfach, aber je Bezeichnung einmal (ohne Groß-/Kleinschreibung).
-    stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"fachberater","bezeichnung":"THW"})).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"fachberater","bezeichnung":"Chemie"})).await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"fachberater","bezeichnung":"THW"}),
+    )
+    .await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"fachberater","bezeichnung":"Chemie"}),
+    )
+    .await;
     let (status, _) = stelle_neu(
         &app,
         &admin,
@@ -190,26 +272,66 @@ async fn statuscodes_beim_anlegen() {
     let lang = "x".repeat(201);
 
     for (body, erwartet) in [
-        (json!({"stellenart":"funktion","funktion":"s9"}), StatusCode::BAD_REQUEST),
+        (
+            json!({"stellenart":"funktion","funktion":"s9"}),
+            StatusCode::BAD_REQUEST,
+        ),
         (json!({"stellenart":"funktion"}), StatusCode::BAD_REQUEST),
-        (json!({"stellenart":"feuerwehrhaus","bezeichnung":"x"}), StatusCode::BAD_REQUEST),
-        (json!({"stellenart":"funktion","funktion":"fachberater"}), StatusCode::UNPROCESSABLE_ENTITY),
-        (json!({"stellenart":"funktion","funktion":"s3","bezeichnung":"Müller"}), StatusCode::UNPROCESSABLE_ENTITY),
-        (json!({"stellenart":"funktion","funktion":"s7"}), StatusCode::UNPROCESSABLE_ENTITY),
-        (json!({"stellenart":"leitstelle","bezeichnung":"   "}), StatusCode::BAD_REQUEST),
+        (
+            json!({"stellenart":"feuerwehrhaus","bezeichnung":"x"}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"stellenart":"funktion","funktion":"fachberater"}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"stellenart":"funktion","funktion":"s3","bezeichnung":"Müller"}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"stellenart":"funktion","funktion":"s7"}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"stellenart":"leitstelle","bezeichnung":"   "}),
+            StatusCode::BAD_REQUEST,
+        ),
         (json!({"stellenart":"leitstelle"}), StatusCode::BAD_REQUEST),
-        (json!({"stellenart":"leitstelle","bezeichnung":lang}), StatusCode::BAD_REQUEST),
-        (json!({"stellenart":"leitstelle","bezeichnung":"ILS","funktion":"s2"}), StatusCode::UNPROCESSABLE_ENTITY),
+        (
+            json!({"stellenart":"leitstelle","bezeichnung":lang}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"stellenart":"leitstelle","bezeichnung":"ILS","funktion":"s2"}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
     ] {
         let (status, json) = stelle_neu(&app, &admin, einsatz, body.clone()).await;
         assert_eq!(status, erwartet, "{body} → {json:?}");
     }
-    assert_eq!(laden(&app, &admin, einsatz).await, json!([]), "nichts gespeichert");
+    assert_eq!(
+        laden(&app, &admin, einsatz).await,
+        json!([]),
+        "nichts gespeichert"
+    );
 
     // S7 eingeschaltet → angenommen.
-    anfrage(&app, "PUT", "/api/org-fuehrungsfunktionen/s7", &admin, Some(r#"{"aktiv":true}"#)).await;
-    let (status, json) =
-        stelle_neu(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s7"})).await;
+    anfrage(
+        &app,
+        "PUT",
+        "/api/org-fuehrungsfunktionen/s7",
+        &admin,
+        Some(r#"{"aktiv":true}"#),
+    )
+    .await;
+    let (status, json) = stelle_neu(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s7"}),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
 }
 
@@ -220,7 +342,13 @@ async fn umbenennen_aendert_nur_die_bezeichnung() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"behoerde","bezeichnung":"Polizei"})).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"behoerde","bezeichnung":"Polizei"}),
+    )
+    .await;
 
     let (status, plan) = anfrage(
         &app,
@@ -247,10 +375,30 @@ async fn umbenennen_aendert_nur_die_bezeichnung() {
     assert_eq!(stelle_mit_id(&plan, sid)["stellenart"], "behoerde");
 
     // Leer bei externer Stelle → 400; Bezeichnung an einem Sachgebiet → 422.
-    let (status, _) = anfrage(&app, "PATCH", &stelle_pfad(einsatz, sid), &admin, Some(r#"{"bezeichnung":""}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &stelle_pfad(einsatz, sid),
+        &admin,
+        Some(r#"{"bezeichnung":""}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let s2 = stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s2"})).await;
-    let (status, _) = anfrage(&app, "PATCH", &stelle_pfad(einsatz, s2), &admin, Some(r#"{"bezeichnung":"Müller"}"#)).await;
+    let s2 = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s2"}),
+    )
+    .await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &stelle_pfad(einsatz, s2),
+        &admin,
+        Some(r#"{"bezeichnung":"Müller"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -259,9 +407,29 @@ async fn entfernen_nimmt_die_verbindungen_mit() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"behoerde","bezeichnung":"Polizei"})).await;
-    verbindung_neu(&app, &admin, einsatz, sid, json!({"mittel":"festnetz","wert":"110"})).await;
-    verbindung_neu(&app, &admin, einsatz, sid, json!({"mittel":"fax","wert":"0421 9"})).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"behoerde","bezeichnung":"Polizei"}),
+    )
+    .await;
+    verbindung_neu(
+        &app,
+        &admin,
+        einsatz,
+        sid,
+        json!({"mittel":"festnetz","wert":"110"}),
+    )
+    .await;
+    verbindung_neu(
+        &app,
+        &admin,
+        einsatz,
+        sid,
+        json!({"mittel":"fax","wert":"0421 9"}),
+    )
+    .await;
 
     let (status, plan) = anfrage(&app, "DELETE", &stelle_pfad(einsatz, sid), &admin, None).await;
     assert_eq!(status, StatusCode::OK);
@@ -283,7 +451,13 @@ async fn verbindungen_in_anlagefolge_mit_hinweis() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"leitstelle","bezeichnung":"ILS Nord"})).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"leitstelle","bezeichnung":"ILS Nord"}),
+    )
+    .await;
 
     let (status, _) = verbindung_neu(
         &app,
@@ -294,11 +468,20 @@ async fn verbindungen_in_anlagefolge_mit_hinweis() {
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
-    let (status, plan) =
-        verbindung_neu(&app, &admin, einsatz, sid, json!({"mittel":"fax","wert":"0421 1235"})).await;
+    let (status, plan) = verbindung_neu(
+        &app,
+        &admin,
+        einsatz,
+        sid,
+        json!({"mittel":"fax","wert":"0421 1235"}),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
 
-    let v = stelle_mit_id(&plan, sid)["verbindungen"].as_array().unwrap().clone();
+    let v = stelle_mit_id(&plan, sid)["verbindungen"]
+        .as_array()
+        .unwrap()
+        .clone();
     assert_eq!(v.len(), 2);
     assert_eq!(v[0]["mittel"], "festnetz");
     assert_eq!(v[0]["wert"], "0421 1234", "getrimmt");
@@ -312,20 +495,41 @@ async fn statuscodes_der_verbindung() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"leitstelle","bezeichnung":"ILS"})).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"leitstelle","bezeichnung":"ILS"}),
+    )
+    .await;
     let lang = "1".repeat(201);
 
     for (body, erwartet) in [
-        (json!({"mittel":"brieftaube","wert":"x"}), StatusCode::BAD_REQUEST),
-        (json!({"mittel":"mobil","wert":"  "}), StatusCode::BAD_REQUEST),
+        (
+            json!({"mittel":"brieftaube","wert":"x"}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"mittel":"mobil","wert":"  "}),
+            StatusCode::BAD_REQUEST,
+        ),
         (json!({"mittel":"mobil"}), StatusCode::BAD_REQUEST),
-        (json!({"mittel":"mobil","wert":lang}), StatusCode::BAD_REQUEST),
+        (
+            json!({"mittel":"mobil","wert":lang}),
+            StatusCode::BAD_REQUEST,
+        ),
     ] {
         let (status, json) = verbindung_neu(&app, &admin, einsatz, sid, body.clone()).await;
         assert_eq!(status, erwartet, "{body} → {json:?}");
     }
-    let (status, _) =
-        verbindung_neu(&app, &admin, einsatz, 999_999, json!({"mittel":"mobil","wert":"1"})).await;
+    let (status, _) = verbindung_neu(
+        &app,
+        &admin,
+        einsatz,
+        999_999,
+        json!({"mittel":"mobil","wert":"1"}),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     let plan = laden(&app, &admin, einsatz).await;
     assert_eq!(stelle_mit_id(&plan, sid)["verbindungen"], json!([]));
@@ -336,7 +540,13 @@ async fn verbindung_aendern_und_entfernen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s2"})).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s2"}),
+    )
+    .await;
     let (_, plan) = verbindung_neu(
         &app,
         &admin,
@@ -345,7 +555,9 @@ async fn verbindung_aendern_und_entfernen() {
         json!({"mittel":"mobil","wert":"0170 111","hinweis":"Diensthandy"}),
     )
     .await;
-    let vid = stelle_mit_id(&plan, sid)["verbindungen"][0]["id"].as_i64().unwrap();
+    let vid = stelle_mit_id(&plan, sid)["verbindungen"][0]["id"]
+        .as_i64()
+        .unwrap();
 
     // Nur der Wert: Mittel und Hinweis bleiben.
     let (status, plan) = anfrage(
@@ -358,19 +570,51 @@ async fn verbindung_aendern_und_entfernen() {
     .await;
     assert_eq!(status, StatusCode::OK, "{plan:?}");
     let v = &stelle_mit_id(&plan, sid)["verbindungen"][0];
-    assert_eq!((v["mittel"].as_str(), v["wert"].as_str(), v["hinweis"].as_str()), (Some("mobil"), Some("0170 222"), Some("Diensthandy")));
+    assert_eq!(
+        (
+            v["mittel"].as_str(),
+            v["wert"].as_str(),
+            v["hinweis"].as_str()
+        ),
+        (Some("mobil"), Some("0170 222"), Some("Diensthandy"))
+    );
 
     // null löscht den Hinweis.
-    let (_, plan) = anfrage(&app, "PATCH", &verbindung_pfad(einsatz, vid), &admin, Some(r#"{"hinweis":null}"#)).await;
-    assert!(!stelle_mit_id(&plan, sid)["verbindungen"][0].as_object().unwrap().contains_key("hinweis"));
+    let (_, plan) = anfrage(
+        &app,
+        "PATCH",
+        &verbindung_pfad(einsatz, vid),
+        &admin,
+        Some(r#"{"hinweis":null}"#),
+    )
+    .await;
+    assert!(!stelle_mit_id(&plan, sid)["verbindungen"][0]
+        .as_object()
+        .unwrap()
+        .contains_key("hinweis"));
 
     // Leerer Body, unbekanntes Mittel → 400.
-    let (status, _) = anfrage(&app, "PATCH", &verbindung_pfad(einsatz, vid), &admin, Some("{}")).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &verbindung_pfad(einsatz, vid),
+        &admin,
+        Some("{}"),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _) = anfrage(&app, "PATCH", &verbindung_pfad(einsatz, vid), &admin, Some(r#"{"mittel":"funk"}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &verbindung_pfad(einsatz, vid),
+        &admin,
+        Some(r#"{"mittel":"funk"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
-    let (status, plan) = anfrage(&app, "DELETE", &verbindung_pfad(einsatz, vid), &admin, None).await;
+    let (status, plan) =
+        anfrage(&app, "DELETE", &verbindung_pfad(einsatz, vid), &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(stelle_mit_id(&plan, sid)["verbindungen"], json!([]));
     let (status, _) = anfrage(&app, "DELETE", &verbindung_pfad(einsatz, vid), &admin, None).await;
@@ -384,14 +628,27 @@ async fn fremde_ids_sind_404() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let a = einsatz_anlegen_mit(&app, &admin, "Einsatz A").await;
     let b = einsatz_anlegen_mit(&app, &admin, "Einsatz B").await;
-    let sid = stelle(&app, &admin, a, json!({"stellenart":"leitstelle","bezeichnung":"ILS"})).await;
-    let (_, plan) = verbindung_neu(&app, &admin, a, sid, json!({"mittel":"mobil","wert":"1"})).await;
-    let vid = stelle_mit_id(&plan, sid)["verbindungen"][0]["id"].as_i64().unwrap();
+    let sid = stelle(
+        &app,
+        &admin,
+        a,
+        json!({"stellenart":"leitstelle","bezeichnung":"ILS"}),
+    )
+    .await;
+    let (_, plan) =
+        verbindung_neu(&app, &admin, a, sid, json!({"mittel":"mobil","wert":"1"})).await;
+    let vid = stelle_mit_id(&plan, sid)["verbindungen"][0]["id"]
+        .as_i64()
+        .unwrap();
 
     for (methode, pfad, body) in [
         ("PATCH", stelle_pfad(b, sid), Some(r#"{"bezeichnung":"x"}"#)),
         ("DELETE", stelle_pfad(b, sid), None),
-        ("POST", verbindungen_pfad(b, sid), Some(r#"{"mittel":"mobil","wert":"2"}"#)),
+        (
+            "POST",
+            verbindungen_pfad(b, sid),
+            Some(r#"{"mittel":"mobil","wert":"2"}"#),
+        ),
         ("PATCH", verbindung_pfad(b, vid), Some(r#"{"wert":"2"}"#)),
         ("DELETE", verbindung_pfad(b, vid), None),
     ] {
@@ -425,19 +682,62 @@ async fn jede_schreibaktion_sendet_stab_und_nie_etb() {
     };
 
     let mut rx = live.abonniere(einsatz);
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"leitstelle","bezeichnung":"ILS"})).await;
-    let (_, plan) = verbindung_neu(&app, &admin, einsatz, sid, json!({"mittel":"mobil","wert":"1"})).await;
-    let vid = stelle_mit_id(&plan, sid)["verbindungen"][0]["id"].as_i64().unwrap();
-    anfrage(&app, "PATCH", &verbindung_pfad(einsatz, vid), &admin, Some(r#"{"wert":"2"}"#)).await;
-    anfrage(&app, "PATCH", &stelle_pfad(einsatz, sid), &admin, Some(r#"{"bezeichnung":"ILS Nord"}"#)).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"leitstelle","bezeichnung":"ILS"}),
+    )
+    .await;
+    let (_, plan) = verbindung_neu(
+        &app,
+        &admin,
+        einsatz,
+        sid,
+        json!({"mittel":"mobil","wert":"1"}),
+    )
+    .await;
+    let vid = stelle_mit_id(&plan, sid)["verbindungen"][0]["id"]
+        .as_i64()
+        .unwrap();
+    anfrage(
+        &app,
+        "PATCH",
+        &verbindung_pfad(einsatz, vid),
+        &admin,
+        Some(r#"{"wert":"2"}"#),
+    )
+    .await;
+    anfrage(
+        &app,
+        "PATCH",
+        &stelle_pfad(einsatz, sid),
+        &admin,
+        Some(r#"{"bezeichnung":"ILS Nord"}"#),
+    )
+    .await;
     anfrage(&app, "DELETE", &verbindung_pfad(einsatz, vid), &admin, None).await;
     anfrage(&app, "DELETE", &stelle_pfad(einsatz, sid), &admin, None).await;
-    assert_eq!(zaehle(&mut rx), (6, 0), "sechs Schreibaktionen, sechs Stab-Ereignisse, kein ETB");
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vor, "kein ETB-Eintrag");
+    assert_eq!(
+        zaehle(&mut rx),
+        (6, 0),
+        "sechs Schreibaktionen, sechs Stab-Ereignisse, kein ETB"
+    );
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        vor,
+        "kein ETB-Eintrag"
+    );
 
     // Eine abgelehnte Aktion sendet nichts.
     let mut rx = live.abonniere(einsatz);
-    stelle_neu(&app, &admin, einsatz, json!({"stellenart":"funktion","funktion":"s9"})).await;
+    stelle_neu(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"funktion","funktion":"s9"}),
+    )
+    .await;
     assert_eq!(zaehle(&mut rx), (0, 0));
 }
 
@@ -448,22 +748,50 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let sid = stelle(&app, &admin, einsatz, json!({"stellenart":"leitstelle","bezeichnung":"ILS"})).await;
+    let sid = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"leitstelle","bezeichnung":"ILS"}),
+    )
+    .await;
     let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
     rolle_setzen(&app, &admin, einsatz, beob, "beobachter").await;
     let beob_cookie = login_cookie(&app, "beobachter", "beobachterpw1").await;
 
-    assert_eq!(laden(&app, &beob_cookie, einsatz).await.as_array().unwrap().len(), 1);
+    assert_eq!(
+        laden(&app, &beob_cookie, einsatz)
+            .await
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     for (methode, pfad, body) in [
-        ("POST", stellen_pfad(einsatz), Some(r#"{"stellenart":"behoerde","bezeichnung":"x"}"#)),
-        ("PATCH", stelle_pfad(einsatz, sid), Some(r#"{"bezeichnung":"x"}"#)),
+        (
+            "POST",
+            stellen_pfad(einsatz),
+            Some(r#"{"stellenart":"behoerde","bezeichnung":"x"}"#),
+        ),
+        (
+            "PATCH",
+            stelle_pfad(einsatz, sid),
+            Some(r#"{"bezeichnung":"x"}"#),
+        ),
         ("DELETE", stelle_pfad(einsatz, sid), None),
-        ("POST", verbindungen_pfad(einsatz, sid), Some(r#"{"mittel":"mobil","wert":"1"}"#)),
+        (
+            "POST",
+            verbindungen_pfad(einsatz, sid),
+            Some(r#"{"mittel":"mobil","wert":"1"}"#),
+        ),
     ] {
         let (status, _) = anfrage(&app, methode, &pfad, &beob_cookie, body).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{methode} {pfad}");
     }
-    assert_eq!(laden(&app, &admin, einsatz).await.as_array().unwrap().len(), 1);
+    assert_eq!(
+        laden(&app, &admin, einsatz).await.as_array().unwrap().len(),
+        1
+    );
 }
 
 #[tokio::test]
@@ -476,7 +804,11 @@ async fn fremde_org_wird_abgewiesen() {
 
     for (methode, pfad, body) in [
         ("GET", plan_pfad(einsatz), None),
-        ("POST", stellen_pfad(einsatz), Some(r#"{"stellenart":"behoerde","bezeichnung":"x"}"#)),
+        (
+            "POST",
+            stellen_pfad(einsatz),
+            Some(r#"{"stellenart":"behoerde","bezeichnung":"x"}"#),
+        ),
     ] {
         let (status, _) = anfrage(&app, methode, &pfad, &fremd, body).await;
         assert!(
@@ -491,13 +823,34 @@ async fn abgeschlossener_einsatz_ist_409_und_bleibt_lesbar() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    stelle(&app, &admin, einsatz, json!({"stellenart":"leitstelle","bezeichnung":"ILS"})).await;
-    anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/abschliessen"), &admin, None).await;
+    stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"leitstelle","bezeichnung":"ILS"}),
+    )
+    .await;
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
 
-    let (status, _) =
-        stelle_neu(&app, &admin, einsatz, json!({"stellenart":"behoerde","bezeichnung":"x"})).await;
+    let (status, _) = stelle_neu(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart":"behoerde","bezeichnung":"x"}),
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT);
-    assert_eq!(laden(&app, &admin, einsatz).await.as_array().unwrap().len(), 1);
+    assert_eq!(
+        laden(&app, &admin, einsatz).await.as_array().unwrap().len(),
+        1
+    );
 }
 
 // ---------- Schwärzung ----------

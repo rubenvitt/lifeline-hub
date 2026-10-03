@@ -176,7 +176,10 @@ async fn laden_conn(
             // statt den ganzen Plan scheitern zu lassen.
             let art = Stellenart::parse(&s.stellenart).unwrap_or(Stellenart::Sonstige);
             let funktion = s.funktion.as_deref().and_then(Fuehrungsfunktion::parse);
-            let art_rang = Stellenart::ALLE.iter().position(|a| *a == art).unwrap_or(usize::MAX);
+            let art_rang = Stellenart::ALLE
+                .iter()
+                .position(|a| *a == art)
+                .unwrap_or(usize::MAX);
             let funktion_rang = funktion
                 .and_then(|f| Fuehrungsfunktion::ALLE.iter().position(|g| *g == f))
                 .unwrap_or(0);
@@ -478,13 +481,17 @@ mod tests {
             assert_eq!(Verbindungsmittel::parse(m.as_str()), Some(m), "{m:?}");
         }
         assert_eq!(Verbindungsmittel::parse("brieftaube"), None);
-        assert_eq!(Stellenart::parse("Leitstelle"), None, "Wire ist kleingeschrieben");
+        assert_eq!(
+            Stellenart::parse("Leitstelle"),
+            None,
+            "Wire ist kleingeschrieben"
+        );
     }
 
     #[test]
     fn externe_stelle_braucht_bezeichnung() {
-        let err = pruefe_bezeichnung_fuer(Stellenart::Leitstelle, None, Some("  "), false)
-            .unwrap_err();
+        let err =
+            pruefe_bezeichnung_fuer(Stellenart::Leitstelle, None, Some("  "), false).unwrap_err();
         assert_eq!(err.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
             pruefe_bezeichnung_fuer(Stellenart::Leitstelle, None, Some(" ILS Nord "), false)
@@ -513,8 +520,8 @@ mod tests {
     #[test]
     fn zu_lange_bezeichnung_ist_400() {
         let lang = "x".repeat(TEXT_MAX + 1);
-        let err = pruefe_bezeichnung_fuer(Stellenart::Behoerde, None, Some(&lang), false)
-            .unwrap_err();
+        let err =
+            pruefe_bezeichnung_fuer(Stellenart::Behoerde, None, Some(&lang), false).unwrap_err();
         assert_eq!(err.status(), StatusCode::BAD_REQUEST);
     }
 }
