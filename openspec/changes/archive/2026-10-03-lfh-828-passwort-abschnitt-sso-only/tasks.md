@@ -34,5 +34,9 @@
 
 ## 3. Abschluss
 
-- [ ] 3.1 `./scripts/check-all.sh` grün (lokal, ersatzweise die CI des PRs). Prüfung: Exit 0
-      bzw. grüner CI-Lauf.
+- [x] 3.1 `./scripts/check-all.sh` grün (lokal, ersatzweise die CI des PRs). Prüfung: Exit 0
+      bzw. grüner CI-Lauf. Lokal (03.10.2026): 11 von 13 Schritten grün, darunter Vitest
+      komplett. Schritt 4 scheiterte am Linker (Plattenkontingent der Sitzung), Schritt 7 an
+      fehlenden Playwright-Browsern; die betroffenen Rust-Suiten `auth`, `benutzer`,
+      `passwort_aendern` und `openapi_spec_aktuell` liefen einzeln grün. Den vollen Lauf belegt
+      die CI des PRs.
