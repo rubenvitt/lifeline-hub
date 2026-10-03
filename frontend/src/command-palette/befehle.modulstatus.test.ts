@@ -78,6 +78,7 @@ describe('baueBefehle — Schnellaktionen folgen der Leseachse', () => {
       'aktion:tiere',
       'aktion:bereitstellungsraeume',
       'aktion:einsatzabschnitte',
+      'aktion:lagekarte-gefahrengebiet',
     ]);
   });
 });

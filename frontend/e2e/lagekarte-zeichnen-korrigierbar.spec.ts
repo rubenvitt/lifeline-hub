@@ -37,14 +37,14 @@ async function anmelden(page: Page) {
 }
 
 /** Name ohne Modulnamen — die Kommandopalette sucht Module und Einsätze gemeinsam. */
-async function lagekarteOeffnen(page: Page) {
+async function lagekarteOeffnen(page: Page, suche = '') {
   await anmelden(page);
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
   await page.getByLabel('Bezeichnung').fill(`E2E Korrektur ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const eid = Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
-  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await page.goto(`/einsaetze/${eid}/lagekarte${suche}`);
   const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toBeVisible();
@@ -368,4 +368,26 @@ test.describe('Eigenposition: Anflug an die Genauigkeit (LFH-766)', () => {
     expect(nachher.mitte.lat).toBeCloseTo(vorher.mitte.lat, 6);
     expect(nachher.zoom).toBeCloseTo(vorher.zoom, 6);
   });
+});
+
+/**
+ * Zeichnen per Link (LFH-825): der Kaltstart über `?zeichnen=` (voller Seitenaufruf wie ein neuer
+ * Tab aus der Sprungpalette) landet im Zeichenmodus der echten Karte, räumt die Adresse, und Esc
+ * ohne Punkt beendet den Modus (LFH-712).
+ */
+test('Zeichnen per Link: ?zeichnen=gefahrengebiet startet den Modus und räumt', async ({
+  page,
+}) => {
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (f) => seitenFehler.push(f));
+  const { canvas } = await lagekarteOeffnen(page, '?zeichnen=gefahrengebiet');
+
+  await expect(page.getByText('Gefahrengebiet · Fläche')).toBeVisible();
+  await expect(page.locator('[data-lfh="zeichnen-punkte"]')).toHaveText('0 Punkte');
+  await expect(canvas).toHaveCSS('cursor', 'crosshair');
+  await expect(page).not.toHaveURL(/zeichnen=/);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
+  expect(seitenFehler).toEqual([]);
 });

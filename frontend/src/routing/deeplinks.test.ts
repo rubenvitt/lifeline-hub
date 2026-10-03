@@ -23,6 +23,7 @@ import {
   tierePfad,
   parseKartenzentrum,
   parsePlatzierenAuftrag,
+  parseZeichnenAuftrag,
   personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
@@ -241,6 +242,47 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       expect(parseKartenzentrum(w), String(w)).toBeNull();
     }
     expect(parseKartenzentrum('0,0')).toEqual({ lat: 0, lon: 0 });
+  });
+  it('parseZeichnenAuftrag liest jeden Zonentyp, mit und ohne Form (LFH-825)', () => {
+    for (const typ of [
+      'gefahrengebiet',
+      'absperrbereich',
+      'absperrgrenze',
+      'sperrgebiet',
+      'freie_skizze',
+      'evakuierungsbezirk',
+    ] as const) {
+      expect(parseZeichnenAuftrag(typ)).toEqual({ typ });
+      expect(parseZeichnenAuftrag(`${typ}:flaeche`)).toEqual({ typ, form: 'flaeche' });
+      expect(parseZeichnenAuftrag(`${typ}:linie`)).toEqual({ typ, form: 'linie' });
+    }
+  });
+  it('parseZeichnenAuftrag verwirft Unbrauchbares statt halb zu füllen (LFH-825)', () => {
+    expect(parseZeichnenAuftrag(null)).toBeNull();
+    expect(parseZeichnenAuftrag(undefined)).toBeNull();
+    expect(parseZeichnenAuftrag('')).toBeNull();
+    expect(parseZeichnenAuftrag('tier')).toBeNull();
+    expect(parseZeichnenAuftrag('gefahrengebiet:')).toBeNull();
+    expect(parseZeichnenAuftrag('gefahrengebiet:polygon')).toBeNull();
+    expect(parseZeichnenAuftrag('gefahrengebiet:linie:x')).toBeNull();
+    expect(parseZeichnenAuftrag(':linie')).toBeNull();
+    // Kein Prototyp-Schlüssel schlüpft als Typ oder Form durch.
+    expect(parseZeichnenAuftrag('toString')).toBeNull();
+    expect(parseZeichnenAuftrag('gefahrengebiet:toString')).toBeNull();
+  });
+  it('der Zeichnen-Auftrag überlebt den Weg durch die URL (LFH-825)', () => {
+    for (const zeichnen of [
+      { typ: 'gefahrengebiet' as const },
+      { typ: 'freie_skizze' as const, form: 'linie' as const },
+    ]) {
+      const pfad = lagekartePfad(E, { zeichnen });
+      expect(pfad.split('?')[0]).toBe('/einsaetze/5/lagekarte');
+      const params = new URLSearchParams(pfad.split('?')[1]);
+      expect(parseZeichnenAuftrag(params.get('zeichnen'))).toEqual(zeichnen);
+    }
+    expect(lagekartePfad(E, { zeichnen: { typ: 'gefahrengebiet' } })).toBe(
+      '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet',
+    );
   });
   it('parsePlatzierenAuftrag liest den Auftrag zurück', () => {
     expect(parsePlatzierenAuftrag('schaden:7')).toEqual({ typ: 'schaden', id: 7 });

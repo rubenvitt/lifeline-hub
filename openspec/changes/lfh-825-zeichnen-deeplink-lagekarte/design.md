@@ -122,6 +122,24 @@ gleiche Aussagen).
   Schlüssel nein), und ein `neu`-Leser zählt nicht als `zeichnen`-Leser.
 - **Leerlauf-Schutz:** je benutztem Parameter mindestens ein Leser.
 
+### D6 — Zonen-Zeichnen wartet auf das Style-JSON (beim Umsetzen gefunden)
+
+Der e2e-Kaltstart zeigte, was die Seitentests mit gemockter Karte nicht sehen: der Link startet
+den Modus, während die Karte noch den Blindstil lädt, und kurz danach ersetzt `setStyle` (Style der
+Ansicht, `diff: false`) die Sources des terra-draw-Adapters. Folge: „Style is not done loading“
+und ein Absturz in die Fehlergrenze. Über das Paneel trat das nie auf, weil dort erst nach dem
+Laden geklickt wird.
+
+`Kartenflaeche.tsx` startet das Zonen-Zeichnen deshalb erst, wenn das Style-JSON steht (eigener
+Merker: wahr ab `style.load`, falsch ab `setStyle`), sonst beim nächsten `style.load` mit dem dann
+gewünschten Modus. Ein Stilwechsel während des Zeichnens räumt und startet neu wie bei der Messung
+(eine angefangene Figur geht dabei verloren, wie dort).
+
+*Verworfen:* `map.isStyleLoaded()` als Bedingung — es wartet zusätzlich auf alle Kacheln, danach
+kommt kein `style.load` mehr, und der Modus startete nie (fünf bestehende e2e-Tests wurden rot);
+ein „Karte bereit“-Signal an `LagekartePage` durchreichen und den Deeplink dort warten lassen —
+hilft nur dem Link, nicht dem Stilwechsel mitten im Zeichnen.
+
 ## Risks / Trade-offs
 
 - [Der Leser hängt nicht am Literal (Konstante, Helfer)] → Guard wird rot, wie heute bei `neu`;

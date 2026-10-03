@@ -456,6 +456,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Abschnitt; beide zugleich lässt der Modus-Reducer nicht zu).
   const zeichnenArtRef = useRef({ zeichnen, zoneZeichnen });
   zeichnenArtRef.current = { zeichnen, zoneZeichnen };
+  // Steht das Style-JSON? Wahr ab `style.load`, falsch ab jedem `setStyle`. NICHT
+  // `map.isStyleLoaded()`: das wartet zusätzlich auf alle Kacheln, und danach käme kein
+  // `style.load` mehr, auf das sich vertagen ließe (LFH-825).
+  const stilJsonAngewandtRef = useRef(false);
   // Dritter Controller: Messen. Eigene Instanz, weil er bei jeder Änderung meldet statt erst beim
   // Abschluss (`messZeichnung.ts`).
   const messRef = useRef<MessZeichnung | null>(null);
@@ -563,6 +567,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // auf alle sichtbaren Kacheln, 'style.load' feuert, sobald das Style-JSON angewandt ist — und
     // bei gescheitertem Style-Fetch gar nicht (dort kommt ein ErrorEvent).
     map.on('style.load', () => {
+      stilJsonAngewandtRef.current = true;
       stilWaechterRef.current.stilGeladen();
     });
     map.on('load', () => {
@@ -681,11 +686,23 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // geräumt und danach in derselben Form neu begonnen.
     const messForm = messenRef.current;
     if (messForm) messRef.current?.stoppen();
+    // Dasselbe gilt für das Zonen-Zeichnen (LFH-825): der Deeplink startet es oft noch VOR dem
+    // ersten Wechsel vom Blindstil auf den Style der Ansicht. Eine angefangene Figur geht dabei
+    // verloren wie bei der Messung.
+    const zoneForm = zeichnenArtRef.current.zoneZeichnen;
+    if (zoneForm) zoneDrawRef.current?.stoppen();
+    stilJsonAngewandtRef.current = false;
     map.setStyle(style, { diff: false });
     if (messForm) {
       map.once('style.load', () => {
         const noch = messenRef.current;
         if (noch && messRef.current) messRef.current.starten(noch);
+      });
+    }
+    if (zoneForm) {
+      map.once('style.load', () => {
+        const noch = zeichnenArtRef.current.zoneZeichnen;
+        if (noch && zoneDrawRef.current) zoneDrawRef.current.starten(noch);
       });
     }
     planeReAnlegenNachStyle(
@@ -1438,19 +1455,30 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   }, [zeichnen]);
 
   // Zonen-Zeichenmodus (Polygon/Linie) an-/abschalten; eigener Controller-Lifecycle.
+  //
+  // Erst mit geladenem Style (LFH-825): der Zeichnen-Deeplink `?zeichnen=` startet den Modus beim
+  // Kaltstart, während die Karte noch den Blindstil lädt — terra-draw legte seine Sources dann auf
+  // einen ungeladenen Style („Style is not done loading“). Vertagt wird auf das nächste
+  // `style.load`; gestartet wird dort der DANN gewünschte Modus, nicht der von damals.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     if (zoneZeichnen) {
-      if (!zoneDrawRef.current) {
-        zoneDrawRef.current = createZeichnung(
-          map,
-          (g) => onZoneGezeichnetRef.current?.(g),
-          (stand) => onZeichnenStandAenderungRef.current?.(stand),
-          'td-zone',
-        );
-      }
-      zoneDrawRef.current.starten(zoneZeichnen);
+      const starte = () => {
+        const modus = zeichnenArtRef.current.zoneZeichnen;
+        if (!modus) return;
+        if (!zoneDrawRef.current) {
+          zoneDrawRef.current = createZeichnung(
+            map,
+            (g) => onZoneGezeichnetRef.current?.(g),
+            (stand) => onZeichnenStandAenderungRef.current?.(stand),
+            'td-zone',
+          );
+        }
+        zoneDrawRef.current.starten(modus);
+      };
+      if (stilJsonAngewandtRef.current) starte();
+      else map.once('style.load', starte);
     } else if (zoneDrawRef.current) {
       zoneDrawRef.current.stoppen();
     }
