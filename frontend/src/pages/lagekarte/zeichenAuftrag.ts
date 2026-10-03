@@ -1,14 +1,6 @@
-import type { ZoneTyp } from '../../api/types';
 import type { ZeichnenAuftrag } from '../../routing/deeplinks';
-import type { ZeichenModus } from './zeichnen';
+import type { ZoneEntwurf } from './useKartenInteraktion';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
-
-/** Der Zonen-Entwurf, mit dem `onZoneZeichnenStart` den Zeichenmodus betritt. */
-export interface ZonenZeichenEntwurf {
-  typ: ZoneTyp;
-  modus: ZeichenModus;
-  farbe?: string;
-}
 
 /**
  * Übersetzt einen Zeichnen-Auftrag aus `?zeichnen=` (LFH-825) in den Entwurf, den der Knopf des
@@ -21,7 +13,7 @@ export interface ZonenZeichenEntwurf {
  *   wie im Paneel.
  * - Typ ohne Eintrag in `ZONE_TYPEN`: `null`.
  */
-export function zeichenAuftragZuEntwurf(auftrag: ZeichnenAuftrag): ZonenZeichenEntwurf | null {
+export function zeichenAuftragZuEntwurf(auftrag: ZeichnenAuftrag): ZoneEntwurf | null {
   const info = ZONE_TYPEN.find((t) => t.typ === auftrag.typ);
   if (!info) return null;
   if (info.geometrie === 'beides') {

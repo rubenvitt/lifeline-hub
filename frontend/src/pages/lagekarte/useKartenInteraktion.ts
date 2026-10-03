@@ -47,7 +47,7 @@ function kopfMitKoordinate(
   };
 }
 
-type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
+export type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
 type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
 
 /**

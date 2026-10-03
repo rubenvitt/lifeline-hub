@@ -84,8 +84,10 @@ räumen (anwenden, dann räumen). `darfSchreiben` ist im Historien-Modus schon `
 
 Damit gelten automatisch: zweistufiges Esc (LFH-712, gleicher Modus), Freigabe der Karte unter
 `lg` (LFH-765, abgeleitet aus `exklusiverModusAktiv`), Exklusivität gegen andere Modi (ein Modus-Feld).
-Treffen `platzieren` und `zeichnen` in einem Link zusammen, gewinnt der zuletzt laufende Effekt;
-die App erzeugt solche Links nicht, eine eigene Regel lohnt nicht.
+Treffen `platzieren` und `zeichnen` in einem Link zusammen, startet zuerst das Zeichnen; weil
+beide Effekte dieselben alten `searchParams` kopieren, schreibt das Räumen von `zeichnen` den
+Platzier-Auftrag zurück, und der Platzier-Effekt läuft danach und verdrängt den Zeichenmodus. Die
+App erzeugt solche Links nicht, eine eigene Regel lohnt nicht.
 
 `lagekartePfad` bekommt `zeichnen?: { typ: ZoneTyp; form?: 'flaeche' | 'linie' }`.
 
@@ -131,9 +133,13 @@ und ein Absturz in die Fehlergrenze. Über das Paneel trat das nie auf, weil dor
 Laden geklickt wird.
 
 `Kartenflaeche.tsx` startet das Zonen-Zeichnen deshalb erst, wenn das Style-JSON steht (eigener
-Merker: wahr ab `style.load`, falsch ab `setStyle`), sonst beim nächsten `style.load` mit dem dann
-gewünschten Modus. Ein Stilwechsel während des Zeichnens räumt und startet neu wie bei der Messung
-(eine angefangene Figur geht dabei verloren, wie dort).
+Merker: wahr ab `style.load`, falsch ab `setStyle`). Sonst wird vertagt: nach dem nächsten
+`style.load` UND dem Neuaufbau der App-Ebenen (einmaliges `load` der Karte bzw. Render-Poller von
+`planeReAnlegenNachStyle`), damit die `td-zone-*`-Ebenen wie beim Start über das Paneel über
+Zonen und Abschnitten liegen; gestartet wird der dann gewünschte Modus. Es steht höchstens ein
+vertagter Start aus, Nonce- und Stilwechsel stapeln keine Hörer. Ein Stilwechsel während des
+Zeichnens räumt und startet auf demselben Weg neu wie bei der Messung (eine angefangene Figur geht
+dabei verloren, wie dort). Die Merker gehören zur Karteninstanz und werden mit ihr zurückgesetzt.
 
 *Verworfen:* `map.isStyleLoaded()` als Bedingung — es wartet zusätzlich auf alle Kacheln, danach
 kommt kein `style.load` mehr, und der Modus startete nie (fünf bestehende e2e-Tests wurden rot);

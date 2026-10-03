@@ -387,6 +387,32 @@ test('Zeichnen per Link: ?zeichnen=gefahrengebiet startet den Modus und räumt',
   await expect(canvas).toHaveCSS('cursor', 'crosshair');
   await expect(page).not.toHaveURL(/zeichnen=/);
 
+  // Der Wechsel vom Blindstil auf den Style der Ansicht hat die Zeichnung nicht zerlegt: Punkte
+  // landen bei terra-draw (D6).
+  const box = (await canvas.boundingBox())!;
+  for (const [dx, dy] of [
+    [-120, -140],
+    [120, -140],
+    [120, -40],
+  ]) {
+    await page.mouse.click(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy);
+  }
+  await expect(page.locator('[data-lfh="zeichnen-punkte"]')).toHaveText('3 Punkte');
+  // Die Zeichnung liegt wie beim Start über das Paneel ÜBER Zonen und Abschnitten: gestartet vor
+  // dem Neuaufbau der App-Ebenen läge sie direkt über dem Hintergrund (Review zu D6).
+  const ebenen = await page.evaluate(() =>
+    ((window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.getStyle()?.layers ?? []).map(
+      (l) => l.id,
+    ),
+  );
+  const ersteZeichnung = ebenen.findIndex((id) => id.startsWith('td-zone-'));
+  expect(ersteZeichnung).toBeGreaterThanOrEqual(0);
+  for (const id of ['abschnitte-fill', 'zonen-fill', 'zonen-label']) {
+    expect(ebenen.indexOf(id), `${id} fehlt`).toBeGreaterThanOrEqual(0);
+    expect(ebenen.indexOf(id), `${id} liegt über der Zeichnung`).toBeLessThan(ersteZeichnung);
+  }
+
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
   expect(seitenFehler).toEqual([]);

@@ -460,6 +460,48 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // `map.isStyleLoaded()`: das wartet zusätzlich auf alle Kacheln, und danach käme kein
   // `style.load` mehr, auf das sich vertagen ließe (LFH-825).
   const stilJsonAngewandtRef = useRef(false);
+  // Hat die Karte ihr einmaliges `load` gemeldet? Dort legt sie Abschnitte, Zonen und Fachebenen an.
+  const karteGeladenRef = useRef(false);
+  // Steht ein vertagter Zonen-Start aus? Genau einer: Nonce-Wechsel und Stilwechsel stapeln keine
+  // weiteren Hörer, und ein `style.load` startet nicht zweimal.
+  const zoneStartAnstehendRef = useRef(false);
+  /**
+   * Startet das Zonen-Zeichnen im DANN gewünschten Modus (nicht dem beim Vertagen), legt den
+   * Controller bei Bedarf an. Nur Refs, deshalb stabil.
+   */
+  const starteZonenZeichnung = useRef((map: maplibregl.Map) => {
+    const modus = zeichnenArtRef.current.zoneZeichnen;
+    if (!modus) return;
+    if (!zoneDrawRef.current) {
+      zoneDrawRef.current = createZeichnung(
+        map,
+        (g) => onZoneGezeichnetRef.current?.(g),
+        (stand) => onZeichnenStandAenderungRef.current?.(stand),
+        'td-zone',
+      );
+    }
+    zoneDrawRef.current.starten(modus);
+  }).current;
+  /**
+   * Vertagt den Zonen-Start bis nach dem nächsten `style.load` UND dem Neuaufbau der App-Ebenen
+   * (LFH-825, D6): terra-draw hängt seine `td-zone-*`-Ebenen beim Start oben an. Gestartet vor dem
+   * Neuaufbau, lägen Zonen, Abschnitte und Marker darüber; danach liegt die Zeichnung wie beim
+   * Start über das Paneel oben. Der Neuaufbau läuft am `load` der Karte (einmalig) bzw. im
+   * Render-Poller von `planeReAnlegenNachStyle` — `wendeKartenDatenAn` reiht sich dahinter ein.
+   */
+  const planeZonenStart = useRef((map: maplibregl.Map) => {
+    if (zoneStartAnstehendRef.current) return;
+    zoneStartAnstehendRef.current = true;
+    const nachAufbau = () =>
+      wendeKartenDatenAn(map, () => {
+        zoneStartAnstehendRef.current = false;
+        starteZonenZeichnung(map);
+      });
+    map.once('style.load', () => {
+      if (karteGeladenRef.current) nachAufbau();
+      else map.once('load', nachAufbau);
+    });
+  }).current;
   // Dritter Controller: Messen. Eigene Instanz, weil er bei jeder Änderung meldet statt erst beim
   // Abschluss (`messZeichnung.ts`).
   const messRef = useRef<MessZeichnung | null>(null);
@@ -571,6 +613,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       stilWaechterRef.current.stilGeladen();
     });
     map.on('load', () => {
+      karteGeladenRef.current = true;
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       for (const fe of fachebenenRef.current) {
@@ -650,6 +693,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     return () => {
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
+      // Die Merker gehören zu DIESER Karte: eine neue (Remount, Fast Refresh) lädt ihren Style
+      // erst noch, und ein Zonen-Start darauf liefe in „Style is not done loading“ (LFH-825).
+      stilJsonAngewandtRef.current = false;
+      karteGeladenRef.current = false;
+      zoneStartAnstehendRef.current = false;
       // Testhaken mit abräumen: sonst zeigte er auf eine entfernte Map, und ein späterer Test wäre
       // grün, ohne dass eine Karte lief. (Unter StrictMode zeigt er danach korrekt auf die zweite
       // Instanz.)
@@ -693,16 +741,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (zoneForm) zoneDrawRef.current?.stoppen();
     stilJsonAngewandtRef.current = false;
     map.setStyle(style, { diff: false });
+    // Nach dem Neuaufbau der App-Ebenen wieder beginnen; ein schon anstehender Start deckt das ab.
+    if (zoneForm) planeZonenStart(map);
     if (messForm) {
       map.once('style.load', () => {
         const noch = messenRef.current;
         if (noch && messRef.current) messRef.current.starten(noch);
-      });
-    }
-    if (zoneForm) {
-      map.once('style.load', () => {
-        const noch = zeichnenArtRef.current.zoneZeichnen;
-        if (noch && zoneDrawRef.current) zoneDrawRef.current.starten(noch);
       });
     }
     planeReAnlegenNachStyle(
@@ -725,7 +769,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         eigenpositionRef.current.farbe,
       ),
     );
-  }, [style]);
+    // `planeZonenStart` ist stabil (nur Refs); er steht nur der Regel wegen in den Deps.
+  }, [style, planeZonenStart]);
 
   // AttributionControl je View neu setzen: MapLibre hat keinen Setter für `customAttribution`.
   useEffect(() => {
@@ -1456,35 +1501,22 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 
   // Zonen-Zeichenmodus (Polygon/Linie) an-/abschalten; eigener Controller-Lifecycle.
   //
-  // Erst mit geladenem Style (LFH-825): der Zeichnen-Deeplink `?zeichnen=` startet den Modus beim
-  // Kaltstart, während die Karte noch den Blindstil lädt — terra-draw legte seine Sources dann auf
-  // einen ungeladenen Style („Style is not done loading“). Vertagt wird auf das nächste
-  // `style.load`; gestartet wird dort der DANN gewünschte Modus, nicht der von damals.
+  // Erst mit geladenem Style (LFH-825, D6): der Zeichnen-Deeplink `?zeichnen=` startet den Modus
+  // beim Kaltstart, während die Karte noch den Blindstil lädt — terra-draw legte seine Sources
+  // dann auf einen ungeladenen Style („Style is not done loading“). Vertagt wird über
+  // `planeZonenStart`.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     if (zoneZeichnen) {
-      const starte = () => {
-        const modus = zeichnenArtRef.current.zoneZeichnen;
-        if (!modus) return;
-        if (!zoneDrawRef.current) {
-          zoneDrawRef.current = createZeichnung(
-            map,
-            (g) => onZoneGezeichnetRef.current?.(g),
-            (stand) => onZeichnenStandAenderungRef.current?.(stand),
-            'td-zone',
-          );
-        }
-        zoneDrawRef.current.starten(modus);
-      };
-      if (stilJsonAngewandtRef.current) starte();
-      else map.once('style.load', starte);
+      if (stilJsonAngewandtRef.current) starteZonenZeichnung(map);
+      else planeZonenStart(map);
     } else if (zoneDrawRef.current) {
       zoneDrawRef.current.stoppen();
     }
     // `zoneZeichnenNonce` wird nicht gelesen — sie erzwingt ein Re-Fire bei gleichem Modus, damit
-    // `starten()` einen offenen Entwurf verwirft.
-  }, [zoneZeichnen, zoneZeichnenNonce]);
+    // `starten()` einen offenen Entwurf verwirft. Die beiden Helfer sind stabil (nur Refs).
+  }, [zoneZeichnen, zoneZeichnenNonce, starteZonenZeichnung, planeZonenStart]);
 
   // Messen an-/abschalten bzw. die Form wechseln; `starten` verwirft dabei die alte Figur.
   useEffect(() => {
