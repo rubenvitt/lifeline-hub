@@ -1078,6 +1078,129 @@ async fn totp_enroll_start_ohne_session_ist_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
+/// Abschluss ohne vorherigen Start ist ein Zustand, kein kaputtes Feld → 422
+/// (`src/AGENTS.md`, Statuscode-Konvention).
+#[tokio::test]
+async fn totp_enroll_finish_ohne_start_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(r#"{"code":"123456"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// LFH-794: Wer nur eine Session hat (unbeaufsichtigter Fükw, entwendetes Tablet), darf den
+/// aktiven Zweitfaktor nicht per `enroll/start` still abschalten oder austauschen. Neu
+/// einrichten geht nur nach einem Admin-Reset.
+#[tokio::test]
+async fn totp_enroll_start_bei_aktivem_totp_ist_422_und_laesst_mfa_unveraendert() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (secret_vor, _) = totp_fuer_admin_aktivieren(&app, &admin).await;
+
+    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        json.get("secret_base32").is_none(),
+        "abgelehnter Start darf kein neues Secret herausgeben"
+    );
+
+    let (db_secret, db_aktiviert): (Option<String>, i64) = sqlx::query_as(
+        "SELECT totp_secret, totp_aktiviert FROM benutzer WHERE benutzername = 'admin'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(db_aktiviert, 1, "MFA muss aktiv bleiben");
+    assert_eq!(
+        db_secret.as_deref(),
+        Some(secret_vor.as_str()),
+        "das aktive Secret darf nicht überschrieben werden"
+    );
+}
+
+/// LFH-794: `enroll/finish` bei schon aktivem TOTP erzeugt keine neuen Recovery-Codes — sonst
+/// ersetzte ein zweiter (etwa doppelt abgeschickter) Abschluss die gerade angezeigten Codes.
+#[tokio::test]
+async fn totp_enroll_finish_bei_aktivem_totp_ist_422_und_ersetzt_keine_recovery_codes() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (secret, recovery_codes) = totp_fuer_admin_aktivieren(&app, &admin).await;
+
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(&format!(r#"{{"code":"{code}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(json.get("recovery_codes").is_none());
+
+    // Die zuerst ausgegebenen Codes gelten weiter: Login mit Passwort + Recovery-Code.
+    let (_, _, login_cookies) = login_alle_cookies(&app, "admin", "startpw12").await;
+    let pending_paar = login_cookies[0].split(';').next().unwrap().to_string();
+    let (status, _, _) = totp_finish(&app, Some(&pending_paar), &recovery_codes[0]).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "die beim ersten Abschluss ausgegebenen Recovery-Codes müssen gültig bleiben"
+    );
+}
+
+/// LFH-794: Aktivieren und Recovery-Codes speichern sind EINE Transaktion. Scheitert das
+/// Speichern der Codes, bleibt MFA aus, statt aktiv ohne Codes beim Nutzer zu landen.
+#[tokio::test]
+async fn totp_enroll_finish_fehler_beim_speichern_der_recovery_codes_laesst_mfa_aus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let secret = json["secret_base32"].as_str().unwrap().to_string();
+
+    sqlx::query(
+        "CREATE TRIGGER recovery_code_scheitert BEFORE INSERT ON totp_recovery_code \
+         BEGIN SELECT RAISE(ABORT, 'Testfehler'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(&format!(r#"{{"code":"{code}"}}"#)),
+    )
+    .await;
+    assert!(
+        status.is_server_error(),
+        "der Speicherfehler muss als Fehler ankommen, war {status}"
+    );
+
+    let db_aktiviert: i64 =
+        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        db_aktiviert, 0,
+        "ohne gespeicherte Recovery-Codes darf MFA nicht aktiv sein"
+    );
+}
+
 // ===== Zweistufiger Passwort→TOTP-Login + /totp/finish (LFH-43): Pending-State→Session =====
 
 /// Aktiviert TOTP für den admin über den regulären Enroll-Flow (statt direkt in die DB) — deckt
