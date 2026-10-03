@@ -9,21 +9,21 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 1. Datenhaltung und Schwärzung (D2, D6)
 
-- [ ] 1.1 Migration `NNNN_einsatz_fuehrungsstelle.sql` mit der nächsten freien Nummer über
+- [x] 1.1 Migration `NNNN_einsatz_fuehrungsstelle.sql` mit der nächsten freien Nummer über
   `alpha` (`git fetch origin alpha`, `scripts/check-migrationen.sh`): Tabellen
   `einsatz_fuehrungsstelle` und `einsatz_fuehrungsstelle_sprechgruppe` wie in D2. Nachweis:
   `check-migrationen.sh` grün, `db::tests::migrationsnummern_sind_eindeutig` grün.
-- [ ] 1.2 Test zuerst: der Register-Guard (`einsatz::schwaerzung_registry::tests`) wird mit den
+- [x] 1.2 Test zuerst: der Register-Guard (`einsatz::schwaerzung_registry::tests`) wird mit den
   neuen Tabellen rot. Dann Einträge nach D6 (`erreichbarkeit` → `scrub(NullSetzen, Z_EINSATZ)`,
   Rest Retain mit Begründung). Nachweis: Guard grün, `tests::kategorie_zuordnung_ist_gepinnt`
   grün.
-- [ ] 1.3 Schwärzungstest: ein Einsatz mit erfasster Führungsstelle wird geschwärzt; danach ist
+- [x] 1.3 Schwärzungstest: ein Einsatz mit erfasster Führungsstelle wird geschwärzt; danach ist
   `erreichbarkeit` NULL, Rufname, Kommunikationsmittel und Sprechgruppen sind unverändert.
   Nachweis: Test erst rot (ohne Registereintrag), dann grün.
 
 ## 2. Endpunkt `…/fuehrungsstelle` (D2, D3)
 
-- [ ] 2.1 Test zuerst `tests/einsatz_fuehrungsstelle.rs`:
+- [x] 2.1 Test zuerst `tests/einsatz_fuehrungsstelle.rs`:
   - GET ohne Zeile → alle Angaben leer, `sprechgruppen: []`; Beobachter liest; Fremde 403/404
     wie beim Kopf
   - PATCH Teilfelder: Rufname, dann aus „altem Stand“ nur Erreichbarkeit → beide stehen
@@ -35,26 +35,26 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   - Erfolg verteilt `einsatz`, Ablehnung nicht
 
   Nachweis: rot belegt.
-- [ ] 2.2 Umsetzung: Repo in `src/einsatz/` (Laden, Upsert + Zuordnung in EINEM `write_retry!`),
+- [x] 2.2 Umsetzung: Repo in `src/einsatz/` (Laden, Upsert + Zuordnung in EINEM `write_retry!`),
   Zuordnung über `sprechgruppe::repo` (`pruefe_zuordenbar` vor dem Schreiben), DTO
   `FuehrungsstelleAnzeige` (`ToSchema`, ehrliche Optionalität), Routen GET
   (`EinsatzLesezugriff`) und PATCH (`EinsatzVerwaltungszugriff`, `JsonBody`, `kopf_geaendert`
   nach dem Commit), Eintrag in `api_doc.rs`. Nachweis: 2.1 grün, `json_extractor_guard`,
   `path_extractor_guard`, `fehler_vertrag` grün.
-- [ ] 2.3 Codegen: `scripts/check-typ-codegen.sh`, `openapi.json` und `types.generated.ts`
+- [x] 2.3 Codegen: `scripts/check-typ-codegen.sh`, `openapi.json` und `types.generated.ts`
   mitcommitten. Nachweis: Skript grün.
 
 ## 3. Client: API, Query-Key, Paneel auf Einsatzdaten (D1, D3)
 
-- [ ] 3.1 `api/`: `ladeFuehrungsstelle`, `patcheFuehrungsstelle`, handgepflegter
+- [x] 3.1 `api/`: `ladeFuehrungsstelle`, `patcheFuehrungsstelle`, handgepflegter
   `FuehrungsstellePatch`; `einsatzKeys.fuehrungsstelle` in `EINSATZ_KEYS` und in
   `EINSATZ_STREAM_EVENTS.einsatz`. Nachweis: `queryKeys.guard.test.ts` und die
   Live-Klassifikation grün; ein Test belegt, dass `einsatz` den Key invalidiert.
-- [ ] 3.2 Test zuerst `EinsatzdatenPage.test.tsx`: Paneel „Eigene Führungsstelle“ mit vier Zeilen;
+- [x] 3.2 Test zuerst `EinsatzdatenPage.test.tsx`: Paneel „Eigene Führungsstelle“ mit vier Zeilen;
   jede Zeile schickt nur ihr Feld (Sprechgruppen als `sprechgruppe_ids`), unverändert sendet
   nichts, leer sendet `null`; Beobachter ohne Aufforderung, leer „—“; Fehler an der Zeile ohne
   Toast. Nachweis: rot belegt.
-- [ ] 3.3 Umsetzung des Paneels nach D1 mit `InlineAngabe` und `SprechgruppenPicker`; Antwort in
+- [x] 3.3 Umsetzung des Paneels nach D1 mit `InlineAngabe` und `SprechgruppenPicker`; Antwort in
   den Cache vor dem Erfüllen. Nachweis: 3.2 grün, `tsc -b` und Lint grün.
 
 ## 4. Funkplan: Zeile, Lücken, Markdown, Deeplink (D4, D5)
