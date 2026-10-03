@@ -624,13 +624,25 @@ impl TestIdp {
     }
 }
 
+/// Frische `nonce` je Flow, wie `oidc_start` sie erzeugt. Ein festes Literal wäre für den
+/// Test gleichwertig, CodeQL meldet es aber als hartcodierten kryptografischen Wert.
+fn zufalls_nonce() -> String {
+    lifeline_hub::auth::session::neuer_token()
+}
+
 /// Legt einen vom Server „begonnenen“ Flow in den State-Store (wie `oidc_start`, aber ohne
 /// Browser) und ruft den Callback mit passendem Binding-Cookie auf. Liefert den Redirect-Ziel.
-async fn oidc_rueckweg(app: &axum::Router, state_key: &str, code: &str, ip: &str) -> String {
+async fn oidc_rueckweg(
+    app: &axum::Router,
+    state_key: &str,
+    nonce: &str,
+    code: &str,
+    ip: &str,
+) -> String {
     lifeline_hub::auth::oidc::state::speichere(
         state_key.to_string(),
         lifeline_hub::auth::oidc::state::StateEintrag {
-            nonce: format!("nonce-{state_key}"),
+            nonce: nonce.to_string(),
             pkce_verifier: "v".repeat(43),
             ziel_pfad: "/einsaetze".to_string(),
         },
@@ -664,8 +676,9 @@ async fn oidc_anmeldung_schreibt_login_ok_fuer_das_jit_konto() {
     let (app, pool) = setup_mit_pool().await;
     spur_leeren(&pool).await;
 
-    idp.token_hinterlegen("code-ok", "sub-neu", "sso.neu", "nonce-state-ok");
-    let ziel = oidc_rueckweg(&app, "state-ok", "code-ok", "203.0.113.64").await;
+    let nonce = zufalls_nonce();
+    idp.token_hinterlegen("code-ok", "sub-neu", "sso.neu", &nonce);
+    let ziel = oidc_rueckweg(&app, "state-ok", &nonce, "code-ok", "203.0.113.64").await;
     assert_eq!(ziel, "/einsaetze", "Anmeldung muss gelingen");
 
     let (id, name): (i64, String) =
@@ -708,13 +721,16 @@ async fn oidc_mit_deaktiviertem_konto_schreibt_login_fehlgeschlagen_mit_dem_kont
         .unwrap();
     spur_leeren(&pool).await;
 
-    idp.token_hinterlegen(
+    let nonce = zufalls_nonce();
+    idp.token_hinterlegen("code-gesperrt", "sub-gesperrt", "sso.gesperrt", &nonce);
+    let ziel = oidc_rueckweg(
+        &app,
+        "state-gesperrt",
+        &nonce,
         "code-gesperrt",
-        "sub-gesperrt",
-        "sso.gesperrt",
-        "nonce-state-gesperrt",
-    );
-    let ziel = oidc_rueckweg(&app, "state-gesperrt", "code-gesperrt", "203.0.113.65").await;
+        "203.0.113.65",
+    )
+    .await;
     assert_eq!(ziel, "/login?fehler=oidc");
 
     assert_eq!(
@@ -736,7 +752,14 @@ async fn oidc_mit_abgelehntem_code_schreibt_login_fehlgeschlagen_ohne_konto() {
     spur_leeren(&pool).await;
 
     // Kein Token hinterlegt: der IdP lehnt den Code ab, der Token-Tausch scheitert.
-    let ziel = oidc_rueckweg(&app, "state-abgelehnt", "code-unbekannt", "203.0.113.66").await;
+    let ziel = oidc_rueckweg(
+        &app,
+        "state-abgelehnt",
+        &zufalls_nonce(),
+        "code-unbekannt",
+        "203.0.113.66",
+    )
+    .await;
     assert_eq!(ziel, "/login?fehler=oidc");
 
     assert_eq!(
