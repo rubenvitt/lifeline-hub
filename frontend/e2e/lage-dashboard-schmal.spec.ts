@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Kennzahlenband und die drei Paneele des Lage-Dashboards auf den drei Prüfbreiten. Dass das
@@ -54,7 +55,7 @@ async function dashboardOeffnen(page: Page, breite: number, hoehe: number) {
 }
 
 /** Spaltenzahl von Band und Paneelraster + Flächenbreite, als Anmerkung protokolliert. */
-async function messen(page: Page, viewportBreite: number) {
+async function messen(page: Page, viewportBreite: number, einsatz = einsatzId) {
   // Genau ein Knoten — sonst wäre eine grüne Zusicherung grün durch Nichtstun.
   await expect(FLAECHE(page)).toHaveCount(1);
   await expect(BAND(page)).toHaveCount(1);
@@ -76,8 +77,9 @@ async function messen(page: Page, viewportBreite: number) {
       `Viewport ${viewportBreite} px → Fläche ${flaecheBreite} px ` +
       `→ Band ${band.spalten} Spalten (${band.scrollWidth}/${band.clientWidth} px), ` +
       `Paneele ${paneelSpalten} Spalten, ` +
-      // Belegt, dass alle drei Tests DIESELBE Vorbedingung teilen.
-      `Einsatz ${einsatzId}`,
+      // Belegt, dass die drei Admin-Tests DIESELBE Vorbedingung teilen (die Sperr-Tests legen je
+      // einen eigenen Einsatz an).
+      `Einsatz ${einsatz}`,
   });
 
   return { ...band, paneelSpalten, flaecheBreite };
@@ -151,6 +153,107 @@ test.describe('Lage-Dashboard auf den drei Prüfbreiten', () => {
     // Zelle" eine zu schmale.
     await dashboardOeffnen(page, 390, 844);
     const mass = await messen(page, 390);
+    expect(mass.spalten, 'Band-Spalten am Handschirm').toBe(2);
+    expect(mass.paneelSpalten, 'Paneele am Handschirm').toBe(1);
+    await keinWaagerechterUeberlauf(page);
+    await jedeKennzahlStehtInIhrerZelle(page);
+  });
+});
+
+/**
+ * Modulsperre per Override (LFH-820, `openspec/changes/archive/2026-10-03-lfh-820-layout-gates-modulsperre-override/`):
+ * für den Admin ist kein Modul gesperrt (Admin-Ausnahme), die Plätze „—" mit Grund und die
+ * Sperrsätze der Paneele sieht nur ein Benutzer ohne die verlangte Rolle. Gesperrt werden
+ * Personen (Plätze „Verbleib offen", Betroffene, Vermisste und das Sichtungspaneel), Gefahren
+ * (Matrix) und ETB (Meldungsstrom); die übrigen drei Plätze bleiben Links. So misst das Band
+ * beide Arten von Zelle nebeneinander.
+ */
+const GESPERRTE_MODULE = ['personen', 'gefahrenzonen', 'etb'] as const;
+
+/**
+ * Eigener Einsatz je Test — der Override darf die geteilte Admin-Messung (`einsatzId ??=`)
+ * nicht berühren. Seeding als Admin, dann Wechsel; Viewport erst danach (s. o.).
+ */
+async function dashboardMitSperreOeffnen(
+  page: Page,
+  breite: number,
+  hoehe: number,
+): Promise<string> {
+  await anmelden(page);
+  const id = await einsatzAnlegen(page, `E2E Kennzahlen Sperre ${Date.now()}`);
+  for (const key of GESPERRTE_MODULE) {
+    const antwort = await page.request.put(`/api/einsaetze/${id}/modul-overrides/${key}`, {
+      data: { sichtbar: true, benoetigte_rolle: 'admin' },
+    });
+    // Ein still gescheitertes Seeding führte zurück in den ungesperrten Zustand.
+    expect(antwort.ok(), `Override ${key}: ${antwort.status()} ${await antwort.text()}`).toBe(true);
+  }
+  await wechsleZuRolle(page, 'beobachter', id);
+
+  await page.setViewportSize({ width: breite, height: hoehe });
+  await page.goto(`/einsaetze/${id}/lage-dashboard`);
+  await sperrzweigSteht(page);
+  return id;
+}
+
+/**
+ * Vorbedingung: drei Plätze „—" mit Grund und ohne Link, drei Plätze weiter Links, die Paneele
+ * mit ihrem Sperrsatz. Zugleich der Anker: der Admin-Anker (sechs Links) gilt hier nicht.
+ */
+async function sperrzweigSteht(page: Page) {
+  const zellen = BAND(page).locator('[data-lfh="kennzahl"]');
+  await expect(zellen).toHaveCount(6);
+  const gesperrt = zellen.filter({
+    has: page.locator('[data-lfh="kennzahl-notiz"]', { hasText: 'nicht freigegeben' }),
+  });
+  await expect(gesperrt, 'Vorbedingung: drei Plätze ohne Freigabe').toHaveCount(3);
+  for (const zelle of await gesperrt.all()) {
+    await expect(zelle).toContainText('—');
+    await expect(zelle.locator('a'), 'Vorbedingung: kein Sprung ins gesperrte Modul').toHaveCount(
+      0,
+    );
+  }
+  await expect(BAND(page).locator('a[data-lfh="kennzahl"]')).toHaveCount(3);
+  // Ein Link bleibt auch im Zustand `laden` ein Link: erst messen, wenn die freien Plätze ihre
+  // Zahl tragen.
+  await expect(BAND(page).getByText('wird abgerufen')).toHaveCount(0);
+  for (const satz of [
+    'Modul Gefahren nicht freigegeben.',
+    'Modul Personen nicht freigegeben.',
+    'Modul ETB nicht freigegeben.',
+  ]) {
+    await expect(PANEELE(page).getByText(satz), `Vorbedingung: „${satz}"`).toBeVisible();
+  }
+}
+
+test.describe('Lage-Dashboard mit Modulsperre (Beobachter)', () => {
+  test('am Fükw-Schirm (1366 px) bleibt die Staffel, gesperrte Plätze stehen in ihrer Zelle', async ({
+    page,
+  }) => {
+    const id = await dashboardMitSperreOeffnen(page, 1366, 768);
+    const mass = await messen(page, 1366, id);
+    expect(mass.spalten, 'Band-Spalten am Fükw-Schirm').toBe(6);
+    expect(mass.paneelSpalten, 'Paneele am Fükw-Schirm').toBe(3);
+    await keinWaagerechterUeberlauf(page);
+    await jedeKennzahlStehtInIhrerZelle(page);
+  });
+
+  test('bei 1024 px bleibt die Staffel, gesperrte Plätze stehen in ihrer Zelle', async ({
+    page,
+  }) => {
+    const id = await dashboardMitSperreOeffnen(page, 1024, 768);
+    const mass = await messen(page, 1024, id);
+    expect(mass.spalten, 'Band-Spalten am Führungs-Tablet').toBe(3);
+    expect(mass.paneelSpalten, 'Paneele am Führungs-Tablet').toBe(3);
+    await keinWaagerechterUeberlauf(page);
+    await jedeKennzahlStehtInIhrerZelle(page);
+  });
+
+  test('bei 390 px bleibt die Staffel, gesperrte Plätze stehen in ihrer Zelle', async ({
+    page,
+  }) => {
+    const id = await dashboardMitSperreOeffnen(page, 390, 844);
+    const mass = await messen(page, 390, id);
     expect(mass.spalten, 'Band-Spalten am Handschirm').toBe(2);
     expect(mass.paneelSpalten, 'Paneele am Handschirm').toBe(1);
     await keinWaagerechterUeberlauf(page);

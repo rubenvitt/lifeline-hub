@@ -104,3 +104,23 @@ describe('BezugDialog', () => {
     expect(await screen.findByText('S-003 · sachschaden · B5')).toBeInTheDocument();
   });
 });
+
+describe('BezugDialog — Erfassungshülle (LFH-796)', () => {
+  // Erfassungs-Norm (frontend/AGENTS.md): eine reine Select-Maske, Enter schluckt der `Select`.
+  // Belegt wird deshalb die Struktur: Knopf im `<form>`, keine antd-Fußzeile.
+  it('liegt auf der Erfassungshülle: Knopf im Formular, keine Fußzeile', () => {
+    renderMitProviders(
+      <BezugDialog
+        offen
+        nachricht={nachricht}
+        optionen={optionen}
+        senden={false}
+        onAbbrechen={vi.fn()}
+        onBestaetigen={vi.fn()}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Speichern' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+  });
+});

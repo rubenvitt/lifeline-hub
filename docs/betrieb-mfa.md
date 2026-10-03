@@ -24,10 +24,17 @@ per-Nutzer und opt-in, jeder Nutzer richtet es selbst über sein Profil ein.
    Recovery-Codes an.** Dieses Fenster kommt nicht wieder — die Codes müssen
    in diesem Moment gesichert werden (Passwort-Manager, Ausdruck o.ä.).
 
-Ein erneutes Starten der Einrichtung (Re-Enroll) ersetzt das Secret und
-setzt `totp_aktiviert` zurück auf 0, bis der neue Code bestätigt wird — ein
-abgebrochener Re-Enroll lässt das Konto also vorübergehend ohne aktives
-TOTP, nicht mit dem alten Secret.
+Ein noch nicht bestätigtes Enrollment lässt sich neu starten (neues Secret,
+das alte wird verworfen). **Ist TOTP aktiv, lehnt der Server ein erneutes
+Einrichten ab (422, LFH-794)**: wer nur eine fremde Session hat
+(unbeaufsichtigter Fükw, entwendetes Tablet), soll den Zweitfaktor weder
+abschalten noch gegen einen eigenen tauschen können. Ein Gerätewechsel läuft
+deshalb über den Admin-Reset (unten) und danach eine neue Einrichtung.
+
+Dasselbe gilt für die Bestätigung: geht die Antwort mit den Recovery-Codes
+unterwegs verloren (Netzabbruch), ist TOTP trotzdem aktiv, und ein zweiter
+Versuch liefert keine neuen Codes. Ohne gesicherte Codes hilft dann nur der
+Admin-Reset.
 
 ## Recovery-Codes: der einzige Ausweg bei Geräteverlust
 

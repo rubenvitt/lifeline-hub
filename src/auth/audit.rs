@@ -29,12 +29,18 @@ pub const AUFBEWAHRUNG_TAGE: i64 = 90;
 wire_enum! {
     #[wire(ohne_serde)]
     /// Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
-    /// `migrations/0091_auth_audit.sql` — beide Seiten müssen zusammenpassen.
+    /// `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` —
+    /// beide Seiten müssen zusammenpassen (Test `jede_variante_passiert_den_db_check`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum Ereignis {
         LoginOk => "login_ok",
         LoginFehlgeschlagen => "login_fehlgeschlagen",
         Logout => "logout",
+        /// Selbst gewechseltes Passwort (LFH-827), nach dem Commit des neuen Hashes.
+        PasswortGeaendert => "passwort_geaendert",
+        /// Passwortwechsel mit falschem Alt-Passwort abgewiesen (LFH-827). In einer gültigen
+        /// Sitzung ist das das Muster einer übernommenen Sitzung, die das Konto kapern will.
+        PasswortWechselAbgewiesen => "passwort_wechsel_abgewiesen",
     }
 }
 
@@ -42,7 +48,8 @@ wire_enum! {
 /// womöglich gar nicht existiert — genau das ist die interessante Information einer
 /// Brute-Force-Spur). `benutzer_id` steht bei Erfolg und bei einem Fehlschlag, dessen Benutzer
 /// der Server schon selbst festgestellt hat, etwa am Zweitfaktor nach bestandenem Passwort
-/// (LFH-792).
+/// (LFH-792). Die Passwort-Ereignisse entstehen in einer angemeldeten Sitzung und tragen deshalb
+/// immer beides.
 #[derive(Debug, Clone)]
 pub struct AuditEintrag<'a> {
     pub ereignis: Ereignis,
@@ -102,11 +109,8 @@ mod tests {
     async fn jede_variante_passiert_den_db_check() {
         let pool = db::test_pool().await;
 
-        for ereignis in [
-            Ereignis::LoginOk,
-            Ereignis::LoginFehlgeschlagen,
-            Ereignis::Logout,
-        ] {
+        // Über `ALLE`, nicht über eine Handliste: eine neue Variante ist damit automatisch dabei.
+        for ereignis in Ereignis::ALLE {
             schreibe(
                 &pool,
                 AuditEintrag {
@@ -125,8 +129,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(
-            anzahl, 3,
-            "jede Ereignis-Variante muss den CHECK in migrations/0091 passieren"
+            anzahl,
+            Ereignis::ALLE.len() as i64,
+            "jede Ereignis-Variante muss den CHECK passieren (migrations/0091, erweitert in 0143)"
         );
     }
 

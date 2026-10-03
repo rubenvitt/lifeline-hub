@@ -11,6 +11,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 
 vi.mock('../api/befehle');
 
@@ -80,7 +81,10 @@ function renderListe() {
     <QueryClientProvider client={qc}>
       <AntApp>
         <MemoryRouter>
-          <BefehlListe einsatzId={1} darfSchreiben />
+          {/* Die Tastatur-Registry trägt Escape in der Erfassungshülle (`keyboard={false}`). */}
+          <CommandPaletteProvider>
+            <BefehlListe einsatzId={1} darfSchreiben />
+          </CommandPaletteProvider>
         </MemoryRouter>
       </AntApp>
     </QueryClientProvider>,
@@ -230,5 +234,96 @@ describe('BefehlListe — Fassungszeile (LFH-350 · H60)', () => {
     // 12:00 UTC → 14:00 Sommerzeit in Berlin.
     expect(await screen.findByText('v1 · 251400JUL2026 · EL')).toBeInTheDocument();
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
+  });
+});
+
+/**
+ * Anlegen-Dialog auf der Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm; LFH-796).
+ *
+ * Der Datenfehler: der Speicher von rc-field-form überlebt `destroyOnHidden`. Ohne Zurücksetzen auf
+ * jedem Weg hinaus stünden nach Abbruch und erneutem Öffnen Titel und Schema des verworfenen
+ * Befehls wieder da, und der nächste Befehl würde damit angelegt.
+ */
+describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
+  async function oeffneDialog(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click(await screen.findByRole('button', { name: 'Befehl erteilen' }));
+    // Ohne Namen: das rohe `render` vergibt jede `useId` als `test-id`, `aria-labelledby` des
+    // Dialogs zeigt deshalb nicht verlässlich auf den Titel. Der Titel wird stattdessen geprüft.
+    // Kein Warten aufs Verschwinden beim Schliessen: jsdom beendet antds Ausblendung nicht, der
+    // Dialog bleibt im Baum. Gerade dann zeigt das erneute Öffnen, was der Formularspeicher hält.
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Neuen Befehl anlegen')).toBeInTheDocument();
+    return dialog;
+  }
+
+  async function waehleSchema(nutzer: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
+    await nutzer.click(within(dialog).getByRole('combobox'));
+    const option = (await screen.findAllByText('Einzelauftrag (EA/ZMW)')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    await nutzer.click(option!);
+  }
+
+  it.each(['knopf', 'kreuz', 'escape'] as const)(
+    'ist nach Abbruch über %s beim erneuten Öffnen leer',
+    async (weg) => {
+      const nutzer = userEvent.setup();
+      renderListe();
+      let dialog = await oeffneDialog(nutzer);
+      await nutzer.type(within(dialog).getByLabelText('Titel'), 'Verworfener Befehl');
+      await waehleSchema(nutzer, dialog);
+
+      if (weg === 'knopf')
+        await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+      if (weg === 'kreuz')
+        await nutzer.click(within(dialog).getByRole('button', { name: 'Close' }));
+      if (weg === 'escape') await nutzer.keyboard('{Escape}');
+
+      dialog = await oeffneDialog(nutzer);
+      expect(within(dialog).getByLabelText('Titel')).toHaveValue('');
+      // Das Schema steht wieder auf der Vorgabe, nicht auf dem verworfenen Wert.
+      expect(within(dialog).getByText('Befehl LAD (vereinfacht)')).toBeInTheDocument();
+      expect(within(dialog).queryByText('Einzelauftrag (EA/ZMW)')).toBeNull();
+    },
+  );
+
+  it('liegt auf der Erfassungshülle: Knopf im Formular, keine Fußzeile, Fokus im ersten Feld', async () => {
+    const nutzer = userEvent.setup();
+    renderListe();
+    const dialog = await oeffneDialog(nutzer);
+    const knopf = within(dialog).getByRole('button', { name: 'Anlegen' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+    await vi.waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
+  });
+
+  it('legt per Enter im Titel an und ist danach beim erneuten Öffnen leer', async () => {
+    vi.mocked(befehleApi.legeBefehlAn).mockResolvedValue({ ...KETTE[2], id: 11 } as never);
+    const nutzer = userEvent.setup();
+    renderListe();
+    let dialog = await oeffneDialog(nutzer);
+    await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl an 2. Zug{Enter}');
+
+    await vi.waitFor(() =>
+      expect(befehleApi.legeBefehlAn).toHaveBeenCalledWith(1, {
+        vorlage: 'befehl_lad',
+        titel: 'Befehl an 2. Zug',
+      }),
+    );
+    dialog = await oeffneDialog(nutzer);
+    expect(within(dialog).getByLabelText('Titel')).toHaveValue('');
+  });
+
+  it('lässt die Felder bei Ablehnung stehen', async () => {
+    vi.mocked(befehleApi.legeBefehlAn).mockRejectedValue(new Error('abgelehnt'));
+    const nutzer = userEvent.setup();
+    renderListe();
+    const dialog = await oeffneDialog(nutzer);
+    await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl X');
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+
+    await vi.waitFor(() => expect(befehleApi.legeBefehlAn).toHaveBeenCalled());
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Titel')).toHaveValue('Befehl X');
   });
 });

@@ -2470,3 +2470,96 @@ describe('LFH-712: Eigenposition', () => {
     );
   });
 });
+
+/**
+ * Zeichnen per Link (LFH-825, Spec `lagekarte-zeichnen`): `?zeichnen=<zonentyp>[:flaeche|:linie]`
+ * betritt den Zonen-Zeichenmodus wie der Knopf im Paneel. Anwenden, dann räumen — wie
+ * `?platzieren=`, mit demselben Lade-Riegel.
+ */
+describe('LFH-825: Zeichnen per Link', () => {
+  it('startet das Gefahrengebiet als Fläche und räumt den Param', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+  });
+
+  it('nimmt die Form der freien Skizze aus dem Auftrag', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=freie_skizze%3Alinie');
+    expect(await screen.findByText('Freie Skizze · Linie')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+  });
+
+  it.each([
+    ['unpassende Form', 'absperrgrenze%3Aflaeche'],
+    ['unbekannter Typ', 'tier'],
+  ])('%s: kein Zeichenmodus, Param geräumt', async (_fall, wert) => {
+    basisHandler();
+    renderSeiteMitSonde(`/einsaetze/1/lagekarte?zeichnen=${wert}`);
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+    // Die Seite steht: das Paneel ist da, der Modus nicht.
+    expect(
+      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+  });
+
+  it('ein Beobachter kommt nicht in den Zeichenmodus, der Param wird trotzdem geräumt', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+    expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Kaltstart (neuer Tab, F5): solange der Einsatz lädt, ist `darfSchreiben` noch `false`. Ohne
+   * Lade-Riegel räumte der Effekt den Auftrag in diesem Moment und stiege aus.
+   */
+  it('wartet, bis der Einsatz geladen ist, statt den Auftrag zu verwerfen', async () => {
+    let freigeben!: () => void;
+    const einsatzDa = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    basisHandler([
+      http.get('/api/einsaetze/1', async () => {
+        await einsatzDa;
+        return HttpResponse.json(EINSATZ);
+      }),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getByTestId('location-search')).toHaveTextContent('zeichnen=gefahrengebiet');
+    freigeben();
+    expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+  });
+
+  it('Esc ohne Punkt beendet den per Link gestarteten Modus (LFH-712)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
+    );
+  });
+});

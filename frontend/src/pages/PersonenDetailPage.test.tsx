@@ -1460,3 +1460,42 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
     expect(screen.queryByText('anhang')).toBeNull();
   });
 });
+
+// Erfassungs-Norm (frontend/AGENTS.md, LFH-796): die vier Dialoge der Seite liegen auf der
+// Erfassungshülle. Alle sind Select-Masken — Enter schluckt der `Select`, belegt wird die Struktur.
+describe('PersonenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', () => {
+  const leereListen: Parameters<typeof server.use> = [
+    http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+  ];
+
+  it.each([
+    { dialog: 'Sichtung erfassen', ausloeser: 'Sichten', knopf: 'Übernehmen', zuordnung: false },
+    { dialog: 'UHS zuweisen', ausloeser: 'UHS zuweisen', knopf: 'Zuweisen', zuordnung: true },
+    {
+      dialog: 'Tier als Halter zuweisen',
+      ausloeser: 'Tier zuweisen',
+      knopf: 'Zuweisen',
+      zuordnung: true,
+    },
+    {
+      dialog: 'Schaden zuweisen (Geschädigte)',
+      ausloeser: 'Schaden zuweisen',
+      knopf: 'Zuweisen',
+      zuordnung: true,
+    },
+  ])(
+    '$dialog: Knopf im Formular, keine Fußzeile',
+    async ({ dialog, ausloeser, knopf, zuordnung }) => {
+      render(einsatzAktiv, detail, leereListen);
+      if (zuordnung) await klappeZuordnungenAuf();
+      await userEvent.click(await screen.findByRole('button', { name: ausloeser }));
+      const fenster = await screen.findByRole('dialog');
+      expect(within(fenster).getByText(dialog)).toBeInTheDocument();
+      const absenden = within(fenster).getByRole('button', { name: knopf });
+      expect(absenden.closest('form')).not.toBeNull();
+      expect(document.querySelector('.ant-modal-footer')).toBeNull();
+    },
+  );
+});

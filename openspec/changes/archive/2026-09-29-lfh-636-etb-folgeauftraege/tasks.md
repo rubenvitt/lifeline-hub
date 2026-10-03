@@ -21,5 +21,5 @@
 ## 4. Abschluss
 
 - [x] 4.1 `./scripts/check-all.sh` grün (inkl. Prettier, Lint, e2e) — wegen vollem Datenträger in Teilstücken gefahren (`--nur schnell`, `cargo test --workspace`, Vitest, `--nur e2e`); zwei Last-Wackler in fremden Modulen einzeln grün nachgefahren
-- [ ] 4.2 (offen, Anmeldung im Browser steht aus; Wire-Feld per API am laufenden Backend belegt) Im Browser geprüft: Entscheidung erfassen → „Auftrag erteilen" zweimal → Zeitachse zeigt „Folgeauftrag Nr. …" zweimal, Klick selektiert den Auftrag; Überblick zeigt „2 Aufträge"
+- [x] 4.2 (nachgezogen in LFH-815 als `frontend/e2e/etb-folgeauftraege.spec.ts`; Wire-Feld vorher per API am laufenden Backend belegt) Im Browser geprüft: Entscheidung erfassen → „Auftrag erteilen" zweimal → Zeitachse zeigt „Folgeauftrag Nr. …" zweimal, Klick selektiert den Auftrag; Überblick zeigt „2 Aufträge"
 - [x] 4.3 `docs/design/2026-09-21-neuentwurf/umsetzung.md`: Folgeauftrag-Verweis aus der Datenlücken-Liste nehmen und Zeile „Entscheidungen" auf den neuen Stand bringen (Neuentscheid Übersicht offen, s. Abschlussmeldung)

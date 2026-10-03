@@ -6,7 +6,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Popconfirm,
   Space,
   Spin,
@@ -40,6 +39,7 @@ import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import TierAnhaenge from './tiere/TierAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { ErfassungsModal } from '../components/Erfassung';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
 /**
@@ -176,11 +176,8 @@ export default function TiereDetailPage() {
         abschluss_grund: v.abschluss_grund,
         abschluss_ziel: v.abschluss_ziel ?? null,
       }),
-    onSuccess: () => {
-      invalidateDetail();
-      setAbschlussOffen(false);
-      abschlussForm.resetFields();
-    },
+    // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`).
+    onSuccess: invalidateDetail,
     onError: fehler,
   });
 
@@ -432,39 +429,36 @@ export default function TiereDetailPage() {
         <TierAnhaenge einsatzId={einsatzId} tier={t} darfSchreiben={darfSchreiben} />
       </Space>
 
-      <Modal
-        open={abschlussOffen}
-        title="Tier abschließen"
-        okText="Abschließen"
-        confirmLoading={abschlussMutation.isPending}
-        onOk={() => abschlussForm.submit()}
-        onCancel={() => {
-          setAbschlussOffen(false);
-          abschlussForm.resetFields();
-        }}
-        destroyOnHidden
+      {/* Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). */}
+      <ErfassungsModal<{ abschluss_grund: AbschlussGrund; abschluss_ziel?: string }>
+        offen={abschlussOffen}
+        titel="Tier abschließen"
+        form={abschlussForm}
+        erfassenText="Abschließen"
+        laeuft={abschlussMutation.isPending}
+        onErfassen={(v) => abschlussMutation.mutateAsync(v)}
+        onFertig={() => setAbschlussOffen(false)}
+        onAbbrechen={() => setAbschlussOffen(false)}
       >
-        <Form form={abschlussForm} layout="vertical" onFinish={abschlussMutation.mutate}>
-          <Form.Item
-            label="Abschlussgrund"
-            name="abschluss_grund"
-            rules={[{ required: true, message: 'Grund ist Pflicht' }]}
-          >
-            <Select
-              options={(Object.keys(TIER_ABSCHLUSS) as AbschlussGrund[]).map((k) => ({
-                value: k,
-                label: TIER_ABSCHLUSS[k],
-              }))}
-            />
-          </Form.Item>
-          <Form.Item
-            label="Ziel (Freitext, z. B. Tierarzt Müller, R-Nr. des Halters)"
-            name="abschluss_ziel"
-          >
-            <Input />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item
+          label="Abschlussgrund"
+          name="abschluss_grund"
+          rules={[{ required: true, message: 'Grund ist Pflicht' }]}
+        >
+          <Select
+            options={(Object.keys(TIER_ABSCHLUSS) as AbschlussGrund[]).map((k) => ({
+              value: k,
+              label: TIER_ABSCHLUSS[k],
+            }))}
+          />
+        </Form.Item>
+        <Form.Item
+          label="Ziel (Freitext, z. B. Tierarzt Müller, R-Nr. des Halters)"
+          name="abschluss_ziel"
+        >
+          <Input />
+        </Form.Item>
+      </ErfassungsModal>
     </EinsatzSeite>
   );
 }

@@ -18,6 +18,7 @@ import {
   meldeSitzungAbgelaufen,
   sitzungsMeldungZuruecksetzen,
 } from './sitzungsEvent';
+import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
 import {
   lagebildAnmelden,
   lagebildBeenden,
@@ -117,11 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Einziger Weg, den Benutzer zu setzen: hält den erwarteten Benutzer der Schreibanfragen
    *  (`api/client.ts`) synchron mit dem Zustand — ein Effekt ließe ein Render-Fenster offen,
-   *  in dem der Tab schon B zeigt, aber noch als A schreibt (oder umgekehrt). */
+   *  in dem der Tab schon B zeigt, aber noch als A schreibt (oder umgekehrt). Aus demselben
+   *  Grund hier gebunden: die behaltenen Erfassungswerte (LFH-785), die eine Maske von B sonst
+   *  mit denen von A vorbelegte. */
   const uebernimm = useCallback((b: BenutzerAnzeige | null) => {
     generation.current++;
     benutzerRef.current = b;
     setzeErwartetenBenutzer(b?.id ?? null);
+    erfassungsSitzungBinden(b?.id ?? null);
     setBenutzer(b);
   }, []);
 
@@ -227,7 +231,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Ohne Serverbestätigung (Netzfehler) bleibt `laedt` stehen, bis der vorgehaltene Stand im
    * Speicher ist — erst er sagt, WER angemeldet ist, und `RequireAuth` rendert bis dahin
    * nichts Geschütztes. Bei einem gültigen Stand ist die Person danach als der zuletzt
-   * bestätigte Benutzer angemeldet, ohne Netz nur lesend. Ein Fremdstand erreicht den
+   * bestätigte Benutzer angemeldet: Sie liest den vorgehaltenen Stand, und was sie erfasst,
+   * geht in die Offline-Queue, nicht auf die Anmeldung (LFH-780, e2e
+   * `lagebild-offline.spec.ts`). Eine 401 nach der Rückkehr des Servers führt wie sonst zur
+   * Anmeldung, die Queue bleibt. Ein Fremdstand erreicht den
    * Speicher nie: wiederhergestellt wird nur der Stand der bestätigten bzw. gespeicherten
    * Identität selbst.
    *

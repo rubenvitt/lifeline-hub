@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import KanalListe, { sortiereKanaele } from './KanalListe';
@@ -143,5 +143,54 @@ describe('KanalListe', () => {
     const name = await screen.findByLabelText('Name');
     await user.type(name, '  Abschnitt Nord  {Enter}');
     await waitFor(() => expect(onKanalAnlegen).toHaveBeenCalledWith('Abschnitt Nord', undefined));
+  });
+  it('behält Name und Beschreibung, wenn die Anlage abgelehnt wird (LFH-795)', async () => {
+    const user = userEvent.setup();
+    const onKanalAnlegen = vi.fn(() => Promise.reject(new Error('409')));
+    renderMitProviders(
+      <KanalListe
+        kanaele={[]}
+        aktiverKanalId={null}
+        onWechsel={vi.fn()}
+        darfSchreiben
+        onKanalAnlegen={onKanalAnlegen}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
+    await user.type(await screen.findByLabelText('Name'), 'Allgemein');
+    await user.type(screen.getByLabelText('Beschreibung (optional)'), 'Doppelt');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(onKanalAnlegen).toHaveBeenCalledWith('Allgemein', 'Doppelt'));
+    // Dialog bleibt offen, die Eingaben stehen noch.
+    expect(screen.getByRole('dialog')).not.toHaveClass('ant-zoom-leave');
+    expect(screen.getByLabelText('Name')).toHaveValue('Allgemein');
+    expect(screen.getByLabelText('Beschreibung (optional)')).toHaveValue('Doppelt');
+  });
+
+  it('schliesst und leert die Anlage erst nach Erfolg (LFH-795)', async () => {
+    const user = userEvent.setup();
+    let erfuellen!: () => void;
+    const onKanalAnlegen = vi.fn(() => new Promise<void>((r) => (erfuellen = r)));
+    renderMitProviders(
+      <KanalListe
+        kanaele={[]}
+        aktiverKanalId={null}
+        onWechsel={vi.fn()}
+        darfSchreiben
+        onKanalAnlegen={onKanalAnlegen}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
+    await user.type(await screen.findByLabelText('Name'), 'Abschnitt Nord');
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(onKanalAnlegen).toHaveBeenCalledTimes(1));
+    // Noch nicht bestätigt: Dialog offen, Wert steht.
+    expect(screen.getByLabelText('Name')).toHaveValue('Abschnitt Nord');
+    await act(async () => erfuellen());
+    // Zu = Ausblend-Animation läuft (jsdom beendet sie nicht).
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveClass('ant-zoom-leave'));
+    // Wieder geöffnet: leer.
+    await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
+    expect(await screen.findByLabelText('Name')).toHaveValue('');
   });
 });
