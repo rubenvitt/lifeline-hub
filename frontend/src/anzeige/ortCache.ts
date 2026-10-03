@@ -1,6 +1,8 @@
 /**
  * Persistenter Cache für Reverse-Geocoding (Koordinate → Ortsname) in IndexedDB, Schlüssel auf
- * ~100 m gerundet wie serverseitig. Ortsnamen ändern sich faktisch nicht → keine Eviction.
+ * ~100 m gerundet wie serverseitig. Ortsnamen ändern sich faktisch nicht → im Betrieb keine
+ * Eviction. Beim Abmelden und Sitzungsende geht er trotzdem ganz (LFH-767, `ortCacheRaeumen`):
+ * er verrät, welche Orte im Einsatz nachgeschlagen wurden.
  * Fehler sind nie fatal: Lesen → null, Schreiben → no-op.
  */
 import { openDB, type IDBPDatabase } from 'idb';
@@ -43,11 +45,8 @@ export async function setzeOrt(key: string, name: string): Promise<void> {
   }
 }
 
-/** Nur für Tests: leert den persistenten Store (Isolation zwischen Testdateien). */
-export async function leereOrtCache(): Promise<void> {
-  try {
-    await (await db()).clear(STORE);
-  } catch {
-    /* idb evtl. nicht verfügbar */
-  }
+/** Abmelden und Sitzungsende (LFH-767): leert den Store auf der Platte. Wirft bei einem
+ *  Fehler — der Aufrufer (`geraetRaeumen`) protokolliert ihn und räumt die übrigen Orte. */
+export async function ortCacheRaeumen(): Promise<void> {
+  await (await db()).clear(STORE);
 }

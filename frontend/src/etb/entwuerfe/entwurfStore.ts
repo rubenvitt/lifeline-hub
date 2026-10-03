@@ -6,8 +6,19 @@ interface EntwurfDB extends DBSchema {
   entwuerfe: {
     key: string;
     value: EtbEntwurf;
-    indexes: { 'by-einsatz': number };
+    indexes: { 'by-einsatz': number; 'by-benutzer-einsatz': [number, number] };
   };
+}
+
+/** Höchstliegezeit ohne angemeldeten Besitzer (LFH-767, design.md D4). */
+const HOECHSTLIEGEZEIT_OHNE_BESITZER_MS = 24 * 60 * 60 * 1000;
+
+/** Merker des aktiven Entwurfs je Person und Einsatz (LFH-767). Der Präfix deckt auch die
+ *  alten Schlüssel `etb-entwurf-aktiv-<einsatz>` ab, die beim Räumen mitgehen. */
+const AKTIV_PRAEFIX = 'etb-entwurf-aktiv-';
+
+export function aktivSchluessel(benutzerId: number, einsatzId: number): string {
+  return `${AKTIV_PRAEFIX}${benutzerId}-${einsatzId}`;
 }
 
 /**
@@ -76,12 +87,35 @@ let dbPromise: Promise<IDBPDatabase<EntwurfDB>> | null = null;
 
 function db(): Promise<IDBPDatabase<EntwurfDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<EntwurfDB>('lifeline-etb-entwuerfe', 1, {
-      upgrade(d) {
-        const store = d.createObjectStore('entwuerfe', { keyPath: 'id' });
-        store.createIndex('by-einsatz', 'einsatz_id');
+    // v2 (LFH-767): Index je Person und Einsatz. Altbestand ohne `benutzer_id` erscheint darin
+    // nicht; `entwuerfeAufraeumen` übernimmt oder verwirft ihn (design.md D5).
+    const geoeffnet = openDB<EntwurfDB>('lifeline-etb-entwuerfe', 2, {
+      upgrade(d, oldVersion, _newVersion, tx) {
+        if (oldVersion < 1) {
+          const store = d.createObjectStore('entwuerfe', { keyPath: 'id' });
+          store.createIndex('by-einsatz', 'einsatz_id');
+        }
+        if (oldVersion < 2) {
+          tx.objectStore('entwuerfe').createIndex('by-benutzer-einsatz', [
+            'benutzer_id',
+            'einsatz_id',
+          ]);
+        }
+      },
+      // Ein Tab mit älterem Bundle hält v1 offen und hat keinen `blocking`-Handler: dann wartet
+      // dieses Upgrade, bis er schließt. Der Auth-Pfad wartet deshalb nie auf die Entwürfe
+      // (LFH-767, `AuthContext.tsx`); hier wird es nur sichtbar gemacht.
+      blocked() {
+        console.warn('ETB-Entwürfe: ein anderer Tab hält die alte Datenbank offen');
+      },
+      // Ein anderer Tab mit neuerem Bundle will upgraden: Verbindung freigeben, der nächste
+      // Zugriff öffnet neu. Sonst hinge dessen Upgrade, bis dieser Tab schließt.
+      blocking() {
+        void geoeffnet.then((d) => d.close());
+        if (dbPromise === geoeffnet) dbPromise = null;
       },
     });
+    dbPromise = geoeffnet;
   }
   return dbPromise;
 }
@@ -109,8 +143,9 @@ async function vorlaufNachtragen(d: IDBPDatabase<EntwurfDB>): Promise<void> {
   for (const { id, stand } of offen) quittieren(id, stand);
 }
 
-/** Entwürfe eines Einsatzes, aufsteigend nach erstellt_at (älteste zuerst → stabile Tab-Reihenfolge). */
-export async function entwuerfeLaden(einsatzId: number): Promise<EtbEntwurf[]> {
+/** Entwürfe einer Person in einem Einsatz, aufsteigend nach erstellt_at (älteste zuerst →
+ *  stabile Tab-Reihenfolge). Fremde Entwürfe liefert der Index nie (LFH-767). */
+export async function entwuerfeLaden(benutzerId: number, einsatzId: number): Promise<EtbEntwurf[]> {
   const d = await db();
   try {
     await vorlaufNachtragen(d);
@@ -118,7 +153,7 @@ export async function entwuerfeLaden(einsatzId: number): Promise<EtbEntwurf[]> {
     // Ein unlesbarer Vorlauf darf die Erfassung nicht sperren; er bleibt für den nächsten Versuch.
     console.warn('ETB-Entwürfe: Vorlauf ließ sich nicht nachtragen', fehler);
   }
-  const alle = await d.getAllFromIndex('entwuerfe', 'by-einsatz', einsatzId);
+  const alle = await d.getAllFromIndex('entwuerfe', 'by-benutzer-einsatz', [benutzerId, einsatzId]);
   return alle.sort((a, b) => a.erstellt_at.localeCompare(b.erstellt_at));
 }
 
@@ -134,6 +169,55 @@ export async function entwurfEntfernen(id: string): Promise<void> {
   const d = await db();
   await d.delete('entwuerfe', id);
   quittieren(id, stand);
+}
+
+/** Abmelden (LFH-767, design.md D2): alle Entwürfe samt Vorlauf und Aktiv-Merkern. Wirft bei
+ *  einem Plattenfehler — `geraetRaeumen` protokolliert ihn und räumt die übrigen Orte. */
+export async function entwuerfeRaeumen(): Promise<void> {
+  for (const id of vorlaufIds()) localStorage.removeItem(VORLAUF_PRAEFIX + id);
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith(AKTIV_PRAEFIX)) localStorage.removeItem(k);
+    }
+  } catch {
+    // localStorage gesperrt: dann liegt dort auch kein Merker.
+  }
+  const d = await db();
+  await d.clear('entwuerfe');
+}
+
+/**
+ * Start und Anmeldung (LFH-767, design.md D4/D5). Mit bestätigter Person gehen alle fremden
+ * Entwürfe, eigene bleiben unabhängig vom Alter. Ohne Person gehen nur Entwürfe, deren letzte
+ * Änderung länger als 24 h zurückliegt. Altbestand ohne Besitzer übernimmt die bestätigte Person
+ * einmalig, wenn er höchstens 24 h alt ist — so sah ihn vor LFH-767 ohnehin jeder Benutzer.
+ *
+ * Der Vorlauf wird vorher nachgetragen, damit auch ein fremder Entwurf dort erfasst wird.
+ */
+export async function entwuerfeAufraeumen(benutzerId: number | null, jetzt: number): Promise<void> {
+  const d = await db();
+  try {
+    await vorlaufNachtragen(d);
+  } catch (fehler) {
+    // Wie in `entwuerfeLaden`: ein unlesbarer Vorlauf darf das Räumen der Platte nicht sperren.
+    console.warn('ETB-Entwürfe: Vorlauf ließ sich nicht nachtragen', fehler);
+  }
+  const grenze = jetzt - HOECHSTLIEGEZEIT_OHNE_BESITZER_MS;
+  const tx = d.transaction('entwuerfe', 'readwrite');
+  let cursor = await tx.store.openCursor();
+  while (cursor) {
+    // Altbestand aus v1 trägt keinen Besitzer, obwohl der Typ ihn verlangt.
+    const e = cursor.value as Omit<EtbEntwurf, 'benutzer_id'> & { benutzer_id?: number };
+    const abgelaufen = Date.parse(e.geaendert_at) < grenze;
+    if (e.benutzer_id === undefined) {
+      if (abgelaufen) await cursor.delete();
+      else if (benutzerId !== null) await cursor.update({ ...e, benutzer_id: benutzerId });
+    } else if (benutzerId !== null ? e.benutzer_id !== benutzerId : abgelaufen) {
+      await cursor.delete();
+    }
+    cursor = await cursor.continue();
+  }
+  await tx.done;
 }
 
 /** Nur für Tests: leert den Store (fake-indexeddb persistiert sonst zwischen Tests). */

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
-import { holeOrt, leereOrtCache, ortKeyVon, setzeOrt } from './ortCache';
+import { holeOrt, ortCacheRaeumen, ortKeyVon, setzeOrt } from './ortCache';
 import { useOrtVorschau } from './useOrtVorschau';
 
 function wrapper(client = neuerQueryClient()) {
@@ -14,7 +14,7 @@ function wrapper(client = neuerQueryClient()) {
   );
 }
 
-afterEach(() => leereOrtCache());
+afterEach(() => ortCacheRaeumen());
 
 describe('useOrtVorschau', () => {
   it('ruft nach Debounce und liefert die Antwort', async () => {

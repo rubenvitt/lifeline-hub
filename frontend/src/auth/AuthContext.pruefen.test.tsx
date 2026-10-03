@@ -443,7 +443,7 @@ describe('An- und Abmelden über mehrere Tabs (LFH-387)', () => {
       await userEvent.click(screen.getByText('logout'));
       await waitFor(() => expect(ergebnisLogout).toBe(true));
       expect(screen.getByTestId('name')).toHaveTextContent('anonym');
-      await waitFor(() => expect(ohr.gehoert).toEqual([{ art: 'abgemeldet' }]));
+      await waitFor(() => expect(ohr.gehoert).toEqual([{ art: 'abgemeldet', anlass: 'abmelden' }]));
       expect(await kopfBeimSchreiben()).toBeNull();
     } finally {
       ohr.schliessen();
@@ -470,7 +470,9 @@ describe('An- und Abmelden über mehrere Tabs (LFH-387)', () => {
       sitzung = null;
       pruefenAnstossen();
       await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
-      await waitFor(() => expect(ohr.gehoert).toEqual([{ art: 'abgemeldet' }]));
+      await waitFor(() =>
+        expect(ohr.gehoert).toEqual([{ art: 'abgemeldet', anlass: 'sitzungsende' }]),
+      );
     } finally {
       ohr.schliessen();
     }

@@ -11,6 +11,7 @@ import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
 import { useEntwurfsVersand, type EntwurfsVersand } from './useEntwurfsVersand';
 import { anVorbelegung } from '../../fuehrung/funktionsOptionenKern';
 import { IconKreuz } from '../../icons';
+import { useAuth } from '../../auth/AuthContext';
 
 interface EtbEntwurfsTabsProps {
   einsatzId: number;
@@ -71,6 +72,7 @@ export default function EtbEntwurfsTabs({
   versand: versandVonAussen,
 }: EtbEntwurfsTabsProps) {
   const { token } = theme.useToken();
+  const benutzerId = useAuth().benutzer?.id ?? null;
   const {
     entwuerfe,
     aktiverId,
@@ -80,7 +82,7 @@ export default function EtbEntwurfsTabs({
     entwurfFesthalten,
     entwurfNeuAusweisen,
     aktivenSetzen,
-  } = useEtbEntwuerfe(einsatzId, anVorbelegung(einsatz), kontextLaedt);
+  } = useEtbEntwuerfe(benutzerId, einsatzId, anVorbelegung(einsatz), kontextLaedt);
 
   /**
    * Wertübernahme über die Remount-Grenze (LFH-332).

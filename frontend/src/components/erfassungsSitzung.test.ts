@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { liesErfassungsSitzungswert, schreibeErfassungsSitzungswert } from './erfassungsSitzung';
+import {
+  erfassungsSitzungRaeumen,
+  liesErfassungsSitzungswert,
+  schreibeErfassungsSitzungswert,
+} from './erfassungsSitzung';
 
 const PERSON_1_ORT = 'lfh:erfassung:1:person:antreff_ort';
 
@@ -64,5 +68,25 @@ describe('erfassungsSitzung', () => {
         expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBeUndefined();
       },
     );
+  });
+});
+
+describe('erfassungsSitzungRaeumen (LFH-767)', () => {
+  it('entfernt alle Erfassungswerte und lässt fremde Schlüssel stehen', () => {
+    schreibeErfassungsSitzungswert(1, 'person', 'antreff_ort', 'Sammelstelle Süd');
+    schreibeErfassungsSitzungswert(2, 'schaden', 'ort', 'Deich km 3');
+    sessionStorage.setItem('fremd', 'bleibt');
+
+    erfassungsSitzungRaeumen();
+
+    expect(sessionStorage.getItem(PERSON_1_ORT)).toBeNull();
+    expect(liesErfassungsSitzungswert(2, 'schaden', 'ort')).toBeUndefined();
+    expect(sessionStorage.getItem('fremd')).toBe('bleibt');
+  });
+
+  it('wirft nicht ohne sessionStorage', () => {
+    mitSessionStorage(undefined, () => {
+      expect(() => erfassungsSitzungRaeumen()).not.toThrow();
+    });
   });
 });

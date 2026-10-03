@@ -7,9 +7,13 @@ import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './en
 import type { EtbEntwurf } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 
+/** Angemeldete Person (LFH-767): Der Hook lädt und schreibt nur ihre Entwürfe. */
+const ICH = 11;
+
 function entwurf(over: Partial<EtbEntwurf> = {}): EtbEntwurf {
   return {
     id: 'vorhanden',
+    benutzer_id: ICH,
     einsatz_id: 7,
     inhalt: 'Bestand',
     typ: 'meldung',
@@ -36,7 +40,7 @@ describe('useEtbEntwuerfe', () => {
         freigeben = resolve;
       }),
     );
-    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(7, stelle), {
+    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(ICH, 7, stelle), {
       initialProps: { stelle: 'Alter Cache' },
     });
     await waitFor(() => expect(laden).toHaveBeenCalledTimes(1));
@@ -50,7 +54,7 @@ describe('useEtbEntwuerfe', () => {
   });
 
   it('LFH-461: nur der erste neue Entwurf bekommt die Stelle; Rerender und Folgeentwürfe nicht', async () => {
-    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(7, stelle), {
+    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(ICH, 7, stelle), {
       initialProps: { stelle: 'Florian Leitung' },
     });
     await waitFor(() => expect(result.current.entwuerfe[0]?.an).toBe('Florian Leitung'));
@@ -70,14 +74,14 @@ describe('useEtbEntwuerfe', () => {
     'LFH-461: geladener Entwurf bleibt maßgeblich (%s)',
     async (an) => {
       await entwurfSpeichern(entwurf({ an }));
-      const { result } = renderHook(() => useEtbEntwuerfe(7, 'Florian Leitung'));
+      const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7, 'Florian Leitung'));
       await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
       expect(result.current.entwuerfe[0].an).toBe(an);
     },
   );
 
   it('garantiert nach dem Laden mindestens einen (leeren) Entwurf', async () => {
-    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
     expect(result.current.entwuerfe[0].inhalt).toBe('');
     expect(result.current.aktiverId).toBe(result.current.entwuerfe[0].id);
@@ -85,28 +89,28 @@ describe('useEtbEntwuerfe', () => {
 
   it('lädt vorhandene Entwürfe statt einen neuen anzulegen', async () => {
     await entwurfSpeichern(entwurf());
-    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
     expect(result.current.entwuerfe[0].inhalt).toBe('Bestand');
   });
 
   it('persistiert einen Entwurf erst bei nicht-leerer Aktualisierung', async () => {
-    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
     const id = result.current.entwuerfe[0].id;
 
     // leerer Default-Tab ist NICHT in idb
-    expect(await entwuerfeLaden(7)).toHaveLength(0);
+    expect(await entwuerfeLaden(ICH, 7)).toHaveLength(0);
 
     await act(async () => {
       result.current.entwurfAktualisieren(id, { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} });
     });
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
-    expect((await entwuerfeLaden(7))[0].inhalt).toBe('Pumpe');
+    await waitFor(async () => expect(await entwuerfeLaden(ICH, 7)).toHaveLength(1));
+    expect((await entwuerfeLaden(ICH, 7))[0].inhalt).toBe('Pumpe');
   });
 
   it('LFH-748: ein geleerter Entwurf mit `festhalten` bleibt gespeichert, ohne fällt er weg', async () => {
-    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
     const id = result.current.entwuerfe[0].id;
     const leer = { inhalt: '', typ: 'meldung' as const, metadaten: {} };
@@ -114,24 +118,24 @@ describe('useEtbEntwuerfe', () => {
     await act(async () => {
       result.current.entwurfAktualisieren(id, { ...leer, inhalt: 'Pumpe' });
     });
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+    await waitFor(async () => expect(await entwuerfeLaden(ICH, 7)).toHaveLength(1));
 
     // Trägt der Entwurf Dateien, reicht der Aufrufer `festhalten`: der geleerte Stand wird
     // gespeichert — nicht entfernt und nicht mit dem alten Text.
     await act(async () => {
       result.current.entwurfAktualisieren(id, leer, { festhalten: true });
     });
-    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe(''));
-    expect(await entwuerfeLaden(7)).toHaveLength(1);
+    await waitFor(async () => expect((await entwuerfeLaden(ICH, 7))[0]?.inhalt).toBe(''));
+    expect(await entwuerfeLaden(ICH, 7)).toHaveLength(1);
 
     await act(async () => {
       result.current.entwurfAktualisieren(id, leer);
     });
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
+    await waitFor(async () => expect(await entwuerfeLaden(ICH, 7)).toHaveLength(0));
   });
 
   it('neuerEntwurf öffnet einen weiteren Tab und aktiviert ihn', async () => {
-    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
     act(() => result.current.neuerEntwurf());
     expect(result.current.entwuerfe).toHaveLength(2);
@@ -140,20 +144,20 @@ describe('useEtbEntwuerfe', () => {
 
   it('entwurfSchliessen entfernt aus idb; beim letzten entsteht ein neuer leerer', async () => {
     await entwurfSpeichern(entwurf({ id: 'x', inhalt: 'A' }));
-    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
 
     await act(async () => {
       await result.current.entwurfSchliessen('x');
     });
-    expect(await entwuerfeLaden(7)).toHaveLength(0);
+    expect(await entwuerfeLaden(ICH, 7)).toHaveLength(0);
     expect(result.current.entwuerfe).toHaveLength(1); // neuer leerer Tab
     expect(result.current.entwuerfe[0].inhalt).toBe('');
   });
 
   it('persistiert unter StrictMode nur einmal — keine idb-Writes im setEntwuerfe-Updater (LFH-216)', async () => {
     const speichernSpy = vi.spyOn(entwurfStore, 'entwurfSpeichern');
-    const { result } = renderHook(() => useEtbEntwuerfe(7), { wrapper: StrictMode });
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7), { wrapper: StrictMode });
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
     const id = result.current.entwuerfe[0].id;
     speichernSpy.mockClear();
@@ -161,7 +165,7 @@ describe('useEtbEntwuerfe', () => {
     await act(async () => {
       result.current.entwurfAktualisieren(id, { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} });
     });
-    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+    await waitFor(async () => expect(await entwuerfeLaden(ICH, 7)).toHaveLength(1));
 
     // Der setEntwuerfe-Updater wird unter StrictMode doppelt invoked; liegt der idb-Write
     // im Updater, läuft er doppelt. Aus dem Updater gezogen → genau ein Write.
@@ -176,7 +180,7 @@ describe('useEtbEntwuerfe', () => {
     await entwurfSpeichern(entwurf({ id: 'A', inhalt: 'A' }));
     await entwurfSpeichern(entwurf({ id: 'B', inhalt: 'B' }));
     await entwurfSpeichern(entwurf({ id: 'C', inhalt: 'C' }));
-    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
     await waitFor(() => expect(result.current.entwuerfe).toHaveLength(3));
 
     await act(async () => {
