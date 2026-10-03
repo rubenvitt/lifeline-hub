@@ -46,6 +46,7 @@ import {
   ZEICHEN_KARTEN_PX,
   type ZeichenQuelle,
 } from './markerIcons';
+import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
 import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
@@ -592,6 +593,16 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         // Kein Bild ist besser als ein Fehler im Resolver; der Marker bleibt klickbar.
       }
     });
+    // Wechselt die Pixeldichte (anderer Monitor, Browser-Zoom), rastern die schon angelegten
+    // Fachobjekt-Zeichen neu, sonst blieben sie bis zum nächsten Stilwechsel unscharf (LFH-842).
+    // Nur bei einer anderen Rasterdichte: 1,25 → 1,5 bleibt bei 2.
+    let zeichenDichte = kartenPixelRatio(window.devicePixelRatio);
+    const pixeldichteAbmelden = beobachtePixeldichte(window, (dpr) => {
+      const neu = kartenPixelRatio(dpr);
+      if (neu === zeichenDichte) return;
+      zeichenDichte = neu;
+      rastereZeichenNeu(map, zeichenRegistryRef.current, neu);
+    });
     // Taktische Zeichen lazy als Karten-Icons: MapLibre meldet fehlende icon-image-IDs, wir rendern
     // on-demand. Race-Guard, weil das Event während des asynchronen Ladens mehrfach für dieselbe ID
     // feuern kann (sonst wirft addImage "image already exists").
@@ -643,6 +654,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // Zeile weg.
     if (import.meta.env.DEV) (window as unknown as { __lfhKarte?: unknown }).__lfhKarte = map;
     return () => {
+      pixeldichteAbmelden();
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
       // Testhaken mit abräumen: sonst zeigte er auf eine entfernte Map, und ein späterer Test wäre

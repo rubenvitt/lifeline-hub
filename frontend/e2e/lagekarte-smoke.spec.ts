@@ -369,6 +369,23 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
 test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
   test.use({ deviceScaleFactor: 2 });
 
+  /** Die `ez|`-Bilder der Karte mit Rasterbreite, und ob das Einsatzort-Zeichen gezeichnet ist. */
+  const einsatzortZeichen = (page: Page) =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+      // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
+      if (!map?.isStyleLoaded()) return null;
+      return map
+        .listImages()
+        .filter((id) => id.startsWith('ez|'))
+        .map((id) => ({
+          id,
+          breite: map.getImage(id)?.data.width,
+          // Registriert ist nicht gezeichnet: das Symbol muss im Layer stehen.
+          gezeichnet: map.queryRenderedFeatures({ layers: ['marker-einsatzort-symbol'] }).length,
+        }));
+    });
+
   test('Einsatzort-Zeichen in Bildschirmschärfe, auch nach einem Stilwechsel', async ({ page }) => {
     await anmelden(page);
     const eid = await einsatzAnlegenUndOeffnen(page);
@@ -378,21 +395,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
       1,
     );
 
-    const zeichenBilder = () =>
-      page.evaluate(() => {
-        const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
-        // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
-        if (!map?.isStyleLoaded()) return null;
-        return map
-          .listImages()
-          .filter((id) => id.startsWith('ez|'))
-          .map((id) => ({
-            id,
-            breite: map.getImage(id)?.data.width,
-            // Registriert ist nicht gezeichnet: das Symbol muss im Layer stehen.
-            gezeichnet: map.queryRenderedFeatures({ layers: ['marker-einsatzort-symbol'] }).length,
-          }));
-      });
+    const zeichenBilder = () => einsatzortZeichen(page);
 
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'kein @einsatzzeichen-Bild auf der Karte' })
@@ -406,6 +409,44 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'Zeichen nach Stilwechsel nicht zurück' })
       .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
+  });
+
+  // LFH-842: Wandert das Fenster auf einen Monitor anderer Dichte (oder ändert sich der Zoom),
+  // rastern die schon angelegten Zeichen neu: Breite 34 × ceil(dpr). Den Wechsel löst die
+  // Geräte-Emulation über CDP aus, wie ihn der Browser beim Monitorwechsel meldet (die
+  // `resolution`-Abfrage kippt). Zweimal, damit auch der zweite Wechsel ankommt.
+  test('Zeichen rastern nach einem Wechsel der Pixeldichte neu', async ({ page }) => {
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    await einsatzortSetzen(page, eid, { lat: 49.3519, lon: 9.1457 });
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+    const id = 'ez|{"v":1,"spec":{"kind":"event"}}';
+    await expect
+      .poll(() => einsatzortZeichen(page), { timeout: 15_000 })
+      .toEqual([{ id, breite: 68, gezeichnet: 1 }]);
+
+    const cdp = await page.context().newCDPSession(page);
+    const { width, height } = page.viewportSize()!;
+    for (const [dichte, breite] of [
+      [1, 34],
+      [1.5, 68],
+    ]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width,
+        height,
+        deviceScaleFactor: dichte,
+        mobile: false,
+      });
+      await expect
+        .poll(() => einsatzortZeichen(page), {
+          timeout: 15_000,
+          message: `Zeichen nicht in Dichte ${dichte} neu gerastert`,
+        })
+        .toEqual([{ id, breite, gezeichnet: 1 }]);
+    }
   });
 
   // Gezählt wird, was GEZEICHNET ist, nicht, was registriert ist: MapLibre 6 baut die Bildantwort
