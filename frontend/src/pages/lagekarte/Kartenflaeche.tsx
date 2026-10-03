@@ -81,12 +81,15 @@ import {
   ABSCHNITT_KLICK_LAYER,
   ZONEN_KLICK_LAYER,
   entscheideKlickziel,
+  istOrtsziel,
   ordneKlickebene,
   type Flaechenziel,
   type Klickziel,
 } from './klickziel';
 import { fachebeneQuelleVon, flaechenKennung } from './flaechenwahl';
 import FlaechenwahlMenue from './FlaechenwahlMenue';
+import PunktankerMenue, { type PunktankerMenueProps } from './PunktankerMenue';
+import { erzeugeNachklickRiegel } from './nachklickRiegel';
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
@@ -152,6 +155,24 @@ function transformiereKartenAnfrage(url: string): { url: string } {
 
 // Re-Export: LagekartePage importiert ZoneFeature aus Kartenflaeche.
 export type { ZoneFeature };
+
+/** Eine Stelle der Karte, an der das Kontextmenü geöffnet wurde (LFH-776). */
+export interface KartenKontextPunkt {
+  lng: number;
+  lat: number;
+  /** Rechtsklick oder langer Druck — der Dialog „Zeichen hier setzen“ fokussiert nur bei Maus. */
+  quelle: 'maus' | 'touch';
+}
+
+/** Kontextmenü an der Kartenstelle (LFH-776, Spec `lagekarte-kontextmenue`). */
+export interface KartenKontextmenue {
+  /** Kopf und Einträge für die Stelle; die Rechte prüft die Ableitung beim Aufrufer. */
+  inhalt: (punkt: KartenKontextPunkt) => {
+    kopf: PunktankerMenueProps['kopf'];
+    items: PunktankerMenueProps['items'];
+  };
+  onWaehlen: (key: string, punkt: KartenKontextPunkt) => void;
+}
 
 export interface KartenflaecheProps {
   style: StyleSpecification | string;
@@ -220,6 +241,16 @@ export interface KartenflaecheProps {
   flaechenwahl?: boolean;
   /** Messwerkzeug: aktive Form oder `null`. */
   messen?: MessForm | null;
+  /**
+   * Erster Punkt der Messung („Messen ab hier“, LFH-776); gesetzt wird er einmal je `nr`, direkt
+   * nach dem Start der Messung.
+   */
+  messStart?: { lng: number; lat: number; nr: number } | null;
+  /**
+   * Kontextmenü an der Kartenstelle per Rechtsklick oder langem Druck (LFH-776). `null` sperrt es —
+   * in einem exklusiven Modus gehört die Karte dem Modus. Vorgabe gesperrt.
+   */
+  kontextmenue?: KartenKontextmenue | null;
   /** Laufender bzw. abgeschlossener Messentwurf; `null` = nichts gesetzt. */
   onMessung?: (geometrie: MessGeometrie | null, fertig: boolean) => void;
   /** Aktive Fachebenen mit Daten (externe Overlays). */
@@ -349,6 +380,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onZoneKlick,
     flaechenwahl = false,
     messen,
+    messStart = null,
+    kontextmenue = null,
     onMessung,
     onZeichnenStandAenderung,
     eigenposition,
@@ -873,6 +906,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       const ziel = klickzielAm(map, e);
       if (ziel?.art !== 'mehrdeutig' || !flaechenwahlRef.current) return;
       nr += 1;
+      setOffenesKontextmenue(null);
       setOffeneWahl({
         nr,
         x: e.point.x,
@@ -894,6 +928,55 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   useEffect(() => {
     if (!flaechenwahl) setOffeneWahl(null);
   }, [flaechenwahl]);
+
+  // Kontextmenü an der Kartenstelle (LFH-776, `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md`
+  // D2/D3): maplibre meldet Rechtsklick UND langen Druck (ab 6.11) als `contextmenu`. Es öffnet nur
+  // an einem Ort (`istOrtsziel`: freie Karte, Fläche), nicht auf Punktziel oder Trefferzone. Der
+  // Nachklick-Riegel hängt VOR jedem Dropdown am `window`: nach einem langen Druck schlössen die
+  // Ereignisse des Abhebens das Menü sonst sofort oder landeten als Tipp auf der Karte.
+  const [offenesKontextmenue, setOffenesKontextmenue] = useState<{
+    nr: number;
+    x: number;
+    y: number;
+    punkt: KartenKontextPunkt;
+  } | null>(null);
+  const kontextmenueRef = useRef(kontextmenue);
+  kontextmenueRef.current = kontextmenue;
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return;
+    const riegel = erzeugeNachklickRiegel(container);
+    let nr = 0;
+    const kontext = (e: maplibregl.MapMouseEvent) => {
+      if (!kontextmenueRef.current || !istOrtsziel(klickzielAm(map, e))) return;
+      // Erst hier, wenn das Menü wirklich öffnet: ein langer Druck schärft den Riegel.
+      const quelle = riegel.quelleFuerKontextmenue();
+      nr += 1;
+      setOffeneWahl(null);
+      setOffenesKontextmenue({
+        nr,
+        x: e.point.x,
+        y: e.point.y,
+        punkt: { lng: e.lngLat.lng, lat: e.lngLat.lat, quelle },
+      });
+    };
+    // Der Anker sitzt in Pixeln; bei jeder Kartenbewegung schließt das Menü.
+    const schliesse = () => setOffenesKontextmenue(null);
+    map.on('contextmenu', kontext);
+    map.on('movestart', schliesse);
+    return () => {
+      map.off('contextmenu', kontext);
+      map.off('movestart', schliesse);
+      riegel.abbauen();
+    };
+  }, []);
+  const kontextmenueGesperrt = kontextmenue == null;
+  useEffect(() => {
+    if (kontextmenueGesperrt) setOffenesKontextmenue(null);
+  }, [kontextmenueGesperrt]);
+  const kontextInhalt =
+    offenesKontextmenue && kontextmenue ? kontextmenue.inhalt(offenesKontextmenue.punkt) : null;
 
   const waehleFlaeche = (
     ziel: Flaechenziel<maplibregl.MapGeoJSONFeature>,
@@ -1472,6 +1555,15 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
   }, [messen]);
 
+  // „Messen ab hier“ (LFH-776, D6): nach dem Start genau einmal je `nr` den ersten Punkt setzen. Ein
+  // Formwechsel startet neu und setzt ihn bewusst nicht noch einmal.
+  const messStartGesetzt = useRef<number | null>(null);
+  useEffect(() => {
+    if (!messen || !messStart || messStartGesetzt.current === messStart.nr) return;
+    messStartGesetzt.current = messStart.nr;
+    messRef.current?.setzeStartpunkt(messStart);
+  }, [messen, messStart]);
+
   // Controller bei Unmount sauber zerstören.
   useEffect(
     () => () => {
@@ -1568,6 +1660,19 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           if (ziel && offeneWahl) waehleFlaeche(ziel, offeneWahl.lngLat);
         }}
         onSchliessen={() => setOffeneWahl(null)}
+        fokusZiel={() => mapRef.current?.getCanvas() ?? null}
+      />
+      <PunktankerMenue
+        key={`kontext-${offenesKontextmenue?.nr}`}
+        anker={kontextInhalt && offenesKontextmenue}
+        ariaLabel="Aktionen an dieser Stelle"
+        ankerKennung="kontextmenue-anker"
+        kopf={kontextInhalt?.kopf}
+        items={kontextInhalt?.items ?? []}
+        onWaehlen={(key) => {
+          if (offenesKontextmenue) kontextmenue?.onWaehlen(key, offenesKontextmenue.punkt);
+        }}
+        onSchliessen={() => setOffenesKontextmenue(null)}
         fokusZiel={() => mapRef.current?.getCanvas() ?? null}
       />
     </div>

@@ -6,14 +6,14 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
 
 ## 1. Gemeinsame Schale des Punktanker-Menüs (D1)
 
-- [ ] 1.1 `PunktankerMenue.test.tsx` zuerst schreiben, mit diesen Fällen, und rot belegen:
+- [x] 1.1 `PunktankerMenue.test.tsx` zuerst schreiben, mit diesen Fällen, und rot belegen:
   - Einträge in Reihenfolge, `aria-label`
   - ArrowDown+Enter wählt und ruft `onSchliessen`
   - Esc schließt ohne Wahl
   - Fokus zurück an `fokusZiel`, auch beim Aushängen
   - `escGehoertOverlay` ist bei offenem Menü wahr
   - eine antd-Gruppe (Kopf) ist nicht wählbar
-- [ ] 1.2 `pages/lagekarte/PunktankerMenue.tsx` aus `FlaechenwahlMenue.tsx` herauslösen und
+- [x] 1.2 `pages/lagekarte/PunktankerMenue.tsx` aus `FlaechenwahlMenue.tsx` herauslösen und
   `punktmenueEintragStil(token)` in die Schale verschieben. `flaechenwahlEintragStil` bleibt als
   Wiederexport, `FlaechenwahlMenue` wird zur Hülle. Fertig, wenn diese Tests grün sind:
   - Tests aus 1.1
@@ -22,24 +22,24 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
 
 ## 2. Ortsziel und Einträge (D2, D4)
 
-- [ ] 2.1 `klickziel.test.ts`: Fälle für `istOrtsziel` ergänzen und rot belegen.
+- [x] 2.1 `klickziel.test.ts`: Fälle für `istOrtsziel` ergänzen und rot belegen.
   - wahr: `null`, `zone`, `abschnitt`, `mehrdeutig`, Fachebenen-Fläche (`fachebene-dwd-fill`)
   - falsch: `marker` (Zeichen und Trefferzone), `personenCluster`, Fachebenen-Punkt, -Bündel
     und -Trefferzone
 
   Danach `istOrtsziel` in `klickziel.ts` umsetzen, bis die Tests grün sind.
-- [ ] 2.2 `kontextmenue.test.ts`: Fälle zuerst, rot belegen.
+- [x] 2.2 `kontextmenue.test.ts`: Fälle zuerst, rot belegen.
   - mit Schreibrecht: `kopieren`, `messen`, `zeichen` in dieser Reihenfolge
   - ohne Schreibrecht: kein `zeichen`, auch nicht gesperrt
   - kein Eintrag mit `gefahr`
-  - die Items aus `kontextMenueItems(eintraege, kopf)` haben eine Gruppe mit dem Kopftext und
-    darin die Einträge mit `punktmenueEintragStil`
+  - die antd-Items entstehen über `menueEintraege()` (LFH-365), Schlüssel und Texte in
+    Reihenfolge; der Kopf (Koordinate) steht über `kopf` der Schale, nicht als Gruppe (D4)
 
   Danach `pages/lagekarte/kontextmenue.ts` umsetzen, bis die Tests grün sind.
 
 ## 3. Nachklick-Riegel (D3)
 
-- [ ] 3.1 `nachklickRiegel.test.ts` (jsdom) zuerst, rot belegen:
+- [x] 3.1 `nachklickRiegel.test.ts` (jsdom) zuerst, rot belegen:
   - **ohne Scharfschalten** läuft `mousedown`, `click` und `contextmenu` am `window` durch
   - **scharf** nach `touchstart` + `contextmenu`: `contextmenu`, `mousedown`, `mouseup` und
     `click` erreichen einen später am `window` (Capture) angemeldeten Hörer nicht
@@ -47,19 +47,19 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
   - ein neues `touchstart` löst den Riegel sofort
   - ein Rechtsklick mit der Maus (`contextmenu` ohne liegenden Finger) schaltet nicht scharf
   - `abbauen()` entfernt alle Hörer
-- [ ] 3.2 `pages/lagekarte/nachklickRiegel.ts` umsetzen und die Tests aus 3.1 grün machen. Den
+- [x] 3.2 `pages/lagekarte/nachklickRiegel.ts` umsetzen und die Tests aus 3.1 grün machen. Den
   Rückgabewert `quelle: 'maus' | 'touch'` für ein `contextmenu` als reine Funktion mit eigenem
   Test.
 
 ## 4. Startpunkt fürs Messen (D6)
 
-- [ ] 4.1 `messZeichnung.test.ts` zuerst, rot belegen: `setzeStartpunkt({lng,lat})` feuert am
+- [x] 4.1 `messZeichnung.test.ts` zuerst, rot belegen: `setzeStartpunkt({lng,lat})` feuert am
   Kartenelement `pointerdown` und `pointerup` an der projizierten Bildschirmstelle (Canvas-Rect
   plus `map.project`). Ohne aktive Messung tut es nichts. Die terra-draw-Instanz und den Adapter
   dafür über `vi.mock` ersetzen, nach dem Muster vorhandener terra-draw-Tests (falls keiner
   existiert: Kartenattrappe mit `getCanvas`, `project`, `getContainer`).
-- [ ] 4.2 `setzeStartpunkt` in `messZeichnung.ts` umsetzen und die Tests aus 4.1 grün machen.
-- [ ] 4.3 `useKartenInteraktion.ts`:
+- [x] 4.2 `setzeStartpunkt` in `messZeichnung.ts` umsetzen und die Tests aus 4.1 grün machen.
+- [x] 4.3 `useKartenInteraktion.ts`:
   - `onMessenAb(punkt)` startet `messen`/`strecke` und setzt `messStart {lng,lat,nr}`
   - beim Ende des Messens wird `messStart` geleert
   - `Kartenflaeche`: Prop `messStart`; der Messen-Effekt ruft nach `starten` einmal je `nr`
@@ -70,7 +70,7 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
 
 ## 5. Kontextmenü verdrahten (D2, D3, D5, D7)
 
-- [ ] 5.1 `ZeichenHierDialog.test.tsx` zuerst, rot belegen:
+- [x] 5.1 `ZeichenHierDialog.test.tsx` zuerst, rot belegen:
   - Titel „Zeichen hier setzen“
   - „Setzen“ ruft `onSetzen(spec)`
   - während `laeuft` ist „Setzen“ gesperrt, ein zweiter Klick ruft nichts
@@ -79,20 +79,20 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
   - `autoFokus` nur bei `quelle: 'maus'`
 
   Danach `pages/lagekarte/ZeichenHierDialog.tsx` umsetzen, bis die Tests grün sind.
-- [ ] 5.2 `useKartenInteraktion.ts`: `legeZeichenAnPunkt(spec, punkt)` als eigene Mutation
+- [x] 5.2 `useKartenInteraktion.ts`: `legeZeichenAnPunkt(spec, punkt)` als eigene Mutation
   (`legeFreiesZeichenAn` mit `ansicht_id`, `merkeZuletztVerwendet`, Invalidierung `freieZeichen`,
   Guard über `isPending` und `darfSchreiben`). Vitest mit gemockter API: ein Aufruf legt an und
   merkt das Zeichen, ein zweiter Aufruf während `isPending` legt nichts an.
-- [ ] 5.3 `Kartenflaeche.tsx`:
+- [x] 5.3 `Kartenflaeche.tsx`:
   - Prop `kontextmenue` (Ref) und `contextmenu`-Hörer mit `istOrtsziel`
   - Menüzustand `offenesKontextmenue`; `movestart` schließt, die Prop `null` schließt
   - Kontextmenü und Flächenwahl schließen sich gegenseitig
   - Riegel aus Aufgabe 3 beim Mounten anmelden, beim Unmount abbauen
-  - `KartenKontextMenue` (dünne Hülle über `PunktankerMenue`, `aria-label="Aktionen an dieser
-    Stelle"`) im Rahmen einhängen
+  - `PunktankerMenue` mit `aria-label="Aktionen an dieser Stelle"` und Kopf direkt im Rahmen
+    einhängen (keine eigene Hülle nötig)
 
   Bestehende Vitests der Lagekarte bleiben grün.
-- [ ] 5.4 `LagekartePage.tsx`:
+- [x] 5.4 `LagekartePage.tsx`:
   - `kontextmenue` nur ohne exklusiven Modus übergeben
   - `eintraege` aus `kontextEintraege({ darfSchreiben })` mit Kopf `formatKoordinate(lat, lon)`
   - `kopieren`: Zwischenablage und Quittung, Fehler mit Koordinate im Text

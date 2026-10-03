@@ -190,6 +190,15 @@ export function useKartenInteraktion({
   const [selektion, setSelektion] = useState<KartenSelektion>({ art: 'keine' });
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
   const verortenLaeuft = useRef(false);
+  // „Messen ab hier“ (LFH-776, D6): Startpunkt der nächsten Messung; `nr` macht jeden Start neu,
+  // auch an derselben Stelle. Sichtbar nur, solange gemessen wird.
+  const [messStartWert, setMessStartWert] = useState<{ lng: number; lat: number; nr: number } | null>(
+    null,
+  );
+  const messStartNr = useRef(0);
+  // „Hier Zeichen setzen“ (LFH-776, D7): der Ref schließt zwei Aufrufe im selben Renderfenster aus,
+  // bevor `isPending` den nächsten Render erreicht (`legeFreiesZeichenAn` ist nicht idempotent).
+  const zeichenAnPunktLaeuftRef = useRef(false);
 
   const auswahl = selektion.art === 'objekt' ? selektion.schluessel : null;
   const zoneAuswahl = selektion.art === 'zone' ? selektion.id : null;
@@ -223,6 +232,7 @@ export function useKartenInteraktion({
   const bildPlatzierenId = modus.art === 'bild' ? modus.id : null;
   const zeichenPlatzieren = modus.art === 'zeichen' ? modus.spec : null;
   const messForm = modus.art === 'messen' ? modus.form : null;
+  const messStart = messForm ? messStartWert : null;
 
   // Während eines exklusiven Modus darf ein Karten-Klick auf ein Objekt kein Auswahl-Panel öffnen
   // (sonst Doppel-Panel neben der ZeichnenSteuerung).
@@ -309,6 +319,41 @@ export function useKartenInteraktion({
     },
     onError: fehler,
   });
+
+  // Freies Zeichen an einer Stelle aus dem Kontextmenü (LFH-776, D7): ohne Platzier-Modus, sonst
+  // wie `legeZeichenMutation` (Ansicht, „zuletzt verwendet“, Invalidierung).
+  const zeichenAnPunktMutation = useMutation({
+    mutationFn: async (p: { spec: FreiesZeichenUpdate; lat: number; lon: number }) => {
+      await legeFreiesZeichenAn(einsatzId, {
+        lat: p.lat,
+        lon: p.lon,
+        ...p.spec,
+        ansicht_id: aktiveAnsichtId ?? null,
+      });
+      return p.spec;
+    },
+    onSuccess: (gesendet) => {
+      erfolg('Taktisches Zeichen angelegt');
+      merkeZuletztVerwendet(gesendet);
+      qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
+    },
+    onError: fehler,
+    onSettled: () => {
+      zeichenAnPunktLaeuftRef.current = false;
+    },
+  });
+  function legeZeichenAnPunkt(
+    spec: FreiesZeichenUpdate,
+    punkt: { lng: number; lat: number },
+    nachErfolg?: () => void,
+  ) {
+    if (!darfSchreiben || zeichenAnPunktLaeuftRef.current) return;
+    zeichenAnPunktLaeuftRef.current = true;
+    zeichenAnPunktMutation.mutate(
+      { spec, lat: punkt.lat, lon: punkt.lng },
+      nachErfolg ? { onSuccess: () => nachErfolg() } : undefined,
+    );
+  }
 
   function verorten(lat: number, lon: number) {
     if (!platzierungZiel || verortenLaeuft.current) return;
@@ -569,6 +614,7 @@ export function useKartenInteraktion({
   const onBildPlatzierenFertig = () => dispatch({ t: 'beenden', arten: ['bild'] });
   /** Messen starten oder die Form wechseln; eine offene Auswahl schließt wie bei jedem Modus. */
   const onMessenStart = (form: MessForm) => {
+    setMessStartWert(null);
     dispatch({ t: 'messen', form });
     setAuswahl(null);
   };
@@ -577,6 +623,13 @@ export function useKartenInteraktion({
    * ist stabil.
    */
   const onMessenBeenden = useCallback(() => dispatch({ t: 'beenden', arten: ['messen'] }), []);
+  /** „Messen ab hier“ aus dem Kontextmenü: Strecke mit der Stelle als erstem Punkt (LFH-776). */
+  const onMessenAb = (punkt: { lng: number; lat: number }) => {
+    messStartNr.current += 1;
+    setMessStartWert({ lng: punkt.lng, lat: punkt.lat, nr: messStartNr.current });
+    dispatch({ t: 'messen', form: 'strecke' });
+    setAuswahl(null);
+  };
 
   // Abschnittsfläche fertig → persistieren, quittieren, dann Zeichenmodus beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
@@ -679,7 +732,9 @@ export function useKartenInteraktion({
     bildPlatzierenId,
     zeichenPlatzieren,
     messForm,
+    messStart,
     exklusiverModusAktiv,
+    zeichenAnPunktLaeuft: zeichenAnPunktMutation.isPending,
     // Serienmodus.
     zeichenSerie,
     setZeichenSerie,
@@ -716,6 +771,8 @@ export function useKartenInteraktion({
     onZeichenPlatzierenFertig,
     onMessenStart,
     onMessenBeenden,
+    onMessenAb,
+    legeZeichenAnPunkt,
     onFlaecheGezeichnet,
     onFlaecheKlick,
     onZoneKlick,

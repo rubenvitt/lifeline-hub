@@ -162,3 +162,23 @@ export function entscheideKlickziel<F extends Merkmal>(
   if (flaechen.length === 1) return flaechen[0];
   return { art: 'mehrdeutig', flaechen };
 }
+
+/**
+ * Gehört die Stelle keinem Objekt? Dann ist sie ein Ort, an dem das Kontextmenü öffnen darf
+ * (LFH-776, `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D2): freie Karte und Flächen,
+ * nicht Punktziele und Trefferzonen. Die Art `fachebene` steht für Punkt, Bündel, Trefferzone UND
+ * Fläche, darum entscheidet dort die Ebene des Merkmals.
+ */
+export function istOrtsziel<F extends Merkmal>(ziel: Klickziel<F> | null): boolean {
+  if (ziel == null) return true;
+  switch (ziel.art) {
+    case 'zone':
+    case 'abschnitt':
+    case 'mehrdeutig':
+      return true;
+    case 'fachebene':
+      return ordneKlickebene(ziel.merkmal.layer.id) === 'fachebeneFlaeche';
+    default:
+      return false;
+  }
+}

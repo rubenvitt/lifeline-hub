@@ -128,8 +128,9 @@ scharf, wenn `contextmenu` aus einem langen Druck kommt (`quelle: 'touch'`). Dan
 `preventDefault`), bis 400 ms nach `touchend`/`touchcancel` vergangen sind. Ein neues
 `touchstart` löst ihn sofort.
 
-- **Quelle erkennen:** Der Riegel führt selbst mit, ob ein Finger liegt (`touchstart` bis
-  `touchend` am Kartencontainer). Ein `contextmenu` bei liegendem Finger kommt aus einem langen
+- **Quelle erkennen:** Der Riegel führt selbst mit, ob ein Finger auf der Karte liegt
+  (`touchstart` bis `touchend`, gehört am `window`, gezählt nur mit Ziel im Kartencontainer). Ein
+  Finger außerhalb, etwa im Menü im Portal, löst den Riegel ebenfalls sofort. Ein `contextmenu` bei liegendem Finger kommt aus einem langen
   Druck. `isTrusted` wird nicht benutzt, weil sich darauf in Tests nicht bauen lässt.
 - *Verworfen: das Menü erst beim Abheben öffnen.* Damit bliebe es beim Halten ohne Rückmeldung,
   und die Kompatibilitäts-Ereignisse nach dem Abheben kämen trotzdem. Den Riegel bräuchte es also
@@ -152,8 +153,10 @@ die Regel „kein Auslöser ohne Rechte“ aus LFH-365, angewandt auf den einzel
 - Alle drei Einträge sind umkehrbar, also keiner rot und kein Trenner.
 - Die antd-Items baut `menueEintraege()` aus `MenueAusloeser.tsx`. Damit gilt LFH-365 ohne
   zweite Implementierung.
-- Den Kopf mit der Koordinate legt eine antd-Gruppe um die Einträge:
-  `{ type: 'group', label: formatKoordinate(...) }`. Er ist kein Eintrag und nicht wählbar.
+- Der Kopf mit der Koordinate (`formatKoordinate(...)`) steht als eigene Zeile über dem Menü
+  (Prop `kopf` der Schale, `popupRender`). Er ist kein Eintrag und nicht wählbar. *Nicht als
+  antd-Gruppe:* rc-menu fokussierte mit `autoFocus` die Gruppe statt des ersten Eintrags (in
+  jsdom belegt). Die Hülle um Kopf und Menü reicht den Fokus an den ersten Eintrag weiter.
 - `darfSchreiben` kommt aus `useLagekarteDaten` (Snapshot ⇒ `false`). Das ist der Rechte-Riegel
   an der Ableitung, nicht im Callback.
 - LFH-616 („ein Sprung ist keine Handlung“) greift nicht, denn keiner der Einträge ist ein

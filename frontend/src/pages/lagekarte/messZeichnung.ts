@@ -14,6 +14,8 @@ export interface MessZeichnung {
   zerstoeren: () => void;
   /** Schließt die laufende Messung ab (Enter-Geste); false, solange zu wenige Punkte stehen. */
   abschliessen: () => boolean;
+  /** Setzt den ersten Punkt der laufenden Messung („Messen ab hier“, LFH-776); ohne Messung nichts. */
+  setzeStartpunkt: (punkt: { lng: number; lat: number }) => void;
 }
 
 /**
@@ -130,6 +132,26 @@ export function createMessung(
       canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       canvas.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
       return fertig != null;
+    },
+    setzeStartpunkt: ({ lng, lat }) => {
+      if (!aktiv) return;
+      // Keine öffentliche API für einen Punkt in einer laufenden Zeichnung (`addFeatures` nimmt nur
+      // fertige Figuren) — derselbe Weg wie ein Klick: primärer Zeiger am Kartenelement des
+      // Adapters (Canvas), Lage über das Rechteck des Containers, aus dem terra-draw zurückrechnet.
+      // LFH-776, `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md` D6.
+      const p = map.project([lng, lat]);
+      const rahmen = map.getContainer().getBoundingClientRect();
+      const init: PointerEventInit = {
+        clientX: rahmen.left + p.x,
+        clientY: rahmen.top + p.y,
+        isPrimary: true,
+        button: 0,
+        pointerType: 'mouse',
+        bubbles: true,
+        cancelable: true,
+      };
+      canvas.dispatchEvent(new PointerEvent('pointerdown', { ...init, buttons: 1 }));
+      canvas.dispatchEvent(new PointerEvent('pointerup', { ...init, buttons: 0 }));
     },
   };
 }

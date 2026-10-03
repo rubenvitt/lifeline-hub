@@ -1133,3 +1133,90 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     expect(erfolg).not.toHaveBeenCalled();
   });
 });
+
+describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
+  it('„Messen ab hier“ startet eine Strecke mit Startpunkt; ein Start über die Steuerung hat keinen', () => {
+    const { result } = rendere();
+    act(() => result.current.onMessenAb({ lng: 8.6, lat: 50.1 }));
+    expect(result.current.messForm).toBe('strecke');
+    expect(result.current.messStart).toMatchObject({ lng: 8.6, lat: 50.1 });
+    const erster = result.current.messStart!.nr;
+    // Ein zweites „ab hier“ ist ein neuer Startpunkt, auch an derselben Stelle.
+    act(() => result.current.onMessenBeenden());
+    expect(result.current.messStart).toBeNull();
+    act(() => result.current.onMessenAb({ lng: 8.6, lat: 50.1 }));
+    expect(result.current.messStart!.nr).not.toBe(erster);
+    act(() => result.current.onMessenBeenden());
+    act(() => result.current.onMessenStart('strecke'));
+    expect(result.current.messStart).toBeNull();
+  });
+
+  it('„Hier Zeichen setzen“ legt an der Stelle an und merkt das Zeichen, ohne Platzier-Modus', async () => {
+    localStorage.clear();
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const erfolg = vi.fn();
+    const nachErfolg = vi.fn();
+    const { result } = rendere(vi.fn(), erfolg);
+    act(() =>
+      result.current.legeZeichenAnPunkt(
+        { grundzeichen: 'stelle', label: 'Y' },
+        { lng: 8.6, lat: 50.1 },
+        nachErfolg,
+      ),
+    );
+    await waitFor(() => expect(nachErfolg).toHaveBeenCalledOnce());
+    expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledExactlyOnceWith(1, {
+      lat: 50.1,
+      lon: 8.6,
+      grundzeichen: 'stelle',
+      label: 'Y',
+      ansicht_id: null,
+    });
+    expect(erfolg).toHaveBeenCalledWith('Taktisches Zeichen angelegt');
+    expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']);
+    expect(result.current.zeichenPlatzieren).toBeNull();
+    expect(result.current.exklusiverModusAktiv).toBe(false);
+  });
+
+  it('ein zweites „Setzen“ während des Speicherns legt nichts an', async () => {
+    let aufloesen: (v: { id: number }) => void = () => {};
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(
+      () =>
+        new Promise((r) => {
+          aufloesen = r;
+        }),
+    );
+    const { result } = rendere();
+    const punkt = { lng: 8.6, lat: 50.1 };
+    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, punkt));
+    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, punkt));
+    await waitFor(() => expect(result.current.zeichenAnPunktLaeuft).toBe(true));
+    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, punkt));
+    await new Promise((r) => setTimeout(r, 15));
+    expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1);
+    aufloesen({ id: 1 });
+    await waitFor(() => expect(result.current.zeichenAnPunktLaeuft).toBe(false));
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.resolve({ id: 42 }));
+  });
+
+  it('ohne Schreibrecht legt „Hier Zeichen setzen“ nichts an', async () => {
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          einsatz: undefined,
+          darfSchreiben: false,
+          waehlbar: [],
+          fehler: vi.fn(),
+          erfolg: vi.fn(),
+        }),
+      { wrapper: wrapper() },
+    );
+    act(() => result.current.legeZeichenAnPunkt({ grundzeichen: 'stelle' }, { lng: 1, lat: 2 }));
+    await new Promise((r) => setTimeout(r, 15));
+    expect(freieZeichenApi.legeFreiesZeichenAn).not.toHaveBeenCalled();
+  });
+});
