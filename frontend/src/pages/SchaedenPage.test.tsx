@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
 import { einsatzKeys } from '../api/queryKeys';
 import SchaedenPage from './SchaedenPage';
 import { benutzerFixture } from '../test/fixtures';
@@ -647,6 +648,8 @@ describe('SchaedenPage', () => {
   });
 
   it('setzt beim Einsatzwechsel alle Schadenwerte zurück und lädt nur den B-Sitzungsort', async () => {
+    // Gemerkt vom angemeldeten Benutzer: ungebundene Werte verwirft die Anmeldung (LFH-785).
+    erfassungsSitzungBinden(nutzer.id);
     sessionStorage.setItem('lfh:erfassung:1:schaden:ort', 'Schadenort A');
     sessionStorage.setItem('lfh:erfassung:2:schaden:ort', 'Schadenort B');
     server.use(
