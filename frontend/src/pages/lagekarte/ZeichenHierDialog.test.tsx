@@ -69,7 +69,9 @@ describe('ZeichenHierDialog (LFH-776)', () => {
 
   it('fokussiert die Suche nur bei der Maus, am Touchschirm nicht (Bildschirmtastatur)', async () => {
     const maus = aufbau({ quelle: 'maus' });
-    await waitFor(() => expect(within(dialog()).getByLabelText('Grundzeichen suchen')).toHaveFocus());
+    await waitFor(() =>
+      expect(within(dialog()).getByLabelText('Grundzeichen suchen')).toHaveFocus(),
+    );
     maus.unmount();
     aufbau({ quelle: 'touch' });
     await new Promise((r) => setTimeout(r, 30));

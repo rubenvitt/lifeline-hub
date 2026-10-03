@@ -37,6 +37,16 @@ diese Zusage.
   über Füllung + Umriss zählt einmal), ab zwei `mehrdeutig` → `FlaechenwahlMenue` am Tipppunkt,
   eigene vor Fachebenen, Kennung aus `flaechenwahl.ts`; Wahl über dieselben Callbacks, aus im
   exklusiven Modus (Prop `flaechenwahl`). Geschlossen wird nur über `onOpenChange`.
+- **Kontextmenü an der Kartenstelle** (LFH-776, Spec `lagekarte-kontextmenue`,
+  `openspec/changes/lfh-776-lagekarte-kontextmenue/design.md`): Rechtsklick und langer Druck kommen
+  als EIN maplibre-Ereignis `contextmenu` (`Kartenflaeche.tsx`); offen nur an einem Ort
+  (`istOrtsziel` in `klickziel.ts`: freie Karte, Fläche — nie Punktziel oder Trefferzone), gesperrt
+  über die Prop `kontextmenue` (`null` im exklusiven Modus). Nach dem langen Druck liegt der Finger
+  noch: `nachklickRiegel.ts` hängt VOR jedem Dropdown am `window` (Capture) und schluckt die
+  Ereignisse des Abhebens. Einträge und Rechte nur aus `kontextEintraege` (`kontextmenue.ts`).
+  Punktmenüs der Karte (Flächenwahl, Kontextmenü) teilen die Schale `PunktankerMenue.tsx`; ein Kopf
+  steht über dem Menü, nie als antd-Gruppe (rc-menu fokussierte sonst die Gruppe). Nachweis
+  `e2e/lagekarte-touch.spec.ts` (langer Druck per CDP, Rechtsklick).
 - **Betreuung auf der Karte** (LFH-673, `openspec/changes/archive/2026-09-29-lfh-673-betreuung-auf-der-lagekarte/design.md`):
   Marker-Ebene wie UHS (`alleVerortet`, `?platzieren=betreuungsstelle:<id>`), Sperre an der
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);

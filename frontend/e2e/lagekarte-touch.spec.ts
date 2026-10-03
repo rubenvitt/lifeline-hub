@@ -1396,3 +1396,283 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
   });
 });
+
+// LFH-776: Kontextmenü an der Kartenstelle. maplibre (ab 6.11) meldet einen langen Druck als
+// `contextmenu`; gemessen wird, dass das Menü nach dem ABHEBEN noch offen ist (Nachklick-Riegel),
+// die Karte dabei stillsteht und jeder Eintrag per Tipp wirkt — nicht bloß sichtbar ist.
+
+/** Langer Druck mit einem Finger über CDP: aufsetzen, halten, abheben. */
+async function langerDruck(page: Page, cdp: CDPSession, p: Punkt, ms = 700) {
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: p.x, y: p.y, id: 0, radiusX: 4, radiusY: 4, force: 1 }],
+  });
+  await page.waitForTimeout(ms);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+}
+
+/** Steuerhöhe je Dichtestufe (`frontend/AGENTS.md`, Dichte-Staffel). */
+const STEUERHOEHE: Record<string, number> = { kompakt: 30, komfortabel: 48, handschuh: 72 };
+
+const kontextMenue = (page: Page) =>
+  page.locator(
+    '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"][aria-label="Aktionen an dieser Stelle"]',
+  );
+const kontextKopf = (page: Page) => page.locator('[data-lfh="kontextmenue-anker-kopf"]');
+
+interface KontextSaat {
+  einsatzId: number;
+  /** Freie Stelle: kein Marker, keine Zone. */
+  frei: [number, number];
+  /** In der Zone, abseits jedes Zeichens. */
+  inZone: [number, number];
+}
+
+async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
+  const einsatzId = await post(page, '/api/einsaetze', {
+    bezeichnung: `E2E Kontextmenue ${Date.now()}`,
+  });
+  await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
+  const [lng, lat] = EINZEL;
+  const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+    data: {
+      typ: 'absperrbereich',
+      geometrie_typ: 'Polygon',
+      geometrie: JSON.stringify(rechteck(lng - 0.004, lat - 0.008, lng + 0.004, lat - 0.003)),
+      label: 'Sperrzone Kontext',
+    },
+  });
+  expect(zone.ok(), await zone.text()).toBeTruthy();
+  return { einsatzId, frei: [lng, lat + 0.004], inZone: [lng + 0.002, lat - 0.0055] };
+}
+
+/** Holt `ll` in die freie Kartenmitte und gibt seinen Bildschirmpunkt — hinter der Trefferwache. */
+async function stelleAufKarte(page: Page, ll: [number, number], wo: string): Promise<Punkt> {
+  await springe(page, ll, 15);
+  const m = await kartenMitte(page);
+  const ziel = await page.evaluate(
+    ({ x, y }) => {
+      const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+      const r = k.getCanvas().getBoundingClientRect();
+      const g = k.unproject([x - r.left, y - r.top]);
+      return [g.lng, g.lat] as [number, number];
+    },
+    { x: m.x, y: m.y },
+  );
+  await springe(page, [ll[0] + (ll[0] - ziel[0]), ll[1] + (ll[1] - ziel[1])], 15);
+  const p = await aufSchirm(page, ll);
+  await aufKarte(page, [p], wo);
+  await page.waitForTimeout(400); // kein Doppeltipp mit der Geste davor
+  return p;
+}
+
+for (const { viewport, dichte } of [
+  { viewport: { width: 1024, height: 768 }, dichte: 'handschuh' },
+  { viewport: { width: 390, height: 844 }, dichte: null },
+] as const) {
+  test.describe(`Kontextmenü per langem Druck bei ${viewport.width} px (LFH-776)`, () => {
+    test.use({ hasTouch: true, viewport });
+
+    test('langer Druck öffnet das Menü an der Stelle; Messen ab hier misst ab dort', async ({
+      page,
+    }) => {
+      test.setTimeout(150_000);
+      const seitenFehler: Error[] = [];
+      page.on('pageerror', (f) => seitenFehler.push(f));
+      if (dichte)
+        await page.addInitScript(
+          ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+          [DICHTE_SCHLUESSEL, dichte] as const,
+        );
+      await anmelden(page);
+      const saat = await einsatzFuerKontext(page);
+      await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
+      if (dichte) await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      await ruhe(page);
+      const cdp = await page.context().newCDPSession(page);
+      const menue = kontextMenue(page);
+      const eintraege = menue.getByRole('menuitem');
+
+      // ── Langer Druck auf freie Karte: Menü offen NACH dem Abheben, Karte steht ─────────
+      const frei = await stelleAufKarte(page, saat.frei, 'freie Stelle');
+      const vorher = await stand(page);
+      await langerDruck(page, cdp, frei);
+      await expect(menue).toBeVisible();
+      await page.waitForTimeout(500); // ein Nachklick käme jetzt — das Menü muss stehen bleiben
+      await expect(menue).toBeVisible();
+      const nachher = await stand(page);
+      expect(nachher.zoom).toBeCloseTo(vorher.zoom, 6);
+      expect(nachher.lng).toBeCloseTo(vorher.lng, 7);
+      expect(nachher.lat).toBeCloseTo(vorher.lat, 7);
+      expect(nachher.pitch).toBe(0);
+      expect(nachher.bearing).toBe(0);
+      await expect(kontextKopf(page)).toContainText(/\d{3}/);
+      expect(await eintraege.allTextContents()).toEqual([
+        'Koordinate kopieren',
+        'Messen ab hier',
+        'Hier Zeichen setzen',
+      ]);
+      // Anker an der Druckstelle (Pixel relativ zur Kartenhülle).
+      const anker = await page.locator('[data-lfh="kontextmenue-anker"]').boundingBox();
+      expect(Math.abs(anker!.x - frei.x)).toBeLessThan(2);
+      expect(Math.abs(anker!.y - frei.y)).toBeLessThan(2);
+      const stufe = (await page.locator('html').getAttribute('data-dichte')) ?? 'kompakt';
+      await expect
+        .poll(
+          async () =>
+            Math.min(
+              ...(await Promise.all((await eintraege.all()).map((e) => e.boundingBox()))).map(
+                (b) => b!.height,
+              ),
+            ),
+          { message: `Einträge halten die Steuerhöhe der Stufe ${stufe}` },
+        )
+        .toBeGreaterThanOrEqual(STEUERHOEHE[stufe]);
+
+      // ── „Messen ab hier“ per Tipp, dann ein zweiter Tipp: die Strecke steht ────────────
+      await eintraege.filter({ hasText: 'Messen ab hier' }).tap();
+      await expect(menue).toHaveCount(0);
+      await expect(page.locator('[data-lfh="mess-steuerung"]')).toBeVisible();
+      const zweiter = { x: frei.x + 60, y: frei.y };
+      await aufKarte(page, [zweiter], 'zweiter Messpunkt');
+      await page.waitForTimeout(400);
+      await tippe(page, zweiter);
+      await expect(page.locator('[data-lfh="messwert"]')).toContainText(/\d.*\s(m|km)\b/);
+
+      // ── Im Messmodus öffnet ein langer Druck kein Menü ────────────────────────────────
+      const dritter = { x: frei.x - 50, y: frei.y + 30 };
+      await aufKarte(page, [dritter], 'langer Druck im Messmodus');
+      await langerDruck(page, cdp, dritter);
+      await page.waitForTimeout(300);
+      await expect(menue).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);
+
+      expect(seitenFehler).toEqual([]);
+    });
+
+    test('Zeichen hier setzen; Marker und Zone', async ({ page }) => {
+      test.setTimeout(150_000);
+      if (dichte)
+        await page.addInitScript(
+          ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+          [DICHTE_SCHLUESSEL, dichte] as const,
+        );
+      await anmelden(page);
+      const saat = await einsatzFuerKontext(page);
+      await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
+      await ruhe(page);
+      const cdp = await page.context().newCDPSession(page);
+      const menue = kontextMenue(page);
+      const eintraege = menue.getByRole('menuitem');
+      const auswahl = page.locator('[data-lfh="auswahl"] h3');
+
+      // ── „Hier Zeichen setzen“: Dialog, Kachel per Tipp, „Setzen“ → Zeichen an der Stelle ──
+      const frei = await stelleAufKarte(page, saat.frei, 'freie Stelle (Zeichen)');
+      const druckLl = await page.evaluate(
+        ({ x, y }) => {
+          const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+          const r = k.getCanvas().getBoundingClientRect();
+          return k.unproject([x - r.left, y - r.top]);
+        },
+        { x: frei.x, y: frei.y },
+      );
+      await langerDruck(page, cdp, frei);
+      await expect(menue).toBeVisible();
+      await eintraege.filter({ hasText: 'Hier Zeichen setzen' }).tap();
+      const dialog = page.getByRole('dialog', { name: 'Zeichen hier setzen' });
+      await expect(dialog).toBeVisible();
+      // Am Touchschirm bleibt die Suche ohne Fokus (keine Bildschirmtastatur über dem Raster).
+      await expect(dialog.getByLabel('Grundzeichen suchen')).not.toBeFocused();
+      await dialog
+        .getByRole('radiogroup', { name: 'Grundzeichen' })
+        .getByRole('radio', { name: 'Person' })
+        .tap();
+      await dialog.getByRole('button', { name: 'Setzen' }).tap();
+      await expect(dialog).toHaveCount(0);
+      await expect
+        .poll(
+          async () =>
+            (await (
+              await page.request.get(`/api/einsaetze/${saat.einsatzId}/freie-zeichen`)
+            ).json()) as { grundzeichen: string; lat: number; lon: number }[],
+          { message: 'Zeichen ist an der Druckstelle gespeichert' },
+        )
+        .toEqual([
+          expect.objectContaining({
+            grundzeichen: 'person',
+            lat: expect.closeTo(druckLl.lat, 4),
+            lon: expect.closeTo(druckLl.lng, 4),
+          }),
+        ]);
+      // Kein Platzier-Modus blieb stehen.
+      await expect(page.locator('[data-lfh="platzier-steuerung"]')).toHaveCount(0);
+
+      // ── Langer Druck auf einen Marker: kein Menü ─────────────────────────────────────
+      const marker = await stelleAufKarte(page, EINZEL, 'Marker');
+      await langerDruck(page, cdp, marker);
+      await page.waitForTimeout(300);
+      await expect(menue).toHaveCount(0);
+      // Was ein Tipp danach öffnet (Inspector), ist nicht Teil der Aussage: zurück auf null.
+      const schliessen = page.getByRole('button', { name: /schließen/i }).first();
+      if (await schliessen.isVisible().catch(() => false)) await schliessen.click();
+
+      // ── Langer Druck in die Zone: Menü, und das Abheben wählt die Zone nicht ─────────
+      const zone = await stelleAufKarte(page, saat.inZone, 'Zone');
+      await langerDruck(page, cdp, zone);
+      await expect(menue).toBeVisible();
+      await page.waitForTimeout(500);
+      await expect(menue).toBeVisible();
+      await expect(auswahl).toHaveCount(0);
+      // Tipp daneben schließt ohne Wirkung eines Eintrags.
+      const daneben = { x: zone.x + 80, y: zone.y - 80 };
+      await aufKarte(page, [daneben], 'Tipp daneben');
+      await tippe(page, daneben);
+      await expect(menue).toHaveCount(0);
+      expect(
+        (
+          (await (
+            await page.request.get(`/api/einsaetze/${saat.einsatzId}/freie-zeichen`)
+          ).json()) as unknown[]
+        ).length,
+      ).toBe(1);
+    });
+  });
+}
+
+// Fükw: Rechtsklick öffnet dasselbe Menü; „Koordinate kopieren“ legt genau den Kopf in die
+// Zwischenablage, Esc schließt und gibt den Fokus an die Karte.
+test.describe('Kontextmenü per Rechtsklick am Fükw (LFH-776)', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('Rechtsklick, Koordinate kopieren, Esc', async ({ page, context }) => {
+    test.setTimeout(120_000);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await anmelden(page);
+    const saat = await einsatzFuerKontext(page);
+    await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
+    await ruhe(page);
+    const menue = kontextMenue(page);
+
+    const frei = await stelleAufKarte(page, saat.frei, 'freie Stelle (Maus)');
+    await page.mouse.click(frei.x, frei.y, { button: 'right' });
+    await expect(menue).toBeVisible();
+    const kopf = (await kontextKopf(page).textContent())!.trim();
+    expect(kopf).toMatch(/\d{3}/);
+    await menue.getByRole('menuitem', { name: 'Koordinate kopieren' }).click();
+    await expect(menue).toHaveCount(0);
+    await expect(page.getByText('Koordinate kopiert')).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(kopf);
+
+    await page.mouse.click(frei.x, frei.y, { button: 'right' });
+    await expect(menue).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('[role="menu"]'))), {
+        message: 'Fokus liegt im Menü',
+      })
+      .toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(menue).toHaveCount(0);
+    await expect(page.locator('canvas.maplibregl-canvas')).toBeFocused();
+  });
+});

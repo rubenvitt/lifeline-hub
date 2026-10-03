@@ -192,9 +192,11 @@ export function useKartenInteraktion({
   const verortenLaeuft = useRef(false);
   // „Messen ab hier“ (LFH-776, D6): Startpunkt der nächsten Messung; `nr` macht jeden Start neu,
   // auch an derselben Stelle. Sichtbar nur, solange gemessen wird.
-  const [messStartWert, setMessStartWert] = useState<{ lng: number; lat: number; nr: number } | null>(
-    null,
-  );
+  const [messStartWert, setMessStartWert] = useState<{
+    lng: number;
+    lat: number;
+    nr: number;
+  } | null>(null);
   const messStartNr = useRef(0);
   // „Hier Zeichen setzen“ (LFH-776, D7): der Ref schließt zwei Aufrufe im selben Renderfenster aus,
   // bevor `isPending` den nächsten Render erreicht (`legeFreiesZeichenAn` ist nicht idempotent).
