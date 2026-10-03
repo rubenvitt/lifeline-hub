@@ -54,6 +54,9 @@ jobs:
     permissions:
       contents: read
       statuses: write
+      # Nur für den Autofix-Kommentar: die Release-App darf Pull Requests nur lesen, und ein
+      # Kommentar an einem PR braucht `pull-requests: write` (Issues-Recht reicht nicht, 403).
+      pull-requests: write
     env:
       # Für die `if:` der Autofix-Schritte; ohne Release-App wird nur geprüft.
       APP_ID: ${{ secrets.RELEASE_APP_ID }}
@@ -105,9 +108,9 @@ jobs:
               -f state="$state" -f context=Migrationsnummern \
               -f description="$text" -f target_url="$LAUF" > /dev/null
           fi
-      # Der Token entsteht erst, wenn es etwas zu reparieren gibt, und nur mit den zwei Rechten,
-      # die der Autofix braucht (Push, Kommentar). Die App hat Bypass-Rechte auf `alpha`; die
-      # Grenzen dagegen stehen in migrationen-autofix.sh und seinem Selbsttest.
+      # Der Token entsteht erst, wenn es etwas zu reparieren gibt, und nur mit dem Recht, das der
+      # Push braucht. Die App hat Bypass-Rechte auf `alpha`; die Grenzen dagegen stehen in
+      # migrationen-autofix.sh und seinem Selbsttest.
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         if: >-
@@ -117,7 +120,6 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
-          permission-issues: write
       - name: Umnummerieren und auf den PR-Branch pushen
         if: steps.app-token.outputs.token != ''
         env:
@@ -152,8 +154,10 @@ jobs:
             || code=$?
           case "$code" in
             0)
-              GH_TOKEN="$APP_TOKEN" gh api "repos/$GITHUB_REPOSITORY/issues/$NR/comments" \
-                -F body=@"$RUNNER_TEMP/bericht.md" > /dev/null
+              # Gepusht ist schon; ein fehlender Kommentar darf den Status nicht verhindern.
+              gh api "repos/$GITHUB_REPOSITORY/issues/$NR/comments" \
+                -F body=@"$RUNNER_TEMP/bericht.md" > /dev/null \
+                || echo "::warning::Kommentar an #$NR nicht möglich."
               gh api "repos/$GITHUB_REPOSITORY/statuses/$KOPF" \
                 -f state=failure -f context=Migrationsnummern \
                 -f description="Umnummeriert per Autofix, neuer Commit folgt." \
@@ -174,7 +178,7 @@ jobs:
     permissions:
       contents: read
       statuses: write
-      pull-requests: read
+      pull-requests: write # Autofix-Kommentar, siehe Job oben
     env:
       APP_ID: ${{ secrets.RELEASE_APP_ID }}
     steps:
@@ -245,7 +249,6 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
-          permission-issues: write
       - name: Rote PRs umnummerieren
         if: steps.app-token.outputs.token != ''
         env:
@@ -273,8 +276,9 @@ jobs:
             echo "::endgroup::"
             if [ "$code" = 0 ]; then
               umnummeriert=$((umnummeriert + 1))
-              GH_TOKEN="$APP_TOKEN" gh api "repos/$GITHUB_REPOSITORY/issues/$nr/comments" \
-                -F body=@"$RUNNER_TEMP/bericht-$nr.md" > /dev/null
+              gh api "repos/$GITHUB_REPOSITORY/issues/$nr/comments" \
+                -F body=@"$RUNNER_TEMP/bericht-$nr.md" > /dev/null \
+                || echo "::warning::Kommentar an #$nr nicht möglich."
               gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
                 -f state=failure -f context=Migrationsnummern \
                 -f description="Umnummeriert per Autofix, neuer Commit folgt." \

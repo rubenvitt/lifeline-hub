@@ -47,7 +47,8 @@ Keine.
   Bündel `schnell`), `scripts/AGENTS.md` (Reihenfolge der Selbsttests).
 - `AGENTS.md`, Abschnitt „Backend — Migrationsvergabe“: Autofix und Pflicht-Status.
 - Release-App (`RELEASE_APP_ID`/`RELEASE_APP_PRIVATE_KEY`): bekommt eine zweite Aufgabe,
-  braucht keine neuen Berechtigungen (Contents und Issues Read & Write hat sie schon).
+  braucht keine neuen Berechtigungen (Contents Read & Write hat sie schon). Den Kommentar
+  schreibt der `GITHUB_TOKEN` mit `pull-requests: write`.
 - Ruleset 17017911: `Migrationsnummern` als Required Check ohne `integration_id` (Handgriff
   von Ruben).
 - Keine Änderung an Migrationen, am Versionsschema oder an `src/`.
