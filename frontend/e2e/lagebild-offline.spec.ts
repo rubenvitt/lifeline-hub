@@ -345,8 +345,9 @@ test.describe('Kaltstart ohne Server (LFH-780)', () => {
 
   /** Erfasst offline einen ETB-Eintrag über die Schnellerfassung; er liegt danach in der Queue. */
   async function offlineErfassen(app: Page, inhalt: string) {
-    await expect(app, 'Kaltstart ohne Server: nicht auf der Anmeldung').not.toHaveURL(/\/login/);
+    // Erst der Inhalt, dann die Adresse: `not.toHaveURL` gälte schon vor einer Umleitung.
     await expect(app.getByText('Kaltstart-Probe vorher')).toBeVisible();
+    await expect(app, 'Kaltstart ohne Server: nicht auf der Anmeldung').not.toHaveURL(/\/login/);
     await expect(app.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
     const feld = app.getByRole('textbox', { name: /Inhalt/ }).first();
     await feld.fill(inhalt);
