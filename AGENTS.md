@@ -122,7 +122,7 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
 - **Autofix nur auf dem PR-Branch** (LFH-1014): ein reiner Nummernkonflikt wird per Bot-Commit
   umgelegt (`scripts/migrationen-autofix.sh`), nie auf `alpha`. Danach vor dem nächsten Push
   den Branch holen. Herleitung:
-  `openspec/changes/lfh-1014-migrationsnummern-autofix/design.md`.
+  `openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md`.
 - **Falle: sqlx spielt eine kleinere, noch nicht eingespielte Migration still nach**
   (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`).
 - **Migrationen entstehen nur über `alpha`**; Freigaben als Merge-Commit, nicht Squash.

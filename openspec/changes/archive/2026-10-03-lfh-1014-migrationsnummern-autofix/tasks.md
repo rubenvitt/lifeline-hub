@@ -38,13 +38,21 @@
 
 ## 4. Verifikation und Einführung
 
-- [ ] 4.1 `./scripts/check-all.sh --nur schnell` grün, Ausgabe gelesen; dazu
-  `scripts/check-fmt.sh`.
-- [ ] 4.2 Probe am echten Repo vor dem Merge: Wegwerf-Branch auf diesem Branch mit einer
+- [x] 4.1 `./scripts/check-all.sh --nur schnell` grün, Ausgabe gelesen; dazu
+  `scripts/check-fmt.sh`. In der Cloud-Sitzung fehlt `mise`: die Schritte mit Node/pnpm enden
+  dort mit Exit 127; Schritt 9, 10 (beide Selbsttests) und 13 sowie `cargo fmt --check` grün.
+  Den vollen Lauf trägt die CI des PRs.
+- [x] 4.2 Probe am echten Repo vor dem Merge: Wegwerf-Branch auf diesem Branch mit einer
   Migration auf einer auf `alpha` vergebenen Nummer, PR gegen `alpha` öffnen. Weil `alpha`
   das Skript noch nicht trägt, greift die Fassung des PRs (wie beim Prüfskript). Sehen, dass
   Autofix-Commit, Kommentar und neue CI-Läufe kommen; PR schließen, Branch löschen.
-- [ ] 4.3 Ruben bitten, `Migrationsnummern` ohne `integration_id` ins Ruleset 17017911
+  Erledigt an #409 im dritten Anlauf (die ersten beiden fanden den Checkout-Header und das
+  fehlende Kommentar-Recht, siehe D3/D4). PR geschlossen; den Branch `claude/lfh-1014-probe`
+  konnte die Sitzung nicht löschen (Proxy 403), das bleibt ein Handgriff.
+- [x] 4.3 Ruben bitten, `Migrationsnummern` ohne `integration_id` ins Ruleset 17017911
   aufzunehmen, und den Eintrag per `GET /repos/rubenvitt/lifeline-hub/rules/branches/alpha`
   nachweisen.
   Aufgabe 5.3 im Archiv von LFH-658 bleibt als historischer Stand unangetastet.
+  Nachgewiesen am 03.10.: `Migrationsnummern` steht als zwölfter Required Check im Ruleset,
+  mit `integration_id` 15368 (GitHub Actions). Das passt, denn beide Jobs setzen den Status
+  mit dem `GITHUB_TOKEN`.

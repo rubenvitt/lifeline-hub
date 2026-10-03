@@ -22,7 +22,7 @@
 # wird mit einem Token der Release-App, weil ein Push mit `GITHUB_TOKEN` keine CI auslöst und
 # der PR dann ohne Checks hinge. Der alte Kopf bleibt rot, der neue bekommt seinen Status aus
 # dem eigenen `pull_request`-Lauf. Ohne `RELEASE_APP_ID` wird nur geprüft.
-# Herleitung: openspec/changes/lfh-1014-migrationsnummern-autofix/design.md.
+# Herleitung: openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md.
 name: Migrationsnummern
 
 on:

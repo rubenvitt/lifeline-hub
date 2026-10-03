@@ -34,7 +34,7 @@
   Pflicht-Status im Rennfenster durchrutscht. Die bleibt ein Fix-PR wie #379.
 - Keine fachliche Prüfung, ob die umnummerierte Migration hinter den neuen Vorgängern noch
   das Richtige tut. Das zeigen die Tests auf dem Autofix-Commit.
-- Keine Umbenennung von Bezeichnern, die die alte Nummer tragen (`migration_0143_…`). Der
+- Keine Umbenennung von Bezeichnern, die die alte Nummer tragen (`migration_NNNN_…`). Der
   Kommentar nennt sie, die CI fängt Bruch.
 - Kein Opt-out-Label. Kommt Bedarf, ist es eine kleine Ergänzung.
 

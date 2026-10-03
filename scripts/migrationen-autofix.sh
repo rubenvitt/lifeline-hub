@@ -12,7 +12,7 @@
 #             AUTOFIX_BERICHT Datei für den PR-Kommentar (Markdown), nur nach Exit 0 geschrieben
 #             AUTOFIX_PRUEFER Prüfskript (Vorgabe: check-migrationen.sh neben diesem Skript)
 #
-# DIE GRENZEN (Begründung: openspec/…/lfh-1014-migrationsnummern-autofix/design.md):
+# DIE GRENZEN (Begründung: openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md):
 #   1. Nie auf `alpha`, `beta`, `main` oder die Basis selbst. Das Token des Workflows hat auf
 #      `alpha` Bypass-Rechte; diese Sperre ist die erste von zwei.
 #   2. Nur Fast-Forward, nie Force: der Commit sitzt direkt auf <kopf-sha>. Hat jemand
