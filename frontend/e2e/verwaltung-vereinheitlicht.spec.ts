@@ -324,8 +324,9 @@ test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und kein
  * Test wie bei 390 px zusätzlich, dass keine Zeile in sich überläuft.
  *
  * Mutationsprobe (03.10.2026, nicht committet): Kurzwort bei `sperrGrund === 'rechte'`
- * (`ModulEinstellungsListe.tsx`) `whiteSpace: 'nowrap'` + `minWidth: 2000` → dieser Test rot
- * (Modulzeilen laufen über), der Admin-Test daneben grün.
+ * (`ModulEinstellungsListe.tsx`) `whiteSpace: 'nowrap'`, `display: 'inline-block'`,
+ * `minWidth: 2000` → dieser Test und der 390-px-Durchgang rot (Modulzeilen laufen um 1669 px
+ * über), der Admin-Test bei 1280 px grün.
  */
 test('bei 1280 px steht der gesperrte Rollen-Auswähler der Einsatz-Defaults breit genug zum Lesen, und keine Zeile läuft über (Führungskraft)', async ({
   page,
