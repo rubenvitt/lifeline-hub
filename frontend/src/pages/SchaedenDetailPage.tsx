@@ -1,17 +1,5 @@
 import StatusTag from '../components/StatusTag';
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Space,
-  Spin,
-  Tag,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Popconfirm, Space, Spin, Tag } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -48,6 +36,7 @@ import {
   geschaedigtFelder,
 } from './schaeden/schadenHelfer';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { ErfassungsModal } from '../components/Erfassung';
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
   value: t,
@@ -140,21 +129,14 @@ export default function SchaedenDetailPage() {
   });
   const uebergebMutation = useMutation({
     mutationFn: (an: string) => uebergebeSchaden(einsatzId, schadenId, an),
-    onSuccess: () => {
-      invalidateDetail();
-      setUebergebenOffen(false);
-      uebergebForm.resetFields();
-    },
+    // Schliessen und Leeren besorgt die Erfassungshülle (`onFertig`).
+    onSuccess: invalidateDetail,
     onError: fehler,
   });
   const abschlussMutation = useMutation({
     mutationFn: (v: { abschluss_grund: string; notiz?: string }) =>
       schliesseSchadenAb(einsatzId, schadenId, v.abschluss_grund, v.notiz),
-    onSuccess: () => {
-      invalidateDetail();
-      setAbschlussOffen(false);
-      abschlussForm.resetFields();
-    },
+    onSuccess: invalidateDetail,
     onError: fehler,
   });
   const stornoMutation = useMutation({
@@ -335,52 +317,47 @@ export default function SchaedenDetailPage() {
         <SchadenAnhaenge einsatzId={einsatzId} schaden={s} darfSchreiben={darfSchreiben} />
       </div>
 
-      <Modal
-        title="Schaden übergeben"
-        open={uebergebenOffen}
-        onCancel={() => setUebergebenOffen(false)}
-        onOk={() => uebergebForm.submit()}
-        okText="Übergeben"
-        confirmLoading={uebergebMutation.isPending}
-        destroyOnHidden
+      {/* Beide Status-Dialoge auf der Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). */}
+      <ErfassungsModal<{ uebergeben_an: string }>
+        offen={uebergebenOffen}
+        titel="Schaden übergeben"
+        form={uebergebForm}
+        erfassenText="Übergeben"
+        laeuft={uebergebMutation.isPending}
+        onErfassen={(v) => uebergebMutation.mutateAsync(v.uebergeben_an)}
+        onFertig={() => setUebergebenOffen(false)}
+        onAbbrechen={() => setUebergebenOffen(false)}
       >
-        <Form
-          form={uebergebForm}
-          layout="vertical"
-          onFinish={(v) => uebergebMutation.mutate(v.uebergeben_an)}
+        <Form.Item
+          label="Übergeben an"
+          name="uebergeben_an"
+          rules={[{ required: true, message: 'Adressat ist Pflicht' }]}
         >
-          <Form.Item
-            label="Übergeben an"
-            name="uebergeben_an"
-            rules={[{ required: true, message: 'Adressat ist Pflicht' }]}
-          >
-            <Input placeholder="z. B. Stadtwerke, Bauhof, Umweltamt" />
-          </Form.Item>
-        </Form>
-      </Modal>
+          <Input placeholder="z. B. Stadtwerke, Bauhof, Umweltamt" />
+        </Form.Item>
+      </ErfassungsModal>
 
-      <Modal
-        title="Schaden abschließen"
-        open={abschlussOffen}
-        onCancel={() => setAbschlussOffen(false)}
-        onOk={() => abschlussForm.submit()}
-        okText="Abschließen"
-        confirmLoading={abschlussMutation.isPending}
-        destroyOnHidden
+      <ErfassungsModal<{ abschluss_grund: string; notiz?: string }>
+        offen={abschlussOffen}
+        titel="Schaden abschließen"
+        form={abschlussForm}
+        erfassenText="Abschließen"
+        laeuft={abschlussMutation.isPending}
+        onErfassen={(v) => abschlussMutation.mutateAsync(v)}
+        onFertig={() => setAbschlussOffen(false)}
+        onAbbrechen={() => setAbschlussOffen(false)}
       >
-        <Form form={abschlussForm} layout="vertical" onFinish={(v) => abschlussMutation.mutate(v)}>
-          <Form.Item
-            label="Abschlussgrund"
-            name="abschluss_grund"
-            rules={[{ required: true, message: 'Grund ist Pflicht' }]}
-          >
-            <Select options={ABSCHLUSS_GRUENDE} />
-          </Form.Item>
-          <Form.Item label="Notiz (optional, wird an Beschreibung angehängt)" name="notiz">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <Form.Item
+          label="Abschlussgrund"
+          name="abschluss_grund"
+          rules={[{ required: true, message: 'Grund ist Pflicht' }]}
+        >
+          <Select options={ABSCHLUSS_GRUENDE} />
+        </Form.Item>
+        <Form.Item label="Notiz (optional, wird an Beschreibung angehängt)" name="notiz">
+          <Input.TextArea rows={2} />
+        </Form.Item>
+      </ErfassungsModal>
     </EinsatzSeite>
   );
 }
