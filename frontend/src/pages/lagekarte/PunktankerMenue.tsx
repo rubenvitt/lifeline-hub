@@ -33,18 +33,22 @@ export function punktmenueEintragStil(token: {
   } as const;
 }
 
-/** Kopfzeile über den Einträgen: Mono mit festen Ziffern (Koordinate), nicht bedienbar. */
+/**
+ * Kopfzeile über den Einträgen: Mono mit festen Ziffern (Koordinate), nicht bedienbar. Volle
+ * Textfarbe, nicht gedämpft: die Koordinate wird abgelesen (Funk), auch im Nachtbetrieb bei Tag
+ * (Prüfliste LFH-776, Kriterium 5).
+ */
 function punktmenueKopfStil(token: {
   paddingXS: number;
   paddingSM: number;
-  colorTextSecondary: string;
+  colorText: string;
   colorBorderSecondary: string;
   fontFamilyCode: string;
 }) {
   return {
     paddingBlock: token.paddingXS,
     paddingInline: token.paddingSM,
-    color: token.colorTextSecondary,
+    color: token.colorText,
     fontFamily: token.fontFamilyCode,
     fontVariantNumeric: 'tabular-nums',
     borderBottom: `1px solid ${token.colorBorderSecondary}`,

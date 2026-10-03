@@ -135,7 +135,7 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
 
 ## 7. Prüfliste, Regeln, Integration
 
-- [ ] 7.1 `openspec/changes/lfh-776-lagekarte-kontextmenue/pruefliste.md`: 15 Kriterien der
+- [x] 7.1 `openspec/changes/lfh-776-lagekarte-kontextmenue/pruefliste.md`: 15 Kriterien der
   Einsatztauglichkeit (Festlegung 7, `docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`),
   je Zeile ein Verdikt mit Beleg. Dazu die Mutationsproben aus 6.6 und die offene Abnahme am
   echten Android-Tablet (natives `contextmenu`).
