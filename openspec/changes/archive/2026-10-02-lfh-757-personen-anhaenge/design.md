@@ -68,7 +68,7 @@ der den Weg vorgibt (gemessen am 02.10.2026 auf `origin/alpha` `da9bfe1c`, höch
 
 ## Decisions
 
-### D1 — Linker `einsatz_person_anhang` (Migration 0139)
+### D1 — Linker `einsatz_person_anhang` (Migration 0140)
 
 Rein additiv, Spiegel von 0126:
 
@@ -91,7 +91,7 @@ CREATE INDEX idx_einsatz_person_anhang_person
 Begründungen wie LFH-21 D1 (eine Datei je Person, CASCADE von `anhang` für die Schwärzung,
 `einsatz_id` direkt am Linker, Soft-Delete am Linker, Einsatzgleichheit durch Bau). Die
 CASCADE von `einsatz_person` ist ehrlich, weil Personen nur mit dem Einsatz hart
-verschwinden. **Wichtig für 0140:** die neue Tabelle verweist auf `einsatz_person`, nicht auf
+verschwinden. **Wichtig für 0141:** die neue Tabelle verweist auf `einsatz_person`, nicht auf
 `person_zugriff_audit`; das Audit bleibt Leaf, der Rebuild braucht weiter keinen
 `foreign_keys`-Toggle.
 
@@ -108,9 +108,9 @@ und ETB-Sperre (422) ohne Handarbeit. `gebunden_meldung()` lautet danach „Anha
 gebunden (Chat-Nachricht, Dokumentenablage, ETB-Eintrag, Schaden oder Person)“; der Pin in
 `tests/etb_anhang.rs` zieht nach.
 
-### D2 — Audit-Art `anhang` per Rebuild (Migration 0140)
+### D2 — Audit-Art `anhang` per Rebuild (Migration 0141)
 
-Eigene Datei, weil `-- no-transaction` für die ganze Datei gilt und 0139 eine normale
+Eigene Datei, weil `-- no-transaction` für die ganze Datei gilt und 0140 eine normale
 Transaktion verträgt. Inhalt: 0132 wörtlich, nur `CHECK (art IN
 ('detail','export','druck','anhang'))` und der Kopfkommentar (LFH-757, Schema = 0132 1:1).
 Muster: Zwischentabelle, Kopie mit ids, `sqlite_sequence` vor dem `DROP` umhängen, `RENAME`,
@@ -121,11 +121,11 @@ abgelehnt. Er hätte die Einsicht um den Dateinamen erweitert, also genau den Fr
 Protokoll gezogen, das die Schwärzung behält. **`art = 'detail'` für Downloads** ohne
 Rebuild: verwischt, ob jemand die Person geöffnet oder ein Foto geladen hat.
 
-`ZugriffArt` bekommt `Anhang` (Wire `anhang`, Kommentar mit Migration 0140); der Kommentar am
-Enum nennt 0140 als Quelle des CHECK. Codegen zieht `openapi.json` und `types.generated.ts`
+`ZugriffArt` bekommt `Anhang` (Wire `anhang`, Kommentar mit Migration 0141); der Kommentar am
+Enum nennt 0141 als Quelle des CHECK. Codegen zieht `openapi.json` und `types.generated.ts`
 nach.
 
-**Netz:** `db::tests::migration_0140_*` nach dem Muster der 0132-Tests, aber gegen eine Alt-DB
+**Netz:** `db::tests::migration_0141_*` nach dem Muster der 0132-Tests, aber gegen eine Alt-DB
 im **0132-Stand** (0021 und dann 0132 einspielen): Zeilen aller drei Bestandsarten samt ids
 erhalten, Sequenz erhalten (auch bei leerer Tabelle), Schema unverändert, DDL unterscheidet
 sich nur in `,'anhang'`, CHECK nimmt `anhang` und lehnt `foo` ab, `foreign_key_check` leer.
@@ -275,8 +275,8 @@ brauchen es — deshalb kommen sie später“ steht nur im Archiv von LFH-21 und
 
 ## Migration Plan
 
-1. `git fetch origin alpha`, `scripts/check-migrationen.sh` — `0139`/`0140` sind frei.
-2. `0139_einsatz_person_anhang.sql` (additiv) und `0140_person_zugriff_audit_anhang.sql`
+1. `git fetch origin alpha`, `scripts/check-migrationen.sh` — `0140`/`0141` sind frei.
+2. `0140_einsatz_person_anhang.sql` (additiv) und `0141_person_zugriff_audit_anhang.sql`
    (Rebuild, `-- no-transaction` als erste Zeile).
 3. Rollback: eingespielte Migrationen werden nicht editiert. Eine Rücknahme braucht eine
    Folgemigration (Linker und zugehörige `anhang`-Zeilen entfernen; der erweiterte CHECK kann
@@ -302,4 +302,4 @@ Beim Merge hängt die Person als vierte Ablage an diesem Kern (`person::anhang::
 der eigene Baustein `ObjektAnhaenge` aus D6 entfällt, ebenso die Kopie von Domäne und Kern aus D4. `ErfassungsAnhaenge` bekam dafür die Hülle
 `abschnitt`; die Person setzt `vorschau={false}` (D3 unverändert). Das Lese-Audit bleibt in
 `person_zugriff_audit` (D2): `0138_anhang_zugriff_audit.sql` aus LFH-758 hält ihr Protokoll
-ausdrücklich getrennt, weil an der UHS keine Person hängt. Migrationen damit 0139/0140.
+ausdrücklich getrennt, weil an der UHS keine Person hängt. Migrationen damit erst 0139/0140, nach der Auflösung der doppelten 0136 auf `alpha` (PR #379, Tier-Anhänge auf 0139) 0140/0141.

@@ -6,12 +6,12 @@
 -- 0021/0132 (die DDL trägt ihn mit, der Test vergleicht sie).
 --
 -- SQLite ändert einen Spalten-CHECK nur per Tabellen-Rebuild. person_zugriff_audit ist Leaf
--- (keine Tabelle verweist darauf; einsatz_person_anhang aus 0139 verweist auf einsatz_person,
+-- (keine Tabelle verweist darauf; einsatz_person_anhang aus 0140 verweist auf einsatz_person,
 -- nicht hierher) → kein PRAGMA-foreign_keys-Toggle nötig, das DROP löst keine Kaskade aus
 -- (Muster 0112/0132). Die Tabelle trägt AUTOINCREMENT → der sqlite_sequence-Eintrag wird
 -- umgehängt, sonst vergäbe SQLite nach dem Löschen der höchsten Zeile deren id erneut.
 -- Schema = 0132 1:1, einzige Änderung ist der art-CHECK.
--- Abgesichert von db::tests::migration_0140_* (include_str!).
+-- Abgesichert von db::tests::migration_0141_* (include_str!).
 
 CREATE TABLE person_zugriff_audit_neu (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

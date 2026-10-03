@@ -24,7 +24,7 @@
 -- die Person wird mit `AND einsatz_id = ?` geladen). Ein Repo-Test pinnt das.
 --
 -- Die Tabelle verweist auf `einsatz_person`, nicht auf `person_zugriff_audit`: das Audit bleibt
--- Leaf (wichtig für den Rebuild in 0140).
+-- Leaf (wichtig für den Rebuild in 0141).
 CREATE TABLE einsatz_person_anhang (
     id               INTEGER PRIMARY KEY,
     einsatz_id       INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,
