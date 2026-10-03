@@ -1,3 +1,51 @@
+## [1.0.0-alpha.68](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.67...v1.0.0-alpha.68) (2026-10-03)
+
+### Wichtige Änderungen
+
+Bei diesem Update wird eine Datenbankmigrierung durchgeführt, die Duplikate in den Migrationsnummern auflöst. Nach dem Update sollte sichergestellt werden, dass alle Migrationen erfolgreich durchgelaufen sind.
+
+### Aufbewahrung und Archivierung
+
+- Einsätze können nun unterschiedliche Aufbewahrungsfristen für verschiedene Datenkategorien haben (Behandlungsdaten, Personenauskunft, Anhänge). Jede Kategorie kann mit eigener Frist und Rechtsgrundlage versehen werden.
+- In den Organisationseinstellungen können Standardfristen für Datenkategorien hinterlegt werden, die beim Einsatzabschluss vorgeschlagen werden.
+- Die Archivakte zeigt nun den Aufbewahrungsstatus getrennt nach Datenkategorien an.
+- Geschwärzte Einsätze können nach Ablauf einer optionalen Skelett-Frist endgültig aus der Datenbank gelöscht werden. Die Skelett-Frist wird in den Organisationseinstellungen festgelegt.
+- Beim erstmaligen Setzen oder Verkürzen einer Skelett-Frist muss dies explizit bestätigt werden.
+- Die Aufbewahrungsübersicht zeigt nun das Löschdatum und bereits endgültig gelöschte Einsätze an.
+- Gelöschte Einsätze belegen ihre Einsatznummern und IDs dauerhaft, um Verwechslungen auszuschließen. Die Löschung wird in einem separaten Protokoll dokumentiert.
+- Wiederherstellungen aus Backups werden beim nächsten Aufbewahrungslauf automatisch erneut gelöscht, wenn die Frist abgelaufen ist.
+
+### Anhänge
+
+- An Tieren können nun Fotos und Dateien abgelegt werden. In der Tier-Detailansicht erscheint ein neues Paneel "Fotos und Dateien".
+- An Unbewohnbaren Häusern/Objekten (UHS) können nun Dateien hochgeladen werden. In der UHS-Detailansicht gibt es einen neuen Reiter "Dateien".
+- Bei UHS wird jeder Zugriff auf Anhänge protokolliert. Das Zugriffsprotokoll ist nur für die Einsatzleitung einsehbar und kann in der Detailansicht aufgeklappt werden.
+- Anhänge an Tieren und UHS werden bei der Aufbewahrung nach denselben Regeln wie Schadenanhänge behandelt.
+
+### Lagekarte
+
+- Die Eigenposition wird nun automatisch so eingerahmt, dass der Genauigkeitskreis sichtbar ist, maximal bis Zoomstufe 15.
+- Nach manueller Bedienung der Karte (Verschieben, Zoomen, Kartenmodus) erfolgt kein automatischer Anflug der Eigenposition mehr.
+- Die Drehung der Karte bleibt beim Anflug auf die Eigenposition erhalten.
+- Beim Zeichnen werden Stützpunkte nicht mehr von der Eigenpositionsanzeige verdeckt.
+
+### Bedienung
+
+- Die Helligkeitsregelung berücksichtigt nun auch aktuelle DWD-Unwetterwarnungen: Bei schweren oder extremen Unwetterwarnungen am Einsatzort kann die Bildschirmhelligkeit nicht unter den Warnboden gedimmt werden.
+- In der Ablösungsansicht werden Uhrzeiten nun in einer Festbreitenschrift angezeigt, sodass die Breite der Zeilen unabhängig von der dargestellten Zeit konstant bleibt.
+
+### Gerätedaten und Datenschutz
+
+- Beim Abmelden werden personenbezogene Gerätedaten automatisch vom Gerät entfernt, darunter Personen-Erfassungsquittungen, Ortsdaten-Cache und Erfassungswerte.
+- Bei freiwilligem Abmelden werden zusätzlich Einsatztagebuch-Entwürfe gelöscht.
+- Entwürfe ohne angemeldeten Besitzer werden nach 24 Stunden automatisch entfernt.
+- Die Offline-Warteschlange bleibt beim Abmelden erhalten.
+
+### Technisches
+
+- Ein Fehler in der Migrationsnummerierung wurde behoben: Doppelt vergebene Migrationsnummern wurden aufgelöst.
+- Die Volltextsuche im Einsatztagebuch löscht nun auch die Suchindizes entfernter Einträge vollständig.
+
 ## [1.0.0-alpha.67](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.66...v1.0.0-alpha.67) (2026-10-02)
 
 ### Wichtige Änderungen
