@@ -184,7 +184,20 @@ autofix_commit "$r" feature 2
 pruefe "zwei Autofixes in Folge: dritter läuft (Exit 0)" 0 \
   "$(lauf "$r" feature "$(remote_kopf zwei feature)")"
 
-# 8 — Ein Kopf-SHA, den es nicht gibt, ist ein Aufruffehler.
+# 8 — Das Remote lehnt ab, obwohl der Branch noch steht (etwa 403, weil der falsche Token
+# pushte; so geschehen an der Probe #409). Das ist kein bewegter Branch, sondern ein Fehler,
+# und die Meldung darf nicht auf „bewegt" lenken.
+r="$(repo_neu verweigert)"
+datei "$r" feature migrations/0003_eigen.sql
+datei "$r" alpha migrations/0003_fremd.sql
+printf '#!/bin/sh\necho "Zugriff verweigert" >&2\nexit 1\n' > "$ARBEIT/verweigert.git/hooks/pre-receive"
+chmod +x "$ARBEIT/verweigert.git/hooks/pre-receive"
+vorher="$(remote_kopf verweigert feature)"
+pruefe "abgelehnter Push bei stehendem Branch Exit 2" 2 "$(lauf "$r" feature "$vorher")"
+pruefe "abgelehnter Push: Branch unverändert" "$vorher" "$(remote_kopf verweigert feature)"
+enthaelt "abgelehnter Push wird als Fehler gemeldet" "$ARBEIT/ausgabe" "Push fehlgeschlagen"
+
+# 9 — Ein Kopf-SHA, den es nicht gibt, ist ein Aufruffehler.
 r="$(repo_neu aufruf)"
 pruefe "unbekannter Kopf Exit 2" 2 "$(lauf "$r" feature 0123456789abcdef0123456789abcdef01234567)"
 

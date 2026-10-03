@@ -79,8 +79,13 @@ lokales Bare-Repo pushen kann.
 `headRepositoryOwner` und `headRefName` aus `gh pr list`. Der Token kommt aus
 `actions/create-github-app-token` mit `permission-contents: write` und
 `permission-issues: write`, nur für dieses Repository, und wird erst im Reparaturschritt
-erzeugt. `actions/checkout` läuft mit `persist-credentials: false`; der Token geht nur in die
-Push-URL und in `gh`. PR-Code wird nie ausgeführt: das Skript benennt um und ersetzt Text.
+erzeugt. Der Token geht nur in die Push-URL und in `gh`. Der Checkout hinterlegt seinen
+`GITHUB_TOKEN` als `http.extraheader` in einer per `includeIf` eingebundenen Datei, die auch
+für Arbeitsbäume gilt; dieser Header schlägt die Zugangsdaten der Push-URL (gemessen an der
+Probe #409: Push als `github-actions[bot]`, 403). Der Reparaturschritt setzt die Header-Liste
+deshalb über Umgebungs-Konfiguration (`GIT_CONFIG_COUNT`, leerer Wert) zurück; die übrigen
+Schritte holen weiter mit dem Checkout-Token. Ein Push, der bei stehendem Branch scheitert,
+ist Exit 2 und heißt „Push fehlgeschlagen“, nicht „bewegt“. PR-Code wird nie ausgeführt: das Skript benennt um und ersetzt Text.
 Fehlt `RELEASE_APP_ID`, wird die Reparatur mit `::notice::` übersprungen, die Prüfung bleibt.
 Den alten Kopf-Commit lässt der Workflow auf failure, mit der Beschreibung „umnummeriert, neuer
 Commit folgt“; der neue Kopf bekommt seinen Status aus dem eigenen `pull_request`-Lauf.

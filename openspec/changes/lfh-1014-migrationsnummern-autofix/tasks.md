@@ -8,7 +8,8 @@
   Commit · Bestandsmigration geändert → Exit 1, Remote unverändert · Branch im Remote
   inzwischen bewegt → Exit 4, Remote unverändert · Kopf-Branch `alpha` → Exit 3 · drei
   Autofix-Commits an der Spitze → Exit 3 · Kommentardatei nennt `alt → neu` und den
-  Pull-Hinweis. Zuerst laufen lassen und rot sehen.
+  Pull-Hinweis · Push bei stehendem Branch abgelehnt → Exit 2 („Push fehlgeschlagen“).
+  Zuerst laufen lassen und rot sehen.
 - [x] 1.2 `scripts/migrationen-autofix.sh` wie in design.md D2 umsetzen, bis 1.1 grün ist.
 - [x] 1.3 Mutationsproben von Hand: Ziel-Branch-Sperre entfernen, Schleifenzähler auf 30
   setzen, Push mit `--force`; jeweils muss ein Fall aus 1.1 rot werden. Danach zurückdrehen.

@@ -7,7 +7,7 @@
 #     <kopf-sha>     der geprüfte Kopf-Commit; gepusht wird nur, solange der Branch dort steht
 #   Exit 0 = Autofix gepusht · 1 = nicht behebbar (Bestandsmigration verletzt)
 #        2 = Aufruf- oder Umgebungsfehler · 3 = verweigert (Ziel-Branch, Schleifenbremse)
-#        4 = Push abgewiesen (Branch hat sich bewegt) · 5 = nichts umzunummerieren
+#        4 = Push abgewiesen, weil der Branch sich bewegt hat · 5 = nichts umzunummerieren
 #   Umgebung: AUTOFIX_REMOTE  (Vorgabe origin)
 #             AUTOFIX_BERICHT Datei für den PR-Kommentar (Markdown), nur nach Exit 0 geschrieben
 #             AUTOFIX_PRUEFER Prüfskript (Vorgabe: check-migrationen.sh neben diesem Skript)
@@ -106,9 +106,17 @@ neu="$(git -C "$WT" rev-parse HEAD)"
 
 # Ohne Force: nur ein Fast-Forward von <kopf-sha> wird angenommen (Grenze 2).
 if ! git -C "$WT" push -q "$REMOTE" "$neu:refs/heads/$KOPF_BRANCH"; then
-  echo "==> Push abgewiesen: '$KOPF_BRANCH' steht nicht mehr auf ${K:0:12}. Der neue Stand wird" >&2
-  echo "    von seinem eigenen Lauf bewertet." >&2
-  exit 4
+  # Bewegt oder verweigert? Nur ein bewegter Branch ist der erwartete Fall; ein Push, der bei
+  # stehendem Branch scheitert (Rechte, falscher Token), ist ein Fehler und muss so heißen.
+  jetzt="$(git -C "$WT" ls-remote "$REMOTE" "refs/heads/$KOPF_BRANCH" | cut -f1)" || jetzt=""
+  if [ -n "$jetzt" ] && [ "$jetzt" != "$K" ]; then
+    echo "==> Push abgewiesen: '$KOPF_BRANCH' steht nicht mehr auf ${K:0:12}. Der neue Stand wird" >&2
+    echo "    von seinem eigenen Lauf bewertet." >&2
+    exit 4
+  fi
+  echo "FEHLER: Push fehlgeschlagen, obwohl '$KOPF_BRANCH' noch auf ${K:0:12} steht" >&2
+  echo "    (Rechte des Tokens? Ausgabe von git push oben)." >&2
+  exit 2
 fi
 echo "==> Autofix gepusht: $KOPF_BRANCH ${K:0:12} -> ${neu:0:12}"
 
