@@ -117,7 +117,12 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
   Ziel-Branch**; bestehende werden nie geändert, umbenannt oder gelöscht.
 - `scripts/check-migrationen.sh` (gegen `origin/alpha`, vorher `git fetch`), Umlegen mit
   `--umnummerieren`. Durchgesetzt über `.github/workflows/migrationen.yml` (Required Check
-  `Migrationsnummern`); Netz `db::tests::migrationsnummern_sind_eindeutig`.
+  `Migrationsnummern` im Ruleset 17017911; fehlt er, warnt der Push-Lauf auf `alpha`); Netz
+  `db::tests::migrationsnummern_sind_eindeutig`.
+- **Autofix nur auf dem PR-Branch** (LFH-1014): ein reiner Nummernkonflikt wird per Bot-Commit
+  umgelegt (`scripts/migrationen-autofix.sh`), nie auf `alpha`. Danach vor dem nächsten Push
+  den Branch holen. Herleitung:
+  `openspec/changes/lfh-1014-migrationsnummern-autofix/design.md`.
 - **Falle: sqlx spielt eine kleinere, noch nicht eingespielte Migration still nach**
   (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`).
 - **Migrationen entstehen nur über `alpha`**; Freigaben als Merge-Commit, nicht Squash.

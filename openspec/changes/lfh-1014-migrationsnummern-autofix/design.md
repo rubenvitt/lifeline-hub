@@ -60,7 +60,7 @@ Selbsttest gegen echte Git-Repos). Ablauf:
    Trailer `Migrationsnummern-Autofix: LFH-1014`).
 2. `<kopf-sha>` als losgelösten Stand auschecken und `check-migrationen.sh --umnummerieren
    <basis>` laufen lassen. Die Fassung des Prüfskripts kommt vom Ziel-Branch, wie im PR-Job.
-   Exit 1 (Bestandsverletzung) wird durchgereicht, „nichts umzunummerieren“ ist Exit 0 ohne
+   Exit 1 (Bestandsverletzung) wird durchgereicht, „nichts umzunummerieren“ ist Exit 5 ohne
    Commit.
 3. Bei Änderungen committen mit festem Betreff `fix(migrationen): Nummern über <basis> legen`,
    Liste alt → neu im Text, Trailer wie oben.

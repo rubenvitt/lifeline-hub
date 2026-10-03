@@ -7,7 +7,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` → `check-all.test.sh` + `bauziel.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh`.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für

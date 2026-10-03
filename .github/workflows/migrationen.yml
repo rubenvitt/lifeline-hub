@@ -15,6 +15,14 @@
 # OHNE `integration_id`: ein falscher Pin ließe jeden PR still hängen.
 #
 # Die Regel steht in `scripts/check-migrationen.sh` und ist dort selbstgetestet.
+#
+# AUTOFIX (LFH-1014): Ist ein PR aus diesem Repository nur wegen der Nummer rot, legt
+# `scripts/migrationen-autofix.sh` seine neuen Migrationen hinter den Ziel-Branch und pusht das
+# als Bot-Commit auf den PR-Branch — nie auf einen Ziel-Branch, nur als Fast-Forward. Gepusht
+# wird mit einem Token der Release-App, weil ein Push mit `GITHUB_TOKEN` keine CI auslöst und
+# der PR dann ohne Checks hinge. Der alte Kopf bleibt rot, der neue bekommt seinen Status aus
+# dem eigenen `pull_request`-Lauf. Ohne `RELEASE_APP_ID` wird nur geprüft.
+# Herleitung: openspec/changes/lfh-1014-migrationsnummern-autofix/design.md.
 name: Migrationsnummern
 
 on:
@@ -30,8 +38,11 @@ permissions:
   contents: read
 
 concurrency:
-  # Je PR bzw. je Ziel-Branch zählt nur der jüngste Stand.
-  group: migrationen-${{ github.event.pull_request.number || github.ref }}
+  # Je Kopf-Commit bzw. je Ziel-Branch zählt nur der jüngste Lauf. Bewusst je Commit und nicht je
+  # PR: der Autofix-Push startet sofort einen Lauf für denselben PR, und eine Gruppe je PR bräche
+  # den laufenden ab, bevor er Kommentar und Status geschrieben hat. Ein überholter Lauf schreibt
+  # nur auf seinen eigenen, alten Commit.
+  group: migrationen-${{ github.event.pull_request.head.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,6 +54,9 @@ jobs:
     permissions:
       contents: read
       statuses: write
+    env:
+      # Für die `if:` der Autofix-Schritte; ohne Release-App wird nur geprüft.
+      APP_ID: ${{ secrets.RELEASE_APP_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,6 +68,7 @@ jobs:
           BASIS: ${{ github.event.pull_request.base.ref }}
         run: git fetch --no-tags origin "+refs/heads/$BASIS:refs/remotes/origin/$BASIS"
       - name: Prüfen und Status setzen
+        id: pruefen
         env:
           GH_TOKEN: ${{ github.token }}
           BASIS: ${{ github.event.pull_request.base.ref }}
@@ -65,15 +80,21 @@ jobs:
         run: |
           # Die Regel kommt vom ZIEL-Branch, nicht aus dem PR — sonst bewertete ein PR sich mit
           # seiner eigenen Fassung selbst. Nur wenn der Ziel-Branch sie noch nicht trägt, gilt
-          # die des PRs.
-          pruefer=scripts/check-migrationen.sh
-          if git cat-file -e "origin/$BASIS:scripts/check-migrationen.sh" 2> /dev/null; then
-            pruefer="$RUNNER_TEMP/check-migrationen.sh"
-            git show "origin/$BASIS:scripts/check-migrationen.sh" > "$pruefer"
-            chmod +x "$pruefer"
-          fi
+          # die des PRs. Dasselbe für den Autofix; beide landen im selben Verzeichnis, weil der
+          # Autofix das Prüfskript neben sich erwartet.
+          pruefung="$RUNNER_TEMP/pruefung"
+          mkdir -p "$pruefung"
+          for skript in check-migrationen.sh migrationen-autofix.sh; do
+            if git cat-file -e "origin/$BASIS:scripts/$skript" 2> /dev/null; then
+              git show "origin/$BASIS:scripts/$skript" > "$pruefung/$skript"
+            elif [ -f "scripts/$skript" ]; then
+              cp "scripts/$skript" "$pruefung/$skript"
+            fi
+            if [ -f "$pruefung/$skript" ]; then chmod +x "$pruefung/$skript"; fi
+          done
           code=0
-          "$pruefer" "origin/$BASIS" "$KOPF" || code=$?
+          "$pruefung/check-migrationen.sh" "origin/$BASIS" "$KOPF" || code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
           case "$code" in
             0) state=success; text="Neue Migrationen liegen über $BASIS." ;;
             1) state=failure; text="Migrationsnummer kollidiert oder ist eingeschoben (gegen $BASIS)." ;;
@@ -84,7 +105,61 @@ jobs:
               -f state="$state" -f context=Migrationsnummern \
               -f description="$text" -f target_url="$LAUF" > /dev/null
           fi
-          exit "$code"
+      # Der Token entsteht erst, wenn es etwas zu reparieren gibt, und nur mit den zwei Rechten,
+      # die der Autofix braucht (Push, Kommentar). Die App hat Bypass-Rechte auf `alpha`; die
+      # Grenzen dagegen stehen in migrationen-autofix.sh und seinem Selbsttest.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        if: >-
+          steps.pruefen.outputs.code == '1' && env.APP_ID != '' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - name: Umnummerieren und auf den PR-Branch pushen
+        if: steps.app-token.outputs.token != ''
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ github.event.pull_request.base.ref }}
+          KOPF: ${{ github.event.pull_request.head.sha }}
+          KOPF_BRANCH: ${{ github.event.pull_request.head.ref }}
+          NR: ${{ github.event.pull_request.number }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ ! -x "$RUNNER_TEMP/pruefung/migrationen-autofix.sh" ]; then
+            echo "::notice::Autofix übersprungen: weder $BASIS noch der PR tragen migrationen-autofix.sh."
+            exit 0
+          fi
+          # Der Checkout hinterlegt den GITHUB_TOKEN als Header; er schlüge die Push-URL.
+          git config --local --unset-all "http.https://github.com/.extraheader" || true
+          git remote set-url --push origin \
+            "https://x-access-token:$APP_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          id="$(GH_TOKEN="$APP_TOKEN" gh api "users/$APP_SLUG%5Bbot%5D" --jq .id)"
+          git config --global user.name "$APP_SLUG[bot]"
+          git config --global user.email "$id+$APP_SLUG[bot]@users.noreply.github.com"
+          code=0
+          AUTOFIX_BERICHT="$RUNNER_TEMP/bericht.md" \
+            "$RUNNER_TEMP/pruefung/migrationen-autofix.sh" "origin/$BASIS" "$KOPF_BRANCH" "$KOPF" \
+            || code=$?
+          case "$code" in
+            0)
+              GH_TOKEN="$APP_TOKEN" gh api "repos/$GITHUB_REPOSITORY/issues/$NR/comments" \
+                -F body=@"$RUNNER_TEMP/bericht.md" > /dev/null
+              gh api "repos/$GITHUB_REPOSITORY/statuses/$KOPF" \
+                -f state=failure -f context=Migrationsnummern \
+                -f description="Umnummeriert per Autofix, neuer Commit folgt." \
+                -f target_url="$LAUF" > /dev/null
+              echo "Autofix gepusht, siehe Kommentar an #$NR." >> "$GITHUB_STEP_SUMMARY" ;;
+            *) echo "::warning::Autofix nicht angewendet (Exit $code), siehe Log." ;;
+          esac
+      - name: Ergebnis der Prüfung
+        env:
+          CODE: ${{ steps.pruefen.outputs.code }}
+        run: exit "$CODE"
 
   offene-prs:
     name: Offene PRs neu bewerten
@@ -95,11 +170,14 @@ jobs:
       contents: read
       statuses: write
       pull-requests: read
+    env:
+      APP_ID: ${{ secrets.RELEASE_APP_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Jeden offenen PR gegen diesen Branch prüfen
+        id: pruefen
         env:
           GH_TOKEN: ${{ github.token }}
           BASIS: ${{ github.ref_name }}
@@ -108,10 +186,12 @@ jobs:
           # Das Skript kommt hier vom Ziel-Branch selbst, nicht aus dem PR.
           git fetch --no-tags origin "+refs/heads/$BASIS:refs/remotes/origin/$BASIS"
           gh pr list --repo "$GITHUB_REPOSITORY" --base "$BASIS" --state open --limit 200 \
-            --json number --jq '.[].number' > prs.txt
+            --json number,headRefName,isCrossRepository \
+            --jq '.[] | "\(.number) \(.headRefName) \(.isCrossRepository)"' > prs.txt
           echo "Offene PRs gegen $BASIS: $(wc -l < prs.txt)"
           rot=0
-          while read -r nr; do
+          : > reparieren.txt
+          while read -r nr branch fremd; do
             # Ein PR, der zwischen Liste und Abruf geschlossen wurde, bricht die Runde nicht ab.
             git fetch --no-tags --quiet origin "+refs/pull/$nr/head:refs/remotes/pr/$nr" || {
               echo "::warning::PR #$nr: Kopf nicht abrufbar, übersprungen"; continue; }
@@ -123,7 +203,9 @@ jobs:
             case "$code" in
               0) state=success; text="Neue Migrationen liegen über $BASIS." ;;
               1) state=failure; text="Migrationsnummer kollidiert oder ist eingeschoben (gegen $BASIS)."
-                 rot=$((rot + 1)); echo "::warning::PR #$nr: Migrationsnummer gegen $BASIS verletzt" ;;
+                 rot=$((rot + 1)); echo "::warning::PR #$nr: Migrationsnummer gegen $BASIS verletzt"
+                 # Nur PRs aus diesem Repository: in einen Fork kann der Autofix nicht pushen.
+                 [ "$fremd" = false ] && echo "$nr $branch $kopf" >> reparieren.txt ;;
               *) state=error; text="Prüfung nicht möglich, siehe Lauf."
                  rot=$((rot + 1)); echo "::warning::PR #$nr: Prüfung nicht möglich (Exit $code)" ;;
             esac
@@ -134,3 +216,64 @@ jobs:
           # Der Lauf selbst bleibt grün: rot ist der PR, nicht der Ziel-Branch. Die Zahl steht
           # in der Zusammenfassung, damit ein Blick auf den Push-Lauf reicht.
           echo "PRs mit rotem Status \`Migrationsnummern\`: $rot" >> "$GITHUB_STEP_SUMMARY"
+          echo "reparieren=$(wc -l < reparieren.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+      - name: Ist der Status Pflicht?
+        if: github.ref_name == 'alpha'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ github.ref_name }}
+        run: |
+          # Fehlt der Eintrag im Ruleset, ist ein roter Status nur eine Anzeige: GitHub mergt
+          # trotzdem (so geschehen mit #367 am 03.10.2026). Gemeldet, nicht rot — ein roter
+          # Push-Lauf hielte keinen Merge auf.
+          pflicht="$(gh api "repos/$GITHUB_REPOSITORY/rules/branches/$BASIS" --jq \
+            '[.[] | select(.type == "required_status_checks")
+              | .parameters.required_status_checks[].context] | index("Migrationsnummern")')"
+          if [ "$pflicht" = null ] || [ -z "$pflicht" ]; then
+            echo "::warning::\`Migrationsnummern\` ist auf $BASIS kein Required Check — rote PRs lassen sich mergen."
+            echo "⚠️ \`Migrationsnummern\` ist auf $BASIS kein Required Check (Ruleset 17017911)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        if: steps.pruefen.outputs.reparieren != '0' && env.APP_ID != ''
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - name: Rote PRs umnummerieren
+        if: steps.app-token.outputs.token != ''
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ github.ref_name }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Wie im PR-Job: der Header des Checkouts schlüge die Push-URL.
+          git config --local --unset-all "http.https://github.com/.extraheader" || true
+          git remote set-url --push origin \
+            "https://x-access-token:$APP_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          id="$(GH_TOKEN="$APP_TOKEN" gh api "users/$APP_SLUG%5Bbot%5D" --jq .id)"
+          git config --global user.name "$APP_SLUG[bot]"
+          git config --global user.email "$id+$APP_SLUG[bot]@users.noreply.github.com"
+          umnummeriert=0
+          while read -r nr branch kopf; do
+            echo "::group::Autofix PR #$nr ($branch)"
+            code=0
+            AUTOFIX_BERICHT="$RUNNER_TEMP/bericht-$nr.md" \
+              scripts/migrationen-autofix.sh "origin/$BASIS" "$branch" "$kopf" || code=$?
+            echo "::endgroup::"
+            if [ "$code" = 0 ]; then
+              umnummeriert=$((umnummeriert + 1))
+              GH_TOKEN="$APP_TOKEN" gh api "repos/$GITHUB_REPOSITORY/issues/$nr/comments" \
+                -F body=@"$RUNNER_TEMP/bericht-$nr.md" > /dev/null
+              gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
+                -f state=failure -f context=Migrationsnummern \
+                -f description="Umnummeriert per Autofix, neuer Commit folgt." \
+                -f target_url="$LAUF" > /dev/null
+            else
+              echo "::warning::PR #$nr: Autofix nicht angewendet (Exit $code)"
+            fi
+          done < reparieren.txt
+          echo "Per Autofix umnummeriert: $umnummeriert" >> "$GITHUB_STEP_SUMMARY"
