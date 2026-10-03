@@ -45,7 +45,11 @@ async fn lokale_sprechgruppe(
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )
     .await;
-    assert_eq!(status, StatusCode::CREATED, "Sprechgruppe anlegen: {json:?}");
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "Sprechgruppe anlegen: {json:?}"
+    );
     json["id"].as_i64().unwrap()
 }
 
@@ -69,7 +73,11 @@ async fn neuer_einsatz_hat_leere_fuehrungsstelle() {
 
     let (status, json) = lesen(&app, &admin, einsatz).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
-    assert_eq!(json, json!({"sprechgruppen": []}), "leere Angaben fehlen im JSON");
+    assert_eq!(
+        json,
+        json!({"sprechgruppen": []}),
+        "leere Angaben fehlen im JSON"
+    );
 }
 
 #[tokio::test]
@@ -93,7 +101,10 @@ async fn beobachter_liest_und_darf_nicht_schreiben() {
 
     let (status, _) = patchen(&app, &bea, einsatz, json!({"rufname": "Anders"})).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(lesen(&app, &admin, einsatz).await.1["rufname"], "Florian 10/1");
+    assert_eq!(
+        lesen(&app, &admin, einsatz).await.1["rufname"],
+        "Florian 10/1"
+    );
 }
 
 #[tokio::test]
@@ -104,11 +115,21 @@ async fn ohne_lesezugriff_wie_beim_einsatzkopf() {
     benutzer_anlegen(&app, &admin, "fremd", "keine").await;
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
 
-    let (kopf, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}"), &fremd, None).await;
+    let (kopf, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &fremd,
+        None,
+    )
+    .await;
     assert!(kopf.is_client_error(), "Vorbedingung: {kopf}");
     let (status, json) = lesen(&app, &fremd, einsatz).await;
     assert_eq!(status, kopf, "dieselbe Tür wie der Kopf");
-    assert!(json.get("sprechgruppen").is_none(), "keine Angaben: {json:?}");
+    assert!(
+        json.get("sprechgruppen").is_none(),
+        "keine Angaben: {json:?}"
+    );
 }
 
 // ---------- Teil-Patch ----------
@@ -177,7 +198,11 @@ async fn sprechgruppen_ersetzen_die_zuordnung() {
         .iter()
         .map(|s| s["bezeichnung"].as_str().unwrap())
         .collect();
-    assert_eq!(namen, ["505", "311"], "sortiert nach Betriebsart: DMO vor TMO");
+    assert_eq!(
+        namen,
+        ["505", "311"],
+        "sortiert nach Betriebsart: DMO vor TMO"
+    );
 
     let (_, json) = patchen(&app, &admin, einsatz, json!({"sprechgruppe_ids": [tmo]})).await;
     assert_eq!(json["sprechgruppen"].as_array().unwrap().len(), 1);

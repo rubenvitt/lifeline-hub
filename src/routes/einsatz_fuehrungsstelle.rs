@@ -33,7 +33,9 @@ pub async fn lesen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<FuehrungsstelleAnzeige>, AppError> {
-    Ok(Json(fuehrungsstelle::laden(&state.pool, ctx.einsatz.id).await?))
+    Ok(Json(
+        fuehrungsstelle::laden(&state.pool, ctx.einsatz.id).await?,
+    ))
 }
 
 /// PATCH /api/einsaetze/{id}/fuehrungsstelle — echter Teil-Patch. Prüfungen vor dem Schreiben,

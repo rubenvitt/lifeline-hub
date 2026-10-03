@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -29,6 +29,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import {
   einheitDetailPfad,
   einsatzabschnittePfad,
+  einsatzdatenPfad,
   fahrzeugePfad,
   lageberichtDetailPfad,
   parseFunkplanAnsicht,
@@ -45,10 +46,12 @@ import {
   aufklappbareSchluessel,
   baueFunkplan,
   funkplanLuecken,
+  gegenstelleHinweis,
   rendereFunkplanMarkdown,
   type FunkplanQuellen,
   type FunkplanZeile,
 } from '../stab/funkplan';
+import type { FuehrungsstelleQuelle } from '../stab/fuehrungsstelle';
 import type { Luecke, Quelle, Verbindung } from '../stab/luecken';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
@@ -65,7 +68,9 @@ import './funkplanPrint.css';
  *   kein leerer Bestand: ihre Ebene fehlt, und der Grund steht oberhalb der Tabelle (D2). Eine
  *   Liste eines fremden Moduls läuft nur bei Freigabe des Servers (LFH-669, Spec
  *   `modul-freigabe`); ist ihr Modul gesperrt, geht sie ohne Anfrage durch dieselbe Weiche wie
- *   ein 403. Die Sprechgruppen gehören keinem Modul (`PFAD_KEY`).
+ *   ein 403. Die Sprechgruppen gehören keinem Modul (`PFAD_KEY`), ebenso die eigene
+ *   Führungsstelle als sechste Quelle (LFH-849, gepflegt auf den Einsatzdaten): erfasst steht
+ *   sie als erste Zeile, sonst nennt das Lücken-Paneel sie.
  * - **Form:** `form="tabelle"` in jeder Breite (Vergleichsfläche, `NUR_TABELLE`). Kein Suchen,
  *   Sortieren oder Filtern, die Ordnung ist der Baum (D3, D4). Bearbeitet wird am Datensatz, jede
  *   Zeile führt über ihre Kennung dorthin (D7).
@@ -98,6 +103,18 @@ function useQuelle<T>(
   const zustand: AbrufZustand = !frei ? 'gesperrt' : q.data != null ? 'daten' : abrufZustand(q);
   const data = frei ? q.data : undefined;
   return useMemo(() => ({ zustand, daten: data ?? [] }), [zustand, data]);
+}
+
+/** Die eigene Führungsstelle als Quelle (LFH-849), mit derselben Weiche wie die Listen. */
+function useFuehrungsstelleQuelle(q: {
+  data: FuehrungsstelleQuelle['daten'] | undefined;
+  error: unknown;
+  isError: boolean;
+  isPending: boolean;
+}): FuehrungsstelleQuelle {
+  const zustand: AbrufZustand = q.data != null ? 'daten' : abrufZustand(q);
+  const data = q.data ?? null;
+  return useMemo(() => ({ zustand, daten: data }), [zustand, data]);
 }
 
 function Mono({ children }: { children: ReactNode }) {
@@ -223,16 +240,18 @@ function LueckenZeile<T>({
   titel,
   luecke,
   treffer,
+  letzte = false,
 }: {
   titel: string;
   luecke: Luecke<T>;
   treffer: (x: T) => { key: Key; name: string; ziel: string | null };
+  letzte?: boolean;
 }) {
   const { token, rollen } = useRollen();
   const gezeigt = luecke.treffer.slice(0, TREFFER_DECKEL).map(treffer);
   const rest = luecke.treffer.length - gezeigt.length;
   return (
-    <PaneelZeile>
+    <PaneelZeile style={letzte ? { borderBlockEnd: 'none' } : undefined}>
       <div data-lfh="funkplan-luecke">
         <Flex wrap align="baseline" gap={token.marginXS}>
           <span>{titel}</span>
@@ -395,15 +414,21 @@ export default function FunkplanPage() {
     queryKey: einsatzKeys.sprechgruppen(einsatzId),
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
+  // Die eigene Führungsstelle (LFH-849): Teil der Kopfdaten, kein Modul; live über `einsatz`.
+  const fuehrungsstelleQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+  });
 
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
   const fahrzeuge = useQuelle(fahrzeugeQuery, fahrzeugeFrei);
   const personal = useQuelle(personalQuery, personalFrei);
   const sprechgruppen = useQuelle(sprechgruppenQuery);
+  const fuehrungsstelle = useFuehrungsstelleQuelle(fuehrungsstelleQuery);
   const quellen: FunkplanQuellen = useMemo(
-    () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen }),
-    [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen],
+    () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle }),
+    [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle],
   );
   const zeilen = useMemo(() => baueFunkplan(quellen), [quellen]);
   const luecken = useMemo(() => funkplanLuecken(quellen), [quellen]);
@@ -465,9 +490,10 @@ export default function FunkplanPage() {
         ? baueFernmeldeskizze(
             abschnitte.daten,
             einheiten.zustand === 'daten' ? einheiten.daten : null,
+            fuehrungsstelle,
           )
         : null,
-    [ansicht, abschnitte, einheiten],
+    [ansicht, abschnitte, einheiten, fuehrungsstelle],
   );
   const [skizzeZugeklappt, setSkizzeZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const skizzeKlappbar = useMemo(
@@ -513,6 +539,7 @@ export default function FunkplanPage() {
     fahrzeugeFrei ? fahrzeugeQuery.dataUpdatedAt : undefined,
     personalFrei ? personalQuery.dataUpdatedAt : undefined,
     sprechgruppenQuery.dataUpdatedAt,
+    fuehrungsstelleQuery.dataUpdatedAt,
   );
 
   // Die Skizze zeigt keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review LFH-625).
@@ -522,6 +549,8 @@ export default function FunkplanPage() {
   )
     .map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`)
     .join(' · ');
+
+  const gegenstelle = gegenstelleHinweis(quellen);
 
   // Nur Gescheitertes und Gesperrtes: Ladendes kündigt die Tabelle selbst an.
   const fehlend = fehlendeQuellen(quellen).filter((f) => f.zustand !== 'laden');
@@ -608,19 +637,32 @@ export default function FunkplanPage() {
           <LueckenZeile
             titel="Einsatzlokale Sprechgruppen ohne Zuordnung"
             luecke={luecken.lokaleSprechgruppenOhneZuordnung}
-            // Kein Ziel: eine Sprechgruppe hat keine eigene Seite, zugeordnet wird am Abschnitt
-            // bzw. an der Einheit (`SprechgruppenPicker`).
+            // Kein Ziel: eine Sprechgruppe hat keine eigene Seite, zugeordnet wird am Abschnitt,
+            // an der Einheit bzw. an der Führungsstelle (`SprechgruppenPicker`).
             treffer={(s) => ({ key: s.id, name: s.bezeichnung, ziel: null })}
+            letzte={gegenstelle == null}
           />
-          {/* LFH-849: der Einsatz kennt die eigene Führungsstelle (Rufname, Sprechgruppen,
-              Erreichbarkeit) noch nicht. Keine erfundene Zeile, sondern die benannte Lücke. */}
-          <PaneelZeile style={{ borderBlockEnd: 'none' }}>
-            <Flex wrap align="baseline" gap={token.marginXS}>
-              <span>{GEGENSTELLE_HINWEIS}</span>
-              <span style={monoStil(14, 500)}>—</span>
-              <span style={{ color: rollen.gedaempft }}>nicht erfasst</span>
-            </Flex>
-          </PaneelZeile>
+          {/* LFH-849: solange die eigene Führungsstelle nicht erfasst ist (oder nicht vorliegt),
+              steht sie als benannte Lücke da, mit dem Weg zu ihrem Pflegeort. Erfasst ist sie
+              die erste Zeile des Plans. */}
+          {gegenstelle != null && (
+            <PaneelZeile style={{ borderBlockEnd: 'none' }}>
+              <div data-lfh="funkplan-luecke">
+                <Flex wrap align="baseline" gap={token.marginXS}>
+                  <span>{GEGENSTELLE_HINWEIS}</span>
+                  <span style={monoStil(14, 500)}>—</span>
+                  <span style={{ color: rollen.gedaempft }}>{gegenstelle}</span>
+                </Flex>
+                {quellen.fuehrungsstelle.zustand === 'daten' && (
+                  <Flex wrap align="center">
+                    <Link to={einsatzdatenPfad(einsatzId)} style={stabZeilenzielStil(token)}>
+                      auf Einsatzdaten erfassen
+                    </Link>
+                  </Flex>
+                )}
+              </div>
+            </PaneelZeile>
+          )}
         </Paneel>
 
         {fehlend.length > 0 && (
@@ -709,15 +751,17 @@ export default function FunkplanPage() {
               titel: {
                 spalte: 'stelle',
                 ziel: (z) =>
-                  z.id == null
-                    ? null
-                    : z.art === 'abschnitt'
-                      ? abschnittZiel(z.id)
-                      : z.art === 'einheit'
-                        ? einheitDetailPfad(einsatzId, z.id)
-                        : z.art === 'fahrzeug'
-                          ? fahrzeugePfad(einsatzId, { fahrzeug: z.id })
-                          : null,
+                  z.art === 'fuehrungsstelle'
+                    ? einsatzdatenPfad(einsatzId)
+                    : z.id == null
+                      ? null
+                      : z.art === 'abschnitt'
+                        ? abschnittZiel(z.id)
+                        : z.art === 'einheit'
+                          ? einheitDetailPfad(einsatzId, z.id)
+                          : z.art === 'fahrzeug'
+                            ? fahrzeugePfad(einsatzId, { fahrzeug: z.id })
+                            : null,
               },
               sekundaer: ['rufname', 'tmo', 'dmo'],
             }}
