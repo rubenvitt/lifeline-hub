@@ -412,14 +412,26 @@ pub async fn liste_fuer(
         .collect())
 }
 
+/// Ergebnis einer Einsatz-Mutation, die System-ETB-Einträge schreibt (LFH-858): der neu
+/// geladene Einsatz und die Kennungen der Einträge, in Schreibreihenfolge. Die Route meldet
+/// jede Kennung nach dem Commit als `etb`-Ereignis (`LiveHub::publiziere`), damit offene
+/// ETB-Schirme, die Kopfzahl und der Modulzähler ohne Neuladen nachziehen — Muster
+/// `stab::repo::AbschlussErgebnis`.
+#[derive(Debug)]
+pub struct MitEtbEintraegen {
+    pub einsatz: Einsatz,
+    pub etb_eintrag_ids: Vec<i64>,
+}
+
 /// Schließt einen Einsatz ab (nur wenn aktuell `aktiv`) und lädt ihn neu.
 /// Das `status = 'aktiv'`-Prädikat im WHERE schützt gegen Races; die fachliche
-/// 409-Prüfung erfolgt zusätzlich im Handler.
+/// 409-Prüfung erfolgt zusätzlich im Handler. Die ETB-Kennungen sind die der automatischen
+/// Frist und der Kategorie-Fristen; ein Re-Close-No-Op liefert keine.
 pub async fn abschliessen(
     pool: &SqlitePool,
     einsatz_id: i64,
     von_benutzer_id: i64,
-) -> Result<Einsatz, AppError> {
+) -> Result<MitEtbEintraegen, AppError> {
     // Dauer-Politik vor der tx laden (eigener Pool-Borrow); steuert die Auto-Befüllung.
     let einstellungen = super::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
@@ -433,6 +445,7 @@ pub async fn abschliessen(
     let kategorie_vorgaben =
         crate::org::aufbewahrung_kategorie::laden(pool, org_id.unwrap_or(0)).await?;
 
+    let mut etb_eintrag_ids = Vec::new();
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
         "UPDATE einsatz \
@@ -476,7 +489,7 @@ pub async fn abschliessen(
                         "Aufbewahrungsfrist automatisch gesetzt auf {neue_frist} \
                          (Aufbewahrungs-Dauer {dauer} Tage ab Abschluss)"
                     );
-                    crate::etb::repo::anlegen_tx(
+                    let etb_id = crate::etb::repo::anlegen_tx(
                         &mut tx,
                         einsatz_id,
                         von_benutzer_id,
@@ -494,6 +507,7 @@ pub async fn abschliessen(
                         },
                     )
                     .await?;
+                    etb_eintrag_ids.push(etb_id);
                 }
             }
         }
@@ -504,7 +518,7 @@ pub async fn abschliessen(
                     .fetch_one(&mut *tx)
                     .await?;
             if let Some(abgeschlossen_at) = abgeschlossen_at {
-                super::aufbewahrung_kategorie::fristen_beim_abschluss(
+                let kategorie_ids = super::aufbewahrung_kategorie::fristen_beim_abschluss(
                     &mut tx,
                     einsatz_id,
                     von_benutzer_id,
@@ -513,25 +527,29 @@ pub async fn abschliessen(
                     &kategorie_vorgaben,
                 )
                 .await?;
+                etb_eintrag_ids.extend(kategorie_ids);
             }
         }
     }
     tx.commit().await?;
-    laden(pool, einsatz_id).await
+    Ok(MitEtbEintraegen {
+        einsatz: laden(pool, einsatz_id).await?,
+        etb_eintrag_ids,
+    })
 }
 
 /// Setzt die Aufbewahrungsfrist (`retention_bis`) eines Einsatzes und schreibt in
 /// derselben Transaktion einen ETB-System-Eintrag als Audit (LFH-130, ETB-Kopplung
 /// Pattern B). `neue_frist = None` hebt die Frist auf (unbegrenzt). Der Audit-Text
 /// wird vom Aufrufer gebildet (er kennt alten/neuen Wert). Die Verkürzungs-
-/// Bestätigung ist Sache des Handlers.
+/// Bestätigung ist Sache des Handlers. Liefert genau eine ETB-Kennung, den Audit-Eintrag.
 pub async fn frist_setzen(
     pool: &SqlitePool,
     einsatz_id: i64,
     erfasser_id: i64,
     neue_frist: Option<&str>,
     audit_inhalt: &str,
-) -> Result<Einsatz, AppError> {
+) -> Result<MitEtbEintraegen, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
     // Bewacht (LFH-23, design.md D6): die Route prüft die Tombstones vorher, aber zwischen
@@ -564,7 +582,7 @@ pub async fn frist_setzen(
             AppError::Internal("Frist-UPDATE ohne Zeile, aber ohne Tombstone".into())
         }));
     }
-    crate::etb::repo::anlegen_tx(
+    let etb_id = crate::etb::repo::anlegen_tx(
         &mut tx,
         einsatz_id,
         erfasser_id,
@@ -583,7 +601,10 @@ pub async fn frist_setzen(
     )
     .await?;
     tx.commit().await?;
-    laden(pool, einsatz_id).await
+    Ok(MitEtbEintraegen {
+        einsatz: laden(pool, einsatz_id).await?,
+        etb_eintrag_ids: vec![etb_id],
+    })
 }
 
 // ---------- Aufbewahrung / Purge (LFH-135) ----------
@@ -753,7 +774,8 @@ pub async fn soft_delete_einsatz(
 /// Zeilen wird neu gelesen und eingeordnet: geschwärzt oder Karenz abgelaufen → 409
 /// (endgültiger Lebenszyklus-Zustand, kein Rückweg), nicht vorgemerkt → 422 (die Frist
 /// ändert man dort über `PUT …/aufbewahrungsfrist`), aktiv → 409, unbekannt → 404.
-/// Keine Ablehnung schreibt.
+/// Keine Ablehnung schreibt. Liefert die Kennung des ETB-Eintrags für das `etb`-Ereignis
+/// (LFH-858).
 pub async fn wiederherstellen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -761,7 +783,7 @@ pub async fn wiederherstellen(
     admin_org_id: i64,
     neue_frist: Option<&str>,
     jetzt: chrono::DateTime<Utc>,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     // `write_retry!` (BEGIN IMMEDIATE, F09/LFH-240): der Körper liest vor dem Schreiben; in
     // einer verzögerten Transaktion bräche der Lock-Aufstieg bei jedem parallelen Schreiber
@@ -839,8 +861,7 @@ pub async fn wiederherstellen(
                 berichtigt_eintrag_id: None,
             },
         )
-        .await?;
-        Ok(())
+        .await
     })
 }
 
@@ -1311,7 +1332,7 @@ mod tests {
         let leit = benutzer_anlegen(&pool, "leit").await;
         let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
-        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap().einsatz;
         assert_eq!(abgeschlossen.status, EinsatzStatus::Abgeschlossen);
         assert!(abgeschlossen.abgeschlossen_at.is_some());
         assert_eq!(abgeschlossen.abgeschlossen_von, Some(leit));
@@ -3025,7 +3046,7 @@ mod tests {
         let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         setze_dauer(&pool, einsatz.id, leit, 30).await;
 
-        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap().einsatz;
         // retention_bis = abgeschlossen_at + 30 Tage (gleiche Uhrzeit, kanonisches Format).
         let erwartet = super::super::retention::berechne_retention_bis(
             abgeschlossen.abgeschlossen_at.as_deref().unwrap(),
@@ -3055,7 +3076,7 @@ mod tests {
         let leit = benutzer_anlegen(&pool, "leit").await;
         let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
 
-        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap().einsatz;
         assert_eq!(abgeschlossen.retention_bis, None);
     }
 
@@ -3068,7 +3089,7 @@ mod tests {
         // Kein Einsatz-Override; Org-Default=30.
         setze_org_dauer(&pool, einsatz.org_id, leit, 30).await;
 
-        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap().einsatz;
         let erwartet = super::super::retention::berechne_retention_bis(
             abgeschlossen.abgeschlossen_at.as_deref().unwrap(),
             30,
@@ -3090,7 +3111,7 @@ mod tests {
         setze_dauer(&pool, einsatz.id, leit, 60).await;
         setze_org_dauer(&pool, einsatz.org_id, leit, 30).await;
 
-        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap().einsatz;
         let erwartet = super::super::retention::berechne_retention_bis(
             abgeschlossen.abgeschlossen_at.as_deref().unwrap(),
             60,
@@ -3120,7 +3141,7 @@ mod tests {
         .await
         .unwrap();
 
-        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap().einsatz;
         // Auto-Fill darf die manuelle Frist nicht überschreiben.
         assert_eq!(
             abgeschlossen.retention_bis.as_deref(),
@@ -3143,7 +3164,8 @@ mod tests {
             "Aufbewahrungsfrist gesetzt auf 2030-01-01 00:00:00",
         )
         .await
-        .unwrap();
+        .unwrap()
+        .einsatz;
         assert_eq!(
             aktualisiert.retention_bis.as_deref(),
             Some("2030-01-01 00:00:00")
@@ -3245,7 +3267,8 @@ mod tests {
 
         let aufgehoben = frist_setzen(&pool, einsatz.id, leit, None, "aufgehoben")
             .await
-            .unwrap();
+            .unwrap()
+            .einsatz;
         assert_eq!(aufgehoben.retention_bis, None);
     }
 
