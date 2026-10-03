@@ -6,7 +6,7 @@ describe('tzIconKey', () => {
     expect(tzIconKey({ grundzeichen: 'anlass' })).toBe(tzIconKey({ grundzeichen: 'anlass' }));
   });
 
-  it('beginnt mit dem tz|-Präfix (für den styleimagemissing-Filter)', () => {
+  it('beginnt mit dem tz|-Präfix (für den Bild-Resolver)', () => {
     expect(tzIconKey({ grundzeichen: 'anlass' }).startsWith('tz|')).toBe(true);
   });
 
