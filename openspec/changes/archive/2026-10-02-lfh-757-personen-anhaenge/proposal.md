@@ -64,7 +64,7 @@ Person, weil sie aus dem Register gebaut wird.
 
 ## Impact
 
-- **Migrationen:** `0140_einsatz_person_anhang.sql` (neuer Linker, rein additiv) und
+- **Migrationen:** `0142_einsatz_person_anhang.sql` (neuer Linker, rein additiv) und
   `0141_person_zugriff_audit_anhang.sql` (Rebuild von `person_zugriff_audit` mit Art `anhang`,
   `-- no-transaction`, Muster 0132). Stand 02.10.2026 ist `0134` die höchste Nummer auf
   `origin/alpha`. Vor dem PR erneut mit `scripts/check-migrationen.sh` prüfen.

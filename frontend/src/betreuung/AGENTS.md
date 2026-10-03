@@ -18,8 +18,8 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   (`istNachgetragen`); Rücknahme unumkehrbar mit Rückfrage (`betreuung/MeldeVerlauf.tsx`);
   Aufklappen über `Datensicht.aufklappen`, seit LFH-697 der einzige Aufklappweg.
 - **Meldungen offline** (LFH-675, `openspec/changes/archive/2026-09-29-lfh-675-betreuung-meldungen-offline/design.md`):
-  `offline/schreiben.ts` (`stand`/`belegung`) mit `client_id`; Replay-Lookup **vor** jeder
-  Zustandsprüfung (auch nach Einsatzende, `EinsatzSchreibfreigabe`); Erfassungszeit nur an der vorgemerkten Kopie, online die Serveruhr.
+  `offline/schreiben.ts` (`stand`/`belegung`) mit `client_id`; Replay-Lookup nach dem Lese-Gate,
+  aber **vor** jeder Zustandsprüfung (auch nach Einsatzende, `EinsatzSchreibfreigabe`, LFH-769); Erfassungszeit nur an der vorgemerkten Kopie, online die Serveruhr.
   Zeitpunkt der vorgemerkten Kopie: LFH-705, Regel in `offline/AGENTS.md`, „Schreiben ohne Netz“.
 - **Verpflegung** (LFH-634, `pages/VerpflegungPage.tsx`, `src/verpflegung/`): eigene Zeitfenster;
   Bedarf wird **erfasst**, Vorschläge ohne Quelle bleiben leer (nicht 0); Sonderkost ist Teilmenge

@@ -63,9 +63,10 @@ pub async fn erfassen(
     let einsatz_id = ctx.einsatz.id;
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
 
-    // Replay erst NACH Auth-/Schreib-/Modul-Gates, aber VOR dem Aktiv-Gate erkennen:
-    // ein bereits committeter Offline-Eintrag bleibt auch im abgeschlossenen Einsatz
-    // abrufbar. Der Lookup ist durch `einsatz_id` gegen Cross-Einsatz-Treffer geschützt.
+    // Replay erst NACH Auth-/Schreib-/Modul-/Lese-Gates, aber VOR dem Aktiv-Gate erkennen:
+    // ein bereits committeter Offline-Eintrag bleibt im abgeschlossenen Einsatz abrufbar,
+    // solange der Einsatz für den Benutzer lesbar ist (LFH-769, `EinsatzSchreibfreigabe`).
+    // Der Lookup ist durch `einsatz_id` gegen Cross-Einsatz-Treffer geschützt.
     let client_id = bereinige(req.client_id);
     if let Some(cid) = &client_id {
         if cid.chars().count() > 64 {

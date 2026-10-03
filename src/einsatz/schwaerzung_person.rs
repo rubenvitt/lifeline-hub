@@ -16,6 +16,10 @@
 //! Bezug steht und jede ihrer Scrub-Spalten genau eine Markierung trägt. Eine neue Tabelle mit
 //! Personenverweis und Freitext macht damit einen Test rot, statt still durchzurutschen.
 //!
+//! **Dateien an der Person** (LFH-757): ein Linker, dessen Zeile die Registry ganz löscht, steht
+//! nicht in [`PERSONENBEZUEGE`], sondern in [`PERSONENANHAENGE`]. Der Vollzug löscht dessen
+//! Dateien samt Linker, wie die Schwärzung des Einsatzes.
+//!
 //! Herleitung: `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D5.
 
 use super::repo::SCHWAERZUNG_PLATZHALTER;
@@ -289,6 +293,29 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
     },
 ];
 
+/// Ein Datei-Linker einer Personenart (LFH-757): bindet Dateien (`anhang`) an die Person. Die
+/// Registry führt ihn als `ZeileLoeschen`, das ein Spalten-Scrub nicht kann. Der Personen-Vollzug
+/// löscht darum die Dateien selbst; der Linker geht per CASCADE mit, wie bei der Schwärzung des
+/// Einsatzes. Auch eine schon entfernte Datei (Linker mit `geloescht_at`) geht.
+#[derive(Debug, Clone, Copy)]
+pub struct PersonenAnhaenge {
+    pub art: PersonenArt,
+    pub tabelle: &'static str,
+    /// FK-Spalte auf die Wurzel der Personenart.
+    pub bezug: &'static str,
+    /// FK-Spalte auf `anhang`.
+    pub anhang: &'static str,
+}
+
+/// Alle Datei-Linker an Personen. Ein Personenverweis steht entweder hier oder in
+/// [`PERSONENBEZUEGE`] (Guard `jeder_personenverweis_ist_als_bezug_deklariert`).
+pub const PERSONENANHAENGE: &[PersonenAnhaenge] = &[PersonenAnhaenge {
+    art: PersonenArt::Betroffene,
+    tabelle: "einsatz_person_anhang",
+    bezug: "person_id",
+    anhang: "anhang_id",
+}];
+
 /// Entfernt die personengebundenen Werte der Person `art`/`person_id` im Einsatz `einsatz_id`,
 /// auf der Transaktions-Verbindung des Aufrufers (atomar mit Kennzeichen und Audit).
 /// Andere Personen und andere Einsätze bleiben unberührt. Prüft nicht, ob die Person existiert
@@ -335,6 +362,25 @@ pub async fn scrubbe_person(
             query = query.bind(SCHWAERZUNG_PLATZHALTER);
         }
         query
+            .bind(einsatz_id)
+            .bind(person_id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    for l in PERSONENANHAENGE.iter().filter(|l| l.art == art) {
+        let regel = TABELLEN
+            .iter()
+            .find(|t| t.tabelle == l.tabelle)
+            .expect("Datei-Linker außerhalb der Registry (Guard)");
+        let sql = format!(
+            "DELETE FROM anhang WHERE id IN \
+               (SELECT {} FROM {} WHERE {} AND {} = ?)",
+            l.anhang,
+            l.tabelle,
+            where_klausel(regel),
+            l.bezug
+        );
+        sqlx::query(sqlx::AssertSqlSafe(sql))
             .bind(einsatz_id)
             .bind(person_id)
             .execute(&mut *conn)

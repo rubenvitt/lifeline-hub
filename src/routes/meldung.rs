@@ -215,8 +215,8 @@ pub async fn anlegen(
     let einsatz_id = ctx.einsatz.id;
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
 
-    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-Gates, aber vor dem
-    // Aktiv-Gate erkennen. Der Lookup bleibt durch die Einsatz-ID mandantenfest.
+    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-/Lese-Gates (LFH-769), aber
+    // vor dem Aktiv-Gate erkennen. Der Lookup bleibt durch die Einsatz-ID mandantenfest.
     let client_id = req
         .client_id
         .as_deref()

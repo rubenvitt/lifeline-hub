@@ -186,6 +186,13 @@ impl<M: ModulMarker> Deref for EinsatzSchreibzugriff<M> {
 /// Einsatzabschluss zurückgeben müssen. Org-Floor, Schreibrecht und Modul-Gate laufen wie bei
 /// [`EinsatzSchreibzugriff`] strukturell im Extractor; der Handler muss `fordere_aktiv` direkt
 /// nach seinem einsatzgebundenen Replay-Lookup und vor jedem echten Insert aufrufen.
+///
+/// Dazu zieht der Typ die volle Lese-Policy (`fordere_lesezugriff`, LFH-769): ein Replay gibt
+/// einen gespeicherten Datensatz heraus und ist damit ein Lesezugriff. Nach der Nachlauffrist
+/// (außer für die Einsatzleitung), nach Fristablauf, Vormerkung oder Schwärzung ist er 403 ohne
+/// Inhalt, wie jede Leseroute dort (Totalsperre, `src/AGENTS.md`, „Aufbewahrung“). Die Sperre
+/// fragt nicht, ob es den Schlüssel gibt, sonst verriete der Statuscode ihn. Am aktiven Einsatz
+/// liest jedes Mitglied, dort ändert sich nichts.
 pub struct EinsatzSchreibfreigabe<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
 
 impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzSchreibfreigabe<M> {
@@ -197,6 +204,7 @@ impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzSchreibfreigabe<M> {
         if let Some(key) = M::KEY {
             ctx.fordere_modul_zugriff(&state.pool, key).await?;
         }
+        ctx.fordere_lesezugriff()?;
         Ok(Self(ctx, PhantomData))
     }
 }
