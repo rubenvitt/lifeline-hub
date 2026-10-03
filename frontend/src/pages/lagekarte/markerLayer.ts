@@ -420,7 +420,7 @@ export function sorgeFuerMarkerLayer(
       paint: { ...KREIS_PAINT },
     });
   }
-  // TZ-Marker — Symbol mit lazy via styleimagemissing geladenem Icon.
+  // Zeichen-Marker — Symbol mit lazy über den Bild-Resolver (`kartenbildResolver.ts`) angelegtem Icon.
   if (!map.getLayer('marker-symbol')) {
     map.addLayer({
       id: 'marker-symbol',

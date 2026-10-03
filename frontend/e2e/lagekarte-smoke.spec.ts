@@ -364,6 +364,70 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
 
+// LFH-841: Die Beschriftungsplaketten (`plakette|…`, 9-Slice) legt der Bild-Resolver an, nicht mehr
+// `styleimagemissing`. Dort angelegt, fehlten sie im laufenden Layout (MapLibre 6 baut die
+// Bildantwort einer Kachel, BEVOR es das Event feuert) und nach einem Stilwechsel ohne neue Daten
+// ganz. Den Fehlgriff verrät MapLibres Warnung „Image … could not be loaded“: sie fällt genau dann,
+// wenn ein Bild zur Layoutzeit fehlte — gezählte Features allein unterscheiden das nicht, weil der
+// Text auch ohne Plakette steht.
+test('Lagekarte: Beschriftungsplaketten stehen sofort, auch nach einem Stilwechsel', async ({
+  page,
+}) => {
+  const fehlbilder: string[] = [];
+  page.on('console', (m) => {
+    if (m.text().includes('could not be loaded')) fehlbilder.push(m.text());
+  });
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  const ort = { lat: 49.3519, lon: 9.1457 };
+  await einsatzortSetzen(page, eid, ort);
+  // Eine Schadenstelle neben dem Einsatzort: im Bild bei Zoom 14, nicht im selben Cluster.
+  const r = await page.request.post(`/api/einsaetze/${eid}/schaeden`, {
+    data: {
+      typ: 'sachschaden',
+      ausmass: 'mittel',
+      ort: 'Schadenstelle Nord',
+      lat: ort.lat + 0.0028,
+      lon: ort.lon + 0.004,
+    },
+  });
+  expect(r.ok(), await r.text()).toBeTruthy();
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+    1,
+  );
+
+  const plaketten = () =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+      // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
+      if (!map?.isStyleLoaded()) return null;
+      return {
+        bilder: map.listImages().filter((id) => id.startsWith('plakette|')).length,
+        // Registriert ist nicht gezeichnet: die Beschriftung muss im Layer stehen.
+        gezeichnet: map.queryRenderedFeatures({
+          layers: ['marker-label', 'marker-einsatzort-label'],
+        }).length,
+      };
+    });
+
+  // Eine Bild-Id je Farbpaar: Einsatzort und Schaden teilen sich die Plakette.
+  await expect
+    .poll(plaketten, { timeout: 15_000, message: 'keine Beschriftungsplakette gezeichnet' })
+    .toEqual({ bilder: 1, gezeichnet: 2 });
+
+  // Ein Grundkarten-/Themenwechsel setzt den Stil neu (`diff: false`) und wirft alle Bilder weg.
+  await page.evaluate(() => {
+    const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+    map.setStyle(map.getStyle(), { diff: false });
+  });
+  await expect
+    .poll(plaketten, { timeout: 15_000, message: 'Plaketten nach dem Stilwechsel nicht zurück' })
+    .toEqual({ bilder: 1, gezeichnet: 2 });
+
+  expect(fehlbilder.filter((t) => t.includes('plakette|'))).toEqual([]);
+});
+
 // LFH-835: Fachobjekt-Zeichen kommen aus @einsatzzeichen, synchron über Canvas gerastert —
 // jsdom hat kein Canvas, das belegt nur der Browser. Pixeldichte 2 → 34 CSS-px = 68 Gerätepixel.
 test.describe('Lagekarte: Fachobjekt-Zeichen', () => {

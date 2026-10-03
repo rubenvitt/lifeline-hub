@@ -227,7 +227,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Ohne Serverbestätigung (Netzfehler) bleibt `laedt` stehen, bis der vorgehaltene Stand im
    * Speicher ist — erst er sagt, WER angemeldet ist, und `RequireAuth` rendert bis dahin
    * nichts Geschütztes. Bei einem gültigen Stand ist die Person danach als der zuletzt
-   * bestätigte Benutzer angemeldet, ohne Netz nur lesend. Ein Fremdstand erreicht den
+   * bestätigte Benutzer angemeldet: Sie liest den vorgehaltenen Stand, und was sie erfasst,
+   * geht in die Offline-Queue, nicht auf die Anmeldung (LFH-780, e2e
+   * `lagebild-offline.spec.ts`). Eine 401 nach der Rückkehr des Servers führt wie sonst zur
+   * Anmeldung, die Queue bleibt. Ein Fremdstand erreicht den
    * Speicher nie: wiederhergestellt wird nur der Stand der bestätigten bzw. gespeicherten
    * Identität selbst.
    *

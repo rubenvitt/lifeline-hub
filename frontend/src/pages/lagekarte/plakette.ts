@@ -22,11 +22,11 @@ export function zonenPlakette(
   return { text: rollen.text, grund: rollen.paneel, rahmen: rollen.linieStark };
 }
 
-/** Präfix der Plakettenbilder; `styleimagemissing` in `Kartenflaeche.tsx` erkennt es daran. */
+/** Präfix der Plakettenbilder; der Bild-Resolver (`kartenbildResolver.ts`) erkennt es daran. */
 export const PLAKETTE_PRAEFIX = 'plakette|';
 
 /**
- * Bild-Id einer Plakette: die Farben stehen in der Id, damit der Handler sie nach einem `setStyle`
+ * Bild-Id einer Plakette: die Farben stehen in der Id, damit der Resolver sie nach einem `setStyle`
  * (der alle Bilder wegwischt) ohne weiteren Zustand neu zeichnen kann.
  */
 export function plakettenBildId(p: Pick<Plakette, 'grund' | 'rahmen'>): string {

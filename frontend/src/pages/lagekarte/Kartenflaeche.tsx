@@ -56,14 +56,13 @@ import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
 import { neuerStilFehlerWaechter } from './stilFehlerWaechter';
+import { kartenbildResolver } from './kartenbildResolver';
 import {
   baueFlaechenFc,
   baueZonenFc,
   planeReAnlegenNachStyle,
   sorgeFuerAbschnittLayer,
   sorgeFuerZonenLayer,
-  plakettenBild,
-  PLAKETTE_PRAEFIX,
   type FlaechenFeatureCollection,
   type ZonenFeatureCollection,
   type ZoneFeature,
@@ -392,8 +391,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const eigenpositionRef = useRef({ daten: eigenpositionFc(null), farbe: rollen.bedien });
   // Suchnadel (LFH-638): wie die Eigenposition nach setStyle re-angelegt, unter ihr.
   const suchnadelRef = useRef({ daten: suchnadelFc(null), farbe: rollen.bedien });
-  // Image-Key → Zeichenquelle; Resolver (`ez|`) und styleimagemissing-Handler (`tz|`) erzeugen
-  // daraus lazy die Karten-Icons.
+  // Image-Key → Zeichenquelle; der Bild-Resolver (`kartenbildResolver.ts`) erzeugt daraus lazy die
+  // Karten-Icons.
   const zeichenRegistryRef = useRef<Map<string, ZeichenQuelle>>(new Map());
   // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker): alle bekannten bzw. aktuell auf der
   // Karte. Nur für `marker-cluster` — Personen-Cluster sind WebGL-Layer, damit sie unter den
@@ -574,25 +573,33 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
-    // Fachobjekte (@einsatzzeichen, LFH-835) über den Resolver, NICHT über `styleimagemissing`:
-    // MapLibre 6 baut die Bildantwort einer Kachel, bevor es das Event feuert — ein dort angelegtes
-    // Bild fehlte im laufenden Layout und erschiene erst beim nächsten Neu-Layout (nach einem
-    // Stilwechsel ohne neue Daten: nie). Den Resolver wartet MapLibre ab, und er überlebt
-    // `setStyle`. Synchron über Canvas, in Bildschirmschärfe, alle gleich groß (der Statusring in
-    // markerLayer.ts ist auf ZEICHEN_KARTEN_PX abgestimmt).
-    map.setMissingStyleImageResolver((id) => {
-      if (!id.startsWith('ez|')) return;
-      const quelle = zeichenRegistryRef.current.get(id);
-      if (quelle?.art !== 'ez' || map.hasImage(id)) return;
-      try {
-        addSymbolImage(map, id, quelle.drawing, {
-          size: ZEICHEN_KARTEN_PX,
-          pixelRatio: kartenPixelRatio(window.devicePixelRatio),
-        });
-      } catch {
-        // Kein Bild ist besser als ein Fehler im Resolver; der Marker bleibt klickbar.
-      }
-    });
+    // Alle Kartenbilder (Plaketten, Fachobjekte, freie Zeichen) über den Resolver, NICHT über
+    // `styleimagemissing` (LFH-841, Begründung in kartenbildResolver.ts). Fachobjekte synchron über
+    // Canvas, in Bildschirmschärfe, alle gleich groß (der Statusring in markerLayer.ts ist auf
+    // ZEICHEN_KARTEN_PX abgestimmt).
+    map.setMissingStyleImageResolver(
+      kartenbildResolver(map, {
+        zeichen: () => zeichenRegistryRef.current,
+        zeichneEz: (id, drawing) =>
+          addSymbolImage(map, id, drawing, {
+            size: ZEICHEN_KARTEN_PX,
+            pixelRatio: kartenPixelRatio(window.devicePixelRatio),
+          }),
+        ladeTz: (tz) => {
+          const { dataUrl, size } = erzeugeTaktischesZeichen(tz);
+          return new Promise((resolve, reject) => {
+            const bild = new Image(size[0], size[1]);
+            // Auf einheitliche Marker-Größe normieren (die TZ-SVGs haben je Grundzeichen
+            // abweichende Größe); erst so deckt der feste Status-Ring (markerLayer.ts, radius 20)
+            // das Symbol ab.
+            bild.onload = () =>
+              resolve({ bild, pixelRatio: Math.max(size[0], size[1]) / ZEICHEN_KARTEN_PX });
+            bild.onerror = reject;
+            bild.src = dataUrl;
+          });
+        },
+      }),
+    );
     // Wechselt die Pixeldichte (anderer Monitor, Browser-Zoom), rastern die schon angelegten
     // Fachobjekt-Zeichen neu, sonst blieben sie bis zum nächsten Stilwechsel unscharf (LFH-842).
     // Nur bei einer anderen Rasterdichte: 1,25 → 1,5 bleibt bei 2.
@@ -602,51 +609,6 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (neu === zeichenDichte) return;
       zeichenDichte = neu;
       rastereZeichenNeu(map, zeichenRegistryRef.current, neu);
-    });
-    // Taktische Zeichen lazy als Karten-Icons: MapLibre meldet fehlende icon-image-IDs, wir rendern
-    // on-demand. Race-Guard, weil das Event während des asynchronen Ladens mehrfach für dieselbe ID
-    // feuern kann (sonst wirft addImage "image already exists").
-    const ladendeIcons = new Set<string>();
-    map.on('styleimagemissing', (e) => {
-      const id = e.id;
-      // Beschriftungsplakette der Zonen und Marker (9-Slice, Farben in der Id). Nach `setStyle`
-      // sind alle Bilder weg; dieser Handler legt sie bei Bedarf neu an.
-      if (id.startsWith(PLAKETTE_PRAEFIX)) {
-        const bild = plakettenBild(id);
-        if (!bild || map.hasImage(id)) return;
-        const { width, height, data, ...dehnung } = bild;
-        map.addImage(id, { width, height, data }, dehnung);
-        return;
-      }
-      if (!id.startsWith('tz|')) return; // fremde IDs ignorieren
-      if (map.hasImage(id) || ladendeIcons.has(id)) return;
-      const quelle = zeichenRegistryRef.current.get(id);
-      if (quelle?.art !== 'tz') return;
-      const tz = quelle.tz;
-      // `erzeugeTaktischesZeichen` kann bei nicht DV-102-konformen Werten synchron werfen. Zuerst
-      // erzeugen, dann zu `ladendeIcons` hinzufügen — sonst bliebe die id bei einem Throw dauerhaft
-      // im Guard und der Fehler flöge ungefangen aus dem MapLibre-Callback.
-      let bild;
-      try {
-        bild = erzeugeTaktischesZeichen(tz);
-      } catch {
-        return;
-      }
-      ladendeIcons.add(id);
-      const { dataUrl, size } = bild;
-      const img = new Image(size[0], size[1]);
-      img.onload = () => {
-        // Auf einheitliche Marker-Größe normieren (die TZ-SVGs haben je Grundzeichen abweichende
-        // Größe); erst so deckt der feste Status-Ring (markerLayer.ts, radius 20) das Symbol ab.
-        const ZIEL_PX = 34;
-        const pixelRatio = Math.max(size[0], size[1]) / ZIEL_PX;
-        if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio });
-        ladendeIcons.delete(id);
-      };
-      img.onerror = () => {
-        ladendeIcons.delete(id);
-      };
-      img.src = dataUrl;
     });
     mapRef.current = map;
     // Testhaken für den Browser-Smoke (e2e/lagekarte-smoke.spec.ts): die Karte lebt in WebGL, ein
@@ -1038,7 +1000,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const nurInhalt = nurInhaltGeaendert(markerDatenRef.current, marker);
     markerDatenRef.current = marker;
     einsatzortDatenRef.current = einsatzort;
-    // Registry für styleimagemissing (Key → Zeichenquelle). `markerIconKey` ist die eine Quelle der
+    // Registry des Bild-Resolvers (Key → Zeichenquelle). `markerIconKey` ist die eine Quelle der
     // Key-Bildung, identisch zum icon-Property aus `baueMarkerFc`.
     zeichenRegistryRef.current = baueZeichenRegistry(markers);
     // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; ein
