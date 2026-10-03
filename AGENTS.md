@@ -8,8 +8,7 @@ steht nur, was gilt und wo es getragen wird.
 
 Die Regeln liegen bei dem Code, den sie betreffen. **Bevor du eine Datei änderst, lies jede
 `AGENTS.md` auf dem Weg von der Wurzel bis zu ihrem Verzeichnis.** Claude Code lädt eine
-Bereichsdatei selbst, sobald es eine Datei darunter liest; Codex lädt nur die Dateien von der
-Wurzel bis zum Arbeitsverzeichnis, alles darunter liest du selbst. Pfade ohne Präfix sind im
+Bereichsdatei selbst, sobald es eine Datei darunter liest. Pfade ohne Präfix sind im
 Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 
 | Datei | Inhalt |
@@ -38,7 +37,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 - **Es gibt keine `CLAUDE.md`.** Claude Code liest `AGENTS.md` ab v2.1.277 direkt (alle
   Sitzungsarten ab v2.1.281), aber nur, solange auf dem Pfad keine `CLAUDE.md`,
   `.claude/CLAUDE.md` oder `CLAUDE.local.md` liegt — eine solche Datei, auch eine lokale,
-  verdrängt alle `AGENTS.md`. Codex liest je Lauf höchstens 32 KiB (`project_doc_max_bytes`).
+  verdrängt alle `AGENTS.md`.
 - Code-Kommentare verweisen auf Regeln mit Datei und Abschnitt („`src/AGENTS.md`,
   Statuscode-Konvention“). Wer eine Regel verschiebt, greppt die Verweise.
 
@@ -92,8 +91,8 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
   `/opsx:apply` → `/opsx:archive` → erst dann der PR, mit Plan, Umsetzung und Archiv zusammen.
   Den Branch zu pushen, um den Stand zu sichern, ist erlaubt; der PR wartet auf die Umsetzung —
   auch wenn die Umgebung (etwa eine Cloud-Sitzung) nach jedem Push einen PR verlangt.
-- In Codex heißen die OpenSpec-Befehle `$openspec-propose`, `$openspec-apply-change` usw.
-  (`.agents/skills/`, erzeugt von `openspec`); Claude Code liest nur `.claude/`.
+- Skills und OpenSpec-Befehle liegen nur unter `.claude/`; Codex ist entfernt (LFH-853). Bei
+  `openspec init`/`openspec update` nur das Werkzeug Claude Code wählen, keinen `.agents/`-Spiegel.
 
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 

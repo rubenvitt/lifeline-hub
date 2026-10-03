@@ -31,7 +31,13 @@ import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import { zeichenAuftragZuEntwurf } from './lagekarte/zeichenAuftrag';
-import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
+import Kartenflaeche, {
+  type KartenHandle,
+  type KartenKontextmenue,
+  type KartenKontextPunkt,
+} from './lagekarte/Kartenflaeche';
+import { kontextEintraege, kontextMenueItems, kopiereKoordinate } from './lagekarte/kontextmenue';
+import ZeichenHierDialog from './lagekarte/ZeichenHierDialog';
 import type { GriffModus, KantenAus } from './lagekarte/bildGriffe';
 import Sidebar, { platzierObjekt } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
@@ -406,6 +412,10 @@ export default function LagekartePage() {
     onZoneZeichnenFertig,
     onMessenStart,
     onMessenBeenden,
+    onMessenAb,
+    messStart,
+    legeZeichenAnPunkt,
+    zeichenAnPunktLaeuft,
     zeichenAendern,
     zeichenVerschieben,
     zeichenLoeschen,
@@ -440,6 +450,25 @@ export default function LagekartePage() {
   // Ortssuche (LFH-638, Spec `lagekarte-ortssuche`): höchstens eine Suchnadel, nur in diesem Zustand
   // — nicht in Ansicht, Snapshot oder Speicher, nach dem Neuladen fort.
   const { formatKoordinate } = useAnzeigeKonventionen();
+
+  // Kontextmenü an der Kartenstelle (LFH-776, Spec `lagekarte-kontextmenue`): Einträge aus der reinen
+  // Ableitung (Rechte-Riegel dort), Kopf ist die Koordinate im aktiven System. Gesperrt in jedem
+  // exklusiven Modus — wie das Flächen-Auswahlmenü.
+  const [zeichenHier, setZeichenHier] = useState<KartenKontextPunkt | null>(null);
+  const kontextmenue: KartenKontextmenue | null = exklusiverModusAktiv
+    ? null
+    : {
+        inhalt: (p) => ({
+          kopf: formatKoordinate(p.lat, p.lng),
+          items: kontextMenueItems(kontextEintraege({ darfSchreiben: !!darfSchreiben })),
+        }),
+        onWaehlen: (key, p) => {
+          if (key === 'kopieren')
+            void kopiereKoordinate(formatKoordinate(p.lat, p.lng), navigator.clipboard, message);
+          else if (key === 'messen') onMessenAb(p);
+          else if (key === 'zeichen' && darfSchreiben) setZeichenHier(p);
+        },
+      };
   const [suchnadel, setSuchnadel] = useState<GefundenerOrt | null>(null);
   const [ortVorbelegung, setOrtVorbelegung] = useState<{ text: string; nonce: number } | null>(
     null,
@@ -1002,6 +1031,8 @@ export default function LagekartePage() {
         onZoneGezeichnet={onZoneGezeichnet}
         onZeichnenStandAenderung={setZeichenStand}
         messen={messForm}
+        messStart={messStart}
+        kontextmenue={kontextmenue}
         onMessung={(geometrie, fertig) => messQuelle.melde({ geometrie, fertig })}
         fachebenen={aktiveFachebenen}
         // Der Ausschnitt hängt an jeder sichtbaren bbox-Ebene — sonst bliebe „Energie an, KRITIS
@@ -1344,6 +1375,21 @@ export default function LagekartePage() {
           {karte}
           {leiste}
         </div>
+        {/* „Hier Zeichen setzen“ aus dem Kontextmenü (LFH-776, D7): öffnet nach dem Menü. */}
+        <ZeichenHierDialog
+          offen={zeichenHier != null}
+          quelle={zeichenHier?.quelle ?? 'maus'}
+          laeuft={zeichenAnPunktLaeuft}
+          onSetzen={(spec) => {
+            // Geschlossen wird nur der Dialog DIESER Stelle, nie ein später geöffneter.
+            const punkt = zeichenHier;
+            if (punkt)
+              legeZeichenAnPunkt(spec, punkt, () =>
+                setZeichenHier((offen) => (offen === punkt ? null : offen)),
+              );
+          }}
+          onAbbrechen={() => setZeichenHier(null)}
+        />
       </div>
     </FensterRahmen>
   );
