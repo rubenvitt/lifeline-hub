@@ -1533,14 +1533,17 @@ for (const { viewport, dichte } of [
       await eintraege.filter({ hasText: 'Messen ab hier' }).tap();
       await expect(menue).toHaveCount(0);
       await expect(page.locator('[data-lfh="mess-steuerung"]')).toBeVisible();
-      const zweiter = { x: frei.x + 60, y: frei.y };
+      // Die Messsteuerung wächst als Band über die Karte (Handschuh: hoch) — die freie Mitte neu
+      // bestimmen, sonst landete der Tipp auf dem Band.
+      const mitteImModus = await kartenMitte(page);
+      const zweiter = { x: mitteImModus.x + 60, y: mitteImModus.y };
       await aufKarte(page, [zweiter], 'zweiter Messpunkt');
       await page.waitForTimeout(400);
       await tippe(page, zweiter);
       await expect(page.locator('[data-lfh="messwert"]')).toContainText(/\d.*\s(m|km)\b/);
 
       // ── Im Messmodus öffnet ein langer Druck kein Menü ────────────────────────────────
-      const dritter = { x: frei.x - 50, y: frei.y + 30 };
+      const dritter = { x: mitteImModus.x - 50, y: mitteImModus.y };
       await aufKarte(page, [dritter], 'langer Druck im Messmodus');
       await langerDruck(page, cdp, dritter);
       await page.waitForTimeout(300);
