@@ -75,11 +75,11 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Verrät, welche Orte im Einsatz nachgeschlagen wurden; die Ortsvorschau des Servers füllt ihn wieder.',
   },
   {
-    ort: 'sessionStorage lfh:erfassung:<einsatz>:<maske>:<feld>',
+    ort: 'sessionStorage lfh:erfassung:<einsatz>:<maske>:<feld>, lfh:erfassung:besitzer',
     datei: 'components/erfassungsSitzung.ts',
     entscheidung: 'jeder-ausgang',
     grund:
-      'Letzter Antreff- bzw. Schadensort; ein zweiter Benutzer im selben Tab bekäme ihn sonst vorbelegt.',
+      'Letzter Antreff- bzw. Schadensort; ein zweiter Benutzer im selben Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LFH-785).',
   },
   {
     ort: 'localStorage lfh:offline-quittung-signal',

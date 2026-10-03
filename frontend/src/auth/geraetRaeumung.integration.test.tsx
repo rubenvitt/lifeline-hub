@@ -48,7 +48,7 @@ function Anzeige() {
 
 function rendern() {
   const client = neuerQueryClient();
-  render(
+  return render(
     <QueryClientProvider client={client}>
       <AuthProvider>
         <Anzeige />
@@ -242,6 +242,34 @@ describe('Gerät räumen beim Ausgang (LFH-767)', () => {
       expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]),
     );
     expect(fehler).toHaveBeenCalled();
+  });
+
+  it('Neuladen als B (Benutzerkonflikt, LFH-785): kein Erfassungswert von A ist vorbelegt', async () => {
+    server.use(meHandler(a));
+    const { unmount } = rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename));
+    schreibeErfassungsSitzungswert(7, 'person', 'antreff_ort', 'Sammelstelle Süd');
+    unmount();
+
+    // Ein anderer Tab hat B angemeldet; dieser Tab lädt neu, der sessionStorage überlebt das.
+    server.use(meHandler(b));
+    rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(b.anzeigename));
+
+    expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
+  });
+
+  it('Neuladen als derselbe Benutzer (LFH-785): der behaltene Erfassungswert bleibt', async () => {
+    server.use(meHandler(a));
+    const { unmount } = rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename));
+    schreibeErfassungsSitzungswert(7, 'person', 'antreff_ort', 'Sammelstelle Süd');
+    unmount();
+
+    rendern();
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent(a.anzeigename));
+
+    expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBe('Sammelstelle Süd');
   });
 
   it('Anmeldung von B nach Ablauf von A: Entwürfe und Quittungen von A sind von der Platte', async () => {
