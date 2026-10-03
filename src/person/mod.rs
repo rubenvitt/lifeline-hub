@@ -1,4 +1,5 @@
 pub mod abgleich_repo;
+pub mod anhang;
 pub mod audit_repo;
 pub mod repo;
 pub mod sichtung_repo;

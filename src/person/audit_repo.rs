@@ -4,7 +4,8 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-/// `art IN ('detail','export','druck')` (migrations/0132_person_zugriff_audit_druck.sql, zuvor 0021).
+/// `art IN ('detail','export','druck','anhang')` (migrations/0141_person_zugriff_audit_anhang.sql,
+/// zuvor 0132 und 0021).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ZugriffArt {
@@ -12,6 +13,9 @@ pub enum ZugriffArt {
     Export,
     /// LFH-727: Abruf der Personen-Druckansicht (`GET …/personen/druck`), ohne Person.
     Druck,
+    /// LFH-757: Abruf der Datei eines Personen-Anhangs (`GET …/personen/{pid}/anhaenge/{aid}/datei`),
+    /// mit Person, ohne Bezug auf die Datei. Auch 304 und Original schreiben eine Zeile.
+    Anhang,
 }
 
 /// Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).
@@ -27,7 +31,7 @@ pub struct ZugriffAnzeige {
 }
 
 /// Schreibt einen append-only Audit-Eintrag. `person_id = None` beim Export oder Druck der
-/// gesamten Liste. `art` ist 'detail', 'export' oder 'druck'.
+/// gesamten Liste. `art` ist 'detail', 'export', 'druck' oder 'anhang'.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -146,5 +150,17 @@ mod tests {
         .unwrap();
         assert_eq!(count, 1);
         assert!(liste_je_person(&pool, e, p).await.unwrap().is_empty());
+    }
+
+    /// LFH-757: ein Datei-Download schreibt `anhang` MIT Person; die Einsicht je Person zeigt ihn.
+    #[tokio::test]
+    async fn anhang_eintrag_mit_person() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        anlegen(&pool, e, Some(p), b, "anhang").await.unwrap();
+        let eintraege = liste_je_person(&pool, e, p).await.unwrap();
+        assert_eq!(eintraege.len(), 1);
+        assert_eq!(eintraege[0].art, "anhang");
+        assert_eq!(eintraege[0].person_id, Some(p));
     }
 }

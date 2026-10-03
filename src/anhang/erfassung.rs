@@ -1,5 +1,6 @@
 //! Gemeinsamer Kern der Erfassungs-Anhänge (LFH-758, design.md D2): Fotos und Dateien an einem
-//! Datensatz eines Fachmoduls — Schaden (LFH-21), Tier und Unfallhilfsstelle (LFH-758).
+//! Datensatz eines Fachmoduls — Schaden (LFH-21), Tier und Unfallhilfsstelle (LFH-758), Person
+//! (LFH-757).
 //!
 //! Ein Modul beschreibt seinen Linker mit einem [`ErfassungsAblage`]-Deskriptor aus
 //! Compile-Zeit-Konstanten; Liste, Laden, Download-Lookup, Ablage und Soft-Delete stehen hier
@@ -39,6 +40,7 @@ pub const ERFASSUNGS_ABLAGEN: &[&ErfassungsAblage] = &[
     &crate::schaden::anhang::SCHADEN_ABLAGE,
     &crate::tier::anhang::TIER_ABLAGE,
     &crate::uhs::anhang::UHS_ABLAGE,
+    &crate::person::anhang::PERSON_ABLAGE,
 ];
 
 /// Ein lebender Anhang eines Besitzers. `id` ist die **Linker-id**, nicht `anhang.id`.

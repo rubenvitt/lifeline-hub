@@ -225,6 +225,8 @@ export type Verbleib = S['VerbleibAnzeige'];
 export type Abgleich = S['AbgleichAnzeige'];
 export type PersonDetail = S['PersonDetail'];
 export type PersonZugriff = S['ZugriffAnzeige'];
+export type PersonZugriffArt = S['ZugriffArt'];
+export type PersonAnhang = S['PersonAnhangAnzeige'];
 
 // ============================== E‑3 Unfallhilfsstellen ==============================
 export type UhsTyp = S['UhsTyp'];

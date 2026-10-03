@@ -225,6 +225,13 @@ pub const MODUL_LINKER: &[ModulLinker] = &[
         loesch_meldung: "Anhang gehört zu einer Unfallhilfsstelle und wird dort entfernt",
         ort: "Unfallhilfsstelle",
     },
+    // LFH-757: Personen-Anhänge. Ohne diesen Eintrag wäre eine Personen-Datei für die ablegende
+    // Person generisch ladbar — am Lese-Audit der Personenroute vorbei.
+    ModulLinker {
+        tabelle: "einsatz_person_anhang",
+        loesch_meldung: "Anhang gehört zu einer Person und wird dort entfernt",
+        ort: "Person",
+    },
 ];
 
 /// Positiver SQL-Baustein: „der Anhang `{alias}` hängt an einem modulgebundenen Linker" —
@@ -984,6 +991,11 @@ mod tests {
                  VALUES (?1, 'behandlungsplatz', 'BHP ' || (SELECT COUNT(*) + 1 FROM uhs), ?2, ?2) \
                  RETURNING id"
             }
+            "einsatz_person" => {
+                "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+                 VALUES (?1, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_person \
+                              WHERE einsatz_id = ?1), ?2, ?2) RETURNING id"
+            }
             andere => panic!("kein Besitzer-Fixture für {andere}"),
         };
         sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
@@ -1066,5 +1078,12 @@ mod tests {
     #[tokio::test]
     async fn uhs_linker_bindet_haelt_im_sweep_und_verweigert_loeschen() {
         pruefe_erfassungs_linker(&crate::uhs::anhang::UHS_ABLAGE).await;
+    }
+
+    // Auch ein entfernter Personen-Linker bindet: sonst wäre die Datei für die ablegende Person
+    // generisch ladbar — ohne Lese-Audit (LFH-757, design.md D12).
+    #[tokio::test]
+    async fn person_linker_bindet_haelt_im_sweep_und_verweigert_loeschen() {
+        pruefe_erfassungs_linker(&crate::person::anhang::PERSON_ABLAGE).await;
     }
 }

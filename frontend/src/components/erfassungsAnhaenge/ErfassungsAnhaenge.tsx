@@ -7,6 +7,7 @@ import {
   Paneel,
   PaneelZeile,
   PaneelZustand,
+  paneelMetaStil,
   Sammelbanner,
   useRollen,
   type PaneelDatenzustand,
@@ -29,7 +30,8 @@ import {
   type AnhangZufluss,
 } from './anhangZufluss';
 
-/** Was die Liste von einem Anhang braucht — Schnittmenge der DTOs von Schaden, Tier und UHS. */
+/** Was die Liste von einem Anhang braucht — Schnittmenge der DTOs von Schaden, Tier,
+ *  UHS und Person. */
 export interface ErfassungsAnhangEintrag {
   id: number;
   dateiname: string;
@@ -71,13 +73,20 @@ interface Props {
   zeilenKennung?: string;
   /** Unter der Liste, im selben Paneel (UHS: Zugriffsprotokoll der Einsatzleitung). */
   children?: ReactNode;
+  /**
+   * `paneel` (Vorgabe): eigenes `Paneel` mit „Datei ablegen“ im Kopf (Schaden, Tier, UHS).
+   * `abschnitt`: ohne eigenen Rahmen, „Datei ablegen“ über der Liste — für einen Abschnitt, dessen
+   * Kopf einem anderen Baustein gehört (aufklappbarer Abschnitt der Personen-Detailseite, LFH-757).
+   */
+  huelle?: 'paneel' | 'abschnitt';
 }
 
-const TITEL = 'Fotos und Dateien';
+/** Titel des Blocks; die Personen-Detailseite trägt ihn als Kopf ihres Abschnitts (LFH-757). */
+export const ANHAENGE_TITEL = 'Fotos und Dateien';
 
 /**
- * Paneel „Fotos und Dateien“ einer Erfassungs-Ablage (Schaden LFH-21, Tier und UHS LFH-758) —
- * eine Liste, keine Tabelle. Jede Zeile ist ein nativer Download-Anker auf die modul-gegatete
+ * Paneel „Fotos und Dateien“ einer Erfassungs-Ablage (Schaden LFH-21, Tier und UHS LFH-758,
+ * Person LFH-757) — eine Liste, keine Tabelle. Jede Zeile ist ein nativer Download-Anker auf die modul-gegatete
  * Route, mit Zeilenkennung im zugänglichen Namen.
  *
  * Entfernen ist serverseitig ein Soft-Delete ohne Rückweg in der Oberfläche, also Rückfrage mit
@@ -104,6 +113,7 @@ export default function ErfassungsAnhaenge({
   vorschau = true,
   zeilenKennung = 'erfassung-anhang-zeile',
   children,
+  huelle = 'paneel',
 }: Props) {
   const { message } = App.useApp();
   const { rollen } = useRollen();
@@ -258,33 +268,32 @@ export default function ErfassungsAnhaenge({
     </div>
   );
 
-  return (
-    <Paneel
-      titel={TITEL}
-      meta={query.data ? `${liste.length} ${liste.length === 1 ? 'Datei' : 'Dateien'}` : undefined}
-      aktion={
-        aktionen ? (
-          <Button
-            ref={kopfKnopf}
-            onClick={() => setAblegenOffen(true)}
-            icon={
-              <span aria-hidden="true">
-                <IconHochladen />
-              </span>
-            }
-          >
-            Datei ablegen
-          </Button>
-        ) : undefined
+  const ablegenAktion = aktionen ? (
+    <Button
+      ref={kopfKnopf}
+      onClick={() => setAblegenOffen(true)}
+      icon={
+        <span aria-hidden="true">
+          <IconHochladen />
+        </span>
       }
     >
+      Datei ablegen
+    </Button>
+  ) : undefined;
+  const meta = query.data
+    ? `${liste.length} ${liste.length === 1 ? 'Datei' : 'Dateien'}`
+    : undefined;
+
+  const koerper = (
+    <>
       <SpeicherFehler
         fehler={entfernen.error}
         titel={fehlerName ? `Datei ${fehlerName} nicht entfernt` : 'Nicht entfernt'}
       />
       <PaneelZustand
         zustand={zustand}
-        titel={TITEL}
+        titel={ANHAENGE_TITEL}
         leerText="Noch keine Fotos oder Dateien"
         onNeuladen={() => void query.refetch()}
       >
@@ -317,6 +326,30 @@ export default function ErfassungsAnhaenge({
           onAbgelegt={(a) => aendereZufluss((z) => vorgemerkt(z, a.id))}
         />
       )}
+    </>
+  );
+
+  if (huelle === 'abschnitt') {
+    return (
+      <div role="region" aria-label={ANHAENGE_TITEL} data-lfh="anhaenge-abschnitt">
+        {(ablegenAktion || meta) && (
+          <Space
+            size="middle"
+            align="center"
+            style={{ width: '100%', justifyContent: 'space-between' }}
+          >
+            {ablegenAktion ?? <span />}
+            {/* Dieselbe Meta wie im Paneelkopf: Mono, `tabular-nums`. */}
+            {meta && <span style={paneelMetaStil(rollen)}>{meta}</span>}
+          </Space>
+        )}
+        {koerper}
+      </div>
+    );
+  }
+  return (
+    <Paneel titel={ANHAENGE_TITEL} meta={meta} aktion={ablegenAktion}>
+      {koerper}
     </Paneel>
   );
 }

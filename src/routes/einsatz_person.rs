@@ -44,7 +44,7 @@ pub struct PersonDetail {
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
 /// (nur einsatz_id + person_id); Clients refetchen die Liste.
-pub(super) fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
+pub(crate) fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Person, "person_id", person_id);

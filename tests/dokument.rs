@@ -1059,3 +1059,72 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         assert_eq!(s, StatusCode::FORBIDDEN, "{art:?}: Download");
     }
 }
+
+// ---------- LFH-757: Abschottung der Personen-Anhänge ----------
+
+/// Ein Foto an einer Person steht nicht in der Dokumentenablage.
+#[tokio::test]
+async fn person_anhang_erscheint_nicht_in_der_ablage() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    person_anhang(&pool, einsatz).await;
+
+    let (status, json) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json.as_array().unwrap().len(), 0, "{json:?}");
+}
+
+/// Recht auf Dokumente genügt nicht: wer Dokumente sieht, aber nicht Personen, bekommt an der
+/// Personenroute 403. Die 404 über den generischen Download belegt HIER nichts (diese Person
+/// hat nicht abgelegt, für sie wäre ein ungebundener Anhang ohnehin 404) — die Aussage tragen
+/// die Uploader-Tests in `tests/anhang.rs`.
+#[tokio::test]
+async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = person_anhang(&pool, einsatz).await;
+    let (pid, lid): (i64, i64) =
+        sqlx::query_as("SELECT person_id, id FROM einsatz_person_anhang WHERE anhang_id = ?")
+            .bind(aid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
+    let person_pfad = format!("/api/einsaetze/{einsatz}/personen/{pid}/anhaenge");
+    let (s, _) = anfrage(&app, "GET", &person_pfad, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Personenroute");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{person_pfad}/{lid}/datei"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Download an der Personenroute");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "generischer Download");
+}

@@ -3158,6 +3158,26 @@ export interface components {
             richtung: string;
         };
         /**
+         * @description Ein Anhang einer Person. `id` ist die **Linker-id** (`einsatz_person_anhang.id`), nicht
+         *     `anhang.id` — die Datei ist nur über die Personenroute ladbar (mit Lese-Audit); eine
+         *     `anhang_id` auf dem Wire wäre nur ein Anreiz, den gesperrten generischen Weg zu probieren.
+         */
+        PersonAnhangAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            /** @description Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert. */
+            abgelegt_von_name?: string | null;
+            dateiname: string;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            mime: string;
+            /** Format: int64 */
+            person_id: number;
+        };
+        /**
          * @description Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
          *     `org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,
          *     kein Snapshot wie bei Material.
@@ -4268,10 +4288,11 @@ export interface components {
         };
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-         *     `art IN ('detail','export','druck')` (migrations/0132_person_zugriff_audit_druck.sql, zuvor 0021).
+         *     `art IN ('detail','export','druck','anhang')` (migrations/0141_person_zugriff_audit_anhang.sql,
+         *     zuvor 0132 und 0021).
          * @enum {string}
          */
-        ZugriffArt: "detail" | "export" | "druck";
+        ZugriffArt: "detail" | "export" | "druck" | "anhang";
         /**
          * @description Welche Fassung abgerufen wurde. Wire = DB-CHECK `fassung IN ('bereinigt','original')`.
          * @enum {string}

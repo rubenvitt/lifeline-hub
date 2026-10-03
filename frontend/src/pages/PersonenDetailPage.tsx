@@ -59,6 +59,9 @@ import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
+import PersonAnhaenge from './personen/PersonAnhaenge';
+import { zugriffArtText } from '../personen/zugriffArt';
+import { ANHAENGE_TITEL } from '../components/erfassungsAnhaenge/ErfassungsAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
@@ -192,6 +195,8 @@ export default function PersonenDetailPage() {
    */
   const [zuordnungenOffen, setZuordnungenOffen] = useState(false);
   const [auditOffen, setAuditOffen] = useState(false);
+  /** LFH-757: die Anhangliste lädt erst mit ihrem Abschnitt (Ladehoheit wie Zuordnungen). */
+  const [anhaengeOffen, setAnhaengeOffen] = useState(false);
   const [uhsModalOffen, setUhsModalOffen] = useState(false);
 
   const tiereDerPersonQuery = useQuery({
@@ -529,7 +534,12 @@ export default function PersonenDetailPage() {
       render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" />,
     },
     { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
-    { title: 'Art', dataIndex: 'art', key: 'art' },
+    {
+      title: 'Art',
+      dataIndex: 'art',
+      key: 'art',
+      render: (art: PersonZugriff['art']) => zugriffArtText(art),
+    },
   ];
 
   function medSpalte(person: PersonDetail) {
@@ -794,8 +804,8 @@ export default function PersonenDetailPage() {
           </Descriptions>
         )}
 
-        {/* Zuordnungen und Audit laden erst beim Aufklappen; Kopf und medizinischer Verlauf
-            kommen aus demselben Detail-Abruf und stehen sofort.
+        {/* Zuordnungen, Fotos und Dateien und Audit laden erst beim Aufklappen; Kopf und
+            medizinischer Verlauf kommen aus demselben Detail-Abruf und stehen sofort.
 
             Kein `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim Aufklappen"
             wäre nicht von „immer da" zu unterscheiden.
@@ -807,11 +817,13 @@ export default function PersonenDetailPage() {
           ghost
           activeKey={[
             ...(zuordnungenOffen ? ['zuordnungen'] : []),
+            ...(anhaengeOffen ? ['anhaenge'] : []),
             ...(auditOffen ? ['audit'] : []),
           ]}
           onChange={(offen: string | string[]) => {
             const schluessel = Array.isArray(offen) ? offen : [offen];
             setZuordnungenOffen(schluessel.includes('zuordnungen'));
+            setAnhaengeOffen(schluessel.includes('anhaenge'));
             setAuditOffen(schluessel.includes('audit'));
           }}
           items={[
@@ -964,6 +976,18 @@ export default function PersonenDetailPage() {
                     </div>
                   </div>
                 </Space>
+              ),
+            },
+            {
+              // LFH-757: Fotos und Dateien. Jeder Download steht im Zugriffsprotokoll der Person.
+              key: 'anhaenge',
+              label: ANHAENGE_TITEL,
+              children: (
+                <PersonAnhaenge
+                  einsatzId={einsatzId}
+                  person={person}
+                  darfSchreiben={darfSchreiben}
+                />
               ),
             },
             ...(istEinsatzLeitung(einsatz)

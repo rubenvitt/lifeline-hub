@@ -183,6 +183,7 @@ use utoipa::OpenApi;
         crate::person::abgleich_repo::AbgleichAnzeige,
         crate::person::audit_repo::ZugriffAnzeige,
         crate::person::audit_repo::ZugriffArt,
+        crate::person::anhang::PersonAnhangAnzeige,
         crate::person::sichtung_repo::SichtungAnzeige,
         crate::person::verbleib_repo::VerbleibAnzeige,
         crate::person::verlaufsnotiz_repo::NotizAnzeige,

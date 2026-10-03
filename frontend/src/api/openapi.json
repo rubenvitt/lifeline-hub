@@ -8324,6 +8324,53 @@
           }
         }
       },
+      "PersonAnhangAnzeige": {
+        "type": "object",
+        "description": "Ein Anhang einer Person. `id` ist die **Linker-id** (`einsatz_person_anhang.id`), nicht\n`anhang.id` — die Datei ist nur über die Personenroute ladbar (mit Lese-Audit); eine\n`anhang_id` auf dem Wire wäre nur ein Anreiz, den gesperrten generischen Weg zu probieren.",
+        "required": [
+          "id",
+          "person_id",
+          "dateiname",
+          "mime",
+          "groesse",
+          "abgelegt_von_id",
+          "abgelegt_at"
+        ],
+        "properties": {
+          "abgelegt_at": {
+            "type": "string"
+          },
+          "abgelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abgelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert."
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "PersonAnzeige": {
         "type": "object",
         "description": "Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein\n`org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,\nkein Snapshot wie bei Material.",
@@ -11262,11 +11309,12 @@
       },
       "ZugriffArt": {
         "type": "string",
-        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck')` (migrations/0132_person_zugriff_audit_druck.sql, zuvor 0021).",
+        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck','anhang')` (migrations/0141_person_zugriff_audit_anhang.sql,\nzuvor 0132 und 0021).",
         "enum": [
           "detail",
           "export",
-          "druck"
+          "druck",
+          "anhang"
         ]
       },
       "ZugriffFassung": {

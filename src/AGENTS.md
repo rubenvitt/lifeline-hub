@@ -93,6 +93,14 @@ Lese-Audit (wie Tiere insgesamt).
   lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
   protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
 
+**Personen-Anhänge (LFH-757)** (Spec `personen-anhaenge`, Herleitung
+`openspec/changes/archive/2026-10-02-lfh-757-personen-anhaenge/design.md`): `einsatz_person_anhang` im Register;
+`routes::person_anhang`, sonst wie Schaden-Anhänge (Linker-id, `ERLAUBTE_MIME_ERFASSUNG`, eine
+Transaktion, Soft-Delete, ETB „Person R-007: Foto abgelegt“). **Lese-Audit:** `datei` schreibt
+nach Fassung-, Linker- und Original-Prüfung und VOR `anhang_antwort` eine Zeile `anhang` in
+`person_zugriff_audit`, auch bei 304, Original und den Vorschau-Fassungen; scheitert sie, keine
+Bytes. Liste ohne Audit. Die Detailseite zeigt deshalb kein Vorschaubild (`vorschau: false`).
+
 **Auslieferung (LFH-747)** (Spec `anhang-metadaten`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-747-exif-bereinigung-auslieferung/design.md`):
 gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.

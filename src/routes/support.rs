@@ -177,7 +177,7 @@ pub async fn original_freigeben(
     Ok(())
 }
 
-/// Liest genau eine Datei aus dem Multipart einer Erfassungs-Ablage (Schaden, Tier, UHS):
+/// Liest genau eine Datei aus dem Multipart einer Erfassungs-Ablage (Schaden, Tier, UHS, Person):
 /// `(dateiname, bytes)`. Die Datei steht im Feld `datei` (API-Vertrag, wie die
 /// Dokumentenablage); eine Datei unter einem anderen Feldnamen ist 400, statt still einen
 /// undokumentierten Vertrag anzunehmen (Code-Review C2). Ein zweites Datei-Feld ist 400 (eine
@@ -235,8 +235,9 @@ pub const ANHANG_CSP: &str = "default-src 'none'; sandbox";
 ///
 /// Jede Antwort trägt `X-Content-Type-Options: nosniff` und [`ANHANG_CSP`].
 ///
-/// Geteilt von allen Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden, Tier, UHS); **der
-/// einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in `tests/anhang_metadaten.rs`).
+/// Geteilt von allen Anhang-Downloads (Chat/generisch, Dokument, ETB, Schaden, Tier, UHS,
+/// Person); **der einzige Aufrufer von `anhang::repo::laden_bytes`** (Guard in
+/// `tests/anhang_metadaten.rs`).
 /// Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit, Linker-Sperre, Modul-Gate) macht der
 /// Aufrufer VORHER — dieser Helfer prüft nichts. Der Karten-Hintergrundbild-Download bleibt
 /// außen vor: er liest aus einer eigenen Tabelle. Regeln: `src/AGENTS.md`, „Anhänge“.

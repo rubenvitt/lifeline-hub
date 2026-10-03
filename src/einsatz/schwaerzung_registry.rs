@@ -574,7 +574,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     TabellenRegel {
         // Ganze Zeile löschen: `daten` sind Fotos/Dateien Betroffener, kein Kartografie-Skelett.
         // CASCADE räumt die Linker chat_nachricht_anhang, einsatz_dokument, etb_eintrag_anhang,
-        // einsatz_schaden_anhang, einsatz_tier_anhang und uhs_anhang (LFH-758) mit.
+        // einsatz_schaden_anhang, einsatz_tier_anhang, uhs_anhang (LFH-758) und
+        // einsatz_person_anhang (LFH-757) mit.
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -672,6 +673,28 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
             scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
             scrub("uhs_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("anhang_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+        ],
+    },
+    TabellenRegel {
+        // LFH-757, Linker der Personen-Anhänge: ganze Zeile löschen wie bei
+        // einsatz_schaden_anhang — die Datei geht ohnehin per CASCADE mit (`anhang` steht vor
+        // dieser Regel), und ein Linker ohne Datei trägt nichts. Die System-ETB-Einträge nennen
+        // nur Registriernummer und Art („Person R-007: Foto abgelegt“), nie Dateinamen oder
+        // Namen; das Zugriffsprotokoll (person_zugriff_audit, Art `anhang`) bleibt retain. Gepinnt
+        // in `einsatz::repo::tests::schwaerzung_loescht_personen_anhaenge_und_haelt_etb_und_audit`.
+        tabelle: "einsatz_person_anhang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("person_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
             scrub("anhang_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
             scrub("abgelegt_von_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
             scrub("abgelegt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
@@ -2645,6 +2668,7 @@ mod tests {
             "einsatz_schaden_anhang",
             "einsatz_tier_anhang",
             "uhs_anhang",
+            "einsatz_person_anhang",
         ] {
             anhaenge.extend(spalten_von(t));
         }
@@ -2715,6 +2739,11 @@ mod tests {
                 "Geschädigte Person eines Sachschadens: Personenauskunft",
             ),
             ("einsatz_tier", "Halter eines Tiers: Personenauskunft"),
+            (
+                "einsatz_person_anhang",
+                "Fotos und Dateien (LFH-757): Kategorie anhaenge, die Zeilen gehen mit ihr und \
+                 taugen nicht als stabiles Prädikat; eine Ablage ist kein Behandlungsnachweis",
+            ),
             (
                 "uhs_platz",
                 "Reservierung ohne Belegung ist kein Behandlungsnachweis; eine Belegung steht in \

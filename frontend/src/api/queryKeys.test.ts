@@ -9,6 +9,7 @@ import {
   einsatzKeys,
   globalKeys,
   istKeyDesEinsatzes,
+  istLagebildOfflineKey,
   istRueckmeldungenKey,
 } from './queryKeys';
 
@@ -35,6 +36,7 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.presse).toBe('einsatz-presse');
     expect(EINSATZ_KEYS.infotelefon).toBe('einsatz-infotelefon');
     expect(EINSATZ_KEYS.schadenAnhaenge).toBe('einsatz-schaden-anhaenge');
+    expect(EINSATZ_KEYS.personAnhaenge).toBe('einsatz-person-anhaenge');
     expect(EINSATZ_KEYS.tierAnhaenge).toBe('einsatz-tier-anhaenge');
     expect(EINSATZ_KEYS.uhsAnhaenge).toBe('einsatz-uhs-anhaenge');
     expect(EINSATZ_KEYS.uhsAnhangZugriffe).toBe('einsatz-uhs-anhang-zugriffe');
@@ -44,11 +46,13 @@ describe('EINSATZ_KEYS', () => {
 describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   // `person` und `personal` sind getrennte Wire-Events. Die Betreuungsübersicht hängt mit dran,
   // weil „davon namentlich n“ am Verbleib der Personen hängt.
-  it('bildet person auf die Personen-Registrierung und die Betreuungsübersicht ab', () => {
+  // LFH-757: dazu die Anhangliste einer Person, nie das auditierte Detail.
+  it('bildet person auf die Personen-Registrierung, Betreuungsübersicht und Anhänge ab', () => {
     expect(EINSATZ_STREAM_EVENTS.person).toEqual([
       EINSATZ_KEYS.personen,
       EINSATZ_KEYS.modulZaehler,
       EINSATZ_KEYS.betreuung,
+      EINSATZ_KEYS.personAnhaenge,
     ]);
   });
 
@@ -245,6 +249,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.uhsDetail(1, 2)).toEqual(['einsatz-uhs-detail', 1, 2]);
     expect(einsatzKeys.schaden(1, 2)).toEqual(['einsatz-schaden', 1, 2]);
     expect(einsatzKeys.schadenAnhaenge(1, 2)).toEqual(['einsatz-schaden-anhaenge', 1, 2]);
+    expect(einsatzKeys.personAnhaenge(1, 2)).toEqual(['einsatz-person-anhaenge', 1, 2]);
     expect(einsatzKeys.tierAnhaenge(1, 2)).toEqual(['einsatz-tier-anhaenge', 1, 2]);
     expect(einsatzKeys.uhsAnhaenge(1, 2)).toEqual(['einsatz-uhs-anhaenge', 1, 2]);
     expect(einsatzKeys.uhsAnhangZugriffe(1, 2)).toEqual(['einsatz-uhs-anhang-zugriffe', 1, 2]);
@@ -515,6 +520,26 @@ describe('einsatzKeys.schadenAnhaenge (LFH-21)', () => {
       qc.getQueryState(['einsatz-schaden-anhaenge', 9, 2])?.isInvalidated,
       'ein anderer Einsatz bleibt unberührt',
     ).toBe(false);
+  });
+});
+
+describe('einsatzKeys.personAnhaenge (LFH-757)', () => {
+  it('das person-Ereignis invalidiert die Anhangliste, nicht das Detail', async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(einsatzKeys.personAnhaenge(1, 2), []);
+    qc.setQueryData(einsatzKeys.person(1, 2), { id: 2 });
+    for (const prefix of EINSATZ_STREAM_EVENTS.person) {
+      await qc.invalidateQueries({ queryKey: [prefix, 1] });
+    }
+    expect(qc.getQueryState(['einsatz-person-anhaenge', 1, 2])?.isInvalidated).toBe(true);
+    expect(
+      qc.getQueryState(['einsatz-person', 1, 2])?.isInvalidated,
+      'das Detail schreibt je Abruf eine Audit-Zeile und bleibt still',
+    ).toBe(false);
+  });
+
+  it('steht nicht im Lagebild offline', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.personAnhaenge(1, 2))).toBe(false);
   });
 });
 

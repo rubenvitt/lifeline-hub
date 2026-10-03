@@ -80,8 +80,8 @@ pub const ERLAUBTE_MIME_DOKUMENT: &[&str] = &[
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
 
-/// Allowlist der Erfassungsmodule (heute Schäden, daher modulneutral benannt): Kamerabilder und
-/// PDF.
+/// Allowlist der Erfassungsmodule (Schäden, Tiere, UHS, Personen; modulneutral benannt):
+/// Kamerabilder und PDF.
 /// - HEIC/HEIF ist das Standardformat der iPhone-Kamera.
 /// - JPEG/PNG/WebP decken Android-Kameras, Screenshots und Messenger-Weiterleitungen.
 /// - PDF trägt Kostenvoranschlag, Gutachten, Übergabeprotokoll.
