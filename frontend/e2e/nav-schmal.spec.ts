@@ -256,6 +256,15 @@ async function sperrzweigSteht(ort: Locator) {
   }
 }
 
+/** Inhalt breiter als der eigene Kasten — auch dort, wo ein Vorfahre klippt. */
+async function keinInnererUeberlauf(ort: Locator, name: string) {
+  const mass = await ort.evaluate((el) => ({ scroll: el.scrollWidth, klient: el.clientWidth }));
+  expect(
+    mass.scroll,
+    `${name}: Inhalt breiter als der Kasten (${mass.scroll}/${mass.klient} px)`,
+  ).toBeLessThanOrEqual(mass.klient + 1);
+}
+
 test('Navigationsrahmen: auf 390 px hält der Drawer gesperrte Zeilen (Beobachter, Modulsperre)', async ({
   page,
 }) => {
@@ -283,6 +292,17 @@ test('Navigationsrahmen: auf 390 px hält der Drawer gesperrte Zeilen (Beobachte
   const drawer = page.getByRole('dialog');
   await expect(drawer.getByRole('navigation', { name: 'Einsatz-Navigation' })).toBeVisible();
   await sperrzweigSteht(drawer);
+  // Eingeschwungen messen: der Drawer fährt von links ein, mitten in der Bewegung lägen Panel
+  // und Zeilen an verschiedenen Stellen.
+  await expect
+    .poll(async () => {
+      const b = await drawer.boundingBox();
+      return b ? Math.round(b.x + b.width) : null;
+    }, 'Drawer eingefahren')
+    .toBe(DRAWER_BREITE);
+  const schliessen = (await drawer.locator('.ant-drawer-close').boundingBox())!;
+  haeltTreffflaeche(schliessen.width, 'Schließen-Breite');
+  haeltTreffflaeche(schliessen.height, 'Schließen-Höhe');
 
   const offen = await messeUeberlauf(page);
   expect(
@@ -290,14 +310,12 @@ test('Navigationsrahmen: auf 390 px hält der Drawer gesperrte Zeilen (Beobachte
     `Der offene Drawer mit gesperrten Zeilen erzeugt Überlauf:\n${offen.rahmen.join('\n')}`,
   ).toEqual([]);
   meldeFremdenUeberlauf('Sperre, Drawer offen', offen);
-  // Jede Zeile des Drawers bleibt innerhalb des Panels — die gesperrte trägt ein Icon mehr.
-  const drawerRechts = (await drawer.locator('.ant-drawer-content-wrapper').boundingBox())!;
+  // `messeUeberlauf` sieht in den Drawer nicht hinein: dessen Körper klippt, und ein Knopf mit
+  // `width: 100%` wächst nicht mit seinem Inhalt (Mutationsprobe LFH-820). Deshalb wird hier
+  // innen gemessen: weder die gesperrte Zeile noch der Drawer-Körper läuft in sich über.
+  await keinInnererUeberlauf(drawer.locator('.ant-drawer-body'), 'Drawer-Körper');
   for (const name of [GESPERRT_ZEILE, GESPERRT_SPRUNG]) {
-    const zeile = (await drawer.getByRole('button', { name, exact: true }).boundingBox())!;
-    expect(
-      zeile.x + zeile.width,
-      `„${name}" endet im Drawer (gemessen ${zeile.x + zeile.width})`,
-    ).toBeLessThanOrEqual(drawerRechts.x + drawerRechts.width + SUBPIXEL);
+    await keinInnererUeberlauf(drawer.getByRole('button', { name, exact: true }), `„${name}"`);
   }
 });
 
@@ -322,14 +340,11 @@ test('Navigationsrahmen: auf 1024 px hält die Liste gesperrte Zeilen (Beobachte
   ).toEqual([]);
   meldeFremdenUeberlauf('Sperre, 1024 px', messung);
   // Das Panel selbst läuft nicht in sich über (es klippt, statt die Seite aufzuschieben —
-  // `messeUeberlauf` sähe das nicht).
-  const panelMass = await panel.evaluate((el) => ({
-    scroll: el.scrollWidth,
-    klient: el.clientWidth,
-  }));
-  expect(panelMass.scroll, 'Modulpanel: Inhalt breiter als das Panel').toBeLessThanOrEqual(
-    panelMass.klient + 1,
-  );
+  // `messeUeberlauf` sähe das nicht), die gesperrten Zeilen ebenso wenig.
+  await keinInnererUeberlauf(panel, 'Modulpanel');
+  for (const name of [GESPERRT_ZEILE, GESPERRT_SPRUNG]) {
+    await keinInnererUeberlauf(panel.getByRole('button', { name, exact: true }), `„${name}"`);
+  }
 });
 
 /**

@@ -105,6 +105,9 @@ wird sie in dieser Change behoben, mit Vitest oder der e2e-Zeile als Nachweis. S
 - Je Spec ein Geschwistertest „… (Beobachter, Modulsperre)“ bzw. im Dashboard je Prüfbreite ein
   Test im bestehenden `describe`, der dieselben Mess-Hilfen (`messen`, `keinWaagerechterUeberlauf`,
   `jedeKennzahlStehtInIhrerZelle`, `messeUeberlauf`) benutzt. Die Admin-Tests bleiben unverändert.
+  Weil Drawer-Körper und Modulpanel klippen und ein Knopf mit `width: 100%` nicht mit seinem
+  Inhalt wächst, misst der Navigationsdurchgang zusätzlich innen: Körper bzw. Panel und jede
+  gesperrte Zeile ohne `scrollWidth` über `clientWidth` (Befund der Probe N1, `pruefliste.md`).
   Das Dashboard teilt heute einen Einsatz über alle Tests (`einsatzId ??=`). Der Sperrdurchgang
   legt seinen eigenen Einsatz an, damit der Override die Admin-Messung nicht berührt.
 - Mutationsproben, nie committet, Baum danach per `git diff --stat` sauber:
