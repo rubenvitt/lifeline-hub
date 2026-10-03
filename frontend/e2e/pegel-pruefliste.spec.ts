@@ -546,14 +546,18 @@ function abstandZumNaechstenZiel(ziel: Locator) {
 }
 
 /**
- * Elemente des Inspectors, die rechts aus ihm ragen — STRUKTURUNABHÄNGIG wie in
+ * Was rechts aus dem Inspector ragt — STRUKTURUNABHÄNGIG wie in
  * `lagekarte-leiste-dichte.spec.ts`: der Inspector steht mit `minWidth: 0` im Fluss der Leiste,
  * ein zu breiter Inhalt weitet ihn nicht, sondern ragt hinaus.
+ *
+ * Gemessen werden Elemente UND Textzeilen: ein Block-`div` bleibt so breit wie sein Elternteil,
+ * auch wenn sein Text (`white-space: nowrap`) darüber hinausläuft — die Elementkästen allein
+ * sähen das nicht (Mutationsprobe LFH-821).
  */
 function ueberstaende(paneel: Locator) {
   return paneel.evaluate((el, toleranz) => {
     const rand = el.getBoundingClientRect().right + toleranz;
-    return [...el.querySelectorAll<HTMLElement>('*')]
+    const befunde = [...el.querySelectorAll<HTMLElement>('*')]
       .filter((kind) => {
         const k = kind.getBoundingClientRect();
         return k.width > 0 && k.right > rand;
@@ -562,6 +566,16 @@ function ueberstaende(paneel: Locator) {
         (kind) =>
           `${kind.innerText.split('\n')[0] || kind.tagName} (+${Math.round(kind.getBoundingClientRect().right - rand)} px)`,
       );
+    const gang = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const bereich = document.createRange();
+    for (let t = gang.nextNode(); t; t = gang.nextNode()) {
+      if (!t.textContent?.trim()) continue;
+      bereich.selectNodeContents(t);
+      const rechts = Math.max(...[...bereich.getClientRects()].map((r) => r.right));
+      if (rechts > rand)
+        befunde.push(`Text „${t.textContent.trim()}" (+${Math.round(rechts - rand)} px)`);
+    }
+    return befunde;
   }, SUBPIXEL);
 }
 
