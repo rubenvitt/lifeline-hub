@@ -127,3 +127,89 @@ async fn erfolgreicher_login_und_logout_werden_protokolliert() {
         "der Logout muss dem Benutzer zuzuordnen sein, sonst ist die Spur wertlos"
     );
 }
+
+// --- Passwortwechsel (LFH-827) ---
+//
+// `POST /api/auth/passwort` schrieb bis LFH-827 nur `tracing`. Bei einem Vorfall lautet die Frage
+// aber „wann hat wer das Passwort geändert, und von wo?“ — die beantwortet nur die Tabelle.
+
+/// Wechselt das Passwort der angemeldeten Sitzung und liefert den Status.
+async fn passwort_wechseln(app: &axum::Router, cookie: &str, alt: &str, neu: &str) -> StatusCode {
+    let body = format!(r#"{{"altes_passwort":"{alt}","neues_passwort":"{neu}"}}"#);
+    common::anfrage(app, "POST", "/api/auth/passwort", cookie, Some(&body))
+        .await
+        .0
+}
+
+/// Ereignis, Benutzername, Benutzer-id und Anmeldeweg der Passwort-Ereignisse.
+async fn passwort_spur(
+    pool: &sqlx::SqlitePool,
+) -> Vec<(String, Option<String>, Option<i64>, String)> {
+    sqlx::query_as(
+        "SELECT ereignis, benutzername, benutzer_id, provider FROM auth_audit \
+         WHERE ereignis LIKE 'passwort%' ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+async fn admin_id(pool: &sqlx::SqlitePool) -> i64 {
+    sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn erfolgreicher_passwortwechsel_hinterlaesst_eine_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let status = passwort_wechseln(&app, &cookie, "startpw12", "ganzneu1234").await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    assert_eq!(
+        passwort_spur(&pool).await,
+        vec![(
+            "passwort_geaendert".to_string(),
+            Some("admin".to_string()),
+            Some(admin_id(&pool).await),
+            "passwort".to_string(),
+        )],
+        "ein Passwortwechsel muss rückwirkend nachweisbar sein"
+    );
+}
+
+#[tokio::test]
+async fn abgewiesener_passwortwechsel_hinterlaesst_eine_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let status = passwort_wechseln(&app, &cookie, "daneben123", "ganzneu1234").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    assert_eq!(
+        passwort_spur(&pool).await,
+        vec![(
+            "passwort_wechsel_abgewiesen".to_string(),
+            Some("admin".to_string()),
+            Some(admin_id(&pool).await),
+            "passwort".to_string(),
+        )],
+        "ein Wechselversuch mit falschem Alt-Passwort ist das Muster einer übernommenen Sitzung"
+    );
+}
+
+/// Was schon an der Form scheitert (zu kurzes neues Passwort), hat das Alt-Passwort nie geprüft
+/// und ist kein Wechselversuch im Sinne der Spur.
+#[tokio::test]
+async fn formfehler_beim_passwortwechsel_hinterlaesst_keine_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let status = passwort_wechseln(&app, &cookie, "startpw12", "kurz123").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    assert!(passwort_spur(&pool).await.is_empty());
+}
