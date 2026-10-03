@@ -13,6 +13,7 @@ import SchwaerzungsantragDialog, {
   type AntragZielWahl,
   antragBody,
   kennungPasst,
+  personenUmfang,
   vollzugAb,
 } from './SchwaerzungsantragDialog';
 
@@ -114,6 +115,9 @@ describe('SchwaerzungsantragDialog', () => {
     expect(kennungPasst(' R-042 ', 'R-042')).toBe(true);
     expect(kennungPasst('r-042', 'R-042')).toBe(false);
     expect(kennungPasst(undefined, 'R-042')).toBe(false);
+    // LFH-757: bei Betroffenen gehen Fotos und Dateien mit, bei den übrigen Arten gibt es keine.
+    expect(personenUmfang('betroffene')).toContain('Fotos und Dateien');
+    expect(personenUmfang('externe_kraft')).not.toContain('Dateien');
     expect(
       antragBody({ art: 'einsatz', kennung: 'E-1' }, { aktenzeichen: ' A ', bestaetigung: 'E-1 ' }),
     ).toEqual({

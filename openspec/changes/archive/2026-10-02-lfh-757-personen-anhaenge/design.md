@@ -68,7 +68,7 @@ der den Weg vorgibt (gemessen am 02.10.2026 auf `origin/alpha` `da9bfe1c`, höch
 
 ## Decisions
 
-### D1 — Linker `einsatz_person_anhang` (Migration 0140)
+### D1 — Linker `einsatz_person_anhang` (Migration 0142)
 
 Rein additiv, Spiegel von 0126:
 
@@ -110,7 +110,7 @@ gebunden (Chat-Nachricht, Dokumentenablage, ETB-Eintrag, Schaden oder Person)“
 
 ### D2 — Audit-Art `anhang` per Rebuild (Migration 0141)
 
-Eigene Datei, weil `-- no-transaction` für die ganze Datei gilt und 0140 eine normale
+Eigene Datei, weil `-- no-transaction` für die ganze Datei gilt und 0142 eine normale
 Transaktion verträgt. Inhalt: 0132 wörtlich, nur `CHECK (art IN
 ('detail','export','druck','anhang'))` und der Kopfkommentar (LFH-757, Schema = 0132 1:1).
 Muster: Zwischentabelle, Kopie mit ids, `sqlite_sequence` vor dem `DROP` umhängen, `RENAME`,
@@ -276,7 +276,7 @@ brauchen es — deshalb kommen sie später“ steht nur im Archiv von LFH-21 und
 ## Migration Plan
 
 1. `git fetch origin alpha`, `scripts/check-migrationen.sh` — `0140`/`0141` sind frei.
-2. `0140_einsatz_person_anhang.sql` (additiv) und `0141_person_zugriff_audit_anhang.sql`
+2. `0142_einsatz_person_anhang.sql` (additiv) und `0141_person_zugriff_audit_anhang.sql`
    (Rebuild, `-- no-transaction` als erste Zeile).
 3. Rollback: eingespielte Migrationen werden nicht editiert. Eine Rücknahme braucht eine
    Folgemigration (Linker und zugehörige `anhang`-Zeilen entfernen; der erweiterte CHECK kann
@@ -303,3 +303,11 @@ der eigene Baustein `ObjektAnhaenge` aus D6 entfällt, ebenso die Kopie von Dom�
 `abschnitt`; die Person setzt `vorschau={false}` (D3 unverändert). Das Lese-Audit bleibt in
 `person_zugriff_audit` (D2): `0138_anhang_zugriff_audit.sql` aus LFH-758 hält ihr Protokoll
 ausdrücklich getrennt, weil an der UHS keine Person hängt. Migrationen damit erst 0139/0140, nach der Auflösung der doppelten 0136 auf `alpha` (PR #379, Tier-Anhänge auf 0139) 0140/0141.
+
+Nach dem Merge (PR #367) trug `alpha` zweimal 0140: `0140_schwaerzung_antrag` (LFH-751, PR #375)
+und den Linker. Wie in PR #379 weicht der später gemergte auf die nächste freie Nummer aus:
+`0140_einsatz_person_anhang` → `0142_einsatz_person_anhang`, Inhalt unverändert;
+`0141_person_zugriff_audit_anhang` bleibt. Der Rebuild läuft damit vor dem Linker — unschädlich,
+weil der Linker auf `einsatz_person` verweist, nicht auf `person_zugriff_audit`. Die
+Kopfkommentare der beiden Migrationen nennen noch die alte Reihenfolge; sie bleiben, weil eine
+eingespielte Migration nicht geändert wird.

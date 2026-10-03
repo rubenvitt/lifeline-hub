@@ -20,6 +20,9 @@ pub const ZIEL_KLARTEXTE: &[&str] = &[
     "THW OV Nord",
     "Hans Funk 0172",
     "Anruferin Lisa",
+    // LFH-757: Dateinamen der Personen-Anhänge (auch ein schon entfernter) gehen samt Datei.
+    "Yilmaz-Wunde.jpg",
+    "Yilmaz-Ausweis-alt.pdf",
     "0151 1112223",
     "Maria Beispiel",
     "+49 511 1234567",
@@ -35,6 +38,8 @@ pub const NACHBAR_KLARTEXTE: &[&str] = &[
     "Anrufer Tom",
     "Paul Presse",
     "Anderer Einsatz Meier",
+    "Mustermann-Ausweis.pdf",
+    "Meier-Foto-E2.jpg",
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -326,6 +331,43 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
         &[e1, leitung],
     )
     .await;
+
+    // LFH-757: Personen-Anhänge — Ziel (einer davon schon entfernt), Nachbar im selben Einsatz,
+    // und die Person im anderen Einsatz.
+    for (einsatz, person, datei, entfernt) in [
+        (e1, p1, "Yilmaz-Wunde.jpg", false),
+        (e1, p1, "Yilmaz-Ausweis-alt.pdf", true),
+        (e1, p2, "Mustermann-Ausweis.pdf", false),
+        (e2, p_e2, "Meier-Foto-E2.jpg", false),
+    ] {
+        let anhang = id(
+            pool,
+            &format!(
+                "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, \
+                    hochgeladen_von) VALUES (?, '{datei}', 'image/jpeg', 1, 'x', X'00', ?) \
+                 RETURNING id"
+            ),
+            &[einsatz, leitung],
+        )
+        .await;
+        exec(
+            pool,
+            if entfernt {
+                "INSERT INTO einsatz_person_anhang (einsatz_id, person_id, anhang_id, \
+                    abgelegt_von_id, geloescht_at, geloescht_von_id) \
+                 VALUES (?, ?, ?, ?, '2026-01-01 00:00:00', ?)"
+            } else {
+                "INSERT INTO einsatz_person_anhang (einsatz_id, person_id, anhang_id, \
+                    abgelegt_von_id) VALUES (?, ?, ?, ?)"
+            },
+            &if entfernt {
+                vec![einsatz, person, anhang, leitung, leitung]
+            } else {
+                vec![einsatz, person, anhang, leitung]
+            },
+        )
+        .await;
+    }
 
     Bestand {
         org_id: 1,

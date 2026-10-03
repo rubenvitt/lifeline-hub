@@ -16,6 +16,9 @@
 //! Bezug steht und jede ihrer Scrub-Spalten genau eine Markierung trägt. Eine neue Tabelle mit
 //! Personenverweis und Freitext macht damit einen Test rot, statt still durchzurutschen.
 //!
+//! **Dateien:** Linker auf `anhang`, die beim Einsatz ganz gelöscht werden, stehen nicht hier,
+//! sondern in [`PERSONEN_ANHAENGE`]; ihre Dateien gehen mit der Person (LFH-757).
+//!
 //! Herleitung: `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md`, D5.
 
 use super::repo::SCHWAERZUNG_PLATZHALTER;
@@ -289,6 +292,33 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
     },
 ];
 
+/// Verknüpfungstabelle, deren Zeilen samt Datei mit der Person gehen (LFH-757).
+///
+/// Ein Linker wie `einsatz_person_anhang` kennt keinen Spalten-Scrub: die Registry löscht ihn
+/// beim Einsatz ganz (`ZeileLoeschen`), und [`PERSONENBEZUEGE`] verbietet `ZeileLoeschen`. Die
+/// Fotos und Dateien einer Person SIND aber ihre Daten, also gehen sie beim Löschersuchen mit:
+/// [`scrubbe_person`] löscht die `anhang`-Zeilen (die Datei liegt in `anhang.daten`), die
+/// Verknüpfung folgt per `ON DELETE CASCADE`. ETB-Vermerke („Person R-007: Foto abgelegt“)
+/// nennen weder Datei noch Namen und bleiben wie jede ETB-Zeile; das Zugriffsprotokoll bleibt.
+/// Entscheidung 03.10.2026, gepinnt in `tests` (Guard + Scrub-Test).
+#[derive(Debug, Clone, Copy)]
+pub struct PersonenAnhaenge {
+    pub art: PersonenArt,
+    pub tabelle: &'static str,
+    /// FK-Spalte auf die Wurzel der Personenart.
+    pub bezug: &'static str,
+    /// FK-Spalte auf `anhang(id)` mit `ON DELETE CASCADE`.
+    pub anhang: &'static str,
+}
+
+/// Alle Linker, deren Dateien mit der Person gehen.
+pub const PERSONEN_ANHAENGE: &[PersonenAnhaenge] = &[PersonenAnhaenge {
+    art: PersonenArt::Betroffene,
+    tabelle: "einsatz_person_anhang",
+    bezug: "person_id",
+    anhang: "anhang_id",
+}];
+
 /// Entfernt die personengebundenen Werte der Person `art`/`person_id` im Einsatz `einsatz_id`,
 /// auf der Transaktions-Verbindung des Aufrufers (atomar mit Kennzeichen und Audit).
 /// Andere Personen und andere Einsätze bleiben unberührt. Prüft nicht, ob die Person existiert
@@ -335,6 +365,25 @@ pub async fn scrubbe_person(
             query = query.bind(SCHWAERZUNG_PLATZHALTER);
         }
         query
+            .bind(einsatz_id)
+            .bind(person_id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    for a in PERSONEN_ANHAENGE.iter().filter(|a| a.art == art) {
+        let regel = TABELLEN
+            .iter()
+            .find(|t| t.tabelle == a.tabelle)
+            .expect("Personen-Anhänge auf eine Tabelle außerhalb der Registry (Guard)");
+        // Auch schon entfernte Anhänge (Soft-Delete): ihre Datei liegt noch in `anhang`.
+        let sql = format!(
+            "DELETE FROM anhang WHERE id IN (SELECT {} FROM {} WHERE {} AND {} = ?)",
+            a.anhang,
+            a.tabelle,
+            where_klausel(regel),
+            a.bezug
+        );
+        sqlx::query(sqlx::AssertSqlSafe(sql))
             .bind(einsatz_id)
             .bind(person_id)
             .execute(&mut *conn)
