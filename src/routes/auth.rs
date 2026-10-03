@@ -268,6 +268,11 @@ pub struct PasswortWechsel {
 /// eröffnete Sitzung dürfte sonst bis zu [`session::SITZUNG_TAGE`] Tage weiterlaufen. Die eigene
 /// Sitzung bleibt, sonst würfe der Wechsel den Handelnden aus dem laufenden Einsatz. Passkeys
 /// und der TOTP-Zweitfaktor bleiben unberührt: sie hängen nicht am Passwort.
+///
+/// **Audit (LFH-827):** beide Ausgänge der Alt-Passwort-Prüfung landen in `auth_audit` —
+/// `passwort_geaendert` nach dem Commit, `passwort_wechsel_abgewiesen` beim falschen
+/// Alt-Passwort. Was vorher scheitert (400, 403, 429), hat kein Passwort geprüft und schreibt
+/// nichts; die 429 steht über die Fehlversuche davor schon in der Spur.
 pub async fn passwort_aendern(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -316,6 +321,17 @@ pub async fn passwort_aendern(
                 peer_ip = ?peer_ip,
                 "Passwortwechsel abgewiesen: altes Passwort falsch"
             );
+            crate::auth::audit::schreibe(
+                &state.pool,
+                crate::auth::audit::AuditEintrag {
+                    ereignis: crate::auth::audit::Ereignis::PasswortWechselAbgewiesen,
+                    benutzername: Some(&benutzer.benutzername),
+                    benutzer_id: Some(benutzer.id),
+                    peer_ip: peer_ip.map(|ip| ip.to_string()),
+                    provider: crate::auth::provider::ID_PASSWORT,
+                },
+            )
+            .await;
             return Err(AppError::UnprocessableEntity(
                 "Das bisherige Passwort stimmt nicht.".to_string(),
             ));
@@ -353,6 +369,17 @@ pub async fn passwort_aendern(
         andere_sitzungen_beendet = beendet,
         "Passwort gewechselt"
     );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::PasswortGeaendert,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_PASSWORT,
+        },
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
