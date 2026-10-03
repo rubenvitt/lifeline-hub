@@ -38,9 +38,11 @@ wire_enum! {
     }
 }
 
-/// Ein Audit-Ereignis. `benutzer_id` ist nur bei Erfolg bekannt; `benutzername` trägt bei
-/// einem Fehlschlag den VERSUCHTEN Namen (der womöglich gar nicht existiert — genau das
-/// ist die interessante Information einer Brute-Force-Spur).
+/// Ein Audit-Ereignis. `benutzername` trägt beim Passwort-Fehlschlag den VERSUCHTEN Namen (der
+/// womöglich gar nicht existiert — genau das ist die interessante Information einer
+/// Brute-Force-Spur). `benutzer_id` steht bei Erfolg und bei einem Fehlschlag, dessen Benutzer
+/// der Server schon selbst festgestellt hat, etwa am Zweitfaktor nach bestandenem Passwort
+/// (LFH-792).
 #[derive(Debug, Clone)]
 pub struct AuditEintrag<'a> {
     pub ereignis: Ereignis,

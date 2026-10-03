@@ -13,6 +13,10 @@ use crate::error::AppError;
 /// TOTP-Issuer, wie er in der otpauth-URL erscheint (Anzeige in der Authenticator-App).
 pub const TOTP_ISSUER: &str = "lifeline-hub";
 
+/// Anbieter-Kennung im Auth-Audit für eine Anmeldung, die mit dem Zweitfaktor abschließt
+/// (LFH-792). Der Passwortschritt davor schreibt keinen Eintrag.
+pub const PROVIDER: &str = "totp";
+
 /// Anzahl der bei einem Enrollment ausgegebenen Recovery-Codes.
 const RECOVERY_CODE_ANZAHL: usize = 10;
 
