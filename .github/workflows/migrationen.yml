@@ -124,6 +124,13 @@ jobs:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           GH_TOKEN: ${{ github.token }}
+          # Der Checkout hinterlegt den GITHUB_TOKEN als Header in einer per includeIf
+          # eingebundenen Datei (auch für Arbeitsbäume). Er schlüge die Push-URL, und der Push
+          # liefe als github-actions[bot] ins 403 (gemessen an der Probe #409). Ein leerer Wert
+          # setzt die Header-Liste zurück; Umgebungs-Konfiguration gilt nach allen Dateien.
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0: ""
           BASIS: ${{ github.event.pull_request.base.ref }}
           KOPF: ${{ github.event.pull_request.head.sha }}
           KOPF_BRANCH: ${{ github.event.pull_request.head.ref }}
@@ -134,8 +141,6 @@ jobs:
             echo "::notice::Autofix übersprungen: weder $BASIS noch der PR tragen migrationen-autofix.sh."
             exit 0
           fi
-          # Der Checkout hinterlegt den GITHUB_TOKEN als Header; er schlüge die Push-URL.
-          git config --local --unset-all "http.https://github.com/.extraheader" || true
           git remote set-url --push origin \
             "https://x-access-token:$APP_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           id="$(GH_TOKEN="$APP_TOKEN" gh api "users/$APP_SLUG%5Bbot%5D" --jq .id)"
@@ -247,11 +252,13 @@ jobs:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           GH_TOKEN: ${{ github.token }}
+          # Wie im PR-Job: ohne den Reset pushte der Header des Checkouts statt der App.
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0: ""
           BASIS: ${{ github.ref_name }}
           LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # Wie im PR-Job: der Header des Checkouts schlüge die Push-URL.
-          git config --local --unset-all "http.https://github.com/.extraheader" || true
           git remote set-url --push origin \
             "https://x-access-token:$APP_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           id="$(GH_TOKEN="$APP_TOKEN" gh api "users/$APP_SLUG%5Bbot%5D" --jq .id)"
