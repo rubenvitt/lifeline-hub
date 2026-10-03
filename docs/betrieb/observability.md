@@ -34,6 +34,12 @@ sie revisionssicher, im Backup enthalten und auswertbar. Protokolliert werden:
 | `login_ok` | erfolgreiche Anmeldung **mit Session** | der angemeldete Benutzer |
 | `login_fehlgeschlagen` | falsches Passwort, unbekannter Benutzer, gesperrte Quelle | der **versuchte** Name (muss keinem Benutzer entsprechen) |
 | `logout` | Abmeldung | — (nur `benutzer_id`) |
+| `passwort_geaendert` | Passwort selbst gewechselt (`POST /api/auth/passwort`), nach dem Speichern | der angemeldete Benutzer (mit `benutzer_id`) |
+| `passwort_wechsel_abgewiesen` | Passwortwechsel mit falschem Alt-Passwort | der angemeldete Benutzer (mit `benutzer_id`) |
+
+Beim Passwortwechsel schreibt nur die Prüfung des Alt-Passworts eine Zeile. Formfehler (`400`),
+ein abgeschalteter Passwort-Provider (`403`) und eine gesperrte Quelle (`429`) protokollieren
+nichts: dort wurde kein Passwort geprüft (LFH-827).
 
 Bei aktivem TOTP gibt es **kein** `login_ok` nach dem Passwort-Schritt: solange der
 Zweitfaktor aussteht, ist niemand angemeldet.
@@ -45,6 +51,11 @@ Beispielabfragen:
 SELECT peer_ip, COUNT(*) FROM auth_audit
 WHERE ereignis = 'login_fehlgeschlagen' AND zeitpunkt > datetime('now', '-1 hour')
 GROUP BY peer_ip ORDER BY COUNT(*) DESC;
+
+-- Wer hat wann von wo das Passwort geändert oder es versucht?
+SELECT zeitpunkt, ereignis, benutzername, peer_ip FROM auth_audit
+WHERE ereignis IN ('passwort_geaendert', 'passwort_wechsel_abgewiesen')
+ORDER BY zeitpunkt DESC;
 
 -- Wer war heute angemeldet?
 SELECT zeitpunkt, benutzername, peer_ip FROM auth_audit

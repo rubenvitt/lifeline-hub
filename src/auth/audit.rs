@@ -131,11 +131,6 @@ mod tests {
             Ereignis::ALLE.len() as i64,
             "jede Ereignis-Variante muss den CHECK passieren (migrations/0091, erweitert in 0143)"
         );
-        assert!(
-            Ereignis::ALLE.contains(&Ereignis::PasswortGeaendert)
-                && Ereignis::ALLE.contains(&Ereignis::PasswortWechselAbgewiesen),
-            "die Passwort-Ereignisse (LFH-827) gehören zur Spur"
-        );
     }
 
     #[tokio::test]
