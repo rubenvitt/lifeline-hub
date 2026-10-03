@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import type { Einheit, Einsatzabschnitt, KommunikationsStelle, Sprechgruppe } from '../api/types';
 import {
   abschnitteOhneSprechgruppe,
   einheitenOhneErreichbarkeit,
   einheitenOhneSprechgruppe,
+  leitstelleOhneVerbindung,
   lokaleSprechgruppenOhneZuordnung,
   verbindungenOhneGemeinsameSprechgruppe,
   verbindungsurteil,
@@ -241,5 +242,48 @@ describe('verbindungenOhneGemeinsameSprechgruppe', () => {
       daten([eh(10, [TMO312])]),
     );
     expect(l).toEqual({ zustand: 'gesperrt', treffer: [] });
+  });
+});
+
+describe('leitstelleOhneVerbindung (LFH-848)', () => {
+  const stelle = (
+    id: number,
+    stellenart: KommunikationsStelle['stellenart'],
+    verbindungen = 0,
+  ): KommunikationsStelle => ({
+    id,
+    stellenart,
+    bezeichnung: `Stelle ${id}`,
+    verbindungen: Array.from({ length: verbindungen }, (_, i) => ({
+      id: id * 10 + i,
+      mittel: 'festnetz' as const,
+      wert: '0421 1',
+    })),
+  });
+  const daten = (d: KommunikationsStelle[]): Quelle<KommunikationsStelle> => ({
+    zustand: 'daten',
+    daten: d,
+  });
+
+  it('meldet die Lücke, wenn nur S2 und eine Behörde Verbindungen tragen', () => {
+    const l = leitstelleOhneVerbindung(daten([stelle(1, 'funktion', 1), stelle(2, 'behoerde', 1)]));
+    expect(l).toEqual({ zustand: 'daten', fehlt: true });
+  });
+
+  it('zählt eine Leitstelle ohne Verbindung als fehlend', () => {
+    expect(leitstelleOhneVerbindung(daten([stelle(1, 'leitstelle')])).fehlt).toBe(true);
+  });
+
+  it('schließt die Lücke, sobald eine Leitstelle eine Verbindung trägt', () => {
+    const l = leitstelleOhneVerbindung(
+      daten([stelle(1, 'leitstelle'), stelle(2, 'leitstelle', 1)]),
+    );
+    expect(l).toEqual({ zustand: 'daten', fehlt: false });
+  });
+
+  it('behauptet ohne geladene Stellen nichts', () => {
+    for (const zustand of ['laden', 'fehler', 'gesperrt'] as const) {
+      expect(leitstelleOhneVerbindung({ zustand, daten: [] })).toEqual({ zustand, fehlt: false });
+    }
   });
 });

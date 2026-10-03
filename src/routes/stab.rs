@@ -19,6 +19,7 @@ use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
 use crate::routes::support::{self, pflicht};
 use crate::stab::checkliste::{self, ChecklistenEintrag, ChecklistenPunkt, PunktEingabe};
+use crate::stab::kommunikation;
 use crate::stab::repo::{self, AbschlussEingabe, BesetzungEingabe};
 use crate::stab::{BesetzungArt, LagebesprechungAnzeige, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
 use crate::zeit::jetzt;
@@ -329,6 +330,250 @@ pub async fn checkliste_setzen(
     }
     Ok(Json(gesetzt.liste))
 }
+
+// ── Kommunikationsplan (LFH-848) ────────────────────────────────────────────────────────────
+//
+// Gates wie die übrigen Stab-Routen; jede wirksame Schreibaktion sendet `LiveEvent::Stab` und
+// antwortet mit dem ganzen Plan (Muster `checkliste_setzen`). Kein ETB. Design:
+// `openspec/changes/lfh-848-kommunikationsplan/design.md` (D3).
+
+#[derive(Debug, Deserialize)]
+pub struct KommunikationsStelleNeu {
+    /// Als `String`, damit ein unbekannter Wert eine benannte 400 liefert.
+    stellenart: String,
+    #[serde(default)]
+    funktion: Option<String>,
+    #[serde(default)]
+    bezeichnung: Option<String>,
+}
+
+/// PATCH einer Stelle: nur die Bezeichnung. Stellenart und Funktion sind nach dem Anlegen fest;
+/// ein Body, der sie trotzdem trägt, scheitert mit 400 statt still ignoriert zu werden.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KommunikationsStellePatch {
+    #[serde(default)]
+    bezeichnung: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KommunikationsVerbindungNeu {
+    mittel: String,
+    wert: String,
+    #[serde(default)]
+    hinweis: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KommunikationsVerbindungPatch {
+    #[serde(default)]
+    mittel: Option<String>,
+    #[serde(default)]
+    wert: Option<String>,
+    /// **Tri-State**: fehlt = unverändert, `null` oder leer = Hinweis löschen.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    hinweis: Option<Option<String>>,
+}
+
+fn mittel_aus(wert: &str) -> Result<kommunikation::Verbindungsmittel, AppError> {
+    support::parse_enum(
+        kommunikation::Verbindungsmittel::parse,
+        wert,
+        format!(
+            "Unbekanntes Verbindungsmittel '{wert}' (erlaubt: festnetz, mobil, fax, email, \
+             messenger, melder, sonstiges)"
+        ),
+    )
+}
+
+/// Wert: Pflicht, höchstens [`kommunikation::TEXT_MAX`] Zeichen — ein Feld für sich → 400.
+fn wert_aus(wert: &str) -> Result<String, AppError> {
+    let w = pflicht(wert, "wert")?;
+    laenge_hoechstens(&w, "wert")?;
+    Ok(w)
+}
+
+fn laenge_hoechstens(text: &str, feld: &str) -> Result<(), AppError> {
+    if text.chars().count() > kommunikation::TEXT_MAX {
+        return Err(AppError::Validation(format!(
+            "{feld} darf höchstens {} Zeichen lang sein",
+            kommunikation::TEXT_MAX
+        )));
+    }
+    Ok(())
+}
+
+fn hinweis_aus(hinweis: Option<String>) -> Result<Option<String>, AppError> {
+    let h = hinweis.map(|h| h.trim().to_string()).filter(|h| !h.is_empty());
+    if let Some(h) = &h {
+        laenge_hoechstens(h, "hinweis")?;
+    }
+    Ok(h)
+}
+
+/// GET /api/einsaetze/{id}/stab/kommunikationsplan — gepflegte Stellen mit Verbindungen.
+pub async fn kommunikationsplan_laden(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Stab>,
+) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
+    Ok(Json(kommunikation::laden(&state.pool, ctx.einsatz.id).await?))
+}
+
+/// POST /api/einsaetze/{id}/stab/kommunikationsplan/stellen — Stelle anlegen.
+pub async fn kommunikationsplan_stelle_anlegen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    JsonBody(req): JsonBody<KommunikationsStelleNeu>,
+) -> Result<(StatusCode, Json<Vec<kommunikation::KommunikationsStelle>>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let stellenart = support::parse_enum(
+        kommunikation::Stellenart::parse,
+        &req.stellenart,
+        format!(
+            "Unbekannte Stellenart '{}' (erlaubt: funktion, leitstelle, behoerde, \
+             verbindungsperson, sonstige)",
+            req.stellenart
+        ),
+    )?;
+    let funktion_roh = req.funktion.as_deref().map(str::trim).filter(|f| !f.is_empty());
+    let eingabe = if stellenart.ist_extern() {
+        let bezeichnung =
+            kommunikation::pruefe_bezeichnung_fuer(stellenart, None, req.bezeichnung.as_deref(), false)?;
+        // Erst das Feld (Bezeichnung, 400), dann der Zusammenhang (Funktion an externer Stelle, 422).
+        if funktion_roh.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Eine externe Stelle trägt keine Funktion".into(),
+            ));
+        }
+        kommunikation::StelleEingabe { stellenart, funktion: None, bezeichnung }
+    } else {
+        let Some(code) = funktion_roh else {
+            return Err(AppError::Validation(
+                "stellenart 'funktion' verlangt eine funktion".into(),
+            ));
+        };
+        let s7_aktiv = {
+            let mut conn = state.pool.acquire().await?;
+            crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut conn, einsatz_id)
+                .await?
+                .s7_aktiv
+        };
+        let angabe = crate::fuehrung::pruefe_funktion(Some(code), req.bezeichnung.as_deref(), s7_aktiv)?;
+        kommunikation::StelleEingabe {
+            stellenart,
+            funktion: angabe.funktion,
+            bezeichnung: angabe.text,
+        }
+    };
+    let plan =
+        kommunikation::stelle_anlegen(&state.pool, einsatz_id, ctx.benutzer.id, &eingabe).await?;
+    sse(&state, einsatz_id);
+    Ok((StatusCode::CREATED, Json(plan)))
+}
+
+/// PATCH /api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid} — Bezeichnung ändern.
+pub async fn kommunikationsplan_stelle_aendern(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    PfadParam((_einsatz_id, stelle_id)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<KommunikationsStellePatch>,
+) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let plan = kommunikation::stelle_umbenennen(
+        &state.pool,
+        einsatz_id,
+        stelle_id,
+        ctx.benutzer.id,
+        req.bezeichnung.as_deref(),
+    )
+    .await?;
+    sse(&state, einsatz_id);
+    Ok(Json(plan))
+}
+
+/// DELETE /api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid} — Stelle samt Verbindungen.
+pub async fn kommunikationsplan_stelle_entfernen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    PfadParam((_einsatz_id, stelle_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let plan = kommunikation::stelle_entfernen(&state.pool, einsatz_id, stelle_id).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(plan))
+}
+
+/// POST /api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/verbindungen
+pub async fn kommunikationsplan_verbindung_anlegen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    PfadParam((_einsatz_id, stelle_id)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<KommunikationsVerbindungNeu>,
+) -> Result<(StatusCode, Json<Vec<kommunikation::KommunikationsStelle>>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let eingabe = kommunikation::VerbindungEingabe {
+        mittel: mittel_aus(&req.mittel)?,
+        wert: wert_aus(&req.wert)?,
+        hinweis: hinweis_aus(req.hinweis)?,
+    };
+    let plan = kommunikation::verbindung_anlegen(
+        &state.pool,
+        einsatz_id,
+        stelle_id,
+        ctx.benutzer.id,
+        &eingabe,
+    )
+    .await?;
+    sse(&state, einsatz_id);
+    Ok((StatusCode::CREATED, Json(plan)))
+}
+
+/// PATCH /api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}
+pub async fn kommunikationsplan_verbindung_aendern(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    PfadParam((_einsatz_id, verbindung_id)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<KommunikationsVerbindungPatch>,
+) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let patch = kommunikation::VerbindungPatch {
+        mittel: req.mittel.as_deref().map(mittel_aus).transpose()?,
+        wert: req.wert.as_deref().map(wert_aus).transpose()?,
+        hinweis: match req.hinweis {
+            None => None,
+            Some(h) => Some(hinweis_aus(h)?),
+        },
+    };
+    if patch == kommunikation::VerbindungPatch::default() {
+        return Err(AppError::Validation(
+            "erwartet mittel, wert und/oder hinweis".into(),
+        ));
+    }
+    let plan = kommunikation::verbindung_aendern(
+        &state.pool,
+        einsatz_id,
+        verbindung_id,
+        ctx.benutzer.id,
+        &patch,
+    )
+    .await?;
+    sse(&state, einsatz_id);
+    Ok(Json(plan))
+}
+
+/// DELETE /api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}
+pub async fn kommunikationsplan_verbindung_entfernen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    PfadParam((_einsatz_id, verbindung_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<kommunikation::KommunikationsStelle>>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let plan = kommunikation::verbindung_entfernen(&state.pool, einsatz_id, verbindung_id).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(plan))
+}
+
 
 #[cfg(test)]
 mod tests {

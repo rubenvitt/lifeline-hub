@@ -107,7 +107,7 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 - [ ] 6.1 Druck des Kommunikationsplans: `Druckkopf` „Kommunikationsplan“, `DruckKnopf`,
   `pages/kommunikationsplanPrint.css` (Aktionsspalte und Knöpfe aus), Regeln sonst aus `druck.css`.
   - Nachweis: Formtest analog `funkplanPrint.test.ts`; e2e in 7.1.
-- [ ] 6.2 Darstellung „Sprechgruppen“: `stab/sprechgruppenplan.test.ts` zuerst (Menge = zugeordnete
+- [x] 6.2 Darstellung „Sprechgruppen“: `stab/sprechgruppenplan.test.ts` zuerst (Menge = zugeordnete
   plus einsatzlokale, Katalog ohne Zuordnung fehlt, TMO vor DMO, Teilnehmer mit Rufnamen,
   gesperrte Quelle → „—“ bzw. „unvollständig“ statt „keine“), dann `stab/sprechgruppenplan.ts`;
   `parseFunkplanAnsicht` um `sprechgruppen`, dreistelliger Umschalter und Tabelle in

@@ -675,6 +675,189 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
   });
 });
 
+/**
+ * Darstellung „Sprechgruppen“ (LFH-848 D8): die Kanalbelegung als dritte Darstellung derselben
+ * Seite. Umschalter dreistellig, Sichtvorgabe `?ansicht=sprechgruppen` apply-then-clean, Druckkopf
+ * nennt die Darstellung, Lücken-Paneel und Übernahme bleiben die der Seite.
+ */
+describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
+  function SuchAnzeige() {
+    return <span data-testid="suche">{useLocation().search}</span>;
+  }
+  function rendereMit(route = '/einsaetze/1/stab/funkplan') {
+    return renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/stab/funkplan" element={<FunkplanPage />} />
+        </Routes>
+        <SuchAnzeige />
+      </>,
+      { route },
+    );
+  }
+  const plan = () => screen.getByRole('region', { name: 'Sprechgruppen' });
+  const zeile = (c: HTMLElement, id: number) =>
+    c.querySelector(`[aria-label="Sprechgruppen"] tr[data-row-key="sg-${id}"]`) as HTMLElement;
+  const druckkopf = (c: HTMLElement) =>
+    c.querySelector('[data-lfh="druckwurzel"] [data-lfh="druckkopf"]') as HTMLElement;
+
+  // Der Server liefert an Zuordnung und Liste dieselbe Sprechgruppe, samt Hinweis.
+  const TMO311 = { ...sg(1, 'TMO', 'TMO 311'), hinweis: 'Führungskanal' };
+
+  beforeEach(() => {
+    vi.mocked(listeAbschnitte).mockResolvedValue([
+      { ...ABSCHNITTE[0], sprechgruppen: [TMO311, sg(2, 'DMO', 'DMO 505')] },
+      ABSCHNITTE[1],
+    ]);
+    // Der 1. Zug arbeitet mit Abschnitt Nord auf TMO 311.
+    vi.mocked(listeEinheiten).mockResolvedValue([{ ...EINHEITEN[0], sprechgruppen: [TMO311] }]);
+    vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue([
+      TMO311,
+      sg(2, 'DMO', 'DMO 505'),
+      sg(9, 'DMO', 'DMO 999', true),
+      // Katalog, nirgends zugeordnet: keine Sprechgruppe dieses Einsatzes.
+      sg(4, 'TMO', 'TMO 400'),
+    ]);
+  });
+
+  it('schaltet dreistellig um, auch ohne Schreibrecht; Spalten fest, Lücken bleiben', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' });
+    rendereMit();
+    await screen.findByText('Florian 1/42-1');
+    const umschalter = screen.getByRole('radiogroup', { name: 'Darstellung' });
+    expect(
+      within(umschalter)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Tabelle', 'Skizze', 'Sprechgruppen']);
+    await userEvent.click(within(umschalter).getByRole('radio', { name: 'Sprechgruppen' }));
+    expect(within(umschalter).getByRole('radio', { name: 'Sprechgruppen' })).toBeChecked();
+    const kopf = [...plan().querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
+    expect(kopf).toEqual(['Sprechgruppe', 'Betriebsart', 'Hinweis', 'Herkunft', 'Teilnehmer']);
+    // Die Funkplan-Tabelle ist weg, Fahrzeuge sind keine Teilnehmer.
+    expect(screen.queryByRole('region', { name: 'Funkplan' })).toBeNull();
+    expect(within(plan()).queryByText('Florian 1/42-1')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Lücken' })).toBeInTheDocument();
+    // Katalog ohne Zuordnung fehlt; TMO vor DMO.
+    expect(within(plan()).queryByText('TMO 400')).toBeNull();
+    expect(
+      [...plan().querySelectorAll('tr[data-row-key^="sg-"]')].map((z) =>
+        z.getAttribute('data-row-key'),
+      ),
+    ).toEqual(['sg-1', 'sg-2', 'sg-9']);
+  });
+
+  it('nennt je Sprechgruppe die Teilnehmer mit Rufnamen, jede führt zu ihrem Datensatz', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    await waitFor(() => expect(zeile(container, 1)).not.toBeNull());
+    const tmo = zeile(container, 1);
+    await waitFor(() => expect(within(tmo).getByRole('link', { name: '1. Zug' })).toBeVisible());
+    expect(within(tmo).getByText('TMO 311')).toBeInTheDocument();
+    expect(within(tmo).getByText('TMO')).toBeInTheDocument();
+    expect(within(tmo).getByText('Führungskanal')).toBeInTheDocument();
+    expect(within(tmo).getByText('Katalog')).toBeInTheDocument();
+    expect(within(tmo).getByRole('link', { name: 'Abschnitt Nord' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einsatzabschnitte?abschnitt=1',
+    );
+    expect(within(tmo).getByRole('link', { name: '1. Zug' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/10',
+    );
+    expect(within(tmo).getByText('EA-N')).toBeInTheDocument();
+    expect(within(tmo).getByText('Florian 1/10')).toBeInTheDocument();
+    // Die Sprechgruppe selbst hat keine Seite: die Kennung ist kein Link.
+    expect(within(tmo).queryByRole('link', { name: 'TMO 311' })).toBeNull();
+  });
+
+  it('zeigt eine einsatzlokale Sprechgruppe ohne Zuordnung mit „keine“ Teilnehmer', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    await waitFor(() => expect(zeile(container, 9)).not.toBeNull());
+    // Erst mit geladenen Abschnitten und Einheiten ist „keine“ belegt (vorher „lädt“).
+    await waitFor(() => expect(within(zeile(container, 9)).getByText('keine')).toBeInTheDocument());
+    expect(within(zeile(container, 9)).getByText('einsatzlokal')).toBeInTheDocument();
+  });
+
+  it('?ansicht=sprechgruppen öffnet die Darstellung, räumt den Parameter, nie zuerst die Tabelle', async () => {
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    const tabellen: number[] = [];
+    const beobachter = new MutationObserver(() =>
+      tabellen.push(container.querySelectorAll('[aria-label="Funkplan"]').length),
+    );
+    beobachter.observe(container, { childList: true, subtree: true });
+    expect(await screen.findByRole('region', { name: 'Sprechgruppen' })).toBeInTheDocument();
+    beobachter.disconnect();
+    expect(Math.max(0, ...tabellen)).toBe(0);
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByRole('radio', { name: 'Sprechgruppen' })).toBeChecked();
+  });
+
+  it('nennt im Druckkopf die Darstellung „Sprechgruppen“ und zählt keine Fahrzeuge', async () => {
+    const { container } = rendereMit();
+    await screen.findByText('Florian 1/42-1');
+    expect(druckkopf(container)).not.toHaveTextContent('Sprechgruppen');
+    await userEvent.click(screen.getByRole('radio', { name: 'Sprechgruppen' }));
+    expect(druckkopf(container)).toHaveTextContent('Funkplan – Sprechgruppen');
+    expect(druckkopf(container)).toHaveTextContent('3 Sprechgruppen · 2 Abschnitte · 1 Einheiten');
+    expect(druckkopf(container)).not.toHaveTextContent('Fahrzeuge');
+    expect(container.querySelectorAll('[data-lfh="druckwurzel"]')).toHaveLength(1);
+  });
+
+  it('Einheiten gesperrt: „—“ mit Grund statt „keine“, bekannte Teilnehmer „unvollständig“', async () => {
+    vi.mocked(listeEinheiten).mockRejectedValue(new ApiError(403, 'verboten'));
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    await waitFor(() =>
+      expect(
+        within(zeile(container, 1)).getByRole('link', { name: 'Abschnitt Nord' }),
+      ).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/Einheiten: nicht freigegeben/)).toBeInTheDocument(),
+    );
+    const lokal = zeile(container, 9);
+    expect(within(lokal).queryByText('keine')).toBeNull();
+    expect(within(lokal).getByText(/—.*Einheiten nicht freigegeben/)).toBeInTheDocument();
+    const tmo = zeile(container, 1);
+    expect(within(tmo).getByRole('link', { name: 'Abschnitt Nord' })).toBeInTheDocument();
+    expect(within(tmo).getByText(/unvollständig/)).toBeInTheDocument();
+    expect(within(tmo).getByText(/Einheiten nicht freigegeben/)).toBeInTheDocument();
+    // Oberhalb steht, dass die Einheiten fehlen.
+    expect(screen.getByText(/Einheiten: nicht freigegeben/)).toBeInTheDocument();
+  });
+
+  it('nennt die fehlende Sprechgruppenliste, statt lokale ohne Zuordnung still wegzulassen', async () => {
+    vi.mocked(listeEinsatzSprechgruppen).mockRejectedValue(new ApiError(500, 'kaputt'));
+    const { container } = rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    await waitFor(() => expect(zeile(container, 1)).not.toBeNull());
+    expect(zeile(container, 9)).toBeNull();
+    expect(
+      await screen.findByText(/Sprechgruppen des Einsatzes: nicht geladen/),
+    ).toBeInTheDocument();
+  });
+
+  it('übernimmt auch aus dieser Darstellung den Funkplan mit genau einem Aufruf', async () => {
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    await screen.findByRole('region', { name: 'Sprechgruppen' });
+    const knopf = screen.getByRole('button', { name: 'In Lagebericht übernehmen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await waitFor(() => expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/lageberichte/77'));
+    expect(legeLageberichtAn).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(legeLageberichtAn).mock.calls[0][1].titel).toMatch(/^Funkplan /);
+  });
+
+  it('zeigt bei gesperrtem Stab auch mit ?ansicht=sprechgruppen nur die Sperre', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
+    rendereMit('/einsaetze/1/stab/funkplan?ansicht=sprechgruppen');
+    expect(
+      await screen.findByText(/Stab ist in diesem Einsatz nicht freigegeben/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Sprechgruppen' })).toBeNull();
+  });
+});
+
 describe('FunkplanPage — Lücke „Verbindungen ohne gemeinsame Sprechgruppe“ (LFH-625)', () => {
   it('zählt die Verbindung und verweist auf die untere Stelle', async () => {
     vi.mocked(listeEinheiten).mockResolvedValue([
