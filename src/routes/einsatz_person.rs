@@ -165,8 +165,8 @@ pub async fn anlegen(
     }
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
 
-    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-Gates, aber vor dem
-    // Aktiv-Gate erkennen. Die Einsatz-ID ist Teil des Lookups (kein Cross-Einsatz-Replay).
+    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-/Lese-Gates (LFH-769), aber
+    // vor dem Aktiv-Gate erkennen. Die Einsatz-ID ist Teil des Lookups (kein Cross-Einsatz-Replay).
     let client_id = trimme(body.client_id);
     if client_id.as_deref().is_some_and(|cid| cid.len() > 64) {
         return Err(AppError::Validation(

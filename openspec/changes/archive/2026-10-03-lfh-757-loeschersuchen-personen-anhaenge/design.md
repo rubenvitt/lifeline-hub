@@ -11,7 +11,7 @@ daraus UPDATEs; `ZeileLoeschen` ist dort ausdrücklich verboten. LFH-757 bringt 
 
 ### D1 — Zweite Liste statt Ausnahme im Markierungs-Guard
 
-`PERSONEN_ANHAENGE: &[PersonenAnhaenge { art, tabelle, bezug, anhang }]` neben
+`PERSONENANHAENGE: &[PersonenAnhaenge { art, tabelle, bezug, anhang }]` neben
 `PERSONENBEZUEGE`. Die Markierungs-Guards bleiben unverändert streng (kein `ZeileLoeschen` im
 Spalten-Scrub); GUARD 1 akzeptiert einen Verweis aus einer der beiden Listen und prüft auch die
 `anhang`-Spalte als echte Kante. GUARD 4: jede Spalte der Tabelle ist `ZeileLoeschen`, die Tabelle

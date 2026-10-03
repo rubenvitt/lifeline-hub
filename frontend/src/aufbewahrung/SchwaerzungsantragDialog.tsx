@@ -49,7 +49,7 @@ export function kennungPasst(eingabe: string | undefined, kennung: string): bool
 }
 
 /** Was der Vollzug eines Personen-Antrags entfernt. Bei Betroffenen auch ihre Fotos und Dateien
- *  samt Datei (LFH-757, `PERSONEN_ANHAENGE` im Backend). */
+ *  samt Datei (LFH-757, `PERSONENANHAENGE` im Backend). */
 export function personenUmfang(art: AntragZielArt): string {
   return art === 'betroffene'
     ? 'Name, Kontakt, Adresse und Notizen dieser Person sowie ihre Fotos und Dateien'

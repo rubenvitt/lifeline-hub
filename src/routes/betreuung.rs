@@ -5,7 +5,8 @@
 //! Beobachter) bzw. `EinsatzSchreibzugriff<Betreuung>` (Schreibrecht, aktiver Einsatz, Modul).
 //! Die zwei Melde-Routen nehmen `EinsatzSchreibfreigabe<Betreuung>` und prüfen den aktiven
 //! Einsatz selbst, NACH dem Replay-Lookup ihrer `client_id` (LFH-675, design.md D2): eine
-//! offline erfasste und schon gespeicherte Meldung kommt auch nach Einsatzende zurück.
+//! offline erfasste und schon gespeicherte Meldung kommt auch nach Einsatzende zurück, solange
+//! der Einsatz lesbar ist (Lese-Gate im Extractor, LFH-769).
 //! Bodies nur über `JsonBody`, Sub-IDs nur über `PfadParam`.
 //!
 //! **Statuscodes** nach der Konvention in `src/error.rs` (src/AGENTS.md „Statuscode-Konvention“,

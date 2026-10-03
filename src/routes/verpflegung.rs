@@ -224,9 +224,9 @@ pub struct AusgabeErfassen {
 /// POST /api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben — ohne ETB-Eintrag.
 ///
 /// Idempotent über `client_id` (LFH-688, design.md D2): Reihenfolge wie `routes/meldung.rs`
-/// — Gates im Extractor (Org, Schreibrecht, Modul), Queue-Besitzer, Replay-Lookup, ERST DANN
-/// `fordere_aktiv`. Ein gespeicherter Replay kommt so auch nach dem Einsatzende zurück; ein
-/// Replay publiziert nichts (D5).
+/// — Gates im Extractor (Org, Schreibrecht, Modul, Lesezugriff), Queue-Besitzer, Replay-Lookup,
+/// ERST DANN `fordere_aktiv`. Ein gespeicherter Replay kommt so auch nach dem Einsatzende
+/// zurück, solange der Einsatz lesbar ist (LFH-769); ein Replay publiziert nichts (D5).
 pub async fn ausgabe_erfassen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Verpflegung>,

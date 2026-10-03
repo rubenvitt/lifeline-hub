@@ -32,11 +32,7 @@ async fn kanten(pool: &SqlitePool) -> Vec<Kante> {
 /// GUARD 1 (rein): jede Kante auf die Wurzel einer Personenart ist als Bezug deklariert, und
 /// jeder deklarierte Spalten-Bezug ist eine echte Kante auf die Wurzel seiner Art (kein toter
 /// Eintrag, kein Tippfehler). Dazu je Art genau ein `SelbstId`-Bezug auf der Wurzel.
-fn befund_bezuege(
-    kanten: &[Kante],
-    bezuege: &[PersonenBezug],
-    anhaenge: &[PersonenAnhaenge],
-) -> Vec<String> {
+fn befund_bezuege(kanten: &[Kante], bezuege: &[PersonenBezug]) -> Vec<String> {
     let mut befund = Vec::new();
     for art in PersonenArt::ALLE {
         for (tabelle, spalte, parent) in kanten {
@@ -47,12 +43,13 @@ fn befund_bezuege(
                 b.art == art
                     && b.tabelle == tabelle
                     && matches!(b.bezug, Bezug::Spalte(s) if s == spalte)
-            }) || anhaenge
+            }) || PERSONENANHAENGE
                 .iter()
-                .any(|a| a.art == art && a.tabelle == tabelle && a.bezug == spalte);
+                .any(|l| l.art == art && l.tabelle == tabelle && l.bezug == spalte);
             if !deklariert {
                 befund.push(format!(
-                    "{tabelle}.{spalte} verweist auf {} ({}), steht aber weder in PERSONENBEZUEGE noch in PERSONEN_ANHAENGE",
+                    "{tabelle}.{spalte} verweist auf {} ({}), steht aber weder in PERSONENBEZUEGE \
+                     noch in PERSONENANHAENGE",
                     art.wurzel(),
                     art.as_str()
                 ));
@@ -83,50 +80,6 @@ fn befund_bezuege(
                     b.art.wurzel()
                 ));
             }
-        }
-    }
-    for a in anhaenge {
-        for (spalte, parent) in [(a.bezug, a.art.wurzel()), (a.anhang, "anhang")] {
-            let echt = kanten
-                .iter()
-                .any(|(t, sp, p)| t == a.tabelle && sp == spalte && p == parent);
-            if !echt {
-                befund.push(format!(
-                    "{}.{spalte} steht in PERSONEN_ANHAENGE, ist aber keine FK-Kante auf {parent}",
-                    a.tabelle
-                ));
-            }
-        }
-    }
-    befund
-}
-
-/// GUARD 4 (rein, LFH-757): ein Eintrag in [`PERSONEN_ANHAENGE`] ist ein Linker, den die
-/// Registry beim Einsatz ganz löscht (jede Spalte `ZeileLoeschen`), und steht nicht zugleich in
-/// [`PERSONENBEZUEGE`] — sonst würde ein Teil der Zeile gescrubbt statt gelöscht.
-fn befund_anhaenge(anhaenge: &[PersonenAnhaenge], bezuege: &[PersonenBezug]) -> Vec<String> {
-    let mut befund = Vec::new();
-    for a in anhaenge {
-        let Some(regel) = TABELLEN.iter().find(|t| t.tabelle == a.tabelle) else {
-            befund.push(format!("{} steht nicht in der Registry", a.tabelle));
-            continue;
-        };
-        for s in regel.spalten {
-            if !matches!(
-                s.klassifikation,
-                Klassifikation::Scrub(Strategie::ZeileLoeschen, _)
-            ) {
-                befund.push(format!(
-                    "{}.{} ist nicht ZeileLoeschen — ein Personen-Anhang-Linker geht ganz",
-                    a.tabelle, s.spalte
-                ));
-            }
-        }
-        if bezuege.iter().any(|b| b.tabelle == a.tabelle) {
-            befund.push(format!(
-                "{} steht in PERSONEN_ANHAENGE und in PERSONENBEZUEGE",
-                a.tabelle
-            ));
         }
     }
     befund
@@ -187,69 +140,12 @@ fn befund_markierungen(bezuege: &[PersonenBezug]) -> Vec<String> {
 #[tokio::test]
 async fn jeder_personenverweis_ist_als_bezug_deklariert() {
     let pool = crate::db::test_pool().await;
-    let befund = befund_bezuege(&kanten(&pool).await, PERSONENBEZUEGE, PERSONEN_ANHAENGE);
+    let befund = befund_bezuege(&kanten(&pool).await, PERSONENBEZUEGE);
     assert!(
         befund.is_empty(),
         "Personenbezüge unvollständig (LFH-751, design.md D5):\n{}",
         befund.join("\n")
     );
-}
-
-#[tokio::test]
-async fn personen_anhaenge_sind_ganze_linker_mit_kaskade() {
-    let befund = befund_anhaenge(PERSONEN_ANHAENGE, PERSONENBEZUEGE);
-    assert!(
-        befund.is_empty(),
-        "PERSONEN_ANHAENGE (LFH-757):\n{}",
-        befund.join("\n")
-    );
-    // Die Verknüpfung folgt der gelöschten Datei nur mit ON DELETE CASCADE.
-    let pool = crate::db::test_pool().await;
-    for a in PERSONEN_ANHAENGE {
-        let sql = format!("PRAGMA foreign_key_list('{}')", a.tabelle);
-        let kaskade = sqlx::query(sqlx::AssertSqlSafe(sql))
-            .fetch_all(&pool)
-            .await
-            .unwrap()
-            .iter()
-            .any(|r| {
-                r.get::<String, _>("from") == a.anhang
-                    && r.get::<String, _>("table") == "anhang"
-                    && r.get::<String, _>("on_delete") == "CASCADE"
-            });
-        assert!(
-            kaskade,
-            "{}.{} braucht ON DELETE CASCADE auf anhang",
-            a.tabelle, a.anhang
-        );
-    }
-}
-
-/// Selbsttest GUARD 1/4 (LFH-757): ein fehlender, ein toter und ein falsch gebauter Eintrag in
-/// PERSONEN_ANHAENGE fallen auf.
-#[tokio::test]
-async fn guard_anhaenge_erkennt_fehlenden_toten_und_falschen_eintrag() {
-    let pool = crate::db::test_pool().await;
-    let k = kanten(&pool).await;
-    assert!(befund_bezuege(&k, PERSONENBEZUEGE, &[])
-        .iter()
-        .any(|v| v.contains("einsatz_person_anhang.person_id")));
-
-    let tot = [PersonenAnhaenge {
-        anhang: "datei_tippfehler",
-        ..PERSONEN_ANHAENGE[0]
-    }];
-    assert!(befund_bezuege(&k, PERSONENBEZUEGE, &tot)
-        .iter()
-        .any(|v| v.contains("datei_tippfehler")));
-
-    let kein_linker = [PersonenAnhaenge {
-        tabelle: "person_sichtung",
-        ..PERSONEN_ANHAENGE[0]
-    }];
-    let befund = befund_anhaenge(&kein_linker, PERSONENBEZUEGE);
-    assert!(befund.iter().any(|v| v.contains("ist nicht ZeileLoeschen")));
-    assert!(befund.iter().any(|v| v.contains("und in PERSONENBEZUEGE")));
 }
 
 #[test]
@@ -262,20 +158,66 @@ fn jede_scrub_spalte_eines_bezugs_ist_markiert() {
     );
 }
 
+/// GUARD 4: jeder Eintrag in [`PERSONENANHAENGE`] ist ein echter Datei-Linker. Bezug und
+/// Datei-Spalte sind FK-Kanten auf die Wurzel bzw. auf `anhang`, die Registry löscht die ganze
+/// Zeile (sonst wiche der Personen-Vollzug von der Einsatz-Schwärzung ab), und die Tabelle steht
+/// nicht zusätzlich in [`PERSONENBEZUEGE`].
+#[tokio::test]
+async fn jeder_personenanhang_ist_ein_datei_linker() {
+    let pool = crate::db::test_pool().await;
+    let k = kanten(&pool).await;
+    let kante = |t: &str, s: &str, p: &str| k.iter().any(|(a, b, c)| a == t && b == s && c == p);
+    for l in PERSONENANHAENGE {
+        assert!(
+            kante(l.tabelle, l.bezug, l.art.wurzel()),
+            "{}.{} ist keine FK-Kante auf {}",
+            l.tabelle,
+            l.bezug,
+            l.art.wurzel()
+        );
+        assert!(
+            kante(l.tabelle, l.anhang, "anhang"),
+            "{}.{} ist keine FK-Kante auf anhang",
+            l.tabelle,
+            l.anhang
+        );
+        let regel = TABELLEN
+            .iter()
+            .find(|t| t.tabelle == l.tabelle)
+            .unwrap_or_else(|| panic!("{} steht nicht in der Registry", l.tabelle));
+        for s in regel.spalten {
+            assert!(
+                matches!(
+                    s.klassifikation,
+                    Klassifikation::Scrub(Strategie::ZeileLoeschen, _)
+                ),
+                "{}.{} ist nicht ZeileLoeschen",
+                l.tabelle,
+                s.spalte
+            );
+        }
+        assert!(
+            !PERSONENBEZUEGE.iter().any(|b| b.tabelle == l.tabelle),
+            "{} steht in beiden Listen",
+            l.tabelle
+        );
+    }
+}
+
 /// Selbsttest GUARD 1: eine neue Tabelle mit FK auf das Personenregister fällt auf, ein
 /// entfernter Bezug fällt auf, ein toter Bezug fällt auf.
 #[tokio::test]
 async fn guard_bezuege_erkennt_sonde_entfernten_und_toten_bezug() {
     let pool = crate::db::test_pool().await;
     let mut k = kanten(&pool).await;
-    assert!(befund_bezuege(&k, PERSONENBEZUEGE, PERSONEN_ANHAENGE).is_empty());
+    assert!(befund_bezuege(&k, PERSONENBEZUEGE).is_empty());
 
     k.push((
         "lfh751_sonde".into(),
         "person_id".into(),
         "einsatz_person".into(),
     ));
-    assert!(befund_bezuege(&k, PERSONENBEZUEGE, PERSONEN_ANHAENGE)
+    assert!(befund_bezuege(&k, PERSONENBEZUEGE)
         .iter()
         .any(|v| v.contains("lfh751_sonde.person_id")));
     k.pop();
@@ -285,7 +227,7 @@ async fn guard_bezuege_erkennt_sonde_entfernten_und_toten_bezug() {
         .copied()
         .filter(|b| b.bezug != Bezug::Spalte("halter_person_id"))
         .collect();
-    assert!(befund_bezuege(&k, &ohne_halter, PERSONEN_ANHAENGE)
+    assert!(befund_bezuege(&k, &ohne_halter)
         .iter()
         .any(|v| v.contains("einsatz_tier.halter_person_id")));
 
@@ -296,7 +238,7 @@ async fn guard_bezuege_erkennt_sonde_entfernten_und_toten_bezug() {
         bezug: Bezug::Spalte("halter_id_tippfehler"),
         spalten: &[],
     });
-    assert!(befund_bezuege(&k, &tot, PERSONEN_ANHAENGE)
+    assert!(befund_bezuege(&k, &tot)
         .iter()
         .any(|v| v.contains("halter_id_tippfehler")));
 }
@@ -422,58 +364,6 @@ async fn scrub_je_art_trifft_nur_die_zielperson() {
     fk_check_leer(&pool).await;
 }
 
-/// LFH-757: Ein Löschersuchen für eine betroffene Person löscht ihre Dateien samt Verknüpfung,
-/// auch eine schon entfernte. Die Dateien der Nachbarin und der Person im anderen Einsatz
-/// bleiben, ebenso jede ETB-Zeile.
-#[tokio::test]
-async fn scrub_betroffene_loescht_ihre_anhaenge_samt_datei() {
-    let pool = crate::db::test_pool().await;
-    let b = testdaten::anlegen(&pool).await;
-    let zaehle = |sql: &'static str, id: i64| {
-        let pool = pool.clone();
-        async move {
-            sqlx::query_scalar::<_, i64>(sql)
-                .bind(id)
-                .fetch_one(&pool)
-                .await
-                .unwrap()
-        }
-    };
-    let etb_vorher = zaehle(
-        "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
-        b.e1,
-    )
-    .await;
-    let dateien = "SELECT COUNT(*) FROM anhang a JOIN einsatz_person_anhang l \
-                   ON l.anhang_id = a.id WHERE l.person_id = ?";
-    assert_eq!(zaehle(dateien, b.p1).await, 2);
-
-    scrub(&pool, b.e1, PersonenArt::Betroffene, b.p1).await;
-
-    let linker = "SELECT COUNT(*) FROM einsatz_person_anhang WHERE person_id = ?";
-    assert_eq!(zaehle(linker, b.p1).await, 0);
-    assert_eq!(zaehle(dateien, b.p2).await, 1);
-    assert_eq!(zaehle(dateien, b.p_e2).await, 1);
-    let verwaist: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE dateiname LIKE 'Yilmaz-%'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(
-        verwaist, 0,
-        "die Datei selbst muss weg sein, nicht nur die Verknüpfung"
-    );
-    assert_eq!(
-        zaehle(
-            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
-            b.e1
-        )
-        .await,
-        etb_vorher
-    );
-    fk_check_leer(&pool).await;
-}
-
 /// Die Einsatzgrenze hält: ein Scrub mit der ID einer Person, aber dem falschen Einsatz,
 /// ändert nichts — auch nicht an Zeilen, die per FK auf sie zeigen.
 #[tokio::test]
@@ -502,4 +392,101 @@ async fn scrub_externe_kraft_laesst_stammkraft_stehen() {
         .await
         .unwrap();
     assert_eq!(name, "Stamm-Dora");
+}
+
+// ---------- Anhänge einer Person (LFH-757 × LFH-751) ----------
+
+/// Legt eine Datei samt Linker an die Person `person_id` und liefert die `anhang.id`.
+/// `entfernt` setzt den Linker auf entfernt (Soft-Delete), die Datei bleibt dabei liegen.
+async fn person_anhang(
+    pool: &SqlitePool,
+    b: &Bestand,
+    einsatz_id: i64,
+    person_id: i64,
+    entfernt: bool,
+) -> i64 {
+    let anhang: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'Foto_Yilmaz.jpg', 'image/jpeg', 3, 'abc', X'414243', ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(b.leitung)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let (geloescht_at, geloescht_von) = if entfernt {
+        (Some("2026-01-01 00:00:00"), Some(b.leitung))
+    } else {
+        (None, None)
+    };
+    sqlx::query(
+        "INSERT INTO einsatz_person_anhang \
+           (einsatz_id, person_id, anhang_id, abgelegt_von_id, geloescht_at, geloescht_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .bind(anhang)
+    .bind(b.leitung)
+    .bind(geloescht_at)
+    .bind(geloescht_von)
+    .execute(pool)
+    .await
+    .unwrap();
+    anhang
+}
+
+async fn anhang_da(pool: &SqlitePool, anhang_id: i64) -> bool {
+    let datei: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE id = ?")
+        .bind(anhang_id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let linker: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person_anhang WHERE anhang_id = ?")
+            .bind(anhang_id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    assert_eq!(datei, linker, "Datei und Linker gehen nur zusammen");
+    datei == 1
+}
+
+/// Spec `aufbewahrung-loeschersuchen`, „Vollzug für eine Person“: die Dateien an der Person
+/// sind personengebunden (Registry: `ZeileLoeschen`) und gehören über `person_id` zu ihr. Der
+/// Vollzug löscht sie samt Linker, auch eine schon entfernte; die Dateien der Nachbarperson und
+/// eines anderen Einsatzes bleiben, und ein Scrub im falschen Einsatz löscht nichts.
+#[tokio::test]
+async fn scrub_betroffene_loescht_ihre_anhaenge_und_nur_ihre() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    let ziel = person_anhang(&pool, &b, b.e1, b.p1, false).await;
+    let ziel_entfernt = person_anhang(&pool, &b, b.e1, b.p1, true).await;
+    let nachbar = person_anhang(&pool, &b, b.e1, b.p2, false).await;
+    let anderer_einsatz = person_anhang(&pool, &b, b.e2, b.p_e2, false).await;
+
+    scrub(&pool, b.e2, PersonenArt::Betroffene, b.p1).await;
+    assert!(
+        anhang_da(&pool, ziel).await,
+        "falscher Einsatz löscht nichts"
+    );
+
+    scrub(&pool, b.e1, PersonenArt::Betroffene, b.p1).await;
+    assert!(
+        !anhang_da(&pool, ziel).await,
+        "Datei der Zielperson muss weg sein"
+    );
+    assert!(
+        !anhang_da(&pool, ziel_entfernt).await,
+        "auch die entfernte Datei geht"
+    );
+    assert!(
+        anhang_da(&pool, nachbar).await,
+        "Datei der Nachbarperson bleibt"
+    );
+    assert!(
+        anhang_da(&pool, anderer_einsatz).await,
+        "Datei des anderen Einsatzes bleibt"
+    );
+    fk_check_leer(&pool).await;
 }

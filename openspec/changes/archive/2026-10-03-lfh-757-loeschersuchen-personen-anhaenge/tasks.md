@@ -1,5 +1,8 @@
 # Tasks
 
+1.1, 2.2 und 2.3 sind parallel über PR #374 auf `alpha` gelandet (`d33e1f8e`, `e6c2e638`); beim
+Merge wurde deren Umsetzung übernommen und gegen die Testdaten aus 2.1 erneut geprüft.
+
 ## 1. Migrationsnummer
 
 - [x] 1.1 `0140_einsatz_person_anhang.sql` → `0142_einsatz_person_anhang.sql` (Inhalt unverändert),
@@ -10,7 +13,7 @@
 - [x] 2.1 Testdaten: Anhänge an Ziel (einer entfernt), Nachbarin und Person im anderen Einsatz;
   Dateinamen als Ziel- bzw. Nachbar-Klartexte. Prüfen: `scrub_je_art_trifft_nur_die_zielperson`
   rot vor 2.2.
-- [x] 2.2 `PERSONEN_ANHAENGE` und das DELETE in `scrubbe_person`. Prüfen:
+- [x] 2.2 `PERSONENANHAENGE` und das DELETE in `scrubbe_person`. Prüfen:
   `scrub_betroffene_loescht_ihre_anhaenge_samt_datei` und die bestehenden Scrub-Tests grün;
   Mutationsprobe (DELETE abgeschaltet) → zwei Tests rot.
 - [x] 2.3 GUARD 1 kennt beide Listen, GUARD 4 neu, Selbsttest
