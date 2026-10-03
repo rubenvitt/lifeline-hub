@@ -38,7 +38,7 @@ sie auch ohne Registereintrag grün.
 
 ## 2. Backend: Tier-Anhänge
 
-- [x] 2.1 Migration `0136_einsatz_tier_anhang.sql` nach design.md D1.
+- [x] 2.1 Migration `0139_einsatz_tier_anhang.sql` nach design.md D1.
   - Vorher `git fetch origin alpha` und `scripts/check-migrationen.sh`.
   - Kopfkommentar wie `0126`.
   - Verifiziert dadurch, dass `anhang::repo::tests::jeder_fremdschluessel_auf_anhang_ist_registriert` rot ist und `db::tests::migrationsnummern_sind_eindeutig` grün.

@@ -5,10 +5,10 @@ import { server } from '../test/server';
 import { render } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import KoordinatenAnzeige from './KoordinatenAnzeige';
-import { leereOrtCache } from './ortCache';
+import { ortCacheRaeumen } from './ortCache';
 
 // Isolation: idb-OrtCache zwischen Tests leeren (kein State-Leak in/aus anderen Testdateien)
-afterEach(() => leereOrtCache());
+afterEach(() => ortCacheRaeumen());
 
 describe('KoordinatenAnzeige', () => {
   it('zeigt ohne einsatzId nur die Koordinate (kein Provider nötig)', () => {

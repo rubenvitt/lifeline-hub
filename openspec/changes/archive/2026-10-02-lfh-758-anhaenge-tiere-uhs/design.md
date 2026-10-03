@@ -122,7 +122,7 @@ der jeweils höchsten Zeile wieder vergeben werden.
 ### D1 Zwei Linker-Tabellen nach dem Muster von `0126`
 
 Die beiden Tabellen kommen in je einer Migration:
-- `0136_einsatz_tier_anhang.sql` mit `tier_id → einsatz_tier(id) ON DELETE CASCADE`;
+- `0139_einsatz_tier_anhang.sql` mit `tier_id → einsatz_tier(id) ON DELETE CASCADE`;
 - `0137_uhs_anhang.sql` mit `uhs_id → uhs(id) ON DELETE CASCADE`.
 
 Sonst haben beide dieselben Spalten wie `einsatz_schaden_anhang`, also `einsatz_id`,

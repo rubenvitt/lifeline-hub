@@ -60,9 +60,26 @@ draußen gelassen werden.
   `await`, ein wartendes `afterEach` verschob den Takt zwischen Tests. Eine Mutationsprobe
   am Prod-Bundle baut mit `vite build`, nicht mit `pnpm build`: Dessen `tsc -b` bricht an
   einem ungenutzten Import ab, und `dist` bleibt still der alte Stand.
-- **Offen:** die übrigen personenbezogenen Daten auf dem Gerät (LFH-767). Herleitung und
-  Prüfspur: `openspec/changes/archive/2026-09-30-lfh-723-lagebild-offline-lesen/design.md`, Prüfliste
-  `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`.
+- Herleitung und Prüfspur: `openspec/changes/archive/2026-09-30-lfh-723-lagebild-offline-lesen/design.md`,
+  Prüfliste `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`. Die übrigen Gerätedaten
+  regelt der nächste Abschnitt.
+
+## Gerätedaten beim Abmelden (LFH-767)
+
+- **Jeder Speicherort steht in `GERAETESPEICHER`** (`offline/geraetRaeumung.ts`) mit
+  Entscheidung und Grund. `geraetRaeumung.guard.test.ts` findet jede Datei, die `openDB`
+  aufruft oder in `localStorage`/`sessionStorage` schreibt, und wird ohne Eintrag rot.
+- **Grundsatz:** Was der Server wieder liefern kann, geht bei jedem Ausgang (Quittungen,
+  Ortscache, Erfassungswerte). Was nur auf dem Gerät liegt (ETB-Entwürfe), überlebt ein
+  Sitzungsende, gebunden an `benutzer_id` und ohne angemeldeten Besitzer höchstens 24 h. Die
+  Offline-Queue bleibt immer. Geräte-Einstellungen ohne Personenbezug bleiben.
+- **Ein Weg hinaus:** `abmeldenLokal(anlass)` im `AuthProvider` ruft nach `lagebildLoeschen`
+  `geraetRaeumen(anlass)`. `logout()` übergibt `'abmelden'`, die beiden 401-Wege
+  `'sitzungsende'`; eine 401 schon beim Start räumt mit demselben Anlass. Nach Start und jeder Anmeldung räumt `geraetFuerBenutzerRaeumen` fremde und
+  abgelaufene Daten. Beide werfen nie, jeder Ort wird einzeln versucht, und **keiner wird abgewartet**: Ein Tab mit altem Bundle hält eine DB im alten Schema offen, dann hinge das Upgrade und mit ihm der Login (`auth/geraetRaeumung.haengt.test.tsx`). Die Kanalmeldung `abgemeldet` trägt den Anlass, damit andere Tabs beim Abmelden auch die Entwürfe räumen.
+- **Testfalle:** Ein Räumtest liest die Platte über `test/rohIdb.ts` (eigene Verbindung), nicht
+  über die Modulfunktionen — ein Index blendet fremde Zeilen nur aus.
+- Herleitung: `openspec/changes/archive/2026-10-02-lfh-767-geraet-raeumung-abmelden/design.md`.
 
 ## Schreiben ohne Netz (LFH-705)
 

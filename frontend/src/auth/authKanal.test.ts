@@ -95,6 +95,21 @@ describe('authKanal (LFH-387)', () => {
     }
   });
 
+  it('reicht den Anlass einer Abmeldung weiter, aber nur bekannte Werte (LFH-767)', async () => {
+    const empfangen: AuthWechsel[] = [];
+    const abbestellen = abonniereAuthWechsel((w) => empfangen.push(w));
+    const tab = andererTab();
+    try {
+      tab.kanal.postMessage({ art: 'abgemeldet', anlass: 'abmelden' });
+      tab.kanal.postMessage({ art: 'abgemeldet', anlass: 'irgendwas' });
+      await warteAuf(() => empfangen.length === 2);
+      expect(empfangen).toEqual([{ art: 'abgemeldet', anlass: 'abmelden' }, { art: 'abgemeldet' }]);
+    } finally {
+      tab.schliessen();
+      abbestellen();
+    }
+  });
+
   it('ist ohne BroadcastChannel ein stiller No-op', () => {
     vi.stubGlobal('BroadcastChannel', undefined);
     const abbestellen = abonniereAuthWechsel(() => {});

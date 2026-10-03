@@ -19,12 +19,24 @@
 
 const KANAL = 'lfh-auth';
 
-export type AuthWechsel = { art: 'angemeldet' } | { art: 'abgemeldet' };
+/** `anlass` (LFH-767): ein freiwilliges Abmelden räumt auch in den anderen Tabs die
+ *  ETB-Entwürfe, ein Sitzungsende nicht. Kein Benutzerbezug, nur der Weg hinaus. */
+export type AuthWechsel =
+  { art: 'angemeldet' } | { art: 'abgemeldet'; anlass?: 'abmelden' | 'sitzungsende' };
 
 function istAuthWechsel(daten: unknown): daten is AuthWechsel {
   if (typeof daten !== 'object' || daten === null) return false;
   const art = (daten as { art?: unknown }).art;
   return art === 'angemeldet' || art === 'abgemeldet';
+}
+
+/** Nur bekannte Felder weiterreichen — fremde (etwa Benutzerdaten) fallen weg. */
+function bereinigt(daten: AuthWechsel): AuthWechsel {
+  if (daten.art === 'angemeldet') return { art: 'angemeldet' };
+  const anlass = (daten as { anlass?: unknown }).anlass;
+  return anlass === 'abmelden' || anlass === 'sitzungsende'
+    ? { art: 'abgemeldet', anlass }
+    : { art: 'abgemeldet' };
 }
 
 const hoerer = new Set<(wechsel: AuthWechsel) => void>();
@@ -36,7 +48,7 @@ function kanalDerHoerer(): BroadcastChannel | null {
   kanal = new BroadcastChannel(KANAL);
   kanal.onmessage = (ereignis: MessageEvent<unknown>) => {
     if (!istAuthWechsel(ereignis.data)) return;
-    const wechsel: AuthWechsel = { art: ereignis.data.art };
+    const wechsel = bereinigt(ereignis.data);
     for (const h of [...hoerer]) h(wechsel);
   };
   return kanal;

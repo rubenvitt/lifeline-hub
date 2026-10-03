@@ -38,3 +38,10 @@ Ableitungen in `etb/zeitachseModell.ts`)
   Entwurf, nie eine gemeinsame Tabelle — Tabs überschrieben sich; Quittung per `stand`);
   `entwuerfeLaden` trägt nach, jüngere Plattenfassung gewinnt.
   Nachweis `e2e/etb-entwurf-tabs.spec.ts`: ausstehend beim Reload und gespeichert getrennt.
+- **ETB-Entwürfe gehören der Person, die sie schreibt** (LFH-767): `benutzer_id` am Entwurf,
+  gelesen nur über den Index `by-benutzer-einsatz`, Aktiv-Merker `aktivSchluessel(benutzer,
+einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsende (401) nicht
+  — ein Entwurf ist das Einzige, was der Server nicht wieder liefert. Ohne angemeldeten Besitzer
+  höchstens 24 h ab der letzten Änderung. Regel und Weg hinaus: `offline/AGENTS.md`,
+  „Gerätedaten“; Nachweis `auth/geraetRaeumung.integration.test.tsx`,
+  `e2e/geraet-raeumung.spec.ts`.
