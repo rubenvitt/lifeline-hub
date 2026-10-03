@@ -148,11 +148,16 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
 
   // `/admin/benutzer` statt einer kleinen Stammdatenliste: erst sechs Spalten geben der
   // fixierten Spalte einen waagerechten Bildlaufweg.
+  //
+  // Lange Anzeigenamen (≥ 35 Zeichen) sind der scharfe Fall (LFH-819): ohne gedeckelte
+  // Namensspalte wächst die fixierte Spalte mit dem längsten Namen, und auf 390 px landet
+  // „Bearbeiten" beim Tabben vollständig darunter. Kurze Namen machten den Lauf trivial grün.
   const LAUF = Date.now();
+  const LANGER_NAME = 'Maximiliane Kirchgassner-Wohlfahrt';
   for (let i = 0; i < 8; i += 1) {
     const antwort = await page.request.post('/api/benutzer', {
       data: {
-        anzeigename: `E2E Fokus ${LAUF}-${i}`,
+        anzeigename: `${LANGER_NAME} ${i}`,
         benutzername: `e2e-fokus-${LAUF}-${i}`,
         passwort: 'e2e-fokus-pw-123',
       },
@@ -180,7 +185,24 @@ test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierte
     })
     .toBeGreaterThanOrEqual(9);
 
+  // Auf die langen Namen verengen: die Liste blättert ab 50 Zeilen nach `id`, und in der vollen
+  // Suite stünden die gesäten Zeilen sonst womöglich erst auf Seite 2. Der Fokus bleibt im
+  // Suchfeld, der Durchlauf beginnt also unmittelbar vor der Tabelle.
+  await page.getByPlaceholder('Name oder Benutzername').fill('Kirchgassner');
+
   // ── VORBEDINGUNGEN. Ohne sie ist „0 verdeckte Ziele" trivial wahr.
+  // Jede Zeile trägt einen langen Namen in der fixierten Spalte (LFH-819); mindestens acht, weil
+  // die Liste über Wiederholungen nur wächst.
+  const zeilen = page.locator('tr.ant-table-row');
+  const langeNamen = zeilen.locator('td.ant-table-cell-fix').filter({ hasText: LANGER_NAME });
+  await expect
+    .poll(() => langeNamen.count(), {
+      message: 'Vorbedingung: die fixierte Spalte trägt die langen Anzeigenamen',
+    })
+    .toBeGreaterThanOrEqual(8);
+  await expect(zeilen, 'Vorbedingung: die Suche lässt nur die langen Namen stehen').toHaveCount(
+    await langeNamen.count(),
+  );
   const kopf = page.locator('.ant-table-sticky-holder');
   await expect(kopf).toHaveCount(1);
   await expect(kopf, 'Vorbedingung: die Kopfzeile muss überhaupt stehen').toHaveCSS(
