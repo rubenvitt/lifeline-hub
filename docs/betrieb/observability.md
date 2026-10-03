@@ -34,6 +34,12 @@ sie revisionssicher, im Backup enthalten und auswertbar. Protokolliert werden:
 | `login_ok` | erfolgreiche Anmeldung **mit Session** | der angemeldete Benutzer |
 | `login_fehlgeschlagen` | falsches Passwort, unbekannter Benutzer, gesperrte Quelle | der **versuchte** Name (muss keinem Benutzer entsprechen) |
 | `logout` | Abmeldung | — (nur `benutzer_id`) |
+| `passwort_geaendert` | Passwort selbst gewechselt (`POST /api/auth/passwort`), nach dem Speichern | der angemeldete Benutzer (mit `benutzer_id`) |
+| `passwort_wechsel_abgewiesen` | Passwortwechsel mit falschem Alt-Passwort | der angemeldete Benutzer (mit `benutzer_id`) |
+
+Beim Passwortwechsel schreibt nur die Prüfung des Alt-Passworts eine Zeile. Formfehler (`400`),
+ein abgeschalteter Passwort-Provider (`403`) und eine gesperrte Quelle (`429`) protokollieren
+nichts: dort wurde kein Passwort geprüft (LFH-827).
 
 Bei aktivem TOTP gibt es **kein** `login_ok` nach dem Passwort-Schritt: solange der
 Zweitfaktor aussteht, ist niemand angemeldet.
@@ -45,6 +51,11 @@ Beispielabfragen:
 SELECT peer_ip, COUNT(*) FROM auth_audit
 WHERE ereignis = 'login_fehlgeschlagen' AND zeitpunkt > datetime('now', '-1 hour')
 GROUP BY peer_ip ORDER BY COUNT(*) DESC;
+
+-- Wer hat wann von wo das Passwort geändert oder es versucht?
+SELECT zeitpunkt, ereignis, benutzername, peer_ip FROM auth_audit
+WHERE ereignis IN ('passwort_geaendert', 'passwort_wechsel_abgewiesen')
+ORDER BY zeitpunkt DESC;
 
 -- Wer war heute angemeldet?
 SELECT zeitpunkt, benutzername, peer_ip FROM auth_audit
@@ -70,11 +81,19 @@ Bewusst großzügig: eine ganze Wache kann hinter einer NAT-Adresse hängen, und
 Aussperren im Einsatz ist ein echter Betriebsschaden. Zwei Sicherungen dagegen:
 
 - Nur **Fehlversuche** zählen.
-- Eine **erfolgreiche Anmeldung räumt den Zähler** der Quelle — wer das Passwort kennt,
-  gibt damit auch alle anderen hinter derselben IP wieder frei.
+- Eine **erfolgreiche Anmeldung räumt die Fehlversuche gegen das eigene Konto** — wer
+  sich vertippt und dann anmeldet, bringt die Quelle nicht näher an die Sperre.
+
+Versuche gegen **andere** Konten räumt der Erfolg nicht (LFH-793): sonst setzte jemand die
+Sperre nach neun fremden Passwörtern mit dem eigenen Konto zurück. Eine Sperre je Konto über
+alle Quellen gibt es bewusst nicht; sie sperrte ein Konto für jeden, der seinen Namen kennt.
 
 Der Zähler liegt im Prozessspeicher und ist nach einem Neustart leer. Für den Zweck
 (automatisiertes Raten ausbremsen) reicht das; die dauerhafte Spur liegt in `auth_audit`.
+Die Tabelle ist begrenzt: ab 1 024 Quellen räumt ein neuer Eintrag die abgelaufenen weg
+(höchstens einmal je Sekunde), bei 10 000 verdrängt er die Quellen mit dem ältesten letzten
+Versuch auf 9 000. Je Quelle bleiben die ältesten zehn Versuche, damit ein Schwall eigener
+Fehlversuche die fremden nicht verdrängt.
 
 Die Quell-IP ist die **Socket-Adresse**. `X-Forwarded-For` wird nur ausgewertet, wenn
 die Gegenstelle ein ausdrücklich genannter Proxy ist (`LIFELINE_TRUSTED_PROXIES`, LFH-604;

@@ -15,7 +15,7 @@
 //! Zeitschritt und nimmt nur spätere an. Ein mitgelesener Code gilt damit genau einmal, auch im
 //! ±1-Skew-Fenster und bei zwei gleichzeitigen Anfragen (ein bedingtes `UPDATE`).
 //!
-//! Beides steht in `benutzer` (Migration `0143_totp_schutz.sql`), nicht im Prozess: die Sperre
+//! Beides steht in `benutzer` (Migration `0144_totp_schutz.sql`), nicht im Prozess: die Sperre
 //! übersteht einen Neustart, und Testläufe mit eigener Datenbank stören sich nicht.
 
 use sqlx::SqlitePool;

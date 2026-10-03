@@ -254,7 +254,10 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
   };
   it('nutzt lokale Glyphs/Sprite (offline)', () => {
     expect(style.glyphs).toBe('/api/karte/offline/fonts/{fontstack}/{range}.pbf');
-    expect(style.sprite).toBe('/api/karte/offline/sprites/basemap');
+    // Absolut (LFH-781): MapLibre parst die Sprite-URL mit `new URL(url)` ohne Basis, eine
+    // root-relative scheitert mit „Invalid sprite URL … must be absolute", und das Sprite fehlt.
+    expect(style.sprite).toBe(`${window.location.origin}/api/karte/offline/sprites/basemap`);
+    expect(() => new URL(style.sprite)).not.toThrow();
   });
   it('bindet je Region eine region-adressierte Vektor-Source basemap-{id}', () => {
     const src = style.sources['basemap-7'];

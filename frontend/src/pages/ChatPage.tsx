@@ -440,7 +440,9 @@ export default function ChatPage() {
                 })
               }
               darfSchreiben={darfSchreiben}
-              onKanalAnlegen={(name, beschreibung) => kanalMutation.mutate({ name, beschreibung })}
+              onKanalAnlegen={(name, beschreibung) =>
+                kanalMutation.mutateAsync({ name, beschreibung })
+              }
             />
           </Col>
         )}
@@ -497,7 +499,7 @@ export default function ChatPage() {
           />
           {darfSchreiben && kanalId !== null && (
             <NachrichtEingabe
-              onSenden={(t, d) => sendenMutation.mutate({ text: t, dateien: d })}
+              onSenden={(t, d) => sendenMutation.mutateAsync({ text: t, dateien: d })}
               senden={sendenMutation.isPending}
             />
           )}
@@ -544,18 +546,23 @@ export default function ChatPage() {
         optionen={bezugOptionen}
         senden={bezugMutation.isPending}
         onAbbrechen={() => setBezugAuswahl(null)}
-        onBestaetigen={(typ, zielId) => {
-          if (bezugNachricht) bezugMutation.mutate({ nid: bezugNachricht.id, typ, zielId });
-        }}
+        // mutateAsync: die Erfassungshülle leert nur, wenn der Bezug angekommen ist.
+        onBestaetigen={(typ, zielId) =>
+          bezugNachricht
+            ? bezugMutation.mutateAsync({ nid: bezugNachricht.id, typ, zielId })
+            : Promise.reject(new Error('Keine Nachricht'))
+        }
       />
       <BearbeitenModal
         offen={bearbeiten !== null}
         nachricht={bearbeiten}
         senden={bearbeitenMutation.isPending}
         onAbbrechen={() => setBearbeitenAuswahl(null)}
-        onBestaetigen={(text) => {
-          if (bearbeiten) bearbeitenMutation.mutate({ id: bearbeiten.id, text });
-        }}
+        onBestaetigen={(text) =>
+          bearbeiten
+            ? bearbeitenMutation.mutateAsync({ id: bearbeiten.id, text })
+            : Promise.reject(new Error('Keine Nachricht'))
+        }
       />
       <HeraufstufenModal
         offen={heraufstufen !== null}

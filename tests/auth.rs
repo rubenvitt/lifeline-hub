@@ -1078,6 +1078,129 @@ async fn totp_enroll_start_ohne_session_ist_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
+/// Abschluss ohne vorherigen Start ist ein Zustand, kein kaputtes Feld → 422
+/// (`src/AGENTS.md`, Statuscode-Konvention).
+#[tokio::test]
+async fn totp_enroll_finish_ohne_start_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(r#"{"code":"123456"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// LFH-794: Wer nur eine Session hat (unbeaufsichtigter Fükw, entwendetes Tablet), darf den
+/// aktiven Zweitfaktor nicht per `enroll/start` still abschalten oder austauschen. Neu
+/// einrichten geht nur nach einem Admin-Reset.
+#[tokio::test]
+async fn totp_enroll_start_bei_aktivem_totp_ist_422_und_laesst_mfa_unveraendert() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (secret_vor, _) = totp_fuer_admin_aktivieren(&app, &admin).await;
+
+    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(
+        json.get("secret_base32").is_none(),
+        "abgelehnter Start darf kein neues Secret herausgeben"
+    );
+
+    let (db_secret, db_aktiviert): (Option<String>, i64) = sqlx::query_as(
+        "SELECT totp_secret, totp_aktiviert FROM benutzer WHERE benutzername = 'admin'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(db_aktiviert, 1, "MFA muss aktiv bleiben");
+    assert_eq!(
+        db_secret.as_deref(),
+        Some(secret_vor.as_str()),
+        "das aktive Secret darf nicht überschrieben werden"
+    );
+}
+
+/// LFH-794: `enroll/finish` bei schon aktivem TOTP erzeugt keine neuen Recovery-Codes — sonst
+/// ersetzte ein zweiter (etwa doppelt abgeschickter) Abschluss die gerade angezeigten Codes.
+#[tokio::test]
+async fn totp_enroll_finish_bei_aktivem_totp_ist_422_und_ersetzt_keine_recovery_codes() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (secret, recovery_codes) = totp_fuer_admin_aktivieren(&app, &admin).await;
+
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(&format!(r#"{{"code":"{code}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(json.get("recovery_codes").is_none());
+
+    // Die zuerst ausgegebenen Codes gelten weiter: Login mit Passwort + Recovery-Code.
+    let (_, _, login_cookies) = login_alle_cookies(&app, "admin", "startpw12").await;
+    let pending_paar = login_cookies[0].split(';').next().unwrap().to_string();
+    let (status, _, _) = totp_finish(&app, Some(&pending_paar), &recovery_codes[0]).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "die beim ersten Abschluss ausgegebenen Recovery-Codes müssen gültig bleiben"
+    );
+}
+
+/// LFH-794: Aktivieren und Recovery-Codes speichern sind EINE Transaktion. Scheitert das
+/// Speichern der Codes, bleibt MFA aus, statt aktiv ohne Codes beim Nutzer zu landen.
+#[tokio::test]
+async fn totp_enroll_finish_fehler_beim_speichern_der_recovery_codes_laesst_mfa_aus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let secret = json["secret_base32"].as_str().unwrap().to_string();
+
+    sqlx::query(
+        "CREATE TRIGGER recovery_code_scheitert BEFORE INSERT ON totp_recovery_code \
+         BEGIN SELECT RAISE(ABORT, 'Testfehler'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(&format!(r#"{{"code":"{code}"}}"#)),
+    )
+    .await;
+    assert!(
+        status.is_server_error(),
+        "der Speicherfehler muss als Fehler ankommen, war {status}"
+    );
+
+    let db_aktiviert: i64 =
+        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        db_aktiviert, 0,
+        "ohne gespeicherte Recovery-Codes darf MFA nicht aktiv sein"
+    );
+}
+
 // ===== Zweistufiger Passwort→TOTP-Login + /totp/finish (LFH-43): Pending-State→Session =====
 
 /// Aktiviert TOTP für den admin über den regulären Enroll-Flow (statt direkt in die DB) — deckt
@@ -1345,7 +1468,7 @@ fn naechster_totp_code(secret: &str) -> String {
 
 /// `POST /api/auth/login` als admin von der Quelle `ip` (optional; `None` = keine Gegenstelle,
 /// wie in den übrigen Tests). Liefert Status und das `mfa_pending`-Cookie-Paar, falls gesetzt.
-async fn login_von(
+async fn admin_login_von(
     app: &axum::Router,
     ip: Option<&str>,
     passwort: &str,
@@ -1414,14 +1537,14 @@ async fn falsche_totp_codes_ueber_wiederholte_passwort_logins_sperren_den_zweitf
     let falsch = falscher_totp_code(&secret);
 
     for i in 0..lifeline_hub::auth::totp::schutz::MAX_FEHLVERSUCHE {
-        let (status, paar) = login_von(&app, None, "startpw12").await;
+        let (status, paar) = admin_login_von(&app, None, "startpw12").await;
         assert_eq!(status, StatusCode::OK, "Passwort stimmt (Versuch {i})");
         let (status, session) = totp_finish_von(&app, None, &paar.unwrap(), &falsch).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "Versuch {i}");
         assert!(!session);
     }
 
-    let (status, paar) = login_von(&app, None, "startpw12").await;
+    let (status, paar) = admin_login_von(&app, None, "startpw12").await;
     assert_eq!(
         status,
         StatusCode::OK,
@@ -1449,18 +1572,18 @@ async fn erfolgreicher_zweitfaktor_raeumt_den_fehlversuchszaehler() {
     let max = lifeline_hub::auth::totp::schutz::MAX_FEHLVERSUCHE;
 
     for _ in 0..max - 1 {
-        let (_, paar) = login_von(&app, None, "startpw12").await;
+        let (_, paar) = admin_login_von(&app, None, "startpw12").await;
         let (status, _) = totp_finish_von(&app, None, &paar.unwrap(), &falsch).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
-    let (_, paar) = login_von(&app, None, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, None, "startpw12").await;
     let (status, session) =
         totp_finish_von(&app, None, &paar.unwrap(), &naechster_totp_code(&secret)).await;
     assert_eq!(status, StatusCode::OK, "unter der Schwelle gilt der Code");
     assert!(session);
 
     for i in 0..max {
-        let (_, paar) = login_von(&app, None, "startpw12").await;
+        let (_, paar) = admin_login_von(&app, None, "startpw12").await;
         let (status, _) = totp_finish_von(&app, None, &paar.unwrap(), &falsch).await;
         assert_eq!(
             status,
@@ -1468,7 +1591,7 @@ async fn erfolgreicher_zweitfaktor_raeumt_den_fehlversuchszaehler() {
             "Versuch {i} nach dem Erfolg zählt von vorn"
         );
     }
-    let (_, paar) = login_von(&app, None, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, None, "startpw12").await;
     let (status, _) = totp_finish_von(&app, None, &paar.unwrap(), &falsch).await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
 }
@@ -1483,10 +1606,10 @@ async fn gesperrter_zweitfaktor_laesst_den_recovery_code_durch() {
     let falsch = falscher_totp_code(&secret);
 
     for _ in 0..lifeline_hub::auth::totp::schutz::MAX_FEHLVERSUCHE {
-        let (_, paar) = login_von(&app, None, "startpw12").await;
+        let (_, paar) = admin_login_von(&app, None, "startpw12").await;
         totp_finish_von(&app, None, &paar.unwrap(), &falsch).await;
     }
-    let (_, paar) = login_von(&app, None, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, None, "startpw12").await;
     let (status, _) = totp_finish_von(&app, None, &paar.unwrap(), &falsch).await;
     assert_eq!(
         status,
@@ -1496,13 +1619,13 @@ async fn gesperrter_zweitfaktor_laesst_den_recovery_code_durch() {
 
     // Falsche Recovery-Codes zählen nicht in die Benutzersperre …
     for _ in 0..lifeline_hub::auth::totp::schutz::MAX_FEHLVERSUCHE {
-        let (_, paar) = login_von(&app, None, "startpw12").await;
+        let (_, paar) = admin_login_von(&app, None, "startpw12").await;
         let (status, _) =
             totp_finish_von(&app, None, &paar.unwrap(), "0000-0000-0000-0000-0000").await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
     // … und ein gültiger kommt trotz Sperre durch.
-    let (_, paar) = login_von(&app, None, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, None, "startpw12").await;
     let (status, session) = totp_finish_von(&app, None, &paar.unwrap(), &codes[0]).await;
     assert_eq!(status, StatusCode::OK);
     assert!(session);
@@ -1517,12 +1640,12 @@ async fn derselbe_gueltige_totp_code_wird_beim_zweiten_login_abgelehnt() {
     let (secret, _codes) = totp_fuer_admin_aktivieren(&app, &admin).await;
     let code = naechster_totp_code(&secret);
 
-    let (_, paar) = login_von(&app, None, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, None, "startpw12").await;
     let (status, session) = totp_finish_von(&app, None, &paar.unwrap(), &code).await;
     assert_eq!(status, StatusCode::OK);
     assert!(session);
 
-    let (_, paar) = login_von(&app, None, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, None, "startpw12").await;
     let (status, session) = totp_finish_von(&app, None, &paar.unwrap(), &code).await;
     assert_eq!(
         status,
@@ -1552,7 +1675,7 @@ async fn der_enrollment_code_gilt_nicht_fuer_den_login() {
     .await;
     assert_eq!(status, StatusCode::OK);
 
-    let (_, paar) = login_von(&app, None, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, None, "startpw12").await;
     let (status, session) = totp_finish_von(&app, None, &paar.unwrap(), &code).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(!session);
@@ -1571,10 +1694,10 @@ async fn ip_sperre_zaehlt_totp_fehlversuche_und_das_passwort_allein_raeumt_sie_n
     let quelle = Some("198.51.100.91");
 
     for i in 0..lifeline_hub::auth::rate_limit::MAX_FEHLVERSUCHE - 1 {
-        let (status, _) = login_von(&app, quelle, "falsch").await;
+        let (status, _) = admin_login_von(&app, quelle, "falsch").await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "Versuch {i}");
     }
-    let (status, paar) = login_von(&app, quelle, "startpw12").await;
+    let (status, paar) = admin_login_von(&app, quelle, "startpw12").await;
     assert_eq!(
         status,
         StatusCode::OK,
@@ -1584,7 +1707,7 @@ async fn ip_sperre_zaehlt_totp_fehlversuche_und_das_passwort_allein_raeumt_sie_n
         totp_finish_von(&app, quelle, &paar.unwrap(), &falscher_totp_code(&secret)).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 
-    let (status, _) = login_von(&app, quelle, "startpw12").await;
+    let (status, _) = admin_login_von(&app, quelle, "startpw12").await;
     assert_eq!(
         status,
         StatusCode::TOO_MANY_REQUESTS,
@@ -1602,20 +1725,20 @@ async fn bestandener_zweitfaktor_raeumt_die_ip_sperre() {
     let quelle = Some("198.51.100.92");
 
     for _ in 0..lifeline_hub::auth::rate_limit::MAX_FEHLVERSUCHE - 1 {
-        login_von(&app, quelle, "falsch").await;
+        admin_login_von(&app, quelle, "falsch").await;
     }
-    let (_, paar) = login_von(&app, quelle, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, quelle, "startpw12").await;
     let (status, _) =
         totp_finish_von(&app, quelle, &paar.unwrap(), &naechster_totp_code(&secret)).await;
     assert_eq!(status, StatusCode::OK);
 
-    let (status, _) = login_von(&app, quelle, "falsch").await;
+    let (status, _) = admin_login_von(&app, quelle, "falsch").await;
     assert_eq!(
         status,
         StatusCode::UNAUTHORIZED,
         "nach dem bestandenen Zweitfaktor zählt die Quelle von vorn"
     );
-    let (status, _) = login_von(&app, quelle, "startpw12").await;
+    let (status, _) = admin_login_von(&app, quelle, "startpw12").await;
     assert_eq!(status, StatusCode::OK);
 }
 
@@ -1628,9 +1751,9 @@ async fn gesperrte_quelle_bekommt_bei_totp_finish_429() {
     let quelle = Some("198.51.100.93");
 
     // Pending-Key holen, solange die Quelle frei ist, dann die Quelle sperren.
-    let (_, paar) = login_von(&app, quelle, "startpw12").await;
+    let (_, paar) = admin_login_von(&app, quelle, "startpw12").await;
     for _ in 0..lifeline_hub::auth::rate_limit::MAX_FEHLVERSUCHE {
-        login_von(&app, quelle, "falsch").await;
+        admin_login_von(&app, quelle, "falsch").await;
     }
     let (status, session) =
         totp_finish_von(&app, quelle, &paar.unwrap(), &naechster_totp_code(&secret)).await;
@@ -1665,4 +1788,75 @@ async fn me_liefert_totp_aktiviert_true_nach_enroll() {
         json["totp_aktiviert"], true,
         "nach abgeschlossenem Enrollment muss /me totp_aktiviert=true zeigen: {json}"
     );
+}
+
+// ===== Login-Sperre je Konto (LFH-793) =====
+
+/// POST `/api/auth/login` mit fester Gegenstelle, damit die prozessweite Sperre nur diesen Test
+/// trifft.
+async fn login_von(
+    app: &axum::Router,
+    gegenstelle: &str,
+    benutzername: &str,
+    passwort: &str,
+) -> StatusCode {
+    let body = serde_json::json!({ "benutzername": benutzername, "passwort": passwort });
+    let mut req = Request::builder()
+        .method("POST")
+        .uri("/api/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let peer: std::net::SocketAddr = gegenstelle.parse().unwrap();
+    req.extensions_mut()
+        .insert(axum::extract::ConnectInfo(peer));
+    app.clone().oneshot(req).await.unwrap().status()
+}
+
+/// Ein Innentäter darf die Sperre nicht mit dem eigenen Konto zurücksetzen: der Erfolg räumt nur
+/// die Fehlversuche gegen das Konto, das sich eben angemeldet hat.
+#[tokio::test]
+async fn eigener_login_hebt_die_sperre_fuer_fremde_konten_nicht_auf() {
+    let app = setup().await;
+    let quelle = "203.0.113.93:40000";
+
+    for i in 0..9 {
+        let s = login_von(&app, quelle, "opfer", "geraten").await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED, "Fremdversuch {i}");
+    }
+    assert_eq!(
+        login_von(&app, quelle, "admin", "startpw12").await,
+        StatusCode::OK,
+        "unter der Schwelle meldet sich das eigene Konto an"
+    );
+    assert_eq!(
+        login_von(&app, quelle, "opfer", "geraten").await,
+        StatusCode::UNAUTHORIZED,
+        "der zehnte Fremdversuch läuft noch"
+    );
+    assert_eq!(
+        login_von(&app, quelle, "opfer", "geraten").await,
+        StatusCode::TOO_MANY_REQUESTS,
+        "die Fremdversuche vor dem eigenen Login zählen weiter"
+    );
+}
+
+/// Wer sich am eigenen Konto vertippt und dann anmeldet, nimmt seine Fehlversuche mit: die
+/// Quelle (etwa eine Wache hinter NAT) wird dadurch nicht schneller gesperrt.
+#[tokio::test]
+async fn eigener_login_raeumt_die_eigenen_fehlversuche() {
+    let app = setup().await;
+    let quelle = "203.0.113.94:40000";
+
+    for _ in 0..9 {
+        login_von(&app, quelle, "admin", "vertippt").await;
+    }
+    assert_eq!(
+        login_von(&app, quelle, "admin", "startpw12").await,
+        StatusCode::OK
+    );
+    for i in 0..9 {
+        let s = login_von(&app, quelle, "admin", "vertippt").await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED, "Versuch {i} nach dem Erfolg");
+    }
 }

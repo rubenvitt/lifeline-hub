@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import BearbeitenModal from './BearbeitenModal';
@@ -68,5 +68,42 @@ describe('BearbeitenModal', () => {
     await userEvent.clear(screen.getByDisplayValue('Deich instabil'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(onBestaetigen).not.toHaveBeenCalled();
+  });
+});
+
+describe('BearbeitenModal — Erfassungshülle (LFH-796)', () => {
+  it('liegt auf der Erfassungshülle: Knopf im Formular, keine Fußzeile, Fokus im Text', async () => {
+    renderMitProviders(
+      <BearbeitenModal
+        offen
+        nachricht={nachricht}
+        senden={false}
+        onAbbrechen={vi.fn()}
+        onBestaetigen={vi.fn()}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Speichern' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+    await waitFor(() => expect(screen.getByDisplayValue('Deich instabil')).toHaveFocus());
+  });
+
+  it('lässt den geänderten Text bei Ablehnung stehen', async () => {
+    const onBestaetigen = vi.fn().mockRejectedValue(new Error('abgelehnt'));
+    renderMitProviders(
+      <BearbeitenModal
+        offen
+        nachricht={nachricht}
+        senden={false}
+        onAbbrechen={vi.fn()}
+        onBestaetigen={onBestaetigen}
+      />,
+    );
+    const feld = screen.getByDisplayValue('Deich instabil');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Deich gehalten');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onBestaetigen).toHaveBeenCalled());
+    expect(screen.getByDisplayValue('Deich gehalten')).toBeInTheDocument();
   });
 });

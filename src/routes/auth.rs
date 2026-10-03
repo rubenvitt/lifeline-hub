@@ -117,7 +117,7 @@ pub async fn login(
         Ok(b) => b,
         Err(e) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&req.benutzername));
             }
             tracing::warn!(
                 benutzername = %req.benutzername,
@@ -152,9 +152,9 @@ pub async fn login(
         // noch niemand, den Abschluss protokolliert `totp_finish`.
         //
         // Auch kein `rate_limit::erfolg` (LFH-791): angemeldet ist erst, wer den zweiten Faktor
-        // besteht. Räumte schon das Passwort die Quelle, setzte jeder Anlauf `login` →
-        // `totp/finish` den Zähler zurück, und der Code ließe sich ungebremst raten. Die Quelle
-        // räumt `totp_finish`.
+        // besteht. Räumte schon das Passwort die Fehlversuche gegen dieses Konto, setzte jeder
+        // Anlauf `login` → `totp/finish` den Zähler zurück, und der Code ließe sich ungebremst
+        // raten. Geräumt wird in `totp_finish`.
         let key = session::neuer_token();
         crate::auth::totp::state::speichere(key.clone(), benutzer.id);
         let jar = jar.add(mfa_pending_cookie(key, secure));
@@ -166,9 +166,9 @@ pub async fn login(
         ));
     }
 
-    // Angemeldet; das gibt auch alle anderen hinter derselben IP wieder frei (NAT).
+    // Angemeldet; das räumt nur die Fehlversuche gegen dieses Konto (LFH-793).
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
@@ -273,6 +273,11 @@ pub struct PasswortWechsel {
 /// eröffnete Sitzung dürfte sonst bis zu [`session::SITZUNG_TAGE`] Tage weiterlaufen. Die eigene
 /// Sitzung bleibt, sonst würfe der Wechsel den Handelnden aus dem laufenden Einsatz. Passkeys
 /// und der TOTP-Zweitfaktor bleiben unberührt: sie hängen nicht am Passwort.
+///
+/// **Audit (LFH-827):** beide Ausgänge der Alt-Passwort-Prüfung landen in `auth_audit` —
+/// `passwort_geaendert` nach dem Commit, `passwort_wechsel_abgewiesen` beim falschen
+/// Alt-Passwort. Was vorher scheitert (400, 403, 429), hat kein Passwort geprüft und schreibt
+/// nichts; die 429 steht über die Fehlversuche davor schon in der Spur.
 pub async fn passwort_aendern(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -314,13 +319,24 @@ pub async fn passwort_aendern(
         Ok(_) => {}
         Err(AppError::Unauthorized) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
             }
             tracing::warn!(
                 benutzer_id = benutzer.id,
                 peer_ip = ?peer_ip,
                 "Passwortwechsel abgewiesen: altes Passwort falsch"
             );
+            crate::auth::audit::schreibe(
+                &state.pool,
+                crate::auth::audit::AuditEintrag {
+                    ereignis: crate::auth::audit::Ereignis::PasswortWechselAbgewiesen,
+                    benutzername: Some(&benutzer.benutzername),
+                    benutzer_id: Some(benutzer.id),
+                    peer_ip: peer_ip.map(|ip| ip.to_string()),
+                    provider: crate::auth::provider::ID_PASSWORT,
+                },
+            )
+            .await;
             return Err(AppError::UnprocessableEntity(
                 "Das bisherige Passwort stimmt nicht.".to_string(),
             ));
@@ -328,7 +344,7 @@ pub async fn passwort_aendern(
         Err(e) => return Err(e),
     }
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     // Argon2 blockiert den Worker ~50–100 ms; auf den Blocking-Pool damit.
@@ -358,6 +374,17 @@ pub async fn passwort_aendern(
         andere_sitzungen_beendet = beendet,
         "Passwort gewechselt"
     );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::PasswortGeaendert,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_PASSWORT,
+        },
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1168,13 +1195,19 @@ fn jetzt_unix() -> u64 {
         .unwrap_or(0)
 }
 
-/// POST /api/auth/totp/enroll/start — beginnt oder erneuert ein TOTP-Enrollment. Das neue
-/// Secret wird sofort gespeichert, aber erst `enroll/finish` aktiviert MFA.
+/// Meldung, wenn ein Enrollment auf ein schon aktives TOTP trifft (422, Zustand).
+const TOTP_BEREITS_AKTIV: &str =
+    "Zwei-Faktor-Anmeldung ist bereits aktiv; neu einrichten geht nur nach einem Admin-Reset";
+
+/// POST /api/auth/totp/enroll/start — beginnt ein TOTP-Enrollment oder beginnt ein noch nicht
+/// abgeschlossenes neu. Das neue Secret wird sofort gespeichert, aber erst `enroll/finish`
+/// aktiviert MFA.
 ///
-/// Ein erneuter `start` überschreibt das Secret und setzt `totp_aktiviert` auf 0 — auch bei
-/// bereits aktivem TOTP. Bis zur Bestätigung ist der Nutzer dann ohne Zweitfaktor; das
-/// vermeidet ein zusätzliches „Pending-Secret“-Feld und ist unkritisch, weil der Nutzer selbst
-/// aus seinem Profil handelt.
+/// Bei aktivem TOTP → 422, nichts wird geschrieben (LFH-794): sonst schaltete jeder mit einer
+/// fremden Session (unbeaufsichtigter Fükw, entwendetes Tablet) den Zweitfaktor still ab oder
+/// tauschte ihn gegen seinen eigenen. Neu einrichten geht nur nach dem Admin-Reset
+/// (`routes::benutzer`), wie es die Profilseite sagt. Bedingung und Schreiben stehen in EINEM
+/// `UPDATE`, damit kein paralleler Abschluss dazwischenfällt.
 pub async fn totp_enroll_start(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -1182,14 +1215,20 @@ pub async fn totp_enroll_start(
     let secret = crate::auth::totp::neues_secret();
 
     // Ein neues Secret beginnt ohne verbrauchten Zeitschritt (LFH-791).
-    sqlx::query(
-        "UPDATE benutzer SET totp_secret = ?, totp_aktiviert = 0, totp_letzter_schritt = NULL \
-         WHERE id = ?",
+    let geschrieben = sqlx::query(
+        "UPDATE benutzer SET totp_secret = ?, totp_letzter_schritt = NULL \
+         WHERE id = ? AND totp_aktiviert = 0",
     )
     .bind(&secret)
     .bind(benutzer.id)
     .execute(&state.pool)
-    .await?;
+    .await?
+    .rows_affected();
+    if geschrieben != 1 {
+        return Err(AppError::UnprocessableEntity(
+            TOTP_BEREITS_AKTIV.to_string(),
+        ));
+    }
 
     let otpauth_url = crate::auth::totp::otpauth_url(&secret, &benutzer.benutzername)?;
     Ok(Json(TotpEnrollStart {
@@ -1201,38 +1240,57 @@ pub async fn totp_enroll_start(
 /// POST /api/auth/totp/enroll/finish — schließt ein Enrollment ab. `totp_secret` wird frisch
 /// gelesen, weil `CurrentUser` die `totp_*`-Spalten nicht trägt.
 ///
-/// Ohne `totp_secret` → 400 „Kein TOTP-Enrollment gestartet“. Ein falscher Code → 422, MFA wird
-/// nie ohne gültigen Code aktiviert. Ein gültiger Code aktiviert MFA, erzeugt zehn
-/// Klartext-Recovery-Codes und ersetzt alte.
+/// Ohne `totp_secret` → 422 „Kein TOTP-Enrollment gestartet“. Schon aktives TOTP → 422, ohne
+/// neue Recovery-Codes (ein zweiter Abschluss ersetzte sonst die gerade angezeigten). Ein
+/// falscher Code → 422, MFA wird nie ohne gültigen Code aktiviert. Ein gültiger Code aktiviert
+/// MFA, erzeugt zehn Klartext-Recovery-Codes und ersetzt alte.
+///
+/// Lesen, Aktivieren und Codes speichern laufen in EINER Transaktion (LFH-794): scheitert das
+/// Speichern der Codes, bleibt MFA aus, statt aktiv ohne Codes beim Nutzer zu landen.
 pub async fn totp_enroll_finish(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     JsonBody(req): JsonBody<TotpEnrollFinishRequest>,
 ) -> Result<Json<TotpEnrollFinish>, AppError> {
-    let secret: Option<String> =
-        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
-            .bind(benutzer.id)
-            .fetch_one(&state.pool)
-            .await?;
-    let secret =
-        secret.ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
-
-    let Some(schritt) = crate::auth::totp::pruefe_code_schritt(&secret, &req.code, jetzt_unix())
-    else {
-        return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
-    };
-    // Auch der Enrollment-Code gilt genau einmal (LFH-791): wer ihn beim Einrichten mitliest,
-    // kommt damit nicht durch den Login. Das Ergebnis zählt hier nicht, `enroll/start` hat den
-    // Schritt geleert.
-    crate::auth::totp::schutz::schritt_annehmen(&state.pool, benutzer.id, schritt).await?;
-
-    sqlx::query("UPDATE benutzer SET totp_aktiviert = 1 WHERE id = ?")
-        .bind(benutzer.id)
-        .execute(&state.pool)
-        .await?;
-
     let codes = crate::auth::totp::neue_recovery_codes();
-    crate::auth::totp::storage::speichere_recovery_codes(&state.pool, benutzer.id, &codes).await?;
+    let jetzt = jetzt_unix();
+
+    crate::write_retry!(&state.pool, |conn| {
+        let (secret, aktiviert): (Option<String>, bool) =
+            sqlx::query_as("SELECT totp_secret, totp_aktiviert FROM benutzer WHERE id = ?")
+                .bind(benutzer.id)
+                .fetch_one(&mut *conn)
+                .await?;
+        if aktiviert {
+            return Err(AppError::UnprocessableEntity(
+                TOTP_BEREITS_AKTIV.to_string(),
+            ));
+        }
+        let secret = secret.ok_or_else(|| {
+            AppError::UnprocessableEntity("Kein TOTP-Enrollment gestartet".to_string())
+        })?;
+
+        let Some(schritt) = crate::auth::totp::pruefe_code_schritt(&secret, &req.code, jetzt)
+        else {
+            return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
+        };
+
+        // Auch der Enrollment-Code gilt genau einmal (LFH-791): wer ihn beim Einrichten
+        // mitliest, kommt damit nicht durch den Login (`totp::schutz`, Replay-Schutz).
+        sqlx::query(
+            "UPDATE benutzer SET totp_aktiviert = 1, totp_letzter_schritt = ? WHERE id = ?",
+        )
+        .bind(
+            i64::try_from(schritt).map_err(|_| {
+                AppError::Internal("TOTP-Zeitschritt außerhalb von i64".to_string())
+            })?,
+        )
+        .bind(benutzer.id)
+        .execute(&mut *conn)
+        .await?;
+        crate::auth::totp::storage::speichere_recovery_codes(conn, benutzer.id, &codes).await?;
+        Ok(())
+    })?;
 
     Ok(Json(TotpEnrollFinish {
         recovery_codes: codes,
@@ -1350,7 +1408,7 @@ pub async fn totp_finish(
     };
     if !gueltig {
         if let Some(ip) = peer_ip {
-            crate::auth::rate_limit::fehlversuch(ip);
+            crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
         }
         tracing::warn!(
             benutzer_id,
@@ -1362,7 +1420,7 @@ pub async fn totp_finish(
 
     crate::auth::totp::schutz::erfolg(&state.pool, benutzer_id).await?;
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
@@ -1468,7 +1526,8 @@ pub async fn app_code_einloesen(
     };
     let Some(benutzer) = benutzer else {
         if let Some(ip) = peer_ip {
-            crate::auth::rate_limit::fehlversuch(ip);
+            // Ziel unbekannt: diesen Versuch räumt kein Erfolg, er läuft nur aus.
+            crate::auth::rate_limit::fehlversuch(ip, None);
         }
         tracing::warn!(peer_ip = ?peer_ip, "Anmeldung aus dem Browser abgewiesen");
         crate::auth::audit::schreibe(
@@ -1486,7 +1545,7 @@ pub async fn app_code_einloesen(
     };
 
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
     // Eine übrig gebliebene Sitzung im Webview würde sonst verwaist in der Tabelle stehen.
     if let Some(alt) = jar.get(SESSION_COOKIE) {

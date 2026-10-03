@@ -107,8 +107,13 @@ if (globalThis.localStorage == null) {
     });
 }
 
+// Hatte die Datei je einen Upload-Listeneintrag im DOM? Steuert die Länge des Drains unten.
+let uploadListeGemountet = false;
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
+  // VOR `cleanup()` prüfen, danach ist der Eintrag ausgehängt — sein Timer läuft aber weiter.
+  uploadListeGemountet ||= document.querySelector('.ant-upload-list-item') !== null;
   cleanup();
   server.resetHandlers();
   // Ein offline geschalteter Test (`setzeOnline`) leckt sonst: beide Hälften zurück, damit
@@ -140,7 +145,16 @@ const echterSetTimeout = globalThis.setTimeout;
 // diesen 10 ms, feuert er nach dem Teardown, react-dom liest `window.event` → „window is not
 // defined" als Unhandled Error, und Vitest exitet 1 bei grünen Tests. Nur Timer am DATEIENDE
 // überleben den Teardown, deshalb einmal je Datei. Node löst Timer nach Fälligkeit aus.
-afterAll(() => new Promise<void>((fertig) => echterSetTimeout(fertig, 25)));
+//
+// Upload-Listen (LFH-784): antds Upload-Listeneintrag setzt beim Mounten per `useDelayState`
+// einen 300-ms-Timer (`showProgress`), ebenfalls ohne Abräumen. Nur Dateien, die einen solchen
+// Eintrag gemountet hatten, warten deshalb 350 ms; alle übrigen bleiben bei 25 ms. Lokal endet
+// der Worker meist, bevor der Timer fällig wird. Unter Last lebt er nach dem Abbau länger; so
+// nachgestellt: ein ausgelasteter Hauptprozess leert die stdout-Pipe nicht, und der Worker
+// wartet in Vitests `flushStdio()`. Wächter: ./uploadListeDrain.test.tsx (Probe im PR zu LFH-784).
+afterAll(
+  () => new Promise<void>((fertig) => echterSetTimeout(fertig, uploadListeGemountet ? 350 : 25)),
+);
 
 // jsdom kennt keine EventSource — No-op-Stub für Seiten, die useEinsatzLiveStream mounten.
 // beforeEach stellt ihn nach `vi.unstubAllGlobals()` wieder her.
