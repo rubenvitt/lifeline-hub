@@ -97,6 +97,9 @@ export default function ProfilPage() {
   // 403 ab. Anders als die LoginPage kein Rückfall auf „aktiv" bei leerer Liste: dort sperrte er
   // sonst jeden aus, hier bliebe nur ein Knopf, der nicht wirken kann.
   const passwortAktiv = provider.some((p) => p.typ === 'passwort' && p.aktiviert);
+  // Ein SSO-only-Konto hat kein lokales Passwort und könnte kein „bisheriges“ nennen; der Server
+  // antwortete mit 422. Kein toter Knopf (LFH-370): ohne lokales Passwort kein Abschnitt (LFH-828).
+  const passwortWechselMoeglich = passwortAktiv && (benutzer?.passwort_gesetzt ?? false);
   // WebAuthn verlangt einen Secure Context (https/localhost); ohne ihn scheiterte
   // `navigator.credentials.create`, bevor eine Ceremony beginnt. Der Knopf erscheint nur, wenn er
   // funktionieren kann.
@@ -200,7 +203,7 @@ export default function ProfilPage() {
 
         <Paneel titel="Sicherheit" koerperPolster>
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
-            {passwortAktiv && (
+            {passwortWechselMoeglich && (
               <section style={{ maxWidth: 480 }}>
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
                   Passwort

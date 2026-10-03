@@ -14,8 +14,9 @@ const webauthnProvider = [
   { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
 ];
 
-/** `benutzer`-Fixture für `/api/auth/me` — `ProfilPage` liest `totp_aktiviert` daraus. */
-function benutzerBody(totpAktiviert: boolean) {
+/** `benutzer`-Fixture für `/api/auth/me` — `ProfilPage` liest `totp_aktiviert` und
+ *  `passwort_gesetzt` daraus. */
+function benutzerBody(totpAktiviert: boolean, passwortGesetzt = true) {
   return {
     id: 1,
     // Bewusst nicht „Admin": der Anzeigename stünde sonst gleichlautend neben der
@@ -27,14 +28,17 @@ function benutzerBody(totpAktiviert: boolean) {
     aktiv: true,
     erstellt_at: '2026-05-23 10:00:00',
     totp_aktiviert: totpAktiviert,
+    passwort_gesetzt: passwortGesetzt,
   };
 }
 
 /** ProfilPage hängt an `useAuth()` — den `AuthProvider` hängt `renderMitProviders` ein, der
  *  Benutzer kommt aus der `/api/auth/me`-Antwort. */
-function setup(totpAktiviert = false, providerListe: unknown[] = []) {
+function setup(totpAktiviert = false, providerListe: unknown[] = [], passwortGesetzt = true) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(totpAktiviert))),
+    http.get('/api/auth/me', () =>
+      HttpResponse.json(benutzerBody(totpAktiviert, passwortGesetzt)),
+    ),
     http.get('/api/auth/providers', () => HttpResponse.json(providerListe)),
     // Die Organisation steht nicht am Benutzer; die Kopfsektion holt sie aus `GET
     // /api/organisation`.
@@ -515,6 +519,27 @@ describe('ProfilPage — Passwort ändern (LFH-471)', () => {
     await screen.findByText('Zwei-Faktor (TOTP)');
     await waitFor(() => expect(screen.queryByText('Passwort')).toBeNull());
     expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
+  });
+
+  /**
+   * SSO-only-Konto (LFH-828): Es hat kein lokales Passwort, der Server lehnte jeden Wechsel mit
+   * 422 ab. Der Passkey-Knopf belegt, dass die Provider-Liste geladen ist, der Anzeigename, dass
+   * der Benutzer geladen ist. Erst dann trägt die Abwesenheit etwas.
+   */
+  it('erscheint NICHT für ein SSO-only-Konto, auch bei aktivem Passwort-Provider', async () => {
+    setzeSecureContext(true);
+    setup(false, [...passwortProvider, ...webauthnProvider], false);
+    await screen.findByRole('button', { name: 'Passkey registrieren' });
+    await screen.findByText('Rita Beispiel');
+    expect(screen.queryByText('Passwort')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Passwort ändern' })).toBeNull();
+  });
+
+  it('erscheint für ein Konto mit lokalem Passwort (Gegenprobe zu SSO-only)', async () => {
+    setzeSecureContext(true);
+    setup(false, [...passwortProvider, ...webauthnProvider], true);
+    await screen.findByRole('button', { name: 'Passkey registrieren' });
+    expect(await screen.findByRole('button', { name: 'Passwort ändern' })).toBeInTheDocument();
   });
 
   it('erscheint NICHT, wenn der Passwort-Provider als deaktiviert geliefert wird', async () => {

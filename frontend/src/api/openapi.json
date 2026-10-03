@@ -1819,7 +1819,8 @@
           "org_rolle",
           "aktiv",
           "erstellt_at",
-          "totp_aktiviert"
+          "totp_aktiviert",
+          "passwort_gesetzt"
         ],
         "properties": {
           "aktiv": {
@@ -1845,6 +1846,10 @@
           },
           "org_rolle": {
             "$ref": "#/components/schemas/OrgRolle"
+          },
+          "passwort_gesetzt": {
+            "type": "boolean",
+            "description": "`true`, wenn das Konto ein lokales Passwort hat; ein SSO-only-Konto (Sentinel\n[`PASSWORT_HASH_SSO_ONLY`]) hat keins (LFH-828). Das Profil bietet den Passwortwechsel nur\ndann an. Hash und Sentinel selbst verlassen den Server nie. Die SQL-Abfragen in\n`routes::benutzer` leiten das Feld mit gebundenem Sentinel ab."
           },
           "system_rolle": {
             "$ref": "#/components/schemas/SystemRolle"

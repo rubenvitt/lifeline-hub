@@ -73,7 +73,7 @@ der Seite: lieber kein Knopf als einer, der nicht wirken kann.
 ## Risks / Trade-offs
 
 - [Neues Pflichtfeld bricht Frontend-Fixtures, die `BenutzerAnzeige` vollständig ausschreiben] →
-  Es sind sieben Stellen (`test/fixtures.ts` und sechs Testdateien), `tsc` findet sie alle. Der
+  Es sind fünf Stellen (`test/fixtures.ts` und vier Testdateien), `tsc` findet sie alle. Der
   Default in `benutzerFixture` ist `true`, so bleibt jeder bestehende Test bei seinem Verhalten.
 - [Sentinel-Text im SQL weicht von der Rust-Konstante ab] → Er wird nie als Literal
   geschrieben, sondern immer aus `PASSWORT_HASH_SSO_ONLY` gebunden. Ein Backend-Test legt ein

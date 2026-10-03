@@ -16,6 +16,7 @@ const anna: BenutzerAnzeige = {
   aktiv: true,
   erstellt_at: '2026-05-23 10:00:00',
   totp_aktiviert: false,
+  passwort_gesetzt: true,
 };
 const bruno: BenutzerAnzeige = {
   ...anna,

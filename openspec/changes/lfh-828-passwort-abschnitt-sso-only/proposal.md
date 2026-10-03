@@ -47,5 +47,5 @@ lief ohne OpenSpec-Change.)
 - **Codegen:** `frontend/src/api/openapi.json` und `frontend/src/api/types.generated.ts`
   (`scripts/check-typ-codegen.sh`).
 - **Frontend:** `frontend/src/pages/ProfilPage.tsx` mit Test. Dazu kommen die Fixtures, die
-  `BenutzerAnzeige` vollständig ausschreiben (`test/fixtures.ts` und sechs Testdateien).
+  `BenutzerAnzeige` vollständig ausschreiben (`test/fixtures.ts` und vier Testdateien).
 - **Keine Migration:** Das Feld leitet sich aus der bestehenden Spalte `passwort_hash` ab.

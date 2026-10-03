@@ -661,6 +661,13 @@ export interface components {
              */
             org_id: number;
             org_rolle: components["schemas"]["OrgRolle"];
+            /**
+             * @description `true`, wenn das Konto ein lokales Passwort hat; ein SSO-only-Konto (Sentinel
+             *     [`PASSWORT_HASH_SSO_ONLY`]) hat keins (LFH-828). Das Profil bietet den Passwortwechsel nur
+             *     dann an. Hash und Sentinel selbst verlassen den Server nie. Die SQL-Abfragen in
+             *     `routes::benutzer` leiten das Feld mit gebundenem Sentinel ab.
+             */
+            passwort_gesetzt: boolean;
             system_rolle: components["schemas"]["SystemRolle"];
             /**
              * @description MFA-Status (LFH-43, Increment 5 Task 6): `true`, wenn der Nutzer TOTP als zweiten Faktor

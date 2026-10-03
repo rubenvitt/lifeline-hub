@@ -755,3 +755,52 @@ async fn patch_unbekannter_benutzer_ist_404() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+// ===== Lokales Passwort in `BenutzerAnzeige` (LFH-828) =====
+
+/// Die Admin-Endpunkte lesen `BenutzerAnzeige` per SQL statt über `anzeige()`. Geprüft werden
+/// beide Wege dort: die Liste und eine Einzelabfrage (`totp/reset`). Konto mit Passwort und
+/// SSO-only-Konto stehen nebeneinander, damit eine vertauschte Bind-Reihenfolge auffällt.
+#[tokio::test]
+async fn admin_endpunkte_liefern_passwort_gesetzt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let sso_id = benutzer_anlegen(&app, &admin_cookie, "ssokonto", "keine").await;
+    sqlx::query("UPDATE benutzer SET passwort_hash = ? WHERE id = ?")
+        .bind(lifeline_hub::auth::PASSWORT_HASH_SSO_ONLY)
+        .bind(sso_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (status, liste) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let eintrag = |name: &str| {
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|b| b["benutzername"] == name)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(eintrag("admin")["passwort_gesetzt"], true, "{liste}");
+    assert_eq!(eintrag("ssokonto")["passwort_gesetzt"], false, "{liste}");
+    assert!(
+        !liste
+            .to_string()
+            .contains(lifeline_hub::auth::PASSWORT_HASH_SSO_ONLY),
+        "Sentinel ausgeliefert: {liste}"
+    );
+
+    let (status, einzeln) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/benutzer/{sso_id}/totp/reset"),
+        &admin_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{einzeln}");
+    assert_eq!(einzeln["passwort_gesetzt"], false, "{einzeln}");
+}

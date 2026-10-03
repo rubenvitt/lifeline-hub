@@ -144,6 +144,7 @@ impl Benutzer {
             aktiv: self.aktiv,
             erstellt_at: self.erstellt_at.clone(),
             totp_aktiviert,
+            passwort_gesetzt: self.passwort_hash != PASSWORT_HASH_SSO_ONLY,
         }
     }
 }
@@ -167,6 +168,11 @@ pub struct BenutzerAnzeige {
     /// aktiviert hat. Zeigt sowohl der Admin-Benutzerliste als auch dem eigenen Profil
     /// (`GET /api/auth/me`) den Status an.
     pub totp_aktiviert: bool,
+    /// `true`, wenn das Konto ein lokales Passwort hat; ein SSO-only-Konto (Sentinel
+    /// [`PASSWORT_HASH_SSO_ONLY`]) hat keins (LFH-828). Das Profil bietet den Passwortwechsel nur
+    /// dann an. Hash und Sentinel selbst verlassen den Server nie. Die SQL-Abfragen in
+    /// `routes::benutzer` leiten das Feld mit gebundenem Sentinel ab.
+    pub passwort_gesetzt: bool,
 }
 
 #[cfg(test)]
