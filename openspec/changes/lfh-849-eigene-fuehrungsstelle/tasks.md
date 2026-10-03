@@ -59,39 +59,39 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 
 ## 4. Funkplan: Zeile, Lücken, Markdown, Deeplink (D4, D5)
 
-- [ ] 4.1 Test zuerst `stab/funkplan.test.ts`: ohne erfasste Führungsstelle keine Zeile `fs`;
+- [x] 4.1 Test zuerst `stab/funkplan.test.ts`: ohne erfasste Führungsstelle keine Zeile `fs`;
   erfasst → erste Zeile ohne Kinder mit Rufname, TMO/DMO, Label, Erreichbarkeit, Leitung leer;
   `fuehrungsstelleErfasst` für jede der vier Angaben; Markdown beginnt die Gliederung mit der
   Führungsstelle und enthält ihre Erreichbarkeit nicht; Lücken-Zeile „Eigene Gegenstelle“ nur bei
   nicht erfasst bzw. mit Grund. Nachweis: rot belegt.
-- [ ] 4.2 Test zuerst `stab/luecken.test.ts`: oberster Abschnitt ohne gemeinsamen Kanal mit der
+- [x] 4.2 Test zuerst `stab/luecken.test.ts`: oberster Abschnitt ohne gemeinsamen Kanal mit der
   Führungsstelle zählt; Führungsstelle ohne Sprechgruppe → keine Zählung; Zustand schlechtester
   der drei Quellen; lokale Sprechgruppe nur an der Führungsstelle ist keine Lücke. Nachweis: rot
   belegt.
-- [ ] 4.3 Umsetzung in `stab/funkplan.ts` und `stab/luecken.ts` nach D4/D5. Nachweis: 4.1 und 4.2
+- [x] 4.3 Umsetzung in `stab/funkplan.ts` und `stab/luecken.ts` nach D4/D5. Nachweis: 4.1 und 4.2
   grün, bestehende Funkplan-Tests unverändert grün.
-- [ ] 4.4 `pages/FunkplanPage.tsx`: Quelle mit eigener Weiche laden, Zeile in der Tabelle mit
+- [x] 4.4 `pages/FunkplanPage.tsx`: Quelle mit eigener Weiche laden, Zeile in der Tabelle mit
   Deeplink auf `einsatzdatenPfad`, Hinweiszeile nach D4, Übernahme gesperrt solange die Quelle
   lädt. Seitentest: Zeile vor dem ersten Abschnitt, Hinweis nur ohne Angaben, Grund bei 403.
   Nachweis: Seitentest grün.
 
 ## 5. Fernmeldeskizze (D5)
 
-- [ ] 5.1 Test zuerst `stab/fernmeldeskizze.test.ts` und `FernmeldeskizzeBild.test.tsx`: Wurzel
+- [x] 5.1 Test zuerst `stab/fernmeldeskizze.test.ts` und `FernmeldeskizzeBild.test.tsx`: Wurzel
   zeigt Rufname, TMO/DMO, Kommunikationsmittel und nie die Erreichbarkeit; Kanten der ersten Ebene
   urteilen gegen die Führungsstelle; ohne Erfassung „Gegenstelle nicht erfasst“ und kein Urteil;
   Wurzel verweist auf Einsatzdaten; Zahl der Kanten-Lücken = Paneel. Nachweis: rot belegt.
-- [ ] 5.2 Umsetzung in `stab/fernmeldeskizze.ts` und `stab/FernmeldeskizzeBild.tsx`. Nachweis: 5.1
+- [x] 5.2 Umsetzung in `stab/fernmeldeskizze.ts` und `stab/FernmeldeskizzeBild.tsx`. Nachweis: 5.1
   grün, bestehende Skizzen-Tests unverändert grün.
 
 ## 6. Regeln, e2e, Gate
 
-- [ ] 6.1 `frontend/src/stab/AGENTS.md`: Funkplan-Absatz „Eigene Gegenstelle fehlt als benannte
+- [x] 6.1 `frontend/src/stab/AGENTS.md`: Funkplan-Absatz „Eigene Gegenstelle fehlt als benannte
   Lücke (LFH-849)“ ersetzen durch Quelle, Erfasst-Regel und Pflegeort (Einsatzdaten); Verweise
   auf LFH-849 in Code-Kommentaren (`fernmeldeskizze.ts`, `FernmeldeskizzeBild.tsx`,
   `FunkplanPage.tsx`) nachziehen. Nachweis: Prettier über `frontend/` grün,
   `grep -rn "LFH-849" frontend/src` zeigt nur aktuelle Aussagen.
-- [ ] 6.2 e2e `e2e/funkplan.spec.ts`: Führungsstelle auf Einsatzdaten erfassen, Funkplan zeigt sie
+- [x] 6.2 e2e `e2e/funkplan.spec.ts`: Führungsstelle auf Einsatzdaten erfassen, Funkplan zeigt sie
   als erste Zeile; Druckpfad (`beforeprint`) enthält die Zeile samt Erreichbarkeit; Übernahme ohne
   Erreichbarkeit. Nachweis: Spec grün, Gate-1-Routen unverändert grün.
 - [ ] 6.3 `./scripts/check-all.sh` grün, dazu Vitest und Rust-Tests vollständig. Nachweis: Lauf

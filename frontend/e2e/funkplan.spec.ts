@@ -279,6 +279,68 @@ test('die Kennung einer Einheit führt auf ihre Detailseite', async ({ page }) =
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einheiten/${einheit}$`));
 });
 
+// ── Eigene Führungsstelle (LFH-849) ─────────────────────────────────────────────────────────────
+//
+// Erfasst wird sie auf den Einsatzdaten (Zeilenbearbeitung), der Funkplan zeigt sie als erste
+// Zeile. Der Druckpfad (A4, `beforeprint`) trägt ihre Erreichbarkeit, die Übernahme nie.
+
+const FS_RUF = 'Florian Musterstadt 10/1';
+const FS_ERREICHBAR = '+49 171 7654321';
+
+test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck mit Erreichbarkeit, im Bericht ohne', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Führungsstelle ${Date.now()}`);
+  await seede(page, einsatzId);
+
+  await page.setViewportSize(FUEKW);
+  await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
+  const paneel = page.getByRole('region', { name: 'Eigene Führungsstelle' });
+  await paneel.getByRole('button', { name: 'Rufname eintragen', exact: true }).click();
+  const ruf = paneel.getByRole('textbox', { name: 'Rufname', exact: true });
+  await ruf.fill(FS_RUF);
+  await ruf.press('Enter');
+  await expect(paneel.getByRole('button', { name: 'Rufname bearbeiten' })).toContainText(FS_RUF);
+  await paneel.getByRole('button', { name: 'Erreichbarkeit eintragen', exact: true }).click();
+  const erreichbar = paneel.getByRole('textbox', { name: 'Erreichbarkeit', exact: true });
+  await erreichbar.fill(FS_ERREICHBAR);
+  await erreichbar.press('Enter');
+  await expect(paneel.getByRole('button', { name: 'Erreichbarkeit bearbeiten' })).toContainText(
+    FS_ERREICHBAR,
+  );
+
+  await oeffne(page, einsatzId);
+  const ersteZeile = tabelle(page).locator('tr[data-row-key]').first();
+  await expect(ersteZeile).toHaveAttribute('data-row-key', 'fs');
+  await expect(ersteZeile).toContainText(FS_RUF);
+  await expect(
+    page.getByRole('region', { name: 'Lücken' }).getByText('Eigene Gegenstelle (Führungsstelle)'),
+  ).toHaveCount(0);
+
+  // Druckpfad bei A4-Breite: die Erreichbarkeit der Führungsstelle steht da.
+  await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
+  await expect(ersteZeile).not.toContainText(FS_ERREICHBAR);
+  await page.evaluate(() => {
+    window.print = () => {
+      window.dispatchEvent(new Event('beforeprint'));
+    };
+  });
+  await page.getByRole('button', { name: /Drucken/ }).click();
+  await page.emulateMedia({ media: 'print' });
+  await expect(tabelle(page).locator('tr[data-row-key="fs"]')).toContainText(FS_ERREICHBAR);
+  await page.emulateMedia({ media: null });
+
+  // Übernahme: die Führungsstelle steht im Bericht, ihre Erreichbarkeit nie.
+  await page.reload();
+  await page.setViewportSize(FUEKW);
+  await expect(tabelle(page).getByText(FAHRZEUG)).toBeVisible();
+  await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
+  await expect(page.getByText(FS_RUF).first()).toBeVisible();
+  await expect(page.getByText(FS_ERREICHBAR)).toHaveCount(0);
+});
+
 // ── Darstellung „Skizze“: die Fernmeldeskizze (LFH-625) ──────────────────────────────────────────
 //
 // - MESSUNG (Aufgabe 4.1, „vor dem Bau messen“): Contentbreite der Funkplan-Seite am Fükw mit
