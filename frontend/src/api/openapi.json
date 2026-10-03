@@ -1819,7 +1819,8 @@
           "org_rolle",
           "aktiv",
           "erstellt_at",
-          "totp_aktiviert"
+          "totp_aktiviert",
+          "passwort_gesetzt"
         ],
         "properties": {
           "aktiv": {
@@ -1845,6 +1846,10 @@
           },
           "org_rolle": {
             "$ref": "#/components/schemas/OrgRolle"
+          },
+          "passwort_gesetzt": {
+            "type": "boolean",
+            "description": "`true`, wenn das Konto ein lokales Passwort hat; ein SSO-only-Konto hat keins (LFH-828).\nDas Profil bietet den Passwortwechsel nur dann an. Hash und Sentinel verlassen den Server\nnie."
           },
           "system_rolle": {
             "$ref": "#/components/schemas/SystemRolle"
