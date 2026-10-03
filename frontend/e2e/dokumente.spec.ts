@@ -679,9 +679,29 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await page.keyboard.press('Tab');
   await expect(dateiKnopf, 'zurück am ersten Ziel').toBeFocused();
 
-  // Enter auf dem Knopf öffnet den Dateidialog — genau EIN `input.click()` je Tastendruck.
+  /*
+   * Enter auf dem Knopf öffnet den Dateidialog — genau EIN `input.click()` je Tastendruck
+   * (LFH-778). rc-upload ruft ihn im `keydown` der Hülle und nimmt dem Knopf dabei den Fokus;
+   * so landet das `keypress`, an dem Chromium den Knopf per Enter klickt, auf `<body>` und löst
+   * keinen zweiten Aufruf aus. Den zweiten verdeckte der Wähler-Hörer: er nimmt nur den ersten.
+   * Mutationsprobe `target.blur()` in `onClick` von `@rc-component/upload` (`AjaxUploader.js`)
+   * entfernt: zwei Aufrufe, rot.
+   */
+  await page.evaluate(() => {
+    const zaehler = window as unknown as { __dateiKlicks: number };
+    zaehler.__dateiKlicks = 0;
+    const klick = HTMLInputElement.prototype.click;
+    HTMLInputElement.prototype.click = function (this: HTMLInputElement) {
+      if (this.type === 'file') zaehler.__dateiKlicks += 1;
+      klick.call(this);
+    };
+  });
   await page.keyboard.press('Enter');
   const waehler = await waehlerKommt;
+  expect(
+    await page.evaluate(() => (window as unknown as { __dateiKlicks: number }).__dateiKlicks),
+    'ein `input.click()` je Enter',
+  ).toBe(1);
   await waehler.setFiles({ name: 'Einsatzbefehl 3.pdf', mimeType: 'application/pdf', buffer: PDF });
   await expect(dialog.getByLabel('Titel')).toHaveValue('Einsatzbefehl 3');
 
