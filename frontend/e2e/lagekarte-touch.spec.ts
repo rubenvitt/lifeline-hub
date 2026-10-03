@@ -166,6 +166,78 @@ async function aufKarte(page: Page, punkte: Punkt[], wo: string) {
 }
 
 /**
+ * Erster Kandidat, an dem der Karten-Canvas obenauf liegt. Überlagerungen (Seitenkopf, linke
+ * Kartenüberlagerung samt Messsteuerung) sind je nach Schrift und Umbruch verschieden hoch —
+ * ein einzelner fester Versatz landet in der CI darauf. Sonst wie `aufKarte`; im Fehlertext
+ * stehen die ersten sechs Treffer.
+ */
+async function freierPunkt(page: Page, kandidaten: Punkt[], wo: string): Promise<Punkt> {
+  const treffer = await page.evaluate(
+    (ps) =>
+      ps.map((p) => {
+        const el = document.elementFromPoint(p.x, p.y);
+        return el?.classList.contains('maplibregl-canvas') ? 'canvas' : (el?.outerHTML ?? 'nichts');
+      }),
+    kandidaten,
+  );
+  const i = treffer.indexOf('canvas');
+  expect(
+    i,
+    `${wo}: kein Kandidat frei — ${treffer
+      .slice(0, 6)
+      .map((t, j) => `${JSON.stringify(kandidaten[j])} → ${t.slice(0, 120)}`)
+      .join(' | ')}`,
+  ).toBeGreaterThanOrEqual(0);
+  return kandidaten[i];
+}
+
+/**
+ * Nächster freier Punkt zu `p`: ein Raster über den sichtbaren Canvas, nach Abstand zu `p`
+ * sortiert, dann wie `freierPunkt`. Feste Versätze reichen bei 1024 px in der Handschuh-Stufe
+ * nicht — rund um die Stelle liegen Seitenkopf, Kartenknöpfe, die linke Überlagerung samt
+ * Messsteuerung und das offene Menü selbst, je nach Schrift verschieden groß.
+ * `ausserhalb` (`[west, süd, ost, nord]`) schließt einen Rahmen aus, `fern` hält
+ * `mindestens` Pixel Abstand zu jedem der Punkte.
+ */
+async function freierPunktNahe(
+  page: Page,
+  p: Punkt,
+  wo: string,
+  {
+    ausserhalb,
+    fern,
+    mindestens = 50,
+  }: { ausserhalb?: [number, number, number, number]; fern?: Punkt[]; mindestens?: number } = {},
+): Promise<Punkt> {
+  const raster = await page.evaluate((rahmen) => {
+    const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+    const r = k.getCanvas().getBoundingClientRect();
+    const rand = 0.0005; // Abstand zum Zonenrand, damit kein Tipp auf der Kante landet
+    const punkte: { x: number; y: number }[] = [];
+    for (let y = Math.max(r.top, 0) + 20; y < Math.min(r.bottom, innerHeight) - 20; y += 30)
+      for (let x = Math.max(r.left, 0) + 20; x < Math.min(r.right, innerWidth) - 20; x += 30) {
+        if (rahmen) {
+          const [west, sued, ost, nord] = rahmen;
+          const g = k.unproject([x - r.left, y - r.top]);
+          if (
+            g.lng > west - rand &&
+            g.lng < ost + rand &&
+            g.lat > sued - rand &&
+            g.lat < nord + rand
+          )
+            continue;
+        }
+        punkte.push({ x, y });
+      }
+    return punkte;
+  }, ausserhalb ?? null);
+  const kandidaten = raster
+    .filter((q) => (fern ?? []).every((f) => Math.hypot(q.x - f.x, q.y - f.y) >= mindestens))
+    .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  return freierPunkt(page, kandidaten, wo);
+}
+
+/**
  * Mitte der FREIEN Kartenfläche: sichtbarer Teil des Canvas oberhalb des Kartenfußes. Unten
  * liegen Zeitachse und Zeichnen-Steuerung über der Karte; bei 390 px mit ausgeklappter Zeitachse
  * bleibt darüber nur ein Streifen. Die Trefferwache fängt, was trotzdem danebengeht.
@@ -1426,8 +1498,8 @@ interface KontextSaat {
   frei: [number, number];
   /** In der Zone, abseits jedes Zeichens. */
   inZone: [number, number];
-  /** Knapp nördlich der Zone, frei. */
-  nebenZone: [number, number];
+  /** Rahmen der Zone `[west, süd, ost, nord]` — „daneben“ heißt außerhalb davon. */
+  zone: [number, number, number, number];
 }
 
 async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
@@ -1439,11 +1511,17 @@ async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
   for (const [i, name] of TRAUBE.entries())
     await einheitAn(page, einsatzId, name, [MITTE[0] + i * 0.00005, MITTE[1] + i * 0.00003]);
   const [lng, lat] = EINZEL;
+  const rahmen: [number, number, number, number] = [
+    lng - 0.004,
+    lat - 0.008,
+    lng + 0.004,
+    lat - 0.003,
+  ];
   const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
     data: {
       typ: 'absperrbereich',
       geometrie_typ: 'Polygon',
-      geometrie: JSON.stringify(rechteck(lng - 0.004, lat - 0.008, lng + 0.004, lat - 0.003)),
+      geometrie: JSON.stringify(rechteck(...rahmen)),
       label: 'Sperrzone Kontext',
     },
   });
@@ -1452,7 +1530,7 @@ async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
     einsatzId,
     frei: [lng, lat + 0.004],
     inZone: [lng + 0.002, lat - 0.0055],
-    nebenZone: [lng + 0.002, lat - 0.0022],
+    zone: rahmen,
   };
 }
 
@@ -1566,8 +1644,13 @@ for (const { viewport, dichte } of [
       // Die Messsteuerung wächst als Band über die Karte (Handschuh: hoch) — die freie Mitte neu
       // bestimmen, sonst landete der Tipp auf dem Band.
       const mitteImModus = await kartenMitte(page);
-      const zweiter = { x: mitteImModus.x + 60, y: mitteImModus.y };
-      await aufKarte(page, [zweiter], 'zweiter Messpunkt');
+      // Weit genug von der Druckstelle, damit die Strecke eine echte Länge hat.
+      const zweiter = await freierPunktNahe(
+        page,
+        { x: mitteImModus.x + 60, y: mitteImModus.y },
+        'zweiter Messpunkt',
+        { fern: [frei], mindestens: 50 },
+      );
       await page.waitForTimeout(400);
       const zweiterLl = await geoAm(page, zweiter);
       await tippe(page, zweiter);
@@ -1593,8 +1676,13 @@ for (const { viewport, dichte } of [
       expect(gemessen / erwartet).toBeLessThan(1.1);
 
       // ── Im Messmodus öffnet ein langer Druck kein Menü ────────────────────────────────
-      const dritter = { x: mitteImModus.x - 50, y: mitteImModus.y };
-      await aufKarte(page, [dritter], 'langer Druck im Messmodus');
+      // Nicht auf einem der beiden Messpunkte: der Druck soll freie Karte treffen.
+      const dritter = await freierPunktNahe(
+        page,
+        { x: mitteImModus.x - 50, y: mitteImModus.y },
+        'langer Druck im Messmodus',
+        { fern: [frei, zweiter], mindestens: 40 },
+      );
       await langerDruck(page, cdp, dritter);
       await page.waitForTimeout(300);
       await expect(menue).toHaveCount(0);
@@ -1698,9 +1786,8 @@ for (const { viewport, dichte } of [
       await page.waitForTimeout(500);
       await expect(menue).toBeVisible();
       await expect(auswahl).toHaveCount(0);
-      // Tipp daneben (frei, nördlich der Zone) schließt ohne Wirkung eines Eintrags.
-      const daneben = await aufSchirm(page, saat.nebenZone);
-      await aufKarte(page, [daneben], 'Tipp daneben');
+      // Tipp daneben (frei, außerhalb der Zone) schließt ohne Wirkung eines Eintrags.
+      const daneben = await freierPunktNahe(page, zone, 'Tipp daneben', { ausserhalb: saat.zone });
       await tippe(page, daneben);
       await expect(menue).toHaveCount(0);
       await expect(auswahl).toHaveCount(0);
