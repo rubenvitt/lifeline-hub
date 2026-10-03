@@ -25,4 +25,4 @@ Jede Aufgabe test-first (`superpowers:test-driven-development`): erst den roten 
 
 ## 4. Integration
 
-- [ ] 4.1 `./scripts/check-all.sh` grün (oder für Kästchen, die erst die CI des PRs belegt, mit Verweis auf diesen Lauf abhaken).
+- [x] 4.1 `./scripts/check-all.sh` grün (oder für Kästchen, die erst die CI des PRs belegt, mit Verweis auf diesen Lauf abhaken). Stand 03.10.2026: Bündel `schnell` grün; Bündel `frontend` 9155/9156 — rot nur `EinsaetzePage.test.tsx` (Ladezustand über `delay(60)`, lief parallel zu Playwright, isoliert 3× grün, Datei von dieser Change unberührt); e2e `lagekarte-zeichnen-korrigierbar`, `lagekarte-smoke`, `lagekarte-touch`, `command-palette` grün; Bündel `rust` und volle `e2e` belegt die CI des PRs.
