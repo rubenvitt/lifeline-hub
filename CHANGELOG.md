@@ -1,3 +1,27 @@
+## [1.0.0-alpha.69](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.68...v1.0.0-alpha.69) (2026-10-03)
+
+### Wichtige Änderungen
+
+**Datenbankmigrationen:** Diese Version enthält mehrere Datenbankmigrationen, die beim ersten Start automatisch ausgeführt werden. Ein Backup der Datenbank vor dem Update wird empfohlen.
+
+### Aufbewahrung und Datenschutz
+
+**Löschersuchen nach Art. 17 DSGVO:** Organisationsadministratoren können jetzt Anträge auf sofortige Schwärzung personenbezogener Daten stellen – unabhängig von den regulären Aufbewahrungsfristen. Nach einer 24-Stunden-Karenzfrist werden betroffene Personen und ihre Daten aus abgeschlossenen Einsätzen dauerhaft geschwärzt. In der Archivakte steht ein neues Paneel „Löschersuchen (Art. 17)" zur Verfügung, das eine pseudonyme Personensuche, Antragstellung mit Aktenzeichen und Rücknahmemöglichkeit bietet. Einsätze mit beantragter Schwärzung werden in der Übersicht und Archivakte entsprechend gekennzeichnet.
+
+**Verbesserte Zugriffskontrolle:** Offline gespeicherte Meldungen (Einsatztagebuch, Personen, Betreuung, Verpflegung) werden nach Ablauf der Aufbewahrungsfristen oder bei gesperrten Einsätzen nicht mehr ausgespielt – auch nicht aus dem lokalen Replay-Speicher. Führungspersonal erhält nach Ende der Nachlauffrist keinen Zugriff mehr auf gespeicherte Offline-Daten.
+
+**Vollständige Löschung bei Löschersuchen:** Werden personenbezogene Daten auf Antrag gelöscht, werden jetzt auch alle zugehörigen Dateianhänge (Fotos, Dokumente) automatisch mit entfernt.
+
+### Betroffene und Personenerfassung
+
+**Dateianhänge an Personen:** Auf der Personendetailseite können jetzt Fotos und andere Dateien hochgeladen, angezeigt und heruntergeladen werden. Jeder Download wird aus Datenschutzgründen im Zugriffsprotokoll erfasst. Die Anhänge erscheinen in einem aufklappbaren Abschnitt und werden erst beim Öffnen geladen. Im Einsatztagebuch werden Dateianhänge pseudonym protokolliert.
+
+**Datenschutzkonforme Schwärzung:** Bei der Schwärzung einer Person werden jetzt auch alle ihre Dateianhänge automatisch gelöscht. Telefonnummern von Meldenden werden nicht fälschlicherweise als personenbezogene Daten der Betroffenen behandelt.
+
+### Betrieb und Installation
+
+**Behobene Migrationskonflikte:** Mehrere parallel entwickelte Datenbankmigrationen, die dieselbe Versionsnummer verwendeten, wurden aufgelöst. Frische Installationen starten jetzt fehlerfrei durch.
+
 ## [1.0.0-alpha.68](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.67...v1.0.0-alpha.68) (2026-10-03)
 
 ### Wichtige Änderungen
