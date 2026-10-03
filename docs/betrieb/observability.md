@@ -70,11 +70,17 @@ Bewusst großzügig: eine ganze Wache kann hinter einer NAT-Adresse hängen, und
 Aussperren im Einsatz ist ein echter Betriebsschaden. Zwei Sicherungen dagegen:
 
 - Nur **Fehlversuche** zählen.
-- Eine **erfolgreiche Anmeldung räumt den Zähler** der Quelle — wer das Passwort kennt,
-  gibt damit auch alle anderen hinter derselben IP wieder frei.
+- Eine **erfolgreiche Anmeldung räumt die Fehlversuche gegen das eigene Konto** — wer
+  sich vertippt und dann anmeldet, bringt die Quelle nicht näher an die Sperre.
+
+Versuche gegen **andere** Konten räumt der Erfolg nicht (LFH-793): sonst setzte jemand die
+Sperre nach neun fremden Passwörtern mit dem eigenen Konto zurück. Eine Sperre je Konto über
+alle Quellen gibt es bewusst nicht; sie sperrte ein Konto für jeden, der seinen Namen kennt.
 
 Der Zähler liegt im Prozessspeicher und ist nach einem Neustart leer. Für den Zweck
 (automatisiertes Raten ausbremsen) reicht das; die dauerhafte Spur liegt in `auth_audit`.
+Die Tabelle ist begrenzt: ab 1 024 Quellen räumt jeder neue Eintrag die abgelaufenen weg, bei
+10 000 verdrängt er die Quelle mit dem ältesten letzten Versuch.
 
 Die Quell-IP ist die **Socket-Adresse**. `X-Forwarded-For` wird nur ausgewertet, wenn
 die Gegenstelle ein ausdrücklich genannter Proxy ist (`LIFELINE_TRUSTED_PROXIES`, LFH-604;

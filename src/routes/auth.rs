@@ -117,7 +117,7 @@ pub async fn login(
         Ok(b) => b,
         Err(e) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&req.benutzername));
             }
             tracing::warn!(
                 benutzername = %req.benutzername,
@@ -146,9 +146,9 @@ pub async fn login(
             .fetch_one(&state.pool)
             .await?;
 
-    // Das Passwort stimmt; das gibt auch alle anderen hinter derselben IP wieder frei (NAT).
+    // Das Passwort stimmt; das räumt nur die Fehlversuche gegen dieses Konto (LFH-793).
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     if totp_aktiviert {
@@ -309,7 +309,7 @@ pub async fn passwort_aendern(
         Ok(_) => {}
         Err(AppError::Unauthorized) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
             }
             tracing::warn!(
                 benutzer_id = benutzer.id,
@@ -323,7 +323,7 @@ pub async fn passwort_aendern(
         Err(e) => return Err(e),
     }
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     // Argon2 blockiert den Worker ~50–100 ms; auf den Blocking-Pool damit.
@@ -1394,7 +1394,8 @@ pub async fn app_code_einloesen(
     };
     let Some(benutzer) = benutzer else {
         if let Some(ip) = peer_ip {
-            crate::auth::rate_limit::fehlversuch(ip);
+            // Ziel unbekannt: diesen Versuch räumt kein Erfolg, er läuft nur aus.
+            crate::auth::rate_limit::fehlversuch(ip, None);
         }
         tracing::warn!(peer_ip = ?peer_ip, "Anmeldung aus dem Browser abgewiesen");
         crate::auth::audit::schreibe(
@@ -1412,7 +1413,7 @@ pub async fn app_code_einloesen(
     };
 
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
     // Eine übrig gebliebene Sitzung im Webview würde sonst verwaist in der Tabelle stehen.
     if let Some(alt) = jar.get(SESSION_COOKIE) {
