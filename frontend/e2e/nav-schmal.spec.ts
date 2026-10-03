@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Der Einsatz-Navigationsrahmen auf dem Handschirm: kein waagerechter Überlauf und jede
@@ -210,6 +211,124 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
   // 280.00000762939453 kam vor).
   expect(koerper.width, `Körper liegt im Panel (gemessen ${koerper.width})`).toBeLessThanOrEqual(
     DRAWER_BREITE + SUBPIXEL,
+  );
+});
+
+/**
+ * Modulsperre per Override (LFH-820, `openspec/changes/lfh-820-layout-gates-modulsperre-override/`):
+ * eine Mandanten-, keine Rollenachse. Für den Admin ist kein Modul gesperrt (Admin-Ausnahme in
+ * `src/einsatz/berechtigung.rs`); die gesperrten Zeilen (Schloss, „Keine Berechtigung") sieht nur
+ * ein Benutzer ohne die verlangte Rolle — hier der Beobachter.
+ *
+ * Gesperrt werden zwei Module der Kategorie Führung, die auf dem Überblick offen steht: eine
+ * Modulzeile und das Ziel der Sprungmarke „Entscheidungen" (ETB). So steht beides ohne Klick da.
+ */
+const GESPERRT_ZEILE = 'Aufträge/Befehle';
+const GESPERRT_SPRUNG = 'Entscheidungen, springt zu ETB, Typ Entscheidung';
+
+async function modulSperren(page: Page, einsatzId: string, modulKey: string) {
+  const antwort = await page.request.put(
+    `/api/einsaetze/${einsatzId}/modul-overrides/${modulKey}`,
+    { data: { sichtbar: true, benoetigte_rolle: 'admin' } },
+  );
+  // Ein still gescheitertes Seeding führte zurück in den ungesperrten Zustand.
+  expect(antwort.ok(), `Override ${modulKey}: ${antwort.status()} ${await antwort.text()}`).toBe(
+    true,
+  );
+}
+
+/** Admin legt an und sperrt, dann Wechsel auf den Beobachter; Viewport erst danach. */
+async function beobachterMitSperre(page: Page, name: string): Promise<string> {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `${name} ${Date.now()}`);
+  await modulSperren(page, einsatzId, 'auftraege');
+  await modulSperren(page, einsatzId, 'etb');
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  return einsatzId;
+}
+
+/** Vorbedingung: der Sperrzweig steht — beide Zeilen gesperrt, mit Grund. */
+async function sperrzweigSteht(ort: Locator) {
+  for (const name of [GESPERRT_ZEILE, GESPERRT_SPRUNG]) {
+    const zeile = ort.getByRole('button', { name, exact: true });
+    await expect(zeile, `Vorbedingung: „${name}" gesperrt`).toBeDisabled();
+    await expect(zeile).toHaveAttribute('title', 'Keine Berechtigung');
+  }
+}
+
+test('Navigationsrahmen: auf 390 px hält der Drawer gesperrte Zeilen (Beobachter, Modulsperre)', async ({
+  page,
+}) => {
+  const einsatzId = await beobachterMitSperre(page, 'E2E Nav Sperre schmal');
+
+  await page.setViewportSize(HANDSCHIRM);
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  // Rollenneutraler Anker (wie Gate 1): die Überschrift, nicht die ETB-Erfassung.
+  await expect(page.getByRole('heading', { name: 'Überblick', level: 1 })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Kategorien' })).toHaveCount(0);
+
+  const hamburger = page.getByRole('button', { name: 'Navigation öffnen' });
+  const kasten = (await hamburger.boundingBox())!;
+  haeltTreffflaeche(kasten.width, 'Hamburger-Breite');
+  haeltTreffflaeche(kasten.height, 'Hamburger-Höhe');
+
+  const zu = await messeUeberlauf(page);
+  expect(
+    zu.rahmen,
+    `Der Navigationsrahmen ragt auf ${HANDSCHIRM.width} px über:\n${zu.rahmen.join('\n')}`,
+  ).toEqual([]);
+  meldeFremdenUeberlauf('Sperre, Drawer zu', zu);
+
+  await hamburger.click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer.getByRole('navigation', { name: 'Einsatz-Navigation' })).toBeVisible();
+  await sperrzweigSteht(drawer);
+
+  const offen = await messeUeberlauf(page);
+  expect(
+    offen.rahmen,
+    `Der offene Drawer mit gesperrten Zeilen erzeugt Überlauf:\n${offen.rahmen.join('\n')}`,
+  ).toEqual([]);
+  meldeFremdenUeberlauf('Sperre, Drawer offen', offen);
+  // Jede Zeile des Drawers bleibt innerhalb des Panels — die gesperrte trägt ein Icon mehr.
+  const drawerRechts = (await drawer.locator('.ant-drawer-content-wrapper').boundingBox())!;
+  for (const name of [GESPERRT_ZEILE, GESPERRT_SPRUNG]) {
+    const zeile = (await drawer.getByRole('button', { name, exact: true }).boundingBox())!;
+    expect(
+      zeile.x + zeile.width,
+      `„${name}" endet im Drawer (gemessen ${zeile.x + zeile.width})`,
+    ).toBeLessThanOrEqual(drawerRechts.x + drawerRechts.width + SUBPIXEL);
+  }
+});
+
+test('Navigationsrahmen: auf 1024 px hält die Liste gesperrte Zeilen (Beobachter, Modulsperre)', async ({
+  page,
+}) => {
+  const einsatzId = await beobachterMitSperre(page, 'E2E Nav Sperre Tablet');
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  await expect(page.getByRole('heading', { name: 'Überblick', level: 1 })).toBeVisible();
+  // Ab `lg` inline: Rail und Modulpanel, kein Hamburger.
+  await expect(page.getByRole('navigation', { name: 'Kategorien' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Navigation öffnen' })).toHaveCount(0);
+  const panel = page.locator('[data-lfh="modul-panel"]');
+  await sperrzweigSteht(panel);
+
+  const messung = await messeUeberlauf(page);
+  expect(
+    messung.rahmen,
+    `Der Navigationsrahmen ragt auf 1024 px über:\n${messung.rahmen.join('\n')}`,
+  ).toEqual([]);
+  meldeFremdenUeberlauf('Sperre, 1024 px', messung);
+  // Das Panel selbst läuft nicht in sich über (es klippt, statt die Seite aufzuschieben —
+  // `messeUeberlauf` sähe das nicht).
+  const panelMass = await panel.evaluate((el) => ({
+    scroll: el.scrollWidth,
+    klient: el.clientWidth,
+  }));
+  expect(panelMass.scroll, 'Modulpanel: Inhalt breiter als das Panel').toBeLessThanOrEqual(
+    panelMass.klient + 1,
   );
 });
 
