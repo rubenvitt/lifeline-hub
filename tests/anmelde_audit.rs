@@ -3,7 +3,9 @@
 //! `tests/auth_audit.rs` deckt den Passwort-Login ab. Hier stehen die übrigen Wege: TOTP als
 //! zweiter Schritt, OIDC und Passkey. Jeder Test leert die Spur unmittelbar vor dem Schritt,
 //! um den es geht, und verlangt danach GENAU einen Eintrag — ein fehlender verbirgt ein
-//! Durchprobieren, ein doppelter verfälscht jede Zählung.
+//! Durchprobieren, ein doppelter verfälscht jede Zählung. Eine Abweisung ohne laufende
+//! Zeremonie und ein gestörter IdP schreiben dagegen KEINEN: sonst füllte jede Anfrage ohne
+//! Vorlauf die Tabelle.
 //!
 //! Damit Erfolg und Fehlschlag ohne äußeren Dienst echt durchlaufen, signiert der Test selbst:
 //! einen Passkey mit einem frischen P-256-Schlüssel und das `id_token` eines Mini-IdP, der in
@@ -244,7 +246,7 @@ async fn falscher_totp_code_hinterlaesst_genau_einen_fehlschlag_mit_benutzer() {
 }
 
 #[tokio::test]
-async fn totp_abschluss_ohne_gueltigen_pending_state_hinterlaesst_einen_fehlschlag() {
+async fn totp_abschluss_ohne_laufende_anmeldung_hinterlaesst_keinen_eintrag() {
     let (app, pool) = setup_mit_pool().await;
 
     let antwort = sende(
@@ -257,7 +259,38 @@ async fn totp_abschluss_ohne_gueltigen_pending_state_hinterlaesst_einen_fehlschl
     .await;
     assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
 
-    assert_eq!(spur(&pool).await, vec![fehlschlag("totp", None)]);
+    assert_eq!(spur(&pool).await, vec![]);
+}
+
+#[tokio::test]
+async fn totp_abschluss_fuer_deaktiviertes_konto_nennt_den_benutzer() {
+    let (app, pool) = setup_mit_pool().await;
+    let secret = totp_fuer_admin(&app).await;
+    let id = benutzer_id(&pool, "admin").await;
+    let pending = passwortschritt(&app).await;
+    // Zwischen Passwortschritt und Zweitfaktor deaktiviert.
+    sqlx::query("UPDATE benutzer SET aktiv = 0 WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    spur_leeren(&pool).await;
+
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();
+    let antwort = sende(
+        &app,
+        "POST",
+        "/api/auth/totp/finish",
+        Some(&pending),
+        Some(format!(r#"{{"code":"{code}"}}"#)),
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
+
+    assert_eq!(
+        spur(&pool).await,
+        vec![fehlschlag("totp", Some(("admin", id)))]
+    );
 }
 
 // ===== Passkey =====
@@ -325,11 +358,13 @@ impl TestPasskey {
         webauthn_rs::prelude::Passkey::from(cred)
     }
 
-    /// Die Assertion auf `challenge` (base64url), signiert mit `signierer`.
+    /// Die Assertion auf `challenge` (base64url), signiert mit `signierer`; `user_handle` nur
+    /// für den discoverable Login.
     fn assertion(
         &self,
         challenge: &str,
         signierer: &openssl::ec::EcKey<openssl::pkey::Private>,
+        user_handle: Option<&[u8]>,
     ) -> String {
         let client_data = serde_json::json!({
             "type": "webauthn.get",
@@ -359,7 +394,7 @@ impl TestPasskey {
                 "authenticatorData": URL_SAFE_NO_PAD.encode(&auth_data),
                 "clientDataJSON": URL_SAFE_NO_PAD.encode(client_data.as_bytes()),
                 "signature": URL_SAFE_NO_PAD.encode(&signatur),
-                "userHandle": null,
+                "userHandle": user_handle.map(|h| URL_SAFE_NO_PAD.encode(h)),
             },
             "type": "public-key",
         })
@@ -408,7 +443,7 @@ async fn passkey_anmeldung_hinterlaesst_genau_einen_login_ok() {
     let id = benutzer_id(&pool, "admin").await;
     spur_leeren(&pool).await;
 
-    let body = passkey.assertion(&challenge, &passkey.schluessel);
+    let body = passkey.assertion(&challenge, &passkey.schluessel, None);
     let antwort = sende(
         &app,
         "POST",
@@ -431,7 +466,7 @@ async fn passkey_mit_falscher_signatur_hinterlaesst_genau_einen_fehlschlag() {
 
     // Signiert mit einem fremden Schlüssel: die Bibliothek weist die Assertion ab.
     let fremd = TestPasskey::neu(b"fremd");
-    let body = passkey.assertion(&challenge, &fremd.schluessel);
+    let body = passkey.assertion(&challenge, &fremd.schluessel, None);
     let antwort = sende(
         &app,
         "POST",
@@ -446,18 +481,156 @@ async fn passkey_mit_falscher_signatur_hinterlaesst_genau_einen_fehlschlag() {
 }
 
 #[tokio::test]
-async fn gescheiterter_discoverable_passkey_hinterlaesst_genau_einen_fehlschlag() {
+async fn passkey_fuer_deaktiviertes_konto_nennt_den_benutzer() {
     webauthn_aktivieren();
     let (app, pool) = setup_mit_pool().await;
-    let passkey = TestPasskey::neu(b"discoverable");
+    let (passkey, challenge, cookie) = passkey_zeremonie(&app, &pool, b"passkey-inaktiv").await;
+    let id = benutzer_id(&pool, "admin").await;
+    sqlx::query("UPDATE benutzer SET aktiv = 0 WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    spur_leeren(&pool).await;
 
-    // Ohne laufende Zeremonie (kein `webauthn_disc`-Cookie) scheitert der Abschluss.
-    let body = passkey.assertion("AAAA", &passkey.schluessel);
+    // Gültige Signatur: der Server weiß, wessen Passkey das ist, und nennt ihn.
+    let body = passkey.assertion(&challenge, &passkey.schluessel, None);
+    let antwort = sende(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/finish",
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::UNAUTHORIZED);
+
+    assert_eq!(
+        spur(&pool).await,
+        vec![fehlschlag("webauthn", Some(("admin", id)))]
+    );
+}
+
+#[tokio::test]
+async fn passkey_abschluss_ohne_laufende_zeremonie_hinterlaesst_keinen_eintrag() {
+    webauthn_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+    let passkey = TestPasskey::neu(b"ohne-zeremonie");
+
+    for pfad in [
+        "/api/auth/webauthn/auth/finish",
+        "/api/auth/webauthn/discoverable/finish",
+    ] {
+        let body = passkey.assertion("AAAA", &passkey.schluessel, None);
+        let antwort = sende(&app, "POST", pfad, None, Some(body)).await;
+        assert_eq!(antwort.status, StatusCode::UNAUTHORIZED, "{pfad}");
+    }
+
+    assert_eq!(spur(&pool).await, vec![]);
+}
+
+#[tokio::test]
+async fn abgeschalteter_passkey_provider_hinterlaesst_keinen_eintrag() {
+    webauthn_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+    sqlx::query(
+        "INSERT INTO auth_provider (id, aktiviert) VALUES ('webauthn', 0) \
+         ON CONFLICT(id) DO UPDATE SET aktiviert = 0",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let passkey = TestPasskey::neu(b"provider-aus");
+
+    let body = passkey.assertion("AAAA", &passkey.schluessel, None);
+    let antwort = sende(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/finish",
+        Some("webauthn_auth=egal"),
+        Some(body),
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::NOT_FOUND);
+
+    assert_eq!(spur(&pool).await, vec![]);
+}
+
+/// Legt für den admin einen Passkey an, startet den discoverable Login und liefert
+/// (Passkey, User-Handle, Challenge, `webauthn_disc`-Cookie-Paar).
+async fn discoverable_zeremonie(
+    app: &axum::Router,
+    pool: &sqlx::SqlitePool,
+    cred_id: &[u8],
+) -> (TestPasskey, Vec<u8>, String, String) {
+    let passkey = TestPasskey::neu(cred_id);
+    let id = benutzer_id(pool, "admin").await;
+    lifeline_hub::auth::webauthn::storage::speichere_passkey(pool, id, &passkey.als_passkey())
+        .await
+        .unwrap();
+    let handle = lifeline_hub::auth::webauthn::user_handle(pool, id)
+        .await
+        .unwrap();
+
+    let antwort = sende(
+        app,
+        "POST",
+        "/api/auth/webauthn/discoverable/start",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::OK);
+    let challenge = antwort.json["publicKey"]["challenge"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    (
+        passkey,
+        handle.as_bytes().to_vec(),
+        challenge,
+        cookie_paar(&antwort.cookies, "webauthn_disc"),
+    )
+}
+
+#[tokio::test]
+async fn discoverable_passkey_anmeldung_hinterlaesst_genau_einen_login_ok() {
+    webauthn_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+    let (passkey, handle, challenge, cookie) =
+        discoverable_zeremonie(&app, &pool, b"disc-erfolg").await;
+    let id = benutzer_id(&pool, "admin").await;
+    spur_leeren(&pool).await;
+
+    let body = passkey.assertion(&challenge, &passkey.schluessel, Some(&handle));
     let antwort = sende(
         &app,
         "POST",
         "/api/auth/webauthn/discoverable/finish",
-        None,
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
+    assert_eq!(antwort.status, StatusCode::OK, "{:?}", antwort.json);
+
+    assert_eq!(spur(&pool).await, vec![erfolg("webauthn", "admin", id)]);
+}
+
+#[tokio::test]
+async fn discoverable_passkey_mit_falscher_signatur_hinterlaesst_genau_einen_fehlschlag() {
+    webauthn_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+    let (passkey, handle, challenge, cookie) =
+        discoverable_zeremonie(&app, &pool, b"disc-falsch").await;
+    spur_leeren(&pool).await;
+
+    let fremd = TestPasskey::neu(b"fremd");
+    let body = passkey.assertion(&challenge, &fremd.schluessel, Some(&handle));
+    let antwort = sende(
+        &app,
+        "POST",
+        "/api/auth/webauthn/discoverable/finish",
+        Some(&cookie),
         Some(body),
     )
     .await;
@@ -470,8 +643,11 @@ async fn gescheiterter_discoverable_passkey_hinterlaesst_genau_einen_fehlschlag(
 
 const CLIENT_ID: &str = "lifeline-test";
 const NONCE: &str = "nonce-fest";
-/// Der einzige Code, den der Mini-IdP gegen ein Token tauscht.
+/// Der Code, den der Mini-IdP gegen ein gültiges Token tauscht.
 const GUTER_CODE: &str = "guter-code";
+/// Dieser Code liefert ein korrekt signiertes Token mit FREMDER `nonce`, das der Server abweisen
+/// muss. Jeden anderen Code weist schon der IdP ab.
+const FREMDE_NONCE_CODE: &str = "fremde-nonce";
 
 /// Basis-URL des Mini-IdP. Er läuft in einem eigenen Thread mit eigener Runtime, weil jeder
 /// `#[tokio::test]` seine Runtime am Ende abbaut, der Discovery-Cache des Servers aber
@@ -554,7 +730,8 @@ struct MiniIdp {
     schluessel: openidconnect::core::CoreRsaPrivateSigningKey,
 }
 
-/// Token-Endpoint: tauscht nur [`GUTER_CODE`], jeden anderen Code weist er ab.
+/// Token-Endpoint: tauscht [`GUTER_CODE`] und [`FREMDE_NONCE_CODE`], jeden anderen Code weist
+/// er ab.
 async fn token(
     axum::extract::State(idp): axum::extract::State<std::sync::Arc<MiniIdp>>,
     body: String,
@@ -564,15 +741,19 @@ async fn token(
         Audience, EmptyAdditionalClaims, EndUserUsername, Nonce, StandardClaims, SubjectIdentifier,
     };
 
-    if !body
+    let nonce = if body.split('&').any(|t| t == format!("code={GUTER_CODE}")) {
+        NONCE
+    } else if body
         .split('&')
-        .any(|teil| teil == format!("code={GUTER_CODE}"))
+        .any(|t| t == format!("code={FREMDE_NONCE_CODE}"))
     {
+        "andere-nonce"
+    } else {
         return (
             StatusCode::BAD_REQUEST,
             axum::Json(serde_json::json!({"error": "invalid_grant"})),
         );
-    }
+    };
     let jetzt = chrono::Utc::now();
     let claims = CoreIdTokenClaims::new(
         idp.issuer.clone(),
@@ -583,7 +764,7 @@ async fn token(
             .set_preferred_username(Some(EndUserUsername::new("sso.nutzer".to_string()))),
         EmptyAdditionalClaims {},
     )
-    .set_nonce(Some(Nonce::new(NONCE.to_string())));
+    .set_nonce(Some(Nonce::new(nonce.to_string())));
     let id_token = CoreIdToken::new(
         claims,
         &idp.schluessel,
@@ -647,32 +828,83 @@ async fn oidc_anmeldung_hinterlaesst_genau_einen_login_ok() {
 }
 
 #[tokio::test]
-async fn gescheiterter_oidc_token_tausch_hinterlaesst_genau_einen_fehlschlag() {
+async fn ungueltiges_id_token_hinterlaesst_genau_einen_fehlschlag() {
     oidc_aktivieren();
     let (app, pool) = setup_mit_pool().await;
 
-    let antwort = oidc_callback(&app, "state-fehlschlag", "falscher-code").await;
+    let antwort = oidc_callback(&app, "state-fremde-nonce", FREMDE_NONCE_CODE).await;
     assert_eq!(antwort.location.as_deref(), Some("/login?fehler=oidc"));
 
     assert_eq!(spur(&pool).await, vec![fehlschlag("oidc", None)]);
 }
 
 #[tokio::test]
+async fn gestoerter_oidc_token_tausch_hinterlaesst_keinen_eintrag() {
+    oidc_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+
+    // Der IdP weist den Code ab: eine Störung am IdP, kein Fehlschlag des Anmeldenden.
+    let antwort = oidc_callback(&app, "state-stoerung", "falscher-code").await;
+    assert_eq!(antwort.location.as_deref(), Some("/login?fehler=oidc"));
+
+    assert_eq!(spur(&pool).await, vec![]);
+}
+
+#[tokio::test]
 async fn oidc_abbruch_beim_idp_hinterlaesst_genau_einen_fehlschlag() {
     oidc_aktivieren();
     let (app, pool) = setup_mit_pool().await;
+    lifeline_hub::auth::oidc::state::speichere(
+        "state-abbruch".to_string(),
+        lifeline_hub::auth::oidc::state::StateEintrag {
+            nonce: NONCE.to_string(),
+            pkce_verifier: "v".repeat(43),
+            ziel_pfad: "/einsaetze".to_string(),
+        },
+    );
 
     let antwort = sende(
         &app,
         "GET",
-        "/api/auth/oidc/callback?error=access_denied&state=irgendwas",
-        None,
+        "/api/auth/oidc/callback?error=access_denied&state=state-abbruch",
+        Some("oidc_state=state-abbruch"),
         None,
     )
     .await;
     assert_eq!(antwort.location.as_deref(), Some("/login?fehler=oidc"));
 
     assert_eq!(spur(&pool).await, vec![fehlschlag("oidc", None)]);
+}
+
+#[tokio::test]
+async fn oidc_callback_ohne_laufende_anmeldung_hinterlaesst_keinen_eintrag() {
+    oidc_aktivieren();
+    let (app, pool) = setup_mit_pool().await;
+
+    // Auslösbar von jeder fremden Seite: Fehler-Callback, unbekannter State, falsches Cookie.
+    for (uri, cookie) in [
+        (
+            "/api/auth/oidc/callback?error=access_denied&state=nie",
+            None,
+        ),
+        (
+            "/api/auth/oidc/callback?code=x&state=unbekannt",
+            Some("oidc_state=unbekannt"),
+        ),
+        (
+            "/api/auth/oidc/callback?code=x&state=a",
+            Some("oidc_state=b"),
+        ),
+    ] {
+        let antwort = sende(&app, "GET", uri, cookie, None).await;
+        assert_eq!(
+            antwort.location.as_deref(),
+            Some("/login?fehler=oidc"),
+            "{uri}"
+        );
+    }
+
+    assert_eq!(spur(&pool).await, vec![]);
 }
 
 #[tokio::test]

@@ -61,20 +61,34 @@ fn mfa_pending_cookie(key: String, secure: bool) -> Cookie<'static> {
 /// deaktiviertes Konto nach geprüfter Signatur), nie aus einer bloßen Behauptung des Aufrufers.
 struct Abgewiesen {
     fehler: AppError,
+    /// `false`, wenn die Abweisung kein Anmeldeversuch war und deshalb keinen Eintrag schreibt:
+    /// es lief keine Zeremonie (Cookie fehlt, State unbekannt oder verbraucht), oder der IdP war
+    /// gestört. Sonst schriebe jede Anfrage ohne jeden Vorlauf eine Zeile, die 90 Tage bleibt.
+    spur: bool,
     benutzer: Option<Benutzer>,
 }
 
 impl Abgewiesen {
-    /// 401 ohne festgestellte Identität.
+    /// 401 eines Anmeldeversuchs ohne festgestellte Identität.
     fn anonym() -> Self {
         AppError::Unauthorized.into()
     }
 
-    /// 401 für einen Benutzer, den der Server schon kennt.
+    /// 401 eines Anmeldeversuchs für einen Benutzer, den der Server schon kennt.
     fn fuer(benutzer: Benutzer) -> Self {
         Self {
             fehler: AppError::Unauthorized,
+            spur: true,
             benutzer: Some(benutzer),
+        }
+    }
+
+    /// 401 ohne Audit-Eintrag (s. [`Abgewiesen::spur`]).
+    fn ohne_spur() -> Self {
+        Self {
+            fehler: AppError::Unauthorized,
+            spur: false,
+            benutzer: None,
         }
     }
 }
@@ -83,6 +97,7 @@ impl From<AppError> for Abgewiesen {
     fn from(fehler: AppError) -> Self {
         Self {
             fehler,
+            spur: true,
             benutzer: None,
         }
     }
@@ -95,8 +110,10 @@ impl From<sqlx::Error> for Abgewiesen {
 }
 
 /// Schreibt genau einen Audit-Eintrag für den Abschluss einer Anmeldung (LFH-792): `login_ok`
-/// bei Erfolg, `login_fehlgeschlagen` bei jedem 401. Jeder andere Fehler (Provider aus,
-/// Datenbank) ist kein gescheiterter Anmeldeversuch und bleibt ohne Eintrag.
+/// bei Erfolg, `login_fehlgeschlagen` bei jedem 401 eines Anmeldeversuchs. Eine Abweisung ohne
+/// laufende Zeremonie oder wegen eines gestörten IdP ([`Abgewiesen::ohne_spur`]) und jeder
+/// andere Fehler (Provider aus, Datenbank) sind keine gescheiterten Anmeldeversuche und bleiben
+/// ohne Eintrag.
 ///
 /// Die Handler prüfen in einer inneren Funktion und rufen dies mit deren Ergebnis auf; so
 /// hinterlässt jeder Rückweg der Prüfung eine Spur, auch einer, der später hinzukommt.
@@ -120,6 +137,7 @@ async fn audit_anmeldung(
         }
         Err(Abgewiesen {
             fehler: AppError::Unauthorized,
+            spur: true,
             benutzer,
         }) => {
             tracing::warn!(
@@ -635,8 +653,9 @@ fn oidc_fehler_redirect() -> Redirect {
 ///    abgewiesen.
 /// 9. Session, Cookie, Redirect auf den bereits geprüften `ziel_pfad`.
 ///
-/// Der Erfolg und jede Abweisung hinterlassen genau einen Eintrag im Auth-Audit
-/// ([`audit_anmeldung`], LFH-792); ein abgeschalteter Provider und Serverfehler keinen.
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, ein
+/// abgeschalteter Provider und Serverfehler keinen.
 ///
 /// Jeder Fehler ab Schritt 2 endet im selben generischen Redirect; nur Datenbankfehler
 /// propagieren als `AppError` (generisches 500, ohne IdP-Details).
@@ -691,16 +710,25 @@ async fn oidc_anmelden(
     // IdP-Error-Callback oder Query ohne `code`/`state`. Ein gespeicherter State-Eintrag wird
     // konsumiert, damit er nicht bis zum TTL-Ablauf in der Map hängt.
     let (Some(code), Some(state_key), None) = (query.code, query.state.clone(), query.error) else {
-        if let Some(s) = &query.state {
-            let _ = crate::auth::oidc::state::entnehme(s);
-        }
-        return Err(Abgewiesen::anonym());
+        // Antwortet der IdP auf eine laufende Anmeldung (Abbruch, verweigerte Zustimmung), ist das
+        // ein gescheiterter Versuch. Ohne gespeicherten State lief keiner: ein solcher Aufruf
+        // lässt sich von jeder fremden Seite aus dem Browser eines Besuchers auslösen.
+        let lief = query
+            .state
+            .as_deref()
+            .and_then(crate::auth::oidc::state::entnehme)
+            .is_some();
+        return Err(if lief {
+            Abgewiesen::anonym()
+        } else {
+            Abgewiesen::ohne_spur()
+        });
     };
 
     if !oidc_state_binding_ok(cookie_state, &state_key) {
         // Kein `state::entnehme`: ein Binding-Fehlschlag darf den State-Store-Eintrag nicht
-        // verbrennen.
-        return Err(Abgewiesen::anonym());
+        // verbrennen. Ohne passendes Cookie lief in diesem Browser keine Anmeldung.
+        return Err(Abgewiesen::ohne_spur());
     }
 
     // Synchron und VOR Token-Tausch/Discovery: ein unbekannter oder abgelaufener `state` muss vor
@@ -709,25 +737,29 @@ async fn oidc_anmelden(
     // Die `let … else`-Arme bis zum Aktiv-Check verwerfen den Fehlerinhalt bewusst. Ein `?`
     // reichte Token-/IdP-Details über `AppError::ServiceUnavailable` in die Antwort durch.
     let Some(eintrag) = crate::auth::oidc::state::entnehme(&state_key) else {
-        return Err(Abgewiesen::anonym());
+        return Err(Abgewiesen::ohne_spur());
     };
 
+    // Discovery, Token-Tausch und eine Antwort ohne `id_token` scheitern am IdP oder an der
+    // Konfiguration, nicht am Anmeldenden: kein Eintrag, sonst erschiene ein IdP-Ausfall als
+    // Welle gescheiterter Anmeldungen. Das `warn!` steht in `auth::oidc`.
     let Ok(client) = crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await
     else {
-        return Err(Abgewiesen::anonym());
+        return Err(Abgewiesen::ohne_spur());
     };
 
     let Ok(token_response) =
         crate::auth::oidc::tausche_code_gegen_token(&client, code, eintrag.pkce_verifier).await
     else {
-        return Err(Abgewiesen::anonym());
+        return Err(Abgewiesen::ohne_spur());
     };
 
     let Some(id_token) = token_response.id_token() else {
-        return Err(Abgewiesen::anonym());
+        return Err(Abgewiesen::ohne_spur());
     };
 
-    // Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — s. Punkt 6.
+    // Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — s. Punkt 6. Ein ungültiges Token ist ein
+    // gescheiterter Versuch und schreibt einen Eintrag.
     let Ok(claims) = id_token.claims(&client.id_token_verifier(), &Nonce::new(eintrag.nonce))
     else {
         return Err(Abgewiesen::anonym());
@@ -963,8 +995,9 @@ pub async fn webauthn_auth_start(
 /// 5. Ein inzwischen deaktiviertes Konto bekommt trotz gültiger Signatur keine Session.
 /// 6. Session anlegen, Cookie setzen, `webauthn_auth`-Cookie entfernen, 200.
 ///
-/// Der Erfolg und jede Abweisung hinterlassen genau einen Eintrag im Auth-Audit
-/// ([`audit_anmeldung`], LFH-792); ein abgeschalteter Provider und Serverfehler keinen.
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, ein
+/// abgeschalteter Provider und Serverfehler keinen.
 ///
 /// # Counter-Prüfung in webauthn-rs 0.5
 ///
@@ -1016,14 +1049,15 @@ async fn webauthn_auth_pruefen(
     key: Option<String>,
     body: &PublicKeyCredential,
 ) -> Result<(Benutzer, String), Abgewiesen> {
-    let key = key.ok_or_else(Abgewiesen::anonym)?;
+    // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
+    let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
 
     // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 2).
     let auth_state = match crate::auth::webauthn::state::entnehme(&key) {
         Some(crate::auth::webauthn::state::CeremonyZustand::Authentifizierung(auth_state)) => {
             auth_state
         }
-        _ => return Err(Abgewiesen::anonym()),
+        _ => return Err(Abgewiesen::ohne_spur()),
     };
 
     // Counter-/Klon-Check in der Bibliothek, s. Doc oben.
@@ -1140,8 +1174,9 @@ pub async fn webauthn_discoverable_start(
 ///    per Handle aufgelöste sein.
 /// 6. Aktiv-Check, Session, Cookies, 200.
 ///
-/// Der Erfolg und jede Abweisung hinterlassen genau einen Eintrag im Auth-Audit
-/// ([`audit_anmeldung`], LFH-792); ein abgeschalteter Provider und Serverfehler keinen.
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, ein
+/// abgeschalteter Provider und Serverfehler keinen.
 pub async fn webauthn_discoverable_finish(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -1182,12 +1217,13 @@ async fn webauthn_discoverable_pruefen(
     key: Option<String>,
     body: &PublicKeyCredential,
 ) -> Result<(Benutzer, String), Abgewiesen> {
-    let key = key.ok_or_else(Abgewiesen::anonym)?;
+    // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
+    let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
 
     // Synchron, Guard vor jedem folgenden `.await` freigegeben.
     let disc_state = match crate::auth::webauthn::state::entnehme(&key) {
         Some(crate::auth::webauthn::state::CeremonyZustand::AuthentifizierungDiscoverable(s)) => s,
-        _ => return Err(Abgewiesen::anonym()),
+        _ => return Err(Abgewiesen::ohne_spur()),
     };
 
     let Ok((handle, _cred_id)) = webauthn.identify_discoverable_authentication(body) else {
@@ -1378,8 +1414,9 @@ pub struct TotpFinishRequest {
 ///    `false` → 401, ohne zu verraten, welcher Weg scheiterte.
 /// 4. Erst dann Session und Cookie, `mfa_pending` entfernen, 200 mit `BenutzerAnzeige`.
 ///
-/// Der Erfolg und jede Abweisung hinterlassen genau einen Eintrag im Auth-Audit
-/// ([`audit_anmeldung`], LFH-792); ein abgeschalteter Provider und Serverfehler keinen.
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, ein
+/// abgeschalteter Provider und Serverfehler keinen.
 pub async fn totp_finish(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -1415,10 +1452,11 @@ async fn totp_pruefen(
     key: Option<String>,
     code: &str,
 ) -> Result<(Benutzer, String), Abgewiesen> {
-    let key = key.ok_or_else(Abgewiesen::anonym)?;
+    // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
+    let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
 
     // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 1).
-    let benutzer_id = crate::auth::totp::state::entnehme(&key).ok_or_else(Abgewiesen::anonym)?;
+    let benutzer_id = crate::auth::totp::state::entnehme(&key).ok_or_else(Abgewiesen::ohne_spur)?;
 
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
