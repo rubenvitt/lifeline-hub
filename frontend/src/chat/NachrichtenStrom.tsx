@@ -170,6 +170,9 @@ export default function NachrichtenStrom({
       style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
     >
       <Liste<ChatNachricht>
+        // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): ein Strom ist
+        // keine Gliederung, 200 Nachrichten wären 200 Sprungmarken. Autor und Zeit sind Meta, die
+        // Navigation je Nachricht trägt der Listenpunkt.
         dataSource={nachrichten}
         emptyText="Noch keine Nachrichten"
         renderItem={(n) => {

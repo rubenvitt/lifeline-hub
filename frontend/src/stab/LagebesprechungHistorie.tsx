@@ -81,7 +81,10 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
   return (
     <>
       {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void query.refetch()} />}
+      {/* Einbauort ist das Paneel „Lagebesprechung“ (h2) der Stab-Seite: jede Lagebesprechung
+          ein Gegenstand mit Entschluss und Termin darunter, ihr Titel h3 (LFH-826). */}
       <Liste
+        unterEbene={2}
         dataSource={query.data?.slice(0, SICHTBAR)}
         rowKey={(l) => l.id}
         loading={query.isLoading}
@@ -95,7 +98,14 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
             {
               key: 'frueher',
               label: `Frühere Lagebesprechungen (${frueher.length})`,
-              children: <Liste dataSource={frueher} rowKey={(l) => l.id} renderItem={eintrag} />,
+              children: (
+                <Liste
+                  unterEbene={2}
+                  dataSource={frueher}
+                  rowKey={(l) => l.id}
+                  renderItem={eintrag}
+                />
+              ),
             },
           ]}
         />

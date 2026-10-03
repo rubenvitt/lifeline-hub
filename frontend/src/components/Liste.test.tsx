@@ -237,6 +237,95 @@ describe('Liste — Kopf ist eine Überschrift und benennt die Liste', () => {
 });
 
 /**
+ * Eintragstitel (LFH-826, Spec `ueberschriften-gliederung`): die Ebene kommt vom Einbauort der
+ * Liste — unter dem Kopf eine darunter, ohne Kopf aus `unterEbene`, ohne beides keine
+ * Überschrift. Eine fest verdrahtete Ebene fiele in mindestens einem der Fälle durch.
+ */
+describe('Liste — Eintragstitel folgt dem Einbauort', () => {
+  const metaEintrag = () => (
+    <ListenEintrag>
+      <ListenEintragMeta title="S4 · Versorgung" description="Beschreibung" />
+    </ListenEintrag>
+  );
+
+  it('unter einem Kopf h3 ist der Eintragstitel h4', () => {
+    renderMitProviders(
+      <Liste
+        kopf={{ inhalt: 'Kopf', unterEbene: 2 }}
+        dataSource={['x']}
+        renderItem={metaEintrag}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 3, name: 'Kopf' })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 4, name: 'S4 · Versorgung' })).toBeVisible();
+  });
+
+  it('unter einem Kopf h6 bleibt der Eintragstitel bei h6, nie über dem Kopf', () => {
+    renderMitProviders(
+      <Liste
+        kopf={{ inhalt: 'Kopf', unterEbene: 5 }}
+        dataSource={['x']}
+        renderItem={metaEintrag}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 6, name: 'S4 · Versorgung' })).toBeVisible();
+  });
+
+  it('ohne Kopf folgt er `unterEbene` (eine Ebene darunter)', () => {
+    renderMitProviders(<Liste unterEbene={2} dataSource={['x']} renderItem={metaEintrag} />);
+    expect(screen.getByRole('heading', { level: 3, name: 'S4 · Versorgung' })).toBeVisible();
+  });
+
+  it('ohne Kopf und ohne `unterEbene` ist er keine Überschrift, bleibt aber sichtbar', () => {
+    renderMitProviders(<Liste dataSource={['x']} renderItem={metaEintrag} />);
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.getByText('S4 · Versorgung')).toBeVisible();
+  });
+
+  it('ein Kopf ohne Inhalt zählt nicht: keine Überschrift', () => {
+    renderMitProviders(
+      <Liste kopf={{ inhalt: null, unterEbene: 2 }} dataSource={['x']} renderItem={metaEintrag} />,
+    );
+    expect(screen.queryByRole('heading')).toBeNull();
+  });
+
+  it('außerhalb einer Liste ist er keine Überschrift', () => {
+    renderMitProviders(<ListenEintragMeta title="Lose" />);
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.getByText('Lose')).toBeVisible();
+  });
+
+  /**
+   * Gewicht, Größe und Abstand stehen inline und gleich — sonst sähe der Titel ohne Überschrift
+   * dünner aus als der mit (das Gewicht kam früher aus der h4-Kaskade).
+   */
+  it('sieht als Überschrift und als Text gleich aus', () => {
+    const { unmount } = render(
+      <Liste unterEbene={2} dataSource={['x']} renderItem={metaEintrag} />,
+    );
+    const alsUeberschrift = screen.getByText('S4 · Versorgung').getAttribute('style');
+    unmount();
+    render(<Liste dataSource={['x']} renderItem={metaEintrag} />);
+    const alsText = screen.getByText('S4 · Versorgung');
+    expect(alsText.getAttribute('style')).toBe(alsUeberschrift);
+    expect(alsText.style.fontWeight).toBe('600');
+  });
+
+  it('Kopf und `unterEbene` schließen sich per Typ aus', () => {
+    renderMitProviders(
+      <Liste
+        // @ts-expect-error — zwei Quellen für dieselbe Ebene sind verboten (design.md D1).
+        kopf={{ inhalt: 'Kopf', unterEbene: 2 }}
+        unterEbene={2}
+        dataSource={['x']}
+        renderItem={metaEintrag}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 4, name: 'S4 · Versorgung' })).toBeVisible();
+  });
+});
+
+/**
  * Innenabstände (LFH-328/T14): zieht `Liste` bei einer Dichteumschaltung nicht mit, bleibt die
  * Dichte-Staffel in ihren Masken folgenlos.
  *
