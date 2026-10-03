@@ -1,0 +1,189 @@
+# Messprotokoll LFH-845, 03.10.2026, Cloud-Container (Linux x86_64, 4 Kerne, cargo 1.97.0)
+# Rohausgaben von messen.sh (Workspace ohne Hülle) und probe.sh (lib + tests/einsatz.rs + Wegwerf-Panik-Test).
+# Die Spaltenanalyse per awk scheiterte an mawk (kein strtonum); die Sektionsaufteilung steht in design.md.
+# A, B und C brachen mit voller Platte ab (Zuteilung ~29 GB frei). Für A belegt: df meldete 0 MB frei, deps allein 23,6 GB.
+# B und C zeigen dieselbe Signatur (Abbruch beim Linken eines Testbinarys); die Fehlerzeile kürzte `tail`.
+
+### A-basis
+== A-basis: 
+   Compiling webauthn-rs v0.5.5
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5m 39s
+
+error: could not compile `lifeline-hub` (test "lage_taktik") due to 1 previous error
+
+### B-ltonly
+== B-ltonly: --config profile.dev.debug="line-tables-only"
+   Compiling webauthn-rs v0.5.5
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4m 55s
+
+error: could not compile `lifeline-hub` (test "demo_daten") due to 1 previous error
+
+### C-deps-aus
+== C-deps-aus: --config profile.dev.package."*".debug=false
+   Compiling webauthn-rs v0.5.5
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4m 59s
+
+error: could not compile `lifeline-hub` (test "uhs_anhang") due to 1 previous error
+
+### D-ltonly-deps-aus
+== D-ltonly-deps-aus: --config profile.dev.debug="line-tables-only" --config profile.dev.package."*".debug=false
+   Compiling webauthn-rs v0.5.5
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4m 35s
+  Executable tests/wetter.rs (target/debug/deps/wetter-87724d81fd9a82fd)
+  Executable tests/zulassung_guard.rs (target/debug/deps/zulassung_guard-aaf99a8db8080a29)
+build_s=276 test_no_run_s=215 total_s=491
+21630	target
+testbinaries:
+anzahl=129 mb=15724
+lifeline-hub binary: 153 MB
+
+### probe-A
+== A: 
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5m 18s
+  Executable tests/einsatz.rs (target/debug/deps/einsatz-83fd9c3821fa1927)
+  Executable tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-8858e36a770f615f)
+zeit_s=319
+5029	target
+einsatz: 501 MB
+zz_backtrace_probe: 19 MB
+--- backtrace
+     Running tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-8858e36a770f615f)
+thread 'backtrace_nennt_datei_und_zeile' (17323) panicked at tests/zz_backtrace_probe.rs:4:6:
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:271:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:272:10
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:19:15
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/alloc/src/vec/mod.rs:3864:9
+   6: zz_backtrace_probe::tief_im_eigenen_code
+             at ./tests/zz_backtrace_probe.rs:4:6
+   7: zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}
+             at ./tests/zz_backtrace_probe.rs:9:34
+   8: <tokio::runtime::task::core::Core<zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}, alloc::sync::Arc<tokio::runtime::scheduler::current_thread::Handle>>>::poll::{closure#0}
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/core.rs:380:24
+
+### probe-B
+== B: --config profile.dev.debug="line-tables-only"
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 42s
+  Executable tests/einsatz.rs (target/debug/deps/einsatz-daa5568a3597f7af)
+  Executable tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-9c576ea7a8a5d42f)
+zeit_s=283
+3211	target
+einsatz: 208 MB
+zz_backtrace_probe: 11 MB
+--- backtrace
+     Running tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-9c576ea7a8a5d42f)
+thread 'backtrace_nennt_datei_und_zeile' (3276) panicked at tests/zz_backtrace_probe.rs:4:6:
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:271:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:272:10
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:19:15
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/alloc/src/vec/mod.rs:3864:9
+   6: zz_backtrace_probe::tief_im_eigenen_code
+             at ./tests/zz_backtrace_probe.rs:4:6
+   7: zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}
+             at ./tests/zz_backtrace_probe.rs:9:34
+   8: <tokio::runtime::task::core::Core<zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}, alloc::sync::Arc<tokio::runtime::scheduler::current_thread::Handle>>>::poll::{closure#0}
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/core.rs:380:24
+
+### probe-C
+== C: --config profile.dev.package."*".debug=false
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 46s
+  Executable tests/einsatz.rs (target/debug/deps/einsatz-ba42e3fdc1f71b6b)
+  Executable tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-cebec467d5c07fdf)
+zeit_s=287
+3694	target
+einsatz: 302 MB
+zz_backtrace_probe: 10 MB
+--- backtrace
+     Running tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-cebec467d5c07fdf)
+thread 'backtrace_nennt_datei_und_zeile' (21687) panicked at tests/zz_backtrace_probe.rs:4:6:
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:271:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:272:10
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:19:15
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/alloc/src/vec/mod.rs:3864:9
+   6: zz_backtrace_probe::tief_im_eigenen_code
+             at ./tests/zz_backtrace_probe.rs:4:6
+   7: zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}
+             at ./tests/zz_backtrace_probe.rs:9:34
+   8: <tokio::runtime::task::core::Core<zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}, alloc::sync::Arc<tokio::runtime::scheduler::current_thread::Handle>>>::poll::{closure#0}
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/core.rs:380:24
+
+### probe-D
+== D: --config profile.dev.debug="line-tables-only" --config profile.dev.package."*".debug=false
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 34s
+  Executable tests/einsatz.rs (target/debug/deps/einsatz-5c100573c46496d3)
+  Executable tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-1b450b9984fedd19)
+zeit_s=274
+2514	target
+einsatz: 142 MB
+zz_backtrace_probe: 9 MB
+--- backtrace
+     Running tests/zz_backtrace_probe.rs (target/debug/deps/zz_backtrace_probe-1b450b9984fedd19)
+thread 'backtrace_nennt_datei_und_zeile' (7606) panicked at tests/zz_backtrace_probe.rs:4:6:
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:271:5
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:272:10
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/slice/index.rs:19:15
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/alloc/src/vec/mod.rs:3864:9
+   6: zz_backtrace_probe::tief_im_eigenen_code
+             at ./tests/zz_backtrace_probe.rs:4:6
+   7: zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}
+             at ./tests/zz_backtrace_probe.rs:9:34
+   8: <tokio::runtime::task::core::Core<zz_backtrace_probe::backtrace_nennt_datei_und_zeile::{closure#0}::{closure#0}, alloc::sync::Arc<tokio::runtime::scheduler::current_thread::Handle>>>::poll::{closure#0}
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/core.rs:380:24
+
+### Skripte
+
+#!/usr/bin/env bash
+# Misst kalten Bau + test --no-run je Variante. Aufruf: messen.sh <name> [--config ...]...
+set -euo pipefail
+cd /home/user/lifeline-hub
+name="$1"; shift
+out=/tmp/claude-0/-home-user-lifeline-hub/9a7a608b-cabf-5180-9f55-ec40caa56f29/scratchpad/mess/$name.txt
+rm -rf target
+{
+echo "== $name: $*"
+s=$(date +%s)
+cargo build --workspace --exclude lifeline-desktop "$@" 2>&1 | tail -2
+m=$(date +%s)
+cargo test --workspace --exclude lifeline-desktop --no-run "$@" 2>&1 | tail -2
+e=$(date +%s)
+echo "build_s=$((m-s)) test_no_run_s=$((e-m)) total_s=$((e-s))"
+du -sm target target/debug/* | sort -k2
+echo "testbinaries:"
+n=0; sz=0
+while read -r f; do n=$((n+1)); sz=$((sz+$(stat -c %s "$f"))); done < <(find target/debug/deps -maxdepth 1 -type f -executable ! -name '*.so' ! -name '*.d')
+echo "anzahl=$n mb=$((sz/1024/1024))"
+echo "lifeline-hub binary: $(stat -c %s target/debug/lifeline-hub | awk '{print int($1/1024/1024)}') MB"
+} > "$out" 2>&1
+cat "$out"
+
+#!/usr/bin/env bash
+# Ein Testbinary je Variante: Größe, Anteil .debug_*, Bauzeit, Backtrace.
+set -uo pipefail
+cd /home/user/lifeline-hub
+name="$1"; shift
+out=/tmp/claude-0/-home-user-lifeline-hub/9a7a608b-cabf-5180-9f55-ec40caa56f29/scratchpad/mess/probe-$name.txt
+cargo clean -q
+{
+echo "== $name: $*"
+s=$(date +%s)
+cargo test -p lifeline-hub --test einsatz --test zz_backtrace_probe --no-run "$@" 2>&1 | tail -3
+e=$(date +%s)
+echo "zeit_s=$((e-s))"
+du -sm target target/debug/deps target/debug/incremental target/debug/build
+for t in einsatz zz_backtrace_probe; do
+  b=$(ls -S target/debug/deps/$t-* | grep -v '\.d$' | head -1)
+  echo "$t: $(stat -c %s "$b" | awk '{printf "%.0f MB", $1/1048576}')"
+  readelf -SW "$b" | awk '$2 ~ /^\.debug/ {d+=strtonum("0x"$6)} $2 ~ /^\.(text|rodata|symtab|strtab|eh_frame|data\.rel\.ro)$/ {o[$2]+=strtonum("0x"$6)} END {printf "  debug=%.0f MB", d/1048576; for (k in o) printf " %s=%.0f MB", k, o[k]/1048576; print ""}'
+done
+echo "--- backtrace"
+RUST_BACKTRACE=1 cargo test -p lifeline-hub --test zz_backtrace_probe "$@" 2>&1 | grep -E "panicked|zz_backtrace_probe|tokio|at \./|at /" | head -14
+} > "$out" 2>&1
+cat "$out"
+
