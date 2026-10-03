@@ -187,3 +187,21 @@ RUST_BACKTRACE=1 cargo test -p lifeline-hub --test zz_backtrace_probe "$@" 2>&1 
 } > "$out" 2>&1
 cat "$out"
 
+
+### E-cargo-toml (Einstellung aus Cargo.toml, ohne --config; pnpm install lief parallel, Zeit daher verrauscht)
+== E-cargo-toml: 
+   Compiling webauthn-rs v0.5.5
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5m 23s
+  Executable tests/wetter.rs (target/debug/deps/wetter-87724d81fd9a82fd)
+  Executable tests/zulassung_guard.rs (target/debug/deps/zulassung_guard-aaf99a8db8080a29)
+build_s=323 test_no_run_s=237 total_s=560
+21630	target
+testbinaries:
+anzahl=129 mb=15724
+lifeline-hub binary: 153 MB
+einsatz-Testbinary: 148642336 Byte (141,8 MiB)
+Backtrace (RUST_BACKTRACE=1, Panik in tokio::spawn):
+thread 'backtrace_nennt_datei_und_zeile' (13548) panicked at tests/zz_backtrace_probe.rs:4:6:
+             at ./tests/zz_backtrace_probe.rs:4:6
+             at ./tests/zz_backtrace_probe.rs:9:34
+             at /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/task/core.rs:380:24

@@ -41,12 +41,10 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # Die Debuginfo-Stufe (Zeilentabellen, keine für Abhängigkeiten) steht in Cargo.toml,
+  # [profile.dev] (LFH-845), und gilt lokal wie hier.
   # 2 vCPU: die lokale Vorgabe von 3 Playwright-Workern überzeichnete den Runner.
   PW_WORKERS: 2
-  # Volle Debug-Symbole kosten bei diesem Abhängigkeitsbaum mehrere GB Platte;
-  # `line-tables-only` behält Datei und Zeile im Backtrace und ändert keine Testsemantik.
-  # coverage.yml setzt dasselbe.
-  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   # Der Runner läuft in UTC. check-all.sh setzt die Zone selbst; hier steht sie für alles
   # außerhalb des Skripts.
   TZ: Europe/Berlin
