@@ -26,9 +26,8 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # llvm-cov braucht Zeileninfo, mehr nicht; volle Debug-Symbole kosten mehrere GB Platte
-  # (Begründung ausführlich in ci.yml).
-  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  # Die Debuginfo-Stufe (Zeilentabellen, keine für Abhängigkeiten) steht in Cargo.toml,
+  # [profile.dev] (LFH-845), und gilt lokal wie hier.
   # Der Runner läuft in UTC; dieser Workflow fährt check-all.sh nicht, das die Zone sonst setzt.
   TZ: Europe/Berlin
 
