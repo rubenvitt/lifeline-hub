@@ -1163,24 +1163,37 @@ fn jetzt_unix() -> u64 {
         .unwrap_or(0)
 }
 
-/// POST /api/auth/totp/enroll/start — beginnt oder erneuert ein TOTP-Enrollment. Das neue
-/// Secret wird sofort gespeichert, aber erst `enroll/finish` aktiviert MFA.
+/// Meldung, wenn ein Enrollment auf ein schon aktives TOTP trifft (422, Zustand).
+const TOTP_BEREITS_AKTIV: &str =
+    "Zwei-Faktor-Anmeldung ist bereits aktiv; neu einrichten geht nur nach einem Admin-Reset";
+
+/// POST /api/auth/totp/enroll/start — beginnt ein TOTP-Enrollment oder beginnt ein noch nicht
+/// abgeschlossenes neu. Das neue Secret wird sofort gespeichert, aber erst `enroll/finish`
+/// aktiviert MFA.
 ///
-/// Ein erneuter `start` überschreibt das Secret und setzt `totp_aktiviert` auf 0 — auch bei
-/// bereits aktivem TOTP. Bis zur Bestätigung ist der Nutzer dann ohne Zweitfaktor; das
-/// vermeidet ein zusätzliches „Pending-Secret“-Feld und ist unkritisch, weil der Nutzer selbst
-/// aus seinem Profil handelt.
+/// Bei aktivem TOTP → 422, nichts wird geschrieben (LFH-794): sonst schaltete jeder mit einer
+/// fremden Session (unbeaufsichtigter Fükw, entwendetes Tablet) den Zweitfaktor still ab oder
+/// tauschte ihn gegen seinen eigenen. Neu einrichten geht nur nach dem Admin-Reset
+/// (`routes::benutzer`), wie es die Profilseite sagt. Bedingung und Schreiben stehen in EINEM
+/// `UPDATE`, damit kein paralleler Abschluss dazwischenfällt.
 pub async fn totp_enroll_start(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
 ) -> Result<Json<TotpEnrollStart>, AppError> {
     let secret = crate::auth::totp::neues_secret();
 
-    sqlx::query("UPDATE benutzer SET totp_secret = ?, totp_aktiviert = 0 WHERE id = ?")
-        .bind(&secret)
-        .bind(benutzer.id)
-        .execute(&state.pool)
-        .await?;
+    let geschrieben =
+        sqlx::query("UPDATE benutzer SET totp_secret = ? WHERE id = ? AND totp_aktiviert = 0")
+            .bind(&secret)
+            .bind(benutzer.id)
+            .execute(&state.pool)
+            .await?
+            .rows_affected();
+    if geschrieben != 1 {
+        return Err(AppError::UnprocessableEntity(
+            TOTP_BEREITS_AKTIV.to_string(),
+        ));
+    }
 
     let otpauth_url = crate::auth::totp::otpauth_url(&secret, &benutzer.benutzername)?;
     Ok(Json(TotpEnrollStart {
@@ -1192,33 +1205,46 @@ pub async fn totp_enroll_start(
 /// POST /api/auth/totp/enroll/finish — schließt ein Enrollment ab. `totp_secret` wird frisch
 /// gelesen, weil `CurrentUser` die `totp_*`-Spalten nicht trägt.
 ///
-/// Ohne `totp_secret` → 400 „Kein TOTP-Enrollment gestartet“. Ein falscher Code → 422, MFA wird
-/// nie ohne gültigen Code aktiviert. Ein gültiger Code aktiviert MFA, erzeugt zehn
-/// Klartext-Recovery-Codes und ersetzt alte.
+/// Ohne `totp_secret` → 400 „Kein TOTP-Enrollment gestartet“. Schon aktives TOTP → 422, ohne
+/// neue Recovery-Codes (ein zweiter Abschluss ersetzte sonst die gerade angezeigten). Ein
+/// falscher Code → 422, MFA wird nie ohne gültigen Code aktiviert. Ein gültiger Code aktiviert
+/// MFA, erzeugt zehn Klartext-Recovery-Codes und ersetzt alte.
+///
+/// Lesen, Aktivieren und Codes speichern laufen in EINER Transaktion (LFH-794): scheitert das
+/// Speichern der Codes, bleibt MFA aus, statt aktiv ohne Codes beim Nutzer zu landen.
 pub async fn totp_enroll_finish(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     JsonBody(req): JsonBody<TotpEnrollFinishRequest>,
 ) -> Result<Json<TotpEnrollFinish>, AppError> {
-    let secret: Option<String> =
-        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
-            .bind(benutzer.id)
-            .fetch_one(&state.pool)
-            .await?;
-    let secret =
-        secret.ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
-
-    if !crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix()) {
-        return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
-    }
-
-    sqlx::query("UPDATE benutzer SET totp_aktiviert = 1 WHERE id = ?")
-        .bind(benutzer.id)
-        .execute(&state.pool)
-        .await?;
-
     let codes = crate::auth::totp::neue_recovery_codes();
-    crate::auth::totp::storage::speichere_recovery_codes(&state.pool, benutzer.id, &codes).await?;
+    let jetzt = jetzt_unix();
+
+    crate::write_retry!(&state.pool, |conn| {
+        let (secret, aktiviert): (Option<String>, bool) =
+            sqlx::query_as("SELECT totp_secret, totp_aktiviert FROM benutzer WHERE id = ?")
+                .bind(benutzer.id)
+                .fetch_one(&mut *conn)
+                .await?;
+        if aktiviert {
+            return Err(AppError::UnprocessableEntity(
+                TOTP_BEREITS_AKTIV.to_string(),
+            ));
+        }
+        let secret = secret
+            .ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
+
+        if !crate::auth::totp::pruefe_code(&secret, &req.code, jetzt) {
+            return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
+        }
+
+        sqlx::query("UPDATE benutzer SET totp_aktiviert = 1 WHERE id = ?")
+            .bind(benutzer.id)
+            .execute(&mut *conn)
+            .await?;
+        crate::auth::totp::storage::speichere_recovery_codes(conn, benutzer.id, &codes).await?;
+        Ok(())
+    })?;
 
     Ok(Json(TotpEnrollFinish {
         recovery_codes: codes,
