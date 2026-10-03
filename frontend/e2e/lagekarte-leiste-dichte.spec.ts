@@ -148,7 +148,8 @@ const SOLL = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
  *
  * Nicht hier: die Aktion „Als maßgeblichen Pegel festlegen" im Fachebenen-Inspector
  * (`FachebenenInspector.tsx`) — der erscheint erst mit einem gewählten Pegel auf der Karte und
- * ist in `pegel-pruefliste.spec.ts` gemessen (LFH-631, gestellte Stationen).
+ * ist in `pegel-pruefliste.spec.ts` gemessen, mit gestellten Stationen als Admin (LFH-631) und
+ * als Beobachter ohne die Aktion (LFH-821).
  */
 for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
   test(`Lagekarten-Leiste, Stufe ${dichte}: Schalterzeilen bleiben in der Leiste (Beobachter)`, async ({
