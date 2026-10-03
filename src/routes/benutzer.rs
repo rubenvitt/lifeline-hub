@@ -1,7 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::AdminUser;
 use crate::auth::{
-    password, BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER,
+    password, BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY,
+    ROLLE_ADMIN, ROLLE_KEINER,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -73,19 +74,37 @@ fn pruefe_org_rolle(wert: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Spaltenliste für `query_as::<_, BenutzerAnzeige>`. `passwort_gesetzt` leitet sich aus dem Hash ab
+/// (LFH-828): Das `?` bindet [`PASSWORT_HASH_SSO_ONLY`], damit der Sentinel nicht als zweites
+/// Literal neben der Konstante steht. Es steht vor jedem `?` der `WHERE`-Klausel, also wird der
+/// Sentinel zuerst gebunden.
+const ANZEIGE_SPALTEN: &str = "SELECT id, org_id, anzeigename, benutzername, system_rolle, \
+     org_rolle, aktiv, erstellt_at, totp_aktiviert, passwort_hash <> ? AS passwort_gesetzt \
+     FROM benutzer";
+
+/// Lädt die öffentliche Darstellung eines Benutzers nach einer Änderung durch den Admin.
+async fn anzeige_laden(pool: &sqlx::SqlitePool, id: i64) -> Result<BenutzerAnzeige, AppError> {
+    let sql = format!("{ANZEIGE_SPALTEN} WHERE id = ?");
+    Ok(
+        sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
+            .bind(PASSWORT_HASH_SSO_ONLY)
+            .bind(id)
+            .fetch_one(pool)
+            .await?,
+    )
+}
+
 /// GET /api/benutzer — Liste aller Benutzer (ohne Passwort-Hashes). Admin-only. Enthält den
-/// MFA-Status (`totp_aktiviert`, LFH-43 Increment 5 Task 6).
+/// MFA-Status (`totp_aktiviert`, LFH-43 Increment 5 Task 6) und `passwort_gesetzt` (LFH-828).
 pub async fn liste(
     State(state): State<AppState>,
     _admin: AdminUser,
 ) -> Result<Json<Vec<BenutzerAnzeige>>, AppError> {
-    let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
-                erstellt_at, totp_aktiviert \
-         FROM benutzer ORDER BY id",
-    )
-    .fetch_all(&state.pool)
-    .await?;
+    let sql = format!("{ANZEIGE_SPALTEN} ORDER BY id");
+    let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
+        .bind(PASSWORT_HASH_SSO_ONLY)
+        .fetch_all(&state.pool)
+        .await?;
     Ok(Json(benutzer))
 }
 
@@ -134,14 +153,7 @@ pub async fn anlegen(
     }
     let id = ergebnis?.last_insert_rowid();
 
-    let angelegt = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
-                erstellt_at, totp_aktiviert \
-         FROM benutzer WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let angelegt = anzeige_laden(&state.pool, id).await?;
 
     Ok((StatusCode::CREATED, Json(angelegt)))
 }
@@ -219,14 +231,7 @@ pub async fn deaktivieren(
         .await?;
     tx.commit().await?;
 
-    let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
-                erstellt_at, totp_aktiviert \
-         FROM benutzer WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let aktualisiert = anzeige_laden(&state.pool, id).await?;
 
     Ok(Json(aktualisiert))
 }
@@ -302,14 +307,7 @@ pub async fn bearbeiten(
     }
     tx.commit().await?;
 
-    let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
-                erstellt_at, totp_aktiviert \
-         FROM benutzer WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let aktualisiert = anzeige_laden(&state.pool, id).await?;
 
     Ok(Json(aktualisiert))
 }
@@ -351,14 +349,7 @@ pub async fn totp_reset(
         .await?;
     tx.commit().await?;
 
-    let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, org_id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, \
-                erstellt_at, totp_aktiviert \
-         FROM benutzer WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let aktualisiert = anzeige_laden(&state.pool, id).await?;
 
     Ok(Json(aktualisiert))
 }

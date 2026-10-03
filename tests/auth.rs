@@ -1320,6 +1320,8 @@ async fn login_ohne_totp_liefert_weiterhin_die_nackte_benutzeranzeige() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["benutzername"], "admin");
     assert_eq!(json["system_rolle"], "admin");
+    // Auch der Login-Weg trägt das Feld (LFH-828), der `AuthContext` übernimmt diese Antwort.
+    assert_eq!(json["passwort_gesetzt"], true, "{json}");
     assert!(
         json.get("mfa_erforderlich").is_none(),
         "ein Nicht-TOTP-Login darf KEIN mfa_erforderlich-Feld tragen: {json}"
@@ -1787,6 +1789,48 @@ async fn me_liefert_totp_aktiviert_true_nach_enroll() {
     assert_eq!(
         json["totp_aktiviert"], true,
         "nach abgeschlossenem Enrollment muss /me totp_aktiviert=true zeigen: {json}"
+    );
+}
+
+// ===== Lokales Passwort in `BenutzerAnzeige` (LFH-828) =====
+
+#[tokio::test]
+async fn me_liefert_passwort_gesetzt_true_fuer_konto_mit_passwort() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/me", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        json["passwort_gesetzt"], true,
+        "ein Konto mit lokalem Passwort: {json}"
+    );
+}
+
+/// Ein SSO-only-Konto (Sentinel-Hash) bekommt `false`, und weder Hash noch Sentinel stehen in
+/// der Antwort.
+#[tokio::test]
+async fn me_liefert_passwort_gesetzt_false_fuer_sso_only_konto() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    sqlx::query("UPDATE benutzer SET passwort_hash = ? WHERE benutzername = 'admin'")
+        .bind(lifeline_hub::auth::PASSWORT_HASH_SSO_ONLY)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/me", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["passwort_gesetzt"], false, "SSO-only-Konto: {json}");
+    assert!(
+        json.get("passwort_hash").is_none(),
+        "Hash ausgeliefert: {json}"
+    );
+    assert!(
+        !json
+            .to_string()
+            .contains(lifeline_hub::auth::PASSWORT_HASH_SSO_ONLY),
+        "Sentinel ausgeliefert: {json}"
     );
 }
 
