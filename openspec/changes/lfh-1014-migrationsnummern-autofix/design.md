@@ -16,7 +16,7 @@
   steht offen. #367 stand ab 07:10:40 UTC auf failure und wurde um 07:12:15 gemergt. Die
   Push-Läufe brauchen 10–15 Sekunden.
 - Ein Push mit dem `GITHUB_TOKEN` löst keine Workflows aus. Die Release-App (`RELEASE_APP_ID`,
-  `RELEASE_APP_PRIVATE_KEY`) hat Contents und Issues Read & Write und ist der einzige
+  `RELEASE_APP_PRIVATE_KEY`) hat Contents und Issues Read & Write, Pull Requests nur Read, und ist der einzige
   Bypass-Actor des Rulesets (Integration 1018751).
 - Ein grüner Lauf auf `alpha` released und rollt aus (`ci.yml`, Job `release`). Eine dort
   eingespielte Migration darf nie umbenannt werden: sqlx fände unter der alten Version eine
@@ -77,8 +77,7 @@ lokales Bare-Repo pushen kann.
 `pr` und `offene-prs` rufen das Skript nach einem Exit 1 der Prüfung auf, `pr` nur, wenn
 `head.repo.full_name == github.repository`; `offene-prs` liest dafür `headRepository`,
 `headRepositoryOwner` und `headRefName` aus `gh pr list`. Der Token kommt aus
-`actions/create-github-app-token` mit `permission-contents: write` und
-`permission-issues: write`, nur für dieses Repository, und wird erst im Reparaturschritt
+`actions/create-github-app-token` mit `permission-contents: write`, nur für dieses Repository, und wird erst im Reparaturschritt
 erzeugt. Der Token geht nur in die Push-URL und in `gh`. Der Checkout hinterlegt seinen
 `GITHUB_TOKEN` als `http.extraheader` in einer per `includeIf` eingebundenen Datei, die auch
 für Arbeitsbäume gilt; dieser Header schlägt die Zugangsdaten der Push-URL (gemessen an der
@@ -92,8 +91,11 @@ Commit folgt“; der neue Kopf bekommt seinen Status aus dem eigenen `pull_reque
 
 ### D4 — Kommentar statt stiller Commit
 Lokale und Cloud-Sitzungen auf dem Branch würden beim nächsten Push abgewiesen und wüssten
-nicht warum. Der Kommentar (über die Issues-API mit dem App-Token) nennt die Umbenennungen und
-den nötigen `git pull`. Er weckt außerdem Sitzungen, die den PR beobachten.
+nicht warum. Der Kommentar nennt die Umbenennungen und
+den nötigen `git pull`. Er weckt außerdem Sitzungen, die den PR beobachten. Geschrieben wird
+er mit dem `GITHUB_TOKEN` (`pull-requests: write`): ein Kommentar an einem PR braucht dieses
+Recht, das Issues-Recht der App reicht nicht (gemessen an der Probe #409, 403). Scheitert er,
+bleibt es bei einer Warnung, denn gepusht ist dann schon.
 
 ### D5 — Pflicht-Status überwachen statt erzwingen
 `offene-prs` fragt `GET /repos/{repo}/rules/branches/{basis}` ab. Fehlt `Migrationsnummern`
