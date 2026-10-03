@@ -6,6 +6,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const [browserName, BASIS, idsDatei, AUS] = process.argv.slice(2);
 const ids = JSON.parse(readFileSync(idsDatei, 'utf8'));
+// Admin-Zugang des Prüf-Backends (`--admin-password`) aus der Umgebung, nicht aus dem Skript.
+const PW = process.env.E2E_ADMIN_PW;
+if (!PW) throw new Error('E2E_ADMIN_PW fehlt: das Admin-Passwort des Prüf-Backends setzen.');
 mkdirSync(AUS, { recursive: true });
 
 const browser = await puppeteer.launch(
@@ -19,14 +22,14 @@ page.setDefaultTimeout(60_000);
 
 // Anmelden über die API im Seitenkontext: das Sitzungs-Cookie landet im Browser.
 await page.goto(`${BASIS}/login`);
-const anmeldung = await page.evaluate(async () => {
+const anmeldung = await page.evaluate(async (passwort) => {
   const r = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ benutzername: 'admin', passwort: 'e2e-admin-pw' }),
+    body: JSON.stringify({ benutzername: 'admin', passwort }),
   });
   return r.status;
-});
+}, PW);
 if (anmeldung !== 200) throw new Error(`Anmeldung: ${anmeldung}`);
 
 const protokoll = [];

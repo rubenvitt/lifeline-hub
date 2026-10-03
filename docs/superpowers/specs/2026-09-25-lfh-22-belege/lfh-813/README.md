@@ -51,9 +51,12 @@ Bericht im Tagbetrieb, zum Vergleich der Papierfarbe.
 ## Nachvollziehen
 
 ```sh
-# Backend (Debug-Build) und Vite wie in playwright.config.ts, mit frischer Datenbank:
+# Backend (Debug-Build) und Vite wie in playwright.config.ts, mit frischer Datenbank.
+# E2E_ADMIN_PW ist ein frei gewähltes Wegwerf-Passwort nur für dieses Prüf-Backend;
+# saeen.mjs und drucken.mjs lesen es aus der Umgebung.
+export E2E_ADMIN_PW=<wegwerf-passwort>
 target/debug/lifeline-hub --db-path /tmp/druck/lifeline.db --bind 127.0.0.1:18080 \
-  --admin-password e2e-admin-pw --kritis-extrakt false
+  --admin-password "$E2E_ADMIN_PW" --kritis-extrakt false
 LIFELINE_BACKEND_URL=http://127.0.0.1:18080 node frontend/node_modules/vite/bin/vite.js \
   --host 127.0.0.1 --port 15173 --strictPort   # im Ordner frontend/
 

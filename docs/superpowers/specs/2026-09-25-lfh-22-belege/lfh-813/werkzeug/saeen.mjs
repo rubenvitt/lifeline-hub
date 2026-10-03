@@ -3,6 +3,9 @@
 import { deflateSync } from 'node:zlib';
 
 const BASIS = process.argv[2];
+// Admin-Zugang des Prüf-Backends (`--admin-password`) aus der Umgebung, nicht aus dem Skript.
+const PW = process.env.E2E_ADMIN_PW;
+if (!PW) throw new Error('E2E_ADMIN_PW fehlt: das Admin-Passwort des Prüf-Backends setzen.');
 let cookie = '';
 
 async function anfrage(pfad, methode = 'GET', daten, roh) {
@@ -91,7 +94,7 @@ async function befehl(eid, freigeben, titel) {
   return id;
 }
 
-await anfrage('/api/auth/login', 'POST', { benutzername: 'admin', passwort: 'e2e-admin-pw' });
+await anfrage('/api/auth/login', 'POST', { benutzername: 'admin', passwort: PW });
 await anfrage('/api/organisation', 'PATCH', { name: 'DRK KV Musterstadt' });
 const fd = new FormData();
 fd.append('datei', new Blob([logoPng()], { type: 'image/png' }), 'logo.png');
