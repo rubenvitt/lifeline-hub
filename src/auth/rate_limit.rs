@@ -15,9 +15,14 @@
 //! Bewusst **keine** Sperre je Konto über alle Quellen: sie sperrte das Konto für jeden, der
 //! seinen Namen kennt.
 //!
+//! **Je Quelle bleiben die ältesten [`MAX_FEHLVERSUCHE`] Versuche.** Gleichzeitige Anfragen kommen
+//! alle an der Sperrprüfung vorbei, bevor ihr Fehlversuch zählt. Behielte die Tabelle die
+//! jüngsten, verdrängte ein Schwall eigener Fehlversuche die fremden, und der eigene Erfolg
+//! räumte danach die ganze Quelle.
+//!
 //! **Die Tabelle ist begrenzt:** ab [`AUFRAEUM_SCHWELLE`] Quellen räumt ein neuer Eintrag die
-//! abgelaufenen weg, bei [`OBERGRENZE`] verdrängt er die Quelle mit dem ältesten letzten Versuch;
-//! je Quelle bleiben höchstens [`MAX_FEHLVERSUCHE`] Versuche. Sonst wüchse sie mit vielen
+//! abgelaufenen weg (höchstens alle [`AUFRAEUM_PAUSE`]), bei [`OBERGRENZE`] verdrängt er die
+//! Quellen mit dem ältesten letzten Versuch auf [`NACH_VERDRAENGUNG`]. Sonst wüchse sie mit vielen
 //! einmaligen Quelladressen (IPv6, Botnetz) bis zum Neustart.
 
 use std::collections::hash_map::RandomState;
@@ -36,9 +41,16 @@ pub const FENSTER: Duration = Duration::from_secs(300);
 /// Ab so vielen Quellen räumt ein neuer Eintrag die abgelaufenen weg.
 const AUFRAEUM_SCHWELLE: usize = 1_024;
 
+/// Mindestabstand zweier Aufräumläufe: ein Lauf geht über die ganze Tabelle, unter einer Flut
+/// sonst bei jedem neuen Eintrag.
+const AUFRAEUM_PAUSE: Duration = Duration::from_secs(1);
+
 /// Harte Obergrenze der Quellen. Wer so viele Adressen hat, umgeht eine Sperre je Quelle
 /// ohnehin; die Verdrängung schützt hier nur den Speicher.
 const OBERGRENZE: usize = 10_000;
+
+/// Auf so viele Quellen verdrängt ein Lauf, damit nicht jeder neue Eintrag die Tabelle absucht.
+const NACH_VERDRAENGUNG: usize = OBERGRENZE - OBERGRENZE / 10;
 
 /// Das Zielkonto eines Versuchs, als Hash des Benutzernamens: so belegt ein langer erfundener
 /// Name keinen Speicher. Der Schlüssel ist je Prozess zufällig, also nicht vorab berechenbar.
@@ -65,6 +77,8 @@ fn laeuft(v: &Versuch, jetzt: Instant) -> bool {
 #[derive(Default)]
 struct Tabelle {
     quellen: HashMap<IpAddr, Vec<Versuch>>,
+    /// Frühester Zeitpunkt des nächsten Aufräumlaufs.
+    naechste_raeumung: Option<Instant>,
 }
 
 impl Tabelle {
@@ -82,33 +96,39 @@ impl Tabelle {
 
     fn fehlversuch(&mut self, ip: IpAddr, konto: Option<Konto>, jetzt: Instant) {
         if !self.quellen.contains_key(&ip) && self.quellen.len() >= AUFRAEUM_SCHWELLE {
-            self.quellen.retain(|_, versuche| {
-                versuche.retain(|v| laeuft(v, jetzt));
-                !versuche.is_empty()
-            });
+            if self.naechste_raeumung.is_none_or(|t| jetzt >= t) {
+                self.quellen.retain(|_, versuche| {
+                    versuche.retain(|v| laeuft(v, jetzt));
+                    !versuche.is_empty()
+                });
+                self.naechste_raeumung = Some(jetzt + AUFRAEUM_PAUSE);
+            }
             if self.quellen.len() >= OBERGRENZE {
                 self.aelteste_verdraengen();
             }
         }
         let versuche = self.quellen.entry(ip).or_default();
         versuche.retain(|v| laeuft(v, jetzt));
-        versuche.push(Versuch { zeit: jetzt, konto });
-        // Mehr als die Schwelle ändert nichts an der Sperre; die jüngsten halten sie am längsten.
-        if versuche.len() > MAX_FEHLVERSUCHE {
-            let zuviel = versuche.len() - MAX_FEHLVERSUCHE;
-            versuche.drain(..zuviel);
+        // Über der Schwelle zählt nichts mehr dazu; die ältesten bleiben (s. Modulkopf).
+        if versuche.len() < MAX_FEHLVERSUCHE {
+            versuche.push(Versuch { zeit: jetzt, konto });
         }
     }
 
-    /// Verdrängt die Quelle, deren letzter Versuch am längsten zurückliegt.
+    /// Verdrängt die Quellen mit dem ältesten letzten Versuch, bis [`NACH_VERDRAENGUNG`] bleiben.
     fn aelteste_verdraengen(&mut self) {
-        let aelteste = self
+        let zuviel = self.quellen.len().saturating_sub(NACH_VERDRAENGUNG);
+        if zuviel == 0 {
+            return;
+        }
+        let mut nach_alter: Vec<(Option<Instant>, IpAddr)> = self
             .quellen
             .iter()
-            .min_by_key(|(_, versuche)| versuche.last().map(|v| v.zeit))
-            .map(|(ip, _)| *ip);
-        if let Some(ip) = aelteste {
-            self.quellen.remove(&ip);
+            .map(|(ip, versuche)| (versuche.last().map(|v| v.zeit), *ip))
+            .collect();
+        nach_alter.select_nth_unstable_by_key(zuviel - 1, |(zeit, _)| *zeit);
+        for (_, ip) in &nach_alter[..zuviel] {
+            self.quellen.remove(ip);
         }
     }
 
@@ -270,6 +290,29 @@ mod tests {
         assert!(t.ist_gesperrt(quelle, jetzt));
     }
 
+    /// Gleichzeitige Anfragen kommen alle an der Sperrprüfung vorbei, bevor ihr Fehlversuch
+    /// zählt. Eigene Fehlversuche über die Schwelle dürfen die fremden nicht verdrängen, sonst
+    /// räumt der eigene Erfolg danach die ganze Quelle.
+    #[test]
+    fn eigene_fehlversuche_verdraengen_keine_fremden() {
+        let mut t = Tabelle::default();
+        let jetzt = Instant::now();
+        let quelle = ip("192.0.2.9");
+
+        for _ in 0..MAX_FEHLVERSUCHE - 1 {
+            t.fehlversuch(quelle, Some(konto("opfer")), jetzt);
+        }
+        for _ in 0..MAX_FEHLVERSUCHE {
+            t.fehlversuch(quelle, Some(konto("innentaeter")), jetzt);
+        }
+        t.erfolg(quelle, konto("innentaeter"));
+        t.fehlversuch(quelle, Some(konto("opfer")), jetzt);
+        assert!(
+            t.ist_gesperrt(quelle, jetzt),
+            "die Fremdversuche überleben den Schwall eigener Fehlversuche"
+        );
+    }
+
     #[test]
     fn tabelle_bleibt_bei_vielen_einmaligen_quellen_unter_der_schwelle() {
         let mut t = Tabelle::default();
@@ -295,7 +338,7 @@ mod tests {
         for n in 0..OBERGRENZE + 500 {
             t.fehlversuch(ip6(n), None, start + Duration::from_millis(n as u64));
         }
-        assert_eq!(t.quellen.len(), OBERGRENZE);
+        assert!(t.quellen.len() <= OBERGRENZE, "{} Quellen", t.quellen.len());
         assert!(
             !t.quellen.contains_key(&ip6(0)),
             "verdrängt wird die Quelle mit dem ältesten letzten Versuch"

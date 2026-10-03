@@ -79,8 +79,10 @@ alle Quellen gibt es bewusst nicht; sie sperrte ein Konto für jeden, der seinen
 
 Der Zähler liegt im Prozessspeicher und ist nach einem Neustart leer. Für den Zweck
 (automatisiertes Raten ausbremsen) reicht das; die dauerhafte Spur liegt in `auth_audit`.
-Die Tabelle ist begrenzt: ab 1 024 Quellen räumt jeder neue Eintrag die abgelaufenen weg, bei
-10 000 verdrängt er die Quelle mit dem ältesten letzten Versuch.
+Die Tabelle ist begrenzt: ab 1 024 Quellen räumt ein neuer Eintrag die abgelaufenen weg
+(höchstens einmal je Sekunde), bei 10 000 verdrängt er die Quellen mit dem ältesten letzten
+Versuch auf 9 000. Je Quelle bleiben die ältesten zehn Versuche, damit ein Schwall eigener
+Fehlversuche die fremden nicht verdrängt.
 
 Die Quell-IP ist die **Socket-Adresse**. `X-Forwarded-For` wird nur ausgewertet, wenn
 die Gegenstelle ein ausdrücklich genannter Proxy ist (`LIFELINE_TRUSTED_PROXIES`, LFH-604;
