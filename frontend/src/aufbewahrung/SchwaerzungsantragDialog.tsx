@@ -48,6 +48,14 @@ export function kennungPasst(eingabe: string | undefined, kennung: string): bool
   return (eingabe ?? '').trim() === kennung;
 }
 
+/** Was der Vollzug eines Personen-Antrags entfernt. Bei Betroffenen auch ihre Fotos und Dateien
+ *  samt Datei (LFH-757, `PERSONENANHAENGE` im Backend). */
+export function personenUmfang(art: AntragZielArt): string {
+  return art === 'betroffene'
+    ? 'Name, Kontakt, Adresse und Notizen dieser Person sowie ihre Fotos und Dateien'
+    : 'Name, Kontakt, Adresse und Notizen dieser Person';
+}
+
 /** Reiner Body-Bau — ohne Render prüfbar. */
 export function antragBody(ziel: AntragZielWahl, werte: AntragWerte): NeuerSchwaerzungsantrag {
   return {
@@ -116,7 +124,7 @@ export default function SchwaerzungsantragDialog({
         description={
           istEinsatz
             ? 'Der Purge-Lauf schwärzt 24 Stunden nach dem Antrag alle personenbezogenen Angaben des Einsatzes, unabhängig von Frist und Karenz. Bis dahin lässt sich der Antrag zurücknehmen. Das Einsatztagebuch bleibt im Wortlaut erhalten.'
-            : 'Der Purge-Lauf entfernt 24 Stunden nach dem Antrag Name, Kontakt, Adresse und Notizen dieser Person. Bis dahin lässt sich der Antrag zurücknehmen.'
+            : `Der Purge-Lauf entfernt 24 Stunden nach dem Antrag ${personenUmfang(ziel.art)}. Bis dahin lässt sich der Antrag zurücknehmen.`
         }
       />
       {!istEinsatz && (

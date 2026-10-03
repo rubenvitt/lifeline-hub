@@ -450,7 +450,7 @@ async fn vollzug_einsatz_mit_frist_in_5_jahren_wie_fristbasiert() {
     for k in ZIEL_KLARTEXTE.iter().chain(
         NACHBAR_KLARTEXTE
             .iter()
-            .filter(|n| !["Stamm-Dora", "Anderer Einsatz Meier"].contains(n)),
+            .filter(|n| !["Stamm-Dora", "Anderer Einsatz Meier", "Meier-Foto-E2.jpg"].contains(n)),
     ) {
         assert!(
             !texte.contains(k),
@@ -458,7 +458,11 @@ async fn vollzug_einsatz_mit_frist_in_5_jahren_wie_fristbasiert() {
         );
     }
     // Stammkraft-Snapshot und der andere Einsatz bleiben.
-    assert!(texte.contains("Stamm-Dora") && texte.contains("Anderer Einsatz Meier"));
+    assert!(
+        texte.contains("Stamm-Dora")
+            && texte.contains("Anderer Einsatz Meier")
+            && texte.contains("Meier-Foto-E2.jpg")
+    );
     // Der offene Personen-Antrag gilt als vollzogen.
     let l = liste(&pool, b.e1, t(T0) + Duration::hours(24))
         .await
