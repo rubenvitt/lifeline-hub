@@ -90,7 +90,18 @@ export interface FachebeneDef {
   // Keine Farbe: die Ebenenfarbe hängt am Modus und steht im Farbvertrag
   // (`fachebeneFarbe` in `theme/statusFarben.ts`, LFH-593).
   geometrieTyp: 'polygon' | 'punkt';
-  /** Poll-Intervall in ms (Frontend refetchInterval). */
+  /**
+   * Poll-Intervall in ms (Frontend refetchInterval), `0` = kein Hintergrund-Takt.
+   *
+   * Liegt unter der Server-TTL (LFH-856, Wächter in `fachebenen.test.ts`). Der Server erneuert
+   * einen abgelaufenen Stand erst, wenn ihn ein Abruf anfragt, und liefert diesem noch den alten
+   * (`liefere_mit_swr`); den neuen sieht erst der nächste Poll. Mit nur einem Client ist der
+   * gezeigte Stand also bis zu TTL + 2 × Takt alt, bei `pollMs == TTL` das Dreifache der TTL.
+   * Ein Poll ohne neuen Stand kostet seit LFH-594 nur ein 304 (194 B Kopf); wie oft ein 200 mit
+   * voller Nutzlast kommt, bestimmt die TTL, nicht der Takt. Auf dem Server kostet jeder Poll
+   * weiter Lesen, Serialisieren und Hashen (Autobahn ~9 ms) — Messung je Ebene in
+   * `docs/fachebenen-quellen.md`.
+   */
   pollMs: number;
   /** True → braucht Karten-Viewport-bbox (kein Hintergrund-Polling, Refetch bei moveend). */
   bboxAbhaengig: boolean;
@@ -136,7 +147,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     key: 'nina',
     label: 'Amtliche Warnungen (NINA)',
     geometrieTyp: 'polygon',
-    pollMs: 90_000,
+    // TTL 90 s. Warnungen: eine neue muss schnell sichtbar sein, ein 200 ist klein (~10 KB);
+    // schlechtester Fall 2,5 statt 4,5 min.
+    pollMs: 30_000,
     bboxAbhaengig: false,
     // Warnungen: eine neue muss schnell sichtbar sein.
     veraltetNachMin: 15,
@@ -145,7 +158,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     key: 'dwd',
     label: 'Wetterwarnungen (DWD)',
     geometrieTyp: 'polygon',
-    pollMs: 300_000,
+    // TTL 300 s. Warnungen wie NINA, der DWD gibt sie laufend heraus; ein 200 hängt an der Lage
+    // (ohne Warnung 290 B). Schlechtester Fall 7 statt 15 min.
+    pollMs: 60_000,
     bboxAbhaengig: false,
     veraltetNachMin: 30,
   },
@@ -153,7 +168,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     key: 'pegelonline',
     label: 'Pegel / Hochwasser',
     geometrieTyp: 'punkt',
-    pollMs: 300_000,
+    // TTL 300 s. Messwerte im 15-Minuten-Takt, ein 200 ~225 KB: ein Drittel der TTL reicht,
+    // schlechtester Fall gut 8 statt 15 min.
+    pollMs: 100_000,
     bboxAbhaengig: false,
     veraltetNachMin: 60,
   },
@@ -161,7 +178,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     key: 'hochwasser',
     label: 'Hochwasser-Meldeklassen (LHP)',
     geometrieTyp: 'punkt',
-    pollMs: 300_000,
+    // TTL 300 s. Die Meldeklasse ist eine amtliche Warnstufe (Anlass von LFH-591) und bekommt den
+    // Takt der DWD-Warnungen, obwohl ein 200 ~400 KB wiegt. Schlechtester Fall 7 statt 15 min.
+    pollMs: 60_000,
     bboxAbhaengig: false,
     veraltetNachMin: 60,
     klassenfarben: {
@@ -173,8 +192,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     key: 'luftqualitaet',
     label: 'Luftqualität (UBA)',
     geometrieTyp: 'punkt',
-    // = serverseitige TTL (900 s); die Quelle liefert Stundenwerte mit ~2 h Verzug.
-    pollMs: 900_000,
+    // TTL 900 s; die Quelle liefert Stundenwerte mit ~2 h Verzug, ein 200 ~170 KB. Ein Drittel
+    // der TTL holt eine neue Stunde 20 min früher (25 statt 45 min), schneller bringt nichts.
+    pollMs: 300_000,
     bboxAbhaengig: false,
     geltung: 'Messstationen — keine Aussage zwischen den Stationen',
     // Der Verzug der Quelle (~2 h) zählt nicht als Veraltung.
@@ -192,8 +212,9 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     key: 'odl',
     label: 'Strahlung / ODL (BfS)',
     geometrieTyp: 'punkt',
-    // = serverseitige TTL (600 s); die Quelle liefert Stundenwerte.
-    pollMs: 600_000,
+    // TTL 600 s; die Quelle liefert Stundenwerte, ein 200 ~580 KB. Die halbe TTL reicht für
+    // einen Stundentakt: schlechtester Fall 20 statt 30 min.
+    pollMs: 300_000,
     bboxAbhaengig: false,
     geltung: 'nur ortsfeste BfS-Sonden (Stundenwerte) — keine Einsatzmessungen',
     // Zwei Stundenwerte verpasst, plus Verzug der Quelle.
@@ -207,8 +228,11 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     key: 'autobahn',
     label: 'Autobahn-Lage (BAB)',
     geometrieTyp: 'punkt',
-    // = serverseitige TTL (600 s); die Ebene aggregiert 111 Autobahnen × 3 Dienste.
-    pollMs: 600_000,
+    // TTL 600 s; die Ebene aggregiert 111 Autobahnen × 3 Dienste, ein 200 ~1,7 MB. Sperrungen
+    // sollen nicht eine halbe Stunde auf sich warten lassen: schlechtester Fall 14 statt 30 min.
+    // Der Takt bleibt über der Laufzeit einer Erneuerung (~25 s), sonst holte der nächste Poll
+    // noch den alten Stand.
+    pollMs: 120_000,
     bboxAbhaengig: false,
     // Der erste Lauf hängt an keinem Request (`fetch_autobahn`), die Ebene meldet solange
     // `offline`. 20 s fallen nicht auf und trommeln einen gestörten Anbieter nicht — die Antwort

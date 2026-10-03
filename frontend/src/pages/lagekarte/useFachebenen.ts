@@ -161,7 +161,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         enabled: fachebenenSichtbar.autobahn,
         // Takt hängt am zuletzt gesehenen Status: der erste Lauf der Ebene dauert serverseitig ~25
         // s und hängt an keinem Request. Bis dahin meldet sie `offline`; mit dem regulären
-        // 600-s-Takt sähe man zehn Minuten nichts.
+        // Takt (120 s) sähe man zwei Minuten nichts.
         //
         // State statt Callback-Form von `refetchInterval`: die Callback-Form lässt die Typinferenz
         // dieses `useQueries`-Tupels kollabieren (alles `UseQueryResult<unknown>`, `combine`
