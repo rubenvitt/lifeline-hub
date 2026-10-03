@@ -7,7 +7,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
-`check-migrationen.sh` → `check-all.test.sh` + `bauziel.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh`.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
@@ -28,9 +28,13 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   Workspace-Wurzel, Frische per mtime), und Tests liefen still gegen einen fremden Stand.
   Schritt 3, 4 und 7 prüfen das vorab (`scripts/lib/bauziel.sh`, rot bei fremdem Ziel ohne
   Umgebungsvariable), Selbsttest `scripts/bauziel.test.sh`; Gate und Playwright nennen das
-  gestartete `Backend-Binary:`. Kosten: ~3 min kalt, bis 19 GB je voll gebautem Worktree,
-  frei mit dem Worktree. Ein älterer Worktree ohne die Datei erbt unter einem Main-Checkout
-  mit ihr dessen Ziel, bis er auf `alpha` vorgezogen ist
+  gestartete `Backend-Binary:`. Kosten: ~3 min kalt, bis 19 GB je voll gebautem Worktree
+  (Mac, vor LFH-845), frei mit dem Worktree. Seit LFH-845 trägt nur der eigene Code
+  Zeilentabellen, Abhängigkeiten keine Debuginfo (`Cargo.toml`, `[profile.dev]`); unter Linux
+  belegt ein voller Testbau 21,6 GB statt hochgerechnet über 60
+  (`openspec/changes/archive/2026-10-03-lfh-845-debuginfo-testbinaries/design.md`). Ein älterer
+  Worktree ohne die Datei erbt unter einem Main-Checkout mit ihr dessen Ziel, bis er auf
+  `alpha` vorgezogen ist
   (`openspec/changes/archive/2026-09-30-lfh-520-cargo-artefakte-isolieren/design.md`).
 - **Playwright fährt drei Projekte** (LFH-729): `chromium` alles, `firefox` und `webkit` nur die
   Druck-Specs (`frontend/playwright.config.ts`). Die vier Pflicht-Shards `e2e k/4` fahren alle

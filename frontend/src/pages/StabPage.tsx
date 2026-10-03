@@ -224,6 +224,9 @@ export default function StabPage() {
               <SeitenStandVeraltet onWiederholen={() => void stabQuery.refetch()} />
             )}
             <Liste
+              // Unter dem Paneel (h2): jedes Sachgebiet ein Gegenstand mit Besetzung und
+              // Werkzeugen darunter, sein Titel h3 (LFH-826).
+              unterEbene={2}
               dataSource={sachgebiete}
               rowKey={(s) => s.sachgebiet}
               loading={stabQuery.isLoading}

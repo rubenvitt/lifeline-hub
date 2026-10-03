@@ -254,10 +254,13 @@ schritt_9() {
 }
 
 schritt_10() {
-  echo "==> [10/$SCHRITTE] Migrationsnummern gegen den Ziel-Branch (LFH-658)"
+  echo "==> [10/$SCHRITTE] Migrationsnummern gegen den Ziel-Branch, Autofix-Selbsttest (LFH-658/1014)"
   # Erst der Selbsttest: das Prüfskript bemerkt als einzige Stelle eine eingeschobene Nummer
   # (sqlx spielt sie still nach) und irrt in beide Richtungen still.
   "$ROOT/scripts/check-migrationen.test.sh"
+  # Der Autofix (LFH-1014) pusht mit einem Token, das auf `alpha` Bypass-Rechte hat; seine
+  # Grenzen (nie Ziel-Branch, nur Fast-Forward, Schleifenbremse) stehen nur in diesem Test.
+  "$ROOT/scripts/migrationen-autofix.test.sh"
   # Dann die Prüfung gegen `origin/alpha`, so frisch wie der letzte `fetch` — eine
   # Frühwarnung; durchgesetzt wird über den Workflow `migrationen.yml`. Ohne den Ref (flacher
   # PR-Checkout) laut übersprungen.

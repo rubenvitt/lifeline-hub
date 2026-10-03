@@ -2,6 +2,7 @@
 //! einen festen Unix-Timestamp deterministisch testbar. Persistenz der Recovery-Codes steht in
 //! [`storage`], der Pending-State zwischen Passwort- und TOTP-Schritt in [`state`].
 
+pub mod schutz;
 pub mod state;
 pub mod storage;
 
@@ -56,12 +57,17 @@ pub fn otpauth_url(secret_base32: &str, benutzername: &str) -> Result<String, Ap
 
 /// Prüft `code` zum Zeitpunkt `jetzt_unix` (±1 Schritt Skew). Liefert `false` bei jedem
 /// Baufehler (z. B. korruptes Secret), nie fälschlich „gültig“. Einen Replay-Schutz (RFC 6238
-/// §5.2) leistet diese Funktion nicht.
+/// §5.2) leistet diese Funktion nicht, den gibt es nur über [`pruefe_code_schritt`] und
+/// [`schutz::schritt_annehmen`].
 pub fn pruefe_code(secret_base32: &str, code: &str, jetzt_unix: u64) -> bool {
-    match baue_totp(secret_base32, "") {
-        Ok(totp) => totp.check(code, jetzt_unix).is_some(),
-        Err(_) => false,
-    }
+    pruefe_code_schritt(secret_base32, code, jetzt_unix).is_some()
+}
+
+/// Wie [`pruefe_code`], liefert aber den Zeitschritt (`Unix-Zeit / 30`), zu dem der Code
+/// passt. Den braucht der Replay-Schutz: angenommen wird ein Code erst über
+/// [`schutz::schritt_annehmen`].
+pub fn pruefe_code_schritt(secret_base32: &str, code: &str, jetzt_unix: u64) -> Option<u64> {
+    baue_totp(secret_base32, "").ok()?.check(code, jetzt_unix)
 }
 
 /// Erzeugt den zu `jetzt_unix` gültigen Code. Test-Helfer für deterministische
@@ -96,6 +102,21 @@ fn formatiere_recovery_code(bytes: &[u8]) -> String {
         .join("-")
 }
 
+/// Hat `code` die Form eines Recovery-Codes aus [`neue_recovery_codes`] (fünf Gruppen aus vier
+/// Kleinbuchstaben-Hexziffern)? Nur die Form, nicht die Gültigkeit: danach unterscheidet
+/// `/auth/totp/finish`, ob die Sperre des zweiten Faktors greift (LFH-791). Ein Recovery-Code
+/// trägt 80 Bit und lässt sich nicht raten, deshalb sperrt er nicht mit; so bleibt er der
+/// Ausweg, wenn jemand mit dem Passwort die TOTP-Codes absichtlich sperrt.
+pub fn ist_recovery_form(code: &str) -> bool {
+    let gruppen: Vec<&str> = code.split('-').collect();
+    gruppen.len() == 5
+        && gruppen.iter().all(|g| {
+            g.len() == 4
+                && g.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        })
+}
+
 /// SHA-256-Hex eines Recovery-Codes. Die Codes sind hochentropisch, ein Argon2/Salt ist
 /// unnötig.
 pub fn hash_recovery(code: &str) -> String {
@@ -117,6 +138,21 @@ mod tests {
     fn pruefe_code_akzeptiert_gueltigen_code() {
         let code = generiere_code(TEST_SECRET, JETZT).unwrap();
         assert!(pruefe_code(TEST_SECRET, &code, JETZT));
+    }
+
+    #[test]
+    fn pruefe_code_schritt_nennt_den_passenden_zeitschritt() {
+        let schritt = JETZT / 30;
+        for (versatz, erwartet) in [(-30i64, schritt - 1), (0, schritt), (30, schritt + 1)] {
+            let zeit = JETZT.checked_add_signed(versatz).unwrap();
+            let code = generiere_code(TEST_SECRET, zeit).unwrap();
+            assert_eq!(
+                pruefe_code_schritt(TEST_SECRET, &code, JETZT),
+                Some(erwartet),
+                "Versatz {versatz}"
+            );
+        }
+        assert_eq!(pruefe_code_schritt("kein-base32!", "123456", JETZT), None);
     }
 
     #[test]
@@ -261,6 +297,25 @@ mod tests {
 
         for code in &codes {
             assert!(code.len() >= 16, "Code zu kurz: {code}");
+        }
+    }
+
+    #[test]
+    fn ist_recovery_form_erkennt_genau_die_ausgegebene_form() {
+        for code in neue_recovery_codes() {
+            assert!(ist_recovery_form(&code), "Code: {code}");
+        }
+        for kein in [
+            "123456",
+            "",
+            "abcd-1234-efgh-5678-90ab",
+            "ABCD-1234-abcd-5678-90ab",
+            "abcd-1234-abcd-5678",
+            "abcd-1234-abcd-5678-90ab-cdef",
+            "abcd1234abcd567890ab",
+            " abcd-1234-abcd-5678-90ab",
+        ] {
+            assert!(!ist_recovery_form(kein), "kein Recovery-Code: {kein:?}");
         }
     }
 

@@ -29,7 +29,7 @@ use common::{anfrage, login_cookie, setup_mit_pool};
 const PEER: &str = "198.51.100.7:40000";
 
 /// Ein Audit-Eintrag, wie ihn die Tests vergleichen.
-#[derive(Debug, PartialEq, sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 struct Eintrag {
     ereignis: String,
     provider: String,
@@ -196,7 +196,9 @@ async fn totp_anmeldung_hinterlaesst_genau_einen_login_ok() {
 
     // Der Passwortschritt allein meldet noch niemanden an und schreibt deshalb nichts.
     let pending = passwortschritt(&app).await;
-    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();
+    // Der Code des nächsten Zeitschritts: den aktuellen hat das Enrollment schon verbraucht
+    // (Replay-Schutz, LFH-791), der nächste liegt im ±1-Skew.
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix() + 30).unwrap();
     let antwort = sende(
         &app,
         "POST",
@@ -246,6 +248,49 @@ async fn falscher_totp_code_hinterlaesst_genau_einen_fehlschlag_mit_benutzer() {
 }
 
 #[tokio::test]
+async fn gesperrter_zweitfaktor_hinterlaesst_keinen_weiteren_eintrag() {
+    let (app, pool) = setup_mit_pool().await;
+    let secret = totp_fuer_admin(&app).await;
+    let id = benutzer_id(&pool, "admin").await;
+    spur_leeren(&pool).await;
+
+    let gueltige: Vec<String> = [jetzt_unix() - 30, jetzt_unix(), jetzt_unix() + 30]
+        .iter()
+        .map(|t| lifeline_hub::auth::totp::generiere_code(&secret, *t).unwrap())
+        .collect();
+    let falsch = (0..1_000_000)
+        .map(|n| format!("{n:06}"))
+        .find(|c| !gueltige.contains(c))
+        .unwrap();
+    let max = lifeline_hub::auth::totp::schutz::MAX_FEHLVERSUCHE as usize;
+
+    // Jeder falsche Code bis zur Sperre ist ein gescheiterter Versuch mit Eintrag; danach weist
+    // die Sperre (LFH-791) mit 429 ab, und die Tabelle wächst nicht weiter.
+    for versuch in 0..=max {
+        let pending = passwortschritt(&app).await;
+        let antwort = sende(
+            &app,
+            "POST",
+            "/api/auth/totp/finish",
+            Some(&pending),
+            Some(format!(r#"{{"code":"{falsch}"}}"#)),
+        )
+        .await;
+        let erwartet = if versuch < max {
+            StatusCode::UNAUTHORIZED
+        } else {
+            StatusCode::TOO_MANY_REQUESTS
+        };
+        assert_eq!(antwort.status, erwartet, "Versuch {versuch}");
+    }
+
+    assert_eq!(
+        spur(&pool).await,
+        vec![fehlschlag("totp", Some(("admin", id))); max]
+    );
+}
+
+#[tokio::test]
 async fn totp_abschluss_ohne_laufende_anmeldung_hinterlaesst_keinen_eintrag() {
     let (app, pool) = setup_mit_pool().await;
 
@@ -276,7 +321,7 @@ async fn totp_abschluss_fuer_deaktiviertes_konto_nennt_den_benutzer() {
         .unwrap();
     spur_leeren(&pool).await;
 
-    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix()).unwrap();
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, jetzt_unix() + 30).unwrap();
     let antwort = sende(
         &app,
         "POST",

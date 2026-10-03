@@ -84,6 +84,9 @@ export default function FuehrungsfunktionenTab() {
       }
     >
       <Liste
+        // Ohne `unterEbene`, die Eintragstitel sind keine Überschriften (LFH-826): eine
+        // Einstellungsliste. Die Kennung benennt die Zeile, Feld und Schalter tragen eigene
+        // Etiketten.
         loading={katalog.isLoading}
         dataSource={verwaltungsZeilen(katalog.data ?? [])}
         rowKey={(z) => z.eintrag.funktion}
