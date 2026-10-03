@@ -146,15 +146,15 @@ pub async fn login(
             .fetch_one(&state.pool)
             .await?;
 
-    // Das Passwort stimmt; das gibt auch alle anderen hinter derselben IP wieder frei (NAT).
-    if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
-    }
-
     if totp_aktiviert {
         // Keine Session, kein Session-Cookie (s. Doc oben). Kein `login_ok`-Audit: angemeldet ist
         // hier
         // noch niemand, den Abschluss protokolliert `totp_finish`.
+        //
+        // Auch kein `rate_limit::erfolg` (LFH-791): angemeldet ist erst, wer den zweiten Faktor
+        // besteht. Räumte schon das Passwort die Quelle, setzte jeder Anlauf `login` →
+        // `totp/finish` den Zähler zurück, und der Code ließe sich ungebremst raten. Die Quelle
+        // räumt `totp_finish`.
         let key = session::neuer_token();
         crate::auth::totp::state::speichere(key.clone(), benutzer.id);
         let jar = jar.add(mfa_pending_cookie(key, secure));
@@ -164,6 +164,11 @@ pub async fn login(
                 mfa_erforderlich: "totp".to_string(),
             }),
         ));
+    }
+
+    // Angemeldet; das gibt auch alle anderen hinter derselben IP wieder frei (NAT).
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::erfolg(ip);
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
@@ -1176,11 +1181,15 @@ pub async fn totp_enroll_start(
 ) -> Result<Json<TotpEnrollStart>, AppError> {
     let secret = crate::auth::totp::neues_secret();
 
-    sqlx::query("UPDATE benutzer SET totp_secret = ?, totp_aktiviert = 0 WHERE id = ?")
-        .bind(&secret)
-        .bind(benutzer.id)
-        .execute(&state.pool)
-        .await?;
+    // Ein neues Secret beginnt ohne verbrauchten Zeitschritt (LFH-791).
+    sqlx::query(
+        "UPDATE benutzer SET totp_secret = ?, totp_aktiviert = 0, totp_letzter_schritt = NULL \
+         WHERE id = ?",
+    )
+    .bind(&secret)
+    .bind(benutzer.id)
+    .execute(&state.pool)
+    .await?;
 
     let otpauth_url = crate::auth::totp::otpauth_url(&secret, &benutzer.benutzername)?;
     Ok(Json(TotpEnrollStart {
@@ -1208,9 +1217,14 @@ pub async fn totp_enroll_finish(
     let secret =
         secret.ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
 
-    if !crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix()) {
+    let Some(schritt) = crate::auth::totp::pruefe_code_schritt(&secret, &req.code, jetzt_unix())
+    else {
         return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
-    }
+    };
+    // Auch der Enrollment-Code gilt genau einmal (LFH-791): wer ihn beim Einrichten mitliest,
+    // kommt damit nicht durch den Login. Das Ergebnis zählt hier nicht, `enroll/start` hat den
+    // Schritt geleert.
+    crate::auth::totp::schutz::schritt_annehmen(&state.pool, benutzer.id, schritt).await?;
 
     sqlx::query("UPDATE benutzer SET totp_aktiviert = 1 WHERE id = ?")
         .bind(benutzer.id)
@@ -1239,15 +1253,36 @@ pub struct TotpFinishRequest {
 ///    unbekannter/abgelaufener/verbrauchter Key → 401.
 /// 2. `benutzer` frisch per `id` laden. Deaktiviertes Konto oder fehlendes `totp_secret` (etwa
 ///    nach einem Admin-Reset zwischen `login` und `finish`) → 401.
-/// 3. `totp::pruefe_code`, nur bei Fehlschlag EIN atomarer `verbrauche_recovery_code`. Beides
-///    `false` → 401, ohne zu verraten, welcher Weg scheiterte.
+/// 3. Hat der Code die Recovery-Form (`totp::ist_recovery_form`), EIN atomarer
+///    `verbrauche_recovery_code`; sonst `totp::pruefe_code_schritt` samt Replay-Schutz
+///    (`schutz::schritt_annehmen`). `false` → 401, ohne zu verraten, welcher Weg scheiterte.
 /// 4. Erst dann Session und Cookie, `mfa_pending` entfernen, 200 mit `BenutzerAnzeige`.
+///
+/// **Bremsen (LFH-791):** Eine gesperrte Quelle (`rate_limit`) bekommt 429, bevor der
+/// Pending-Key verbraucht wird; ein gesperrter zweiter Faktor (`totp::schutz`) 429 vor der
+/// Codeprüfung, auch für einen gültigen TOTP-Code. Jeder TOTP-Versuch zählt je Benutzer schon
+/// vor der Codeprüfung (atomar mit der Sperrprüfung); Recovery-Codes zählen dort nicht und
+/// sperren nicht mit. Jeder falsche Code zählt je Quelle.
+/// Erst ein bestandener zweiter Faktor räumt beides — `login` räumt bei TOTP-Konten nichts.
 pub async fn totp_finish(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<TotpFinishRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
+    if let Some(ip) = peer_ip {
+        if crate::auth::rate_limit::ist_gesperrt(ip) {
+            tracing::warn!(
+                peer_ip = %ip,
+                "Zweitfaktor abgewiesen: zu viele Fehlversuche aus dieser Quelle"
+            );
+            return Err(AppError::TooManyRequests(
+                "Zu viele fehlgeschlagene Anmeldeversuche. Bitte kurz warten.".to_string(),
+            ));
+        }
+    }
+
     let key = jar
         .get(MFA_PENDING_COOKIE)
         .map(|c| c.value().to_string())
@@ -1279,16 +1314,55 @@ pub async fn totp_finish(
         return Err(AppError::Unauthorized);
     };
 
-    // `||` schließt kurz: bei gültigem TOTP-Code wird kein Recovery-Code verbraucht.
-    let gueltig = crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix())
-        || crate::auth::totp::storage::verbrauche_recovery_code(
-            &state.pool,
-            benutzer_id,
-            &req.code,
-        )
-        .await?;
+    let jetzt = jetzt_unix();
+    let jetzt_i64 = i64::try_from(jetzt).unwrap_or(i64::MAX);
+
+    let gueltig = if crate::auth::totp::ist_recovery_form(&req.code) {
+        // Recovery-Codes umgehen die Sperre des zweiten Faktors (s. `totp::schutz`); die Sperre
+        // je Quelle oben gilt auch für sie.
+        crate::auth::totp::storage::verbrauche_recovery_code(&state.pool, benutzer_id, &req.code)
+            .await?
+    } else {
+        // Zählt den Versuch vorab, in derselben Anweisung wie die Prüfung der Sperre: sonst kämen
+        // gleichzeitige Anfragen alle an der Sperre vorbei (`schutz::versuch_beginnen`).
+        if !crate::auth::totp::schutz::versuch_beginnen(&state.pool, benutzer_id, jetzt_i64).await?
+        {
+            tracing::warn!(
+                benutzer_id,
+                peer_ip = ?peer_ip,
+                "Zweitfaktor abgewiesen: zu viele falsche Codes für dieses Konto"
+            );
+            return Err(AppError::TooManyRequests(format!(
+                "Zu viele falsche Codes. Bitte in höchstens {} Minuten erneut anmelden oder einen \
+                 Recovery-Code verwenden.",
+                crate::auth::totp::schutz::SPERRE_SEKUNDEN / 60
+            )));
+        }
+        // Ein gültiger TOTP-Code gilt nur, wenn sein Zeitschritt noch nicht verbraucht ist
+        // (RFC 6238 §5.2).
+        match crate::auth::totp::pruefe_code_schritt(&secret, &req.code, jetzt) {
+            Some(schritt) => {
+                crate::auth::totp::schutz::schritt_annehmen(&state.pool, benutzer_id, schritt)
+                    .await?
+            }
+            None => false,
+        }
+    };
     if !gueltig {
+        if let Some(ip) = peer_ip {
+            crate::auth::rate_limit::fehlversuch(ip);
+        }
+        tracing::warn!(
+            benutzer_id,
+            peer_ip = ?peer_ip,
+            "Zweitfaktor fehlgeschlagen"
+        );
         return Err(AppError::Unauthorized);
+    }
+
+    crate::auth::totp::schutz::erfolg(&state.pool, benutzer_id).await?;
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::erfolg(ip);
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;

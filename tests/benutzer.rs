@@ -383,6 +383,15 @@ async fn admin_totp_reset_loescht_secret_aktiviert_recovery_codes_und_sessions()
         "Vorbedingung: Secret muss gesetzt sein"
     );
 
+    // Zweitfaktor gesperrt und ein Schritt verbraucht (LFH-791): der Reset beginnt sauber.
+    sqlx::query(
+        "UPDATE benutzer SET totp_fehlversuche = 3, totp_gesperrt_bis = 4000000000 WHERE id = ?",
+    )
+    .bind(erika_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
     let recovery_anzahl_vor: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM totp_recovery_code WHERE benutzer_id = ?")
             .bind(erika_id)
@@ -424,6 +433,21 @@ async fn admin_totp_reset_loescht_secret_aktiviert_recovery_codes_und_sessions()
     assert!(
         secret_nach.is_none(),
         "Reset muss totp_secret auf NULL setzen"
+    );
+
+    let (schritt_nach, fehlversuche_nach, gesperrt_bis_nach): (Option<i64>, i64, Option<i64>) =
+        sqlx::query_as(
+            "SELECT totp_letzter_schritt, totp_fehlversuche, totp_gesperrt_bis \
+             FROM benutzer WHERE id = ?",
+        )
+        .bind(erika_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        (schritt_nach, fehlversuche_nach, gesperrt_bis_nach),
+        (None, 0, None),
+        "Reset räumt Replay-Merker und Sperre des zweiten Faktors (LFH-791)"
     );
 
     let recovery_anzahl_nach: i64 =

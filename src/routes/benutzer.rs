@@ -335,10 +335,15 @@ pub async fn totp_reset(
     existiert.ok_or(AppError::NotFound)?;
 
     let mut tx = state.pool.begin().await?;
-    sqlx::query("UPDATE benutzer SET totp_secret = NULL, totp_aktiviert = 0 WHERE id = ?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    // Mit dem Secret gehen auch Replay-Merker und Sperre des zweiten Faktors (LFH-791): ein
+    // neues Enrollment beginnt sauber.
+    sqlx::query(
+        "UPDATE benutzer SET totp_secret = NULL, totp_aktiviert = 0, totp_letzter_schritt = NULL, \
+         totp_fehlversuche = 0, totp_gesperrt_bis = NULL WHERE id = ?",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     crate::auth::totp::storage::loesche_recovery_codes(&mut *tx, id).await?;
     sqlx::query("DELETE FROM session WHERE benutzer_id = ?")
         .bind(id)
