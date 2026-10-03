@@ -800,7 +800,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
  * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
  * (Object-URLs, nur im Speicher, LFH-759),
- * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, der
+ * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, die eigene
+ * Führungsstelle (LFH-849: Erreichbarkeit ist personenbezogen), der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
  * LFH-554 design.md D8, offen mit LFH-767).

@@ -24,8 +24,10 @@ pub struct FuehrungsstellePatchBody {
     pub kommunikationsmittel: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub erreichbarkeit: Option<Option<String>>,
-    /// `Some` ersetzt die Zuordnung vollständig, absent lässt sie unverändert.
-    pub sprechgruppe_ids: Option<Vec<i64>>,
+    /// Ersetzt die Zuordnung vollständig; `null` oder `[]` leert sie, absent lässt sie
+    /// unverändert.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub sprechgruppe_ids: Option<Option<Vec<i64>>>,
 }
 
 /// GET /api/einsaetze/{id}/fuehrungsstelle — ohne erfasste Angaben alles leer (200).
@@ -46,11 +48,16 @@ pub async fn aendern(
     JsonBody(body): JsonBody<FuehrungsstellePatchBody>,
 ) -> Result<Json<FuehrungsstelleAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let ids: Option<Vec<i64>> = body.sprechgruppe_ids.map(Option::unwrap_or_default);
     let rufname = trimme_tri(body.rufname);
     let mittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
-    if let Some(ids) = &body.sprechgruppe_ids {
+    // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
+    if rufname.is_none() && mittel.is_none() && erreichbarkeit.is_none() && ids.is_none() {
+        return Ok(Json(fuehrungsstelle::laden(&state.pool, einsatz_id).await?));
+    }
+    if let Some(ids) = &ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(
             &state.pool,
             ctx.einsatz.org_id,
@@ -63,7 +70,7 @@ pub async fn aendern(
         rufname: rufname.as_ref().map(|v| v.as_deref()),
         kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
         erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
-        sprechgruppe_ids: body.sprechgruppe_ids.as_deref(),
+        sprechgruppe_ids: ids.as_deref(),
     };
     let anzeige = crate::write_retry!(&state.pool, |conn| {
         fuehrungsstelle::patchen_tx(conn, einsatz_id, &patch).await

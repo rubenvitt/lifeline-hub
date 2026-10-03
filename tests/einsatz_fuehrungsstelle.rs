@@ -238,6 +238,94 @@ async fn fremde_sprechgruppe_ist_422_und_speichert_nichts() {
 }
 
 #[tokio::test]
+async fn sprechgruppe_einer_fremden_org_ist_422() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (fremde_org, _) =
+        fremde_org_anlegen(&pool, "Fremde Org", "fremdling", "fremdlingpw1", "keine").await;
+    let katalog: i64 = sqlx::query_scalar(
+        "INSERT INTO sprechgruppe (org_id, bezeichnung, betriebsart) \
+         VALUES (?, '311', 'TMO') RETURNING id",
+    )
+    .bind(fremde_org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let (status, json) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"sprechgruppe_ids": [katalog]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{json:?}");
+}
+
+#[tokio::test]
+async fn null_leert_die_sprechgruppen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let tmo = lokale_sprechgruppe(&app, &admin, einsatz, "311", "TMO").await;
+    patchen(&app, &admin, einsatz, json!({"sprechgruppe_ids": [tmo]})).await;
+
+    let (status, json) = patchen(&app, &admin, einsatz, json!({"sprechgruppe_ids": null})).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json, json!({"sprechgruppen": []}));
+}
+
+#[tokio::test]
+async fn leerer_patch_legt_nichts_an() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (status, json) = patchen(&app, &admin, einsatz, json!({})).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json, json!({"sprechgruppen": []}));
+    let zeilen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(zeilen, 0, "keine leere Zeile");
+    assert_eq!(kopf_events(&mut rx), 0, "nichts geändert, nichts gemeldet");
+}
+
+/// Die Prüfungen der Route laufen vor dem Schreiben; dass ein Fehler MITTEN im Schreiben nichts
+/// teilweise hinterlässt, zeigt erst der Repo-Aufruf in einer Transaktion: der Rufname steht vor
+/// der scheiternden Zuordnung (Fremdschlüssel) und ist nach dem Rollback fort.
+#[tokio::test]
+async fn ein_fehler_im_schreiben_hinterlaesst_nichts() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let mut tx = pool.begin().await.unwrap();
+    let patch = lifeline_hub::einsatz::fuehrungsstelle::FuehrungsstellePatch {
+        rufname: Some(Some("Florian 10/1")),
+        sprechgruppe_ids: Some(&[987_654]),
+        ..Default::default()
+    };
+    let ergebnis =
+        lifeline_hub::einsatz::fuehrungsstelle::patchen_tx(&mut tx, einsatz, &patch).await;
+    assert!(
+        ergebnis.is_err(),
+        "unbekannte Sprechgruppe verletzt den Fremdschlüssel"
+    );
+    drop(tx);
+
+    assert_eq!(
+        lesen(&app, &admin, einsatz).await.1,
+        json!({"sprechgruppen": []})
+    );
+}
+
+#[tokio::test]
 async fn unbekanntes_kommunikationsmittel_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
@@ -300,6 +388,33 @@ async fn erfolg_feuert_einsatz_ablehnung_nicht() {
             .await
             .0,
         StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let id = benutzer_anlegen(&app, &admin, "beobachterin", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "beobachter").await;
+    let bea = login_cookie(&app, "beobachterin", "beobachterinpw1").await;
+    assert_eq!(
+        patchen(&app, &bea, einsatz, json!({"rufname": "Y"}))
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(kopf_events(&mut rx), 0);
+
+    // Der Abschluss meldet selbst `einsatz`; erst danach zählt die Ablehnung.
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    kopf_events(&mut rx);
+    assert_eq!(
+        patchen(&app, &admin, einsatz, json!({"rufname": "Z"}))
+            .await
+            .0,
+        StatusCode::CONFLICT
     );
     assert_eq!(kopf_events(&mut rx), 0);
 }

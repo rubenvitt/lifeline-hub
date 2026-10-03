@@ -124,9 +124,20 @@ export function baueFernmeldeskizze(
   // urteilt `verbindungsurteil` selbst nicht.
   const fsSprechgruppen =
     fuehrungsstelle.zustand === 'daten' ? (fuehrungsstelle.daten?.sprechgruppen ?? null) : null;
+  // Gegen die Führungsstelle urteilt nur ein Abschnitt ohne bekannten Oberabschnitt — wie die
+  // Lücke (`verbindungenOhneGemeinsameSprechgruppe`). Ein Ringglied, das das Organigramm als
+  // Wurzel aufnimmt, urteilt gegen seinen Oberabschnitt.
+  const abschnittJeId = new Map(abschnitte.map((a) => [a.id, a]));
+  const obenDerWurzel = (k: OrgKnoten): readonly Sprechgruppe[] | null => {
+    if (k.art !== 'abschnitt') return null;
+    const a = abschnittJeId.get(k.id);
+    const ueber =
+      a?.ueber_abschnitt_id != null ? abschnittJeId.get(a.ueber_abschnitt_id) : undefined;
+    return ueber ? ueber.sprechgruppen : fsSprechgruppen;
+  };
   return {
     fuehrungsstelle: wurzelAus(fuehrungsstelle),
-    wurzeln: org.wurzeln.map((k) => umbauen(k, fsSprechgruppen)),
+    wurzeln: org.wurzeln.map((k) => umbauen(k, obenDerWurzel(k))),
     einheitenFehlen: org.einheitenFehlen,
   };
 }

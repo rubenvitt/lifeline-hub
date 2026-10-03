@@ -87,13 +87,14 @@ CREATE TABLE einsatz_fuehrungsstelle_sprechgruppe (
 );
 ```
 
-- Die Zeile entsteht lazy beim ersten PATCH (`INSERT … ON CONFLICT DO UPDATE`), wie die
-  Stab-Checkliste. Fehlt sie, liefert der GET alle Angaben leer.
+- Die Zeile entsteht lazy beim ersten PATCH, der etwas ändert (`INSERT OR IGNORE`, dann ein
+  `UPDATE` je gesendeter Angabe); ein leerer Patch legt nichts an und meldet nichts. Fehlt sie,
+  liefert der GET alle Angaben leer.
 - `GET /api/einsaetze/{id}/fuehrungsstelle` (`EinsatzLesezugriff`, kein Modul) →
   `FuehrungsstelleAnzeige { rufname?, sprechgruppen: Sprechgruppe[], kommunikationsmittel?,
   erreichbarkeit? }`, Sprechgruppen sortiert wie an Abschnitt und Einheit.
 - `PATCH` derselbe Pfad (`EinsatzVerwaltungszugriff`, wie die Kopfdaten): Tri-State je Feld über
-  `deserialize_optional_field` und `trimme_tri`, `sprechgruppe_ids: Option<Vec<i64>>` ersetzt
+  `deserialize_optional_field` und `trimme_tri`, `sprechgruppe_ids` (Tri-State, `null` wie `[]`) ersetzt
   vollständig. `pruefe_kommunikationsmittel` (400) und `pruefe_zuordenbar` (422) laufen vor dem
   Schreiben; Upsert und Ersetzen der Zuordnung stehen in EINER Transaktion (`write_retry!`), damit
   ein 422 nichts teilweise speichert. Danach `kopf_geaendert`.

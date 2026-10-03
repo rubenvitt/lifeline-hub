@@ -110,6 +110,15 @@ describe('baueFernmeldeskizze — Struktur', () => {
     ];
     const skizze = baueFernmeldeskizze(ring, [], ohneFs);
     expect(struktur(skizze.wurzeln)).toEqual(struktur(baueFuehrungsorganisation(ring, []).wurzeln));
+    // Ringglieder an der Wurzel urteilen wie die Lücke gegen ihren Oberabschnitt, nicht gegen die
+    // Führungsstelle (LFH-849).
+    const mitFs = fs({ sprechgruppen: [TMO311, DMO505] });
+    const keine = alle(baueFernmeldeskizze(ring, [], mitFs).wurzeln).filter(
+      (k) => k.art !== 'sammel' && k.kante.art === 'keine',
+    );
+    expect(keine).toHaveLength(
+      verbindungenOhneGemeinsameSprechgruppe(daten(ring), daten([]), mitFs).treffer.length,
+    );
   });
 
   it('zeigt ohne Einheiten nur die Abschnitte und meldet es', () => {

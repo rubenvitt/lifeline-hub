@@ -652,14 +652,11 @@ export default function FunkplanPage() {
                   <span>{GEGENSTELLE_HINWEIS}</span>
                   <span style={monoStil(14, 500)}>—</span>
                   <span style={{ color: rollen.gedaempft }}>{gegenstelle}</span>
+                  {/* In derselben Zeile: der Hinweis bleibt so hoch wie vorher (erstes Bild). */}
+                  {quellen.fuehrungsstelle.zustand === 'daten' && (
+                    <Link to={einsatzdatenPfad(einsatzId)}>auf Einsatzdaten erfassen</Link>
+                  )}
                 </Flex>
-                {quellen.fuehrungsstelle.zustand === 'daten' && (
-                  <Flex wrap align="center">
-                    <Link to={einsatzdatenPfad(einsatzId)} style={stabZeilenzielStil(token)}>
-                      auf Einsatzdaten erfassen
-                    </Link>
-                  </Flex>
-                )}
               </div>
             </PaneelZeile>
           )}

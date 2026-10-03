@@ -318,7 +318,7 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
 }
 
 /** Sprechgruppen als eine Zeile: „TMO 311, 312 · DMO 505“ — dieselbe Teilung wie der Funkplan. */
-export function sprechgruppenText(fs: Pick<Fuehrungsstelle, 'sprechgruppen'>): string {
+function sprechgruppenText(fs: Pick<Fuehrungsstelle, 'sprechgruppen'>): string {
   const { tmo, dmo } = teileSprechgruppen(fs.sprechgruppen);
   return [
     tmo.length > 0 ? `TMO ${tmo.map((s) => s.bezeichnung).join(', ')}` : null,
