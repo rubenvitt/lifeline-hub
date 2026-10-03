@@ -950,6 +950,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     let nr = 0;
     const kontext = (e: maplibregl.MapMouseEvent) => {
       if (!kontextmenueRef.current || !istOrtsziel(klickzielAm(map, e))) return;
+      // Kräfte-Cluster (Donut) und Bildgriffe sind DOM-Marker ohne Klickebene: `queryRenderedFeatures`
+      // sieht sie nicht. maplibres langer Druck trägt die Lage des Fingers, kein Ziel im DOM.
+      const { clientX, clientY } = e.originalEvent;
+      if (document.elementFromPoint(clientX, clientY)?.closest('.maplibregl-marker')) return;
       // Erst hier, wenn das Menü wirklich öffnet: ein langer Druck schärft den Riegel.
       const quelle = riegel.quelleFuerKontextmenue();
       nr += 1;

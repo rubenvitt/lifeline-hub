@@ -1358,7 +1358,12 @@ export default function LagekartePage() {
           quelle={zeichenHier?.quelle ?? 'maus'}
           laeuft={zeichenAnPunktLaeuft}
           onSetzen={(spec) => {
-            if (zeichenHier) legeZeichenAnPunkt(spec, zeichenHier, () => setZeichenHier(null));
+            // Geschlossen wird nur der Dialog DIESER Stelle, nie ein später geöffneter.
+            const punkt = zeichenHier;
+            if (punkt)
+              legeZeichenAnPunkt(spec, punkt, () =>
+                setZeichenHier((offen) => (offen === punkt ? null : offen)),
+              );
           }}
           onAbbrechen={() => setZeichenHier(null)}
         />

@@ -58,6 +58,15 @@ describe('ZeichenHierDialog (LFH-776)', () => {
     expect(onSetzen).not.toHaveBeenCalled();
   });
 
+  it('während des Speicherns lässt sich der Dialog nicht schließen (der POST liefe weiter)', async () => {
+    const { onAbbrechen } = aufbau({ laeuft: true });
+    expect(within(dialog()).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    fireEvent.keyDown(dialog(), { key: 'Escape' });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(onAbbrechen).not.toHaveBeenCalled();
+    expect(within(dialog()).queryByRole('button', { name: /close|schließen/i })).toBeNull();
+  });
+
   it('„Abbrechen“ und Esc legen nichts an', async () => {
     const { onSetzen, onAbbrechen } = aufbau();
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Abbrechen' }));

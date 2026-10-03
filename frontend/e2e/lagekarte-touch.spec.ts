@@ -1426,6 +1426,8 @@ interface KontextSaat {
   frei: [number, number];
   /** In der Zone, abseits jedes Zeichens. */
   inZone: [number, number];
+  /** Knapp nördlich der Zone, frei. */
+  nebenZone: [number, number];
 }
 
 async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
@@ -1433,6 +1435,9 @@ async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
     bezeichnung: `E2E Kontextmenue ${Date.now()}`,
   });
   await einheitAn(page, einsatzId, 'Pumpe Ost', EINZEL);
+  // Die Traube bildet einen Kräfte-Cluster: ein DOM-Donut ohne Klickebene (Review LFH-776).
+  for (const [i, name] of TRAUBE.entries())
+    await einheitAn(page, einsatzId, name, [MITTE[0] + i * 0.00005, MITTE[1] + i * 0.00003]);
   const [lng, lat] = EINZEL;
   const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
     data: {
@@ -1443,7 +1448,31 @@ async function einsatzFuerKontext(page: Page): Promise<KontextSaat> {
     },
   });
   expect(zone.ok(), await zone.text()).toBeTruthy();
-  return { einsatzId, frei: [lng, lat + 0.004], inZone: [lng + 0.002, lat - 0.0055] };
+  return {
+    einsatzId,
+    frei: [lng, lat + 0.004],
+    inZone: [lng + 0.002, lat - 0.0055],
+    nebenZone: [lng + 0.002, lat - 0.0022],
+  };
+}
+
+/** Großkreisabstand in Metern (wie `geo.ts`, genau genug für eine Toleranz von 10 %). */
+function abstandM(a: { lng: number; lat: number }, b: { lng: number; lat: number }): number {
+  const r = (g: number) => (g * Math.PI) / 180;
+  const h =
+    Math.sin(r(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+  return 2 * 6_371_008.8 * Math.asin(Math.sqrt(h));
+}
+
+/** Geokoordinate eines Bildschirmpunkts. */
+async function geoAm(page: Page, p: Punkt): Promise<{ lng: number; lat: number }> {
+  return page.evaluate(({ x, y }) => {
+    const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+    const r = k.getCanvas().getBoundingClientRect();
+    const g = k.unproject([x - r.left, y - r.top]);
+    return { lng: g.lng, lat: g.lat };
+  }, p);
 }
 
 /** Holt `ll` in die freie Kartenmitte und gibt seinen Bildschirmpunkt — hinter der Trefferwache. */
@@ -1496,6 +1525,7 @@ for (const { viewport, dichte } of [
       // ── Langer Druck auf freie Karte: Menü offen NACH dem Abheben, Karte steht ─────────
       const frei = await stelleAufKarte(page, saat.frei, 'freie Stelle');
       const vorher = await stand(page);
+      const druckLl = await geoAm(page, frei);
       await langerDruck(page, cdp, frei);
       await expect(menue).toBeVisible();
       await page.waitForTimeout(500); // ein Nachklick käme jetzt — das Menü muss stehen bleiben
@@ -1539,8 +1569,28 @@ for (const { viewport, dichte } of [
       const zweiter = { x: mitteImModus.x + 60, y: mitteImModus.y };
       await aufKarte(page, [zweiter], 'zweiter Messpunkt');
       await page.waitForTimeout(400);
+      const zweiterLl = await geoAm(page, zweiter);
       await tippe(page, zweiter);
-      await expect(page.locator('[data-lfh="messwert"]')).toContainText(/\d.*\s(m|km)\b/);
+      // Die Strecke beginnt an der DRUCKSTELLE: ihr Wert ist der Abstand Druckstelle → zweiter
+      // Tipp, nicht bloß „irgendeine Zahl" (ein versetzter Startpunkt fiele hier auf).
+      const erwartet = abstandM(druckLl, zweiterLl);
+      await expect
+        .poll(
+          async () => {
+            const text = (await page.locator('[data-lfh="messwert"]').textContent()) ?? '';
+            const m = /([\d.,]+)\s*(km|m)\b/.exec(text.replace(/\u202f|\u00a0/g, ' '));
+            if (!m) return NaN;
+            const zahl = Number(m[1].replace(/\./g, '').replace(',', '.'));
+            return (m[2] === 'km' ? zahl * 1000 : zahl) / erwartet;
+          },
+          { message: `Strecke ab der Druckstelle (~${Math.round(erwartet)} m)` },
+        )
+        .toBeGreaterThan(0.9);
+      const text = (await page.locator('[data-lfh="messwert"]').textContent()) ?? '';
+      const m = /([\d.,]+)\s*(km|m)\b/.exec(text.replace(/\u202f|\u00a0/g, ' '))!;
+      const gemessen =
+        Number(m[1].replace(/\./g, '').replace(',', '.')) * (m[2] === 'km' ? 1000 : 1);
+      expect(gemessen / erwartet).toBeLessThan(1.1);
 
       // ── Im Messmodus öffnet ein langer Druck kein Menü ────────────────────────────────
       const dritter = { x: mitteImModus.x - 50, y: mitteImModus.y };
@@ -1620,6 +1670,27 @@ for (const { viewport, dichte } of [
       const schliessen = page.getByRole('button', { name: /schließen/i }).first();
       if (await schliessen.isVisible().catch(() => false)) await schliessen.click();
 
+      // ── Langer Druck auf einen Kräfte-Cluster (DOM-Donut, keine Klickebene): kein Menü ──
+      await springe(page, MITTE, ZOOM);
+      // Wie im Tipp-Test oben: der Donut ist der DOM-Marker mit der Zahl der Traube.
+      const donut = page.locator('.maplibregl-marker').filter({ hasText: '3' });
+      await expect(donut).toHaveCount(1);
+      const db = (await donut.boundingBox())!;
+      const donutMitte = { x: db.x + db.width / 2, y: db.y + db.height / 2 };
+      expect(
+        await page.evaluate(
+          ({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest('.maplibregl-marker')),
+          donutMitte,
+        ),
+        'der Finger liegt auf dem Donut',
+      ).toBe(true);
+      await page.waitForTimeout(400);
+      await langerDruck(page, cdp, donutMitte);
+      await page.waitForTimeout(300);
+      await expect(menue).toHaveCount(0);
+      const zuklappen = page.getByRole('button', { name: /schließen/i }).first();
+      if (await zuklappen.isVisible().catch(() => false)) await zuklappen.click();
+
       // ── Langer Druck in die Zone: Menü, und das Abheben wählt die Zone nicht ─────────
       const zone = await stelleAufKarte(page, saat.inZone, 'Zone');
       await langerDruck(page, cdp, zone);
@@ -1627,11 +1698,12 @@ for (const { viewport, dichte } of [
       await page.waitForTimeout(500);
       await expect(menue).toBeVisible();
       await expect(auswahl).toHaveCount(0);
-      // Tipp daneben schließt ohne Wirkung eines Eintrags.
-      const daneben = { x: zone.x + 80, y: zone.y - 80 };
+      // Tipp daneben (frei, nördlich der Zone) schließt ohne Wirkung eines Eintrags.
+      const daneben = await aufSchirm(page, saat.nebenZone);
       await aufKarte(page, [daneben], 'Tipp daneben');
       await tippe(page, daneben);
       await expect(menue).toHaveCount(0);
+      await expect(auswahl).toHaveCount(0);
       expect(
         (
           (await (

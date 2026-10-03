@@ -101,6 +101,10 @@ demselben Muster wie `flaechenwahl`. `punkt` ist `{ lng, lat, quelle: 'maus' | '
   Bündel, Trefferzone **und** Fläche, deshalb reicht die Art allein nicht. Falsch ist die
   Funktion bei `marker` (Zeichen, Plakette, Trefferzone, aufgefächertes Blatt), `personenCluster`
   und bei Fachebenen-Punkt, -Bündel und -Trefferzone.
+- Kräfte-Cluster (Donut) und Bildgriffe sind DOM-Marker ohne Klickebene, `klickzielAm` sieht sie
+  nicht. Liegt unter der Stelle ein `.maplibregl-marker` (`elementFromPoint` an den Koordinaten des
+  Originalereignisses, die auch der lange Druck trägt), öffnet der Hörer ebenfalls nichts (Review,
+  03.10.2026).
 - Der Menüzustand `{ nr, x, y, punkt }` liegt in `Kartenflaeche`, wie `offeneWahl`, weil nur dort
   die Pixel, `movestart` und der Fokus der Karte bekannt sind. `movestart` schließt, und wird die
   Prop `null`, schließt das Menü ebenfalls.
@@ -210,6 +214,9 @@ setzen“. Es öffnet nach dem Schließen des Menüs (Spec `datensatz-aktionsmen
   wie `legeZeichenMutation`, aber ohne den Modus `zeichen`.
 - **Doppelt anlegen:** „Setzen“ ist während `isPending` gesperrt (`loading`), und die Mutation
   prüft `isPending` selbst. `legeFreiesZeichenAn` ist nicht idempotent.
+- **Kein Schließen während des Anlegens:** „Abbrechen“, Kreuz, Maske und Esc sind gesperrt, solange
+  der POST läuft. Schließen hielte ihn nicht auf, „Abbrechen legt nichts an“ wäre falsch. Der
+  Erfolg schließt nur den Dialog seiner eigenen Stelle (Review, 03.10.2026).
 - *Verworfen: Modus `zeichen` starten, Leiste öffnen, Punkt vormerken.* Der Mensch müsste in die
   Leiste, die unter `lg` geschlossen ist (LFH-765). Und der vorgemerkte Punkt wäre ein
   unsichtbarer Zustand.

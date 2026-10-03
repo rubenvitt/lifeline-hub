@@ -104,7 +104,7 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
 
 ## 6. e2e: Touch und Maus (D9)
 
-- [ ] 6.1 `e2e/lagekarte-touch.spec.ts` (Touch, 1024 und 390 px). Einen Helper
+- [x] 6.1 `e2e/lagekarte-touch.spec.ts` (Touch, 1024 und 390 px). Einen Helper
   `langerDruck(page, x, y, ms = 700)` per CDP `Input.dispatchTouchEvent` bauen (`touchStart`,
   Warten, `touchEnd`). Ein langer Druck auf eine freie Stelle (Trefferwache `elementFromPoint`)
   muss belegen:
@@ -112,20 +112,21 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
   - der Kopf zeigt eine Koordinate
   - Mitte, Zoom, Neigung und Drehung sind unverändert (`__lfhKarte`)
   - jeder `menuitem` ist ≥ `controlHeight` hoch, in Stufe `handschuh` ≥ 72
-- [ ] 6.2 Gleiche Spec: „Messen ab hier“ per Tipp, danach Tipp an eine zweite Stelle. Belegt,
+- [x] 6.2 Gleiche Spec: „Messen ab hier“ per Tipp, danach Tipp an eine zweite Stelle. Belegt,
   wenn die Messsteuerung einen Streckenwert ≠ „—“ zeigt. Danach beendet Esc das Messen. Im
   Messmodus öffnet ein langer Druck kein Menü (`[role="menu"]` fehlt).
-- [ ] 6.3 Gleiche Spec, mit Schreibrecht: „Hier Zeichen setzen“ per Tipp, im Dialog eine
+- [x] 6.3 Gleiche Spec, mit Schreibrecht: „Hier Zeichen setzen“ per Tipp, im Dialog eine
   Grundzeichen-Kachel per Tipp wählen, dann „Setzen“. Belegt, wenn das Zeichen per API an der
   Druckstelle liegt (Toleranz ein paar Meter) und auf der Karte erscheint.
-- [ ] 6.4 Gleiche Spec: Ein langer Druck in die Trefferzone eines Markers öffnet kein Menü. Ein
+- [x] 6.4 Gleiche Spec: Ein langer Druck in die Trefferzone eines Markers öffnet kein Menü,
+  ebenso auf den DOM-Donut eines Kräfte-Clusters (Review 03.10.2026). Ein
   langer Druck in eine Zone öffnet das Menü, und nach dem Abheben zeigt der Inspector die Zone
   nicht.
-- [ ] 6.5 Mausfall (in `lagekarte-touch.spec.ts` als Block ohne `hasTouch` oder in
+- [x] 6.5 Mausfall (in `lagekarte-touch.spec.ts` als Block ohne `hasTouch` oder in
   `lagekarte-smoke.spec.ts`): Rechtsklick → Menü. „Koordinate kopieren“ mit Playwright-
   `clipboard-read`/`-write`: die Zwischenablage entspricht dem Kopf, die Quittung „Koordinate
   kopiert“ ist sichtbar. Esc schließt, der Fokus liegt auf dem Canvas.
-- [ ] 6.6 Mutationsproben, Befund in die Prüfliste (7.1):
+- [x] 6.6 Mutationsproben, Befund in die Prüfliste (7.1):
   - Riegel abgeschaltet ⇒ 6.1 rot (Menü nach dem Abheben zu oder Zone gewählt)
   - Sperre `kontextmenue` im Modus entfernt ⇒ 6.2 rot
   - `istOrtsziel` immer wahr ⇒ 6.4 rot
@@ -138,7 +139,7 @@ Jede Aufgabe läuft nach `superpowers:test-driven-development`: erst rot, dann g
   Einsatztauglichkeit (Festlegung 7, `docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`),
   je Zeile ein Verdikt mit Beleg. Dazu die Mutationsproben aus 6.6 und die offene Abnahme am
   echten Android-Tablet (natives `contextmenu`).
-- [ ] 7.2 `frontend/src/pages/lagekarte/AGENTS.md`: ein Punkt „Kontextmenü an der Kartenstelle“
+- [x] 7.2 `frontend/src/pages/lagekarte/AGENTS.md`: ein Punkt „Kontextmenü an der Kartenstelle“
   (Träger `contextmenu` in `Kartenflaeche`, `istOrtsziel`, `nachklickRiegel.ts`, Sperre über die
   Prop `kontextmenue`, Schale `PunktankerMenue`, Verweis auf die Change und später das Archiv).
   Prettier ist grün (`scripts/check-fmt.sh`).

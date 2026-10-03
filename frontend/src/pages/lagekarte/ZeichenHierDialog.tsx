@@ -39,9 +39,16 @@ export default function ZeichenHierDialog({ offen, quelle, laeuft, onSetzen, onA
       title="Zeichen hier setzen"
       onCancel={onAbbrechen}
       destroyOnHidden
+      // Während des Anlegens gibt es kein Zurück: Schließen hielte den POST nicht auf, das Zeichen
+      // entstünde trotzdem („Abbrechen legt nichts an“ wäre gelogen).
+      closable={!laeuft}
+      mask={{ closable: !laeuft }}
+      keyboard={!laeuft}
       footer={
         <Space>
-          <Button onClick={onAbbrechen}>Abbrechen</Button>
+          <Button onClick={onAbbrechen} disabled={laeuft}>
+            Abbrechen
+          </Button>
           <Button type="primary" loading={laeuft} onClick={() => setzen(entwurf)}>
             Setzen
           </Button>

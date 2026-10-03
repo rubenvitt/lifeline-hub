@@ -40,11 +40,15 @@ Auswahlmenü, kein Verorten.
 ### Requirement: Kein Kontextmenü auf Punktzielen und Trefferzonen
 Das Kontextmenü SHALL nur öffnen, wenn an der Stelle kein gezeichnetes Punktziel und keine
 Trefferzone liegt (Rangfolge der Klickziele): auf freier Karte und auf einer oder mehreren
-Flächen. Auf einem Markerzeichen, seiner Trefferzone, einem Personen-Cluster, einem
+Flächen. Auf einem Markerzeichen, seiner Trefferzone, einem Personen- oder Kräfte-Cluster, einem
 aufgefächerten Zeichen oder einem Fachebenen-Punkt oder -Bündel MUST es sich nicht öffnen.
 
 #### Scenario: Langer Druck auf einen Marker
 - **WHEN** der Mensch innerhalb der Trefferzone eines Markers lange drückt
+- **THEN** öffnet sich kein Kontextmenü
+
+#### Scenario: Langer Druck auf einen Kräfte-Cluster
+- **WHEN** der Mensch lange auf den Ring eines Kräfte-Clusters drückt
 - **THEN** öffnet sich kein Kontextmenü
 
 #### Scenario: Langer Druck in eine Zone
@@ -113,7 +117,8 @@ Steuerung, auch das Ende mit einem Esc.
 Die Wahl von „Hier Zeichen setzen“ SHALL nach dem Schließen des Menüs einen Dialog mit der
 Zeichenwahl öffnen. „Setzen“ MUST das gewählte Zeichen an der Druckstelle anlegen, ohne weiteren
 Tipp auf die Karte, und es in „Zuletzt verwendet“ eintragen. „Abbrechen“ und Esc MUST nichts
-anlegen. Ein zweites „Setzen“ während des Speicherns MUST NOT ein zweites Zeichen anlegen.
+anlegen. Ein zweites „Setzen“ während des Speicherns MUST NOT ein zweites Zeichen anlegen;
+solange gespeichert wird, MUST sich der Dialog nicht schließen lassen.
 
 #### Scenario: Zeichen an der Druckstelle
 - **WHEN** der Mensch „Hier Zeichen setzen“ wählt, im Dialog ein Zeichen wählt und „Setzen“ tippt
