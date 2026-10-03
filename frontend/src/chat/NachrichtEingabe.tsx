@@ -28,6 +28,10 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
       .map((f) => f.originFileObj as File | undefined)
       .filter((f): f is File => f !== undefined);
     if (!getrimmt && rohdateien.length === 0) return;
+    // Feld und Liste bleiben während des Sendens bedienbar (offline pausiert die Mutation, bis das
+    // Netz zurück ist). Nach dem Erfolg wird deshalb nur geleert, was gesendet wurde.
+    const gesendeterText = text;
+    const gesendeteDateien = new Set(dateien.map((f) => f.uid));
     sendetRef.current = true;
     try {
       await onSenden(getrimmt, rohdateien);
@@ -37,8 +41,8 @@ export default function NachrichtEingabe({ onSenden, senden }: Props) {
     } finally {
       sendetRef.current = false;
     }
-    setText('');
-    setDateien([]);
+    setText((jetzt) => (jetzt === gesendeterText ? '' : jetzt));
+    setDateien((jetzt) => jetzt.filter((f) => !gesendeteDateien.has(f.uid)));
   };
 
   return (

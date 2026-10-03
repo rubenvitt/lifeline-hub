@@ -123,9 +123,8 @@ describe('ChatPage', () => {
     await user.type(screen.getByLabelText('Beschreibung (optional)'), 'Zweiter Versuch');
     await user.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(versucht).toBe(1));
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Anlegen' })).not.toHaveClass('ant-btn-loading'),
-    );
+    // Die Ablehnung ist verarbeitet, sobald die Fehlermeldung steht.
+    expect(await screen.findByText('Name vergeben')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).not.toHaveClass('ant-zoom-leave');
     expect(screen.getByLabelText('Name')).toHaveValue('Allgemein');
     expect(screen.getByLabelText('Beschreibung (optional)')).toHaveValue('Zweiter Versuch');

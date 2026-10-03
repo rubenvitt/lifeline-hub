@@ -57,6 +57,27 @@ describe('NachrichtEingabe', () => {
     expect(feld).toHaveValue('');
   });
 
+  it('verwirft keinen Nachtrag, der während des Sendens dazukam (LFH-795)', async () => {
+    // Offline pausiert die Mutation; wer währenddessen weiterschreibt oder anhängt, darf das nach
+    // dem Erfolg nicht verlieren. Geleert wird nur, was gesendet wurde.
+    let erfuellen!: () => void;
+    const onSenden = vi.fn(() => new Promise<void>((r) => (erfuellen = r)));
+    renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
+    const feld = screen.getByPlaceholderText('Nachricht…');
+    // rc-upload ersetzt sein Datei-Input nach jeder Wahl, deshalb je Upload neu abfragen.
+    const dateiInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.type(feld, 'A');
+    await userEvent.upload(dateiInput(), new File(['1'], 'lage.pdf', { type: 'application/pdf' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await userEvent.type(feld, ', Nachtrag');
+    await userEvent.upload(dateiInput(), new File(['2'], 'foto.jpg', { type: 'image/jpeg' }));
+    expect(await screen.findByTitle('foto.jpg')).toBeInTheDocument();
+    await act(async () => erfuellen());
+    expect(feld).toHaveValue('A, Nachtrag');
+    await waitFor(() => expect(screen.queryByTitle('lage.pdf')).not.toBeInTheDocument());
+    expect(screen.getByTitle('foto.jpg')).toBeInTheDocument();
+  });
+
   it('sendet nicht bei leerem Text ohne Anhang', async () => {
     const onSenden = vi.fn();
     renderMitProviders(<NachrichtEingabe onSenden={onSenden} senden={false} />);
