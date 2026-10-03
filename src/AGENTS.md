@@ -208,8 +208,9 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Personenart Bezug und `Mit`/`Ohne(Grund)` je Scrub-Spalte; Strategie kommt aus `TABELLEN`, nie
   eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal`,
   `infotelefon_anruf` oder `medienkontakt` braucht dort einen Eintrag (Guard
-  `jeder_personenverweis_ist_als_bezug_deklariert`). Freitexte, die eine Person nur erwähnen,
-  bleiben bis zur Einsatz-Schwärzung.
+  `jeder_personenverweis_ist_als_bezug_deklariert`); ein Datei-Linker an einer Person (Registry
+  `ZeileLoeschen`) steht stattdessen in `PERSONENANHAENGE`, der Vollzug löscht seine Dateien
+  (LFH-769). Freitexte, die eine Person nur erwähnen, bleiben bis zur Einsatz-Schwärzung.
 - **Die Personensuche (`aufbewahrung::suche`) ist die einzige Archiv-Stelle, die Scrub-Spalten
   liest**: nur ganze Wörter bzw. ≥ 6 Ziffern, Antwort pseudonym, `no-store`, Suchtext nie
   geloggt, schreibt nichts (Guard `archiv_namensraum_nur_lesend_und_admin`, benannte
