@@ -72,6 +72,8 @@ export const EINSATZ_KEYS = {
   infotelefon: 'einsatz-infotelefon',
   // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
+  // Eigene Führungsstelle (LFH-849): eigener Endpunkt, live über dasselbe `einsatz`-Ereignis.
+  fuehrungsstelle: 'einsatz-fuehrungsstelle',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einstellungen: 'einsatz-einstellungen',
   mitglieder: 'einsatz-mitglieder',
@@ -235,8 +237,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // Einsatzkopf (LFH-555). Der Stab-GET liefert den Termin der nächsten Lagebesprechung aus
   // derselben Spalte mit (LFH-46, Entscheidung 11), deshalb hängt er hier mit dran: eine
   // Terminwahrheit, zwei Caches. Die benutzerbezogenen Kopffelder (`meine_*`) und
-  // `lagekennzahlen` lösen das Ereignis nicht aus; sie werden beim nächsten Abruf frisch.
-  einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.stab],
+  // `lagekennzahlen` lösen das Ereignis nicht aus; sie werden beim nächsten Abruf frisch. Die
+  // eigene Führungsstelle (LFH-849) meldet ihre Änderung über dasselbe Ereignis.
+  einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.stab, EINSATZ_KEYS.fuehrungsstelle],
   // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
   // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.
   presse: [EINSATZ_KEYS.presse],
@@ -344,6 +347,8 @@ export const einsatzKeys = {
   // Einsatz-Stammdaten. einsatzId nullbar: die Kommandopalette lädt den Einsatz nur im
   // Einsatzkontext (enabled-Guard).
   einsatz: (einsatzId: number | null) => [EINSATZ_KEYS.einsatz, einsatzId] as const,
+  /** Eigene Führungsstelle (LFH-849), live über `einsatz`. */
+  fuehrungsstelle: (einsatzId: number) => [EINSATZ_KEYS.fuehrungsstelle, einsatzId] as const,
   einstellungen: (einsatzId: number) => [EINSATZ_KEYS.einstellungen, einsatzId] as const,
   /** Aufbewahrung je Datenkategorie (LFH-749) — Unter-Key der Einstellungen: dieselbe Seite,
    *  dieselbe Invalidierung, kein Live-Ereignis, kein Personenbezug. */

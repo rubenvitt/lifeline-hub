@@ -32,7 +32,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { ladeEinsatz, ladeMitglieder, patcheEinsatz, type KopfdatenPatch } from '../api/einsaetze';
+import {
+  ladeEinsatz,
+  ladeFuehrungsstelle,
+  ladeMitglieder,
+  patcheEinsatz,
+  patcheFuehrungsstelle,
+  type KopfdatenPatch,
+} from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -43,7 +50,19 @@ import {
   darfEinsatzLeiten,
   istEinsatzLeitung,
 } from '../einsatz/schreibrecht';
-import type { EinsatzAnzeige, Einsatzart } from '../api/types';
+import type {
+  EinsatzAnzeige,
+  Einsatzart,
+  Fuehrungsstelle,
+  FuehrungsstellePatch,
+} from '../api/types';
+import PaneelZustand from '../components/instrument/PaneelZustand';
+import SprechgruppenPicker from '../components/SprechgruppenPicker';
+import {
+  KOMMUNIKATIONSMITTEL_OPTIONEN,
+  kommunikationsmittelLabel,
+  teileSprechgruppen,
+} from '../components/kommunikationsmittel';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
@@ -295,6 +314,148 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Sprechgruppen als eine Zeile: „TMO 311, 312 · DMO 505“ — dieselbe Teilung wie der Funkplan. */
+export function sprechgruppenText(fs: Pick<Fuehrungsstelle, 'sprechgruppen'>): string {
+  const { tmo, dmo } = teileSprechgruppen(fs.sprechgruppen);
+  return [
+    tmo.length > 0 ? `TMO ${tmo.map((s) => s.bezeichnung).join(', ')}` : null,
+    dmo.length > 0 ? `DMO ${dmo.map((s) => s.bezeichnung).join(', ')}` : null,
+  ]
+    .filter((t): t is string => t != null)
+    .join(' · ');
+}
+
+/** Gleiche Sprechgruppen-Auswahl unabhängig von der Reihenfolge („unverändert → kein Senden“). */
+function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  const menge = new Set(a);
+  return b.every((id) => menge.has(id));
+}
+
+/**
+ * Eigene Führungsstelle des Einsatzes (LFH-849, Spec `einsatz-fuehrungsstelle`): die Gegenstelle
+ * des Funkplans. Vier Zeilen, jede schickt nur ihr Feld an `…/fuehrungsstelle`, mit dem
+ * Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
+ */
+function FuehrungsstellePaneel({
+  einsatzId,
+  darfSchreiben,
+}: {
+  einsatzId: number;
+  darfSchreiben: boolean;
+}) {
+  const qc = useQueryClient();
+  const { message } = App.useApp();
+  const { token } = useRollen();
+  const query = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+  });
+  // Wie `feldMutation`: erst in den Cache, dann erfüllen — die Zeile schließt mit dem neuen Wert,
+  // und die Fokusrückgabe trifft den frischen Wertknopf. Der Fehler steht an der Zeile.
+  const mutation = useMutation({
+    mutationFn: ({ patch }: { etikett: string; patch: FuehrungsstellePatch }) =>
+      patcheFuehrungsstelle(einsatzId, patch),
+    onSuccess: (neu, { etikett }) => {
+      qc.setQueryData(einsatzKeys.fuehrungsstelle(einsatzId), neu);
+      message.success(`${etikett} gespeichert`);
+    },
+  });
+  const speichern = (etikett: string, patch: FuehrungsstellePatch) =>
+    mutation.mutateAsync({ etikett, patch });
+
+  const fs = query.data;
+  const text = (
+    etikett: string,
+    wert: string | null | undefined,
+    mono: boolean,
+    schluessel: 'rufname' | 'erreichbarkeit',
+  ) => (
+    <InlineAngabe<string>
+      etikett={etikett}
+      wert={wert ?? ''}
+      anzeige={mono ? <span style={monoStil(13)}>{wert}</span> : wert}
+      leer={leererText}
+      gleich={(a, b) => a.trim() === b.trim()}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={(w) => speichern(etikett, { [schluessel]: leerZuNull(w) })}
+      eingabe={({ feld, value, onChange }) => (
+        <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    />
+  );
+
+  return (
+    <Paneel titel="Eigene Führungsstelle" style={{ marginTop: token.margin }}>
+      <PaneelZustand
+        zustand={query.isPending ? 'laden' : query.isError ? 'fehler' : 'daten'}
+        titel="Eigene Führungsstelle"
+        leerText=""
+        onNeuladen={() => void query.refetch()}
+      >
+        {fs && (
+          <Angaben
+            zeilen={[
+              { etikett: 'Rufname', wert: text('Rufname', fs.rufname, true, 'rufname') },
+              {
+                etikett: 'Sprechgruppen',
+                wert: (
+                  <InlineAngabe<number[]>
+                    etikett="Sprechgruppen"
+                    wert={fs.sprechgruppen.map((s) => s.id)}
+                    anzeige={<span style={monoStil(13)}>{sprechgruppenText(fs)}</span>}
+                    leer={(ids) => ids.length === 0}
+                    gleich={gleicheIds}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(ids) => speichern('Sprechgruppen', { sprechgruppe_ids: ids })}
+                    eingabe={({ feld, popup, value, onChange }) => (
+                      <SprechgruppenPicker
+                        einsatzId={einsatzId}
+                        value={value}
+                        onChange={onChange}
+                        auswahl={{ ...feld, ...popup }}
+                      />
+                    )}
+                  />
+                ),
+              },
+              {
+                etikett: 'Kommunikationsmittel',
+                wert: (
+                  <InlineAngabe<string | null>
+                    etikett="Kommunikationsmittel"
+                    wert={fs.kommunikationsmittel ?? null}
+                    anzeige={kommunikationsmittelLabel(fs.kommunikationsmittel)}
+                    leer={(w) => w === null}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(w) =>
+                      speichern('Kommunikationsmittel', { kommunikationsmittel: w })
+                    }
+                    eingabe={({ feld, popup, value, onChange }) => (
+                      <Select<string>
+                        {...feld}
+                        {...popup}
+                        allowClear
+                        options={KOMMUNIKATIONSMITTEL_OPTIONEN}
+                        value={value ?? undefined}
+                        onChange={(w) => onChange(w ?? null)}
+                      />
+                    )}
+                  />
+                ),
+              },
+              {
+                etikett: 'Erreichbarkeit',
+                wert: text('Erreichbarkeit', fs.erreichbarkeit, false, 'erreichbarkeit'),
+              },
+            ]}
+          />
+        )}
+      </PaneelZustand>
+    </Paneel>
   );
 }
 
@@ -697,6 +858,8 @@ export default function EinsatzdatenPage() {
               ]}
             />
           </Paneel>
+
+          <FuehrungsstellePaneel einsatzId={einsatzId} darfSchreiben={darfBearbeiten} />
 
           {/* Technische Angaben — Aktenzeichen und Anlege-Zeitstempel: gebraucht beim
               Nachweisen, nicht beim Führen, deshalb eingeklappt. Kein `forceRender`: der

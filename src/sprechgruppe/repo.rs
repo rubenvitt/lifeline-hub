@@ -207,7 +207,7 @@ pub async fn liste_fuer_einsatz(
 /// Prüft, ob alle `ids` zur `org_id` als Katalog-Eintrag (`einsatz_id IS NULL`)
 /// **oder** als einsatz-lokale Sprechgruppe mit genau diesem `einsatz_id` gehören.
 /// Jede ID, die diese Bedingung nicht erfüllt, ergibt `UnprocessableEntity`.
-async fn pruefe_zuordenbar(
+pub(crate) async fn pruefe_zuordenbar(
     pool: &SqlitePool,
     org_id: i64,
     einsatz_id: i64,

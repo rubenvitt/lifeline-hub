@@ -1428,6 +1428,33 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("sprechgruppe_id", G_FK),
         ],
     },
+    // Eigene Führungsstelle (LFH-849): Rufname und Kommunikationsmittel sind Führungsstruktur wie
+    // an Abschnitt und Einheit, die Erreichbarkeit eine mögliche Rufnummer (Scrub).
+    TabellenRegel {
+        tabelle: "einsatz_fuehrungsstelle",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("rufname", G_OP_LABEL),
+            retain(
+                "kommunikationsmittel",
+                "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
+            ),
+            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "einsatz_fuehrungsstelle_sprechgruppe",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("sprechgruppe_id", G_FK),
+        ],
+    },
     // ---------- Führungsdokumentation: ETB (RETAIN, Wortlaut) und Führungsmodule ----------
     // Rechtsverbindlich ist allein der ETB-Wortlaut. Die Freitexte der Module darunter werden
     // gescrubbt, ihre Struktur bleibt (LFH-701, Linie A).

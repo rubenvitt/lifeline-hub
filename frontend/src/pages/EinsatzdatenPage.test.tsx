@@ -7,7 +7,13 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
+import type {
+  BenutzerAnzeige,
+  EinsatzAnzeige,
+  Fuehrungsstelle,
+  FuehrungsstellePatch,
+  Sprechgruppe,
+} from '../api/types';
 import EinsatzdatenPage, {
   geaenderteKopfdaten,
   gleicherZeitpunkt,
@@ -52,6 +58,29 @@ const vorschlaege = [
   { id: 2, text: 'MANV' },
 ];
 
+const sprechgruppenListe: Sprechgruppe[] = [
+  {
+    id: 1,
+    einsatz_id: null,
+    einsatz_lokal: false,
+    bezeichnung: '311',
+    betriebsart: 'TMO',
+    hinweis: null,
+    aktiv: true,
+    sortier: 1,
+  },
+  {
+    id: 2,
+    einsatz_id: 7,
+    einsatz_lokal: true,
+    bezeichnung: '505',
+    betriebsart: 'DMO',
+    hinweis: null,
+    aktiv: true,
+    sortier: 2,
+  },
+];
+
 interface SetupOpts {
   einsatz?: Partial<EinsatzAnzeige>;
   benutzer?: BenutzerAnzeige;
@@ -71,6 +100,10 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/:id/ort-vorschau', () =>
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
+    http.get('/api/einsaetze/7/fuehrungsstelle', () =>
+      HttpResponse.json({ sprechgruppen: [] } satisfies Fuehrungsstelle),
+    ),
+    http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
   );
   const routen = (
     <Routes>
@@ -1048,5 +1081,140 @@ describe('EinsatzdatenPage — Einstieg in den Einsatzbericht (LFH-726)', () => 
     await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await screen.findByText('Einsatzdaten bearbeiten');
     expect(screen.queryByRole('link', { name: 'Einsatzbericht drucken' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Eigene Führungsstelle (LFH-849, Spec `einsatz-fuehrungsstelle`): ein Paneel mit vier Zeilen,
+ * jede schickt nur ihr Feld an `…/fuehrungsstelle`.
+ */
+describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
+  /** Nimmt jeden PATCH-Body auf und legt ihn wie der Server über den Stand. */
+  function fuehrungsstelleMitschnitt(start: Fuehrungsstelle = { sprechgruppen: [] }) {
+    const bodies: FuehrungsstellePatch[] = [];
+    let stand: Fuehrungsstelle = start;
+    server.use(
+      http.get('/api/einsaetze/7/fuehrungsstelle', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/7/fuehrungsstelle', async ({ request }) => {
+        const body = (await request.json()) as FuehrungsstellePatch;
+        bodies.push(body);
+        const { sprechgruppe_ids, ...felder } = body;
+        const naechster: Fuehrungsstelle = { ...stand };
+        for (const [k, v] of Object.entries(felder)) {
+          if (v == null) delete naechster[k as keyof typeof felder];
+          else naechster[k as keyof typeof felder] = v;
+        }
+        if (sprechgruppe_ids) {
+          naechster.sprechgruppen = sprechgruppenListe.filter((g) =>
+            sprechgruppe_ids.includes(g.id),
+          );
+        }
+        stand = naechster;
+        return HttpResponse.json(stand);
+      }),
+    );
+    return bodies;
+  }
+
+  async function paneel() {
+    return within(await screen.findByRole('region', { name: 'Eigene Führungsstelle' }));
+  }
+
+  it('zeigt vier Angaben; leer mit Aufforderung', async () => {
+    setup();
+    fuehrungsstelleMitschnitt();
+    const p = await paneel();
+    for (const etikett of ['Rufname', 'Sprechgruppen', 'Kommunikationsmittel', 'Erreichbarkeit']) {
+      expect(await p.findByRole('button', { name: `${etikett} eintragen` })).toBeInTheDocument();
+    }
+  });
+
+  it('Rufname: nur dieses Feld geht hinaus, die Zeile zeigt den Wert', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.type(p.getByRole('textbox', { name: 'Rufname' }), 'Florian Musterstadt 10/1{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ rufname: 'Florian Musterstadt 10/1' }]));
+    expect(
+      await p.findByRole('button', { name: 'Rufname bearbeiten' }),
+    ).toHaveAccessibleDescription('Florian Musterstadt 10/1');
+  });
+
+  it('Sprechgruppen: Auswahl geht als `sprechgruppe_ids`, Anzeige nach Betriebsart', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Sprechgruppen eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await user.click(await screen.findByText('311'));
+    await user.click(await screen.findByText('505 (lokal)'));
+    await user.click(p.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ sprechgruppe_ids: [1, 2] }]));
+    expect(
+      await p.findByRole('button', { name: 'Sprechgruppen bearbeiten' }),
+    ).toHaveAccessibleDescription('TMO 311 · DMO 505');
+  });
+
+  it('Kommunikationsmittel: Schlüssel hinaus, Label in der Anzeige', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Kommunikationsmittel eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Kommunikationsmittel' }));
+    await user.click(await screen.findByText('Digitalfunk'));
+    await user.click(p.getByRole('button', { name: 'Kommunikationsmittel speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ kommunikationsmittel: 'digitalfunk' }]));
+    expect(
+      await p.findByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
+    ).toHaveAccessibleDescription('Digitalfunk');
+  });
+
+  it('Erreichbarkeit: unverändert sendet nichts, geleert sendet null', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt({ sprechgruppen: [], erreichbarkeit: '0171 1234567' });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Erreichbarkeit bearbeiten' }));
+    await user.keyboard('{Enter}');
+    expect(await p.findByRole('button', { name: 'Erreichbarkeit bearbeiten' })).toBeVisible();
+    expect(bodies).toEqual([]);
+
+    await user.click(p.getByRole('button', { name: 'Erreichbarkeit bearbeiten' }));
+    await user.clear(p.getByRole('textbox', { name: 'Erreichbarkeit' }));
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ erreichbarkeit: null }]));
+    expect(await p.findByRole('button', { name: 'Erreichbarkeit eintragen' })).toBeVisible();
+  });
+
+  it('Beobachter: Angaben ohne Aufforderung, leer als „—“', async () => {
+    setup({
+      einsatz: { meine_rolle: 'beobachter' },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
+    fuehrungsstelleMitschnitt({ sprechgruppen: [], rufname: 'Florian 10/1' });
+    const p = await paneel();
+    expect(await p.findByText('Florian 10/1')).toBeInTheDocument();
+    expect(p.queryByRole('button', { name: /eintragen|bearbeiten/ })).toBeNull();
+    expect(p.getAllByText('—')).toHaveLength(3);
+  });
+
+  it('Speicherfehler steht an der Zeile, die Eingabe bleibt offen', async () => {
+    setup();
+    server.use(
+      http.patch('/api/einsaetze/7/fuehrungsstelle', () =>
+        HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.type(p.getByRole('textbox', { name: 'Rufname' }), 'X{Enter}');
+    const fehler = await p.findByText('Einsatz ist abgeschlossen');
+    expect(fehler.closest('.ant-message')).toBeNull();
+    expect(p.getByRole('textbox', { name: 'Rufname' })).toHaveValue('X');
   });
 });
