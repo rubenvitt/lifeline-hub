@@ -15,7 +15,7 @@
  * `parseRouteId`, Render-Stellen mit möglicherweise fehlender ID guarden vor dem Aufruf.
  */
 import type { EtbFilterWerte } from '../api/etb';
-import type { EtbTyp, SchadenStatus, Spezies } from '../api/types';
+import type { EtbTyp, SchadenStatus, Spezies, ZoneTyp } from '../api/types';
 import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter';
 import type { TiereSicht } from '../pages/tiere/tierHelfer';
 import type { SchaedenSicht } from '../pages/schaeden/schadenHelfer';
@@ -685,6 +685,7 @@ export function lagekartePfad(
     ansicht?: number;
     snapshot?: number;
     platzieren?: { typ: PlatzierenZielTyp; id: number };
+    zeichnen?: ZeichnenAuftrag;
     zentrum?: Kartenzentrum;
     /** Adresssuche (LFH-638): die Karte übernimmt den Text ins Suchfeld und sucht ihn. */
     ort?: string;
@@ -700,6 +701,12 @@ export function lagekartePfad(
     snapshot: opts.snapshot,
     // Platzier-Auftrag: der nächste Klick auf die Karte setzt die Koordinate dieses Objekts.
     platzieren: opts.platzieren ? `${opts.platzieren.typ}:${opts.platzieren.id}` : undefined,
+    // Zeichnen-Auftrag (LFH-825): die Karte betritt den Zonen-Zeichenmodus dieses Typs und räumt.
+    zeichnen: opts.zeichnen
+      ? opts.zeichnen.form
+        ? `${opts.zeichnen.typ}:${opts.zeichnen.form}`
+        : opts.zeichnen.typ
+      : undefined,
     // Kartenmittelpunkt (Koordinatensprung der Sprungpalette): die Karte fliegt hin und räumt den
     // Parameter. Fünf Nachkommastellen ≙ rund 1 m.
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
@@ -764,6 +771,54 @@ export function parsePlatzierenAuftrag(
   if (!typ || !Object.prototype.hasOwnProperty.call(PLATZIEREN_ZIEL_ERLAUBT, typ)) return null;
   const id = parseRouteId(roheId);
   return id == null ? null : { typ: typ as PlatzierenZielTyp, id };
+}
+
+/**
+ * Form eines Zeichnen-Auftrags. Deutsch und sprechend, weil der Link ein äußerer Vertrag ist; die
+ * Übersetzung in den Kartenmodus steht in `pages/lagekarte/zeichenAuftrag.ts`.
+ */
+export type ZeichnenForm = 'flaeche' | 'linie';
+
+/** Ein Zeichnen-Auftrag `?zeichnen=<zonentyp>[:flaeche|:linie]` (LFH-825). */
+export interface ZeichnenAuftrag {
+  typ: ZoneTyp;
+  form?: ZeichnenForm;
+}
+
+/**
+ * Exhaustiv über die Zonentypen der API: ein neuer Typ bricht den Typcheck, statt im Parser still
+ * zu fehlen. Ob die Karte ihn zeichnen kann und in welcher Geometrie, entscheidet erst die
+ * Lagekarte über `ZONE_TYPEN` — das Routing-Modul bleibt frei von Seitenbezügen.
+ */
+const ZEICHNEN_TYP_ERLAUBT: Record<ZoneTyp, true> = {
+  gefahrengebiet: true,
+  absperrbereich: true,
+  absperrgrenze: true,
+  sperrgebiet: true,
+  freie_skizze: true,
+  evakuierungsbezirk: true,
+};
+
+const ZEICHNEN_FORM_ERLAUBT: Record<ZeichnenForm, true> = { flaeche: true, linie: true };
+
+const istEigenerSchluessel = (o: object, k: string): boolean =>
+  Object.prototype.hasOwnProperty.call(o, k);
+
+/**
+ * Liest den Zeichnen-Auftrag aus `?zeichnen=<zonentyp>[:flaeche|:linie]` zurück (LFH-825):
+ * unbekannter Typ, unbekannte Form oder überzählige Teile liefern `null`, kein halb gefülltes
+ * Objekt. Ob die Form zur Geometrie des Typs passt, prüft die Lagekarte. Der Aufrufer räumt den
+ * Parameter, sonst ginge die Karte bei jedem Neuladen erneut in den Modus.
+ */
+export function parseZeichnenAuftrag(wert: string | null | undefined): ZeichnenAuftrag | null {
+  if (!wert) return null;
+  const teile = wert.split(':');
+  if (teile.length > 2) return null;
+  const [typ, form] = teile;
+  if (!typ || !istEigenerSchluessel(ZEICHNEN_TYP_ERLAUBT, typ)) return null;
+  if (form === undefined) return { typ: typ as ZoneTyp };
+  if (!istEigenerSchluessel(ZEICHNEN_FORM_ERLAUBT, form)) return null;
+  return { typ: typ as ZoneTyp, form: form as ZeichnenForm };
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

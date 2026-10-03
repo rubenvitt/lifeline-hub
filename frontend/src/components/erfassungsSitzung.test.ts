@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  erfassungsSitzungBinden,
   erfassungsSitzungRaeumen,
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
@@ -87,6 +88,74 @@ describe('erfassungsSitzungRaeumen (LFH-767)', () => {
   it('wirft nicht ohne sessionStorage', () => {
     mitSessionStorage(undefined, () => {
       expect(() => erfassungsSitzungRaeumen()).not.toThrow();
+    });
+  });
+});
+
+describe('erfassungsSitzungBinden (LFH-785)', () => {
+  const A = 11;
+  const B = 12;
+
+  it('Wechsel von A zu B: die Werte von A sind weg', () => {
+    erfassungsSitzungBinden(A);
+    schreibeErfassungsSitzungswert(1, 'person', 'antreff_ort', 'Sammelstelle Süd');
+    schreibeErfassungsSitzungswert(2, 'schaden', 'ort', 'Deich km 3');
+
+    erfassungsSitzungBinden(B);
+
+    expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBeUndefined();
+    expect(liesErfassungsSitzungswert(2, 'schaden', 'ort')).toBeUndefined();
+  });
+
+  it('derselbe Benutzer erneut (A zu A): „Werte behalten“ bleibt', () => {
+    erfassungsSitzungBinden(A);
+    schreibeErfassungsSitzungswert(1, 'person', 'antreff_ort', 'Sammelstelle Süd');
+
+    erfassungsSitzungBinden(A);
+
+    expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBe('Sammelstelle Süd');
+  });
+
+  it('verwirft Werte aus der Zeit vor der Bindung, statt sie zu übernehmen', () => {
+    sessionStorage.setItem(PERSON_1_ORT, 'ohne Besitzer');
+
+    erfassungsSitzungBinden(A);
+
+    expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBeUndefined();
+  });
+
+  it('ohne Benutzer räumt es nichts — das tun Abmelden und Sitzungsende', () => {
+    erfassungsSitzungBinden(A);
+    schreibeErfassungsSitzungswert(1, 'person', 'antreff_ort', 'Sammelstelle Süd');
+
+    erfassungsSitzungBinden(null);
+
+    expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBe('Sammelstelle Süd');
+  });
+
+  it('lässt fremde Schlüssel stehen', () => {
+    erfassungsSitzungBinden(A);
+    sessionStorage.setItem('fremd', 'bleibt');
+
+    erfassungsSitzungBinden(B);
+
+    expect(sessionStorage.getItem('fremd')).toBe('bleibt');
+  });
+
+  it('nach dem Räumen beim Abmelden bindet sich der nächste Benutzer neu', () => {
+    erfassungsSitzungBinden(A);
+    erfassungsSitzungRaeumen();
+    erfassungsSitzungBinden(B);
+    schreibeErfassungsSitzungswert(1, 'person', 'antreff_ort', 'Ort von B');
+
+    erfassungsSitzungBinden(B);
+
+    expect(liesErfassungsSitzungswert(1, 'person', 'antreff_ort')).toBe('Ort von B');
+  });
+
+  it('wirft nicht ohne sessionStorage', () => {
+    mitSessionStorage(undefined, () => {
+      expect(() => erfassungsSitzungBinden(A)).not.toThrow();
     });
   });
 });

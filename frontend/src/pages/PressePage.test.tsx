@@ -120,6 +120,14 @@ describe('PressePage (LFH-554)', () => {
     expect(await screen.findByText('NDR 1 · Evakuierte')).toBeInTheDocument();
   });
 
+  it('jede Pressemitteilung ist eine Überschrift unter dem Paneel (h2 → h3, LFH-826)', async () => {
+    setup();
+    const paneel = await screen.findByRole('region', { name: 'Pressemitteilungen' });
+    expect(
+      await within(paneel).findByRole('heading', { level: 3, name: /Hochwasser Musterstadt/ }),
+    ).toBeInTheDocument();
+  });
+
   it('filtert per Segmentleiste auf offene Kontakte', async () => {
     setup();
     await screen.findByText('RTL · Dreh');

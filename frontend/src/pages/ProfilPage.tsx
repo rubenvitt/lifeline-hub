@@ -129,8 +129,9 @@ export default function ProfilPage() {
     }
   }
 
-  // Startet ein TOTP-Enrollment. Ein erneuter Klick (Re-Enroll, z. B. neues Gerät) überschreibt
-  // serverseitig das noch nicht bestätigte Secret.
+  // Startet ein TOTP-Enrollment. Ein erneuter Start überschreibt serverseitig nur ein noch nicht
+  // bestätigtes Secret; bei aktivem TOTP lehnt der Server ab (422, LFH-794), ein Gerätewechsel
+  // braucht den Admin-Reset.
   async function totpEinrichtenStarten() {
     setTotpFehler(null);
     setTotpLaedt(true);

@@ -1,26 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import * as ts from 'typescript';
-import { SCHNELLAKTIONEN } from './befehle';
+import { SCHNELLAKTIONEN, type SchnellaktionParameter } from './befehle';
 import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
-import { einsatzModulPfad } from '../routing/deeplinks';
+import { einsatzModulPfad, parseZeichnenAuftrag } from '../routing/deeplinks';
+import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
 
 /**
  * Guard: die Schnellaktionen der Kommandopalette zeigen auf ein fertiges Modul der Registry und
- * auf Seiten, die `?neu=1` WIRKLICH lesen. Eine Schnellaktion ins Leere macht keinen Test rot:
- * die Zielseite ignoriert den Parameter, und die Person steht auf einer Liste statt in der
- * Erfassung.
+ * auf Seiten, die den Auftrag ihres Ziels WIRKLICH lesen. Eine Schnellaktion ins Leere macht keinen
+ * Test rot: die Zielseite ignoriert den Parameter, und die Person steht auf einer Liste statt in
+ * der Erfassung.
+ *
+ * Zwei Aktionsarten, je nach dem Parameter, den der Eintrag deklariert (LFH-825): `neu`
+ * (Erfassung, `?neu=1`) und `zeichnen` (Zeichenmodus der Lagekarte, `?zeichnen=<zonentyp>`). Ziel
+ * und Deckung werden JE PARAMETER geprüft; ein `neu`-Leser deckt keine Zeichen-Aktion.
  *
  * Erkennung per TS-AST (Muster `api/queryKeyScan.ts`): ein Grep auf `neu=1` träfe auch Kommentare
  * und Builder. Die Deckung ist eine ZUORDNUNG, kein Zählvergleich: je Eintrag muss es einen Leser
- * SEINES Trägermoduls geben, zugeordnet über den DATEINAMEN (`PersonenPage.tsx` → `personen`,
- * gegen Schlüssel und Route des Registry-Eintrags).
+ * SEINES Parameters in einer Datei SEINES Trägermoduls geben, zugeordnet über den DATEINAMEN
+ * (`PersonenPage.tsx` → `personen`, `LagekartePage.tsx` → `lagekarte`, gegen Schlüssel und Route
+ * des Registry-Eintrags).
  *
  * ── WAS DIESER GUARD NICHT SIEHT ──
  *
  *  1. ER LÖST KEINE ROUTEN AUF. Dass die Datei mit dem Leser unter dem Zielpfad hängt, trägt der
  *     Literal-Pin in `befehle.test.ts` (UHS-Listenroute).
- *  2. INDIREKTION, und das ist eine FALLE: erfasst wird `X.get('neu')` / `X.has('neu')` mit dem
- *     Schlüssel als LITERAL. Hinter einer Konstante oder einem Helfer wird der Guard ROT, obwohl
+ *  2. INDIREKTION, und das ist eine FALLE: erfasst wird `X.get('<parameter>')` /
+ *     `X.has('<parameter>')` mit dem Schlüssel als LITERAL. Hinter einer Konstante oder einem Helfer wird der Guard ROT, obwohl
  *     der Deeplink funktioniert. Wer das ändern will, ändert den Scanner, nicht die Seite.
  *  3. OB DER LESER DEN PARAMETER VERWERTET; ein toter Zweig zählt mit.
  *  4. TESTDATEIEN werden gar nicht gescannt.
@@ -28,20 +34,20 @@ import { einsatzModulPfad } from '../routing/deeplinks';
  *     nicht zugeordnet.
  */
 
-/** Eine Fundstelle `X.get('neu')` / `X.has('neu')`. */
-interface NeuLeser {
+/** Eine Fundstelle `X.get('<parameter>')` / `X.has('<parameter>')`. */
+interface Leser {
   pfad: string;
   /** 1-basiert, wie in Editor-/Guard-Meldungen üblich. */
   zeile: number;
 }
 
 /**
- * Findet die Stellen, an denen ein Suchparameter namens `neu` gelesen wird: CallExpression mit
- * PropertyAccess auf `get`/`has` und dem String-Literal `'neu'` als erstem Argument. Ohne
+ * Findet die Stellen, an denen ein Suchparameter namens `parameter` gelesen wird: CallExpression
+ * mit PropertyAccess auf `get`/`has` und dem String-Literal `parameter` als erstem Argument. Ohne
  * Typprüfung des Empfängers (das bräuchte das Typprogramm); der Selbstbeweis unten misst, was das
  * Prädikat trennt.
  */
-export function findeNeuLeser(pfad: string, quelltext: string): NeuLeser[] {
+export function findeLeser(pfad: string, quelltext: string, parameter: string): Leser[] {
   const quelle = ts.createSourceFile(
     pfad,
     quelltext,
@@ -49,7 +55,7 @@ export function findeNeuLeser(pfad: string, quelltext: string): NeuLeser[] {
     /* setParentNodes */ true,
     pfad.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
-  const funde: NeuLeser[] = [];
+  const funde: Leser[] = [];
   const gehe = (knoten: ts.Node): void => {
     if (ts.isCallExpression(knoten) && ts.isPropertyAccessExpression(knoten.expression)) {
       const name = knoten.expression.name.text;
@@ -58,7 +64,7 @@ export function findeNeuLeser(pfad: string, quelltext: string): NeuLeser[] {
         (name === 'get' || name === 'has') &&
         erstes &&
         ts.isStringLiteralLike(erstes) &&
-        erstes.text === 'neu'
+        erstes.text === parameter
       ) {
         funde.push({
           pfad,
@@ -72,6 +78,19 @@ export function findeNeuLeser(pfad: string, quelltext: string): NeuLeser[] {
   return funde;
 }
 
+/**
+ * Was ein Ziel je Parameter tragen muss. Exhaustiv: eine neue Aktionsart bricht den Typcheck,
+ * statt ungeprüft durchzugehen. Die Zeichen-Aktion muss einen Auftrag tragen, den die Lagekarte
+ * wirklich in einen Zeichenmodus übersetzt — nicht nur einen syntaktisch gültigen.
+ */
+const ZIEL_TRAEGT: Record<SchnellaktionParameter, (wert: string | null) => boolean> = {
+  neu: (wert) => wert === '1',
+  zeichnen: (wert) => {
+    const auftrag = parseZeichnenAuftrag(wert);
+    return auftrag != null && zeichenAuftragZuEntwurf(auftrag) != null;
+  },
+};
+
 // Das Glob bleibt HIER im Guard, sonst landete der Quelltext des Frontends im App-Bundle.
 const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
   query: '?raw',
@@ -82,9 +101,14 @@ const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
 /** `.typetest.ts` zählt mit: es endet NICHT auf `.test.ts`. */
 const istTestdatei = (pfad: string): boolean => /\.(type)?test\.tsx?$/.test(pfad);
 
-const LESER: NeuLeser[] = Object.entries(dateien)
-  .filter(([pfad]) => !istTestdatei(pfad))
-  .flatMap(([pfad, inhalt]) => findeNeuLeser(pfad, inhalt));
+const QUELLEN = Object.entries(dateien).filter(([pfad]) => !istTestdatei(pfad));
+
+/** Die Parameter, die die Tabelle tatsächlich benutzt — nur für sie gibt es Leser zu prüfen. */
+const PARAMETER = [...new Set(SCHNELLAKTIONEN.map((a) => a.parameter))];
+
+const LESER = new Map<SchnellaktionParameter, Leser[]>(
+  PARAMETER.map((p) => [p, QUELLEN.flatMap(([pfad, inhalt]) => findeLeser(pfad, inhalt, p))]),
+);
 
 /** Vergleichsform für die Dateiname-↔-Registry-Zuordnung: nur Buchstaben und Ziffern. */
 const normal = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -102,14 +126,19 @@ export function modulZuLeserDatei(pfad: string): string[] {
     .map((m) => m.key);
 }
 
-const LESER_MODULE = new Map<string, string[]>();
-for (const l of LESER) {
-  for (const key of modulZuLeserDatei(l.pfad)) {
-    LESER_MODULE.set(key, [...(LESER_MODULE.get(key) ?? []), l.pfad]);
+/** Je Parameter: Modulschlüssel → Leser-Dateien dieses Moduls. */
+const LESER_MODULE = new Map<SchnellaktionParameter, Map<string, string[]>>();
+for (const [p, leser] of LESER) {
+  const module = new Map<string, string[]>();
+  for (const l of leser) {
+    for (const key of modulZuLeserDatei(l.pfad)) {
+      module.set(key, [...(module.get(key) ?? []), l.pfad]);
+    }
   }
+  LESER_MODULE.set(p, module);
 }
 
-const zeige = (l: NeuLeser): string => `${l.pfad}:${l.zeile}`;
+const zeige = (l: Leser): string => `${l.pfad}:${l.zeile}`;
 
 /**
  * LEERLAUF-SCHUTZ: über einer leeren Tabelle wäre die Deckung trivial wahr, über einer leeren
@@ -118,10 +147,14 @@ const zeige = (l: NeuLeser): string => `${l.pfad}:${l.zeile}`;
 describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
   it('scannt die Quellen und findet Leser', () => {
     expect(Object.keys(dateien).length).toBeGreaterThan(200);
-    expect(
-      LESER.length,
-      'kein einziger `?neu=1`-Leser gefunden — Glob oder Prädikat kaputt',
-    ).toBeGreaterThan(0);
+    // Beide Aktionsarten sind in Gebrauch; fiele eine weg, prüfte der Guard sie still nicht mehr.
+    expect([...PARAMETER].sort()).toEqual(['neu', 'zeichnen']);
+    for (const p of PARAMETER) {
+      expect(
+        LESER.get(p)!.length,
+        `kein einziger \`?${p}\`-Leser gefunden — Glob oder Prädikat kaputt`,
+      ).toBeGreaterThan(0);
+    }
     expect(
       SCHNELLAKTIONEN.length,
       'leere Schnellaktions-Tabelle macht jede Aussage unten trivial',
@@ -134,15 +167,29 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
    */
   it('findet den echten Aufruf und NICHT Kommentar, Text oder fremden Schlüssel', () => {
     const quelle = `
-      // Schnellaktion: ?neu=1 öffnet die Erfassung
+      // Schnellaktion: ?neu=1 öffnet die Erfassung, ?zeichnen=gefahrengebiet den Zeichenmodus
       /* auch hier steht searchParams.get('neu') nur als Prosa */
       const a = "neu=1";
       const b = params.get('person');
       const c = params.get("neu");
       const d = suchparameter
         .has('neu');
+      const e = searchParams.get('zeichnen');
+      const f = "zeichnen=gefahrengebiet";
     `;
-    expect(findeNeuLeser('/src/synthetisch.ts', quelle).map((l) => l.zeile)).toEqual([6, 7]);
+    expect(findeLeser('/src/synthetisch.ts', quelle, 'neu').map((l) => l.zeile)).toEqual([6, 7]);
+    // Ein `neu`-Leser deckt keine Zeichen-Aktion und umgekehrt.
+    expect(findeLeser('/src/synthetisch.ts', quelle, 'zeichnen').map((l) => l.zeile)).toEqual([9]);
+  });
+
+  it('prüft das Ziel je Parameter', () => {
+    expect(ZIEL_TRAEGT.neu('1')).toBe(true);
+    expect(ZIEL_TRAEGT.neu(null)).toBe(false);
+    expect(ZIEL_TRAEGT.zeichnen('gefahrengebiet')).toBe(true);
+    expect(ZIEL_TRAEGT.zeichnen('1')).toBe(false);
+    expect(ZIEL_TRAEGT.zeichnen(null)).toBe(false);
+    // Syntaktisch gültig, aber nicht zeichenbar: die Karte räumte nur.
+    expect(ZIEL_TRAEGT.zeichnen('absperrgrenze:flaeche')).toBe(false);
   });
 });
 
@@ -165,7 +212,7 @@ describe('Schnellaktionen-Guard: Trägermodul', () => {
 });
 
 describe('Schnellaktionen-Guard: Ziel', () => {
-  it('liegt unter dem Modulpfad seines EIGENEN Trägers und trägt neu=1', () => {
+  it('liegt unter dem Modulpfad seines EIGENEN Trägers und trägt den Auftrag seines Parameters', () => {
     const einsatzId = 4711;
     for (const a of SCHNELLAKTIONEN) {
       const m = modulRegistry.find((x) => x.key === a.modulKey)!;
@@ -177,22 +224,26 @@ describe('Schnellaktionen-Guard: Ziel', () => {
         `„${a.label}" zeigt auf ${ziel}, liegt aber nicht unter dem Modulpfad ${basis}`,
       ).toBe(true);
       // Über `URLSearchParams`, damit die Parameterreihenfolge keine Rolle spielt.
-      expect(new URLSearchParams(query).get('neu'), `„${a.label}" (${ziel}) trägt kein neu=1`).toBe(
-        '1',
-      );
+      const wert = new URLSearchParams(query).get(a.parameter);
+      expect(
+        ZIEL_TRAEGT[a.parameter](wert),
+        `„${a.label}" (${ziel}) trägt keinen brauchbaren Auftrag ?${a.parameter}= (gelesen: ${wert})`,
+      ).toBe(true);
     }
   });
 });
 
 describe('Schnellaktionen-Guard: Deckung', () => {
   /** DIE tragende Aussage, eine ZUORDNUNG (siehe Kopfkommentar). */
-  it('hat je Eintrag eine Seite seines Trägermoduls, die ?neu=1 wirklich liest', () => {
+  it('hat je Eintrag eine Seite seines Trägermoduls, die seinen Parameter wirklich liest', () => {
     for (const a of SCHNELLAKTIONEN) {
+      const leser = LESER.get(a.parameter) ?? [];
+      const module = LESER_MODULE.get(a.parameter) ?? new Map<string, string[]>();
       expect(
-        LESER_MODULE.get(a.modulKey) ?? [],
+        module.get(a.modulKey) ?? [],
         `Schnellaktion „${a.label}" zeigt auf das Modul '${a.modulKey}', aber KEINE Seite dieses ` +
-          `Moduls liest ?neu=1. Gefundene Leser:\n${LESER.map(zeige).join('\n')}\n` +
-          `Zugeordnet: ${[...LESER_MODULE].map(([k, v]) => `${k} ← ${v.join(', ')}`).join(' | ')}`,
+          `Moduls liest ?${a.parameter}. Gefundene Leser:\n${leser.map(zeige).join('\n')}\n` +
+          `Zugeordnet: ${[...module].map(([k, v]) => `${k} ← ${v.join(', ')}`).join(' | ')}`,
       ).not.toHaveLength(0);
     }
   });
@@ -203,13 +254,14 @@ describe('Schnellaktionen-Guard: Deckung', () => {
    * die Palette eine Zeile führt.
    */
   it('ordnet jeden gefundenen Leser einem Registry-Modul zu', () => {
-    const verwaist = LESER.filter((l) => modulZuLeserDatei(l.pfad).length === 0);
+    const alle = [...LESER.values()].flat();
+    const verwaist = alle.filter((l) => modulZuLeserDatei(l.pfad).length === 0);
     expect(
       verwaist.map(zeige),
-      'Diese Dateien lesen ?neu=1, ihr Name trifft aber keinen Registry-Eintrag — die ' +
+      'Diese Dateien lesen einen Schnellaktions-Parameter, ihr Name trifft aber keinen Registry-Eintrag — die ' +
         'Deckungsaussage oben kann sie nicht sehen. Datei umbenennen oder die Zuordnung erweitern.',
     ).toEqual([]);
-    const mehrdeutig = LESER.filter((l) => modulZuLeserDatei(l.pfad).length > 1);
+    const mehrdeutig = alle.filter((l) => modulZuLeserDatei(l.pfad).length > 1);
     expect(mehrdeutig.map(zeige), 'Dateiname trifft mehrere Registry-Einträge').toEqual([]);
   });
 });

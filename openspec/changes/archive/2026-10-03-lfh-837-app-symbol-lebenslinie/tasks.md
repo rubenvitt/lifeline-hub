@@ -49,9 +49,9 @@
 
 ## 5. Integration
 
-- [ ] 5.1 Gezielt `e2e/lagekarte-offline-precache.spec.ts` gegen den Prod-Bundle laufen lassen,
+- [x] 5.1 Gezielt `e2e/lagekarte-offline-precache.spec.ts` gegen den Prod-Bundle laufen lassen,
       dann `./scripts/check-all.sh` bis grün. Prüfung: Exit-Code 0, kein Schritt
       ÜBERSPRUNGEN ohne Grund.
-- [ ] 5.2 Endkontrolle am Kontaktbogen: die gerenderten `pwa-192.png`, `32x32.png` und
+- [x] 5.2 Endkontrolle am Kontaktbogen: die gerenderten `pwa-192.png`, `32x32.png` und
       `icon.icns` (32er-Stufe) sowie ein Bildschirmfoto der Kopfleiste und der Anmeldeseite
       (Tag/Nacht) dem Menschen vorlegen. Prüfung: Freigabe des Menschen.

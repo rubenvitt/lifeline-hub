@@ -46,6 +46,7 @@ import {
   ZEICHEN_KARTEN_PX,
   type ZeichenQuelle,
 } from './markerIcons';
+import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
 import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
@@ -147,6 +148,18 @@ function transformiereKartenAnfrage(url: string): { url: string } {
     if (liste.length < ANFRAGEN_DECKEL) liste.push({ ein: url, aus: ergebnis.url });
   }
   return ergebnis;
+}
+
+/**
+ * DEV-Mitschnitt der MapLibre-`error`-Events unter `window.__lfhKartenFehler` (LFH-781). Mit einem
+ * eigenen `error`-Hörer schreibt MapLibre nichts mehr in die Konsole: ein Sprite- oder Quellenfehler
+ * bliebe für jeden Browser-Test unsichtbar. Kachel-Fehler bleiben draußen, sie sind Netzlage.
+ */
+function schneideKartenFehlerMit(e: { error?: { message?: string }; tile?: unknown }) {
+  if (!import.meta.env.DEV || e.tile !== undefined) return;
+  const w = window as unknown as { __lfhKartenFehler?: string[] };
+  const liste = (w.__lfhKartenFehler ??= []);
+  if (liste.length < ANFRAGEN_DECKEL) liste.push(e.error?.message ?? String(e.error));
 }
 
 // Re-Export: LagekartePage importiert ZoneFeature aus Kartenflaeche.
@@ -455,6 +468,52 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Abschnitt; beide zugleich lässt der Modus-Reducer nicht zu).
   const zeichnenArtRef = useRef({ zeichnen, zoneZeichnen });
   zeichnenArtRef.current = { zeichnen, zoneZeichnen };
+  // Steht das Style-JSON? Wahr ab `style.load`, falsch ab jedem `setStyle`. NICHT
+  // `map.isStyleLoaded()`: das wartet zusätzlich auf alle Kacheln, und danach käme kein
+  // `style.load` mehr, auf das sich vertagen ließe (LFH-825).
+  const stilJsonAngewandtRef = useRef(false);
+  // Hat die Karte ihr einmaliges `load` gemeldet? Dort legt sie Abschnitte, Zonen und Fachebenen an.
+  const karteGeladenRef = useRef(false);
+  // Steht ein vertagter Zonen-Start aus? Genau einer: Nonce-Wechsel und Stilwechsel stapeln keine
+  // weiteren Hörer, und ein `style.load` startet nicht zweimal.
+  const zoneStartAnstehendRef = useRef(false);
+  /**
+   * Startet das Zonen-Zeichnen im DANN gewünschten Modus (nicht dem beim Vertagen), legt den
+   * Controller bei Bedarf an. Nur Refs, deshalb stabil.
+   */
+  const starteZonenZeichnung = useRef((map: maplibregl.Map) => {
+    const modus = zeichnenArtRef.current.zoneZeichnen;
+    if (!modus) return;
+    if (!zoneDrawRef.current) {
+      zoneDrawRef.current = createZeichnung(
+        map,
+        (g) => onZoneGezeichnetRef.current?.(g),
+        (stand) => onZeichnenStandAenderungRef.current?.(stand),
+        'td-zone',
+      );
+    }
+    zoneDrawRef.current.starten(modus);
+  }).current;
+  /**
+   * Vertagt den Zonen-Start bis nach dem nächsten `style.load` UND dem Neuaufbau der App-Ebenen
+   * (LFH-825, D6): terra-draw hängt seine `td-zone-*`-Ebenen beim Start oben an. Gestartet vor dem
+   * Neuaufbau, lägen Zonen, Abschnitte und Marker darüber; danach liegt die Zeichnung wie beim
+   * Start über das Paneel oben. Der Neuaufbau läuft am `load` der Karte (einmalig) bzw. im
+   * Render-Poller von `planeReAnlegenNachStyle` — `wendeKartenDatenAn` reiht sich dahinter ein.
+   */
+  const planeZonenStart = useRef((map: maplibregl.Map) => {
+    if (zoneStartAnstehendRef.current) return;
+    zoneStartAnstehendRef.current = true;
+    const nachAufbau = () =>
+      wendeKartenDatenAn(map, () => {
+        zoneStartAnstehendRef.current = false;
+        starteZonenZeichnung(map);
+      });
+    map.once('style.load', () => {
+      if (karteGeladenRef.current) nachAufbau();
+      else map.once('load', nachAufbau);
+    });
+  }).current;
   // Dritter Controller: Messen. Eigene Instanz, weil er bei jeder Änderung meldet statt erst beim
   // Abschluss (`messZeichnung.ts`).
   const messRef = useRef<MessZeichnung | null>(null);
@@ -531,8 +590,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!containerRef.current) return;
     // Mitschnitt vor dem Konstruktor leeren: `transformRequest` feuert schon für Style und Glyphs,
     // während `new maplibregl.Map` läuft. Sonst läse ein Test Einträge einer entfernten Karte.
-    if (import.meta.env.DEV)
+    if (import.meta.env.DEV) {
       (window as unknown as { __lfhKartenAnfragen?: KartenAnfrage[] }).__lfhKartenAnfragen = [];
+      (window as unknown as { __lfhKartenFehler?: string[] }).__lfhKartenFehler = [];
+    }
     const map = new maplibregl.Map({
       container: containerRef.current,
       style,
@@ -562,9 +623,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // auf alle sichtbaren Kacheln, 'style.load' feuert, sobald das Style-JSON angewandt ist — und
     // bei gescheitertem Style-Fetch gar nicht (dort kommt ein ErrorEvent).
     map.on('style.load', () => {
+      stilJsonAngewandtRef.current = true;
       stilWaechterRef.current.stilGeladen();
     });
+    if (import.meta.env.DEV) map.on('error', schneideKartenFehlerMit);
     map.on('load', () => {
+      karteGeladenRef.current = true;
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       for (const fe of fachebenenRef.current) {
@@ -599,14 +663,30 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         },
       }),
     );
+    // Wechselt die Pixeldichte (anderer Monitor, Browser-Zoom), rastern die schon angelegten
+    // Fachobjekt-Zeichen neu, sonst blieben sie bis zum nächsten Stilwechsel unscharf (LFH-842).
+    // Nur bei einer anderen Rasterdichte: 1,25 → 1,5 bleibt bei 2.
+    let zeichenDichte = kartenPixelRatio(window.devicePixelRatio);
+    const pixeldichteAbmelden = beobachtePixeldichte(window, (dpr) => {
+      const neu = kartenPixelRatio(dpr);
+      if (neu === zeichenDichte) return;
+      zeichenDichte = neu;
+      rastereZeichenNeu(map, zeichenRegistryRef.current, neu);
+    });
     mapRef.current = map;
     // Testhaken für den Browser-Smoke (e2e/lagekarte-smoke.spec.ts): die Karte lebt in WebGL, ein
     // toter Tile-Worker lässt das DOM unverändert, nur `map.loaded()` kippt. Im Prod-Build ist die
     // Zeile weg.
     if (import.meta.env.DEV) (window as unknown as { __lfhKarte?: unknown }).__lfhKarte = map;
     return () => {
+      pixeldichteAbmelden();
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
+      // Die Merker gehören zu DIESER Karte: eine neue (Remount, Fast Refresh) lädt ihren Style
+      // erst noch, und ein Zonen-Start darauf liefe in „Style is not done loading“ (LFH-825).
+      stilJsonAngewandtRef.current = false;
+      karteGeladenRef.current = false;
+      zoneStartAnstehendRef.current = false;
       // Testhaken mit abräumen: sonst zeigte er auf eine entfernte Map, und ein späterer Test wäre
       // grün, ohne dass eine Karte lief. (Unter StrictMode zeigt er danach korrekt auf die zweite
       // Instanz.)
@@ -614,6 +694,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
         // Mitschnitt mit abräumen, aus demselben Grund.
         delete (window as unknown as { __lfhKartenAnfragen?: unknown }).__lfhKartenAnfragen;
+        delete (window as unknown as { __lfhKartenFehler?: unknown }).__lfhKartenFehler;
       }
       // Ref nullen: sonst ruft der Attribution-Effekt nach StrictMode-Remount `removeControl` auf
       // der entfernten Map.
@@ -643,7 +724,15 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // geräumt und danach in derselben Form neu begonnen.
     const messForm = messenRef.current;
     if (messForm) messRef.current?.stoppen();
+    // Dasselbe gilt für das Zonen-Zeichnen (LFH-825): der Deeplink startet es oft noch VOR dem
+    // ersten Wechsel vom Blindstil auf den Style der Ansicht. Eine angefangene Figur geht dabei
+    // verloren wie bei der Messung.
+    const zoneForm = zeichnenArtRef.current.zoneZeichnen;
+    if (zoneForm) zoneDrawRef.current?.stoppen();
+    stilJsonAngewandtRef.current = false;
     map.setStyle(style, { diff: false });
+    // Nach dem Neuaufbau der App-Ebenen wieder beginnen; ein schon anstehender Start deckt das ab.
+    if (zoneForm) planeZonenStart(map);
     if (messForm) {
       map.once('style.load', () => {
         const noch = messenRef.current;
@@ -670,7 +759,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         eigenpositionRef.current.farbe,
       ),
     );
-  }, [style]);
+    // `planeZonenStart` ist stabil (nur Refs); er steht nur der Regel wegen in den Deps.
+  }, [style, planeZonenStart]);
 
   // AttributionControl je View neu setzen: MapLibre hat keinen Setter für `customAttribution`.
   useEffect(() => {
@@ -1400,25 +1490,23 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   }, [zeichnen]);
 
   // Zonen-Zeichenmodus (Polygon/Linie) an-/abschalten; eigener Controller-Lifecycle.
+  //
+  // Erst mit geladenem Style (LFH-825, D6): der Zeichnen-Deeplink `?zeichnen=` startet den Modus
+  // beim Kaltstart, während die Karte noch den Blindstil lädt — terra-draw legte seine Sources
+  // dann auf einen ungeladenen Style („Style is not done loading“). Vertagt wird über
+  // `planeZonenStart`.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     if (zoneZeichnen) {
-      if (!zoneDrawRef.current) {
-        zoneDrawRef.current = createZeichnung(
-          map,
-          (g) => onZoneGezeichnetRef.current?.(g),
-          (stand) => onZeichnenStandAenderungRef.current?.(stand),
-          'td-zone',
-        );
-      }
-      zoneDrawRef.current.starten(zoneZeichnen);
+      if (stilJsonAngewandtRef.current) starteZonenZeichnung(map);
+      else planeZonenStart(map);
     } else if (zoneDrawRef.current) {
       zoneDrawRef.current.stoppen();
     }
     // `zoneZeichnenNonce` wird nicht gelesen — sie erzwingt ein Re-Fire bei gleichem Modus, damit
-    // `starten()` einen offenen Entwurf verwirft.
-  }, [zoneZeichnen, zoneZeichnenNonce]);
+    // `starten()` einen offenen Entwurf verwirft. Die beiden Helfer sind stabil (nur Refs).
+  }, [zoneZeichnen, zoneZeichnenNonce, starteZonenZeichnung, planeZonenStart]);
 
   // Messen an-/abschalten bzw. die Form wechseln; `starten` verwirft dabei die alte Figur.
   useEffect(() => {

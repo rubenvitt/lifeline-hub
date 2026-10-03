@@ -211,12 +211,32 @@ describe('NachforderungenPage', () => {
 
     const begruendungFeld = () => screen.getByLabelText('Begründung / Lagebezug');
 
+    /**
+     * Wartet, bis ALLE vier Felder den erwarteten Stand zeigen, statt nach dem ersten Feld
+     * synchron weiterzuprüfen (LFH-789). Die Felder kommen nicht im selben Render an:
+     * `InputNumber` zieht seine Anzeige erst über einen `useLayoutUpdateEffect` von
+     * `@rc-component/util` nach, und der ist unter `NODE_ENV=test` ein `useEffect`, also eine
+     * Task später als die Textfelder. Unter Last stand „Art“ schon da, „Anzahl“ noch leer.
+     */
+    const erwarteMaske = (w: {
+      art: string;
+      bezeichnung: string;
+      anzahl: string;
+      begruendung: string;
+    }) =>
+      waitFor(() => {
+        expect(screen.getByLabelText('Art')).toHaveValue(w.art);
+        expect(screen.getByLabelText('Bezeichnung')).toHaveValue(w.bezeichnung);
+        expect(screen.getByLabelText('Anzahl')).toHaveValue(w.anzahl);
+        expect(begruendungFeld()).toHaveValue(w.begruendung);
+      });
+    const erwarteVorbelegt = () => erwarteMaske({ ...vorbelegung, anzahl: '20' });
+    const erwarteLeer = () =>
+      erwarteMaske({ art: '', bezeichnung: '', anzahl: '', begruendung: '' });
+
     it('öffnet die Erfassung vorbelegt und räumt die Adresse', async () => {
       renderPage(deeplink);
-      expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
-      expect(screen.getByLabelText('Bezeichnung')).toHaveValue(vorbelegung.bezeichnung);
-      expect(screen.getByLabelText('Anzahl')).toHaveValue('20');
-      expect(begruendungFeld()).toHaveValue(vorbelegung.begruendung);
+      await erwarteVorbelegt();
       await waitFor(() =>
         expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
       );
@@ -238,10 +258,7 @@ describe('NachforderungenPage', () => {
     it('eine unbrauchbare Vorbelegung wird ganz verworfen, die Erfassung öffnet leer', async () => {
       // Art ist brauchbar, die Anzahl nicht — die Art darf trotzdem nicht übernommen werden.
       renderPage(deeplink.replace('anzahl=20', 'anzahl=0'));
-      expect(await screen.findByLabelText('Art')).toHaveValue('');
-      expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');
-      expect(screen.getByLabelText('Anzahl')).toHaveValue('');
-      expect(begruendungFeld()).toHaveValue('');
+      await erwarteLeer();
       await waitFor(() =>
         expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
       );
@@ -250,7 +267,7 @@ describe('NachforderungenPage', () => {
     it('nach dem Absetzen füllt sich die Erfassung NICHT erneut mit der Vorbelegung', async () => {
       legeNachforderungAn.mockResolvedValue(nf());
       renderPage(deeplink);
-      expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
+      await erwarteVorbelegt();
       await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
       await waitFor(() =>
         expect(legeNachforderungAn).toHaveBeenCalledWith(
@@ -259,14 +276,12 @@ describe('NachforderungenPage', () => {
         ),
       );
       // Eine wieder vorbelegte Maske stünde einen Druck vor der Dublette.
-      await waitFor(() => expect(screen.getByLabelText('Art')).toHaveValue(''));
-      expect(screen.getByLabelText('Anzahl')).toHaveValue('');
-      expect(begruendungFeld()).toHaveValue('');
+      await erwarteLeer();
     });
 
     it('Schließen und erneutes Öffnen zeigt eine leere Erfassung', async () => {
       renderPage(deeplink);
-      expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
+      await erwarteVorbelegt();
       // Zwei Knöpfe schließen die Erfassung: der im Seitenkopf und das Kreuz am Paneel. Bis
       // LFH-595 schob antds Icon `aria-label="up"` in den Namen des Kopfknopfs; die Icons des
       // Satzes sind `aria-hidden`, beide heißen jetzt gleich. Geklickt wird der Kopfknopf.
@@ -275,8 +290,7 @@ describe('NachforderungenPage', () => {
       await userEvent.click(schliessen[0]);
       await waitFor(() => expect(screen.queryByLabelText('Art')).not.toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-      expect(await screen.findByLabelText('Art')).toHaveValue('');
-      expect(screen.getByLabelText('Anzahl')).toHaveValue('');
+      await erwarteLeer();
     });
 
     it('ohne Schreibrecht öffnet nichts, die Adresse wird trotzdem geräumt', async () => {

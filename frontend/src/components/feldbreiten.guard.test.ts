@@ -92,10 +92,21 @@ const OBERGRENZE = /\bmaxWidth: \d/g;
 
 const QUELLEN = BEREICHE.flatMap(sammleDateien);
 
-/** Was eine feste Zahlbreite behalten darf — und warum. */
+/** Was eine feste Zahlbreite behalten darf, wie oft — und warum. */
 const ZUGELASSEN = [
-  { pfad: 'stammdaten/StichworteTab.tsx', grund: 'Spaltenbreite einer Tabellenspalte' },
-  { pfad: 'karten/OfflineKartenVerwaltung.tsx', grund: 'Fortschrittsbalken des Downloads' },
+  { pfad: 'stammdaten/StichworteTab.tsx', anzahl: 1, grund: 'Spaltenbreite einer Tabellenspalte' },
+  {
+    pfad: 'karten/OfflineKartenVerwaltung.tsx',
+    anzahl: 1,
+    grund: 'Fortschrittsbalken des Downloads',
+  },
+  {
+    pfad: 'pages/BenutzerPage.tsx',
+    anzahl: 4,
+    // Neben der Fließspalte trägt jede übrige Spalte eine Zahl (LFH-523), sonst bleibt die
+    // fixierte Namensspalte ungedeckelt (LFH-819).
+    grund: 'Spaltenbreiten der Benutzertabelle neben ihrer Fließspalte',
+  },
 ];
 
 describe('Feldbreiten im Verwaltungsteil', () => {
@@ -106,12 +117,12 @@ describe('Feldbreiten im Verwaltungsteil', () => {
 
     expect(mitFesterBreite.sort()).toEqual(ZUGELASSEN.map((z) => z.pfad).sort());
 
-    // An den zugelassenen Stellen bleibt es bei GENAU einer, damit die Ausnahme keine Einfallstür
-    // wird.
-    for (const { pfad } of ZUGELASSEN) {
+    // An den zugelassenen Stellen bleibt es bei GENAU der genannten Zahl, damit die Ausnahme
+    // keine Einfallstür wird.
+    for (const { pfad, anzahl } of ZUGELASSEN) {
       const quelle = QUELLEN.find((q) => q.pfad === pfad)!;
-      const anzahl = quelle.text.split('\n').filter((z) => FESTE_BREITE.test(z)).length;
-      expect(anzahl, pfad).toBe(1);
+      const gemessen = quelle.text.split('\n').filter((z) => FESTE_BREITE.test(z)).length;
+      expect(gemessen, pfad).toBe(anzahl);
     }
   });
 

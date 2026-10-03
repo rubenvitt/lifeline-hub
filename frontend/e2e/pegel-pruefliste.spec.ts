@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Browser-Nachweise der Prüfliste für den Pegel (LFH-606): Trefflächen über die
@@ -7,7 +8,7 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
  * Achtungskante (5/6), Querlauf der Einstellungssektion auf 390 px (Gate 1), verdeckte
  * Fokusziele (13) und der CLS-Beitrag des Nachladens (12). Dazu der Fachebenen-Inspector der
  * Lagekarte (Fläche C, Kriterien 1/2/5/13; LFH-631): erreicht über einen Klick auf den
- * Pegel-Punkt der Karte.
+ * Pegel-Punkt der Karte, als Admin und ohne Schreibrecht als Beobachter (LFH-821).
  *
  * HERMETISCH: Pegel- und Stationsliste kommen per `page.route` aus Literalen in der Wire-Form
  * von `api/types.generated.ts` — der echte Abruf ginge an PEGELONLINE und mäße dessen
@@ -544,6 +545,40 @@ function abstandZumNaechstenZiel(ziel: Locator) {
   });
 }
 
+/**
+ * Was rechts aus dem Inspector ragt — STRUKTURUNABHÄNGIG wie in
+ * `lagekarte-leiste-dichte.spec.ts`: der Inspector steht mit `minWidth: 0` im Fluss der Leiste,
+ * ein zu breiter Inhalt weitet ihn nicht, sondern ragt hinaus.
+ *
+ * Gemessen werden Elemente UND Textzeilen: ein Block-`div` bleibt so breit wie sein Elternteil,
+ * auch wenn sein Text (`white-space: nowrap`) darüber hinausläuft — die Elementkästen allein
+ * sähen das nicht (Mutationsprobe LFH-821).
+ */
+function ueberstaende(paneel: Locator) {
+  return paneel.evaluate((el, toleranz) => {
+    const rand = el.getBoundingClientRect().right + toleranz;
+    const befunde = [...el.querySelectorAll<HTMLElement>('*')]
+      .filter((kind) => {
+        const k = kind.getBoundingClientRect();
+        return k.width > 0 && k.right > rand;
+      })
+      .map(
+        (kind) =>
+          `${kind.innerText.split('\n')[0] || kind.tagName} (+${Math.round(kind.getBoundingClientRect().right - rand)} px)`,
+      );
+    const gang = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const bereich = document.createRange();
+    for (let t = gang.nextNode(); t; t = gang.nextNode()) {
+      if (!t.textContent?.trim()) continue;
+      bereich.selectNodeContents(t);
+      const rechts = Math.max(...[...bereich.getClientRects()].map((r) => r.right));
+      if (rechts > rand)
+        befunde.push(`Text „${t.textContent.trim()}" (+${Math.round(rechts - rand)} px)`);
+    }
+    return befunde;
+  }, SUBPIXEL);
+}
+
 test('Fachebenen-Inspector: Trefflächen über die Staffel, Abstand im Handschuh-Betrieb (1366 und 390 px)', async ({
   page,
 }) => {
@@ -576,6 +611,10 @@ test('Fachebenen-Inspector: Trefflächen über die Staffel, Abstand im Handschuh
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       expect(querlauf, `Querlauf ${breite}/${dichte}`).toBeLessThanOrEqual(0);
+      expect(
+        await ueberstaende(auswahl),
+        `Elemente ragen aus dem Inspector (${breite}/${dichte})`,
+      ).toEqual([]);
       gemessen.push(
         `${breite}/${dichte} (≥${soll}): Festlegen ${hKnopf}, Schließen ${hZu}, ` +
           `Abstand ${Math.round(abstand)} (${nachbar}), Querlauf ${querlauf}`,
@@ -583,6 +622,76 @@ test('Fachebenen-Inspector: Trefflächen über die Staffel, Abstand im Handschuh
     }
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * LFH-821, Nur-Lese-Zweig des Inspectors (Muster LFH-435, `e2e/AGENTS.md`): ohne Schreibrecht
+ * fehlt „Als maßgeblichen Pegel festlegen" (`PegelFestlegen`, `darfSchreiben`), die Marke an
+ * einer festgelegten Station steht weiter. Gemessen wird wie im Admin-Durchgang oben über die
+ * Staffel: nichts ragt aus dem Inspector, kein Querlauf, „Schließen" hält die Stufe.
+ *
+ * Gesät wird als Admin; die Stubs aus `stellePegel` überleben den Rollenwechsel, weil er im
+ * selben Kontext läuft (`rollen-kern.ts`).
+ */
+test('Fachebenen-Inspector ohne Schreibrecht (Beobachter): Festlegen fehlt, Trefflächen und Überlauf über die Staffel (1366 und 390 px)', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Pegel Inspector lesend ${Date.now()}`);
+  await stellePegel(page, einsatzId, pegelListe(10));
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await page.setViewportSize({ width: 1366, height: 844 });
+
+  // POSITIVER ANKER: der Pegel-Block des Inspectors ist für den Beobachter überhaupt da — die
+  // Marke des Leitpegels steht auch ohne Schreibrecht. Ohne ihn wäre „Knopf fehlt" auch dann
+  // grün, wenn der Block aus einem anderen Grund (kein `pegelBezug`, keine `uuid`) entfiele.
+  const mitMarke = await inspectorOeffnen(page, einsatzId, 'HANN. MÜNDEN');
+  await expect(
+    mitMarke.locator('[data-lfh="pegel-massgeblich"] .ant-tag'),
+    'Vorbedingung: die Marke steht ohne Schreibrecht',
+  ).toHaveText('maßgeblicher Pegel · Leitpegel');
+
+  const gemessen: string[] = [];
+  for (const breite of [1366, 390]) {
+    await page.setViewportSize({ width: breite, height: 844 });
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+      await stelleDichte(page, dichte);
+      // KASSEL steht nicht in der Liste: beim Admin trägt der Inspector hier den Knopf.
+      const auswahl = await inspectorOeffnen(page, einsatzId, 'KASSEL');
+
+      // ── VORBEDINGUNG: der Nur-Lese-Zweig steht. Fehlt der Knopf, fehlen auch Grenzhinweis und
+      // Speicherfehler — sie hängen am selben Zweig.
+      await expect(
+        auswahl.getByRole('button', { name: FESTLEGEN }),
+        `Vorbedingung ${breite}/${dichte}: ohne Schreibrecht kein Festlegen`,
+      ).toHaveCount(0);
+      await expect(
+        auswahl.locator('[data-lfh="pegel-grenze"]'),
+        `Vorbedingung ${breite}/${dichte}: kein Grenzhinweis`,
+      ).toHaveCount(0);
+
+      const hZu = await haeltStufe(
+        auswahl.getByRole('button', { name: 'Schließen' }),
+        soll,
+        `Schließen ${breite}/${dichte}`,
+      );
+      const querlauf = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(querlauf, `Querlauf ${breite}/${dichte}`).toBeLessThanOrEqual(0);
+      expect(
+        await ueberstaende(auswahl),
+        `Elemente ragen aus dem Inspector (${breite}/${dichte})`,
+      ).toEqual([]);
+      gemessen.push(`${breite}/${dichte} (≥${soll}): Schließen ${hZu}, Querlauf ${querlauf}`);
+    }
+  }
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `Beobachter: ${gemessen.join(' | ')}`,
+  });
 });
 
 for (const modus of ['light', 'dark'] as const) {

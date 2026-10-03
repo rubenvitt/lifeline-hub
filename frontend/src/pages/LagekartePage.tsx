@@ -15,6 +15,7 @@ import {
   gefahrenPfad,
   parseKartenzentrum,
   parsePlatzierenAuftrag,
+  parseZeichnenAuftrag,
   parseRouteId,
 } from '../routing/deeplinks';
 import { parsePolygon, polygonZentroid } from './lagekarte/geo';
@@ -29,6 +30,7 @@ import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
+import { zeichenAuftragZuEntwurf } from './lagekarte/zeichenAuftrag';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
 import type { GriffModus, KantenAus } from './lagekarte/bildGriffe';
 import Sidebar, { platzierObjekt } from './lagekarte/Sidebar';
@@ -710,6 +712,27 @@ export default function LagekartePage() {
     betreuungZugriff,
     personenZugriff,
   ]);
+
+  /**
+   * Zeichnen-Auftrag von außen (LFH-825): `?zeichnen=gefahrengebiet` betritt den Zonen-Zeichenmodus
+   * wie der Knopf im Paneel (Schnellaktion „Gefahrengebiet zeichnen“ der Sprungpalette). Gleiches
+   * Muster wie der Platzier-Auftrag oben: Lade-Riegel vor dem Räumen, nur mit `darfSchreiben`
+   * (im Historien-Modus schon `false`), anwenden, dann räumen — auch einen ungültigen Auftrag.
+   *
+   * Der Parameter wird als LITERAL gelesen: daran erkennt `schnellaktionen.guard.test.ts` die
+   * Seite als Leser. Hinter einer Konstante wird der Guard rot.
+   */
+  useEffect(() => {
+    const roh = searchParams.get('zeichnen');
+    if (roh === null) return;
+    if (ladt) return;
+    const auftrag = parseZeichnenAuftrag(roh);
+    const entwurf = auftrag ? zeichenAuftragZuEntwurf(auftrag) : null;
+    if (darfSchreiben && entwurf) onZoneZeichnenStart(entwurf);
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('zeichnen');
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, ladt, darfSchreiben, onZoneZeichnenStart]);
 
   /**
    * Koordinatensprung: `?zentrum=<lat>,<lon>` aus der Sprungpalette — anfliegen, dann räumen, sonst

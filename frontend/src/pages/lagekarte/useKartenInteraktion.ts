@@ -47,7 +47,7 @@ function kopfMitKoordinate(
   };
 }
 
-type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
+export type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
 type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
 
 /**
@@ -537,13 +537,20 @@ export function useKartenInteraktion({
     dispatch({ t: 'abschnitt', id });
     setAuswahl(null);
   };
-  const onZoneZeichnenStart = (entwurf: ZoneEntwurf) => {
-    dispatch({ t: 'zone', entwurf });
-    setZoneZeichnenNonce((n) => n + 1);
-    setZoneSerieAnzahl(0);
-    setZoneAuswahl(null);
-    setAuswahl(null);
-  };
+  /**
+   * `useCallback` aus demselben Grund wie `onPlatzierenStart`: der Handler steht in den Deps des
+   * Zeichnen-Deeplinks `?zeichnen=<zonentyp>` (LFH-825) in `LagekartePage`. Die Setter sind stabil.
+   */
+  const onZoneZeichnenStart = useCallback(
+    (entwurf: ZoneEntwurf) => {
+      dispatch({ t: 'zone', entwurf });
+      setZoneZeichnenNonce((n) => n + 1);
+      setZoneSerieAnzahl(0);
+      setZoneAuswahl(null);
+      setAuswahl(null);
+    },
+    [setZoneAuswahl, setAuswahl],
+  );
   /** Beendet eine laufende Zonen-Serie — Vorbild: onBildPlatzierenFertig. */
   const onZoneZeichnenFertig = () => dispatch({ t: 'beenden', arten: ['zone'] });
   const onKoordinateEingeben = (lat: number, lon: number) => {

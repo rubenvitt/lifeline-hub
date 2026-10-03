@@ -114,6 +114,25 @@ function bett1(page: Page): Locator {
 }
 
 /**
+ * Vor jedem Tipp in ein antd-Popup (Menü, Auswahlliste): warten, bis es eingeblendet ist
+ * (LFH-838). Bis zur Ausrichtung steht es unsichtbar (`opacity: 0`) an einer vorläufigen Stelle,
+ * Playwright zählt das als sichtbar und tippt. `touchstart`/`touchend` treffen dann den Eintrag,
+ * den `click` erzeugt Chromium aber erst aus der Tipp-Geste und sucht sein Ziel neu. Unter Last
+ * war das Popup bis dahin ausgerichtet, und der Klick traf `<body>` (Auswahl leer, kein POST)
+ * oder den UHS-Umschalter im Kopf. Gemessen unter Last (Load ~11 auf 4 Kernen), beide Wege
+ * verschränkt je 40-mal: ohne diesen Anker 7 rot, mit ihm keiner. Ein Mensch tippt nicht auf ein
+ * Popup, das er noch nicht sieht — eine Testfalle, kein Produktfehler.
+ */
+async function eingeblendet(popup: Locator) {
+  await expect(popup).not.toHaveClass(/ant-slide-(up|down)-(enter|appear)/);
+}
+
+/** Das offene Platzmenü bzw. die offene Auswahlliste (jeweils als Popup-Hülle). */
+const offenesPlatzmenue = (page: Page) => page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
+const offeneAuswahl = (page: Page) =>
+  page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+
+/**
  * Startet einen Touch-Drag auf `quelle` in Richtung `zielMitte` und lässt ihn LAUFEN —
  * ohne `pointerup`. Zehn Zwischenschritte, damit dnd-kit den 5-px-Activation-Constraint
  * sicher nimmt.
@@ -380,11 +399,13 @@ test.describe('UHS-Grundriss unter Touch', () => {
     // Der Klickweg per echtem Touch-Tap. In „komfortabel" ist die Karte das EINE Bedienziel
     // und öffnet ihr Aktionsmenü; zugewiesen wird über den ersten Eintrag.
     await bett1(page).tap();
+    await eingeblendet(offenesPlatzmenue(page));
     await page.getByRole('menuitem', { name: /Patient zuweisen/ }).tap();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('Patient zuweisen');
     await dialog.getByRole('combobox').tap();
+    await eingeblendet(offeneAuswahl(page));
     await page.locator('.ant-select-item-option').filter({ hasText: personName }).tap();
     // „Erfassen" ist der Vorgabetext der Erfassungshülle. Auf den Dialog eingegrenzt, weil
     // dieselbe Beschriftung auch an der Schnellerfassung hängt.
@@ -395,6 +416,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     // Rückweg: unter `lg` gibt es keinen Drag in den Wartebereich; der Ersatz ist der
     // Menüeintrag.
     await bett1(page).tap();
+    await eingeblendet(offenesPlatzmenue(page));
     await page.getByRole('menuitem', { name: /Zurück in den Wartebereich/ }).tap();
     await expect(bett1(page), 'der Platz ist wieder frei').not.toContainText(personName);
     await page.getByRole('tab', { name: 'Wartebereich' }).tap();
@@ -531,6 +553,13 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(karte).toHaveAttribute('aria-expanded', 'false');
 
     // Gegenprobe: ein Klick OHNE Bewegung öffnet das Menü im Bearbeiten-Modus weiterhin.
+    // Unter Last war das bis LFH-519 ein Produktfehler, keine Testfalle (LFH-838): dnd-kit
+    // schluckt nach dem Zug jeden Klick, bis sein 50-ms-Timer läuft, und Chromium arbeitet
+    // Eingaben vor Timern ab — dieser Klick ging verloren. Heute nimmt `ZugPointerSensor` den
+    // Stopper beim nächsten `pointerdown` ab. Hier fällt der Klick nach den Zusicherungen oben
+    // (gemessen 300–460 ms nach dem Loslassen) und trifft das Fenster nur unter schwerer Last;
+    // den Mechanismus erzwingt `e2e/uhs-grundriss-menue-belegung.spec.ts` mit einem Klick
+    // direkt nach dem Loslassen.
     await karte.click();
     await expect(offenesMenue).toHaveCount(1);
     await expect(offenesMenue.getByRole('menuitem').last()).toContainText('Platz löschen');

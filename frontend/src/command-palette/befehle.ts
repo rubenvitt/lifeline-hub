@@ -31,6 +31,7 @@ import {
   einsatzModulPfad,
   einsatzPfad,
   etbPfad,
+  lagekartePfad,
   personenPfad,
   schaedenPfad,
   stabPfad,
@@ -49,49 +50,68 @@ function kategorieKontext(key: KategorieKey): string | undefined {
   return kategorien.find((k) => k.key === key)?.label;
 }
 
+/** Suchparameter, über den die Zielseite einer Schnellaktion den Auftrag liest. */
+export type SchnellaktionParameter = 'neu' | 'zeichnen';
+
 /**
  * Die Ziele stehen als **Builder** aus `routing/deeplinks.ts` in der Tabelle, nicht als
  * Routenstück: Unfallhilfsstellen und Bereitstellungsräume liegen unter `…/liste`, der bare
  * Modulpfad zeigt jeweils auf eine Seite, die `?neu=1` nicht liest.
  *
- * GEFAHREN FEHLEN BEWUSST (LFH-506): die Gefahrenmatrix hat keine Erfassungsmaske — ein
- * Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte. Eine Zeile hierher zeigte ins Leere;
- * ein Einstieg bräuchte einen Zeichnen-Deeplink auf die Karte (eigenes Ticket).
+ * GEFAHREN ÜBER DIE LAGEKARTE (LFH-825): die Gefahrenmatrix hat keine Erfassungsmaske — ein
+ * Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte. „Gefahrengebiet zeichnen“ hat deshalb
+ * den Träger `lagekarte` und den Parameter `zeichnen` (`?zeichnen=gefahrengebiet`), keinen
+ * `?neu=1`-Leser auf der Matrix. So bleibt die Regel „Ziel unter dem Modulpfad des Trägers“
+ * unverändert, und die Zeile hängt an der Freigabe der Karte, auf der gezeichnet wird.
  *
  * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT, bewusst nicht die Registry-Reihenfolge (die ist
  * die Navigations-Rangfolge); sonst sortierte eine Umsortierung der Navigation still die Palette
  * um. Der `toEqual`-Pin in `befehle.test.ts` ist Absicht.
  *
  * Exportiert für `schnellaktionen.guard.test.ts` (Trägermodul, Ziel, Deckung gegen die Seiten,
- * die `?neu=1` lesen). Die Tabelle bleibt hier statt in der `modulRegistry`, die frei von
+ * die den Parameter des Eintrags lesen). Die Tabelle bleibt hier statt in der `modulRegistry`, die frei von
  * Router-/Deeplink-Bezügen ist.
  */
 export const SCHNELLAKTIONEN: {
   modulKey: string;
+  /**
+   * Der Suchparameter, den die Zielseite liest: `neu` (Erfassung, `?neu=1`) oder `zeichnen`
+   * (Zeichenmodus der Lagekarte, LFH-825). Der Guard prüft Ziel und Deckung je Parameter.
+   */
+  parameter: SchnellaktionParameter;
+  /**
+   * Befehls-Id `aktion:<kennung>`; ohne Kennung `aktion:<modulKey>`. Die Bestandszeilen tragen
+   * keine, damit gemerkte Ids gültig bleiben (das Gedächtnis merkt Schnellaktionen über die Id).
+   */
+  kennung?: string;
   pfad: (einsatzId: number) => string;
   label: string;
   schlagworte: string[];
 }[] = [
   {
     modulKey: 'personen',
+    parameter: 'neu',
     pfad: (id) => personenPfad(id, { neu: true }),
     label: 'Neue Person erfassen',
     schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'],
   },
   {
     modulKey: 'etb',
+    parameter: 'neu',
     pfad: (id) => etbPfad(id, { neu: true }),
     label: 'Neuer ETB-Eintrag',
     schlagworte: ['tagebuch', 'meldung', 'eintrag'],
   },
   {
     modulKey: 'unfallhilfsstellen',
+    parameter: 'neu',
     pfad: (id) => unfallhilfsstellenListePfad(id, { neu: true }),
     label: 'Neue Unfallhilfsstelle',
     schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'],
   },
   {
     modulKey: 'schaeden',
+    parameter: 'neu',
     pfad: (id) => schaedenPfad(id, { neu: true }),
     label: 'Neuen Schaden erfassen',
     schlagworte: ['schaden', 'objekt'],
@@ -100,6 +120,7 @@ export const SCHNELLAKTIONEN: {
     // Ans ENDE: eine Lagebesprechung fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden.
     // Leser: `pages/StabPage.tsx`.
     modulKey: 'stab',
+    parameter: 'neu',
     pfad: (id) => stabPfad(id, { neu: true }),
     label: 'Lagebesprechung abschließen',
     schlagworte: ['lagebesprechung', 'entschluss', 'stab', 'führungsvorgang'],
@@ -107,6 +128,7 @@ export const SCHNELLAKTIONEN: {
   {
     // Ans ENDE: eine neue Zeile ordnet die Bestandszeilen nicht um. Leser: `pages/DokumentePage.tsx`.
     modulKey: 'dokumente',
+    parameter: 'neu',
     pfad: (id) => dokumentePfad(id, { neu: true }),
     label: 'Dokument ablegen',
     schlagworte: ['datei', 'hochladen', 'foto', 'lageplan', 'formular'],
@@ -116,21 +138,34 @@ export const SCHNELLAKTIONEN: {
   // Modulpfad), `pages/EinsatzabschnittePage.tsx`.
   {
     modulKey: 'tiere',
+    parameter: 'neu',
     pfad: (id) => tierePfad(id, { neu: true }),
     label: 'Neues Tier erfassen',
     schlagworte: ['tier', 'hund', 'katze', 'haustier', 'nutztier'],
   },
   {
     modulKey: 'bereitstellungsraeume',
+    parameter: 'neu',
     pfad: (id) => bereitstellungsraeumeListePfad(id, { neu: true }),
     label: 'Neuen Bereitstellungsraum anlegen',
     schlagworte: ['br', 'bereitstellung', 'sammelraum', 'kräfte'],
   },
   {
     modulKey: 'einsatzabschnitte',
+    parameter: 'neu',
     pfad: (id) => einsatzabschnittePfad(id, { neu: true }),
     label: 'Neuen Einsatzabschnitt anlegen',
     schlagworte: ['abschnitt', 'unterabschnitt', 'gliederung', 'ea'],
+  },
+  {
+    // Ans ENDE (LFH-825): eine neue Zeile ordnet die Bestandszeilen nicht um. Leser:
+    // `pages/LagekartePage.tsx` (`searchParams.get('zeichnen')`).
+    modulKey: 'lagekarte',
+    parameter: 'zeichnen',
+    kennung: 'lagekarte-gefahrengebiet',
+    pfad: (id) => lagekartePfad(id, { zeichnen: { typ: 'gefahrengebiet' } }),
+    label: 'Gefahrengebiet zeichnen',
+    schlagworte: ['gefahr', 'gefahrenbereich', 'gefahrenzone', 'zone', 'skizze', 'lagekarte'],
   },
 ];
 
@@ -348,7 +383,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
         const ziel = a.pfad(k.einsatzId);
         befehle.push({
-          id: `aktion:${a.modulKey}`,
+          id: `aktion:${a.kennung ?? a.modulKey}`,
           gruppe: 'schnellaktionen',
           label: a.label,
           icon: IconPlus,

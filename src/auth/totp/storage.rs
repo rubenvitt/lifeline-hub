@@ -5,24 +5,22 @@
 //! Prüfung von `rows_affected() == 1`, kein SELECT-then-UPDATE: das hätte ein
 //! Double-Spend-Fenster für zwei nebenläufige Requests mit demselben Code.
 
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::auth::totp::hash_recovery;
 use crate::error::AppError;
 
-/// Ersetzt die Recovery-Codes von `benutzer_id` (Erst- und Re-Enroll; alte Codes werden damit
-/// ungültig). DELETE und INSERTs laufen in einer Transaktion, damit ein Fehler niemanden ohne
-/// gültige Codes zurücklässt.
+/// Ersetzt die Recovery-Codes von `benutzer_id` (alte Codes werden damit ungültig). Öffnet
+/// keine eigene Transaktion: der Aufrufer reicht seine herein, damit Aktivieren und Codes
+/// gemeinsam committen oder gemeinsam scheitern (LFH-794, `routes::auth::totp_enroll_finish`).
 pub async fn speichere_recovery_codes(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     benutzer_id: i64,
     codes_klartext: &[String],
 ) -> Result<(), AppError> {
-    let mut tx = pool.begin().await?;
-
     sqlx::query("DELETE FROM totp_recovery_code WHERE benutzer_id = ?")
         .bind(benutzer_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
 
     for code in codes_klartext {
@@ -30,11 +28,10 @@ pub async fn speichere_recovery_codes(
         sqlx::query("INSERT INTO totp_recovery_code (benutzer_id, code_hash) VALUES (?, ?)")
             .bind(benutzer_id)
             .bind(hash)
-            .execute(&mut *tx)
+            .execute(&mut *conn)
             .await?;
     }
 
-    tx.commit().await?;
     Ok(())
 }
 
@@ -85,6 +82,18 @@ mod tests {
         pool
     }
 
+    /// Wie der Enroll-Abschluss: Codes in einer eigenen Transaktion speichern.
+    async fn speichere(
+        pool: &SqlitePool,
+        benutzer_id: i64,
+        codes: &[String],
+    ) -> Result<(), AppError> {
+        let mut tx = pool.begin().await?;
+        speichere_recovery_codes(&mut tx, benutzer_id, codes).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     async fn benutzer(pool: &SqlitePool, benutzername: &str) -> i64 {
         sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
@@ -101,9 +110,7 @@ mod tests {
         let pool = pool_mit_org().await;
         let benutzer_id = benutzer(&pool, "erika").await;
         let codes = vec!["aaaa-1111".to_string(), "bbbb-2222".to_string()];
-        speichere_recovery_codes(&pool, benutzer_id, &codes)
-            .await
-            .unwrap();
+        speichere(&pool, benutzer_id, &codes).await.unwrap();
 
         let erster_verbrauch = verbrauche_recovery_code(&pool, benutzer_id, "aaaa-1111")
             .await
@@ -126,7 +133,7 @@ mod tests {
     async fn verbrauche_recovery_code_lehnt_unbekannten_code_ab() {
         let pool = pool_mit_org().await;
         let benutzer_id = benutzer(&pool, "erika").await;
-        speichere_recovery_codes(&pool, benutzer_id, &["aaaa-1111".to_string()])
+        speichere(&pool, benutzer_id, &["aaaa-1111".to_string()])
             .await
             .unwrap();
 
@@ -142,7 +149,7 @@ mod tests {
         let pool = pool_mit_org().await;
         let erika = benutzer(&pool, "erika").await;
         let max = benutzer(&pool, "max").await;
-        speichere_recovery_codes(&pool, erika, &["aaaa-1111".to_string()])
+        speichere(&pool, erika, &["aaaa-1111".to_string()])
             .await
             .unwrap();
 
@@ -166,7 +173,7 @@ mod tests {
     async fn loesche_recovery_codes_entfernt_alle_codes_des_nutzers() {
         let pool = pool_mit_org().await;
         let benutzer_id = benutzer(&pool, "erika").await;
-        speichere_recovery_codes(
+        speichere(
             &pool,
             benutzer_id,
             &["aaaa-1111".to_string(), "bbbb-2222".to_string()],
@@ -189,12 +196,12 @@ mod tests {
     async fn speichere_recovery_codes_ersetzt_vorhandene_codes() {
         let pool = pool_mit_org().await;
         let benutzer_id = benutzer(&pool, "erika").await;
-        speichere_recovery_codes(&pool, benutzer_id, &["alt-code".to_string()])
+        speichere(&pool, benutzer_id, &["alt-code".to_string()])
             .await
             .unwrap();
 
-        // Re-Enroll: neue Codes ersetzen die alten.
-        speichere_recovery_codes(&pool, benutzer_id, &["neu-code".to_string()])
+        // Erneutes Speichern (Admin-Reset, dann neue Einrichtung): neue Codes ersetzen die alten.
+        speichere(&pool, benutzer_id, &["neu-code".to_string()])
             .await
             .unwrap();
 
@@ -203,7 +210,7 @@ mod tests {
             .unwrap();
         assert!(
             !alter_code_noch_gueltig,
-            "alter Code muss durch Re-Enroll invalidiert sein"
+            "alter Code muss durch erneutes Speichern ungültig sein"
         );
 
         let neuer_code_gueltig = verbrauche_recovery_code(&pool, benutzer_id, "neu-code")
@@ -211,7 +218,7 @@ mod tests {
             .unwrap();
         assert!(
             neuer_code_gueltig,
-            "neuer Code muss nach Re-Enroll gültig sein"
+            "neuer Code muss nach erneutem Speichern gültig sein"
         );
     }
 
@@ -226,9 +233,7 @@ mod tests {
 
         let codes = crate::auth::totp::neue_recovery_codes();
         assert_eq!(codes.len(), 10);
-        speichere_recovery_codes(&pool, benutzer_id, &codes)
-            .await
-            .unwrap();
+        speichere(&pool, benutzer_id, &codes).await.unwrap();
 
         let anzahl: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM totp_recovery_code WHERE benutzer_id = ?")

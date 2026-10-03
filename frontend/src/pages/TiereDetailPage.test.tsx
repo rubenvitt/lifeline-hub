@@ -424,3 +424,17 @@ describe('TiereDetailPage — Robustheit', () => {
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 });
+
+// Erfassungs-Norm (frontend/AGENTS.md, LFH-796): Grund ist ein `Select`, Enter schluckt er —
+// belegt wird die Struktur.
+describe('TiereDetailPage — Abschluss auf der Erfassungshülle (LFH-796)', () => {
+  it('Knopf im Formular, keine Fußzeile', async () => {
+    render(einsatzAktiv, tierBasis);
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    expect(within(dialog).getByText('Tier abschließen')).toBeInTheDocument();
+    const knopf = within(dialog).getByRole('button', { name: 'Abschließen' });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+  });
+});
