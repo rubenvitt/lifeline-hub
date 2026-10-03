@@ -225,28 +225,11 @@ test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Defaults breit genug z
 });
 
 /**
- * LFH-435 · Zweig „Org-Führungskraft": dieselbe Messung ohne Admin-Recht. Die Führungskraft
- * erreicht die Einsatz-Defaults, darf sie aber nicht ändern: Rechtehinweis, gesperrtes
- * Formular, und JEDE Modulzeile trägt den Sperrgrund „nur Admins" in ihrer Beschriftungszelle
- * (`EinsatzDefaults.tsx`, `ModulEinstellungsListe.tsx`). Der Sperrgrund ist das Element, das
- * die Rolle hinzufügt — gemessen wird deshalb zusätzlich, dass keine Zeile in sich überläuft;
- * die Breite des Auswählers sähe einen Sperrgrund nicht, der nur die Beschriftung sprengt.
- *
- * Nicht gespiegelt: Messung 1 (die Aktionsspalte entfällt ohne Admin-Recht, `dienststatus.tsx`
- * — es gibt nichts zu messen) und Messung 3 (1280 px, außerhalb dieses Auftrags).
+ * Vorbedingung der Führungskraft-Durchgänge (LFH-435, `e2e/AGENTS.md`): der Nur-Lese-Zweig steht
+ * VOR der Messung — Rechtehinweis, „Speichern" gesperrt statt versteckt, Sperrgrund an der
+ * Modulzeile, Auswähler gesperrt. Fehlte der Zweig, mäße der Test still den Admin-Zustand.
  */
-test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und keine Zeile läuft über (Führungskraft)', async ({
-  page,
-}) => {
-  await anmelden(page);
-  await wechsleZuRolle(page, 'fuehrungskraft');
-  await page.setViewportSize(HANDSCHIRM);
-  await page.goto('/admin/einstellungen/einsatz');
-
-  const auswahl = page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` });
-  await expect(auswahl).toBeVisible();
-
-  // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
+async function nurLeseZweigSteht(page: Page) {
   await expect(
     page.getByRole('alert').filter({ hasText: 'dürfen die Org-Defaults ändern' }),
     'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
@@ -260,7 +243,47 @@ test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und kein
     modulZeile.getByText('nur Admins', { exact: true }),
     'Vorbedingung: die Modulzeile nennt ihren Sperrgrund',
   ).toBeVisible();
-  await expect(auswahl, 'Vorbedingung: der Auswähler ist gesperrt, nicht versteckt').toBeDisabled();
+  await expect(
+    page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` }),
+    'Vorbedingung: der Auswähler ist gesperrt, nicht versteckt',
+  ).toBeDisabled();
+}
+
+/** Modulzeilen, deren Inhalt waagerecht über ihre Contentbreite hinausläuft. */
+async function ueberlaufendeModulzeilen(page: Page) {
+  return page.locator('[data-modul-zeile]').evaluateAll((els) =>
+    els
+      .map((el) => ({
+        modul: el.getAttribute('data-modul-zeile'),
+        ueber: el.scrollWidth - el.clientWidth,
+      }))
+      .filter((z) => z.ueber > 0),
+  );
+}
+
+/**
+ * LFH-435 · Zweig „Org-Führungskraft": dieselbe Messung ohne Admin-Recht. Die Führungskraft
+ * erreicht die Einsatz-Defaults, darf sie aber nicht ändern: Rechtehinweis, gesperrtes
+ * Formular, und JEDE Modulzeile trägt den Sperrgrund „nur Admins" in ihrer Beschriftungszelle
+ * (`EinsatzDefaults.tsx`, `ModulEinstellungsListe.tsx`). Der Sperrgrund ist das Element, das
+ * die Rolle hinzufügt — gemessen wird deshalb zusätzlich, dass keine Zeile in sich überläuft;
+ * die Breite des Auswählers sähe einen Sperrgrund nicht, der nur die Beschriftung sprengt.
+ *
+ * Nicht gespiegelt: Messung 1 (die Aktionsspalte entfällt ohne Admin-Recht, `dienststatus.tsx`
+ * — es gibt nichts zu messen). Messung 3 (1280 px) spiegelt der Test darunter (LFH-822).
+ */
+test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und keine Zeile läuft über (Führungskraft)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await wechsleZuRolle(page, 'fuehrungskraft');
+  await page.setViewportSize(HANDSCHIRM);
+  await page.goto('/admin/einstellungen/einsatz');
+
+  const auswahl = page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` });
+  await expect(auswahl).toBeVisible();
+
+  await nurLeseZweigSteht(page);
 
   // Wie im Admin-Test: Spaltenköpfe weg, gestapelt, Auswähler lesbar und in seiner Zeile.
   await expect(
@@ -287,15 +310,52 @@ test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und kein
   ).toBeLessThanOrEqual(masse.zeilenbreite + SUBPIXEL);
 
   // Zusätzlich: der Sperrgrund sprengt keine Zeile.
-  const befunde = await page.locator('[data-modul-zeile]').evaluateAll((els) =>
-    els
-      .map((el) => ({
-        modul: el.getAttribute('data-modul-zeile'),
-        ueber: el.scrollWidth - el.clientWidth,
-      }))
-      .filter((z) => z.ueber > 0),
-  );
-  expect(befunde, 'Modulzeilen laufen waagerecht über (gesperrter Zweig)').toEqual([]);
+  expect(
+    await ueberlaufendeModulzeilen(page),
+    'Modulzeilen laufen waagerecht über (gesperrter Zweig)',
+  ).toEqual([]);
+});
+
+/**
+ * LFH-822 · Messung 3 (1280 px) als Org-Führungskraft, Geschwister des Admin-Tests oben. Bei
+ * 1280 px steht der Sperrgrund „nur Admins" NEBEN dem Modulnamen in der fließenden Spalte
+ * (`minmax(0, 1fr)`), der Auswähler in der festen Spur daneben. Die feste Spur hält den
+ * Auswähler auch dann breit, wenn der Sperrgrund die Beschriftung sprengt — deshalb misst der
+ * Test wie bei 390 px zusätzlich, dass keine Zeile in sich überläuft.
+ *
+ * Mutationsprobe (03.10.2026, nicht committet): Kurzwort bei `sperrGrund === 'rechte'`
+ * (`ModulEinstellungsListe.tsx`) `whiteSpace: 'nowrap'` + `minWidth: 2000` → dieser Test rot
+ * (Modulzeilen laufen über), der Admin-Test daneben grün.
+ */
+test('bei 1280 px steht der gesperrte Rollen-Auswähler der Einsatz-Defaults breit genug zum Lesen, und keine Zeile läuft über (Führungskraft)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await wechsleZuRolle(page, 'fuehrungskraft');
+  await page.setViewportSize(FUEKW);
+  await page.goto('/admin/einstellungen/einsatz');
+
+  await nurLeseZweigSteht(page);
+
+  await expect(
+    page.getByText('Benötigte Rolle (Default)', { exact: true }),
+    'bei 1280 px gibt es Spalten, also auch Spaltenköpfe',
+  ).toBeVisible();
+
+  const masse = await rollenspaltenMasse(page);
+  expect(
+    masse.breite,
+    `Rollen-Auswähler bei 1280 px (gemessen ${masse.breite} px in einer ${masse.zeilenbreite} px breiten Zeile) ist zu schmal zum Lesen`,
+  ).toBeGreaterThanOrEqual(LESBAR);
+  expect(
+    masse.breite,
+    `Rollen-Auswähler (${masse.breite} px) darf die Contentbreite seiner Zeile (${masse.zeilenbreite} px) nicht überschreiten`,
+  ).toBeLessThanOrEqual(masse.zeilenbreite + SUBPIXEL);
+
+  expect(
+    await ueberlaufendeModulzeilen(page),
+    'Modulzeilen laufen waagerecht über (gesperrter Zweig)',
+  ).toEqual([]);
 });
 
 // ── MESSUNG 3 ───────────────────────────────────────────────────────────────────────────
