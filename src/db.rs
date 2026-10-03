@@ -3214,6 +3214,177 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
+    const MIGRATION_0143: &str = include_str!("../migrations/0143_auth_audit_passwortwechsel.sql");
+
+    /// Alt-DB im 0091-Stand: Minimal-`benutzer` für den FK und die echte 0091.
+    async fn alt_db_auth_audit() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .expect("In-Memory-Pool");
+        sqlx::raw_sql(
+            "CREATE TABLE benutzer (id INTEGER PRIMARY KEY); \
+             INSERT INTO benutzer (id) VALUES (1);",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql(include_str!("../migrations/0091_auth_audit.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool
+    }
+
+    // --- Migration 0143: Leaf-Rebuild von auth_audit mit den Passwort-Ereignissen (LFH-827) ---
+    //
+    // Befüllt mit allen drei Bestandsereignissen, höchste Zeile gelöscht (Sequenz > MAX(id)),
+    // dann die echte 0143: Zeilen samt ids, Schema, DDL bis auf den CHECK, Sequenz, CHECK-Grenze.
+    #[tokio::test]
+    async fn migration_0143_auth_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = alt_db_auth_audit().await;
+        sqlx::query(
+            "INSERT INTO auth_audit (zeitpunkt, ereignis, benutzername, benutzer_id, peer_ip, provider) \
+             VALUES ('2026-10-02 10:00:00', 'login_fehlgeschlagen', 'gibtsnicht', NULL, '10.0.0.9', 'passwort'), \
+                    ('2026-10-02 10:01:00', 'login_ok', 'admin', 1, '10.0.0.1', 'oidc'), \
+                    ('2026-10-02 10:02:00', 'logout', 'admin', 1, NULL, 'passwort')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM auth_audit WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let schema_vorher = schema_von(&pool, "auth_audit").await;
+        let ddl = || async {
+            let sql: String = sqlx::query_scalar(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'auth_audit'",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            sql.replacen("CREATE TABLE \"auth_audit\"", "CREATE TABLE T", 1)
+                .replacen("CREATE TABLE auth_audit_neu", "CREATE TABLE T", 1)
+                .replacen("CREATE TABLE auth_audit", "CREATE TABLE T", 1)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let ddl_vorher = ddl().await;
+        type Zeile = (
+            i64,
+            String,
+            String,
+            Option<String>,
+            Option<i64>,
+            Option<String>,
+            String,
+        );
+        let alle = "SELECT id, zeitpunkt, ereignis, benutzername, benutzer_id, peer_ip, provider \
+                    FROM auth_audit ORDER BY id";
+        let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+
+        assert!(
+            MIGRATION_0143.starts_with("-- no-transaction"),
+            "sqlx erkennt die Direktive nur am Dateianfang"
+        );
+        sqlx::raw_sql(MIGRATION_0143)
+            .execute(&pool)
+            .await
+            .expect("der Rebuild muss auf einer befüllten DB durchlaufen");
+
+        let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(
+            zeilen_nachher, zeilen_vorher,
+            "alle Zeilen samt ids verlustfrei kopiert"
+        );
+        assert_eq!(
+            schema_von(&pool, "auth_audit").await,
+            schema_vorher,
+            "Spalten, FKs und Indizes unverändert"
+        );
+        assert_eq!(
+            ddl().await.replacen(
+                ", 'passwort_geaendert', 'passwort_wechsel_abgewiesen'",
+                "",
+                1
+            ),
+            ddl_vorher,
+            "die DDL unterscheidet sich ausschließlich im ereignis-CHECK"
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'auth_audit_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'auth_audit_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+
+        // Die Sequenz überlebt: die gelöschte id 3 wird nicht wiedervergeben.
+        for (erwartet, ereignis) in [
+            (4, "passwort_geaendert"),
+            (5, "passwort_wechsel_abgewiesen"),
+        ] {
+            let neue_id: i64 = sqlx::query_scalar(
+                "INSERT INTO auth_audit (ereignis, benutzername, benutzer_id, provider) \
+                 VALUES (?, 'admin', 1, 'passwort') RETURNING id",
+            )
+            .bind(ereignis)
+            .fetch_one(&pool)
+            .await
+            .expect("der neue CHECK nimmt die Passwort-Ereignisse");
+            assert_eq!(neue_id, erwartet, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        }
+        assert!(
+            sqlx::query("INSERT INTO auth_audit (ereignis, provider) VALUES ('foo', 'passwort')")
+                .execute(&pool)
+                .await
+                .is_err(),
+            "der CHECK lehnt unbekannte Ereignisse weiter ab"
+        );
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+    }
+
+    // Sind ALLE Zeilen gelöscht (etwa vom 90-Tage-Purge), kopiert der Rebuild nichts; ohne
+    // Übernahme der Sequenz begänne die Nummerierung wieder bei 1.
+    #[tokio::test]
+    async fn migration_0143_erhaelt_sequenz_auch_bei_leerer_tabelle() {
+        let pool = alt_db_auth_audit().await;
+        sqlx::query(
+            "INSERT INTO auth_audit (ereignis, provider) \
+             VALUES ('login_ok', 'passwort'), ('logout', 'passwort')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM auth_audit")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(MIGRATION_0143).execute(&pool).await.unwrap();
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO auth_audit (ereignis, provider) \
+             VALUES ('passwort_geaendert', 'passwort') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
+    }
+
     /// 0115 übernimmt nur Bestandsnummern im exakten Muster `JJJJ-NNN` in die Zahlenspalten. Gegen
     /// die echte Migration auf einem Minimal-Schema: `2026-01` neben `2026-001` ergäbe sonst
     /// dasselbe Zahlenpaar und spränge den Unique-Index mitten in der Migration.

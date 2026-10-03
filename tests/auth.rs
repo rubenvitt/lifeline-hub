@@ -1358,3 +1358,74 @@ async fn me_liefert_totp_aktiviert_true_nach_enroll() {
         "nach abgeschlossenem Enrollment muss /me totp_aktiviert=true zeigen: {json}"
     );
 }
+
+// ===== Login-Sperre je Konto (LFH-793) =====
+
+/// POST `/api/auth/login` mit fester Gegenstelle, damit die prozessweite Sperre nur diesen Test
+/// trifft.
+async fn login_von(
+    app: &axum::Router,
+    gegenstelle: &str,
+    benutzername: &str,
+    passwort: &str,
+) -> StatusCode {
+    let body = serde_json::json!({ "benutzername": benutzername, "passwort": passwort });
+    let mut req = Request::builder()
+        .method("POST")
+        .uri("/api/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let peer: std::net::SocketAddr = gegenstelle.parse().unwrap();
+    req.extensions_mut()
+        .insert(axum::extract::ConnectInfo(peer));
+    app.clone().oneshot(req).await.unwrap().status()
+}
+
+/// Ein Innentäter darf die Sperre nicht mit dem eigenen Konto zurücksetzen: der Erfolg räumt nur
+/// die Fehlversuche gegen das Konto, das sich eben angemeldet hat.
+#[tokio::test]
+async fn eigener_login_hebt_die_sperre_fuer_fremde_konten_nicht_auf() {
+    let app = setup().await;
+    let quelle = "203.0.113.93:40000";
+
+    for i in 0..9 {
+        let s = login_von(&app, quelle, "opfer", "geraten").await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED, "Fremdversuch {i}");
+    }
+    assert_eq!(
+        login_von(&app, quelle, "admin", "startpw12").await,
+        StatusCode::OK,
+        "unter der Schwelle meldet sich das eigene Konto an"
+    );
+    assert_eq!(
+        login_von(&app, quelle, "opfer", "geraten").await,
+        StatusCode::UNAUTHORIZED,
+        "der zehnte Fremdversuch läuft noch"
+    );
+    assert_eq!(
+        login_von(&app, quelle, "opfer", "geraten").await,
+        StatusCode::TOO_MANY_REQUESTS,
+        "die Fremdversuche vor dem eigenen Login zählen weiter"
+    );
+}
+
+/// Wer sich am eigenen Konto vertippt und dann anmeldet, nimmt seine Fehlversuche mit: die
+/// Quelle (etwa eine Wache hinter NAT) wird dadurch nicht schneller gesperrt.
+#[tokio::test]
+async fn eigener_login_raeumt_die_eigenen_fehlversuche() {
+    let app = setup().await;
+    let quelle = "203.0.113.94:40000";
+
+    for _ in 0..9 {
+        login_von(&app, quelle, "admin", "vertippt").await;
+    }
+    assert_eq!(
+        login_von(&app, quelle, "admin", "startpw12").await,
+        StatusCode::OK
+    );
+    for i in 0..9 {
+        let s = login_von(&app, quelle, "admin", "vertippt").await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED, "Versuch {i} nach dem Erfolg");
+    }
+}

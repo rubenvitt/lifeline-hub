@@ -10,6 +10,11 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   (Hinweis steht, Aktion gesperrt oder abwesend), die Mutationsprobe macht nur den
   Nicht-Admin rot. Freistellungen in Gate 1 nennen die Rolle. Inventar:
   `openspec/changes/archive/2026-09-30-lfh-435-e2e-gates-nicht-privilegiert/pruefliste.md`.
+  **Die Modulsperre per Override ist eine eigene Achse** (LFH-820): der Admin ist nie gesperrt,
+  deshalb sät der Admin die Sperre per Einsatz-Override (`benoetigte_rolle: 'admin'`, nie
+  `sichtbar: false`, keine Org-Vorgabe) und der Beobachter misst; Vorbedingung „gesperrte Zeile
+  bzw. ‚—‘ mit Grund steht“. Träger `nav-schmal`, `lage-dashboard-schmal`; Inventar:
+  `openspec/changes/archive/2026-10-03-lfh-820-layout-gates-modulsperre-override/pruefliste.md`.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.

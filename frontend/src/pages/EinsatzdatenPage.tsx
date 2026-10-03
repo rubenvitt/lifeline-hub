@@ -29,17 +29,10 @@ import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 import { Link, useNavigate, useParams } from 'react-router';
 import { einsatzberichtPfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import {
-  aktualisiereEinsatz,
-  ladeEinsatz,
-  ladeMitglieder,
-  patcheEinsatz,
-  type KopfdatenPatch,
-  type KopfdatenUpdate,
-} from '../api/einsaetze';
+import { ladeEinsatz, ladeMitglieder, patcheEinsatz, type KopfdatenPatch } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -169,7 +162,7 @@ function ZeitpunktAngabe({
 }
 
 /** Werte des Bearbeiten-Formulars (`begonnen_at` als Zeitpunkt, vor der UTC-Wandlung; LFH-692). */
-interface FormWerte {
+export interface FormWerte {
   bezeichnung: string;
   stichwort?: string;
   einsatzart: Einsatzart;
@@ -181,6 +174,52 @@ interface FormWerte {
   anzahl_betroffene_initial?: number;
   begonnen_at: Dayjs;
   naechste_lagebesprechung_at?: Dayjs | null;
+}
+
+/** Freie Textangaben des Vollformulars; leer heißt `null` (wie `leerZuNull` beim Senden). */
+const TEXTFELDER = [
+  'stichwort',
+  'leitstellen_nr',
+  'einsatzort',
+  'meldende_stelle',
+  'sachverhalt',
+] as const satisfies readonly (keyof FormWerte & keyof KopfdatenPatch)[];
+
+/**
+ * Was das Vollformular gegenüber dem Stand beim Öffnen geändert hat (LFH-839) — nur diese
+ * Schlüssel gehen in den PATCH. Ein Vollersatz überschriebe die Zeilenänderung einer anderen
+ * Person, die zwischen Öffnen und Speichern kam, still mit dem Stand von damals.
+ *
+ * Verglichen wird wie in der Zeile: Texte getrimmt (leer = `null`), Zeitpunkte am Instant
+ * (`gleicherZeitpunkt`), die Koordinate als Paar — ändert sich ein Wert, gehen beide hinaus.
+ */
+export function geaenderteKopfdaten(vorher: FormWerte, nachher: FormWerte): KopfdatenPatch {
+  const patch: KopfdatenPatch = {};
+  const bezeichnung = nachher.bezeichnung.trim();
+  if (bezeichnung !== vorher.bezeichnung.trim()) patch.bezeichnung = bezeichnung;
+  if (nachher.einsatzart !== vorher.einsatzart) patch.einsatzart = nachher.einsatzart;
+  for (const feld of TEXTFELDER) {
+    const neu = leerZuNull(nachher[feld]);
+    if (neu !== leerZuNull(vorher[feld])) patch[feld] = neu;
+  }
+  const anzahl = nachher.anzahl_betroffene_initial ?? null;
+  if (anzahl !== (vorher.anzahl_betroffene_initial ?? null)) {
+    patch.anzahl_betroffene_initial = anzahl;
+  }
+  if (!gleicherZeitpunkt(vorher.begonnen_at ?? null, nachher.begonnen_at ?? null)) {
+    patch.begonnen_at = alsBackendZeit(nachher.begonnen_at);
+  }
+  const termin = nachher.naechste_lagebesprechung_at ?? null;
+  if (!gleicherZeitpunkt(vorher.naechste_lagebesprechung_at ?? null, termin)) {
+    patch.naechste_lagebesprechung_at = termin ? alsBackendZeit(termin) : null;
+  }
+  const koordAlt = alsLatLon(vorher.einsatzort_koord);
+  const koordNeu = alsLatLon(nachher.einsatzort_koord);
+  if (koordAlt?.lat !== koordNeu?.lat || koordAlt?.lon !== koordNeu?.lon) {
+    patch.einsatzort_lat = koordNeu?.lat ?? null;
+    patch.einsatzort_lon = koordNeu?.lon ?? null;
+  }
+  return patch;
 }
 
 /**
@@ -269,6 +308,9 @@ export default function EinsatzdatenPage() {
   const { token, rollen } = useRollen();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<FormWerte>();
+  // Stand beim Öffnen des Vollformulars: Bezugspunkt für „geändert" (LFH-839). Ein Neuabruf
+  // zwischendurch verschiebt ihn nicht — sonst sähe eine fremde Änderung wie eine eigene aus.
+  const geoeffnetRef = useRef<FormWerte | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -284,7 +326,7 @@ export default function EinsatzdatenPage() {
   });
 
   const speichernMutation = useMutation({
-    mutationFn: (felder: KopfdatenUpdate) => aktualisiereEinsatz(einsatzId, felder),
+    mutationFn: (patch: KopfdatenPatch) => patcheEinsatz(einsatzId, patch),
     // Kein `onError`-Toast: der Fehler steht als `<SpeicherFehler>` über dem Formular. Ein Toast
     // verfällt nach ~3 s, und das Formular wirkte danach gespeichert.
     onSuccess: () => {
@@ -337,7 +379,7 @@ export default function EinsatzdatenPage() {
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
 
   function bearbeitenStarten() {
-    form.setFieldsValue({
+    const werte: FormWerte = {
       bezeichnung: einsatz.bezeichnung,
       stichwort: einsatz.stichwort ?? undefined,
       einsatzart: einsatz.einsatzart,
@@ -350,31 +392,23 @@ export default function EinsatzdatenPage() {
       meldende_stelle: einsatz.meldende_stelle ?? undefined,
       sachverhalt: einsatz.sachverhalt ?? undefined,
       anzahl_betroffene_initial: einsatz.anzahl_betroffene_initial ?? undefined,
-      begonnen_at: alsZeitpunkt(einsatz.begonnen_at),
+      // Die Alarmzeit ist am Server Pflicht, der Wire-String nie leer.
+      begonnen_at: alsZeitpunkt(einsatz.begonnen_at)!,
       naechste_lagebesprechung_at: alsZeitpunkt(einsatz.naechste_lagebesprechung_at) ?? null,
-    });
+    };
+    geoeffnetRef.current = werte;
+    form.setFieldsValue(werte);
     setBearbeiten(true);
   }
 
   function speichern(werte: FormWerte) {
-    const koord = alsLatLon(werte.einsatzort_koord);
-    const felder: KopfdatenUpdate = {
-      bezeichnung: werte.bezeichnung.trim(),
-      stichwort: leerZuNull(werte.stichwort),
-      einsatzart: werte.einsatzart,
-      leitstellen_nr: leerZuNull(werte.leitstellen_nr),
-      einsatzort: leerZuNull(werte.einsatzort),
-      einsatzort_lat: koord?.lat ?? null,
-      einsatzort_lon: koord?.lon ?? null,
-      meldende_stelle: leerZuNull(werte.meldende_stelle),
-      sachverhalt: leerZuNull(werte.sachverhalt),
-      anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
-      begonnen_at: alsBackendZeit(werte.begonnen_at),
-      naechste_lagebesprechung_at: werte.naechste_lagebesprechung_at
-        ? alsBackendZeit(werte.naechste_lagebesprechung_at)
-        : null,
-    };
-    speichernMutation.mutate(felder);
+    const patch = geaenderteKopfdaten(geoeffnetRef.current ?? werte, werte);
+    // Nichts geändert → kein PATCH, wie in der Zeile (`InlineAngabe`): das Formular schließt.
+    if (Object.keys(patch).length === 0) {
+      setBearbeiten(false);
+      return;
+    }
+    speichernMutation.mutate(patch);
   }
 
   return (

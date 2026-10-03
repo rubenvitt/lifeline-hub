@@ -117,7 +117,7 @@ pub async fn login(
         Ok(b) => b,
         Err(e) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&req.benutzername));
             }
             tracing::warn!(
                 benutzername = %req.benutzername,
@@ -146,9 +146,9 @@ pub async fn login(
             .fetch_one(&state.pool)
             .await?;
 
-    // Das Passwort stimmt; das gibt auch alle anderen hinter derselben IP wieder frei (NAT).
+    // Das Passwort stimmt; das räumt nur die Fehlversuche gegen dieses Konto (LFH-793).
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     if totp_aktiviert {
@@ -268,6 +268,11 @@ pub struct PasswortWechsel {
 /// eröffnete Sitzung dürfte sonst bis zu [`session::SITZUNG_TAGE`] Tage weiterlaufen. Die eigene
 /// Sitzung bleibt, sonst würfe der Wechsel den Handelnden aus dem laufenden Einsatz. Passkeys
 /// und der TOTP-Zweitfaktor bleiben unberührt: sie hängen nicht am Passwort.
+///
+/// **Audit (LFH-827):** beide Ausgänge der Alt-Passwort-Prüfung landen in `auth_audit` —
+/// `passwort_geaendert` nach dem Commit, `passwort_wechsel_abgewiesen` beim falschen
+/// Alt-Passwort. Was vorher scheitert (400, 403, 429), hat kein Passwort geprüft und schreibt
+/// nichts; die 429 steht über die Fehlversuche davor schon in der Spur.
 pub async fn passwort_aendern(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -309,13 +314,24 @@ pub async fn passwort_aendern(
         Ok(_) => {}
         Err(AppError::Unauthorized) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
             }
             tracing::warn!(
                 benutzer_id = benutzer.id,
                 peer_ip = ?peer_ip,
                 "Passwortwechsel abgewiesen: altes Passwort falsch"
             );
+            crate::auth::audit::schreibe(
+                &state.pool,
+                crate::auth::audit::AuditEintrag {
+                    ereignis: crate::auth::audit::Ereignis::PasswortWechselAbgewiesen,
+                    benutzername: Some(&benutzer.benutzername),
+                    benutzer_id: Some(benutzer.id),
+                    peer_ip: peer_ip.map(|ip| ip.to_string()),
+                    provider: crate::auth::provider::ID_PASSWORT,
+                },
+            )
+            .await;
             return Err(AppError::UnprocessableEntity(
                 "Das bisherige Passwort stimmt nicht.".to_string(),
             ));
@@ -323,7 +339,7 @@ pub async fn passwort_aendern(
         Err(e) => return Err(e),
     }
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     // Argon2 blockiert den Worker ~50–100 ms; auf den Blocking-Pool damit.
@@ -353,6 +369,17 @@ pub async fn passwort_aendern(
         andere_sitzungen_beendet = beendet,
         "Passwort gewechselt"
     );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::PasswortGeaendert,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_PASSWORT,
+        },
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1394,7 +1421,8 @@ pub async fn app_code_einloesen(
     };
     let Some(benutzer) = benutzer else {
         if let Some(ip) = peer_ip {
-            crate::auth::rate_limit::fehlversuch(ip);
+            // Ziel unbekannt: diesen Versuch räumt kein Erfolg, er läuft nur aus.
+            crate::auth::rate_limit::fehlversuch(ip, None);
         }
         tracing::warn!(peer_ip = ?peer_ip, "Anmeldung aus dem Browser abgewiesen");
         crate::auth::audit::schreibe(
@@ -1412,7 +1440,7 @@ pub async fn app_code_einloesen(
     };
 
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
     // Eine übrig gebliebene Sitzung im Webview würde sonst verwaist in der Tabelle stehen.
     if let Some(alt) = jar.get(SESSION_COOKIE) {
