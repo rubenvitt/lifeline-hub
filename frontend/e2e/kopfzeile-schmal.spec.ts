@@ -275,9 +275,20 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
 }) => {
   /**
    * Der RUHEZUSTAND, für den die Verdichtung gebaut ist (die Störungswörter misst
-   * `gate1-ueberlauf.spec.ts`): Benachrichtigungen erlaubt (headless nachgebildet), Strom
-   * verbunden, Ton bereit. Dann stehen die Zustände nur als Icon, und auch die breiteste
-   * Stufe hält eine Zeile.
+   * `gate1-ueberlauf.spec.ts`): Benachrichtigungen erlaubt und Ton bereit (beide headless
+   * nachgebildet), Strom verbunden. Dann stehen die Zustände nur als Icon, und auch die
+   * breiteste Stufe hält eine Zeile.
+   *
+   * Warum der Ton nachgebildet wird (LFH-809): ob der AudioContext ohne Nutzergeste
+   * `running` meldet, entscheidet die Audio-Umgebung der Maschine, nicht die App. Im
+   * Linux-Container stand er auch im vollen Suite-Lauf unter Last ab der ersten Zeile auf
+   * `running` (gemessen 03.10.2026, Load 15 auf 4 Kernen). Im vollen Suite-Lauf
+   * unter Fremdlast (29.09.2026) blieb er in beiden Läufen gesperrt, allein gefahren nie.
+   * Die App prüft den Ton nur EINMAL beim Betreten des Einsatzes und hält das Ergebnis
+   * modulweit (`src/alarm/alarmTon.ts`, `stelleAudioBereit`). Erst ein Klick prüft neu,
+   * deshalb stand „Ton blockiert" für das ganze Dokument, und der Kopf trug ein Wort, das
+   * diese Spec gar nicht misst. Den echten Prüfpfad decken `AlarmZentrale.pruefung.test.tsx`
+   * und `kopfzeile-start-cls.spec.ts` ab.
    */
   test.setTimeout(60_000);
   await page.addInitScript(() => {
@@ -290,6 +301,16 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
       value: ErlaubteBenachrichtigung,
       configurable: true,
     });
+    // Ton bereit: `state` meldet `running`, `resume()` löst sofort auf. Der echte `resume()`
+    // bleibt unberührt liegen, er könnte in einer gesperrten Umgebung nie auflösen.
+    const AC = window.AudioContext;
+    if (AC) {
+      Object.defineProperty(AC.prototype, 'state', {
+        configurable: true,
+        get: () => 'running',
+      });
+      AC.prototype.resume = () => Promise.resolve();
+    }
   });
   await page.setViewportSize({ width: 1024, height: 800 });
   await anmelden(page);
@@ -305,12 +326,15 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
     { timeout: 30_000 },
   );
   const alarm = page.locator('header [data-lfh="kopf-alarm"]');
-  // Ruhezustand ohne Wort — aber benannt: beide Ziele stehen mit Zustand im Namen da.
-  await expect(alarm).toHaveText('');
+  // Vorbedingung VOR der Messung, mit vollem Namen statt Regex: der Name trägt den Zustand,
+  // und ein Fehlschlag soll die gestörte Nachbildung nennen, nicht das Layout. Gesperrt hieße
+  // der Ton-Knopf „Alarmton durch Klick entsperren".
   await expect(
     alarm.getByRole('button', { name: 'Desktop-Benachrichtigungen: erlaubt' }),
   ).toBeVisible();
-  await expect(alarm.getByRole('button', { name: /Alarmton/ })).toBeVisible();
+  await expect(alarm.getByRole('button', { name: 'Alarmton stummschalten' })).toBeVisible();
+  // Ruhezustand ohne Wort — aber benannt: beide Ziele stehen mit Zustand im Namen da.
+  await expect(alarm).toHaveText('');
   const hoehe = await page.locator('header').evaluate((h) => h.clientHeight);
   expect(hoehe, 'eine Zeile in handschuh (72 px)').toBeLessThanOrEqual(72);
 });
