@@ -338,8 +338,9 @@ export function ListenEintragMeta({ title, description }: ListenEintragMetaProps
   const { titelEbene } = useContext(ListeContext);
   // Bildet antd `List.Item.Meta` nach: Titel hervorgehoben, darunter die Beschreibung. Ob der
   // Titel eine Überschrift ist und welche, sagt die Liste (LFH-826). Der Stil steht vollständig
-  // inline, auch das Gewicht: Überschrift und Text sehen gleich aus, nichts hängt an der
-  // h*-Kaskade.
+  // inline, auch das Gewicht: Überschrift und Text sehen gleich aus. 700 ist das Gewicht des
+  // früheren festen <h4> (Browser-Standard `bold`, Archivo 700 wird lokal ausgeliefert), NICHT
+  // `fontWeightStrong` (600) — sonst würde jeder Titel leichter.
   const Titel = titelEbene != null ? (`h${titelEbene}` as const) : 'div';
   return (
     <div style={{ minWidth: 0 }}>
@@ -349,7 +350,7 @@ export function ListenEintragMeta({ title, description }: ListenEintragMetaProps
             margin: `0 0 ${token.marginXXS}px 0`,
             color: token.colorText,
             fontSize: token.fontSize,
-            fontWeight: token.fontWeightStrong,
+            fontWeight: 700,
             lineHeight: token.lineHeight,
           }}
         >

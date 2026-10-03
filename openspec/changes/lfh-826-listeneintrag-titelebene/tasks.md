@@ -2,7 +2,7 @@
 
 ## 1. Mechanik in `components/Liste.tsx` (LFH-826)
 
-- [x] 1.1 Tests zuerst in `Liste.test.tsx`: Kopf `unterEbene` 2 → Eintragstitel `heading` Ebene 4; Kopf `unterEbene` 5 → Ebene 6 (Deckel); ohne Kopf mit `unterEbene` 2 → Ebene 3; ohne beides → kein `heading`, Titeltext sichtbar; Kopf ohne Inhalt → kein `heading`; Schriftgewicht von `div`- und `h*`-Titel gleich (`token.fontWeightStrong`). Verifikation: die neuen Fälle laufen rot (`mise exec -- pnpm -C frontend exec vitest run src/components/Liste.test.tsx`).
+- [x] 1.1 Tests zuerst in `Liste.test.tsx`: Kopf `unterEbene` 2 → Eintragstitel `heading` Ebene 4; Kopf `unterEbene` 5 → Ebene 6 (Deckel); ohne Kopf mit `unterEbene` 2 → Ebene 3; ohne beides → kein `heading`, Titeltext sichtbar; Kopf ohne Inhalt → kein `heading`; Schriftgewicht von `div`- und `h*`-Titel gleich (700 wie das frühere `h4`). Verifikation: die neuen Fälle laufen rot (`mise exec -- pnpm -C frontend exec vitest run src/components/Liste.test.tsx`).
 - [x] 1.2 `ListeContext` um `titelEbene` erweitern, `Liste`-Props als Union `kopf` XOR `unterEbene`, Berechnung nach design.md D1; `ListenEintragMeta` rendert `h{N}` oder `div` mit identischem Inline-Stil inkl. `fontWeight`. Verifikation: 1.1 grün, `tsc` meldet einen Fehler, wenn `kopf` und `unterEbene` zusammen gesetzt werden (Typtest mit `@ts-expect-error` in `Liste.test.tsx`).
 - [x] 1.3 Dateikopf von `Liste.tsx` um den Absatz „Eintragstitel (LFH-826)“ ergänzen und den veralteten Kommentar „Titel als <h4>“ in `ListenEintragMeta` ersetzen. Verifikation: `grep -n "h4" frontend/src/components/Liste.tsx` zeigt nur noch `KOPF_ELEMENT`.
 
@@ -20,4 +20,5 @@
 ## 4. Regel und Abschluss
 
 - [x] 4.1 `frontend/AGENTS.md`, Komponentenkatalog neben `Markdown`: Regel nach design.md D3. Verifikation: `mise exec -- pnpm -C frontend exec prettier --check AGENTS.md` grün.
-- [ ] 4.2 Gesamtlauf `./scripts/check-all.sh` (bzw. die Bündel, die in der Cloud-Sitzung laufen: Frontend-Lint, Typecheck, Vitest, Prettier) grün; Kästchen, die erst die CI des PRs belegt, mit Verweis auf diesen Lauf abhaken.
+- [x] 4.2 Gesamtlauf `./scripts/check-all.sh` (bzw. die Bündel, die in der Cloud-Sitzung laufen: Frontend-Lint, Typecheck, Vitest, Prettier) grün; Kästchen, die erst die CI des PRs belegt, mit Verweis auf diesen Lauf abhaken.
+  Belegt in der Sitzung: Bündel `schnell` grün (13 Schritte), Prettier über `frontend/`, ESLint und `tsc` grün, Vitest 666 Dateien grün unter der Gate-Zeitzone `Europe/Berlin` (vier zeitzonenabhängige Dateien sind ohne sie auch auf `origin/alpha` rot). Bündel `rust` und `e2e` belegt die CI des PRs.

@@ -5,7 +5,8 @@
 `components/Liste.tsx` reicht über `ListeContext` heute nur `size` und `bordered` an die
 Einträge weiter. Der Kopf (LFH-470) rendert über `KOPF_ELEMENT[kopf.unterEbene]` eine Ebene unter
 dem Einbauort. `ListenEintragMeta` rendert den Titel als festes `<h4>`. Größe, Farbe, Abstand und
-Zeilenhöhe setzt es inline, das Gewicht erbt es aus der globalen Überschriften-Kaskade.
+Zeilenhöhe setzt es inline. Das Gewicht kommt aus dem Browser-Standard für `h4` (`bold`, 700), denn
+weder das Projekt noch antd setzen eine Regel für Überschriften.
 
 Einbauorte (Überschrift darüber → heute):
 
@@ -51,9 +52,10 @@ Ein antd-Dialogtitel ist keine Überschrift (`div.ant-modal-title`), er benennt 
 
 `kopf` und `unterEbene` schließen sich per Typ aus (Union mit `never`), damit es keine zwei
 Quellen für dieselbe Zahl gibt. `ListenEintragMeta` rendert bei `titelEbene` ein `h{N}`, bei
-`null` ein `div`. Beide tragen denselben Inline-Stil. Das Gewicht wird jetzt ausdrücklich gesetzt
-(`token.fontWeightStrong`), damit `div` und `h*` gleich aussehen und nichts mehr an der
-Kaskade hängt.
+`null` ein `div`. Beide tragen denselben Inline-Stil. Das Gewicht wird jetzt ausdrücklich gesetzt,
+und zwar auf 700, das Gewicht des früheren `<h4>`. So sehen `div` und `h*` gleich aus, und die
+Optik bleibt unverändert. `token.fontWeightStrong` (600) schiede aus, denn damit würde jeder Titel
+leichter.
 
 *Ein Kopf ohne Inhalt* ergibt keine Überschrift (LFH-470). Dann zählt er auch für die
 Titelebene nicht. Es gilt `unterEbene`, und weil die Union beides ausschließt, ist das in der
@@ -109,9 +111,9 @@ eigenständigen Gegenständen (Spec `ueberschriften-gliederung`).“ Kurz, mit V
   Überschrift“-Orten.] → Beim Umsetzen per `grep` auf `heading` in den Tests und e2e-Specs
   dieser Seiten suchen und auf Text- oder Listenpunkt-Abfragen umstellen. Die Pegel-Abfragen in
   `e2e/pegel-pruefliste.spec.ts` betreffen den Inspector der Lagekarte, nicht diese Liste.
-- [Das Gewicht des Titels hing an der Kaskade. Ein `div` sähe ohne ausdrückliches Gewicht
-  dünner aus.] → `fontWeight` inline setzen und den Zustand in `Liste.test.tsx` für beide
-  Varianten festhalten.
+- [Das Gewicht des Titels hing am Browser-Standard für `h4`. Ein `div` sähe ohne ausdrückliches
+  Gewicht dünner aus.] → `fontWeight: 700` inline setzen und den Wert in `Liste.test.tsx` für
+  beide Varianten festhalten.
 - [Ein künftiger Aufrufer vergisst `unterEbene`.] → Fail-safe: es entsteht keine falsche Ebene.
   Die Regel steht im Katalog (D3) und im Dateikopf von `Liste.tsx`.
 

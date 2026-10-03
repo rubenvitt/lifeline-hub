@@ -297,7 +297,7 @@ describe('Liste — Eintragstitel folgt dem Einbauort', () => {
 
   /**
    * Gewicht, Größe und Abstand stehen inline und gleich — sonst sähe der Titel ohne Überschrift
-   * dünner aus als der mit (das Gewicht kam früher aus der h4-Kaskade).
+   * dünner aus als der mit. 700 ist das Gewicht des früheren festen h4 (Browser-Standard).
    */
   it('sieht als Überschrift und als Text gleich aus', () => {
     const { unmount } = render(
@@ -308,13 +308,13 @@ describe('Liste — Eintragstitel folgt dem Einbauort', () => {
     render(<Liste dataSource={['x']} renderItem={metaEintrag} />);
     const alsText = screen.getByText('S4 · Versorgung');
     expect(alsText.getAttribute('style')).toBe(alsUeberschrift);
-    expect(alsText.style.fontWeight).toBe('600');
+    expect(alsText.style.fontWeight).toBe('700');
   });
 
   it('Kopf und `unterEbene` schließen sich per Typ aus', () => {
     renderMitProviders(
       <Liste
-        // @ts-expect-error — zwei Quellen für dieselbe Ebene sind verboten (design.md D1).
+        // @ts-expect-error — zwei Quellen für dieselbe Ebene sind verboten (Spec `ueberschriften-gliederung`, `frontend/AGENTS.md` Liste).
         kopf={{ inhalt: 'Kopf', unterEbene: 2 }}
         unterEbene={2}
         dataSource={['x']}
