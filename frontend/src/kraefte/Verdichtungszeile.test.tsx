@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
+import { freigabenFixture } from '../test/fixtures';
 import { Routes, Route } from 'react-router';
 import { renderMitProviders } from '../test/utils';
 import Verdichtungszeile, {
@@ -200,5 +203,18 @@ describe('Verdichtungszeile — Kontrast der Statuszahlen (LFH-538)', () => {
         color: verdichtungsTextfarbe(farbenHell, statusKategorie[kategorie].rolle),
       });
     }
+  });
+});
+
+describe('Verdichtungszeile · Meldebild gesperrt (LFH-888)', () => {
+  it('zeigt die Zahlen, aber keinen Link in ein gesperrtes Meldebild', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ kraefteuebersicht: { zugriff: false } })),
+      ),
+    );
+    setup();
+    expect(await screen.findByText('0/0/0//0')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Meldebild' })).toBeNull());
   });
 });
