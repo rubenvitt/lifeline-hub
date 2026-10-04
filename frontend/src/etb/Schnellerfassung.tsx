@@ -523,7 +523,7 @@ export default function Schnellerfassung({
     // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein langer
     // Upload Ereigniszeit und `erfasst_lokal_at`. Sie gilt nach der Serveruhr, soweit der Versatz
     // bekannt ist: eine vorgehende Geräteuhr datierte den Eintrag sonst zu spät (LFH-895,
-    // `openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`, D1/D2).
+    // `openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`, D1/D2).
     const jetztIso = serverJetzt().toISOString();
     aendereVersand({ sendet: true, hinweis: null });
     try {

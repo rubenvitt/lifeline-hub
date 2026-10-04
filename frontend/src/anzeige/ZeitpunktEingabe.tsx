@@ -9,7 +9,7 @@
  * - `onChange` feuert nur bei einer Eingabe — ein unberührtes Feld behält den gelesenen Zeitpunkt.
  * - antds „Jetzt“ wäre browserlokal; es ist aus, ein eigener Knopf im Panel-Fuß setzt `serverJetzt()`
  *   — jetzt nach der Serveruhr, soweit der Versatz bekannt ist (LFH-895,
- *   `openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`, D3).
+ *   `openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`, D3).
  * - Weicht die Anzeigezone von der Browserzone ab, steht die Zone am Feld und im Panel-Fuß.
  */
 import { Button, DatePicker, type GetRef } from 'antd';

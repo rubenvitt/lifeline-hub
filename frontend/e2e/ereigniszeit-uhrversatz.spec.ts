@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
  * ohne Handeingabe die Ereigniszeit nach der Serveruhr. Vorher kam „jetzt“ aus der Geräteuhr:
  * Der Eintrag stand 5 min zu spät, die Zeitachse markierte ihn als nachgetragen, und die
  * Rückmeldefrist der meldenden Einheit verschob sich mit
- * (`openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`).
+ * (`openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`).
  *
  * Der Test braucht den echten Server: Der Versatz kommt aus dem `Date`-Header seiner Antworten.
  */

@@ -108,4 +108,4 @@ draußen gelassen werden.
   einem nachgehenden Gerät durch. Eine eingetragene Zeit geht unverändert hinaus. Der Server
   begrenzt ETB- und Meldungs-Ereigniszeiten bewusst nicht. Weitere Vorbelegungen aus `dayjs()`
   sind offen (LFH-1031). Herleitung:
-  `openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`.
+  `openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`.
