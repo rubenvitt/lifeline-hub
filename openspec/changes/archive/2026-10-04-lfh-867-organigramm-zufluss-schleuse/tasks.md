@@ -21,4 +21,4 @@
 ## 4. Prüflisten und Abschluss
 
 - [x] 4.1 Kriterium 12 in `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/pruefliste.md` und `…/2026-10-01-lfh-625-fernmeldeskizze/pruefliste.md` auf **erfüllt** mit Testnamen, Zielticket räumen, Bilanz nachziehen. In `…/2026-10-04-lfh-848-kommunikationsplan/pruefliste.md` beide Tabellen (Datensicht-Bäume) auf das Folgeticket LFH-1020 (D6) umschreiben
-- [ ] 4.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs); Vitest der berührten Dateien und die e2e-Specs `fuehrungsorganisation`, `funkplan`, `gate1-ueberlauf`, `gate3-trefflaeche` grün
+- [x] 4.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs); Vitest der berührten Dateien und die e2e-Specs `fuehrungsorganisation`, `funkplan`, `gate1-ueberlauf`, `gate3-trefflaeche` grün

@@ -2,7 +2,8 @@ import type { BaumKnoten } from './baum';
 
 /**
  * Die Zufluss-Schleuse des hängenden Gerüsts (LFH-867, Herleitung
- * `openspec/changes/lfh-867-organigramm-zufluss-schleuse/design.md`, D1/D3) — rein, ohne React.
+ * `openspec/changes/archive/2026-10-04-lfh-867-organigramm-zufluss-schleuse/design.md`, D1/D3) —
+ * rein, ohne React.
  * Gegenstück der Zeilenschleuse in `components/Datensicht.tsx` und der Kartenschleuse in
  * `personen/kartenSchleuse.ts`.
  *

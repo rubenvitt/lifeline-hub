@@ -38,7 +38,7 @@ import './haengenderBaumPrint.css';
  *
  * Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`
  * (D3, D6), `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` (D4) und
- * `openspec/changes/lfh-867-organigramm-zufluss-schleuse/design.md`.
+ * `openspec/changes/archive/2026-10-04-lfh-867-organigramm-zufluss-schleuse/design.md`.
  */
 
 /** Mindestbreite einer Spalte der ersten Ebene; gemessen vor dem Bau (LFH-626 D3, Nachtrag). */
