@@ -45,7 +45,7 @@ function quelle<T>(
  * `src/einsatz/modul.rs`; die Lageberichte prüfen ihr Modul im Handler), Key und Abruf. EINE
  * Beschreibung für den Hook (Dashboard, Vorbereitung) und den Abruf beim Klick
  * (`ladeLagebasis`, Übernahme in den Lagevortrag, LFH-869): gleiche Listen, gleiche Keys, gleicher
- * Cache.
+ * Cache. Regel: `frontend/src/entwurf/AGENTS.md`, „Weitere Quellen im Lagevortrag“.
  */
 export const LAGEBILD_QUELLEN = {
   personen: quelle('personen', einsatzKeys.personen, (id) => listePersonen(id)),

@@ -26,3 +26,12 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
   Vortragsschema als Datenmodell (LFH-46 §2.3). Texte kommen aus den Renderern der
   Einzelübernahmen, nie aus einer zweiten Verdichtung; was fehlt, steht als „—“ mit Grund, nie 0.
   Der Lagevortrag zur Entscheidung bleibt von Hand.
+- **Weitere Quellen im Lagevortrag zur Information** (LFH-869, Spec `lagevortrag-uebernahme`):
+  Gefahren-/Schadenlage, Lageentwicklung und Besondere (Führungs-)Probleme; Auftrag, Anträge und
+  Zusammenfassung bleiben von Hand. Das Lagebild lädt beim Klick nur über `ladeLagebasis` aus
+  `LAGEBILD_QUELLEN` (`pages/lage-dashboard/useLagebild.ts`, dieselben Keys und Module wie der
+  Hook), Wortlaut aus Vorbereitung (`stab/vorbereitung.ts`) und Funkplan
+  (`funkplanLueckenZeilen`). **Kein Freitext aus Auftrag, Meldung, ETB, Personen oder Schäden**
+  (Dritte), nur Zahlen, Nummern, Arten und Zeiten als DTG. Die Lageentwicklung zählt ab dem
+  ETB-Eintrag der letzten Lagebesprechung nach `lfd_nr`, ohne `system` und freigegebene
+  Lagevorträge, und legt keinen Freitext in den Zwischenspeicher (er wird offline gesichert).
