@@ -85,3 +85,23 @@ nachgezogen. Ein e2e-Fall belegt Akzeptanzkriterium 1 über den echten Strom.
 ## Migration Plan
 
 Keine Daten- oder Wire-Änderung. Ein PR: Backend mit Tests, Kommentare, e2e-Fall, Archiv.
+
+## Nachweise (Umsetzung 04.10.2026)
+
+- **Rot vor Grün:** Die fünf Umschalt-Tests in `tests/einsatz_live.rs` waren vor der Umsetzung rot
+  (je an der `einsatz`-Zählung), die drei Abwesenheitsfälle schon grün; danach alle 14 grün.
+- **Mutationsproben Backend:**
+  - Vergleich in den Bezirks-Routen auf `true` gezwungen →
+    `erste_evakuierung_feuert_einsatz_neben_betreuung_weitere_nicht` rot.
+  - Vergleich in `pegel::repo::anfuegen` auf `true` gezwungen →
+    `erster_pegel_per_post_feuert_einsatz_weitere_nicht` rot.
+  - Emitter in `routes/pegel.rs::ersetzen` und `bezirk_stornieren` entfernt →
+    `pegelliste_per_put_schaltet_in_beide_richtungen` und
+    `stornieren_des_letzten_aktiven_bezirks_feuert_einsatz` rot.
+  - Bezirksprädikat in `lagekennzahl::lesen` ohne `raeumung <> 'aufgehoben'` →
+    `letzte_evakuierung_aufgehoben_und_wieder_angeordnet_feuert_einsatz` und der Unit-Test
+    `lesen_zaehlt_stornierte_und_aufgehobene_bezirke_nicht` rot.
+  Jeweils zurückgedreht → grün.
+- **Mutationsprobe e2e:** Emitter in `routes/pegel.rs::anfuegen` entfernt → der LFH-855-Fall in
+  `e2e/einsatzkopf-live.spec.ts` rot (kein Sammelbanner ohne Neuladen); zurückgedreht → grün.
+- **Nachbartests:** `tests/pegel.rs` und `tests/betreuung.rs` unverändert grün.

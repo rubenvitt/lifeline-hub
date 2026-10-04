@@ -234,8 +234,9 @@ export const EINSATZ_STREAM_EVENTS = {
   verpflegung: [EINSATZ_KEYS.verpflegung],
   // Einsatzkopf (LFH-555). Der Stab-GET liefert den Termin der nächsten Lagebesprechung aus
   // derselben Spalte mit (LFH-46, Entscheidung 11), deshalb hängt er hier mit dran: eine
-  // Terminwahrheit, zwei Caches. Die benutzerbezogenen Kopffelder (`meine_*`) und
-  // `lagekennzahlen` lösen das Ereignis nicht aus; sie werden beim nächsten Abruf frisch.
+  // Terminwahrheit, zwei Caches. `lagekennzahlen` lösen es aus, aber nur beim Umschalten einer
+  // Kennzahl, nicht bei jeder Pegel- oder Bezirksänderung (LFH-855). Die benutzerbezogenen
+  // Kopffelder (`meine_*`) lösen es nicht aus; sie werden beim nächsten Abruf frisch.
   einsatz: [EINSATZ_KEYS.einsatz, EINSATZ_KEYS.stab],
   // Medienkontakte, Pressemitteilungen und ihre Details unter EINEM Prefix. Die Freigabe schreibt
   // den ETB-Snapshot; der kommt über das eigene `etb`-Ereignis.

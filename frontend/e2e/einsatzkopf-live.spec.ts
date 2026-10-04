@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzdatenPfad, stabPfad } from '../src/routing/deeplinks';
+import { einsatzdatenPfad, einsatzModulPfad, stabPfad } from '../src/routing/deeplinks';
 
 /**
  * Der Einsatzkopf ist live (LFH-555): ein Termin, den ein anderer Schirm setzt, erscheint ohne
@@ -11,6 +11,10 @@ import { einsatzdatenPfad, stabPfad } from '../src/routing/deeplinks';
  * verloren (kein Refetch-Fallback, vgl. `kernfluss.spec.ts`). Kein `networkidle` (LFH-385).
  *
  * Mutationsprobe (LFH-555, 5.2): `einsatz` aus `EINSATZ_STREAM_EVENTS` genommen → beide Tests rot.
+ *
+ * LFH-855: Das Umschalten einer Lagekennzahl läuft über dasselbe Ereignis; das Lage-Dashboard hält
+ * seinen Zuschnitt und bietet den neuen per Sammelbanner an. Mutationsprobe: Emitter in
+ * `routes/pegel.rs` entfernt → der Fall ist rot.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -80,4 +84,32 @@ test('LFH-555: die Einsatzdaten setzen den Termin, der offene Stab-Kopfblock fol
 
   await expect(stand.getByText(/^in (1 h 5\d|2 h 00) min$/)).toBeVisible();
   await expect(stand.getByText('kein Termin', { exact: true })).toHaveCount(0);
+});
+
+test('LFH-855: der erste Pegel auf einem anderen Schirm bietet dem offenen Dashboard den Zuschnitt an', async ({
+  page,
+}) => {
+  const id = await anmeldenUndAnlegen(page);
+  await oeffnenMitStrom(page, einsatzModulPfad(id, 'lage-dashboard'), id);
+  const platzEins = page
+    .getByRole('group', { name: 'Lage in Zahlen' })
+    .locator('[data-lfh="kennzahl"]')
+    .first();
+  await expect(platzEins).toContainText('Verbleib offen');
+
+  const festlegen = await page.request.post(`/api/einsaetze/${id}/pegel`, {
+    data: { station_uuid: 'a6ee8177-107b-47dd-bcfd-30960ccc6e9c', name: 'Hann. Münden' },
+  });
+  expect(festlegen.status()).toBe(201);
+
+  const banner = page.locator('[data-lfh="sammelbanner"]', {
+    hasText: 'Kennzahlreihe geändert: Pegel statt Verbleib offen',
+  });
+  await expect(banner).toBeVisible();
+  // Gehalten: die Reihe tauscht nicht unter dem Blick.
+  await expect(platzEins).toContainText('Verbleib offen');
+
+  await banner.getByRole('button', { name: 'übernehmen' }).click();
+  await expect(platzEins).toContainText('Pegel');
+  await expect(banner).toHaveCount(0);
 });

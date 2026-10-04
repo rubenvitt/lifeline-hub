@@ -8,6 +8,7 @@
 use sqlx::SqlitePool;
 
 use super::PEGEL_MAX;
+use crate::einsatz::lagekennzahl;
 use crate::error::AppError;
 use crate::write_retry;
 
@@ -64,12 +65,15 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<PegelZeile>
 
 /// Ersetzt die Liste vollständig; Reihenfolge = Position im Slice. Die Route hat Länge und
 /// Eindeutigkeit bereits geprüft (400/422) — der UNIQUE-Index bliebe sonst als 409 übrig.
+///
+/// `true`, wenn das Ersetzen eine Lagekennzahl am Einsatz umgeschaltet hat (erster Pegel,
+/// Liste geleert) — dann meldet die Route den Einsatzkopf (LFH-855, `lagekennzahl::lesen`).
 pub async fn ersetzen(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
     eintraege: &[PegelEingabe],
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
     let uuids = serde_json::to_string(
         &eintraege
             .iter()
@@ -78,6 +82,7 @@ pub async fn ersetzen(
     )
     .map_err(|e| AppError::Internal(e.to_string()))?;
     write_retry!(pool, |conn| {
+        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
         sqlx::query(
             "DELETE FROM einsatz_pegel WHERE einsatz_id = ? \
              AND station_uuid NOT IN (SELECT value FROM json_each(?))",
@@ -104,7 +109,7 @@ pub async fn ersetzen(
             .execute(&mut *conn)
             .await?;
         }
-        Ok(())
+        Ok(lagekennzahl::lesen(conn, einsatz_id).await? != vorher)
     })
 }
 
@@ -161,7 +166,16 @@ pub async fn setze_prognose(
     Ok(geaendert > 0)
 }
 
-/// Fügt einen Pegel hinten an. `Ok(false)`, wenn die Station schon festgelegt ist (dann
+/// Ergebnis von [`anfuegen`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Angefuegt {
+    /// `false`, wenn die Station schon festgelegt war (idempotent, nichts geschrieben).
+    pub neu: bool,
+    /// Der Pegel hat die Lagekennzahl `pegel` am Einsatz eingeschaltet (LFH-855).
+    pub umgeschaltet: bool,
+}
+
+/// Fügt einen Pegel hinten an. `neu == false`, wenn die Station schon festgelegt ist (dann
 /// bleibt alles, wie es ist — idempotent). Die Obergrenze wird erst NACH der
 /// Vorhandensein-Prüfung geprüft: ein wiederholter POST bei voller Liste ist kein Fehler.
 pub async fn anfuegen(
@@ -169,8 +183,9 @@ pub async fn anfuegen(
     einsatz_id: i64,
     benutzer_id: i64,
     e: &PegelEingabe,
-) -> Result<bool, AppError> {
+) -> Result<Angefuegt, AppError> {
     write_retry!(pool, |conn| {
+        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
         let vorhanden: Option<i64> = sqlx::query_scalar(
             "SELECT id FROM einsatz_pegel WHERE einsatz_id = ? AND station_uuid = ?",
         )
@@ -179,7 +194,10 @@ pub async fn anfuegen(
         .fetch_optional(&mut *conn)
         .await?;
         if vorhanden.is_some() {
-            return Ok(false);
+            return Ok(Angefuegt {
+                neu: false,
+                umgeschaltet: false,
+            });
         }
         let (anzahl, naechste): (i64, i64) = sqlx::query_as(
             "SELECT COUNT(*), COALESCE(MAX(reihenfolge) + 1, 0) FROM einsatz_pegel \
@@ -208,6 +226,9 @@ pub async fn anfuegen(
         .bind(benutzer_id)
         .execute(&mut *conn)
         .await?;
-        Ok(true)
+        Ok(Angefuegt {
+            neu: true,
+            umgeschaltet: lagekennzahl::lesen(conn, einsatz_id).await? != vorher,
+        })
     })
 }
