@@ -281,7 +281,13 @@ export interface FunkplanLuecken {
   lokaleSprechgruppenOhneZuordnung: Luecke<Sprechgruppe>;
 }
 
-export function funkplanLuecken(q: FunkplanQuellen): FunkplanLuecken {
+/** Was die Lücken lesen: Fahrzeuge und Personal tragen keine (LFH-869 liest nur diese). */
+export type LueckenQuellen = Pick<
+  FunkplanQuellen,
+  'abschnitte' | 'einheiten' | 'sprechgruppen' | 'fuehrungsstelle'
+>;
+
+export function funkplanLuecken(q: LueckenQuellen): FunkplanLuecken {
   return {
     abschnitteOhneSprechgruppe: abschnitteOhneSprechgruppe(q.abschnitte),
     einheitenOhneSprechgruppe: einheitenOhneSprechgruppe(q.einheiten),
@@ -352,7 +358,7 @@ export const GEGENSTELLE_HINWEIS = 'Eigene Gegenstelle (Führungsstelle)';
  * vorliegt, oder `null` — dann ist sie erfasst und steht als erste Zeile im Plan. Seite und
  * Bericht fragen nur hier.
  */
-export function gegenstelleHinweis(q: FunkplanQuellen): string | null {
+export function gegenstelleHinweis(q: Pick<FunkplanQuellen, 'fuehrungsstelle'>): string | null {
   const { zustand, daten } = q.fuehrungsstelle;
   if (zustand !== 'daten') return ZUSTAND_GRUND[zustand];
   return fuehrungsstelleErfasst(daten) ? null : 'nicht erfasst';
@@ -360,13 +366,27 @@ export function gegenstelleHinweis(q: FunkplanQuellen): string | null {
 
 // ── Markdown für den Lagebericht ───────────────────────────────────────────────────────────────
 
+/** Wortverbindungszeichen: unsichtbar, ohne Breite, kein Umbruch. */
+const WJ = '\u2060';
+
 /**
  * Entschärft, was `components/Markdown.tsx` (remark-gfm) als Auszeichnung läse: Backslash,
- * Backtick, Stern, Unterstrich, eckige Klammern und die Tilde (GFM streicht schon `~x~` durch).
- * Auch die Vorbereitung der Lagebesprechung (`stab/vorbereitung.ts`) maskiert hierüber.
+ * Backtick, Stern, Unterstrich, eckige Klammern, die Tilde (GFM streicht schon `~x~` durch) und
+ * `<` (spitzer Autolink `<https://x>`, `<a@b.de>`).
+ *
+ * GFM-Autolink-Literale (`www.`, `http(s)://`, E-Mail, LFH-868) hilft kein Backslash: remark-gfm
+ * sucht sie erst NACH dem Auflösen der Escapes im fertigen Textknoten (`www\.x.de` wird trotzdem
+ * ein Link). Deshalb steht dort ein {@link WJ} zwischen `www` und `.`, zwischen `:` und `//` und
+ * vor dem `@`: die Muster greifen nicht mehr, sichtbar bleibt derselbe Text.
+ * Auch die Vorbereitung der Lagebesprechung (`stab/vorbereitung.ts`) und das Organigramm
+ * (`pages/einsatzabschnitte/fuehrungsorganisation.ts`) maskieren hierüber.
  */
 export function md(text: string): string {
-  return text.replace(/[\\`*_[\]~]/g, (z) => `\\${z}`);
+  return text
+    .replace(/[\\`*_[\]~<]/g, (z) => `\\${z}`)
+    .replace(/(www)(?=\.)/gi, `$1${WJ}`)
+    .replace(/(https?:)(?=\/\/)/gi, `$1${WJ}`)
+    .replace(/(?<=[-.\w+])@/g, `${WJ}@`);
 }
 
 function leitungMarkdown(z: FunkplanZeile): string | null {
@@ -401,7 +421,7 @@ function lueckeMarkdown<T>(titel: string, l: Luecke<T>, name: (x: T) => string):
   return `- ${titel}: ${l.treffer.length}${namen}`;
 }
 
-function gegenstelleMarkdown(q: FunkplanQuellen): string[] {
+function gegenstelleMarkdown(q: Pick<FunkplanQuellen, 'fuehrungsstelle'>): string[] {
   const hinweis = gegenstelleHinweis(q);
   if (hinweis == null) return [];
   // Wie jede andere Lücke: ohne Daten „—“ mit Grund.
@@ -409,6 +429,38 @@ function gegenstelleMarkdown(q: FunkplanQuellen): string[] {
     q.fuehrungsstelle.zustand === 'daten'
       ? `- ${GEGENSTELLE_HINWEIS}: ${hinweis}`
       : `- ${GEGENSTELLE_HINWEIS}: — (${hinweis})`,
+  ];
+}
+
+/**
+ * Die Lücken als Listenzeilen, mit dem Hinweis auf die eigene Gegenstelle. EIN Wortlaut für den
+ * Funkplan im Lagebericht und die Führungsprobleme im Lagevortrag (LFH-869).
+ */
+export function funkplanLueckenZeilen(
+  luecken: FunkplanLuecken,
+  quellen: Pick<FunkplanQuellen, 'fuehrungsstelle'>,
+  { nurBefund = false }: { nurBefund?: boolean } = {},
+): string[] {
+  // Mit `nurBefund` fallen Lücken ohne Treffer weg; eine ohne Daten bleibt („—“ mit Grund).
+  const zeile = <T>(titel: string, l: Luecke<T>, name: (x: T) => string): string[] =>
+    nurBefund && l.zustand === 'daten' && l.treffer.length === 0
+      ? []
+      : [lueckeMarkdown(titel, l, name)];
+  return [
+    ...zeile('Abschnitte ohne Sprechgruppe', luecken.abschnitteOhneSprechgruppe, (a) => a.name),
+    ...zeile('Einheiten ohne Sprechgruppe', luecken.einheitenOhneSprechgruppe, (e) => e.name),
+    ...zeile('Einheiten ohne Erreichbarkeit', luecken.einheitenOhneErreichbarkeit, (e) => e.name),
+    ...zeile(
+      'Verbindungen ohne gemeinsame Sprechgruppe',
+      luecken.verbindungenOhneGemeinsameSprechgruppe,
+      (v) => `${v.unten.name} → ${v.oben.name}`,
+    ),
+    ...zeile(
+      'Einsatzlokale Sprechgruppen ohne Zuordnung',
+      luecken.lokaleSprechgruppenOhneZuordnung,
+      (s) => s.bezeichnung,
+    ),
+    ...gegenstelleMarkdown(quellen),
   ];
 }
 
@@ -440,28 +492,7 @@ export function rendereFunkplanMarkdown(
     '',
     '## Lücken',
     '',
-    lueckeMarkdown(
-      'Abschnitte ohne Sprechgruppe',
-      luecken.abschnitteOhneSprechgruppe,
-      (a) => a.name,
-    ),
-    lueckeMarkdown('Einheiten ohne Sprechgruppe', luecken.einheitenOhneSprechgruppe, (e) => e.name),
-    lueckeMarkdown(
-      'Einheiten ohne Erreichbarkeit',
-      luecken.einheitenOhneErreichbarkeit,
-      (e) => e.name,
-    ),
-    lueckeMarkdown(
-      'Verbindungen ohne gemeinsame Sprechgruppe',
-      luecken.verbindungenOhneGemeinsameSprechgruppe,
-      (v) => `${v.unten.name} → ${v.oben.name}`,
-    ),
-    lueckeMarkdown(
-      'Einsatzlokale Sprechgruppen ohne Zuordnung',
-      luecken.lokaleSprechgruppenOhneZuordnung,
-      (s) => s.bezeichnung,
-    ),
-    ...gegenstelleMarkdown(quellen),
+    ...funkplanLueckenZeilen(luecken, quellen),
     '',
     ...quellenAbschnitt,
     '## Gliederung',

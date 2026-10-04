@@ -1,3 +1,24 @@
+## [1.0.0-alpha.74](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.73...v1.0.0-alpha.74) (2026-10-04)
+
+### Lagekarte
+
+- **Verbesserte Bedienbarkeit im Handschuh-Betrieb**: Kartenknöpfe, Ansichtsleiste und Grundlagen-Auswahl haben nun größere Abstände zwischen den Bedienelementen (mindestens 16 Pixel im Handschuh-Modus). Dies verhindert Fehlbedienungen beim Arbeiten mit Handschuhen.
+- **Knopfspalte scrollt bei vielen Elementen**: Die Spalte mit Kartenknöpfen passt sich der verfügbaren Kartenhöhe an und scrollt bei Bedarf, ohne dabei Bedienelemente anderer Bereiche zu überlagern oder Klicks abzufangen.
+
+### Führung und Lagevortrag
+
+- **Eigene Lage automatisch zusammenstellen**: Der Abschnitt "Eigene Lage" im Lagevortrag kann nun Informationen aus dem Kräftemeldebild und der Führungsorganisation übernehmen. Die Übernahme zeigt den aktuellen Stand an und berücksichtigt automatisch, welche Module freigeschaltet sind. Gesperrte oder nicht verfügbare Daten werden entsprechend gekennzeichnet.
+- **Schutz vor ungewollten Links in übernommenen Texten**: Namen und Bezeichnungen wie "www.thw-nord.de" oder E-Mail-Adressen werden in übernommenen Lageberichten, Funkplänen und Organigrammen nicht mehr automatisch in anklickbare Links umgewandelt.
+
+### Kräfte und Mittel
+
+- **Stabile Ereignisliste bei Live-Aktualisierungen**: Während Sie in der Ereignisliste einer Kraft arbeiten (Fokus oder Mauszeiger in der Liste), werden neu eintreffende Ereignisse anderer Benutzer zunächst zurückgehalten und erscheinen erst nach Verlassen der Liste. Dies verhindert, dass sich Zeilen unter dem Cursor verschieben. Ihre eigenen Einträge und Streichungen werden weiterhin sofort angezeigt.
+- **Zuverlässigere Datenverarbeitung**: Die interne Verarbeitung eingehender Kräftemeldungen wurde robuster gemacht.
+
+### Sicherheit und Anmeldung
+
+- **Wirksamere Login-Sperre bei IPv6**: Die automatische Sperrung nach fehlgeschlagenen Anmeldeversuchen erfasst IPv6-Verbindungen nun pro Anschluss (/64-Netz) statt pro Einzeladresse. Dies verhindert Umgehungsversuche durch Rotation der IP-Adresse.
+
 ## [1.0.0-alpha.73](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.72...v1.0.0-alpha.73) (2026-10-04)
 
 ### Lagekarte

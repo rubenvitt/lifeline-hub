@@ -103,4 +103,17 @@ describe('MedienlageUebernahme (LFH-554)', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByRole('button', { name: 'Aus S5 übernehmen' })).toBeNull();
   });
+
+  it('erklärt bei gesperrtem Stab, warum der Knopf fehlt (LFH-870)', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
+    renderMitProviders(<Probe />);
+    expect(
+      await screen.findByText(
+        'Aus S5 übernehmen nicht verfügbar: Modul Stab ist in diesem Einsatz nicht freigegeben',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aus S5 übernehmen' })).toBeNull();
+  });
 });

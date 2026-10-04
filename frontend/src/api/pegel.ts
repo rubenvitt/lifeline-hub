@@ -24,7 +24,7 @@ export const PEGEL_MAX = 5;
  */
 export const PEGEL_ABRUF_MS = 5 * 60_000;
 
-function listePegel(einsatzId: number): Promise<PegelAnzeige[]> {
+export function listePegel(einsatzId: number): Promise<PegelAnzeige[]> {
   return apiGet<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`);
 }
 

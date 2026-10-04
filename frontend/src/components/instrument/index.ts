@@ -26,6 +26,7 @@ export { tonVonRolle, type StatusTon } from './statusFlaeche';
 export {
   default as Segmentleiste,
   segmentStil,
+  segmentZelleStil,
   naechsterIndex,
   type SegmentOption,
 } from './Segmentleiste';
@@ -33,4 +34,5 @@ export { default as Sammelbanner, sammelbannerKurz } from './Sammelbanner';
 export { default as Schnellerfassungszeile } from './Schnellerfassungszeile';
 export { rollenwerte, useRollen, monoStil } from './rollenwerte';
 export { default as Datenraster, Datenfeld } from './Datenraster';
+export { zielEinzug } from './zielEinzug';
 export { default as PaneelZustand, PaneelLink, type PaneelDatenzustand } from './PaneelZustand';

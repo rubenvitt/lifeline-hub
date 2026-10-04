@@ -13,7 +13,7 @@ import {
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit } from '../anzeige/format';
 import { etbPfad } from '../routing/deeplinks';
-import { etbTypFarbe } from '../theme/statusFarben';
+import { etbTypFarbe, etbTypMehrzahl } from '../theme/statusFarben';
 import {
   berichtigungsindex,
   kopfMeta,
@@ -39,14 +39,7 @@ interface Props {
 }
 
 /** Die Mehrzahl der Bilanzzeile — „Meldungen", nicht „Meldung". */
-const MEHRZAHL: Record<EtbEintragAnzeige['typ'], string> = {
-  meldung: 'Meldungen',
-  anordnung: 'Anordnungen',
-  entscheidung: 'Entscheidungen',
-  lage: 'Lagemeldungen',
-  berichtigung: 'Berichtigungen',
-  system: 'Systemeinträge',
-};
+const MEHRZAHL = etbTypMehrzahl;
 
 /**
  * Die Seitenleiste des Einsatztagebuchs: Bilanz nach Typ, jüngste Berichtigungen, Zustand des

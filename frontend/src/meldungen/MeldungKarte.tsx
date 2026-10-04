@@ -11,7 +11,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { istAlarmiert } from './meldungKennzahlen';
+import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 
 const { Text } = Typography;
 
@@ -21,14 +21,6 @@ interface BearbeiterOption {
 }
 
 // Modul-spezifische Labels.
-const ART_LABEL: Record<string, string> = {
-  lagemeldung: 'Lagemeldung',
-  sofortmeldung: 'Sofortmeldung',
-  rueckmeldung: 'Rückmeldung',
-  vollzugsmeldung: 'Vollzugsmeldung',
-  anfrage: 'Anfrage',
-  sonstige: 'Sonstige',
-};
 const WEG_LABEL: Record<string, string> = {
   funk: 'Funk',
   telefon: 'Telefon',
@@ -212,7 +204,7 @@ export default function MeldungKarte({
 
       <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
         <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
-          {WEG_LABEL[m.meldeweg]} · {ART_LABEL[m.meldungsart]} · Ereignis:{' '}
+          {WEG_LABEL[m.meldeweg]} · {MELDUNGSART_LABEL[m.meldungsart]} · Ereignis:{' '}
           {formatZeit(m.ereigniszeit)}
         </Text>
         {ansicht === 'abgeschlossen' && m.erledigt_at && (

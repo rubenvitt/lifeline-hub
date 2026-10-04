@@ -14,12 +14,25 @@ import {
   baueFunkplan,
   funkplanLuecken,
   gegenstelleHinweis,
+  md,
   rendereFunkplanMarkdown,
   type FunkplanQuellen,
   type FunkplanZeile,
 } from './funkplan';
 import { fuehrungsstelleErfasst } from './fuehrungsstelle';
 import type { Quelle } from './luecken';
+
+/** Namen, die remark-gfm ohne Schutz als Link läse (LFH-868). */
+const AUTOLINKS = {
+  www: 'www.thw-nord.de',
+  gross: 'WWW.Nord.de/fz',
+  http: 'https://thw.de/ov?a=1',
+  spitz: '<https://x.de>',
+  mail: 'ops@thw-nord.de',
+} as const;
+
+/** Text, wie ihn ein Mensch sieht: ohne das unsichtbare Wortverbindungszeichen (U+2060). */
+const sichtbar = (text: string | null) => (text ?? '').replace(/\u2060/g, '');
 
 function sg(
   id: number,
@@ -492,6 +505,40 @@ describe('rendereFunkplanMarkdown', () => {
       expect(container.textContent, wert).toContain(wert);
     }
     expect(container.querySelectorAll('del, em, a, code')).toHaveLength(0);
+  });
+
+  it('Rundlauf: GFM-Autolinks in Namen bleiben Text, ohne <a> (LFH-868)', () => {
+    const q4 = quellen({
+      abschnitte: daten([
+        abschnitt(1, {
+          name: AUTOLINKS.www,
+          leiter_name: AUTOLINKS.mail,
+          sprechgruppen: [sg(1, 'TMO', AUTOLINKS.http)],
+        }),
+      ]),
+      einheiten: daten([einheit(10, { name: AUTOLINKS.spitz, abschnitt_id: 1 })]),
+      fahrzeuge: daten([fahrzeug(100, { einheit_id: 10, fahrzeugtyp: AUTOLINKS.gross })]),
+    });
+    const text = rendereFunkplanMarkdown(baueFunkplan(q4), 'X', funkplanLuecken(q4), q4);
+    const { container } = render(<Markdown unterEbene={2}>{text}</Markdown>);
+    expect(container.querySelectorAll('a')).toHaveLength(0);
+    for (const wert of Object.values(AUTOLINKS)) {
+      expect(sichtbar(container.textContent), wert).toContain(wert);
+    }
+  });
+});
+
+describe('md (LFH-868)', () => {
+  it('bricht GFM-Autolinks, ohne den sichtbaren Text zu ändern', () => {
+    for (const wert of Object.values(AUTOLINKS)) {
+      const { container } = render(<Markdown unterEbene={2}>{md(wert)}</Markdown>);
+      expect(container.querySelector('a'), wert).toBeNull();
+      expect(sichtbar(container.textContent), wert).toBe(wert);
+    }
+  });
+
+  it('lässt Text ohne Autolink unverändert', () => {
+    expect(md('OV Nord, Zug 2 @ Halle 3. www-Team')).toBe('OV Nord, Zug 2 @ Halle 3. www-Team');
   });
 });
 

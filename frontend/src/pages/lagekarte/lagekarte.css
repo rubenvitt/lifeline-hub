@@ -10,6 +10,9 @@
 .lfh-ebenenzeile {
   background: transparent;
 }
+/* Die Zelle trägt den Grund, der Knopf rückt darin um den Zielabstand ein (LFH-865,
+   `kartenKnopfZelleStil`); der Knopf selbst behält seinen Grund für Hover und „eingerastet“. */
+.lfh-kartenknopf-zelle,
 .lfh-kartenknopf {
   background: var(--lfh-flaeche);
 }

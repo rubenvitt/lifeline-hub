@@ -238,7 +238,9 @@ describe('LageberichtDetailPage', () => {
     });
     await screen.findByRole('button', { name: /Freigeben/i });
     await userEvent.click(screen.getByRole('button', { name: /Freigeben/i }));
-    expect(await screen.findByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
+    // Im Dialog: der Entwurf trägt selbst Übernahme-Knöpfe, die „ETB“ nennen (LFH-873).
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
   });
 
   it('Entwurf-Editor zeigt die Vorschau auf Wunsch neben dem Text (Umschalter, Vorgabe AUS)', async () => {
