@@ -1,3 +1,15 @@
+## [1.0.0-alpha.77](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.76...v1.0.0-alpha.77) (2026-10-04)
+
+### Lagekarte
+
+- **Pegelstände:** Die Farbkodierung der Pegelzustände wurde vereinheitlicht – hohe und niedrige Wasserstände werden nun in der Warnfarbe Orange dargestellt, Normalzustände in Grün. Werte über dem mittleren Hochwasser erscheinen nicht mehr in Rot, da hier noch keine Meldestufe vorliegt.
+
+- **Warnmeldungen:** Die Anzeige der Warnquelle wurde korrigiert – bei fehlenden Absenderinformationen zeigt die Karte nun je nach Ebene den korrekten Herausgeber an (Deutscher Wetterdienst bei Wetterwarnungen, BBK/MoWaS bei NINA-Warnungen).
+
+### Allgemeine Verbesserungen
+
+- **Darstellung bei Nachtmodus:** Die Lesbarkeit von Code-Blöcken und formatierten Texten im Dunkelmodus wurde verbessert – Hintergründe und Rahmen fügen sich nun einheitlich in das Farbschema ein und bieten durchgängig ausreichenden Kontrast für gute Lesbarkeit.
+
 ## [1.0.0-alpha.76](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.75...v1.0.0-alpha.76) (2026-10-04)
 
 ### Führung
