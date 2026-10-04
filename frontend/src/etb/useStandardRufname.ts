@@ -31,6 +31,9 @@ export interface StandardRufnameZugriff {
  * ablehnt, darf nicht als gesetzt dastehen. Aus der Antwort übernimmt der Cache nur DIESEN
  * Schlüssel — das Gedächtnis der Palette schreibt optimistisch in dasselbe Fach, eine späte
  * Vollantwort setzte es zurück.
+ *
+ * Das Fach steht in der Offline-Allowlist (`LAGEBILD_OFFLINE`): nach einem Kaltstart ohne Server
+ * trägt der vorgehaltene Standard die Erfassung in die Queue.
  */
 export function useStandardRufname(): StandardRufnameZugriff {
   const auth = useAuthOptional();

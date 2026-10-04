@@ -44,7 +44,13 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-kartenbilder',
   'einsatz-lage-snapshot',
 ]);
-const ERWARTET_GLOBAL = new Set(['einsaetze', 'karte-config', 'organisation', 'fahrzeug-status']);
+const ERWARTET_GLOBAL = new Set([
+  'einsaetze',
+  'karte-config',
+  'organisation',
+  'fahrzeug-status',
+  'benutzer-einstellungen',
+]);
 
 function geschriebeneKeys(qc: QueryClient): unknown[][] {
   return dehydrate(qc, lagebildDehydrierOptionen(qc)).queries.map((q) => q.queryKey as unknown[]);

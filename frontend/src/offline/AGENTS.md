@@ -9,8 +9,9 @@ außerdem für jede Mutation, die eine `erfasse…OfflineFaehig`-Funktion ruft, 
 und `istLagebildOfflineKey` in `api/queryKeys.ts`. Das sind ETB, Meldebild, Betroffene,
 Aufträge und Lagekarte samt Rahmendaten (Einsatzkopf, Modulfreigaben `modulFreigaben` — seit
 LFH-669 statt der Overrides —, Einstellungen, Zähler,
-Einsatzliste, Kartenkonfiguration, Organisation, Fahrzeugstatus). Von den Meldungen zählen nur
-die Rückmeldungen. Gespeichert wird in einer eigenen IndexedDB `lifeline-lagebild`
+Einsatzliste, Kartenkonfiguration, Organisation, Fahrzeugstatus) und die Präferenzen der Person:
+ohne den Standard-Rufnamen hielte die Von/An-Pflicht jede Erfassung nach einem Kaltstart auf
+(LFH-894). Von den Meldungen zählen nur die Rückmeldungen. Gespeichert wird in einer eigenen IndexedDB `lifeline-lagebild`
 (`offline/lagebildSpeicher.ts`, genau ein Datensatz je Gerät), nie über Workbox auf URL-Ebene.
 `lagebildOffline.guard.test.ts` vergleicht die Liste mit **jedem** verwalteten Prefix. Ein neuer
 Prefix landet also nicht still auf der Platte, er muss aufgenommen oder ausdrücklich
