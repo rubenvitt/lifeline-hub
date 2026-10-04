@@ -88,9 +88,11 @@ Ohne Standard steht über der Eingabezeile eine kompakte Zeile „Dein Rufname f
 einer Auswahl (`AutoComplete` über Funkrufnamen und Sachgebiete, Freitext erlaubt), dem
 Schalter „Empfänger wie Absender“ (Vorgabe an; aus zeigt ein zweites Feld) und „Übernehmen“.
 Mit Standard stehen Von und An als Chips da, gekennzeichnet als Standard (Titel, kein
-„Entfernen“), und „Standard-Rufname ändern“ steht in der Chip-Zeile; es öffnet dieselbe Zeile
-vorbelegt. (Umgesetzt in der Chip-Zeile statt der Hinweiszeile: die Chips zeigen den Wert
-ohnehin, ein zweites „Von/An: …“ wiederholte ihn.) Gründe: Das ETB wird auch gelesen (ein Modal sperrte die Zeitachse); das
+„Entfernen“). Ihr Menü bietet „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“;
+letzteres öffnet dieselbe Zeile vorbelegt. (Umgesetzt im Chip-Menü statt in der Hinweiszeile:
+die Chips zeigen den Wert ohnehin. Ein eigener Knopf in der Chip-Zeile brach sie im
+Handschuh-Betrieb um, die Erfassungsleiste stieg bei 1024 × 768 von 364 auf 488 px und riss den
+Deckel aus `e2e/leisten-flaeche.spec.ts`.) Gründe: Das ETB wird auch gelesen (ein Modal sperrte die Zeitachse); das
 Feldbudget der Schnellerfassung bleibt, weil die Zeile nur bis zur Antwort steht; e2e-Specs,
 die nur lesen, laufen ohne Standard weiter. Die Zeile erscheint nur mit Schreibrecht im
 laufenden Einsatz, nie in einer Berichtigung (dort gilt der vorhandene Standard).
