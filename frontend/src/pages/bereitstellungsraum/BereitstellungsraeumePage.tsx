@@ -2,7 +2,7 @@ import { Breadcrumb, Button, type TableColumnsType } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
+import { bereitstellungsraumDetailPfad, einsaetzePfad, einsatzPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -108,8 +108,8 @@ export default function BereitstellungsraeumePage() {
       breadcrumb={
         <Breadcrumb
           items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
+            { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
+            { title: <Link to={einsatzPfad(einsatzId)}>{einsatzQuery.data?.bezeichnung}</Link> },
             { title: 'Bereitstellungsräume' },
           ]}
         />

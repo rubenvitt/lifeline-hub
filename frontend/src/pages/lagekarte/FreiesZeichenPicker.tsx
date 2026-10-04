@@ -23,7 +23,7 @@ import type { FreiesZeichenUpdate } from '../../api/types';
 import type { Farbrollen } from '../../theme/tokens';
 import { useRollen } from '../../components/instrument';
 import { grundzeichenAkzeptiert } from './taktischesZeichen';
-import { baueFreiesZeichenTz } from './marker';
+import { baueFreiesZeichenTz, FREIES_ZEICHEN_TINTE } from './marker';
 import { abonniereZuletztVerwendet, leseZuletztVerwendet } from './zuletztVerwendet';
 
 export interface FreiesZeichenPickerProps {
@@ -79,8 +79,6 @@ const NAMENS_TEILE: { katalog: readonly KatalogEintrag[]; feld: keyof FreiesZeic
   { katalog: einheiten, feld: 'einheit' },
   { katalog: funktionen, feld: 'funktion' },
 ];
-
-const NEUTRALE_FARBE = '#333333';
 
 /** Kantenlänge der Zeichnung in einer Kachel. Ab 40 px bleibt die DV-102-Binnenzeichnung
  *  (Fachaufgabe im Grundzeichen) unterscheidbar. */
@@ -579,9 +577,9 @@ export default function FreiesZeichenPicker({
                     key={`farbe-${wert.farbe ?? ''}`}
                     aria-label="Farbe"
                     type="color"
-                    defaultValue={wert.farbe ?? NEUTRALE_FARBE}
+                    defaultValue={wert.farbe ?? FREIES_ZEICHEN_TINTE}
                     onBlur={(e) => {
-                      if (e.target.value !== (wert.farbe ?? NEUTRALE_FARBE)) {
+                      if (e.target.value !== (wert.farbe ?? FREIES_ZEICHEN_TINTE)) {
                         onChange({ ...wert, farbe: e.target.value });
                       }
                     }}

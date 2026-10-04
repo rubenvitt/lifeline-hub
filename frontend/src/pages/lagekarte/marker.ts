@@ -247,8 +247,13 @@ export function baueLageMeldungMarker(
   return verortet;
 }
 
-// Neutrale DV-102-Tinte, wenn das freie Zeichen keine eigene Farbe trägt.
-const FREIES_ZEICHEN_FARBE = '#333333';
+/**
+ * Neutrale DV-102-Tinte, wenn das freie Zeichen keine eigene Farbe trägt: Farbe auf der Karte und
+ * Vorgabe des Farbfelds im Picker (LFH-797, eine Quelle). Ein Datenwert für das Zeichen auf
+ * weißem Grundzeichen, keine UI-Farbe — die Symbolkachel im Inspector nimmt ohne eigene Farbe
+ * eine Textrolle (Spec `lagekarte-taktische-zeichen`).
+ */
+export const FREIES_ZEICHEN_TINTE = '#333333';
 
 /**
  * Baut die DV-102-Spec eines freien Zeichens und strippt jedes Overlay (auch die Farbe), das das
@@ -295,7 +300,7 @@ export function baueFreieZeichenMarker(
     lat: z.lat,
     lon: z.lon,
     label: z.label ?? FREIES_ZEICHEN_ERSATZLABEL,
-    farbe: z.farbe ?? FREIES_ZEICHEN_FARBE,
+    farbe: z.farbe ?? FREIES_ZEICHEN_TINTE,
     tz: baueFreiesZeichenTz(z),
     trefferDurchmesser: token.controlHeight,
   }));

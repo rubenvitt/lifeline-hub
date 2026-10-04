@@ -5,6 +5,7 @@ import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders } from '../../test/utils';
 import type { Gefahrengebiet, LageZone } from '../../api/types';
 import ZonenInspector, { type ZonenInspectorProps } from './ZonenInspector';
+import { FREIE_SKIZZE_VORGABEFARBE, zoneStil } from './zonenStil';
 
 const basisZone: LageZone = {
   id: 1,
@@ -504,5 +505,33 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
   it('an anderen Zonentypen erscheint nichts vom Bezirk', () => {
     mitBezirk({ zone: { ...basisZone, typ: 'absperrbereich', gefahrengebiet_id: null } });
     expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).toBeNull();
+  });
+});
+
+describe('ZonenInspector — Vorgabefarbe der freien Skizze (LFH-797)', () => {
+  const farbloseSkizze: LageZone = {
+    ...basisZone,
+    typ: 'freie_skizze',
+    farbe: null,
+    gefahrengebiet_id: null,
+  };
+
+  it('zeigt die Vorgabe der Karte im Farbfeld und schreibt beim bloßen Blur nichts', async () => {
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>();
+    renderInspector({ zone: farbloseSkizze, gebiete: [], onAendern });
+
+    const farbe = screen.getByLabelText('Farbe');
+    // Eine Quelle: Farbfeld und Kartendarstellung lesen dieselbe Vorgabe.
+    expect(farbe).toHaveValue(FREIE_SKIZZE_VORGABEFARBE);
+    expect(zoneStil('freie_skizze', null).lineColor).toBe(FREIE_SKIZZE_VORGABEFARBE);
+
+    await userEvent.click(farbe);
+    fireEvent.blur(farbe);
+    expect(onAendern).not.toHaveBeenCalled();
+
+    // Gegenaussage: eine echte Farbwahl kommt an.
+    fireEvent.change(farbe, { target: { value: '#00ff00' } });
+    fireEvent.blur(farbe);
+    expect(onAendern).toHaveBeenCalledWith({ farbe: '#00ff00' });
   });
 });

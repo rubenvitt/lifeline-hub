@@ -51,6 +51,7 @@ import {
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { neueClientId } from '../offline/clientId';
+import { lageberichtePfad } from '../routing/deeplinks';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
@@ -851,7 +852,7 @@ export default function Schnellerfassung({
             <Button
               type="link"
               disabled={sendet}
-              onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}
+              onClick={() => navigate(lageberichtePfad(einsatz.id))}
             >
               Als strukturierten Lagebericht erfassen →
             </Button>

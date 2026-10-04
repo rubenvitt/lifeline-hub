@@ -35,8 +35,10 @@ const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
 
 /**
  * Vorgabefarbe der freien Skizze: mit ihr startet das Zeichnen (Paneel und Zeichnen-Deeplink,
- * LFH-825), und eine Skizze ohne gespeicherte Farbe wird in ihr gezeigt. Ein persistierter
- * Datenwert, kein Laufzeit-Token — sonst deutete ein Themenwechsel gespeicherte Zonen um.
+ * LFH-825), eine Skizze ohne gespeicherte Farbe wird in ihr gezeigt, und das Farbfeld im
+ * `ZonenInspector` vergleicht gegen sie (LFH-797, Spec `lagekarte-zeichnen`: EINE Quelle, sonst
+ * löste ein bloßer Blur ein PATCH aus). Ein persistierter Datenwert, kein Laufzeit-Token — sonst
+ * deutete ein Themenwechsel gespeicherte Zonen um.
  */
 export const FREIE_SKIZZE_VORGABEFARBE = '#1677ff';
 

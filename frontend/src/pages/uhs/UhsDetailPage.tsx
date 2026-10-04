@@ -7,6 +7,8 @@ import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import {
+  einsaetzePfad,
+  einsatzPfad,
   parseRouteId,
   personenAufnahmePfad,
   unfallhilfsstellenListePfad,
@@ -130,8 +132,8 @@ export default function UhsDetailPage() {
       breadcrumb={
         <Breadcrumb
           items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
+            { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
+            { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
             { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
             { title: uhs.bezeichnung },
           ]}

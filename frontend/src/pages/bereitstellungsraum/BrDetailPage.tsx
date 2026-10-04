@@ -6,7 +6,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
-import { parseRouteId, bereitstellungsraeumeListePfad } from '../../routing/deeplinks';
+import {
+  parseRouteId,
+  bereitstellungsraeumeListePfad,
+  einsaetzePfad,
+  einsatzPfad,
+} from '../../routing/deeplinks';
 import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -179,8 +184,8 @@ export default function BrDetailPage() {
       breadcrumb={
         <Breadcrumb
           items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
+            { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
+            { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
             { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
             { title: br.bezeichnung },
           ]}

@@ -4,7 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders } from '../../test/utils';
 import type { FreiesZeichen } from '../../api/types';
+import { ConfigProvider, theme } from 'antd';
 import FreiesZeichenInspector, { type FreiesZeichenInspectorProps } from './FreiesZeichenInspector';
+import { FREIES_ZEICHEN_TINTE } from './marker';
+import { antdToken, farbenDunkel } from '../../theme/tokens';
 
 const basis: FreiesZeichen = {
   id: 42,
@@ -296,5 +299,42 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(onLoeschen).toHaveBeenCalledTimes(1);
     unmount();
     expect(onAendern).not.toHaveBeenCalled();
+  });
+});
+
+describe('FreiesZeichenInspector — Symbolkachel (LFH-797)', () => {
+  /** CSS-Normalform einer Farbe (jsdom liest `style.borderColor` als `rgb(…)`). */
+  const css = (farbe: string) => {
+    const probe = document.createElement('div');
+    probe.style.color = farbe;
+    return probe.style.color;
+  };
+  const kachelImNachtmodus = (zeichen: FreiesZeichen) => {
+    renderMitProviders(
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
+        <FreiesZeichenInspector
+          zeichen={zeichen}
+          darfSchreiben={false}
+          onSchliessen={() => {}}
+          onAendern={() => {}}
+          onLoeschen={() => {}}
+          ansichten={[]}
+          onVerschieben={() => {}}
+        />
+      </ConfigProvider>,
+    );
+    return document.querySelector<HTMLElement>('[data-lfh="auswahl-kachel"]')!;
+  };
+
+  it('zeigt ein farbloses Zeichen in der Textrolle, nicht in der Kartentinte', () => {
+    const zelle = kachelImNachtmodus({ ...basis, farbe: null });
+    expect(zelle.style.borderColor).toBe(css(farbenDunkel.text2));
+    expect(zelle.style.color).toBe(css(farbenDunkel.text2));
+    expect(zelle.style.borderColor).not.toBe(css(FREIES_ZEICHEN_TINTE));
+  });
+
+  it('zeigt ein Zeichen mit eigener Farbe in dieser Farbe', () => {
+    const zelle = kachelImNachtmodus({ ...basis, farbe: '#cc0000' });
+    expect(zelle.style.borderColor).toBe(css('#cc0000'));
   });
 });

@@ -210,6 +210,29 @@ async fn download_setzt_content_disposition_attachment() {
     assert!(cd.contains("plan.png"), "Dateiname im Header: {cd}");
 }
 
+/// LFH-797: Die Route setzt `nosniff` nicht selbst; die Schicht in `app.rs` hängt ihn an
+/// (Spec `http-schutzkoepfe`). Hochgeladene Bytes dürfen nie als etwas anderes gedeutet werden.
+#[tokio::test]
+async fn download_setzt_nosniff() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let png = minimal_png();
+
+    let (status, bild) =
+        upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    assert_eq!(status, StatusCode::CREATED, "Upload: {bild:?}");
+    let bild_id = bild["id"].as_i64().unwrap();
+
+    let (s, headers, _) = download_bild(&app, einsatz, bild_id, &admin).await;
+    assert_eq!(s, StatusCode::OK);
+    let werte: Vec<_> = headers
+        .get_all(header::X_CONTENT_TYPE_OPTIONS)
+        .iter()
+        .collect();
+    assert_eq!(werte, ["nosniff"], "X-Content-Type-Options: {werte:?}");
+}
+
 /// (b) Beobachter ohne Schreibrecht → POST Upload → 403.
 #[tokio::test]
 async fn beobachter_darf_nicht_hochladen() {
