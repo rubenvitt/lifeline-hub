@@ -200,6 +200,16 @@ export const etbTyp: Record<EtbTyp, StatusDarstellung> = {
   berichtigung: { rolle: 'alarm', label: 'Berichtigung' },
 };
 
+/** Mehrzahl je Eintragstyp: „5 Meldungen“ (ETB-Bilanz, Lageentwicklung im Lagevortrag). */
+export const etbTypMehrzahl: Record<EtbTyp, string> = {
+  meldung: 'Meldungen',
+  anordnung: 'Anordnungen',
+  entscheidung: 'Entscheidungen',
+  lage: 'Lagemeldungen',
+  berichtigung: 'Berichtigungen',
+  system: 'Systemeinträge',
+};
+
 /** Status einer Unfallhilfsstelle. */
 export const uhsStatus: Record<UhsStatus, StatusDarstellung> = {
   geplant: { rolle: 'neutral', label: 'geplant' },

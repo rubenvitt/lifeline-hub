@@ -13,6 +13,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
+import { freigabenFixture } from '../test/fixtures';
 
 vi.mock('../api/einsaetze');
 vi.mock('../api/lageberichte');
@@ -488,5 +489,39 @@ describe('LageberichtDetailPage — Entwurfsdruck (LFH-731)', () => {
     // 16:30 Ortszeit (Berlin, Sommerzeit) = 14:30 UTC → in der Anzeigezone wieder 16:30.
     await waitFor(() => expect(within(kopf()).getByText('251630JUL2026')).toBeInTheDocument());
     expect(lageberichteApi.aktualisiereLagebericht).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ── Übernahmen im Lagevortrag zur Information (LFH-869) ──
+ *
+ * Fünf Abschnitte tragen im Schreibzweig eine Übernahme (Eigene Lage und Medienlage seit LFH-870,
+ * dazu Gefahren-/Schadenlage, Lageentwicklung und Führungsprobleme); Auftrag, Anträge und
+ * Zusammenfassung bleiben von Hand (Spec `lagevortrag-uebernahme`). Welcher Knopf an welchem
+ * Abschnitt steht, pinnt `lageberichte/uebernahmen.test.ts`.
+ */
+describe('LageberichtDetailPage — Übernahmen (LFH-869)', () => {
+  it('zeigt die Knöpfe der drei neuen Abschnitte und keinen weiteren', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(einsaetzeApi.ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf' }) as never,
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    for (const name of [
+      'Aus dem Lagebild übernehmen',
+      'Aus dem ETB übernehmen',
+      'Aus dem Führungsstand übernehmen',
+    ]) {
+      // Zugeklappte Abschnitte sind gerendert, aber verborgen (`forceRender`).
+      expect(await screen.findByRole('button', { name, hidden: true })).toBeInTheDocument();
+    }
+    // Acht Abschnitte, fünf mit Übernahme: Auftrag, Anträge und Zusammenfassung tragen keine.
+    expect(screen.getAllByRole('button', { name: /übernehmen$/, hidden: true })).toHaveLength(5);
   });
 });
