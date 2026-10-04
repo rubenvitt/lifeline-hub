@@ -30,4 +30,5 @@ Branch mergen (design.md D6). Jede Aufgabe per TDD (Test zuerst rot). Pfade rela
 
 - [x] 5.1 Abschnitt zum Baustein in `frontend/src/entwurf/AGENTS.md` (von LFH-870) um die drei Quellen, `LAGEBILD_QUELLEN`/`ladeLagebasis` und „kein Freitext aus Auftrag, Meldung, ETB, Personen, Schäden“ ergänzen; Verweis in `pages/lage-dashboard/useLagebild.ts`. Verifikation: `prettier --check` über `frontend/` grün.
 - [x] 5.2 Komponententest in `pages/LageberichtDetailPage.test.tsx`: die drei Abschnitte tragen im Schreibzweig ihren Knopf, „Auftrag“, „Anträge und Vorschläge“ und „Zusammenfassung“ keinen. Verifikation: grün.
-- [ ] 5.3 Gesamtlauf `./scripts/check-all.sh` (bzw. die in der Sitzung lauffähigen Bündel: Prettier, ESLint, `tsc -b`, Vitest, Rust-Tests) grün; was nur die CI belegt, mit Verweis auf den Lauf abhaken.
+- [x] 5.3 Gesamtlauf `./scripts/check-all.sh` (bzw. die in der Sitzung lauffähigen Bündel: Prettier, ESLint, `tsc -b`, Vitest, Rust-Tests) grün; was nur die CI belegt, mit Verweis auf den Lauf abhaken.
+  Sitzung (Node 22 statt 26.7, ohne mise): Prettier, ESLint, `tsc -b` grün, Vitest 9475/9476 grün; rot nur `api/kartenbilder.test.ts` (msw `object.stream` unter Node 22, Datei nicht berührt). Rust ohne Änderung; beides belegt die CI des PR.

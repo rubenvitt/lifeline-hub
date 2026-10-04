@@ -26,7 +26,9 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
   Vortragsschema als Datenmodell (LFH-46 §2.3). Texte kommen aus den Renderern der
   Einzelübernahmen, nie aus einer zweiten Verdichtung; was fehlt, steht als „—“ mit Grund, nie 0.
   Der Lagevortrag zur Entscheidung bleibt von Hand.
-- **Weitere Quellen im Lagevortrag zur Information** (LFH-869, Spec `lagevortrag-uebernahme`):
+- **Weitere Quellen im Lagevortrag zur Information** (LFH-869,
+  `openspec/changes/archive/2026-10-04-lfh-869-lagevortrag-weitere-abschnitte/design.md`, Spec
+  `lagevortrag-uebernahme`):
   Gefahren-/Schadenlage, Lageentwicklung und Besondere (Führungs-)Probleme; Auftrag, Anträge und
   Zusammenfassung bleiben von Hand. Das Lagebild lädt beim Klick nur über `ladeLagebasis` aus
   `LAGEBILD_QUELLEN` (`pages/lage-dashboard/useLagebild.ts`, dieselben Keys und Module wie der
