@@ -127,6 +127,9 @@ const NUR_TABELLE: string[] = [
   // Der Funkplan (LFH-548) wird verglichen („welche Stelle funkt auf welcher Gruppe?“) und
   // gedruckt; Tabelle in jeder Breite, auf schmalem Schirm angepasst.
   '/src/pages/FunkplanPage.tsx',
+  // Der Kommunikationsplan (LFH-848): „welche Nummer hat …?“ ist ein Vergleich, Tabelle in jeder
+  // Breite.
+  '/src/pages/KommunikationsplanPage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
 ];
 
@@ -170,6 +173,8 @@ const KONSUMENTEN = [
   '/src/pages/FahrzeugePage.tsx',
   // Der Funkplan S6 (LFH-548): abgeleiteter Baum Abschnitt → Einheit → Fahrzeug, schreibgeschützt.
   '/src/pages/FunkplanPage.tsx',
+  // Der Kommunikationsplan S6 (LFH-848): Gruppen als Baumknoten, Aktionsspalte selbst gebaut.
+  '/src/pages/KommunikationsplanPage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
   '/src/pages/MaterialPage.tsx',
@@ -698,7 +703,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer umbaut, ohne einzutragen, an der
     // Formprüfung.
     expect(NUR_KARTE).toHaveLength(3);
-    expect(NUR_TABELLE).toHaveLength(4);
+    expect(NUR_TABELLE).toHaveLength(5);
     // Eine PFLICHT, dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild.
     expect(VOLLMENGE_PFLICHT).toHaveLength(1);
     // Eine SCHULD, auf 0 geschrumpft. Ein Eintrag wäre eine zweite Seite mit demselben Fehler.

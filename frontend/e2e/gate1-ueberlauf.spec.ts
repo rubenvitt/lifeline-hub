@@ -246,6 +246,9 @@ const BESTAND_OFFEN: readonly Freistellung[] = [];
  * Personalseite und im Meldebild (Sammelzeile „Ohne Einheit"). Jede Antwort wird
  * zugesichert: ein still fehlgeschlagenes Seeding führt zurück in den Leerzustand.
  */
+/** Lange Bezeichnung einer externen Stelle im Kommunikationsplan (LFH-848). */
+const KOMMUNIKATION_STELLE = 'Polizeiinspektion Musterstadt-Nordwest, Führungsgruppe';
+
 async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
   const anlegen = async (pfad: string, data: unknown, was: string) => {
     const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
@@ -328,6 +331,25 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string) {
       antreff_ort: 'Weidekoppel südlich der Bundesstraße',
     },
     'Tier',
+  );
+  // Kommunikationsplan S6 (LFH-848): eine Behörde mit langer Bezeichnung, langer Nummer und
+  // langem Hinweis. Die Antwort ist der ganze Plan; die id der Stelle steht darin.
+  const plan = await page.request.post(
+    `/api/einsaetze/${einsatzId}/stab/kommunikationsplan/stellen`,
+    { data: { stellenart: 'behoerde', bezeichnung: KOMMUNIKATION_STELLE } },
+  );
+  expect(plan.ok(), `Seeding Kommunikationsplan: ${await plan.text()}`).toBeTruthy();
+  const stelle = ((await plan.json()) as { id: number; bezeichnung?: string }[]).find(
+    (s) => s.bezeichnung === KOMMUNIKATION_STELLE,
+  )!;
+  await anlegen(
+    `stab/kommunikationsplan/stellen/${stelle.id}/verbindungen`,
+    {
+      mittel: 'festnetz',
+      wert: '+49 421 361-1234567',
+      hinweis: 'Lagedienst rund um die Uhr, außerhalb Bürozeit über Zentrale',
+    },
+    'Verbindung',
   );
 }
 
@@ -652,6 +674,19 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
           expect(
             p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
             'Vorbedingung: ohne Schreibrecht keine Übernahme',
+          ).toHaveCount(0),
+      },
+    },
+    {
+      // Kommunikationsplan S6 (LFH-848). Datenanker ist die gesäte Behörde IN der Tabelle.
+      pfad: `/einsaetze/${einsatzId}/stab/kommunikationsplan`,
+      anker: (p: Page) =>
+        p.getByRole('region', { name: 'Kommunikationsplan' }).getByText(KOMMUNIKATION_STELLE),
+      lesend: {
+        vorbedingung: (p: Page) =>
+          expect(
+            p.getByRole('button', { name: 'Stelle hinzufügen' }),
+            'Vorbedingung: ohne Schreibrecht kein „Stelle hinzufügen“',
           ).toHaveCount(0),
       },
     },

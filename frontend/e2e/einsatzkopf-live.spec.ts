@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzdatenPfad, einsatzModulPfad, stabPfad } from '../src/routing/deeplinks';
+import { anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /**
  * Der Einsatzkopf ist live (LFH-555): ein Termin, den ein anderer Schirm setzt, erscheint ohne
@@ -12,9 +13,13 @@ import { einsatzdatenPfad, einsatzModulPfad, stabPfad } from '../src/routing/dee
  *
  * Mutationsprobe (LFH-555, 5.2): `einsatz` aus `EINSATZ_STREAM_EVENTS` genommen → beide Tests rot.
  *
+ * LFH-854: ein Rollenwechsel im Einsatz feuert ebenfalls `einsatz`; der Schirm der betroffenen
+ * Person zeigt ihr neues Schreibrecht ohne Neuladen. Mutationsprobe: Emitter in
+ * `mitglied_setzen` entfernt → der Rollenwechsel-Test rot.
+ *
  * LFH-855: Das Umschalten einer Lagekennzahl läuft über dasselbe Ereignis; das Lage-Dashboard hält
  * seinen Zuschnitt und bietet den neuen per Sammelbanner an. Mutationsprobe: Emitter in
- * `routes/pegel.rs` entfernt → der Fall ist rot.
+ * `routes/pegel.rs` entfernt → der Pegel-Test rot.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -84,6 +89,40 @@ test('LFH-555: die Einsatzdaten setzen den Termin, der offene Stab-Kopfblock fol
 
   await expect(stand.getByText(/^in (1 h 5\d|2 h 00) min$/)).toBeVisible();
   await expect(stand.getByText('kein Termin', { exact: true })).toHaveCount(0);
+});
+
+test('LFH-854: ein Rollenwechsel schaltet das Schreibrecht der betroffenen Person ohne Neuladen', async ({
+  page,
+  browser,
+}) => {
+  // Zwei Sitzungen: die Einsatzleitung (Admin) und die betroffene Person in eigenem Kontext.
+  const id = await anmeldenUndAnlegen(page);
+  const konto = await benutzerAnlegen(page, 'beobachter');
+  await mitgliedEintragen(page, String(id), konto.id, 'beobachter');
+
+  const kontext = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+  try {
+    const person = await kontext.newPage();
+    await anmeldenAls(person, konto.benutzername, konto.passwort);
+    await oeffnenMitStrom(person, `/einsaetze/${id}/chat`, id);
+
+    const hinweis = person.getByRole('alert').filter({
+      hasText: 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.',
+    });
+    const eingabe = person.getByPlaceholder('Nachricht…');
+    await expect(hinweis, 'Vorbedingung: als Beobachter steht der Hinweis').toHaveCount(1);
+    await expect(eingabe, 'Vorbedingung: als Beobachter keine Eingabe').toHaveCount(0);
+
+    await mitgliedEintragen(page, String(id), konto.id, 'fuehrungspersonal');
+    await expect(eingabe).toBeVisible();
+    await expect(hinweis).toHaveCount(0);
+
+    await mitgliedEintragen(page, String(id), konto.id, 'beobachter');
+    await expect(hinweis).toHaveCount(1);
+    await expect(eingabe).toHaveCount(0);
+  } finally {
+    await kontext.close();
+  }
 });
 
 test('LFH-855: der erste Pegel auf einem anderen Schirm bietet dem offenen Dashboard den Zuschnitt an', async ({

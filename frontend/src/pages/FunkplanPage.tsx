@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -29,6 +29,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import {
   einheitDetailPfad,
   einsatzabschnittePfad,
+  einsatzdatenPfad,
   fahrzeugePfad,
   lageberichtDetailPfad,
   parseFunkplanAnsicht,
@@ -45,11 +46,21 @@ import {
   aufklappbareSchluessel,
   baueFunkplan,
   funkplanLuecken,
+  gegenstelleHinweis,
   rendereFunkplanMarkdown,
   type FunkplanQuellen,
   type FunkplanZeile,
 } from '../stab/funkplan';
+import type { FuehrungsstelleQuelle } from '../stab/fuehrungsstelle';
 import type { Luecke, Quelle, Verbindung } from '../stab/luecken';
+import {
+  HERKUNFT_LABEL,
+  baueSprechgruppenplan,
+  fehlendText,
+  sprechgruppenplanLeerText,
+  type SprechgruppenZeile,
+  type TeilnehmerAngabe,
+} from '../stab/sprechgruppenplan';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import './funkplanPrint.css';
@@ -65,16 +76,21 @@ import './funkplanPrint.css';
  *   kein leerer Bestand: ihre Ebene fehlt, und der Grund steht oberhalb der Tabelle (D2). Eine
  *   Liste eines fremden Moduls läuft nur bei Freigabe des Servers (LFH-669, Spec
  *   `modul-freigabe`); ist ihr Modul gesperrt, geht sie ohne Anfrage durch dieselbe Weiche wie
- *   ein 403. Die Sprechgruppen gehören keinem Modul (`PFAD_KEY`).
+ *   ein 403. Die Sprechgruppen gehören keinem Modul (`PFAD_KEY`), ebenso die eigene
+ *   Führungsstelle als sechste Quelle (LFH-849, gepflegt auf den Einsatzdaten): erfasst steht
+ *   sie als erste Zeile, sonst nennt das Lücken-Paneel sie.
  * - **Form:** `form="tabelle"` in jeder Breite (Vergleichsfläche, `NUR_TABELLE`). Kein Suchen,
  *   Sortieren oder Filtern, die Ordnung ist der Baum (D3, D4). Bearbeitet wird am Datensatz, jede
  *   Zeile führt über ihre Kennung dorthin (D7).
  * - **Erreichbarkeit** ist personenbezogen: am Schirm ab `xl`, im Druck immer, im Lagebericht nie
  *   (D5, Entscheidung 30.09.2026).
- * - **Zwei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6):
- *   „Tabelle“ und „Skizze“ (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`). Dieselben Quellen,
- *   dasselbe Lücken-Paneel, dieselbe Übernahme; eine Druckwurzel, der Druckkopf nennt die aktive
- *   Darstellung. Die Klappzustände sind getrennt: die Tabelle kennt Fahrzeuge, die Skizze nicht.
+ * - **Drei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6;
+ *   LFH-848, `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` D8): „Tabelle“, „Skizze“
+ *   (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`) und „Sprechgruppen“ (Kanalbelegung,
+ *   `stab/sprechgruppenplan.ts`). Dieselben Quellen, dasselbe Lücken-Paneel, dieselbe Übernahme
+ *   (sie schreibt immer die Tabelle); eine Druckwurzel, der Druckkopf nennt die aktive
+ *   Darstellung. Die Klappzustände sind getrennt: die Tabelle kennt Fahrzeuge, die Skizze nicht;
+ *   die Sprechgruppen sind flach.
  */
 
 type SpalteKey =
@@ -98,6 +114,18 @@ function useQuelle<T>(
   const zustand: AbrufZustand = !frei ? 'gesperrt' : q.data != null ? 'daten' : abrufZustand(q);
   const data = frei ? q.data : undefined;
   return useMemo(() => ({ zustand, daten: data ?? [] }), [zustand, data]);
+}
+
+/** Die eigene Führungsstelle als Quelle (LFH-849), mit derselben Weiche wie die Listen. */
+function useFuehrungsstelleQuelle(q: {
+  data: FuehrungsstelleQuelle['daten'] | undefined;
+  error: unknown;
+  isError: boolean;
+  isPending: boolean;
+}): FuehrungsstelleQuelle {
+  const zustand: AbrufZustand = q.data != null ? 'daten' : abrufZustand(q);
+  const data = q.data ?? null;
+  return useMemo(() => ({ zustand, daten: data }), [zustand, data]);
 }
 
 function Mono({ children }: { children: ReactNode }) {
@@ -216,6 +244,82 @@ function funkplanSpalten(druckt: boolean) {
   ]);
 }
 
+type SprechgruppenSpalteKey =
+  'sprechgruppe' | 'betriebsart' | 'hinweis' | 'herkunft' | 'teilnehmer';
+
+/** Teilnehmer einer Sprechgruppe: je Stelle der Verweis auf ihren Datensatz und ihr Rufname. */
+function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
+  const { token, rollen } = useRollen();
+  // Ohne alle Strukturquellen ist „keine“ nicht belegt: der Grund steht da (design.md D8).
+  if (angabe.art === 'unbekannt') return <Leer grund={fehlendText(angabe.fehlend)} />;
+  if (angabe.teilnehmer.length === 0) return <span style={{ color: rollen.gedaempft }}>keine</span>;
+  return (
+    <Flex vertical>
+      {angabe.teilnehmer.map((t) => (
+        <Flex key={t.key} wrap align="center" style={{ overflowWrap: 'anywhere' }}>
+          <Link to={t.ziel} style={stabZeilenzielStil(token)}>
+            {t.name}
+          </Link>
+          {t.rufname && <Mono>{t.rufname}</Mono>}
+        </Flex>
+      ))}
+      {angabe.art === 'unvollstaendig' && (
+        <span style={{ color: rollen.gedaempft }}>
+          {`unvollständig · ${fehlendText(angabe.fehlend)}`}
+        </span>
+      )}
+    </Flex>
+  );
+}
+
+/**
+ * Spalten der Darstellung „Sprechgruppen“ (design.md D8). Gegen dieselbe Fläche gewählt wie die
+ * Tabelle (LFH-548 D4: 1050 px Contentbreite am Fükw mit offenem Panel): Σ Zahlbreiten 630 +
+ * `mindestBreite` 300 = 930 px, Rest als Reserve. EINE fließende Spalte (Teilnehmer, LFH-523);
+ * Kennung und Hinweis brechen um, statt die Summe zu sprengen. Im Druck neutralisiert
+ * `druck/druck.css` die Breiten (A4 ohne Überhang, `e2e/funkplan.spec.ts`).
+ */
+function sprechgruppenSpalten() {
+  return spaltenFuer<SprechgruppenZeile>()([
+    {
+      title: 'Sprechgruppe',
+      key: 'sprechgruppe' as SprechgruppenSpalteKey,
+      width: 200,
+      immerSichtbar: true,
+      render: (_t, z) => (
+        <span style={{ overflowWrap: 'anywhere' }}>
+          <Mono>{z.bezeichnung}</Mono>
+        </span>
+      ),
+    },
+    {
+      title: 'Betriebsart',
+      key: 'betriebsart' as SprechgruppenSpalteKey,
+      width: 100,
+      render: (_t, z) => <Mono>{z.betriebsart}</Mono>,
+    },
+    {
+      title: 'Hinweis',
+      key: 'hinweis' as SprechgruppenSpalteKey,
+      width: 220,
+      render: (_t, z) =>
+        z.hinweis ? <span style={{ overflowWrap: 'anywhere' }}>{z.hinweis}</span> : <Leer />,
+    },
+    {
+      title: 'Herkunft',
+      key: 'herkunft' as SprechgruppenSpalteKey,
+      width: 110,
+      render: (_t, z) => HERKUNFT_LABEL[z.herkunft],
+    },
+    {
+      title: 'Teilnehmer',
+      key: 'teilnehmer' as SprechgruppenSpalteKey,
+      mindestBreite: 300,
+      render: (_t, z) => <TeilnehmerZelle angabe={z.teilnehmer} />,
+    },
+  ]);
+}
+
 /** Höchstens so viele Betroffene je Lücke, danach „+n weitere". */
 const TREFFER_DECKEL = 5;
 
@@ -223,16 +327,18 @@ function LueckenZeile<T>({
   titel,
   luecke,
   treffer,
+  letzte = false,
 }: {
   titel: string;
   luecke: Luecke<T>;
   treffer: (x: T) => { key: Key; name: string; ziel: string | null };
+  letzte?: boolean;
 }) {
   const { token, rollen } = useRollen();
   const gezeigt = luecke.treffer.slice(0, TREFFER_DECKEL).map(treffer);
   const rest = luecke.treffer.length - gezeigt.length;
   return (
-    <PaneelZeile>
+    <PaneelZeile style={letzte ? { borderBlockEnd: 'none' } : undefined}>
       <div data-lfh="funkplan-luecke">
         <Flex wrap align="baseline" gap={token.marginXS}>
           <span>{titel}</span>
@@ -290,6 +396,7 @@ const FUNKPLAN_SEITE = { titel: 'Funkplan', mitArtikel: 'der Funkplan' };
 const DARSTELLUNG_OPTIONEN = [
   { wert: 'tabelle', label: 'Tabelle' },
   { wert: 'skizze', label: 'Skizze' },
+  { wert: 'sprechgruppen', label: 'Sprechgruppen' },
 ] as const satisfies readonly { wert: FunkplanAnsicht; label: string }[];
 
 const UMFANG: { quelle: 'abschnitte' | 'einheiten' | 'fahrzeuge'; wort: string }[] = [
@@ -395,15 +502,21 @@ export default function FunkplanPage() {
     queryKey: einsatzKeys.sprechgruppen(einsatzId),
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
+  // Die eigene Führungsstelle (LFH-849): Teil der Kopfdaten, kein Modul; live über `einsatz`.
+  const fuehrungsstelleQuery = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+  });
 
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
   const fahrzeuge = useQuelle(fahrzeugeQuery, fahrzeugeFrei);
   const personal = useQuelle(personalQuery, personalFrei);
   const sprechgruppen = useQuelle(sprechgruppenQuery);
+  const fuehrungsstelle = useFuehrungsstelleQuelle(fuehrungsstelleQuery);
   const quellen: FunkplanQuellen = useMemo(
-    () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen }),
-    [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen],
+    () => ({ abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle }),
+    [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle],
   );
   const zeilen = useMemo(() => baueFunkplan(quellen), [quellen]);
   const luecken = useMemo(() => funkplanLuecken(quellen), [quellen]);
@@ -432,6 +545,7 @@ export default function FunkplanPage() {
   });
 
   const spalten = useMemo(() => funkplanSpalten(druckt), [druckt]);
+  const sgSpalten = useMemo(() => sprechgruppenSpalten(), []);
 
   // ── Darstellung (LFH-625 D1, D6) ────────────────────────────────────────────────────────────
   // Sichtvorgabe ?ansicht= apply-then-clean wie auf der Abschnittsseite. Schon der erste Zustand
@@ -465,10 +579,17 @@ export default function FunkplanPage() {
         ? baueFernmeldeskizze(
             abschnitte.daten,
             einheiten.zustand === 'daten' ? einheiten.daten : null,
+            fuehrungsstelle,
           )
         : null,
-    [ansicht, abschnitte, einheiten],
+    [ansicht, abschnitte, einheiten, fuehrungsstelle],
   );
+  // Kanalbelegung (LFH-848 D8): wie die Skizze nur gebaut, solange sie gezeigt wird.
+  const sprechgruppenplan = useMemo(
+    () => (ansicht === 'sprechgruppen' ? baueSprechgruppenplan(quellen, einsatzId) : []),
+    [ansicht, quellen, einsatzId],
+  );
+
   const [skizzeZugeklappt, setSkizzeZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const skizzeKlappbar = useMemo(
     () => (skizze ? klappbareSchluessel(skizze.wurzeln) : []),
@@ -513,15 +634,21 @@ export default function FunkplanPage() {
     fahrzeugeFrei ? fahrzeugeQuery.dataUpdatedAt : undefined,
     personalFrei ? personalQuery.dataUpdatedAt : undefined,
     sprechgruppenQuery.dataUpdatedAt,
+    fuehrungsstelleQuery.dataUpdatedAt,
   );
 
-  // Die Skizze zeigt keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review LFH-625).
-  const umfang = UMFANG.filter(
-    (u) =>
-      quellen[u.quelle].zustand === 'daten' && !(ansicht === 'skizze' && u.quelle === 'fahrzeuge'),
-  )
-    .map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`)
-    .join(' · ');
+  // Skizze und Sprechgruppen zeigen keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review
+  // LFH-625). Die Sprechgruppen zählen ihre Zeilen vorweg.
+  const umfang = [
+    ...(ansicht === 'sprechgruppen' ? [`${sprechgruppenplan.length} Sprechgruppen`] : []),
+    ...UMFANG.filter(
+      (u) =>
+        quellen[u.quelle].zustand === 'daten' &&
+        (ansicht === 'tabelle' || u.quelle !== 'fahrzeuge'),
+    ).map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`),
+  ].join(' · ');
+
+  const gegenstelle = gegenstelleHinweis(quellen);
 
   // Nur Gescheitertes und Gesperrtes: Ladendes kündigt die Tabelle selbst an.
   const fehlend = fehlendeQuellen(quellen).filter((f) => f.zustand !== 'laden');
@@ -557,7 +684,7 @@ export default function FunkplanPage() {
           />
         }
         aktionen={
-          // Auch ohne Schreibrecht: lesen kann jeder beide Darstellungen.
+          // Auch ohne Schreibrecht: lesen kann jeder alle Darstellungen.
           <Segmentleiste<FunkplanAnsicht>
             beschriftung="Darstellung"
             optionen={DARSTELLUNG_OPTIONEN}
@@ -568,6 +695,7 @@ export default function FunkplanPage() {
       >
         <Druckkopf
           dokumentart={ansicht === 'skizze' ? 'Fernmeldeskizze' : 'Funkplan'}
+          titel={ansicht === 'sprechgruppen' ? 'Sprechgruppen' : undefined}
           einsatz={einsatz}
           sichtbarkeit="druck"
           zeilen={[
@@ -608,19 +736,31 @@ export default function FunkplanPage() {
           <LueckenZeile
             titel="Einsatzlokale Sprechgruppen ohne Zuordnung"
             luecke={luecken.lokaleSprechgruppenOhneZuordnung}
-            // Kein Ziel: eine Sprechgruppe hat keine eigene Seite, zugeordnet wird am Abschnitt
-            // bzw. an der Einheit (`SprechgruppenPicker`).
+            // Kein Ziel: eine Sprechgruppe hat keine eigene Seite, zugeordnet wird am Abschnitt,
+            // an der Einheit bzw. an der Führungsstelle (`SprechgruppenPicker`).
             treffer={(s) => ({ key: s.id, name: s.bezeichnung, ziel: null })}
+            letzte={gegenstelle == null}
           />
-          {/* LFH-849: der Einsatz kennt die eigene Führungsstelle (Rufname, Sprechgruppen,
-              Erreichbarkeit) noch nicht. Keine erfundene Zeile, sondern die benannte Lücke. */}
-          <PaneelZeile style={{ borderBlockEnd: 'none' }}>
-            <Flex wrap align="baseline" gap={token.marginXS}>
-              <span>{GEGENSTELLE_HINWEIS}</span>
-              <span style={monoStil(14, 500)}>—</span>
-              <span style={{ color: rollen.gedaempft }}>nicht erfasst</span>
-            </Flex>
-          </PaneelZeile>
+          {/* LFH-849: solange die eigene Führungsstelle nicht erfasst ist (oder nicht vorliegt),
+              steht sie als benannte Lücke da, mit dem Weg zu ihrem Pflegeort. Erfasst ist sie
+              die erste Zeile des Plans. */}
+          {gegenstelle != null && (
+            <PaneelZeile style={{ borderBlockEnd: 'none' }}>
+              <div data-lfh="funkplan-luecke">
+                <Flex wrap align="baseline" gap={token.marginXS}>
+                  <span>{GEGENSTELLE_HINWEIS}</span>
+                  <span style={monoStil(14, 500)}>—</span>
+                  <span style={{ color: rollen.gedaempft }}>{gegenstelle}</span>
+                  {/* In derselben Zeile, mit der Trefffläche der übrigen Lücken-Verweise. */}
+                  {quellen.fuehrungsstelle.zustand === 'daten' && (
+                    <Link to={einsatzdatenPfad(einsatzId)} style={stabZeilenzielStil(token)}>
+                      auf Einsatzdaten erfassen
+                    </Link>
+                  )}
+                </Flex>
+              </div>
+            </PaneelZeile>
+          )}
         </Paneel>
 
         {fehlend.length > 0 && (
@@ -629,6 +769,19 @@ export default function FunkplanPage() {
             {' — diese Angaben fehlen im Funkplan.'}
           </Typography.Paragraph>
         )}
+
+        {/* Ohne die Liste des Einsatzes fehlen nur die lokalen Sprechgruppen ohne Zuordnung; die
+            zugeordneten stehen an Abschnitt und Einheit. Ladendes kündigt die Tabelle an. */}
+        {ansicht === 'sprechgruppen' &&
+          (sprechgruppen.zustand === 'fehler' || sprechgruppen.zustand === 'gesperrt') && (
+            <Typography.Paragraph
+              data-lfh="sprechgruppen-quelle"
+              style={{ color: rollen.gedaempft }}
+            >
+              {`Sprechgruppen des Einsatzes: ${ZUSTAND_GRUND[sprechgruppen.zustand]} — `}
+              {'einsatzlokale Sprechgruppen ohne Zuordnung fehlen in dieser Darstellung.'}
+            </Typography.Paragraph>
+          )}
 
         {/* ── Werkzeugzeile ── außerhalb des Primitivs, nur hier trägt `.funkplan-no-print`. */}
         <Space className="funkplan-no-print" wrap style={{ marginBlockEnd: token.margin }}>
@@ -685,8 +838,33 @@ export default function FunkplanPage() {
             zugeklappt={skizzeZugeklappt}
             onUmschalten={umschaltenSkizze}
           />
+        ) : ansicht === 'sprechgruppen' ? (
+          // Flach und schreibgeschützt, Vergleichsfläche wie die Tabelle („wer funkt auf 311?“).
+          // Zwei Sichten in einer Datei: der `key` trennt ihren Zustand (`datensicht.guard`).
+          <Datensicht
+            key="sprechgruppen"
+            bezeichnung="Sprechgruppen"
+            form="tabelle"
+            spalten={sgSpalten}
+            daten={sprechgruppenplan}
+            zeilenSchluessel="key"
+            ladend={
+              quellen.abschnitte.zustand === 'laden' ||
+              quellen.einheiten.zustand === 'laden' ||
+              quellen.sprechgruppen.zustand === 'laden'
+            }
+            leerText={sprechgruppenplanLeerText(quellen)}
+            // Die Sprechgruppe hat keine eigene Seite: zugeordnet wird an Abschnitt und Einheit,
+            // dorthin führen die Teilnehmer.
+            karte={{
+              art: 'plan',
+              titel: { spalte: 'sprechgruppe' },
+              sekundaer: ['betriebsart', 'herkunft', 'teilnehmer'],
+            }}
+          />
         ) : (
           <Datensicht
+            key="funkplan"
             bezeichnung="Funkplan"
             form="tabelle"
             spalten={spalten}
@@ -709,15 +887,17 @@ export default function FunkplanPage() {
               titel: {
                 spalte: 'stelle',
                 ziel: (z) =>
-                  z.id == null
-                    ? null
-                    : z.art === 'abschnitt'
-                      ? abschnittZiel(z.id)
-                      : z.art === 'einheit'
-                        ? einheitDetailPfad(einsatzId, z.id)
-                        : z.art === 'fahrzeug'
-                          ? fahrzeugePfad(einsatzId, { fahrzeug: z.id })
-                          : null,
+                  z.art === 'fuehrungsstelle'
+                    ? einsatzdatenPfad(einsatzId)
+                    : z.id == null
+                      ? null
+                      : z.art === 'abschnitt'
+                        ? abschnittZiel(z.id)
+                        : z.art === 'einheit'
+                          ? einheitDetailPfad(einsatzId, z.id)
+                          : z.art === 'fahrzeug'
+                            ? fahrzeugePfad(einsatzId, { fahrzeug: z.id })
+                            : null,
               },
               sekundaer: ['rufname', 'tmo', 'dmo'],
             }}

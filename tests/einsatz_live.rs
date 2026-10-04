@@ -3,6 +3,11 @@
 //! Wer es feuert, wann es ausbleibt, was es trägt. Wer es empfängt (Modul-Filter des Feeds),
 //! prüft `modul_override.rs`. Spec: `openspec/specs/einsatzkopf-live/`, Herleitung
 //! `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`.
+//!
+//! Seit LFH-854 feuert auch eine Mitgliedschaftsänderung `einsatz`, damit `meine_rolle` (und
+//! mit ihr das Schreibrecht) auf dem Schirm der betroffenen Person ohne Neuladen frisch wird.
+//! Herleitung und Leck-Abwägung:
+//! `openspec/changes/archive/2026-10-04-lfh-854-rollenwechsel-live/design.md`.
 
 use axum::http::StatusCode;
 use lifeline_hub::live::{LiveEvent, LiveNachricht};
@@ -132,6 +137,169 @@ async fn frist_setzen_feuert_einsatz_unveraendert_nicht() {
     let (status, _) = anfrage(&app, "PUT", &pfad, &admin, Some(rumpf)).await;
     assert_eq!(status, StatusCode::OK);
     assert!(kopf_events(&eingegangen(&mut rx)).is_empty());
+}
+
+// ---------- System-ETB aus Abschluss, Frist und Wiederherstellen (LFH-858) ----------
+
+/// Die `etb`-Ereignisse als Nutzlast, in Eingangsreihenfolge.
+fn etb_nutzlasten(nachrichten: &[LiveNachricht]) -> Vec<&str> {
+    nachrichten
+        .iter()
+        .filter(|n| n.event == LiveEvent::Etb)
+        .map(|n| n.data.as_str())
+        .collect()
+}
+
+/// Die Kennungen der System-Einträge eines Einsatzes, aufsteigend.
+async fn system_eintraege(pool: &sqlx::SqlitePool, einsatz: i64) -> Vec<i64> {
+    sqlx::query_scalar(
+        "SELECT id FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id",
+    )
+    .bind(einsatz)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Die Einträge, die zwischen zwei Ständen von [`system_eintraege`] neu hinzukamen.
+fn neu(vorher: &[i64], nachher: &[i64]) -> Vec<i64> {
+    nachher
+        .iter()
+        .copied()
+        .filter(|id| !vorher.contains(id))
+        .collect()
+}
+
+fn etb_nutzlast(einsatz: i64, etb_id: i64) -> String {
+    format!(r#"{{"einsatz_id":{einsatz},"etb_id":{etb_id}}}"#)
+}
+
+async fn abschliessen(app: &axum::Router, cookie: &str, einsatz: i64) {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+}
+
+#[tokio::test]
+async fn abschluss_mit_dauer_politik_meldet_den_frist_eintrag_im_etb() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einstellungen"),
+        &admin,
+        Some(r#"{"retention_dauer_tage":365}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: {json:?}");
+    let vorher = system_eintraege(&pool, einsatz).await;
+
+    let mut rx = live.abonniere(einsatz);
+    abschliessen(&app, &admin, einsatz).await;
+
+    let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
+    assert_eq!(eintraege.len(), 1, "Vorbedingung: ein Frist-Eintrag");
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        etb_nutzlasten(&alle),
+        [etb_nutzlast(einsatz, eintraege[0])],
+        "genau ein `etb`-Ereignis mit der Kennung des Frist-Eintrags: {alle:?}"
+    );
+}
+
+#[tokio::test]
+async fn abschluss_ohne_dauer_politik_meldet_kein_etb() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let mut rx = live.abonniere(einsatz);
+    abschliessen(&app, &admin, einsatz).await;
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        anzahl(&alle, LiveEvent::Einsatz),
+        1,
+        "Vorbedingung: {alle:?}"
+    );
+    assert!(
+        etb_nutzlasten(&alle).is_empty(),
+        "kein Eintrag, kein Ereignis: {alle:?}"
+    );
+}
+
+#[tokio::test]
+async fn frist_setzen_meldet_den_audit_eintrag_im_etb() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/aufbewahrungsfrist");
+    let rumpf = r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#;
+    let vorher = system_eintraege(&pool, einsatz).await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (status, json) = anfrage(&app, "PUT", &pfad, &admin, Some(rumpf)).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
+    assert_eq!(eintraege.len(), 1, "Vorbedingung: ein Audit-Eintrag");
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        etb_nutzlasten(&alle),
+        [etb_nutzlast(einsatz, eintraege[0])],
+        "genau ein `etb`-Ereignis mit der Kennung des Audit-Eintrags: {alle:?}"
+    );
+
+    // Unverändert: kein Eintrag, also auch kein `etb`-Ereignis.
+    let (status, _) = anfrage(&app, "PUT", &pfad, &admin, Some(rumpf)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(etb_nutzlasten(&eingegangen(&mut rx)).is_empty());
+}
+
+#[tokio::test]
+async fn wiederherstellen_meldet_den_audit_eintrag_im_etb() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    abschliessen(&app, &admin, einsatz).await;
+    // Vorgemerkt seit gestern, Karenz läuft.
+    let gestern = (chrono::Utc::now() - chrono::Duration::days(1))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    sqlx::query("UPDATE einsatz SET retention_bis = ?1, geloescht_at = ?1 WHERE id = ?2")
+        .bind(&gestern)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let vorher = system_eintraege(&pool, einsatz).await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/aufbewahrung/einsaetze/{einsatz}/wiederherstellen"),
+        &admin,
+        Some(r#"{"retention_bis":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
+    assert_eq!(eintraege.len(), 1, "Vorbedingung: ein Audit-Eintrag");
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        etb_nutzlasten(&alle),
+        [etb_nutzlast(einsatz, eintraege[0])],
+        "genau ein `etb`-Ereignis mit der Kennung des Audit-Eintrags: {alle:?}"
+    );
 }
 
 // ---------- Lagebesprechung (design.md D3) ----------
@@ -267,6 +435,139 @@ async fn besetzung_eines_sachgebiets_feuert_kein_einsatz() {
     let alle = eingegangen(&mut rx);
     assert_eq!(anzahl(&alle, LiveEvent::Stab), 1, "Vorbedingung: {alle:?}");
     assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 0, "{alle:?}");
+}
+
+// ---------- Mitgliedschaft (LFH-854) ----------
+
+fn mitglied_pfad(einsatz: i64, benutzer: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer}")
+}
+
+/// Setzt die Rolle eines Mitglieds (Vorbedingung: 200).
+async fn rolle_setzen(app: &axum::Router, cookie: &str, einsatz: i64, benutzer: i64, rolle: &str) {
+    let rumpf = format!(r#"{{"einsatz_rolle":"{rolle}"}}"#);
+    let (status, json) = anfrage(
+        app,
+        "PUT",
+        &mitglied_pfad(einsatz, benutzer),
+        cookie,
+        Some(&rumpf),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: {json:?}");
+}
+
+/// Die Benutzerkennung des Admin-Kontos der Test-Instanz (erste Einsatzleitung jedes Einsatzes).
+async fn admin_id(pool: &sqlx::SqlitePool) -> i64 {
+    sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn rollenwechsel_feuert_einsatz_nur_mit_der_kennung() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let mitglied = benutzer_anlegen(&app, &admin, "mitglied", "keine").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    rolle_setzen(&app, &admin, einsatz, mitglied, "beobachter").await;
+    let alle = eingegangen(&mut rx);
+    let kopf = kopf_events(&alle);
+    assert_eq!(kopf.len(), 1, "Aufnahme: genau ein `einsatz`: {alle:?}");
+    assert_eq!(
+        kopf[0].data,
+        format!(r#"{{"einsatz_id":{einsatz}}}"#),
+        "die Nutzlast trägt nur die Kennung, keine Rolle"
+    );
+
+    rolle_setzen(&app, &admin, einsatz, mitglied, "fuehrungspersonal").await;
+    assert_eq!(
+        kopf_events(&eingegangen(&mut rx)).len(),
+        1,
+        "Wechsel Beobachter → Führungspersonal"
+    );
+}
+
+#[tokio::test]
+async fn entfernen_eines_mitglieds_feuert_einsatz() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let mitglied = benutzer_anlegen(&app, &admin, "mitglied", "keine").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, einsatz, mitglied, "fuehrungspersonal").await;
+    let mut rx = live.abonniere(einsatz);
+
+    let (status, json) = anfrage(
+        &app,
+        "DELETE",
+        &mitglied_pfad(einsatz, mitglied),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(kopf_events(&eingegangen(&mut rx)).len(), 1);
+}
+
+#[tokio::test]
+async fn abgelehnte_mitgliedschaftsaenderung_feuert_nichts() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fp = benutzer_anlegen(&app, &admin, "fuehrpers", "keine").await;
+    let ziel = benutzer_anlegen(&app, &admin, "zielperson", "keine").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, einsatz, fp, "fuehrungspersonal").await;
+    let admin_id = admin_id(&pool).await;
+    let mut rx = live.abonniere(einsatz);
+
+    // Letzte Einsatzleitung herabstufen bzw. entfernen: 409.
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &mitglied_pfad(einsatz, admin_id),
+        &admin,
+        Some(r#"{"einsatz_rolle":"beobachter"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &mitglied_pfad(einsatz, admin_id),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+
+    // Unbekannter Benutzer: 404.
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &mitglied_pfad(einsatz, 999_999),
+        &admin,
+        Some(r#"{"einsatz_rolle":"beobachter"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Führungspersonal ohne Leitungsrecht: 403.
+    let fp_cookie = login_cookie(&app, "fuehrpers", "fuehrperspw1").await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &mitglied_pfad(einsatz, ziel),
+        &fp_cookie,
+        Some(r#"{"einsatz_rolle":"beobachter"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let alle = eingegangen(&mut rx);
+    assert!(kopf_events(&alle).is_empty(), "{alle:?}");
 }
 
 // ---------- Umschalten einer Lagekennzahl (LFH-855) ----------

@@ -13,6 +13,16 @@ interface SprechgruppenPickerProps {
   /** Ausgewählte Sprechgruppen-IDs (antd-Form-Control-Vertrag). */
   value?: number[];
   onChange?: (ids: number[]) => void;
+  /**
+   * Für die Auswahl selbst: Kennung, zugänglicher Name, Erstfokus und Popup-Meldung. Die
+   * Zeilenbearbeitung (`InlineAngabe`, LFH-849) spreizt hier `feld` und `popup` hinein.
+   */
+  auswahl?: {
+    id?: string;
+    'aria-label'?: string;
+    autoFocus?: boolean;
+    onOpenChange?: (offen: boolean) => void;
+  };
 }
 
 /**
@@ -28,6 +38,7 @@ export default function SprechgruppenPicker({
   einsatzId,
   value = [],
   onChange,
+  auswahl,
 }: SprechgruppenPickerProps) {
   const { message } = App.useApp();
   const { token } = theme.useToken();
@@ -78,6 +89,7 @@ export default function SprechgruppenPicker({
   return (
     <div>
       <Select
+        {...auswahl}
         mode="multiple"
         value={value}
         onChange={(ids: number[]) => onChange?.(ids)}

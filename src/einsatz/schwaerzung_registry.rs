@@ -1222,6 +1222,44 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
         ],
     },
+    // Kommunikationsplan des S6 (LFH-848, design.md D10): die Bezeichnung kann eine Person
+    // nennen („Verbindungsperson Herr Beispiel“, dieselbe Linie wie
+    // `einsatz_stabsfunktion.bezeichnung`), Wert und Hinweis tragen Rufnummern und Adressen.
+    // Art, Funktion und Mittel bleiben als Skelett: erkennbar bleibt, DASS S2 ein Mobiltelefon
+    // hatte, nicht welches.
+    TabellenRegel {
+        tabelle: "einsatz_kommunikation_stelle",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("stellenart", G_ENUM),
+            retain("funktion", G_ENUM),
+            scrub("bezeichnung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Name einer Verbindungsperson/Stelle
+            retain("sortier", G_ZAEHLER),
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "einsatz_kommunikation_verbindung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("stelle_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("mittel", G_ENUM),
+            scrub("wert", Strategie::Platzhalter, Z_EINSATZ), // REVIEW: Rufnummer/Adresse (NOT NULL)
+            scrub("hinweis", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Freitext zur Verbindung
+            retain("sortier", G_ZAEHLER),
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
     // Maßgebliche Pegel: Stationsname und Gewässer benennen eine WSV-Messstelle, keine Person.
     TabellenRegel {
         tabelle: "einsatz_pegel",
@@ -1425,6 +1463,33 @@ pub const TABELLEN: &[TabellenRegel] = &[
         person_bezug: None,
         spalten: &[
             retain("abschnitt_id", G_FK),
+            retain("sprechgruppe_id", G_FK),
+        ],
+    },
+    // Eigene Führungsstelle (LFH-849): Rufname und Kommunikationsmittel sind Führungsstruktur wie
+    // an Abschnitt und Einheit, die Erreichbarkeit eine mögliche Rufnummer (Scrub).
+    TabellenRegel {
+        tabelle: "einsatz_fuehrungsstelle",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("rufname", G_OP_LABEL),
+            retain(
+                "kommunikationsmittel",
+                "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
+            ),
+            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "einsatz_fuehrungsstelle_sprechgruppe",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
             retain("sprechgruppe_id", G_FK),
         ],
     },

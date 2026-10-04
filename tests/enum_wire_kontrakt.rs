@@ -624,6 +624,30 @@ fn stab_checklisten_punkt_wire() {
 }
 
 #[test]
+fn stab_kommunikation_stellenart_wire() {
+    enum_wire!(lifeline_hub::stab::kommunikation::Stellenart {
+        Funktion => "funktion",
+        Leitstelle => "leitstelle",
+        Behoerde => "behoerde",
+        Verbindungsperson => "verbindungsperson",
+        Sonstige => "sonstige",
+    } in lifeline_hub::stab::kommunikation::Stellenart::ALLE);
+}
+
+#[test]
+fn stab_kommunikation_verbindungsmittel_wire() {
+    enum_wire!(lifeline_hub::stab::kommunikation::Verbindungsmittel {
+        Festnetz => "festnetz",
+        Mobil => "mobil",
+        Fax => "fax",
+        Email => "email",
+        Messenger => "messenger",
+        Melder => "melder",
+        Sonstiges => "sonstiges",
+    } in lifeline_hub::stab::kommunikation::Verbindungsmittel::ALLE);
+}
+
+#[test]
 fn stab_besetzung_art_wire() {
     enum_wire_as_str!(lifeline_hub::stab::BesetzungArt {
         Einsatzleitung,

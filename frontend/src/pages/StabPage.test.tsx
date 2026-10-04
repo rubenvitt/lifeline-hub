@@ -311,7 +311,7 @@ describe('StabPage', () => {
     expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull();
   });
 
-  it('die S6-Zeile führt zum Funkplan, keine andere Zeile (LFH-548)', async () => {
+  it('die S6-Zeile führt zu Funkplan und Kommunikationsplan, keine andere Zeile (LFH-548, LFH-848)', async () => {
     rendere();
     await besetzungsSektion();
     const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
@@ -319,7 +319,12 @@ describe('StabPage', () => {
       'href',
       '/einsaetze/1/stab/funkplan',
     );
+    expect(within(s6).getByRole('link', { name: 'Kommunikationsplan' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/stab/kommunikationsplan',
+    );
     expect(screen.getAllByRole('link', { name: 'Funkplan' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Kommunikationsplan' })).toHaveLength(1);
   });
 
   it('die S5-Zeile führt zu Pressearbeit und Informationstelefon, keine andere Zeile (LFH-554)', async () => {

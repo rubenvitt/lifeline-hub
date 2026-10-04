@@ -39,10 +39,12 @@ die Menge gleich, MUST kein `einsatz` verteilt werden, auch wenn der Weg Daten �
 ## MODIFIED Requirements
 
 ### Requirement: Bewusst nicht live
-Die benutzerbezogenen Felder des Einsatzkopfs (`meine_rolle`, `meine_fuehrungsstelle`,
-`meine_sachgebiete`, `meine_funktion`) SHALL nicht über `einsatz` angestoßen werden. Sie werden erst
-beim nächsten Abruf des Kopfs frisch, auch dann, wenn ein Ereignis `einsatz` aus anderem Anlass
-eintrifft. Eine Stab-Besetzung MUST kein Ereignis `einsatz` auslösen.
+Die benutzerbezogenen Felder des Einsatzkopfs aus der Stab-Besetzung (`meine_sachgebiete`) SHALL
+nicht über `einsatz` angestoßen werden. Sie werden erst beim nächsten Abruf des Kopfs frisch, auch
+dann, wenn ein Ereignis `einsatz` aus anderem Anlass eintrifft. Eine Stab-Besetzung MUST kein
+Ereignis `einsatz` auslösen. Die mitgliedschaftsbezogenen Felder (`meine_rolle`,
+`meine_fuehrungsstelle`, `meine_funktion`) werden über die Mitgliedschaftsänderung frisch,
+`lagekennzahlen` über ihr Umschalten.
 
 #### Scenario: Besetzung eines Sachgebiets
 - **WHEN** im Stab ein Sachgebiet besetzt wird

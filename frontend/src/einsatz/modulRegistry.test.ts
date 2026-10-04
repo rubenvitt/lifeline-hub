@@ -322,6 +322,7 @@ describe('modulZuRoute / modulAusPfad', () => {
     expect(modulAusPfad('/einsaetze/7/etb')?.key).toBe('etb');
     // Die Unterroute des Funkplans markiert den Stab (LFH-548), sie ist kein eigenes Modul.
     expect(modulAusPfad('/einsaetze/7/stab/funkplan')?.key).toBe('stab');
+    expect(modulAusPfad('/einsaetze/7/stab/kommunikationsplan')?.key).toBe('stab');
     // Der Einsatzbericht (LFH-726) erbt die Einsatzdaten: nie ausgeblendet, nie gesperrt.
     expect(modulAusPfad('/einsaetze/7/einsatzdaten/bericht')?.key).toBe('einsatzdaten');
     // Das Segment NACH der Einsatz-ID, nicht das letzte: sonst verlöre eine Unterseite ihr Modul.
