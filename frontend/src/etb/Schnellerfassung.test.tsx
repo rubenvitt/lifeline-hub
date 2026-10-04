@@ -922,14 +922,21 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
   });
 
-  it('in der Berichtigung wird nicht gefragt, der Standard gilt trotzdem', async () => {
-    const p = props({ berichtigungZu: original() });
-    renderMitProviders(<Schnellerfassung {...p} />);
+  it('in der Berichtigung bietet das Chip-Menü keinen Standardwechsel', async () => {
+    renderMitProviders(<Schnellerfassung {...props({ berichtigungZu: original() })} />);
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
     expect(
       await screen.findByRole('menuitem', { name: 'Nur für diesen Eintrag ändern' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Standard-Rufname ändern' })).toBeNull();
+  });
+
+  // Ohne offenes Chip-Menü: es holt sich per `autoFocus` den Fokus und riss unter CI-Last das
+  // Tippen nach zwei Zeichen aus dem Feld.
+  it('in der Berichtigung wird nicht gefragt, der Standard gilt trotzdem', async () => {
+    const p = props({ berichtigungZu: original() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Korrektur{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
