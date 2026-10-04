@@ -6,7 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import UhsDetailPage from './UhsDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
+import { freigabenFixture } from '../../test/fixtures';
 import { ladeUhs } from '../../api/einsatzUhs';
 
 // Auto-Mocks: bei ungültiger ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
@@ -223,6 +224,25 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
     // Die Adresse ist die Zusicherung: am `uhs`-Auftrag erkennt die Aufnahmeseite den
     // Wartebereich-Eintritt.
     await waitFor(() => expect(aktuellerPfad()).toBe('/einsaetze/1/personen/aufnahme?uhs=7'));
+  });
+
+  it('gesperrte Personen: „Patient aufnehmen" steht gesperrt mit Grund (LFH-888)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ personen: { zugriff: false } }),
+    );
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      id: 7,
+      typ: 'patientenablage',
+      status: 'aktiv',
+    } as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/7');
+
+    const knopf = await screen.findByRole('button', { name: 'Patient aufnehmen' });
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    vi.mocked(ladeModulFreigaben).mockReset();
   });
 
   it('bietet die Aufnahme in einer geplanten UHS nicht an', async () => {

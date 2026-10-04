@@ -1,4 +1,6 @@
 import { IconPersonPlus } from '../../icons';
+import { useSprungSperre } from '../../einsatz/useSprungSperre';
+import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -37,6 +39,8 @@ const REITER_NAME = {
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
+  // Aufnahme führt ins Modul Personen (LFH-888, design.md D4): gesperrt mit Grund statt ins 403.
+  const personenGesperrt = useSprungSperre(einsatzId)('personen');
   const navigate = useNavigate();
   // Material/Bewegungen als Segmentleiste; nur das aktive Feld ist gebaut.
   const [reiter, setReiter] = useState<'material' | 'bewegungen' | 'dateien'>('material');
@@ -149,6 +153,8 @@ export default function UhsDetailPage() {
             <Button
               type="primary"
               icon={<IconPersonPlus />}
+              disabled={personenGesperrt}
+              title={personenGesperrt ? KEINE_BERECHTIGUNG : undefined}
               onClick={() => navigate(personenAufnahmePfad(einsatzId, { uhs: uhs.id }))}
             >
               Patient aufnehmen

@@ -39,4 +39,20 @@ describe('useSprungSperre (LFH-888)', () => {
     expect(result.current[0]('lageberichte')).toBe(false);
     expect(abrufe).toBe(1);
   });
+
+  it('eine verbogene Einsatz-ID fragt nichts ab und sperrt nichts (LFH-438)', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/:id/modul-freigaben', () => {
+        abrufe += 1;
+        return HttpResponse.json(freigabenFixture());
+      }),
+    );
+    const { result } = renderHook(() => useSprungSperre(Number('abc')), {
+      wrapper: wrapper(neuerQueryClient()),
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(result.current('etb')).toBe(false);
+    expect(abrufe).toBe(0);
+  });
 });

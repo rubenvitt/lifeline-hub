@@ -14,6 +14,9 @@ export function useSprungSperre(einsatzId: number): (key: string) => boolean {
   const { data: freigaben } = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
+    // Eine verbogene Routen-ID (LFH-438) fragt nichts ab: die Seite leitet ohnehin um, und ein
+    // Abruf gegen `/api/einsaetze/NaN/…` wäre Rauschen.
+    enabled: Number.isInteger(einsatzId) && einsatzId > 0,
   });
   return useCallback((key: string) => istSprungGesperrt(key, freigaben), [freigaben]);
 }
