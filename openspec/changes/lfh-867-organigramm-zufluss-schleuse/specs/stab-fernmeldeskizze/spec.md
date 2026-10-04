@@ -7,7 +7,8 @@ Solange der Mauszeiger oder ein Stift über der Fernmeldeskizze liegt oder der F
 SHALL die Skizze Menge, Ort und Reihenfolge ihrer Knoten halten, mit demselben Verhalten wie das
 Organigramm der Führungsorganisation: Neue, umgehängte und entfallene Knoten warten hinter einem
 Sammelbanner in einer Zeile fester Höhe, Rufname, Sprechgruppen und Kante gezeigter Knoten
-aktualisieren weiter, die Wurzel „Einsatzleitung“ steht still. Der Druck MUST den Live-Stand zeigen.
+aktualisieren weiter, die Wurzel „Einsatzleitung“ steht still. Eine umgehängte Einheit MUST am
+alten Ort ihre bisherige Kante zeigen, nicht das Urteil gegen den neuen Abschnitt. Der Druck MUST den Live-Stand zeigen.
 
 #### Scenario: Zugang unter dem Zeiger
 - **WHEN** der Mauszeiger auf einem Namenslink der Skizze liegt und live eine Einheit einem

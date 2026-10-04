@@ -29,7 +29,8 @@ import './haengenderBaumPrint.css';
  *
  * ZUFLUSS-SCHLEUSE (LFH-867, Kriterium 12, WCAG 3.2.5): solange Maus oder Stift über dem Baum
  * liegen oder der Fokus darin steht, hält das Gerüst Menge, Ort und Folge der Knoten
- * (`baumSchleuse.ts`); der Inhalt fließt. Neu, umgehängt und entfallen wartet im Sammelbanner der
+ * (`baumSchleuse.ts`); der Inhalt fließt, außer bei einem umgehängten Knoten am alten Ort. Neu,
+ * umgehängt, umsortiert und entfallen wartet im Sammelbanner der
  * Standzeile fester Höhe zwischen Kopf und erster Ebene. Entfallenes bleibt als Platzhalter ohne
  * Link stehen, der Kopf steht still (eine neue Stabszeile schöbe sonst den ganzen Baum). Der
  * Bereich ist die ganze `section` samt Standzeile: der Weg zum Banner taut nicht auf. Touch zählt
@@ -87,7 +88,10 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
   // Schleuse ist das der frische.
   const [gehalten, setGehalten] = useState<{ wurzeln: readonly K[]; kopf: ReactNode } | null>(null);
   const frischRef = useRef({ wurzeln, kopf });
-  frischRef.current = { wurzeln, kopf };
+  // Erst nach dem Commit: ein verworfener Render darf „anzeigen“ keinen nie gezeigten Stand geben.
+  useLayoutEffect(() => {
+    frischRef.current = { wurzeln, kopf };
+  });
   const bedingungRef = useRef({ zeiger: false, fokus: false });
   const setzeBedingung = (art: 'zeiger' | 'fokus', wert: boolean) => {
     const b = { ...bedingungRef.current, [art]: wert };
@@ -122,14 +126,19 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
     setzeBedingung('fokus', false);
   };
   /**
-   * Sicherheitsnetz: entfernt ein Render den fokussierten Knoten, meldet WebKit kein `focusout`,
-   * das hier ankäme — die Fokus-Bedingung hinge, und der Baum bliebe gehalten. Nach jedem Render:
-   * liegt der Fokus nicht mehr im Bereich, gilt er als gegangen.
+   * Sicherheitsnetz: entfernt ein Render den fokussierten Knoten (ein entfallener Abschnitt wird zum
+   * Platzhalter ohne Link), fällt der Fokus auf `body`, und WebKit meldet kein `focusout`. Nach
+   * jedem Render: fiel der Fokus auf `body`, fängt ihn die Standzeile (WCAG 2.4.3) — die Schleuse
+   * hält weiter, sonst rückte gerade der Platzhalter weg. Liegt er sonst außerhalb (oder fängt die
+   * Standzeile nicht, etwa im Druck), gilt er als gegangen.
    */
   useLayoutEffect(() => {
-    if (bedingungRef.current.fokus && !bereichRef.current?.contains(document.activeElement)) {
-      setzeBedingung('fokus', false);
+    if (!bedingungRef.current.fokus || bereichRef.current?.contains(document.activeElement)) return;
+    if (document.activeElement === null || document.activeElement === document.body) {
+      standRef.current?.focus({ preventScroll: true });
+      if (bereichRef.current?.contains(document.activeElement)) return;
     }
+    setzeBedingung('fokus', false);
   });
 
   const offen = druckt || gehalten === null;
@@ -209,7 +218,8 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
           data-lfh="org-ebene1"
           style={{
             listStyle: 'none',
-            margin: `${token.marginSM}px 0 0`,
+            // Im Druck fehlt die Standzeile: der Abstand zum Kopf ist dann wieder der alte.
+            margin: `${druckt ? token.marginLG : token.marginSM}px 0 0`,
             padding: 0,
             display: 'grid',
             gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${SPALTE_MIN_PX}px), 1fr))`,

@@ -22,7 +22,7 @@ describe('baumSchleuse — offen', () => {
     const frisch = [k('a', [k('a1')]), k('neu')];
     const s = schleuse(null, frisch);
     expect(s.gezeigt).toBe(frisch);
-    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 0, entfallen: 0 });
+    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 0, umsortiert: 0, entfallen: 0 });
     expect(s.entfallen.size).toBe(0);
   });
 });
@@ -31,7 +31,7 @@ describe('baumSchleuse — gehalten', () => {
   it('ohne Abweichung zeigt sie die gehaltene Gliederung, nichts wartet', () => {
     const s = schleuse(STAND, structuredClone(STAND));
     expect(form(s.gezeigt)).toBe(form(STAND));
-    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 0, entfallen: 0 });
+    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 0, umsortiert: 0, entfallen: 0 });
   });
 
   it('hält einen neuen Knoten zurück, auch ein neues Kind, und zählt beide als neu', () => {
@@ -43,7 +43,7 @@ describe('baumSchleuse — gehalten', () => {
     ];
     const s = schleuse(STAND, frisch);
     expect(form(s.gezeigt)).toBe(form(STAND));
-    expect(s.wartend).toEqual({ neu: 2, umgehaengt: 0, entfallen: 0 });
+    expect(s.wartend).toEqual({ neu: 2, umgehaengt: 0, umsortiert: 0, entfallen: 0 });
   });
 
   it('lässt einen umgehängten Knoten am gehaltenen Ort und zählt ihn als umgehängt', () => {
@@ -51,21 +51,47 @@ describe('baumSchleuse — gehalten', () => {
     const frisch = [k('a', [k('a1'), k('e9')]), k('b', [k('b1'), k('a2')]), k('sammel', [])];
     const s = schleuse(STAND, frisch);
     expect(form(s.gezeigt)).toBe(form(STAND));
-    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 2, entfallen: 0 });
+    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 2, umsortiert: 0, entfallen: 0 });
+  });
+
+  it('lässt einem umgehängten Knoten am alten Ort seinen gehaltenen Inhalt', () => {
+    // Was vom Ort abhängt (die Kante der Skizze), stimmte frisch am alten Ort nicht.
+    const frisch = [
+      k('a', [k('a1')]),
+      k('b', [k('b1'), k('a2', [], 'A2 unter B')]),
+      k('sammel', [k('e9')]),
+    ];
+    const s = schleuse(STAND, frisch);
+    expect(form(s.gezeigt)).toBe(form(STAND));
+  });
+
+  it('zählt einen geänderten Platz unter denselben Geschwistern als umsortiert', () => {
+    // Nach einer Umbenennung steht b frisch vor a: beide Plätze weichen ab.
+    const frisch = [k('b', [k('b1')]), k('a', [k('a1'), k('a2')]), k('sammel', [k('e9')])];
+    const s = schleuse(STAND, frisch);
+    expect(form(s.gezeigt)).toBe(form(STAND));
+    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 0, umsortiert: 2, entfallen: 0 });
+    expect(wartendText(s.wartend)).toBe('2 umsortiert');
   });
 
   it('zählt den Wechsel zwischen Wurzel und Kind als umgehängt', () => {
     const frisch = [k('a', [k('a1'), k('a2')]), k('b'), k('b1'), k('sammel', [k('e9')])];
-    expect(schleuse(STAND, frisch).wartend).toEqual({ neu: 0, umgehaengt: 1, entfallen: 0 });
+    expect(schleuse(STAND, frisch).wartend).toEqual({
+      neu: 0,
+      umgehaengt: 1,
+      umsortiert: 0,
+      entfallen: 0,
+    });
   });
 
   it('lässt einen entfallenen Knoten mit letztem Inhalt und Marke stehen, seine Kinder unter ihm', () => {
-    // a ist aufgelöst; a1 steht frisch als Waise an der Wurzel und hat einen neuen Namen.
+    // a ist aufgelöst; a1 steht frisch als Waise an der Wurzel (umgehängt) und hat einen neuen
+    // Namen, der am alten Ort wartet.
     const frisch = [k('a1', [], 'A1 neu'), k('b', [k('b1')]), k('sammel', [k('e9')])];
     const s = schleuse(STAND, frisch);
-    expect(form(s.gezeigt)).toBe('a(A)[a1(A1 neu) a2(A2)] b(B)[b1(B1)] sammel(SAMMEL)[e9(E9)]');
+    expect(form(s.gezeigt)).toBe('a(A)[a1(A1) a2(A2)] b(B)[b1(B1)] sammel(SAMMEL)[e9(E9)]');
     expect([...s.entfallen].sort()).toEqual(['a', 'a2']);
-    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 1, entfallen: 2 });
+    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 1, umsortiert: 0, entfallen: 2 });
   });
 
   it('hält einen Sammelknoten wie jeden Knoten', () => {
@@ -73,7 +99,7 @@ describe('baumSchleuse — gehalten', () => {
     const s = schleuse(STAND, frisch);
     expect(form(s.gezeigt)).toBe(form(STAND));
     expect([...s.entfallen]).toEqual(['sammel']);
-    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 1, entfallen: 1 });
+    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 1, umsortiert: 0, entfallen: 1 });
   });
 
   it('lässt den Inhalt fließen und hält die Folge, auch wenn die frische umsortiert ist', () => {
@@ -86,7 +112,8 @@ describe('baumSchleuse — gehalten', () => {
     expect(form(s.gezeigt)).toBe(
       'a(A)[a1(A1) a2(A2)] b(B neu)[b1(B1)] sammel(SAMMEL)[e9(E9 umbenannt)]',
     );
-    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 0, entfallen: 0 });
+    // Oben tauschen a und sammel die Plätze, unter a die beiden Kinder: vier Plätze weichen ab.
+    expect(s.wartend).toEqual({ neu: 0, umgehaengt: 0, umsortiert: 4, entfallen: 0 });
   });
 
   it('gibt den frischen Knoten weiter, nur mit den gehaltenen Kindern', () => {
@@ -98,14 +125,14 @@ describe('baumSchleuse — gehalten', () => {
 
 describe('wartendText', () => {
   it('nennt nur Teile über 0 in fester Folge', () => {
-    expect(wartendText({ neu: 2, umgehaengt: 1, entfallen: 1 })).toBe(
-      '2 neu · 1 umgehängt · 1 entfallen',
+    expect(wartendText({ neu: 2, umgehaengt: 1, umsortiert: 3, entfallen: 1 })).toBe(
+      '2 neu · 1 umgehängt · 3 umsortiert · 1 entfallen',
     );
-    expect(wartendText({ neu: 0, umgehaengt: 3, entfallen: 0 })).toBe('3 umgehängt');
-    expect(wartendText({ neu: 0, umgehaengt: 0, entfallen: 1 })).toBe('1 entfallen');
+    expect(wartendText({ neu: 0, umgehaengt: 3, umsortiert: 0, entfallen: 0 })).toBe('3 umgehängt');
+    expect(wartendText({ neu: 0, umgehaengt: 0, umsortiert: 0, entfallen: 1 })).toBe('1 entfallen');
   });
 
   it('ist ohne Wartendes null', () => {
-    expect(wartendText({ neu: 0, umgehaengt: 0, entfallen: 0 })).toBeNull();
+    expect(wartendText({ neu: 0, umgehaengt: 0, umsortiert: 0, entfallen: 0 })).toBeNull();
   });
 });

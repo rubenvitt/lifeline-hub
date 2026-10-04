@@ -12,13 +12,13 @@
 
 ## 3. Browser-Nachweis (e2e)
 
-- [ ] 3.1 `e2e/fuehrungsorganisation.spec.ts` „Fokus: ein live angelegter Abschnitt springt nicht unter den fokussierten Link“: Fokus per Tastatur auf einen Namenslink, Abschnitt per `page.request` anlegen. Rechteck des Links Δ 0 px, Banner „1 neu“, der neue Abschnitt fehlt; „anzeigen“ → er steht da. Mutationsprobe: Schleuse fest offen → rot
-- [ ] 3.2 Ebenda „Zeiger: ein umgehängter Unterabschnitt springt nicht unter dem Zeiger“: Maus auf einen Namenslink, Unterabschnitt per API umhängen. Rechteck Δ 0 px, Banner „1 umgehängt“; Maus aus dem Bereich → am neuen Ort, kein Banner. Mutationsprobe wie 3.1. Der bestehende Live-Test (ohne Zeiger und Fokus) bleibt grün
-- [ ] 3.3 Ebenda „Banner verschiebt den Baum nicht“ bei 390 × 844 und 1366 × 768: Oberkante der ersten Ebene Δ 0 px beim Erscheinen und Verschwinden des Banners
-- [ ] 3.4 Ebenda „Druck mit wartendem Abschnitt“: wartender Abschnitt, `beforeprint` ausgelöst, Druckmedium → der Abschnitt steht im Druckbild, die Standzeile nicht
-- [ ] 3.5 `e2e/funkplan.spec.ts`, Skizze: Maus auf einem Namenslink, Einheit per API einem Abschnitt zuordnen → Rechteck Δ 0 px, Banner „1 umgehängt“; Maus raus → unter dem Abschnitt
+- [x] 3.1 `e2e/fuehrungsorganisation.spec.ts` „Fokus: ein live angelegter Abschnitt springt nicht unter den fokussierten Link“: Fokus per Tastatur auf einen Namenslink, Abschnitt per `page.request` anlegen. Rechteck des Links Δ 0 px, Banner „1 neu“, der neue Abschnitt fehlt; „anzeigen“ → er steht da. Mutationsprobe: Schleuse fest offen → rot
+- [x] 3.2 Ebenda „Zeiger: ein umgehängter Unterabschnitt springt nicht unter dem Zeiger“: Maus auf einen Namenslink, Unterabschnitt per API umhängen. Rechteck Δ 0 px, Banner „1 umgehängt“; Maus aus dem Bereich → am neuen Ort, kein Banner. Mutationsprobe wie 3.1. Der bestehende Live-Test (ohne Zeiger und Fokus) bleibt grün
+- [x] 3.3 Ebenda „Banner verschiebt den Baum nicht“ bei 390 × 844 und 1366 × 768: Oberkante der ersten Ebene Δ 0 px beim Erscheinen und Verschwinden des Banners
+- [x] 3.4 Ebenda „Druck mit wartendem Abschnitt“: wartender Abschnitt, `beforeprint` ausgelöst, Druckmedium → der Abschnitt steht im Druckbild, die Standzeile nicht
+- [x] 3.5 `e2e/funkplan.spec.ts`, Skizze: Maus auf einem Namenslink, Einheit per API einem Abschnitt zuordnen → Rechteck Δ 0 px, Banner „1 umgehängt“; Maus raus → unter dem Abschnitt
 
 ## 4. Prüflisten und Abschluss
 
-- [ ] 4.1 Kriterium 12 in `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/pruefliste.md` und `…/2026-10-01-lfh-625-fernmeldeskizze/pruefliste.md` auf **erfüllt** mit Testnamen, Zielticket räumen, Bilanz nachziehen. In `…/2026-10-04-lfh-848-kommunikationsplan/pruefliste.md` die Skizze nachtragen und die Tabellen auf das Folgeticket LFH-1020 (D6) umschreiben
+- [x] 4.1 Kriterium 12 in `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/pruefliste.md` und `…/2026-10-01-lfh-625-fernmeldeskizze/pruefliste.md` auf **erfüllt** mit Testnamen, Zielticket räumen, Bilanz nachziehen. In `…/2026-10-04-lfh-848-kommunikationsplan/pruefliste.md` beide Tabellen (Datensicht-Bäume) auf das Folgeticket LFH-1020 (D6) umschreiben
 - [ ] 4.2 `./scripts/check-all.sh` ist grün (lokal oder belegt durch die CI des PRs); Vitest der berührten Dateien und die e2e-Specs `fuehrungsorganisation`, `funkplan`, `gate1-ueberlauf`, `gate3-trefflaeche` grün

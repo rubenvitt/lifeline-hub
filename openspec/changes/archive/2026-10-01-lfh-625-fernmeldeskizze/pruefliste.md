@@ -51,9 +51,9 @@ Begründung). Gerechnetes und aus dem Quelltext Geschlossenes trägt **[abgeleit
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Das Lücken-Paneel mit der neuen Zeile steht im ersten Bild bei 1366 × 768 mit offenem Panel (e2e). Die Kante steht am betroffenen Knoten | — |
 | 10 | **Alarmbudget** | **nicht anwendbar** | Keine Meldung. Die Übernahme navigiert bei Erfolg | — |
 | 11 | **Warnverhalten** | **erfüllt** | Kein Blinken, kein Ton (Grep) | — |
-| 12 | **Kein Sprung unter dem Cursor** | **offen** | Wie beim Organigramm (gleiches Gerüst): live hinzukommende Knoten verschieben die dahinter sofort. Einziges Bedienziel je Knoten ist ein Link, ein Fehlgriff ändert nichts. Das Zielticket gilt für das Gerüst und damit für beide Nutzer | [LFH-867](https://app.clickup.com/t/123zgec64ta) |
+| 12 | **Kein Sprung unter dem Cursor** | **erfüllt** (nachgetragen mit [LFH-867](https://app.clickup.com/t/123zgec64ta)) | Dieselbe Zufluss-Schleuse des Gerüsts wie das Organigramm: Zeiger oder Fokus halten die Knoten, Sprechgruppen und Kanten fließen, Wartendes steht im Sammelbanner. `e2e/funkplan.spec.ts` „Skizze, Schleuse (LFH-867) …“ (Link-Rechteck Δ 0 px unter dem Zeiger); Mutationsprobe Schleuse fest offen → rot | — |
 | 13 | **Fokus nie verdeckt** | **erfüllt** [abgeleitet] | Keine angepinnte oder schwebende Leiste in der Darstellung | — |
 | 14 | **Tabellenseite vollständig** | **nicht anwendbar** | Die Skizze beantwortet „wer erreicht wen?“, nicht „welcher von diesen?“. Der Vergleich steht in der Tabelle derselben Seite | — |
 | 15 | **Erfassungsmaske vollständig** | **nicht anwendbar** | Schreibgeschützt. Bearbeitet wird am Abschnitt bzw. an der Einheit, Namen und Lückenverweise führen dorthin | — |
 
-**Bilanz:** 10 erfüllt · 1 offen ([LFH-867](https://app.clickup.com/t/123zgec64ta)) · 4 nicht anwendbar.
+**Bilanz:** 11 erfüllt · 4 nicht anwendbar (Kriterium 12 nachgetragen mit [LFH-867](https://app.clickup.com/t/123zgec64ta)).

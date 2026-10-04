@@ -278,7 +278,20 @@ describe('HaengenderBaum — Zufluss-Schleuse', () => {
     expect(banner()).toBeNull();
   });
 
-  it('verschwindet der fokussierte Knoten ohne `focusout`, öffnet das Sicherheitsnetz', () => {
+  it('wird der fokussierte Knoten zum Platzhalter, fängt die Standzeile den Fokus und hält', () => {
+    renderMitProviders(<Buehne start={START} />);
+    act(() => screen.getByTestId('inhalt-b').focus());
+    live([k('a', [k('a1')])]);
+    const platz = document.querySelector('[data-lfh="org-entfallen"]') as HTMLElement;
+    expect(platz).toHaveTextContent('B');
+    expect(stand()).toHaveFocus();
+    expect(banner()).toHaveTextContent('1 entfallen');
+    // Erst ein Ziel außerhalb öffnet; dann fällt der Platzhalter weg.
+    act(() => screen.getByRole('button', { name: 'draußen' }).focus());
+    expect(document.querySelector('[data-lfh="org-entfallen"]')).toBeNull();
+  });
+
+  it('geht der fokussierte Knoten ohne `focusout`, fängt das Sicherheitsnetz den Fokus', () => {
     renderMitProviders(<Buehne start={START} />);
     act(() => screen.getByTestId('inhalt-a').focus());
     live([...START, k('c')]);
@@ -290,6 +303,11 @@ describe('HaengenderBaum — Zufluss-Schleuse', () => {
       ziel.remove();
     });
     live([...START, k('c'), k('d')]);
+    expect(stand()).toHaveFocus();
+    expect(screen.queryByTestId('inhalt-d')).toBeNull();
+    expect(banner()).toHaveTextContent('2 neu');
+    // Der Fokus steht wieder auf einem Ziel des Bereichs: ein späteres Verlassen öffnet.
+    act(() => screen.getByRole('button', { name: 'draußen' }).focus());
     expect(screen.getByTestId('inhalt-d')).toBeInTheDocument();
   });
 });
