@@ -1,3 +1,23 @@
+## [1.0.0-alpha.77](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.76...v1.0.0-alpha.77) (2026-10-04)
+
+### Lagekarte
+
+- **Pegelstände:** Die Farbkodierung der Pegelzustände wurde vereinheitlicht – hohe und niedrige Wasserstände werden nun in der Warnfarbe Orange dargestellt, Normalzustände in Grün. Werte über dem mittleren Hochwasser erscheinen nicht mehr in Rot, da hier noch keine Meldestufe vorliegt.
+
+- **Warnmeldungen:** Die Anzeige der Warnquelle wurde korrigiert – bei fehlenden Absenderinformationen zeigt die Karte nun je nach Ebene den korrekten Herausgeber an (Deutscher Wetterdienst bei Wetterwarnungen, BBK/MoWaS bei NINA-Warnungen).
+
+### Allgemeine Verbesserungen
+
+- **Darstellung bei Nachtmodus:** Die Lesbarkeit von Code-Blöcken und formatierten Texten im Dunkelmodus wurde verbessert – Hintergründe und Rahmen fügen sich nun einheitlich in das Farbschema ein und bieten durchgängig ausreichenden Kontrast für gute Lesbarkeit.
+
+## [1.0.0-alpha.76](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.75...v1.0.0-alpha.76) (2026-10-04)
+
+### Führung
+
+#### Organigramm und Fernmeldeskizze
+
+Die Darstellung von Organigramm und Fernmeldeskizze wurde grundlegend überarbeitet. Bei Interaktion mit der Maus oder bei Fokus auf einem Element bleibt die Struktur des Organigramms stabil: Knoten bleiben an ihrem Platz, auch wenn sich deren Inhalt ändert. Neue Einheiten, umgehängte Strukturen oder entfallene Elemente werden in einem Banner mit fester Höhe angezeigt, bevor sie ihre endgültige Position einnehmen. Entfallene Einheiten bleiben als Platzhalter sichtbar, ohne dass die gesamte Struktur verrutscht. Der Kopf des Organigramms passt sich automatisch an die verfügbare Breite an. Im Druck wird immer der aktuelle Stand dargestellt.
+
 ## [1.0.0-alpha.75](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.74...v1.0.0-alpha.75) (2026-10-04)
 
 ### Führung
