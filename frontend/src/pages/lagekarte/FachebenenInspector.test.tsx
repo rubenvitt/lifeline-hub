@@ -418,8 +418,8 @@ describe('FachebenenInspector', () => {
     expect(screen.queryByText('katastrophal')).not.toBeInTheDocument();
   });
 
-  it('Pegel: Wasserstand mit Einheit, Zustand-Tag (high→Hoch), Gewässer', () => {
-    render(
+  it('Pegel: Wasserstand mit Einheit, Zustand „Hoch“ in Achtung (LFH-881), Gewässer', () => {
+    const { container } = render(
       <FachebenenInspector
         quelle="pegelonline"
         properties={{
@@ -433,21 +433,49 @@ describe('FachebenenInspector', () => {
       />,
     );
     expect(screen.getByText(/320 cm/)).toBeInTheDocument();
-    expect(screen.getByText('Hoch')).toBeInTheDocument();
+    // Über MHW ist keine Meldestufe: Achtung, nicht Rot, und nie Bedienblau.
+    expect(screen.getByText('Hoch')).toHaveAttribute('data-rolle', 'achtung');
+    expect(
+      container.querySelector(
+        '.ant-tag-red, .ant-tag-blue, [data-rolle="alarm"], [data-rolle="bedien"]',
+      ),
+    ).toBeNull();
     expect(screen.getByText('RHEIN')).toBeInTheDocument();
   });
 
-  it('Pegel: Zustand "unknown" zeigt KEIN Tag (statt Rohwert)', () => {
-    render(
-      <FachebenenInspector
-        quelle="pegelonline"
-        properties={{ titel: 'X', wert: 100, einheit: 'cm', zustand: 'unknown' }}
-        onSchliessen={() => {}}
-      />,
-    );
-    expect(screen.queryByText('unknown')).toBeNull();
-    expect(screen.getByText(/100 cm/)).toBeInTheDocument();
-  });
+  it.each([
+    ['normal', 'Normal', 'normal'],
+    ['low', 'Niedrig', 'achtung'],
+  ])(
+    'Pegel: Zustand %s zeigt „%s“ mit der Rolle %s aus dem Vertrag (LFH-881)',
+    (zustand, wort, rolle) => {
+      const { container } = render(
+        <FachebenenInspector
+          quelle="pegelonline"
+          properties={{ titel: 'X', wert: 100, einheit: 'cm', zustand }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(screen.getByText(wort)).toHaveAttribute('data-rolle', rolle);
+      expect(container.querySelector('.ant-tag-green, .ant-tag-gold')).toBeNull();
+    },
+  );
+
+  it.each(['unknown', 'commented', 'out-dated', 'constructor', undefined])(
+    'Pegel: Zustand %s zeigt KEIN Tag (statt Rohwert)',
+    (zustand) => {
+      const { container } = render(
+        <FachebenenInspector
+          quelle="pegelonline"
+          properties={{ titel: 'X', wert: 100, einheit: 'cm', zustand }}
+          onSchliessen={() => {}}
+        />,
+      );
+      if (zustand) expect(screen.queryByText(zustand)).toBeNull();
+      expect(screen.getByText(/100 cm/)).toBeInTheDocument();
+      expect(container.querySelector('.ant-tag')).toBeNull();
+    },
+  );
 
   it('KRITIS: Kategorie-Label, Adresse, klickbares Telefon', () => {
     render(
