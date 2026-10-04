@@ -6,10 +6,10 @@ import { antdAlgorithmus, antdKomponenten, antdToken, farbenDunkel, farbenHell }
  * Beschriftung auf satter Bedienfläche (Primärknopf), GERECHNET statt behauptet (WCAG-Formel).
  *
  * Kein eigener Knopfboden (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung hält den
- * Textboden aus Kriterium 5, Tag ≥ 7 : 1, Nacht ≥ 5 : 1, in Ruhe UND unter dem Zeiger. Ein
- * Großtext-Boden trägt nicht: die Knopfschrift misst 13,5 bis 16 px (großer Knopf), WCAG verlangt
- * für fetten Großtext 18,66 px. Böden als Literale; der Browser-Nachweis steht in
- * `e2e/primaerknopf-kontrast.spec.ts`.
+ * Textboden aus Kriterium 5, Tag ≥ 7 : 1, Nacht ≥ 5 : 1, in Ruhe, unter dem Zeiger und gedrückt
+ * (LFH-897). Ein Großtext-Boden trägt nicht: die Knopfschrift misst 13,5 bis 16 px (großer
+ * Knopf), WCAG verlangt für fetten Großtext 18,66 px. Böden als Literale; der Browser-Nachweis
+ * steht in `e2e/primaerknopf-kontrast.spec.ts`.
  */
 function luminanz(hex: string): number {
   const h = hex.replace('#', '');
@@ -23,6 +23,12 @@ function kontrast(a: string, b: string): number {
   const [x, y] = [luminanz(a), luminanz(b)];
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
+/** Ein Komponenten-Token als Hex; fehlt es, ist das ein Befund, kein Rückfall auf antd. */
+function token(quelle: object | undefined, name: string): string {
+  const wert = (quelle as Record<string, unknown> | undefined)?.[name];
+  if (typeof wert !== 'string') throw new Error(`Komponenten-Token ${name} fehlt`);
+  return wert;
+}
 
 describe.each([
   ['Tag', farbenHell, 7],
@@ -34,6 +40,18 @@ describe.each([
 
   it('die Fläche unter dem Zeiger unterscheidet sich von der Ruhe', () => {
     expect(farben.bedienHover.toLowerCase()).not.toBe(farben.bedien.toLowerCase());
+  });
+
+  // Gedrückt (LFH-897): antd leitete den Ton selbst ab, nachts DUNKLER als `bedien` und damit
+  // 3,35 : 1 unter der dunklen Schrift. Das Komponenten-Token muss gesetzt sein.
+  it('aufBedien auf der gedrückten Fläche hält den Textboden', () => {
+    const gedrueckt = token(antdKomponenten(farben, 'kompakt').Button, 'colorPrimaryActive');
+    expect(kontrast(farben.aufBedien, gedrueckt)).toBeGreaterThanOrEqual(boden);
+  });
+
+  it('die gedrückte Fläche unterscheidet sich von der Ruhe', () => {
+    const gedrueckt = token(antdKomponenten(farben, 'kompakt').Button, 'colorPrimaryActive');
+    expect(gedrueckt.toLowerCase()).not.toBe(farben.bedien.toLowerCase());
   });
 });
 

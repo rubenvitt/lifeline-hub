@@ -112,7 +112,8 @@ export interface Farbrollen {
  * Knopfschrift misst 13,5 px, der große Anmelde-Knopf 16 px; WCAGs Großtext-Boden 4,5 gilt fett
  * erst ab 18,66 px. Weiß auf bedien 8,55 (vorher `#1a5fa0`, 6,59), auf bedienHover 7,32 (vorher
  * `#236aad`, 5,62): gleicher Ton und gleiche Sättigung, nur dunkler; der Zeiger hellt um
- * denselben Schritt auf wie zuvor (1,17). bedien auf grund 7,16. Gerechnet in
+ * denselben Schritt auf wie zuvor (1,17). bedien auf grund 7,16. Gedrückt trägt den Zeigerton
+ * (LFH-897), also ebenfalls 7,32 (antds Ableitung `#0a335e` lag bei 12,74). Gerechnet in
  * `bedienKontrast.test.ts`, gemessen in `e2e/primaerknopf-kontrast.spec.ts`.
  *
  * TEXTBODEN für JEDE Textstufe, auch den Tertiärtext `schwach` (Augenbraue, Meta,
@@ -137,8 +138,9 @@ export interface Farbrollen {
  * Gefahrrot (LFH-693, `antdKomponenten`): als Text `alarmText`, roter Menüeintrag auf flaeche2
  * 8,29, Gefahrknopf ohne Rahmen auf grund 7,51 (knappstes Paar); Weiß auf `alarmText` 8,96 (gefüllter Gefahrknopf in Ruhe, Menüeintrag unter dem Zeiger),
  * auf `alarmHover` 10,45 (Zeiger und Drücken); `alarmHover` als Schrift des umrandeten Knopfs auf
- * flaeche 10,45, auf grund 8,75. `alarm` trüge hier nicht: als Text auf flaeche2 6,27, Weiß darauf
- * 6,78.
+ * flaeche 10,45, auf grund 8,75, beim Drücken des Knopfs ohne Rahmen auf alarmFlaeche 8,52
+ * (LFH-897; antds Tönung `#d69285` lag bei 4,13). `alarm` trüge hier nicht: als Text auf
+ * flaeche2 6,27, Weiß darauf 6,78.
  *
  * Hinweisflächen (LFH-739, `antdKomponenten`: `Alert`) sind die Statusflächen; `steuerRahmen` als
  * Rand eines Knopfs darauf: bedienFlaeche 3,34 · achtungFlaeche 3,43 · alarmFlaeche 3,22 ·
@@ -199,7 +201,9 @@ export const farbenHell: Farbrollen = {
  * auf alarm 7,18. Statusflächen: normalText 10,44, achtung 11,18, alarm 6,89, bedienText 9,65.
  * Gefahrrot (LFH-693): roter Menüeintrag auf flaeche2 6,48; aufBedien auf alarm 7,18 (gefüllter
  * Gefahrknopf, Menüeintrag unter dem Zeiger — vorher antds Weiß, 2,78), auf alarmHover 7,98
- * (Zeiger und Drücken, vorher gedrückt 3,74).
+ * (Zeiger und Drücken, vorher gedrückt 3,74); alarmHover gedrückt ohne Rahmen auf alarmFlaeche
+ * 7,66 (LFH-897, antds Tönung `#5b2e2e`: 4,49). Primärknopf gedrückt (LFH-897): aufBedien auf
+ * bedienHover 9,00 (antds Ableitung `#396792`, dunkler als bedien: 3,35).
  * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
  * Tabellenkopf auf kopf 7,48.
  * Hinweisflächen (LFH-739): `steuerRahmen` auf bedienFlaeche 3,32 · achtungFlaeche 3,26 ·
@@ -697,6 +701,14 @@ export function kopfzeilenMasse(
  * `colorError` als Fläche des gefüllten und als Schrift des umrandeten und des `text`-Knopfs,
  * `colorErrorHover`/`colorErrorActive` ebenso unter dem Zeiger und beim Drücken (warum der
  * Zeiger dunkelt: {@link Farbrollen.alarmHover}).
+ *
+ * Gedrückt (LFH-897, Spec `farbrollen-kontrast`) hält denselben Textboden und trägt den
+ * Zeigerton, nicht antds Ableitung: `colorPrimaryActive` = `bedienHover` (die Fläche des
+ * gedrückten Primärknopfs, auch der Rand des gedrückten Standardknopfs), `colorErrorBgActive` =
+ * `alarmFlaeche` (die Tönung unter einem gedrückten Gefahrknopf ohne Rahmen; sonst liest sie im
+ * Knopf nur die Variante `filled`, die die App nicht nutzt). Beide im `Button`, nicht global:
+ * `colorPrimaryActive` färbt auch Eingaben und Auswahlen, die keinen Text auf satter Fläche
+ * tragen.
  * GRENZE: antd setzt die Überschreibungen als CSS-Variablen auf die Wurzel des Popups bzw. des
  * Knopfs; sie gelten für den ganzen Teilbaum. Heute liest darin nur der Gefahreintrag
  * (`dropdown/style/status.js`) bzw. der Knopf selbst sie (antd 6.6.5). Wer Badge, gefüllten Tag,
@@ -731,6 +743,11 @@ export function antdKomponenten(
       colorError: farben.alarmText,
       colorErrorHover: farben.alarmHover,
       colorErrorActive: farben.alarmHover,
+      // Gedrückt trägt den Zeigerton (LFH-897), wie beim gefüllten Gefahrknopf. antd leitete
+      // beide Töne selbst ab: der Primärknopf dunkelte nachts unter die dunkle Schrift ab
+      // (3,35 : 1), der Gefahrknopf ohne Rahmen bekam eine satte Tönung (Tag 4,13, Nacht 4,49).
+      colorPrimaryActive: farben.bedienHover,
+      colorErrorBgActive: farben.alarmFlaeche,
     },
     Dropdown: {
       colorError: farben.alarmText,

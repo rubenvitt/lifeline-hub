@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ruheUndZeiger } from './kontrast-kern';
+import { gedrueckt, ruheUndZeiger } from './kontrast-kern';
 
 /**
  * Gefahrrot in Ruhe UND unter dem Zeiger, Tag und Nacht (LFH-693, Spec `farbrollen-kontrast`):
@@ -14,7 +14,14 @@ import { ruheUndZeiger } from './kontrast-kern';
  *    Eintrag hinter dem Trenner): unter dem Zeiger wechselt die Hinterlegung auf Rot.
  *  · „Löschen“ der Rückfrage danach (`Modal` mit `okButtonProps={{ danger: true }}`).
  *  · „Deaktivieren“ im Fahrzeug-Status-Katalog der Stammdaten (umrandet): unter dem Zeiger
- *    wechselt die Schrift, die Fläche bleibt.
+ *    und gedrückt wechselt die Schrift, die Fläche bleibt.
+ *  · Der Papierkorb „Dokument … entfernen“ in der Dokumentenliste (ohne Rahmen, LFH-897): unter
+ *    dem Zeiger und gedrückt legt sich eine rote Tönung darunter; gedrückt war sie bei antd satt
+ *    (Tag 4,13, Nacht 4,49). Er trägt ein Ikon, gemessen wird seine Farbe (`color`) gegen die
+ *    Tönung — dasselbe Paar wie die Beschriftung „abgelehnt – prüfen“ im Live-Banner, die eine
+ *    abgelehnte Offline-Aktion bräuchte und deshalb nur in `gefahrKontrast.test.ts` gerechnet ist.
+ *
+ * Gedrückt gehalten und neben dem Knopf losgelassen (`gedrueckt`): kein Klick, keine Rückfrage.
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
@@ -34,7 +41,7 @@ async function post<T = { id: number }>(page: Page, pfad: string, data?: unknown
 }
 
 for (const modus of ['light', 'dark'] as const) {
-  test(`Gefahrrot in Ruhe und unter dem Zeiger — ${modus}`, async ({ page }) => {
+  test(`Gefahrrot in Ruhe, unter dem Zeiger und gedrückt — ${modus}`, async ({ page }) => {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -81,6 +88,52 @@ for (const modus of ['light', 'dark'] as const) {
     const deaktivieren = page.getByRole('button', { name: 'Deaktivieren', exact: true }).first();
     await expect(deaktivieren).toHaveClass(/ant-btn-dangerous/);
     await expect(deaktivieren).toHaveClass(/ant-btn-variant-outlined/);
-    await ruheUndZeiger(page, deaktivieren, TEXT[modus], `${modus}/Deaktivieren`, 'text');
+    const deaktivierenRuhe = await ruheUndZeiger(
+      page,
+      deaktivieren,
+      TEXT[modus],
+      `${modus}/Deaktivieren`,
+      'text',
+    );
+    await gedrueckt(
+      page,
+      deaktivieren,
+      TEXT[modus],
+      `${modus}/Deaktivieren`,
+      deaktivierenRuhe.ruhe,
+      'text',
+    );
+
+    // Gefahrknopf ohne Rahmen (LFH-897): der Papierkorb einer Dokumentenzeile.
+    const ablage = await page.request.post(`/api/einsaetze/${einsatzId}/dokumente`, {
+      multipart: {
+        datei: {
+          name: 'Plan Gefahr.pdf',
+          mimeType: 'application/octet-stream',
+          buffer: Buffer.from('%PDF-1.4 e2e'),
+        },
+        titel: 'Plan Gefahr',
+        kategorie: 'lagekarte_plan',
+      },
+    });
+    expect(ablage.ok(), `Dokument: ${ablage.status()} ${await ablage.text()}`).toBeTruthy();
+    await page.goto(`/einsaetze/${einsatzId}/dokumente`);
+    const papierkorb = page.getByRole('button', { name: 'Dokument Plan Gefahr entfernen' });
+    await expect(papierkorb).toHaveClass(/ant-btn-dangerous/);
+    await expect(papierkorb).toHaveClass(/ant-btn-variant-text/);
+    const papierkorbRuhe = await ruheUndZeiger(
+      page,
+      papierkorb,
+      TEXT[modus],
+      `${modus}/Dokument entfernen`,
+    );
+    await gedrueckt(
+      page,
+      papierkorb,
+      TEXT[modus],
+      `${modus}/Dokument entfernen`,
+      papierkorbRuhe.ruhe,
+    );
+    await expect(page.getByText('Dokument entfernen?')).toHaveCount(0);
   });
 }
