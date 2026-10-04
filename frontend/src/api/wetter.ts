@@ -8,7 +8,7 @@ import type { WetterAnzeige } from './types';
  * beide über Bright Sky. Ein Ausfall der Quelle ist KEIN HTTP-Fehler — jeder Teil trägt seinen
  * eigenen `zustand` (`ok` · `kein_ort` · `ausfall`), damit ein Teil den anderen nicht mitreißt.
  */
-function ladeWetter(einsatzId: number): Promise<WetterAnzeige> {
+export function ladeWetter(einsatzId: number): Promise<WetterAnzeige> {
   return apiGet<WetterAnzeige>(`/api/einsaetze/${einsatzId}/wetter`);
 }
 

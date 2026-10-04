@@ -2,6 +2,7 @@ import type { LageberichtVorlageKey } from '../api/types';
 import { MEDIENLAGE_QUELLE } from '../stab/medienlageUebernahme';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
 import { FUEHRUNGSPROBLEME_QUELLE } from './fuehrungsproblemeUebernahme';
+import { SCHADENLAGE_QUELLE } from './schadenlageUebernahme';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
 
 /**
@@ -13,6 +14,7 @@ import type { UebernahmeQuelle } from './uebernahmeQuelle';
 export const UEBERNAHMEN: Partial<Record<LageberichtVorlageKey, Record<string, UebernahmeQuelle>>> =
   {
     lagebericht: {
+      gefahren_schadenlage: SCHADENLAGE_QUELLE,
       eigene_lage: EIGENE_LAGE_QUELLE,
       fuehrungsprobleme: FUEHRUNGSPROBLEME_QUELLE,
       medienlage: MEDIENLAGE_QUELLE,

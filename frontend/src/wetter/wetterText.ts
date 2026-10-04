@@ -82,23 +82,23 @@ export function windText(
 
 /**
  * Zeitraum einer Warnung: „seit 13:00 · bis 16:00" (gilt) bzw. „ab 17:00 · bis 20:00"
- * (angekündigt); am anderen Tag mit Tag davor ({@link standZeit}). Rein.
+ * (angekündigt); am anderen Tag mit Tag davor ({@link standZeit}). `zeit` ersetzt die Uhrzeit,
+ * etwa durch die DTG im Lagevortrag (LFH-872). Rein.
  */
 export function warnZeitraum(
   beginn: string | null | undefined,
   ende: string | null | undefined,
   jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  zeit: (zeitpunkt: string) => string = (z) => standZeit(z, jetzt, konv),
 ): string {
   const teile: string[] = [];
   const b = beginn ? Date.parse(beginn) : Number.NaN;
   if (Number.isFinite(b)) {
-    teile.push(`${b > jetzt ? 'ab' : 'seit'} ${standZeit(beginn as string, jetzt, konv)}`);
+    teile.push(`${b > jetzt ? 'ab' : 'seit'} ${zeit(beginn as string)}`);
   }
   const e = ende ? Date.parse(ende) : Number.NaN;
-  teile.push(
-    Number.isFinite(e) ? `bis ${standZeit(ende as string, jetzt, konv)}` : 'bis auf Weiteres',
-  );
+  teile.push(Number.isFinite(e) ? `bis ${zeit(ende as string)}` : 'bis auf Weiteres');
   return teile.join(' · ');
 }
 
