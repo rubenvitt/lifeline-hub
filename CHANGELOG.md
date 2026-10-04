@@ -1,3 +1,26 @@
+## [1.0.0-alpha.71](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.70...v1.0.0-alpha.71) (2026-10-03)
+
+### Lagekarte
+
+- **Kontextmenü per Rechtsklick und langem Druck**: An freien Kartenstellen und auf Flächen kann nun per Rechtsklick (Desktop) oder langem Druck (Touch) ein Menü geöffnet werden, um Koordinaten zu kopieren, eine Messung zu beginnen oder direkt ein Zeichen zu setzen
+- Kontextmenü erscheint nicht auf Kräfte-Clustern, um versehentliche Aktionen zu vermeiden
+- Dialog „Zeichen hier setzen" kann während des Speicherns nicht mehr versehentlich geschlossen werden und schließt nach erfolgreicher Anlage automatisch
+
+### Benutzerverwaltung
+
+- **Passwort-Bereich im Profil**: Benutzer, die sich ausschließlich über Single Sign-On (SSO) anmelden, sehen im Profil keinen Passwort-Bereich mehr – der Button „Passwort ändern" wird nur noch angezeigt, wenn ein lokales Passwort gesetzt ist
+
+### Sicherheit
+
+- **Anmelde-Protokollierung erweitert**: Erfolgreiche und fehlgeschlagene Anmeldungen über Zweifaktor-Authentifizierung (TOTP), Single Sign-On (OIDC) und Passkeys werden nun vollständig im Audit-Log erfasst
+- Störungen beim Identity Provider (z. B. nicht erreichbar, ungültige Konfiguration) erzeugen keine Fehleinträge mehr im Anmelde-Protokoll – nur tatsächliche Anmeldeversuche mit laufender Zeremonie werden dokumentiert
+- Anfragen ohne gültige Anmelde-Session werden nicht mehr protokolliert, um das Audit-Log sauber zu halten
+
+### Betrieb und Installation
+
+- Verbesserungen an der internen Test-Infrastruktur für stabilere Builds unter Last
+- Aufräumarbeiten in der Dokumentation: veraltete Agent-Konfigurationen entfernt
+
 ## [1.0.0-alpha.70](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.69...v1.0.0-alpha.70) (2026-10-03)
 
 ### Wichtige Änderungen

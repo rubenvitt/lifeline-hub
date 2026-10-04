@@ -161,7 +161,7 @@ pub async fn wiederherstellen(
             ));
         }
     }
-    crate::einsatz::repo::wiederherstellen(
+    let etb_id = crate::einsatz::repo::wiederherstellen(
         &state.pool,
         einsatz_id,
         benutzer.id,
@@ -170,8 +170,10 @@ pub async fn wiederherstellen(
         jetzt,
     )
     .await?;
-    // Der Einsatz erscheint wieder in den Listen seiner Leser (LFH-734).
+    // Der Einsatz erscheint wieder in den Listen seiner Leser (LFH-734), sein ETB-Audit im
+    // ETB (LFH-858).
     crate::live::org::einsatzliste_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+    state.live.publiziere(einsatz_id, etb_id);
     let kopf = archivkopf(&state, &benutzer, einsatz_id).await?;
     Ok(Json(repo::akte(&state.pool, &kopf, Utc::now()).await?))
 }
