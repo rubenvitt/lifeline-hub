@@ -43,8 +43,8 @@ Die Marken werden zu `Tag` ohne `color`.
   eine Sprechgruppe sind kein Status. Sie gehören weder in den Vertrag noch an `wort`/Rolle.
 - **Gewählt: neutral.** Das Wort trägt die Bedeutung (WCAG 1.4.1 bleibt erfüllt, weil Blau nie
   der einzige Kanal war), die Umrandung die Form. Der Text ist `text` auf einer fast
-  transparenten Fläche über dem Grund, gerechnet weit über dem Boden (Tag rund 17 : 1, Nacht
-  rund 15 : 1). Belegt wird das im Browser (Task 2.1).
+  transparenten Fläche über dem Grund, gemessen im Browser an „ad-hoc“: Tag 16,94 : 1, Nacht
+  12,87 : 1 (Task 2.1).
 
 ### D2 Die Ampel der Besatzungsstärke
 
@@ -58,7 +58,9 @@ fortgeschrieben, der `title` bleibt der zweite Kanal.
 Die Funk-Erreichbarkeit zeigt TMO-Sprechgruppen blau und DMO-Sprechgruppen `geekblue`. Würde nur
 TMO neutral, stünde DMO als einzige farbige Marke da und läse sich wie hervorgehoben. Beide werden
 neutral. Das Präfix „TMO:“/„DMO:“ unterscheidet sie schon heute im Wort. Der Guard verbietet nur
-`blue`, `geekblue` fällt unter den Nachzug (Non-Goals).
+`blue`, `geekblue` fällt unter den Nachzug (Non-Goals). Dasselbe gilt für den Kacheltyp der
+Online-Kartenquellen (`vektor` blau, `raster` `geekblue`), den erst der Guard fand: beide
+neutral, das Wort ist der Drahtwert selbst.
 
 ### D4 Guard im bestehenden Tag-Scanner
 

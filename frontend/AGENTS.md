@@ -147,7 +147,9 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 - **Sichtung ist eine eigene Achse nach BBK** und die Ausnahme vom Neuentwurf:
   `SichtungsTag`/`sichtungsfarben`, umrandetes Farbfeld, SK I rot, II gelb, III grün, IV blau,
   Tote schwarz, „unverletzt" ohne Farbe; die Umrandung macht Gelb auf hellem und Schwarz auf
-  dunklem Grund sichtbar. Nie `color="black"` an antds `Tag`. Übergabe, Geschädigt-Bezug,
+  dunklem Grund sichtbar. Nie `color="black"` an antds `Tag`; nie `color="blue"` (LFH-891, Spec
+  `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): eine Kennzeichnung
+  ohne Status (ad-hoc, Rolle, Kennung) ist neutral wie die Demo-Marke, Blau bedient. Übergabe, Geschädigt-Bezug,
   UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind unabhängig.
 - **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)
   **ist** `bedienText`, ein Link braucht kein eigenes `style`, Zeiger-Rückmeldung ist die
