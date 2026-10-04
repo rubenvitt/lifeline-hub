@@ -42,10 +42,11 @@ Keine Änderung an Server, Daten, Vorlagen oder Typen. Keine **BREAKING**-Änder
 
 ## Impact
 
-- Neu: `frontend/src/lageberichte/AbschnittUebernahme.tsx` (Baustein) und
-  `frontend/src/lageberichte/uebernahmen.ts` (Zuordnung und Quelle „Eigene Lage“), je mit Test.
-- `frontend/src/stab/MedienlageUebernahme.tsx` wird zur Quelldefinition der Medienlage; ihr Test
-  bleibt grün.
+- Neu: `frontend/src/lageberichte/AbschnittUebernahme.tsx` (Baustein),
+  `lageberichte/uebernahmeQuelle.ts` (Schnittstelle, Listenabruf), `lageberichte/uebernahmen.ts`
+  (Zuordnung) und `lageberichte/eigeneLageUebernahme.ts` (Quelle „Eigene Lage“), je mit Test.
+- `frontend/src/stab/MedienlageUebernahme.tsx` rendert den Baustein mit der Quelldefinition aus
+  `stab/medienlageUebernahme.ts`; ihr Test bleibt grün.
 - `frontend/src/pages/LageberichtDetailPage.tsx`: Abschnitts-Editor fragt die Zuordnung statt
   `schluessel === 'medienlage'`.
 - Renderer `rendereMeldebildMarkdown` und `rendereFuehrungsorganisationMarkdown` bleiben

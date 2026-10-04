@@ -42,7 +42,8 @@ abgerufen, wenn `istKeyFreigegeben(<Modul>, freigaben)` sie freigibt (`einsatzab
 ### D1 Baustein und Quelldefinition getrennt
 
 `lageberichte/AbschnittUebernahme.tsx` ist die Bedienung: Knopf, Unterzeile, Rückfrage,
-`onGeaendert`, Hinweis bei Sperre. Er bekommt eine **Quelldefinition**:
+`onGeaendert`, Hinweis bei Sperre. Er bekommt eine **Quelldefinition**
+(`lageberichte/uebernahmeQuelle.ts`, dort auch der Listenabruf `ladeListe`):
 
 ```ts
 interface UebernahmeQuelle {
@@ -63,7 +64,8 @@ Der Baustein liest die Freigaben über dieselbe Abfrage wie `useStabFreigabe`
 ermittelbar“, `gesperrt` → Hinweis mit Grund, `frei` → Knopf.
 
 `lageberichte/uebernahmen.ts` hält die Zuordnung `UEBERNAHMEN: Record<schluessel, UebernahmeQuelle>`
-für die Vorlage `lagebericht`. Die Seite fragt `uebernahmeFuer(vorlage, schluessel)`; für andere
+für die Vorlage `lagebericht`; jede Quelle liegt in eigener Datei (Eigene Lage:
+`lageberichte/eigeneLageUebernahme.ts`). Die Seite fragt `uebernahmeFuer(vorlage, schluessel)`; für andere
 Vorlagen kommt `undefined`. So bleibt der Lagevortrag zur Entscheidung ohne Knopf, auch wenn ein
 Schlüssel dort später gleich hieße.
 
