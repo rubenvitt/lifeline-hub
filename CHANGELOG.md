@@ -1,3 +1,29 @@
+## [1.0.0-alpha.72](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.71...v1.0.0-alpha.72) (2026-10-04)
+
+### Wichtige Änderungen
+
+- **Datenmodell-Erweiterung**: Neue Datenbanktabellen für Führungsstelle und Kommunikationsplan erfordern automatische Migration beim Start
+
+### Führung
+
+- **Eigene Führungsstelle erfassen**: Die eigene Führungsstelle kann jetzt mit Rufname, Sprechgruppen, Kommunikationsmitteln und Erreichbarkeit in den Einsatzdaten gepflegt werden
+- **Führungsstelle in Funkplan und Fernmeldeskizze**: Die eigene Führungsstelle erscheint automatisch als erste Zeile im Funkplan und als Wurzelknoten in der Fernmeldeskizze
+- **Kommunikationsplan für S6**: Neue Unterseite im Stab zur Erfassung und Darstellung des Kommunikationsplans mit Stellen und Verbindungen, druckbar und offline lesbar
+- **Sprechgruppen-Darstellung im Funkplan**: Dritte Darstellungsvariante des Funkplans nach Sprechgruppen verfügbar
+- **Überfällige Lagebesprechungen einheitlich gekennzeichnet**: Erreichte oder verstrichene Besprechungstermine werden auf der Stab-Seite und im Führungsüberblick mit demselben Warnton und derselben Formulierung („jetzt fällig" / „überfällig seit…") angezeigt
+
+### Einsatztagebuch
+
+- **Echtzeit-Aktualisierung bei Abschluss und Wiederherstellen**: System-Einträge beim Einsatzabschluss, bei Änderung der Aufbewahrungsfrist und beim Wiederherstellen aus dem Archiv werden sofort auf allen offenen Einsatztagebuch-Ansichten sichtbar
+
+### Einsatzverwaltung
+
+- **Rollenwechsel in Echtzeit**: Änderungen der Einsatzrollen (z.B. von Beobachter zu Führungspersonal) werden sofort auf dem Bildschirm der betroffenen Person wirksam, ohne dass die Seite neu geladen werden muss
+
+### Lagekarte
+
+- **Schnellere Aktualisierung der Fachebenen**: Externe Datenquellen wie NINA-Warnungen, DWD-Unwetterwarnungen, Pegelstände, Hochwasserlagen, Luftqualität und Autobahnstörungen werden deutlich häufiger abgerufen und zeigen aktuellere Daten (Verbesserung von bis zu 20 Minuten je nach Quelle)
+
 ## [1.0.0-alpha.71](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.70...v1.0.0-alpha.71) (2026-10-03)
 
 ### Lagekarte
