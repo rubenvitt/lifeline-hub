@@ -13,6 +13,7 @@ import GeraeteLayout, {
   GeraetAufnahme,
   GeraetEinsatzRahmen,
   GeraetStart,
+  GeraetStelle,
   GeraetUhs,
 } from './geraet/GeraeteLayout';
 import GeraetPatientenPage from './geraet/GeraetPatientenPage';
@@ -234,6 +235,7 @@ export const appRouten = createRoutesFromElements(
           <Route path="patienten/:personId" element={<PersonenDetailPage />} />
           <Route path="aufnahme" element={<GeraetAufnahme />} />
           <Route path="uhs/:uhsId" element={<GeraetUhs />} />
+          <Route path="stelle" element={<GeraetStelle />} />
           <Route path="*" element={<GeraetStart />} />
         </Route>
         <Route path="*" element={<GeraetStart />} />

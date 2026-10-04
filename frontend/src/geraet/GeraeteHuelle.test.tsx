@@ -10,11 +10,19 @@ import { meHandler, server } from '../test/server';
 import { neuerQueryClient, setzeOnline } from '../test/utils';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
-import type { GeraetAnzeige, Person, PersonDetail, UhsDetail } from '../api/types';
+import type {
+  EinsatzMaterial,
+  GeraetAnzeige,
+  Meldung,
+  Person,
+  PersonDetail,
+  UhsDetail,
+} from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
+import { platzZahlen } from './GeraetStellePage';
 
 /**
  * Die Gerätehülle im echten Routenbaum (LFH-892, Spec `feldgeraet-bedienung`): Startseite,
@@ -285,6 +293,141 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
   });
 });
 
+describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
+  const laptop = geraet({ ansicht: 'uhs-laptop', bezeichnung: 'Laptop 1' });
+  const trage = {
+    id: 12,
+    einsatz_id: 7,
+    material_id: 5,
+    einheit_id: null,
+    ist_adhoc: false,
+    bezeichnung: 'Trage',
+    kategorie: 'Transport',
+    menge: 2,
+    bestandsnummer: null,
+    traegerorganisation: null,
+    status: 'einsatzbereit',
+    bemerkung: null,
+    uhs_id: 2,
+    disponiert_at: '2026-10-04 08:00:00',
+    disponiert_von: 1,
+  } as unknown as EinsatzMaterial;
+  const eigene = {
+    id: 40,
+    einsatz_id: 7,
+    lfd_nr: 4,
+    absender: 'UHS Nord · Laptop 1',
+    empfaenger: 'Einsatzleitung',
+    meldeweg: 'sonstige',
+    inhalt: 'Decken knapp',
+    meldungsart: 'sonstige',
+    prioritaet: 'dringend',
+    richtung: 'intern',
+    status: 'neu',
+    bearbeiter_id: null,
+    bearbeiter_name: null,
+    lagerelevant: false,
+    ereigniszeit: '2026-10-04 09:30:00',
+    eingang_at: '2026-10-04 09:30:00',
+    etb_meldung_id: 8,
+    auftrag_id: 3,
+    erfasst_von_id: 50,
+    erstellt_at: '2026-10-04 09:30:00',
+    lage_meldung_id: null,
+    ist_offen: true,
+    erledigt_at: null,
+    bestaetigung_pflicht: false,
+    bestaetigung_frist_at: null,
+    eskaliert: false,
+    bestaetigt_at: null,
+    bestaetigt_von_id: null,
+    bestaetigt_von_name: null,
+    ist_bestaetigt: false,
+  } as unknown as Meldung;
+
+  function laptopBereit() {
+    stelleBereit(laptop);
+    const materialListe = vi.fn();
+    const gesendet: unknown[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/uhs/2', () => HttpResponse.json({ ...uhs, material: [trage] })),
+      http.get('/api/einsaetze/7/material', () => {
+        materialListe();
+        return HttpResponse.json([], { status: 403 });
+      }),
+      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([eigene])),
+      http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({ ...eigene, id: 41, lfd_nr: 5 }, { status: 201 });
+      }),
+    );
+    return { materialListe, gesendet };
+  }
+
+  it('Navigation mit „UHS“; der Grundriss lässt Plätze bearbeiten, aber nicht den Status', async () => {
+    vi.useRealTimers();
+    laptopBereit();
+    renderApp('/geraet/7/uhs/2');
+    expect(await screen.findByRole('heading', { level: 1, name: /UHS Nord/ })).toBeVisible();
+    const nav = screen.getByRole('navigation', { name: 'Gerätenavigation' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((l) => l.textContent),
+    ).toEqual(['Patienten', 'Aufnahme', 'Grundriss', 'UHS']);
+    expect(await screen.findByRole('button', { name: 'Plätze bearbeiten' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Auflösen' })).toBeNull();
+    // Material und Dateien stehen im Bereich „UHS“, nicht unter dem Grundriss.
+    expect(screen.queryByRole('tablist')).toBeNull();
+  });
+
+  it('Plätze in Zahlen, Material der UHS nur lesend und ohne die Einsatzliste', async () => {
+    vi.useRealTimers();
+    const { materialListe } = laptopBereit();
+    renderApp('/geraet/7/stelle');
+    expect(await screen.findByRole('heading', { level: 1, name: 'UHS' })).toBeVisible();
+    const zahlen = await screen.findByRole('group', { name: 'Plätze in Zahlen' });
+    expect(within(zahlen).getByText('Frei')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Grundriss bearbeiten' })).toBeVisible();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Material' }));
+    expect(await screen.findByText('Trage')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Lösen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Material zuordnen' })).toBeNull();
+    expect(materialListe).not.toHaveBeenCalled();
+  });
+
+  it('Meldung an die Einsatzleitung: Absender ist die Stelle, die eigenen stehen darunter', async () => {
+    vi.useRealTimers();
+    const { gesendet } = laptopBereit();
+    renderApp('/geraet/7/stelle');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Meldungen' }));
+    expect(await screen.findByText('Decken knapp')).toBeVisible();
+    // Ein Auftrag zur Meldung ist kein Sprung für das Gerät.
+    expect(screen.queryByRole('link', { name: /Auftrag/ })).toBeNull();
+
+    await user.type(screen.getByLabelText('Inhalt'), 'Zwei Tragen frei');
+    await user.click(screen.getByRole('radio', { name: 'dringend' }));
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      absender: 'UHS Nord · Laptop 1',
+      empfaenger: 'Einsatzleitung',
+      inhalt: 'Zwei Tragen frei',
+      prioritaet: 'dringend',
+    });
+    await waitFor(() => expect(screen.getByLabelText('Inhalt')).toHaveValue(''));
+  });
+
+  it('das Tablet hat keinen Bereich „UHS“', async () => {
+    stelleBereit();
+    const router = renderApp('/geraet/7/stelle');
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/patienten'));
+  });
+});
+
 describe('Bausteine', () => {
   it('kopplungEndetBald: unter einer Stunde bald, ab einer Stunde nicht', () => {
     expect(kopplungEndetBald('2026-10-04 10:59:00', JETZT)).toBe(true);
@@ -295,5 +438,26 @@ describe('Bausteine', () => {
     expect(ortInDerUhs(wartend, uhs)).toBe('Wartebereich');
     expect(ortInDerUhs({ ...wartend, aktueller_platz_id: 30 }, uhs)).toBe('Liege 1');
     expect(ortInDerUhs(ausgetreten, uhs)).toBe('KH Mitte');
+  });
+
+  it('platzZahlen: belegt vor Verfügbarkeit, Wartebereich und stornierte zählen nicht', () => {
+    const p = uhs.plaetze[0];
+    const mit: UhsDetail = {
+      ...uhs,
+      plaetze: [
+        p,
+        { ...p, id: 31, verfuegbarkeit: 'defekt' },
+        { ...p, id: 32, verfuegbarkeit: 'aufbereitung' },
+        { ...p, id: 33 },
+        { ...p, id: 34, typ: 'wartebereich' },
+        { ...p, id: 35, storniert_at: '2026-10-04 09:00:00' },
+      ],
+    };
+    expect(platzZahlen(mit, new Set([30, 32]))).toEqual({
+      gesamt: 4,
+      belegt: 2,
+      frei: 1,
+      nichtVerfuegbar: 1,
+    });
   });
 });

@@ -29,7 +29,7 @@ nach den Subtasks, die nach der Freigabe auf dem Board angelegt werden; Reihenfo
 ## 3. UHS-Laptop — LFH-1025
 
 - [x] 3.1 Server: Plätze, Stammdaten und Anhänge der eigenen UHS, Material der eigenen UHS lesen, Meldungen anlegen und eigene lesen; Status und Stornieren bleiben 403; verifiziert durch Tests je Zeile der Matrix (Laptop gegen Tablet)
-- [ ] 3.2 Ansicht UHS-Laptop mit Bereich „UHS“ (Grundriss bearbeiten, Material, Meldungen); verifiziert durch Komponententests und einen e2e-Lauf bei 1366 × 768
+- [x] 3.2 Ansicht UHS-Laptop mit Bereich „UHS“ (Grundriss bearbeiten, Material, Meldungen); verifiziert durch Komponententests und einen e2e-Lauf bei 1366 × 768
 
 ## 4. Lagemonitor — LFH-1026
 

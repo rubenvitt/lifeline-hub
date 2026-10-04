@@ -920,5 +920,10 @@ export function geraetUhsPfad(einsatzId: number, uhsId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/uhs/${uhsId}`;
 }
 
+/** Bereich „UHS“ des UHS-Laptops: Plätze, Material, Meldungen, Dateien der eigenen UHS. */
+export function geraetStellePfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/stelle`;
+}
+
 /** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
 export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';

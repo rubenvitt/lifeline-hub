@@ -3,7 +3,7 @@ import { theme } from 'antd';
 import { Navigate, NavLink, Outlet, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import type { GeraetAnzeige } from '../api/types';
-import { IconKachelraster, IconPersonPlus, IconPersonen, type Icon } from '../icons';
+import { IconHausHerz, IconKachelraster, IconPersonPlus, IconPersonen, type Icon } from '../icons';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
@@ -11,13 +11,16 @@ import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
 import {
   geraetAufnahmePfad,
   geraetPatientenPfad,
+  geraetStellePfad,
   geraetUhsPfad,
   parseRouteId,
 } from '../routing/deeplinks';
 import { rahmenFarben } from '../theme/tokens';
 import AufnahmePage from '../pages/personen/AufnahmePage';
 import UhsDetailPage from '../pages/uhs/UhsDetailPage';
+import GeraetStellePage from './GeraetStellePage';
 import { GeraeteKopf } from './GeraeteKopf';
+import { geraetDarf } from './geraetSicht';
 
 /** Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS. */
 export function geraetStartPfad(geraet: GeraetAnzeige): string {
@@ -60,6 +63,15 @@ export function GeraetUhs() {
   return <UhsDetailPage />;
 }
 
+/** Bereich „UHS“ nur für die Ansicht, die Material und Dateien ihrer UHS führt (UHS-Laptop). */
+export function GeraetStelle() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.uhs_id == null || !geraetDarf(geraet, 'uhs-material')) {
+    return <GeraetStart />;
+  }
+  return <GeraetStellePage />;
+}
+
 function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: ReactNode }) {
   const { token } = theme.useToken();
   return (
@@ -90,7 +102,7 @@ function NavZiel({ zu, Icon, children }: { zu: string; Icon: Icon; children: Rea
 
 /**
  * Feste Navigation am unteren Rand, in Daumenreichweite (Spec `feldgeraet-bedienung`): Patienten,
- * Aufnahme, Grundriss. Der UHS-Laptop erweitert sie um „UHS“ (LFH-1025).
+ * Aufnahme, Grundriss; der UHS-Laptop zusätzlich „UHS“ mit Plätzen, Material und Meldungen.
  */
 function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   const eid = geraet.einsatz_id;
@@ -117,6 +129,11 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
           <NavZiel zu={geraetUhsPfad(eid, uhsId)} Icon={IconKachelraster}>
             Grundriss
           </NavZiel>
+          {geraetDarf(geraet, 'uhs-material') && (
+            <NavZiel zu={geraetStellePfad(eid)} Icon={IconHausHerz}>
+              UHS
+            </NavZiel>
+          )}
         </>
       )}
     </nav>

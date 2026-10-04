@@ -51,16 +51,18 @@ export default function UhsDetailPage() {
   // Person ist alles frei. Die Wege führen in die Oberfläche, aus der man kommt.
   const darf = useGeraetDarf();
   const pfade = useEinsatzPfade();
+  // Am Gerät stehen Material und Dateien im Bereich „UHS“ des Laptops (`geraet/GeraetStellePage`),
+  // nicht unter dem Grundriss; hier bleibt dort nur der Verlauf.
+  const { benutzer, geraet } = useAuth();
   const reiterListe: Reiter[] = [
-    ...(darf('uhs-material') ? (['material'] as const) : []),
+    ...(!geraet && darf('uhs-material') ? (['material'] as const) : []),
     'bewegungen',
     // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
-    ...(darf('uhs-anhaenge') ? (['dateien'] as const) : []),
+    ...(!geraet && darf('uhs-anhaenge') ? (['dateien'] as const) : []),
   ];
   // Material/Bewegungen als Segmentleiste; nur das aktive Feld ist gebaut.
   const [reiter, setReiter] = useState<Reiter>(reiterListe[0]);
   const reiterFeld = useId();
-  const { benutzer } = useAuth();
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
   const listenPfad = unfallhilfsstellenListePfad(einsatzId);

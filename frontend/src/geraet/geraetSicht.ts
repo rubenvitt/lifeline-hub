@@ -1,4 +1,4 @@
-import { useAuth } from '../auth/AuthContext';
+import { useAuthOptional } from '../auth/AuthContext';
 import type { GeraetAnzeige } from '../api/types';
 
 /**
@@ -27,12 +27,13 @@ export type GeraetFaehigkeit =
 
 export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehigkeit): boolean {
   if (!geraet) return true;
-  // Der UHS-Laptop (Subtask LFH-1025) erweitert diese Liste; bis dahin gilt die Matrix des Tablets.
   switch (faehigkeit) {
+    // Der UHS-Laptop pflegt Grundriss und Dateien seiner UHS und liest ihr Material (LFH-1025).
     case 'grundriss-bearbeiten':
-    case 'uhs-verwalten':
     case 'uhs-material':
     case 'uhs-anhaenge':
+      return geraet.ansicht === 'uhs-laptop';
+    case 'uhs-verwalten':
     case 'person-status':
     case 'person-zuordnungen':
     case 'person-anhaenge':
@@ -41,8 +42,9 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
   }
 }
 
-/** {@link geraetDarf} für die Sitzung dieses Tabs. */
+/** {@link geraetDarf} für die Sitzung dieses Tabs. Ohne `AuthProvider` (Komponententests einer
+ *  geteilten Fläche) gibt es kein Gerät. */
 export function useGeraetDarf(): (faehigkeit: GeraetFaehigkeit) => boolean {
-  const { geraet } = useAuth();
+  const geraet = useAuthOptional()?.geraet ?? null;
   return (faehigkeit) => geraetDarf(geraet, faehigkeit);
 }
