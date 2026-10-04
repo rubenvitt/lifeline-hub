@@ -1,6 +1,6 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): `GET`/`PATCH
 //! /api/einsaetze/{id}/fuehrungsstelle`. Spec `einsatz-fuehrungsstelle`, Herleitung
-//! `openspec/changes/lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3, D6).
+//! `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3, D6).
 //!
 //! Nicht verwechseln mit `tests/fuehrungsstelle.rs`: dort die Führungsstelle je Person
 //! (`einsatz_mitgliedschaft.fuehrungsstelle`, LFH-461).

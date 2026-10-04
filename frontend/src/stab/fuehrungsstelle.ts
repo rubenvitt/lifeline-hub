@@ -5,7 +5,7 @@ import type { Fuehrungsstelle } from '../api/types';
  * Die eigene Führungsstelle (LFH-849) als Quelle des Funkplans und der Fernmeldeskizze. Anders als
  * die Listen eine einzelne Angabe; `daten` ist `null`, solange sie nicht geladen ist.
  *
- * Herleitung: `openspec/changes/lfh-849-eigene-fuehrungsstelle/design.md` (D4, D5).
+ * Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D4, D5).
  */
 export interface FuehrungsstelleQuelle {
   zustand: AbrufZustand;

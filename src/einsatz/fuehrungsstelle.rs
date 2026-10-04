@@ -5,7 +5,7 @@
 //! Führungsstelle als nicht erfasst und der Abruf liefert alle Angaben leer. Nicht zu verwechseln
 //! mit `einsatz_mitgliedschaft.fuehrungsstelle` (Freitext je Person, LFH-461).
 //!
-//! Herleitung: `openspec/changes/lfh-849-eigene-fuehrungsstelle/design.md` (D2).
+//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2).
 
 use crate::error::AppError;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};

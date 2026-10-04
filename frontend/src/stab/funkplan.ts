@@ -29,7 +29,7 @@ import {
  * Fahrzeug und Personal (Migrationen 0047/0073/0086) und an der eigenen Führungsstelle (0145).
  *
  * Herleitung: `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md` (D3, D6),
- * Führungsstelle: `openspec/changes/lfh-849-eigene-fuehrungsstelle/design.md` (D4).
+ * Führungsstelle: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D4).
  */
 
 export type FunkplanArt = 'fuehrungsstelle' | 'abschnitt' | 'einheit' | 'fahrzeug' | 'sammel';

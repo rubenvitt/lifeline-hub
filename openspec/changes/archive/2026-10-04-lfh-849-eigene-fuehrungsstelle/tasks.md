@@ -94,5 +94,9 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
 - [x] 6.2 e2e `e2e/funkplan.spec.ts`: Führungsstelle auf Einsatzdaten erfassen, Funkplan zeigt sie
   als erste Zeile; Druckpfad (`beforeprint`) enthält die Zeile samt Erreichbarkeit; Übernahme ohne
   Erreichbarkeit. Nachweis: Spec grün, Gate-1-Routen unverändert grün.
-- [ ] 6.3 `./scripts/check-all.sh` grün, dazu Vitest und Rust-Tests vollständig. Nachweis: Lauf
+- [x] 6.3 `./scripts/check-all.sh` grün, dazu Vitest und Rust-Tests vollständig. Nachweis: Lauf
   ohne Fehler (Kästchen mit Verweis auf diesen Lauf bzw. die CI des PRs abhaken).
+  Lauf 04.10.2026 (Cloud-Sitzung, nur Chromium): Schritte 1–3, 5, 6, 8–13 grün; Rust-Workspace
+  grün, die Desktop-Hülle baut hier nicht (GTK fehlt). e2e: die Funkplan-Specs grün; zwölf
+  Layout-Specs (`fokus-verdeckung`, `leisten-flaeche`, `etb-chronologie`, `stab-vorbereitung`)
+  sind mit dem hiesigen Browser auch auf `alpha` rot, die Wahrheit ist die CI des PRs.

@@ -3,7 +3,7 @@
 //!
 //! Lesen mit dem Einsatz (kein Modul), Schreiben mit den Rechten der Kopfdaten. Eine Änderung
 //! meldet das Ereignis `einsatz` über `routes::einsatz::kopf_geaendert` (Spec `einsatzkopf-live`).
-//! Herleitung: `openspec/changes/lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3).
+//! Herleitung: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3).
 
 use crate::app::AppState;
 use crate::einsatz::fuehrungsstelle::{self, FuehrungsstelleAnzeige, FuehrungsstellePatch};

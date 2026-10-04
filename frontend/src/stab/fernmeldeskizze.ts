@@ -25,7 +25,7 @@ import { verbindungsurteil, type Kante } from './luecken';
  *   Erreichbarkeit; nicht erfasst oder nicht geladen nennt sie den Grund.
  *
  * Herleitung: `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` (D2, D3),
- * Führungsstelle: `openspec/changes/lfh-849-eigene-fuehrungsstelle/design.md` (D5).
+ * Führungsstelle: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D5).
  */
 
 export type SkizzenKnoten =

@@ -6,7 +6,7 @@
 -- M:N-Zuordnung; `erreichbarkeit` ist personenbezogen und wird geschwärzt
 -- (`einsatz::schwaerzung_registry`).
 --
--- Herleitung: openspec/changes/lfh-849-eigene-fuehrungsstelle/design.md (D2).
+-- Herleitung: openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md (D2).
 CREATE TABLE einsatz_fuehrungsstelle (
     einsatz_id           INTEGER PRIMARY KEY REFERENCES einsatz(id) ON DELETE CASCADE,
     rufname              TEXT,
