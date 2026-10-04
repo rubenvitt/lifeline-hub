@@ -1,6 +1,6 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { monoStil, useRollen } from '../components/instrument';
-import { kartenKante } from './kartenKante';
+import { kartenGrund, kartenKante } from './kartenKante';
 
 type Hueller = Omit<HTMLAttributes<HTMLElement>, 'children' | 'style'>;
 
@@ -12,6 +12,13 @@ type Hueller = Omit<HTMLAttributes<HTMLElement>, 'children' | 'style'>;
  * `unbearbeitet` vor nichts ({@link kartenKante}). Zusätzlich als `data-alarm` /
  * `data-unbearbeitet` prüfbar. Das Etikett bleibt davon unberührt. Eine alarmierte Karte steht
  * außerdem auf der getönten Alarmfläche.
+ *
+ * Deeplink-Hervorhebung (LFH-896, Spec `deeplink-hervorhebung`): dieselbe Form wie Datensicht und
+ * Zeitachse (`index.css`, `.zeile-hervorgehoben`) — Fläche `bedienFlaeche` und je eine 2-px-Linie
+ * oben und unten in `bedien`, als `inset`-Schatten innerhalb des Rahmens, damit die Statuskante
+ * links stehen bleibt und die Karte beim Sprung nicht wächst. Kein umlaufender Ring: das ist die
+ * Form des Fokusrings. Gefahr gewinnt: eine alarmierte Karte behält ihre Fläche
+ * ({@link kartenGrund}), die Markierung legt nur die Linien darüber.
  */
 export default function KommKarte({
   alarm = false,
@@ -25,7 +32,7 @@ export default function KommKarte({
 }: Hueller & {
   alarm?: boolean;
   unbearbeitet?: boolean;
-  /** Deeplink-Hervorhebung (`?meldung=` / `?auftrag=`): Ring in Bedienfarbe. */
+  /** Deeplink-Hervorhebung (`?meldung=` / `?auftrag=`): Bedienfläche plus Ober-/Unterlinie. */
   hervorgehoben?: boolean;
   /** Zeitspalte links (Zeitachsen-Optik) — ohne sie beginnt die Karte mit dem Inhalt. */
   zeit?: ReactNode;
@@ -47,11 +54,13 @@ export default function KommKarte({
         alignItems: 'stretch',
         minWidth: 0,
         marginBottom: token.marginXS,
-        background: alarm ? rollen.alarmFlaeche : rollen.paneel,
+        background: kartenGrund(rollen, { alarm, hervorgehoben }),
         border: `1px solid ${rollen.linie}`,
         borderInlineStart: `3px solid ${kante.farbe}`,
         borderRadius: 0,
-        boxShadow: hervorgehoben ? `0 0 0 2px ${rollen.bedien}` : undefined,
+        boxShadow: hervorgehoben
+          ? `inset 0 2px 0 ${rollen.bedien}, inset 0 -2px 0 ${rollen.bedien}`
+          : undefined,
         color: rollen.text,
         ...style,
       }}

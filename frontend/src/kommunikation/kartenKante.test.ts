@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { farbenDunkel } from '../theme/tokens';
-import { kartenKante, phaseTon, prioTon } from './kartenKante';
+import { kartenGrund, kartenKante, phaseTon, prioTon } from './kartenKante';
 
 describe('kartenKante — der linke Rand trägt EINE Farbe, Gefahr gewinnt', () => {
   it('Alarm schlägt den Eingangszustand', () => {
@@ -22,6 +22,26 @@ describe('kartenKante — der linke Rand trägt EINE Farbe, Gefahr gewinnt', () 
       zustand: 'keine',
       farbe: farbenDunkel.linie,
     });
+  });
+});
+
+describe('kartenGrund — Gefahr gewinnt auch gegen die Deeplink-Markierung (LFH-896)', () => {
+  it('eine alarmierte Karte bleibt angesprungen auf der Alarmfläche', () => {
+    expect(kartenGrund(farbenDunkel, { alarm: true, hervorgehoben: true })).toBe(
+      farbenDunkel.alarmFlaeche,
+    );
+  });
+
+  it('eine angesprungene Karte ohne Alarm steht auf der Bedienfläche', () => {
+    expect(kartenGrund(farbenDunkel, { alarm: false, hervorgehoben: true })).toBe(
+      farbenDunkel.bedienFlaeche,
+    );
+  });
+
+  it('ohne beides steht das Paneel', () => {
+    expect(kartenGrund(farbenDunkel, { alarm: false, hervorgehoben: false })).toBe(
+      farbenDunkel.paneel,
+    );
   });
 });
 
