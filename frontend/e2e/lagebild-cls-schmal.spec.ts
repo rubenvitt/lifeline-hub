@@ -99,8 +99,11 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge) {
   let loslassen!: () => void;
   const tor = new Promise<void>((f) => (loslassen = f));
   const kopf = `/api/einsaetze/${einsatzId}`;
+  // Die Modulfreigaben gehören wie der Kopf zum Rahmen: bis sie antworten, wartet der Modulwächter
+  // (LFH-888) und die Seite rendert noch nicht. Gehalten werden die Abfragen der Seite.
+  const rahmen = (pfad: string) => pfad === kopf || pfad === `${kopf}/modul-freigaben`;
   const haelt = (pfad: string) =>
-    folge === 'Einsatz zuerst' ? pfad !== kopf : folge === 'Einsatz zuletzt' && pfad === kopf;
+    folge === 'Einsatz zuerst' ? !rahmen(pfad) : folge === 'Einsatz zuletzt' && pfad === kopf;
   let gehalten = 0;
   await page.route(new RegExp(`/api/einsaetze/${einsatzId}(?:[/?]|$)`), async (route) => {
     const anfrage = route.request();
