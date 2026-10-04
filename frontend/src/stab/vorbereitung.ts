@@ -72,7 +72,8 @@ function fehlt(
   return { wert: '—', notiz: ZUSTAND_GRUND[zustand] };
 }
 
-function ausKennzahl(
+/** Wert und Notiz einer Kennzahl des Lagebilds, wie Dashboard und Vorbereitung sie zeigen. */
+export function ausKennzahl(
   lagebild: Lagebild,
   etikett: KennzahlEtikett,
 ): Pick<VorbereitungsZeile, 'wert' | 'notiz'> {
@@ -82,12 +83,24 @@ function ausKennzahl(
   return { wert: k.einheit ? `${k.wert} ${k.einheit}` : k.wert, notiz: k.notiz || null };
 }
 
-function sichtungText(sk: Lagebild['sk']): string {
+/** Die Sichtung im Wortlaut der Vorbereitung (auch Lagevortrag, LFH-869). */
+export function sichtungText(sk: Lagebild['sk']): string {
   const teile = (['sk1', 'sk2', 'sk3', 'sk4'] as const).map((k) => `${SK_META[k].label} ${sk[k]}`);
   if (sk.tot > 0) teile.push(`${SK_META.tot.label} ${sk.tot}`);
   if (sk.unverletzt > 0) teile.push(`${SK_META.unverletzt.label} ${sk.unverletzt}`);
   teile.push(`${SK_WORT.ohne} ${sk.ohne}`);
   return teile.join(' · ');
+}
+
+/** Höchste Warnstufe mit der Zahl der Gebiete (auch Lagevortrag, LFH-869). */
+export function warnstufeAngabe(l: Lagebild): Pick<VorbereitungsZeile, 'wert' | 'notiz'> {
+  return {
+    wert: warnstufeKennzahl[l.hoechsteWarnstufe].label,
+    notiz:
+      l.gebieteMitWarnstufe === 1
+        ? '1 Gebiet mit Warnstufe'
+        : `${l.gebieteMitWarnstufe} Gebiete mit Warnstufe`,
+  };
 }
 
 function ausZaehler<T>(
@@ -150,13 +163,7 @@ export function vorbereitungsZeilen(
     zeile('kraefte', 'Kräfte', 'kraefteuebersicht', q.zustand.kraefte, (l) =>
       ausKennzahl(l, 'Kräfte'),
     ),
-    zeile('warnstufe', 'Höchste Warnstufe', 'gefahren', q.zustand.gefahren, (l) => ({
-      wert: warnstufeKennzahl[l.hoechsteWarnstufe].label,
-      notiz:
-        l.gebieteMitWarnstufe === 1
-          ? '1 Gebiet mit Warnstufe'
-          : `${l.gebieteMitWarnstufe} Gebiete mit Warnstufe`,
-    })),
+    zeile('warnstufe', 'Höchste Warnstufe', 'gefahren', q.zustand.gefahren, warnstufeAngabe),
     {
       schluessel: 'auftraege',
       titel: 'Aufträge offen',

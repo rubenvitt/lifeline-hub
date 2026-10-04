@@ -1,6 +1,16 @@
 import type { Meldung } from '../api/types';
 import { MELDUNG_STATUS, istAbgeschlossen } from '../kommunikation';
 
+/** Anzeigename je Meldungsart (Karte und Lagevortrag, LFH-871). */
+export const MELDUNGSART_LABEL: Record<string, string> = {
+  lagemeldung: 'Lagemeldung',
+  sofortmeldung: 'Sofortmeldung',
+  rueckmeldung: 'Rückmeldung',
+  vollzugsmeldung: 'Vollzugsmeldung',
+  anfrage: 'Anfrage',
+  sonstige: 'Sonstige',
+};
+
 /**
  * Alarmzustand einer Meldung — dieselbe Regel wie der rote Rand von `MeldungKarte`:
  * bestätigungspflichtige, unbestätigte Sofortmeldung, deren Frist abgelaufen oder die eskaliert
