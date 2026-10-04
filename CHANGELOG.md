@@ -1,3 +1,19 @@
+## [1.0.0-alpha.73](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.72...v1.0.0-alpha.73) (2026-10-04)
+
+### Lagekarte
+
+- Freie Zonen und freie taktische Zeichen können jetzt farblos angelegt werden – die Anwendung zeigt dann eine einheitliche Vorgabefarbe an
+- Farbdarstellung im gesamten Kartenmodul vereinheitlicht (Zeichenwerkzeuge, Symbolpalette, Zonenstile)
+
+### Führung
+
+- Das Lage-Dashboard wird jetzt automatisch aktualisiert, sobald sich Lagekennzahlen ändern (z. B. beim Festlegen eines Pegels oder beim Anordnen einer Evakuierung) – ein manuelles Neuladen der Ansicht ist nicht mehr erforderlich
+- Änderungen, die keine Lagekennzahlen beeinflussen (z. B. Standmeldungen, Prognosen, zweiter Pegel in derselben Kategorie), lösen keine unnötige Aktualisierung mehr aus
+
+### Betrieb und Installation
+
+- Alle HTTP-Antworten der Anwendung (JSON-Daten, Kartenhintergrundbilder, Fehlerseiten) enthalten jetzt den Sicherheits-Header `X-Content-Type-Options: nosniff` zum Schutz vor MIME-Type-Sniffing-Angriffen
+
 ## [1.0.0-alpha.72](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.71...v1.0.0-alpha.72) (2026-10-04)
 
 ### Wichtige Änderungen
