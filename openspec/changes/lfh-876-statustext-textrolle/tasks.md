@@ -16,5 +16,5 @@
 ## 3. Regel und Gesamtlauf
 
 - [x] 3.1 `frontend/AGENTS.md`, Eintrag „Geerbter Text auf Textrollen“: Warn- und Erfolgstext (`Typography` `warning`/`success`) liest `achtungText`/`normalText` über `colorWarningText`/`colorSuccessText` in `antdToken`, neben dem roten Fehlertext; die Füllfarben bleiben. Prüfen: Prettier über `frontend/` grün, Stil der Nachbareinträge
-- [ ] 3.2 Übrige Kontrast-Specs gegen die neuen Tokens laufen lassen (`hellmodus-`, `betroffene-`, `hinweis-`, `lagekarte-ebenen-kontrast.spec.ts` und der rote Fehlertext-Spec). Prüfen: grün; liegt etwas unter dem Boden, als Nachzug erfassen und die Nummer hier eintragen
-- [ ] 3.3 `./scripts/check-all.sh` grün (bzw. die Bündel, die in der Umgebung laufen; der volle Lauf wird mit der CI des PRs belegt)
+- [x] 3.2 Übrige Kontrast-Specs gegen die neuen Tokens laufen lassen (`hellmodus-`, `betroffene-`, `hinweis-`, `lagekarte-ebenen-kontrast.spec.ts` und der rote Fehlertext-Spec). Prüfen: grün; liegt etwas unter dem Boden, als Nachzug erfassen und die Nummer hier eintragen. **Ergebnis:** `hellmodus-`, `betroffene-`, `hinweis-`, `lagekarte-ebenen-`, `gefahr-`, `kraefte-`, `stab-kontrast.spec.ts` 30/30 grün (chromium); kein Nachzug nötig. Der rote Fehlertext-Spec läuft nach dem Merge aus 0.1 mit
+- [ ] 3.3 `./scripts/check-all.sh` grün (bzw. die Bündel, die in der Umgebung laufen; der volle Lauf wird mit der CI des PRs belegt). **Zwischenstand vor 0.1:** Bündel `schnell` 10/10 grün, Vitest voll 9500/9500 grün
