@@ -19,6 +19,12 @@
     display: none !important;
   }
 
+  /* Die Standzeile der Zufluss-Schleuse (LFH-867) ist Bildschirmzustand: im Druck gilt der
+     Live-Stand, „Live pausiert“ und der Sammelbanner hätten keinen Sinn auf dem Papier. */
+  .haengender-baum [data-lfh='org-stand'] {
+    display: none !important;
+  }
+
   /* `druck.css` hält jede Liste zusammen. Eine lange Spalte ist aber eine verschachtelte Liste
      und schöbe sonst ganze Seiten leer vor sich her: hier bricht die Liste, der Knoten nicht. */
   .haengender-baum [data-lfh='org-ebene1'] ul {
