@@ -49,10 +49,16 @@ Der Wächter sitzt in `EinsatzRahmen` an der Stelle des `<Outlet>`. Ist
 `aktuellesModul && istModulGesperrt(aktuellesModul, freigaben)`, steht dort `<ModulGesperrt>`
 statt `<Outlet>`. Rail, Panel, Kopfleiste und Banner bleiben, und der Benutzer kann weiter.
 
-- Die Lesart ist die der Navigation (`istModulGesperrt`): unbekannt heißt offen. Solange die
-  Freigaben laden oder scheitern, rendert die Seite wie heute. Ihr eigener 403-Zustand bleibt als
-  Netz. Würde der Wächter bei unbekannten Freigaben sperren, blitzte er bei jedem Einsatzstart
-  auf. Würde er warten, verzögerte er jede Modulseite um einen Abruf.
+- Die Lesart ist die der Navigation (`istModulGesperrt`): unbekannt heißt offen. Scheitert der
+  Abruf der Freigaben oder ruht er ohne Netz, rendert die Seite wie heute, und ihr eigener
+  403-Zustand bleibt das Netz. Würde der Wächter bei unbekannten Freigaben sperren, blitzte er
+  bei jedem Einsatzstart auf.
+- **Nachtrag (Umsetzung, e2e-Befund):** Solange die Freigaben laden, wartet der Rahmen mit einem
+  Ladeskelett. Ursprünglich sollte die Seite währenddessen rendern, weil Warten jede Modulseite
+  um einen Abruf verzögere. Der e2e-Lauf zeigte die Folge: Beim Kaltstart per Deeplink rendert
+  die Seite vor der Antwort und schickt ihre Listen-Anfrage an das gesperrte Modul, erst danach
+  greift der Wächter. Das Warten kostet nur den ersten Aufruf eines Einsatzes, danach liegen die
+  Freigaben im Cache. `einsatzdaten` und `einsatz-einstellungen` warten nicht.
 - `sichtbar: false, zugriff: true` (System-Admin in einem ausgeblendeten Modul) passiert. Das
   folgt der Spec: das Modul ist für ihn erreichbar, nur nicht in der Navigation.
 - `einsatzdaten` und `einsatz-einstellungen` sind nie gesperrt. Damit bleiben auch

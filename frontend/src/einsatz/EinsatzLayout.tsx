@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 import {
   erstesFreigegebenesModul,
   freiesRueckwegModul,
+  istModulAusblendbar,
   istModulGesperrt,
   kategorien,
   modulAusPfad,
@@ -40,7 +41,7 @@ import {
   Wortmarke,
   kopfZelleStil,
 } from '../components/Kopfleiste';
-import { SeitenSackgasse } from '../components/SeitenZustand';
+import { SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
@@ -441,9 +442,18 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} freigaben={modulFreigaben} />
             {/* Modulwächter (LFH-888, Spec `modul-freigabe`, design.md D1): meldet der Server für
                das Modul der Route `zugriff: false`, steht der Hinweis an der Stelle der Seite —
-               auch für Unterrouten (`modulAusPfad`). Lesart der Navigation: unbekannte Freigaben
-               (Laden, Fehler) sperren nicht, dann bleibt der 403-Zustand der Seite das Netz. */}
-            {aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
+               auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
+               Rahmen (sonst ginge beim Kaltstart die Anfrage der Seite an ein gesperrtes Modul
+               raus); Einsatzdaten und Einstellungen sind nie gesperrt und warten nicht. Ein
+               gescheiterter oder pausierter Abruf (offline) sperrt nicht, dann bleibt der
+               403-Zustand der Seite das Netz. */}
+            {aktuellesModul &&
+            istModulAusblendbar(aktuellesModul.key) &&
+            modulFreigabenQuery.isLoading ? (
+              <div data-testid="modulwaechter-laedt">
+                <SeitenSkeleton />
+              </div>
+            ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
               <GesperrtesModul
                 einsatzId={einsatzId}
                 modul={aktuellesModul}

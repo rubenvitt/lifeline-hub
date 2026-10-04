@@ -22,52 +22,56 @@ interface Props {
  * des 403-Zustands der jeweiligen Seite.
  *
  * Form wie `components/Platzhalter.tsx`: ein schmales Paneel, Info statt Rot (eine Sperre ist keine
- * Gefahr), der Rückweg als EINE Primäraktion. Anders als dort trägt der Modulname das `h1`: die
+ * Gefahr), der Rückweg als EINE Primäraktion. Anders als dort trägt der Modulname das `h1`, über dem Paneel: die
  * Modulseite, die sonst den Seitentitel stellt, wird nicht gerendert.
  */
 export default function ModulGesperrt({ modul, ausgeblendet, rueckweg }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
   return (
-    <Paneel
-      titel={KEINE_BERECHTIGUNG}
+    <div
       style={{
         maxWidth: flaeche.seiteSchmal,
         marginInline: 'auto',
         marginBlockStart: token.marginLG,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: token.marginSM,
       }}
-      koerperPolster
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
-        <h1
-          style={{
-            ...schriftStil('seitentitel'),
-            margin: 0,
-            color: rollen.text,
-            display: 'flex',
-            alignItems: 'center',
-            gap: token.marginXS,
-          }}
-        >
-          <IconSchloss aria-hidden />
-          {modul.label}
-        </h1>
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
-          {ausgeblendet
-            ? `„${modul.label}“ ist in diesem Einsatz ausgeblendet.`
-            : `„${modul.label}“ ist für deine Rolle in diesem Einsatz nicht freigegeben.`}
-        </p>
-        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}>
-          Freigaben legt die Einsatzleitung unter Einstellungen › Module fest.
-        </p>
-        {rueckweg && (
-          <div>
-            <Button type="primary" onClick={() => void navigate(rueckweg.pfad)}>
-              {rueckweg.label}
-            </Button>
-          </div>
-        )}
-      </div>
-    </Paneel>
+      {/* Das h1 steht vor dem Paneel: dessen Überschrift ist ein h2, die Gliederung beginnt oben. */}
+      <h1
+        style={{
+          ...schriftStil('seitentitel'),
+          margin: 0,
+          color: rollen.text,
+          display: 'flex',
+          alignItems: 'center',
+          gap: token.marginXS,
+        }}
+      >
+        <IconSchloss aria-hidden />
+        {modul.label}
+      </h1>
+      <Paneel titel={KEINE_BERECHTIGUNG} koerperPolster>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
+            {ausgeblendet
+              ? `„${modul.label}“ ist in diesem Einsatz ausgeblendet.`
+              : `„${modul.label}“ ist für deine Rolle in diesem Einsatz nicht freigegeben.`}
+          </p>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}>
+            Freigaben legt die Einsatzleitung unter Einstellungen › Module fest.
+          </p>
+          {rueckweg && (
+            <div>
+              <Button type="primary" onClick={() => void navigate(rueckweg.pfad)}>
+                {rueckweg.label}
+              </Button>
+            </div>
+          )}
+        </div>
+      </Paneel>
+    </div>
   );
 }

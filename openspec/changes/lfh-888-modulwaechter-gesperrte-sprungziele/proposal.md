@@ -17,8 +17,8 @@ LFH-669 hatte das bewusst als Non-Goal ausgeklammert.
   Das gilt auch für die Unterrouten des Moduls (Detail, Druck, Stab-Unterseiten). Der Hinweis
   nennt das Modul und den Grund („ausgeblendet“ oder „für deine Rolle nicht freigegeben“). Er
   bietet einen Rückweg in ein freies Modul an. Rail und Modulpanel bleiben bedienbar. Solange die
-  Freigaben laden oder ihr Abruf scheitert, greift der Wächter nicht, und die Seite verhält sich
-  wie heute.
+  Freigaben laden, wartet der Rahmen kurz. Scheitert ihr Abruf, greift der Wächter nicht, und die
+  Seite verhält sich wie heute.
 - **Bedienelemente in ein fremdes Modul prüfen die Freigabe.** Dazu gehören Kopfaktionen,
   Paneel-, Leer- und Inspector-Aktionen, Kennzahl-Ziele und eigenständige Verweise wie
   „Meldebild ↗“. Ein Knopf steht gesperrt da, mit „Keine Berechtigung“ als Grund (M16). Ein

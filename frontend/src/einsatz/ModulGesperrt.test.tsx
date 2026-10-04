@@ -45,6 +45,12 @@ describe('ModulGesperrt (LFH-888)', () => {
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
   });
 
+  it('Gliederung: das h1 steht vor der Paneel-Überschrift (h2)', () => {
+    rendern(false);
+    const ebenen = screen.getAllByRole('heading').map((h) => h.tagName);
+    expect(ebenen).toEqual(['H1', 'H2']);
+  });
+
   it('ein ausgeblendetes Modul heißt „ausgeblendet“, nicht „nicht freigegeben“', () => {
     rendern(true);
     expect(screen.getByText(/in diesem Einsatz ausgeblendet/)).toBeInTheDocument();

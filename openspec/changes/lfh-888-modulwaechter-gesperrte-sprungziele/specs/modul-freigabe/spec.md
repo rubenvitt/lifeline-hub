@@ -8,8 +8,9 @@ Hinweis MUST das Modul nennen und den Grund angeben. Bei `sichtbar: false` laute
 „ausgeblendet“, sonst „für deine Rolle nicht freigegeben“. Er MUST einen Rückweg in ein Modul
 anbieten, das für den Benutzer frei ist. Die Modulseite MUST dabei nicht gerendert werden und
 MUST keine Anfrage an den Listen-Endpunkt des Moduls stellen. Die Navigation des Einsatzes bleibt
-bedienbar. Solange die Freigaben laden oder ihr Abruf gescheitert ist, MUST der Rahmen die
-Modulseite unverändert rendern.
+bedienbar. Solange die Freigaben laden, MUST der Rahmen statt der Modulseite einen Ladezustand
+zeigen; für `einsatzdaten` und `einsatz-einstellungen` gilt das nicht. Ist ihr Abruf gescheitert
+oder ruht er ohne Netz, MUST der Rahmen die Modulseite unverändert rendern.
 
 #### Scenario: Deeplink in ein gesperrtes Modul
 - **WHEN** die Org-Vorgabe das Modul `lagemeldungen` auf Führungskräfte beschränkt und ein normales Mitglied `/einsaetze/:id/lagemeldungen` direkt aufruft
@@ -29,7 +30,11 @@ Modulseite unverändert rendern.
 
 #### Scenario: Freigaben laden noch
 - **WHEN** ein Benutzer eine Modulroute öffnet und die Freigaben noch nicht geantwortet haben
-- **THEN** rendert der Rahmen die Modulseite wie bisher und zeigt keinen Hinweis
+- **THEN** zeigt der Rahmen einen Ladezustand, rendert die Modulseite noch nicht und zeigt keinen Hinweis
+
+#### Scenario: Freigaben gescheitert
+- **WHEN** der Abruf der Freigaben scheitert
+- **THEN** rendert der Rahmen die Modulseite wie bisher
 
 #### Scenario: Rückweg
 - **WHEN** der Hinweis erscheint

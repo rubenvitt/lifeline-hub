@@ -925,10 +925,20 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
   });
 
-  it('Freigaben laden noch: die Seite rendert wie bisher', async () => {
+  it('Freigaben laden noch: der Rahmen wartet, die Seite rendert noch nicht', async () => {
+    // Kaltstart per Deeplink: rendert die Seite vor der Antwort, ginge ihre Listen-Anfrage an
+    // ein gesperrtes Modul raus (design.md D1, Nachtrag).
     setupWaechter('/einsaetze/7/lagemeldungen', 'laden');
-    expect(await screen.findByText('Lagemeldungen-Inhalt')).toBeInTheDocument();
+    expect(await screen.findByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
+    expect(screen.getByTestId('modulwaechter-laedt')).toBeInTheDocument();
+    expect(screen.queryByText('Lagemeldungen-Inhalt')).not.toBeInTheDocument();
     expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
+  });
+
+  it('Einsatzdaten warten nie auf die Freigaben und zeigen nie den Hinweis', async () => {
+    setupWaechter('/einsaetze/7/einsatzdaten', 'laden');
+    expect(await screen.findByText('Einsatzdaten-Inhalt')).toBeInTheDocument();
+    expect(screen.queryByTestId('modulwaechter-laedt')).not.toBeInTheDocument();
   });
 
   it('Freigaben gescheitert: die Seite rendert, ihr eigener 403-Zustand bleibt das Netz', async () => {
