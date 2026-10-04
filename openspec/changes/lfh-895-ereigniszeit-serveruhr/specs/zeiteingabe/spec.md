@@ -6,7 +6,8 @@
 Ein „Jetzt“ in einer Zeiteingabe SHALL den aktuellen Zeitpunkt setzen und ihn in der Anzeigezone
 zeigen. Der aktuelle Zeitpunkt MUST nach der Serveruhr bemessen sein, soweit das Gerät seinen
 Versatz zur Serveruhr aus einer Antwort des Servers kennt; ohne bekannten Versatz gilt die
-Geräteuhr. Tagesgrenzen der Eingabe und der Fälligkeitsgruppen (keine Zukunftstage, „heute“,
+Geräteuhr. Eine Prüfung der Eingabe auf Zeitpunkte in der Zukunft MUST an derselben Uhr messen,
+sodass ein „Jetzt“ sie immer besteht. Tagesgrenzen der Eingabe und der Fälligkeitsgruppen (keine Zukunftstage, „heute“,
 „überfällig“) SHALL nach dem Kalendertag der Anzeigezone bestimmt werden.
 
 #### Scenario: Jetzt bei abweichender Browserzone
@@ -16,6 +17,10 @@ Geräteuhr. Tagesgrenzen der Eingabe und der Fälligkeitsgruppen (keine Zukunfts
 #### Scenario: Jetzt auf einem vorgehenden Gerät
 - **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat, es ist 10:00 Serverzeit, und in einer Zeiteingabe wird „Jetzt“ gewählt
 - **THEN** zeigt das Feld 10:00, nicht 10:05
+
+#### Scenario: Jetzt auf einem nachgehenden Gerät ist keine Zukunft
+- **WHEN** die Uhr eines Geräts 10 min nachgeht, das Gerät eine Antwort des Servers erhalten hat und in einer Zeiteingabe ohne Zukunftszeitpunkte „Jetzt“ gewählt wird
+- **THEN** meldet die Eingabe keinen Zeitpunkt in der Zukunft
 
 #### Scenario: Zukunftstag nach Kalender der Anzeigezone
 - **WHEN** Browser UTC, Anzeigezone Europe/Berlin, es ist 2026-07-14 23:30 UTC (15.07. 01:30 in Berlin)

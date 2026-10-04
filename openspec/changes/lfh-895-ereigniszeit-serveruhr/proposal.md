@@ -6,8 +6,8 @@ Die Ereigniszeit eines ETB-Eintrags und einer Meldung ist, wenn niemand eine Zei
 „jetzt“ nach der **Geräteuhr**, online wie offline. Geht die Uhr eines Geräts vor, steht der
 Eintrag um den Vorlauf zu spät: Die Zeitachse ordnet ihn falsch ein, „nachgetragen“ schlägt
 an, obwohl nichts nachgetragen wurde, und bei einer Meldung verschiebt sich die
-Rückmeldefrist der meldenden Einheit (`faellig_at` = Ereigniszeit + Frist). Der Server lehnt dort nichts ab, der
-Fehler bleibt also still. LFH-705 hat den Versatz zur Serveruhr schon gemessen
+Rückmeldefrist der meldenden Einheit (`faellig_at` = Ereigniszeit + Frist). Der Server lehnt
+dort nichts ab, der Fehler bleibt also still. LFH-705 hat den Versatz zur Serveruhr schon gemessen
 (`offline/serveruhr.ts`), ihn aber bewusst nur für vorgemerkte Betreuungsmeldungen genutzt und
 diesen Befund als Nachzug ausgeklammert.
 
@@ -42,9 +42,15 @@ diesen Befund als Nachzug ausgeklammert.
 
 - Frontend: `etb/Schnellerfassung.tsx` (Zeitpunkt des Absendens), `etb/MetaChip.tsx`
   (Vorschlag im Zeit-Editor), `meldungen/MeldungFormular.tsx` (leeres Feld = jetzt),
-  `anzeige/ZeitpunktEingabe.tsx` („Jetzt“). Regeltext in `frontend/src/offline/AGENTS.md`
-  („Schreiben ohne Netz“) und `frontend/src/etb/AGENTS.md`.
-- Mit wirksam, ohne eigenen Code: „Jetzt“ in jeder anderen Zeiteingabe (etwa Betreuung,
-  Kräfte-Zeitachse). Dort lehnt der Server Zukunft über 60 s bzw. 2 min ab, ein „Jetzt“ auf
-  einem vorgehenden Gerät scheitert heute also; danach nicht mehr.
+  `anzeige/ZeitpunktEingabe.tsx` („Jetzt“), `etb/bausteinEinsetzen.ts` (`{datum}`,
+  `{uhrzeit}`). Regeltext in `frontend/src/offline/AGENTS.md` („Schreiben ohne Netz“), Verweis
+  in `frontend/AGENTS.md`.
+- Mit wirksam: „Jetzt“ in jeder anderen Zeiteingabe. Dafür messen die Zukunftsprüfungen im
+  Client, die an einer Zeiteingabe hängen (`betreuung/BetreuungDialoge.tsx`,
+  `personen/LagedatenFelder.tsx`), an derselben Uhr, sonst fiele „Jetzt“ auf einem nachgehenden
+  Gerät dort durch. Die Vorbelegung des Nachtrags in der Kräfte-Zeitachse
+  (`kraefte/KraftZeitachse.tsx`) nimmt ebenfalls die Serveruhr; sie scheitert auf einem
+  vorgehenden Gerät heute an der Uhrentoleranz von 2 min (422).
+- Weitere Vorbelegungen „jetzt“ (Auftrag, Einsatzbeginn, Erinnerung, Lagebesprechung,
+  Wiedervorlage) stehen als Nachzug LFH-1031 auf dem Board.
 - Backend, API, Schema, Migrationen: keine Änderung.

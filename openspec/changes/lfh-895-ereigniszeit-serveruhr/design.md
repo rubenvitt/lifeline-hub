@@ -38,6 +38,9 @@ Motivation: `proposal.md`, „Why“. Darauf baut die Änderung auf:
 - **Kalendergrenzen** der Zeiteingabe („keine Zukunftstage“, „heute“) bleiben bei der
   Geräteuhr. Ein Vorlauf von Minuten verschiebt sie nur kurz vor Mitternacht.
 - **Server:** keine Änderung (D4).
+- **Weitere Vorbelegungen „jetzt“** außerhalb von ETB, Meldung und Zeiteingabe (Auftrag
+  `erteilt_at`, Einsatzbeginn, Erinnerung, Lagebesprechung, Wiedervorlage) bleiben in dieser
+  Change bei der Geräteuhr. Sie stehen als Nachzug LFH-1031 auf dem Board.
 - **Bestehende Daten** werden nicht korrigiert. Der Versatz eines Geräts zur Zeit eines alten
   Eintrags ist unbekannt.
 
@@ -105,6 +108,18 @@ Der Server begrenzt ETB- und Meldungs-Ereigniszeiten weiter nicht.
 **Verworfen: Kappen auf „jetzt“** im Server (wie in LFH-705, D1 verworfen): bricht die
 Reihenfolge und kann einen Handwert nicht von einer Vorgabe unterscheiden.
 
+### D5 — Was an „Jetzt“ hängt, misst an derselben Uhr (Befund aus dem Review)
+
+Mit D3 liefert „Jetzt“ die Serverzeit. Zwei Prüfungen im Client verglichen eine Eingabe aber mit
+der Geräteuhr: „kein Zeitpunkt in der Zukunft“ in der Betreuung (60 s) und „vermisst seit“
+(5 min). Auf einem **nachgehenden** Gerät läge „Jetzt“ dann in deren Zukunft und fiele durch,
+obwohl der Server ihn annähme. Beide messen deshalb an `serverJetzt()`.
+
+Aus demselben Grund nehmen die Bausteine `{datum}` und `{uhrzeit}` die Serveruhr: Sonst stünde
+im Text eines ETB-Eintrags 10:05 und als seine Ereigniszeit 10:00. Die Vorbelegung des
+Nachtrags in der Kräfte-Zeitachse ist ein „jetzt“, das der Server bei mehr als 2 min Vorlauf mit
+422 ablehnt; sie folgt D1.
+
 ## Risks / Trade-offs
 
 - [Die Geräteuhr springt zwischen Messung und Absenden] → Die Vorgabe ist um den Sprung
@@ -113,6 +128,8 @@ Reihenfolge und kann einen Handwert nicht von einer Vorgabe unterscheiden.
   Gewollt (D3); die Abweichung ist der Uhrenfehler des Geräts.
 - [Ein Test einer anderen Seite drückt „Jetzt“ und erwartet `dayjs()`] → Im Test ist kein
   Versatz gemessen, `serverJetzt()` gibt dann die Geräteuhr; Bestandstests bleiben gleich.
+- [Eine weitere Prüfung im Client vergleicht mit der Geräteuhr] → „Jetzt“ fiele dort auf einem
+  nachgehenden Gerät durch (D5). Die Regel in `frontend/src/offline/AGENTS.md` nennt das.
 
 ## Migration Plan
 

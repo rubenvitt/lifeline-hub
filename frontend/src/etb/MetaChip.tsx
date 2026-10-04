@@ -159,7 +159,8 @@ export default function MetaChip({
         aria-label={d.label}
         disabled={gesperrt}
         // Der Vorschlag kommt von derselben Uhr wie die Vorgabe ohne Chip, sonst lieferten „Chip
-        // öffnen, OK“ und „Chip weglassen“ zwei Zeiten (LFH-895, design.md D3).
+        // öffnen, OK“ und „Chip weglassen“ zwei Zeiten (LFH-895, `frontend/src/offline/AGENTS.md`,
+        // „Schreiben ohne Netz“).
         defaultValue={dayjs.isDayjs(wert) ? wert : serverJetzt()}
         onOk={(v) => {
           if (v) onCommit(feld, v);

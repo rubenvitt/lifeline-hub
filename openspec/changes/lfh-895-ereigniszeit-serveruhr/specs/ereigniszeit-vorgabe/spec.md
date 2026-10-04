@@ -20,9 +20,8 @@ lokale Erfassungszeit eines ETB-Eintrags MUST derselbe Zeitpunkt sein.
 - **AND** die Zeitachse markiert ihn nicht als nachgetragen
 
 #### Scenario: Meldung eines vorgehenden Geräts
-- **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat und dort um 10:00 Serverzeit eine Meldung der Einheit „RTW 2“ mit leerem Feld „Ereigniszeit“ angelegt wird und die Rückmeldefrist 30 min beträgt
+- **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat und dort um 10:00 Serverzeit eine Meldung mit leerem Feld „Ereigniszeit“ angelegt wird
 - **THEN** trägt die Meldung die Ereigniszeit 10:00
-- **AND** die nächste Rückmeldung von „RTW 2“ ist um 10:30 fällig, nicht um 10:35
 
 #### Scenario: ETB-Eintrag offline vorgemerkt
 - **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät vor dem Ausfall eine Antwort des Servers erhalten hat und ohne Netz um 10:00 Serverzeit ein ETB-Eintrag ohne Zeit-Chip vorgemerkt wird
@@ -52,3 +51,12 @@ Bestätigt sie den Vorschlag unverändert, MUST der Eintrag diesen Zeitpunkt tra
 #### Scenario: Vorschlag eines vorgehenden Geräts
 - **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat und eine Person um 10:00 Serverzeit den Zeit-Chip öffnet
 - **THEN** schlägt die Eingabe 10:00 vor, nicht 10:05
+
+### Requirement: Datum und Uhrzeit in Bausteinen nach der Serveruhr
+Setzt ein ETB-Baustein die Platzhalter für das aktuelle Datum oder die aktuelle Uhrzeit ein,
+SHALL er sie nach der Serveruhr bemessen, soweit der Versatz bekannt ist, damit Text und
+Ereigniszeit desselben Eintrags übereinstimmen.
+
+#### Scenario: Uhrzeit im Baustein eines vorgehenden Geräts
+- **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat und um 10:00 Serverzeit ein Baustein mit „Stand {uhrzeit}“ eingesetzt wird
+- **THEN** steht im Text „Stand 10:00“

@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Zeitachse } from '../api/types';
 import KraftZeitachse, { ZEITACHSE_RECHTE_TEXT } from './KraftZeitachse';
@@ -150,6 +151,35 @@ describe('KraftZeitachse (LFH-552)', () => {
     await waitFor(() => expect(rumpf).not.toBeNull());
     expect(rumpf).toMatchObject({ art: 'eintreffen', notiz: 'per Funk' });
     expect(String(rumpf!.zeitpunkt_at)).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+  });
+
+  it('Nachtrag: die Vorbelegung „jetzt“ gilt nach der Serveruhr (LFH-895)', async () => {
+    const serverMs = Date.parse('2026-09-30T10:00:00Z');
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(serverMs + 5 * 60_000);
+    serveruhrVergessenFuerTests();
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(serverMs).toUTCString() } }));
+    try {
+      let rumpf: Record<string, unknown> | null = null;
+      server.use(
+        http.post(PFAD, async ({ request }) => {
+          rumpf = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(ZEITACHSE, { status: 201 });
+        }),
+      );
+      rendere();
+      await waitFor(() => expect(eintraege()).toHaveLength(3));
+      await userEvent.click(screen.getByRole('button', { name: 'Nachtragen' }));
+      const dialog = await screen.findByRole('dialog');
+      await waehle('Ereignis', 'Eintreffen');
+      await userEvent.type(within(dialog).getByLabelText('Notiz (optional)'), 'x{Enter}');
+      await waitFor(() => expect(rumpf).not.toBeNull());
+      const gesendet = Date.parse(`${String(rumpf!.zeitpunkt_at).replace(' ', 'T')}Z`);
+      expect(Math.abs(gesendet - serverMs)).toBeLessThanOrEqual(5_000);
+    } finally {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    }
   });
 
   it('eine 422 steht im Dialog, nicht im Toast, und die Felder bleiben', async () => {

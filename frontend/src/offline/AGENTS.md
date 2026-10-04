@@ -101,8 +101,11 @@ draußen gelassen werden.
   `openspec/changes/archive/2026-10-01-lfh-705-serveruhr-versatz-offline/design.md`.
 - **„Jetzt“ beim Erfassen gilt nach der Serveruhr** (LFH-895), online wie offline: die
   vorbelegte Ereigniszeit von ETB-Eintrag (samt `erfasst_lokal_at`) und Meldung, der Vorschlag
-  im Zeit-Chip der ETB-Erfassung und der Knopf „Jetzt“ jeder `ZeitpunktEingabe`. Alle nehmen
-  `serverJetzt()`, nie `dayjs()`, damit „Chip öffnen, OK“ und „Chip weglassen“ dieselbe Zeit
-  ergeben. Eine eingetragene Zeit geht unverändert hinaus. Der Server begrenzt ETB- und
-  Meldungs-Ereigniszeiten bewusst nicht. Herleitung:
+  im Zeit-Chip der ETB-Erfassung, der Knopf „Jetzt“ jeder `ZeitpunktEingabe`, die Bausteine
+  `{datum}`/`{uhrzeit}` und der Nachtrag der Kräfte-Zeitachse. Alle nehmen `serverJetzt()`, nie
+  `dayjs()`, damit „Chip öffnen, OK“ und „Chip weglassen“ dieselbe Zeit ergeben. Eine
+  Zukunftsprüfung im Client an einer Zeiteingabe misst an derselben Uhr, sonst fällt „Jetzt“ auf
+  einem nachgehenden Gerät durch. Eine eingetragene Zeit geht unverändert hinaus. Der Server
+  begrenzt ETB- und Meldungs-Ereigniszeiten bewusst nicht. Weitere Vorbelegungen aus `dayjs()`
+  sind offen (LFH-1031). Herleitung:
   `openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`.

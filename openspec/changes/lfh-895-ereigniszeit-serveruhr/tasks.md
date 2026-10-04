@@ -12,6 +12,7 @@ Code. „Verifiziert“ heißt, der genannte Test läuft grün **und** war vorhe
 
 - [x] 2.1 `frontend/src/etb/MetaChip.tsx`: Editor des Zeit-Chips mit `defaultValue = serverJetzt()`, wenn kein Wert gesetzt ist. Verifiziert mit `MetaChip.test.tsx`: Gerät +5 min nach Messung, Chip ohne Wert öffnen und bestätigen → übergebener Zeitpunkt = Serverzeit.
 - [x] 2.2 `frontend/src/anzeige/ZeitpunktEingabe.tsx`: „Jetzt“ setzt `serverJetzt()`; Kopfkommentar anpassen. Verifiziert mit dem Test der Zeiteingabe: Gerät +5 min nach Messung, „Jetzt“ → gemeldeter Zeitpunkt = Serverzeit; Bestandsszenario „Jetzt bei abweichender Browserzone“ bleibt grün.
+- [x] 2.3 Befunde aus dem Review (D5): Zukunftsprüfung in `betreuung/BetreuungDialoge.tsx` (`zeitRegel`) und `personen/LagedatenFelder.tsx` („vermisst seit“) an `serverJetzt()`; Bausteine `{datum}`/`{uhrzeit}` in `etb/bausteinEinsetzen.ts` und Vorbelegung des Nachtrags in `kraefte/KraftZeitachse.tsx` aus `serverJetzt()`. Verifiziert mit je einem Test, vorher rot: „Jetzt“ auf einem 10 min nachgehenden Gerät besteht die Prüfung (`BetreuungDialoge.test.tsx`, `LagedatenFelder.test.tsx`); `{uhrzeit}` und der Nachtrag eines 5 min vorgehenden Geräts tragen die Serverzeit (`bausteinEinsetzen.test.ts`, `KraftZeitachse.test.tsx`).
 
 ## 3. Regeln nachziehen
 
@@ -23,5 +24,6 @@ Code. „Verifiziert“ heißt, der genannte Test läuft grün **und** war vorhe
 
 ## 5. Abschluss
 
-- [ ] 5.1 Review-Workflow über die Dimensionen Fehler, Projektregeln und Tests, jeder Befund adversarial geprüft. Verifiziert, wenn jeder bestätigte Befund behoben ist.
-- [ ] 5.2 `./scripts/check-all.sh` grün. Verifiziert durch Exit-Code 0 ohne `| tail`, Ergebnis hier eintragen.
+- [x] 5.1 Review über die Dimensionen Fehler, Projektregeln und Tests, jeder Befund adversarial geprüft. Verifiziert, wenn jeder bestätigte Befund behoben ist. **Ergebnis:** Review per Subagent (kein Workflow-Lauf), 6 Befunde bestätigt: „Jetzt“ fiel an zwei Zukunftsprüfungen eines nachgehenden Geräts durch (behoben, 2.3); e2e prüfte ein Feld `faellig_at`, das die Meldungsliste nicht trägt, und das Spec-Szenario band die Bestätigungsfrist an die Ereigniszeit (beides korrigiert: Rückmeldefrist, Szenario ohne ungeprüfte Fälligkeit); Regelzeile in `frontend/AGENTS.md` doppelt und zu breit (auf Verweis gekürzt), Kräfte-Nachtrag scheiterte weiter (behoben, 2.3), übrige Vorbelegungen als Nachzug LFH-1031; Bausteine `{uhrzeit}` aus der Geräteuhr (behoben, 2.3); Verweise auf den aktiven Change-Pfad (beim Archiv umschreiben, 5.2); Kleinkram in `proposal.md` (behoben).
+- [ ] 5.2 Beim `/opsx:archive` alle Verweise auf `openspec/changes/lfh-895-ereigniszeit-serveruhr/` auf den Archivpfad umschreiben (`grep -rn lfh-895-ereigniszeit-serveruhr`). Verifiziert, wenn der grep nur noch den Archivpfad findet.
+- [ ] 5.3 `./scripts/check-all.sh` grün. Verifiziert durch Exit-Code 0 ohne `| tail`, Ergebnis hier eintragen.
