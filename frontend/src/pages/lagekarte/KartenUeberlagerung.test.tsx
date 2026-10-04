@@ -144,6 +144,13 @@ describe('KartenUeberlagerung — Knopfblock', () => {
     }
   });
 
+  it('LFH-865: der Block endet am Kartenrand und rollt, statt über die Leiste zu ragen', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    const block = screen.getByRole('group', { name: 'Kartensteuerung' });
+    expect(block.style.maxHeight).toBe('calc(100% - 24px)');
+    expect(block.style.overflowY).toBe('auto');
+  });
+
   it('LFH-865: jeder Knopf steht in einer Zelle ohne Rolle, auch der gesperrte', () => {
     renderMitProviders(
       <KartenUeberlagerung

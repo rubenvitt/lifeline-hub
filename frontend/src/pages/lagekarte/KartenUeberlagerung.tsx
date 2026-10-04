@@ -361,7 +361,13 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         {props.grundlage}
         <ZeigerKoordinate quelle={props.zeigerQuelle} />
       </div>
-      {/* Fugenraster: Knopfzellen mit 1 px Fuge auf `linieStark`, Einzug in der Zelle (LFH-865). */}
+      {/* Fugenraster: Knopfzellen mit 1 px Fuge auf `linieStark`, Einzug in der Zelle (LFH-865).
+          Der Block endet am unteren Kartenrand und rollt, wenn er höher wäre: im Handschuh mit
+          eingeblendeter Leiste ist die Karte am Handschirm nur gut 300 px hoch, der Block mit
+          sechs Knöpfen über 500 px. Ohne die Grenze lag er über der Leiste unter der Karte und
+          fing deren Klicks ab (`e2e/fokus-verdeckung.spec.ts`, „Bild einpassen“ bei 390 px).
+          Keine Laufleiste: sie nähme den Knöpfen Breite; der angeschnittene Knopf zeigt, dass
+          es weitergeht, und der Fokus rollt ihn herein. */}
       <div
         role="group"
         aria-label="Kartensteuerung"
@@ -372,6 +378,10 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           display: 'flex',
           flexDirection: 'column',
           gap: KNOPF_FUGE,
+          maxHeight: `calc(100% - ${2 * UEBERLAGERUNG_RAND}px)`,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          scrollbarWidth: 'none',
           background: rollen.linieStark,
           border: `1px solid ${rollen.linieStark}`,
         }}
