@@ -5181,6 +5181,54 @@
           }
         }
       },
+      "Fernmeldeskizze": {
+        "type": "object",
+        "description": "Alles, was die Skizze selbst speichert. Zuordnungen von Abschnitt, Einheit, Führungsstelle und\nexternen Stellen liest der Client aus ihren Datensätzen.",
+        "required": [
+          "lage",
+          "komponenten",
+          "verbindungen",
+          "bereiche",
+          "schriftfeld",
+          "stand"
+        ],
+        "properties": {
+          "bereiche": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkizzenBereich"
+            }
+          },
+          "komponenten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkizzenKomponente"
+            }
+          },
+          "lage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkizzenLage"
+            }
+          },
+          "schriftfeld": {
+            "$ref": "#/components/schemas/Schriftfeld"
+          },
+          "stand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Jüngster Änderungszeitpunkt aller Skizzendaten (Lage, Komponenten samt Kanälen,\nVerbindungen, Bereiche, Schriftfeld, Kanäle externer Stellen); `null`, solange nichts\ngespeichert ist. Ein Entfernen hinterlässt keinen Zeitpunkt."
+          },
+          "verbindungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkizzenVerbindung"
+            }
+          }
+        }
+      },
       "FolgeauftragVerweis": {
         "type": "object",
         "description": "Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink\n(`id`) und einen unterscheidbaren Namen (`lfd_nr`) — die DB-`id` wird nie angezeigt.",
@@ -6118,7 +6166,8 @@
         "required": [
           "id",
           "stellenart",
-          "verbindungen"
+          "verbindungen",
+          "sprechgruppen"
         ],
         "properties": {
           "bezeichnung": {
@@ -6146,6 +6195,13 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "sprechgruppen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StellenKanal"
+            },
+            "description": "Kanäle der externen Stelle (LFH-893, design.md D3/D14), sortiert wie an Abschnitt und\nEinheit; bei einer Funktion immer leer. Gepflegt in der Fernmeldeskizze."
           },
           "stellenart": {
             "$ref": "#/components/schemas/Stellenart"
@@ -6184,6 +6240,18 @@
             "type": "string"
           }
         }
+      },
+      "Komponentenart": {
+        "type": "string",
+        "description": "Komponente der Fernmeldeskizze (DV 810.3 J.3). Wire == `as_str()`.",
+        "enum": [
+          "repeater",
+          "gateway",
+          "basisstation",
+          "mobile_basisstation",
+          "antenne",
+          "vermittlung"
+        ]
       },
       "Koordinatenformat": {
         "type": "string",
@@ -9561,6 +9629,47 @@
           "sonstige"
         ]
       },
+      "Schriftfeld": {
+        "type": "object",
+        "description": "Schriftfeld der Skizze (J.5). Ohne gespeicherte Angabe gilt als Herausgeber die\nEinsatzbezeichnung.",
+        "required": [
+          "herausgeber",
+          "vs_vermerk",
+          "gueltig_ab",
+          "gez_name",
+          "gez_at"
+        ],
+        "properties": {
+          "gez_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gez_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Personenbezogen: wird bei der Aufbewahrung geschwärzt."
+          },
+          "gueltig_ab": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "herausgeber": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vs_vermerk": {
+            "$ref": "#/components/schemas/VsVermerk"
+          }
+        }
+      },
       "Schutzobjekt": {
         "type": "string",
         "description": "Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.",
@@ -9698,6 +9807,236 @@
           "tot",
           "unverletzt"
         ]
+      },
+      "SkizzenBereich": {
+        "type": "object",
+        "required": [
+          "id",
+          "bezeichnung",
+          "x",
+          "y",
+          "breite",
+          "hoehe",
+          "version"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "breite": {
+            "type": "number",
+            "format": "double"
+          },
+          "hoehe": {
+            "type": "number",
+            "format": "double"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "x": {
+            "type": "number",
+            "format": "double"
+          },
+          "y": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "SkizzenBereichKonflikt": {
+        "type": "object",
+        "description": "409-Antwort auf `PATCH …/bereiche/{bid}` mit dem gespeicherten Stand.",
+        "required": [
+          "error",
+          "aktuell"
+        ],
+        "properties": {
+          "aktuell": {
+            "$ref": "#/components/schemas/SkizzenBereich"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "SkizzenBezug": {
+        "type": "object",
+        "description": "Endpunkt einer Verbindung. `id` ist `null` genau bei der Führungsstelle.",
+        "required": [
+          "art",
+          "id"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/SkizzenBezugArt"
+          },
+          "id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "SkizzenBezugArt": {
+        "type": "string",
+        "description": "Art eines Endpunkts einer Verbindung (`SkizzenBezug.art`).",
+        "enum": [
+          "fuehrungsstelle",
+          "abschnitt",
+          "einheit",
+          "stelle",
+          "komponente"
+        ]
+      },
+      "SkizzenKomponente": {
+        "type": "object",
+        "required": [
+          "id",
+          "art",
+          "bezeichnung",
+          "sprechgruppen"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/Komponentenart"
+          },
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sprechgruppen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprechgruppeAnzeige"
+            },
+            "description": "Kanäle der Komponente, sortiert wie an Abschnitt und Einheit."
+          }
+        }
+      },
+      "SkizzenLage": {
+        "type": "object",
+        "description": "Gespeicherte Lage eines Elements. Ein Element ohne Zeile setzt das Auto-Layout (D4).",
+        "required": [
+          "element",
+          "x",
+          "y",
+          "breite",
+          "version"
+        ],
+        "properties": {
+          "breite": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Nur bei Schienen (`sg-<id>`)."
+          },
+          "element": {
+            "type": "string",
+            "description": "`fs` | `ab-<id>` | `eh-<id>` | `ks-<id>` | `ko-<id>` | `sg-<id>`."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Erwarteter Stand für das nächste Verschieben (409 bei Abweichung)."
+          },
+          "x": {
+            "type": "number",
+            "format": "double"
+          },
+          "y": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "SkizzenLageKonflikt": {
+        "type": "object",
+        "description": "409-Antwort auf `PUT …/lage/{element}`: der Fehlertext und der gespeicherte Stand (`null`,\nwenn es keine Zeile gibt, etwa nach „Neu anordnen“).",
+        "required": [
+          "error",
+          "aktuell"
+        ],
+        "properties": {
+          "aktuell": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SkizzenLage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "SkizzenVerbindung": {
+        "type": "object",
+        "required": [
+          "id",
+          "von",
+          "nach",
+          "art",
+          "medium",
+          "status",
+          "verkehr",
+          "hinweis"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/Verbindungsart"
+          },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "medium": {
+            "$ref": "#/components/schemas/Verbindungsmedium"
+          },
+          "nach": {
+            "$ref": "#/components/schemas/SkizzenBezug"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Verbindungsstatus"
+          },
+          "verkehr": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Verkehrsart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "von": {
+            "$ref": "#/components/schemas/SkizzenBezug"
+          }
+        }
       },
       "Sonderkost": {
         "type": "object",
@@ -10067,6 +10406,22 @@
           "stelle_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "StellenKanal": {
+        "type": "object",
+        "description": "Eine Sprechgruppe am Datensatz einer externen Stelle, mit Status (D7).",
+        "required": [
+          "sprechgruppe",
+          "status"
+        ],
+        "properties": {
+          "sprechgruppe": {
+            "$ref": "#/components/schemas/SprechgruppeAnzeige"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Verbindungsstatus"
           }
         }
       },
@@ -10548,6 +10903,29 @@
           "sonstige"
         ]
       },
+      "Verbindungsart": {
+        "type": "string",
+        "description": "Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die\nErreichbarkeit steht im Kommunikationsplan.",
+        "enum": [
+          "telefon",
+          "fax",
+          "daten",
+          "melder",
+          "bild",
+          "livestream",
+          "richtfunk",
+          "satellit",
+          "sonstige"
+        ]
+      },
+      "Verbindungsmedium": {
+        "type": "string",
+        "description": "Übertragungsweg einer Verbindung: Funk (Zickzack-Marke) oder leitergebunden.",
+        "enum": [
+          "funk",
+          "leitung"
+        ]
+      },
       "Verbindungsmittel": {
         "type": "string",
         "description": "Mittel einer Verbindung. Wire == `as_str()`.\n\nBewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine\nErreichbarkeit je Datensatz, design.md D2). Funk steht im Funkplan; eine ISSI oder\nEinzelrufnummer ist `sonstiges` mit Hinweis.",
@@ -10559,6 +10937,14 @@
           "messenger",
           "melder",
           "sonstiges"
+        ]
+      },
+      "Verbindungsstatus": {
+        "type": "string",
+        "description": "Status einer skizzeneigenen Verbindung oder eines Kanals einer externen Stelle (D7).\n„Geplant“ ist nur Darstellung: kein ETB, keine Erinnerung.",
+        "enum": [
+          "bestehend",
+          "geplant"
         ]
       },
       "VerbleibAnzeige": {
@@ -10663,6 +11049,14 @@
           "reserviert"
         ]
       },
+      "Verkehrsart": {
+        "type": "string",
+        "description": "Betriebsart einer Verbindung: Wechsel- oder Gegenverkehr.",
+        "enum": [
+          "wechsel",
+          "gegen"
+        ]
+      },
       "VerpflegungAnzeige": {
         "type": "object",
         "description": "Die eine Lesequelle der Modulseite (`GET …/verpflegung`).",
@@ -10695,6 +11089,14 @@
             "format": "int64"
           }
         }
+      },
+      "VsVermerk": {
+        "type": "string",
+        "description": "VS-Vermerk im Schriftfeld (J.5).",
+        "enum": [
+          "keiner",
+          "vs_nfd"
+        ]
       },
       "Warnstufe": {
         "type": "string",

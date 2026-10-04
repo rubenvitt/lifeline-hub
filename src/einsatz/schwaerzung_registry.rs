@@ -1260,6 +1260,130 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
         ],
     },
+    // Taktische Fernmeldeskizze (LFH-893, design.md D3): Namen und Hinweise gehen (eine
+    // Komponente „Repeater Hof Müller“, ein Hinweis „Mast bei Familie Beispiel“, der Name bei
+    // „gez.“), Arten, Status und Lage bleiben als Skelett: erkennbar bleibt, DASS die Leitstelle
+    // über eine geplante Datenverbindung angebunden war.
+    TabellenRegel {
+        tabelle: "einsatz_kommunikation_stelle_sprechgruppe",
+        scoping: Scoping::UeberParent {
+            fk: "stelle_id",
+            parent: "einsatz_kommunikation_stelle",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("stelle_id", G_FK),
+            retain("sprechgruppe_id", G_FK),
+            retain("status", G_ENUM),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "fernmeldeskizze_komponente",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("art", G_ENUM),
+            scrub("bezeichnung", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Freitext (Standort)
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "fernmeldeskizze_komponente_sprechgruppe",
+        scoping: Scoping::UeberParent {
+            fk: "komponente_id",
+            parent: "fernmeldeskizze_komponente",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("komponente_id", G_FK),
+            retain("sprechgruppe_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "fernmeldeskizze_verbindung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("von_art", G_ENUM),
+            retain("von_id", G_POLY),
+            retain("nach_art", G_ENUM),
+            retain("nach_id", G_POLY),
+            retain("art", G_ENUM),
+            retain("medium", G_ENUM),
+            retain("status", G_ENUM),
+            retain("verkehr", G_ENUM),
+            scrub("hinweis", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Freitext zur Verbindung
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "fernmeldeskizze_bereich",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            scrub("bezeichnung", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL; Freitext (Ort)
+            retain("x", G_GEO),
+            retain("y", G_GEO),
+            retain("breite", G_GEO),
+            retain("hoehe", G_GEO),
+            retain("version", G_ZAEHLER),
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "fernmeldeskizze_lage",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain(
+                "element",
+                "Elementschlüssel der Skizze (fs/ab-/eh-/ks-/ko-/sg- + id, Struktur)",
+            ),
+            retain("x", G_GEO),
+            retain("y", G_GEO),
+            retain("breite", G_GEO),
+            retain("version", G_ZAEHLER),
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "fernmeldeskizze_schriftfeld",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain(
+                "herausgeber",
+                "Herausgebende Stelle (Führungsstruktur wie die Einsatzbezeichnung, kein Name)",
+            ),
+            retain("vs_vermerk", G_ENUM),
+            retain("gueltig_ab", G_ZEIT),
+            scrub("gez_name", Strategie::NullSetzen, Z_EINSATZ), // Name bei „gez.“ (PII)
+            retain("gez_at", G_ZEIT),
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
     // Maßgebliche Pegel: Stationsname und Gewässer benennen eine WSV-Messstelle, keine Person.
     TabellenRegel {
         tabelle: "einsatz_pegel",

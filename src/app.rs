@@ -150,6 +150,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_fuehrungsstelle::lesen)
                 .patch(routes::einsatz_fuehrungsstelle::aendern),
         )
+        // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
+        .route(
+            "/api/einsaetze/{id}/fuehrungsstelle/sprechgruppen/{sg}",
+            put(routes::einsatz_fuehrungsstelle::sprechgruppe_zuordnen)
+                .delete(routes::einsatz_fuehrungsstelle::sprechgruppe_loesen),
+        )
         .route(
             "/api/einsaetze/{id}/aufbewahrungsfrist",
             put(routes::einsatz::aufbewahrungsfrist_setzen),
@@ -538,6 +544,60 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}",
             patch(routes::stab::kommunikationsplan_verbindung_aendern)
                 .delete(routes::stab::kommunikationsplan_verbindung_entfernen),
+        )
+        // LFH-893: Kanäle externer Stellen und taktische Fernmeldeskizze (design.md D14).
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg}",
+            put(routes::stab::kommunikationsplan_kanal_setzen)
+                .delete(routes::stab::kommunikationsplan_kanal_loesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze",
+            get(routes::stab::fernmeldeskizze_laden),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/lage",
+            delete(routes::stab::fernmeldeskizze_lage_verwerfen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/lage/{element}",
+            put(routes::stab::fernmeldeskizze_lage_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/schriftfeld",
+            put(routes::stab::fernmeldeskizze_schriftfeld_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten",
+            post(routes::stab::fernmeldeskizze_komponente_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}",
+            patch(routes::stab::fernmeldeskizze_komponente_aendern)
+                .delete(routes::stab::fernmeldeskizze_komponente_entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/komponenten/{kid}/sprechgruppen/{sg}",
+            put(routes::stab::fernmeldeskizze_komponente_kanal_setzen)
+                .delete(routes::stab::fernmeldeskizze_komponente_kanal_loesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen",
+            post(routes::stab::fernmeldeskizze_verbindung_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/verbindungen/{vid}",
+            patch(routes::stab::fernmeldeskizze_verbindung_aendern)
+                .delete(routes::stab::fernmeldeskizze_verbindung_entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche",
+            post(routes::stab::fernmeldeskizze_bereich_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}",
+            patch(routes::stab::fernmeldeskizze_bereich_aendern)
+                .delete(routes::stab::fernmeldeskizze_bereich_entfernen),
         )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(
@@ -953,6 +1013,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             patch(routes::einsatzabschnitt::flaeche),
         )
         .route(
+            "/api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg}",
+            put(routes::einsatzabschnitt::sprechgruppe_zuordnen)
+                .delete(routes::einsatzabschnitt::sprechgruppe_loesen),
+        )
+        .route(
             "/api/einsaetze/{id}/abschnitte/{aid}",
             delete(routes::einsatzabschnitt::aufloesen),
         )
@@ -1296,6 +1361,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/position",
             patch(routes::einsatz_einheit::position),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg}",
+            put(routes::einsatz_einheit::sprechgruppe_zuordnen)
+                .delete(routes::einsatz_einheit::sprechgruppe_loesen),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/status",

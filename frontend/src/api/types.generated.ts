@@ -1931,6 +1931,23 @@ export interface components {
             traegerorganisation: string[];
         };
         /**
+         * @description Alles, was die Skizze selbst speichert. Zuordnungen von Abschnitt, Einheit, Führungsstelle und
+         *     externen Stellen liest der Client aus ihren Datensätzen.
+         */
+        Fernmeldeskizze: {
+            bereiche: components["schemas"]["SkizzenBereich"][];
+            komponenten: components["schemas"]["SkizzenKomponente"][];
+            lage: components["schemas"]["SkizzenLage"][];
+            schriftfeld: components["schemas"]["Schriftfeld"];
+            /**
+             * @description Jüngster Änderungszeitpunkt aller Skizzendaten (Lage, Komponenten samt Kanälen,
+             *     Verbindungen, Bereiche, Schriftfeld, Kanäle externer Stellen); `null`, solange nichts
+             *     gespeichert ist. Ein Entfernen hinterlässt keinen Zeitpunkt.
+             */
+            stand: string | null;
+            verbindungen: components["schemas"]["SkizzenVerbindung"][];
+        };
+        /**
          * @description Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink
          *     (`id`) und einen unterscheidbaren Namen (`lfd_nr`) — die DB-`id` wird nie angezeigt.
          */
@@ -2282,6 +2299,11 @@ export interface components {
             funktion_label?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Kanäle der externen Stelle (LFH-893, design.md D3/D14), sortiert wie an Abschnitt und
+             *     Einheit; bei einer Funktion immer leer. Gepflegt in der Fernmeldeskizze.
+             */
+            sprechgruppen: components["schemas"]["StellenKanal"][];
             stellenart: components["schemas"]["Stellenart"];
             verbindungen: components["schemas"]["KommunikationsVerbindung"][];
         };
@@ -2293,6 +2315,11 @@ export interface components {
             mittel: components["schemas"]["Verbindungsmittel"];
             wert: string;
         };
+        /**
+         * @description Komponente der Fernmeldeskizze (DV 810.3 J.3). Wire == `as_str()`.
+         * @enum {string}
+         */
+        Komponentenart: "repeater" | "gateway" | "basisstation" | "mobile_basisstation" | "antenne" | "vermittlung";
         /**
          * @description Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
          * @enum {string}
@@ -3577,6 +3604,18 @@ export interface components {
         /** @enum {string} */
         SchadenTyp: "sachschaden" | "verkehrshindernis" | "infrastruktur" | "umweltschaden" | "tierkadaver" | "sonstige";
         /**
+         * @description Schriftfeld der Skizze (J.5). Ohne gespeicherte Angabe gilt als Herausgeber die
+         *     Einsatzbezeichnung.
+         */
+        Schriftfeld: {
+            gez_at: string | null;
+            /** @description Personenbezogen: wird bei der Aufbewahrung geschwärzt. */
+            gez_name: string | null;
+            gueltig_ab: string | null;
+            herausgeber: string | null;
+            vs_vermerk: components["schemas"]["VsVermerk"];
+        };
+        /**
          * @description Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.
          * @enum {string}
          */
@@ -3626,6 +3665,83 @@ export interface components {
          * @enum {string}
          */
         Sichtungskategorie: "sk1" | "sk2" | "sk3" | "sk4" | "tot" | "unverletzt";
+        SkizzenBereich: {
+            bezeichnung: string;
+            /** Format: double */
+            breite: number;
+            /** Format: double */
+            hoehe: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            version: number;
+            /** Format: double */
+            x: number;
+            /** Format: double */
+            y: number;
+        };
+        /** @description 409-Antwort auf `PATCH …/bereiche/{bid}` mit dem gespeicherten Stand. */
+        SkizzenBereichKonflikt: {
+            aktuell: components["schemas"]["SkizzenBereich"];
+            error: string;
+        };
+        /** @description Endpunkt einer Verbindung. `id` ist `null` genau bei der Führungsstelle. */
+        SkizzenBezug: {
+            art: components["schemas"]["SkizzenBezugArt"];
+            /** Format: int64 */
+            id: number | null;
+        };
+        /**
+         * @description Art eines Endpunkts einer Verbindung (`SkizzenBezug.art`).
+         * @enum {string}
+         */
+        SkizzenBezugArt: "fuehrungsstelle" | "abschnitt" | "einheit" | "stelle" | "komponente";
+        SkizzenKomponente: {
+            art: components["schemas"]["Komponentenart"];
+            bezeichnung: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Kanäle der Komponente, sortiert wie an Abschnitt und Einheit. */
+            sprechgruppen: components["schemas"]["SprechgruppeAnzeige"][];
+        };
+        /** @description Gespeicherte Lage eines Elements. Ein Element ohne Zeile setzt das Auto-Layout (D4). */
+        SkizzenLage: {
+            /**
+             * Format: double
+             * @description Nur bei Schienen (`sg-<id>`).
+             */
+            breite: number | null;
+            /** @description `fs` | `ab-<id>` | `eh-<id>` | `ks-<id>` | `ko-<id>` | `sg-<id>`. */
+            element: string;
+            /**
+             * Format: int64
+             * @description Erwarteter Stand für das nächste Verschieben (409 bei Abweichung).
+             */
+            version: number;
+            /** Format: double */
+            x: number;
+            /** Format: double */
+            y: number;
+        };
+        /**
+         * @description 409-Antwort auf `PUT …/lage/{element}`: der Fehlertext und der gespeicherte Stand (`null`,
+         *     wenn es keine Zeile gibt, etwa nach „Neu anordnen“).
+         */
+        SkizzenLageKonflikt: {
+            aktuell: components["schemas"]["SkizzenLage"] | null;
+            error: string;
+        };
+        SkizzenVerbindung: {
+            art: components["schemas"]["Verbindungsart"];
+            hinweis: string | null;
+            /** Format: int64 */
+            id: number;
+            medium: components["schemas"]["Verbindungsmedium"];
+            nach: components["schemas"]["SkizzenBezug"];
+            status: components["schemas"]["Verbindungsstatus"];
+            verkehr: components["schemas"]["Verkehrsart"] | null;
+            von: components["schemas"]["SkizzenBezug"];
+        };
         /**
          * @description Anzahl EP je Kostform, ohne Personenbezug. Der Satz der Kostformen ist fest; der Rest bis
          *     zur Gesamtzahl ist Normalkost.
@@ -3790,6 +3906,11 @@ export interface components {
             anzahl: number;
             /** Format: int64 */
             stelle_id: number;
+        };
+        /** @description Eine Sprechgruppe am Datensatz einer externen Stelle, mit Status (D7). */
+        StellenKanal: {
+            sprechgruppe: components["schemas"]["SprechgruppeAnzeige"];
+            status: components["schemas"]["Verbindungsstatus"];
         };
         /**
          * @description Art einer gepflegten Stelle des Kommunikationsplans. Wire == `as_str()`.
@@ -3966,6 +4087,17 @@ export interface components {
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
         /**
+         * @description Art einer Punkt-zu-Punkt-Verbindung (J.2). Wire == `as_str()`. Keine Rufnummer: die
+         *     Erreichbarkeit steht im Kommunikationsplan.
+         * @enum {string}
+         */
+        Verbindungsart: "telefon" | "fax" | "daten" | "melder" | "bild" | "livestream" | "richtfunk" | "satellit" | "sonstige";
+        /**
+         * @description Übertragungsweg einer Verbindung: Funk (Zickzack-Marke) oder leitergebunden.
+         * @enum {string}
+         */
+        Verbindungsmedium: "funk" | "leitung";
+        /**
          * @description Mittel einer Verbindung. Wire == `as_str()`.
          *
          *     Bewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine
@@ -3974,6 +4106,12 @@ export interface components {
          * @enum {string}
          */
         Verbindungsmittel: "festnetz" | "mobil" | "fax" | "email" | "messenger" | "melder" | "sonstiges";
+        /**
+         * @description Status einer skizzeneigenen Verbindung oder eines Kanals einer externen Stelle (D7).
+         *     „Geplant“ ist nur Darstellung: kein ETB, keine Erinnerung.
+         * @enum {string}
+         */
+        Verbindungsstatus: "bestehend" | "geplant";
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];
@@ -4017,6 +4155,11 @@ export interface components {
          * @enum {string}
          */
         Verfuegbarkeit: "frei" | "defekt" | "aufbereitung" | "gesperrt" | "reserviert";
+        /**
+         * @description Betriebsart einer Verbindung: Wechsel- oder Gegenverkehr.
+         * @enum {string}
+         */
+        Verkehrsart: "wechsel" | "gegen";
         /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
         VerpflegungAnzeige: {
             /** @description Nach Beginn geordnet. */
@@ -4031,6 +4174,11 @@ export interface components {
             /** Format: int64 */
             groesse: number;
         };
+        /**
+         * @description VS-Vermerk im Schriftfeld (J.5).
+         * @enum {string}
+         */
+        VsVermerk: "keiner" | "vs_nfd";
         /**
          * @description Warnstufe (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `warnstufe`.
          * @enum {string}

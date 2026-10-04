@@ -647,6 +647,54 @@ fn stab_kommunikation_verbindungsmittel_wire() {
     } in lifeline_hub::stab::kommunikation::Verbindungsmittel::ALLE);
 }
 
+/// LFH-893: taktische Fernmeldeskizze. Die Werte stehen als CHECK in
+/// `migrations/0147_fernmeldeskizze.sql`; der Client zeichnet je Wert ein Zeichen (J.1–J.3).
+#[test]
+fn stab_fernmeldeskizze_wire() {
+    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Komponentenart {
+        Repeater => "repeater",
+        Gateway => "gateway",
+        Basisstation => "basisstation",
+        MobileBasisstation => "mobile_basisstation",
+        Antenne => "antenne",
+        Vermittlung => "vermittlung",
+    } in lifeline_hub::stab::fernmeldeskizze::Komponentenart::ALLE);
+    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsart {
+        Telefon => "telefon",
+        Fax => "fax",
+        Daten => "daten",
+        Melder => "melder",
+        Bild => "bild",
+        Livestream => "livestream",
+        Richtfunk => "richtfunk",
+        Satellit => "satellit",
+        Sonstige => "sonstige",
+    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsart::ALLE);
+    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsmedium {
+        Funk => "funk",
+        Leitung => "leitung",
+    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsmedium::ALLE);
+    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verbindungsstatus {
+        Bestehend => "bestehend",
+        Geplant => "geplant",
+    } in lifeline_hub::stab::fernmeldeskizze::Verbindungsstatus::ALLE);
+    enum_wire!(lifeline_hub::stab::fernmeldeskizze::Verkehrsart {
+        Wechsel => "wechsel",
+        Gegen => "gegen",
+    } in lifeline_hub::stab::fernmeldeskizze::Verkehrsart::ALLE);
+    enum_wire!(lifeline_hub::stab::fernmeldeskizze::VsVermerk {
+        Keiner => "keiner",
+        VsNfd => "vs_nfd",
+    } in lifeline_hub::stab::fernmeldeskizze::VsVermerk::ALLE);
+    enum_wire!(lifeline_hub::stab::fernmeldeskizze::SkizzenBezugArt {
+        Fuehrungsstelle => "fuehrungsstelle",
+        Abschnitt => "abschnitt",
+        Einheit => "einheit",
+        Stelle => "stelle",
+        Komponente => "komponente",
+    } in lifeline_hub::stab::fernmeldeskizze::SkizzenBezugArt::ALLE);
+}
+
 #[test]
 fn stab_besetzung_art_wire() {
     enum_wire_as_str!(lifeline_hub::stab::BesetzungArt {

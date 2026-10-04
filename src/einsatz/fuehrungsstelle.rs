@@ -116,20 +116,12 @@ pub async fn patchen_tx(
         .await?;
     }
     if let Some(ids) = patch.sprechgruppe_ids {
-        sqlx::query("DELETE FROM einsatz_fuehrungsstelle_sprechgruppe WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?;
-        for &id in ids {
-            sqlx::query(
-                "INSERT OR IGNORE INTO einsatz_fuehrungsstelle_sprechgruppe \
-                 (einsatz_id, sprechgruppe_id) VALUES (?, ?)",
-            )
-            .bind(einsatz_id)
-            .bind(id)
-            .execute(&mut *conn)
-            .await?;
-        }
+        crate::sprechgruppe::repo::ersetzen_tx(
+            conn,
+            crate::sprechgruppe::repo::Zuordnungsziel::Fuehrungsstelle(einsatz_id),
+            ids,
+        )
+        .await?;
     }
     laden_tx(conn, einsatz_id).await
 }
