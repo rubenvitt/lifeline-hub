@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { render } from '@testing-library/react';
+import Markdown from '../components/Markdown';
 import type { EinsatzAnzeige, Person, Stab } from '../api/types';
 import { baueLagebild, type Rohdaten } from '../pages/lage-dashboard/lagebild';
 import {
@@ -227,6 +230,27 @@ describe('vorbereitungMarkdown', () => {
         '_Zusammengestellt aus den Modulen des Einsatzes; keine Vortragsgliederung._',
         '',
       ].join('\n'),
+    );
+  });
+
+  it('Werte und Notizen mit www., http(s):// und @ bleiben im Bericht Text (LFH-868)', () => {
+    const text = vorbereitungMarkdown(
+      [
+        {
+          schluessel: 'c',
+          titel: 'Letzter Lagebericht',
+          wert: 'www.thw-nord.de',
+          notiz: 'Lage <https://x.de> · ops@thw-nord.de · http://a.de',
+          quelle: 'Lageberichte',
+          zustand: 'daten',
+        },
+      ],
+      'X',
+    );
+    const { container } = render(createElement(Markdown, { unterEbene: 2, children: text }));
+    expect(container.querySelector('a')).toBeNull();
+    expect((container.textContent ?? '').replace(/\u2060/g, '')).toContain(
+      'www.thw-nord.de (Lage <https://x.de> · ops@thw-nord.de · http://a.de)',
     );
   });
 });

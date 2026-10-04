@@ -371,4 +371,19 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(container.querySelector('em')).toBeNull();
     expect(container.querySelector('a')).toBeNull();
   });
+
+  it('übernimmt Namen mit www., http(s):// und @ als Text, ohne Link (LFH-868)', () => {
+    const roh = ['www.thw-nord.de', 'https://thw.de/ov', '<https://x.de>', 'ops@thw-nord.de'];
+    const md = rendereFuehrungsorganisationMarkdown(
+      baueFuehrungsorganisation(
+        [abschnitt(1, { name: roh[0], leiter_name: roh[3] })],
+        [einheit(10, { name: roh[1], abschnitt_id: 1 }), einheit(11, { name: roh[2] })],
+      ),
+      { stand: 'x', stab: null, einheitenZustand: 'daten' },
+    );
+    const { container } = render(createElement(Markdown, { unterEbene: 1, children: md }));
+    expect(container.querySelector('a')).toBeNull();
+    const text = (container.textContent ?? '').replace(/\u2060/g, '');
+    for (const wert of roh) expect(text, wert).toContain(wert);
+  });
 });
