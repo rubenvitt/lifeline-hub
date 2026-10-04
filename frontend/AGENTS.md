@@ -152,7 +152,10 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   (`colorTextDescription`) und Kopf der `KatalogTabelle` lesen `gedaempft`, nie `schwach`;
   Formularmeldung über `Form`-Token in `alarmText`/`achtungText`, das globale `colorError` bleibt
   Füllfarbe; Standardknopf unter dem Zeiger in `bedienText`. Alles in `tokens.ts:antdToken`/
-  `antdKomponenten`, nicht je Stelle.
+  `antdKomponenten`, nicht je Stelle. Warn- und Erfolgstext (`Typography` `warning`/`success`,
+  LFH-876) liest `achtungText`/`normalText` über die Map-Tokens `colorWarningText`/
+  `colorSuccessText` in `antdToken`; `colorWarning`/`colorSuccess` bleiben Füllfarbe. Nachweis
+  `theme/statustextKontrast.test.ts`, `e2e/statustext-kontrast.spec.ts`.
 - Kontrast: `e2e/betroffene-kontrast.spec.ts` (Tag ≥ 7:1, Nacht ≥ 5:1, Alpha mitgerechnet).
 - **Kein eigener Knopfboden** (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung des
   Primärknopfs hält den Textboden in Ruhe und unter dem Zeiger; Werte und Messung am Wert in

@@ -144,6 +144,11 @@ export interface Farbrollen {
  * Rand eines Knopfs darauf: bedienFlaeche 3,34 · achtungFlaeche 3,43 · alarmFlaeche 3,22 ·
  * normalFlaeche 3,39 (antds Ableitung lag bei 2,16 · 1,96 · 3,20 · 1,57). Gerechnet in
  * `hinweisKontrast.test.ts`.
+ *
+ * Warn- und Erfolgstext (LFH-876, `antdToken`: `colorWarningText`/`colorSuccessText`):
+ * `achtungText` 7,23–9,22, `normalText` 7,19–9,18 auf jeder deckenden Fläche, knappstes Paar auf
+ * `flaeche3`; antds Ableitung (die Füllfarben) lag bei 5,43 bzw. 5,44. Gerechnet in
+ * `statustextKontrast.test.ts`.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -204,6 +209,8 @@ export const farbenHell: Farbrollen = {
  * Tabellenkopf auf kopf 7,48.
  * Hinweisflächen (LFH-739): `steuerRahmen` auf bedienFlaeche 3,32 · achtungFlaeche 3,26 ·
  * alarmFlaeche 3,48 · normalFlaeche 3,27 (antds Ableitung: 3,09 · 2,83 · 3,01 · 2,98).
+ * Warn- und Erfolgstext (LFH-876): `achtungText` ≥ 11,02, `normalText` ≥ 10,25 auf jeder deckenden
+ * Fläche, statt antds abgeleiteter Töne `#c8b034`/`#49aa19`, die in keiner Rolle stehen.
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#838b94` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
@@ -842,6 +849,17 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     // Der Platzhalter ist bei mehreren Filtern die EINZIGE Beschriftung. antds Ableitung aus
     // `colorTextQuaternary` lag unter 2,5 : 1; `schwach` hält den Textboden (Tag ≥ 7, Nacht ≥ 5).
     colorTextPlaceholder: farben.schwach,
+    // Warn- und Erfolgstext trägt die Textrolle des Status (LFH-876, Spec `textkontrast-rollen`).
+    // `Typography` `warning`/`success` liest diese Map-Tokens, nicht `colorWarning`/`colorSuccess`;
+    // antd leitete sie aus der Füllfarbe ab: am Tag die Füllfarbe selbst (5,43–6,94 : 1), nachts
+    // fremde Töne (`#c8b034`, `#49aa19`). Global statt als `Typography`-Komponententoken, weil die
+    // `…Text`-Tokens bei antd nur Schrift färben; die Füllfarben oben bleiben für Kante, Badge und
+    // Ikone. Leser bei antd 6.6.5 (`grep -rln 'colorWarningText\|colorSuccessText'
+    // node_modules/antd/es`): `typography/style`, für Gelb zusätzlich `input/style/variants.js`
+    // (Feldzusatz und gefülltes Feld mit Status), sonst nur die Token-Tabellen unter `version/` —
+    // alles Schrift. Wer antd hebt, prüft den grep.
+    colorWarningText: farben.achtungText,
+    colorSuccessText: farben.normalText,
 
     // Der Rahmen eines Steuerelements, nicht die dekorative Linie (Messwerte bei `farbenDunkel`).
     colorBorder: farben.steuerRahmen,
