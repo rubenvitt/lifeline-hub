@@ -3,6 +3,7 @@ import {
   ABSCHNITT_KLICK_LAYER,
   ZONEN_KLICK_LAYER,
   entscheideKlickziel,
+  istOrtsziel,
   ordneKlickebene,
 } from './klickziel';
 import {
@@ -391,5 +392,39 @@ describe('Klickebenen-Guard (LFH-764)', () => {
     for (const def of Object.values(FACHEBENEN).filter((d) => d.geometrieTyp === 'punkt')) {
       expect(fachebeneClickLayerIds(def), def.key).toContain(`fachebene-${def.key}-treffer`);
     }
+  });
+});
+
+/**
+ * Kontextmenü an der Kartenstelle (LFH-776, D2): es öffnet nur, wo der Tipp keinem Objekt gehört —
+ * freie Karte und Flächen; auf Punktzielen und Trefferzonen nicht.
+ */
+describe('istOrtsziel', () => {
+  const ziel = (merkmale: M[]) => entscheideKlickziel(merkmale, klick, projiziere);
+
+  it('freie Karte, eine Zone, ein Abschnitt, mehrere Flächen und eine Fachebenen-Fläche sind Orte', () => {
+    expect(istOrtsziel(ziel([]))).toBe(true);
+    expect(istOrtsziel(ziel([flaeche('zonen-fill', 3)]))).toBe(true);
+    expect(istOrtsziel(ziel([flaeche(ABSCHNITT_KLICK_LAYER, 9)]))).toBe(true);
+    expect(istOrtsziel(ziel([flaeche('zonen-fill', 3), flaeche(ABSCHNITT_KLICK_LAYER, 9)]))).toBe(
+      true,
+    );
+    expect(istOrtsziel(ziel([flaeche('fachebene-dwd-fill', 1)]))).toBe(true);
+  });
+
+  it('Markerzeichen, Trefferzone und Personen-Cluster sind keine Orte', () => {
+    expect(istOrtsziel(ziel([einheit, flaeche('zonen-fill', 3)]))).toBe(false);
+    expect(istOrtsziel(ziel([zoneVon('einheit-1', 5), flaeche('zonen-fill', 3)]))).toBe(false);
+    expect(istOrtsziel(ziel([personenCluster]))).toBe(false);
+  });
+
+  it('Fachebenen-Punkt, -Bündel und -Trefferzone sind keine Orte, auch über einer Fläche', () => {
+    expect(istOrtsziel(ziel([pegel, flaeche('zonen-fill', 3)]))).toBe(false);
+    expect(istOrtsziel(ziel([kritisBuendel]))).toBe(false);
+    expect(
+      istOrtsziel(
+        ziel([punkt('fachebene-pegelonline-treffer', 4, { uuid: 'p1' }), flaeche('zonen-fill', 3)]),
+      ),
+    ).toBe(false);
   });
 });

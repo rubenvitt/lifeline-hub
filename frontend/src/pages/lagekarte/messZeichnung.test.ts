@@ -207,3 +207,54 @@ describe('createMessung (LFH-616)', () => {
     expect(meldungen).toEqual([]);
   });
 });
+
+/**
+ * „Messen ab hier“ (LFH-776, D6): terra-draw hat keinen öffentlichen Weg, einen ersten Punkt zu
+ * setzen; `setzeStartpunkt` tippt ihn am Kartenelement des Adapters (Canvas) an der projizierten
+ * Bildschirmstelle — terra-draw rechnet sie über das Rechteck des Containers zurück.
+ */
+describe('createMessung: setzeStartpunkt (LFH-776)', () => {
+  function karteMitLage() {
+    const canvas = document.createElement('canvas');
+    const container = document.createElement('div');
+    container.getBoundingClientRect = () => ({ left: 100, top: 50 }) as DOMRect;
+    const projiziert: [number, number][] = [];
+    const map = {
+      getCanvas: () => canvas,
+      getContainer: () => container,
+      project: ([lng, lat]: [number, number]) => {
+        projiziert.push([lng, lat]);
+        return { x: 30, y: 40 };
+      },
+    } as unknown as MapLibreMap;
+    const ereignisse: PointerEvent[] = [];
+    for (const t of ['pointerdown', 'pointerup'])
+      canvas.addEventListener(t, (e) => ereignisse.push(e as PointerEvent));
+    return { map, ereignisse, projiziert };
+  }
+
+  it('tippt den Punkt als primären Linksklick an der Bildschirmstelle an', () => {
+    const { map, ereignisse, projiziert } = karteMitLage();
+    const m = createMessung(map, () => {});
+    m.starten('strecke');
+    m.setzeStartpunkt({ lng: 11.5, lat: 53.6 });
+    expect(projiziert).toEqual([[11.5, 53.6]]);
+    expect(ereignisse.map((e) => e.type)).toEqual(['pointerdown', 'pointerup']);
+    for (const e of ereignisse) {
+      expect(e.clientX).toBe(130);
+      expect(e.clientY).toBe(90);
+      expect(e.isPrimary).toBe(true);
+      expect(e.button).toBe(0);
+    }
+  });
+
+  it('ohne laufende Messung tut es nichts', () => {
+    const { map, ereignisse } = karteMitLage();
+    const m = createMessung(map, () => {});
+    m.setzeStartpunkt({ lng: 11.5, lat: 53.6 });
+    m.starten('strecke');
+    m.stoppen();
+    m.setzeStartpunkt({ lng: 11.5, lat: 53.6 });
+    expect(ereignisse).toEqual([]);
+  });
+});
