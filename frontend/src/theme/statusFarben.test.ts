@@ -43,7 +43,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle einunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle zweiunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -65,6 +65,7 @@ describe('Statusfarb-Vertrag', () => {
       'materialStatus',
       'medienkontaktStatus',
       'odlStufe',
+      'pegelZustand',
       'personStatus',
       'pressemitteilungStatus',
       'raeumungszustand',
@@ -191,7 +192,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(31);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(32);
   });
 });
 
@@ -254,6 +255,34 @@ describe('capSchwere (LFH-662)', () => {
     expect(sf.capSchwereVon('MINOR')).toEqual(sf.capSchwere.minor);
     expect(sf.capSchwereVon('Unknown')).toBeNull();
     expect(sf.capSchwereVon(null)).toBeNull();
+  });
+});
+
+describe('pegelZustand (LFH-881)', () => {
+  // Byte-Pin: das Wort ist der zweite Kanal (WCAG 1.4.1). Über MHW ist keine Meldestufe, deshalb
+  // `achtung` statt `alarm`; unter MNW ist das Gegenstück und trägt dieselbe Rolle
+  // (`openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D3).
+  it('bildet die drei aussagekräftigen PEGELONLINE-Zustände auf Rolle und Wort ab', () => {
+    expect(sf.pegelZustand).toEqual({
+      high: { rolle: 'achtung', label: 'Hoch' },
+      normal: { rolle: 'normal', label: 'Normal' },
+      low: { rolle: 'achtung', label: 'Niedrig' },
+    });
+  });
+
+  it('färbt keinen Zustand in Alarm oder Bedienblau', () => {
+    for (const d of Object.values(sf.pegelZustand)) {
+      expect(d.rolle).not.toBe('alarm');
+      expect(d.rolle).not.toBe('bedien');
+    }
+  });
+
+  it('schlägt nur die drei Wire-Werte nach, alles andere ist `null`', () => {
+    expect(sf.pegelZustandVon('high')).toEqual(sf.pegelZustand.high);
+    expect(sf.pegelZustandVon('low')).toEqual(sf.pegelZustand.low);
+    for (const v of ['unknown', 'commented', 'out-dated', 'constructor', '', null, undefined, 3]) {
+      expect(sf.pegelZustandVon(v)).toBeNull();
+    }
   });
 });
 

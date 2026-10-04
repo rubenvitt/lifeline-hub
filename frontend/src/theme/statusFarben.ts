@@ -540,6 +540,36 @@ export function capSchwereVon(schwere: unknown): StatusDarstellung | null {
   return Object.prototype.hasOwnProperty.call(capSchwere, k) ? capSchwere[k as CapSchwere] : null;
 }
 
+/** Die drei aussagekräftigen Werte von PEGELONLINE `stateMnwMhw`, wie die Quelle sie liefert. */
+type PegelZustand = 'high' | 'normal' | 'low';
+
+/**
+ * Zustand eines PEGELONLINE-Pegels gegenüber mittlerem Niedrig- (MNW) und Hochwasser (MHW),
+ * gezeigt im Fachebenen-Inspector (LFH-881,
+ * `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md`).
+ *
+ * Über MHW ist keine Meldestufe, nur höher als das Mittel der Jahreshöchststände: `achtung`,
+ * nicht `alarm`, den auf der Lagekarte das große Hochwasser von {@link hochwasserKlasse} trägt
+ * (D1). Unter MNW ist das Gegenstück und trägt dieselbe Rolle; das Wort unterscheidet (D2).
+ */
+export const pegelZustand: Record<PegelZustand, StatusDarstellung> = {
+  high: { rolle: 'achtung', label: 'Hoch' },
+  normal: { rolle: 'normal', label: 'Normal' },
+  low: { rolle: 'achtung', label: 'Niedrig' },
+};
+
+/**
+ * Nachschlag in {@link pegelZustand}. `unknown`, `commented`, `out-dated` und alles andere sagen
+ * nichts über den Wasserstand aus → `null`; `hasOwnProperty`, damit `constructor` nicht in den
+ * Prototyp greift (D4).
+ */
+export function pegelZustandVon(zustand: unknown): StatusDarstellung | null {
+  if (typeof zustand !== 'string') return null;
+  return Object.prototype.hasOwnProperty.call(pegelZustand, zustand)
+    ? pegelZustand[zustand as PegelZustand]
+    : null;
+}
+
 /**
  * Die drei Rollen, die eine Kennzahl **stufen** können, als VERENGUNG von {@link Statusrolle}.
  * `Extract<>` statt einer zweiten Literalliste, damit eine Umbenennung im Vertrag die
