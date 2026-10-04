@@ -123,7 +123,7 @@ export default function KraftZeitachse({
   });
 
   // ── Zuflussschleuse (LFH-861) ───────────────────────────────────────────────────────
-  const kraft = `${art}:${id}`;
+  const kraft = `${einsatzId}:${art}:${id}`;
   const liste = useRef<HTMLDivElement>(null);
   const fokusDrin = useRef(false);
   const zeigerDrin = useRef(false);
