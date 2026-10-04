@@ -279,10 +279,9 @@ for (const dichte of DICHTEN) {
       abfragen.freigeben();
       await endzustand(page);
       const nachher = (await band(page).boundingBox())?.height ?? Number.NaN;
-      hoehen.push(`${folge}: ${vorher.toFixed(1)} → ${nachher.toFixed(1)}`);
-      expect
-        .soft(Math.abs(nachher - vorher), `${dichte}, ${folge}: ${hoehen.at(-1)}`)
-        .toBeLessThanOrEqual(1);
+      const messwert = `${folge}: ${vorher.toFixed(1)} → ${nachher.toFixed(1)}`;
+      hoehen.push(messwert);
+      expect.soft(Math.abs(nachher - vorher), `${dichte}, ${messwert}`).toBeLessThanOrEqual(1);
     }
     test.info().annotations.push({ type: 'messwert', description: hoehen.join(' | ') });
   });
