@@ -322,7 +322,7 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
   let antwort: Promise<unknown> | undefined;
   let standVorher: string | null = null;
   let abrufeVorher = 0;
-  let laufVorher = 0;
+  let laufVorher = '';
   for (let versuch = 1; !antwort; versuch += 1) {
     expect(versuch, 'die Liste kam in drei Anläufen nicht zur Ruhe').toBeLessThanOrEqual(3);
     await expect.poll(gealtert, { timeout: 30_000, intervals: [250] }).toBe(true);
