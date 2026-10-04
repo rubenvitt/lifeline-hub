@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
   erstesFreigegebenesModul,
+  freiesRueckwegModul,
+  istModulGesperrt,
   kategorien,
   modulAusPfad,
   moduleNachKategorie,
@@ -15,6 +17,7 @@ import {
   type KategorieKey,
   type ModulEintrag,
 } from './modulRegistry';
+import ModulGesperrt from './ModulGesperrt';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -39,7 +42,7 @@ import {
 } from '../components/Kopfleiste';
 import { SeitenSackgasse } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
-import type { EinsatzAnzeige } from '../api/types';
+import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
 import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
 import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
@@ -436,7 +439,19 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
             <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} freigaben={modulFreigaben} />
-            <Outlet />
+            {/* Modulwächter (LFH-888, Spec `modul-freigabe`, design.md D1): meldet der Server für
+               das Modul der Route `zugriff: false`, steht der Hinweis an der Stelle der Seite —
+               auch für Unterrouten (`modulAusPfad`). Lesart der Navigation: unbekannte Freigaben
+               (Laden, Fehler) sperren nicht, dann bleibt der 403-Zustand der Seite das Netz. */}
+            {aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
+              <GesperrtesModul
+                einsatzId={einsatzId}
+                modul={aktuellesModul}
+                freigaben={modulFreigaben!}
+              />
+            ) : (
+              <Outlet />
+            )}
           </EinsatzAnzeigeProvider>
         </Content>
       </Layout>
@@ -467,5 +482,41 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         </Drawer>
       )}
     </Layout>
+  );
+}
+
+/**
+ * Der Wächter-Hinweis mit Rückweg (LFH-888, design.md D3): das freie Standardmodul, sonst der
+ * Überblick, sonst das erste freie Modul. Der Knopf erscheint erst nach dem Laden der
+ * Einstellungen — sonst zeigte er kurz auf den Überblick und wechselte unter dem Zeigefinger
+ * (wie `ModulStub`).
+ */
+function GesperrtesModul({
+  einsatzId,
+  modul,
+  freigaben,
+}: {
+  einsatzId: number;
+  modul: ModulEintrag;
+  freigaben: ModulFreigaben;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: einsatzKeys.einstellungen(einsatzId),
+    queryFn: () => ladeEinstellungen(einsatzId),
+  });
+  const ziel = freiesRueckwegModul(freigaben, data?.standard_modul);
+  return (
+    <ModulGesperrt
+      modul={modul}
+      ausgeblendet={freigaben[modul.key]?.sichtbar === false}
+      rueckweg={
+        isLoading
+          ? undefined
+          : {
+              pfad: einsatzModulPfad(einsatzId, modulZielRoute(ziel)),
+              label: `${ziel.label} öffnen`,
+            }
+      }
+    />
   );
 }

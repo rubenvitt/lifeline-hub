@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { freigabenFixture } from '../test/fixtures';
 import ModulStub from './ModulStub';
 import type { ModulEintrag } from './modulRegistry';
 
@@ -84,6 +85,20 @@ describe('ModulStub', () => {
     server.use(
       http.get('/api/einsaetze/7/einstellungen', () =>
         HttpResponse.json({ einsatz_id: 7, standard_modul: 'wip-probe' }),
+      ),
+    );
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Überblick öffnen' }));
+    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/7/ueberblick');
+  });
+
+  it('überspringt ein gesperrtes Standardmodul im Rückweg (LFH-888)', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 7, standard_modul: 'einheiten' }),
+      ),
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
     rendern();

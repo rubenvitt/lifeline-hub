@@ -4,7 +4,7 @@ import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben } from '../api/types';
 import { SeitenFehler, SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
-import { istKeyFreigegeben } from '../einsatz/modulRegistry';
+import { freiesRueckwegModul, istKeyFreigegeben, modulZielRoute } from '../einsatz/modulRegistry';
 import { einsatzModulPfad } from '../routing/deeplinks';
 
 /**
@@ -20,7 +20,7 @@ import { einsatzModulPfad } from '../routing/deeplinks';
 export type StabFreigabe =
   | { zustand: 'laden' }
   | { zustand: 'fehler'; fehler: unknown; wiederholen: () => void }
-  | { zustand: 'gesperrt' }
+  | { zustand: 'gesperrt'; freigaben: ModulFreigaben }
   | { zustand: 'frei'; freigaben: ModulFreigaben };
 
 export function useStabFreigabe(einsatzId: number): StabFreigabe {
@@ -39,7 +39,7 @@ export function useStabFreigabe(einsatzId: number): StabFreigabe {
     }
     return { zustand: 'laden' };
   }
-  if (!istKeyFreigegeben('stab', freigaben)) return { zustand: 'gesperrt' };
+  if (!istKeyFreigegeben('stab', freigaben)) return { zustand: 'gesperrt', freigaben };
   return { zustand: 'frei', freigaben };
 }
 
@@ -71,13 +71,20 @@ export function stabFreigabeAnzeige(
           onWiederholen={freigabe.wiederholen}
         />
       );
-    case 'gesperrt':
+    case 'gesperrt': {
+      // Rückweg in ein freies Modul (LFH-888, design.md D3): fest der Überblick führte in eine
+      // zweite Sackgasse, wenn auch er gesperrt ist.
+      const ziel = freiesRueckwegModul(freigabe.freigaben);
       return (
         <SeitenSackgasse
           titel={`${seite.titel} nicht verfügbar`}
           hinweis={`Das Modul Stab ist in diesem Einsatz nicht freigegeben; ${seite.mitArtikel} gehört dazu.`}
-          rueckweg={{ pfad: einsatzModulPfad(einsatzId, 'ueberblick'), label: 'Zum Überblick' }}
+          rueckweg={{
+            pfad: einsatzModulPfad(einsatzId, modulZielRoute(ziel)),
+            label: `${ziel.label} öffnen`,
+          }}
         />
       );
+    }
   }
 }

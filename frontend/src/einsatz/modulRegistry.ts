@@ -562,6 +562,48 @@ export function istKeyFreigegeben(key: string, freigaben?: ModulFreigaben): bool
 }
 
 /**
+ * Grund einer Sperre an einem Bedienelement (M16: erklären statt stumm wegschalten). EINE
+ * Konstante für Navigation, Sprungstellen und Kartenebenen: eine abweichende Fassung fiele
+ * niemandem auf, weil jede Stelle für sich plausibel aussieht.
+ */
+export const KEINE_BERECHTIGUNG = 'Keine Berechtigung';
+
+/**
+ * Ist ein Sprung in das Modul `key` gesperrt (LFH-888, Spec `modul-freigabe`)? Die Lesart der
+ * Navigation ({@link istModulGesperrt}): gesperrt nur, wenn der Server `zugriff: false` meldet.
+ * Solange die Freigaben unbekannt sind, steht der Sprung offen — ein Kopfknopf, der beim Laden
+ * gesperrt aufblitzt, wäre falsch, und ein früher Klick landet im Modulwächter des Rahmens.
+ * NICHT {@link istKeyFreigegeben}: dessen strenge Lesart ist für Datenabrufe gedacht.
+ */
+export function istSprungGesperrt(key: string, freigaben?: ModulFreigaben): boolean {
+  return freigaben?.[key]?.zugriff === false;
+}
+
+/**
+ * Rückweg aus einer Sackgasse (Modulwächter, Platzhalter, Stab ohne Freigabe; LFH-888): das
+ * Standardmodul des Einsatzes, wenn es frei ist, sonst der Überblick, sonst das erste freie Modul
+ * in Registry-Reihenfolge, zuletzt die Einsatzdaten (nie gesperrt). „Frei" in der strengen Lesart
+ * ({@link istModulFreigegeben}), damit der Rückweg nie selbst in den Wächter führt. Den Pfad baut
+ * der Aufrufer über {@link modulZielRoute}.
+ */
+export function freiesRueckwegModul(
+  freigaben: ModulFreigaben | undefined,
+  standardModul?: string | null,
+  register: ModulEintrag[] = modulRegistry,
+): ModulEintrag {
+  const frei = (key: string | null | undefined) => {
+    const modul = register.find((m) => m.key === key);
+    return modul && istModulFreigegeben(modul, freigaben) ? modul : undefined;
+  };
+  return (
+    frei(standardModul) ??
+    frei('ueberblick') ??
+    register.find((m) => istModulFreigegeben(m, freigaben)) ??
+    register.find((m) => m.key === 'einsatzdaten')!
+  );
+}
+
+/**
  * Ziel der Default-Route /einsaetze/:id: der Führungsüberblick, solange er fertig ist, sonst
  * der ETB-Fallback.
  */

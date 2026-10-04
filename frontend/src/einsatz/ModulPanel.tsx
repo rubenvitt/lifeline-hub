@@ -1,7 +1,12 @@
 import { IconExternPfeil, IconSchloss, IconSchraubenschluessel } from '../icons';
 import type { CSSProperties } from 'react';
 import { theme } from 'antd';
-import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
+import {
+  istModulGesperrt,
+  istModulSichtbar,
+  KEINE_BERECHTIGUNG,
+  type ModulEintrag,
+} from './modulRegistry';
 import { navZeilen, sprungZiel, type Sprungmarke } from './sprungmarken';
 import { form, schrift, type Farbrollen } from '../theme/tokens';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
@@ -165,7 +170,7 @@ export function ModulListe({
               type="button"
               data-lfh="modul-sprungmarke"
               disabled={gesperrt}
-              title={gesperrt ? 'Keine Berechtigung' : `Springt zu ${marke.hinweis}`}
+              title={gesperrt ? KEINE_BERECHTIGUNG : `Springt zu ${marke.hinweis}`}
               // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen", wer vorliest, soll vorher
               // wissen, dass er im ETB landet.
               aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
@@ -205,7 +210,7 @@ export function ModulListe({
             key={m.key}
             type="button"
             disabled={gesperrt}
-            title={gesperrt ? 'Keine Berechtigung' : undefined}
+            title={gesperrt ? KEINE_BERECHTIGUNG : undefined}
             aria-current={aktiv ? 'true' : undefined}
             aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
             onClick={() => !gesperrt && onModulKlick(m)}
