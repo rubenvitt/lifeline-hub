@@ -347,10 +347,13 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
     - 30.09.2026: 113 von 113 Strecken leer, jede mit HTTP 200 (LFH-596). Gegenprobe im
       selben Lauf: `…/A1/services/roadworks` lieferte 236 Einträge, die Quelle selbst lief
       also. Die Streckenliste schwankt (am selben Tag einmal 114, einmal 113 Einträge).
+    - 03.10.2026: 109 von 109 Strecken leer, jede mit HTTP 200 und `{"webcam":[]}`, seriell
+      abgefragt (LFH-857). Die Streckenliste hatte roh 110 Einträge, darunter wieder `"A60 "`.
+      Gegenprobe im selben Lauf: `…/A1/services/roadworks` lieferte 237 Einträge.
 
     Weil nie echte Webcam-Daten ankamen, ist der Weg bis zur Karte nur gegen die Spec
     belegt, nicht gegen die Quelle. Das betrifft auch `coordinate`, das im Spec-Beispiel als
-    String steht (`autobahn_zahl` nimmt Zahl und String). Nächste Prüfung: LFH-857.
+    String steht (`autobahn_zahl` nimmt Zahl und String). Nächste Prüfung: LFH-1017.
   * Das **Webcam-Standbild lädt der Browser direkt beim Betreiber** (die Quelle liefert nur
     die URL, nicht das Bild) — anders als alle übrigen Fachebenen-Daten läuft es also NICHT
     über den Backend-Proxy. Ohne Internet am Gerät lädt es nicht; das Detailpanel blendet
