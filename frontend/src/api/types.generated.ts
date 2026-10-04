@@ -2271,6 +2271,29 @@ export interface components {
             rechtsgrundlage: string;
         };
         /**
+         * @description Eine gepflegte Stelle samt ihren Verbindungen.
+         *
+         *     `funktion_label` ist das wirksame Mandantenlabel („S3 Einsatz“), vom Server aufgelöst, damit
+         *     die Seite den Katalog nicht braucht — auch nicht ohne Netz (design.md D3, D9).
+         */
+        KommunikationsStelle: {
+            bezeichnung?: string | null;
+            funktion?: components["schemas"]["Fuehrungsfunktion"] | null;
+            funktion_label?: string | null;
+            /** Format: int64 */
+            id: number;
+            stellenart: components["schemas"]["Stellenart"];
+            verbindungen: components["schemas"]["KommunikationsVerbindung"][];
+        };
+        /** @description Eine Verbindung einer Stelle. */
+        KommunikationsVerbindung: {
+            hinweis?: string | null;
+            /** Format: int64 */
+            id: number;
+            mittel: components["schemas"]["Verbindungsmittel"];
+            wert: string;
+        };
+        /**
          * @description Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
          * @enum {string}
          */
@@ -3768,6 +3791,14 @@ export interface components {
             /** Format: int64 */
             stelle_id: number;
         };
+        /**
+         * @description Art einer gepflegten Stelle des Kommunikationsplans. Wire == `as_str()`.
+         *
+         *     `ALLE` ist die Anzeigereihenfolge: Funktionen zuerst, dann die externen Stellen in dieser
+         *     Folge (die Leitstelle ist die wichtigste Gegenstelle außerhalb des Einsatzes).
+         * @enum {string}
+         */
+        Stellenart: "funktion" | "leitstelle" | "behoerde" | "verbindungsperson" | "sonstige";
         /** @description Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
         StichwortVorschlag: {
             /** Format: int64 */
@@ -3934,6 +3965,15 @@ export interface components {
          * @enum {string}
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
+        /**
+         * @description Mittel einer Verbindung. Wire == `as_str()`.
+         *
+         *     Bewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine
+         *     Erreichbarkeit je Datensatz, design.md D2). Funk steht im Funkplan; eine ISSI oder
+         *     Einzelrufnummer ist `sonstiges` mit Hinweis.
+         * @enum {string}
+         */
+        Verbindungsmittel: "festnetz" | "mobil" | "fax" | "email" | "messenger" | "melder" | "sonstiges";
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];

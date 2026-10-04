@@ -487,6 +487,12 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,
   /** Checkliste Arbeitsaufnahme (LFH-551), ebenfalls unter dem Stab-Prefix: kein eigenes Ereignis. */
   stabCheckliste: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId, 'checkliste'] as const,
+  /**
+   * Kommunikationsplan (LFH-848), unter dem Stab-Prefix: das `stab`-Ereignis trifft ihn mit. Als
+   * einziger Stab-Key ohne Netz lesbar (`LAGEBILD_OFFLINE.einsatzUnterKeys`, design.md D9).
+   */
+  stabKommunikationsplan: (einsatzId: number) =>
+    [EINSATZ_KEYS.stab, einsatzId, 'kommunikationsplan'] as const,
 
   // Dokumentenablage.
   dokumente: (einsatzId: number) => [EINSATZ_KEYS.dokumente, einsatzId] as const,
@@ -845,7 +851,12 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.lageSnapshot,
   ],
   /** Einzelne Sub-Keys eines sonst ungelisteten Prefix: `[prefix, einsatzId, sub]`. */
-  einsatzUnterKeys: [[EINSATZ_KEYS.meldungen, 'rueckmeldungen']],
+  einsatzUnterKeys: [
+    [EINSATZ_KEYS.meldungen, 'rueckmeldungen'],
+    // Kommunikationsplan (LFH-848, design.md D9): die Telefonliste wird gebraucht, wenn der Server
+    // weg ist. Besetzung und Lagebesprechungen unter demselben Prefix bleiben draußen.
+    [EINSATZ_KEYS.stab, 'kommunikationsplan'],
+  ],
   global: [
     GLOBAL_KEYS.einsaetze,
     GLOBAL_KEYS.karteConfig,

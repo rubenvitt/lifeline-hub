@@ -426,6 +426,40 @@ export type ChecklistenPunkt = S['ChecklistenPunkt'];
  */
 export type ChecklistenPunktBody = { erledigt: boolean } | { bemerkung: string | null };
 
+// Kommunikationsplan des S6 (LFH-848).
+export type KommunikationsStelle = S['KommunikationsStelle'];
+export type KommunikationsVerbindung = S['KommunikationsVerbindung'];
+export type Stellenart = S['Stellenart'];
+export type Verbindungsmittel = S['Verbindungsmittel'];
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/stab/kommunikationsplan/stellen`, FE-lokal.
+ * `funktion` nur bei `stellenart: 'funktion'`; `bezeichnung` Pflicht bei externen Stellen und bei
+ * Führungshilfspersonal/Fachberater, sonst weglassen (422).
+ */
+export interface NeueKommunikationsStelle {
+  stellenart: Stellenart;
+  funktion?: Fuehrungsfunktion;
+  bezeichnung?: string;
+}
+
+/** Kein Backend-Schema: Eingabe-Body von `POST …/stellen/{sid}/verbindungen`, FE-lokal. */
+export interface NeueVerbindung {
+  mittel: Verbindungsmittel;
+  wert: string;
+  hinweis?: string;
+}
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/kommunikationsplan/verbindungen/{vid}`. Fehlt =
+ * unverändert, `hinweis: null` löscht. Unbekannte Felder lehnt der Server mit 400 ab.
+ */
+export interface VerbindungPatch {
+  mittel?: Verbindungsmittel;
+  wert?: string;
+  hinweis?: string | null;
+}
+
 /**
  * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.
  * `personal_id` ist `einsatz_personal.id` (= `EinsatzPersonal.id`). Überzählige Felder sind 422;

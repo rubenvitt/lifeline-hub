@@ -29,6 +29,7 @@ import {
   schaedenPfad,
   stabPfad,
   funkplanPfad,
+  kommunikationsplanPfad,
   infotelefonPfad,
   pressePfad,
   pressemitteilungPfad,
@@ -396,6 +397,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parseRouteId(q.get('kontakt') ?? undefined)).toBe(12);
   });
 
+  it('kommunikationsplanPfad liegt unter dem Stab (LFH-848)', () => {
+    expect(kommunikationsplanPfad(E)).toBe('/einsaetze/5/stab/kommunikationsplan');
+  });
   it('funkplanPfad liegt unter dem Stab (LFH-548)', () => {
     expect(funkplanPfad(E)).toBe('/einsaetze/5/stab/funkplan');
   });
@@ -404,9 +408,16 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       '/einsaetze/5/stab/funkplan?ansicht=skizze',
     );
   });
-  it('parseFunkplanAnsicht liest beide Darstellungen und verwirft einen unbekannten Wert GANZ', () => {
+  it('parseFunkplanAnsicht liest alle drei Darstellungen und verwirft einen unbekannten Wert GANZ', () => {
     expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=skizze'))).toBe('skizze');
     expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=tabelle'))).toBe('tabelle');
+    // Dritte Darstellung „Sprechgruppen“ (LFH-848 D8).
+    expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=sprechgruppen'))).toBe(
+      'sprechgruppen',
+    );
+    expect(funkplanPfad(E, { ansicht: 'sprechgruppen' })).toBe(
+      '/einsaetze/5/stab/funkplan?ansicht=sprechgruppen',
+    );
     expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=quatsch'))).toBeUndefined();
     expect(parseFunkplanAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();
     expect(parseFunkplanAnsicht(new URLSearchParams(''))).toBeUndefined();

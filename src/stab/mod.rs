@@ -19,6 +19,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 pub mod checkliste;
+pub mod kommunikation;
 pub mod repo;
 
 wire_enum! {

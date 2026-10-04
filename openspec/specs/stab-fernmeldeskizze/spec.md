@@ -10,7 +10,7 @@ aus den gepflegten Abschnitten und Einheiten abgeleitet und hat keine eigene Dat
 ### Requirement: Zweite Darstellung des Funkplans
 
 Die Fernmeldeskizze SHALL als zweite Darstellung der Funkplan-Seite erreichbar sein. Ein Umschalter
-„Tabelle | Skizze“ steht auf der Seite. Die Sichtvorgabe `?ansicht=skizze` öffnet die Skizze, danach
+„Tabelle | Skizze | Sprechgruppen“ steht auf der Seite. Die Sichtvorgabe `?ansicht=skizze` öffnet die Skizze, danach
 wird der Parameter aus der Adresse entfernt, ein unbrauchbarer Wert ebenso. Die Skizze MUST NOT als
 eigenes Modul erscheinen. Sie MUST die Stab-Freigabe der Funkplan-Seite erben.
 

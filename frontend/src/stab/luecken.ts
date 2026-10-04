@@ -1,5 +1,5 @@
 import { schlechtesterZustand, type AbrufZustand } from '../api/abrufZustand';
-import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import type { Einheit, Einsatzabschnitt, KommunikationsStelle, Sprechgruppe } from '../api/types';
 import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from './fuehrungsstelle';
 
 /**
@@ -64,6 +64,22 @@ export function lokaleSprechgruppenOhneZuordnung(
     zustand,
     treffer: sprechgruppen.daten.filter((s) => s.einsatz_lokal && !zugeordnet.has(s.id)),
   };
+}
+
+/**
+ * Kommunikationsplan (LFH-848): fehlt der Draht zur Leitstelle? Erst wenn keine Stelle der Art
+ * Leitstelle eine Verbindung trägt; eine Leitstelle ohne Verbindung zählt als fehlend. Ohne
+ * geladene Stellen gibt es kein Urteil, der Zustand sagt warum.
+ */
+export function leitstelleOhneVerbindung(stellen: Quelle<KommunikationsStelle>): {
+  zustand: AbrufZustand;
+  fehlt: boolean;
+} {
+  if (stellen.zustand !== 'daten') return { zustand: stellen.zustand, fehlt: false };
+  const erfasst = stellen.daten.some(
+    (s) => s.stellenart === 'leitstelle' && s.verbindungen.length > 0,
+  );
+  return { zustand: 'daten', fehlt: !erfasst };
 }
 
 // ── Verbindungen (LFH-625 D3) ──────────────────────────────────────────────────────────────────
