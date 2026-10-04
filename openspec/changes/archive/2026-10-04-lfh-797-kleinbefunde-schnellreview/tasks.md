@@ -50,4 +50,6 @@ Jede Aufgabe per TDD: erst der rote Test (bzw. die Mutationsprobe), dann die Än
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh` grün (Rust- und Frontend-Bündel).
+- [x] 4.1 `./scripts/check-all.sh` grün. Lokal (Cloud-Sitzung, 04.10.2026): Bündel `schnell`,
+  `rust` (4109 Tests, Hülle eingeschlossen) und `frontend` grün. `e2e` belegt die CI des PRs:
+  im Container fehlen die Playwright-Browser der gepinnten Version.
