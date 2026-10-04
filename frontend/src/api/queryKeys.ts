@@ -133,8 +133,15 @@ export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
  * - `lagged`: rein abgeleitet (Union aller Keys hier, dedupliziert) → im Hook.
  */
 export const EINSATZ_STREAM_EVENTS = {
-  // Ablegen und Entfernen einer UHS-Datei verteilen `uhs` (LFH-758).
-  uhs: [EINSATZ_KEYS.uhs, EINSATZ_KEYS.uhsAnhaenge, EINSATZ_KEYS.lagemonitor],
+  // Ablegen und Entfernen einer UHS-Datei verteilen `uhs` (LFH-758). Das Detail trägt die Plätze
+  // und ist live, weil der UHS-Laptop den Grundriss offen hält, den die Einsatzleitung ändert
+  // (LFH-892).
+  uhs: [
+    EINSATZ_KEYS.uhs,
+    EINSATZ_KEYS.uhsDetail,
+    EINSATZ_KEYS.uhsAnhaenge,
+    EINSATZ_KEYS.lagemonitor,
+  ],
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Anhangliste der Detailseite hängt
   // deshalb mit daran.
   schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenAnhaenge],
@@ -146,7 +153,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.kraefteZeitachse,
   ],
-  material: [EINSATZ_KEYS.material],
+  // Das UHS-Detail trägt das dort verortete Material (LFH-892).
+  material: [EINSATZ_KEYS.material, EINSATZ_KEYS.uhsDetail],
   // Ablegen und Entfernen einer Tier-Datei verteilen `tier` (LFH-758).
   tier: [EINSATZ_KEYS.tiere, EINSATZ_KEYS.tierAnhaenge],
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],
@@ -263,7 +271,7 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *
  * - `einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event. Der
  *   Einsatzkopf `einsatz` ist seit LFH-555 live.
- * - `uhsDetail`/`person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
+ * - `person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
  *   eines anderen Nutzers propagiert nicht live.
@@ -303,7 +311,6 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.ortSuche,
   EINSATZ_KEYS.anhangHeicVorschau,
-  EINSATZ_KEYS.uhsDetail,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
   EINSATZ_KEYS.tier,

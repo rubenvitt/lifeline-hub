@@ -13,6 +13,7 @@ import type { Meldung, MeldungPrioritaet, NeueMeldung, Person, UhsDetail } from 
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
+import { ErfassungsFormular } from '../components/Erfassung';
 import { Kennzahl, Kennzahlenband, Paneel, Segmentleiste } from '../components/instrument';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -102,6 +103,27 @@ function PlaetzeBereich({ einsatzId, uhs }: { einsatzId: number; uhs: UhsDetail 
 
 interface MeldungWerte {
   inhalt: string;
+  prioritaet: MeldungPrioritaet;
+}
+
+const MELDUNG_START: MeldungWerte = { inhalt: '', prioritaet: 'normal' };
+
+/** Segmentleiste als Formularfeld (`value`/`onChange` von `Form.Item`). */
+function PrioritaetFeld({
+  value = 'normal',
+  onChange,
+}: {
+  value?: MeldungPrioritaet;
+  onChange?: (wert: MeldungPrioritaet) => void;
+}) {
+  return (
+    <Segmentleiste
+      beschriftung="Priorität"
+      wert={value}
+      onWechsel={(w) => onChange?.(w)}
+      optionen={PRIORITAETEN}
+    />
+  );
 }
 
 /**
@@ -123,7 +145,6 @@ function MeldungenBereich({
   const { message } = App.useApp();
   const fehler = useFehlerMeldung();
   const [form] = Form.useForm<MeldungWerte>();
-  const [prioritaet, setPrioritaet] = useState<MeldungPrioritaet>('normal');
 
   const meldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungen(einsatzId),
@@ -137,9 +158,8 @@ function MeldungenBereich({
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfasseMeldungOfflineFaehig(benutzer.id, einsatzId, d);
     },
+    // Leeren übernimmt `ErfassungsFormular`, und nur nach Erfolg; abgelehnt bleibt der Wortlaut.
     onSuccess: (ergebnis) => {
-      form.resetFields();
-      setPrioritaet('normal');
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning('Offline vorgemerkt — Meldung wird bei Verbindung gesendet');
         return;
@@ -156,8 +176,8 @@ function MeldungenBereich({
       absender,
       empfaenger: 'Einsatzleitung',
       meldeweg: 'sonstige',
-      meldungsart: prioritaet === 'sofort' ? 'sofortmeldung' : 'sonstige',
-      prioritaet,
+      meldungsart: w.prioritaet === 'sofort' ? 'sofortmeldung' : 'sonstige',
+      prioritaet: w.prioritaet,
       inhalt: w.inhalt.trim(),
       ereigniszeit: alsBackendZeit(serverJetzt()),
     });
@@ -170,7 +190,15 @@ function MeldungenBereich({
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       {!schreibgeschuetzt && (
         <Paneel titel="Meldung an die Einsatzleitung">
-          <Form<MeldungWerte> form={form} layout="vertical" onFinish={absenden}>
+          <ErfassungsFormular<MeldungWerte>
+            form={form}
+            initialValues={MELDUNG_START}
+            onErfassen={absenden}
+            // Inline: nach dem Senden bleibt das Formular stehen, leer, für die nächste Meldung.
+            onFertig={() => {}}
+            laeuft={senden.isPending}
+            erfassenText="Meldung senden"
+          >
             <Form.Item<MeldungWerte>
               name="inhalt"
               label="Inhalt"
@@ -178,18 +206,10 @@ function MeldungenBereich({
             >
               <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} />
             </Form.Item>
-            <Form.Item label="Priorität">
-              <Segmentleiste
-                beschriftung="Priorität"
-                wert={prioritaet}
-                onWechsel={setPrioritaet}
-                optionen={PRIORITAETEN}
-              />
+            <Form.Item<MeldungWerte> name="prioritaet" label="Priorität">
+              <PrioritaetFeld />
             </Form.Item>
-            <Button type="primary" htmlType="submit" loading={senden.isPending}>
-              Meldung senden
-            </Button>
-          </Form>
+          </ErfassungsFormular>
         </Paneel>
       )}
       <Paneel titel="Eigene Meldungen">

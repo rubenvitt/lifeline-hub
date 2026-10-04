@@ -35,6 +35,12 @@ Betroffenen, Patienten oder Einsatzkräften MUST er nicht anzeigen und nicht vom
 - **THEN** zeigt der Monitor für die UHS Nord die Zahl 3
 - **AND** enthält die Antwort des Servers keine Namen und keine Personenkennungen
 
+#### Scenario: Freitexte im Einsatzkopf
+
+- **WHEN** der Sachverhalt des Einsatzes „Herr Muster gestürzt“ lautet
+- **THEN** erhält der Monitor den Einsatzkopf ohne Sachverhalt, meldende Stelle und Ortsangabe
+- **AND** behält er den Punkt des Einsatzorts für die Karte
+
 ### Requirement: Lesbar aus der Entfernung
 
 Der Lagemonitor SHALL für Großbild ausgelegt sein: Kennzahlen mindestens 72 px, jeder Text

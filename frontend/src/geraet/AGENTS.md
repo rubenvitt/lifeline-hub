@@ -34,7 +34,8 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Handschuh-Stufe wählt das Gerätemenü.
 - **Lagemonitor (Großbild):** feste Kachelung ohne Bildlauf bei 1920 × 1080, Kacheln und Karte
   ohne Bedienung; Kennzahlen mindestens 72 px, jeder Text mindestens 28 px; keine Namen und keine
-  Personenkennungen, auch nicht in der Serverantwort; Datenstand älter als 2 Minuten
+  Personenkennungen, auch nicht in der Serverantwort (der Einsatzkopf kommt ohne Sachverhalt,
+  meldende Stelle und Ortsangabe, `routes/einsatz.rs` `detail`); Datenstand älter als 2 Minuten
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe.
   Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
   nur für diese Ansicht); Personen-Ereignisse erreichen ihn nicht, deshalb holt

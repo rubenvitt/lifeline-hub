@@ -145,11 +145,14 @@ function Zahl({
   bezeichnung,
   groesse = GROSS.kennzahlKlein,
   farbe,
+  zeilen = 1,
 }: {
   wert: number | string;
   bezeichnung: string;
   groesse?: number;
   farbe?: string;
+  /** Zeilen der Bezeichnung; ein UHS-Name bricht um, statt in der Mitte abzureißen. */
+  zeilen?: 1 | 2;
 }) {
   const { rollen } = useRollen();
   return (
@@ -167,13 +170,26 @@ function Zahl({
         {wert}
       </span>
       <span
-        style={{
-          fontSize: GROSS.text,
-          color: rollen.gedaempft,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
+        style={
+          zeilen === 1
+            ? {
+                fontSize: GROSS.text,
+                color: rollen.gedaempft,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }
+            : {
+                fontSize: GROSS.text,
+                lineHeight: 1.2,
+                color: rollen.gedaempft,
+                display: '-webkit-box',
+                WebkitLineClamp: zeilen,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                overflowWrap: 'anywhere',
+              }
+        }
       >
         {bezeichnung}
       </span>
@@ -243,6 +259,7 @@ function Kacheln({ lage }: { lage: LagemonitorAnzeige }) {
                 <Zahl
                   wert={u.plaetze > 0 ? `${u.belegt}/${u.plaetze}` : u.belegt}
                   bezeichnung={u.bezeichnung}
+                  zeilen={2}
                 />
               </div>
             ))}
@@ -316,7 +333,9 @@ function Geraetemenue({ onSchliessen }: { onSchliessen: () => void }) {
           <button
             type="button"
             style={knopf(false)}
-            onClick={() => void document.documentElement.requestFullscreen?.()}
+            onClick={() =>
+              void document.documentElement.requestFullscreen?.().catch(() => undefined)
+            }
           >
             Vollbild
           </button>

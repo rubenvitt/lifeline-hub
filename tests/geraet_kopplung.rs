@@ -1549,6 +1549,38 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
         );
     }
 
+    // Auch der Einsatzkopf trägt keine Freitexte, die Personen nennen können.
+    let kopf = format!("/api/einsaetze/{einsatz}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &kopf,
+        &admin,
+        Some(&json!({
+            "sachverhalt": "Herr Muster gestürzt",
+            "meldende_stelle": "Frau Vera",
+            "einsatzort": "Musterweg 3, bei Familie Muster",
+            "einsatzort_lat": 52.5,
+            "einsatzort_lon": 13.4,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(&app, "GET", &kopf, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(
+        v["sachverhalt"].is_null() && v["meldende_stelle"].is_null() && v["einsatzort"].is_null(),
+        "{v}"
+    );
+    // Die Karte braucht nur den Punkt.
+    assert_eq!(v["einsatzort_lat"], json!(52.5), "{v}");
+    let (_, v) = anfrage(&app, "GET", &kopf, &admin, None).await;
+    assert_eq!(
+        v["sachverhalt"],
+        json!("Herr Muster gestürzt"),
+        "Personen sehen ihn"
+    );
+
     // Nur der Lagemonitor: Person und Tablet bekommen das verdichtete Lagebild nicht.
     let (s, _) = anfrage(&app, "GET", &lagebild, &admin, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Person");

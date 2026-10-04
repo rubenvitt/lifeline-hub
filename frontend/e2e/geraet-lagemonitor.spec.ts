@@ -38,7 +38,9 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     data: { lat: 52.52, lon: 13.405 },
   });
   expect(verortet.ok(), await verortet.text()).toBeTruthy();
-  for (const b of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']) {
+  // „A …“ steht als zweite UHS sichtbar und ist zu lang für eine Zeile: der Name bricht um.
+  const langerName = 'UHS A Sportplatz am Nordufer der Spree Ostseite';
+  for (const b of [langerName.slice(4), 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']) {
     await anlegen(page, `/api/einsaetze/${e}/uhs`, { typ: 'sonstige', bezeichnung: `UHS ${b}` });
   }
   for (const name of ['Erste', 'Zweite', 'Dritte']) {
@@ -65,6 +67,13 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     await expect(erste).toContainText('UHS Nord');
     await expect(erste.locator('span').first()).toHaveText('3');
     await expect(belegung.getByText('+5 weitere')).toBeVisible();
+    // Der lange Name reißt nicht nach einer Zeile ab: er bricht um und zeigt zwei Zeilen.
+    const lang = belegung.getByText(langerName);
+    await expect(lang).toBeVisible();
+    const zeilen = await lang.evaluate(
+      (el) => el.clientHeight / parseFloat(getComputedStyle(el).lineHeight),
+    );
+    expect(Math.round(zeilen)).toBe(2);
     await expect(monitor.getByText('Erste')).toHaveCount(0);
     const betroffene = monitor.getByRole('region', { name: 'Betroffene' });
     await expect(betroffene.getByText('gesamt')).toBeVisible();

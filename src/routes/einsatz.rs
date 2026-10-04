@@ -134,12 +134,22 @@ pub async fn detail(
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let id = ctx.einsatz.id;
-    Ok(Json(ctx.einsatz.anzeige(
+    let mut anzeige = ctx.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
-    )))
+    );
+    // Der Lagemonitor erhält keine Freitexte, die Personen nennen können (LFH-892, Spec
+    // `lagemonitor`, „Keine personenbezogenen Daten“): Sachverhalt, meldende Stelle und die
+    // Ortsangabe fehlen (eine Wohnanschrift ist personenbezogen). Die Karte braucht nur den Punkt.
+    if ctx.geraet.as_ref().map(|g| g.ansicht) == Some(crate::geraet::Funktionsansicht::Lagemonitor)
+    {
+        anzeige.sachverhalt = None;
+        anzeige.meldende_stelle = None;
+        anzeige.einsatzort = None;
+    }
+    Ok(Json(anzeige))
 }
 
 /// POST /api/einsaetze/{id}/abschliessen — Einsatz abschließen (read-only).

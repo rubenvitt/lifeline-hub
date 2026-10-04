@@ -421,6 +421,25 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     await waitFor(() => expect(screen.getByLabelText('Inhalt')).toHaveValue(''));
   });
 
+  it('Meldung abgelehnt: der Wortlaut bleibt stehen, die Priorität auch', async () => {
+    vi.useRealTimers();
+    laptopBereit();
+    server.use(
+      http.post('/api/einsaetze/7/meldungen', () =>
+        HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 }),
+      ),
+    );
+    renderApp('/geraet/7/stelle');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Meldungen' }));
+    await user.type(await screen.findByLabelText('Inhalt'), 'Zwei Tragen frei');
+    await user.click(screen.getByRole('radio', { name: 'sofort' }));
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    expect(await screen.findByText(/Einsatz ist abgeschlossen/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Inhalt')).toHaveValue('Zwei Tragen frei');
+    expect(screen.getByRole('radio', { name: 'sofort' })).toBeChecked();
+  });
+
   it('das Tablet hat keinen Bereich „UHS“', async () => {
     stelleBereit();
     const router = renderApp('/geraet/7/stelle');
