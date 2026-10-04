@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import HaengenderBaum, { baumZielStil } from '../components/organigramm/HaengenderBaum';
 import { monoStil, useRollen } from '../components/instrument';
+import { mitBetriebsart } from '../components/kommunikationsmittel';
 import { IconWarndreieck } from '../icons';
 import { einheitDetailPfad, einsatzabschnittePfad, einsatzdatenPfad } from '../routing/deeplinks';
 import EinsatzZeichen from '../zeichen/EinsatzZeichen';
@@ -27,15 +28,6 @@ import type { Kante } from './luecken';
  */
 
 const ZEICHEN_PX = 22;
-
-/**
- * Eine Sprechgruppe mit ihrer Betriebsart: „TMO 311“ aus „311“. Trägt die Bezeichnung die
- * Betriebsart schon („DMO 505“), bleibt sie, wie sie ist — die Tabelle trennt nach Spalten, die
- * Skizze nach Wort, und „DMO DMO 505“ läse sich wie ein Fehler.
- */
-function mitBetriebsart(art: 'TMO' | 'DMO', bezeichnung: string): string {
-  return bezeichnung.trim().toUpperCase().startsWith(art) ? bezeichnung : `${art} ${bezeichnung}`;
-}
 
 function sprechgruppenLabels(tmo: readonly string[], dmo: readonly string[]): string[] {
   return [...tmo.map((b) => mitBetriebsart('TMO', b)), ...dmo.map((b) => mitBetriebsart('DMO', b))];
