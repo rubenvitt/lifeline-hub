@@ -6,6 +6,7 @@ import { dichten } from '../../theme/tokens';
 import KartenUeberlagerung, {
   GrundlageLeiste,
   kartenKnopfKante,
+  kartenKnopfZelleStil,
   naechsterFreierIndex,
 } from './KartenUeberlagerung';
 import { erzeugeZeigerQuelle } from './mausPosition';
@@ -124,6 +125,43 @@ describe('KartenUeberlagerung — Knopfblock', () => {
     expect(kartenKnopfKante({ controlHeight: dichten.komfortabel.zeilenhoehe })).toBe(48);
     expect(kartenKnopfKante({ controlHeight: dichten.handschuh.zeilenhoehe })).toBe(72);
   });
+
+  /**
+   * Zielabstand (LFH-865, Muster LFH-630): die Fuge bleibt 1 px, der Knopf rückt in seiner Zelle
+   * ein — nur in Stapelrichtung, der Block hat Nachbarn nur oben und unten.
+   */
+  it('LFH-865: der Einzug je Stufe hält ≥ 8 / ≥ 16 px und lässt die Breite unverändert', () => {
+    const FUGE = 1;
+    const zelle = (s: keyof typeof dichten) =>
+      kartenKnopfZelleStil({ controlHeight: dichten[s].zeilenhoehe });
+    expect(zelle('kompakt').paddingBlock).toBe(0);
+    expect(zelle('komfortabel').paddingBlock).toBe(4);
+    expect(zelle('handschuh').paddingBlock).toBe(8);
+    expect(2 * Number(zelle('komfortabel').paddingBlock) + FUGE).toBeGreaterThanOrEqual(8);
+    expect(2 * Number(zelle('handschuh').paddingBlock) + FUGE).toBeGreaterThanOrEqual(16);
+    for (const s of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      expect(zelle(s).paddingInline, s).toBe(0);
+    }
+  });
+
+  it('LFH-865: jeder Knopf steht in einer Zelle ohne Rolle, auch der gesperrte', () => {
+    renderMitProviders(
+      <KartenUeberlagerung
+        {...basis()}
+        leiste={{ sichtbar: true, sperrGrund: 'Auswahl schließen', onUmschalten: vi.fn() }}
+      />,
+    );
+    const block = screen.getByRole('group', { name: 'Kartensteuerung' });
+    const knoepfe = block.querySelectorAll('button');
+    expect(knoepfe).toHaveLength(6);
+    for (const knopf of knoepfe) {
+      const zelle = knopf.parentElement!;
+      expect(zelle).toHaveAttribute('data-lfh', 'kartenknopf-zelle');
+      expect(zelle).toHaveAttribute('role', 'none');
+      expect(zelle).toHaveClass('lfh-kartenknopf-zelle');
+      expect(zelle.parentElement).toBe(block);
+    }
+  });
 });
 
 describe('KartenUeberlagerung — Eigenposition (LFH-712)', () => {
@@ -218,6 +256,23 @@ describe('GrundlageLeiste', () => {
       'Offline-Karte nicht konfiguriert',
     );
     expect(screen.getByRole('radio', { name: 'Blind' })).toBeChecked();
+  });
+
+  it('LFH-865: jedes Segment steht in einer eigenen Zelle wie in der Segmentleiste', () => {
+    renderMitProviders(
+      <GrundlageLeiste
+        optionen={grundlageOptionen(STILE, false)}
+        wert="blind"
+        onWechsel={() => {}}
+      />,
+    );
+    const radios = screen.getAllByRole('radio');
+    expect(radios.length).toBeGreaterThan(1);
+    for (const radio of radios) {
+      expect(radio.parentElement).toHaveAttribute('data-lfh', 'segment-zelle');
+      expect(radio.parentElement).toHaveAttribute('role', 'none');
+      expect(radio.parentElement!.parentElement).toHaveAttribute('role', 'radiogroup');
+    }
   });
 
   it('wählt per Pfeiltaste und überspringt dabei Gesperrtes', () => {

@@ -190,6 +190,11 @@
   background: var(--lfh-linie-stark);
   border: 1px solid var(--lfh-linie-stark);
 }
+/* Rasterzelle eines Segments (LFH-865): trägt den Grund, das Segment rückt darin um den
+   Zielabstand ein (`Segmentleiste`, Dateikopf „Zielabstand“). */
+.lfh-segment-zelle {
+  background: var(--lfh-flaeche);
+}
 .lfh-segment {
   margin: 0;
   border: 0;

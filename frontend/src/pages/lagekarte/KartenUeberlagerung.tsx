@@ -11,7 +11,14 @@ import {
 } from '../../icons';
 import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Popover } from 'antd';
-import { naechsterIndex, monoStil, segmentStil, useRollen } from '../../components/instrument';
+import {
+  naechsterIndex,
+  monoStil,
+  segmentStil,
+  segmentZelleStil,
+  useRollen,
+  zielEinzug,
+} from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
 import type { GrundlageOption, GrundlageWert } from './leistenDaten';
@@ -31,9 +38,26 @@ export const UEBERLAGERUNG_RAND = 12;
 
 /**
  * Die Fuge zwischen den Kartenknöpfen ist eine Haarlinie, kein Abstand: sie zeigt `linieStark`
- * durch und bleibt in jeder Dichte 1 px, wie die Fuge des Kennzahlenbands (LFH-703).
+ * durch und bleibt in jeder Dichte 1 px, wie die Fuge des Kennzahlenbands (LFH-703). Den
+ * Zielabstand hält der Einzug der Zelle ({@link kartenKnopfZelleStil}).
  */
 const KNOPF_FUGE = 1;
+
+/**
+ * Rasterzelle eines Kartenknopfs — rein und exportiert. Zielabstand (LFH-865, Muster LFH-630,
+ * Bedien-Leitlinie Kriterium 2): der Knopf rückt in seiner Zelle um {@link zielEinzug}
+ * (0 / 4 / 8 px) ab, benachbarte Knöpfe stehen so in `komfortabel` ≥ 8 px, in `handschuh`
+ * ≥ 16 px auseinander, die Fuge bleibt 1 px. NUR IN STAPELRICHTUNG: der Block ist eine Spalte,
+ * Nachbarn hat ein Knopf nur oben und unten. Ein Einzug auch links und rechts machte den Block
+ * breiter, ohne einen Abstand zu gewinnen, und verschöbe die Kanten, an denen Kartenfuß und
+ * linke Überlagerung enden (`fussStil`, `maxWidth` unten). Der Knopf behält seine Kante
+ * (Treffhöhe), der Block wird je Knopf um 2 × Einzug höher. Grund der Zelle:
+ * `.lfh-kartenknopf-zelle` (`lagekarte.css`); Hover, Fokus und „eingerastet“ bleiben am Knopf,
+ * sie zeigen, wo ein Tippen wirkt.
+ */
+export function kartenKnopfZelleStil(token: { controlHeight: number }): CSSProperties {
+  return { display: 'flex', paddingBlock: zielEinzug(token), paddingInline: 0 };
+}
 
 /**
  * Kantenlänge eines Kartenknopfs: der Entwurf zeichnet 32 px, die Dichte-Staffel verlangt
@@ -120,30 +144,38 @@ export function GrundlageLeiste({
       {optionen.map((o, i) => {
         const aktiv = i === aktivIndex;
         const aus = o.gesperrt != null;
+        // Zelle wie in `Segmentleiste` (Zielabstand, LFH-865); `flexShrink: 0` an der Zelle,
+        // sie ist das Kind der einzeiligen Leiste.
         return (
-          <button
+          <span
             key={o.wert}
-            ref={(el) => {
-              knoepfe.current[i] = el;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={aktiv}
-            disabled={aus}
-            title={o.gesperrt}
-            tabIndex={i === tabZiel ? 0 : -1}
-            className={aktiv ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
-            onClick={() => onWechsel(o.wert)}
-            onKeyDown={(e) => taste(e, i)}
-            style={{
-              ...segmentStil(token),
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-              ...(aus ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
-            }}
+            role="none"
+            className="lfh-segment-zelle"
+            data-lfh="segment-zelle"
+            style={{ ...segmentZelleStil(token), flexShrink: 0 }}
           >
-            {o.label}
-          </button>
+            <button
+              ref={(el) => {
+                knoepfe.current[i] = el;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={aktiv}
+              disabled={aus}
+              title={o.gesperrt}
+              tabIndex={i === tabZiel ? 0 : -1}
+              className={aktiv ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
+              onClick={() => onWechsel(o.wert)}
+              onKeyDown={(e) => taste(e, i)}
+              style={{
+                ...segmentStil(token),
+                whiteSpace: 'nowrap',
+                ...(aus ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
+              }}
+            >
+              {o.label}
+            </button>
+          </span>
         );
       })}
     </div>
@@ -218,6 +250,7 @@ function Kartenknopf({
   sperrGrund?: string | null;
   children: ReactNode;
 }) {
+  const { token } = useRollen();
   const grundId = useId();
   const knopf = (
     <button
@@ -250,16 +283,26 @@ function Kartenknopf({
       </span>
     </button>
   );
-  if (sperrGrund == null) return knopf;
   return (
-    <>
-      <Popover trigger={['click']} placement="left" content={sperrGrund}>
-        {knopf}
-      </Popover>
-      <span id={grundId} style={NUR_VORLESEN}>
-        {sperrGrund}
-      </span>
-    </>
+    <span
+      role="none"
+      className="lfh-kartenknopf-zelle"
+      data-lfh="kartenknopf-zelle"
+      style={kartenKnopfZelleStil(token)}
+    >
+      {sperrGrund == null ? (
+        knopf
+      ) : (
+        <>
+          <Popover trigger={['click']} placement="left" content={sperrGrund}>
+            {knopf}
+          </Popover>
+          <span id={grundId} style={NUR_VORLESEN}>
+            {sperrGrund}
+          </span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -318,7 +361,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         {props.grundlage}
         <ZeigerKoordinate quelle={props.zeigerQuelle} />
       </div>
-      {/* Fugenraster: Knöpfe mit 1 px Fuge auf `linieStark`. */}
+      {/* Fugenraster: Knopfzellen mit 1 px Fuge auf `linieStark`, Einzug in der Zelle (LFH-865). */}
       <div
         role="group"
         aria-label="Kartensteuerung"
