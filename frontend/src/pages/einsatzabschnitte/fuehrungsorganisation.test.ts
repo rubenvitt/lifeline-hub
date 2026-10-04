@@ -383,7 +383,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     );
     const { container } = render(createElement(Markdown, { unterEbene: 1, children: md }));
     expect(container.querySelector('a')).toBeNull();
-    const text = (container.textContent ?? '').replaceAll('\u2060', '');
+    const text = (container.textContent ?? '').replace(/\u2060/g, '');
     for (const wert of roh) expect(text, wert).toContain(wert);
   });
 });

@@ -32,7 +32,7 @@ const AUTOLINKS = {
 } as const;
 
 /** Text, wie ihn ein Mensch sieht: ohne das unsichtbare Wortverbindungszeichen (U+2060). */
-const sichtbar = (text: string | null) => (text ?? '').replaceAll('\u2060', '');
+const sichtbar = (text: string | null) => (text ?? '').replace(/\u2060/g, '');
 
 function sg(
   id: number,

@@ -249,7 +249,7 @@ describe('vorbereitungMarkdown', () => {
     );
     const { container } = render(createElement(Markdown, { unterEbene: 2, children: text }));
     expect(container.querySelector('a')).toBeNull();
-    expect((container.textContent ?? '').replaceAll('\u2060', '')).toContain(
+    expect((container.textContent ?? '').replace(/\u2060/g, '')).toContain(
       'www.thw-nord.de (Lage <https://x.de> · ops@thw-nord.de · http://a.de)',
     );
   });
