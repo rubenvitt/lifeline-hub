@@ -574,7 +574,7 @@ async fn abgelehnte_mitgliedschaftsaenderung_feuert_nichts() {
 //
 // `einsatz` fällt nur, wenn sich die Menge der aktiven Lagekennzahlen ändert — nie bei jeder
 // Änderung an Pegel oder Bezirk. Herleitung:
-// `openspec/changes/lfh-855-lagekennzahl-umschalten-live/design.md` D1.
+// `openspec/changes/archive/2026-10-04-lfh-855-lagekennzahl-umschalten-live/design.md` D1.
 
 const PEGEL_A: &str = "a6ee8177-107b-47dd-bcfd-30960ccc6e9c";
 const PEGEL_B: &str = "593647aa-9fea-43ec-a7d6-6476a76ae868";

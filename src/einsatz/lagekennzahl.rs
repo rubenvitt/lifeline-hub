@@ -66,7 +66,8 @@ pub fn ableiten(pegel_festgelegt: bool, evakuierung_angeordnet: bool) -> Vec<Lag
 /// vor und nach ihrer Änderung: nur wenn sich die Menge unterscheidet, melden sie den Kopf
 /// (`einsatz`, `routes::einsatz::kopf_geaendert`). Unter `BEGIN IMMEDIATE` schreibt niemand
 /// dazwischen, der Vergleich ist exakt — dieselbe Technik wie beim Termin der Lagebesprechung
-/// (LFH-555 D3). Herleitung: `openspec/changes/lfh-855-lagekennzahl-umschalten-live/design.md` D1.
+/// (LFH-555 D3). Herleitung:
+/// `openspec/changes/archive/2026-10-04-lfh-855-lagekennzahl-umschalten-live/design.md` D1.
 pub async fn lesen(
     conn: &mut SqliteConnection,
     einsatz_id: i64,

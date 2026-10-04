@@ -22,5 +22,5 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` sowie Vitest und Rust-Tests grün (CI-Lauf des PRs belegt den Rest).
-- [ ] 5.2 `/opsx:archive` im selben Branch, Spec `einsatzkopf-live` synchronisiert, Verweise nachgezogen.
+- [x] 5.1 `./scripts/check-all.sh` sowie Vitest und Rust-Tests grün (CI-Lauf des PRs belegt den Rest). Lokal: Bündel `schnell` grün; `rust` grün bis auf den Bau der Desktop-Hülle (GTK fehlt im Container); `frontend` grün bis auf den Uhrzeit-Test LFH-1019, der auf `alpha` behoben ist; e2e `einsatzkopf-live` und `lage-dashboard-schmal` grün. Den vollen Lauf belegt die CI des PRs.
+- [x] 5.2 `/opsx:archive` im selben Branch, Spec `einsatzkopf-live` synchronisiert, Verweise nachgezogen.
