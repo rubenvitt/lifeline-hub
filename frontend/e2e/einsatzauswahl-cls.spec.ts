@@ -153,9 +153,9 @@ async function stelleListe(
   page: Page,
   liste: EinsatzAnzeige[],
   tor?: Promise<void>,
-): Promise<{ abrufe: number; zeiten: number[]; zuletzt: number }> {
+): Promise<{ abrufe: number; zeiten: number[] }> {
   const start = Date.now();
-  const zaehler = { abrufe: 0, zeiten: [] as number[], zuletzt: start };
+  const zaehler: { abrufe: number; zeiten: number[] } = { abrufe: 0, zeiten: [] };
   await page.route(/\/api\/einsaetze(\?.*)?$/, async (route: Route) => {
     if (route.request().method() !== 'GET') {
       await route.continue();
@@ -168,7 +168,6 @@ async function stelleListe(
     // react-query die Antwort verarbeitet hat.
     zaehler.abrufe += 1;
     zaehler.zeiten.push(Date.now() - start);
-    zaehler.zuletzt = Date.now();
   });
   return zaehler;
 }
@@ -313,51 +312,37 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
   await kartenStehen(page, liste[0].bezeichnung);
   const ladephase = await ruheShifts(page);
 
-  // Die Query muss erst altern, sonst ignoriert react-query das Fokus-Ereignis. Gezählt wird ab
-  // dem LETZTEN Abruf, nicht ab dem Laden: legt ein paralleler Test einen Einsatz an, lädt das
-  // Org-Ereignis `einsatzliste` (LFH-734) die Liste neu, die Query ist wieder frisch, der Fokus
-  // löste nichts aus, und der Test starb im Warten auf die Antwort (LFH-879).
-  const gealtert = () => Date.now() - zaehler.zuletzt > STALE_TIME + 500;
+  // Die Query muss erst altern, sonst ignoriert react-query das Fokus-Ereignis.
+  await page.waitForTimeout(STALE_TIME + 500);
+
+  // Erst jetzt zurücksetzen: was ab hier gemeldet wird, gehört zum Refetch.
+  await setzeShiftsZurueck(page);
+
+  // Der `Datenstand`-Titel trägt Sekunden und ist nach dem Warten garantiert ein anderer,
+  // sobald die Antwort gerendert ist — der Anker, der dem Zähler fehlt. Nur das
+  // `title`-Attribut ändert sich, der Anker verschiebt also selbst nichts.
   const datenstand = page.locator('[aria-label^="Datenstand "]');
-  let antwort: Promise<unknown> | undefined;
-  let standVorher: string | null = null;
-  let abrufeVorher = 0;
-  let laufVorher = '';
-  for (let versuch = 1; !antwort; versuch += 1) {
-    expect(versuch, 'die Liste kam in drei Anläufen nicht zur Ruhe').toBeLessThanOrEqual(3);
-    await expect.poll(gealtert, { timeout: 30_000, intervals: [250] }).toBe(true);
+  await expect(datenstand).toHaveCount(1);
+  const standVorher = await datenstand.getAttribute('title');
+  expect(standVorher, 'der Datenstand muss vor dem Refetch einen Titel tragen').not.toBeNull();
 
-    // Erst jetzt zurücksetzen: was ab hier gemeldet wird, gehört zum Refetch.
-    await setzeShiftsZurueck(page);
-
-    // Der `Datenstand`-Titel trägt Sekunden und ist nach dem Warten garantiert ein anderer,
-    // sobald die Antwort gerendert ist — der Anker, der dem Zähler fehlt. Nur das
-    // `title`-Attribut ändert sich, der Anker verschiebt also selbst nichts.
-    await expect(datenstand).toHaveCount(1);
-    standVorher = await datenstand.getAttribute('title');
-    expect(standVorher, 'der Datenstand muss vor dem Refetch einen Titel tragen').not.toBeNull();
-
-    // RELATIV gezählt und der Stand erst HIER genommen: ein Abruf im Wartefenster hätte den
-    // Zähler sonst schon auf den Zielwert gehoben.
-    abrufeVorher = zaehler.abrufe;
-    expect(abrufeVorher, 'vor dem Refetch mindestens der Erstabruf').toBeGreaterThanOrEqual(1);
-    laufVorher = (await leseShifts(page)).lauf;
-
-    // Das Warten wird VOR dem Auslöser aufgesetzt, sonst ginge die Antwort verloren. Bleibt
-    // der Refetch aus, stirbt der Test hier. Kam seit dem Altern ein fremder Abruf, ist die
-    // Query wieder frisch: dann noch ein Anlauf. Ein fremder Abruf NACH dem Aufsetzen stört
-    // nicht, er liefert dieselbe Liste und ist selbst die erwartete Antwort.
-    const warten = page.waitForResponse(
-      (r) => /\/api\/einsaetze(\?|$)/.test(r.url()) && r.request().method() === 'GET',
-    );
-    if (zaehler.abrufe === abrufeVorher && gealtert()) antwort = warten;
-    else warten.catch(() => undefined);
-  }
+  // RELATIV gezählt und der Stand erst HIER genommen: ein Abruf im Wartefenster hätte den
+  // Zähler sonst schon auf den Zielwert gehoben.
+  const abrufeVorher = zaehler.abrufe;
+  expect(abrufeVorher, 'vor dem Refetch mindestens der Erstabruf').toBeGreaterThanOrEqual(1);
+  const laufVorher = (await leseShifts(page)).lauf;
 
   // react-querys `focusManager` hängt an `visibilitychange`; es von Hand zu feuern ist die
   // deterministische Fassung des Fensterwechsels (`bringToFront` ist headless unzuverlässig).
-  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
-  await antwort;
+  // WIEDERHOLT, bis ein Abruf kommt: legt ein paralleler Test einen Einsatz an, lädt das
+  // Org-Ereignis `einsatzliste` (LFH-734) die Liste im Wartefenster neu, die Query ist beim
+  // Fokus wieder frisch, und ein einzelnes Ereignis löste nichts aus — der Test starb dann im
+  // Warten auf die Antwort (LFH-879). Ein solcher Abruf liefert dieselbe Liste; kommt er nach
+  // dem Zurücksetzen, ist er selbst der Refetch mit unveränderten Daten, den der Test misst.
+  await expect(async () => {
+    await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+    expect(zaehler.abrufe, 'noch kein Abruf nach dem Fokus').toBeGreaterThan(abrufeVorher);
+  }).toPass({ timeout: 45_000, intervals: [1_000] });
 
   await expect
     .poll(() => zaehler.abrufe, {
