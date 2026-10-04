@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
  * LFH-895: Ein ETB-Eintrag und eine Meldung von einem Gerät, dessen Uhr 5 min vorgeht, tragen
  * ohne Handeingabe die Ereigniszeit nach der Serveruhr. Vorher kam „jetzt“ aus der Geräteuhr:
  * Der Eintrag stand 5 min zu spät, die Zeitachse markierte ihn als nachgetragen, und die
- * Bestätigungsfrist einer Meldung verschob sich mit
+ * Rückmeldefrist der meldenden Einheit verschob sich mit
  * (`openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`).
  *
  * Der Test braucht den echten Server: Der Versatz kommt aus dem `Date`-Header seiner Antworten.
@@ -76,9 +76,7 @@ test('ETB-Eintrag eines vorgehenden Geräts trägt die Serverzeit und ist nicht 
   await expect(zeile).not.toContainText('nachgetragen');
 });
 
-test('Meldung eines vorgehenden Geräts trägt die Serverzeit, die Frist läuft ab ihr', async ({
-  page,
-}) => {
+test('Meldung eines vorgehenden Geräts trägt die Serverzeit', async ({ page }) => {
   const einsatzId = await neuerEinsatz(page, 'Meldung-Uhrversatz');
   await page.goto(`/einsaetze/${einsatzId}/meldungen`);
   await page.getByRole('button', { name: 'Meldung erfassen' }).click();
@@ -87,32 +85,15 @@ test('Meldung eines vorgehenden Geräts trägt die Serverzeit, die Frist läuft 
   const inhalt = `MANV ${Date.now()}`;
   await formular.getByLabel('Absender').fill('RTW 2');
   await formular.getByLabel('Inhalt / Wortlaut').fill(inhalt);
-  await formular.getByRole('switch', { name: 'Bestätigung erforderlich' }).click();
   const erfasstMs = Date.now();
   await formular.getByRole('button', { name: 'Meldung erfassen' }).click();
 
-  await expect
-    .poll(
-      async () => {
-        const r = await page.request.get(`/api/einsaetze/${einsatzId}/meldungen`);
-        const liste = (await r.json()) as { inhalt: string }[];
-        return liste.some((m) => m.inhalt === inhalt);
-      },
-      { timeout: 15_000 },
-    )
-    .toBe(true);
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/meldungen`);
-  const meldung = (
-    (await r.json()) as {
-      inhalt: string;
-      ereigniszeit: string;
-      faellig_at: string | null;
-    }[]
-  ).find((m) => m.inhalt === inhalt)!;
-  expect(Math.abs(alsMillis(meldung.ereigniszeit) - erfasstMs)).toBeLessThan(TOLERANZ_MS);
-  // Die Frist (Vorgabe 5 min) läuft ab der Ereigniszeit nach der Serveruhr.
-  expect(meldung.faellig_at).not.toBeNull();
-  expect(Math.abs(alsMillis(meldung.faellig_at!) - (erfasstMs + 5 * 60_000))).toBeLessThan(
-    TOLERANZ_MS,
-  );
+  const meldung = async () => {
+    const r = await page.request.get(`/api/einsaetze/${einsatzId}/meldungen`);
+    const liste = (await r.json()) as { inhalt: string; ereigniszeit: string }[];
+    return liste.find((m) => m.inhalt === inhalt);
+  };
+  await expect.poll(async () => (await meldung()) != null, { timeout: 15_000 }).toBe(true);
+  const { ereigniszeit } = (await meldung())!;
+  expect(Math.abs(alsMillis(ereigniszeit) - erfasstMs)).toBeLessThan(TOLERANZ_MS);
 });

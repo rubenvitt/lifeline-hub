@@ -15,7 +15,10 @@ Motivation: `proposal.md`, „Why“. Darauf baut die Änderung auf:
   `erfasst_lokal_at`. Online wie offline geht dieselbe Nutzlast hinaus (`useEtbErfassung`).
   Der Zeit-Chip (`MetaChip.tsx`) öffnet seinen Editor mit `defaultValue = dayjs()`.
 - **Meldung:** `MeldungFormular.tsx` sendet `alsBackendZeit(w.ereigniszeit ?? dayjs())`; das
-  Feld zeigt „leer = jetzt“. Der Server rechnet `faellig_at` = Ereigniszeit + Frist.
+  Feld zeigt „leer = jetzt“. Der Server rechnet die Rückmeldefrist einer Einheit
+  (`faellig_at`, `GET …/meldungen/rueckmeldungen`) als Ereigniszeit ihrer letzten Meldung +
+  Frist. Die Bestätigungsfrist einer Sofortmeldung hängt dagegen am Eingang (Serveruhr) und ist
+  nicht betroffen.
 - **Zeiteingabe:** `ZeitpunktEingabe.tsx` hat einen eigenen Knopf „Jetzt“, der `dayjs()`
   setzt (antds browserlokales „Jetzt“ ist aus, LFH-692).
 - **Server:** `routes/etb.rs` und `routes/meldung.rs` normalisieren die Ereigniszeit nur. Eine
@@ -29,7 +32,7 @@ Motivation: `proposal.md`, „Why“. Darauf baut die Änderung auf:
   für die stille Vorgabe und für jeden Vorschlag, den die Person sieht.
 
 **Non-Goals:**
-- **Laufende Anzeigen** („vor 3 min“, Countdown einer Bestätigungsfrist, „überfällig“,
+- **Laufende Anzeigen** („vor 3 min“, Countdown einer Frist, „überfällig“,
   Lesemarke) rechnen weiter mit der Geräteuhr. Das ist ein Anzeigefehler auf einem falsch
   gehenden Gerät, aber kein falsch gespeicherter Wert, und berührt ein Dutzend Stellen.
 - **Kalendergrenzen** der Zeiteingabe („keine Zukunftstage“, „heute“) bleiben bei der

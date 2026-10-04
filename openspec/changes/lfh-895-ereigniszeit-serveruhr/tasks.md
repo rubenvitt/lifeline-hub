@@ -19,7 +19,7 @@ Code. „Verifiziert“ heißt, der genannte Test läuft grün **und** war vorhe
 
 ## 4. Ende zu Ende
 
-- [ ] 4.1 `frontend/e2e/ereigniszeit-uhrversatz.spec.ts` nach dem Muster von `betreuung-offline-uhrversatz.spec.ts`: Geräteuhr per `page.clock` 5 min vor, ETB-Seite laden (Messung über echte Antworten), Eintrag ohne Zeit-Chip erfassen, Meldung mit leerem Feld „Ereigniszeit“ anlegen. Verifiziert, wenn Ereigniszeit beider (API) höchstens 60 s von der Serverzeit abweicht und der ETB-Eintrag nicht als nachgetragen markiert ist. Mutationsprobe: `serverJetzt()` ohne Versatz macht den Test rot.
+- [x] 4.1 `frontend/e2e/ereigniszeit-uhrversatz.spec.ts` nach dem Muster von `betreuung-offline-uhrversatz.spec.ts`: Geräteuhr per `page.clock` 5 min vor, ETB-Seite laden (Messung über echte Antworten), Eintrag ohne Zeit-Chip erfassen, Meldung mit leerem Feld „Ereigniszeit“ anlegen. Verifiziert, wenn Ereigniszeit beider (API) höchstens 60 s von der Serverzeit abweicht und der ETB-Eintrag nicht als nachgetragen markiert ist. Mutationsprobe: `serverJetzt()` ohne Versatz macht den Test rot. **Ergebnis:** grün, zweimal hintereinander (`--repeat-each=2`). Mutationsprobe (`serverJetzt()` gibt die Geräteuhr): beide Fälle rot, Abweichung ~300 s.
 
 ## 5. Abschluss
 

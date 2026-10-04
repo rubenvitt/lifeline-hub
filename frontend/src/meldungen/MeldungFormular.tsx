@@ -130,7 +130,7 @@ export default function MeldungFormular({
       prioritaet: w.prioritaet,
       richtung: w.richtung,
       // Ereigniszeit Pflicht: leer ⇒ jetzt (Funk-Realität: meist „eben empfangen"), nach der
-      // Serveruhr, sonst verschöbe eine vorgehende Geräteuhr auch die Bestätigungsfrist (LFH-895).
+      // Serveruhr, sonst verschöbe eine vorgehende Geräteuhr auch die Rückmeldefrist (LFH-895).
       ereigniszeit: alsBackendZeit(w.ereigniszeit ?? serverJetzt()),
       bestaetigung_pflicht: w.bestaetigung_pflicht,
       bestaetigung_frist_min:

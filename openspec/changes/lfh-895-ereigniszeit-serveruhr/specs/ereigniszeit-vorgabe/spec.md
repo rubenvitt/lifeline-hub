@@ -20,9 +20,9 @@ lokale Erfassungszeit eines ETB-Eintrags MUST derselbe Zeitpunkt sein.
 - **AND** die Zeitachse markiert ihn nicht als nachgetragen
 
 #### Scenario: Meldung eines vorgehenden Geräts
-- **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat und dort um 10:00 Serverzeit eine Meldung mit leerem Feld „Ereigniszeit“ und Bestätigungsfrist 5 min angelegt wird
+- **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat und dort um 10:00 Serverzeit eine Meldung der Einheit „RTW 2“ mit leerem Feld „Ereigniszeit“ angelegt wird und die Rückmeldefrist 30 min beträgt
 - **THEN** trägt die Meldung die Ereigniszeit 10:00
-- **AND** ihre Bestätigung ist um 10:05 fällig
+- **AND** die nächste Rückmeldung von „RTW 2“ ist um 10:30 fällig, nicht um 10:35
 
 #### Scenario: ETB-Eintrag offline vorgemerkt
 - **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät vor dem Ausfall eine Antwort des Servers erhalten hat und ohne Netz um 10:00 Serverzeit ein ETB-Eintrag ohne Zeit-Chip vorgemerkt wird

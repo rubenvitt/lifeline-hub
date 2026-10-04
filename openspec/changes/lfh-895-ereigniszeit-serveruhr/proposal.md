@@ -6,7 +6,7 @@ Die Ereigniszeit eines ETB-Eintrags und einer Meldung ist, wenn niemand eine Zei
 „jetzt“ nach der **Geräteuhr**, online wie offline. Geht die Uhr eines Geräts vor, steht der
 Eintrag um den Vorlauf zu spät: Die Zeitachse ordnet ihn falsch ein, „nachgetragen“ schlägt
 an, obwohl nichts nachgetragen wurde, und bei einer Meldung verschiebt sich die
-Bestätigungsfrist (`faellig_at` = Ereigniszeit + Frist). Der Server lehnt dort nichts ab, der
+Rückmeldefrist der meldenden Einheit (`faellig_at` = Ereigniszeit + Frist). Der Server lehnt dort nichts ab, der
 Fehler bleibt also still. LFH-705 hat den Versatz zur Serveruhr schon gemessen
 (`offline/serveruhr.ts`), ihn aber bewusst nur für vorgemerkte Betreuungsmeldungen genutzt und
 diesen Befund als Nachzug ausgeklammert.
