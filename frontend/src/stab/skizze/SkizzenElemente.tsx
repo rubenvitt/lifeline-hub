@@ -34,10 +34,11 @@ import {
   STRICHMUSTER_GEPLANT,
   STRICH_HERVORGEHOBEN,
   Sammelschiene,
+  umbrich,
 } from '../skizzenZeichen';
 import type { Punkt } from './ansicht';
 import { zeichenMitte } from './geometrie';
-import { umbrich, type SchriftfeldBlock } from './schriftfeld';
+import type { SchriftfeldBlock } from './schriftfeld';
 
 const SCHRIFT_TEXT: CSSProperties = { fontFamily: 'var(--lfh-schrift-text)' };
 const SCHRIFT_MONO: CSSProperties = {
@@ -208,7 +209,6 @@ export function StelleBild({
   zustand: Zustand;
   meldung?: string | null;
 }) {
-  const { rollen } = useRollen();
   const strich = zustand.hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
   const cx = platz.x + platz.breite / 2;
   const luecke = stelle.luecken.map((l) => l.text).join(' · ');
@@ -239,7 +239,10 @@ export function StelleBild({
   const schrift = kasten ? KASTEN_SCHRIFT : NAME_SCHRIFT;
   const zeile = kasten ? KASTEN_ZEILE : NAME_ZEILE;
   const rufY = nameY + zeilenHoehe(name, schrift, zeile, innen);
-  const lueckeY = rufY + RUFNAME_ZEILE;
+  // Ein langer Rufname bricht um wie die Bezeichnung (Messung 1.1); der Platz wächst in
+  // `stellenMasse` um dieselben Zeilen mit.
+  const rufZeilen = ruf ? umbrich(ruf, NAME_SCHRIFT, innen) : [];
+  const lueckeY = rufY + Math.max(1, rufZeilen.length) * RUFNAME_ZEILE;
   return (
     <g data-teil="stelle">
       {kasten ? (
@@ -283,10 +286,19 @@ export function StelleBild({
           fontSize={NAME_SCHRIFT}
           textAnchor="middle"
           dominantBaseline="central"
-          fill={stelle.rufname || stelle.art === 'extern' ? 'currentColor' : rollen.gedaempft}
-          style={stelle.art === 'extern' ? SCHRIFT_TEXT : SCHRIFT_MONO}
+          // Auch „kein Rufname“ in Textfarbe: zurückgenommen (Deckkraft 0,6) hielte `gedaempft`
+          // nur 3,35 : 1 (Prüfliste Kriterium 5). Das Wort und die Textschrift statt der
+          // Festbreitenschrift eines Rufnamens tragen die Unterscheidung.
+          fill="currentColor"
+          style={stelle.art === 'extern' || !stelle.rufname ? SCHRIFT_TEXT : SCHRIFT_MONO}
         >
-          {ruf}
+          {rufZeilen.length === 1
+            ? ruf
+            : rufZeilen.map((z, i) => (
+                <tspan key={i} x={cx} dy={i === 0 ? 0 : RUFNAME_ZEILE}>
+                  {z}
+                </tspan>
+              ))}
         </text>
       ) : null}
       {luecke ? <MarkenZeile x={cx} y={lueckeY + 8} text={luecke} anker="middle" /> : null}

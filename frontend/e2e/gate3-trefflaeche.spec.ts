@@ -1621,48 +1621,104 @@ for (const schreibend of [true, false]) {
   });
 }
 
-// ── Fernmeldeskizze (LFH-625) ────────────────────────────────────────────────────────
+// ── Fernmeldeskizze (LFH-893) ────────────────────────────────────────────────────────
 //
-// Darstellung „Skizze“ des Funkplans über dem geteilten Gerüst: Namen als handgebaute
-// Bedienziele (`baumZielStil`), Klappziele, die Werkzeugzeile und der Umschalter
-// (`Segmentleiste`, eigene Knöpfe). Dasselbe Seeding wie der Funkplan: Abschnitt Nord mit
-// 1. Zug (zwei Namen, ein Klappziel).
+// Die Bedienung um die Zeichenfläche: Werkzeugleiste (antd-`Button`, zwei `Segmentleiste`n),
+// Palette (Einträge mit „Setzen“/„Zeigen“, die drei Anlegen-Knöpfe), Eigenschaftspaneel des
+// gewählten Elements, die Wahlknöpfe des Lücken-Paneels (handgebaut, `stabZeilenzielStil`) und
+// der Umschalter der Darstellung. Die Elemente AUF der Fläche skalieren mit dem Maßstab, nicht
+// mit der Dichte; ihre Trefffläche misst `fernmeldeskizze.spec.ts` (Prüfliste Kriterium 1).
+// Seeding wie der Funkplan (Abschnitt Nord, 1. Zug, je ohne Sprechgruppe: drei Lücken mit
+// Wahlknopf) und eine einsatzlokale Sprechgruppe für die Palette.
 
-const SKIZZE_NAMEN = 2;
-const SKIZZE_KLAPPZIELE = 1;
+/** Palette, Verkleinern, Vergrößern, Einpassen, Rückgängig, Wiederholen, Neu anordnen. */
+const SKIZZE_WERKZEUGE_SCHREIBEND = 7;
+/** Verkleinern, Vergrößern, Einpassen. */
+const SKIZZE_WERKZEUGE_LESEND = 3;
+/** Ebenen: Alle, Sprechfunk, Leitergebunden, Daten, Nur Lücken. */
+const SKIZZE_EBENEN = 5;
+/** Drei Anlegen-Knöpfe und mindestens ein Palettenknopf („Setzen“ bzw. „Zeigen“). */
+const SKIZZE_PALETTE = 4;
+/** Abschnitt ohne Sprechgruppe, Einheit ohne Sprechgruppe, Einheit ohne Erreichbarkeit. */
+const SKIZZE_LUECKEN_WAHL = 3;
+
+async function skizzeSaeen(page: Page, einsatzId: string) {
+  await funkplanSaeen(page, einsatzId);
+  await anlegen(
+    page,
+    einsatzId,
+    'sprechgruppen',
+    { bezeichnung: 'BN_BOS', betriebsart: 'TMO' },
+    'Sprechgruppe',
+  );
+}
 
 async function messeSkizze(page: Page, soll: number, dichte: string, schreibend: boolean) {
-  const skizze = page.getByRole('region', { name: 'Fernmeldeskizze', exact: true });
+  const zug = page
+    .getByRole('group', { name: 'Fernmeldeskizze', exact: true })
+    .getByRole('button', { name: /^Einheit 1\. Zug/ });
   // Datenanker: der Zug steht erst, wenn Abschnitte und Einheiten geladen sind.
-  await expect(skizze.getByRole('link', { name: '1. Zug' })).toHaveCount(1);
-  if (!schreibend) {
+  await expect(zug).toBeVisible();
+  const werkzeuge = page.getByRole('toolbar', { name: 'Werkzeuge der Skizze' });
+  const palette = page.getByRole('navigation', { name: 'Palette' });
+  if (schreibend) {
+    // Am Fükw (unter `xxl`) ist die Palette zu; gemessen wird sie offen.
+    const knopf = werkzeuge.getByRole('button', { name: 'Palette' });
+    if ((await knopf.getAttribute('aria-expanded')) !== 'true') await knopf.click();
+    await expect(palette).toBeVisible();
+  } else {
     await expect(
       page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
       'Vorbedingung: ohne Schreibrecht keine Übernahme',
     ).toHaveCount(0);
+    await expect(palette, 'Vorbedingung: ohne Schreibrecht keine Palette').toHaveCount(0);
   }
-  const namen = await alleHaltenStufe(
-    skizze.getByRole('link'),
+  await zug.click();
+  const paneel = page.locator('[data-lfh="skizze-paneel"]');
+  await expect(paneel.locator('[data-lfh="skizze-paneel-titel"]')).toContainText('1. Zug');
+  if (!schreibend) {
+    await expect(paneel.locator('[data-lfh="skizze-rechte-grund"]')).toContainText(
+      'Kein Schreibrecht im Einsatz',
+    );
+  }
+
+  const knoepfe = await alleHaltenStufe(
+    werkzeuge.getByRole('button'),
     soll,
-    `Name (${dichte})`,
-    SKIZZE_NAMEN,
+    `Werkzeugknopf (${dichte})`,
+    schreibend ? SKIZZE_WERKZEUGE_SCHREIBEND : SKIZZE_WERKZEUGE_LESEND,
   );
-  const klappen = await alleHaltenStufe(
-    skizze.getByRole('button', { name: /^Unterstellte von / }),
+  const segmente = await alleHaltenStufe(
+    werkzeuge.getByRole('radio'),
     soll,
-    `Klappziel (${dichte})`,
-    SKIZZE_KLAPPZIELE,
+    `Segment der Werkzeugleiste (${dichte})`,
+    SKIZZE_EBENEN,
+  );
+  const paletteKnoepfe = schreibend
+    ? await alleHaltenStufe(
+        palette.getByRole('button'),
+        soll,
+        `Palette (${dichte})`,
+        SKIZZE_PALETTE,
+      )
+    : null;
+  const paneelZiele = await alleHaltenStufe(
+    paneel.getByRole('button').or(paneel.getByRole('link')),
+    soll,
+    `Paneel (${dichte})`,
+    1,
+  );
+  const wahl = await alleHaltenStufe(
+    page.getByRole('region', { name: 'Lücken', exact: true }).getByRole('button'),
+    soll,
+    `Lücken-Wahlknopf (${dichte})`,
+    SKIZZE_LUECKEN_WAHL,
   );
   const umschalter = await alleHaltenStufe(
     page.getByRole('radiogroup', { name: 'Darstellung' }).getByRole('radio'),
     soll,
     `Umschalter (${dichte})`,
-    2,
-  );
-  const alleAuf = await haeltStufe(
-    page.getByRole('button', { name: 'Alle aufklappen', exact: true }),
-    soll,
-    `Alle aufklappen (${dichte})`,
+    3,
   );
   const druck = await haeltStufe(
     page.getByRole('button', { name: /Drucken/ }),
@@ -1670,19 +1726,20 @@ async function messeSkizze(page: Page, soll: number, dichte: string, schreibend:
     `Drucken (${dichte})`,
   );
   return (
-    `${dichte} (Soll ≥ ${soll}): Name ${namen}, Klappziel ${klappen}, Umschalter ${umschalter}, ` +
-    `Alle aufklappen ${alleAuf}, Drucken ${druck}`
+    `${dichte} (Soll ≥ ${soll}): Werkzeug ${knoepfe}, Segment ${segmente}, ` +
+    `${paletteKnoepfe == null ? '' : `Palette ${paletteKnoepfe}, `}Paneel ${paneelZiele}, ` +
+    `Lücken-Wahl ${wahl}, Umschalter ${umschalter}, Drucken ${druck}`
   );
 }
 
-test('Fernmeldeskizze: Namen, Klappziele, Umschalter und Werkzeugknöpfe folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+test('Fernmeldeskizze: Werkzeugleiste, Palette, Paneel, Lücken-Wahl und Umschalter folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fernmeldeskizze`);
-  await funkplanSaeen(page, einsatzId);
+  await skizzeSaeen(page, einsatzId);
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
@@ -1695,14 +1752,14 @@ test('Fernmeldeskizze: Namen, Klappziele, Umschalter und Werkzeugknöpfe folgen 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Fernmeldeskizze (Beobachter): Namen, Klappziele, Umschalter und Drucken folgen der Staffel, die Übernahme fehlt', async ({
+test('Fernmeldeskizze (Beobachter): Werkzeugleiste, Paneel, Lücken-Wahl und Umschalter folgen der Staffel, Palette und Übernahme fehlen', async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fernmeldeskizze Lesend`);
-  await funkplanSaeen(page, einsatzId);
+  await skizzeSaeen(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const gemessen: string[] = [];

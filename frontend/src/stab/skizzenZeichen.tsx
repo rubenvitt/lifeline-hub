@@ -119,6 +119,31 @@ export function schaetzeTextbreite(text: string, schriftgrad: number): number {
   return [...text].length * schriftgrad * ZEICHENBREITE_EM;
 }
 
+/** Bricht an Wortgrenzen um; ein Wort, das allein zu lang ist, zeichenweise. Kürzt nie. */
+export function umbrich(text: string, schrift: number, breite: number): string[] {
+  const passt = (t: string) => schaetzeTextbreite(t, schrift) <= breite;
+  const zeilen: string[] = [];
+  let zeile = '';
+  for (const wort of text.split(/\s+/).filter(Boolean)) {
+    const kandidat = zeile ? `${zeile} ${wort}` : wort;
+    if (passt(kandidat)) {
+      zeile = kandidat;
+      continue;
+    }
+    if (zeile) zeilen.push(zeile);
+    let rest = wort;
+    while (!passt(rest)) {
+      let n = [...rest].length - 1;
+      while (n > 1 && !passt([...rest].slice(0, n).join(''))) n -= 1;
+      zeilen.push([...rest].slice(0, n).join(''));
+      rest = [...rest].slice(n).join('');
+    }
+    zeile = rest;
+  }
+  zeilen.push(zeile);
+  return zeilen;
+}
+
 /** Inhalt des Bedingungszeichens: Betriebsart und Bezeichnung, z. B. „TMO BN_BOS“. */
 export function bedingungszeichenText(betriebsart: Betriebsart, bezeichnung: string): string {
   return `${betriebsart} ${bezeichnung}`.trim();

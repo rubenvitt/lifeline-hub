@@ -367,4 +367,40 @@ die neuen Tabellen bleiben ungenutzt liegen (anhängen, nie ändern, LFH-658).
   (`null`, wenn leer); die Vorgabe Einsatzbezeichnung setzt der Client für Anzeige und Druck. Zuordnungen senden ihr Live-Ereignis nur bei echter Änderung; kein Weg
   schreibt ins ETB (auch der PATCH nicht). Das Einzel-PUT an der Führungsstelle legt keine
   Zeile `einsatz_fuehrungsstelle` an.
+- **D4 (Messung 1.1, `e2e/fernmeldeskizze.spec.ts` „Messung 1.1“, Chromium, 8 Abschnitte × 3
+  Einheiten, zwei Sprechgruppen je Abschnitt, eingepasst):**
+
+  | Breite | Fläche | viewBox | Maßstab | „TMO BN_BOS_LANGNAME_40“ | Rufname 30 Zeichen | kleinste Einheit |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 1366 (Modulpanel offen) | 690 × 522 px | 2097 × 1587 | 0,329 | 134 E. | 2 Zeilen, 98 E. | 47 × 29 px |
+  | 1024 | 708 × 522 px | 2095 × 1546 | 0,338 | 131 E. | 2 Zeilen, 98 E. | 48 × 30 px |
+  | 768 | 720 × 696 px | 2095 × 2026 | 0,344 | 128 E. | 2 Zeilen, 96 E. | 49 × 30 px |
+  | 390 | 366 × 506 px | 2142 × 2963 | 0,171 | 129 E. | 2 Zeilen, 100 E. | 24 × 15 px |
+
+  Kein Text ragt aus seinem Platz, keine Seite läuft waagerecht über. Die Maße bleiben: Raster
+  8 (`RASTER`), Spaltenbreite Kasten 176 / Einheit 144 / Extern 160 bei Spaltenabstand 32
+  (das längste Bedingungszeichen passt mit 134 E. in den Kasten; die Schätzung 0,6 em liegt über
+  der gemessenen Mono-Laufweite von etwa 0,51 em, schätzt also sicher), Zoom Schritt 1,25,
+  Grenzen 0,25 bzw. der Einpass-Maßstab, wenn kleiner, bis 4 (`skizze/ansicht.ts`), Mobil-Schwelle
+  unter 768 px (`istSchmal`; Flächenhöhe `clamp(360px, 68vh, 960px)`, schmal 60vh). Geändert hat
+  die Messung eines: ein Rufname von 30 Zeichen lief über die Einheitenbreite 144 hinaus. Er
+  bricht jetzt an Wortgrenzen um (zu langes Wort zeichenweise, `skizzenZeichen.tsx: umbrich`,
+  dieselbe Funktion für das Schriftfeld), und `stellenMasse` lässt den Platz um die Zeilen
+  wachsen (`rufnamenHoehe`; Tests „lässt eine Einheit mit langem Rufname mitwachsen“, „rechnet die
+  Zeilen wie das Bild“, „Langer Rufname bricht im Platz der Einheit um“).
+- **Prüfliste (gemessen in `e2e/fernmeldeskizze.spec.ts`):** Kriterium 1 — am Fükw hält die
+  eingepasste große Skizze jedes Element ≥ 24 × 24 px (kleinstes 47 × 29 px); bei 390 px liegen
+  33 Elemente unter 24 px (kleinstes 24 × 15 px), dort ist die Fläche nur lesbar, Bedienung über
+  Hervorheben und Zoom (Verdikt in 9.2). Kriterium 5 — zurückgenommene Texte (Deckkraft 0,6)
+  halten 4,5 : 1 (Name, Rufname 6,18; Lückenwort 4,84; Kasten 6,18). „kein Rufname“ stand in
+  `gedaempft` und kam zurückgenommen auf 3,35 : 1; es steht jetzt in Textfarbe (6,18) und wirkt
+  über die Schrift (Test „„kein Rufname“ steht in Textfarbe“).
+- **D13 (Druck, `e2e/fernmeldeskizze-druck.spec.ts`):** Druckkopf (45 mm) und Lücken-Paneel
+  (bis 89 mm) über der Fläche drückten die Skizze auf Seite 2. Das Lücken-Paneel folgt im Blatt
+  jetzt der Skizze (`order: 1`), die Fläche ist im Druck höchstens 205 mm (A3) bzw. 120 mm (A4)
+  hoch (nutzbar 267 bzw. 180 mm abzüglich Kopf). Die Seitenbeschreibung (`data-lfh=
+  "seiten-beschreibung"`, `EinsatzSeite`) ist im Funkplan-Druck aus; als Kasten vor dem benannten
+  Blatt erzwang sie eine leere Hochformatseite. Nachweis Chromium: Seite 1 hat 1191 × 842 pt (A3)
+  bzw. 842 × 595 pt (A4) und trägt die ganze Skizze, die Anlage beginnt eine eigene Seite;
+  Graustufen „geplant“ 17 Hell-Dunkel-Wechsel, bestehend 0, Wort „geplant“ ≥ 4,5 : 1.
 

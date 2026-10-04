@@ -29,6 +29,14 @@ describe('funkplanPrint.css', () => {
     );
   });
 
+  // LFH-893 (e2e `fernmeldeskizze-druck.spec.ts`): die Beschreibung stand vor dem quer benannten
+  // Skizzenblatt und erzwang eine eigene, fast leere erste Seite im Hochformat.
+  it('blendet die Beschreibung des Seitenkopfs aus (Bildschirmhilfe, keine eigene Seite)', () => {
+    expect(regelKoerper(".funkplan-print-root [data-lfh='seiten-beschreibung']")).toMatch(
+      /display:\s*none\s*!important/,
+    );
+  });
+
   it('trägt keine Mechanik ein zweites Mal', () => {
     expect(css).not.toMatch(/visibility\s*:/);
     expect(css).not.toMatch(/position:\s*absolute/);

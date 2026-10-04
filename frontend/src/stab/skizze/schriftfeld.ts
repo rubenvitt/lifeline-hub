@@ -1,6 +1,6 @@
 import type { Schriftfeld } from '../../api/fernmeldeskizzeVertrag';
 import { RASTER } from '../fernmeldeskizzeLayout';
-import { schaetzeTextbreite } from '../skizzenZeichen';
+import { umbrich } from '../skizzenZeichen';
 
 /**
  * Schriftfeld der Fernmeldeskizze (LFH-893 D13, Spec „Schriftfeld“): Inhalt und Satz, rein. Das
@@ -77,30 +77,9 @@ export const SCHRIFTFELD_ZEILE = 16;
 /** Breite der Etikett-Spalte. */
 export const SCHRIFTFELD_ETIKETT = 12 * RASTER;
 
-/** Bricht an Wortgrenzen um; ein Wort, das allein zu lang ist, zeichenweise. Kürzt nie. */
-export function umbrich(text: string, schrift: number, breite: number): string[] {
-  const passt = (t: string) => schaetzeTextbreite(t, schrift) <= breite;
-  const zeilen: string[] = [];
-  let zeile = '';
-  for (const wort of text.split(/\s+/).filter(Boolean)) {
-    const kandidat = zeile ? `${zeile} ${wort}` : wort;
-    if (passt(kandidat)) {
-      zeile = kandidat;
-      continue;
-    }
-    if (zeile) zeilen.push(zeile);
-    let rest = wort;
-    while (!passt(rest)) {
-      let n = [...rest].length - 1;
-      while (n > 1 && !passt([...rest].slice(0, n).join(''))) n -= 1;
-      zeilen.push([...rest].slice(0, n).join(''));
-      rest = [...rest].slice(n).join('');
-    }
-    zeile = rest;
-  }
-  zeilen.push(zeile);
-  return zeilen;
-}
+/** Umbruch wie alle Texte der Skizze; liegt bei `schaetzeTextbreite`, damit das Layout ihn ohne
+ * Zyklus rechnet. */
+export { umbrich };
 
 export interface SatzZeile {
   /** Linker Rand des Textes, relativ zum Block. */

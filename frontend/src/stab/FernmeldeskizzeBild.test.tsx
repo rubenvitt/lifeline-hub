@@ -17,10 +17,16 @@ import {
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import { baueFernmeldenetz, type Fernmeldenetz, type NetzRechte } from './fernmeldeskizze';
-import { RASTER, layoutFernmeldenetz, schienenLinieY } from './fernmeldeskizzeLayout';
+import {
+  EINHEIT_BREITE,
+  NAME_SCHRIFT,
+  RASTER,
+  layoutFernmeldenetz,
+  schienenLinieY,
+} from './fernmeldeskizzeLayout';
 import FernmeldeskizzeBild from './FernmeldeskizzeBild';
 import type { SkizzenAktionen } from './skizzenAktionen';
-import { STRICH_HERVORGEHOBEN } from './skizzenZeichen';
+import { STRICH_HERVORGEHOBEN, schaetzeTextbreite } from './skizzenZeichen';
 import { ZURUECK_DECKKRAFT } from './skizze/SkizzenElemente';
 
 /**
@@ -90,6 +96,7 @@ function aktionenAttrappe() {
         version: ++version,
       }),
     ),
+    entferneLage: vi.fn(async () => {}),
     neuAnordnen: vi.fn(async () => {}),
     ordneZu: vi.fn(async () => {}),
     loese: vi.fn(async () => {}),
@@ -107,6 +114,7 @@ function aktionenAttrappe() {
     aendereKomponente: vi.fn(),
     entferneKomponente: vi.fn(),
     legeExterneStelleAn: vi.fn(),
+    entferneExterneStelle: vi.fn(async () => {}),
     legeBereichAn: vi.fn(),
     aendereBereich: vi.fn(),
     entferneBereich: vi.fn(),
@@ -255,6 +263,40 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
     expect(vb.querySelector('[data-teil="funk"]')).toBeNull();
     expect(vb.querySelector('[data-teil="art"]')).not.toBeNull();
     expect(within(vb as unknown as HTMLElement).getAllByText('geplant').length).toBeGreaterThan(0);
+  });
+
+  it('Langer Rufname bricht im Platz der Einheit um und wird nicht gekürzt (Messung 1.1)', () => {
+    const lang = 'Florian Musterstadt-Nord 12/34';
+    const n = netz();
+    bild({
+      ...n,
+      stellen: n.stellen.map((s) => (s.key === 'eh-10' ? { ...s, rufname: lang } : s)),
+    });
+    const ruf = [...element('eh-10')!.querySelectorAll('text')].find(
+      (t) => t.textContent?.replace(/\s+/g, '') === lang.replace(/\s+/g, ''),
+    );
+    expect(ruf, 'Rufname-Text').toBeDefined();
+    const zeilen = [...ruf!.querySelectorAll('tspan')].map((t) => t.textContent ?? '');
+    expect(zeilen.length).toBeGreaterThan(1);
+    expect(zeilen.join(' ')).toBe(lang);
+    for (const z of zeilen)
+      expect(schaetzeTextbreite(z, NAME_SCHRIFT)).toBeLessThanOrEqual(EINHEIT_BREITE);
+  });
+
+  // Prüfliste Kriterium 5 (e2e `fernmeldeskizze.spec.ts`): zurückgenommen (Deckkraft 0,6) hielt
+  // „kein Rufname“ in `gedaempft` nur 3,35 : 1. Das Wort trägt die Unterscheidung, die Farbe ist
+  // die des Textes, der mit der Deckkraft den Boden 4,5 : 1 hält (`zurueckKontrast.test.ts`).
+  it('„kein Rufname“ steht in Textfarbe, damit es zurückgenommen lesbar bleibt', () => {
+    const n = netz();
+    bild({
+      ...n,
+      stellen: n.stellen.map((s) => (s.key === 'eh-10' ? { ...s, rufname: null } : s)),
+    });
+    const ohne = [...element('eh-10')!.querySelectorAll('text')].find(
+      (t) => t.textContent === 'kein Rufname',
+    );
+    expect(ohne, '„kein Rufname“ steht da').toBeDefined();
+    expect(ohne!.getAttribute('fill')).toBe('currentColor');
   });
 
   it('Lücke am Element als Wort: die Einheit ohne Sprechgruppe trägt „keine Sprechgruppe“', () => {
@@ -433,6 +475,16 @@ describe('Fernmeldeskizze — Bearbeiten ohne Zeiger (5.3, 6.3, 6.4)', () => {
       'data-lfh',
       'inspector-sprung',
     );
+  });
+
+  it('„zum Datensatz“ trägt die Trefffläche der Stab-Ziele (Gate 3: sonst 15 px hoch)', async () => {
+    const user = userEvent.setup();
+    bild();
+    act(() => element('ab-1')!.focus());
+    await user.keyboard('{Enter}');
+    const sprung = within(paneel()).getByRole('link', { name: /zum Datensatz/ });
+    expect(sprung.style.display).toBe('inline-flex');
+    expect(parseFloat(sprung.style.minHeight)).toBeGreaterThanOrEqual(24);
   });
 
   it('Zuordnung zurücknehmen: Strg+Z löst die eben gesetzte Zuordnung, Strg+Y setzt sie wieder', async () => {

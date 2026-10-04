@@ -9,12 +9,17 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
 
 ## 1. Messen vor dem Bau (D4, D13)
 
-- [ ] 1.1 Messspec `e2e/fernmeldeskizze-flaeche.spec.ts` (vorläufig, geht in 9.1 auf): bei
+- [x] 1.1 Messspec `e2e/fernmeldeskizze-flaeche.spec.ts` (vorläufig, geht in 9.1 auf): bei
   1366 × 768 mit offenem Modulpanel, 1024, 768 und 390 px die verfügbare Flächengröße unter
   `stab/funkplan?ansicht=skizze` messen; dazu die Laufweite des längsten Bedingungszeichens
   („TMO BN_BOS_LANGNAME_40“) und eines Rufnamens von 30 Zeichen.
   - Nachweis: Messwerte und daraus Rastermaß, Spaltenbreite des Auto-Layouts, Zoomgrenzen und
     Mobil-Schwelle als Nachtrag in `design.md` D4.
+  - Erledigt: aufgegangen in `e2e/fernmeldeskizze.spec.ts` („Messung 1.1: 8 × 3 eingepasst …“,
+    prüft zugleich, dass kein Text aus seinem Platz ragt); Werte und Folgen im Nachtrag D4 von
+    `design.md`. Maße bleiben (Raster 8, Kasten 176, Einheit 144, Zoom 1,25/0,25/4, mobil unter
+    768 px); geändert: ein Rufname von 30 Zeichen bricht um und lässt den Platz wachsen
+    (`umbrich`, `rufnamenHoehe`, drei Unit-Tests zuerst rot).
 
 ## 2. Schnitt 1 — Netzmodell und Darstellung, abgeleitet (D2, D11, D12)
 
@@ -122,7 +127,7 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
   - Erledigt: Schriftfeld unten rechts im SVG (`flaechenAusdehnung`), Paneel mit Herausgeber,
     VS-Vermerk, Gültig ab, gez. Name/DTG, Stand (`Eigenschaftspaneel.tsx`). Tests „Schriftfeld
     ohne Angaben“, „Gültig ab setzen“ (Bildschirm und Druck), Herausgeber schreibt nur sein Feld.
-- [ ] 4.3 Druck quer A3/A4 mit Schriftfeld, ganze Skizze auf Seite 1, Funkplan-Tabelle als Anlage
+- [x] 4.3 Druck quer A3/A4 mit Schriftfeld, ganze Skizze auf Seite 1, Funkplan-Tabelle als Anlage
   ab neuer Seite, Filter und Hervorhebung aus.
   - Seitenteil erledigt: im Druck der Skizze hängt `FunkplanPage` die ganz offene Funkplan-Tabelle
     (mit Erreichbarkeit) als `data-lfh="druck-anlage"` hinter die Fläche; `druck/druck.css` setzt
@@ -136,6 +141,13 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
     (A3 quer Vorgabe) über `druckFormat`/`onDruckFormat`; `stab/skizze/skizzeDruck.css` macht aus
     `skizzenDruckKlasse` die benannte Seite (`@page fernmeldeskizze-a3|-a4 { size: … landscape }`),
     Test `skizzeDruck.test.ts`. Offen bleibt nur der e2e-Nachweis (9.1).
+  - Erledigt: `e2e/fernmeldeskizze-druck.spec.ts` (in `DRUCK_SPECS`) — je A3/A4 Seite 1 im
+    Format quer mit ganzer Skizze, ohne Filter, Bedienung und Hervorhebung, nichts ragt aus Fläche
+    oder Blatt, Anlage `break-before: page` und im PDF ab eigener Seite; Graustufen-Screenshot:
+    „geplant“ 17 Hell-Dunkel-Wechsel, bestehend 0, Wort „geplant“ ≥ 4,5 : 1 (Mutationsprobe
+    Strichmuster weg → rot). Zwei Fehler behoben: leere Hochformatseite vor dem Blatt
+    (`seiten-beschreibung` im Druck aus) und Skizze auf Seite 2 (Lücken nach der Fläche, Höhe
+    205/120 mm); Tests in `funkplanPrint.test.ts`, `skizzeDruck.test.ts`, `EinsatzSeite.test.tsx`.
 
 ## 5. Schnitt 3 — Zeichenfläche mit Layout (D1, D4)
 
@@ -248,9 +260,18 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
 
 ## 9. Abschluss
 
-- [ ] 9.1 e2e `e2e/fernmeldeskizze.spec.ts` ersetzt die alte Skizzen-Spec (Klappen, Baum, Kante);
+- [x] 9.1 e2e `e2e/fernmeldeskizze.spec.ts` ersetzt die alte Skizzen-Spec (Klappen, Baum, Kante);
   Gate 1 (`gate1-ueberlauf`) und Gate 3 (`gate3-trefflaeche`) für Fläche, Palette und Paneel.
   - Nachweis: Suite grün, keine Skips.
+  - Erledigt: `e2e/fernmeldeskizze.spec.ts` (17 Tests: Messung, Sammelschiene, Ziehen mit zweitem
+    Kontext und Strg+Z, Tastatur, Leitstelle, Geplant, Lücken, Wurzel, Lage, Gleichzeitig (409),
+    Ruhige Fläche, zweimal Rechte, Mobil 390, Prüfliste 1 und 5) und `fernmeldeskizze-druck.spec.ts`
+    ersetzen den Skizzenteil von `funkplan.spec.ts` (entfernt, nicht übersprungen); Gate 1 mit
+    gewählter Einheit langen Namens und lesender Vorbedingung, Gate 3 für Werkzeugleiste,
+    Palette, Paneel, Lücken-Wahl und Umschalter, auch als Beobachter. Gate 3 fand „zum Datensatz“
+    mit 15 px (jetzt `stabZeilenzielStil`, Test zuerst rot). Chromium: neue Specs und beide Gates 40/42,
+    die zwei roten (Gate 3 „zum Datensatz“) nach dem Fix 2/2; mit `funkplan`, `kommunikationsplan*`
+    31/31 und Offline-Spec 1/1, keine Skips; Firefox/WebKit lokal nicht gelaufen.
 - [ ] 9.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für Fükw, Führungs-Tablet und mobil mit
   Verdikt als Nachtrag in `design.md`.
 - [ ] 9.3 `frontend/src/stab/AGENTS.md` (Absatz Fernmeldeskizze neu) und `src/AGENTS.md` falls

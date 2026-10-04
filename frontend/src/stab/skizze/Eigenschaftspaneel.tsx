@@ -11,7 +11,7 @@
  * - **Schiene:** nur lesend (Katalog-Einträge gelten org-weit), mit Verweis auf die
  *   Sprechgruppen-Darstellung des Funkplans.
  */
-import { Alert, Button, Flex, Input } from 'antd';
+import { Alert, Button, Flex, Input, theme } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { forwardRef, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -42,6 +42,7 @@ import { funkplanPfad } from '../../routing/deeplinks';
 import type { Fernmeldenetz, NetzStelle } from '../fernmeldeskizze';
 import { STELLENART_LABEL } from '../kommunikationsplan';
 import { HERKUNFT_LABEL } from '../sprechgruppenplan';
+import { stabZeilenzielStil } from '../zeilenziel';
 import {
   KOMPONENTENARTEN,
   VERBINDUNGSARTEN,
@@ -214,8 +215,10 @@ function Wert({ children }: { children: ReactNode }) {
 }
 
 function Sprung({ ziel, children }: { ziel: string; children: ReactNode }) {
+  // Handgebautes Ziel in einer Textzeile: Trefffläche der Stab-Ziele (Gate 3, LFH-893).
+  const { token } = theme.useToken();
   return (
-    <Link to={ziel} data-lfh="inspector-sprung">
+    <Link to={ziel} data-lfh="inspector-sprung" style={stabZeilenzielStil(token)}>
       {children} <span aria-hidden="true">↗</span>
     </Link>
   );

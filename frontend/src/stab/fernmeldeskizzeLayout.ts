@@ -4,7 +4,7 @@ import {
   ZEICHEN_GROESSE,
   bedingungszeichenBreite,
   sammelschienenMindestbreite,
-  schaetzeTextbreite,
+  umbrich,
 } from './skizzenZeichen';
 
 /**
@@ -104,8 +104,20 @@ function aufRaster(v: number): number {
   return Math.ceil(v / RASTER) * RASTER;
 }
 
+/** Zeilen eines Textes, genau wie das Bild sie umbricht (`umbrich`). */
 function zeilen(text: string, schrift: number, breite: number): number {
-  return Math.max(1, Math.ceil(schaetzeTextbreite(text, schrift) / breite));
+  return umbrich(text, schrift, breite).length;
+}
+
+/**
+ * Höhe der Rufnamenzeile(n): ein langer Rufname bricht um und lässt den Platz wachsen, statt
+ * überzustehen (Messung 1.1). Externe Stellen tragen dort die kurze Stellenart.
+ */
+function rufnamenHoehe(s: NetzStelle, breite: number): number {
+  if (s.art !== 'abschnitt' && s.art !== 'einheit' && s.art !== 'fuehrungsstelle') {
+    return RUFNAME_ZEILE;
+  }
+  return zeilen(s.rufname ?? '', NAME_SCHRIFT, breite) * RUFNAME_ZEILE;
 }
 
 /** Breite und Höhe des Platzes einer Stelle; lange Bezeichnungen wachsen nach unten mit. */
@@ -122,7 +134,7 @@ export function stellenMasse(s: NetzStelle): { breite: number; hoehe: number } {
         TZ_HOEHE +
         ZEICHEN_ABSTAND +
         zeilen(text, KASTEN_SCHRIFT, innen) * KASTEN_ZEILE +
-        RUFNAME_ZEILE +
+        rufnamenHoehe(s, innen) +
         LUECKE_ZEILE;
       return { breite: KASTEN_BREITE, hoehe: aufRaster(hoehe) };
     }
@@ -133,7 +145,7 @@ export function stellenMasse(s: NetzStelle): { breite: number; hoehe: number } {
         TZ_HOEHE +
         ZEICHEN_ABSTAND +
         zeilen(s.bezeichnung, NAME_SCHRIFT, breite) * NAME_ZEILE +
-        RUFNAME_ZEILE +
+        rufnamenHoehe(s, breite) +
         LUECKE_ZEILE;
       return { breite, hoehe: aufRaster(hoehe) };
     }

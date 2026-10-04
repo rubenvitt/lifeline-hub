@@ -386,4 +386,25 @@ describe('stellenMasse', () => {
     expect(stellenMasse(lang).hoehe).toBeGreaterThan(stellenMasse(kurz).hoehe);
     expect(stellenMasse(lang).hoehe % RASTER).toBe(0);
   });
+
+  // Messung 1.1 (e2e `fernmeldeskizze.spec.ts`): ein Rufname mit 30 Zeichen ist breiter als der
+  // Platz einer Einheit; er bricht um und der Platz wächst mit, statt dass der Text übersteht.
+  it('lässt eine Einheit mit langem Rufname mitwachsen', () => {
+    const mit = (funkrufname: string) =>
+      netz({ einheiten: [einheit(1, { funkrufname })] }).stellen.find((s) => s.key === 'eh-1')!;
+    const kurz = mit('Florian 1/1');
+    const lang = mit('Florian Musterstadt-Nord 12/34');
+    expect(stellenMasse(lang).breite).toBe(stellenMasse(kurz).breite);
+    expect(stellenMasse(lang).hoehe).toBeGreaterThan(stellenMasse(kurz).hoehe);
+  });
+
+  it('rechnet die Zeilen wie das Bild: Umbruch an Wortgrenzen, nicht Zeichen durch Breite', () => {
+    // Je 40 Zeichen, geschätzt 40 · 12 · 0,6 = 288 = 2 · 144. Ohne Leerzeichen bricht das Bild
+    // zeichenweise in zwei Zeilen, an Wortgrenzen (18 + 18 + 2) aber in drei.
+    const mit = (name: string) =>
+      netz({ einheiten: [einheit(1, { name })] }).stellen.find((s) => s.key === 'eh-1')!;
+    const zwei = mit('X'.repeat(40));
+    const drei = mit(`${'A'.repeat(18)} ${'B'.repeat(18)} Cc`);
+    expect(stellenMasse(drei).hoehe).toBeGreaterThan(stellenMasse(zwei).hoehe);
+  });
 });
