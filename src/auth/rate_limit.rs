@@ -20,6 +20,12 @@
 //! jüngsten, verdrängte ein Schwall eigener Fehlversuche die fremden, und der eigene Erfolg
 //! räumte danach die ganze Quelle.
 //!
+//! **Eine Quelle ist bei IPv6 ein /64, bei IPv4 die Einzeladresse** (LFH-866). Ein Anschluss
+//! bekommt ein /64 und wechselt darin die Adresse nach Belieben; je Einzeladresse gezählt, käme
+//! er mit Rotation an der Sperre vorbei. IPv4-gemappte Adressen (`::ffff:a.b.c.d`) zählen als
+//! IPv4, sonst teilten alle IPv4-Clients hinter einem Dual-Stack-Socket ein /64. Gekürzt wird nur
+//! der Schlüssel der Sperre: Log und `auth_audit` behalten die volle Adresse.
+//!
 //! **Die Tabelle ist begrenzt:** ab [`AUFRAEUM_SCHWELLE`] Quellen räumt ein neuer Eintrag die
 //! abgelaufenen weg (höchstens alle [`AUFRAEUM_PAUSE`]), bei [`OBERGRENZE`] verdrängt er die
 //! Quellen mit dem ältesten letzten Versuch auf [`NACH_VERDRAENGUNG`]. Sonst wüchse sie mit vielen
@@ -68,12 +74,20 @@ struct Versuch {
     konto: Option<Konto>,
 }
 
+/// Der Schlüssel einer Quelle in der Tabelle (s. Modulkopf).
+fn quelle(ip: IpAddr) -> IpAddr {
+    match ip.to_canonical() {
+        IpAddr::V6(v6) => IpAddr::V6((u128::from(v6) & !u128::from(u64::MAX)).into()),
+        v4 => v4,
+    }
+}
+
 fn laeuft(v: &Versuch, jetzt: Instant) -> bool {
     jetzt.saturating_duration_since(v.zeit) < FENSTER
 }
 
-/// Fehlversuche je Quell-IP. Die Zeit kommt von außen, damit Tests das Fenster ohne Warten
-/// überspringen.
+/// Fehlversuche je Quelle ([`quelle`]). Die Zeit kommt von außen, damit Tests das Fenster ohne
+/// Warten überspringen.
 #[derive(Default)]
 struct Tabelle {
     quellen: HashMap<IpAddr, Vec<Versuch>>,
@@ -83,6 +97,7 @@ struct Tabelle {
 
 impl Tabelle {
     fn ist_gesperrt(&mut self, ip: IpAddr, jetzt: Instant) -> bool {
+        let ip = quelle(ip);
         let Some(versuche) = self.quellen.get_mut(&ip) else {
             return false;
         };
@@ -95,6 +110,7 @@ impl Tabelle {
     }
 
     fn fehlversuch(&mut self, ip: IpAddr, konto: Option<Konto>, jetzt: Instant) {
+        let ip = quelle(ip);
         if !self.quellen.contains_key(&ip) && self.quellen.len() >= AUFRAEUM_SCHWELLE {
             if self.naechste_raeumung.is_none_or(|t| jetzt >= t) {
                 self.quellen.retain(|_, versuche| {
@@ -133,6 +149,7 @@ impl Tabelle {
     }
 
     fn erfolg(&mut self, ip: IpAddr, konto: Konto) {
+        let ip = quelle(ip);
         let Some(versuche) = self.quellen.get_mut(&ip) else {
             return;
         };
@@ -177,9 +194,11 @@ mod tests {
         s.parse().unwrap()
     }
 
-    /// Die n-te Adresse aus 2001:db8::/32, für viele einmalige Quellen.
+    /// Eine Adresse im n-ten /64 aus 2001:db8::/32, für viele einmalige Quellen.
     fn ip6(n: usize) -> IpAddr {
-        IpAddr::V6(std::net::Ipv6Addr::from(0x2001_0db8_u128 << 96 | n as u128))
+        IpAddr::V6(std::net::Ipv6Addr::from(
+            0x2001_0db8_u128 << 96 | (n as u128) << 64 | 1,
+        ))
     }
 
     #[test]
@@ -278,6 +297,70 @@ mod tests {
         );
     }
 
+    /// Ein Anschluss bekommt ein /64; wer darin die Adresse wechselt, bleibt dieselbe Quelle.
+    #[test]
+    fn wechselnde_adressen_eines_ipv6_64_sperren_gemeinsam() {
+        let mut t = Tabelle::default();
+        let jetzt = Instant::now();
+        for n in 0..MAX_FEHLVERSUCHE {
+            let rotiert = ip(&format!("2001:db8:1:2:{n:x}::{:x}", n * 7 + 1));
+            assert!(!t.ist_gesperrt(rotiert, jetzt));
+            t.fehlversuch(rotiert, Some(konto("opfer")), jetzt);
+        }
+        assert!(
+            t.ist_gesperrt(ip("2001:db8:1:2:ffff:ffff:ffff:ffff"), jetzt),
+            "jede Adresse desselben /64 ist gesperrt"
+        );
+        assert!(
+            !t.ist_gesperrt(ip("2001:db8:1:3::1"), jetzt),
+            "das Nachbar-/64 bleibt frei"
+        );
+        assert_eq!(
+            t.quellen.len(),
+            1,
+            "Rotation im /64 legt keine neuen Einträge an"
+        );
+    }
+
+    #[test]
+    fn erfolg_raeumt_ueber_das_ganze_ipv6_64() {
+        let mut t = Tabelle::default();
+        let jetzt = Instant::now();
+        for _ in 0..MAX_FEHLVERSUCHE - 1 {
+            t.fehlversuch(ip("2001:db8:1:2::a"), Some(konto("max")), jetzt);
+        }
+        t.erfolg(ip("2001:db8:1:2::b"), konto("max"));
+        assert!(t.quellen.is_empty());
+    }
+
+    /// IPv4 bleibt Einzeladresse: eine NAT-Wache neben der anderen sperrt nicht mit.
+    #[test]
+    fn ipv4_bleibt_einzeladresse() {
+        let mut t = Tabelle::default();
+        let jetzt = Instant::now();
+        for _ in 0..MAX_FEHLVERSUCHE {
+            t.fehlversuch(ip("192.0.2.10"), None, jetzt);
+        }
+        assert!(t.ist_gesperrt(ip("192.0.2.10"), jetzt));
+        assert!(!t.ist_gesperrt(ip("192.0.2.11"), jetzt));
+    }
+
+    /// Ein Dual-Stack-Socket liefert IPv4-Clients als `::ffff:a.b.c.d`. Auf /64 gekürzt hätten
+    /// alle denselben Schlüssel, und ein Angreifer sperrte jeden IPv4-Client mit.
+    #[test]
+    fn ipv4_gemappte_adressen_zaehlen_als_ipv4() {
+        let mut t = Tabelle::default();
+        let jetzt = Instant::now();
+        for _ in 0..MAX_FEHLVERSUCHE {
+            t.fehlversuch(ip("::ffff:192.0.2.12"), None, jetzt);
+        }
+        assert!(t.ist_gesperrt(ip("192.0.2.12"), jetzt));
+        assert!(
+            !t.ist_gesperrt(ip("::ffff:192.0.2.13"), jetzt),
+            "ein anderer IPv4-Client hinter dem Dual-Stack-Socket bleibt frei"
+        );
+    }
+
     #[test]
     fn je_quelle_bleiben_hoechstens_die_schwelle_an_versuchen() {
         let mut t = Tabelle::default();
@@ -340,9 +423,9 @@ mod tests {
         }
         assert!(t.quellen.len() <= OBERGRENZE, "{} Quellen", t.quellen.len());
         assert!(
-            !t.quellen.contains_key(&ip6(0)),
+            !t.quellen.contains_key(&quelle(ip6(0))),
             "verdrängt wird die Quelle mit dem ältesten letzten Versuch"
         );
-        assert!(t.quellen.contains_key(&ip6(OBERGRENZE + 499)));
+        assert!(t.quellen.contains_key(&quelle(ip6(OBERGRENZE + 499))));
     }
 }
