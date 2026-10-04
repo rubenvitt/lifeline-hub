@@ -1,22 +1,22 @@
 /* Gerendertes Markdown — geteilt von Lagebericht-Anzeige und ETB.
    Farben erben (color: inherit) die antd-Textfarbe, damit Light/Dark ohne
-   eigene Token-Pflege lesbar bleiben. Nur strukturelle Akzente (Code-Hinter-
-   grund, Zitat-/Tabellen-Rahmen) bekommen einen theme-abhängigen Wert. */
+   eigene Token-Pflege lesbar bleiben. Die strukturellen Akzente (Code-Grund,
+   Zitat-/Tabellen-Rahmen) kommen aus Rollen, die ihren Modus selbst tragen
+   (LFH-889, vorher `rgba()` über Schwarz/Weiß je Modus):
+   - Code-Grund `flaeche-3`, nicht `flaeche-2`: die hebt sich am Tag nur 1,08 : 1
+     von `flaeche` und 1,01 : 1 von `paneel` ab (LFH-618). Code-Text darauf (geerbt
+     `text`) 14,5 : 1 Tag, 14,7 : 1 Nacht; Messung `e2e/markdown-kontrast.spec.ts`.
+   - Rahmen `linie`, dieselbe Rolle wie antds `colorBorderSecondary`: eine
+     Markdown-Tabelle sieht aus wie jede andere Tabelle der Anwendung.
+   Gewollte Verschiebung: nachts liegen Code-Grund (früher Weiß 8 %) und Rahmen
+   (Weiß 18 %) dunkler, also so zurückhaltend wie die übrigen Flächen der Nacht. */
 .markdown {
   --md-akzent: var(--lfh-marke);
-  --md-flaeche: rgba(0, 0, 0, 0.04);
-  --md-rahmen: rgba(0, 0, 0, 0.12);
+  --md-flaeche: var(--lfh-flaeche-3);
+  --md-rahmen: var(--lfh-linie);
   color: inherit;
   overflow-wrap: anywhere;
   word-break: break-word;
-}
-
-[data-theme='dark'] .markdown {
-  /* `--md-akzent` braucht hier KEINE Korrektur mehr: `--lfh-marke` aus
-     `theme/rollen.css` trägt seit A0 (LFH-352) je Modus einen eigenen Wert, der
-     auf dunklem Grund lesbar ist. Die Fläche/Rahmen-Werte bleiben modusabhängig. */
-  --md-flaeche: rgba(255, 255, 255, 0.08);
-  --md-rahmen: rgba(255, 255, 255, 0.18);
 }
 
 /* Außenränder kollabieren lassen: der Container gibt den Abstand vor, nicht
