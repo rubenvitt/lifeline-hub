@@ -258,7 +258,8 @@ export function rendereFuehrungsorganisationMarkdown(
     '',
     '## Einsatzleitung',
     '',
-    // LFH-849: die eigene Führungsstelle ist kein Datum.
+    // Wer die Einsatzleitung führt, ist kein Datum (die Führungsstelle, LFH-849, trägt nur
+    // Funkangaben).
     '- Leitung nicht erfasst',
     ...stab,
     '',

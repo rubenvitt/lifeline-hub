@@ -579,8 +579,8 @@ describe('useFachebenen', () => {
       const nachFehlschlag = rufe;
 
       // Die tragende Aussage: react-query hält nach einem gescheiterten Refetch die vorigen `data`.
-      // Ohne `isError` in der Takt-Ableitung bliebe die Ebene auf 600 s und zeigte zehn Minuten
-      // nichts, obwohl das Backend längst wieder da wäre.
+      // Ohne `isError` in der Takt-Ableitung bliebe die Ebene auf dem regulären Takt (120 s) und
+      // zeigte zwei Minuten nichts, obwohl das Backend längst wieder da wäre.
       await act(() => vi.advanceTimersByTimeAsync(FACHEBENEN.autobahn.aufwaermPollMs! + 1_000));
       expect(rufe).toBeGreaterThan(nachFehlschlag);
     } finally {
@@ -665,7 +665,7 @@ describe('useFachebenen', () => {
           }),
     );
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date('2026-09-23T15:00:30Z'));
+    vi.setSystemTime(new Date('2026-09-23T15:01:30Z'));
     try {
       const { result } = rendere();
       act(() => result.current.onFachebeneToggle('dwd', true));
@@ -675,9 +675,12 @@ describe('useFachebenen', () => {
         ['FROST', undefined],
         ['STURM', true],
       ]);
-      // Kein neuer Abruf (Poll alle 5 min), nur der Minutentakt: um 15:03 ist FROST abgelaufen.
+      // Kein neuer Abruf, nur der Minutentakt: um 15:02 ist FROST abgelaufen, der nächste Poll
+      // käme erst nach dem Sprung (Vorbedingung, sonst bewiese der Test den Takt nicht).
+      const sprung = 40_000;
+      expect(FACHEBENEN.dwd.pollMs).toBeGreaterThan(sprung);
       const rufe = lade.mock.calls.filter(([q]) => q === 'dwd').length;
-      await act(() => vi.advanceTimersByTimeAsync(3 * 60_000));
+      await act(() => vi.advanceTimersByTimeAsync(sprung));
       await waitFor(() =>
         expect(dwd()!.features.map((f) => f.properties.EVENT)).toEqual(['STURM']),
       );

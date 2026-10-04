@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
 import { baueFernmeldeskizze } from './fernmeldeskizze';
+import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
 import FernmeldeskizzeBild from './FernmeldeskizzeBild';
 
 function sg(id: number, betriebsart: 'TMO' | 'DMO', bezeichnung: string): Sprechgruppe {
@@ -59,8 +60,14 @@ const EINHEITEN = [
   einheit(20, { name: 'Lose Gruppe', sprechgruppen: [TMO311] }),
 ];
 
-function bild(zugeklappt: ReadonlySet<string> = new Set(), onUmschalten = vi.fn()) {
-  const skizze = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN);
+const ohneFs: FuehrungsstelleQuelle = { zustand: 'daten', daten: null };
+
+function bild(
+  zugeklappt: ReadonlySet<string> = new Set(),
+  onUmschalten = vi.fn(),
+  fuehrungsstelle: FuehrungsstelleQuelle = ohneFs,
+) {
+  const skizze = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, fuehrungsstelle);
   const utils = renderMitProviders(
     <FernmeldeskizzeBild
       einsatzId={1}
@@ -85,6 +92,43 @@ describe('Fernmeldeskizze — Wurzel', () => {
       'data-lfh',
       'skizze',
     );
+  });
+
+  it('führt über „Einsatzleitung“ zu den Einsatzdaten, wo die Führungsstelle gepflegt wird', () => {
+    bild();
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByRole('link', { name: 'Einsatzleitung' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einsatzdaten',
+    );
+  });
+
+  it('zeigt die erfasste Führungsstelle ohne Erreichbarkeit (LFH-849)', () => {
+    bild(new Set(), vi.fn(), {
+      zustand: 'daten',
+      daten: {
+        rufname: 'Florian Musterstadt 10/1',
+        sprechgruppen: [TMO311],
+        kommunikationsmittel: 'digitalfunk',
+        erreichbarkeit: '0171 ELW',
+      },
+    });
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('Florian Musterstadt 10/1')).toBeInTheDocument();
+    expect(within(wurzel).getByText('TMO 311')).toBeInTheDocument();
+    expect(within(wurzel).getByText('Digitalfunk')).toBeInTheDocument();
+    expect(within(wurzel).queryByText(/nicht erfasst/)).toBeNull();
+    expect(wurzel.textContent).not.toContain('0171 ELW');
+    // Die Kante zum obersten Abschnitt urteilt jetzt gegen die Führungsstelle.
+    expect(knotenVon('EA Nord').querySelector('[data-lfh="skizze-kante"]')).toHaveTextContent(
+      '⇄ TMO 311',
+    );
+  });
+
+  it('nennt den Grund, wenn die Führungsstelle nicht vorliegt', () => {
+    bild(new Set(), vi.fn(), { zustand: 'fehler', daten: null });
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(within(wurzel).getByText('Gegenstelle nicht geladen')).toBeInTheDocument();
   });
 });
 
@@ -149,6 +193,7 @@ describe('Fernmeldeskizze — Kanten', () => {
     const skizze = baueFernmeldeskizze(
       [abschnitt(1, { name: 'EA West', sprechgruppen: [tmo, dmo] })],
       [einheit(30, { name: 'Zug West', abschnitt_id: 1, sprechgruppen: [tmo, dmo] })],
+      ohneFs,
     );
     renderMitProviders(
       <FernmeldeskizzeBild
@@ -172,6 +217,7 @@ describe('Fernmeldeskizze — Kanten', () => {
     const skizze = baueFernmeldeskizze(
       [abschnitt(1, { name: 'EA Ost', sprechgruppen: [stamm, lokal] })],
       [],
+      ohneFs,
     );
     renderMitProviders(
       <FernmeldeskizzeBild

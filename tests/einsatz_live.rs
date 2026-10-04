@@ -138,6 +138,169 @@ async fn frist_setzen_feuert_einsatz_unveraendert_nicht() {
     assert!(kopf_events(&eingegangen(&mut rx)).is_empty());
 }
 
+// ---------- System-ETB aus Abschluss, Frist und Wiederherstellen (LFH-858) ----------
+
+/// Die `etb`-Ereignisse als Nutzlast, in Eingangsreihenfolge.
+fn etb_nutzlasten(nachrichten: &[LiveNachricht]) -> Vec<&str> {
+    nachrichten
+        .iter()
+        .filter(|n| n.event == LiveEvent::Etb)
+        .map(|n| n.data.as_str())
+        .collect()
+}
+
+/// Die Kennungen der System-Einträge eines Einsatzes, aufsteigend.
+async fn system_eintraege(pool: &sqlx::SqlitePool, einsatz: i64) -> Vec<i64> {
+    sqlx::query_scalar(
+        "SELECT id FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id",
+    )
+    .bind(einsatz)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Die Einträge, die zwischen zwei Ständen von [`system_eintraege`] neu hinzukamen.
+fn neu(vorher: &[i64], nachher: &[i64]) -> Vec<i64> {
+    nachher
+        .iter()
+        .copied()
+        .filter(|id| !vorher.contains(id))
+        .collect()
+}
+
+fn etb_nutzlast(einsatz: i64, etb_id: i64) -> String {
+    format!(r#"{{"einsatz_id":{einsatz},"etb_id":{etb_id}}}"#)
+}
+
+async fn abschliessen(app: &axum::Router, cookie: &str, einsatz: i64) {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+}
+
+#[tokio::test]
+async fn abschluss_mit_dauer_politik_meldet_den_frist_eintrag_im_etb() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einstellungen"),
+        &admin,
+        Some(r#"{"retention_dauer_tage":365}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: {json:?}");
+    let vorher = system_eintraege(&pool, einsatz).await;
+
+    let mut rx = live.abonniere(einsatz);
+    abschliessen(&app, &admin, einsatz).await;
+
+    let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
+    assert_eq!(eintraege.len(), 1, "Vorbedingung: ein Frist-Eintrag");
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        etb_nutzlasten(&alle),
+        [etb_nutzlast(einsatz, eintraege[0])],
+        "genau ein `etb`-Ereignis mit der Kennung des Frist-Eintrags: {alle:?}"
+    );
+}
+
+#[tokio::test]
+async fn abschluss_ohne_dauer_politik_meldet_kein_etb() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let mut rx = live.abonniere(einsatz);
+    abschliessen(&app, &admin, einsatz).await;
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        anzahl(&alle, LiveEvent::Einsatz),
+        1,
+        "Vorbedingung: {alle:?}"
+    );
+    assert!(
+        etb_nutzlasten(&alle).is_empty(),
+        "kein Eintrag, kein Ereignis: {alle:?}"
+    );
+}
+
+#[tokio::test]
+async fn frist_setzen_meldet_den_audit_eintrag_im_etb() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/aufbewahrungsfrist");
+    let rumpf = r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#;
+    let vorher = system_eintraege(&pool, einsatz).await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (status, json) = anfrage(&app, "PUT", &pfad, &admin, Some(rumpf)).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
+    assert_eq!(eintraege.len(), 1, "Vorbedingung: ein Audit-Eintrag");
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        etb_nutzlasten(&alle),
+        [etb_nutzlast(einsatz, eintraege[0])],
+        "genau ein `etb`-Ereignis mit der Kennung des Audit-Eintrags: {alle:?}"
+    );
+
+    // Unverändert: kein Eintrag, also auch kein `etb`-Ereignis.
+    let (status, _) = anfrage(&app, "PUT", &pfad, &admin, Some(rumpf)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(etb_nutzlasten(&eingegangen(&mut rx)).is_empty());
+}
+
+#[tokio::test]
+async fn wiederherstellen_meldet_den_audit_eintrag_im_etb() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    abschliessen(&app, &admin, einsatz).await;
+    // Vorgemerkt seit gestern, Karenz läuft.
+    let gestern = (chrono::Utc::now() - chrono::Duration::days(1))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    sqlx::query("UPDATE einsatz SET retention_bis = ?1, geloescht_at = ?1 WHERE id = ?2")
+        .bind(&gestern)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let vorher = system_eintraege(&pool, einsatz).await;
+
+    let mut rx = live.abonniere(einsatz);
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/aufbewahrung/einsaetze/{einsatz}/wiederherstellen"),
+        &admin,
+        Some(r#"{"retention_bis":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+
+    let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
+    assert_eq!(eintraege.len(), 1, "Vorbedingung: ein Audit-Eintrag");
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        etb_nutzlasten(&alle),
+        [etb_nutzlast(einsatz, eintraege[0])],
+        "genau ein `etb`-Ereignis mit der Kennung des Audit-Eintrags: {alle:?}"
+    );
+}
+
 // ---------- Lagebesprechung (design.md D3) ----------
 
 #[tokio::test]

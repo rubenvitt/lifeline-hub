@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import type { Einheit, Einsatzabschnitt, Fuehrungsstelle, Sprechgruppe } from '../api/types';
 import {
   baueFuehrungsorganisation,
   type OrgKnoten,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
 import { baueFernmeldeskizze, type SkizzenKnoten } from './fernmeldeskizze';
 import { baueFunkplan, type FunkplanZeile } from './funkplan';
+import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
 import { verbindungenOhneGemeinsameSprechgruppe, type Quelle } from './luecken';
 
 function sg(id: number, betriebsart: 'TMO' | 'DMO', bezeichnung: string): Sprechgruppe {
@@ -38,6 +39,11 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
 }
 
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
+const ohneFs: FuehrungsstelleQuelle = { zustand: 'daten', daten: null };
+const fs = (p: Partial<Fuehrungsstelle> = {}): FuehrungsstelleQuelle => ({
+  zustand: 'daten',
+  daten: { sprechgruppen: [], ...p },
+});
 
 /**
  * Ein Datensatz mit allen Platzierungsfällen: Unterabschnitt, oberste Einheit, Untereinheit,
@@ -91,7 +97,7 @@ function knoten(k: readonly SkizzenKnoten[], key: string) {
 
 describe('baueFernmeldeskizze — Struktur', () => {
   it('hat denselben Baum wie das Organigramm', () => {
-    const skizze = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN);
+    const skizze = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, ohneFs);
     const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
     expect(struktur(skizze.wurzeln)).toEqual(struktur(org.wurzeln));
     expect(skizze.wurzeln[skizze.wurzeln.length - 1]?.key).toBe('sammel');
@@ -102,12 +108,21 @@ describe('baueFernmeldeskizze — Struktur', () => {
       abschnitt(1, { ueber_abschnitt_id: 2, sprechgruppen: [TMO311] }),
       abschnitt(2, { ueber_abschnitt_id: 1, sprechgruppen: [DMO505] }),
     ];
-    const skizze = baueFernmeldeskizze(ring, []);
+    const skizze = baueFernmeldeskizze(ring, [], ohneFs);
     expect(struktur(skizze.wurzeln)).toEqual(struktur(baueFuehrungsorganisation(ring, []).wurzeln));
+    // Ringglieder an der Wurzel urteilen wie die Lücke gegen ihren Oberabschnitt, nicht gegen die
+    // Führungsstelle (LFH-849).
+    const mitFs = fs({ sprechgruppen: [TMO311, DMO505] });
+    const keine = alle(baueFernmeldeskizze(ring, [], mitFs).wurzeln).filter(
+      (k) => k.art !== 'sammel' && k.kante.art === 'keine',
+    );
+    expect(keine).toHaveLength(
+      verbindungenOhneGemeinsameSprechgruppe(daten(ring), daten([]), mitFs).treffer.length,
+    );
   });
 
   it('zeigt ohne Einheiten nur die Abschnitte und meldet es', () => {
-    const skizze = baueFernmeldeskizze(ABSCHNITTE, null);
+    const skizze = baueFernmeldeskizze(ABSCHNITTE, null, ohneFs);
     expect(skizze.einheitenFehlen).toBe(true);
     expect(alle(skizze.wurzeln).every((k) => k.art === 'abschnitt')).toBe(true);
   });
@@ -115,7 +130,7 @@ describe('baueFernmeldeskizze — Struktur', () => {
 
 describe('baueFernmeldeskizze — Funkangaben wie die Tabelle', () => {
   it('trägt je Schlüssel Rufname, TMO, DMO und Kommunikationsmittel wie der Funkplan', () => {
-    const skizze = alle(baueFernmeldeskizze(ABSCHNITTE, EINHEITEN).wurzeln);
+    const skizze = alle(baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, ohneFs).wurzeln);
     const zeilen = new Map(
       alleZeilen(
         baueFunkplan({
@@ -124,6 +139,7 @@ describe('baueFernmeldeskizze — Funkangaben wie die Tabelle', () => {
           fahrzeuge: daten([]),
           personal: daten([]),
           sprechgruppen: daten([]),
+          fuehrungsstelle: ohneFs,
         }),
       ).map((z) => [z.key, z]),
     );
@@ -147,7 +163,7 @@ describe('baueFernmeldeskizze — Funkangaben wie die Tabelle', () => {
 });
 
 describe('baueFernmeldeskizze — Kanten', () => {
-  const w = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN).wurzeln;
+  const w = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, ohneFs).wurzeln;
 
   it('urteilt nicht an der Wurzel und unter dem Sammelknoten', () => {
     for (const k of w)
@@ -172,12 +188,79 @@ describe('baueFernmeldeskizze — Kanten', () => {
 
   it('zählt so viele Kanten „keine“, wie die Lücke im Funkplan Treffer hat', () => {
     const keine = alle(w).filter((k) => k.art !== 'sammel' && k.kante.art === 'keine');
-    const luecke = verbindungenOhneGemeinsameSprechgruppe(daten(ABSCHNITTE), daten(EINHEITEN));
+    const luecke = verbindungenOhneGemeinsameSprechgruppe(
+      daten(ABSCHNITTE),
+      daten(EINHEITEN),
+      ohneFs,
+    );
     expect(keine.map((k) => k.key).sort()).toEqual(
       luecke.treffer
         .map((v) => `${v.unten.art === 'abschnitt' ? 'ab' : 'eh'}-${v.unten.id}`)
         .sort(),
     );
     expect(keine).toHaveLength(3);
+  });
+});
+
+// ── Eigene Führungsstelle an der Wurzel (LFH-849 D5) ───────────────────────────────────────────
+
+describe('baueFernmeldeskizze — Führungsstelle an der Wurzel', () => {
+  const FS = fs({
+    rufname: 'Florian Musterstadt 10/1',
+    sprechgruppen: [TMO311],
+    kommunikationsmittel: 'digitalfunk',
+    erreichbarkeit: '0171 GEHEIM',
+  });
+
+  it('trägt Rufname, TMO/DMO und Kommunikationsmittel, nie die Erreichbarkeit', () => {
+    const { fuehrungsstelle } = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, FS);
+    expect(fuehrungsstelle).toEqual({
+      erfasst: true,
+      rufname: 'Florian Musterstadt 10/1',
+      tmo: ['TMO 311'],
+      dmo: [],
+      kommunikationsmittel: 'Digitalfunk',
+    });
+    expect(JSON.stringify(fuehrungsstelle)).not.toContain('GEHEIM');
+  });
+
+  it('nennt ohne Erfassung „nicht erfasst“, ohne Daten den Grund', () => {
+    expect(baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, ohneFs).fuehrungsstelle).toEqual({
+      erfasst: false,
+      hinweis: 'nicht erfasst',
+    });
+    expect(
+      baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, { zustand: 'gesperrt', daten: null })
+        .fuehrungsstelle,
+    ).toEqual({ erfasst: false, hinweis: 'nicht freigegeben' });
+  });
+
+  it('urteilt die Kanten der ersten Ebene gegen die Führungsstelle, nicht unter dem Sammelknoten', () => {
+    const w = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, FS).wurzeln;
+    expect(knoten(w, 'ab-1').kante).toEqual({ art: 'gemeinsam', tmo: ['TMO 311'], dmo: [] });
+    // Die Waise steht oben und hat mit DMO 506 keinen Kanal zur Führungsstelle.
+    expect(knoten(w, 'ab-4').kante).toEqual({ art: 'keine' });
+    const sammel = w.find((k) => k.art === 'sammel')!;
+    for (const k of sammel.kinder) {
+      if (k.art !== 'sammel') expect(k.kante, k.key).toEqual({ art: 'ohne-urteil' });
+    }
+  });
+
+  it('urteilt ohne Sprechgruppe an der Führungsstelle nicht', () => {
+    const w = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, fs({ rufname: 'Florian 10/1' })).wurzeln;
+    for (const k of w)
+      if (k.art !== 'sammel') expect(k.kante, k.key).toEqual({ art: 'ohne-urteil' });
+  });
+
+  it('zählt mit Führungsstelle so viele Kanten „keine“, wie die Lücke im Funkplan Treffer hat', () => {
+    const w = baueFernmeldeskizze(ABSCHNITTE, EINHEITEN, FS).wurzeln;
+    const keine = alle(w).filter((k) => k.art !== 'sammel' && k.kante.art === 'keine');
+    const luecke = verbindungenOhneGemeinsameSprechgruppe(daten(ABSCHNITTE), daten(EINHEITEN), FS);
+    expect(keine.map((k) => k.key).sort()).toEqual(
+      luecke.treffer
+        .map((v) => `${v.unten.art === 'abschnitt' ? 'ab' : 'eh'}-${v.unten.id}`)
+        .sort(),
+    );
+    expect(keine).toHaveLength(4);
   });
 });

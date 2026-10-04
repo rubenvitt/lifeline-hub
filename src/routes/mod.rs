@@ -18,6 +18,7 @@ pub mod einsatz;
 pub mod einsatz_bereitstellungsraum;
 pub mod einsatz_einheit;
 pub mod einsatz_fahrzeug;
+pub mod einsatz_fuehrungsstelle;
 pub mod einsatz_material;
 pub mod einsatz_person;
 pub mod einsatz_personal;

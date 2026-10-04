@@ -149,9 +149,10 @@ pub async fn abschliessen(
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let id = ctx.einsatz.id;
 
-    let aktualisiert = repo::abschliessen(&state.pool, id, ctx.benutzer.id).await?;
+    let ergebnis = repo::abschliessen(&state.pool, id, ctx.benutzer.id).await?;
     kopf_geaendert(&state, id).await;
-    Ok(Json(aktualisiert.anzeige(
+    etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    Ok(Json(ergebnis.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
@@ -243,7 +244,7 @@ pub async fn aufbewahrungsfrist_setzen(
         (Some(a), Some(neu)) => format!("Aufbewahrungsfrist geändert von {a} auf {neu}"),
     };
 
-    let aktualisiert = repo::frist_setzen(
+    let ergebnis = repo::frist_setzen(
         &state.pool,
         id,
         ctx.benutzer.id,
@@ -252,6 +253,8 @@ pub async fn aufbewahrungsfrist_setzen(
     )
     .await?;
     kopf_geaendert(&state, id).await;
+    etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    let aktualisiert = ergebnis.einsatz;
     let anzeige = aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
@@ -379,6 +382,15 @@ pub async fn kategorie_frist_setzen(
         )
         .await?,
     ))
+}
+
+/// Meldet die System-ETB-Einträge einer Einsatz-Mutation nach dem Commit live (LFH-858): ein
+/// `etb`-Ereignis je Kennung, damit offene ETB-Schirme, die Kopfzahl und der Modulzähler ohne
+/// Neuladen nachziehen.
+fn etb_eintraege_melden(state: &AppState, einsatz_id: i64, etb_eintrag_ids: &[i64]) {
+    for &etb_id in etb_eintrag_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
 }
 
 /// Der Frist-PUT hat bewusst kein Lesegate (eine abgelaufene Frist soll reaktiv verlängert
