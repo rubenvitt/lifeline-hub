@@ -3,6 +3,8 @@ import { listeAuftraege } from '../api/auftraege';
 import { ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
+import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
+import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { listeMeldungen } from '../api/meldungen';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { einsatzKeys } from '../api/queryKeys';
@@ -129,36 +131,58 @@ export const FUEHRUNGSPROBLEME_QUELLE: UebernahmeQuelle = {
     ): Promise<Geladen<T[]>> =>
       offen ? ladeListe<T[]>(qc, key, fn, []) : Promise.resolve(gesperrt<T[]>([]));
 
-    const [zaehler, auftraege, meldungen, abschnitte, einheiten, sprechgruppen, fs] =
-      await Promise.all([
-        auftraegeFrei || meldungenFrei
-          ? ladeListe(
-              qc,
-              einsatzKeys.modulZaehler(einsatzId),
-              () => ladeModulZaehler(einsatzId),
-              null,
-            )
-          : Promise.resolve(gesperrt(null)),
-        lade(auftraegeFrei, einsatzKeys.auftraege(einsatzId), () => listeAuftraege(einsatzId)),
-        lade(meldungenFrei, einsatzKeys.meldungen(einsatzId), () => listeMeldungen(einsatzId)),
-        lade(funkFrei('einsatzabschnitte'), einsatzKeys.abschnitte(einsatzId), () =>
-          listeAbschnitte(einsatzId),
-        ),
-        lade(funkFrei('einheiten'), einsatzKeys.einheiten(einsatzId), () =>
-          listeEinheiten(einsatzId),
-        ),
-        lade(stabFrei, einsatzKeys.sprechgruppen(einsatzId), () =>
-          listeEinsatzSprechgruppen(einsatzId),
-        ),
-        stabFrei
-          ? ladeListe(
-              qc,
-              einsatzKeys.fuehrungsstelle(einsatzId),
-              () => ladeFuehrungsstelle(einsatzId),
-              null,
-            )
-          : Promise.resolve(gesperrt(null)),
-      ]);
+    const [
+      zaehler,
+      auftraege,
+      meldungen,
+      abschnitte,
+      einheiten,
+      sprechgruppen,
+      fs,
+      stellen,
+      skizze,
+    ] = await Promise.all([
+      auftraegeFrei || meldungenFrei
+        ? ladeListe(
+            qc,
+            einsatzKeys.modulZaehler(einsatzId),
+            () => ladeModulZaehler(einsatzId),
+            null,
+          )
+        : Promise.resolve(gesperrt(null)),
+      lade(auftraegeFrei, einsatzKeys.auftraege(einsatzId), () => listeAuftraege(einsatzId)),
+      lade(meldungenFrei, einsatzKeys.meldungen(einsatzId), () => listeMeldungen(einsatzId)),
+      lade(funkFrei('einsatzabschnitte'), einsatzKeys.abschnitte(einsatzId), () =>
+        listeAbschnitte(einsatzId),
+      ),
+      lade(funkFrei('einheiten'), einsatzKeys.einheiten(einsatzId), () =>
+        listeEinheiten(einsatzId),
+      ),
+      lade(stabFrei, einsatzKeys.sprechgruppen(einsatzId), () =>
+        listeEinsatzSprechgruppen(einsatzId),
+      ),
+      stabFrei
+        ? ladeListe(
+            qc,
+            einsatzKeys.fuehrungsstelle(einsatzId),
+            () => ladeFuehrungsstelle(einsatzId),
+            null,
+          )
+        : Promise.resolve(gesperrt(null)),
+      // LFH-893: externe Stellen und Komponenten der Skizze tragen Sprechgruppen wie die
+      // Struktur; dieselben Keys wie die Funkplan-Seite (gemeinsamer Cache).
+      lade(stabFrei, einsatzKeys.stabKommunikationsplan(einsatzId), () =>
+        ladeKommunikationsplan(einsatzId),
+      ),
+      stabFrei
+        ? ladeListe(
+            qc,
+            einsatzKeys.stabFernmeldeskizze(einsatzId),
+            () => ladeFernmeldeskizze(einsatzId),
+            null,
+          )
+        : Promise.resolve(gesperrt(null)),
+    ]);
 
     // Fehlt das Feld im Zähler, ist das Modul für die Person nicht frei (`fuehrungsZahlen.ts`).
     const auftragsZahl = auftraegeFrei ? zaehler.daten?.auftraege : undefined;
@@ -201,16 +225,34 @@ export const FUEHRUNGSPROBLEME_QUELLE: UebernahmeQuelle = {
       sprechgruppen: alsQuelle(sprechgruppen),
       fuehrungsstelle: { zustand: fs.zustand, daten: fs.daten },
     };
-    const lueckenZeilen = funkplanLueckenZeilen(funkplanLuecken(funkQuellen), funkQuellen, {
-      nurBefund: true,
-    });
+    const lueckenZeilen = funkplanLueckenZeilen(
+      funkplanLuecken({
+        ...funkQuellen,
+        stellen: alsQuelle(stellen),
+        skizze: { zustand: skizze.zustand, daten: skizze.daten },
+      }),
+      funkQuellen,
+      {
+        nurBefund: true,
+      },
+    );
     const funkTeil = !stabFrei
       ? [fehlt('gesperrt')]
       : lueckenZeilen.length > 0
         ? lueckenZeilen
         : ['- keine Lücken'];
 
-    const gelesen = [zaehler, auftraege, meldungen, abschnitte, einheiten, sprechgruppen, fs];
+    const gelesen = [
+      zaehler,
+      auftraege,
+      meldungen,
+      abschnitte,
+      einheiten,
+      sprechgruppen,
+      fs,
+      stellen,
+      skizze,
+    ];
     const stand = gemeinsamerDatenstand(...gelesen.map((g) => g.stand)) || Date.now();
 
     return [

@@ -62,8 +62,9 @@ export interface WeitereKanalQuellen {
  * Teilnehmer“). Fehlt eine Strukturquelle, wäre jede Zahl geraten. Fehlt eine der weiteren
  * Quellen, urteilt die Regel nur, wenn die Struktur schon jede lokale Sprechgruppe trägt.
  *
- * @param weitere fehlt das Argument, hat der Aufrufer Stellen und Skizze nicht als Quelle (die
- *   Übernahme in den Lagebericht): dann zählen nur Abschnitte, Einheiten und Führungsstelle.
+ * @param weitere fehlt das Argument, hat der Aufrufer Stellen und Skizze nicht als Quelle: dann
+ *   zählen nur Abschnitte, Einheiten und Führungsstelle. Funkplan-Seite und Übernahme in den
+ *   Lagebericht reichen beide mit.
  */
 export function lokaleSprechgruppenOhneZuordnung(
   sprechgruppen: Quelle<Sprechgruppe>,
