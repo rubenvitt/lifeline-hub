@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -162,7 +162,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
 
       await userEvent.click(screen.getByRole('button', { name: /Zuordnungen/ }));
       expect(await screen.findByText('Zugeordnete Tiere')).toBeInTheDocument();
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(pfade).toContain('/api/einsaetze/1/tiere');
         expect(pfade).toContain('/api/einsaetze/1/schaeden');
         expect(pfade).toContain('/api/einsaetze/1/uhs');
@@ -180,7 +180,7 @@ describe('PersonenDetailPage — Ladehoheit', () => {
       expect(pfade).not.toContain('/api/einsaetze/1/personen/10/audit');
 
       await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
-      await vi.waitFor(() => expect(pfade).toContain('/api/einsaetze/1/personen/10/audit'));
+      await waitFor(() => expect(pfade).toContain('/api/einsaetze/1/personen/10/audit'));
     } finally {
       loesen();
     }
@@ -292,7 +292,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     const menue = await oeffneKopfmenue();
     await userEvent.click(within(menue).getByRole('menuitem', { name: /vermisst/ }));
-    await vi.waitFor(() => expect(gerufen.status).toBe('vermisst'));
+    await waitFor(() => expect(gerufen.status).toBe('vermisst'));
   });
 
   it('„verstorben" fragt über einen Dialog zurück, nicht über ein Popconfirm', async () => {
@@ -311,7 +311,7 @@ describe('PersonenDetailPage — Kopfleiste', () => {
     // Die tragende Hälfte: bis zur Bestätigung ist nichts passiert.
     expect(gerufen.status).toBeUndefined();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Status setzen' }));
-    await vi.waitFor(() => expect(gerufen.status).toBe('verstorben'));
+    await waitFor(() => expect(gerufen.status).toBe('verstorben'));
   });
 
   it('ohne Schreibrecht steht weder Primäraktion noch Auslöser', async () => {
@@ -348,7 +348,7 @@ describe('PersonenDetailPage — med. Verlauf', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
     await userEvent.click(await screen.findByText('SK II'));
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
-    await vi.waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
+    await waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
   });
 
   it('zeigt bei Sichtung=tot den Hinweis „Status → verstorben"', async () => {
@@ -450,7 +450,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
 
     // Statuswechsel liegen im Kopfmenü, nicht als eigener Knopf.
     await ausMenue(/vermisst/);
-    await vi.waitFor(() => {
+    await waitFor(() => {
       const optimistisch = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
       expect(optimistisch?.status).toBe('vermisst');
       expect(optimistisch?.notizen).toEqual(mitVerlauf.notizen);
@@ -486,7 +486,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await act(async () => {
       statusFreigeben();
     });
-    await vi.waitFor(() => {
+    await waitFor(() => {
       const zurueckgerollt = client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10));
       expect(zurueckgerollt?.status).toBe('erfasst');
       expect(zurueckgerollt?.name).toBe('Neuer Detailname');
@@ -536,7 +536,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
 
     // Statuswechsel liegen im Kopfmenü, nicht als eigener Knopf.
     await ausMenue(/vermisst/);
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))?.status).toBe('vermisst');
     });
     act(() => {
@@ -563,7 +563,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await act(async () => {
       statusFreigeben();
     });
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(client.getQueryData<PersonDetail>(einsatzKeys.person(1, 10))).toMatchObject({
         status: 'vermisst',
         name: 'Neuer Detailstand',
@@ -599,7 +599,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     ]);
     await ausMenue(/Bearbeiten/);
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(gesendet).toBe(true));
+    await waitFor(() => expect(gesendet).toBe(true));
   });
 
   it('friert Formularwerte und CAS-Basis gemeinsam ein, auch wenn der Detailstand refetcht', async () => {
@@ -630,7 +630,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     expect(name).toHaveValue('Lokaler Name');
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(koerper).toBeDefined());
+    await waitFor(() => expect(koerper).toBeDefined());
     expect(koerper?.name).toBe('Lokaler Name');
     expect(koerper?.basis_geaendert_at).toBe('2026-05-27 09:00:00');
   });
@@ -651,7 +651,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    await waitFor(() => expect(koerper).toHaveLength(2));
     // Der erste Request trug den beim Öffnen gelesenen Stand; der Overwrite bewusst nicht.
     expect(koerper[0].basis_geaendert_at).toBe('2026-05-27 09:00:00');
     expect(koerper[1].basis_geaendert_at).toBeUndefined();
@@ -675,7 +675,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await ausMenue(/Bearbeiten/);
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    await waitFor(() => expect(koerper).toHaveLength(2));
     // Die Servermeldung belegt den else-Zweig (`fehler`); ein zweiter Dialog wäre eine Schleife,
     // deren einziger Ausweg „Neu laden" ist.
     expect(
@@ -727,7 +727,7 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
-    await vi.waitFor(() => expect(entscheidung).toBe('bestaetigt'));
+    await waitFor(() => expect(entscheidung).toBe('bestaetigt'));
   });
 
   it('zeigt den „Zugeordnete Tiere"-Block und verlinkt auf die Tier-Detailseite', async () => {
@@ -916,7 +916,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
     await userEvent.click(await screen.findByText('BHP 50'));
     await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
-    await vi.waitFor(() => expect(gesendet).toMatchObject({ art: 'eintritt', uhs_id: 5 }));
+    await waitFor(() => expect(gesendet).toMatchObject({ art: 'eintritt', uhs_id: 5 }));
   });
 
   it('wechselt die UHS einer bereits verorteten Person (art=wechsel)', async () => {
@@ -947,7 +947,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
     await userEvent.click(await screen.findByText('PA 1'));
     await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
-    await vi.waitFor(() => expect(gesendet).toMatchObject({ art: 'wechsel', uhs_id: 6 }));
+    await waitFor(() => expect(gesendet).toMatchObject({ art: 'wechsel', uhs_id: 6 }));
   });
 
   it('trägt eine verortete Person aus der UHS aus (art=austritt)', async () => {
@@ -975,7 +975,7 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     ]);
     await klappeZuordnungenAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Austragen' }));
-    await vi.waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
+    await waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
   });
 
   it('bietet bei gesetztem Verbleib kein Zuweisen an (Grundriss-Konsistenz)', async () => {
@@ -1105,7 +1105,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
     await userEvent.click(await screen.findByText(/Minka/));
     await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(patch).toMatchObject({ halter_person_id: 10, halter_kontakt: null }),
     );
   });
@@ -1127,7 +1127,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     await klappeZuordnungenAuf();
     await screen.findByText(/T-007/);
     await userEvent.click(await screen.findByRole('button', { name: 'lösen' }));
-    await vi.waitFor(() => expect(patch).toMatchObject({ halter_person_id: null }));
+    await waitFor(() => expect(patch).toMatchObject({ halter_person_id: null }));
   });
 
   it('weist der Person einen freien Schaden als Geschädigte zu (XOR-Leerung)', async () => {
@@ -1148,7 +1148,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
     await userEvent.click(await screen.findByText(/S-009/));
     await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(patch).toMatchObject({
         geschaedigt_person_id: 10,
         geschaedigt_personal_id: null,
@@ -1175,7 +1175,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     await klappeZuordnungenAuf();
     await screen.findByText((t) => t.includes('S-003'));
     await userEvent.click(await screen.findByRole('button', { name: 'lösen' }));
-    await vi.waitFor(() => expect(patch).toMatchObject({ geschaedigt_person_id: null }));
+    await waitFor(() => expect(patch).toMatchObject({ geschaedigt_person_id: null }));
   });
 
   it('bietet im Picker nur freie Tiere an (bereits belegte werden ausgeschlossen)', async () => {
@@ -1270,7 +1270,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     // Ohne Status vermisst gibt es das Feld nicht (sonst 422).
     expect(screen.queryByLabelText('vermisst seit')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(koerper).toBeDefined());
+    await waitFor(() => expect(koerper).toBeDefined());
     expect(koerper).toMatchObject({
       zustand: 'Beinfraktur',
       antreff_lat: 52.2691,
@@ -1291,7 +1291,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     await ausMenue(/Bearbeiten/);
     expect(screen.getByLabelText('Koordinate')).toHaveValue('52.2691/9.1343');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(koerper).toBeDefined());
+    await waitFor(() => expect(koerper).toBeDefined());
     expect(koerper).not.toHaveProperty('antreff_lat');
     expect(koerper).not.toHaveProperty('antreff_lon');
     expect(koerper).toMatchObject({ zustand: 'gehfähig' });
@@ -1308,7 +1308,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     await ausMenue(/Bearbeiten/);
     await userEvent.clear(screen.getByLabelText('Koordinate'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(koerper).toBeDefined());
+    await waitFor(() => expect(koerper).toBeDefined());
     expect(koerper).toMatchObject({ antreff_lat: null, antreff_lon: null });
   });
 
@@ -1358,7 +1358,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     await ausMenue(/Bearbeiten/);
     expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await waitFor(() => expect(koerper).toHaveLength(1));
     // Unverändert: kein Key — auch kein `null`, das wäre ein 400.
     expect(koerper[0]).not.toHaveProperty('vermisst_seit');
   });

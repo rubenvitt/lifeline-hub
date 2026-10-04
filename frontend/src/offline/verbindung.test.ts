@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, NetzFehler } from '../api/client';
 import { erzeugeQueryClient } from '../api/queryClient';
@@ -53,8 +53,9 @@ describe('Verbindung (LFH-723, design.md D7)', () => {
       .fetchQuery({ queryKey: ['x', 1], queryFn: () => Promise.reject(new NetzFehler()) })
       .catch(() => {});
     // Die Produktionsvorgabe wiederholt zweimal mit Backoff — die Kennzeichnung wartet nicht
-    // darauf, sondern kommt mit dem ersten gescheiterten Versuch.
-    await vi.waitFor(() => expect(result.current).toBe(true), { timeout: 900 });
+    // darauf, sondern kommt mit dem ersten gescheiterten Versuch. Die 900 ms sind die Aussage, kein
+    // Wartebudget: die erste Wiederholung käme nach 1 s (`retryDelay`, `api/queryClient.ts`).
+    await waitFor(() => expect(result.current).toBe(true), { timeout: 900 });
     await abruf;
   });
 

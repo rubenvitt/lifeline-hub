@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -33,7 +33,7 @@ async function dialog(hinweis?: string) {
   renderMitProviders(<Rahmen hinweis={hinweis} />);
   const d = (await screen.findAllByRole('dialog'))[0];
   const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
-  await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+  await waitFor(() => expect(document.activeElement).toBe(knopf));
   return d;
 }
 
@@ -75,9 +75,9 @@ describe('ErfassungsAnhangAblegenModal (LFH-21, LFH-758)', () => {
     await userEvent.upload(dateiInput(d), foto('erstes.jpg'));
     await userEvent.click(within(d).getByRole('button', { name: /Speichern und nächste/ }));
 
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     expect(legeAb).toHaveBeenCalledWith(expect.objectContaining({ name: 'erstes.jpg' }));
-    await vi.waitFor(() => expect(within(d).queryByText('erstes.jpg')).not.toBeInTheDocument());
+    await waitFor(() => expect(within(d).queryByText('erstes.jpg')).not.toBeInTheDocument());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 

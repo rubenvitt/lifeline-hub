@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, isInaccessible, screen, within } from '@testing-library/react';
+import { act, fireEvent, isInaccessible, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -116,7 +116,7 @@ function optionsLabels() {
 async function oeffneBezugsliste(d: HTMLElement) {
   await oeffneBezug(d);
   await userEvent.click(within(d).getByRole('combobox', { name: 'Bezug' }));
-  await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 12 · Lage erkundet'));
+  await waitFor(() => expect(optionsLabels()).toContain('ETB 12 · Lage erkundet'));
 }
 
 /** Schließt die Liste wie die Maus: Klick in ein anderes Feld. Zu ist sie am `aria-expanded`
@@ -125,7 +125,7 @@ async function oeffneBezugsliste(d: HTMLElement) {
 async function schliesseBezugsliste(d: HTMLElement) {
   await userEvent.click(within(d).getByRole('textbox', { name: 'Titel' }));
   const feld = within(d).getByRole('combobox', { name: 'Bezug' });
-  await vi.waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
+  await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
 }
 
 /** Ein Takt für React: der Query-Cache meldet seine Beobachter gebündelt per `setTimeout`. Ohne
@@ -140,7 +140,7 @@ const neuGezeichnet = () => act(() => new Promise((r) => setTimeout(r, 20)));
 async function dialog() {
   const d = (await screen.findAllByRole('dialog'))[0];
   const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
-  await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+  await waitFor(() => expect(document.activeElement).toBe(knopf));
   return d;
 }
 
@@ -165,7 +165,7 @@ async function oeffneBezug(d: HTMLElement) {
 
 /** Wie `SchaedenPage.test.tsx`: jsdom beendet die Schließbewegung nicht von selbst. */
 async function warteBisDialogWeg() {
-  await vi.waitFor(() => {
+  await waitFor(() => {
     const modal = document.querySelector<HTMLElement>('.ant-modal');
     if (modal) {
       fireEvent.transitionEnd(modal);
@@ -208,7 +208,7 @@ describe('DokumentAblegenModal', () => {
     await within(d).findByRole('combobox', { name: 'Kategorie' });
     expect(etbAbrufe).toBe(0);
     await oeffneBezug(d);
-    await vi.waitFor(() => expect(etbAbrufe).toBe(1));
+    await waitFor(() => expect(etbAbrufe).toBe(1));
   });
 
   it('füllt einen leeren Titel mit dem Dateinamen ohne Endung', async () => {
@@ -264,7 +264,7 @@ describe('DokumentAblegenModal', () => {
     await fuellePflicht(d, datei);
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     const [einsatzId, eingabe] = legeAb.mock.calls[0];
     expect(einsatzId).toBe(1);
     expect(eingabe).toEqual({ datei, titel: 'Lageplan Nord', kategorie: 'lagekarte_plan' });
@@ -281,7 +281,7 @@ describe('DokumentAblegenModal', () => {
     await waehleOption('EA Nord');
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     expect(legeAb.mock.calls[0][1].bezug).toEqual({ typ: 'abschnitt', id: 3 });
   });
 
@@ -295,7 +295,7 @@ describe('DokumentAblegenModal', () => {
     await waehleOption('ETB 12 · Lage erkundet');
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     expect(legeAb.mock.calls[0][1].bezug).toEqual({ typ: 'etb_eintrag', id: 9 });
   });
 
@@ -312,7 +312,7 @@ describe('DokumentAblegenModal', () => {
       await client.invalidateQueries({ queryKey: einsatzKeys.etb(1) });
       expect(etbAbrufe).toBeGreaterThan(abrufeVorher);
       // Der Cache trägt den neuen Eintrag schon — die Liste darf ihn trotzdem nicht einschieben.
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(
           client
             .getQueriesData<EtbStub[]>({ queryKey: einsatzKeys.etb(1) })
@@ -324,7 +324,7 @@ describe('DokumentAblegenModal', () => {
 
       await schliesseBezugsliste(d);
       await userEvent.click(within(d).getByRole('combobox', { name: 'Bezug' }));
-      await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 13 · Neue Meldung'));
+      await waitFor(() => expect(optionsLabels()).toContain('ETB 13 · Neue Meldung'));
     });
 
     it('ein neuer Abschnitt verschiebt die offene Liste nicht', async () => {
@@ -335,7 +335,7 @@ describe('DokumentAblegenModal', () => {
 
       abschnitte = [...abschnitte, { id: 8, einsatz_id: 1, name: 'EA Süd' }];
       await client.invalidateQueries({ queryKey: einsatzKeys.abschnitte(1) });
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(
           client.getQueryData<{ name: string }[]>(einsatzKeys.abschnitte(1))?.map((a) => a.name),
         ).toContain('EA Süd'),
@@ -353,13 +353,13 @@ describe('DokumentAblegenModal', () => {
       expect(optionsLabels()).not.toContain('ETB 3 · Deichbruch gemeldet');
 
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Deichbruch');
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(etbAnfragen.some((qs) => qs.get('q') === 'Deichbruch')).toBe(true),
       );
       await waehleOption('ETB 3 · Deichbruch gemeldet');
       await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
-      await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
       expect(legeAb.mock.calls[0][1].bezug).toEqual({ typ: 'etb_eintrag', id: 5 });
     });
 
@@ -373,9 +373,9 @@ describe('DokumentAblegenModal', () => {
       // Nach der Wahl gilt wieder das jüngste Fenster — der Eintrag steht dort nicht. Erst nach
       // der Entprellfrist ist die Suche wirklich zurückgefallen; vorher stünde die Option noch da.
       const feld = within(d).getByRole('combobox', { name: 'Bezug' });
-      await vi.waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
+      await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
       await act(() => new Promise((r) => setTimeout(r, 400)));
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(feld.closest('.ant-select-content')).toHaveTextContent(
           /^ETB 3 · Deichbruch gemeldet$/,
         ),
@@ -388,7 +388,7 @@ describe('DokumentAblegenModal', () => {
       const d = await dialog();
       await oeffneBezugsliste(d);
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Sandsäcke');
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(optionsLabels()).toEqual([expect.stringMatching(/^ETB 4 · Lagemeldung x+…$/)]),
       );
     });
@@ -398,7 +398,7 @@ describe('DokumentAblegenModal', () => {
       const d = await dialog();
       await oeffneBezugsliste(d);
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'erkund');
-      await vi.waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'erkund')).toBe(true));
+      await waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'erkund')).toBe(true));
       await neuGezeichnet();
       expect(optionsLabels()).toEqual(['ETB 12 · Lage erkundet']);
     });
@@ -422,11 +422,11 @@ describe('DokumentAblegenModal', () => {
       await oeffneBezugsliste(d);
       const feld = within(d).getByRole('combobox', { name: 'Bezug' });
       await userEvent.type(feld, 'Deichbruch');
-      await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
+      await waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
 
       await schliesseBezugsliste(d);
       await userEvent.click(feld);
-      await vi.waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'true'));
+      await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'true'));
       const sofort = optionsLabels();
       expect(sofort).toContain('ETB 12 · Lage erkundet');
       expect(sofort).not.toContain('ETB 3 · Deichbruch gemeldet');
@@ -444,7 +444,7 @@ describe('DokumentAblegenModal', () => {
       await oeffneBezugsliste(d);
       const feld = within(d).getByRole('combobox', { name: 'Bezug' });
       await userEvent.type(feld, 'Deichbruch');
-      await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
+      await waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
       // Innerhalb der Entprellfrist: die Antwort für „Deichbruch Pumpe" steht noch aus.
       await userEvent.type(feld, ' Pumpe');
       expect(optionsLabels()).not.toContain('ETB 3 · Deichbruch gemeldet');
@@ -457,11 +457,11 @@ describe('DokumentAblegenModal', () => {
       await oeffneBezugsliste(d);
       const feld = within(d).getByRole('combobox', { name: 'Bezug' });
       await userEvent.type(feld, 'Deichbruch');
-      await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
+      await waitFor(() => expect(optionsLabels()).toContain('ETB 3 · Deichbruch gemeldet'));
 
       await userEvent.clear(feld);
       await userEvent.type(feld, 'Lage');
-      await vi.waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'Lage')).toBe(true));
+      await waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'Lage')).toBe(true));
       await neuGezeichnet();
       // Ohne Server-Antwort bleibt der Filter über das jüngste Fenster — nie die Treffer von vorhin.
       expect(optionsLabels()).toEqual(['ETB 12 · Lage erkundet']);
@@ -480,7 +480,7 @@ describe('DokumentAblegenModal', () => {
 
       etbFenster = [eintrag(10, 13, 'Neue Meldung'), ...etbFenster];
       await client.invalidateQueries({ queryKey: einsatzKeys.etb(1) });
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(
           client
             .getQueriesData<EtbStub[]>({ queryKey: einsatzKeys.etb(1) })
@@ -496,7 +496,7 @@ describe('DokumentAblegenModal', () => {
       const d = await dialog();
       await oeffneBezugsliste(d);
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'ETB 412');
-      await vi.waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
+      await waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
     });
 
     it('filtert Abschnitte und Einheiten am Client mit', async () => {
@@ -504,7 +504,7 @@ describe('DokumentAblegenModal', () => {
       const d = await dialog();
       await oeffneBezugsliste(d);
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Nord');
-      await vi.waitFor(() => expect(optionsLabels()).toContain('EA Nord'));
+      await waitFor(() => expect(optionsLabels()).toContain('EA Nord'));
       expect(optionsLabels()).not.toContain('Florian 1');
     });
   });
@@ -560,7 +560,7 @@ describe('DokumentAblegenModal', () => {
     expect(await within(d).findByText('Datei ist zu groß (25 MiB erlaubt)')).toBeInTheDocument();
 
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(within(d).getAllByText('Datei ist zu groß (25 MiB erlaubt)')).toHaveLength(1),
     );
     expect(legeAb).not.toHaveBeenCalled();
@@ -573,7 +573,7 @@ describe('DokumentAblegenModal', () => {
     await fuellePflicht(d, pdfMitGroesse(UPLOAD_MAX_GROESSE));
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     expect(within(d).queryByText('Datei ist zu groß (25 MiB erlaubt)')).not.toBeInTheDocument();
   });
 
@@ -582,7 +582,7 @@ describe('DokumentAblegenModal', () => {
     rendere();
     const d = await dialog();
     const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
-    await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+    await waitFor(() => expect(document.activeElement).toBe(knopf));
   });
 
   it('lässt Titel und Datei bei Ablehnung stehen und zeigt den Fehler IM Dialog', async () => {
@@ -592,7 +592,7 @@ describe('DokumentAblegenModal', () => {
     await fuellePflicht(d, pdf(), 'Mein Plan');
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     const alarm = await within(d).findByRole('alert');
     expect(alarm).toHaveTextContent('Dateityp exe ist nicht erlaubt');
     // Im Dialog, nicht bloß in der Toast-Warteschlange.
@@ -651,7 +651,7 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     const d = await dialog();
     await fuellePflicht(d, pdf(), 'Mein Plan');
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     const fortschritt = (f: UploadFortschritt) => act(() => melde!(f));
     return { d, fortschritt, erfuellen, ablehnen };
   }
@@ -700,7 +700,7 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
   it('die Ansage-Region spricht in 10-%-Schritten, nicht bei jedem Ereignis', async () => {
     const { d, fortschritt } = await starteAblage();
     fortschritt({ phase: 'senden', anteil: 0.21 });
-    const region = await vi.waitFor(() => {
+    const region = await waitFor(() => {
       const r = d.querySelector('[aria-live="polite"]');
       expect(r).toHaveTextContent('Wird hochgeladen · 20 %');
       return r!;
@@ -731,7 +731,7 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     let d = await dialog();
     await fuellePflicht(d, pdf(), 'Erster');
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
     await warteBisDialogWeg();
 
@@ -739,7 +739,7 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     d = await dialog();
     await fuellePflicht(d, pdf(), 'Zweiter');
     await userEvent.click(within(d).getByRole('button', { name: /Ablegen/ }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
     act(() => melder[1]({ phase: 'senden', anteil: 0.1 }));
     // Die alte Übertragung läuft serverseitig weiter und meldet noch.
     act(() => melder[0]({ phase: 'pruefen' }));
@@ -760,7 +760,7 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     let d = await dialog();
     await fuellePflicht(d, pdf(), 'Erster');
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
     await warteBisDialogWeg();
 
@@ -768,7 +768,7 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
     d = await dialog();
     await fuellePflicht(d, pdf(), 'Zweiter');
     await userEvent.click(within(d).getByRole('button', { name: /Ablegen/ }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
     act(() => melder[1]({ phase: 'pruefen' }));
     await within(d).findByRole('progressbar', { name: 'Datei wird geprüft' });
     // Die alte Übertragung endet, während die neue noch geprüft wird.
@@ -812,7 +812,7 @@ describe('DokumentAblegenModal — Rückmeldung beim Ablegen (LFH-654)', () => {
 
     legeAb.mockResolvedValue({} as never);
     await userEvent.click(within(d).getByRole('button', { name: /Ablegen/ }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
     expect(legeAb.mock.calls[1][1]).toMatchObject({
       titel: 'Mein Plan',
       kategorie: 'lagekarte_plan',

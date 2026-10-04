@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
@@ -134,7 +134,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     const ok = within(pop).getByRole('button', { name: 'Entfernen' });
     expect(ok.className).toMatch(/ant-btn-dangerous/);
     await userEvent.click(ok);
-    await vi.waitFor(() => expect(entferne).toHaveBeenCalledWith(1, 10, 5));
+    await waitFor(() => expect(entferne).toHaveBeenCalledWith(1, 10, 5));
   });
 
   it('öffnet den Ablegen-Dialog aus dem Paneelkopf', async () => {
@@ -163,7 +163,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     const knopf = screen.getByRole('button', {
       name: 'Datei dach.jpg von Schaden S-003 entfernen',
     });
-    await vi.waitFor(() => expect(knopf.className).toMatch(/ant-btn-loading/));
+    await waitFor(() => expect(knopf.className).toMatch(/ant-btn-loading/));
     // Nur die betroffene Zeile lädt.
     expect(
       screen.getByRole('button', { name: 'Datei gutachten.pdf von Schaden S-003 entfernen' })
@@ -194,18 +194,18 @@ describe('SchadenAnhaenge (LFH-21)', () => {
       [anhang(6, 'gutachten.pdf', 'application/pdf')],
     ]);
     await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
-    await vi.waitFor(() => expect(screen.queryByRole('link', { name: /^dach\.jpg/ })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('link', { name: /^dach\.jpg/ })).toBeNull());
     const naechste = screen.getByRole('link', { name: /^gutachten\.pdf/ });
-    await vi.waitFor(() => expect(document.activeElement).toBe(naechste));
+    await waitFor(() => expect(document.activeElement).toBe(naechste));
   });
 
   it('setzt den Fokus nach dem Entfernen auf den Verweis der nächsten Zeile, nicht auf ihr Vorschaubild (LFH-759)', async () => {
     entferne.mockResolvedValue(undefined);
     rendere([[anhang(5, 'dach.jpg'), anhang(6, 'giebel.jpg')], [anhang(6, 'giebel.jpg')]]);
     await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
-    await vi.waitFor(() => expect(screen.queryByRole('link', { name: /^dach\.jpg/ })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('link', { name: /^dach\.jpg/ })).toBeNull());
     const naechste = screen.getByRole('link', { name: /^giebel\.jpg/ });
-    await vi.waitFor(() => expect(document.activeElement).toBe(naechste));
+    await waitFor(() => expect(document.activeElement).toBe(naechste));
   });
 
   it('setzt den Fokus nach dem Entfernen der letzten Datei auf „Datei ablegen“', async () => {
@@ -214,7 +214,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
     await within(paneel()).findByText('Noch keine Fotos oder Dateien');
     const kopf = within(paneel()).getByRole('button', { name: 'Datei ablegen' });
-    await vi.waitFor(() => expect(document.activeElement).toBe(kopf));
+    await waitFor(() => expect(document.activeElement).toBe(kopf));
   });
 });
 
@@ -241,7 +241,7 @@ describe('SchadenAnhaenge — Live-Zufluss (LFH-760)', () => {
     expect(zeilen()).toEqual(['fremd.jpg', 'dach.jpg']);
     expect(within(paneel()).queryByRole('status')).toBeNull();
     // Der Fokus fällt nicht mit dem Banner auf <body>, sondern geht auf die oberste neue Zeile.
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByRole('link', { name: /^fremd\.jpg/ })),
     );
   });
@@ -258,7 +258,7 @@ describe('SchadenAnhaenge — Live-Zufluss (LFH-760)', () => {
     await userEvent.upload(input, new File(['x'], 'eigen.jpg', { type: 'image/jpeg' }));
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
-    await vi.waitFor(() => expect(zeilen()).toEqual(['eigen.jpg', 'dach.jpg']));
+    await waitFor(() => expect(zeilen()).toEqual(['eigen.jpg', 'dach.jpg']));
     expect(within(paneel()).getByRole('status')).toHaveTextContent('1 neue Datei');
   });
 

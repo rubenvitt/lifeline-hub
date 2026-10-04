@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -147,7 +147,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body).not.toBeNull());
+    await waitFor(() => expect(body).not.toBeNull());
     expect(body!.ort).toBe('Hauptstr. 17');
     expect(body!.geschaedigt_person_id).toBeNull();
     expect(body!.geschaedigt_personal_id).toBeNull();
@@ -165,7 +165,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body).not.toBeNull());
+    await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');
   });
 
@@ -189,14 +189,14 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     await act(async () => {
       await client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) });
     });
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(
         client.getQueryData<{ geaendert_at: string }>(einsatzKeys.schaden(1, 10))?.geaendert_at,
       ).toBe('2026-05-29 12:30:00'),
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body).not.toBeNull());
+    await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');
   });
 
@@ -216,7 +216,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    await waitFor(() => expect(koerper).toHaveLength(2));
     expect(koerper[0].basis_geaendert_at).toBe('2026-05-29 10:00:00');
     expect(koerper[1].basis_geaendert_at).toBeUndefined();
   });
@@ -237,7 +237,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    await waitFor(() => expect(koerper).toHaveLength(2));
     // Die Servermeldung erscheint — der else-Zweig (`fehler`) lief, nicht erneut der
     // Konfliktdialog.
     expect(
@@ -268,7 +268,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     expect(option).toBeTruthy();
     await userEvent.click(option!);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body.geschaedigt_person_id).toBe(42));
+    await waitFor(() => expect(body.geschaedigt_person_id).toBe(42));
     expect(body.geschaedigt_kontakt).toBeNull();
   });
 
@@ -292,7 +292,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     fireEvent.mouseDown(clear);
     fireEvent.click(clear);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body.geschaedigt_person_id).toBeNull());
+    await waitFor(() => expect(body.geschaedigt_person_id).toBeNull());
     expect(body.geschaedigt_personal_id).toBeNull();
     expect(body.geschaedigt_organisation_id).toBeNull();
     expect(body.geschaedigt_kontakt).toBeNull();
@@ -316,7 +316,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     // Popconfirm-Bestätigung trägt denselben okText → der zweite „Stornieren"-Button.
     const stornoButtons = screen.getAllByRole('button', { name: 'Stornieren' });
     await userEvent.click(stornoButtons[stornoButtons.length - 1]);
-    await vi.waitFor(() => expect(geloescht).toBe(true));
+    await waitFor(() => expect(geloescht).toBe(true));
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
   });
 });
@@ -339,7 +339,7 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     expect(body.uebergeben_an).toBeUndefined();
     await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
-    await vi.waitFor(() => expect(body.uebergeben_an).toBe('Stadtwerke'));
+    await waitFor(() => expect(body.uebergeben_an).toBe('Stadtwerke'));
   });
 
   it('Abschließen-Modal erzwingt einen Grund und schickt ihn', async () => {
@@ -363,7 +363,7 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     );
     await userEvent.click(option!);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
-    await vi.waitFor(() => expect(body.abschluss_grund).toBe('behoben'));
+    await waitFor(() => expect(body.abschluss_grund).toBe('behoben'));
   });
 
   it('zeigt den Übergeben-an-Wert bei übergebenem Schaden', async () => {
@@ -432,8 +432,8 @@ describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', ()
     await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
     const feld = within(dialog).getByLabelText('Übergeben an');
-    await vi.waitFor(() => expect(feld).toHaveFocus());
+    await waitFor(() => expect(feld).toHaveFocus());
     await userEvent.type(feld, 'Bauhof{Enter}');
-    await vi.waitFor(() => expect(body.uebergeben_an).toBe('Bauhof'));
+    await waitFor(() => expect(body.uebergeben_an).toBe('Bauhof'));
   });
 });

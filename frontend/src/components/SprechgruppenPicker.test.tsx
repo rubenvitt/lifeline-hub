@@ -104,7 +104,7 @@ describe('SprechgruppenPicker', () => {
     // Anlegen (reiner onClick-Button, kein Submit)
     await userEvent.click(screen.getByRole('button', { name: /^anlegen$/i }));
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(legeEinsatzSprechgruppeAn).toHaveBeenCalledWith(5, {
         bezeichnung: 'Sonder 1',
         betriebsart: 'DMO',
