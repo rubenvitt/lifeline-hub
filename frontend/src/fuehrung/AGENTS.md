@@ -13,5 +13,6 @@ Bezeichnung bei FHP/FB, Prüfung `fuehrung::pruefe_funktion`); **kein Rückschlu
 einen Code**, auch nicht „S3“ (Kodierung `funktion:<code>` nur über `fuehrung/funktionsOptionenKern.ts`).
 Der Snapshot trägt nur das Label, **nie einen Personennamen** (er steht im ETB); die Besetzung löst
 der Server zur Lesezeit auf (`fuehrung::aufloesung`, nur mit Stab-Recht, `stab`-Ereignis invalidiert
-Aufträge und Erinnerungen). ETB-Vorbelegung „An“: Führungsstelle → erstes eigenes Sachgebiet → nichts
-(`anVorbelegung`); `etb_eintrag.von`/`an` bleiben Freitext.
+Aufträge und Erinnerungen). ETB-Vorschlag: Führungsstelle → erstes eigenes Sachgebiet → nichts
+(`anVorbelegung`) ist nur der erste Vorschlag der Rufname-Abfrage, er belegt keinen Eintrag vor
+(LFH-894, `etb/AGENTS.md`); `etb_eintrag.von`/`an` bleiben Freitext.

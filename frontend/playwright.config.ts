@@ -135,6 +135,8 @@ const baseURL = `http://127.0.0.1:${frontendPort}`;
 
 export default defineConfig({
   testDir: './e2e',
+  // Standard-Rufname des Admins für die ETB-Erfassung (LFH-894); läuft nach den Webservern.
+  globalSetup: './e2e/globale-vorbereitung.ts',
   /**
    * Gedeckelte Worker-Zahl: mit Playwrights Vorgabe (`cpus / 2`) fielen unter Lastdruck
    * wandernde Tests mit Infrastruktur-Signaturen aus (goto-Timeout, ERR_CONNECTION_REFUSED),

@@ -311,8 +311,10 @@ async fn etb_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
                 crate::etb::repo::EintragDaten {
                     typ,
                     inhalt,
-                    von: None,
-                    an: None,
+                    // Hand-Einträge der Leitung: Vermerk mit eigenem Rufnamen in Von und An
+                    // (LFH-894), damit sie nicht wie Systemeinträge aussehen.
+                    von: Some("Einsatzleitung"),
+                    an: Some("Einsatzleitung"),
                     meldeweg: None,
                     veranlassung: None,
                     ereigniszeit: Some(ereigniszeit),

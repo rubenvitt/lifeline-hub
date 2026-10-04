@@ -337,7 +337,7 @@ async fn verstecktes_etb_blockt_mitglied_auf_get_und_post() {
             &app,
             &frieda,
             &format!("/api/einsaetze/{eid}/etb"),
-            r#"{"typ":"meldung","inhalt":"Test"}"#
+            r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Test"}"#
         )
         .await,
         StatusCode::FORBIDDEN
@@ -553,7 +553,7 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(
-                    r#"{"typ":"meldung","inhalt":"Geheime Lagemeldung"}"#,
+                    r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Geheime Lagemeldung"}"#,
                 ))
                 .unwrap(),
         )
@@ -682,7 +682,7 @@ async fn einsatzkopf_erreicht_ein_mitglied_ohne_ausblendbare_module() {
         &app,
         &admin,
         &format!("/api/einsaetze/{eid}/etb"),
-        r#"{"typ":"meldung","inhalt":"Nicht fuer Frieda"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Nicht fuer Frieda"}"#,
     )
     .await;
     let (status, _) = anfrage(
@@ -815,7 +815,7 @@ async fn org_modul_default_wirkt_auch_im_live_feed() {
         &app,
         &admin,
         &format!("/api/einsaetze/{eid}/etb"),
-        r#"{"typ":"meldung","inhalt":"Nur fuer Fuehrungskraefte"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Nur fuer Fuehrungskraefte"}"#,
     )
     .await;
 
@@ -869,7 +869,7 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
         &app,
         &admin,
         &format!("/api/einsaetze/{eid}/etb"),
-        r#"{"typ":"meldung","inhalt":"Verpasst und geheim"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Verpasst und geheim"}"#,
     )
     .await;
     admin_post(
@@ -914,7 +914,7 @@ async fn live_payloads_tragen_keinen_klartext() {
         &app,
         &admin,
         &format!("/api/einsaetze/{eid}/etb"),
-        r#"{"typ":"meldung","inhalt":"ETB-Klartext-Kanarienvogel","von":"Absender-Kanarienvogel"}"#,
+        r#"{"an":"ELW 1","typ":"meldung","inhalt":"ETB-Klartext-Kanarienvogel","von":"Absender-Kanarienvogel"}"#,
     )
     .await;
     admin_post(

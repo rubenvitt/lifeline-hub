@@ -187,6 +187,37 @@ async fn demo_importieren(pool: &sqlx::SqlitePool) -> (i64, chrono::NaiveDateTim
     (erg.einsatz_id, jetzt)
 }
 
+/// LFH-894: Nach dem Import trägt jeder ETB-Eintrag des Demo-Einsatzes Von und An, über alle
+/// Kopplungspfade des Drehbuchs (Systemkennung für die fehlende Seite, eigener Rufname für die
+/// Vermerke der Einsatzleitung).
+#[tokio::test]
+async fn demo_import_schreibt_kein_etb_ohne_von_und_an() {
+    let (_app, pool) = common::setup_mit_pool().await;
+    let (e, _) = demo_importieren(&pool).await;
+    let (gesamt, ohne): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), \
+                COALESCE(SUM(von IS NULL OR TRIM(von) = '' OR an IS NULL OR TRIM(an) = ''), 0) \
+         FROM etb_eintrag WHERE einsatz_id = ?",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        gesamt > 10,
+        "das Drehbuch schreibt viele Einträge, waren {gesamt}"
+    );
+    assert_eq!(ohne, 0, "{ohne} von {gesamt} Einträgen ohne Von oder An");
+    let vermerk: (String, String) = sqlx::query_as(
+        "SELECT von, an FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'entscheidung' LIMIT 1",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(vermerk, ("Einsatzleitung".into(), "Einsatzleitung".into()));
+}
+
 /// Liste eines Lese-Endpunkts des Demo-Einsatzes, als der importierende Admin über den echten
 /// GET-Endpunkt gelesen. Belegt wird, dass das Modul Daten trägt und wie viele. Die Sichtbarkeit
 /// für andere Rollen belegt das nicht: der System-Admin kommt am Modul-Guard immer vorbei
@@ -1042,7 +1073,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     .await;
     post(
         format!("/api/einsaetze/{e}/etb"),
-        r#"{"typ":"meldung","inhalt":"Lage im Nachbar-Einsatz"}"#.into(),
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Lage im Nachbar-Einsatz"}"#.into(),
     )
     .await;
     post(

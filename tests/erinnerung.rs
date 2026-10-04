@@ -155,7 +155,7 @@ async fn erinnerung_bezug_gueltige_etb_ist_201() {
         "POST",
         &format!("/api/einsaetze/{e}/etb"),
         &admin,
-        Some(r#"{"typ":"meldung","inhalt":"Deich instabil"}"#),
+        Some(r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich instabil"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);

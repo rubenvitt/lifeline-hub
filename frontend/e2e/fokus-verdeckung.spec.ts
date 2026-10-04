@@ -805,6 +805,8 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
     const b = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: {
         typ: 'berichtigung',
+        von: 'ELW 1',
+        an: 'Leitstelle',
         inhalt: 'Berichtigung: Uhrzeit korrigiert',
         berichtigt_eintrag_id: ziel,
       },

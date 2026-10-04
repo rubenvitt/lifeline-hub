@@ -22,9 +22,15 @@ use utoipa::ToSchema;
 /// Zuletzt ausgeführte Befehls-IDs der Kommandopalette; Wert ist ein JSON-Array als Text.
 pub const SCHLUESSEL_ZULETZT_BEFEHLE: &str = "zuletzt_befehle";
 
+/// Standard-Rufname für Von und An im ETB (LFH-894); Wert ist ein JSON-Objekt
+/// `{"von": "…", "an": "…"}` als Text, beide Seiten in EINEM Schlüssel, damit ein Schreiben sie
+/// gemeinsam ändert. Gelesen und geprüft wird er nur im Client (`etb/standardRufname.ts`).
+pub const SCHLUESSEL_ETB_STANDARD_RUFNAME: &str = "etb_standard_rufname";
+
 /// Der gesamte gültige Schlüsselraum. Eine neue Präferenz wird hier eingetragen —
 /// die Tabelle bleibt unangetastet.
-pub const BEKANNTE_SCHLUESSEL: &[&str] = &[SCHLUESSEL_ZULETZT_BEFEHLE];
+pub const BEKANNTE_SCHLUESSEL: &[&str] =
+    &[SCHLUESSEL_ZULETZT_BEFEHLE, SCHLUESSEL_ETB_STANDARD_RUFNAME];
 
 /// Obergrenze für einen Wert in **Zeichen** (nicht Bytes, sonst hinge sie an der Kodierung).
 /// Eine Schranke gegen Missbrauch mit viel Luft: auch 40 Palette-IDs samt JSON-Rahmen bleiben
@@ -73,6 +79,8 @@ mod tests {
     #[test]
     fn whitelist_kennt_zuletzt_befehle_und_sonst_nichts_erfundenes() {
         assert!(ist_gueltiger_schluessel(SCHLUESSEL_ZULETZT_BEFEHLE));
+        assert!(ist_gueltiger_schluessel(SCHLUESSEL_ETB_STANDARD_RUFNAME));
+        assert_eq!(SCHLUESSEL_ETB_STANDARD_RUFNAME, "etb_standard_rufname");
         assert!(!ist_gueltiger_schluessel("theme"));
         assert!(!ist_gueltiger_schluessel(""));
         // Kein Präfix-Match: ein Schlüssel gilt ganz oder gar nicht.

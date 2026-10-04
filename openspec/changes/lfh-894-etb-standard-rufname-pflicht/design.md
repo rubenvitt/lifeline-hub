@@ -87,8 +87,10 @@ Standard (dann gäbe es An ohne Von, und die Pflicht würde trotzdem greifen).
 Ohne Standard steht über der Eingabezeile eine kompakte Zeile „Dein Rufname für Von und An“ mit
 einer Auswahl (`AutoComplete` über Funkrufnamen und Sachgebiete, Freitext erlaubt), dem
 Schalter „Empfänger wie Absender“ (Vorgabe an; aus zeigt ein zweites Feld) und „Übernehmen“.
-Mit Standard steht in der Hinweiszeile „Von/An: ELW 1 · ändern“; „ändern“ öffnet dieselbe
-Zeile vorbelegt. Gründe: Das ETB wird auch gelesen (ein Modal sperrte die Zeitachse); das
+Mit Standard stehen Von und An als Chips da, gekennzeichnet als Standard (Titel, kein
+„Entfernen“), und „Standard-Rufname ändern“ steht in der Chip-Zeile; es öffnet dieselbe Zeile
+vorbelegt. (Umgesetzt in der Chip-Zeile statt der Hinweiszeile: die Chips zeigen den Wert
+ohnehin, ein zweites „Von/An: …“ wiederholte ihn.) Gründe: Das ETB wird auch gelesen (ein Modal sperrte die Zeitachse); das
 Feldbudget der Schnellerfassung bleibt, weil die Zeile nur bis zur Antwort steht; e2e-Specs,
 die nur lesen, laufen ohne Standard weiter. Die Zeile erscheint nur mit Schreibrecht im
 laufenden Einsatz, nie in einer Berichtigung (dort gilt der vorhandene Standard).

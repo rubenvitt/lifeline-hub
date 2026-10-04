@@ -15,6 +15,9 @@ const CHIP_MENUE: readonly MenueEintrag<'bearbeiten' | 'entfernen'>[] = [
   { key: 'bearbeiten', label: 'Bearbeiten' },
   { key: 'entfernen', label: 'Entfernen', gefahr: true },
 ];
+/** Ein Chip aus dem Standard-Rufnamen hat nichts zu entfernen (LFH-894). */
+const CHIP_MENUE_STANDARD = CHIP_MENUE.filter((e) => e.key === 'bearbeiten');
+const STANDARD_TITEL = 'Standard-Rufname: gilt für jeden neuen Eintrag, ändern nur für diesen';
 
 interface Props {
   feld: MetaFeld;
@@ -33,6 +36,12 @@ interface Props {
    * an (LFH-748). Er bleibt sichtbar stehen; nach einem Fehler geht es mit seinem Wert weiter.
    */
   gesperrt?: boolean;
+  /**
+   * Der Wert kommt aus dem Standard-Rufnamen, nicht aus diesem Eintrag (LFH-894): kein
+   * „Entfernen“ (es gäbe nichts zu entfernen, die Pflicht bliebe), ein Klick bearbeitet ihn für
+   * diesen Eintrag. Der Titel sagt, woher der Wert kommt.
+   */
+  ausStandard?: boolean;
 }
 
 function feldDef(feld: MetaFeld) {
@@ -75,6 +84,7 @@ export default function MetaChip({
   onRemove,
   onEdit,
   gesperrt = false,
+  ausStandard = false,
 }: Props) {
   const d = feldDef(feld);
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
@@ -169,7 +179,10 @@ export default function MetaChip({
   }
 
   return (
-    <Tag>
+    <Tag
+      title={ausStandard ? STANDARD_TITEL : undefined}
+      data-standard={ausStandard ? 'ja' : undefined}
+    >
       {/* Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip.
 
          Ein `onClick` am `<Tag>` machte jeden Nachfahren zum Auslöser, und das Menü-Overlay IST
@@ -190,7 +203,7 @@ export default function MetaChip({
       {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
          „Bearbeiten" daneben legt es wieder an (LFH-363). */}
       <MenueAusloeser
-        eintraege={CHIP_MENUE}
+        eintraege={ausStandard ? CHIP_MENUE_STANDARD : CHIP_MENUE}
         zugaenglicherName={`Aktionen zu ${d.label}`}
         gesperrt={gesperrt}
         onWahl={(key) => {

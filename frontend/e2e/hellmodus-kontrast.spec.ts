@@ -32,10 +32,19 @@ for (const modus of ['light', 'dark'] as const) {
     const basis = `/api/einsaetze/${einsatzId}`;
     const ids: Record<string, number> = {};
     for (const typ of ['meldung', 'anordnung', 'entscheidung', 'lage']) {
-      ids[typ] = (await post(page, `${basis}/etb`, { typ, inhalt: `Messung ${typ}` })).id;
+      ids[typ] = (
+        await post(page, `${basis}/etb`, {
+          typ,
+          inhalt: `Messung ${typ}`,
+          von: 'ELW 1',
+          an: 'Leitstelle',
+        })
+      ).id;
     }
     await post(page, `${basis}/etb`, {
       typ: 'berichtigung',
+      von: 'ELW 1',
+      an: 'Leitstelle',
       inhalt: 'Messung Berichtigung',
       berichtigt_eintrag_id: ids.meldung,
     });

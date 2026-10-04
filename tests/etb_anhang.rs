@@ -231,8 +231,13 @@ async fn upload_im_abgeschlossenen_einsatz_ist_409_wie_das_erfassen() {
     assert!(s.is_success(), "abschliessen: {s}");
 
     let (upload, _) = etb_upload(&app, einsatz, &admin, "a.jpg", b"x").await;
-    let (erfassen_status, _) =
-        erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"x"}"#).await;
+    let (erfassen_status, _) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x"}"#,
+    )
+    .await;
     assert_eq!(erfassen_status, StatusCode::CONFLICT);
     assert_eq!(
         upload, erfassen_status,
@@ -267,7 +272,7 @@ async fn erfassen_mit_zwei_anhaengen_traegt_beide() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"Schadenstelle","anhang_ids":[{b},{a},{b}]}}"#),
+        &format!(r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Schadenstelle","anhang_ids":[{b},{a},{b}]}}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -298,7 +303,7 @@ async fn liste_traegt_den_schluessel_anhaenge_auch_leer() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"ohne"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"ohne"}"#,
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
@@ -332,7 +337,9 @@ async fn fremder_anhang_ist_400_ohne_eintrag() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{fremd}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{fremd}]}}"#
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
@@ -359,7 +366,9 @@ async fn gebundener_anhang_ist_422() {
     let admin = login_cookie(&app, "admin", ADMIN_PW).await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let a = hochgeladen(&app, einsatz, &admin, "a.jpg").await;
-    let body = format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{a}]}}"#);
+    let body = format!(
+        r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{a}]}}"#
+    );
 
     let (erst, _) = erfassen(&app, &admin, einsatz, &body).await;
     assert_eq!(erst, StatusCode::CREATED);
@@ -401,7 +410,9 @@ async fn schaden_anhang_nicht_an_etb_verknuepfbar() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
@@ -438,7 +449,9 @@ async fn leerer_inhalt_mit_anhang_ist_400() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"  ","anhang_ids":[{a}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"  ","anhang_ids":[{a}]}}"#
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
@@ -456,7 +469,7 @@ async fn elf_anhaenge_sind_400_elf_doppelte_nicht() {
         &admin,
         einsatz,
         &format!(
-            r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{}]}}"#,
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{}]}}"#,
             elf.join(",")
         ),
     )
@@ -471,7 +484,7 @@ async fn elf_anhaenge_sind_400_elf_doppelte_nicht() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{doppelt}]}}"#),
+        &format!(r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{doppelt}]}}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -496,7 +509,7 @@ async fn zehn_anhaenge_gehen_durch() {
         &admin,
         einsatz,
         &format!(
-            r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{}]}}"#,
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{}]}}"#,
             liste.join(",")
         ),
     )
@@ -514,7 +527,7 @@ async fn berichtigung_traegt_eigenen_anhang_grundeintrag_bleibt_ohne() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Grund"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Grund"}"#,
     )
     .await;
     let gid = grund["id"].as_i64().unwrap();
@@ -525,7 +538,7 @@ async fn berichtigung_traegt_eigenen_anhang_grundeintrag_bleibt_ohne() {
         &admin,
         einsatz,
         &format!(
-            r#"{{"typ":"berichtigung","inhalt":"Richtig ist …","berichtigt_eintrag_id":{gid},"anhang_ids":[{a}]}}"#
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"berichtigung","inhalt":"Richtig ist …","berichtigt_eintrag_id":{gid},"anhang_ids":[{a}]}}"#
         ),
     )
     .await;
@@ -556,8 +569,9 @@ async fn replay_nach_commit_liefert_bestand_samt_anhaengen_und_ein_live_ereignis
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let a = hochgeladen(&app, einsatz, &admin, "a.jpg").await;
     let mut rx = live.abonniere(einsatz);
-    let body =
-        format!(r#"{{"typ":"meldung","inhalt":"Foto","client_id":"cid-117","anhang_ids":[{a}]}}"#);
+    let body = format!(
+        r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Foto","client_id":"cid-117","anhang_ids":[{a}]}}"#
+    );
 
     let (s1, v1) = erfassen(&app, &admin, einsatz, &body).await;
     assert_eq!(s1, StatusCode::CREATED);
@@ -596,7 +610,9 @@ async fn eintrag_mit_foto(app: &axum::Router, admin: &str) -> (i64, i64, i64) {
         app,
         admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"Foto","anhang_ids":[{aid}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Foto","anhang_ids":[{aid}]}}"#
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
@@ -656,7 +672,7 @@ async fn download_an_falschem_eintrag_ist_404() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"ohne"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"ohne"}"#,
     )
     .await;
     let anderer = anderer["id"].as_i64().unwrap();
@@ -761,14 +777,16 @@ async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
         &app,
         &frieda,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{a}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{a}]}}"#
+        ),
     )
     .await;
     let (s_unbekannt, v_unbekannt) = erfassen(
         &app,
         &frieda,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"x","anhang_ids":[987654]}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[987654]}"#,
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
@@ -792,7 +810,9 @@ async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"eigen","anhang_ids":[{a}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"eigen","anhang_ids":[{a}]}}"#
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -814,7 +834,9 @@ async fn fremder_gebundener_anhang_ist_beim_erfassen_unbekannt() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"admin","anhang_ids":[{a}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"admin","anhang_ids":[{a}]}}"#
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -824,7 +846,7 @@ async fn fremder_gebundener_anhang_ist_beim_erfassen_unbekannt() {
         &app,
         &frieda,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"x","anhang_ids":[987654]}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[987654]}"#,
     )
     .await;
     for (ort, aid) in [("ETB-Eintrag", a), ("Schaden", schaden)] {
@@ -832,7 +854,7 @@ async fn fremder_gebundener_anhang_ist_beim_erfassen_unbekannt() {
             &app,
             &frieda,
             einsatz,
-            &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+            &format!(r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
         )
         .await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{ort}: {v}");
@@ -929,7 +951,7 @@ async fn gleiche_client_id_mit_anderem_inhalt_ist_409() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Deich hält","client_id":"entwurf-x"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich hält","client_id":"entwurf-x"}"#,
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{erst}");
@@ -939,7 +961,7 @@ async fn gleiche_client_id_mit_anderem_inhalt_ist_409() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Deich bricht","client_id":"entwurf-x"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich bricht","client_id":"entwurf-x"}"#,
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
@@ -955,7 +977,7 @@ async fn gleiche_client_id_mit_anderem_inhalt_ist_409() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"lage","inhalt":"Deich hält","client_id":"entwurf-x"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"lage","inhalt":"Deich hält","client_id":"entwurf-x"}"#,
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
@@ -974,7 +996,7 @@ async fn gleiche_client_id_mit_anderem_inhalt_ist_409() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"  Deich hält \n","client_id":"entwurf-x","erfasst_lokal_at":"2026-09-25T10:05:00Z"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"  Deich hält \n","client_id":"entwurf-x","erfasst_lokal_at":"2026-09-25T10:05:00Z"}"#,
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{wieder}");
@@ -996,7 +1018,7 @@ async fn gleiche_client_id_mit_anderen_anhaengen_ist_409_ohne_bindung() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{a},{b}]}}"#),
+        &format!(r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{a},{b}]}}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{erst}");
@@ -1006,7 +1028,7 @@ async fn gleiche_client_id_mit_anderen_anhaengen_ist_409_ohne_bindung() {
         &admin,
         einsatz,
         &format!(
-            r#"{{"typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{b},{a},{a}]}}"#
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{b},{a},{a}]}}"#
         ),
     )
     .await;
@@ -1022,7 +1044,7 @@ async fn gleiche_client_id_mit_anderen_anhaengen_ist_409_ohne_bindung() {
         &admin,
         einsatz,
         &format!(
-            r#"{{"typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{a},{b},{c}]}}"#
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{a},{b},{c}]}}"#
         ),
     )
     .await;
@@ -1067,7 +1089,7 @@ async fn tier_und_uhs_anhang_nicht_an_etb_verknuepfbar() {
             &app,
             &admin,
             einsatz,
-            &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+            &format!(r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
         )
         .await;
         assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{art:?}: {v}");
@@ -1122,7 +1144,9 @@ async fn person_anhang_nicht_an_etb_verknuepfbar() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#
+        ),
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");

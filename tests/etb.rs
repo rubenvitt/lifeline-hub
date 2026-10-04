@@ -104,7 +104,7 @@ async fn etb_auftrag_beobachter_ist_403() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Lage"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Lage"}"#,
     )
     .await;
     let etb_id = etb["id"].as_i64().unwrap();
@@ -133,7 +133,13 @@ async fn etb_auftrag_cross_einsatz_ist_404() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let a = einsatz_anlegen_mit(&app, &admin, "Lage A").await;
     let b = einsatz_anlegen_mit(&app, &admin, "Lage B").await;
-    let (_, etb) = eintrag_erfassen(&app, &admin, a, r#"{"typ":"meldung","inhalt":"Lage"}"#).await;
+    let (_, etb) = eintrag_erfassen(
+        &app,
+        &admin,
+        a,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Lage"}"#,
+    )
+    .await;
     let etb_id_a = etb["id"].as_i64().unwrap();
 
     // Quell-Eintrag aus Einsatz A über Einsatz B ansprechen → 404.
@@ -156,7 +162,7 @@ async fn etb_auftrag_happy_path_setzt_quellbezug() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Brand Halle 3"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Brand Halle 3"}"#,
     )
     .await;
     let quell_id = etb["id"].as_i64().unwrap();
@@ -197,7 +203,7 @@ async fn etb_auftrag_mehrfach_aus_einem_eintrag_erlaubt() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Mehrere Aufträge"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Mehrere Aufträge"}"#,
     )
     .await;
     let quell_id = etb["id"].as_i64().unwrap();
@@ -231,7 +237,7 @@ async fn etb_liste_fuehrt_folgeauftraege_am_quell_eintrag() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"entscheidung","inhalt":"Turnhalle Ost wird Notunterkunft"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"entscheidung","inhalt":"Turnhalle Ost wird Notunterkunft"}"#,
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
@@ -277,7 +283,7 @@ async fn berichtigung_erfassen(
     grund_id: i64,
 ) -> Value {
     let body = format!(
-        r#"{{"typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{grund_id}}}"#
+        r#"{{"von":"ELW 1","an":"ELW 1","typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{grund_id}}}"#
     );
     let (status, json) = eintrag_erfassen(app, cookie, einsatz, &body).await;
     assert_eq!(status, StatusCode::CREATED, "{json}");
@@ -305,7 +311,7 @@ async fn etb_liste_fuehrt_berichtigungen_am_grundeintrag() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Pegel 4,20 m"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Pegel 4,20 m"}"#,
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
@@ -319,7 +325,7 @@ async fn etb_liste_fuehrt_berichtigungen_am_grundeintrag() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"lage","inhalt":"unberührt"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"lage","inhalt":"unberührt"}"#,
     )
     .await;
     let b1 = berichtigung_erfassen(&app, &admin, einsatz, grund_id).await;
@@ -356,7 +362,7 @@ async fn berichtigt_durch_unabhaengig_von_seite_und_filter() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Pegel 4,20 m"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Pegel 4,20 m"}"#,
     )
     .await;
     let grund_id = grund["id"].as_i64().unwrap();
@@ -420,7 +426,7 @@ async fn einsatzleitung_erfasst_eintrag() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Deich instabil"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich instabil"}"#,
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
@@ -459,8 +465,13 @@ async fn beobachter_darf_nicht_erfassen() {
     );
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
-    let (status, _) =
-        eintrag_erfassen(&app, &erika, einsatz, r#"{"typ":"meldung","inhalt":"X"}"#).await;
+    let (status, _) = eintrag_erfassen(
+        &app,
+        &erika,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"X"}"#,
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -472,8 +483,13 @@ async fn nicht_mitglied_darf_nicht_erfassen() {
     benutzer_anlegen(&app, &admin, "fremd", "keine").await;
 
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
-    let (status, _) =
-        eintrag_erfassen(&app, &fremd, einsatz, r#"{"typ":"meldung","inhalt":"X"}"#).await;
+    let (status, _) = eintrag_erfassen(
+        &app,
+        &fremd,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"X"}"#,
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -483,8 +499,13 @@ async fn system_typ_wird_abgelehnt() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
-    let (status, _) =
-        eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"system","inhalt":"X"}"#).await;
+    let (status, _) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"system","inhalt":"X"}"#,
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -494,9 +515,72 @@ async fn leerer_inhalt_wird_abgelehnt() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
-    let (status, _) =
-        eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"   "}"#).await;
+    let (status, _) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"   "}"#,
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+/// LFH-894: Von und An sind Pflicht. Fehlt eines oder ist es leer, ist das 400, und das ETB
+/// bleibt unverändert. Gilt auch für die Berichtigung.
+#[tokio::test]
+async fn von_und_an_sind_pflicht() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let (_, vorher) = etb_abrufen(&app, &admin, einsatz, "").await;
+    let anzahl_vorher = inhalte(&vorher).len();
+
+    for body in [
+        r#"{"von":"ELW 1","typ":"meldung","inhalt":"ohne An"}"#,
+        r#"{"an":"ELW 1","typ":"meldung","inhalt":"ohne Von"}"#,
+        r#"{"von":"  ","an":"ELW 1","typ":"lage","inhalt":"Von aus Leerzeichen"}"#,
+        r#"{"von":"ELW 1","an":"","typ":"anordnung","inhalt":"An leer"}"#,
+        r#"{"typ":"entscheidung","inhalt":"beides fehlt"}"#,
+    ] {
+        let (status, json) = eintrag_erfassen(&app, &admin, einsatz, body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body} → {json}");
+    }
+    let (_, nachher) = etb_abrufen(&app, &admin, einsatz, "").await;
+    assert_eq!(inhalte(&nachher).len(), anzahl_vorher, "nichts angelegt");
+
+    let (_, original) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Falsch"}"#,
+    )
+    .await;
+    let original_id = original["id"].as_i64().unwrap();
+    let body = format!(
+        r#"{{"an":"ELW 1","typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{original_id}}}"#
+    );
+    let (status, _) = eintrag_erfassen(&app, &admin, einsatz, &body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "Berichtigung ohne Von");
+}
+
+/// Mit beiden Seiten 201; die Werte kommen getrimmt an und werden nicht durch die
+/// Systemkennung ersetzt.
+#[tokio::test]
+async fn von_und_an_kommen_getrimmt_an() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+
+    let (status, json) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":" Florian 1 ","an":"ELW 1 ","typ":"meldung","inhalt":"Lage ruhig"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(json["von"], "Florian 1");
+    assert_eq!(json["an"], "ELW 1");
 }
 
 #[tokio::test]
@@ -509,14 +593,14 @@ async fn berichtigung_verknuepft_und_validiert() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Falsch"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Falsch"}"#,
     )
     .await;
     let original_id = original["id"].as_i64().unwrap();
 
     // Gültige Berichtigung.
     let body = format!(
-        r#"{{"typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{original_id}}}"#
+        r#"{{"von":"ELW 1","an":"ELW 1","typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{original_id}}}"#
     );
     let (status, json) = eintrag_erfassen(&app, &admin, einsatz, &body).await;
     assert_eq!(status, StatusCode::CREATED);
@@ -527,7 +611,7 @@ async fn berichtigung_verknuepft_und_validiert() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"berichtigung","inhalt":"X"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"berichtigung","inhalt":"X"}"#,
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -538,11 +622,18 @@ async fn berichtigt_eintrag_id_ohne_berichtigungstyp_ist_400() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
-    let (_, e1) =
-        eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"A"}"#).await;
+    let (_, e1) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"A"}"#,
+    )
+    .await;
     let id = e1["id"].as_i64().unwrap();
 
-    let body = format!(r#"{{"typ":"meldung","inhalt":"B","berichtigt_eintrag_id":{id}}}"#);
+    let body = format!(
+        r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"B","berichtigt_eintrag_id":{id}}}"#
+    );
     let (status, _) = eintrag_erfassen(&app, &admin, einsatz, &body).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
@@ -565,8 +656,13 @@ async fn erfassen_in_abgeschlossenem_einsatz_ist_409() {
         .await
         .unwrap();
 
-    let (status, _) =
-        eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"X"}"#).await;
+    let (status, _) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"X"}"#,
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
@@ -582,7 +678,9 @@ async fn erfassen_ohne_session_ist_401() {
                 .method("POST")
                 .uri(format!("/api/einsaetze/{einsatz}/etb"))
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(r#"{"typ":"meldung","inhalt":"X"}"#))
+                .body(Body::from(
+                    r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"X"}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -601,7 +699,7 @@ async fn erfasster_eintrag_wird_live_publiziert() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Live-Test"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Live-Test"}"#,
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
@@ -636,7 +734,7 @@ async fn erfassung_mit_client_id_ist_idempotent() {
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
 
     let mut rx = live.abonniere(einsatz);
-    let body = r#"{"typ":"meldung","inhalt":"Deich instabil","client_id":"offline-uuid-1"}"#;
+    let body = r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich instabil","client_id":"offline-uuid-1"}"#;
 
     // Erster Versand: neuer Eintrag + genau ein Live-Event.
     let (status1, json1) = eintrag_erfassen(&app, &admin, einsatz, body).await;
@@ -677,8 +775,7 @@ async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
-    let body =
-        r#"{"typ":"meldung","inhalt":"Bereits committed","client_id":"offline-etb-abgeschlossen"}"#;
+    let body = r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Bereits committed","client_id":"offline-etb-abgeschlossen"}"#;
     let (status, original) = eintrag_erfassen(&app, &admin, einsatz, body).await;
     assert_eq!(status, StatusCode::CREATED, "{original:?}");
 
@@ -705,7 +802,7 @@ async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Neu","client_id":"offline-etb-neu-nach-abschluss"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Neu","client_id":"offline-etb-neu-nach-abschluss"}"#,
     )
     .await;
     assert_eq!(
@@ -719,7 +816,7 @@ async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Anders","client_id":"offline-etb-abgeschlossen"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Anders","client_id":"offline-etb-abgeschlossen"}"#,
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
@@ -734,7 +831,7 @@ async fn etb_offline_replay_mit_falschem_queue_besitzer_ist_412() {
     let (app, _) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen_mit(&app, &admin, "Queue-Owner").await;
-    let body = r#"{"typ":"meldung","inhalt":"Besitzgebunden","client_id":"owner-etb-1"}"#;
+    let body = r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Besitzgebunden","client_id":"owner-etb-1"}"#;
     assert_eq!(
         eintrag_erfassen(&app, &admin, e, body).await.0,
         StatusCode::CREATED
@@ -767,14 +864,14 @@ async fn leere_client_id_dedupliziert_nicht() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Erste","client_id":""}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Erste","client_id":""}"#,
     )
     .await;
     let (s2, j2) = eintrag_erfassen(
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Zweite","client_id":"   "}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Zweite","client_id":"   "}"#,
     )
     .await;
     assert_eq!(s1, StatusCode::CREATED);
@@ -804,7 +901,9 @@ async fn zu_lange_client_id_wird_abgelehnt() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"A","client_id":"{lang}"}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"A","client_id":"{lang}"}}"#
+        ),
     )
     .await;
     assert_eq!(
@@ -818,7 +917,9 @@ async fn zu_lange_client_id_wird_abgelehnt() {
         &app,
         &admin,
         einsatz,
-        &format!(r#"{{"typ":"meldung","inhalt":"B","client_id":"{grenze}"}}"#),
+        &format!(
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"B","client_id":"{grenze}"}}"#
+        ),
     )
     .await;
     assert_eq!(s_ok, StatusCode::CREATED, "64 Zeichen sind erlaubt");
@@ -833,14 +934,14 @@ async fn liste_zeigt_eintraege_neueste_zuerst() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"erster"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"erster"}"#,
     )
     .await;
     eintrag_erfassen(
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"zweiter"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"zweiter"}"#,
     )
     .await;
 
@@ -877,7 +978,7 @@ async fn admin_nicht_mitglied_darf_etb_lesen() {
         &app,
         &frieda,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Test"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Test"}"#,
     )
     .await;
 
@@ -925,7 +1026,7 @@ async fn beobachter_darf_lesen() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Test"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Test"}"#,
     )
     .await;
     let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
@@ -964,14 +1065,14 @@ async fn liste_volltextsuche_filtert() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Deich bricht"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich bricht"}"#,
     )
     .await;
     eintrag_erfassen(
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Lage ruhig"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Lage ruhig"}"#,
     )
     .await;
 
@@ -987,8 +1088,20 @@ async fn liste_typ_filter() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
-    eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"m"}"#).await;
-    eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"anordnung","inhalt":"a"}"#).await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"m"}"#,
+    )
+    .await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"anordnung","inhalt":"a"}"#,
+    )
+    .await;
 
     let (status, json) = etb_abrufen(&app, &admin, einsatz, "typ=anordnung").await;
     assert_eq!(status, StatusCode::OK);
@@ -1003,7 +1116,7 @@ async fn liste_cursor_pagination() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     for i in 1..=3 {
-        let body = format!(r#"{{"typ":"meldung","inhalt":"e{i}"}}"#);
+        let body = format!(r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"e{i}"}}"#);
         eintrag_erfassen(&app, &admin, einsatz, &body).await;
     }
 
@@ -1082,10 +1195,10 @@ async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
     )
     .await;
     for body in [
-        r#"{"typ":"meldung","inhalt":"von-treffer","von":" 1. zug "}"#,
-        r#"{"typ":"meldung","inhalt":"an-treffer","an":"1. Zug"}"#,
-        r#"{"typ":"meldung","inhalt":"andere","von":"2. Zug"}"#,
-        r#"{"typ":"meldung","inhalt":"nur im Text: 1. Zug"}"#,
+        r#"{"an":"ELW 1","typ":"meldung","inhalt":"von-treffer","von":" 1. zug "}"#,
+        r#"{"von":"ELW 1","typ":"meldung","inhalt":"an-treffer","an":"1. Zug"}"#,
+        r#"{"an":"ELW 1","typ":"meldung","inhalt":"andere","von":"2. Zug"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"nur im Text: 1. Zug"}"#,
     ] {
         eintrag_erfassen(&app, &admin, einsatz, body).await;
     }
@@ -1119,7 +1232,7 @@ async fn liste_einheit_filter_fremder_einsatz_ist_leer() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"x","von":"1. Zug"}"#,
+        r#"{"an":"ELW 1","typ":"meldung","inhalt":"x","von":"1. Zug"}"#,
     )
     .await;
 

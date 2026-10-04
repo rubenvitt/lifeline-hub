@@ -6,7 +6,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { act, type ReactElement } from 'react';
 import { meHandler, server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import { neuerQueryClient, renderMitProviders as renderMitBasisProviders } from '../test/utils';
+import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { EINSATZ_STREAM_EVENTS, einsatzKeys } from '../api/queryKeys';
 import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
@@ -14,6 +14,7 @@ import { queueEinreihen, queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
+import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -118,6 +119,12 @@ function setupMSW() {
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     // Auftrags-Ziele für das ETB→Auftrag-Formular.
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    // Standard-Rufname gesetzt (LFH-894): ohne ihn sperrte die Von/An-Pflicht jedes Absenden.
+    http.get('/api/benutzer-einstellungen', () =>
+      HttpResponse.json({
+        eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },
+      }),
+    ),
   );
 }
 
@@ -251,46 +258,58 @@ describe('EtbPage', () => {
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2099-09-09 13:17:43'));
   });
 
-  it.each([null, 'Alte Leitung'])(
-    'LFH-461 Review: erster Entwurf wartet auf laufenden Detail-Refetch (Cache: %s)',
-    async (meine_fuehrungsstelle) => {
-      setupMSW();
-      const client = neuerQueryClient();
-      client.setQueryData(einsatzKeys.einsatz(7), { ...einsatz, meine_fuehrungsstelle });
-      let freigeben!: () => void;
-      const antwort = new Promise<void>((resolve) => {
-        freigeben = resolve;
-      });
-      server.use(
-        http.get('/api/einsaetze/7', async () => {
-          await antwort;
-          return HttpResponse.json({ ...einsatz, meine_fuehrungsstelle: 'Neue Leitung' });
-        }),
-      );
-      // Entspricht der nach dem Stellen-Speichern gestarteten Invalidierung.
-      await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
-      renderMitProviders(
-        <Routes>
-          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
-        </Routes>,
-        { client, route: '/einsaetze/7/etb' },
-      );
-      try {
-        await screen.findByText('Erste Meldung');
-        expect.soft(screen.queryByPlaceholderText(/Inhalt/)).not.toBeInTheDocument();
-        expect.soft(screen.queryByRole('button', { name: /add|hinzu/i })).not.toBeInTheDocument();
-      } finally {
-        freigeben();
-      }
-      expect(await screen.findByText('An: Neue Leitung')).toBeInTheDocument();
-      await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meine Eingabe');
-      await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
-      await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
-      await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(7) });
-      expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Meine Eingabe');
-      expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-    },
-  );
+  it('LFH-894: fragt ohne Standard nach dem Rufnamen, schlägt die Führungsstelle vor und sendet danach mit ihm', async () => {
+    let gespeichert: string | null = null;
+    let body: Record<string, unknown> | null = null;
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' }),
+      ),
+      http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
+      http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+        gespeichert = ((await request.json()) as { wert: string }).wert;
+        return HttpResponse.json({
+          eintraege: { [String(params.schluessel)]: gespeichert },
+          geaendert_at: '2026-10-04 18:00:00',
+        });
+      }),
+      http.post('/api/einsaetze/7/etb', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...eintrag, id: 2, lfd_nr: 2 }, { status: 201 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    const abfrage = await screen.findByRole('group', {
+      name: 'Mit welchem Rufnamen schreibst du ins ETB?',
+    });
+    expect(within(abfrage).getByRole('combobox', { name: 'Rufname für Von und An' })).toHaveValue(
+      'Florian Leitung',
+    );
+
+    // Ohne Rufname hält die Pflicht den Eintrag zurück; der Text bleibt stehen.
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Pegel steigt{Enter}');
+    expect(await screen.findByText(/Von fehlt/)).toBeInTheDocument();
+    expect(body).toBeNull();
+    expect(feld).toHaveValue('Pegel steigt');
+
+    await user.click(within(abfrage).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() =>
+      expect(gespeichert).toBe('{"von":"Florian Leitung","an":"Florian Leitung"}'),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: /Rufnamen/ })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('Von: Florian Leitung')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      inhalt: 'Pegel steigt',
+      von: 'Florian Leitung',
+      an: 'Florian Leitung',
+    });
+  });
 
   it('zeigt Seitentitel, Einsatz im Ortspfad, Einträge und die Serverzahl im Kopf', async () => {
     setup();
@@ -462,6 +481,8 @@ describe('EtbPage', () => {
     await user.type(feld, 'Neuer Eintrag X{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.inhalt).toBe('Neuer Eintrag X');
+    // Von/An aus dem Standard-Rufnamen (LFH-894).
+    expect(body).toMatchObject({ von: 'ELW 1', an: 'ELW 1' });
   });
 
   it('entfernt den Entwurf auch bei Offline-Enqueue (Netzwerkfehler → eingereiht statt abgelehnt)', async () => {

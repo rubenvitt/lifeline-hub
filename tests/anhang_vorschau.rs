@@ -184,7 +184,7 @@ async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
         &format!("/api/einsaetze/{einsatz}/etb"),
         cookie,
         Some(&format!(
-            r#"{{"typ":"meldung","inhalt":"Foto","anhang_ids":[{aid}]}}"#
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Foto","anhang_ids":[{aid}]}}"#
         )),
     )
     .await;

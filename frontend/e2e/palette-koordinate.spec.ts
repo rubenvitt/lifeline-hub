@@ -120,7 +120,7 @@ test('der ETB-Sammeltreffer nennt die Trefferzahl und springt auf die gefilterte
   // Sequentiell: `lfd_nr` wird per MAX+1 vergeben.
   for (const inhalt of ['Deich Nord durchfeuchtet', 'Sandsäcke an den Deich', 'Lage ruhig']) {
     const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
-      data: { typ: 'meldung', inhalt },
+      data: { typ: 'meldung', von: 'ELW 1', an: 'Leitstelle', inhalt },
     });
     expect(r.ok(), await r.text()).toBeTruthy();
   }

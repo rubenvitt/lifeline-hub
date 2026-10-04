@@ -19,7 +19,7 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development` (erst der rote T
 
 ## 3. Client: Abfrage und Pflicht in der Erfassung
 
-- [ ] 3.1 Abfragezeile in der Erfassung (D4): ohne Standard mit Schreibrecht im laufenden Einsatz sichtbar, `AutoComplete` über Funkrufnamen und Sachgebiete mit dem Vorrangregel-Vorschlag vorgewählt, Freitext, „Empfänger wie Absender“ (Vorgabe an), „Übernehmen“; mit Standard „Von/An: … · ändern“ in der Hinweiszeile; verifiziert durch Komponententests (erste Abfrage, Beobachter ohne Zeile, Freitext übernommen, getrennte Seiten, Ändern, keine Zeile in der Berichtigung)
+- [ ] 3.1 Abfragezeile in der Erfassung (D4): ohne Standard mit Schreibrecht im laufenden Einsatz sichtbar, `AutoComplete` über Funkrufnamen und Sachgebiete mit dem Vorrangregel-Vorschlag vorgewählt, Freitext, „Empfänger wie Absender“ (Vorgabe an), „Übernehmen“; mit Standard stehen Von/An als gekennzeichnete Chips da, „Standard-Rufname ändern“ steht in der Chip-Zeile; verifiziert durch Komponententests (erste Abfrage, Beobachter ohne Zeile, Freitext übernommen, getrennte Seiten, Ändern, keine Zeile in der Berichtigung)
 - [ ] 3.2 Pflicht vor dem Absenden (D7): fehlendes Von/An sendet nichts, nennt das Feld, öffnet ohne Standard die Abfragezeile, Text/Metadaten/Anhänge bleiben, nichts geht in die Offline-Warteschlange; verifiziert durch `Schnellerfassung.test.tsx` (kein `erfassen`-Aufruf, Meldung steht, Text steht) und einen Test der Entwurfsspeicherung ohne Von/An
 - [ ] 3.3 Regeln nachziehen: `frontend/src/etb/AGENTS.md` (Von/An-Pflicht, Standard je Person, Vorbelegung zur Anzeige-/Sendezeit, Systemkennung), `frontend/src/fuehrung/AGENTS.md` (Vorrangregel nur noch Vorschlag); verifiziert durch `prettier --check` über `frontend/` grün
 
