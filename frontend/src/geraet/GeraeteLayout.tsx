@@ -10,6 +10,7 @@ import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
 import {
   geraetAufnahmePfad,
+  geraetMonitorPfad,
   geraetPatientenPfad,
   geraetStellePfad,
   geraetUhsPfad,
@@ -19,12 +20,18 @@ import { rahmenFarben } from '../theme/tokens';
 import AufnahmePage from '../pages/personen/AufnahmePage';
 import UhsDetailPage from '../pages/uhs/UhsDetailPage';
 import GeraetStellePage from './GeraetStellePage';
+import LagemonitorPage from './LagemonitorPage';
 import { GeraeteKopf } from './GeraeteKopf';
 import { geraetDarf } from './geraetSicht';
 
-/** Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS. */
+/**
+ * Startseite der Ansicht: Tablet und Laptop beginnen mit der Patientenliste ihrer UHS, der
+ * Lagemonitor mit seinem Großbild.
+ */
 export function geraetStartPfad(geraet: GeraetAnzeige): string {
-  return geraetPatientenPfad(geraet.einsatz_id);
+  return geraet.ansicht === 'lagemonitor'
+    ? geraetMonitorPfad(geraet.einsatz_id)
+    : geraetPatientenPfad(geraet.einsatz_id);
 }
 
 /** Leitet auf die Startseite der Ansicht (Index und jede fremde Adresse). */
@@ -40,6 +47,20 @@ export function GeraetEinsatzRahmen() {
   const { id } = useParams();
   if (!geraet || parseRouteId(id) !== geraet.einsatz_id) return <GeraetStart />;
   return <Outlet />;
+}
+
+/** Die Seiten der UHS-Ansichten; ein Lagemonitor hat keine und landet auf seinem Großbild. */
+export function GeraetUhsRahmen() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht === 'lagemonitor') return <GeraetStart />;
+  return <Outlet />;
+}
+
+/** Großbild nur für den Lagemonitor. */
+export function GeraetMonitor() {
+  const { geraet } = useAuth();
+  if (!geraet || geraet.ansicht !== 'lagemonitor') return <GeraetStart />;
+  return <LagemonitorPage />;
 }
 
 /** Aufnahme immer in die eigene UHS: der Auftrag `?uhs` steht fest, ein anderer wird ersetzt. */
@@ -140,6 +161,20 @@ function GeraeteNavigation({ geraet }: { geraet: GeraetAnzeige }) {
   );
 }
 
+/**
+ * Hülle des Lagemonitors: bildschirmfüllend, ohne Kopfzeile und Navigation; die Statusleiste
+ * trägt die Seite selbst. Der Einsatzstrom hält die Zahlen aktuell und beendet die Anzeige beim
+ * Widerruf. Keine Schreib-Warteschlange: der Monitor schreibt nichts.
+ */
+function MonitorHuelle({ geraet }: { geraet: GeraetAnzeige }) {
+  useEinsatzLiveStream(geraet.einsatz_id);
+  return (
+    <EinsatzPfadeProvider pfade={GERAET_PFADE}>
+      <Outlet />
+    </EinsatzPfadeProvider>
+  );
+}
+
 function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   const { benutzer, konflikt } = useAuth();
   // Der Einsatzstrom hält die Daten live und trägt das Ende der Kopplung: schließt der Server ihn
@@ -181,5 +216,6 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
 export default function GeraeteLayout() {
   const { geraet } = useAuth();
   if (!geraet) return <Navigate to="/einsaetze" replace />;
+  if (geraet.ansicht === 'lagemonitor') return <MonitorHuelle geraet={geraet} />;
   return <GeraeteHuelle geraet={geraet} />;
 }

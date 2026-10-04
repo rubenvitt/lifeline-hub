@@ -27,6 +27,8 @@ export type MeAntwort = S['MeAntwort'];
 // ============================== Gerätekopplung (LFH-892) ==============================
 export type Funktionsansicht = S['Funktionsansicht'];
 export type GeraetAnzeige = S['GeraetAnzeige'];
+export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
+export type LagemonitorUhs = S['LagemonitorUhs'];
 export type KopplungAnzeige = S['KopplungAnzeige'];
 export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];

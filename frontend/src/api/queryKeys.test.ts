@@ -65,6 +65,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.modulZaehler,
       // Statuswechsel und Nachtrag an einer Person schreiben ihre Zeitachse (LFH-552).
       EINSATZ_KEYS.kraefteZeitachse,
+      // Die Kräftesummen des Lagemonitors (LFH-892).
+      EINSATZ_KEYS.lagemonitor,
     ]);
   });
 
@@ -91,6 +93,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.abloesungen,
       // Handstatus, Nachtrag und Streichung an einer Einheit (LFH-552).
       EINSATZ_KEYS.kraefteZeitachse,
+      // Die Kräftesummen des Lagemonitors (LFH-892).
+      EINSATZ_KEYS.lagemonitor,
     ]);
   });
 
@@ -129,7 +133,12 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   // LFH-758: dasselbe an Tieren und UHS; das UHS-Zugriffsprotokoll bleibt draußen.
   it('tier und uhs invalidieren ihre Listen und Anhanglisten, nie das Zugriffsprotokoll', () => {
     expect(EINSATZ_STREAM_EVENTS.tier).toEqual(['einsatz-tiere', 'einsatz-tier-anhaenge']);
-    expect(EINSATZ_STREAM_EVENTS.uhs).toEqual(['einsatz-uhs', 'einsatz-uhs-anhaenge']);
+    // Dazu die Belegung je UHS des Lagemonitors (LFH-892).
+    expect(EINSATZ_STREAM_EVENTS.uhs).toEqual([
+      'einsatz-uhs',
+      'einsatz-uhs-anhaenge',
+      'einsatz-lagemonitor',
+    ]);
     expect(NICHT_LIVE_KEYS).toContain('einsatz-uhs-anhang-zugriffe');
   });
 

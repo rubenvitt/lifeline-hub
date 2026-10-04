@@ -58,6 +58,9 @@ export const EINSATZ_KEYS = {
   // Modulzähler des Navigationsrahmens: hängt an jedem Ereignis, das die Liste eines gezählten
   // Moduls invalidiert (Vollständigkeit: `queryKeys.test.ts`).
   modulZaehler: 'einsatz-modul-zaehler',
+  // Verdichtetes Lagebild des Lagemonitors (LFH-892): Zahlen ohne Personenbezug. Personen-
+  // Ereignisse erreichen den Monitor nicht; er holt die Zahlen zusätzlich im Takt.
+  lagemonitor: 'einsatz-lagemonitor',
   dokumente: 'einsatz-dokumente',
   abloesungen: 'einsatz-abloesungen',
   // Kräfte-Zeitachse (LFH-552): Perioden je Einheit/Person und Zeitachse einer Kraft unter EINEM
@@ -131,7 +134,7 @@ export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
  */
 export const EINSATZ_STREAM_EVENTS = {
   // Ablegen und Entfernen einer UHS-Datei verteilen `uhs` (LFH-758).
-  uhs: [EINSATZ_KEYS.uhs, EINSATZ_KEYS.uhsAnhaenge],
+  uhs: [EINSATZ_KEYS.uhs, EINSATZ_KEYS.uhsAnhaenge, EINSATZ_KEYS.lagemonitor],
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Anhangliste der Detailseite hängt
   // deshalb mit daran.
   schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenAnhaenge],
@@ -162,6 +165,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.abloesungen,
     // Handstatus, Nachtrag und Streichung an einer Einheit (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
+    EINSATZ_KEYS.lagemonitor,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke und
   // Betreuungsstellen tragen den Abschnittsnamen per Join. Umbenennen oder Löschen eines
@@ -196,6 +200,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
     // Statuswechsel, Nachtrag, Streichung und Fan-out an einer Person (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
+    EINSATZ_KEYS.lagemonitor,
   ],
   lagebericht: [EINSATZ_KEYS.lageberichte, EINSATZ_KEYS.lagebericht],
   chat: [EINSATZ_KEYS.chatKanaele, EINSATZ_KEYS.chatNachrichten, EINSATZ_KEYS.modulZaehler],
@@ -546,6 +551,7 @@ export const einsatzKeys = {
 
   // Modulzähler des Navigationsrahmens
   modulZaehler: (einsatzId: number) => [EINSATZ_KEYS.modulZaehler, einsatzId] as const,
+  lagemonitor: (einsatzId: number) => [EINSATZ_KEYS.lagemonitor, einsatzId] as const,
 
   // Abgeleitetes
   // Die gerundeten Koordinaten sind Teil des Keys (Cache-Trefferquote + serverseitiger

@@ -33,9 +33,9 @@ nach den Subtasks, die nach der Freigabe auf dem Board angelegt werden; Reihenfo
 
 ## 4. Lagemonitor — LFH-1026
 
-- [ ] 4.1 `GET /api/einsaetze/{id}/lagemonitor` (Kopfzahlen, Belegung je UHS als Zahl, Kräftesummen, Datenstand) und Lagekarte ohne personenbezogene Ebenen für die Ansicht; verifiziert durch einen Test, der die Antwort auf Namen und Personenkennungen prüft, und „Lagemonitor schreibt nichts“ über alle schreibenden Einsatzrouten
-- [ ] 4.2 Kiosk-Seite: feste Kachelung ohne Bildlauf bei 1920 × 1080, keine Bedienung der Kacheln, Großbild-Größen, „Anzeige starten“ mit Vollbild und Wachhalten (neu anfordern bei Rückkehr, Hinweis ohne Unterstützung); verifiziert durch Komponententests mit nachgebildetem `navigator.wakeLock` und einen e2e-Lauf bei 1920 × 1080
-- [ ] 4.3 Aktualität: Live-Kanal, selbst neu verbinden, Datenstand mit Alter, veraltet nach 2 Minuten; Gerätemenü nur nach 3 s Drücken, schließt nach 30 s, Tag/Nacht/Automatik gespeichert; verifiziert durch Komponententests mit Fake-Timern
+- [x] 4.1 `GET /api/einsaetze/{id}/lagemonitor` (Kopfzahlen, Belegung je UHS als Zahl, Kräftesummen, Datenstand) und Lagekarte ohne personenbezogene Ebenen für die Ansicht; verifiziert durch einen Test, der die Antwort auf Namen und Personenkennungen prüft, und „Lagemonitor schreibt nichts“ über alle schreibenden Einsatzrouten
+- [x] 4.2 Kiosk-Seite: feste Kachelung ohne Bildlauf bei 1920 × 1080, keine Bedienung der Kacheln, Großbild-Größen, „Anzeige starten“ mit Vollbild und Wachhalten (neu anfordern bei Rückkehr, Hinweis ohne Unterstützung); verifiziert durch Komponententests mit nachgebildetem `navigator.wakeLock` und einen e2e-Lauf bei 1920 × 1080
+- [x] 4.3 Aktualität: Live-Kanal, selbst neu verbinden, Datenstand mit Alter, veraltet nach 2 Minuten; Gerätemenü nur nach 3 s Drücken, schließt nach 30 s, Tag/Nacht/Automatik gespeichert; verifiziert durch Komponententests mit Fake-Timern
 
 ## 5. Abschluss
 

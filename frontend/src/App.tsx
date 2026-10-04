@@ -13,7 +13,9 @@ import GeraeteLayout, {
   GeraetAufnahme,
   GeraetEinsatzRahmen,
   GeraetStart,
+  GeraetMonitor,
   GeraetStelle,
+  GeraetUhsRahmen,
   GeraetUhs,
 } from './geraet/GeraeteLayout';
 import GeraetPatientenPage from './geraet/GeraetPatientenPage';
@@ -231,11 +233,15 @@ export const appRouten = createRoutesFromElements(
         <Route index element={<GeraetStart />} />
         <Route path=":id" element={<GeraetEinsatzRahmen />}>
           <Route index element={<GeraetStart />} />
-          <Route path="patienten" element={<GeraetPatientenPage />} />
-          <Route path="patienten/:personId" element={<PersonenDetailPage />} />
-          <Route path="aufnahme" element={<GeraetAufnahme />} />
-          <Route path="uhs/:uhsId" element={<GeraetUhs />} />
-          <Route path="stelle" element={<GeraetStelle />} />
+          <Route path="monitor" element={<GeraetMonitor />} />
+          {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
+          <Route element={<GeraetUhsRahmen />}>
+            <Route path="patienten" element={<GeraetPatientenPage />} />
+            <Route path="patienten/:personId" element={<PersonenDetailPage />} />
+            <Route path="aufnahme" element={<GeraetAufnahme />} />
+            <Route path="uhs/:uhsId" element={<GeraetUhs />} />
+            <Route path="stelle" element={<GeraetStelle />} />
+          </Route>
           <Route path="*" element={<GeraetStart />} />
         </Route>
         <Route path="*" element={<GeraetStart />} />

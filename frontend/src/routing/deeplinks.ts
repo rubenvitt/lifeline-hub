@@ -920,6 +920,11 @@ export function geraetUhsPfad(einsatzId: number, uhsId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/uhs/${uhsId}`;
 }
 
+/** Großbild des Lagemonitors. */
+export function geraetMonitorPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/monitor`;
+}
+
 /** Bereich „UHS“ des UHS-Laptops: Plätze, Material, Meldungen, Dateien der eigenen UHS. */
 export function geraetStellePfad(einsatzId: number): string {
   return `${GERAET_START_PFAD}/${einsatzId}/stelle`;

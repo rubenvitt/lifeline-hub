@@ -193,6 +193,18 @@ Die Kopplung gewährt nichts über die Ansicht hinaus und gilt nur für Gerätek
 ändert sich keine Anforderung. Die beiden betroffenen Requirements nennen die Kopplung künftig
 ausdrücklich, statt sie als Ausnahme im Code zu verstecken.
 
+### D11 Aktualität des Lagemonitors: Live-Kanal plus Takt (bei der Umsetzung)
+
+`LiveEvent::Person` gehört nur dem Modul `personen` und trägt Personenkennungen; der Lagemonitor
+bekommt es deshalb nicht. Die übrigen Ereignisse seiner Ansicht (UHS, Einheiten, Personal,
+Abschnitte, Einsatzkopf) invalidieren sein Lagebild sofort. Für neue oder neu gesichtete
+Personen holt der Monitor das Lagebild zusätzlich alle 30 Sekunden. *Verworfen:* ein eigenes,
+kennungsfreies Ereignis für den Monitor. Es bräuchte einen zweiten Ereignisweg im LiveHub für
+einen Gewinn von höchstens 30 Sekunden auf einem Wandbild.
+
+Die Belegungskachel zeigt die vollsten UHS zuerst und nennt den Rest als „+n weitere“: eine
+feste Kachelung ohne Bildlauf hat Platz für sechs.
+
 ## Risks / Trade-offs
 
 - [Ein vergessener Listenfilter zeigt Gerätekonten als Personen] → Filter als ein gemeinsames
