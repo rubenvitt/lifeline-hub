@@ -1,11 +1,6 @@
-# einsatzkopf-live Specification
+# Spec Delta
 
-## Purpose
-Der Einsatzkopf (Stammdaten, Status, Termin der nächsten Lagebesprechung) wird auf jedem Schirm
-frisch, sobald eine Nutzeraktion ihn ändert. Die Spec legt fest, welche Wege das SSE-Ereignis
-`einsatz` auslösen, wer es empfängt und was bewusst nicht live ist (LFH-555).
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Ereignis für den Einsatzkopf
 Das System SHALL ein SSE-Ereignis mit dem Wire-Namen `einsatz` verteilen, sobald eine Nutzeraktion
@@ -45,27 +40,6 @@ Das Ereignis MUST verteilt werden nach
 - **WHEN** ein PATCH der Kopfdaten oder der Führungsstelle abgelehnt wird (400, 403, 409, 422)
 - **THEN** wird kein Ereignis `einsatz` verteilt
 
-### Requirement: Wer vom Einsatzkopf erfährt
-Das Ereignis `einsatz` MUST jeden Abonnenten erreichen, der den Live-Strom des Einsatzes öffnen darf,
-unabhängig von seinen Modulfreigaben. Die Tür des Stroms und die des Einsatzkopfs sind dieselbe
-(Lesezugriff auf den Einsatz ohne Modul). Außer `einsatz` und dem Kontrollereignis `lagged` MUST
-jedes Einsatz-Ereignis mindestens einem Modul zugeordnet bleiben. Die Org-Ereignisse `einsatzliste`
-und `stammdaten`, die derselbe Strom mitträgt (LFH-734), sind keine Einsatz-Ereignisse: sie gehören
-keinem Modul und folgen den Gates der Fähigkeit `org-live`. Ihre Wire-Namen MUST sich von allen
-Einsatz-Ereignissen unterscheiden.
-
-#### Scenario: Leser ohne jedes ausblendbare Modul
-- **WHEN** ein Mitglied, dem jedes ausblendbare Modul des Einsatzes entzogen ist, den Strom geöffnet hat und der Kopf geändert wird
-- **THEN** erhält es das Ereignis `einsatz`
-
-#### Scenario: Leser ohne Stab-Recht bei einer Besprechung ohne neuen Termin
-- **WHEN** ein Mitglied ohne Stab-Recht den Strom geöffnet hat und eine Lagebesprechung ohne Terminänderung abgeschlossen wird
-- **THEN** erhält es weder `stab` noch `einsatz`
-
-#### Scenario: Org-Ereignis auf dem Einsatz-Strom
-- **WHEN** ein Mitglied den Strom eines Einsatzes geöffnet hat und der System-Admin seiner Organisation ein Fahrzeug im Katalog ändert
-- **THEN** erhält es auf demselben Strom das Ereignis `stammdaten`, unabhängig von seinen Modulfreigaben
-
 ### Requirement: Der Kopf wird auf jedem Schirm frisch
 Das Frontend SHALL beim Ereignis `einsatz` den Einsatzkopf, die eigene Führungsstelle und die
 Stab-Anzeige des Einsatzes neu abrufen. Einsatzkopf und Führungsstelle MUST dazu in der
@@ -88,13 +62,3 @@ Stab-GET liefert sie mit. Einen zweiten gespeicherten Termin gibt es nicht.
 #### Scenario: Offenes Bearbeitungsformular
 - **WHEN** auf Schirm B das Formular „Einsatzdaten bearbeiten" offen ist und ein Ereignis `einsatz` eintrifft
 - **THEN** behält das Formular die Eingaben von Schirm B
-
-### Requirement: Bewusst nicht live
-Die benutzerbezogenen Felder des Einsatzkopfs (`meine_rolle`, `meine_fuehrungsstelle`,
-`meine_sachgebiete`, `meine_funktion`) und `lagekennzahlen` SHALL nicht über `einsatz` angestoßen
-werden. Sie werden erst beim nächsten Abruf des Kopfs frisch, auch dann, wenn ein Ereignis
-`einsatz` aus anderem Anlass eintrifft. Eine Stab-Besetzung MUST kein Ereignis `einsatz` auslösen.
-
-#### Scenario: Besetzung eines Sachgebiets
-- **WHEN** im Stab ein Sachgebiet besetzt wird
-- **THEN** wird `stab` verteilt, aber kein `einsatz`

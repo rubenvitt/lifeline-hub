@@ -212,6 +212,19 @@ export type EinheitStatus = S['EinheitStatus'];
 export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
+/** Eigene Führungsstelle des Einsatzes (LFH-849). */
+export type Fuehrungsstelle = S['FuehrungsstelleAnzeige'];
+
+/**
+ * Teiländerung der Führungsstelle (kein Backend-Schema, `routes/einsatz_fuehrungsstelle.rs`):
+ * fehlender Schlüssel = unverändert, `null` = leeren; `sprechgruppe_ids` ersetzt vollständig.
+ */
+export interface FuehrungsstellePatch {
+  rufname?: string | null;
+  kommunikationsmittel?: string | null;
+  erreichbarkeit?: string | null;
+  sprechgruppe_ids?: number[];
+}
 
 // ============================== E‑2 Personen ==============================
 export type PersonStatus = S['PersonStatus'];

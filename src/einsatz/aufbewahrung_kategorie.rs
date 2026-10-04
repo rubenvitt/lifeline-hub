@@ -94,13 +94,14 @@ pub async fn laden(
     Ok(v)
 }
 
+/// Schreibt einen System-ETB-Eintrag und liefert seine Kennung (für das `etb`-Ereignis).
 async fn etb_eintrag(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     etb_startwert: i64,
     inhalt: &str,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     crate::etb::repo::anlegen_tx(
         conn,
         einsatz_id,
@@ -118,14 +119,14 @@ async fn etb_eintrag(
             berichtigt_eintrag_id: None,
         },
     )
-    .await?;
-    Ok(())
+    .await
 }
 
 /// Legt beim Abschluss je Org-Vorgabe die Kategorie-Frist an (`abgeschlossen_at + dauer`,
 /// Rechtsgrundlage als Kopie) und schreibt je Kategorie einen ETB-Eintrag — auf der
 /// Abschluss-Transaktion (Spec „Kategorie-Frist beim Abschluss“). Eine schon vorhandene Zeile
-/// bleibt unverändert.
+/// bleibt unverändert. Liefert die Kennungen der neuen ETB-Einträge, damit die Route sie nach
+/// dem Commit live meldet (LFH-858).
 pub(super) async fn fristen_beim_abschluss(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -133,7 +134,8 @@ pub(super) async fn fristen_beim_abschluss(
     etb_startwert: i64,
     abgeschlossen_at: &str,
     vorgaben: &[KategorieVorgabe],
-) -> Result<(), AppError> {
+) -> Result<Vec<i64>, AppError> {
+    let mut etb_eintrag_ids = Vec::new();
     for v in vorgaben {
         let Some(frist) = berechne_retention_bis(abgeschlossen_at, v.dauer_tage) else {
             continue;
@@ -159,9 +161,10 @@ pub(super) async fn fristen_beim_abschluss(
             v.dauer_tage,
             v.rechtsgrundlage
         );
-        etb_eintrag(conn, einsatz_id, von_benutzer_id, etb_startwert, &inhalt).await?;
+        etb_eintrag_ids
+            .push(etb_eintrag(conn, einsatz_id, von_benutzer_id, etb_startwert, &inhalt).await?);
     }
-    Ok(())
+    Ok(etb_eintrag_ids)
 }
 
 /// Ergebnis einer manuellen Kategorie-Frist.
@@ -777,7 +780,7 @@ mod tests {
         let e = super::super::repo::abschliessen(&pool, einsatz, leit)
             .await
             .unwrap();
-        let abgeschlossen_at = e.abgeschlossen_at.unwrap();
+        let abgeschlossen_at = e.einsatz.abgeschlossen_at.unwrap();
 
         let zeilen = laden(&pool, einsatz).await.unwrap();
         assert_eq!(zeilen.len(), 2);
@@ -802,6 +805,24 @@ mod tests {
         assert!(eintrag.contains(&abgeschlossen_at));
         assert!(eintrag.contains("§ 46 Abs. 5 BHKG NRW"));
         assert!(etb.iter().any(|t| t.contains("„Anhänge“")));
+
+        // Beide Einträge kommen als Kennung zurück, damit die Route sie live meldet (LFH-858).
+        let mut gemeldet: Vec<String> = Vec::new();
+        for id in &e.etb_eintrag_ids {
+            gemeldet.push(
+                sqlx::query_scalar(
+                    "SELECT inhalt FROM etb_eintrag WHERE id = ? AND einsatz_id = ?",
+                )
+                .bind(id)
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        assert_eq!(gemeldet.len(), 2, "{gemeldet:?}");
+        assert!(gemeldet.iter().any(|t| t.contains("„Personenauskunft“")));
+        assert!(gemeldet.iter().any(|t| t.contains("„Anhänge“")));
     }
 
     #[tokio::test]

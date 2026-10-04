@@ -251,6 +251,8 @@ describe('baueFuehrungsorganisation — dieselbe Platzierung wie der Funkplan', 
       fahrzeuge: daten([]),
       personal: daten([]),
       sprechgruppen: daten([]),
+      // Ohne erfasste Führungsstelle: sie stünde sonst als Zeile vor den Wurzeln (LFH-849).
+      fuehrungsstelle: { zustand: 'daten', daten: null },
     });
     const org = baueFuehrungsorganisation(abschnitte, einheiten);
     expect(org.wurzeln.map(schluessel)).toEqual(funkplan.map(funkplanSchluessel));

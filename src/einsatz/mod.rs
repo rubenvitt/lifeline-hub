@@ -2,6 +2,7 @@ pub mod aufbewahrung_kategorie;
 pub mod berechtigung;
 pub mod effektiv;
 pub mod einstellungen;
+pub mod fuehrungsstelle;
 pub mod funktion;
 pub mod kontext;
 pub mod lagekennzahl;

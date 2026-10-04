@@ -2012,6 +2012,20 @@ export interface components {
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
+        /** @description Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON. */
+        FuehrungsstelleAnzeige: {
+            /** @description Personenbezogen: wird geschwärzt und steht nie im Lagebericht. */
+            erreichbarkeit?: string | null;
+            /** @description Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`). */
+            kommunikationsmittel?: string | null;
+            /** @description Funkrufname der Führungsstelle, z. B. „Florian Musterstadt 10/1“. */
+            rufname?: string | null;
+            /**
+             * @description Zugeordnete Sprechgruppen (Katalog oder einsatzlokal), sortiert wie an Abschnitt und
+             *     Einheit.
+             */
+            sprechgruppen: components["schemas"]["SprechgruppeAnzeige"][];
+        };
         /**
          * @description Art der Führungsfunktion nach FwDV 100 Anlage 1 (Nr. 1.1.4/1.1.5). Aus dem Code
          *     abgeleitet, nie gespeichert und nie vom Client gesetzt.

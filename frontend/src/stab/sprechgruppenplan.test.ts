@@ -50,6 +50,7 @@ function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {
     fahrzeuge: daten([]),
     personal: daten([]),
     sprechgruppen: daten([]),
+    fuehrungsstelle: { zustand: 'daten', daten: null },
     ...p,
   };
 }

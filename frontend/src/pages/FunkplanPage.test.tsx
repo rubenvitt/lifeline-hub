@@ -7,7 +7,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { renderMitProviders } from '../test/utils';
 import { server } from '../test/server';
 import FunkplanPage from './FunkplanPage';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -25,7 +25,11 @@ import type {
   Sprechgruppe,
 } from '../api/types';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({
+  ladeEinsatz: vi.fn(),
+  ladeModulFreigaben: vi.fn(),
+  ladeFuehrungsstelle: vi.fn(),
+}));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
@@ -139,6 +143,7 @@ beforeEach(() => {
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue(FAHRZEUGE);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue(PERSONAL);
   vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(SPRECHGRUPPEN);
+  vi.mocked(ladeFuehrungsstelle).mockResolvedValue({ sprechgruppen: [] });
 });
 
 function setup() {
@@ -243,7 +248,13 @@ describe('FunkplanPage — Lücken und Rechteweiche', () => {
       within(luecken()).getByText(/Eigene Gegenstelle \(Führungsstelle\)/),
     ).toBeInTheDocument();
     expect(within(luecken()).getByText(/nicht erfasst/)).toBeInTheDocument();
-    expect(container.querySelectorAll('tr[data-row-key^="fuehrungsstelle"]')).toHaveLength(0);
+    expect(container.querySelectorAll('tr[data-row-key="fs"]')).toHaveLength(0);
+    // Der Hinweis führt dorthin, wo die Führungsstelle gepflegt wird.
+    expect(
+      within(lueckenZeile('Eigene Gegenstelle (Führungsstelle)')).getByRole('link', {
+        name: 'auf Einsatzdaten erfassen',
+      }),
+    ).toHaveAttribute('href', '/einsaetze/1/einsatzdaten');
   });
 
   it('zeigt bei gesperrten Einheiten „—“ mit Grund statt „0“ und nennt die fehlende Ebene', async () => {
@@ -881,5 +892,75 @@ describe('FunkplanPage — Lücke „Verbindungen ohne gemeinsame Sprechgruppe�
     const zeile = lueckenZeile('Verbindungen ohne gemeinsame Sprechgruppe');
     expect(within(zeile).getByText('—')).toBeInTheDocument();
     expect(within(zeile).getByText(/nicht freigegeben/)).toBeInTheDocument();
+  });
+});
+
+describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
+  const FS = {
+    rufname: 'Florian Stadt 10/1',
+    sprechgruppen: [sg(1, 'TMO', 'TMO 311')],
+    kommunikationsmittel: 'digitalfunk',
+    erreichbarkeit: '0171 ELW',
+  };
+
+  it('steht erfasst als erste Zeile mit Verweis auf die Einsatzdaten; der Hinweis entfällt', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue(FS);
+    const { container } = setup();
+    await screen.findByText('Florian Stadt 10/1');
+    await screen.findByText('Florian 1/42-1');
+    const zeilen = [...container.querySelectorAll('tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+    expect(zeilen[0]).toBe('fs');
+    expect(zeilen[1]).toBe('ab-1');
+    const fs = container.querySelector('tr[data-row-key="fs"]') as HTMLElement;
+    expect(within(fs).getByRole('link', { name: 'Führungsstelle' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einsatzdaten',
+    );
+    expect(within(fs).getByText('TMO 311')).toBeInTheDocument();
+    expect(within(fs).getByText('Digitalfunk')).toBeInTheDocument();
+    expect(within(luecken()).queryByText(/Eigene Gegenstelle/)).toBeNull();
+  });
+
+  it('nennt bei 403 den Grund statt „nicht erfasst“', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockRejectedValue(new ApiError(403, 'verboten'));
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    const zeile = await waitFor(() => lueckenZeile('Eigene Gegenstelle (Führungsstelle)'));
+    await waitFor(() => expect(within(zeile).getByText(/nicht freigegeben/)).toBeInTheDocument());
+    expect(within(zeile).queryByText(/nicht erfasst/)).toBeNull();
+  });
+
+  it('sperrt die Übernahme, solange die Führungsstelle noch lädt', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockReturnValue(new Promise(() => {}));
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    expect(screen.getByRole('button', { name: 'In Lagebericht übernehmen' })).toBeDisabled();
+  });
+
+  it('zählt die Verbindung Führungsstelle → oberster Abschnitt und verweist auf den Abschnitt', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
+      sprechgruppen: [sg(7, 'TMO', 'TMO 700')],
+    });
+    setup();
+    await screen.findByText('Florian 1/42-1');
+    const zeile = lueckenZeile('Verbindungen ohne gemeinsame Sprechgruppe');
+    await waitFor(() =>
+      expect(
+        within(zeile).getByRole('link', { name: 'Abschnitt Nord → Führungsstelle' }),
+      ).toHaveAttribute('href', '/einsaetze/1/einsatzabschnitte?abschnitt=1'),
+    );
+  });
+
+  it('übernimmt die Führungsstelle ohne ihre Erreichbarkeit in den Lagebericht', async () => {
+    vi.mocked(ladeFuehrungsstelle).mockResolvedValue(FS);
+    setup();
+    await screen.findByText('Florian Stadt 10/1');
+    await userEvent.click(screen.getByRole('button', { name: 'In Lagebericht übernehmen' }));
+    await waitFor(() => expect(legeLageberichtAn).toHaveBeenCalledTimes(1));
+    const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text as string;
+    expect(text).toContain('- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO TMO 311');
+    expect(text).not.toContain('0171 ELW');
   });
 });

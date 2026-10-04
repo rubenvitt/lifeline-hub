@@ -146,6 +146,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz::abschliessen),
         )
         .route(
+            "/api/einsaetze/{id}/fuehrungsstelle",
+            get(routes::einsatz_fuehrungsstelle::lesen)
+                .patch(routes::einsatz_fuehrungsstelle::aendern),
+        )
+        .route(
             "/api/einsaetze/{id}/aufbewahrungsfrist",
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
