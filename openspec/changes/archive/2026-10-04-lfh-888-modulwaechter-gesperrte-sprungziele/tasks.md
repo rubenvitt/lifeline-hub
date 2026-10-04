@@ -28,4 +28,4 @@ lesen (`frontend/AGENTS.md`, dazu `stab/`, `etb/`, `pages/lagekarte/`, `personen
 
 - [x] 4.1 `frontend/AGENTS.md` nach design.md D5 fortschreiben. Verifiziert durch `prettier --check frontend/AGENTS.md`
 - [x] 4.2 e2e: `e2e/modulfreigabe-org-vorgabe.spec.ts` um den Deeplink `/einsaetze/:id/lagemeldungen` als Beobachter erweitern: Hinweis mit „Lagemeldungen“ sichtbar, kein Request an `/lage/meldungen`, Rückweg führt in ein freies Modul. Vorher `frontend/e2e/AGENTS.md` lesen. Verifiziert durch den grünen e2e-Lauf der Spec und eine Mutationsprobe (Wächter aus → rot)
-- [ ] 4.3 `./scripts/check-all.sh` grün, Vitest und betroffene e2e-Specs grün. Verifiziert durch den Exit-Code bzw. die CI des PRs
+- [x] 4.3 `./scripts/check-all.sh` grün, Vitest und betroffene e2e-Specs grün. Verifiziert durch den Exit-Code bzw. die CI des PRs

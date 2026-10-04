@@ -440,9 +440,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
             <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} freigaben={modulFreigaben} />
-            {/* Modulwächter (LFH-888, Spec `modul-freigabe`, design.md D1): meldet der Server für
-               das Modul der Route `zugriff: false`, steht der Hinweis an der Stelle der Seite —
-               auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
+            {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
+               `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`):
+               meldet der Server für das Modul der Route `zugriff: false`, steht der Hinweis an der
+               Stelle der Seite — auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
                Rahmen (sonst ginge beim Kaltstart die Anfrage der Seite an ein gesperrtes Modul
                raus); Einsatzdaten und Einstellungen sind nie gesperrt und warten nicht. Ein
                gescheiterter oder pausierter Abruf (offline) sperrt nicht, dann bleibt der
