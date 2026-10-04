@@ -23,7 +23,7 @@ war. Diese Change trifft die Wahl und baut den Signierschritt in den Release-Lau
   den Deinstaller im Installer, bevor etwas ans Release geht.
 - Lokale Bauten bleiben unsigniert (`tauri.conf.json` unverändert), erst die Umgebung des
   Release-Laufs setzt den Signierbefehl.
-- **Akzeptanzkriterium (zur Entscheidung):** Windows zeigt „Ruben Vitt“ als Herausgeber.
+- **Akzeptanzkriterium (entschieden 04.10.2026):** Windows zeigt „Ruben Vitt“ als Herausgeber.
   „Ohne SmartScreen-Warnung“ ist **kein** Kriterium: Seit 2024 baut auch ein EV-Zertifikat die
   SmartScreen-Reputation erst über Downloads auf, die ersten Releases können also weiter
   warnen, dann aber mit Herausgeber statt „Unbekannt“.

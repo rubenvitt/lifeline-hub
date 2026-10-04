@@ -62,7 +62,7 @@ Ballot CSC-31), auch bei Mehrjahreskauf wird also etwa jährlich neu ausgestellt
 
 ## Decisions
 
-### D1 — SSL.com IV-Zertifikat mit eSigner (Empfehlung, zur Entscheidung)
+### D1 — SSL.com IV-Zertifikat mit eSigner (entschieden 04.10.2026)
 
 Ein Zertifikat „Individual Validation“ von SSL.com, der Schlüssel im Cloud-HSM von eSigner,
 signiert im Lauf mit `CodeSignTool`.
@@ -182,7 +182,9 @@ Verlängerung, Vorgehen bei Ablauf oder verlorenem TOTP-Secret, Grenzen aktualis
 
 ## Migration Plan
 
-1. Plan freigeben (Anbieter nach D1, Akzeptanzkriterium nach proposal.md).
+1. Plan freigeben (Anbieter nach D1, Akzeptanzkriterium nach proposal.md). Erledigt am
+   04.10.2026: Ruben wählt SSL.com eSigner und damit das Kriterium „Herausgeber sichtbar“.
+   Die Anbindung wartet ausdrücklich auf den Kauf (Ruben: „später anbinden“).
 2. Wenn das erste stabile Release ansteht: Zertifikat und eSigner kaufen, Identität prüfen
    lassen, Zugangsdaten in 1Password, Secrets setzen (D4).
 3. Workflow ändern, Prüflauf per Dispatch mit Zustimmung (D7).
