@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { dichten } from '../../theme/tokens';
-import Segmentleiste, { naechsterIndex, segmentStil, type SegmentOption } from './Segmentleiste';
+import Segmentleiste, {
+  naechsterIndex,
+  segmentStil,
+  segmentZelleStil,
+  type SegmentOption,
+} from './Segmentleiste';
 
 const OPTIONEN: SegmentOption<string>[] = [
   { wert: 'alle', label: 'Alle' },
@@ -132,5 +137,71 @@ describe('Segmentleiste', () => {
     expect(segmentStil(t('kompakt')).paddingInline).not.toBe(
       segmentStil(t('handschuh')).paddingInline,
     );
+  });
+
+  /**
+   * Zielabstand (LFH-865, Muster LFH-630): die Fuge bleibt 1 px, das Segment rückt in seiner
+   * Zelle ein. Soll als Literale aus der Bedien-Leitlinie (Kriterium 2).
+   */
+  describe('Zielabstand im Fugenraster', () => {
+    const FUGE = 1;
+    const t = (s: keyof typeof dichten) => ({
+      controlHeight: dichten[s].zeilenhoehe,
+      paddingSM: dichten[s].abstand.sm,
+      marginXS: dichten[s].abstand.xs,
+    });
+
+    it('der Einzug je Stufe: kompakt 0, komfortabel 4, handschuh 8', () => {
+      expect(segmentZelleStil(t('kompakt')).padding).toBe(0);
+      expect(segmentZelleStil(t('komfortabel')).padding).toBe(4);
+      expect(segmentZelleStil(t('handschuh')).padding).toBe(8);
+    });
+
+    it('zwei Einzüge plus Fuge halten ≥ 8 (komfortabel) und ≥ 16 (handschuh)', () => {
+      expect(2 * Number(segmentZelleStil(t('komfortabel')).padding) + FUGE).toBeGreaterThanOrEqual(
+        8,
+      );
+      expect(2 * Number(segmentZelleStil(t('handschuh')).padding) + FUGE).toBeGreaterThanOrEqual(
+        16,
+      );
+    });
+
+    it('Einzug und Restpolsterung ergeben die Polsterung von bisher — die Breite bleibt', () => {
+      for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+        const e = Number(segmentZelleStil(t(stufe)).padding);
+        expect(Number(segmentStil(t(stufe)).paddingInline) + e, stufe).toBe(
+          dichten[stufe].abstand.sm,
+        );
+      }
+    });
+
+    it('jedes Segment steht in einer eigenen Zelle ohne Rolle, die Gruppe besitzt die Segmente', () => {
+      renderMitProviders(<Gesteuert rolle="tablist" />);
+      const tabs = screen.getAllByRole('tab');
+      expect(tabs).toHaveLength(3);
+      for (const tab of tabs) {
+        const zelle = tab.parentElement!;
+        expect(zelle).toHaveAttribute('data-lfh', 'segment-zelle');
+        expect(zelle).toHaveAttribute('role', 'none');
+        expect(zelle).toHaveClass('lfh-segment-zelle');
+        expect(zelle.parentElement).toHaveAttribute('role', 'tablist');
+      }
+    });
+
+    it('auch ein gesperrtes Segment steht in seiner Zelle (der Tooltip liegt darin)', () => {
+      renderMitProviders(
+        <Segmentleiste
+          optionen={[
+            { wert: 'a', label: 'A' },
+            { wert: 'b', label: 'B', gesperrt: 'Grund' },
+          ]}
+          wert="a"
+          onWechsel={() => {}}
+          beschriftung="x"
+        />,
+      );
+      const b = screen.getByRole('radio', { name: 'B' });
+      expect(b.parentElement).toHaveAttribute('data-lfh', 'segment-zelle');
+    });
   });
 });

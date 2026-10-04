@@ -5,6 +5,7 @@ import Augenbraue from './Augenbraue';
 import { Aufgliederung, type Segment } from './Aufgliederung';
 import { monoStil, schriftStil, useRollen } from './rollenwerte';
 import { statusFlaeche, type StatusTon } from './statusFlaeche';
+import { zielEinzug } from './zielEinzug';
 // Grund und Hover/Fokus der Zelle stehen als Klasse `.lfh-kennzahl` in der Gestaltungssprache:
 // ein Inline-Grund schlüge jede `:hover`-Regel.
 import '../../theme/sprache.css';
@@ -175,15 +176,11 @@ export function kennzahlStil(
 
 /**
  * Einzug der Trefffläche in ihrer Rasterzelle je Dichtestufe — siehe Dateikopf „Abstand
- * zwischen Zielen“. Abgeleitet aus `controlHeight`, derselben Quelle wie Treffhöhe und
- * Polsterung: unter einem lokal überschriebenen Theme hielte die Zelle sonst die Höhe der einen
- * und den Abstand der anderen Stufe. Die Werte stehen als Literale: 2 · 4 + 1 ≥ 8 (komfortabel),
- * 2 · 8 + 1 ≥ 16 (handschuh); `kompakt` hat die Spacing-Ausnahme der Leitlinie (Fükw, Maus).
+ * zwischen Zielen“. Seit LFH-865 teilen Segmentleiste und Kartenknöpfe denselben Einzug; Werte
+ * und Begründung stehen in {@link zielEinzug}.
  */
 export function kennzahlZielEinzug(token: { controlHeight: number }): number {
-  if (token.controlHeight >= 72) return 8;
-  if (token.controlHeight >= 48) return 4;
-  return 0;
+  return zielEinzug(token);
 }
 
 /**

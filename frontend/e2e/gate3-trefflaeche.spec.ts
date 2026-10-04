@@ -2518,6 +2518,43 @@ async function abstandZuNachbarn(bereich: Locator, ziel: Locator): Promise<numbe
   return abstand;
 }
 
+/**
+ * Zielabstand im Fugenraster (LFH-630, LFH-865): jedes der `ziele` gegen jedes andere
+ * Bedienziel in `raster`, Soll nach {@link ZIELABSTAND} (`kompakt` nur gemessen). Im Handschuh
+ * zusätzlich die berechnete Fuge: sie bleibt 1 px in beiden Richtungen — der Abstand kommt aus
+ * dem Einzug in der Zelle, nicht aus einer breiteren Fuge. Liefert den kleinsten Abstand.
+ */
+async function zielabstandImFugenraster(
+  raster: Locator,
+  ziele: Locator,
+  dichte: keyof typeof ZIELABSTAND,
+  name: string,
+  mindestens: number,
+): Promise<number> {
+  const anzahl = await ziele.count();
+  expect(anzahl, `${name}: mindestens ${mindestens} Ziele erwartet`).toBeGreaterThanOrEqual(
+    mindestens,
+  );
+  let abstand = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < anzahl; i += 1) {
+    abstand = Math.min(abstand, await abstandZuNachbarn(raster, ziele.nth(i)));
+  }
+  const soll = ZIELABSTAND[dichte];
+  if (soll != null) {
+    expect(abstand, `kleinster Abstand zwischen ${name} (${dichte})`).toBeGreaterThanOrEqual(
+      soll - SUBPIXEL,
+    );
+  }
+  if (dichte === 'handschuh') {
+    const fuge = await raster.evaluate((el) => {
+      const stil = getComputedStyle(el);
+      return `${stil.columnGap} ${stil.rowGap}`;
+    });
+    expect(fuge, `${name}: das Fugenraster bleibt im Handschuh-Betrieb 1 px`).toBe('1px 1px');
+  }
+  return abstand;
+}
+
 test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abstand ≥ 16 px im Handschuh', async ({
   page,
 }) => {
@@ -2600,11 +2637,14 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
     }
 
     // ── Was bleibt: die drei Segmente der Ansichtsleiste im Kopf (`role="radio"`).
-    const segmente = kopfAktionen.locator('[data-lfh="segmentleiste"] button');
+    const leiste = kopfAktionen.locator('[data-lfh="segmentleiste"]');
+    const segmente = leiste.locator('button');
     await expect(segmente).toHaveCount(3);
     const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 3);
+    // Zielabstand (LFH-865): die Segmente rücken in ihrer Rasterzelle ein, die Fuge bleibt 1 px.
+    const abstand = await zielabstandImFugenraster(leiste, segmente, dichte, 'Segmenten', 3);
 
-    gemessen.push(`${dichte} (Soll ≥ ${soll}): Segment ${segment}`);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Segment ${segment}, Abstand ${abstand}`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
@@ -2924,7 +2964,7 @@ test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dic
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der Dichte-Staffel', async ({
+test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeitachse folgen der Dichte-Staffel, Knöpfe und Grundlage halten den Zielabstand', async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -2983,6 +3023,34 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
     });
     await expect(knoepfe).toHaveCount(5);
     const karte = await kurzeAchseHaelt(knoepfe, BODEN_KARTE[dichte], `Kartenknopf (${dichte})`, 5);
+    // Zielabstand (LFH-865): JEDER Knopf des Blocks (auch Eigenposition und Leisten-Umschalter)
+    // gegen seine Nachbarn; die Knöpfe rücken in ihrer Zelle ein, die Fuge bleibt 1 px.
+    const block = page.locator('[data-lfh="karten-knoepfe"]');
+    const knopfAbstand = await zielabstandImFugenraster(
+      block,
+      block.getByRole('button'),
+      dichte,
+      'Kartenknöpfen',
+      5,
+    );
+
+    // Kartengrundlage über der Karte (ab `md`): Segmente der lokalen Leiste, dieselbe Zelle.
+    const grundlage = page.locator('[data-lfh="grundlage-leiste"]');
+    // Online-Stile je nach e2e-Konfiguration, dazu immer Offline und Blind: mindestens drei.
+    const grundSegmente = grundlage.getByRole('radio');
+    const grundHoehe = await alleHaltenStufe(
+      grundSegmente,
+      soll,
+      `Grundlage-Segment (${dichte})`,
+      3,
+    );
+    const grundAbstand = await zielabstandImFugenraster(
+      grundlage,
+      grundSegmente,
+      dichte,
+      'Grundlage-Segmenten',
+      3,
+    );
 
     // Zeitachse: beschriftete Knöpfe halten die Höhe, Symbolknöpfe die kurze Achse.
     const band = page.locator('[data-lfh="zeitachse"]');
@@ -3000,7 +3068,8 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
     je.set(`${dichte} Kartenknopf`, karte.kleinstes);
     je.set(`${dichte} Zeitachse`, zeitBeschriftet);
     gemessen.push(
-      `${dichte}: Verortet ${verortet}, Kartenknopf ${karte.kleinstes}, ` +
+      `${dichte}: Verortet ${verortet}, Kartenknopf ${karte.kleinstes} (Abstand ${knopfAbstand}), ` +
+        `Grundlage ${grundHoehe} (Abstand ${grundAbstand}), ` +
         `Zeitachse ${zeitBeschriftet}, Zeitachse Symbol ${zeitSymbol.kleinstes}`,
     );
   }

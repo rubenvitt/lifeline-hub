@@ -1,6 +1,7 @@
 import { Tooltip } from 'antd';
 import { useId, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { useRollen } from './rollenwerte';
+import { zielEinzug } from './zielEinzug';
 import '../../theme/sprache.css';
 
 /**
@@ -21,6 +22,17 @@ import '../../theme/sprache.css';
  *
  * BEDIENZIEL: jedes Segment ist ein `<button>` ohne antd-Höhe und trägt die ZWEI Angaben aus
  * LFH-365 ({@link segmentStil}). Die Staffel 30 / 48 / 72 gilt, nicht die Entwurfsskizze.
+ *
+ * ZIELABSTAND (LFH-865, Muster LFH-630, Bedien-Leitlinie Kriterium 2): die Fuge bleibt 1 px,
+ * und jedes Segment steht in einer eigenen Rasterzelle (`data-lfh="segment-zelle"`, Grund
+ * `flaeche`), in der es um {@link zielEinzug} (0 / 4 / 8 px) von jedem Rand abrückt — auch oben
+ * und unten, weil die Leiste umbricht. Benachbarte Segmente stehen so in `komfortabel` ≥ 8 px,
+ * in `handschuh` ≥ 16 px auseinander. Die waagerechte Polsterung des Segments sinkt um den
+ * Einzug, die Breite bleibt; die Leiste wird um 2 × Einzug höher, die Treffhöhe bleibt
+ * `controlHeight`. Die Zelle hat `role="none"`: Radiogruppe und Tabliste besitzen ihre Segmente
+ * weiter unmittelbar, Pfeiltasten und roving tabindex bleiben am `<button>`. Aktiv-Fläche,
+ * Hover und Fokus liegen auf dem Segment, nicht auf der Zelle: sie zeigen, wo ein Tippen wirkt,
+ * der Rand bleibt still (wie die Kennzahl, LFH-630 D4).
  *
  * GESPERRT: ein Segment mit `gesperrt` bleibt SICHTBAR und nennt seinen Grund — als Tooltip und
  * als Beschreibung (`aria-describedby`). Es ist `aria-disabled`, nicht `disabled`: ein natives
@@ -44,7 +56,11 @@ export interface SegmentOption<W extends string | number> {
   gesperrt?: string;
 }
 
-/** Geometrie eines Segments — rein und exportiert (Muster `bedienzielStil`). */
+/**
+ * Geometrie eines Segments — rein und exportiert (Muster `bedienzielStil`). Die waagerechte
+ * Polsterung ist `paddingSM` abzüglich des Einzugs der Zelle ({@link segmentZelleStil}): Zelle
+ * und Segment zusammen sind so breit wie ein Segment ohne Einzug.
+ */
 export function segmentStil(token: {
   controlHeight: number;
   paddingSM: number;
@@ -55,9 +71,17 @@ export function segmentStil(token: {
     alignItems: 'center',
     gap: token.marginXS,
     minHeight: token.controlHeight,
-    paddingInline: token.paddingSM,
+    paddingInline: token.paddingSM - zielEinzug(token),
     paddingBlock: 0,
   };
+}
+
+/**
+ * Rasterzelle eines Segments — rein und exportiert. Der Einzug ringsum hält den Zielabstand
+ * (Dateikopf „Zielabstand“); den Grund trägt die Klasse `.lfh-segment-zelle` (`sprache.css`).
+ */
+export function segmentZelleStil(token: { controlHeight: number }): CSSProperties {
+  return { display: 'flex', padding: zielEinzug(token) };
 }
 
 /**
@@ -147,7 +171,6 @@ export default function Segmentleiste<W extends string | number>({
         const beschreibungId = gesperrt ? `${grundId}-${i}` : undefined;
         const knopf = (
           <button
-            key={String(o.wert)}
             ref={(el) => {
               knoepfe.current[i] = el;
             }}
@@ -183,12 +206,16 @@ export default function Segmentleiste<W extends string | number>({
             )}
           </button>
         );
-        return gesperrt ? (
-          <Tooltip key={String(o.wert)} title={o.gesperrt}>
-            {knopf}
-          </Tooltip>
-        ) : (
-          knopf
+        return (
+          <span
+            key={String(o.wert)}
+            role="none"
+            className="lfh-segment-zelle"
+            data-lfh="segment-zelle"
+            style={segmentZelleStil(token)}
+          >
+            {gesperrt ? <Tooltip title={o.gesperrt}>{knopf}</Tooltip> : knopf}
+          </span>
         );
       })}
     </div>
