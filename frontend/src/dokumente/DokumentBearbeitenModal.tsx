@@ -8,7 +8,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import { aendereDokument, type DokumentPatch } from '../api/dokumente';
 import type { Dokument, DokumentKategorie } from '../api/types';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from './kategorien';
-import { bezugAusWert, bezugWert, useBezugOptionen } from './bezug';
+import { bezugAusWert, bezugWert } from './bezug';
+import { useBezugswahl } from './bezugswahl';
 
 interface Props {
   einsatzId: number;
@@ -45,8 +46,10 @@ function zuAenderung(werte: BearbeitenFormular): DokumentPatch {
  * änderbar; dafür bleibt Entfernen und neu Ablegen.
  *
  * Vorbelegt wird beim Öffnen per `setFieldsValue` (kein Reset im Sinne der Erfassungs-Norm).
- * Liegt der aktuelle Bezug nicht in den geladenen Optionen, ergänzt `useBezugOptionen` ihn aus
- * dem Dokument. `mutateAsync`, damit eine Ablehnung die Felder stehen lässt.
+ * Die Bezugswahl ist dieselbe wie beim Ablegen (`useBezugswahl`, LFH-886): ETB-Einträge sucht der
+ * Server, auch per laufender Nummer und jenseits der jüngsten, und die offene Liste steht still.
+ * Liegt der aktuelle Bezug nicht in den geladenen Optionen, ergänzt die Bezugswahl ihn aus dem
+ * Dokument. `mutateAsync`, damit eine Ablehnung die Felder stehen lässt.
  */
 export default function DokumentBearbeitenModal({ einsatzId, dokument, onSchliessen }: Props) {
   const { message } = App.useApp();
@@ -54,11 +57,7 @@ export default function DokumentBearbeitenModal({ einsatzId, dokument, onSchlies
   const [form] = Form.useForm<BearbeitenFormular>();
   const offen = dokument != null;
 
-  const { optionen: bezugOptionen, etbLaedt } = useBezugOptionen(einsatzId, {
-    aktiv: offen,
-    etbLaden: offen,
-    aktuell: dokument,
-  });
+  const bezugswahl = useBezugswahl(einsatzId, { offen, etbLaden: offen, aktuell: dokument });
 
   useEffect(() => {
     if (!dokument) return;
@@ -80,6 +79,7 @@ export default function DokumentBearbeitenModal({ einsatzId, dokument, onSchlies
   });
 
   function schliessen() {
+    bezugswahl.zuruecksetzen();
     mutation.reset();
     onSchliessen();
   }
@@ -118,7 +118,7 @@ export default function DokumentBearbeitenModal({ einsatzId, dokument, onSchlies
         <Input maxLength={200} />
       </Form.Item>
       <Form.Item name="bezug" label="Bezug">
-        <Select allowClear loading={etbLaedt} options={bezugOptionen} />
+        <Select allowClear {...bezugswahl.selectProps} />
       </Form.Item>
     </ErfassungsModal>
   );
