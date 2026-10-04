@@ -10,6 +10,7 @@ Transaktion verteilt werden. Seine Nutzlast MUST nur die Kennung des Einsatzes t
 
 Das Ereignis MUST verteilt werden nach
 - einer erfolgreichen Änderung der Kopfdaten (`PATCH /api/einsaetze/{id}`),
+- einer erfolgreichen Änderung der eigenen Führungsstelle (`PATCH /api/einsaetze/{id}/fuehrungsstelle`),
 - dem Abschluss des Einsatzes (`POST /api/einsaetze/{id}/abschliessen`),
 - dem Setzen, Ändern oder Aufheben der Aufbewahrungsfrist (`PUT /api/einsaetze/{id}/aufbewahrungsfrist`),
 - dem Abschluss einer Lagebesprechung, der den Termin der nächsten Lagebesprechung auf einen
@@ -19,6 +20,10 @@ Das Ereignis MUST verteilt werden nach
 
 #### Scenario: Termin auf der Einsatzdaten-Seite gepflegt
 - **WHEN** eine Person mit Schreibrecht den Termin der nächsten Lagebesprechung per PATCH ändert
+- **THEN** erhält jeder Abonnent des Einsatzes ein Ereignis `einsatz` mit genau der Einsatzkennung als Nutzlast
+
+#### Scenario: Führungsstelle gepflegt
+- **WHEN** eine Person mit Schreibrecht den Rufnamen der Führungsstelle ändert
 - **THEN** erhält jeder Abonnent des Einsatzes ein Ereignis `einsatz` mit genau der Einsatzkennung als Nutzlast
 
 #### Scenario: Einsatz abgeschlossen
@@ -34,7 +39,7 @@ Das Ereignis MUST verteilt werden nach
 - **THEN** wird kein Ereignis `einsatz` verteilt
 
 #### Scenario: Abgelehnte Änderung
-- **WHEN** ein PATCH der Kopfdaten abgelehnt wird (400, 403, 409)
+- **WHEN** ein PATCH der Kopfdaten oder der Führungsstelle abgelehnt wird (400, 403, 409, 422)
 - **THEN** wird kein Ereignis `einsatz` verteilt
 
 #### Scenario: Rolle eines Mitglieds geändert
