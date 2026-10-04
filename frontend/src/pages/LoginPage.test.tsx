@@ -502,6 +502,7 @@ describe('LoginPage', () => {
       aktiv: true,
       erstellt_at: '2026-09-30',
       totp_aktiviert: false,
+      passwort_gesetzt: true,
     };
     const urspruenglicheSecureContext = window.isSecureContext;
 

@@ -50,19 +50,6 @@ export function flaechenKennung<F extends Merkmal>(ziel: Flaechenziel<F>): Flaec
 }
 
 /**
- * Stil eines Menüeintrags: antds Menüeinträge wachsen nicht mit `controlHeight`, also trägt jeder
- * Eintrag die Steuerhöhe der Dichtestufe als Boden (Gate 3, Handschuh 72 px).
+ * Stil eines Menüeintrags: seit LFH-776 die gemeinsame Schale aller Punktmenüs der Karte.
  */
-export function flaechenwahlEintragStil(token: {
-  controlHeight: number;
-  paddingXS: number;
-  paddingSM: number;
-}) {
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    minHeight: token.controlHeight,
-    paddingBlock: token.paddingXS,
-    paddingInline: token.paddingSM,
-  } as const;
-}
+export { punktmenueEintragStil as flaechenwahlEintragStil } from './PunktankerMenue';
