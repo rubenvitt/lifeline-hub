@@ -105,15 +105,15 @@ schon der Funktions-Snapshot sitzt, und jeder Kopplungspfad läuft hindurch. Die
 Demo-Szenario und Dev-Seeds, die Hand-Einträge nachbilden, bekommen ausdrücklich einen Rufnamen
 („Einsatzleitung“ für Von und An), damit sie nicht wie Systemeinträge aussehen.
 
-**Entscheidung offen beim Auftraggeber (Karte im Thread).** Alternativen, die an derselben
-Stelle umsetzbar sind, ohne Specs-Struktur oder Aufgabenschnitt zu ändern:
+**Entschieden vom Auftraggeber am 04.10.2026: Systemkennung.** Verworfene Alternativen, die an
+derselben Stelle umsetzbar gewesen wären:
 - *Rufname des Auslösers:* `einfuegen` liest den Standard des `erfasser_id` aus
   `benutzer_einstellungen`, Rückfall „System“. Liest sich wie Funkverkehr, behauptet aber bei
   Einträgen wie „Ablösung vollzogen“ einen Funkspruch, den es nie gab.
 - *Nur von Hand:* kein Rückfall in `einfuegen`, die Pflicht gilt nur in der Route; die
   Systemszenarien der Spec entfallen.
 
-Empfehlung „System“: ehrlich, eine Zeile Logik, und der Auslöser steht schon in
+Gründe für „System“: ehrlich, eine Zeile Logik, und der Auslöser steht schon in
 `erfasser_id`/`erfasser_funktion`.
 
 ### D6 Pflicht im Server: 400 über `pflicht`

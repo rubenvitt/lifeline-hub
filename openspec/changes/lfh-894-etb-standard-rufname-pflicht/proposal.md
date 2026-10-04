@@ -24,8 +24,8 @@ Das Ergebnis sind lückenhafte Einträge (LFH-894, Anwenderwunsch vom 01.10.2026
   **BREAKING** für API-Aufrufer: `POST /api/einsaetze/{id}/etb` ohne `von` oder `an` ist 400.
 - **Systemeinträge.** Was ein Modul an Von/An kennt (Meldungsabsender, Auftragsadressat),
   bleibt; eine fehlende Seite bekommt die feste Kennung „System“, an einer Stelle für alle
-  Kopplungspfade. *(Empfehlung, Entscheidung beim Auftraggeber angefragt; die Alternativen
-  stehen in `design.md`, D5.)*
+  Kopplungspfade. *(Entscheidung des Auftraggebers vom 04.10.2026; die verworfenen
+  Alternativen stehen in `design.md`, D5.)*
 - **Vorrangregel der An-Vorbelegung** (Führungsstelle → erstes Sachgebiet) belegt nicht mehr
   den Entwurf vor, sondern wird zum ersten Vorschlag der Rufname-Abfrage.
 - **Entwürfe** dürfen weiter ohne Von/An gespeichert werden; die Pflicht greift beim Absenden.
