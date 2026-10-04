@@ -19,7 +19,9 @@ Das Ereignis MUST verteilt werden nach
 - dem Abschluss des Einsatzes (`POST /api/einsaetze/{id}/abschliessen`),
 - dem Setzen, Ändern oder Aufheben der Aufbewahrungsfrist (`PUT /api/einsaetze/{id}/aufbewahrungsfrist`),
 - dem Abschluss einer Lagebesprechung, der den Termin der nächsten Lagebesprechung auf einen
-  **anderen** Wert setzt (auch auf „kein Termin").
+  **anderen** Wert setzt (auch auf „kein Termin"),
+- dem erfolgreichen Setzen, Ändern oder Entfernen einer Mitgliedschaft
+  (`PUT`/`DELETE /api/einsaetze/{id}/mitglieder/{benutzer_id}`, LFH-854).
 
 #### Scenario: Termin auf der Einsatzdaten-Seite gepflegt
 - **WHEN** eine Person mit Schreibrecht den Termin der nächsten Lagebesprechung per PATCH ändert
@@ -44,6 +46,22 @@ Das Ereignis MUST verteilt werden nach
 #### Scenario: Abgelehnte Änderung
 - **WHEN** ein PATCH der Kopfdaten oder der Führungsstelle abgelehnt wird (400, 403, 409, 422)
 - **THEN** wird kein Ereignis `einsatz` verteilt
+
+#### Scenario: Rolle eines Mitglieds geändert
+- **WHEN** die Einsatzleitung ein Mitglied vom Beobachter auf Führungspersonal setzt
+- **THEN** erhalten alle Abonnenten des Einsatzes genau ein Ereignis `einsatz` mit genau der Einsatzkennung als Nutzlast
+
+#### Scenario: Mitglied entfernt
+- **WHEN** die Einsatzleitung ein Mitglied aus dem Einsatz entfernt
+- **THEN** erhalten alle Abonnenten des Einsatzes ein Ereignis `einsatz`
+
+#### Scenario: Abgelehnte Mitgliedschaftsänderung
+- **WHEN** das Herabstufen oder Entfernen der letzten Einsatzleitung (409), das Setzen eines unbekannten Benutzers (404) oder eine Mitgliedschaftsänderung ohne Leitungsrecht (403) abgelehnt wird
+- **THEN** wird kein Ereignis `einsatz` verteilt
+
+#### Scenario: Schreibrecht der betroffenen Person ohne Neuladen
+- **WHEN** die betroffene Person den Einsatz offen hat und die Einsatzleitung sie vom Beobachter auf Führungspersonal setzt
+- **THEN** zeigt ihr Schirm die zuvor gesperrte Primäraktion ohne Neuladen der Seite als frei
 
 ### Requirement: Wer vom Einsatzkopf erfährt
 Das Ereignis `einsatz` MUST jeden Abonnenten erreichen, der den Live-Strom des Einsatzes öffnen darf,
@@ -90,10 +108,11 @@ Stab-GET liefert sie mit. Einen zweiten gespeicherten Termin gibt es nicht.
 - **THEN** behält das Formular die Eingaben von Schirm B
 
 ### Requirement: Bewusst nicht live
-Die benutzerbezogenen Felder des Einsatzkopfs (`meine_rolle`, `meine_fuehrungsstelle`,
-`meine_sachgebiete`, `meine_funktion`) und `lagekennzahlen` SHALL nicht über `einsatz` angestoßen
-werden. Sie werden erst beim nächsten Abruf des Kopfs frisch, auch dann, wenn ein Ereignis
-`einsatz` aus anderem Anlass eintrifft. Eine Stab-Besetzung MUST kein Ereignis `einsatz` auslösen.
+Die benutzerbezogenen Felder des Einsatzkopfs aus der Stab-Besetzung (`meine_sachgebiete`) und
+`lagekennzahlen` SHALL nicht über `einsatz` angestoßen werden. Sie werden erst beim nächsten Abruf
+des Kopfs frisch, auch dann, wenn ein Ereignis `einsatz` aus anderem Anlass eintrifft. Eine
+Stab-Besetzung MUST kein Ereignis `einsatz` auslösen. Die mitgliedschaftsbezogenen Felder
+(`meine_rolle`, `meine_fuehrungsstelle`, `meine_funktion`) werden über die Mitgliedschaftsänderung frisch.
 
 #### Scenario: Besetzung eines Sachgebiets
 - **WHEN** im Stab ein Sachgebiet besetzt wird

@@ -6,7 +6,8 @@
 //!
 //! Seit LFH-854 feuert auch eine Mitgliedschaftsänderung `einsatz`, damit `meine_rolle` (und
 //! mit ihr das Schreibrecht) auf dem Schirm der betroffenen Person ohne Neuladen frisch wird.
-//! Herleitung und Leck-Abwägung: `openspec/changes/lfh-854-rollenwechsel-live/design.md`.
+//! Herleitung und Leck-Abwägung:
+//! `openspec/changes/archive/2026-10-04-lfh-854-rollenwechsel-live/design.md`.
 
 use axum::http::StatusCode;
 use lifeline_hub::live::{LiveEvent, LiveNachricht};

@@ -18,5 +18,9 @@ Jede Aufgabe per `superpowers:test-driven-development` (erst rot, dann grün). R
 
 ## 3. Integration
 
-- [ ] 3.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR`) grün, Log nach „ÜBERSPRUNGEN" durchsehen. Belegt durch die CI des PR (`ci.yml` ruft `check-all.sh`).
-- [ ] 3.2 `/opsx:archive lfh-854-rollenwechsel-live` im selben Branch vor dem PR; den MODIFIED-Block „Bewusst nicht live" gegen den Stand von `alpha` prüfen (LFH-855 ändert dieselbe Anforderung).
+- [x] 3.1 `./scripts/check-all.sh` (eigenes `CARGO_TARGET_DIR`) grün, Log nach „ÜBERSPRUNGEN" durchsehen. Belegt durch die CI des PR (`ci.yml` ruft `check-all.sh`).
+  Lokaler Lauf 04.10.2026 (Cloud-Container): Bündel `rust` mit allen 132 Server-Testbinaries grün,
+  rot nur der Bau der Desktop-Hülle (keine GTK-Bibliotheken im Container); Bündel `schnell` vor dem
+  PR; e2e `einsatzkopf-live.spec.ts` grün (Chromium-Headless 1194 statt 1234). Vitest und die
+  übrige e2e-Suite fährt die CI, der Diff ändert keinen Frontend-Quelltext.
+- [x] 3.2 `/opsx:archive lfh-854-rollenwechsel-live` im selben Branch vor dem PR; den MODIFIED-Block „Bewusst nicht live" gegen den Stand von `alpha` prüfen (LFH-855 ändert dieselbe Anforderung).

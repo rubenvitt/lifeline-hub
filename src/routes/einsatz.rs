@@ -36,8 +36,9 @@ pub(crate) async fn kopf_geaendert(state: &AppState, einsatz_id: i64) {
 /// zusätzlich `betroffene`, auch wenn sie nicht (mehr) Leser sind. `einsatz` geht an jeden
 /// Abonnenten des Stroms; das ist kein Leck, weil die Mitgliederliste mit allen Rollen hinter
 /// derselben Tür liegt (`EinsatzLesezugriff` ohne Modul, Herleitung
-/// `openspec/changes/lfh-854-rollenwechsel-live/design.md`, D2). So wird `meine_rolle` auf dem
-/// Schirm der betroffenen Person ohne Neuladen frisch, und mit ihr das Schreibrecht.
+/// `openspec/changes/archive/2026-10-04-lfh-854-rollenwechsel-live/design.md`, D2). So wird
+/// `meine_rolle` auf dem Schirm der betroffenen Person ohne Neuladen frisch, und mit ihr das
+/// Schreibrecht.
 pub(crate) async fn kopf_geaendert_fuer(state: &AppState, einsatz_id: i64, betroffene: &[i64]) {
     state
         .live
