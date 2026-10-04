@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { abrufZustand, type AbrufZustand } from '../../api/abrufZustand';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
@@ -15,7 +15,10 @@ import { listeLageberichte } from '../../api/lageberichte';
 import { ladeModulZaehler } from '../../api/modulZaehler';
 import { pegelAbfrage } from '../../api/pegel';
 import { einsatzKeys } from '../../api/queryKeys';
+import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import { gesperrt, ladeListe, type Geladen } from '../../lageberichte/uebernahmeQuelle';
+import type { ModulFreigaben } from '../../api/types';
 import type { Rohdaten } from './lagebild';
 
 /** Was jede Ansicht des Lagebilds gleich liefert; die Seitenteile (Pegel-Ziel, Evakuierung)
@@ -28,24 +31,41 @@ interface Optionen {
   mitPegel: boolean;
 }
 
-/**
- * Die modulgebundenen Quellen des Lagebilds und ihr Modul (Schlüssel nach `PFAD_KEY` in
- * `src/einsatz/modul.rs`; die Lageberichte prüfen ihr Modul im Handler).
- */
-const QUELL_MODUL = {
-  personen: 'personen',
-  uhs: 'unfallhilfsstellen',
-  schaeden: 'schaeden',
-  gefahren: 'gefahrenzonen',
-  lageberichte: 'lageberichte',
-  einheiten: 'einheiten',
-  personal: 'personal',
-  fahrzeuge: 'fahrzeuge',
-  material: 'material',
-  abschnitte: 'einsatzabschnitte',
-} as const;
+/** Eine modulgebundene Liste des Lagebilds: ihr Modul, ihr Key, ihr Abruf. */
+function quelle<T>(
+  modul: string,
+  key: (einsatzId: number) => readonly unknown[],
+  abruf: (einsatzId: number) => Promise<T[]>,
+) {
+  return { modul, key, abruf };
+}
 
-export type GebundeneQuelle = keyof typeof QUELL_MODUL;
+/**
+ * Die modulgebundenen Quellen des Lagebilds mit Modul (Schlüssel nach `PFAD_KEY` in
+ * `src/einsatz/modul.rs`; die Lageberichte prüfen ihr Modul im Handler), Key und Abruf. EINE
+ * Beschreibung für den Hook (Dashboard, Vorbereitung) und den Abruf beim Klick
+ * (`ladeLagebasis`, Übernahme in den Lagevortrag, LFH-869): gleiche Listen, gleiche Keys, gleicher
+ * Cache.
+ */
+export const LAGEBILD_QUELLEN = {
+  personen: quelle('personen', einsatzKeys.personen, (id) => listePersonen(id)),
+  uhs: quelle('unfallhilfsstellen', einsatzKeys.uhs, listeUhs),
+  schaeden: quelle('schaeden', einsatzKeys.schaeden, listeSchaeden),
+  gefahren: quelle('gefahrenzonen', einsatzKeys.gefahrengebiete, ladeGefahrengebiete),
+  lageberichte: quelle('lageberichte', einsatzKeys.lageberichte, listeLageberichte),
+  einheiten: quelle('einheiten', einsatzKeys.einheiten, listeEinheiten),
+  personal: quelle('personal', einsatzKeys.personal, listeEinsatzPersonal),
+  fahrzeuge: quelle('fahrzeuge', einsatzKeys.fahrzeuge, listeEinsatzFahrzeuge),
+  material: quelle('material', einsatzKeys.material, listeEinsatzMaterial),
+  abschnitte: quelle('einsatzabschnitte', einsatzKeys.abschnitte, listeAbschnitte),
+};
+
+export type GebundeneQuelle = keyof typeof LAGEBILD_QUELLEN;
+
+/** Ist die Liste für die Person frei? Ohne bekannte Freigaben nie. */
+export function quelleFrei(quelle: GebundeneQuelle, freigaben: ModulFreigaben | undefined) {
+  return istKeyFreigegeben(LAGEBILD_QUELLEN[quelle].modul, freigaben);
+}
 
 /**
  * Die Quellen des Lagebilds — EINE Zusammenstellung für Lage-Dashboard und die Vorbereitung der
@@ -73,60 +93,60 @@ export function useLagebild(einsatzId: number, { mitPegel }: Optionen) {
   const freigaben = freigabenQuery.data;
   // Ausfall nur ohne verwertbaren Stand: scheitert ein Neuabruf, bleiben die alten Freigaben gültig.
   const freigabenFehler = freigabenQuery.isError && freigaben === undefined;
-  const frei = (quelle: GebundeneQuelle) => istKeyFreigegeben(QUELL_MODUL[quelle], freigaben);
+  const frei = (quelle: GebundeneQuelle) => quelleFrei(quelle, freigaben);
 
   const einsatz = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const personen = useQuery({
-    queryKey: einsatzKeys.personen(einsatzId),
-    queryFn: () => listePersonen(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.personen.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.personen.abruf(einsatzId),
     enabled: frei('personen'),
   });
   const uhs = useQuery({
-    queryKey: einsatzKeys.uhs(einsatzId),
-    queryFn: () => listeUhs(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.uhs.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.uhs.abruf(einsatzId),
     enabled: frei('uhs'),
   });
   const schaeden = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.schaeden.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.schaeden.abruf(einsatzId),
     enabled: frei('schaeden'),
   });
   const gefahren = useQuery({
-    queryKey: einsatzKeys.gefahrengebiete(einsatzId),
-    queryFn: () => ladeGefahrengebiete(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.gefahren.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.gefahren.abruf(einsatzId),
     enabled: frei('gefahren'),
   });
   const lageberichte = useQuery({
-    queryKey: einsatzKeys.lageberichte(einsatzId),
-    queryFn: () => listeLageberichte(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.lageberichte.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.lageberichte.abruf(einsatzId),
     enabled: frei('lageberichte'),
   });
   const einheiten = useQuery({
-    queryKey: einsatzKeys.einheiten(einsatzId),
-    queryFn: () => listeEinheiten(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.einheiten.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.einheiten.abruf(einsatzId),
     enabled: frei('einheiten'),
   });
   const personal = useQuery({
-    queryKey: einsatzKeys.personal(einsatzId),
-    queryFn: () => listeEinsatzPersonal(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.personal.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.personal.abruf(einsatzId),
     enabled: frei('personal'),
   });
   const fahrzeuge = useQuery({
-    queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.fahrzeuge.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.fahrzeuge.abruf(einsatzId),
     enabled: frei('fahrzeuge'),
   });
   const material = useQuery({
-    queryKey: einsatzKeys.material(einsatzId),
-    queryFn: () => listeEinsatzMaterial(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.material.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.material.abruf(einsatzId),
     enabled: frei('material'),
   });
   const abschnitte = useQuery({
-    queryKey: einsatzKeys.abschnitte(einsatzId),
-    queryFn: () => listeAbschnitte(einsatzId),
+    queryKey: LAGEBILD_QUELLEN.abschnitte.key(einsatzId),
+    queryFn: () => LAGEBILD_QUELLEN.abschnitte.abruf(einsatzId),
     enabled: frei('abschnitte'),
   });
   const pegel = useQuery({ ...pegelAbfrage(einsatzId), enabled: mitPegel });
@@ -221,7 +241,7 @@ export function useLagebild(einsatzId: number, { mitPegel }: Optionen) {
 
   /** Datenstand je Quelle; eine gesperrte zählt nicht (0 fällt aus `gemeinsamerDatenstand`). */
   const stand = (quelle: keyof typeof q): number =>
-    quelle in QUELL_MODUL && !frei(quelle as GebundeneQuelle) ? 0 : q[quelle].dataUpdatedAt;
+    quelle in LAGEBILD_QUELLEN && !frei(quelle as GebundeneQuelle) ? 0 : q[quelle].dataUpdatedAt;
 
   /**
    * „Erneut abrufen" einer gebundenen Quelle. Fehlen die Freigaben, werden sie neu gefragt — die
@@ -233,4 +253,73 @@ export function useLagebild(einsatzId: number, { mitPegel }: Optionen) {
   };
 
   return { q, zustand, basis, daten, stand, nachladen };
+}
+
+/** Ergebnis von `ladeLagebasis`: Zustand nur für die geladenen Quellen. */
+export interface GeladeneLagebasis {
+  /** `null`, solange bzw. wenn der Einsatz fehlt. */
+  basis: Lagebasis | null;
+  zustand: Partial<Record<GebundeneQuelle | 'pegel', AbrufZustand>> & { einsatz: AbrufZustand };
+  /** Ältester Abruf der gelesenen Listen (ms seit Epoche); `undefined`, wenn keine Daten kamen. */
+  stand: number | undefined;
+}
+
+/**
+ * Dieselbe Zusammenstellung wie `useLagebild`, aber beim Klick (`fetchQuery`, gemeinsamer Cache):
+ * für die Übernahme in den Lagevortrag (LFH-869, design.md D1). Geladen werden nur `quellen`; eine
+ * gesperrte wird nicht angefragt und steht als `gesperrt`, eine gescheiterte als `fehler`. Nicht
+ * geladene Listen gehen wie im Hook als `[]` in die Basis — ob eine Zahl gilt, sagt `zustand`.
+ */
+export async function ladeLagebasis(
+  qc: QueryClient,
+  einsatzId: number,
+  freigaben: ModulFreigaben,
+  { quellen, mitPegel }: { quellen: readonly GebundeneQuelle[]; mitPegel: boolean },
+): Promise<GeladeneLagebasis> {
+  const lade = (q: GebundeneQuelle): Promise<Geladen<unknown[]>> =>
+    quelleFrei(q, freigaben)
+      ? ladeListe<unknown[]>(
+          qc,
+          LAGEBILD_QUELLEN[q].key(einsatzId),
+          () => LAGEBILD_QUELLEN[q].abruf(einsatzId),
+          [],
+        )
+      : Promise.resolve(gesperrt<unknown[]>([]));
+  const pegelAbruf = pegelAbfrage(einsatzId);
+  const [einsatz, pegel, ...listen] = await Promise.all([
+    ladeListe(qc, einsatzKeys.einsatz(einsatzId), () => ladeEinsatz(einsatzId), null),
+    mitPegel ? ladeListe(qc, pegelAbruf.queryKey, pegelAbruf.queryFn, []) : Promise.resolve(null),
+    ...quellen.map(lade),
+  ]);
+  const geladen = new Map(quellen.map((q, i) => [q, listen[i]]));
+  const daten = <Q extends GebundeneQuelle>(q: Q) =>
+    (geladen.get(q)?.daten ?? []) as Awaited<ReturnType<(typeof LAGEBILD_QUELLEN)[Q]['abruf']>>;
+
+  const zustand: GeladeneLagebasis['zustand'] = { einsatz: einsatz.zustand };
+  for (const [q, g] of geladen) zustand[q] = g.zustand;
+  if (pegel) zustand.pegel = pegel.zustand;
+
+  const staende = [...geladen.values(), ...(pegel ? [pegel] : [])].map((g) => g.stand ?? 0);
+  const stand = gemeinsamerDatenstand(...staende) || undefined;
+
+  return {
+    basis: einsatz.daten
+      ? {
+          einsatz: einsatz.daten,
+          personen: daten('personen'),
+          uhs: daten('uhs'),
+          schaeden: daten('schaeden'),
+          gefahren: daten('gefahren'),
+          lageberichte: daten('lageberichte'),
+          einheiten: daten('einheiten'),
+          personal: daten('personal'),
+          fahrzeuge: daten('fahrzeuge'),
+          material: daten('material'),
+          abschnitte: daten('abschnitte'),
+          pegel: pegel?.daten ?? [],
+        }
+      : null,
+    zustand,
+    stand,
+  };
 }

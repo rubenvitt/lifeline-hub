@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MEDIENLAGE_QUELLE } from '../stab/medienlageUebernahme';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
+import { FUEHRUNGSPROBLEME_QUELLE } from './fuehrungsproblemeUebernahme';
 import { UEBERNAHMEN, uebernahmeFuer } from './uebernahmen';
 import { VORLAGEN, vorlage } from './vorlagen';
 
@@ -9,6 +10,12 @@ describe('Zuordnung Abschnitt → Quelle (LFH-870)', () => {
     expect(uebernahmeFuer('lagebericht', 'eigene_lage')).toBe(EIGENE_LAGE_QUELLE);
     expect(uebernahmeFuer('lagebericht', 'medienlage')).toBe(MEDIENLAGE_QUELLE);
     expect(uebernahmeFuer('lagebericht', 'auftrag')).toBeUndefined();
+  });
+
+  it('bindet die weiteren Abschnitte des Lagevortrags zur Information an (LFH-869)', () => {
+    expect(uebernahmeFuer('lagebericht', 'fuehrungsprobleme')).toBe(FUEHRUNGSPROBLEME_QUELLE);
+    for (const ohne of ['auftrag', 'antraege_vorschlaege', 'zusammenfassung'])
+      expect(uebernahmeFuer('lagebericht', ohne)).toBeUndefined();
   });
 
   it('lässt den Lagevortrag zur Entscheidung und den freien Bericht von Hand', () => {
