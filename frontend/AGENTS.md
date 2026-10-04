@@ -115,7 +115,12 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
   das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
   `SPALTE_MIN_PX` gemessen, tiefer senkrecht), geteilt mit der Fernmeldeskizze — keine
-  Graph-Bibliothek, kein zweites Gerüst.
+  Graph-Bibliothek, kein zweites Gerüst. **Live-Zufluss nur über die Schleuse des Gerüsts**
+  (LFH-867, `components/organigramm/baumSchleuse.ts`,
+  `openspec/changes/archive/2026-10-04-lfh-867-organigramm-zufluss-schleuse/design.md`): Zeiger
+  (ohne Touch) oder Fokus im Baum halten Menge, Ort und Folge der Knoten, Inhalt fließt;
+  Entfallenes bleibt als Platzhalter ohne Link, der Kopf steht still; Banner in der Standzeile
+  fester Höhe; im Druck gilt sie nicht. Kein Nutzer baut eine eigene.
 - `Datensicht` bricht fest bei `md`; die Prop `tabelleAb` hält `datensicht.guard.test.ts` fern.
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
   (`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`).
@@ -335,13 +340,14 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 31 am 02.10.2026, LFH-751); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 32 am 04.10.2026, LFH-881); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4,
   `schwaerzungsantragStand` in
   `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md` D9, `capSchwere` in
-  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
+  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5,
+  `pegelZustand` in `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D2). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
   der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
 
 **Farbe und Zeichen**

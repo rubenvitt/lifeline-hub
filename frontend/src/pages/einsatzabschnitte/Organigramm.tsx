@@ -70,13 +70,16 @@ interface BildProps {
   onUmschalten: (key: string) => void;
 }
 
-/** Reine Darstellung — der Klappzustand und die Stabsstelle kommen von außen. */
-export function OrganigrammBild({ einsatzId, org, stab, zugeklappt, onUmschalten }: BildProps) {
+/**
+ * Einsatzleitung, daneben (unter `md` darunter) die Stabsstelle. Eigene Komponente: die Schleuse des
+ * Gerüsts (LFH-867) hält das Element mit seinem Inhalt, die Anordnung folgt der Breite trotzdem —
+ * `useViewport` rendert das gehaltene Element bei einem Wechsel neu.
+ */
+function OrganigrammKopf({ stab }: { stab: StabsstelleZustand }) {
   const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const breit = abBreite('md');
   const linie = `1px solid ${rollen.linieStark}`;
-
   const kasten: CSSProperties = {
     border: linie,
     background: rollen.paneel,
@@ -84,8 +87,7 @@ export function OrganigrammBild({ einsatzId, org, stab, zugeklappt, onUmschalten
     minWidth: 0,
   };
 
-  // ── Kopf: Einsatzleitung, daneben (unter `md` darunter) die Stabsstelle ──
-  const kopf = (
+  return (
     <div
       style={{
         display: 'flex',
@@ -125,12 +127,17 @@ export function OrganigrammBild({ einsatzId, org, stab, zugeklappt, onUmschalten
       )}
     </div>
   );
+}
+
+/** Reine Darstellung — der Klappzustand und die Stabsstelle kommen von außen. */
+export function OrganigrammBild({ einsatzId, org, stab, zugeklappt, onUmschalten }: BildProps) {
+  const { token } = useRollen();
 
   return (
     <HaengenderBaum<OrgKnoten>
       bezeichnung="Organigramm"
       lfh="organigramm"
-      kopf={kopf}
+      kopf={<OrganigrammKopf stab={stab} />}
       wurzeln={org.wurzeln}
       zugeklappt={zugeklappt}
       onUmschalten={onUmschalten}
