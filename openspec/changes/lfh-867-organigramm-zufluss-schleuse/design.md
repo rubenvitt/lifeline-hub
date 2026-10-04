@@ -106,8 +106,9 @@ ganzen Baum. Der Kopf wird nicht gezählt (das Gerüst kennt seinen Inhalt nicht
 
 **Standzeile** zwischen Kopf und erster Ebene, im Bereich: „Live“, „Live pausiert“ oder der
 `Sammelbanner` mit „anzeigen“. Feste Höhe = Höhe des Sammelbanners (Knopf `controlHeight` +
-`2 × paddingXS` + Rand, wie `BetroffeneKarte`). Unter `md` die Kurzform `sammelbannerKurz`
-(LFH-694). Wortlaut: nur Teile über 0, feste Folge, „2 neu · 1 umgehängt · 1 entfallen“; nur der
+`2 × paddingXS` + Rand, wie `BetroffeneKarte`). Der Text des Banners bleibt einzeilig und endet
+schmal mit „…“ (voller Satz im `title` und im Statusbereich), wie in `BetroffeneKarte`; die
+Kurzform `sammelbannerKurz` (LFH-694) sagt „n neu“ und passte nicht zu „umgehängt“. Wortlaut: nur Teile über 0, feste Folge, „2 neu · 1 umgehängt · 1 entfallen“; nur der
 Banner trägt `role="status"`.
 
 Verworfen: Überlagerung mit Nullhöhe (ETB). Sie deckte die oberste Zeile ab, also womöglich genau
@@ -119,8 +120,8 @@ Knopf taute auf.
 
 Im Druck gilt die Schleuse nicht: das Gerüst liest `useDruckModus()` und zeichnet bei `druckt`
 den frischen Baum und den frischen Kopf. `beforeprint` setzt den Zustand per `flushSync`, der Knopf
-(`useDrucken`) und Strg+P laufen beide darüber. Die Standzeile trägt eine Klasse, die
-`haengenderBaumPrint.css` ausblendet. Die Übernahme in den Lagebericht liest schon heute das
+(`useDrucken`) und Strg+P laufen beide darüber. Die Standzeile (`data-lfh="org-stand"`)
+blendet `haengenderBaumPrint.css` aus. Die Übernahme in den Lagebericht liest schon heute das
 frische Modell der Seite (`rendereFuehrungsorganisationMarkdown(org, …)`), daran ändert sich
 nichts.
 
@@ -130,8 +131,8 @@ Die Prüfliste des Kommunikationsplans (LFH-848) verweist für Tabelle, Skizze u
 Sprechgruppen-Tabelle ebenfalls auf LFH-867. Die Skizze ist das Gerüst und damit hier erledigt.
 Die beiden Tabellen sind `Datensicht`-Bäume: deren Schleuse friert nur die oberste Ebene ein (ein
 neues Kind springt), und sie kennt keinen Zeiger. Das ist eine Änderung an der `Datensicht` mit
-eigenen Guards und allen Listen als Nutzern. Vorschlag: eigenes Ticket, das LFH-848-Verdikt zeigt
-danach dorthin.
+eigenen Guards und allen Listen als Nutzern. Entschieden am 04.10.2026: eigenes Ticket
+[LFH-1020](https://app.clickup.com/t/123zgec6jkz); das LFH-848-Verdikt zeigt dorthin.
 
 ### D7 Nachweise
 

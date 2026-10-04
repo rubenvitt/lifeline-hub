@@ -1,0 +1,88 @@
+import type { BaumKnoten } from './baum';
+
+/**
+ * Die Zufluss-Schleuse des hängenden Gerüsts (LFH-867, Herleitung
+ * `openspec/changes/lfh-867-organigramm-zufluss-schleuse/design.md`, D1/D3) — rein, ohne React.
+ * Gegenstück der Zeilenschleuse in `components/Datensicht.tsx` und der Kartenschleuse in
+ * `personen/kartenSchleuse.ts`.
+ *
+ * - **Gehalten** wird die Struktur: welche Knoten, unter welchem Elternknoten, in welcher Folge.
+ * - **Der Inhalt fließt**: je Schlüssel steht der frische Knoten da, nur mit den gehaltenen
+ *   Kindern. Name, Stärke, Sprechgruppen sind nie älter als die Liste.
+ * - **Entfallenes bleibt stehen**, anders als in der Datensicht: im Spalten-Grid der ersten Ebene
+ *   rückte sonst alles dahinter um eine Stelle vor. Der gehaltene Knoten steht mit letztem Inhalt
+ *   und seinem Schlüssel in `entfallen`; was er zeichnet, entscheidet das Gerüst.
+ */
+export interface Wartend {
+  neu: number;
+  umgehaengt: number;
+  entfallen: number;
+}
+
+export interface SchleusenStand<K> {
+  gezeigt: readonly K[];
+  wartend: Wartend;
+  /** Schlüssel gehaltener Knoten, die im frischen Baum fehlen. */
+  entfallen: ReadonlySet<string>;
+}
+
+const NICHTS: Wartend = { neu: 0, umgehaengt: 0, entfallen: 0 };
+const KEINE: ReadonlySet<string> = new Set();
+
+/** Elternschlüssel je Knoten; `null` an der Wurzel. */
+function elternVon<K extends BaumKnoten<K>>(
+  knoten: readonly K[],
+  eltern: string | null = null,
+  m = new Map<string, { knoten: K; eltern: string | null }>(),
+) {
+  for (const k of knoten) {
+    m.set(k.key, { knoten: k, eltern });
+    elternVon(k.kinder, k.key, m);
+  }
+  return m;
+}
+
+/** `gehalten === null` heißt: die Schleuse ist offen, `frisch` geht unverändert durch. */
+export function schleuse<K extends BaumKnoten<K>>(
+  gehalten: readonly K[] | null,
+  frisch: readonly K[],
+): SchleusenStand<K> {
+  if (gehalten === null) return { gezeigt: frisch, wartend: NICHTS, entfallen: KEINE };
+
+  const frischNach = elternVon(frisch);
+  const gehaltenNach = elternVon(gehalten);
+  const entfallen = new Set<string>();
+
+  const bau = (alt: K): K => {
+    const kinder = alt.kinder.map(bau);
+    const neu = frischNach.get(alt.key);
+    if (!neu) entfallen.add(alt.key);
+    return { ...(neu ? neu.knoten : alt), kinder } as K;
+  };
+  const gezeigt = gehalten.map(bau);
+
+  let neu = 0;
+  let umgehaengt = 0;
+  for (const [key, f] of frischNach) {
+    const alt = gehaltenNach.get(key);
+    if (!alt) neu += 1;
+    else if (alt.eltern !== f.eltern) umgehaengt += 1;
+  }
+
+  return {
+    gezeigt,
+    wartend:
+      neu || umgehaengt || entfallen.size ? { neu, umgehaengt, entfallen: entfallen.size } : NICHTS,
+    entfallen,
+  };
+}
+
+/** Der Wortlaut des Sammelbanners: nur Teile über 0, in fester Folge; ohne Wartendes `null`. */
+export function wartendText(w: Wartend): string | null {
+  const teile = [
+    w.neu > 0 ? `${w.neu} neu` : null,
+    w.umgehaengt > 0 ? `${w.umgehaengt} umgehängt` : null,
+    w.entfallen > 0 ? `${w.entfallen} entfallen` : null,
+  ].filter((t): t is string => t !== null);
+  return teile.length > 0 ? teile.join(' · ') : null;
+}

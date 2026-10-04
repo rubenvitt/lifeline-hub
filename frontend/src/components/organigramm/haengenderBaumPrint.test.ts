@@ -38,6 +38,12 @@ describe('haengenderBaumPrint.css', () => {
     );
   });
 
+  it('blendet die Standzeile der Schleuse aus (LFH-867)', () => {
+    expect(regelKoerper(".haengender-baum [data-lfh='org-stand']")).toMatch(
+      /display:\s*none\s*!important/,
+    );
+  });
+
   it('setzt A4 auf zwei feste Spalten', () => {
     expect(regelKoerper(".haengender-baum [data-lfh='org-ebene1']")).toMatch(
       /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)\s*!important/,

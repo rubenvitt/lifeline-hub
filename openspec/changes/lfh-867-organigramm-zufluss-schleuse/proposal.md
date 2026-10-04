@@ -36,7 +36,7 @@ Für Listen und die Betroffenen-Karte hat das Projekt die Antwort schon: die Zei
 
 - Die Baumtabellen der `Datensicht` (Funkplan-Tabelle, Kommunikationsplan): ihre Schleuse hält
   nur die oberste Ebene, und sie reagiert nur auf den Fokus, nicht auf den Zeiger. Die Prüfliste
-  LFH-848 verweist dafür ebenfalls auf LFH-867. Vorschlag: eigenes Ticket (s. design.md D6).
+  LFH-848 verweist dafür ebenfalls auf LFH-867. Eigenes Ticket [LFH-1020](https://app.clickup.com/t/123zgec6jkz) (design.md D6).
 
 ## Capabilities
 

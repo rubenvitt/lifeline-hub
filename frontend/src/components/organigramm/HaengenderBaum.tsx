@@ -1,8 +1,19 @@
 import { Button } from 'antd';
-import type { CSSProperties, ReactNode } from 'react';
-import { useRollen } from '../instrument';
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
+import { Sammelbanner, useRollen } from '../instrument';
+import { useDruckModus } from '../druck/useDruckModus';
 import { IconChevronRechts, IconChevronRunter } from '../../icons';
 import type { BaumKnoten } from './baum';
+import { schleuse, wartendText } from './baumSchleuse';
 import './haengenderBaumPrint.css';
 
 /**
@@ -16,8 +27,17 @@ import './haengenderBaumPrint.css';
  * noch Inhalt; Druckregeln in `haengenderBaumPrint.css`. Die `data-lfh`-Namen (`org-…`) tragen
  * Gates und e2e beider Nutzer.
  *
+ * ZUFLUSS-SCHLEUSE (LFH-867, Kriterium 12, WCAG 3.2.5): solange Maus oder Stift über dem Baum
+ * liegen oder der Fokus darin steht, hält das Gerüst Menge, Ort und Folge der Knoten
+ * (`baumSchleuse.ts`); der Inhalt fließt. Neu, umgehängt und entfallen wartet im Sammelbanner der
+ * Standzeile fester Höhe zwischen Kopf und erster Ebene. Entfallenes bleibt als Platzhalter ohne
+ * Link stehen, der Kopf steht still (eine neue Stabszeile schöbe sonst den ganzen Baum). Der
+ * Bereich ist die ganze `section` samt Standzeile: der Weg zum Banner taut nicht auf. Touch zählt
+ * nur über den Fokus. Im Druck gilt die Schleuse nicht (`useDruckModus`).
+ *
  * Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`
- * (D3, D6) und `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` (D4).
+ * (D3, D6), `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` (D4) und
+ * `openspec/changes/lfh-867-organigramm-zufluss-schleuse/design.md`.
  */
 
 /** Mindestbreite einer Spalte der ersten Ebene; gemessen vor dem Bau (LFH-626 D3, Nachtrag). */
@@ -58,22 +78,145 @@ interface Props<K extends BaumKnoten<K>> {
 export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>) {
   const { bezeichnung, lfh, kopf, wurzeln } = props;
   const { token, rollen } = useRollen();
+  const druckt = useDruckModus();
+  const bereichRef = useRef<HTMLElement>(null);
+  const standRef = useRef<HTMLDivElement>(null);
+
+  // ── Schleuse (LFH-867) ─────────────────────────────────────────────────────────────
+  // `gehalten === null`: offen. Geschlossen wird mit dem gerade gezeigten Stand — bei offener
+  // Schleuse ist das der frische.
+  const [gehalten, setGehalten] = useState<{ wurzeln: readonly K[]; kopf: ReactNode } | null>(null);
+  const frischRef = useRef({ wurzeln, kopf });
+  frischRef.current = { wurzeln, kopf };
+  const bedingungRef = useRef({ zeiger: false, fokus: false });
+  const setzeBedingung = (art: 'zeiger' | 'fokus', wert: boolean) => {
+    const b = { ...bedingungRef.current, [art]: wert };
+    bedingungRef.current = b;
+    // Ein leerer Baum schließt nicht: ohne Knoten rückt nichts, und der erste Zugang soll nicht
+    // hinter dem Banner landen (wie die `Datensicht`).
+    setGehalten((vorher) =>
+      b.zeiger || b.fokus
+        ? (vorher ?? (frischRef.current.wurzeln.length > 0 ? frischRef.current : null))
+        : null,
+    );
+  };
+  // Touch zählt nicht: ein Tipp betritt und verlässt den Bereich; nach dem Tipp hält der Fokus.
+  const zeigerRein = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch') setzeBedingung('zeiger', true);
+  };
+  // Erscheint der Baum unter einem ruhenden Zeiger, meldet der Browser beim nächsten Bewegen kein
+  // `pointerenter`. Die erste Bewegung holt es nach (LFH-668).
+  const zeigerBewegt = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' && !bedingungRef.current.zeiger) setzeBedingung('zeiger', true);
+  };
+  const zeigerRaus = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch') setzeBedingung('zeiger', false);
+  };
+  // Jeder Fokus hält, auch einer per Klick auf ein Klappziel: er sitzt auf einem echten Bedienziel
+  // (Verhalten der `Datensicht`; design.md D2).
+  const fokusRein = () => setzeBedingung('fokus', true);
+  // `blur` feuert auch beim Wechsel zwischen zwei Zielen des Bereichs — nur ein Ziel außerhalb taut.
+  const fokusRaus = (e: FocusEvent) => {
+    const ziel = e.relatedTarget;
+    if (ziel instanceof Node && bereichRef.current?.contains(ziel)) return;
+    setzeBedingung('fokus', false);
+  };
+  /**
+   * Sicherheitsnetz: entfernt ein Render den fokussierten Knoten, meldet WebKit kein `focusout`,
+   * das hier ankäme — die Fokus-Bedingung hinge, und der Baum bliebe gehalten. Nach jedem Render:
+   * liegt der Fokus nicht mehr im Bereich, gilt er als gegangen.
+   */
+  useLayoutEffect(() => {
+    if (bedingungRef.current.fokus && !bereichRef.current?.contains(document.activeElement)) {
+      setzeBedingung('fokus', false);
+    }
+  });
+
+  const offen = druckt || gehalten === null;
+  const stand = useMemo(
+    () => schleuse(offen ? null : gehalten.wurzeln, wurzeln),
+    [offen, gehalten, wurzeln],
+  );
+  const gezeigterKopf = offen ? kopf : gehalten.kopf;
+  const wartet = wartendText(stand.wartend);
+
+  /**
+   * Feste Höhe = die des Sammelbanners (Knopf `controlHeight` + Innenabstand + Rand): der Wechsel
+   * zwischen „Live", „Live pausiert" und dem Banner verschiebt den Baum nicht. Nur der Banner
+   * trägt `role="status"` — die ruhigen Texte wechselten beim bloßen Überfahren.
+   */
+  const standzeile = (
+    <div
+      ref={standRef}
+      tabIndex={-1}
+      data-lfh="org-stand"
+      style={{
+        height: token.controlHeight + 2 * token.paddingXS + 2,
+        marginBlockStart: token.marginSM,
+        display: 'flex',
+      }}
+    >
+      {wartet !== null ? (
+        <Sammelbanner
+          aktion={{
+            label: 'anzeigen',
+            // Der Knopf verschwindet gleich; der Fokus bleibt im Bereich (Standzeile), statt auf
+            // `body` zu fallen (WCAG 2.4.3), und ein späteres Verlassen erzeugt ein `focusout`.
+            onKlick: () => {
+              standRef.current?.focus({ preventScroll: true });
+              setGehalten(frischRef.current);
+            },
+          }}
+          style={{ flex: '1 1 auto', minWidth: 0, flexWrap: 'nowrap', boxSizing: 'border-box' }}
+        >
+          <span
+            title={wartet}
+            style={{
+              display: 'block',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {wartet}
+          </span>
+        </Sammelbanner>
+      ) : (
+        <span style={{ alignSelf: 'center', fontSize: token.fontSizeSM, color: rollen.gedaempft }}>
+          {offen ? 'Live' : 'Live pausiert'}
+        </span>
+      )}
+    </div>
+  );
+
+  const zweigProps = { ...props, entfallen: stand.entfallen };
   return (
-    <section aria-label={bezeichnung} data-lfh={lfh} className="haengender-baum">
-      {kopf}
-      {wurzeln.length > 0 && (
+    <section
+      ref={bereichRef}
+      aria-label={bezeichnung}
+      data-lfh={lfh}
+      className="haengender-baum"
+      onPointerEnter={zeigerRein}
+      onPointerMove={zeigerBewegt}
+      onPointerLeave={zeigerRaus}
+      onFocus={fokusRein}
+      onBlur={fokusRaus}
+    >
+      {gezeigterKopf}
+      {standzeile}
+      {stand.gezeigt.length > 0 && (
         <ul
           data-lfh="org-ebene1"
           style={{
             listStyle: 'none',
-            margin: `${token.marginLG}px 0 0`,
+            margin: `${token.marginSM}px 0 0`,
             padding: 0,
             display: 'grid',
             gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${SPALTE_MIN_PX}px), 1fr))`,
             gap: token.margin,
           }}
         >
-          {wurzeln.map((k) => (
+          {stand.gezeigt.map((k) => (
             <li
               key={k.key}
               data-lfh="org-spalte"
@@ -83,7 +226,7 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
                 minWidth: 0,
               }}
             >
-              <Zweig {...props} knoten={k} tiefe={0} />
+              <Zweig {...zweigProps} knoten={k} tiefe={0} />
             </li>
           ))}
         </ul>
@@ -93,8 +236,14 @@ export default function HaengenderBaum<K extends BaumKnoten<K>>(props: Props<K>)
 }
 
 /** Ein Knoten mit seinen Kindern, senkrecht darunter. */
-function Zweig<K extends BaumKnoten<K>>(props: Props<K> & { knoten: K; tiefe: number }) {
-  const { knoten, tiefe, zugeklappt, onUmschalten, knotenName, gruppe, inhalt } = props;
+type ZweigProps<K extends BaumKnoten<K>> = Props<K> & {
+  entfallen: ReadonlySet<string>;
+  knoten: K;
+  tiefe: number;
+};
+
+function Zweig<K extends BaumKnoten<K>>(props: ZweigProps<K>) {
+  const { knoten, tiefe, zugeklappt, onUmschalten, knotenName, gruppe, inhalt, entfallen } = props;
   const { token, rollen } = useRollen();
   const offen = !zugeklappt.has(knoten.key);
   const kinderId = `org-kinder-${knoten.key}`;
@@ -125,7 +274,27 @@ function Zweig<K extends BaumKnoten<K>>(props: Props<K> & { knoten: K; tiefe: nu
           style={{ flex: `0 0 ${token.controlHeight}px` }}
         />
       )}
-      {inhalt(knoten, tiefe)}
+      {entfallen.has(knoten.key) ? (
+        // Platzhalter des Gerüsts, nicht des Aufrufers: kein Link auf einen gelöschten Datensatz.
+        // Als Wort, nicht nur als Farbe (WCAG 1.4.1).
+        <div
+          data-lfh="org-entfallen"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: token.marginXS,
+            minHeight: token.controlHeight,
+            minWidth: 0,
+            color: rollen.gedaempft,
+          }}
+        >
+          <span style={{ overflowWrap: 'anywhere' }}>{knotenName(knoten)}</span>
+          <span>entfallen</span>
+        </div>
+      ) : (
+        inhalt(knoten, tiefe)
+      )}
     </div>
   );
 
