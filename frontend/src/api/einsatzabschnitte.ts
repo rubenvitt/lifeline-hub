@@ -40,6 +40,22 @@ export function aktualisiereAbschnitt(
   return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}`, 'PATCH', daten);
 }
 
+/**
+ * Teiländerung eines Abschnitts (LFH-306, Tri-State): nur die übergebenen Schlüssel gehen hinaus,
+ * `null` leert. Für Einzelfelder ohne Formular, etwa Rufname und Kommunikationsmittel aus der
+ * Fernmeldeskizze (LFH-893) — ein mitgeschickter Name aus einem älteren Stand überschriebe eine
+ * gleichzeitige Umbenennung.
+ */
+export type AbschnittPatch = Partial<AbschnittEingabe>;
+
+export function patcheAbschnitt(
+  einsatzId: number,
+  aid: number,
+  patch: AbschnittPatch,
+): Promise<Einsatzabschnitt> {
+  return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}`, 'PATCH', patch);
+}
+
 export function loeseAbschnittAuf(einsatzId: number, aid: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}`, 'DELETE');
 }

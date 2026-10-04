@@ -264,6 +264,59 @@ A3 (J.5). Das SVG skaliert über `viewBox` auf die Seite, ohne Bedienelemente, H
 Filter; das Schriftfeld steht unten rechts. Die Funkplan-Tabelle folgt ab einer neuen Seite als
 Anlage. Graustufen: Linienart, Muster und Wort tragen jede Unterscheidung.
 
+### D14 · API-Vertrag (verbindlich für Backend und Client)
+
+Alle Pfade unter `/api/einsaetze/{id}`. Feldnamen snake_case wie im übrigen API.
+
+**Lesen** `GET /stab/fernmeldeskizze` (`EinsatzLesezugriff<Stab>`) → `Fernmeldeskizze`:
+
+```
+Fernmeldeskizze  { lage: SkizzenLage[], komponenten: SkizzenKomponente[],
+                   verbindungen: SkizzenVerbindung[], bereiche: SkizzenBereich[],
+                   schriftfeld: Schriftfeld, stand: string | null }   // stand = jüngstes geaendert_at
+SkizzenLage      { element: string, x: number, y: number, breite: number | null, version: number }
+                 // element ∈ "fs" | "ab-<id>" | "eh-<id>" | "ks-<id>" | "ko-<id>" | "sg-<id>"
+SkizzenKomponente{ id, art: Komponentenart, bezeichnung: string | null,
+                   sprechgruppen: SprechgruppeAnzeige[] }
+SkizzenVerbindung{ id, von: SkizzenBezug, nach: SkizzenBezug, art: Verbindungsart,
+                   medium: "funk" | "leitung", status: Verbindungsstatus,
+                   verkehr: "wechsel" | "gegen" | null, hinweis: string | null }
+SkizzenBezug     { art: "fuehrungsstelle" | "abschnitt" | "einheit" | "stelle" | "komponente",
+                   id: number | null }                                // id null nur bei fuehrungsstelle
+SkizzenBereich   { id, bezeichnung: string, x, y, breite, hoehe, version: number }
+Schriftfeld      { herausgeber: string | null, vs_vermerk: "keiner" | "vs_nfd",
+                   gueltig_ab: string | null, gez_name: string | null, gez_at: string | null }
+Komponentenart   = "repeater" | "gateway" | "basisstation" | "mobile_basisstation" | "antenne" | "vermittlung"
+Verbindungsart   = "telefon" | "fax" | "daten" | "melder" | "bild" | "livestream" | "richtfunk" | "satellit" | "sonstige"
+Verbindungsstatus= "bestehend" | "geplant"
+```
+
+`KommunikationsStelle` (Kommunikationsplan) bekommt `sprechgruppen: StellenKanal[]` mit
+`StellenKanal { sprechgruppe: SprechgruppeAnzeige, status: Verbindungsstatus }`; bei Funktionen
+immer leer.
+
+**Schreiben** (alle `EinsatzSchreibzugriff<Stab>`, sofern nicht anders genannt):
+
+| Aufruf | Body | Antwort |
+| --- | --- | --- |
+| `PUT /stab/fernmeldeskizze/lage/{element}` | `{ x, y, breite?, version: number \| null }` (`null` = noch keine Zeile erwartet) | 200 `SkizzenLage`; 409 bei abweichender Version |
+| `DELETE /stab/fernmeldeskizze/lage` | — | 204 („Neu anordnen“) |
+| `PUT /stab/fernmeldeskizze/schriftfeld` | Teilfelder, Tri-State (fehlend = unverändert, `null` = leeren) | 200 `Schriftfeld` |
+| `POST /stab/fernmeldeskizze/komponenten` | `{ art, bezeichnung? }` | 201 `SkizzenKomponente` |
+| `PATCH/DELETE /stab/fernmeldeskizze/komponenten/{kid}` | `{ art?, bezeichnung? }` | 200 / 204 |
+| `PUT/DELETE /stab/fernmeldeskizze/komponenten/{kid}/sprechgruppen/{sg}` | — | 204 |
+| `POST /stab/fernmeldeskizze/verbindungen` | `{ von, nach, art, medium, status, verkehr?, hinweis? }` | 201 `SkizzenVerbindung`; 422 bei `von == nach` oder Bezug außerhalb des Einsatzes |
+| `PATCH/DELETE /stab/fernmeldeskizze/verbindungen/{vid}` | Teilfelder ohne `von`/`nach` | 200 / 204 |
+| `POST /stab/fernmeldeskizze/bereiche` | `{ bezeichnung?, x, y, breite, hoehe }` | 201 `SkizzenBereich` |
+| `PATCH/DELETE /stab/fernmeldeskizze/bereiche/{bid}` | `{ bezeichnung?, x?, y?, breite?, hoehe?, version }` | 200 / 204; 409 bei abweichender Version |
+| `PUT/DELETE /abschnitte/{aid}/sprechgruppen/{sg}` | — | 204 (`EinsatzSchreibzugriff<Einsatzabschnitte>`) |
+| `PUT/DELETE /einheiten/{eid}/sprechgruppen/{sg}` | — | 204 (`EinsatzSchreibzugriff<Einheiten>`) |
+| `PUT/DELETE /fuehrungsstelle/sprechgruppen/{sg}` | — | 204 (`EinsatzVerwaltungszugriff`) |
+| `PUT/DELETE /stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg}` | PUT `{ status }` | 204; 422 bei Stellenart `funktion` |
+
+PUT und DELETE der Zuordnungen sind idempotent. Jede Änderung sendet das Live-Ereignis des
+Datensatzes (Abschnitt, Einheit, Einsatz, Stab), die Skizzendaten das Stab-Ereignis.
+
 ## Risks / Trade-offs
 
 - [Eigene Zeichenfläche ist viel Code] → Bausteine rein und getestet (Layout, Modell, Befehle),
@@ -288,3 +341,23 @@ die neuen Tabellen bleiben ungenutzt liegen (anhängen, nie ändern, LFH-658).
 ## Open Questions
 
 - Genaue Schwellen für Mobil-Lesemodus und Zoomgrenzen ergeben sich aus der Messung (Aufgabe 1).
+
+## Nachträge (Bau)
+
+- **D12:** `@einsatzzeichen/core` 3.0.0 enthält Anhang J.1–J.4 (`COMMS_PICTOGRAMS`, `pictogram('comms.<id>',
+  'primary' | 'alternative')`, `primary` = Funk mit Zickzack). Die Verbindungsarten außer Melder,
+  sonstige und Satellit sowie alle Komponenten kommen aus dem Katalog; ein kleiner Renderer setzt
+  Schwarz auf `currentColor` und Weiß auf `--lfh-skizze-grund`. Selbst gezeichnet (Konstante
+  `SELBST_GEZEICHNET`): Bedingungszeichen, Sammelschiene, Zickzack-Marke auf freier Linie,
+  „geplant“, Bereich, Melder, sonstige, Satellit. Folgeticket an `@einsatzzeichen`: LFH-1033.
+- **Folgetickets aus D10 und den Non-Goals:** Übernahme in den Befehl (LFH-1027), Bild-Anlage an
+  Lagebericht und Befehl, Führungsmittel im Kasten (LFH-1029), Felder „Netz“/„Sicherheit“ an der
+  Sprechgruppe (LFH-1030).
+- **D5/D14 (Backend):** Die Einzel-Endpunkte prüfen die Sprechgruppe wie der PATCH
+  (`pruefe_zuordenbar`), also nicht auf `aktiv`. Ein 409 bei Lage bzw. Bereich trägt
+  `aktuell` (`SkizzenLageKonflikt`, `SkizzenBereichKonflikt`); `version` ist im Lage-Body Pflicht
+  (`null` = keine Zeile erwartet), `breite` nur bei `sg-`. Ein leerer Herausgeber liefert die
+  Einsatzbezeichnung. Zuordnungen senden ihr Live-Ereignis nur bei echter Änderung; kein Weg
+  schreibt ins ETB (auch der PATCH nicht). Das Einzel-PUT an der Führungsstelle legt keine
+  Zeile `einsatz_fuehrungsstelle` an.
+

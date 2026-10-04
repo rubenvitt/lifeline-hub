@@ -1,0 +1,38 @@
+/* Eigenheiten der Fernmeldeskizze im Druck (LFH-893 D13). Die Mechanik (Ausblenden des Rahmens,
+   Fluss, Papierfarben, Umbruch) liegt in `druck/druck.css`; die Seite setzt die Klasse aus
+   `skizzenDruckKlasse` an das Element, das Druckkopf, Skizze, Schriftfeld und Lücken trägt.
+
+   Quer und das Format kommen über benannte Seiten: `page` an der Klasse wählt die Seite, das
+   Format selbst steht in der benannten `@page`. Die unbenannte `@page` von `druck.css` (Rand,
+   Seitenzahl) bleibt unberührt, die benannte erbt sie. Die Skizze passt über ihre `viewBox` auf
+   die erste Seite; die Höhe begrenzt sie, damit Kopf und Lücken mit auf dieses Blatt passen. */
+@media print {
+  @page fernmeldeskizze-a3 {
+    size: A3 landscape;
+  }
+
+  @page fernmeldeskizze-a4 {
+    size: A4 landscape;
+  }
+
+  .lfh-skizze-druck-a3 {
+    page: fernmeldeskizze-a3;
+  }
+
+  .lfh-skizze-druck-a4 {
+    page: fernmeldeskizze-a4;
+  }
+
+  /* Bedienung (Werkzeugleiste, Palette, Paneel, Hinweise) gehört nicht aufs Papier. */
+  .lfh-skizze-bedienung {
+    display: none !important;
+  }
+
+  .lfh-skizze-druck-a3 .lfh-skizze-flaeche svg {
+    max-height: 215mm;
+  }
+
+  .lfh-skizze-druck-a4 .lfh-skizze-flaeche svg {
+    max-height: 140mm;
+  }
+}

@@ -1,6 +1,15 @@
 import { schlechtesterZustand, type AbrufZustand } from '../api/abrufZustand';
-import type { Einheit, Einsatzabschnitt, KommunikationsStelle, Sprechgruppe } from '../api/types';
+import type {
+  Einheit,
+  Einsatzabschnitt,
+  Fernmeldeskizze,
+  KommunikationsStelle,
+  SkizzenVerbindung,
+  Sprechgruppe,
+  Verbindungsstatus,
+} from '../api/types';
 import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from './fuehrungsstelle';
+import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 
 /**
  * Lücken als reine Filter über bereits geladene Listen (Stab-Spec LFH-46, Entscheidung 15:
@@ -67,19 +76,151 @@ export function lokaleSprechgruppenOhneZuordnung(
 }
 
 /**
- * Kommunikationsplan (LFH-848): fehlt der Draht zur Leitstelle? Erst wenn keine Stelle der Art
- * Leitstelle eine Verbindung trägt; eine Leitstelle ohne Verbindung zählt als fehlend. Ohne
- * geladene Stellen gibt es kein Urteil, der Zustand sagt warum.
+ * Fehlt der Draht zur Leitstelle? Die eine Regel für Kommunikationsplan, Funkplan und
+ * Fernmeldeskizze (LFH-848, erweitert LFH-893 D11). Eine Leitstelle gilt als verbunden, wenn sie
+ * eine Verbindung im Kommunikationsplan, einen Kanal (Sprechgruppe) oder eine Verbindung in der
+ * Skizze trägt; erst wenn keine Stelle der Art Leitstelle verbunden ist, fehlt sie.
+ *
+ * - Ohne geladene Stellen gibt es kein Urteil; der Zustand sagt warum.
+ * - Fehlen nur die Verbindungen der Skizze, urteilt die Regel aus den übrigen Angaben, wenn diese
+ *   schon eine Verbindung belegen, sonst steht der Zustand der Skizze (Spec-Delta
+ *   `stab-kommunikationsplan`, „Lücke ‚Leitstelle‘“).
+ *
+ * @param skizzenVerbindungen die Verbindungen der Fernmeldeskizze. Fehlt das Argument, hat der
+ *   Aufrufer die Skizze noch nicht als Quelle (Übergang bis LFH-893 2.6/7.4): dann zählen nur
+ *   Kommunikationsplan und Kanäle.
  */
-export function leitstelleOhneVerbindung(stellen: Quelle<KommunikationsStelle>): {
+export function leitstelleOhneVerbindung(
+  stellen: Quelle<KommunikationsStelle>,
+  skizzenVerbindungen?: Quelle<SkizzenVerbindung>,
+): {
   zustand: AbrufZustand;
   fehlt: boolean;
 } {
   if (stellen.zustand !== 'daten') return { zustand: stellen.zustand, fehlt: false };
-  const erfasst = stellen.daten.some(
-    (s) => s.stellenart === 'leitstelle' && s.verbindungen.length > 0,
+  const leitstellen = stellen.daten.filter((s) => s.stellenart === 'leitstelle');
+  const ohneSkizze = leitstellen.some(
+    (s) => s.verbindungen.length > 0 || s.sprechgruppen.length > 0,
   );
-  return { zustand: 'daten', fehlt: !erfasst };
+  if (ohneSkizze || skizzenVerbindungen == null) return { zustand: 'daten', fehlt: !ohneSkizze };
+  if (skizzenVerbindungen.zustand !== 'daten') {
+    return { zustand: skizzenVerbindungen.zustand, fehlt: false };
+  }
+  const ids = new Set(leitstellen.map((s) => s.id));
+  const trifft = (b: SkizzenVerbindung['von']) =>
+    b.art === 'stelle' && b.id != null && ids.has(b.id);
+  const verbunden = skizzenVerbindungen.daten.some((v) => trifft(v.von) || trifft(v.nach));
+  return { zustand: 'daten', fehlt: !verbunden };
+}
+
+// ── Kanäle der Fernmeldeskizze (LFH-893 D2, D11) ───────────────────────────────────────────────
+
+/** Die Daten der Fernmeldeskizze als Quelle; wie die Führungsstelle eine Angabe, keine Liste. */
+export interface SkizzenQuelle {
+  zustand: AbrufZustand;
+  daten: Fernmeldeskizze | null;
+}
+
+/** Was die Kanalbelegung liest: die Strukturquellen des Funkplans plus Stellen und Skizze. */
+export interface KanalQuellen {
+  abschnitte: Quelle<Einsatzabschnitt>;
+  einheiten: Quelle<Einheit>;
+  fuehrungsstelle: FuehrungsstelleQuelle;
+  /** Sprechgruppen des Einsatzes (Katalog und einsatzlokal). */
+  sprechgruppen: Quelle<Sprechgruppe>;
+  /** Die Stellen des Kommunikationsplans mit ihren Kanälen. */
+  stellen: Quelle<KommunikationsStelle>;
+  skizze: SkizzenQuelle;
+}
+
+/** Eine Stichleitung: das Element (Schlüssel wie in der Skizze, D2) und ihr Status (D7). */
+export interface KanalTeilnehmer {
+  element: string;
+  status: Verbindungsstatus;
+}
+
+export interface Kanal {
+  sprechgruppe: Sprechgruppe;
+  teilnehmer: KanalTeilnehmer[];
+}
+
+/**
+ * Die Kanalbelegung des Netzes: jede Sprechgruppe, die eine Stelle oder Komponente trägt, jede
+ * einsatzlokale und jede mit Lagezeile (`sg-<id>`), mit ihren Teilnehmern in fester Folge
+ * (Führungsstelle, Abschnitte, Einheiten, externe Stellen, Komponenten, je wie ihre Liste).
+ * Führungsfunktionen sind nie Teilnehmer. Liest nur, was geladen ist: das Urteil über fehlende
+ * Quellen fällen die Lücken, die Skizze nennt sie. Eine Lagezeile ohne bekannte Sprechgruppe ist
+ * verwaist und fehlt.
+ *
+ * Die eine Belegung für die Schienen der Skizze (`stab/fernmeldeskizze.ts`) und die Lücke
+ * {@link schienenMitEinemTeilnehmer}: Bild und Paneel zählen dieselben Stichleitungen.
+ */
+export function kanalbelegung(q: KanalQuellen): Map<number, Kanal> {
+  const kanaele = new Map<number, Kanal>();
+  const kanal = (s: Sprechgruppe): Kanal => {
+    let k = kanaele.get(s.id);
+    if (!k) {
+      k = { sprechgruppe: s, teilnehmer: [] };
+      kanaele.set(s.id, k);
+    }
+    return k;
+  };
+  const trage = (s: Sprechgruppe, element: string, status: Verbindungsstatus = 'bestehend') => {
+    const k = kanal(s);
+    // Doppelte Zuordnung derselben Stelle: eine Stichleitung.
+    if (!k.teilnehmer.some((t) => t.element === element)) k.teilnehmer.push({ element, status });
+  };
+  const geladen = <T>(quelle: Quelle<T>): readonly T[] =>
+    quelle.zustand === 'daten' ? quelle.daten : [];
+
+  if (q.fuehrungsstelle.zustand === 'daten') {
+    for (const s of q.fuehrungsstelle.daten?.sprechgruppen ?? []) trage(s, 'fs');
+  }
+  for (const a of geladen(q.abschnitte)) for (const s of a.sprechgruppen) trage(s, `ab-${a.id}`);
+  for (const e of geladen(q.einheiten)) for (const s of e.sprechgruppen) trage(s, `eh-${e.id}`);
+  for (const st of geladen(q.stellen)) {
+    if (st.stellenart === 'funktion') continue;
+    for (const k of st.sprechgruppen) trage(k.sprechgruppe, `ks-${st.id}`, k.status);
+  }
+  const skizze = q.skizze.zustand === 'daten' ? q.skizze.daten : null;
+  for (const ko of skizze?.komponenten ?? []) {
+    for (const s of ko.sprechgruppen) trage(s, `ko-${ko.id}`);
+  }
+
+  const bekannt = new Map(geladen(q.sprechgruppen).map((s) => [s.id, s]));
+  for (const s of bekannt.values()) if (s.einsatz_lokal) kanal(s);
+  for (const l of skizze?.lage ?? []) {
+    const m = /^sg-(\d+)$/.exec(l.element);
+    const s = m ? bekannt.get(Number(m[1])) : undefined;
+    if (s) kanal(s);
+  }
+  return kanaele;
+}
+
+/**
+ * Sprechgruppen mit genau einem Teilnehmer (Stelle oder Komponente): ein Kanal, auf dem niemand
+ * antwortet. Eine einsatzlokale ohne Teilnehmer zählt weiter nur bei
+ * {@link lokaleSprechgruppenOhneZuordnung}; eine Katalog-Schiene ohne Teilnehmer (nur Lagezeile)
+ * zählt hier. Treffer TMO vor DMO. Fehlt eine Quelle, wäre jede Zahl geraten: dann der Zustand.
+ */
+export function schienenMitEinemTeilnehmer(q: KanalQuellen): Luecke<Sprechgruppe> {
+  const zustand = schlechtesterZustand(
+    q.abschnitte.zustand,
+    q.einheiten.zustand,
+    q.fuehrungsstelle.zustand,
+    q.sprechgruppen.zustand,
+    q.stellen.zustand,
+    q.skizze.zustand,
+  );
+  if (zustand !== 'daten') return { zustand, treffer: [] };
+  const treffer = [...kanalbelegung(q).values()]
+    .filter(
+      (k) =>
+        k.teilnehmer.length === 1 || (k.teilnehmer.length === 0 && !k.sprechgruppe.einsatz_lokal),
+    )
+    .map((k) => k.sprechgruppe)
+    .sort(vergleicheSprechgruppen);
+  return { zustand, treffer };
 }
 
 // ── Verbindungen (LFH-625 D3) ──────────────────────────────────────────────────────────────────

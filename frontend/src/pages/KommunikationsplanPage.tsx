@@ -8,6 +8,7 @@ import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import {
   aendereVerbindung,
   benenneKommunikationsStelleUm,
@@ -23,6 +24,7 @@ import type {
   KommunikationsStelle,
   NeueKommunikationsStelle,
   NeueVerbindung,
+  SkizzenVerbindung,
   VerbindungPatch,
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
@@ -49,6 +51,9 @@ import {
 } from '../stab/KommunikationsplanDialoge';
 import {
   baueKommunikationsplan,
+  brauchtRueckfrage,
+  entfernText,
+  entfernUmfang,
   type KommunikationsGruppe,
   type KommunikationsZeile,
   type VerbindungsAnzeige,
@@ -73,6 +78,10 @@ import './kommunikationsplanPrint.css';
  * - **Kein Lagebericht** (D6): ein Bericht wird verteilt und fortgeschrieben, Rufnummern gehören
  *   nicht hinein. Druck ja.
  * - **Ohne Netz** lesbar (Unter-Key in `LAGEBILD_OFFLINE`), die Bedienung ist gesperrt (D9).
+ * - **Fernmeldeskizze** (LFH-893, `openspec/changes/lfh-893-taktische-fernmeldeskizze/`): die
+ *   Kanäle einer externen Stelle stehen als Nebentext (gepflegt in der Skizze); die Verbindungen
+ *   der Skizze sind eine eigene Quelle mit Weiche. Sie belegen die Leitstelle als verbunden
+ *   (`leitstelleOhneVerbindung`) und zählen in der Rückfrage beim Entfernen mit.
  */
 
 /** Eine Zeile der Tabelle: ein Gruppenknoten oder eine Stelle darunter. */
@@ -115,6 +124,7 @@ function istFunktion(z: KommunikationsZeile): boolean {
 }
 
 function StelleZelle({ zeile: p }: { zeile: PlanZeile }) {
+  const { token } = useRollen();
   if (p.gruppe) return <Typography.Text strong>{p.gruppe.titel}</Typography.Text>;
   const z = p.zeile!;
   return (
@@ -125,6 +135,16 @@ function StelleZelle({ zeile: p }: { zeile: PlanZeile }) {
           {' · '}
           <Gedaempft>{z.nebentext}</Gedaempft>
         </>
+      )}
+      {/* Kanäle externer Stellen (LFH-893): Kennungen in Mono, je eine eigene Angabe. */}
+      {z.kanaele.length > 0 && (
+        <Flex wrap data-lfh="stelle-kanaele" gap={token.marginXS}>
+          {z.kanaele.map((k) => (
+            <span key={k} style={monoStil(12)}>
+              <Gedaempft>{k}</Gedaempft>
+            </span>
+          ))}
+        </Flex>
       )}
     </span>
   );
@@ -269,7 +289,7 @@ type Dialog =
   | { art: 'stelle' }
   | { art: 'verbindung'; stelle: KommunikationsStelle; kennung: string; basis?: VerbindungsAnzeige }
   | { art: 'bezeichnung'; stelle: KommunikationsStelle; kennung: string }
-  | { art: 'entfernen'; stelle: KommunikationsStelle; kennung: string };
+  | { art: 'entfernen'; stelle: KommunikationsStelle; text: string };
 
 export default function KommunikationsplanPage() {
   const { id } = useParams();
@@ -314,6 +334,21 @@ export default function KommunikationsplanPage() {
     enabled: einheitenFrei,
   });
 
+  // Die Verbindungen der Fernmeldeskizze (LFH-893), eigene Quelle mit Weiche. Nicht auf der
+  // Platte: ohne Netz pausiert die Abfrage, dann gilt sie als nicht geladen wie die Besetzung.
+  const skizzeQuery = useQuery({
+    queryKey: einsatzKeys.stabFernmeldeskizze(einsatzId),
+    queryFn: () => ladeFernmeldeskizze(einsatzId),
+    enabled: stabFrei,
+  });
+  const skizzeZustand: AbrufZustand =
+    skizzeQuery.data != null ? 'daten' : ohneVerbindung ? 'fehler' : abrufZustand(skizzeQuery);
+  const skizzeVerbindungen = skizzeQuery.data?.verbindungen;
+  const skizzenVerbindungen: Quelle<SkizzenVerbindung> = useMemo(
+    () => ({ zustand: skizzeZustand, daten: skizzeVerbindungen ?? [] }),
+    [skizzeZustand, skizzeVerbindungen],
+  );
+
   const stellen = useQuelle(stellenQuery);
   const abschnitte = useQuelle(abschnitteQuery, abschnitteFrei);
   const einheiten = useQuelle(einheitenQuery, einheitenFrei);
@@ -332,7 +367,10 @@ export default function KommunikationsplanPage() {
       }),
     [einsatzId, stellen, abschnitte, einheiten, stabZustand, stabQuery.data],
   );
-  const luecke = useMemo(() => leitstelleOhneVerbindung(stellen), [stellen]);
+  const luecke = useMemo(
+    () => leitstelleOhneVerbindung(stellen, skizzenVerbindungen),
+    [stellen, skizzenVerbindungen],
+  );
   const zeilen: PlanZeile[] = useMemo(
     () =>
       plan.map((g) => ({
@@ -371,7 +409,11 @@ export default function KommunikationsplanPage() {
   });
   const stelleEntfernen = useMutation({
     mutationFn: (sid: number) => entferneKommunikationsStelle(einsatzId, sid),
-    ...mitAntwort,
+    onSuccess: (neu: KommunikationsStelle[]) => {
+      queryClient.setQueryData(planKey, neu);
+      // Der Server räumt die Verbindungen der Stelle in der Skizze mit (LFH-893 D3).
+      void queryClient.invalidateQueries({ queryKey: einsatzKeys.stabFernmeldeskizze(einsatzId) });
+    },
   });
   const verbindungAnlegen = useMutation({
     mutationFn: ({ sid, body }: { sid: number; body: NeueVerbindung }) =>
@@ -406,9 +448,17 @@ export default function KommunikationsplanPage() {
           if (aktion === 'bezeichnung') {
             oeffne({ art: 'bezeichnung', stelle: z.stelle, kennung: z.kennung });
           } else if (aktion === 'entfernen') {
-            // Ohne Verbindungen ist nichts verloren, was ein Feld nicht wiederbrächte.
-            if (z.stelle.verbindungen.length === 0) stelleEntfernen.mutate(z.stelle.id);
-            else setDialog({ art: 'entfernen', stelle: z.stelle, kennung: z.kennung });
+            // Ohne Verbindungen, Kanäle und Skizzen-Verbindungen ist nichts verloren, was ein Feld
+            // nicht wiederbrächte. Ist die Skizze nicht geladen, ist das unbekannt: Rückfrage.
+            const umfang = entfernUmfang(z.stelle, skizzenVerbindungen);
+            if (!brauchtRueckfrage(umfang)) stelleEntfernen.mutate(z.stelle.id);
+            else {
+              setDialog({
+                art: 'entfernen',
+                stelle: z.stelle,
+                text: entfernText(z.kennung, umfang),
+              });
+            }
           } else if (aktion.startsWith('bearbeiten-')) {
             const vid = Number(aktion.slice('bearbeiten-'.length));
             const basis = z.verbindungen.find((v) => v.id === vid);
@@ -418,9 +468,10 @@ export default function KommunikationsplanPage() {
           }
         },
       ),
-    // Die Mutationen sind identitätsstabil genug; neu gebaut wird mit Recht, Netz und Druck.
+    // Die Mutationen sind identitätsstabil genug; neu gebaut wird mit Recht, Netz, Druck und den
+    // Verbindungen der Skizze (sie bestimmen die Rückfrage beim Entfernen).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mitAktionen, ohneVerbindung],
+    [mitAktionen, ohneVerbindung, skizzenVerbindungen],
   );
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
@@ -438,6 +489,7 @@ export default function KommunikationsplanPage() {
 
   const datenstand = gemeinsamerDatenstand(
     stellenQuery.dataUpdatedAt,
+    skizzeQuery.dataUpdatedAt,
     abschnitteFrei ? abschnitteQuery.dataUpdatedAt : undefined,
     einheitenFrei ? einheitenQuery.dataUpdatedAt : undefined,
   );
@@ -506,7 +558,12 @@ export default function KommunikationsplanPage() {
                   <>
                     <span>Leitstelle</span>
                     <span style={monoStil(14, 500)}>—</span>
-                    <Gedaempft>{ZUSTAND_GRUND[luecke.zustand]}</Gedaempft>
+                    {/* Ohne Stellen fehlt alles; sonst fehlt nur die Skizze (Spec-Delta). */}
+                    <Gedaempft>
+                      {stellen.zustand !== 'daten'
+                        ? ZUSTAND_GRUND[luecke.zustand]
+                        : `Fernmeldeskizze ${ZUSTAND_GRUND[luecke.zustand]}`}
+                    </Gedaempft>
                   </>
                 )}
               </Flex>
@@ -593,8 +650,7 @@ export default function KommunikationsplanPage() {
       )}
       {dialog?.art === 'entfernen' && (
         <StelleEntfernenRueckfrage
-          kennung={dialog.kennung}
-          anzahl={dialog.stelle.verbindungen.length}
+          text={dialog.text}
           laeuft={stelleEntfernen.isPending}
           onEntfernen={() => stelleEntfernen.mutate(dialog.stelle.id, { onSettled: schliessen })}
           onSchliessen={schliessen}

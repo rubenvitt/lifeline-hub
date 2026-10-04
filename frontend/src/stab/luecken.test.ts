@@ -6,9 +6,19 @@ import type {
   KommunikationsStelle,
   Sprechgruppe,
 } from '../api/types';
+import type {
+  Fernmeldeskizze,
+  KommunikationsStelleMitKanaelen,
+  SkizzenVerbindung,
+  Verbindungsstatus,
+} from '../api/fernmeldeskizzeVertrag';
 import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
 import {
   abschnitteOhneSprechgruppe,
+  kanalbelegung,
+  schienenMitEinemTeilnehmer,
+  type KanalQuellen,
+  type SkizzenQuelle,
   einheitenOhneErreichbarkeit,
   einheitenOhneSprechgruppe,
   leitstelleOhneVerbindung,
@@ -337,6 +347,7 @@ describe('leitstelleOhneVerbindung (LFH-848)', () => {
     id,
     stellenart,
     bezeichnung: `Stelle ${id}`,
+    sprechgruppen: [],
     verbindungen: Array.from({ length: verbindungen }, (_, i) => ({
       id: id * 10 + i,
       mittel: 'festnetz' as const,
@@ -368,5 +379,261 @@ describe('leitstelleOhneVerbindung (LFH-848)', () => {
     for (const zustand of ['laden', 'fehler', 'gesperrt'] as const) {
       expect(leitstelleOhneVerbindung({ zustand, daten: [] })).toEqual({ zustand, fehlt: false });
     }
+  });
+});
+
+// ── Netz der Fernmeldeskizze (LFH-893 D11) ─────────────────────────────────────────────────────
+
+const LEER_SKIZZE: Fernmeldeskizze = {
+  lage: [],
+  komponenten: [],
+  verbindungen: [],
+  bereiche: [],
+  schriftfeld: {
+    herausgeber: null,
+    vs_vermerk: 'keiner',
+    gueltig_ab: null,
+    gez_name: null,
+    gez_at: null,
+  },
+  stand: null,
+};
+const skizze = (p: Partial<Fernmeldeskizze> = {}): SkizzenQuelle => ({
+  zustand: 'daten',
+  daten: { ...LEER_SKIZZE, ...p },
+});
+
+function externe(
+  id: number,
+  stellenart: KommunikationsStelle['stellenart'],
+  {
+    kanaele = [],
+    verbindungen = 0,
+  }: { kanaele?: [Sprechgruppe, Verbindungsstatus][]; verbindungen?: number } = {},
+): KommunikationsStelleMitKanaelen {
+  return {
+    id,
+    stellenart,
+    bezeichnung: `Stelle ${id}`,
+    verbindungen: Array.from({ length: verbindungen }, (_, i) => ({
+      id: id * 10 + i,
+      mittel: 'festnetz' as const,
+      wert: '0421 1',
+    })),
+    sprechgruppen: kanaele.map(([sprechgruppe, status]) => ({ sprechgruppe, status })),
+  };
+}
+
+function datenverbindung(
+  id: number,
+  von: SkizzenVerbindung['von'],
+  nach: SkizzenVerbindung['nach'],
+): SkizzenVerbindung {
+  return {
+    id,
+    von,
+    nach,
+    art: 'daten',
+    medium: 'leitung',
+    status: 'bestehend',
+    verkehr: null,
+    hinweis: null,
+  };
+}
+
+function netzQuellen(p: Partial<KanalQuellen> = {}): KanalQuellen {
+  return {
+    abschnitte: daten([]),
+    einheiten: daten([]),
+    fuehrungsstelle: ohneFs,
+    sprechgruppen: daten([]),
+    stellen: daten([]),
+    skizze: skizze(),
+    ...p,
+  };
+}
+
+describe('kanalbelegung (LFH-893 D2)', () => {
+  const BN = sgArt(1, 'BN_BOS', 'TMO');
+  const F314 = sgArt(2, '314_F*', 'DMO');
+
+  it('nennt je Sprechgruppe alle Teilnehmer: Führungsstelle, Abschnitte, Einheiten, Stellen, Komponenten', () => {
+    const k = kanalbelegung(
+      netzQuellen({
+        fuehrungsstelle: fs([BN]),
+        abschnitte: daten([abschnitt(1, [BN, F314])]),
+        einheiten: daten([einheit(5, { sprechgruppen: [F314] })]),
+        stellen: daten([externe(7, 'leitstelle', { kanaele: [[BN, 'geplant']] })]),
+        skizze: skizze({
+          komponenten: [{ id: 3, art: 'repeater', bezeichnung: null, sprechgruppen: [F314] }],
+        }),
+      }),
+    );
+    expect(k.get(1)?.teilnehmer).toEqual([
+      { element: 'fs', status: 'bestehend' },
+      { element: 'ab-1', status: 'bestehend' },
+      { element: 'ks-7', status: 'geplant' },
+    ]);
+    expect(k.get(2)?.teilnehmer.map((t) => t.element)).toEqual(['ab-1', 'eh-5', 'ko-3']);
+  });
+
+  it('führt Führungsfunktionen nie als Teilnehmer', () => {
+    const k = kanalbelegung(
+      netzQuellen({ stellen: daten([externe(1, 'funktion', { kanaele: [[BN, 'bestehend']] })]) }),
+    );
+    expect(k.size).toBe(0);
+  });
+
+  it('nimmt einsatzlokale Sprechgruppen und Schienen mit Lagezeile ohne Teilnehmer auf', () => {
+    const lokal = { ...sgArt(9, 'DMO 999', 'DMO'), einsatz_lokal: true };
+    const k = kanalbelegung(
+      netzQuellen({
+        sprechgruppen: daten([lokal, F314, BN]),
+        skizze: skizze({
+          lage: [
+            { element: 'sg-2', x: 0, y: 0, breite: 200, version: 1 },
+            // Verwaist: die Sprechgruppe gibt es nicht (mehr).
+            { element: 'sg-77', x: 0, y: 0, breite: 200, version: 1 },
+          ],
+        }),
+      }),
+    );
+    expect([...k.keys()].sort()).toEqual([2, 9]);
+    expect(k.get(2)?.teilnehmer).toEqual([]);
+  });
+});
+
+describe('schienenMitEinemTeilnehmer (LFH-893 D11)', () => {
+  const DMO505b = sgArt(3, 'DMO 505', 'DMO');
+
+  it('trifft eine Sprechgruppe mit genau einem Teilnehmer (Szenario „nur ein Teilnehmer“)', () => {
+    const l = schienenMitEinemTeilnehmer(
+      netzQuellen({
+        abschnitte: daten([abschnitt(1, [TMO311])]),
+        einheiten: daten([
+          einheit(1, { sprechgruppen: [TMO311, DMO505b] }),
+          einheit(2, { sprechgruppen: [TMO311] }),
+        ]),
+      }),
+    );
+    expect(l).toEqual({ zustand: 'daten', treffer: [DMO505b] });
+  });
+
+  it('zählt Stelle und Komponente als Teilnehmer', () => {
+    const l = schienenMitEinemTeilnehmer(
+      netzQuellen({
+        einheiten: daten([einheit(1, { sprechgruppen: [DMO505b] })]),
+        skizze: skizze({
+          komponenten: [{ id: 1, art: 'repeater', bezeichnung: null, sprechgruppen: [DMO505b] }],
+        }),
+      }),
+    );
+    expect(l.treffer).toEqual([]);
+    const nurStelle = schienenMitEinemTeilnehmer(
+      netzQuellen({
+        stellen: daten([externe(1, 'leitstelle', { kanaele: [[TMO312, 'geplant']] })]),
+      }),
+    );
+    expect(nurStelle.treffer).toEqual([TMO312]);
+  });
+
+  it('zählt eine lokale ohne Teilnehmer nicht, eine Katalog-Schiene nur mit Lagezeile schon', () => {
+    const lokal = { ...sgArt(9, 'DMO 999', 'DMO'), einsatz_lokal: true };
+    const l = schienenMitEinemTeilnehmer(
+      netzQuellen({
+        sprechgruppen: daten([lokal, TMO312]),
+        skizze: skizze({ lage: [{ element: 'sg-2', x: 0, y: 0, breite: 160, version: 1 }] }),
+      }),
+    );
+    expect(l.treffer).toEqual([TMO312]);
+  });
+
+  it('ordnet die Treffer TMO vor DMO', () => {
+    const l = schienenMitEinemTeilnehmer(
+      netzQuellen({
+        einheiten: daten([
+          einheit(1, { sprechgruppen: [DMO505b] }),
+          einheit(2, { sprechgruppen: [TMO312] }),
+        ]),
+      }),
+    );
+    expect(l.treffer.map((s) => s.bezeichnung)).toEqual(['TMO 312', 'DMO 505']);
+  });
+
+  it.each(['abschnitte', 'einheiten', 'sprechgruppen', 'stellen'] as const)(
+    'nennt ohne geladene Quelle %s den Zustand statt einer Zahl',
+    (quelle) => {
+      const l = schienenMitEinemTeilnehmer(
+        netzQuellen({
+          einheiten: daten([einheit(1, { sprechgruppen: [DMO505b] })]),
+          [quelle]: { zustand: 'fehler', daten: [] },
+        }),
+      );
+      expect(l).toEqual({ zustand: 'fehler', treffer: [] });
+    },
+  );
+
+  it('nennt ohne Führungsstelle oder Skizzendaten den Zustand statt einer Zahl', () => {
+    expect(
+      schienenMitEinemTeilnehmer(
+        netzQuellen({ fuehrungsstelle: { zustand: 'laden', daten: null } }),
+      ),
+    ).toEqual({ zustand: 'laden', treffer: [] });
+    expect(
+      schienenMitEinemTeilnehmer(netzQuellen({ skizze: { zustand: 'gesperrt', daten: null } })),
+    ).toEqual({ zustand: 'gesperrt', treffer: [] });
+  });
+});
+
+describe('leitstelleOhneVerbindung · Kanal und Skizze (LFH-893 D11)', () => {
+  it('schließt die Lücke, wenn die Leitstelle nur eine Sprechgruppe trägt (Szenario „nur über Funk“)', () => {
+    const l = leitstelleOhneVerbindung(
+      daten([externe(1, 'leitstelle', { kanaele: [[TMO311, 'bestehend']] })]),
+      daten<SkizzenVerbindung>([]),
+    );
+    expect(l).toEqual({ zustand: 'daten', fehlt: false });
+  });
+
+  it('schließt die Lücke über eine Verbindung der Skizze mit Bezug auf die Leitstelle', () => {
+    const l = leitstelleOhneVerbindung(
+      daten([externe(4, 'leitstelle'), externe(5, 'behoerde')]),
+      daten([datenverbindung(1, { art: 'fuehrungsstelle', id: null }, { art: 'stelle', id: 4 })]),
+    );
+    expect(l).toEqual({ zustand: 'daten', fehlt: false });
+  });
+
+  it('zählt eine Skizzen-Verbindung einer anderen Stelle nicht', () => {
+    const l = leitstelleOhneVerbindung(
+      daten([externe(4, 'leitstelle'), externe(5, 'behoerde')]),
+      daten([
+        datenverbindung(1, { art: 'stelle', id: 5 }, { art: 'fuehrungsstelle', id: null }),
+        // Gleiche id, andere Art: eine Einheit 4 ist nicht die Stelle 4.
+        datenverbindung(2, { art: 'einheit', id: 4 }, { art: 'abschnitt', id: 1 }),
+      ]),
+    );
+    expect(l).toEqual({ zustand: 'daten', fehlt: true });
+  });
+
+  it('urteilt ohne Skizzendaten aus den übrigen Angaben, wenn diese schon eine Verbindung belegen', () => {
+    const l = leitstelleOhneVerbindung(daten([externe(1, 'leitstelle', { verbindungen: 1 })]), {
+      zustand: 'fehler',
+      daten: [],
+    });
+    expect(l).toEqual({ zustand: 'daten', fehlt: false });
+  });
+
+  it('nennt ohne Skizzendaten sonst den Zustand statt „fehlt“', () => {
+    for (const zustand of ['laden', 'fehler', 'gesperrt'] as const) {
+      const l = leitstelleOhneVerbindung(daten([externe(1, 'leitstelle')]), {
+        zustand,
+        daten: [],
+      });
+      expect(l).toEqual({ zustand, fehlt: false });
+    }
+  });
+
+  it('nennt ohne geladene Stellen den Zustand der Stellen', () => {
+    const l = leitstelleOhneVerbindung({ zustand: 'gesperrt', daten: [] }, daten([]));
+    expect(l).toEqual({ zustand: 'gesperrt', fehlt: false });
   });
 });
