@@ -595,6 +595,29 @@ describe('StabPage · Vorbereitung der Lagebesprechung (LFH-550)', () => {
     expect(zeile(p, 'betroffene')).not.toHaveTextContent(/\b0\b/);
   });
 
+  it('Kräfte hängen nur an Personal und Einheiten (LFH-887): gesperrte Fahrzeuge zeigen die Stärke', async () => {
+    const abrufe: Record<string, number> = {};
+    rendere({
+      freigaben: freigabenFixture({
+        fahrzeuge: { zugriff: false },
+        material: { zugriff: false },
+        einsatzabschnitte: { zugriff: false },
+      }),
+      lage: {
+        abrufe,
+        personal: [
+          { id: 1, name: 'A', staerke_position: 'mannschaft', status_kategorie: 'verfuegbar' },
+        ],
+      },
+    });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'kraefte')).toHaveAttribute('data-zustand', 'daten'));
+    expect(zeile(p, 'kraefte')).toHaveTextContent('0/0/1//1');
+    expect(zeile(p, 'kraefte')).not.toHaveTextContent('nicht freigegeben');
+    expect(abrufe.fahrzeuge).toBeUndefined();
+    expect(abrufe.material).toBeUndefined();
+  });
+
   it('solange die Freigaben laden: keine modulgebundene Anfrage, die Zeilen „lädt“', async () => {
     const abrufe: Record<string, number> = {};
     rendere({ freigaben: 'haengt', lage: { abrufe } });
