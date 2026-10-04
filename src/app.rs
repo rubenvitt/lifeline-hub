@@ -205,6 +205,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/modul-zaehler",
             get(routes::modul_zaehler::liste),
         )
+        // Lagebild des Lagemonitors (LFH-892): modul-los, nur für die Ansicht `lagemonitor`.
+        .route(
+            "/api/einsaetze/{id}/lagemonitor",
+            get(routes::lagemonitor::lagebild),
+        )
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/zaehler", get(routes::etb::zaehler))
         .route("/api/einsaetze/{id}/etb/anzahl", get(routes::etb::anzahl))

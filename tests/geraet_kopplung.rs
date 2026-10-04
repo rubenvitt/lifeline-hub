@@ -1494,3 +1494,83 @@ async fn laptop_meldet_und_liest_nur_eigene_meldungen() {
     let (s, _) = anfrage(&app, "GET", &meldungen, &tablet, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Tablet liest keine Meldungen");
 }
+
+async fn lagemonitor(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
+    let (_, code) = kopplung(
+        app,
+        cookie,
+        einsatz,
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor Stab"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    a.cookie.expect("Sitzungscookie")
+}
+
+#[tokio::test]
+async fn lagemonitor_antwort_traegt_keine_personen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    for _ in 0..3 {
+        person_in(&app, &admin, einsatz, Some(nord)).await;
+    }
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &admin,
+        Some(&json!({"name": "Vermisstfrau", "vorname": "Vera", "status": "vermisst"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let lagebild = format!("/api/einsaetze/{einsatz}/lagemonitor");
+
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    // Spec `lagemonitor`, „Belegung einer UHS“: drei Personen in der UHS Nord → 3.
+    let uhs = v["uhs"].as_array().unwrap();
+    let zahl = |id: i64| uhs.iter().find(|u| u["id"] == id).unwrap()["belegt"].clone();
+    assert_eq!(zahl(nord), json!(3));
+    assert_eq!(zahl(sued), json!(0));
+    assert_eq!(v["betroffene"]["gesamt"], json!(4));
+    assert_eq!(v["betroffene"]["vermisst"], json!(1));
+    // Keine Namen und keine Personenkennungen in der Antwort.
+    let text = v.to_string();
+    for name in ["Muster", "Max", "Vermisstfrau", "Vera"] {
+        assert!(!text.contains(name), "Name {name} in der Antwort: {text}");
+    }
+    for schluessel in ["person_id", "personen", "registrier_nr", "name", "vorname"] {
+        assert!(
+            !text.contains(&format!("\"{schluessel}\"")),
+            "Feld {schluessel} in der Antwort: {text}"
+        );
+    }
+
+    // Nur der Lagemonitor: Person und Tablet bekommen das verdichtete Lagebild nicht.
+    let (s, _) = anfrage(&app, "GET", &lagebild, &admin, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Person");
+    let (s, _) = anfrage(&app, "GET", &lagebild, &tablet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Tablet");
+
+    // Der Monitor liest keine Personen und keine UHS-Detailseite und schreibt nichts.
+    for (m, pfad, body) in [
+        ("GET", format!("/api/einsaetze/{einsatz}/personen"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/uhs/{nord}"), None),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/personen"),
+            Some(json!({"name": "X"})),
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),
+            Some(json!({"status": "aufgeloest"})),
+        ),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &monitor, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+}

@@ -6856,6 +6856,166 @@
           "evakuiert"
         ]
       },
+      "LagemonitorAnzeige": {
+        "type": "object",
+        "required": [
+          "stand_at",
+          "betroffene",
+          "kraefte",
+          "uhs"
+        ],
+        "properties": {
+          "betroffene": {
+            "$ref": "#/components/schemas/LagemonitorBetroffene"
+          },
+          "kraefte": {
+            "$ref": "#/components/schemas/LagemonitorKraefte"
+          },
+          "stand_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Berechnung (UTC, SQLite-Format)."
+          },
+          "uhs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorUhs"
+            }
+          }
+        }
+      },
+      "LagemonitorBetroffene": {
+        "type": "object",
+        "description": "Betroffene in Zahlen, wie die Kopfzahl des Lage-Dashboards (`lageVerdichtung.ts`).",
+        "required": [
+          "gesamt",
+          "patienten",
+          "sk1",
+          "sk2",
+          "sk3",
+          "sk4",
+          "tot",
+          "unverletzt",
+          "ohne",
+          "vermisst"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ohne": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Noch nicht gesichtet."
+          },
+          "patienten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "SK I bis SK IV."
+          },
+          "sk1": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk2": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk4": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tot": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unverletzt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vermisst": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LagemonitorKraefte": {
+        "type": "object",
+        "description": "Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke.",
+        "required": [
+          "einheiten",
+          "personal",
+          "staerke"
+        ],
+        "properties": {
+          "einheiten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "personal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "staerke": {
+            "$ref": "#/components/schemas/Staerke"
+          }
+        }
+      },
+      "LagemonitorUhs": {
+        "type": "object",
+        "description": "Eine nicht aufgelöste UHS mit ihrer Belegung als Zahl.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "typ",
+          "status",
+          "belegt",
+          "plaetze"
+        ],
+        "properties": {
+          "belegt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personen, die gerade in dieser UHS liegen."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Plätze ohne Wartebereich."
+          },
+          "status": {
+            "$ref": "#/components/schemas/UhsStatus"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/UhsTyp"
+          }
+        }
+      },
       "LetzteRueckmeldung": {
         "type": "object",
         "description": "Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).\nAls Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher\nMeldungsart; maßgeblich ist die jüngste `ereigniszeit`.",

@@ -2535,6 +2535,72 @@ export interface components {
          * @enum {string}
          */
         Lagekennzahl: "pegel" | "evakuiert";
+        LagemonitorAnzeige: {
+            betroffene: components["schemas"]["LagemonitorBetroffene"];
+            kraefte: components["schemas"]["LagemonitorKraefte"];
+            /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
+            stand_at: string;
+            uhs: components["schemas"]["LagemonitorUhs"][];
+        };
+        /** @description Betroffene in Zahlen, wie die Kopfzahl des Lage-Dashboards (`lageVerdichtung.ts`). */
+        LagemonitorBetroffene: {
+            /** Format: int64 */
+            gesamt: number;
+            /**
+             * Format: int64
+             * @description Noch nicht gesichtet.
+             */
+            ohne: number;
+            /**
+             * Format: int64
+             * @description SK I bis SK IV.
+             */
+            patienten: number;
+            /** Format: int64 */
+            sk1: number;
+            /** Format: int64 */
+            sk2: number;
+            /** Format: int64 */
+            sk3: number;
+            /** Format: int64 */
+            sk4: number;
+            /** Format: int64 */
+            tot: number;
+            /** Format: int64 */
+            unverletzt: number;
+            /** Format: int64 */
+            vermisst: number;
+        };
+        /** @description Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke. */
+        LagemonitorKraefte: {
+            /** Format: int64 */
+            einheiten: number;
+            /** Format: int64 */
+            personal: number;
+            staerke: components["schemas"]["Staerke"];
+        };
+        /** @description Eine nicht aufgelöste UHS mit ihrer Belegung als Zahl. */
+        LagemonitorUhs: {
+            /**
+             * Format: int64
+             * @description Personen, die gerade in dieser UHS liegen.
+             */
+            belegt: number;
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** Format: double */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
+            /**
+             * Format: int64
+             * @description Plätze ohne Wartebereich.
+             */
+            plaetze: number;
+            status: components["schemas"]["UhsStatus"];
+            typ: components["schemas"]["UhsTyp"];
+        };
         /**
          * @description Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).
          *     Als Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher

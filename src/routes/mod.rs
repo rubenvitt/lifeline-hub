@@ -44,6 +44,7 @@ pub mod karten_ansicht;
 pub mod lage_snapshot;
 pub mod lage_zone;
 pub mod lagebericht;
+pub mod lagemonitor;
 pub mod live;
 pub mod material;
 pub mod meldung;

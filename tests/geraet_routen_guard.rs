@@ -133,3 +133,66 @@ fn ansichtslisten_tragen_nur_einsatzrouten() {
         }
     }
 }
+
+/// Jeder `.route(…)`-Block in `quelle` mit seinem Pfad (erstes Literal).
+fn alle_route_bloecke(quelle: &str) -> Vec<(String, String)> {
+    let bytes = quelle.as_bytes();
+    let mut bloecke = Vec::new();
+    let mut suche_ab = 0usize;
+    while let Some(rel) = quelle[suche_ab..].find(".route(") {
+        let treffer = suche_ab + rel;
+        suche_ab = treffer + ".route(".len();
+        let open = treffer + ".route".len();
+        let mut tiefe = 0i32;
+        for (offset, &b) in bytes[open..].iter().enumerate() {
+            match b {
+                b'(' => tiefe += 1,
+                b')' => {
+                    tiefe -= 1;
+                    if tiefe == 0 {
+                        let block = &quelle[open..=open + offset];
+                        if let Some(pfad) = erstes_literal(block) {
+                            bloecke.push((pfad, block.to_string()));
+                        }
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    bloecke
+}
+
+/// Spec `funktionsansichten`, „Lagemonitor schreibt nichts“: keine schreibende Einsatzroute,
+/// die in `src/app.rs` registriert ist, steht dem Lagemonitor offen. Gelesen wird die echte
+/// Routentabelle, nicht die Liste der Ansicht: eine neue schreibende Route fällt hier auf, auch
+/// wenn jemand sie versehentlich in `ALLE_ANSICHTEN` einträgt.
+#[test]
+fn lagemonitor_schreibt_nichts() {
+    let quelle = fs::read_to_string("src/app.rs").expect("src/app.rs lesbar");
+    let mut geprueft = 0usize;
+    let mut verstoesse = Vec::new();
+    for (pfad, block) in alle_route_bloecke(&quelle) {
+        if !pfad.starts_with("/api/einsaetze/{id}") {
+            continue;
+        }
+        for methode in ["POST", "PATCH", "PUT", "DELETE"] {
+            if !block.contains(&format!("{}(", methode.to_lowercase())) {
+                continue;
+            }
+            geprueft += 1;
+            if lifeline_hub::geraet::darf_route(Funktionsansicht::Lagemonitor, methode, &pfad) {
+                verstoesse.push(format!("{methode} {pfad}"));
+            }
+        }
+    }
+    assert!(
+        geprueft > 100,
+        "Selbstbeweis: nur {geprueft} schreibende Routen gefunden"
+    );
+    assert!(
+        verstoesse.is_empty(),
+        "Lagemonitor darf schreiben: {verstoesse:?}"
+    );
+}

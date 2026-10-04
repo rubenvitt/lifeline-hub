@@ -187,7 +187,9 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/meldungen"),
 ];
 /// Zusätzliche Einsatzrouten des Lagemonitors (Subtask Lagemonitor).
-const LAGEMONITOR: &[(&str, &str)] = &[];
+/// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
+/// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
+const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor")];
 
 /// Ob eine Gerätesitzung mit dieser Ansicht die Route `(methode, pfad)` aufrufen darf. `pfad`
 /// ist die `MatchedPath` (Muster mit Platzhaltern). Ohne Treffer: verboten.
