@@ -1,5 +1,11 @@
 import { vi } from 'vitest';
-import type { BenutzerAnzeige, EinsatzAnzeige, ModulFreigabe, ModulFreigaben } from '../api/types';
+import type {
+  BenutzerAnzeige,
+  EinsatzAnzeige,
+  MeAntwort,
+  ModulFreigabe,
+  ModulFreigaben,
+} from '../api/types';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import type { useAuth } from '../auth/AuthContext';
 
@@ -65,9 +71,10 @@ export function adminFixture(overrides: Partial<BenutzerAnzeige> = {}): Benutzer
 }
 
 /** Rückgabe eines gemockten `useAuth` mit festem Benutzer und Stub-Aktionen. */
-export function authWertFixture(benutzer: BenutzerAnzeige | null): ReturnType<typeof useAuth> {
+export function authWertFixture(benutzer: MeAntwort | null): ReturnType<typeof useAuth> {
   return {
     benutzer,
+    geraet: benutzer?.geraet ?? null,
     laedt: false,
     login: vi.fn(),
     logout: vi.fn(),

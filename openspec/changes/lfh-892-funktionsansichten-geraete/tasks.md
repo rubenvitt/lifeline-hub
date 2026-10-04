@@ -15,7 +15,7 @@ nach den Subtasks, die nach der Freigabe auf dem Board angelegt werden; Reihenfo
 - [x] 1.7 Live-Kanal: Ereignisse nach Ansicht filtern, Broadcast „Kopplung beendet“ schließt offene Ströme (D7); verifiziert durch einen Integrationstest „Strom offen → Widerruf → Strom zu → 401“ und „ETB-Ereignis erreicht Tablet nicht“
 - [x] 1.8 Gerätekonten aus Benutzer-, Mitglieder- und Personenauswahl filtern, Login-Wege lehnen sie ab; verifiziert durch je einen Test pro Auswahlroute und Login-Weg
 - [x] 1.9 Audit: Einlösung (gelungen und gescheitert) im Anmelde-Audit unter `geraetecode`, Ereignisspur der Kopplung, ETB-System-Einträge für Anlegen, Einlösen, Widerruf; Erfasseranzeige „Stelle · Gerät“; verifiziert durch Tests auf `auth_audit`, die Ereignisspur und die ETB-Einträge
-- [ ] 1.10 Frontend: Einsatzeinstellungen „Geräte“ (Liste, Anlegen mit Prüfung der Modulfreigaben, Code als Text und QR, Verlängern, Widerrufen mit Rückfrage) und Seite `/koppeln` (Code aus dem Fragment oder per Eingabe); verifiziert durch Komponententests und `e2e/geraet-kopplung.spec.ts` (koppeln, widerrufen, „Kopplung beendet“)
+- [x] 1.10 Frontend: Einsatzeinstellungen „Geräte“ (Liste, Anlegen mit Prüfung der Modulfreigaben, Code als Text und QR, Verlängern, Widerrufen mit Rückfrage) und Seite `/koppeln` (Code aus dem Fragment oder per Eingabe); verifiziert durch Komponententests und `e2e/geraet-kopplung.spec.ts` (koppeln, widerrufen, „Kopplung beendet“)
 - [x] 1.11 Typ-Codegen für neue DTOs und Enums (`scripts/check-typ-codegen.sh`, beide generierten Dateien committet)
 
 ## 2. UHS-Tablet — LFH-1024

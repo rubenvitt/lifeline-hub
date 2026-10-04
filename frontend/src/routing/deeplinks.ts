@@ -849,7 +849,8 @@ export function parseRouteId(param: string | undefined): number | null {
 // ── Sektions-Routen der Einsatz-Einstellungen ────────────────────────────────
 
 /** Die Sektionen von `/einsaetze/:id/einstellungen`. */
-export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel';
+export type EinstellungenSektion =
+  'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel' | 'geraete';
 
 /**
  * Sektionen in Bedienreihenfolge — EINE Wahrheit für Tab-Band, Routentabelle und das Ziel des
@@ -863,6 +864,8 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   { key: 'module', label: 'Module' },
   // Hinten angehängt: die erste Sektion ist das Redirect-Ziel.
   { key: 'pegel', label: 'Pegel' },
+  // Gerätekopplung (LFH-892): nur die Einsatzleitung koppelt, die Sektion erklärt das selbst.
+  { key: 'geraete', label: 'Geräte' },
 ];
 
 /**
@@ -875,3 +878,23 @@ export function einsatzEinstellungenPfad(
 ): string {
   return `${einsatzModulPfad(einsatzId, 'einstellungen')}/${sektion}`;
 }
+
+// ── Gerätekopplung (LFH-892) ─────────────────────────────────────────────────
+
+/** Einlöseseite eines Kopplungscodes. Ohne Einsatz-Präfix: das Gerät kennt seinen Einsatz erst
+ *  nach dem Einlösen. */
+export const KOPPELN_PFAD = '/koppeln';
+
+/**
+ * Adresse im QR-Code einer Kopplung: der Code steht im **Fragment** (`#…`), das der Browser nie
+ * an den Server schickt — so landet er in keinem Zugriffslog (design.md D3).
+ */
+export function koppelnAdresse(origin: string, code: string): string {
+  return `${origin}${KOPPELN_PFAD}#${encodeURIComponent(code)}`;
+}
+
+/** Startseite eines gekoppelten Geräts; die Hülle wählt darunter die Ansicht. */
+export const GERAET_START_PFAD = '/geraet';
+
+/** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
+export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';

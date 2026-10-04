@@ -79,6 +79,8 @@ export const EINSATZ_KEYS = {
   mitglieder: 'einsatz-mitglieder',
   sprechgruppen: 'einsatz-sprechgruppen',
   modulOverrides: 'einsatz-modul-overrides',
+  // Gerätekopplungen der Einsatzleitung (LFH-892).
+  geraete: 'einsatz-geraete',
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
   modulFreigaben: 'einsatz-modul-freigaben',
   ortVorschau: 'ort-vorschau',
@@ -260,6 +262,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
  *   eines anderen Nutzers propagiert nicht live.
+ * - `geraete` (LFH-892): Kopplungen sieht nur die Einsatzleitung auf ihrer Einstellungsseite; die
+ *   eigene Änderung setzt die Antwort, der letzte Zugriff eines Geräts ist kein Ereignis.
  * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).
  *   Die eigene Änderung invalidiert die Mutation; die eines anderen wirkt beim nächsten Abruf,
  *   das 403 der Server-Gates bleibt das Netz.
@@ -289,6 +293,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.mitglieder,
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.modulOverrides,
+  EINSATZ_KEYS.geraete,
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.ortSuche,
@@ -359,6 +364,8 @@ export const einsatzKeys = {
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulOverrides: (einsatzId: number | null) => [EINSATZ_KEYS.modulOverrides, einsatzId] as const,
+  /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
+  geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulFreigaben: (einsatzId: number | null) => [EINSATZ_KEYS.modulFreigaben, einsatzId] as const,
   // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe wirkt auf jeden Einsatz der Org.

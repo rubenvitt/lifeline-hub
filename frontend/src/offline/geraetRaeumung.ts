@@ -88,6 +88,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Datenarmes Tab-Signal (Benutzer- und Einsatz-id), ohne Personendaten (LFH-688).',
   },
   {
+    ort: 'localStorage lifeline-hub.geraet-gekoppelt',
+    datei: 'geraet/geraetMarke.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Nur „dieser Browser ist ein gekoppeltes Gerät" (LFH-892), damit ein Ende der Kopplung „Kopplung beendet" statt der Anmeldung zeigt; kein Personenbezug.',
+  },
+  {
     ort: 'localStorage lifeline-serveruhr',
     datei: 'offline/serveruhr.ts',
     entscheidung: 'bleibt',
