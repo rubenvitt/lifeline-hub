@@ -35,8 +35,8 @@ const ROLLENQUELLE = 'theme/rollen.css';
 /**
  * SCHULDMENGE: Dateien, die beim Einführen des Guards noch Farbliterale tragen. Sie schrumpft
  * nur: ein Eintrag ohne Fund färbt den Guard rot und fällt im selben Commit wie der Fix.
- * Leer seit LFH-889 (Markdown-Renderer und -Editor auf Rollen). Ein neuer Eintrag braucht eine
- * Entscheidung, keinen Nachzug: wer ein Literal braucht, legt die Rolle an.
+ * Leer seit LFH-889 (Markdown-Renderer und -Editor auf Rollen), und sie wächst nicht wieder:
+ * wer ein Literal braucht, legt die Rolle an.
  */
 export const OFFEN: readonly string[] = [];
 
