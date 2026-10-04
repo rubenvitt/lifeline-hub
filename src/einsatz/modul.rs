@@ -211,6 +211,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/einstellungen", None),
     ("/api/einsaetze/{id}/modul-overrides", None),
     ("/api/einsaetze/{id}/mitglieder", None),
+    // Eigene Führungsstelle (LFH-849): Teil der Kopfdaten, modul-los wie die Wurzel.
+    ("/api/einsaetze/{id}/fuehrungsstelle", None),
 ];
 
 /// Der Einsatz selbst (`GET`/`PATCH /api/einsaetze/{id}`). In [`key_fuer_pfad`] trifft dieser

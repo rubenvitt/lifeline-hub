@@ -6,16 +6,19 @@ import type {
   EinsatzFahrzeug,
   EinsatzPersonal,
   Einsatzabschnitt,
+  Fuehrungsstelle,
   Sprechgruppe,
 } from '../api/types';
 import {
   aufklappbareSchluessel,
   baueFunkplan,
   funkplanLuecken,
+  gegenstelleHinweis,
   rendereFunkplanMarkdown,
   type FunkplanQuellen,
   type FunkplanZeile,
 } from './funkplan';
+import { fuehrungsstelleErfasst } from './fuehrungsstelle';
 import type { Quelle } from './luecken';
 
 function sg(
@@ -81,8 +84,13 @@ function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {
     fahrzeuge: daten([]),
     personal: daten([]),
     sprechgruppen: daten([]),
+    fuehrungsstelle: { zustand: 'daten', daten: null },
     ...p,
   };
+}
+
+function fs(p: Partial<Fuehrungsstelle> = {}): FunkplanQuellen['fuehrungsstelle'] {
+  return { zustand: 'daten', daten: { sprechgruppen: [], ...p } };
 }
 
 function alleSchluessel(zeilen: FunkplanZeile[]): string[] {
@@ -484,5 +492,109 @@ describe('rendereFunkplanMarkdown', () => {
       expect(container.textContent, wert).toContain(wert);
     }
     expect(container.querySelectorAll('del, em, a, code')).toHaveLength(0);
+  });
+});
+
+// ── Eigene Führungsstelle (LFH-849 D4) ─────────────────────────────────────────────────────────
+
+describe('fuehrungsstelleErfasst', () => {
+  it('ist ohne Daten und mit leeren Angaben nicht erfasst', () => {
+    expect(fuehrungsstelleErfasst(null)).toBe(false);
+    expect(fuehrungsstelleErfasst({ sprechgruppen: [] })).toBe(false);
+    expect(fuehrungsstelleErfasst({ sprechgruppen: [], rufname: '  ', erreichbarkeit: null })).toBe(
+      false,
+    );
+  });
+
+  it.each<[string, Fuehrungsstelle]>([
+    ['Rufname', { sprechgruppen: [], rufname: 'Florian Stadt 10/1' }],
+    ['Kommunikationsmittel', { sprechgruppen: [], kommunikationsmittel: 'digitalfunk' }],
+    ['Erreichbarkeit', { sprechgruppen: [], erreichbarkeit: '0171 1234567' }],
+    ['Sprechgruppe', { sprechgruppen: [sg(1, 'TMO', '311')] }],
+  ])('ist mit %s allein erfasst', (_, daten) => {
+    expect(fuehrungsstelleErfasst(daten)).toBe(true);
+  });
+});
+
+describe('baueFunkplan · eigene Führungsstelle', () => {
+  const mitFs = quellen({
+    abschnitte: daten([abschnitt(1, { name: 'Abschnitt Nord' })]),
+    fuehrungsstelle: fs({
+      rufname: 'Florian Stadt 10/1',
+      sprechgruppen: [sg(1, 'TMO', '311'), sg(2, 'DMO', '505')],
+      kommunikationsmittel: 'digitalfunk',
+      erreichbarkeit: '0171 GEHEIM',
+    }),
+  });
+
+  it('hat ohne erfasste Führungsstelle keine Zeile', () => {
+    for (const fuehrungsstelle of [
+      fs(),
+      { zustand: 'laden', daten: null },
+      { zustand: 'gesperrt', daten: null },
+    ] as const) {
+      const zeilen = baueFunkplan(quellen({ abschnitte: daten([abschnitt(1)]), fuehrungsstelle }));
+      expect(alleSchluessel(zeilen)).toEqual(['ab-1']);
+    }
+  });
+
+  it('steht erfasst als erste Zeile, ohne Kinder und ohne Leitung', () => {
+    const zeilen = baueFunkplan(mitFs);
+    expect(zeilen.map((z) => z.key)).toEqual(['fs', 'ab-1']);
+    expect(zeilen[0]).toEqual({
+      key: 'fs',
+      art: 'fuehrungsstelle',
+      id: null,
+      stelle: 'Führungsstelle',
+      stelleZusatz: null,
+      rufname: 'Florian Stadt 10/1',
+      leitung: { art: 'leer' },
+      tmo: ['311'],
+      dmo: ['505'],
+      kommunikationsmittel: 'Digitalfunk',
+      erreichbarkeit: '0171 GEHEIM',
+    });
+    expect(aufklappbareSchluessel(zeilen)).toEqual([]);
+  });
+
+  it('beginnt die Gliederung im Bericht mit der Führungsstelle, ohne ihre Erreichbarkeit', () => {
+    const text = rendereFunkplanMarkdown(baueFunkplan(mitFs), 'X', funkplanLuecken(mitFs), mitFs);
+    const gliederung = text.slice(text.indexOf('## Gliederung')).split('\n');
+    expect(gliederung[2]).toBe(
+      '- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO 311 · DMO 505 · Digitalfunk',
+    );
+    expect(gliederung[3]).toBe('- **Abschnitt Nord**');
+    expect(text).not.toContain('GEHEIM');
+  });
+
+  it('nennt die eigene Gegenstelle nur, solange sie nicht erfasst ist oder nicht vorliegt', () => {
+    expect(gegenstelleHinweis(mitFs)).toBeNull();
+    expect(gegenstelleHinweis(quellen())).toBe('nicht erfasst');
+    expect(
+      gegenstelleHinweis(quellen({ fuehrungsstelle: { zustand: 'gesperrt', daten: null } })),
+    ).toBe('nicht freigegeben');
+    expect(
+      gegenstelleHinweis(quellen({ fuehrungsstelle: { zustand: 'fehler', daten: null } })),
+    ).toBe('nicht geladen');
+
+    const bericht = (q: FunkplanQuellen) =>
+      rendereFunkplanMarkdown(baueFunkplan(q), 'X', funkplanLuecken(q), q);
+    expect(bericht(mitFs)).not.toContain('Eigene Gegenstelle');
+    expect(bericht(quellen())).toContain('- Eigene Gegenstelle (Führungsstelle): nicht erfasst');
+    expect(bericht(quellen({ fuehrungsstelle: { zustand: 'fehler', daten: null } }))).toContain(
+      '- Eigene Gegenstelle (Führungsstelle): — (nicht geladen)',
+    );
+  });
+
+  it('zählt die Verbindung Führungsstelle → oberster Abschnitt in den Lücken', () => {
+    const q = quellen({
+      abschnitte: daten([
+        abschnitt(1, { name: 'Abschnitt Nord', sprechgruppen: [sg(3, 'TMO', '312')] }),
+      ]),
+      fuehrungsstelle: fs({ sprechgruppen: [sg(1, 'TMO', '311')] }),
+    });
+    expect(rendereFunkplanMarkdown(baueFunkplan(q), 'X', funkplanLuecken(q), q)).toContain(
+      '- Verbindungen ohne gemeinsame Sprechgruppe: 1 (Abschnitt Nord → Führungsstelle)',
+    );
   });
 });

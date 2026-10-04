@@ -49,8 +49,9 @@ import './organigrammPrint.css';
  * - **Hängendes Layout ohne Bibliothek** (D3): das Gerüst `components/organigramm/HaengenderBaum`
  *   (Spalten der ersten Ebene, senkrechte Zweige, Klappziele, Druckregeln), geteilt mit der
  *   Fernmeldeskizze des S6 (LFH-625 D4).
- * - **Einsatzleitung ohne erfundene Leitung** (D5): die eigene Führungsstelle ist kein Datum
- *   (LFH-849). Der Stab steht nur mit Stab-Freigabe daneben — fail-closed über `useStabFreigabe`.
+ * - **Einsatzleitung ohne erfundene Leitung** (D5): wer die Einsatzleitung führt, ist kein Datum;
+ *   die eigene Führungsstelle (LFH-849) trägt nur Funkangaben und steht im Funkplan. Der Stab
+ *   steht nur mit Stab-Freigabe daneben — fail-closed über `useStabFreigabe`.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
  */
 
@@ -100,8 +101,8 @@ export function OrganigrammBild({ einsatzId, org, stab, zugeklappt, onUmschalten
         style={{ ...kasten, borderWidth: 2 }}
       >
         <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
-        {/* LFH-849: der Einsatz kennt die eigene Führungsstelle nicht. Keine erfundene Leitung,
-            sondern die benannte Lücke. */}
+        {/* Wer die Einsatzleitung führt, ist kein Datum (die Führungsstelle, LFH-849, trägt nur
+            Funkangaben). Keine erfundene Leitung, sondern die benannte Lücke. */}
         <div style={{ color: rollen.gedaempft }}>Leitung nicht erfasst</div>
       </div>
       {stab.zustand !== 'aus' && (

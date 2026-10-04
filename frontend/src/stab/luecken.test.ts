@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import type { Einheit, Einsatzabschnitt, Fuehrungsstelle, Sprechgruppe } from '../api/types';
+import type { FuehrungsstelleQuelle } from './fuehrungsstelle';
 import {
   abschnitteOhneSprechgruppe,
   einheitenOhneErreichbarkeit,
@@ -52,6 +53,15 @@ function einheit(
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 const gesperrt = <T>(): Quelle<T> => ({ zustand: 'gesperrt', daten: [] });
 const laden = <T>(): Quelle<T> => ({ zustand: 'laden', daten: [] });
+/** Geladen, aber nichts erfasst: der Stand vor LFH-849. */
+const ohneFs: FuehrungsstelleQuelle = { zustand: 'daten', daten: null };
+const fs = (
+  sprechgruppen: Sprechgruppe[],
+  p: Partial<Fuehrungsstelle> = {},
+): FuehrungsstelleQuelle => ({
+  zustand: 'daten',
+  daten: { sprechgruppen, ...p },
+});
 
 describe('abschnitteOhneSprechgruppe', () => {
   it('trifft nur Abschnitte ohne zugeordnete Sprechgruppe', () => {
@@ -108,15 +118,36 @@ describe('lokaleSprechgruppenOhneZuordnung', () => {
       daten([lokalFrei, lokalAmAbschnitt, lokalAnEinheit, katalogFrei]),
       daten([abschnitt(1, [lokalAmAbschnitt])]),
       daten([einheit(1, { sprechgruppen: [lokalAnEinheit] })]),
+      ohneFs,
     );
     expect(l.zustand).toBe('daten');
     expect(l.treffer.map((s) => s.bezeichnung)).toEqual(['DMO 999']);
   });
 
   it('nimmt den schlechtesten Zustand der drei Quellen und behauptet dann keine Zahl', () => {
-    const l = lokaleSprechgruppenOhneZuordnung(daten([lokalFrei]), daten([]), gesperrt());
+    const l = lokaleSprechgruppenOhneZuordnung(daten([lokalFrei]), daten([]), gesperrt(), ohneFs);
     expect(l).toEqual({ zustand: 'gesperrt', treffer: [] });
-    expect(lokaleSprechgruppenOhneZuordnung(laden(), daten([]), daten([])).zustand).toBe('laden');
+    expect(lokaleSprechgruppenOhneZuordnung(laden(), daten([]), daten([]), ohneFs).zustand).toBe(
+      'laden',
+    );
+  });
+
+  it('zählt eine lokale Sprechgruppe nur an der Führungsstelle nicht als Lücke (LFH-849)', () => {
+    const l = lokaleSprechgruppenOhneZuordnung(
+      daten([lokalFrei, lokalAmAbschnitt]),
+      daten([]),
+      daten([]),
+      fs([lokalAmAbschnitt]),
+    );
+    expect(l.treffer.map((s) => s.bezeichnung)).toEqual(['DMO 999']);
+  });
+
+  it('behauptet ohne geladene Führungsstelle keine Zahl', () => {
+    const l = lokaleSprechgruppenOhneZuordnung(daten([lokalFrei]), daten([]), daten([]), {
+      zustand: 'fehler',
+      daten: null,
+    });
+    expect(l).toEqual({ zustand: 'fehler', treffer: [] });
   });
 });
 
@@ -174,7 +205,7 @@ describe('verbindungenOhneGemeinsameSprechgruppe', () => {
       eh(11, [DMO506], { abschnitt_id: 1, ueber_einheit_id: 10 }),
       eh(12, [TMO311], { abschnitt_id: 1 }),
     ];
-    const l = verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten));
+    const l = verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten), ohneFs);
     expect(l.zustand).toBe('daten');
     expect(l.treffer).toEqual([
       {
@@ -196,7 +227,7 @@ describe('verbindungenOhneGemeinsameSprechgruppe', () => {
     const abschnitte = [ab(2, [DMO505], 77)];
     const einheiten = [eh(10, [TMO312], { abschnitt_id: 88 }), eh(11, [TMO312])];
     expect(
-      verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten)).treffer,
+      verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten), ohneFs).treffer,
     ).toEqual([]);
   });
 
@@ -204,7 +235,7 @@ describe('verbindungenOhneGemeinsameSprechgruppe', () => {
     const abschnitte = [ab(1, [TMO311])];
     const einheiten = [eh(11, [DMO506], { abschnitt_id: 1, ueber_einheit_id: 999 })];
     expect(
-      verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten)).treffer,
+      verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten), ohneFs).treffer,
     ).toEqual([
       {
         unten: { art: 'einheit', id: 11, name: 'E11' },
@@ -217,7 +248,7 @@ describe('verbindungenOhneGemeinsameSprechgruppe', () => {
     const abschnitte = [ab(1, [TMO311]), ab(2, [], 1)];
     const einheiten = [eh(10, [], { abschnitt_id: 1 })];
     expect(
-      verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten)).treffer,
+      verbindungenOhneGemeinsameSprechgruppe(daten(abschnitte), daten(einheiten), ohneFs).treffer,
     ).toEqual([]);
   });
 
@@ -230,6 +261,7 @@ describe('verbindungenOhneGemeinsameSprechgruppe', () => {
           zustand,
           daten: [],
         },
+        ohneFs,
       );
       expect(l).toEqual({ zustand, treffer: [] });
     },
@@ -239,7 +271,52 @@ describe('verbindungenOhneGemeinsameSprechgruppe', () => {
     const l = verbindungenOhneGemeinsameSprechgruppe(
       { zustand: 'gesperrt', daten: [] },
       daten([eh(10, [TMO312])]),
+      ohneFs,
     );
     expect(l).toEqual({ zustand: 'gesperrt', treffer: [] });
   });
+
+  // ── Führungsstelle → oberste Abschnitte (LFH-849 D5) ──────────────────────────────────────────
+
+  it('prüft jeden obersten Abschnitt gegen die eigene Führungsstelle', () => {
+    const abschnitte = [ab(1, [TMO311]), ab(2, [DMO505]), ab(3, [TMO312], 1), ab(4, [DMO506], 77)];
+    const l = verbindungenOhneGemeinsameSprechgruppe(
+      daten(abschnitte),
+      daten([]),
+      fs([TMO311, DMO506]),
+    );
+    expect(l.zustand).toBe('daten');
+    // A1 teilt TMO 311, A4 (Waise, steht oben) teilt DMO 506; A3 hängt an A1 und urteilt dort.
+    expect(l.treffer).toEqual([
+      {
+        unten: { art: 'abschnitt', id: 2, name: 'A2' },
+        oben: { art: 'fuehrungsstelle', name: 'Führungsstelle' },
+      },
+      {
+        unten: { art: 'abschnitt', id: 3, name: 'A3' },
+        oben: { art: 'abschnitt', id: 1, name: 'A1' },
+      },
+    ]);
+  });
+
+  it('zählt nichts gegen eine Führungsstelle ohne Sprechgruppe', () => {
+    const l = verbindungenOhneGemeinsameSprechgruppe(
+      daten([ab(1, [TMO311])]),
+      daten([]),
+      fs([], { rufname: 'Florian Stadt 10/1' }),
+    );
+    expect(l).toEqual({ zustand: 'daten', treffer: [] });
+  });
+
+  it.each(['gesperrt', 'fehler', 'laden'] as const)(
+    'hat ohne Führungsstelle (%s) keine Zahl, sondern den Zustand',
+    (zustand) => {
+      const l = verbindungenOhneGemeinsameSprechgruppe(
+        daten([ab(1, [TMO311]), ab(2, [DMO505], 1)]),
+        daten([]),
+        { zustand, daten: null },
+      );
+      expect(l).toEqual({ zustand, treffer: [] });
+    },
+  );
 });

@@ -5412,6 +5412,43 @@
           }
         }
       },
+      "FuehrungsstelleAnzeige": {
+        "type": "object",
+        "description": "Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON.",
+        "required": [
+          "sprechgruppen"
+        ],
+        "properties": {
+          "erreichbarkeit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Personenbezogen: wird geschwärzt und steht nie im Lagebericht."
+          },
+          "kommunikationsmittel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`)."
+          },
+          "rufname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funkrufname der Führungsstelle, z. B. „Florian Musterstadt 10/1“."
+          },
+          "sprechgruppen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprechgruppeAnzeige"
+            },
+            "description": "Zugeordnete Sprechgruppen (Katalog oder einsatzlokal), sortiert wie an Abschnitt und\nEinheit."
+          }
+        }
+      },
       "FunktionsArt": {
         "type": "string",
         "description": "Art der Führungsfunktion nach FwDV 100 Anlage 1 (Nr. 1.1.4/1.1.5). Aus dem Code\nabgeleitet, nie gespeichert und nie vom Client gesetzt.",
