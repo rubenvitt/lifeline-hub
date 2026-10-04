@@ -61,12 +61,12 @@ Begründung). Aus dem Quelltext Geschlossenes trägt **[abgeleitet]**.
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Lücke „Leitstelle“ im ersten Bild bei 1366 × 768 mit offenem Panel (e2e) | — |
 | 10 | **Alarmbudget** | **nicht anwendbar** | Keine Meldung, keine Toasts; die Quittung ist die neue Zeile | — |
 | 11 | **Warnverhalten** | **erfüllt** | Kein Blinken, kein Ton | — |
-| 12 | **Kein Sprung unter dem Cursor** | **offen** | Live hinzukommende Stellen (Ereignis `stab`) schieben die Zeilen darunter, wie im Funkplan. Bedienziele je Zeile sind „+ Verbindung“ und ein Menü; ein Fehlgriff öffnet eine Maske, die nichts ohne Absenden ändert | [LFH-867](https://app.clickup.com/t/123zgec64ta) |
+| 12 | **Kein Sprung unter dem Cursor** | **offen** | Live hinzukommende Stellen (Ereignis `stab`) schieben die Zeilen darunter, wie im Funkplan. Bedienziele je Zeile sind „+ Verbindung“ und ein Menü; ein Fehlgriff öffnet eine Maske, die nichts ohne Absenden ändert. Die Tabellen der `Datensicht` sind nicht Teil der Gerüst-Schleuse von [LFH-867](https://app.clickup.com/t/123zgec64ta) | [LFH-1020](https://app.clickup.com/t/123zgec6jkz) |
 | 13 | **Fokus nie verdeckt** | **erfüllt** [abgeleitet] | Keine angepinnte Leiste; Masken sind Dialoge | — |
 | 14 | **Tabellenseite vollständig** | **erfüllt** | `form="tabelle"` in jeder Breite (`NUR_TABELLE`), fixierte Spalte „Stelle“, stehende Kopfzeile, kein Überhang bei 1366/390 px (e2e, Gate 1). Keine Suche und Sortierung: die Ordnung ist die feste Gruppenfolge, der Plan ist klein | — |
 | 15 | **Erfassungsmaske vollständig** | **erfüllt** | `ErfassungsModal`: Fokus im ersten Feld, Enter sendet, Escape bricht ab und leert; Verbindung im Serienmodus mit „Werte behalten“ für das Mittel; Bezeichnung nur, wo Pflicht (ausgeblendet statt leer); Bearbeiten vorbelegt, schickt nur Geändertes | — |
 
-**Bilanz:** 13 erfüllt · 1 offen ([LFH-867](https://app.clickup.com/t/123zgec64ta)) · 1 nicht anwendbar.
+**Bilanz:** 13 erfüllt · 1 offen ([LFH-1020](https://app.clickup.com/t/123zgec6jkz)) · 1 nicht anwendbar.
 
 ## Tabelle: Funkplan, Darstellung „Sprechgruppen“
 
@@ -83,9 +83,9 @@ Begründung). Aus dem Quelltext Geschlossenes trägt **[abgeleitet]**.
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Lücken-Paneel bleibt im ersten Bild (e2e) | — |
 | 10 | **Alarmbudget** | **nicht anwendbar** | Keine Meldung | — |
 | 11 | **Warnverhalten** | **erfüllt** | Kein Blinken, kein Ton | — |
-| 12 | **Kein Sprung unter dem Cursor** | **offen** | Wie Tabelle und Skizze: live hinzukommende Zuordnungen verschieben Zeilen | [LFH-867](https://app.clickup.com/t/123zgec64ta) |
+| 12 | **Kein Sprung unter dem Cursor** | **offen** | Wie Tabelle und Skizze: live hinzukommende Zuordnungen verschieben Zeilen. Die Tabellen der `Datensicht` sind nicht Teil der Gerüst-Schleuse von [LFH-867](https://app.clickup.com/t/123zgec64ta) | [LFH-1020](https://app.clickup.com/t/123zgec6jkz) |
 | 13 | **Fokus nie verdeckt** | **erfüllt** [abgeleitet] | Keine schwebende Leiste | — |
 | 14 | **Tabellenseite vollständig** | **erfüllt** | `form="tabelle"`, fixierte Spalte „Sprechgruppe“, Σ 930 px am Fükw ohne Überhang, A4 ohne Überhang (e2e) | — |
 | 15 | **Erfassungsmaske vollständig** | **nicht anwendbar** | Schreibgeschützt; zugeordnet wird an Abschnitt und Einheit, die Teilnehmer führen dorthin | — |
 
-**Bilanz:** 11 erfüllt · 1 offen ([LFH-867](https://app.clickup.com/t/123zgec64ta)) · 3 nicht anwendbar.
+**Bilanz:** 11 erfüllt · 1 offen ([LFH-1020](https://app.clickup.com/t/123zgec6jkz)) · 3 nicht anwendbar.

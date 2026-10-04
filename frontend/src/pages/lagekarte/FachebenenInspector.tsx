@@ -27,6 +27,7 @@ import {
   dwdStufeAusSeverity,
   dwdWarnstufe,
   fachebeneFarbe,
+  pegelZustandVon,
   rollenFarbe,
   type StatusDarstellung,
 } from '../../theme/statusFarben';
@@ -107,13 +108,6 @@ const DRINGLICHKEIT: Record<string, string> = {
   Future: 'Zukünftig',
   Past: 'Vergangen',
   Unknown: 'Unbekannt',
-};
-
-// PEGELONLINE `stateMnwMhw` ist englisch; nur aussagekräftige Werte werden ein Tag.
-const ZUSTAND: Record<string, { label: string; color: string }> = {
-  high: { label: 'Hoch', color: 'red' },
-  normal: { label: 'Normal', color: 'green' },
-  low: { label: 'Niedrig', color: 'gold' },
 };
 
 // Rückfall für „Quelle“, wenn `SENDERNAME` fehlt oder leer ist (LFH-882): je Ebene die amtliche
@@ -288,8 +282,8 @@ function PegelInhalt({
   const { token } = theme.useToken();
   const wert = s(p.wert);
   const einheit = s(p.einheit);
-  const zustand = s(p.zustand);
-  const zust = zustand ? ZUSTAND[zustand] : undefined;
+  // PEGELONLINE `stateMnwMhw`; nur aussagekräftige Werte werden ein Tag (Vertrag `pegelZustand`).
+  const zust = pegelZustandVon(s(p.zustand));
   const km = s(p.km);
   return (
     <>
@@ -305,7 +299,7 @@ function PegelInhalt({
           }}
         >
           {wert}
-          {einheit ? ` ${einheit}` : ''} {zust ? <Tag color={zust.color}>{zust.label}</Tag> : null}
+          {einheit ? ` ${einheit}` : ''} {zust ? <StatusTag darstellung={zust} /> : null}
         </Typography.Text>
       ) : (
         <Typography.Paragraph type="secondary" style={{ marginBottom: token.marginSM }}>

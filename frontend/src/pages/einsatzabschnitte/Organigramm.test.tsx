@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, within, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
 import { ladeModulFreigaben } from '../../api/einsaetze';
@@ -245,6 +245,11 @@ describe('Organigramm — Klappzustand im Container', () => {
   it('zeigt einen live hinzukommenden Knoten aufgeklappt', async () => {
     const { rerender } = container();
     await userEvent.click(screen.getByRole('button', { name: 'Unterstellte von UA Deich' }));
+    // Zeiger und Fokus verlassen das Organigramm, sonst hielte die Schleuse den Zugang (LFH-867).
+    fireEvent.pointerLeave(screen.getByRole('region', { name: 'Organigramm' }), {
+      pointerType: 'mouse',
+    });
+    act(() => (document.activeElement as HTMLElement).blur());
     const neu = [...ABSCHNITTE, abschnitt(3, { name: 'EA Süd' })];
     const neueEinheiten = [...EINHEITEN, einheit(11, { name: 'Gruppe Süd', abschnitt_id: 3 })];
     rerender(<Organigramm einsatz={EINSATZ} abschnitte={neu} einheiten={daten(neueEinheiten)} />);
