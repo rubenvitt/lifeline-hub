@@ -447,17 +447,9 @@ export function funkplanLueckenZeilen(
       ? []
       : [lueckeMarkdown(titel, l, name)];
   return [
-    ...zeile(
-      'Abschnitte ohne Sprechgruppe',
-      luecken.abschnitteOhneSprechgruppe,
-      (a) => a.name,
-    ),
+    ...zeile('Abschnitte ohne Sprechgruppe', luecken.abschnitteOhneSprechgruppe, (a) => a.name),
     ...zeile('Einheiten ohne Sprechgruppe', luecken.einheitenOhneSprechgruppe, (e) => e.name),
-    ...zeile(
-      'Einheiten ohne Erreichbarkeit',
-      luecken.einheitenOhneErreichbarkeit,
-      (e) => e.name,
-    ),
+    ...zeile('Einheiten ohne Erreichbarkeit', luecken.einheitenOhneErreichbarkeit, (e) => e.name),
     ...zeile(
       'Verbindungen ohne gemeinsame Sprechgruppe',
       luecken.verbindungenOhneGemeinsameSprechgruppe,
