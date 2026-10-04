@@ -41,7 +41,8 @@ import {
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
-import MedienlageUebernahme from '../stab/MedienlageUebernahme';
+import AbschnittUebernahme from '../lageberichte/AbschnittUebernahme';
+import { uebernahmeFuer } from '../lageberichte/uebernahmen';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -61,9 +62,6 @@ import { useFehlerMeldung } from '../components/useFehlerMeldung';
  * beim Senden — `anzeige/zeitEingabe.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
  */
 type FormWerte = { titel: string; zeitstand?: Dayjs } & Record<string, string | Dayjs | undefined>;
-
-/** Schlüssel des Abschnitts „Medienlage“ im Lagevortrag (LFH-554). */
-const MEDIENLAGE = 'medienlage';
 
 export default function LageberichtDetailPage() {
   const { lbId } = useParams();
@@ -119,6 +117,8 @@ function LageberichtDetail() {
   // Vor den frühen Rückgaben (Hook-Reihenfolge); `vorlage()` liefert je Schlüssel dasselbe Objekt
   // aus `VORLAGEN`, die Abhängigkeit ist stabil.
   const vorlageDef = berichtQuery.data ? vorlage(berichtQuery.data.vorlage) : undefined;
+  // Als Primitiv für `abschnittsEditor` (Übernahme-Zuordnung je Vorlage, LFH-870).
+  const vorlageKey = berichtQuery.data?.vorlage;
   /**
    * Die Leer-Marke je Kopfzeile — über ein Primitiv memoisiert. `befuellteAbschnitte(werte, …)`
    * liefert je Tastenanschlag ein neues `Set` mit gleichem Inhalt; als Prop am memoisierten
@@ -183,42 +183,47 @@ function LageberichtDetail() {
     onGespeichert: invalidate,
   });
 
-  // Stabil (`useCallback` im Hook): die Übernahme aus S5 meldet ihre Änderung darüber.
+  // Stabil (`useCallback` im Hook): die Übernahmen in Abschnitte melden ihre Änderung darüber.
   const { markiereGeaendert } = schutz;
   /**
    * `useCallback`, nicht inline: eine neue Funktionsidentität je Anschlag höbe die `memo`-Sperre
-   * des Akkordeons auf — ohne Fehlerbild, nur langsam. Abhängig allein von `vorschauNeben`.
+   * des Akkordeons auf — ohne Fehlerbild, nur langsam. Abhängig von `vorschauNeben` und der Vorlage.
    */
   const abschnittsEditor = useCallback(
-    (a: AbschnittDef) => (
-      // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
-      // Label-Verknüpfung, steht aber nicht ein zweites Mal da.
-      <>
-        {/* LFH-554: Punkt III des Lagevortrags aus S5. Der Baustein fehlt ohne Stab-Freigabe;
-            er steht nur im Schreibzweig, denn nur dort gibt es den Editor. */}
-        {a.schluessel === MEDIENLAGE && (
-          <MedienlageUebernahme
-            einsatzId={einsatzId}
-            form={form}
-            feld={MEDIENLAGE}
-            onGeaendert={markiereGeaendert}
-          />
-        )}
-        <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
-          {/* Direkt unter dem Seitentitel (h1): die Akkordeon-Köpfe sind Schaltflächen, keine
+    (a: AbschnittDef) => {
+      // LFH-870: Abschnitte des Lagevortrags aus vorhandenen Lagedaten (Medienlage seit LFH-554,
+      // Eigene Lage). Der Baustein prüft die Freigabe seiner Quelle selbst; er steht nur im
+      // Schreibzweig, denn nur dort gibt es den Editor.
+      const quelle = vorlageKey ? uebernahmeFuer(vorlageKey, a.schluessel) : undefined;
+      return (
+        // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
+        // Label-Verknüpfung, steht aber nicht ein zweites Mal da.
+        <>
+          {quelle && (
+            <AbschnittUebernahme
+              quelle={quelle}
+              einsatzId={einsatzId}
+              form={form}
+              feld={a.schluessel}
+              onGeaendert={markiereGeaendert}
+            />
+          )}
+          <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
+            {/* Direkt unter dem Seitentitel (h1): die Akkordeon-Köpfe sind Schaltflächen, keine
             Überschriften, und ein Paneel rahmt den Entwurf nicht (s. u.). */}
-          <MarkdownEditor
-            layout={vorschauNeben ? 'split' : 'toggle'}
-            // Ohne sie druckte das Toggle-Layout sein Textfeld (`lageberichtPrint.css`).
-            druckfassung
-            unterEbene={1}
-            variante="dokument"
-            autoSize={{ minRows: 6 }}
-          />
-        </Form.Item>
-      </>
-    ),
-    [vorschauNeben, einsatzId, form, markiereGeaendert],
+            <MarkdownEditor
+              layout={vorschauNeben ? 'split' : 'toggle'}
+              // Ohne sie druckte das Toggle-Layout sein Textfeld (`lageberichtPrint.css`).
+              druckfassung
+              unterEbene={1}
+              variante="dokument"
+              autoSize={{ minRows: 6 }}
+            />
+          </Form.Item>
+        </>
+      );
+    },
+    [vorschauNeben, einsatzId, form, markiereGeaendert, vorlageKey],
   );
 
   /**
