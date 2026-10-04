@@ -19,7 +19,7 @@ Schreibrecht.
 - **THEN** bleibt das Band in der Kartenspalte, und Knopfblock und Band überschneiden sich nicht
 
 #### Scenario: Zielabstand im Handschuh-Betrieb
-- **WHEN** die Zeitachse in `handschuh` auf Handschirm, Führungs-Tablet oder Fükw ausgeklappt ist, mit und ohne Schreibrecht
+- **WHEN** die Zeitachse in `handschuh` auf Handschirm, Führungs-Tablet oder Fükw ausgeklappt ist, auf dem Handschirm auch ohne Schreibrecht
 - **THEN** liegen zwischen je zwei Bedienzielen des Bandes mindestens 16 px
 
 #### Scenario: Abstände wachsen mit der Stufe

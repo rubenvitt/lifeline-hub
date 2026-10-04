@@ -103,7 +103,7 @@ Nachgerechnet in `handschuh` (Innenbreite = Bandbreite − 2 × `paddingSM`):
 
 | Fläche | Innenbreite | Reihe 1 | Reihe 2 | Bandhöhe | Anteil |
 | --- | --- | --- | --- | --- | --- |
-| Handschirm | 250 px | Ausblenden, Abspielen, Schieber 74 px | Auswahl 162 px, Sichern | 202 px | 35 % |
+| Handschirm | 250 px | Ausblenden, Abspielen, Schieber 74 px (Schiene 42 px) | Auswahl 162 px, Sichern | 202 px | 35 % |
 | Tablet | 303 px | dto., Schieber 127 px | Auswahl 215 px, Sichern | 202 px | 35 % |
 | Fükw | ≈ 700 px | beide Gruppen in einer Reihe | — | 104 px | 16 % |
 
@@ -121,12 +121,13 @@ ist der einzige Ort mit nachgiebigem Inhalt (Schieber).
 | `BAND_LUECKE` (zwischen Gruppen) | 12 | `token.margin` (11 / 18 / 26) |
 | `BAND_POLSTER` | `8px 12px` | `token.paddingSM` (7 / 11 / 16) |
 | `ZEITLEISTE_LUECKE`, `STAND_LUECKE` (in der Gruppe) | 8 / 6 | `token.marginSM` (7 / 11 / 16) |
-| `SCHIEBER_RAND` | `0 8px` | `0 ${token.marginXS}px` (3 / 5 / 7) |
+| `SCHIEBER_RAND` | `0 8px` | `marginInline: token.marginSM` (7 / 11 / 16) |
 
 Die Polsterung ist rundum `paddingSM` statt `paddingSM`/`padding` (Ticket): mit `padding` (26 px)
 sänke die Innenbreite am Handschirm auf 230 px und der Schieber auf 54 px. Der Rand des Schiebers
-ist der Platz für den halben Griff an den Enden der Schiene, kein Abstand zwischen Zielen; die
-Gruppenlücke davor hält die 16 px. Der Guard bekommt keinen Ausnahmeabsatz mehr: die Werte sind
+trägt den halben Griff an den Enden der Schiene. Geplant war `marginXS`; gemessen steht der Griff
+in `handschuh` 11 px über das Schienenende, und mit 7 px Rand lag er nur 12 px neben „Abspielen“.
+Mit `marginSM` hält er die 16 px (Nachtrag aus der Umsetzung). Der Guard bekommt keinen Ausnahmeabsatz mehr: die Werte sind
 Token-Ausdrücke, die er nicht als Zahl liest.
 
 ### D5 — Nachweise
@@ -141,9 +142,12 @@ Token-Ausdrücke, die er nicht als Zahl liest.
   beschriftetes Ziel und Ausblenden, Abspielen, Sichern als Symbolknöpfe.
   `lagekarte-smoke.spec.ts`: Stand über die Auswahl, „höchstens zwei Reihen“ bleibt.
 
+Gemessen nach der Umsetzung (04.10.2026, zwei Stände): Handschirm und Tablet in `handschuh`
+202 px (35 %), Fükw in `handschuh` 104 px (16 %), Fükw in `kompakt` 44 px in einer Reihe.
+
 ## Risks / Trade-offs
 
-- [Schieber am Handschirm in `handschuh` nur 74 px breit] → bei zwei Ständen ein Umschalter, bei
+- [Schieber am Handschirm in `handschuh` nur 74 px breit, die Schiene 42 px] → bei zwei Ständen ein Umschalter, bei
   vielen Ständen grob. Die Auswahl springt direkt zu jedem Stand; der Schieber ist dort Zusatz für
   das Abspielen.
 - [Ein Klick mehr beim Sichern mit Bezeichnung] → selten gegenüber dem Wählen (D2).
