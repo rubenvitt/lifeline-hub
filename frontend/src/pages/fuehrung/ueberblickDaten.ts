@@ -45,7 +45,7 @@ import {
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
 import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
-import { dauerText } from '../../stab/lagebesprechungZustand';
+import { dauerText, lagebesprechungUeberfaellig } from '../../stab/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
@@ -493,7 +493,21 @@ interface MarkenAuswahl {
   weitere: number;
 }
 
-export function markenBewertung(zeit: Dayjs, jetzt: Dayjs): { ton: MarkenTon; wort: string } {
+/**
+ * Ton und Wort einer Frist: überfällig `alarm`, unter {@link KNAPP_MINUTEN} `achtung`, sonst
+ * `neutral`. Ausnahme ist die überfällige Lagebesprechung: sie liest Ton und Wort aus
+ * `lagebesprechungUeberfaellig`, damit die Stab-Seite und diese Liste denselben Termin gleich
+ * zeigen (LFH-859, `stab/AGENTS.md`).
+ */
+export function markenBewertung(
+  zeit: Dayjs,
+  jetzt: Dayjs,
+  art?: MarkenArt,
+): { ton: MarkenTon; wort: string } {
+  if (art === 'lagebesprechung') {
+    const ueberfaellig = lagebesprechungUeberfaellig(zeit, jetzt);
+    if (ueberfaellig) return { ton: ueberfaellig.rolle, wort: ueberfaellig.label };
+  }
   const abstand = zeit.valueOf() - jetzt.valueOf();
   if (abstand <= 0) return { ton: 'alarm', wort: 'überfällig' };
   const minuten = Math.floor(abstand / 60_000);
@@ -594,7 +608,7 @@ export function naechsteMarken(
   );
   const marken = sortiert.slice(0, MARKEN_MAX).map((m) => ({
     ...m,
-    ...markenBewertung(zeitpunkt(m.zeit)!, jetzt),
+    ...markenBewertung(zeitpunkt(m.zeit)!, jetzt, m.art),
   }));
   return { marken, weitere: Math.max(0, sortiert.length - MARKEN_MAX) };
 }
