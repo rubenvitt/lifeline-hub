@@ -51,6 +51,7 @@ import {
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { neueClientId } from '../offline/clientId';
+import { serverJetzt } from '../offline/serveruhr';
 import { lageberichtePfad } from '../routing/deeplinks';
 
 interface Props {
@@ -520,8 +521,10 @@ export default function Schnellerfassung({
       return;
     }
     // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein langer
-    // Upload Ereigniszeit und `erfasst_lokal_at`.
-    const jetztIso = new Date().toISOString();
+    // Upload Ereigniszeit und `erfasst_lokal_at`. Sie gilt nach der Serveruhr, soweit der Versatz
+    // bekannt ist: eine vorgehende Geräteuhr datierte den Eintrag sonst zu spät (LFH-895,
+    // `openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`, D1/D2).
+    const jetztIso = serverJetzt().toISOString();
     aendereVersand({ sendet: true, hinweis: null });
     try {
       const anhangIds = await ladeAnhaengeHoch();

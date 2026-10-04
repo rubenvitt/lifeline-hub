@@ -7,7 +7,9 @@
  * Anzeigezone gewandelt (`zeitEingabe.ts`, Begründung dort und in
  * `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`, D1–D4):
  * - `onChange` feuert nur bei einer Eingabe — ein unberührtes Feld behält den gelesenen Zeitpunkt.
- * - antds „Jetzt“ wäre browserlokal; es ist aus, ein eigener Knopf im Panel-Fuß setzt `dayjs()`.
+ * - antds „Jetzt“ wäre browserlokal; es ist aus, ein eigener Knopf im Panel-Fuß setzt `serverJetzt()`
+ *   — jetzt nach der Serveruhr, soweit der Versatz bekannt ist (LFH-895,
+ *   `openspec/changes/lfh-895-ereigniszeit-serveruhr/design.md`, D3).
  * - Weicht die Anzeigezone von der Browserzone ab, steht die Zone am Feld und im Panel-Fuß.
  */
 import { Button, DatePicker, type GetRef } from 'antd';
@@ -15,6 +17,7 @@ import type { RangePickerProps } from 'antd/es/date-picker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useMemo, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import { monoStil, useRollen } from '../components/instrument';
+import { serverJetzt } from '../offline/serveruhr';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { browserZone, effektiveZone, istZukunftstag, ausWanduhr, zuWanduhr } from './zeitEingabe';
 
@@ -187,7 +190,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         <PanelFuss
           zone={z.zonenHinweis}
           onJetzt={() => {
-            const jetzt = dayjs();
+            const jetzt = serverJetzt();
             melde(jetzt);
             onOk?.(jetzt);
             oeffne(false);
