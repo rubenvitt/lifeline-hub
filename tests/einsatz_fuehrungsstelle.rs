@@ -391,6 +391,9 @@ async fn erfolg_feuert_einsatz_ablehnung_nicht() {
     );
     let id = benutzer_anlegen(&app, &admin, "beobachterin", "keine").await;
     rolle_setzen(&app, &admin, einsatz, id, "beobachter").await;
+    // Die beiden Ablehnungen melden nichts; die Mitgliedschaftsänderung meldet selbst `einsatz`
+    // (LFH-854). Erst danach zählt die dritte Ablehnung.
+    assert_eq!(kopf_events(&mut rx), 1);
     let bea = login_cookie(&app, "beobachterin", "beobachterinpw1").await;
     assert_eq!(
         patchen(&app, &bea, einsatz, json!({"rufname": "Y"}))

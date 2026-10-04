@@ -68,6 +68,8 @@ describe('UnwetterHinweis', () => {
       minute: '2-digit',
       hourCycle: 'h23',
     }).format(new Date(beginn));
-    expect(ereignisse[0].detail.beschreibung).toContain(`seit ${uhrNy}`);
+    // Liegt der Beginn in New York am Vortag (00:00–00:59 Ortszeit), setzt `standZeit` den Tag
+    // davor („seit 03. 23:11"); das ist gewollt und darf den Test nicht färben.
+    expect(ereignisse[0].detail.beschreibung).toMatch(new RegExp(`seit (\\d{2}\\. )?${uhrNy}`));
   });
 });
