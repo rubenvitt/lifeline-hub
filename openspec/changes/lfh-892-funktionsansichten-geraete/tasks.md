@@ -22,13 +22,13 @@ nach den Subtasks, die nach der Freigabe auf dem Board angelegt werden; Reihenfo
 
 - [x] 2.1 Stellenbindung in `routes/einsatz_uhs.rs` (fremde UHS 404, Liste nur eigene UHS, Belegung nur in der eigenen UHS) über einen gemeinsamen Helfer; verifiziert durch Tests mit zwei UHS je Szenario aus „Stellenbindung“
 - [x] 2.2 Stellenbindung in `routes/einsatz_person.rs` (sichtbar bei Belegung in der eigenen UHS, auch nach Austritt) und Aufnahme mit Eintritt im selben Schritt; verifiziert durch Tests „Person der anderen UHS → 404“, „Verbleib nach Austritt“, „Aufnahme steht im Eingang“ samt Rücknahme bei Fehler
-- [ ] 2.3 Hülle `frontend/src/geraet/GeraeteLayout.tsx` (Kopfzeile mit Stelle, Gerät, Verbindung, Kopplungsende; Gerätemenü; keine Sprungpalette; fremde Adresse → Startseite; 401 → „Kopplung beendet“); verifiziert durch Komponententests zu jedem Szenario aus `feldgeraet-bedienung`
-- [ ] 2.4 Ansicht UHS-Tablet: Aufnahme, Patienten, Grundriss aus den vorhandenen Flächen, ohne Sprünge in fremde Module; kein Lagebild auf der Platte, Warteschlange an; verifiziert durch Komponententests und `e2e/geraet-uhs-tablet.spec.ts` bei 1024 × 768 mit grobem Zeiger
-- [ ] 2.5 Bereichsdatei `frontend/src/geraet/AGENTS.md` (Hülle, Ansichten, Schranke nur verengend, keine Platte, Großbild-Regeln des Monitors) und Eintrag in der Tabelle der Wurzel-`AGENTS.md`; verifiziert durch `prettier --check` über `frontend/`
+- [x] 2.3 Hülle `frontend/src/geraet/GeraeteLayout.tsx` (Kopfzeile mit Stelle, Gerät, Verbindung, Kopplungsende; Gerätemenü; keine Sprungpalette; fremde Adresse → Startseite; 401 → „Kopplung beendet“); verifiziert durch Komponententests zu jedem Szenario aus `feldgeraet-bedienung`
+- [x] 2.4 Ansicht UHS-Tablet: Aufnahme, Patienten, Grundriss aus den vorhandenen Flächen, ohne Sprünge in fremde Module; kein Lagebild auf der Platte, Warteschlange an; verifiziert durch Komponententests und `e2e/geraet-uhs-tablet.spec.ts` bei 1024 × 768 mit grobem Zeiger
+- [x] 2.5 Bereichsdatei `frontend/src/geraet/AGENTS.md` (Hülle, Ansichten, Schranke nur verengend, keine Platte, Großbild-Regeln des Monitors) und Eintrag in der Tabelle der Wurzel-`AGENTS.md`; verifiziert durch `prettier --check` über `frontend/`
 
 ## 3. UHS-Laptop — LFH-1025
 
-- [ ] 3.1 Server: Plätze, Stammdaten und Anhänge der eigenen UHS, Material der eigenen UHS lesen, Meldungen anlegen und eigene lesen; Status und Stornieren bleiben 403; verifiziert durch Tests je Zeile der Matrix (Laptop gegen Tablet)
+- [x] 3.1 Server: Plätze, Stammdaten und Anhänge der eigenen UHS, Material der eigenen UHS lesen, Meldungen anlegen und eigene lesen; Status und Stornieren bleiben 403; verifiziert durch Tests je Zeile der Matrix (Laptop gegen Tablet)
 - [ ] 3.2 Ansicht UHS-Laptop mit Bereich „UHS“ (Grundriss bearbeiten, Material, Meldungen); verifiziert durch Komponententests und einen e2e-Lauf bei 1366 × 768
 
 ## 4. Lagemonitor — LFH-1026

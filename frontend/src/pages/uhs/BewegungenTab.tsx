@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
-import { personDetailPfad } from '../../routing/deeplinks';
+import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import type { Person, UhsBelegung, UhsDetail, BelegungsArt } from '../../api/types';
 import Datensicht, { spaltenFuer } from '../../components/Datensicht';
 import StatusTag from '../../components/StatusTag';
@@ -42,6 +42,8 @@ const ART_WERTE = (Object.keys(belegungsArt) as BelegungsArt[]).map((art) => ({
 }));
 
 export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
+  // Gerätehülle oder Stab: die Person öffnet in der Oberfläche, aus der man kommt (LFH-892).
+  const pfade = useEinsatzPfade();
   const personenQuery = useQuery({
     queryKey: einsatzKeys.personen(uhs.einsatz_id),
     queryFn: () => listePersonen(uhs.einsatz_id),
@@ -92,7 +94,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
             // auch unbekannte Personen. Ohne `ziel` trägt `zelle()` diesen Knoten unverändert in
             // die Kartentitelzeile.
             if (!personenById.has(personId)) return etikett;
-            return <Link to={personDetailPfad(uhs.einsatz_id, personId)}>{etikett}</Link>;
+            return <Link to={pfade.personDetail(uhs.einsatz_id, personId)}>{etikett}</Link>;
           },
         },
         {
@@ -123,7 +125,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           render: (v: string | null) => v ?? '—',
         },
       ]),
-    [personenById, plaetzeById, uhs.einsatz_id],
+    [personenById, plaetzeById, uhs.einsatz_id, pfade],
   );
 
   return (

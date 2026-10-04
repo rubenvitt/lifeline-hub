@@ -896,5 +896,29 @@ export function koppelnAdresse(origin: string, code: string): string {
 /** Startseite eines gekoppelten Geräts; die Hülle wählt darunter die Ansicht. */
 export const GERAET_START_PFAD = '/geraet';
 
+/*
+ * Pfade der Gerätehülle (LFH-892, design.md D9). Die Einsatz-ID steht wie unter `/einsaetze` als
+ * Segment `:id`, die Detailkennungen tragen dieselben Namen (`:personId`, `:uhsId`): die geteilten
+ * Seiten lesen sie unverändert über `useParams`.
+ */
+
+/** Patientenliste der UHS eines Geräts, Startseite von Tablet und Laptop. */
+export function geraetPatientenPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/patienten`;
+}
+
+export function geraetPersonPfad(einsatzId: number, personId: number): string {
+  return `${geraetPatientenPfad(einsatzId)}/${personId}`;
+}
+
+export function geraetAufnahmePfad(einsatzId: number, opts: { uhs?: number } = {}): string {
+  return mitQuery(`${GERAET_START_PFAD}/${einsatzId}/aufnahme`, { uhs: opts.uhs });
+}
+
+/** Grundriss der eigenen UHS. */
+export function geraetUhsPfad(einsatzId: number, uhsId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/uhs/${uhsId}`;
+}
+
 /** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
 export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';

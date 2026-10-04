@@ -155,8 +155,37 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
 ];
-/// Zusätzliche Einsatzrouten des UHS-Laptops (Subtask UHS-Laptop).
-const UHS_LAPTOP: &[(&str, &str)] = &[];
+/// Zusätzliche Einsatzrouten des UHS-Laptops: alles des Tablets, dazu Plätze, Stammdaten und
+/// Anhänge der eigenen UHS, Meldungen anlegen und die eigenen lesen. Material liest der Laptop
+/// über das UHS-Detail. Status, Stornieren, UHS anlegen und die Zugriffsliste der Anhänge fehlen
+/// bewusst; jeder UHS-Handler hier prüft die Stelle über [`stelle`].
+const UHS_LAPTOP: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/uhs"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}"),
+    ("PATCH", "/api/einsaetze/{id}/uhs/{uid}"),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/plaetze"),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/plaetze/bulk"),
+    ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}"),
+    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
+    ),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
+    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
+    ("GET", "/api/einsaetze/{id}/personen"),
+    ("POST", "/api/einsaetze/{id}/personen"),
+    ("GET", "/api/einsaetze/{id}/personen/{pid}"),
+    ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
+    ("GET", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/meldungen"),
+];
 /// Zusätzliche Einsatzrouten des Lagemonitors (Subtask Lagemonitor).
 const LAGEMONITOR: &[(&str, &str)] = &[];
 

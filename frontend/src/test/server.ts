@@ -1,10 +1,10 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import type { BenutzerAnzeige } from '../api/types';
+import type { MeAntwort } from '../api/types';
 import { freigabenFixture } from './fixtures';
 
 /** `/api/auth/me` mit einem angemeldeten Benutzer — für `server.use(...)`. */
-export function meHandler(benutzer: BenutzerAnzeige) {
+export function meHandler(benutzer: MeAntwort) {
   return http.get('/api/auth/me', () => HttpResponse.json(benutzer));
 }
 

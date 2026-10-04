@@ -1,7 +1,7 @@
 import { Button, Drawer } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
-import { personDetailPfad } from '../routing/deeplinks';
+import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { ladePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import PersonVorschau from './PersonVorschau';
@@ -20,6 +20,7 @@ export default function PersonDetailDrawer({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const pfade = useEinsatzPfade();
   const detailQuery = useQuery({
     queryKey: einsatzKeys.person(einsatzId, personId),
     queryFn: () => ladePerson(einsatzId, personId!),
@@ -35,7 +36,7 @@ export default function PersonDetailDrawer({
       onClose={onClose}
       extra={
         p && (
-          <Button type="link" onClick={() => navigate(personDetailPfad(einsatzId, p.id))}>
+          <Button type="link" onClick={() => navigate(pfade.personDetail(einsatzId, p.id))}>
             Vollständig öffnen
           </Button>
         )

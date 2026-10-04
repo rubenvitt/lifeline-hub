@@ -69,12 +69,12 @@ test('LFH-892: koppeln, auf der Hülle bleiben, widerrufen → „Kopplung beend
     await expect(geraet.getByLabel('Kopplungscode')).toHaveValue(code);
     await expect(geraet).toHaveURL(/\/koppeln$/);
     await geraet.getByRole('button', { name: 'Gerät koppeln' }).click();
-    await expect(geraet).toHaveURL(/\/geraet$/);
-    await expect(geraet.getByText('UHS Nord', { exact: true })).toBeVisible();
+    await expect(geraet).toHaveURL(new RegExp(`/geraet/${einsatz}/patienten$`));
+    await expect(geraet.getByRole('banner').getByText('UHS Nord', { exact: true })).toBeVisible();
 
     // Eine fremde Adresse führt auf die Startseite der Hülle.
     await geraet.goto(`/einsaetze/${einsatz}/lagekarte`);
-    await expect(geraet).toHaveURL(/\/geraet$/);
+    await expect(geraet).toHaveURL(new RegExp(`/geraet/${einsatz}/patienten$`));
 
     // Die Liste der Einsatzleitung zeigt die Kopplung als gekoppelt.
     await page.reload();

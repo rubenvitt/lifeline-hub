@@ -1277,3 +1277,220 @@ async fn tablet_traegt_den_verbleib_nach_dem_austritt_ein() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["abgleiche"], json!([]), "kein Abgleich am Gerät");
 }
+
+// ---------- UHS-Laptop (Subtask LFH-1025) ----------
+
+/// Ein gekoppelter UHS-Laptop: Geräte-Cookie.
+async fn laptop(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64) -> String {
+    let (_, code) = kopplung(
+        app,
+        cookie,
+        einsatz,
+        json!({"ansicht": "uhs-laptop", "uhs_id": uhs, "bezeichnung": "Laptop 1"}),
+    )
+    .await;
+    let a = koppeln(app, &code, None).await;
+    assert_eq!(a.status, StatusCode::OK, "{:?}", a.body);
+    a.cookie.expect("Sitzungscookie")
+}
+
+#[tokio::test]
+async fn laptop_bearbeitet_grundriss_und_stammdaten_der_eigenen_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let plaetze = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze");
+
+    // Platz anlegen: Laptop ja, Tablet nein, fremde UHS 404.
+    let neu = json!({"typ": "bett", "bezeichnung": "B1"});
+    let (s, v) = anfrage_json(&app, "POST", &plaetze(nord), &geraet, Some(&neu)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let platz = v["id"].as_i64().unwrap();
+    let (s, _) = anfrage_json(&app, "POST", &plaetze(nord), &tablet, Some(&neu)).await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Tablet bearbeitet den Grundriss nicht"
+    );
+    let (s, _) = anfrage_json(&app, "POST", &plaetze(sued), &geraet, Some(&neu)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/bulk", plaetze(nord)),
+        &geraet,
+        Some(&json!({"typ": "bett", "menge": 2})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{}/{platz}", plaetze(nord)),
+        &geraet,
+        Some(&json!({"bezeichnung": "Liege 1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{}/{platz}", plaetze(nord)),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    // Stammdaten der eigenen UHS, nicht der fremden.
+    let stamm = json!({"standort": "Halle 2"});
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+        &geraet,
+        Some(&stamm),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["standort"], "Halle 2");
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{sued}"),
+        &geraet,
+        Some(&stamm),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS");
+}
+
+#[tokio::test]
+async fn laptop_wechselt_den_uhs_status_nicht() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+
+    let verboten: [(&str, String, Option<Value>); 4] = [
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),
+            Some(json!({"status": "aufgeloest"})),
+        ),
+        (
+            "DELETE",
+            format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+            None,
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/uhs"),
+            Some(json!({"typ": "behandlungsplatz", "bezeichnung": "UHS West"})),
+        ),
+        (
+            "GET",
+            format!("/api/einsaetze/{einsatz}/uhs/{nord}/anhaenge/zugriffe"),
+            None,
+        ),
+    ];
+    for (methode, pfad, body) in verboten {
+        let (s, v) = anfrage_json(&app, methode, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{methode} {pfad}: {v}");
+    }
+}
+
+#[tokio::test]
+async fn laptop_liest_material_und_anhaenge_der_eigenen_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(&json!({"bezeichnung": "Wolldecke", "kategorie": "Betreuung"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&json!({"material_id": v["id"], "menge": 20})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{}", v["id"]),
+        &admin,
+        Some(&json!({"uhs_id": nord})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let detail = format!("/api/einsaetze/{einsatz}/uhs/{nord}");
+    let (s, v) = anfrage(&app, "GET", &detail, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["material"].as_array().unwrap().len(), 1, "{v}");
+    let (_, v) = anfrage(&app, "GET", &detail, &tablet, None).await;
+    assert_eq!(v["material"], json!([]), "Tablet liest kein Material");
+
+    let anhaenge = |uhs: i64| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge");
+    let (s, v) = anfrage(&app, "GET", &anhaenge(nord), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = anfrage(&app, "GET", &anhaenge(sued), &geraet, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS");
+    let (s, _) = anfrage(&app, "GET", &anhaenge(nord), &tablet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Tablet liest keine Anhänge");
+}
+
+#[tokio::test]
+async fn laptop_meldet_und_liest_nur_eigene_meldungen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldung = |inhalt: &str| {
+        json!({
+            "absender": "UHS Nord",
+            "meldeweg": "persoenlich",
+            "inhalt": inhalt,
+            "ereigniszeit": "2026-10-04 10:00:00",
+        })
+    };
+
+    let (s, v) = anfrage_json(&app, "POST", &meldungen, &admin, Some(&meldung("Lage"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &geraet,
+        Some(&meldung("Decken knapp")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let (s, v) = anfrage(&app, "GET", &meldungen, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let inhalte: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["inhalt"].as_str().unwrap())
+        .collect();
+    assert_eq!(inhalte, vec!["Decken knapp"], "nur die eigene Meldung");
+
+    let (s, _) = anfrage(&app, "GET", &meldungen, &tablet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Tablet liest keine Meldungen");
+}

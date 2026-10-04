@@ -18,6 +18,7 @@ import { einsatzIdAusPfad } from './einsatzPfad';
 import { modulAusPfad } from '../einsatz/modulRegistry';
 import { CommandPalette } from './CommandPalette';
 import { tastaturAktionFuerEreignis } from './befehle';
+import { useAuthOptional } from '../auth/AuthContext';
 import type { Oeffnung, PaletteModus, TastaturAktionen } from './typen';
 
 interface TastaturEbene {
@@ -124,6 +125,9 @@ function flachsteEbene(ebenen: Map<symbol, TastaturEbene>): TastaturEbene[] {
 
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [offen, setOffen] = useState(false);
+  // Ein gekoppeltes Gerät hat keine Sprungpalette (LFH-892, Spec `feldgeraet-bedienung`): ihre
+  // Sprünge führten in Module, die seine Ansicht nicht liest.
+  const ohnePalette = useAuthOptional()?.geraet != null;
   /**
    * Das Befehls-Gedächtnis hängt HIER und nicht in `PaletteHost`: der Provider ist app-weit
    * montiert, der Stand ist beim ersten `Strg/⌘+K` meist schon da, und der Schreib-Callback
@@ -143,13 +147,13 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     setAktionsRevision((revision) => revision + 1);
   }, []);
   const oeffne = useCallback(() => {
-    if (offenRef.current) return;
+    if (offenRef.current || ohnePalette) return;
     // Bewusst die ROHE Kette merken: ein Anzeige-Fallback liefe sonst über `schliesse` in den
     // Tastenweg, und Strg+S feuerte auf einer Maske, die der Fokus verlassen hat.
     vorPaletteKetteRef.current = aktiveKetteRef.current;
     offenRef.current = true;
     setOffen(true);
-  }, []);
+  }, [ohnePalette]);
   const schliesse = useCallback(() => {
     if (!offenRef.current) return;
     aktiveKetteRef.current = vorPaletteKetteRef.current;

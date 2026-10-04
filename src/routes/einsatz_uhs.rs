@@ -177,6 +177,7 @@ pub async fn aktualisieren(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<UhsAnzeige>, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
     if vorher.storniert_at.is_some() {
@@ -301,6 +302,7 @@ pub async fn platz_anlegen(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PlatzAnlegenBody>,
 ) -> Result<(StatusCode, Json<PlatzAnzeige>), AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     parse_enum(PlatzTyp::parse, &body.typ, "Unbekannter Platz-Typ")?;
     let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
@@ -337,6 +339,7 @@ pub async fn plaetze_bulk_anlegen(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PlatzBulkBody>,
 ) -> Result<(StatusCode, Json<Vec<PlatzAnzeige>>), AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     let Some(typ) = PlatzTyp::parse(&body.typ) else {
         return Err(AppError::Validation("Unbekannter Platz-Typ".into()));
@@ -378,6 +381,7 @@ pub async fn platz_aktualisieren(
     PfadParam((_eid, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
     JsonBody(body): JsonBody<PlatzPatchBody>,
 ) -> Result<Json<PlatzAnzeige>, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
@@ -447,6 +451,7 @@ pub async fn platz_stornieren(
     ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
     PfadParam((_eid, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 

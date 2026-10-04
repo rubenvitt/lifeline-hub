@@ -9,7 +9,13 @@ import LoginPage from './pages/LoginPage';
 import AppAnmeldungPage from './pages/AppAnmeldungPage';
 import KoppelnPage from './geraet/KoppelnPage';
 import KopplungBeendetPage from './geraet/KopplungBeendetPage';
-import GeraeteLayout from './geraet/GeraeteLayout';
+import GeraeteLayout, {
+  GeraetAufnahme,
+  GeraetEinsatzRahmen,
+  GeraetStart,
+  GeraetUhs,
+} from './geraet/GeraeteLayout';
+import GeraetPatientenPage from './geraet/GeraetPatientenPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
@@ -220,7 +226,18 @@ export const appRouten = createRoutesFromElements(
     <Route path={KOPPLUNG_BEENDET_PFAD} element={<KopplungBeendetPage />} />
     <Route element={<RequireAuth />}>
       {/* Hülle eines gekoppelten Geräts; die Ansichten hängen darunter (LFH-892, design.md D9). */}
-      <Route path={`${GERAET_START_PFAD}/*`} element={<GeraeteLayout />} />
+      <Route path={GERAET_START_PFAD} element={<GeraeteLayout />}>
+        <Route index element={<GeraetStart />} />
+        <Route path=":id" element={<GeraetEinsatzRahmen />}>
+          <Route index element={<GeraetStart />} />
+          <Route path="patienten" element={<GeraetPatientenPage />} />
+          <Route path="patienten/:personId" element={<PersonenDetailPage />} />
+          <Route path="aufnahme" element={<GeraetAufnahme />} />
+          <Route path="uhs/:uhsId" element={<GeraetUhs />} />
+          <Route path="*" element={<GeraetStart />} />
+        </Route>
+        <Route path="*" element={<GeraetStart />} />
+      </Route>
       {/* Bestätigung im Systembrowser für die Mac-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
       <Route path="/app-anmeldung" element={<AppAnmeldungPage />} />
       <Route element={<BetriebsLayout />}>
