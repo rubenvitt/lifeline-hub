@@ -109,6 +109,8 @@ export function einsatzKennung(
   return leitstelle ? leitstelle : null;
 }
 
+const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
+
 /**
  * Statuspunkt vor der Einsatznummer: `normal` bei aktivem Einsatz, sonst neutral. Das Wort
  * steht als zugänglicher Name (`role="img"`) und `title` am Punkt (WCAG 1.4.1).
@@ -121,7 +123,7 @@ function StatusPunkt({ status }: { status: EinsatzAnzeige['status'] }) {
       role="img"
       aria-label={`Einsatzstatus: ${darstellung.label}`}
       title={darstellung.label}
-      style={{ width: 6, height: 6, flexShrink: 0, background: farbe }}
+      style={{ ...STATUSPUNKT_PLATZ, background: farbe }}
     />
   );
 }
@@ -327,7 +329,15 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 />
               </>
             )}
-            {einsatz && <StatusPunkt status={einsatz.status} />}
+            {/* Solange der Einsatz lädt, hält ein leerer Platz die Breite des Statuspunkts und
+                die Spinnerzelle die Höhe des Umschalters: Name und Punkt erscheinen dann, ohne
+                den Kopf zu verschieben (LFH-883). Auf 390 px fiel dieser Sprung sonst in
+                dasselbe Bild wie der Ortspfad der Seite und hob dessen Seiten-CLS auf 0,02. */}
+            {einsatz ? (
+              <StatusPunkt status={einsatz.status} />
+            ) : (
+              einsatzQuery.isLoading && <span aria-hidden="true" style={STATUSPUNKT_PLATZ} />
+            )}
             {mittel && einsatzKennung(einsatz) && (
               <span
                 data-lfh="kopf-einsatznummer"
@@ -342,9 +352,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 {einsatzKennung(einsatz)}
               </span>
             )}
-            <div style={REST_STIL}>
+            <div data-lfh="kopf-einsatzname" style={REST_STIL}>
               {einsatzQuery.isLoading ? (
-                <Spin />
+                <span
+                  style={{ display: 'flex', alignItems: 'center', minHeight: token.controlHeight }}
+                >
+                  <Spin />
+                </span>
               ) : (
                 <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
               )}
