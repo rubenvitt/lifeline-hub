@@ -34,6 +34,15 @@ vom Modulzähler), Quelle je Zeile, Rechteweiche je Quelle („—“ mit Grund,
 das Dashboard, **kein Vortragsschema** (LFH-46 §2.3), nichts wird eingefroren; ein fester Stand
 nur über „In Lagebericht übernehmen“ (EIN Aufruf, Freitext).
 
+**Überfälliger Besprechungstermin** (LFH-859,
+`openspec/changes/archive/2026-10-04-lfh-859-lagebesprechung-ein-warnton/design.md`): ein erreichter oder
+verstrichener Termin trägt `achtung`, nie `alarm` (keine Gefahr, Alarmbudget EEMUA 191), mit dem
+Wort „jetzt fällig“ bzw. „seit 5 min überfällig“. Ton und Wort nur aus
+`stab/lagebesprechungZustand.ts:lagebesprechungUeberfaellig`; die Stab-Seite und die Marke
+„Lagebesprechung“ der Fristenliste im Überblick (`markenBewertung`) lesen beide dort.
+Überfällige Aufträge und Erinnerungen dort bleiben `alarm`, das „knapp“ unter 30 min bleibt der
+Fristenliste.
+
 **Presse und Medienarbeit S5** (LFH-554, `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md`):
 Unterrouten `stab/presse` (Presse-Log, Pressemitteilungen, Medienlage), `stab/presse/mitteilungen/:id`,
 `stab/infotelefon`, kein Modul; Einstiege über `stab/unterseiten.ts`, jede Seite prüft

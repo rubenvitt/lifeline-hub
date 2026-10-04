@@ -32,6 +32,7 @@ import {
   warnstufeNotiz,
   zeitpunkt,
 } from './ueberblickDaten';
+import { lagebesprechungZustand } from '../../stab/lagebesprechungZustand';
 
 dayjs.extend(utc);
 
@@ -289,6 +290,40 @@ describe('Nächste Marken', () => {
       wort: 'in 30 min',
     });
     expect(markenBewertung(JETZT.add(20, 'second'), JETZT).wort).toBe('in < 1 min');
+  });
+
+  /**
+   * LFH-859: derselbe überfällige Termin trägt auf der Stab-Seite und in der Fristenliste denselben
+   * Ton und dasselbe Wort. Verglichen werden die beiden Ergebnisse MITEINANDER, nicht mit
+   * Literalen — rot wird nur eine Abweichung, nicht eine gemeinsame Änderung.
+   */
+  it.each([0, 30, 5 * 60 + 30, 125 * 60])(
+    'überfällige Lagebesprechung (seit %i s): Marke ≡ Stab-Seite',
+    (sekunden) => {
+      const termin = JETZT.subtract(sekunden, 'second').format('YYYY-MM-DD HH:mm:ss');
+      const stab = lagebesprechungZustand(termin, JETZT);
+      const marke = naechsteMarken([], [], termin, JETZT).marken.find(
+        (m) => m.art === 'lagebesprechung',
+      );
+      expect(marke).toBeDefined();
+      expect({ ton: marke!.ton, wort: marke!.wort }).toEqual({ ton: stab.rolle, wort: stab.label });
+      expect(marke!.ton).toBe('achtung');
+    },
+  );
+
+  it('LFH-859 ändert nur die Lagebesprechung: Auftrag überfällig bleibt alarm, knapp bleibt achtung', () => {
+    const ueberfaellig = naechsteMarken(
+      [auftrag({ id: 201, auftrag_text: 'gerissen', frist_at: vor(10), ist_ueberfaellig: true })],
+      [],
+      vor(10),
+      JETZT,
+    );
+    expect(ueberfaellig.marken.map((m) => [m.art, m.ton, m.wort])).toEqual([
+      ['auftrag', 'alarm', 'überfällig'],
+      ['lagebesprechung', 'achtung', 'seit 10 min überfällig'],
+    ]);
+    const knapp = naechsteMarken([], [], nach(20), JETZT).marken[0];
+    expect([knapp.ton, knapp.wort]).toEqual(['achtung', 'in 20 min']);
   });
 
   it('mischt Auftragsfristen, offene Erinnerungen und Lagebesprechung, aufsteigend', () => {
