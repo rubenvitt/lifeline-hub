@@ -5,7 +5,7 @@ import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders } from '../../test/utils';
 import type { Gefahrengebiet, LageZone } from '../../api/types';
 import ZonenInspector, { type ZonenInspectorProps } from './ZonenInspector';
-import { FREIE_SKIZZE_VORGABE, zoneStil } from './zonenStil';
+import { FREIE_SKIZZE_VORGABEFARBE, zoneStil } from './zonenStil';
 
 const basisZone: LageZone = {
   id: 1,
@@ -522,8 +522,8 @@ describe('ZonenInspector — Vorgabefarbe der freien Skizze (LFH-797)', () => {
 
     const farbe = screen.getByLabelText('Farbe');
     // Eine Quelle: Farbfeld und Kartendarstellung lesen dieselbe Vorgabe.
-    expect(farbe).toHaveValue(FREIE_SKIZZE_VORGABE);
-    expect(zoneStil('freie_skizze', null).lineColor).toBe(FREIE_SKIZZE_VORGABE);
+    expect(farbe).toHaveValue(FREIE_SKIZZE_VORGABEFARBE);
+    expect(zoneStil('freie_skizze', null).lineColor).toBe(FREIE_SKIZZE_VORGABEFARBE);
 
     await userEvent.click(farbe);
     fireEvent.blur(farbe);

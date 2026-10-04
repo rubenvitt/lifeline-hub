@@ -402,3 +402,38 @@ describe('SchaedenDetailPage — Robustheit', () => {
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 });
+
+// Erfassungs-Norm (frontend/AGENTS.md, LFH-796): beide Status-Dialoge liegen auf der
+// Erfassungshülle.
+describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', () => {
+  it.each([
+    { ausloeser: 'Übergeben', titel: 'Schaden übergeben' },
+    { ausloeser: 'Abschließen', titel: 'Schaden abschließen' },
+  ])('$titel: Knopf im Formular, keine Fußzeile', async ({ ausloeser, titel }) => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: ausloeser }));
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    expect(within(dialog).getByText(titel)).toBeInTheDocument();
+    const knopf = within(dialog).getByRole('button', { name: ausloeser });
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+  });
+
+  it('Übergeben: Fokus im Feld, Enter sendet ab', async () => {
+    let body: { uebergeben_an?: string } = {};
+    render(einsatzAktiv, basisSchaden(), [
+      http.post('/api/einsaetze/1/schaeden/10/uebergeben', async ({ request }) => {
+        body = (await request.json()) as { uebergeben_an?: string };
+        return HttpResponse.json(
+          basisSchaden({ status: 'uebergeben', uebergeben_an: body.uebergeben_an }),
+        );
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    const feld = within(dialog).getByLabelText('Übergeben an');
+    await vi.waitFor(() => expect(feld).toHaveFocus());
+    await userEvent.type(feld, 'Bauhof{Enter}');
+    await vi.waitFor(() => expect(body.uebergeben_an).toBe('Bauhof'));
+  });
+});

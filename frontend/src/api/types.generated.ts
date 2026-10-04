@@ -661,6 +661,12 @@ export interface components {
              */
             org_id: number;
             org_rolle: components["schemas"]["OrgRolle"];
+            /**
+             * @description `true`, wenn das Konto ein lokales Passwort hat; ein SSO-only-Konto hat keins (LFH-828).
+             *     Das Profil bietet den Passwortwechsel nur dann an. Hash und Sentinel verlassen den Server
+             *     nie.
+             */
+            passwort_gesetzt: boolean;
             system_rolle: components["schemas"]["SystemRolle"];
             /**
              * @description MFA-Status (LFH-43, Increment 5 Task 6): `true`, wenn der Nutzer TOTP als zweiten Faktor
@@ -2006,6 +2012,20 @@ export interface components {
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
+        /** @description Die Führungsstelle, wie der Client sie liest. Leere Angaben fehlen im JSON. */
+        FuehrungsstelleAnzeige: {
+            /** @description Personenbezogen: wird geschwärzt und steht nie im Lagebericht. */
+            erreichbarkeit?: string | null;
+            /** @description Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`). */
+            kommunikationsmittel?: string | null;
+            /** @description Funkrufname der Führungsstelle, z. B. „Florian Musterstadt 10/1“. */
+            rufname?: string | null;
+            /**
+             * @description Zugeordnete Sprechgruppen (Katalog oder einsatzlokal), sortiert wie an Abschnitt und
+             *     Einheit.
+             */
+            sprechgruppen: components["schemas"]["SprechgruppeAnzeige"][];
+        };
         /**
          * @description Art der Führungsfunktion nach FwDV 100 Anlage 1 (Nr. 1.1.4/1.1.5). Aus dem Code
          *     abgeleitet, nie gespeichert und nie vom Client gesetzt.
@@ -2249,6 +2269,29 @@ export interface components {
             dauer_tage: number;
             kategorie: components["schemas"]["Datenkategorie"];
             rechtsgrundlage: string;
+        };
+        /**
+         * @description Eine gepflegte Stelle samt ihren Verbindungen.
+         *
+         *     `funktion_label` ist das wirksame Mandantenlabel („S3 Einsatz“), vom Server aufgelöst, damit
+         *     die Seite den Katalog nicht braucht — auch nicht ohne Netz (design.md D3, D9).
+         */
+        KommunikationsStelle: {
+            bezeichnung?: string | null;
+            funktion?: components["schemas"]["Fuehrungsfunktion"] | null;
+            funktion_label?: string | null;
+            /** Format: int64 */
+            id: number;
+            stellenart: components["schemas"]["Stellenart"];
+            verbindungen: components["schemas"]["KommunikationsVerbindung"][];
+        };
+        /** @description Eine Verbindung einer Stelle. */
+        KommunikationsVerbindung: {
+            hinweis?: string | null;
+            /** Format: int64 */
+            id: number;
+            mittel: components["schemas"]["Verbindungsmittel"];
+            wert: string;
         };
         /**
          * @description Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
@@ -3748,6 +3791,14 @@ export interface components {
             /** Format: int64 */
             stelle_id: number;
         };
+        /**
+         * @description Art einer gepflegten Stelle des Kommunikationsplans. Wire == `as_str()`.
+         *
+         *     `ALLE` ist die Anzeigereihenfolge: Funktionen zuerst, dann die externen Stellen in dieser
+         *     Folge (die Leitstelle ist die wichtigste Gegenstelle außerhalb des Einsatzes).
+         * @enum {string}
+         */
+        Stellenart: "funktion" | "leitstelle" | "behoerde" | "verbindungsperson" | "sonstige";
         /** @description Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
         StichwortVorschlag: {
             /** Format: int64 */
@@ -3914,6 +3965,15 @@ export interface components {
          * @enum {string}
          */
         UhsTyp: "patientenablage" | "behandlungsplatz" | "verletztensammelstelle" | "sonstige";
+        /**
+         * @description Mittel einer Verbindung. Wire == `as_str()`.
+         *
+         *     Bewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine
+         *     Erreichbarkeit je Datensatz, design.md D2). Funk steht im Funkplan; eine ISSI oder
+         *     Einzelrufnummer ist `sonstiges` mit Hinweis.
+         * @enum {string}
+         */
+        Verbindungsmittel: "festnetz" | "mobil" | "fax" | "email" | "messenger" | "melder" | "sonstiges";
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];

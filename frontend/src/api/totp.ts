@@ -1,9 +1,10 @@
 import type { BenutzerAnzeige, TotpEnrollFinish, TotpEnrollStart } from './types';
 import { apiSend } from './client';
 
-/** POST /api/auth/totp/enroll/start: beginnt (oder erneuert) ein TOTP-Enrollment für den
- *  angemeldeten Nutzer. Liefert das frische, noch NICHT aktive Secret: `otpauth_url` für den
- *  QR-Code, `secret_base32` als Klartext-Fallback. */
+/** POST /api/auth/totp/enroll/start: beginnt ein TOTP-Enrollment für den angemeldeten Nutzer
+ *  (oder ein noch nicht bestätigtes neu). Liefert das frische, noch NICHT aktive Secret:
+ *  `otpauth_url` für den QR-Code, `secret_base32` als Klartext-Fallback. Bei aktivem TOTP 422
+ *  (LFH-794). */
 export function enrollStart(): Promise<TotpEnrollStart> {
   return apiSend<TotpEnrollStart>('/api/auth/totp/enroll/start', 'POST');
 }

@@ -46,8 +46,8 @@ describe('LagebesprechungHistorie', () => {
     );
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
     const [zwei, eins] = screen.getAllByRole('listitem');
-    expect(within(zwei).getByRole('heading', { level: 4 })).toHaveTextContent(/^Nr\. 2 · /);
-    expect(within(eins).getByRole('heading', { level: 4 })).toHaveTextContent(/^Nr\. 1 · /);
+    expect(within(zwei).getByRole('heading', { level: 3 })).toHaveTextContent(/^Nr\. 2 · /);
+    expect(within(eins).getByRole('heading', { level: 3 })).toHaveTextContent(/^Nr\. 1 · /);
     expect(
       within(zwei).getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 2' }),
     ).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=72');
@@ -61,7 +61,7 @@ describe('LagebesprechungHistorie', () => {
     screen
       .getAllByRole('listitem')
       .filter((li) => (li.closest('.ant-collapse') != null) === imExpander)
-      .map((li) => within(li).getByRole('heading', { level: 4 }).textContent);
+      .map((li) => within(li).getByRole('heading', { level: 3 }).textContent);
 
   /**
    * Die Historie steht ÜBER der Besetzung; ab dem vierten Eintrag wächst sie nicht mehr in der

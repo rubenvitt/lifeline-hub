@@ -8,6 +8,11 @@ import type {
 } from '../api/types';
 import { kommunikationsmittelLabel, teileSprechgruppen } from '../components/kommunikationsmittel';
 import {
+  FUEHRUNGSSTELLE_STELLE,
+  fuehrungsstelleErfasst,
+  type FuehrungsstelleQuelle,
+} from './fuehrungsstelle';
+import {
   abschnitteOhneSprechgruppe,
   einheitenOhneErreichbarkeit,
   einheitenOhneSprechgruppe,
@@ -21,12 +26,13 @@ import {
 /**
  * Der Funkplan des Sachgebiets S6 (FwDV 100 Anlage 5, LFH-548) als reine Ableitung aus den
  * geladenen Listen. Keine eigene Datenhaltung: was hier steht, steht so an Abschnitt, Einheit,
- * Fahrzeug und Personal (Migrationen 0047/0073/0086).
+ * Fahrzeug und Personal (Migrationen 0047/0073/0086) und an der eigenen Führungsstelle (0145).
  *
- * Herleitung: `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md` (D3, D6).
+ * Herleitung: `openspec/changes/archive/2026-09-30-lfh-548-funkplan/design.md` (D3, D6),
+ * Führungsstelle: `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D4).
  */
 
-export type FunkplanArt = 'abschnitt' | 'einheit' | 'fahrzeug' | 'sammel';
+export type FunkplanArt = 'fuehrungsstelle' | 'abschnitt' | 'einheit' | 'fahrzeug' | 'sammel';
 
 /** Leiter/Führer einer Zeile. `zustand`: die Quelle fehlt, es ist KEIN leerer Bestand. */
 export type Leitung =
@@ -39,7 +45,7 @@ export type Leitung =
  * verlangt (`KinderFeld<T>`); `art` unterscheidet.
  */
 export interface FunkplanZeile {
-  /** Über alle Ebenen eindeutig: `ab-<id>`, `eh-<id>`, `fz-<id>`, `sammel`. */
+  /** Über alle Ebenen eindeutig: `fs`, `ab-<id>`, `eh-<id>`, `fz-<id>`, `sammel`. */
   key: string;
   art: FunkplanArt;
   /** Datenbank-ID der Quelle — nur für Deeplinks, nie für die Anzeige. */
@@ -48,7 +54,10 @@ export interface FunkplanZeile {
   stelle: string;
   /** Beim Fahrzeug der Fahrzeugtyp, sonst `null`. */
   stelleZusatz: string | null;
-  /** Abschnitt: Kurzbezeichnung · Einheit: Funkrufname · Fahrzeug: OPTA. Nie geraten. */
+  /**
+   * Führungsstelle: Rufname · Abschnitt: Kurzbezeichnung · Einheit: Funkrufname · Fahrzeug: OPTA.
+   * Nie geraten.
+   */
   rufname: string | null;
   leitung: Leitung;
   tmo: string[];
@@ -66,6 +75,8 @@ export interface FunkplanQuellen {
   fahrzeuge: Quelle<EinsatzFahrzeug>;
   personal: Quelle<EinsatzPersonal>;
   sprechgruppen: Quelle<Sprechgruppe>;
+  /** Die eigene Führungsstelle (LFH-849): eine Angabe, keine Liste. */
+  fuehrungsstelle: FuehrungsstelleQuelle;
 }
 
 export const SAMMEL_STELLE = 'Ohne Abschnitt / Einheit';
@@ -93,6 +104,25 @@ function gruppiere<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T
     else m.set(k, [x]);
   }
   return m;
+}
+
+/** Die Zeile der eigenen Führungsstelle — nur, wenn sie geladen und erfasst ist (D4). */
+function fuehrungsstelleZeile(q: FuehrungsstelleQuelle): FunkplanZeile | null {
+  const fs = q.zustand === 'daten' ? q.daten : null;
+  if (!fs || !fuehrungsstelleErfasst(fs)) return null;
+  return {
+    key: 'fs',
+    art: 'fuehrungsstelle',
+    id: null,
+    stelle: FUEHRUNGSSTELLE_STELLE,
+    stelleZusatz: null,
+    rufname: fs.rufname ?? null,
+    // Wer die Führungsstelle besetzt, steht in der Besetzung des Stabs, nicht hier.
+    leitung: { art: 'leer' },
+    ...funk(fs.sprechgruppen),
+    kommunikationsmittel: kommunikationsmittelLabel(fs.kommunikationsmittel),
+    erreichbarkeit: fs.erreichbarkeit ?? null,
+  };
 }
 
 export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
@@ -229,7 +259,10 @@ export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
       children: heimatlos,
     });
   }
-  return wurzeln;
+  // Die Führungsstelle steht VOR den Wurzeln, nicht über ihnen: der Baum bleibt gleich dem
+  // Organigramm, die Verbindung zu den obersten Abschnitten urteilt die Lücke (D5).
+  const fs = fuehrungsstelleZeile(q.fuehrungsstelle);
+  return fs ? [fs, ...wurzeln] : wurzeln;
 }
 
 /** Schlüssel aller Knoten mit Kindern — der Druck klappt alles auf. */
@@ -256,11 +289,13 @@ export function funkplanLuecken(q: FunkplanQuellen): FunkplanLuecken {
     verbindungenOhneGemeinsameSprechgruppe: verbindungenOhneGemeinsameSprechgruppe(
       q.abschnitte,
       q.einheiten,
+      q.fuehrungsstelle,
     ),
     lokaleSprechgruppenOhneZuordnung: lokaleSprechgruppenOhneZuordnung(
       q.sprechgruppen,
       q.abschnitte,
       q.einheiten,
+      q.fuehrungsstelle,
     ),
   };
 }
@@ -273,7 +308,10 @@ export const ZUSTAND_GRUND: Record<Exclude<AbrufZustand, 'daten'>, string> = {
 };
 
 /** Die Quellen, deren Fehlen eine Ebene oder Spalte leert — mit ihrem Namen für Seite und Bericht. */
-export const QUELLEN_NAME: Record<Exclude<keyof FunkplanQuellen, 'sprechgruppen'>, string> = {
+export const QUELLEN_NAME: Record<
+  Exclude<keyof FunkplanQuellen, 'sprechgruppen' | 'fuehrungsstelle'>,
+  string
+> = {
   abschnitte: 'Abschnitte',
   einheiten: 'Einheiten',
   fahrzeuge: 'Fahrzeuge',
@@ -306,8 +344,19 @@ export function strukturVollstaendig(q: FunkplanQuellen): boolean {
   );
 }
 
-/** Der feste Hinweis auf die fehlende eigene Gegenstelle (kein Feld am Einsatz, D6). */
+/** Der Hinweis auf die eigene Gegenstelle, solange sie fehlt (LFH-849 D4). */
 export const GEGENSTELLE_HINWEIS = 'Eigene Gegenstelle (Führungsstelle)';
+
+/**
+ * Was der Hinweis auf die eigene Gegenstelle sagt: „nicht erfasst“, der Grund, warum sie nicht
+ * vorliegt, oder `null` — dann ist sie erfasst und steht als erste Zeile im Plan. Seite und
+ * Bericht fragen nur hier.
+ */
+export function gegenstelleHinweis(q: FunkplanQuellen): string | null {
+  const { zustand, daten } = q.fuehrungsstelle;
+  if (zustand !== 'daten') return ZUSTAND_GRUND[zustand];
+  return fuehrungsstelleErfasst(daten) ? null : 'nicht erfasst';
+}
 
 // ── Markdown für den Lagebericht ───────────────────────────────────────────────────────────────
 
@@ -350,6 +399,17 @@ function lueckeMarkdown<T>(titel: string, l: Luecke<T>, name: (x: T) => string):
   if (l.zustand !== 'daten') return `- ${titel}: — (${ZUSTAND_GRUND[l.zustand]})`;
   const namen = l.treffer.length > 0 ? ` (${l.treffer.map((x) => md(name(x))).join(', ')})` : '';
   return `- ${titel}: ${l.treffer.length}${namen}`;
+}
+
+function gegenstelleMarkdown(q: FunkplanQuellen): string[] {
+  const hinweis = gegenstelleHinweis(q);
+  if (hinweis == null) return [];
+  // Wie jede andere Lücke: ohne Daten „—“ mit Grund.
+  return [
+    q.fuehrungsstelle.zustand === 'daten'
+      ? `- ${GEGENSTELLE_HINWEIS}: ${hinweis}`
+      : `- ${GEGENSTELLE_HINWEIS}: — (${hinweis})`,
+  ];
 }
 
 export function rendereFunkplanMarkdown(
@@ -401,7 +461,7 @@ export function rendereFunkplanMarkdown(
       luecken.lokaleSprechgruppenOhneZuordnung,
       (s) => s.bezeichnung,
     ),
-    `- ${GEGENSTELLE_HINWEIS}: nicht erfasst`,
+    ...gegenstelleMarkdown(quellen),
     '',
     ...quellenAbschnitt,
     '## Gliederung',

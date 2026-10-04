@@ -56,6 +56,113 @@ fn mfa_pending_cookie(key: String, secure: bool) -> Cookie<'static> {
         .build()
 }
 
+/// Abweisung eines Anmeldeabschlusses (TOTP, OIDC, Passkey; LFH-792). `benutzer` ist gesetzt,
+/// sobald der Server die Identität selbst festgestellt hat (TOTP nach dem Passwortschritt, ein
+/// deaktiviertes Konto nach geprüfter Signatur), nie aus einer bloßen Behauptung des Aufrufers.
+struct Abgewiesen {
+    fehler: AppError,
+    /// `false`, wenn die Abweisung kein Anmeldeversuch war und deshalb keinen Eintrag schreibt:
+    /// es lief keine Zeremonie (Cookie fehlt, State unbekannt oder verbraucht), oder der IdP war
+    /// gestört. Sonst schriebe jede Anfrage ohne jeden Vorlauf eine Zeile, die 90 Tage bleibt.
+    spur: bool,
+    benutzer: Option<Benutzer>,
+}
+
+impl Abgewiesen {
+    /// 401 eines Anmeldeversuchs ohne festgestellte Identität.
+    fn anonym() -> Self {
+        AppError::Unauthorized.into()
+    }
+
+    /// 401 eines Anmeldeversuchs für einen Benutzer, den der Server schon kennt.
+    fn fuer(benutzer: Benutzer) -> Self {
+        Self {
+            fehler: AppError::Unauthorized,
+            spur: true,
+            benutzer: Some(benutzer),
+        }
+    }
+
+    /// 401 ohne Audit-Eintrag (s. [`Abgewiesen::spur`]).
+    fn ohne_spur() -> Self {
+        Self {
+            fehler: AppError::Unauthorized,
+            spur: false,
+            benutzer: None,
+        }
+    }
+}
+
+impl From<AppError> for Abgewiesen {
+    fn from(fehler: AppError) -> Self {
+        Self {
+            fehler,
+            spur: true,
+            benutzer: None,
+        }
+    }
+}
+
+impl From<sqlx::Error> for Abgewiesen {
+    fn from(fehler: sqlx::Error) -> Self {
+        AppError::from(fehler).into()
+    }
+}
+
+/// Schreibt genau einen Audit-Eintrag für den Abschluss einer Anmeldung (LFH-792): `login_ok`
+/// bei Erfolg, `login_fehlgeschlagen` bei jedem 401 eines Anmeldeversuchs. Eine Abweisung ohne
+/// laufende Zeremonie oder wegen eines gestörten IdP ([`Abgewiesen::ohne_spur`]) und jeder
+/// andere Fehler (Provider aus, Datenbank) sind keine gescheiterten Anmeldeversuche und bleiben
+/// ohne Eintrag.
+///
+/// Die Handler prüfen in einer inneren Funktion und rufen dies mit deren Ergebnis auf; so
+/// hinterlässt jeder Rückweg der Prüfung eine Spur, auch einer, der später hinzukommt.
+async fn audit_anmeldung(
+    pool: &SqlitePool,
+    provider: &str,
+    peer_ip: Option<std::net::IpAddr>,
+    ergebnis: Result<&Benutzer, &Abgewiesen>,
+) {
+    use crate::auth::audit::{schreibe, AuditEintrag, Ereignis};
+    let (ereignis, benutzer) = match ergebnis {
+        Ok(benutzer) => {
+            tracing::info!(
+                benutzer_id = benutzer.id,
+                benutzername = %benutzer.benutzername,
+                peer_ip = ?peer_ip,
+                provider,
+                "Anmeldung erfolgreich"
+            );
+            (Ereignis::LoginOk, Some(benutzer))
+        }
+        Err(Abgewiesen {
+            fehler: AppError::Unauthorized,
+            spur: true,
+            benutzer,
+        }) => {
+            tracing::warn!(
+                benutzer_id = ?benutzer.as_ref().map(|b| b.id),
+                peer_ip = ?peer_ip,
+                provider,
+                "Anmeldung fehlgeschlagen"
+            );
+            (Ereignis::LoginFehlgeschlagen, benutzer.as_ref())
+        }
+        Err(_) => return,
+    };
+    schreibe(
+        pool,
+        AuditEintrag {
+            ereignis,
+            benutzername: benutzer.map(|b| b.benutzername.as_str()),
+            benutzer_id: benutzer.map(|b| b.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider,
+        },
+    )
+    .await;
+}
+
 /// Antwort auf `POST /api/auth/login`. `#[serde(untagged)]` serialisiert `Angemeldet`
 /// byte-identisch als nackte `BenutzerAnzeige`; nur ein TOTP-Nutzer bekommt stattdessen
 /// `{"mfa_erforderlich":"totp"}` ohne Benutzer-Objekt und ohne Session-Cookie. Nicht im Codegen
@@ -117,7 +224,7 @@ pub async fn login(
         Ok(b) => b,
         Err(e) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&req.benutzername));
             }
             tracing::warn!(
                 benutzername = %req.benutzername,
@@ -146,15 +253,14 @@ pub async fn login(
             .fetch_one(&state.pool)
             .await?;
 
-    // Das Passwort stimmt; das gibt auch alle anderen hinter derselben IP wieder frei (NAT).
-    if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
-    }
-
     if totp_aktiviert {
-        // Keine Session, kein Session-Cookie (s. Doc oben). Kein `login_ok`-Audit: angemeldet ist
-        // hier
-        // noch niemand, den Abschluss protokolliert `totp_finish`.
+        // Keine Session, kein Session-Cookie (s. Doc oben). Kein Audit: angemeldet ist hier noch
+        // niemand. Erfolg wie Fehlschlag des Zweitfaktors protokolliert `totp_finish` (LFH-792).
+        //
+        // Auch kein `rate_limit::erfolg` (LFH-791): angemeldet ist erst, wer den zweiten Faktor
+        // besteht. Räumte schon das Passwort die Fehlversuche gegen dieses Konto, setzte jeder
+        // Anlauf `login` → `totp/finish` den Zähler zurück, und der Code ließe sich ungebremst
+        // raten. Geräumt wird in `totp_finish`.
         let key = session::neuer_token();
         crate::auth::totp::state::speichere(key.clone(), benutzer.id);
         let jar = jar.add(mfa_pending_cookie(key, secure));
@@ -164,6 +270,11 @@ pub async fn login(
                 mfa_erforderlich: "totp".to_string(),
             }),
         ));
+    }
+
+    // Angemeldet; das räumt nur die Fehlversuche gegen dieses Konto (LFH-793).
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
@@ -268,6 +379,11 @@ pub struct PasswortWechsel {
 /// eröffnete Sitzung dürfte sonst bis zu [`session::SITZUNG_TAGE`] Tage weiterlaufen. Die eigene
 /// Sitzung bleibt, sonst würfe der Wechsel den Handelnden aus dem laufenden Einsatz. Passkeys
 /// und der TOTP-Zweitfaktor bleiben unberührt: sie hängen nicht am Passwort.
+///
+/// **Audit (LFH-827):** beide Ausgänge der Alt-Passwort-Prüfung landen in `auth_audit` —
+/// `passwort_geaendert` nach dem Commit, `passwort_wechsel_abgewiesen` beim falschen
+/// Alt-Passwort. Was vorher scheitert (400, 403, 429), hat kein Passwort geprüft und schreibt
+/// nichts; die 429 steht über die Fehlversuche davor schon in der Spur.
 pub async fn passwort_aendern(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -309,13 +425,24 @@ pub async fn passwort_aendern(
         Ok(_) => {}
         Err(AppError::Unauthorized) => {
             if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip);
+                crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
             }
             tracing::warn!(
                 benutzer_id = benutzer.id,
                 peer_ip = ?peer_ip,
                 "Passwortwechsel abgewiesen: altes Passwort falsch"
             );
+            crate::auth::audit::schreibe(
+                &state.pool,
+                crate::auth::audit::AuditEintrag {
+                    ereignis: crate::auth::audit::Ereignis::PasswortWechselAbgewiesen,
+                    benutzername: Some(&benutzer.benutzername),
+                    benutzer_id: Some(benutzer.id),
+                    peer_ip: peer_ip.map(|ip| ip.to_string()),
+                    provider: crate::auth::provider::ID_PASSWORT,
+                },
+            )
+            .await;
             return Err(AppError::UnprocessableEntity(
                 "Das bisherige Passwort stimmt nicht.".to_string(),
             ));
@@ -323,7 +450,7 @@ pub async fn passwort_aendern(
         Err(e) => return Err(e),
     }
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
     // Argon2 blockiert den Worker ~50–100 ms; auf den Blocking-Pool damit.
@@ -353,6 +480,17 @@ pub async fn passwort_aendern(
         andere_sitzungen_beendet = beendet,
         "Passwort gewechselt"
     );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::PasswortGeaendert,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_PASSWORT,
+        },
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -547,10 +685,15 @@ fn oidc_fehler_redirect() -> Redirect {
 ///    abgewiesen.
 /// 9. Session, Cookie, Redirect auf den bereits geprüften `ziel_pfad`.
 ///
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, ein
+/// abgeschalteter Provider und Serverfehler keinen.
+///
 /// Jeder Fehler ab Schritt 2 endet im selben generischen Redirect; nur Datenbankfehler
 /// propagieren als `AppError` (generisches 500, ohne IdP-Details).
 pub async fn oidc_callback(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     Query(query): Query<OidcCallbackQuery>,
@@ -563,61 +706,95 @@ pub async fn oidc_callback(
         return Err(AppError::NotFound);
     }
 
-    // IdP-Error-Callback oder Query ohne `code`/`state`: generischer Redirect. Ein gespeicherter
-    // State-Eintrag wird konsumiert, damit er nicht bis zum TTL-Ablauf in der Map hängt.
-    if query.error.is_some() || query.code.is_none() || query.state.is_none() {
-        if let Some(s) = &query.state {
-            let _ = crate::auth::oidc::state::entnehme(s);
-        }
-        return Ok((
-            jar.remove(raeume_oidc_state_cookie()),
-            oidc_fehler_redirect(),
-        ));
-    }
-    let code = query.code.expect("Guard oben stellt sicher: code ist Some");
-    let state_key = query
-        .state
-        .expect("Guard oben stellt sicher: state ist Some");
-
     // Binding-Check (Punkt 3 oben): den Cookie-Wert VOR dem Räumen lesen, sonst schlüge jede
-    // Anmeldung fehl.
+    // Anmeldung fehl. Ab hier trägt jeder Rückgabepfad das geräumte Cookie.
     let cookie_state = jar.get(OIDC_STATE_COOKIE).map(|c| c.value().to_string());
-    // Ab hier trägt jeder Rückgabepfad das geräumte Cookie.
     let jar = jar.remove(raeume_oidc_state_cookie());
-    if !oidc_state_binding_ok(cookie_state.as_deref(), &state_key) {
+
+    let ergebnis = oidc_anmelden(&state.pool, query, cookie_state.as_deref()).await;
+    audit_anmeldung(
+        &state.pool,
+        crate::auth::provider::ID_OIDC,
+        peer_ip,
+        ergebnis.as_ref().map(|(benutzer, _, _)| benutzer),
+    )
+    .await;
+    match ergebnis {
+        Ok((_, token, ziel_pfad)) => {
+            let jar = jar.add(session_cookie(token, secure));
+            Ok((jar, Redirect::to(&ziel_pfad)))
+        }
+        Err(Abgewiesen {
+            fehler: AppError::Unauthorized,
+            ..
+        }) => Ok((jar, oidc_fehler_redirect())),
+        Err(abgewiesen) => Err(abgewiesen.fehler),
+    }
+}
+
+/// Schritte 2–9 von [`oidc_callback`]: liefert Benutzer, Session-Token und Zielpfad. Jede
+/// Abweisung ist ein 401, den der Aufrufer in den generischen Redirect übersetzt.
+async fn oidc_anmelden(
+    pool: &SqlitePool,
+    query: OidcCallbackQuery,
+    cookie_state: Option<&str>,
+) -> Result<(Benutzer, String, String), Abgewiesen> {
+    // IdP-Error-Callback oder Query ohne `code`/`state`. Ein gespeicherter State-Eintrag wird
+    // konsumiert, damit er nicht bis zum TTL-Ablauf in der Map hängt.
+    let (Some(code), Some(state_key), None) = (query.code, query.state.clone(), query.error) else {
+        // Antwortet der IdP auf eine laufende Anmeldung (Abbruch, verweigerte Zustimmung), ist das
+        // ein gescheiterter Versuch. Ohne gespeicherten State lief keiner: ein solcher Aufruf
+        // lässt sich von jeder fremden Seite aus dem Browser eines Besuchers auslösen.
+        let lief = query
+            .state
+            .as_deref()
+            .and_then(crate::auth::oidc::state::entnehme)
+            .is_some();
+        return Err(if lief {
+            Abgewiesen::anonym()
+        } else {
+            Abgewiesen::ohne_spur()
+        });
+    };
+
+    if !oidc_state_binding_ok(cookie_state, &state_key) {
         // Kein `state::entnehme`: ein Binding-Fehlschlag darf den State-Store-Eintrag nicht
-        // verbrennen.
-        return Ok((jar, oidc_fehler_redirect()));
+        // verbrennen. Ohne passendes Cookie lief in diesem Browser keine Anmeldung.
+        return Err(Abgewiesen::ohne_spur());
     }
 
     // Synchron und VOR Token-Tausch/Discovery: ein unbekannter oder abgelaufener `state` muss vor
     // jedem Netzzugriff kurzschließen. Kein Test pinnt diese Reihenfolge.
     //
-    // Die `let … else { redirect }`-Arme bis zum Aktiv-Check verwerfen den Fehlerinhalt bewusst.
-    // Ein `?` reichte Token-/IdP-Details über `AppError::ServiceUnavailable` in die Antwort durch.
+    // Die `let … else`-Arme bis zum Aktiv-Check verwerfen den Fehlerinhalt bewusst. Ein `?`
+    // reichte Token-/IdP-Details über `AppError::ServiceUnavailable` in die Antwort durch.
     let Some(eintrag) = crate::auth::oidc::state::entnehme(&state_key) else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Err(Abgewiesen::ohne_spur());
     };
 
+    // Discovery, Token-Tausch und eine Antwort ohne `id_token` scheitern am IdP oder an der
+    // Konfiguration, nicht am Anmeldenden: kein Eintrag, sonst erschiene ein IdP-Ausfall als
+    // Welle gescheiterter Anmeldungen. Das `warn!` steht in `auth::oidc`.
     let Ok(client) = crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await
     else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Err(Abgewiesen::ohne_spur());
     };
 
     let Ok(token_response) =
         crate::auth::oidc::tausche_code_gegen_token(&client, code, eintrag.pkce_verifier).await
     else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Err(Abgewiesen::ohne_spur());
     };
 
     let Some(id_token) = token_response.id_token() else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Err(Abgewiesen::ohne_spur());
     };
 
-    // Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — s. Punkt 6.
+    // Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — s. Punkt 6. Ein ungültiges Token ist ein
+    // gescheiterter Versuch und schreibt einen Eintrag.
     let Ok(claims) = id_token.claims(&client.id_token_verifier(), &Nonce::new(eintrag.nonce))
     else {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Err(Abgewiesen::anonym());
     };
 
     // `name` ist ein lokalisierter Claim; ohne Sprachpräferenz der Default-Wert, sonst der erste.
@@ -635,17 +812,15 @@ pub async fn oidc_callback(
     };
 
     let benutzer =
-        crate::auth::oidc::provisioning::finde_oder_provisioniere(&state.pool, &oidc_claims)
-            .await?;
+        crate::auth::oidc::provisioning::finde_oder_provisioniere(pool, &oidc_claims).await?;
 
     // Punkt 8 oben.
     if !benutzer.aktiv {
-        return Ok((jar, oidc_fehler_redirect()));
+        return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, secure));
-    Ok((jar, Redirect::to(&eintrag.ziel_pfad)))
+    let token = session::anlegen(pool, benutzer.id).await?;
+    Ok((benutzer, token, eintrag.ziel_pfad))
 }
 
 /// Cookie für den Registrierungs-State-Key. Trägt nur den Schlüssel in `auth::webauthn::state`,
@@ -852,6 +1027,10 @@ pub async fn webauthn_auth_start(
 /// 5. Ein inzwischen deaktiviertes Konto bekommt trotz gültiger Signatur keine Session.
 /// 6. Session anlegen, Cookie setzen, `webauthn_auth`-Cookie entfernen, 200.
 ///
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, ein
+/// abgeschalteter Provider und Serverfehler keinen.
+///
 /// # Counter-Prüfung in webauthn-rs 0.5
 ///
 /// `WebauthnBuilder::build()` setzt `require_valid_counter_value: true` fest. Ist
@@ -865,6 +1044,7 @@ pub async fn webauthn_auth_start(
 /// Counter als Vergleichsbasis.
 pub async fn webauthn_auth_finish(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(body): JsonBody<PublicKeyCredential>,
@@ -874,67 +1054,17 @@ pub async fn webauthn_auth_finish(
     }
     let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
 
-    let key = jar
-        .get(WEBAUTHN_AUTH_COOKIE)
-        .map(|c| c.value().to_string())
-        .ok_or(AppError::Unauthorized)?;
-
-    // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 2).
-    let auth_state = match crate::auth::webauthn::state::entnehme(&key) {
-        Some(crate::auth::webauthn::state::CeremonyZustand::Authentifizierung(auth_state)) => {
-            auth_state
-        }
-        _ => return Err(AppError::Unauthorized),
-    };
-
-    // Counter-/Klon-Check in der Bibliothek, s. Doc oben.
-    let auth_result = match webauthn.finish_passkey_authentication(&body, &auth_state) {
-        Ok(r) => r,
-        Err(WebauthnError::CredentialPossibleCompromise) => {
-            // Nur ins Log (Signal für ein mögliches Klon-Gerät); der Client bekommt das generische
-            // 401.
-            tracing::warn!("WebAuthn-Login abgelehnt: möglicher Klon (Counter-Regression) erkannt");
-            return Err(AppError::Unauthorized);
-        }
-        Err(_) => return Err(AppError::Unauthorized),
-    };
-
-    // Counter-Writeback, Punkt 4.
-    let gefunden = crate::auth::webauthn::storage::passkey_je_credential_id(
+    let key = jar.get(WEBAUTHN_AUTH_COOKIE).map(|c| c.value().to_string());
+    let ergebnis = webauthn_auth_pruefen(&state.pool, webauthn, key, &body).await;
+    audit_anmeldung(
         &state.pool,
-        auth_result.cred_id().as_ref(),
+        crate::auth::provider::ID_WEBAUTHN,
+        peer_ip,
+        ergebnis.as_ref().map(|(benutzer, _)| benutzer),
     )
-    .await?;
-    let Some((benutzer_id, mut passkey)) = gefunden else {
-        return Err(AppError::Unauthorized);
-    };
+    .await;
+    let (_, token) = ergebnis.map_err(|abgewiesen| abgewiesen.fehler)?;
 
-    // `update_credential` liefert `None` nur bei `cred_id`-Mismatch — unerreichbar, weil der
-    // Passkey über genau diese `cred_id` geladen wurde. Deshalb 500 statt 401.
-    if passkey.update_credential(&auth_result).is_none() {
-        return Err(AppError::Internal(
-            "WebAuthn: credential_id-Mismatch beim Counter-Update".to_string(),
-        ));
-    }
-    crate::auth::webauthn::storage::aktualisiere_counter(&state.pool, &passkey).await?;
-
-    let benutzer = sqlx::query_as::<_, Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
-         aktiv, erstellt_at FROM benutzer WHERE id = ?",
-    )
-    .bind(benutzer_id)
-    .fetch_optional(&state.pool)
-    .await?;
-
-    // Deaktiviertes Konto → keine Session (Punkt 5).
-    let Some(benutzer) = benutzer else {
-        return Err(AppError::Unauthorized);
-    };
-    if !benutzer.aktiv {
-        return Err(AppError::Unauthorized);
-    }
-
-    let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token, secure));
     let jar = jar.remove(
         Cookie::build((WEBAUTHN_AUTH_COOKIE, ""))
@@ -942,6 +1072,76 @@ pub async fn webauthn_auth_finish(
             .build(),
     );
     Ok((jar, StatusCode::OK))
+}
+
+/// Schritte 2–6 von [`webauthn_auth_finish`]: liefert Benutzer und Session-Token.
+async fn webauthn_auth_pruefen(
+    pool: &SqlitePool,
+    webauthn: &webauthn_rs::prelude::Webauthn,
+    key: Option<String>,
+    body: &PublicKeyCredential,
+) -> Result<(Benutzer, String), Abgewiesen> {
+    // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
+    let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
+
+    // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 2).
+    let auth_state = match crate::auth::webauthn::state::entnehme(&key) {
+        Some(crate::auth::webauthn::state::CeremonyZustand::Authentifizierung(auth_state)) => {
+            auth_state
+        }
+        _ => return Err(Abgewiesen::ohne_spur()),
+    };
+
+    // Counter-/Klon-Check in der Bibliothek, s. Doc oben.
+    let auth_result = match webauthn.finish_passkey_authentication(body, &auth_state) {
+        Ok(r) => r,
+        Err(WebauthnError::CredentialPossibleCompromise) => {
+            // Nur ins Log (Signal für ein mögliches Klon-Gerät); der Client bekommt das generische
+            // 401.
+            tracing::warn!("WebAuthn-Login abgelehnt: möglicher Klon (Counter-Regression) erkannt");
+            return Err(Abgewiesen::anonym());
+        }
+        Err(_) => return Err(Abgewiesen::anonym()),
+    };
+
+    // Counter-Writeback, Punkt 4.
+    let gefunden = crate::auth::webauthn::storage::passkey_je_credential_id(
+        pool,
+        auth_result.cred_id().as_ref(),
+    )
+    .await?;
+    let Some((benutzer_id, mut passkey)) = gefunden else {
+        return Err(Abgewiesen::anonym());
+    };
+
+    // `update_credential` liefert `None` nur bei `cred_id`-Mismatch — unerreichbar, weil der
+    // Passkey über genau diese `cred_id` geladen wurde. Deshalb 500 statt 401.
+    if passkey.update_credential(&auth_result).is_none() {
+        return Err(AppError::Internal(
+            "WebAuthn: credential_id-Mismatch beim Counter-Update".to_string(),
+        )
+        .into());
+    }
+    crate::auth::webauthn::storage::aktualisiere_counter(pool, &passkey).await?;
+
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    )
+    .bind(benutzer_id)
+    .fetch_optional(pool)
+    .await?;
+
+    // Deaktiviertes Konto → keine Session (Punkt 5).
+    let Some(benutzer) = benutzer else {
+        return Err(Abgewiesen::anonym());
+    };
+    if !benutzer.aktiv {
+        return Err(Abgewiesen::fuer(benutzer));
+    }
+
+    let token = session::anlegen(pool, benutzer.id).await?;
+    Ok((benutzer, token))
 }
 
 /// Cookie für den discoverable-State-Key (LFH-313). Ein eigener Name, damit benutzergebundene
@@ -1004,7 +1204,11 @@ pub async fn webauthn_discoverable_start(
 /// 4. `finish_discoverable_authentication` prüft Signatur und Counter/Klon; jeder Fehler → 401.
 /// 5. Counter-Writeback über die genutzte `cred_id`; der darüber gefundene Benutzer MUSS der
 ///    per Handle aufgelöste sein.
-/// 6. Aktiv-Check, Session, Cookies, `LoginOk`-Audit, 200.
+/// 6. Aktiv-Check, Session, Cookies, 200.
+///
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, ein
+/// abgeschalteter Provider und Serverfehler keinen.
 pub async fn webauthn_discoverable_finish(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -1017,41 +1221,64 @@ pub async fn webauthn_discoverable_finish(
     }
     let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
 
-    let key = jar
-        .get(WEBAUTHN_DISC_COOKIE)
-        .map(|c| c.value().to_string())
-        .ok_or(AppError::Unauthorized)?;
+    let key = jar.get(WEBAUTHN_DISC_COOKIE).map(|c| c.value().to_string());
+    let ergebnis = webauthn_discoverable_pruefen(&state.pool, webauthn, key, &body).await;
+    audit_anmeldung(
+        &state.pool,
+        crate::auth::provider::ID_WEBAUTHN,
+        peer_ip,
+        ergebnis.as_ref().map(|(benutzer, _)| benutzer),
+    )
+    .await;
+    let (_, token) = ergebnis.map_err(|abgewiesen| abgewiesen.fehler)?;
+
+    let jar = jar.add(session_cookie(token, secure));
+    let jar = jar.remove(
+        Cookie::build((WEBAUTHN_DISC_COOKIE, ""))
+            .path("/api/auth/webauthn")
+            .build(),
+    );
+    Ok((jar, StatusCode::OK))
+}
+
+/// Schritte 1–6 von [`webauthn_discoverable_finish`] ohne den Provider-Check: liefert Benutzer
+/// und Session-Token.
+async fn webauthn_discoverable_pruefen(
+    pool: &SqlitePool,
+    webauthn: &webauthn_rs::prelude::Webauthn,
+    key: Option<String>,
+    body: &PublicKeyCredential,
+) -> Result<(Benutzer, String), Abgewiesen> {
+    // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
+    let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
 
     // Synchron, Guard vor jedem folgenden `.await` freigegeben.
     let disc_state = match crate::auth::webauthn::state::entnehme(&key) {
         Some(crate::auth::webauthn::state::CeremonyZustand::AuthentifizierungDiscoverable(s)) => s,
-        _ => return Err(AppError::Unauthorized),
+        _ => return Err(Abgewiesen::ohne_spur()),
     };
 
-    let (handle, _cred_id) = webauthn
-        .identify_discoverable_authentication(&body)
-        .map_err(|_| AppError::Unauthorized)?;
+    let Ok((handle, _cred_id)) = webauthn.identify_discoverable_authentication(body) else {
+        return Err(Abgewiesen::anonym());
+    };
 
     // Unbekannt oder inaktiv → generischer 401.
-    let benutzer_id = crate::auth::webauthn::benutzer_je_user_handle(&state.pool, handle)
+    let benutzer_id = crate::auth::webauthn::benutzer_je_user_handle(pool, handle)
         .await?
-        .ok_or(AppError::Unauthorized)?;
+        .ok_or_else(Abgewiesen::anonym)?;
 
     // Die Kandidaten-Passkeys injiziert `finish_discoverable_authentication` erst jetzt als
     // erlaubte Credentials in den Zeremonie-State.
     let passkeys =
-        crate::auth::webauthn::storage::passkeys_fuer_benutzer(&state.pool, benutzer_id).await?;
+        crate::auth::webauthn::storage::passkeys_fuer_benutzer(pool, benutzer_id).await?;
     if passkeys.is_empty() {
-        return Err(AppError::Unauthorized);
+        return Err(Abgewiesen::anonym());
     }
-    let kandidaten: Vec<DiscoverableKey> = passkeys
-        .iter()
-        .map(|pk| DiscoverableKey::from(pk))
-        .collect();
+    let kandidaten: Vec<DiscoverableKey> = passkeys.iter().map(DiscoverableKey::from).collect();
 
     // Counter-/Klon-Check in der Bibliothek, wie im Passkey-Flow.
     let auth_result = match webauthn.finish_discoverable_authentication(
-        &body,
+        body,
         disc_state,
         &kandidaten,
     ) {
@@ -1060,73 +1287,49 @@ pub async fn webauthn_discoverable_finish(
             tracing::warn!(
                     "WebAuthn-Discoverable-Login abgelehnt: möglicher Klon (Counter-Regression) erkannt"
                 );
-            return Err(AppError::Unauthorized);
+            return Err(Abgewiesen::anonym());
         }
-        Err(_) => return Err(AppError::Unauthorized),
+        Err(_) => return Err(Abgewiesen::anonym()),
     };
 
     // Counter-Writeback über die genutzte `cred_id`; der gefundene Benutzer muss der per Handle
     // aufgelöste sein, sonst 401.
     let gefunden = crate::auth::webauthn::storage::passkey_je_credential_id(
-        &state.pool,
+        pool,
         auth_result.cred_id().as_ref(),
     )
     .await?;
     let Some((cred_benutzer_id, mut passkey)) = gefunden else {
-        return Err(AppError::Unauthorized);
+        return Err(Abgewiesen::anonym());
     };
     if cred_benutzer_id != benutzer_id {
-        return Err(AppError::Unauthorized);
+        return Err(Abgewiesen::anonym());
     }
 
     if passkey.update_credential(&auth_result).is_none() {
         return Err(AppError::Internal(
             "WebAuthn: credential_id-Mismatch beim Counter-Update".to_string(),
-        ));
+        )
+        .into());
     }
-    crate::auth::webauthn::storage::aktualisiere_counter(&state.pool, &passkey).await?;
+    crate::auth::webauthn::storage::aktualisiere_counter(pool, &passkey).await?;
 
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
          aktiv, erstellt_at FROM benutzer WHERE id = ?",
     )
     .bind(benutzer_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(pool)
     .await?;
     let Some(benutzer) = benutzer else {
-        return Err(AppError::Unauthorized);
+        return Err(Abgewiesen::anonym());
     };
     if !benutzer.aktiv {
-        return Err(AppError::Unauthorized);
+        return Err(Abgewiesen::fuer(benutzer));
     }
 
-    let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token, secure));
-    let jar = jar.remove(
-        Cookie::build((WEBAUTHN_DISC_COOKIE, ""))
-            .path("/api/auth/webauthn")
-            .build(),
-    );
-
-    tracing::info!(
-        benutzer_id = benutzer.id,
-        benutzername = %benutzer.benutzername,
-        peer_ip = ?peer_ip,
-        "WebAuthn-Discoverable-Anmeldung erfolgreich"
-    );
-    crate::auth::audit::schreibe(
-        &state.pool,
-        crate::auth::audit::AuditEintrag {
-            ereignis: crate::auth::audit::Ereignis::LoginOk,
-            benutzername: Some(&benutzer.benutzername),
-            benutzer_id: Some(benutzer.id),
-            peer_ip: peer_ip.map(|ip| ip.to_string()),
-            provider: crate::auth::provider::ID_WEBAUTHN,
-        },
-    )
-    .await;
-
-    Ok((jar, StatusCode::OK))
+    let token = session::anlegen(pool, benutzer.id).await?;
+    Ok((benutzer, token))
 }
 
 /// Antwort auf `POST /api/auth/totp/enroll/start` (LFH-43, Task 4): das frisch erzeugte,
@@ -1163,24 +1366,40 @@ fn jetzt_unix() -> u64 {
         .unwrap_or(0)
 }
 
-/// POST /api/auth/totp/enroll/start — beginnt oder erneuert ein TOTP-Enrollment. Das neue
-/// Secret wird sofort gespeichert, aber erst `enroll/finish` aktiviert MFA.
+/// Meldung, wenn ein Enrollment auf ein schon aktives TOTP trifft (422, Zustand).
+const TOTP_BEREITS_AKTIV: &str =
+    "Zwei-Faktor-Anmeldung ist bereits aktiv; neu einrichten geht nur nach einem Admin-Reset";
+
+/// POST /api/auth/totp/enroll/start — beginnt ein TOTP-Enrollment oder beginnt ein noch nicht
+/// abgeschlossenes neu. Das neue Secret wird sofort gespeichert, aber erst `enroll/finish`
+/// aktiviert MFA.
 ///
-/// Ein erneuter `start` überschreibt das Secret und setzt `totp_aktiviert` auf 0 — auch bei
-/// bereits aktivem TOTP. Bis zur Bestätigung ist der Nutzer dann ohne Zweitfaktor; das
-/// vermeidet ein zusätzliches „Pending-Secret“-Feld und ist unkritisch, weil der Nutzer selbst
-/// aus seinem Profil handelt.
+/// Bei aktivem TOTP → 422, nichts wird geschrieben (LFH-794): sonst schaltete jeder mit einer
+/// fremden Session (unbeaufsichtigter Fükw, entwendetes Tablet) den Zweitfaktor still ab oder
+/// tauschte ihn gegen seinen eigenen. Neu einrichten geht nur nach dem Admin-Reset
+/// (`routes::benutzer`), wie es die Profilseite sagt. Bedingung und Schreiben stehen in EINEM
+/// `UPDATE`, damit kein paralleler Abschluss dazwischenfällt.
 pub async fn totp_enroll_start(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
 ) -> Result<Json<TotpEnrollStart>, AppError> {
     let secret = crate::auth::totp::neues_secret();
 
-    sqlx::query("UPDATE benutzer SET totp_secret = ?, totp_aktiviert = 0 WHERE id = ?")
-        .bind(&secret)
-        .bind(benutzer.id)
-        .execute(&state.pool)
-        .await?;
+    // Ein neues Secret beginnt ohne verbrauchten Zeitschritt (LFH-791).
+    let geschrieben = sqlx::query(
+        "UPDATE benutzer SET totp_secret = ?, totp_letzter_schritt = NULL \
+         WHERE id = ? AND totp_aktiviert = 0",
+    )
+    .bind(&secret)
+    .bind(benutzer.id)
+    .execute(&state.pool)
+    .await?
+    .rows_affected();
+    if geschrieben != 1 {
+        return Err(AppError::UnprocessableEntity(
+            TOTP_BEREITS_AKTIV.to_string(),
+        ));
+    }
 
     let otpauth_url = crate::auth::totp::otpauth_url(&secret, &benutzer.benutzername)?;
     Ok(Json(TotpEnrollStart {
@@ -1192,33 +1411,57 @@ pub async fn totp_enroll_start(
 /// POST /api/auth/totp/enroll/finish — schließt ein Enrollment ab. `totp_secret` wird frisch
 /// gelesen, weil `CurrentUser` die `totp_*`-Spalten nicht trägt.
 ///
-/// Ohne `totp_secret` → 400 „Kein TOTP-Enrollment gestartet“. Ein falscher Code → 422, MFA wird
-/// nie ohne gültigen Code aktiviert. Ein gültiger Code aktiviert MFA, erzeugt zehn
-/// Klartext-Recovery-Codes und ersetzt alte.
+/// Ohne `totp_secret` → 422 „Kein TOTP-Enrollment gestartet“. Schon aktives TOTP → 422, ohne
+/// neue Recovery-Codes (ein zweiter Abschluss ersetzte sonst die gerade angezeigten). Ein
+/// falscher Code → 422, MFA wird nie ohne gültigen Code aktiviert. Ein gültiger Code aktiviert
+/// MFA, erzeugt zehn Klartext-Recovery-Codes und ersetzt alte.
+///
+/// Lesen, Aktivieren und Codes speichern laufen in EINER Transaktion (LFH-794): scheitert das
+/// Speichern der Codes, bleibt MFA aus, statt aktiv ohne Codes beim Nutzer zu landen.
 pub async fn totp_enroll_finish(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     JsonBody(req): JsonBody<TotpEnrollFinishRequest>,
 ) -> Result<Json<TotpEnrollFinish>, AppError> {
-    let secret: Option<String> =
-        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
-            .bind(benutzer.id)
-            .fetch_one(&state.pool)
-            .await?;
-    let secret =
-        secret.ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
-
-    if !crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix()) {
-        return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
-    }
-
-    sqlx::query("UPDATE benutzer SET totp_aktiviert = 1 WHERE id = ?")
-        .bind(benutzer.id)
-        .execute(&state.pool)
-        .await?;
-
     let codes = crate::auth::totp::neue_recovery_codes();
-    crate::auth::totp::storage::speichere_recovery_codes(&state.pool, benutzer.id, &codes).await?;
+    let jetzt = jetzt_unix();
+
+    crate::write_retry!(&state.pool, |conn| {
+        let (secret, aktiviert): (Option<String>, bool) =
+            sqlx::query_as("SELECT totp_secret, totp_aktiviert FROM benutzer WHERE id = ?")
+                .bind(benutzer.id)
+                .fetch_one(&mut *conn)
+                .await?;
+        if aktiviert {
+            return Err(AppError::UnprocessableEntity(
+                TOTP_BEREITS_AKTIV.to_string(),
+            ));
+        }
+        let secret = secret.ok_or_else(|| {
+            AppError::UnprocessableEntity("Kein TOTP-Enrollment gestartet".to_string())
+        })?;
+
+        let Some(schritt) = crate::auth::totp::pruefe_code_schritt(&secret, &req.code, jetzt)
+        else {
+            return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
+        };
+
+        // Auch der Enrollment-Code gilt genau einmal (LFH-791): wer ihn beim Einrichten
+        // mitliest, kommt damit nicht durch den Login (`totp::schutz`, Replay-Schutz).
+        sqlx::query(
+            "UPDATE benutzer SET totp_aktiviert = 1, totp_letzter_schritt = ? WHERE id = ?",
+        )
+        .bind(
+            i64::try_from(schritt).map_err(|_| {
+                AppError::Internal("TOTP-Zeitschritt außerhalb von i64".to_string())
+            })?,
+        )
+        .bind(benutzer.id)
+        .execute(&mut *conn)
+        .await?;
+        crate::auth::totp::storage::speichere_recovery_codes(conn, benutzer.id, &codes).await?;
+        Ok(())
+    })?;
 
     Ok(Json(TotpEnrollFinish {
         recovery_codes: codes,
@@ -1239,59 +1482,51 @@ pub struct TotpFinishRequest {
 ///    unbekannter/abgelaufener/verbrauchter Key → 401.
 /// 2. `benutzer` frisch per `id` laden. Deaktiviertes Konto oder fehlendes `totp_secret` (etwa
 ///    nach einem Admin-Reset zwischen `login` und `finish`) → 401.
-/// 3. `totp::pruefe_code`, nur bei Fehlschlag EIN atomarer `verbrauche_recovery_code`. Beides
-///    `false` → 401, ohne zu verraten, welcher Weg scheiterte.
+/// 3. Hat der Code die Recovery-Form (`totp::ist_recovery_form`), EIN atomarer
+///    `verbrauche_recovery_code`; sonst `totp::pruefe_code_schritt` samt Replay-Schutz
+///    (`schutz::schritt_annehmen`). `false` → 401, ohne zu verraten, welcher Weg scheiterte.
 /// 4. Erst dann Session und Cookie, `mfa_pending` entfernen, 200 mit `BenutzerAnzeige`.
+///
+/// **Bremsen (LFH-791):** Eine gesperrte Quelle (`rate_limit`) bekommt 429, bevor der
+/// Pending-Key verbraucht wird; ein gesperrter zweiter Faktor (`totp::schutz`) 429 vor der
+/// Codeprüfung, auch für einen gültigen TOTP-Code. Jeder TOTP-Versuch zählt je Benutzer schon
+/// vor der Codeprüfung (atomar mit der Sperrprüfung); Recovery-Codes zählen dort nicht und
+/// sperren nicht mit. Jeder falsche Code zählt je Quelle.
+/// Erst ein bestandener zweiter Faktor räumt beides — `login` räumt bei TOTP-Konten nichts.
+///
+/// Der Erfolg und jede Abweisung eines Anmeldeversuchs hinterlassen genau einen Eintrag im
+/// Auth-Audit ([`audit_anmeldung`], LFH-792); eine Abweisung ohne laufende Zeremonie, eine
+/// Sperre (429), ein abgeschalteter Provider und Serverfehler keinen.
 pub async fn totp_finish(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     SichererTransport(secure): SichererTransport,
     jar: CookieJar,
     JsonBody(req): JsonBody<TotpFinishRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
-    let key = jar
-        .get(MFA_PENDING_COOKIE)
-        .map(|c| c.value().to_string())
-        .ok_or(AppError::Unauthorized)?;
+    if let Some(ip) = peer_ip {
+        if crate::auth::rate_limit::ist_gesperrt(ip) {
+            tracing::warn!(
+                peer_ip = %ip,
+                "Zweitfaktor abgewiesen: zu viele Fehlversuche aus dieser Quelle"
+            );
+            return Err(AppError::TooManyRequests(
+                "Zu viele fehlgeschlagene Anmeldeversuche. Bitte kurz warten.".to_string(),
+            ));
+        }
+    }
 
-    // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 1).
-    let benutzer_id = crate::auth::totp::state::entnehme(&key).ok_or(AppError::Unauthorized)?;
-
-    let benutzer = sqlx::query_as::<_, Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
-         aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    let key = jar.get(MFA_PENDING_COOKIE).map(|c| c.value().to_string());
+    let ergebnis = totp_pruefen(&state.pool, key, &req.code, peer_ip).await;
+    audit_anmeldung(
+        &state.pool,
+        crate::auth::totp::PROVIDER,
+        peer_ip,
+        ergebnis.as_ref().map(|(benutzer, _)| benutzer),
     )
-    .bind(benutzer_id)
-    .fetch_optional(&state.pool)
-    .await?;
-    let Some(benutzer) = benutzer else {
-        return Err(AppError::Unauthorized);
-    };
-    if !benutzer.aktiv {
-        return Err(AppError::Unauthorized);
-    }
+    .await;
+    let (benutzer, token) = ergebnis.map_err(|abgewiesen| abgewiesen.fehler)?;
 
-    let secret: Option<String> =
-        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
-            .bind(benutzer_id)
-            .fetch_one(&state.pool)
-            .await?;
-    let Some(secret) = secret else {
-        return Err(AppError::Unauthorized);
-    };
-
-    // `||` schließt kurz: bei gültigem TOTP-Code wird kein Recovery-Code verbraucht.
-    let gueltig = crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix())
-        || crate::auth::totp::storage::verbrauche_recovery_code(
-            &state.pool,
-            benutzer_id,
-            &req.code,
-        )
-        .await?;
-    if !gueltig {
-        return Err(AppError::Unauthorized);
-    }
-
-    let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token, secure));
     let jar = jar.remove(
         Cookie::build((MFA_PENDING_COOKIE, ""))
@@ -1300,6 +1535,97 @@ pub async fn totp_finish(
     );
     // Der Pending-State entsteht nur im TOTP-Zweig von `login`; der Status ist hier sicher `true`.
     Ok((jar, Json(benutzer.anzeige(true))))
+}
+
+/// Schritte 1–4 von [`totp_finish`]: liefert Benutzer und Session-Token. Ab Schritt 2 steht der
+/// Benutzer fest (er hat den Passwortschritt bestanden), und jede Abweisung nennt ihn.
+async fn totp_pruefen(
+    pool: &SqlitePool,
+    key: Option<String>,
+    code: &str,
+    peer_ip: Option<std::net::IpAddr>,
+) -> Result<(Benutzer, String), Abgewiesen> {
+    // Ohne Cookie oder mit unbekanntem Key lief keine Zeremonie: kein Eintrag.
+    let key = key.ok_or_else(Abgewiesen::ohne_spur)?;
+
+    // Synchron, Guard vor jedem folgenden `.await` freigegeben (Punkt 1).
+    let benutzer_id = crate::auth::totp::state::entnehme(&key).ok_or_else(Abgewiesen::ohne_spur)?;
+
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    )
+    .bind(benutzer_id)
+    .fetch_optional(pool)
+    .await?;
+    let Some(benutzer) = benutzer else {
+        return Err(Abgewiesen::anonym());
+    };
+    if !benutzer.aktiv {
+        return Err(Abgewiesen::fuer(benutzer));
+    }
+
+    let secret: Option<String> =
+        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
+            .bind(benutzer_id)
+            .fetch_one(pool)
+            .await?;
+    let Some(secret) = secret else {
+        return Err(Abgewiesen::fuer(benutzer));
+    };
+
+    let jetzt = jetzt_unix();
+    let jetzt_i64 = i64::try_from(jetzt).unwrap_or(i64::MAX);
+
+    let gueltig = if crate::auth::totp::ist_recovery_form(code) {
+        // Recovery-Codes umgehen die Sperre des zweiten Faktors (s. `totp::schutz`); die Sperre
+        // je Quelle in `totp_finish` gilt auch für sie.
+        crate::auth::totp::storage::verbrauche_recovery_code(pool, benutzer_id, code).await?
+    } else {
+        // Zählt den Versuch vorab, in derselben Anweisung wie die Prüfung der Sperre: sonst kämen
+        // gleichzeitige Anfragen alle an der Sperre vorbei (`schutz::versuch_beginnen`). Die
+        // Sperre ist ein 429 und schreibt keinen Eintrag, wie die gesperrte Quelle beim Passwort.
+        if !crate::auth::totp::schutz::versuch_beginnen(pool, benutzer_id, jetzt_i64).await? {
+            tracing::warn!(
+                benutzer_id,
+                peer_ip = ?peer_ip,
+                "Zweitfaktor abgewiesen: zu viele falsche Codes für dieses Konto"
+            );
+            return Err(AppError::TooManyRequests(format!(
+                "Zu viele falsche Codes. Bitte in höchstens {} Minuten erneut anmelden oder einen \
+                 Recovery-Code verwenden.",
+                crate::auth::totp::schutz::SPERRE_SEKUNDEN / 60
+            ))
+            .into());
+        }
+        // Ein gültiger TOTP-Code gilt nur, wenn sein Zeitschritt noch nicht verbraucht ist
+        // (RFC 6238 §5.2).
+        match crate::auth::totp::pruefe_code_schritt(&secret, code, jetzt) {
+            Some(schritt) => {
+                crate::auth::totp::schutz::schritt_annehmen(pool, benutzer_id, schritt).await?
+            }
+            None => false,
+        }
+    };
+    if !gueltig {
+        if let Some(ip) = peer_ip {
+            crate::auth::rate_limit::fehlversuch(ip, Some(&benutzer.benutzername));
+        }
+        tracing::warn!(
+            benutzer_id,
+            peer_ip = ?peer_ip,
+            "Zweitfaktor fehlgeschlagen"
+        );
+        return Err(Abgewiesen::fuer(benutzer));
+    }
+
+    crate::auth::totp::schutz::erfolg(pool, benutzer_id).await?;
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
+    }
+
+    let token = session::anlegen(pool, benutzer.id).await?;
+    Ok((benutzer, token))
 }
 
 /// Body von `POST /api/auth/app-code` (LFH-818).
@@ -1394,7 +1720,8 @@ pub async fn app_code_einloesen(
     };
     let Some(benutzer) = benutzer else {
         if let Some(ip) = peer_ip {
-            crate::auth::rate_limit::fehlversuch(ip);
+            // Ziel unbekannt: diesen Versuch räumt kein Erfolg, er läuft nur aus.
+            crate::auth::rate_limit::fehlversuch(ip, None);
         }
         tracing::warn!(peer_ip = ?peer_ip, "Anmeldung aus dem Browser abgewiesen");
         crate::auth::audit::schreibe(
@@ -1412,7 +1739,7 @@ pub async fn app_code_einloesen(
     };
 
     if let Some(ip) = peer_ip {
-        crate::auth::rate_limit::erfolg(ip);
+        crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
     // Eine übrig gebliebene Sitzung im Webview würde sonst verwaist in der Tabelle stehen.
     if let Some(alt) = jar.get(SESSION_COOKIE) {

@@ -24,3 +24,9 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   Vorgabemodus immer zuletzt und nie vorausgewählt, auch allein nicht (Stufe 3, Score hinter
   jedem Treffer, Gruppe `ortssuche` zuletzt; Vorgabe -1 in `CommandPalette.tsx`). Sie **springt nur** (`lagekartePfad(id, { ort })`); die Palette fragt den
   Geocoder nie. Rechte wie der Koordinatensprung über `useLagekarteZugang`.
+- **Schnellaktionen** (`SCHNELLAKTIONEN` in `befehle.ts`, Guard `schnellaktionen.guard.test.ts`):
+  das Ziel liegt unter dem Modulpfad des **eigenen** Trägers, und eine Seite dieses Moduls liest
+  den deklarierten `parameter` als Literal (`X.get('neu')` bzw. `X.get('zeichnen')`). `neu` ist die
+  Erfassung (`?neu=1`), `zeichnen` der Zeichenmodus der Lagekarte (LFH-825, Träger `lagekarte`,
+  `?zeichnen=<zonentyp>`). Eine Zeile ohne Leser gibt es nicht; neue Zeilen ans Ende (Pins in
+  `befehle.test.ts`, `befehle.modulstatus.test.ts`), Bestandszeilen ohne `kennung`.

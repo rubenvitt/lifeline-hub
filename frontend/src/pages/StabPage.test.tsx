@@ -160,7 +160,7 @@ describe('StabPage', () => {
     const sektion = await besetzungsSektion();
     expect(
       await within(sektion).findByRole('heading', {
-        level: 4,
+        level: 3,
         name: /S4 · Versorgung \(Logistik\)/,
       }),
     ).toBeInTheDocument();
@@ -172,7 +172,7 @@ describe('StabPage', () => {
     await waitFor(() =>
       expect(
         within(sektion)
-          .getAllByRole('heading', { level: 4 })
+          .getAllByRole('heading', { level: 3 })
           .map((h) => h.textContent),
       ).toEqual([
         expect.stringContaining('S1 · Personal'),
@@ -277,7 +277,7 @@ describe('StabPage', () => {
       { route: '/einsaetze/1/stab' },
     );
     const sektion = await besetzungsSektion();
-    expect(within(sektion).getAllByRole('heading', { level: 4 })).toHaveLength(6);
+    expect(within(sektion).getAllByRole('heading', { level: 3 })).toHaveLength(6);
     expect(within(sektion).queryByText('nicht vergeben')).toBeNull();
     expect(within(sektion).queryAllByRole('button', { name: /^Besetzung ändern/ })).toHaveLength(0);
     // Ohne Stand fehlte der Termin zur Vorbelegung — gesperrt (Gegenfall: Kopfaktion-Test unten).
@@ -311,7 +311,7 @@ describe('StabPage', () => {
     expect(within(s6).queryByRole('link', { name: label('chat') })).toBeNull();
   });
 
-  it('die S6-Zeile führt zum Funkplan, keine andere Zeile (LFH-548)', async () => {
+  it('die S6-Zeile führt zu Funkplan und Kommunikationsplan, keine andere Zeile (LFH-548, LFH-848)', async () => {
     rendere();
     await besetzungsSektion();
     const s6 = await screen.findByRole('group', { name: 'Werkzeuge S6' });
@@ -319,7 +319,12 @@ describe('StabPage', () => {
       'href',
       '/einsaetze/1/stab/funkplan',
     );
+    expect(within(s6).getByRole('link', { name: 'Kommunikationsplan' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/stab/kommunikationsplan',
+    );
     expect(screen.getAllByRole('link', { name: 'Funkplan' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Kommunikationsplan' })).toHaveLength(1);
   });
 
   it('die S5-Zeile führt zu Pressearbeit und Informationstelefon, keine andere Zeile (LFH-554)', async () => {

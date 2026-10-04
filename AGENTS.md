@@ -8,8 +8,7 @@ steht nur, was gilt und wo es getragen wird.
 
 Die Regeln liegen bei dem Code, den sie betreffen. **Bevor du eine Datei änderst, lies jede
 `AGENTS.md` auf dem Weg von der Wurzel bis zu ihrem Verzeichnis.** Claude Code lädt eine
-Bereichsdatei selbst, sobald es eine Datei darunter liest; Codex lädt nur die Dateien von der
-Wurzel bis zum Arbeitsverzeichnis, alles darunter liest du selbst. Pfade ohne Präfix sind im
+Bereichsdatei selbst, sobald es eine Datei darunter liest. Pfade ohne Präfix sind im
 Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 
 | Datei | Inhalt |
@@ -24,7 +23,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/druck/AGENTS.md` | Druck (LFH-71/LFH-22) |
 | `frontend/src/entwurf/AGENTS.md` | Entwürfe, Lagebericht-Akkordeon |
 | `frontend/src/personen/AGENTS.md` | Personen und Sichtung |
-| `frontend/src/stab/AGENTS.md` | Stab: Funkplan S6, Checkliste Arbeitsaufnahme, Vorbereitung der Lagebesprechung |
+| `frontend/src/stab/AGENTS.md` | Stab: Funkplan S6, Kommunikationsplan S6, Checkliste Arbeitsaufnahme, Vorbereitung der Lagebesprechung |
 | `frontend/src/fuehrung/AGENTS.md` | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server |
 | `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
@@ -38,7 +37,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 - **Es gibt keine `CLAUDE.md`.** Claude Code liest `AGENTS.md` ab v2.1.277 direkt (alle
   Sitzungsarten ab v2.1.281), aber nur, solange auf dem Pfad keine `CLAUDE.md`,
   `.claude/CLAUDE.md` oder `CLAUDE.local.md` liegt — eine solche Datei, auch eine lokale,
-  verdrängt alle `AGENTS.md`. Codex liest je Lauf höchstens 32 KiB (`project_doc_max_bytes`).
+  verdrängt alle `AGENTS.md`.
 - Code-Kommentare verweisen auf Regeln mit Datei und Abschnitt („`src/AGENTS.md`,
   Statuscode-Konvention“). Wer eine Regel verschiebt, greppt die Verweise.
 
@@ -92,8 +91,8 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
   `/opsx:apply` → `/opsx:archive` → erst dann der PR, mit Plan, Umsetzung und Archiv zusammen.
   Den Branch zu pushen, um den Stand zu sichern, ist erlaubt; der PR wartet auf die Umsetzung —
   auch wenn die Umgebung (etwa eine Cloud-Sitzung) nach jedem Push einen PR verlangt.
-- In Codex heißen die OpenSpec-Befehle `$openspec-propose`, `$openspec-apply-change` usw.
-  (`.agents/skills/`, erzeugt von `openspec`); Claude Code liest nur `.claude/`.
+- Skills und OpenSpec-Befehle liegen nur unter `.claude/`; Codex ist entfernt (LFH-853). Bei
+  `openspec init`/`openspec update` nur das Werkzeug Claude Code wählen, keinen `.agents/`-Spiegel.
 
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 
@@ -117,7 +116,12 @@ Werkzeuge ohne Präfix (`clickup_update_task`); der Präfix hängt an der Umgebu
   Ziel-Branch**; bestehende werden nie geändert, umbenannt oder gelöscht.
 - `scripts/check-migrationen.sh` (gegen `origin/alpha`, vorher `git fetch`), Umlegen mit
   `--umnummerieren`. Durchgesetzt über `.github/workflows/migrationen.yml` (Required Check
-  `Migrationsnummern`); Netz `db::tests::migrationsnummern_sind_eindeutig`.
+  `Migrationsnummern` im Ruleset 17017911; fehlt er, warnt der Push-Lauf auf `alpha`); Netz
+  `db::tests::migrationsnummern_sind_eindeutig`.
+- **Autofix nur auf dem PR-Branch** (LFH-1014): ein reiner Nummernkonflikt wird per Bot-Commit
+  umgelegt (`scripts/migrationen-autofix.sh`), nie auf `alpha`. Danach vor dem nächsten Push
+  den Branch holen. Herleitung:
+  `openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md`.
 - **Falle: sqlx spielt eine kleinere, noch nicht eingespielte Migration still nach**
   (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`).
 - **Migrationen entstehen nur über `alpha`**; Freigaben als Merge-Commit, nicht Squash.

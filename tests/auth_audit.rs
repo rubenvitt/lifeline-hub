@@ -6,7 +6,9 @@
 //! gescheiterte?
 
 use axum::body::Body;
+use axum::extract::ConnectInfo;
 use axum::http::{header, Request, StatusCode};
+use std::net::SocketAddr;
 use tower::ServiceExt;
 
 mod common;
@@ -126,4 +128,123 @@ async fn erfolgreicher_login_und_logout_werden_protokolliert() {
         benutzer_id.is_some(),
         "der Logout muss dem Benutzer zuzuordnen sein, sonst ist die Spur wertlos"
     );
+}
+
+// --- Passwortwechsel (LFH-827) ---
+//
+// `POST /api/auth/passwort` schrieb bis LFH-827 nur `tracing`. Bei einem Vorfall lautet die Frage
+// aber „wann hat wer das Passwort geändert, und von welcher IP?“ — die beantwortet nur die
+// Tabelle.
+
+/// Wechselt das Passwort der angemeldeten Sitzung von `gegenstelle` aus und liefert den Status.
+/// Die Gegenstelle setzt `ConnectInfo` wie der echte Server, damit die IP in der Spur ankommt;
+/// jeder Test nimmt eine eigene, weil die Anmelde-Bremse prozessweit je IP zählt.
+async fn passwort_wechseln(
+    app: &axum::Router,
+    cookie: &str,
+    gegenstelle: &str,
+    alt: &str,
+    neu: &str,
+) -> StatusCode {
+    let body = format!(r#"{{"altes_passwort":"{alt}","neues_passwort":"{neu}"}}"#);
+    let mut req = Request::builder()
+        .method("POST")
+        .uri("/api/auth/passwort")
+        .header(header::COOKIE, cookie)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body))
+        .unwrap();
+    let peer: SocketAddr = gegenstelle.parse().unwrap();
+    req.extensions_mut().insert(ConnectInfo(peer));
+    app.clone().oneshot(req).await.unwrap().status()
+}
+
+/// Ereignis, Benutzername, Benutzer-id, IP und Anmeldeweg der Passwort-Ereignisse.
+type PasswortZeile = (String, Option<String>, Option<i64>, Option<String>, String);
+
+async fn passwort_spur(pool: &sqlx::SqlitePool) -> Vec<PasswortZeile> {
+    sqlx::query_as(
+        "SELECT ereignis, benutzername, benutzer_id, peer_ip, provider FROM auth_audit \
+         WHERE ereignis LIKE 'passwort%' ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+async fn admin_id(pool: &sqlx::SqlitePool) -> i64 {
+    sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn erfolgreicher_passwortwechsel_hinterlaesst_eine_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let status = passwort_wechseln(
+        &app,
+        &cookie,
+        "203.0.113.21:50000",
+        "startpw12",
+        "ganzneu1234",
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    assert_eq!(
+        passwort_spur(&pool).await,
+        vec![(
+            "passwort_geaendert".to_string(),
+            Some("admin".to_string()),
+            Some(admin_id(&pool).await),
+            Some("203.0.113.21".to_string()),
+            "passwort".to_string(),
+        )],
+        "ein Passwortwechsel muss rückwirkend nachweisbar sein"
+    );
+}
+
+#[tokio::test]
+async fn abgewiesener_passwortwechsel_hinterlaesst_eine_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let status = passwort_wechseln(
+        &app,
+        &cookie,
+        "203.0.113.22:50000",
+        "daneben123",
+        "ganzneu1234",
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    assert_eq!(
+        passwort_spur(&pool).await,
+        vec![(
+            "passwort_wechsel_abgewiesen".to_string(),
+            Some("admin".to_string()),
+            Some(admin_id(&pool).await),
+            Some("203.0.113.22".to_string()),
+            "passwort".to_string(),
+        )],
+        "ein Wechselversuch mit falschem Alt-Passwort ist das Muster einer übernommenen Sitzung"
+    );
+}
+
+/// Was schon an der Form scheitert (zu kurzes neues Passwort), hat das Alt-Passwort nie geprüft
+/// und ist kein Wechselversuch im Sinne der Spur.
+#[tokio::test]
+async fn formfehler_beim_passwortwechsel_hinterlaesst_keine_spur() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let status =
+        passwort_wechseln(&app, &cookie, "203.0.113.23:50000", "startpw12", "kurz123").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    assert!(passwort_spur(&pool).await.is_empty());
 }

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, request, test, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -286,5 +286,129 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
     await expect.poll(() => vorgehalteneKeys(page), { timeout: 10_000 }).toBeNull();
     expect(await queueEintraege(page)).toBe(1);
     await page.context().setOffline(false);
+  });
+});
+
+// Kaltstart ohne Server (LFH-780, Befund des Spikes LFH-720): die App startet neu, der Server
+// fehlt. Die Offline-Identität aus LFH-723 hält die Person angemeldet — trägt sie auch das
+// SCHREIBEN? Gemessen wurde vor LFH-723 der Login, und die Erfassung kam erst nach ihm in Gang.
+//
+// „Kaltstart" heißt hier: die alte Seite ist zu, eine neue im selben Kontext öffnet die App.
+// Cookie, Service Worker und IndexedDB bleiben wie auf dem Gerät, vom Speicher der App nichts.
+// Ein Neuladen wie oben im Lesetest täte es auch; der eigene Weg schließt aus, dass ein Rest
+// der alten Seite (BroadcastChannel, Web Lock) die neue trägt.
+test.describe('Kaltstart ohne Server (LFH-780)', () => {
+  test.skip(bundleFehlt, 'Prod-Bundle fehlt (frontend/dist/sw.js) — vorher `pnpm build`');
+  test.skip(!lauf, 'LIFELINE_E2E_LAUF fehlt — Backend-Port unbekannt');
+
+  /** Einsatz mit einem ETB-Eintrag, das ETB einmal online geladen. Vorbedingung, gelesen statt
+   *  erwartet: sein Stand liegt auf der Platte, die Queue ist leer. */
+  async function etbVorhalten(page: Page, bezeichnung: string): Promise<number> {
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `${bezeichnung} ${Date.now()}`,
+    });
+    await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+      typ: 'meldung',
+      inhalt: 'Kaltstart-Probe vorher',
+      von: 'ELW 1',
+      an: 'Leitstelle',
+    });
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await expect(page.getByText('Kaltstart-Probe vorher')).toBeVisible();
+    await expect
+      .poll(async () => (await vorgehalteneKeys(page)) ?? [], { timeout: 20_000 })
+      .toContain('etb');
+    expect(await queueEintraege(page)).toBe(0);
+    return einsatzId;
+  }
+
+  /** Netz weg — und nachweislich weg. */
+  async function netzWeg(page: Page) {
+    await page.context().setOffline(true);
+    expect(
+      await page.evaluate(() =>
+        fetch('/api/health', { cache: 'no-store' }).then(
+          (a) => `beantwortet ${a.status}`,
+          () => 'scheitert',
+        ),
+      ),
+    ).toBe('scheitert');
+  }
+
+  /** Die App neu starten: alte Seite zu, neue Seite im selben Kontext. */
+  async function kaltstart(page: Page, pfad: string): Promise<Page> {
+    const app = await page.context().newPage();
+    await page.close();
+    await app.goto(pfad);
+    return app;
+  }
+
+  /** Erfasst offline einen ETB-Eintrag über die Schnellerfassung; er liegt danach in der Queue. */
+  async function offlineErfassen(app: Page, inhalt: string) {
+    // Erst der Inhalt, dann die Adresse: `not.toHaveURL` gälte schon vor einer Umleitung.
+    await expect(app.getByText('Kaltstart-Probe vorher')).toBeVisible();
+    await expect(app, 'Kaltstart ohne Server: nicht auf der Anmeldung').not.toHaveURL(/\/login/);
+    await expect(app.getByText(/^Stand \d\d:\d\d · offline$/).first()).toBeVisible();
+    const feld = app.getByRole('textbox', { name: /Inhalt/ }).first();
+    await feld.fill(inhalt);
+    await feld.press('Enter');
+    await expect.poll(() => queueEintraege(app), { timeout: 10_000 }).toBe(1);
+  }
+
+  test('ohne Anmeldung ins ETB: die Erfassung landet in der Queue und geht mit dem Server hinaus', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await anmelden(page);
+    await serviceWorkerZustaendig(page);
+    const einsatzId = await etbVorhalten(page, 'E2E Kaltstart');
+
+    await netzWeg(page);
+    const app = await kaltstart(page, `/einsaetze/${einsatzId}/etb`);
+    const seitenFehler: string[] = [];
+    app.on('pageerror', (f) => seitenFehler.push(f.message));
+    await offlineErfassen(app, 'Kaltstart-Probe offline erfasst');
+
+    // Server zurück: die Queue leert sich, ohne neue Anmeldung. Chromium meldet nach einem
+    // Start unter dem Offline-Schalter `onLine === true` (offline/AGENTS.md) — dann kommt kein
+    // `online`-Ereignis, und der Backoff des Abgleichs trägt; daher die lange Frist.
+    await app.context().setOffline(false);
+    await expect.poll(() => queueEintraege(app), { timeout: 60_000 }).toBe(0);
+    await expect(app).not.toHaveURL(/\/login/);
+    const etb = await app.request.get(`/api/einsaetze/${einsatzId}/etb`);
+    expect(etb.ok(), await etb.text()).toBeTruthy();
+    expect(await etb.text()).toContain('Kaltstart-Probe offline erfasst');
+    expect(seitenFehler).toEqual([]);
+  });
+
+  test('eine auf dem Server beendete Sitzung führt nach der Rückkehr zur Anmeldung, die Queue bleibt', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await anmelden(page);
+    await serviceWorkerZustaendig(page);
+    const einsatzId = await etbVorhalten(page, 'E2E Kaltstart 401');
+
+    // Die Sitzung endet auf dem Server, das Gerät behält sein Cookie — wie ein Ablauf während
+    // der Funkstille. Abgemeldet wird aus einem eigenen Anfragekontext mit demselben Cookie (ein
+    // Logout aus der Seite nähme das Cookie mit), und erst NACH dem Netz: sonst sähe die noch
+    // offene alte Seite die 401 zuerst und räumte den vorgehaltenen Stand vor dem Kaltstart.
+    await netzWeg(page);
+    const fremd = await request.newContext({
+      baseURL: backendUrl,
+      storageState: await page.context().storageState(),
+    });
+    const abmeldung = await fremd.post('/api/auth/logout');
+    expect(abmeldung.status(), await abmeldung.text()).toBe(204);
+    await fremd.dispose();
+
+    const app = await kaltstart(page, `/einsaetze/${einsatzId}/etb`);
+    await offlineErfassen(app, 'Kaltstart-Probe für die Beweissicherung');
+
+    // Server zurück: jetzt antwortet er mit 401 — das ist eine Antwort über die Sitzung, kein
+    // Leitungsfehler, also Anmeldung. Die Erfassung bleibt in der Queue (Beweissicherung).
+    await app.context().setOffline(false);
+    await expect(app).toHaveURL(/\/login/, { timeout: 60_000 });
+    expect(await queueEintraege(app)).toBe(1);
   });
 });

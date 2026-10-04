@@ -6,6 +6,7 @@ import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
+import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
 import { einsatzKeys } from '../api/queryKeys';
 import { onlineManager } from '@tanstack/react-query';
 import TierePage from './TierePage';
@@ -739,6 +740,8 @@ describe('TierePage', () => {
   });
 
   it('liest nur den Tierwert des aktuellen Einsatzes und füllt ihn nach Serien-Reset nicht erneut ein', async () => {
+    // Gemerkt vom angemeldeten Benutzer: ungebundene Werte verwirft die Anmeldung (LFH-785).
+    erfassungsSitzungBinden(nutzer.id);
     sessionStorage.setItem('lfh:erfassung:2:tier:antreff_ort', 'Falscher Einsatz');
     sessionStorage.setItem('lfh:erfassung:1:person:antreff_ort', 'Falsche Maske');
     sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager Nord');
@@ -760,6 +763,8 @@ describe('TierePage', () => {
   });
 
   it('setzt beim Einsatzwechsel alle Tierwerte zurück und lädt nur den B-Sitzungsort', async () => {
+    // Gemerkt vom angemeldeten Benutzer: ungebundene Werte verwirft die Anmeldung (LFH-785).
+    erfassungsSitzungBinden(nutzer.id);
     sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager A');
     sessionStorage.setItem('lfh:erfassung:2:tier:antreff_ort', 'Tierlager B');
     server.use(

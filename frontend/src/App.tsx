@@ -47,6 +47,7 @@ import SchaedenPage from './pages/SchaedenPage';
 import DokumentePage from './pages/DokumentePage';
 import StabPage from './pages/StabPage';
 import FunkplanPage from './pages/FunkplanPage';
+import KommunikationsplanPage from './pages/KommunikationsplanPage';
 import InfotelefonPage from './pages/InfotelefonPage';
 import PressePage from './pages/PressePage';
 import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
@@ -280,6 +281,8 @@ export const appRouten = createRoutesFromElements(
           {/* Funkplan S6 (LFH-548): Unterroute des Stabs, kein Modul; `modulAusPfad` markiert den
               Stab, Sperre und Sichtbarkeit kommen vom Stab. */}
           <Route path="stab/funkplan" element={<FunkplanPage />} />
+          {/* Kommunikationsplan S6 (LFH-848): Unterroute des Stabs wie der Funkplan. */}
+          <Route path="stab/kommunikationsplan" element={<KommunikationsplanPage />} />
           {/* Presse- und Medienarbeit S5 (LFH-554): Unterrouten des Stabs wie der Funkplan. */}
           <Route path="stab/presse" element={<PressePage />} />
           <Route

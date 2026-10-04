@@ -1,3 +1,88 @@
+## [1.0.0-alpha.71](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.70...v1.0.0-alpha.71) (2026-10-03)
+
+### Lagekarte
+
+- **Kontextmenü per Rechtsklick und langem Druck**: An freien Kartenstellen und auf Flächen kann nun per Rechtsklick (Desktop) oder langem Druck (Touch) ein Menü geöffnet werden, um Koordinaten zu kopieren, eine Messung zu beginnen oder direkt ein Zeichen zu setzen
+- Kontextmenü erscheint nicht auf Kräfte-Clustern, um versehentliche Aktionen zu vermeiden
+- Dialog „Zeichen hier setzen" kann während des Speicherns nicht mehr versehentlich geschlossen werden und schließt nach erfolgreicher Anlage automatisch
+
+### Benutzerverwaltung
+
+- **Passwort-Bereich im Profil**: Benutzer, die sich ausschließlich über Single Sign-On (SSO) anmelden, sehen im Profil keinen Passwort-Bereich mehr – der Button „Passwort ändern" wird nur noch angezeigt, wenn ein lokales Passwort gesetzt ist
+
+### Sicherheit
+
+- **Anmelde-Protokollierung erweitert**: Erfolgreiche und fehlgeschlagene Anmeldungen über Zweifaktor-Authentifizierung (TOTP), Single Sign-On (OIDC) und Passkeys werden nun vollständig im Audit-Log erfasst
+- Störungen beim Identity Provider (z. B. nicht erreichbar, ungültige Konfiguration) erzeugen keine Fehleinträge mehr im Anmelde-Protokoll – nur tatsächliche Anmeldeversuche mit laufender Zeremonie werden dokumentiert
+- Anfragen ohne gültige Anmelde-Session werden nicht mehr protokolliert, um das Audit-Log sauber zu halten
+
+### Betrieb und Installation
+
+- Verbesserungen an der internen Test-Infrastruktur für stabilere Builds unter Last
+- Aufräumarbeiten in der Dokumentation: veraltete Agent-Konfigurationen entfernt
+
+## [1.0.0-alpha.70](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.69...v1.0.0-alpha.70) (2026-10-03)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration**: Neue Spalten für Zwei-Faktor-Authentifizierung und Audit-Ereignisse (Migrationen 0142, 0143, 0144)
+- **Automatische Korrektur**: Kollidierende Migrationsnummern in Pull Requests werden automatisch umnummeriert
+
+### Authentifizierung und Sicherheit
+
+- Zwei-Faktor-Authentifizierung gegen Durchprobieren und Wiederverwendung abgesichert: Codes können nicht mehrfach verwendet werden, nach 5 Fehlversuchen wird der zweite Faktor für 15 Minuten gesperrt
+- TOTP-Einrichtung kann aktivierte Zwei-Faktor-Authentifizierung nicht mehr abschalten – Neueinrichtung nur nach Administrator-Reset
+- Login-Sperre wird jetzt pro Benutzerkonto statt pro IP-Adresse aufgehoben, verhindert Umgehung durch parallele Anmeldeversuche
+- Passwortwechsel wird im Audit-Protokoll mitgeschrieben (erfolgreiche Änderungen und abgewiesene Versuche)
+- Fehlgeschlagene Login-Versuche werden in der Datenbank begrenzt, um unbegrenztes Wachstum zu verhindern
+
+### Einsatztagebuch
+
+- Folgeaufträge aus Entscheidungen werden in der Zeitachse mit Verweisen angezeigt, die direkt zum jeweiligen Auftrag führen
+- Offline-Erfassung funktioniert auch beim Kaltstart ohne Serververbindung – Einträge landen in der Warteschlange und werden bei Netzrückkehr übertragen
+
+### Lagekarte
+
+- Zeichnen-Modus kann jetzt per Link geöffnet werden (`?zeichnen=<zonentyp>`) – Schnellaktion "Gefahrengebiet zeichnen" verfügbar
+- Kartenzeichen werden bei Wechsel der Pixeldichte (z.B. anderer Monitor oder geänderter Browser-Zoom) automatisch neu gerastert, keine unscharfen Zeichen mehr
+- Offline-Kartendarstellung funktioniert jetzt auch beim ersten Laden ohne vorherigen Online-Besuch
+- Pegel-Inspector zeigt auch ohne Schreibrecht alle Informationen korrekt an
+
+### Einsatzverwaltung
+
+- Einsatzdaten-Formular sendet nur noch geänderte Angaben statt aller Felder – verhindert versehentliches Überschreiben gleichzeitig geänderter Daten
+- Einsatz-Standardwerte können jetzt auch von Organisations-Führungskräften eingesehen werden (nur Administratoren dürfen ändern)
+
+### Kommunikation
+
+- Chat-Nachrichten und Kanalanlage behalten Eingaben bei Sendefehlern – kein Verlust durch Netzprobleme oder abgelehnte Anfragen
+- Nachrichten werden nur geleert, wenn sie tatsächlich erfolgreich gesendet wurden
+
+### Betroffene und Schäden
+
+- Erfassungswerte werden an den angemeldeten Benutzer gebunden – nach Benutzerwechsel im selben Tab werden keine fremden Vorbelegungen mehr übernommen
+- Löschersuchen für betroffene Personen entfernt auch zugehörige Fotos und Dateien vollständig
+
+### Benutzerverwaltung
+
+- Namensspalte in der Benutzerliste hat jetzt eine feste Breite, "Bearbeiten"-Knopf ist auf schmalen Bildschirmen nicht mehr verdeckt
+
+### Bedienung
+
+- Listeneinträge verwenden die zur Überschriftenstruktur passende Ebene statt festem h4 – bessere Barrierefreiheit durch korrekte Hierarchie
+- Erfassungsdialoge setzen sich beim Abbrechen korrekt zurück, keine versehentlich behaltenen Werte mehr
+
+### Betrieb und Installation
+
+- Test-Binaries deutlich verkleinert (von 501 auf 142 MB unter Linux) durch reduzierte Debug-Informationen, Backtraces bleiben vollständig
+- Druckausgabe in Firefox geprüft und dokumentiert (Lagebericht, Befehle, Einsatztagebuch)
+- Automatische Korrektur kollisionierter Migrationsnummern in Pull Requests mit Kommentar am PR
+
+### Qualitätssicherung
+
+- Zahlreiche Stabilitätsverbesserungen in Tests unter Last (Modulfreigaben, Deeplink-Vorbelegung, Touch-Bedienung, Layout-Messungen)
+- Behoben: Timer-Drain wartet auf Upload-Listen, verhindert Testabbrüche unter Last
+
 ## [1.0.0-alpha.69](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.68...v1.0.0-alpha.69) (2026-10-03)
 
 ### Wichtige Änderungen

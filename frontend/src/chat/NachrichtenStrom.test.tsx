@@ -58,6 +58,27 @@ describe('NachrichtenStrom', () => {
     expect(screen.getByText('Max')).toBeInTheDocument();
   });
 
+  /**
+   * Ein Strom ist keine Gliederung (LFH-826): bei 200 Nachrichten wären es 200 Sprungmarken in
+   * der Überschriftenliste. Die Navigation je Nachricht trägt der Listenpunkt.
+   */
+  it('Nachrichten sind Listenpunkte, keine Überschriften', () => {
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[nachricht(), nachricht({ id: 2, inhalt: 'Zweite' })]}
+        eigeneBenutzerId={1}
+        darfSchreiben
+        onBearbeiten={vi.fn()}
+        onLoeschen={vi.fn()}
+        onHeraufstufen={vi.fn()}
+        onHeraufstufenAuftrag={vi.fn()}
+      />,
+    );
+    expect(screen.queryAllByRole('heading')).toHaveLength(0);
+    expect(screen.getAllByText('Max')).toHaveLength(2);
+    expect(screen.getByText('Zweite').closest('li')).not.toBeNull();
+  });
+
   it('begrenzt den Nachrichtentext auf Lesebreite, nicht den Strom', () => {
     renderMitProviders(
       <NachrichtenStrom

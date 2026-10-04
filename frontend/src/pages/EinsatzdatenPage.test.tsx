@@ -7,8 +7,18 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
-import EinsatzdatenPage, { gleicherZeitpunkt } from './EinsatzdatenPage';
+import type {
+  BenutzerAnzeige,
+  EinsatzAnzeige,
+  Fuehrungsstelle,
+  FuehrungsstellePatch,
+  Sprechgruppe,
+} from '../api/types';
+import EinsatzdatenPage, {
+  geaenderteKopfdaten,
+  gleicherZeitpunkt,
+  type FormWerte,
+} from './EinsatzdatenPage';
 import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
@@ -48,6 +58,29 @@ const vorschlaege = [
   { id: 2, text: 'MANV' },
 ];
 
+const sprechgruppenListe: Sprechgruppe[] = [
+  {
+    id: 1,
+    einsatz_id: null,
+    einsatz_lokal: false,
+    bezeichnung: '311',
+    betriebsart: 'TMO',
+    hinweis: null,
+    aktiv: true,
+    sortier: 1,
+  },
+  {
+    id: 2,
+    einsatz_id: 7,
+    einsatz_lokal: true,
+    bezeichnung: '505',
+    betriebsart: 'DMO',
+    hinweis: null,
+    aktiv: true,
+    sortier: 2,
+  },
+];
+
 interface SetupOpts {
   einsatz?: Partial<EinsatzAnzeige>;
   benutzer?: BenutzerAnzeige;
@@ -67,6 +100,10 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/:id/ort-vorschau', () =>
       HttpResponse.json({ peilung: null, ortsname: null }),
     ),
+    http.get('/api/einsaetze/7/fuehrungsstelle', () =>
+      HttpResponse.json({ sprechgruppen: [] } satisfies Fuehrungsstelle),
+    ),
+    http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
   );
   const routen = (
     <Routes>
@@ -121,9 +158,58 @@ describe('gleicherZeitpunkt (LFH-472)', () => {
   });
 });
 
+describe('geaenderteKopfdaten (LFH-839)', () => {
+  const vorher: FormWerte = {
+    bezeichnung: 'Hochwasser Nord',
+    stichwort: 'H1',
+    einsatzart: 'realeinsatz',
+    einsatzort_koord: { lat: 48.1234, lon: 11.5678 },
+    begonnen_at: alsZeitpunkt('2026-05-23 09:00:00')!,
+    naechste_lagebesprechung_at: alsZeitpunkt('2026-05-23 12:00:00')!,
+  };
+
+  it('frische Objekte mit denselben Werten sind keine Änderung', () => {
+    expect(
+      geaenderteKopfdaten(vorher, {
+        ...vorher,
+        stichwort: ' H1 ',
+        einsatzort_koord: { lat: 48.1234, lon: 11.5678 },
+        begonnen_at: alsZeitpunkt('2026-05-23 09:00:00')!,
+        naechste_lagebesprechung_at: alsZeitpunkt('2026-05-23 12:00:00')!,
+      }),
+    ).toEqual({});
+  });
+
+  it('Geleertes geht als null hinaus, die Koordinate als Paar', () => {
+    expect(
+      geaenderteKopfdaten(vorher, {
+        ...vorher,
+        stichwort: '',
+        einsatzort_koord: null,
+        naechste_lagebesprechung_at: null,
+      }),
+    ).toEqual({
+      stichwort: null,
+      einsatzort_lat: null,
+      einsatzort_lon: null,
+      naechste_lagebesprechung_at: null,
+    });
+  });
+
+  it('Einsatzart und Alarmzeit gehen nur geändert hinaus', () => {
+    expect(
+      geaenderteKopfdaten(vorher, {
+        ...vorher,
+        einsatzart: 'uebung',
+        begonnen_at: alsZeitpunkt('2026-05-23 09:00:01')!,
+      }),
+    ).toEqual({ einsatzart: 'uebung', begonnen_at: '2026-05-23 09:00:01' });
+  });
+});
+
 describe('EinsatzdatenPage', () => {
-  it('LFH-463: zeigt den Besprechungstermin lokal und speichert denselben UTC-Instant', async () => {
-    let patchBody: Record<string, unknown> = {};
+  it('LFH-463: zeigt den Besprechungstermin lokal; derselbe Instant gilt als unverändert', async () => {
+    let patchBody: Record<string, unknown> | null = null;
     setup({ einsatz: { naechste_lagebesprechung_at: '2026-09-09 13:17:43' } });
     server.use(
       http.patch('/api/einsaetze/7', async ({ request }) => {
@@ -137,8 +223,11 @@ describe('EinsatzdatenPage', () => {
     expect(screen.getByLabelText('Nächste Lagebesprechung (optional)')).toHaveValue(
       dayjs.utc('2026-09-09 13:17:43').local().format('YYYY-MM-DD HH:mm:ss'),
     );
+    // Die Runde Wire→Feld→Instant verschiebt nichts: der Termin fehlt im Teil-Patch (LFH-839).
+    await user.type(screen.getByLabelText('Bezeichnung'), ' 2');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody.naechste_lagebesprechung_at).toBe('2026-09-09 13:17:43'));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toEqual({ bezeichnung: 'Hochwasser Nord 2' });
   });
 
   it('LFH-463: leeren des Besprechungstermins sendet explizit null', async () => {
@@ -160,7 +249,7 @@ describe('EinsatzdatenPage', () => {
     await waitFor(() => expect(patchBody.naechste_lagebesprechung_at).toBeNull());
   });
 
-  it('zeigt die Alarmzeit im Picker lokal und schickt sie unverändert als UTC zurück', async () => {
+  it('zeigt die Alarmzeit im Picker lokal; unverändert geht sie nicht hinaus', async () => {
     let patchBody: Record<string, unknown> = {};
     setup();
     server.use(
@@ -179,10 +268,12 @@ describe('EinsatzdatenPage', () => {
       dayjs.utc(basisEinsatz.begonnen_at).local().format('YYYY-MM-DD HH:mm:ss'),
     );
 
-    // Unverändert gespeichert muss exakt derselbe UTC-Wirestring zurückgehen: die
-    // Runde Wire→Picker→Wire darf den Instant nicht verschieben.
+    // Die Runde Wire→Picker→Instant darf den Instant nicht verschieben: unverändert fehlt die
+    // Alarmzeit im Teil-Patch (LFH-839). Eine verschobene Zeit stünde hier als Schlüssel.
+    await user.type(screen.getByLabelText('Bezeichnung'), ' 2');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(patchBody.begonnen_at).toBe('2026-05-23 09:00:00'));
+    await waitFor(() => expect(patchBody).toHaveProperty('bezeichnung'));
+    expect(patchBody).not.toHaveProperty('begonnen_at');
   });
 
   it('zeigt Kopfdaten im Lesemodus, leere Felder als —', async () => {
@@ -204,6 +295,7 @@ describe('EinsatzdatenPage', () => {
 
   it('speichert einsatzort_koord als einsatzort_lat/lon im PATCH-Body', async () => {
     let patchBody: Record<string, unknown> = {};
+    // Nur eine geänderte Koordinate geht hinaus (LFH-839); unverändert fehlt das Paar.
     setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
     server.use(
       http.patch('/api/einsaetze/7', async ({ request }) => {
@@ -218,10 +310,14 @@ describe('EinsatzdatenPage', () => {
 
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Koordinate' });
+    await user.clear(feld);
+    await user.type(feld, '48.2234, 11.6678');
+    await user.tab();
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
-    await waitFor(() => expect(patchBody.einsatzort_lat).toBeCloseTo(48.1234, 4));
-    expect(patchBody.einsatzort_lon).toBeCloseTo(11.5678, 4);
+    await waitFor(() => expect(patchBody.einsatzort_lat).toBeCloseTo(48.2234, 4));
+    expect(patchBody.einsatzort_lon).toBeCloseTo(11.6678, 4);
   });
 
   // LFH-517: ungültig ist nicht leer — kein PATCH, der die gespeicherte Koordinate löscht.
@@ -300,8 +396,8 @@ describe('EinsatzdatenPage', () => {
     server.use(
       http.patch('/api/einsaetze/7', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
-        expect(body.bezeichnung).toBe('Geändert');
-        expect(body.einsatzart).toBe('realeinsatz');
+        // Nur die geänderte Angabe (LFH-839), kein Vollersatz.
+        expect(body).toEqual({ bezeichnung: 'Geändert' });
         patchAufgerufen = true;
         return HttpResponse.json({ ...basisEinsatz, bezeichnung: 'Geändert' });
       }),
@@ -371,6 +467,7 @@ describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), ' 2');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     const treffer = await screen.findByText('Bezeichnung bereits vergeben');
     expect(treffer.closest('.ant-message')).toBeNull();
@@ -390,6 +487,7 @@ describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), ' 2');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await screen.findByText('Bezeichnung bereits vergeben');
 
@@ -449,11 +547,12 @@ describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
     expect(screen.queryByLabelText(/Einsatznummer/)).toBeNull();
     expect(screen.getByLabelText('Leitstellen-Nr.')).toHaveValue('LS-1');
 
+    await user.type(screen.getByLabelText('Leitstellen-Nr.'), '2');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(patchBody).not.toBeNull());
     // Abwesenheit des Schlüssels, nicht bloß `null`: auch `null` ist beim Server 400.
     expect(patchBody).not.toHaveProperty('einsatznummer_intern');
-    expect(patchBody).toHaveProperty('leitstellen_nr', 'LS-1');
+    expect(patchBody).toHaveProperty('leitstellen_nr', 'LS-12');
   });
 
   it('setzt den Fokus beim Bearbeiten aufs erste Feld', async () => {
@@ -766,6 +865,123 @@ describe('EinsatzdatenPage · Live-Refetch des Kopfs (LFH-555)', () => {
 });
 
 /**
+ * LFH-839: Das Vollformular schickt nur, was sich gegenüber dem Stand beim Öffnen geändert hat. Ein
+ * Vollersatz überschrieb die Zeilenänderung einer anderen Person still mit dem Stand von damals.
+ */
+describe('EinsatzdatenPage · Vollformular sendet nur Geändertes (LFH-839)', () => {
+  /** Wie der Server: jeder PATCH legt nur seine Schlüssel über den Stand; fremd ändert dazwischen. */
+  function serverStand(einsatz: Partial<EinsatzAnzeige> = {}) {
+    const bodies: Record<string, unknown>[] = [];
+    let stand: EinsatzAnzeige = { ...basisEinsatz, ...einsatz };
+    server.use(
+      http.get('/api/einsaetze/7', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        const body = (await request.json()) as Partial<EinsatzAnzeige>;
+        bodies.push(body);
+        stand = { ...stand, ...body };
+        return HttpResponse.json(stand);
+      }),
+    );
+    return {
+      bodies,
+      stand: () => stand,
+      fremdAendern: (teil: Partial<EinsatzAnzeige>) => {
+        stand = { ...stand, ...teil };
+      },
+    };
+  }
+
+  it('nur die Bezeichnung geändert: genau { bezeichnung } geht hinaus', async () => {
+    setup();
+    const { bodies } = serverStand();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = screen.getByLabelText('Bezeichnung');
+    await user.clear(feld);
+    await user.type(feld, 'Hochwasser Süd');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ bezeichnung: 'Hochwasser Süd' }]));
+  });
+
+  it('eine fremd geänderte Leitstellen-Nr. bleibt nach dem Speichern erhalten', async () => {
+    setup({ einsatz: { leitstellen_nr: 'LS-1' } });
+    const { bodies, stand, fremdAendern } = serverStand({ leitstellen_nr: 'LS-1' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(screen.getByLabelText('Leitstellen-Nr.')).toHaveValue('LS-1');
+
+    // Eine andere Person trägt die Nummer über die Zeile nach, während das Formular offen ist.
+    fremdAendern({ leitstellen_nr: 'LS-99' });
+
+    const feld = screen.getByLabelText('Bezeichnung');
+    await user.clear(feld);
+    await user.type(feld, 'Hochwasser Süd');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('leitstellen_nr');
+    expect(stand().leitstellen_nr).toBe('LS-99');
+  });
+
+  it('ohne Änderung: kein PATCH, das Formular schließt', async () => {
+    setup();
+    const { bodies } = serverStand();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(screen.queryByText('Einsatzdaten bearbeiten')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
+  it('Texte zählen getrimmt: angehängter Leerraum ist keine Änderung', async () => {
+    setup({ einsatz: { einsatzort: 'Deich Süd' } });
+    const { bodies } = serverStand({ einsatzort: 'Deich Süd' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await user.type(screen.getByLabelText('Bezeichnung'), '  ');
+    await user.type(screen.getByLabelText('Einsatzort (Adresse)'), ' ');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(screen.queryByText('Einsatzdaten bearbeiten')).toBeNull());
+    expect(bodies).toEqual([]);
+  });
+
+  it('ein geleertes Textfeld geht als null hinaus', async () => {
+    setup({ einsatz: { meldende_stelle: 'ILS Nord' } });
+    const { bodies } = serverStand({ meldende_stelle: 'ILS Nord' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await user.clear(screen.getByLabelText('Meldende/anfordernde Stelle'));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ meldende_stelle: null }]));
+  });
+
+  it('die Koordinate geht als Paar hinaus, auch wenn sich nur ein Wert ändert', async () => {
+    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
+    const { bodies } = serverStand({ einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Koordinate' });
+    await user.clear(feld);
+    await user.type(feld, '48.1234, 11.6');
+    await user.tab();
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ einsatzort_lat: 48.1234, einsatzort_lon: 11.6 });
+  });
+
+  it('die Anzahl Betroffene geht als Zahl hinaus, die übrigen Felder nicht', async () => {
+    setup();
+    const { bodies } = serverStand();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await user.type(screen.getByLabelText('Anzahl Betroffene (initial)'), '12');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ anzahl_betroffene_initial: 12 }]));
+  });
+});
+
+/**
  * LFH-692 (Delta `einsatzdaten-bearbeitung`, Szenario „Browser in anderer Zone“): Browser auf UTC,
  * Anzeigezone Europe/Berlin. Vorher zeigte die Zeile die Browser-Wanduhr neben der Berliner
  * Leseansicht.
@@ -796,7 +1012,7 @@ describe('EinsatzdatenPage — Alarmzeit in der Anzeigezone (LFH-692)', () => {
     await waitFor(() => expect(bodies).toEqual([{ begonnen_at: '2026-07-14 11:00:00' }]));
   });
 
-  it('Vollformular: Alarmzeit in Berlin, unverändert gespeichert bleibt der Wire-String gleich', async () => {
+  it('Vollformular: Alarmzeit in Berlin; unverändert geht sie nicht hinaus, 13:00 sendet 11:00 UTC', async () => {
     setup({ zeitzone: 'Europe/Berlin', einsatz: { begonnen_at: '2026-07-14 10:00:00' } });
     const puts: Record<string, unknown>[] = [];
     server.use(
@@ -808,9 +1024,20 @@ describe('EinsatzdatenPage — Alarmzeit in der Anzeigezone (LFH-692)', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     expect(await screen.findByLabelText('Alarmzeit')).toHaveValue('2026-07-14 12:00:00');
+    // Unverändert: die Wandlung Berlin↔UTC verschiebt den Instant nicht, also kein Schlüssel.
+    await user.type(screen.getByLabelText('Bezeichnung'), ' 2');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0]).toMatchObject({ begonnen_at: '2026-07-14 10:00:00' });
+    expect(puts[0]).not.toHaveProperty('begonnen_at');
+
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByLabelText('Alarmzeit');
+    await user.clear(feld);
+    await user.type(feld, '2026-07-14 13:00:00');
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(puts).toHaveLength(2));
+    expect(puts[1]).toEqual({ begonnen_at: '2026-07-14 11:00:00' });
   });
 });
 
@@ -854,5 +1081,140 @@ describe('EinsatzdatenPage — Einstieg in den Einsatzbericht (LFH-726)', () => 
     await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await screen.findByText('Einsatzdaten bearbeiten');
     expect(screen.queryByRole('link', { name: 'Einsatzbericht drucken' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Eigene Führungsstelle (LFH-849, Spec `einsatz-fuehrungsstelle`): ein Paneel mit vier Zeilen,
+ * jede schickt nur ihr Feld an `…/fuehrungsstelle`.
+ */
+describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
+  /** Nimmt jeden PATCH-Body auf und legt ihn wie der Server über den Stand. */
+  function fuehrungsstelleMitschnitt(start: Fuehrungsstelle = { sprechgruppen: [] }) {
+    const bodies: FuehrungsstellePatch[] = [];
+    let stand: Fuehrungsstelle = start;
+    server.use(
+      http.get('/api/einsaetze/7/fuehrungsstelle', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/7/fuehrungsstelle', async ({ request }) => {
+        const body = (await request.json()) as FuehrungsstellePatch;
+        bodies.push(body);
+        const { sprechgruppe_ids, ...felder } = body;
+        const naechster: Fuehrungsstelle = { ...stand };
+        for (const [k, v] of Object.entries(felder)) {
+          if (v == null) delete naechster[k as keyof typeof felder];
+          else naechster[k as keyof typeof felder] = v;
+        }
+        if (sprechgruppe_ids) {
+          naechster.sprechgruppen = sprechgruppenListe.filter((g) =>
+            sprechgruppe_ids.includes(g.id),
+          );
+        }
+        stand = naechster;
+        return HttpResponse.json(stand);
+      }),
+    );
+    return bodies;
+  }
+
+  async function paneel() {
+    return within(await screen.findByRole('region', { name: 'Eigene Führungsstelle' }));
+  }
+
+  it('zeigt vier Angaben; leer mit Aufforderung', async () => {
+    setup();
+    fuehrungsstelleMitschnitt();
+    const p = await paneel();
+    for (const etikett of ['Rufname', 'Sprechgruppen', 'Kommunikationsmittel', 'Erreichbarkeit']) {
+      expect(await p.findByRole('button', { name: `${etikett} eintragen` })).toBeInTheDocument();
+    }
+  });
+
+  it('Rufname: nur dieses Feld geht hinaus, die Zeile zeigt den Wert', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.type(p.getByRole('textbox', { name: 'Rufname' }), 'Florian Musterstadt 10/1{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ rufname: 'Florian Musterstadt 10/1' }]));
+    expect(
+      await p.findByRole('button', { name: 'Rufname bearbeiten' }),
+    ).toHaveAccessibleDescription('Florian Musterstadt 10/1');
+  });
+
+  it('Sprechgruppen: Auswahl geht als `sprechgruppe_ids`, Anzeige nach Betriebsart', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Sprechgruppen eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Sprechgruppen' }));
+    await user.click(await screen.findByText('311'));
+    await user.click(await screen.findByText('505 (lokal)'));
+    await user.click(p.getByRole('button', { name: 'Sprechgruppen speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ sprechgruppe_ids: [1, 2] }]));
+    expect(
+      await p.findByRole('button', { name: 'Sprechgruppen bearbeiten' }),
+    ).toHaveAccessibleDescription('TMO 311 · DMO 505');
+  });
+
+  it('Kommunikationsmittel: Schlüssel hinaus, Label in der Anzeige', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt();
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Kommunikationsmittel eintragen' }));
+    await user.click(p.getByRole('combobox', { name: 'Kommunikationsmittel' }));
+    await user.click(await screen.findByText('Digitalfunk'));
+    await user.click(p.getByRole('button', { name: 'Kommunikationsmittel speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ kommunikationsmittel: 'digitalfunk' }]));
+    expect(
+      await p.findByRole('button', { name: 'Kommunikationsmittel bearbeiten' }),
+    ).toHaveAccessibleDescription('Digitalfunk');
+  });
+
+  it('Erreichbarkeit: unverändert sendet nichts, geleert sendet null', async () => {
+    setup();
+    const bodies = fuehrungsstelleMitschnitt({ sprechgruppen: [], erreichbarkeit: '0171 1234567' });
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Erreichbarkeit bearbeiten' }));
+    await user.keyboard('{Enter}');
+    expect(await p.findByRole('button', { name: 'Erreichbarkeit bearbeiten' })).toBeVisible();
+    expect(bodies).toEqual([]);
+
+    await user.click(p.getByRole('button', { name: 'Erreichbarkeit bearbeiten' }));
+    await user.clear(p.getByRole('textbox', { name: 'Erreichbarkeit' }));
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ erreichbarkeit: null }]));
+    expect(await p.findByRole('button', { name: 'Erreichbarkeit eintragen' })).toBeVisible();
+  });
+
+  it('Beobachter: Angaben ohne Aufforderung, leer als „—“', async () => {
+    setup({
+      einsatz: { meine_rolle: 'beobachter' },
+      benutzer: { ...admin, system_rolle: 'keiner' },
+    });
+    fuehrungsstelleMitschnitt({ sprechgruppen: [], rufname: 'Florian 10/1' });
+    const p = await paneel();
+    expect(await p.findByText('Florian 10/1')).toBeInTheDocument();
+    expect(p.queryByRole('button', { name: /eintragen|bearbeiten/ })).toBeNull();
+    expect(p.getAllByText('—')).toHaveLength(3);
+  });
+
+  it('Speicherfehler steht an der Zeile, die Eingabe bleibt offen', async () => {
+    setup();
+    server.use(
+      http.patch('/api/einsaetze/7/fuehrungsstelle', () =>
+        HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    const p = await paneel();
+    await user.click(await p.findByRole('button', { name: 'Rufname eintragen' }));
+    await user.type(p.getByRole('textbox', { name: 'Rufname' }), 'X{Enter}');
+    const fehler = await p.findByText('Einsatz ist abgeschlossen');
+    expect(fehler.closest('.ant-message')).toBeNull();
+    expect(p.getByRole('textbox', { name: 'Rufname' })).toHaveValue('X');
   });
 });

@@ -37,6 +37,16 @@ diese Zusage.
   über Füllung + Umriss zählt einmal), ab zwei `mehrdeutig` → `FlaechenwahlMenue` am Tipppunkt,
   eigene vor Fachebenen, Kennung aus `flaechenwahl.ts`; Wahl über dieselben Callbacks, aus im
   exklusiven Modus (Prop `flaechenwahl`). Geschlossen wird nur über `onOpenChange`.
+- **Kontextmenü an der Kartenstelle** (LFH-776, Spec `lagekarte-kontextmenue`,
+  `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md`): Rechtsklick und langer Druck kommen
+  als EIN maplibre-Ereignis `contextmenu` (`Kartenflaeche.tsx`); offen nur an einem Ort
+  (`istOrtsziel` in `klickziel.ts`: freie Karte, Fläche — nie Punktziel oder Trefferzone), gesperrt
+  über die Prop `kontextmenue` (`null` im exklusiven Modus). Nach dem langen Druck liegt der Finger
+  noch: `nachklickRiegel.ts` hängt VOR jedem Dropdown am `window` (Capture) und schluckt die
+  Ereignisse des Abhebens. Einträge und Rechte nur aus `kontextEintraege` (`kontextmenue.ts`).
+  Punktmenüs der Karte (Flächenwahl, Kontextmenü) teilen die Schale `PunktankerMenue.tsx`; ein Kopf
+  steht über dem Menü, nie als antd-Gruppe (rc-menu fokussierte sonst die Gruppe). Nachweis
+  `e2e/lagekarte-touch.spec.ts` (langer Druck per CDP, Rechtsklick).
 - **Betreuung auf der Karte** (LFH-673, `openspec/changes/archive/2026-09-29-lfh-673-betreuung-auf-der-lagekarte/design.md`):
   Marker-Ebene wie UHS (`alleVerortet`, `?platzieren=betreuungsstelle:<id>`), Sperre an der
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);
@@ -131,6 +141,15 @@ diese Zusage.
   Lagedaten, aber unter der ersten `td-*`-Ebene (LFH-766,
   `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md` D3);
   Messung vor `setStyle` räumen, nach `style.load` neu.
+- **Zeichnen per Link** (LFH-825, Spec `lagekarte-zeichnen`,
+  `openspec/changes/archive/2026-10-03-lfh-825-zeichnen-deeplink-lagekarte/design.md`): `?zeichnen=<zonentyp>[:flaeche|:linie]`
+  liest `LagekartePage` als **Literal** (Guard der Sprungpalette), wartet auf `ladt`, startet nur
+  mit `darfSchreiben` über `onZoneZeichnenStart` (stabil per `useCallback`) und räumt immer.
+  Typ und Form prüft `parseZeichnenAuftrag` (`routing/deeplinks.ts`), die Geometrie
+  `zeichenAuftragZuEntwurf` über `ZONE_TYPEN`; die Farbe der freien Skizze ist
+  `FREIE_SKIZZE_VORGABEFARBE`, für Paneel und Link dieselbe. Das Zonen-Zeichnen startet in
+  `Kartenflaeche` erst mit angewandtem Style-JSON (Merker ab `style.load`, nie
+  `isStyleLoaded()` — das wartet auf Kacheln) und beginnt nach `setStyle` neu wie die Messung.
 - **Esc beim Zeichnen ist zweistufig** (LFH-712, Entscheidung 28.09.2026): erstes Esc verwirft
   die Figur mit Quittung, der Modus bleibt; Esc ohne Figur beendet ihn (Messen: ein Esc). Stufe
   aus `lagekarte/zeichnenEsc.ts`, **ein** `keydown`-Zuhörer der Seite, terra-draw-Modi mit

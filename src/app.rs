@@ -146,6 +146,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz::abschliessen),
         )
         .route(
+            "/api/einsaetze/{id}/fuehrungsstelle",
+            get(routes::einsatz_fuehrungsstelle::lesen)
+                .patch(routes::einsatz_fuehrungsstelle::aendern),
+        )
+        .route(
             "/api/einsaetze/{id}/aufbewahrungsfrist",
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
@@ -511,6 +516,28 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/stab/checkliste/{punkt}",
             put(routes::stab::checkliste_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan",
+            get(routes::stab::kommunikationsplan_laden),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen",
+            post(routes::stab::kommunikationsplan_stelle_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}",
+            patch(routes::stab::kommunikationsplan_stelle_aendern)
+                .delete(routes::stab::kommunikationsplan_stelle_entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/verbindungen",
+            post(routes::stab::kommunikationsplan_verbindung_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}",
+            patch(routes::stab::kommunikationsplan_verbindung_aendern)
+                .delete(routes::stab::kommunikationsplan_verbindung_entfernen),
         )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(

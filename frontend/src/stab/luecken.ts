@@ -1,5 +1,6 @@
 import { schlechtesterZustand, type AbrufZustand } from '../api/abrufZustand';
-import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import type { Einheit, Einsatzabschnitt, KommunikationsStelle, Sprechgruppe } from '../api/types';
+import { FUEHRUNGSSTELLE_STELLE, type FuehrungsstelleQuelle } from './fuehrungsstelle';
 
 /**
  * Lücken als reine Filter über bereits geladene Listen (Stab-Spec LFH-46, Entscheidung 15:
@@ -39,27 +40,46 @@ export function einheitenOhneErreichbarkeit(einheiten: Quelle<Einheit>): Luecke<
 }
 
 /**
- * Einsatzlokale Sprechgruppen, die weder ein Abschnitt noch eine Einheit trägt. Die Zuordnung
- * steht an Abschnitt und Einheit; fehlt eine der beiden Listen, wäre jede Zahl geraten.
+ * Einsatzlokale Sprechgruppen, die weder ein Abschnitt, eine Einheit noch die eigene
+ * Führungsstelle (LFH-849) trägt. Fehlt eine dieser Quellen, wäre jede Zahl geraten.
  */
 export function lokaleSprechgruppenOhneZuordnung(
   sprechgruppen: Quelle<Sprechgruppe>,
   abschnitte: Quelle<Einsatzabschnitt>,
   einheiten: Quelle<Einheit>,
+  fuehrungsstelle: FuehrungsstelleQuelle,
 ): Luecke<Sprechgruppe> {
   const zustand = schlechtesterZustand(
     sprechgruppen.zustand,
     abschnitte.zustand,
     einheiten.zustand,
+    fuehrungsstelle.zustand,
   );
   if (zustand !== 'daten') return { zustand, treffer: [] };
   const zugeordnet = new Set<number>();
   for (const a of abschnitte.daten) for (const s of a.sprechgruppen) zugeordnet.add(s.id);
   for (const e of einheiten.daten) for (const s of e.sprechgruppen) zugeordnet.add(s.id);
+  for (const s of fuehrungsstelle.daten?.sprechgruppen ?? []) zugeordnet.add(s.id);
   return {
     zustand,
     treffer: sprechgruppen.daten.filter((s) => s.einsatz_lokal && !zugeordnet.has(s.id)),
   };
+}
+
+/**
+ * Kommunikationsplan (LFH-848): fehlt der Draht zur Leitstelle? Erst wenn keine Stelle der Art
+ * Leitstelle eine Verbindung trägt; eine Leitstelle ohne Verbindung zählt als fehlend. Ohne
+ * geladene Stellen gibt es kein Urteil, der Zustand sagt warum.
+ */
+export function leitstelleOhneVerbindung(stellen: Quelle<KommunikationsStelle>): {
+  zustand: AbrufZustand;
+  fehlt: boolean;
+} {
+  if (stellen.zustand !== 'daten') return { zustand: stellen.zustand, fehlt: false };
+  const erfasst = stellen.daten.some(
+    (s) => s.stellenart === 'leitstelle' && s.verbindungen.length > 0,
+  );
+  return { zustand: 'daten', fehlt: !erfasst };
 }
 
 // ── Verbindungen (LFH-625 D3) ──────────────────────────────────────────────────────────────────
@@ -100,25 +120,41 @@ export interface Stelle {
   name: string;
 }
 
+/** Die eigene Führungsstelle als Gegenstelle der obersten Abschnitte (LFH-849). Keine Zeile in
+ * einer Liste, daher ohne ID. */
+export interface FuehrungsstellenStelle {
+  art: 'fuehrungsstelle';
+  name: string;
+}
+
 export interface Verbindung {
   unten: Stelle;
-  oben: Stelle;
+  oben: Stelle | FuehrungsstellenStelle;
 }
 
 /**
  * Verbindungen ohne gemeinsame Sprechgruppe. Die Paare folgen der Platzierung des Funkplans und
- * des Organigramms (Spec `stab-fernmeldeskizze`, „Knotenaufbau“): Unterabschnitt → Abschnitt,
- * oberste Einheit → Abschnitt, Untereinheit → Einheit — jeweils nur, wenn die übergeordnete Stelle
- * bekannt ist. Waisen haben kein Paar. Treffer erst der Abschnitte, dann der Einheiten, je in der
- * Reihenfolge ihrer Liste. Fehlt eine der beiden Listen, wäre jede Zahl unvollständig: dann der
- * Zustand statt einer Zahl.
+ * des Organigramms (Spec `stab-fernmeldeskizze`, „Knotenaufbau“): oberster Abschnitt → eigene
+ * Führungsstelle (LFH-849), Unterabschnitt → Abschnitt, oberste Einheit → Abschnitt, Untereinheit
+ * → Einheit. Ein Abschnitt mit unbekanntem Oberabschnitt steht oben und urteilt gegen die
+ * Führungsstelle; eine Einheit ohne bekannte übergeordnete Stelle hat kein Paar. Treffer erst der
+ * Abschnitte, dann der Einheiten, je in der Reihenfolge ihrer Liste. Fehlt eine der Quellen, wäre
+ * jede Zahl unvollständig: dann der Zustand statt einer Zahl.
  */
 export function verbindungenOhneGemeinsameSprechgruppe(
   abschnitte: Quelle<Einsatzabschnitt>,
   einheiten: Quelle<Einheit>,
+  fuehrungsstelle: FuehrungsstelleQuelle,
 ): Luecke<Verbindung> {
-  const zustand = schlechtesterZustand(abschnitte.zustand, einheiten.zustand);
+  const zustand = schlechtesterZustand(
+    abschnitte.zustand,
+    einheiten.zustand,
+    fuehrungsstelle.zustand,
+  );
   if (zustand !== 'daten') return { zustand, treffer: [] };
+  // Ohne Sprechgruppe an der Führungsstelle urteilt `verbindungsurteil` „ohne-urteil“: keine Zahl.
+  const fsSprechgruppen = fuehrungsstelle.daten?.sprechgruppen ?? [];
+  const fsStelle: FuehrungsstellenStelle = { art: 'fuehrungsstelle', name: FUEHRUNGSSTELLE_STELLE };
 
   const abschnittJeId = new Map(abschnitte.daten.map((a) => [a.id, a]));
   const einheitJeId = new Map(einheiten.daten.map((e) => [e.id, e]));
@@ -132,8 +168,9 @@ export function verbindungenOhneGemeinsameSprechgruppe(
   const treffer: Verbindung[] = [];
   for (const a of abschnitte.daten) {
     const oben = a.ueber_abschnitt_id != null ? abschnittJeId.get(a.ueber_abschnitt_id) : undefined;
-    if (oben && verbindungsurteil(oben.sprechgruppen, a.sprechgruppen).art === 'keine') {
-      treffer.push({ unten: stelleAbschnitt(a), oben: stelleAbschnitt(oben) });
+    const urteil = verbindungsurteil(oben ? oben.sprechgruppen : fsSprechgruppen, a.sprechgruppen);
+    if (urteil.art === 'keine') {
+      treffer.push({ unten: stelleAbschnitt(a), oben: oben ? stelleAbschnitt(oben) : fsStelle });
     }
   }
   // Die übergeordnete Stelle einer Einheit: ihre Einheit, sonst (oberste Einheit) ihr Abschnitt.

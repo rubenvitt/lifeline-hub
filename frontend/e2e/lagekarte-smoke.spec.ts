@@ -364,10 +364,91 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
 
+// LFH-841: Die Beschriftungsplaketten (`plakette|…`, 9-Slice) legt der Bild-Resolver an, nicht mehr
+// `styleimagemissing`. Dort angelegt, fehlten sie im laufenden Layout (MapLibre 6 baut die
+// Bildantwort einer Kachel, BEVOR es das Event feuert) und nach einem Stilwechsel ohne neue Daten
+// ganz. Den Fehlgriff verrät MapLibres Warnung „Image … could not be loaded“: sie fällt genau dann,
+// wenn ein Bild zur Layoutzeit fehlte — gezählte Features allein unterscheiden das nicht, weil der
+// Text auch ohne Plakette steht.
+test('Lagekarte: Beschriftungsplaketten stehen sofort, auch nach einem Stilwechsel', async ({
+  page,
+}) => {
+  const fehlbilder: string[] = [];
+  page.on('console', (m) => {
+    if (m.text().includes('could not be loaded')) fehlbilder.push(m.text());
+  });
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  const ort = { lat: 49.3519, lon: 9.1457 };
+  await einsatzortSetzen(page, eid, ort);
+  // Eine Schadenstelle neben dem Einsatzort: im Bild bei Zoom 14, nicht im selben Cluster.
+  const r = await page.request.post(`/api/einsaetze/${eid}/schaeden`, {
+    data: {
+      typ: 'sachschaden',
+      ausmass: 'mittel',
+      ort: 'Schadenstelle Nord',
+      lat: ort.lat + 0.0028,
+      lon: ort.lon + 0.004,
+    },
+  });
+  expect(r.ok(), await r.text()).toBeTruthy();
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+    1,
+  );
+
+  const plaketten = () =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+      // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
+      if (!map?.isStyleLoaded()) return null;
+      return {
+        bilder: map.listImages().filter((id) => id.startsWith('plakette|')).length,
+        // Registriert ist nicht gezeichnet: die Beschriftung muss im Layer stehen.
+        gezeichnet: map.queryRenderedFeatures({
+          layers: ['marker-label', 'marker-einsatzort-label'],
+        }).length,
+      };
+    });
+
+  // Eine Bild-Id je Farbpaar: Einsatzort und Schaden teilen sich die Plakette.
+  await expect
+    .poll(plaketten, { timeout: 15_000, message: 'keine Beschriftungsplakette gezeichnet' })
+    .toEqual({ bilder: 1, gezeichnet: 2 });
+
+  // Ein Grundkarten-/Themenwechsel setzt den Stil neu (`diff: false`) und wirft alle Bilder weg.
+  await page.evaluate(() => {
+    const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+    map.setStyle(map.getStyle(), { diff: false });
+  });
+  await expect
+    .poll(plaketten, { timeout: 15_000, message: 'Plaketten nach dem Stilwechsel nicht zurück' })
+    .toEqual({ bilder: 1, gezeichnet: 2 });
+
+  expect(fehlbilder.filter((t) => t.includes('plakette|'))).toEqual([]);
+});
+
 // LFH-835: Fachobjekt-Zeichen kommen aus @einsatzzeichen, synchron über Canvas gerastert —
 // jsdom hat kein Canvas, das belegt nur der Browser. Pixeldichte 2 → 34 CSS-px = 68 Gerätepixel.
 test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
   test.use({ deviceScaleFactor: 2 });
+
+  /** Die `ez|`-Bilder der Karte mit Rasterbreite, und ob das Einsatzort-Zeichen gezeichnet ist. */
+  const einsatzortZeichen = (page: Page) =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+      // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
+      if (!map?.isStyleLoaded()) return null;
+      return map
+        .listImages()
+        .filter((id) => id.startsWith('ez|'))
+        .map((id) => ({
+          id,
+          breite: map.getImage(id)?.data.width,
+          // Registriert ist nicht gezeichnet: das Symbol muss im Layer stehen.
+          gezeichnet: map.queryRenderedFeatures({ layers: ['marker-einsatzort-symbol'] }).length,
+        }));
+    });
 
   test('Einsatzort-Zeichen in Bildschirmschärfe, auch nach einem Stilwechsel', async ({ page }) => {
     await anmelden(page);
@@ -378,21 +459,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
       1,
     );
 
-    const zeichenBilder = () =>
-      page.evaluate(() => {
-        const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
-        // Während eines Stilwechsels wirft `listImages` („Style is not done loading“): weiterpollen.
-        if (!map?.isStyleLoaded()) return null;
-        return map
-          .listImages()
-          .filter((id) => id.startsWith('ez|'))
-          .map((id) => ({
-            id,
-            breite: map.getImage(id)?.data.width,
-            // Registriert ist nicht gezeichnet: das Symbol muss im Layer stehen.
-            gezeichnet: map.queryRenderedFeatures({ layers: ['marker-einsatzort-symbol'] }).length,
-          }));
-      });
+    const zeichenBilder = () => einsatzortZeichen(page);
 
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'kein @einsatzzeichen-Bild auf der Karte' })
@@ -406,6 +473,57 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'Zeichen nach Stilwechsel nicht zurück' })
       .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
+  });
+
+  // LFH-842: Wandert das Fenster auf einen Monitor anderer Dichte (oder ändert sich der Zoom),
+  // rastern die schon angelegten Zeichen neu: Breite 34 × ceil(dpr). Den Wechsel stellt der Test
+  // so nach, wie ihn der Browser meldet: `devicePixelRatio` springt, und die `resolution`-Abfrage
+  // auf die alte Dichte meldet `change`. Nicht über CDP-Emulation
+  // (`Emulation.setDeviceMetricsOverride` aus einer zweiten Sitzung): unter dem Chromium der CI
+  // rasterte danach nichts neu, lokal schon — der Test hinge an der Emulation statt an der Karte.
+  // Zweimal, damit auch der zweite Wechsel ankommt (die Karte meldet sich je Wechsel neu an).
+  test('Zeichen rastern nach einem Wechsel der Pixeldichte neu', async ({ page }) => {
+    await page.addInitScript(() => {
+      const echt = window.matchMedia.bind(window);
+      const abfragen: { media: string; mql: MediaQueryList }[] = [];
+      window.matchMedia = (media: string) => {
+        const mql = echt(media);
+        abfragen.push({ media, mql });
+        return mql;
+      };
+      (window as unknown as { __lfhDichte: (neu: number) => void }).__lfhDichte = (neu) => {
+        const alt = `(resolution: ${window.devicePixelRatio}dppx)`;
+        Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: neu });
+        for (const a of abfragen) if (a.media === alt) a.mql.dispatchEvent(new Event('change'));
+      };
+    });
+    await anmelden(page);
+    const eid = await einsatzAnlegenUndOeffnen(page);
+    await einsatzortSetzen(page, eid, { lat: 49.3519, lon: 9.1457 });
+    await page.goto(`/einsaetze/${eid}/lagekarte`);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+    const id = 'ez|{"v":1,"spec":{"kind":"event"}}';
+    await expect
+      .poll(() => einsatzortZeichen(page), { timeout: 15_000 })
+      .toEqual([{ id, breite: 68, gezeichnet: 1 }]);
+
+    for (const [dichte, breite] of [
+      [1, 34],
+      [1.5, 68],
+    ]) {
+      await page.evaluate(
+        (d) => (window as unknown as { __lfhDichte: (neu: number) => void }).__lfhDichte(d),
+        dichte,
+      );
+      await expect
+        .poll(() => einsatzortZeichen(page), {
+          timeout: 15_000,
+          message: `Zeichen nicht in Dichte ${dichte} neu gerastert`,
+        })
+        .toEqual([{ id, breite, gezeichnet: 1 }]);
+    }
   });
 
   // Gezählt wird, was GEZEICHNET ist, nicht, was registriert ist: MapLibre 6 baut die Bildantwort

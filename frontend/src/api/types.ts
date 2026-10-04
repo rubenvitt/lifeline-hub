@@ -212,6 +212,19 @@ export type EinheitStatus = S['EinheitStatus'];
 export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
+/** Eigene Führungsstelle des Einsatzes (LFH-849). */
+export type Fuehrungsstelle = S['FuehrungsstelleAnzeige'];
+
+/**
+ * Teiländerung der Führungsstelle (kein Backend-Schema, `routes/einsatz_fuehrungsstelle.rs`):
+ * fehlender Schlüssel = unverändert, `null` = leeren; `sprechgruppe_ids` ersetzt vollständig.
+ */
+export interface FuehrungsstellePatch {
+  rufname?: string | null;
+  kommunikationsmittel?: string | null;
+  erreichbarkeit?: string | null;
+  sprechgruppe_ids?: number[];
+}
 
 // ============================== E‑2 Personen ==============================
 export type PersonStatus = S['PersonStatus'];
@@ -412,6 +425,40 @@ export type ChecklistenPunkt = S['ChecklistenPunkt'];
  * Ein Bedienziel schickt genau SEIN Feld — der Server lässt das andere unverändert.
  */
 export type ChecklistenPunktBody = { erledigt: boolean } | { bemerkung: string | null };
+
+// Kommunikationsplan des S6 (LFH-848).
+export type KommunikationsStelle = S['KommunikationsStelle'];
+export type KommunikationsVerbindung = S['KommunikationsVerbindung'];
+export type Stellenart = S['Stellenart'];
+export type Verbindungsmittel = S['Verbindungsmittel'];
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/stab/kommunikationsplan/stellen`, FE-lokal.
+ * `funktion` nur bei `stellenart: 'funktion'`; `bezeichnung` Pflicht bei externen Stellen und bei
+ * Führungshilfspersonal/Fachberater, sonst weglassen (422).
+ */
+export interface NeueKommunikationsStelle {
+  stellenart: Stellenart;
+  funktion?: Fuehrungsfunktion;
+  bezeichnung?: string;
+}
+
+/** Kein Backend-Schema: Eingabe-Body von `POST …/stellen/{sid}/verbindungen`, FE-lokal. */
+export interface NeueVerbindung {
+  mittel: Verbindungsmittel;
+  wert: string;
+  hinweis?: string;
+}
+
+/**
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/kommunikationsplan/verbindungen/{vid}`. Fehlt =
+ * unverändert, `hinweis: null` löscht. Unbekannte Felder lehnt der Server mit 400 ab.
+ */
+export interface VerbindungPatch {
+  mittel?: Verbindungsmittel;
+  wert?: string;
+  hinweis?: string | null;
+}
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `PUT …/stab/besetzung/{sachgebiet}`, FE-lokal.

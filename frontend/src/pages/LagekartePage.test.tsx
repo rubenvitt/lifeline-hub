@@ -27,6 +27,8 @@ const kartenHandle = vi.hoisted(() => ({
   zeichnungVerwerfen: vi.fn(),
 }));
 
+const KONTEXT_PUNKT = vi.hoisted(() => ({ lng: 8.6, lat: 50.1, quelle: 'maus' as const }));
+
 vi.mock('./lagekarte/Kartenflaeche', async () => {
   const { forwardRef, useImperativeHandle } = await import('react');
   return {
@@ -85,6 +87,20 @@ vi.mock('./lagekarte/Kartenflaeche', async () => {
               Strecke von ~111 m meldet wie terra-draw beim Doppelklick. */}
           <div data-testid="messen">{props.messen ?? 'aus'}</div>
           <div data-testid="flaechenwahl">{props.flaechenwahl ? 'an' : 'aus'}</div>
+          {/* Kontextmenü (LFH-776): an/aus, die Einträge an einer festen Stelle und ihre Wahl. */}
+          <div data-testid="kontextmenue">
+            {props.kontextmenue
+              ? (props.kontextmenue.inhalt(KONTEXT_PUNKT).items ?? [])
+                  .map((i) => (i && 'label' in i ? String(i.label) : ''))
+                  .join('|')
+              : 'aus'}
+          </div>
+          {props.kontextmenue &&
+            ['kopieren', 'messen', 'zeichen'].map((key) => (
+              <button key={key} onClick={() => props.kontextmenue?.onWaehlen(key, KONTEXT_PUNKT)}>
+                kontext-{key}
+              </button>
+            ))}
           {props.messen && (
             <button
               onClick={() =>
@@ -967,6 +983,49 @@ describe('LagekartePage', () => {
     await user.keyboard('{Escape}');
     expect(screen.getByTestId('messen')).toHaveTextContent('aus');
     expect(screen.getByTestId('flaechenwahl')).toHaveTextContent('an');
+  });
+
+  it('LFH-776: Kontextmenü — Einträge mit Schreibrecht, aus im exklusiven Modus, Wahl wirkt', async () => {
+    let angelegt: unknown = null;
+    basisHandler([
+      http.post('/api/einsaetze/1/freie-zeichen', async ({ request }) => {
+        angelegt = await request.json();
+        return HttpResponse.json({ id: 9 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await waitFor(() =>
+      expect(screen.getByTestId('kontextmenue')).toHaveTextContent(
+        'Koordinate kopieren|Messen ab hier|Hier Zeichen setzen',
+      ),
+    );
+
+    // „Messen ab hier“ startet eine Strecke; im Modus ist das Menü aus.
+    await user.click(screen.getByText('kontext-messen'));
+    expect(screen.getByTestId('messen')).toHaveTextContent('strecke');
+    expect(screen.getByTestId('kontextmenue')).toHaveTextContent('aus');
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('kontextmenue')).not.toHaveTextContent('aus');
+
+    // „Hier Zeichen setzen“ öffnet den Dialog; „Setzen“ legt an der Stelle an und schließt ihn.
+    await user.click(screen.getByText('kontext-zeichen'));
+    // Die Seite trägt mehr Overlays als der Einzeltest; antd setzt dabei `aria-hidden` an Hüllen,
+    // deshalb über die Modal-Klasse statt über die Rolle.
+    const dialog = await waitFor(() => {
+      const el = [...document.querySelectorAll<HTMLElement>('.ant-modal')].find((m) =>
+        m.textContent?.includes('Zeichen hier setzen'),
+      );
+      expect(el).toBeDefined();
+      return el!;
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Setzen', hidden: true }));
+    await waitFor(() =>
+      expect(angelegt).toMatchObject({ lat: KONTEXT_PUNKT.lat, lon: KONTEXT_PUNKT.lng }),
+    );
+    // jsdom feuert kein `transitionend`: beobachtbar ist der Verlassen-Zustand (vgl.
+    // `MaterialPage.test.tsx`).
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
   });
 
   it('platziert eine Einheit: wählen → Karten-Klick → PATCH /position mit lat/lon', async () => {
@@ -2467,6 +2526,99 @@ describe('LFH-712: Eigenposition', () => {
     expect(knopf).toHaveAttribute('aria-disabled', 'true');
     expect(document.getElementById(knopf.getAttribute('aria-describedby') ?? '')).toHaveTextContent(
       /https/,
+    );
+  });
+});
+
+/**
+ * Zeichnen per Link (LFH-825, Spec `lagekarte-zeichnen`): `?zeichnen=<zonentyp>[:flaeche|:linie]`
+ * betritt den Zonen-Zeichenmodus wie der Knopf im Paneel. Anwenden, dann räumen — wie
+ * `?platzieren=`, mit demselben Lade-Riegel.
+ */
+describe('LFH-825: Zeichnen per Link', () => {
+  it('startet das Gefahrengebiet als Fläche und räumt den Param', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+  });
+
+  it('nimmt die Form der freien Skizze aus dem Auftrag', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=freie_skizze%3Alinie');
+    expect(await screen.findByText('Freie Skizze · Linie')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+  });
+
+  it.each([
+    ['unpassende Form', 'absperrgrenze%3Aflaeche'],
+    ['unbekannter Typ', 'tier'],
+  ])('%s: kein Zeichenmodus, Param geräumt', async (_fall, wert) => {
+    basisHandler();
+    renderSeiteMitSonde(`/einsaetze/1/lagekarte?zeichnen=${wert}`);
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+    // Die Seite steht: das Paneel ist da, der Modus nicht.
+    expect(
+      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+  });
+
+  it('ein Beobachter kommt nicht in den Zeichenmodus, der Param wird trotzdem geräumt', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+    expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Kaltstart (neuer Tab, F5): solange der Einsatz lädt, ist `darfSchreiben` noch `false`. Ohne
+   * Lade-Riegel räumte der Effekt den Auftrag in diesem Moment und stiege aus.
+   */
+  it('wartet, bis der Einsatz geladen ist, statt den Auftrag zu verwerfen', async () => {
+    let freigeben!: () => void;
+    const einsatzDa = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    basisHandler([
+      http.get('/api/einsaetze/1', async () => {
+        await einsatzDa;
+        return HttpResponse.json(EINSATZ);
+      }),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getByTestId('location-search')).toHaveTextContent('zeichnen=gefahrengebiet');
+    freigeben();
+    expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
+    );
+  });
+
+  it('Esc ohne Punkt beendet den per Link gestarteten Modus (LFH-712)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
+    expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
     );
   });
 });

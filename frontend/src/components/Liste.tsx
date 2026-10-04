@@ -31,18 +31,35 @@ import { useRollen } from './instrument/rollenwerte';
  * statt durch alle Einträge zu wandern. Die Ebene kennt nur der Einbauort, deshalb ist
  * `unterEbene` Pflicht (Ebene der nächsten Überschrift darüber, gerendert wird eine darunter;
  * dieselbe Rechnung wie `Markdown`). Die Optik bleibt die der früheren Kopfzeile.
+ *
+ * **Eintragstitel (LFH-826, Spec `ueberschriften-gliederung`).** Der Titel aus
+ * `ListenEintragMeta` ist eine Überschrift eine Ebene unter dem Kopf; eine Liste ohne Kopf nennt
+ * dafür `unterEbene` (Kopf und `unterEbene` schließen sich per Typ aus). Ohne beides ist er
+ * hervorgehobener Text, gleich aussehend, aber ohne Überschriftenrolle — eine fehlende Angabe
+ * kostet so höchstens eine Sprungmarke, eine falsche Ebene entsteht nie. `unterEbene` bekommt nur
+ * eine Liste, deren Einträge eigene Gegenstände mit Inhalt darunter sind; Auswahl-, Einstellungs-
+ * und Stromlisten bleiben ohne.
  */
 
 const { useToken } = theme;
 
 type ListenGroesse = 'small' | 'default';
 
+/** Ebene eines Eintragstitels; `h1` gehört dem Seitentitel. */
+type TitelEbene = 2 | 3 | 4 | 5 | 6;
+
 interface ListenKontext {
   size: ListenGroesse;
   bordered: boolean;
+  /** Ebene des Eintragstitels (LFH-826); `null` = keine Überschrift. */
+  titelEbene: TitelEbene | null;
 }
 
-const ListeContext = createContext<ListenKontext>({ size: 'default', bordered: false });
+const ListeContext = createContext<ListenKontext>({
+  size: 'default',
+  bordered: false,
+  titelEbene: null,
+});
 
 /** Kopf einer Liste — immer eine Überschrift, nie bloß eine Zeile. */
 export interface ListenKopf {
@@ -60,14 +77,36 @@ const KOPF_ELEMENT = {
   5: 'h6',
 } as const satisfies Record<UnterEbene, string>;
 
-interface ListeProps<T> {
+/** Eine Ebene unter der Überschrift der Ebene `ebene`, gedeckelt bei h6 (wie `Markdown`). */
+function ebeneUnter(ebene: number): TitelEbene {
+  return Math.min(6, ebene + 1) as TitelEbene;
+}
+
+/**
+ * Woher die Ebene der Eintragstitel kommt: aus dem Kopf ODER aus `unterEbene`, nie aus beiden —
+ * zwei Quellen für dieselbe Zahl könnten auseinanderlaufen (LFH-826).
+ */
+type ListenEbene =
+  | { kopf?: ListenKopf; unterEbene?: never }
+  | {
+      kopf?: never;
+      /**
+       * Ebene der nächsten Überschrift über einer Liste OHNE Kopf. Nur gesetzt sind die
+       * Eintragstitel (`ListenEintragMeta`) Überschriften, eine Ebene darunter; ohne Angabe sind
+       * sie hervorgehobener Text.
+       */
+      unterEbene?: UnterEbene;
+    };
+
+type ListeProps<T> = ListenEbene & ListeBasisProps<T>;
+
+interface ListeBasisProps<T> {
   dataSource?: readonly T[];
   renderItem: (item: T, index: number) => ReactNode;
   /** Stabiler React-Key je Eintrag (Default: Index). */
   rowKey?: (item: T, index: number) => Key;
   size?: ListenGroesse;
   bordered?: boolean;
-  kopf?: ListenKopf;
   loading?: boolean;
   /** Inhalt bei leerer `dataSource` (analog antd `locale.emptyText`). */
   emptyText?: ReactNode;
@@ -82,6 +121,7 @@ export function Liste<T>({
   size = 'default',
   bordered = false,
   kopf,
+  unterEbene,
   loading = false,
   emptyText,
   style,
@@ -91,6 +131,14 @@ export function Liste<T>({
   const kopfId = useId();
   // Ein Kopf ohne Inhalt ergäbe eine leere Überschrift und einen leeren Listennamen.
   const KopfElement = kopf != null && kopf.inhalt != null ? KOPF_ELEMENT[kopf.unterEbene] : null;
+  // Eintragstitel eine Ebene unter dem Kopf (der selbst `kopf.unterEbene + 1` ist); ohne
+  // gerenderten Kopf aus `unterEbene`; ohne beides keine Überschrift.
+  const titelEbene =
+    kopf != null && KopfElement
+      ? ebeneUnter(kopf.unterEbene + 1)
+      : unterEbene != null
+        ? ebeneUnter(unterEbene)
+        : null;
 
   const containerStyle: CSSProperties = {
     ...(bordered
@@ -147,7 +195,7 @@ export function Liste<T>({
     );
 
   return (
-    <ListeContext.Provider value={{ size, bordered }}>
+    <ListeContext.Provider value={{ size, bordered, titelEbene }}>
       <div style={containerStyle} className={className}>
         {KopfElement && (
           <KopfElement
@@ -287,22 +335,27 @@ interface ListenEintragMetaProps {
 
 export function ListenEintragMeta({ title, description }: ListenEintragMetaProps) {
   const { token } = useToken();
-  // Bildet antd `List.Item.Meta` nach: Titel als <h4> (heading-Rolle + emphasized), darunter die
-  // Beschreibung. Overrides wie antd (margin/color/fontSize/lineHeight); den Rest erbt das <h4>
-  // aus der globalen Kaskade.
+  const { titelEbene } = useContext(ListeContext);
+  // Bildet antd `List.Item.Meta` nach: Titel hervorgehoben, darunter die Beschreibung. Ob der
+  // Titel eine Überschrift ist und welche, sagt die Liste (LFH-826). Der Stil steht vollständig
+  // inline, auch das Gewicht: Überschrift und Text sehen gleich aus. 700 ist das Gewicht des
+  // früheren festen <h4> (Browser-Standard `bold`, Archivo 700 wird lokal ausgeliefert), NICHT
+  // `fontWeightStrong` (600) — sonst würde jeder Titel leichter.
+  const Titel = titelEbene != null ? (`h${titelEbene}` as const) : 'div';
   return (
     <div style={{ minWidth: 0 }}>
       {title != null && (
-        <h4
+        <Titel
           style={{
             margin: `0 0 ${token.marginXXS}px 0`,
             color: token.colorText,
             fontSize: token.fontSize,
+            fontWeight: 700,
             lineHeight: token.lineHeight,
           }}
         >
           {title}
-        </h4>
+        </Titel>
       )}
       {description != null && (
         <div

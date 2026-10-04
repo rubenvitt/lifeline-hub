@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { erfassungsSitzungBinden } from '../components/erfassungsSitzung';
 import TierePage from './TierePage';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -71,6 +72,8 @@ function render(route: string) {
 
 describe('TierePage · Formularbindung (LFH-627)', () => {
   it('?neu=1 setzt den gemerkten Antreffort erst, wenn das Formular eingehängt ist', async () => {
+    // Gemerkt vom angemeldeten Benutzer: ungebundene Werte verwirft die Anmeldung (LFH-785).
+    erfassungsSitzungBinden(nutzer.id);
     sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager A');
     const spy = vi.spyOn(console, 'error');
     render('/einsaetze/1/tiere?neu=1');

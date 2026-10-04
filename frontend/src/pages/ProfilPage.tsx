@@ -97,6 +97,9 @@ export default function ProfilPage() {
   // 403 ab. Anders als die LoginPage kein Rückfall auf „aktiv" bei leerer Liste: dort sperrte er
   // sonst jeden aus, hier bliebe nur ein Knopf, der nicht wirken kann.
   const passwortAktiv = provider.some((p) => p.typ === 'passwort' && p.aktiviert);
+  // Ein SSO-only-Konto hat kein lokales Passwort und könnte kein „bisheriges“ nennen; der Server
+  // antwortete mit 422. Kein toter Knopf (LFH-370): ohne lokales Passwort kein Abschnitt (LFH-828).
+  const passwortWechselMoeglich = passwortAktiv && (benutzer?.passwort_gesetzt ?? false);
   // WebAuthn verlangt einen Secure Context (https/localhost); ohne ihn scheiterte
   // `navigator.credentials.create`, bevor eine Ceremony beginnt. Der Knopf erscheint nur, wenn er
   // funktionieren kann.
@@ -126,8 +129,9 @@ export default function ProfilPage() {
     }
   }
 
-  // Startet ein TOTP-Enrollment. Ein erneuter Klick (Re-Enroll, z. B. neues Gerät) überschreibt
-  // serverseitig das noch nicht bestätigte Secret.
+  // Startet ein TOTP-Enrollment. Ein erneuter Start überschreibt serverseitig nur ein noch nicht
+  // bestätigtes Secret; bei aktivem TOTP lehnt der Server ab (422, LFH-794), ein Gerätewechsel
+  // braucht den Admin-Reset.
   async function totpEinrichtenStarten() {
     setTotpFehler(null);
     setTotpLaedt(true);
@@ -200,7 +204,7 @@ export default function ProfilPage() {
 
         <Paneel titel="Sicherheit" koerperPolster>
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
-            {passwortAktiv && (
+            {passwortWechselMoeglich && (
               <section style={{ maxWidth: 480 }}>
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
                   Passwort

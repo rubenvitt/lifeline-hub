@@ -124,6 +124,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       'aktion:tiere',
       'aktion:bereitstellungsraeume',
       'aktion:einsatzabschnitte',
+      'aktion:lagekarte-gefahrengebiet',
     ]);
   });
   /**
@@ -144,10 +145,44 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:tiere', '/einsaetze/5/tiere?neu=1'],
       ['aktion:bereitstellungsraeume', '/einsaetze/5/bereitstellungsraeume/liste?neu=1'],
       ['aktion:einsatzabschnitte', '/einsaetze/5/einsatzabschnitte?neu=1'],
+      ['aktion:lagekarte-gefahrengebiet', '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);
     }
+  });
+  /**
+   * „Gefahrengebiet zeichnen“ (LFH-825, Spec `sprungpalette`): Träger ist die Lagekarte, nicht
+   * das Modul Gefahren — gezeichnet wird auf der Karte, und das Paneel dort fragt die
+   * Gefahren-Freigabe ebenfalls nicht.
+   */
+  describe('Gefahrengebiet zeichnen (LFH-825)', () => {
+    const ID = 'aktion:lagekarte-gefahrengebiet';
+    it('springt in den Zeichenmodus der Lagekarte, auch im neuen Tab', () => {
+      const k = kontext();
+      const zeile = baueBefehle(k).find((x) => x.id === ID)!;
+      expect(zeile.label).toBe('Gefahrengebiet zeichnen');
+      expect(zeile.gruppe).toBe('schnellaktionen');
+      zeile.ausfuehren('neuerTab');
+      expect(k.navigate).toHaveBeenCalledWith(
+        '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet',
+        'neuerTab',
+      );
+    });
+    it('fehlt ohne Schreibrecht im Einsatz', () => {
+      const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false }));
+      expect(b.some((x) => x.id === ID)).toBe(false);
+    });
+    it('fehlt, wenn die Lagekarte nicht freigegeben ist', () => {
+      for (const teil of [{ sichtbar: false }, { zugriff: false }]) {
+        const freigaben = freigabenFixture({ lagekarte: teil });
+        expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === ID)).toBe(false);
+      }
+    });
+    it('erscheint ohne Freigabe des Moduls Gefahren', () => {
+      const freigaben = freigabenFixture({ gefahrenzonen: { sichtbar: false, zugriff: false } });
+      expect(baueBefehle(kontext({ freigaben })).some((x) => x.id === ID)).toBe(true);
+    });
   });
   it('folgt dem Modulfilter: versteckte Trägermodule liefern keine Schnellaktion', () => {
     const freigaben = freigabenFixture({ etb: { sichtbar: false } });

@@ -1,7 +1,12 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import { dauerText, lagebesprechungZustand, terminZeitpunkt } from './lagebesprechungZustand';
+import {
+  dauerText,
+  lagebesprechungUeberfaellig,
+  lagebesprechungZustand,
+  terminZeitpunkt,
+} from './lagebesprechungZustand';
 
 dayjs.extend(utc);
 
@@ -92,6 +97,36 @@ describe('lagebesprechungZustand', () => {
     expect(lagebesprechungZustand(wire('2026-09-13T10:01:00Z'), jetzt)).toEqual({
       rolle: 'neutral',
       label: 'in 1 min',
+    });
+  });
+});
+
+/** Die eine Heimat für Ton und Wort des überfälligen Termins (LFH-859). */
+describe('lagebesprechungUeberfaellig', () => {
+  const jetzt = dayjs('2026-09-13T10:00:00Z');
+  const vor = (sekunden: number) => jetzt.subtract(sekunden, 'second');
+
+  it('kommender Termin: null — der Zustand gehört dem Aufrufer', () => {
+    expect(lagebesprechungUeberfaellig(jetzt.add(1, 'second'), jetzt)).toBeNull();
+  });
+
+  it('erste Minute ab dem Termin: „jetzt fällig", achtung', () => {
+    for (const s of [0, 59]) {
+      expect(lagebesprechungUeberfaellig(vor(s), jetzt)).toEqual({
+        rolle: 'achtung',
+        label: 'jetzt fällig',
+      });
+    }
+  });
+
+  it('danach „seit … überfällig" in ganzen Minuten, nie alarm', () => {
+    expect(lagebesprechungUeberfaellig(vor(5 * 60 + 30), jetzt)).toEqual({
+      rolle: 'achtung',
+      label: 'seit 5 min überfällig',
+    });
+    expect(lagebesprechungUeberfaellig(vor(125 * 60), jetzt)).toEqual({
+      rolle: 'achtung',
+      label: 'seit 2 h 05 min überfällig',
     });
   });
 });

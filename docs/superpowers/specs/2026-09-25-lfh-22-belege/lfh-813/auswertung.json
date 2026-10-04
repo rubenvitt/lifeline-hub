@@ -1,0 +1,827 @@
+{
+ "befehl-entwurf": {
+  "firefox": {
+   "seiten": 6,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.024,
+   "endmarke_seite": 6,
+   "titel_vorkommen": {
+    "Lage": 1,
+    "Auftrag": 1,
+    "Durchführung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0
+  },
+  "chromium": {
+   "seiten": 6,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 6,
+   "dunkelanteil_s1": 0.024,
+   "endmarke_seite": 6,
+   "titel_vorkommen": {
+    "Lage": 1,
+    "Auftrag": 1,
+    "Durchführung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0
+  }
+ },
+ "befehl-lesend": {
+  "firefox": {
+   "seiten": 6,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.024,
+   "endmarke_seite": 6,
+   "titel_vorkommen": {
+    "Lage": 1,
+    "Auftrag": 1,
+    "Durchführung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0
+  },
+  "chromium": {
+   "seiten": 6,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 6,
+   "dunkelanteil_s1": 0.026,
+   "endmarke_seite": 6,
+   "titel_vorkommen": {
+    "Lage": 1,
+    "Auftrag": 1,
+    "Durchführung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0
+  }
+ },
+ "etb-gefiltert": {
+  "firefox": {
+   "seiten": 28,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.043,
+   "kopf_je_seite": 28,
+   "nummern": {
+    "anzahl": 512,
+    "erste": [
+     43,
+     44,
+     45
+    ],
+    "letzte": [
+     552,
+     553,
+     554
+    ],
+    "aufsteigend": true,
+    "lueckenlos": true
+   },
+   "nachtrag": true,
+   "berichtigt_nr": 0,
+   "berichtigt_durch": 1,
+   "auswahl_kopf": "Typ: Meldung",
+   "letzte_zeile_letzte_seite": "nachgetragen um 12:59                                              EL",
+   "titel_am_seitenende": [],
+   "s1_zeilen": 37
+  },
+  "chromium": {
+   "seiten": 28,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 28,
+   "dunkelanteil_s1": 0.047,
+   "kopf_je_seite": 28,
+   "nummern": {
+    "anzahl": 512,
+    "erste": [
+     43,
+     44,
+     45
+    ],
+    "letzte": [
+     552,
+     553,
+     554
+    ],
+    "aufsteigend": true,
+    "lueckenlos": true
+   },
+   "nachtrag": true,
+   "berichtigt_nr": 0,
+   "berichtigt_durch": 1,
+   "auswahl_kopf": "Typ: Meldung",
+   "letzte_zeile_letzte_seite": "nachgetragen um 12:59                                              EL",
+   "titel_am_seitenende": [],
+   "s1_zeilen": 37
+  }
+ },
+ "etb": {
+  "firefox": {
+   "seiten": 64,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.006,
+   "kopf_je_seite": 64,
+   "nummern": {
+    "anzahl": 555,
+    "erste": [
+     1,
+     2,
+     3
+    ],
+    "letzte": [
+     553,
+     554,
+     555
+    ],
+    "aufsteigend": true,
+    "lueckenlos": true
+   },
+   "nachtrag": true,
+   "berichtigt_nr": 1,
+   "berichtigt_durch": 1,
+   "auswahl_kopf": "vollständiges Tagebuch",
+   "letzte_zeile_letzte_seite": "berichtigt Nr. 43                     EL",
+   "titel_am_seitenende": [
+    [
+     6,
+     "Eigene Lage"
+    ],
+    [
+     13,
+     "Anträge und Vorschläge"
+    ],
+    [
+     29,
+     "Durchführung"
+    ]
+   ],
+   "s1_zeilen": 10
+  },
+  "chromium": {
+   "seiten": 73,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 73,
+   "dunkelanteil_s1": 0.005,
+   "kopf_je_seite": 72,
+   "nummern": {
+    "anzahl": 555,
+    "erste": [
+     1,
+     2,
+     3
+    ],
+    "letzte": [
+     553,
+     554,
+     555
+    ],
+    "aufsteigend": true,
+    "lueckenlos": true
+   },
+   "nachtrag": true,
+   "berichtigt_nr": 1,
+   "berichtigt_durch": 1,
+   "auswahl_kopf": "vollständiges Tagebuch",
+   "letzte_zeile_letzte_seite": "berichtigt Nr. 43                     EL",
+   "titel_am_seitenende": [],
+   "s1_zeilen": 8
+  }
+ },
+ "lagebericht-entwurf-split": {
+  "firefox": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.021,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  },
+  "chromium": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 9,
+   "dunkelanteil_s1": 0.027,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  }
+ },
+ "lagebericht-entwurf-vorgabe": {
+  "firefox": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.021,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  },
+  "chromium": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 9,
+   "dunkelanteil_s1": 0.027,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  }
+ },
+ "lagebericht-lesend-hell": {
+  "firefox": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.018,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  },
+  "chromium": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 9,
+   "dunkelanteil_s1": 0.019,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  }
+ },
+ "lagebericht-lesend": {
+  "firefox": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.025,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  },
+  "chromium": {
+   "seiten": 9,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 9,
+   "dunkelanteil_s1": 0.027,
+   "endmarke_seite": 9,
+   "titel_vorkommen": {
+    "Auftrag": 1,
+    "Gefahren-/Schadenlage": 1,
+    "Eigene Lage": 1,
+    "Lageentwicklung": 1,
+    "Besondere (Führungs-)Probleme": 1,
+    "Anträge und Vorschläge": 1,
+    "Medienlage": 1,
+    "Zusammenfassung": 1
+   },
+   "titel_am_seitenende": [],
+   "absatz_zerrissen": 0,
+   "letzter_absatz": true
+  }
+ },
+ "meldebild-beforeprint": {
+  "firefox": {
+   "seiten": 21,
+   "bilder": {
+    "1": [
+     "163x66",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25"
+    ],
+    "2": [
+     "25x25",
+     "25x25"
+    ],
+    "3": [
+     "25x25",
+     "25x25"
+    ],
+    "4": [
+     "25x25",
+     "25x25"
+    ],
+    "5": [
+     "25x25",
+     "25x25"
+    ],
+    "6": [
+     "25x25",
+     "25x25"
+    ],
+    "7": [
+     "25x25",
+     "25x25"
+    ],
+    "8": [
+     "25x25",
+     "25x25"
+    ],
+    "9": [
+     "25x25",
+     "25x25"
+    ],
+    "10": [
+     "25x25",
+     "25x25"
+    ],
+    "11": [
+     "25x25",
+     "25x25"
+    ],
+    "12": [
+     "25x25",
+     "25x25"
+    ],
+    "13": [
+     "25x25",
+     "25x25"
+    ],
+    "14": [
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.011,
+   "kopf_je_seite": 21,
+   "kraefte": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39
+   ]
+  },
+  "chromium": {
+   "seiten": 21,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 21,
+   "dunkelanteil_s1": 0.016,
+   "kopf_je_seite": 21,
+   "kraefte": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39
+   ]
+  }
+ },
+ "meldebild": {
+  "firefox": {
+   "seiten": 21,
+   "bilder": {
+    "1": [
+     "163x66",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25"
+    ],
+    "2": [
+     "25x25",
+     "25x25"
+    ],
+    "3": [
+     "25x25",
+     "25x25"
+    ],
+    "4": [
+     "25x25",
+     "25x25"
+    ],
+    "5": [
+     "25x25",
+     "25x25"
+    ],
+    "6": [
+     "25x25",
+     "25x25"
+    ],
+    "7": [
+     "25x25",
+     "25x25"
+    ],
+    "8": [
+     "25x25",
+     "25x25"
+    ],
+    "9": [
+     "25x25",
+     "25x25"
+    ],
+    "10": [
+     "25x25",
+     "25x25"
+    ],
+    "11": [
+     "25x25",
+     "25x25"
+    ],
+    "12": [
+     "25x25",
+     "25x25"
+    ],
+    "13": [
+     "25x25",
+     "25x25"
+    ],
+    "14": [
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25",
+     "25x25"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 0,
+   "dunkelanteil_s1": 0.011,
+   "kopf_je_seite": 21,
+   "kraefte": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39
+   ]
+  },
+  "chromium": {
+   "seiten": 21,
+   "bilder": {
+    "1": [
+     "160x64"
+    ]
+   },
+   "rahmen_gefunden": [],
+   "kopf_s1_fehlt": [],
+   "letzte_seite_leer": false,
+   "seitenzaehlung": 21,
+   "dunkelanteil_s1": 0.016,
+   "kopf_je_seite": 21,
+   "kraefte": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39
+   ]
+  }
+ }
+}

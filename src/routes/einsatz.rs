@@ -26,12 +26,24 @@ use utoipa::ToSchema;
 /// rufen; die Nutzlast trägt nur die Einsatzkennung, die Kopfdaten holt der GET.
 ///
 /// Meldet zugleich `einsatzliste` an die Leser des Einsatzes (LFH-734): die Liste zeigt
-/// dieselben Kopfspalten. Jeder `einsatz`-Emitter läuft hierüber, auch der aus dem Stab.
+/// dieselben Kopfspalten. Jeder `einsatz`-Emitter läuft hierüber oder über
+/// [`kopf_geaendert_fuer`], auch der aus dem Stab.
 pub(crate) async fn kopf_geaendert(state: &AppState, einsatz_id: i64) {
+    kopf_geaendert_fuer(state, einsatz_id, &[]).await;
+}
+
+/// [`kopf_geaendert`] für eine Mitgliedschaftsänderung (LFH-854): `einsatzliste` erreicht
+/// zusätzlich `betroffene`, auch wenn sie nicht (mehr) Leser sind. `einsatz` geht an jeden
+/// Abonnenten des Stroms; das ist kein Leck, weil die Mitgliederliste mit allen Rollen hinter
+/// derselben Tür liegt (`EinsatzLesezugriff` ohne Modul, Herleitung
+/// `openspec/changes/archive/2026-10-04-lfh-854-rollenwechsel-live/design.md`, D2). So wird
+/// `meine_rolle` auf dem Schirm der betroffenen Person ohne Neuladen frisch, und mit ihr das
+/// Schreibrecht.
+pub(crate) async fn kopf_geaendert_fuer(state: &AppState, einsatz_id: i64, betroffene: &[i64]) {
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Einsatz);
-    einsatzliste_melden(&state.pool, &state.live, einsatz_id, &[]).await;
+    einsatzliste_melden(&state.pool, &state.live, einsatz_id, betroffene).await;
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,9 +150,10 @@ pub async fn abschliessen(
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let id = ctx.einsatz.id;
 
-    let aktualisiert = repo::abschliessen(&state.pool, id, ctx.benutzer.id).await?;
+    let ergebnis = repo::abschliessen(&state.pool, id, ctx.benutzer.id).await?;
     kopf_geaendert(&state, id).await;
-    Ok(Json(aktualisiert.anzeige(
+    etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    Ok(Json(ergebnis.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
@@ -232,7 +245,7 @@ pub async fn aufbewahrungsfrist_setzen(
         (Some(a), Some(neu)) => format!("Aufbewahrungsfrist geändert von {a} auf {neu}"),
     };
 
-    let aktualisiert = repo::frist_setzen(
+    let ergebnis = repo::frist_setzen(
         &state.pool,
         id,
         ctx.benutzer.id,
@@ -241,6 +254,8 @@ pub async fn aufbewahrungsfrist_setzen(
     )
     .await?;
     kopf_geaendert(&state, id).await;
+    etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    let aktualisiert = ergebnis.einsatz;
     let anzeige = aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
@@ -368,6 +383,15 @@ pub async fn kategorie_frist_setzen(
         )
         .await?,
     ))
+}
+
+/// Meldet die System-ETB-Einträge einer Einsatz-Mutation nach dem Commit live (LFH-858): ein
+/// `etb`-Ereignis je Kennung, damit offene ETB-Schirme, die Kopfzahl und der Modulzähler ohne
+/// Neuladen nachziehen.
+fn etb_eintraege_melden(state: &AppState, einsatz_id: i64, etb_eintrag_ids: &[i64]) {
+    for &etb_id in etb_eintrag_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
 }
 
 /// Der Frist-PUT hat bewusst kein Lesegate (eine abgelaufene Frist soll reaktiv verlängert
@@ -841,8 +865,9 @@ pub async fn mitglied_setzen(
         fuehrungsstelle.as_ref(),
     )
     .await?;
-    // Die Liste des neuen Mitglieds bekommt den Einsatz, die der übrigen eine neue `meine_*`-Lage.
-    einsatzliste_melden(&state.pool, &state.live, id, &[ziel_id]).await;
+    // Die Liste des neuen Mitglieds bekommt den Einsatz, die der übrigen eine neue `meine_*`-Lage;
+    // der Kopf auf dem Schirm der betroffenen Person ihr neues Schreibrecht (LFH-854).
+    kopf_geaendert_fuer(&state, id, &[ziel_id]).await;
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
@@ -868,8 +893,9 @@ pub async fn mitglied_entfernen(
     }
 
     repo::entferne(&state.pool, id, ziel_id).await?;
-    // Die entfernte Person ist kein Mitglied mehr, ihre Liste verliert den Einsatz trotzdem.
-    einsatzliste_melden(&state.pool, &state.live, id, &[ziel_id]).await;
+    // Die entfernte Person ist kein Mitglied mehr, ihre Liste verliert den Einsatz trotzdem;
+    // ihr offener Kopf verliert das Schreibrecht (LFH-854).
+    kopf_geaendert_fuer(&state, id, &[ziel_id]).await;
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 

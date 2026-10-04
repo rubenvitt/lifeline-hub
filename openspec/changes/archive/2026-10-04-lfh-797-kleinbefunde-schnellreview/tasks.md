@@ -1,5 +1,8 @@
 # Tasks
 
+Nachtrag beim Merge von `alpha` (04.10.2026): LFH-825 hatte dieselbe Konstante parallel als
+`FREIE_SKIZZE_VORGABEFARBE` eingeführt; deren Name gilt, `FREIE_SKIZZE_VORGABE` unten meint sie.
+
 Jede Aufgabe per TDD: erst der rote Test (bzw. die Mutationsprobe), dann die Änderung.
 
 ## 1. `nosniff` an jeder Antwort (D1, Spec `http-schutzkoepfe`)

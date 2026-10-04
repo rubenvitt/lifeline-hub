@@ -29,16 +29,16 @@ import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 import { Link, useNavigate, useParams } from 'react-router';
 import { einsatzberichtPfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
-  aktualisiereEinsatz,
   ladeEinsatz,
+  ladeFuehrungsstelle,
   ladeMitglieder,
   patcheEinsatz,
+  patcheFuehrungsstelle,
   type KopfdatenPatch,
-  type KopfdatenUpdate,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -50,7 +50,19 @@ import {
   darfEinsatzLeiten,
   istEinsatzLeitung,
 } from '../einsatz/schreibrecht';
-import type { EinsatzAnzeige, Einsatzart } from '../api/types';
+import type {
+  EinsatzAnzeige,
+  Einsatzart,
+  Fuehrungsstelle,
+  FuehrungsstellePatch,
+} from '../api/types';
+import PaneelZustand from '../components/instrument/PaneelZustand';
+import SprechgruppenPicker from '../components/SprechgruppenPicker';
+import {
+  KOMMUNIKATIONSMITTEL_OPTIONEN,
+  kommunikationsmittelLabel,
+  teileSprechgruppen,
+} from '../components/kommunikationsmittel';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
@@ -169,7 +181,7 @@ function ZeitpunktAngabe({
 }
 
 /** Werte des Bearbeiten-Formulars (`begonnen_at` als Zeitpunkt, vor der UTC-Wandlung; LFH-692). */
-interface FormWerte {
+export interface FormWerte {
   bezeichnung: string;
   stichwort?: string;
   einsatzart: Einsatzart;
@@ -181,6 +193,52 @@ interface FormWerte {
   anzahl_betroffene_initial?: number;
   begonnen_at: Dayjs;
   naechste_lagebesprechung_at?: Dayjs | null;
+}
+
+/** Freie Textangaben des Vollformulars; leer heißt `null` (wie `leerZuNull` beim Senden). */
+const TEXTFELDER = [
+  'stichwort',
+  'leitstellen_nr',
+  'einsatzort',
+  'meldende_stelle',
+  'sachverhalt',
+] as const satisfies readonly (keyof FormWerte & keyof KopfdatenPatch)[];
+
+/**
+ * Was das Vollformular gegenüber dem Stand beim Öffnen geändert hat (LFH-839) — nur diese
+ * Schlüssel gehen in den PATCH. Ein Vollersatz überschriebe die Zeilenänderung einer anderen
+ * Person, die zwischen Öffnen und Speichern kam, still mit dem Stand von damals.
+ *
+ * Verglichen wird wie in der Zeile: Texte getrimmt (leer = `null`), Zeitpunkte am Instant
+ * (`gleicherZeitpunkt`), die Koordinate als Paar — ändert sich ein Wert, gehen beide hinaus.
+ */
+export function geaenderteKopfdaten(vorher: FormWerte, nachher: FormWerte): KopfdatenPatch {
+  const patch: KopfdatenPatch = {};
+  const bezeichnung = nachher.bezeichnung.trim();
+  if (bezeichnung !== vorher.bezeichnung.trim()) patch.bezeichnung = bezeichnung;
+  if (nachher.einsatzart !== vorher.einsatzart) patch.einsatzart = nachher.einsatzart;
+  for (const feld of TEXTFELDER) {
+    const neu = leerZuNull(nachher[feld]);
+    if (neu !== leerZuNull(vorher[feld])) patch[feld] = neu;
+  }
+  const anzahl = nachher.anzahl_betroffene_initial ?? null;
+  if (anzahl !== (vorher.anzahl_betroffene_initial ?? null)) {
+    patch.anzahl_betroffene_initial = anzahl;
+  }
+  if (!gleicherZeitpunkt(vorher.begonnen_at ?? null, nachher.begonnen_at ?? null)) {
+    patch.begonnen_at = alsBackendZeit(nachher.begonnen_at);
+  }
+  const termin = nachher.naechste_lagebesprechung_at ?? null;
+  if (!gleicherZeitpunkt(vorher.naechste_lagebesprechung_at ?? null, termin)) {
+    patch.naechste_lagebesprechung_at = termin ? alsBackendZeit(termin) : null;
+  }
+  const koordAlt = alsLatLon(vorher.einsatzort_koord);
+  const koordNeu = alsLatLon(nachher.einsatzort_koord);
+  if (koordAlt?.lat !== koordNeu?.lat || koordAlt?.lon !== koordNeu?.lon) {
+    patch.einsatzort_lat = koordNeu?.lat ?? null;
+    patch.einsatzort_lon = koordNeu?.lon ?? null;
+  }
+  return patch;
 }
 
 /**
@@ -259,6 +317,148 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
   );
 }
 
+/** Sprechgruppen als eine Zeile: „TMO 311, 312 · DMO 505“ — dieselbe Teilung wie der Funkplan. */
+function sprechgruppenText(fs: Pick<Fuehrungsstelle, 'sprechgruppen'>): string {
+  const { tmo, dmo } = teileSprechgruppen(fs.sprechgruppen);
+  return [
+    tmo.length > 0 ? `TMO ${tmo.map((s) => s.bezeichnung).join(', ')}` : null,
+    dmo.length > 0 ? `DMO ${dmo.map((s) => s.bezeichnung).join(', ')}` : null,
+  ]
+    .filter((t): t is string => t != null)
+    .join(' · ');
+}
+
+/** Gleiche Sprechgruppen-Auswahl unabhängig von der Reihenfolge („unverändert → kein Senden“). */
+function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  const menge = new Set(a);
+  return b.every((id) => menge.has(id));
+}
+
+/**
+ * Eigene Führungsstelle des Einsatzes (LFH-849, Spec `einsatz-fuehrungsstelle`): die Gegenstelle
+ * des Funkplans. Vier Zeilen, jede schickt nur ihr Feld an `…/fuehrungsstelle`, mit dem
+ * Schreibrecht der Kopfdaten. Der Funkplan verweist hierher und bearbeitet selbst nichts.
+ */
+function FuehrungsstellePaneel({
+  einsatzId,
+  darfSchreiben,
+}: {
+  einsatzId: number;
+  darfSchreiben: boolean;
+}) {
+  const qc = useQueryClient();
+  const { message } = App.useApp();
+  const { token } = useRollen();
+  const query = useQuery({
+    queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+    queryFn: () => ladeFuehrungsstelle(einsatzId),
+  });
+  // Wie `feldMutation`: erst in den Cache, dann erfüllen — die Zeile schließt mit dem neuen Wert,
+  // und die Fokusrückgabe trifft den frischen Wertknopf. Der Fehler steht an der Zeile.
+  const mutation = useMutation({
+    mutationFn: ({ patch }: { etikett: string; patch: FuehrungsstellePatch }) =>
+      patcheFuehrungsstelle(einsatzId, patch),
+    onSuccess: (neu, { etikett }) => {
+      qc.setQueryData(einsatzKeys.fuehrungsstelle(einsatzId), neu);
+      message.success(`${etikett} gespeichert`);
+    },
+  });
+  const speichern = (etikett: string, patch: FuehrungsstellePatch) =>
+    mutation.mutateAsync({ etikett, patch });
+
+  const fs = query.data;
+  const text = (
+    etikett: string,
+    wert: string | null | undefined,
+    mono: boolean,
+    schluessel: 'rufname' | 'erreichbarkeit',
+  ) => (
+    <InlineAngabe<string>
+      etikett={etikett}
+      wert={wert ?? ''}
+      anzeige={mono ? <span style={monoStil(13)}>{wert}</span> : wert}
+      leer={leererText}
+      gleich={(a, b) => a.trim() === b.trim()}
+      darfSchreiben={darfSchreiben}
+      onSpeichern={(w) => speichern(etikett, { [schluessel]: leerZuNull(w) })}
+      eingabe={({ feld, value, onChange }) => (
+        <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    />
+  );
+
+  return (
+    <Paneel titel="Eigene Führungsstelle" style={{ marginTop: token.margin }}>
+      <PaneelZustand
+        zustand={query.isPending ? 'laden' : query.isError ? 'fehler' : 'daten'}
+        titel="Eigene Führungsstelle"
+        leerText=""
+        onNeuladen={() => void query.refetch()}
+      >
+        {fs && (
+          <Angaben
+            zeilen={[
+              { etikett: 'Rufname', wert: text('Rufname', fs.rufname, true, 'rufname') },
+              {
+                etikett: 'Sprechgruppen',
+                wert: (
+                  <InlineAngabe<number[]>
+                    etikett="Sprechgruppen"
+                    wert={fs.sprechgruppen.map((s) => s.id)}
+                    anzeige={<span style={monoStil(13)}>{sprechgruppenText(fs)}</span>}
+                    leer={(ids) => ids.length === 0}
+                    gleich={gleicheIds}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(ids) => speichern('Sprechgruppen', { sprechgruppe_ids: ids })}
+                    eingabe={({ feld, popup, value, onChange }) => (
+                      <SprechgruppenPicker
+                        einsatzId={einsatzId}
+                        value={value}
+                        onChange={onChange}
+                        auswahl={{ ...feld, ...popup }}
+                      />
+                    )}
+                  />
+                ),
+              },
+              {
+                etikett: 'Kommunikationsmittel',
+                wert: (
+                  <InlineAngabe<string | null>
+                    etikett="Kommunikationsmittel"
+                    wert={fs.kommunikationsmittel ?? null}
+                    anzeige={kommunikationsmittelLabel(fs.kommunikationsmittel)}
+                    leer={(w) => w === null}
+                    darfSchreiben={darfSchreiben}
+                    onSpeichern={(w) =>
+                      speichern('Kommunikationsmittel', { kommunikationsmittel: w })
+                    }
+                    eingabe={({ feld, popup, value, onChange }) => (
+                      <Select<string>
+                        {...feld}
+                        {...popup}
+                        allowClear
+                        options={KOMMUNIKATIONSMITTEL_OPTIONEN}
+                        value={value ?? undefined}
+                        onChange={(w) => onChange(w ?? null)}
+                      />
+                    )}
+                  />
+                ),
+              },
+              {
+                etikett: 'Erreichbarkeit',
+                wert: text('Erreichbarkeit', fs.erreichbarkeit, false, 'erreichbarkeit'),
+              },
+            ]}
+          />
+        )}
+      </PaneelZustand>
+    </Paneel>
+  );
+}
+
 export default function EinsatzdatenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -269,6 +469,9 @@ export default function EinsatzdatenPage() {
   const { token, rollen } = useRollen();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<FormWerte>();
+  // Stand beim Öffnen des Vollformulars: Bezugspunkt für „geändert" (LFH-839). Ein Neuabruf
+  // zwischendurch verschiebt ihn nicht — sonst sähe eine fremde Änderung wie eine eigene aus.
+  const geoeffnetRef = useRef<FormWerte | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -284,7 +487,7 @@ export default function EinsatzdatenPage() {
   });
 
   const speichernMutation = useMutation({
-    mutationFn: (felder: KopfdatenUpdate) => aktualisiereEinsatz(einsatzId, felder),
+    mutationFn: (patch: KopfdatenPatch) => patcheEinsatz(einsatzId, patch),
     // Kein `onError`-Toast: der Fehler steht als `<SpeicherFehler>` über dem Formular. Ein Toast
     // verfällt nach ~3 s, und das Formular wirkte danach gespeichert.
     onSuccess: () => {
@@ -337,7 +540,7 @@ export default function EinsatzdatenPage() {
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
 
   function bearbeitenStarten() {
-    form.setFieldsValue({
+    const werte: FormWerte = {
       bezeichnung: einsatz.bezeichnung,
       stichwort: einsatz.stichwort ?? undefined,
       einsatzart: einsatz.einsatzart,
@@ -350,31 +553,23 @@ export default function EinsatzdatenPage() {
       meldende_stelle: einsatz.meldende_stelle ?? undefined,
       sachverhalt: einsatz.sachverhalt ?? undefined,
       anzahl_betroffene_initial: einsatz.anzahl_betroffene_initial ?? undefined,
-      begonnen_at: alsZeitpunkt(einsatz.begonnen_at),
+      // Die Alarmzeit ist am Server Pflicht, der Wire-String nie leer.
+      begonnen_at: alsZeitpunkt(einsatz.begonnen_at)!,
       naechste_lagebesprechung_at: alsZeitpunkt(einsatz.naechste_lagebesprechung_at) ?? null,
-    });
+    };
+    geoeffnetRef.current = werte;
+    form.setFieldsValue(werte);
     setBearbeiten(true);
   }
 
   function speichern(werte: FormWerte) {
-    const koord = alsLatLon(werte.einsatzort_koord);
-    const felder: KopfdatenUpdate = {
-      bezeichnung: werte.bezeichnung.trim(),
-      stichwort: leerZuNull(werte.stichwort),
-      einsatzart: werte.einsatzart,
-      leitstellen_nr: leerZuNull(werte.leitstellen_nr),
-      einsatzort: leerZuNull(werte.einsatzort),
-      einsatzort_lat: koord?.lat ?? null,
-      einsatzort_lon: koord?.lon ?? null,
-      meldende_stelle: leerZuNull(werte.meldende_stelle),
-      sachverhalt: leerZuNull(werte.sachverhalt),
-      anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
-      begonnen_at: alsBackendZeit(werte.begonnen_at),
-      naechste_lagebesprechung_at: werte.naechste_lagebesprechung_at
-        ? alsBackendZeit(werte.naechste_lagebesprechung_at)
-        : null,
-    };
-    speichernMutation.mutate(felder);
+    const patch = geaenderteKopfdaten(geoeffnetRef.current ?? werte, werte);
+    // Nichts geändert → kein PATCH, wie in der Zeile (`InlineAngabe`): das Formular schließt.
+    if (Object.keys(patch).length === 0) {
+      setBearbeiten(false);
+      return;
+    }
+    speichernMutation.mutate(patch);
   }
 
   return (
@@ -663,6 +858,8 @@ export default function EinsatzdatenPage() {
               ]}
             />
           </Paneel>
+
+          <FuehrungsstellePaneel einsatzId={einsatzId} darfSchreiben={darfBearbeiten} />
 
           {/* Technische Angaben — Aktenzeichen und Anlege-Zeitstempel: gebraucht beim
               Nachweisen, nicht beim Führen, deshalb eingeklappt. Kein `forceRender`: der

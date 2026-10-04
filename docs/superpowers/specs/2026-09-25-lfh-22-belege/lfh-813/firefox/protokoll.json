@@ -1,0 +1,85 @@
+{
+  "browser": "firefox/157.0",
+  "protokoll": [
+    {
+      "name": "lagebericht-lesend",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 30623
+    },
+    {
+      "name": "lagebericht-lesend-hell",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 30656
+    },
+    {
+      "name": "lagebericht-entwurf-vorgabe",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 31410
+    },
+    {
+      "name": "lagebericht-entwurf-split",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 34628
+    },
+    {
+      "name": "befehl-lesend",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 24962
+    },
+    {
+      "name": "befehl-entwurf",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 25622
+    },
+    {
+      "name": "meldebild",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 75174
+    },
+    {
+      "name": "meldebild-beforeprint",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 75174
+    },
+    {
+      "name": "etb",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 104925
+    },
+    {
+      "name": "etb-gefiltert",
+      "ereignisse": {
+        "vorher": 1,
+        "nachher": 1
+      },
+      "bytes": 57260
+    }
+  ]
+}

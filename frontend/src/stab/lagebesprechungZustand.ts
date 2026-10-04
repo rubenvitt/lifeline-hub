@@ -22,8 +22,9 @@ export function dauerText(minuten: number): string {
 }
 
 /**
- * Stand der nächsten Lagebesprechung: „in 23 min" neutral, „seit 5 min überfällig" `achtung`,
- * „kein Termin" neutral; das Wort ist der zweite Kanal (WCAG 1.4.1).
+ * Stand der nächsten Lagebesprechung: „in 23 min" neutral, „seit 5 min überfällig" `achtung`
+ * (über {@link lagebesprechungUeberfaellig}), „kein Termin" neutral; das Wort ist der zweite
+ * Kanal (WCAG 1.4.1).
  *
  * Rein, mit `jetzt` als Argument. Gerechnet in absoluten Millisekunden, nie in Wanduhrzeit
  * (Sommerzeitgrenze). `termin ≤ jetzt` gilt als überfällig; abgerundet. Unter einer Minute
@@ -39,11 +40,29 @@ export function lagebesprechungZustand(
   if (!terminWire) return { rolle: 'neutral', label: 'kein Termin' };
   const termin = terminZeitpunkt(terminWire);
   if (!termin) return { rolle: 'neutral', label: 'Termin unlesbar' };
-  const abstandMs = termin.valueOf() - jetzt.valueOf();
-  const minuten = Math.floor(Math.abs(abstandMs) / 60_000);
-  if (abstandMs > 0) {
-    return { rolle: 'neutral', label: minuten === 0 ? 'in < 1 min' : `in ${dauerText(minuten)}` };
-  }
+  const ueberfaellig = lagebesprechungUeberfaellig(termin, jetzt);
+  if (ueberfaellig) return ueberfaellig;
+  const minuten = Math.floor((termin.valueOf() - jetzt.valueOf()) / 60_000);
+  return { rolle: 'neutral', label: minuten === 0 ? 'in < 1 min' : `in ${dauerText(minuten)}` };
+}
+
+/**
+ * Ton und Wort eines erreichten oder verstrichenen Besprechungstermins — die EINE Heimat dieser
+ * Regel (LFH-859, `stab/AGENTS.md`): die Stab-Seite (`lagebesprechungZustand`) und die
+ * Fristenliste des Führungsüberblicks (`markenBewertung`, Marke „Lagebesprechung") lesen beide
+ * hier. `achtung`, nie `alarm`: eine Besprechung ist kein Gefahrenereignis (Alarmbudget
+ * EEMUA 191). In der ersten Minute „jetzt fällig", danach „seit 5 min überfällig".
+ *
+ * `null`, solange der Termin in der Zukunft liegt; den kommenden Termin bewertet jeder Aufrufer
+ * selbst. Der Rückgabetyp hält `achtung` als Literal fest, damit er in `MarkenTon` passt.
+ */
+export function lagebesprechungUeberfaellig(
+  termin: Dayjs,
+  jetzt: Dayjs,
+): { rolle: 'achtung'; label: string } | null {
+  const seitMs = jetzt.valueOf() - termin.valueOf();
+  if (seitMs < 0) return null;
+  const minuten = Math.floor(seitMs / 60_000);
   if (minuten === 0) return { rolle: 'achtung', label: 'jetzt fällig' };
   return { rolle: 'achtung', label: `seit ${dauerText(minuten)} überfällig` };
 }
