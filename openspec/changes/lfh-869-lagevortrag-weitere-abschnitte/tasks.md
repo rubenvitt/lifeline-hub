@@ -7,7 +7,7 @@ Branch mergen (design.md D6). Jede Aufgabe per TDD (Test zuerst rot). Pfade rela
 ## 1. Gemeinsame Quellen
 
 - [ ] 1.1 Tests zuerst: aus denselben Rohdaten ergeben `useLagebild` und `ladeLagebasis` dieselbe `Lagebasis` und dieselben Zustände je Quelle, auch mit gesperrtem Modul (das gesperrte Modul wird im Lade-Pfad nicht angefragt, msw zählt). Verifikation: rot.
-- [ ] 1.2 `LAGEBILD_QUELLEN` aus `pages/lage-dashboard/useLagebild.ts` herausziehen, `ladeLagebasis(qc, einsatzId, freigaben)` nach design.md D1 (inklusive Stand je Quelle). Verifikation: 1.1 grün, Tests von `useLagebild`, Dashboard und Vorbereitung unverändert grün.
+- [ ] 1.2 `LAGEBILD_QUELLEN` aus `pages/lage-dashboard/useLagebild.ts` herausziehen, `ladeLagebasis(qc, einsatzId, freigaben)` nach design.md D1 (inklusive Stand je Quelle), Listen über `ladeListe` aus LFH-870. Verifikation: 1.1 grün, Tests von `useLagebild`, Dashboard und Vorbereitung unverändert grün.
 - [ ] 1.3 `ladeFunkplanQuellen(qc, einsatzId, freigaben)` mit denselben Keys und Modulen wie `FunkplanPage`; `funkplanLueckenZeilen(luecken, quellen)` aus `rendereFunkplanMarkdown` herauslösen. Verifikation: Test „gesperrt ohne Anfrage“ grün, `stab/funkplan.test.tsx` unverändert grün (Funkplan-Freitext wörtlich gleich).
 - [ ] 1.4 Formatierer der Vorbereitung (`sichtungText`, Warnstufen-Zeile, Vermisste mit Notiz) exportieren. Verifikation: `stab/vorbereitung.test.ts` unverändert grün.
 

@@ -6,8 +6,11 @@
   - `lageberichte/AbschnittUebernahme.tsx` übernimmt die Bedienung: Knopf, Rückfrage, Hinweis bei
     Sperre und `onGeaendert`.
   - `lageberichte/uebernahmen.ts` hält die Zuordnung `uebernahmeFuer(vorlage, schluessel)`.
-  - Eine Quelle ist eine `UebernahmeQuelle` mit `knopf`, `unterzeile`, `ersetzenTitel`,
-    `ersetzenText`, `verfuegbar(freigaben)` und `erzeuge({ qc, einsatzId, freigaben, dtg })`.
+  - Eine Quelle ist eine `UebernahmeQuelle` (`lageberichte/uebernahmeQuelle.ts`) mit `knopf`,
+    `unterzeile`, `ersetzenTitel`, `ersetzenText`, `verfuegbar(freigaben)` und
+    `erzeuge({ qc, einsatzId, freigaben, dtg })`. Dazu kommen die Helfer
+    `ladeListe(qc, key, fn, leer)` (liefert Zustand, Daten und Stand) und `gesperrt(leer)`.
+    Vorbild für eine Quelle ist `lageberichte/eigeneLageUebernahme.ts`.
   - Der Baustein regelt Klick, Rückfrage, Schreibzweig und den Hinweis bei Sperre. Diese Change
     fügt nur Quellen hinzu.
 - **Zahlenquellen:**
