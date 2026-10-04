@@ -55,10 +55,11 @@ export async function sucheEtbBezuege(
  * Die ETB-Einträge, die die Bezugswahl zu einem getippten Begriff anbietet.
  *
  * Das jüngste Fenster filtert immer der Client am sichtbaren Text („ETB 412 · …“): so treffen
- * Wortmitten und Teilnummern, die der Server nicht findet, und solange die Server-Antwort für GENAU diesen Begriff fehlt
- * (entprellt, unterwegs, gescheitert), steht nie ein Eintrag zur Wahl, der nicht passt — Enter
- * nähme sonst den ersten unpassenden. Gehören die Server-Treffer zum Begriff, kommen sie dazu:
- * der Eintrag mit genau der getippten Nummer vorn, sonst absteigend nach laufender Nummer.
+ * Wortmitten und Teilnummern, die der Server nicht findet, und solange die Server-Antwort für
+ * GENAU diesen Begriff fehlt (entprellt, unterwegs, gescheitert), steht nie ein Eintrag zur Wahl,
+ * der nicht passt — Enter nähme sonst den ersten unpassenden. Gehören die Server-Treffer zum
+ * Begriff, kommen sie dazu: der Eintrag mit genau der getippten Nummer vorn, sonst absteigend nach
+ * laufender Nummer.
  */
 export function waehleEtbEintraege(
   fenster: EtbEintragAnzeige[],
