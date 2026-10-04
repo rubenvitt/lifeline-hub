@@ -858,6 +858,11 @@ export default function Schnellerfassung({
               ausStandard={
                 (feld === 'von' || feld === 'an') && ausStandard(feld, metadaten, rufname.standard)
               }
+              // Der Weg zum Standard selbst (Spec `etb-absender-empfaenger`); in der Berichtigung
+              // wird er nicht geändert.
+              onStandardAendern={
+                berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
+              }
               optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
               onCommit={commitFeld}
               onCancel={() => {
@@ -893,14 +898,6 @@ export default function Schnellerfassung({
           )}
           {!istSchmal && feldKnopf}
           {!istSchmal && anhangTeil}
-          {/* Der gesetzte Standard steht als Chips da; hier wird er geändert (Spec
-             `etb-absender-empfaenger`). In der rollenden Chip-Zeile kostet das unter `md` keine
-             Höhe. */}
-          {!berichtigungZu && rufname.standard && !rufnameAendern && (
-            <Button type="link" disabled={sendet} onClick={() => setRufnameAendern(true)}>
-              Standard-Rufname ändern
-            </Button>
-          )}
           {!berichtigungZu && typ === 'lage' && (
             // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
             // weiter und ein Upload-Fehler stünde nirgends.

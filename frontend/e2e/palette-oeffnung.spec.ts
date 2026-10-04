@@ -401,7 +401,7 @@ test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
   await expect(
     vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde', { exact: true }),
   ).toBeVisible();
-  await expect(vorschau.getByText('Abschnitt Nord → —')).toBeVisible();
+  await expect(vorschau.getByText('Abschnitt Nord → Leitstelle')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(vorschau).toBeHidden();
   await expect(paletteInput(page)).toHaveValue('#Wasserstand');

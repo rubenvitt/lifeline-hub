@@ -11,12 +11,21 @@ import { teilwortSuche } from '../components/teilwortSuche';
 
 type Wert = string | dayjs.Dayjs | MeldeWeg | undefined;
 
-const CHIP_MENUE: readonly MenueEintrag<'bearbeiten' | 'entfernen'>[] = [
+type ChipAktion = 'bearbeiten' | 'entfernen' | 'standard';
+
+const CHIP_MENUE: readonly MenueEintrag<ChipAktion>[] = [
   { key: 'bearbeiten', label: 'Bearbeiten' },
   { key: 'entfernen', label: 'Entfernen', gefahr: true },
 ];
-/** Ein Chip aus dem Standard-Rufnamen hat nichts zu entfernen (LFH-894). */
-const CHIP_MENUE_STANDARD = CHIP_MENUE.filter((e) => e.key === 'bearbeiten');
+/**
+ * Ein Chip aus dem Standard-Rufnamen (LFH-894) hat nichts zu entfernen; dafür führt sein Menü zum
+ * Standard selbst. Kein eigener Knopf in der Chip-Zeile: er bräche die Zeile im Handschuh-Betrieb
+ * um, und die Erfassungsleiste risse den Deckel (`e2e/leisten-flaeche.spec.ts`).
+ */
+const CHIP_MENUE_STANDARD: readonly MenueEintrag<ChipAktion>[] = [
+  { key: 'bearbeiten', label: 'Nur für diesen Eintrag ändern' },
+  { key: 'standard', label: 'Standard-Rufname ändern' },
+];
 const STANDARD_TITEL = 'Standard-Rufname: gilt für jeden neuen Eintrag, ändern nur für diesen';
 
 interface Props {
@@ -42,6 +51,8 @@ interface Props {
    * diesen Eintrag. Der Titel sagt, woher der Wert kommt.
    */
   ausStandard?: boolean;
+  /** Öffnet die Rufname-Abfrage; nur an Chips aus dem Standard. */
+  onStandardAendern?: () => void;
 }
 
 function feldDef(feld: MetaFeld) {
@@ -85,6 +96,7 @@ export default function MetaChip({
   onEdit,
   gesperrt = false,
   ausStandard = false,
+  onStandardAendern,
 }: Props) {
   const d = feldDef(feld);
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
@@ -203,12 +215,19 @@ export default function MetaChip({
       {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
          „Bearbeiten" daneben legt es wieder an (LFH-363). */}
       <MenueAusloeser
-        eintraege={ausStandard ? CHIP_MENUE_STANDARD : CHIP_MENUE}
+        eintraege={
+          !ausStandard
+            ? CHIP_MENUE
+            : onStandardAendern
+              ? CHIP_MENUE_STANDARD
+              : CHIP_MENUE_STANDARD.filter((e) => e.key !== 'standard')
+        }
         zugaenglicherName={`Aktionen zu ${d.label}`}
         gesperrt={gesperrt}
         onWahl={(key) => {
           if (key === 'bearbeiten') onEdit(feld);
           if (key === 'entfernen') onRemove(feld);
+          if (key === 'standard') onStandardAendern?.();
         }}
       />
     </Tag>

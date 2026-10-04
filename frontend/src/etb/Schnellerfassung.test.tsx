@@ -904,17 +904,20 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     expect(screen.getByText('An: S2').closest('[data-standard]')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
-    expect(await screen.findByRole('menuitem', { name: /Bearbeiten/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('menuitem', { name: 'Nur für diesen Eintrag ändern' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Standard-Rufname ändern' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Entfernen/ })).toBeNull();
   });
 
-  it('„Standard-Rufname ändern“ öffnet die Abfrage mit Abbrechen', async () => {
+  it('„Standard-Rufname ändern“ im Chip-Menü öffnet die Abfrage mit Abbrechen', async () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Standard-Rufname ändern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Standard-Rufname ändern' }));
     const abfrage = screen.getByRole('group', { name: 'Dein Rufname für Von und An' });
     expect(abfrage).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Standard-Rufname ändern' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
   });
@@ -922,7 +925,11 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
   it('in der Berichtigung wird nicht gefragt, der Standard gilt trotzdem', async () => {
     const p = props({ berichtigungZu: original() });
     renderMitProviders(<Schnellerfassung {...p} />);
-    expect(screen.queryByRole('button', { name: 'Standard-Rufname ändern' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Nur für diesen Eintrag ändern' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Standard-Rufname ändern' })).toBeNull();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Korrektur{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
