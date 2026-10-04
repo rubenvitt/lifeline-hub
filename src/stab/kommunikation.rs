@@ -11,7 +11,7 @@
 //! Kein ETB-Eintrag je Änderung: der Plan ist ein Arbeitsmittel des S6, kein Führungsnachweis
 //! (dieselbe Linie wie die Checkliste, LFH-551).
 //!
-//! Design: `openspec/changes/lfh-848-kommunikationsplan/design.md` (D2, D3, D10).
+//! Design: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D2, D3, D10).
 
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};

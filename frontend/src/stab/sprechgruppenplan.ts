@@ -20,7 +20,7 @@ import { ZUSTAND_GRUND, type FunkplanQuellen } from './funkplan';
  *   Teilnehmer“ nicht belegbar: die Zelle trägt dann den Grund, bei schon bekannten Teilnehmern
  *   die bekannten plus „unvollständig“.
  *
- * Herleitung: `openspec/changes/lfh-848-kommunikationsplan/design.md` (D8).
+ * Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D8).
  */
 
 export type Herkunft = 'katalog' | 'einsatzlokal';

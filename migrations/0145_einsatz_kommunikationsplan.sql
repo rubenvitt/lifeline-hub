@@ -7,7 +7,7 @@
 -- Invarianten im Code (`stab::kommunikation`), kein Mehrspalten-CHECK (Muster
 -- `auftrag_empfaenger`): stellenart='funktion' ⇒ funktion gesetzt, Bezeichnung nur bei
 -- Führungshilfspersonal/Fachberater (Pflicht); sonst funktion NULL und bezeichnung nicht leer.
--- Herleitung: openspec/changes/lfh-848-kommunikationsplan/design.md (D2).
+-- Herleitung: openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md (D2).
 CREATE TABLE einsatz_kommunikation_stelle (
     id               INTEGER PRIMARY KEY,
     einsatz_id       INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

@@ -27,7 +27,7 @@ Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Fehlt eine Strukturquelle, ste
 „unvollständig“ mit Grund, nie „keine“. Eigene `key` je `Datensicht` (zwei Sichten in einer Datei).
 
 **Kommunikationsplan S6** (LFH-848,
-`openspec/changes/archive/2026-10-03-lfh-848-kommunikationsplan/design.md`): Unterroute
+`openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md`): Unterroute
 `stab/kommunikationsplan` (`kommunikationsplanPfad`), zweiter S6-Eintrag in `stab/unterseiten.ts`,
 `useStabFreigabe` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
 dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/stab/kommunikation.rs`,

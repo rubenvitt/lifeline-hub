@@ -138,5 +138,12 @@ Vor „fertig“ stehen `verification-before-completion` und `requesting-code-re
   abgeleitete Zeilen, kein Lagebericht, offline) und Ergänzung der Funkplan-Regel um die dritte
   Darstellung; Kopf der Datei um die neuen Pfade.
   - Nachweis: Prettier grün, Verweise per `grep` geprüft.
-- [ ] 7.5 `./scripts/check-all.sh` grün, Vitest und Rust-Tests grün.
+- [x] 7.5 `./scripts/check-all.sh` grün, Vitest und Rust-Tests grün. Lokal (Cloud-Container, 4 Kerne)
+      in Bündeln: `schnell` grün; `rust` 131 Suiten grün, nur die Desktop-Hülle baut hier nicht
+      (GTK/`gdk-3.0` fehlt im Container); `frontend` 674 Dateien/9300 Tests grün; e2e Chromium
+      voll: 607 grün, die Stab-Linkzahl in `gate3-trefflaeche.spec.ts` (17 → 18, neuer Link
+      „Kommunikationsplan“) nachgezogen, 28 Nachläufer grün. Offen nur Fälle außerhalb dieses
+      Diffs, die hier umgebungsbedingt scheitern: drei Anhang-Downloads (Dateiname „download“ in
+      der Headless-Shell) und die ETB-Zeitachse über neun Breiten (30-s-Budget). Die CI fährt die
+      Suite voll.
   - Nachweis: Lauf dieses Branches (lokal bzw. CI des PRs).

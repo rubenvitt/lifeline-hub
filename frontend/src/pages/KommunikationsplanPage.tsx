@@ -60,7 +60,7 @@ import './kommunikationsplanPrint.css';
 
 /**
  * Kommunikationsplan des Sachgebiets S6 (LFH-848): wer über welche Verbindung außerhalb des
- * Funks erreichbar ist. Herleitung: `openspec/changes/lfh-848-kommunikationsplan/design.md`.
+ * Funks erreichbar ist. Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md`.
  *
  * - **Ort:** Unterroute des Stabs (`kommunikationsplanPfad`) neben dem Funkplan, Einstieg in der
  *   S6-Zeile. Sperre und Sichtbarkeit erbt die Seite vom Stab, fail-closed über

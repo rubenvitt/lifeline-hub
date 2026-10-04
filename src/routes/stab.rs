@@ -335,7 +335,7 @@ pub async fn checkliste_setzen(
 //
 // Gates wie die übrigen Stab-Routen; jede wirksame Schreibaktion sendet `LiveEvent::Stab` und
 // antwortet mit dem ganzen Plan (Muster `checkliste_setzen`). Kein ETB. Design:
-// `openspec/changes/lfh-848-kommunikationsplan/design.md` (D3).
+// `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D3).
 
 #[derive(Debug, Deserialize)]
 pub struct KommunikationsStelleNeu {

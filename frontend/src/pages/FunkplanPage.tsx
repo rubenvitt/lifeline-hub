@@ -80,7 +80,7 @@ import './funkplanPrint.css';
  * - **Erreichbarkeit** ist personenbezogen: am Schirm ab `xl`, im Druck immer, im Lagebericht nie
  *   (D5, Entscheidung 30.09.2026).
  * - **Drei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6;
- *   LFH-848, `openspec/changes/lfh-848-kommunikationsplan/design.md` D8): „Tabelle“, „Skizze“
+ *   LFH-848, `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` D8): „Tabelle“, „Skizze“
  *   (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`) und „Sprechgruppen“ (Kanalbelegung,
  *   `stab/sprechgruppenplan.ts`). Dieselben Quellen, dasselbe Lücken-Paneel, dieselbe Übernahme
  *   (sie schreibt immer die Tabelle); eine Druckwurzel, der Druckkopf nennt die aktive

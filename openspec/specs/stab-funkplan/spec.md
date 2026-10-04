@@ -126,7 +126,7 @@ MUST NOT „0“ zeigen. Bei einer Zahl größer null MUST der Funkplan die betr
 nennen: Abschnitte und Einheiten als Verweis auf die Stelle, an der sie gepflegt werden,
 einsatzlokale Sprechgruppen mit ihrer Bezeichnung, Verbindungen als Verweis auf die untere Stelle.
 Die Lücken MUST im ersten Bild stehen, bei 1366 × 768 px mit offenem Modulpanel. Sie MUST in
-beiden Darstellungen des Funkplans (Tabelle und Skizze) dieselben sein.
+jeder Darstellung des Funkplans (Tabelle, Skizze und Sprechgruppen) dieselben sein.
 
 #### Scenario: Abschnitt ohne Sprechgruppe
 - **WHEN** einem von drei Abschnitten keine Sprechgruppe zugeordnet ist
@@ -226,3 +226,40 @@ Lagebericht (Vorlage Freitext) mit dem Titel „Funkplan <DTG>“ übernehmen k�
 #### Scenario: Übernahme scheitert
 - **WHEN** das Anlegen des Lageberichts abgelehnt wird
 - **THEN** zeigt die Seite den Fehler, und im Einsatz ist kein neuer Lagebericht entstanden
+
+### Requirement: Darstellung „Sprechgruppen“
+Der Funkplan SHALL eine dritte Darstellung „Sprechgruppen“ haben: eine Zeile je Sprechgruppe des
+Einsatzes, also jede einem Abschnitt oder einer Einheit zugeordnete und jede einsatzlokale. Spalten:
+Sprechgruppe (fixiert, Festbreitenschrift), Betriebsart, Hinweis, Herkunft (Katalog oder
+einsatzlokal) und Teilnehmer. Zuerst TMO, dann DMO, je in der Sortierung der Sprechgruppen. Sie ist
+schreibgeschützt und aus denselben Quellen abgeleitet wie die Tabelle.
+
+#### Scenario: Teilnehmer einer Sprechgruppe
+- **WHEN** „TMO 311“ dem Abschnitt „EA Nord“ (Kurzbezeichnung „EA N“) und der Einheit „1. Zug“
+  (Funkrufname „Florian Musterstadt 1“) zugeordnet ist
+- **THEN** zeigt die Zeile „311“ beide Stellen mit Rufnamen als Teilnehmer, und jede führt zu ihrem
+  Datensatz
+
+#### Scenario: Einsatzlokale Sprechgruppe ohne Zuordnung
+- **WHEN** die lokale Sprechgruppe „DMO 999“ nirgends zugeordnet ist
+- **THEN** steht sie mit Herkunft „einsatzlokal“ und dem Teilnehmer „keine“ in der Darstellung
+
+#### Scenario: Katalog-Sprechgruppe ohne Zuordnung
+- **WHEN** eine Sprechgruppe des Organisationskatalogs keinem Abschnitt und keiner Einheit des
+  Einsatzes zugeordnet ist
+- **THEN** erscheint sie nicht
+
+#### Scenario: Einheiten gesperrt
+- **WHEN** die Einheitenliste mit 403 abgelehnt wird
+- **THEN** zeigt die Darstellung die Sprechgruppen der Abschnitte und die einsatzlokalen, und
+  oberhalb steht, dass Einheiten nicht freigegeben sind; keine Zeile behauptet, eine Sprechgruppe
+  habe keine Teilnehmer, wenn sie nur an einer gesperrten Quelle hängen könnte
+
+#### Scenario: Sichtvorgabe aus einem Link
+- **WHEN** eine Person `/einsaetze/:id/stab/funkplan?ansicht=sprechgruppen` öffnet
+- **THEN** steht die Darstellung auf „Sprechgruppen“, und `ansicht` ist aus der Adresse entfernt
+
+#### Scenario: Druck der Darstellung
+- **WHEN** eine Person in der Darstellung „Sprechgruppen“ druckt
+- **THEN** nennt der Druckkopf die Darstellung „Sprechgruppen“, und jede Zeile steht ohne
+  waagerechten Überhang auf A4

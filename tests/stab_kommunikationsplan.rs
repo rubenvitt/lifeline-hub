@@ -1,6 +1,6 @@
 //! Integrationstests des Kommunikationsplans (LFH-848).
 //!
-//! Spec: `openspec/changes/lfh-848-kommunikationsplan/specs/stab-kommunikationsplan/spec.md`.
+//! Spec: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/specs/stab-kommunikationsplan/spec.md`.
 //! Die tragenden Aussagen: eine Funktion je Einsatz höchstens einmal (409), die Verbindung
 //! gehört der Stelle, Antwort ist immer der ganze Plan, jede Schreibaktion sendet `stab` und
 //! nie `etb`, die Schwärzung nimmt Name und Nummer und lässt das Skelett stehen.

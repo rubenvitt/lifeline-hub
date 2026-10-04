@@ -16,7 +16,7 @@ import type { Quelle } from './luecken';
 /**
  * Kommunikationsplan des S6 (LFH-848): wer im Einsatz über welche Verbindung außerhalb des Funks
  * erreichbar ist. Reiner Kern ohne React. Herleitung:
- * `openspec/changes/lfh-848-kommunikationsplan/design.md` (D4, D5).
+ * `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D4, D5).
  *
  * - **Gepflegt** sind nur Stellen ohne eigenes Heim: Führungsfunktionen und externe Stellen
  *   (Server, `api/kommunikationsplan.ts`).

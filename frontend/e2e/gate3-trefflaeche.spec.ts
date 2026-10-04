@@ -1060,10 +1060,11 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 const STAB_ETB_LINKS = 3;
 /**
  * 3 + 3 + 3 + 3 + 0 + 2 Registry-Schlüssel aus `stab/sachgebiete.ts`, alle `fertig`, dazu die
- * Unterseiten aus `stab/unterseiten.ts`: „Funkplan“ in der S6-Zeile (LFH-548) sowie
- * „Pressearbeit“ und „Informationstelefon“ in der S5-Zeile (LFH-554), keine Module, gleicher Stil.
+ * Unterseiten aus `stab/unterseiten.ts`: „Funkplan“ und „Kommunikationsplan“ (LFH-848) in der
+ * S6-Zeile (LFH-548) sowie „Pressearbeit“ und „Informationstelefon“ in der S5-Zeile (LFH-554),
+ * keine Module, gleicher Stil.
  */
-const STAB_WERKZEUG_LINKS = 17;
+const STAB_WERKZEUG_LINKS = 18;
 /** Jede Zeile trägt jetzt eine Gruppe; S5 durch ihre zwei Unterseiten (LFH-554). */
 const STAB_WERKZEUG_GRUPPEN = 6;
 /** Sechs feste Sachgebietszeilen, je ein Knopf. */
