@@ -1,3 +1,24 @@
+## [1.0.0-alpha.75](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.74...v1.0.0-alpha.75) (2026-10-04)
+
+### Führung
+
+#### Lageberichte
+
+**Automatische Übernahme aus dem Einsatztagebuch**  
+Lagevorträge zur Information können nun mit einem Klick Inhalte aus dem laufenden Einsatz übernehmen:
+
+- **Eigene Lage**: Funkplan, Baustein-Module mit Zählern, Anzahl Einsatzkräfte und Führungskräfte – jeweils mit Zeitstempel
+- **Besondere Führungsprobleme**: Zähler der Module, überfällige Aufträge (Nummer, Art, Frist), unbestätigte Meldungen (Nummer, Art, Frist), Lücken im Funkplan
+- **Gefahren- und Schadenlage**: Betroffene, Vermisste, Sichtungsergebnisse, offene Schäden, aktuelle Warnstufe, DWD-Warnungen, Wetterbedingungen, maßgebliche Pegel mit Werten – Texte wie in der Lagebild-Vorbereitung
+- **Lageentwicklung**: Anzahl neuer Einsatztagebuch-Einträge je Typ seit der letzten Lagebesprechung (ohne System-Einträge und freigegebene Lagevorträge), neue Entscheidungen mit Nummer und Zeit
+
+Jeder Abschnitt trägt einen eigenen „Aus dem ETB übernehmen"-Button. Sind erforderliche Berechtigungen oder Daten nicht vorhanden, erscheint ein Hinweis. Zeitangaben im DTG-Format.
+
+### Verwaltung
+
+- Dokumentation der Übernahme-Funktion in Lagevortrag-Spezifikation aufgenommen
+- Technische Schnittstellen für Lagevortrag-Übernahme synchronisiert
+
 ## [1.0.0-alpha.74](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.73...v1.0.0-alpha.74) (2026-10-04)
 
 ### Lagekarte
