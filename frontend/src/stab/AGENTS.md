@@ -13,19 +13,30 @@ gepflegt im Paneel auf Einsatzdaten, live über `einsatz`): erfasst (`fuehrungss
 eine Regel) steht sie als Zeile `fs` vor den Wurzeln und an der Skizzenwurzel und ist Gegenstelle
 der obersten Abschnitte in `verbindungsurteil`; sonst nennt `gegenstelleHinweis` sie als Lücke.
 
-**Fernmeldeskizze** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md`): zweite
-Darstellung des Funkplans („Tabelle | Skizze“, `?ansicht=skizze` apply-then-clean), kein Modul,
-keine Route. Modell `stab/fernmeldeskizze.ts` nur über `baueFuehrungsorganisation` (kein dritter
-Baum), Funkangaben über dieselben Funktionen wie `baueFunkplan`; Darstellung
-`stab/FernmeldeskizzeBild.tsx` über das Gerüst `components/organigramm/HaengenderBaum`. Die
-Kante (gemeinsame Sprechgruppe zur übergeordneten Stelle) und ihre Lücke nur über
-`verbindungsurteil` in `stab/luecken.ts`; „ohne Urteil“, wenn einer Seite jede Sprechgruppe fehlt.
-Keine Leitung, Stärke, Erreichbarkeit, keine Fahrzeuge; keine eigene Übernahme, eine Druckwurzel
-mit Druckkopf je Darstellung, getrennte Klappmengen.
+**Fernmeldeskizze** (LFH-893, `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md`;
+Vorgänger LFH-625): taktische Skizze nach BBK-Anhang J.5 als zweite Darstellung des Funkplans
+(`?ansicht=skizze`), kein Modul, keine Route. **Ein Modell:** `stab/fernmeldeskizze.ts:
+baueFernmeldenetz` (Stellen `fs`/`ab-`/`eh-`/`ks-`/`ko-`, Schienen `sg-` aus
+`luecken.ts:kanalbelegung`, Verbindungen, Bereiche, Lücken je Element) speist Bild, Lücken-Paneel,
+Druck und Übernahme; Lücken nur über `stab/luecken.ts` (Bild zählt wie das Paneel). Je
+Sprechgruppe **eine Sammelschiene**, keine Kante je Eltern-Kind-Paar; die Führungsorganisation ist
+nur Vorlage für Auto-Layout (`stab/fernmeldeskizzeLayout.ts`) und Fokusfolge. Zeichen nur aus
+`stab/skizzenZeichen.tsx` (Katalog `@einsatzzeichen` J.1–J.4, Rest in `SELBST_GEZEICHNET`),
+„geplant“ immer Strichmuster **und** Wort. **Eine Wahrheit:** Zuordnungen schreibt die Fläche über
+die Einzel-Endpunkte in die Datensätze (Abschnitt, Einheit, Führungsstelle, Kommunikationsstelle),
+externe Stellen sind die des Kommunikationsplans; die Skizze speichert nur Lage, Komponenten,
+Verbindungen, Bereiche, Schriftfeld (`src/stab/fernmeldeskizze.rs`, Bezüge polymorph, jeder
+Löschpfad ruft `vergiss`). Schreibwege der Fläche nur über `stab/skizzenAktionen.ts`
+(umgesetzt in `stab/useSkizzenAktionen.ts`), Rückgängig über `stab/skizzenBefehle.ts`; Lage mit
+`version` (409 statt stillem Überschreiben). Rechte je Element nach dem Datensatz, mobil und ohne
+Schreibrecht nur lesen. Keine Erreichbarkeit, keine Rufnummern, keine Fahrzeuge, kein ETB je
+Änderung; Druck A3/A4 quer mit Funkplan-Anlage (`stab/skizze/druckformat.ts`), Übernahme nur über
+den Funkplan (Abschnitt „Kommunikationsskizze“).
 
 **Sprechgruppen** (LFH-848 D8): dritte Darstellung des Funkplans („Tabelle | Skizze |
 Sprechgruppen“, `?ansicht=sprechgruppen`), flach, schreibgeschützt. Menge und Teilnehmer nur über
-`stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen`: zugeordnete plus einsatzlokale
+`stab/sprechgruppenplan.ts` aus denselben `FunkplanQuellen` (dazu externe Stellen mit Status und
+Komponenten der Skizze, LFH-893): zugeordnete plus einsatzlokale
 Sprechgruppen, nach `id` entdoppelt, TMO vor DMO. Fehlt eine Strukturquelle, steht „—“ bzw.
 „unvollständig“ mit Grund, nie „keine“. Eigene `key` je `Datensicht` (zwei Sichten in einer Datei).
 
