@@ -115,7 +115,12 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
   das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
   `SPALTE_MIN_PX` gemessen, tiefer senkrecht), geteilt mit der Fernmeldeskizze — keine
-  Graph-Bibliothek, kein zweites Gerüst.
+  Graph-Bibliothek, kein zweites Gerüst. **Live-Zufluss nur über die Schleuse des Gerüsts**
+  (LFH-867, `components/organigramm/baumSchleuse.ts`,
+  `openspec/changes/archive/2026-10-04-lfh-867-organigramm-zufluss-schleuse/design.md`): Zeiger
+  (ohne Touch) oder Fokus im Baum halten Menge, Ort und Folge der Knoten, Inhalt fließt;
+  Entfallenes bleibt als Platzhalter ohne Link, der Kopf steht still; Banner in der Standzeile
+  fester Höhe; im Druck gilt sie nicht. Kein Nutzer baut eine eigene.
 - `Datensicht` bricht fest bei `md`; die Prop `tabelleAb` hält `datensicht.guard.test.ts` fern.
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
   (`docs/superpowers/specs/2026-09-08-lfh-463-464-pruefliste.md`).

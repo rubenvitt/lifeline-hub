@@ -397,6 +397,9 @@ const skizze = (page: Page) => page.getByRole('region', { name: 'Fernmeldeskizze
 
 async function oeffneSkizze(page: Page, einsatzId: string) {
   await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`);
+  // Der Zeiger steht noch, wo der letzte Klick war, womöglich über der Skizze: dann hielte die
+  // Zufluss-Schleuse (LFH-867) jede Live-Änderung zurück. Ruhestellung oben links.
+  await page.mouse.move(0, 0);
   // Datenanker: die Einheit steht erst, wenn Abschnitte und Einheiten geladen sind.
   await expect(skizze(page).getByRole('link', { name: OHNE_KANAL })).toBeVisible();
 }
@@ -741,4 +744,37 @@ test('Sprechgruppen im Druck bei A4-Breite: Druckkopf, Bedienung aus, nichts rag
     `keine Zelle über der Druckwurzel (Zelle ${lage.zellenRechts}px, Wurzel ${lage.wurzelRechts}px)`,
   ).toBeLessThanOrEqual(lage.wurzelRechts + SUBPIXEL);
   await page.emulateMedia({ media: null });
+});
+
+test('Skizze, Schleuse (LFH-867): eine umgehängte Einheit springt nicht unter dem Zeiger', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Skizze Schleuse ${Date.now()}`);
+  await seedeSkizze(page, einsatzId);
+  const liste = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`)
+  ).json()) as { id: number; name: string; abschnitt_id: number | null }[];
+  const vorne = liste.find((e) => e.name === 'Einheit 1.2')!;
+  const zielAbschnitt = liste.find((e) => e.name === 'Einheit 2.1')!.abschnitt_id;
+  await oeffneSkizze(page, einsatzId);
+
+  // Gezielt wird auf die Einheit HINTER der, die gleich umgehängt wird.
+  const ziel = skizze(page).getByRole('link', { name: OHNE_KANAL });
+  await ziel.hover();
+  const vorher = (await ziel.boundingBox())!;
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/einheiten/${vorne.id}`, {
+    data: { abschnitt_id: zielAbschnitt },
+  });
+  expect(antwort.ok(), `Umhängen: ${await antwort.text()}`).toBeTruthy();
+
+  const stand = skizze(page).locator('[data-lfh="org-stand"]');
+  await expect(stand.getByRole('status')).toContainText('1 umgehängt');
+  expect((await ziel.boundingBox())!.y, 'der Link unter dem Zeiger bleibt stehen').toBe(vorher.y);
+
+  // Der Zeiger geht: der Live-Stand gilt.
+  await page.mouse.move(0, 0);
+  await expect(stand).toHaveText('Live');
+  expect((await ziel.boundingBox())!.y).toBeLessThan(vorher.y);
 });
