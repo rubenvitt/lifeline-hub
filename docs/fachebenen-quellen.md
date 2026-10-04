@@ -45,17 +45,17 @@ Einstufung altert im Minutentakt mit, auch ohne neuen Abruf. Fällt der eigene S
 Karte zeigt gehaltene Daten, steht der Stand neben „offline“. Der Inspector nennt denselben
 Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Quelle am Objekt.
 
-| Ebene | Server-TTL | veraltet nach | Begründung |
-|---|---|---|---|
-| NINA | 90 s | 15 min | Warnungen: eine neue muss schnell sichtbar sein; ~10 ausgefallene Erneuerungen |
-| DWD | 300 s | 30 min | Warnungen wie NINA, gröberer Takt |
-| PEGELONLINE | 300 s | 60 min | Messwerte ~15 min, vier verpasst |
-| Hochwasser | 300 s | 60 min | Amtliche Meldeklasse, Anlass von LFH-591 |
-| Autobahn | 600 s | 60 min | Sechs Läufe verpasst |
-| ODL | 600 s | 3 h | Stundenwerte: zwei verpasst, plus Verzug der Quelle |
-| Luftqualität | 900 s | 4 h | Stundenwerte mit ~2 h Verzug; der Verzug zählt nicht als Veraltung |
-| Energie | 24 h | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
-| KRITIS | Import 168 h | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
+| Ebene | Server-TTL | Poll | veraltet nach | Begründung |
+|---|---|---|---|---|
+| NINA | 90 s | 30 s | 15 min | Warnungen: eine neue muss schnell sichtbar sein; ~10 ausgefallene Erneuerungen |
+| DWD | 300 s | 60 s | 30 min | Warnungen wie NINA, gröberer Takt |
+| PEGELONLINE | 300 s | 100 s | 60 min | Messwerte ~15 min, vier verpasst |
+| Hochwasser | 300 s | 60 s | 60 min | Amtliche Meldeklasse, Anlass von LFH-591 |
+| Autobahn | 600 s | 120 s | 60 min | Sechs Läufe verpasst |
+| ODL | 600 s | 300 s | 3 h | Stundenwerte: zwei verpasst, plus Verzug der Quelle |
+| Luftqualität | 900 s | 300 s | 4 h | Stundenwerte mit ~2 h Verzug; der Verzug zählt nicht als Veraltung |
+| Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
+| KRITIS | Import 168 h | — | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
 
 Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
 `veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen alle bei
@@ -63,6 +63,40 @@ mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server u
 Zeitpunkt in der Zukunft zählt als Alter 0. **KRITIS:** Das Import-Intervall ist konfigurierbar
 (`--kritis-extrakt-intervall-stunden`), die Schwelle nicht. Wer das Intervall über 14 Tage
 hebt, sieht KRITIS schon vor dem nächsten Lauf als veraltet.
+
+**Takt unter der TTL (LFH-856).** Der Server erneuert einen abgelaufenen Stand erst, wenn ein
+Abruf ihn anfragt, und gibt diesem Abruf noch den alten Stand (Stale-While-Revalidate); den
+neuen holt erst der nächste Poll. Mit einem einzigen Client ist der gezeigte Stand deshalb bis
+zu TTL + 2 × Poll alt. Bis LFH-856 galt Poll = TTL, also bis zur dreifachen TTL. Seit LFH-594
+antwortet der Endpunkt bedingt, ein Poll ohne neuen Stand kostet ein 304 ohne Rumpf. Wie oft ein
+200 mit voller Nutzlast kommt, bestimmt die TTL, nicht der Poll. Jede Ebene mit
+Hintergrund-Takt pollt deshalb schneller als ihre TTL, begründet je Ebene am `pollMs` in
+`frontend/src/pages/lagekarte/fachebenen.ts`. Ein Wächter in `fachebenen.test.ts` liest die TTL aus
+`src/karte/quellen.rs` und wird rot, sobald ein Takt sie erreicht. KRITIS und Energie pollen
+nicht, sie laden je Ausschnitt.
+
+Messung am 03.10.2026 gegen die echten Quellen (Dev-Server, `curl` mit Cookie, `--compressed`):
+
+| Ebene | Stand | 200 (Rumpf) | 304 (Kopf) | Server je Poll |
+|---|---|---|---|---|
+| NINA | 11 Warnungen | 10 265 B | 194 B | 0,2 ms |
+| DWD | keine Warnung | 290 B | 194 B | < 0,1 ms |
+| PEGELONLINE | 729 Pegel | 225 136 B | 194 B | 2,3 ms |
+| Hochwasser | 2 062 Pegel | 406 320 B | 194 B | 5,8 ms |
+| ODL | 1 676 Sonden | 583 542 B | 194 B | 8,6 ms |
+| Luftqualität | 381 Stationen | 173 302 B | 194 B | 1,6 ms |
+| Autobahn | 2 217 Meldungen | 1 704 054 B | 194 B | 8,9 ms |
+
+Der Server komprimiert nicht, der Rumpf geht also roh über die Leitung. Ein 200 trägt 240 B
+Kopf. „Server je Poll" heißt: Cache-JSON parsen, wieder serialisieren, SHA-256 bilden, im
+Release-Build und ohne das Lesen aus SQLite. Das Hashen allein kostet davon unter 1,3 ms. Der
+DWD-Rumpf wächst mit der Wetterlage.
+
+Die Leitung wird entlastet, der Server nicht: jeder Poll rechnet weiter die ganze Antwort durch.
+Mit allen sieben Ebenen und den Takten oben sind das je Client rund 15 ms Rechenzeit pro Minute,
+bei 20 Clients 0,3 s pro Minute, also ein halbes Prozent eines Kerns. Ein zwischengespeicherter
+ETag je Cache-Eintrag lohnt deshalb nicht. Bei DWD müsste er ohnehin je Auslieferung neu entstehen,
+weil der Server abgelaufene Warnungen erst beim Ausliefern filtert.
 
 Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Attribution
 (unten rechts) eingeblendet.
@@ -279,7 +313,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   mit `offline` und füllt im Hintergrund.
   Praktisch heißt das: das erste Einschalten nach einem Backend-Start zeigt rund eine halbe
   Minute lang „offline", dann stehen die Daten. Das Frontend pollt währenddessen kurz
-  getaktet (`aufwaermPollMs`, 20 s statt 600 s) — ohne das sähe der Bediener zehn Minuten
+  getaktet (`aufwaermPollMs`, 20 s statt 120 s) — ohne das sähe der Bediener zwei Minuten
   lang nichts, obwohl die Daten längst da sind. **Die Aufwärmphase meldet also `offline`,
   obwohl die Quelle gerade geladen wird**; ein eigener Zwischenzustand dafür wäre eine
   Erweiterung des Fachebenen-Vertrags und ist bewusst nicht gebaut.

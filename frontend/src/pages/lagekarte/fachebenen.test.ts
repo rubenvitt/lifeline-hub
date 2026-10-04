@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+import type { FachebeneQuelle } from '../../api/fachebenen';
 import { defaultFachebenenSichtbar } from './fachebenenAuswahl';
 import {
   FACHEBENEN,
@@ -68,12 +69,12 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.hochwasser.bboxAbhaengig).toBe(false);
     expect(FACHEBENEN.hochwasser.pollMs).toBeGreaterThan(0);
   });
-  it('führt die Luftqualitätsebene als Punktebene im Takt der Server-TTL (LFH-79)', () => {
+  it('führt die Luftqualitätsebene als Punktebene unter der Server-TTL (LFH-79, LFH-856)', () => {
     const def = FACHEBENEN.luftqualitaet;
     expect(def.geometrieTyp).toBe('punkt');
     expect(def.bboxAbhaengig).toBe(false);
-    // = serverseitige TTL (900 s); häufiger abzufragen liefert nichts Frischeres.
-    expect(def.pollMs).toBe(900_000);
+    // Ein Drittel der Server-TTL (900 s): Stundenwerte mit ~2 h Verzug, schneller bringt nichts.
+    expect(def.pollMs).toBe(300_000);
     // Messpunkte, keine Fläche — die Einschränkung steht als Text, nicht als Tooltip.
     expect(def.geltung).toMatch(/Messstationen/);
   });
@@ -81,8 +82,9 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.odl.geometrieTyp).toBe('punkt');
     // Keine bbox-Pflicht wie bei KRITIS (~358 KB, 1 676 Sonden).
     expect(FACHEBENEN.odl.bboxAbhaengig).toBe(false);
-    // = serverseitige TTL: die Quelle hat Stundentakt, häufiger zu fragen wird nicht frischer.
-    expect(FACHEBENEN.odl.pollMs).toBe(600_000);
+    // Die halbe Server-TTL (600 s): die Quelle hat Stundentakt, häufiger zu fragen wird nicht
+    // frischer.
+    expect(FACHEBENEN.odl.pollMs).toBe(300_000);
     // Als Text, nicht als Tooltip: wer die Ebene für Einsatzmessungen hält, liest eine
     // Messtrupp-Lücke als „alles unauffällig".
     expect(FACHEBENEN.odl.geltung).toMatch(/ortsfeste/);
@@ -137,7 +139,7 @@ describe('Fachebenen-Registry', () => {
   });
   it('taktet die Autobahn-Ebene kurz, solange sie aufwärmt (LFH-80)', () => {
     // Der erste Lauf hängt serverseitig an keinem Request; bis er durch ist, meldet die Ebene
-    // `offline`. Mit dem regulären Takt sähe der Bediener zehn Minuten nichts.
+    // `offline`. Mit dem regulären Takt sähe der Bediener zwei Minuten nichts.
     const kurz = FACHEBENEN.autobahn.aufwaermPollMs!;
     const lang = FACHEBENEN.autobahn.pollMs;
     expect(kurz).toBeLessThan(lang);
@@ -181,6 +183,37 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
     expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn']);
+  });
+  it('pollt jede Hintergrund-Ebene schneller als ihre Server-TTL (LFH-856)', () => {
+    // Seit LFH-594 kostet ein Poll ohne neuen Stand nur ein 304. Mit `pollMs == TTL` verschenkte
+    // der Takt bis zu eine TTL, bevor der Abruf nach Ablauf die Erneuerung anstößt, und eine
+    // weitere, bis der neue Stand ankommt. Die TTL steht im Backend; gelesen wird die Quelle,
+    // damit eine dort geänderte Zahl hier rot wird statt still auseinanderzulaufen.
+    const quellen = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../../../src/karte/quellen.rs'),
+      'utf8',
+    );
+    const ttlKonstante: Partial<Record<FachebeneQuelle, string>> = {
+      nina: 'NINA_TTL',
+      dwd: 'DWD_TTL',
+      pegelonline: 'PEGEL_TTL',
+      hochwasser: 'HOCHWASSER_TTL',
+      odl: 'ODL_TTL',
+      luftqualitaet: 'LUFTQUALITAET_TTL',
+      autobahn: 'AUTOBAHN_TTL',
+    };
+    // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL.
+    const pollend = fachebeneKeys().filter((k) => FACHEBENEN[k].pollMs > 0);
+    expect(pollend.sort()).toEqual(Object.keys(ttlKonstante).sort());
+    for (const k of pollend) {
+      const name = ttlKonstante[k]!;
+      const treffer = quellen.match(
+        new RegExp(`const ${name}: Duration = Duration::from_secs\\(([\\d_]+)\\);`),
+      );
+      expect(treffer, `${name} in src/karte/quellen.rs`).not.toBeNull();
+      const ttlMs = Number(treffer![1].replace(/_/g, '')) * 1000;
+      expect(FACHEBENEN[k].pollMs, k).toBeLessThan(ttlMs);
+    }
   });
   it('jede Ebene hat Label, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {
