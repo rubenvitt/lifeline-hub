@@ -461,6 +461,7 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
     q.abschnitte,
     q.einheiten,
     q.fuehrungsstelle,
+    { stellen: q.stellen, skizze: q.skizze },
   ).treffer) {
     haenge(`sg-${s.id}`, 'lokal-ohne-zuordnung');
   }

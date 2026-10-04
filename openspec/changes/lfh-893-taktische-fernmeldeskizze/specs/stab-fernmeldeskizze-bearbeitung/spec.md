@@ -114,6 +114,12 @@ mehr zurückgenommen werden, MUST der Grund am Element stehen.
   Zuordnung drückt
 - **THEN** meldet die Skizze, dass die Einheit nicht mehr besteht, und nichts sonst ändert sich
 
+#### Scenario: Inzwischen an einem anderen Arbeitsplatz verschoben
+- **WHEN** eine Person „EA 1“ verschoben hat, ein anderer Arbeitsplatz „EA 1“ danach weiter
+  verschiebt und die Person Strg+Z drückt
+- **THEN** bleibt „EA 1“ dort, wo der andere Arbeitsplatz es hingesetzt hat, und die Skizze meldet
+  „von einem anderen Arbeitsplatz verschoben“
+
 ### Requirement: Externe Stelle anlegen und anbinden
 Personen mit Schreibrecht auf den Stab SHALL in der Skizze eine externe Stelle (Leitstelle,
 Behörde, Verbindungsperson, sonstige) mit frei wählbarer Bezeichnung anlegen und sie wie jede

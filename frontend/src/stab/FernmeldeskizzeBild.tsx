@@ -166,7 +166,10 @@ export default function FernmeldeskizzeBild(props: FernmeldeskizzeBildProps) {
       </Typography.Paragraph>
     );
   }
-  return <Skizze {...props} />;
+  // Je Einsatz eine eigene Fläche (Review O6): die Seite bleibt beim Einsatzwechsel montiert
+  // (Outlet ohne Schlüssel), eigene Lagen, bestätigte Versionen, Status, eigener Stapel und Wahl
+  // gehören aber zum alten Einsatz — `ab-1` ist dort ein anderer Abschnitt.
+  return <Skizze key={netz.einsatzId} {...props} />;
 }
 
 function Skizze({

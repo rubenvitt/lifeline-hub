@@ -561,7 +561,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/lage/{element}",
-            put(routes::stab::fernmeldeskizze_lage_setzen),
+            put(routes::stab::fernmeldeskizze_lage_setzen)
+                .delete(routes::stab::fernmeldeskizze_lage_entfernen),
         )
         .route(
             "/api/einsaetze/{id}/stab/fernmeldeskizze/schriftfeld",

@@ -704,11 +704,13 @@ describe('baueFernmeldenetz · Eigenschaft: Lücken am Bild zählen wie das Pane
         .length,
     );
     expect(zahl('lokal-ohne-zuordnung')).toBe(
+      // Wie das Paneel der Seite: Kanäle externer Stellen und Komponenten tragen mit (Review O2).
       lokaleSprechgruppenOhneZuordnung(
         q.sprechgruppen,
         q.abschnitte,
         q.einheiten,
         q.fuehrungsstelle,
+        { stellen: q.stellen, skizze: q.skizze },
       ).treffer.length,
     );
     expect(zahl('ein-teilnehmer')).toBe(netz.luecken.schienenMitEinemTeilnehmer.treffer.length);

@@ -637,3 +637,53 @@ describe('leitstelleOhneVerbindung · Kanal und Skizze (LFH-893 D11)', () => {
     expect(l).toEqual({ zustand: 'gesperrt', fehlt: false });
   });
 });
+
+describe('lokaleSprechgruppenOhneZuordnung — externe Stellen und Komponenten (Review O2)', () => {
+  const anStelle = sg(20, 'TMO 320', true);
+  const anKomponente = sg(21, 'DMO 321', true);
+  const frei = sg(22, 'DMO 322', true);
+  const alle = daten([anStelle, anKomponente, frei]);
+  const weitere = {
+    stellen: daten([externe(5, 'leitstelle', { kanaele: [[anStelle, 'geplant']] })]),
+    skizze: skizze({
+      komponenten: [{ id: 3, art: 'repeater', bezeichnung: null, sprechgruppen: [anKomponente] }],
+    }),
+  };
+
+  it('zählt eine lokale Sprechgruppe nur an einer externen Stelle oder Komponente nicht als „ohne Zuordnung“', () => {
+    const l = lokaleSprechgruppenOhneZuordnung(alle, daten([]), daten([]), ohneFs, weitere);
+    expect(l).toEqual({ zustand: 'daten', treffer: [frei] });
+  });
+
+  it('dieselbe Kanalbelegung wie „nur ein Teilnehmer“: eine Lücke, nicht zwei', () => {
+    const q = netzQuellen({ sprechgruppen: alle, ...weitere });
+    const ohne = lokaleSprechgruppenOhneZuordnung(
+      q.sprechgruppen,
+      q.abschnitte,
+      q.einheiten,
+      q.fuehrungsstelle,
+      weitere,
+    ).treffer;
+    const einer = schienenMitEinemTeilnehmer(q).treffer;
+    expect(einer.map((s) => s.id).sort()).toEqual([20, 21]);
+    expect(ohne.filter((s) => einer.includes(s))).toEqual([]);
+  });
+
+  it('urteilt ohne die weiteren Quellen nur, wenn die Struktur schon alles zuordnet', () => {
+    const fehlt = { stellen: { zustand: 'fehler' as const, daten: [] }, skizze: weitere.skizze };
+    expect(lokaleSprechgruppenOhneZuordnung(alle, daten([]), daten([]), ohneFs, fehlt)).toEqual({
+      zustand: 'fehler',
+      treffer: [],
+    });
+    // Trägt ein Abschnitt jede lokale Sprechgruppe, ist die Zahl auch ohne Stellen sicher.
+    expect(
+      lokaleSprechgruppenOhneZuordnung(
+        alle,
+        daten([abschnitt(1, [anStelle, anKomponente, frei])]),
+        daten([]),
+        ohneFs,
+        fehlt,
+      ),
+    ).toEqual({ zustand: 'daten', treffer: [] });
+  });
+});

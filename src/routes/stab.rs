@@ -6,7 +6,7 @@
 //! Führungspersonal, System-Admin; enthält `fordere_aktiv`). Das Sachgebiet verleiht
 //! **kein** Recht (Entscheidung 12 der Spec).
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -431,13 +431,32 @@ pub async fn kommunikationsplan_laden(
     ))
 }
 
-/// POST /api/einsaetze/{id}/stab/kommunikationsplan/stellen — Stelle anlegen.
+#[derive(Debug, Deserialize)]
+pub struct StelleAnlegenParams {
+    /// `stelle` = nur die neue Stelle zurück (Fernmeldeskizze, Rückgängig braucht ihre id);
+    /// fehlt = der ganze Plan (Kommunikationsplan).
+    #[serde(default)]
+    antwort: Option<String>,
+}
+
+/// POST /api/einsaetze/{id}/stab/kommunikationsplan/stellen — Stelle anlegen. Antwort: der ganze
+/// Plan, mit `?antwort=stelle` nur die neue Stelle (LFH-893, Review S4).
 pub async fn kommunikationsplan_stelle_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Stab>,
+    Query(params): Query<StelleAnlegenParams>,
     JsonBody(req): JsonBody<KommunikationsStelleNeu>,
-) -> Result<(StatusCode, Json<Vec<kommunikation::KommunikationsStelle>>), AppError> {
+) -> Result<Response, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let nur_stelle = match params.antwort.as_deref() {
+        None | Some("plan") => false,
+        Some("stelle") => true,
+        Some(andere) => {
+            return Err(AppError::Validation(format!(
+                "Unbekannte Antwort '{andere}' (erlaubt: plan, stelle)"
+            )))
+        }
+    };
     let stellenart = support::parse_enum(
         kommunikation::Stellenart::parse,
         &req.stellenart,
@@ -490,10 +509,17 @@ pub async fn kommunikationsplan_stelle_anlegen(
             bezeichnung: angabe.text,
         }
     };
-    let plan =
+    let (id, plan) =
         kommunikation::stelle_anlegen(&state.pool, einsatz_id, ctx.benutzer.id, &eingabe).await?;
     sse(&state, einsatz_id);
-    Ok((StatusCode::CREATED, Json(plan)))
+    if !nur_stelle {
+        return Ok((StatusCode::CREATED, Json(plan)).into_response());
+    }
+    let stelle = plan
+        .into_iter()
+        .find(|s| s.id == id)
+        .ok_or_else(|| AppError::Internal("Angelegte Stelle fehlt im Plan".into()))?;
+    Ok((StatusCode::CREATED, Json(stelle)).into_response())
 }
 
 /// PATCH /api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid} — Bezeichnung ändern.
@@ -787,6 +813,49 @@ pub async fn fernmeldeskizze_lage_setzen(
             Json(SkizzenLageKonflikt {
                 error: "Von einem anderen Arbeitsplatz verschoben".into(),
                 aktuell,
+            }),
+        )
+            .into_response()),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LageVerwerfen {
+    /// Pflicht: erwartete Version der Zeile.
+    version: Option<i64>,
+}
+
+/// DELETE /api/einsaetze/{id}/stab/fernmeldeskizze/lage/{element} — die Lage EINES Elements
+/// verwerfen (Review O3, Rückgängig des ersten Verschiebens). Body `{ version }`; weicht sie ab,
+/// 409 mit dem gespeicherten Stand wie beim Verschieben. Ohne Zeile 204 ohne Ereignis.
+pub async fn fernmeldeskizze_lage_entfernen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Stab>,
+    PfadParam((_einsatz_id, element)): PfadParam<(i64, String)>,
+    JsonBody(req): JsonBody<LageVerwerfen>,
+) -> Result<Response, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let element = skizze::Element::parse(&element).ok_or_else(|| {
+        AppError::Validation(format!(
+            "Unbekanntes Element '{element}' (erwartet fs, ab-<id>, eh-<id>, ks-<id>, ko-<id>, \
+             sg-<id>)"
+        ))
+    })?;
+    let Some(version) = req.version else {
+        return Err(AppError::Validation("version fehlt".into()));
+    };
+    match skizze::lage_entfernen(&state.pool, einsatz_id, element, version).await? {
+        skizze::LageVerworfen::Entfernt => {
+            sse(&state, einsatz_id);
+            Ok(StatusCode::NO_CONTENT.into_response())
+        }
+        skizze::LageVerworfen::Unveraendert => Ok(StatusCode::NO_CONTENT.into_response()),
+        skizze::LageVerworfen::Konflikt(aktuell) => Ok((
+            StatusCode::CONFLICT,
+            Json(SkizzenLageKonflikt {
+                error: "Von einem anderen Arbeitsplatz verschoben".into(),
+                aktuell: Some(aktuell),
             }),
         )
             .into_response()),

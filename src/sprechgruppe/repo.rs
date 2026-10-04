@@ -385,10 +385,12 @@ pub async fn setze_abschnitt_sprechgruppen(
     ids: &[i64],
 ) -> Result<(), AppError> {
     pruefe_zuordenbar(pool, org_id, einsatz_id, ids).await?;
-    let mut tx = pool.begin().await?;
-    ersetzen_tx(&mut tx, Zuordnungsziel::Abschnitt(abschnitt_id), ids).await?;
-    tx.commit().await?;
-    Ok(())
+    // Lesen, dann schreiben: unter einem aufgeschobenen `BEGIN` scheiterte das neben den
+    // Einzel-Zuordnungen am Sperr-Upgrade (SQLITE_BUSY → 503). `write_retry!` öffnet mit
+    // BEGIN IMMEDIATE und versucht erneut (Muster `einsatz::fuehrungsstelle`).
+    crate::write_retry!(pool, |conn| {
+        ersetzen_tx(conn, Zuordnungsziel::Abschnitt(abschnitt_id), ids).await
+    })
 }
 
 /// Lädt alle Sprechgruppen eines Abschnitts, sortiert nach `betriebsart, sortier, bezeichnung`.
@@ -429,10 +431,12 @@ pub async fn setze_einheit_sprechgruppen(
     ids: &[i64],
 ) -> Result<(), AppError> {
     pruefe_zuordenbar(pool, org_id, einsatz_id, ids).await?;
-    let mut tx = pool.begin().await?;
-    ersetzen_tx(&mut tx, Zuordnungsziel::Einheit(einheit_id), ids).await?;
-    tx.commit().await?;
-    Ok(())
+    // Lesen, dann schreiben: unter einem aufgeschobenen `BEGIN` scheiterte das neben den
+    // Einzel-Zuordnungen am Sperr-Upgrade (SQLITE_BUSY → 503). `write_retry!` öffnet mit
+    // BEGIN IMMEDIATE und versucht erneut (Muster `einsatz::fuehrungsstelle`).
+    crate::write_retry!(pool, |conn| {
+        ersetzen_tx(conn, Zuordnungsziel::Einheit(einheit_id), ids).await
+    })
 }
 
 /// Lädt alle Sprechgruppen einer Einheit, sortiert nach `betriebsart, sortier, bezeichnung`.
@@ -1204,5 +1208,55 @@ mod tests {
             .collect();
         assert!(ids.contains(&kat.id) && ids.contains(&lokal.id));
         assert_eq!(ids.len(), 2, "inaktiver Katalogeintrag nicht enthalten");
+    }
+
+    /// LFH-893 (Review S2): Der PATCH mit der ganzen Menge liest erst und schreibt dann. Unter
+    /// einem aufgeschobenen `BEGIN` scheitert das neben gleichzeitigen Einzel-Zuordnungen am
+    /// Sperr-Upgrade (SQLITE_BUSY, 503) — unter `write_retry!` (BEGIN IMMEDIATE) gelingt jeder
+    /// Aufruf. Braucht das Datei/WAL-Harness.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn ganze_menge_neben_einzel_zuordnungen_scheitert_nicht_an_der_sperre() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (e, a) = setup_einsatz_abschnitt(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut katalog = Vec::new();
+        for i in 0..6 {
+            let name = format!("TMO {i}");
+            katalog.push(
+                anlegen_katalog(&pool, 1, daten(&name, "TMO"))
+                    .await
+                    .unwrap()
+                    .id,
+            );
+        }
+        let mut handles = Vec::new();
+        for runde in 0..24usize {
+            let pool = pool.clone();
+            let katalog = katalog.clone();
+            handles.push(tokio::spawn(async move {
+                let sg = katalog[runde % katalog.len()];
+                match runde % 4 {
+                    0 => setze_abschnitt_sprechgruppen(&pool, 1, e, a, &katalog[..3]).await,
+                    1 => setze_einheit_sprechgruppen(&pool, 1, e, einheit, &katalog[2..]).await,
+                    2 => einzeln_zuordnen(&pool, 1, e, Zuordnungsziel::Abschnitt(a), sg)
+                        .await
+                        .map(|_| ()),
+                    _ => einzeln_zuordnen(&pool, 1, e, Zuordnungsziel::Einheit(einheit), sg)
+                        .await
+                        .map(|_| ()),
+                }
+            }));
+        }
+        for h in handles {
+            h.await
+                .unwrap()
+                .expect("kein Aufruf scheitert an der Sperre");
+        }
     }
 }

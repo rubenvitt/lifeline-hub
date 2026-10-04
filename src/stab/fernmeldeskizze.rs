@@ -194,8 +194,9 @@ pub struct SkizzenBereich {
     pub version: i64,
 }
 
-/// Schriftfeld der Skizze (J.5). Ohne gespeicherte Angabe gilt als Herausgeber die
-/// Einsatzbezeichnung.
+/// Schriftfeld der Skizze (J.5). Jedes Feld trägt den gespeicherten Wert, `null` = leer. Die
+/// Vorgabe des Herausgebers (Einsatzbezeichnung) setzt erst die Darstellung ein, damit
+/// Bearbeiten und Rückgängig „leer“ von „Einsatzbezeichnung“ unterscheiden (Review O1).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct Schriftfeld {
     #[schema(required)]
@@ -556,9 +557,10 @@ async fn schriftfeld_laden(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
 ) -> Result<Schriftfeld, AppError> {
-    // LEFT JOIN vom Einsatz: ohne Zeile gelten die Vorgaben (D3).
+    // LEFT JOIN vom Einsatz: ohne Zeile gelten die Vorgaben (D3). Der Herausgeber kommt, wie er
+    // gespeichert ist; die Einsatzbezeichnung als Vorgabe setzt der Client (Review O1).
     let z = sqlx::query_as::<_, SchriftfeldRoh>(
-        "SELECT COALESCE(s.herausgeber, e.bezeichnung) AS herausgeber, s.vs_vermerk, \
+        "SELECT s.herausgeber AS herausgeber, s.vs_vermerk, \
                 s.gueltig_ab, s.gez_name, s.gez_at \
          FROM einsatz e LEFT JOIN fernmeldeskizze_schriftfeld s ON s.einsatz_id = e.id \
          WHERE e.id = ?",
@@ -675,6 +677,48 @@ pub async fn lage_setzen(
             .await?
             .ok_or_else(|| AppError::Internal("Lage nach dem Schreiben verschwunden".into()))?;
         Ok(LageErgebnis::Gesetzt(neu))
+    })
+}
+
+/// Ergebnis des Verwerfens einer einzelnen Lage.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LageVerworfen {
+    /// Die Zeile ist weg (Live-Ereignis).
+    Entfernt,
+    /// Es gab keine Zeile: nichts zu tun, idempotent (kein Ereignis).
+    Unveraendert,
+    /// Die gespeicherte Version weicht ab: nichts gelöscht.
+    Konflikt(SkizzenLage),
+}
+
+/// Verwirft die Lage EINES Elements, nur wenn der gespeicherte Stand dem erwarteten entspricht
+/// (Review O3: Rückgängig nach dem ersten Verschieben eines auto-gelegten Elements; danach stellt
+/// es wieder das Auto-Layout). Ohne Zeile idempotent; das Element selbst wird nicht geprüft, es
+/// kann inzwischen gelöscht sein und hat dann ohnehin keine Zeile (`vergiss`).
+pub async fn lage_entfernen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    element: Element,
+    version: i64,
+) -> Result<LageVerworfen, AppError> {
+    let schluessel = element.schluessel();
+    write_retry!(pool, |conn| {
+        fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        let Some(aktuell) = lage_zeile(conn, einsatz_id, &schluessel).await? else {
+            return Ok(LageVerworfen::Unveraendert);
+        };
+        if aktuell.version != version {
+            return Ok(LageVerworfen::Konflikt(aktuell));
+        }
+        sqlx::query(
+            "DELETE FROM fernmeldeskizze_lage WHERE einsatz_id = ? AND element = ? AND version = ?",
+        )
+        .bind(einsatz_id)
+        .bind(&schluessel)
+        .bind(version)
+        .execute(&mut *conn)
+        .await?;
+        Ok(LageVerworfen::Entfernt)
     })
 }
 

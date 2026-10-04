@@ -23,6 +23,7 @@ import {
   type Luecke,
   type Quelle,
   type Verbindung,
+  type WeitereKanalQuellen,
 } from './luecken';
 
 /**
@@ -283,11 +284,16 @@ export interface FunkplanLuecken {
   lokaleSprechgruppenOhneZuordnung: Luecke<Sprechgruppe>;
 }
 
-/** Was die Lücken lesen: Fahrzeuge und Personal tragen keine (LFH-869 liest nur diese). */
+/**
+ * Was die Lücken lesen: Fahrzeuge und Personal tragen keine (LFH-869 liest nur diese). Externe
+ * Stellen und Daten der Skizze (LFH-893) tragen Sprechgruppen wie die Struktur; reicht der
+ * Aufrufer sie mit, zählt „lokale Sprechgruppen ohne Zuordnung“ wie das Bild (Review O2).
+ */
 export type LueckenQuellen = Pick<
   FunkplanQuellen,
   'abschnitte' | 'einheiten' | 'sprechgruppen' | 'fuehrungsstelle'
->;
+> &
+  Partial<WeitereKanalQuellen>;
 
 export function funkplanLuecken(q: LueckenQuellen): FunkplanLuecken {
   return {
@@ -304,6 +310,7 @@ export function funkplanLuecken(q: LueckenQuellen): FunkplanLuecken {
       q.abschnitte,
       q.einheiten,
       q.fuehrungsstelle,
+      q.stellen && q.skizze ? { stellen: q.stellen, skizze: q.skizze } : undefined,
     ),
   };
 }

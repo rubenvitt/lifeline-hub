@@ -129,7 +129,8 @@ Eine Migration (Nummer beim Umsetzen per `scripts/check-migrationen.sh`, größe
   (D4).
 - **`fernmeldeskizze_schriftfeld`** (`einsatz_id` PK, `herausgeber`, `vs_vermerk`
   keiner|vs_nfd, `gueltig_ab`, `gez_name`, `gez_at`). Fehlt die Zeile, gelten Vorgaben
-  (Herausgeber = Einsatzbezeichnung, kein VS-Vermerk, leer). „Stand“ ist abgeleitet: der jüngste
+  (kein VS-Vermerk, sonst leer); den Herausgeber setzt bei leerem Feld der Client für Anzeige und
+  Druck auf die Einsatzbezeichnung, gespeichert und geliefert wird nur der eingetragene Wert. „Stand“ ist abgeleitet: der jüngste
   Änderungszeitpunkt aller Skizzendaten.
 
 **Polymorphe Bezüge** (`von_art`/`von_id`, `element`) haben keinen Fremdschlüssel. Deshalb:
@@ -155,7 +156,8 @@ Fälle. Kommt der Bedarf, ist es ein eigener Umbau.
   der ersten Schiene, an der sie hängen. Raster 8 px, Ausgabe in Rasterpunkten.
 - **Gespeichert wird nur Verschobenes.** Ein Element ohne Lagezeile steht dort, wo das
   Auto-Layout es hinsetzt; ab dem ersten Verschieben trägt es eine Zeile. Neue Elemente erscheinen
-  so immer, nie unsichtbar in einer Palette.
+  so immer, nie unsichtbar in einer Palette. Nimmt Rückgängig dieses erste Verschieben zurück,
+  verwirft es die Zeile (`DELETE …/lage/{element}`), statt die Auto-Lage festzuschreiben.
 - **„Neu anordnen“** löscht alle Lagezeilen des Einsatzes (ein Aufruf). Zuordnungen bleiben
   unberührt.
 - **Gleichzeitiges Verschieben:** `PUT …/lage/{element}` trägt die erwartete `version`. Weicht sie
@@ -198,8 +200,11 @@ PATCH. Der PATCH bleibt
   Zwei-Finger-Zoom, Langdruck öffnet das Kontextmenü. Zoom auch über Knöpfe (+, −, Einpassen).
 - **Mobil (< 768 px):** nur lesen, zoomen, hervorheben.
 - **Rückgängig:** Befehlsstapel je Tab (`stab/skizzenBefehle.ts`), nur eigene Handlungen dieser
-  Sitzung, je Eintrag die Gegenhandlung (Zuordnen ↔ Lösen, Verschieben ↔ zurückschieben mit
-  aktueller `version`). Scheitert eine Gegenhandlung (Datensatz gelöscht, 409), steht der Grund am
+  Sitzung, je Eintrag die Gegenhandlung (Zuordnen ↔ Lösen, Verschieben ↔ zurückschieben, Bereich ändern
+  ↔ zurückändern, externe Stelle anlegen ↔ genau diese Stelle entfernen). Gegenhandlung und
+  Wiederholen schicken die `version` der eigenen letzten Antwort, nicht die jüngste im Netz: hat
+  ein anderer Arbeitsplatz dazwischen geändert, ist das ein 409 statt stillem Überschreiben.
+  Scheitert eine Gegenhandlung (Datensatz gelöscht, 409), steht der Grund am
   Element, und der Eintrag fällt aus dem Stapel.
 
 ### D7 · Status „geplant“ (E3)
@@ -300,6 +305,7 @@ immer leer.
 | Aufruf | Body | Antwort |
 | --- | --- | --- |
 | `PUT /stab/fernmeldeskizze/lage/{element}` | `{ x, y, breite?, version: number \| null }` (`null` = noch keine Zeile erwartet) | 200 `SkizzenLage`; 409 bei abweichender Version |
+| `DELETE /stab/fernmeldeskizze/lage/{element}` | `{ version: number }` | 204 (auch ohne Zeile, idempotent; Ereignis nur bei Änderung); 409 mit `aktuell` bei abweichender Version (Rückgängig des ersten Verschiebens) |
 | `DELETE /stab/fernmeldeskizze/lage` | — | 204 („Neu anordnen“) |
 | `PUT /stab/fernmeldeskizze/schriftfeld` | Teilfelder, Tri-State (fehlend = unverändert, `null` = leeren) | 200 `Schriftfeld` |
 | `POST /stab/fernmeldeskizze/komponenten` | `{ art, bezeichnung? }` | 201 `SkizzenKomponente` |
@@ -313,6 +319,7 @@ immer leer.
 | `PUT/DELETE /einheiten/{eid}/sprechgruppen/{sg}` | — | 204 (`EinsatzSchreibzugriff<Einheiten>`) |
 | `PUT/DELETE /fuehrungsstelle/sprechgruppen/{sg}` | — | 204 (`EinsatzVerwaltungszugriff`) |
 | `PUT/DELETE /stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg}` | PUT `{ status }` | 204; 422 bei Stellenart `funktion` |
+| `POST /stab/kommunikationsplan/stellen?antwort=stelle` | wie ohne Parameter | 201 nur die angelegte `KommunikationsStelle` (externe Stelle aus der Fläche); ohne Parameter bzw. `antwort=plan` der ganze Plan, sonst 400 |
 
 PUT und DELETE der Zuordnungen sind idempotent. Jede Änderung sendet das Live-Ereignis des
 Datensatzes (Abschnitt, Einheit, Einsatz, Stab), die Skizzendaten das Stab-Ereignis.
@@ -356,8 +363,8 @@ die neuen Tabellen bleiben ungenutzt liegen (anhängen, nie ändern, LFH-658).
 - **D5/D14 (Backend):** Die Einzel-Endpunkte prüfen die Sprechgruppe wie der PATCH
   (`pruefe_zuordenbar`), also nicht auf `aktiv`. Ein 409 bei Lage bzw. Bereich trägt
   `aktuell` (`SkizzenLageKonflikt`, `SkizzenBereichKonflikt`); `version` ist im Lage-Body Pflicht
-  (`null` = keine Zeile erwartet), `breite` nur bei `sg-`. Ein leerer Herausgeber liefert die
-  Einsatzbezeichnung. Zuordnungen senden ihr Live-Ereignis nur bei echter Änderung; kein Weg
+  (`null` = keine Zeile erwartet), `breite` nur bei `sg-`. Der Server liefert den gespeicherten Herausgeber
+  (`null`, wenn leer); die Vorgabe Einsatzbezeichnung setzt der Client für Anzeige und Druck. Zuordnungen senden ihr Live-Ereignis nur bei echter Änderung; kein Weg
   schreibt ins ETB (auch der PATCH nicht). Das Einzel-PUT an der Führungsstelle legt keine
   Zeile `einsatz_fuehrungsstelle` an.
 

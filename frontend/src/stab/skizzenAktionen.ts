@@ -48,6 +48,11 @@ export interface SkizzenAktionen {
     lage: { x: number; y: number; breite?: number | null },
     version: number | null,
   ): Promise<SkizzenLage>;
+  /**
+   * Die Lage EINES Elements verwerfen, mit erwartetem Stand (409 bei Abweichung, ohne Zeile
+   * nichts): Rückgängig nach dem ersten Verschieben eines auto-gelegten Elements (Review O3).
+   */
+  entferneLage(element: string, version: number): Promise<void>;
   /** Alle Lagen verwerfen („Neu anordnen“). */
   neuAnordnen(): Promise<void>;
 
@@ -71,11 +76,16 @@ export interface SkizzenAktionen {
   ): Promise<SkizzenKomponente>;
   entferneKomponente(id: number): Promise<void>;
 
-  /** Legt die Stelle im Kommunikationsplan an (eine Stelle, nicht zwei, D3). */
+  /**
+   * Legt die Stelle im Kommunikationsplan an (eine Stelle, nicht zwei, D3) und gibt GENAU diese
+   * zurück, wie der Server sie nennt (Review S4).
+   */
   legeExterneStelleAn(
     stellenart: ExterneStellenart,
     bezeichnung: string,
   ): Promise<KommunikationsStelle>;
+  /** Entfernt eine externe Stelle samt Kanälen, Verbindungen und Lage (Rückgängig des Anlegens). */
+  entferneExterneStelle(id: number): Promise<void>;
 
   legeBereichAn(
     felder: Required<Omit<BereichsFelder, 'bezeichnung'>> & { bezeichnung?: string },

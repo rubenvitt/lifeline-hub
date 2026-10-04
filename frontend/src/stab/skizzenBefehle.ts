@@ -17,9 +17,12 @@ import { ApiError, AusgangUnbekannt, NetzFehler, fehlerText } from '../api/clien
  *   geht mit dem Element zurück, damit die Fläche ihn dort zeigt. Ausnahme: hat die Anfrage den
  *   Server nachweislich nicht erreicht (`NetzFehler`, nicht `AusgangUnbekannt`), bleibt der
  *   Eintrag liegen — es ist nichts geschehen, ein zweiter Versuch ist sicher.
- * - **Aktuelle Version:** Eine Gegenhandlung, die einen erwarteten Stand mitschickt (Lage), liest
- *   ihn erst beim Aufruf, nicht beim Anlegen des Eintrags — sonst scheiterte jedes Zurückschieben
- *   nach einem Live-Update mit 409.
+ * - **Erwarteter Stand:** Eine Gegenhandlung, die einen erwarteten Stand mitschickt (Lage,
+ *   Bereich), schickt genau den, den die eigene Handlung geschrieben hat — nicht den jüngsten im
+ *   Netz (Review S3). Hat ein anderer Arbeitsplatz dazwischen geändert, antwortet der Server 409,
+ *   der Eintrag fällt aus dem Stapel, und die Fläche meldet „von einem anderen Arbeitsplatz
+ *   geändert“ bzw. „verschoben“; nichts wird still überschrieben. Ein Live-Update, das nur die
+ *   eigene Handlung zurückspiegelt, trägt dieselbe Version und stört nicht.
  */
 
 export interface SkizzenBefehl {
@@ -62,9 +65,24 @@ export interface BefehlsStand {
 /** Wie viele Handlungen zurückgenommen werden können. */
 export const BEFEHLS_TIEFE = 50;
 
+/**
+ * Ein 422, das sagt, dass der Bezug nicht (mehr) zum Einsatz gehört: der Server prüft Bezüge der
+ * Skizze in der Transaktion (`stab::fernmeldeskizze::pruefe_im_einsatz`, Lage und Verbindung) und
+ * Sprechgruppen wie der PATCH (`sprechgruppe::repo::pruefe_zuordenbar`). Für Rückgängig heißt das
+ * dasselbe wie ein 404 (Review O4).
+ */
+const GEHOERT_NICHT_MEHR = /gehört nicht zu diesem Einsatz|nicht zuordenbar/;
+
 /** Der allgemeine Wortlaut eines gescheiterten Schritts. */
 export function befehlsGrund(fehler: unknown): string {
   if (fehler instanceof ApiError && fehler.status === 404) return 'besteht nicht mehr';
+  if (
+    fehler instanceof ApiError &&
+    fehler.status === 422 &&
+    GEHOERT_NICHT_MEHR.test(fehler.message)
+  ) {
+    return 'besteht nicht mehr';
+  }
   if (fehler instanceof ApiError && fehler.status === 409) {
     return 'von einem anderen Arbeitsplatz geändert';
   }

@@ -63,6 +63,20 @@ export function setzeSkizzenLage(
   );
 }
 
+/**
+ * Die Lage EINES Elements verwerfen (Rückgängig des ersten Verschiebens, Review O3): mit
+ * erwarteter `version`, 409 bei Abweichung, ohne Zeile 204 ohne Wirkung.
+ */
+export function entferneSkizzenLage(
+  einsatzId: number,
+  element: string,
+  version: number,
+): Promise<void> {
+  return apiSend<void>(`${skizze(einsatzId)}/lage/${encodeURIComponent(element)}`, 'DELETE', {
+    version,
+  });
+}
+
 /** „Neu anordnen“: alle Lagen des Einsatzes verwerfen, Zuordnungen bleiben. */
 export function verwerfeSkizzenLage(einsatzId: number): Promise<void> {
   return apiSend<void>(`${skizze(einsatzId)}/lage`, 'DELETE');

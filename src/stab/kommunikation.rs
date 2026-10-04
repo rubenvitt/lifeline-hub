@@ -280,14 +280,16 @@ async fn stelle_im_einsatz(
 }
 
 /// Legt eine Stelle an. Eine schon vorhandene Funktion (bei FHP/FB: dieselbe Bezeichnung,
-/// ohne Groß-/Kleinschreibung) ist 409; der UNIQUE-Index ist das Netz dahinter.
+/// ohne Groß-/Kleinschreibung) ist 409; der UNIQUE-Index ist das Netz dahinter. Gibt die id der
+/// neuen Stelle und den ganzen Plan zurück: die Fernmeldeskizze braucht für Rückgängig genau diese
+/// Stelle (LFH-893, Review S4), der Plan allein nennt sie nicht eindeutig.
 pub async fn stelle_anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
     eingabe: &StelleEingabe,
-) -> Result<Vec<KommunikationsStelle>, AppError> {
-    write_retry!(pool, |conn| {
+) -> Result<(i64, Vec<KommunikationsStelle>), AppError> {
+    let id = write_retry!(pool, |conn| {
         super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         if let Some(f) = eingabe.funktion {
             let vorhanden: Option<i64> = sqlx::query_scalar(
@@ -306,7 +308,7 @@ pub async fn stelle_anlegen(
                 ));
             }
         }
-        sqlx::query(
+        let r = sqlx::query(
             "INSERT INTO einsatz_kommunikation_stelle \
                 (einsatz_id, stellenart, funktion, bezeichnung, sortier, geaendert_von_id) \
              VALUES (?1, ?2, ?3, ?4, \
@@ -320,9 +322,9 @@ pub async fn stelle_anlegen(
         .bind(benutzer_id)
         .execute(&mut *conn)
         .await?;
-        Ok(())
+        Ok(r.last_insert_rowid())
     })?;
-    laden(pool, einsatz_id).await
+    Ok((id, laden(pool, einsatz_id).await?))
 }
 
 /// Ändert die Bezeichnung einer Stelle. Stellenart und Funktion sind nach dem Anlegen fest

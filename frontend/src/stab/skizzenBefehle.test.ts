@@ -206,4 +206,24 @@ describe('befehlsGrund', () => {
     expect(befehlsGrund(new AusgangUnbekannt())).toMatch(/unklar/);
     expect(befehlsGrund(new Error('x'))).toBe('Rücknahme fehlgeschlagen');
   });
+
+  it('nimmt ein 422 „gehört nicht zu diesem Einsatz“ bzw. „nicht zuordenbar“ wie ein 404 (Review O4)', () => {
+    // Wortlaut des Servers: `stab::fernmeldeskizze::pruefe_im_einsatz` (Lage, Verbindung) und
+    // `sprechgruppe::repo::pruefe_zuordenbar` (gelöschte einsatzlokale Sprechgruppe).
+    expect(befehlsGrund(new ApiError(422, "'eh-10' gehört nicht zu diesem Einsatz"))).toBe(
+      'besteht nicht mehr',
+    );
+    expect(
+      befehlsGrund(
+        new ApiError(
+          422,
+          'Sprechgruppe 9 ist für diese Organisation/diesen Einsatz nicht zuordenbar',
+        ),
+      ),
+    ).toBe('besteht nicht mehr');
+    // Ein anderes 422 bleibt die Meldung des Servers.
+    expect(befehlsGrund(new ApiError(422, 'Eine Führungsfunktion trägt keine Sprechgruppe'))).toBe(
+      'Eine Führungsfunktion trägt keine Sprechgruppe',
+    );
+  });
 });

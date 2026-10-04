@@ -765,7 +765,15 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     rendereMit('/einsaetze/1/stab/funkplan?ansicht=skizze');
     const region = await screen.findByRole('region', { name: 'Fernmeldeskizze' });
     expect(within(region).getByText('Abschnitt Nord')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Einheiten: nicht geladen')).toBeInTheDocument());
+    // Über der Fläche nennt den Grund nur das Bild aus `netz.fehlend` (`skizze-fehlend`); die
+    // Seite setzt keine eigene Zeile davor (Review O5: sonst stand er zweimal untereinander). Der
+    // Quellenhinweis unter dem Lücken-Paneel gilt der ganzen Seite und bleibt.
+    await waitFor(() =>
+      expect(bild.props?.netz.fehlend).toContainEqual(
+        expect.objectContaining({ name: 'Einheiten', zustand: 'fehler' }),
+      ),
+    );
+    expect(screen.queryByText('Einheiten: nicht geladen')).toBeNull();
   });
 });
 

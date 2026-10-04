@@ -48,15 +48,29 @@ export function einheitenOhneErreichbarkeit(einheiten: Quelle<Einheit>): Luecke<
   return filtere(einheiten, (e) => !e.erreichbarkeit?.trim());
 }
 
+/** Weitere Träger von Sprechgruppen (LFH-893): externe Stellen und Komponenten der Skizze. */
+export interface WeitereKanalQuellen {
+  stellen: Quelle<KommunikationsStelle>;
+  skizze: SkizzenQuelle;
+}
+
 /**
  * Einsatzlokale Sprechgruppen, die weder ein Abschnitt, eine Einheit noch die eigene
- * Führungsstelle (LFH-849) trägt. Fehlt eine dieser Quellen, wäre jede Zahl geraten.
+ * Führungsstelle (LFH-849) trägt — und, mit `weitere`, auch keine externe Stelle und keine
+ * Komponente der Skizze (LFH-893, Review O2: dieselben Träger wie {@link kanalbelegung}, sonst
+ * zählte eine Sprechgruppe nur an einer Komponente zugleich als „ohne Zuordnung“ und „nur ein
+ * Teilnehmer“). Fehlt eine Strukturquelle, wäre jede Zahl geraten. Fehlt eine der weiteren
+ * Quellen, urteilt die Regel nur, wenn die Struktur schon jede lokale Sprechgruppe trägt.
+ *
+ * @param weitere fehlt das Argument, hat der Aufrufer Stellen und Skizze nicht als Quelle (die
+ *   Übernahme in den Lagebericht): dann zählen nur Abschnitte, Einheiten und Führungsstelle.
  */
 export function lokaleSprechgruppenOhneZuordnung(
   sprechgruppen: Quelle<Sprechgruppe>,
   abschnitte: Quelle<Einsatzabschnitt>,
   einheiten: Quelle<Einheit>,
   fuehrungsstelle: FuehrungsstelleQuelle,
+  weitere?: WeitereKanalQuellen,
 ): Luecke<Sprechgruppe> {
   const zustand = schlechtesterZustand(
     sprechgruppen.zustand,
@@ -69,10 +83,23 @@ export function lokaleSprechgruppenOhneZuordnung(
   for (const a of abschnitte.daten) for (const s of a.sprechgruppen) zugeordnet.add(s.id);
   for (const e of einheiten.daten) for (const s of e.sprechgruppen) zugeordnet.add(s.id);
   for (const s of fuehrungsstelle.daten?.sprechgruppen ?? []) zugeordnet.add(s.id);
-  return {
-    zustand,
-    treffer: sprechgruppen.daten.filter((s) => s.einsatz_lokal && !zugeordnet.has(s.id)),
-  };
+  const offen = () => sprechgruppen.daten.filter((s) => s.einsatz_lokal && !zugeordnet.has(s.id));
+  if (weitere) {
+    if (weitere.stellen.zustand === 'daten') {
+      for (const st of weitere.stellen.daten) {
+        if (st.stellenart === 'funktion') continue;
+        for (const k of st.sprechgruppen) zugeordnet.add(k.sprechgruppe.id);
+      }
+    }
+    if (weitere.skizze.zustand === 'daten') {
+      for (const ko of weitere.skizze.daten?.komponenten ?? []) {
+        for (const s of ko.sprechgruppen) zugeordnet.add(s.id);
+      }
+    }
+    const fehlt = schlechtesterZustand(weitere.stellen.zustand, weitere.skizze.zustand);
+    if (fehlt !== 'daten' && offen().length > 0) return { zustand: fehlt, treffer: [] };
+  }
+  return { zustand, treffer: offen() };
 }
 
 /**

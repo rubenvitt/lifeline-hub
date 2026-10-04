@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { ApiError } from '../api/client';
 import {
   entferneKomponente,
+  entferneSkizzenLage,
   legeSkizzenVerbindungAn,
   loeseSprechgruppe,
   ordneSprechgruppeZu,
@@ -15,7 +16,10 @@ import {
 import { patcheAbschnitt } from '../api/einsatzabschnitte';
 import { patcheEinheit } from '../api/einheiten';
 import { patcheFuehrungsstelle } from '../api/einsaetze';
-import { legeKommunikationsStelleAn } from '../api/kommunikationsplan';
+import {
+  entferneKommunikationsStelle,
+  legeKommunikationsStelleEinzelnAn,
+} from '../api/kommunikationsplan';
 import type {
   EinsatzAnzeige,
   Fernmeldeskizze,
@@ -30,6 +34,7 @@ vi.mock('../api/fernmeldeskizze', () => ({
   ladeFernmeldeskizze: vi.fn(),
   setzeSkizzenLage: vi.fn(),
   verwerfeSkizzenLage: vi.fn(),
+  entferneSkizzenLage: vi.fn(),
   setzeSchriftfeld: vi.fn(),
   legeKomponenteAn: vi.fn(),
   aendereKomponente: vi.fn(),
@@ -46,7 +51,10 @@ vi.mock('../api/fernmeldeskizze', () => ({
 vi.mock('../api/einsatzabschnitte', () => ({ patcheAbschnitt: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ patcheEinheit: vi.fn() }));
 vi.mock('../api/einsaetze', () => ({ patcheFuehrungsstelle: vi.fn() }));
-vi.mock('../api/kommunikationsplan', () => ({ legeKommunikationsStelleAn: vi.fn() }));
+vi.mock('../api/kommunikationsplan', () => ({
+  legeKommunikationsStelleEinzelnAn: vi.fn(),
+  entferneKommunikationsStelle: vi.fn(),
+}));
 
 /** Literale statt Factory (Charakterisierung, `frontend/AGENTS.md` Query-Key-Registry). */
 const SKIZZE_KEY = ['einsatz-stab', 7, 'fernmeldeskizze'];
@@ -250,30 +258,70 @@ describe('useSkizzenAktionen — Datensatz der Stelle', () => {
     await expect(setup().current!.setzeRufname('ks-5', 'x')).rejects.toThrow();
   });
 
-  it('legt eine externe Stelle im Kommunikationsplan an und gibt sie zurück (D3)', async () => {
-    const alt: KommunikationsStelle = {
-      id: 1,
-      stellenart: 'behoerde',
-      bezeichnung: 'Polizei',
-      verbindungen: [],
-      sprechgruppen: [],
-    };
-    const ils: KommunikationsStelle = {
-      id: 4,
+  it('legt eine externe Stelle an und gibt GENAU die vom Server genannte zurück, auch bei leerem Plan-Cache (Review S4)', async () => {
+    const gleichnamig: KommunikationsStelle = {
+      id: 3,
       stellenart: 'leitstelle',
       bezeichnung: 'ILS Musterhausen',
       verbindungen: [],
       sprechgruppen: [],
     };
-    qc.setQueryData(PLAN_KEY, [alt]);
-    vi.mocked(legeKommunikationsStelleAn).mockResolvedValue([ils, alt]);
+    const ils: KommunikationsStelle = { ...gleichnamig, id: 4 };
+    // Der Plan ist noch nicht geladen: aus dem Cache ließe sich „neu“ nicht ablesen.
+    qc.removeQueries({ queryKey: PLAN_KEY });
+    vi.mocked(legeKommunikationsStelleEinzelnAn).mockResolvedValue(ils);
     const neu = await setup().current!.legeExterneStelleAn('leitstelle', 'ILS Musterhausen');
-    expect(legeKommunikationsStelleAn).toHaveBeenCalledWith(7, {
+    expect(legeKommunikationsStelleEinzelnAn).toHaveBeenCalledWith(7, {
       stellenart: 'leitstelle',
       bezeichnung: 'ILS Musterhausen',
     });
     expect(neu).toBe(ils);
-    expect(qc.getQueryData(PLAN_KEY)).toEqual([ils, alt]);
+  });
+
+  it('der neue Plan kommt per Abruf, nicht aus einer Vermutung', async () => {
+    qc.setQueryData(PLAN_KEY, []);
+    vi.mocked(legeKommunikationsStelleEinzelnAn).mockResolvedValue({
+      id: 4,
+      stellenart: 'leitstelle',
+      bezeichnung: 'ILS',
+      verbindungen: [],
+      sprechgruppen: [],
+    });
+    await setup().current!.legeExterneStelleAn('leitstelle', 'ILS');
+    expect(invalidiert(PLAN_KEY)).toBe(true);
+  });
+
+  it('entfernt eine externe Stelle (Rückgängig des Anlegens), setzt den Plan und holt die Skizze', async () => {
+    const plan: KommunikationsStelle[] = [
+      {
+        id: 1,
+        stellenart: 'behoerde',
+        bezeichnung: 'Polizei',
+        verbindungen: [],
+        sprechgruppen: [],
+      },
+    ];
+    vi.mocked(entferneKommunikationsStelle).mockResolvedValue(plan);
+    await setup().current!.entferneExterneStelle(4);
+    expect(entferneKommunikationsStelle).toHaveBeenCalledWith(7, 4);
+    expect(qc.getQueryData(PLAN_KEY)).toEqual(plan);
+    expect(invalidiert(SKIZZE_KEY)).toBe(true);
+  });
+});
+
+describe('useSkizzenAktionen — einzelne Lage verwerfen (Review O3)', () => {
+  it('verwirft die Lage mit erwarteter Version und nimmt sie aus dem Cache', async () => {
+    vi.mocked(entferneSkizzenLage).mockResolvedValue(undefined);
+    await setup().current!.entferneLage('ab-3', 1);
+    expect(entferneSkizzenLage).toHaveBeenCalledWith(7, 'ab-3', 1);
+    expect(qc.getQueryData<Fernmeldeskizze>(SKIZZE_KEY)!.lage).toEqual([]);
+  });
+
+  it('holt bei 409 den Stand des Servers und reicht den Fehler weiter', async () => {
+    vi.mocked(entferneSkizzenLage).mockRejectedValue(new ApiError(409, 'verschoben'));
+    await expect(setup().current!.entferneLage('ab-3', 1)).rejects.toBeInstanceOf(ApiError);
+    expect(invalidiert(SKIZZE_KEY)).toBe(true);
+    expect(qc.getQueryData<Fernmeldeskizze>(SKIZZE_KEY)!.lage).toHaveLength(1);
   });
 });
 

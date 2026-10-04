@@ -10,6 +10,7 @@ import {
   aendereSkizzenVerbindung,
   entferneBereich,
   entferneKomponente,
+  entferneSkizzenLage,
   entferneSkizzenVerbindung,
   legeBereichAn,
   legeKomponenteAn,
@@ -21,7 +22,10 @@ import {
   verwerfeSkizzenLage,
   type ZuordnungsZiel,
 } from '../api/fernmeldeskizze';
-import { legeKommunikationsStelleAn } from '../api/kommunikationsplan';
+import {
+  entferneKommunikationsStelle,
+  legeKommunikationsStelleEinzelnAn,
+} from '../api/kommunikationsplan';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
   Fernmeldeskizze,
@@ -191,6 +195,13 @@ export function useSkizzenAktionen(
         aendereSkizze(qc, einsatzId, (alt) => mitLage(alt, neu));
         return neu;
       },
+      async entferneLage(element, version) {
+        await beiKonflikt(entferneSkizzenLage(einsatzId, element, version));
+        aendereSkizze(qc, einsatzId, (alt) => ({
+          ...alt,
+          lage: alt.lage.filter((l) => l.element !== element),
+        }));
+      },
       async neuAnordnen() {
         await verwerfeSkizzenLage(einsatzId);
         aendereSkizze(qc, einsatzId, (alt) => ({ ...alt, lage: [] }));
@@ -261,21 +272,20 @@ export function useSkizzenAktionen(
       },
 
       async legeExterneStelleAn(stellenart, bezeichnung) {
-        const planKey = einsatzKeys.stabKommunikationsplan(einsatzId);
-        const vorher = new Set(
-          (qc.getQueryData<KommunikationsStelle[]>(planKey) ?? []).map((s) => s.id),
-        );
-        const plan = await legeKommunikationsStelleAn(einsatzId, { stellenart, bezeichnung });
-        qc.setQueryData(planKey, plan);
-        // Die Antwort ist der ganze Plan: neu ist, was vorher nicht da war; ohne bekannten
-        // Vorstand die jüngste Stelle dieser Art und Bezeichnung.
-        const neu =
-          plan.find((s) => !vorher.has(s.id) && s.stellenart === stellenart) ??
-          plan
-            .filter((s) => s.stellenart === stellenart && s.bezeichnung === bezeichnung)
-            .sort((a, b) => b.id - a.id)[0];
-        if (!neu) throw new Error('Die angelegte Stelle fehlt in der Antwort des Servers');
+        // Die Antwort nennt genau die neue Stelle (`?antwort=stelle`, Review S4): „neu“ wird nicht
+        // aus dem Cache des Plans erraten, der leer oder veraltet sein kann.
+        const neu = await legeKommunikationsStelleEinzelnAn(einsatzId, { stellenart, bezeichnung });
+        await qc.invalidateQueries({ queryKey: einsatzKeys.stabKommunikationsplan(einsatzId) });
         return neu;
+      },
+      async entferneExterneStelle(id) {
+        const plan = await beiKonflikt(entferneKommunikationsStelle(einsatzId, id));
+        qc.setQueryData<KommunikationsStelle[]>(
+          einsatzKeys.stabKommunikationsplan(einsatzId),
+          plan,
+        );
+        // Der Server räumt Lage und Verbindungen der Stelle mit (D3): den Rest holt der Abruf.
+        await holeSkizze();
       },
 
       async legeBereichAn(felder) {

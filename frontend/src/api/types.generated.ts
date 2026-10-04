@@ -3604,8 +3604,9 @@ export interface components {
         /** @enum {string} */
         SchadenTyp: "sachschaden" | "verkehrshindernis" | "infrastruktur" | "umweltschaden" | "tierkadaver" | "sonstige";
         /**
-         * @description Schriftfeld der Skizze (J.5). Ohne gespeicherte Angabe gilt als Herausgeber die
-         *     Einsatzbezeichnung.
+         * @description Schriftfeld der Skizze (J.5). Jedes Feld trägt den gespeicherten Wert, `null` = leer. Die
+         *     Vorgabe des Herausgebers (Einsatzbezeichnung) setzt erst die Darstellung ein, damit
+         *     Bearbeiten und Rückgängig „leer“ von „Einsatzbezeichnung“ unterscheiden (Review O1).
          */
         Schriftfeld: {
             gez_at: string | null;

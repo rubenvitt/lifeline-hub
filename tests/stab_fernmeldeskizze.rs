@@ -138,7 +138,7 @@ async fn neue_skizze_ist_leer_mit_vorgaben_im_schriftfeld() {
             "verbindungen": [],
             "bereiche": [],
             "schriftfeld": {
-                "herausgeber": "Hochwasser Elbe",
+                "herausgeber": null,
                 "vs_vermerk": "keiner",
                 "gueltig_ab": null,
                 "gez_name": null,
@@ -452,6 +452,98 @@ async fn neu_anordnen_verwirft_nur_die_lagen() {
     assert_eq!(json["version"], 1);
 }
 
+/// Review O3: Rückgängig nach dem ersten Verschieben eines auto-gelegten Elements verwirft genau
+/// dessen Lagezeile, mit erwarteter Version (409 statt stillem Löschen), idempotent und mit
+/// Live-Ereignis nur bei echter Änderung.
+#[tokio::test]
+async fn einzelne_lage_verwerfen_mit_version() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let eh = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let b = basis(einsatz);
+    for element in ["fs".to_string(), format!("eh-{eh}")] {
+        let (status, _) = senden(
+            &app,
+            &admin,
+            "PUT",
+            &format!("{b}/lage/{element}"),
+            Some(json!({"x": 16, "y": 16, "version": null})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    let pfad = format!("{b}/lage/eh-{eh}");
+    let mut rx = live.abonniere(einsatz);
+
+    // Abweichende Version: 409 mit dem gespeicherten Stand, nichts gelöscht, kein Ereignis.
+    let (status, json) = senden(&app, &admin, "DELETE", &pfad, Some(json!({"version": 7}))).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
+    assert_eq!(json["aktuell"]["version"], 1);
+    assert_eq!(zaehle(&mut rx), (0, 0));
+
+    // Passende Version: genau diese Zeile ist weg, die übrigen bleiben.
+    let (status, _) = senden(&app, &admin, "DELETE", &pfad, Some(json!({"version": 1}))).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(zaehle(&mut rx), (1, 0), "ein stab-Ereignis, kein ETB");
+    let s = skizze(&app, &admin, einsatz).await;
+    let lage: Vec<&str> = s["lage"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["element"].as_str().unwrap())
+        .collect();
+    assert_eq!(lage, ["fs"]);
+
+    // Idempotent: noch einmal 204, ohne Ereignis.
+    let (status, _) = senden(&app, &admin, "DELETE", &pfad, Some(json!({"version": 1}))).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(zaehle(&mut rx), (0, 0));
+
+    // Version ist Pflicht, das Element wird geprüft.
+    let (status, _) = senden(&app, &admin, "DELETE", &pfad, Some(json!({}))).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = senden(
+        &app,
+        &admin,
+        "DELETE",
+        &format!("{b}/lage/xx-1"),
+        Some(json!({"version": 1})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+/// Review O3: dasselbe Recht wie das Verschieben.
+#[tokio::test]
+async fn einzelne_lage_verwerfen_braucht_stab_recht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "beobachter").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let pfad = format!("{}/lage/fs", basis(einsatz));
+    let (status, _) = senden(
+        &app,
+        &admin,
+        "PUT",
+        &pfad,
+        Some(json!({"x": 8, "y": 8, "version": null})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = senden(&app, &frieda, "DELETE", &pfad, Some(json!({"version": 1}))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        skizze(&app, &admin, einsatz).await["lage"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
 // ---------- Schriftfeld ----------
 
 #[tokio::test]
@@ -472,7 +564,7 @@ async fn schriftfeld_tri_state_und_zeiten() {
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
         json,
-        json!({"herausgeber": "Hochwasser Elbe", "vs_vermerk": "vs_nfd",
+        json!({"herausgeber": null, "vs_vermerk": "vs_nfd",
                "gueltig_ab": "2026-10-04 18:00:00", "gez_name": null, "gez_at": null})
     );
     let (_, json) = senden(
@@ -492,7 +584,9 @@ async fn schriftfeld_tri_state_und_zeiten() {
         "fehlend = unverändert"
     );
     assert_eq!(json["gez_at"], "2026-10-04 18:05:00");
-    // null leert; ein leerer Herausgeber fällt auf die Vorgabe zurück.
+    // null leert. Der Server liefert nur den gespeicherten Wert (Review O1): die Vorgabe
+    // „Einsatzbezeichnung“ setzt erst die Darstellung ein, sonst sähe das Paneel nie „Vorgabe:“
+    // und Rückgängig speicherte die Einsatzbezeichnung statt der Leere.
     let (_, json) = senden(
         &app,
         &admin,
@@ -501,7 +595,7 @@ async fn schriftfeld_tri_state_und_zeiten() {
         Some(json!({"herausgeber": null, "gueltig_ab": null})),
     )
     .await;
-    assert_eq!(json["herausgeber"], "Hochwasser Elbe");
+    assert_eq!(json["herausgeber"], Value::Null);
     assert_eq!(json["gueltig_ab"], Value::Null);
     assert_eq!(json["gez_name"], "M. Muster");
     assert_eq!(skizze(&app, &admin, einsatz).await["schriftfeld"], json);

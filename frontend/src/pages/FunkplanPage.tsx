@@ -478,12 +478,11 @@ const UMFANG: { quelle: 'abschnitte' | 'einheiten' | 'fahrzeuge'; wort: string }
 
 /**
  * Die Skizze mit ihren Quellzuständen (LFH-625 D5, LFH-893): ohne Abschnitte gibt es keine
- * Fläche, nur den Grund; fehlende Einheiten stehen als Hinweis darüber. Die übrigen fehlenden
- * Quellen (externe Stellen, Daten der Skizze) nennt die Fläche selbst aus `netz.fehlend`.
+ * Fläche, nur den Grund. Jede übrige fehlende Quelle (Einheiten, externe Stellen, Daten der
+ * Skizze) nennt die Fläche selbst, einmal, aus `netz.fehlend` (Review O5).
  */
 function SkizzenBereich({
   abschnitte,
-  einheiten,
   netz,
   aktionen,
   einsatzbezeichnung,
@@ -495,7 +494,6 @@ function SkizzenBereich({
   befehle,
 }: {
   abschnitte: AbrufZustand;
-  einheiten: AbrufZustand;
   netz: Fernmeldenetz;
   aktionen: SkizzenAktionen | null;
   einsatzbezeichnung: string;
@@ -506,7 +504,7 @@ function SkizzenBereich({
   druckt: boolean;
   befehle: Befehlsstapel;
 }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   if (abschnitte === 'laden') return <SeitenSkeleton />;
   if (abschnitte !== 'daten') {
     return (
@@ -516,24 +514,17 @@ function SkizzenBereich({
     );
   }
   return (
-    <>
-      {einheiten !== 'daten' && (
-        <div style={{ color: rollen.gedaempft, marginBlockEnd: token.marginSM }}>
-          {`Einheiten: ${ZUSTAND_GRUND[einheiten]}`}
-        </div>
-      )}
-      <FernmeldeskizzeBild
-        netz={netz}
-        aktionen={aktionen}
-        einsatzbezeichnung={einsatzbezeichnung}
-        gewaehlt={gewaehlt}
-        onWahl={onWahl}
-        druckFormat={druckFormat}
-        onDruckFormat={onDruckFormat}
-        druckt={druckt}
-        befehle={befehle}
-      />
-    </>
+    <FernmeldeskizzeBild
+      netz={netz}
+      aktionen={aktionen}
+      einsatzbezeichnung={einsatzbezeichnung}
+      gewaehlt={gewaehlt}
+      onWahl={onWahl}
+      druckFormat={druckFormat}
+      onDruckFormat={onDruckFormat}
+      druckt={druckt}
+      befehle={befehle}
+    />
   );
 }
 
@@ -645,7 +636,11 @@ export default function FunkplanPage() {
     [abschnitte, einheiten, fahrzeuge, personal, sprechgruppen, fuehrungsstelle],
   );
   const zeilen = useMemo(() => baueFunkplan(quellen), [quellen]);
-  const luecken = useMemo(() => funkplanLuecken(quellen), [quellen]);
+  // Mit Stellen und Skizze: Paneel und Bild zählen dieselben Träger (Review O2).
+  const luecken = useMemo(
+    () => funkplanLuecken({ ...quellen, stellen, skizze: skizzenDaten }),
+    [quellen, stellen, skizzenDaten],
+  );
 
   // Das Netz EINMAL (LFH-893): Skizze, Lücken-Paneel und Übernahme lesen dasselbe. Die Rechte je
   // Quelle bestimmen, was die Fläche anbietet; ohne Verbindung bietet sie nichts an.
@@ -1077,7 +1072,6 @@ export default function FunkplanPage() {
           {ansicht === 'skizze' ? (
             <SkizzenBereich
               abschnitte={quellen.abschnitte.zustand}
-              einheiten={quellen.einheiten.zustand}
               netz={netz}
               aktionen={aktionen}
               einsatzbezeichnung={einsatz.bezeichnung}

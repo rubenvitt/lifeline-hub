@@ -34,10 +34,16 @@ import { bezugAus } from './bedienung';
  * `SkizzenAktionen`, legt bei Erfolg Handlung und Gegenhandlung auf den Befehlsstapel und meldet
  * ein Scheitern am Element. Die Fläche selbst ruft nie das API.
  *
- * - **Verschieben** zeigt die neue Lage sofort (eigene Lage über dem Netz, bis das Netz sie mit
- *   derselben oder einer jüngeren Version trägt) und schickt die zuletzt bekannte `version`; ein
+ * - **Verschieben** zeigt die neue Lage sofort: die eigene Lage steht über dem Netz, solange die
+ *   Anfrage läuft und bis ein neueres Netz kommt; danach gilt das Netz, auch wenn es die Zeile
+ *   nicht mehr trägt („Neu anordnen“ an einem anderen Arbeitsplatz, Review S1). Erwartet wird die
+ *   Version des Netzes (`null` ohne Zeile), bis das Netz nachzieht die der eigenen Antwort; ein
  *   409 setzt das Element zurück und meldet „von einem anderen Arbeitsplatz verschoben“ (D4).
- * - **Gegenhandlungen** lesen Versionen und IDs erst beim Aufruf (Befehlsstapel, Dateikopf).
+ * - **Gegenhandlungen** von Lage und Bereich schicken genau die Version, die die eigene Handlung
+ *   geschrieben hat (Review S3): hat ein anderer Arbeitsplatz dazwischen geändert, ist das ein
+ *   409, der Eintrag fällt aus dem Stapel, und nichts wird still überschrieben. Stand das Element
+ *   vor dem ersten Verschieben im Auto-Layout, verwirft Rückgängig seine Lage wieder (Review O3).
+ *   IDs angelegter Datensätze lesen die Gegenhandlungen erst beim Aufruf.
  * - **Scheitern** steht am Element (`meldungen`) und, weil das Element verschwunden sein kann
  *   („Datensatz inzwischen gelöscht“), zusätzlich als letzte Meldung in der Statuszeile.
  */
@@ -55,10 +61,25 @@ export interface Meldung {
   text: string;
 }
 
-/** Eigene, noch nicht vom Netz bestätigte Lage; `version` erst nach der Antwort bekannt. */
+/** Eigene Lage über dem Netz; `lage: null` = Zeile verworfen (das Auto-Layout stellt). */
 interface EigeneLage {
-  lage: Lage;
-  version: number;
+  lage: Lage | null;
+  /** Die Anfrage läuft noch. */
+  offen: boolean;
+  /** Das Netz zur Zeit der Antwort: ein anderes Netz löst die eigene Lage ab. */
+  basis: ReadonlyMap<string, SkizzenLage> | null;
+}
+
+/** Was die eigene Antwort geschrieben hat, solange das Netz noch das von damals ist. */
+interface Bestaetigt {
+  version: number | null;
+  basis: ReadonlyMap<string, SkizzenLage>;
+}
+
+/** Ergebnis eines Lage-Schreibens: was erwartet und was danach gespeichert war. */
+interface LageGeschrieben {
+  erwartet: number | null;
+  version: number | null;
 }
 
 interface EigenerBereich {
@@ -79,7 +100,7 @@ export function useSkizzenHandlungen(
   useLayoutEffect(() => {
     netzRef.current = netz;
   }, [netz]);
-  const versionen = useRef(new Map<string, number>());
+  const bestaetigt = useRef(new Map<string, Bestaetigt>());
   const [eigeneLagen, setEigeneLagen] = useState<ReadonlyMap<string, EigeneLage>>(new Map());
   const [eigeneBereiche, setEigeneBereiche] = useState<ReadonlyMap<string, EigenerBereich>>(
     new Map(),
@@ -113,11 +134,17 @@ export function useSkizzenHandlungen(
     return key;
   }, []);
 
+  /**
+   * Der erwartete Stand fürs nächste Schreiben: die eigene Antwort, solange das Netz noch das von
+   * damals ist (zweimal Pfeil rechts, bevor der Cache nachzieht), sonst das Netz — `null`, wenn es
+   * keine Zeile trägt.
+   */
   const version = useCallback((key: string): number | null => {
-    const imNetz = netzRef.current.lage.get(key)?.version ?? null;
-    const eigen = versionen.current.get(key) ?? null;
-    if (imNetz == null) return eigen;
-    return eigen == null ? imNetz : Math.max(imNetz, eigen);
+    const n = netzRef.current;
+    const eigen = bestaetigt.current.get(key);
+    if (eigen && eigen.basis === n.lage) return eigen.version;
+    bestaetigt.current.delete(key);
+    return n.lage.get(key)?.version ?? null;
   }, []);
 
   /** Führt aus, legt ab und meldet ein Scheitern am Element; wirft weiter (für Inline-Felder). */
@@ -150,30 +177,40 @@ export function useSkizzenHandlungen(
    * neue Lage steht sofort im Bild.
    */
   const ketten = useRef(new Map<string, Promise<unknown>>());
+  /**
+   * Schreibt die Lage (`null` = Zeile verwerfen) mit dem erwarteten Stand `erwartet`; fehlt er,
+   * gilt {@link version} zur Zeit des Schreibens.
+   */
   const schreibeLage = useCallback(
-    (key: string, lage: Lage): Promise<void> => {
+    (key: string, lage: Lage | null, erwartet?: number | null): Promise<LageGeschrieben> => {
       const a = pflicht();
-      setEigeneLagen((alt) => new Map(alt).set(key, { lage, version: Infinity }));
+      const eintrag: EigeneLage = { lage, offen: true, basis: null };
+      setEigeneLagen((alt) => new Map(alt).set(key, eintrag));
       const vorher = ketten.current.get(key) ?? Promise.resolve();
       const jetzt = vorher
         .catch(() => {})
-        .then(async () => {
+        .then(async (): Promise<LageGeschrieben> => {
+          const v = erwartet === undefined ? version(key) : erwartet;
           try {
-            const antwort: SkizzenLage = await a.verschiebe(key, lage, version(key));
-            versionen.current.set(key, antwort.version);
+            let neu: number | null = null;
+            if (lage) neu = (await a.verschiebe(key, lage, v)).version;
+            else if (v != null) await a.entferneLage(key, v);
+            const basis = netzRef.current.lage;
+            bestaetigt.current.set(key, { version: neu, basis });
             setEigeneLagen((alt) => {
-              // Ein späteres Verschieben desselben Elements hat schon eine neuere Lage gesetzt.
-              if (alt.get(key)?.lage !== lage) return alt;
-              return new Map(alt).set(key, { lage, version: antwort.version });
+              // Ein späteres Schreiben desselben Elements hat schon eine neuere Lage gesetzt.
+              if (alt.get(key) !== eintrag) return alt;
+              return new Map(alt).set(key, { lage, offen: false, basis });
             });
+            return { erwartet: v, version: neu };
           } catch (e) {
             setEigeneLagen((alt) => {
-              if (alt.get(key)?.lage !== lage) return alt;
+              if (alt.get(key) !== eintrag) return alt;
               const neu = new Map(alt);
               neu.delete(key);
               return neu;
             });
-            if (ist409(e)) versionen.current.delete(key);
+            if (ist409(e)) bestaetigt.current.delete(key);
             throw e;
           }
         });
@@ -184,20 +221,34 @@ export function useSkizzenHandlungen(
   );
 
   const verschieben = useCallback(
-    (key: string, ziel: Lage, vorher: Lage) =>
-      tue({
+    (key: string, ziel: Lage, vorher: Lage) => {
+      // Die Version, die dieser Eintrag zuletzt geschrieben hat; `undefined` vor dem ersten Mal.
+      // Rückgängig und Wiederholen erwarten genau sie (Review S3).
+      let stand: number | null | undefined;
+      // Stand das Element vorher im Auto-Layout (keine Zeile erwartet)? Dann verwirft Rückgängig
+      // die Zeile wieder, statt die Auto-Lage festzuschreiben (Review O3).
+      let ohneZeile = false;
+      return tue({
         beschreibung: `Verschieben von ${name(key)}`,
         element: key,
-        ausfuehren: () => schreibeLage(key, ziel),
-        zuruecknehmen: () => schreibeLage(key, vorher),
+        ausfuehren: async () => {
+          const erstes = stand === undefined;
+          const r = await schreibeLage(key, ziel, stand);
+          if (erstes) ohneZeile = r.erwartet == null;
+          stand = r.version;
+        },
+        zuruecknehmen: async () => {
+          stand = (await schreibeLage(key, ohneZeile ? null : vorher, stand)).version;
+        },
         grund: (e) => (ist409(e) ? VERSCHOBEN_MELDUNG : null),
-      }),
+      });
+    },
     [tue, name, schreibeLage],
   );
 
   /**
-   * Erste Lage einer Schiene aus der Palette. Ohne Rückgängig: es gibt keinen Weg, eine einzelne
-   * Lage zu verwerfen (D14 kennt nur „Neu anordnen“); weggezogen wird sie wie jede Schiene.
+   * Erste Lage einer Schiene aus der Palette. Ohne Rückgängig: weggezogen wird sie wie jede
+   * Schiene, verworfen über „Neu anordnen“.
    */
   const setzeSchiene = useCallback(
     async (key: string, lage: Lage) => {
@@ -214,7 +265,7 @@ export function useSkizzenHandlungen(
 
   const neuAnordnen = useCallback(async () => {
     await pflicht().neuAnordnen();
-    versionen.current.clear();
+    bestaetigt.current.clear();
     setEigeneLagen(new Map());
   }, [pflicht]);
 
@@ -387,11 +438,25 @@ export function useSkizzenHandlungen(
     [tue, name, pflicht],
   );
 
+  /**
+   * Legt die Stelle im Kommunikationsplan an (Review S4). Rückgängig entfernt genau die Stelle,
+   * deren id der Server für DIESES Anlegen genannt hat — nie eine, die schon bestand.
+   */
   const legeExterneStelleAn = useCallback(
-    async (stellenart: ExterneStellenart, bezeichnung: string) => {
-      await pflicht().legeExterneStelleAn(stellenart, bezeichnung);
+    (stellenart: ExterneStellenart, bezeichnung: string) => {
+      let id: number | null = null;
+      return tue({
+        beschreibung: `${bezeichnung} anlegen`,
+        element: 'extern',
+        ausfuehren: async () => {
+          id = (await pflicht().legeExterneStelleAn(stellenart, bezeichnung)).id;
+        },
+        zuruecknehmen: async () => {
+          if (id != null) await pflicht().entferneExterneStelle(id);
+        },
+      });
     },
-    [pflicht],
+    [tue, pflicht],
   );
 
   // ── Bereiche ──────────────────────────────────────────────────────────────────────────────
@@ -412,15 +477,17 @@ export function useSkizzenHandlungen(
     [tue, pflicht],
   );
 
+  /** Gibt die gespeicherte Version zurück; ohne `erwartet` gilt der jüngste bekannte Stand. */
   const schreibeBereich = useCallback(
-    async (b: NetzBereich, felder: BereichsFelder) => {
+    async (b: NetzBereich, felder: BereichsFelder, erwartet?: number): Promise<number> => {
       const a = pflicht();
       const v = eigeneBereiche.get(b.key)?.version;
-      const erwartet = Math.max(b.version, Number.isFinite(v) ? (v as number) : -1);
+      const bekannt = Math.max(b.version, Number.isFinite(v) ? (v as number) : -1);
       setEigeneBereiche((alt) => new Map(alt).set(b.key, { felder, version: Infinity }));
       try {
-        const antwort = await a.aendereBereich(b.id, felder, erwartet);
+        const antwort = await a.aendereBereich(b.id, felder, erwartet ?? bekannt);
         setEigeneBereiche((alt) => new Map(alt).set(b.key, { felder, version: antwort.version }));
+        return antwort.version;
       } catch (e) {
         setEigeneBereiche((alt) => {
           const neu = new Map(alt);
@@ -440,11 +507,18 @@ export function useSkizzenHandlungen(
         (vorher as Record<string, unknown>)[k] = b[k];
       }
       const aktuell = (): NetzBereich => netzRef.current.bereiche.find((x) => x.key === b.key) ?? b;
+      // Wie beim Verschieben: Rückgängig und Wiederholen erwarten genau die Version, die dieser
+      // Eintrag zuletzt geschrieben hat (Review S3).
+      let stand: number | undefined;
       return tue({
         beschreibung: `Bereich ${b.bezeichnung} ändern`,
         element: b.key,
-        ausfuehren: () => schreibeBereich(aktuell(), felder),
-        zuruecknehmen: () => schreibeBereich(aktuell(), vorher),
+        ausfuehren: async () => {
+          stand = await schreibeBereich(aktuell(), felder, stand);
+        },
+        zuruecknehmen: async () => {
+          stand = await schreibeBereich(aktuell(), vorher, stand);
+        },
         grund: (e) => (ist409(e) ? 'von einem anderen Arbeitsplatz geändert' : null),
       });
     },
@@ -532,11 +606,12 @@ export function useSkizzenHandlungen(
     [befehle, melde],
   );
 
-  /** Das Netz mit den eigenen, noch nicht bestätigten Lagen und Bereichen darüber. */
+  /**
+   * Das Netz mit den eigenen Lagen und Bereichen darüber. Eine eigene Lage steht, solange ihre
+   * Anfrage läuft und bis ein neueres Netz kommt; danach gilt das Netz (Review S1).
+   */
   const angezeigt = useMemo((): Fernmeldenetz => {
-    const offen = [...eigeneLagen].filter(
-      ([key, e]) => (netz.lage.get(key)?.version ?? -1) < e.version,
-    );
+    const offen = [...eigeneLagen].filter(([, e]) => e.offen || e.basis === netz.lage);
     const bereiche = [...eigeneBereiche].filter(([key, e]) => {
       const b = netz.bereiche.find((x) => x.key === key);
       return b != null && b.version < e.version;
@@ -544,6 +619,10 @@ export function useSkizzenHandlungen(
     if (offen.length === 0 && bereiche.length === 0) return netz;
     const lage = new Map(netz.lage);
     for (const [key, e] of offen) {
+      if (!e.lage) {
+        lage.delete(key);
+        continue;
+      }
       lage.set(key, {
         element: key,
         x: e.lage.x,

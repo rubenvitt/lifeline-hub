@@ -143,7 +143,9 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
   Abweichung, mit aktuellem Stand) und `DELETE …/lage` für „Neu anordnen“.
   - Nachweis: Integrationstests „Zwei Personen ziehen dieselbe Einheit“ und „Neu anordnen“.
   - Erledigt: `zwei_personen_ziehen_dieselbe_einheit`, `neu_anordnen_verwirft_nur_die_lagen`,
-    `lage_mit_version_ohne_zeile_ist_409_mit_leerem_stand`, `lage_prueft_element_und_werte`.
+    `lage_mit_version_ohne_zeile_ist_409_mit_leerem_stand`, `lage_prueft_element_und_werte`;
+    `DELETE …/lage/{element}` mit `version` (Review O3): `einzelne_lage_verwerfen_mit_version`,
+    `einzelne_lage_verwerfen_braucht_stab_recht`.
     409-Körper `SkizzenLageKonflikt { error, aktuell }`.
 - [x] 5.2 Ziehen auf der Fläche mit `@dnd-kit/core` und `ZugPointerSensor`, Raster, Speichern; ruhige
   Fläche unter Zeiger/Fokus, Markierung „neu“.

@@ -9631,7 +9631,7 @@
       },
       "Schriftfeld": {
         "type": "object",
-        "description": "Schriftfeld der Skizze (J.5). Ohne gespeicherte Angabe gilt als Herausgeber die\nEinsatzbezeichnung.",
+        "description": "Schriftfeld der Skizze (J.5). Jedes Feld trägt den gespeicherten Wert, `null` = leer. Die\nVorgabe des Herausgebers (Einsatzbezeichnung) setzt erst die Darstellung ein, damit\nBearbeiten und Rückgängig „leer“ von „Einsatzbezeichnung“ unterscheiden (Review O1).",
         "required": [
           "herausgeber",
           "vs_vermerk",
