@@ -176,6 +176,12 @@ export interface components {
             id: number;
             zugriff_at: string;
         };
+        /** @description Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind. */
+        AnsichtSperre: {
+            ansicht: components["schemas"]["Funktionsansicht"];
+            /** @description Modul-Keys, die das Gerät nicht nutzen könnte. Leer: die Ansicht ist voll nutzbar. */
+            gesperrte_module: string[];
+        };
         /**
          * @description Stand eines Antrags.
          * @enum {string}
@@ -2033,6 +2039,12 @@ export interface components {
          */
         FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
+         * @description Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
+         *     `migrations/0147_geraet_kopplung.sql`.
+         * @enum {string}
+         */
+        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor";
+        /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
          *     `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
          */
@@ -2096,6 +2108,25 @@ export interface components {
         GeoJsonGeometrie: {
             coordinates: unknown;
             type: string;
+        };
+        /** @description Wie ein Gerät sich selbst sieht (`GET /api/auth/me`, Feld `geraet`). */
+        GeraetAnzeige: {
+            ansicht: components["schemas"]["Funktionsansicht"];
+            bezeichnung: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            kopplung_id: number;
+            laeuft_ab_at: string;
+            /** @description Bezeichnung der UHS, falls stellengebunden. */
+            stelle?: string | null;
+            /** Format: int64 */
+            uhs_id?: number | null;
+        };
+        /** @description Geräteübersicht der Einsatzleitung. */
+        GeraeteUebersicht: {
+            kopplungen: components["schemas"]["KopplungAnzeige"][];
+            sperren: components["schemas"]["AnsichtSperre"][];
         };
         /**
          * @description Optionale Geschlechtsangabe. `unbekannt` ist ein erstklassiger Wert.
@@ -2298,6 +2329,42 @@ export interface components {
          * @enum {string}
          */
         Koordinatenformat: "wgs84" | "dms" | "utm" | "mgrs" | "gk";
+        /** @description Eine Kopplung für die Geräteübersicht der Einsatzleitung. */
+        KopplungAnzeige: {
+            ansicht: components["schemas"]["Funktionsansicht"];
+            /** @description Anzeigename des Gerätekontos, so wie er an Einträgen steht. */
+            anzeigename: string;
+            bezeichnung: string;
+            erstellt_at: string;
+            erstellt_von_name: string;
+            gekoppelt_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            laeuft_ab_at: string;
+            letzter_zugriff_at?: string | null;
+            status: components["schemas"]["KopplungStatus"];
+            /** @description Bezeichnung der UHS, falls stellengebunden. */
+            stelle?: string | null;
+            /** Format: int64 */
+            uhs_id?: number | null;
+            widerrufen_at?: string | null;
+            widerrufen_von_name?: string | null;
+        };
+        /** @description Antwort auf das Anlegen und das Neuausstellen: Kopplung plus Code. */
+        KopplungMitCode: {
+            code: components["schemas"]["KopplungsCode"];
+            kopplung: components["schemas"]["KopplungAnzeige"];
+        };
+        /**
+         * @description Zustand einer Kopplung, aus Sicht der Einsatzleitung.
+         * @enum {string}
+         */
+        KopplungStatus: "wartend" | "aktiv" | "abgelaufen" | "widerrufen";
+        /** @description Ein frisch ausgestellter Kopplungscode. Der Klartext verlässt den Server nur hier, einmal. */
+        KopplungsCode: {
+            code: string;
+            laeuft_ab_at: string;
+        };
         /**
          * @description Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)
          *     per JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.
@@ -2521,6 +2588,13 @@ export interface components {
          * @enum {string}
          */
         MaterialStatus: "einsatzbereit" | "im_einsatz" | "defekt" | "verbraucht" | "desinfektion_noetig";
+        /**
+         * @description Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) zusätzlich
+         *     die Kopplung. Eine Person bekommt `geraet: null`.
+         */
+        MeAntwort: components["schemas"]["BenutzerAnzeige"] & {
+            geraet?: components["schemas"]["GeraetAnzeige"] | null;
+        };
         /** @description Öffentliche Darstellung eines Medienkontakts. */
         MedienkontaktAnzeige: {
             angelegt_at: string;

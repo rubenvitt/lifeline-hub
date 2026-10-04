@@ -98,40 +98,47 @@ Task „Bediener am Gerät“, der die Kopplung nicht ersetzt.
   Nachlauffrist (Geräte lesen nie nach Abschluss). *Verworfen:* „gilt bis Einsatzende“ ohne
   Frist. Ein verlorenes Tablet, das niemand vermisst, bliebe dann tagelang offen.
 
-### D4 Funktionsansicht als feste Scope-Liste im Code
+### D4 Funktionsansicht als feste Routenliste im Code
 
 Eine Funktionsansicht ist ein Enum (`uhs-tablet`, `uhs-laptop`, `lagemonitor`) mit einer im Code
-festen Tabelle: je Modul-Key *lesen* und/oder *schreiben*, ob die Ansicht an eine Stelle
-gebunden ist, welche Einsatzrolle sie trägt (Lagemonitor `beobachter`, UHS-Ansichten
-`fuehrungspersonal`) und welche Routen ohne Modul-Marker sie nutzen darf. Die Matrix steht in
-`specs/funktionsansichten/spec.md`.
+festen Beschreibung: die erlaubten Routen als `(Methode, MatchedPath)`, die Module, deren
+Live-Ereignisse sie erhält, ob sie an eine Stelle gebunden ist und welche Einsatzrolle sie
+trägt (Lagemonitor `beobachter`, UHS-Ansichten `fuehrungspersonal`). Die Routenliste ist die
+Scope-Matrix aus `specs/funktionsansichten/spec.md` in maschinenlesbarer Form. Vorbild ist
+`OHNE_ZULASSUNGSGRENZE` in `src/zulassung.rs`, das schon methodengenau mit `MatchedPath`
+arbeitet.
 
-*Verworfen:* frei konfigurierbare Ansichten je Org. Jede Ansicht braucht zugeschnittene
-Oberfläche und Stellenfilter im Server; eine Konfiguration ohne beides wäre eine Schranke, die
-nur auf dem Papier steht. Neue Ansichten kommen als Code mit Tests.
+*Verworfen:* Rechte je Modul-Key. Die Matrix ist feiner als ein Modul: Das Tablet darf in
+`unfallhilfsstellen` Belegungen schreiben, aber keine Plätze anlegen; beides läuft über
+denselben Schreib-Extractor mit demselben Marker. *Verworfen:* frei konfigurierbare Ansichten
+je Org. Jede Ansicht braucht zugeschnittene Oberfläche und Stellenfilter im Server; eine
+Konfiguration ohne beides wäre eine Schranke, die nur auf dem Papier steht. Neue Ansichten
+kommen als Code mit Tests.
 
-### D5 Durchsetzung in den Gate-Extractoren, Vorgabe „verboten“
+### D5 Durchsetzung in `CurrentUser`, Vorgabe „verboten“
 
-- `EinsatzKontext` trägt zusätzlich `geraet: Option<GeraetKontext>` (Kopplung, Ansicht,
-  Stelle). Bei einer Gerätesitzung kommt die Rolle aus der Ansicht, nicht aus
-  `einsatz_mitgliedschaft`; ein anderer Einsatz als der gekoppelte ist 404, wie ein
-  unbekannter Einsatz.
-- `EinsatzLesezugriff<M>` verlangt für Geräte `M ∈ lesen(Ansicht)`, die Schreib-Extractoren
-  `M ∈ schreiben(Ansicht)`. `OhneModul` ist für Geräte verboten, außer die Route steht in der
-  Ausnahmeliste der Ansicht (Einsatzkopf, `modul-freigaben`, `modul-zaehler`, `live`).
-  `EinsatzLeitungszugriff` und `EinsatzVerwaltungszugriff` sind für Geräte immer 403. Die
-  bestehende Modulfreigabe gilt zusätzlich: Sperrt die Org ein Modul für Mitglieder ohne
-  Führungsrolle, sperrt sie es auch für das Gerät.
-- **Außerhalb von `/api/einsaetze/{id}/…`** lehnt `CurrentUser` eine Gerätesitzung mit 403 ab.
-  Wenige Routen ziehen stattdessen einen eigenen Extractor, der Geräte zulässt (`/api/auth/me`,
-  `/api/auth/logout`, die lesenden Kartengrundlagen unter `/api/karte/` wie Konfiguration,
-  Kacheln, Schriften, Sprites und Proxy, sowie `GET /api/organisation` für das Branding). Ein Guard-Test neben
-  `einsatz_kontext_guard.rs` hält beide Listen gegen `app.rs`.
+- **Ein Engpass:** Jede authentifizierte Route zieht `CurrentUser`, direkt oder über
+  `EinsatzKontext`, `AdminUser` und die Gate-Extractoren. Löst `CurrentUser` eine Gerätesitzung
+  auf, prüft er `(Methode, MatchedPath)` gegen die Routenliste der Ansicht plus eine kleine
+  Liste für alle Geräte (`/api/auth/me`, `/api/auth/logout`, die lesenden Kartengrundlagen
+  unter `/api/karte/`, `GET /api/organisation` für das Branding). Nicht gelistet: 403. Trägt der
+  Pfad ein `{id}`, muss es der gekoppelte Einsatz sein, sonst 404 wie ein unbekannter Einsatz.
+  Eine neue Route ist damit für Geräte gesperrt, ohne dass jemand an sie denkt; die Handler
+  bleiben unverändert.
+- `CurrentUser` legt den `GeraetKontext` (Kopplung, Ansicht, Stelle) in die Extensions der
+  Anfrage. `EinsatzKontext` liest ihn und nimmt für Geräte die Rolle aus der Ansicht statt aus
+  `einsatz_mitgliedschaft`. Die bestehende Modulfreigabe gilt zusätzlich: Sperrt die Org ein
+  Modul für Mitglieder ohne Führungsrolle, sperrt sie es auch für das Gerät.
+- Ein Guard-Test neben `tests/zulassung_guard.rs` hält jede Listenzeile gegen `app.rs` (keine
+  toten Einträge) und verlangt, dass jede für Geräte zugelassene Einsatzroute einen
+  sanktionierten Gate-Typ zieht, nicht den bloßen `EinsatzKontext`.
 - **Stellenbindung im Handler, über einen Helfer:** Routen mit `{uid}` vergleichen gegen die
   Stelle der Kopplung (fremde UHS: 404, damit der Statuscode nichts verrät). Listen filtern auf
   die eigene Stelle. Personen sind für ein UHS-Gerät sichtbar, wenn sie mindestens eine Belegung
   in der eigenen UHS haben (auch nach dem Austritt, für den Verbleib).
-- *Verworfen:* Schranke nur in der Oberfläche. Ein Gerät liegt unbeaufsichtigt im Feld; wer es
+- *Verworfen:* Prüfung je Gate-Extractor über den Modul-Marker. Bloßer `EinsatzKontext`, die
+  noch nicht migrierten Module und alle Routen außerhalb des Einsatzes fielen durch.
+  *Verworfen:* Schranke nur in der Oberfläche. Ein Gerät liegt unbeaufsichtigt im Feld; wer es
   in die Hand bekommt, hat die Entwicklerwerkzeuge des Browsers.
 
 ### D6 Zuschnitt der drei Ansichten
@@ -191,9 +198,9 @@ ausdrücklich, statt sie als Ausnahme im Code zu verstecken.
 - [Ein vergessener Listenfilter zeigt Gerätekonten als Personen] → Filter als ein gemeinsames
   SQL-Fragment; Test, der für jede Personen-Auswahlroute ein Gerätekonto anlegt und es dort
   nicht findet.
-- [Eine neue Einsatzroute ohne Modul-Marker wäre für Geräte offen] → Vorgabe „verboten“ im
-  Extractor; der Guard-Test kennt die Ausnahmeliste und schlägt bei jeder neuen Route an, die
-  ein Gerät erreicht.
+- [Eine Listenzeile überlebt das Umbenennen ihrer Route und sperrt still eine Funktion] →
+  Guard-Test gegen `app.rs` und je Ansicht ein Durchlauf aller gelisteten Routen im
+  Integrationstest.
 - [Stellenfilter in Handlern kann vergessen werden] → Helfer `fordere_stelle(uid)` und je
   UHS- und Personenroute ein Test mit fremder UHS (404).
 - [Modulfreigabe der Org sperrt ein Modul, das die Ansicht braucht] → Die Kopplungsmaske prüft

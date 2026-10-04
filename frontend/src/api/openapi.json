@@ -443,6 +443,26 @@
           }
         }
       },
+      "AnsichtSperre": {
+        "type": "object",
+        "description": "Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.",
+        "required": [
+          "ansicht",
+          "gesperrte_module"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/Funktionsansicht"
+          },
+          "gesperrte_module": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Modul-Keys, die das Gerät nicht nutzen könnte. Leer: die Ansicht ist voll nutzbar."
+          }
+        }
+      },
       "AntragStand": {
         "type": "string",
         "description": "Stand eines Antrags.",
@@ -5459,6 +5479,15 @@
           "fachberater"
         ]
       },
+      "Funktionsansicht": {
+        "type": "string",
+        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0147_geraet_kopplung.sql`.",
+        "enum": [
+          "uhs-tablet",
+          "uhs-laptop",
+          "lagemonitor"
+        ]
+      },
       "GefahrBewertungAnzeige": {
         "type": "object",
         "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit\n`warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.",
@@ -5629,6 +5658,72 @@
           "coordinates": {},
           "type": {
             "type": "string"
+          }
+        }
+      },
+      "GeraetAnzeige": {
+        "type": "object",
+        "description": "Wie ein Gerät sich selbst sieht (`GET /api/auth/me`, Feld `geraet`).",
+        "required": [
+          "kopplung_id",
+          "einsatz_id",
+          "ansicht",
+          "bezeichnung",
+          "laeuft_ab_at"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/Funktionsansicht"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kopplung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          },
+          "stelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung der UHS, falls stellengebunden."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "GeraeteUebersicht": {
+        "type": "object",
+        "description": "Geräteübersicht der Einsatzleitung.",
+        "required": [
+          "kopplungen",
+          "sperren"
+        ],
+        "properties": {
+          "kopplungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KopplungAnzeige"
+            }
+          },
+          "sperren": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnsichtSperre"
+            }
           }
         }
       },
@@ -6195,6 +6290,128 @@
           "mgrs",
           "gk"
         ]
+      },
+      "KopplungAnzeige": {
+        "type": "object",
+        "description": "Eine Kopplung für die Geräteübersicht der Einsatzleitung.",
+        "required": [
+          "id",
+          "ansicht",
+          "bezeichnung",
+          "anzeigename",
+          "status",
+          "erstellt_at",
+          "erstellt_von_name",
+          "laeuft_ab_at"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/Funktionsansicht"
+          },
+          "anzeigename": {
+            "type": "string",
+            "description": "Anzeigename des Gerätekontos, so wie er an Einträgen steht."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von_name": {
+            "type": "string"
+          },
+          "gekoppelt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          },
+          "letzter_zugriff_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/KopplungStatus"
+          },
+          "stelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung der UHS, falls stellengebunden."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "widerrufen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "KopplungMitCode": {
+        "type": "object",
+        "description": "Antwort auf das Anlegen und das Neuausstellen: Kopplung plus Code.",
+        "required": [
+          "kopplung",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/KopplungsCode"
+          },
+          "kopplung": {
+            "$ref": "#/components/schemas/KopplungAnzeige"
+          }
+        }
+      },
+      "KopplungStatus": {
+        "type": "string",
+        "description": "Zustand einer Kopplung, aus Sicht der Einsatzleitung.",
+        "enum": [
+          "wartend",
+          "aktiv",
+          "abgelaufen",
+          "widerrufen"
+        ]
+      },
+      "KopplungsCode": {
+        "type": "object",
+        "description": "Ein frisch ausgestellter Kopplungscode. Der Klartext verlässt den Server nur hier, einmal.",
+        "required": [
+          "code",
+          "laeuft_ab_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          }
+        }
       },
       "LageMeldungAnzeige": {
         "type": "object",
@@ -6791,6 +7008,29 @@
           "verbraucht",
           "desinfektion_noetig"
         ]
+      },
+      "MeAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BenutzerAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "geraet": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/GeraetAnzeige"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) zusätzlich\ndie Kopplung. Eine Person bekommt `geraet: null`."
       },
       "MedienkontaktAnzeige": {
         "type": "object",

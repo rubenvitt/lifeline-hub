@@ -136,15 +136,22 @@ Anzeige MUST Stelle und Gerätebezeichnung nennen (etwa „UHS Nord · Tablet 1�
 
 ### Requirement: Kopplungen sind auditiert
 
-Das System SHALL Anlegen, Einlösen (mit IP), Verlängern, Neuausstellen, Widerruf und Ablauf
-einer Kopplung im Auth-Audit festhalten und Anlegen, Einlösen und Widerruf zusätzlich als
-System-Eintrag im ETB des Einsatzes. Die Einsatzleitung MUST je Kopplung sehen, wer sie angelegt
+Das System SHALL jede Einlösung, gelungen wie gescheitert, mit IP im Anmelde-Audit unter dem
+Anmeldeweg `geraetecode` festhalten, Anlegen, Code-Ausstellung, Einlösung, Verlängerung und
+Widerruf in der Ereignisspur der Kopplung, und Anlegen, Einlösen und Widerruf zusätzlich als
+System-Eintrag im ETB des Einsatzes. Der Ablauf braucht keinen Eintrag: er folgt aus dem
+gespeicherten Ende. Die Einsatzleitung MUST je Kopplung sehen, wer sie angelegt
 hat, wann sie eingelöst wurde und wann das Gerät zuletzt zugegriffen hat.
 
 #### Scenario: Widerruf im ETB
 
 - **WHEN** die Einsatzleitung das Tablet der UHS Nord widerruft
 - **THEN** steht im ETB ein System-Eintrag mit Gerät, Stelle und widerrufender Person
+
+#### Scenario: Gescheiterte Einlösung im Anmelde-Audit
+
+- **WHEN** jemand einen falschen Kopplungscode eingibt
+- **THEN** steht im Anmelde-Audit ein Fehlschlag mit Anmeldeweg `geraetecode` und IP
 
 #### Scenario: Übersicht der Kopplungen
 

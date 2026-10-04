@@ -34,6 +34,7 @@ pub mod fahrzeug_status;
 pub mod freies_zeichen;
 pub mod fuehrungsfunktion;
 pub mod gefahr;
+pub mod geraet;
 pub mod health;
 pub mod infotelefon;
 pub mod karte;

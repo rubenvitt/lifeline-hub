@@ -303,6 +303,34 @@ async fn lade_modul_regeln(
     Ok((overrides, org_defaults))
 }
 
+/// Welche der `module` in diesem Einsatz einem Mitglied ohne System- und Org-Rolle gesperrt
+/// sind (LFH-892): so behandelt der Server ein gekoppeltes Gerät. Die Kopplungsmaske nennt sie,
+/// bevor ein Gerät gekoppelt wird, das seine Ansicht nicht nutzen könnte.
+pub async fn gesperrt_fuer_einfaches_mitglied(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    module: &[&'static str],
+) -> Result<Vec<&'static str>, AppError> {
+    let (overrides, org_defaults) = lade_modul_regeln(pool, einsatz_id, org_id).await?;
+    let mitglied = Benutzer {
+        id: 0,
+        org_id,
+        anzeigename: String::new(),
+        benutzername: String::new(),
+        passwort_hash: String::new(),
+        system_rolle: crate::auth::SystemRolle::Keiner,
+        org_rolle: crate::auth::OrgRolle::Keine,
+        aktiv: true,
+        erstellt_at: String::new(),
+    };
+    Ok(module
+        .iter()
+        .copied()
+        .filter(|m| !modul_freigabe(&overrides, &org_defaults, m, &mitglied).zugriff)
+        .collect())
+}
+
 /// Async-Wrapper für Route-Handler: lädt die Modulregeln aus der DB und ruft dann
 /// `fordere_modul_zugriff` auf.
 pub async fn fordere_modul_zugriff_laden(

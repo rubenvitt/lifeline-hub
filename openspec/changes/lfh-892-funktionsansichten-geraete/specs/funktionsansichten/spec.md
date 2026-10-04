@@ -142,9 +142,7 @@ Organisation erreichen.
 #### Scenario: Neue Route ohne Zulassung
 
 - **WHEN** eine neue Einsatzroute hinzukommt, die keine Ansicht zulässt
-- **THEN** antwortet sie einem Gerät mit 403
-- **AND** schlägt der Guard-Test an, bis die Route einer Ansicht zugeordnet oder ausdrücklich
-  ausgeschlossen ist
+- **THEN** antwortet sie einem Gerät mit 403, ohne dass die Ansicht geändert wurde
 
 ### Requirement: Modulfreigabe gilt zusätzlich
 
