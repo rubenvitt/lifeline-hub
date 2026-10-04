@@ -580,6 +580,16 @@ export function istSprungGesperrt(key: string, freigaben?: ModulFreigaben): bool
 }
 
 /**
+ * {@link istSprungGesperrt} über einen fertigen Zielpfad (`/einsaetze/:id/<route>/…?…`): für Stellen,
+ * deren Ziel erst aus Daten entsteht (Kennzahlen des Lagebilds). Ein Pfad außerhalb eines Moduls
+ * ist nie gesperrt.
+ */
+export function istPfadGesperrt(pfad: string, freigaben?: ModulFreigaben): boolean {
+  const modul = modulAusPfad(pfad.split(/[?#]/)[0]);
+  return modul != null && istSprungGesperrt(modul.key, freigaben);
+}
+
+/**
  * Rückweg aus einer Sackgasse (Modulwächter, Platzhalter, Stab ohne Freigabe; LFH-888): das
  * Standardmodul des Einsatzes, wenn es frei ist, sonst der Überblick, sonst das erste freie Modul
  * in Registry-Reihenfolge, zuletzt die Einsatzdaten (nie gesperrt). „Frei" in der strengen Lesart

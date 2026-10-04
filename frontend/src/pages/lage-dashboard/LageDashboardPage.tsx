@@ -60,7 +60,7 @@ import {
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
 import { ladeModulFreigaben } from '../../api/einsaetze';
-import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import { istKeyFreigegeben, istPfadGesperrt } from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import { ladeMatrix } from '../../api/gefahren';
 import { listeEtb } from '../../api/etb';
@@ -433,6 +433,10 @@ export default function LageDashboardPage() {
                 ))
               : lagebild.kennzahlen.map((k) => {
                   const z = kennzahlZustand[k.etikett];
+                  // Ziel nur in ein freies Modul (LFH-888, design.md D4): Wert bleibt, Link entfällt.
+                  const zielPfad = k.ohneZiel
+                    ? undefined
+                    : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route));
                   // Nicht freigegeben (LFH-669): „—" mit Grund, kein Ausfall, keine erfundene 0,
                   // kein Sprung ins gesperrte Modul — wie „Aufträge offen".
                   return z === 'gesperrt' ? (
@@ -452,9 +456,9 @@ export default function LageDashboardPage() {
                       ton={k.ton}
                       zustand={alsKennzahlZustand(z)}
                       ziel={
-                        k.ohneZiel
-                          ? undefined
-                          : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route))
+                        zielPfad != null && !istPfadGesperrt(zielPfad, freigabenQuery.data)
+                          ? zielPfad
+                          : undefined
                       }
                     />
                   );

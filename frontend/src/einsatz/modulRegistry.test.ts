@@ -15,6 +15,7 @@ import {
   istKeyFreigegeben,
   istModulFreigegeben,
   istSprungGesperrt,
+  istPfadGesperrt,
   freiesRueckwegModul,
   KEINE_BERECHTIGUNG,
   type ModulEintrag,
@@ -385,6 +386,20 @@ describe('istSprungGesperrt (LFH-888)', () => {
 
   it('der Grundtext ist EINE Konstante', () => {
     expect(KEINE_BERECHTIGUNG).toBe('Keine Berechtigung');
+  });
+});
+
+describe('istPfadGesperrt (LFH-888)', () => {
+  it('liest das Modul aus dem Pfad, auch mit Query und Unterroute', () => {
+    const f = freigabenFixture({ personen: { zugriff: false } });
+    expect(istPfadGesperrt('/einsaetze/1/personen?sichtung=rot', f)).toBe(true);
+    expect(istPfadGesperrt('/einsaetze/1/personen/5', f)).toBe(true);
+    expect(istPfadGesperrt('/einsaetze/1/etb', f)).toBe(false);
+  });
+
+  it('außerhalb eines Moduls oder bei unbekannten Freigaben nie gesperrt', () => {
+    expect(istPfadGesperrt('/admin/stammdaten/personal', freigabenFixture())).toBe(false);
+    expect(istPfadGesperrt('/einsaetze/1/personen', undefined)).toBe(false);
   });
 });
 
