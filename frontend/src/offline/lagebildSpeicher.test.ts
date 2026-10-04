@@ -20,6 +20,7 @@ const BENUTZER: BenutzerAnzeige = {
   system_rolle: 'keiner',
   aktiv: true,
   totp_aktiviert: false,
+  passwort_gesetzt: true,
   erstellt_at: '2026-09-01T00:00:00',
 } as BenutzerAnzeige;
 
