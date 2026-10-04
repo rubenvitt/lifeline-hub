@@ -149,8 +149,9 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   Tote schwarz, „unverletzt" ohne Farbe; die Umrandung macht Gelb auf hellem und Schwarz auf
   dunklem Grund sichtbar. Nie `color="black"` an antds `Tag`; nie `color="blue"` (LFH-891, Spec
   `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): eine Kennzeichnung
-  ohne Status (ad-hoc, Rolle, Kennung) ist neutral wie die Demo-Marke, Blau bedient. Übergabe, Geschädigt-Bezug,
-  UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind unabhängig.
+  ohne Status (ad-hoc, Rolle, Kennung) ist neutral wie die Demo-Marke, Blau bedient.
+  Übergabe, Geschädigt-Bezug, UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind
+  unabhängig.
 - **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)
   **ist** `bedienText`, ein Link braucht kein eigenes `style`, Zeiger-Rückmeldung ist die
   Unterstreichung. Radio-Text im Stil `outline` über `index.css` (`--lfh-bedien-text`), kein
