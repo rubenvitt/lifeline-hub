@@ -12,6 +12,7 @@
 
 pub mod code;
 pub mod repo;
+pub mod stelle;
 
 use crate::einsatz::EinsatzRolle;
 use crate::wire_enum::wire_enum;
@@ -134,9 +135,26 @@ impl Funktionsansicht {
     }
 }
 
-/// Zusätzliche Einsatzrouten des UHS-Tablets. Leer, bis die Stellenbindung der UHS- und
-/// Personenrouten steht (Subtask UHS-Tablet); vorher sähe ein Tablet jede UHS des Einsatzes.
-const UHS_TABLET: &[(&str, &str)] = &[];
+/// Zusätzliche Einsatzrouten des UHS-Tablets: die eigene UHS lesen, Belegung und
+/// Platzverfügbarkeit, Personen der eigenen UHS mit Aufnahme, Stammdaten, Sichtung, Verbleib und
+/// Notizen. Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
+/// Material, Status, Storno, Export, Druck, Abgleich und Anhänge fehlen bewusst.
+const UHS_TABLET: &[(&str, &str)] = &[
+    ("GET", "/api/einsaetze/{id}/uhs"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}"),
+    (
+        "POST",
+        "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
+    ),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
+    ("GET", "/api/einsaetze/{id}/personen"),
+    ("POST", "/api/einsaetze/{id}/personen"),
+    ("GET", "/api/einsaetze/{id}/personen/{pid}"),
+    ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
+];
 /// Zusätzliche Einsatzrouten des UHS-Laptops (Subtask UHS-Laptop).
 const UHS_LAPTOP: &[(&str, &str)] = &[];
 /// Zusätzliche Einsatzrouten des Lagemonitors (Subtask Lagemonitor).
@@ -243,6 +261,32 @@ mod tests {
             "GET",
             "/api/auth/logout"
         ));
+    }
+
+    #[test]
+    fn tablet_bearbeitet_den_grundriss_nicht() {
+        let t = Funktionsansicht::UhsTablet;
+        assert!(darf_route(t, "GET", "/api/einsaetze/{id}/uhs/{uid}"));
+        assert!(darf_route(
+            t,
+            "POST",
+            "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit"
+        ));
+        for (m, p) in [
+            ("POST", "/api/einsaetze/{id}/uhs/{uid}/plaetze"),
+            ("POST", "/api/einsaetze/{id}/uhs/{uid}/plaetze/bulk"),
+            ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}"),
+            ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}"),
+            ("PATCH", "/api/einsaetze/{id}/uhs/{uid}"),
+            ("POST", "/api/einsaetze/{id}/uhs/{uid}/status"),
+            ("POST", "/api/einsaetze/{id}/uhs"),
+            ("DELETE", "/api/einsaetze/{id}/personen/{pid}"),
+            ("GET", "/api/einsaetze/{id}/personen/export"),
+            ("POST", "/api/einsaetze/{id}/personen/{pid}/abgleich"),
+            ("GET", "/api/einsaetze/{id}/personen/{pid}/anhaenge"),
+        ] {
+            assert!(!darf_route(t, m, p), "Tablet darf {m} {p} nicht");
+        }
     }
 
     #[test]

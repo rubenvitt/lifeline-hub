@@ -921,3 +921,359 @@ async fn kopplung_ist_auditiert() {
     );
     assert!(finde("widerrufen").0.contains("widerrufen von"));
 }
+
+// ---------- Stellenbindung (Subtask UHS-Tablet) ----------
+
+/// Zwei aktive UHS und ein Tablet der ersten: `(einsatz, nord, sued, tablet-cookie)`.
+async fn zwei_uhs_mit_tablet(app: &axum::Router, admin: &str) -> (i64, i64, i64, String) {
+    let einsatz = einsatz_anlegen(app, admin).await;
+    let nord = uhs_anlegen(app, admin, einsatz, "UHS Nord").await;
+    let sued = uhs_anlegen(app, admin, einsatz, "UHS Süd").await;
+    let (_, geraet) = tablet(app, admin, einsatz, nord).await;
+    (einsatz, nord, sued, geraet)
+}
+
+/// Person mit Eintritt in `uhs` (Aufnahme in einem Schritt), angelegt von `cookie`.
+async fn person_in(app: &axum::Router, cookie: &str, einsatz: i64, uhs: Option<i64>) -> Value {
+    let mut body = json!({"name": "Muster", "vorname": "Max"});
+    if let Some(u) = uhs {
+        body["uhs_id"] = json!(u);
+    }
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        cookie,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v
+}
+
+#[tokio::test]
+async fn tablet_kennt_nur_die_eigene_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ids: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|u| u["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(ids, vec![nord], "UHS-Liste nur mit der eigenen UHS");
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["material"], json!([]), "Das Tablet liest kein Material");
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{sued}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS");
+
+    // Der Personenzähler zählt den ganzen Einsatz und fehlt deshalb am Tablet.
+    person_in(&app, &admin, einsatz, Some(sued)).await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/modul-zaehler"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("personen").is_none(), "{v}");
+}
+
+#[tokio::test]
+async fn tablet_setzt_verfuegbarkeit_aber_bearbeitet_den_grundriss_nicht() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let platz = |uhs: i64| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            let (s, v) = anfrage_json(
+                &app,
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze"),
+                &admin,
+                Some(&json!({"typ": "bett", "bezeichnung": "B1"})),
+            )
+            .await;
+            assert_eq!(s, StatusCode::CREATED, "{v}");
+            v["id"].as_i64().unwrap()
+        }
+    };
+    let platz_nord = platz(nord).await;
+    let platz_sued = platz(sued).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/plaetze"),
+        &geraet,
+        Some(&json!({"typ": "bett", "bezeichnung": "B2"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Grundriss bearbeiten: {v}");
+
+    let verfuegbarkeit = |uhs: i64, pid: i64| {
+        format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/{pid}/verfuegbarkeit")
+    };
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &verfuegbarkeit(nord, platz_nord),
+        &geraet,
+        Some(&json!({"verfuegbarkeit": "gesperrt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "eigene UHS: {v}");
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &verfuegbarkeit(sued, platz_sued),
+        &geraet,
+        Some(&json!({"verfuegbarkeit": "gesperrt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS");
+}
+
+#[tokio::test]
+async fn aufnahme_am_tablet_steht_im_eingang_der_eigenen_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+
+    // Ohne Angabe bucht der Server in die eigene UHS, im selben Schritt.
+    let p = person_in(&app, &geraet, einsatz, None).await;
+    assert_eq!(p["aktuelle_uhs_id"], json!(nord), "{p}");
+    assert_eq!(
+        p["aktueller_platz_id"],
+        Value::Null,
+        "Eingang ohne Platz: {p}"
+    );
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        v.as_array().unwrap().iter().any(|x| x["id"] == p["id"]),
+        "in der Patientenliste des Tablets: {v}"
+    );
+
+    // Eine andere UHS lässt das Tablet nicht zu.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"name": "Fremd", "uhs_id": sued})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+}
+
+#[tokio::test]
+async fn aufnahme_scheitert_ganz_wenn_der_eintritt_scheitert() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),
+        &admin,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let vorher: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        Some(&json!({"name": "Muster"})),
+    )
+    .await;
+    assert!(
+        s.is_client_error(),
+        "aufgelöste UHS nimmt niemanden auf: {s} {v}"
+    );
+    let nachher: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(nachher, vorher, "keine Person ohne Eintritt");
+}
+
+#[tokio::test]
+async fn person_der_anderen_uhs_ist_fuer_das_tablet_404() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let fremd = person_in(&app, &admin, einsatz, Some(sued)).await;
+    let ohne = person_in(&app, &admin, einsatz, None).await;
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(liste, json!([]), "keine fremde Person in der Liste");
+
+    for p in [&fremd, &ohne] {
+        let pid = p["id"].as_i64().unwrap();
+        let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+        for (methode, uri, body) in [
+            ("GET", basis.clone(), None),
+            ("PATCH", basis.clone(), Some(json!({"name": "X"}))),
+            (
+                "POST",
+                format!("{basis}/sichtung"),
+                Some(json!({"kategorie": "sk2"})),
+            ),
+            (
+                "POST",
+                format!("{basis}/verbleib"),
+                Some(json!({"art": "entlassung"})),
+            ),
+            (
+                "POST",
+                format!("{basis}/notizen"),
+                Some(json!({"text": "x"})),
+            ),
+            (
+                "POST",
+                format!("{basis}/uhs-belegung"),
+                Some(json!({"art": "austritt"})),
+            ),
+        ] {
+            let (s, v) = anfrage_json(&app, methode, &uri, &geraet, body.as_ref()).await;
+            assert_eq!(s, StatusCode::NOT_FOUND, "{methode} {uri}: {v}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn tablet_bucht_nicht_in_eine_fremde_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let p = person_in(&app, &geraet, einsatz, None).await;
+    let pid = p["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &geraet,
+        Some(&json!({"art": "wechsel", "uhs_id": sued})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Wechsel in die UHS Süd: {v}");
+
+    // Die Einsatzleitung verlegt die Person; danach nimmt das Tablet sie nicht mehr heraus.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &admin,
+        Some(&json!({"art": "wechsel", "uhs_id": sued})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &geraet,
+        Some(&json!({"art": "austritt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Austritt aus der UHS Süd: {v}");
+}
+
+#[tokio::test]
+async fn tablet_traegt_den_verbleib_nach_dem_austritt_ein() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let p = person_in(&app, &geraet, einsatz, None).await;
+    let pid = p["id"].as_i64().unwrap();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung"),
+        &geraet,
+        Some(&json!({"art": "austritt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Austritt aus der eigenen UHS: {v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &geraet,
+        Some(&json!({"art": "transport", "ziel": "KH Mitte"})),
+    )
+    .await;
+    assert!(s.is_success(), "Verbleib nach Austritt: {s} {v}");
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["abgleiche"], json!([]), "kein Abgleich am Gerät");
+}

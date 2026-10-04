@@ -24,6 +24,12 @@ pub async fn liste(
     // Ein Gerät (LFH-892) zählt nur die Module seiner Ansicht.
     if let Some(g) = &ctx.geraet {
         erlaubt = g.schneide_module(erlaubt);
+        // Personen und Meldungen zählen den ganzen Einsatz; ein UHS-Gerät sieht nur seine
+        // Stelle (Stellenbindung) und bekommt diese Zähler deshalb nicht.
+        if crate::geraet::stelle::stelle(Some(g)).is_some() {
+            erlaubt.remove("personen");
+            erlaubt.remove("meldungen");
+        }
     }
     let jetzt = crate::zeit::jetzt();
     Ok(Json(

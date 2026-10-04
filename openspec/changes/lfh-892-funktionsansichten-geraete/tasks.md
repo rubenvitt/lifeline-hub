@@ -7,7 +7,7 @@ nach den Subtasks, die nach der Freigabe auf dem Board angelegt werden; Reihenfo
 ## 1. Kopplung und Durchsetzung (Server und Verwaltung) — LFH-1023
 
 - [x] 1.1 Migrationen (nach der höchsten Nummer auf `alpha`): `geraet_kopplung`, `geraet_kopplungscode`, Spalte `session.kopplung_id`; verifiziert durch `scripts/check-migrationen.sh` und einen Repo-Test, der Kopplung, Code und Gerätesitzung anlegt
-- [ ] 1.2 Modul `src/geraet/` mit `Funktionsansicht` (Enum, Wire-Werte) und der Routenliste aus D4; verifiziert durch Unit-Tests (Lagemonitor nur GET, Tablet ohne Grundriss-Bearbeitung) und einen Guard-Test gegen `app.rs` (keine toten Einträge, nur sanktionierte Gate-Typen)
+- [x] 1.2 Modul `src/geraet/` mit `Funktionsansicht` (Enum, Wire-Werte) und der Routenliste aus D4; verifiziert durch Unit-Tests (Lagemonitor nur GET, Tablet ohne Grundriss-Bearbeitung) und einen Guard-Test gegen `app.rs` (keine toten Einträge, nur sanktionierte Gate-Typen)
 - [x] 1.3 Routen der Einsatzleitung: Kopplung anlegen, Code ausstellen, verlängern, widerrufen, Übersicht mit letztem Zugriff (`EinsatzLeitungszugriff`, Gerätekonto nach D1); verifiziert durch `tests/geraet_kopplung.rs` (403 für Führungspersonal, 400 ohne UHS und über 72 h, 409 am abgeschlossenen Einsatz, 404 für UHS eines anderen Einsatzes)
 - [x] 1.4 `POST /api/geraete/koppeln` (Code einmalig, 10 min, gehasht, Rate-Limit, einheitlich 401, neuer Code beendet alte Sitzungen); verifiziert durch Integrationstests zu jedem Szenario aus „Kopplungscode ist kurzlebig und einmalig“ und „Eine Kopplung, ein Gerät“
 - [x] 1.5 Sitzungsauflösung prüft Kopplung (widerrufen, abgelaufen, Einsatz aktiv), ungültige Kopplung = 401; verifiziert durch Tests „Widerruf → nächste Anfrage 401“, „Einsatzabschluss → 401“, „Ablauf → 401“
@@ -20,8 +20,8 @@ nach den Subtasks, die nach der Freigabe auf dem Board angelegt werden; Reihenfo
 
 ## 2. UHS-Tablet — LFH-1024
 
-- [ ] 2.1 Stellenbindung in `routes/einsatz_uhs.rs` (fremde UHS 404, Liste nur eigene UHS, Belegung nur in der eigenen UHS) über einen gemeinsamen Helfer; verifiziert durch Tests mit zwei UHS je Szenario aus „Stellenbindung“
-- [ ] 2.2 Stellenbindung in `routes/einsatz_person.rs` (sichtbar bei Belegung in der eigenen UHS, auch nach Austritt) und Aufnahme mit Eintritt im selben Schritt; verifiziert durch Tests „Person der anderen UHS → 404“, „Verbleib nach Austritt“, „Aufnahme steht im Eingang“ samt Rücknahme bei Fehler
+- [x] 2.1 Stellenbindung in `routes/einsatz_uhs.rs` (fremde UHS 404, Liste nur eigene UHS, Belegung nur in der eigenen UHS) über einen gemeinsamen Helfer; verifiziert durch Tests mit zwei UHS je Szenario aus „Stellenbindung“
+- [x] 2.2 Stellenbindung in `routes/einsatz_person.rs` (sichtbar bei Belegung in der eigenen UHS, auch nach Austritt) und Aufnahme mit Eintritt im selben Schritt; verifiziert durch Tests „Person der anderen UHS → 404“, „Verbleib nach Austritt“, „Aufnahme steht im Eingang“ samt Rücknahme bei Fehler
 - [ ] 2.3 Hülle `frontend/src/geraet/GeraeteLayout.tsx` (Kopfzeile mit Stelle, Gerät, Verbindung, Kopplungsende; Gerätemenü; keine Sprungpalette; fremde Adresse → Startseite; 401 → „Kopplung beendet“); verifiziert durch Komponententests zu jedem Szenario aus `feldgeraet-bedienung`
 - [ ] 2.4 Ansicht UHS-Tablet: Aufnahme, Patienten, Grundriss aus den vorhandenen Flächen, ohne Sprünge in fremde Module; kein Lagebild auf der Platte, Warteschlange an; verifiziert durch Komponententests und `e2e/geraet-uhs-tablet.spec.ts` bei 1024 × 768 mit grobem Zeiger
 - [ ] 2.5 Bereichsdatei `frontend/src/geraet/AGENTS.md` (Hülle, Ansichten, Schranke nur verengend, keine Platte, Großbild-Regeln des Monitors) und Eintrag in der Tabelle der Wurzel-`AGENTS.md`; verifiziert durch `prettier --check` über `frontend/`
