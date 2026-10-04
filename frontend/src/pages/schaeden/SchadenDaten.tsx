@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { Link } from 'react-router';
-import { Space, Tag, Typography } from 'antd';
+import { Button, Space, Tag, Typography } from 'antd';
 import StatusTag from '../../components/StatusTag';
 import { Datenfeld, Datenraster } from '../../components/instrument';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
@@ -23,6 +24,7 @@ export default function SchadenDaten({
   einsatzId,
   eingabe,
   verortenLink = false,
+  karteGesperrt = false,
   ortZeile = true,
   spalten = 3,
 }: {
@@ -32,6 +34,8 @@ export default function SchadenDaten({
   eingabe?: Partial<Record<SchadenEingabeFeld, ReactNode>>;
   /** „Auf Karte verorten" bei unverortetem Schaden — nur mit Schreibrecht sinnvoll. */
   verortenLink?: boolean;
+  /** Lagekarte für den Benutzer gesperrt (LFH-888): der Auftrag steht gesperrt mit Grund. */
+  karteGesperrt?: boolean;
   /**
    * Ort-Zeile (Ortsname, Peilung) unter der Koordinate. Sie ist ein eigener Serverabruf; die
    * Palettenvorschau lässt sie deshalb weg.
@@ -62,11 +66,16 @@ export default function SchadenDaten({
         ) : (
           <Space wrap>
             <Typography.Text type="secondary">nicht verortet</Typography.Text>
-            {verortenLink && (
-              <Link to={lagekartePfad(einsatzId, { platzieren: { typ: 'schaden', id: s.id } })}>
-                Auf Karte verorten
-              </Link>
-            )}
+            {verortenLink &&
+              (karteGesperrt ? (
+                <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
+                  Auf Karte verorten
+                </Button>
+              ) : (
+                <Link to={lagekartePfad(einsatzId, { platzieren: { typ: 'schaden', id: s.id } })}>
+                  Auf Karte verorten
+                </Link>
+              ))}
           </Space>
         )}
       </Datenfeld>

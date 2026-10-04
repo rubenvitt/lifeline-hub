@@ -1,4 +1,6 @@
 import { useRollen } from '../components/instrument/rollenwerte';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { bezugsDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
@@ -147,6 +149,8 @@ export default function PersonenDetailPage() {
   const { token, rollen } = useRollen();
   const { id, personId: personIdParam } = useParams();
   const einsatzId = Number(id);
+  // Verortungsauftrag nur in eine freie Lagekarte (LFH-888, design.md D4).
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const personId = Number(personIdParam);
   const idGueltig = parseRouteId(personIdParam) != null;
   const aktuelleRouteRef = useRef({ einsatzId, personId });
@@ -689,7 +693,13 @@ export default function PersonenDetailPage() {
                 <span data-lfh="koordinate" style={{ fontFamily: token.fontFamilyCode }}>
                   {koordinatenText(person) ?? '—'}
                 </span>
-                {darfSchreiben && !person.storniert_at && angetroffen && (
+                {darfSchreiben && !person.storniert_at && angetroffen && karteGesperrt && (
+                  // Gesperrte Lagekarte (LFH-888): der Auftrag steht gesperrt mit Grund (M16).
+                  <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
+                    Auf Lagekarte verorten
+                  </Button>
+                )}
+                {darfSchreiben && !person.storniert_at && angetroffen && !karteGesperrt && (
                   // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
                   // Lagekarte), in einem neuen Tab öffenbar. Die zwei Angaben des handgebauten
                   // Bedienziels trägt `verortenLinkStil`.

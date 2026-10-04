@@ -1,4 +1,5 @@
 import StatusTag from '../components/StatusTag';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { Alert, App, Breadcrumb, Button, Form, Input, Popconfirm, Space, Spin, Tag } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { monoStil } from '../components/instrument';
@@ -52,6 +53,8 @@ type EditWerte = SchadenPatch & { geschaedigt?: GeschaedigtWert };
 export default function SchaedenDetailPage() {
   const { id, schadenId: schadenIdParam } = useParams();
   const einsatzId = Number(id);
+  // Verortungsauftrag nur in eine freie Lagekarte (LFH-888, design.md D4).
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const { benutzer } = useAuth();
   const schadenId = Number(schadenIdParam);
   const idGueltig = parseRouteId(schadenIdParam) != null;
@@ -195,6 +198,7 @@ export default function SchaedenDetailPage() {
       schaden={s}
       einsatzId={einsatzId}
       verortenLink={darfSchreiben}
+      karteGesperrt={karteGesperrt}
       eingabe={
         bearbeiten
           ? {
