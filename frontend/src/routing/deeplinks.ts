@@ -289,12 +289,17 @@ export function funkplanPfad(einsatzId: number, opts: { ansicht?: FunkplanAnsich
 }
 
 /**
- * Darstellung des Funkplans (LFH-625): Tabelle oder Fernmeldeskizze. `ansicht` ist ein AUFTRAG wie
- * bei {@link einsatzabschnittePfad} (apply-then-clean); als Lesezeichen taugt die Adresse ohne.
+ * Darstellung des Funkplans: Tabelle, Fernmeldeskizze (LFH-625) oder Kanalbelegung je
+ * Sprechgruppe (LFH-848 D8). `ansicht` ist ein AUFTRAG wie bei {@link einsatzabschnittePfad}
+ * (apply-then-clean); als Lesezeichen taugt die Adresse ohne.
  */
-export type FunkplanAnsicht = 'tabelle' | 'skizze';
+export type FunkplanAnsicht = 'tabelle' | 'skizze' | 'sprechgruppen';
 
-const FUNKPLAN_ANSICHT_ERLAUBT: Record<FunkplanAnsicht, true> = { tabelle: true, skizze: true };
+const FUNKPLAN_ANSICHT_ERLAUBT: Record<FunkplanAnsicht, true> = {
+  tabelle: true,
+  skizze: true,
+  sprechgruppen: true,
+};
 
 /** Umkehr von {@link funkplanPfad}: ein unbekannter Wert wird GANZ verworfen. */
 export function parseFunkplanAnsicht(params: URLSearchParams): FunkplanAnsicht | undefined {
@@ -302,6 +307,14 @@ export function parseFunkplanAnsicht(params: URLSearchParams): FunkplanAnsicht |
   return ansicht && Object.prototype.hasOwnProperty.call(FUNKPLAN_ANSICHT_ERLAUBT, ansicht)
     ? (ansicht as FunkplanAnsicht)
     : undefined;
+}
+
+/**
+ * Kommunikationsplan des Sachgebiets S6 (LFH-848): Verbindungen außerhalb des Funks je Stelle.
+ * Unterroute des Stabs wie der Funkplan.
+ */
+export function kommunikationsplanPfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'stab')}/kommunikationsplan`;
 }
 
 /**

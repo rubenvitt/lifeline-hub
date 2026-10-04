@@ -50,6 +50,14 @@ import {
   type FunkplanZeile,
 } from '../stab/funkplan';
 import type { Luecke, Quelle, Verbindung } from '../stab/luecken';
+import {
+  HERKUNFT_LABEL,
+  baueSprechgruppenplan,
+  fehlendText,
+  sprechgruppenplanLeerText,
+  type SprechgruppenZeile,
+  type TeilnehmerAngabe,
+} from '../stab/sprechgruppenplan';
 import { stabZeilenzielStil } from '../stab/zeilenziel';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
 import './funkplanPrint.css';
@@ -71,10 +79,13 @@ import './funkplanPrint.css';
  *   Zeile führt über ihre Kennung dorthin (D7).
  * - **Erreichbarkeit** ist personenbezogen: am Schirm ab `xl`, im Druck immer, im Lagebericht nie
  *   (D5, Entscheidung 30.09.2026).
- * - **Zwei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6):
- *   „Tabelle“ und „Skizze“ (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`). Dieselben Quellen,
- *   dasselbe Lücken-Paneel, dieselbe Übernahme; eine Druckwurzel, der Druckkopf nennt die aktive
- *   Darstellung. Die Klappzustände sind getrennt: die Tabelle kennt Fahrzeuge, die Skizze nicht.
+ * - **Drei Darstellungen** (LFH-625, `openspec/changes/archive/2026-10-01-lfh-625-fernmeldeskizze/design.md` D1, D6;
+ *   LFH-848, `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` D8): „Tabelle“, „Skizze“
+ *   (Fernmeldeskizze, `stab/FernmeldeskizzeBild.tsx`) und „Sprechgruppen“ (Kanalbelegung,
+ *   `stab/sprechgruppenplan.ts`). Dieselben Quellen, dasselbe Lücken-Paneel, dieselbe Übernahme
+ *   (sie schreibt immer die Tabelle); eine Druckwurzel, der Druckkopf nennt die aktive
+ *   Darstellung. Die Klappzustände sind getrennt: die Tabelle kennt Fahrzeuge, die Skizze nicht;
+ *   die Sprechgruppen sind flach.
  */
 
 type SpalteKey =
@@ -216,6 +227,82 @@ function funkplanSpalten(druckt: boolean) {
   ]);
 }
 
+type SprechgruppenSpalteKey =
+  'sprechgruppe' | 'betriebsart' | 'hinweis' | 'herkunft' | 'teilnehmer';
+
+/** Teilnehmer einer Sprechgruppe: je Stelle der Verweis auf ihren Datensatz und ihr Rufname. */
+function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
+  const { token, rollen } = useRollen();
+  // Ohne alle Strukturquellen ist „keine“ nicht belegt: der Grund steht da (design.md D8).
+  if (angabe.art === 'unbekannt') return <Leer grund={fehlendText(angabe.fehlend)} />;
+  if (angabe.teilnehmer.length === 0) return <span style={{ color: rollen.gedaempft }}>keine</span>;
+  return (
+    <Flex vertical>
+      {angabe.teilnehmer.map((t) => (
+        <Flex key={t.key} wrap align="center" style={{ overflowWrap: 'anywhere' }}>
+          <Link to={t.ziel} style={stabZeilenzielStil(token)}>
+            {t.name}
+          </Link>
+          {t.rufname && <Mono>{t.rufname}</Mono>}
+        </Flex>
+      ))}
+      {angabe.art === 'unvollstaendig' && (
+        <span style={{ color: rollen.gedaempft }}>
+          {`unvollständig · ${fehlendText(angabe.fehlend)}`}
+        </span>
+      )}
+    </Flex>
+  );
+}
+
+/**
+ * Spalten der Darstellung „Sprechgruppen“ (design.md D8). Gegen dieselbe Fläche gewählt wie die
+ * Tabelle (LFH-548 D4: 1050 px Contentbreite am Fükw mit offenem Panel): Σ Zahlbreiten 630 +
+ * `mindestBreite` 300 = 930 px, Rest als Reserve. EINE fließende Spalte (Teilnehmer, LFH-523);
+ * Kennung und Hinweis brechen um, statt die Summe zu sprengen. Im Druck neutralisiert
+ * `druck/druck.css` die Breiten (A4 ohne Überhang, `e2e/funkplan.spec.ts`).
+ */
+function sprechgruppenSpalten() {
+  return spaltenFuer<SprechgruppenZeile>()([
+    {
+      title: 'Sprechgruppe',
+      key: 'sprechgruppe' as SprechgruppenSpalteKey,
+      width: 200,
+      immerSichtbar: true,
+      render: (_t, z) => (
+        <span style={{ overflowWrap: 'anywhere' }}>
+          <Mono>{z.bezeichnung}</Mono>
+        </span>
+      ),
+    },
+    {
+      title: 'Betriebsart',
+      key: 'betriebsart' as SprechgruppenSpalteKey,
+      width: 100,
+      render: (_t, z) => <Mono>{z.betriebsart}</Mono>,
+    },
+    {
+      title: 'Hinweis',
+      key: 'hinweis' as SprechgruppenSpalteKey,
+      width: 220,
+      render: (_t, z) =>
+        z.hinweis ? <span style={{ overflowWrap: 'anywhere' }}>{z.hinweis}</span> : <Leer />,
+    },
+    {
+      title: 'Herkunft',
+      key: 'herkunft' as SprechgruppenSpalteKey,
+      width: 110,
+      render: (_t, z) => HERKUNFT_LABEL[z.herkunft],
+    },
+    {
+      title: 'Teilnehmer',
+      key: 'teilnehmer' as SprechgruppenSpalteKey,
+      mindestBreite: 300,
+      render: (_t, z) => <TeilnehmerZelle angabe={z.teilnehmer} />,
+    },
+  ]);
+}
+
 /** Höchstens so viele Betroffene je Lücke, danach „+n weitere". */
 const TREFFER_DECKEL = 5;
 
@@ -290,6 +377,7 @@ const FUNKPLAN_SEITE = { titel: 'Funkplan', mitArtikel: 'der Funkplan' };
 const DARSTELLUNG_OPTIONEN = [
   { wert: 'tabelle', label: 'Tabelle' },
   { wert: 'skizze', label: 'Skizze' },
+  { wert: 'sprechgruppen', label: 'Sprechgruppen' },
 ] as const satisfies readonly { wert: FunkplanAnsicht; label: string }[];
 
 const UMFANG: { quelle: 'abschnitte' | 'einheiten' | 'fahrzeuge'; wort: string }[] = [
@@ -432,6 +520,7 @@ export default function FunkplanPage() {
   });
 
   const spalten = useMemo(() => funkplanSpalten(druckt), [druckt]);
+  const sgSpalten = useMemo(() => sprechgruppenSpalten(), []);
 
   // ── Darstellung (LFH-625 D1, D6) ────────────────────────────────────────────────────────────
   // Sichtvorgabe ?ansicht= apply-then-clean wie auf der Abschnittsseite. Schon der erste Zustand
@@ -469,6 +558,12 @@ export default function FunkplanPage() {
         : null,
     [ansicht, abschnitte, einheiten],
   );
+  // Kanalbelegung (LFH-848 D8): wie die Skizze nur gebaut, solange sie gezeigt wird.
+  const sprechgruppenplan = useMemo(
+    () => (ansicht === 'sprechgruppen' ? baueSprechgruppenplan(quellen, einsatzId) : []),
+    [ansicht, quellen, einsatzId],
+  );
+
   const [skizzeZugeklappt, setSkizzeZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const skizzeKlappbar = useMemo(
     () => (skizze ? klappbareSchluessel(skizze.wurzeln) : []),
@@ -515,13 +610,16 @@ export default function FunkplanPage() {
     sprechgruppenQuery.dataUpdatedAt,
   );
 
-  // Die Skizze zeigt keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review LFH-625).
-  const umfang = UMFANG.filter(
-    (u) =>
-      quellen[u.quelle].zustand === 'daten' && !(ansicht === 'skizze' && u.quelle === 'fahrzeuge'),
-  )
-    .map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`)
-    .join(' · ');
+  // Skizze und Sprechgruppen zeigen keine Fahrzeuge, also zählt ihr Umfang sie auch nicht (Review
+  // LFH-625). Die Sprechgruppen zählen ihre Zeilen vorweg.
+  const umfang = [
+    ...(ansicht === 'sprechgruppen' ? [`${sprechgruppenplan.length} Sprechgruppen`] : []),
+    ...UMFANG.filter(
+      (u) =>
+        quellen[u.quelle].zustand === 'daten' &&
+        (ansicht === 'tabelle' || u.quelle !== 'fahrzeuge'),
+    ).map((u) => `${quellen[u.quelle].daten.length} ${u.wort}`),
+  ].join(' · ');
 
   // Nur Gescheitertes und Gesperrtes: Ladendes kündigt die Tabelle selbst an.
   const fehlend = fehlendeQuellen(quellen).filter((f) => f.zustand !== 'laden');
@@ -557,7 +655,7 @@ export default function FunkplanPage() {
           />
         }
         aktionen={
-          // Auch ohne Schreibrecht: lesen kann jeder beide Darstellungen.
+          // Auch ohne Schreibrecht: lesen kann jeder alle Darstellungen.
           <Segmentleiste<FunkplanAnsicht>
             beschriftung="Darstellung"
             optionen={DARSTELLUNG_OPTIONEN}
@@ -568,6 +666,7 @@ export default function FunkplanPage() {
       >
         <Druckkopf
           dokumentart={ansicht === 'skizze' ? 'Fernmeldeskizze' : 'Funkplan'}
+          titel={ansicht === 'sprechgruppen' ? 'Sprechgruppen' : undefined}
           einsatz={einsatz}
           sichtbarkeit="druck"
           zeilen={[
@@ -630,6 +729,19 @@ export default function FunkplanPage() {
           </Typography.Paragraph>
         )}
 
+        {/* Ohne die Liste des Einsatzes fehlen nur die lokalen Sprechgruppen ohne Zuordnung; die
+            zugeordneten stehen an Abschnitt und Einheit. Ladendes kündigt die Tabelle an. */}
+        {ansicht === 'sprechgruppen' &&
+          (sprechgruppen.zustand === 'fehler' || sprechgruppen.zustand === 'gesperrt') && (
+            <Typography.Paragraph
+              data-lfh="sprechgruppen-quelle"
+              style={{ color: rollen.gedaempft }}
+            >
+              {`Sprechgruppen des Einsatzes: ${ZUSTAND_GRUND[sprechgruppen.zustand]} — `}
+              {'einsatzlokale Sprechgruppen ohne Zuordnung fehlen in dieser Darstellung.'}
+            </Typography.Paragraph>
+          )}
+
         {/* ── Werkzeugzeile ── außerhalb des Primitivs, nur hier trägt `.funkplan-no-print`. */}
         <Space className="funkplan-no-print" wrap style={{ marginBlockEnd: token.margin }}>
           {ansicht === 'skizze' && (
@@ -685,8 +797,33 @@ export default function FunkplanPage() {
             zugeklappt={skizzeZugeklappt}
             onUmschalten={umschaltenSkizze}
           />
+        ) : ansicht === 'sprechgruppen' ? (
+          // Flach und schreibgeschützt, Vergleichsfläche wie die Tabelle („wer funkt auf 311?“).
+          // Zwei Sichten in einer Datei: der `key` trennt ihren Zustand (`datensicht.guard`).
+          <Datensicht
+            key="sprechgruppen"
+            bezeichnung="Sprechgruppen"
+            form="tabelle"
+            spalten={sgSpalten}
+            daten={sprechgruppenplan}
+            zeilenSchluessel="key"
+            ladend={
+              quellen.abschnitte.zustand === 'laden' ||
+              quellen.einheiten.zustand === 'laden' ||
+              quellen.sprechgruppen.zustand === 'laden'
+            }
+            leerText={sprechgruppenplanLeerText(quellen)}
+            // Die Sprechgruppe hat keine eigene Seite: zugeordnet wird an Abschnitt und Einheit,
+            // dorthin führen die Teilnehmer.
+            karte={{
+              art: 'plan',
+              titel: { spalte: 'sprechgruppe' },
+              sekundaer: ['betriebsart', 'herkunft', 'teilnehmer'],
+            }}
+          />
         ) : (
           <Datensicht
+            key="funkplan"
             bezeichnung="Funkplan"
             form="tabelle"
             spalten={spalten}

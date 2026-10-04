@@ -512,6 +512,28 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/stab/checkliste/{punkt}",
             put(routes::stab::checkliste_setzen),
         )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan",
+            get(routes::stab::kommunikationsplan_laden),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen",
+            post(routes::stab::kommunikationsplan_stelle_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}",
+            patch(routes::stab::kommunikationsplan_stelle_aendern)
+                .delete(routes::stab::kommunikationsplan_stelle_entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/verbindungen",
+            post(routes::stab::kommunikationsplan_verbindung_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/stab/kommunikationsplan/verbindungen/{vid}",
+            patch(routes::stab::kommunikationsplan_verbindung_aendern)
+                .delete(routes::stab::kommunikationsplan_verbindung_entfernen),
+        )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(
             "/api/einsaetze/{id}/meldungen/rueckmeldungen",

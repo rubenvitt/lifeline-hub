@@ -1,0 +1,14 @@
+/* Eigenheiten des Kommunikationsplans im Druck (LFH-848). Die Mechanik (Ausblenden des Rahmens,
+   Fluss, Papierfarben, Umbruch, Tabellen-Neutralisierer) liegt in `druck/druck.css`;
+   `.kommunikationsplan-print-root` trägt dafür `data-lfh="druckwurzel"`. Die Aktionsspalte fehlt
+   im Druck schon in der Seite (`useDruckModus`). */
+@media print {
+  .kommunikationsplan-no-print {
+    display: none !important;
+  }
+
+  /* Der Seitenkopf ist Bedienung: Titel, Meta und Datenstand stehen auf Papier im Druckkopf. */
+  .kommunikationsplan-print-root [data-lfh='seitenkopf'] {
+    display: none !important;
+  }
+}

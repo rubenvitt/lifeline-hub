@@ -63,6 +63,13 @@ describe('istLagebildOfflineKey', () => {
     expect(istLagebildOfflineKey(['einsatz-meldungen', 7, 'andere'])).toBe(false);
   });
 
+  it('nimmt vom Stab nur den Kommunikationsplan (LFH-848)', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.stabKommunikationsplan(7))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.stab(7))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.stabCheckliste(7))).toBe(false);
+    expect(istLagebildOfflineKey(einsatzKeys.stabLagebesprechungen(7))).toBe(false);
+  });
+
   it('verlangt an Stelle 1 eine Einsatz-ID', () => {
     expect(istLagebildOfflineKey(['etb'])).toBe(false);
     expect(istLagebildOfflineKey(['etb', 'x'])).toBe(false);

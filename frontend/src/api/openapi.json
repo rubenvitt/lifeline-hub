@@ -6075,6 +6075,79 @@
           }
         }
       },
+      "KommunikationsStelle": {
+        "type": "object",
+        "description": "Eine gepflegte Stelle samt ihren Verbindungen.\n\n`funktion_label` ist das wirksame Mandantenlabel („S3 Einsatz“), vom Server aufgelöst, damit\ndie Seite den Katalog nicht braucht — auch nicht ohne Netz (design.md D3, D9).",
+        "required": [
+          "id",
+          "stellenart",
+          "verbindungen"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funktion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fuehrungsfunktion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "funktion_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stellenart": {
+            "$ref": "#/components/schemas/Stellenart"
+          },
+          "verbindungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KommunikationsVerbindung"
+            }
+          }
+        }
+      },
+      "KommunikationsVerbindung": {
+        "type": "object",
+        "description": "Eine Verbindung einer Stelle.",
+        "required": [
+          "id",
+          "mittel",
+          "wert"
+        ],
+        "properties": {
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mittel": {
+            "$ref": "#/components/schemas/Verbindungsmittel"
+          },
+          "wert": {
+            "type": "string"
+          }
+        }
+      },
       "Koordinatenformat": {
         "type": "string",
         "description": "Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.",
@@ -9960,6 +10033,17 @@
           }
         }
       },
+      "Stellenart": {
+        "type": "string",
+        "description": "Art einer gepflegten Stelle des Kommunikationsplans. Wire == `as_str()`.\n\n`ALLE` ist die Anzeigereihenfolge: Funktionen zuerst, dann die externen Stellen in dieser\nFolge (die Leitstelle ist die wichtigste Gegenstelle außerhalb des Einsatzes).",
+        "enum": [
+          "funktion",
+          "leitstelle",
+          "behoerde",
+          "verbindungsperson",
+          "sonstige"
+        ]
+      },
       "StichwortVorschlag": {
         "type": "object",
         "description": "Org-weiter Einsatzstichwort-Vorschlag für die Combobox.",
@@ -10425,6 +10509,19 @@
           "behandlungsplatz",
           "verletztensammelstelle",
           "sonstige"
+        ]
+      },
+      "Verbindungsmittel": {
+        "type": "string",
+        "description": "Mittel einer Verbindung. Wire == `as_str()`.\n\nBewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine\nErreichbarkeit je Datensatz, design.md D2). Funk steht im Funkplan; eine ISSI oder\nEinzelrufnummer ist `sonstiges` mit Hinweis.",
+        "enum": [
+          "festnetz",
+          "mobil",
+          "fax",
+          "email",
+          "messenger",
+          "melder",
+          "sonstiges"
         ]
       },
       "VerbleibAnzeige": {
