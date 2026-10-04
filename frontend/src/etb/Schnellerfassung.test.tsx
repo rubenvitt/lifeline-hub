@@ -11,7 +11,8 @@ import { renderMitProviders } from '../test/utils';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import Schnellerfassung, { chipZeileStil, rolleWaagerechtInsBild } from './Schnellerfassung';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
-import { einsatzFixture } from '../test/fixtures';
+import { einsatzFixture, freigabenFixture } from '../test/fixtures';
+import { einsatzKeys } from '../api/queryKeys';
 import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
 import { useLocation } from 'react-router';
 
@@ -563,6 +564,25 @@ describe('Schnellerfassung', () => {
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
     );
     expect(screen.getByLabelText('Ort')).toHaveTextContent(`/einsaetze/${einsatz.id}/lageberichte`);
+  });
+
+  it('LFH-888: ohne Zugriff auf Lageberichte entfällt der Sprung, der Typ „Lage" bleibt', async () => {
+    server.use(
+      http.get('/api/einsaetze/:id/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ lageberichte: { zugriff: false } })),
+      ),
+    );
+    const p = props();
+    const { client } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waitFor(() =>
+      expect(client.getQueryData(einsatzKeys.modulFreigaben(einsatz.id))).toBeDefined(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp /meldung ändern' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
+    expect(screen.getByRole('button', { name: 'Eintragstyp /lage ändern' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
+    ).not.toBeInTheDocument();
   });
 });
 
