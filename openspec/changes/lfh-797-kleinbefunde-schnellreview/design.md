@@ -88,7 +88,8 @@ Guard ändert nur seine Wurzel (`SRC` statt der zwei Verzeichnisse) und nimmt
 
 - [Eine Antwort ohne oder mit falschem Content-Type wird unter `nosniff` vom Browser
   verworfen (Skript/Style)] → `static_files` liefert JS/CSS mit korrektem Typ (Tests vorhanden);
-  der Integrationstest prüft Startseite und ein Asset. Karten-Assets setzen `nosniff` schon heute.
+  den Typ je Endung sichern die Unit-Tests in `src/static_files.rs`, der Integrationstest prüft
+  `nosniff` am Frontend-Fallback (im Test ohne eingebettetes Bundle). Karten-Assets setzen `nosniff` schon heute.
 - [SSE-Strom (`/api/live`, Einsatz-Strom) bekommt den Kopf] → harmlos, `text/event-stream` wird
   nicht gesnifft; der bestehende Live-Test läuft im Gate mit.
 - [Feature `set-header` fehlt in einem Offline-Build-Cache] → reines Feature-Flag derselben

@@ -1,8 +1,8 @@
 //! Schutzköpfe an jeder Antwort (LFH-797, Spec `http-schutzkoepfe`).
 //!
 //! Die Schicht in `app.rs` setzt `X-Content-Type-Options: nosniff`, wo die Route ihn nicht schon
-//! setzt. Geprüft wird an Antworten, die heute keine Route selbst versieht (JSON, 404 unter
-//! `/api/`, eingebettetes Frontend), und an einem Anhang-Download, dessen Route den Kopf selbst
+//! setzt. Geprüft wird an Antworten, die heute keine Route selbst versieht (JSON, 401, 404 unter
+//! `/api/`, 405, Frontend-Fallback), und an einem Anhang-Download, dessen Route den Kopf selbst
 //! setzt: dort steht er genau einmal. Der Download des Karten-Hintergrundbilds steht in
 //! `tests/karte_hintergrundbild.rs` (eigener Upload-Harness).
 
@@ -60,13 +60,33 @@ async fn unbekannte_api_route_traegt_nosniff() {
     nosniff_genau_einmal(&h);
 }
 
-/// Der SPA-Fallback antwortet auch ohne eingebettetes Frontend (dann 404) — der Kopf hängt an
-/// jeder Antwort des Fallbacks, nicht nur an einer gefundenen Datei.
+/// Der Frontend-Fallback (`static_files::serve`). Im Test ist `frontend/dist` leer, die Antwort
+/// ist also seine 404 — der Kopf hängt an jeder Antwort des Fallbacks. Den passenden
+/// Content-Type je Endung sichern die Unit-Tests in `src/static_files.rs`.
 #[tokio::test]
-async fn eingebettetes_frontend_traegt_nosniff() {
+async fn frontend_fallback_traegt_nosniff() {
     let app = setup().await;
     let (_, h) = kopf(&app, "/", None).await;
     nosniff_genau_einmal(&h);
+}
+
+/// Der 405-Fallback (`methode_nicht_erlaubt`) liegt innerhalb der Schicht.
+#[tokio::test]
+async fn methode_nicht_erlaubt_traegt_nosniff() {
+    let app = setup().await;
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/api/auth/me")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
+    nosniff_genau_einmal(resp.headers());
 }
 
 /// `anhang_antwort` setzt `nosniff` selbst; die Schicht darf ihn nicht verdoppeln.

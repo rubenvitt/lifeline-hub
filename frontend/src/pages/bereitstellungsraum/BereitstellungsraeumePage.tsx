@@ -2,11 +2,7 @@ import { Breadcrumb, Button, type TableColumnsType } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import {
-  bereitstellungsraumDetailPfad,
-  einsaetzePfad,
-  einsatzPfad,
-} from '../../routing/deeplinks';
+import { bereitstellungsraumDetailPfad, einsaetzePfad, einsatzPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';

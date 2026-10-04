@@ -302,7 +302,7 @@ export const rahmenFarben = {
  * Abgedunkelte Maske hinter der Sprungpalette (`command-palette/CommandPalette.tsx`). Wie
  * {@link rahmenFarben} modusunabhängig und keine `Farbrolle`: in beiden Modi dieselbe
  * Abdunkelung, die Palette ist ein Fokusmoment, kein Farbträger. Hier statt in der Palette,
- * weil Farbwerte nur aus `theme/` kommen (LFH-797).
+ * damit der Wert an der Farbquelle steht und nicht als Literal in einer Komponente (LFH-797).
  */
 export const paletteMaske = 'rgba(5, 6, 8, 0.72)';
 
