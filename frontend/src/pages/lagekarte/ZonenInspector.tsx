@@ -12,7 +12,7 @@ import type {
   ZoneTyp,
 } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
-import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
+import { FREIE_SKIZZE_VORGABE, ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import StatusTag from '../../components/StatusTag';
 import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
 import { Datenfeld, Datenraster } from '../../components/instrument';
@@ -74,7 +74,7 @@ export default function ZonenInspector({
   const [entwurf, setEntwurf] = useState(() => ({
     typ: zone.typ,
     label: zone.label ?? '',
-    farbe: zone.farbe ?? '#1677ff',
+    farbe: zone.farbe ?? FREIE_SKIZZE_VORGABE,
     notiz: zone.notiz ?? '',
     gefahrengebiet_id: zone.gefahrengebiet_id,
     ansicht_id: zone.ansicht_id,
@@ -98,7 +98,7 @@ export default function ZonenInspector({
     setEntwurf({
       typ: zone.typ,
       label: zone.label ?? '',
-      farbe: zone.farbe ?? '#1677ff',
+      farbe: zone.farbe ?? FREIE_SKIZZE_VORGABE,
       notiz: zone.notiz ?? '',
       gefahrengebiet_id: zone.gefahrengebiet_id,
       ansicht_id: zone.ansicht_id,
@@ -227,7 +227,7 @@ export default function ZonenInspector({
             disabled={gesperrt}
             onChange={(e) => setEntwurf((alt) => ({ ...alt, farbe: e.target.value }))}
             onBlur={() => {
-              if (entwurf.farbe !== (zone.farbe ?? '#1677ff'))
+              if (entwurf.farbe !== (zone.farbe ?? FREIE_SKIZZE_VORGABE))
                 void speichern({ farbe: entwurf.farbe });
             }}
           />

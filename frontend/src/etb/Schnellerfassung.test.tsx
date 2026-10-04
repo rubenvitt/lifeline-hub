@@ -13,6 +13,7 @@ import Schnellerfassung, { chipZeileStil, rolleWaagerechtInsBild } from './Schne
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { einsatzFixture } from '../test/fixtures';
 import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
+import { useLocation } from 'react-router';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
 // onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
@@ -543,6 +544,25 @@ describe('Schnellerfassung', () => {
     expect(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
     ).toBeInTheDocument();
+  });
+
+  it('springt aus Typ „Lage" in die Lageberichtsliste des Einsatzes (LFH-797)', async () => {
+    const p = props();
+    function Ort() {
+      return <output aria-label="Ort">{useLocation().pathname}</output>;
+    }
+    renderMitProviders(
+      <>
+        <Schnellerfassung {...p} />
+        <Ort />
+      </>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp /meldung ändern' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
+    );
+    expect(screen.getByLabelText('Ort')).toHaveTextContent(`/einsaetze/${einsatz.id}/lageberichte`);
   });
 });
 

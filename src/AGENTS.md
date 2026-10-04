@@ -124,12 +124,25 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   Arbeit (`erzeugen_mit_platz`), ein Abbruch gibt ihn nicht frei; gespeichert wird nichts. HEIC/HEIF → 422, das dekodiert
   der Browser. Wer die Erzeugung ändert, erhöht `VORSCHAU_VERSION` (ETag `"<sha256>.v<n>.<k|g>"`).
 - `inline` und `image/jpeg` nur für diese beiden Fassungen; alles andere bleibt `attachment` mit
-  gespeichertem `mime`. Jede Anhang-Antwort trägt `nosniff` und `ANHANG_CSP`.
+  gespeichertem `mime`. Jede Anhang-Antwort trägt `nosniff` (auch ohne die Schicht, s.
+  „Schutzköpfe“) und `ANHANG_CSP`.
 - Frontend: Bild-Anhänge zeigen `components/AnhangVorschau.tsx` (über `DownloadAnker` mit `mime`
   oder direkt), nie ein `<img>` auf die Download-Adresse und nie `fassung=original` zur Anzeige.
   In einer Überlagerung ohne Bedienelemente (Palettenvorschau) `grossansicht={false}`.
   Eine künftige App-CSP muss `img-src blob:`, `worker-src 'self'` und `'wasm-unsafe-eval'`
   erlauben (HEIC-Decoder, `frontend/src/heic/`).
+
+## Backend — Schutzköpfe (LFH-797)
+
+- **Jede Antwort trägt `X-Content-Type-Options: nosniff`** über die äußerste Schicht in
+  `app.rs` (`SetResponseHeaderLayer::if_not_present`, Spec `http-schutzkoepfe`), auch Panik-500,
+  Lastabwurf, 405 und der Frontend-Fallback. Eine neue Route braucht dafür nichts.
+- Eine Route darf den Kopf zusätzlich selbst setzen (Anhang, Logo, Karten-Assets: dort sichern
+  ihn Handler-Tests ohne Router); `if_not_present` hält ihn einfach. Nachweis
+  `tests/schutzkoepfe.rs`.
+- Unter `nosniff` verwirft der Browser Skripte und Styles mit falschem Typ: jede neue Endung in
+  `static_files::content_type` braucht ihren richtigen MIME-Typ. Weitere Köpfe (App-CSP, HSTS
+  …) sind eine eigene Entscheidung, s. „Anhänge“ zur CSP.
 
 ## Backend — Org-Ereignisse (LFH-734)
 

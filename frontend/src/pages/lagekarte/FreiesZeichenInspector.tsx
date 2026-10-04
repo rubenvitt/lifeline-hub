@@ -14,6 +14,7 @@ import KartenDetailCard from './KartenDetailCard';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { baueFreiesZeichenTz } from './marker';
+import { useRollen } from '../../components/instrument';
 
 export interface FreiesZeichenInspectorProps {
   zeichen: FreiesZeichen;
@@ -25,8 +26,6 @@ export interface FreiesZeichenInspectorProps {
   ansichten: KartenAnsicht[];
   onVerschieben: (ansichtId: number | null) => void;
 }
-
-const NEUTRALE_FARBE = '#333333';
 
 /** Ruhefrist, nach der eine Änderung im Inspector geschrieben wird. */
 const SCHREIB_FRIST_MS = 600;
@@ -70,6 +69,7 @@ export default function FreiesZeichenInspector({
   ansichten,
   onVerschieben,
 }: FreiesZeichenInspectorProps) {
+  const { rollen } = useRollen();
   const [entwurf, setEntwurf] = useState<FreiesZeichenUpdate>(() => baueWert(zeichen));
   /**
    * Eigen-Merker: nur eine Änderung im Picker setzt ihn, das Senden löscht ihn. Ohne ihn schriebe
@@ -130,7 +130,11 @@ export default function FreiesZeichenInspector({
   return (
     <KartenDetailCard
       titel={titel}
-      akzentFarbe={zeichen.farbe ?? NEUTRALE_FARBE}
+      akzentFarbe={
+        // Ohne eigene Farbe eine Textrolle: die Kartentinte verschwände auf dem dunklen Paneel
+        // (LFH-797, Spec `lagekarte-taktische-zeichen`).
+        zeichen.farbe ?? rollen.text2
+      }
       onSchliessen={onSchliessen}
     >
       {darfSchreiben ? (

@@ -1,7 +1,7 @@
 import { Breadcrumb, Button, type TableColumnsType } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { uhsDetailPfad } from '../routing/deeplinks';
+import { einsaetzePfad, einsatzPfad, uhsDetailPfad } from '../routing/deeplinks';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -105,8 +105,8 @@ export default function UnfallhilfsstellenPage() {
       breadcrumb={
         <Breadcrumb
           items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatzQuery.data?.bezeichnung}</Link> },
+            { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
+            { title: <Link to={einsatzPfad(einsatzId)}>{einsatzQuery.data?.bezeichnung}</Link> },
             { title: 'Unfallhilfsstellen' },
           ]}
         />

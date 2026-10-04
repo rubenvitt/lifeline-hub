@@ -41,7 +41,7 @@ import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
-import { ZONE_TYPEN } from './zonenStil';
+import { FREIE_SKIZZE_VORGABE, ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
@@ -899,14 +899,14 @@ export default function Sidebar(props: SidebarProps) {
                         <Typography.Text>{t.label}</Typography.Text>
                         {/* `farbe` ist ein persistierter Datenwert: er wandert über
                             `onZoneZeichnenStart` in die Datenbank. Kein Laufzeit-Token, sonst
-                            deutete ein Themenwechsel gespeicherte Zonen um — das Literal bleibt
-                            bewusst. */}
+                            deutete ein Themenwechsel gespeicherte Zonen um — deshalb die
+                            Datenkonstante aus `zonenStil.ts`, dieselbe wie im Inspector. */}
                         <Button
                           onClick={() =>
                             props.onZoneZeichnenStart({
                               typ: t.typ,
                               modus: 'polygon',
-                              farbe: '#1677ff',
+                              farbe: FREIE_SKIZZE_VORGABE,
                             })
                           }
                         >
@@ -917,7 +917,7 @@ export default function Sidebar(props: SidebarProps) {
                             props.onZoneZeichnenStart({
                               typ: t.typ,
                               modus: 'linie',
-                              farbe: '#1677ff',
+                              farbe: FREIE_SKIZZE_VORGABE,
                             })
                           }
                         >

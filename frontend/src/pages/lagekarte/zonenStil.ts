@@ -13,7 +13,7 @@ export interface ZoneStil {
  * Voreingestellter Stil je typisierter Zone (eine Wahrheit; nicht gespeichert).
  *
  * Bewusst nicht auf die Rollen gezogen: `ZoneTyp` ist kein Enum des Statusfarb-Vertrags. Gleiches
- * gilt für {@link FREIE_SKIZZE_FALLBACK} (`#1677ff`, in `zonenStil.test.ts` gepinnt) — die Grenze
+ * gilt für {@link FREIE_SKIZZE_VORGABE} (`#1677ff`, in `zonenStil.test.ts` gepinnt) — die Grenze
  * zwischen Rollenfarbe und Nutzer-/Katalogfarbe.
  */
 const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
@@ -33,12 +33,19 @@ const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
   },
 };
 
-const FREIE_SKIZZE_FALLBACK = '#1677ff';
+/**
+ * Vorgabefarbe einer freien Skizze (LFH-797, Spec `lagekarte-zeichnen`): Rückfall der
+ * Darstellung, Farbe beim Anlegen (`Sidebar`) und Wert des Farbfelds im `ZonenInspector`. EINE
+ * Quelle, damit der Vergleich im Inspector nie gegen eine abweichende Kopie läuft und ein bloßer
+ * Blur kein PATCH auslöst. Ein gespeicherter Datenwert, kein Laufzeit-Token: ein Themenwechsel
+ * darf gespeicherte Zonen nicht umdeuten.
+ */
+export const FREIE_SKIZZE_VORGABE = '#1677ff';
 
 /** Stil einer Zone: typisierte aus `typ`, freie Skizze aus gespeicherter `farbe`. */
 export function zoneStil(typ: ZoneTyp, farbe: string | null | undefined): ZoneStil {
   if (typ === 'freie_skizze') {
-    const c = farbe && farbe.trim() ? farbe : FREIE_SKIZZE_FALLBACK;
+    const c = farbe && farbe.trim() ? farbe : FREIE_SKIZZE_VORGABE;
     return { fillColor: c, fillOpacity: 0.2, lineColor: c, lineWidth: 2 };
   }
   return STILE[typ];

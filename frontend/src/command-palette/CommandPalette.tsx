@@ -4,7 +4,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
-import { schrift } from '../theme/tokens';
+import { paletteMaske, schrift } from '../theme/tokens';
 import { istApplePlattform } from './befehle';
 import { sichtbareDatensaetze } from './datensaetze';
 import {
@@ -40,12 +40,6 @@ const ENTPRELLUNG_MS = 300;
  * die Zeilen tragen ihren Boden über `palettenZeilenStil` aus der Dichte-Staffel.
  */
 const PALETTE = { breite: 640, oben: 120, kopf: 52 } as const;
-
-/**
- * Die abgedunkelte Maske hinter der Palette. Kein Rollenwert: in beiden Modi dieselbe
- * Abdunkelung, die Palette ist ein Fokusmoment, kein Farbträger.
- */
-const MASKE = 'rgba(5, 6, 8, 0.72)';
 
 /** EIN Leer-Array statt eines Vorgabewerts im Kopf: ein `[]` dort wäre je Render eine neue
  *  Identität und machte die `useMemo` darunter wirkungslos. */
@@ -496,7 +490,7 @@ export function CommandPalette({
       zIndex={2000}
       style={{ top: PALETTE.oben }}
       styles={{
-        mask: { background: MASKE },
+        mask: { background: paletteMaske },
         // Rahmen in Bedienfarbe, keine Rundung. `colorBgElevated` ist `flaeche2` des Modus; nur Kopf
         // und Rail sind modusfest.
         container: {

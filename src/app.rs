@@ -1502,6 +1502,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .layer(tower_http::request_id::SetRequestIdLayer::x_request_id(
             tower_http::request_id::MakeRequestUuid,
         ))
+        // Schutzköpfe an JEDER Antwort (LFH-797, `src/AGENTS.md`, „Schutzköpfe“). Ganz außen,
+        // damit auch Panik-500, Lastabwurf, 405 und der Frontend-Fallback ihn tragen.
+        // `if_not_present`: eine Route, die den Kopf selbst setzt (Anhang, Logo, Karten-Assets),
+        // behält ihren Wert, und er steht nie doppelt.
+        .layer(
+            tower_http::set_header::SetResponseHeaderLayer::if_not_present(
+                axum::http::header::X_CONTENT_TYPE_OPTIONS,
+                axum::http::HeaderValue::from_static("nosniff"),
+            ),
+        )
         .with_state(state)
 }
 
