@@ -313,12 +313,7 @@ export function Kennzahl({
         {/* `lineHeight: 1` wie die Zahl: mit der normalen Zeilenhöhe ragte die Einheit an der
             Grundlinie über die Zahl hinaus, und die Zeile wuchs mit den Daten um 1 px (LFH-883). */}
         {einheit != null && zustand === 'daten' && (
-          <span
-            data-lfh="kennzahl-einheit"
-            style={{ ...monoStil(12), lineHeight: 1, color: rollen.schwach }}
-          >
-            {einheit}
-          </span>
+          <span style={{ ...monoStil(12), lineHeight: 1, color: rollen.schwach }}>{einheit}</span>
         )}
       </span>
       {aufgliederung != null && zustand === 'daten' && (
