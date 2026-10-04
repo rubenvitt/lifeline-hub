@@ -6,6 +6,8 @@ import type {
   MitgliedAnzeige,
   EinsatzEinstellungen,
   EinstellungenUpdate,
+  Fuehrungsstelle,
+  FuehrungsstellePatch,
   ModulOverride,
   ModulFreigaben,
   ModulOverrides,
@@ -108,6 +110,19 @@ export type KopfdatenPatch = Partial<KopfdatenUpdate>;
  */
 export function patcheEinsatz(id: number, patch: KopfdatenPatch): Promise<EinsatzAnzeige> {
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', patch);
+}
+
+/** Eigene Führungsstelle (LFH-849); ohne erfasste Angaben nur `sprechgruppen: []`. */
+export function ladeFuehrungsstelle(id: number): Promise<Fuehrungsstelle> {
+  return apiGet<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`);
+}
+
+/** Teiländerung der Führungsstelle: nur die übergebenen Schlüssel gehen hinaus (wie die Zeile). */
+export function patcheFuehrungsstelle(
+  id: number,
+  patch: FuehrungsstellePatch,
+): Promise<Fuehrungsstelle> {
+  return apiSend<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`, 'PATCH', patch);
 }
 
 /** Einsatz-Einstellungen laden (LFH-131); existiert keine Zeile → Defaults (alle null). */
