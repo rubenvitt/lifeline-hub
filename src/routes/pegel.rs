@@ -8,8 +8,10 @@
 //! Listenroute und bleibt ebenfalls modul-los: die Pegeldaten sind über die Liste ohnehin für
 //! jeden Leser offen, ein Modul-Gate schützte hier nichts.
 //!
-//! **Kein Live-Ereignis**: die Messwerte ändern sich im 15-min-Raster, die Festlegung ist
-//! selten; das Frontend fragt alle 5 min nach.
+//! **Kein eigenes Live-Ereignis**: die Messwerte ändern sich im 15-min-Raster, die Festlegung
+//! ist selten; das Frontend fragt alle 5 min nach. Schaltet eine Festlegung die Lagekennzahl
+//! `pegel` am Einsatz um (erster Pegel, Liste geleert), melden PUT und POST nach dem Commit den
+//! Einsatzkopf (`einsatz`, LFH-855) — sonst nicht.
 //!
 //! **Linie 400 ↔ 422 (LFH-267):** leerer oder zu langer Name, keine UUID-Form und eine
 //! PUT-Liste mit mehr als [`PEGEL_MAX`] Einträgen scheitern am Body für sich → 400. Zwei
@@ -221,7 +223,11 @@ pub async fn ersetzen(
             doppelt.station_uuid
         )));
     }
-    repo::ersetzen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eintraege).await?;
+    let umgeschaltet =
+        repo::ersetzen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eintraege).await?;
+    if umgeschaltet {
+        crate::routes::einsatz::kopf_geaendert(&state, ctx.einsatz.id).await;
+    }
     Ok(Json(
         anzeige(&state, ctx.einsatz.id, abruf::Modus::NurCache).await?,
     ))
@@ -235,8 +241,11 @@ pub async fn anfuegen(
     JsonBody(req): JsonBody<PegelWahl>,
 ) -> Result<(StatusCode, Json<Vec<PegelAnzeige>>), AppError> {
     let eingabe = validiere(req)?;
-    let neu = repo::anfuegen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eingabe).await?;
-    let status = if neu {
+    let ergebnis = repo::anfuegen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eingabe).await?;
+    if ergebnis.umgeschaltet {
+        crate::routes::einsatz::kopf_geaendert(&state, ctx.einsatz.id).await;
+    }
+    let status = if ergebnis.neu {
         StatusCode::CREATED
     } else {
         StatusCode::OK

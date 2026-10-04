@@ -569,3 +569,258 @@ async fn abgelehnte_mitgliedschaftsaenderung_feuert_nichts() {
     let alle = eingegangen(&mut rx);
     assert!(kopf_events(&alle).is_empty(), "{alle:?}");
 }
+
+// ---------- Umschalten einer Lagekennzahl (LFH-855) ----------
+//
+// `einsatz` fällt nur, wenn sich die Menge der aktiven Lagekennzahlen ändert — nie bei jeder
+// Änderung an Pegel oder Bezirk. Herleitung:
+// `openspec/changes/archive/2026-10-04-lfh-855-lagekennzahl-umschalten-live/design.md` D1.
+
+const PEGEL_A: &str = "a6ee8177-107b-47dd-bcfd-30960ccc6e9c";
+const PEGEL_B: &str = "593647aa-9fea-43ec-a7d6-6476a76ae868";
+
+/// Router mit LiveHub, dessen PEGELONLINE-Basis sofort scheitert und dessen Nachschlage-Cache in
+/// einem eigenen Tempdir liegt: die Pegel-Routen stoßen fehlende Messungen im Hintergrund an,
+/// und kein Test geht ins Netz (vgl. Kopf von `tests/pegel.rs`).
+async fn setup_pegel_mit_live() -> (axum::Router, lifeline_hub::live::LiveHub, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut hub = None;
+    let (app, _pool) = setup_mit_state(|s| {
+        s.karten_dir = dir.path().to_path_buf();
+        s.fachebenen =
+            lifeline_hub::karte::FachebenenState::neu().mit_pegel_basis_url("http://127.0.0.1:1");
+        hub = Some(s.live.clone());
+    })
+    .await;
+    (app, hub.unwrap(), dir)
+}
+
+fn pegel_station(uuid: &str) -> String {
+    format!(r#"{{"station_uuid":"{uuid}","name":"Pegel {uuid}","gewaesser":"WESER"}}"#)
+}
+
+fn pegel_liste(uuids: &[&str]) -> String {
+    let teile: Vec<String> = uuids.iter().map(|u| pegel_station(u)).collect();
+    format!(r#"{{"stationen":[{}]}}"#, teile.join(","))
+}
+
+async fn pegel_anfuegen(app: &axum::Router, cookie: &str, einsatz: i64, uuid: &str) {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/pegel"),
+        cookie,
+        Some(&pegel_station(uuid)),
+    )
+    .await;
+    assert!(status.is_success(), "Vorbedingung: {status} {json:?}");
+}
+
+async fn pegel_ersetzen(app: &axum::Router, cookie: &str, einsatz: i64, uuids: &[&str]) {
+    let (status, json) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/pegel"),
+        cookie,
+        Some(&pegel_liste(uuids)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: {json:?}");
+}
+
+#[tokio::test]
+async fn erster_pegel_per_post_feuert_einsatz_weitere_nicht() {
+    let (app, live, _dir) = setup_pegel_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    pegel_anfuegen(&app, &admin, einsatz, PEGEL_A).await;
+    let alle = eingegangen(&mut rx);
+    let kopf = kopf_events(&alle);
+    assert_eq!(kopf.len(), 1, "erster Pegel schaltet `pegel`: {alle:?}");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&kopf[0].data).unwrap(),
+        serde_json::json!({ "einsatz_id": einsatz })
+    );
+
+    // Zweiter Pegel, derselbe noch einmal (idempotent) und Umordnen: kein Umschalten.
+    pegel_anfuegen(&app, &admin, einsatz, PEGEL_B).await;
+    pegel_anfuegen(&app, &admin, einsatz, PEGEL_B).await;
+    pegel_ersetzen(&app, &admin, einsatz, &[PEGEL_B, PEGEL_A]).await;
+    pegel_ersetzen(&app, &admin, einsatz, &[PEGEL_B]).await;
+    let alle = eingegangen(&mut rx);
+    assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 0, "{alle:?}");
+}
+
+#[tokio::test]
+async fn pegelliste_per_put_schaltet_in_beide_richtungen() {
+    let (app, live, _dir) = setup_pegel_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    // Leer bleibt leer: kein Umschalten.
+    pegel_ersetzen(&app, &admin, einsatz, &[]).await;
+    assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 0);
+
+    pegel_ersetzen(&app, &admin, einsatz, &[PEGEL_A, PEGEL_B]).await;
+    assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 1);
+
+    // Die Liste leeren nimmt den Platz zurück.
+    pegel_ersetzen(&app, &admin, einsatz, &[]).await;
+    assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 1);
+}
+
+#[tokio::test]
+async fn prognose_eines_pegels_feuert_kein_einsatz() {
+    let (app, live, _dir) = setup_pegel_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    pegel_anfuegen(&app, &admin, einsatz, PEGEL_A).await;
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &admin,
+        None,
+    )
+    .await;
+    let pegel_id = liste[0]["id"].as_i64().expect("Pegel-id");
+
+    let mut rx = live.abonniere(einsatz);
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/pegel/{pegel_id}/prognose"),
+        &admin,
+        Some(r#"{"hoechststand_cm":420,"zeitpunkt":"2026-09-22T18:00:00+02:00"}"#),
+    )
+    .await;
+    assert!(status.is_success(), "Vorbedingung: {status} {json:?}");
+    assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 0);
+}
+
+fn betreuung_pfad(einsatz: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/betreuung")
+}
+
+async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("{}/bezirke", betreuung_pfad(einsatz)),
+        cookie,
+        Some(&format!(
+            r#"{{"bezeichnung":"{bezeichnung}","plan_personen":640,"plan_erhebung":"geschaetzt"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "Vorbedingung: {json:?}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn bezirk_aendern(app: &axum::Router, cookie: &str, einsatz: i64, bid: i64, rumpf: &str) {
+    let (status, json) = anfrage(
+        app,
+        "PATCH",
+        &format!("{}/bezirke/{bid}", betreuung_pfad(einsatz)),
+        cookie,
+        Some(rumpf),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: {json:?}");
+}
+
+async fn bezirk_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, bid: i64) {
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("{}/bezirke/{bid}/stornieren", betreuung_pfad(einsatz)),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: {json:?}");
+}
+
+#[tokio::test]
+async fn erste_evakuierung_feuert_einsatz_neben_betreuung_weitere_nicht() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut rx = live.abonniere(einsatz);
+
+    let erster = bezirk_anlegen(&app, &admin, einsatz, "Uferstraße").await;
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        anzahl(&alle, LiveEvent::Betreuung),
+        1,
+        "Vorbedingung: {alle:?}"
+    );
+    assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 1, "{alle:?}");
+
+    // Zweiter Bezirk, Stammdaten, Räumung ohne Wechsel über `aufgehoben`, Stand: kein Umschalten.
+    let zweiter = bezirk_anlegen(&app, &admin, einsatz, "Altstadt").await;
+    bezirk_aendern(&app, &admin, einsatz, erster, r#"{"plan_personen":700}"#).await;
+    bezirk_aendern(&app, &admin, einsatz, erster, r#"{"raeumung":"geraeumt"}"#).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke/{erster}/staende", betreuung_pfad(einsatz)),
+        &admin,
+        Some(r#"{"evakuiert":120,"erhebung":"gezaehlt"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "Vorbedingung: {json:?}");
+    // Einer von zwei aktiven fällt weg: die Anordnung bleibt.
+    bezirk_aendern(
+        &app,
+        &admin,
+        einsatz,
+        zweiter,
+        r#"{"raeumung":"aufgehoben"}"#,
+    )
+    .await;
+    let alle = eingegangen(&mut rx);
+    assert_eq!(
+        anzahl(&alle, LiveEvent::Betreuung),
+        5,
+        "Vorbedingung: {alle:?}"
+    );
+    assert_eq!(anzahl(&alle, LiveEvent::Einsatz), 0, "{alle:?}");
+}
+
+#[tokio::test]
+async fn letzte_evakuierung_aufgehoben_und_wieder_angeordnet_feuert_einsatz() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk_anlegen(&app, &admin, einsatz, "Uferstraße").await;
+    let mut rx = live.abonniere(einsatz);
+
+    bezirk_aendern(&app, &admin, einsatz, bid, r#"{"raeumung":"aufgehoben"}"#).await;
+    assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 1);
+
+    bezirk_aendern(&app, &admin, einsatz, bid, r#"{"raeumung":"laeuft"}"#).await;
+    assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 1);
+}
+
+#[tokio::test]
+async fn stornieren_des_letzten_aktiven_bezirks_feuert_einsatz() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let erster = bezirk_anlegen(&app, &admin, einsatz, "Uferstraße").await;
+    let zweiter = bezirk_anlegen(&app, &admin, einsatz, "Altstadt").await;
+    let mut rx = live.abonniere(einsatz);
+
+    bezirk_stornieren(&app, &admin, einsatz, erster).await;
+    assert_eq!(
+        anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz),
+        0,
+        "ein aktiver Bezirk bleibt"
+    );
+    bezirk_stornieren(&app, &admin, einsatz, zweiter).await;
+    assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 1);
+}

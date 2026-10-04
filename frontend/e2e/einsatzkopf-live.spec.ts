@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzdatenPfad, stabPfad } from '../src/routing/deeplinks';
+import { einsatzdatenPfad, einsatzModulPfad, stabPfad } from '../src/routing/deeplinks';
 import { anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /**
@@ -16,6 +16,10 @@ import { anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
  * LFH-854: ein Rollenwechsel im Einsatz feuert ebenfalls `einsatz`; der Schirm der betroffenen
  * Person zeigt ihr neues Schreibrecht ohne Neuladen. Mutationsprobe: Emitter in
  * `mitglied_setzen` entfernt → der Rollenwechsel-Test rot.
+ *
+ * LFH-855: Das Umschalten einer Lagekennzahl läuft über dasselbe Ereignis; das Lage-Dashboard hält
+ * seinen Zuschnitt und bietet den neuen per Sammelbanner an. Mutationsprobe: Emitter in
+ * `routes/pegel.rs` entfernt → der Pegel-Test rot.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -119,4 +123,32 @@ test('LFH-854: ein Rollenwechsel schaltet das Schreibrecht der betroffenen Perso
   } finally {
     await kontext.close();
   }
+});
+
+test('LFH-855: der erste Pegel auf einem anderen Schirm bietet dem offenen Dashboard den Zuschnitt an', async ({
+  page,
+}) => {
+  const id = await anmeldenUndAnlegen(page);
+  await oeffnenMitStrom(page, einsatzModulPfad(id, 'lage-dashboard'), id);
+  const platzEins = page
+    .getByRole('group', { name: 'Lage in Zahlen' })
+    .locator('[data-lfh="kennzahl"]')
+    .first();
+  await expect(platzEins).toContainText('Verbleib offen');
+
+  const festlegen = await page.request.post(`/api/einsaetze/${id}/pegel`, {
+    data: { station_uuid: 'a6ee8177-107b-47dd-bcfd-30960ccc6e9c', name: 'Hann. Münden' },
+  });
+  expect(festlegen.status()).toBe(201);
+
+  const banner = page.locator('[data-lfh="sammelbanner"]', {
+    hasText: 'Kennzahlreihe geändert: Pegel statt Verbleib offen',
+  });
+  await expect(banner).toBeVisible();
+  // Gehalten: die Reihe tauscht nicht unter dem Blick.
+  await expect(platzEins).toContainText('Verbleib offen');
+
+  await banner.getByRole('button', { name: 'übernehmen' }).click();
+  await expect(platzEins).toContainText('Pegel');
+  await expect(banner).toHaveCount(0);
 });

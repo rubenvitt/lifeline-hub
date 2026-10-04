@@ -31,6 +31,11 @@
 //! `LiveEvent::Betreuung` mit Kennungen only (`{einsatz_id, bezirk_id}` bzw.
 //! `{einsatz_id, stelle_id}`) — keine Anzahlen, Bezeichnungen oder Freitexte. Ein PATCH ohne
 //! wirksame Änderung (Leerlauf-Riegel im Repo, leere `etb_ids`) publiziert nichts.
+//!
+//! **Lagekennzahl** (LFH-855): Anlegen, Ändern und Stornieren eines Bezirks lesen die
+//! Lagekennzahlen des Einsatzes vor und nach dem Repo-Aufruf in derselben Transaktion. Schaltet
+//! `evakuiert` um, meldet die Route nach dem Commit zusätzlich den Einsatzkopf (`einsatz`,
+//! [`kopf_bei_umschalten`]). Stand- und Stellenmeldungen schalten ihn nie.
 
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -50,6 +55,7 @@ use crate::betreuung::{
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
+use crate::einsatz::lagekennzahl;
 use crate::einsatz::modul::Betreuung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -113,6 +119,16 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], objekt: Objekt
 fn publiziere_wirksam(state: &AppState, einsatz_id: i64, g: &repo::Geschrieben, objekt: Objekt) {
     if !g.etb_ids.is_empty() || g.still_geaendert {
         publiziere(state, einsatz_id, &g.etb_ids, objekt);
+    }
+}
+
+/// Nach dem Commit: den Einsatzkopf melden, wenn die Bezirksänderung eine Lagekennzahl
+/// umgeschaltet hat (LFH-855). Der Kopf zeigt `lagekennzahlen` jedem Leser, auch ohne Modul
+/// Betreuung — das ungegatete `einsatz` verrät also nichts darüber hinaus, und eine Änderung
+/// ohne Umschalten bleibt für ihn unsichtbar.
+async fn kopf_bei_umschalten(state: &AppState, einsatz_id: i64, umgeschaltet: bool) {
+    if umgeschaltet {
+        crate::routes::einsatz::kopf_geaendert(state, einsatz_id).await;
     }
 }
 
@@ -237,10 +253,13 @@ pub async fn bezirk_anlegen(
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
-    let g = crate::write_retry!(&state.pool, |conn| {
-        repo::bezirk_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, &eingabe).await
+    let (g, umgeschaltet) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
+        let g = repo::bezirk_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, &eingabe).await?;
+        Ok((g, lagekennzahl::lesen(conn, einsatz_id).await? != vorher))
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
+    kopf_bei_umschalten(&state, einsatz_id, umgeschaltet).await;
     Ok((
         StatusCode::CREATED,
         Json(repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?),
@@ -286,10 +305,14 @@ pub async fn bezirk_aendern(
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
-    let g = crate::write_retry!(&state.pool, |conn| {
-        repo::bezirk_aendern_tx(conn, einsatz_id, bid, benutzer_id, startwert, &eingabe).await
+    let (g, umgeschaltet) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
+        let g = repo::bezirk_aendern_tx(conn, einsatz_id, bid, benutzer_id, startwert, &eingabe)
+            .await?;
+        Ok((g, lagekennzahl::lesen(conn, einsatz_id).await? != vorher))
     })?;
     publiziere_wirksam(&state, einsatz_id, &g, Objekt::Bezirk(g.id));
+    kopf_bei_umschalten(&state, einsatz_id, umgeschaltet).await;
     Ok(Json(
         repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?,
     ))
@@ -305,10 +328,13 @@ pub async fn bezirk_stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
-    let (g, geloeste_zonen) = crate::write_retry!(&state.pool, |conn| {
-        repo::bezirk_stornieren_tx(conn, einsatz_id, bid, benutzer_id, startwert).await
+    let ((g, geloeste_zonen), umgeschaltet) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
+        let r = repo::bezirk_stornieren_tx(conn, einsatz_id, bid, benutzer_id, startwert).await?;
+        Ok((r, lagekennzahl::lesen(conn, einsatz_id).await? != vorher))
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
+    kopf_bei_umschalten(&state, einsatz_id, umgeschaltet).await;
     // LFH-673: die Karte zeichnet die gelösten Flächen jetzt ohne Bezirk.
     for zid in geloeste_zonen {
         super::lage_zone::sse_zone(&state, einsatz_id, zid);

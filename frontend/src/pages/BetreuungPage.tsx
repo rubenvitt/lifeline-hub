@@ -156,8 +156,9 @@ export default function BetreuungPage() {
   }, [qc, einsatzId]);
   /**
    * Nach einer Bezirksänderung zusätzlich den Einsatz: Anlegen, Räumung und Stornieren können die
-   * Lagekennzahl `evakuiert` kippen, und dieses Kippen löst kein `einsatz`-Ereignis aus (LFH-555,
-   * design.md D5). Stand- und Stellenmeldungen kippen ihn nie.
+   * Lagekennzahl `evakuiert` kippen. Andere Schirme erfahren das Kippen über `einsatz` (LFH-855);
+   * der eigene Abruf hier wirkt auch bei gestörtem Strom, damit der Rückweg zum Dashboard den neuen
+   * Zuschnitt ohne Banner zeigt. Stand- und Stellenmeldungen kippen ihn nie.
    */
   const invalidiereBezirk = useCallback(() => {
     invalidiere();
