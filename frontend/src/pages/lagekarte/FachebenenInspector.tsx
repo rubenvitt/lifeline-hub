@@ -116,6 +116,13 @@ const ZUSTAND: Record<string, { label: string; color: string }> = {
   low: { label: 'Niedrig', color: 'gold' },
 };
 
+// Rückfall für „Quelle“, wenn `SENDERNAME` fehlt oder leer ist (LFH-882): je Ebene die amtliche
+// Stelle, die sie liefert. Im DWD-WFS ist `SENDERNAME` optional und nillable.
+const WARNQUELLE_RUECKFALL: Record<'nina' | 'dwd', string> = {
+  nina: 'BBK / MoWaS',
+  dwd: 'Deutscher Wetterdienst',
+};
+
 function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina' | 'dwd' }) {
   const { token } = theme.useToken();
   const jetzt = useMinutenTakt();
@@ -130,7 +137,7 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
   const beginn = fmtZeit(pick(p, 'ONSET'));
   const von = fmtZeit(pick(p, 'ONSET', 'EFFECTIVE', 'beginn'));
   const bis = fmtZeit(pick(p, 'EXPIRES'));
-  const quelle = pick(p, 'SENDERNAME') ?? 'BBK / MoWaS';
+  const quelle = pick(p, 'SENDERNAME') ?? WARNQUELLE_RUECKFALL[ebene];
   const beschreibung = pick(p, 'DESCRIPTION', 'description');
   const hinweis = pick(p, 'INSTRUCTION', 'instruction');
 

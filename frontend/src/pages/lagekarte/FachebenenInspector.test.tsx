@@ -146,7 +146,56 @@ describe('FachebenenInspector', () => {
     });
   });
 
-  it('ODL: Messwert, Messende, Stufe im Wortlaut und der Hinweis auf die Projekt-Einteilung (LFH-78)', () => {
+  describe('Quelle einer Warnung (LFH-882)', () => {
+    const quelleText = () => screen.getByText('Quelle').closest('tr')?.textContent ?? '';
+
+    it('DWD-Warnung ohne SENDERNAME nennt den DWD, nie BBK/MoWaS', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'FROST', SEVERITY: 'Minor' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(quelleText()).toContain('Deutscher Wetterdienst');
+      expect(document.body.textContent).not.toMatch(/BBK|MoWaS/);
+    });
+
+    it('DWD-Warnung mit leerem SENDERNAME nennt ebenfalls den DWD', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'FROST', SENDERNAME: '  ' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(quelleText()).toContain('Deutscher Wetterdienst');
+    });
+
+    it('NINA-Warnung ohne SENDERNAME nennt BBK / MoWaS', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Test' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(quelleText()).toContain('BBK / MoWaS');
+    });
+
+    it('ein gelieferter SENDERNAME geht dem Rückfall vor', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'FROST', SENDERNAME: 'DWD / Nationales Warnzentrum Offenbach' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(quelleText()).toContain('DWD / Nationales Warnzentrum Offenbach');
+    });
+  });
+
+  it('ODL:Messwert, Messende, Stufe im Wortlaut und der Hinweis auf die Projekt-Einteilung (LFH-78)', () => {
     render(
       <FachebenenInspector
         quelle="odl"
