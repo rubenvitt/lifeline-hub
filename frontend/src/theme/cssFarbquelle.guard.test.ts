@@ -35,14 +35,10 @@ const ROLLENQUELLE = 'theme/rollen.css';
 /**
  * SCHULDMENGE: Dateien, die beim Einführen des Guards noch Farbliterale tragen. Sie schrumpft
  * nur: ein Eintrag ohne Fund färbt den Guard rot und fällt im selben Commit wie der Fix.
- * Nachzug: Markdown-Renderer und -Editor auf Rollen ziehen (LFH-889).
+ * Leer seit LFH-889 (Markdown-Renderer und -Editor auf Rollen). Ein neuer Eintrag braucht eine
+ * Entscheidung, keinen Nachzug: wer ein Literal braucht, legt die Rolle an.
  */
-export const OFFEN: readonly string[] = [
-  // Code-Grund und Rahmen des Markdown-Renderers, je Modus als `rgba()` über Schwarz/Weiß.
-  'components/Markdown.css',
-  // Rahmen und Fläche des Markdown-Editors, dieselbe Form.
-  'components/MarkdownEditor.css',
-];
+export const OFFEN: readonly string[] = [];
 
 const FARBLITERAL =
   /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![0-9a-z_-])|\b(?:rgba?|hsla?)\(/gi;
