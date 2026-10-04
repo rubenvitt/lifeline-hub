@@ -160,6 +160,8 @@ impl LiveEvent {
             // öffnen darf, darf den Kopf lesen und damit auch erfahren, dass er sich geändert
             // hat. Ein Modul-Key hier (etwa `einsatzdaten`) ließe genau die Kopf-Leser ohne
             // dieses Modul mit einem stehenden Cache zurück. Nutzlast nur die Einsatzkennung.
+            // Auch eine Mitgliedschaftsänderung feuert es (LFH-854): kein Leck, denn die
+            // Mitgliederliste mit allen Rollen liegt ebenfalls hinter dieser Tür.
             LiveEvent::Einsatz => &[],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.

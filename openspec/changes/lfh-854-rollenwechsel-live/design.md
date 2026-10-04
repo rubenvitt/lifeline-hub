@@ -90,3 +90,14 @@ Schreibrecht verschwindet ohne Neuladen.
 
 Keine Datenmigration, kein DTO, kein Codegen. Rückbau: die beiden Aufrufe in `mitglied_setzen`/
 `mitglied_entfernen` zurück auf `einsatzliste_melden`.
+
+## Nachweise (Umsetzung 04.10.2026)
+
+- **Mutationsprobe Backend:** Emitter in `mitglied_entfernen` vor die 409-Prüfung gezogen →
+  `abgelehnte_mitgliedschaftsaenderung_feuert_nichts` rot; zurückgedreht → grün.
+- **Mutationsprobe Ende zu Ende:** In `mitglied_setzen` nur noch `einsatzliste_melden` statt
+  `kopf_geaendert_fuer` → der LFH-854-Fall in `e2e/einsatzkopf-live.spec.ts` rot (die Eingabe im
+  Chat erscheint ohne Neuladen nicht); zurückgedreht → grün, dreimal wiederholt.
+- **Genau ein `einsatzliste` je Änderung:** `tests/org_live.rs` (`hinzugefuegtes_mitglied_erfaehrt_die_aenderung`,
+  `entferntes_mitglied_erfaehrt_die_aenderung_noch`) zählt weiterhin genau eine Meldung an die
+  betroffene Person; `kopf_geaendert_fuer` meldet sie nicht doppelt.
