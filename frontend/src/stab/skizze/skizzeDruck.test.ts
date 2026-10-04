@@ -68,6 +68,14 @@ describe('skizzeDruck.css', () => {
     expect(css).not.toContain('druckwurzel');
   });
 
+  // Prüfliste O4 (Kriterium 11): die Fläche lässt die Meldung im Druck weg (`druck`, über
+  // `beforeprint`); die Regel deckt Druckwege ohne `beforeprint` (`page.pdf`, `emulateMedia`).
+  it('blendet Meldungen am Element aus, auch ohne `beforeprint`', () => {
+    expect(koerper(".lfh-skizze-flaeche [data-teil='meldung']")).toMatch(
+      /display:\s*none\s*!important/,
+    );
+  });
+
   it('die Komponente bindet die Datei ein', () => {
     const bild = readFileSync(join(HIER, '..', 'FernmeldeskizzeBild.tsx'), 'utf8');
     expect(bild).toContain("import './skizze/skizzeDruck.css';");

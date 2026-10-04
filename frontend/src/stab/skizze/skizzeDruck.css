@@ -40,6 +40,13 @@
     display: none !important;
   }
 
+  /* Eine Meldung am Element ist Rückmeldung an den Arbeitsplatz, kein Teil des Blatts (Prüfliste
+     O4). Die Fläche lässt sie im Druck schon weg (`druck` über `beforeprint`); diese Regel deckt
+     Druckwege ohne `beforeprint` (`page.pdf`, `emulateMedia`, `useDruckModus`). */
+  .lfh-skizze-flaeche [data-teil='meldung'] {
+    display: none !important;
+  }
+
   /* Nutzhöhe quer bei 15 mm Rand (`druck/druck.css`): A3 267 mm, A4 180 mm; davon Druckkopf
      45 mm und Abstände. */
   .lfh-skizze-druck-a3 .lfh-skizze-flaeche svg {

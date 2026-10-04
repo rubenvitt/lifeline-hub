@@ -231,6 +231,8 @@ export interface EigenschaftspaneelProps {
   kontext: Bedienkontext;
   handlungen: SkizzenHandlungen;
   meldung: string | null;
+  /** Quittiert die Meldung am gewählten Element (Prüfliste O4). */
+  onQuittieren: () => void;
   onVerbinden: (stelle: string) => void;
   /** Rückfrage vor Unumkehrbarem (Komponente, Bereich entfernen). */
   onEntfernenFrage: (key: string) => void;
@@ -245,6 +247,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
       kontext,
       handlungen: h,
       meldung,
+      onQuittieren,
       onVerbinden,
       onEntfernenFrage,
     } = props;
@@ -274,11 +277,18 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
           style={{ marginBlockEnd: token.marginSM }}
         />
       ) : null;
+    // Quittieren als Knopf im `action`-Platz, nicht antds Schließkreuz: der Knopf hält die
+    // Dichte-Staffel (Gate 3), das Kreuz nicht.
     const meldungHinweis = meldung ? (
       <Alert
         type="warning"
         showIcon
         title={meldung}
+        action={
+          <Button onClick={onQuittieren} aria-label="Meldung quittieren">
+            Quittieren
+          </Button>
+        }
         data-lfh="skizze-meldung"
         style={{ marginBlockEnd: token.marginSM }}
       />

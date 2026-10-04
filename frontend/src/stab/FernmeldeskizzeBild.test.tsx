@@ -28,6 +28,7 @@ import FernmeldeskizzeBild from './FernmeldeskizzeBild';
 import type { SkizzenAktionen } from './skizzenAktionen';
 import { STRICH_HERVORGEHOBEN, schaetzeTextbreite } from './skizzenZeichen';
 import { ZURUECK_DECKKRAFT } from './skizze/SkizzenElemente';
+import { VERSCHOBEN_MELDUNG } from './skizze/useSkizzenHandlungen';
 
 /**
  * Die Zeichenfläche als Ganzes (LFH-893, Spec-Szenarien aus `stab-fernmeldeskizze` und
@@ -44,7 +45,10 @@ const DMO505 = sg(4, 'DMO', '505');
 
 const ALLE: NetzRechte = { einsatzabschnitte: true, einheiten: true, verwaltung: true, stab: true };
 
-function netz(rechte: NetzRechte = ALLE, p: { ohneZug?: boolean } = {}): Fernmeldenetz {
+function netz(
+  rechte: NetzRechte = ALLE,
+  p: { ohneZug?: boolean; mitKomponente?: boolean } = {},
+): Fernmeldenetz {
   return baueFernmeldenetz({
     ...quellen({
       fuehrungsstelle: fs({ sprechgruppen: [BN_BOS] }),
@@ -66,6 +70,9 @@ function netz(rechte: NetzRechte = ALLE, p: { ohneZug?: boolean } = {}): Fernmel
         }),
       ]),
       skizze: {
+        komponenten: p.mitKomponente
+          ? [{ id: 3, art: 'repeater', bezeichnung: 'Repeater Nord', sprechgruppen: [F314] }]
+          : [],
         verbindungen: [
           verbindung(
             8,
@@ -142,8 +149,17 @@ function bild(
 const element = (key: string) =>
   document.querySelector<SVGGElement>(`[data-lfh="skizze-element"][data-key="${key}"]`);
 const svg = () => document.querySelector<SVGSVGElement>('[data-lfh="skizze-flaeche"] svg')!;
-const zurueck = (key: string) =>
-  element(key)?.getAttribute('opacity') === String(ZURUECK_DECKKRAFT);
+/** Tritt das Element zurück? Die Deckkraft trägt sein Bild, die Gruppe nur die Marke. */
+const zurueck = (key: string) => element(key)?.hasAttribute('data-zurueck') ?? false;
+/** Deckkraft, mit der ein Teil der Skizze steht: Produkt der `opacity` bis zum `svg`. */
+function deckkraft(teil: Element): number {
+  let d = 1;
+  for (let e: Element | null = teil; e && e.tagName !== 'svg'; e = e.parentElement) {
+    const o = e.getAttribute('opacity');
+    if (o != null) d *= Number(o);
+  }
+  return d;
+}
 const status = () => document.querySelector<HTMLElement>('[data-lfh="skizze-status"]')!;
 const paneel = () => document.querySelector<HTMLElement>('[data-lfh="skizze-paneel"]')!;
 
@@ -318,6 +334,25 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
     // Hervorgehoben über die Strichstärke, nicht nur über Farbe.
     const linie = element('sg-1')!.querySelector('[data-teil="schiene"]')!;
     expect(Number(linie.getAttribute('stroke-width'))).toBe(STRICH_HERVORGEHOBEN);
+  });
+
+  // Prüfliste O1: mit der Deckkraft 0,6 hielt das Lückenwort in `achtungText` im hellen Modus nur
+  // 3,20 : 1. Lücke und Meldung sind die kritische Anzeige des Elements (Kriterium 9) und treten
+  // nicht mit zurück; der Kontrast ist in `zurueckKontrast.test.ts` gerechnet.
+  it('zurückgenommen: Name und Zeichen treten zurück, Lückenwort und Marke nicht', async () => {
+    const user = userEvent.setup();
+    bild();
+    await user.click(element('sg-1')!);
+    expect(zurueck('eh-10')).toBe(true);
+    const texte = [...element('eh-10')!.querySelectorAll('text')];
+    const name = texte.find((t) => t.textContent === '1. Zug');
+    const wort = texte.find((t) => t.textContent?.includes('keine Sprechgruppe'));
+    expect(name, 'Name steht').toBeDefined();
+    expect(wort, 'Lückenwort steht').toBeDefined();
+    expect(deckkraft(name!)).toBe(ZURUECK_DECKKRAFT);
+    expect(deckkraft(wort!)).toBe(1);
+    const marke = wort!.closest('[data-teil="luecke"]')!.querySelector('polygon')!;
+    expect(deckkraft(marke)).toBe(1);
   });
 
   it('Nur Lücken: Elemente mit Lücke voll, die übrigen zurückgenommen', async () => {
@@ -517,6 +552,76 @@ describe('Fernmeldeskizze — Bearbeiten ohne Zeiger (5.3, 6.3, 6.4)', () => {
       ),
     );
     expect(aktionen!.ordneZu).toHaveBeenCalledTimes(1);
+  });
+
+  // Prüfliste O4 (Kriterium 11): eine Meldung am Element lässt sich quittieren und kommt nicht
+  // aufs Blatt.
+  async function meldungAnEa1() {
+    const user = userEvent.setup();
+    const aktionen = aktionenAttrappe();
+    aktionen.verschiebe.mockRejectedValueOnce(new ApiError(409, 'Versionskonflikt'));
+    const props = { netz: netz(), aktionen, einsatzbezeichnung: 'Großbrand Musterhausen' };
+    const utils = renderMitProviders(<FernmeldeskizzeBild {...props} />);
+    act(() => element('ab-1')!.focus());
+    await user.keyboard('{ArrowRight}');
+    await waitFor(() => expect(element('ab-1')!.textContent).toContain(VERSCHOBEN_MELDUNG));
+    expect(element('ab-1')!.querySelector('[data-teil="meldung"]')).not.toBeNull();
+    expect(within(paneel()).getByText(VERSCHOBEN_MELDUNG)).toBeInTheDocument();
+    return { user, props, ...utils };
+  }
+
+  it('Meldung am Element: Escape quittiert sie, ein zweites Escape wählt ab', async () => {
+    const { user } = await meldungAnEa1();
+    expect(document.activeElement).toBe(element('ab-1'));
+    await user.keyboard('{Escape}');
+    expect(element('ab-1')!.textContent).not.toContain(VERSCHOBEN_MELDUNG);
+    expect(element('ab-1')!.getAttribute('aria-label')).not.toContain(VERSCHOBEN_MELDUNG);
+    expect(document.querySelector('[data-lfh="skizze-meldung"]')).toBeNull();
+    expect(status()).not.toHaveTextContent(VERSCHOBEN_MELDUNG);
+    expect(element('ab-1')!.getAttribute('aria-pressed')).toBe('true');
+    await user.keyboard('{Escape}');
+    expect(element('ab-1')!.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('Meldung am Element: „Quittieren“ im Paneel nimmt sie von Fläche und Paneel', async () => {
+    const { user } = await meldungAnEa1();
+    await user.click(within(paneel()).getByRole('button', { name: 'Meldung quittieren' }));
+    expect(element('ab-1')!.textContent).not.toContain(VERSCHOBEN_MELDUNG);
+    expect(document.querySelector('[data-lfh="skizze-meldung"]')).toBeNull();
+    expect(element('ab-1')!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('Meldung am Element kommt nicht aufs Blatt', async () => {
+    const { props, rerender } = await meldungAnEa1();
+    rerender(<FernmeldeskizzeBild {...props} druckt />);
+    expect(svg().textContent).not.toContain(VERSCHOBEN_MELDUNG);
+    expect(svg().querySelector('[data-teil="meldung"]')).toBeNull();
+  });
+
+  // Prüfliste O6 (Kriterium 4): Unumkehrbares fragt nach; Rückgängig legt die Verbindungen einer
+  // Komponente nicht neu an.
+  it('„‹Komponente› entfernen?“: Entf fragt nach, entfernt wird erst mit „Entfernen“', async () => {
+    const user = userEvent.setup();
+    const { aktionen } = bild(netz(ALLE, { mitKomponente: true }));
+    act(() => element('ko-3')!.focus());
+    await user.keyboard('{Delete}');
+    const frage = await screen.findByRole('dialog', { name: 'Repeater Nord entfernen?' });
+    expect(within(frage).getByText(/die Verbindungen nicht/)).toBeInTheDocument();
+    expect(aktionen!.entferneKomponente).not.toHaveBeenCalled();
+    await user.click(within(frage).getByRole('button', { name: 'Entfernen' }));
+    await waitFor(() => expect(aktionen!.entferneKomponente).toHaveBeenCalledWith(3));
+    expect(aktionen!.entferneKomponente).toHaveBeenCalledTimes(1);
+  });
+
+  it('„‹Komponente› entfernen?“: Abbrechen entfernt nichts', async () => {
+    const user = userEvent.setup();
+    const { aktionen } = bild(netz(ALLE, { mitKomponente: true }));
+    act(() => element('ko-3')!.focus());
+    await user.keyboard('{Delete}');
+    const frage = await screen.findByRole('dialog', { name: 'Repeater Nord entfernen?' });
+    await user.click(within(frage).getByRole('button', { name: 'Abbrechen' }));
+    expect(aktionen!.entferneKomponente).not.toHaveBeenCalled();
+    expect(element('ko-3')).not.toBeNull();
   });
 
   it('Stichleitung lösen: Entf an der gewählten Stichleitung löst ohne Rückfrage', async () => {

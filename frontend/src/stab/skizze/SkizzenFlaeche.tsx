@@ -12,8 +12,8 @@
  *   Fläche an den Enden; alle übrigen Tasten gibt die Fläche als `TastenBefehl` nach oben.
  * - **Ruhige Fläche** (D4): solange Zeiger (ohne Touch) oder Fokus in der Fläche liegen, meldet
  *   sie `onHalten(true)`; die Seite hält dann die auto-gelegten Plätze fest.
- * - **Druck:** ohne Bedienelemente, Hervorhebung, Filter und Wahl, eingepasst über die ganze
- *   Ausdehnung (D13).
+ * - **Druck:** ohne Bedienelemente, Hervorhebung, Filter, Wahl und Meldungen am Element,
+ *   eingepasst über die ganze Ausdehnung (D13, Prüfliste O4).
  */
 import { useDraggable, useDndContext } from '@dnd-kit/core';
 import {
@@ -55,7 +55,6 @@ import {
   StelleBild,
   StichBild,
   VerbindungBild,
-  ZURUECK_DECKKRAFT,
   anzeigeName,
   rufnamenZeile,
   type Zustand,
@@ -209,7 +208,9 @@ function Element({
       aria-label={label}
       aria-pressed={gewaehlt}
       tabIndex={fokus ? 0 : -1}
-      opacity={zurueck ? ZURUECK_DECKKRAFT : undefined}
+      // Die Deckkraft nimmt jedes Bild selbst (`zurueckDeckkraft`): Lücken- und Meldungszeile
+      // treten nicht mit zurück (Prüfliste O1).
+      data-zurueck={zurueck || undefined}
       transform={transform ? `translate(${dx} ${dy})` : undefined}
       style={{ cursor: ziehbar ? 'move' : 'pointer', outline: 'none' }}
       onFocus={() => {
@@ -515,6 +516,9 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
   const linienTreffer = Math.max(24, (token.controlHeight * 2) / 3);
   const zustand = (key: string): Zustand =>
     druck ? { hervorgehoben: false, zurueck: false } : zustandVon(key, hervor, voll);
+  // Eine Meldung am Element ist Rückmeldung an diesen Arbeitsplatz, kein Teil des Blatts
+  // (Prüfliste O4); `skizzeDruck.css` blendet sie auch ohne `beforeprint` aus.
+  const meldung = (key: string): string | undefined => (druck ? undefined : meldungen.get(key));
   const platz = (key: string): Platz | undefined => layout.plaetze.get(key);
   const stiche = stichleitungen(netz);
   const stelleJeKey = new Map(netz.stellen.map((x) => [x.key, x]));
@@ -622,7 +626,7 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
             schiene={sch}
             platz={p}
             zustand={zustand(sch.key)}
-            meldung={meldungen.get(sch.key)}
+            meldung={meldung(sch.key)}
           />
         </>,
       ),
@@ -671,17 +675,12 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
       element(
         st.key,
         { art: 'stelle', key: st.key },
-        stellenLabel(st) + (meldungen.get(st.key) ? `, ${meldungen.get(st.key)}` : ''),
+        stellenLabel(st) + (meldung(st.key) ? `, ${meldung(st.key)}` : ''),
         p,
         <>
           <rect x={p.x} y={p.y} width={p.breite} height={p.hoehe} fill="transparent" />
-          <StelleBild
-            stelle={st}
-            platz={p}
-            zustand={zustand(st.key)}
-            meldung={meldungen.get(st.key)}
-          />
-          {p.neu && !druck ? <NeuMarke platz={p} /> : null}
+          <StelleBild stelle={st} platz={p} zustand={zustand(st.key)} meldung={meldung(st.key)} />
+          {p.neu && !druck ? <NeuMarke platz={p} zustand={zustand(st.key)} /> : null}
         </>,
       ),
     ];
@@ -701,7 +700,7 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
       x={schriftfeld.x}
       y={schriftfeld.y}
       block={schriftfeld.block}
-      hervorgehoben={zustand(SCHRIFTFELD).hervorgehoben}
+      zustand={zustand(SCHRIFTFELD)}
     />,
   );
 

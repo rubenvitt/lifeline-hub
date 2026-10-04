@@ -144,6 +144,11 @@ interface Kontextmenue {
   anker: Punkt;
 }
 
+/** Wo die Meldung eines Elements steht: die einer Stichleitung an ihrer Stelle. */
+function meldungsElement(key: string): string {
+  return teileStichSchluessel(key)?.stelle ?? key;
+}
+
 function istEingabe(ziel: EventTarget | null): boolean {
   const el = ziel as HTMLElement | null;
   if (!el || !el.tagName) return false;
@@ -394,9 +399,13 @@ function Skizze({
       case 'wiederholen':
         if (aktionen) void h.wiederholen();
         return;
-      case 'abwaehlen':
-        waehle(null);
+      case 'abwaehlen': {
+        // Escape quittiert erst die Meldung am Element, erst das nächste wählt ab (Prüfliste O4).
+        const melder = key == null ? null : meldungsElement(key);
+        if (melder != null && h.meldungen.has(melder)) h.quittiere(melder);
+        else waehle(null);
         return;
+      }
       case 'zoom':
         zoom(befehl.richtung);
         return;
@@ -504,9 +513,8 @@ function Skizze({
   const hervor = druck ? null : hervorhebung(angezeigt, zeiger ?? gewaehlt);
   const voll = druck ? null : sichtbarImFilter(angezeigt, filter);
   const schreibt = aktionen != null && !istSchmal;
-  const meldung = gewaehlt
-    ? (h.meldungen.get(teileStichSchluessel(gewaehlt)?.stelle ?? gewaehlt) ?? null)
-    : null;
+  const meldungsKey = gewaehlt ? meldungsElement(gewaehlt) : null;
+  const meldung = meldungsKey ? (h.meldungen.get(meldungsKey) ?? null) : null;
 
   const menueStelle = menue ? angezeigt.stellen.find((s) => s.key === menue.key) : undefined;
   const menueStich = menue ? teileStichSchluessel(menue.key) : null;
@@ -668,6 +676,9 @@ function Skizze({
                 kontext={kontext}
                 handlungen={h}
                 meldung={meldung}
+                onQuittieren={() => {
+                  if (meldungsKey) h.quittiere(meldungsKey);
+                }}
                 onVerbinden={oeffneVerbinden}
                 onEntfernenFrage={entfernenFrage}
               />

@@ -254,9 +254,11 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
   - Nachweis: Szenario „Kanäle im Lagebericht“ als Test; fehlende Quelle nennt den Grund.
   - Erledigt: 7 Tests (5 zuerst rot). Fünftes Argument `{ netz, gueltigAb }` optional, bis
     `FunkplanPage` es übergibt (2.6); der Hinweis einer Verbindung bleibt draußen (Freitext).
-- [ ] 8.2 Folgetickets per `clickup-task-anlegen`: Übernahme in den Befehl, Skizze als Bild-Anlage,
+- [x] 8.2 Folgetickets per `clickup-task-anlegen`: Übernahme in den Befehl, Skizze als Bild-Anlage,
   Führungsmittel/Funktionen im Kasten, Feld „Netz“ an der Sprechgruppe (nach Duplikatsuche).
   - Nachweis: Tickets verlinkt im Nachtrag von `design.md`.
+  - Erledigt: LFH-1027 (Befehl), LFH-1028 (Bild-Anlage), LFH-1029 (Führungsmittel im Kasten),
+    LFH-1030 (Feld „Netz“), LFH-1033 (fehlende Zeichen), nach Duplikatsuche; im Nachtrag genannt.
 
 ## 9. Abschluss
 
@@ -272,9 +274,21 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
     mit 15 px (jetzt `stabZeilenzielStil`, Test zuerst rot). Chromium: neue Specs und beide Gates 40/42,
     die zwei roten (Gate 3 „zum Datensatz“) nach dem Fix 2/2; mit `funkplan`, `kommunikationsplan*`
     31/31 und Offline-Spec 1/1, keine Skips; Firefox/WebKit lokal nicht gelaufen.
-- [ ] 9.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für Fükw, Führungs-Tablet und mobil mit
+- [x] 9.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für Fükw, Führungs-Tablet und mobil mit
   Verdikt als Nachtrag in `design.md`.
-- [ ] 9.3 `frontend/src/stab/AGENTS.md` (Absatz Fernmeldeskizze neu) und `src/AGENTS.md` falls
+  - Erledigt: `pruefliste.md` (15 Zeilen, Verdikt je Kontext, Beleg je Zeile), Nachtrag in
+    `design.md`. Fükw 9 erfüllt / 3 teilweise / 3 nicht anwendbar, Tablet 9 / 4 / 2, mobil 7
+    erfüllt, 2 teilweise, 1 offen, 5 nicht anwendbar. Befund beim Prüfen: im hellen Modus hat das
+    Lückenwort eines zurückgenommenen Elements 3,20 : 1 (gerechnet; e2e misst nur dunkel,
+    `zurueckKontrast.test.ts` nur `text`). O1, O4 und der Komponententest von O6 hier
+    geschlossen (Lückenwort und Meldung nicht zurückgenommen, 9,22 : 1 hell; Meldung quittierbar und
+    nicht im Druck); O2, O3, O5, e2e-Teil von O6 und O7 als Folgetickets LFH-1037, LFH-1038,
+    LFH-1039. Endstand: Fükw 10 / 2 / 3, Tablet 10 / 3 / 2, mobil 7 / 2 / 1 offen / 5. Vitest `FernmeldeskizzeBild`, `useSkizzenHandlungen`, `zurueckKontrast` 49/49 grün.
+- [x] 9.3 `frontend/src/stab/AGENTS.md` (Absatz Fernmeldeskizze neu) und `src/AGENTS.md` falls
   Regeln für Bezüge/Schwärzung dazukommen; Verweise auf die abgelösten Requirements gegrept.
+  - Erledigt: Absatz Fernmeldeskizze in `frontend/src/stab/AGENTS.md` neu (Bezüge polymorph,
+    jeder Löschpfad ruft `vergiss`, Schreibwege nur über `skizzenAktionen.ts`); `frontend/AGENTS.md`
+    (Organigramm) angepasst; `src/AGENTS.md` braucht keine neue Regel (Schwärzung über die
+    Registry). Verweise auf das Altmodell gegrept, keiner übrig.
 - [ ] 9.4 `./scripts/check-all.sh` grün, Vitest und Rust-Tests grün.
 - [ ] 9.5 `/opsx:archive lfh-893-taktische-fernmeldeskizze` im selben Branch vor dem PR.

@@ -45,7 +45,9 @@ import { bezugAus } from './bedienung';
  *   vor dem ersten Verschieben im Auto-Layout, verwirft Rückgängig seine Lage wieder (Review O3).
  *   IDs angelegter Datensätze lesen die Gegenhandlungen erst beim Aufruf.
  * - **Scheitern** steht am Element (`meldungen`) und, weil das Element verschwunden sein kann
- *   („Datensatz inzwischen gelöscht“), zusätzlich als letzte Meldung in der Statuszeile.
+ *   („Datensatz inzwischen gelöscht“), zusätzlich als letzte Meldung in der Statuszeile. Sie gilt
+ *   bis zur nächsten Handlung an diesem Element oder bis sie quittiert ist (`quittiere`: Escape
+ *   am Element, „Quittieren“ im Paneel; Prüfliste O4).
  */
 
 export const VERSCHOBEN_MELDUNG = 'von einem anderen Arbeitsplatz verschoben';
@@ -123,6 +125,17 @@ export function useSkizzenHandlungen(
       return neu;
     });
     if (text != null) setLetzte({ element, text });
+  }, []);
+
+  /** Nimmt die Meldung am Element zurück, in der Statuszeile nur die dieses Elements. */
+  const quittiere = useCallback((element: string) => {
+    setMeldungen((alt) => {
+      if (!alt.has(element)) return alt;
+      const neu = new Map(alt);
+      neu.delete(element);
+      return neu;
+    });
+    setLetzte((alt) => (alt?.element === element ? null : alt));
   }, []);
 
   const name = useCallback((key: string): string => {
@@ -649,6 +662,7 @@ export function useSkizzenHandlungen(
     letzte,
     laeuft,
     melde,
+    quittiere,
     verschieben,
     setzeSchiene,
     neuAnordnen,

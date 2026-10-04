@@ -8,6 +8,10 @@
  * Farbe: Striche und Schrift in `currentColor`, Lücken und Meldungen zusätzlich als Wort mit
  * Marke (Dreieck mit „!“, Teil des Bildes, kein Icon des Iconsatzes), Hervorhebung über die
  * Strichstärke, „neu“ als Wort mit Rahmen (WCAG 1.4.1, Druck in Graustufen).
+ *
+ * Zurücktreten: jedes Bild nimmt seine Deckkraft selbst über `zurueckDeckkraft`, damit Lücken-
+ * und Meldungszeile außerhalb davon stehen können (Prüfliste O1); die Gruppe des Elements in
+ * `SkizzenFlaeche.tsx` trägt nur die Marke `data-zurueck`.
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useRollen } from '../../components/instrument';
@@ -65,6 +69,16 @@ export interface Zustand {
  */
 export const ZURUECK_DECKKRAFT = 0.6;
 
+/**
+ * Deckkraft eines Teils an einem Element, `undefined` = voll. Lücken- und Meldungszeile (`marke`)
+ * treten nie mit zurück: mit 0,6 hielten Wort und Marke in `achtungText` im hellen Modus nur
+ * 3,20 : 1 (Prüfliste O1, gerechnet in `zurueckKontrast.test.ts`), und sie sind die kritische
+ * Anzeige des Elements (Kriterium 9). Das übrige Bild (`bild`) tritt zurück.
+ */
+export function zurueckDeckkraft(zurueck: boolean, teil: 'bild' | 'marke'): number | undefined {
+  return zurueck && teil === 'bild' ? ZURUECK_DECKKRAFT : undefined;
+}
+
 /** Warnmarke: Dreieck mit „!“ — Zeichen der Skizze, steht immer neben einem Wort. */
 export function LueckenMarke({ x, y }: { x: number; y: number }) {
   const h = MARKE;
@@ -97,11 +111,14 @@ function MarkenZeile({
   x,
   y,
   text,
+  teil,
   anker = 'start',
 }: {
   x: number;
   y: number;
   text: string;
+  /** `meldung` blendet `skizzeDruck.css` im Druck aus (Prüfliste O4). */
+  teil: 'luecke' | 'meldung';
   anker?: 'start' | 'middle';
 }) {
   const { rollen } = useRollen();
@@ -110,7 +127,7 @@ function MarkenZeile({
   const mx = anker === 'middle' ? x - breite / 2 - MARKE - 2 : x;
   const tx = anker === 'middle' ? x + (MARKE + 2) / 2 : x + MARKE + 3;
   return (
-    <g data-teil="luecke" style={{ color: rollen.achtungText }}>
+    <g data-teil={teil} style={{ color: rollen.achtungText }}>
       <LueckenMarke x={mx} y={y} />
       <text
         x={tx}
@@ -210,23 +227,32 @@ export function StelleBild({
   meldung?: string | null;
 }) {
   const strich = zustand.hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH;
+  const deckkraft = zurueckDeckkraft(zustand.zurueck, 'bild');
   const cx = platz.x + platz.breite / 2;
   const luecke = stelle.luecken.map((l) => l.text).join(' · ');
 
   if (stelle.art === 'komponente') {
     const mitte = zeichenMitte(stelle, platz);
     return (
-      <g data-teil="stelle">
-        <KomponentenZeichen
-          art={stelle.komponentenart}
-          x={mitte.x}
-          y={mitte.y}
-          bezeichnung={stelle.bezeichnung}
-        />
+      <>
+        <g data-teil="stelle" opacity={deckkraft}>
+          <KomponentenZeichen
+            art={stelle.komponentenart}
+            x={mitte.x}
+            y={mitte.y}
+            bezeichnung={stelle.bezeichnung}
+          />
+        </g>
         {meldung ? (
-          <MarkenZeile x={cx} y={platz.y + platz.hoehe + 8} text={meldung} anker="middle" />
+          <MarkenZeile
+            x={cx}
+            y={platz.y + platz.hoehe + 8}
+            text={meldung}
+            teil="meldung"
+            anker="middle"
+          />
         ) : null}
-      </g>
+      </>
     );
   }
 
@@ -244,68 +270,78 @@ export function StelleBild({
   const rufZeilen = ruf ? umbrich(ruf, NAME_SCHRIFT, innen) : [];
   const lueckeY = rufY + Math.max(1, rufZeilen.length) * RUFNAME_ZEILE;
   return (
-    <g data-teil="stelle">
-      {kasten ? (
-        <rect
-          x={platz.x}
-          y={platz.y}
-          width={platz.breite}
-          height={platz.hoehe}
-          fill="none"
-          style={{ fill: 'var(--lfh-skizze-grund, var(--lfh-flaeche))' }}
-          stroke="currentColor"
-          strokeWidth={strich}
-          data-teil="kasten"
-        />
-      ) : zustand.hervorgehoben ? (
-        // Ohne Kasten trägt ein Unterstrich unter dem Namen die Hervorhebung (Form, nicht Farbe).
-        <line
-          data-teil="unterstrich"
-          x1={platz.x + 8}
-          x2={platz.x + platz.breite - 8}
-          y1={rufY - 1}
-          y2={rufY - 1}
-          stroke="currentColor"
-          strokeWidth={STRICH_HERVORGEHOBEN}
-        />
-      ) : null}
-      <Taktisch stelle={stelle} x={cx} y={tzY} />
-      <Zeilen
-        x={cx}
-        y={nameY}
-        text={name}
-        schrift={schrift}
-        zeile={zeile}
-        breite={innen}
-        fett={kasten}
-      />
-      {ruf ? (
-        <text
+    <>
+      <g data-teil="stelle" opacity={deckkraft}>
+        {kasten ? (
+          <rect
+            x={platz.x}
+            y={platz.y}
+            width={platz.breite}
+            height={platz.hoehe}
+            fill="none"
+            style={{ fill: 'var(--lfh-skizze-grund, var(--lfh-flaeche))' }}
+            stroke="currentColor"
+            strokeWidth={strich}
+            data-teil="kasten"
+          />
+        ) : zustand.hervorgehoben ? (
+          // Ohne Kasten trägt ein Unterstrich unter dem Namen die Hervorhebung (Form, nicht Farbe).
+          <line
+            data-teil="unterstrich"
+            x1={platz.x + 8}
+            x2={platz.x + platz.breite - 8}
+            y1={rufY - 1}
+            y2={rufY - 1}
+            stroke="currentColor"
+            strokeWidth={STRICH_HERVORGEHOBEN}
+          />
+        ) : null}
+        <Taktisch stelle={stelle} x={cx} y={tzY} />
+        <Zeilen
           x={cx}
-          y={rufY + RUFNAME_ZEILE / 2}
-          fontSize={NAME_SCHRIFT}
-          textAnchor="middle"
-          dominantBaseline="central"
-          // Auch „kein Rufname“ in Textfarbe: zurückgenommen (Deckkraft 0,6) hielte `gedaempft`
-          // nur 3,35 : 1 (Prüfliste Kriterium 5). Das Wort und die Textschrift statt der
-          // Festbreitenschrift eines Rufnamens tragen die Unterscheidung.
-          fill="currentColor"
-          style={stelle.art === 'extern' || !stelle.rufname ? SCHRIFT_TEXT : SCHRIFT_MONO}
-        >
-          {rufZeilen.length === 1
-            ? ruf
-            : rufZeilen.map((z, i) => (
-                <tspan key={i} x={cx} dy={i === 0 ? 0 : RUFNAME_ZEILE}>
-                  {z}
-                </tspan>
-              ))}
-        </text>
+          y={nameY}
+          text={name}
+          schrift={schrift}
+          zeile={zeile}
+          breite={innen}
+          fett={kasten}
+        />
+        {ruf ? (
+          <text
+            x={cx}
+            y={rufY + RUFNAME_ZEILE / 2}
+            fontSize={NAME_SCHRIFT}
+            textAnchor="middle"
+            dominantBaseline="central"
+            // Auch „kein Rufname“ in Textfarbe: zurückgenommen (Deckkraft 0,6) hielte `gedaempft`
+            // nur 3,35 : 1 (Prüfliste Kriterium 5). Das Wort und die Textschrift statt der
+            // Festbreitenschrift eines Rufnamens tragen die Unterscheidung.
+            fill="currentColor"
+            style={stelle.art === 'extern' || !stelle.rufname ? SCHRIFT_TEXT : SCHRIFT_MONO}
+          >
+            {rufZeilen.length === 1
+              ? ruf
+              : rufZeilen.map((z, i) => (
+                  <tspan key={i} x={cx} dy={i === 0 ? 0 : RUFNAME_ZEILE}>
+                    {z}
+                  </tspan>
+                ))}
+          </text>
+        ) : null}
+      </g>
+      {luecke ? (
+        <MarkenZeile x={cx} y={lueckeY + 8} text={luecke} teil="luecke" anker="middle" />
       ) : null}
-      {luecke ? <MarkenZeile x={cx} y={lueckeY + 8} text={luecke} anker="middle" /> : null}
       {meldung ? (
-        <MarkenZeile x={cx} y={platz.y + platz.hoehe + 10} text={meldung} anker="middle" />
+        <MarkenZeile
+          x={cx}
+          y={platz.y + platz.hoehe + 10}
+          text={meldung}
+          teil="meldung"
+          anker="middle"
+        />
       ) : null}
-    </g>
+    </>
   );
 }
 
@@ -324,18 +360,20 @@ export function SchieneBild({
   const luecke = schiene.luecken.map((l) => l.text).join(' · ');
   return (
     <g data-teil="schiene-bild">
-      <Sammelschiene
-        x={platz.x}
-        y={y}
-        breite={platz.breite}
-        betriebsart={schiene.betriebsart}
-        bezeichnung={schiene.bezeichnung}
-        hinweis={schiene.hinweis}
-        zeichenX={platz.zeichenX ?? undefined}
-        hervorgehoben={zustand.hervorgehoben}
-      />
-      {luecke ? <MarkenZeile x={platz.x} y={y + 30} text={luecke} /> : null}
-      {meldung ? <MarkenZeile x={platz.x} y={y - 20} text={meldung} /> : null}
+      <g opacity={zurueckDeckkraft(zustand.zurueck, 'bild')}>
+        <Sammelschiene
+          x={platz.x}
+          y={y}
+          breite={platz.breite}
+          betriebsart={schiene.betriebsart}
+          bezeichnung={schiene.bezeichnung}
+          hinweis={schiene.hinweis}
+          zeichenX={platz.zeichenX ?? undefined}
+          hervorgehoben={zustand.hervorgehoben}
+        />
+      </g>
+      {luecke ? <MarkenZeile x={platz.x} y={y + 30} text={luecke} teil="luecke" /> : null}
+      {meldung ? <MarkenZeile x={platz.x} y={y - 20} text={meldung} teil="meldung" /> : null}
     </g>
   );
 }
@@ -354,7 +392,7 @@ export function StichBild({
   const a = punkte[punkte.length - 2] ?? punkte[0];
   const b = punkte[punkte.length - 1];
   return (
-    <g data-teil="stich">
+    <g data-teil="stich" opacity={zurueckDeckkraft(zustand.zurueck, 'bild')}>
       <polyline
         points={punkte.map((p) => `${p.x},${p.y}`).join(' ')}
         fill="none"
@@ -394,28 +432,32 @@ export function VerbindungBild({
   bezug: string;
 }) {
   return (
-    <Leitung
-      von={von}
-      nach={nach}
-      medium={verbindung.medium}
-      status={verbindung.status}
-      art={verbindung.art}
-      bezug={bezug}
-      hervorgehoben={zustand.hervorgehoben}
-    />
+    <g opacity={zurueckDeckkraft(zustand.zurueck, 'bild')}>
+      <Leitung
+        von={von}
+        nach={nach}
+        medium={verbindung.medium}
+        status={verbindung.status}
+        art={verbindung.art}
+        bezug={bezug}
+        hervorgehoben={zustand.hervorgehoben}
+      />
+    </g>
   );
 }
 
 export function BereichBild({ bereich, zustand }: { bereich: NetzBereich; zustand: Zustand }) {
   return (
-    <BereichsRahmen
-      x={bereich.x}
-      y={bereich.y}
-      breite={bereich.breite}
-      hoehe={bereich.hoehe}
-      bezeichnung={bereich.bezeichnung}
-      hervorgehoben={zustand.hervorgehoben}
-    />
+    <g opacity={zurueckDeckkraft(zustand.zurueck, 'bild')}>
+      <BereichsRahmen
+        x={bereich.x}
+        y={bereich.y}
+        breite={bereich.breite}
+        hoehe={bereich.hoehe}
+        bezeichnung={bereich.bezeichnung}
+        hervorgehoben={zustand.hervorgehoben}
+      />
+    </g>
   );
 }
 
@@ -424,22 +466,26 @@ export function SchriftfeldBild({
   x,
   y,
   block,
-  hervorgehoben,
+  zustand,
 }: {
   x: number;
   y: number;
   block: SchriftfeldBlock;
-  hervorgehoben: boolean;
+  zustand: Zustand;
 }) {
   return (
-    <g data-teil="schriftfeld" transform={`translate(${x} ${y})`}>
+    <g
+      data-teil="schriftfeld"
+      transform={`translate(${x} ${y})`}
+      opacity={zurueckDeckkraft(zustand.zurueck, 'bild')}
+    >
       <rect
         width={block.breite}
         height={block.hoehe}
         fill="none"
         style={{ fill: 'var(--lfh-skizze-grund, var(--lfh-flaeche))' }}
         stroke="currentColor"
-        strokeWidth={hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH}
+        strokeWidth={zustand.hervorgehoben ? STRICH_HERVORGEHOBEN : STRICH}
       />
       {block.linien.map((ly) => (
         <line
@@ -470,12 +516,12 @@ export function SchriftfeldBild({
 }
 
 /** „neu“ als Wort mit Rahmen über der rechten oberen Ecke (Spec „Neue Einheit unter dem Zeiger“). */
-export function NeuMarke({ platz }: { platz: Platz }) {
+export function NeuMarke({ platz, zustand }: { platz: Platz; zustand: Zustand }) {
   const breite = 28;
   const x = platz.x + platz.breite - breite;
   const y = platz.y - 14;
   return (
-    <g data-teil="neu" aria-hidden="true">
+    <g data-teil="neu" aria-hidden="true" opacity={zurueckDeckkraft(zustand.zurueck, 'bild')}>
       <rect
         x={x}
         y={y}

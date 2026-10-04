@@ -220,9 +220,9 @@ test('Sammelschiene: eine Linie je Sprechgruppe, vier Stellen hängen per Stichl
   await schiene.click();
   await expect(schiene).toHaveAttribute('aria-pressed', 'true');
   for (const key of ['fs', ...n.ea.map((id) => `ab-${id}`)]) {
-    await expect(element(page, key), `${key} bleibt voll`).not.toHaveAttribute('opacity');
+    await expect(element(page, key), `${key} bleibt voll`).not.toHaveAttribute('data-zurueck');
   }
-  await expect(element(page, `sg-${n.f314}`)).toHaveAttribute('opacity', '0.6');
+  await expect(element(page, `sg-${n.f314}`)).toHaveAttribute('data-zurueck', 'true');
 });
 
 // ── Zuordnen durch Ziehen, zweiter Kontext ─────────────────────────────────────────────────
@@ -869,8 +869,8 @@ test('Rechte: der Beobachter liest — kein Griff, nichts verschiebt, aber Hervo
 
   // Hervorheben: die Schiene „314_F*“ gewählt, ihr Teilnehmer voll, der Rest tritt zurück.
   await element(page, `sg-${n.f314}`).click();
-  await expect(element(page, `ab-${n.ea[1]}`)).not.toHaveAttribute('opacity');
-  await expect(ea1).toHaveAttribute('opacity', '0.6');
+  await expect(element(page, `ab-${n.ea[1]}`)).not.toHaveAttribute('data-zurueck');
+  await expect(ea1).toHaveAttribute('data-zurueck', 'true');
   // Zoom: „+“ vergrößert, „Einpassen“ passt wieder ein.
   const breite = () =>
     flaeche(page).evaluate((s) => Number(s.getAttribute('viewBox')!.split(' ')[2]));
@@ -936,7 +936,7 @@ test('Mobil 390 px: nur lesen — kein Griff, keine Palette, aber Hervorheben un
   await expect(ea1).toHaveCSS('cursor', 'pointer');
 
   await element(page, `sg-${n.f314}`).click();
-  await expect(ea1).toHaveAttribute('opacity', '0.6');
+  await expect(ea1).toHaveAttribute('data-zurueck', 'true');
   const breite = () =>
     flaeche(page).evaluate((s) => Number(s.getAttribute('viewBox')!.split(' ')[2]));
   const eingepasst = await breite();
@@ -1032,8 +1032,8 @@ test('Prüfliste 5: zurückgenommene Texte halten 4,5 : 1 (Name, Rufname, Lücke
   // Die Schiene „DMO 505“ gewählt: nur „3. Zug“ hängt daran, alles andere tritt zurück.
   await element(page, `sg-${n.d505}`).click();
   const zurueck = (key: string) => element(page, key);
-  await expect(zurueck(`eh-${n.ohne}`)).toHaveAttribute('opacity', '0.6');
-  await expect(zurueck(`eh-${n.mit}`)).toHaveAttribute('opacity', '0.6');
+  await expect(zurueck(`eh-${n.ohne}`)).toHaveAttribute('data-zurueck', 'true');
+  await expect(zurueck(`eh-${n.mit}`)).toHaveAttribute('data-zurueck', 'true');
 
   const faelle: [string, Locator][] = [
     ['Name', zurueck(`eh-${n.mit}`).locator('[data-teil="stelle"] > text').first()],

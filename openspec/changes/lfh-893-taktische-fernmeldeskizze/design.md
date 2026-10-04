@@ -358,7 +358,7 @@ die neuen Tabellen bleiben ungenutzt liegen (anhängen, nie ändern, LFH-658).
   `SELBST_GEZEICHNET`): Bedingungszeichen, Sammelschiene, Zickzack-Marke auf freier Linie,
   „geplant“, Bereich, Melder, sonstige, Satellit. Folgeticket an `@einsatzzeichen`: LFH-1033.
 - **Folgetickets aus D10 und den Non-Goals:** Übernahme in den Befehl (LFH-1027), Bild-Anlage an
-  Lagebericht und Befehl, Führungsmittel im Kasten (LFH-1029), Felder „Netz“/„Sicherheit“ an der
+  Lagebericht und Befehl (LFH-1028), Führungsmittel im Kasten (LFH-1029), Felder „Netz“/„Sicherheit“ an der
   Sprechgruppe (LFH-1030).
 - **D5/D14 (Backend):** Die Einzel-Endpunkte prüfen die Sprechgruppe wie der PATCH
   (`pruefe_zuordenbar`), also nicht auf `aktiv`. Ein 409 bei Lage bzw. Bereich trägt
@@ -403,4 +403,13 @@ die neuen Tabellen bleiben ungenutzt liegen (anhängen, nie ändern, LFH-658).
   Blatt erzwang sie eine leere Hochformatseite. Nachweis Chromium: Seite 1 hat 1191 × 842 pt (A3)
   bzw. 842 × 595 pt (A4) und trägt die ganze Skizze, die Anlage beginnt eine eigene Seite;
   Graustufen „geplant“ 17 Hell-Dunkel-Wechsel, bestehend 0, Wort „geplant“ ≥ 4,5 : 1.
+- **Prüfliste Einsatztauglichkeit (9.2, `pruefliste.md`):** Fükw 10 erfüllt, 2 teilweise, 3 nicht
+  anwendbar; Tablet 10 erfüllt, 3 teilweise, 2 nicht anwendbar; mobil 7 erfüllt, 2 teilweise,
+  1 offen, 5 nicht anwendbar. Hier geschlossen: O1 (Lücken- und Meldungszeile treten nicht mehr mit
+  zurück, vorher hell 3,20 : 1, unter dem Boden), O4 (Meldung am Element quittierbar mit Escape
+  und im Paneel, nicht im Druck) und der Komponententest der Rückfrage „‹Komponente› entfernen?“
+  aus O6. Offen sind: Fläche ohne Handschuh-Maß am Tablet (O3), Treffläche bei 390 px (O2), Sprung
+  durch das Lücken-Paneel über der Fläche (O5), Saat und Tablet-Breite der Messung „Prüfliste 1“
+  (O6) und die Entscheidung, ob zurückgenommener Text am Tag 7 : 1 halten muss (O7, hell 4,83 : 1).
+  Folgetickets: LFH-1037 (O5), LFH-1038 (O2, O3, O6), LFH-1039 (O7).
 

@@ -117,8 +117,8 @@ async function vorbereiten(page: Page, format: 'A3 quer' | 'A4 quer') {
     .getByRole('radio', { name: 'Nur Lücken' })
     .click();
   await expect(element(page, `vb-${n.geplant}`), 'Vorbedingung: Filter greift').toHaveAttribute(
-    'opacity',
-    '0.6',
+    'data-zurueck',
+    'true',
   );
   const papier = page.getByRole('radiogroup', { name: 'Papierformat' });
   await papier.getByRole('radio', { name: format }).click();
