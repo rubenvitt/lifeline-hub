@@ -1,5 +1,5 @@
 import type { LageberichtVorlageKey } from '../api/types';
-import { MEDIENLAGE_QUELLE } from '../stab/medienlageUebernahme';
+import { MEDIENLAGE_QUELLE } from '../stab/medienlageQuelle';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
 import { FUEHRUNGSPROBLEME_QUELLE } from './fuehrungsproblemeUebernahme';
 import { LAGEENTWICKLUNG_QUELLE } from './lageentwicklungUebernahme';

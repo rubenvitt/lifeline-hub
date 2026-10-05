@@ -1,6 +1,6 @@
 import type { FormInstance } from 'antd';
 import AbschnittUebernahme from '../lageberichte/AbschnittUebernahme';
-import { MEDIENLAGE_QUELLE } from './medienlageUebernahme';
+import { MEDIENLAGE_QUELLE } from './medienlageQuelle';
 
 /**
  * „Aus S5 übernehmen“ im Abschnitt „Medienlage“ eines Lagevortrag-Entwurfs (LFH-554, Spec
