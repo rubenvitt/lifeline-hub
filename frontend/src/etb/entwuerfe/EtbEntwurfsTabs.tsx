@@ -1,11 +1,11 @@
-import { Spin, Tabs, theme } from 'antd';
+import { Modal, Spin, Tabs, Typography, theme } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
 import Schnellerfassung, { nurUebernahme, VERSAND_RUHE, type Versand } from '../Schnellerfassung';
 import type { MetadatenWerte } from '../schnellerfassungModell';
-import { entwurfLabel, zuWerte } from './entwurfModell';
+import { entwurfLabel, istLeer, zuWerte } from './entwurfModell';
 import type { StandardRufnameZugriff } from '../useStandardRufname';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
@@ -37,6 +37,17 @@ interface EtbEntwurfsTabsProps {
 
 /** Stabile leere Liste: ein frisches `[]` je Render wäre für die Schnellerfassung jedes Mal neu. */
 const KEINE_DATEIEN: File[] = [];
+
+/**
+ * Deutsche Namen für „+“, × und das Überlaufmenü. antd reicht kein Locale an die Reiter, und
+ * `de_DE` kennt keine Tabs-Texte; ohne diese Zeile hießen die Knöpfe „Add tab“, „remove“ und
+ * „expanded dropdown“ (LFH-957).
+ */
+const REITER_TEXTE = {
+  addAriaLabel: 'Weiteren Entwurf anlegen',
+  removeAriaLabel: 'Entwurf verwerfen',
+  dropdownAriaLabel: 'Weitere Entwürfe',
+};
 
 /**
  * Stil des Schließen-Kreuzes je Entwurfstab — rein und exportiert (Muster `bedienzielStil`).
@@ -136,6 +147,23 @@ export default function EtbEntwurfsTabs({
     return () => onSendetChange?.(false);
   }, [irgendeinerSendet, onSendetChange]);
 
+  const verwerfen = useCallback(
+    (id: string) => {
+      dateienVerwerfen(id);
+      versandAendern(id, VERSAND_RUHE);
+      void entwurfSchliessen(id);
+    },
+    [dateienVerwerfen, versandAendern, entwurfSchliessen],
+  );
+
+  /**
+   * Entwurf, dessen Verwerfen auf die Rückfrage wartet (LFH-957). Ein Entwurf hat keinen
+   * Rückweg: kein Papierkorb, nichts auf dem Server (`frontend/AGENTS.md`, LFH-343). Deshalb
+   * fragt das × nach, sobald etwas verloren ginge — Text, ausdrücklich gesetzte Felder oder
+   * Dateien. `istLeer` sieht die Dateien nicht, sie liegen nur im Speicher.
+   */
+  const [verwerfenId, setVerwerfenId] = useState<string | null>(null);
+
   const onEdit = useCallback(
     (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
       if (action === 'add') neuerEntwurf(werteBehalten ? uebernahme : {});
@@ -143,20 +171,14 @@ export default function EtbEntwurfsTabs({
         // Ein sendender Entwurf trägt kein Schließkreuz; der Riegel hier hält auch den
         // Tastaturweg (Entf auf dem Reiter) — sonst entstünde ein verworfener Eintrag doch.
         if (versandJe[targetKey]?.sendet) return;
-        dateienVerwerfen(targetKey);
-        versandAendern(targetKey, VERSAND_RUHE);
-        void entwurfSchliessen(targetKey);
+        // Die Rückfrage steht HIER und nicht am Icon: auch Entf auf dem Reiter läuft über `onEdit`.
+        const entwurf = entwuerfe.find((e) => e.id === targetKey);
+        const hatDateien = (dateien.je[targetKey]?.length ?? 0) > 0;
+        if ((entwurf && !istLeer(zuWerte(entwurf))) || hatDateien) setVerwerfenId(targetKey);
+        else verwerfen(targetKey);
       }
     },
-    [
-      neuerEntwurf,
-      entwurfSchliessen,
-      werteBehalten,
-      uebernahme,
-      dateienVerwerfen,
-      versandJe,
-      versandAendern,
-    ],
+    [neuerEntwurf, werteBehalten, uebernahme, versandJe, entwuerfe, dateien.je, verwerfen],
   );
 
   const items = entwuerfe.map((e) => ({
@@ -229,17 +251,41 @@ export default function EtbEntwurfsTabs({
   if (entwuerfe.length === 0) return <Spin aria-label="ETB-Entwürfe werden geladen" />;
 
   return (
-    <Tabs
-      type="editable-card"
-      removeIcon={
-        <span style={entfernenStil(token)}>
-          <IconKreuz />
-        </span>
-      }
-      activeKey={aktiverId ?? undefined}
-      onChange={aktivenSetzen}
-      onEdit={onEdit}
-      items={items}
-    />
+    <>
+      <Tabs
+        type="editable-card"
+        locale={REITER_TEXTE}
+        removeIcon={
+          <span style={entfernenStil(token)}>
+            <IconKreuz />
+          </span>
+        }
+        activeKey={aktiverId ?? undefined}
+        onChange={aktivenSetzen}
+        onEdit={onEdit}
+        items={items}
+      />
+      {/* Kontrolliertes `<Modal>` statt `Popconfirm`: am × lässt sich keine Blase verankern, und
+         der Tastaturweg (Entf) hat gar kein Ziel dafür. */}
+      <Modal
+        open={verwerfenId != null}
+        title="Entwurf verwerfen?"
+        okText="Verwerfen"
+        okButtonProps={{ danger: true }}
+        cancelText="Behalten"
+        onOk={() => {
+          // Hat der Entwurf inzwischen zu senden begonnen, bleibt er: verworfen stünde er doch im
+          // Tagebuch.
+          if (verwerfenId != null && !versandJe[verwerfenId]?.sendet) verwerfen(verwerfenId);
+          setVerwerfenId(null);
+        }}
+        onCancel={() => setVerwerfenId(null)}
+        destroyOnHidden
+      >
+        <Typography.Paragraph>
+          Text, Felder und Anhänge dieses Entwurfs gehen verloren. Er steht noch nicht im Tagebuch.
+        </Typography.Paragraph>
+      </Modal>
+    </>
   );
 }

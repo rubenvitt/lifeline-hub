@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -254,7 +254,7 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
     // Antd rendert auch die Remove-Buttons mit role="tab"; nur Tab-Btn-Elemente zählen.
-    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
     await waitFor(() =>
       expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
     );
@@ -275,7 +275,7 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
     expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
 
-    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
     await waitFor(() =>
       expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
     );
@@ -300,13 +300,16 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-c.jpg', { type: 'image/jpeg' }));
-    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
     await waitFor(() =>
       expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
     );
     // Den ersten Entwurf schliessen (antds Entfernen-Knopf je Tab).
     const entfernen = document.querySelectorAll<HTMLElement>('.ant-tabs-tab-remove');
     await userEvent.click(entfernen[0]);
+    // Mit Datei fragt das × nach (LFH-957).
+    const dialog = await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
     await waitFor(() =>
       expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(1),
     );
@@ -355,7 +358,7 @@ describe('EtbEntwurfsTabs', () => {
   }
 
   async function zweitenTabOeffnen() {
-    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
     await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
   }
 
@@ -544,6 +547,94 @@ describe('EtbEntwurfsTabs', () => {
     fireEvent.click(screen.getByRole('button', { name: /Erfassen$/ }));
     await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
     expect(erfassen.mock.calls[1][0].client_id).toBe(neueId);
+  });
+});
+
+/**
+ * Das × verwirft einen Entwurf endgültig (LFH-957): einen Papierkorb gibt es nicht, und einen
+ * serverseitigen Rückweg auch nicht — also eine Rückfrage (`frontend/AGENTS.md`, LFH-363/LFH-343).
+ * Entf auf dem Reiter läuft über denselben `onEdit` und damit durch dieselbe Rückfrage.
+ */
+describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
+  function dateiEingabe(): HTMLInputElement {
+    const el = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!el) throw new Error('Dateieingabe fehlt');
+    return el;
+  }
+
+  function rueckfrage() {
+    return screen.queryByRole('dialog', { name: 'Entwurf verwerfen?' });
+  }
+
+  async function verwerfenKlicken(index = 0) {
+    await userEvent.click(screen.getAllByRole('button', { name: 'Entwurf verwerfen' })[index]);
+  }
+
+  it('fragt bei einem Entwurf mit Text nach, „Behalten“ lässt ihn stehen', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Pegel Mühlbach 3,20 m');
+    await verwerfenKlicken();
+    const dialog = await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Behalten' }));
+    // antd schließt animiert; „zu“ heißt im jsdom: Ausblend-Zustand.
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Pegel Mühlbach 3,20 m');
+    await waitFor(async () =>
+      expect((await entwuerfeLaden(ich.id, 7))[0]?.inhalt).toBe('Pegel Mühlbach 3,20 m'),
+    );
+  });
+
+  it('fragt auch bei einem Entwurf nach, der nur Dateien trägt', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'lagefoto.jpg', { type: 'image/jpeg' }));
+    await verwerfenKlicken();
+    expect(await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' })).toBeInTheDocument();
+    expect(screen.getByText(/lagefoto\.jpg/)).toBeInTheDocument();
+  });
+
+  it('„Verwerfen“ entfernt Entwurf und Dateien', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Halb erfasst');
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'lagefoto.jpg', { type: 'image/jpeg' }));
+    await verwerfenKlicken();
+    const dialog = await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    expect(screen.queryByText(/lagefoto\.jpg/)).toBeNull();
+    await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
+  });
+
+  it('ein leerer Entwurf schließt ohne Rückfrage', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
+    await verwerfenKlicken(1);
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1));
+    expect(rueckfrage()).toBeNull();
+  });
+
+  it('Entf auf dem Reiter läuft durch dieselbe Rückfrage', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Nicht weg');
+    const reiter = screen.getAllByRole('tab')[0];
+    act(() => reiter.focus());
+    fireEvent.keyDown(reiter, { key: 'Delete', code: 'Delete' });
+    expect(await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' })).toBeInTheDocument();
+    expect(screen.getAllByRole('tab', { name: /Nicht weg/ })).toHaveLength(1);
+  });
+
+  it('die Knöpfe tragen deutsche Namen, kein „Add tab“ und kein „remove“', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    expect(
+      screen.getAllByRole('button', { name: 'Weiteren Entwurf anlegen' }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Entwurf verwerfen' })).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: 'Add tab' })).toHaveLength(0);
+    expect(screen.queryAllByRole('button', { name: 'remove' })).toHaveLength(0);
+    expect(document.querySelector('[aria-label="expanded dropdown"]')).toBeNull();
   });
 });
 
