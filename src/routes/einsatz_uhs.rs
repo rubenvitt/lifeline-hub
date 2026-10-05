@@ -36,6 +36,9 @@ pub struct UhsDetail {
     pub plaetze: Vec<PlatzAnzeige>,
     pub belegungen: Vec<BelegungAnzeige>,
     pub material: Vec<EinsatzMaterialAnzeige>,
+    /// Plan als Hintergrund des Platz-Layouts (LFH-999); fehlt ohne Plan.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan: Option<crate::uhs::plan::UhsPlanAnzeige>,
 }
 
 // ---------- ETB-/SSE-Helfer (lokales Muster wie in anderen Routen) ----------
@@ -141,11 +144,13 @@ pub async fn detail(
         material_repo::liste_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
             .await?
     };
+    let plan = crate::uhs::plan::repo::laden_optional(&state.pool, einsatz_id, uhs_id).await?;
     Ok(Json(UhsDetail {
         uhs,
         plaetze,
         belegungen,
         material,
+        plan,
     }))
 }
 

@@ -1,6 +1,7 @@
 pub mod anhang;
 pub mod belegung_repo;
 pub mod hooks;
+pub mod plan;
 pub mod platz_repo;
 pub mod repo;
 

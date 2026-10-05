@@ -80,6 +80,10 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
         "GET",
         "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
     ),
+    // UHS-Plan (LFH-999): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Auslieferung des Bildes.
+    // Nur PUT bzw. GET — PATCH, DELETE und die Übernahme (ein Kopieren in der DB) bleiben geregelt.
+    ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/bild"),
     // CSV-Vollexporte: laden ohne Limit und bauen im Speicher — Dauer wächst linear mit der
     // Betroffenen-/Tierzahl der Lage.
     ("GET", "/api/einsaetze/{id}/personen/export"),

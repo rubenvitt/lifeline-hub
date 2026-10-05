@@ -394,7 +394,7 @@ describe('Versatz zur Serveruhr aus dem Date-Header (LFH-705)', () => {
 
 /** LFH-654: Upload mit Byte-Fortschritt über `XMLHttpRequest`, Fehlerformat wie `apiUpload`. */
 describe('apiUploadMitFortschritt (LFH-654)', () => {
-  function starte(optionen: { timeoutMs?: number } = {}) {
+  function starte(optionen: { timeoutMs?: number; methode?: 'POST' | 'PUT' } = {}) {
     const anfragen = installiereXhrAttrappe();
     const meldungen: UploadFortschritt[] = [];
     const fd = new FormData();
@@ -420,6 +420,10 @@ describe('apiUploadMitFortschritt (LFH-654)', () => {
 
   it('übernimmt ein explizites Zeitlimit', () => {
     expect(starte({ timeoutMs: 120_000 }).xhr.timeout).toBe(120_000);
+  });
+
+  it('sendet mit `methode: PUT` ein Ersetzen (LFH-999, UHS-Plan)', () => {
+    expect(starte({ methode: 'PUT' }).xhr.methode).toBe('PUT');
   });
 
   it('setzt den Kopf des erwarteten Benutzers (LFH-387)', () => {

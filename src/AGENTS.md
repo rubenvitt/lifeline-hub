@@ -92,6 +92,13 @@ Lese-Audit (wie Tiere insgesamt).
   Linker-Guard ein Linker, und die Schwärzung nähme das Protokoll mit); `ablage` hält den Ort
   lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
   protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
+- **UHS-Plan (LFH-999)** (Spec `uhs-plan`, Herleitung
+  `openspec/changes/archive/2026-10-05-lfh-999-uhs-plan-hintergrund/design.md`): der Plan unter
+  dem Platz-Layout ist **kein Anhang**, sondern eigene, bereinigte Bytes in `uhs_plan` (einer je
+  UHS, `uhs::plan`, `routes::uhs_plan`). Seine Anzeige (`GET …/uhs/{uid}/plan/bild`) schreibt
+  weder Lese-Audit noch ETB; nur die Übernahme aus einem UHS-Anhang (`…/plan/aus-anhang`) ist
+  EIN protokollierter Abruf, vor dem Lesen der Bytes über `support::anhang_bereinigt_kopieren`.
+  Keinen Verweis vom Plan auf einen Anhang einführen: das Audit verlöre seine Aussage.
 
 **Personen-Anhänge (LFH-757)** (Spec `personen-anhaenge`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-757-personen-anhaenge/design.md`): `einsatz_person_anhang` im Register;
@@ -170,7 +177,8 @@ Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzlis
 - **`einsatzliste` nur über `live::org::einsatzliste_melden`** nach dem Commit (Leser = org-weite
   Leser, System-Admins, Mitglieder, dazu eine gerade entfernte Person); ein Löschweg liest die
   Leser VOR dem `DELETE` (`einsatzleser_lesen`, `Einsatzleser::melden`). Jeder `einsatz`-Emitter
-  läuft über `routes::einsatz::kopf_geaendert`, das beide meldet. Nie ein leeres Ereignis an die
+  läuft über `live::org::kopf_melden`, das beide meldet: die Routen über
+  `routes::einsatz::kopf_geaendert`, der Purge-Lauf direkt (LFH-996). Nie ein leeres Ereignis an die
   ganze Org für etwas Einsatzbezogenes: das ist der Metadaten-Kanal, den F01 geschlossen hat.
 - **Katalog-Schreibrouten liegen unter einem Präfix aus `STAMMDATEN_PFADE`** (Middleware
   `stammdaten_live`); ein neuer Katalogpfad braucht einen Eintrag, Guard
@@ -236,6 +244,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   System-Admin der Einsatz-Org, nur abgeschlossen; 24 h zurücknehmbar, dann Vollzug in Phase A2
   des Purge-Laufs (`vollziehe_faellige`, zählt für den WAL-Rückschrieb). Kein Sofort-Auslöser
   ohne diese 24 h.
+- **Geräte erfahren Schwärzung und Sperre über den Kopf** (LFH-996, Spec
+  `lagebild-offline-lesen`): `EinsatzAnzeige.teilschwaerzungen` zählt vollzogene
+  Personen-Anträge und geschwärzte Kategorien (`teilschwaerzungen_spalte!` und
+  `teilschwaerzungen_joins!` in `einsatz/repo.rs`, in `laden` und `liste_fuer`). Vormerkung (Phase A), Vollzug mit Wirkung und Kategorie-Schwärzung
+  rufen nach dem Commit `kopf_melden`; Phase B und D bleiben stumm (der Einsatz ist seit der
+  Vormerkung gesperrt). Wer eine neue Teilschwärzung baut, zählt sie dort mit und meldet den
+  Kopf. Herleitung: `openspec/changes/archive/2026-10-05-lfh-996-schwaerzung-clients-raeumen/design.md`.
 - **Personen-Scrub nur über `PERSONENBEZUEGE`** (`einsatz/schwaerzung_person.rs`): je
   Personenart Bezug und `Mit`/`Ohne(Grund)` je Scrub-Spalte; Strategie kommt aus `TABELLEN`, nie
   eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal`,

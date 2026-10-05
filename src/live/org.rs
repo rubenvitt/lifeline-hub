@@ -94,6 +94,21 @@ impl OrgAbonnent {
     }
 }
 
+/// Meldet nach dem Commit eine Änderung des Einsatzkopfs: `einsatz` an die Abonnenten des
+/// Einsatzes (LFH-555) und `einsatzliste` an seine Leser (LFH-734), die Liste zeigt dieselben
+/// Kopfspalten. Der gemeinsame Weg der Routen (`routes::einsatz::kopf_geaendert_fuer`) und des
+/// Purge-Laufs (LFH-996): Vormerkung, Vollzug eines Löschersuchens und Kategorie-Schwärzung
+/// ändern den Kopf (Sperre bzw. `teilschwaerzungen`).
+pub async fn kopf_melden(
+    pool: &SqlitePool,
+    live: &super::LiveHub,
+    einsatz_id: i64,
+    zusaetzlich: &[i64],
+) {
+    live.publiziere_einsatz(einsatz_id, super::LiveEvent::Einsatz);
+    einsatzliste_melden(pool, live, einsatz_id, zusaetzlich).await;
+}
+
 /// Meldet nach dem Commit, dass sich die Einsatzliste zu `einsatz_id` geändert haben kann.
 /// Empfänger sind die Leser des Einsatzes in der Liste ([`OrgEmpfaenger::Einsatzleser`]), dazu
 /// `zusaetzlich` (etwa eine gerade entfernte Person).

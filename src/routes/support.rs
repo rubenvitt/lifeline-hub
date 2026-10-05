@@ -360,6 +360,27 @@ pub async fn anhang_antwort(
     Ok((headers, daten).into_response())
 }
 
+/// Bereinigte Bytes eines Anhangs zum Kopieren in einen UHS-Plan (LFH-999, design.md D4):
+/// `(mime, bytes)`. Kein Auslieferungsweg, aber eine Lesestelle von `anhang::repo::laden_bytes`
+/// und deshalb hier neben [`anhang_antwort`] (Guard in `tests/anhang_metadaten.rs`). Gibt nie
+/// das Original heraus. Zugriffsprüfung und Lese-Audit macht der Aufrufer VORHER; lässt sich
+/// das Bild nicht bereinigen → 422.
+pub async fn anhang_bereinigt_kopieren(
+    pool: &SqlitePool,
+    anhang_id: i64,
+) -> Result<(String, Vec<u8>), AppError> {
+    let (_, mime, daten) = anhang::repo::laden_bytes(pool, anhang_id).await?;
+    let daten = match anhang::metadaten::bereinigen(&daten, &mime) {
+        Ok(Cow::Owned(neu)) => neu,
+        Ok(Cow::Borrowed(_)) => daten,
+        Err(anhang::metadaten::Unbereinigbar(grund)) => {
+            tracing::warn!(anhang_id, grund, "Anhang lässt sich nicht bereinigen");
+            return Err(AppError::UnprocessableEntity(UNBEREINIGBAR_MELDUNG.into()));
+        }
+    };
+    Ok((mime, daten))
+}
+
 /// Die Schlüssel, die `kommunikationsmittel` an Einsatzabschnitt (LFH-86) und Einheit
 /// (LFH-108) tragen darf — dieselben drei, die die Oberfläche als Auswahl anbietet
 /// (`frontend/src/components/FunkErreichbarkeit.tsx`, `KOMMUNIKATIONSMITTEL_LABEL`).

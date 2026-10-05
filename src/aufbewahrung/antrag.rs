@@ -648,7 +648,7 @@ pub async fn vollziehen_ergebnis(
                              Freitexten und im ETB bleiben bis zur Schwärzung des Einsatzes.",
                             z.aktenzeichen
                         ),
-                        Vollzug::Person,
+                        Vollzug::Person(z.einsatz_id),
                     )
                 }
             }
@@ -675,16 +675,16 @@ pub async fn vollziehen_ergebnis(
 pub enum Vollzug {
     /// Nichts (nicht mehr offen bzw. fällig, oder der Einsatz war schon geschwärzt).
     Nichts,
-    /// Die Werte einer Person.
-    Person,
+    /// Die Werte einer Person in diesem Einsatz.
+    Person(i64),
     /// Der ganze Einsatz — er ist danach gesperrt und verschwindet aus den Einsatzlisten.
     Einsatz(i64),
 }
 
 /// Vollzieht alle fälligen Anträge (Phase des Purge-Laufs). Liefert die Zahl der Vollzüge, die
 /// etwas geschwärzt haben. Ein Fehler bei einem Antrag hält die übrigen nicht auf. Ein
-/// geschwärzter Einsatz ist danach gesperrt und wird wie in Phase A aus den Einsatzlisten
-/// seiner Leser gemeldet (LFH-734).
+/// geschwärzter Einsatz ist danach gesperrt; er und ein Einsatz mit geschwärzter Person melden
+/// Kopf und Liste (LFH-734, LFH-996).
 pub async fn vollziehe_faellige(
     pool: &SqlitePool,
     live: &crate::live::LiveHub,
@@ -704,11 +704,12 @@ pub async fn vollziehe_faellige(
             "Purge: Schwärzungsantrag fällig — Vollzug (irreversibel)"
         );
         match vollziehen_ergebnis(pool, id, jetzt).await {
-            Ok(Vollzug::Einsatz(einsatz_id)) => {
+            // Kopf und Liste melden (LFH-996): ein gesperrter Einsatz räumt offene Tabs am 404,
+            // ein Personen-Vollzug erhöht `teilschwaerzungen` und räumt die Geräte-Stände.
+            Ok(Vollzug::Einsatz(einsatz_id) | Vollzug::Person(einsatz_id)) => {
                 geschwaerzt += 1;
-                crate::live::org::einsatzliste_melden(pool, live, einsatz_id, &[]).await;
+                crate::live::org::kopf_melden(pool, live, einsatz_id, &[]).await;
             }
-            Ok(Vollzug::Person) => geschwaerzt += 1,
             Ok(Vollzug::Nichts) => {}
             Err(e) => tracing::error!(antrag_id = id, "Vollzug des Antrags fehlgeschlagen: {e}"),
         }

@@ -3524,6 +3524,14 @@
               "string",
               "null"
             ]
+          },
+          "teilschwaerzungen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Schwärzungsstand (LFH-996): vollzogene Personen-Anträge plus geschwärzte\nDatenkategorien dieses Einsatzes. Wächst nur; fehlt bei 0. Ein Gerät, das einen höheren\nStand sieht, verwirft jeden älteren Stand des Einsatzes (`frontend/src/offline/AGENTS.md`).\nNennt bewusst weder Person noch Zeitpunkt noch Modul."
           }
         }
       },
@@ -11278,11 +11286,94 @@
                 "items": {
                   "$ref": "#/components/schemas/PlatzAnzeige"
                 }
+              },
+              "plan": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/UhsPlanAnzeige",
+                    "description": "Plan als Hintergrund des Platz-Layouts (LFH-999); fehlt ohne Plan."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           }
         ],
         "description": "Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material."
+      },
+      "UhsPlanAnzeige": {
+        "type": "object",
+        "description": "Der Plan einer UHS ohne Bytes: Teil von `UhsDetail` und Antwort der schreibenden Routen.",
+        "required": [
+          "uhs_id",
+          "mime",
+          "sha256",
+          "bild_breite",
+          "bild_hoehe",
+          "x",
+          "y",
+          "breite",
+          "helligkeit",
+          "kontrast",
+          "nacht_umkehren",
+          "hinterlegt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "bild_breite": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bild_hoehe": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "breite": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "helligkeit": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Prozent: Helligkeit 20–100, Kontrast 50–150."
+          },
+          "hinterlegt_at": {
+            "type": "string"
+          },
+          "kontrast": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "nacht_umkehren": {
+            "type": "boolean",
+            "description": "Im dunklen Thema umkehren (helle Flächen werden dunkel)."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Prüfsumme der gespeicherten Bytes; ETag des Bildes und Cache-Schlüssel im Client."
+          },
+          "uhs_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "x": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Versatz und Breite in Koordinaten der Platzfläche; Höhe = breite × bild_hoehe / bild_breite."
+          },
+          "y": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "UhsStatus": {
         "type": "string",
