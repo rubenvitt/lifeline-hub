@@ -1,3 +1,9 @@
+## [1.0.0-alpha.79](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.78...v1.0.0-alpha.79) (2026-10-05)
+
+### Betrieb und Installation
+
+- **Fehler bei macOS-Builds behoben**: Ein Problem mit der Dateinamen-Groß-/Kleinschreibung, das den Build-Prozess auf macOS unterbrochen und die Bereitstellung von ausführbaren Dateien verhindert hat, wurde behoben. Die Anwendung kann nun wieder auf allen unterstützten Plattformen ausgeliefert werden.
+
 ## [1.0.0-alpha.78](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.77...v1.0.0-alpha.78) (2026-10-05)
 
 ### Wichtige Änderungen
