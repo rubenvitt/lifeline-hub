@@ -51,7 +51,7 @@ describe('AnzeigeEinstellungen', () => {
   });
 
   it('sendet beim Speichern den VOLLEN Payload — Einsatz-Default-Felder bleiben erhalten (Vollersatz)', async () => {
-    renderMitProviders(<AnzeigeEinstellungen />);
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     const btn = await screen.findByRole('button', { name: 'Speichern' });
     fireEvent.click(btn);
@@ -81,7 +81,7 @@ describe('AnzeigeEinstellungen', () => {
   });
 
   it('eigenes geändertes Feld fließt ein, andere Sektion bleibt', async () => {
-    renderMitProviders(<AnzeigeEinstellungen />);
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     const feld = await screen.findByLabelText(/Geocoder-URL/i);
     await userEvent.type(feld, 'https://nominatim.example.org');
@@ -103,7 +103,7 @@ describe('AnzeigeEinstellungen', () => {
       authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
     );
 
-    renderMitProviders(<AnzeigeEinstellungen />);
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     await screen.findByText('Anzeige-Konventionen');
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
@@ -123,7 +123,7 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
 
   it('meldet den Fehler an der Seite, NICHT als Toast', async () => {
     vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Zeitzone unbekannt'));
-    renderMitProviders(<AnzeigeEinstellungen />);
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     const treffer = await screen.findByText('Zeitzone unbekannt');
@@ -134,7 +134,7 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
     vi.mocked(speichereOrgEinstellungen)
       .mockRejectedValueOnce(new ApiError(422, 'Zeitzone unbekannt'))
       .mockResolvedValue({ ...VOLL } as never);
-    renderMitProviders(<AnzeigeEinstellungen />);
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Zeitzone unbekannt');
@@ -149,7 +149,7 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
       authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
     );
 
-    renderMitProviders(<AnzeigeEinstellungen />);
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     expect(await screen.findByText(/Nur Benutzer mit der Systemrolle/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
@@ -157,7 +157,7 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
 
   it('schweigt ueber Berechtigungen, wenn welche da sind', async () => {
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
-    renderMitProviders(<AnzeigeEinstellungen />);
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
     await screen.findByText('Anzeige-Konventionen');
     expect(screen.queryByText(/Nur Benutzer mit der Systemrolle/)).not.toBeInTheDocument();

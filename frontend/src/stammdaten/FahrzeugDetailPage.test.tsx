@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
@@ -82,7 +82,7 @@ function renderRoute(pfad: string) {
       <Route path="/admin/stammdaten/fahrzeuge" element={<FahrzeugeTab />} />
       <Route path="/admin/stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
     </Routes>,
-    { route: pfad },
+    { route: pfad, datenRouter: true },
   );
 }
 
@@ -104,7 +104,7 @@ function renderMitWechsel() {
         <Route path="/admin/stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
       </Routes>
     </>,
-    { route: fahrzeugDetailPfad(7) },
+    { route: fahrzeugDetailPfad(7), datenRouter: true },
   );
 }
 
@@ -268,6 +268,59 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     expect(await screen.findByRole('heading', { name: 'Florian 2' })).toBeInTheDocument();
     expect(screen.getByLabelText('OPTA')).toHaveValue('FL MUS 08');
     expect(screen.getByLabelText('Bemerkung')).toHaveValue('Zweiter');
+  });
+});
+
+/**
+ * Verlassen-Schutz (LFH-979, Spec `formularseiten`): eine offene Änderung hält den Weg über die
+ * Brotkrume an; „Bleiben" erhält sie, nach dem Speichern und ohne Schreibrecht fragt niemand.
+ */
+describe('FahrzeugDetailPage — Verlassen-Schutz (LFH-979)', () => {
+  it('fragt vor dem Verlassen mit geändertem Kennzeichen nach, nach dem Speichern nicht mehr', async () => {
+    handler();
+    const nutzer = userEvent.setup();
+    renderRoute('/admin/stammdaten/fahrzeuge/7');
+    const kennzeichen = await screen.findByLabelText('Kennzeichen');
+    await nutzer.clear(kennzeichen);
+    await nutzer.type(kennzeichen, 'XX-CD 2');
+
+    await nutzer.click(screen.getByRole('link', { name: 'Fahrzeuge' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByLabelText('Kennzeichen')).toHaveValue('XX-CD 2');
+
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Fahrzeug gespeichert');
+    await nutzer.click(screen.getByRole('link', { name: 'Fahrzeuge' }));
+    expect(await screen.findByRole('button', { name: 'Fahrzeug anlegen' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Ungespeicherte Änderungen' })).toBeNull();
+  });
+
+  it('ohne Schreibrecht: verlässt die Seite ohne Rückfrage', async () => {
+    handler(nichtAdmin);
+    const nutzer = userEvent.setup();
+    renderRoute('/admin/stammdaten/fahrzeuge/7');
+    await screen.findByRole('heading', { name: 'Florian 1' });
+    await nutzer.click(screen.getByRole('link', { name: 'Fahrzeuge' }));
+    expect(await screen.findByRole('button', { name: 'Fahrzeug anlegen' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Ungespeicherte Änderungen' })).toBeNull();
+  });
+
+  /** Gleiche Route, anderer Datensatz: die verworfene Eingabe hängt nicht am nächsten. */
+  it('nimmt eine verworfene Änderung nicht zum nächsten Datensatz mit', async () => {
+    const nutzer = userEvent.setup();
+    renderMitWechsel();
+    await nutzer.type(await screen.findByLabelText('Bemerkung'), ' alt');
+    await nutzer.click(screen.getByRole('button', { name: 'Nächstes Fahrzeug' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
+
+    expect(await screen.findByRole('heading', { name: 'Florian 2' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Bemerkung')).toHaveValue('Zweiter');
+    // Kein Rest der verworfenen Eingabe: der Tab schließt ohne Warnung.
+    const ereignis = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(ereignis);
+    expect(ereignis.defaultPrevented).toBe(false);
   });
 });
 

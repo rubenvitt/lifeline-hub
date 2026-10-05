@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  entferneOrgLogo,
-  ladeOrgLogoHoch,
-  orgLogoPfad,
-  setzeOrgDefault,
-  setzeOrgName,
-} from './organisation';
+import { aendereOrganisation, entferneOrgLogo, ladeOrgLogoHoch, orgLogoPfad } from './organisation';
 
 /**
  * Pfad, Methode und Body der Organisations-Aufrufe. Der PATCH nimmt beide Felder optional; wer
@@ -25,17 +19,26 @@ describe('api/organisation', () => {
     return { pfad, init };
   }
 
-  it('setzeOrgName schickt NUR den Namen per PATCH', async () => {
-    await setzeOrgName('DRK Kreisverband Musterstadt');
+  it('aendereOrganisation schickt NUR den Namen, wenn nur er übergeben ist', async () => {
+    await aendereOrganisation({ name: 'DRK Kreisverband Musterstadt' });
     const { pfad, init } = aufruf();
     expect(pfad).toBe('/api/organisation');
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body as string)).toEqual({ name: 'DRK Kreisverband Musterstadt' });
   });
 
-  it('setzeOrgDefault bleibt beim Bestandsaufruf mit nur tz_organisation', async () => {
-    await setzeOrgDefault('thw');
+  it('aendereOrganisation schickt nur tz_organisation, wenn nur sie übergeben ist', async () => {
+    await aendereOrganisation({ tz_organisation: 'thw' });
     expect(JSON.parse(aufruf().init.body as string)).toEqual({ tz_organisation: 'thw' });
+  });
+
+  it('aendereOrganisation schickt beide Felder in einem PATCH', async () => {
+    await aendereOrganisation({ name: 'DRK', tz_organisation: 'thw' });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.parse(aufruf().init.body as string)).toEqual({
+      name: 'DRK',
+      tz_organisation: 'thw',
+    });
   });
 
   it('ladeOrgLogoHoch schickt die Datei als Multipart-Feld `datei` per POST', async () => {
