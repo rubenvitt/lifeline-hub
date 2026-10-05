@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useCallback, useMemo } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Typography } from 'antd';
 import { ApiError } from '../api/client';
@@ -10,11 +10,19 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
+import Auswahlleiste from '../druck/einsatzbericht/Auswahlleiste';
 import Bloecke from '../druck/einsatzbericht/Bloecke';
+import {
+  AUSWAHL_PARAM,
+  auswahlParam,
+  auswahlSchluessel,
+  umfangZeilen,
+  type BlockSchluessel,
+} from '../druck/einsatzbericht/auswahl';
 import { berichtZustand, ladeEinsatzbericht } from '../druck/einsatzbericht/abruf';
 import { berichtFreigabe } from '../druck/einsatzbericht/quellen';
 import { verdichteEinsatzbericht } from '../druck/einsatzbericht/verdichtung';
-import { einsatzdatenPfad } from '../routing/deeplinks';
+import { einsatzdatenPfad, parseBerichtAuswahl } from '../routing/deeplinks';
 
 /**
  * Druckansicht des Einsatzberichts (LFH-726, `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/`): der
@@ -29,12 +37,34 @@ import { einsatzdatenPfad } from '../routing/deeplinks';
  *
  * Schnappschuss wie der ETB-Druck: `einsatzKeys.einsatzberichtDruck` ist nicht live, „Neu laden“
  * holt einen neuen Stand. Route unter den Einsatzdaten (nie ausgeblendet, nie gesperrt).
+ *
+ * Blöcke wählbar (LFH-902, `openspec/changes/lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`):
+ * die Auswahl steht in `?bloecke=`, Weiche und Abruf gelten nur für die gewählten Blöcke, der
+ * Druckkopf nennt den Umfang. Die Auswahlleiste bleibt auch in der Sackgasse stehen — dort ist das
+ * Abwählen des gesperrten Blocks der Ausweg.
  */
 export default function EinsatzberichtDruckPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
   const { konventionen } = useAnzeigeKonventionen();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const auswahl = useMemo(() => parseBerichtAuswahl(searchParams), [searchParams]);
+  // `replace`: der Zurück-Knopf des Browsers springt nicht durch jede Häkchenänderung.
+  const setzeAuswahl = useCallback(
+    (neu: BlockSchluessel[]) =>
+      setSearchParams(
+        (alt) => {
+          const params = new URLSearchParams(alt);
+          const wert = auswahlParam(neu);
+          if (wert) params.set(AUSWAHL_PARAM, wert);
+          else params.delete(AUSWAHL_PARAM);
+          return params;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -46,13 +76,13 @@ export default function EinsatzberichtDruckPage() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const freigabe = useMemo(
-    () => (freigabenQuery.data ? berichtFreigabe(freigabenQuery.data) : null),
-    [freigabenQuery.data],
+    () => (freigabenQuery.data ? berichtFreigabe(freigabenQuery.data, auswahl) : null),
+    [freigabenQuery.data, auswahl],
   );
   const gesperrt = freigabe != null && freigabe.gesperrteModule.length > 0;
 
   const berichtQuery = useQuery({
-    queryKey: einsatzKeys.einsatzberichtDruck(einsatzId),
+    queryKey: einsatzKeys.einsatzberichtDruck(einsatzId, auswahlSchluessel(auswahl)),
     queryFn: () => ladeEinsatzbericht(einsatzId, freigabe!.je),
     enabled: freigabe != null && !gesperrt,
     // Ein Druckbeleg ist ein Schnappschuss (wie `EtbDruckPage`): kein stilles Nachladen, beim
@@ -68,9 +98,9 @@ export default function EinsatzberichtDruckPage() {
   const bericht = useMemo(
     () =>
       berichtQuery.data && zustand?.art === 'bereit'
-        ? verdichteEinsatzbericht(berichtQuery.data, konventionen)
+        ? verdichteEinsatzbericht(berichtQuery.data, konventionen, auswahl)
         : null,
-    [berichtQuery.data, zustand?.art, konventionen],
+    [berichtQuery.data, zustand?.art, konventionen, auswahl],
   );
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
@@ -120,7 +150,7 @@ export default function EinsatzberichtDruckPage() {
     inhalt = (
       <SeitenSackgasse
         titel="Einsatzbericht nicht verfügbar"
-        hinweis={`Für den Einsatzbericht fehlen Rechte an: ${freigabe.gesperrteModule.join(', ')}.`}
+        hinweis={`Für den Einsatzbericht fehlen Rechte an: ${freigabe.gesperrteModule.join(', ')}. Blöcke, die daraus schöpfen, lassen sich oben abwählen.`}
         rueckweg={{ pfad: zurueck, label: 'Zu den Einsatzdaten' }}
       />
     );
@@ -170,6 +200,7 @@ export default function EinsatzberichtDruckPage() {
           // Am Bildschirm steht darüber der Seitenkopf mit dem `h1`.
           ebene={2}
           zeilen={[
+            ...umfangZeilen(auswahl),
             { etikett: 'Stand', wert: bericht.stand },
             ...(bericht.vorlaeufig
               ? [{ etikett: 'Status', wert: 'Vorläufig – Einsatz läuft' }]
@@ -218,6 +249,7 @@ export default function EinsatzberichtDruckPage() {
         </>
       }
     >
+      <Auswahlleiste auswahl={auswahl} onAendern={setzeAuswahl} />
       {inhalt}
     </EinsatzSeite>
   );

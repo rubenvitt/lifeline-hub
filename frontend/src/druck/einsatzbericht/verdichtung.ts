@@ -5,6 +5,8 @@ import type {
   Einheit,
   EinheitPerioden,
   EinsatzAnzeige,
+  EinsatzPersonal,
+  Einsatzperiode,
   EtbEintragAnzeige,
   EtbZaehler,
   LageberichtAnzeige,
@@ -41,7 +43,7 @@ import {
   sichtung,
 } from '../../theme/statusFarben';
 import type { BerichtQuellen, EinsatzberichtRoh, QuellenErgebnis } from './abruf';
-import { BLOECKE, type BlockSchluessel } from './quellen';
+import { BLOECKE, STANDARDUMFANG, ordneAuswahl, type BlockSchluessel } from './auswahl';
 
 dayjs.extend(utc);
 
@@ -228,6 +230,16 @@ function fuehrung(
   ];
 }
 
+/**
+ * Helferstunden: Summe der Einsatzzeit aller Personen mit Periode (design.md D6 von LFH-726). EINE
+ * Rechnung für den Block Kräfte und die Personal-Anlage (LFH-902): beide Zahlen stimmen überein.
+ */
+function helferMinuten(personalPerioden: readonly PersonPerioden[], bisMs: number): number {
+  let minuten = 0;
+  for (const p of personalPerioden) minuten += kraftDauern(p.perioden, bisMs).gesamtMinuten ?? 0;
+  return minuten;
+}
+
 function kraefte(
   einheiten: Einheit[] | null,
   einheitenPerioden: EinheitPerioden[] | null,
@@ -247,8 +259,7 @@ function kraefte(
 
   const einheitenMit = einheitenPerioden?.filter((e) => e.perioden.length > 0).length ?? null;
   const personenMit = personalPerioden?.filter((p) => p.perioden.length > 0) ?? null;
-  let minuten = 0;
-  for (const p of personenMit ?? []) minuten += kraftDauern(p.perioden, bisMs).gesamtMinuten ?? 0;
+  const minuten = helferMinuten(personenMit ?? [], bisMs);
 
   const insgesamt: Zeile[] = [
     {
@@ -490,11 +501,136 @@ function etbAuszug(
   ];
 }
 
+// ── Anlagen (LFH-902, design.md D5) ────────────────────────────────────────────────
+
+const OHNE_ZEITACHSE = 'keine Zeitachse';
+
+/** Beginn, Ende und Einsatzzeit einer Kraft aus ihren Perioden, als Tabellenzellen. */
+function zeitenDerKraft(
+  perioden: readonly Einsatzperiode[],
+  bisMs: number,
+  abgeschlossen: boolean,
+  konv: AnzeigeKonventionen,
+): [string, string, string] {
+  const dauern = kraftDauern(perioden, bisMs);
+  if (dauern.gesamtMinuten == null) return [LEER, LEER, OHNE_ZEITACHSE];
+  const letzte = perioden[perioden.length - 1];
+  // Offen in einem laufenden Einsatz heißt „läuft“; offen nach dem Abschluss hat niemand das Ende
+  // erfasst — gezählt wird bis zum Abschluss, aber kein Ende behauptet.
+  const ende = letzte.ende_at
+    ? zeit(letzte.ende_at, konv)
+    : abgeschlossen
+      ? 'nicht erfasst'
+      : 'läuft';
+  return [zeit(perioden[0].beginn_at, konv), ende, dauerText(dauern.gesamtMinuten)];
+}
+
+/** Anzeigename einer Einheit: Name, der Funkrufname in Klammern, wenn er etwas hinzufügt. */
+function einheitName(e: Einheit): string {
+  return e.funkrufname && e.funkrufname !== e.name ? `${e.name} (${e.funkrufname})` : e.name;
+}
+
+function einheitenZeiten(
+  einheiten: Einheit[] | null,
+  einheitenPerioden: EinheitPerioden[] | null,
+  bisMs: number,
+  abgeschlossen: boolean,
+  konv: AnzeigeKonventionen,
+): Abschnitt[] {
+  if (einheiten == null || einheitenPerioden == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
+  if (einheiten.length === 0) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
+  const perioden = new Map(einheitenPerioden.map((e) => [e.einheit_id, e.perioden]));
+  const mit = einheiten
+    .map((e) => ({ e, p: perioden.get(e.id) ?? [] }))
+    .filter((x) => x.p.length > 0)
+    .sort((a, b) => a.p[0].beginn_at.localeCompare(b.p[0].beginn_at));
+  const ohne = einheiten.length - mit.length;
+  const inhalt: Inhalt[] = [];
+  if (mit.length > 0) {
+    inhalt.push({
+      art: 'tabelle',
+      kopf: ['Einheit', 'Beginn', 'Ende', 'Einsatzzeit'],
+      zeilen: mit.map(({ e, p }) => [
+        einheitName(e),
+        ...zeitenDerKraft(p, bisMs, abgeschlossen, konv),
+      ]),
+    });
+  }
+  // Ohne Zeitachse keine Zeile mit 0 (Spec „Anlage Einheiten mit Einsatzzeiten“), aber gezählt.
+  if (ohne > 0) {
+    inhalt.push(
+      vermerk(`Für ${ohne} ${ohne === 1 ? 'Einheit' : 'Einheiten'} keine Zeitachse erfasst`),
+    );
+  }
+  return [{ inhalt }];
+}
+
+/**
+ * Personal je Kopf als Helfernachweis. **Feld-Whitelist:** aus `EinsatzPersonal` gelangen nur Name,
+ * Funktion und die Zuordnung zur Einheit hierher; Bemerkung, Trägerorganisation, Stamm-Kennung und
+ * Status nicht. Es sind Einsatzkräfte, nie Betroffene (Spec „Anlage Personal je Kopf“).
+ */
+function personalJeKopf(
+  personal: EinsatzPersonal[] | null,
+  personalPerioden: PersonPerioden[] | null,
+  einheiten: Einheit[] | null,
+  bisMs: number,
+  abgeschlossen: boolean,
+  konv: AnzeigeKonventionen,
+): Abschnitt[] {
+  if (personal == null || personalPerioden == null) return [{ inhalt: [vermerk(NICHT_GENUTZT)] }];
+  if (personal.length === 0) return [{ inhalt: [vermerk(KEINE_EINTRAEGE)] }];
+  const perioden = new Map(personalPerioden.map((p) => [p.personal_id, p.perioden]));
+  const namen = new Map((einheiten ?? []).map((e) => [e.id, einheitName(e)]));
+  const tabellenZeilen = personal
+    .map((k) => ({
+      name: k.name,
+      funktion: textOder(k.funktion),
+      einheit: k.einheit_id != null ? namen.get(k.einheit_id) : undefined,
+      zeiten: zeitenDerKraft(perioden.get(k.id) ?? [], bisMs, abgeschlossen, konv),
+    }))
+    // Nach Einheit, dann Name; Kräfte ohne (lesbare) Einheit am Ende.
+    .sort(
+      (a, b) =>
+        Number(a.einheit == null) - Number(b.einheit == null) ||
+        (a.einheit ?? '').localeCompare(b.einheit ?? '', 'de') ||
+        a.name.localeCompare(b.name, 'de'),
+    )
+    .map((z) => [z.name, z.funktion, z.einheit ?? LEER, ...z.zeiten]);
+  const mitZeitachse = personalPerioden.filter((p) => p.perioden.length > 0);
+  return [
+    {
+      inhalt: [
+        {
+          art: 'tabelle',
+          kopf: ['Name', 'Funktion', 'Einheit', 'Beginn', 'Ende', 'Einsatzzeit'],
+          zeilen: tabellenZeilen,
+        },
+        zeilen([
+          { etikett: 'Personen', wert: zahl(personal.length) },
+          {
+            etikett: 'Helferstunden',
+            wert:
+              mitZeitachse.length === 0
+                ? KEINE_ZEITACHSE
+                : dauerText(helferMinuten(mitZeitachse, bisMs)),
+          },
+        ]),
+      ],
+    },
+  ];
+}
+
 // ── Gesamt ─────────────────────────────────────────────────────────────────────────
 
+/**
+ * Baut die gewählten Blöcke in Druckreihenfolge (LFH-902). Ein abgewählter Block entsteht gar
+ * nicht, und seine Quellen werden nicht gelesen — sie sind `nicht-gewaehlt` und nicht abgerufen.
+ */
 export function verdichteEinsatzbericht(
   roh: EinsatzberichtRoh,
   konv: AnzeigeKonventionen,
+  auswahl: readonly BlockSchluessel[] = STANDARDUMFANG,
 ): Einsatzbericht {
   const q: BerichtQuellen = roh.quellen;
   const einsatz = daten(q.einsatz);
@@ -504,47 +640,61 @@ export function verdichteEinsatzbericht(
   // UTC und werden ausdrücklich so gelesen (wie `einsatz/einsatzDauer.ts`).
   const abschluss = einsatz.abgeschlossen_at ? dayjs.utc(einsatz.abgeschlossen_at) : null;
   const bisMs = abschluss?.isValid() ? Math.min(standMs, abschluss.valueOf()) : standMs;
+  const abgeschlossen = einsatz.status !== 'aktiv';
 
-  const personen = daten(q.personen);
-  const schaeden = daten(q.schaeden);
-  const betreuung = daten(q.betreuung);
-  const verpflegung = daten(q.verpflegung);
-
-  const inhalt: Record<BlockSchluessel, Abschnitt[]> = {
-    stammdaten: stammdaten(einsatz),
-    zeiten: zeiten(einsatz, standMs, konv),
-    fuehrung: fuehrung(daten(q.mitglieder) ?? [], daten(q.stab), daten(q.lagebesprechungen), konv),
-    kraefte: kraefte(
-      daten(q.einheiten),
-      daten(q.einheitenPerioden),
-      daten(q.personal),
-      daten(q.personalPerioden),
-      daten(q.fahrzeuge),
-      bisMs,
-    ),
-    lage: lage(daten(q.lageberichte), konv),
-    bilanz: [
-      abschnittAus('Personen', personen, (p) => p.length === 0, personenBilanz),
-      abschnittAus('Schäden', schaeden, (s) => s.length === 0, schadenBilanz),
+  const bauen: Record<BlockSchluessel, () => Abschnitt[]> = {
+    stammdaten: () => stammdaten(einsatz),
+    zeiten: () => zeiten(einsatz, standMs, konv),
+    fuehrung: () =>
+      fuehrung(daten(q.mitglieder) ?? [], daten(q.stab), daten(q.lagebesprechungen), konv),
+    kraefte: () =>
+      kraefte(
+        daten(q.einheiten),
+        daten(q.einheitenPerioden),
+        daten(q.personal),
+        daten(q.personalPerioden),
+        daten(q.fahrzeuge),
+        bisMs,
+      ),
+    lage: () => lage(daten(q.lageberichte), konv),
+    bilanz: () => [
+      abschnittAus('Personen', daten(q.personen), (p) => p.length === 0, personenBilanz),
+      abschnittAus('Schäden', daten(q.schaeden), (s) => s.length === 0, schadenBilanz),
       abschnittAus(
         'Betreuung und Evakuierung',
-        betreuung,
+        daten(q.betreuung),
         (b) => b.bezirke.length === 0 && b.stellen.length === 0,
         betreuungBilanz,
       ),
       abschnittAus(
         'Verpflegung',
-        verpflegung,
+        daten(q.verpflegung),
         (v) => v.zeitfenster.length === 0,
         verpflegungBilanz,
       ),
     ],
-    etb: etbAuszug(daten(q.etbZaehler), daten(q.etbEntscheidungen), konv),
+    etb: () => etbAuszug(daten(q.etbZaehler), daten(q.etbEntscheidungen), konv),
+    'einheiten-zeiten': () =>
+      einheitenZeiten(daten(q.einheiten), daten(q.einheitenPerioden), bisMs, abgeschlossen, konv),
+    'personal-kopf': () =>
+      personalJeKopf(
+        daten(q.personal),
+        daten(q.personalPerioden),
+        daten(q.einheiten),
+        bisMs,
+        abgeschlossen,
+        konv,
+      ),
   };
 
+  const gewaehlt = ordneAuswahl(auswahl);
   return {
     vorlaeufig: einsatz.status === 'aktiv',
     stand: taktischeDtgVoll(roh.geladenAt, konv),
-    bloecke: BLOECKE.map((b) => ({ ...b, abschnitte: inhalt[b.schluessel] })),
+    bloecke: BLOECKE.filter((b) => gewaehlt.includes(b.schluessel)).map((b) => ({
+      schluessel: b.schluessel,
+      titel: b.titel,
+      abschnitte: bauen[b.schluessel](),
+    })),
   };
 }

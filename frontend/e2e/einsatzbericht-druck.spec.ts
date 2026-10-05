@@ -16,6 +16,10 @@ import { wechsleZu, wechsleZuRolle } from './rollen-kern';
  *
  * Druckbild mit ausgelöstem `beforeprint` (`window.print` als Stub, `druck/AGENTS.md`), nicht nur
  * `emulateMedia`.
+ *
+ * Der dritte Fall wählt Blöcke ab und die Personal-Anlage an (LFH-902): ein abgewählter Block fehlt
+ * im Blatt, die Auswahl übersteht ein Neuladen, ein unbekannter Schlüssel erscheint nirgends, die
+ * Auswahlleiste steht nicht auf dem Papier.
  */
 
 const ADMIN = 'admin';
@@ -257,4 +261,80 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
   });
   await expect(drucken).toHaveCount(0);
   await expect(wurzel).toHaveCount(0);
+});
+
+test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der Adresse (LFH-902)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht Auswahl ${Date.now()}`);
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const kraft = await sende(page, 'POST', `${basis}/personal`, {
+    adhoc: { name: 'Hanna Helferin' },
+  });
+  await sende(page, 'POST', `${basis}/personal/${kraft.id}/zeitachse`, {
+    art: 'alarmierung',
+    zeitpunkt_at: vorEinerStunde(),
+  });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/einsatzdaten/bericht`);
+  const drucken = page.getByRole('button', { name: 'Drucken / als PDF' });
+  await expect(drucken).toBeEnabled({ timeout: 60_000 });
+  const wurzel = page.locator('[data-lfh="druckwurzel"]');
+  const kopf = page.locator('[data-lfh="druckkopf"]');
+  const leiste = page.getByRole('region', { name: 'Blöcke' });
+  await expect(kopf).toContainText('Standardumfang');
+  // Ohne Anlage steht kein Name einer Einsatzkraft auf dem Blatt.
+  expect(await wurzel.innerText()).not.toContain('Hanna Helferin');
+
+  // ── Bilanz und Lage ab, Personal-Anlage an.
+  await leiste.getByRole('checkbox', { name: 'Bilanz' }).click();
+  await leiste.getByRole('checkbox', { name: 'Lage', exact: true }).click();
+  await leiste.getByRole('checkbox', { name: /Anlage Personal je Kopf/ }).click();
+  await expect(drucken).toBeEnabled({ timeout: 60_000 });
+  const erwartet = [
+    'Stammdaten',
+    'Zeiten',
+    'Führung',
+    'Kräfte',
+    'ETB-Auszug',
+    'Anlage Personal je Kopf',
+  ];
+  await expect(wurzel.getByRole('heading', { level: 3 })).toHaveText(erwartet);
+  await expect(page.locator('[data-lfh="einsatzbericht-block-bilanz"]')).toHaveCount(0);
+  await expect(kopf).toContainText(`Auswahl: ${erwartet.join(', ')}`);
+  await expect(kopf).toContainText('enthält Namen von Einsatzkräften');
+  const anlage = page.locator('[data-lfh="einsatzbericht-block-personal-kopf"]');
+  await expect(anlage).toContainText('Hanna Helferin');
+  // Eine Stunde seit der Alarmierung, noch im Einsatz.
+  await expect(anlage).toContainText('läuft');
+
+  // ── Die Auswahl steht in der Adresse und übersteht ein Neuladen.
+  await expect(page).toHaveURL(/bloecke=/);
+  await page.reload();
+  await expect(drucken).toBeEnabled({ timeout: 60_000 });
+  await expect(wurzel.getByRole('heading', { level: 3 })).toHaveText(erwartet);
+
+  // ── Ein unbekannter Schlüssel fällt weg.
+  await page.goto(`/einsaetze/${einsatzId}/einsatzdaten/bericht?bloecke=stammdaten,kosten`);
+  await expect(drucken).toBeEnabled({ timeout: 60_000 });
+  await expect(wurzel.getByRole('heading', { level: 3 })).toHaveText(['Stammdaten']);
+  await expect(kopf).toContainText('Auswahl: Stammdaten');
+  await expect(kopf).not.toContainText('kosten');
+
+  // ── Druckbild: die Auswahlleiste steht nicht auf dem Papier (keine Box, auch wenn ein Vorfahr
+  // statt ihrer selbst ausgeblendet ist).
+  await page.evaluate(() => {
+    window.print = () => {
+      window.dispatchEvent(new Event('beforeprint'));
+    };
+  });
+  await drucken.click();
+  await page.emulateMedia({ media: 'print' });
+  expect(
+    await leiste.evaluate((el) => el.getClientRects().length),
+    'Auswahlleiste im Druck ohne Box',
+  ).toBe(0);
+  await expect(wurzel).toBeVisible();
 });

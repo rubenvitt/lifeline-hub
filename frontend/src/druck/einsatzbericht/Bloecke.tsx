@@ -5,8 +5,9 @@ import { monoStil } from '../../components/instrument';
 import type { Abschnitt, Einsatzbericht, Inhalt } from './verdichtung';
 
 /**
- * Die sieben Blöcke des Einsatzberichts auf Papier (LFH-726). Bildet nur das verdichtete Objekt
- * ab (design.md D5) und kann deshalb nichts zeigen, was die Verdichtung nicht hineingegeben hat.
+ * Die gewählten Blöcke des Einsatzberichts auf Papier (LFH-726, Auswahl LFH-902). Bildet nur das
+ * verdichtete Objekt ab (design.md D5) und kann deshalb nichts zeigen, was die Verdichtung nicht
+ * hineingegeben hat — auch keinen abgewählten Block.
  *
  * Gliederung: der Druckkopf trägt `h2` („Einsatzbericht“), die Blöcke `h3`, ihre Abschnitte `h4`,
  * die Abschnitte des Lageberichts `h5`. Umbruchregeln (Überschrift bleibt beim Text, Zeile nicht

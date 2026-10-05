@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type {
   BetreuungUebersicht,
+  Einheit,
+  EinheitPerioden,
   EinsatzAnzeige,
+  EinsatzPersonal,
   PersonPerioden,
   Schaden,
   Verpflegung,
@@ -25,6 +28,7 @@ import {
   type Inhalt,
 } from './verdichtung';
 import type { BlockSchluessel } from './quellen';
+import { STANDARDUMFANG } from './auswahl';
 
 const konv: AnzeigeKonventionen = { zeitzone: 'Europe/Berlin' };
 
@@ -452,5 +456,233 @@ describe('3.5 ETB-Auszug', () => {
       konv,
     );
     expect(vermerke(abschnitt(b, 'etb', 'Entscheidungen'))).toEqual([KEINE_EINTRAEGE]);
+  });
+});
+
+describe('Auswahl der Blöcke (LFH-902)', () => {
+  it('ohne Auswahl die sieben Standardblöcke, keine Anlage', () => {
+    const b = verdichteEinsatzbericht(rohBericht(), konv);
+    expect(b.bloecke.map((x) => x.schluessel)).toEqual(STANDARDUMFANG);
+  });
+
+  it('baut nur die gewählten Blöcke in Druckreihenfolge; ein abgewählter fehlt ganz', () => {
+    const b = verdichteEinsatzbericht(rohBericht(), konv, ['etb', 'stammdaten']);
+    expect(b.bloecke.map((x) => x.schluessel)).toEqual(['stammdaten', 'etb']);
+  });
+
+  it('liest abgewählte Quellen nicht (sie sind nicht abgerufen)', () => {
+    const roh = rohBericht({
+      personen: { zustand: 'nicht-gewaehlt' },
+      schaeden: { zustand: 'nicht-gewaehlt' },
+      betreuung: { zustand: 'nicht-gewaehlt' },
+      verpflegung: { zustand: 'nicht-gewaehlt' },
+    });
+    const auswahl = STANDARDUMFANG.filter((s) => s !== 'bilanz');
+    const b = verdichteEinsatzbericht(roh, konv, auswahl);
+    expect(b.bloecke.map((x) => x.schluessel)).toEqual(auswahl);
+  });
+});
+
+// Ein Sommertag ohne Zeitumstellung: 06:00 UTC = 08:00 in Berlin.
+const STAND_SOMMER = '2026-06-01T12:32:00.000Z';
+
+function sommerEinsatz(teil: Partial<EinsatzAnzeige> = {}) {
+  return einsatz({ begonnen_at: '2026-06-01T05:30:00', ...teil });
+}
+
+describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
+  const auswahl = ['einheiten-zeiten'] as const;
+
+  function anlage(roh: ReturnType<typeof rohBericht>) {
+    return block(verdichteEinsatzbericht(roh, konv, auswahl), 'einheiten-zeiten').abschnitte[0];
+  }
+
+  it('Einheit noch im Einsatz: Beginn, Ende „läuft“, Einsatzzeit bis zum Stand', () => {
+    const roh = rohBericht(
+      {
+        einsatz: sommerEinsatz(),
+        einheiten: daten([
+          { id: 1, name: 'Zug 1', funkrufname: 'Florian 1/1', ueber_einheit_id: null },
+        ] as Einheit[]),
+        einheitenPerioden: daten([
+          { einheit_id: 1, perioden: [periode('2026-06-01T06:00:00', null)] },
+        ] as EinheitPerioden[]),
+      },
+      STAND_SOMMER,
+    );
+    expect(tabelle(anlage(roh))).toEqual({
+      art: 'tabelle',
+      kopf: ['Einheit', 'Beginn', 'Ende', 'Einsatzzeit'],
+      zeilen: [['Zug 1 (Florian 1/1)', '01.06.2026 08:00', 'läuft', '6 h 32']],
+    });
+  });
+
+  it('mehrere Perioden: erste Alarmierung, letztes Ende, Summe; sortiert nach Beginn', () => {
+    const roh = rohBericht(
+      {
+        einsatz: sommerEinsatz(),
+        einheiten: daten([
+          { id: 1, name: 'Zug 1', ueber_einheit_id: null },
+          { id: 2, name: 'Gruppe 1', ueber_einheit_id: 1 },
+        ] as Einheit[]),
+        einheitenPerioden: daten([
+          {
+            einheit_id: 1,
+            perioden: [
+              periode('2026-06-01T07:00:00', '2026-06-01T08:00:00'),
+              periode('2026-06-01T09:00:00', '2026-06-01T09:30:00'),
+            ],
+          },
+          { einheit_id: 2, perioden: [periode('2026-06-01T06:30:00', '2026-06-01T07:10:00')] },
+        ] as EinheitPerioden[]),
+      },
+      STAND_SOMMER,
+    );
+    expect(tabelle(anlage(roh)).zeilen).toEqual([
+      ['Gruppe 1', '01.06.2026 08:30', '01.06.2026 09:10', '40 min'],
+      ['Zug 1', '01.06.2026 09:00', '01.06.2026 11:30', '1 h 30'],
+    ]);
+  });
+
+  it('Einheit ohne Zeitachse steht nicht mit 0 in der Tabelle, der Vermerk zählt sie', () => {
+    const a = anlage(rohBericht());
+    // Gruppe 1 hat in den Testdaten keine Periode.
+    expect(tabelle(a).zeilen.map((z) => z[0])).toEqual(['Zug 1']);
+    expect(vermerke(a)).toEqual(['Für 1 Einheit keine Zeitachse erfasst']);
+  });
+
+  it('offene Periode in einem abgeschlossenen Einsatz endet beim Abschluss', () => {
+    const roh = rohBericht(
+      {
+        einsatz: sommerEinsatz({
+          status: 'abgeschlossen',
+          abgeschlossen_at: '2026-06-01T10:00:00',
+        }),
+        einheiten: daten([{ id: 1, name: 'Zug 1', ueber_einheit_id: null }] as Einheit[]),
+        einheitenPerioden: daten([
+          { einheit_id: 1, perioden: [periode('2026-06-01T06:00:00', null)] },
+        ] as EinheitPerioden[]),
+      },
+      STAND_SOMMER,
+    );
+    expect(tabelle(anlage(roh)).zeilen).toEqual([
+      ['Zug 1', '01.06.2026 08:00', 'nicht erfasst', '4 h 00'],
+    ]);
+  });
+
+  it('Einheiten im Einsatz ausgeblendet: Vermerk', () => {
+    const roh = rohBericht({
+      einheiten: { zustand: 'nicht-genutzt' },
+      einheitenPerioden: { zustand: 'nicht-genutzt' },
+    });
+    expect(vermerke(anlage(roh))).toEqual([NICHT_GENUTZT]);
+  });
+
+  it('ohne Einheit „keine Einträge“', () => {
+    const roh = rohBericht({ einheiten: daten([]), einheitenPerioden: daten([]) });
+    expect(vermerke(anlage(roh))).toEqual([KEINE_EINTRAEGE]);
+  });
+});
+
+describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
+  const auswahl = ['kraefte', 'personal-kopf'] as const;
+
+  function kraft(teil: Partial<EinsatzPersonal>): EinsatzPersonal {
+    return {
+      id: 1,
+      einsatz_id: 5,
+      name: 'Anna Helferin',
+      funktion: 'Truppführerin',
+      einheit_id: 1,
+      ist_adhoc: false,
+      ist_demo: false,
+      disponiert_at: '2026-06-01T05:30:00',
+      bemerkung: 'GEHEIM-Bemerkung',
+      traegerorganisation: 'GEHEIM-Traeger',
+      personal_id: 987654,
+      status_label: 'GEHEIM-Status',
+      ...teil,
+    } as EinsatzPersonal;
+  }
+
+  function roh() {
+    return rohBericht(
+      {
+        einsatz: sommerEinsatz(),
+        einheiten: daten([
+          { id: 1, name: 'Zug 1', ueber_einheit_id: null },
+          { id: 2, name: 'Bereitschaft', ueber_einheit_id: null },
+        ] as Einheit[]),
+        personal: daten([
+          kraft({ id: 11, name: 'Zora Zander', einheit_id: 1 }),
+          kraft({ id: 12, name: 'Anna Abel', einheit_id: 1, funktion: null }),
+          kraft({ id: 13, name: 'Bert Bauer', einheit_id: 2 }),
+          kraft({ id: 14, name: 'Frei Kraft', einheit_id: null }),
+        ]),
+        personalPerioden: daten([
+          { personal_id: 11, perioden: [periode('2026-06-01T06:00:00', null)] },
+          { personal_id: 12, perioden: [periode('2026-06-01T06:00:00', '2026-06-01T07:00:00')] },
+          { personal_id: 13, perioden: [] },
+        ] as PersonPerioden[]),
+      },
+      STAND_SOMMER,
+    );
+  }
+
+  function anlage(b: Einsatzbericht) {
+    return block(b, 'personal-kopf').abschnitte[0];
+  }
+
+  it('jede Kraft mit Name, Funktion, Einheit und Zeiten; sortiert nach Einheit, dann Name', () => {
+    const t = tabelle(anlage(verdichteEinsatzbericht(roh(), konv, auswahl)));
+    expect(t.kopf).toEqual(['Name', 'Funktion', 'Einheit', 'Beginn', 'Ende', 'Einsatzzeit']);
+    expect(t.zeilen).toEqual([
+      ['Bert Bauer', 'Truppführerin', 'Bereitschaft', '—', '—', 'keine Zeitachse'],
+      ['Anna Abel', '—', 'Zug 1', '01.06.2026 08:00', '01.06.2026 09:00', '1 h 00'],
+      ['Zora Zander', 'Truppführerin', 'Zug 1', '01.06.2026 08:00', 'läuft', '6 h 32'],
+      ['Frei Kraft', 'Truppführerin', '—', '—', '—', 'keine Zeitachse'],
+    ]);
+  });
+
+  it('Helferstunden gleichen denen im Block Kräfte', () => {
+    const b = verdichteEinsatzbericht(roh(), konv, auswahl);
+    const imKraefteblock = wert(abschnitt(b, 'kraefte', 'Insgesamt eingesetzt'), 'Helferstunden');
+    expect(wert(anlage(b), 'Helferstunden')).toBe(imKraefteblock);
+    expect(imKraefteblock).toBe('7 h 32');
+  });
+
+  it('enthält nur Name, Funktion, Einheit und Zeiten, keine weiteren Felder der Kraft', () => {
+    const json = JSON.stringify(anlage(verdichteEinsatzbericht(roh(), konv, auswahl)));
+    for (const verboten of ['GEHEIM-Bemerkung', 'GEHEIM-Traeger', '987654', 'GEHEIM-Status']) {
+      expect(json).not.toContain(verboten);
+    }
+  });
+
+  it('der Standardumfang enthält keinen Namen aus dem Personal', () => {
+    const json = JSON.stringify(verdichteEinsatzbericht(roh(), konv));
+    for (const name of ['Zora Zander', 'Anna Abel', 'Bert Bauer', 'Frei Kraft']) {
+      expect(json).not.toContain(name);
+    }
+  });
+
+  it('Einheiten ausgeblendet: Spalte Einheit „—“, die Anlage bleibt', () => {
+    const r = roh();
+    r.quellen.einheiten = { zustand: 'nicht-genutzt' };
+    const t = tabelle(anlage(verdichteEinsatzbericht(r, konv, ['personal-kopf'])));
+    expect(t.zeilen.map((z) => z[2])).toEqual(['—', '—', '—', '—']);
+  });
+
+  it('Personal ausgeblendet: Vermerk; ohne Kraft „keine Einträge“', () => {
+    const r = roh();
+    r.quellen.personal = { zustand: 'nicht-genutzt' };
+    r.quellen.personalPerioden = { zustand: 'nicht-genutzt' };
+    expect(vermerke(anlage(verdichteEinsatzbericht(r, konv, ['personal-kopf'])))).toEqual([
+      NICHT_GENUTZT,
+    ]);
+    const leer = roh();
+    leer.quellen.personal = daten([]);
+    expect(vermerke(anlage(verdichteEinsatzbericht(leer, konv, ['personal-kopf'])))).toEqual([
+      KEINE_EINTRAEGE,
+    ]);
   });
 });
