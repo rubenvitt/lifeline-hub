@@ -9,8 +9,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen_mit, login_cookie, rolle_setzen, setup,
-    setup_mit_pool_und_live, sse_anfang_lesen,
+    anfrage, benutzer_anlegen, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie, rolle_setzen,
+    setup, setup_mit_pool, setup_mit_pool_und_live, sse_anfang_lesen,
 };
 
 // ----------------------------- Test-Harness -----------------------------
@@ -265,6 +265,90 @@ async fn nicht_leitung_kann_keinen_override_setzen() {
     assert_eq!(
         override_setzen(&app, &berta, eid, "chat", false, None).await,
         StatusCode::FORBIDDEN
+    );
+}
+
+/// Zweite Organisation mit eigenem System-Admin (`fremde_org_anlegen` legt `keiner` an, die
+/// Rolle kommt per SQL). Liefert das Login-Cookie.
+async fn fremder_admin(app: &axum::Router, pool: &sqlx::SqlitePool) -> String {
+    let (_, id) = fremde_org_anlegen(pool, "Fremd", "fremdadmin", "fremdpw12", "keine").await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+    login_cookie(app, "fremdadmin", "fremdpw12").await
+}
+
+async fn mitglied_per_sql(pool: &sqlx::SqlitePool, einsatz: i64, benutzername: &str, rolle: &str) {
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         SELECT ?, id, ? FROM benutzer WHERE benutzername = ?",
+    )
+    .bind(einsatz)
+    .bind(rolle)
+    .bind(benutzername)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn admin_einer_fremden_org_setzt_keinen_override() {
+    // LFH-995: derselbe Org-Schnitt wie am Frist-PUT. Lesen darf der fremde Admin weiter
+    // serverweit, schreiben nicht.
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let fremd = fremder_admin(&app, &pool).await;
+
+    assert_eq!(
+        override_setzen(&app, &fremd, eid, "chat", false, None).await,
+        StatusCode::FORBIDDEN
+    );
+    let (status, json) = overrides_laden(&app, &fremd, eid).await;
+    assert_eq!(status, StatusCode::OK, "lesen bleibt serverweit");
+    assert!(
+        json.as_object().unwrap().is_empty(),
+        "nichts darf sich geändert haben: {json}"
+    );
+}
+
+#[tokio::test]
+async fn fremder_admin_traegt_nur_eine_rolle_als_einsatzleitung() {
+    // Wie am Frist-PUT (LFH-753, design.md D1): die Mitgliedschaft als Einsatzleitung ist ein
+    // ausdrücklich erteiltes Recht am Einsatz und trägt auch über die Org-Grenze.
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fremd = fremder_admin(&app, &pool).await;
+
+    let als_fuehrung = einsatz_anlegen_mit(&app, &admin, "Führung").await;
+    mitglied_per_sql(&pool, als_fuehrung, "fremdadmin", "fuehrungspersonal").await;
+    assert_eq!(
+        override_setzen(&app, &fremd, als_fuehrung, "chat", false, None).await,
+        StatusCode::FORBIDDEN
+    );
+
+    let als_leitung = einsatz_anlegen_mit(&app, &admin, "Leitung").await;
+    mitglied_per_sql(&pool, als_leitung, "fremdadmin", "einsatzleitung").await;
+    assert_eq!(
+        override_setzen(&app, &fremd, als_leitung, "chat", false, None).await,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn einsatzleitung_ohne_admin_rechte_setzt_override() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let lid = benutzer_anlegen(&app, &admin, "lotta", "keine").await;
+    rolle_setzen(&app, &admin, eid, lid, "einsatzleitung").await;
+    let lotta = login_cookie(&app, "lotta", "lottapw1").await;
+
+    assert_eq!(
+        override_setzen(&app, &lotta, eid, "chat", false, None).await,
+        StatusCode::OK
     );
 }
 
