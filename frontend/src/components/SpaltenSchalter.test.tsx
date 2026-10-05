@@ -79,4 +79,23 @@ describe('SpaltenSchalter · ohne onAn (Seitenvariante)', () => {
     await userEvent.click(url);
     expect(onAus).not.toHaveBeenCalled();
   });
+
+  it('das Kästchen im Eintrag trägt keinen eigenen Boden — der Menüeintrag ist das Ziel (LFH-907)', async () => {
+    renderMitProviders(
+      <SpaltenSchalter bezeichnung="Quellen" spalten={SPALTEN} aus={[]} onAus={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    const kaestchen = within(menue)
+      .getByRole('menuitem', { name: 'URL' })
+      .querySelector<HTMLElement>('label.ant-checkbox-wrapper');
+    expect(kaestchen, 'Kästchen im Eintrag').not.toBeNull();
+    expect(kaestchen!.style.minHeight).toBe('0px');
+  });
 });

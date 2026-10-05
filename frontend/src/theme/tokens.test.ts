@@ -3,7 +3,7 @@
  * Tokens. Geprüft werden auch die Abstände: ein `antdToken`, das `padding*` weiter aus der
  * Modulkonstante läse, wäre sonst halb verdrahtet und trotzdem grün.
  */
-import { theme as antdTheme } from 'antd';
+import { theme as antdTheme, type CheckboxProps } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
@@ -290,15 +290,24 @@ describe('Klappkopf folgt der Staffel (LFH-653)', () => {
 describe('Beschriftetes Kästchen folgt der Staffel (LFH-907)', () => {
   const SOLL: Record<Dichte, number> = { kompakt: 24, komfortabel: 48, handschuh: 72 };
 
+  /** antd ruft die Stilfunktion mit den Props des Kästchens. */
+  function stileFuer(d: Dichte, props: CheckboxProps) {
+    const stile = antdKaestchen(d).styles;
+    expect(typeof stile, d).toBe('function');
+    return (stile as (info: { props: CheckboxProps }) => { root?: unknown })({ props });
+  }
+
   it('setzt den Boden der GEWÄHLTEN Stufe am Label und stellt Box und Text mittig', () => {
     for (const d of Object.keys(SOLL) as Dichte[]) {
-      const stile = antdKaestchen(d).styles;
-      expect(typeof stile, d).toBe('object');
-      expect((stile as { root?: unknown }).root, d).toEqual({
+      expect(stileFuer(d, { children: 'Werte behalten' }).root, d).toEqual({
         minHeight: SOLL[d],
         alignItems: 'center',
       });
     }
+  });
+
+  it('lässt das Kästchen OHNE Text frei — im Tabellenfilter trägt der Menüeintrag die Höhe', () => {
+    expect(stileFuer('handschuh', {}).root).toBeUndefined();
   });
 
   it('kein Komponenten-Token für das Kästchen — antd kennt keins für die Höhe des Labels', () => {

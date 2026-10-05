@@ -842,12 +842,15 @@ export function antdKlappkopf(dichte: Dichte): NonNullable<ConfigProviderProps['
  * Zeile von {@link dichten} wie `controlHeightSM` — ein Baustein bräuchte einen Wächter gegen das
  * nackte antd-Kästchen, und `rollen.css` trägt in den `[data-dichte]`-Blöcken nur Dichte-Properties
  * (`rollen.guard.test.ts`). Muster wie {@link antdKlappkopf}. Ein eigener `minHeight` an der Stelle
- * schlägt den Kontext (Stab-Checkliste: `checklistenZeileStil`).
+ * schlägt den Kontext (Stab-Checkliste: `checklistenZeileStil`; Spaltenschalter: `minHeight: 0`,
+ * weil dort der Menüeintrag das Ziel ist).
  */
 export function antdKaestchen(dichte: Dichte): NonNullable<ConfigProviderProps['checkbox']> {
-  return {
-    styles: { root: { minHeight: dichten[dichte].kleineZeilenhoehe, alignItems: 'center' } },
-  };
+  const boden = { minHeight: dichten[dichte].kleineZeilenhoehe, alignItems: 'center' } as const;
+  // Nur das BESCHRIFTETE Kästchen: ein Kästchen ohne Text baut antd selbst in den Spaltenfilter
+  // einer Tabelle (`FilterDropdown`, Text als Geschwister im Menüeintrag). Dort trägt der
+  // Menüeintrag die Steuerhöhe schon; ein Boden am Label käme oben drauf (handschuh ≈ 120 px).
+  return { styles: ({ props }) => (props.children == null ? {} : { root: boden }) };
 }
 
 /**

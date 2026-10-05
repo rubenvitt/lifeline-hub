@@ -279,9 +279,11 @@ anwendbar), „nicht geprüft" ist keins.
   (`antdKlappkopf(dichte)` in `theme/tokens.ts`, `collapse` am `ConfigProvider`: `minHeight`
   30/48/72 + Mittellage); antd rechnet den Kopf sonst aus der Schrift (36/45/55). Kein lokales
   `styles.header` je Stelle. Nachweis `e2e/dokumente.spec.ts` „Dichte-Staffel“.
-- **Beschriftetes Kästchen** (LFH-907): jede `Checkbox` bekommt den Boden über den Kontext
-  (`antdKaestchen(dichte)`, `checkbox` am `ConfigProvider`: `minHeight` 24/48/72 am Label +
-  Mittellage); antd hat dafür kein Token, das Label wäre nur so hoch wie die Schrift (21,5/36).
+- **Beschriftetes Kästchen** (LFH-907): jede `Checkbox` mit Text bekommt den Boden über den
+  Kontext (`antdKaestchen(dichte)`, `checkbox` am `ConfigProvider`: `minHeight` 24/48/72 am Label
+  und Mittellage); antd hat dafür kein Token, das Label wäre nur so hoch wie die Schrift
+  (21,5/36). Ohne Text (antds Tabellenfilter) kein Boden; im Menüeintrag hebt
+  `style={{ minHeight: 0 }}` ihn auf, dort ist der Eintrag das Ziel (`SpaltenSchalter`).
   Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7, C13).
 - **Handgebautes Bedienziel** (LFH-365): `minHeight: token.controlHeight` **plus** `padding` aus
   `token.paddingSM`/`token.padding` (aufgelöste Tokens, nie `var(--lfh-*)`), geprüft über eine

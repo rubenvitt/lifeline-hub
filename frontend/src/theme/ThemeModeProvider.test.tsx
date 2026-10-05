@@ -383,4 +383,15 @@ describe('Beschriftetes Kästchen folgt der Staffel über den Kontext (LFH-907)'
     expect(label.style.minHeight).toBe('72px');
     expect(label.style.marginBottom).toBe('8px');
   });
+
+  it('ein Kästchen ohne Text bleibt ohne Boden (Spaltenfilter der Tabelle)', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    const { container } = render(
+      <ThemeModeProvider>
+        <Checkbox aria-label="Filterwert" />
+      </ThemeModeProvider>,
+    );
+    const label = container.querySelector<HTMLElement>('label.ant-checkbox-wrapper')!;
+    expect(label.style.minHeight).toBe('');
+  });
 });
