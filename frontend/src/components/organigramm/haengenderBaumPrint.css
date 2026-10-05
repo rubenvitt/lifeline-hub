@@ -1,8 +1,8 @@
 /* Druckregeln des hängenden Organigramm-Gerüsts (LFH-626 D6, geteilt seit LFH-625 D4). Sie gelten
    in jeder Druckwurzel, die das Gerüst trägt (Organigramm, Fernmeldeskizze). Die Mechanik
    (Ausblenden des Rahmens, Fluss, Papierfarben, Umbruch der Grundelemente) liegt in
-   `druck/druck.css`. Nachweis der Wirkung: `e2e/fuehrungsorganisation.spec.ts` und
-   `e2e/funkplan.spec.ts` (ausgelöstes `beforeprint`, A4-Breite). */
+   `druck/druck.css`. Nachweis der Wirkung: `e2e/fuehrungsorganisation-druck.spec.ts` (ausgelöstes
+   `beforeprint`, A4-Breite). */
 @media print {
   /* A4 hoch: zwei feste Spalten statt `auto-fill` nach Fensterbreite. */
   .haengender-baum [data-lfh='org-ebene1'] {

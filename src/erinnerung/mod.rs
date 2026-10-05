@@ -105,5 +105,15 @@ wire_enum! {
     }
 }
 
+/// Obergrenze für das Wiederholintervall: 7 Tage (LFH-924). Ein Einsatz dauert Stunden bis
+/// wenige Wochen; der längste Rhythmus der Stabsarbeit ist der Tag, ein Wochenrhythmus deckt
+/// lange Lagen mit ab. Was darüber liegt, wiederholt sich im Einsatz praktisch nie und ist
+/// ein Tippfehler.
+pub const INTERVALL_MAX_MINUTEN: i64 = 7 * 24 * 60;
+
+/// Plausibler Jahresbereich einer Fälligkeit (LFH-924). Darin hat das Jahr immer vier
+/// Stellen, die Textsortierung von `faellig_at` stimmt also.
+pub const FAELLIG_JAHRE: std::ops::RangeInclusive<i32> = 2000..=2100;
+
 pub const QUELLE_MANUELL: &str = "manuell";
 pub const QUELLE_AUTO_FRIST: &str = "auto_frist";

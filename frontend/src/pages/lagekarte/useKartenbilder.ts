@@ -90,6 +90,23 @@ export function useKartenbilder({
   const invalidiereBilder = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
 
+  // Laufende Downloads (Bild-IDs) und die zuletzt gezeigten Bilder. Ein Download lebt unabhängig
+  // vom Lauf des Ladeeffekts: jeder Refetch der Bilderliste (Live-Kanal, Opazität, Zeitraffer) ließe
+  // ihn sonst verfallen und startete ihn neu. Übernommen oder freigegeben wird bei Ankunft, nach dem
+  // DANN gültigen Stand (LFH-943, D4).
+  const imFlugRef = useRef<Set<number>>(new Set());
+  const aktiveIdsRef = useRef<Set<number>>(new Set());
+  const abbruchRef = useRef<AbortController>(new AbortController());
+
+  // Ein Abbruch je Einsatz: Einsatzwechsel und Verlassen der Karte brechen laufende Downloads ab.
+  // Vor dem Ladeeffekt deklariert, damit dessen Lauf schon den neuen Controller sieht.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    abbruchRef.current = ctrl;
+    imFlugRef.current = new Set();
+    return () => ctrl.abort();
+  }, [einsatzId]);
+
   // Blob-URLs laden und bei entfernten Bildern inkrementell revoken. blobUrls bewusst nicht in den
   // Deps: das Map-Objekt löste den Effekt endlos aus. Kein pauschales revoke im Cleanup: React ruft
   // ihn vor jedem Re-Run (jeder Refetch der Bilderliste), das machte aktive URLs unbrauchbar, und
@@ -97,25 +114,32 @@ export function useKartenbilder({
   // liegt deshalb in einem eigenen Effekt weiter unten.
   useEffect(() => {
     const bilder = bilderRoh ?? [];
-    let abgebrochen = false;
+    const aktiveIds = new Set(bilder.map((b) => b.id));
+    aktiveIdsRef.current = aktiveIds;
+    const abbruch = abbruchRef.current.signal;
+    const imFlug = imFlugRef.current;
     for (const b of bilder) {
-      if (!blobUrlsRef.current[b.id]) {
-        ladeBildBlobUrl(einsatzId, b.id)
-          .then((url) => {
-            if (!abgebrochen) {
-              blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
-              setBlobUrls(blobUrlsRef.current);
-            }
-          })
-          .catch((e) => {
-            // Lade-Fehler sichtbar machen statt schlucken.
-            if (!abgebrochen) fehler(e);
-          });
-      }
+      if (blobUrlsRef.current[b.id] || imFlug.has(b.id)) continue;
+      imFlug.add(b.id);
+      ladeBildBlobUrl(einsatzId, b.id, abbruch)
+        .then((url) => {
+          // Jede URL wird freigegeben, die niemand mehr übernimmt: Karte verlassen, Einsatz
+          // gewechselt oder Bild inzwischen aus der Liste.
+          if (abbruch.aborted || !aktiveIdsRef.current.has(b.id) || blobUrlsRef.current[b.id]) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
+          setBlobUrls(blobUrlsRef.current);
+        })
+        .catch((e) => {
+          // Lade-Fehler sichtbar machen statt schlucken; ein Abbruch ist keiner.
+          if (!abbruch.aborted && aktiveIdsRef.current.has(b.id)) fehler(e);
+        })
+        .finally(() => imFlug.delete(b.id));
     }
     // Entfernte Bilder (gelöscht, Einsatzwechsel) inkrementell freigeben — deckt den Leak ab, ohne
     // aktive URLs zu treffen.
-    const aktiveIds = new Set(bilder.map((b) => b.id));
     for (const idStr of Object.keys(blobUrlsRef.current)) {
       const id = Number(idStr);
       if (!aktiveIds.has(id)) {
@@ -126,9 +150,6 @@ export function useKartenbilder({
         setBlobUrls(blobUrlsRef.current);
       }
     }
-    return () => {
-      abgebrochen = true;
-    };
     // `fehler` ist ein stabiler useCallback-Handler und löst den Effekt nicht neu aus.
   }, [bilderRoh, einsatzId, fehler]);
 
