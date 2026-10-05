@@ -1,3 +1,100 @@
+## [1.0.0-alpha.81](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.80...v1.0.0-alpha.81) (2026-10-05)
+
+### Wichtige Änderungen
+
+- **Datenmodell:** Die Aufbewahrungsfristen werden jetzt mit einem Setzungszeitpunkt gespeichert. Nach dem Zurückspielen einer Sicherung beginnt die Karenzzeit ab dem ursprünglichen Fristablauf, nicht erst ab dem nächsten Prüflauf.
+- **Anmeldung:** Benutzernamen werden beim Login nun ohne Berücksichtigung von Groß-/Kleinschreibung verglichen. Bestehende Konten mit kollidierenden Namen müssen vor der Migration eindeutig sein.
+
+### Einsatztagebuch
+
+- Auf Mobilgeräten wird beim Öffnen des Einsatztagebuches zunächst die Zeitachse angezeigt. Die Erfassungsleiste startet eingeklappt und öffnet sich erst beim Fokussieren.
+- Das Textfeld für neue Einträge nutzt auf größeren Bildschirmen die volle Breite der Erfassungszeile.
+- Auf Touchgeräten fügt die Enter-Taste einen Zeilenumbruch ein. Zum Senden wird die Schaltfläche „Erfassen" oder Strg+Enter verwendet.
+- Entwürfe mit Inhalt können nur noch nach Rückfrage verworfen werden.
+- Auf Mobilgeräten stehen Druck und Abschluss im Menü „Weitere", die Filterleiste kann ein- und ausgeklappt werden.
+- Die Zeilenhöhe der Schnellerfassung passt sich nun korrekt der eingestellten Dichtestufe an.
+
+### Lagekarte
+
+- Die Karte gibt ihre Ressourcen (Zeichenwerkzeuge, Bilder, Hintergründe) nun zuverlässiger frei, auch bei längeren Laufzeiten oder häufigem Modulwechsel.
+- Zeitangaben in Lagekarte, Historienbanner und Fachebenen-Inspektor werden in der eingestellten Anzeigezone formatiert.
+
+### Kräfte und Mittel
+
+- Im Funkplan und in anderen Baumansichten bleibt der Einzug von Untereinheiten nun auch bei Zeilenumbrüchen erhalten. Lange Einheitennamen oder Fahrzeugbezeichnungen rutschen nicht mehr unter das Aufklappsymbol.
+- Taktische Zeichen nutzen jetzt die Version 4.1 der Einsatzzeichen-Bibliothek. Bisher fehlende Fachaufgaben werden nun abgeleitet dargestellt.
+- Kennungen und Bezeichnungen in Tabellen und Listen sind als Links erkennbar und erfüllen die Mindesthöhe für Touch-Bedienung.
+
+### Betroffene und Personen
+
+- Die Einsatzleitung kann nun Zugriffe auf die Personenliste (Export und Druck) einsehen. Eine neue Schaltfläche „Listenzugriffe" zeigt eine Übersicht aller Zugriffe auf die Liste.
+- Das Zugriffsprotokoll einzelner Personen enthält nun auch Export- und Druckvorgänge aus dem Erfassungsfenster.
+
+### Unterstützungsanfragen (UHS)
+
+- Pläne oder Grundrisse können nun als Hintergrundbild unter dem Platz-Layout hochgeladen werden. Im Bearbeitungsmodus stehen Funktionen für Helligkeit, Kontrast, Umkehrung und automatisches Einpassen zur Verfügung.
+
+### Gefahren und Lage
+
+- In der Gefahrenmatrix wird nun deutlich zwischen „nicht bewertet" und „keine Gefahr" unterschieden. Nicht bewertete Felder bleiben leer und werden gezählt.
+- Gebiete können über eine Schaltfläche umbenannt werden statt über das kleine Stift-Symbol.
+
+### Alarmierung und Benachrichtigungen
+
+- Blockierte Desktop-Benachrichtigungen oder Alarmtöne werden nun angezeigt. Eine Geste irgendwo in der Anwendung schaltet den Ton frei.
+- Desktop-Benachrichtigungen schließen sich automatisch, sobald der Tab wieder sichtbar ist oder die Meldung quittiert wurde.
+- Verpasste Alarme werden nach einer Unterbrechung der Verbindung automatisch nachgeliefert.
+
+### Chat und Kommunikation
+
+- Zeitangaben im Chat und bei Nachforderungen werden in der eingestellten Anzeigezone formatiert.
+
+### Verwaltung und Organisation
+
+- Der Name der Organisation kann nun direkt auf der Einstellungsseite gespeichert werden.
+- Formularseiten mit ungespeicherten Änderungen fragen vor dem Verlassen nach und warnen beim Schließen des Browsers.
+- Modul-Overrides können nur noch von Systemadministratoren der eigenen Organisation des Einsatzes geändert werden, nicht mehr von Administratoren anderer Organisationen.
+
+### Anmeldung und Zugriffssicherheit
+
+- Benutzernamen werden automatisch von führenden und nachfolgenden Leerzeichen befreit und beim Login ohne Unterscheidung von Groß-/Kleinschreibung verglichen.
+- Die maximale Länge von Benutzernamen beträgt 128 Zeichen, neue Passwörter ebenfalls 128 Zeichen.
+- Das Hashing von Passwörtern bei der Anmeldung und bei Passwortwechseln ist nun ressourcenschonend gedrosselt.
+- Bei entzogenem Einsatzzugriff (HTTP 403) wird die Live-Verbindung nicht mehr automatisch neu aufgebaut.
+
+### Druck
+
+- Meldebild, Funkplan und Führungsorganisation drucken nun auch in Firefox und WebKit-basierten Browsern korrekt.
+
+### Markdown und Formatierung
+
+- Zitatblöcke in Markdown-Inhalten nutzen eine dedizierte Textrolle statt Transparenz, wodurch die Lesbarkeit und der Kontrast verbessert werden.
+
+### Aufbewahrung und Datenschutz
+
+- Die Karenzzeit vor der endgültigen Schwärzung beginnt nun ab dem Fristablauf, nicht erst ab dem nächsten Prüflauf. Nach dem Zurückspielen einer Sicherung oder nach einem Stillstand wird die Karenz nicht neu gestartet.
+- Nach einer Schwärzung werden der Browser-Speicher und das Offline-Lagebild geöffneter Clients automatisch geräumt. Ein Schwärzungsstand wird im Einsatzkopf mitgeführt.
+
+### Erinnerungen
+
+- Der Erinnerungsplaner ist nun robuster gegen ungültige Eingaben. Intervalle von 1 bis 10.080 Minuten (7 Tage) und Fälligkeiten zwischen 2000 und 2100 werden akzeptiert.
+- Bestehende Erinnerungen mit ungültigen Werten werden bei der Migration entschärft.
+
+### Offline-Karten
+
+- Alte, nicht mehr genutzte Aktualisierungswege für Offline-Karten wurden entfernt. Karten werden nur noch in-place aktualisiert.
+
+### Sicherung und Wiederherstellung
+
+- Sicherungen werden nun als Teildateien erstellt und erst nach erfolgreichem Abschluss umbenannt. Abgebrochene Sicherungen werden automatisch aufgeräumt.
+- Der Sicherungsplaner wartet beim Herunterfahren des Servers bis zu 45 Sekunden auf laufende Sicherungen.
+- Konfigurationswerte für Sicherungsintervall und Anzahl der zu behaltenden Sicherungen müssen nun mindestens 1 betragen.
+- Der Download einer Sicherung legt die Kopie neben der Datenbank ab und erlaubt nur einen gleichzeitigen Download.
+
+### Betrieb und Installation
+
+- Der Dev-Seed wird nun im Sammel-Gate gebaut und getestet, wenn das Feature aktiviert ist.
+
 ## [1.0.0-alpha.80](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.79...v1.0.0-alpha.80) (2026-10-05)
 
 ### Wichtige Änderungen
