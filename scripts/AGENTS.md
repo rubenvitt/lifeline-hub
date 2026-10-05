@@ -8,7 +8,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` → `check-all.test.sh` + `bauziel.test.sh` → `check-toolversionen.sh` →
-`check-openspec-archiv.sh` → `check-schreibweisen.sh`.
+`check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed).
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,
@@ -26,7 +26,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   das globale `build.target-dir`; `CARGO_TARGET_DIR` schlägt beide). In einem geteilten Ziel
   teilen sich Worktrees Fingerprints und Binaries (Hash aus dem Pfad relativ zur
   Workspace-Wurzel, Frische per mtime), und Tests liefen still gegen einen fremden Stand.
-  Schritt 3, 4 und 7 prüfen das vorab (`scripts/lib/bauziel.sh`, rot bei fremdem Ziel ohne
+  Schritt 3, 4, 7 und 15 prüfen das vorab (`scripts/lib/bauziel.sh`, rot bei fremdem Ziel ohne
   Umgebungsvariable), Selbsttest `scripts/bauziel.test.sh`; Gate und Playwright nennen das
   gestartete `Backend-Binary:`. Kosten: ~3 min kalt, bis 19 GB je voll gebautem Worktree
   (Mac, vor LFH-845), frei mit dem Worktree. Seit LFH-845 trägt nur der eigene Code
@@ -47,6 +47,15 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   TS/JS-Endung, Verzeichnisse zählen mit). Die CI läuft nur unter Linux; den Konflikt sah erst
   der macOS-Build nach dem Release (LFH-1050)
   (`openspec/changes/archive/2026-10-05-lfh-1053-schreibweisen-waechter/design.md`).
+- **Der Dev-Seed läuft mit seinem Feature** (LFH-912, Schritt 15, Bündel `rust`): Schritt 4
+  baut ohne Features und sieht `src/dev/`, `/api/dev/users`, `tests/dev_present.rs` und den
+  Seed-Aufruf in `src/main.rs` nicht. Schritt 15 baut sie mit `dev-seeds` und fährt nur die
+  Tests unter `dev::` und `dev_present`; ein neuer Test hinter dem Feature gehört dorthin. Er
+  wählt dieselben Pakete wie Schritt 4, nie `-p lifeline-hub`, sonst baut Cargo die
+  Abhängigkeiten mit anderen Features ein zweites Mal. Beim Verlassen legt er das Binary ohne
+  Feature nach `target/debug/lifeline-hub` zurück: das Dev-Binary seedet beim Start und bräche
+  jeden Admin-Login der e2e-Suite
+  (`openspec/changes/archive/2026-10-05-lfh-912-gate-dev-seed/design.md`).
 - Optionaler pre-push-Hook: `git config core.hooksPath .githooks`.
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job
   ist Normalfall; `chore(release):` zählt nicht als neuer Commit. Notizen über

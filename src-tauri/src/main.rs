@@ -207,7 +207,8 @@ fn baue_fenster(app: &AppHandle, label: &str, start: WebviewUrl) -> tauri::Resul
             }
         })
         // Downloads: Vorgabeverhalten beider Webviews — Download-Ordner, Umlaute
-        // erhalten, Dubletten mit Zählzusatz (gemessen in LFH-720, Befund 14).
+        // erhalten, Dubletten mit Zählzusatz (gemessen in LFH-720, Befund 14). Auch der
+        // `blob:`-Export der Seite kommt hier an, am Navigations-Handler vorbei (`links.rs`).
         .on_download(|_fenster, ereignis| {
             if let DownloadEvent::Finished { url, success, .. } = ereignis {
                 log::info!(
@@ -637,6 +638,12 @@ mod tests {
         assert_eq!(
             fuers_protokoll(&url("tauri://localhost/index.html?x=1")),
             "tauri://localhost/index.html"
+        );
+        // So meldet `on_download` den CSV-Export (LFH-914); Tauri verwirft eine URL, die sich
+        // nicht lesen lässt, samt Download.
+        assert_eq!(
+            fuers_protokoll(&url("blob:https://elw.local:8443/6f1c2a9e-8d3b-4e7a")),
+            "blob:"
         );
     }
 
