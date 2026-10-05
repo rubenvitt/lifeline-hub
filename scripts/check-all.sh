@@ -16,7 +16,7 @@
 # stellt außerdem `frontend/dist` bereit — den Service Worker für
 # `e2e/lagekarte-offline-precache.spec.ts` gibt es nur im Prod-Bundle.
 #
-# Schritt 3, 4 und 7 prüfen vorab, dass das Cargo-Build-Ziel diesem Checkout gehört
+# Schritt 3, 4, 7 und 15 prüfen vorab, dass das Cargo-Build-Ziel diesem Checkout gehört
 # (`.cargo/config.toml`, lib/bauziel.sh, LFH-520): In einem mit anderen Worktrees geteilten Ziel
 # liefen Tests und Backend still gegen einen fremden Stand.
 set -euo pipefail
@@ -28,7 +28,8 @@ set -euo pipefail
 #                    Werkzeugversionen aus mise.toml,
 #                    fertige OpenSpec-Changes archiviert,
 #                    Schreibweisen der Dateinamen            (Sekunden bis ~1:30)
-#   --nur rust       cargo test (Workspace, Hülle getrennt)   (~17 min)
+#   --nur rust       cargo test (Workspace, Hülle getrennt),
+#                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
 # Unabhängig vom Bündel:
@@ -72,7 +73,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=14
+SCHRITTE=15
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -86,7 +87,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die vierzehn Schritte, je als Funktion ───────────────────────────────────────────
+# ── Die fünfzehn Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -281,7 +282,7 @@ schritt_11() {
   # Die Binary-Suche entscheidet, ob Schritt 7 die Browsertests fährt oder überspringt — sucht
   # sie am falschen Ort, meldet das Gate OK mit Lücke, wo es hätte prüfen können.
   "$ROOT/scripts/backend-binaer.test.sh"
-  # Die Vorbedingung von Schritt 3, 4 und 7: das Build-Ziel je Checkout (LFH-520). Sie irrt
+  # Die Vorbedingung von Schritt 3, 4, 7 und 15: das Build-Ziel je Checkout (LFH-520). Sie irrt
   # ebenfalls still — ein geteiltes Ziel färbt kein Ergebnis rot, nur das falsche grün.
   "$ROOT/scripts/bauziel.test.sh"
 }
@@ -311,16 +312,37 @@ schritt_14() {
   "$ROOT/scripts/check-schreibweisen.sh"
 }
 
+schritt_15() {
+  echo "==> [15/$SCHRITTE] Dev-Seed mit Feature dev-seeds: bauen und testen (LFH-912)"
+  # Schritt 4 baut ohne Features; `src/dev/`, `/api/dev/users`, `tests/dev_present.rs` und der
+  # Seed-Aufruf in `src/main.rs` existieren nur mit `dev-seeds` und brächen sonst erst beim
+  # nächsten `cargo run --features dev-seeds`. Kein zweiter voller Lauf: gebaut wird alles, was
+  # das Feature berührt, gefahren nur die Tests hinter ihm.
+  #
+  # Paketzuschnitt wie Schritt 4, NICHT `-p lifeline-hub`: Cargo vereinigt die Features der
+  # Abhängigkeiten über die gewählten Pakete; ohne die übrigen Mitglieder baute es rund 120
+  # Abhängigkeiten ein zweites Mal. So baut es nur das eigene Crate neu.
+  # Erst EIN Bau (Testbibliothek, Bibliothek, Binary und `dev_present` parallel), dann zwei
+  # Läufe: der Filter `dev::` gälte sonst auch für `dev_present`, dessen Testnamen ihn nicht
+  # tragen. Ein Test hinter `dev-seeds` gehört deshalb nach `src/dev/` oder `tests/dev_present.rs`.
+  bauziel_pruefen "$ROOT"
+  local auswahl=(--workspace --exclude lifeline-desktop --features lifeline-hub/dev-seeds)
+  ohne_dev_env cargo test "${auswahl[@]}" --lib --test dev_present --bin lifeline-hub --no-run
+  ohne_dev_env cargo test "${auswahl[@]}" --lib dev::
+  ohne_dev_env cargo test "${auswahl[@]}" --test dev_present --bin lifeline-hub
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
-# deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
+# deshalb früh; die drei teuren Suiten bekommen je einen eigenen Runner. Schritt 15 fährt
+# im Bündel `rust` mit: er nutzt die Abhängigkeiten, die Schritt 4 gerade gebaut hat.
 BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13 14"
-BUENDEL_rust="4"
+BUENDEL_rust="4 15"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die vierzehn Schritte, jeden einmal —
+# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die fünfzehn Schritte, jeden einmal —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
