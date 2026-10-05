@@ -1,6 +1,6 @@
 -- LFH-892: Gerätekopplung. Ein ausgegebenes Gerät (UHS-Tablet, UHS-Laptop, Lagemonitor) arbeitet
 -- ohne Personenkonto in genau einem Einsatz, einer Funktionsansicht und ggf. einer UHS.
--- Herleitung: openspec/changes/lfh-892-funktionsansichten-geraete/design.md (D1, D3).
+-- Herleitung: openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md (D1, D3).
 --
 -- Jede Kopplung bekommt ein eigenes Gerätekonto in `benutzer` (benutzer_id UNIQUE), damit alle
 -- Urheberspalten (erfasser_id, erfasst_von, …) unverändert weiterlaufen. Die Ansicht ist ein

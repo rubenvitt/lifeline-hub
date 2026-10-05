@@ -3,7 +3,8 @@
 Gilt für `frontend/src/geraet/` und die Gerätezweige der geteilten Seiten (UHS-Detail, Grundriss,
 Aufnahme, Personendetail), Client und Server (`src/geraet/`), ergänzt `frontend/AGENTS.md`. Pfade
 relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktionsansichten`,
-`feldgeraet-bedienung`, `lagemonitor` (LFH-892).
+`feldgeraet-bedienung`, `lagemonitor` (LFH-892); Herleitung (`design.md`, D1–D11):
+`openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/`.
 
 - **Die Schranke steht beim Server, die Oberfläche verengt nur.** Je Ansicht eine Routenliste in
   `src/geraet/mod.rs` (was fehlt, ist verboten; anderer Einsatz 404), die Stellenbindung in

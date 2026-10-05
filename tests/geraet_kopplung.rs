@@ -1,7 +1,7 @@
 //! Gerätekopplung (LFH-892): Verwaltung durch die Einsatzleitung, Einlösen des Codes,
 //! Durchsetzung an der Sitzung und sofortiger Widerruf.
 //!
-//! Spec: `openspec/changes/lfh-892-funktionsansichten-geraete/specs/geraete-kopplung/spec.md`.
+//! Spec: `openspec/specs/geraete-kopplung/spec.md`.
 
 use axum::body::{to_bytes, Body};
 use axum::extract::ConnectInfo;

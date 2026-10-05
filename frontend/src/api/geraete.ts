@@ -8,7 +8,7 @@ import type {
 import { apiGet, apiSend } from './client';
 
 // Gerätekopplung (LFH-892): Verwaltung durch die Einsatzleitung und Einlösen des Codes.
-// Herleitung: `openspec/changes/lfh-892-funktionsansichten-geraete/design.md` (D3).
+// Herleitung: `openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md` (D3).
 
 export function ladeGeraete(einsatzId: number): Promise<GeraeteUebersicht> {
   return apiGet<GeraeteUebersicht>(`/api/einsaetze/${einsatzId}/geraete`);

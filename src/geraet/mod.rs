@@ -8,7 +8,7 @@
 //! zieht ihn. Für eine Gerätesitzung prüft er `(Methode, MatchedPath)` gegen
 //! [`darf_route`]; was nicht gelistet ist, ist 403. Eine neue Route ist damit für Geräte
 //! gesperrt, ohne dass jemand an sie denkt. Herleitung:
-//! `openspec/changes/lfh-892-funktionsansichten-geraete/design.md` (D4, D5).
+//! `openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md` (D4, D5).
 
 pub mod code;
 pub mod repo;

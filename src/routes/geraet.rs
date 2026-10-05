@@ -1,6 +1,6 @@
 //! Gerätekopplung (LFH-892): Verwaltung durch die Einsatzleitung und Einlösen des Codes.
 //!
-//! Herleitung: `openspec/changes/lfh-892-funktionsansichten-geraete/design.md` (D1, D3, D7).
+//! Herleitung: `openspec/changes/archive/2026-10-05-lfh-892-funktionsansichten-geraete/design.md` (D1, D3, D7).
 //! Die Schranke einer Gerätesitzung steht nicht hier, sondern in `CurrentUser`
 //! (`crate::geraet::darf_route`).
 
