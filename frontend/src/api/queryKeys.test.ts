@@ -40,6 +40,7 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.tierAnhaenge).toBe('einsatz-tier-anhaenge');
     expect(EINSATZ_KEYS.uhsAnhaenge).toBe('einsatz-uhs-anhaenge');
     expect(EINSATZ_KEYS.uhsAnhangZugriffe).toBe('einsatz-uhs-anhang-zugriffe');
+    expect(EINSATZ_KEYS.uhsPlanBild).toBe('einsatz-uhs-plan-bild');
   });
 });
 
@@ -268,6 +269,9 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.tierAnhaenge(1, 2)).toEqual(['einsatz-tier-anhaenge', 1, 2]);
     expect(einsatzKeys.uhsAnhaenge(1, 2)).toEqual(['einsatz-uhs-anhaenge', 1, 2]);
     expect(einsatzKeys.uhsAnhangZugriffe(1, 2)).toEqual(['einsatz-uhs-anhang-zugriffe', 1, 2]);
+    // LFH-999: das Planbild hängt am sha256, ein Live-Ereignis lädt es nicht neu.
+    expect(einsatzKeys.uhsPlanBild(1, 2, 'ab')).toEqual(['einsatz-uhs-plan-bild', 1, 2, 'ab']);
+    expect(NICHT_LIVE_KEYS).toContain('einsatz-uhs-plan-bild');
     expect(einsatzKeys.tier(1, 2)).toEqual(['einsatz-tier', 1, 2]);
     expect(einsatzKeys.brDetail(1, 2)).toEqual(['einsatz-br-detail', 1, 2]);
     expect(einsatzKeys.befehl(1, 2)).toEqual(['einsatz-befehl', 1, 2]);

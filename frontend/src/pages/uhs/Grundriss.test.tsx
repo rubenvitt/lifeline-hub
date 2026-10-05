@@ -1,4 +1,4 @@
-import { describe, expect, it, onTestFinished } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,7 +12,13 @@ import Grundriss, {
   platzBedienform,
   platzMenueEintraege,
 } from './Grundriss';
-import { antdKnopf, antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
+import {
+  antdAlgorithmus,
+  antdKnopf,
+  antdToken,
+  farbenDunkel,
+  type Dichte,
+} from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 
@@ -94,6 +100,9 @@ function renderGrundriss(
   personen: Person[],
   schreibgeschuetzt = false,
   dichte: Dichte = 'kompakt',
+  /** Nachtbetrieb mit antds dunklem Algorithmus; ohne ihn liest `useRollen` das Thema als hell. */
+  nacht = false,
+  platzBearbeitbar = true,
 ) {
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -101,9 +110,19 @@ function renderGrundriss(
     // MemoryRouter: der Detail-Drawer nutzt useNavigate.
     <MemoryRouter>
       <QueryClientProvider client={qc}>
-        <ConfigProvider theme={{ token: antdToken(farbenDunkel, dichte) }}>
+        <ConfigProvider
+          theme={{
+            token: antdToken(farbenDunkel, dichte),
+            ...(nacht ? { algorithm: antdAlgorithmus(true) } : {}),
+          }}
+        >
           <AntApp>
-            <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+            <Grundriss
+              einsatzId={1}
+              uhs={uhs}
+              schreibgeschuetzt={schreibgeschuetzt}
+              platzBearbeitbar={platzBearbeitbar}
+            />
           </AntApp>
         </ConfigProvider>
       </QueryClientProvider>
@@ -1450,5 +1469,175 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
     expect(screen.getByRole('button', { name: 'Verbleib / Entlassung erfassen' })).toBeDisabled();
 
     freigeben();
+  });
+});
+
+describe('Grundriss – Plan als Hintergrund (LFH-999)', () => {
+  const plan = (over: Partial<NonNullable<UhsDetail['plan']>> = {}): UhsDetail['plan'] => ({
+    uhs_id: 1,
+    mime: 'image/png',
+    sha256: 'ab12',
+    bild_breite: 800,
+    bild_hoehe: 400,
+    x: 30,
+    y: 40,
+    breite: 1200,
+    helligkeit: 60,
+    kontrast: 120,
+    nacht_umkehren: true,
+    hinterlegt_at: 'x',
+    geaendert_at: 'x',
+    ...over,
+  });
+  const mitPlan = (over: Partial<NonNullable<UhsDetail['plan']>> = {}) =>
+    uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
+      plan: plan(over),
+    });
+
+  function bildLiefern() {
+    const abrufe: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/1/uhs/1/plan/bild', ({ request }) => {
+        abrufe.push(request.url);
+        return new HttpResponse(new Blob(['png']), { headers: { 'Content-Type': 'image/png' } });
+      }),
+    );
+    const erzeugen = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:plan');
+    onTestFinished(() => erzeugen.mockRestore());
+    return abrufe;
+  }
+  const planBild = () => screen.findByTestId('uhs-plan');
+
+  it('legt das Bild als erstes Kind unter die Karten, ohne Zeiger und ohne Vorlesen', async () => {
+    bildLiefern();
+    renderGrundriss(mitPlan(), []);
+    const bild = await planBild();
+    expect(bild.tagName).toBe('IMG');
+    expect(bild).toHaveAttribute('src', 'blob:plan');
+    expect(bild).toHaveAttribute('alt', '');
+    expect(bild).toHaveAttribute('aria-hidden', 'true');
+    expect(bild).toHaveAttribute('draggable', 'false');
+    expect(bild).toHaveStyle({
+      pointerEvents: 'none',
+      position: 'absolute',
+      left: '30px',
+      top: '40px',
+      width: '1200px',
+      height: '600px',
+    });
+    // Erstes Kind der Fläche: die Karten liegen darüber.
+    const flaeche = bild.parentElement!;
+    expect(flaeche.firstElementChild).toBe(bild);
+    expect(flaeche).toContainElement(screen.getByTestId('platz-karte'));
+  });
+
+  it('lässt die Fläche auf den Plan wachsen', async () => {
+    bildLiefern();
+    renderGrundriss(mitPlan(), []);
+    const flaeche = (await planBild()).parentElement!;
+    // 30 + 1200 und 40 + 1200 × 400 / 800.
+    expect(flaeche).toHaveStyle({ width: '1230px', height: '640px' });
+  });
+
+  it('kehrt im dunklen Thema zuerst um und dimmt dann', async () => {
+    bildLiefern();
+    renderGrundriss(mitPlan(), [], false, 'kompakt', true);
+    expect((await planBild()).style.filter).toBe(
+      'invert(1) hue-rotate(180deg) brightness(60%) contrast(120%)',
+    );
+  });
+
+  it('kehrt im dunklen Thema nicht um, wenn der Plan es abschaltet', async () => {
+    bildLiefern();
+    renderGrundriss(mitPlan({ nacht_umkehren: false }), [], false, 'kompakt', true);
+    expect((await planBild()).style.filter).toBe('brightness(60%) contrast(120%)');
+  });
+
+  it('dimmt im hellen Thema nur', async () => {
+    bildLiefern();
+    renderGrundriss(mitPlan(), []);
+    expect((await planBild()).style.filter).toBe('brightness(60%) contrast(120%)');
+  });
+
+  it('lässt die Platzkarte deckend und in ihrer Größe', async () => {
+    bildLiefern();
+    renderGrundriss(mitPlan(), []);
+    await planBild();
+    const karte = screen.getByTestId('platz-karte');
+    expect(karte).toHaveStyle({
+      width: `${PLATZ_KARTE_BREITE}px`,
+      height: `${PLATZ_KARTE_HOEHE}px`,
+    });
+    expect(karte.style.background).not.toBe('');
+    expect(karte.style.background).not.toMatch(/transparent|rgba\([^)]*,\s*0(\.\d+)?\)/);
+  });
+
+  it('zeigt ohne Plan kein Bild und fragt keins ab', async () => {
+    const abrufe = bildLiefern();
+    renderGrundriss(uhsDetail({ status: 'aktiv', plaetze: [platz({})] }), []);
+    await screen.findByTestId('platz-karte');
+    expect(screen.queryByTestId('uhs-plan')).not.toBeInTheDocument();
+    expect(abrufe).toHaveLength(0);
+  });
+
+  it('öffnet in „komfortabel“ beim Tipp auf einen Platz über dem Plan das Menü', async () => {
+    bildLiefern();
+    renderGrundriss(mitPlan(), [], false, 'komfortabel');
+    await planBild();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Bett 1' }));
+    expect(screen.getByRole('button', { name: 'Aktionen zu Bett 1' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+});
+
+describe('Grundriss – Knopf „Plan“ (LFH-999)', () => {
+  const aktiv = () => uhsDetail({ status: 'aktiv', plaetze: [platz({})] });
+  const planKnopf = () => screen.queryByRole('button', { name: 'Plan' });
+  const anhaengeLeer = () =>
+    server.use(http.get('/api/einsaetze/1/uhs/1/anhaenge', () => HttpResponse.json([])));
+
+  it('fehlt ohne Bearbeiten-Modus und erscheint mit ihm', async () => {
+    anhaengeLeer();
+    renderGrundriss(aktiv(), []);
+    await screen.findByTestId('platz-karte');
+    expect(planKnopf()).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Plätze bearbeiten' }));
+    expect(planKnopf()).toBeInTheDocument();
+  });
+
+  it('fehlt ohne Schreibrecht', async () => {
+    renderGrundriss(uhsDetail({ status: 'geplant', plaetze: [platz({})] }), [], true);
+    await screen.findByTestId('platz-karte');
+    expect(planKnopf()).not.toBeInTheDocument();
+  });
+
+  it('fehlt, wenn die Plätze nicht bearbeitbar sind (UHS-Tablet)', async () => {
+    renderGrundriss(
+      uhsDetail({ status: 'geplant', plaetze: [platz({})] }),
+      [],
+      false,
+      'kompakt',
+      false,
+      false,
+    );
+    await screen.findByTestId('platz-karte');
+    expect(planKnopf()).not.toBeInTheDocument();
+  });
+
+  it('klappt das Paneel „Plan“ über der Fläche auf und zu', async () => {
+    anhaengeLeer();
+    renderGrundriss(uhsDetail({ status: 'geplant', plaetze: [platz({})] }), []);
+    const knopf = await screen.findByRole('button', { name: 'Plan' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region', { name: 'Plan' })).not.toBeInTheDocument();
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region', { name: 'Plan' })).toBeInTheDocument();
+    await userEvent.click(knopf);
+    expect(screen.queryByRole('region', { name: 'Plan' })).not.toBeInTheDocument();
   });
 });

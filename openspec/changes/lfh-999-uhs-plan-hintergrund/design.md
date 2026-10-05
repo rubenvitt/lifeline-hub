@@ -225,18 +225,21 @@ Dateien.
 - **Bildebene in `Grundriss.tsx`:** erstes Kind der Fläche, `<img>` mit
   `position: absolute`, `left/top/width` aus dem DTO, `pointer-events: none`,
   `user-select: none`, `draggable={false}`, `alt=""` und `aria-hidden` (der Plan trägt keine
-  Information, die nicht auch in den Platzkarten steht). Die Bild-Query hängt an
-  `[…uhsDetail, 'plan', sha256]`, also lädt ein unveränderter Plan nach einem Live-Ereignis
-  nicht neu; `staleTime: Infinity`. Der Key steht in der Query-Key-Registry
-  (`frontend/AGENTS.md`), als `NICHT_LIVE`, weil er am sha256 hängt.
+  Information, die nicht auch in den Platzkarten steht). Die Bild-Query hat einen
+  eigenen Prefix `uhsPlanBild` (`[prefix, einsatzId, uhsId, sha256]`), kein Sub-Key des
+  Details: das `uhs`-Ereignis invalidiert den Detail-Prefix, und eine aktive Query darunter lüde
+  trotz `staleTime: Infinity` neu. So lädt ein unveränderter Plan nach einem Live-Ereignis nicht
+  neu. Der Key steht in der Query-Key-Registry (`frontend/AGENTS.md`) als `NICHT_LIVE` und
+  außerhalb von `LAGEBILD_OFFLINE` (eine Object-URL überlebt keinen Neustart); die Object-URL gibt
+  `erzeugeQueryClient` frei wie die HEIC-Vorschau.
 - **Filter:** `filter: brightness(h%) contrast(k%)`; im dunklen Thema (`useRollen().dunkel`)
   und `nacht_umkehren` vorneweg `invert(1) hue-rotate(180deg)`. Die Reihenfolge ist Absicht:
   erst umkehren, dann dimmen, sonst hellt „Helligkeit 40 %“ nach dem Umkehren auf.
 - **Platzkarten:** unverändert. Ihr Grund ist schon deckend; ein Test pinnt, dass er es bleibt
   (Spec „Plätze bleiben auf dem Plan bedienbar“).
 - **Bedienfeld „Plan“:** nur bei `platzEditAktiv`, als Knopf „Plan“ in der Kopfzeile der Fläche
-  neben „Platz anlegen“. Er öffnet ein Seitenpaneel nach der UI-Form-Leitlinie
-  (`frontend/AGENTS.md`) mit: „Bild hochladen“ (`DateiFeld`, Accept PNG/JPEG/WebP), „Aus
+  neben „Platz anlegen“. Er klappt ein Paneel über der Fläche auf (Expander;
+  die UI-Form-Leitlinie in `frontend/AGENTS.md` lässt einen Drawer nur bis vier Felder zu) mit: „Bild hochladen“ (`DateiFeld`, Accept PNG/JPEG/WebP), „Aus
   Dateien übernehmen“ (Auswahl der Bild-Anhänge dieser UHS aus der vorhandenen Liste, ohne
   Vorschau, mit dem Hinweis, dass die Übernahme als Abruf protokolliert wird), Zahlenfelder
   „Links“, „Oben“, „Breite“ (Schritt 10), Regler „Helligkeit“ und „Kontrast“, Schalter „Im

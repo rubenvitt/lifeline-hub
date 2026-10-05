@@ -95,6 +95,10 @@ export const EINSATZ_KEYS = {
   // Singular-Detail-Keys: der SSE-Fan-out invalidiert die Listen-Prefixe, nicht diese (eigenes
   // erstes Element, kein Prefix-Match). Bewusst NICHT_LIVE.
   uhsDetail: 'einsatz-uhs-detail',
+  // Plan einer UHS (LFH-999): Object-URL des Bildes, Key mit sha256. Eigener Prefix statt
+  // Sub-Key des Details: das `uhs`-Ereignis invalidiert das Detail, ein Sub-Key lüde das
+  // unveränderte Bild bei jedem Ereignis neu.
+  uhsPlanBild: 'einsatz-uhs-plan-bild',
   person: 'einsatz-person',
   personAudit: 'einsatz-person-audit',
   // Fotos und Dateien an einer Person (LFH-757): live über das `person`-Ereignis. Nicht im
@@ -300,6 +304,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
+ * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
+ *   Plan ist ein neuer Key, ein Live-Refetch lüde dieselben Bytes noch einmal.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einstellungen,
@@ -324,6 +330,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
+  EINSATZ_KEYS.uhsPlanBild,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -409,6 +416,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.uhsAnhaenge, einsatzId, uhsId] as const,
   uhsAnhangZugriffe: (einsatzId: number, uhsId: number) =>
     [EINSATZ_KEYS.uhsAnhangZugriffe, einsatzId, uhsId] as const,
+  uhsPlanBild: (einsatzId: number, uhsId: number, sha256: string) =>
+    [EINSATZ_KEYS.uhsPlanBild, einsatzId, uhsId, sha256] as const,
 
   // Schäden / Tiere (inkl. personenbezogener Kontext-Filter)
   schaeden: (einsatzId: number) => [EINSATZ_KEYS.schaeden, einsatzId] as const,

@@ -40,16 +40,16 @@ Gates ohne `| tail`, Node und pnpm über `mise exec --`.
 
 ## 4. Frontend: Bildebene (design.md D8)
 
-- [ ] 4.1 `api/uhsPlan.ts` mit `ladePlanBild`, `hinterlegePlan`, `uebernehmePlan`, `aenderePlan`, `entfernePlan` und der reinen Funktion `einpassen`; Query-Key in der Registry (`api/queryKeys.ts`, `NICHT_LIVE`).
+- [x] 4.1 `api/uhsPlan.ts` mit `ladePlanBild`, `hinterlegePlan`, `uebernehmePlan`, `aenderePlan`, `entfernePlan` und der reinen Funktion `einpassen`; Query-Key `uhsPlanBild` in der Registry (`api/queryKeys.ts`, `NICHT_LIVE`, eigener Prefix, Object-URL-Freigabe in `api/queryClient.ts`); `methode: 'PUT'` für `apiUploadMitFortschritt`.
   - Vitest zuerst: Pfade; `einpassen` liefert für zehn Rasterplätze dieselben Werte wie `startlage` im Server (gleiche Testdaten); Registry-Test bleibt grün.
   - Verifiziert durch `mise exec -- pnpm -C frontend test -- uhsPlan queryKeys`.
-- [ ] 4.2 `Grundriss.tsx`: Planebene als erstes Kind der Fläche, Flächengröße mit Plan, Filter nach D8.
+- [x] 4.2 `Grundriss.tsx`: Planebene als erstes Kind der Fläche, Flächengröße mit Plan, Filter nach D8.
   - Vitest zuerst in `Grundriss.test.tsx`: mit Plan steht ein `img` mit `pointer-events: none`, `aria-hidden` und `left/top/width` aus dem DTO vor den Karten; Fläche wächst auf `x + breite`; im hellen Thema Filter nur `brightness/contrast`, im dunklen mit `invert(1) hue-rotate(180deg)` davor, ohne bei `nacht_umkehren: false`; Platzkarte behält deckenden Grund und 140 × 116; ohne Plan kein `img`. Ein Tipp in „komfortabel“ auf einen Platz über dem Plan öffnet das Menü.
   - Verifiziert durch `mise exec -- pnpm -C frontend test -- Grundriss`.
 
 ## 5. Frontend: Bedienfeld „Plan“ (design.md D8)
 
-- [ ] 5.1 Knopf „Plan“ in der Kopfzeile der Fläche nur bei `platzEditAktiv`; Seitenpaneel mit Upload, Übernahme aus Dateien (nur Bild-Anhänge, Hinweis auf das Protokoll), Lagefeldern (Schritt 10), Helligkeit, Kontrast, Umkehr-Schalter, „An Plätze einpassen“, „Plan entfernen“ mit roter Rückfrage, Hinweis „Nur Pläne, keine Fotos von Patienten“.
+- [x] 5.1 Knopf „Plan“ in der Kopfzeile der Fläche nur bei `platzEditAktiv`; aufklappbares Paneel über der Fläche mit Upload, Übernahme aus Dateien (nur Bild-Anhänge, Hinweis auf das Protokoll), Lagefeldern (Schritt 10), Helligkeit, Kontrast, Umkehr-Schalter, „An Plätze einpassen“, „Plan entfernen“ mit roter Rückfrage, Hinweis „Nur Pläne, keine Fotos von Patienten“.
   - Vitest zuerst: Knopf fehlt ohne Schreibrecht, ohne Bearbeiten-Modus und mit `platzBearbeitbar={false}`; Übernahme listet nur PNG/JPEG/WebP-Anhänge; PATCH erst beim Loslassen des Reglers; Einpassen schickt die Werte von `einpassen`; Entfernen fragt vorher.
   - Verifiziert durch `mise exec -- pnpm -C frontend test -- Grundriss UhsPlan`, `mise exec -- pnpm -C frontend lint` und `typecheck`.
 - [ ] 5.2 e2e in `frontend/e2e/` (Regeln `frontend/e2e/AGENTS.md`): Plan hochladen, in „Handschuh“ auf einen Platz über dem Plan tippen → Menü; Plätze verschieben, einpassen; Seite neu laden → kein neuer Eintrag in „Zugriffe“.
