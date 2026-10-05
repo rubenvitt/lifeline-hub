@@ -1672,3 +1672,144 @@ async fn entfernte_personen_datei_bleibt_generisch_gesperrt() {
         .unwrap();
     assert_eq!(n, 1, "die Datei bleibt bis zur Schwärzung gespeichert");
 }
+
+// --- LFH-903: Chat verknüpft nur eigene freie Dateien oder solche an lebenden Nachrichten ---
+
+/// Sendet eine Nachricht mit `anhang_ids` und liefert (Status, Antwort), ohne Erfolg zu fordern.
+async fn senden_roh(
+    app: &axum::Router,
+    einsatz: i64,
+    kid: i64,
+    cookie: &str,
+    anhang_ids: &[i64],
+) -> (StatusCode, Value) {
+    let ids = anhang_ids
+        .iter()
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        cookie,
+        Some(&format!(r#"{{"inhalt":"m","anhang_ids":[{ids}]}}"#)),
+    )
+    .await
+}
+
+async fn chat_verknuepfungen(pool: &sqlx::SqlitePool, aid: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?")
+        .bind(aid)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn nachrichten(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM chat_nachricht WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Ein fremder, noch nicht gesendeter Upload lässt sich nicht an die eigene Nachricht hängen:
+/// dieselbe Antwort wie für eine unbekannte ID. Sonst lüde die Person die Datei über ihre
+/// Nachricht und stufte sie ins ETB herauf, und die Hochladende bekäme beim Erfassen 422.
+#[tokio::test]
+async fn fremder_freier_upload_laesst_sich_nicht_an_chat_haengen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let aid = hochgeladen(&app, einsatz, &admin, "lage.jpg").await;
+
+    let (s, v) = senden_roh(&app, einsatz, kid, &frieda, &[aid]).await;
+    let (s_unbekannt, v_unbekannt) = senden_roh(&app, einsatz, kid, &frieda, &[987654]).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(s_unbekannt, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        v["error"], v_unbekannt["error"],
+        "kein Unterschied zu „unbekannt“"
+    );
+    assert_eq!(chat_verknuepfungen(&pool, aid).await, 0);
+    assert_eq!(nachrichten(&pool, einsatz).await, 0, "Rollback");
+    let (s, _, _) = download(&app, einsatz, aid, &frieda).await;
+    assert_eq!(
+        s,
+        StatusCode::NOT_FOUND,
+        "die Datei bleibt der Hochladenden"
+    );
+
+    // Die Hochladende sendet ihre Datei weiter; danach gilt n : m für alle.
+    nachricht_senden(&app, einsatz, kid, &admin, &[aid]).await;
+    let (s, v) = senden_roh(&app, einsatz, kid, &frieda, &[aid]).await;
+    assert_eq!(s, StatusCode::CREATED, "an einer lebenden Nachricht: {v}");
+    assert_eq!(chat_verknuepfungen(&pool, aid).await, 2);
+}
+
+/// Ein fremder freier Upload mit einem Typ, den der Chat nicht nimmt (die ETB-Allowlist lässt
+/// HEIC zu), verrät sich auch nicht über die Typ-Meldung.
+#[tokio::test]
+async fn fremder_freier_upload_verraet_sich_nicht_ueber_den_dateityp() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let von: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let heic: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'foto.heic', 'image/heic', 3, 'deadbeef', X'414243', ?) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(von)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let (s, v) = senden_roh(&app, einsatz, kid, &frieda, &[heic]).await;
+    let (_, v_unbekannt) = senden_roh(&app, einsatz, kid, &frieda, &[987654]).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(v["error"], v_unbekannt["error"]);
+}
+
+/// LFH-116: Eine Datei, die nur noch an gelöschten Nachrichten hängt, ist gesperrt. Auch an
+/// eine neue Nachricht gehängt wird sie nicht wieder ladbar, für niemanden.
+#[tokio::test]
+async fn datei_nur_an_geloeschten_nachrichten_laesst_sich_nicht_neu_verknuepfen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let aid = hochgeladen(&app, einsatz, &admin, "lage.jpg").await;
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &[aid]).await;
+    nachricht_loeschen(&app, einsatz, mid, &admin).await;
+
+    let (_, v_unbekannt) = senden_roh(&app, einsatz, kid, &admin, &[987654]).await;
+    for (wer, cookie) in [("Hochladende", &admin), ("andere", &frieda)] {
+        let (s, v) = senden_roh(&app, einsatz, kid, cookie, &[aid]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{wer}: {v}");
+        assert_eq!(v["error"], v_unbekannt["error"], "{wer}");
+    }
+    assert_eq!(
+        chat_verknuepfungen(&pool, aid).await,
+        1,
+        "nur die gelöschte"
+    );
+    assert_eq!(nachrichten(&pool, einsatz).await, 1, "Rollback");
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "bleibt gesperrt");
+}

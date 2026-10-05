@@ -274,9 +274,10 @@ pub async fn anlegen(
 
 /// Legt eine Nachricht an und verknüpft sie mit bereits hochgeladenen Anhängen —
 /// alles in EINER Transaktion. Jeder `anhang_id` muss zu `einsatz_id` gehören
-/// (Cross-Einsatz-Schutz); andernfalls Rollback und `Validation`, sodass keine
-/// Nachricht ohne ihre Anhänge zurückbleibt. `inhalt` darf leer sein, wenn
-/// mindestens ein Anhang vorhanden ist (Anhang-only-Nachricht).
+/// (Cross-Einsatz-Schutz) und entweder ein freier Upload von `autor_id` sein oder an
+/// mindestens einer nicht gelöschten Nachricht hängen (LFH-903); andernfalls Rollback und
+/// `Validation`, sodass keine Nachricht ohne ihre Anhänge zurückbleibt. `inhalt` darf leer
+/// sein, wenn mindestens ein Anhang vorhanden ist (Anhang-only-Nachricht).
 pub async fn anlegen_mit_anhaengen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -292,12 +293,25 @@ pub async fn anlegen_mit_anhaengen(
             // Rechte-Semantik aushebeln („eine Datei, ein Lebenszyklus"). Die Bedingung kommt
             // aus dem Linker-Register `anhang::repo::MODUL_LINKER` (src/AGENTS.md „ETB-Anhänge"):
             // ein neuer Linker braucht dort einen Eintrag, hier keine Handarbeit.
+            //
+            // LFH-903, Gegenstück zu `etb::repo::pruefe_anhaenge`: verknüpfbar ist ein freier
+            // Upload nur für die hochladende Person, eine Chat-Datei nur, solange eine Nachricht
+            // mit ihr lebt. Sonst hängte jemand einen erratenen fremden Entwurf oder eine per
+            // Tombstone (LFH-116) gesperrte Datei an die eigene Nachricht und lüde sie dort,
+            // bis ins ETB heraufgestuft. Alles andere klingt wie eine unbekannte ID, auch vor
+            // der Typ-Prüfung, damit sich keine IDs abtasten lassen.
             let mime: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-                "SELECT a.mime FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? AND NOT {}",
+                "SELECT a.mime FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? AND NOT {} \
+                   AND (EXISTS (SELECT 1 FROM chat_nachricht_anhang c \
+                                  JOIN chat_nachricht n ON n.id = c.nachricht_id \
+                                 WHERE c.anhang_id = a.id AND n.geloescht_at IS NULL) \
+                        OR (a.hochgeladen_von = ? AND NOT EXISTS \
+                              (SELECT 1 FROM chat_nachricht_anhang c WHERE c.anhang_id = a.id)))",
                 crate::anhang::repo::modul_gebunden_sql("a")
             )))
             .bind(aid)
             .bind(einsatz_id)
+            .bind(autor_id)
             .fetch_optional(&mut *conn)
             .await?;
             let Some(mime) = mime else {
