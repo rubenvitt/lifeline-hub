@@ -9,6 +9,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from './AnzeigeKonventionenContext';
 import { ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from './ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from './zeitEingabe';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 
 dayjs.extend(utc);
 
@@ -91,6 +92,31 @@ describe('ZeitpunktEingabe — Browser UTC, Anzeigezone Europe/Berlin (LFH-692)'
       expect(screen.getByRole('textbox', { name: 'Beginn' })).toHaveValue('2026-07-14 12:00');
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('„Jetzt“ auf einem 5 min vorgehenden Gerät setzt die Serverzeit (LFH-895)', async () => {
+    const server = Date.parse('2026-07-14T10:00:00Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(server + 5 * 60_000);
+    serveruhrVergessenFuerTests();
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(server).toUTCString() } }));
+    try {
+      const onChange = vi.fn<(d: Dayjs | null) => void>();
+      const user = userEvent.setup();
+      render(
+        mitZone(
+          'Europe/Berlin',
+          <ZeitpunktEingabe aria-label="Beginn" format="YYYY-MM-DD HH:mm" onChange={onChange} />,
+        ),
+      );
+      await user.click(screen.getByRole('textbox', { name: 'Beginn' }));
+      await user.click(await screen.findByRole('button', { name: 'Jetzt' }));
+      expect(Math.abs(onChange.mock.lastCall![0]!.valueOf() - server)).toBeLessThanOrEqual(1_000);
+      expect(screen.getByRole('textbox', { name: 'Beginn' })).toHaveValue('2026-07-14 12:00');
+    } finally {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
     }
   });
 

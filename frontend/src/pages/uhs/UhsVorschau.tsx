@@ -13,7 +13,7 @@ import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
  * Lese-Vorschau einer Unfallhilfsstelle in der Sprungpalette.
  *
  * Daten: das Listenfach der Palette (`datensatzAbfrage.uhs`) mit `select` auf die `id`, nicht das
- * Detailfach `uhsDetail` — das steht in `NICHT_LIVE_KEYS`.
+ * Detailfach `uhsDetail` — das lüde Plätze und Material, die die Vorschau nicht zeigt.
  *
  * Inhalt wie der Kopf der Detailseite (Typ als Wort, Status, Standort, Notiz) plus Verortung.
  * `KoordinatenAnzeige` ohne `einsatzId`, weil die Ort-Zeile sonst einen eigenen Abruf holte. „nicht

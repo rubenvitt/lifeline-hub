@@ -34,8 +34,9 @@ function etbNummer(suche: string): number | null {
 /**
  * Sucht ETB-Einträge für die Bezugswahl am Server (LFH-655), über den ganzen Einsatz:
  *
- * - die Volltextsuche (`q`, gedeckelt). Sie trifft nur GANZE Wörter (`fts_query` in
- *   `src/etb/repo.rs`); Wortanfänge deckt {@link waehleEtbEintraege} über das jüngste Fenster ab.
+ * - die Volltextsuche (`q`, gedeckelt). Sie trifft Wortanfänge, aber keine Wortmitten
+ *   (`fts_query` in `src/etb/repo.rs`, LFH-880); Wortmitten und Teilnummern deckt
+ *   {@link waehleEtbEintraege} über das jüngste Fenster ab.
  * - bei einer laufenden Nummer den Eintrag mit genau dieser Nummer. Ihn holt der Cursor
  *   (`before_lfd_nr` = n + 1, `limit` 1) wie den Zahlenzweig der Sprungpalette
  *   (`etbNummerSchluessel` in `command-palette/datensatzAbfrage.ts`); ob die Antwort die gesuchte
@@ -60,10 +61,11 @@ export async function sucheEtbBezuege(
  * Die ETB-Einträge, die die Bezugswahl zu einem getippten Begriff anbietet.
  *
  * Das jüngste Fenster filtert immer der Client am sichtbaren Text („ETB 412 · …“): so treffen
- * Wortanfänge und Teilnummern, und solange die Server-Antwort für GENAU diesen Begriff fehlt
- * (entprellt, unterwegs, gescheitert), steht nie ein Eintrag zur Wahl, der nicht passt — Enter
- * nähme sonst den ersten unpassenden. Gehören die Server-Treffer zum Begriff, kommen sie dazu:
- * der Eintrag mit genau der getippten Nummer vorn, sonst absteigend nach laufender Nummer.
+ * Wortmitten und Teilnummern, die der Server nicht findet, und solange die Server-Antwort für
+ * GENAU diesen Begriff fehlt (entprellt, unterwegs, gescheitert), steht nie ein Eintrag zur Wahl,
+ * der nicht passt — Enter nähme sonst den ersten unpassenden. Gehören die Server-Treffer zum
+ * Begriff, kommen sie dazu: der Eintrag mit genau der getippten Nummer vorn, sonst absteigend nach
+ * laufender Nummer.
  */
 export function waehleEtbEintraege(
   fenster: EtbEintragAnzeige[],

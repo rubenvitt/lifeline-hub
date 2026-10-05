@@ -833,10 +833,17 @@ export default function Grundriss({
   einsatzId,
   uhs,
   schreibgeschuetzt,
+  platzBearbeitbar = true,
 }: {
   einsatzId: number;
   uhs: UhsDetail;
   schreibgeschuetzt: boolean;
+  /**
+   * Ob die Plätze selbst (anlegen, verschieben, löschen) bearbeitbar sind. Unabhängig vom
+   * Schreibrecht: das UHS-Tablet belegt und meldet Verfügbarkeit, ändert aber den Grundriss
+   * nicht (LFH-892, Scope-Matrix).
+   */
+  platzBearbeitbar?: boolean;
 }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -858,7 +865,7 @@ export default function Grundriss({
   useEffect(() => {
     setPlatzBearbeitung(uhs.status === 'geplant');
   }, [uhs.status]);
-  const platzEditAktiv = platzBearbeitung && !schreibgeschuetzt;
+  const platzEditAktiv = platzBearbeitung && !schreibgeschuetzt && platzBearbeitbar;
 
   // Die gezogene Person rendert im DragOverlay (Portal); Platz-Drags nutzen ihren Inline-Transform
   // innerhalb der Fläche.
@@ -1187,6 +1194,7 @@ export default function Grundriss({
       >
         <Augenbraue als="h3">Unfallhilfsstelle</Augenbraue>
         {!schreibgeschuetzt &&
+          platzBearbeitbar &&
           (uhs.status === 'geplant' ? (
             <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
           ) : (

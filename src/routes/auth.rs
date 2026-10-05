@@ -32,7 +32,7 @@ pub struct LoginRequest {
 /// (Tauri-Hülle) und Browser das Cookie beim Prozessende, und nach jedem Neustart stünde der
 /// Login da. Widerruf bleibt serverseitig (Abmelden, Konto sperren, Passwortwechsel löschen die
 /// Sitzung); ein übrig gebliebenes Cookie läuft dann in 401.
-fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
+pub(crate) fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
     Cookie::build((SESSION_COOKIE, token))
         .http_only(true)
         .same_site(SameSite::Lax)
@@ -345,13 +345,37 @@ pub async fn logout(
 pub async fn me(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-) -> Result<Json<crate::auth::BenutzerAnzeige>, AppError> {
+    geraet: Option<axum::Extension<crate::geraet::GeraetKontext>>,
+) -> Result<Json<MeAntwort>, AppError> {
     let totp_aktiviert: bool =
         sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
             .bind(benutzer.id)
             .fetch_one(&state.pool)
             .await?;
-    Ok(Json(benutzer.anzeige(totp_aktiviert)))
+    let geraet = match geraet {
+        None => None,
+        Some(axum::Extension(g)) => {
+            let k = crate::geraet::repo::laden(&state.pool, g.einsatz_id, g.kopplung_id).await?;
+            Some(crate::routes::geraet::geraet_anzeige(
+                &k,
+                g.einsatz_id,
+                g.kopplung_id,
+            ))
+        }
+    };
+    Ok(Json(MeAntwort {
+        benutzer: benutzer.anzeige(totp_aktiviert),
+        geraet,
+    }))
+}
+
+/// Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) zusätzlich
+/// die Kopplung. Eine Person bekommt `geraet: null`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MeAntwort {
+    #[serde(flatten)]
+    pub benutzer: crate::auth::BenutzerAnzeige,
+    pub geraet: Option<crate::geraet::GeraetAnzeige>,
 }
 
 #[derive(Debug, Deserialize)]

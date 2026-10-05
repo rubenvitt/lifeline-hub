@@ -1159,4 +1159,90 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     await waitFor(() => expect(zelle('Betroffene')).toHaveTextContent('Stand unbekannt'));
     expect(zelle('Betroffene')).not.toHaveTextContent('nicht freigegeben');
   });
+
+  /** Der Einsatz ohne Lagebesprechung: dann trägt nur noch eine gebundene Quelle Fristen. */
+  const ohneLagebesprechung = http.get('/api/einsaetze/1', () =>
+    HttpResponse.json({ ...einsatz, naechste_lagebesprechung_at: null }),
+  );
+
+  it('Nächste Marken (LFH-887): Aufträge und Erinnerungen gesperrt → der Grund, keine Leeraussage', async () => {
+    mitFreigaben({ auftraege: { zugriff: false }, erinnerungen: { zugriff: false } }, [
+      ohneLagebesprechung,
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    await waitFor(() =>
+      expect(p).toHaveTextContent('Nicht freigegeben: Aufträge/Befehle, Erinnerungen.'),
+    );
+    expect(p).toHaveTextContent('Keine sichtbaren Fristen.');
+    expect(within(p).queryByText('Keine anstehenden Fristen.')).toBeNull();
+    // Kein Ausfall: der Grund ist kein „Stand unbekannt".
+    expect(within(p).queryByRole('alert')).toBeNull();
+  });
+
+  it('Nächste Marken (LFH-887): eine gesperrte Fristquelle steht als Hinweis unter den Marken', async () => {
+    mitFreigaben({
+      erinnerungen: { zugriff: false },
+      abloesung: { zugriff: false },
+      'wetter-pegel': { zugriff: false },
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    await within(p).findByText('Lagebesprechung');
+    // Die freien Quellen tragen weiter bei (Aufträge), die Liste gilt nicht als vollständig.
+    expect(within(p).getAllByRole('link')).toHaveLength(3);
+    expect(p).toHaveTextContent('Nicht freigegeben: Erinnerungen, Ablösung, Wetter & Pegel.');
+  });
+
+  it('Nächste Marken (LFH-887): ein ausgeblendetes Modul ist keine fehlende Freigabe', async () => {
+    mitFreigaben({ erinnerungen: { sichtbar: false, zugriff: false } }, [ohneLagebesprechung]);
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    await within(p).findByText('Trupps verlegen');
+    expect(p).not.toHaveTextContent(/Nicht freigegeben/);
+  });
+
+  it('Kräfte (LFH-887): nur Fahrzeuge und Material gesperrt → Stärke in Kennzahl und Abschnittszeile', async () => {
+    const aufrufe = mitFreigaben({ fahrzeuge: { zugriff: false }, material: { zugriff: false } });
+    rendern();
+    await waitFor(() => expect(zelle('Kräfte im Einsatz')).toHaveTextContent('F/UF/M//Σ 1/0/1//2'));
+    expect(zelle('Kräfte im Einsatz')).not.toHaveTextContent('nicht freigegeben');
+    expect(zelle('Kräfte im Einsatz').closest('a')).toHaveAttribute(
+      'href',
+      '/einsaetze/1/kraefteuebersicht',
+    );
+    const zeile = await within(paneel('Einsatzabschnitte')).findByRole('link', {
+      name: /Abschnitt Nord/,
+    });
+    expect(zeile).toHaveTextContent('1/0/1//2');
+    expect(aufrufe['/api/einsaetze/1/fahrzeuge']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/material']).toBeUndefined();
+  });
+
+  it('Abschnittspaneel (LFH-887): leer bei gesperrten Fahrzeugen behauptet nicht „keine Kräfte"', async () => {
+    mitFreigaben({ fahrzeuge: { zugriff: false } }, [
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    await waitFor(() =>
+      expect(p).toHaveTextContent(
+        'Noch keine Abschnitte, Einheiten oder Personal erfasst. Nicht freigegeben: Fahrzeuge.',
+      ),
+    );
+    expect(within(p).queryByText('Noch keine Abschnitte und keine Kräfte erfasst.')).toBeNull();
+  });
+
+  it('Kräfte (LFH-887): Personal gesperrt → Kennzahl „—" mit Grund wie bisher', async () => {
+    mitFreigaben({ personal: { zugriff: false } });
+    rendern();
+    await waitFor(() => expect(zelle('Kräfte im Einsatz')).toHaveTextContent('nicht freigegeben'));
+    expect(zelle('Kräfte im Einsatz')).toHaveTextContent('—');
+    expect(
+      within(paneel('Einsatzabschnitte')).getByText('Modul nicht freigegeben.'),
+    ).toBeInTheDocument();
+  });
 });

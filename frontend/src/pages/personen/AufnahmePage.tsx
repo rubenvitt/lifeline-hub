@@ -22,7 +22,9 @@ import AufnahmeFelder, {
   type AufnahmeWerte,
 } from '../../personen/AufnahmeFelder';
 import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
-import { parseRouteId, personenPfad, uhsDetailPfad } from '../../routing/deeplinks';
+import { parseRouteId } from '../../routing/deeplinks';
+import { useEinsatzPfade } from '../../routing/EinsatzPfade';
+import { useGeraetDarf } from '../../geraet/geraetSicht';
 import StatusTag from '../../components/StatusTag';
 import { einsatzStatus } from '../../theme/statusFarben';
 
@@ -45,6 +47,10 @@ export default function AufnahmePage() {
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const navigate = useNavigate();
+  // Am gekoppelten Gerät führt der Rückweg in die Gerätehülle, ohne Brotkrumen in fremde Module
+  // (LFH-892).
+  const pfade = useEinsatzPfade();
+  const darf = useGeraetDarf();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<AufnahmeWerte>();
@@ -143,22 +149,24 @@ export default function AufnahmePage() {
           : 'Sichtungskategorie zuerst — die übrigen Angaben sind optional.'
       }
       breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: einsatz.bezeichnung },
-            {
-              // Zeigt den Auftrag: mit Auftrag führt der Rückweg zur UHS, nicht in die
-              // Personenliste. Den UHS-Namen lädt die Seite bewusst nicht.
-              title: uhsAuftrag ? (
-                <Link to={uhsDetailPfad(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
-              ) : (
-                <Link to={personenPfad(einsatzId)}>Personen</Link>
-              ),
-            },
-            { title: 'Aufnahme' },
-          ]}
-        />
+        darf('fremde-module') && (
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: einsatz.bezeichnung },
+              {
+                // Zeigt den Auftrag: mit Auftrag führt der Rückweg zur UHS, nicht in die
+                // Personenliste. Den UHS-Namen lädt die Seite bewusst nicht.
+                title: uhsAuftrag ? (
+                  <Link to={pfade.uhsDetail(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
+                ) : (
+                  <Link to={pfade.personenListe(einsatzId)}>Personen</Link>
+                ),
+              },
+              { title: 'Aufnahme' },
+            ]}
+          />
+        )
       }
       hinweis={
         !darfSchreiben && (
@@ -199,7 +207,9 @@ export default function AufnahmePage() {
            * und geht zurück in die Liste — er heißt nicht „Fertig", weil er speichert.
            */
           onFertig={() =>
-            navigate(uhsAuftrag ? uhsDetailPfad(einsatzId, uhsAuftrag) : personenPfad(einsatzId))
+            navigate(
+              uhsAuftrag ? pfade.uhsDetail(einsatzId, uhsAuftrag) : pfade.personenListe(einsatzId),
+            )
           }
         >
           <AufnahmeFelder modus="schnell" />

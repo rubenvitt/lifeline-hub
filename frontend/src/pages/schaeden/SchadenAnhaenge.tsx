@@ -32,7 +32,8 @@ export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: P
       quelle={{
         queryKey: einsatzKeys.schadenAnhaenge(einsatzId, schaden.id),
         liste: () => listeSchadenAnhaenge(einsatzId, schaden.id),
-        ablegen: (datei) => legeSchadenAnhangAb(einsatzId, schaden.id, datei),
+        ablegen: (datei, onFortschritt) =>
+          legeSchadenAnhangAb(einsatzId, schaden.id, datei, onFortschritt),
         entfernen: (id) => entferneSchadenAnhang(einsatzId, schaden.id, id),
         downloadPfad: (id) => schadenAnhangDownloadPfad(einsatzId, schaden.id, id),
       }}

@@ -14,6 +14,8 @@ import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { einsatzFixture } from '../test/fixtures';
 import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
 import { useLocation } from 'react-router';
+import dayjs from 'dayjs';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
 // onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
@@ -830,5 +832,60 @@ describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
     expect(zeile.scrollLeft).toBe(140);
     expect(rollen).not.toHaveBeenCalled();
     rollen.mockRestore();
+  });
+});
+
+// LFH-895: „jetzt“ beim Erfassen gilt nach der Serveruhr (`offline/serveruhr.ts`), eine
+// eingetragene Ereigniszeit bleibt.
+describe('Ereigniszeit eines vorgehenden Geräts (LFH-895)', () => {
+  const SERVER = Date.parse('2026-10-04T10:00:00Z');
+  const VORLAUF = 5 * 60_000;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER + VORLAUF);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  function serverAntwortGesehen() {
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(SERVER).toUTCString() } }));
+  }
+
+  async function erfasseOhneChip(p: ReturnType<typeof props>): Promise<NeuerEintrag> {
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    return (p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0] as NeuerEintrag;
+  }
+
+  it('ohne Zeit-Chip tragen Ereigniszeit und erfasst_lokal_at die Serverzeit', async () => {
+    serverAntwortGesehen();
+    const eintrag = await erfasseOhneChip(props());
+    const ereignis = dayjs.utc(eintrag.ereigniszeit).valueOf();
+    expect(Math.abs(ereignis - SERVER)).toBeLessThanOrEqual(1_000);
+    expect(Math.abs(Date.parse(eintrag.erfasst_lokal_at!) - SERVER)).toBeLessThanOrEqual(1_000);
+  });
+
+  it('ohne bekannten Versatz gilt die Geräteuhr', async () => {
+    const eintrag = await erfasseOhneChip(props());
+    expect(dayjs.utc(eintrag.ereigniszeit).valueOf()).toBe(SERVER + VORLAUF);
+  });
+
+  it('eine eingetragene Ereigniszeit bleibt unverändert', async () => {
+    serverAntwortGesehen();
+    const eintrag = await erfasseOhneChip(
+      props({
+        initialWerte: {
+          inhalt: '',
+          typ: 'meldung',
+          metadaten: { ereigniszeit: dayjs.utc('2026-10-04T09:30:00Z') },
+        },
+      }),
+    );
+    expect(eintrag.ereigniszeit).toBe('2026-10-04 09:30:00');
   });
 });

@@ -51,12 +51,15 @@ async fn pruefe_benutzer_link(
     benutzer_id: i64,
     eigene_id: Option<i64>,
 ) -> Result<(), AppError> {
-    let gehoert: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM benutzer WHERE id = ? AND org_id = ?")
-            .bind(benutzer_id)
-            .bind(org_id)
-            .fetch_optional(&mut *conn)
-            .await?;
+    // Ein Gerätekonto (LFH-892) ist keine Person: es zählt hier als fremd.
+    let gehoert: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT 1 FROM benutzer b WHERE b.id = ? AND b.org_id = ? AND {}",
+        crate::geraet::repo::OHNE_GERAETEKONTEN
+    )))
+    .bind(benutzer_id)
+    .bind(org_id)
+    .fetch_optional(&mut *conn)
+    .await?;
     if gehoert.is_none() {
         return Err(AppError::Validation(
             "Benutzerkonto gehört nicht zur Organisation".into(),

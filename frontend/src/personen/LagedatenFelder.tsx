@@ -2,6 +2,7 @@ import { Form, Input, theme } from 'antd';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { serverJetzt } from '../offline/serveruhr';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { parseKoordinate } from './koordinate';
 
@@ -53,7 +54,8 @@ export function VermisstSeitFeld({ hinweis }: { hinweis?: string }) {
       rules={[
         {
           validator: (_, wert?: string) =>
-            wert && dayjs.utc(wert).valueOf() > Date.now() + ZUKUNFT_TOLERANZ_MS
+            // An der Serveruhr gemessen wie „Jetzt“ (LFH-895).
+            wert && dayjs.utc(wert).valueOf() > serverJetzt().valueOf() + ZUKUNFT_TOLERANZ_MS
               ? Promise.reject(new Error('Liegt in der Zukunft'))
               : Promise.resolve(),
         },

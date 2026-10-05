@@ -18,6 +18,20 @@ export function kartenKante(
 }
 
 /**
+ * Grund der Kommunikations-Karte — Gefahr gewinnt auch gegen die Deeplink-Markierung (LFH-896,
+ * Spec `deeplink-hervorhebung`): `alarmFlaeche` vor `bedienFlaeche` vor `paneel`. Eine
+ * angesprungene Alarmkarte behält ihre Fläche, die Markierung trägt dort nur die Linien.
+ */
+export function kartenGrund(
+  rollen: Pick<Farbrollen, 'alarmFlaeche' | 'bedienFlaeche' | 'paneel'>,
+  { alarm, hervorgehoben }: { alarm: boolean; hervorgehoben: boolean },
+): string {
+  if (alarm) return rollen.alarmFlaeche;
+  if (hervorgehoben) return rollen.bedienFlaeche;
+  return rollen.paneel;
+}
+
+/**
  * Phase → Ton der Statusfläche. `in_arbeit` ist eine aktive Beziehung und trägt `bedien` (wie
  * `verfuegbarkeit.reserviert` in `theme/statusFarben.ts`); `ausnahme` ist `alarm`,
  * abgeschlossen `normal`, offen neutral. Der Eingangszustand schlägt die Phase und wird `achtung`.

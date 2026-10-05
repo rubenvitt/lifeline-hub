@@ -12,6 +12,7 @@ import StatusTag from '../../components/StatusTag';
 import { monoStil } from '../../components/instrument';
 import { materialStatus } from '../../theme/statusFarben';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { useAuthOptional } from '../../auth/AuthContext';
 
 interface Props {
   einsatzId: number;
@@ -29,14 +30,19 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   const { message } = App.useApp();
   const [zuordnenOffen, setZuordnenOffen] = useState(false);
   const [form] = Form.useForm<ZuordnenWerte>();
+  // Ein Gerät (UHS-Laptop) liest nur das Material seiner UHS, und das steht schon im Detail: die
+  // Einsatzliste ist ihm verwehrt (403), Zuordnen und Lösen ebenso (LFH-892, Scope-Matrix).
+  const nurDetail = useAuthOptional()?.geraet != null;
+  const bedienbar = !schreibgeschuetzt && !nurDetail;
 
   const materialQuery = useQuery({
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listeEinsatzMaterial(einsatzId),
+    enabled: !nurDetail,
   });
 
   const material = materialQuery.data ?? [];
-  const verortet = material.filter((em) => em.uhs_id === uhs.id);
+  const verortet = nurDetail ? uhs.material : material.filter((em) => em.uhs_id === uhs.id);
   const freiVerortbar = material.filter((em) => em.uhs_id == null);
 
   function invalidate() {
@@ -90,31 +96,36 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         </span>
       ),
     },
-    {
-      title: 'Aktion',
-      key: 'aktion',
-      render: (_: unknown, em: EinsatzMaterial) =>
-        // Keine Rückfrage: die gelöste Zuordnung ist umkehrbar (über „Material zuordnen" darüber),
-        // also `danger` und Abstand, aber keine zusätzliche Reibung.
-        !schreibgeschuetzt ? (
-          // Ohne Größen-Prop: die Zelle hängt an keiner Backend-Konstante, die Tabelle wächst mit.
-          // `loading` je Zeile, nicht je Mutation (`loesenMut` bedient alle Zeilen): es fängt den
-          // zweiten Klick ab, den sonst die Rückfrage abgefangen hätte.
-          <Button
-            danger
-            loading={loesenMut.isPending && loesenMut.variables === em.id}
-            onClick={() => loesenMut.mutate(em.id)}
-          >
-            Lösen
-          </Button>
-        ) : null,
-    },
+    // Am Gerät gibt es keine Aktion, also auch keine leere Spalte.
+    ...(nurDetail
+      ? []
+      : [
+          {
+            title: 'Aktion',
+            key: 'aktion',
+            render: (_: unknown, em: EinsatzMaterial) =>
+              // Keine Rückfrage: die gelöste Zuordnung ist umkehrbar (über „Material zuordnen" darüber),
+              // also `danger` und Abstand, aber keine zusätzliche Reibung.
+              bedienbar ? (
+                // Ohne Größen-Prop: die Zelle hängt an keiner Backend-Konstante, die Tabelle wächst mit.
+                // `loading` je Zeile, nicht je Mutation (`loesenMut` bedient alle Zeilen): es fängt den
+                // zweiten Klick ab, den sonst die Rückfrage abgefangen hätte.
+                <Button
+                  danger
+                  loading={loesenMut.isPending && loesenMut.variables === em.id}
+                  onClick={() => loesenMut.mutate(em.id)}
+                >
+                  Lösen
+                </Button>
+              ) : null,
+          },
+        ]),
   ];
 
   return (
     <Space orientation="vertical" style={{ width: '100%' }}>
-      <Datenstand dataUpdatedAt={materialQuery.dataUpdatedAt} />
-      {!schreibgeschuetzt && (
+      {!nurDetail && <Datenstand dataUpdatedAt={materialQuery.dataUpdatedAt} />}
+      {bedienbar && (
         <Button onClick={() => setZuordnenOffen(true)} disabled={freiVerortbar.length === 0}>
           Material zuordnen
         </Button>
@@ -126,7 +137,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         size="small"
         pagination={false}
         locale={{ emptyText: 'Kein Material dieser UHS zugeordnet' }}
-        loading={materialQuery.isLoading}
+        loading={!nurDetail && materialQuery.isLoading}
       />
       {/* Erfassungshülle: Absende-Knopf im `<form>`, Fokus im Auswahlfeld, Reset auf jedem Weg
           hinaus. Enter sendet hier trotzdem nicht ab — rc-select ruft bei jedem Enter

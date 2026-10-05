@@ -107,12 +107,9 @@ interface KraefteKennzahl {
   text: string;
 }
 
-export function kraefteKennzahl(
-  personal: EinsatzPersonal[],
-  fahrzeuge: EinsatzFahrzeug[],
-  material: EinsatzMaterial[],
-): KraefteKennzahl {
-  const s = verdichte(personal, fahrzeuge, material).staerke;
+/** Die Stärke kommt nur aus dem Personal; Fahrzeuge und Material zählen nicht (LFH-887). */
+export function kraefteKennzahl(personal: EinsatzPersonal[]): KraefteKennzahl {
+  const s = verdichte(personal, [], []).staerke;
   return { gesamt: s.gesamt, text: staerkeText(s) };
 }
 

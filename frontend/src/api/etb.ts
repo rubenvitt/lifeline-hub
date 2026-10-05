@@ -9,7 +9,13 @@ import type {
   MeldeWeg,
   NeuerAuftrag,
 } from './types';
-import { apiGet, apiSend, apiUpload, type ApiSendOptionen } from './client';
+import {
+  apiGet,
+  apiSend,
+  apiUploadMitFortschritt,
+  type ApiSendOptionen,
+  type UploadFortschritt,
+} from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 
 export const SEITENGROESSE = 100;
@@ -97,14 +103,20 @@ export const ETB_ANHAENGE_MAX = 10;
 /**
  * Lädt EINE Datei für einen ETB-Eintrag hoch (LFH-117). Eine Datei je Anfrage: das Body-Limit
  * gilt für die ganze Anfrage, und ein gescheiterter Upload soll die übrigen nicht mitnehmen.
- * Timeout wie die Dokumentenablage (25 MiB samt Virenscan über Mobilfunk).
+ * Timeout und Fortschritt wie die Dokumentenablage (25 MiB samt Virenscan über Mobilfunk, LFH-878).
  */
-export async function ladeEtbAnhangHoch(einsatzId: number, datei: File): Promise<Anhang> {
+export async function ladeEtbAnhangHoch(
+  einsatzId: number,
+  datei: File,
+  onFortschritt?: (stand: UploadFortschritt) => void,
+): Promise<Anhang> {
   const fd = new FormData();
   fd.append('datei', datei);
-  const angelegt = await apiUpload<Anhang[]>(`/api/einsaetze/${einsatzId}/etb/anhaenge`, fd, {
-    timeoutMs: UPLOAD_TIMEOUT_MS,
-  });
+  const angelegt = await apiUploadMitFortschritt<Anhang[]>(
+    `/api/einsaetze/${einsatzId}/etb/anhaenge`,
+    fd,
+    { timeoutMs: UPLOAD_TIMEOUT_MS, onFortschritt },
+  );
   return angelegt[0];
 }
 

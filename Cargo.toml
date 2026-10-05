@@ -42,7 +42,7 @@ ipnet = "2"
 tokio-stream = { version = "0.1", features = ["sync"] }
 tempfile = "3"
 sha2 = "0.11"
-base64 = "0.22"
+base64 = "0.23"
 mime_guess = "2"
 # Vorschaubilder der Anhänge (LFH-759, `src/anhang/vorschau/`): nur die Decoder für JPEG, PNG,
 # GIF, WebP und TIFF plus den JPEG-Encoder. Alle reines Rust (zune-jpeg, png, gif, image-webp,
@@ -128,7 +128,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.76"
+version = "1.0.0-alpha.77"
 
 [workspace]
 members = [".", "crates/karten-katalog", "karten-service", "src-tauri"]

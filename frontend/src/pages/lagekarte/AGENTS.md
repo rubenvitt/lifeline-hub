@@ -78,6 +78,11 @@ diese Zusage.
   `pages/lagekarte/KartenFuss.tsx`): ein Rahmen (`pointerEvents: 'none'`), Bänder als
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
+- **Das Zeitachsen-Band hat höchstens zwei Reihen** (LFH-899, Spec `lagekarte-zeitachse`,
+  `openspec/changes/archive/2026-10-04-lfh-899-zeitachse-band-flacher/design.md`): zwei Gruppen,
+  die nicht in sich umbrechen (Wiedergabe: Ausblenden, Abspielen, Schieber · Stand: Auswahl
+  „Stand“, Sichern); Stände nur über die Auswahl, nie als Knopfreihe; die Bezeichnung im Dialog.
+  Abstände nur aus `bandStile` (Staffel), Deckel und Zielabstand in `e2e/leisten-flaeche.spec.ts`.
 - **Jeder Kamera-Aufruf sagt, wer bewegt** (LFH-766, `lagekarte/kamera.ts`, D2 in
   `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md`):
   letztes Argument `BEDIENUNG` (Knopf, Tipp, `flyToZiel`) oder `AUTOMATISCH` (Startansicht,

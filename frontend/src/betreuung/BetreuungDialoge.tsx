@@ -1,7 +1,8 @@
 import { Alert, Checkbox, Collapse, Form, Input, InputNumber, Modal, Radio } from 'antd';
 import { Typography } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import dayjs, { type Dayjs } from 'dayjs';
+import { serverJetzt } from '../offline/serveruhr';
+import type { Dayjs } from 'dayjs';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   Betreuungsstelle,
@@ -232,10 +233,13 @@ const ART_OPTIONEN = (Object.keys(ART_LABEL) as BetreuungsstelleArt[]).map((a) =
   label: ART_LABEL[a],
 }));
 
-/** Kein Zeitpunkt in der Zukunft — der Server duldet 60 s Uhrenversatz, mehr ist 400. */
+/**
+ * Kein Zeitpunkt in der Zukunft — der Server duldet 60 s Uhrenversatz, mehr ist 400. Gemessen an
+ * der Serveruhr wie „Jetzt“, sonst fiele „Jetzt“ auf einem nachgehenden Gerät durch (LFH-895).
+ */
 const zeitRegel = {
   validator: (_: unknown, v: Dayjs | null | undefined) =>
-    v && v.isAfter(dayjs().add(1, 'minute'))
+    v && v.isAfter(serverJetzt().add(1, 'minute'))
       ? Promise.reject(new Error('Der Zeitpunkt liegt in der Zukunft.'))
       : Promise.resolve(),
 };

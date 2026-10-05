@@ -1,5 +1,11 @@
 import type { Schaden, SchadenAnhang, SchadenStatus, SchadenTyp, Ausmass } from './types';
-import { apiGet, apiSend, apiUpload, mitParametern } from './client';
+import {
+  apiGet,
+  apiSend,
+  apiUploadMitFortschritt,
+  mitParametern,
+  type UploadFortschritt,
+} from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
@@ -127,17 +133,20 @@ export function listeSchadenAnhaenge(
 
 /**
  * Legt EINE Datei am Schaden ab (Feld `datei`). Mehrere Fotos entstehen über den Serienmodus des
- * Dialogs, jedes mit eigenem ETB-Nachweis. Timeout wie die übrigen Uploads.
+ * Dialogs, jedes mit eigenem ETB-Nachweis. Timeout wie die übrigen Uploads; den Stand der
+ * Übertragung meldet `onFortschritt` (LFH-878).
  */
 export function legeSchadenAnhangAb(
   einsatzId: number,
   schadenId: number,
   datei: File,
+  onFortschritt?: (stand: UploadFortschritt) => void,
 ): Promise<SchadenAnhang> {
   const fd = new FormData();
   fd.append('datei', datei);
-  return apiUpload<SchadenAnhang>(anhangBasis(einsatzId, schadenId), fd, {
+  return apiUploadMitFortschritt<SchadenAnhang>(anhangBasis(einsatzId, schadenId), fd, {
     timeoutMs: UPLOAD_TIMEOUT_MS,
+    onFortschritt,
   });
 }
 

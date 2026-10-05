@@ -10,9 +10,10 @@ import {
   einsaetzePfad,
   einsatzPfad,
   parseRouteId,
-  personenAufnahmePfad,
   unfallhilfsstellenListePfad,
 } from '../../routing/deeplinks';
+import { useEinsatzPfade } from '../../routing/EinsatzPfade';
+import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
@@ -33,15 +34,35 @@ const REITER_NAME = {
   bewegungen: 'Bewegungen',
   dateien: 'Dateien',
 } as const;
+type Reiter = keyof typeof REITER_NAME;
+
+/** „Material, Bewegungen und Dateien“: der Name der Reiterleiste nennt, was sie führt. */
+function aufzaehlung(namen: string[]): string {
+  return namen.length < 2
+    ? (namen[0] ?? '')
+    : `${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]}`;
+}
 
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
+  // Ein gekoppeltes Gerät sieht nur, was seine Ansicht bedient (LFH-892, Scope-Matrix); für eine
+  // Person ist alles frei. Die Wege führen in die Oberfläche, aus der man kommt.
+  const darf = useGeraetDarf();
+  const pfade = useEinsatzPfade();
+  // Am Gerät stehen Material und Dateien im Bereich „UHS“ des Laptops (`geraet/GeraetStellePage`),
+  // nicht unter dem Grundriss; hier bleibt dort nur der Verlauf.
+  const { benutzer, geraet } = useAuth();
+  const reiterListe: Reiter[] = [
+    ...(!geraet && darf('uhs-material') ? (['material'] as const) : []),
+    'bewegungen',
+    // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
+    ...(!geraet && darf('uhs-anhaenge') ? (['dateien'] as const) : []),
+  ];
   // Material/Bewegungen als Segmentleiste; nur das aktive Feld ist gebaut.
-  const [reiter, setReiter] = useState<'material' | 'bewegungen' | 'dateien'>('material');
+  const [reiter, setReiter] = useState<Reiter>(reiterListe[0]);
   const reiterFeld = useId();
-  const { benutzer } = useAuth();
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
   const listenPfad = unfallhilfsstellenListePfad(einsatzId);
@@ -60,9 +81,11 @@ export default function UhsDetailPage() {
   });
 
   // Diese UHS als „zuletzt ausgewählt" merken — der Default-Einstieg landet wieder hier.
+  // Ein Gerät kennt nur seine eine UHS und merkt sich nichts.
+  const merkeUhs = darf('uhs-verwalten');
   useEffect(() => {
-    if (detailQuery.isSuccess) merkeLetzteUhs(einsatzId, uhsId);
-  }, [einsatzId, uhsId, detailQuery.isSuccess]);
+    if (merkeUhs && detailQuery.isSuccess) merkeLetzteUhs(einsatzId, uhsId);
+  }, [einsatzId, uhsId, detailQuery.isSuccess, merkeUhs]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
@@ -109,6 +132,7 @@ export default function UhsDetailPage() {
   const einsatz = einsatzQuery.data;
   const uhs = detailQuery.data;
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer);
+  const verwalten = !schreibgeschuetzt && darf('uhs-verwalten');
 
   // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
   // nur seine Beschriftung aus `uhsTyp`. Die Notiz ist Freitext und bleibt Beschreibungszeile.
@@ -121,7 +145,11 @@ export default function UhsDetailPage() {
         // `wrap`: bei langem Namen rutscht der Status unter den Namen, statt auf 390 px
         // über den Rand zu ragen (gemessen 11 px, LFH-435).
         <Space wrap>
-          <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
+          {darf('uhs-verwalten') ? (
+            <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
+          ) : (
+            uhs.bezeichnung
+          )}
           <StatusTag darstellung={uhsStatus[uhs.status]} />
         </Space>
       }
@@ -130,14 +158,16 @@ export default function UhsDetailPage() {
       /* Datenstand im Kopf über das Primitiv — der Grundriss läuft live mit. */
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
-            { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
-            { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
-            { title: uhs.bezeichnung },
-          ]}
-        />
+        darf('fremde-module') && (
+          <Breadcrumb
+            items={[
+              { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
+              { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
+              { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
+              { title: uhs.bezeichnung },
+            ]}
+          />
+        )
       }
       aktionen={
         <Space wrap size="middle">
@@ -149,12 +179,12 @@ export default function UhsDetailPage() {
             <Button
               type="primary"
               icon={<IconPersonPlus />}
-              onClick={() => navigate(personenAufnahmePfad(einsatzId, { uhs: uhs.id }))}
+              onClick={() => navigate(pfade.aufnahme(einsatzId, { uhs: uhs.id }))}
             >
               Patient aufnehmen
             </Button>
           )}
-          {!schreibgeschuetzt && uhs.status === 'geplant' && (
+          {verwalten && uhs.status === 'geplant' && (
             <>
               <Button
                 type="primary"
@@ -172,7 +202,7 @@ export default function UhsDetailPage() {
               </Popconfirm>
             </>
           )}
-          {!schreibgeschuetzt && uhs.status === 'aktiv' && (
+          {verwalten && uhs.status === 'aktiv' && (
             <Popconfirm
               title="UHS auflösen?"
               description="Nur möglich, wenn keine Person mehr belegt ist."
@@ -188,25 +218,39 @@ export default function UhsDetailPage() {
         // Mindest-Arbeitsfläche: unter einem langen Kopf scrollt die Seite, statt Grundriss und
         // Reiter zu überlagern. 380 px beschreiben die Fläche, keine Kopfhöhe.
         mindestHoehe: 380,
-        inhalt: <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
+        inhalt: (
+          <Grundriss
+            einsatzId={einsatzId}
+            uhs={uhs}
+            schreibgeschuetzt={schreibgeschuetzt}
+            platzBearbeitbar={darf('grundriss-bearbeiten')}
+          />
+        ),
       }}
     >
       {/* Der Seitenkopf teilt die Resthöhe mit dem Grundriss; Material/Bewegungen/Dateien folgen
           im Seitenfluss. */}
-      <Segmentleiste
-        rolle="tablist"
-        beschriftung="Material, Bewegungen und Dateien"
-        wert={reiter}
-        onWechsel={setReiter}
-        optionen={[
-          { wert: 'material', label: 'Material', steuert: reiterFeld },
-          { wert: 'bewegungen', label: 'Bewegungen', steuert: reiterFeld },
-          // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
-          { wert: 'dateien', label: 'Dateien', steuert: reiterFeld },
-        ]}
-        style={{ marginTop: 16, marginBottom: 12 }}
-      />
-      <div role="tabpanel" id={reiterFeld} aria-label={REITER_NAME[reiter]}>
+      {/* Ein einzelner Reiter ist keine Wahl: dann steht nur das Feld (UHS-Tablet). */}
+      {reiterListe.length > 1 && (
+        <Segmentleiste
+          rolle="tablist"
+          beschriftung={aufzaehlung(reiterListe.map((r) => REITER_NAME[r]))}
+          wert={reiter}
+          onWechsel={setReiter}
+          optionen={reiterListe.map((r) => ({
+            wert: r,
+            label: REITER_NAME[r],
+            steuert: reiterFeld,
+          }))}
+          style={{ marginTop: 16, marginBottom: 12 }}
+        />
+      )}
+      {/* Ohne Leiste kein Reiterfeld: dann benennt sich die Liste darin selbst. */}
+      <div
+        {...(reiterListe.length > 1
+          ? { role: 'tabpanel', id: reiterFeld, 'aria-label': REITER_NAME[reiter] }
+          : { style: { marginTop: 16 } })}
+      >
         {reiter === 'material' ? (
           <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
         ) : reiter === 'bewegungen' ? (

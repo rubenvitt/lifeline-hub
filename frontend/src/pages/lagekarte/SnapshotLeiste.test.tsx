@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -18,16 +18,10 @@ vi.mock('../../api/lageSnapshot', () => ({
   ladeLageSnapshot: (...a: unknown[]) => ladeLageSnapshot(...a),
 }));
 
-import {
-  SnapshotLeiste,
-  ANZEIGE_MS,
-  abspielenStil,
-  sichernFeldStil,
-  standLeisteStil,
-  startEingeklappt,
-  zeitleisteStil,
-} from './SnapshotLeiste';
+import { SnapshotLeiste, ANZEIGE_MS, bandStile, startEingeklappt } from './SnapshotLeiste';
 import { setzeViewportBreite } from '../../test/viewport';
+import { dichten } from '../../theme/tokens';
+import { formatZeitKurz } from '../../anzeige/format';
 
 type Snap = Record<string, unknown>;
 function snapshot(over: Snap = {}): Snap {
@@ -66,6 +60,27 @@ function renderLeiste(liste: Snap[], props: Record<string, unknown>) {
   );
 }
 
+/** Angezeigter Wert der Auswahl „Stand“. */
+function auswahlText(): string | null {
+  // antd 6 rendert die gewählte Option als `.ant-select-content` (Muster
+  // `DokumentBearbeitenModal.test.tsx`).
+  const feld = screen.getByRole('combobox', { name: 'Stand' });
+  return feld.closest('.ant-select')!.querySelector('.ant-select-content')?.textContent ?? null;
+}
+
+/** Offene Liste greifen, nicht die Portale geschlossener Dropdowns (antd lässt sie stehen). */
+async function waehleStand(titel: string) {
+  await userEvent.click(screen.getByRole('combobox', { name: 'Stand' }));
+  const knoten = await waitFor(() => {
+    const k = document.querySelector<HTMLElement>(
+      `.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="${titel}"]`,
+    );
+    expect(k).not.toBeNull();
+    return k!;
+  });
+  await userEvent.click(knoten);
+}
+
 // Ohne gemerkte Wahl startet die Leiste erst ab `xl` ausgeklappt; die Bestandstests prüfen die
 // ausgeklappte Leiste und laufen deshalb bei 1440 px. Die Breitenregel prüfen die Tests unten.
 beforeEach(() => setzeViewportBreite(1440));
@@ -79,23 +94,109 @@ describe('SnapshotLeiste', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it('„Stand sichern" ruft erzeugeLageSnapshot mit der Bezeichnung', async () => {
+  it('„Stand sichern" öffnet den Dialog; Enter sichert mit der Bezeichnung und schließt', async () => {
     erzeugeLageSnapshot.mockResolvedValue(snapshot());
     renderLeiste([], { darfSichern: true });
-    await userEvent.type(await screen.findByLabelText('Snapshot-Bezeichnung'), '08:00 Lage');
-    await userEvent.click(screen.getByRole('button', { name: /Stand sichern/ }));
+    // Das Feld steht nicht dauerhaft im Band (LFH-899, D2).
+    expect(screen.queryByLabelText('Snapshot-Bezeichnung')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Stand sichern' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Stand sichern' });
+    const feld = within(dialog).getByLabelText('Snapshot-Bezeichnung');
+    await waitFor(() => expect(feld).toHaveFocus());
+    await userEvent.type(feld, '08:00 Lage{Enter}');
     await waitFor(() =>
       expect(erzeugeLageSnapshot).toHaveBeenCalledWith(5, { bezeichnung: '08:00 Lage' }),
     );
+    // Erfolg quittiert und schließt: antd hängt das Modal erst nach `transitionend` ab, das jsdom
+    // nie feuert; beobachtbar ist der Austritt (`ant-zoom-leave`).
+    expect(await screen.findByText('Stand gesichert')).toBeInTheDocument();
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
   });
 
-  it('Klick auf einen Stand ruft onWaehle(id), „Aktuell" ruft onWaehle(null)', async () => {
+  it('der Knopf „Sichern" im Dialog sichert; ohne Bezeichnung ohne Bezeichnung', async () => {
+    erzeugeLageSnapshot.mockResolvedValue(snapshot());
+    renderLeiste([], { darfSichern: true });
+    await userEvent.click(screen.getByRole('button', { name: 'Stand sichern' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Stand sichern' });
+    const knopf = within(dialog).getByRole('button', { name: 'Sichern' });
+    // Erfassungs-Norm: Absende-Knopf im <form>, keine Modal-Fußzeile.
+    expect(knopf.closest('form')).not.toBeNull();
+    expect(document.querySelector('.ant-modal-footer')).toBeNull();
+    await userEvent.click(knopf);
+    await waitFor(() => expect(erzeugeLageSnapshot).toHaveBeenCalledWith(5, { bezeichnung: null }));
+  });
+
+  it('ein abgelehntes Sichern meldet den Fehler und lässt Dialog und Wortlaut stehen', async () => {
+    const fehler = vi.fn();
+    erzeugeLageSnapshot.mockRejectedValue(new Error('kaputt'));
+    renderLeiste([], { darfSichern: true, fehler });
+    await userEvent.click(screen.getByRole('button', { name: 'Stand sichern' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Stand sichern' });
+    await userEvent.type(within(dialog).getByLabelText('Snapshot-Bezeichnung'), 'Lage{Enter}');
+    await waitFor(() => expect(fehler).toHaveBeenCalled());
+    expect(within(dialog).getByLabelText('Snapshot-Bezeichnung')).toHaveValue('Lage');
+  });
+
+  it('die Auswahl „Stand“ bietet Live und die Stände an, die neuesten oben', async () => {
+    renderLeiste(
+      [
+        snapshot({ id: 10, bezeichnung: 'Stand A', stand_at: '2026-07-24 08:00:00' }),
+        snapshot({ id: 30, bezeichnung: null, stand_at: '2026-07-24 10:15:00' }),
+        snapshot({ id: 20, bezeichnung: 'Stand B', stand_at: '2026-07-24 09:00:00' }),
+      ],
+      {},
+    );
+    await userEvent.click(screen.getByRole('combobox', { name: 'Stand' }));
+    const titel = await waitFor(() => {
+      const t = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option',
+        ),
+      ).map((o) => o.getAttribute('title'));
+      expect(t.length).toBe(4);
+      return t;
+    });
+    // Ohne Bezeichnung die Uhrzeit (`formatZeitKurz`, UTC-Wire-String).
+    expect(titel).toEqual(['Live', formatZeitKurz('2026-07-24 10:15:00'), 'Stand B', 'Stand A']);
+  });
+
+  it('die Auswahl zeigt den aktiven Stand, sonst „Live“', () => {
+    const liste = [snapshot({ id: 7, bezeichnung: 'Stand A' })];
+    const { unmount } = renderLeiste(liste, { aktiverSnapshotId: 7 });
+    expect(auswahlText()).toBe('Stand A');
+    unmount();
+    renderLeiste(liste, {});
+    expect(auswahlText()).toBe('Live');
+  });
+
+  it('ein unbekannter aktiver Stand (gelöscht, alter Link) zeigt „Live“, nicht seine Id', () => {
+    renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], { aktiverSnapshotId: 42 });
+    expect(auswahlText()).toBe('Live');
+  });
+
+  it('eine Wahl in der Auswahl ruft onWaehle(id), „Live“ ruft onWaehle(null)', async () => {
     const onWaehle = vi.fn();
-    renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], { aktiverSnapshotId: 7, onWaehle });
-    await userEvent.click(await screen.findByRole('button', { name: 'Stand A' }));
-    expect(onWaehle).toHaveBeenCalledWith(7);
-    await userEvent.click(screen.getByRole('button', { name: 'Aktuell' }));
-    expect(onWaehle).toHaveBeenCalledWith(null);
+    const liste = [snapshot({ id: 7, bezeichnung: 'Stand A' })];
+    const { unmount } = renderLeiste(liste, { aktiverSnapshotId: 7, onWaehle });
+    await waehleStand('Live');
+    expect(onWaehle).toHaveBeenLastCalledWith(null);
+    unmount();
+    renderLeiste(liste, { onWaehle });
+    await waehleStand('Stand A');
+    expect(onWaehle).toHaveBeenLastCalledWith(7);
+  });
+
+  it('im Band stehen keine Stand-Knöpfe und kein „Aktuell“ (LFH-899, D1)', () => {
+    const { container } = renderLeiste(
+      [snapshot(), snapshot({ id: 2, bezeichnung: 'Stand B', stand_at: '2026-07-24 09:00:00' })],
+      { darfSichern: true },
+    );
+    // Positivkontrolle: das Band steht ausgeklappt mit beiden Ständen.
+    expect(screen.getByRole('combobox', { name: 'Stand' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stand A' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Stand B' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Aktuell' })).toBeNull();
+    expect(container.querySelector('[data-lfh="zeitachse-staende"]')).toBeNull();
   });
 
   it('rendert nichts ohne Schreibrecht und ohne Stände', () => {
@@ -203,12 +304,12 @@ describe('SnapshotLeiste', () => {
   it('Ausblenden lässt nur den Einblenden-Knopf stehen, Einblenden holt die Leiste zurück', async () => {
     renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], { darfSichern: true });
     await userEvent.click(await screen.findByRole('button', { name: 'Zeitachse ausblenden' }));
-    expect(screen.queryByRole('button', { name: 'Stand A' })).toBeNull();
-    expect(screen.queryByLabelText('Snapshot-Bezeichnung')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Stand' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Stand sichern' })).toBeNull();
     expect(screen.queryByRole('slider')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Zeitachse einblenden' }));
-    expect(screen.getByRole('button', { name: 'Stand A' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Stand' })).toBeInTheDocument();
   });
 
   it('der eingeklappte Zustand überlebt einen Remount (per-User gemerkt)', async () => {
@@ -218,7 +319,7 @@ describe('SnapshotLeiste', () => {
 
     renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], {});
     expect(await screen.findByRole('button', { name: 'Zeitachse einblenden' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Stand A' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Stand' })).toBeNull();
   });
 
   it('Ausblenden stoppt eine laufende Wiedergabe (sonst liefe sie ohne sichtbare Pause-Taste weiter)', async () => {
@@ -236,7 +337,7 @@ describe('SnapshotLeiste', () => {
     expect(screen.getByRole('button', { name: 'Abspielen' })).toBeInTheDocument();
   });
 
-  it('„Aktuell" unterbricht eine laufende Wiedergabe', async () => {
+  it('eine Wahl in der Auswahl unterbricht eine laufende Wiedergabe', async () => {
     const onWaehle = vi.fn();
     renderLeiste(
       [
@@ -247,8 +348,8 @@ describe('SnapshotLeiste', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Abspielen' }));
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktuell' }));
-    expect(onWaehle).toHaveBeenLastCalledWith(null);
+    await waehleStand('B');
+    expect(onWaehle).toHaveBeenLastCalledWith(20);
     expect(screen.getByRole('button', { name: 'Abspielen' })).toBeInTheDocument();
   });
 });
@@ -271,21 +372,6 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
     expect(knopf.style.zIndex).toBe('');
     expect(knopf.style.alignSelf).toBe('flex-start');
     expect(knopf.style.pointerEvents).toBe('auto');
-  });
-
-  it('die Stände teilen sich die Zeile und rollen, statt eine zweite Zeile aufzumachen', () => {
-    const { container } = renderLeiste(
-      [snapshot(), snapshot({ id: 2, bezeichnung: 'Stand B', stand_at: '2026-07-24 09:00:00' })],
-      { darfSichern: true },
-    );
-    const reihe = container.querySelector('[data-lfh="zeitachse-staende"]') as HTMLElement;
-    // Positivkontrolle: die Reihe trägt die Stände wirklich.
-    expect(reihe.querySelectorAll('button').length).toBe(2);
-    expect(reihe.style.minWidth).toBe('0px');
-    expect(reihe.style.overflowX).toBe('auto');
-    // 120 statt 160: unter Linux-Schriften rutschte der Einklapp-Pfeil bei 1440 px sonst allein in
-    // eine dritte Reihe. Die Stand-Reihe rollt ohnehin — die Basis ist nur ihre Umbruchschwelle.
-    expect(standLeisteStil.flex).toBe('1 1 120px');
   });
 
   it('Startzustand: gemerkte Wahl gewinnt, ohne Wahl eingeklappt nur auf dem Handschirm', () => {
@@ -314,25 +400,81 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
   });
 });
 
-describe('SnapshotLeiste — Umbruch statt Überlauf (LFH-373)', () => {
-  /**
-   * Seit der Fuß vor der Knopfspalte endet, ist das Band schmaler: ein Bezeichnungsfeld mit festen
-   * 180 px ragte bei 390 px aus dem Band und fing Klicks auf die Kartenknöpfe ab. Geprüft wird die
-   * Struktur; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
-   */
-  it('das Bezeichnungsfeld darf schrumpfen und hat keine feste Breite mehr', () => {
-    expect(sichernFeldStil.width).toBeUndefined();
-    expect(sichernFeldStil.minWidth).toBe(0);
-    expect(sichernFeldStil.flex).toBe('0 1 180px');
+describe('SnapshotLeiste — zwei Gruppen, Abstände aus der Staffel (LFH-899)', () => {
+  /** Die Werte der Stufe `handschuh`, so wie `antdToken` sie ins Theme legt. */
+  const HANDSCHUH = {
+    controlHeight: dichten.handschuh.zeilenhoehe,
+    margin: dichten.handschuh.abstand.md,
+    marginSM: dichten.handschuh.abstand.sm,
+    paddingSM: dichten.handschuh.abstand.sm,
+  };
+  const KOMPAKT = {
+    controlHeight: dichten.kompakt.zeilenhoehe,
+    margin: dichten.kompakt.abstand.md,
+    marginSM: dichten.kompakt.abstand.sm,
+    paddingSM: dichten.kompakt.abstand.sm,
+  };
+
+  it('Gruppenlücke `margin`, Lücke in der Gruppe `marginSM`, Polsterung `paddingSM`', () => {
+    const s = bandStile(HANDSCHUH);
+    // Literale statt Rechnung: 26 / 16 / 16 ist die Handschuh-Stufe aus `theme/tokens.ts`.
+    expect(s.band.gap).toBe(26);
+    expect(s.band.padding).toBe(16);
+    expect(s.wiedergabe.gap).toBe(16);
+    expect(s.stand.gap).toBe(16);
+    expect(s.schieber.marginInline).toBe(16);
+    // Gegenprobe: die Abstände wachsen mit der Stufe.
+    expect(bandStile(KOMPAKT).band.padding).toBe(7);
   });
 
-  it('die Zeitleiste bricht um, statt über den Bandrand zu laufen', () => {
-    expect(zeitleisteStil.flexWrap).toBe('wrap');
-    expect(zeitleisteStil.minWidth).toBe(0);
+  it('jede Gruppe bleibt in einer Zeile, das Band bricht zwischen den Gruppen um', () => {
+    const s = bandStile(HANDSCHUH);
+    expect(s.band.flexWrap).toBe('wrap');
+    expect(s.wiedergabe.flexWrap).toBe('nowrap');
+    expect(s.stand.flexWrap).toBe('nowrap');
+    // Ohne `minWidth: 0` nähme eine Gruppe ihre Inhaltsbreite an und liefe über den Bandrand.
+    expect(s.wiedergabe.minWidth).toBe(0);
+    expect(s.stand.minWidth).toBe(0);
+    expect(s.schieber.minWidth).toBe(0);
+    expect(s.auswahl.minWidth).toBe(0);
   });
 
-  it('der Abspielknopf schrumpft nicht unter seine Kante', () => {
-    expect(abspielenStil.flexShrink).toBe(0);
+  it('beide Gruppen passen im Fükw in eine Zeile, am Tablet nicht', () => {
+    // Innenbreite = Bandbreite − 2 × Polsterung; Bandbreiten gemessen auf `alpha` (design.md).
+    for (const [token, fuekw, tablet] of [
+      [HANDSCHUH, 730 - 32, 335 - 32],
+      [KOMPAKT, 730 - 14, 335 - 14],
+    ] as const) {
+      const s = bandStile(token);
+      const zeile = s.wiedergabeBasis + token.margin + s.standBasis;
+      expect(zeile).toBeLessThanOrEqual(fuekw);
+      expect(zeile).toBeGreaterThan(tablet);
+    }
+  });
+
+  it('Ausblenden, Abspielen und Sichern schrumpfen nicht unter ihre Kante', () => {
+    const s = bandStile(HANDSCHUH);
+    expect(s.knopf.flexShrink).toBe(0);
+  });
+
+  it('die Gruppen tragen die Ziele: Ausblenden, Abspielen, Schieber | Auswahl, Sichern', () => {
+    const { container } = renderLeiste(
+      [snapshot(), snapshot({ id: 2, bezeichnung: 'Stand B', stand_at: '2026-07-24 09:00:00' })],
+      { darfSichern: true },
+    );
+    const wiedergabe = container.querySelector('[data-lfh="zeitachse-wiedergabe"]') as HTMLElement;
+    const stand = container.querySelector('[data-lfh="zeitachse-stand"]') as HTMLElement;
+    expect(within(wiedergabe).getByRole('button', { name: 'Zeitachse ausblenden' })).toBeTruthy();
+    expect(within(wiedergabe).getByRole('button', { name: 'Abspielen' })).toBeTruthy();
+    expect(within(wiedergabe).getByRole('slider')).toBeTruthy();
+    expect(within(stand).getByRole('combobox', { name: 'Stand' })).toBeTruthy();
+    expect(within(stand).getByRole('button', { name: 'Stand sichern' })).toBeTruthy();
+  });
+
+  it('ohne Schreibrecht fehlt „Stand sichern“, die Auswahl bleibt', () => {
+    renderLeiste([snapshot()], { darfSichern: false });
+    expect(screen.getByRole('combobox', { name: 'Stand' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stand sichern' })).toBeNull();
   });
 
   it('„Stand sichern" heißt so — ohne das englische Symbol-Label „camera" davor', () => {

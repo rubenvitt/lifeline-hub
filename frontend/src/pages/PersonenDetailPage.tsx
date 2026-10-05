@@ -83,10 +83,11 @@ import type {
 import {
   lagekartePfad,
   parseRouteId,
-  personenPfad,
   schadenDetailPfad,
   tiereDetailPfad,
 } from '../routing/deeplinks';
+import { useEinsatzPfade } from '../routing/EinsatzPfade';
+import { useGeraetDarf } from '../geraet/geraetSicht';
 import { koordinatenText } from '../personen/koordinate';
 import { istAngetroffen } from '../personen/personenBilanz';
 import { KoordinateFeld, VermisstSeitFeld } from '../personen/LagedatenFelder';
@@ -153,6 +154,10 @@ export default function PersonenDetailPage() {
   aktuelleRouteRef.current = { einsatzId, personId };
   const navigate = useNavigate();
   const { benutzer } = useAuth();
+  // Am gekoppelten Gerät (LFH-892): kein Status, kein Storno, keine Zuordnungen und Anhänge und
+  // kein Sprung in fremde Module; der Rückweg führt in die Gerätehülle.
+  const darf = useGeraetDarf();
+  const pfade = useEinsatzPfade();
 
   const qc = useQueryClient();
   const { modal } = App.useApp();
@@ -325,7 +330,7 @@ export default function PersonenDetailPage() {
     mutationFn: (pid: number) => stornierePerson(einsatzId, pid),
     onSuccess: () => {
       invalidate();
-      navigate(personenPfad(einsatzId));
+      navigate(pfade.personenListe(einsatzId));
     },
     onError: fehler,
   });
@@ -407,7 +412,7 @@ export default function PersonenDetailPage() {
   // Strukturell ungültige Personen-ID → zurück zur Liste, statt mit NaN zu laden. Steht nach allen
   // Hooks (Rules-of-Hooks).
   if (!idGueltig) {
-    return <Navigate to={personenPfad(einsatzId)} replace />;
+    return <Navigate to={pfade.personenListe(einsatzId)} replace />;
   }
 
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
@@ -421,7 +426,7 @@ export default function PersonenDetailPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const zurueck = personenPfad(einsatzId);
+  const zurueck = pfade.personenListe(einsatzId);
 
   if (detailQuery.isError) {
     return (
@@ -689,7 +694,7 @@ export default function PersonenDetailPage() {
                 <span data-lfh="koordinate" style={{ fontFamily: token.fontFamilyCode }}>
                   {koordinatenText(person) ?? '—'}
                 </span>
-                {darfSchreiben && !person.storniert_at && angetroffen && (
+                {darfSchreiben && !person.storniert_at && angetroffen && darf('fremde-module') && (
                   // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
                   // Lagekarte), in einem neuen Tab öffenbar. Die zwei Angaben des handgebauten
                   // Bedienziels trägt `verortenLinkStil`.
@@ -894,7 +899,11 @@ export default function PersonenDetailPage() {
                   },
                 ]
               : []),
-          ]}
+          ].filter(
+            (abschnitt) =>
+              (abschnitt.key !== 'zuordnungen' || darf('person-zuordnungen')) &&
+              (abschnitt.key !== 'anhaenge' || darf('person-anhaenge')),
+          )}
         />
       </Space>
     );
@@ -955,7 +964,9 @@ export default function PersonenDetailPage() {
     };
     const verbleib: Kopfaktion = { art: 'verbleib', key: 'verbleib', label: 'Verbleib erfassen' };
     const bearbeiten: Kopfaktion = { art: 'bearbeiten', key: 'bearbeiten', label: 'Bearbeiten' };
-    const statuswechsel: Kopfaktion[] = naechsteStatus(p.status).map((s) => ({
+    // Status und Storno bleiben am Gerät aus; der Server lehnt sie dort ab (LFH-892).
+    const statusFrei = darf('person-status');
+    const statuswechsel: Kopfaktion[] = (statusFrei ? naechsteStatus(p.status) : []).map((s) => ({
       art: 'status',
       key: `status:${s}`,
       label: `→ ${STATUS_META[s].label}`,
@@ -973,7 +984,7 @@ export default function PersonenDetailPage() {
       primaer === sichten ? verbleib : sichten,
       bearbeiten,
       ...statuswechsel,
-      stornieren,
+      ...(statusFrei ? [stornieren] : []),
     ];
     return { primaer, weitere: uebrig };
   })();
@@ -1001,14 +1012,16 @@ export default function PersonenDetailPage() {
         </Space>
       }
       breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>Personen</Link> },
-            { title: registrierAnzeige(p.registrier_nr) },
-          ]}
-        />
+        darf('fremde-module') && (
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: einsatz.bezeichnung },
+              { title: <Link to={zurueck}>Personen</Link> },
+              { title: registrierAnzeige(p.registrier_nr) },
+            ]}
+          />
+        )
       }
       aktionen={
         /**

@@ -62,7 +62,7 @@ function halterAnzeige(t: Tier): React.ReactNode {
     return t.halter_storniert_at ? (
       <Typography.Text type="secondary">Halter (storniert): {label}</Typography.Text>
     ) : (
-      <Tag color="blue">{label}</Tag>
+      <Tag>{label}</Tag>
     );
   }
   if (t.halter_kontakt) return <Typography.Text>{t.halter_kontakt}</Typography.Text>;
