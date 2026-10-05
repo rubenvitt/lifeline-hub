@@ -305,6 +305,13 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
       `Überhang screen ${bildschirm.koerperUeberhang}px → print ${druck.koerperUeberhang}px`,
   });
 
+  // (c) Hängender Einzug im Druck (LFH-977): die Kräfte stehen rechts von „Ohne Einheit“, und
+  //     kein Text ragt aus seiner Zelle. Die Einheitenspalte hat keine Breite; eine Hülle neben
+  //     antds Floats behielt hier ~12 px, weil Floats nicht zur Mindestbreite der Zelle zählen.
+  const einzug = await baumLage(page, '.kraefte-print-root');
+  expect(einzug.filter((z) => z.ebene === 1)).toHaveLength(8);
+  pruefeHaengendenEinzug(einzug, `Meldebild-Druck ${A4_DRUCKBREITE} px`, 'inhalt');
+
   // Medium zurückstellen, damit ein Folgeschritt nicht im Druckmodus weiterläuft.
   await page.emulateMedia({ media: null });
 });

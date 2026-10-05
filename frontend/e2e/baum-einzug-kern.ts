@@ -24,11 +24,14 @@ export interface BaumZeile {
   anfang: number;
   /**
    * Linkes Ende des Zelleninhalts hinter Einzug und Symbol, Zeichen (`EinheitZeichen`) und
-   * Folgezeilen eingeschlossen: das Minimum über die Zeilenboxen der übrigen Zellkinder.
+   * Folgezeilen eingeschlossen: das Minimum über die Boxen aller übrigen Elemente der Zelle.
    */
   inhalt: number;
   /** Linkestes Ende aller Zeilenboxen (Folgezeilen eingeschlossen). */
   linkesteZeile: number;
+  /** Rechtes Ende der längsten Zeilenbox und rechte Innenkante der Zelle. */
+  textRechts: number;
+  zelleRechts: number;
   /** Anzahl verschiedener Zeilenoberkanten: > 1 heißt, der Text bricht um. */
   zeilen: number;
   ersteOben: number;
@@ -63,19 +66,25 @@ export function baumLage(page: Page, wurzel: string): Promise<BaumZeile[]> {
         '.ant-table-row-expand-icon:not(.ant-table-row-expand-icon-spaced)',
       );
       const s = symbol?.getBoundingClientRect();
-      const inhalt = Array.from(zelle.children)
-        .filter(
-          (k) =>
-            !k.classList.contains('ant-table-row-indent') &&
-            !k.classList.contains('ant-table-row-expand-icon'),
-        )
-        .flatMap((k) => Array.from(k.getClientRects()).map((r) => r.left));
+      // Jedes Element, das weder Einzug noch Symbol ist noch eines davon enthält: so zählt eine
+      // Hülle um Symbol und Text nicht, der Textblock daneben schon (unabhängig vom Aufbau).
+      const randKnoten = Array.from(
+        zelle.querySelectorAll('.ant-table-row-indent, .ant-table-row-expand-icon'),
+      );
+      const inhalt = Array.from(zelle.querySelectorAll('*'))
+        .filter((e) => !randKnoten.some((r) => e === r || e.contains(r) || r.contains(e)))
+        .flatMap((e) => Array.from(e.getClientRects()))
+        .filter((r) => r.width > 0)
+        .map((r) => r.left);
       return {
         schluessel: tr.getAttribute('data-row-key') ?? '',
         text: text.trim(),
         ebene,
         anfang: kasten[0].left,
-        inhalt: Math.min(...inhalt),
+        inhalt: Math.min(...inhalt, ...kasten.map((r) => r.left)),
+        textRechts: Math.max(...kasten.map((r) => r.right)),
+        zelleRechts:
+          zelle.getBoundingClientRect().right - parseFloat(getComputedStyle(zelle).paddingRight),
         linkesteZeile: Math.min(...kasten.map((r) => r.left)),
         zeilen: new Set(kasten.map((r) => Math.round(r.top))).size,
         ersteOben: kasten[0].top,
@@ -87,9 +96,9 @@ export function baumLage(page: Page, wurzel: string): Promise<BaumZeile[]> {
 }
 
 /**
- * Die drei Akzeptanzkriterien je Zeile: Text rechts vom Textanfang der Elternzeile (die
- * nächste vorausgehende Zeile eine Ebene höher), Folgezeilen nicht links vom eigenen Textanfang,
- * das Symbol in derselben Zeile wie der Textanfang.
+ * Die Akzeptanzkriterien je Zeile: Text rechts vom Textanfang der Elternzeile (die nächste
+ * vorausgehende Zeile eine Ebene höher), Folgezeilen nicht links vom eigenen Textanfang, kein
+ * Text über die Zelle hinaus, das Symbol in derselben Zeile wie der Textanfang.
  *
  * `vergleich: 'inhalt'` misst die Stufe am Inhaltsanfang statt am Text: im Meldebild trägt die
  * Einheit ein Zeichen vor dem Namen, ihre Kräfte nicht, der Text der Kinder steht dort also
@@ -107,6 +116,10 @@ export function pruefeHaengendenEinzug(
       z.linkesteZeile,
       `${name}: Folgezeile ${z.linkesteZeile}px links vom Textanfang ${z.anfang}px`,
     ).toBeGreaterThanOrEqual(z.anfang - SUBPIXEL);
+    expect(
+      z.textRechts,
+      `${name}: Text ragt bis ${z.textRechts}px über die Zelle (${z.zelleRechts}px) hinaus`,
+    ).toBeLessThanOrEqual(z.zelleRechts + SUBPIXEL);
     if (z.symbol) {
       expect(
         z.symbol.oben < z.ersteUnten && z.symbol.unten > z.ersteOben,

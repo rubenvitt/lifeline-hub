@@ -1,10 +1,11 @@
 import { IconChevronRechts, IconChevronRunter } from '../icons';
-import { Button, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, ConfigProvider, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { TableColumnType } from 'antd';
 import {
   isValidElement,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -91,6 +92,9 @@ import { kennungsLinkStil } from './kennungsLink';
  *   stromaufwärts über die Vollmenge kumuliert (`kraefte/kraeftebild.ts`) und lögen still, fiele
  *   hier eine Zeile weg. Vorgefiltert wird stromaufwärts (`filtereKraefte`).
  */
+
+/** Einzug je Baumebene in px: antds Vorgabe (`indentSize`), seit LFH-977 selbst gezeichnet. */
+const BAUM_EINZUG_PX = 15;
 
 // ── Formachse ────────────────────────────────────────────────────────────────────────
 /**
@@ -662,6 +666,9 @@ export default function Datensicht<T extends object, const K extends string>(
   } = props;
 
   const { token } = theme.useToken();
+  const { getPrefixCls, locale: antdLocale } = useContext(ConfigProvider.ConfigContext);
+  const tabellenPraefix = getPrefixCls('table');
+  const tabellenText = antdLocale?.Table;
   const { abBreite } = useViewport();
   const wurzel = useRef<HTMLElement>(null);
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
@@ -1144,14 +1151,57 @@ export default function Datensicht<T extends object, const K extends string>(
    * fixierten Kennung glitt eine solche Spalte bei 390 px unter sie (Gate 1), an Position 0 erbte
    * sie deren `fixed`. Die Kennungszelle ist immer sichtbar, wie in der Karte.
    *
-   * Mit `baum` steht der Inhalt der ersten Spalte in einer Block-Hülle mit eigenem
-   * Formatierungskontext (LFH-977, hängender Einzug): antd setzt Einzug (1 px hoch) und
-   * Aufklappsymbol als Floats VOR den Inhalt. Als Inline-Inhalt bräche ein langer Name unter den
-   * Floats an den Zellrand um, und ein zu breiter Titel-Link (`inline-flex`, atomar) rutschte ganz
-   * darunter: das Fahrzeug stand links von seiner Einheit, das Symbol allein darüber. Die Hülle
-   * steht neben den Floats und bricht nur in sich um. Breitere Spalten heilten nur das Symptom.
+   * Mit `baum` zeichnet die erste Spalte Einzug und Aufklappsymbol SELBST, als Flex-Zeile vor
+   * einem Textblock (LFH-977, hängender Einzug). antd setzt beides als Floats vor den Inhalt
+   * (Einzug 1 px hoch): ein langer Name brach darunter an den Zellrand um, ein zu breiter
+   * Titel-Link (`inline-flex`, atomar) rutschte ganz darunter, das Fahrzeug stand links von
+   * seiner Einheit und das Symbol allein darüber. Eine Block-Hülle neben den Floats genügt nicht:
+   * Floats zählen nicht zur Mindestbreite der Zelle, im Druck des Meldebilds (Spalte ohne Breite)
+   * blieben der Hülle ~12 px. Die Flex-Zeile trägt Einzug und Symbol in ihrer Mindestbreite.
+   * Breitere Spalten heilten nur das Symptom. Symbol und Platzhalter behalten antds Klassen und
+   * Verhalten (Klick stoppt die Weitergabe an den Zeilen-Riegel).
    */
   const ersteSpalte = gezeigteSpalten[0];
+  const baumTiefe = useMemo(() => {
+    const tiefe = new Map<Key, number>();
+    if (!baum) return tiefe;
+    const gehe = (zeilen: readonly T[], t: number) => {
+      for (const z of zeilen) {
+        tiefe.set(schluessel(z), t);
+        gehe((z[baum.kinder] as readonly T[] | undefined) ?? [], t + 1);
+      }
+    };
+    gehe(sichtbareZeilen, 0);
+    return tiefe;
+  }, [baum, sichtbareZeilen, schluessel]);
+  const baumSymbol = (zeile: T): ReactNode => {
+    const klasse = `${tabellenPraefix}-row-expand-icon`;
+    const kinder = zeile[baum!.kinder] as readonly T[] | undefined;
+    // Blatt: antds unsichtbarer Platzhalter, damit Geschwister bündig stehen.
+    if (!kinder || kinder.length === 0) {
+      return <span aria-hidden className={`${klasse} ${klasse}-spaced`} />;
+    }
+    const k = schluessel(zeile);
+    const offen = baum!.aufgeklappt.includes(k);
+    return (
+      <button
+        type="button"
+        className={`${klasse} ${klasse}-${offen ? 'expanded' : 'collapsed'}`}
+        aria-label={
+          offen
+            ? (tabellenText?.collapse ?? 'Zeile reduzieren')
+            : (tabellenText?.expand ?? 'Zeile erweitern')
+        }
+        aria-expanded={offen}
+        onClick={(event) => {
+          event.stopPropagation();
+          baum!.onAufgeklappt(
+            offen ? baum!.aufgeklappt.filter((x) => x !== k) : [...baum!.aufgeklappt, k],
+          );
+        }}
+      />
+    );
+  };
   const ersteZelle = (wert: unknown, zeile: T, index: number): ReactNode => {
     const basis = antdSpalten[0].render;
     // Der Titel-Link ersetzt das Spalten-`render`; sonst die Zelle über `zelle`.
@@ -1185,8 +1235,28 @@ export default function Datensicht<T extends object, const K extends string>(
             {
               ...antdSpalten[0],
               render: (wert: unknown, zeile: T, index: number) => (
-                <div data-lfh="datensicht-baum-text" style={{ display: 'flow-root' }}>
-                  {ersteZelle(wert, zeile, index)}
+                <div
+                  data-lfh="datensicht-baum-zelle"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: token.paddingXS,
+                    paddingInlineStart: (baumTiefe.get(schluessel(zeile)) ?? 0) * BAUM_EINZUG_PX,
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flex: '0 0 auto',
+                      height: token.fontSize * token.lineHeight,
+                    }}
+                  >
+                    {baumSymbol(zeile)}
+                  </span>
+                  <div data-lfh="datensicht-baum-text" style={{ minWidth: 0, flex: '1 1 auto' }}>
+                    {ersteZelle(wert, zeile, index)}
+                  </div>
                 </div>
               ),
             },
@@ -1228,7 +1298,7 @@ export default function Datensicht<T extends object, const K extends string>(
                  * `expandRowByClick` kennt keinen Riegel: ein Klick auf den Titel-Link klappte
                  * sonst mit um, beim Strg-Klick sogar in der Seite, die stehen bleibt; ein
                  * Statusknopf klappte die Einheit zu, während sein Menü aufging. Das
-                 * Aufklappsymbol selbst stoppt die Weitergabe (rc-table, im Test gepinnt).
+                 * Aufklappsymbol selbst stoppt die Weitergabe (`baumSymbol`, im Test gepinnt).
                  */
                 onClick: (event) => {
                   const ziel = event.target as HTMLElement;
@@ -1269,6 +1339,9 @@ export default function Datensicht<T extends object, const K extends string>(
           ? {
               childrenColumnName: baum.kinder,
               expandedRowKeys: [...baum.aufgeklappt],
+              // Einzug und Symbol zeichnet die erste Spalte selbst (LFH-977, `tabellenSpalten`).
+              indentSize: 0,
+              expandIcon: () => null,
               onExpandedRowsChange: (schluessel) => baum.onAufgeklappt([...schluessel]),
               // Die ganze Zeile ist das Trefferziel, nicht das ~16 px breite Symbol (antd zeichnet es in fester
               // Größe). Im Primitiv, damit es für jeden Baum gilt; `onZeileKlick` ist im Baummodus gesperrt.
