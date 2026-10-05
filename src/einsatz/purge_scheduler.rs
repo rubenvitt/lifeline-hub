@@ -5,7 +5,8 @@
 //!
 //! Vier Phasen:
 //! - **Phase A** (reversibel): Einsätze mit abgelaufener Aufbewahrungsfrist werden
-//!   soft-gelöscht (`geloescht_at` gesetzt = Karenz-Start). Ab da am Datenzugriff
+//!   soft-gelöscht (`geloescht_at` = Karenz-Start: Fristablauf bzw. Setzen einer Frist in die
+//!   Vergangenheit, höchstens jetzt; LFH-906). Ab da am Datenzugriff
 //!   gesperrt (`darf_lesen`).
 //! - **Phase A2** (IRREVERSIBEL, LFH-751): fällige Schwärzungsanträge (Löschersuchen nach
 //!   Art. 17) werden vollzogen (`aufbewahrung::antrag::vollziehe_faellige`).
@@ -69,7 +70,7 @@ pub async fn tick_mit_rueckschrieb(
     let mut geschwaerzt = 0;
     let mut geloescht = 0;
 
-    // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start) ---
+    // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start ab Fristablauf) ---
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
         Ok(ids) => {
             for id in ids {
@@ -1474,6 +1475,159 @@ mod tests {
         assert_eq!(s, None, "vor Ablauf der Karenz nicht geschwärzt");
     }
 
+    // ---------- LFH-906: Karenz-Beginn ab Fristablauf ----------
+
+    /// Setzt den Zeitpunkt, zu dem die Frist gesetzt wurde (sonst NULL = unbekannt).
+    async fn frist_gesetzt_am(pool: &SqlitePool, id: i64, gesetzt_at: &str) {
+        sqlx::query("UPDATE einsatz SET retention_gesetzt_at = ? WHERE id = ?")
+            .bind(gesetzt_at)
+            .bind(id)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    async fn tombstones(pool: &SqlitePool, id: i64) -> (Option<String>, Option<String>) {
+        sqlx::query_as("SELECT geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn vormerkungs_audit(pool: &SqlitePool, id: i64) -> String {
+        sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' \
+             AND inhalt LIKE 'Aufbewahrungsfrist abgelaufen%'",
+        )
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Spec `aufbewahrung`, „Erster Lauf lange nach dem Fristablauf“: die beim Abschluss gesetzte
+    /// Frist lief am 01.06. ab, der erste Lauf kommt zehn Tage später (Stillstand). Die Karenz
+    /// rechnet ab dem 01.06., nicht ab dem Lauf.
+    #[tokio::test]
+    async fn erster_lauf_lange_nach_fristablauf_rechnet_karenz_ab_fristablauf() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        frist_gesetzt_am(&pool, id, "2026-01-01 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-11 12:00:00")).await,
+            1
+        );
+        assert_eq!(
+            tombstones(&pool, id).await,
+            (Some("2026-06-01 00:00:00".into()), None),
+            "vorgemerkt mit dem Fristablauf als Karenz-Beginn"
+        );
+        let audit = vormerkungs_audit(&pool, id).await;
+        assert!(audit.contains("seit 2026-06-01 00:00:00"), "{audit}");
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-30 23:59:59")).await,
+            0,
+            "Karenz läuft bis 30 Tage nach dem Fristablauf"
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-01 00:00:00")).await,
+            1
+        );
+        assert_eq!(
+            tombstones(&pool, id).await.1.as_deref(),
+            Some("2026-07-01 00:00:00")
+        );
+    }
+
+    /// Im normalen Betrieb liegt der Lauf kurz nach dem Fristablauf; der ETB-Eintrag nennt den
+    /// Karenz-Beginn trotzdem, damit „Vormerkung“ und Karenz im ETB nicht auseinanderfallen.
+    #[tokio::test]
+    async fn lauf_zur_fristablauf_minute_merkt_ohne_verschiebung_vor() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        frist_gesetzt_am(&pool, id, "2026-01-01 00:00:00").await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 00:00:00")).await,
+            1
+        );
+        assert_eq!(
+            tombstones(&pool, id).await.0.as_deref(),
+            Some("2026-06-01 00:00:00")
+        );
+        let audit = vormerkungs_audit(&pool, id).await;
+        assert!(
+            !audit.contains("seit"),
+            "kein Karenz-Beginn vor dem Lauf: {audit}"
+        );
+    }
+
+    /// Spec `aufbewahrung`, „Frist in die Vergangenheit verkürzt“: die Frist wurde am 01.06. auf
+    /// einen Zeitpunkt 60 Tage davor gesetzt. Die Karenz beginnt mit dem Setzen und hält volle
+    /// 30 Tage.
+    #[tokio::test]
+    async fn frist_in_die_vergangenheit_behaelt_volle_karenz_ab_dem_setzen() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-04-02 12:00:00").await;
+        frist_gesetzt_am(&pool, id, "2026-06-01 12:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-01 12:10:00")).await,
+            1
+        );
+        assert_eq!(
+            tombstones(&pool, id).await,
+            (Some("2026-06-01 12:00:00".into()), None)
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-01 11:59:59")).await,
+            0
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-07-01 12:00:00")).await,
+            1
+        );
+    }
+
+    /// Spec `aufbewahrung`, „Vormerkung mit schon abgelaufener Karenz“: Frist seit 40 Tagen
+    /// abgelaufen, ein Lauf merkt vor und schwärzt.
+    #[tokio::test]
+    async fn vormerkung_mit_abgelaufener_karenz_schwaerzt_im_selben_lauf() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-05-01 00:00:00").await;
+        frist_gesetzt_am(&pool, id, "2026-01-01 00:00:00").await;
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-10 00:00:00")).await,
+            2,
+            "Vormerkung und Schwärzung"
+        );
+        assert_eq!(
+            tombstones(&pool, id).await,
+            (
+                Some("2026-05-01 00:00:00".into()),
+                Some("2026-06-10 00:00:00".into())
+            )
+        );
+    }
+
+    /// Ist nicht bekannt, wann die Frist gesetzt wurde (NULL), gilt wie bisher der Lauf selbst.
+    #[tokio::test]
+    async fn unbekannter_setzzeitpunkt_beginnt_karenz_beim_lauf() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-05-01 00:00:00").await;
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-06-10 00:00:00")).await,
+            1
+        );
+        assert_eq!(
+            tombstones(&pool, id).await,
+            (Some("2026-06-10 00:00:00".into()), None)
+        );
+    }
+
     // ---------- LFH-23: Audit ohne stilles Auslassen ----------
 
     /// Abgeschlossener Einsatz OHNE jeden Akteur: kein `abgeschlossen_von`, keine
@@ -2219,6 +2373,126 @@ mod tests {
             "erneut geschwärzt, Vormerkung aus der Sicherung unverändert"
         );
         assert!(!enthaelt_klartext(&pfad));
+    }
+
+    /// Spec `aufbewahrung`, „Restore von vor der Vormerkung, Karenz abgelaufen“ (LFH-906): die
+    /// Sicherung stammt aus der Zeit vor der Vormerkung. Im ursprünglichen Verlauf ist der Einsatz
+    /// am 31.01. geschwärzt; nach dem Restore am 01.03. schwärzt der nächste Lauf ihn sofort,
+    /// statt die Karenz neu zu beginnen.
+    #[tokio::test]
+    async fn restore_von_vor_der_vormerkung_rechnet_karenz_ab_fristablauf() {
+        let (dir, pfad, pool) = produktions_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        // Stand der Sicherung: Frist beim Abschluss gesetzt, noch nicht vorgemerkt.
+        sqlx::query(
+            "UPDATE einsatz SET geloescht_at = NULL, retention_gesetzt_at = '2025-12-01 00:00:00' \
+             WHERE id = ?",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let sicherung = dir.path().join("vor_der_vormerkung.sqlite");
+        crate::backup::erzeuge_sicherung(&pool, &sicherung)
+            .await
+            .unwrap();
+
+        // Ursprünglicher Verlauf: Vormerkung zum Fristablauf, Schwärzung 30 Tage danach.
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-01 00:10:00")).await,
+            1
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-31 00:10:00")).await,
+            1
+        );
+        pool.close().await;
+
+        crate::backup::restore::restore_aus_datei(&sicherung, &pfad, true)
+            .await
+            .unwrap();
+        let pool = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        assert_eq!(
+            tombstones(&pool, e).await,
+            (None, None),
+            "Vorbedingung: die Sicherung trägt den Einsatz weder vorgemerkt noch geschwärzt"
+        );
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            2,
+            "Vormerkung und Schwärzung im selben Lauf"
+        );
+        assert_eq!(
+            tombstones(&pool, e).await,
+            (
+                Some("2026-01-01 00:00:00".into()),
+                Some("2026-03-01 12:00:00".into())
+            ),
+            "Karenz ab dem Fristablauf, nicht ab dem Restore"
+        );
+        assert!(!enthaelt_klartext(&pfad));
+    }
+
+    /// Spec `aufbewahrung`, „Restore von vor der Vormerkung, Karenz läuft noch“ (LFH-906): Restore
+    /// zehn Tage nach dem Fristablauf. Der Einsatz ist mit dem Fristablauf vorgemerkt, die
+    /// Friständerung liefert 422, Wiederherstellen gelingt, und ohne es ist er 20 Tage später
+    /// geschwärzt.
+    #[tokio::test]
+    async fn restore_von_vor_der_vormerkung_laesst_nur_die_restkarenz() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2026-01-01 00:00:00").await;
+        frist_gesetzt_am(&pool, e, "2025-12-01 00:00:00").await;
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let zweiter: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                 retention_bis, retention_gesetzt_at) \
+             VALUES (1, 'Lage 2', 'abgeschlossen', '2026-01-01 00:00:00', ?, \
+                 '2026-01-01 00:00:00', '2025-12-01 00:00:00') RETURNING id",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-11 00:00:00")).await,
+            2
+        );
+        for id in [e, zweiter] {
+            assert_eq!(
+                tombstones(&pool, id).await,
+                (Some("2026-01-01 00:00:00".into()), None)
+            );
+        }
+
+        let jetzt = t("2026-01-11 00:10:00");
+        assert!(matches!(
+            repo::frist_setzen(&pool, e, b, Some("2027-01-01 00:00:00"), "x", jetzt).await,
+            Err(crate::error::AppError::UnprocessableEntity(_))
+        ));
+        repo::wiederherstellen(&pool, zweiter, b, 1, Some("2027-01-01 00:00:00"), jetzt)
+            .await
+            .expect("Wiederherstellen in der Restkarenz");
+        assert_eq!(tombstones(&pool, zweiter).await, (None, None));
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-30 23:59:59")).await,
+            0
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-01-31 00:00:00")).await,
+            1
+        );
+        assert_eq!(
+            tombstones(&pool, e).await.1.as_deref(),
+            Some("2026-01-31 00:00:00")
+        );
+        assert_eq!(tombstones(&pool, zweiter).await, (None, None));
     }
 
     // ---------- LFH-750: endgültige Löschung des Skeletts (Phase D) ----------

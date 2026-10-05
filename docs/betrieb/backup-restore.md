@@ -124,8 +124,16 @@ nachträglich geschwärzt:
 - **Wiederherstellen einer älteren Sicherung:** War ein Einsatz in der Sicherung schon zur
   Löschung vorgemerkt, schwärzt ihn der nächste Purge-Lauf (alle 10 Minuten) erneut. Die
   Vormerkung aus der Sicherung gilt dabei, die Karenz beginnt nicht neu. Stammt die
-  Sicherung aus der Zeit **vor** der Vormerkung, merkt der Server den Einsatz neu vor, und
-  die Karenz von 30 Tagen läuft ab dann noch einmal.
+  Sicherung aus der Zeit **vor** der Vormerkung, merkt der Server den Einsatz mit dem Ablauf
+  seiner Frist als Zeitpunkt vor (LFH-906). Liegt der Fristablauf mehr als 30 Tage zurück,
+  schwärzt derselbe Lauf ihn sofort; sonst läuft nur die Restkarenz, und bis zu ihrem Ende
+  kann der Org-Admin ihn wiederherstellen. Das gilt auch für Sicherungen, die vor diesem
+  Update entstanden sind.
+- **Stillstand des Servers:** Dasselbe gilt, wenn der Server über den Fristablauf hinaus aus
+  war, etwa ein Notebook, das wochenlang nicht lief. Die Karenz rechnet ab dem Ablauf der
+  Frist; ein Einsatz, dessen Frist plus Karenz in der Zeit verstrichen ist, wird beim ersten
+  Purge-Lauf nach dem Start geschwärzt. Nur eine Frist, die jemand bewusst in die
+  Vergangenheit gesetzt hat, behält die volle Karenz ab dem Setzen.
 - **Endgültig gelöschte Skelette** (LFH-750, nur mit einer Skelett-Frist der Organisation):
   Eine Sicherung von vor der Löschung bringt das Skelett samt ETB zurück. Der nächste
   Purge-Lauf löscht es erneut, denn die Frist ergibt sich aus Abschluss und Org-Einstellung.

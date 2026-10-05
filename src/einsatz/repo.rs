@@ -478,8 +478,11 @@ pub async fn abschliessen(
                     .as_deref()
                     .and_then(|a| super::retention::berechne_retention_bis(a, dauer))
                 {
+                    // Die Frist gilt als beim Abschluss gesetzt (LFH-906): ihre Karenz beginnt
+                    // mit ihrem Ablauf, nicht erst mit dem Purge-Lauf, der vormerkt.
                     sqlx::query(
-                        "UPDATE einsatz SET retention_bis = ? WHERE id = ? AND retention_bis IS NULL",
+                        "UPDATE einsatz SET retention_bis = ?, retention_gesetzt_at = abgeschlossen_at \
+                         WHERE id = ? AND retention_bis IS NULL",
                     )
                     .bind(&neue_frist)
                     .bind(einsatz_id)
@@ -543,12 +546,15 @@ pub async fn abschliessen(
 /// Pattern B). `neue_frist = None` hebt die Frist auf (unbegrenzt). Der Audit-Text
 /// wird vom Aufrufer gebildet (er kennt alten/neuen Wert). Die Verkürzungs-
 /// Bestätigung ist Sache des Handlers. Liefert genau eine ETB-Kennung, den Audit-Eintrag.
+/// `jetzt` ist der Zeitpunkt des Setzens (`retention_gesetzt_at`, LFH-906): liegt die neue
+/// Frist davor, beginnt ihre Karenz erst mit ihm.
 pub async fn frist_setzen(
     pool: &SqlitePool,
     einsatz_id: i64,
     erfasser_id: i64,
     neue_frist: Option<&str>,
     audit_inhalt: &str,
+    jetzt: chrono::DateTime<Utc>,
 ) -> Result<MitEtbEintraegen, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
@@ -557,10 +563,11 @@ pub async fn frist_setzen(
     // eine „geänderte" Frist samt ETB an einem vorgemerkten Einsatz, und die Schwärzung
     // käme trotzdem (Phase B liest `retention_bis` nicht).
     let res = sqlx::query(
-        "UPDATE einsatz SET retention_bis = ? \
+        "UPDATE einsatz SET retention_bis = ?, retention_gesetzt_at = ? \
          WHERE id = ? AND geloescht_at IS NULL AND geschwaerzt_at IS NULL",
     )
     .bind(neue_frist)
+    .bind(crate::zeit::formatiere_utc(jetzt))
     .bind(einsatz_id)
     .execute(&mut *tx)
     .await?;
@@ -576,7 +583,7 @@ pub async fn frist_setzen(
         return Err(crate::aufbewahrung::frist_sperre(
             geloescht_at.as_deref(),
             geschwaerzt_at.as_deref(),
-            Utc::now(),
+            jetzt,
         )
         .unwrap_or_else(|| {
             AppError::Internal("Frist-UPDATE ohne Zeile, aber ohne Tombstone".into())
@@ -722,6 +729,13 @@ pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<
 /// schreibt einen System-ETB-Audit in derselben Transaktion. Idempotent über den
 /// `geloescht_at IS NULL`-Guard: ein bereits soft-gelöschter Einsatz liefert
 /// `false` (kein Doppel-Audit). Reversibel (Karenz vor der Schwärzung).
+///
+/// Der Tombstone ist der Karenz-Beginn (LFH-906, Spec `aufbewahrung`, „Löschvormerkung nach
+/// Fristablauf“): der Ablauf der Frist, oder der Zeitpunkt ihres Setzens, wenn sie in die
+/// Vergangenheit gesetzt wurde — höchstens `jetzt`. Ohne bekannten Setzzeitpunkt `jetzt`. So
+/// beginnt die Karenz nach einem Stillstand oder nach dem Rückspielen einer Sicherung von vor
+/// der Vormerkung nicht neu. Liegt der Beginn 30 Tage oder mehr zurück, schwärzt Phase B im
+/// selben Lauf.
 pub async fn soft_delete_einsatz(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -731,30 +745,38 @@ pub async fn soft_delete_einsatz(
     let mut tx = pool.begin().await?;
     // Die Fälligkeit wird im UPDATE selbst noch einmal geprüft (LFH-23): eine Frist, die
     // zwischen Kandidatenliste und diesem Schreibvorgang verlängert wurde, gewinnt.
-    let res = sqlx::query(
-        "UPDATE einsatz SET geloescht_at = ? \
+    // `MAX`/`MIN` vergleichen Text; alle Zeitpunkte stehen im Format von `zeit::formatiere_utc`.
+    let karenz_beginn: Option<String> = sqlx::query_scalar(
+        "UPDATE einsatz SET geloescht_at = CASE \
+             WHEN retention_gesetzt_at IS NULL THEN ? \
+             ELSE MIN(?, MAX(retention_bis, retention_gesetzt_at)) END \
          WHERE id = ? AND status = ? AND geloescht_at IS NULL \
-           AND retention_bis IS NOT NULL AND ? >= retention_bis",
+           AND retention_bis IS NOT NULL AND ? >= retention_bis \
+         RETURNING geloescht_at",
     )
+    .bind(jetzt)
     .bind(jetzt)
     .bind(einsatz_id)
     .bind(STATUS_ABGESCHLOSSEN)
     .bind(jetzt)
-    .execute(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
-    if res.rows_affected() == 0 {
+    let Some(karenz_beginn) = karenz_beginn else {
         // Nichts zu tun (schon soft-gelöscht, nicht abgeschlossen oder nicht mehr fällig)
         // — kein Audit.
         return Ok(false);
-    }
-    system_audit_tx(
-        &mut tx,
-        einsatz_id,
-        etb_startwert,
+    };
+    let audit = if karenz_beginn.as_str() < jetzt {
+        format!(
+            "Aufbewahrungsfrist abgelaufen — Einsatz zur Löschung vorgemerkt (Soft-Delete). \
+             Die Karenz bis zur unwiderruflichen PII-Schwärzung läuft seit {karenz_beginn}."
+        )
+    } else {
         "Aufbewahrungsfrist abgelaufen — Einsatz zur Löschung vorgemerkt (Soft-Delete). \
-         Die Karenz bis zur unwiderruflichen PII-Schwärzung läuft.",
-    )
-    .await?;
+         Die Karenz bis zur unwiderruflichen PII-Schwärzung läuft."
+            .to_string()
+    };
+    system_audit_tx(&mut tx, einsatz_id, etb_startwert, &audit).await?;
     tx.commit().await?;
     Ok(true)
 }
@@ -790,6 +812,7 @@ pub async fn wiederherstellen(
     // (etwa dem Purge-Lauf) sofort mit SQLITE_BUSY ab. Der Körper ist reine DB-Arbeit und
     // darf wiederholt werden.
     let karenz_grenze = super::retention::karenz_grenze(jetzt);
+    let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     crate::write_retry!(pool, |conn| {
         let vorher: Option<(i64, String, Option<String>, Option<String>)> = sqlx::query_as(
             "SELECT org_id, status, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?",
@@ -806,11 +829,12 @@ pub async fn wiederherstellen(
             return Err(AppError::Forbidden);
         }
         let res = sqlx::query(
-            "UPDATE einsatz SET geloescht_at = NULL, retention_bis = ? \
+            "UPDATE einsatz SET geloescht_at = NULL, retention_bis = ?, retention_gesetzt_at = ? \
              WHERE id = ? AND org_id = ? AND status = ? AND geloescht_at IS NOT NULL \
                AND geschwaerzt_at IS NULL AND geloescht_at > ?",
         )
         .bind(neue_frist)
+        .bind(&jetzt_s)
         .bind(einsatz_id)
         .bind(admin_org_id)
         .bind(STATUS_ABGESCHLOSSEN)
@@ -3059,6 +3083,11 @@ mod tests {
             abgeschlossen.retention_bis.as_deref(),
             Some(erwartet.as_str())
         );
+        // LFH-906: die Frist gilt als beim Abschluss gesetzt (Karenz-Beginn ab ihrem Ablauf).
+        assert_eq!(
+            retention_gesetzt_at(&pool, einsatz.id).await,
+            abgeschlossen.abgeschlossen_at
+        );
 
         // Ein ETB-System-Audit über die Auto-Frist entstanden.
         let anzahl: i64 = sqlx::query_scalar(
@@ -3139,6 +3168,7 @@ mod tests {
             leit,
             Some("2099-01-01 00:00:00"),
             "manuell",
+            Utc::now(),
         )
         .await
         .unwrap();
@@ -3164,6 +3194,7 @@ mod tests {
             leit,
             Some("2030-01-01 00:00:00"),
             "Aufbewahrungsfrist gesetzt auf 2030-01-01 00:00:00",
+            Utc::now(),
         )
         .await
         .unwrap()
@@ -3263,15 +3294,53 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
-        frist_setzen(&pool, einsatz.id, leit, Some("2030-01-01 00:00:00"), "set")
-            .await
-            .unwrap();
+        frist_setzen(
+            &pool,
+            einsatz.id,
+            leit,
+            Some("2030-01-01 00:00:00"),
+            "set",
+            Utc::now(),
+        )
+        .await
+        .unwrap();
 
-        let aufgehoben = frist_setzen(&pool, einsatz.id, leit, None, "aufgehoben")
+        let aufgehoben = frist_setzen(&pool, einsatz.id, leit, None, "aufgehoben", Utc::now())
             .await
             .unwrap()
             .einsatz;
         assert_eq!(aufgehoben.retention_bis, None);
+    }
+
+    /// LFH-906: `frist_setzen` merkt sich den Zeitpunkt des Setzens. Eine Frist in die
+    /// Vergangenheit behält so die volle Karenz ab dem Setzen (Phase A, D1).
+    #[tokio::test]
+    async fn frist_setzen_merkt_sich_den_zeitpunkt_des_setzens() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        frist_setzen(
+            &pool,
+            einsatz.id,
+            leit,
+            Some("2026-01-01 00:00:00"),
+            "verkürzt",
+            zeit("2026-06-30 12:00:00"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            retention_gesetzt_at(&pool, einsatz.id).await.as_deref(),
+            Some("2026-06-30 12:00:00")
+        );
+    }
+
+    async fn retention_gesetzt_at(pool: &SqlitePool, einsatz_id: i64) -> Option<String> {
+        sqlx::query_scalar("SELECT retention_gesetzt_at FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 
     #[tokio::test]
@@ -3991,6 +4060,11 @@ mod tests {
         let (frist, g, s, etb) = stand(&pool, e).await;
         assert_eq!(frist.as_deref(), Some("2026-09-28 12:00:00"));
         assert_eq!((g, s, etb), (None, None, 1));
+        assert_eq!(
+            retention_gesetzt_at(&pool, e).await.as_deref(),
+            Some("2026-06-30 12:00:00"),
+            "LFH-906: die neue Frist gilt als beim Wiederherstellen gesetzt"
+        );
         let (erfasser, typ, inhalt): (i64, String, String) =
             sqlx::query_as("SELECT erfasser_id, typ, inhalt FROM etb_eintrag WHERE einsatz_id = ?")
                 .bind(e)
@@ -4089,7 +4163,15 @@ mod tests {
         let vorgemerkt = archiv_einsatz(&pool, leit, Some(&gestern), None).await;
         let vorher = stand(&pool, vorgemerkt).await;
         assert!(matches!(
-            frist_setzen(&pool, vorgemerkt, leit, Some("2099-01-01 00:00:00"), "x").await,
+            frist_setzen(
+                &pool,
+                vorgemerkt,
+                leit,
+                Some("2099-01-01 00:00:00"),
+                "x",
+                Utc::now()
+            )
+            .await,
             Err(AppError::UnprocessableEntity(_))
         ));
         assert_eq!(
@@ -4102,7 +4184,15 @@ mod tests {
         let ausstehend = archiv_einsatz(&pool, leit, Some("2026-01-02 00:00:00"), None).await;
         let vorher = stand(&pool, ausstehend).await;
         assert!(matches!(
-            frist_setzen(&pool, ausstehend, leit, Some("2099-01-01 00:00:00"), "x").await,
+            frist_setzen(
+                &pool,
+                ausstehend,
+                leit,
+                Some("2099-01-01 00:00:00"),
+                "x",
+                Utc::now()
+            )
+            .await,
             Err(AppError::Conflict(_))
         ));
         assert_eq!(stand(&pool, ausstehend).await, vorher);
@@ -4116,7 +4206,7 @@ mod tests {
         .await;
         let vorher = stand(&pool, schwarz).await;
         assert!(matches!(
-            frist_setzen(&pool, schwarz, leit, None, "x").await,
+            frist_setzen(&pool, schwarz, leit, None, "x", Utc::now()).await,
             Err(AppError::Conflict(_))
         ));
         assert_eq!(stand(&pool, schwarz).await, vorher);
@@ -4187,7 +4277,8 @@ mod tests {
         let vorher = stand(&pool, e).await;
         assert!(!schwaerze_einsatz(&pool, e, &jetzt_s).await.unwrap());
         assert_eq!(stand(&pool, e).await, vorher, "nichts geschwärzt, kein ETB");
-        assert_eq!(vorher.1.as_deref(), Some("2026-06-29 12:00:00"));
+        // Karenz-Beginn ist der Ablauf der neuen Frist (LFH-906), nicht der Lauf am 29.06.
+        assert_eq!(vorher.1.as_deref(), Some("2026-06-01 00:00:00"));
 
         // Grenze wie `karenz_abgelaufen`: genau 30 Tage → schwärzen, eine Sekunde jünger nicht.
         let knapp = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:01"), None).await;

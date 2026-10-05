@@ -91,7 +91,7 @@ Sicherung bleibt so ein Zustand stehen.
 ### D4: ETB-Eintrag nennt den Karenz-Beginn
 
 `soft_delete_einsatz` liest den gesetzten Wert zurück (`RETURNING geloescht_at`). Liegt er vor
-`jetzt`, nennt der Audit-Text ihn: „Die Karenz läuft seit <Zeitpunkt> (Ablauf der Frist)“. So
+`jetzt`, nennt der Audit-Text ihn: „Die Karenz … läuft seit <Zeitpunkt>.“ So
 erklärt das ETB, warum eine Schwärzung schon kurz nach der Vormerkung folgt.
 
 ### D5: Wiederherstellen und Statuscodes bleiben, wie sie sind
