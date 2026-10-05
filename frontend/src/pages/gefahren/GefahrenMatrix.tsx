@@ -116,6 +116,9 @@ export const ZELLE_UNBEWERTET = {
   begriff: 'unbewertet',
 } as const;
 
+/** Zelle, solange die Matrix lädt: weder Stufe noch Lücke ist bekannt. */
+const ZELLE_LAEDT = { label: 'lädt', kuerzel: '' } as const;
+
 /** Ungültige Kombination: Text als zweiter Kanal, kein Knopf (WCAG 1.4.1). */
 export const ZELLE_NICHT_ANWENDBAR = { label: 'nicht anwendbar', kuerzel: 'n. a.' } as const;
 
@@ -137,6 +140,12 @@ export interface GefahrenMatrixProps {
   matrix: GefahrBewertung[];
   darfSchreiben: boolean;
   /**
+   * Die Matrix ist noch nicht geladen (LFH-969). Dann sagt keine Zelle „nicht bewertet" und der
+   * Zähler keine Zahl, und alle Zellen sind gesperrt: ein Klick schriebe sonst über Details, die
+   * noch unterwegs sind.
+   */
+  laedt?: boolean;
+  /**
    * Die Zelle, deren PUT unterwegs ist (`zellSchluessel`), oder `null` — gesperrt wird nur sie,
    * nicht alle 58.
    */
@@ -154,6 +163,7 @@ export interface GefahrenMatrixProps {
 export default function GefahrenMatrix({
   matrix,
   darfSchreiben,
+  laedt = false,
   laufendeZelle,
   onSetzen,
   onDetailsSpeichern,
@@ -199,7 +209,7 @@ export default function GefahrenMatrix({
           // Ohne Bewertung keine Fläche und kein Balken — und eine eigene Kennung, nicht „keine".
           const stufe = zelleVon(zeile.typ, obj.wert)?.warnstufe;
           return {
-            'data-warnstufe': stufe ?? DATEN_UNBEWERTET,
+            'data-warnstufe': stufe ?? (laedt ? undefined : DATEN_UNBEWERTET),
             style: {
               ...(stufe ? zellFlaechenStil(stufe, token) : {}),
               textAlign: 'center' as const,
@@ -221,7 +231,11 @@ export default function GefahrenMatrix({
           }
           const zelle = zelleVon(zeile.typ, obj.wert);
           // Kein Rückfall auf „keine" (LFH-969): die Lücke ist ein eigener Zustand.
-          const anzeige = zelle ? warnstufeFlaeche[zelle.warnstufe] : ZELLE_UNBEWERTET;
+          const anzeige = zelle
+            ? warnstufeFlaeche[zelle.warnstufe]
+            : laedt
+              ? ZELLE_LAEDT
+              : ZELLE_UNBEWERTET;
           const schluessel = zellSchluessel(zeile.typ, obj.wert);
           const items = [
             ...WARNSTUFEN.map((w) => ({
@@ -237,7 +251,7 @@ export default function GefahrenMatrix({
               trigger={['click']}
               // `autoFocus` steht am Dropdown: `MenuProps` kennt es nicht.
               autoFocus
-              disabled={!darfSchreiben || laufendeZelle === schluessel}
+              disabled={!darfSchreiben || laedt || laufendeZelle === schluessel}
               menu={{
                 items,
                 // Zuordnung am Menü, nicht je Eintrag: ein Riegel hat einen Ort, und das Synthetic
@@ -319,7 +333,7 @@ export default function GefahrenMatrix({
           ].join(' · ')}
         </Typography.Text>
         <Typography.Text style={monoStil(token.fontSize)}>
-          {unbewertetText(unbewertet)}
+          {laedt ? 'Bewertungen laden …' : unbewertetText(unbewertet)}
         </Typography.Text>
       </div>
       <Table<ZeilenDaten>

@@ -206,6 +206,16 @@ describe('GefahrenMatrix', () => {
     expect(screen.getByText('Alle Felder bewertet')).toBeInTheDocument();
   });
 
+  it('behauptet beim Laden weder „nicht bewertet" noch eine Zahl und sperrt die Zellen', () => {
+    rendereMatrix({ laedt: true });
+    expect(screen.queryByRole('button', { name: /nicht bewertet$/ })).toBeNull();
+    expect(screen.queryByText(/Felder unbewertet/)).toBeNull();
+    expect(screen.getByText('Bewertungen laden …')).toBeInTheDocument();
+    const zelle = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: lädt' });
+    expect(zelle).toBeDisabled();
+    expect(zelle.closest('td')).not.toHaveAttribute('data-warnstufe');
+  });
+
   it('hält den Detail-Wortlaut, wenn das Speichern abgelehnt wird', async () => {
     const onDetailsSpeichern = vi.fn().mockRejectedValue(new Error('422'));
     rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })], onDetailsSpeichern });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -65,6 +65,7 @@ export default function GefahrenPage() {
 
   const { token } = theme.useToken();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
+  const titelId = useId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
@@ -242,6 +243,7 @@ export default function GefahrenPage() {
       >
         {aktuell && (
           <div
+            data-lfh="gefahrengebiet-kopf"
             style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -255,6 +257,7 @@ export default function GefahrenPage() {
                 Umbenennen hat einen eigenen Auslöser (LFH-969) statt antds 13-px-Stift. */}
             <Typography.Title
               level={3}
+              id={titelId}
               style={{ margin: 0, fontSize: token.fontSizeHeading5, minWidth: 0 }}
             >
               {gefahrengebietName(aktuell.label, aktuell.id)}
@@ -264,32 +267,50 @@ export default function GefahrenPage() {
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
-                gap: token.marginXS,
+                // `marginSM` (7/11/16): zwei Bedienziele halten den Zielabstand der Stufe.
+                gap: token.marginSM,
               }}
             >
               {/* Pflichtangabe (frontend/AGENTS.md, „Inline-Bearbeitung und Status"): leer sendet
                   nichts. Früher setzte ein leerer Name still auf „Gefahrengebiet #<id>" zurück.
                   `key` je Gebiet: ein offener Entwurf wandert nicht ins nächste Gebiet. */}
-              <InlineAngabe<string>
-                key={aktuell.id}
-                etikett="Bezeichnung"
-                wert={aktuell.label ?? ''}
-                anzeige={null}
-                leer={(w) => w.trim() === ''}
-                gleich={(a, b) => a.trim() === b.trim()}
-                darfSchreiben={darfSchreiben}
-                pflicht
-                eingabe={({ feld, value, onChange }) => (
-                  <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
-                )}
-                // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).
-                ausloeser={({ ref, onClick }) => (
-                  <Button ref={ref} onClick={onClick}>
-                    Umbenennen
-                  </Button>
-                )}
-                onSpeichern={(w) => umbenennen.mutateAsync(w.trim())}
-              />
+              {/* Eigene Spalte: der Pflicht-Hinweis steht UNTER dem Knopf und schiebt den Sprung
+                  nicht weg; das offene Formular bekommt eine lesbare Breite. */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: token.marginXXS,
+                  minWidth: 0,
+                }}
+              >
+                <InlineAngabe<string>
+                  key={aktuell.id}
+                  etikett="Bezeichnung"
+                  wert={aktuell.label ?? ''}
+                  anzeige={null}
+                  leer={(w) => w.trim() === ''}
+                  gleich={(a, b) => a.trim() === b.trim()}
+                  darfSchreiben={darfSchreiben}
+                  pflicht
+                  eingabe={({ feld, value, onChange }) => (
+                    <Input
+                      {...feld}
+                      value={value}
+                      onChange={(e) => onChange(e.target.value)}
+                      style={{ minWidth: 'min(16rem, 100%)' }}
+                    />
+                  )}
+                  // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).
+                  ausloeser={({ ref, onClick }) => (
+                    // Der Name ist die Handlung; die Überschrift nennt das Gebiet als Beschreibung.
+                    <Button ref={ref} onClick={onClick} aria-describedby={titelId}>
+                      Umbenennen
+                    </Button>
+                  )}
+                  onSpeichern={(w) => umbenennen.mutateAsync(w.trim())}
+                />
+              </div>
               {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an.
                   Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗", kein Knopf darin
                   (LFH-969). `KennungsLink` trägt den Boden, ein `<a>` erbt keine Steuerhöhe. */}
@@ -318,6 +339,8 @@ export default function GefahrenPage() {
         ) : (
           <GefahrenMatrix
             matrix={matrixQuery.data ?? []}
+            // Ohne Daten wäre jede Zelle „nicht bewertet" — eine Aussage, die niemand geprüft hat.
+            laedt={matrixQuery.isPending}
             darfSchreiben={darfSchreiben}
             // Nur die Zelle des laufenden PUT sperren; `variables` ist genau die Eingabe der
             // laufenden Mutation, kein Parallel-State.

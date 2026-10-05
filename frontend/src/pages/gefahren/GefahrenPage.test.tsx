@@ -186,6 +186,32 @@ describe('GefahrenPage', () => {
     expect(patches).toBe(0);
   });
 
+  it('abgelehntes Umbenennen: Entwurf bleibt offen, Fehler an der Zeile, kein zweiter Toast', async () => {
+    server.use(
+      ...handlers(),
+      http.patch('/api/einsaetze/1/gefahrengebiete/7', () =>
+        HttpResponse.json({ error: 'Konflikt' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Umbenennen' }));
+    const feld = screen.getByRole('textbox', { name: 'Bezeichnung' });
+    await user.clear(feld);
+    await user.type(feld, 'Nord-Ost{Enter}');
+    expect(await screen.findByText(/Nicht gespeichert/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Bezeichnung' })).toHaveValue('Nord-Ost');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('„Umbenennen" nennt das Gebiet als Beschreibung', async () => {
+    server.use(...handlers());
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Umbenennen' })).toHaveAccessibleDescription(
+      'Nord',
+    );
+  });
+
   it('ohne Schreibrecht: Hinweis steht, kein „Umbenennen", der Sprung bleibt', async () => {
     server.use(...handlers([gebiet], [], einsatzFixture({ meine_rolle: 'beobachter' })));
     renderPage();

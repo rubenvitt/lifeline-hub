@@ -3718,6 +3718,17 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
       `Auf Karte zeigen (${dichte})`,
     );
     await expect(page.locator('a button'), 'kein Knopf in einem Link').toHaveCount(0);
+    // Knopf und Sprung stehen nebeneinander: der Zielabstand der Stufe gilt zwischen ihnen.
+    const abstand = await abstandZuNachbarn(
+      page.locator('[data-lfh="gefahrengebiet-kopf"]'),
+      page.getByRole('button', { name: 'Umbenennen', exact: true }),
+    );
+    const sollAbstand = ZIELABSTAND[dichte];
+    if (sollAbstand != null) {
+      expect(abstand, `Abstand Umbenennen ↔ Sprung (${dichte})`).toBeGreaterThanOrEqual(
+        sollAbstand - SUBPIXEL,
+      );
+    }
 
     je.set(`${dichte} Matrixzelle`, zelle.kleinstes);
     je.set(`${dichte} Gebietszeile`, gebiet);
@@ -3725,7 +3736,7 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
     je.set(`${dichte} Sprung`, sprung);
     gemessen.push(
       `${dichte}: Zelle kurz ${zelle.kleinstes} / lang ${zelle.groesstes}, Gebietszeile ${gebiet}, ` +
-        `Umbenennen ${umbenennen}, Sprung ${sprung}`,
+        `Umbenennen ${umbenennen}, Sprung ${sprung}, Abstand ${abstand}`,
     );
   }
 
