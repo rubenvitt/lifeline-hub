@@ -2922,7 +2922,7 @@ mod tests {
     // --- Migration 0150: Giftzeilen des Erinnerungs-Planers (LFH-924) ---
     //
     // Alt-DB mit allem, was vor den Eingabegrenzen durchkam: unplausible Intervalle werden
-    // einmalig, offene Zeilen mit unplausiblem Jahr gelten als ausgelöst; gesunde und erledigte
+    // einmalig, Zeilen mit unplausiblem Jahr gelten als ausgelöst (auch erledigte); gesunde
     // Zeilen bleiben, wie sie sind.
     #[tokio::test]
     async fn migration_0150_entschaerft_erinnerungs_giftzeilen() {
@@ -3020,8 +3020,8 @@ mod tests {
         }
         assert_eq!(
             zeile(jahr_0226_erledigt).await,
-            (Some(1), None),
-            "erledigte Zeilen bleiben unberührt"
+            (None, Some("0226-05-01 10:00:00".to_string())),
+            "auch erledigte: nach einer Rücknahme liefe sie sonst minütlich"
         );
     }
 
