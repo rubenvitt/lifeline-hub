@@ -44,6 +44,7 @@ import {
   einsatzberichtPfad,
   parseEtbFilter,
   parsePersonenSicht,
+  parseBerichtAuswahl,
   personalPfad,
   einheitenPfad,
   fahrzeugePfad,
@@ -66,6 +67,7 @@ import {
   parseRouteId,
   ueberblickPfad,
 } from './deeplinks';
+import { STANDARDUMFANG } from '../druck/einsatzbericht/auswahl';
 
 const E = 5; // einsatzId
 
@@ -580,6 +582,17 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
 describe('einsatzberichtPfad (LFH-726)', () => {
   it('zeigt auf die Druckansicht unter den Einsatzdaten', () => {
     expect(einsatzberichtPfad(7)).toBe('/einsaetze/7/einsatzdaten/bericht');
+  });
+
+  it('schreibt den Standardumfang nicht in die Adresse (LFH-902)', () => {
+    expect(einsatzberichtPfad(7, STANDARDUMFANG)).toBe('/einsaetze/7/einsatzdaten/bericht');
+  });
+
+  it('trägt eine Auswahl kanonisch geordnet, die Umkehr liest sie zurück (LFH-902)', () => {
+    const pfad = einsatzberichtPfad(7, ['personal-kopf', 'stammdaten']);
+    expect(pfad).toBe('/einsaetze/7/einsatzdaten/bericht?bloecke=stammdaten%2Cpersonal-kopf');
+    const query = new URLSearchParams(pfad.split('?')[1]);
+    expect(parseBerichtAuswahl(query)).toEqual(['stammdaten', 'personal-kopf']);
   });
 });
 

@@ -468,8 +468,14 @@ describe('Druck-Keys der Modul-Listen (LFH-727)', () => {
  * damit kein Modul-Ereignis den geöffneten Bericht per Präfix ändert.
  */
 describe('einsatzKeys.einsatzberichtDruck (LFH-726)', () => {
-  it('baut den Key als [prefix, einsatzId] mit handgeschriebenem Prefix', () => {
-    expect(einsatzKeys.einsatzberichtDruck(7)).toEqual(['einsatz-einsatzbericht-druck', 7]);
+  it('baut den Key als [prefix, einsatzId, auswahl] mit handgeschriebenem Prefix', () => {
+    // Die Auswahl der Blöcke (LFH-902) bestimmt, welche Quellen geladen werden: eigener Stand je
+    // Auswahl, wie der Filter im ETB-Druck.
+    expect(einsatzKeys.einsatzberichtDruck(7, 'stammdaten,kraefte')).toEqual([
+      'einsatz-einsatzbericht-druck',
+      7,
+      'stammdaten,kraefte',
+    ]);
   });
 
   it('ist nicht live: kein Ereignis invalidiert ihn, NICHT_LIVE_KEYS führt ihn', () => {
