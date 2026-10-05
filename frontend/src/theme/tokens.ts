@@ -90,6 +90,11 @@ export interface Farbrollen {
   achtungFlaeche: string;
   alarmFlaeche: string;
   bedienFlaeche: string;
+  /** Fläche einer gewählten Option, eines gewählten Menüeintrags oder Knotens (antds
+   *  `colorPrimaryBg`, LFH-984). Eigene Rolle statt `bedienFlaeche`: die hebt sich am Tag von der
+   *  Zeigerspur und nachts von der Ruhe zu wenig ab (Messwerte über `farbenHell`/`farbenDunkel`,
+   *  Vergleich in `openspec/changes/archive/2026-10-05-lfh-984-auswahlflaeche-rolle/design.md`, E1). */
+  auswahlFlaeche: string;
   /** Sammelbanner („12 neue Meldungen"): Grund und Kante. */
   bannerGrund: string;
   bannerLinie: string;
@@ -150,6 +155,10 @@ export interface Farbrollen {
  * Rand eines Knopfs darauf: bedienFlaeche 3,34 · achtungFlaeche 3,43 · alarmFlaeche 3,22 ·
  * normalFlaeche 3,39 (antds Ableitung lag bei 2,16 · 1,96 · 3,20 · 1,57). Gerechnet in
  * `hinweisKontrast.test.ts`.
+ *
+ * Auswahlfläche (LFH-984, `antdToken`: `colorPrimaryBg`): knappste Textstufe `schwach` 7,17,
+ * `bedienText` 7,59, `steuerRahmen` 3,15; ΔE gegen `flaeche2` 9,2, gegen die Zeigerspur darauf
+ * 7,5 (antds `#b9c1c4`: `schwach` 4,92, Rand 2,16). Gerechnet in `auswahlKontrast.test.ts`.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -188,6 +197,7 @@ export const farbenHell: Farbrollen = {
   achtungFlaeche: '#f7efd5',
   alarmFlaeche: '#f9e3e3',
   bedienFlaeche: '#e4edf7',
+  auswahlFlaeche: '#dbe7f5',
   bannerGrund: '#e6eef8',
   bannerLinie: '#9dbbe0',
   berichtigungZeile: '#fbeaea',
@@ -214,6 +224,9 @@ export const farbenHell: Farbrollen = {
  * Tabellenkopf auf kopf 7,48.
  * Hinweisflächen (LFH-739): `steuerRahmen` auf bedienFlaeche 3,32 · achtungFlaeche 3,26 ·
  * alarmFlaeche 3,48 · normalFlaeche 3,27 (antds Ableitung: 3,09 · 2,83 · 3,01 · 2,98).
+ * Auswahlfläche (LFH-984): knappste Textstufe `schwach` 5,21, `bedienText` 9,53,
+ * `steuerRahmen` 3,28; ΔE gegen `flaeche2` 12,3, gegen die Zeigerspur 16,2 (antds `#253a4e`:
+ * `schwach` 3,39, Rand 2,13).
  *
  * Zwei bewusste Abweichungen vom Entwurf:
  * - `schwach` `#838b94` statt `#5f676f` (3,47 auf `grund`): die Rolle trägt über antds
@@ -264,6 +277,7 @@ export const farbenDunkel: Farbrollen = {
   achtungFlaeche: '#1c1705',
   alarmFlaeche: '#1c0a0d',
   bedienFlaeche: '#0d1620',
+  auswahlFlaeche: '#08172b',
   bannerGrund: '#0d1520',
   bannerLinie: '#1d3a5c',
   berichtigungZeile: '#160d0f',
@@ -710,6 +724,8 @@ export function kopfzeilenMasse(
  * `colorError` als Fläche des gefüllten und als Schrift des umrandeten und des `text`-Knopfs,
  * `colorErrorHover`/`colorErrorActive` ebenso unter dem Zeiger und beim Drücken (warum der
  * Zeiger dunkelt: {@link Farbrollen.alarmHover}).
+ * Ebenso schreibt der gewählte Dropdown-Eintrag in `bedienText` statt `colorPrimary` (LFH-984,
+ * Fläche: {@link Farbrollen.auswahlFlaeche}).
  *
  * Gedrückt (LFH-897, Spec `farbrollen-kontrast`) hält denselben Textboden und trägt den
  * Zeigerton, nicht antds Ableitung: `colorPrimaryActive` = `bedienHover` (die Fläche des
@@ -761,6 +777,10 @@ export function antdKomponenten(
     Dropdown: {
       colorError: farben.alarmText,
       colorTextLightSolid: farben.aufBedien,
+      // Der gewählte Eintrag (Statuswahl, ETB-Typwahl) und der Titel eines gewählten Untermenüs
+      // sind Text in `colorPrimary` (LFH-984): `bedien` hielte auf der Auswahlfläche am Tag nur
+      // 6,83, `bedienText` hält 7,59 (Nacht 9,53).
+      colorPrimary: farben.bedienText,
     },
     Form: {
       colorError: farben.alarmText,
@@ -853,6 +873,12 @@ export function antdKaestchen(dichte: Dichte): NonNullable<ConfigProviderProps['
   return { styles: ({ props }) => (props.children == null ? {} : { root: boden }) };
 }
 
+/** Eine deckende Rollenfarbe `#rrggbb` als `rgba(…)` mit Deckkraft. */
+function mitDeckkraft(hex: string, deckkraft: number): string {
+  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, ${deckkraft})`;
+}
+
 /**
  * Leitet die antd-Tokens aus den Rollen ab, eine Richtung, keine zweite Liste. Was antd nicht
  * kennt (Marke, Kartenraster, Versal-Sperrung), lebt allein in `rollen.css`.
@@ -884,6 +910,22 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     // ≥ 5,48 auf jeder deckenden Fläche, wie die eigenen Klassen in `sprache.css`. Gerechnet in
     // `bedienKontrast.test.ts`, gemessen in `e2e/fokusring-kontrast.spec.ts`.
     colorPrimaryBorder: farben.bedien,
+    // Die Auswahlfläche (LFH-984, Spec `farbrollen-kontrast`): antd leitet `colorPrimaryBg` und
+    // daraus `controlItemBgActive` aus `bedien` ab, am Tag ein trübes `#b9c1c4`, nachts `#253a4e`.
+    // Darauf lagen Beschreibung (6,01 · 4,53), Tertiärtext (4,92 · 3,39) und der Rand eines
+    // Steuerelements (2,16 · 2,13) unter dem Boden. Gesetzt GLOBAL, weil die Fläche überall „das
+    // ist gewählt“ heißt: gewählte Option in Select/AutoComplete, gewählter Dropdown-Eintrag und
+    // Baumknoten, dazu die eigenen Leser (Gefahrengebiete, Lagekarte, UHS-Grundriss, Slash-Menü).
+    // Unter dem Zeiger dieselbe Fläche: zwischen den Böden ist für eine eigene Stufe mit
+    // Abstand zu Ruhe, Zeigerspur und Auswahl kein Platz. Gerechnet in `auswahlKontrast.test.ts`,
+    // gemessen in `e2e/auswahl-kontrast.spec.ts`.
+    colorPrimaryBg: farben.auswahlFlaeche,
+    colorPrimaryBgHover: farben.auswahlFlaeche,
+    // Den Fokus-Halo von Eingabefeld und Auswahlliste (`activeShadow`, `activeOutlineColor`) leitet
+    // antd aus `colorPrimaryBg` ab; aus der Auswahlfläche wäre er nachts dunkler als die Fläche und
+    // verschwände. Er ist keine Auswahl, sondern eine Tönung der Bedienfarbe. Dekorativ: den Fokus
+    // trägt der Ring (`colorPrimaryBorder`), der Halo trägt keinen Boden.
+    controlOutline: mitDeckkraft(farben.bedien, 0.25),
     // Ein Link ist blauer TEXT und trägt die Textrolle, in Ruhe wie unter dem Zeiger (LFH-652):
     // aus `bedien` abgeleitet verdunkelte ihn die Nachtpalette auf 4,55, und antds Hover-Ableitung
     // hellt ihn am Tag auf rund 4,3 auf. Die Rückmeldung unter dem Zeiger ist die Unterstreichung,

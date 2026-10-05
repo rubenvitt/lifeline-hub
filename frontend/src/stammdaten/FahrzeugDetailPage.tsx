@@ -31,6 +31,8 @@ import { globalKeys } from '../api/queryKeys';
 // Die Speicherleiste wird WIEDERVERWENDET, nicht nachgebaut: `speicherLeiste` ist die eine
 // Stelle, an der „sticky am unteren Rand, im Formular" begründet und geprüft ist.
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
 import type { Fahrzeug, Staerke } from '../api/types';
@@ -80,6 +82,9 @@ export default function FahrzeugDetailPage() {
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
+  // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“); `schluessel` wie `key={id}`
+  // am Formular.
+  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin, schluessel: id });
 
   const fahrzeugeQuery = useQuery({
     queryKey: globalKeys.fahrzeugeListe('alle'),
@@ -142,6 +147,7 @@ export default function FahrzeugDetailPage() {
 
   return (
     <div>
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       {/* Brotkrume statt eines zweiten „Zurück"-Knopfes im Kopf: der Aktionen-Slot sichert GENAU
          EINE Primäraktion zu, und die ist hier das Speichern — das im Formular steht. */}
       <Breadcrumb
@@ -191,8 +197,12 @@ export default function FahrzeugDetailPage() {
           key={id}
           layout="vertical"
           disabled={!istAdmin}
+          onValuesChange={schutz.geaendert}
           initialValues={zuFormWerten(fahrzeug)}
-          onFinish={(werte) => speichern.mutate(werte)}
+          onFinish={(werte) => {
+            const fassung = schutz.fassung();
+            speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+          }}
         >
           <Formularpaneel titel="Identität" dataUpdatedAt={fahrzeugeQuery.dataUpdatedAt}>
             <Row gutter={token.margin}>

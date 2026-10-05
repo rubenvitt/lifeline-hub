@@ -747,8 +747,8 @@ pub struct ModulOverrideUpdate {
 }
 
 /// PUT /api/einsaetze/{id}/modul-overrides/{modul_key} — Sichtbarkeit + benötigte
-/// Rolle eines Moduls überschreiben (LFH-132). Gate: Einsatzleitung ODER System-Admin,
-/// plus aktiver Einsatz (Freeze → 409). Unbekannter Modul-Key → 400. Nicht-ausblendbare
+/// Rolle eines Moduls überschreiben (LFH-132). Gate: Einsatzleitung ODER System-Admin der
+/// Einsatz-Org (fremde Org → 403, LFH-995), plus aktiver Einsatz (Freeze → 409). Unbekannter Modul-Key → 400. Nicht-ausblendbare
 /// Module (einsatzdaten, einsatz-einstellungen) lassen sich nicht verstecken
 /// (Selbst-Aussperr-Schutz) → 400. Ungültige `benoetigte_rolle` → 400.
 pub async fn modul_override_setzen(
@@ -758,8 +758,11 @@ pub async fn modul_override_setzen(
     JsonBody(req): JsonBody<ModulOverrideUpdate>,
 ) -> Result<Json<modul_override::EinsatzModulOverride>, AppError> {
     let id = ctx.einsatz.id;
-    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
-    if !ctx.benutzer.ist_admin() {
+    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin der Einsatz-Org —
+    // derselbe Org-Schnitt wie am Frist-PUT (LFH-995). Der Extractor-Floor allein ließe den
+    // Admin einer fremden Org serverweit durch.
+    let admin_der_org = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+    if !admin_der_org {
         ctx.fordere_einsatzleitung()?;
     }
     ctx.fordere_aktiv()?; // Freeze bei Abschluss

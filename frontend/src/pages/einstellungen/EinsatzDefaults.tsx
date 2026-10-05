@@ -1,5 +1,5 @@
 import { App, Button, Form, Input, InputNumber, Modal, Switch, Typography, theme } from 'antd';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
 import { quittiereModulGespeichert } from './modulQuittung';
@@ -15,6 +15,8 @@ import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis
 import { useAuth } from '../../auth/AuthContext';
 import { einsatzKeys, globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
@@ -35,8 +37,9 @@ const RECHTE_TEXT =
  * Modul-Rollen-Default. Bearbeiten nur `system_rolle=admin`. Der PUT ist Vollersatz (Payload aus
  * geladenen Daten + eigenen Feldern). Die Modul-Rollen-Selects speichern sofort (eigene Mutation).
  *
- * Die ungespeicherte Fassung ist ein eigener State, nicht `form.isFieldsTouched()`: antd setzt das
- * Flag beim Speichern nicht zurück.
+ * Die ungespeicherte Fassung führt der Verlassen-Schutz der Formularseiten
+ * (`components/useFormularVerlassenSchutz.ts`, LFH-979): Rückfrage vor dem Verlassen und Warnung
+ * beim Schließen. Die Modul-Liste speichert je Zeile sofort und zählt nicht dazu.
  *
  * Skelett-Frist (LFH-750): erstmaliges Setzen und Verkürzen fragen VOR dem Absenden zurück, erst
  * dann geht `skelett_dauer_bestaetigt: true` hinaus (der Server lehnt sonst mit 409 ab). Eine
@@ -50,7 +53,7 @@ export default function EinsatzDefaults() {
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
   const istAdmin = benutzer?.system_rolle === 'admin';
-  const [hatFassung, setHatFassung] = useState(false);
+  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin });
   const [rueckfrage, setRueckfrage] = useState<OrgEinstellungenUpdate | null>(null);
 
   const einstellungenQuery = useQuery({
@@ -72,7 +75,6 @@ export default function EinsatzDefaults() {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
       // Die Org-Rückmeldefrist steckt im `faellig_at` jedes Einsatzes ohne eigene.
       qc.invalidateQueries({ predicate: (q) => istRueckmeldungenKey(q.queryKey) });
-      setHatFassung(false);
       message.success('Einstellungen gespeichert');
     },
   });
@@ -87,16 +89,6 @@ export default function EinsatzDefaults() {
       quittiereModulGespeichert(message, 'Modul-Default gespeichert');
     },
   });
-
-  // Ungespeicherte Fassung (siehe Dateikopf): gesetzt bei jeder Feldänderung, zurückgesetzt beim
-  // erfolgreichen Speichern.
-  useEffect(() => {
-    if (!hatFassung) return;
-    // `preventDefault()` allein ist der heutige Weg — `returnValue` ist abgekündigt.
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [hatFassung]);
 
   if (einstellungenQuery.isLoading || modulQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -114,13 +106,18 @@ export default function EinsatzDefaults() {
   const einstellungen = einstellungenQuery.data;
   const orgModul = modulQuery.data ?? {};
 
+  function absenden(daten: OrgEinstellungenUpdate) {
+    const fassung = schutz.fassung();
+    speichernMutation.mutate(daten, { onSuccess: () => schutz.gespeichert(fassung) });
+  }
+
   function speichern(werte: FormWerteEinsatz) {
     const daten = { ...zuUpdate(einstellungen), ...normalisiereEinsatz(werte) };
     if (istSkelettVerkuerzung(einstellungen.skelett_dauer_tage, daten.skelett_dauer_tage)) {
       setRueckfrage(daten);
       return;
     }
-    speichernMutation.mutate(daten);
+    absenden(daten);
   }
 
   return (
@@ -139,12 +136,13 @@ export default function EinsatzDefaults() {
         />
       }
     >
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <Form<FormWerteEinsatz>
         form={form}
         layout="vertical"
         initialValues={initialEinsatz(einstellungen)}
         onFinish={speichern}
-        onValuesChange={() => setHatFassung(true)}
+        onValuesChange={schutz.geaendert}
         disabled={!istAdmin}
       >
         <Formularpaneel
@@ -309,8 +307,7 @@ export default function EinsatzDefaults() {
         okButtonProps={{ danger: true }}
         cancelText="Abbrechen"
         onOk={() => {
-          if (rueckfrage)
-            speichernMutation.mutate({ ...rueckfrage, skelett_dauer_bestaetigt: true });
+          if (rueckfrage) absenden({ ...rueckfrage, skelett_dauer_bestaetigt: true });
           setRueckfrage(null);
         }}
         onCancel={() => setRueckfrage(null)}

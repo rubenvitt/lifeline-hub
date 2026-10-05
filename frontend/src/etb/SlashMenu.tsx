@@ -151,6 +151,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
                 padding: `${token.paddingSM}px ${token.padding}px`,
                 cursor: 'pointer',
                 color: token.colorText,
+                // Auswahlfläche wie in antds Auswahllisten (Rolle `auswahlFlaeche`, LFH-984).
                 background: idx === aktiv ? token.controlItemBgActive : undefined,
               }}
             >

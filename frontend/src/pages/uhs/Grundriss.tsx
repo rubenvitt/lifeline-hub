@@ -456,7 +456,8 @@ function PlatzKarte({
     border: `${PLATZ_KARTE_RAND}px solid ${rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token)}`,
     // Belegt: Fläche `bedienFlaeche` + „belegt"-Tag; „frei" und „belegt" schließen sich aus, andere
     // Verfügbarkeiten bleiben sichtbar. Nur Farbe und Ecke kommen aus dem Neuentwurf — Höhe, Rand
-    // und Polsterung bleiben an die Konstanten gebunden.
+    // und Polsterung bleiben an die Konstanten gebunden. Das Drop-Ziel ist die Auswahlfläche
+    // (`colorPrimaryBg` = `auswahlFlaeche`, LFH-984), eine eigene Rolle neben `bedienFlaeche`.
     background: isOver ? token.colorPrimaryBg : belegtVon ? rollen.bedienFlaeche : rollen.flaeche,
     padding: PLATZ_KARTE_POLSTER,
     borderRadius: 0,

@@ -90,7 +90,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
 
   it.each(SEKTIONEN)('$name nennt ohne Admin-Recht den Grund', async ({ Komp }) => {
     handler(nichtAdmin);
-    renderMitProviders(<Komp />);
+    renderMitProviders(<Komp />, { datenRouter: true });
     expect(await screen.findByText(STAMMDATEN_RECHTE_TEXT)).toBeInTheDocument();
   });
 
@@ -103,7 +103,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
     '$name zeigt die Primäraktion GESPERRT statt versteckt',
     async ({ Komp, aktion }) => {
       handler(nichtAdmin);
-      renderMitProviders(<Komp />);
+      renderMitProviders(<Komp />, { datenRouter: true });
       // `findBy`, weil das Recht aus `auth/me` eine Runde nach dem ersten Anstrich eintrifft.
       await screen.findByText(STAMMDATEN_RECHTE_TEXT);
       // Symmetrisch zur Admin-Hälfte gewartet. Der Hinweis steht im `hinweis`-Slot, fünf der elf
@@ -121,7 +121,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
     '$name zeigt dem Admin KEINEN Rechte-Hinweis',
     async ({ name, Komp, aktion }) => {
       handler(admin);
-      renderMitProviders(<Komp />);
+      renderMitProviders(<Komp />, { datenRouter: true });
       // Erst auf den gerenderten Seitenkopf warten — ein `queryBy` vor dem ersten Anstrich
       // wäre trivial `null` und belegte nichts.
       expect(await screen.findByRole('heading', { level: 1, name })).toBeInTheDocument();
