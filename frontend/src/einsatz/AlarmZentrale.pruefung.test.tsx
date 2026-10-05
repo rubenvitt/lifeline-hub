@@ -12,22 +12,23 @@ import { farbenDunkel, rahmenFarben } from '../theme/tokens';
  * „blockiert". Eigene Datei, weil `alarmTon` den zuletzt festgestellten Status modulweit hält:
  * in `AlarmZentrale.test.tsx` hinge der Startzustand an der Reihenfolge der Tests.
  *
- * Jeder Test hält die Prüfung mit einem eigenen `resume()` an und gibt sie selbst frei.
- * Der AudioContext entsteht je Modul nur einmal; deshalb liefert der Stub bei jedem Aufruf
- * dasselbe Objekt, dessen Verhalten der Test vorher setzt.
+ * Jeder Test hält die Prüfung an und gibt sie selbst frei. Der AudioContext entsteht je Modul nur
+ * einmal; deshalb liefert der Stub bei jedem Aufruf dasselbe Objekt, dessen Verhalten der Test
+ * vorher setzt. Wie im Browser lösen beim Freigeben ALLE offenen `resume()` gemeinsam auf: seit
+ * LFH-950 teilen sich Anforderungen ohne Geste ein `resume()`, und ein noch offenes aus dem
+ * vorigen Test ist dasselbe, auf das der nächste wartet.
  */
 
 type Ausgang = 'running' | 'suspended';
 
 const audio = {
   state: 'suspended' as AudioContextState,
-  /** Gibt die laufende Prüfung frei; `null`, solange keine wartet. */
-  freigeben: null as ((ausgang: Ausgang) => void) | null,
+  /** Offene `resume()`; über Tests hinweg, wie der modulweit gehaltene AudioContext. */
+  wartende: [] as Array<() => void>,
 };
 
 function stubAngehalteneAudioPruefung() {
   audio.state = 'suspended';
-  audio.freigeben = null;
   const ctx = {
     get state() {
       return audio.state;
@@ -36,10 +37,7 @@ function stubAngehalteneAudioPruefung() {
     resume: vi.fn(
       () =>
         new Promise<void>((fertig) => {
-          audio.freigeben = (ausgang) => {
-            audio.state = ausgang;
-            fertig();
-          };
+          audio.wartende.push(fertig);
         }),
     ),
     createOscillator: vi.fn(() => ({
@@ -81,9 +79,10 @@ function renderAlarm() {
 }
 
 async function pruefungEndet(ausgang: Ausgang) {
-  await waitFor(() => expect(audio.freigeben).not.toBeNull());
+  await waitFor(() => expect(audio.wartende.length).toBeGreaterThan(0));
   await act(async () => {
-    audio.freigeben!(ausgang);
+    audio.state = ausgang;
+    for (const fertig of audio.wartende.splice(0)) fertig();
   });
 }
 
@@ -117,15 +116,15 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     let ton = tonKnopf();
     expect(ton).toHaveTextContent(/^$/);
     expect(ton).toHaveStyle({ color: rahmenFarben.gedaempft });
-    // Die Bedienung ist die des Ruhezustands, nicht „entsperren".
-    expect(ton).toHaveAccessibleName('Alarmton stummschalten');
+    // Ein Tipp schaltet frei, nie stumm (LFH-950) — der Name sagt es.
+    expect(ton).toHaveAccessibleName('Alarmton wird geprüft – tippen zum Freischalten');
     tablet.unmount();
 
     // Breite Bauform: das Wort steht, aber es nennt die Prüfung, nicht eine Störung.
     setzeViewportBreite(1366);
     const breit = renderAlarm();
     ton = tonKnopf();
-    expect(ton).toHaveTextContent('Ton prüft');
+    expect(ton).toHaveTextContent('Ton wird geprüft');
     expect(ton).toHaveStyle({ color: rahmenFarben.gedaempft });
     breit.unmount();
 
@@ -134,7 +133,7 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     setzeViewportBreite(390);
     renderAlarm();
     const marke = screen.getByRole('button', { name: /^Alarmzentrale:/ });
-    expect(marke).toHaveAccessibleName('Alarmzentrale: Ton prüft');
+    expect(marke).toHaveAccessibleName('Alarmzentrale: Ton wird geprüft');
     expect(marke).toHaveStyle({ color: rahmenFarben.gedaempft });
   });
 
@@ -160,6 +159,6 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     await pruefungEndet('suspended');
     await waitFor(() => expect(tonKnopf()).toHaveTextContent('Ton blockiert'));
     expect(tonKnopf()).toHaveStyle({ color: farbenDunkel.achtung });
-    expect(tonKnopf()).toHaveAccessibleName('Alarmton durch Klick entsperren');
+    expect(tonKnopf()).toHaveAccessibleName('Alarmton blockiert – tippen zum Freischalten');
   });
 });

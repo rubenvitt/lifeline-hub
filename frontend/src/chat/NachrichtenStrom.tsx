@@ -1,7 +1,7 @@
 import { Button, Modal, Popover, Space, Tag, Tooltip, Typography, theme } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
-import { formatZeit, formatZeitKurz } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import DownloadAnker from '../components/DownloadAnker';
 import { AnhangVorschauGruppe } from '../components/AnhangVorschau';
 import { istBildMime, originalPfad } from '../api/anhangFassung';
@@ -87,6 +87,7 @@ export default function NachrichtenStrom({
 }: Props) {
   const behaelter = useRef<HTMLDivElement>(null);
   const { token } = theme.useToken();
+  const { formatZeit, formatZeitKurz } = useAnzeigeKonventionen();
   // Die id der JÜNGSTEN Nachricht unterscheidet die beiden Wachstumsrichtungen (siehe Effekt
   // unten). `nachrichten` ist aufsteigend sortiert.
   const juengsteId = nachrichten.length > 0 ? nachrichten[nachrichten.length - 1].id : null;
@@ -121,7 +122,10 @@ export default function NachrichtenStrom({
     loeschFrageId == null
       ? undefined
       : nachrichten.find((n) => n.id === loeschFrageId && n.geloescht_at === null);
-  const namen = useMemo(() => aktionsNamen(nachrichten), [nachrichten]);
+  const namen = useMemo(
+    () => aktionsNamen(nachrichten, formatZeitKurz),
+    [nachrichten, formatZeitKurz],
+  );
   const neueAnzahl = markeId === null ? 0 : nachrichten.filter((n) => n.id > markeId).length;
 
   /** Flankenwechsel am unteren Rand: Marke setzen bzw. räumen. */

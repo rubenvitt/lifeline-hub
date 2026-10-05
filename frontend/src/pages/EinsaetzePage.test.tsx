@@ -7,7 +7,7 @@ import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
-import { formatZeitKurz } from '../anzeige/format';
+import { formatZeitKurz, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import EinsaetzePage, { kartenTitelStil } from './EinsaetzePage';
@@ -363,7 +363,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     render();
     // `formatZeitKurz` liefert je nach Tagesbezug verschiedene Formen; geprüft wird das Wort „seit"
     // plus der Funktionswert — die Formatierung prüft `format.test.ts`.
-    const erwartet = formatZeitKurz('2026-06-08 06:12:00');
+    const erwartet = formatZeitKurz('2026-06-08 06:12:00', DEFAULT_KONVENTIONEN);
     expect(await screen.findByText(new RegExp(`seit ${erwartet}`))).toBeInTheDocument();
   });
 

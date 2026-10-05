@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArchivAkte, PersonTreffer, Schwaerzungsantrag } from '../api/types';
-import { formatZeit } from '../anzeige/format';
+import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import Loeschersuchen, { antragswege } from './Loeschersuchen';
@@ -253,7 +253,9 @@ describe('Loeschersuchen', () => {
     expect(screen.queryByRole('button', { name: 'Antrag für IT-5 zurücknehmen' })).toBeNull();
     expect(screen.getAllByText('DS-2026-014')).toHaveLength(2);
     // „Vollzug ab“ beider Zeilen (gleiche Fälligkeit im Fixture).
-    expect(screen.getAllByText(formatZeit('2026-10-03 08:00:00'))).toHaveLength(2);
+    expect(
+      screen.getAllByText(formatZeit('2026-10-03 08:00:00', DEFAULT_KONVENTIONEN)),
+    ).toHaveLength(2);
     await userEvent.setup().click(knopf);
     await waitFor(() => expect(zurueck).toBe(1));
     expect(screen.queryByRole('dialog')).toBeNull();
