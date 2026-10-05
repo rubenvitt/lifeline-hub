@@ -202,3 +202,100 @@ async fn backup_als_nicht_admin_ist_403() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+/// Ruft `GET /api/backup` ab, ohne den Body zu lesen: der Stream (und mit ihm die Sperre und die
+/// Kopie) lebt, bis die Antwort fallen gelassen oder gelesen wird.
+async fn backup_abrufen(app: &axum::Router, cookie: &str) -> axum::response::Response {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/backup")
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+}
+
+/// LFH-926: Jeder Download legt eine Vollkopie der Datenbank an. Ein zweiter Abruf, solange der
+/// erste noch streamt (Doppelklick, zweiter Admin), bekommt 503 statt einer zweiten Kopie;
+/// nach dem ersten geht es wieder.
+#[tokio::test]
+async fn paralleler_backup_download_ist_503() {
+    let app = setup().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let erster = backup_abrufen(&app, &cookie).await;
+    assert_eq!(erster.status(), StatusCode::OK);
+
+    let zweiter = backup_abrufen(&app, &cookie).await;
+    assert_eq!(
+        zweiter.status(),
+        StatusCode::SERVICE_UNAVAILABLE,
+        "solange die erste Sicherung streamt, entsteht keine zweite Kopie"
+    );
+    let fehler = to_bytes(zweiter.into_body(), usize::MAX).await.unwrap();
+    assert!(
+        String::from_utf8_lossy(&fehler).contains("läuft bereits"),
+        "die Meldung muss sagen, warum: {}",
+        String::from_utf8_lossy(&fehler)
+    );
+
+    let bytes = to_bytes(erster.into_body(), usize::MAX).await.unwrap();
+    assert!(bytes.starts_with(b"SQLite format 3\0"));
+
+    let dritter = backup_abrufen(&app, &cookie).await;
+    assert_eq!(
+        dritter.status(),
+        StatusCode::OK,
+        "nach dem ersten Download ist die Sperre wieder frei"
+    );
+}
+
+/// LFH-926: Die Kopie des Downloads liegt neben der Datenbank, nicht im System-Temp (auf Debian
+/// ein tmpfs, also RAM), und verschwindet mit dem Ende des Streams.
+#[tokio::test]
+async fn backup_download_legt_die_kopie_neben_die_datenbank() {
+    let (db_dir, pool) = lifeline_hub::db::test_pool_datei().await;
+    lifeline_hub::auth::bootstrap::bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let app = lifeline_hub::app::build_router(common::test_state(
+        &pool,
+        &lifeline_hub::live::LiveHub::new(),
+    ));
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let reste = || -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(db_dir.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("lifeline-download-"))
+            })
+            .collect()
+    };
+
+    let resp = backup_abrufen(&app, &cookie).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let waehrend = reste();
+    assert_eq!(
+        waehrend.len(),
+        1,
+        "während des Streams liegt genau ein Download-Verzeichnis neben der DB"
+    );
+    assert!(
+        waehrend[0].join("lifeline-backup.sqlite").exists(),
+        "die Kopie liegt in diesem Verzeichnis"
+    );
+
+    to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    assert!(
+        reste().is_empty(),
+        "nach dem letzten Chunk ist die Kopie wieder weg"
+    );
+}
