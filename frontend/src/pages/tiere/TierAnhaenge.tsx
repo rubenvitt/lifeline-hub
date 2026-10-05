@@ -32,7 +32,8 @@ export default function TierAnhaenge({ einsatzId, tier, darfSchreiben }: Props) 
       quelle={{
         queryKey: einsatzKeys.tierAnhaenge(einsatzId, tier.id),
         liste: () => listeTierAnhaenge(einsatzId, tier.id),
-        ablegen: (datei) => legeTierAnhangAb(einsatzId, tier.id, datei),
+        ablegen: (datei, onFortschritt) =>
+          legeTierAnhangAb(einsatzId, tier.id, datei, onFortschritt),
         entfernen: (id) => entferneTierAnhang(einsatzId, tier.id, id),
         downloadPfad: (id) => tierAnhangDownloadPfad(einsatzId, tier.id, id),
       }}

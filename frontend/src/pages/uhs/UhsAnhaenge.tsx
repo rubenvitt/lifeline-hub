@@ -51,7 +51,7 @@ export default function UhsAnhaenge({ einsatzId, uhs, darfSchreiben, zeigeZugrif
       quelle={{
         queryKey: einsatzKeys.uhsAnhaenge(einsatzId, uhs.id),
         liste: () => listeUhsAnhaenge(einsatzId, uhs.id),
-        ablegen: (datei) => legeUhsAnhangAb(einsatzId, uhs.id, datei),
+        ablegen: (datei, onFortschritt) => legeUhsAnhangAb(einsatzId, uhs.id, datei, onFortschritt),
         entfernen: (id) => entferneUhsAnhang(einsatzId, uhs.id, id),
         downloadPfad: (id) => uhsAnhangDownloadPfad(einsatzId, uhs.id, id),
       }}
