@@ -16,9 +16,9 @@ freigegebene Pressemitteilung im ETB.
 Ansprechperson und Erreichbarkeit MUST als personenbezogen gelten. Die Schwärzung eines Einsatzes
 MUST beide entfernen, ebenso die Freitexte des Presse-Logs: Medium, Thema, Antwort und
 Freigabeangabe. Erhalten bleiben MUST Art, Status, Eingang, Bearbeitungs- und Änderungszeitpunkte
-sowie die Verweise auf Benutzer und auf die Pressemitteilung. Der System-Eintrag der Schwärzung MUST die Freitexte des
-Presse-Logs als entfernt nennen. Medienkontakte MUST NOT im Offline-Lagebild auf dem Gerät
-gespeichert werden.
+sowie die Verweise auf Benutzer und auf die Pressemitteilung. Der System-Eintrag der Schwärzung MUST
+die Freitexte des Presse-Logs als entfernt nennen. Medienkontakte MUST NOT im Offline-Lagebild auf
+dem Gerät gespeichert werden.
 
 #### Scenario: Schwärzung
 - **WHEN** ein Einsatz mit einer beantworteten Anfrage „Anfrage zu Fam. Yilmaz“ von „NDR 1“ mit

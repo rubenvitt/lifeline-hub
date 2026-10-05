@@ -1827,7 +1827,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
     // bleibt. Jeder Freitext geht, auch Medium (kann eine Person sein) und Freigabeangabe
     // (nennt oft einen Namen). `antwort` nimmt den Platzhalter nur, wenn sie gesetzt ist: ein
     // CHECK verlangt sie bei `beantwortet`. Herleitung
-    // `openspec/changes/lfh-901-presse-log-schwaerzung/design.md`, D1/D2.
+    // `openspec/changes/archive/2026-10-05-lfh-901-presse-log-schwaerzung/design.md`, D1/D2.
     TabellenRegel {
         tabelle: "medienkontakt",
         scoping: Scoping::EinsatzId,
