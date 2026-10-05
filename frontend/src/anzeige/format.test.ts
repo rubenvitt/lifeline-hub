@@ -42,11 +42,10 @@ describe('taktische Zeit-Varianten', () => {
 });
 
 describe('formatZeit (taktische DTG)', () => {
-  it('Default = taktische DTG in Lokalzeit', () => {
+  it('DEFAULT_KONVENTIONEN = taktische DTG in Lokalzeit', () => {
     const wire = '2026-06-11 09:00:00';
     const d = dayjs.utc(wire).local();
     const erwartet = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`;
-    expect(formatZeit(wire, DEFAULT_KONVENTIONEN)).toBe(erwartet);
     expect(formatZeit(wire, DEFAULT_KONVENTIONEN)).toBe(erwartet);
   });
 
