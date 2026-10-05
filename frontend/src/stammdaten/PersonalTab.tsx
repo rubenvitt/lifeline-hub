@@ -1,6 +1,5 @@
 import { Button, Space, Tag, type TableColumnsType } from 'antd';
 import DemoMarke from '../components/DemoMarke';
-import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -20,6 +19,7 @@ import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
+import { KennungsLink } from '../components/kennungsLink';
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
@@ -60,7 +60,7 @@ export default function PersonalTab() {
        */
       render: (_, p) => (
         <Space size={4}>
-          <Link to={personalDetailPfad(p.id)}>{p.name}</Link>
+          <KennungsLink to={personalDetailPfad(p.id)}>{p.name}</KennungsLink>
           {p.ist_demo && <DemoMarke />}
         </Space>
       ),

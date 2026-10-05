@@ -126,6 +126,18 @@ for (const { dichte, zeilenhoehe, abstandSm, abstandMd } of STAFFEL) {
       ).toBeLessThanOrEqual(SUBPIXEL);
     }
 
+    // (a') Der Kennungs-Link der Leitspalte (LFH-908): ein `<a>` erbt keine Steuerhöhe und maß
+    //      im Handschuh 17 px. GLEICHHEIT mit der Steuerhöhe: nach unten der nackte Link, nach
+    //      oben eine eigene Polsterung, die die Zeile über ihre Zeilenknöpfe höbe.
+    const kennung = (await zeile
+      .getByRole('link', { name: fahrzeug.funkrufname, exact: true })
+      .boundingBox())!;
+    expect(kennung, 'Funkrufname-Link nicht messbar').not.toBeNull();
+    expect(
+      Math.abs(kennung.height - zeilenhoehe),
+      `Funkrufname-Link (gemessen ${kennung.height} px) muss die Steuerhöhe der Stufe ${dichte} tragen (${zeilenhoehe} px)`,
+    ).toBeLessThanOrEqual(SUBPIXEL);
+
     // (b) Abstand zur destruktiven Nachbarin gegen die FORDERUNG (`marginSM`), nicht gegen
     //     den Ist-Wert — sonst bräche die Zusicherung bei jeder Abstandspflege. `Space` ohne
     //     `size` legte nur `paddingXS` und fiele durch.

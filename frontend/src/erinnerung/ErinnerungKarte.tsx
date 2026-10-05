@@ -1,7 +1,7 @@
 import { IconUhr } from '../icons';
 import { Button, Flex, Space, Tooltip, Typography } from 'antd';
 import type { ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
 import {
   auftraegePfad,
@@ -16,6 +16,7 @@ import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
+import { KennungsLink } from '../components/kennungsLink';
 
 const { Text } = Typography;
 
@@ -51,9 +52,9 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
   }
   // Verweis als Link mit ↗-Zeichen, kein farbiges Etikett.
   return (
-    <Link to={bezug.pfad(eid, e.bezug_id)} style={monoStil(11)}>
+    <KennungsLink to={bezug.pfad(eid, e.bezug_id)} style={monoStil(11)}>
       {text}
-    </Link>
+    </KennungsLink>
   );
 }
 

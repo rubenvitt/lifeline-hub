@@ -38,6 +38,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { KennungsLink } from '../components/kennungsLink';
 
 /**
  * Gliederung der Einheiten eines Einsatzes. Die Detailansicht liegt auf eigener Route
@@ -67,7 +68,7 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
       key: e.id,
       title: (
         <Space size={4}>
-          <Link to={einheitDetailPfad(einsatzId, e.id)}>{e.name}</Link>
+          <KennungsLink to={einheitDetailPfad(einsatzId, e.id)}>{e.name}</KennungsLink>
           {e.typ_label && <Tag>{e.typ_label}</Tag>}
           {/* Stärke als Mono-Zahl, nicht als blaues Etikett: Blau ist `bedien`, eine Stärke ist
               eine Angabe. */}

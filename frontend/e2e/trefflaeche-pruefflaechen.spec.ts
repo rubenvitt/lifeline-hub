@@ -27,8 +27,9 @@ import {
  *
  * ZIELE WERDEN BENANNT, NICHT GEFEGT: jede Zielsorte nennt ihre Knoten über Rolle, Name oder
  * die antd-Hülle (`.ant-select`, `.ant-input-number`, nicht deren inneres `input`) und fordert
- * eine Mindestzahl. Bewusst NICHT gemessen und je in einem Folgeticket: die Brotkrume (LFH-909),
- * Kennungs-Links in Tabellenzellen (LFH-908) und beschriftete Checkboxen (LFH-907). Das
+ * eine Mindestzahl. Bewusst NICHT gemessen und je in einem Folgeticket: die Brotkrume (LFH-909)
+ * und beschriftete Checkboxen (LFH-907). Kennungs-Links (LFH-908) misst C13 an der Zeitachse der
+ * Lagemeldungen, den Funkrufname-Link der Katalogtabelle `verwaltung-vereinheitlicht.spec.ts`. Das
  * Löschkreuz eines Auswahlfelds ist benannt ausgenommen: das Feld selbst ist das gleichwertige
  * Ziel.
  *
@@ -863,6 +864,14 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
           sorte: 'Lagemeldungen Suche',
           ziele: (page) => inMain(page).locator('.ant-input-affix-wrapper'),
           mindestens: 1,
+        },
+        {
+          // Der Deeplink zur Quellmeldung maß nackt 13 px (LFH-908). Der Deckel ist die
+          // Steuerhöhe: eine eigene Polsterung höbe die Metazeile über ihre Nachbarn.
+          sorte: 'Lagemeldungen Quellmeldung-Link',
+          ziele: (page) => inMain(page).getByRole('link', { name: /^Meldung #\d+$/ }),
+          mindestens: 1,
+          deckel: { kompakt: 30, handschuh: 72 },
         },
       ],
     },
