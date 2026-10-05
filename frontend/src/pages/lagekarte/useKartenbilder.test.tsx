@@ -36,6 +36,9 @@ vi.mock('../../api/kartenbilder', () => ({
   loescheHintergrundbild: vi.fn(),
 }));
 
+const ladeLageSnapshot = vi.hoisted(() => vi.fn());
+vi.mock('../../api/lageSnapshot', () => ({ ladeLageSnapshot }));
+
 const bild = (id: number, opazitaet = 80): Hintergrundbild =>
   ({
     id,
@@ -162,5 +165,47 @@ describe('useKartenbilder: Bild-URLs (LFH-943)', () => {
 
     hook.unmount();
     expect(freigegeben()).toContain('blob:aktiv');
+  });
+});
+
+describe('useKartenbilder im Rückblick', () => {
+  // LFH-997: Nach der Schwärzung des Einsatzes oder seiner Kategorie „Anhänge“ sind die Bilder der
+  // Lagekarte gelöscht; ein Lage-Stand nennt sie weiter. Wie bei einem im Einsatz gelöschten Bild
+  // erscheint ein Hinweis, die übrigen Bilder werden gezeichnet.
+  it('zeichnet vorhandene Bilder und meldet ein gelöschtes als Hinweis', async () => {
+    ladeLageSnapshot.mockResolvedValue({
+      id: 9,
+      einsatz_id: 5,
+      stand_at: '2026-07-24 08:00:00',
+      schema_version: 1,
+      daten: { bilder: [bild(1), bild(2)] },
+    });
+    const fehler = vi.fn();
+    const qc = neuerQueryClient();
+    const { result } = renderHook(
+      () =>
+        useKartenbilder({
+          einsatzId: 5,
+          kartenRef: createRef<KartenHandle>(),
+          bildPlatzierenId: null,
+          quelle: { typ: 'snapshot', id: 9 },
+          fehler,
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    await waitFor(() => expect(api.downloads).toHaveLength(2));
+
+    await act(async () => {
+      api.downloads.find((d) => d.id === 1)?.aufloesen('blob:eins');
+      api.downloads.find((d) => d.id === 2)?.ablehnen(new Error('Download fehlgeschlagen (404)'));
+    });
+
+    await waitFor(() => expect(result.current.bildOverlays.map((o) => o.id)).toEqual([1]));
+    expect(fehler).toHaveBeenCalledTimes(1);
+    expect(String(fehler.mock.calls[0][0])).toMatch(/404/);
   });
 });

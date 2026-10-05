@@ -663,9 +663,9 @@ pub async fn vollziehen_ergebnis(
         .await?;
         Ok(geaendert)
     })?;
-    // Nachlauf nach dem Commit (LFH-905): die Anhänge des Einsatzes einzeln.
+    // Nachlauf nach dem Commit (LFH-905): Anhänge und Bilder der Lagekarte des Einsatzes einzeln.
     if let Vollzug::Einsatz(einsatz_id) = vollzug {
-        crate::einsatz::repo::anhaenge_nachlaufen(pool, einsatz_id).await;
+        crate::einsatz::schwaerzung_nachlauf::nachlaufen(pool, einsatz_id).await;
     }
     Ok(vollzug)
 }

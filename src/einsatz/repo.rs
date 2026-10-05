@@ -950,7 +950,7 @@ pub(crate) fn schwaerzungs_audit(grund: &str) -> String {
     format!(
         "PII-Schwärzung durchgeführt ({grund}). \
          Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
-         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
+         Foto-/Datei-Anhänge, Bilder der Lagekarte, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
          die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
          Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
          Befehle, Pressemitteilungen, Lagebesprechungen) und des Presse-Logs) wurden \
@@ -1050,9 +1050,10 @@ async fn scrubbe_einsatz_ganz_tx(
 /// denselben Konstanten (kein Guard↔Scrub-Drift). Der eigentliche Scrub steht dort, nicht
 /// mehr hier als handgepflegte UPDATE-Liste.
 ///
-/// Datei-Anhänge löscht der atomare Vorgang nicht selbst, er macht sie nur unerreichbar; die
-/// Zeilen löscht danach [`crate::anhang::repo::entferne_vorgesehene`] je Anhang in einer eigenen
-/// Transaktion (LFH-905, `Strategie::ZeileEinzelnLoeschen`). Scheitert dieser Nachlauf, bleibt
+/// Datei-Anhänge und Bilder der Lagekarte löscht der atomare Vorgang nicht selbst, er macht sie
+/// nur unerreichbar; die Zeilen löscht danach
+/// [`super::schwaerzung_nachlauf::entferne_vorgesehene`] je Zeile in einer eigenen Transaktion
+/// (LFH-905, LFH-997, `Strategie::ZeileEinzelnLoeschen`). Scheitert dieser Nachlauf, bleibt
 /// es beim `Ok(true)`: die Schwärzung steht, und der nächste Purge-Lauf holt die Reste nach.
 pub async fn schwaerze_einsatz(
     pool: &SqlitePool,
@@ -1061,21 +1062,9 @@ pub async fn schwaerze_einsatz(
 ) -> Result<bool, AppError> {
     let geschwaerzt = schwaerze_einsatz_atomar(pool, einsatz_id, jetzt).await?;
     if geschwaerzt {
-        anhaenge_nachlaufen(pool, einsatz_id).await;
+        super::schwaerzung_nachlauf::nachlaufen(pool, einsatz_id).await;
     }
     Ok(geschwaerzt)
-}
-
-/// Nachlauf einer Schwärzung für einen Einsatz (LFH-905): löscht seine zur Entfernung
-/// vorgesehenen Anhänge einzeln. Ein Fehler wird nur geloggt, der Purge-Lauf holt nach.
-pub(crate) async fn anhaenge_nachlaufen(pool: &SqlitePool, einsatz_id: i64) {
-    if let Err(e) = crate::anhang::repo::entferne_vorgesehene(pool, Some(einsatz_id)).await {
-        tracing::warn!(
-            einsatz_id,
-            "Nachlauf der Schwärzung: Anhänge nicht vollständig entfernt, der Purge-Lauf holt \
-             nach: {e}"
-        );
-    }
 }
 
 /// Der atomare Teil von [`schwaerze_einsatz`], ohne den Nachlauf der Anhänge.
@@ -2372,8 +2361,8 @@ mod tests {
     #[tokio::test]
     async fn schwaerzung_nullt_freies_zeichen_label_pii() {
         // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.
-        // Müller"). Es MUSS von schwaerze_einsatz genullt werden (wie karte_hintergrundbild.name);
-        // die operative Position (lat/lon) bleibt wie das übrige Skelett erhalten.
+        // Müller"). Es MUSS von schwaerze_einsatz genullt werden; die operative Position (lat/lon)
+        // bleibt wie das übrige Skelett erhalten.
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();

@@ -91,7 +91,7 @@ wire_enum! {
         Behandlung => "behandlung",
         /// Herkunftsadresse und Melderkontakt.
         Personenauskunft => "personenauskunft",
-        /// Datei-Anhänge samt ihrer Ablage als Dokument.
+        /// Datei-Anhänge samt ihrer Ablage als Dokument und die Bilder der Lagekarte.
         Anhaenge => "anhaenge",
     }
 }

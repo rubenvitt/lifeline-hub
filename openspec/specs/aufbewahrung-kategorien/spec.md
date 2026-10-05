@@ -13,7 +13,8 @@ Einsatz zu sperren.
 Das System SHALL genau drei Datenkategorien mit eigener Frist führen:
 - `behandlung`: Zustand einer Person, Notizen zu Sichtung, Verlauf und UHS-Belegung
 - `personenauskunft`: Herkunftsadresse und Melderkontakt
-- `anhaenge`: Datei-Anhänge samt ihrer Ablage als Dokument, an Schaden, Chat und ETB
+- `anhaenge`: Datei-Anhänge samt ihrer Ablage als Dokument, an Schaden, Chat und ETB, und die
+  Bild-Hintergründe der Lagekarte
 
 Der Personenstamm folgt den Zwecken seiner Person. Alle übrigen Scrub-Daten MUST der Frist des
 Einsatzes folgen. ETB, Registriernummer und Triage- und Statuskategorien MUST keiner
@@ -27,6 +28,10 @@ Kategorie angehören.
 #### Scenario: Neue Spalte ohne Zuordnung
 - **WHEN** eine neue Scrub-Spalte keiner Zuordnung angehört
 - **THEN** scheitern Build oder Testsuite und nennen Tabelle und Spalte
+
+#### Scenario: Beschreibung nennt die Bilder der Lagekarte
+- **WHEN** der Admin in den Org-Einstellungen den Bereich Aufbewahrung öffnet
+- **THEN** nennt die Beschreibung der Kategorie Anhänge auch die Bilder der Lagekarte
 
 ### Requirement: Personenstamm folgt den Zwecken der Person
 
@@ -158,8 +163,8 @@ und unumkehrbar sein und die physische Entfernung nach `aufbewahrung` einhalten.
 
 #### Scenario: Anhänge nach Ablauf
 - **WHEN** die Karenz von `anhaenge` abläuft und der Purge-Lauf läuft
-- **THEN** sind alle Datei-Anhänge des Einsatzes samt Dokumentablage entfernt
-- **AND** tragen Personen, Schäden und Meldungen ihre Angaben unverändert
+- **THEN** sind alle Datei-Anhänge des Einsatzes samt Dokumentablage und alle Bilder seiner Lagekarte entfernt
+- **AND** tragen Personen, Schäden, Meldungen und die übrigen Objekte der Lagekarte ihre Angaben unverändert
 - **AND** nennt das ETB die Schwärzung der Anhänge mit Rechtsgrundlage
 
 #### Scenario: Zweiter Lauf

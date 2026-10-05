@@ -35,7 +35,8 @@ export const KATEGORIE_TEXT: Record<Datenkategorie, KategorieText> = {
   },
   anhaenge: {
     bezeichnung: 'Anhänge',
-    daten: 'Datei-Anhänge samt ihrer Ablage als Dokument (an Schäden, Chat und ETB)',
+    daten:
+      'Datei-Anhänge samt ihrer Ablage als Dokument (an Schäden, Chat und ETB) und die Bilder der Lagekarte',
     vorschlag: { tage: 30, quelle: '§ 32b Abs. 3 NKatSG (Drohnenbilder: höchstens zwei Monate)' },
   },
 };

@@ -40,7 +40,8 @@ impl Datenkategorie {
             }
             Datenkategorie::Personenauskunft => "Herkunftsadresse und Melderkontakt der Personen",
             Datenkategorie::Anhaenge => {
-                "alle Datei-Anhänge samt ihrer Ablage als Dokument (an Schäden, Chat und ETB)"
+                "alle Datei-Anhänge samt ihrer Ablage als Dokument (an Schäden, Chat und ETB) und \
+                 die Bilder der Lagekarte"
             }
         }
     }
@@ -553,9 +554,10 @@ pub async fn schwaerzen(
         kategorie = kategorie.as_str(),
         "Purge Phase K2 abgeschlossen: Datenkategorie geschwärzt"
     );
-    // Die Anhänge löscht der Nachlauf einzeln nach dem Commit (LFH-905).
+    // Anhänge und Bilder der Lagekarte löscht der Nachlauf einzeln nach dem Commit (LFH-905,
+    // LFH-997).
     if kategorie == Datenkategorie::Anhaenge {
-        super::repo::anhaenge_nachlaufen(pool, einsatz_id).await;
+        super::schwaerzung_nachlauf::nachlaufen(pool, einsatz_id).await;
     }
     Ok(true)
 }

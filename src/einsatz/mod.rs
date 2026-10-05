@@ -12,6 +12,7 @@ pub mod nummer;
 pub mod purge_scheduler;
 pub mod repo;
 pub mod retention;
+pub mod schwaerzung_nachlauf;
 pub mod schwaerzung_person;
 pub mod schwaerzung_registry;
 pub mod skelett_loeschung;

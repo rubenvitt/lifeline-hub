@@ -20,6 +20,10 @@ describe('kategorieText', () => {
     }
   });
 
+  it('Anhänge umfassen auch die Bilder der Lagekarte (LFH-997)', () => {
+    expect(KATEGORIE_TEXT.anhaenge.daten).toMatch(/Bilder der Lagekarte/);
+  });
+
   it('vorgabeSatz unterscheidet keine Dauer, 0 und eine Zahl', () => {
     expect(vorgabeSatz(null)).toBe('folgt der Frist des Einsatzes');
     expect(vorgabeSatz(0)).toMatch(/sofort/);
