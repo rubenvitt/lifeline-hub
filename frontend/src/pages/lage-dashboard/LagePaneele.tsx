@@ -3,7 +3,7 @@
  * — Abfragen, Zustände und Wassermarke hält `LageDashboardPage.tsx`, die Ableitungen liegen in
  * `lageVerdichtung.ts` und `meldungsstrom.ts`.
  */
-import type { CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import type { EtbEintragAnzeige, Sichtungskategorie } from '../../api/types';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import {
@@ -373,7 +373,8 @@ export function MeldungsstromPaneel({
   onEtb: () => void;
   onErfassen: () => void;
 }) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
+  const listeRef = useRef<HTMLOListElement>(null);
   const gesperrt = zustand === 'gesperrt';
   // „live" nur bei offener Leitung — bei totem Stream liefert der Cache weiter alte Daten.
   const metaFarbe =
@@ -411,18 +412,41 @@ export function MeldungsstromPaneel({
         onLeerAktion={onErfassen}
         onNeuladen={onNeuladen}
       >
-        <div style={{ position: 'relative' }}>
-          {/* Überlagerung über dem Listenkopf (LFH-900): im Fluss machte der Banner das Paneel
-            höher, die Paneelreihe wuchs mit, und das Band „Führungsstand“ rutschte nach unten. */}
+        {/* Der Banner liegt als Überlagerung über dem Listenkopf (LFH-900, Muster
+          `InfotelefonPage`): im Fluss machte er das Paneel höher, die Paneelreihe wuchs mit, und
+          das Band „Führungsstand“ rutschte nach unten. `absolute` statt `sticky`: das Paneel ist
+          kein Scrollbereich. Er verdeckt den Kopf der jüngsten gezeigten Zeile, bis „anzeigen“
+          sie mit dem Neuen freigibt. Die Mindesthöhe ist die des Banners (Knopf `controlHeight` +
+          Innenabstand + Rand, wie `HaengenderBaum`): steht nur eine Zeile da, ragte er sonst
+          über das Paneel und in Handschuh über das Band darunter. */}
+        <div
+          style={{
+            position: 'relative',
+            minHeight: token.controlHeight + 2 * token.paddingXS + 2,
+          }}
+        >
           {neu > 0 && (
             <Sammelbanner
-              aktion={{ label: 'anzeigen', onKlick: onAnzeigen }}
+              aktion={{
+                label: 'anzeigen',
+                // Der Knopf verschwindet mit dem Banner; der Fokus geht auf die Liste, statt auf
+                // `body` zu fallen (WCAG 2.4.3, wie `HaengenderBaum`).
+                onKlick: () => {
+                  listeRef.current?.focus({ preventScroll: true });
+                  onAnzeigen();
+                },
+              }}
               style={{ position: 'absolute', insetInline: 0, top: 0, zIndex: 1 }}
             >
               {bannerText(neu, neuMindestens)}
             </Sammelbanner>
           )}
-          <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          <ol
+            ref={listeRef}
+            tabIndex={-1}
+            aria-label="Jüngste Einträge"
+            style={{ listStyle: 'none', margin: 0, padding: 0 }}
+          >
             {sichtbar.map((e) => (
               <Zeitachseneintrag
                 key={e.id}
