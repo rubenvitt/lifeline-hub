@@ -731,8 +731,9 @@ pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<
 /// `false` (kein Doppel-Audit). Reversibel (Karenz vor der Schwärzung).
 ///
 /// Der Tombstone ist der Karenz-Beginn (LFH-906, Spec `aufbewahrung`, „Löschvormerkung nach
-/// Fristablauf“): der Ablauf der Frist, oder der Zeitpunkt ihres Setzens, wenn sie in die
-/// Vergangenheit gesetzt wurde — höchstens `jetzt`. Ohne bekannten Setzzeitpunkt `jetzt`. So
+/// Fristablauf“): der späteste von Fristablauf, Setzen der Frist (eine Frist in die
+/// Vergangenheit) und Abschluss (eine Frist, die am aktiven Einsatz ablief) — höchstens `jetzt`.
+/// Ohne bekannten Setzzeitpunkt `jetzt`. So
 /// beginnt die Karenz nach einem Stillstand oder nach dem Rückspielen einer Sicherung von vor
 /// der Vormerkung nicht neu. Liegt der Beginn 30 Tage oder mehr zurück, schwärzt Phase B im
 /// selben Lauf.
@@ -749,11 +750,12 @@ pub async fn soft_delete_einsatz(
     let karenz_beginn: Option<String> = sqlx::query_scalar(
         "UPDATE einsatz SET geloescht_at = CASE \
              WHEN retention_gesetzt_at IS NULL THEN ? \
-             ELSE MIN(?, MAX(retention_bis, retention_gesetzt_at)) END \
+             ELSE MIN(?, MAX(retention_bis, retention_gesetzt_at, COALESCE(abgeschlossen_at, ?))) END \
          WHERE id = ? AND status = ? AND geloescht_at IS NULL \
            AND retention_bis IS NOT NULL AND ? >= retention_bis \
          RETURNING geloescht_at",
     )
+    .bind(jetzt)
     .bind(jetzt)
     .bind(jetzt)
     .bind(einsatz_id)

@@ -1542,8 +1542,8 @@ mod tests {
         );
     }
 
-    /// Im normalen Betrieb liegt der Lauf kurz nach dem Fristablauf; der ETB-Eintrag nennt den
-    /// Karenz-Beginn trotzdem, damit „Vormerkung“ und Karenz im ETB nicht auseinanderfallen.
+    /// Fällt der Lauf genau auf den Fristablauf, ist der Karenz-Beginn der Lauf selbst, und der
+    /// ETB-Eintrag nennt keinen früheren Zeitpunkt. Jeder spätere Lauf nennt ihn („seit …“).
     #[tokio::test]
     async fn lauf_zur_fristablauf_minute_merkt_ohne_verschiebung_vor() {
         let pool = crate::db::test_pool().await;
@@ -2435,8 +2435,81 @@ mod tests {
         assert!(!enthaelt_klartext(&pfad));
     }
 
-    /// Spec `aufbewahrung`, „Restore von vor der Vormerkung, Karenz läuft noch“ (LFH-906): Restore
-    /// zehn Tage nach dem Fristablauf. Der Einsatz ist mit dem Fristablauf vorgemerkt, die
+    /// Spec `aufbewahrung`, „Rückspielen einer Sicherung von vor der Schwärzung“, Satz „auch wenn
+    /// die Sicherung vor diesem Verhalten entstand“ (LFH-906): eine Datenbank auf dem Stand vor
+    /// Migration 0149 (wie eine alte Sicherung) wird beim Start migriert, und der erste Lauf
+    /// rechnet die Karenz ab dem Fristablauf.
+    #[tokio::test]
+    async fn sicherung_von_vor_dem_update_rechnet_karenz_ab_fristablauf() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("alt.db");
+        let pool = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        Migrator {
+            migrations: Cow::Owned(alle.into_iter().filter(|m| m.version <= 148).collect()),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen bis 0148");
+        let e = abgeschlossen_mit_frist(&pool, "2026-01-01 00:00:00").await;
+        pool.close().await;
+
+        let pool = crate::db::connect(pfad.to_str().unwrap()).await.unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
+            2,
+            "Vormerkung und Schwärzung im selben Lauf"
+        );
+        assert_eq!(
+            tombstones(&pool, e).await,
+            (
+                Some("2026-01-01 00:00:00".into()),
+                Some("2026-03-01 12:00:00".into())
+            )
+        );
+    }
+
+    /// Spec `aufbewahrung`, „Frist am aktiven Einsatz abgelaufen“ (LFH-906): die Frist lief am
+    /// 10.01. ab, abgeschlossen wurde erst am 01.03. Die Karenz beginnt mit dem Abschluss, nicht
+    /// mit dem Fristablauf; sonst schwärzte der erste Lauf nach dem Abschluss sofort.
+    #[tokio::test]
+    async fn frist_am_aktiven_einsatz_abgelaufen_karenz_ab_abschluss() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-01-10 00:00:00").await;
+        frist_gesetzt_am(&pool, id, "2026-01-01 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET abgeschlossen_at = '2026-03-01 00:00:00' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 00:05:00")).await,
+            1
+        );
+        assert_eq!(
+            tombstones(&pool, id).await,
+            (Some("2026-03-01 00:00:00".into()), None)
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-30 23:59:59")).await,
+            0
+        );
+        assert_eq!(
+            tick_einmal(&pool, &LiveHub::new(), t("2026-03-31 00:00:00")).await,
+            1
+        );
+    }
+
+    /// Spec `aufbewahrung`, „Restore von vor der Vormerkung, Karenz läuft noch“ (LFH-906): der
+    /// Stand nach einem Restore zehn Tage nach dem Fristablauf (Frist abgelaufen, nicht vorgemerkt,
+    /// Setzzeitpunkt bekannt), ohne das Rückspielen selbst; das belegen die Tests daneben. Der
+    /// Einsatz ist mit dem Fristablauf vorgemerkt, die
     /// Friständerung liefert 422, Wiederherstellen gelingt, und ohne es ist er 20 Tage später
     /// geschwärzt.
     #[tokio::test]

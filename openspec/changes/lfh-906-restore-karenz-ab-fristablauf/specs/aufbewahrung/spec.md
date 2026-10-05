@@ -5,10 +5,11 @@
 ### Requirement: Löschvormerkung nach Fristablauf
 
 Das System SHALL einen abgeschlossenen Einsatz, dessen Frist abgelaufen ist, zur Löschung
-vormerken (`geloescht_at`). Als Zeitpunkt der Vormerkung MUST der Ablauf der Frist gelten, nicht
-der Purge-Lauf, der sie setzt. Wurde die Frist erst nach ihrem eigenen Zeitpunkt gesetzt, also
-in die Vergangenheit, MUST stattdessen der Zeitpunkt des Setzens gelten. Ist nicht bekannt, wann
-die Frist gesetzt wurde, MUST der Purge-Lauf selbst gelten. Die Vormerkung beginnt die Karenz.
+vormerken (`geloescht_at`). Als Zeitpunkt der Vormerkung MUST nicht der Purge-Lauf gelten, der
+sie setzt, sondern der späteste dieser Zeitpunkte, höchstens der Lauf selbst: der Ablauf der
+Frist, das Setzen der Frist (bei einer Frist in die Vergangenheit) und der Abschluss des
+Einsatzes (bei einer Frist, die am aktiven Einsatz ablief). Ist nicht bekannt, wann die Frist
+gesetzt wurde, MUST der Purge-Lauf selbst gelten. Die Vormerkung beginnt die Karenz.
 Ein aktiver Einsatz MUST nie vorgemerkt werden. Die Vormerkung MUST idempotent sein: Ein bereits
 vorgemerkter Einsatz bleibt bei seinem ersten Zeitpunkt und erhält keinen zweiten ETB-Eintrag.
 Die Vormerkung MUST bis zum Ende der Karenz umkehrbar sein (siehe `aufbewahrung-archiv`,
@@ -26,6 +27,11 @@ Wiederherstellen).
 - **WHEN** die Frist eines Einsatzes beim Abschluss gesetzt wurde und der erste Purge-Lauf danach zehn Tage nach ihrem Ablauf läuft, etwa nach einem Stillstand des Servers
 - **THEN** ist der Einsatz mit dem Ablauf der Frist als Zeitpunkt vorgemerkt
 - **AND** nennt der ETB-Eintrag zur Vormerkung diesen Zeitpunkt als Beginn der Karenz
+
+#### Scenario: Frist am aktiven Einsatz abgelaufen
+- **WHEN** die Frist eines Einsatzes abläuft, während er noch aktiv ist, und er 50 Tage später abgeschlossen wird
+- **THEN** ist er nach dem nächsten Purge-Lauf mit dem Abschluss als Zeitpunkt vorgemerkt
+- **AND** ist er erst 30 Tage nach dem Abschluss geschwärzt
 
 #### Scenario: Frist in die Vergangenheit verkürzt
 - **WHEN** die Einsatzleitung die Frist bestätigt auf einen Zeitpunkt vor 60 Tagen setzt und danach der Purge-Lauf läuft

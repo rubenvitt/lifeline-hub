@@ -34,23 +34,27 @@
 
 ## Decisions
 
-### D1: Karenz-Beginn = `max(retention_bis, Frist gesetzt am)`, höchstens `jetzt`
+### D1: Karenz-Beginn = `max(retention_bis, Frist gesetzt am, Abschluss)`, höchstens `jetzt`
 
-Phase A setzt `geloescht_at` nicht mehr auf `jetzt`, sondern auf den Zeitpunkt, ab dem die
-Frist tatsächlich abgelaufen war: den späteren von `retention_bis` und dem Zeitpunkt, zu dem
-diese Frist gesetzt wurde, gedeckelt auf `jetzt`. Das trennt die drei Ursachen ohne
-Restore-Erkennung:
+Phase A setzt `geloescht_at` nicht mehr auf `jetzt`, sondern auf den Zeitpunkt, ab dem der
+Einsatz im ursprünglichen Verlauf vorgemerkt worden wäre: den spätesten von `retention_bis`, dem
+Zeitpunkt, zu dem diese Frist gesetzt wurde, und `abgeschlossen_at`, gedeckelt auf `jetzt`. Der
+Abschluss gehört dazu, weil die Frist auch am aktiven Einsatz gesetzt werden und dort ablaufen
+kann; vorgemerkt wird erst ab dem Abschluss (Befund aus dem Review: ohne ihn schwärzte der erste
+Lauf nach einem späten Abschluss sofort). Das trennt die Ursachen ohne Restore-Erkennung:
 
 | Fall | Frist gesetzt am | Karenz-Beginn |
 |---|---|---|
 | Sicherung von vor der Vormerkung | vor `retention_bis` | `retention_bis` |
 | Stillstand über den Fristablauf | vor `retention_bis` | `retention_bis` |
 | Verkürzung in die Vergangenheit | nach `retention_bis` | Zeitpunkt des Setzens |
+| Frist am aktiven Einsatz abgelaufen | vor `retention_bis` | Abschluss |
 | normaler Betrieb (Lauf alle 10 min) | vor `retention_bis` | `retention_bis` (≤ 10 min früher als heute) |
 
 Der Wert wird im bewachten `UPDATE` selbst berechnet (SQLite `MAX`/`MIN` auf Text, alle Werte im
 kanonischen Format von `zeit::formatiere_utc`), damit Kandidatenliste und Schreiben nicht
-auseinanderlaufen.
+auseinanderlaufen. `abgeschlossen_at` steht in `COALESCE(…, jetzt)`, weil SQLites `MAX` mit
+mehreren Argumenten bei einem NULL selbst NULL liefert.
 
 **Alternativen:**
 - *`max(retention_bis, jetzt − KARENZ)`* (Vorschlag im Ticket): erfüllt das Akzeptanzkriterium,

@@ -16,14 +16,16 @@
 - [x] 3.2 ETB-Audit nennt den Karenz-Beginn, wenn er vor `jetzt` liegt (D4); belegt im Test aus 3.1
 - [x] 3.3 Test „Vormerkung mit schon abgelaufener Karenz“: Frist seit 40 Tagen abgelaufen, ein Tick merkt vor und schwärzt
 - [x] 3.4 Modul-Doku von `purge_scheduler.rs` (Phase A „Karenz-Start“) und Doc-Kommentar von `soft_delete_einsatz` nachziehen
+- [x] 3.5 Abschluss als untere Schranke des Karenz-Beginns (Review-Befund, D1); belegt durch Test „Frist am aktiven Einsatz abgelaufen“, Mutationsprobe ohne `abgeschlossen_at` rot
 
 ## 4. Restore-Fall
 
 - [x] 4.1 Test `restore_von_vor_der_vormerkung_rechnet_karenz_ab_fristablauf` neben `restore_von_vor_der_schwaerzung_wird_erneut_geschwaerzt`: Sicherung vor der Vormerkung, Restore nach Frist + 30 Tagen → nächster Tick schwärzt (Akzeptanzkriterium des Tickets), rot vor der Änderung
 - [x] 4.2 Test zur Restkarenz: Restore 10 Tage nach Fristablauf → vorgemerkt mit `retention_bis`, Friständerung 422, Wiederherstellen gelingt; 20 Tage später geschwärzt
 - [x] 4.3 `docs/betrieb/backup-restore.md`, „Sicherungen und Schwärzung“: Lücke durch das neue Verhalten ersetzen, Stillstand des Servers nennen
+- [x] 4.4 Test `sicherung_von_vor_dem_update_rechnet_karenz_ab_fristablauf`: Datenbank auf dem Stand 0148, Start migriert, erster Lauf schwärzt
 
 ## 5. Abschluss
 
 - [ ] 5.1 `cargo test` der betroffenen Module und `./scripts/check-all.sh` grün (Umgebungsrot nach `cloud-sitzung-gate-umgebungsrot` gegen `alpha` gegengeprüft)
-- [ ] 5.2 Folgeticket für die Datenkategorien (Phase K1) auf dem Entwicklungsboard anlegen
+- [x] 5.2 Folgeticket für die Datenkategorien (Phase K1) auf dem Entwicklungsboard anlegen (LFH-1049)
