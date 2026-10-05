@@ -24,6 +24,13 @@ interface FormWerte {
   empfaenger: string[];
 }
 
+/**
+ * Obergrenze des Intervalls: 7 Tage, wie der Server (`INTERVALL_MAX_MINUTEN`, LFH-924). Ein
+ * zwölfstelliges Intervall legte vorher den Erinnerungs-Planer still. Bewusst eine Regel statt
+ * `max` am Feld: `max` kappte die Eingabe beim Verlassen still auf 7 Tage.
+ */
+const INTERVALL_MAX_MINUTEN = 7 * 24 * 60;
+
 /** Wiederholfelder einer Serie: meist dieselbe Funktion im selben Takt; der Anlass wechselt. */
 const UEBERNAHME: (keyof FormWerte & string)[] = ['empfaenger', 'intervall'];
 
@@ -99,7 +106,17 @@ export default function ErinnerungFormular({ senden, onAnlegen, card = true, ein
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="intervall" label="Intervall (Min, optional)">
+          <Form.Item
+            name="intervall"
+            label="Intervall (Min, optional)"
+            rules={[
+              {
+                type: 'number',
+                max: INTERVALL_MAX_MINUTEN,
+                message: `Höchstens ${INTERVALL_MAX_MINUTEN} Min (7 Tage)`,
+              },
+            ]}
+          >
             <InputNumber
               aria-label="Intervall"
               min={1}

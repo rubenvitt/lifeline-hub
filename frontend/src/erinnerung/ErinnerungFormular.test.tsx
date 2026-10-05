@@ -119,3 +119,33 @@ describe('ErinnerungFormular — Fälligkeit in der Anzeigezone (LFH-692)', () =
     );
   });
 });
+
+/** LFH-924: ein zwölfstelliges Intervall legte den Erinnerungs-Planer still. */
+describe('ErinnerungFormular — Obergrenze des Intervalls', () => {
+  it('schickt kein Intervall über 7 Tagen ab, sondern sagt warum', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
+
+    await userEvent.type(screen.getByLabelText('Titel'), 'Lagemeldung');
+    await userEvent.type(screen.getByLabelText('Intervall'), '999999999999');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    expect(await screen.findByText(/höchstens 10080 Min/i)).toBeInTheDocument();
+    expect(onAnlegen).not.toHaveBeenCalled();
+    // Nicht still auf 7 Tage gekappt: der Wert bleibt stehen, bis jemand ihn korrigiert.
+    expect(screen.getByLabelText('Intervall')).toHaveValue('999999999999');
+  });
+
+  it('nimmt 7 Tage selbst an', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<ErinnerungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
+
+    await userEvent.type(screen.getByLabelText('Titel'), 'Wochenbericht');
+    await userEvent.type(screen.getByLabelText('Intervall'), '10080');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({ intervall_minuten: 10080 })),
+    );
+  });
+});

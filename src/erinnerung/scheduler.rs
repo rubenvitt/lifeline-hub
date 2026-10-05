@@ -8,7 +8,10 @@ use crate::erinnerung::repo;
 use crate::live::LiveEvent;
 use crate::live::LiveHub;
 use chrono::{DateTime, Utc};
+use futures::FutureExt;
 use sqlx::SqlitePool;
+use std::future::Future;
+use std::panic::AssertUnwindSafe;
 use std::time::Duration;
 
 /// Pollintervall des Schedulers.
@@ -30,89 +33,135 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
 
     let mut ausgeloest = 0;
     for f in &faellige {
-        // Eskalation einer bestätigungspflichtigen Sofortmeldung (LFH-97) ZUERST: die Auto-Frist-
-        // Erinnerung trägt bezug_typ='meldung' + die Meldungs-ID. setze_eskaliert ist One-Shot
-        // (eskaliert=0-Guard) und prüft unbestätigt+überfällig. Bewusst VOR markiere_ausgeloest:
-        // schlägt der DB-Schreib fehl, wird NICHT markiert (continue) → der einmalige Reminder
-        // bleibt fällig und wird nächsten Tick erneut versucht, statt die Eskalation + das
-        // Re-Highlight dauerhaft zu verlieren. Reitet auf demselben Tick, kein neuer Timer.
-        let mut eskaliert_mid: Option<i64> = None;
-        if f.bezug_typ.as_deref() == Some(crate::kommunikation::OBJEKT_MELDUNG) {
-            if let Some(mid) = f.bezug_id {
-                match crate::meldung::repo::setze_eskaliert(pool, mid, &jetzt_s).await {
-                    Ok(true) => eskaliert_mid = Some(mid),
-                    Ok(false) => {}
-                    Err(e) => {
-                        tracing::warn!("Eskalation Meldung {mid} fehlgeschlagen: {e}");
-                        continue;
-                    }
+        // Jede Zeile für sich (LFH-924): eine Panic in einer Zeile kostet nur diese, nicht den
+        // Tick und nicht die Zeilen dahinter.
+        let wofuer = format!("Erinnerung {}", f.id);
+        if isoliert(&wofuer, loese_aus(pool, live, f, jetzt, &jetzt_s)).await == Some(true) {
+            ausgeloest += 1;
+        }
+    }
+    ausgeloest
+}
+
+/// Löst eine fällige Erinnerung aus; `false`, wenn ein DB-Schreib scheiterte und sie im
+/// nächsten Tick erneut drankommt.
+async fn loese_aus(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    f: &repo::FaelligeErinnerung,
+    jetzt: DateTime<Utc>,
+    jetzt_s: &str,
+) -> bool {
+    // Eskalation einer bestätigungspflichtigen Sofortmeldung (LFH-97) ZUERST: die Auto-Frist-
+    // Erinnerung trägt bezug_typ='meldung' + die Meldungs-ID. setze_eskaliert ist One-Shot
+    // (eskaliert=0-Guard) und prüft unbestätigt+überfällig. Bewusst VOR markiere_ausgeloest:
+    // schlägt der DB-Schreib fehl, wird NICHT markiert (`false`) → der einmalige Reminder
+    // bleibt fällig und wird nächsten Tick erneut versucht, statt die Eskalation + das
+    // Re-Highlight dauerhaft zu verlieren. Reitet auf demselben Tick, kein neuer Timer.
+    let mut eskaliert_mid: Option<i64> = None;
+    if f.bezug_typ.as_deref() == Some(crate::kommunikation::OBJEKT_MELDUNG) {
+        if let Some(mid) = f.bezug_id {
+            match crate::meldung::repo::setze_eskaliert(pool, mid, jetzt_s).await {
+                Ok(true) => eskaliert_mid = Some(mid),
+                Ok(false) => {}
+                Err(e) => {
+                    tracing::warn!("Eskalation Meldung {mid} fehlgeschlagen: {e}");
+                    return false;
                 }
             }
         }
-        let neu = match (f.intervall_minuten, crate::zeit::parse_utc(&f.faellig_at)) {
-            (Some(iv), Some(fa)) if iv > 0 => Some(crate::zeit::formatiere_utc(
-                naechste_faelligkeit(fa, iv, jetzt),
-            )),
-            _ => None, // einmalig oder unparsbar → nur als ausgelöst markieren
-        };
-        if let Err(e) = repo::markiere_ausgeloest(pool, f.id, neu.as_deref(), &jetzt_s).await {
-            tracing::warn!("Scheduler-Update {id} fehlgeschlagen: {e}", id = f.id);
-            continue;
+    }
+    let neu = match (f.intervall_minuten, crate::zeit::parse_utc(&f.faellig_at)) {
+        (Some(iv), Some(fa)) if iv > 0 => {
+            let neu = naechste_faelligkeit(fa, iv, jetzt).map(crate::zeit::formatiere_utc);
+            if neu.is_none() {
+                // Giftzeile (LFH-924): kein darstellbarer nächster Slot. Einmal auslösen und
+                // stehen lassen, statt den Planer daran sterben zu lassen.
+                tracing::warn!(
+                    "Erinnerung {id}: kein nächster Slot (fällig {fa}, Intervall {iv} min), \
+                     nur als ausgelöst markiert",
+                    id = f.id,
+                    fa = f.faellig_at
+                );
+            }
+            neu
         }
+        _ => None, // einmalig oder unparsbar → nur als ausgelöst markieren
+    };
+    if let Err(e) = repo::markiere_ausgeloest(pool, f.id, neu.as_deref(), jetzt_s).await {
+        tracing::warn!("Scheduler-Update {id} fehlgeschlagen: {e}", id = f.id);
+        return false;
+    }
+    live.publiziere_event(
+        f.einsatz_id,
+        LiveEvent::Erinnerung,
+        serde_json::json!({
+            "einsatz_id": f.einsatz_id,
+            "erinnerung_id": f.id,
+            "bezug_typ": f.bezug_typ,
+            "bezug_id": f.bezug_id,
+        })
+        .to_string(),
+    );
+    // Ablösungsfrist (LFH-635): zusätzlich das Modul-Event `abloesung` mit `art`. Das
+    // Gate von `erinnerung` erreicht nur Leser des Moduls `erinnerungen`; der Hinweis muss
+    // aber bei denen ankommen, die die Ablösung führen (design.md D3). Das Frontend
+    // alarmiert nur über DIESES Event und überspringt den `erinnerung`-Zweig für
+    // `abloesung*` (kein Doppelalarm).
+    let art = match f.bezug_typ.as_deref() {
+        Some(crate::kommunikation::OBJEKT_ABLOESUNG) => Some("faellig"),
+        Some(crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG) => Some("vorwarnung"),
+        _ => None,
+    };
+    if let (Some(art), Some(abloesung_id)) = (art, f.bezug_id) {
+        // Die Fälligkeit der Schicht, nicht die der Vorwarn-Frist: der Hinweis nennt die
+        // Uhrzeit, zu der abgelöst werden muss.
+        let faellig_at = match art {
+            "vorwarnung" => crate::zeit::parse_utc(&f.faellig_at)
+                .and_then(|v| {
+                    v.checked_add_signed(chrono::Duration::minutes(
+                        crate::abloesung::VORWARNUNG_MINUTEN,
+                    ))
+                })
+                .map(crate::zeit::formatiere_utc)
+                .unwrap_or_else(|| f.faellig_at.clone()),
+            _ => f.faellig_at.clone(),
+        };
         live.publiziere_event(
             f.einsatz_id,
-            LiveEvent::Erinnerung,
+            LiveEvent::Abloesung,
             serde_json::json!({
                 "einsatz_id": f.einsatz_id,
-                "erinnerung_id": f.id,
-                "bezug_typ": f.bezug_typ,
-                "bezug_id": f.bezug_id,
+                "abloesung_id": abloesung_id,
+                "art": art,
+                "titel": f.titel,
+                "faellig_at": faellig_at,
             })
             .to_string(),
         );
-        // Ablösungsfrist (LFH-635): zusätzlich das Modul-Event `abloesung` mit `art`. Das
-        // Gate von `erinnerung` erreicht nur Leser des Moduls `erinnerungen`; der Hinweis muss
-        // aber bei denen ankommen, die die Ablösung führen (design.md D3). Das Frontend
-        // alarmiert nur über DIESES Event und überspringt den `erinnerung`-Zweig für
-        // `abloesung*` (kein Doppelalarm).
-        let art = match f.bezug_typ.as_deref() {
-            Some(crate::kommunikation::OBJEKT_ABLOESUNG) => Some("faellig"),
-            Some(crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG) => Some("vorwarnung"),
-            _ => None,
-        };
-        if let (Some(art), Some(abloesung_id)) = (art, f.bezug_id) {
-            // Die Fälligkeit der Schicht, nicht die der Vorwarn-Frist: der Hinweis nennt die
-            // Uhrzeit, zu der abgelöst werden muss.
-            let faellig_at = match art {
-                "vorwarnung" => crate::zeit::parse_utc(&f.faellig_at)
-                    .map(|v| {
-                        crate::zeit::formatiere_utc(
-                            v + chrono::Duration::minutes(crate::abloesung::VORWARNUNG_MINUTEN),
-                        )
-                    })
-                    .unwrap_or_else(|| f.faellig_at.clone()),
-                _ => f.faellig_at.clone(),
-            };
-            live.publiziere_event(
-                f.einsatz_id,
-                LiveEvent::Abloesung,
-                serde_json::json!({
-                    "einsatz_id": f.einsatz_id,
-                    "abloesung_id": abloesung_id,
-                    "art": art,
-                    "titel": f.titel,
-                    "faellig_at": faellig_at,
-                })
-                .to_string(),
-            );
-        }
-        // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks).
-        if let Some(mid) = eskaliert_mid {
-            live.publiziere_objekt(f.einsatz_id, LiveEvent::Sofortmeldung, "meldung_id", mid);
-        }
-        ausgeloest += 1;
     }
-    ausgeloest
+    // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks).
+    if let Some(mid) = eskaliert_mid {
+        live.publiziere_objekt(f.einsatz_id, LiveEvent::Sofortmeldung, "meldung_id", mid);
+    }
+    true
+}
+
+/// Führt `fut` aus und fängt eine Panic darin ab (LFH-924): sie erscheint als
+/// `tracing::error!`, und der Aufrufer bekommt `None`, statt mit dem Planer-Task zu sterben.
+async fn isoliert<F: Future>(wofuer: &str, fut: F) -> Option<F::Output> {
+    match AssertUnwindSafe(fut).catch_unwind().await {
+        Ok(v) => Some(v),
+        Err(panik) => {
+            let grund = panik
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| panik.downcast_ref::<String>().map(String::as_str))
+                .unwrap_or("unbekannt");
+            tracing::error!("Erinnerungs-Planer: Panic bei {wofuer}: {grund}");
+            None
+        }
+    }
 }
 
 /// Startet den Hintergrund-Scheduler (nur im Produktivlauf aus `main.rs`).
@@ -122,7 +171,9 @@ pub fn starte_scheduler(pool: SqlitePool, live: LiveHub) {
         let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
         loop {
             ticker.tick().await;
-            tick_einmal(&pool, &live, Utc::now()).await;
+            // Eine Panic im Tick beendet nur diesen Tick, nie die Schleife (LFH-924): das
+            // JoinHandle wird verworfen, ein gestorbener Task fiele niemandem auf.
+            isoliert("Tick", tick_einmal(&pool, &live, Utc::now())).await;
         }
     });
 }
@@ -684,6 +735,88 @@ mod tests {
         for (bezeichnung, _, _, rx) in &mut beendete {
             assert!(rx.try_recv().is_err(), "{bezeichnung}: kein Live-Ereignis");
         }
+    }
+
+    /// Schreibt eine Erinnerung an der Route vorbei, wie sie vor LFH-924 durchkam.
+    async fn giftzeile(pool: &SqlitePool, e: i64, b: i64, faellig: &str, intervall: i64) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO erinnerung (einsatz_id, titel, faellig_at, intervall_minuten, \
+                                     erstellt_von_id) \
+             VALUES (?, 'Gift', ?, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(faellig)
+        .bind(intervall)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LFH-924: Giftzeilen (riesiges Intervall, Jahr 0226 bzw. −262000) legen den Planer nicht
+    /// still. Sie lösen einmal aus und blockieren nichts; die übrigen fälligen Erinnerungen
+    /// kommen im selben und im nächsten Tick dran.
+    #[tokio::test]
+    async fn giftzeilen_legen_den_planer_nicht_still() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let live = LiveHub::new();
+        // Vor der gesunden Zeile einsortiert (ORDER BY faellig_at), wie im Befund.
+        let riesig = giftzeile(&pool, e, b, "2026-06-11 09:00:00", 999_999_999_999).await;
+        let jahr_0226 = giftzeile(&pool, e, b, "0226-05-01 10:00:00", 1).await;
+        let jahr_negativ = giftzeile(&pool, e, b, "-262000-05-01 10:00:00", 1).await;
+        let gesund = repo::anlegen(
+            &pool,
+            e,
+            b,
+            ErinnerungDaten {
+                titel: "Lagemeldung",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: Some(1),
+                empfaenger_funktion: None,
+                empfaenger_funktion_code: None,
+                bezug_typ: None,
+                bezug_id: None,
+            },
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap()
+        .id;
+        let faellig_at = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, String>("SELECT faellig_at FROM erinnerung WHERE id = ?")
+                    .bind(id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:30")).await, 4);
+        assert_eq!(faellig_at(gesund).await, "2026-06-11 10:02:00");
+        // Kein darstellbarer nächster Slot: bleibt stehen, als ausgelöst markiert.
+        assert_eq!(faellig_at(riesig).await, "2026-06-11 09:00:00");
+        // Der Tippfehler rückt in einem Schritt auf den nächsten echten Slot.
+        assert_eq!(faellig_at(jahr_0226).await, "2026-06-11 10:02:00");
+        assert_eq!(faellig_at(jahr_negativ).await, "2026-06-11 10:02:00");
+
+        // Nächster Tick: die gesunde (und die eingefangenen Tippfehler) wieder, die riesige nicht.
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:02:30")).await, 3);
+        assert_eq!(faellig_at(gesund).await, "2026-06-11 10:03:00");
+        assert_eq!(faellig_at(riesig).await, "2026-06-11 09:00:00");
+    }
+
+    /// LFH-924: eine Panic im Tick beendet nur den Tick; der Aufrufer läuft weiter.
+    #[tokio::test]
+    async fn isoliert_faengt_eine_panic_ab() {
+        let panikt = async {
+            panic!("Giftzeile");
+        };
+        assert_eq!(isoliert("Test", panikt).await, None::<()>);
+        assert_eq!(isoliert("Test", async { 7 }).await, Some(7));
     }
 
     /// LFH-699: die Frist einer Sofortmeldung in einem abgeschlossenen Einsatz eskaliert nicht

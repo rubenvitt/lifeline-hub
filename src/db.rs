@@ -2919,6 +2919,112 @@ mod tests {
         assert_eq!(gesetzt(ohne_frist).await, None);
     }
 
+    // --- Migration 0150: Giftzeilen des Erinnerungs-Planers (LFH-924) ---
+    //
+    // Alt-DB mit allem, was vor den Eingabegrenzen durchkam: unplausible Intervalle werden
+    // einmalig, offene Zeilen mit unplausiblem Jahr gelten als ausgelöst; gesunde und erledigte
+    // Zeilen bleiben, wie sie sind.
+    #[tokio::test]
+    async fn migration_0150_entschaerft_erinnerungs_giftzeilen() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        let bis = |version: i64| Migrator {
+            migrations: Cow::Owned(
+                alle.iter()
+                    .filter(|m| m.version <= version)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        };
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        bis(149).run(&pool).await.expect("Migrationen bis 0149");
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 1, 'L', 'l', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let erinnerung = |faellig: &'static str, intervall: Option<i64>, status: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO erinnerung (einsatz_id, titel, faellig_at, intervall_minuten, \
+                                             status, erstellt_von_id) \
+                     VALUES (1, 'X', ?, ?, ?, 1) RETURNING id",
+                )
+                .bind(faellig)
+                .bind(intervall)
+                .bind(status)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let gesund = erinnerung("2026-06-11 10:00:00", Some(30), "offen").await;
+        let wochenrhythmus = erinnerung("2026-06-11 10:00:00", Some(10_080), "offen").await;
+        let riesig = erinnerung("2026-06-11 10:00:00", Some(999_999_999_999), "offen").await;
+        let null_intervall = erinnerung("2026-06-11 10:00:00", Some(0), "offen").await;
+        let jahr_0226 = erinnerung("0226-05-01 10:00:00", Some(1), "offen").await;
+        let jahr_negativ = erinnerung("-262000-05-01 10:00:00", Some(1), "offen").await;
+        let jahr_fern = erinnerung("+10000-05-01 10:00:00", None, "offen").await;
+        let jahr_0226_erledigt = erinnerung("0226-05-01 10:00:00", Some(1), "erledigt").await;
+
+        bis(150).run(&pool).await.expect("Migration 0150");
+
+        let zeile = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (Option<i64>, Option<String>)>(
+                    "SELECT intervall_minuten, zuletzt_ausgeloest_at FROM erinnerung WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(zeile(gesund).await, (Some(30), None));
+        assert_eq!(zeile(wochenrhythmus).await, (Some(10_080), None));
+        assert_eq!(zeile(riesig).await, (None, None), "einmalig, löst noch aus");
+        assert_eq!(zeile(null_intervall).await, (None, None));
+        for (id, faellig) in [
+            (jahr_0226, "0226-05-01 10:00:00"),
+            (jahr_negativ, "-262000-05-01 10:00:00"),
+            (jahr_fern, "+10000-05-01 10:00:00"),
+        ] {
+            assert_eq!(
+                zeile(id).await,
+                (None, Some(faellig.to_string())),
+                "{faellig}: gilt als ausgelöst"
+            );
+        }
+        assert_eq!(
+            zeile(jahr_0226_erledigt).await,
+            (Some(1), None),
+            "erledigte Zeilen bleiben unberührt"
+        );
+    }
+
     // --- Migration 0111: Lagedaten an einsatz_person ---
     //
     // Auf der leeren Vorlage liefe der Backfill über null Zeilen. Hier eine befüllte Alt-DB mit
