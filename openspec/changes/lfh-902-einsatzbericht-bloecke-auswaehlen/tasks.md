@@ -1,0 +1,34 @@
+# Tasks
+
+Jede Aufgabe entsteht test-first (`superpowers:test-driven-development`): erst der rote Test,
+dann der Code. Vor jeder „fertig“-Aussage gelten `verification-before-completion` und
+`requesting-code-review`. Pfade relativ zu `frontend/src/`, sofern nicht anders genannt.
+
+## 1. Blockliste, Auswahl und Adresse
+
+- [ ] 1.1 `druck/einsatzbericht/quellen.ts`: `BLOECKE` um `standard: boolean` und die Anlagen `einheiten-zeiten` und `personal-kopf` erweitern (design.md D2), `STANDARDUMFANG` daraus ableiten. `Quelle.block` wird zu `bloecke: BlockSchluessel[]`, die Personal-Anlage hängt an `personal`, `personalPerioden` und `einheiten`, die Einheiten-Anlage an `einheiten` und `einheitenPerioden`. Verifiziert durch `quellen.test.ts`: Standardumfang = die sieben Blöcke aus LFH-726 in alter Reihenfolge; jeder Block hat mindestens eine Quelle und jede Quelle mindestens einen Block; der Abgleich mit `modulRegistry` bleibt grün.
+- [ ] 1.2 Neues `druck/einsatzbericht/auswahl.ts`: `parseBerichtAuswahl(params)` (unbekannte und doppelte Schlüssel verwerfen, kanonisch ordnen, leer oder fehlend → Standardumfang), `auswahlSchluessel(auswahl)` und `umfangZeilen(auswahl)` („Standardumfang“ bzw. „Auswahl: …“, dazu „Personenbezug: enthält Namen von Einsatzkräften“ bei `personal-kopf`). Verifiziert durch `auswahl.test.ts` mit den Szenarien der Spec: „Unbekannter Schlüssel“, „Nur unbekannte Schlüssel“, „Reihenfolge unabhängig von der Adresse“, „Ohne Auswahl“, „Mit Auswahl“; Round-Trip durch `URLSearchParams`. Mutationsprobe: Verwerfen unbekannter Schlüssel entfernen → rot.
+- [ ] 1.3 `routing/deeplinks.ts`: `einsatzberichtPfad(einsatzId, auswahl?)` schreibt `?bloecke=` nur abweichend vom Standardumfang (D1). Verifiziert durch `deeplinks.test.ts`: ohne Auswahl und mit Standardumfang derselbe Pfad wie bisher, mit Auswahl die kanonische Liste; `parseBerichtAuswahl` kehrt den Pfad um. `routing/inlinePfade.guard.test.ts` bleibt grün.
+
+## 2. Weiche und Abruf je Auswahl
+
+- [ ] 2.1 `berichtFreigabe(freigaben, auswahl)`: Quellen ohne gewählten Block sind `nicht-gewaehlt` und zählen nicht zu den gesperrten Modulen (D3). Verifiziert durch `quellen.test.ts`: Personen gesperrt und Bilanz gewählt → gesperrt mit „Personen“; Bilanz abgewählt → kein gesperrtes Modul, `personen` ist `nicht-gewaehlt`; nur `personal-kopf` gewählt → `personal`, `personalPerioden`, `einheiten` und `einsatz` werden abgerufen, sonst nichts.
+- [ ] 2.2 `abruf.ts` ruft für `nicht-gewaehlt` nichts ab; `berichtZustand` behandelt den Zustand wie `nicht-genutzt`. `api/queryKeys.ts`: `einsatzKeys.einsatzberichtDruck(einsatzId, auswahlSchluessel)`, Präfix in `NICHT_LIVE_KEYS` unverändert. Verifiziert durch `abruf.test.ts` (kein Aufruf für eine abgewählte Quelle), `queryKeys.guard.test.ts`, den Literal-Pin in `queryKeys.test.ts` und `liveEvent.contract.test.ts`.
+
+## 3. Verdichtung der gewählten Blöcke und der Anlagen
+
+- [ ] 3.1 `verdichteEinsatzbericht(roh, konv, auswahl)` baut nur gewählte Blöcke in kanonischer Reihenfolge. Verifiziert durch `verdichtung.test.ts`: Standardumfang ergibt dasselbe Objekt wie bisher (bestehende Tests unverändert grün); Bilanz abgewählt → kein Block `bilanz`, auch kein Vermerk.
+- [ ] 3.2 Anlage Einheiten mit Einsatzzeiten (D5): Name bzw. Funkrufname, Beginn, Ende oder „läuft“, Einsatzzeit bis `bisMs`, sortiert nach Beginn; Einheiten ohne Periode nur im Vermerk. Verifiziert durch Tests nach den Szenarien „Einheit noch im Einsatz“ (6 h 32 bis 14:32) und „Einheit ohne Zeitachse“; offene Periode in abgeschlossenem Einsatz endet beim Abschluss.
+- [ ] 3.3 Anlage Personal je Kopf (D5): Name, Funktion, Einheit, Beginn, Ende, Einsatzzeit; ohne Periode „keine Zeitachse“; Summe als Helferstunden über dieselbe Hilfsfunktion wie der Block Kräfte. Verifiziert durch Tests: zwölf Kräfte erscheinen alle; eine Kraft ohne Periode steht ohne 0; die Helferstundensumme gleicht der im Block Kräfte; Whitelist-Test: Fixture mit `bemerkung`, `traegerorganisation`, `personal_id`, `status_label` → `JSON.stringify` der Anlage enthält keinen dieser Werte (Mutationsprobe: `bemerkung` aufnehmen → rot); Standardumfang enthält keinen Namen aus `listeEinsatzPersonal`.
+- [ ] 3.4 `Bloecke.tsx` bleibt Abbildung; Anlagen nutzen die vorhandenen Inhaltsarten (`tabelle`, `vermerk`, `zeilen`). Verifiziert durch einen Rendertest, dass ein abgewählter Block kein `data-lfh="einsatzbericht-block-…"` erzeugt.
+
+## 4. Druckansicht
+
+- [ ] 4.1 `pages/EinsatzberichtDruckPage.tsx`: Auswahl aus `useSearchParams`, Paneel „Blöcke“ außerhalb der Druckwurzel mit den Gruppen „Bericht“ und „Anlagen“, Hinweis am Personal, letztes Häkchen gesperrt, Knopf „Standardumfang“, Schreiben per `replace` (D4). Druckkopf mit den Zeilen aus `umfangZeilen`. Die Sackgasse nennt nur Module gewählter Blöcke, die Auswahlleiste bleibt dort sichtbar. Verifiziert durch `EinsatzberichtDruckPage.test.tsx`: ohne Parameter sieben Blöcke und „Standardumfang“; Bilanz abwählen → Adresse trägt die Auswahl, Bilanz fehlt, Kopf nennt „Auswahl: …“; letztes Häkchen gesperrt; Personen gesperrt + Bilanz abgewählt → druckbar; Paneel liegt nicht in der Druckwurzel.
+- [ ] 4.2 `frontend/src/druck/AGENTS.md`, Abschnitt Einsatzbericht: Auswahl in `?bloecke=` (Positivliste, Standardumfang ohne Parameter), Weiche und Abruf nur für gewählte Blöcke, Anlagen am Ende, Personal-Anlage nur mit Feld-Whitelist und Kopfvermerk, Verweis auf dieses design.md. Verifiziert durch Lesen des Diffs und Prettier über `frontend/`.
+
+## 5. e2e und Abschluss
+
+- [ ] 5.1 e2e `frontend/e2e/einsatzbericht-druck.spec.ts` erweitern: Bilanz und Lage abwählen → Abschnitte fehlen, Kopf nennt die Auswahl, Neuladen behält sie; Adresse mit unbekanntem Schlüssel → nicht im Kopf; Anlage Personal je Kopf wählen → die gesäte Einsatzkraft steht mit Einsatzzeit, Kopf vermerkt den Personenbezug; unter `emulateMedia('print')` mit `beforeprint` ist das Paneel `display: none`. Verifiziert durch grünen Spec-Lauf in Chromium, Firefox und WebKit (`DRUCK_SPECS`).
+- [ ] 5.2 `pruefliste.md` dieser Change: Prüfliste Einsatztauglichkeit für die Auswahlleiste (Bedienung mit Handschuh, Tastatur, schmale Breite), je Zeile Verdikt und Beleg. Verifiziert durch die vollständige Liste.
+- [ ] 5.3 Gesamtlauf `./scripts/check-all.sh` (ohne `| tail`) grün. Verifiziert durch den Lauf bzw. die CI dieses PRs.
