@@ -189,7 +189,7 @@ function MeldungenBereich({
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       {!schreibgeschuetzt && (
-        <Paneel titel="Meldung an die Einsatzleitung">
+        <Paneel titel="Meldung an die Einsatzleitung" koerperPolster>
           <ErfassungsFormular<MeldungWerte>
             form={form}
             initialValues={MELDUNG_START}
@@ -212,7 +212,7 @@ function MeldungenBereich({
           </ErfassungsFormular>
         </Paneel>
       )}
-      <Paneel titel="Eigene Meldungen">
+      <Paneel titel="Eigene Meldungen" koerperPolster>
         {meldungenQuery.isError ? (
           <Alert type="error" showIcon title="Meldungen konnten nicht geladen werden" />
         ) : meldungenQuery.isLoading ? (

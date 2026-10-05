@@ -187,7 +187,8 @@ describe('Lagemonitor — Großbild', () => {
     renderApp('/geraet/7/monitor');
     expect(await screen.findByRole('note')).toHaveTextContent(/Bildschirmschoner/);
     fireEvent.click(screen.getByRole('button', { name: 'Anzeige starten' }));
-    expect(screen.getByRole('region', { name: 'Betroffene' })).toBeInTheDocument();
+    // Der Hinweis steht sofort, die Kacheln erst mit den Zahlen.
+    expect(await screen.findByRole('region', { name: 'Betroffene' })).toBeInTheDocument();
   });
 });
 

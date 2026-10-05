@@ -39,5 +39,5 @@ nach den Subtasks, die nach der Freigabe auf dem Board angelegt werden; Reihenfo
 
 ## 5. Abschluss
 
-- [ ] 5.1 Gates: `./scripts/check-all.sh` lokal grün bis auf umgebungsbedingte Schritte; vollständig belegt durch die CI des PRs
-- [ ] 5.2 Sichtprüfung im echten Stack: Tablet koppeln, Patient aufnehmen, widerrufen (Tablet zeigt „Kopplung beendet“), Lagemonitor bei 1920 × 1080; Screenshots im PR-Thread
+- [x] 5.1 Gates: `./scripts/check-all.sh` lokal grün bis auf umgebungsbedingte Schritte; vollständig belegt durch die CI des PRs
+- [x] 5.2 Sichtprüfung im echten Stack: Tablet koppeln, Patient aufnehmen, widerrufen (Tablet zeigt „Kopplung beendet“), Lagemonitor bei 1920 × 1080; Screenshots im PR-Thread
