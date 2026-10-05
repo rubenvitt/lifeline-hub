@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Auftrag } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeit } from '../anzeige/format';
+import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import AuftragListe from './AuftragListe';
 
@@ -168,7 +168,7 @@ describe('AuftragKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
       </AnzeigeKonventionenProvider>,
     );
     const erwartet = formatZeit('2026-07-14 12:00:00', berlin);
-    expect(erwartet).not.toBe(formatZeit('2026-07-14 12:00:00'));
+    expect(erwartet).not.toBe(formatZeit('2026-07-14 12:00:00', DEFAULT_KONVENTIONEN));
     expect(screen.getByText(`Frist ${erwartet}`)).toBeInTheDocument();
   });
 });

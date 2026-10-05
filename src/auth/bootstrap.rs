@@ -57,6 +57,14 @@ pub async fn bootstrap_admin(
     if anzahl > 0 {
         return Ok(BootstrapErgebnis::default());
     }
+    // Derselbe Weg wie Login und Anlage (LFH-921, LFH-981): sonst entstünde aus
+    // `LIFELINE_ADMIN_USER=" admin"` ein Admin, der sich nie anmelden kann.
+    let admin_benutzername = crate::auth::benutzername::normalisiere(admin_benutzername)?;
+    if admin_benutzername.is_empty() {
+        return Err(AppError::Validation(
+            "Benutzername des Admin-Kontos darf nicht leer sein".into(),
+        ));
+    }
 
     let (passwort, generiert) = match admin_passwort {
         Some(p) => (p.to_string(), None),
@@ -205,6 +213,28 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(org_name, "Meine Orga");
+    }
+
+    /// Der Admin-Name aus der Umgebung geht durch dieselbe Normalisierung wie Login und Anlage.
+    #[tokio::test]
+    async fn admin_name_wird_getrimmt_und_begrenzt() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", " admin ", Some("startpw12"))
+            .await
+            .unwrap();
+        let name: String = sqlx::query_scalar("SELECT benutzername FROM benutzer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(name, "admin");
+
+        for falsch in ["   ".to_string(), "a".repeat(129)] {
+            let leer = crate::db::test_pool().await;
+            let err = bootstrap_admin(&leer, "Orga", &falsch, Some("startpw12"))
+                .await
+                .unwrap_err();
+            assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+        }
     }
 
     #[tokio::test]

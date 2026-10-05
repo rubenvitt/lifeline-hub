@@ -4,7 +4,7 @@ import type { ChatKanal } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Liste, ListenEintrag } from '../components/Liste';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
-import { formatZeitKurz } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 
 interface Props {
   kanaele: ChatKanal[];
@@ -62,6 +62,7 @@ export default function KanalListe({
   const [offen, setOffen] = useState(false);
   const [form] = Form.useForm<KanalFormWerte>();
   const { token, rollen } = useRollen();
+  const { formatZeitKurz } = useAnzeigeKonventionen();
 
   return (
     <Paneel

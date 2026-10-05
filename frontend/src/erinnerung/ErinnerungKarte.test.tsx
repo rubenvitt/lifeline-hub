@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router';
 import ErinnerungKarte from './ErinnerungKarte';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeit } from '../anzeige/format';
+import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import type { Erinnerung } from '../api/types';
 
@@ -120,7 +120,7 @@ describe('ErinnerungKarte — Fälligkeit in der Anzeigezone (LFH-692)', () => {
       </AnzeigeKonventionenProvider>,
     );
     const erwartet = formatZeit('2026-06-11 10:00:00', berlin);
-    expect(erwartet).not.toBe(formatZeit('2026-06-11 10:00:00'));
+    expect(erwartet).not.toBe(formatZeit('2026-06-11 10:00:00', DEFAULT_KONVENTIONEN));
     expect(screen.getByText(`fällig: ${erwartet}`, { exact: false })).toBeInTheDocument();
   });
 });

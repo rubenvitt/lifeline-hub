@@ -276,6 +276,7 @@ use utoipa::OpenApi;
         crate::schaden::anhang::SchadenAnhangAnzeige,
         crate::tier::anhang::TierAnhangAnzeige,
         crate::uhs::anhang::UhsAnhangAnzeige,
+        crate::uhs::plan::UhsPlanAnzeige,
         crate::anhang::audit_repo::AnhangZugriffAnzeige,
         crate::anhang::audit_repo::ZugriffFassung,
         crate::schaden::SchadenStatus,

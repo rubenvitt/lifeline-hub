@@ -182,7 +182,9 @@ function StelleZelle({ zeile: z }: { zeile: FunkplanZeile }) {
   }
   return (
     // Umbrechend: die Kennung wird gelesen, nicht verglichen. Ein langer Fahrzeug-Funkrufname
-    // (gemessen 245 px in Mono 12) bricht in der 240er-Spalte um, statt die Summe zu sprengen.
+    // (gemessen 245 px in Mono 12) bricht in der 240er-Spalte um, statt die Summe zu sprengen,
+    // und zwar hängend unter seinem eigenen Textanfang: der Baum-Zweig von `Datensicht` stellt
+    // den Text als eigenen Block neben Einzug und Symbol (LFH-977).
     <span style={{ overflowWrap: 'anywhere' }}>
       {z.art === 'fahrzeug' ? <Mono>{z.stelle}</Mono> : z.stelle}
       {z.stelleZusatz && (
@@ -310,7 +312,7 @@ function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
  * Tabelle (LFH-548 D4: 1050 px Contentbreite am Fükw mit offenem Panel): Σ Zahlbreiten 630 +
  * `mindestBreite` 300 = 930 px, Rest als Reserve. EINE fließende Spalte (Teilnehmer, LFH-523);
  * Kennung und Hinweis brechen um, statt die Summe zu sprengen. Im Druck neutralisiert
- * `druck/druck.css` die Breiten (A4 ohne Überhang, `e2e/funkplan.spec.ts`).
+ * `druck/druck.css` die Breiten (A4 ohne Überhang, `e2e/funkplan-druck.spec.ts`).
  */
 function sprechgruppenSpalten() {
   return spaltenFuer<SprechgruppenZeile>()([

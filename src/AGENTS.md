@@ -92,6 +92,13 @@ Lese-Audit (wie Tiere insgesamt).
   Linker-Guard ein Linker, und die Schwärzung nähme das Protokoll mit); `ablage` hält den Ort
   lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
   protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
+- **UHS-Plan (LFH-999)** (Spec `uhs-plan`, Herleitung
+  `openspec/changes/archive/2026-10-05-lfh-999-uhs-plan-hintergrund/design.md`): der Plan unter
+  dem Platz-Layout ist **kein Anhang**, sondern eigene, bereinigte Bytes in `uhs_plan` (einer je
+  UHS, `uhs::plan`, `routes::uhs_plan`). Seine Anzeige (`GET …/uhs/{uid}/plan/bild`) schreibt
+  weder Lese-Audit noch ETB; nur die Übernahme aus einem UHS-Anhang (`…/plan/aus-anhang`) ist
+  EIN protokollierter Abruf, vor dem Lesen der Bytes über `support::anhang_bereinigt_kopieren`.
+  Keinen Verweis vom Plan auf einen Anhang einführen: das Audit verlöre seine Aussage.
 
 **Personen-Anhänge (LFH-757)** (Spec `personen-anhaenge`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-757-personen-anhaenge/design.md`): `einsatz_person_anhang` im Register;
@@ -144,6 +151,25 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `static_files::content_type` braucht ihren richtigen MIME-Typ. Weitere Köpfe (App-CSP, HSTS
   …) sind eine eigene Entscheidung, s. „Anhänge“ zur CSP.
 
+## Backend — Benutzername und KDF (LFH-921, LFH-981)
+
+Spec `passwort-anmeldung`, Herleitung
+`openspec/changes/archive/2026-10-05-lfh-921-981-anmeldung-benutzername/design.md`.
+- **Ein Name von außen geht durch `auth::benutzername::normalisiere`** (Trim, höchstens 128
+  Zeichen, sonst 400) — als erster Schritt, vor Sperre, Audit und Log. Login, Passkey-Start,
+  Anlage und `bootstrap_admin` tun das; ein neuer Eingang auch.
+- **Ein Name von außen wird mit `benutzername = ? COLLATE NOCASE` gesucht**; eindeutig ist er ohne
+  Groß-/Kleinschreibung (Index aus `0151`, Verstoß → 409). `NOCASE` faltet nur A–Z; wer Namen
+  vergleicht (SSO-Kollision, `rate_limit::konto`), faltet ebenso mit `to_ascii_lowercase`.
+- Namen in `auth_audit` kürzt `audit::schreibe` selbst; Log-Felder der Anmeldung nehmen
+  `benutzername::fuer_protokoll`. Die 429-Zeile nennt keinen Namen.
+- **Nur ein 401 ist ein Fehlversuch** (`rate_limit::fehlversuch`, `login_fehlgeschlagen`); ein 503
+  aus dem KDF-Gate geht unverändert durch.
+- **Argon2 im Handler nur über `provider::password::hash_gedrosselt`** (KDF-Gate, Andrang,
+  `spawn_blocking`). Synchrones `password::hash` bleibt `bootstrap.rs`, `dev/seed.rs` und Tests.
+  Neue Passwörter höchstens 128 Zeichen (`pruefe_passwort_laenge`), sonst passen sie nicht in die
+  4-KiB-Grenze des Logins.
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und
@@ -151,7 +177,8 @@ Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzlis
 - **`einsatzliste` nur über `live::org::einsatzliste_melden`** nach dem Commit (Leser = org-weite
   Leser, System-Admins, Mitglieder, dazu eine gerade entfernte Person); ein Löschweg liest die
   Leser VOR dem `DELETE` (`einsatzleser_lesen`, `Einsatzleser::melden`). Jeder `einsatz`-Emitter
-  läuft über `routes::einsatz::kopf_geaendert`, das beide meldet. Nie ein leeres Ereignis an die
+  läuft über `live::org::kopf_melden`, das beide meldet: die Routen über
+  `routes::einsatz::kopf_geaendert`, der Purge-Lauf direkt (LFH-996). Nie ein leeres Ereignis an die
   ganze Org für etwas Einsatzbezogenes: das ist der Metadaten-Kanal, den F01 geschlossen hat.
 - **Katalog-Schreibrouten liegen unter einem Präfix aus `STAMMDATEN_PFADE`** (Middleware
   `stammdaten_live`); ein neuer Katalogpfad braucht einen Eintrag, Guard
@@ -217,6 +244,13 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   System-Admin der Einsatz-Org, nur abgeschlossen; 24 h zurücknehmbar, dann Vollzug in Phase A2
   des Purge-Laufs (`vollziehe_faellige`, zählt für den WAL-Rückschrieb). Kein Sofort-Auslöser
   ohne diese 24 h.
+- **Geräte erfahren Schwärzung und Sperre über den Kopf** (LFH-996, Spec
+  `lagebild-offline-lesen`): `EinsatzAnzeige.teilschwaerzungen` zählt vollzogene
+  Personen-Anträge und geschwärzte Kategorien (`teilschwaerzungen_spalte!` und
+  `teilschwaerzungen_joins!` in `einsatz/repo.rs`, in `laden` und `liste_fuer`). Vormerkung (Phase A), Vollzug mit Wirkung und Kategorie-Schwärzung
+  rufen nach dem Commit `kopf_melden`; Phase B und D bleiben stumm (der Einsatz ist seit der
+  Vormerkung gesperrt). Wer eine neue Teilschwärzung baut, zählt sie dort mit und meldet den
+  Kopf. Herleitung: `openspec/changes/archive/2026-10-05-lfh-996-schwaerzung-clients-raeumen/design.md`.
 - **Personen-Scrub nur über `PERSONENBEZUEGE`** (`einsatz/schwaerzung_person.rs`): je
   Personenart Bezug und `Mit`/`Ohne(Grund)` je Scrub-Spalte; Strategie kommt aus `TABELLEN`, nie
   eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal`,

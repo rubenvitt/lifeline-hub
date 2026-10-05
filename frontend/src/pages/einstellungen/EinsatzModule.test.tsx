@@ -7,10 +7,15 @@ import EinsatzModule from './EinsatzModule';
 
 /** Sektion „Module": die Liste speichert je Zeile sofort und hat deshalb keine Speicher-Leiste. */
 
-const { benutzerRolle } = vi.hoisted(() => ({ benutzerRolle: { wert: 'admin' } }));
+const { benutzerRolle, benutzerOrg } = vi.hoisted(() => ({
+  benutzerRolle: { wert: 'admin' },
+  benutzerOrg: { wert: 1 },
+}));
 
 vi.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ benutzer: { id: 1, system_rolle: benutzerRolle.wert } }),
+  useAuth: () => ({
+    benutzer: { id: 1, system_rolle: benutzerRolle.wert, org_id: benutzerOrg.wert },
+  }),
   AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 
@@ -58,6 +63,7 @@ describe('EinsatzModule', () => {
     vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
     benutzerRolle.wert = 'admin';
+    benutzerOrg.wert = 1;
   });
 
   it('zeigt die Modul-Sichtbarkeits-Sektion; nicht-ausblendbare Module sind gesperrt (LFH-132)', async () => {
@@ -152,6 +158,38 @@ describe('EinsatzModule', () => {
     rendern();
 
     expect(await screen.findByText(/Nur die Einsatzleitung/)).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
+  });
+
+  // LFH-995: wie der Server — der Admin trägt nur in der Org des Einsatzes.
+  it('laesst den Admin der Einsatz-Org ohne Mitgliedschaft verwalten', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      org_id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: null,
+    } as never);
+
+    rendern();
+
+    expect(await screen.findByRole('switch', { name: 'Sichtbar: ETB' })).toBeEnabled();
+    expect(screen.queryByText(/Nur die Einsatzleitung/)).toBeNull();
+  });
+
+  it('sperrt den Admin einer fremden Org ohne Mitgliedschaft', async () => {
+    benutzerOrg.wert = 2;
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      org_id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: null,
+    } as never);
+
+    rendern();
+
+    expect(await screen.findByText(/Organisation des Einsatzes/)).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 

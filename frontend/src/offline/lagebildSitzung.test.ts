@@ -5,7 +5,7 @@ import { ApiError, NetzFehler } from '../api/client';
 import { erzeugeQueryClient } from '../api/queryClient';
 import type { BenutzerAnzeige, MeAntwort } from '../api/types';
 import { merkeGeraet } from '../geraet/geraetMarke';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { lagebildAnlegen, lagebildLesen, lagebildLoeschenPlatte } from './lagebildSpeicher';
 import {
   lagebildAnmelden,
@@ -150,6 +150,45 @@ describe('Lagebild-Sitzung', () => {
       expect(keys).not.toContainEqual(einsatzKeys.personen(3));
       expect(keys).not.toContainEqual(einsatzKeys.etbZaehler(4, {}));
       expect(keys).toContainEqual(einsatzKeys.einheiten(3));
+    });
+
+    it('nimmt nach einer Schwärzung zwischen zwei Sitzungen den Einsatz aus dem Vorrat (LFH-996)', async () => {
+      await vorratAnlegen((q) => {
+        q.setQueryData(einsatzKeys.einsatz(4), { id: 4 });
+        q.setQueryData(einsatzKeys.personen(4), [{ id: 1, name: 'Muster' }]);
+        q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+      });
+      await warte(5);
+      const qc = erzeugeQueryClient({ queries: { retry: false } });
+      clients.push(qc);
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+      await qc.fetchQuery({
+        queryKey: globalKeys.einsaetze(),
+        queryFn: async () => [{ id: 4, teilschwaerzungen: 1 }, { id: 3 }],
+      });
+      await expect
+        .poll(plattenKeys, { timeout: 2000, interval: DROSSEL })
+        .toContainEqual(globalKeys.einsaetze());
+      const keys = await plattenKeys();
+      expect(keys).not.toContainEqual(einsatzKeys.personen(4));
+      expect(keys).not.toContainEqual(einsatzKeys.einsatz(4));
+      expect(keys).toContainEqual(einsatzKeys.einheiten(3));
+    });
+
+    it('nimmt einen aus der Einsatzliste verschwundenen Einsatz aus dem Vorrat (LFH-996)', async () => {
+      await vorratAnlegen((q) => {
+        q.setQueryData(globalKeys.einsaetze(), [{ id: 4 }, { id: 3 }]);
+        q.setQueryData(einsatzKeys.personen(4), [{ id: 1 }]);
+        q.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+      });
+      const qc = erzeugeQueryClient({ queries: { retry: false } });
+      clients.push(qc);
+      await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+      await qc.fetchQuery({ queryKey: globalKeys.einsaetze(), queryFn: async () => [{ id: 3 }] });
+      await expect
+        .poll(plattenKeys, { timeout: 2000, interval: DROSSEL })
+        .not.toContainEqual(einsatzKeys.personen(4));
+      expect(await plattenKeys()).toContainEqual(einsatzKeys.einheiten(3));
     });
 
     it('behält bei erneuter Anmeldung derselben Person den Vorrat', async () => {

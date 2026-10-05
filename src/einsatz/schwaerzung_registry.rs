@@ -1520,6 +1520,35 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        // LFH-999, Plan einer UHS als Hintergrundbild: ganze Zeile löschen. Anders als
+        // `karte_hintergrundbild` (Kartografie) kann ein aus den UHS-Dateien übernommenes Bild ein
+        // Foto aus der Behandlungsstelle sein, und das Skelett braucht den Plan nicht. Das
+        // Platz-Layout (`uhs_platz`) bleibt.
+        tabelle: "uhs_plan",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("uhs_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("mime", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("groesse", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("sha256", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("bild_breite", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("bild_hoehe", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("x", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("y", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("breite", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("helligkeit", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("kontrast", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("nacht_umkehren", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("hinterlegt_von", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("hinterlegt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geaendert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    TabellenRegel {
         tabelle: "uhs",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,

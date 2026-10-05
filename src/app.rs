@@ -59,12 +59,26 @@ pub fn build_router(state: AppState) -> Router {
     build_router_mit(state, RouterOptionen::default())
 }
 
+/// Body-Grenze der öffentlichen Anmelde-Starts mit Body (Passwort-Login, Passkey-Start mit Namen;
+/// LFH-921): ohne sie gälte axums Vorgabe von 2 MiB, und ein Unangemeldeter schickte
+/// Megabyte-Namen. Der discoverable Start liest keinen Body.
+const AUTH_START_BODY_MAX: usize = 4 * 1024;
+
+/// Body-Grenze der Passkey-Abschlüsse: eine Assertion liegt meist unter 2 KiB, mit Erweiterungen
+/// auch darüber (LFH-921; Herleitung
+/// `openspec/changes/archive/2026-10-05-lfh-921-981-anmeldung-benutzername/design.md`,
+/// Entscheidung 6).
+const AUTH_FINISH_BODY_MAX: usize = 16 * 1024;
+
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
 pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
-        .route("/api/auth/login", post(routes::auth::login))
+        .route(
+            "/api/auth/login",
+            post(routes::auth::login).layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
+        )
         .route("/api/auth/logout", post(routes::auth::logout))
         .route("/api/auth/me", get(routes::auth::me))
         .route("/api/auth/providers", get(routes::auth::providers))
@@ -98,11 +112,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/auth/webauthn/auth/start",
-            post(routes::auth::webauthn_auth_start),
+            post(routes::auth::webauthn_auth_start)
+                .layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
         )
         .route(
             "/api/auth/webauthn/auth/finish",
-            post(routes::auth::webauthn_auth_finish),
+            post(routes::auth::webauthn_auth_finish)
+                .layer(DefaultBodyLimit::max(AUTH_FINISH_BODY_MAX)),
         )
         .route(
             "/api/auth/webauthn/discoverable/start",
@@ -110,7 +126,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/auth/webauthn/discoverable/finish",
-            post(routes::auth::webauthn_discoverable_finish),
+            post(routes::auth::webauthn_discoverable_finish)
+                .layer(DefaultBodyLimit::max(AUTH_FINISH_BODY_MAX)),
         )
         .route(
             "/api/auth/totp/enroll/start",
@@ -765,6 +782,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::druck),
         )
         .route(
+            "/api/einsaetze/{id}/personen/listenzugriffe",
+            get(routes::einsatz_person::listenzugriffe),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/{pid}",
             get(routes::einsatz_person::detail),
         )
@@ -968,6 +989,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei",
             get(routes::uhs_anhang::datei).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
+        // UHS-Plan (LFH-999): eigene Bytes, kein Anhang; die Anzeige schreibt kein Lese-Audit.
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plan",
+            put(routes::uhs_plan::hinterlegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024))
+                .patch(routes::uhs_plan::aendern)
+                .delete(routes::uhs_plan::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang",
+            post(routes::uhs_plan::uebernehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plan/bild",
+            get(routes::uhs_plan::bild).layer(ConcurrencyLimitLayer::new(
                 MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
             )),
         )
@@ -1575,10 +1614,6 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/karte/offline-karten/{id}/aktivieren",
             post(routes::karte::offline_aktivieren),
-        )
-        .route(
-            "/api/karte/offline-karten/{id}/neu-laden",
-            post(routes::karte::offline_neu_laden),
         )
         .route(
             "/api/karte/offline-karten/{id}/abbrechen",

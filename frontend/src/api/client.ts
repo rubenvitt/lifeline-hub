@@ -202,6 +202,8 @@ export async function apiDatei(pfad: string, optionen: DateiOptionen = {}): Prom
 export interface UploadOptionen {
   /** Abbruch nach dieser Zeit. Default 15 s; große Dateien mit AV-Scan brauchen mehr. */
   timeoutMs?: number;
+  /** Default `POST`; `PUT` für eine Route, die genau eine Datei ersetzt (UHS-Plan, LFH-999). */
+  methode?: 'POST' | 'PUT';
 }
 
 /** Lädt Dateien per multipart/form-data hoch. Setzt KEINEN Content-Type-Header,
@@ -214,7 +216,7 @@ export async function apiUpload<T>(
 ): Promise<T> {
   try {
     const res = await fetch(pfad, {
-      method: 'POST',
+      method: optionen.methode ?? 'POST',
       credentials: 'same-origin',
       headers: oderNichts(schreibKoepfe()),
       body: formData,
@@ -261,7 +263,7 @@ export function apiUploadMitFortschritt<T>(
   return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     let uebertragen = false;
-    xhr.open('POST', pfad);
+    xhr.open(optionen.methode ?? 'POST', pfad);
     xhr.withCredentials = true;
     xhr.timeout = optionen.timeoutMs ?? 15_000;
     for (const [name, wert] of Object.entries(schreibKoepfe())) xhr.setRequestHeader(name, wert);

@@ -2,7 +2,8 @@ use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Erinnerungen;
 use crate::erinnerung::{
-    anreichern_alle, repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT,
+    anreichern_alle, repo, ErinnerungAnzeige, FAELLIG_JAHRE, INTERVALL_MAX_MINUTEN,
+    STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -17,6 +18,7 @@ use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
+use chrono::Datelike;
 
 use serde::Deserialize;
 
@@ -72,10 +74,20 @@ pub struct NeueErinnerung {
 }
 
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
-/// Akzeptiert mit/ohne Sekunden; sonst `Validation`.
+/// Akzeptiert mit/ohne Sekunden und nur Jahre aus [`FAELLIG_JAHRE`] (LFH-924: ein Jahr
+/// „0226“ oder „-262000“ war sofort fällig und hielt den Planer fest); sonst `Validation`.
 fn parse_faellig(roh: &str) -> Result<String, AppError> {
-    crate::zeit::normalisiere_eingabe(roh)
-        .ok_or_else(|| AppError::Validation("Ungültiger Fälligkeitszeitpunkt".into()))
+    let ungueltig = || AppError::Validation("Ungültiger Fälligkeitszeitpunkt".into());
+    let normal = crate::zeit::normalisiere_eingabe(roh).ok_or_else(ungueltig)?;
+    let jahr = crate::zeit::parse(&normal).ok_or_else(ungueltig)?.year();
+    if !FAELLIG_JAHRE.contains(&jahr) {
+        return Err(AppError::Validation(format!(
+            "Fälligkeit muss zwischen den Jahren {} und {} liegen",
+            FAELLIG_JAHRE.start(),
+            FAELLIG_JAHRE.end()
+        )));
+    }
+    Ok(normal)
 }
 
 /// POST /api/einsaetze/{id}/erinnerungen — Erinnerung anlegen (Schreibrecht + aktiv).
@@ -87,8 +99,12 @@ pub async fn anlegen(
     let einsatz_id = ctx.einsatz.id;
     let titel = pflicht(&req.titel, "Titel")?;
     if let Some(iv) = req.intervall_minuten {
-        if iv <= 0 {
-            return Err(AppError::Validation("Intervall muss positiv sein".into()));
+        // Obergrenze LFH-924: ein zwölfstelliges Intervall ließ den Planer an einer
+        // chrono-Panic sterben.
+        if !(1..=INTERVALL_MAX_MINUTEN).contains(&iv) {
+            return Err(AppError::Validation(format!(
+                "Intervall muss zwischen 1 und {INTERVALL_MAX_MINUTEN} Minuten (7 Tage) liegen"
+            )));
         }
     }
     let faellig = parse_faellig(&req.faellig_at)?;

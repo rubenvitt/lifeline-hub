@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
  * Der Druck des Meldebilds über `druck/druck.css`.
  *
  * Geprüft wird die CSS-Quelle: jsdom lädt diese Datei nicht und kennt kein `@media print`. Ob die
- * Tabellen-Neutralisierer wirken, misst `e2e/meldebild-tabelle.spec.ts`; hier steht, dass sie
+ * Tabellen-Neutralisierer wirken, misst `e2e/meldebild-druck.spec.ts`; hier steht, dass sie
  * dastehen und dass die Datei die gemeinsame Mechanik nicht ein zweites Mal trägt.
  */
 const HIER = dirname(fileURLToPath(import.meta.url));

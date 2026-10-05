@@ -275,3 +275,17 @@ describe('erzeugeQueryClient — Object-URLs bei Datenwechsel (LFH-759)', () => 
     freigeben.mockRestore();
   });
 });
+
+describe('erzeugeQueryClient — Object-URL des UHS-Plans (LFH-999)', () => {
+  it('gibt die URL frei, wenn der Plan wechselt oder den Cache verlässt', () => {
+    const freigeben = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const client = erzeugeQueryClient();
+    client.setQueryData(einsatzKeys.uhsPlanBild(7, 2, 'a'), 'blob:plan-a');
+    client.setQueryData(einsatzKeys.uhsPlanBild(7, 2, 'a'), 'blob:plan-a2');
+    expect(freigeben.mock.calls.flat()).toEqual(['blob:plan-a']);
+    client.setQueryData(einsatzKeys.uhsPlanBild(7, 2, 'b'), 'blob:plan-b');
+    client.clear();
+    expect(freigeben.mock.calls.flat()).toEqual(['blob:plan-a', 'blob:plan-a2', 'blob:plan-b']);
+    freigeben.mockRestore();
+  });
+});

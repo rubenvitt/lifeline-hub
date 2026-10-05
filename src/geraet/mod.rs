@@ -142,6 +142,8 @@ impl Funktionsansicht {
 const UHS_TABLET: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/uhs"),
     ("GET", "/api/einsaetze/{id}/uhs/{uid}"),
+    // Den Plan unter dem Grundriss sehen, nicht ändern (LFH-999).
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/bild"),
     (
         "POST",
         "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
@@ -171,6 +173,12 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
     ),
+    // Plan des Grundrisses (LFH-999): wer Plätze bearbeitet, setzt auch den Plan.
+    ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
+    ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/plan"),
+    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/plan"),
+    ("POST", "/api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang"),
+    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/bild"),
     ("GET", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
     ("POST", "/api/einsaetze/{id}/uhs/{uid}/anhaenge"),
     ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}"),
@@ -315,9 +323,19 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/personen/export"),
             ("POST", "/api/einsaetze/{id}/personen/{pid}/abgleich"),
             ("GET", "/api/einsaetze/{id}/personen/{pid}/anhaenge"),
+            ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
+            ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/plan"),
+            ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/plan"),
+            ("POST", "/api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang"),
         ] {
             assert!(!darf_route(t, m, p), "Tablet darf {m} {p} nicht");
         }
+        // Den Plan sieht es (LFH-999).
+        assert!(darf_route(
+            t,
+            "GET",
+            "/api/einsaetze/{id}/uhs/{uid}/plan/bild"
+        ));
     }
 
     #[test]

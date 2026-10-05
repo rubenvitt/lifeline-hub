@@ -174,12 +174,35 @@ pub(crate) async fn anlegen_tx(
     Ok(einsatz_id)
 }
 
+/// Schwärzungsstand eines Einsatzes `e` als Spalte `teilschwaerzungen` (LFH-996, design.md D1):
+/// vollzogene Personen-Anträge plus geschwärzte Datenkategorien, `NULL` bei 0. Beide Mengen
+/// wachsen nur. Steht in `laden` und `liste_fuer` (Makros, damit beide wortgleich bleiben):
+/// die Spalte hinter das SELECT, die Joins hinter `FROM einsatz e`. Gruppiert gezählt statt je
+/// Zeile korreliert, damit `GET /api/einsaetze` die Anträge einmal liest und nicht einmal je
+/// Einsatz (für Anträge gibt es keinen Index über `einsatz_id`, beide sind Teilindizes).
+macro_rules! teilschwaerzungen_spalte {
+    () => {
+        "NULLIF(COALESCE(tsa.n, 0) + COALESCE(tka.n, 0), 0) AS teilschwaerzungen"
+    };
+}
+
+macro_rules! teilschwaerzungen_joins {
+    () => {
+        " LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM schwaerzung_antrag \
+                     WHERE ziel_art <> 'einsatz' AND vollzogen_at IS NOT NULL \
+                     GROUP BY einsatz_id) tsa ON tsa.einsatz_id = e.id \
+          LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM einsatz_aufbewahrung_kategorie \
+                     WHERE geschwaerzt_at IS NOT NULL \
+                     GROUP BY einsatz_id) tka ON tka.einsatz_id = e.id "
+    };
+}
+
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     // Die beiden EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607); sie
     // stehen wortgleich auch in `liste_fuer`, das Bezirksprädikat wie `istAktiverBezirk` im
     // Frontend — siehe `lagekennzahl::ableiten`.
-    sqlx::query_as::<_, Einsatz>(
+    sqlx::query_as::<_, Einsatz>(concat!(
         "SELECT e.id, e.org_id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
@@ -189,11 +212,13 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet \
-         FROM einsatz e \
-         LEFT JOIN organisation o ON o.id = e.org_id \
+                    AS evakuierung_angeordnet, ",
+        teilschwaerzungen_spalte!(),
+        " FROM einsatz e",
+        teilschwaerzungen_joins!(),
+        "LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
-    )
+    ))
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?
@@ -300,10 +325,11 @@ pub async fn liste_fuer(
         meine_fuehrungsfunktion: Option<String>,
         pegel_festgelegt: bool,
         evakuierung_angeordnet: bool,
+        teilschwaerzungen: Option<i64>,
     }
 
     // EXISTS-Spalten wortgleich zu `laden` (Auslöser der Lagekennzahlen, `lagekennzahl::ableiten`).
-    let rows = sqlx::query_as::<_, Row>(
+    let rows = sqlx::query_as::<_, Row>(concat!(
         "SELECT e.id, e.org_id, o.name AS org_name, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
@@ -314,13 +340,15 @@ pub async fn liste_fuer(
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet \
-         FROM einsatz e \
-         LEFT JOIN organisation o ON o.id = e.org_id \
+                    AS evakuierung_angeordnet, ",
+        teilschwaerzungen_spalte!(),
+        " FROM einsatz e",
+        teilschwaerzungen_joins!(),
+        "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          ORDER BY e.begonnen_at DESC, e.id DESC",
-    )
+    ))
     .bind(benutzer.id)
     .fetch_all(pool)
     .await?;
@@ -407,6 +435,7 @@ pub async fn liste_fuer(
                     r.pegel_festgelegt,
                     r.evakuierung_angeordnet,
                 ),
+                teilschwaerzungen: r.teilschwaerzungen,
             }
         })
         .collect())
@@ -1840,6 +1869,73 @@ mod tests {
                 "Tier T-001: PDF entfernt",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_loescht_den_uhs_plan_und_haelt_die_plaetze() {
+        // LFH-999: `uhs_plan` ist ZeileLoeschen (Bild samt Bytes geht), das Platz-Layout und die
+        // Bezeichnung der UHS bleiben.
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let uhs = crate::uhs::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            crate::uhs::repo::NeueDaten {
+                typ: "behandlungsplatz",
+                bezeichnung: "BHP 50",
+                abschnitt_id: None,
+                standort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        crate::uhs::platz_repo::anlegen_bulk(&pool, uhs.id, "behandlungsplatz", "P", 3)
+            .await
+            .unwrap();
+        let positionen = |pool: sqlx::SqlitePool| async move {
+            sqlx::query_as::<_, (Option<f64>, Option<f64>)>(
+                "SELECT pos_x, pos_y FROM uhs_platz WHERE uhs_id = ? ORDER BY id",
+            )
+            .bind(uhs.id)
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = positionen(pool.clone()).await;
+        let bild = crate::uhs::plan::pruefe_bild(&crate::uhs::plan::testbild::png(16, 16)).unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        crate::uhs::plan::repo::hinterlegen_tx(&mut conn, einsatz.id, uhs.id, leit, &bild)
+            .await
+            .unwrap();
+        drop(conn);
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let plaene: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uhs_plan WHERE einsatz_id = ?")
+            .bind(einsatz.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(plaene, 0, "der Plan ist weg");
+        assert_eq!(positionen(pool.clone()).await, vorher, "die Plätze stehen");
+        let bez: String = sqlx::query_scalar("SELECT bezeichnung FROM uhs WHERE id = ?")
+            .bind(uhs.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(bez, "BHP 50");
     }
 
     #[tokio::test]
