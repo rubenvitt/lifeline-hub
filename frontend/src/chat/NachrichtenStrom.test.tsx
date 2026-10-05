@@ -207,6 +207,62 @@ describe('NachrichtenStrom', () => {
     expect(onHeraufstufenAuftrag).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
   });
 
+  // Spec `modul-freigabe` (LFH-904): ohne Freigabe des Zielmoduls steht der Eintrag gesperrt mit
+  // Grund da (M16), statt zu verschwinden oder in ein 403 zu laufen.
+  it('ohne ETB-Freigabe steht „Zu ETB" gesperrt mit Grund, „Zu Auftrag" bleibt bedienbar', async () => {
+    const onHeraufstufen = vi.fn();
+    const onHeraufstufenAuftrag = vi.fn();
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[nachricht({ id: 5 })]}
+        eigeneBenutzerId={1}
+        darfSchreiben
+        etbGesperrt
+        onBearbeiten={vi.fn()}
+        onLoeschen={vi.fn()}
+        onHeraufstufen={onHeraufstufen}
+        onHeraufstufenAuftrag={onHeraufstufenAuftrag}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
+    const menue = await offenesMenue();
+    expect(within(menue).queryByRole('menuitem', { name: 'Zu ETB' })).toBeNull();
+    const etb = within(menue).getByRole('menuitem', { name: 'Zu ETB (Keine Berechtigung)' });
+    expect(etb).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(etb);
+    expect(onHeraufstufen).not.toHaveBeenCalled();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Zu Auftrag' }));
+    expect(onHeraufstufenAuftrag).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
+  });
+
+  it('ohne Auftrags-Freigabe steht „Zu Auftrag" gesperrt mit Grund', async () => {
+    const onHeraufstufenAuftrag = vi.fn();
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[nachricht({ id: 5 })]}
+        eigeneBenutzerId={1}
+        darfSchreiben
+        auftragGesperrt
+        onBearbeiten={vi.fn()}
+        onLoeschen={vi.fn()}
+        onHeraufstufen={vi.fn()}
+        onHeraufstufenAuftrag={onHeraufstufenAuftrag}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: AKTIONEN }));
+    const menue = await offenesMenue();
+    const auftrag = within(menue).getByRole('menuitem', {
+      name: 'Zu Auftrag (Keine Berechtigung)',
+    });
+    expect(auftrag).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(auftrag);
+    expect(onHeraufstufenAuftrag).not.toHaveBeenCalled();
+    expect(within(menue).getByRole('menuitem', { name: 'Zu ETB' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
   it('der Auslöser nennt Autor und Uhrzeit der Nachricht wie ihre Kopfzeile', () => {
     // Zwei Nachrichten, zwei unterscheidbare Namen: „Aktionen" allein wären n gleichnamige Knöpfe.
     renderMitProviders(
