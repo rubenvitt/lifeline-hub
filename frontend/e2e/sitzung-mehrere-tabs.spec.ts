@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page, type Request } from '@playwright/test';
 
 /*
  * LFH-387 — Sitzung über mehrere Tabs.
@@ -59,6 +59,46 @@ async function aktuellerBenutzer(ctx: BrowserContext): Promise<string | null> {
   const antwort = await ctx.request.get('/api/auth/me');
   if (antwort.status() === 401) return null;
   return ((await antwort.json()) as { benutzername: string }).benutzername;
+}
+
+const pfad = (r: Request) => new URL(r.url()).pathname;
+
+/**
+ * Führt ab sofort Buch über die lesenden API-Abfragen eines Tabs, die der Server noch nicht
+ * beantwortet hat (LFH-998). Offen heißt: abgeschickt, noch ohne Antwortkopf. So zählt auch
+ * der Live-Strom, der nie endet, bis der Server seine Sitzung geprüft hat.
+ *
+ * Gilt nur, solange der Tab sein Dokument behält: Ein Neuladen nimmt die offenen Abfragen
+ * des alten Dokuments mit, ohne dass sie ein Ende melden (gemessen an `/api/auth/me`).
+ */
+function offeneAbfragenVerfolgen(page: Page): Set<Request> {
+  const offen = new Set<Request>();
+  page.on('request', (r) => {
+    if (r.method() === 'GET' && pfad(r).startsWith('/api/')) offen.add(r);
+  });
+  page.on('response', (r) => offen.delete(r.request()));
+  page.on('requestfailed', (r) => offen.delete(r));
+  return offen;
+}
+
+/**
+ * Ab jetzt bricht jede lesende API-Abfrage des Tabs im Browser ab, bevor sie den Server
+ * erreicht, ausgenommen die genannten Pfade (LFH-998). Ein Abbruch ist ein Netzfehler und
+ * keine 401, er löst also keine Umleitung aus. Eine schon abgeschickte Abfrage erreicht
+ * `route` nicht mehr; deshalb danach {@link keineOffenenAbfragen}.
+ */
+async function lesendeAbfragenAbbrechen(page: Page, ausser: string[] = []) {
+  await page.route('**/api/**', (r) =>
+    r.request().method() === 'GET' && !ausser.includes(pfad(r.request()))
+      ? r.abort()
+      : r.continue(),
+  );
+}
+
+async function keineOffenenAbfragen(offen: Set<Request>, tab: string) {
+  await expect
+    .poll(() => [...offen].map(pfad), { message: `offene lesende Abfragen in ${tab}` })
+    .toEqual([]);
 }
 
 const konfliktDialog = (page: Page) =>
@@ -149,13 +189,35 @@ test('(c) Sitzungsablauf: Tab 1 führt zur Anmeldung mit Rückkehrziel, Tab 2 fo
   const tab1 = await ctx.newPage();
   const tab2 = await ctx.newPage();
 
+  /*
+   * Vor dem Logout müssen beide Tabs eingeschwungen sein, sonst holt sich eine ihrer Abfragen
+   * die 401 selbst (LFH-998). Beide Seiten zeigen ihre Anker, bevor ihre Erstabfragen
+   * beantwortet sind; in der CI kam eine davon erst nach dem Logout an. Deshalb bricht nach
+   * dem Laden jede lesende Abfrage ab, die einen Tab umleiten könnte, und die schon
+   * abgeschickten werden abgewartet — in dieser Reihenfolge, sonst rutschte eine dazwischen.
+   * Keiner der beiden Tabs lädt danach neu (s. `offeneAbfragenVerfolgen`).
+   */
+  const offenInTab1 = offeneAbfragenVerfolgen(tab1);
+  const offenInTab2 = offeneAbfragenVerfolgen(tab2);
   await anmelden(tab1, ADMIN, ADMIN_PW);
-  // Tab 2 auf einer Seite ohne Live-Strom und ohne eigene Abfragen im Hintergrund: seine
-  // Umleitung soll an der Meldung aus Tab 1 hängen, nicht an einer eigenen 401.
+  await expect(tab1.getByRole('button', { name: 'Neuer Einsatz' })).toBeVisible();
+  // Tab 2 auf einer Seite ohne eigene Abfragen im Hintergrund, angemeldet und mit stehendem
+  // Live-Strom (der Server beendet ihn beim Logout nicht).
+  const live2 = tab2.waitForResponse((r) => pfad(r.request()) === '/api/live');
   await tab2.goto('/profil');
   await expect(tab2).toHaveURL(/\/profil$/);
-  await tab1.goto('/einsaetze');
-  await expect(tab1.getByRole('button', { name: 'Neuer Einsatz' })).toBeVisible();
+  await expect(
+    tab2.locator('[data-lfh="datenfeld"]').filter({ hasText: 'Benutzername' }).locator('dd'),
+  ).toHaveText(ADMIN);
+  expect((await live2).status()).toBe(200);
+
+  // Tab 1 liest nichts mehr: die 401 soll vom Schreibvorgang kommen. Tab 2 prüft nur noch die
+  // Sitzung (`/me`, auf die Kanalmeldung hin): seine Umleitung soll an der Meldung aus Tab 1
+  // hängen, nicht an einer eigenen 401.
+  await lesendeAbfragenAbbrechen(tab1);
+  await lesendeAbfragenAbbrechen(tab2, ['/api/auth/me']);
+  await keineOffenenAbfragen(offenInTab1, 'Tab 1');
+  await keineOffenenAbfragen(offenInTab2, 'Tab 2');
 
   // Die Sitzung endet an der App vorbei (wie ein serverseitiger Ablauf).
   const aus = await ctx.request.post('/api/auth/logout');
@@ -167,7 +229,14 @@ test('(c) Sitzungsablauf: Tab 1 führt zur Anmeldung mit Rückkehrziel, Tab 2 fo
   // Tab 1 schreibt → 401 → Anmeldung mit Rückkehrziel.
   await tab1.getByRole('button', { name: 'Neuer Einsatz' }).click();
   await tab1.getByLabel('Bezeichnung').fill('nach Ablauf');
+  const schreiben = tab1.waitForResponse(
+    (r) => r.request().method() === 'POST' && pfad(r.request()) === '/api/einsaetze',
+  );
   await tab1.getByRole('button', { name: 'Anlegen', exact: true }).click();
+  expect((await schreiben).status()).toBe(401);
+  // Ab hier lesen beide Tabs wieder, die Anmeldung braucht es.
+  await tab1.unroute('**/api/**');
+  await tab2.unroute('**/api/**');
   await expect(tab1).toHaveURL(/\/login$/);
 
   // Tab 2 folgt über die Kanalmeldung ohne Neuladen.
