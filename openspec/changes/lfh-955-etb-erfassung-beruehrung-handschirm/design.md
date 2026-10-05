@@ -46,7 +46,7 @@ So steht es heute (alpha, 05.10.2026):
 
 ## Decisions
 
-### D1 — Return sendet bei grobem Zeiger nicht (Entscheidung für Ruben)
+### D1 — Return sendet bei grobem Zeiger nicht (entschieden 05.10.2026)
 
 Mit `istBeruehrung` gilt: Enter (auch Shift+Enter) fügt einen Zeilenumbruch ein, wie es die
 `TextArea` ohne Eingriff tut. Strg/⌘+Enter sendet weiter. Das Textfeld trägt
@@ -82,7 +82,7 @@ nennt beide. Das ETB setzt `feldFuellt` immer.
 - Kurzplatzhalter: „Inhalt … ( / für Typ & Felder · @ für Einheit )“. Er ist fünf Zeichen
   länger; die Höhe der Leiste misst `e2e/leisten-flaeche.spec.ts` (Deckel 50 %) weiter.
 
-### D4 — Handschirm: zuerst die Zeitachse (Vorschlag, mit Ruben abzustimmen)
+### D4 — Handschirm: zuerst die Zeitachse (entschieden 05.10.2026: alles einklappen)
 
 Nur unter `md` (`istSchmal`), ab `md` bleibt der Kopf wie er ist.
 

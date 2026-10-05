@@ -21,7 +21,7 @@ Berichtigungen führen:
 
 ## What Changes
 
-- **Entscheidung (offen, Vorschlag D1): Return sendet bei grobem Zeiger nicht.** Mit grobem
+- **Entscheidung (05.10.2026, D1): Return sendet bei grobem Zeiger nicht.** Mit grobem
   Zeiger (`useViewport().istBeruehrung`) fügt Enter ohne Strg/⌘ einen Zeilenumbruch ein; gesendet
   wird über „Erfassen“ oder Strg/⌘+Enter. Das Textfeld trägt `enterKeyHint="enter"`. Mit feinem
   Zeiger bleibt der Vertrag aus LFH-335 unverändert (Enter sendet einen Einzeiler, Shift+Enter
@@ -32,7 +32,7 @@ Berichtigungen führen:
 - **Hinweis und Platzhalter nach Zeigerart:** Bei grobem Zeiger nennt die Hinweiszeile keine
   Tastenkombination, sondern „Return neue Zeile · „Erfassen“ sendet“. Der Kurzplatzhalter heißt
   „Inhalt … ( / für Typ & Felder · @ für Einheit )“.
-- **Handschirm zuerst die Zeitachse (Vorschlag D4):** Unter `md`
+- **Handschirm zuerst die Zeitachse (entschieden 05.10.2026, D4):** Unter `md`
   - stehen „Drucken / als PDF“ und „Einsatz abschließen“ hinter einem Menü „Weitere“ im
     Seitenkopf, die Rückfrage zum Abschließen bleibt;
   - steht der Typfilter einzeilig und rollt waagerecht;
