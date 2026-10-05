@@ -665,6 +665,124 @@ describe('useEinsatzLiveStream', () => {
     setTimeoutSpy.mockRestore();
   });
 
+  it('beendet die Wiederverbindung, wenn der Zugriff auf den Einsatz entzogen ist (403, LFH-910)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const authVerloren = vi.fn();
+    window.addEventListener(SITZUNG_ABGELAUFEN, authVerloren);
+    const status: string[] = [];
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte;
+    setTimeoutSpy.mockClear();
+    quelle?.emitError(FakeEventSource.CLOSED);
+
+    // Der Einsatzkopf wird neu geholt: sein 403 führt den Rahmen in die vorhandene Sackgasse.
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz', 1]);
+    });
+    expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(false);
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    expect(quelle?.closed).toBe(true);
+    expect(status[status.length - 1]).toBe('idle');
+    expect(authVerloren).not.toHaveBeenCalled();
+    window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
+    window.removeEventListener('lfh:live-status', onStatus);
+    setTimeoutSpy.mockRestore();
+  });
+
+  it('verbindet nach einem Endzustand neu, sobald der Einsatzkopf wieder lädt (Wiedergewähren, LFH-910)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    const status: string[] = [];
+    const onStatus = (e: Event) =>
+      status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const { unmount } = render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emitError(FakeEventSource.CLOSED);
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz', 1]);
+    });
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+
+    // Ein von Hand gesetzter Kopf belegt keinen Zugriff.
+    client.setQueryData(['einsatz', 1], { id: 1 });
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+
+    // „Wiederholen" in der Sackgasse lädt den Kopf jetzt erfolgreich: Zugriff wieder gewährt.
+    await client.fetchQuery({ queryKey: ['einsatz', 1], queryFn: () => ({ id: 1 }) });
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+    const neue = FakeEventSource.letzte!;
+    expect(neue.url).toBe('/api/einsaetze/1/live');
+    // Verpasste Ereignisse: der Erst-Open der neuen Verbindung gleicht voll ab.
+    spy.mockClear();
+    neue.emit('open');
+    expect(status[status.length - 1]).toBe('open');
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsatz-material', 1] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
+
+    // Ein weiterer Erfolg baut keine zweite Verbindung daneben.
+    await client.fetchQuery({ queryKey: ['einsatz', 1], queryFn: () => ({ id: 1 }), staleTime: 0 });
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+
+    unmount();
+    expect(neue.closed).toBe(true);
+    expect(status[status.length - 1]).toBe('idle');
+    window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('nimmt nach dem Unmount im Endzustand keinen Neustart mehr vor (LFH-910)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
+      ),
+    );
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const { unmount } = render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emitError(FakeEventSource.CLOSED);
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz', 1]);
+    });
+    unmount();
+    await client.fetchQuery({ queryKey: ['einsatz', 1], queryFn: () => ({ id: 1 }) });
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+  });
+
   it('baut nach dem Backoff neu auf, steigert ihn und setzt ihn nach open zurück (F14)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(
