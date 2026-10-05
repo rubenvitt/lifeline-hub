@@ -9,6 +9,12 @@
  * gelesener Vertragsname). Dafür ist `components/StatusTag.tsx` da: antd 6 rechnet für einen
  * Nicht-Preset ein statisches Farbpaar, das den Modus nicht mehr sieht.
  *
+ * Guard 3 (LFH-891, Spec `farbrollen-kontrast`): kein `<Tag>` mit dem Preset `blue`, auch nicht
+ * in einem Ausdruck. Blau bedient, und antds Preset hält den Textboden nicht (Tag 5,50, Nacht
+ * 4,91 an „ad-hoc“); eine Kennzeichnung ohne Status ist ein `Tag` ohne `color` wie
+ * `components/DemoMarke.tsx`. Er teilt den Tag-Scan mit Guard 2 ({@link farbigeTags}) und damit
+ * die Blindflecken unten.
+ *
  * Guards statt ESLint-Regel wie bei `components/dichte.guard.test.ts`. Es gibt bewusst keine
  * Schuldmenge: ein leerer Ausnahmetopf „für später“ sichert nichts zu.
  *
@@ -810,34 +816,61 @@ function tagNamenIn(inhalt: string): readonly string[] {
   return [...namen];
 }
 
+/**
+ * Jedes `<Tag …>` einer (kommentarbereinigten) Datei mit dem Wert seiner `color`-Prop. Guard 2
+ * und Guard 3 teilen diesen Scan und damit auch seine Blindflecken (Dateikopf).
+ */
+function farbigeTags(inhalt: string): { zeile: number; tag: string; farbe: string }[] {
+  const treffer: { zeile: number; tag: string; farbe: string }[] = [];
+  const zeilen = inhalt.split('\n');
+  for (const element of tagNamenIn(inhalt)) {
+    const marke = `<${element}`;
+    for (let i = inhalt.indexOf(marke); i !== -1; i = inhalt.indexOf(marke, i + marke.length)) {
+      // `<Tagline` o. ä. — der Name muss hier enden.
+      if (!/[\s/>]/.test(inhalt[i + marke.length] ?? '')) continue;
+      // Derselbe Filter wie bei den Karten: ein `<Tag …>` IN einer Zeichenkette ist Text.
+      // Gefiltert wird die Position der Marke; die Wire-Werte in den Attributen bleiben lesbar.
+      const davor = inhalt.slice(0, i).split('\n');
+      if (inZeichenkette(zeilen[davor.length - 1] ?? '', davor[davor.length - 1].length)) {
+        continue;
+      }
+      const ende = tagEnde(inhalt, i);
+      if (ende === -1) continue;
+      const tag = inhalt.slice(i, ende + 1);
+      const farbe = farbAusdruck(tag);
+      if (!farbe) continue;
+      treffer.push({ zeile: davor.length, tag, farbe });
+    }
+  }
+  return treffer;
+}
+
 export function tagBefunde(dateien: Record<string, string>): string[] {
   const verstoesse: string[] = [];
   for (const [pfad, roh] of Object.entries(dateien)) {
     if (!ausserhalbDesVertrags(pfad)) continue;
     const inhalt = ohneKommentare(roh).join('\n');
     const namen = vertragsNamenIn(inhalt);
-    const zeilen = inhalt.split('\n');
-    for (const element of tagNamenIn(inhalt)) {
-      const marke = `<${element}`;
-      for (let i = inhalt.indexOf(marke); i !== -1; i = inhalt.indexOf(marke, i + marke.length)) {
-        // `<Tagline` o. ä. — der Name muss hier enden.
-        if (!/[\s/>]/.test(inhalt[i + marke.length] ?? '')) continue;
-        // Derselbe Filter wie bei den Karten: ein `<Tag …>` IN einer Zeichenkette ist Text.
-        // Gefiltert wird die Position der Marke; die Wire-Werte in den Attributen bleiben lesbar.
-        const davor = inhalt.slice(0, i).split('\n');
-        if (inZeichenkette(zeilen[davor.length - 1] ?? '', davor[davor.length - 1].length)) {
-          continue;
-        }
-        const ende = tagEnde(inhalt, i);
-        if (ende === -1) continue;
-        const tag = inhalt.slice(i, ende + 1);
-        const farbe = farbAusdruck(tag);
-        if (!farbe) continue;
-        const grund = grundFuerBefund(farbe, namen);
-        if (!grund) continue;
-        const zeile = inhalt.slice(0, i).split('\n').length;
-        verstoesse.push(`${pfad}:${zeile}  ${grund}  ${tag.replace(/\s+/g, ' ').slice(0, 110)}`);
-      }
+    for (const { zeile, tag, farbe } of farbigeTags(inhalt)) {
+      const grund = grundFuerBefund(farbe, namen);
+      if (!grund) continue;
+      verstoesse.push(`${pfad}:${zeile}  ${grund}  ${tag.replace(/\s+/g, ' ').slice(0, 110)}`);
+    }
+  }
+  return verstoesse;
+}
+
+/**
+ * Guard 3 (LFH-891): jedes `<Tag>`, dessen `color`-Ausdruck das Preset `blue` als Literal
+ * trägt, auch in einem Ausdruck. Gilt im ganzen Baum, die Vertragsdatei eingeschlossen.
+ */
+export function blauBefunde(dateien: Record<string, string>): string[] {
+  const verstoesse: string[] = [];
+  for (const [pfad, roh] of Object.entries(dateien)) {
+    const inhalt = ohneKommentare(roh).join('\n');
+    for (const { zeile, tag, farbe } of farbigeTags(inhalt)) {
+      if (!literalInhalte(farbe).includes('blue')) continue;
+      verstoesse.push(`${pfad}:${zeile}  ${tag.replace(/\s+/g, ' ').slice(0, 110)}`);
     }
   }
   return verstoesse;
@@ -1529,5 +1562,52 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     // Status zunehmend als `StatusChip`/`StatusZelle` erscheint; wer sie unter 50 drückt, misst
     // neu und senkt die Schranke.
     expect(stellen.length).toBeGreaterThanOrEqual(50);
+  });
+});
+
+describe('Kein Preset `blue` an `Tag` (LFH-891, Spec `farbrollen-kontrast`)', () => {
+  it('findet keine blaue Marke im Baum', () => {
+    const verstoesse = blauBefunde(lieseQuellen(SRC));
+    expect(
+      verstoesse,
+      'Blau bedient (`frontend/AGENTS.md`, „Farbe und Zeichen“), und antds Preset `blue` hält ' +
+        'den Textboden nicht (Tag 5,50, Nacht 4,91). Eine Kennzeichnung ohne Status ist ein ' +
+        `\`Tag\` ohne \`color\` wie \`components/DemoMarke.tsx\`:\n${verstoesse.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('wird rot am Literal und im Ausdruck', () => {
+    expect(blauBefunde({ '/src/pages/A.tsx': '<Tag color="blue">ad-hoc</Tag>' })).toHaveLength(1);
+    expect(
+      blauBefunde({ '/src/pages/B.tsx': "<Tag color={x ? 'blue' : 'default'}>{y}</Tag>" }),
+    ).toHaveLength(1);
+    expect(
+      blauBefunde({
+        '/src/pages/C.tsx': [
+          "import { Tag as Marke } from 'antd';",
+          '<Marke',
+          '  color="blue"',
+          '>',
+        ].join('\n'),
+      }),
+    ).toHaveLength(1);
+    // Auch die Vertragsdatei ist nicht ausgenommen.
+    expect(blauBefunde({ '/src/theme/statusFarben.ts': '<Tag color="blue">x</Tag>' })).toHaveLength(
+      1,
+    );
+  });
+
+  it('meldet keine Nachbar-Prop, keinen Kommentar, keine Zeichenkette und kein anderes Preset', () => {
+    expect(
+      blauBefunde({
+        '/src/pages/D.tsx': [
+          '<Tag icon={<Icon color="blue" />}>{y}</Tag>',
+          '// <Tag color="blue">alt</Tag>',
+          'const text = \'<Tag color="blue">\';',
+          '<Tag color="geekblue">DMO</Tag>',
+          '<Tag>ad-hoc</Tag>',
+        ].join('\n'),
+      }),
+    ).toEqual([]);
   });
 });

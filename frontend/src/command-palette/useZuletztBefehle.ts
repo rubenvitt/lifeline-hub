@@ -37,7 +37,8 @@ export interface BefehlsGedaechtnis {
  */
 export function useZuletztBefehle(): BefehlsGedaechtnis {
   const auth = useAuthOptional();
-  const benutzerId = auth?.benutzer?.id ?? null;
+  // Ein gekoppeltes Gerät hat keine Palette und kein Gedächtnis (LFH-892).
+  const benutzerId = auth?.geraet ? null : (auth?.benutzer?.id ?? null);
   const client = useQueryClient();
   // MEMOISIERT: der Key steht in den Dependencies von `merke`, und das Standbild in `PaletteHost`
   // hängt an dessen Identität.

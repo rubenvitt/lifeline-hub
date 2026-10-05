@@ -25,6 +25,7 @@ use crate::auth::Benutzer;
 use crate::einsatz::modul::{ModulMarker, OhneModul};
 use crate::einsatz::{berechtigung, repo as einsatz_repo, Einsatz, EinsatzRolle};
 use crate::error::AppError;
+use crate::geraet::GeraetKontext;
 use axum::extract::{FromRequestParts, Path};
 use axum::http::request::Parts;
 use sqlx::SqlitePool;
@@ -40,6 +41,10 @@ pub struct EinsatzKontext {
     pub einsatz: Einsatz,
     pub rolle: Option<EinsatzRolle>,
     pub benutzer: Benutzer,
+    /// Gerätesitzung (LFH-892): Kopplung, Ansicht und Stelle. `None` bei einer Person. Die
+    /// Routenschranke hat `CurrentUser` schon geprüft; Handler mit Stellenbindung lesen hier die
+    /// UHS der Kopplung.
+    pub geraet: Option<GeraetKontext>,
 }
 
 impl FromRequestParts<AppState> for EinsatzKontext {
@@ -63,13 +68,20 @@ impl FromRequestParts<AppState> for EinsatzKontext {
             .ok_or(AppError::NotFound)?;
 
         let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-        let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+        // Ein Gerät ist nie Mitglied: seine Rolle kommt aus der Ansicht (design.md D5). Den
+        // Einsatz hat `CurrentUser` schon gegen die Kopplung geprüft (sonst 404).
+        let geraet = parts.extensions.get::<GeraetKontext>().cloned();
+        let rolle = match &geraet {
+            Some(g) => Some(g.ansicht.rolle()),
+            None => einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?,
+        };
         berechtigung::fordere_org_zugehoerigkeit(&benutzer, einsatz.org_id, rolle)?;
 
         Ok(EinsatzKontext {
             einsatz,
             rolle,
             benutzer,
+            geraet,
         })
     }
 }

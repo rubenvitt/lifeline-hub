@@ -291,7 +291,7 @@ export default function MaterialPage() {
       render: (_, em) => (
         <Space>
           {em.bezeichnung}
-          {em.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
+          {em.ist_adhoc && <Tag>ad-hoc</Tag>}
           {em.ist_demo && <DemoMarke />}
         </Space>
       ),

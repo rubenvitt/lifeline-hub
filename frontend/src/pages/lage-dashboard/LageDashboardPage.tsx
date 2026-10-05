@@ -107,8 +107,7 @@ import {
   meldungsStand,
   type Zaehlstand,
 } from './fuehrungsZahlen';
-import { useLagebild } from './useLagebild';
-import { schlechtesterZustand } from '../../api/abrufZustand';
+import { kraefteZustand, useLagebild } from './useLagebild';
 
 /**
  * Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener Block mit
@@ -270,16 +269,10 @@ export default function LageDashboardPage() {
   const strom = stromAuswahl(etbDaten ?? [], angezeigtBis);
 
   // ── Zustände je Block ──
-  // Die Lagebild-Quellen tragen `gesperrt` (Modul nicht freigegeben, LFH-669); mehrere Quellen
-  // einer Aussage verdichtet `schlechtesterZustand` wie in der Vorbereitung.
+  // Die Lagebild-Quellen tragen `gesperrt` (Modul nicht freigegeben, LFH-669); die Kräfte hängen
+  // nur an ihren Rechenquellen, wie in der Vorbereitung (`kraefteZustand`, LFH-887).
   const zBetroffene: Quellzustand = quellZustand.personen;
-  const zKraefte: Quellzustand = schlechtesterZustand(
-    quellZustand.abschnitte,
-    quellZustand.einheiten,
-    quellZustand.personal,
-    quellZustand.fahrzeuge,
-    quellZustand.material,
-  );
+  const zKraefte: Quellzustand = kraefteZustand(quellZustand);
   const zGefahren: Quellzustand = quellZustand.gefahren;
   const zMatrixRoh: Quellzustand = zGefahren === 'daten' ? zustandVon(...matrixQueries) : zGefahren;
   const matrix = verdichteGefahrenmatrix(matrixQueries.flatMap((q) => q.data ?? []));

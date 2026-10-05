@@ -6,8 +6,13 @@ import {
   listePersonAnhaenge,
   personAnhangDownloadPfad,
 } from './einsatzPerson';
+import { installiereXhrAttrappe } from '../test/xhrAttrappe';
+import type { UploadFortschritt } from './client';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 // LFH-727: Der Personendruck lädt über den protokollierenden Druck-Endpunkt, nie über die Liste.
 describe('ladePersonenDruck', () => {
@@ -34,19 +39,27 @@ describe('Personen-Anhänge-API', () => {
   });
 
   it('legt EINE Datei im Feld `datei` ab, mit dem 120-s-Upload-Timeout', async () => {
-    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(JSON.stringify({ id: 1 }), { status: 201 }));
+    const anfragen = installiereXhrAttrappe();
     const datei = new File(['x'], 'verletzung.jpg', { type: 'image/jpeg' });
-    await legePersonAnhangAb(7, 3, datei);
-    const [pfad, init] = fetchMock.mock.calls[0];
-    expect(pfad).toBe('/api/einsaetze/7/personen/3/anhaenge');
-    expect(init?.method).toBe('POST');
-    const fd = init?.body as FormData;
+    const ergebnis = legePersonAnhangAb(7, 3, datei);
+    const [xhr] = anfragen;
+    expect(xhr.url).toBe('/api/einsaetze/7/personen/3/anhaenge');
+    expect(xhr.methode).toBe('POST');
+    const fd = xhr.body as FormData;
     expect(fd.get('datei')).toBe(datei);
     expect([...fd.keys()]).toEqual(['datei']);
-    expect(timeout).toHaveBeenCalledWith(120_000);
+    expect(xhr.timeout).toBe(120_000);
+    xhr.antworten(201, { id: 1 });
+    await expect(ergebnis).resolves.toEqual({ id: 1 });
+  });
+
+  it('reicht den Fortschritt an den Aufrufer durch (LFH-878)', () => {
+    const anfragen = installiereXhrAttrappe();
+    const meldungen: UploadFortschritt[] = [];
+    void legePersonAnhangAb(7, 3, new File(['x'], 'v.jpg'), (f) => meldungen.push(f));
+    anfragen[0].fortschritt(1, 4);
+    anfragen[0].uebertragen();
+    expect(meldungen).toEqual([{ phase: 'senden', anteil: 0.25 }, { phase: 'pruefen' }]);
   });
 
   it('entfernt per DELETE auf die Linker-id', async () => {

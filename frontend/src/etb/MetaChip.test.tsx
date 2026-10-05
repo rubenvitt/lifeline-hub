@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
@@ -365,5 +366,44 @@ describe('MetaChip — Ereigniszeit in der Anzeigezone (LFH-692)', () => {
     expect((onCommit.mock.calls[0][1] as dayjs.Dayjs).toISOString()).toBe(
       '2026-07-14T10:00:00.000Z',
     );
+  });
+});
+
+/** LFH-895: Der Editor eines leeren Zeit-Chips schlägt „jetzt“ nach der Serveruhr vor. */
+describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
+  mitProzessZone('UTC');
+  const SERVER = Date.parse('2026-10-04T10:00:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER + 5 * 60_000);
+    serveruhrVergessenFuerTests();
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(SERVER).toUTCString() } }));
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  it('schlägt die Serverzeit vor, und OK übernimmt sie', async () => {
+    const onCommit = vi.fn();
+    renderMitProviders(
+      <MetaChip
+        feld="ereigniszeit"
+        editing
+        wert={undefined}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit' });
+    expect(feld).toHaveValue('2026-10-04 10:00:00');
+    await userEvent.click(feld);
+    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    const ms = (onCommit.mock.calls[0][1] as dayjs.Dayjs).valueOf();
+    expect(Math.abs(ms - SERVER)).toBeLessThanOrEqual(1_000);
   });
 });

@@ -160,6 +160,16 @@
   .lfh-kennzahlenband--notizzeilen [data-lfh='kennzahl-notiz'] {
     min-height: calc(var(--lfh-kennzahl-notizzeilen) * 1.4em);
   }
+  /* Handschuh (LFH-883): die Polsterung von 44 px lässt der Zelle eine Textspalte von rund 94 px.
+     Darin brach „Schäden offen“ zweizeilig um (+13 px) und die Pegel-Notiz dreizeilig (+16 px),
+     beides erst mit den Daten. Der Platz steht deshalb hier vom ersten Bild an: zwei Zeilen
+     Augenbraue (`lineHeight: 1.3`, `augenbraueStil`), eine Notizzeile über dem Boden des Bandes. */
+  [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen .lfh-kennzahl__titel {
+    min-height: 2.6em;
+  }
+  [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen [data-lfh='kennzahl-notiz'] {
+    min-height: calc((var(--lfh-kennzahl-notizzeilen) + 1) * 1.4em);
+  }
 }
 
 /* Notizhöhe ab `md` (LFH-691, `Kennzahlenband notizZeilen`): Boden UND Deckel. Ohne feste Höhe

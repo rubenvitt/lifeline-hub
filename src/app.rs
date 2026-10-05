@@ -82,6 +82,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/auth/app-code/einloesen",
             post(routes::auth::app_code_einloesen),
         )
+        // LFH-892: ein Gerät löst seinen Kopplungscode ein (öffentlich, Rate-Limit je Quelle).
+        .route("/api/geraete/koppeln", post(routes::geraet::koppeln))
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route(
@@ -202,6 +204,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/modul-zaehler",
             get(routes::modul_zaehler::liste),
+        )
+        // Lagebild des Lagemonitors (LFH-892): modul-los, nur für die Ansicht `lagemonitor`.
+        .route(
+            "/api/einsaetze/{id}/lagemonitor",
+            get(routes::lagemonitor::lagebild),
         )
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/zaehler", get(routes::etb::zaehler))
@@ -841,6 +848,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::schaden_anhang::datei).layer(ConcurrencyLimitLayer::new(
                 MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
             )),
+        )
+        // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
+        .route(
+            "/api/einsaetze/{id}/geraete",
+            get(routes::geraet::liste).post(routes::geraet::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/geraete/{gid}/code",
+            post(routes::geraet::code_ausstellen),
+        )
+        .route(
+            "/api/einsaetze/{id}/geraete/{gid}/verlaengern",
+            post(routes::geraet::verlaengern),
+        )
+        .route(
+            "/api/einsaetze/{id}/geraete/{gid}/widerrufen",
+            post(routes::geraet::widerrufen),
         )
         .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
         .route(

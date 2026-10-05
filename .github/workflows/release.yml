@@ -98,7 +98,7 @@ jobs:
         if: steps.fenster.outputs.freigabe == 'true' && steps.edit-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-edit --locked --version 0.13.7 --no-default-features --features set-version
 
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
         if: steps.fenster.outputs.freigabe == 'true'
         with:
           version: 2026.9.1

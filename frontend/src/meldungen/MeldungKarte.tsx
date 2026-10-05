@@ -12,6 +12,7 @@ import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
+import { useGeraetDarf } from '../geraet/geraetSicht';
 
 const { Text } = Typography;
 
@@ -82,6 +83,8 @@ export default function MeldungKarte({
   onAuftragErteilen,
 }: MeldungKarteProps) {
   const { rollen } = useRollen();
+  // Ein Gerät (UHS-Laptop) springt nicht in die Aufträge (LFH-892).
+  const darf = useGeraetDarf();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
   const { formatZeit } = useAnzeigeKonventionen();
   const status = MELDUNG_STATUS[m.status] ?? MELDUNG_STATUS.neu;
@@ -173,7 +176,7 @@ export default function MeldungKarte({
           />
           {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
           {m.lagerelevant && <StatusChip ton="bedien" wort="Lagerelevant ✓" />}
-          {m.auftrag_id != null && (
+          {m.auftrag_id != null && darf('fremde-module') && (
             <Link to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>↗ Auftrag</Link>
           )}
         </Space>

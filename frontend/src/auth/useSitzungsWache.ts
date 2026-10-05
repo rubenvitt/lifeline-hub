@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from './AuthContext';
 import { SITZUNG_ABGELAUFEN } from './sitzungsEvent';
+import { warGeraet } from '../geraet/geraetMarke';
+import { KOPPLUNG_BEENDET_PFAD } from '../routing/deeplinks';
 
 /**
  * Einziger Empfänger von {@link SITZUNG_ABGELAUFEN}. Gehört ins persistente Root-Layout
@@ -15,7 +17,7 @@ export function useSitzungsWache(): void {
 
   useEffect(() => {
     // Auf der Login-Seite gibt es nichts umzuleiten; der Rückkehr-Pfad zeigte auf sich selbst.
-    if (pathname === '/login') return;
+    if (pathname === '/login' || pathname === KOPPLUNG_BEENDET_PFAD) return;
 
     const beiAblauf = () => {
       // Vollständige Rückkehr-URL: `pathname` allein verlöre die Deeplink-Selektion (`?eintrag=` …).
@@ -32,7 +34,9 @@ export function useSitzungsWache(): void {
       } catch (e) {
         fehler(e);
       }
-      navigate('/login', { replace: true, state: { von } });
+      // Ein gekoppeltes Gerät bekommt keine Anmeldung für Personen (LFH-892).
+      if (warGeraet()) navigate(KOPPLUNG_BEENDET_PFAD, { replace: true });
+      else navigate('/login', { replace: true, state: { von } });
     };
     window.addEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
     return () => window.removeEventListener(SITZUNG_ABGELAUFEN, beiAblauf);

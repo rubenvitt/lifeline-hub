@@ -142,6 +142,10 @@ export interface Farbrollen {
  * (LFH-897; antds Tönung `#d69285` lag bei 4,13). `alarm` trüge hier nicht: als Text auf
  * flaeche2 6,27, Weiß darauf 6,78.
  *
+ * Roter Fehlertext außerhalb von Formularen (LFH-874, `antdToken`: `colorErrorText`) ist
+ * `alarmText`: ≥ 7,03 auf jeder deckenden Fläche (knappstes Paar flaeche3), auf der alarmierten
+ * Karte (`alarmFlaeche`) 7,31. antds Ableitung `alarm` lag bei 5,31–6,78.
+ *
  * Hinweisflächen (LFH-739, `antdKomponenten`: `Alert`) sind die Statusflächen; `steuerRahmen` als
  * Rand eines Knopfs darauf: bedienFlaeche 3,34 · achtungFlaeche 3,43 · alarmFlaeche 3,22 ·
  * normalFlaeche 3,39 (antds Ableitung lag bei 2,16 · 1,96 · 3,20 · 1,57). Gerechnet in
@@ -204,6 +208,8 @@ export const farbenHell: Farbrollen = {
  * (Zeiger und Drücken, vorher gedrückt 3,74); alarmHover gedrückt ohne Rahmen auf alarmFlaeche
  * 7,66 (LFH-897, antds Tönung `#5b2e2e`: 4,49). Primärknopf gedrückt (LFH-897): aufBedien auf
  * bedienHover 9,00 (antds Ableitung `#396792`, dunkler als bedien: 3,35).
+ * Fehlertext (LFH-874): `colorErrorText` = alarmText ≥ 6,35 auf jeder deckenden Fläche (flaeche3),
+ * antds Ableitung `#dc5e5e` lag auf flaeche2 bei 4,97 und auf flaeche3 bei 4,88.
  * Geerbter Text (LFH-652): `bedienText` als Link ≥ 9,34 auf allen Flächenstufen, `gedaempft` als
  * Tabellenkopf auf kopf 7,48.
  * Hinweisflächen (LFH-739): `steuerRahmen` auf bedienFlaeche 3,32 · achtungFlaeche 3,26 ·
@@ -690,6 +696,9 @@ export function kopfzeilenMasse(
  * (LFH-667; `alarm` lag am Tag bei 5,67 : 1 auf `grund`). Das `Form`-Token färbt nur Feldmeldung,
  * Pflichtsternchen und Rückmeldesymbol; die Felder selbst ziehen ihren Fehlerrand aus dem eigenen
  * Komponententoken.
+ * Roter Text außerhalb des Formulars (`Typography` `danger`) läuft dagegen GLOBAL über
+ * `colorErrorText` (LFH-874, Begründung am Wert in `antdToken`): das Token ist in antd schon die
+ * Textrolle, kein Rand und keine Fläche liest es.
  * `colorError` global umzustellen träfe auch Ränder, Icons und Feldränder, und dort ist die
  * Füllfarbe richtig. Die Kante des Standardknopfs bleibt `bedienHover` (Boden 3 : 1). Ein
  * Linkknopf zeigt den Zeiger als `bedienFlaeche`, denn sein Ton wechselt nicht mehr (`bedienText`
@@ -827,6 +836,18 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorPrimary: farben.bedien,
     colorPrimaryHover: farben.bedienHover,
     colorError: farben.alarm,
+    // Roter TEXT trägt die Textrolle (LFH-874, Spec `textkontrast-rollen`). Anders als `colorError`
+    // global gesetzt, weil antd `colorErrorText*` nur als Schriftfarbe liest (antd 6.6.5:
+    // `typography/style` für `type="danger"`, `input/style/variants.js` und
+    // `select/style/select-input.js` für Schrift und Beiwerk im Fehlerzustand der Variante
+    // `filled`). Abgeleitet lag er am Tag bei `alarm` (5,67 auf `grund`), nachts bei `#dc5e5e`
+    // (4,97 auf `flaeche2`). Zeiger und Drücken eines Links `danger` wie am Gefahrknopf
+    // ({@link Farbrollen.alarmHover}). Nach einem antd-Update `grep -rln colorErrorText
+    // node_modules/antd/es` wiederholen: liest ein Rand oder eine Fläche mit, gehört der Wert in
+    // die Komponenten-Tokens. Gerechnet in `fehlertextKontrast.test.ts`.
+    colorErrorText: farben.alarmText,
+    colorErrorTextHover: farben.alarmHover,
+    colorErrorTextActive: farben.alarmHover,
     colorWarning: farben.achtung,
     colorSuccess: farben.normal,
     colorInfo: farben.bedien,

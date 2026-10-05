@@ -62,9 +62,8 @@ export default function OnlineQuellenVerwaltung() {
        * die Freitextsuche — „raster" tippen siebt bereits. Gegenstück ist „Aktiv", dessen
        * Wahrheitswert keine Suche erreicht.
        */
-      render: (t: OnlineQuelle['typ']) => (
-        <Tag color={t === 'vektor' ? 'blue' : 'geekblue'}>{t}</Tag>
-      ),
+      // Neutral (LFH-891): der Typ ist eine Kennzeichnung, das Wort trägt ihn; Blau bedient.
+      render: (t: OnlineQuelle['typ']) => <Tag>{t}</Tag>,
     },
     {
       title: 'URL',
