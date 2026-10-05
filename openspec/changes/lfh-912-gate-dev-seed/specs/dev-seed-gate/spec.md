@@ -42,3 +42,17 @@ MUST NOT einen zweiten vollen Testlauf des Workspace starten.
 #### Scenario: Selbstprüfung der Bündel
 - **WHEN** der Schritt keinem Bündel zugeordnet ist
 - **THEN** bricht das Sammel-Gate vor dem ersten Schritt mit einem Fehler ab
+
+### Requirement: Der Schritt hinterlässt kein Dev-Binary
+Nach dem Dev-Seed-Schritt MUST das Backend-Binary, das die Browsertests des Sammel-Gates
+starten, ohne das Feature `dev-seeds` gebaut sein, gleich ob der Schritt grün oder rot endet.
+Ein Filter, der keinen Test des Dev-Seeds trifft, MUST den Schritt rot machen.
+
+#### Scenario: Browsertests nach dem Rust-Bündel
+- **WHEN** nach `--nur rust` die Browsertests laufen
+- **THEN** starten sie ein Backend ohne Dev-Seed, und der Admin meldet sich mit dem Passwort an,
+  das die Suite vorgibt
+
+#### Scenario: Dev-Seed verschoben
+- **WHEN** die Tests des Dev-Seeds nicht mehr unter `dev::` liegen
+- **THEN** ist der Schritt rot und nennt den Filter

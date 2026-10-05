@@ -52,7 +52,9 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
   Seed-Aufruf in `src/main.rs` nicht. Schritt 15 baut sie mit `dev-seeds` und fährt nur die
   Tests unter `dev::` und `dev_present`; ein neuer Test hinter dem Feature gehört dorthin. Er
   wählt dieselben Pakete wie Schritt 4, nie `-p lifeline-hub`, sonst baut Cargo die
-  Abhängigkeiten mit anderen Features ein zweites Mal
+  Abhängigkeiten mit anderen Features ein zweites Mal. Beim Verlassen legt er das Binary ohne
+  Feature nach `target/debug/lifeline-hub` zurück: das Dev-Binary seedet beim Start und bräche
+  jeden Admin-Login der e2e-Suite
   (`openspec/changes/archive/2026-10-05-lfh-912-gate-dev-seed/design.md`).
 - Optionaler pre-push-Hook: `git config core.hooksPath .githooks`.
 - **Release je Arbeitsschub** (`scripts/release-ruhefenster.sh`, Aufruf in `release.yml`); ein übersprungener Release-Job

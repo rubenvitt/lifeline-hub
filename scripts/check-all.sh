@@ -326,8 +326,23 @@ schritt_15() {
   # Läufe: der Filter `dev::` gälte sonst auch für `dev_present`, dessen Testnamen ihn nicht
   # tragen. Ein Test hinter `dev-seeds` gehört deshalb nach `src/dev/` oder `tests/dev_present.rs`.
   bauziel_pruefen "$ROOT"
+  # Der Bau für `dev_present` legt das Backend-Binary MIT Feature nach `target/debug/lifeline-hub`,
+  # wo Schritt 7 und ein alleinstehendes `pnpm e2e` es suchen. Dieses Binary seedet beim Start
+  # und setzt das Admin-Passwort auf „dev“ — jeder Admin-Login der e2e-Suite schlüge fehl.
+  # Deshalb legt der Schritt beim Verlassen, auch rot, das Binary ohne Feature zurück: Cargo
+  # findet es aus Schritt 4 fertig vor und verlinkt es nur neu (unter einer Sekunde). Die
+  # Falle gilt der Subshell, in der lib/schritte.sh jeden Schritt fährt.
+  trap 'ohne_dev_env cargo test --workspace --exclude lifeline-desktop --test dev_absent --no-run' EXIT
   local auswahl=(--workspace --exclude lifeline-desktop --features lifeline-hub/dev-seeds)
   ohne_dev_env cargo test "${auswahl[@]}" --lib --test dev_present --bin lifeline-hub --no-run
+  # Ein Filter, der nichts trifft, meldet grün: nach einem Umbenennen von `src/dev/` liefe der
+  # Schritt mit null Tests weiter. Deshalb vorher zählen.
+  local anzahl
+  anzahl="$(ohne_dev_env cargo test "${auswahl[@]}" --lib dev:: -- --list 2> /dev/null | grep -c ': test$' || true)"
+  if [ "$anzahl" -lt 1 ]; then
+    echo "FEHLER: Der Filter 'dev::' trifft in der Bibliothek keinen Test (Dev-Seed verschoben?)." >&2
+    return 1
+  fi
   ohne_dev_env cargo test "${auswahl[@]}" --lib dev::
   ohne_dev_env cargo test "${auswahl[@]}" --test dev_present --bin lifeline-hub
 }

@@ -70,6 +70,28 @@ cargo test $A --test dev_present --bin lifeline-hub
 
 Wie Schritt 4: vorher `bauziel_pruefen` (LFH-520), Aufruf über `ohne_dev_env`.
 
+### D5 Das Binary ohne Feature zurücklegen
+
+Der Bau für `dev_present` legt das Backend-Binary mit Feature nach `target/debug/lifeline-hub`.
+Dort suchen Schritt 7 (`scripts/lib/backend-binaer.sh`) und ein alleinstehendes `pnpm e2e`.
+Das Dev-Binary ruft beim Start `dev_seed` auf und setzt das Admin-Passwort auf „dev“; die
+e2e-Suite startet mit eigenem Admin-Passwort und scheiterte an jedem Admin-Login. Im vollen
+Lauf läuft Schritt 7 vor Schritt 15, aber `--nur e2e` nach `--nur rust` träfe es (Befund aus
+dem Review). Deshalb setzt der Schritt eine `trap … EXIT` in seiner Subshell, die
+`cargo test <Zuschnitt von Schritt 4> --test dev_absent --no-run` fährt: Cargo findet das
+Binary ohne Feature aus Schritt 4 fertig vor und verlinkt es neu (0,5 s). Die Falle läuft auch,
+wenn der Schritt rot endet, und ändert dessen Exit-Code nicht.
+
+*Alternativen:* ein eigenes Build-Ziel für Schritt 15 (`CARGO_TARGET_DIR`) baute alle
+Abhängigkeiten ein zweites Mal; `cargo build --bin lifeline-hub` vereinigte die Features ohne
+Dev-Abhängigkeiten anders als `cargo test` und baute ebenfalls neu.
+
+### D6 Ein leerer Filter ist rot
+
+`cargo test … dev::` meldet grün, wenn der Filter nichts trifft. Nach einem Umbenennen von
+`src/dev/` liefe der Schritt still mit null Tests. Vor dem Lauf zählt er deshalb mit `--list`
+die getroffenen Tests und bricht bei null mit einer Meldung ab.
+
 ### D4 Nachweis durch Mutationsproben von Hand
 
 Ein Selbsttest, der eine echte Cargo-Kompilation mit gebrochener Quelle fährt, kostete Minuten

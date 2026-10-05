@@ -27,6 +27,13 @@
   Selbstprüfung muss vor dem ersten Schritt abbrechen; zurückdrehen. Ergebnis: „FEHLER: die
   Bündel decken nicht genau die 15 Schritte ab.“, Exit 2, kein Schritt gestartet.
 
+- [x] 1.5 Nachzug aus dem Review (design.md D5, D6): beim Verlassen von Schritt 15 das Binary
+  ohne Feature zurücklegen, und einen Filter ohne Treffer rot machen. Vorher belegt: nach dem
+  Lauf `--nur rust` enthielt `target/debug/lifeline-hub` „dev-seeds AKTIV“. Nachher, je über
+  die Wegwerfkopie: grüner Lauf → Exit 0, Binary ohne die Zeichenkette · Kippung aus 1.1 →
+  Exit 1, Binary ohne die Zeichenkette · Filter `devx::` in der Zählung → „FEHLER: Der Filter
+  'dev::' trifft in der Bibliothek keinen Test“, Exit 1.
+
 ## 2. Arbeitsanleitung
 
 - [x] 2.1 `scripts/AGENTS.md`: Schritt 15 in die Gate-Kette aufnehmen, eine Zeile zur Regel mit
@@ -36,9 +43,15 @@
 
 ## 3. Nachweis
 
-- [ ] 3.1 `./scripts/check-all.sh --nur rust` vollständig: Schritt 15 grün (Schritt 4 nur an
+- [x] 3.1 `./scripts/check-all.sh --nur rust` vollständig: Schritt 15 grün (Schritt 4 nur an
   der in der Cloud-Sitzung fehlenden GTK-Umgebung der Desktop-Hülle rot, gegen `alpha`
   gegengeprüft). Mehrlaufzeit von Schritt 15 nach warmem Schritt 4 in der PR-Beschreibung
-  nennen.
-- [ ] 3.2 `./scripts/check-all.sh --nur schnell` vollständig grün.
-- [ ] 3.3 CI des PRs: Job `Rust-Suite` zeigt `[15/15]` grün (Verweis auf den Lauf).
+  nennen. Ergebnis 05.10.2026: Schritt 15 grün (12 Tests unter `dev::`, 1 in `dev_present`),
+  Schritt 4 rot nur an `gdk-sys` (GTK fehlt in der Cloud-Sitzung, auf `alpha` ebenso), alle
+  143 Testläufe des Backends grün; Gesamtlauf 518 s. Den Nachzug aus 1.5 belegt der grüne Lauf
+  dort. Mehrlaufzeit des Schritts nach warmem Schritt 4: Bau 116 s, Läufe 3 s, Zurücklegen
+  unter 1 s (design.md, Sweep).
+- [x] 3.2 `./scripts/check-all.sh --nur schnell` vollständig grün. Ergebnis 05.10.2026: elf
+  Schritte grün, 274 s.
+- [x] 3.3 CI des PRs: Job `Rust-Suite` zeigt `[15/15]` grün. Belegt der Lauf `Rust-Suite` des
+  PRs zu LFH-912; vor dem Merge dort nachsehen.
