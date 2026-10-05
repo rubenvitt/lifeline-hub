@@ -19,6 +19,7 @@ import {
   hinterlegePlan,
   PLAN_BREITE,
   PLAN_VERSATZ_MAX,
+  raste,
   uebernehmePlan,
   type PlanPatch,
   type UhsPlan,
@@ -81,9 +82,13 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
       await uebernimm(neu);
     },
   });
+  // Zählt abgeschlossene PATCHes: Felder und Regler setzen sich danach auf den Serverstand zurück,
+  // auch wenn der sich nicht geändert hat (Fehlschlag, eingerastet gleich).
+  const [abgeschlossen, setAbgeschlossen] = useState(0);
   const aendern = useMutation({
     mutationFn: (patch: PlanPatch) => aenderePlan(einsatzId, uhs.id, patch),
     onSuccess: (neu) => uebernimm(neu),
+    onSettled: () => setAbgeschlossen((n) => n + 1),
   });
   const entfernen = useMutation({
     mutationFn: () => entfernePlan(einsatzId, uhs.id),
@@ -146,6 +151,7 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
         {plan && (
           <PlanEinstellungen
             plan={plan}
+            stand={abgeschlossen}
             gesperrt={laeuft}
             onAendern={(patch) => aendern.mutate(patch)}
             onEinpassen={() =>
@@ -194,12 +200,15 @@ function UebernahmeAuswahl(props: {
 
 function PlanEinstellungen({
   plan,
+  stand,
   gesperrt,
   onAendern,
   onEinpassen,
   onEntfernen,
 }: {
   plan: UhsPlan;
+  /** Zähler abgeschlossener PATCHes, Teil der `key`s. */
+  stand: number;
   gesperrt: boolean;
   onAendern: (patch: PlanPatch) => void;
   onEinpassen: () => void;
@@ -209,9 +218,10 @@ function PlanEinstellungen({
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
       <Space wrap size="middle" align="end">
-        {/* `key` am Serverwert: ein Live-Ereignis oder Einpassen setzt das Feld neu auf. */}
+        {/* `key` am Serverwert und am PATCH-Zähler: ein Live-Ereignis, Einpassen, ein Fehlschlag
+            oder ein eingerastet gleicher Wert setzen das Feld neu auf. */}
         <ZahlFeld
-          key={`x-${plan.x}`}
+          key={`x-${plan.x}-${stand}`}
           label="Links"
           wert={plan.x}
           min={0}
@@ -220,7 +230,7 @@ function PlanEinstellungen({
           onFertig={(x) => onAendern({ x })}
         />
         <ZahlFeld
-          key={`y-${plan.y}`}
+          key={`y-${plan.y}-${stand}`}
           label="Oben"
           wert={plan.y}
           min={0}
@@ -229,7 +239,7 @@ function PlanEinstellungen({
           onFertig={(y) => onAendern({ y })}
         />
         <ZahlFeld
-          key={`b-${plan.breite}`}
+          key={`b-${plan.breite}-${stand}`}
           label="Breite"
           wert={plan.breite}
           min={PLAN_BREITE.min}
@@ -242,7 +252,7 @@ function PlanEinstellungen({
         </Button>
       </Space>
       <Regler
-        key={`h-${plan.helligkeit}`}
+        key={`h-${plan.helligkeit}-${stand}`}
         label="Helligkeit"
         wert={plan.helligkeit}
         min={20}
@@ -251,7 +261,7 @@ function PlanEinstellungen({
         onFertig={(helligkeit) => onAendern({ helligkeit })}
       />
       <Regler
-        key={`k-${plan.kontrast}`}
+        key={`k-${plan.kontrast}-${stand}`}
         label="Kontrast"
         wert={plan.kontrast}
         min={50}
@@ -284,7 +294,7 @@ function PlanEinstellungen({
   );
 }
 
-/** Zahl in Pixeln der Fläche, Schritt 10 (der Server rastet ein); gesendet beim Verlassen. */
+/** Zahl in Pixeln der Fläche, Schritt 10; gesendet beim Verlassen oder mit Enter. */
 function ZahlFeld(props: {
   label: string;
   wert: number;
@@ -296,8 +306,14 @@ function ZahlFeld(props: {
   const id = useId();
   const [entwurf, setEntwurf] = useState<number | null>(props.wert);
   const fertig = () => {
-    if (entwurf == null || entwurf === props.wert) return;
-    props.onFertig(Math.min(Math.max(entwurf, props.min), props.max));
+    // Eingerastet und begrenzt wie im Server: geschickt wird, was gespeichert wird.
+    const ziel =
+      entwurf == null ? props.wert : Math.min(Math.max(raste(entwurf), props.min), props.max);
+    if (ziel === props.wert) {
+      setEntwurf(props.wert);
+      return;
+    }
+    props.onFertig(ziel);
   };
   return (
     <Form.Item label={props.label} htmlFor={id} style={{ marginBottom: 0 }}>

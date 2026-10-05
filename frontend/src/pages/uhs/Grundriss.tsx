@@ -856,7 +856,7 @@ function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
   const { dunkel } = useRollen();
   const bild = useQuery({
     queryKey: einsatzKeys.uhsPlanBild(einsatzId, plan.uhs_id, plan.sha256),
-    queryFn: () => ladePlanBild(einsatzId, plan.uhs_id),
+    queryFn: ({ signal }) => ladePlanBild(einsatzId, plan.uhs_id, plan.sha256, signal),
     staleTime: Infinity,
     retry: false,
   });
@@ -923,6 +923,7 @@ export default function Grundriss({
   // Bedienfeld des Plans (LFH-999): nur im Bearbeiten-Modus; das Tablet sieht nur das Bild.
   const [planOffen, setPlanOffen] = useState(false);
   const planPaneelSichtbar = planOffen && platzEditAktiv;
+  const planPaneelId = useId();
 
   // Die gezogene Person rendert im DragOverlay (Portal); Platz-Drags nutzen ihren Inline-Transform
   // innerhalb der Fläche.
@@ -1258,6 +1259,7 @@ export default function Grundriss({
               <Button
                 type="text"
                 aria-expanded={planPaneelSichtbar}
+                aria-controls={planPaneelId}
                 onClick={() => setPlanOffen((v) => !v)}
               >
                 Plan
@@ -1286,7 +1288,11 @@ export default function Grundriss({
           </Space>
         )}
       </div>
-      {planPaneelSichtbar && <UhsPlanPaneel einsatzId={einsatzId} uhs={uhs} />}
+      {planPaneelSichtbar && (
+        <div id={planPaneelId}>
+          <UhsPlanPaneel einsatzId={einsatzId} uhs={uhs} />
+        </div>
+      )}
       <div
         style={{
           flex: 1,

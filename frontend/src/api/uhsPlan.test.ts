@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   aenderePlan,
   einpassen,
+  raste,
   entfernePlan,
   hinterlegePlan,
   ladePlanBild,
@@ -33,26 +34,42 @@ describe('uhsPlan API (LFH-999)', () => {
     vi.restoreAllMocks();
   });
 
-  it('lädt das Bild als Object-URL, ohne Protokoll-Route, mit 15-s-Zeitlimit', async () => {
-    const signal = new AbortController().signal;
-    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+  it('lädt das Bild als Object-URL über die versionierte Adresse, ohne Protokoll-Route', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(new Blob(['bild']), { status: 200 }));
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:plan');
 
-    await expect(ladePlanBild(7, 2)).resolves.toBe('blob:plan');
-    expect(planBildPfad(7, 2)).toBe('/api/einsaetze/7/uhs/2/plan/bild');
-    expect(timeout).toHaveBeenCalledWith(15_000);
+    await expect(ladePlanBild(7, 2, 'ab12')).resolves.toBe('blob:plan');
+    expect(planBildPfad(7, 2, 'ab12')).toBe('/api/einsaetze/7/uhs/2/plan/bild?v=ab12');
+    // `?v=`: der Server erlaubt dem Browser, die Antwort ein Jahr zu behalten; ein neuer Plan
+    // braucht deshalb eine neue Adresse, sonst käme der alte aus dem HTTP-Cache.
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/einsaetze/7/uhs/2/plan/bild',
-      expect.objectContaining({ credentials: 'same-origin', signal }),
+      '/api/einsaetze/7/uhs/2/plan/bild?v=ab12',
+      expect.objectContaining({ credentials: 'same-origin' }),
     );
+  });
+
+  it('gibt einem großen Plan das Upload-Zeitlimit und bricht mit der Query ab', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    let gesehen: AbortSignal | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_pfad, init) => {
+      gesehen = init?.signal ?? undefined;
+      return new Promise((_ok, fehler) =>
+        gesehen!.addEventListener('abort', () => fehler(gesehen!.reason)),
+      );
+    });
+    const query = new AbortController();
+    const laden = ladePlanBild(7, 2, 'ab12', query.signal);
+    expect(timeout).toHaveBeenCalledWith(120_000);
+    query.abort();
+    await expect(laden).rejects.toBeDefined();
+    expect(gesehen?.aborted).toBe(true);
   });
 
   it('wirft, wenn das Bild nicht kommt', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 404 }));
-    await expect(ladePlanBild(7, 2)).rejects.toThrow('404');
+    await expect(ladePlanBild(7, 2, 'ab12')).rejects.toThrow('404');
   });
 
   it('hinterlegt per PUT mit dem Feld `datei`', () => {
@@ -118,5 +135,11 @@ describe('einpassen — dieselbe Rechnung wie `startlage` im Server (LFH-999, D5
       platz(8, { pos_x: null, pos_y: null }),
     ];
     expect(einpassen(plaetze, 800, 600)).toEqual(einpassen(raster(1), 800, 600));
+  });
+});
+
+describe('raste — dieselbe Regel wie im Server (LFH-999, D5)', () => {
+  it('rastet auf 10 px, symmetrisch um null', () => {
+    expect([raste(37), raste(-37), raste(35), raste(34), raste(0)]).toEqual([40, -40, 40, 30, 0]);
   });
 });

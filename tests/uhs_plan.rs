@@ -613,3 +613,24 @@ async fn schreibende_routen_melden_uhs_live() {
         assert!(gelesen.contains("event: uhs"), "{aktion}: {gelesen:?}");
     }
 }
+
+/// Upload bis 26 MiB mit Scan und Voll-BLOB-Auslieferung: Transferdauer, also ohne das
+/// 60-s-Budget der Zulassungssteuerung (wie die Kartenhintergründe). PATCH, DELETE und die
+/// Übernahme bleiben geregelt.
+#[test]
+fn upload_und_bild_sind_vom_zeitbudget_ausgenommen() {
+    use axum::http::Method;
+    use lifeline_hub::zulassung::ist_ausgenommen;
+    let plan = "/api/einsaetze/{id}/uhs/{uid}/plan";
+    assert!(ist_ausgenommen(&Method::PUT, plan));
+    assert!(ist_ausgenommen(
+        &Method::GET,
+        "/api/einsaetze/{id}/uhs/{uid}/plan/bild"
+    ));
+    assert!(!ist_ausgenommen(&Method::PATCH, plan));
+    assert!(!ist_ausgenommen(&Method::DELETE, plan));
+    assert!(!ist_ausgenommen(
+        &Method::POST,
+        "/api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang"
+    ));
+}

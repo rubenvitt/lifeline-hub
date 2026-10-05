@@ -197,7 +197,41 @@ describe('UhsPlanPaneel (LFH-999)', () => {
     expect(anfragen).toHaveLength(0);
     await userEvent.tab();
     await waitFor(() => expect(anfragen).toHaveLength(1));
-    expect(anfragen[0].body).toEqual({ breite: 1234 });
+    // Eingerastet wie im Server (`raste`): der Client schickt, was gespeichert wird.
+    expect(anfragen[0].body).toEqual({ breite: 1230 });
+  });
+
+  it('setzt ein Feld zurück, das eingerastet nichts ändert', async () => {
+    const anfragen = planServer();
+    zeichne(uhs({ plan: PLAN }));
+    const links = screen.getByRole('spinbutton', { name: 'Links' });
+    await userEvent.clear(links);
+    await userEvent.type(links, '3');
+    await userEvent.tab();
+    await waitFor(() => expect(links).toHaveValue('0'));
+    expect(anfragen).toHaveLength(0);
+  });
+
+  it('zeigt nach einem Fehlschlag wieder den gespeicherten Wert', async () => {
+    planServer([], 404);
+    zeichne(uhs({ plan: PLAN }));
+    const breite = screen.getByRole('spinbutton', { name: 'Breite' });
+    await userEvent.clear(breite);
+    await userEvent.type(breite, '1234');
+    await userEvent.tab();
+    expect(await screen.findByText('Plan nicht gefunden')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('spinbutton', { name: 'Breite' })).toHaveValue('820'),
+    );
+    const regler = screen.getByRole('slider', { name: 'Helligkeit' });
+    fireEvent.keyDown(regler, { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 });
+    fireEvent.keyUp(regler, { key: 'ArrowRight', code: 'ArrowRight', keyCode: 39 });
+    await waitFor(() =>
+      expect(screen.getByRole('slider', { name: 'Helligkeit' })).toHaveAttribute(
+        'aria-valuenow',
+        '60',
+      ),
+    );
   });
 
   it('schaltet die Umkehr im Nachtbetrieb', async () => {

@@ -106,7 +106,7 @@ function renderGrundriss(
 ) {
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  const ergebnis = render(
+  const baum = (u: UhsDetail) => (
     // MemoryRouter: der Detail-Drawer nutzt useNavigate.
     <MemoryRouter>
       <QueryClientProvider client={qc}>
@@ -119,16 +119,19 @@ function renderGrundriss(
           <AntApp>
             <Grundriss
               einsatzId={1}
-              uhs={uhs}
+              uhs={u}
               schreibgeschuetzt={schreibgeschuetzt}
               platzBearbeitbar={platzBearbeitbar}
             />
           </AntApp>
         </ConfigProvider>
       </QueryClientProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
-  return { ...ergebnis, client: qc };
+  const ergebnis = render(baum(uhs));
+  /** Neuer Serverstand derselben UHS (Live-Ereignis). */
+  const neu = (u: UhsDetail) => ergebnis.rerender(baum(u));
+  return { ...ergebnis, client: qc, neu };
 }
 
 describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
@@ -1533,6 +1536,24 @@ describe('Grundriss – Plan als Hintergrund (LFH-999)', () => {
     expect(flaeche).toContainElement(screen.getByTestId('platz-karte'));
   });
 
+  it('lädt das Bild über die Adresse mit dem sha256 und einen neuen Plan neu', async () => {
+    const abrufe = bildLiefern();
+    const { neu } = renderGrundriss(mitPlan(), []);
+    await planBild();
+    expect(abrufe.map((u) => new URL(u).search)).toEqual(['?v=ab12']);
+    // Ein Live-Ereignis ohne neuen Plan lädt nichts nach.
+    neu(mitPlan({ helligkeit: 80 }));
+    await waitFor(() =>
+      expect((screen.getByTestId('uhs-plan') as HTMLElement).style.filter).toContain('80%'),
+    );
+    expect(abrufe).toHaveLength(1);
+    // Ein ersetzter Plan hat einen neuen sha256 und damit eine neue Adresse.
+    neu(mitPlan({ sha256: 'cd34' }));
+    await waitFor(() =>
+      expect(abrufe.map((u) => new URL(u).search)).toEqual(['?v=ab12', '?v=cd34']),
+    );
+  });
+
   it('lässt die Fläche auf den Plan wachsen', async () => {
     bildLiefern();
     renderGrundriss(mitPlan(), []);
@@ -1636,7 +1657,8 @@ describe('Grundriss – Knopf „Plan“ (LFH-999)', () => {
     expect(screen.queryByRole('region', { name: 'Plan' })).not.toBeInTheDocument();
     await userEvent.click(knopf);
     expect(knopf).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('region', { name: 'Plan' })).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Plan' });
+    expect(document.getElementById(knopf.getAttribute('aria-controls')!)).toContainElement(region);
     await userEvent.click(knopf);
     expect(screen.queryByRole('region', { name: 'Plan' })).not.toBeInTheDocument();
   });

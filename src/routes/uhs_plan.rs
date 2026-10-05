@@ -231,16 +231,36 @@ pub async fn bild(
 ) -> Result<Response, AppError> {
     stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
-    let (mime, sha256) = plan_repo::bild_meta(&state.pool, einsatz_id, uhs_id).await?;
-    let etag = etag_von(&sha256);
+    // Erst nur die Prüfsumme: ein 304 liest die Bytes gar nicht.
+    let (_, sha256) = plan_repo::bild_meta(&state.pool, einsatz_id, uhs_id).await?;
+    if if_none_match_matcht(&req_headers, &etag_von(&sha256)) {
+        return Ok((StatusCode::NOT_MODIFIED, bild_koepfe(&sha256)?).into_response());
+    }
+    // ETag und Inhalt aus derselben Zeile, auch wenn der Plan inzwischen ersetzt wurde.
+    let (mime, sha256, daten) = plan_repo::bild_voll(&state.pool, einsatz_id, uhs_id).await?;
+    let mut headers = bild_koepfe(&sha256)?;
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&mime)
+            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
+    );
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_static("inline; filename=\"plan\""),
+    );
+    Ok((headers, daten).into_response())
+}
+
+/// Köpfe jeder Bild-Antwort, auch des 304: ETag, Cache, `nosniff` und die Anhang-CSP.
+fn bild_koepfe(sha256: &str) -> Result<HeaderMap, AppError> {
     let mut headers = HeaderMap::new();
     headers.insert(
         header::ETAG,
-        HeaderValue::from_str(&etag)
+        HeaderValue::from_str(&etag_von(sha256))
             .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
     );
     // Inhaltsadressiert: ein neuer Plan hat eine neue Prüfsumme, und der Client hängt sie an die
-    // Adresse (`?v=`), also darf der Browser die Antwort behalten.
+    // Adresse (`?v=`, `frontend/src/api/uhsPlan.ts`), also darf der Browser die Antwort behalten.
     headers.insert(
         header::CACHE_CONTROL,
         HeaderValue::from_static(ASSET_CACHE_CONTROL),
@@ -253,18 +273,5 @@ pub async fn bild(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(ANHANG_CSP),
     );
-    if if_none_match_matcht(&req_headers, &etag) {
-        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
-    }
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_str(&mime)
-            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
-    );
-    headers.insert(
-        header::CONTENT_DISPOSITION,
-        HeaderValue::from_static("inline; filename=\"plan\""),
-    );
-    let daten = plan_repo::bild_bytes(&state.pool, einsatz_id, uhs_id).await?;
-    Ok((headers, daten).into_response())
+    Ok(headers)
 }

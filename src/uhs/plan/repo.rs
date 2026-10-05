@@ -58,14 +58,15 @@ pub async fn bild_meta(
     .ok_or(AppError::NotFound)
 }
 
-/// Die gespeicherten (bereinigten) Bytes.
-pub async fn bild_bytes(
+/// Format, Prüfsumme und die gespeicherten (bereinigten) Bytes in EINER Abfrage: ein Ersetzen
+/// dazwischen kann ETag und Inhalt der Antwort nicht auseinanderreißen.
+pub async fn bild_voll(
     pool: &SqlitePool,
     einsatz_id: i64,
     uhs_id: i64,
-) -> Result<Vec<u8>, AppError> {
-    sqlx::query_scalar::<_, Vec<u8>>(
-        "SELECT daten FROM uhs_plan WHERE uhs_id = ? AND einsatz_id = ?",
+) -> Result<(String, String, Vec<u8>), AppError> {
+    sqlx::query_as::<_, (String, String, Vec<u8>)>(
+        "SELECT mime, sha256, daten FROM uhs_plan WHERE uhs_id = ? AND einsatz_id = ?",
     )
     .bind(uhs_id)
     .bind(einsatz_id)
@@ -425,7 +426,7 @@ mod tests {
             Err(AppError::NotFound)
         ));
         assert!(matches!(
-            bild_bytes(&st.pool, st.einsatz, fremd).await,
+            bild_voll(&st.pool, st.einsatz, fremd).await,
             Err(AppError::NotFound)
         ));
     }

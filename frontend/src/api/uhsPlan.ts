@@ -2,6 +2,7 @@ import type { UhsPlatz } from './types';
 import type { components } from './types.generated';
 import { apiSend, apiUploadMitFortschritt, type UploadFortschritt } from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
+import { eines } from './kartenbilder';
 
 /**
  * Plan einer UHS als Hintergrund des Platz-Layouts (LFH-999). Eigene Bytes, kein Anhang: die
@@ -22,20 +23,38 @@ export interface PlanPatch {
 
 const basis = (einsatzId: number, uhsId: number) => `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plan`;
 
-/** Bild-Route: ohne Audit, mit ETag. Ein API-Pfad, keine Navigation. */
-export function planBildPfad(einsatzId: number, uhsId: number): string {
-  return `${basis(einsatzId, uhsId)}/bild`;
+/**
+ * Bild-Route: ohne Audit, mit ETag. Ein API-Pfad, keine Navigation. `?v=` trägt den sha256: der
+ * Server erlaubt dem Browser, die Antwort ein Jahr zu behalten, ein ersetzter Plan braucht also
+ * eine neue Adresse (sonst käme der alte aus dem HTTP-Cache).
+ */
+export function planBildPfad(einsatzId: number, uhsId: number, sha256: string): string {
+  return `${basis(einsatzId, uhsId)}/bild?v=${encodeURIComponent(sha256)}`;
 }
 
-/** Lädt die Bild-Bytes (same-origin, mit Cookies) als Object-URL. Freigegeben wird sie, wenn die
- *  Query den Cache verlässt (`erzeugeQueryClient`). */
-export async function ladePlanBild(einsatzId: number, uhsId: number): Promise<string> {
-  const res = await fetch(planBildPfad(einsatzId, uhsId), {
-    credentials: 'same-origin',
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`Plan konnte nicht geladen werden (${res.status})`);
-  return URL.createObjectURL(await res.blob());
+/**
+ * Lädt die Bild-Bytes (same-origin, mit Cookies) als Object-URL. Freigegeben wird sie, wenn die
+ * Query den Cache verlässt (`erzeugeQueryClient`). Ein Plan hat bis 25 MiB, deshalb das
+ * Upload-Zeitlimit statt 15 s; `signal` (die Query) bricht zusätzlich ab, etwa beim Verlassen.
+ */
+export async function ladePlanBild(
+  einsatzId: number,
+  uhsId: number,
+  sha256: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const grenze = AbortSignal.timeout(UPLOAD_TIMEOUT_MS);
+  const beide = signal ? eines(signal, grenze) : { signal: grenze, loesen() {} };
+  try {
+    const res = await fetch(planBildPfad(einsatzId, uhsId, sha256), {
+      credentials: 'same-origin',
+      signal: beide.signal,
+    });
+    if (!res.ok) throw new Error(`Plan konnte nicht geladen werden (${res.status})`);
+    return URL.createObjectURL(await res.blob());
+  } finally {
+    beide.loesen();
+  }
 }
 
 /** Hinterlegt oder ersetzt den Plan (PUT, Feld `datei`); Ersetzen behält Lage und Darstellung. */
@@ -82,6 +101,12 @@ const BREITE_OHNE_PLAETZE = 820;
 const BREITE_MIN = 100;
 const BREITE_MAX = 5000;
 const VERSATZ_MAX = 10_000;
+
+/** Einrasten auf 10 px wie `raste` im Server: symmetrisch um null, halbe Schritte aufwärts. */
+export function raste(v: number): number {
+  const betrag = Math.floor((Math.abs(Math.trunc(v)) + RASTER / 2) / RASTER) * RASTER;
+  return v < 0 ? -betrag : betrag;
+}
 
 /** Vom Plan erlaubte Breiten in Pixeln der Platzfläche (Zahlenfeld im Bedienfeld). */
 export const PLAN_BREITE = { min: BREITE_MIN, max: BREITE_MAX, schritt: RASTER } as const;

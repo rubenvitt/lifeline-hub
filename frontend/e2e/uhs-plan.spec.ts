@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { FOTO_JPEG } from './bildFixture';
+import { FOTO_JPEG, MINI_JPEG } from './bildFixture';
 
 /**
  * Plan einer UHS als Hintergrund des Platz-Layouts (LFH-999, Spec `uhs-plan`): hochladen und aus
@@ -84,7 +84,7 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   );
   await seede(page, `/api/einsaetze/${e}/uhs/${u}/status`, { status: 'aktiv' }, 'UHS-Status');
   const abgelegt = await page.request.post(`/api/einsaetze/${e}/uhs/${u}/anhaenge`, {
-    multipart: { datei: { name: 'grundriss.jpg', mimeType: 'image/jpeg', buffer: FOTO_JPEG } },
+    multipart: { datei: { name: 'grundriss.jpg', mimeType: 'image/jpeg', buffer: MINI_JPEG } },
   });
   expect(abgelegt.status(), await abgelegt.text()).toBe(201);
 
@@ -113,6 +113,16 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   await auswahl.getByText('grundriss.jpg').click();
   await paneel.getByRole('button', { name: 'Übernehmen' }).click();
   await expect(page.getByText('Plan übernommen')).toBeVisible();
+  // Der Browser zeigt die neuen Bytes, nicht den ersten Plan aus seinem HTTP-Cache: die
+  // Bildadresse trägt den sha256, die Antwort darf ein Jahr im Cache bleiben.
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const img = document.querySelector<HTMLImageElement>('[data-testid="uhs-plan"]');
+        return img ? (await (await fetch(img.src)).blob()).size : -1;
+      }),
+    )
+    .toBe(MINI_JPEG.length);
 
   // Einen Platz weit nach unten rechts verschieben (Server), dann einpassen.
   const detail = await page.request.get(`/api/einsaetze/${e}/uhs/${u}`);
