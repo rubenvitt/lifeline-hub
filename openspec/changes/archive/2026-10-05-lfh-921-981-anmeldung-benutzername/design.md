@@ -100,7 +100,7 @@ Die Rejection läuft durch `JsonBody` und kommt wie jeder unlesbare Body als 400
 `{error}`-Format („Anfrage-Body konnte nicht gelesen werden.“); `AppError` kennt kein 413, und
 `src/extract.rs` hält diese Ungenauigkeit bewusst.
 
-### 7. Migration `0150_benutzername_nocase.sql`
+### 7. Migration `0151_benutzername_nocase.sql`
 
 Zuerst eine Prüfung, die bei Kollision mit klarer Meldung abbricht: eine temporäre Tabelle mit
 einem `BEFORE INSERT`-Trigger, der `RAISE(ABORT, 'Benutzernamen kollidieren ohne Groß-/Kleinschreibung …')`

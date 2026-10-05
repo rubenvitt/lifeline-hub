@@ -16,7 +16,7 @@
 
 ## 3. Anlage, SSO und Migration
 
-- [x] 3.1 `migrations/0150_benutzername_nocase.sql` (Entscheidung 7) mit Vorprüfung per temporärem Trigger und eindeutigem `NOCASE`-Index. Tests in `src/db.rs` bzw. neben den Migrationstests: Migration auf Daten mit `max`/`Max` bricht mit der Meldung ab; ohne Kollision läuft sie durch. Prüfen: grün, `scripts/check-migrationen.sh` grün (vorher `git fetch origin alpha`) **Ergebnis:** beide Migrationstests grün, `check-migrationen.sh` im Bündel `schnell` grün. Mutationsprobe: ohne Vorprüfung ist der Kollisionstest rot (nur „UNIQUE constraint failed“)
+- [x] 3.1 `migrations/0151_benutzername_nocase.sql` (Entscheidung 7) mit Vorprüfung per temporärem Trigger und eindeutigem `NOCASE`-Index. Tests in `src/db.rs` bzw. neben den Migrationstests: Migration auf Daten mit `max`/`Max` bricht mit der Meldung ab; ohne Kollision läuft sie durch. Prüfen: grün, `scripts/check-migrationen.sh` grün (vorher `git fetch origin alpha`) **Ergebnis:** beide Migrationstests grün, `check-migrationen.sh` im Bündel `schnell` grün. Mutationsprobe: ohne Vorprüfung ist der Kollisionstest rot (nur „UNIQUE constraint failed“)
 - [x] 3.2 `src/routes/benutzer.rs::anlegen`: `normalisiere` statt rohem `trim`, 129 Zeichen → 400; `Admin` neben `admin` → 409 (über den neuen Index). Tests in `tests/benutzer.rs`. Prüfen: grün **Ergebnis:** `anlage_trimmt_begrenzt_und_ist_ohne_schreibweise_eindeutig` grün, `tests/benutzer.rs` grün
 - [x] 3.3 `src/auth/oidc/provisioning.rs`: Kollisionsprüfung kleingeschrieben (Entscheidung 8). Test: lokales `Max` vorhanden, SSO-Erstanmeldung mit `max` bekommt `max-2`. Prüfen: grün **Ergebnis:** `lokaler_name_in_anderer_schreibweise_gilt_als_vergeben` grün
 

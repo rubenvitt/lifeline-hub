@@ -47,7 +47,7 @@ denselben frühen Schritt des Login-Handlers; die Normalisierung des Namens geh�
 - Backend: `src/routes/auth.rs` (login, webauthn_auth_start, passwort_aendern),
   `src/auth/provider/password.rs`, `src/auth/audit.rs`, `src/auth/rate_limit.rs`,
   `src/routes/benutzer.rs`, `src/auth/oidc/provisioning.rs`, `src/app.rs`, neue Migration
-  `migrations/0150_benutzername_nocase.sql`.
+  `migrations/0151_benutzername_nocase.sql`.
 - Frontend: `frontend/src/pages/LoginPage.tsx` samt Test.
 - Regel in `src/AGENTS.md`: Benutzernamen nur über die gemeinsame Vorverarbeitung und mit
   `COLLATE NOCASE` suchen; Argon2 in Handlern nur über `hash_gedrosselt`.
