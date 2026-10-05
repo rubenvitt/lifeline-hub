@@ -10,7 +10,9 @@ import AlarmZentrale from './AlarmZentrale';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { istAlarmGemutet } from '../alarm/alarmTon';
-import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
+import { offeneDesktopAlarme, schliesseAlleDesktopAlarme } from '../alarm/desktopAlarm';
+import { setzeViewportBreite, setzeZeigerGrob, VIEWPORT_STANDARD } from '../test/viewport';
+import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 
 dayjs.extend(utc);
 
@@ -187,16 +189,16 @@ describe('AlarmZentrale', () => {
     expect(istAlarmGemutet()).toBe(false);
   });
 
-  it('zeigt den Desktop-Status dauerhaft als Tri-State und aktiviert aus der User-Geste', async () => {
+  it('zeigt den Benachrichtigungs-Status dauerhaft und aktiviert aus der User-Geste', async () => {
     const NotificationMock = stubNotification('default');
     renderAlarm();
-    const aus = screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: aus' });
-    expect(aus).toHaveTextContent('Desktop aus');
+    const aus = screen.getByRole('button', { name: 'Benachrichtigungen: aus' });
+    expect(aus).toHaveTextContent('Benachrichtigung aus');
     await userEvent.click(aus);
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: erlaubt' }),
-      ).toHaveTextContent('Desktop erlaubt');
+      expect(screen.getByRole('button', { name: 'Benachrichtigungen: erlaubt' })).toHaveTextContent(
+        'Benachrichtigung erlaubt',
+      );
     });
     expect(NotificationMock.requestPermission).toHaveBeenCalledOnce();
   });
@@ -204,9 +206,9 @@ describe('AlarmZentrale', () => {
   it('zeigt Browser-Blockade dauerhaft an', () => {
     stubNotification('denied');
     renderAlarm();
-    expect(
-      screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
-    ).toHaveTextContent('Desktop blockiert');
+    const knopf = screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' });
+    expect(knopf).toHaveTextContent('Benachrichtigung blockiert');
+    expect(knopf).toHaveStyle({ color: farbenDunkel.achtung });
   });
 
   it('bündelt beim vierten Sofort-Ereignis die drei vorherigen und behält das neueste einzeln', async () => {
@@ -499,9 +501,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
 
     // Die zwei Ziele der breiten Bauform sind WEG — sonst erfüllte auch ein zusätzlicher Knopf die
     // Aussage.
-    expect(
-      screen.queryByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Benachrichtigungen: blockiert' })).toBeNull();
     // Über ein MUSTER über alle drei Wortlaute: `tonStatus` dreht erst einen Microtask später auf
     // `bereit`, ein Literal träfe den Knopf in diesem Moment nicht und die Zeile belegte nichts.
     expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
@@ -509,7 +509,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     // An ihrer Stelle steht genau EINES, das den Zustand benennt. `findBy…`, weil das Muster schon
     // greift, bevor die Tonprüfung durch ist.
     const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    await waitFor(() => expect(ziel).toHaveTextContent('Desktop blockiert'));
+    await waitFor(() => expect(ziel).toHaveTextContent('Benachrichtigung blockiert'));
     expect(screen.getAllByRole('button', { name: /^Alarmzentrale:/ })).toHaveLength(1);
   });
 
@@ -598,7 +598,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     renderAlarm();
 
     expect(
-      screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
+      screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
@@ -680,18 +680,18 @@ describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
     const ton = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
     await waitFor(() => expect(ton).toHaveAttribute('aria-pressed', 'false'));
     expect(ton).not.toHaveTextContent('Ton bereit');
-    const desktop = screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: aus' });
-    expect(desktop).not.toHaveTextContent('Desktop aus');
+    const desktop = screen.getByRole('button', { name: 'Benachrichtigungen: aus' });
+    expect(desktop).not.toHaveTextContent('Benachrichtigung aus');
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
   });
 
-  it('Störung: „Ton stumm" und „Desktop blockiert" behalten ihr Wort', async () => {
+  it('Störung: „Ton stumm" und „Benachrichtigung blockiert" behalten ihr Wort', async () => {
     stubAudioReady();
     stubNotification('denied');
     renderAlarm();
-    expect(
-      screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
-    ).toHaveTextContent('Desktop blockiert');
+    expect(screen.getByRole('button', { name: 'Benachrichtigungen: blockiert' })).toHaveTextContent(
+      'Benachrichtigung blockiert',
+    );
     await userEvent.click(await screen.findByRole('button', { name: 'Alarmton stummschalten' }));
     expect(screen.getByRole('button', { name: 'Alarmton einschalten' })).toHaveTextContent(
       'Ton stumm',
@@ -728,5 +728,293 @@ describe('AlarmZentrale — Uhrzeit der Ablösung in der Anzeigezone (LFH-692)',
       );
     });
     expect(await screen.findByText('Ablösung fällig: Florian 1, 15:30')).toBeInTheDocument();
+  });
+});
+
+/**
+ * LFH-950: Auf dem Führungs-Tablet mit Finger bündelt die Zentrale wie auf dem Handschirm. Ein
+ * Tooltip erschiene erst nach dem Tipp, und der Tipp auf die Glocke schaltete sofort stumm.
+ */
+describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
+  afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
+
+  it.each([820, 1024, 1180])(
+    'bei %i px: EIN Ziel, der Tipp öffnet das Menü und schaltet nicht stumm',
+    async (px) => {
+      setzeViewportBreite(px);
+      setzeZeigerGrob(true);
+      stubAudioReady();
+      stubNotification('default');
+      renderAlarm();
+
+      expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
+      const ziel = await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' });
+      // Ruhezustand ohne Wort, wie die breite Bauform zwischen md und xl (LFH-637).
+      expect(ziel).toHaveTextContent(/^$/);
+
+      await userEvent.click(ziel);
+      expect(istAlarmGemutet()).toBe(false);
+      const menue = document.querySelector(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      ) as HTMLElement;
+      expect(menue, 'das Menü muss offen sein').not.toBeNull();
+      const eintraege = within(menue).getAllByRole('menuitem');
+      // Handlung UND Zustand als Satz, ohne Tooltip lesbar.
+      expect(eintraege.map((e) => e.textContent)).toEqual([
+        'Benachrichtigungen sind aus – aktivieren',
+        'Alarmton ist bereit – stummschalten',
+      ]);
+      await userEvent.click(eintraege[1]);
+      expect(istAlarmGemutet()).toBe(true);
+      await waitFor(() => expect(ziel).toHaveTextContent('Ton stumm'));
+    },
+  );
+
+  it('mit Maus bleiben es bei 1024 px zwei Knöpfe', async () => {
+    setzeViewportBreite(1024);
+    setzeZeigerGrob(false);
+    stubAudioReady();
+    stubNotification('default');
+    renderAlarm();
+    expect(await screen.findByRole('button', { name: /^Alarmton / })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
+  });
+
+  it('ab xl gilt auch mit Finger die breite Bauform', async () => {
+    setzeViewportBreite(1366);
+    setzeZeigerGrob(true);
+    stubAudioReady();
+    stubNotification('default');
+    renderAlarm();
+    expect(await screen.findByRole('button', { name: /^Alarmton / })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
+  });
+});
+
+/** LFH-950: Kein „Desktop" mehr als Zustandswort; fehlt die API, keine Warnfarbe. */
+describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
+  afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
+
+  it.each([
+    [390, 'default'],
+    [390, 'denied'],
+    [820, 'denied'],
+    [1366, 'default'],
+    [1366, 'granted'],
+    [1366, 'denied'],
+  ] as const)('bei %i px und %s steht nirgends „Desktop"', async (px, permission) => {
+    setzeViewportBreite(px);
+    stubAudioReady();
+    stubNotification(permission);
+    const { container } = renderAlarm();
+    await waitFor(() => expect(container.textContent).toMatch(/Ton bereit|Benachrichtigung/));
+    expect(container.textContent).not.toMatch(/Desktop/);
+    for (const knopf of screen.getAllByRole('button')) {
+      expect(knopf.getAttribute('aria-label') ?? '').not.toMatch(/Desktop/);
+    }
+  });
+
+  it('ohne Notification-API: „nicht verfügbar", ohne Warnfarbe und ohne Aktion', async () => {
+    setzeViewportBreite(1366);
+    stubAudioReady();
+    Reflect.deleteProperty(window, 'Notification');
+    renderAlarm();
+    const knopf = screen.getByRole('button', { name: 'Benachrichtigungen: nicht verfügbar' });
+    expect(knopf).toHaveTextContent('Benachrichtigung nicht verfügbar');
+    expect(knopf).toHaveStyle({ color: rahmenFarben.gedaempft });
+    expect(knopf).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('auf dem Handschirm nennt die Marke bei abgeschalteter Benachrichtigung den Ton', async () => {
+    setzeViewportBreite(390);
+    stubAudioReady();
+    stubNotification('default');
+    renderAlarm();
+    const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
+    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+  });
+});
+
+/**
+ * LFH-951: Desktop-Meldungen tragen einen fachlichen `tag` und werden geschlossen, sobald die
+ * App den Alarm wieder selbst trägt.
+ */
+describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
+  type Meldung = {
+    tag: string;
+    onclose: (() => void) | null;
+    onclick: (() => void) | null;
+    close: ReturnType<typeof vi.fn>;
+  };
+
+  function stubMeldungen() {
+    const meldungen: Meldung[] = [];
+    const Ctor = vi.fn(function (_titel: string, opts?: NotificationOptions) {
+      const m: Meldung = {
+        tag: opts?.tag ?? '',
+        onclose: null,
+        onclick: null,
+        close: vi.fn(() => m.onclose?.()),
+      };
+      meldungen.push(m);
+      return m;
+    }) as unknown as typeof Notification & { permission: NotificationPermission };
+    Ctor.permission = 'granted';
+    vi.stubGlobal('Notification', Ctor);
+    return { Ctor, meldungen };
+  }
+
+  function setzeHidden(hidden: boolean) {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+  }
+
+  beforeEach(() => setzeViewportBreite(1366));
+  afterEach(() => {
+    schliesseAlleDesktopAlarme();
+    setzeHidden(false);
+    setzeViewportBreite(VIEWPORT_STANDARD);
+  });
+
+  function sofortmeldung(meldung_id: number) {
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: { meldung_id } }));
+    });
+  }
+
+  it('wird der Tab wieder sichtbar, schließen sich die offenen Desktop-Meldungen', async () => {
+    stubAudioReady();
+    const { Ctor, meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    sofortmeldung(3);
+    expect(Ctor).toHaveBeenCalledWith('Sofortmeldung eingegangen', {
+      body: 'Bitte sichten und bestätigen.',
+      tag: '1-sofort-3',
+    });
+    expect(offeneDesktopAlarme()).toBe(1);
+
+    setzeHidden(false);
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(meldungen[0].close).toHaveBeenCalledOnce();
+    expect(offeneDesktopAlarme()).toBe(0);
+    // Der Toast trägt den Alarm weiter.
+    expect(screen.getByText('Sofortmeldung eingegangen')).toBeInTheDocument();
+  });
+
+  it('dieselbe Sofortmeldung erneut ersetzt die Desktop-Meldung, statt sie zu stapeln', () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    sofortmeldung(3);
+    sofortmeldung(3);
+    expect(meldungen).toHaveLength(2);
+    expect(meldungen[0].close).toHaveBeenCalledOnce();
+    expect(offeneDesktopAlarme()).toBe(1);
+  });
+
+  it('jede Quelle trägt ihren fachlichen tag', () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:erinnerung-alarm', {
+          detail: { erinnerung_id: 5, bezug_typ: null, bezug_id: null },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent('lfh:erinnerung-alarm', {
+          detail: { erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent('lfh:abloesung-alarm', {
+          detail: { abloesung_id: 9, art: 'vorwarnung', titel: 'Ablösung fällig: Florian 1' },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent('lfh:unwetter-alarm', { detail: { schluessel: 'sturm-2' } }),
+      );
+    });
+    expect(meldungen.map((m) => m.tag)).toEqual([
+      '1-erinnerung-5',
+      '1-auftrag-12',
+      '1-abloesung-9-vorwarnung',
+      '1-unwetter-sturm-2',
+    ]);
+  });
+
+  it('eine neue Unwetterwarnung ersetzt die ältere Desktop-Meldung wie den Toast', () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:unwetter-alarm', { detail: { schluessel: 'sturm-2' } }),
+      );
+    });
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:unwetter-alarm', { detail: { schluessel: 'gewitter-3' } }),
+      );
+    });
+    expect(meldungen[0].close).toHaveBeenCalled();
+    expect(meldungen[1].close).not.toHaveBeenCalled();
+    expect(offeneDesktopAlarme()).toBe(1);
+  });
+
+  it('Öffnen im Toast schließt die zugehörige Desktop-Meldung', async () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    sofortmeldung(3);
+    sofortmeldung(4);
+    // Sichtbar machen ohne Ereignis: so prüft der Test den Weg über den Toast allein.
+    setzeHidden(false);
+    const toast = (await screen.findAllByText('Sofortmeldung eingegangen'))[0].closest<HTMLElement>(
+      '.ant-notification-notice',
+    )!;
+    await userEvent.click(within(toast).getByRole('button', { name: 'Öffnen' }));
+    expect(meldungen.filter((m) => m.close.mock.calls.length > 0)).toHaveLength(1);
+    expect(offeneDesktopAlarme()).toBe(1);
+  });
+
+  it('Schließen des Toasts (Quittieren) schließt die zugehörige Desktop-Meldung', async () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    sofortmeldung(3);
+    sofortmeldung(4);
+    setzeHidden(false);
+    const toast = (await screen.findAllByText('Sofortmeldung eingegangen'))[0].closest<HTMLElement>(
+      '.ant-notification-notice',
+    )!;
+    const kreuz = toast.querySelector<HTMLElement>('.ant-notification-notice-close');
+    expect(kreuz, 'der Toast hat ein Schließkreuz').not.toBeNull();
+    await userEvent.click(kreuz!);
+    await waitFor(() => expect(offeneDesktopAlarme()).toBe(1));
+    expect(meldungen.filter((m) => m.close.mock.calls.length > 0)).toHaveLength(1);
+  });
+
+  it('der Unmount der Alarmzentrale schließt alle Desktop-Meldungen', () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    const { unmount } = renderAlarm();
+    sofortmeldung(3);
+    act(() => {
+      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: {} }));
+    });
+    expect(meldungen.map((m) => m.tag)).toEqual(['1-sofort-3', '']);
+    unmount();
+    expect(meldungen.every((m) => m.close.mock.calls.length === 1)).toBe(true);
+    expect(offeneDesktopAlarme()).toBe(0);
   });
 });

@@ -131,7 +131,7 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
             /*
              * Einzeilig auf dem Führungs-Tablet: bei 1024 px stehen Ruhezustände nur als Icon.
              * Geprüft nur in `kompakt`, dem einzigen deterministischen Fall: headless meldet der
-             * Browser „Desktop blockiert" und der Strom oft „VERBINDE" — Störungen, die ihr
+             * Browser „Benachrichtigung blockiert" und der Strom oft „VERBINDE" — Störungen, die ihr
              * Wort behalten und den Kopf in größeren Stufen umbrechen dürfen. Den Ruhezustand
              * in `handschuh` belegt `kopfzeile-schmal.spec.ts`.
              */

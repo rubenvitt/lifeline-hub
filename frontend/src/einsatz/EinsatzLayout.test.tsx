@@ -550,7 +550,9 @@ describe('EinsatzLayout', () => {
       expect(alarm).toHaveTextContent('Ton blockiert');
       // Die Einzelknöpfe der breiten Bauform stehen hier NICHT — sonst erfüllten auch drei Ziele
       // „ein Ziel".
-      expect(screen.queryByRole('button', { name: 'Alarmton durch Klick entsperren' })).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: 'Alarmton blockiert – tippen zum Freischalten' }),
+      ).toBeNull();
     });
 
     it('zeigt unter lg die Suche als Icon und keine Wortmarke', async () => {

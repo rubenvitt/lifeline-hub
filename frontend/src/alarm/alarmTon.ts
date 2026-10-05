@@ -62,16 +62,86 @@ function audioContext(): AudioContext | null {
 }
 
 /**
- * Versucht den AudioContext freizuschalten und prüft danach ausdrücklich seinen Zustand.
- * `resume()` kann erfolgreich auflösen, obwohl die Autoplay-Sperre weiter gilt; nur
- * `state === 'running'` zählt deshalb als bereit.
+ * Frist für eine Freischaltung ohne Antwort (LFH-950). Ohne Bediengeste bleibt `resume()` in
+ * Chromium offen, und „wird geprüft" stünde sonst für immer. Nach der Frist gilt der Ton als
+ * blockiert; dieselbe Frist begrenzt, wie alt ein aufgestauter Ton sein darf, damit er nach
+ * der Freischaltung noch spielt. Ältere Alarme tragen die Toasts.
  */
-async function stelleAudioBereit(): Promise<AlarmTonStatus> {
+export const ALARM_TON_FRIST_MS = 2000;
+
+/** Das EINE offene `resume()` aller Anforderungen ohne Geste; `null`, wenn keins wartet. */
+let resumeLaeuft: Promise<AlarmTonStatus> | null = null;
+/** Nur die zuletzt angeforderte Stufe wartet auf die Freischaltung, nie eine Schlange. */
+let ausstehend: { stufe: AlarmStufe; seit: number } | null = null;
+
+/**
+ * Nach einem aufgelösten `resume()`: nur `state === 'running'` zählt als bereit, ein aufgelöstes
+ * Promise belegt nicht, dass die Autoplay-Sperre gefallen ist. Spielt höchstens EINEN
+ * aufgestauten Ton, nur wenn er jünger als die Frist ist und der Ton nicht inzwischen stumm ist.
+ */
+function nachFreigabe(context: AudioContext): AlarmTonStatus {
+  if (context.state !== 'running') return meldeStatus('blockiert');
+  meldeStatus('bereit');
+  const wartend = ausstehend;
+  ausstehend = null;
+  if (wartend && !istAlarmGemutet() && Date.now() - wartend.seit <= ALARM_TON_FRIST_MS) {
+    starteTon(context, wartend.stufe);
+  }
+  return 'bereit';
+}
+
+/** Gibt `p` zurück, meldet aber nach der Frist „blockiert", wenn `p` bis dahin offen ist. */
+function mitFrist(context: AudioContext, p: Promise<AlarmTonStatus>): Promise<AlarmTonStatus> {
+  return new Promise((fertig) => {
+    const frist = setTimeout(() => {
+      // Fiel die Sperre im selben Moment, gewinnt der Zustand, nicht die Uhr.
+      fertig(context.state === 'running' ? nachFreigabe(context) : meldeStatus('blockiert'));
+    }, ALARM_TON_FRIST_MS);
+    void p.then((status) => {
+      clearTimeout(frist);
+      fertig(status);
+    });
+  });
+}
+
+/**
+ * Freischaltung OHNE Geste: alle Anforderungen teilen ein `resume()`. Je Alarm ein eigenes hinge
+ * je Alarm eine Kette an, die bei der ersten Geste alle zugleich spielten (L70).
+ */
+function freigabeOhneGeste(context: AudioContext): Promise<AlarmTonStatus> {
+  resumeLaeuft ??= context
+    .resume()
+    .then(
+      () => nachFreigabe(context),
+      () => meldeStatus('blockiert'),
+    )
+    .finally(() => {
+      resumeLaeuft = null;
+    });
+  return mitFrist(context, resumeLaeuft);
+}
+
+/**
+ * Freischaltung AUS einer Geste: ein eigenes `resume()`, denn nur ein Aufruf mit
+ * Nutzeraktivierung hebt die Sperre auf. Fällt sie, lösen auch die offenen `resume()` auf.
+ */
+function freigabeAusGeste(context: AudioContext): Promise<AlarmTonStatus> {
+  return mitFrist(
+    context,
+    context.resume().then(
+      () => nachFreigabe(context),
+      () => meldeStatus('blockiert'),
+    ),
+  );
+}
+
+/** Versucht den AudioContext freizuschalten und meldet spätestens nach der Frist einen Zustand. */
+async function stelleAudioBereit(ausGeste: boolean): Promise<AlarmTonStatus> {
   try {
     const context = audioContext();
     if (!context) return meldeStatus('blockiert');
-    if (context.state !== 'running') await context.resume();
-    return meldeStatus(context.state === 'running' ? 'bereit' : 'blockiert');
+    if (context.state === 'running') return nachFreigabe(context);
+    return await (ausGeste ? freigabeAusGeste(context) : freigabeOhneGeste(context));
   } catch {
     return meldeStatus('blockiert');
   }
@@ -92,7 +162,7 @@ function starteStummenTestton(context: AudioContext): void {
 
 /** Stummer Einstiegstest beim Betreten des Einsatz-Workspace. */
 export async function pruefeAlarmTonBereitschaft(): Promise<AlarmTonStatus> {
-  const status = await stelleAudioBereit();
+  const status = await stelleAudioBereit(false);
   if (status !== 'bereit') return status;
   try {
     const context = audioContext();
@@ -106,7 +176,7 @@ export async function pruefeAlarmTonBereitschaft(): Promise<AlarmTonStatus> {
 
 /** Erneuter Freischaltversuch aus einer echten User-Geste. */
 export function entsperreAlarmTon(): Promise<AlarmTonStatus> {
-  return stelleAudioBereit();
+  return stelleAudioBereit(true);
 }
 
 function starteTon(context: AudioContext, stufe: AlarmStufe): void {
@@ -146,24 +216,16 @@ export function spieleAlarmTon(stufe: AlarmStufe): void {
       return;
     }
     if (context.state === 'running') {
+      // Ein frischer Ton ersetzt einen aufgestauten, beide zugleich wären zwei Alarme.
+      ausstehend = null;
       meldeStatus('bereit');
       starteTon(context, stufe);
       return;
     }
 
-    // Erst NACH dem Promise erneut auf `state` prüfen — ein aufgelöstes `resume()` belegt nicht,
-    // dass die Autoplay-Sperre gefallen ist.
-    void context
-      .resume()
-      .then(() => {
-        if (context.state !== 'running') {
-          meldeStatus('blockiert');
-          return;
-        }
-        meldeStatus('bereit');
-        starteTon(context, stufe);
-      })
-      .catch(() => meldeStatus('blockiert'));
+    // Gesperrt: nur diese Anforderung merken und das gemeinsame `resume()` abwarten.
+    ausstehend = { stufe, seit: Date.now() };
+    void freigabeOhneGeste(context);
   } catch {
     meldeStatus('blockiert');
   }
