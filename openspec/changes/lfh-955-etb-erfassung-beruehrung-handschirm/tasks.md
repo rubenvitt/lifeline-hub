@@ -17,7 +17,12 @@
 - [x] 3.2 Typfilter einzeilig rollend unter `md`
 - [x] 3.3 Knopf „Filter (n)“ klappt `EtbFilterleiste` auf, aktiver Filter hält sie offen, Test
 - [x] 3.4 Erfassungsleiste eingeklappt: `eingeklappt` an der Schnellerfassung, Reiterband nur ab zwei Entwürfen, Fokusweiche in `EtbPage`, kein Mount-Fokus unter `md`; Tests für Einklappen, Aufklappen bei Fokus und bei Inhalt
-- [ ] 3.5 Infotelefon-Erfassung bei 390 × 844 messen, Ergebnis hier notieren
+- [x] 3.5 Infotelefon-Erfassung bei 390 × 844 messen, Ergebnis hier notieren
+  - Gemessen (05.10.2026, 6 Anrufe, Admin): kompakt Leiste 191 px (23 %), 2 Anrufe ganz darüber;
+    komfortabel 268 px (32 %), erster Anruf bei y = 654 hinter der Leiste ab y = 576, keiner ganz
+    darüber; handschuh 376 px (45 %), keiner darüber. Unter dem Deckel von 50 %, aber ab
+    komfortabel beim Öffnen kein Anruf im Bild. Nicht in diesem Change (Non-Goal); eigener Schnitt
+    am Stab-Kopf.
 
 ## 4. Browser-Nachweis (D5)
 
@@ -30,7 +35,13 @@
     Rufname-Abfrage), Führungspersonal sieht nur einen Eintrag, rot. Der alte Kopf allein lässt
     3 bis 4 Einträge stehen und bleibt im Browser grün; ihn hält `pages/EtbPage.test.tsx`
     („Handschirm“: Menü, Filterknopf, Typfilter einzeilig; vor der Umsetzung 8 von 10 rot).
-- [ ] 4.2 Mitlaufen: `leisten-flaeche`, `fokus-verdeckung`, `etb-entwurf-tabs`, `etb-chronologie`, `gate3-trefflaeche`
+- [x] 4.2 Mitlaufen: `leisten-flaeche`, `fokus-verdeckung`, `etb-entwurf-tabs`, `etb-chronologie`, `gate3-trefflaeche`
+  - Lauf 05.10.2026 mit einem Worker: 97 von 105 grün. Rot sind 8 Fälle in `fokus-verdeckung`
+    (Einheit, Modulpanel, ETB 390 × 600, Informationstelefon, Gefahrenmatrix, Personenliste).
+    ETB und Informationstelefon sind mit dem Frontend-Stand von `alpha` (894781c9) gleich rot,
+    die übrigen Seiten berührt der Change nicht: Umgebung, kein Befund dieses Changes.
+  - Zusätzlich gefunden: `e2e/fuehrungsstelle.spec.ts` (390 px) erwartete Chips und
+    Rufname-Abfrage ohne Fokus; jetzt fokussiert es das Feld zuerst. Vorher rot, jetzt grün.
 
 ## 5. Regel und Gesamtlauf
 
