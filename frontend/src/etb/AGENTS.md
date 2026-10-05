@@ -18,6 +18,24 @@ Ableitungen in `etb/zeitachseModell.ts`)
   Unter `md`: Feld eigene Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst), Feldzeile
   rollt waagerecht, „Werte behalten" in der Hinweiszeile, Kurzplatzhalter, Fokus per
   `preventScroll` (`MetaChip`, nicht `autoFocus`).
+- **Erfassung, Tastatur und Fläche** (LFH-955, Specs `etb-schnellerfassung-tastatur`,
+  `einsatztauglichkeit-layout`):
+  - **Enter weicht nach der Zeigerart, nicht nach der Breite** (`useViewport().istBeruehrung`):
+    mit grobem Zeiger bricht Return um und sendet nie, gesendet wird über „Erfassen“ oder
+    Strg/⌘+Enter; das Feld trägt `enterKeyHint="enter"`. Mit feinem Zeiger gilt LFH-335 (Enter
+    sendet einen Einzeiler). Hinweiszeile und Platzhalter nennen auf Touch keine Tastenkombination
+    und sagen „Typ & Felder“, nie „Befehle“.
+  - **Feldbreite per Opt-in:** `Schnellerfassungszeile feldFuellt` streckt das Kind der Feldzelle
+    (`.lfh-schnellerfassung__feld--fuellt`); das ETB setzt es immer, ab `md` ≥ 60 % der Zeile.
+    Keine pauschale Regel: eine Zelle mit mehreren Feldern (Infotelefon) bleibt ungestreckt.
+  - **Unter `md` zuerst die Zeitachse:** Druck und Abschluss im Menü „Weitere“
+    (`MenueAusloeser`, Rückfrage als `<Modal>`), Typfilter einzeilig rollend, Volltext, Zeitraum
+    und Einheit hinter „Filter (n)“ (ein gesetzter Filter hält sie offen). Die Leiste startet
+    eingeklappt (`EtbEntwurfsTabs einklappbar`, `Schnellerfassung eingeklappt`): kein Fokus beim
+    Mount, ohne Reiterband, Feld- und Hinweiszeile, solange der Fokus nicht in ihr liegt und genau
+    ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
+    (`LEISTEN_SCHWEBE` in `pages/EtbPage.tsx`). Nachweis: zwei Einträge ganz im Bild auf
+    390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
 - **Kopfzahl und Bilanz zählt der Server über DENSELBEN Filter** (LFH-612, `GET …/etb/zaehler`,
   `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität
   `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
