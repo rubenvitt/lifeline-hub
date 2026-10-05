@@ -398,6 +398,11 @@ mod tests {
             1,
         )
         .await;
+        // Die Fixture hängt an jeden geschwärzten Einsatz einen Anhang; Phase D wartet auf den
+        // Nachlauf, der ihn löscht (LFH-905, `phase_d_wartet_auf_den_nachlauf`).
+        crate::anhang::repo::entferne_vorgesehene(&pool, None)
+            .await
+            .unwrap();
 
         assert_eq!(faellige(&pool, t(JETZT)).await.unwrap(), vec![faellig]);
     }
@@ -544,6 +549,9 @@ mod tests {
             1,
         )
         .await;
+        crate::anhang::repo::entferne_vorgesehene(&pool, None)
+            .await
+            .unwrap();
         assert_eq!(faellige(&pool, t(JETZT)).await.unwrap(), vec![e]);
 
         org_frist(&pool, 1, None).await;

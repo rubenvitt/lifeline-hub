@@ -184,18 +184,22 @@ pub async fn laden_bytes(
 }
 
 /// Prüft, ob ein Anhang zum angegebenen Einsatz gehört (Schutz gegen
-/// Cross-Einsatz-Zugriff beim Download und beim Verknüpfen).
+/// Cross-Einsatz-Zugriff beim Download und beim Verknüpfen). Ein zur Entfernung vorgesehener
+/// Anhang gehört zu keinem mehr (LFH-905): so endet ein Abruf schon am ersten Gate mit 404, vor
+/// jedem Lese-Audit.
 pub async fn gehoert_anhang_zu_einsatz(
     pool: &SqlitePool,
     anhang_id: i64,
     einsatz_id: i64,
 ) -> Result<bool, AppError> {
-    let treffer: Option<i64> =
-        sqlx::query_scalar("SELECT 1 FROM anhang WHERE id = ? AND einsatz_id = ?")
-            .bind(anhang_id)
-            .bind(einsatz_id)
-            .fetch_optional(pool)
-            .await?;
+    let treffer: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT 1 FROM anhang WHERE id = ? AND einsatz_id = ? AND NOT {}",
+        zur_entfernung_vorgesehen_sql("anhang")
+    )))
+    .bind(anhang_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
     Ok(treffer.is_some())
 }
 
@@ -429,6 +433,11 @@ pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerSta
 /// macht keinen Fehler, sondern löscht dort gebundene Dateien nach der Karenz still — die
 /// Tests `sweep_verwaiste_haelt_{dokument,etb,schaden}_gebundene_anhaenge` pinnen das.
 /// Ein soft-gelöschtes Dokument ist bewusst KEIN Orphan (Beweissicherung, LFH-632 E1).
+///
+/// **Zur Entfernung vorgesehene Anhänge übergeht der Sweep** (LFH-905): nach der atomaren
+/// Schwärzung haben sie keinen Linker mehr und sähen verwaist aus. Löschte der Sweep sie in
+/// seinem einen `DELETE`, hielte er die Schreibsperre so lange wie vor dem Nachlauf; sie gehören
+/// allein [`entferne_vorgesehene`].
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let grenze = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN));
     let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -436,8 +445,10 @@ pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<
          WHERE erstellt_at < ? \
            AND NOT EXISTS \
                (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id) \
+           AND NOT {} \
            AND NOT {}",
-        modul_gebunden_sql("anhang")
+        modul_gebunden_sql("anhang"),
+        zur_entfernung_vorgesehen_sql("anhang")
     )))
     .bind(grenze)
     .execute(pool)

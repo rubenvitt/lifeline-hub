@@ -2147,6 +2147,12 @@ mod tests {
             "Zeilen stehen bis zum Nachlauf, Verknüpfung weg"
         );
         for id in [foto.id, lose.id] {
+            assert!(
+                !crate::anhang::repo::gehoert_anhang_zu_einsatz(&pool, id, einsatz.id)
+                    .await
+                    .unwrap(),
+                "erstes Gate des Abrufs: 404 vor jedem Lese-Audit"
+            );
             assert!(matches!(
                 crate::anhang::repo::meta_fuer_download(&pool, id).await,
                 Err(AppError::NotFound)

@@ -2261,6 +2261,28 @@ mod tests {
         );
     }
 
+    /// Nach der atomaren Schwärzung sehen die Anhänge verwaist aus (kein Linker). Der
+    /// Verwaisten-Sweep darf sie trotzdem nicht in seinem einen `DELETE` nehmen, sonst kehrte die
+    /// lange Sperre zurück, sobald der Nachlauf einmal scheitert; sie gehören dem Nachlauf.
+    #[tokio::test]
+    async fn verwaisten_sweep_uebergeht_vorgesehene_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        let spaeter = Utc::now() + chrono::Duration::days(2);
+        assert_eq!(
+            crate::anhang::repo::sweep_verwaiste(&pool, spaeter)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(anhaenge_von(&pool, e).await, 1, "bleibt für den Nachlauf");
+    }
+
     /// Szenario „Endgültige Löschung wartet auf den Nachlauf“: Phase D nimmt einen Einsatz mit
     /// verbliebenen Anhängen nicht, sonst löschte die Kaskade sie in einer Transaktion.
     #[tokio::test]

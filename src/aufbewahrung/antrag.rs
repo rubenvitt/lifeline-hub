@@ -536,9 +536,9 @@ pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64
 /// Vollzieht einen fälligen Antrag (LFH-751) — Scrub, Kennzeichen und ETB-Eintrag in EINER
 /// Transaktion; die Anhänge eines geschwärzten Einsatzes löscht danach der Nachlauf einzeln
 /// (LFH-905, `einsatz::repo::schwaerze_einsatz`). `Ok(true)`, wenn etwas geschwärzt wurde
-/// (der Aufrufer schreibt dann den WAL zurück), `Ok(false)`, wenn der Antrag nicht (mehr) offen und fällig ist oder der Einsatz
-/// schon geschwärzt war (dann nur das Kennzeichen samt Eintrag). Ein Fehler rollt alles zurück;
-/// der nächste Lauf versucht es erneut.
+/// (der Aufrufer schreibt dann den WAL zurück), `Ok(false)`, wenn der Antrag nicht (mehr)
+/// offen und fällig ist oder der Einsatz schon geschwärzt war (dann nur das Kennzeichen samt
+/// Eintrag). Ein Fehler rollt alles zurück; der nächste Lauf versucht es erneut.
 ///
 /// ETB-Erfasser ist die Person, die den Antrag gestellt hat (FK, nie gelöscht), ersatzweise
 /// die Akteurskette des Purge-Laufs.

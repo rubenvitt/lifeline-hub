@@ -698,8 +698,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         // LFH-757, Linker der Personen-Anhänge: ganze Zeile löschen wie bei
         // einsatz_schaden_anhang — die `anhang`-Regel davor löscht den Linker schon mit, die Datei
         // der Nachlauf (LFH-905), und ein Linker ohne Datei trägt nichts. Die
-        // System-ETB-Einträge nennen nur Registriernummer und Art („Person R-007: Foto abgelegt“), nie Dateinamen oder
-        // Namen; das Zugriffsprotokoll (person_zugriff_audit, Art `anhang`) bleibt retain. Gepinnt
+        // System-ETB-Einträge nennen nur Registriernummer und Art („Person R-007: Foto
+        // abgelegt“), nie Dateinamen oder Namen; das Zugriffsprotokoll (person_zugriff_audit, Art `anhang`) bleibt retain. Gepinnt
         // in `einsatz::repo::tests::schwaerzung_loescht_personen_anhaenge_und_haelt_etb_und_audit`.
         tabelle: "einsatz_person_anhang",
         scoping: Scoping::EinsatzId,

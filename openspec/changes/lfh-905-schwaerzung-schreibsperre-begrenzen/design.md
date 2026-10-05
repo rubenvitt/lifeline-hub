@@ -41,6 +41,9 @@ einer SD-Karte mit ~20 MB/s hochgerechnet je ~25 s.
 - Der Verwaisten-Sweep (`anhang::repo::sweep_verwaiste`) löscht weiter in einem `DELETE`.
   Verwaiste Uploads sind selten groß; bleibt das ein Befund, ist es ein eigener Task.
 - `demo::entfernen` (Demo-Daten, klein) und das Löschen einzelner Anhänge im Betrieb bleiben.
+- Der Vollzug eines **Personen**-Antrags (`schwaerzung_person::scrubbe_person`) löscht die
+  Anhänge dieser einen Person weiter in seiner Transaktion. Die Menge ist auf eine Person
+  begrenzt; bleibt das ein Befund, ist es ein eigener Task.
 - Die Sperre unterhalb eines Anhangs zu stückeln (etwa ein BLOB in Teilschritten zu nullen).
 
 ## Decisions
@@ -81,7 +84,10 @@ Danach ist der Anhang aus keiner Liste mehr erreichbar. Phase B und A2 sperren d
 Einsatz ohnehin (`darf_lesen`, `geloescht_at`). Für K2 bleibt der Einsatz lesbar; ein Anhang
 ohne Linker wäre über `GET /anhaenge/{aid}` noch für die hochladende Person abrufbar (LFH-117).
 Den Abruf sperrt eine Prüfung „zur Entfernung vorgesehen“ (s. 3) in den Lese-Funktionen von
-`anhang::repo` mit 404.
+`anhang::repo` mit 404, und zwar schon in `gehoert_anhang_zu_einsatz`, dem ersten Gate jedes
+Abrufs, damit kein Lese-Audit einen Abruf vermerkt, der dann 404 liefert. Der
+Verwaisten-Sweep übergeht solche Anhänge: ohne Linker sähen sie verwaist aus, und sein eines
+`DELETE` holte die lange Sperre zurück, sobald ein Nachlauf scheitert.
 
 - *Verworfen: Anhang-Spalten im atomaren Vorgang überschreiben* (etwa den Dateinamen).
   SQLite schreibt dabei den ganzen Datensatz neu, Overflow-Seiten eingeschlossen; das kostet
@@ -170,6 +176,11 @@ zur Dauer eines Anhangs (1 MB ≈ 0,05 s, höchstens 26 MB ≈ 1,3 s bei 20 MB/s
   unter `busy_timeout`, solange die Karte mehr als ~6 MB/s schreibt.
 - [Die SD-Karte ist während des Nachlaufs ausgelastet; Schreibende werden langsamer, aber
   nicht abgewiesen.] → Hingenommen: einmal je Einsatz, im Hintergrund.
+- [Eine Sicherung (`VACUUM INTO`) zwischen atomarer Schwärzung und Nachlauf enthält die
+  Anhang-Zeilen noch.] → Das Fenster dauert Sekunden; vorher stand derselbe Inhalt bis zum
+  Rückschrieb im WAL. Sicherungen tragen ohnehin den Vorzustand (LFH-725, Entscheidung 4).
+- [Scheitert der Nachlauf für einen Anhang dauerhaft, wartet Phase D für diesen Einsatz
+  unbegrenzt.] → Gewollt; jeder Tick meldet den Fehlschlag als Warnung im Log.
 - [Ein neuer Weg, der Anhänge in einer Transaktion löscht, umgeht den Nachlauf.] → Die
   Registry-Strategie trägt den Nachlauf; ein Weg ohne Registry fiele im WAL-Test nicht auf.
   Der Kommentar an `ZeileEinzelnLoeschen` nennt die Regel.
