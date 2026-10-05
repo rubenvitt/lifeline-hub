@@ -1201,7 +1201,7 @@ async fn heraufstufen(
         &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
         cookie,
         Some(&format!(
-            r#"{{"typ":"meldung","inhalt":"Deich","anhang_ids":[{ids}]}}"#
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich","anhang_ids":[{ids}]}}"#
         )),
     )
     .await

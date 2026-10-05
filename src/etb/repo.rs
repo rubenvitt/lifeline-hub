@@ -53,6 +53,11 @@ async fn einfuegen(
     // (Meldung, Auftrag, Befehl, Stab …) läuft durch diese Funktion und kann ihn nicht
     // vergessen. Der Client liefert ihn nie — ein Nachweis, den der Absender setzt, wäre keiner.
     let funktion = crate::einsatz::funktion::kurz_fuer(&mut *conn, einsatz_id, erfasser_id).await?;
+    // Von/An (LFH-894) ebenfalls HIER: jeder neue Eintrag hat beide Seiten. Ein Client-Eintrag
+    // kommt nie in diesen Rückfall, die Route prüft die Pflicht vorher; ein Kopplungspfad
+    // behält, was er kennt, und bekommt für die fehlende Seite die Systemkennung.
+    let von = daten.von.unwrap_or(super::SYSTEM_RUFNAME);
+    let an = daten.an.unwrap_or(super::SYSTEM_RUFNAME);
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
@@ -67,8 +72,8 @@ async fn einfuegen(
     .bind(startwert)
     .bind(daten.typ)
     .bind(daten.inhalt)
-    .bind(daten.von)
-    .bind(daten.an)
+    .bind(von)
+    .bind(an)
     .bind(daten.meldeweg)
     .bind(daten.veranlassung)
     .bind(erfasser_id)
@@ -1377,6 +1382,37 @@ mod tests {
             ergebnis.is_ok(),
             "Sonderzeichen müssen sicher behandelt werden"
         );
+    }
+
+    /// LFH-894 D5: ein Kopplungspfad ohne Von/An bekommt auf beiden Seiten die Systemkennung.
+    #[tokio::test]
+    async fn fehlende_seiten_tragen_die_systemkennung() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let e = anlegen(&pool, einsatz, benutzer, daten("Ablösung vollzogen"))
+            .await
+            .unwrap();
+        assert_eq!(e.von.as_deref(), Some(crate::etb::SYSTEM_RUFNAME));
+        assert_eq!(e.an.as_deref(), Some(crate::etb::SYSTEM_RUFNAME));
+        assert_eq!(crate::etb::SYSTEM_RUFNAME, "System");
+    }
+
+    /// Was der Kopplungspfad kennt, bleibt; nur die fehlende Seite wird „System".
+    #[tokio::test]
+    async fn bekannte_seite_bleibt_nur_die_fehlende_wird_system() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let mut d = daten("Auftrag an EA-Süd");
+        d.an = Some("EA-Süd");
+        let e = anlegen(&pool, einsatz, benutzer, d).await.unwrap();
+        assert_eq!(e.von.as_deref(), Some("System"));
+        assert_eq!(e.an.as_deref(), Some("EA-Süd"));
+
+        let mut d = daten("Meldung von Florian 1");
+        d.von = Some("Florian 1");
+        let e = anlegen(&pool, einsatz, benutzer, d).await.unwrap();
+        assert_eq!(e.von.as_deref(), Some("Florian 1"));
+        assert_eq!(e.an.as_deref(), Some("System"));
     }
 
     /// LFH-880: Die Suche trifft Wortanfänge („Deich“ → „Deichbruch“), aber keine Wortmitte.

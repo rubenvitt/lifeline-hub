@@ -74,6 +74,8 @@ async function saeen(page: Page, einsatzId: string) {
   await sende(page, 'POST', `${basis}/lageberichte/${bericht.id}/freigeben`);
   await sende(page, 'POST', `${basis}/etb`, {
     typ: 'entscheidung',
+    von: 'ELW 1',
+    an: 'Leitstelle',
     inhalt: 'Bereitstellungsraum Nord einrichten',
   });
   await sende(page, 'POST', `${basis}/personen`, {

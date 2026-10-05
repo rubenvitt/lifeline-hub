@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EntwurfWerte, EtbEntwurf } from './entwurfModell';
-import { istLeer, werteZuPatch, zuWerte } from './entwurfModell';
+import { istLeer, werteZuPatch } from './entwurfModell';
 import {
   aktivSchluessel,
   entwuerfeLaden,
@@ -10,11 +10,16 @@ import {
 import type { MetadatenWerte } from '../schnellerfassungModell';
 import { neueClientId } from '../../offline/clientId';
 
+/**
+ * Ein neuer, leerer Entwurf. Er trägt keine Von/An-Vorbelegung (LFH-894, design.md D2/D3): der
+ * Standard-Rufname kommt erst beim Anzeigen und Absenden hinzu, der Entwurf hält nur, was die
+ * Person ausdrücklich gesetzt hat. Damit entfiel auch die Marke `an_vorbelegung_geprueft`
+ * (LFH-461); ältere Entwürfe tragen sie noch, sie wird nicht mehr gelesen.
+ */
 function leererEntwurf(
   benutzerId: number,
   einsatzId: number,
   metadaten: MetadatenWerte = {},
-  vorbelegungGeprueft = false,
 ): EtbEntwurf {
   const jetzt = new Date().toISOString();
   return {
@@ -22,7 +27,6 @@ function leererEntwurf(
     benutzer_id: benutzerId,
     einsatz_id: einsatzId,
     ...werteZuPatch({ inhalt: '', typ: 'meldung', metadaten }),
-    ...(vorbelegungGeprueft ? { an_vorbelegung_geprueft: true as const } : {}),
     erstellt_at: jetzt,
     geaendert_at: jetzt,
   };
@@ -33,16 +37,7 @@ function leererEntwurf(
  * (LFH-767): Sie sieht und schreibt nur ihre eigenen Entwürfe. Ohne Person lädt und speichert
  * der Hook nichts — `RequireAuth` lässt die Seite dann ohnehin nicht zu.
  */
-export function useEtbEntwuerfe(
-  benutzerId: number | null,
-  einsatzId: number,
-  /** Vorbelegung „An“ nach der Vorrangregel (`fuehrung/funktionsOptionenKern.ts:anVorbelegung`). */
-  fuehrungsstelle?: string | null,
-  kontextLaedt = false,
-) {
-  // Erst beim Initialisieren festhalten: beim Mount kann noch ein alter Einsatz aus
-  // dem Query-Cache vorliegen. Spätere Refetches dürfen den Entwurf nicht neu laden.
-  const anfangsEmpfaenger = useRef<string | undefined>(undefined);
+export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
   const [entwuerfe, setEntwuerfe] = useState<EtbEntwurf[]>([]);
   const [aktiverId, setAktiverId] = useState<string | null>(null);
   const initialisiert = useRef(false);
@@ -53,20 +48,14 @@ export function useEtbEntwuerfe(
   entwuerfeRef.current = entwuerfe;
 
   useEffect(() => {
-    if (initialisiert.current || kontextLaedt || benutzerId === null) return;
+    if (initialisiert.current || benutzerId === null) return;
     let abgebrochen = false;
     void (async () => {
       const geladen = await entwuerfeLaden(benutzerId, einsatzId);
       if (abgebrochen || initialisiert.current) return;
       initialisiert.current = true;
-      anfangsEmpfaenger.current = fuehrungsstelle?.trim();
       if (geladen.length === 0) {
-        const leer = leererEntwurf(
-          benutzerId,
-          einsatzId,
-          anfangsEmpfaenger.current ? { an: anfangsEmpfaenger.current } : {},
-          !!anfangsEmpfaenger.current,
-        );
+        const leer = leererEntwurf(benutzerId, einsatzId);
         setEntwuerfe([leer]);
         setAktiverId(leer.id);
         return;
@@ -79,21 +68,7 @@ export function useEtbEntwuerfe(
     return () => {
       abgebrochen = true;
     };
-  }, [benutzerId, einsatzId, fuehrungsstelle, kontextLaedt]);
-
-  // Bewusst leere Zustände nach Entfernen/Absenden/+ bleiben erhalten. Unberührte
-  // Anfangsdefaults haben An und werden weiterhin NICHT beim Mount gespeichert.
-  // Erst nach dem Commit sichern: ein beim Schließen verworfener Ersatzentwurf
-  // darf nicht als Zombie in IndexedDB landen (auch bei parallelem Schließen).
-  const leerGesichert = useRef(new WeakSet<EtbEntwurf>());
-  useEffect(() => {
-    for (const e of entwuerfe) {
-      if (e.an_vorbelegung_geprueft && istLeer(zuWerte(e)) && !leerGesichert.current.has(e)) {
-        leerGesichert.current.add(e);
-        void entwurfSpeichern(e);
-      }
-    }
-  }, [entwuerfe]);
+  }, [benutzerId, einsatzId]);
 
   const aktivenSetzen = useCallback(
     (id: string) => {
@@ -106,7 +81,7 @@ export function useEtbEntwuerfe(
   const neuerEntwurf = useCallback(
     (metadaten: MetadatenWerte = {}) => {
       if (benutzerId === null) return;
-      const leer = leererEntwurf(benutzerId, einsatzId, metadaten, !!anfangsEmpfaenger.current);
+      const leer = leererEntwurf(benutzerId, einsatzId, metadaten);
       setEntwuerfe((prev) => [...prev, leer]);
       aktivenSetzen(leer.id);
     },
@@ -129,7 +104,7 @@ export function useEtbEntwuerfe(
       // die Lebensdauer konstant). So läuft der Write unter React.StrictMode genau einmal (LFH-216).
       if (!bestand) return;
       if (istLeer(werte) && !festhalten) {
-        if (!bestand.an_vorbelegung_geprueft) void entwurfEntfernen(id);
+        void entwurfEntfernen(id);
       } else {
         void entwurfSpeichern({ ...bestand, ...patch, geaendert_at });
       }
@@ -183,7 +158,7 @@ export function useEtbEntwuerfe(
       // aktiverId (LFH-214). Beide Setter bleiben FUNKTIONAL (lesen den frisch committeten State)
       // und sind damit immun gegen Änderungen während des vorausgehenden await — ein
       // Closure-Snapshot ließe einen Zombie-Tab zurück.
-      const leer = leererEntwurf(benutzerId, einsatzId, metadaten, !!anfangsEmpfaenger.current);
+      const leer = leererEntwurf(benutzerId, einsatzId, metadaten);
       let naechsteListe: EtbEntwurf[] = [];
       setEntwuerfe((prev) => {
         const rest = prev.filter((e) => e.id !== id);

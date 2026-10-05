@@ -1,11 +1,12 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, isInaccessible, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, isInaccessible, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { Dokument } from '../api/types';
 import DokumentBearbeitenModal from './DokumentBearbeitenModal';
 
@@ -17,8 +18,30 @@ import { aendereDokument } from '../api/dokumente';
 
 const aendere = vi.mocked(aendereDokument);
 
+interface EtbStub {
+  id: number;
+  einsatz_id: number;
+  lfd_nr: number;
+  inhalt: string;
+}
+const eintrag = (id: number, lfd_nr: number, inhalt: string): EtbStub => ({
+  id,
+  einsatz_id: 1,
+  lfd_nr,
+  inhalt,
+});
+/** Das jüngste Fenster, das der Dialog ohne Suchbegriff bekommt. */
+let etbFenster: EtbStub[] = [];
+/** Der ganze Bestand — auch was außerhalb des Fensters liegt; Suche und Nummer greifen hierauf. */
+let etbBestand: EtbStub[] = [];
+/** Query-Strings aller ETB-Abrufe, in Reihenfolge. */
+let etbAnfragen: URLSearchParams[] = [];
+
 beforeEach(() => {
   aendere.mockReset();
+  etbAnfragen = [];
+  etbFenster = [eintrag(9, 12, 'Lage erkundet')];
+  etbBestand = [...etbFenster, eintrag(5, 3, 'Deichbruch gemeldet'), eintrag(7, 412, 'Pumpe 2')];
   server.use(
     http.get('/api/einsaetze/1/abschnitte', () =>
       HttpResponse.json([
@@ -29,9 +52,29 @@ beforeEach(() => {
     http.get('/api/einsaetze/1/einheiten', () =>
       HttpResponse.json([{ id: 4, einsatz_id: 1, name: 'Florian 1' }]),
     ),
-    http.get('/api/einsaetze/1/etb', () =>
-      HttpResponse.json([{ id: 9, einsatz_id: 1, lfd_nr: 12, inhalt: 'Lage erkundet' }]),
-    ),
+    // Ahmt den Server nach wie `DokumentAblegenModal.test.tsx`: `q` sucht ganze Wörter,
+    // `before_lfd_nr` + `limit` schneidet am Cursor.
+    http.get('/api/einsaetze/1/etb', ({ request }) => {
+      const qs = new URL(request.url).searchParams;
+      etbAnfragen.push(qs);
+      const q = qs.get('q');
+      const vor = qs.get('before_lfd_nr');
+      let treffer = q || vor ? [...etbBestand] : [...etbFenster];
+      if (q) {
+        const woerter = q.toLowerCase().split(/\s+/).filter(Boolean);
+        treffer = treffer.filter((e) =>
+          woerter.every((w) =>
+            e.inhalt
+              .toLowerCase()
+              .split(/[^\p{L}\p{N}]+/u)
+              .includes(w),
+          ),
+        );
+      }
+      if (vor) treffer = treffer.filter((e) => e.lfd_nr < Number(vor));
+      treffer.sort((a, b) => b.lfd_nr - a.lfd_nr);
+      return HttpResponse.json(treffer.slice(0, Number(qs.get('limit') ?? 50)));
+    }),
   );
 });
 afterEach(() => vi.clearAllMocks());
@@ -92,6 +135,23 @@ function selectWert(d: HTMLElement, name: string) {
   const feld = within(d).getByRole('combobox', { name }).closest('.ant-select')!;
   return feld.querySelector('.ant-select-content')?.textContent ?? null;
 }
+
+/** Labels der Optionen in der offenen Liste, in Anzeige-Reihenfolge. */
+function optionsLabels() {
+  return [
+    ...document.querySelectorAll<HTMLElement>(
+      '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option',
+    ),
+  ].map((o) => o.textContent);
+}
+
+async function oeffneBezugsliste(d: HTMLElement) {
+  await userEvent.click(within(d).getByRole('combobox', { name: 'Bezug' }));
+  await waitFor(() => expect(optionsLabels()).toContain('ETB 12 · Lage erkundet'));
+}
+
+/** Ein Takt für React: der Query-Cache meldet seine Beobachter gebündelt per `setTimeout`. */
+const neuGezeichnet = () => act(() => new Promise((r) => setTimeout(r, 20)));
 
 async function warteBisDialogWeg() {
   await waitFor(() => {
@@ -208,6 +268,89 @@ describe('DokumentBearbeitenModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     const neu = await dialog();
     expect(within(neu).getByRole('textbox', { name: 'Titel' })).toHaveValue('Lageplan');
+  });
+
+  describe('Bezugswahl wie beim Ablegen (LFH-886)', () => {
+    it('findet einen ETB-Eintrag jenseits des jüngsten Fensters über seine Nummer', async () => {
+      aendere.mockResolvedValue(lageplan);
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      expect(optionsLabels()).not.toContain('ETB 412 · Pumpe 2');
+
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'ETB 412');
+      await waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
+      await waehleOption('ETB 412 · Pumpe 2');
+      await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
+
+      await waitFor(() =>
+        expect(aendere).toHaveBeenCalledWith(1, 7, {
+          titel: 'Lageplan',
+          kategorie: 'lagekarte_plan',
+          bezug_typ: 'etb_eintrag',
+          bezug_id: 7,
+        }),
+      );
+    });
+
+    it('findet die bloße Nummer ebenso', async () => {
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), '412');
+      await waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
+    });
+
+    it('sucht einen Volltext-Begriff am Server und zeigt den gewählten Treffer danach weiter', async () => {
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      const feld = within(d).getByRole('combobox', { name: 'Bezug' });
+      await userEvent.type(feld, 'Deichbruch');
+      await waitFor(() =>
+        expect(etbAnfragen.some((qs) => qs.get('q') === 'Deichbruch')).toBe(true),
+      );
+      await waehleOption('ETB 3 · Deichbruch gemeldet');
+
+      // Nach der Wahl gilt wieder das jüngste Fenster, in dem der Eintrag nicht steht.
+      await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
+      await act(() => new Promise((r) => setTimeout(r, 400)));
+      expect(selectWert(d, 'Bezug')).toBe('ETB 3 · Deichbruch gemeldet');
+    });
+
+    it('friert die offene Liste ein: ein neuer ETB-Eintrag springt nicht unter den Cursor', async () => {
+      const { client } = rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      const vorher = optionsLabels();
+
+      etbFenster = [eintrag(10, 13, 'Neue Meldung'), ...etbFenster];
+      await client.invalidateQueries({ queryKey: einsatzKeys.etb(1) });
+      await waitFor(() =>
+        expect(
+          client
+            .getQueriesData<EtbStub[]>({ queryKey: einsatzKeys.etb(1) })
+            .some(([, daten]) => daten?.some((e) => e.lfd_nr === 13)),
+        ).toBe(true),
+      );
+      await neuGezeichnet();
+      expect(optionsLabels()).toEqual(vorher);
+    });
+
+    it('ein Suchbegriff blendet den ergänzten aktuellen Bezug aus, wenn er nicht passt', async () => {
+      rendere({
+        ...lageplan,
+        bezug_abschnitt_id: undefined,
+        bezug_abschnitt_name: undefined,
+        bezug_etb_eintrag_id: 55,
+        bezug_etb_lfd_nr: 3,
+      });
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      expect(optionsLabels()).toContain('ETB 3');
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Nord');
+      await waitFor(() => expect(optionsLabels()).toEqual(['EA Nord']));
+    });
   });
 
   it('Struktur statt Tastendruck: Absende-Knopf im <form>, keine Modal-Fußzeile', async () => {

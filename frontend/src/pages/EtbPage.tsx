@@ -31,6 +31,7 @@ import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
+import { useStandardRufname } from '../etb/useStandardRufname';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
 import { useEntwurfsVersand } from '../etb/entwuerfe/useEntwurfsVersand';
@@ -222,6 +223,11 @@ export default function EtbPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
+  /**
+   * Standard-Rufname für Von/An (LFH-894): einmal je Seite, Entwurfs-Reiter und Berichtigung
+   * teilen ihn. Das Fach liest nur die angemeldete Person.
+   */
+  const rufname = useStandardRufname();
   /**
    * Der Schalter „Werte behalten" liegt hier, nicht in `EtbEntwurfsTabs`: die Berichtigung rendert
    * eine eigene `Schnellerfassung` statt der Tabs, der Container verschwindet dabei. Läge der
@@ -487,6 +493,7 @@ export default function EtbPage() {
           onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
           bausteine={bausteineQuery.data ?? []}
           einsatz={einsatz}
+          rufname={rufname}
         />
       ) : (
         <EtbEntwurfsTabs
@@ -495,7 +502,7 @@ export default function EtbPage() {
           erfassen={erfassenMitMeldung}
           bausteine={bausteineQuery.data ?? []}
           einsatz={einsatz}
-          kontextLaedt={einsatzQuery.isFetching}
+          rufname={rufname}
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={setWerteBehalten}
           onSendetChange={setEntwurfSendet}

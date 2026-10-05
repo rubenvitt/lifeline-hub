@@ -58,7 +58,12 @@ for (const modus of ['light', 'dark'] as const) {
       '| --- | --- |',
       '| Nord | ruhig |',
     ].join('\n');
-    await post(page, `/api/einsaetze/${einsatzId}/etb`, { typ: 'meldung', inhalt });
+    await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+      typ: 'meldung',
+      inhalt,
+      von: 'ELW 1',
+      an: 'Leitstelle',
+    });
 
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     const zeile = page.locator('[data-testid="etb-ereigniszeile"]').filter({ hasText: 'Zufahrt' });

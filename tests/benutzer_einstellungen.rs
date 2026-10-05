@@ -292,6 +292,35 @@ async fn zwei_benutzer_sehen_einander_nicht() {
     );
 }
 
+/// LFH-894: Der Standard-Rufname des ETB ist ein bekannter Schlüssel; er hängt an der Person,
+/// eine zweite sieht ihn nicht.
+#[tokio::test]
+async fn etb_standard_rufname_ist_ein_eigenes_fach_je_person() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "berta", "fuehrungskraft").await;
+    let berta = login_cookie(&app, "berta", "bertapw1").await;
+    let pfad = "/api/benutzer-einstellungen/etb_standard_rufname";
+
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        pfad,
+        &admin,
+        Some(r#"{"wert":"{\"von\":\"ELW 1\",\"an\":\"ELW 1\"}"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    let (_, get_json) = anfrage(&app, "GET", PFAD, &admin, None).await;
+    assert_eq!(
+        get_json["eintraege"]["etb_standard_rufname"],
+        Value::String(r#"{"von":"ELW 1","an":"ELW 1"}"#.into())
+    );
+
+    let (_, berta_json) = anfrage(&app, "GET", PFAD, &berta, None).await;
+    assert_eq!(berta_json["eintraege"], serde_json::json!({}));
+}
+
 // ── Cascade ─────────────────────────────────────────────────────────────────
 
 #[tokio::test]

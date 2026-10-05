@@ -6,10 +6,10 @@ import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
 import Schnellerfassung, { nurUebernahme, VERSAND_RUHE, type Versand } from '../Schnellerfassung';
 import type { MetadatenWerte } from '../schnellerfassungModell';
 import { entwurfLabel, zuWerte } from './entwurfModell';
+import type { StandardRufnameZugriff } from '../useStandardRufname';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
 import { useEntwurfsVersand, type EntwurfsVersand } from './useEntwurfsVersand';
-import { anVorbelegung } from '../../fuehrung/funktionsOptionenKern';
 import { IconKreuz } from '../../icons';
 import { useAuth } from '../../auth/AuthContext';
 
@@ -18,8 +18,8 @@ interface EtbEntwurfsTabsProps {
   erfassen: (e: NeuerEintrag) => Promise<void>;
   bausteine: EtbBaustein[];
   einsatz: EinsatzAnzeige;
-  /** Eine laufende Detail-Abfrage muss vor der ersten Vorbelegung ankommen. */
-  kontextLaedt?: boolean;
+  /** Standard-Rufname der Person (LFH-894), an jede Schnellerfassung durchgereicht. */
+  rufname: StandardRufnameZugriff;
   /** Zustand des Schalters „Werte behalten". Liegt beim Aufrufer — s. Kommentar unten. */
   werteBehalten: boolean;
   onWerteBehaltenChange: (b: boolean) => void;
@@ -64,7 +64,7 @@ export default function EtbEntwurfsTabs({
   erfassen,
   bausteine,
   einsatz,
-  kontextLaedt = false,
+  rufname,
   werteBehalten,
   onWerteBehaltenChange,
   onSendetChange,
@@ -82,7 +82,7 @@ export default function EtbEntwurfsTabs({
     entwurfFesthalten,
     entwurfNeuAusweisen,
     aktivenSetzen,
-  } = useEtbEntwuerfe(benutzerId, einsatzId, anVorbelegung(einsatz), kontextLaedt);
+  } = useEtbEntwuerfe(benutzerId, einsatzId);
 
   /**
    * Wertübernahme über die Remount-Grenze (LFH-332).
@@ -202,6 +202,7 @@ export default function EtbEntwurfsTabs({
           onBerichtigungAbbrechen={() => {}}
           bausteine={bausteine}
           einsatz={einsatz}
+          rufname={rufname}
           initialWerte={zuWerte(e)}
           // Mit Dateien bleibt auch ein geleerter Entwurf gespeichert (LFH-748, D2).
           onWerteChange={(w) =>

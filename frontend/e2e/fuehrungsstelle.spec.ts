@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { einsatzdatenPfad, etbPfad } from '../src/routing/deeplinks';
+import { benutzerAnlegen, wechsleZu } from './rollen-kern';
 
 for (const breite of [1280, 390]) {
-  test(`LFH-461: Führungsstelle pflegen und ETB-Entwurf respektieren (${breite}px)`, async ({
+  test(`Führungsstelle pflegen; im ETB nur Vorschlag des Rufnamens (${breite}px)`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: breite, height: 900 });
@@ -43,61 +44,38 @@ for (const breite of [1280, 390]) {
       path: testInfo.outputPath('fuehrungsstelle-pflegen.png'),
       animations: 'disabled',
     });
-    // Der Detail-Refetch nach dem Speichern kommt erst an, nachdem über die SPA-Navigation das
-    // ETB mit seinem alten Cache geöffnet ist.
-    let freigeben!: () => void;
-    const antwort = new Promise<void>((resolve) => {
-      freigeben = resolve;
-    });
-    let angefragt!: () => void;
-    const anfrage = new Promise<void>((resolve) => {
-      angefragt = resolve;
-    });
-    const detailRoute = `**/api/einsaetze/${a}`;
-    await page.route(detailRoute, async (route) => {
-      angefragt();
-      await antwort;
-      await route.continue();
-    });
-    try {
-      await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
-      await expect(dialog).not.toBeVisible();
-      await expect(
-        page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` }),
-      ).toHaveText('Florian A');
-      await anfrage;
-      if (breite < 992)
-        await page.getByRole('button', { name: 'Navigation öffnen', exact: true }).click();
-      await page.getByRole('button', { name: 'Erfassung', exact: true }).click();
-      await page.getByRole('button', { name: 'ETB', exact: true }).click();
-      await expect(page).toHaveURL(etbPfad(a));
-      await expect(page.getByLabel('ETB-Entwürfe werden geladen')).toBeVisible();
-      await expect(page.getByPlaceholder('Inhalt …')).toHaveCount(0);
-    } finally {
-      freigeben();
-    }
+    await dialog.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: `Führungsstelle für ${ich.anzeigename} bearbeiten` }),
+    ).toHaveText('Florian A');
 
-    await expect(page.getByText('An: Florian A', { exact: true })).toBeVisible();
-    await page.unroute(detailRoute);
-    await page.getByPlaceholder('Inhalt …').fill('Entwurf ohne Empfänger');
-    await page.getByRole('button', { name: 'Aktionen zu An', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'Entfernen', exact: true }).click();
-    await expect(page.getByText('An: Florian A', { exact: true })).not.toBeVisible();
-    // Ein echter Context-Refetch darf die Entfernung nicht rückgängig machen.
-    const geaendert = await page.request.put(`/api/einsaetze/${a}/mitglieder/${ich.id}`, {
-      data: { einsatz_rolle: 'einsatzleitung', fuehrungsstelle: 'Neue Leitung A' },
-    });
-    expect(geaendert.ok()).toBeTruthy();
-    await page.reload();
-    await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('Entwurf ohne Empfänger');
-    await expect(page.getByRole('button', { name: 'Aktionen zu An', exact: true })).toHaveCount(0);
+    // Seit LFH-894 belegt die Führungsstelle kein „An“ mehr vor: es gilt der Standard-Rufname
+    // (für den Admin gesetzt in `globale-vorbereitung.ts`).
+    if (breite < 992)
+      await page.getByRole('button', { name: 'Navigation öffnen', exact: true }).click();
+    await page.getByRole('button', { name: 'Erfassung', exact: true }).click();
+    await page.getByRole('button', { name: 'ETB', exact: true }).click();
+    await expect(page).toHaveURL(etbPfad(a));
+    await expect(page.getByText('An: ELW 1', { exact: true })).toBeVisible();
+    await expect(page.getByText('An: Florian A', { exact: true })).toHaveCount(0);
     await page.screenshot({
-      path: testInfo.outputPath('etb-entwurf-ohne-an.png'),
+      path: testInfo.outputPath('etb-an-aus-standard.png'),
       animations: 'disabled',
     });
 
+    // Ohne Standard ist die Führungsstelle der erste Vorschlag der Rufname-Abfrage.
+    const konto = await benutzerAnlegen(page, 'fuehrungspersonal');
+    const eingetragen = await page.request.put(`/api/einsaetze/${b}/mitglieder/${konto.id}`, {
+      data: { einsatz_rolle: 'fuehrungspersonal', fuehrungsstelle: 'Florian B' },
+    });
+    expect(eingetragen.ok(), await eingetragen.text()).toBeTruthy();
+    await wechsleZu(page, konto);
     await page.goto(etbPfad(b));
-    await expect(page.getByPlaceholder('Inhalt …')).toBeVisible();
+    const abfrage = page.getByRole('group', { name: 'Mit welchem Rufnamen schreibst du ins ETB?' });
+    await expect(
+      abfrage.getByRole('combobox', { name: 'Rufname für Von und An', exact: true }),
+    ).toHaveValue('Florian B');
     await expect(page.getByRole('button', { name: 'Aktionen zu An', exact: true })).toHaveCount(0);
   });
 }

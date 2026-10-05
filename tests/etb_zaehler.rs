@@ -29,7 +29,7 @@ async fn typ_erfassen(app: &axum::Router, cookie: &str, einsatz: i64, typ: &str,
         app,
         cookie,
         einsatz,
-        &format!(r#"{{"typ":"{typ}","inhalt":"{inhalt}"}}"#),
+        &format!(r#"{{"von":"ELW 1","an":"ELW 1","typ":"{typ}","inhalt":"{inhalt}"}}"#),
     )
     .await;
 }
@@ -172,28 +172,28 @@ async fn zaehlung_folgt_jedem_filter_wie_die_liste() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Deich bricht","ereigniszeit":"2026-05-23T08:00:00Z"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich bricht","ereigniszeit":"2026-05-23T08:00:00Z"}"#,
     )
     .await;
     erfassen(
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"anordnung","inhalt":"Deich sichern","ereigniszeit":"2026-05-23T12:00:00Z"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"anordnung","inhalt":"Deich sichern","ereigniszeit":"2026-05-23T12:00:00Z"}"#,
     )
     .await;
     erfassen(
         &app,
         &karl,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Pegel steigt","ereigniszeit":"2026-05-23T18:00:00Z"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Pegel steigt","ereigniszeit":"2026-05-23T18:00:00Z"}"#,
     )
     .await;
     erfassen(
         &app,
         &karl,
         einsatz,
-        r#"{"typ":"lage","inhalt":"Lage stabil","ereigniszeit":"2026-05-24T09:00:00Z"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"lage","inhalt":"Lage stabil","ereigniszeit":"2026-05-24T09:00:00Z"}"#,
     )
     .await;
 
@@ -268,10 +268,10 @@ async fn einheitenfilter_zaehlt_wie_die_liste() {
     .await;
     assert_eq!(status, StatusCode::CREATED, "auftrag: {v:?}");
     for body in [
-        r#"{"typ":"meldung","inhalt":"von-treffer","von":" 1. zug "}"#,
-        r#"{"typ":"lage","inhalt":"an-treffer","an":"1. Zug"}"#,
-        r#"{"typ":"meldung","inhalt":"andere","von":"2. Zug"}"#,
-        r#"{"typ":"meldung","inhalt":"nur im Text: 1. Zug"}"#,
+        r#"{"an":"ELW 1","typ":"meldung","inhalt":"von-treffer","von":" 1. zug "}"#,
+        r#"{"von":"ELW 1","typ":"lage","inhalt":"an-treffer","an":"1. Zug"}"#,
+        r#"{"an":"ELW 1","typ":"meldung","inhalt":"andere","von":"2. Zug"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"nur im Text: 1. Zug"}"#,
     ] {
         erfassen(&app, &admin, einsatz, body).await;
     }

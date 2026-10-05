@@ -8,14 +8,10 @@ import type { NeuerEintrag } from '../../api/etb';
 import type { EtbBaustein } from '../../api/types';
 import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import {
-  aktivSchluessel,
-  entwuerfeLaden,
-  entwuerfeLeerenFuerTests,
-  entwurfSpeichern,
-} from './entwurfStore';
+import { entwuerfeLaden, entwuerfeLeerenFuerTests } from './entwurfStore';
 import EtbEntwurfsTabs, { entfernenStil } from './EtbEntwurfsTabs';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
+import { rufnameZugriff } from '../../test/standardRufname';
 
 const einsatz = einsatzFixture({ id: 7, bezeichnung: 'Test' });
 /** Angemeldete Person (LFH-767): Die Reiter zeigen nur ihre Entwürfe. */
@@ -39,6 +35,7 @@ function props(over: Partial<React.ComponentProps<typeof EtbEntwurfsTabs>> = {})
     einsatz,
     werteBehalten: true,
     onWerteBehaltenChange: vi.fn(),
+    rufname: rufnameZugriff(),
     ...over,
   };
 }
@@ -53,90 +50,40 @@ function MitSchalter(p: React.ComponentProps<typeof EtbEntwurfsTabs>) {
 }
 
 describe('EtbEntwurfsTabs', () => {
-  it('LFH-461: Folgeentwurf ohne Werte behalten bleibt auch nach Remount ohne An', async () => {
+  it('LFH-894: der Standard-Rufname überlebt Absenden und Remount, ohne im Entwurf zu stehen', async () => {
     const p = props({
       einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
       werteBehalten: false,
     });
     const ersteAnsicht = renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
+    expect(await screen.findByText('Von: ELW 1')).toBeInTheDocument();
+    // Die Führungsstelle belegt nichts mehr vor (design.md D3).
+    expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'ELW 1',
+      an: 'ELW 1',
+    });
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-    await waitFor(async () => expect((await entwuerfeLaden(ich.id, 7))[0]?.inhalt).toBe(''));
+    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
+    // Ein Entwurf nur mit dem Standard ist leer und wird nicht gespeichert (design.md D2).
+    await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
     ersteAnsicht.unmount();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('');
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+    expect(await screen.findByText('Von: ELW 1')).toBeInTheDocument();
+    expect(screen.getByText('An: ELW 1')).toBeInTheDocument();
   });
 
-  it('LFH-461: nur den Standard-Chip entfernen überlebt auch den vollständigen Remount', async () => {
-    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' } });
-    const ersteAnsicht = renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
-    await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(1));
-    ersteAnsicht.unmount();
-    renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('');
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-  });
-
-  it('LFH-461: echte Tabs belegen nur anfangs vor; Entfernen überlebt Tabwechsel und Kontext-Refetch', async () => {
-    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' } });
+  it('LFH-894: ein geänderter Standard erreicht einen offenen Entwurf', async () => {
+    const p = props();
     const { rerender } = renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
-    const ersterTab = screen.getAllByRole('tab')[0];
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
-    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-    await userEvent.click(ersterTab);
-    rerender(
-      <EtbEntwurfsTabs
-        {...p}
-        einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Andere Leitung' }}
-      />,
-    );
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-  });
-
-  it.each([true, false])(
-    'LFH-461: nach Absenden entscheidet Werte behalten (%s)',
-    async (behalten) => {
-      const p = props({
-        einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
-        werteBehalten: behalten,
-      });
-      renderMitProviders(<EtbEntwurfsTabs {...p} />);
-      expect(await screen.findByText('An: Florian Leitung')).toBeInTheDocument();
-      await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Erste Meldung{Enter}');
-      await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-      if (behalten) expect(screen.getByText('An: Florian Leitung')).toBeInTheDocument();
-      else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-    },
-  );
-
-  it('LFH-461: Wertübernahme befüllt keinen bereits vorhandenen Entwurf mit bewusst leerem An', async () => {
-    const basis = {
-      benutzer_id: ich.id,
-      einsatz_id: 7,
-      typ: 'meldung' as const,
-      erstellt_at: '2026-06-22T10:00:00Z',
-      geaendert_at: '2026-06-22T10:00:00Z',
-    };
-    await entwurfSpeichern({ ...basis, id: 'a', inhalt: 'Erster', an: 'Florian Leitung' });
-    await entwurfSpeichern({ ...basis, id: 'b', inhalt: 'Zweiter' });
-    localStorage.setItem(aktivSchluessel(ich.id, 7), 'a');
-    renderMitProviders(
-      <EtbEntwurfsTabs
-        {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Standard' } })}
-      />,
-    );
-    expect(await screen.findByDisplayValue('Erster')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-    expect(await screen.findByDisplayValue('Zweiter')).toBeInTheDocument();
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Halb fertig');
+    expect(screen.getByText('An: ELW 1')).toBeInTheDocument();
+    rerender(<EtbEntwurfsTabs {...p} rufname={rufnameZugriff({ von: 'ELW 2', an: 'S2' })} />);
+    expect(await screen.findByText('Von: ELW 2')).toBeInTheDocument();
+    expect(screen.getByText('An: S2')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Halb fertig');
   });
 
   it('öffnet mit einem leeren Entwurf-Tab und Eingabefeld', async () => {
@@ -219,9 +166,10 @@ describe('EtbEntwurfsTabs', () => {
 
   async function setzeAnUndMeldeweg(feld: HTMLElement) {
     await userEvent.type(feld, ' /an');
-    await userEvent.click(await screen.findByText('An'));
+    // An trägt schon den Standard-Rufnamen (Haken im Menü, Wert im Editor, LFH-894).
+    await userEvent.click(await screen.findByText('An ✓'));
     // Eingefügt statt getippt (LFH-672, Begründung im Test unten); Enter bestätigt wie getippt.
-    await userEvent.click(await screen.findByLabelText('An'));
+    await userEvent.clear(await screen.findByLabelText('An'));
     await userEvent.paste('Florian 1');
     await userEvent.keyboard('{Enter}');
     await userEvent.type(feld, ' /meldeweg');
@@ -296,6 +244,8 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
     expect(screen.queryByText('An: Florian 1')).toBeNull();
     expect(screen.queryByText('Meldeweg: Funk')).toBeNull();
+    // Verworfen wird der eigene Wert; An fällt auf den Standard-Rufnamen zurück (LFH-894).
+    expect(screen.getByText('An: ELW 1')).toBeInTheDocument();
     // Der Schalterzustand selbst überlebt den Remount ebenfalls.
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });

@@ -15,6 +15,7 @@ import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { einsatzKeys } from '../api/queryKeys';
 import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
 import { useLocation } from 'react-router';
+import { rufnameZugriff } from '../test/standardRufname';
 import dayjs from 'dayjs';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 
@@ -63,6 +64,7 @@ function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}
     onBerichtigungAbbrechen: vi.fn(),
     bausteine: [] as EtbBaustein[],
     einsatz,
+    rufname: rufnameZugriff(),
     ...over,
   };
 }
@@ -99,40 +101,37 @@ describe('TextAreaRef – Caret-Pfad', () => {
 // ---------------------------------------------------------------------------
 
 describe('Schnellerfassung', () => {
-  it('LFH-461: belegt An einmalig vor und setzt einen entfernten Chip bei Refetch nicht zurück', async () => {
-    const p = props({ einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' } });
-    const { rerender } = renderMitProviders(<Schnellerfassung {...p} />);
-    expect(screen.getByText('An: Florian Leitung')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Entfernen/ }));
-    rerender(
-      <Schnellerfassung {...p} einsatz={{ ...p.einsatz, meine_fuehrungsstelle: 'Neue Leitung' }} />,
-    );
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+  it('LFH-894: Von und An kommen aus dem Standard-Rufnamen, nicht aus der Führungsstelle', async () => {
+    const p = props({
+      einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
+      rufname: rufnameZugriff({ von: 'ELW 1', an: 'Einsatzleitung' }),
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
+    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
+    expect(screen.getByText('An: Einsatzleitung')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lage ruhig{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'ELW 1',
+      an: 'Einsatzleitung',
+    });
   });
 
-  it.each(['Eigener Empfänger', undefined])(
-    'LFH-461: vorhandener Entwurf gewinnt auch mit leerem An (%s)',
-    (an) => {
-      renderMitProviders(
-        <Schnellerfassung
-          {...props({
-            einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
-            initialWerte: { inhalt: 'Entwurf', typ: 'meldung', metadaten: { an } },
-          })}
-        />,
-      );
-      expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
-      if (an) expect(screen.getByText('An: Eigener Empfänger')).toBeInTheDocument();
-      else expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
-    },
-  );
-
-  it.each([undefined, null, '   '])('LFH-461: ohne gesetzte Stelle kein An-Chip (%s)', (stelle) => {
+  it('LFH-894: ein Entwurf mit eigenem An schlägt den Standard nur auf dieser Seite', () => {
     renderMitProviders(
-      <Schnellerfassung {...props({ einsatz: { ...einsatz, meine_fuehrungsstelle: stelle } })} />,
+      <Schnellerfassung
+        {...props({
+          initialWerte: {
+            inhalt: 'Entwurf',
+            typ: 'meldung',
+            metadaten: { an: 'Eigener Empfänger' },
+          },
+        })}
+      />,
     );
-    expect(screen.queryByText(/^An:/)).not.toBeInTheDocument();
+    expect(screen.getByText('An: Eigener Empfänger')).toBeInTheDocument();
+    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
   });
 
   it('Enter sendet typ=meldung mit Inhalt; Feld danach leer', async () => {
@@ -323,13 +322,16 @@ describe('Schnellerfassung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage /von');
-    await userEvent.click(await screen.findByText('Von'));
+    // Der Standard füllt Von schon: der Menüeintrag trägt den Haken, der Editor den Wert.
+    await userEvent.click(await screen.findByText('Von ✓'));
     const chipInput = await screen.findByLabelText('Von');
-    await userEvent.type(chipInput, 'ELW 1{Enter}');
+    await userEvent.clear(chipInput);
+    await userEvent.type(chipInput, 'Florian 2{Enter}');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
-      von: 'ELW 1',
+      von: 'Florian 2',
+      an: 'ELW 1',
     });
   });
 
@@ -344,8 +346,9 @@ describe('Schnellerfassung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage /von');
-    await userEvent.click(await screen.findByText('Von'));
+    await userEvent.click(await screen.findByText('Von ✓'));
     const chip = await screen.findByRole('combobox', { name: 'Von' });
+    await userEvent.clear(chip);
     await userEvent.type(chip, 'Florian');
     // Klick auf den Vorschlag committet sofort via AutoComplete onSelect → onCommit.
     const vorschlag = await screen.findByText(
@@ -373,8 +376,9 @@ describe('Schnellerfassung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage /an');
-    await userEvent.click(await screen.findByText('An'));
+    await userEvent.click(await screen.findByText('An ✓'));
     const chip = await screen.findByRole('combobox', { name: 'An' });
+    await userEvent.clear(chip);
     await userEvent.type(chip, 'Florian');
     // Klick auf den Vorschlag committet sofort via AutoComplete onSelect → onCommit.
     const vorschlag = await screen.findByText(
@@ -443,7 +447,7 @@ describe('Schnellerfassung', () => {
     // Weg 2 — über „/" im Text.
     await nutzer.type(feld, '/');
     expect(await screen.findByTestId('slash-menu')).toBeInTheDocument();
-    await nutzer.click(await screen.findByText('Von'));
+    await nutzer.click(await screen.findByText('Von ✓'));
     await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
   });
 
@@ -503,14 +507,17 @@ describe('Schnellerfassung', () => {
     await userEvent.type(feld, 'Korrektur /von');
     // Bausteine dürfen NICHT erscheinen
     expect(screen.queryByText('Lagemeldung')).toBeNull();
-    await userEvent.click(await screen.findByText('Von'));
-    await userEvent.type(await screen.findByLabelText('Von'), 'ELW 1{Enter}');
+    await userEvent.click(await screen.findByText('Von ✓'));
+    const chipInput = await screen.findByLabelText('Von');
+    await userEvent.clear(chipInput);
+    await userEvent.type(chipInput, 'Florian 2{Enter}');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
       typ: 'berichtigung',
       berichtigt_eintrag_id: 5,
-      von: 'ELW 1',
+      von: 'Florian 2',
+      an: 'ELW 1',
     });
   });
 
@@ -598,8 +605,11 @@ describe('Schnellerfassung', () => {
 describe('Schnellerfassung – Wertübernahme', () => {
   async function setzeTextfeld(feld: HTMLElement, trigger: string, label: string, wert: string) {
     await userEvent.type(feld, ` /${trigger}`);
-    await userEvent.click(await screen.findByText(label));
-    await userEvent.type(await screen.findByLabelText(label), `${wert}{Enter}`);
+    // Von/An trägt der Standard schon (Haken im Menü, Wert im Editor).
+    await userEvent.click(await screen.findByText(new RegExp(`^${label}( ✓)?$`)));
+    const eingabe = await screen.findByLabelText(label);
+    await userEvent.clear(eingabe);
+    await userEvent.type(eingabe, `${wert}{Enter}`);
   }
 
   it('zeigt den Schalter nicht, wenn kein Aufrufer den Zustand führt', () => {
@@ -633,17 +643,17 @@ describe('Schnellerfassung – Wertübernahme', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage');
-    await setzeTextfeld(feld, 'von', 'Von', 'ELW 1');
+    await setzeTextfeld(feld, 'von', 'Von', 'Florian 2');
     await setzeTextfeld(feld, 'veranlassung', 'Veranlassung', 'Nachforderung');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
-      von: 'ELW 1',
+      von: 'Florian 2',
       veranlassung: 'Nachforderung',
     });
     expect(feld).toHaveValue('');
     // Von überlebt (Wiederholfeld), Veranlassung nicht (je Eintrag verschieden).
-    expect(await screen.findByText('Von: ELW 1')).toBeInTheDocument();
+    expect(await screen.findByText('Von: Florian 2')).toBeInTheDocument();
     expect(screen.queryByText('Veranlassung: Nachforderung')).toBeNull();
   });
 
@@ -652,11 +662,13 @@ describe('Schnellerfassung – Wertübernahme', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage');
-    await setzeTextfeld(feld, 'von', 'Von', 'ELW 1');
+    await setzeTextfeld(feld, 'von', 'Von', 'Florian 2');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(feld).toHaveValue(''));
-    expect(screen.queryByText('Von: ELW 1')).toBeNull();
+    // Verworfen wird nur der eigene Wert; der Standard-Rufname steht wieder da (LFH-894).
+    expect(screen.queryByText('Von: Florian 2')).toBeNull();
+    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
   });
 
   it('leert im Berichtigungsmodus alles, obwohl der Aufrufer den Schalter an hat', async () => {
@@ -668,11 +680,13 @@ describe('Schnellerfassung – Wertübernahme', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Korrektur');
-    await setzeTextfeld(feld, 'von', 'Von', 'ELW 1');
+    await setzeTextfeld(feld, 'von', 'Von', 'Florian 2');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(feld).toHaveValue(''));
-    expect(screen.queryByText('Von: ELW 1')).toBeNull();
+    // Verworfen wird nur der eigene Wert; der Standard-Rufname steht wieder da (LFH-894).
+    expect(screen.queryByText('Von: Florian 2')).toBeNull();
+    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
   });
 });
 
@@ -852,6 +866,123 @@ describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
     expect(zeile.scrollLeft).toBe(140);
     expect(rollen).not.toHaveBeenCalled();
     rollen.mockRestore();
+  });
+});
+
+describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', () => {
+  it('ohne Standard steht die Abfrage über der Zeile, und die Pflicht hält das Absenden auf', async () => {
+    const p = props({ rufname: rufnameZugriff(null) });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(
+      screen.getByRole('group', { name: 'Mit welchem Rufnamen schreibst du ins ETB?' }),
+    ).toBeInTheDocument();
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pegel steigt{Enter}');
+    expect(
+      await screen.findByText('Von fehlt: Rufname oben festlegen oder /von setzen.'),
+    ).toBeVisible();
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('Pegel steigt');
+  });
+
+  it('ein fehlendes An hält auf, auch wenn Von per Eintrag gesetzt ist', async () => {
+    const p = props({
+      rufname: rufnameZugriff(null),
+      initialWerte: { inhalt: 'Lage', typ: 'meldung', metadaten: { von: 'Florian 1' } },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
+    expect(await screen.findByText(/^An fehlt/)).toBeInTheDocument();
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('übernimmt den Rufnamen aus der Abfrage über den Zugriff', async () => {
+    const rufname = rufnameZugriff(null);
+    renderMitProviders(<Schnellerfassung {...props({ rufname })} />);
+    await userEvent.type(
+      screen.getByRole('combobox', { name: 'Rufname für Von und An' }),
+      'ELW 1{Enter}',
+    );
+    await waitFor(() => expect(rufname.setze).toHaveBeenCalledWith('{"von":"ELW 1","an":"ELW 1"}'));
+  });
+
+  it('fragt erst, wenn das Fach gelesen ist', () => {
+    renderMitProviders(
+      <Schnellerfassung {...props({ rufname: { ...rufnameZugriff(null), geladen: false } })} />,
+    );
+    expect(screen.queryByRole('group', { name: /Rufnamen/ })).toBeNull();
+  });
+
+  it('kennzeichnet Chips aus dem Standard und bietet für sie kein Entfernen an', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: { an: 'S2' } } })}
+      />,
+    );
+    const von = screen.getByText('Von: ELW 1').closest('[data-standard]');
+    expect(von).toHaveAttribute('data-standard', 'ja');
+    expect(von).toHaveAttribute('title', expect.stringMatching(/^Standard-Rufname/));
+    // Der eigene Wert dieses Eintrags ist kein Standard.
+    expect(screen.getByText('An: S2').closest('[data-standard]')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Nur für diesen Eintrag ändern' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Standard-Rufname ändern' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Entfernen/ })).toBeNull();
+  });
+
+  it('„Standard-Rufname ändern“ im Chip-Menü öffnet die Abfrage mit Abbrechen', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu An' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Standard-Rufname ändern' }));
+    const abfrage = screen.getByRole('group', { name: 'Dein Rufname für Von und An' });
+    expect(abfrage).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
+  });
+
+  it('in der Berichtigung bietet das Chip-Menü keinen Standardwechsel', async () => {
+    renderMitProviders(<Schnellerfassung {...props({ berichtigungZu: original() })} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Nur für diesen Eintrag ändern' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Standard-Rufname ändern' })).toBeNull();
+  });
+
+  // Ohne offenes Chip-Menü: es holt sich per `autoFocus` den Fokus und riss unter CI-Last das
+  // Tippen nach zwei Zeichen aus dem Feld.
+  it('in der Berichtigung wird nicht gefragt, der Standard gilt trotzdem', async () => {
+    const p = props({ berichtigungZu: original() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Korrektur{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'berichtigung',
+      von: 'ELW 1',
+      an: 'ELW 1',
+    });
+  });
+
+  it('@ überschreibt nur die eine Seite dieses Eintrags', async () => {
+    const p = props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/anordnung Sandsäcke @EA-Süd');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'ELW 1',
+      an: 'EA-Süd',
+    });
+    // Der nächste Eintrag geht wieder an den Standard.
+    await waitFor(() => expect(screen.getByText('An: ELW 1')).toBeInTheDocument());
   });
 });
 

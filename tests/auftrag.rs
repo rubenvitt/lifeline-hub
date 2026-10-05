@@ -54,11 +54,16 @@ async fn anlegen_erzeugt_auftrag_und_etb_anordnung() {
         None,
     )
     .await;
-    assert!(etb
+    let anordnung = etb
         .as_array()
         .unwrap()
         .iter()
-        .any(|x| x["typ"] == "anordnung"));
+        .find(|x| x["typ"] == "anordnung")
+        .expect("ETB-Anordnung steht im ETB");
+    // LFH-894: der Kopplungspfad kennt den Empfänger, nicht den Absender — An bleibt, Von wird
+    // die Systemkennung.
+    assert_eq!(anordnung["von"], "System");
+    assert_eq!(anordnung["an"], "Abschnitt Nord");
 }
 
 #[tokio::test]

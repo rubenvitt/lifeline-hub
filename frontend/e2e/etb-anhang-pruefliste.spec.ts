@@ -44,7 +44,13 @@ async function saeen(page: Page, modus: string): Promise<number> {
   expect(upload.ok(), `Upload: ${upload.status()}`).toBeTruthy();
   const [{ id: anhang }] = (await upload.json()) as { id: number }[];
   const eintrag = await page.request.post(`/api/einsaetze/${id}/etb`, {
-    data: { typ: 'meldung', inhalt: 'Foto der Schadenstelle', anhang_ids: [anhang] },
+    data: {
+      typ: 'meldung',
+      von: 'ELW 1',
+      an: 'Leitstelle',
+      inhalt: 'Foto der Schadenstelle',
+      anhang_ids: [anhang],
+    },
   });
   expect(eintrag.ok()).toBeTruthy();
   return id;

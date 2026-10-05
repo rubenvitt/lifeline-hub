@@ -81,4 +81,28 @@ describe('bezugOptionen', () => {
     });
     expect(gruppen[1].options).toHaveLength(1);
   });
+
+  it('filtert Abschnitte, Einheiten und den ergänzten Bezug am Suchbegriff, leere Gruppen fallen weg', () => {
+    const gruppen = bezugOptionen({
+      ...quellen,
+      etb: [],
+      aktuell: dokument({ bezug_etb_eintrag_id: 55, bezug_etb_lfd_nr: 3 }),
+      suche: ' nord ',
+    });
+    expect(gruppen).toEqual([
+      { label: 'Abschnitte', options: [{ value: 'abschnitt:3', label: 'EA Nord' }] },
+    ]);
+  });
+
+  it('behält den ergänzten Bezug, wenn der Suchbegriff zu seinem Label passt', () => {
+    const gruppen = bezugOptionen({
+      ...quellen,
+      etb: [],
+      aktuell: dokument({ bezug_etb_eintrag_id: 55, bezug_etb_lfd_nr: 3 }),
+      suche: 'ETB 3',
+    });
+    expect(gruppen).toEqual([
+      { label: 'ETB-Einträge', options: [{ value: 'etb_eintrag:55', label: 'ETB 3' }] },
+    ]);
+  });
 });

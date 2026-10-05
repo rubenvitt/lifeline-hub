@@ -184,7 +184,7 @@ async fn einsatzleitung_ohne_sachgebiet_heisst_einsatzleitung() {
         &app,
         &cookie,
         einsatz,
-        r#"{"typ":"entscheidung","inhalt":"Turnhalle Ost"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"entscheidung","inhalt":"Turnhalle Ost"}"#,
     )
     .await;
     assert_eq!(e["erfasser_funktion"], "EL");
@@ -201,7 +201,7 @@ async fn etb_snapshot_bleibt_bei_umbesetzung_stehen() {
         &app,
         &kraft,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"vorher"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"vorher"}"#,
     )
     .await;
     assert!(
@@ -214,7 +214,7 @@ async fn etb_snapshot_bleibt_bei_umbesetzung_stehen() {
         &app,
         &kraft,
         einsatz,
-        r#"{"typ":"lage","inhalt":"Pegel 6,84 m"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"lage","inhalt":"Pegel 6,84 m"}"#,
     )
     .await;
     assert_eq!(s2["erfasser_funktion"], "S2");
@@ -226,7 +226,7 @@ async fn etb_snapshot_bleibt_bei_umbesetzung_stehen() {
         &app,
         &kraft,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"nachher"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"nachher"}"#,
     )
     .await;
     assert_eq!(s3["erfasser_funktion"], "S3");
@@ -249,7 +249,7 @@ async fn snapshot_auch_auf_dem_client_id_weg() {
     let (einsatz, kraft, ep) = kraft_im_einsatz(&app, &admin).await;
     besetzen(&app, &admin, einsatz, "s1", ep).await;
 
-    let body = r#"{"typ":"meldung","inhalt":"offline","client_id":"6f1c2a9e-0000-4000-8000-000000000615"}"#;
+    let body = r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"offline","client_id":"6f1c2a9e-0000-4000-8000-000000000615"}"#;
     let erst = erfassen(&app, &kraft, einsatz, body).await;
     assert_eq!(erst["erfasser_funktion"], "S1");
 

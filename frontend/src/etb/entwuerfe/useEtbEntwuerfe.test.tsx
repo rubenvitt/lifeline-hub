@@ -33,48 +33,18 @@ afterEach(() => {
 });
 
 describe('useEtbEntwuerfe', () => {
-  it('LFH-461 Review: Kontextwechsel während IndexedDB lädt verwendet die aktuelle Stelle', async () => {
-    let freigeben!: (werte: EtbEntwurf[]) => void;
-    const laden = vi.spyOn(entwurfStore, 'entwuerfeLaden').mockReturnValueOnce(
-      new Promise<EtbEntwurf[]>((resolve) => {
-        freigeben = resolve;
-      }),
-    );
-    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(ICH, 7, stelle), {
-      initialProps: { stelle: 'Alter Cache' },
-    });
-    await waitFor(() => expect(laden).toHaveBeenCalledTimes(1));
-    rerender({ stelle: 'Neue Leitung' });
-    await waitFor(() => expect(result.current.entwuerfe[0]?.an).toBe('Neue Leitung'));
-    await act(async () => {
-      freigeben([]);
-    });
-    expect(result.current.entwuerfe).toHaveLength(1);
-    expect(result.current.entwuerfe[0].an).toBe('Neue Leitung');
-  });
-
-  it('LFH-461: nur der erste neue Entwurf bekommt die Stelle; Rerender und Folgeentwürfe nicht', async () => {
-    const { result, rerender } = renderHook(({ stelle }) => useEtbEntwuerfe(ICH, 7, stelle), {
-      initialProps: { stelle: 'Florian Leitung' },
-    });
-    await waitFor(() => expect(result.current.entwuerfe[0]?.an).toBe('Florian Leitung'));
-    const id = result.current.aktiverId!;
-    act(() =>
-      result.current.entwurfAktualisieren(id, { inhalt: 'Text', typ: 'meldung', metadaten: {} }),
-    );
-    rerender({ stelle: 'Andere Leitung' });
-    expect(result.current.entwuerfe[0].an).toBeUndefined();
-    await act(async () => {
-      await result.current.entwurfSchliessen(id);
-    });
+  it('LFH-894: ein neuer Entwurf trägt kein Von/An, der Standard kommt erst beim Anzeigen', async () => {
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    expect(result.current.entwuerfe[0].von).toBeUndefined();
     expect(result.current.entwuerfe[0].an).toBeUndefined();
   });
 
   it.each(['Eigener Empfänger', undefined])(
-    'LFH-461: geladener Entwurf bleibt maßgeblich (%s)',
+    'geladener Entwurf bleibt maßgeblich (%s)',
     async (an) => {
       await entwurfSpeichern(entwurf({ an }));
-      const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7, 'Florian Leitung'));
+      const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
       await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
       expect(result.current.entwuerfe[0].an).toBe(an);
     },

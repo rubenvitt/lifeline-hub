@@ -904,7 +904,9 @@ async fn admin_ohne_mitgliedschaft_darf_patchen_aber_kein_etb() {
                 .uri(format!("/api/einsaetze/{id}/etb"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin)
-                .body(Body::from(r#"{"typ":"meldung","inhalt":"Test"}"#))
+                .body(Body::from(
+                    r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Test"}"#,
+                ))
                 .unwrap(),
         )
         .await

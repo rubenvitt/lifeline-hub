@@ -168,6 +168,9 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     .getByRole('region', { name: 'Einsatztagebuch' })
     .getByTestId('etb-ereigniszeile');
   await expect(zeilen).toHaveCount(12);
+  // Ruhezustand erst mit stehender Erfassung: die Zeitachse kann vor ihr fertig sein, dann
+  // mäße „vorher" nur den Ladekreisel.
+  await expect(page.locator('.etb-erfassung-sticky').getByPlaceholder(/^Inhalt …/)).toBeVisible();
   await schriftenGeladen(page);
   await page.evaluate(() => window.scrollTo(0, 0));
 
@@ -193,9 +196,10 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     ['Veranlassung', 'Lage an die Leitstelle gemeldet'],
   ] as const) {
     await klickeWieEinMensch(page, leiste.getByRole('button', { name: 'Feld', exact: true }));
+    // Von und An trägt schon der Standard-Rufname (LFH-894): Haken im Menü, Wert im Editor.
     const option = page
       .locator('[data-slash-menu]')
-      .getByRole('option', { name: feld, exact: true });
+      .getByRole('option', { name: new RegExp(`^${feld}( ✓)?$`) });
     // Im Handschuh-Betrieb liegt eine Option im internen Bildlauf des Menüs. Gerollt wird NUR
     // das Menü (`scrollTop`); `scrollIntoView` rollte auch die Seite.
     await option.evaluate((el) => {
@@ -209,6 +213,7 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     // Die Anwendung fokussiert die Chip-Eingabe selbst; getippt wird per Tastatur, weil
     // `fill()` ebenfalls vorab ins Bild rollt.
     await expect(leiste.getByLabel(feld, { exact: true })).toBeFocused();
+    await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.type(wert);
     await page.keyboard.press('Enter');
     await expect(leiste.getByRole('button', { name: `Aktionen zu ${feld}` })).toBeVisible();

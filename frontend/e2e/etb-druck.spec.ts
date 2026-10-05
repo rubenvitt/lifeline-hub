@@ -70,18 +70,27 @@ async function saeen(page: Page, einsatzId: string): Promise<Saat> {
   for (let i = 0; i < SAAT; i += BUENDEL) {
     await Promise.all(
       Array.from({ length: Math.min(BUENDEL, SAAT - i) }, (_, j) =>
-        erfasse(page, einsatzId, { typ: 'meldung', inhalt: `Saatmeldung ${i + j + 1}` }),
+        erfasse(page, einsatzId, {
+          typ: 'meldung',
+          von: 'ELW 1',
+          an: 'Leitstelle',
+          inhalt: `Saatmeldung ${i + j + 1}`,
+        }),
       ),
     );
   }
   // Ein Nachtrag: Ereignis zwei Stunden vor der Erfassung.
   const nachtrag = await erfasse(page, einsatzId, {
     typ: 'meldung',
+    von: 'ELW 1',
+    an: 'Leitstelle',
     inhalt: 'Nachgetragene Meldung',
     ereigniszeit: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
   });
   const berichtigung = await erfasse(page, einsatzId, {
     typ: 'berichtigung',
+    von: 'ELW 1',
+    an: 'Leitstelle',
     inhalt: 'Berichtigung: Deich Süd, nicht Nord',
     berichtigt_eintrag_id: grund.id,
   });

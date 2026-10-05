@@ -12,10 +12,22 @@ import { teilwortSuche } from '../components/teilwortSuche';
 
 type Wert = string | dayjs.Dayjs | MeldeWeg | undefined;
 
-const CHIP_MENUE: readonly MenueEintrag<'bearbeiten' | 'entfernen'>[] = [
+type ChipAktion = 'bearbeiten' | 'entfernen' | 'standard';
+
+const CHIP_MENUE: readonly MenueEintrag<ChipAktion>[] = [
   { key: 'bearbeiten', label: 'Bearbeiten' },
   { key: 'entfernen', label: 'Entfernen', gefahr: true },
 ];
+/**
+ * Ein Chip aus dem Standard-Rufnamen (LFH-894) hat nichts zu entfernen; dafür führt sein Menü zum
+ * Standard selbst. Kein eigener Knopf in der Chip-Zeile: er bräche die Zeile im Handschuh-Betrieb
+ * um, und die Erfassungsleiste risse den Deckel (`e2e/leisten-flaeche.spec.ts`).
+ */
+const CHIP_MENUE_STANDARD: readonly MenueEintrag<ChipAktion>[] = [
+  { key: 'bearbeiten', label: 'Nur für diesen Eintrag ändern' },
+  { key: 'standard', label: 'Standard-Rufname ändern' },
+];
+const STANDARD_TITEL = 'Standard-Rufname: gilt für jeden neuen Eintrag, ändern nur für diesen';
 
 interface Props {
   feld: MetaFeld;
@@ -34,6 +46,14 @@ interface Props {
    * an (LFH-748). Er bleibt sichtbar stehen; nach einem Fehler geht es mit seinem Wert weiter.
    */
   gesperrt?: boolean;
+  /**
+   * Der Wert kommt aus dem Standard-Rufnamen, nicht aus diesem Eintrag (LFH-894): kein
+   * „Entfernen“ (es gäbe nichts zu entfernen, die Pflicht bliebe), ein Klick bearbeitet ihn für
+   * diesen Eintrag. Der Titel sagt, woher der Wert kommt.
+   */
+  ausStandard?: boolean;
+  /** Öffnet die Rufname-Abfrage; nur an Chips aus dem Standard. */
+  onStandardAendern?: () => void;
 }
 
 function feldDef(feld: MetaFeld) {
@@ -76,6 +96,8 @@ export default function MetaChip({
   onRemove,
   onEdit,
   gesperrt = false,
+  ausStandard = false,
+  onStandardAendern,
 }: Props) {
   const d = feldDef(feld);
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
@@ -173,7 +195,10 @@ export default function MetaChip({
   }
 
   return (
-    <Tag>
+    <Tag
+      title={ausStandard ? STANDARD_TITEL : undefined}
+      data-standard={ausStandard ? 'ja' : undefined}
+    >
       {/* Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip.
 
          Ein `onClick` am `<Tag>` machte jeden Nachfahren zum Auslöser, und das Menü-Overlay IST
@@ -194,12 +219,19 @@ export default function MetaChip({
       {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
          „Bearbeiten" daneben legt es wieder an (LFH-363). */}
       <MenueAusloeser
-        eintraege={CHIP_MENUE}
+        eintraege={
+          !ausStandard
+            ? CHIP_MENUE
+            : onStandardAendern
+              ? CHIP_MENUE_STANDARD
+              : CHIP_MENUE_STANDARD.filter((e) => e.key !== 'standard')
+        }
         zugaenglicherName={`Aktionen zu ${d.label}`}
         gesperrt={gesperrt}
         onWahl={(key) => {
           if (key === 'bearbeiten') onEdit(feld);
           if (key === 'entfernen') onRemove(feld);
+          if (key === 'standard') onStandardAendern?.();
         }}
       />
     </Tag>
