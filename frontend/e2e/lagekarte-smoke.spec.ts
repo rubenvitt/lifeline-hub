@@ -222,8 +222,8 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
 /**
  * Startansicht: ein verorteter Einsatz öffnet auf seinem Einsatzort. Im Browser, weil der
  * Fehler ein StrictMode-Fall war: der Start wurde auf der ersten, sofort entfernten Karte
- * verbraucht. Dazu: der Kartenfuß wächst mit ausgeklappter Zeitachse und einem gesicherten
- * Stand nicht über zwei Reihen.
+ * verbraucht. Dazu: die ausgeklappte Zeitachse steht mit einem gesicherten Stand in einer Reihe,
+ * und die Auswahl „Stand“ wechselt in den historischen Stand und zurück.
  */
 test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht zu', async ({
   page,
@@ -256,21 +256,35 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
     .toEqual({ zoom: 14, lat: expect.closeTo(ort.lat, 4), lon: expect.closeTo(ort.lon, 4) });
 
   const zeitachse = page.locator('[data-lfh="zeitachse"]');
-  await expect(zeitachse.getByRole('button', { name: 'Stand vor Ort' })).toBeVisible();
+  const auswahl = zeitachse.getByRole('combobox', { name: 'Stand' });
+  await expect(auswahl).toBeVisible();
   const band = (await zeitachse.boundingBox())!;
-  const zeile = (await page.getByRole('button', { name: 'Aktuell' }).boundingBox())!.height;
-  // Die Stand-Reihe steht in der ersten Reihe des Bands. Der Fuß endet vor der Knopfspalte,
-  // deshalb darf die Zeitleiste in eine zweite Reihe umbrechen; mehr als zwei wären ein Befund.
-  const staende = (await zeitachse.locator('[data-lfh="zeitachse-staende"]').boundingBox())!;
-  expect(
-    staende.y - band.y,
-    `die Stand-Reihe steht in der ersten Reihe des Bands (${staende.y - band.y}px unter der Oberkante)`,
-  ).toBeLessThan(zeile);
-  // Zwei Reihen = zwei Steuerhöhen plus Fuge (12 px) und Polsterung des Bands (2 × 8 px).
+  const zeile = (await zeitachse.getByRole('button', { name: 'Abspielen' }).boundingBox())!.height;
+  const polster = await zeitachse.evaluate((el) => {
+    const stil = getComputedStyle(el);
+    return parseFloat(stil.paddingTop) + parseFloat(stil.paddingBottom);
+  });
+  // LFH-899: im Fükw stehen beide Gruppen (Wiedergabe, Stand) in EINER Reihe.
   expect(
     band.height,
-    `Zeitachse ${band.height}px hoch bei ${zeile}px Zeilenhöhe — höchstens zwei Reihen`,
-  ).toBeLessThanOrEqual(zeile * 2 + 12 + 16 + 1);
+    `Zeitachse ${band.height}px hoch bei ${zeile}px Zeilenhöhe — eine Reihe`,
+  ).toBeLessThanOrEqual(zeile + polster + 1);
+
+  // Stand über die Auswahl wählen, dann über „Live“ zurück (LFH-899, D1).
+  await auswahl.click();
+  await page
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .getByTitle('Stand vor Ort', { exact: true })
+    .click();
+  await expect(page).toHaveURL(/[?&]snapshot=\d+/);
+  await expect(page.getByText('Historischer Stand — schreibgeschützt')).toBeVisible();
+  await auswahl.click();
+  await page
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .getByTitle('Live', { exact: true })
+    .click();
+  await expect(page).not.toHaveURL(/[?&]snapshot=/);
+  await expect(page.getByText('Historischer Stand — schreibgeschützt')).toHaveCount(0);
 
   // Unter `xl` startet die Zeitachse ohne gemerkte Wahl eingeklappt; zur Sicherheit geräumt.
   await page.evaluate(() => localStorage.removeItem('lfh:lagekarte:zeitachse-eingeklappt'));
