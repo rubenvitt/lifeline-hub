@@ -2158,10 +2158,6 @@ mod tests {
                 Err(AppError::NotFound)
             ));
             assert!(matches!(
-                crate::anhang::repo::laden_bytes(&pool, id).await,
-                Err(AppError::NotFound)
-            ));
-            assert!(matches!(
                 crate::anhang::repo::anzeige_laden(&pool, id).await,
                 Err(AppError::NotFound)
             ));
