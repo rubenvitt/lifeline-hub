@@ -257,8 +257,11 @@
 /* Gestapelt (LFH-373, opt-in): das Feld steht auf eigener Zeile und füllt sie. Ohne diese
    Regel blieb das Kind (im ETB der `MarkdownEditor`) als Flex-Kind auf seiner Inhaltsbreite —
    gemessen 176 von 364 px — und die volle Zeile hätte nichts gebracht. Nur im gestapelten
-   Fall: ungestapelt tragen Aufrufer mehrere Felder nebeneinander (Personenseite). */
-.lfh-schnellerfassung__feld--gestapelt > * {
+   Fall: ungestapelt tragen Aufrufer mehrere Felder nebeneinander (Personenseite).
+   Ungestapelt streckt nur das Opt-in `feldFuellt` (LFH-955): das ETB maß ab `md` rund 160 px
+   Feld in einer 870 px breiten Zeile. */
+.lfh-schnellerfassung__feld--gestapelt > *,
+.lfh-schnellerfassung__feld--fuellt > * {
   flex: 1 1 auto;
   min-width: 0;
 }

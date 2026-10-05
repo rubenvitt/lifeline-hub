@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { screen } from '@testing-library/react';
 import { Input } from 'antd';
 import { describe, expect, it } from 'vitest';
@@ -86,5 +88,33 @@ describe('Schnellerfassungszeile', () => {
     const kinder = Array.from(zeile.children);
     expect(kinder[0].classList.contains('lfh-schnellerfassung__feld')).toBe(true);
     expect(kinder[1].getAttribute('data-lfh')).toBe('schnellerfassung-praefix');
+  });
+
+  /**
+   * LFH-955 (design.md D2): ungestapelt blieb das Kind der Feldzelle auf seiner Inhaltsbreite —
+   * im ETB rund 160 px bei 870 px Zeile. Das Strecken ist ein Opt-in, keine Regel der Hülle:
+   * eine Zelle mit mehreren Feldern nebeneinander bekäme sonst gestreckte Kinder.
+   */
+  it('feldFuellt: nur dann trägt die Feldzelle die Klasse, die ihr Kind streckt', () => {
+    const { unmount } = renderMitProviders(
+      <Schnellerfassungszeile feldFuellt>
+        <Input aria-label="Feld" />
+      </Schnellerfassungszeile>,
+    );
+    const zelle = () => screen.getByLabelText('Feld').closest('.lfh-schnellerfassung__feld');
+    expect(zelle()).toHaveClass('lfh-schnellerfassung__feld--fuellt');
+    unmount();
+    renderMitProviders(
+      <Schnellerfassungszeile>
+        <Input aria-label="Feld" />
+      </Schnellerfassungszeile>,
+    );
+    expect(zelle()).not.toHaveClass('lfh-schnellerfassung__feld--fuellt');
+  });
+
+  it('feldFuellt: die Regel in sprache.css streckt das direkte Kind', () => {
+    const css = readFileSync(join(process.cwd(), 'src/theme/sprache.css'), 'utf8');
+    const regel = css.match(/([^{}]*)\{\s*flex: 1 1 auto;\s*min-width: 0;\s*\}/);
+    expect(regel?.[1]).toContain('.lfh-schnellerfassung__feld--fuellt > *');
   });
 });

@@ -839,6 +839,9 @@ export default function Schnellerfassung({
       <div style={{ position: 'relative' }}>
         <Schnellerfassungszeile
           gestapelt={istSchmal}
+          // Ab `md` füllt das Textfeld die Zeile, damit ein Funkspruch am Stück gegenzulesen ist
+          // (LFH-955, design.md D2).
+          feldFuellt
           praefix={praefix}
           hinweis={
             // „Vorschau" neben „Erfassen" statt auf eigener Zeile: eine eigene Knopfzeile kostete im
