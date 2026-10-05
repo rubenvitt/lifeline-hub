@@ -383,6 +383,7 @@ test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E Vorschau ETB ${Date.now()}`);
   await apiPost(page, `/api/einsaetze/${einsatzId}/etb`, {
     typ: 'lage',
+    an: 'Leitstelle',
     inhalt: 'Wasserstand steigt um zehn Zentimeter je Stunde',
     von: 'Abschnitt Nord',
   });
@@ -400,7 +401,7 @@ test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
   await expect(
     vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde', { exact: true }),
   ).toBeVisible();
-  await expect(vorschau.getByText('Abschnitt Nord → —')).toBeVisible();
+  await expect(vorschau.getByText('Abschnitt Nord → Leitstelle')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(vorschau).toBeHidden();
   await expect(paletteInput(page)).toHaveValue('#Wasserstand');
@@ -419,10 +420,14 @@ test('→ nennt am berichtigten ETB-Eintrag „berichtigt durch Nr. …" und fü
   const basis = `/api/einsaetze/${einsatzId}/etb`;
   const grund = await apiPost(page, basis, {
     typ: 'meldung',
+    von: 'ELW 1',
+    an: 'Leitstelle',
     inhalt: 'Pegel Nordbrücke bei vier Metern zwanzig',
   });
   const berichtigung = await apiPost(page, basis, {
     typ: 'berichtigung',
+    von: 'ELW 1',
+    an: 'Leitstelle',
     inhalt: 'Pegel Nordbrücke richtig: drei Meter zwanzig',
     berichtigt_eintrag_id: grund.id,
   });

@@ -162,7 +162,8 @@ export function etbStabVorschlaege(vorschlaege: FunktionsVorschlaege): Funktions
 /**
  * Vorrangregel der ETB-Vorbelegung „An“ (Stab-Spec LFH-46, Entscheidung 13): die gesetzte
  * Führungsstelle gewinnt immer; sonst das Kürzel des ersten eigenen Sachgebiets in S1–S6-Folge
- * (über `personal.benutzer_id`); sonst nichts.
+ * (über `personal.benutzer_id`); sonst nichts. Seit LFH-894 nur noch der erste Vorschlag der
+ * Rufname-Abfrage (`etb/RufnameAbfrage.tsx`); vorbelegt wird kein Eintrag mehr.
  */
 export function anVorbelegung(
   einsatz: Pick<EinsatzAnzeige, 'meine_fuehrungsstelle' | 'meine_sachgebiete'>,

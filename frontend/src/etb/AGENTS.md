@@ -45,3 +45,14 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   höchstens 24 h ab der letzten Änderung. Regel und Weg hinaus: `offline/AGENTS.md`,
   „Gerätedaten“; Nachweis `auth/geraetRaeumung.integration.test.tsx`,
   `e2e/geraet-raeumung.spec.ts`.
+- **Von und An sind Pflicht für jeden neuen Eintrag** (LFH-894, Spec `etb-absender-empfaenger`):
+  der Server lehnt einen Eintrag ohne eine Seite mit 400 ab (`routes/etb.rs::erfassen`), der
+  Client sendet ihn gar nicht erst (`fehlendeSeite`, vor Upload und Warteschlange). Bestehende
+  Einträge bleiben, Entwürfe dürfen unvollständig sein. Systemeinträge (`etb::repo::einfuegen`)
+  tragen für eine fehlende Seite die feste Kennung `etb::SYSTEM_RUFNAME` („System“).
+- **Standard-Rufname je Person** im Präferenz-Fach (`etb_standard_rufname`, JSON `{von, an}`,
+  `etb/standardRufname.ts`, `etb/useStandardRufname.ts`). Er lebt **nie im Entwurf**:
+  `metadaten` hält nur Ausdrückliches, `wirksameMetadaten` setzt ihn erst beim Anzeigen und
+  Absenden ein. `@`, `/von`, `/an` überschreiben ihn für den einen Eintrag. Ohne Standard fragt
+  die Erfassung inline (`etb/RufnameAbfrage.tsx`, kein Modal), erst wenn das Fach gelesen ist;
+  in der Berichtigung wird nicht gefragt.

@@ -220,7 +220,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
         "POST",
         &format!("/api/einsaetze/{id}/etb"),
         &admin,
-        Some(r#"{"typ":"meldung","inhalt":"Erstmeldung"}"#),
+        Some(r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Erstmeldung"}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
@@ -231,7 +231,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
         &format!("/api/einsaetze/{id}/etb"),
         &admin,
         Some(&format!(
-            r#"{{"typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{erst_id}}}"#
+            r#"{{"von":"ELW 1","an":"ELW 1","typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{erst_id}}}"#
         )),
     )
     .await;

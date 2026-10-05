@@ -44,7 +44,7 @@ async fn lage() -> Lage {
         "POST",
         &format!("/api/einsaetze/{einsatz}/etb"),
         &admin,
-        Some(&json!({"typ": "meldung", "inhalt": "Frau Mustermann an RTW übergeben"})),
+        Some(&json!({"von":"ELW 1","an":"ELW 1","typ": "meldung", "inhalt": "Frau Mustermann an RTW übergeben"})),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "etb: {v}");

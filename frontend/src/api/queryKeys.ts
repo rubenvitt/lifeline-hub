@@ -829,13 +829,14 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * und ohne Benutzerbindung. Gelistet sind die fünf Ansichten ETB, Meldebild, Betroffene,
  * Aufträge und Lagekarte sowie die Rahmendaten, ohne die sie nicht rendern (Einsatzkopf,
  * Freigaben, Einstellungen, Zähler, Einsatzliste, Kartenkonfiguration, Organisation,
- * Fahrzeugstatus-Katalog). Von den Meldungen nur die Rückmeldungen, nicht die Liste.
+ * Fahrzeugstatus-Katalog) und die Präferenzen der Person (Standard-Rufname, LFH-894). Von den
+ * Meldungen nur die Rückmeldungen, nicht die Liste.
  *
  * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente, die
  * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
  * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
  * (Object-URLs, nur im Speicher, LFH-759),
- * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Einstellungs- und Admin-Keys, die eigene
+ * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Org-Einstellungs- und Admin-Keys, die eigene
  * Führungsstelle (LFH-849: Erreichbarkeit ist personenbezogen), der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
@@ -892,6 +893,10 @@ export const LAGEBILD_OFFLINE = {
     GLOBAL_KEYS.karteConfig,
     GLOBAL_KEYS.organisation,
     GLOBAL_KEYS.fahrzeugStatus,
+    // Präferenzen der Person (LFH-894): ohne den Standard-Rufnamen hielte die Von/An-Pflicht
+    // jede Erfassung nach einem Kaltstart ohne Server auf. Das Fach trägt sonst nur das
+    // Palettengedächtnis; der Datensatz ist an die Person gebunden und geht beim Abmelden.
+    GLOBAL_KEYS.benutzerEinstellungen,
   ],
 } as const satisfies {
   einsatz: readonly EinsatzKey[];

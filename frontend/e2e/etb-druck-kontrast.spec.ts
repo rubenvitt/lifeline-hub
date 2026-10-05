@@ -70,11 +70,15 @@ for (const modus of ['light', 'dark'] as const) {
     });
     await post(page, etb, {
       typ: 'anordnung',
+      von: 'ELW 1',
+      an: 'Leitstelle',
       inhalt: 'Nachgetragene Anordnung',
       ereigniszeit: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     });
     await post(page, etb, {
       typ: 'berichtigung',
+      von: 'ELW 1',
+      an: 'Leitstelle',
       inhalt: 'Berichtigung: Deich Süd, nicht Nord',
       berichtigt_eintrag_id: grund.id,
     });

@@ -192,7 +192,14 @@ for (const modus of ['light', 'dark'] as const) {
     const ids: number[] = [];
     for (const inhalt of ['Erste Meldung', 'Angesprungene Meldung', 'Dritte Meldung']) {
       ids.push(
-        (await post(page, `/api/einsaetze/${einsatzId}/etb`, { typ: 'meldung', inhalt })).id,
+        (
+          await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+            typ: 'meldung',
+            von: 'ELW 1',
+            an: 'Leitstelle',
+            inhalt,
+          })
+        ).id,
       );
     }
     await page.goto(`/einsaetze/${einsatzId}/etb?eintrag=${ids[1]}`);

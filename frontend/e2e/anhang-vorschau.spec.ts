@@ -47,7 +47,13 @@ async function etbEintragMitHeic(page: Page, einsatzId: string) {
   expect(anhang.status(), await anhang.text()).toBe(201);
   const aid = (await anhang.json())[0].id as number;
   const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
-    data: { typ: 'meldung', inhalt: 'Foto vom Dach', anhang_ids: [aid] },
+    data: {
+      typ: 'meldung',
+      von: 'ELW 1',
+      an: 'Leitstelle',
+      inhalt: 'Foto vom Dach',
+      anhang_ids: [aid],
+    },
   });
   expect(eintrag.status(), await eintrag.text()).toBe(201);
 }

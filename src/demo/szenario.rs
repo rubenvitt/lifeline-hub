@@ -532,11 +532,12 @@ pub enum Vorgang {
     Erinnerung(ErinnerungVorlage),
     /// Früher angelegte Erinnerung erledigen (Status und Vollzug wie im Handler). Kein ETB.
     ErinnerungErledigt { erinnerung: &'static str },
-    /// Fachlicher ETB-Eintrag, `ereigniszeit` = Schrittzeit.
+    /// Fachlicher ETB-Eintrag, `ereigniszeit` = Schrittzeit. Ein Vermerk der Einsatzleitung:
+    /// `rufname` steht in Von UND An (LFH-894), damit er nicht wie ein Systemeintrag aussieht.
     Etb {
         art: EtbArt,
         inhalt: &'static str,
-        von: Option<&'static str>,
+        rufname: &'static str,
     },
 }
 
@@ -573,7 +574,7 @@ const fn lage(vor_min: i64, inhalt: &'static str) -> Schritt {
         Vorgang::Etb {
             art: EtbArt::Lage,
             inhalt,
-            von: None,
+            rufname: "Einsatzleitung",
         },
     )
 }
@@ -584,7 +585,7 @@ const fn entscheidung(vor_min: i64, inhalt: &'static str) -> Schritt {
         Vorgang::Etb {
             art: EtbArt::Entscheidung,
             inhalt,
-            von: Some("Einsatzleitung"),
+            rufname: "Einsatzleitung",
         },
     )
 }

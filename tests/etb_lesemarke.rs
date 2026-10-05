@@ -34,7 +34,7 @@ async fn meldung(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
         app,
         cookie,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Lage unverändert"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Lage unverändert"}"#,
     )
     .await
 }
@@ -185,7 +185,7 @@ async fn nachgetragener_eintrag_zaehlt_als_neu() {
         &app,
         &admin,
         einsatz,
-        r#"{"typ":"meldung","inhalt":"Nachtrag","ereigniszeit":"2020-01-01T08:00:00Z"}"#,
+        r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Nachtrag","ereigniszeit":"2020-01-01T08:00:00Z"}"#,
     )
     .await;
     assert_eq!(

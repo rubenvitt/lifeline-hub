@@ -59,7 +59,9 @@ async fn einsatz_mit_eintraegen(app: &axum::Router, cookie: &str, inhalte: &[(&s
             cookie,
             "POST",
             &format!("/api/einsaetze/{id}/etb"),
-            Some(format!(r#"{{"typ":"{typ}","inhalt":"{inhalt}"}}"#)),
+            Some(format!(
+                r#"{{"von":"ELW 1","an":"ELW 1","typ":"{typ}","inhalt":"{inhalt}"}}"#
+            )),
         )
         .await;
         assert_eq!(s, StatusCode::CREATED);

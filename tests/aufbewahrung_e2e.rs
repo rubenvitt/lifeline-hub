@@ -982,7 +982,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &admin,
         "POST",
         &format!("{basis}/etb"),
-        json!({ "typ": "meldung", "inhalt": "Erstmeldung Lage" }),
+        json!({"von":"ELW 1","an":"ELW 1", "typ": "meldung", "inhalt": "Erstmeldung Lage" }),
     )
     .await["id"]
         .as_i64()
@@ -992,7 +992,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &admin,
         "POST",
         &format!("{basis}/etb"),
-        json!({ "typ": "berichtigung", "inhalt": "Korrektur der Erstmeldung", "berichtigt_eintrag_id": erst }),
+        json!({"von":"ELW 1","an":"ELW 1", "typ": "berichtigung", "inhalt": "Korrektur der Erstmeldung", "berichtigt_eintrag_id": erst }),
     )
     .await;
 

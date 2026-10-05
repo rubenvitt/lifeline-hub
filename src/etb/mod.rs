@@ -22,6 +22,12 @@ pub const TYP_SYSTEM: &str = EtbTyp::System.as_str();
 /// Eintragstyp: Berichtigung (verweist auf den berichtigten Eintrag).
 pub const TYP_BERICHTIGUNG: &str = EtbTyp::Berichtigung.as_str();
 
+/// Von bzw. An eines Eintrags, den das System aus einem anderen Modul schreibt und für den das
+/// Modul selbst keinen Absender bzw. Empfänger kennt (LFH-894, Spec `etb-absender-empfaenger`,
+/// D5 der Change). Gesetzt wird sie an genau einer Stelle, in `repo::einfuegen`; wer die Aktion
+/// ausgelöst hat, steht in `erfasser_id`/`erfasser_funktion`.
+pub const SYSTEM_RUFNAME: &str = "System";
+
 /// Baut die `EintragDaten` eines pseudonymen System-ETB-Eintrags (nur `inhalt`, Rest leer).
 fn system_daten(inhalt: &str) -> repo::EintragDaten<'_> {
     repo::EintragDaten {

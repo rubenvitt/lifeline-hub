@@ -36,6 +36,9 @@ import { useFunkrufnamen } from './funkrufnamen';
 import { anVorbelegung, etbStabVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
+import RufnameAbfrage from './RufnameAbfrage';
+import { ausStandard, fehlendeSeite, wirksameMetadaten } from './standardRufname';
+import type { StandardRufnameZugriff } from './useStandardRufname';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
   amZeilenanfang,
@@ -63,6 +66,11 @@ interface Props {
   onBerichtigungAbbrechen: () => void;
   bausteine: EtbBaustein[];
   einsatz: EinsatzAnzeige;
+  /**
+   * Standard-Rufname der angemeldeten Person (LFH-894), vom Aufrufer über `useStandardRufname`
+   * geführt: die Seite hält ihn einmal, Entwurfs-Reiter und Berichtigung teilen ihn.
+   */
+  rufname: StandardRufnameZugriff;
   initialWerte?: EntwurfWerte;
   onWerteChange?: (werte: EntwurfWerte) => void;
   /**
@@ -229,6 +237,7 @@ export default function Schnellerfassung({
   onBerichtigungAbbrechen,
   bausteine,
   einsatz,
+  rufname,
   initialWerte,
   onWerteChange,
   werteBehalten = false,
@@ -271,18 +280,17 @@ export default function Schnellerfassung({
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
-  // Nur beim ersten Mount ohne Entwurf vorbelegen. Auch ein bewusst leeres
-  // Entwurfsfeld gewinnt; Berichtigungen übernehmen ausschließlich das Original.
-  const [metadaten, setMetadaten] = useState<MetadatenWerte>(
-    () =>
-      initialWerte?.metadaten ??
-      (() => {
-        // Vorrangregel (LFH-46 Entscheidung 13, eingelöst mit LFH-549): Führungsstelle →
-        // erstes eigenes Sachgebiet → nichts.
-        const an = berichtigungZu ? undefined : anVorbelegung(einsatz);
-        return an ? { an } : {};
-      })(),
-  );
+  // `metadaten` hält NUR, was die Person ausdrücklich gesetzt hat. Von/An aus dem
+  // Standard-Rufnamen kommen erst über `wirksam` hinzu (LFH-894, design.md D2): so überlebt der
+  // Standard das Leeren nach dem Absenden, und kein Entwurf trägt einen veralteten Wert. Die
+  // Vorrangregel (Führungsstelle → erstes Sachgebiet) belegt nichts mehr vor, sie ist nur noch
+  // der erste Vorschlag der Rufname-Abfrage (D3).
+  const [metadaten, setMetadaten] = useState<MetadatenWerte>(() => initialWerte?.metadaten ?? {});
+  const wirksam = wirksameMetadaten(metadaten, rufname.standard);
+  /** Abfragezeile zum Ändern eines gesetzten Standards offen (ohne Standard steht sie immer). */
+  const [rufnameAendern, setRufnameAendern] = useState(false);
+  /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
+  const [pflichtHinweis, setPflichtHinweis] = useState<string | null>(null);
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
   // Einzeilige Chip-Zeile unter `md`: den gerade bearbeiteten Chip waagerecht ins Bild holen
   // (die Eingabe fokussiert sich selbst). Ohne Chip in Bearbeitung steht die Zeile am Anfang.
@@ -364,7 +372,12 @@ export default function Schnellerfassung({
     return () => document.removeEventListener('pointerdown', beiZeigerAb);
   }, [menuOffen]);
 
-  const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => metadaten[f] != null);
+  const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => wirksam[f] != null);
+  // Die Abfrage steht nur, wenn das Fach gelesen ist — eine Zeile, die nach der Antwort wieder
+  // verschwände, wäre ein Sprung unter dem Cursor. In der Berichtigung gilt der vorhandene
+  // Standard, gefragt wird dort nicht.
+  const rufnameAbfrageOffen =
+    !berichtigungZu && rufname.geladen && (rufname.standard == null || rufnameAendern);
 
   // Der Schalter erscheint nur ausserhalb der Berichtigung und nur, wenn ein Aufrufer den
   // Zustand führt. Ohne sichtbaren Schalter wird auch nichts übernommen — eine unsichtbar
@@ -539,6 +552,19 @@ export default function Schnellerfassung({
 
   async function absenden() {
     if (sendet || inhalt.trim() === '') return;
+    // Von/An-Pflicht (LFH-894, D7): VOR Upload und Warteschlange. Text, Felder und Anhänge
+    // bleiben stehen; ohne Standard steht die Abfrage ohnehin über der Zeile.
+    const fehlt = fehlendeSeite(wirksam);
+    if (fehlt) {
+      setPflichtHinweis(
+        `${fehlt === 'von' ? 'Von' : 'An'} fehlt: ` +
+          (rufname.standard == null
+            ? 'Rufname oben festlegen oder ' + `/${fehlt} setzen.`
+            : `/${fehlt} setzen.`),
+      );
+      return;
+    }
+    setPflichtHinweis(null);
     // Nur der UPLOAD braucht Netz. Mit Dateien in der Liste wird ohne Verbindung abgewiesen, ohne
     // etwas zu leeren — ein Eintrag ohne die gewählten Dateien wäre eine stille Auslassung.
     // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte mit 400, und die
@@ -568,7 +594,7 @@ export default function Schnellerfassung({
         ...baueEintrag({
           inhalt,
           typ,
-          metadaten,
+          metadaten: wirksam,
           berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
           jetztIso,
         }),
@@ -772,6 +798,24 @@ export default function Schnellerfassung({
         />
       )}
 
+      {rufnameAbfrageOffen && (
+        <RufnameAbfrage
+          // Neu montiert beim Wechsel zwischen erster Abfrage und Ändern: die Felder starten
+          // dann mit dem jeweils richtigen Wert.
+          key={rufname.standard ? 'aendern' : 'erste'}
+          optionen={vonAnOptionen}
+          standard={rufname.standard}
+          vorschlag={anVorbelegung(einsatz)}
+          onUebernehmen={async (wert) => {
+            await rufname.setze(wert);
+            setRufnameAendern(false);
+            setPflichtHinweis(null);
+            fokusInsFeld();
+          }}
+          onAbbrechen={rufname.standard ? () => setRufnameAendern(false) : undefined}
+        />
+      )}
+
       <div style={{ position: 'relative' }}>
         <Schnellerfassungszeile
           gestapelt={istSchmal}
@@ -847,7 +891,15 @@ export default function Schnellerfassung({
               key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
               feld={feld}
               editing={editFeld === feld}
-              wert={metadaten[feld]}
+              wert={wirksam[feld]}
+              ausStandard={
+                (feld === 'von' || feld === 'an') && ausStandard(feld, metadaten, rufname.standard)
+              }
+              // Der Weg zum Standard selbst (Spec `etb-absender-empfaenger`); in der Berichtigung
+              // wird er nicht geändert.
+              onStandardAendern={
+                berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
+              }
               optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
               onCommit={commitFeld}
               onCancel={() => {
@@ -863,7 +915,7 @@ export default function Schnellerfassung({
               gesperrt={sendet}
             />
           ))}
-          {editFeld != null && metadaten[editFeld] == null && (
+          {editFeld != null && wirksam[editFeld] == null && (
             <MetaChip
               key={`${editFeld}-edit-new`}
               feld={editFeld}
@@ -948,6 +1000,15 @@ export default function Schnellerfassung({
       )}
       {anhangHinweis && (
         <Alert type="error" showIcon style={{ marginTop: token.marginXS }} title={anhangHinweis} />
+      )}
+      {pflichtHinweis && (
+        <Alert
+          type="error"
+          showIcon
+          data-lfh="etb-pflicht-hinweis"
+          style={{ marginTop: token.marginXS }}
+          title={pflichtHinweis}
+        />
       )}
 
       <BausteinPlatzhalterModal

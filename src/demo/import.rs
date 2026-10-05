@@ -1135,7 +1135,11 @@ impl Ablauf<'_> {
                 .await?;
                 Ok(())
             }
-            Vorgang::Etb { art, inhalt, von } => {
+            Vorgang::Etb {
+                art,
+                inhalt,
+                rufname,
+            } => {
                 crate::etb::repo::anlegen_tx(
                     conn,
                     self.einsatz_id,
@@ -1144,8 +1148,8 @@ impl Ablauf<'_> {
                     crate::etb::repo::EintragDaten {
                         typ: art.typ(),
                         inhalt,
-                        von,
-                        an: None,
+                        von: Some(rufname),
+                        an: Some(rufname),
                         meldeweg: None,
                         veranlassung: None,
                         ereigniszeit: Some(zeit),

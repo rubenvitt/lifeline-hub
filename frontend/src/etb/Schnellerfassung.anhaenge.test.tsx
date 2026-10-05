@@ -10,6 +10,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import Schnellerfassung from './Schnellerfassung';
 import { einsatzFixture } from '../test/fixtures';
+import { rufnameZugriff } from '../test/standardRufname';
 
 /**
  * Der Bedienweg „Anhang" der ETB-Schnellerfassung (LFH-117, design.md D9). Der Upload ist
@@ -41,6 +42,7 @@ function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}
     onBerichtigungAbbrechen: vi.fn(),
     bausteine: [] as EtbBaustein[],
     einsatz,
+    rufname: rufnameZugriff(),
     ...over,
   };
 }
@@ -676,9 +678,11 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     await waehle(container, datei('a.jpg'));
     await userEvent.type(feld(), 'Foto');
     await userEvent.click(screen.getByRole('button', { name: /Feld/ }));
-    await userEvent.click(await screen.findByText('Von'));
+    // Den Standard-Rufnamen trägt Von schon (Haken im Menü, Wert im Editor).
+    await userEvent.click(await screen.findByText('Von ✓'));
     const von = await screen.findByLabelText('Von');
-    await userEvent.type(von, 'ELW');
+    await userEvent.clear(von);
+    await userEvent.type(von, 'Florian');
 
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await screen.findByText('Lädt hoch (1/1) …');
@@ -687,7 +691,7 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     await act(async () => scheitern(new Error('Netz weg')));
     await screen.findByText(/a\.jpg konnte nicht hochgeladen werden/);
     expect(screen.getByLabelText('Von')).toBeEnabled();
-    expect(screen.getByLabelText('Von')).toHaveValue('ELW');
+    expect(screen.getByLabelText('Von')).toHaveValue('Florian');
     expect(p.erfassen).not.toHaveBeenCalled();
   });
 });

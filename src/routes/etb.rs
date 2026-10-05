@@ -22,7 +22,10 @@ use serde::Deserialize;
 pub struct NeuerEintrag {
     pub typ: String,
     pub inhalt: String,
+    /// Pflicht (LFH-894): fehlend oder leer ist 400. `Option` nur, damit das Fehlen die eigene
+    /// Meldung bekommt.
     pub von: Option<String>,
+    /// Pflicht wie `von`.
     pub an: Option<String>,
     pub meldeweg: Option<String>,
     pub veranlassung: Option<String>,
@@ -117,6 +120,11 @@ pub async fn erfassen(
     }
 
     let inhalt = pflicht(&req.inhalt, "Inhalt")?;
+    // Von und An sind Pflicht (LFH-894, Spec `etb-absender-empfaenger`): fehlend oder leer ist
+    // 400. Der DTO behält `Option`, damit ein fehlendes Feld diese Meldung bekommt und keinen
+    // Deserialisierungsfehler.
+    let von = pflicht(req.von.as_deref().unwrap_or(""), "Von")?;
+    let an = pflicht(req.an.as_deref().unwrap_or(""), "An")?;
 
     // Meldeweg validieren (falls gesetzt).
     let meldeweg = bereinige(req.meldeweg);
@@ -148,8 +156,6 @@ pub async fn erfassen(
         None => None,
     };
 
-    let von = bereinige(req.von);
-    let an = bereinige(req.an);
     let veranlassung = bereinige(req.veranlassung);
 
     let (anzeige, war_neu) = repo::anlegen_idempotent(
@@ -161,8 +167,8 @@ pub async fn erfassen(
         repo::EintragDaten {
             typ: typ.as_str(),
             inhalt: &inhalt,
-            von: von.as_deref(),
-            an: an.as_deref(),
+            von: Some(&von),
+            an: Some(&an),
             meldeweg: meldeweg.as_deref(),
             veranlassung: veranlassung.as_deref(),
             ereigniszeit: ereigniszeit.as_deref(),

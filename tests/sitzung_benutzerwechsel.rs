@@ -157,7 +157,7 @@ async fn etb_schreibt_und_replayt_nur_unter_dem_erwarteten_benutzer() {
     let etb = format!("/api/einsaetze/{einsatz}/etb");
     let vorher = anzahl(&app, &admin, &etb).await;
 
-    let body = r#"{"typ":"meldung","inhalt":"Aus dem alten Tab","client_id":"lfh-387-1"}"#;
+    let body = r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Aus dem alten Tab","client_id":"lfh-387-1"}"#;
     let (status, _) =
         anfrage_erwartet(&app, "POST", &etb, &admin, Some(body), &zweiter.to_string()).await;
     assert_eq!(status, StatusCode::PRECONDITION_FAILED);

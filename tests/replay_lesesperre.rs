@@ -89,13 +89,13 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
     let mut faelle = Vec::new();
 
     let url = format!("{basis}/etb");
-    let body = json!({"typ":"meldung","inhalt":"Geheim-ETB Deichbruch","client_id":"r-etb"});
+    let body = json!({"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Geheim-ETB Deichbruch","client_id":"r-etb"});
     angelegt(app, cookie, &url, &body.to_string(), "ETB").await;
     faelle.push(Fall {
         route: "etb",
         url,
         body: body.to_string(),
-        body_unbekannt: json!({"typ":"meldung","inhalt":"Neu","client_id":"r-etb-neu"}).to_string(),
+        body_unbekannt: json!({"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Neu","client_id":"r-etb-neu"}).to_string(),
         geheim: "Geheim-ETB",
     });
 
