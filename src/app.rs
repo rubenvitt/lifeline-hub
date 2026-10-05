@@ -57,12 +57,15 @@ pub fn build_router(state: AppState) -> Router {
     build_router_mit(state, RouterOptionen::default())
 }
 
-/// Body-Grenze der öffentlichen Anmelde-Starts (Passwort-Login, Passkey-Starts, LFH-921): ohne
-/// sie gälte axums Vorgabe von 2 MiB, und ein Unangemeldeter schickte Megabyte-Namen.
+/// Body-Grenze der öffentlichen Anmelde-Starts mit Body (Passwort-Login, Passkey-Start mit Namen;
+/// LFH-921): ohne sie gälte axums Vorgabe von 2 MiB, und ein Unangemeldeter schickte
+/// Megabyte-Namen. Der discoverable Start liest keinen Body.
 const AUTH_START_BODY_MAX: usize = 4 * 1024;
 
 /// Body-Grenze der Passkey-Abschlüsse: eine Assertion liegt meist unter 2 KiB, mit Erweiterungen
-/// auch darüber (LFH-921, design.md Entscheidung 6).
+/// auch darüber (LFH-921; Herleitung
+/// `openspec/changes/archive/2026-10-05-lfh-921-981-anmeldung-benutzername/design.md`,
+/// Entscheidung 6).
 const AUTH_FINISH_BODY_MAX: usize = 16 * 1024;
 
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
@@ -117,8 +120,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/auth/webauthn/discoverable/start",
-            post(routes::auth::webauthn_discoverable_start)
-                .layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
+            post(routes::auth::webauthn_discoverable_start),
         )
         .route(
             "/api/auth/webauthn/discoverable/finish",

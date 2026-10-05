@@ -149,9 +149,9 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 Spec `passwort-anmeldung`, Herleitung
 `openspec/changes/archive/2026-10-05-lfh-921-981-anmeldung-benutzername/design.md`.
 - **Ein Name von außen geht durch `auth::benutzername::normalisiere`** (Trim, höchstens 128
-  Zeichen, sonst 400) — als erster Schritt, vor Sperre, Audit und Log. Login, Passkey-Start und
-  Anlage tun das; ein neuer Eingang auch.
-- **Gesucht wird mit `benutzername = ? COLLATE NOCASE`**; eindeutig ist der Name ohne
+  Zeichen, sonst 400) — als erster Schritt, vor Sperre, Audit und Log. Login, Passkey-Start,
+  Anlage und `bootstrap_admin` tun das; ein neuer Eingang auch.
+- **Ein Name von außen wird mit `benutzername = ? COLLATE NOCASE` gesucht**; eindeutig ist er ohne
   Groß-/Kleinschreibung (Index aus `0150`, Verstoß → 409). `NOCASE` faltet nur A–Z; wer Namen
   vergleicht (SSO-Kollision, `rate_limit::konto`), faltet ebenso mit `to_ascii_lowercase`.
 - Namen in `auth_audit` kürzt `audit::schreibe` selbst; Log-Felder der Anmeldung nehmen
@@ -160,6 +160,8 @@ Spec `passwort-anmeldung`, Herleitung
   aus dem KDF-Gate geht unverändert durch.
 - **Argon2 im Handler nur über `provider::password::hash_gedrosselt`** (KDF-Gate, Andrang,
   `spawn_blocking`). Synchrones `password::hash` bleibt `bootstrap.rs`, `dev/seed.rs` und Tests.
+  Neue Passwörter höchstens 128 Zeichen (`pruefe_passwort_laenge`), sonst passen sie nicht in die
+  4-KiB-Grenze des Logins.
 
 ## Backend — Org-Ereignisse (LFH-734)
 

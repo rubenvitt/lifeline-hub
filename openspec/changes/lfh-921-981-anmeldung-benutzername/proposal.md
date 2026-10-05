@@ -20,13 +20,15 @@ denselben frühen Schritt des Login-Handlers; die Normalisierung des Namens geh�
   Schreibweise unterscheidet, ist vergeben (409). Neue Migration `0150` mit eindeutigem Index
   `benutzer(benutzername COLLATE NOCASE)`, die bei vorhandener Kollision mit klarer Meldung
   abbricht.
-- Öffentliche Auth-Routen bekommen ein eigenes Body-Limit (4 KiB für Login und Starts).
+- Öffentliche Auth-Routen bekommen ein eigenes Body-Limit (4 KiB für Login und Passkey-Start mit
+  Namen, 16 KiB für die Passkey-Abschlüsse).
 - Benutzernamen in `auth_audit` und Log-Feldern werden auf 64 Zeichen plus „…“ gekürzt; der
   429-Zweig loggt den Namen nicht mehr.
 - Nur ein 401 (falsches Passwort, unbekannter Name) zählt als Fehlversuch und schreibt
   `login_fehlgeschlagen`; ein 503 aus Andrang oder KDF-Wartefrist bleibt 503 ohne Zählung.
 - Benutzeranlage und Self-Service-Passwortwechsel hashen über eine neue Funktion
-  `hash_gedrosselt` unter dem KDF-Gate und per `spawn_blocking`.
+  `hash_gedrosselt` unter dem KDF-Gate und per `spawn_blocking`. Neue Passwörter haben höchstens
+  128 Zeichen, damit sie in die Body-Grenze des Logins passen.
 - Login-Seite: Feld Benutzername mit `autocapitalize="none"`, `autocorrect="off"`,
   `spellcheck="false"`; der Name geht getrimmt an `login()`.
 
@@ -37,7 +39,8 @@ denselben frühen Schritt des Login-Handlers; die Normalisierung des Namens geh�
   vergleicht und protokolliert, und wann ein Anmeldeversuch als Fehlversuch zählt.
 
 ### Modified Capabilities
-- keine
+- `konto-passwortwechsel`: Der Wechsel hasht das neue Passwort unter der Überlastgrenze des
+  Logins.
 
 ## Impact
 

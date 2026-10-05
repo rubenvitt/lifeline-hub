@@ -1,4 +1,6 @@
-//! Passwort-Provider: Login-Logik mit gedrosselter Schlüsselableitung (LFH-270, LFH-310).
+//! Passwort-Provider: Login-Logik mit gedrosselter Schlüsselableitung (LFH-270, LFH-310). Dieselben
+//! Schranken gelten für das Hashen neuer Passwörter in Anlage und Wechsel ([`hash_gedrosselt`],
+//! LFH-921).
 //!
 //! Argon2id kostet je Lauf ~19 MiB und ~50–100 ms; der Login ist damit der teuerste
 //! unauthentifizierte Endpoint. Deshalb:
@@ -31,15 +33,15 @@ fn kdf_plaetze() -> usize {
         .unwrap_or(2)
 }
 
-/// Wie lange ein Anmeldeversuch auf einen freien KDF-Platz wartet, bevor er mit 503 abgewiesen
-/// wird.
+/// Wie lange ein Anmeldeversuch (oder ein Hash in Anlage und Wechsel) auf einen freien KDF-Platz
+/// wartet, bevor er mit 503 abgewiesen wird.
 ///
 /// Nicht `try_acquire`: mehr gleichzeitige Anmeldungen als Plätze sind im Schichtwechsel der
 /// Normalfall und sollen in Wellen abgearbeitet werden. Unbegrenztes Warten verhindert
 /// [`MAX_ANDRANG`].
 const WARTEFRIST: std::time::Duration = std::time::Duration::from_secs(3);
 
-/// Wie viele Anmeldeversuche gleichzeitig auf einen KDF-Platz warten dürfen. Klein gegen
+/// Wie viele Anmeldeversuche und Hashes gleichzeitig auf einen KDF-Platz warten dürfen. Klein gegen
 /// [`crate::zulassung::MAX_GLEICHZEITIGE_REQUESTS`], weil jeder Wartende einen Zulassungsplatz
 /// hält.
 const MAX_ANDRANG: usize = 32;
@@ -173,8 +175,10 @@ async fn platz_holen(
     Ok((andrang, platz))
 }
 
-/// Eine Meldung für beide Abweisungsgründe; die Unterscheidung Andrang/KDF-Gate gehört ins Log.
-const ANMELDUNG_AUSGELASTET: &str = "Anmeldung vorübergehend ausgelastet — bitte erneut versuchen.";
+/// Eine Meldung für beide Abweisungsgründe und alle Aufrufer (Login, Anlage, Wechsel); die
+/// Unterscheidung Andrang/KDF-Gate gehört ins Log.
+const ANMELDUNG_AUSGELASTET: &str =
+    "Passwortprüfung vorübergehend ausgelastet — bitte erneut versuchen.";
 
 #[cfg(test)]
 mod tests {

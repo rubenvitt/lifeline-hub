@@ -92,6 +92,22 @@ describe('LoginPage', () => {
       // Das Passwort bleibt, wie es ist: Leerzeichen können zu ihm gehören.
       expect(gesendet).toEqual({ benutzername: 'admin', passwort: ' geheim ' });
     });
+
+    it('nimmt einen Namen aus lauter Leerzeichen nicht an', async () => {
+      let gesendet = false;
+      server.use(
+        http.post('/api/auth/login', () => {
+          gesendet = true;
+          return HttpResponse.json({ error: 'Nicht angemeldet' }, { status: 401 });
+        }),
+      );
+      setup();
+      await userEvent.type(screen.getByLabelText('Benutzername'), '   ');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+      expect(await screen.findByText('Bitte Benutzername eingeben')).toBeInTheDocument();
+      expect(gesendet).toBe(false);
+    });
   });
 
   it('füllt das Formular bei Auswahl eines Dev-Benutzers', async () => {

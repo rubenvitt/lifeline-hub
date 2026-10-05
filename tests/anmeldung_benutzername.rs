@@ -157,6 +157,66 @@ async fn anlage_trimmt_begrenzt_und_ist_ohne_schreibweise_eindeutig() {
     assert_eq!(status, StatusCode::CREATED);
 }
 
+/// Spec: „Vertippt in anderer Schreibweise, dann angemeldet“: der Erfolg als `max` räumt die
+/// Fehlversuche als `Max`, sonst stünde die Quelle nach acht weiteren vor der Sperre.
+#[tokio::test]
+async fn erfolg_raeumt_fehlversuche_in_anderer_schreibweise() {
+    let (app, _pool) = setup_mit_pool().await;
+    let quelle = "192.0.2.34:4000";
+    for _ in 0..2 {
+        let (status, _) = login(&app, quelle, "Admin", "falsch").await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+    let (status, _) = login(&app, quelle, "admin", "startpw12").await;
+    assert_eq!(status, StatusCode::OK);
+
+    for i in 0..9 {
+        let (status, _) = login(&app, quelle, "ADMIN", "falsch").await;
+        assert_eq!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "Versuch {i}: noch nicht gesperrt"
+        );
+    }
+}
+
+/// Ein Passwort, das der Login (4 KiB Body) nicht mehr annähme, lässt sich nicht setzen.
+#[tokio::test]
+async fn anlage_begrenzt_das_passwort_auf_128_zeichen() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let anlage = |name: &str, pw: String| {
+        json!({ "anzeigename": "Neu", "benutzername": name, "passwort": pw }).to_string()
+    };
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/benutzer",
+        &admin,
+        Some(&anlage("lang", "ü".repeat(129))),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+
+    let grenze = "\u{1F512}".repeat(128);
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/benutzer",
+        &admin,
+        Some(&anlage("grenze", grenze.clone())),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json}");
+    let (status, json) = login(&app, "192.0.2.35:4000", "grenze", &grenze).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "das längste zulässige Passwort passt in den Login: {json}"
+    );
+}
+
 /// Spec: „Deaktiviertes Konto in anderer Schreibweise“.
 #[tokio::test]
 async fn deaktiviertes_konto_bleibt_in_anderer_schreibweise_gesperrt() {

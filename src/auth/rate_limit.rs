@@ -60,12 +60,12 @@ const NACH_VERDRAENGUNG: usize = OBERGRENZE - OBERGRENZE / 10;
 
 /// Das Zielkonto eines Versuchs, als Hash des Benutzernamens: so belegt ein langer erfundener
 /// Name keinen Speicher. Der Schlüssel ist je Prozess zufällig, also nicht vorab berechenbar.
-/// Gehasht wird kleingeschrieben (A–Z), wie die Suche vergleicht (`COLLATE NOCASE`, LFH-981):
-/// sonst räumte ein Erfolg als `max` nicht die Fehlversuche derselben Quelle als `Max`.
 type Konto = u64;
 
 static KONTO_SCHLUESSEL: LazyLock<RandomState> = LazyLock::new(RandomState::new);
 
+/// Gehasht wird kleingeschrieben (A–Z), wie die Suche vergleicht (`COLLATE NOCASE`, LFH-981):
+/// sonst räumte ein Erfolg als `max` nicht die Fehlversuche derselben Quelle als `Max`.
 fn konto(benutzername: &str) -> Konto {
     KONTO_SCHLUESSEL.hash_one(benutzername.to_ascii_lowercase())
 }

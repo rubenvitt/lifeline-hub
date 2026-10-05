@@ -17,12 +17,24 @@ use serde::Deserialize;
 /// Admin und beim Self-Service-Wechsel (LFH-471) — beide prüfen über [`pruefe_passwort_laenge`].
 const PASSWORT_MIN_LEN: usize = 8;
 
-/// 400, wenn ein neues Passwort kürzer als [`PASSWORT_MIN_LEN`] ist. Eine Stelle für die Grenze
-/// und ihre Meldung, damit Anlegen und Wechsel nicht auseinanderlaufen.
+/// Höchstlänge für neue Passwörter in Zeichen (LFH-921). Der Login nimmt höchstens 4 KiB Body an
+/// (`AUTH_START_BODY_MAX` in `src/app.rs`); ein längeres Passwort ließe sich setzen, aber nie
+/// wieder eingeben. 128 Zeichen passen auch JSON-escaped (bis 12 Byte je Zeichen) neben einen
+/// ebenso langen Namen in die Grenze.
+const PASSWORT_MAX_LEN: usize = 128;
+
+/// 400, wenn ein neues Passwort kürzer als [`PASSWORT_MIN_LEN`] oder länger als
+/// [`PASSWORT_MAX_LEN`] Zeichen ist. Eine Stelle für die Grenzen und ihre Meldungen, damit
+/// Anlegen und Wechsel nicht auseinanderlaufen.
 pub(crate) fn pruefe_passwort_laenge(passwort: &str) -> Result<(), AppError> {
     if passwort.len() < PASSWORT_MIN_LEN {
         return Err(AppError::Validation(format!(
             "Passwort muss mindestens {PASSWORT_MIN_LEN} Zeichen haben"
+        )));
+    }
+    if passwort.chars().count() > PASSWORT_MAX_LEN {
+        return Err(AppError::Validation(format!(
+            "Passwort darf höchstens {PASSWORT_MAX_LEN} Zeichen haben"
         )));
     }
     Ok(())

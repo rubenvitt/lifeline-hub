@@ -134,14 +134,29 @@ dasselbe Konto in unterschiedlicher Schreibweise MUST als Versuche gegen ein Kon
 - **WHEN** eine Quelle sich zweimal mit `Max` und falschem Passwort vertippt und dann als `max` erfolgreich anmeldet
 - **THEN** sind die beiden Fehlversuche dieser Quelle geräumt
 
-### Requirement: Passwort-Hashing in Anfragen läuft unter der Überlastgrenze
+### Requirement: Die Benutzeranlage hasht unter der Überlastgrenze
 
-Benutzeranlage und Self-Service-Passwortwechsel MUST das neue Passwort unter derselben Grenze
-gleichzeitiger Passwortberechnungen hashen wie der Login und dürfen dabei keinen Server-Thread für
-Anfragen blockieren. Ist die Grenze über die Wartefrist ausgeschöpft, MUST die Anfrage mit 503
-scheitern.
+Die Benutzeranlage MUST das neue Passwort unter derselben Grenze gleichzeitiger
+Passwortberechnungen hashen wie der Login und darf dabei keinen Server-Thread für Anfragen
+blockieren. Ist die Grenze über die Wartefrist ausgeschöpft, MUST die Anlage mit 503 scheitern.
 
 #### Scenario: Anlage bei ausgeschöpfter Grenze
 
 - **WHEN** alle Plätze für Passwortberechnungen über die Wartefrist belegt sind und ein Admin einen Benutzer anlegt
 - **THEN** antwortet der Server mit 503 und legt keinen Benutzer an
+
+### Requirement: Ein neues Passwort passt in den Login
+
+Ein neues Passwort MUST höchstens 128 Zeichen lang sein; ein längeres MUST der Server bei Anlage
+und Self-Service-Wechsel mit 400 abweisen. So bleibt jedes setzbare Passwort unter der
+Body-Grenze des Logins eingebbar.
+
+#### Scenario: Anlage mit überlangem Passwort
+
+- **WHEN** ein Admin einen Benutzer mit einem Passwort aus 129 Zeichen anlegt
+- **THEN** antwortet der Server mit 400
+
+#### Scenario: Längstes Passwort meldet an
+
+- **WHEN** ein Benutzer mit einem Passwort aus 128 Zeichen angelegt wurde und sich damit anmeldet
+- **THEN** antwortet der Server mit einer Sitzung

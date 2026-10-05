@@ -406,7 +406,9 @@ export default function LoginPage() {
                   <Form.Item
                     label="Benutzername"
                     name="benutzername"
-                    rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+                    rules={[
+                      { required: true, whitespace: true, message: 'Bitte Benutzername eingeben' },
+                    ]}
                   >
                     {/* Bildschirmtastaturen schreiben sonst den ersten Buchstaben groß und
                         hängen bei Wortvorschlägen ein Leerzeichen an (LFH-981). */}

@@ -85,8 +85,15 @@ Hash hält ebenso einen Zulassungsplatz. `benutzer::anlegen` und `passwort_aende
 
 ### 6. Body-Limits
 
-`DefaultBodyLimit::max(4 * 1024)` auf `/api/auth/login`, `/api/auth/webauthn/auth/start` und
-`/api/auth/webauthn/discoverable/start`; `16 * 1024` auf die beiden Passkey-`finish`. Ein
+`DefaultBodyLimit::max(4 * 1024)` auf `/api/auth/login` und `/api/auth/webauthn/auth/start`;
+`16 * 1024` auf die beiden Passkey-`finish`. Der discoverable Start liest keinen Body und braucht
+keine Grenze.
+
+Damit jedes setzbare Passwort in die 4 KiB passt, bekommt `pruefe_passwort_laenge` eine
+Höchstlänge von 128 Zeichen: JSON-escaped (Surrogatpaar, 12 Byte je Zeichen) sind das höchstens
+1536 Byte, ebenso viel für einen 128 Zeichen langen Namen. Ohne die Grenze ließe sich bei Anlage
+oder Wechsel ein Passwort setzen, mit dem sich niemand mehr anmelden kann; einen Admin-Reset
+gibt es nicht. Ein
 Assertion-Body (authenticatorData, clientDataJSON, Signatur, userHandle in base64url) liegt meist
 unter 2 KiB, kann mit Erweiterungen aber darüber gehen; 16 KiB lässt Luft und deckelt trotzdem.
 Die Rejection läuft durch `JsonBody` und kommt wie jeder unlesbare Body als 400 im
@@ -97,7 +104,8 @@ Die Rejection läuft durch `JsonBody` und kommt wie jeder unlesbare Body als 400
 
 Zuerst eine Prüfung, die bei Kollision mit klarer Meldung abbricht: eine temporäre Tabelle mit
 einem `BEFORE INSERT`-Trigger, der `RAISE(ABORT, 'Benutzernamen kollidieren ohne Groß-/Kleinschreibung …')`
-wirft, wenn die eingefügte Anzahl doppelter `lower(benutzername)` größer als 0 ist. Danach
+wirft, wenn die eingefügte Anzahl doppelter Namen (gruppiert mit `COLLATE NOCASE`, derselben
+Kollation wie der Index) größer als 0 ist. Danach
 `CREATE UNIQUE INDEX idx_benutzer_benutzername_nocase ON benutzer(benutzername COLLATE NOCASE)`.
 Die bestehende BINARY-UNIQUE-Einschränkung bleibt (Tabellenumbau nur dafür lohnt nicht).
 Ohne die Vorprüfung käme nur SQLites „UNIQUE constraint failed: index …“, das den Betreiber
@@ -124,8 +132,15 @@ discoverable und schickt keinen Namen; dort ist nichts zu tun.
   Abfrage oben um `max(length(benutzername))` ergänzen.
 - [Umlaute werden nicht gefaltet] → `Jürgen` und `jürgen` bleiben zwei Namen und der Login als
   `jürgen` findet `Jürgen` nicht. Akzeptiert (Entscheidung 1).
-- [Body-Limit zu knapp für einen Passkey] → 16 KiB auf `finish`; ein Test schickt eine realistische
-  Assertion durch.
+- [Body-Limit zu knapp für einen Passkey] → 16 KiB auf `finish`; ein Test belegt, dass 6 KiB nicht an
+  der Größe scheitern.
+- [Weitere öffentliche POSTs mit `JsonBody` (`/api/auth/totp/finish`, `/api/auth/app-code/einloesen`,
+  `/api/geraete/koppeln`) behalten axums 2 MiB] → Sie schreiben keinen Namen in Audit oder Log;
+  eigener Nachzug auf dem Board.
+- [`LIFELINE_ADMIN_USER` mit Randleerzeichen] → `bootstrap_admin` normalisiert ebenfalls und bricht
+  bei leerem oder überlangem Namen den Start ab.
+- [Dev-Seed-Upsert und `= ?`-Suchen in `dev/seed.rs`] → feste, kleingeschriebene Namen, kein Eingang
+  von außen; die Regel in `src/AGENTS.md` gilt für Namen von außen.
 
 ## Migration Plan
 
