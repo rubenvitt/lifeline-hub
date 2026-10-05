@@ -20,6 +20,7 @@ import {
 } from '../components/SeitenZustand';
 import { uhsStatus, uhsTyp } from '../theme/statusFarben';
 import KatalogTabelle from '../components/KatalogTabelle';
+import { KennungsLink } from '../components/kennungsLink';
 
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
@@ -54,7 +55,9 @@ export default function UnfallhilfsstellenPage() {
     {
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
-      render: (b: string, u) => <Link to={uhsDetailPfad(einsatzId, u.id)}>{b}</Link>,
+      render: (b: string, u) => (
+        <KennungsLink to={uhsDetailPfad(einsatzId, u.id)}>{b}</KennungsLink>
+      ),
     },
     { title: 'Typ', dataIndex: 'typ', render: (t: UhsTyp) => uhsTyp[t].label },
     {

@@ -56,6 +56,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
+import { KennungsLink } from '../components/kennungsLink';
 
 export default function PersonalPage() {
   const { id } = useParams();
@@ -318,7 +319,9 @@ export default function PersonalPage() {
         const f = ep.fahrzeug_id != null ? fahrzeugById.get(ep.fahrzeug_id) : undefined;
         if (!f) return '—';
         const label = f.kennzeichen ? `${f.funkrufname} (${f.kennzeichen})` : f.funkrufname;
-        return <Link to={fahrzeugePfad(einsatzId, { fahrzeug: f.id })}>{label}</Link>;
+        return (
+          <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: f.id })}>{label}</KennungsLink>
+        );
       },
     },
     {
@@ -327,7 +330,9 @@ export default function PersonalPage() {
       render: (_, ep) => {
         const e = ep.einheit_id != null ? einheitById.get(ep.einheit_id) : undefined;
         if (!e) return '—';
-        return <Link to={einheitenPfad(einsatzId, { einheit: e.id })}>{e.name}</Link>;
+        return (
+          <KennungsLink to={einheitenPfad(einsatzId, { einheit: e.id })}>{e.name}</KennungsLink>
+        );
       },
     },
     {

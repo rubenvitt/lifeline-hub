@@ -20,6 +20,7 @@ import {
 import { brStatus } from '../../theme/statusFarben';
 import KatalogTabelle from '../../components/KatalogTabelle';
 import BrAnlegenDrawer from './BrAnlegenDrawer';
+import { KennungsLink } from '../../components/kennungsLink';
 
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
@@ -59,7 +60,7 @@ export default function BereitstellungsraeumePage() {
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
       render: (b: string, br) => (
-        <Link to={bereitstellungsraumDetailPfad(einsatzId, br.id)}>{b}</Link>
+        <KennungsLink to={bereitstellungsraumDetailPfad(einsatzId, br.id)}>{b}</KennungsLink>
       ),
     },
     {
