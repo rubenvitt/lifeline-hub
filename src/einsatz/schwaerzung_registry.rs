@@ -3145,6 +3145,31 @@ mod tests {
         assert_eq!(einzeln, nachlauf);
     }
 
+    /// Der atomare Vorgang löst für `ZeileEinzelnLoeschen` nur die Verknüpfungen von `anhang`
+    /// (`scrubbe_aus_registry`). Jede andere Tabelle des Nachlaufs darf deshalb kein Ziel eines
+    /// Fremdschlüssels sein, sonst bliebe ein Verweis bis zum Nachlauf erreichbar (LFH-997).
+    #[tokio::test]
+    async fn einzeln_geloeschte_tabellen_ausser_anhang_haben_keine_verweise() {
+        let pool = crate::db::test_pool().await;
+        for tabelle in super::super::schwaerzung_nachlauf::EINZELN_GELOESCHT
+            .iter()
+            .filter(|t| **t != "anhang")
+        {
+            let verweise: Vec<String> = sqlx::query_scalar(
+                "SELECT m.name FROM sqlite_master m, pragma_foreign_key_list(m.name) f \
+                 WHERE m.type = 'table' AND f.\"table\" = ?",
+            )
+            .bind(tabelle)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert!(
+                verweise.is_empty(),
+                "{tabelle} ist Ziel von {verweise:?}: Verknüpfung in scrubbe_aus_registry lösen"
+            );
+        }
+    }
+
     /// Bilder der Lagekarte tragen Personenbezug (Drohnen- und Luftbilder, beschriftete Pläne)
     /// und fallen mit der Kategorie `anhaenge`, einzeln im Nachlauf (LFH-997, Spec
     /// `aufbewahrung`, „Bild-Hintergründe der Lagekarte“).

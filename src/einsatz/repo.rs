@@ -921,7 +921,7 @@ pub(crate) fn schwaerzungs_audit(grund: &str) -> String {
     format!(
         "PII-Schwärzung durchgeführt ({grund}). \
          Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
-         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
+         Foto-/Datei-Anhänge, Bilder der Lagekarte, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
          die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
          Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
          Befehle, Pressemitteilungen, Lagebesprechungen) und des Presse-Logs) wurden \
@@ -2265,8 +2265,8 @@ mod tests {
     #[tokio::test]
     async fn schwaerzung_nullt_freies_zeichen_label_pii() {
         // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.
-        // Müller"). Es MUSS von schwaerze_einsatz genullt werden (wie karte_hintergrundbild.name);
-        // die operative Position (lat/lon) bleibt wie das übrige Skelett erhalten.
+        // Müller"). Es MUSS von schwaerze_einsatz genullt werden; die operative Position (lat/lon)
+        // bleibt wie das übrige Skelett erhalten.
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();

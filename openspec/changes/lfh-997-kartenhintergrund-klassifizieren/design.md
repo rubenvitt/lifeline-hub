@@ -34,9 +34,15 @@ seine Kategorie `anhaenge` geschwärzt.
 - Eine vierte Datenkategorie „Bildaufnahmen“ (siehe D2).
 - Frist-Vorgaben im Code: die Dauer bleibt Sache der Organisation (Spec
   `aufbewahrung-kategorien`, keine Vorgabewerte).
-- Lage-Stände (`lage_snapshot`), die auf gelöschte Bilder verweisen, zu bereinigen: Sie werden
-  mit dem Einsatz ohnehin ganz gelöscht, und ein Verweis ins Leere entsteht heute schon, wenn
-  jemand ein Bild im laufenden Einsatz entfernt.
+- Lage-Stände (`lage_snapshot`), die auf gelöschte Bilder verweisen, zu bereinigen. Mit dem
+  Einsatz werden sie ganz gelöscht, und ein Verweis ins Leere entsteht heute schon, wenn jemand
+  ein Bild im laufenden Einsatz entfernt. Offen bleibt die Kategorie-Schwärzung: Ein Lage-Stand
+  friert Dateiname und Lage der Bilder in sein JSON ein und folgt als Ganzes der Einsatz-Frist.
+  Nach der Schwärzung von `anhaenge` ist das Bild weg, sein Dateiname steht im Rückblick aber
+  weiter, bis die Einsatz-Frist abläuft. Das war vor dieser Änderung genauso (der Name folgte
+  der Einsatz-Frist), ist also keine Verschlechterung; die Lücke schließt ein Folgeticket
+  (LFH-1069), weil sie eine eigene Entscheidung über das Schwärzen eines JSON-Schlüssels
+  braucht.
 
 ## Decisions
 

@@ -40,7 +40,8 @@ impl Datenkategorie {
             }
             Datenkategorie::Personenauskunft => "Herkunftsadresse und Melderkontakt der Personen",
             Datenkategorie::Anhaenge => {
-                "alle Datei-Anhänge samt ihrer Ablage als Dokument (an Schäden, Chat und ETB)"
+                "alle Datei-Anhänge samt ihrer Ablage als Dokument (an Schäden, Chat und ETB) und \
+                 die Bilder der Lagekarte"
             }
         }
     }

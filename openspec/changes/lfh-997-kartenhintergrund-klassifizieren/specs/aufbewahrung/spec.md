@@ -6,7 +6,7 @@ Die Klassifikation SHALL jedes Bild, das als Hintergrund der Lagekarte hochgelad
 Scrub führen, mit allen Spalten: Bildinhalt, Dateiname, Prüfsumme, Größe, Lage und Darstellung.
 Das gilt unabhängig davon, ob das Bild ein Luftbild, ein Drohnenbild oder ein gezeichneter
 Plan ist. Mit der Schwärzung des Einsatzes oder seiner Kategorie `anhaenge` MUST das Bild
-nicht mehr abrufbar sein, weder in der Liste der Lagekarte noch als Download, und der Nachlauf
+nicht mehr abrufbar sein, weder in der Liste der Bilder des Einsatzes noch als Download, und der Nachlauf
 MUST es danach vollständig löschen. Bilder eines Einsatzes, der vor dieser Anforderung
 geschwärzt wurde, MUST der nächste Purge-Lauf ebenso entfernen.
 
