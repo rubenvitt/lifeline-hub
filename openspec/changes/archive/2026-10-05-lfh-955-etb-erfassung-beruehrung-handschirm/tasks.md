@@ -46,4 +46,12 @@
 ## 5. Regel und Gesamtlauf
 
 - [x] 5.1 `frontend/src/etb/AGENTS.md`, Abschnitt Erfassung: Zeigerweiche (Enter), Feldbreite per Opt-in, Einklappen unter `md`
-- [ ] 5.2 `./scripts/check-all.sh` bzw. die in der Cloud-Sitzung lauffähigen Bündel; Abweichungen gegen `alpha` belegen
+- [x] 5.2 `./scripts/check-all.sh` bzw. die in der Cloud-Sitzung lauffähigen Bündel; Abweichungen gegen `alpha` belegen
+  - 05.10.2026, Cloud-Sitzung: `--nur schnell` grün; `--nur frontend` 10 373 von 10 374 grün,
+    der eine rote Fall war der neue Test zum Feld-Editor, mitten im Lauf vor seiner Umsetzung
+    geschrieben (danach mit den geänderten Dateien 217 von 217 grün). Kein Backend geändert,
+    `--nur rust` nicht gelaufen. e2e mit einem Worker: nach den Review-Fixes 42 Fälle aus
+    `leisten-flaeche`, `etb-entwurf-tabs`, `fuehrungsstelle`, `etb-chronologie`,
+    `seitenrinne`, `palette-oeffnung`, `etb-standard-rufname` grün, darunter der wackelnde
+    Menüauslöser-Test (`etb-chronologie`, LFH-683) nach Ursachenbehebung 8 von 8. Der volle
+    Lauf läuft in der CI des PRs.

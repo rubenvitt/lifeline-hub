@@ -19,7 +19,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   rollt waagerecht, „Werte behalten" in der Hinweiszeile, Kurzplatzhalter, Fokus per
   `preventScroll` (`MetaChip`, nicht `autoFocus`).
 - **Erfassung, Tastatur und Fläche** (LFH-955, Specs `etb-schnellerfassung-tastatur`,
-  `einsatztauglichkeit-layout`):
+  `einsatztauglichkeit-layout`; Herleitung D1–D5, auf die Code-Kommentare verweisen:
+  `openspec/changes/archive/2026-10-05-lfh-955-etb-erfassung-beruehrung-handschirm/design.md`):
   - **Enter weicht nach der Zeigerart, nicht nach der Breite** (`useViewport().istBeruehrung`):
     mit grobem Zeiger bricht Return um und sendet nie, gesendet wird über „Erfassen“ oder
     Strg/⌘+Enter; das Feld trägt `enterKeyHint="enter"`. Mit feinem Zeiger gilt LFH-335 (Enter
