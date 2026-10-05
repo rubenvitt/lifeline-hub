@@ -58,13 +58,46 @@ export function bildDownloadPfad(einsatzId: number, id: number): string {
   return `${basis(einsatzId)}/${id}/download`;
 }
 
+/**
+ * Bricht ab, sobald eines der Signale abbricht. `AbortSignal.any` erst ab Safari 17.4; der Ersatz
+ * meldet sich mit `loesen()` wieder ab, sonst sammelte das langlebige Signal des Aufrufers je
+ * Download einen Hörer.
+ */
+function eines(a: AbortSignal, b: AbortSignal): { signal: AbortSignal; loesen: () => void } {
+  if (typeof AbortSignal.any === 'function')
+    return { signal: AbortSignal.any([a, b]), loesen() {} };
+  const ctrl = new AbortController();
+  const abmelden: Array<() => void> = [];
+  for (const s of [a, b]) {
+    if (s.aborted) {
+      ctrl.abort(s.reason);
+      continue;
+    }
+    const hoerer = () => ctrl.abort(s.reason);
+    s.addEventListener('abort', hoerer, { once: true });
+    abmelden.push(() => s.removeEventListener('abort', hoerer));
+  }
+  return { signal: ctrl.signal, loesen: () => abmelden.forEach((f) => f()) };
+}
+
 /** Lädt die Bild-Bytes (same-origin, mit Cookies) und liefert eine Object-URL.
- *  Aufrufer MUSS die URL später mit URL.revokeObjectURL freigeben. */
-export async function ladeBildBlobUrl(einsatzId: number, id: number): Promise<string> {
-  const res = await fetch(bildDownloadPfad(einsatzId, id), {
-    credentials: 'same-origin',
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`Bild ${id} konnte nicht geladen werden (${res.status})`);
-  return URL.createObjectURL(await res.blob());
+ *  Aufrufer MUSS die URL später mit URL.revokeObjectURL freigeben. `signal` bricht zusätzlich
+ *  zur 15-s-Grenze ab (Karte verlassen, Einsatzwechsel; LFH-943). */
+export async function ladeBildBlobUrl(
+  einsatzId: number,
+  id: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const grenze = AbortSignal.timeout(15_000);
+  const beide = signal ? eines(signal, grenze) : { signal: grenze, loesen() {} };
+  try {
+    const res = await fetch(bildDownloadPfad(einsatzId, id), {
+      credentials: 'same-origin',
+      signal: beide.signal,
+    });
+    if (!res.ok) throw new Error(`Bild ${id} konnte nicht geladen werden (${res.status})`);
+    return URL.createObjectURL(await res.blob());
+  } finally {
+    beide.loesen();
+  }
 }

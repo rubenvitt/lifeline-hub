@@ -8,6 +8,13 @@
 //! nur die URL. `/api/` ist nie eine Anwendungsseite; einzige Ausnahme sind die Anmelderouten
 //! `/api/auth/` (OIDC-Start und -Rücksprung laufen im Fenster). Eine weitere `/api/`-Route, die
 //! als Seite laufen soll, braucht hier eine eigene Ausnahme.
+//!
+//! Exporte, die die Seite selbst lädt und als `blob:` mit `<a download>` anbietet (CSV auf
+//! Betroffene und Tiere, `frontend/src/components/dateiSpeichern.ts`), kommen hier nicht vorbei
+//! (LFH-914, gelesen in wry 0.57): WKWebView meldet `shouldPerformDownload` und wry gibt sie vor
+//! jeder Navigationsentscheidung als Download frei, WebView2 startet sie als `DownloadStarting`.
+//! Beide landen in `on_download` mit dem Namen aus `download`. Eine `blob:`-Navigation, die doch
+//! hier ankommt, darf deshalb nicht verworfen werden: sie bliebe sonst stumm.
 
 use url::Url;
 
@@ -191,6 +198,15 @@ mod tests {
         }
         assert_eq!(navigation("mailto:lage@example.org"), Ziel::System);
         assert_eq!(navigation("tel:+4930123"), Ziel::System);
+    }
+
+    /// Der CSV-Export bietet seine Datei als `blob:` der Serverseite an (LFH-914). Erreicht so
+    /// eine Navigation den Handler, läuft sie weiter und der Webview lädt herunter.
+    #[test]
+    fn blob_der_serverseite_bleibt_im_fenster() {
+        let blob = "blob:https://elw.local:8443/6f1c2a9e-8d3b-4e7a-9c55-0b1d2e3f4a5b";
+        assert_eq!(navigation(blob), Ziel::Huelle);
+        assert!(!gehoert_zum_server(&server(), &url(blob)));
     }
 
     #[test]

@@ -1,5 +1,5 @@
 import { IconStift } from '../icons';
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Button, Space } from 'antd';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
@@ -63,6 +63,13 @@ export interface InlineAngabeProps<T> {
   mehrzeilig?: boolean;
   eingabe: (p: InlineEingabe<T>) => ReactNode;
   /**
+   * Eigener Auslöser statt Wertknopf und Aufforderung (LFH-969): für eine Angabe, deren Wert
+   * schon an anderer Stelle steht, etwa als Überschrift. Bekommt die Fokusrückgabe (`ref`) und das
+   * Öffnen; Name und Trefffläche verantwortet der Aufrufer. Ohne Schreibrecht entfällt er, und
+   * es steht nichts da — der Wert steht ja woanders.
+   */
+  ausloeser?: (p: { ref: Ref<HTMLButtonElement>; onClick: () => void }) => ReactNode;
+  /**
    * Übernahme. Lehnt bei Ablehnung ab (`mutateAsync`) — dann bleibt die Eingabe mit dem Entwurf
    * offen und der Fehler steht an der Zeile. Erfüllt erst, wenn der neue Wert im Cache steht.
    */
@@ -79,6 +86,7 @@ export function InlineAngabe<T>({
   pflicht = false,
   mehrzeilig = false,
   eingabe,
+  ausloeser,
   onSpeichern,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
@@ -99,7 +107,7 @@ export function InlineAngabe<T>({
   const wertId = useId();
   const feldId = useId();
 
-  if (!darfSchreiben) return <>{leer(wert) ? '—' : anzeige}</>;
+  if (!darfSchreiben) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
 
   function oeffnen() {
     setEntwurf(wert);
@@ -207,6 +215,15 @@ export function InlineAngabe<T>({
       {`${etikett} ist eine Pflichtangabe — der bisherige Wert bleibt.`}
     </div>
   ) : null;
+
+  if (ausloeser) {
+    return (
+      <>
+        {ausloeser({ ref: knopfRef, onClick: oeffnen })}
+        {hinweis}
+      </>
+    );
+  }
 
   if (leer(wert)) {
     return (

@@ -15,6 +15,15 @@ einen entsprechenden „Backup herunterladen"-Link der Oberfläche nutzen.
 Die heruntergeladene Datei `lifeline-backup-<zeitstempel>.sqlite` z.B. auf einen
 USB-Stick speichern.
 
+Der Server legt dafür eine Kopie in Datenbankgröße **neben der Datenbank** ab
+(Verzeichnis `lifeline-download-…`, LFH-926), nicht in `/tmp`, das auf Debian im
+Arbeitsspeicher liegt. Neben der Datenbank muss also Platz für eine zweite Kopie frei sein.
+Die Kopie verschwindet mit dem Ende des Downloads; Reste eines abgebrochenen Prozesses räumt
+der nächste Start weg. Es läuft **höchstens ein Download zugleich**: ein zweiter Abruf
+bekommt „Sicherung läuft bereits“ (503). Nimmt der Browser 60 Sekunden lang keine Daten mehr
+ab (bei einer Leitung unter etwa 1 KB/s), bricht der Server den Download ab und gibt die
+Kopie frei.
+
 **Variante B — per CLI (für Skripte/Cron, Server darf laufen):**
 
 ```bash
@@ -39,6 +48,20 @@ lifeline-hub --db-path /var/lib/lifeline/lifeline.db \
 Es bleiben die jüngsten `--backup-behalten` Dateien (`lifeline-auto-<zeitstempel>.sqlite`)
 liegen, ältere werden rotiert. Dateien ohne dieses Präfix fasst die Rotation nie an — eine
 von Hand abgelegte Sicherung im selben Verzeichnis ist also sicher.
+
+**Abschalten** heißt: `--backup-verzeichnis` weglassen. Der Wert `0` bei
+`--backup-intervall-minuten` oder `--backup-behalten` (bzw. `LIFELINE_BACKUP_INTERVALL_MINUTEN`,
+`LIFELINE_BACKUP_BEHALTEN`) bedeutet nicht „aus“, sondern bricht den Start mit einer
+Fehlermeldung ab (LFH-926). Das Intervall reicht bis zu einem Jahr (525600 Minuten).
+
+Jede Sicherung entsteht zuerst als `lifeline-auto-<zeitstempel>.sqlite.part` und bekommt erst
+fertig und ohne Anmelde-Tokens ihren Endnamen. Eine `.part`-Datei ist also **keine fertige
+Sicherung**: sie kann abgeschnitten sein und noch Anmelde-Tokens enthalten. Nicht einspielen
+und nicht weitergeben. Scheitert ein Lauf (Medium voll) oder wird der Server mittendrin
+beendet, räumen der nächste Lauf bzw. der nächste Start sie weg, und die vorhandenen
+Sicherungen bleiben stehen. Beim Herunterfahren wartet der Server, nachdem die laufenden
+Anfragen beendet sind (höchstens 10 Sekunden), noch bis zu 45 Sekunden auf eine laufende
+Sicherung; danach bricht er sie ab, und es bleibt eine `.part`-Datei bis zum nächsten Start.
 
 Ein Verzeichnis **auf einem separaten Medium** (USB/Netzlaufwerk) schützt zusätzlich gegen
 Plattendefekt; ein Verzeichnis neben der Datenbank nur gegen Bedienfehler.

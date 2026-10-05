@@ -93,6 +93,9 @@ selbst, wohin ein Link geht:
 - **Datei vom eigenen Server** (Adressen unter `/api/`, etwa Anhänge): Sie wird
   **heruntergeladen** und landet im Download-Ordner. Die Anwendung bleibt stehen.
   Ausgenommen ist die Anmeldung (`/api/auth/`), die im Fenster läuft.
+- **Export einer Liste** („CSV exportieren“ auf Betroffene und Tiere): Die Datei landet
+  ebenso im Download-Ordner, etwa als `personen-einsatz-42-2026-10-01-0705.csv`. Scheitert
+  der Export, steht der Fehler auf der Seite, und es entsteht keine Datei.
 - **Alles andere** (`file:`, `javascript:` …) öffnet nichts und steht im Protokoll, dort
   ohne Query und bei `mailto:`/`tel:` ohne Adresse.
 
