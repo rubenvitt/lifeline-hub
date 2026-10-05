@@ -456,9 +456,11 @@ export const einsatzKeys = {
   personenDruck: (einsatzId: number) => [EINSATZ_KEYS.personenDruck, einsatzId] as const,
   tiereDruck: (einsatzId: number) => [EINSATZ_KEYS.tiereDruck, einsatzId] as const,
   schaedenDruck: (einsatzId: number) => [EINSATZ_KEYS.schaedenDruck, einsatzId] as const,
-  // Einsatzbericht: alle Quellen in einem Abruf, nicht live (siehe NICHT_LIVE_KEYS).
-  einsatzberichtDruck: (einsatzId: number) =>
-    [EINSATZ_KEYS.einsatzberichtDruck, einsatzId] as const,
+  // Einsatzbericht: alle Quellen der gewählten Blöcke in einem Abruf, nicht live (siehe
+  // NICHT_LIVE_KEYS). `auswahl` ist `auswahlSchluessel` (LFH-902): eine andere Auswahl lädt andere
+  // Quellen und bekommt ihren eigenen Stand.
+  einsatzberichtDruck: (einsatzId: number, auswahl: string) =>
+    [EINSATZ_KEYS.einsatzberichtDruck, einsatzId, auswahl] as const,
 
   // Stab: Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

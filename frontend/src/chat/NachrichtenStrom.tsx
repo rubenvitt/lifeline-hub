@@ -11,6 +11,7 @@ import { aktionsNamen } from './aktionsNamen';
 import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 import { formatGroesse } from '../karten/formatGroesse';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 
 /**
  * Restweg zum unteren Rand, der noch als „der Lesende steht unten" gilt.
@@ -33,6 +34,12 @@ interface Props {
   onLoeschen: (n: ChatNachricht) => void;
   onHeraufstufen: (n: ChatNachricht) => void;
   onHeraufstufenAuftrag: (n: ChatNachricht) => void;
+  /**
+   * Das Zielmodul des Heraufstufens ist laut Server nicht freigegeben (Spec `modul-freigabe`,
+   * LFH-904): der Eintrag steht gesperrt mit Grund da (M16). Unbekannte Freigaben: `false`.
+   */
+  etbGesperrt?: boolean;
+  auftragGesperrt?: boolean;
   /** Sachbezug setzen/ändern (LFH-103). Ohne diesen Callback wird kein Bezug-Button gezeigt. */
   onBezugSetzen?: (n: ChatNachricht) => void;
   /** Sachbezug lösen (LFH-103). */
@@ -46,6 +53,13 @@ interface Props {
   eigeneSendungen?: number;
   /** Ob an Bild-Anhängen der Original-Verweis steht (`darfOriginalLaden`, LFH-747). */
   darfOriginal?: boolean;
+}
+
+/** Heraufstufen in ein Modul: ohne dessen Freigabe gesperrt, der Grund steht im Etikett. */
+function zielEintrag<K extends string>(key: K, label: string, gesperrt: boolean): MenueEintrag<K> {
+  return gesperrt
+    ? { key, label: `${label} (${KEINE_BERECHTIGUNG})`, gesperrt: true }
+    : { key, label };
 }
 
 /**
@@ -62,6 +76,8 @@ export default function NachrichtenStrom({
   onLoeschen,
   onHeraufstufen,
   onHeraufstufenAuftrag,
+  etbGesperrt = false,
+  auftragGesperrt = false,
   onBezugSetzen,
   onBezugLoeschen,
   bezugLabel,
@@ -188,10 +204,10 @@ export default function NachrichtenStrom({
             ? []
             : [
                 ...(darfSchreiben && !heraufgestuft
-                  ? [{ key: 'hoch' as const, label: 'Zu ETB' }]
+                  ? [zielEintrag('hoch' as const, 'Zu ETB', etbGesperrt)]
                   : []),
                 ...(darfSchreiben && !heraufgestuftZuAuftrag
-                  ? [{ key: 'auftrag' as const, label: 'Zu Auftrag' }]
+                  ? [zielEintrag('auftrag' as const, 'Zu Auftrag', auftragGesperrt)]
                   : []),
                 ...(darfSchreiben && onBezugSetzen
                   ? [{ key: 'bezug' as const, label: hatBezug ? 'Bezug ändern' : 'Bezug' }]

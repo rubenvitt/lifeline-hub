@@ -51,5 +51,13 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   dem Gate der Route. EIN nicht-live Schnappschuss-Key `einsatzKeys.einsatzberichtDruck`. Personen
   und Schäden gelangen nur als Zählung in `verdichtung.ts`; die Darstellung bildet nur deren
   Objekt ab.
+- **Blöcke wählbar** (LFH-902, `druck/einsatzbericht/auswahl.ts`,
+  `openspec/changes/archive/2026-10-05-lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`): Positivliste
+  `?bloecke=` über `einsatzberichtPfad`/`parseBerichtAuswahl`, ohne Parameter der Standardumfang
+  (die sieben Blöcke aus LFH-726), Unbekanntes fällt weg. Weiche, Abruf und Verdichtung nur für
+  gewählte Blöcke (`nicht-gewaehlt`), die Auswahl steht im Schnappschuss-Key und als „Umfang“ im
+  Druckkopf. Eine Quelle nennt alle Blöcke, die aus ihr schöpfen. Anlagen stehen am Ende und sind
+  aus; die Personal-Anlage nimmt nur Name, Funktion, Einheit und Zeiten (Feld-Whitelist) und setzt
+  „Personenbezug“ in den Kopf.
 - **Org-Branding** (`PATCH /api/organisation`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
   Virenscan) liegt außerhalb der Schwärzung (`schwaerzung_registry.rs`).

@@ -30,6 +30,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { BezugTyp, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import KanalListe, { sortiereKanaele } from '../chat/KanalListe';
 import NachrichtenStrom from '../chat/NachrichtenStrom';
 import NachrichtEingabe from '../chat/NachrichtEingabe';
@@ -74,6 +75,8 @@ export default function ChatPage() {
   const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
   const { benutzer } = useAuth();
+  // Heraufstufen schreibt in ETB bzw. Aufträge: deren Freigabe gilt (Spec `modul-freigabe`, LFH-904).
+  const istGesperrt = useSprungSperre(einsatzId);
   const qc = useQueryClient();
   const [kanalAuswahl, setKanalAuswahl] = useState<{
     einsatzId: number;
@@ -485,6 +488,8 @@ export default function ChatPage() {
             darfOriginal={darfOriginalLaden(einsatz, benutzer)}
             onBearbeiten={(n) => setBearbeitenAuswahl({ einsatzId, nachricht: n })}
             onLoeschen={(n) => loeschenMutation.mutate(n.id)}
+            etbGesperrt={istGesperrt('etb')}
+            auftragGesperrt={istGesperrt('auftraege')}
             onHeraufstufen={(n) => setHeraufstufenAuswahl({ einsatzId, nachricht: n })}
             onHeraufstufenAuftrag={(n) =>
               setHeraufstufenAuftragAuswahl({

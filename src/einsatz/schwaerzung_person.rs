@@ -289,7 +289,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         art: PersonenArt::Medienkontakt,
         tabelle: "medienkontakt",
         bezug: Bezug::SelbstId,
-        spalten: &[("kontakt_name", Mit), ("kontakt_erreichbarkeit", Mit)],
+        spalten: &[
+            ("medium", Mit),
+            ("thema", Mit),
+            ("kontakt_name", Mit),
+            ("kontakt_erreichbarkeit", Mit),
+            ("antwort", Mit),
+            ("freigabe_durch", Mit),
+        ],
     },
 ];
 
@@ -332,7 +339,12 @@ pub async fn scrubbe_person(
             .iter()
             .filter(|(_, m)| *m == Mit)
             .map(|(spalte, _)| match klassifikation_von(b.tabelle, spalte) {
-                Some(Klassifikation::Scrub(st, _)) if st != Strategie::ZeileLoeschen => {
+                Some(Klassifikation::Scrub(st, _))
+                    if !matches!(
+                        st,
+                        Strategie::ZeileLoeschen | Strategie::ZeileEinzelnLoeschen
+                    ) =>
+                {
                     (*spalte, st)
                 }
                 // Die Guards halten das aus; ein Verstoß ist ein Programmierfehler.

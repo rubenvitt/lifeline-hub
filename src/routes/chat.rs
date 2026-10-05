@@ -2,7 +2,7 @@ use crate::app::AppState;
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::Chat;
+use crate::einsatz::modul::{Auftraege, Chat, Etb, ModulMarker};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -310,13 +310,16 @@ pub struct HeraufstufenBody {
 }
 
 /// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb — Nachricht → ETB.
-/// Schreibrecht + aktiv. Server erzwingt die zulässigen ETB-Typen.
+/// Schreibrecht + aktiv + Freigabe des Moduls `etb`. Server erzwingt die zulässigen ETB-Typen.
 pub async fn heraufstufen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Chat>,
     PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<HeraufstufenBody>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
+    // Das Heraufstufen schreibt ins ETB, also gilt dessen Modulfreigabe (Spec `modul-freigabe`,
+    // LFH-904): Chat-Schreibrecht allein ist kein Weg am gesperrten Tagebuch vorbei. 403 vor 404.
+    fordere_zielmodul::<Etb>(&state, &ctx).await?;
     let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -377,7 +380,8 @@ pub async fn heraufstufen(
 }
 
 /// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag — Nachricht → Auftrag (LFH-101).
-/// Schreibrecht + aktiv. Erzeugt aus der Nachricht einen formalen Auftrag (inkl. ETB-Anordnung,
+/// Schreibrecht + aktiv + Freigabe des Moduls `auftraege`. Erzeugt aus der Nachricht einen formalen
+/// Auftrag (inkl. ETB-Anordnung,
 /// Pattern B) und markiert die Nachricht als „heraufgestuft zu Auftrag". Auftragsfelder (Empfänger,
 /// Priorität …) kommen aus dem Request und durchlaufen dieselbe Validierung wie POST /auftraege.
 pub async fn heraufstufen_auftrag(
@@ -386,6 +390,9 @@ pub async fn heraufstufen_auftrag(
     PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
+    // Wie POST /auftraege: die Freigabe von `auftraege`, nicht zusätzlich die des ETB — die
+    // ETB-Anordnung ist dort wie hier Nebeneffekt (Spec `modul-freigabe`, LFH-904).
+    fordere_zielmodul::<Auftraege>(&state, &ctx).await?;
     let einsatz_id = ctx.einsatz.id;
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -416,4 +423,14 @@ pub async fn heraufstufen_auftrag(
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok((StatusCode::CREATED, Json(nachricht)))
+}
+
+/// Modulfreigabe des Moduls, in das ein Heraufstufen schreibt (LFH-904). Der Extractor prüft nur
+/// das Chat-Modul; das Zielmodul kommt als Marker, damit kein Key als Literal driftet.
+async fn fordere_zielmodul<M: ModulMarker>(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Chat>,
+) -> Result<(), AppError> {
+    let key = M::KEY.expect("Zielmodul des Heraufstufens ist an ein Modul gebunden");
+    ctx.fordere_modul_zugriff(&state.pool, key).await
 }

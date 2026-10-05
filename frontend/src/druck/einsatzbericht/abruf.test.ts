@@ -80,6 +80,13 @@ describe('ladeEinsatzbericht', () => {
     expect(bericht.quellen.betreuung).toEqual({ zustand: 'nicht-genutzt' });
   });
 
+  it('ruft eine nicht gewählte Quelle nicht ab (LFH-902)', async () => {
+    const freigabe = { ...alle('abrufen'), personen: 'nicht-gewaehlt' as const };
+    const bericht = await ladeEinsatzbericht(5, freigabe);
+    expect(api.listePersonen).not.toHaveBeenCalled();
+    expect(bericht.quellen.personen).toEqual({ zustand: 'nicht-gewaehlt' });
+  });
+
   it('ruft eine gesperrte Quelle nicht ab und meldet kein-zugriff', async () => {
     const freigabe = { ...alle('abrufen'), personen: 'gesperrt' as const };
     const bericht = await ladeEinsatzbericht(5, freigabe);
@@ -106,6 +113,11 @@ describe('ladeEinsatzbericht', () => {
 describe('berichtZustand', () => {
   it('bereit, wenn jede Quelle daten oder nicht-genutzt ist', () => {
     const roh = rohBericht({ betreuung: { zustand: 'nicht-genutzt' } });
+    expect(berichtZustand(roh)).toEqual({ art: 'bereit' });
+  });
+
+  it('bereit, wenn abgewählte Quellen fehlen (LFH-902)', () => {
+    const roh = rohBericht({ personen: { zustand: 'nicht-gewaehlt' } });
     expect(berichtZustand(roh)).toEqual({ art: 'bereit' });
   });
 

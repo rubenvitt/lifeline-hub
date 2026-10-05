@@ -4,6 +4,7 @@ import { ConfigProvider } from 'antd';
 import deDE from 'antd/locale/de_DE';
 import {
   antdAlgorithmus,
+  antdKaestchen,
   antdKlappkopf,
   antdKnopf,
   antdKomponenten,
@@ -163,6 +164,7 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
 
   const knopf = useMemo(() => antdKnopf(dichte), [dichte]);
   const klappkopf = useMemo(() => antdKlappkopf(dichte), [dichte]);
+  const kaestchen = useMemo(() => antdKaestchen(dichte), [dichte]);
 
   const wert = useMemo<ThemeModeWert>(
     () => ({
@@ -201,6 +203,9 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
         // Boden des Klappkopfs (LFH-653): antd rechnet den Kopf aus der Schrift, nicht aus
         // `controlHeight`; der Kontext erreicht jedes `Collapse` auf einmal.
         collapse={klappkopf}
+        // Boden des beschrifteten Kästchens (LFH-907): antd hat für die Höhe des Labels kein
+        // Komponenten-Token, es wäre nur so hoch wie seine Schrift.
+        checkbox={kaestchen}
         theme={{
           // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
           // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine

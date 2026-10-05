@@ -27,11 +27,11 @@ import {
  *
  * ZIELE WERDEN BENANNT, NICHT GEFEGT: jede Zielsorte nennt ihre Knoten über Rolle, Name oder
  * die antd-Hülle (`.ant-select`, `.ant-input-number`, nicht deren inneres `input`) und fordert
- * eine Mindestzahl. Bewusst NICHT gemessen und je in einem Folgeticket: die Brotkrume (LFH-909)
- * und beschriftete Checkboxen (LFH-907). Kennungs-Links (LFH-908) misst C13 an der Zeitachse der
- * Lagemeldungen, den Funkrufname-Link der Katalogtabelle `verwaltung-vereinheitlicht.spec.ts`. Das
- * Löschkreuz eines Auswahlfelds ist benannt ausgenommen: das Feld selbst ist das gleichwertige
- * Ziel.
+ * eine Mindestzahl. Bewusst NICHT gemessen und in einem Folgeticket: die Brotkrume (LFH-909).
+ * Kennungs-Links (LFH-908) misst C13 an der Zeitachse der Lagemeldungen, den Funkrufname-Link
+ * der Katalogtabelle `verwaltung-vereinheitlicht.spec.ts`. Beschriftete Checkboxen misst LFH-907
+ * am ganzen Label (`label.ant-checkbox-wrapper`), nicht an der 16-px-Box. Das Löschkreuz eines
+ * Auswahlfelds ist benannt ausgenommen: das Feld selbst ist das gleichwertige Ziel.
  *
  * ROLLENZWEIG (LFH-435, `e2e/AGENTS.md`): jede Fläche mit Schreibaktionen hat ein Geschwister
  * in `handschuh` als Beobachter bzw. Führungskraft. Vorbedingung vor der Messung ist der
@@ -76,6 +76,12 @@ interface Flaeche {
 }
 
 const inMain = (page: Page) => page.locator('main');
+/**
+ * Ein beschriftetes Kästchen (LFH-907): gemessen wird das LABEL, das Box und Text umschließt und
+ * als Ganzes klickt; die Box allein ist `controlInteractiveSize` groß.
+ */
+const kaestchen = (text: string) => (page: Page) =>
+  inMain(page).locator('label.ant-checkbox-wrapper').filter({ hasText: text });
 const knopf = (name: string | RegExp) => (page: Page) =>
   inMain(page).getByRole('button', { name, exact: typeof name === 'string' });
 /** Ein Segment der `Segmentleiste` ist ein `<button role="radio">` (bzw. `tab`). */
@@ -218,6 +224,7 @@ function etbFlaeche(einsatzId: string): Flaeche {
         mindestens: 1,
         deckel: { kompakt: 37.5, handschuh: 90 },
       },
+      { sorte: 'ETB Werte behalten', ziele: kaestchen('Werte behalten'), mindestens: 1 },
       {
         sorte: 'ETB Entwurfstab schließen',
         // Gemessen wird die Trefffläche selbst, das Kind des Knopfs (`entfernenStil`).
@@ -829,6 +836,11 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
           sorte: 'Lagebericht Kopfaktionen',
           ziele: knopf(/^(Entwurf speichern|Freigeben)$/),
           mindestens: 2,
+        },
+        {
+          sorte: 'Lagebericht Vorschau-Schalter',
+          ziele: kaestchen('Vorschau neben dem Text'),
+          mindestens: 1,
         },
       ],
     },

@@ -198,6 +198,79 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Ortspfad im Seitenkopf (LFH-909) ───────────────────────────────────────────────
+//
+// Die Brotkrume hat keine Dichte-Ausnahme: jeder Pfad-Link hält die Staffel, die Schrift bleibt
+// 12 px. antd setzt den Link auf `height: fontHeight` (20 px in jeder Stufe); den Boden trägt
+// `ortspfadStil` in `EinsatzSeite.tsx` mit der Regel in `EinsatzSeite.css`. Gemessen auf der
+// Druckansicht der Personenliste, weil ihr Pfad ZWEI Links trägt („Einsätze“ und „Betroffene“) und
+// nichts außer dem Einsatz gesät werden muss. Fükw und Handschirm, weil der Pfad unter `md` auf
+// eine eigene, nicht umbrechende Zeile mit Auslassung wechselt.
+
+/** Pfad-Links der Druckansicht: „Einsätze“ und das Modul; der Einsatzname ist Text. */
+const PFAD_LINKS = 2;
+/** Schriftgröße des Ortspfads (`Ortspfad` in `EinsatzSeite.tsx`), als Literal. */
+const PFAD_SCHRIFT = '12px';
+/** Mindesthöhe der Seitenkopfleiste (`SEITENKOPF_HOEHE`), als Literal. */
+const SEITENKOPF = 44;
+
+test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Schrift bleibt 12 px', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 Ortspfad ${Date.now()}`);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+
+  for (const [schirm, groesse] of [
+    ['Fükw', FUEKW],
+    ['Handschirm', HANDSCHIRM],
+  ] as const) {
+    await page.setViewportSize(groesse);
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(`/einsaetze/${einsatzId}/personen/druck`);
+      await stelleDichte(page, dichte);
+
+      // Gescopt auf den Pfad, sonst zählten Rail- und Kopfzeilen-Links mit.
+      const pfad = page.locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad');
+      const links = pfad.locator('.ant-breadcrumb-item a');
+      await expect(links).toHaveCount(PFAD_LINKS);
+      await expect(links.first()).toHaveText('Einsätze');
+      const kleinstes = await alleHaltenStufe(
+        links,
+        soll,
+        `Pfad-Link (${schirm}, ${dichte})`,
+        PFAD_LINKS,
+      );
+      for (let i = 0; i < PFAD_LINKS; i += 1) {
+        await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT);
+      }
+
+      let kopf = '';
+      if (schirm === 'Fükw' && dichte === 'kompakt') {
+        // Der Boden darf den Kopf in `kompakt` nicht heben: 30 px plus Polster passen in 44.
+        const kasten = await page.locator('[data-lfh="seitenkopf"]').boundingBox();
+        expect(kasten, 'Seitenkopf: kein Kasten messbar').not.toBeNull();
+        expect(
+          Math.abs(kasten!.height - SEITENKOPF),
+          `Seitenkopf in kompakt (gemessen ${kasten!.height}px, Soll ${SEITENKOPF})`,
+        ).toBeLessThanOrEqual(SUBPIXEL);
+        kopf = `, Kopf ${kasten!.height}`;
+      }
+
+      je.set(`${dichte} ${schirm}`, kleinstes);
+      gemessen.push(`${schirm} ${dichte} (Soll ≥ ${soll}): Pfad-Link ${kleinstes}${kopf}`);
+    }
+  }
+
+  gegenprobe(je, 'Fükw');
+  gegenprobe(je, 'Handschirm');
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── Einheiten-Detailroute ───────────────────────────────────────────────────────────
 // Verwaltung → Führungsfunktionen (LFH-549): das Label ist eine Inline-Angabe, ihr Bearbeiten-Knopf
 // ist das Bedienziel jeder Zeile. Gemessen wird er als Admin (nur dort ist er ein Ziel).
@@ -1053,7 +1126,7 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
 //    und steht exakt, damit ein Modul, das aus der Freigabe fällt, auffällt.
 //  - die sechs Knöpfe „Besetzung ändern" und die Kopfaktion „Lagebesprechung abschließen".
 // Der Boden ist für alle die Staffel. Die Locator sind gescopt, sonst zögen Breadcrumb und
-// Kopfzeilen-Links in die Zusicherung.
+// Kopfzeilen-Links in die Zählungen; die Brotkrume misst der Block „Ortspfad“ (LFH-909).
 
 /** Zwei abgeschlossene Lagebesprechungen → Stand „Letzte" + zwei Historien-Einträge. */
 const STAB_ETB_LINKS = 3;

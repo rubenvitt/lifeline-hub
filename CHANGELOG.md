@@ -1,3 +1,77 @@
+## [1.0.0-alpha.79](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.78...v1.0.0-alpha.79) (2026-10-05)
+
+### Betrieb und Installation
+
+- **Fehler bei macOS-Builds behoben**: Ein Problem mit der Dateinamen-Groß-/Kleinschreibung, das den Build-Prozess auf macOS unterbrochen und die Bereitstellung von ausführbaren Dateien verhindert hat, wurde behoben. Die Anwendung kann nun wieder auf allen unterstützten Plattformen ausgeliefert werden.
+
+## [1.0.0-alpha.78](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.77...v1.0.0-alpha.78) (2026-10-05)
+
+### Wichtige Änderungen
+
+- **Datenbankmigrationen**: Neue Tabellen für die taktische Fernmeldeskizze (Lage, Komponenten, Verbindungen, Bereiche, Schriftfelder) und die Gerätekopplung
+- **Einsatztagebuch**: Von- und An-Angaben sind jetzt Pflichtfelder bei der ETB-Erfassung
+
+### Stabsarbeit und Fernmeldewesen
+
+- **Taktische Fernmeldeskizze**: Neues Werkzeug zur grafischen Darstellung der Fernmeldeverbindungen mit Sammelschienen, Zeichenfläche nach BBK-Anhang J, Drag-and-Drop-Zuordnung, externen Stellen, Verbindungen, Komponenten und Querformat-Druck mit Funkplan-Anlage
+- **Funkplan**: Betriebsart wird nicht mehr doppelt vor der Sprechgruppen-Bezeichnung gesetzt
+- **Kommunikationsplan**: Übernahme-Funktion berücksichtigt jetzt auch Fernmeldeskizzen-Daten und externe Stellen bei der Lückenzählung
+- **Lagebericht**: Funkplan-Lückenberechnung für "Besondere (Führungs-)Probleme" bezieht externe Stellen und Komponenten aus der Fernmeldeskizze mit ein
+
+### Einsatztagebuch
+
+- **Standard-Rufname**: Jede Person kann einen Standard-Rufnamen für Von/An-Felder hinterlegen, der automatisch vorgeschlagen wird
+- **Pflichtfelder**: Von- und An-Angaben sind nun bei der Erfassung verpflichtend
+- **Volltextsuche**: Findet jetzt auch Wortanfänge (z.B. "Deich" findet "Deichbruch gemeldet")
+- **Ereigniszeit**: Die Vorschlagswerte für "jetzt" richten sich nach der Serveruhr, nicht nach der Gerätezeit
+- **Offline-Betrieb**: Standard-Rufnamen bleiben auch ohne Serververbindung verfügbar
+
+### Dokumente
+
+- **Bezugswahl**: Die ETB-Suche im Bearbeiten-Dialog findet jetzt auch Einträge außerhalb der jüngsten 100 und unterstützt Volltextsuche am Server
+
+### Lagekarte
+
+- **Zeitachse**: Kompaktere Darstellung mit Auswahl-Dropdown statt Knopfreihe, platzsparender (202 statt 282 Pixel im Handschuh-Betrieb)
+- **Stand sichern**: Erfolgt jetzt über einen Dialog statt direkt über Knöpfe
+
+### Kommunikation (Meldungen und Aufträge)
+
+- **Hervorhebung**: Angesprungene Meldungen und Aufträge werden mit Ober- und Unterlinie statt Ring markiert; Alarmfarben haben Vorrang
+- **Ereigniszeit**: Vorschlagswert "jetzt" richtet sich nach der Serveruhr
+
+### Führung und Übersicht
+
+- **Modulfreigaben**: Gesperrte Module werden im Überblick genannt; Sprünge in gesperrte Module sind nicht mehr möglich
+- **Einsatzrahmen**: Zeigt einen Hinweis, wenn ein Modul für die Person nicht freigegeben ist, statt die Seite zu laden
+- **Sprungziele**: Alle Navigations-Elemente prüfen, ob das Zielmodul freigegeben ist, und zeigen andernfalls einen Sperrhinweis
+- **Fristquellen**: Die Übersicht "Nächste Marken" nennt gesperrte Fristquellen explizit
+- **Kräftekennzahl**: Wird nur noch angezeigt, wenn die zugrundeliegenden Datenquellen (Personal, Einheiten) freigegeben sind
+
+### UHS und Betroffenenerfassung
+
+- **UHS-Tablet**: Neues gekoppeltes Gerät mit eigener Oberfläche für Patientenliste, Aufnahme und Grundriss der zugeordneten UHS
+- **UHS-Laptop**: Neues gekoppeltes Gerät mit Bearbeitung von Plätzen, Material-Einsicht, Meldungen und Dateien der zugeordneten UHS
+- **Lagemonitor**: Neues gekoppeltes Kiosk-Gerät mit Vollbild-Anzeige (1920×1080) für Lagekarte, Kopfzahlen, Kräfte und UHS-Belegung ohne Bedienelemente
+
+### Geräteverwaltung
+
+- **Gerätekopplung**: Neue Funktion zur Kopplung von UHS-Tablets, UHS-Laptops und Lagemonitoren über QR-Code oder Texteingabe mit zeitlich begrenzter Gültigkeit und sofortigem Widerruf
+- **Funktionsansichten**: Gekoppelte Geräte haben eingeschränkte Rechte und sehen nur Daten ihrer zugeordneten UHS bzw. verdichtete Lagebilder
+
+### Datei-Uploads
+
+- **Fortschrittsanzeige**: ETB-Anhänge und Erfassungsanhänge zeigen jetzt den Upload-Fortschritt in Prozent und eine ehrliche Statusmeldung bei Abbruch
+
+### Bedienung und Barrierefreiheit
+
+- **Farbkontraste**: Rote Fehlertexte, blaue Kennzeichnungen, gedrückte Knöpfe und Hervorhebungsflächen erfüllen durchgängig WCAG-Kontrastanforderungen (4,5:1 für Text, 3:1 für Bedienelemente)
+- **Layout-Stabilität**: Kennzahlen, Seitenkopf und Paneele im Lage-Dashboard springen beim Laden nicht mehr (besonders im Handschuh-Betrieb bei 390 Pixel Breite)
+
+### Entwicklung und Wartung
+
+- Aktualisierung von Tauri, TypeScript-ESLint, Vitest, Vite und weiteren Abhängigkeiten
+
 ## [1.0.0-alpha.77](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.76...v1.0.0-alpha.77) (2026-10-04)
 
 ### Lagekarte

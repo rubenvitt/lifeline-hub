@@ -12,7 +12,8 @@ import {
 } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import { renderMitProviders } from '../test/utils';
-import EinsatzSeite, { seitenBreiteMax, seitenkopfStil } from './EinsatzSeite';
+import { dichten } from '../theme/tokens';
+import EinsatzSeite, { ortspfadStil, seitenBreiteMax, seitenkopfStil } from './EinsatzSeite';
 
 /**
  * Attrappe für die Palettenbefehle (LFH-391 · B5): `src/test/setup.ts` fährt MSW mit
@@ -234,6 +235,54 @@ describe('EinsatzSeite', () => {
     expect(selektor).toContain('.lfh-seitenkopf__pfad');
     expect(selektor).toContain('li:last-child');
     expect(selektor).toContain(':not(.ant-breadcrumb-separator)');
+  });
+
+  /**
+   * LFH-909: jeder Pfad-Link hält die Dichte-Staffel. Die Stilfunktion liefert den Boden als
+   * aufgelösten Pixelwert; die Böden stehen als LITERALE, aus `dichten` gelesen prüfte der Test
+   * den Token gegen sich selbst. Ob der Link die Höhe im Layout erreicht, misst Gate 3.
+   */
+  it('gibt dem Ortspfad den Boden der Stufe als Variable (30 / 48 / 72 px)', () => {
+    const tokenFuer = (s: keyof typeof dichten) => ({ controlHeight: dichten[s].zeilenhoehe });
+    const ziel = (s: keyof typeof dichten) =>
+      (ortspfadStil(tokenFuer(s)) as Record<string, unknown>)['--lfh-ortspfad-ziel'];
+    expect(ziel('kompakt')).toBe('30px');
+    expect(ziel('komfortabel')).toBe('48px');
+    expect(ziel('handschuh')).toBe('72px');
+  });
+
+  it('setzt den Boden am Wrapper des Ortspfads', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="Befehl" breadcrumb={<nav>Einsätze</nav>}>
+        <div>x</div>
+      </EinsatzSeite>,
+    );
+    const pfad = container.querySelector<HTMLElement>('.lfh-seitenkopf__pfad')!;
+    expect(pfad.style.getPropertyValue('--lfh-ortspfad-ziel')).toMatch(/^\d+px$/);
+  });
+
+  /**
+   * Quelltext-Pin der Pfad-Link-Regel (Vitest fährt mit `css: false`): antd setzt den Link auf
+   * `height: fontHeight` (20 px bei 12-px-Schrift). Die Regel hebt das auf, liest den Boden aus der
+   * Variable und hält die Hover-Fläche auf der Textzeile. `:root` macht sie unabhängig von der
+   * Reihenfolge der Stile.
+   */
+  it('hebt den Pfad-Link auf den Boden, ohne die Schrift anzufassen', () => {
+    const regel = seiteCss.match(
+      /:root \.lfh-seitenkopf__pfad \.ant-breadcrumb-item a\s*\{([^}]*)\}/,
+    );
+    expect(regel, 'EinsatzSeite.css trägt die Pfad-Link-Regel').not.toBeNull();
+    const koerper = regel![1];
+    expect(koerper).toMatch(/height:\s*auto/);
+    expect(koerper).toMatch(/min-height:\s*var\(--lfh-ortspfad-ziel\)/);
+    // Durchsichtiger Rand statt Polster: die Hinterlegung behält antds seitliches Polster.
+    expect(koerper).toMatch(/border-block:[^;]*transparent/);
+    expect(koerper).toMatch(/background-clip:\s*padding-box/);
+    expect(koerper).not.toMatch(/padding-block/);
+    expect(koerper).not.toMatch(/font-size/);
+    const liste = seiteCss.match(/:root \.lfh-seitenkopf__pfad \.ant-breadcrumb ol\s*\{([^}]*)\}/);
+    expect(liste, 'EinsatzSeite.css mittet die Pfadliste').not.toBeNull();
+    expect(liste![1]).toMatch(/align-items:\s*center/);
   });
 
   it('löst über einen Header-Button (außerhalb des Form) das Speichern via form.submit() aus', async () => {

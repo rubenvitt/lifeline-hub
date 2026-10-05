@@ -189,9 +189,11 @@ export function SpaltenSchalter<K extends string>(props: {
             (
               /*
                * Das Kästchen ist ANZEIGE: mit eigenem `onChange` löste ein Mausklick zusätzlich das `onClick`
-               * des Eintrags aus und nähme die Umschaltung im selben Zug zurück.
+               * des Eintrags aus und nähme die Umschaltung im selben Zug zurück. Aus demselben
+               * Grund ohne den Boden des Kästchens (`antdKaestchen`, LFH-907): Ziel ist der
+               * Menüeintrag, der die Steuerhöhe schon trägt; der Boden käme oben drauf.
                */
-              <Checkbox checked={sichtbar.has(spalte.key)}>
+              <Checkbox checked={sichtbar.has(spalte.key)} style={{ minHeight: 0 }}>
                 {etikettVon(spalte) ?? spalte.key}
               </Checkbox>
             ),

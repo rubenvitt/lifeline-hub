@@ -15,6 +15,12 @@
  * `parseRouteId`, Render-Stellen mit möglicherweise fehlender ID guarden vor dem Aufruf.
  */
 import type { EtbFilterWerte } from '../api/etb';
+import {
+  AUSWAHL_PARAM,
+  auswahlParam,
+  parseBerichtAuswahl,
+  type BlockSchluessel,
+} from '../druck/einsatzbericht/auswahl';
 import type { EtbTyp, SchadenStatus, Spezies, ZoneTyp } from '../api/types';
 import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter';
 import type { TiereSicht } from '../pages/tiere/tierHelfer';
@@ -142,10 +148,21 @@ export function einsatzdatenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'einsatzdaten');
 }
 
-/** Druckansicht des Einsatzberichts (LFH-726): Unterroute der Einsatzdaten, erbt deren Freigabe. */
-export function einsatzberichtPfad(einsatzId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'einsatzdaten')}/bericht`;
+/**
+ * Druckansicht des Einsatzberichts (LFH-726): Unterroute der Einsatzdaten, erbt deren Freigabe.
+ * Die Auswahl der Blöcke reist als `?bloecke=` (LFH-902); der Standardumfang schreibt nichts.
+ */
+export function einsatzberichtPfad(
+  einsatzId: number,
+  auswahl?: readonly BlockSchluessel[],
+): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'einsatzdaten')}/bericht`, {
+    [AUSWAHL_PARAM]: auswahl ? auswahlParam(auswahl) : undefined,
+  });
 }
+
+/** Umkehr von {@link einsatzberichtPfad}: unbekannte Schlüssel fallen weg, leer = Standardumfang. */
+export { parseBerichtAuswahl };
 
 export function erinnerungenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'erinnerungen');

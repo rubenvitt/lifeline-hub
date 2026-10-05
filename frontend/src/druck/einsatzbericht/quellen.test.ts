@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ModulFreigaben } from '../../api/types';
 import { modulRegistry } from '../../einsatz/modulRegistry';
 import { freigabenFixture } from '../../test/fixtures';
+import { STANDARDUMFANG } from './auswahl';
 import { BLOECKE, QUELLEN, berichtFreigabe } from './quellen';
 
 /**
@@ -18,12 +19,28 @@ describe('QUELLEN', () => {
     }
   });
 
-  it('ordnet jede Quelle einem Block zu, und jeder Block außer Zeiten hat eine eigene', () => {
+  it('ordnet jede Quelle mindestens einem Block zu, und jeder Block hat eine Quelle', () => {
     const bloecke = new Set(BLOECKE.map((b) => b.schluessel));
-    for (const q of QUELLEN) expect(bloecke).toContain(q.block);
-    // Zeiten liest den Einsatz mit, den die Stammdaten schon holen.
-    const ohneQuelle = BLOECKE.filter((b) => !QUELLEN.some((q) => q.block === b.schluessel));
-    expect(ohneQuelle.map((b) => b.schluessel)).toEqual(['zeiten']);
+    for (const q of QUELLEN) {
+      expect(q.bloecke.length, q.schluessel).toBeGreaterThan(0);
+      for (const b of q.bloecke) expect(bloecke).toContain(b);
+    }
+    const ohneQuelle = BLOECKE.filter(
+      (b) => !QUELLEN.some((q) => q.bloecke.includes(b.schluessel)),
+    );
+    expect(ohneQuelle).toEqual([]);
+  });
+
+  it('die Anlagen schöpfen aus der Kräfte-Zeitachse (LFH-902, design.md D2)', () => {
+    const quellenVon = (b: string) =>
+      QUELLEN.filter((q) => q.bloecke.includes(b as never)).map((q) => q.schluessel);
+    expect(quellenVon('einheiten-zeiten')).toEqual(['einsatz', 'einheiten', 'einheitenPerioden']);
+    expect(quellenVon('personal-kopf')).toEqual([
+      'einsatz',
+      'einheiten',
+      'personal',
+      'personalPerioden',
+    ]);
   });
 
   it('hält die Reihenfolge der Blöcke fest', () => {
@@ -35,6 +52,8 @@ describe('QUELLEN', () => {
       'Lage',
       'Bilanz',
       'ETB-Auszug',
+      'Anlage Einheiten mit Einsatzzeiten',
+      'Anlage Personal je Kopf',
     ]);
   });
 });
@@ -90,5 +109,46 @@ describe('berichtFreigabe', () => {
     const f = berichtFreigabe(alleAus);
     expect(f.je.einsatz).toBe('abrufen');
     expect(f.je.mitglieder).toBe('abrufen');
+  });
+});
+
+describe('berichtFreigabe mit Auswahl (LFH-902, design.md D3)', () => {
+  it('ohne Auswahl gilt der Standardumfang, die Anlagen-Quellen bleiben trotzdem abgerufen', () => {
+    // Personal und Einheiten speisen auch den Block Kräfte.
+    const f = berichtFreigabe(freigabenFixture());
+    expect(f.je.personal).toBe('abrufen');
+    expect(f.je.einheitenPerioden).toBe('abrufen');
+  });
+
+  it('ein gesperrtes Modul eines gewählten Blocks sperrt', () => {
+    const f = berichtFreigabe(freigabenFixture({ personen: { zugriff: false } }), [
+      'stammdaten',
+      'bilanz',
+    ]);
+    expect(f.gesperrteModule).toEqual(['Personen']);
+  });
+
+  it('ein gesperrtes Modul eines abgewählten Blocks sperrt nicht und wird nicht abgerufen', () => {
+    const f = berichtFreigabe(
+      freigabenFixture({ personen: { zugriff: false } }),
+      STANDARDUMFANG.filter((b) => b !== 'bilanz'),
+    );
+    expect(f.je.personen).toBe('nicht-gewaehlt');
+    expect(f.je.schaeden).toBe('nicht-gewaehlt');
+    expect(f.gesperrteModule).toEqual([]);
+  });
+
+  it('nur die Personal-Anlage: Einsatz, Einheiten und Personal, sonst nichts', () => {
+    const f = berichtFreigabe(freigabenFixture(), ['personal-kopf']);
+    const abgerufen = QUELLEN.filter((q) => f.je[q.schluessel] === 'abrufen').map(
+      (q) => q.schluessel,
+    );
+    expect(abgerufen).toEqual(['einsatz', 'einheiten', 'personal', 'personalPerioden']);
+  });
+
+  it('der Einsatz wird bei jeder Auswahl abgerufen', () => {
+    const f = berichtFreigabe(freigabenFixture(), ['etb']);
+    expect(f.je.einsatz).toBe('abrufen');
+    expect(f.je.mitglieder).toBe('nicht-gewaehlt');
   });
 });

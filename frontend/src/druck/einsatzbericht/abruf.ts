@@ -19,7 +19,7 @@ import { QUELLEN, modulLabel, type QuellenFreigabe, type QuellenSchluessel } fro
  * Stand. Nie verworfen wird das Ganze wegen einer Quelle — jede trägt ihren eigenen Zustand, und
  * die Seite entscheidet, ob gedruckt werden darf (Spec „Vollständig oder gar nicht“).
  *
- * Eine Quelle auf `gesperrt` oder `nicht-genutzt` geht nicht ans Netz: ein Abruf ergäbe nur ein
+ * Eine Quelle auf `gesperrt`, `nicht-genutzt` oder `nicht-gewaehlt` geht nicht ans Netz: ein Abruf ergäbe nur ein
  * 403 und am Server einen Fehlversuch ohne Erkenntnis.
  */
 
@@ -50,7 +50,9 @@ export type QuellenErgebnis<T> =
   | { zustand: 'fehler'; fehler: unknown }
   /** 403: gesperrt, Org-Vorgabe oder Aufbewahrungsfrist — nie ein leerer Bestand. */
   | { zustand: 'kein-zugriff' }
-  | { zustand: 'nicht-genutzt' };
+  | { zustand: 'nicht-genutzt' }
+  /** Kein gewählter Block schöpft daraus (LFH-902) — nicht abgerufen. */
+  | { zustand: 'nicht-gewaehlt' };
 
 export type BerichtQuellen = {
   [K in QuellenSchluessel]: QuellenErgebnis<Awaited<ReturnType<Abruf[K]>>>;
@@ -67,6 +69,7 @@ async function eineQuelle<T>(
   laden: () => Promise<T>,
 ): Promise<QuellenErgebnis<T>> {
   if (freigabe === 'nicht-genutzt') return { zustand: 'nicht-genutzt' };
+  if (freigabe === 'nicht-gewaehlt') return { zustand: 'nicht-gewaehlt' };
   if (freigabe === 'gesperrt') return { zustand: 'kein-zugriff' };
   try {
     return { zustand: 'daten', daten: await laden() };
@@ -103,7 +106,7 @@ export type BerichtZustand =
   | { art: 'fehler'; module: string[] };
 
 /**
- * Darf gedruckt werden? Nur wenn jede Quelle `daten` oder `nicht-genutzt` trägt (Spec „Vollständig
+ * Darf gedruckt werden? Nur wenn jede Quelle `daten`, `nicht-genutzt` oder `nicht-gewaehlt` trägt (Spec „Vollständig
  * oder gar nicht“). „Kein Zugriff“ geht dem Fehler vor: der Grund gilt auch nach einem neuen
  * Versuch (wie `schlechtesterZustand` in `api/abrufZustand.ts`).
  */

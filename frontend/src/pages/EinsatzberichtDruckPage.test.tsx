@@ -2,7 +2,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
@@ -73,8 +73,16 @@ function freigaben(abweichend: Parameters<typeof freigabenFixture>[0]) {
   );
 }
 
-function rendere() {
+/** Zeigt die aktuelle Adresse, damit ein Test die Auswahl in der Query lesen kann. */
+function Adresse() {
+  const { search } = useLocation();
+  return <output data-testid="adresse">{search}</output>;
+}
+
+function rendere(query = '', { gcTime }: { gcTime?: number } = {}) {
   const client = neuerQueryClient();
+  // Die Testvorgabe `gcTime: 0` verdeckte, ob die Seite einen alten Schnappschuss behält.
+  if (gcTime != null) client.setDefaultOptions({ queries: { retry: false, gcTime } });
   client.setQueryData(einsatzKeys.einstellungen(E), {
     einsatz_id: E,
     zeitzone: 'Europe/Berlin',
@@ -83,10 +91,18 @@ function rendere() {
   return renderMitProviders(
     <EinsatzAnzeigeProvider einsatzId={E}>
       <Routes>
-        <Route path="/einsaetze/:id/einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
+        <Route
+          path="/einsaetze/:id/einsatzdaten/bericht"
+          element={
+            <>
+              <EinsatzberichtDruckPage />
+              <Adresse />
+            </>
+          }
+        />
       </Routes>
     </EinsatzAnzeigeProvider>,
-    { route: `/einsaetze/${E}/einsatzdaten/bericht`, client },
+    { route: `/einsaetze/${E}/einsatzdaten/bericht${query}`, client },
   );
 }
 
@@ -150,7 +166,7 @@ describe('EinsatzberichtDruckPage', () => {
     freigaben({ personen: { zugriff: false } });
     rendere();
     expect(
-      await screen.findByText('Für den Einsatzbericht fehlen Rechte an: Personen.'),
+      await screen.findByText(/^Für den Einsatzbericht fehlen Rechte an: Personen\./),
     ).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
     expect(aufrufe.get('/personen')).toBeUndefined();
@@ -272,5 +288,127 @@ describe('EinsatzberichtDruckPage', () => {
     expect(await screen.findByText('Einsatzbericht wird geladen …')).toBeInTheDocument();
     expect(druckKnopf()).toBeDisabled();
     await fertig();
+  });
+});
+
+describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
+  const blockTitel = () =>
+    Array.from(
+      document.querySelectorAll('[data-lfh="druckwurzel"] [data-lfh^="einsatzbericht-block-"] h3'),
+    ).map((h) => h.textContent);
+  const kopf = () => document.querySelector('[data-lfh="druckkopf"]') as HTMLElement;
+  const adresse = () => screen.getByTestId('adresse').textContent ?? '';
+  const auswahlleiste = () => screen.getByRole('region', { name: 'Blöcke' });
+
+  it('ohne Auswahl: Standardumfang, alle sieben gewählt, Anlagen nicht', async () => {
+    quellen();
+    rendere();
+    await fertig();
+    expect(kopf()).toHaveTextContent('Standardumfang');
+    const leiste = auswahlleiste();
+    expect(within(leiste).getByRole('checkbox', { name: 'Bilanz' })).toBeChecked();
+    expect(
+      within(leiste).getByRole('checkbox', { name: /Anlage Personal je Kopf/ }),
+    ).not.toBeChecked();
+    // Die Leiste ist Bedienung, nicht Blatt: sie liegt außerhalb der Druckwurzel.
+    expect(leiste.closest('[data-lfh="druckwurzel"]')).toBeNull();
+  });
+
+  it('Bilanz abwählen: Block fehlt ganz, Adresse und Kopf tragen die Auswahl', async () => {
+    quellen();
+    rendere();
+    await fertig();
+    await userEvent.click(within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' }));
+    await fertig();
+    await waitFor(() => expect(blockTitel()).not.toContain('Bilanz'));
+    expect(blockTitel()).toEqual([
+      'Stammdaten',
+      'Zeiten',
+      'Führung',
+      'Kräfte',
+      'Lage',
+      'ETB-Auszug',
+    ]);
+    expect(document.querySelector('[data-lfh="einsatzbericht-block-bilanz"]')).toBeNull();
+    expect(new URLSearchParams(adresse()).get('bloecke')).toBe(
+      'stammdaten,zeiten,fuehrung,kraefte,lage,etb',
+    );
+    expect(kopf()).toHaveTextContent(
+      'Auswahl: Stammdaten, Zeiten, Führung, Kräfte, Lage, ETB-Auszug',
+    );
+  });
+
+  it('liest die Auswahl aus der Adresse, verwirft Unbekanntes und ruft nur Gewähltes ab', async () => {
+    const aufrufe = quellen();
+    rendere('?bloecke=stammdaten,kosten');
+    await fertig();
+    expect(blockTitel()).toEqual(['Stammdaten']);
+    expect(kopf()).toHaveTextContent('Auswahl: Stammdaten');
+    expect(kopf()).not.toHaveTextContent('kosten');
+    expect(aufrufe.get('/personen')).toBeUndefined();
+    expect(aufrufe.get('/lageberichte')).toBeUndefined();
+  });
+
+  it('eine frühere Auswahl lädt neu, statt einen alten Schnappschuss zu zeigen', async () => {
+    const aufrufe = quellen();
+    rendere('', { gcTime: 5 * 60_000 });
+    await fertig();
+    expect(aufrufe.get('/personen')).toBe(1);
+    const bilanz = () => within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' });
+    await userEvent.click(bilanz());
+    await waitFor(() => expect(blockTitel()).not.toContain('Bilanz'));
+    await userEvent.click(bilanz());
+    await waitFor(() => expect(blockTitel()).toContain('Bilanz'));
+    await fertig();
+    expect(aufrufe.get('/personen')).toBe(2);
+  });
+
+  it('der letzte gewählte Block lässt sich nicht abwählen', async () => {
+    quellen();
+    rendere('?bloecke=stammdaten');
+    await fertig();
+    expect(within(auswahlleiste()).getByRole('checkbox', { name: 'Stammdaten' })).toBeDisabled();
+    expect(within(auswahlleiste()).getByRole('checkbox', { name: 'Zeiten' })).toBeEnabled();
+  });
+
+  it('„Standardumfang“ setzt die Auswahl zurück', async () => {
+    quellen();
+    rendere('?bloecke=stammdaten');
+    await fertig();
+    await userEvent.click(within(auswahlleiste()).getByRole('button', { name: 'Standardumfang' }));
+    await waitFor(() => expect(blockTitel()).toHaveLength(7));
+    expect(adresse()).toBe('');
+  });
+
+  it('Personen gesperrt, Bilanz abgewählt: druckbar ohne Abruf der Personen', async () => {
+    const aufrufe = quellen();
+    freigaben({ personen: { zugriff: false } });
+    rendere();
+    expect(
+      await screen.findByText(/Für den Einsatzbericht fehlen Rechte an: Personen\./),
+    ).toBeInTheDocument();
+    // Die Leiste bleibt in der Sackgasse: dort liegt der Ausweg.
+    await userEvent.click(within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' }));
+    await fertig();
+    expect(blockTitel()).not.toContain('Bilanz');
+    expect(aufrufe.get('/personen')).toBeUndefined();
+  });
+
+  it('Personal-Anlage: Namen der Einsatzkräfte im Blatt, der Kopf vermerkt den Personenbezug', async () => {
+    const roh = rohBericht({
+      personal: {
+        zustand: 'daten',
+        daten: [{ id: 11, name: 'Anna Helferin', funktion: 'Sprechfunkerin', einheit_id: 1 }],
+      } as never,
+    });
+    quellen(roh);
+    rendere('?bloecke=personal-kopf');
+    await fertig();
+    expect(blockTitel()).toEqual(['Anlage Personal je Kopf']);
+    const anlage = document.querySelector(
+      '[data-lfh="einsatzbericht-block-personal-kopf"]',
+    ) as HTMLElement;
+    expect(within(anlage).getByText('Anna Helferin')).toBeInTheDocument();
+    expect(kopf()).toHaveTextContent('enthält Namen von Einsatzkräften');
   });
 });
