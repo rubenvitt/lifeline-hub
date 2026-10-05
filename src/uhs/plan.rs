@@ -26,7 +26,7 @@ pub const MAX_KANTE: u32 = 10_000;
 /// (`platz_repo::raster_position`, `RAND`).
 pub const RASTER: i64 = 10;
 
-/// Grenzen der Lage (Spec „Lage des Plans zur Platzfläche“, CHECK in `0151_uhs_plan.sql`).
+/// Grenzen der Lage (Spec „Lage des Plans zur Platzfläche“, CHECK in `0152_uhs_plan.sql`).
 pub const BREITE_MIN: i64 = 100;
 pub const BREITE_MAX: i64 = 5_000;
 pub const VERSATZ_MAX: i64 = 10_000;
