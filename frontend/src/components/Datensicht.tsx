@@ -35,6 +35,7 @@ import {
 export { etikettVon, hatWaehlbareSpalten, sichtbareSpalten };
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import { kennungsLinkStil } from './kennungsLink';
 
 /**
  * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2): EINE Spaltendefinition je Modul, zwei
@@ -1110,11 +1111,7 @@ export default function Datensicht<T extends object, const K extends string>(
           const ziel = karte.titel.ziel;
           gebaut.render = (_wert, zeile, index) => {
             const nach = ziel(zeile);
-            const stil = {
-              display: 'inline-flex',
-              alignItems: 'center',
-              minHeight: token.controlHeight,
-            } as const;
+            const stil = kennungsLinkStil({ controlHeight: token.controlHeight });
             return nach == null ? (
               <span style={stil}>{zelle(spalte, zeile, index)}</span>
             ) : (
@@ -1350,15 +1347,7 @@ export default function Datensicht<T extends object, const K extends string>(
             >
               {ziel != null ? (
                 // Das Tastaturziel der Zeile: ein echter Link mit Höhe aus `controlHeight`.
-                <Link
-                  to={ziel}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    minHeight: token.controlHeight,
-                    fontWeight: 600,
-                  }}
-                >
+                <Link to={ziel} style={{ ...kennungsLinkStil(token), fontWeight: 600 }}>
                   {titelInhalt}
                 </Link>
               ) : (

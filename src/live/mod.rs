@@ -4,6 +4,7 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 use tokio::sync::broadcast;
 use utoipa::ToSchema;
 
@@ -187,13 +188,28 @@ const KANAL_KAPAZITAET: usize = 256;
 /// liegt seine Last-Event-ID vor dem ältesten Ring-Eintrag, gilt eine `Luecke` → Voll-Resync.
 const REPLAY_KAPAZITAET: usize = 256;
 
+/// Wie lange ein Kanal ohne Empfänger mit Ring und Zähler stehen bleibt (LFH-918). Ein Client,
+/// der innerhalb dieser Frist zurückkommt, bekommt die verpassten Nachrichten nachgeliefert —
+/// auch die, die genau in sein Offline-Fenster fielen. Danach räumt der Sweep den Kanal ab, und
+/// eine alte `Last-Event-ID` ergibt `Luecke`.
+pub const REPLAY_KARENZ: Duration = Duration::from_secs(10 * 60);
+
+/// Takt des Sweeps über verwaiste Kanäle ([`LiveHub::starte_kanal_sweep`]). Ein leerer Kanal
+/// verschwindet damit zwischen `REPLAY_KARENZ` und `REPLAY_KARENZ + KANAL_SWEEP_TAKT` nach dem
+/// Moment, in dem sein letzter Empfänger wegfiel.
+const KANAL_SWEEP_TAKT: Duration = Duration::from_secs(5 * 60);
+
 /// Eine Live-Nachricht im Einsatz-Kanal: eine monotone Id plus SSE-Event-Name und
 /// serialisierte Daten. Clients abonnieren denselben Kanal und filtern per Event-Name
 /// (`etb`, `person`, …) — sensible Payload gehört NICHT in `data`.
 ///
-/// `id` = `"{epoch}-{n}"`: `n` ist pro Einsatz monoton (ab 1), `epoch` ist prozess-eindeutig
+/// `id` = `"{epoch}-{n}"`: `n` ist pro Einsatz streng monoton, `epoch` ist prozess-eindeutig
 /// (Prozessstart). Nach einem Serverneustart ändert sich die epoch → alte `Last-Event-ID`s
 /// werden als `Luecke` erkannt statt auf wiederverwendete `n` zu aliasen (best-effort-Replay).
+/// Innerhalb des Prozesses vergibt ein Einsatz kein `n` zweimal, auch nicht, wenn der Sweep
+/// seinen Kanal abräumt und ein neues Abonnement ihn neu anlegt (LFH-918): der neue Kanal
+/// beginnt hinter jeder bisher im Prozess vergebenen Nummer (`Kanaele::hoechste_id`).
+/// Verschiedene Einsätze dürfen dieselbe Nummer tragen, der Replay läuft je Einsatz.
 #[derive(Clone, Debug)]
 pub struct LiveNachricht {
     pub id: String,
@@ -219,10 +235,39 @@ pub enum Replay {
 /// unter demselben Write-Lock des `LiveHub` angefasst — so kann zwischen dem Ring-Snapshot
 /// und dem `subscribe()` in `abonniere_mit_replay` kein `send` aus `publiziere_event`
 /// dazwischenfunken (exactly-once, gap-/dup-frei).
+///
+/// Der Kanal überlebt seinen letzten Empfänger (LFH-918): Ring und Zähler bleiben, bis der
+/// Sweep ihn nach [`REPLAY_KARENZ`] ohne Empfänger abräumt.
 struct Kanal {
     sender: broadcast::Sender<LiveNachricht>,
+    /// Erste Nummer, die dieser Kanal vergeben hat bzw. vergeben wird. Eine `Last-Event-ID`
+    /// derselben Epoch davor stammt aus einem abgeräumten Vorgänger → `Luecke`.
+    erste_id: u64,
     naechste_id: u64,
     ring: VecDeque<LiveNachricht>,
+    /// Seit wann der Kanal keinen Empfänger mehr hat; `None`, solange einer lauscht oder der
+    /// Sweep die Leere noch nicht gesehen hat.
+    leer_seit: Option<Instant>,
+}
+
+impl Kanal {
+    fn neu(erste_id: u64) -> Self {
+        Self {
+            sender: broadcast::channel(KANAL_KAPAZITAET).0,
+            erste_id,
+            naechste_id: erste_id,
+            ring: VecDeque::new(),
+            leer_seit: None,
+        }
+    }
+}
+
+/// Inhalt des `LiveHub`-Locks: die Kanäle und die höchste im Prozess vergebene oder verworfene
+/// Nummer. Ein neu angelegter Kanal beginnt bei `hoechste_id + 1` (LFH-918).
+#[derive(Default)]
+struct Kanaele {
+    map: HashMap<i64, Kanal>,
+    hoechste_id: u64,
 }
 
 /// Registry der Live-Kanäle: pro Einsatz ein `Kanal`, über den getaggte `LiveNachricht`-
@@ -231,7 +276,7 @@ struct Kanal {
 /// Klonbar (teilt denselben inneren Zustand) — wird im `AppState` gehalten.
 #[derive(Clone)]
 pub struct LiveHub {
-    kanaele: Arc<RwLock<HashMap<i64, Kanal>>>,
+    kanaele: Arc<RwLock<Kanaele>>,
     /// Prozessweiter Org-Kanal (LFH-734): Org-Ereignisse aller Organisationen, gefiltert erst
     /// beim Abonnenten ([`org::OrgAbonnent::sieht`]). Ohne Ring und ohne Id (LFH-734, design.md D4).
     org: broadcast::Sender<org::OrgNachricht>,
@@ -257,9 +302,10 @@ fn parse_id(roh: &str) -> Option<(u64, u64)> {
 
 /// Bestimmt aus dem Ring, ob und welche Nachrichten seit `roh` (der `Last-Event-ID`) verpasst
 /// wurden. `naechste_id` ist die nächste zu vergebende Id; die zuletzt vergebene war
-/// `naechste_id - 1`.
+/// `naechste_id - 1`. `erste_id` ist die erste Nummer des Kanals (siehe [`Kanal`]).
 fn bestimme_replay(
     ring: &VecDeque<LiveNachricht>,
+    erste_id: u64,
     naechste_id: u64,
     epoch: u64,
     roh: &str,
@@ -273,6 +319,11 @@ fn bestimme_replay(
     // `saturating_add`, weil `n` aus der client-kontrollierten Last-Event-ID stammt
     // (parse_id akzeptiert bis u64::MAX) — `n + 1` würde bei u64::MAX im Debug/Test-Build
     // panicken. Eine „aus der Zukunft" liegende Id fällt so sauber auf „nichts Neues".
+    // Liegt die nächste erwartete Nummer vor dem Kanalbeginn, stammt die Id aus einem
+    // abgeräumten Vorgänger: was dazwischen lag, ist weg — auch bei leerem Ring (LFH-918).
+    if n.saturating_add(1) < erste_id {
+        return Replay::Luecke;
+    }
     if n.saturating_add(1) >= naechste_id {
         return Replay::Events(Vec::new());
     }
@@ -299,7 +350,7 @@ impl LiveHub {
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0);
         Self {
-            kanaele: Arc::new(RwLock::new(HashMap::new())),
+            kanaele: Arc::new(RwLock::new(Kanaele::default())),
             org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
             epoch,
             kopplung_ende: broadcast::channel(256).0,
@@ -368,17 +419,53 @@ impl LiveHub {
         seit: Option<String>,
     ) -> (Replay, broadcast::Receiver<LiveNachricht>) {
         let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
-        let kanal = kanaele.entry(einsatz_id).or_insert_with(|| Kanal {
-            sender: broadcast::channel(KANAL_KAPAZITAET).0,
-            naechste_id: 1,
-            ring: VecDeque::new(),
-        });
+        let Kanaele { map, hoechste_id } = &mut *kanaele;
+        let kanal = map
+            .entry(einsatz_id)
+            .or_insert_with(|| Kanal::neu(hoechste_id.saturating_add(1)));
+        kanal.leer_seit = None;
         let replay = match seit {
             None => Replay::Keine,
-            Some(roh) => bestimme_replay(&kanal.ring, kanal.naechste_id, self.epoch, &roh),
+            Some(roh) => bestimme_replay(
+                &kanal.ring,
+                kanal.erste_id,
+                kanal.naechste_id,
+                self.epoch,
+                &roh,
+            ),
         };
         let rx = kanal.sender.subscribe();
         (replay, rx)
+    }
+
+    /// Räumt Kanäle ab, die seit mindestens [`REPLAY_KARENZ`] keinen Empfänger haben (LFH-918).
+    ///
+    /// Ein Kanal ohne Empfänger, dessen Leere noch nicht vermerkt ist (letzter Empfänger fiel
+    /// ohne folgendes Publish weg), bekommt `jetzt` als Beginn seiner Karenz. Kanäle mit
+    /// Empfänger bleiben unberührt. `jetzt` ist Parameter, damit Tests die Uhr führen.
+    pub fn raeume_verwaiste(&self, jetzt: Instant) {
+        let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
+        kanaele.map.retain(|_, kanal| {
+            // Jeder neue Empfänger kommt über `abonniere_mit_replay`, das `leer_seit` löscht.
+            if kanal.sender.receiver_count() > 0 {
+                return true;
+            }
+            let seit = *kanal.leer_seit.get_or_insert(jetzt);
+            jetzt.saturating_duration_since(seit) < REPLAY_KARENZ
+        });
+    }
+
+    /// Startet den periodischen Sweep über verwaiste Kanäle (nur im Server-Lauf, wie
+    /// `erinnerung::scheduler::starte_scheduler`).
+    pub fn starte_kanal_sweep(&self) {
+        let hub = self.clone();
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(KANAL_SWEEP_TAKT);
+            loop {
+                ticker.tick().await;
+                hub.raeume_verwaiste(Instant::now());
+            }
+        });
     }
 
     /// Meldet einen geänderten ETB-Eintrag an alle Abonnenten — **ID-only**
@@ -419,27 +506,38 @@ impl LiveHub {
     ///
     /// Vergibt die monotone Id, pflegt den Replay-Ring und sendet — alles unter EINEM
     /// Write-Lock (dieselbe Lock wie `abonniere_mit_replay`, siehe dort). Existiert kein
-    /// Kanal (nie jemand abonniert), geht die Nachricht verloren — neue Abonnenten erhalten
-    /// nur nachfolgende Einträge. Ein Kanal, dessen letzter Empfänger weg ist, wird
-    /// opportunistisch entfernt, damit der Hub nicht über abgeschlossene Einsätze leakt.
+    /// Kanal (nie abonniert oder vom Sweep abgeräumt), geht die Nachricht verloren — neue
+    /// Abonnenten erhalten nur nachfolgende Einträge. Sie verbraucht trotzdem eine Nummer,
+    /// damit ein später angelegter Kanal hinter ihr beginnt und ein Client mit älterer Id
+    /// `Luecke` sieht statt „nichts verpasst".
+    ///
+    /// Hat der Kanal keinen Empfänger mehr, bleiben Ring und Zähler stehen (LFH-918): ein
+    /// Client, der innerhalb der [`REPLAY_KARENZ`] zurückkommt, bekommt gerade diese Nachricht
+    /// nachgeliefert. Abgebaut wird nur im Sweep ([`Self::raeume_verwaiste`]).
     pub fn publiziere_event(&self, einsatz_id: i64, event: LiveEvent, data: String) {
         let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
-        let Some(kanal) = kanaele.get_mut(&einsatz_id) else {
-            return; // kein Abonnent → verwerfen
+        let Kanaele { map, hoechste_id } = &mut *kanaele;
+        let Some(kanal) = map.get_mut(&einsatz_id) else {
+            *hoechste_id = hoechste_id.saturating_add(1); // kein Kanal → verwerfen
+            return;
         };
+        let n = kanal.naechste_id;
+        kanal.naechste_id += 1;
+        *hoechste_id = (*hoechste_id).max(n);
         let nachricht = LiveNachricht {
-            id: format!("{}-{}", self.epoch, kanal.naechste_id),
+            id: format!("{}-{n}", self.epoch),
             event,
             data,
         };
-        kanal.naechste_id += 1;
         if kanal.ring.len() >= REPLAY_KAPAZITAET {
             kanal.ring.pop_front();
         }
         kanal.ring.push_back(nachricht.clone());
-        // send() liefert Err, wenn kein Empfänger mehr lauscht → verwaisten Kanal entfernen.
-        if kanal.sender.send(nachricht).is_err() {
-            kanaele.remove(&einsatz_id);
+        // send() liefert Err, wenn kein Empfänger mehr lauscht: die Karenz beginnt.
+        if kanal.sender.send(nachricht).is_ok() {
+            kanal.leer_seit = None;
+        } else {
+            kanal.leer_seit.get_or_insert_with(Instant::now);
         }
     }
 }
@@ -481,13 +579,26 @@ mod tests {
         hub.publiziere(99, 1); // darf nicht panicken
     }
 
+    fn hat_kanal(hub: &LiveHub, einsatz_id: i64) -> bool {
+        hub.kanaele.read().unwrap().map.contains_key(&einsatz_id)
+    }
+
+    /// Seit LFH-918 baut ein Publish ohne Empfänger den Kanal nicht mehr ab: Ring und Zähler
+    /// bleiben für den Reconnect stehen, abgeräumt wird erst nach der Karenz im Sweep.
     #[tokio::test]
-    async fn kanal_ohne_empfaenger_wird_entfernt() {
+    async fn kanal_ohne_empfaenger_bleibt_bis_zur_karenz() {
         let hub = LiveHub::new();
         let rx = hub.abonniere(1);
         drop(rx); // letzter Empfänger weg
-        hub.publiziere(1, 1); // löst Cleanup aus
-        assert!(hub.kanaele.read().unwrap().get(&1).is_none());
+        hub.publiziere(1, 1);
+        assert!(
+            hat_kanal(&hub, 1),
+            "Publish ohne Empfänger darf nicht abbauen"
+        );
+        hub.raeume_verwaiste(Instant::now());
+        assert!(hat_kanal(&hub, 1), "vor Ablauf der Karenz bleibt der Kanal");
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+        assert!(!hat_kanal(&hub, 1), "nach der Karenz räumt der Sweep ab");
     }
 
     #[tokio::test]
@@ -778,5 +889,179 @@ mod tests {
             }
             _ => panic!("verpasste sofortmeldung muss als Replay-Event kommen"),
         }
+    }
+
+    // --- LFH-918: Kanal überlebt den letzten Empfänger, Sweep nach Karenz ---
+
+    #[tokio::test]
+    async fn replay_nach_empfaenger_abbau_liefert_alarm_nach() {
+        // Der einzige Empfänger reißt ab; im Offline-Fenster feuert der Scheduler eine
+        // Erinnerung. Beim Reconnect mit der alten Last-Event-ID muss genau sie nachkommen.
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "vorher".into());
+        let n1 = rx.recv().await.unwrap();
+        drop(rx);
+        hub.publiziere_event(1, LiveEvent::Erinnerung, r#"{"erinnerung_id":4}"#.into());
+
+        let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
+        match replay {
+            Replay::Events(v) => {
+                assert_eq!(v.len(), 1);
+                assert_eq!(v[0].event, LiveEvent::Erinnerung);
+                assert_eq!(v[0].data, r#"{"erinnerung_id":4}"#);
+            }
+            _ => panic!("die verpasste Erinnerung muss als Replay-Event kommen"),
+        }
+    }
+
+    #[tokio::test]
+    async fn verwaister_kanal_verschwindet_nach_karenz_ohne_publish() {
+        // Ruhender Einsatz: der letzte Betrachter schließt, danach wird nichts mehr publiziert.
+        let hub = LiveHub::new();
+        drop(hub.abonniere(1));
+        let t0 = Instant::now();
+        hub.raeume_verwaiste(t0); // vermerkt die Leere
+        hub.raeume_verwaiste(t0 + REPLAY_KARENZ - Duration::from_secs(1));
+        assert!(hat_kanal(&hub, 1), "vor Ablauf der Karenz bleibt der Kanal");
+        hub.raeume_verwaiste(t0 + REPLAY_KARENZ);
+        assert!(!hat_kanal(&hub, 1), "nach der Karenz ist er weg");
+    }
+
+    #[tokio::test]
+    async fn kanal_mit_empfaenger_bleibt_im_sweep() {
+        let hub = LiveHub::new();
+        let _rx = hub.abonniere(1);
+        drop(hub.abonniere(2));
+        let t0 = Instant::now();
+        hub.raeume_verwaiste(t0);
+        hub.raeume_verwaiste(t0 + REPLAY_KARENZ * 10);
+        assert!(
+            hat_kanal(&hub, 1),
+            "ein Kanal mit Empfänger bleibt unberührt"
+        );
+        assert!(!hat_kanal(&hub, 2));
+    }
+
+    #[tokio::test]
+    async fn neues_abonnement_beendet_die_karenz() {
+        let hub = LiveHub::new();
+        drop(hub.abonniere(1));
+        let t0 = Instant::now();
+        hub.raeume_verwaiste(t0);
+        // Ein Client kommt zurück und geht wieder; seine Leere zählt neu ab dem nächsten Sweep.
+        drop(hub.abonniere(1));
+        hub.raeume_verwaiste(t0 + REPLAY_KARENZ);
+        assert!(
+            hat_kanal(&hub, 1),
+            "die Karenz beginnt nach dem Abonnement neu"
+        );
+        hub.raeume_verwaiste(t0 + REPLAY_KARENZ * 2);
+        assert!(!hat_kanal(&hub, 1));
+    }
+
+    /// Nach Sweep und Neuanlage liegt eine alte Id derselben Epoch vor `erste_id` des neuen
+    /// Kanals: das ist eine Lücke, nie „nichts verpasst" — auch bei leerem Ring.
+    #[tokio::test]
+    async fn replay_nach_sweep_ist_luecke() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
+        let n1 = rx.recv().await.unwrap();
+        hub.publiziere_event(1, LiveEvent::Etb, "zwei".into());
+        drop(rx);
+        hub.raeume_verwaiste(Instant::now());
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+        assert!(!hat_kanal(&hub, 1));
+
+        let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
+        assert!(
+            matches!(replay, Replay::Luecke),
+            "alte Id nach Sweep muss Luecke sein"
+        );
+    }
+
+    /// Auch wer das letzte Event vor dem Sweep gesehen hat, erfährt von einer Nachricht, die
+    /// zwischen Sweep und Neuanlage ins Leere ging: sie verbraucht eine Nummer.
+    #[tokio::test]
+    async fn verworfene_nachricht_nach_sweep_ergibt_luecke() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
+        let n1 = rx.recv().await.unwrap();
+        drop(rx);
+        hub.raeume_verwaiste(Instant::now());
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+        hub.publiziere_event(1, LiveEvent::Sofortmeldung, "{}".into()); // kein Kanal → verworfen
+
+        let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
+        assert!(matches!(replay, Replay::Luecke));
+    }
+
+    /// Wer nach dem Sweep auf dem letzten Stand zurückkommt, ohne dass etwas verloren ging,
+    /// bekommt keine Lücke gemeldet.
+    #[tokio::test]
+    async fn replay_nach_sweep_auf_aktuellem_stand_ist_leer() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
+        let n1 = rx.recv().await.unwrap();
+        drop(rx);
+        hub.raeume_verwaiste(Instant::now());
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+
+        let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
+        assert!(matches!(replay, Replay::Events(v) if v.is_empty()));
+    }
+
+    /// Ein anderer Einsatz mit kleineren Nummern darf den Neubeginn nicht nach vorn ziehen:
+    /// sonst aliaste eine alte Id des abgeräumten Einsatzes auf eine neue Nummer.
+    #[tokio::test]
+    async fn neuanlage_beginnt_hinter_der_hoechsten_nummer_aller_einsaetze() {
+        let hub = LiveHub::new();
+        let mut a = hub.abonniere(1);
+        let _b = hub.abonniere(2);
+        for i in 0..10 {
+            hub.publiziere_event(1, LiveEvent::Etb, format!("a{i}"));
+        }
+        let mut alte_ids = Vec::new();
+        for _ in 0..10 {
+            alte_ids.push(a.recv().await.unwrap().id);
+        }
+        hub.publiziere_event(2, LiveEvent::Etb, "b".into()); // Einsatz 2 steht erst bei 1
+        drop(a);
+        hub.raeume_verwaiste(Instant::now());
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+        assert!(!hat_kanal(&hub, 1));
+        assert!(hat_kanal(&hub, 2));
+
+        // Alte Id mitten aus dem abgeräumten Bereich: nie „nichts verpasst", nie ein Replay.
+        let (replay, _rx) = hub.abonniere_mit_replay(1, Some(alte_ids[4].clone()));
+        assert!(matches!(replay, Replay::Luecke));
+        let (_, mut rx) = hub.abonniere_mit_replay(1, None);
+        hub.publiziere_event(1, LiveEvent::Etb, "neu".into());
+        let neu = rx.recv().await.unwrap();
+        assert!(parse_id(&neu.id).unwrap().1 > parse_id(&alte_ids[9]).unwrap().1);
+    }
+
+    #[tokio::test]
+    async fn ids_bleiben_ueber_den_sweep_monoton() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "zwei".into());
+        let _ = rx.recv().await.unwrap();
+        let n2 = rx.recv().await.unwrap();
+        drop(rx);
+        hub.raeume_verwaiste(Instant::now());
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "drei".into());
+        let n3 = rx.recv().await.unwrap();
+        assert!(
+            parse_id(&n3.id).unwrap().1 > parse_id(&n2.id).unwrap().1,
+            "der neu angelegte Kanal vergibt keine Nummer ein zweites Mal"
+        );
     }
 }

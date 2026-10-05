@@ -2839,6 +2839,86 @@ mod tests {
             .expect("mehrere NULL-lfd_nr müssen erlaubt bleiben (Altbestand)");
     }
 
+    // --- Migration 0149: Zeitpunkt des Fristsetzens (LFH-906) ---
+    //
+    // Befüllung auf einer Alt-DB: eine künftige Frist gilt als jetzt gesetzt, eine abgelaufene
+    // als vor ihrem Ablauf gesetzt; ein vorgemerkter Einsatz und einer ohne Frist bleiben NULL.
+    #[tokio::test]
+    async fn migration_0149_befuellt_retention_gesetzt_at() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        let bis = |version: i64| Migrator {
+            migrations: Cow::Owned(
+                alle.iter()
+                    .filter(|m| m.version <= version)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        };
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        bis(148).run(&pool).await.expect("Migrationen bis 0148");
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let einsatz = |frist: Option<&'static str>, vorgemerkt: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz (org_id, bezeichnung, retention_bis, geloescht_at) \
+                     VALUES (1, 'Lage', ?, ?) RETURNING id",
+                )
+                .bind(frist)
+                .bind(vorgemerkt)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let kuenftig = einsatz(Some("2999-01-01 00:00:00"), None).await;
+        let abgelaufen = einsatz(Some("2020-01-01 00:00:00"), None).await;
+        let vorgemerkt = einsatz(Some("2020-01-01 00:00:00"), Some("2020-01-02 00:00:00")).await;
+        let ohne_frist = einsatz(None, None).await;
+
+        bis(149).run(&pool).await.expect("Migration 0149");
+
+        let gesetzt = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, Option<String>>(
+                    "SELECT retention_gesetzt_at FROM einsatz WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let jetzt = gesetzt(kuenftig).await.expect("künftige Frist befüllt");
+        assert!(
+            jetzt.as_str() < "2999-01-01 00:00:00" && crate::zeit::parse_utc(&jetzt).is_some(),
+            "künftige Frist gilt als jetzt gesetzt, im kanonischen Format: {jetzt}"
+        );
+        assert_eq!(
+            gesetzt(abgelaufen).await.as_deref(),
+            Some("2020-01-01 00:00:00"),
+            "abgelaufene Frist gilt als vor ihrem Ablauf gesetzt"
+        );
+        assert_eq!(gesetzt(vorgemerkt).await, None);
+        assert_eq!(gesetzt(ohne_frist).await, None);
+    }
+
     // --- Migration 0111: Lagedaten an einsatz_person ---
     //
     // Auf der leeren Vorlage liefe der Backfill über null Zeilen. Hier eine befüllte Alt-DB mit

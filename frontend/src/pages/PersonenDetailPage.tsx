@@ -101,6 +101,7 @@ import {
 } from '../personen/personBearbeiten';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { registrierNummer } from '../anzeige/registrierNummer';
+import { KennungsLink } from '../components/kennungsLink';
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
@@ -831,12 +832,12 @@ export default function PersonenDetailPage() {
                       <Space wrap style={{ marginTop: 4 }}>
                         {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
                           <Space key={sch.id} size={4}>
-                            <Link to={schadenDetailPfad(einsatzId, sch.id)}>
+                            <KennungsLink to={schadenDetailPfad(einsatzId, sch.id)}>
                               <Tag color="orange" style={{ cursor: 'pointer' }}>
                                 {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} (
                                 {sch.ausmass}) — {sch.status}
                               </Tag>
-                            </Link>
+                            </KennungsLink>
                             {darfZuordnen && (
                               <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>
                                 lösen

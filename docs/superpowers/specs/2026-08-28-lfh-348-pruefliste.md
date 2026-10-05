@@ -112,7 +112,7 @@ gewesen, ohne dass die Seite kürzer ist.
 | # | Verdikt | Beleg |
 | --- | --- | --- |
 | **1 · Treffläche** | **erfüllt [abgeleitet]** | Einzige `size`-Angabe: `Spin size="large"` (`:96`). Links, Filter-`Select`s, Suchfeld aus `Datensicht` |
-| **2 · Handschuh-Modus** | **erfüllt für Filter und Suche · Meldungs-Link offen → LFH-908 (Nachtrag LFH-724)** | Die sieben Filtersegmente und das Suchfeld messen 72 px (`e2e/trefflaeche-pruefflaechen.spec.ts`, C13). Der Link „Meldung #N“ misst 13 px → **LFH-908**. Die Stufen**ableitung** ist festgelegt: Wahl → Zeigerart → `kompakt`, nie aus Person oder Funktion (Spec `bedien-dichte`, LFH-724) |
+| **2 · Handschuh-Modus** | **erfüllt (Nachtrag LFH-724, Meldungs-Link LFH-908)** | Die sieben Filtersegmente und das Suchfeld messen 72 px (`e2e/trefflaeche-pruefflaechen.spec.ts`, C13). Der Link „Meldung #N“ maß 13 px; seit **LFH-908** trägt er über `KennungsLink` die Steuerhöhe (C13, Zielsorte „Lagemeldungen Quellmeldung-Link“). Die Stufen**ableitung** ist festgelegt: Wahl → Zeigerart → `kompakt`, nie aus Person oder Funktion (Spec `bedien-dichte`, LFH-724) |
 | **3 · Rückmeldung vor der Serverantwort** | **erfüllt** | `ladend`; Leerzustand erst **nach** dem Laden (`!lageQuery.isLoading && …`, `:122`) — vorher zeigte die Seite beim Laden kurz „Noch keine …" |
 | **4 · Kritische Aktion hat eine zweite Handlung** | **nicht anwendbar** | Lesefläche ohne Aktion (B3: keine Primäraktion, Begründung im Quelltext) |
 | **5 · Kontrast in beiden Modi** | **erfüllt** | Keine Farbliterale. Der `Tag color="gold"` „Lageobjekt" des Bestands ist **entfallen**: eine Farbfläche ohne Aussage auf einer Seite, die schon „Lagerelevante Meldungen" heißt |
@@ -176,7 +176,7 @@ ist nachgezogen.
   (D5, D8).
 - **Tabelle 1, Zeile 2:** erfüllt nach Fix. Die acht Abschnittsköpfe maßen 55 px und halten die Staffel jetzt über `antdKlappkopf` (LFH-653). Der Beobachter sieht den Lesezweig ohne Akkordeon; dort hält die Druckaktion 72 px. „Vorschau neben dem Text“ (Checkbox, 36 px) → **LFH-907**.
 - **Tabelle 2, Zeile 2:** erfüllt.
-- **Tabelle 3, Zeile 2:** Filtersegmente und Suche erfüllt; der Link „Meldung #N“ misst 13 px → **LFH-908**.
+- **Tabelle 3, Zeile 2:** Filtersegmente und Suche erfüllt; der Link „Meldung #N“ maß 13 px; erfüllt mit **LFH-908**.
 - Tests: „C13 · Lagebericht, Berichtsliste und Lagemeldungen halten 72 px, kompakt bleibt kleiner“ und „C13 · Lagebericht (Beobachter): …“.
 - Querschnittlich, auf keiner Fläche dieser Prüfliste eigens: die Brotkrume im Seitenkopf misst 20 px → **LFH-909**.
 
