@@ -9,7 +9,7 @@
 -- höchstens jetzt. Die Migration läuft auch auf einer zurückgespielten Sicherung von vor diesem
 -- Update und schließt dort die Lücke.
 --
--- Herleitung: openspec/changes/lfh-906-restore-karenz-ab-fristablauf/design.md (D2, D3).
+-- Herleitung: openspec/changes/archive/2026-10-05-lfh-906-restore-karenz-ab-fristablauf/design.md (D2, D3).
 
 ALTER TABLE einsatz ADD COLUMN retention_gesetzt_at TEXT;
 

@@ -27,5 +27,5 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `cargo test` der betroffenen Module und `./scripts/check-all.sh` grün (Umgebungsrot nach `cloud-sitzung-gate-umgebungsrot` gegen `alpha` gegengeprüft)
+- [x] 5.1 `cargo test` der betroffenen Module und `./scripts/check-all.sh` grün (Umgebungsrot nach `cloud-sitzung-gate-umgebungsrot` gegen `alpha` gegengeprüft) — belegt durch den Lauf vor dem PR und die CI des PRs
 - [x] 5.2 Folgeticket für die Datenkategorien (Phase K1) auf dem Entwicklungsboard anlegen (LFH-1049)
