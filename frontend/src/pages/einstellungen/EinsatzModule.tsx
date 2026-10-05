@@ -10,7 +10,7 @@ import { ladeModulOverrides, setzeModulOverride } from '../../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
-import { darfEinsatzLeiten } from '../../einsatz/schreibrecht';
+import { darfModuleVerwalten } from '../../einsatz/schreibrecht';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import type { ModulOverrideUpdate, OrgModulEinstellungen } from '../../api/types';
 
@@ -26,7 +26,7 @@ function orgRollenHinweis(
 
 /** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Zeile. */
 const RECHTE_TEXT =
-  'Nur die Einsatzleitung oder ein System-Admin darf die Modul-Sichtbarkeit dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen.';
+  'Nur die Einsatzleitung oder ein System-Admin der Organisation des Einsatzes darf die Modul-Sichtbarkeit ändern — die Werte stehen hier zum Nachlesen.';
 
 /**
  * Sektion `…/einstellungen/module` — Modul-Sichtbarkeit und Rollen-Schranke je Modul.
@@ -34,9 +34,9 @@ const RECHTE_TEXT =
  * Keine Speicher-Leiste: die Liste speichert je Zeile sofort; ein Speichern-Knopf darüber beträfe
  * sie nicht.
  *
- * Andere Rechte-Achse als die Formular-Sektionen (`darfEinsatzLeiten` statt
- * `darfImEinsatzSchreiben`): Modul-Overrides verwalten nur Einsatzleitung und System-Admin
- * (Backend-Gate `einsatzleitung|admin`). Führungspersonal darf Einstellungen ändern, die
+ * Andere Rechte-Achse als die Formular-Sektionen (`darfModuleVerwalten` statt
+ * `darfImEinsatzSchreiben`): Modul-Overrides verwalten nur Einsatzleitung und System-Admin der
+ * Einsatz-Org (Backend-Gate, LFH-995). Führungspersonal darf Einstellungen ändern, die
  * Modulsichtbarkeit nicht.
  */
 export default function EinsatzModule() {
@@ -86,7 +86,7 @@ export default function EinsatzModule() {
 
   const overrides = overridesQuery.data ?? {};
   const orgModulDefaults: OrgModulEinstellungen = orgModulQuery.data ?? {};
-  const darfModuleVerwalten = darfEinsatzLeiten(daten.einsatz, benutzer);
+  const darfVerwalten = darfModuleVerwalten(daten.einsatz, benutzer);
 
   /** Sichtbarkeit einer Modul-Zeile aus dem Override-Bestand (Default: sichtbar). */
   const sichtbarVon = (modulKey: string) => overrides[modulKey]?.sichtbar ?? true;
@@ -95,7 +95,7 @@ export default function EinsatzModule() {
     <>
       <SeitenHinweise
         fehler={overrideMutation.error}
-        rechteFehlt={daten.istAktiv && !darfModuleVerwalten}
+        rechteFehlt={daten.istAktiv && !darfVerwalten}
         rechteText={RECHTE_TEXT}
       />
       <Formularpaneel
@@ -130,7 +130,7 @@ export default function EinsatzModule() {
                 },
               }),
           }}
-          darfVerwalten={darfModuleVerwalten}
+          darfVerwalten={darfVerwalten}
           // Zwei Ursachen, zwei Wörter: ein abgeschlossener Einsatz sperrt auch die Einsatzleitung,
           // ein Rollenwort widerspräche dann dem Seitenbanner.
           rechteGrund={

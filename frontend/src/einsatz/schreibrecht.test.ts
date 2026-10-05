@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
+  darfModuleVerwalten,
   darfOriginalLaden,
   darfVerwaltung,
   istAdmin,
@@ -70,6 +71,39 @@ describe('darfEinsatzLeiten', () => {
 
   it('ist fail-closed bei fehlendem Einsatz', () => {
     expect(darfEinsatzLeiten(undefined)).toBe(false);
+  });
+});
+
+describe('darfModuleVerwalten (LFH-995)', () => {
+  const eigeneOrg = { ...aktiv, org_id: 1 };
+  const adminOrg1 = { system_rolle: 'admin' as const, org_id: 1 };
+  const adminOrg2 = { system_rolle: 'admin' as const, org_id: 2 };
+
+  it('erlaubt die Einsatzleitung, auch als Admin einer fremden Org', () => {
+    expect(darfModuleVerwalten({ ...eigeneOrg, meine_rolle: 'einsatzleitung' }, undefined)).toBe(
+      true,
+    );
+    expect(darfModuleVerwalten({ ...eigeneOrg, meine_rolle: 'einsatzleitung' }, adminOrg2)).toBe(
+      true,
+    );
+  });
+
+  it('erlaubt den Admin nur in der Org des Einsatzes', () => {
+    expect(darfModuleVerwalten({ ...eigeneOrg, meine_rolle: null }, adminOrg1)).toBe(true);
+    expect(darfModuleVerwalten({ ...eigeneOrg, meine_rolle: null }, adminOrg2)).toBe(false);
+    expect(darfModuleVerwalten({ ...eigeneOrg, meine_rolle: 'fuehrungspersonal' }, adminOrg2)).toBe(
+      false,
+    );
+  });
+
+  it('verweigert im abgeschlossenen Einsatz und ohne Einsatz', () => {
+    expect(
+      darfModuleVerwalten(
+        { status: 'abgeschlossen', org_id: 1, meine_rolle: 'einsatzleitung' },
+        adminOrg1,
+      ),
+    ).toBe(false);
+    expect(darfModuleVerwalten(undefined, adminOrg1)).toBe(false);
   });
 });
 

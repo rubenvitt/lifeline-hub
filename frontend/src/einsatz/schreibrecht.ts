@@ -47,6 +47,27 @@ export function darfEinsatzLeiten(
   return einsatz?.status === 'aktiv' && (istEinsatzLeitung(einsatz) || istAdmin(benutzer));
 }
 
+/** Einsatz-Kontext mit Org — nur für Rechte, deren Admin-Zweig an der Einsatz-Org hängt. Eigener
+    Typ, damit die geteilten `…Schreibkontext`-Typen und ihre Fixtures unberührt bleiben. */
+export type EinsatzOrgKontext =
+  Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'org_id'> | null | undefined;
+
+/** System-Rolle und eigene Org des Benutzers — Gegenstück zu {@link EinsatzOrgKontext}. */
+export type BenutzerOrgKontext =
+  Pick<BenutzerAnzeige, 'system_rolle' | 'org_id'> | null | undefined;
+
+/** Modul-Overrides des Einsatzes verwalten (LFH-995): aktiver Einsatz UND (Einsatzleitung ODER
+    System-Admin der Einsatz-Org) — wie der Server (`modul_override_setzen`). Der Admin einer
+    fremden Org bekäme dort 403; die Einsatzleitung trägt auch über die Org-Grenze. */
+export function darfModuleVerwalten(
+  einsatz: EinsatzOrgKontext,
+  benutzer: BenutzerOrgKontext,
+): boolean {
+  if (einsatz?.status !== 'aktiv') return false;
+  if (istEinsatzLeitung(einsatz)) return true;
+  return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
+}
+
 /** Allgemeines Einsatz-Schreibrecht: aktiver Einsatz UND (Einsatzleitung ODER Führungspersonal
     ODER System-Admin) — die Norm für die Schreib-UI aller Einsatz-Module. */
 export function darfImEinsatzSchreiben(
