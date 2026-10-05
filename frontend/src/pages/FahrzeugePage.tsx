@@ -99,14 +99,15 @@ function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
 }
 
 /**
- * Besatzungs-Ist als Ampel-Badge: blau ohne hinterlegtes Soll (kein Urteil möglich), grün bei
- * erfülltem Soll (nur Ist), sonst rot mit Soll in Klammern. Die Klammer ist zugleich das
- * nicht-farbliche Signal für Unterbesetzung, `title` ergänzt grün/blau.
+ * Besatzungs-Ist als Ampel-Badge: neutral ohne hinterlegtes Soll (kein Urteil möglich; kein
+ * Blau, weil Blau bedient, LFH-891), grün bei erfülltem Soll (nur Ist), sonst rot mit Soll in
+ * Klammern. Die Klammer ist zugleich das nicht-farbliche Signal für Unterbesetzung, `title`
+ * ergänzt grün/neutral.
  */
 function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | null }) {
   if (!soll) {
     return (
-      <Tag color="blue" title="kein Soll hinterlegt">
+      <Tag title="kein Soll hinterlegt">
         <StaerkeAnzeige wert={ist} />
       </Tag>
     );
@@ -487,7 +488,7 @@ export default function FahrzeugePage() {
         <Space>
           {/* Funkrufname in Mono. */}
           <span style={monoStil(13)}>{ef.funkrufname}</span>
-          {ef.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
+          {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
           {ef.ist_demo && <DemoMarke />}
         </Space>
       ),

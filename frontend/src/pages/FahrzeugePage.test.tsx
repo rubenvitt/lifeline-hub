@@ -313,15 +313,17 @@ describe('FahrzeugePage', () => {
     expect(screen.getByText('1/0/1//2', { selector: '.ant-tag' })).toHaveClass('ant-tag-green');
   });
 
-  it('zeigt fehlendes Soll neutral blau ohne Soll-Kontext', async () => {
+  it('zeigt fehlendes Soll neutral ohne Soll-Kontext', async () => {
     const ohneSoll = { ...ef, soll_besatzung: null };
     const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
     const { container } = render(einsatz(), [crew], ohneSoll);
     await screen.findByText('Florian 1');
-    // Kein hinterlegtes Soll → kein „erfüllt"-Urteil möglich → neutral blau, nur Ist.
-    const badge = container.querySelector('.ant-tag-blue');
+    // Kein hinterlegtes Soll → kein „erfüllt"-Urteil möglich → neutral (LFH-891: kein Preset,
+    // Blau bedient), nur Ist; der `title` nennt den Grund.
+    const badge = container.querySelector('.ant-tag[title="kein Soll hinterlegt"]');
     expect(badge).toHaveTextContent('1/0/0//1');
     expect(badge).not.toHaveTextContent('Soll');
+    expect(badge?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
   });
 
   it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker nach dem Aufklappen', async () => {
