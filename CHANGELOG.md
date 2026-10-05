@@ -1,3 +1,20 @@
+## [1.0.0-alpha.82](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.81...v1.0.0-alpha.82) (2026-10-05)
+
+### Aufbewahrung und Datenschutz
+
+- Bildhintergründe der Lagekarte (Luft- und Drohnenbilder, Pläne) werden nun bei der Schwärzung von Einsätzen vollständig entfernt – wie bereits zuvor bei Anhängen. Bisher blieben diese Bilder als Skelett erhalten.
+- Bilder bereits geschwärzter Einsätze werden beim nächsten Aufbewahrungslauf automatisch nachträglich entfernt.
+
+### Bedienung
+
+- Die Sprungpalette (Strg/⌘+K) wurde grundlegend überarbeitet:
+  - Die Markierung folgt jetzt nur noch der Mausbewegung, nicht mehr automatisch während der Tastatureingabe
+  - Strg/⌘+Rücktaste löscht nun das gesamte Suchfeld auf einmal
+  - Die Startansicht zeigt keine doppelten Einträge mehr
+  - Schnellaktionen zeigen jetzt das Icon und den Namen des zugehörigen Moduls
+  - Die Beschriftungen wurden überarbeitet (Objekt + Verb statt alter Formulierungen)
+  - Das Design wurde kompakter: schmalerer Kopfbereich, einfachere Rahmen, einzeilige Fußzeile mit Kurzformen der Tastenkombinationen
+
 ## [1.0.0-alpha.81](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.80...v1.0.0-alpha.81) (2026-10-05)
 
 ### Wichtige Änderungen
