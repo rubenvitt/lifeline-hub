@@ -59,5 +59,5 @@ Gates ohne `| tail`, Node und pnpm über `mise exec --`.
 
 - [x] 6.1 Mutationsproben: (a) Audit-Zeile in der Übernahme entfernt → Test „genau eine Zeile“ rot; (b) `pointer-events: none` entfernt → Vitest der Bildebene rot; (c) Stornoprüfung im PATCH entfernt → 409-Test rot. Ergebnis im Commit-Text.
   - Verifiziert durch die drei roten Läufe vor dem Zurücknehmen.
-- [ ] 6.2 `./scripts/check-all.sh` grün (umgebungsbedingte Schritte gegen `alpha` gegengeprüft).
+- [x] 6.2 `./scripts/check-all.sh` grün (umgebungsbedingte Schritte gegen `alpha` gegengeprüft).
   - Verifiziert durch den Exit-Code bzw. die CI des PRs.
