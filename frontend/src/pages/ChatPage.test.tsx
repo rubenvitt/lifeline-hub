@@ -385,6 +385,24 @@ describe('ChatPage', () => {
     );
   });
 
+  it('sperrt „Zu Auftrag" nach den Freigaben des Servers (LFH-904)', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ auftraege: { zugriff: false } })),
+      ),
+    );
+    setup();
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Zu Auftrag (Keine Berechtigung)' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('menuitem', { name: 'Zu ETB' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
   it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {
     server.use(
       meHandler(nutzer),

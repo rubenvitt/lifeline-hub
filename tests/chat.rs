@@ -730,7 +730,7 @@ async fn heraufstufen_etb_ohne_etb_freigabe_ist_403() {
     )
     .await;
     assert!(
-        liste.as_array().unwrap()[0]["etb_eintrag_id"].is_null(),
+        liste.as_array().unwrap()[0].get("etb_eintrag_id") == Some(&Value::Null),
         "kein Rückverweis an der Nachricht"
     );
 }
@@ -801,7 +801,7 @@ async fn heraufstufen_auftrag_ohne_auftrags_freigabe_ist_403() {
     )
     .await;
     assert!(
-        liste.as_array().unwrap()[0]["auftrag_id"].is_null(),
+        liste.as_array().unwrap()[0].get("auftrag_id") == Some(&Value::Null),
         "kein Rückverweis an der Nachricht"
     );
 }
@@ -842,4 +842,31 @@ async fn anordnungen(app: &axum::Router, einsatz: i64, admin: &str) -> usize {
         .iter()
         .filter(|e| e["typ"] == "anordnung")
         .count()
+}
+
+#[tokio::test]
+async fn heraufstufen_ohne_freigabe_ist_403_vor_404() {
+    // design.md D3: Die Modulsperre greift vor der Zugehörigkeit der Nachricht; wer nicht ins
+    // Zielmodul darf, erfährt nichts über Nachrichten-IDs.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    nur_fuer_admins(&app, &admin, einsatz, "etb").await;
+    nur_fuer_admins(&app, &admin, einsatz, "auftraege").await;
+
+    for (pfad, body) in [
+        ("heraufstufen-etb", r#"{"typ":"meldung"}"#),
+        ("heraufstufen-auftrag", AUFTRAG_BODY),
+    ] {
+        let (s, _) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/chat/nachrichten/999999/{pfad}"),
+            &frieda,
+            Some(body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
+    }
 }

@@ -380,7 +380,8 @@ pub async fn heraufstufen(
 }
 
 /// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag — Nachricht → Auftrag (LFH-101).
-/// Schreibrecht + aktiv. Erzeugt aus der Nachricht einen formalen Auftrag (inkl. ETB-Anordnung,
+/// Schreibrecht + aktiv + Freigabe des Moduls `auftraege`. Erzeugt aus der Nachricht einen formalen
+/// Auftrag (inkl. ETB-Anordnung,
 /// Pattern B) und markiert die Nachricht als „heraufgestuft zu Auftrag". Auftragsfelder (Empfänger,
 /// Priorität …) kommen aus dem Request und durchlaufen dieselbe Validierung wie POST /auftraege.
 pub async fn heraufstufen_auftrag(

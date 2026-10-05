@@ -19,8 +19,9 @@ des Einsatzrahmens (`useModulFreigaben`, Lesart `istSprungGesperrt`: unbekannt h
 - Server und Chat-Menü folgen ihr gleich.
 
 **Non-Goals:**
-- Kein Durchgang durch alle übrigen Querwege zwischen Modulen; die bekannten folgen der Regel
-  bereits.
+- Kein Durchgang durch alle übrigen Querwege zwischen Modulen. Personen, Verbleib und Zonen
+  folgen der Regel bereits; „Auftrag erteilen“ aus ETB und Meldungen prüft `auftraege` noch nicht
+  und bekommt einen eigenen Nachzug (LFH-1051).
 - Keine Änderung am Extractor oder an den Modul-Markern.
 - Die Prüfung fremder Dateien beim Verknüpfen im Chat bleibt beim eigenen Nachzug.
 
@@ -40,7 +41,8 @@ ein zweiter Maßstab für dieselbe Handlung.
 ruft der Handler `ctx.fordere_modul_zugriff(&state.pool, <Marker>::KEY)`, mit den vorhandenen
 Markern `Etb` bzw. `Auftraege` statt eines Stringliterals. Vor der Zugehörigkeitsprüfung der
 Nachricht, damit ein Nicht-Berechtigter keine Auskunft über Nachrichten-IDs bekommt (403 vor 404)
-und nichts verarbeitet wird. Der Extractor-Typ bleibt `EinsatzSchreibzugriff<Chat>`: Ein zweiter
+und keine Daten geladen oder geschrieben werden. Der Body ist dann schon gelesen: ein kaputter
+Body ohne Freigabe ergibt 400 statt 403, wie bei den übrigen Prüfungen im Handler. Der Extractor-Typ bleibt `EinsatzSchreibzugriff<Chat>`: Ein zweiter
 Marker im Typ wäre ein Umbau des Guards (`tests/einsatz_kontext_guard.rs`) für zwei Routen.
 
 **D4 — Menü: gesperrt mit Grund im Etikett.** `NachrichtenStrom` bekommt zwei Schalter
