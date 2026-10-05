@@ -50,16 +50,18 @@ const KANDIDAT_SELECT: &str = "SELECT e.id, e.abgeschlossen_at, e.geschwaerzt_at
 /// Phase-D-Kandidaten: IDs abgeschlossener, geschwärzter Einsätze, deren Org eine
 /// Skelett-Frist hat und deren Frist zu `jetzt` abgelaufen ist.
 ///
-/// Ein Einsatz, an dem noch ein Anhang steht, wartet auf den Nachlauf der Schwärzung
-/// (LFH-905): die Kaskade beim Löschen nähme die Reste sonst in einer Transaktion mit, und die
-/// hielte die Schreibsperre so lange, wie das Nullen dauert. Nur hier, nicht in [`loeschen`]:
-/// an einem geschwärzten Einsatz entsteht kein neuer Anhang, und der Tick löscht nur, was diese
-/// Liste nach dem Nachlauf liefert.
+/// Ein Einsatz, an dem noch ein Anhang oder ein Bild der Lagekarte steht, wartet auf den
+/// Nachlauf der Schwärzung (LFH-905, LFH-997; Tabellen aus
+/// [`super::schwaerzung_nachlauf::EINZELN_GELOESCHT`]): die Kaskade beim Löschen nähme die Reste
+/// sonst in einer Transaktion mit, und die hielte die Schreibsperre so lange, wie das Nullen
+/// dauert. Nur hier, nicht in [`loeschen`]: an einem geschwärzten Einsatz entsteht kein neuer
+/// Datei-Inhalt, und der Tick löscht nur, was diese Liste nach dem Nachlauf liefert.
 pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64>, AppError> {
-    let sql = format!(
-        "{KANDIDAT_SELECT} AND NOT EXISTS (SELECT 1 FROM anhang a WHERE a.einsatz_id = e.id) \
-         ORDER BY e.id"
-    );
+    let ohne_reste: String = super::schwaerzung_nachlauf::EINZELN_GELOESCHT
+        .iter()
+        .map(|t| format!(" AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.einsatz_id = e.id)"))
+        .collect();
+    let sql = format!("{KANDIDAT_SELECT}{ohne_reste} ORDER BY e.id");
     let kandidaten = sqlx::query_as::<_, Kandidat>(sqlx::AssertSqlSafe(sql))
         .bind(STATUS_ABGESCHLOSSEN)
         .fetch_all(pool)
@@ -406,7 +408,7 @@ mod tests {
         .await;
         // Die Fixture hängt an jeden geschwärzten Einsatz einen Anhang; Phase D wartet auf den
         // Nachlauf, der ihn löscht (LFH-905, `phase_d_wartet_auf_den_nachlauf`).
-        crate::anhang::repo::entferne_vorgesehene(&pool, None)
+        crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene(&pool, None)
             .await
             .unwrap();
 
@@ -555,7 +557,7 @@ mod tests {
             1,
         )
         .await;
-        crate::anhang::repo::entferne_vorgesehene(&pool, None)
+        crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene(&pool, None)
             .await
             .unwrap();
         assert_eq!(faellige(&pool, t(JETZT)).await.unwrap(), vec![e]);

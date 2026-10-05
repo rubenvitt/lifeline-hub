@@ -1,4 +1,8 @@
 use super::AnhangAnzeige;
+// „Zur Entfernung vorgesehen“ (LFH-905): die atomare Schwärzung lässt solche Anhänge stehen und
+// löst nur ihre Verknüpfungen (`Strategie::ZeileEinzelnLoeschen`); der Nachlauf der Schwärzung
+// löscht sie danach einzeln, und bis dahin liefern die Lese-Funktionen hier `NotFound`.
+use crate::einsatz::schwaerzung_nachlauf::zur_entfernung_vorgesehen_sql;
 use crate::error::AppError;
 use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
@@ -12,61 +16,6 @@ pub const VERWAISTE_KARENZ_STUNDEN: i64 = 24;
 /// Projektion der Anzeige-Spalten (ohne `daten`/`sha256`).
 const ANZEIGE_SELECT: &str =
     "SELECT id, einsatz_id, dateiname, mime, groesse, hochgeladen_von, erstellt_at FROM anhang";
-
-/// SQL-Bedingung „der Anhang `{alias}` ist zur Entfernung vorgesehen“ (LFH-905): sein
-/// abgeschlossener Einsatz ist geschwärzt, oder dessen Kategorie `anhaenge` ist es. Die
-/// atomare Schwärzung lässt solche Zeilen stehen und löst nur ihre Verknüpfungen
-/// (`Strategie::ZeileEinzelnLoeschen`); [`entferne_vorgesehene`] löscht sie danach einzeln, und
-/// bis dahin liefern die Lese-Funktionen hier `NotFound`. Genau ist die Bedingung, weil Uploads
-/// einen aktiven Einsatz verlangen und ein abgeschlossener nicht wieder aktiv wird.
-///
-/// Der Text entsteht aus Compile-Zeit-Konstanten und dem Alias-Literal des Aufrufers.
-fn zur_entfernung_vorgesehen_sql(alias: &str) -> String {
-    format!(
-        "EXISTS (SELECT 1 FROM einsatz e WHERE e.id = {alias}.einsatz_id AND e.status = '{}' \
-           AND (e.geschwaerzt_at IS NOT NULL \
-                OR EXISTS (SELECT 1 FROM einsatz_aufbewahrung_kategorie k \
-                           WHERE k.einsatz_id = e.id AND k.kategorie = '{}' \
-                             AND k.geschwaerzt_at IS NOT NULL)))",
-        crate::einsatz::STATUS_ABGESCHLOSSEN,
-        crate::einsatz::retention::Datenkategorie::Anhaenge.as_str()
-    )
-}
-
-/// Löscht jeden zur Entfernung vorgesehenen Anhang ([`zur_entfernung_vorgesehen_sql`]) in einer
-/// eigenen Transaktion, mit `einsatz` nur die dieses Einsatzes. Liefert die Zahl gelöschter
-/// Anhänge.
-///
-/// Der Nachlauf der Schwärzung (LFH-905, Spec `aufbewahrung`, „Entfernung der Datei-Inhalte in
-/// Einzelschritten“): Unter `secure_delete = ON` nullt jeder Commit die freigewordenen Seiten,
-/// und so lange hält er die Schreibsperre. Je Anhang eine Transaktion deckelt sie auf einen
-/// Anhang (Upload-Grenze 26 MB); dazwischen kommen andere Schreibende zum Zug, und der
-/// automatische Checkpoint schreibt den WAL fortlaufend zurück. Der Wächter im `DELETE`
-/// wiederholt die Bedingung, damit nur ein vorgesehener Anhang fällt.
-pub async fn entferne_vorgesehene(
-    pool: &SqlitePool,
-    einsatz: Option<i64>,
-) -> Result<u64, AppError> {
-    let vorgesehen = zur_entfernung_vorgesehen_sql("anhang");
-    let ids: Vec<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT id FROM anhang WHERE {vorgesehen} AND (?1 IS NULL OR einsatz_id = ?1) ORDER BY id"
-    )))
-    .bind(einsatz)
-    .fetch_all(pool)
-    .await?;
-    let mut geloescht = 0;
-    for id in ids {
-        let sql = format!("DELETE FROM anhang WHERE id = ? AND {vorgesehen}");
-        geloescht += crate::write_retry!(pool, |conn| {
-            Ok(sqlx::query(sqlx::AssertSqlSafe(sql.clone()))
-                .bind(id)
-                .execute(&mut *conn)
-                .await?
-                .rows_affected())
-        })?;
-    }
-    Ok(geloescht)
-}
 
 /// Hex-Kodierung (kleingeschrieben) ohne externe Crate.
 fn hex(bytes: &[u8]) -> String {
@@ -437,7 +386,7 @@ pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerSta
 /// **Zur Entfernung vorgesehene Anhänge übergeht der Sweep** (LFH-905): nach der atomaren
 /// Schwärzung haben sie keinen Linker mehr und sähen verwaist aus. Löschte der Sweep sie in
 /// seinem einen `DELETE`, hielte er die Schreibsperre so lange wie vor dem Nachlauf; sie gehören
-/// allein [`entferne_vorgesehene`].
+/// allein [`crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene`].
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let grenze = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN));
     let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(

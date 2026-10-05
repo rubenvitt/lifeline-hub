@@ -43,14 +43,17 @@ pub enum Strategie {
     /// Die ganze Zeile wird gelöscht. Für Tabellen, deren Nutzlast selbst PII ist und die kein
     /// Skelett tragen; CASCADE räumt abhängige Zeilen mit.
     ZeileLoeschen,
-    /// Die Zeile wird gelöscht, aber nicht im atomaren Vorgang (LFH-905, nur `anhang`): unter
-    /// `secure_delete = ON` nullt der Commit jedes freigewordene Byte, und alle Datei-Anhänge
-    /// eines Einsatzes in einer Transaktion hielten die Schreibsperre so lange, wie das dauert
-    /// (Pi mit SD-Karte, 500 MB: ~25 s). Der atomare Vorgang löscht deshalb nur jede
-    /// Verknüpfung (Chat-Linker und `anhang::repo::MODUL_LINKER`), damit der Anhang
-    /// unerreichbar ist; die Zeile selbst löscht `anhang::repo::entferne_vorgesehene` danach je
-    /// Anhang in einer eigenen Transaktion. Wer Anhänge auf einem anderen Weg in einer
-    /// Transaktion löscht, holt die lange Sperre zurück. Herleitung:
+    /// Die Zeile wird gelöscht, aber nicht im atomaren Vorgang (LFH-905; nur die Tabellen aus
+    /// `schwaerzung_nachlauf::EINZELN_GELOESCHT`: `anhang` und seit LFH-997
+    /// `karte_hintergrundbild`): unter `secure_delete = ON` nullt der Commit jedes freigewordene
+    /// Byte, und alle Datei-Inhalte eines Einsatzes in einer Transaktion hielten die
+    /// Schreibsperre so lange, wie das dauert (Pi mit SD-Karte, 500 MB: ~25 s). Der atomare
+    /// Vorgang löscht deshalb nur jede Verknüpfung eines Anhangs (Chat-Linker und
+    /// `anhang::repo::MODUL_LINKER`), damit er unerreichbar ist; ein Bild der Lagekarte hat keine
+    /// Verknüpfung, seine Lesewege übergehen es. Die Zeile selbst löscht
+    /// `schwaerzung_nachlauf::entferne_vorgesehene` danach je Zeile in einer eigenen
+    /// Transaktion. Wer solche Zeilen auf einem anderen Weg in einer Transaktion löscht, holt die
+    /// lange Sperre zurück. Herleitung:
     /// `openspec/changes/archive/2026-10-05-lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`.
     ZeileEinzelnLoeschen,
 }
@@ -495,36 +498,34 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     // ---------- Karte / freie Zeichen / Anhänge ----------
     TabellenRegel {
+        // Ganze Zeile löschen (LFH-997): ein Bild der Lagekarte trägt Personenbezug, ein Luft- oder
+        // Drohnenbild in der Regel (Personen, Kennzeichen, Hausansichten; § 32b Abs. 3 NKatSG),
+        // ein Plan möglicherweise (Bewohnernamen, Beschriftung). Die Quelle wird nicht
+        // unterschieden. Zuordnung `anhaenge` wie Datei-Anhänge; einzeln im Nachlauf
+        // (`Strategie::ZeileEinzelnLoeschen`), denn ein Bild hat bis 25 MB. Keine Tabelle verweist
+        // auf diese, der atomare Vorgang übergeht sie, und ihre Lesewege übergehen vorgesehene
+        // Bilder. Herleitung:
+        // `openspec/changes/archive/2026-10-05-lfh-997-kartenhintergrund-klassifizieren/design.md`.
         tabelle: "karte_hintergrundbild",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
         person_bezug: None,
         spalten: &[
-            retain("id", G_PK),
-            retain("einsatz_id", G_SCOPE),
-            // Der Dateiname kann PII tragen („Lageplan Familie Müller.png“) → Platzhalter (NOT
-            // NULL).
-            scrub("name", Strategie::Platzhalter, Z_EINSATZ),
-            // BLOB bleibt: georeferenziertes Kartografie-Skelett, kein Foto Betroffener (≠ anhang).
-            retain(
-                "daten",
-                "Kartografie-Skelett (georeferenzierter Bild-Hintergrund, kein Personenbezug)",
-            ),
-            retain("mime", G_ENUM),
-            retain("groesse", G_ZAEHLER),
-            retain(
-                "sha256",
-                "SHA-256-Integritätshash des Kartografie-BLOBs (kein Personenbezug)",
-            ),
-            retain("ecken_json", G_GEO),
-            retain("opazitaet", G_KONFIG),
-            retain("sichtbar", G_KONFIG),
-            retain("reihenfolge", G_KONFIG),
-            retain("hochgeladen_von", G_FK),
-            retain("erstellt_at", G_ZEIT),
-            retain("geaendert_at", G_ZEIT),
-            // FK auf karten_ansicht, kein Personenbezug.
-            retain("ansicht_id", G_FK),
+            scrub("id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("name", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("daten", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("mime", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("groesse", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("sha256", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("ecken_json", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("opazitaet", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("sichtbar", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("reihenfolge", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("hochgeladen_von", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("erstellt_at", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("geaendert_at", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("ansicht_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
@@ -2395,19 +2396,23 @@ pub async fn scrubbe_aus_registry(
             );
         }
 
-        // Einzeln im Nachlauf (LFH-905): hier nur jede Verknüpfung, die Zeile bleibt für
-        // `anhang::repo::entferne_vorgesehene` stehen.
+        // Einzeln im Nachlauf (LFH-905, LFH-997): hier nur jede Verknüpfung eines Anhangs, die
+        // Zeile bleibt für `schwaerzung_nachlauf::entferne_vorgesehene` stehen. Bilder der
+        // Lagekarte haben keine Verknüpfung.
         if scrubs
             .iter()
             .any(|(_, s)| *s == Strategie::ZeileEinzelnLoeschen)
         {
             debug_assert!(
-                regel.tabelle == "anhang"
+                super::schwaerzung_nachlauf::EINZELN_GELOESCHT.contains(&regel.tabelle)
                     && scrubs
                         .iter()
                         .all(|(_, s)| *s == Strategie::ZeileEinzelnLoeschen),
-                "ZeileEinzelnLoeschen gilt nur für anhang und dort für ALLE Scrub-Spalten"
+                "ZeileEinzelnLoeschen gilt nur für EINZELN_GELOESCHT und dort für ALLE Scrub-Spalten"
             );
+            if regel.tabelle != "anhang" {
+                continue;
+            }
             let linker = std::iter::once(crate::anhang::repo::CHAT_LINKER)
                 .chain(crate::anhang::repo::MODUL_LINKER.iter().map(|l| l.tabelle));
             for tabelle in linker {
@@ -2990,6 +2995,7 @@ mod tests {
             "einsatz_tier_anhang",
             "uhs_anhang",
             "einsatz_person_anhang",
+            "karte_hintergrundbild",
         ] {
             anhaenge.extend(spalten_von(t));
         }
@@ -3098,8 +3104,9 @@ mod tests {
     }
 
     /// `ZeileLoeschen` und `ZeileEinzelnLoeschen` gelten (wenn überhaupt) für ALLE
-    /// Scrub-Spalten einer Tabelle; `ZeileEinzelnLoeschen` nur für `anhang`, denn nur dort
-    /// kennt der atomare Vorgang die Linker (LFH-905).
+    /// Scrub-Spalten einer Tabelle; `ZeileEinzelnLoeschen` genau für die Tabellen, die der
+    /// Nachlauf kennt (`schwaerzung_nachlauf::EINZELN_GELOESCHT`, LFH-905/LFH-997). Eine Tabelle
+    /// nur hier oder nur dort bliebe stehen bzw. fiele in einer langen Transaktion.
     #[test]
     fn zeile_loeschen_ist_kohaerent() {
         for strategie in [Strategie::ZeileLoeschen, Strategie::ZeileEinzelnLoeschen] {
@@ -3131,6 +3138,29 @@ mod tests {
             })
             .map(|r| r.tabelle)
             .collect();
-        assert_eq!(einzeln, vec!["anhang"]);
+        let mut nachlauf = super::super::schwaerzung_nachlauf::EINZELN_GELOESCHT.to_vec();
+        nachlauf.sort_unstable();
+        let mut einzeln = einzeln;
+        einzeln.sort_unstable();
+        assert_eq!(einzeln, nachlauf);
+    }
+
+    /// Bilder der Lagekarte tragen Personenbezug (Drohnen- und Luftbilder, beschriftete Pläne)
+    /// und fallen mit der Kategorie `anhaenge`, einzeln im Nachlauf (LFH-997, Spec
+    /// `aufbewahrung`, „Bild-Hintergründe der Lagekarte“).
+    #[test]
+    fn kartenhintergrund_ist_anhang_und_faellt_einzeln() {
+        let regel = TABELLEN
+            .iter()
+            .find(|t| t.tabelle == "karte_hintergrundbild")
+            .expect("Regel karte_hintergrundbild");
+        for s in regel.spalten {
+            assert_eq!(
+                s.klassifikation,
+                Klassifikation::Scrub(Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+                "karte_hintergrundbild.{}",
+                s.spalte
+            );
+        }
     }
 }

@@ -1,4 +1,8 @@
 use super::HintergrundbildAnzeige;
+// „Zur Entfernung vorgesehen“ (LFH-997): nach der Schwärzung des Einsatzes oder seiner Kategorie
+// `anhaenge` steht ein Bild noch bis zum Nachlauf in der Tabelle; die Lesewege hier übergehen es.
+// Die Schreibwege brauchen den Filter nicht: sie verlangen einen aktiven Einsatz.
+use crate::einsatz::schwaerzung_nachlauf::zur_entfernung_vorgesehen_sql;
 use crate::error::AppError;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
@@ -17,18 +21,21 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// `ansicht = Some(x)` liefert die Bilder der Ansicht x PLUS die ansichtslosen; `None` liefert
-/// alles.
+/// alles, beides ohne die zur Entfernung vorgesehenen.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     ansicht: Option<i64>,
 ) -> Result<Vec<HintergrundbildAnzeige>, AppError> {
+    let vorgesehen = zur_entfernung_vorgesehen_sql("karte_hintergrundbild");
     let sql = match ansicht {
         Some(_) => format!(
             "{ANZEIGE_SELECT} WHERE einsatz_id = ? AND (ansicht_id IS NULL OR ansicht_id = ?) \
-             ORDER BY reihenfolge, id"
+             AND NOT {vorgesehen} ORDER BY reihenfolge, id"
         ),
-        None => format!("{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY reihenfolge, id"),
+        None => format!(
+            "{ANZEIGE_SELECT} WHERE einsatz_id = ? AND NOT {vorgesehen} ORDER BY reihenfolge, id"
+        ),
     };
     let mut q =
         sqlx::query_as::<_, HintergrundbildAnzeige>(sqlx::AssertSqlSafe(sql)).bind(einsatz_id);
@@ -44,7 +51,8 @@ pub async fn laden(
     id: i64,
 ) -> Result<HintergrundbildAnzeige, AppError> {
     sqlx::query_as::<_, HintergrundbildAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{ANZEIGE_SELECT} WHERE id = ? AND einsatz_id = ?"
+        "{ANZEIGE_SELECT} WHERE id = ? AND einsatz_id = ? AND NOT {}",
+        zur_entfernung_vorgesehen_sql("karte_hintergrundbild")
     )))
     .bind(id)
     .bind(einsatz_id)
@@ -55,15 +63,17 @@ pub async fn laden(
 
 /// Download-Metadaten OHNE Bytes: `(name, mime, sha256)` für die Cache-Header und den
 /// `If-None-Match`-304-Kurzschluss, ohne den BLOB zu lesen. `NotFound`, wenn das Bild nicht (zu
-/// diesem Einsatz) existiert.
+/// diesem Einsatz) existiert oder zur Entfernung vorgesehen ist.
 pub async fn meta_fuer_download(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
 ) -> Result<(String, String, String), AppError> {
-    sqlx::query_as::<_, (String, String, String)>(
-        "SELECT name, mime, sha256 FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
-    )
+    sqlx::query_as::<_, (String, String, String)>(sqlx::AssertSqlSafe(format!(
+        "SELECT name, mime, sha256 FROM karte_hintergrundbild \
+         WHERE id = ? AND einsatz_id = ? AND NOT {}",
+        zur_entfernung_vorgesehen_sql("karte_hintergrundbild")
+    )))
     .bind(id)
     .bind(einsatz_id)
     .fetch_optional(pool)
@@ -72,15 +82,18 @@ pub async fn meta_fuer_download(
 }
 
 /// Bytes eines Hintergrundbilds für den Download: `(name, mime, daten)`; `name` speist
-/// `Content-Disposition`. `NotFound`, wenn das Bild nicht (zu diesem Einsatz) existiert.
+/// `Content-Disposition`. `NotFound`, wenn das Bild nicht (zu diesem Einsatz) existiert oder zur
+/// Entfernung vorgesehen ist.
 pub async fn laden_bytes(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
 ) -> Result<(String, String, Vec<u8>), AppError> {
-    sqlx::query_as::<_, (String, String, Vec<u8>)>(
-        "SELECT name, mime, daten FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
-    )
+    sqlx::query_as::<_, (String, String, Vec<u8>)>(sqlx::AssertSqlSafe(format!(
+        "SELECT name, mime, daten FROM karte_hintergrundbild \
+         WHERE id = ? AND einsatz_id = ? AND NOT {}",
+        zur_entfernung_vorgesehen_sql("karte_hintergrundbild")
+    )))
     .bind(id)
     .bind(einsatz_id)
     .fetch_optional(pool)

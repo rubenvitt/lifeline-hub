@@ -15,9 +15,9 @@
 //! - **Phase B** (IRREVERSIBEL): nach Ablauf der Karenz (`KARENZ_TAGE`) werden die
 //!   Personendaten gescrubbt (`repo::schwaerze_einsatz`), das operative Skelett
 //!   (Einsatz, ETB, Zähler) bleibt erhalten. `geschwaerzt_at`-Tombstone = Idempotenz.
-//! - **Nachlauf** (LFH-905): Anhänge geschwärzter Einsätze und Kategorien löscht jede
-//!   Schwärzung nach ihrem Commit einzeln, je Anhang eine Transaktion
-//!   (`anhang::repo::entferne_vorgesehene`); der Tick holt Reste nach.
+//! - **Nachlauf** (LFH-905, LFH-997): Anhänge und Bilder der Lagekarte geschwärzter Einsätze und
+//!   Kategorien löscht jede Schwärzung nach ihrem Commit einzeln, je Zeile eine Transaktion
+//!   (`schwaerzung_nachlauf::entferne_vorgesehene`); der Tick holt Reste nach.
 //! - **Phase C**: abgelaufene Einträge des Auth-Audits (eigene Frist, an keinem Einsatz).
 //! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
 //!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
@@ -197,17 +197,18 @@ pub async fn tick_mit_rueckschrieb(
         Err(e) => tracing::warn!("Purge Phase B: Abfrage fehlgeschlagen: {e}"),
     }
 
-    // --- Nachlauf: Anhänge geschwärzter Einsätze und Kategorien einzeln (LFH-905) ---
+    // --- Nachlauf: Anhänge und Bilder geschwärzter Einsätze und Kategorien einzeln (LFH-905) ---
     // Die Wege oben laufen ihren Einsatz schon selbst nach; hier fallen nur Reste an (Absturz
-    // oder Fehler zwischen atomarer Schwärzung und Nachlauf). Vor Phase D, deren Kaskade die
+    // oder Fehler zwischen atomarer Schwärzung und Nachlauf) und einmalig die Bilder der
+    // Lagekarte, die vor LFH-997 geschwärzte Einsätze noch tragen. Vor Phase D, deren Kaskade die
     // Reste sonst in einer Transaktion löschte, und vor dem Rückschrieb.
     let mut nachgelaufen = 0;
-    match crate::anhang::repo::entferne_vorgesehene(pool, None).await {
+    match crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene(pool, None).await {
         Ok(0) => {}
         Ok(n) => {
             tracing::warn!(
                 anzahl = n,
-                "Purge Nachlauf: verbliebene Anhänge geschwärzter Einsätze einzeln gelöscht"
+                "Purge Nachlauf: verbliebene Anhänge und Bilder geschwärzter Einsätze einzeln gelöscht"
             );
             nachgelaufen = n;
         }
@@ -713,19 +714,18 @@ mod tests {
             "Stammdaten-Snapshot einer disponierten Kraft darf NICHT gescrubbt werden"
         );
         assert_eq!(snap_stamm_funktion.as_deref(), Some("Gruppenführer"));
-        // (b2) Bild-Hintergrund: name geschwärzt, BLOB (Kartografie) bleibt erhalten.
-        let nachher = crate::karte_hintergrundbild::repo::liste(&pool, e, None)
-            .await
-            .unwrap();
-        assert_eq!(
-            nachher[0].name,
-            super::repo::SCHWAERZUNG_PLATZHALTER,
-            "Bildname (PII) geschwärzt"
-        );
-        let (_, _, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id)
-            .await
-            .unwrap();
-        assert!(!daten.is_empty(), "Bild-BLOB (Kartografie) bleibt erhalten");
+        // (b2) Bild-Hintergrund (LFH-997): fällt samt Name und BLOB, einzeln im Nachlauf.
+        let bilder: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM karte_hintergrundbild WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bilder, 0, "Bild der Lagekarte nach der Schwärzung entfernt");
+        assert!(matches!(
+            crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id).await,
+            Err(crate::error::AppError::NotFound)
+        ));
 
         // (c) Skelett intakt: Einsatz + registrier_nr + ETB-Original erhalten.
         let person_anzahl: i64 =
@@ -2058,6 +2058,7 @@ mod tests {
 
     const NAME_KLARTEXT: &str = "LFH725-Gepflanzter-Name";
     const ANHANG_KLARTEXT: &[u8] = b"LFH725-GEPFLANZTER-ANHANG";
+    const BILD_KLARTEXT: &[u8] = b"LFH997-GEPFLANZTES-LUFTBILD";
 
     // ---------- LFH-751: Schwärzungsanträge im Purge-Lauf ----------
 
@@ -2177,8 +2178,9 @@ mod tests {
     }
 
     /// Vorgemerkter Einsatz, Karenz zum Zeitpunkt `2026-03-01` abgelaufen, mit dem Klartext in
-    /// einer Scrub-Spalte (Personenname) und in einem Anhang, der über mehrere Seiten reicht
-    /// (Overflow-Seiten — genau die lässt `secure_delete = FAST` stehen).
+    /// einer Scrub-Spalte (Personenname), in einem Anhang und in einem Bild der Lagekarte, die
+    /// über mehrere Seiten reichen (Overflow-Seiten — genau die lässt `secure_delete = FAST`
+    /// stehen).
     async fn faelliger_einsatz_mit_klartext(pool: &SqlitePool) -> i64 {
         let e = abgeschlossen_mit_frist(pool, "2026-01-01 00:00:00").await;
         sqlx::query("UPDATE einsatz SET geloescht_at = '2026-01-02 00:00:00' WHERE id = ?")
@@ -2213,12 +2215,42 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
+        bild_mit_bytes(pool, e, &BILD_KLARTEXT.repeat(1000)).await;
         e
     }
 
     fn enthaelt_klartext(pfad: &std::path::Path) -> bool {
         crate::db::datei_oder_wal_enthaelt(pfad, NAME_KLARTEXT.as_bytes())
             || crate::db::datei_oder_wal_enthaelt(pfad, ANHANG_KLARTEXT)
+            || crate::db::datei_oder_wal_enthaelt(pfad, BILD_KLARTEXT)
+    }
+
+    /// Ein Bild der Lagekarte mit den Bytes `daten` (LFH-997).
+    async fn bild_mit_bytes(pool: &SqlitePool, einsatz: i64, daten: &[u8]) {
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO karte_hintergrundbild (einsatz_id, name, daten, mime, groesse, sha256, \
+                ecken_json, hochgeladen_von) \
+             VALUES (?, 'Luftbild.png', ?, 'image/png', ?, 'x', '[[0,0],[1,0],[1,1],[0,1]]', ?)",
+        )
+        .bind(einsatz)
+        .bind(daten)
+        .bind(daten.len() as i64)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn bilder_von(pool: &SqlitePool, einsatz: i64) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM karte_hintergrundbild WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 
     /// Spec `aufbewahrung`, „Physische Entfernung geschwärzter Werte“: nach dem Purge-Lauf steht
@@ -2252,6 +2284,10 @@ mod tests {
         assert!(
             !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
             "Anhang-Bytes stehen noch in DB-Datei oder WAL"
+        );
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, BILD_KLARTEXT),
+            "Bytes des Bilds der Lagekarte stehen noch in DB-Datei oder WAL"
         );
     }
 
@@ -2289,6 +2325,17 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        // LFH-997: das Bild der Lagekarte fällt mit `anhaenge`, ein Zeichen der Lagekarte bleibt.
+        bild_mit_bytes(&pool, e, &BILD_KLARTEXT.repeat(1000)).await;
+        sqlx::query(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, label, erstellt_von) \
+             VALUES (?, 50.1, 8.6, 'stelle', 'ELW', ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
         for k in ["personenauskunft", "anhaenge"] {
             kategorie_mit_frist(&pool, e, k, "2026-01-01 00:00:00").await;
         }
@@ -2316,6 +2363,22 @@ mod tests {
         assert!(
             !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
             "Anhang-Bytes stehen noch in DB-Datei oder WAL"
+        );
+        assert_eq!(bilder_von(&pool, e).await, 0, "Bild der Lagekarte entfernt");
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, BILD_KLARTEXT),
+            "Bytes des Bilds der Lagekarte stehen noch in DB-Datei oder WAL"
+        );
+        let zeichen: Option<String> =
+            sqlx::query_scalar("SELECT label FROM freies_zeichen WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            zeichen.as_deref(),
+            Some("ELW"),
+            "Zeichen der Lagekarte bleibt"
         );
         let geschwaerzt: Option<String> =
             sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
@@ -2407,10 +2470,11 @@ mod tests {
         );
 
         assert_eq!(
-            crate::anhang::repo::entferne_vorgesehene(&pool, None)
+            crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene(&pool, None)
                 .await
                 .unwrap(),
-            7
+            8,
+            "7 Anhänge und das Bild der Lagekarte aus der Fixture"
         );
         assert_eq!(anhaenge_von(&pool, e).await, 0);
         assert_eq!(
@@ -2442,6 +2506,11 @@ mod tests {
         tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:10:00")).await;
 
         assert_eq!(anhaenge_von(&pool, e).await, 0);
+        assert_eq!(bilder_von(&pool, e).await, 0);
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, BILD_KLARTEXT),
+            "Bytes des Bilds der Lagekarte stehen noch in DB-Datei oder WAL"
+        );
         assert!(
             !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
             "Anhang-Bytes stehen noch in DB-Datei oder WAL"
@@ -2496,12 +2565,175 @@ mod tests {
                 .is_empty(),
             "Einsatz mit Anhängen ist nicht fällig"
         );
-        crate::anhang::repo::entferne_vorgesehene(&pool, None)
+        crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene(&pool, None)
             .await
             .unwrap();
         assert_eq!(
             skelett_loeschung::faellige(&pool, spaeter).await.unwrap(),
             vec![e]
+        );
+    }
+
+    /// LFH-997: Phase D wartet auch auf Bilder der Lagekarte, nicht nur auf Anhänge.
+    #[tokio::test]
+    async fn phase_d_wartet_auf_bilder_der_lagekarte() {
+        let pool = crate::db::test_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, skelett_dauer_tage) VALUES (1, 1) \
+             ON CONFLICT(org_id) DO UPDATE SET skelett_dauer_tage = excluded.skelett_dauer_tage",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        sqlx::query("DELETE FROM anhang WHERE einsatz_id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let spaeter = t("2026-06-01 12:00:00");
+        assert!(
+            skelett_loeschung::faellige(&pool, spaeter)
+                .await
+                .unwrap()
+                .is_empty(),
+            "Einsatz mit einem Bild der Lagekarte ist nicht fällig"
+        );
+        crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene(&pool, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            skelett_loeschung::faellige(&pool, spaeter).await.unwrap(),
+            vec![e]
+        );
+    }
+
+    /// Spec `aufbewahrung`, „Bild-Hintergründe der Lagekarte“, Szenario „Zwischen Schwärzung und
+    /// Nachlauf“: das Bild steht noch in der Tabelle, ist aber nicht mehr abrufbar.
+    #[tokio::test]
+    async fn bild_ist_zwischen_schwaerzung_und_nachlauf_unerreichbar() {
+        let pool = crate::db::test_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        let id: i64 =
+            sqlx::query_scalar("SELECT id FROM karte_hintergrundbild WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            bilder_von(&pool, e).await,
+            1,
+            "Zeile steht bis zum Nachlauf"
+        );
+        let bild = crate::karte_hintergrundbild::repo::liste(&pool, e, None)
+            .await
+            .unwrap();
+        assert!(bild.is_empty(), "Liste übergeht das vorgesehene Bild");
+        assert!(matches!(
+            crate::karte_hintergrundbild::repo::laden(&pool, e, id).await,
+            Err(crate::error::AppError::NotFound)
+        ));
+        assert!(matches!(
+            crate::karte_hintergrundbild::repo::meta_fuer_download(&pool, e, id).await,
+            Err(crate::error::AppError::NotFound)
+        ));
+        assert!(matches!(
+            crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, id).await,
+            Err(crate::error::AppError::NotFound)
+        ));
+    }
+
+    /// Spec `aufbewahrung`, „Bild-Hintergründe der Lagekarte“, Szenario „Bestand aus der Zeit vor
+    /// der Änderung“: ein vor LFH-997 geschwärzter Einsatz trägt sein Bild noch; der nächste Tick
+    /// löscht es ohne neuen ETB-Eintrag, das Bild eines aktiven Einsatzes bleibt.
+    #[tokio::test]
+    async fn tick_entfernt_bilder_frueher_geschwaerzter_einsaetze() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2026-01-01 00:00:00").await;
+        sqlx::query(
+            "UPDATE einsatz SET geloescht_at = '2026-01-02 00:00:00', \
+                geschwaerzt_at = '2026-02-01 00:00:00' WHERE id = ?",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        bild_mit_bytes(&pool, e, b"altes Luftbild").await;
+        let aktiv: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1, 'Aktiv', 'aktiv') \
+             RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        bild_mit_bytes(&pool, aktiv, b"bleibt").await;
+        let etb_vorher: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await;
+
+        assert_eq!(bilder_von(&pool, e).await, 0);
+        assert_eq!(
+            bilder_von(&pool, aktiv).await,
+            1,
+            "aktiver Einsatz behält sein Bild"
+        );
+        let etb_nachher: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(etb_nachher, etb_vorher, "kein neuer ETB-Eintrag");
+    }
+
+    /// Spec `aufbewahrung`, „Entfernung der Datei-Inhalte in Einzelschritten“, Szenario „Viele
+    /// Bilder der Lagekarte“ (LFH-997). Mutationsprobe: führt die Registry die Bilder als
+    /// `ZeileLoeschen`, wächst der WAL im atomaren Vorgang auf die Summe der Bilder.
+    #[tokio::test]
+    async fn nachlauf_haelt_jede_transaktion_auf_ein_bild() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        for i in 0..4u8 {
+            bild_mit_bytes(&pool, e, &vec![i + 1; NACHLAUF_ANHANG_BYTES]).await;
+        }
+        assert!(crate::db::wal_zurueckschreiben(&pool).await.unwrap());
+        assert_eq!(wal_bytes(&pfad), 0, "Vorbedingung: WAL leer");
+
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        assert!(
+            wal_bytes(&pfad) < 1_000_000,
+            "der atomare Vorgang schreibt die Bilder nicht ins WAL: {} Bytes",
+            wal_bytes(&pfad)
+        );
+        assert_eq!(
+            bilder_von(&pool, e).await,
+            5,
+            "Zeilen stehen bis zum Nachlauf"
+        );
+
+        crate::einsatz::schwaerzung_nachlauf::entferne_vorgesehene(&pool, None)
+            .await
+            .unwrap();
+        assert_eq!(bilder_von(&pool, e).await, 0);
+        assert!(
+            wal_bytes(&pfad) < 2 * NACHLAUF_ANHANG_BYTES as u64,
+            "WAL wuchs über zwei Bilder (eine Transaktion für mehrere?): {} Bytes",
+            wal_bytes(&pfad)
         );
     }
 

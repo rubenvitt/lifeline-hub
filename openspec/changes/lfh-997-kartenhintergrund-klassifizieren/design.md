@@ -146,8 +146,8 @@ derselbe.
   setzt keine kurze Anhang-Frist.
 - **Kategorie-Schwärzung an einem lesbaren Einsatz** nimmt der Lagekarte und ihrem Rückblick
   die Hintergründe. → Gewollt; der Rückblick verkraftet fehlende Bilder heute schon (gelöschtes
-  Bild im laufenden Einsatz). Beim Umsetzen prüfen, dass die Lagekarte ein 404 eines Bilds
-  ohne Fehlerbanner übergeht.
+  Bild im laufenden Einsatz): er zeichnet die übrigen und meldet das fehlende als Hinweis
+  (`useKartenbilder`, belegt in `useKartenbilder.test.tsx`).
 - **Bestand fällt beim ersten Lauf** (D6). → In der Abschlussmeldung nennen.
 - **Breitere Bedingung im Nachlauf** könnte fremde Zeilen treffen. → Der Wächter im `DELETE`
   wiederholt die Bedingung; ein Test belegt, dass Bilder eines nicht geschwärzten Einsatzes
