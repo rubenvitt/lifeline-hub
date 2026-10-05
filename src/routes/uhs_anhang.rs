@@ -22,6 +22,7 @@ use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Unfallhilfsstellen;
 use crate::error::AppError;
 use crate::extract::PfadParam;
+use crate::geraet::stelle;
 use crate::uhs::anhang::{self as uhs_anhang, UhsAnhangAnzeige, UHS_ABLAGE};
 use crate::uhs::repo as uhs_repo;
 
@@ -38,6 +39,7 @@ pub async fn liste(
     ctx: EinsatzLesezugriff<Unfallhilfsstellen>,
     PfadParam((_einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<UhsAnhangAnzeige>>, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     Ok(Json(
         uhs_anhang::liste(&state.pool, ctx.einsatz.id, uhs_id).await?,
     ))
@@ -53,6 +55,7 @@ pub async fn ablegen(
     PfadParam((_einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<UhsAnhangAnzeige>), AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     let uhs = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
     if uhs.storniert_at.is_some() {
@@ -96,6 +99,7 @@ pub async fn datei(
     param: FassungParam,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let fassung = param.fassung()?;
     let anhang_id =
         uhs_anhang::anhang_id_fuer_download(&state.pool, ctx.einsatz.id, uhs_id, id).await?;
@@ -149,6 +153,7 @@ pub async fn entfernen(
     ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
     PfadParam((_einsatz_id, uhs_id, id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let etb_id = uhs_anhang::entfernen(

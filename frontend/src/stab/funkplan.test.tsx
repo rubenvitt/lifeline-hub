@@ -376,6 +376,22 @@ describe('rendereFunkplanMarkdown', () => {
     );
   });
 
+  it('setzt die Betriebsart nicht doppelt vor eine Bezeichnung, die sie schon trägt (LFH-884)', () => {
+    const qb = quellen({
+      abschnitte: daten([
+        abschnitt(1, {
+          name: 'Nord',
+          sprechgruppen: [sg(1, 'TMO', 'TMO 412_F_DRK'), sg(2, 'DMO', 'dmo 505')],
+        }),
+        abschnitt(2, { name: 'Süd', sprechgruppen: [sg(3, 'TMO', '311'), sg(4, 'TMO', '312')] }),
+      ]),
+    });
+    const text = rendereFunkplanMarkdown(baueFunkplan(qb), 'X', funkplanLuecken(qb), qb);
+    expect(text).toContain('- **Nord** · TMO 412\\_F\\_DRK · dmo 505');
+    expect(text).toContain('- **Süd** · TMO 311, 312');
+    expect(text).not.toMatch(/TMO TMO|DMO dmo/i);
+  });
+
   it('nennt die Lücken mit Zahl und Namen und die fehlende Gegenstelle', () => {
     expect(md).toContain('## Lücken');
     expect(md).toContain('- Abschnitte ohne Sprechgruppe: 1 (Abschnitt Süd)');

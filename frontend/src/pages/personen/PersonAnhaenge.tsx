@@ -31,7 +31,8 @@ export default function PersonAnhaenge({ einsatzId, person, darfSchreiben }: Pro
     () => ({
       queryKey: einsatzKeys.personAnhaenge(einsatzId, person.id),
       liste: () => listePersonAnhaenge(einsatzId, person.id),
-      ablegen: (datei) => legePersonAnhangAb(einsatzId, person.id, datei),
+      ablegen: (datei, onFortschritt) =>
+        legePersonAnhangAb(einsatzId, person.id, datei, onFortschritt),
       entfernen: (id) => entfernePersonAnhang(einsatzId, person.id, id),
       downloadPfad: (id) => personAnhangDownloadPfad(einsatzId, person.id, id),
     }),

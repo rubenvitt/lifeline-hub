@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { BenutzerAnzeige } from '../api/types';
+import type { GeraetAnzeige, MeAntwort } from '../api/types';
 import { ApiError, NetzFehler, setzeErwartetenBenutzer } from '../api/client';
 import * as authApi from '../api/auth';
 import { abonniereAuthWechsel, meldeAuthWechsel } from './authKanal';
@@ -31,6 +31,7 @@ import {
   geraetRaeumen,
   type AusgangsAnlass,
 } from '../offline/geraetRaeumung';
+import { merkeGeraet } from '../geraet/geraetMarke';
 import {
   GATEWAY_NICHT_ERREICHBAR,
   istVerbindungsfehler,
@@ -49,12 +50,15 @@ export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
  *  Schreibanfragen tragen weiter dessen Kennung und scheitern am Server mit 412 —, bis die
  *  Person im `BenutzerKonfliktDialog` die Seite neu lädt. */
 export interface BenutzerKonflikt {
-  bisher: BenutzerAnzeige;
-  jetzt: BenutzerAnzeige;
+  bisher: MeAntwort;
+  jetzt: MeAntwort;
 }
 
 interface AuthWert {
-  benutzer: BenutzerAnzeige | null;
+  benutzer: MeAntwort | null;
+  /** Die Kopplung, wenn dieser Tab als gekoppeltes Gerät läuft (LFH-892); sonst `null`. Kommt
+   *  allein aus `/api/auth/me`, nie aus einer Eingabe im Gerät. */
+  geraet: GeraetAnzeige | null;
   laedt: boolean;
   login: (benutzername: string, passwort: string) => Promise<LoginErgebnis>;
   /** Meldet über den Server ab. `false`, wenn der Server mit 412 ablehnte (die Sitzung gehört
@@ -98,13 +102,13 @@ function meFehlerEinordnen(e: unknown): MeErgebnis {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [benutzer, setBenutzer] = useState<BenutzerAnzeige | null>(null);
+  const [benutzer, setBenutzer] = useState<MeAntwort | null>(null);
   const [laedt, setLaedt] = useState(true);
   const [konflikt, setKonflikt] = useState<BenutzerKonflikt | null>(null);
   const queryClient = useQueryClient();
   // Refs für die Prüfung, die aus Fremd-Ereignissen läuft und nicht an einen Render gebunden
   // sein darf: sie muss den Benutzer von JETZT vergleichen, nicht den ihres Closures.
-  const benutzerRef = useRef<BenutzerAnzeige | null>(null);
+  const benutzerRef = useRef<MeAntwort | null>(null);
   const laedtRef = useRef(true);
   const laufendePruefung = useRef<Promise<void> | null>(null);
   const nachlaufNoetig = useRef(false);
@@ -121,8 +125,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  in dem der Tab schon B zeigt, aber noch als A schreibt (oder umgekehrt). Aus demselben
    *  Grund hier gebunden: die behaltenen Erfassungswerte (LFH-785), die eine Maske von B sonst
    *  mit denen von A vorbelegte. */
-  const uebernimm = useCallback((b: BenutzerAnzeige | null) => {
+  const uebernimm = useCallback((b: MeAntwort | null) => {
     generation.current++;
+    // Nur ein bestätigter Benutzer setzt die Gerätemarke (LFH-892); ein Abmelden lässt sie
+    // stehen, damit ein beendetes Gerät „Kopplung beendet" zeigt statt der Anmeldung.
+    if (b) merkeGeraet(b.geraet != null);
     benutzerRef.current = b;
     setzeErwartetenBenutzer(b?.id ?? null);
     erfassungsSitzungBinden(b?.id ?? null);
@@ -159,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  Personen gehen von der Platte. Das Räumen wird nicht abgewartet (s. `abmeldenLokal`) — die
    *  Entwürfe anderer blendet der Index bis dahin ohnehin aus. */
   const vorhaltungAnmelden = useCallback(
-    async (b: BenutzerAnzeige) => {
+    async (b: MeAntwort) => {
       await lagebildAnmelden(queryClient, b);
       void geraetFuerBenutzerRaeumen(b.id);
     },
@@ -185,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           nachlaufNoetig.current = true;
           return true;
         };
-        let aufServer: BenutzerAnzeige;
+        let aufServer: MeAntwort;
         try {
           aufServer = await authApi.me();
         } catch (e) {
@@ -246,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let bestaetigt = false;
     let eigeneGeneration = generation.current;
     const aktuell = () => aktiv && generation.current === eigeneGeneration;
-    const setze = (b: BenutzerAnzeige | null) => {
+    const setze = (b: MeAntwort | null) => {
       uebernimm(b);
       eigeneGeneration = generation.current;
     };
@@ -376,9 +383,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     meldeAuthWechsel({ art: 'angemeldet' });
   }, [uebernimm, vorhaltungAnmelden]);
 
+  const geraet = benutzer?.geraet ?? null;
   const wert = useMemo<AuthWert>(
-    () => ({ benutzer, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt }),
-    [benutzer, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt],
+    () => ({ benutzer, geraet, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt }),
+    [benutzer, geraet, laedt, login, logout, aktualisiere, abmeldenLokal, konflikt],
   );
 
   return <AuthContext.Provider value={wert}>{children}</AuthContext.Provider>;

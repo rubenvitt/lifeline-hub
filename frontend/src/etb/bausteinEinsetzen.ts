@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import { serverJetzt } from '../offline/serveruhr';
 import { zuWanduhr } from '../anzeige/zeitEingabe';
 import type { EtbBaustein, EinsatzAnzeige, EtbTyp, MeldeWeg } from '../api/types';
 
@@ -27,18 +27,19 @@ interface AutoPlatzhalter {
 
 /**
  * Vorkonfigurierte Platzhalter, die beim Einsetzen automatisch aus Datum/Uhrzeit
- * bzw. dem Einsatz befüllt werden. Single Source of Truth für Engine UND Admin-UI.
+ * bzw. dem Einsatz befüllt werden. Single Source of Truth für Engine UND Admin-UI. Datum und
+ * Uhrzeit nach der Serveruhr, wie die Ereigniszeit desselben Eintrags (LFH-895).
  */
 export const AUTO_PLATZHALTER: AutoPlatzhalter[] = [
   {
     name: 'datum',
     beschreibung: 'Aktuelles Datum (TT.MM.JJJJ)',
-    wert: (_e, zone) => zuWanduhr(dayjs(), zone).format('DD.MM.YYYY'),
+    wert: (_e, zone) => zuWanduhr(serverJetzt(), zone).format('DD.MM.YYYY'),
   },
   {
     name: 'uhrzeit',
     beschreibung: 'Aktuelle Uhrzeit (HH:MM)',
-    wert: (_e, zone) => zuWanduhr(dayjs(), zone).format('HH:mm'),
+    wert: (_e, zone) => zuWanduhr(serverJetzt(), zone).format('HH:mm'),
   },
   { name: 'einsatzort', beschreibung: 'Einsatzort', wert: (e) => e.einsatzort },
   { name: 'stichwort', beschreibung: 'Stichwort', wert: (e) => e.stichwort },

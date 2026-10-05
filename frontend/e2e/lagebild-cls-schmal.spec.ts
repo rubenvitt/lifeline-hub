@@ -34,6 +34,13 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * und keine Leeraktionen. Gemessen wird deshalb auch als Beobachter; die Vorbedingung (Hinweis
  * steht bzw. fehlt) prüft der Test vor der Zahl.
  *
+ * DICHTE (LFH-883): gemessen wird in allen drei Stufen der Staffel. Handschuh ist der
+ * Tablet-Kontext und auf 390 px selten, aber dort lagen die Platzhalter am weitesten neben dem
+ * Endzustand: das Kennzahlenband wuchs 427 → 454 px, der Paneelkopf „Einsatzabschnitte“ des
+ * Überblicks brach erst mit dem Meta um (38 → 52 px), Seiten-CLS 0,074–0,083. Die Stufe kommt
+ * als gespeicherte Wahl per `addInitScript` vor jedem Dokument-Script; der Test prüft sie am
+ * `data-dichte` der Wurzel, bevor er zählt.
+ *
  * HERMETISCH beim Pegel: der Einsatz trägt einen festgelegten Pegel (die Kennzahl erscheint nur
  * dann), die Messung kommt per `page.route` aus einem Literal — der echte Abruf ginge an
  * PEGELONLINE.
@@ -56,6 +63,18 @@ const HAUS_GRENZE = 0.03;
 
 /** Handschirm der Bedien-Leitlinie (Kontext mobil, ~390 px). */
 const HANDSCHIRM = { width: 390, height: 844 };
+
+/** Die Staffel der Bedien-Leitlinie; der Schlüssel ist die gespeicherte Wahl (`theme/dichte.ts`). */
+const DICHTEN = ['kompakt', 'komfortabel', 'handschuh'] as const;
+type Dichte = (typeof DICHTEN)[number];
+const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+
+async function stelleDichte(page: Page, dichte: Dichte) {
+  await page.addInitScript(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+    DICHTE_SCHLUESSEL,
+    dichte,
+  ] as const);
+}
 
 /**
  * Ein LANGER Einsatzname, wie ihn ein Lagefall trägt: er passt auf 390 px nicht in eine Zeile.
@@ -135,9 +154,11 @@ async function endzustand(page: Page) {
   await expect(inhalt(page).locator('[aria-busy="true"]')).toHaveCount(0);
 }
 
-async function messe(page: Page, pfad: string, einsatzId: string, folge: Folge) {
+async function messe(page: Page, pfad: string, einsatzId: string, folge: Folge, dichte: Dichte) {
   const abfragen = await stelleAbfragen(page, einsatzId, folge);
   await page.goto(pfad);
+  // Vorbedingung der Zahl: gemessen wird die Stufe, die der Test nennt.
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
   if (folge !== 'natürlich') {
     // Anker des Ladezustands: der Seitenkopf steht. Den Inhalt prüft der Anker nicht — der
     // Überblick zeigt vor dem Einsatz bewusst keinen (`UeberblickPage.tsx`). Dass die Folge
@@ -152,35 +173,43 @@ async function messe(page: Page, pfad: string, einsatzId: string, folge: Folge) 
 
 for (const route of ['ueberblick', 'lage-dashboard'] as const) {
   for (const rolle of ['admin', 'beobachter'] as const) {
-    test(`${route} als ${rolle}: CLS ≤ ${CLS_GUT} auf ${HANDSCHIRM.width} px`, async ({ page }) => {
-      test.setTimeout(150_000);
-      await anmeldenAlsAdmin(page);
-      const einsatzId = await einsatzAnlegen(page);
-      if (rolle === 'beobachter') {
-        await wechsleZuRolle(page, 'beobachter', einsatzId);
-      }
-      await beobachteShifts(page);
-      await page.setViewportSize(HANDSCHIRM);
-      const pfad = `/einsaetze/${einsatzId}/${route}`;
-
-      const werte: string[] = [];
-      for (const folge of FOLGEN) {
-        const m: Messung = await messe(page, pfad, einsatzId, folge);
-        // Der Rollenzweig ist Vorbedingung der Zahl (LFH-435): ohne ihn mäße der Beobachter-Fall
-        // den Admin-Zustand.
-        if (route === 'ueberblick') {
-          await expect(inhalt(page).getByRole('alert')).toHaveCount(0);
-          await expect(page.getByText(/Nur Einsatzleitung und Führungspersonal/)).toHaveCount(
-            rolle === 'beobachter' ? 1 : 0,
-          );
+    for (const dichte of DICHTEN) {
+      test(`${route} als ${rolle}, ${dichte}: CLS ≤ ${CLS_GUT} auf ${HANDSCHIRM.width} px`, async ({
+        page,
+      }) => {
+        test.setTimeout(150_000);
+        await anmeldenAlsAdmin(page);
+        const einsatzId = await einsatzAnlegen(page);
+        if (rolle === 'beobachter') {
+          await wechsleZuRolle(page, 'beobachter', einsatzId);
         }
-        werte.push(`${folge}: ${bericht(m)}`);
-        expect
-          .soft(m.summe, `${route} als ${rolle}, ${folge} (Leitlinie ${CLS_GUT}): ${bericht(m)}`)
-          .toBeLessThanOrEqual(HAUS_GRENZE);
-      }
-      test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
-    });
+        await stelleDichte(page, dichte);
+        await beobachteShifts(page);
+        await page.setViewportSize(HANDSCHIRM);
+        const pfad = `/einsaetze/${einsatzId}/${route}`;
+
+        const werte: string[] = [];
+        for (const folge of FOLGEN) {
+          const m: Messung = await messe(page, pfad, einsatzId, folge, dichte);
+          // Der Rollenzweig ist Vorbedingung der Zahl (LFH-435): ohne ihn mäße der
+          // Beobachter-Fall den Admin-Zustand.
+          if (route === 'ueberblick') {
+            await expect(inhalt(page).getByRole('alert')).toHaveCount(0);
+            await expect(page.getByText(/Nur Einsatzleitung und Führungspersonal/)).toHaveCount(
+              rolle === 'beobachter' ? 1 : 0,
+            );
+          }
+          werte.push(`${folge}: ${bericht(m)}`);
+          expect
+            .soft(
+              m.summe,
+              `${route} als ${rolle}, ${dichte}, ${folge} (Leitlinie ${CLS_GUT}): ${bericht(m)}`,
+            )
+            .toBeLessThanOrEqual(HAUS_GRENZE);
+        }
+        test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+      });
+    }
   }
 }
 
@@ -222,3 +251,113 @@ test('Meldungsstrom: der Paneelkopf hält seine Höhe über die Verbindungszust�
   test.info().annotations.push({ type: 'messwert', description: hoehen.join(' | ') });
   expect(ohne, hoehen.join(' | ')).toBe(offen);
 });
+
+/**
+ * Die Zellhöhe des Kennzahlenbandes steht vom ersten Bild an (LFH-883), in jeder Dichte. Die
+ * Seiten-CLS sieht das nicht mehr allein: seit Kopfleiste und Ortspfad nicht mehr in dasselbe
+ * Bild fallen, blieben die 13 bzw. 16 px, um die eine Reihe in „Handschuh“ wuchs, unter der
+ * Hausgrenze. Deshalb die Geometrie selbst, in beiden Ladefolgen, die einen Platzhalter zeigen:
+ * `Einsatz zuletzt` (sechs leere Plätze ohne Etikett) und `Einsatz zuerst` (Etiketten, Werte im
+ * Ladezustand). Gemessen vor dem Fix in „Handschuh“: 427 → 454 px.
+ */
+for (const dichte of DICHTEN) {
+  test(`Lage-Dashboard, ${dichte}: das Kennzahlenband hält seine Höhe vom Platzhalter bis zu den Daten (390 px)`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page);
+    await stelleDichte(page, dichte);
+    await page.setViewportSize(HANDSCHIRM);
+
+    const hoehen: string[] = [];
+    for (const folge of ['Einsatz zuletzt', 'Einsatz zuerst'] as const) {
+      const abfragen = await stelleAbfragen(page, einsatzId, folge);
+      await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      // Vorbedingung: das Band steht im Ladezustand, mit geladener Schrift.
+      await expect(band(page).locator('[aria-busy="true"]').first()).toBeVisible();
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      const vorher = (await band(page).boundingBox())?.height ?? Number.NaN;
+      abfragen.freigeben();
+      await endzustand(page);
+      const nachher = (await band(page).boundingBox())?.height ?? Number.NaN;
+      const messwert = `${folge}: ${vorher.toFixed(1)} → ${nachher.toFixed(1)}`;
+      hoehen.push(messwert);
+      expect.soft(Math.abs(nachher - vorher), `${dichte}, ${messwert}`).toBeLessThanOrEqual(1);
+    }
+    test.info().annotations.push({ type: 'messwert', description: hoehen.join(' | ') });
+  });
+}
+
+/**
+ * Der Paneelkopf „Einsatzabschnitte“ im Überblick bricht auf 390 px um, sobald sein Meta „0
+ * Abschnitte · 0 Einheiten“ neben dem Titel steht (38 → 52 px). Das Meta kam erst mit den Daten;
+ * der Kopf hält seinen Umbruch jetzt schon im Ladezustand (LFH-883). Das Paneel steht unter dem
+ * ersten Bildschirm, die Seiten-CLS sieht seinen Sprung nicht — deshalb die Geometrie.
+ */
+for (const dichte of DICHTEN) {
+  test(`Überblick, ${dichte}: der Paneelkopf „Einsatzabschnitte“ hält seine Höhe über das Laden (390 px)`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page);
+    await stelleDichte(page, dichte);
+    await page.setViewportSize(HANDSCHIRM);
+
+    const abfragen = await stelleAbfragen(page, einsatzId, 'Einsatz zuerst');
+    await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    const paneel = page
+      .locator('section[data-lfh="paneel"]')
+      .filter({ has: page.getByRole('heading', { name: 'Einsatzabschnitte' }) });
+    const kopf = paneel.locator(':scope > div').first();
+    // Vorbedingung: das Paneel lädt noch.
+    await expect(paneel.locator('[aria-busy="true"]').first()).toBeVisible();
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    const vorher = (await kopf.boundingBox())?.height ?? Number.NaN;
+    abfragen.freigeben();
+    await expect(paneel.getByText('0 Abschnitte · 0 Einheiten')).toBeVisible();
+    const nachher = (await kopf.boundingBox())?.height ?? Number.NaN;
+    const messwert = `${vorher.toFixed(1)} → ${nachher.toFixed(1)}`;
+    test.info().annotations.push({ type: 'messwert', description: messwert });
+    expect(Math.abs(nachher - vorher), messwert).toBeLessThanOrEqual(1);
+  });
+}
+
+/**
+ * Der Einsatzname in der Kopfleiste erscheint, ohne dass sich seine Zelle bewegt (LFH-883): beim
+ * Laden hält die Spinnerzelle die Höhe des Umschalters und ein leerer Platz die Breite des
+ * Statuspunkts. Vorher rückte die Zelle mit dem Einsatz 12 px nach oben und 11 px nach rechts,
+ * im selben Bild wie der Ortspfad der Seite; zusammen lag das bei 0,02 Seiten-CLS in jeder
+ * Dichte — unter der Hausgrenze, deshalb die Geometrie.
+ */
+for (const dichte of DICHTEN) {
+  test(`Kopfleiste, ${dichte}: die Zelle des Einsatznamens steht beim Laden schon an ihrem Platz (390 px)`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page);
+    await stelleDichte(page, dichte);
+    await page.setViewportSize(HANDSCHIRM);
+
+    const abfragen = await stelleAbfragen(page, einsatzId, 'Einsatz zuletzt');
+    await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    const zelle = page.locator('[data-lfh="kopf-einsatzname"]');
+    // Vorbedingung: der Einsatz lädt noch, der Name steht nicht.
+    await expect(zelle).toBeVisible();
+    await expect(zelle.getByRole('button')).toHaveCount(0);
+    const vorher = await zelle.boundingBox();
+    abfragen.freigeben();
+    await expect(zelle.getByRole('button', { name: new RegExp(NAME_PRAEFIX) })).toBeVisible();
+    const nachher = await zelle.boundingBox();
+    const messwert = `x${vorher?.x}/y${vorher?.y}/h${vorher?.height} → x${nachher?.x}/y${nachher?.y}/h${nachher?.height}`;
+    test.info().annotations.push({ type: 'messwert', description: messwert });
+    expect(nachher?.x, messwert).toBe(vorher?.x);
+    expect(nachher?.y, messwert).toBe(vorher?.y);
+    expect(nachher?.height, messwert).toBe(vorher?.height);
+  });
+}

@@ -291,7 +291,7 @@ export default function PersonalPage() {
       render: (_, ep) => (
         <Space>
           {ep.name}
-          {ep.ist_adhoc && <Tag color="blue">ad-hoc</Tag>}
+          {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
           {ep.ist_demo && <DemoMarke />}
         </Space>
       ),

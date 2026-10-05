@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../api/client';
+import { ApiError, AusgangUnbekannt, NetzFehler, type UploadFortschritt } from '../api/client';
 import type { NeuerEintrag } from '../api/etb';
 import { ladeEtbAnhangHoch } from '../api/etb';
 import type { Anhang, EtbBaustein, EtbEintragAnzeige } from '../api/types';
@@ -214,6 +214,84 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
     expect(await screen.findByText('Lädt hoch (1/2) …')).toBeInTheDocument();
     await act(async () => freigeben(anzeige(1, 'a.jpg')));
     await waitFor(() => expect(screen.queryByText(/Lädt hoch/)).toBeNull());
+  });
+
+  describe('Stand der Übertragung (LFH-878)', () => {
+    /** Startet einen Versand mit einer Datei, deren Upload der Test steuert. */
+    async function starteVersand() {
+      let melde: ((f: UploadFortschritt) => void) | undefined;
+      let erfuellen!: (a: Anhang) => void;
+      let ablehnen!: (e: unknown) => void;
+      hochladen.mockImplementationOnce((_id, _datei, onFortschritt) => {
+        melde = onFortschritt;
+        return new Promise((res, rej) => {
+          erfuellen = res;
+          ablehnen = rej;
+        });
+      });
+      const p = props();
+      const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+      await waehle(container, datei('a.jpg'));
+      await userEvent.type(feld(), 'Foto{Enter}');
+      await waitFor(() => expect(hochladen).toHaveBeenCalledTimes(1));
+      const fortschritt = (f: UploadFortschritt) => act(() => melde!(f));
+      return { p, fortschritt, erfuellen, ablehnen };
+    }
+
+    it('zeigt sofort einen Balken ohne Zahl, noch vor dem ersten Byte-Ereignis', async () => {
+      await starteVersand();
+      const balken = await screen.findByRole('progressbar', { name: 'Wird hochgeladen' });
+      expect(balken).not.toHaveAttribute('aria-valuenow');
+    });
+
+    it('zeigt Prozent aus den Bytes, nie rückwärts, danach „Datei wird geprüft“', async () => {
+      const { fortschritt } = await starteVersand();
+      fortschritt({ phase: 'senden', anteil: 0.4 });
+      fortschritt({ phase: 'senden', anteil: 0.3 });
+      const balken = await screen.findByRole('progressbar', { name: 'Wird hochgeladen · 40 %' });
+      expect(balken).toHaveAttribute('aria-valuenow', '40');
+      fortschritt({ phase: 'pruefen' });
+      expect(
+        await screen.findByRole('progressbar', { name: 'Datei wird geprüft' }),
+      ).not.toHaveAttribute('aria-valuenow');
+      // Ein spätes `progress` nach der Prüfphase holt die Prozentzahl nicht zurück.
+      fortschritt({ phase: 'senden', anteil: 1 });
+      expect(screen.getByRole('progressbar', { name: 'Datei wird geprüft' })).toBeInTheDocument();
+    });
+
+    it('räumt den Balken nach dem Upload', async () => {
+      const { p, erfuellen } = await starteVersand();
+      await screen.findByRole('progressbar');
+      await act(async () => erfuellen(anzeige(1, 'a.jpg')));
+      await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('progressbar')).toBeNull();
+    });
+
+    it('Leitung reißt beim Senden ab: „NICHT abgeschickt“, nicht erfasst, kein Balken', async () => {
+      const { p, fortschritt, ablehnen } = await starteVersand();
+      fortschritt({ phase: 'senden', anteil: 0.6 });
+      await act(async () => ablehnen(new NetzFehler()));
+      expect(
+        await screen.findByText(/a\.jpg konnte nicht hochgeladen werden: .*NICHT abgeschickt/),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Der Eintrag ist nicht erfasst/)).toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+      expect(p.erfassen).not.toHaveBeenCalled();
+    });
+
+    it('Antwort bleibt nach dem letzten Byte aus: „unklar“, nicht „NICHT abgeschickt“', async () => {
+      const { p, fortschritt, ablehnen } = await starteVersand();
+      fortschritt({ phase: 'pruefen' });
+      await act(async () => ablehnen(new AusgangUnbekannt()));
+      const hinweis = await screen.findByText(/a\.jpg ist übertragen, aber ohne Antwort/);
+      expect(hinweis).toHaveTextContent(/unklar/);
+      expect(hinweis).toHaveTextContent('Der Eintrag ist nicht erfasst');
+      expect(hinweis).not.toHaveTextContent(/NICHT abgeschickt/);
+      expect(screen.queryByRole('progressbar')).toBeNull();
+      expect(p.erfassen).not.toHaveBeenCalled();
+      expect(feld()).toHaveValue('Foto');
+      expect(within(liste()).getByText('a.jpg · 3 B')).toBeInTheDocument();
+    });
   });
 
   it('erfasst nicht, wenn ein Upload scheitert — Wortlaut, Liste und Grund stehen', async () => {

@@ -27,10 +27,8 @@ import { describe, expect, it } from 'vitest';
  *
  * Bewusst fest und deshalb benannt statt als Zahl: die Haarlinie zwischen den Kartenknöpfen
  * (`KNOPF_FUGE` in `KartenUeberlagerung.tsx`, 1 px in jeder Dichte, wie die Fuge des
- * Kennzahlenbands), der Kartenrand `UEBERLAGERUNG_RAND`/`FUSS_ABSTAND` (Abstand zur
- * Kartenkante, kein Abstand im Baustein) und die Abstände des Zeitachsen-Bands in
- * `SnapshotLeiste.tsx` (wüchse es mit, risse es im Handschuh-Betrieb den Deckel der halben Karte;
- * Begründung dort, Umbau LFH-899). Die Datei bleibt im Scan, damit keine neue Zahl dazukommt.
+ * Kennzahlenbands) und der Kartenrand `UEBERLAGERUNG_RAND`/`FUSS_ABSTAND` (Abstand zur
+ * Kartenkante, kein Abstand im Baustein).
  */
 
 const hier = dirname(fileURLToPath(import.meta.url));

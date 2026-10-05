@@ -2021,6 +2021,88 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("vollzogen_at", G_ZEIT),
         ],
     },
+    // ---------- Gerätekopplung (LFH-892, migrations/0147) ----------
+    TabellenRegel {
+        tabelle: "geraet_kopplung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("benutzer_id", G_FK),
+            retain("ansicht", G_ENUM),
+            retain("uhs_id", G_FK),
+            retain(
+                "bezeichnung",
+                "Gerätename (operatives Label wie „Tablet 1“, kein Personenbezug)",
+            ),
+            retain("erstellt_von", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("laeuft_ab_at", G_ZEIT),
+            retain("gekoppelt_at", G_ZEIT),
+            retain("letzter_zugriff_at", G_ZEIT),
+            retain("widerrufen_at", G_ZEIT),
+            retain("widerrufen_von", G_FK),
+        ],
+    },
+    TabellenRegel {
+        // Kein einsatz_id — scoped über den CASCADE-Parent geraet_kopplung.
+        tabelle: "geraet_kopplungscode",
+        scoping: Scoping::UeberParent {
+            fk: "kopplung_id",
+            parent: "geraet_kopplung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("kopplung_id", G_FK),
+            retain(
+                "code_hash",
+                "SHA-256 eines Kopplungscodes (technisch, kein Personenbezug)",
+            ),
+            retain("laeuft_ab_at", G_ZEIT),
+            retain("eingeloest_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "geraet_kopplung_ereignis",
+        scoping: Scoping::UeberParent {
+            fk: "kopplung_id",
+            parent: "geraet_kopplung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("kopplung_id", G_FK),
+            retain("ereignis", G_ENUM),
+            retain("von", G_FK),
+            // Die IP des einlösenden Geräts ist ein Online-Kennzeichen: sie geht mit dem Einsatz.
+            scrub("peer_ip", Strategie::NullSetzen, Z_EINSATZ),
+            retain("zeitpunkt", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        // Nur Gerätesitzungen sind einsatz-scoped (kopplung_id gesetzt); Personensitzungen nicht.
+        tabelle: "session",
+        scoping: Scoping::UeberParent {
+            fk: "kopplung_id",
+            parent: "geraet_kopplung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain(
+                "token_hash",
+                "SHA-256 des Sitzungstokens (technisch, kein Personenbezug)",
+            ),
+            retain("benutzer_id", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("expires_at", G_ZEIT),
+            retain("kopplung_id", G_FK),
+        ],
+    },
 ];
 
 /// Sucht die Klassifikation einer Spalte in der Registry (`None`, wenn nicht erfasst).

@@ -6,7 +6,8 @@ import {
   IconUhrRueckwaerts,
 } from '../../icons';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { App, Button, Input, Slider, Space, theme, Tooltip } from 'antd';
+import { App, Button, Form, Input, Slider, theme, Tooltip } from 'antd';
+import type { GlobalToken } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
@@ -14,6 +15,8 @@ import { formatZeitKurz } from '../../anzeige/format';
 import { useLageSnapshots } from './useLageSnapshots';
 import { bandStil } from './KartenFuss';
 import { useViewport } from '../../components/useViewport';
+import { Select } from '../../components/Select';
+import { ErfassungsModal } from '../../components/Erfassung';
 
 /** Feste Anzeigedauer je Stand im Replay. */
 export const ANZEIGE_MS = 2500;
@@ -51,60 +54,63 @@ function merkeEingeklappt(wert: boolean): void {
   }
 }
 
-/**
- * Die Abstände des Bands bleiben fest und wachsen NICHT mit der Dichte-Staffel (LFH-703,
- * Entscheidung 01.10.2026). Das Band steht schon so im Handschuh-Betrieb am Handschirm bei 49 % der
- * Karte (Deckel 50 %, `e2e/leisten-flaeche.spec.ts`); mit Lücke und Polsterung aus der Staffel
- * wuchs es auf 314–362 px und riss den Deckel bei 390 und 1024 px. Der Umbau, nach dem das Band
- * mitwachsen darf, ist LFH-899. Benannt, damit der Guard
- * `leistenAbstand.guard.test.ts` jede neue Zahl im Band weiter findet.
- */
-const BAND_LUECKE = 12;
-const BAND_POLSTER = '8px 12px';
-const STAND_LUECKE = 6;
-const ZEITLEISTE_LUECKE = 8;
-const SCHIEBER_RAND = '0 8px';
+/** Die Werte der Dichte-Staffel, die das Band trägt (aufgelöste antd-Tokens). */
+export type BandToken = Pick<GlobalToken, 'controlHeight' | 'margin' | 'marginSM' | 'paddingSM'>;
+
+/** Mindestbreite des Schiebers und der Auswahl, bevor ihre Gruppe allein in eine Zeile geht. */
+const SCHIEBER_BASIS = 120;
+const AUSWAHL_BASIS = 160;
 
 /**
- * Die Reihe der gesicherten Stände teilt sich die Zeile mit Sichern und Zeitleiste. Ohne
- * `flex`-Basis und `minWidth: 0` nahm sie ihre volle Inhaltsbreite an, brach in eine zweite Zeile
- * um und verdoppelte die Höhe der Leiste. Jetzt schrumpft sie auf den Rest und rollt waagerecht;
- * erst unter 120 px Rest bricht sie um. Rein und exportiert.
+ * Stile des Bands aus der Dichte-Staffel (LFH-899, D3/D4 in
+ * `openspec/changes/archive/2026-10-04-lfh-899-zeitachse-band-flacher/design.md`). Zwei Gruppen,
+ * die in sich nicht umbrechen: Wiedergabe (Ausblenden, Abspielen, Schieber) und Stand (Auswahl,
+ * Sichern). Das Band bricht nur zwischen ihnen um und hat damit höchstens zwei Reihen; drei Reihen à 72 px rissen im Handschuh-Betrieb den Deckel der halben
+ * Karte (`e2e/leisten-flaeche.spec.ts`).
  *
- * 120 statt 160: unter Linux-Schriften sind Feld und „Stand sichern" breiter als unter macOS, bei
- * 1440 px rutschte der Einklapp-Pfeil sonst in eine dritte Reihe.
+ * Die Basis einer Gruppe ist ihr Platzbedarf in einer Zeile: passen beide nebeneinander (Fükw),
+ * steht das Band einzeilig, sonst geht die Stand-Gruppe in die zweite Zeile. Rein und exportiert.
  */
-export const standLeisteStil: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: STAND_LUECKE,
-  flex: '1 1 120px',
-  minWidth: 0,
-  overflowX: 'auto',
-};
+export function bandStile(token: BandToken) {
+  const wiedergabeBasis = 2 * token.controlHeight + 2 * token.marginSM + SCHIEBER_BASIS;
+  const standBasis = AUSWAHL_BASIS + token.marginSM + token.controlHeight;
+  const gruppe = {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
+    gap: token.marginSM,
+    minWidth: 0,
+  } satisfies CSSProperties;
+  return {
+    wiedergabeBasis,
+    standBasis,
+    band: {
+      display: 'flex',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: token.margin,
+      padding: token.paddingSM,
+    } satisfies CSSProperties,
+    wiedergabe: { ...gruppe, flex: `1 1 ${wiedergabeBasis}px` } satisfies CSSProperties,
+    stand: { ...gruppe, flex: `1 1 ${standBasis}px` } satisfies CSSProperties,
+    /** Ausblenden, Abspielen, Sichern: als Flex-Kind fiel ein Symbolknopf sonst auf 16 px. */
+    knopf: { flexShrink: 0 } satisfies CSSProperties,
+    /**
+     * Der Griff steht am Schienenende zur Hälfte über der Schiene (gemessen 11 px in `handschuh`).
+     * Mit `marginXS` (7 px) lag er nur 12 px neben „Abspielen“; `marginSM` hält die 16 px.
+     */
+    schieber: {
+      flex: '1 1 0',
+      minWidth: 0,
+      marginBlock: 0,
+      marginInline: token.marginSM,
+    } satisfies CSSProperties,
+    auswahl: { flex: '1 1 0', minWidth: 0 } satisfies CSSProperties,
+  };
+}
 
-/**
- * Das Bezeichnungsfeld neben „Stand sichern": bevorzugt 180 px, schrumpfbar. Fest 180 px ragte das
- * nicht umbrechbare `Space.Compact` bei 390 px im Handschuh-Betrieb über den Bandrand und fing
- * Klicks auf die Kartenknöpfe ab.
- */
-export const sichernFeldStil: CSSProperties = { flex: '0 1 180px', minWidth: 0 };
-
-/**
- * Der Zeitleisten-Block (Aktuell · Abspielen · Schieber · Stand) darf umbrechen: seine
- * Mindestbreite lag sonst über der Bandbreite.
- */
-export const zeitleisteStil: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  flexWrap: 'wrap',
-  gap: ZEITLEISTE_LUECKE,
-  flex: '1 1 260px',
-  minWidth: 0,
-};
-
-/** Der Abspielknopf schrumpft nicht: als Flex-Kind fiel er auf 16 px Breite. */
-export const abspielenStil: CSSProperties = { flexShrink: 0 };
+/** Wert der Auswahl „Stand“ im Live-Modus. */
+const LIVE = 'live';
 
 interface SnapshotLeisteProps {
   einsatzId: number;
@@ -124,18 +130,19 @@ function chipLabel(bezeichnung: string | null | undefined, standAt: string): str
 }
 
 /**
- * Snapshot-/Zeitachsen-Band unter der Karte: „Stand sichern" (Live), die Auswahl gespeicherter
- * Stände und der Replay (Schieber + Play/Pause mit fester Anzeigedauer, Vorladen des nächsten
- * Dokuments gegen Flackern). Die Auswahl schaltet die Karte über `?snapshot=` in den
- * schreibgeschützten Historien-Modus.
+ * Snapshot-/Zeitachsen-Band unter der Karte: „Stand sichern" (Dialog), die Auswahl „Stand" (Live
+ * oder ein gesicherter Stand) und der Replay (Schieber + Play/Pause mit fester Anzeigedauer,
+ * Vorladen des nächsten Dokuments gegen Flackern). Die Auswahl schaltet die Karte über
+ * `?snapshot=` in den schreibgeschützten Historien-Modus; den Rückweg trägt auch das
+ * Historien-Banner („Aktuell").
  *
  * Ein-/ausklappbar: das Band liegt über der Karte und ist ein Werkzeug auf Abruf; eingeklappt
  * bleibt ein kleiner Knopf unten links. Der Zustand ist je Benutzer gemerkt, nicht Teil der
  * geteilten Ansicht.
  *
  * Keine punktuellen Klein-Angaben: größere Knöpfe verdecken zwar Kartenfläche, aber die Leiste
- * klappt dafür ein — wer die Zeitachse bedient, braucht sie treffbar. Der Rahmen trägt `flexWrap:
- * 'wrap'`, auf höheren Dichtestufen wird die Leiste höher statt breiter.
+ * klappt dafür ein — wer die Zeitachse bedient, braucht sie treffbar. Aufbau und Abstände:
+ * {@link bandStile}.
  */
 export function SnapshotLeiste({
   einsatzId,
@@ -148,7 +155,8 @@ export function SnapshotLeiste({
   const { token } = theme.useToken();
   const qc = useQueryClient();
   const { snapshots, sichern, sichertGerade } = useLageSnapshots(einsatzId);
-  const [bezeichnung, setBezeichnung] = useState('');
+  const [sichernOffen, setSichernOffen] = useState(false);
+  const [sichernForm] = Form.useForm<{ bezeichnung?: string }>();
   const [spielt, setSpielt] = useState(false);
   const { abBreite } = useViewport();
   // Abgeleitet statt einmalig gesetzt: die Breitenstufe steht im ersten Render noch nicht fest
@@ -188,13 +196,13 @@ export function SnapshotLeiste({
     return () => clearTimeout(t);
   }, [spielt, aktiverIndex, chrono, onWaehle, prefetch]);
 
-  const aufSichern = async () => {
+  // Bei Ablehnung bricht die Zusage, damit `ErfassungsModal` Dialog und Wortlaut stehen lässt.
+  const aufSichern = async ({ bezeichnung }: { bezeichnung?: string }) => {
     try {
       await sichern(bezeichnung);
-      setBezeichnung('');
-      message.success('Stand gesichert');
     } catch (e) {
       fehler(e);
+      throw e;
     }
   };
 
@@ -209,9 +217,10 @@ export function SnapshotLeiste({
     setSpielt(true);
   };
 
-  const zurueckAktuell = () => {
+  // Eine Wahl hält die Wiedergabe an, wie früher ein Stand-Knopf und „Aktuell“.
+  const waehle = (wert: number | typeof LIVE) => {
     setSpielt(false);
-    onWaehle(null);
+    onWaehle(wert === LIVE ? null : wert);
   };
 
   const klappeUm = (zu: boolean) => {
@@ -244,6 +253,15 @@ export function SnapshotLeiste({
   }
 
   const marks = Object.fromEntries(chrono.map((_, i) => [i, '']));
+  const stile = bandStile(token);
+  // „Live“ ist der jüngste Stand und steht oben, darunter die Stände neueste zuerst.
+  const optionen = [
+    { value: LIVE, label: 'Live', title: 'Live' },
+    ...[...chrono].reverse().map((s) => {
+      const label = chipLabel(s.bezeichnung, s.stand_at);
+      return { value: s.id, label, title: s.notiz ? `${label} · ${s.notiz}` : label };
+    }),
+  ];
 
   return (
     <div
@@ -255,110 +273,112 @@ export function SnapshotLeiste({
         // ZeichnenSteuerung, statt sie zu verdecken. Nachgiebig: passt der Fuß nicht in die Karte,
         // wird dieses Band niedriger und rollt in sich.
         ...bandStil('voll', true),
-        display: 'flex',
-        alignItems: 'center',
-        gap: BAND_LUECKE,
-        flexWrap: 'wrap',
-        padding: BAND_POLSTER,
+        ...stile.band,
         borderRadius: token.borderRadiusLG,
         background: token.colorBgElevated,
         boxShadow: token.boxShadow,
       }}
     >
-      {darfSichern && (
-        <Space.Compact style={{ minWidth: 0 }}>
-          <Input
-            placeholder="Bezeichnung (optional)"
-            value={bezeichnung}
-            onChange={(e) => setBezeichnung(e.target.value)}
-            onPressEnter={aufSichern}
-            style={sichernFeldStil}
-            aria-label="Snapshot-Bezeichnung"
-          />
+      <div data-lfh="zeitachse-wiedergabe" style={stile.wiedergabe}>
+        {/* Links: eingeklappt steht „Zeitachse einblenden“ ebenfalls unten links. */}
+        <Tooltip title="Zeitachse ausblenden">
           <Button
-            type="primary"
-            // Hülle `aria-hidden`: das Symbol brächte sonst „camera" in den zugänglichen Namen.
-            icon={
-              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <IconKamera />
-              </span>
-            }
-            loading={sichertGerade}
-            onClick={aufSichern}
-          >
-            Stand sichern
-          </Button>
-        </Space.Compact>
-      )}
-
-      {chrono.length > 0 && (
-        <div style={zeitleisteStil}>
-          <Button type={aktiverSnapshotId == null ? 'primary' : 'default'} onClick={zurueckAktuell}>
-            Aktuell
-          </Button>
-          <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
-            <Button
-              icon={spielt ? <IconPause /> : <IconPlayKreis />}
-              onClick={aufPlayPause}
-              disabled={chrono.length < 2}
-              aria-label={spielt ? 'Pause' : 'Abspielen'}
-              style={abspielenStil}
-            />
-          </Tooltip>
-          <Slider
-            style={{ flex: 1, margin: SCHIEBER_RAND, minWidth: 120 }}
-            min={0}
-            max={Math.max(0, chrono.length - 1)}
-            value={aktiverIndex >= 0 ? aktiverIndex : 0}
-            marks={marks}
-            tooltip={{
-              formatter: (i) =>
-                i != null && chrono[i] ? chipLabel(chrono[i].bezeichnung, chrono[i].stand_at) : '',
-            }}
-            onChange={(i) => {
-              setSpielt(false);
-              onWaehle(chrono[i].id);
-            }}
-            disabled={chrono.length < 2}
-            aria-label="Zeitleiste"
+            type="text"
+            icon={<IconChevronRunter />}
+            aria-label="Zeitachse ausblenden"
+            onClick={() => klappeUm(true)}
+            style={stile.knopf}
           />
-          <span style={{ minWidth: 96, fontSize: 12, color: token.colorTextSecondary }}>
-            {aktiverIndex >= 0
-              ? chipLabel(chrono[aktiverIndex].bezeichnung, chrono[aktiverIndex].stand_at)
-              : 'Live'}
-          </span>
-        </div>
-      )}
-
-      {chrono.length > 0 && (
-        <div data-lfh="zeitachse-staende" style={standLeisteStil}>
-          {chrono.map((s) => (
-            <Tooltip key={s.id} title={s.notiz ?? undefined}>
+        </Tooltip>
+        {chrono.length > 0 && (
+          <>
+            <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
               <Button
-                type={s.id === aktiverSnapshotId ? 'primary' : 'default'}
-                onClick={() => {
-                  setSpielt(false);
-                  onWaehle(s.id);
-                }}
-              >
-                {chipLabel(s.bezeichnung, s.stand_at)}
-              </Button>
+                icon={spielt ? <IconPause /> : <IconPlayKreis />}
+                onClick={aufPlayPause}
+                disabled={chrono.length < 2}
+                aria-label={spielt ? 'Pause' : 'Abspielen'}
+                style={stile.knopf}
+              />
             </Tooltip>
-          ))}
+            <Slider
+              style={stile.schieber}
+              min={0}
+              max={Math.max(0, chrono.length - 1)}
+              value={aktiverIndex >= 0 ? aktiverIndex : 0}
+              marks={marks}
+              tooltip={{
+                formatter: (i) =>
+                  i != null && chrono[i]
+                    ? chipLabel(chrono[i].bezeichnung, chrono[i].stand_at)
+                    : '',
+              }}
+              onChange={(i) => {
+                setSpielt(false);
+                onWaehle(chrono[i].id);
+              }}
+              disabled={chrono.length < 2}
+              aria-label="Zeitleiste"
+            />
+          </>
+        )}
+      </div>
+
+      {(chrono.length > 0 || darfSichern) && (
+        <div data-lfh="zeitachse-stand" style={stile.stand}>
+          {chrono.length > 0 && (
+            <Select<number | typeof LIVE>
+              aria-label="Stand"
+              // Ein Stand außerhalb der Liste (gelöscht, alter Link) zeigte sonst seine nackte Id;
+              // wie die frühere Beschriftung steht dann „Live“.
+              value={aktiverIndex >= 0 ? chrono[aktiverIndex].id : LIVE}
+              options={optionen}
+              onChange={waehle}
+              // Ohne Suche: am Handschirm öffnete das Tippen sonst die Bildschirmtastatur über der
+              // Karte, und eine Handvoll Stände braucht keinen Filter.
+              showSearch={false}
+              style={stile.auswahl}
+            />
+          )}
+          {darfSichern && (
+            <Tooltip title="Stand sichern">
+              <Button
+                type="primary"
+                // Hülle `aria-hidden`: das Symbol brächte sonst „camera" in den zugänglichen Namen.
+                icon={
+                  <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                    <IconKamera />
+                  </span>
+                }
+                aria-label="Stand sichern"
+                loading={sichertGerade}
+                onClick={() => setSichernOffen(true)}
+                style={stile.knopf}
+              />
+            </Tooltip>
+          )}
         </div>
       )}
 
-      {/* Ganz rechts; `marginLeft: auto` trägt auch ohne den Zeitleisten-Block (Schreibrecht,
-          aber noch keine Stände). */}
-      <Tooltip title="Zeitachse ausblenden">
-        <Button
-          type="text"
-          icon={<IconChevronRunter />}
-          aria-label="Zeitachse ausblenden"
-          onClick={() => klappeUm(true)}
-          style={{ marginLeft: 'auto' }}
-        />
-      </Tooltip>
+      {/* Das Feld steht nicht dauerhaft im Band (LFH-899, D2): es nahm am Handschirm eine eigene
+          Reihe ein. Kurze blockierende Aktion mit einem Feld → Erfassungs-Dialog. */}
+      <ErfassungsModal<{ bezeichnung?: string }>
+        offen={sichernOffen}
+        titel="Stand sichern"
+        form={sichernForm}
+        erfassenText="Sichern"
+        laeuft={sichertGerade}
+        onErfassen={aufSichern}
+        onErfasst={() => {
+          message.success('Stand gesichert');
+        }}
+        onFertig={() => setSichernOffen(false)}
+        onAbbrechen={() => setSichernOffen(false)}
+      >
+        <Form.Item label="Bezeichnung (optional)" name="bezeichnung">
+          <Input placeholder="z. B. Lage 08:00" aria-label="Snapshot-Bezeichnung" />
+        </Form.Item>
+      </ErfassungsModal>
     </div>
   );
 }

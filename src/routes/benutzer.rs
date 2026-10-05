@@ -80,7 +80,7 @@ fn pruefe_org_rolle(wert: &str) -> Result<(), AppError> {
 /// Sentinel zuerst gebunden.
 const ANZEIGE_SPALTEN: &str = "SELECT id, org_id, anzeigename, benutzername, system_rolle, \
      org_rolle, aktiv, erstellt_at, totp_aktiviert, passwort_hash <> ? AS passwort_gesetzt \
-     FROM benutzer";
+     FROM benutzer b";
 
 /// Lädt die öffentliche Darstellung eines Benutzers nach einer Änderung durch den Admin.
 async fn anzeige_laden(pool: &sqlx::SqlitePool, id: i64) -> Result<BenutzerAnzeige, AppError> {
@@ -100,7 +100,11 @@ pub async fn liste(
     State(state): State<AppState>,
     _admin: AdminUser,
 ) -> Result<Json<Vec<BenutzerAnzeige>>, AppError> {
-    let sql = format!("{ANZEIGE_SPALTEN} ORDER BY id");
+    // Gerätekonten (LFH-892) sind keine Personen: sie erscheinen nicht in der Verwaltung.
+    let sql = format!(
+        "{ANZEIGE_SPALTEN} WHERE {} ORDER BY id",
+        crate::geraet::repo::OHNE_GERAETEKONTEN
+    );
     let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(sqlx::AssertSqlSafe(sql))
         .bind(PASSWORT_HASH_SSO_ONLY)
         .fetch_all(&state.pool)
@@ -156,6 +160,15 @@ pub async fn anlegen(
     let angelegt = anzeige_laden(&state.pool, id).await?;
 
     Ok((StatusCode::CREATED, Json(angelegt)))
+}
+
+/// Ein Gerätekonto (LFH-892) verwaltet die Einsatzleitung über seine Kopplung, nicht der Admin:
+/// für die Benutzerverwaltung existiert es nicht (404).
+async fn verweigere_geraetekonto(pool: &sqlx::SqlitePool, id: i64) -> Result<(), AppError> {
+    if crate::geraet::repo::ist_geraetekonto(pool, id).await? {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
 }
 
 /// Verweigert eine Änderung, die den **letzten aktiven Admin** aus der Menge der aktiven
@@ -215,6 +228,7 @@ pub async fn deaktivieren(
     .fetch_optional(&state.pool)
     .await?
     .ok_or(AppError::NotFound)?;
+    verweigere_geraetekonto(&state.pool, id).await?;
 
     // Letzten aktiven Admin schützen: Deaktivieren setzt aktiv=0, der Nutzer bliebe also
     // kein aktiver Admin (geteilter Guard mit `bearbeiten`, LFH-286).
@@ -258,6 +272,7 @@ pub async fn bearbeiten(
     .fetch_optional(&state.pool)
     .await?
     .ok_or(AppError::NotFound)?;
+    verweigere_geraetekonto(&state.pool, id).await?;
 
     // Zielwerte auflösen: mitgeschickt → validieren; sonst Bestandswert (partielle PATCH-Semantik).
     let anzeigename = match &req.anzeigename {
@@ -331,6 +346,7 @@ pub async fn totp_reset(
         .fetch_optional(&state.pool)
         .await?;
     existiert.ok_or(AppError::NotFound)?;
+    verweigere_geraetekonto(&state.pool, id).await?;
 
     let mut tx = state.pool.begin().await?;
     // Mit dem Secret gehen auch Replay-Merker und Sperre des zweiten Faktors (LFH-791): ein

@@ -960,7 +960,9 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'In Lagebericht übernehmen' }));
     await waitFor(() => expect(legeLageberichtAn).toHaveBeenCalledTimes(1));
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text as string;
-    expect(text).toContain('- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO TMO 311');
+    expect(text).toContain(
+      '- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO 311 · Digitalfunk',
+    );
     expect(text).not.toContain('0171 ELW');
   });
 });

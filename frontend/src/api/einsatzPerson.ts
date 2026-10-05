@@ -12,7 +12,14 @@ import type {
   Verlaufsnotiz,
   Abgleich,
 } from './types';
-import { apiDatei, apiGet, apiSend, apiUpload, type ApiSendOptionen } from './client';
+import {
+  apiDatei,
+  apiGet,
+  apiSend,
+  apiUploadMitFortschritt,
+  type ApiSendOptionen,
+  type UploadFortschritt,
+} from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 import { EXPORT_TIMEOUT_MS } from './exportTimeout';
 import { patchBody } from './patchTriState';
@@ -224,16 +231,18 @@ export function listePersonAnhaenge(einsatzId: number, personId: number): Promis
   return apiGet<PersonAnhang[]>(anhangBasis(einsatzId, personId));
 }
 
-/** Legt EINE Datei an der Person ab (Feld `datei`), Timeout wie die übrigen Uploads. */
+/** Legt EINE Datei an der Person ab (Feld `datei`), Timeout und Fortschritt wie die übrigen Uploads. */
 export function legePersonAnhangAb(
   einsatzId: number,
   personId: number,
   datei: File,
+  onFortschritt?: (stand: UploadFortschritt) => void,
 ): Promise<PersonAnhang> {
   const fd = new FormData();
   fd.append('datei', datei);
-  return apiUpload<PersonAnhang>(anhangBasis(einsatzId, personId), fd, {
+  return apiUploadMitFortschritt<PersonAnhang>(anhangBasis(einsatzId, personId), fd, {
     timeoutMs: UPLOAD_TIMEOUT_MS,
+    onFortschritt,
   });
 }
 
