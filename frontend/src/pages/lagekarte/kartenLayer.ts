@@ -235,11 +235,11 @@ export function reAnlegenAlles(
 /**
  * Nach `setStyle` sind alle Custom-Sources/Layer weg. Die Re-Anlage hängt nicht an `styledata` +
  * `isStyleLoaded()` — beim Online-Wechsel bleibt dieses Event aus, bis die Tiles geladen sind —,
- * sondern am render-Frame-Poller `wendeKartenDatenAn`. `getFlaechen`/`getZonen` werden erst im
- * vertagten Lauf gelesen.
+ * sondern an der Warteschlange von `wendeKartenDatenAn` (Schlüssel `stil-neuaufbau`).
+ * `getFlaechen`/`getZonen` werden erst im vertagten Lauf gelesen.
  */
 export function planeReAnlegenNachStyle(
-  map: Pick<MapLibreMap, 'isStyleLoaded' | 'on' | 'off'> & MapLibreMap,
+  map: MapLibreMap,
   getFlaechen: () => FlaechenFeatureCollection,
   getZonen: () => ZonenFeatureCollection,
   getFachebenen: () => AktiveFachebene[] = () => [],
@@ -247,7 +247,7 @@ export function planeReAnlegenNachStyle(
   getMarker?: () => MarkerFeatureCollection,
   getEinsatzort?: () => MarkerFeatureCollection,
 ) {
-  wendeKartenDatenAn(map, () =>
+  wendeKartenDatenAn(map, 'stil-neuaufbau', () =>
     reAnlegenAlles(
       map,
       getFlaechen(),

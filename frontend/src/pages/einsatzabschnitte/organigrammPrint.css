@@ -1,7 +1,7 @@
 /* Eigenheiten des Organigramms im Druck (LFH-626, design.md D6). Die Mechanik liegt in
    `druck/druck.css`, die Regeln des hängenden Gerüsts (Spalten, Klappziele, Umbruch) in
    `components/organigramm/haengenderBaumPrint.css` (LFH-625 D4); `.organigramm-print-root` trägt
-   `data-lfh="druckwurzel"`. Nachweis der Wirkung: `e2e/fuehrungsorganisation.spec.ts`. */
+   `data-lfh="druckwurzel"`. Nachweis der Wirkung: `e2e/fuehrungsorganisation-druck.spec.ts`. */
 @media print {
   .organigramm-no-print {
     display: none !important;
