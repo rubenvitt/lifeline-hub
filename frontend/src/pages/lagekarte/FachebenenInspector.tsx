@@ -14,6 +14,7 @@ import { App, Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { taktischeDtgVoll } from '../../anzeige/format';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { PEGEL_MAX, fuegePegelHinzu, pegelAbfrage, pegelSchreibScope } from '../../api/pegel';
 import { einsatzKeys } from '../../api/queryKeys';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -67,11 +68,14 @@ function nurWeb(v: string | null): string | null {
   return v && /^https?:\/\//i.test(v) ? v : null;
 }
 
-/** ISO-Zeit hübsch (de-DE), Fallback auf Rohwert. */
-function fmtZeit(v: string | null): string | null {
-  if (!v) return null;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? v : taktischeDtgVoll(v);
+/** ISO-Zeit als volle DTG in der Anzeigezone (LFH-913), Fallback auf Rohwert. */
+function useFmtZeit(): (v: string | null) => string | null {
+  const { konventionen } = useAnzeigeKonventionen();
+  return (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? v : taktischeDtgVoll(v, konventionen);
+  };
 }
 
 /**
@@ -118,6 +122,7 @@ const WARNQUELLE_RUECKFALL: Record<'nina' | 'dwd', string> = {
 };
 
 function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina' | 'dwd' }) {
+  const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
   const jetzt = useMinutenTakt();
   const headline = pick(p, 'HEADLINE', 'titel', 'headline');
@@ -279,6 +284,7 @@ function PegelInhalt({
   p: Record<string, unknown>;
   pegelBezug?: FachebenenInspectorProps['pegelBezug'];
 }) {
+  const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
   const wert = s(p.wert);
   const einheit = s(p.einheit);
@@ -416,6 +422,7 @@ const ODL_FAKTOR = new Intl.NumberFormat('de-DE', {
  * keine Stufe „veraltet" gibt.
  */
 function OdlInhalt({ p }: { p: Record<string, unknown> }) {
+  const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
   const wert = typeof p.wert === 'number' && Number.isFinite(p.wert) ? p.wert : null;
   const messende = fmtZeit(s(p.messende));
@@ -486,6 +493,7 @@ const LUFT_KOMPONENTEN: [string, string][] = [
  * Farbe: der Index bleibt die amtliche Einstufung.
  */
 function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
+  const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
   const unbekannt = Object.keys(p)
     .filter((k) => /^wert_k\d+$/.test(k))
@@ -654,6 +662,7 @@ function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
+  const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
   const kategorie = s(p.kategorie);
   const bild = nurWeb(s(p.bild));

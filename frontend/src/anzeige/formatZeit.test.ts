@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { formatZeit, formatZeitKurz } from './format';
+import { formatZeit, formatZeitKurz, DEFAULT_KONVENTIONEN } from './format';
 
 dayjs.extend(utc);
 
@@ -10,13 +10,13 @@ describe('formatZeit', () => {
     const wire = '2026-06-11 09:00:00';
     const d = dayjs.utc(wire).local();
     const erwartet = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`;
-    expect(formatZeit(wire)).toBe(erwartet);
+    expect(formatZeit(wire, DEFAULT_KONVENTIONEN)).toBe(erwartet);
   });
 
   it('gibt leeren String bei null/undefined/leer zurück', () => {
-    expect(formatZeit(null)).toBe('');
-    expect(formatZeit(undefined)).toBe('');
-    expect(formatZeit('')).toBe('');
+    expect(formatZeit(null, DEFAULT_KONVENTIONEN)).toBe('');
+    expect(formatZeit(undefined, DEFAULT_KONVENTIONEN)).toBe('');
+    expect(formatZeit('', DEFAULT_KONVENTIONEN)).toBe('');
   });
 });
 
@@ -24,18 +24,18 @@ describe('formatZeitKurz', () => {
   it('zeigt nur die taktische Uhrzeit (HHmm) wenn der Tag heute ist', () => {
     const heute = dayjs().utc().format('YYYY-MM-DD HH:mm:ss');
     const erwartet = dayjs.utc(heute).local().format('HHmm');
-    expect(formatZeitKurz(heute)).toBe(erwartet);
+    expect(formatZeitKurz(heute, DEFAULT_KONVENTIONEN)).toBe(erwartet);
   });
 
   it('zeigt die kurze DTG (DDHHmm) wenn der Tag nicht heute ist', () => {
     const anderertag = dayjs().utc().subtract(3, 'day').format('YYYY-MM-DD HH:mm:ss');
     const erwartet = dayjs.utc(anderertag).local().format('DDHHmm');
-    expect(formatZeitKurz(anderertag)).toBe(erwartet);
+    expect(formatZeitKurz(anderertag, DEFAULT_KONVENTIONEN)).toBe(erwartet);
   });
 
   it('gibt leeren String bei leer zurück', () => {
-    expect(formatZeitKurz(null)).toBe('');
-    expect(formatZeitKurz('')).toBe('');
+    expect(formatZeitKurz(null, DEFAULT_KONVENTIONEN)).toBe('');
+    expect(formatZeitKurz('', DEFAULT_KONVENTIONEN)).toBe('');
   });
 });
 
