@@ -82,7 +82,7 @@ draußen gelassen werden.
   den Kopf** (Sperrmarke, unbeobachtete weg, der beobachtete Kopf lädt neu). Ohne vorige Liste
   wird nichts geräumt; `clear()` vergisst sie.
 - Die Offline-Queue und die ETB-Entwürfe bleiben (eigene Eingaben, Beweissicherung).
-- Herleitung: `openspec/changes/lfh-996-schwaerzung-clients-raeumen/design.md`.
+- Herleitung: `openspec/changes/archive/2026-10-05-lfh-996-schwaerzung-clients-raeumen/design.md`.
 
 ## Gerätedaten beim Abmelden (LFH-767)
 

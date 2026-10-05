@@ -55,8 +55,18 @@
   verschwundener Einsatz, Queue bleibt) mit Verweis auf diese Change; `src/AGENTS.md`,
   Org-Ereignisse: `kopf_melden` als gemeinsamer Weg, Aufbewahrung: Meldungen des Purge-Laufs.
   Prettier über `frontend/`.
-- [ ] 5.2 `./scripts/check-all.sh` grün (Umgebungsrot nach Gegenprobe gegen `alpha` benannt),
-  Vitest und Rust-Tests grün.
+- [x] 5.2 `./scripts/check-all.sh` grün (Umgebungsrot nach Gegenprobe gegen `alpha` benannt),
+  Vitest und Rust-Tests grün. Ergebnis 05.10.2026 in der Cloud-Sitzung, nach dem Merge von
+  `alpha`: Bündel `schnell` grün; `cargo test --workspace --exclude lifeline-desktop` grün
+  (Schritt 4 ohne Hülle, GTK fehlt); Vitest 715 von 720 Dateien grün, rot nur
+  `DemoDatenPage`, `EtbFilterleiste`, `LageberichtVorschau`, `FachebenenInspector` ohne
+  `TZ=Europe/Berlin` (mit ihr grün, das Gate setzt sie) und der Wächtertest, der während der
+  Mutationsproben lief (einzeln grün); e2e in Chromium 700 grün, 28 rot. Davon bekannt rot auf
+  `alpha`: `fokus-verdeckung`, `etb-chronologie`, Download-Namen in `etb-anhang`,
+  `schaden-anhaenge`, `tier-anhaenge`. Die übrigen (`uhs-grundriss-person-scroll`,
+  `rail-etikett`, `palette-oeffnung`, `kommunikationsplan`, `geraet-kopplung`,
+  `chat-neue-nachrichten`, `datensicht-schmal`) mit `lagebild-offline` einzeln mit einem Worker
+  nachgefahren: 38 von 38 grün, ihr Rot war Last. Den vollen Lauf belegt die CI des PRs.
 - [x] 5.3 Code-Review (`superpowers:requesting-code-review`), Befunde eingearbeitet. Ergebnis
   05.10.2026, kein blockierender Befund; eingearbeitet: laufender Erstabruf wird vor dem Neuladen
   abgebrochen (D3), älterer Kopf lädt neu, wenn die Liste den Stand zuerst trägt (D3),
@@ -65,4 +75,4 @@
   „Einsatz-Antrag zählt nicht“ und für `hydrate` auf Kopf und Liste. Mutationsproben: Abbruch,
   Kopf-Abruf, Maximum, Stand 0, `setState` als Vergleich, Listenvergleich bei `hydrate` und der
   `ziel_art`-Filter je einzeln entfernt, jeweils genau der zugehörige Test rot; zurückgedreht.
-- [ ] 5.4 `/opsx:archive` im selben Branch, danach der PR gegen `alpha`.
+- [x] 5.4 `/opsx:archive` im selben Branch, danach der PR gegen `alpha`.

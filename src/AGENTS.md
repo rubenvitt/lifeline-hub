@@ -220,11 +220,11 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   ohne diese 24 h.
 - **Geräte erfahren Schwärzung und Sperre über den Kopf** (LFH-996, Spec
   `lagebild-offline-lesen`): `EinsatzAnzeige.teilschwaerzungen` zählt vollzogene
-  Personen-Anträge und geschwärzte Kategorien (`teilschwaerzungen_spalte!` und `teilschwaerzungen_joins!` in `einsatz/repo.rs`,
-  in `laden` und `liste_fuer`). Vormerkung (Phase A), Vollzug mit Wirkung und Kategorie-Schwärzung
+  Personen-Anträge und geschwärzte Kategorien (`teilschwaerzungen_spalte!` und
+  `teilschwaerzungen_joins!` in `einsatz/repo.rs`, in `laden` und `liste_fuer`). Vormerkung (Phase A), Vollzug mit Wirkung und Kategorie-Schwärzung
   rufen nach dem Commit `kopf_melden`; Phase B und D bleiben stumm (der Einsatz ist seit der
   Vormerkung gesperrt). Wer eine neue Teilschwärzung baut, zählt sie dort mit und meldet den
-  Kopf. Herleitung: `openspec/changes/lfh-996-schwaerzung-clients-raeumen/design.md`.
+  Kopf. Herleitung: `openspec/changes/archive/2026-10-05-lfh-996-schwaerzung-clients-raeumen/design.md`.
 - **Personen-Scrub nur über `PERSONENBEZUEGE`** (`einsatz/schwaerzung_person.rs`): je
   Personenart Bezug und `Mit`/`Ohne(Grund)` je Scrub-Spalte; Strategie kommt aus `TABELLEN`, nie
   eine eigene. Eine neue Tabelle mit FK auf `einsatz_person`, `einsatz_personal`,
