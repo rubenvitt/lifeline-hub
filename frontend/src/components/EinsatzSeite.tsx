@@ -75,7 +75,19 @@ export function seitenMetaStil(farben: Pick<Farbrollen, 'gedaempft'>): CSSProper
 }
 
 /**
- * Der Ortspfad im Seitenkopf: 12 px, `schwach`, Chevron als Trenner, letzter Teil `text2`.
+ * Boden der Pfad-Links — rein und exportiert (Muster `bedienzielStil`): der aufgelöste
+ * `controlHeight` der Stufe als Variable am Wrapper, gelesen von `EinsatzSeite.css`. Die Brotkrume
+ * hat keine Dichte-Ausnahme (LFH-909, `frontend/AGENTS.md`, Handgebautes Bedienziel): antd setzt
+ * den Link auf die Zeilenhöhe der 12-px-Schrift (20 px), die Trefffläche wächst über einen
+ * durchsichtigen Rand, nicht über die Schrift.
+ */
+export function ortspfadStil(token: { controlHeight: number }): CSSProperties {
+  return { '--lfh-ortspfad-ziel': `${token.controlHeight}px` } as CSSProperties;
+}
+
+/**
+ * Der Ortspfad im Seitenkopf: 12 px, `schwach`, Chevron als Trenner, letzter Teil `text2`. Jeder
+ * Link hält die Dichte-Staffel ({@link ortspfadStil}).
  *
  * Über einen verschachtelten `ConfigProvider`, nicht über Props: der Breadcrumb ist ein
  * `ReactNode` der Seite, Trenner und Farben lassen sich nur so einheitlich setzen. Der letzte
@@ -83,6 +95,9 @@ export function seitenMetaStil(farben: Pick<Farbrollen, 'gedaempft'>): CSSProper
  * „Schäden › Schäden" da.
  */
 function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrollen }) {
+  // Der Token der umgebenden Stufe, nicht der des verschachtelten Providers unten (der setzt nur
+  // Schrift und Farben).
+  const { token } = theme.useToken();
   return (
     <ConfigProvider
       breadcrumb={{
@@ -104,7 +119,9 @@ function Ortspfad({ children, farben }: { children: ReactNode; farben: Farbrolle
         },
       }}
     >
-      <div className="lfh-seitenkopf__pfad">{children}</div>
+      <div className="lfh-seitenkopf__pfad" style={ortspfadStil(token)}>
+        {children}
+      </div>
     </ConfigProvider>
   );
 }

@@ -34,9 +34,9 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
   Bericht“ und der Link einer Berichtskarte, die Filtersegmente und das Suchfeld der Seite
   „Lagemeldungen“.
 - Seitenkopf: jeder Link im Ortspfad (Brotkrume) jeder Seite, die den gemeinsamen Seitenkopf
-  trägt. Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um ein Polster, nicht
-  über die Schrift. Der Ortspfad MUST den Seitenkopf in `kompakt` am Fükw-Schirm nicht über
-  seine 44 px heben.
+  trägt. Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um Fläche über und
+  unter dem Text, nicht über die Schrift. Der Ortspfad MUST den Seitenkopf in `kompakt` am
+  Fükw-Schirm nicht über seine 44 px heben.
 
 Nicht Teil dieser Zusicherung sind Kennungs-Links in Tabellenzellen, beschriftete Checkboxen
 und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Ziel).
@@ -59,7 +59,7 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 - **AND** misst jedes verbleibende genannte Ziel mindestens 72 px in der Höhe
 
 #### Scenario: Brotkrume im Handschuh-Betrieb
-- **WHEN** die Dichtestufe `handschuh` gewählt ist und eine Detailseite mit zwei Links im Ortspfad (etwa „Einsätze“ und „Aufträge/Befehle“) am Fükw-Schirm und auf dem Handschirm steht
+- **WHEN** die Dichtestufe `handschuh` gewählt ist und eine Seite mit zwei Links im Ortspfad (etwa „Einsätze“ und das Modul über der Druckansicht einer Liste) am Fükw-Schirm und auf dem Handschirm steht
 - **THEN** misst jeder Link im Ortspfad mindestens 72 px in der Höhe, und seine Schrift ist 12 px groß
 
 #### Scenario: Brotkrume in kompakt

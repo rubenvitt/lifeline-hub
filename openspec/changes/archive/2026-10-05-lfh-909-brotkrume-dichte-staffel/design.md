@@ -56,7 +56,7 @@ Das Ticket ließ zwei Wege offen. Gewählt ist der Boden.
 - **Verworfen: größere Schrift im Pfad je Stufe.** Das Ticket verlangt die 12-px-Optik, und der
   Pfad stünde dann gleich groß wie der Titel (14/600).
 
-### E2 — Trefffläche über Polster im Block, Boden aus dem aufgelösten Token
+### E2 — Trefffläche über einen durchsichtigen Rand, Boden aus dem aufgelösten Token
 
 `Ortspfad` setzt am Wrapper eine CSS-Variable aus `token.controlHeight` (reine exportierte
 Stilfunktion, etwa `ortspfadStil(token)` → `{ '--lfh-ortspfad-ziel': '48px' }`). Die
@@ -66,11 +66,15 @@ Stilfunktion, etwa `ortspfadStil(token)` → `{ '--lfh-ortspfad-ziel': '48px' }`
   `display: inline-flex; align-items: center` → die Schrift bleibt senkrecht mittig.
 - Die Liste `ol` bekommt `align-items: center`, damit Trenner und Einsatzname (Text ohne Link)
   auf der Mittellinie der hohen Links stehen.
-- Polster im Block statt bloßem `min-height`, damit die Hinterlegung unter dem Zeiger auf der
-  Textzeile bleibt: `padding-block` rechnet die Differenz zwischen Boden und Zeilenhöhe
-  (`calc((var(--lfh-ortspfad-ziel) - 1lh) / 2)`, nicht unter 0) und `background-clip:
-  content-box` begrenzt den Hover-Ton auf die Inhaltsbox. Der Fokusring liegt am Außenrand und
-  zeigt damit die ganze Trefffläche.
+- Ein durchsichtiger Rand oben und unten statt bloßem `min-height` oder Polster, damit die
+  Hinterlegung unter dem Zeiger auf der Textzeile bleibt: `border-block` rechnet die Differenz
+  zwischen Boden und Zeilenhöhe (`calc((var(--lfh-ortspfad-ziel) - 1lh) / 2)`, nicht unter 0), und
+  `background-clip: padding-box` begrenzt den Hover-Ton auf Inhalt plus antds seitliches Polster
+  (4 px), wie bisher. Polster mit `content-box` hätte auch das seitliche Polster abgeschnitten
+  (Review). Der Fokusring liegt am Außenrand und zeigt ab `md` die ganze Trefffläche; darunter
+  schneidet das `li` mit `overflow: hidden` ihn wie schon vor dem Change zu.
+- Die Regeln tragen `:root` vorn: antds Selektoren haben dank `:where(…)` dieselbe Spezifität,
+  unsere gewännen sonst nur über die Reihenfolge im Dokument (Muster `index.css`, Modal-Fuß).
 
 Warum die Variable aus dem Token und nicht aus `var(--lfh-*)` der Dichte-CSS: die Regel
 „aufgelöste Tokens“ gilt, damit ein Test die Stilfunktion ohne Layout prüfen kann. Die
@@ -88,15 +92,14 @@ Stilfunktion liefert den aufgelösten Pixelwert; die CSS liest nur, was sie beko
 
 ### E3 — Nachweis im Gate 3
 
-Ein neuer Block in `e2e/gate3-trefflaeche.spec.ts` misst die Pfad-Links einer Detailseite mit
-zwei Links (Auftrag/Befehl-Detail: „Einsätze“ und „Aufträge/Befehle“) in allen drei Stufen, am
+Ein neuer Block in `e2e/gate3-trefflaeche.spec.ts` misst die Pfad-Links einer Seite mit
+zwei Links (umgesetzt: Druckansicht der Personenliste, „Einsätze“ und „Betroffene“; sie braucht
+keine Saat außer dem Einsatz) in allen drei Stufen, am
 Fükw und auf dem Handschirm, mit den Helfern aus `trefflaeche-kern.ts` (`stelleDichte`,
 `alleHaltenStufe` mit Mindestzahl 2). Locator gescopt auf `.lfh-seitenkopf__pfad a`, damit
 Rail-Links nicht mitzählen. Dazu: berechnete Schriftgröße 12 px je Link, und in `kompakt` am
 Fükw die Kopfhöhe 44 px (`[data-lfh="seitenkopf"]`). Die Gegenprobe der Stufen läuft über
-`gegenprobe` (kompakt kleiner als handschuh). Fällt keine passende Saat leicht, wird eine andere
-Detailseite mit zwei Pfad-Links genommen (etwa die Druckansicht einer Modulliste); das ändert die
-Spec nicht.
+`gegenprobe` (kompakt kleiner als handschuh).
 
 Vitest (`EinsatzSeite.test.tsx`) prüft die reine Stilfunktion mit Böden als Literalen für alle
 drei Stufen. jsdom rechnet kein Layout, den Boden belegt nur der Browser.
@@ -113,4 +116,4 @@ drei Stufen. jsdom rechnet kein Layout, den Boden belegt nur der Browser.
 - [Specs, die den Seitenkopf messen oder fotografieren] → `e2e/uhs-hoehe.spec.ts`,
   `lagebild-offline-kopf.spec.ts`, Druck-Specs (der Kopf ist im Druck ausgeblendet) laufen mit.
 - [`1lh` in der Desktop-Hülle] → Chromium, WebKit und WebView2 unterstützen `lh` seit 2023. Die
-  `min-height` hält den Boden auch dann, wenn das Polster ausfällt; nur der Hover-Ton wüchse.
+  `min-height` hält den Boden auch dann, wenn der Rand ausfällt; nur der Hover-Ton wüchse.

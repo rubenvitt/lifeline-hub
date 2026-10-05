@@ -44,10 +44,13 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
 - Lagebericht: die Abschnittsköpfe des Akkordeons und die Kopfaktionen der Detailseite, „Neuer
   Bericht“ und der Link einer Berichtskarte, die Filtersegmente und das Suchfeld der Seite
   „Lagemeldungen“.
+- Seitenkopf: jeder Link im Ortspfad (Brotkrume) jeder Seite, die den gemeinsamen Seitenkopf
+  trägt. Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um Fläche über und
+  unter dem Text, nicht über die Schrift. Der Ortspfad MUST den Seitenkopf in `kompakt` am
+  Fükw-Schirm nicht über seine 44 px heben.
 
-Nicht Teil dieser Zusicherung sind die Brotkrume im Seitenkopf, Kennungs-Links in
-Tabellenzellen, beschriftete Checkboxen und das Löschkreuz eines Auswahlfelds (das Feld selbst
-ist das gleichwertige Ziel).
+Nicht Teil dieser Zusicherung sind Kennungs-Links in Tabellenzellen, beschriftete Checkboxen
+und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Ziel).
 
 #### Scenario: Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und die Seite neu geladen wurde
@@ -65,6 +68,14 @@ ist das gleichwertige Ziel).
 - **WHEN** eine Person ohne Schreibrecht (Beobachter bzw. Führungskraft in der Verwaltung) eine der neu genannten Flächen in `handschuh` öffnet
 - **THEN** steht der Rechtehinweis, wo die Seite einen trägt, und die Aktion ist gesperrt oder abwesend
 - **AND** misst jedes verbleibende genannte Ziel mindestens 72 px in der Höhe
+
+#### Scenario: Brotkrume im Handschuh-Betrieb
+- **WHEN** die Dichtestufe `handschuh` gewählt ist und eine Seite mit zwei Links im Ortspfad (etwa „Einsätze“ und das Modul über der Druckansicht einer Liste) am Fükw-Schirm und auf dem Handschirm steht
+- **THEN** misst jeder Link im Ortspfad mindestens 72 px in der Höhe, und seine Schrift ist 12 px groß
+
+#### Scenario: Brotkrume in kompakt
+- **WHEN** dieselbe Seite in `kompakt` am Fükw-Schirm steht
+- **THEN** misst jeder Link im Ortspfad mindestens 30 px in der Höhe, und der Seitenkopf ist 44 px hoch
 
 ### Requirement: Abstand zwischen klickbaren Kennzahlen
 

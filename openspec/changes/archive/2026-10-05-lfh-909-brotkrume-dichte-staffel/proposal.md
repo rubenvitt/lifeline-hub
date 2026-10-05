@@ -19,12 +19,12 @@ Umweg kostet dort zwei Tipps mehr.
 
 - **Entscheidung: Die Brotkrume folgt der Staffel.** Keine benannte Ausnahme. Jeder Link im
   Ortspfad des Seitenkopfs erreicht die Steuerhöhe der Stufe (30 / 48 / 72 px). Seine Schrift
-  bleibt 12 px, sein Ton `schwach`. Die Trefffläche wächst über ein Polster im Block, nicht über
+  bleibt 12 px, sein Ton `schwach`. Die Trefffläche wächst über einen durchsichtigen Rand, nicht über
   größere Schrift.
 - **Eine Stelle trägt das für alle Seiten**: der Ortspfad in `EinsatzSeite`. Die rund 45 Seiten,
   die ihre `Breadcrumb` als `ReactNode` hineingeben, bleiben unverändert.
 - **Der Hover-Ton bleibt auf der Textzeile.** Die zarte Hinterlegung unter dem Zeiger wächst
-  nicht mit dem Polster auf 72 px. Der Fokusring umfährt die ganze Trefffläche.
+  nicht mit dem Rand auf 72 px. Der Fokusring umfährt die ganze Trefffläche.
 - **`kompakt` am breiten Schirm bleibt optisch gleich**: der Seitenkopf hält seine 44 px. In
   `komfortabel` und `handschuh` wächst ein Seitenkopf ohne Aktionen auf die Höhe, die er mit
   Aktionen schon heute hat (Knopfhöhe plus Polster der Leiste).
@@ -54,4 +54,4 @@ Umweg kostet dort zwei Tipps mehr.
   Ortspfads mit der Stufe. Kein Backend, keine API, keine Migration.
 - **Nicht in diesem Change**: die Brotkrumen über der Verwaltungsseite der Stammdaten
   (Fahrzeug- und Personal-Detail). Sie stehen außerhalb des Seitenkopfs, in einer eigenen Zeile
-  über `AdminPage`. Sie werden als eigener Task erfasst.
+  über `AdminPage`. Sie sind als eigener Task erfasst (LFH-1047).

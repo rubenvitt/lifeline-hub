@@ -12,6 +12,30 @@
   display: none;
 }
 
+/* Pfad-Links halten die Dichte-Staffel (LFH-909, Spec `einsatztauglichkeit-layout`). antd setzt
+   den Link auf `height: fontHeight` — 20 px bei 12-px-Schrift, in jeder Stufe, gemessen in Gate 3.
+   Der Boden kommt als aufgelöster `controlHeight` über `--lfh-ortspfad-ziel` (`ortspfadStil` in
+   `EinsatzSeite.tsx`), die Schrift bleibt 12 px. Die Trefffläche wächst über einen durchsichtigen
+   Rand oben und unten, nicht über Polster: mit `background-clip: padding-box` bleibt die
+   Hover-Hinterlegung auf der Textzeile samt antds seitlichem Polster (4 px), wie vorher. Ab `md`
+   liegt der Fokusring außen um die ganze Trefffläche; darunter schneidet das `li` mit
+   `overflow: hidden` ihn wie zuvor zu. `min-height` hält den Boden auch, wo `lh` fehlt. Die Liste
+   mittet, damit Trenner und Einsatzname auf der Linie der Links stehen. `:root` hebt die Regeln
+   über antds `:where(…)`-Selektoren gleicher Spezifität, unabhängig von der Reihenfolge im
+   Dokument (Muster `index.css`, Modal-Fuß). */
+:root .lfh-seitenkopf__pfad .ant-breadcrumb ol {
+  align-items: center;
+}
+:root .lfh-seitenkopf__pfad .ant-breadcrumb-item a {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: auto;
+  min-height: var(--lfh-ortspfad-ziel);
+  border-block: max(0px, calc((var(--lfh-ortspfad-ziel) - 1lh) / 2)) solid transparent;
+  background-clip: padding-box;
+}
+
 /* Meta und Datenstand auf schmalem Schirm auf eigener Zeile (LFH-373, gemessen bei 390 px).
    In der Titelzeile schob die spät eintreffende Meta („8 Einträge") den Stand in eine neue
    Zeile, und alles darunter rückte 22 px. Die eigene Zeile hält der unsichtbare Platzhalter
