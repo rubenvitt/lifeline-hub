@@ -1477,6 +1477,33 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
     expect(await screen.findByText('Datei geladen')).toBeInTheDocument();
     expect(screen.queryByText('anhang')).toBeNull();
   });
+
+  // LFH-916 (design.md D3): Export und Druck der Liste stehen im Audit der Person, wenn sie in der
+  // Liste stand; der Abschnitt sagt das, damit „Liste exportiert“ nicht wie ein Fehler aussieht.
+  it('das Zugriffs-Audit zeigt Listenzugriffe und erklärt sie', async () => {
+    render(einsatzFixture({ meine_rolle: 'einsatzleitung' }), detail, [
+      http.get('/api/einsaetze/1/personen/10/audit', () =>
+        HttpResponse.json([
+          {
+            id: 2,
+            person_id: null,
+            benutzer_id: 1,
+            benutzer_name: 'Leitung',
+            art: 'export',
+            zugriff_at: '2026-10-02 10:35:00',
+          },
+        ]),
+      ),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(screen.getByRole('button', { name: /Zugriffs-Audit/ }));
+    expect(await screen.findByText('Liste exportiert')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Export und Druck der Personenliste stehen hier, wenn die Person zu dem Zeitpunkt in der Liste stand.',
+      ),
+    ).toBeInTheDocument();
+  });
 });
 
 // Erfassungs-Norm (frontend/AGENTS.md, LFH-796): die vier Dialoge der Seite liegen auf der

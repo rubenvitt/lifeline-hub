@@ -1788,3 +1788,55 @@ describe('PersonenPage — Einstieg in den Druck (LFH-727)', () => {
     ).toHaveAttribute('href', '/einsaetze/1/personen/druck');
   });
 });
+
+/**
+ * Einsicht in die Listenzugriffe (LFH-916, Spec `personen-zugriffsprotokoll`): nur die
+ * Einsatzleitung sieht den Kopf-Knopf; er öffnet die Schnellansicht und lädt erst dann.
+ */
+describe('PersonenPage — Listenzugriffe (LFH-916)', () => {
+  function kopfAktionen() {
+    return waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+  }
+
+  it('öffnet für die Einsatzleitung die Listenzugriffe erst auf Klick', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1/personen/listenzugriffe', () => {
+        abrufe += 1;
+        return HttpResponse.json([
+          {
+            id: 1,
+            person_id: null,
+            benutzer_id: 1,
+            benutzer_name: 'Erika Leitung',
+            art: 'export',
+            zugriff_at: '2026-05-27 10:00:00',
+          },
+        ]);
+      }),
+    );
+    render(einsatzAktiv, [person]);
+    const kopf = await kopfAktionen();
+    const knopf = within(kopf).getByRole('button', { name: 'Listenzugriffe' });
+    expect(abrufe).toBe(0);
+
+    await userEvent.click(knopf);
+    const ansicht = await screen.findByRole('dialog', { name: 'Listenzugriffe' });
+    expect(await within(ansicht).findByText('Liste exportiert')).toBeInTheDocument();
+    expect(abrufe).toBe(1);
+  });
+
+  it.each([
+    ['Führungspersonal', 'fuehrungspersonal'],
+    ['Beobachter', 'beobachter'],
+  ] as const)('zeigt %s keinen Zugang', async (_name, rolle) => {
+    render(einsatzFixture({ meine_rolle: rolle }), [person]);
+    const kopf = await kopfAktionen();
+    expect(within(kopf).getByRole('button', { name: 'CSV exportieren' })).toBeInTheDocument();
+    expect(within(kopf).queryByRole('button', { name: 'Listenzugriffe' })).toBeNull();
+  });
+});

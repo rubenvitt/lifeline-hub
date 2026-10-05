@@ -52,7 +52,11 @@ pub async fn anlegen(
     Ok(())
 }
 
-/// Audit-Einträge einer Person (neueste zuerst), mit Benutzername.
+/// Audit-Einträge einer Person (neueste zuerst), mit Benutzername — samt den Listenzugriffen
+/// (Export, Druck) aus ihrem Erfassungsfenster: nach `erfasst_at`, nicht nach `storniert_at`
+/// (LFH-916, design.md D3). Beide Grenzen schließen die gleiche Sekunde ein: eher ein Eintrag
+/// zu viel als einer zu wenig. Beide Spalten tragen dasselbe `strftime`-Format wie `zugriff_at`,
+/// der Textvergleich ist also ein Zeitvergleich.
 pub async fn liste_je_person(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -62,11 +66,35 @@ pub async fn liste_je_person(
         "SELECT a.id, a.person_id, a.benutzer_id, b.anzeigename AS benutzer_name, \
                 a.art, a.zugriff_at \
          FROM person_zugriff_audit a JOIN benutzer b ON b.id = a.benutzer_id \
-         WHERE a.einsatz_id = ? AND a.person_id = ? \
+         WHERE a.einsatz_id = ?1 \
+           AND (a.person_id = ?2 \
+                OR (a.person_id IS NULL AND EXISTS ( \
+                     SELECT 1 FROM einsatz_person p \
+                     WHERE p.id = ?2 AND p.einsatz_id = ?1 \
+                       AND a.zugriff_at >= p.erfasst_at \
+                       AND (p.storniert_at IS NULL OR a.zugriff_at <= p.storniert_at)))) \
          ORDER BY a.zugriff_at DESC, a.id DESC",
     )
     .bind(einsatz_id)
     .bind(person_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// LFH-916: Zugriffe auf die ganze Personenliste eines Einsatzes (Export, Druck), neueste zuerst.
+/// „Listenweit“ heißt `person_id IS NULL` — genau dafür ist die Spalte leer (design.md D1).
+pub async fn liste_listenweit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<ZugriffAnzeige>, AppError> {
+    Ok(sqlx::query_as::<_, ZugriffAnzeige>(
+        "SELECT a.id, a.person_id, a.benutzer_id, b.anzeigename AS benutzer_name, \
+                a.art, a.zugriff_at \
+         FROM person_zugriff_audit a JOIN benutzer b ON b.id = a.benutzer_id \
+         WHERE a.einsatz_id = ? AND a.person_id IS NULL \
+         ORDER BY a.zugriff_at DESC, a.id DESC",
+    )
+    .bind(einsatz_id)
     .fetch_all(pool)
     .await?)
 }
@@ -133,12 +161,11 @@ mod tests {
         assert_eq!(count, 1);
     }
 
-    /// LFH-727: der Personendruck schreibt `druck` ohne Person (wie der Export der Liste); die
-    /// Einsicht je Person zeigt ihn deshalb nicht.
+    /// LFH-727: der Personendruck schreibt `druck` ohne Person (wie der Export der Liste).
     #[tokio::test]
     async fn druck_eintrag_ohne_person() {
         let pool = test_pool().await;
-        let (b, e, p) = setup(&pool).await;
+        let (b, e, _p) = setup(&pool).await;
         anlegen(&pool, e, None, b, "druck").await.unwrap();
         let count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM person_zugriff_audit \
@@ -149,6 +176,155 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(count, 1);
+    }
+
+    /// Protokollzeile mit festem Zeitpunkt (die Fensterregel vergleicht Sekunden).
+    async fn zeile(pool: &SqlitePool, e: i64, p: Option<i64>, b: i64, art: &str, at: &str) {
+        sqlx::query(
+            "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art, zugriff_at) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(e)
+        .bind(p)
+        .bind(b)
+        .bind(art)
+        .bind(at)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn setze_person(pool: &SqlitePool, p: i64, erfasst: &str, storniert: Option<&str>) {
+        sqlx::query("UPDATE einsatz_person SET erfasst_at = ?, storniert_at = ? WHERE id = ?")
+            .bind(erfasst)
+            .bind(storniert)
+            .bind(p)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    async fn zweiter_einsatz(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at) \
+             VALUES (1, 'Andere Lage', 'aktiv', '2026-05-27') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    fn arten_und_zeiten(eintraege: &[ZugriffAnzeige]) -> Vec<(&str, &str)> {
+        eintraege
+            .iter()
+            .map(|z| (z.art.as_str(), z.zugriff_at.as_str()))
+            .collect()
+    }
+
+    /// LFH-916 (Spec `personen-zugriffsprotokoll`): nur Zeilen ohne Person dieses Einsatzes, die
+    /// neuesten zuerst, mit Benutzername.
+    #[tokio::test]
+    async fn liste_listenweit_nur_listenzeilen_des_einsatzes() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        let anderer = zweiter_einsatz(&pool).await;
+        zeile(&pool, e, None, b, "export", "2026-05-27 10:00:00").await;
+        zeile(&pool, e, None, b, "druck", "2026-05-27 10:05:00").await;
+        zeile(&pool, e, Some(p), b, "detail", "2026-05-27 10:10:00").await;
+        zeile(&pool, e, Some(p), b, "anhang", "2026-05-27 10:11:00").await;
+        zeile(&pool, anderer, None, b, "export", "2026-05-27 10:20:00").await;
+
+        let eintraege = liste_listenweit(&pool, e).await.unwrap();
+        assert_eq!(
+            arten_und_zeiten(&eintraege),
+            vec![
+                ("druck", "2026-05-27 10:05:00"),
+                ("export", "2026-05-27 10:00:00")
+            ]
+        );
+        assert!(eintraege.iter().all(|z| z.person_id.is_none()));
+        assert_eq!(eintraege[0].benutzer_name, "A");
+    }
+
+    /// Gleicher Zeitpunkt: die spätere Zeile (höhere id) zuerst, wie in der Einsicht je Person.
+    #[tokio::test]
+    async fn liste_listenweit_gleiche_sekunde_nach_id() {
+        let pool = test_pool().await;
+        let (b, e, _p) = setup(&pool).await;
+        zeile(&pool, e, None, b, "export", "2026-05-27 10:00:00").await;
+        zeile(&pool, e, None, b, "druck", "2026-05-27 10:00:00").await;
+        let eintraege = liste_listenweit(&pool, e).await.unwrap();
+        assert_eq!(eintraege[0].art, "druck");
+        assert!(eintraege[0].id > eintraege[1].id);
+    }
+
+    #[tokio::test]
+    async fn liste_listenweit_leer_ohne_export_und_druck() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        zeile(&pool, e, Some(p), b, "detail", "2026-05-27 10:10:00").await;
+        assert!(liste_listenweit(&pool, e).await.unwrap().is_empty());
+    }
+
+    /// LFH-916 (design.md D3): Die Einsicht je Person zeigt die Listenzugriffe aus ihrem
+    /// Erfassungsfenster — nach der Erfassung, nicht nach der Stornierung, gleiche Sekunde drin.
+    #[tokio::test]
+    async fn liste_je_person_zeigt_listenzugriffe_im_erfassungsfenster() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        let anderer = zweiter_einsatz(&pool).await;
+        setze_person(&pool, p, "2026-05-27 09:00:00", Some("2026-05-27 11:00:00")).await;
+        zeile(&pool, e, None, b, "druck", "2026-05-27 08:00:00").await; // vor der Erfassung
+        zeile(&pool, e, None, b, "export", "2026-05-27 09:00:00").await; // gleiche Sekunde
+        zeile(&pool, e, Some(p), b, "detail", "2026-05-27 09:30:00").await;
+        zeile(&pool, e, None, b, "export", "2026-05-27 10:00:00").await; // im Fenster
+        zeile(&pool, anderer, None, b, "export", "2026-05-27 10:00:00").await; // fremd
+        zeile(&pool, e, None, b, "druck", "2026-05-27 11:00:00").await; // gleiche Sekunde
+        zeile(&pool, e, None, b, "export", "2026-05-27 11:00:01").await; // nach Storno
+
+        let eintraege = liste_je_person(&pool, e, p).await.unwrap();
+        assert_eq!(
+            arten_und_zeiten(&eintraege),
+            vec![
+                ("druck", "2026-05-27 11:00:00"),
+                ("export", "2026-05-27 10:00:00"),
+                ("detail", "2026-05-27 09:30:00"),
+                ("export", "2026-05-27 09:00:00"),
+            ]
+        );
+    }
+
+    /// Ohne Stornierung ist das Fenster nach oben offen.
+    #[tokio::test]
+    async fn liste_je_person_ohne_storno_bis_heute() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        setze_person(&pool, p, "2026-05-27 09:00:00", None).await;
+        zeile(&pool, e, None, b, "export", "2026-09-01 12:00:00").await;
+        let eintraege = liste_je_person(&pool, e, p).await.unwrap();
+        assert_eq!(
+            arten_und_zeiten(&eintraege),
+            vec![("export", "2026-09-01 12:00:00")]
+        );
+    }
+
+    /// Die Listenzeilen einer Person zeigen nur ihre eigenen Personenzeilen, nicht die einer
+    /// anderen Person desselben Einsatzes.
+    #[tokio::test]
+    async fn liste_je_person_ohne_zeilen_anderer_personen() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        let andere: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 2, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        zeile(&pool, e, Some(andere), b, "detail", "2099-01-01 00:00:00").await;
         assert!(liste_je_person(&pool, e, p).await.unwrap().is_empty());
     }
 

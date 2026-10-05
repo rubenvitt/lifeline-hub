@@ -2309,3 +2309,191 @@ async fn druck_liefert_ohne_protokolleintrag_keine_personen() {
         "keine Personendaten ohne Protokoll: {body}"
     );
 }
+
+// ---------- Einsicht in die Listenzugriffe (LFH-916, Spec `personen-zugriffsprotokoll`) ----------
+
+async fn csv_export(app: &axum::Router, cookie: &str, e: i64) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/einsaetze/{e}/personen/export"))
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+async fn protokoll_zeilen(pool: &sqlx::SqlitePool, e: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ?")
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn listenzugriffe_zeigt_export_und_druck_neueste_zuerst() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    csv_export(&app, &admin, e).await;
+    anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/druck"),
+        &admin,
+        None,
+    )
+    .await;
+    // Personenbezogene Zeile und fremder Einsatz bleiben draußen.
+    anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        None,
+    )
+    .await;
+    csv_export(&app, &admin, anderer).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/listenzugriffe"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let eintraege = json.as_array().unwrap();
+    let arten: Vec<&str> = eintraege
+        .iter()
+        .map(|z| z["art"].as_str().unwrap())
+        .collect();
+    // Beide in derselben Sekunde möglich: die spätere Zeile (Druck) steht vorn.
+    assert_eq!(arten, vec!["druck", "export"]);
+    assert!(eintraege.iter().all(|z| z["person_id"].is_null()));
+    assert!(eintraege
+        .iter()
+        .all(|z| z["benutzer_name"].as_str().is_some() && z["zugriff_at"].as_str().is_some()));
+
+    // Die Einsicht schreibt selbst keine Zeile, auch beim zweiten Öffnen nicht.
+    let vorher = protokoll_zeilen(&pool, e).await;
+    for _ in 0..2 {
+        let (status, _) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{e}/personen/listenzugriffe"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    assert_eq!(protokoll_zeilen(&pool, e).await, vorher);
+}
+
+#[tokio::test]
+async fn listenzugriffe_nur_fuer_einsatzleitung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fueh_id = benutzer_anlegen(&app, &admin, "fuehrung", "keine").await;
+    let beob_id = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, e, fueh_id, "fuehrungspersonal").await;
+    rolle_setzen(&app, &admin, e, beob_id, "beobachter").await;
+    csv_export(&app, &admin, e).await;
+    for (name, pw) in [("fuehrung", "fuehrungpw1"), ("beobachter", "beobachterpw1")] {
+        let cookie = login_cookie(&app, name, pw).await;
+        let (status, json) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{e}/personen/listenzugriffe"),
+            &cookie,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{name}");
+        assert!(
+            json.get("error").is_some(),
+            "{name}: kein Eintrag, nur Fehler"
+        );
+    }
+}
+
+#[tokio::test]
+async fn listenzugriffe_im_abgeschlossenen_einsatz() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    csv_export(&app, &admin, e).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/listenzugriffe"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json.as_array().unwrap().len(), 1);
+}
+
+/// D3: Die Einsicht je Person zeigt den Export, in dem die Person stand — nicht den einer
+/// später erfassten Person vorausgehenden.
+#[tokio::test]
+async fn einsicht_je_person_zeigt_export_nach_erfassung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let frueh = person_anlegen(&app, &admin, e, r#"{"name":"Frueh"}"#).await;
+    csv_export(&app, &admin, e).await;
+    // Export auf eine Sekunde vor der zweiten Erfassung legen (Sekundenauflösung).
+    sqlx::query(
+        "UPDATE person_zugriff_audit SET zugriff_at = '2026-05-27 10:00:00' WHERE einsatz_id = ?",
+    )
+    .bind(e)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE einsatz_person SET erfasst_at = '2026-05-27 09:00:00' WHERE id = ?")
+        .bind(frueh)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let spaet = person_anlegen(&app, &admin, e, r#"{"name":"Spaet"}"#).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{frueh}/audit"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let arten: Vec<&str> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|z| z["art"].as_str().unwrap())
+        .collect();
+    assert_eq!(arten, vec!["export"]);
+    assert_eq!(audit_anzahl(&app, &admin, e, spaet).await, 0);
+}

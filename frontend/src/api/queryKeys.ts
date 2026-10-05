@@ -97,6 +97,9 @@ export const EINSATZ_KEYS = {
   uhsDetail: 'einsatz-uhs-detail',
   person: 'einsatz-person',
   personAudit: 'einsatz-person-audit',
+  // Zugriffe auf die ganze Personenliste (LFH-916): eigener Prefix, unter `personen` zöge ihn
+  // jedes `person`-Ereignis per Präfix mit.
+  personenListenzugriffe: 'einsatz-personen-listenzugriffe',
   // Fotos und Dateien an einer Person (LFH-757): live über das `person`-Ereignis. Nicht im
   // Lagebild offline (Patientenfotos und ihre Dateinamen bleiben vom Gerät fern, LFH-767).
   personAnhaenge: 'einsatz-person-anhaenge',
@@ -296,6 +299,8 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `uhsAnhangZugriffe` (LFH-758): das Zugriffsprotokoll der UHS-Dateien lädt erst beim
  *   Aufklappen, wie `personAudit`; ein Live-Refetch zeigte Abrufe anderer ohne Handlung der
  *   Einsatzleitung und liefe bei jedem `uhs`-Ereignis mit.
+ * - `personenListenzugriffe` (LFH-916): Export und Druck der Personenliste lädt erst mit der
+ *   geöffneten Ansicht, aus demselben Grund wie `uhsAnhangZugriffe`.
  * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
@@ -324,6 +329,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
+  EINSATZ_KEYS.personenListenzugriffe,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -390,6 +396,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.person, einsatzId, personId] as const,
   personAudit: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAudit, einsatzId, personId] as const,
+  personenListenzugriffe: (einsatzId: number) =>
+    [EINSATZ_KEYS.personenListenzugriffe, einsatzId] as const,
   personAnhaenge: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAnhaenge, einsatzId, personId] as const,
   personal: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId] as const,

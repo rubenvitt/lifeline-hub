@@ -6,7 +6,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { parsePersonenSicht, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
 import DruckAnsichtKnopf from '../druck/DruckAnsichtKnopf';
 import { ladeEinsatz } from '../api/einsaetze';
-import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import {
   ladePersonenExport,
@@ -48,6 +48,7 @@ import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonEr
 import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
 import BetroffeneZeile from '../personen/BetroffeneZeile';
 import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
+import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
 import '../personen/betroffene.css';
 import { erfassePersonOfflineFaehig } from '../offline/schreiben';
 import {
@@ -189,6 +190,9 @@ export default function PersonenPage() {
   >({});
   const frischErfasst = useFrischAngelegt<Person>(einsatzId, einsatzKeys.personen, personenQuery);
   const merkeFrisch = frischErfasst.merke;
+  // Am Einsatz festgemacht wie die Erfassungsmasken: ein Wechsel des Einsatzes schließt die
+  // Listenzugriffe, statt sie für den nächsten Einsatz zu laden (LFH-916).
+  const [listenzugriffeFuer, setListenzugriffeFuer] = useState<number | null>(null);
   const [dokumentSichtbar, setDokumentSichtbar] = useState(
     () => typeof document === 'undefined' || document.visibilityState === 'visible',
   );
@@ -629,6 +633,11 @@ export default function PersonenPage() {
           <Button loading={csvExport.laeuft} onClick={csvExport.exportieren}>
             CSV exportieren
           </Button>
+          {/* LFH-916: wer die Liste exportiert oder gedruckt hat — nur die Einsatzleitung (der
+              Server antwortet sonst 403). Öffnet eine Schnellansicht, sendet nichts ab. */}
+          {istEinsatzLeitung(einsatz) && (
+            <Button onClick={() => setListenzugriffeFuer(einsatzId)}>Listenzugriffe</Button>
+          )}
         </>
       }
       // Zweiter Bedienweg auf die Erfassung („Neue Zeile" in der Palette) mit demselben
@@ -871,6 +880,13 @@ export default function PersonenPage() {
           });
         }}
       />
+      {istEinsatzLeitung(einsatz) && (
+        <ListenzugriffeDrawer
+          einsatzId={einsatzId}
+          offen={listenzugriffeFuer === einsatzId}
+          onClose={() => setListenzugriffeFuer(null)}
+        />
+      )}
     </EinsatzSeite>
   );
 }

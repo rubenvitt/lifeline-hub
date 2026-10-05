@@ -907,14 +907,21 @@ export default function PersonenDetailPage() {
                     key: 'audit',
                     label: 'Zugriffs-Audit',
                     children: (
-                      <KatalogTabelle<PersonZugriff>
-                        rowKey="id"
-                        pagination={false}
-                        loading={auditQuery.isLoading}
-                        dataSource={auditQuery.data ?? []}
-                        columns={auditSpalten}
-                        locale={{ emptyText: 'Noch keine Zugriffe' }}
-                      />
+                      <>
+                        {/* LFH-916 (design.md D3): Listenzeilen aus dem Erfassungsfenster. */}
+                        <Typography.Paragraph type="secondary">
+                          Export und Druck der Personenliste stehen hier, wenn die Person zu dem
+                          Zeitpunkt in der Liste stand.
+                        </Typography.Paragraph>
+                        <KatalogTabelle<PersonZugriff>
+                          rowKey="id"
+                          pagination={false}
+                          loading={auditQuery.isLoading}
+                          dataSource={auditQuery.data ?? []}
+                          columns={auditSpalten}
+                          locale={{ emptyText: 'Noch keine Zugriffe' }}
+                        />
+                      </>
                     ),
                   },
                 ]

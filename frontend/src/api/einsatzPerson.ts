@@ -139,6 +139,14 @@ export function ladePersonAudit(einsatzId: number, personId: number): Promise<Pe
   return apiGet<PersonZugriff[]>(`/api/einsaetze/${einsatzId}/personen/${personId}/audit`);
 }
 
+/**
+ * Zugriffe auf die ganze Personenliste (Export, Druck), neueste zuerst (LFH-916). Nur die
+ * Einsatzleitung (sonst 403); der Abruf wird selbst nicht protokolliert.
+ */
+export function ladePersonenListenzugriffe(einsatzId: number): Promise<PersonZugriff[]> {
+  return apiGet<PersonZugriff[]>(`/api/einsaetze/${einsatzId}/personen/listenzugriffe`);
+}
+
 /** Registriernummer-Anzeige wie im Backend (R-042). */
 export function registrierAnzeige(nr: number): string {
   return registrierNummer('R', nr);

@@ -261,6 +261,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     // Prefix über alle Einsätze: Invalidierung nach einer Org-Vorgabe (LFH-669).
     expect(einsatzKeys.modulFreigabenAlle()).toEqual(['einsatz-modul-freigaben']);
     expect(einsatzKeys.personAudit(1, 2)).toEqual(['einsatz-person-audit', 1, 2]);
+    expect(einsatzKeys.personenListenzugriffe(1)).toEqual(['einsatz-personen-listenzugriffe', 1]);
     expect(einsatzKeys.uhsDetail(1, 2)).toEqual(['einsatz-uhs-detail', 1, 2]);
     expect(einsatzKeys.schaden(1, 2)).toEqual(['einsatz-schaden', 1, 2]);
     expect(einsatzKeys.schadenAnhaenge(1, 2)).toEqual(['einsatz-schaden-anhaenge', 1, 2]);

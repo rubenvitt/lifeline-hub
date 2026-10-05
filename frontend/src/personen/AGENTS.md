@@ -26,3 +26,9 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   die Liste lädt erst mit dem Abschnitt. Jeder Download steht serverseitig im Zugriffsprotokoll, deshalb nur als bewusster
   Verweis, nie als Vorschau. `personAnhaenge` hängt am `person`-Ereignis, das Detail (`person`)
   bleibt nicht live, und die Anhangliste steht nicht im Lagebild offline.
+- **Zugriffsprotokoll** (LFH-916, Spec `personen-zugriffsprotokoll`): nur die Einsatzleitung sieht
+  es, die Einsicht selbst ist unprotokolliert und nicht live. Die Listenzugriffe (Export, Druck)
+  öffnet der Kopf-Knopf „Listenzugriffe“ der Personenliste als Schnellansicht
+  (`personen/ListenzugriffeDrawer.tsx`, lädt erst offen); das Zugriffs-Audit der Detailseite zeigt
+  zusätzlich die Listenzugriffe aus dem Erfassungsfenster der Person (Server:
+  `person/audit_repo.rs`, `liste_je_person`).
