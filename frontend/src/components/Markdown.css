@@ -1,6 +1,6 @@
 /* Gerendertes Markdown — geteilt von Lagebericht-Anzeige und ETB.
    Farben erben (color: inherit) die antd-Textfarbe, damit Light/Dark ohne
-   eigene Token-Pflege lesbar bleiben. Die strukturellen Akzente (Code-Grund,
+   eigene Token-Pflege lesbar bleiben; nur das Zitat trägt eine eigene Textrolle (unten). Die strukturellen Akzente (Code-Grund,
    Zitat-/Tabellen-Rahmen) kommen aus Rollen, die ihren Modus selbst tragen
    (LFH-889, vorher `rgba()` über Schwarz/Weiß je Modus):
    - Code-Grund `flaeche-3`, nicht `flaeche-2`: die hebt sich am Tag nur 1,08 : 1
@@ -56,12 +56,17 @@
   padding: 0;
 }
 
+/* Zitat in der zweiten Textstufe `text2` (LFH-911), nicht mehr geerbt mit `opacity: 0.85`:
+   Deckkraft komponiert das Zitat als Gruppe, das lehnt der Messkern ab (`e2e/kontrast-kern.ts`),
+   und gedimmter Zitattext stand in keiner Kontrast-Spec. `text2` liegt in der Rangfolge direkt
+   unter `text`, also etwa dort, wo die 85 % lagen (auf `flaeche` Tag 13,13 · Nacht 11,60,
+   `theme/tokens.ts`). Gemessen in `e2e/markdown-kontrast.spec.ts` (ETB-Zeitachse) und
+   `e2e/etb-druck-kontrast.spec.ts` (Druckvorschau); auf Papier färbt `druck/druck.css` schwarz. */
 .markdown blockquote {
   margin: 0.75em 0;
   padding: 2px 14px;
   border-left: 3px solid var(--md-akzent);
-  color: inherit;
-  opacity: 0.85;
+  color: var(--lfh-text-2);
 }
 
 .markdown table {
