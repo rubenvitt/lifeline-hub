@@ -6,9 +6,12 @@ import { flaeche, kontrast } from './kontrast-kern';
  * `rgba()` über Schwarz/Weiß je Modus. Gemessen am ETB, das denselben Renderer (`.markdown`) trägt
  * wie die Lagebericht-Anzeige.
  *
- * Boden als Literal: Code-Text Tag ≥ 7, Nacht ≥ 5. Keine Farbwerte aus dem Produkt importieren:
- * eine schlechte Palette muss rot werden. Dass Grund und Rahmen die Rollen SIND, prüft der
- * Abgleich mit den Rollen-Properties, die die laufende Seite selbst auflöst (`rolle`).
+ * Zitate (LFH-911) stehen in der Textrolle `text2`, nicht mehr in geerbter Farbe mit
+ * `opacity: 0.85`: Deckkraft lehnt der Messkern ab, ein gedimmtes Zitat bliebe ungemessen.
+ *
+ * Boden als Literal: Code- und Zitattext Tag ≥ 7, Nacht ≥ 5. Keine Farbwerte aus dem Produkt
+ * importieren: eine schlechte Palette muss rot werden. Dass Grund und Rahmen die Rollen SIND, prüft
+ * der Abgleich mit den Rollen-Properties, die die laufende Seite selbst auflöst (`rolle`).
  */
 const TEXT = { light: 7, dark: 5 } as const;
 
@@ -42,7 +45,7 @@ async function rolle(page: Page, name: string): Promise<string> {
 const rgb = (f: number[]) => f.slice(0, 3).map(Math.round).join();
 
 for (const modus of ['light', 'dark'] as const) {
-  test(`${modus}: Markdown im ETB — Code-Text auf Code-Grund, Rahmen aus der Linie`, async ({
+  test(`${modus}: Markdown im ETB — Code- und Zitattext, Code-Grund und Rahmen aus Rollen`, async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -57,6 +60,8 @@ for (const modus of ['light', 'dark'] as const) {
       '| Ort | Lage |',
       '| --- | --- |',
       '| Nord | ruhig |',
+      '',
+      '> Deichwache meldet Sickerstelle',
     ].join('\n');
     await post(page, `/api/einsaetze/${einsatzId}/etb`, {
       typ: 'meldung',
@@ -73,13 +78,17 @@ for (const modus of ['light', 'dark'] as const) {
 
     const code = zeile.locator('.markdown code', { hasText: 'B 12' });
     const zelle = zeile.locator('.markdown td', { hasText: 'Nord' });
+    const zitat = zeile.locator('.markdown blockquote p', { hasText: 'Deichwache' });
     await expect(code).toBeVisible();
     await expect(zelle).toBeVisible();
+    await expect(zitat).toBeVisible();
 
     await expect(async () => {
       const m = await kontrast(code);
       expect(m.verhaeltnis, `Code-Text: ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(TEXT[modus]);
       expect(rgb(await flaeche(code)), 'Code-Grund').toBe(await rolle(page, '--lfh-flaeche-3'));
+      const z = await kontrast(zitat);
+      expect(z.verhaeltnis, `Zitattext: ${JSON.stringify(z)}`).toBeGreaterThanOrEqual(TEXT[modus]);
       const rahmen = await zelle.evaluate((el) => getComputedStyle(el).borderTopColor);
       expect(rgb((rahmen.match(/[\d.]+/g) ?? []).map(Number)), 'Tabellenrahmen').toBe(
         await rolle(page, '--lfh-linie'),
