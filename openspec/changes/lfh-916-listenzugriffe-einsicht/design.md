@@ -99,7 +99,7 @@ haben dasselbe Format (`strftime('%Y-%m-%d %H:%M:%S')`), der Textvergleich ist e
 Zeitvergleich.
 
 Die Art bleibt `export`/`druck`, `person_id` bleibt `NULL` — die Detailseite zeigt sie als „Liste
-exportiert“/„Liste gedruckt“ und braucht dafür keine neue Spalte. Ein Satz unter der Tabelle
+exportiert“/„Liste gedruckt“ und braucht dafür keine neue Spalte. Ein Satz über der Tabelle
 erklärt, dass Listenzugriffe erscheinen, wenn die Person in der Liste stand.
 
 Begründung: Eine Auskunft nach Art. 15 DSGVO fragt, wer die Daten der Person erhalten hat; ein
@@ -118,6 +118,12 @@ Codegen-Änderung ohne Mehrwert, die Art „Liste …“ sagt es schon).
 - [Personen-Schwärzung (`schwaerzung_person.rs`) behandelt Zeilen mit `person_id`] → Listenweite
   Zeilen tragen keine Person und sind davon nicht berührt; die Einsicht je Person einer
   geschwärzten Person zeigt sie weiter, das ist der Nachweis, den die Schwärzung behalten soll.
+- [Liste und Protokollzeile entstehen nicht im selben Augenblick: der Export liest erst und
+  schreibt dann, der Druck schreibt erst und liest dann] → Fällt dazwischen eine Sekundengrenze
+  mit einer gleichzeitigen Erfassung oder Stornierung zusammen, kann die Einsicht je Person einen
+  Listenzugriff verfehlen. Das Fenster ist eine Sekunde und braucht eine gleichzeitige Änderung
+  derselben Person; Lesen und Schreiben in eine Transaktion zu legen änderte Export und Druck und
+  bleibt außerhalb dieser Change.
 - [Die Einsicht zeigt Namen von Einsatzkräften] → Nur die Einsatzleitung, wie die bestehende
   Einsicht je Person.
 

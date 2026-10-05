@@ -3,9 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ladePersonenListenzugriffe } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import type { PersonZugriff } from '../api/types';
-import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
-import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { zugriffArtText } from './zugriffArt';
+import KatalogTabelle from '../components/KatalogTabelle';
+import { ZUGRIFF_SPALTEN } from './zugriffSpalten';
 
 /**
  * „Listenzugriffe“ (LFH-916, Spec `personen-zugriffsprotokoll`, design.md D2): wer die
@@ -13,7 +12,9 @@ import { zugriffArtText } from './zugriffArt';
  * für die Einsatzleitung — ein Drawer ist dafür zulässig (`frontend/AGENTS.md`, UI-Form-Leitlinie).
  *
  * Lädt erst offen und ohne Wiederholung, wie das Zugriffs-Audit je Person; der Key ist bewusst
- * nicht live (`NICHT_LIVE_KEYS`). Die Einsicht selbst wird nicht protokolliert.
+ * nicht live (`NICHT_LIVE_KEYS`). Jedes Öffnen lädt frisch (`staleTime: 0`): der Drawer bleibt
+ * eingehängt, und ein Export kurz vor dem erneuten Öffnen fehlte sonst. Die Einsicht selbst wird
+ * nicht protokolliert.
  */
 export default function ListenzugriffeDrawer({
   einsatzId,
@@ -29,22 +30,8 @@ export default function ListenzugriffeDrawer({
     queryFn: () => ladePersonenListenzugriffe(einsatzId),
     enabled: offen,
     retry: false,
+    staleTime: 0,
   });
-  const spalten: KatalogSpalte<PersonZugriff>[] = [
-    {
-      title: 'Wann',
-      dataIndex: 'zugriff_at',
-      key: 'zugriff_at',
-      render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" />,
-    },
-    { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
-    {
-      title: 'Art',
-      dataIndex: 'art',
-      key: 'art',
-      render: (art: PersonZugriff['art']) => zugriffArtText(art),
-    },
-  ];
 
   return (
     <Drawer open={offen} size={460} title="Listenzugriffe" onClose={onClose}>
@@ -56,7 +43,7 @@ export default function ListenzugriffeDrawer({
           pagination={false}
           loading={query.isLoading}
           dataSource={query.data ?? []}
-          columns={spalten}
+          columns={ZUGRIFF_SPALTEN}
           locale={{ emptyText: 'Die Personenliste wurde noch nicht exportiert oder gedruckt' }}
         />
       )}

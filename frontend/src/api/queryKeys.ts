@@ -842,7 +842,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Fahrzeugstatus-Katalog) und die Präferenzen der Person (Standard-Rufname, LFH-894). Von den
  * Meldungen nur die Rückmeldungen, nicht die Liste.
  *
- * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit, Chat, Dokumente, die
+ * Bewusst draußen: Druck (ein Schnappschuss), Personen-Audit samt Listenzugriffen der
+ * Personenliste (LFH-916, nur für die Einsatzleitung), Chat, Dokumente, die
  * Anhanglisten der Erfassungsmodule samt UHS-Zugriffsprotokoll (LFH-21/LFH-758: ohne Netz lädt
  * keine Datei, und Dateinamen an einer UHS können Patienten nennen), HEIC-Vorschau
  * (Object-URLs, nur im Speicher, LFH-759),

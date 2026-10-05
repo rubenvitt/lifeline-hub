@@ -2464,7 +2464,7 @@ async fn einsicht_je_person_zeigt_export_nach_erfassung() {
     let e = einsatz_anlegen(&app, &admin).await;
     let frueh = person_anlegen(&app, &admin, e, r#"{"name":"Frueh"}"#).await;
     csv_export(&app, &admin, e).await;
-    // Export auf eine Sekunde vor der zweiten Erfassung legen (Sekundenauflösung).
+    // Export vor die zweite Erfassung legen (die echte Uhr liegt danach), die erste davor.
     sqlx::query(
         "UPDATE person_zugriff_audit SET zugriff_at = '2026-05-27 10:00:00' WHERE einsatz_id = ?",
     )

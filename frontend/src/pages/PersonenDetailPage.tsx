@@ -21,7 +21,6 @@ import {
   Spin,
   Tag,
   Typography,
-  type TableColumnsType,
 } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
@@ -61,7 +60,7 @@ import { STATUS_META, istPatient } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
-import { zugriffArtText } from '../personen/zugriffArt';
+import { ZUGRIFF_SPALTEN } from '../personen/zugriffSpalten';
 import { ANHAENGE_TITEL } from '../components/erfassungsAnhaenge/ErfassungsAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import PersonVerlauf from '../personen/PersonVerlauf';
@@ -448,22 +447,6 @@ export default function PersonenDetailPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
-
-  const auditSpalten: TableColumnsType<PersonZugriff> = [
-    {
-      title: 'Wann',
-      dataIndex: 'zugriff_at',
-      key: 'zugriff_at',
-      render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" />,
-    },
-    { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
-    {
-      title: 'Art',
-      dataIndex: 'art',
-      key: 'art',
-      render: (art: PersonZugriff['art']) => zugriffArtText(art),
-    },
-  ];
 
   function medSpalte(person: PersonDetail) {
     return (
@@ -918,7 +901,7 @@ export default function PersonenDetailPage() {
                           pagination={false}
                           loading={auditQuery.isLoading}
                           dataSource={auditQuery.data ?? []}
-                          columns={auditSpalten}
+                          columns={ZUGRIFF_SPALTEN}
                           locale={{ emptyText: 'Noch keine Zugriffe' }}
                         />
                       </>

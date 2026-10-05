@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { erzeugeQueryClient } from '../api/queryClient';
 import ListenzugriffeDrawer from './ListenzugriffeDrawer';
 import type { PersonZugriff } from '../api/types';
 
@@ -53,6 +54,26 @@ describe('ListenzugriffeDrawer', () => {
     expect(within(zeilen[1]).getByText('Max Funk')).toBeInTheDocument();
     expect(within(zeilen[1]).getByText('Liste exportiert')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Listenzugriffe' })).toBeInTheDocument();
+  });
+
+  it('lädt bei jedem Öffnen frisch, damit ein eben gemachter Export erscheint', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get(URL, () => {
+        abrufe += 1;
+        return HttpResponse.json(abrufe === 1 ? eintraege.slice(1) : eintraege);
+      }),
+    );
+    // Mit den Produktionsvorgaben (10 s frisch), sonst prüfte der Test nichts.
+    const { rerender } = renderMitProviders(
+      <ListenzugriffeDrawer einsatzId={1} offen onClose={() => {}} />,
+      { client: erzeugeQueryClient() },
+    );
+    expect(await screen.findByText('Max Funk')).toBeInTheDocument();
+    rerender(<ListenzugriffeDrawer einsatzId={1} offen={false} onClose={() => {}} />);
+    rerender(<ListenzugriffeDrawer einsatzId={1} offen onClose={() => {}} />);
+    expect(await screen.findByText('Erika Leitung')).toBeInTheDocument();
+    expect(abrufe).toBe(2);
   });
 
   it('nennt den leeren Zustand', async () => {
