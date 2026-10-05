@@ -9,6 +9,10 @@
  * - D3: Welche Kombination sich zeichnen lässt, entscheidet allein die Komposition — nicht
  *   `validateSpec` und keine gepflegte Accepts-Liste. Deshalb eine Rückfallkaskade: jede Fassung
  *   der Fachaufgabe, dann ohne Fachaufgabe, ohne Stärke, ohne Organisation, Körper allein.
+ * - Seit @einsatzzeichen 4.0 leitet der Motor fehlende Vermessungen ab, statt sie abzulehnen
+ *   (`Drawing.derivations`, LFH-991). Gleichwertige Fassungen einer Stufe (randbündig, Box,
+ *   Radpaar) wählt die Kaskade deshalb vermessen vor abgeleitet: ein bisher vermessenes Zeichen
+ *   bleibt, wie es war, eine bisher fehlende Fachaufgabe erscheint abgeleitet.
  * - D4: Ergebnis je Eingang gecacht.
  *
  * Freie Zeichen laufen NICHT hier durch, sie bleiben bis LFH-836 auf dem Altpaket.
@@ -172,28 +176,34 @@ function verbinde(...teile: Array<Teil | undefined>): SymbolSpec {
   return spec as unknown as SymbolSpec;
 }
 
-/** Die Fassungen einer Fachaufgabe am gegebenen Körper, in Versuchsreihenfolge. */
-function fassungen(fachaufgabe: string | undefined, koerper: Teil): Teil[] {
+/**
+ * Die Fassungen einer Fachaufgabe am gegebenen Körper, als Stufen in Versuchsreihenfolge. Die
+ * Fassungen einer Stufe sind gleichwertig (vermessen vor abgeleitet, s. `waehle`), eine spätere
+ * Stufe gibt etwas auf.
+ */
+function fassungen(fachaufgabe: string | undefined, koerper: Teil): Teil[][] {
   if (!fachaufgabe) return [];
   const versorgung = VERSORGUNG[fachaufgabe];
-  // Ist die Marke am Körper nicht vermessen, bleibt wenigstens das Fußband (Versorgung, Anhang G).
-  if (versorgung) return [versorgung, { bodyVariant: versorgung.bodyVariant }];
+  // Ist die Marke am Körper nicht darstellbar, bleibt wenigstens das Fußband (Versorgung, Anhang G).
+  if (versorgung) return [[versorgung], [{ bodyVariant: versorgung.bodyVariant }]];
   const faehigkeiten = FAEHIGKEIT[fachaufgabe];
   if (!faehigkeiten) return [];
-  const liste: Teil[] = [{ bodyMarks: faehigkeiten }, { capabilities: faehigkeiten }];
+  const stufe: Teil[] = [{ bodyMarks: faehigkeiten }, { capabilities: faehigkeiten }];
   // Rettungsdienstfahrzeuge stehen auf dem Radpaar, nicht auf einer Kfz-Kategorie: RTW/KTW mit
-  // Sanität (F.2), NEF/NAW mit Arzt (F.2.4/F.2.5 „alternative“).
+  // Sanität (F.2), NEF/NAW mit Arzt (F.2.4/F.2.5 „alternative“). Seit 4.0 zeichnet der Motor die
+  // Marke auch abgeleitet auf der Kategorie; die vermessene Radpaar-Fassung geht trotzdem vor,
+  // weil sie in derselben Stufe steht.
   if (
     koerper.kind === 'vehicle-land' &&
     faehigkeiten.some((f) => f === 'medical-service' || f === 'physician')
   ) {
-    liste.push({
+    stufe.push({
       vehicleCategory: undefined,
       bodyVariant: 'plain-wheel-pair',
       bodyMarks: faehigkeiten,
     });
   }
-  return liste;
+  return [stufe];
 }
 
 function zeichne(spec: SymbolSpec): Drawing | null {
@@ -212,7 +222,8 @@ function zeichne(spec: SymbolSpec): Drawing | null {
   }
 }
 
-function kandidaten(tz: TzProps): SymbolSpec[] | null {
+/** Die Stufen der Kaskade; jede Stufe hält gleichwertige Fassungen. */
+function kandidaten(tz: TzProps): SymbolSpec[][] | null {
   const koerper = tz.grundzeichen ? KOERPER[tz.grundzeichen] : undefined;
   if (!koerper) return null;
   const org: Teil = { organization: koerper.organization ?? organisation(tz.organisation) };
@@ -224,15 +235,30 @@ function kandidaten(tz: TzProps): SymbolSpec[] | null {
       : (tz.fachaufgabe ?? (tz.symbol ? SYMBOL_ERSATZ[tz.symbol] : undefined));
   const farbe: Teil = tz.farbe ? { technicalFill: FARBE_TOKEN[tz.farbe] ?? 'grau' } : {};
 
-  const liste: SymbolSpec[] = [];
-  for (const f of fassungen(fachaufgabe, koerper)) {
-    liste.push(verbinde(koerper, org, farbe, staerke, f));
-  }
-  liste.push(verbinde(koerper, org, farbe, staerke));
-  liste.push(verbinde(koerper, org, farbe));
-  liste.push(verbinde(koerper, farbe, { organization: undefined }));
-  liste.push(verbinde({ kind: koerper.kind }));
+  const liste: SymbolSpec[][] = fassungen(fachaufgabe, koerper).map((stufe) =>
+    stufe.map((f) => verbinde(koerper, org, farbe, staerke, f)),
+  );
+  liste.push([verbinde(koerper, org, farbe, staerke)]);
+  liste.push([verbinde(koerper, org, farbe)]);
+  liste.push([verbinde(koerper, farbe, { organization: undefined })]);
+  liste.push([verbinde({ kind: koerper.kind })]);
   return liste;
+}
+
+/**
+ * Die erste vermessene Fassung der Stufe, sonst die erste abgeleitete, sonst `null`. Abgeleitet
+ * heißt: die Zeichnung trägt `derivations` (@einsatzzeichen 4.0, „Ableiten statt Messsperre“).
+ */
+function waehle(stufe: SymbolSpec[]): FachobjektZeichen | null {
+  let abgeleitet: FachobjektZeichen | null = null;
+  for (const spec of stufe) {
+    const drawing = zeichne(spec);
+    if (!drawing) continue;
+    const z = { spec, drawing, schluessel: `ez|${serializeSpec(spec)}` };
+    if (!drawing.derivations?.length) return z;
+    abgeleitet ??= z;
+  }
+  return abgeleitet;
 }
 
 const CACHE = new Map<string, FachobjektZeichen | null>();
@@ -257,12 +283,9 @@ export function fachobjektZeichen(tz: TzProps): FachobjektZeichen | null {
   const key = eingangsSchluessel(tz);
   if (CACHE.has(key)) return CACHE.get(key)!;
   let ergebnis: FachobjektZeichen | null = null;
-  for (const spec of kandidaten(tz) ?? []) {
-    const drawing = zeichne(spec);
-    if (drawing) {
-      ergebnis = { spec, drawing, schluessel: `ez|${serializeSpec(spec)}` };
-      break;
-    }
+  for (const stufe of kandidaten(tz) ?? []) {
+    ergebnis = waehle(stufe);
+    if (ergebnis) break;
   }
   CACHE.set(key, ergebnis);
   return ergebnis;

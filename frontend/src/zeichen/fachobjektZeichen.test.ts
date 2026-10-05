@@ -241,19 +241,21 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
     ).toEqual({ kind: 'formation', strength: 'zug' });
   });
 
-  it('lässt eine am Kfz nicht darstellbare Fachaufgabe weg', () => {
-    // IuK ist am Kraftfahrzeug weder randbündig noch als Box vermessen.
-    expect(
-      wirksam({
-        grundzeichen: 'kraftfahrzeug-landgebunden',
-        organisation: 'hilfsorganisation',
-        fachaufgabe: 'iuk',
-      }),
-    ).toEqual({
+  it('zeichnet eine am Kfz nicht vermessene Fachaufgabe abgeleitet statt sie wegzulassen', () => {
+    // IuK ist am Kraftfahrzeug weder randbündig noch als Box vermessen; seit core 4.0 leitet der
+    // Motor die Marke ab („Ableiten statt Messsperre“, LFH-991).
+    const tz: TzProps = {
+      grundzeichen: 'kraftfahrzeug-landgebunden',
+      organisation: 'hilfsorganisation',
+      fachaufgabe: 'iuk',
+    };
+    expect(wirksam(tz)).toEqual({
       kind: 'vehicle-land',
       vehicleCategory: 'kfz-kategorie-1',
       organization: 'hilfsorganisation',
+      bodyMarks: ['information-communications'],
     });
+    expect(fachobjektZeichen(tz)!.drawing.derivations).not.toHaveLength(0);
   });
 
   it('lässt eine am Körper unzulässige Stärke weg und behält die Organisation', () => {
@@ -275,13 +277,15 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
   });
 
   it('zeichnet ärztliche Versorgung am Kfz auf dem Radpaar (NEF, F.2.4)', () => {
-    expect(
-      wirksam({
-        grundzeichen: 'kraftfahrzeug-landgebunden',
-        organisation: 'hilfsorganisation',
-        fachaufgabe: 'aerztliche-versorgung',
-      }),
-    ).toEqual({
+    // Seit core 4.0 ginge die Arztmarke auch abgeleitet auf der Kfz-Kategorie; die vermessene
+    // Radpaar-Fassung derselben Stufe geht vor.
+    const tz: TzProps = {
+      grundzeichen: 'kraftfahrzeug-landgebunden',
+      organisation: 'hilfsorganisation',
+      fachaufgabe: 'aerztliche-versorgung',
+    };
+    expect(fachobjektZeichen(tz)!.drawing.derivations ?? []).toHaveLength(0);
+    expect(wirksam(tz)).toEqual({
       kind: 'vehicle-land',
       bodyVariant: 'plain-wheel-pair',
       organization: 'hilfsorganisation',
@@ -289,7 +293,9 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
     });
   });
 
-  it('behält bei nicht darstellbarer Versorgungsmarke wenigstens das Fußband', () => {
+  it('zeichnet die Versorgungsmarke am Fußband des Kfz abgeleitet, statt sie aufzugeben', () => {
+    // Bis core 3.0 blieb hier nur das Fußband; die Stufe „Fußband allein“ greift jetzt erst, wenn
+    // auch die abgeleitete Marke nicht komponiert.
     expect(
       wirksam({
         grundzeichen: 'kraftfahrzeug-landgebunden',
@@ -301,6 +307,7 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
       vehicleCategory: 'kfz-kategorie-1',
       bodyVariant: 'foot-band',
       organization: 'feuerwehr',
+      bodyMarks: ['catering'],
     });
   });
 
@@ -314,11 +321,11 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
     ).toMatchObject({ bodyMarks: ['transport'] });
   });
 
-  it('fällt bis auf den Körper allein zurück, wenn auch die Füllung nicht passt', () => {
-    // Das Ereignis nimmt keine Füllung: erst „Körper allein“ zeichnet.
-    expect(wirksam({ grundzeichen: 'anlass', farbe: AUSMASS_FARBE.katastrophal })).toEqual({
-      kind: 'event',
-    });
+  it('zeichnet die Füllung am Ereignis abgeleitet, statt auf den Körper allein zu fallen', () => {
+    // Bis core 3.0 nahm das Ereignis keine Füllung; seit 4.0 konstruiert der Motor sie.
+    const tz: TzProps = { grundzeichen: 'anlass', farbe: AUSMASS_FARBE.katastrophal };
+    expect(wirksam(tz)).toEqual({ kind: 'event', technicalFill: 'rot' });
+    expect(fachobjektZeichen(tz)!.drawing.derivations).not.toHaveLength(0);
   });
 
   it('liefert für ein unbekanntes Grundzeichen null statt zu werfen', () => {
@@ -334,9 +341,10 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
 });
 
 // Drift-Wache: welche Fachaufgaben des Hub-Vokabulars die Bibliothek am Körper NICHT zeichnet
-// (Rückfall ohne Fachaufgabe). Ändert ein Update von @einsatzzeichen die Komponierbarkeit, wird das
-// hier in BEIDE Richtungen rot — ein stiller Verlust genauso wie ein neu darstellbares Paar, das
-// dann in design.md D2 und die Abbildungspins gehört (Stand core 3.0.0, 29.09.2026).
+// (Rückfall ohne Fachaufgabe) und welche sie nur ABGELEITET zeichnet. Ändert ein Update von
+// @einsatzzeichen die Komponierbarkeit oder die Vermessung, wird das hier in BEIDE Richtungen rot —
+// ein stiller Verlust genauso wie ein neu vermessenes Paar, das dann in design.md D2 und die
+// Abbildungspins gehört (Stand core 4.1.0, 05.10.2026).
 describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
   const ALLE_FACHAUFGABEN = [
     'brandbekaempfung',
@@ -388,15 +396,32 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
       const marken = (s.bodyMarks ?? []).filter((m) => !m.startsWith('formation-'));
       return !s.capabilities && marken.length === 0 && s.bodyVariant === undefined;
     });
+  const abgeleitet = (basis: TzProps) =>
+    ALLE_FACHAUFGABEN.filter(
+      (fachaufgabe) =>
+        (fachobjektZeichen({ ...basis, fachaufgabe } as TzProps)!.drawing.derivations ?? [])
+          .length > 0,
+    );
+  const FORMATION: TzProps = {
+    grundzeichen: 'taktische-formation',
+    organisation: 'feuerwehr',
+    einheit: 'gruppe',
+  };
+  const KFZ: TzProps = { grundzeichen: 'kraftfahrzeug-landgebunden', organisation: 'feuerwehr' };
 
+  // `fuehrung` fehlt in FAEHIGKEIT mit Absicht (s. dort); sonst zeichnet core 4.x jede Fachaufgabe.
   it('an der Formation (Feuerwehr, Gruppe)', () => {
-    expect(
-      ohneFachaufgabe({
-        grundzeichen: 'taktische-formation',
-        organisation: 'feuerwehr',
-        einheit: 'gruppe',
-      }),
-    ).toEqual([
+    expect(ohneFachaufgabe(FORMATION)).toEqual(['fuehrung']);
+  });
+
+  it('am Kraftfahrzeug (Feuerwehr)', () => {
+    expect(ohneFachaufgabe(KFZ)).toEqual(['fuehrung']);
+  });
+
+  // Genau die Paare, die bis core 3.0 fehlten (und am Kfz die Versorgungsmarken am Fußband): das
+  // Vermessene bleibt vermessen, nur die Lücken sind abgeleitet.
+  it('abgeleitet an der Formation (Feuerwehr, Gruppe)', () => {
+    expect(abgeleitet(FORMATION)).toEqual([
       'hoehenrettung',
       'heben',
       'entschaerfen',
@@ -406,15 +431,12 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
       'umweltschaeden-gewaesser',
       'krankenhaus',
       'seelsorge',
-      'fuehrung',
       'pumpen',
     ]);
   });
 
-  it('am Kraftfahrzeug (Feuerwehr)', () => {
-    expect(
-      ohneFachaufgabe({ grundzeichen: 'kraftfahrzeug-landgebunden', organisation: 'feuerwehr' }),
-    ).toEqual([
+  it('abgeleitet am Kraftfahrzeug (Feuerwehr)', () => {
+    expect(abgeleitet(KFZ)).toEqual([
       'bergung',
       'raeumen',
       'entschaerfen',
@@ -425,10 +447,12 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
       'einsatzeinheit',
       'seelsorge',
       'unterbringung',
+      'verpflegung',
+      'verbrauchsgueter',
       'versorgung-trinkwasser',
       'versorgung-brauchwasser',
+      'versorgung-elektrizitaet',
       'instandhaltung',
-      'fuehrung',
       'iuk',
       'erkundung',
       'veterinaerwesen',
@@ -441,3 +465,4 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
     ]);
   });
 });
+
