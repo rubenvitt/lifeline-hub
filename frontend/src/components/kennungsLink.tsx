@@ -23,12 +23,32 @@ export function kennungsLinkStil(token: { controlHeight: number }): CSSPropertie
   return { display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight };
 }
 
+interface KennungsLinkProps extends LinkProps {
+  /**
+   * Kleine Steuerhöhe (`controlHeightSM`, 24 / 48 / 72) statt `controlHeight`: für Knoten eines
+   * antd-`Tree`, dessen Zeile `titleHeight` = `controlHeightSM` trägt. Mit dem großen Boden stünde
+   * der Knoten in `kompakt` 30 px hoch und der Klapppfeil über der Textmitte.
+   */
+  klein?: boolean;
+}
+
 /**
  * Ein `<Link>` mit dem Boden aus {@link kennungsLinkStil}. Liest das Token selbst, damit
  * Spalten-`render` und Hilfsfunktionen ohne eigenes `useToken` auskommen. Ein übergebener
  * `style` legt sich darüber (Schrift, Farbe), den Boden überschreibt er nur ausdrücklich.
+ *
+ * Der Inhalt steht in EINER Hülle: als Flex-Kind wäre ein `Tag` blockifiziert und erbte die
+ * Hover-Unterstreichung des Links (CSS Text Decoration 3); in der Hülle bleibt er ein atomares
+ * Inline-Element, an das keine Unterstreichung weitergereicht wird.
  */
-export function KennungsLink({ style, ...rest }: LinkProps) {
+export function KennungsLink({ style, klein, children, ...rest }: KennungsLinkProps) {
   const { token } = theme.useToken();
-  return <Link {...rest} style={{ ...kennungsLinkStil(token), ...style }} />;
+  const boden = kennungsLinkStil({
+    controlHeight: klein ? token.controlHeightSM : token.controlHeight,
+  });
+  return (
+    <Link {...rest} style={{ ...boden, ...style }}>
+      <span>{children}</span>
+    </Link>
+  );
 }

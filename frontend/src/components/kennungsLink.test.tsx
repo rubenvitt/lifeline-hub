@@ -44,11 +44,11 @@ describe('kennungsLinkStil', () => {
  * nicht unter `renderMitProviders`: dessen nacktes `ConfigProvider` liefert nur antd-Vorgaben.
  */
 describe('KennungsLink', () => {
-  function linkStil(dichte: Dichte, style?: CSSProperties) {
+  function linkStil(dichte: Dichte, style?: CSSProperties, klein?: boolean) {
     const { unmount } = render(
       <ConfigProvider theme={{ token: antdToken(farbenHell, dichte) }}>
         <MemoryRouter>
-          <KennungsLink to="/ziel" style={style}>
+          <KennungsLink to="/ziel" style={style} klein={klein}>
             Florian 1
           </KennungsLink>
         </MemoryRouter>
@@ -64,6 +64,31 @@ describe('KennungsLink', () => {
   it('trägt den Boden der Stufe: 30 in kompakt, 72 im Handschuh', () => {
     expect(linkStil('kompakt').minHeight).toBe('30px');
     expect(linkStil('handschuh').minHeight).toBe('72px');
+  });
+
+  it('trägt im Baum (`klein`) die kleine Steuerhöhe: 24 in kompakt, 72 im Handschuh', () => {
+    expect(linkStil('kompakt', undefined, true).minHeight).toBe('24px');
+    expect(linkStil('handschuh', undefined, true).minHeight).toBe('72px');
+  });
+
+  /**
+   * Als Flex-Kind wäre ein `Tag` blockifiziert und erbte die Hover-Unterstreichung des Links. In
+   * der Hülle bleibt er ein atomares Inline-Element, das keine Unterstreichung erbt.
+   */
+  it('hüllt den Inhalt in genau ein Flex-Kind', () => {
+    render(
+      <ConfigProvider theme={{ token: antdToken(farbenHell, 'handschuh') }}>
+        <MemoryRouter>
+          <KennungsLink to="/ziel">
+            <span data-testid="marke">R-0001</span>
+          </KennungsLink>
+        </MemoryRouter>
+      </ConfigProvider>,
+    );
+    const link = screen.getByRole('link', { name: 'R-0001' });
+    expect(link.children).toHaveLength(1);
+    expect(link.firstElementChild).not.toBe(screen.getByTestId('marke'));
+    expect(link.firstElementChild?.contains(screen.getByTestId('marke'))).toBe(true);
   });
 
   it('legt einen übergebenen Stil darüber, ohne den Boden zu verlieren', () => {

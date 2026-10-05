@@ -68,7 +68,9 @@ function baueBaum(einheiten: Einheit[], einsatzId: number, sekundaerFarbe: strin
       key: e.id,
       title: (
         <Space size={4}>
-          <KennungsLink to={einheitDetailPfad(einsatzId, e.id)}>{e.name}</KennungsLink>
+          <KennungsLink to={einheitDetailPfad(einsatzId, e.id)} klein>
+            {e.name}
+          </KennungsLink>
           {e.typ_label && <Tag>{e.typ_label}</Tag>}
           {/* Stärke als Mono-Zahl, nicht als blaues Etikett: Blau ist `bedien`, eine Stärke ist
               eine Angabe. */}
