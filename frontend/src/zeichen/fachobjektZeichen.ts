@@ -35,7 +35,10 @@ import {
 import { AUSMASS_FARBE, type TzProps } from '../pages/lagekarte/taktischesZeichen';
 
 export interface FachobjektZeichen {
-  /** Die wirksame Spec — die erste Fassung der Kaskade, die tatsächlich komponiert. */
+  /**
+   * Die wirksame Spec: aus der ersten Stufe der Kaskade, die komponiert, die erste vermessene
+   * Fassung, sonst die erste abgeleitete.
+   */
   spec: SymbolSpec;
   drawing: Drawing;
   /** Karten-Bildschlüssel: `ez|` + kanonische Serialisierung der wirksamen Spec. */
@@ -46,8 +49,9 @@ type Teil = Partial<SymbolSpec>;
 type Koerpermarke = CapabilityId | TechnicalBodyMarkId;
 
 // Grundzeichen des Hubs → Körper. `befehlsstelle` (Abschnitt) ist neutral in „Führung und
-// Leitung“, ohne functionRole mit eingebackenem Kürzel. `stelle` ist nur als circle-12 der
-// Hilfsorganisation mit Fachaufgabe darstellbar (F.3; Lücke LFH-829). `zweirad` hat keinen Körper
+// Leitung“, ohne functionRole mit eingebackenem Kürzel. `stelle` ist circle-12 der
+// Hilfsorganisation mit Fachaufgabe (F.3; Lücke LFH-829); seit core 4.0 füllt jede Organisation
+// den Kreis, die Stellen des Hubs bleiben bewusst Hilfsorganisation. `zweirad` hat keinen Körper
 // (LFH-831) und wird Landfahrzeug. `organisation` hier überstimmt die gespeicherte.
 const KOERPER: Record<string, Teil> = {
   'taktische-formation': { kind: 'formation' },

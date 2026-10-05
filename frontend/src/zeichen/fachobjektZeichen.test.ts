@@ -58,8 +58,8 @@ const FAELLE: Array<[string, TzProps, SymbolSpec]> = [
     },
   ],
   [
-    // Seit @einsatzzeichen 3.0.0 randbündig (vermessene Körperfassung C.1.4); die Box lehnt die
-    // Bibliothek dort ab (`capabilities-pictogram-has-measured-rendition`).
+    // Seit @einsatzzeichen 3.0.0 randbündig (vermessene Körperfassung C.1.4). Seit 4.0 zeichnet
+    // auch die Box dort dieselbe Fassung; randbündig steht in der Stufe zuerst.
     'Einheit THW mit Technischer Hilfe (randbündig, C.1.4)',
     baueTzProps({
       objekttyp: 'einheit',
@@ -465,4 +465,3 @@ describe('fachobjektZeichen — Abdeckung der Fachaufgaben je Körper', () => {
     ]);
   });
 });
-
