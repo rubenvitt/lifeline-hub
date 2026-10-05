@@ -732,8 +732,11 @@ describe('useEinsatzLiveStream', () => {
     });
     expect(FakeEventSource.instanzen).toHaveLength(1);
 
-    // Ein von Hand gesetzter Kopf belegt keinen Zugriff.
+    // Ein von Hand gesetzter Kopf belegt keinen Zugriff, ein anderer Key und ein anderer
+    // Einsatz auch nicht.
     client.setQueryData(['einsatz', 1], { id: 1 });
+    await client.fetchQuery({ queryKey: ['einsatz-material', 1], queryFn: () => [] });
+    await client.fetchQuery({ queryKey: ['einsatz', 2], queryFn: () => ({ id: 2 }) });
     expect(FakeEventSource.instanzen).toHaveLength(1);
 
     // „Wiederholen" in der Sackgasse lädt den Kopf jetzt erfolgreich: Zugriff wieder gewährt.
@@ -756,6 +759,20 @@ describe('useEinsatzLiveStream', () => {
     expect(neue.closed).toBe(true);
     expect(status[status.length - 1]).toBe('idle');
     window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('baut bei gesunder Verbindung auf einen geladenen Einsatzkopf keine zweite auf (LFH-910)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte!.emit('open');
+    await client.fetchQuery({ queryKey: ['einsatz', 1], queryFn: () => ({ id: 1 }) });
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    expect(FakeEventSource.letzte!.closed).toBe(false);
   });
 
   it('nimmt nach dem Unmount im Endzustand keinen Neustart mehr vor (LFH-910)', async () => {
