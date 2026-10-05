@@ -52,7 +52,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   und Schäden gelangen nur als Zählung in `verdichtung.ts`; die Darstellung bildet nur deren
   Objekt ab.
 - **Blöcke wählbar** (LFH-902, `druck/einsatzbericht/auswahl.ts`,
-  `openspec/changes/lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`): Positivliste
+  `openspec/changes/archive/2026-10-05-lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`): Positivliste
   `?bloecke=` über `einsatzberichtPfad`/`parseBerichtAuswahl`, ohne Parameter der Standardumfang
   (die sieben Blöcke aus LFH-726), Unbekanntes fällt weg. Weiche, Abruf und Verdichtung nur für
   gewählte Blöcke (`nicht-gewaehlt`), die Auswahl steht im Schnappschuss-Key und als „Umfang“ im

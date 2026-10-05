@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { useMemo } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Typography } from 'antd';
 import { ApiError } from '../api/client';
@@ -12,17 +12,12 @@ import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import Auswahlleiste from '../druck/einsatzbericht/Auswahlleiste';
 import Bloecke from '../druck/einsatzbericht/Bloecke';
-import {
-  AUSWAHL_PARAM,
-  auswahlParam,
-  auswahlSchluessel,
-  umfangZeilen,
-  type BlockSchluessel,
-} from '../druck/einsatzbericht/auswahl';
+import { auswahlSchluessel, umfangZeilen } from '../druck/einsatzbericht/auswahl';
+import { useBerichtAuswahl } from '../druck/einsatzbericht/useBerichtAuswahl';
 import { berichtZustand, ladeEinsatzbericht } from '../druck/einsatzbericht/abruf';
 import { berichtFreigabe } from '../druck/einsatzbericht/quellen';
 import { verdichteEinsatzbericht } from '../druck/einsatzbericht/verdichtung';
-import { einsatzdatenPfad, parseBerichtAuswahl } from '../routing/deeplinks';
+import { einsatzdatenPfad } from '../routing/deeplinks';
 
 /**
  * Druckansicht des Einsatzberichts (LFH-726, `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/`): der
@@ -38,7 +33,8 @@ import { einsatzdatenPfad, parseBerichtAuswahl } from '../routing/deeplinks';
  * Schnappschuss wie der ETB-Druck: `einsatzKeys.einsatzberichtDruck` ist nicht live, „Neu laden“
  * holt einen neuen Stand. Route unter den Einsatzdaten (nie ausgeblendet, nie gesperrt).
  *
- * Blöcke wählbar (LFH-902, `openspec/changes/lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`):
+ * Blöcke wählbar (LFH-902,
+ * `openspec/changes/archive/2026-10-05-lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`):
  * die Auswahl steht in `?bloecke=`, Weiche und Abruf gelten nur für die gewählten Blöcke, der
  * Druckkopf nennt den Umfang. Die Auswahlleiste bleibt auch in der Sackgasse stehen — dort ist das
  * Abwählen des gesperrten Blocks der Ausweg.
@@ -48,23 +44,7 @@ export default function EinsatzberichtDruckPage() {
   const einsatzId = Number(id);
   const navigate = useNavigate();
   const { konventionen } = useAnzeigeKonventionen();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const auswahl = useMemo(() => parseBerichtAuswahl(searchParams), [searchParams]);
-  // `replace`: der Zurück-Knopf des Browsers springt nicht durch jede Häkchenänderung.
-  const setzeAuswahl = useCallback(
-    (neu: BlockSchluessel[]) =>
-      setSearchParams(
-        (alt) => {
-          const params = new URLSearchParams(alt);
-          const wert = auswahlParam(neu);
-          if (wert) params.set(AUSWAHL_PARAM, wert);
-          else params.delete(AUSWAHL_PARAM);
-          return params;
-        },
-        { replace: true },
-      ),
-    [setSearchParams],
-  );
+  const [auswahl, setzeAuswahl] = useBerichtAuswahl();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -92,6 +72,9 @@ export default function EinsatzberichtDruckPage() {
     refetchOnReconnect: false,
     refetchOnMount: 'always',
     retry: false,
+    // Je Auswahl ein eigener Key (LFH-902): ohne `gcTime: 0` zeigte die Rückkehr zu einer früheren
+    // Auswahl deren alten Schnappschuss, denn `staleTime: Infinity` lädt beim Key-Wechsel nicht.
+    gcTime: 0,
   });
 
   const zustand = berichtQuery.data ? berichtZustand(berichtQuery.data) : null;

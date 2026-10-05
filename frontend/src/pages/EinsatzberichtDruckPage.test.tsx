@@ -79,8 +79,10 @@ function Adresse() {
   return <output data-testid="adresse">{search}</output>;
 }
 
-function rendere(query = '') {
+function rendere(query = '', { gcTime }: { gcTime?: number } = {}) {
   const client = neuerQueryClient();
+  // Die Testvorgabe `gcTime: 0` verdeckte, ob die Seite einen alten Schnappschuss behält.
+  if (gcTime != null) client.setDefaultOptions({ queries: { retry: false, gcTime } });
   client.setQueryData(einsatzKeys.einstellungen(E), {
     einsatz_id: E,
     zeitzone: 'Europe/Berlin',
@@ -345,6 +347,20 @@ describe('EinsatzberichtDruckPage – Auswahl der Blöcke (LFH-902)', () => {
     expect(kopf()).not.toHaveTextContent('kosten');
     expect(aufrufe.get('/personen')).toBeUndefined();
     expect(aufrufe.get('/lageberichte')).toBeUndefined();
+  });
+
+  it('eine frühere Auswahl lädt neu, statt einen alten Schnappschuss zu zeigen', async () => {
+    const aufrufe = quellen();
+    rendere('', { gcTime: 5 * 60_000 });
+    await fertig();
+    expect(aufrufe.get('/personen')).toBe(1);
+    const bilanz = () => within(auswahlleiste()).getByRole('checkbox', { name: 'Bilanz' });
+    await userEvent.click(bilanz());
+    await waitFor(() => expect(blockTitel()).not.toContain('Bilanz'));
+    await userEvent.click(bilanz());
+    await waitFor(() => expect(blockTitel()).toContain('Bilanz'));
+    await fertig();
+    expect(aufrufe.get('/personen')).toBe(2);
   });
 
   it('der letzte gewählte Block lässt sich nicht abwählen', async () => {

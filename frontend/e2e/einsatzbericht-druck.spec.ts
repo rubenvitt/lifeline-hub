@@ -269,13 +269,8 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht Auswahl ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const kraft = await sende(page, 'POST', `${basis}/personal`, {
-    adhoc: { name: 'Hanna Helferin' },
-  });
-  await sende(page, 'POST', `${basis}/personal/${kraft.id}/zeitachse`, {
-    art: 'alarmierung',
-    zeitpunkt_at: vorEinerStunde(),
-  });
+  // Die Disposition setzt die Alarmierung selbst: die Kraft hat damit eine offene Periode.
+  await sende(page, 'POST', `${basis}/personal`, { adhoc: { name: 'Hanna Helferin' } });
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/einsatzdaten/bericht`);
@@ -307,7 +302,7 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
   await expect(kopf).toContainText('enthält Namen von Einsatzkräften');
   const anlage = page.locator('[data-lfh="einsatzbericht-block-personal-kopf"]');
   await expect(anlage).toContainText('Hanna Helferin');
-  // Eine Stunde seit der Alarmierung, noch im Einsatz.
+  // Seit der Disposition im Einsatz.
   await expect(anlage).toContainText('läuft');
 
   // ── Die Auswahl steht in der Adresse und übersteht ein Neuladen.
@@ -332,8 +327,10 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
   });
   await drucken.click();
   await page.emulateMedia({ media: 'print' });
+  // Im Druck ist die Leiste aus dem Zugänglichkeitsbaum: `includeHidden`.
+  const leisteImDruck = page.getByRole('region', { name: 'Blöcke', includeHidden: true });
   expect(
-    await leiste.evaluate((el) => el.getClientRects().length),
+    await leisteImDruck.evaluate((el) => el.getClientRects().length),
     'Auswahlleiste im Druck ohne Box',
   ).toBe(0);
   await expect(wurzel).toBeVisible();

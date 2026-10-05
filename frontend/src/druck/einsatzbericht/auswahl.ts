@@ -1,6 +1,6 @@
 /**
- * Blöcke des Einsatzberichts und ihre Auswahl (LFH-902,
- * `openspec/changes/lfh-902-einsatzbericht-bloecke-auswaehlen/design.md` D1, D2, D4).
+ * Blöcke des Einsatzberichts und ihre Auswahl (LFH-902, D1, D2, D4 in
+ * `openspec/changes/archive/2026-10-05-lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`).
  *
  * Ohne Abhängigkeiten, damit `routing/deeplinks.ts` die Auswahl lesen kann, ohne die Quellen
  * samt Modul-Registry zu laden.

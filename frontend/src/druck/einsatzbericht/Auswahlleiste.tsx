@@ -32,13 +32,7 @@ export default function Auswahlleiste({
             checked={gewaehlt}
             disabled={gewaehlt && auswahl.length === 1}
             onChange={(e) => umschalten(b.schluessel, e.target.checked)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              minHeight: token.controlHeight,
-              marginInlineStart: 0,
-              paddingInline: token.paddingXS,
-            }}
+            style={haekchenStil(token)}
           >
             {b.titel}
             {b.schluessel === 'personal-kopf' && (
@@ -81,14 +75,41 @@ export default function Auswahlleiste({
   );
 }
 
+/**
+ * Ein Häkchen samt Beschriftung ist EIN Bedienziel (`frontend/AGENTS.md`, „Handgebautes
+ * Bedienziel“, LFH-365): Höhe aus `controlHeight`, Polsterung aus `paddingSM`/`padding`; antds
+ * Randabstand zwischen Häkchen entfällt, den Abstand trägt {@link zielAbstand}.
+ */
+export function haekchenStil(token: { controlHeight: number; paddingSM: number; padding: number }) {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    minHeight: token.controlHeight,
+    padding: `${token.paddingSM}px ${token.padding}px`,
+    marginInlineStart: 0,
+  } as const;
+}
+
+/**
+ * Abstand zwischen zwei Häkchen, in beiden Richtungen (Bedien-Leitlinie Kriterium 2, wie
+ * `components/instrument/zielEinzug.ts`): `komfortabel` ≥ 8 px, `handschuh` ≥ 16 px; `kompakt`
+ * (Fükw, Maus) hat die Spacing-Ausnahme. Literale, damit die Böden prüfbar bleiben.
+ */
+export function zielAbstand(token: { controlHeight: number }): number {
+  if (token.controlHeight >= 72) return 16;
+  if (token.controlHeight >= 48) return 8;
+  return 4;
+}
+
 function Gruppe({ titel, children }: { titel: string; children: ReactNode }) {
   const id = useId();
+  const { token } = theme.useToken();
   return (
     <div role="group" aria-labelledby={id} style={{ minWidth: 0 }}>
       <Typography.Text id={id} type="secondary">
         {titel}
       </Typography.Text>
-      <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: 4 }}>{children}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: zielAbstand(token) }}>{children}</div>
     </div>
   );
 }

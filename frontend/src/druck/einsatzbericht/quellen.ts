@@ -13,9 +13,9 @@ import { BLOECKE, STANDARDUMFANG, type BlockSchluessel } from './auswahl';
  * nichts frei (Spec `modul-freigabe`). Der Server bleibt Türsteher: ein 403 trotz `abrufen`
  * (Aufbewahrungsfrist) wertet der Abruf als „kein Zugriff“, nie als leeren Bestand.
  *
- * Geprüft und abgerufen werden nur Quellen gewählter Blöcke (LFH-902,
- * `openspec/changes/lfh-902-einsatzbericht-bloecke-auswaehlen/design.md` D3): „vollständig oder gar
- * nicht“ gilt für die gewählte Menge.
+ * Geprüft und abgerufen werden nur Quellen gewählter Blöcke (LFH-902, D3 in
+ * `openspec/changes/archive/2026-10-05-lfh-902-einsatzbericht-bloecke-auswaehlen/design.md`):
+ * „vollständig oder gar nicht“ gilt für die gewählte Menge.
  */
 
 export { BLOECKE, type BlockSchluessel } from './auswahl';
