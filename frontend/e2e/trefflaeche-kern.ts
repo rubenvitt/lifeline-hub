@@ -88,6 +88,23 @@ export async function haeltStufe(ziel: Locator, soll: number, name: string): Pro
 }
 
 /**
+ * Wartet, bis eine Menge mindestens `mindestens` Knoten trägt, und liefert dann ihre Zahl.
+ * Gezählt wird wiederholt, nicht einmal (LFH-885): `stelleDichte` lädt die Seite neu, und eine
+ * Liste aus einer Query steht danach noch im Ladezustand (0 statt 9 Knöpfe). Weniger als
+ * `mindestens` bleibt bis zum Expect-Timeout rot — ein echter Leerzustand fällt weiter auf.
+ */
+export async function mindestensKnoten(
+  ziele: Locator,
+  mindestens: number,
+  name: string,
+): Promise<number> {
+  await expect
+    .poll(() => ziele.count(), { message: `${name}: mindestens ${mindestens} Knoten erwartet` })
+    .toBeGreaterThanOrEqual(mindestens);
+  return ziele.count();
+}
+
+/**
  * Höhe JEDES Knotens einer Menge. `mindestens` ist die Zahl, die das Seeding garantiert —
  * trifft der Locator weniger, misst er einen Leer- oder Ladezustand. Zurück kommt das
  * kleinste Maß für die Anmerkung am Test.
@@ -98,10 +115,7 @@ export async function alleHaltenStufe(
   name: string,
   mindestens: number,
 ): Promise<number> {
-  const anzahl = await ziele.count();
-  expect(anzahl, `${name}: mindestens ${mindestens} Knoten erwartet`).toBeGreaterThanOrEqual(
-    mindestens,
-  );
+  const anzahl = await mindestensKnoten(ziele, mindestens, name);
   let kleinstes = Number.POSITIVE_INFINITY;
   for (let i = 0; i < anzahl; i += 1) {
     const kasten = await ziele.nth(i).boundingBox();
@@ -164,10 +178,7 @@ export async function kurzeAchseHaelt(
   name: string,
   mindestens: number,
 ): Promise<{ kleinstes: number; groesstes: number }> {
-  const anzahl = await ziele.count();
-  expect(anzahl, `${name}: mindestens ${mindestens} Knoten erwartet`).toBeGreaterThanOrEqual(
-    mindestens,
-  );
+  const anzahl = await mindestensKnoten(ziele, mindestens, name);
   let kleinstes = Number.POSITIVE_INFINITY;
   let groesstes = 0;
   for (let i = 0; i < anzahl; i += 1) {
