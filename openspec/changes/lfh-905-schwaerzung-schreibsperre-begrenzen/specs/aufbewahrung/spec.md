@@ -70,9 +70,10 @@ freigeben, damit andere Schreibende höchstens so lange warten, wie das Nullen e
 dauert. Bleibt ein Anhang übrig, MUST jeder folgende Lauf ihn löschen, auch nach einem Neustart.
 
 #### Scenario: Viele Anhänge
-- **WHEN** ein Einsatz mit 20 Anhängen zu je 1 MB geschwärzt wird
+- **WHEN** ein Einsatz mit 6 Anhängen zu je 5 MB geschwärzt wird
 - **THEN** ist nach dem Purge-Lauf keiner der Anhänge mehr vorhanden
-- **AND** wächst das Write-Ahead-Log in keinem Schreibvorgang um mehr als den Umfang eines Anhangs plus Verwaltungsseiten
+- **AND** schreibt der atomare Vorgang weniger als 1 MB ins Write-Ahead-Log
+- **AND** wird das Write-Ahead-Log nie größer als zwei der Anhänge zusammen
 
 #### Scenario: Abbruch nach der atomaren Schwärzung
 - **WHEN** die atomare Schwärzung festgeschrieben ist, die Anhänge aber noch vorhanden sind, und danach ein Purge-Lauf startet

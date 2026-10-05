@@ -41,8 +41,18 @@ pub enum Strategie {
     /// JSON; das leere Array heißt „keine Abschnitte“.
     LeeresJsonArray,
     /// Die ganze Zeile wird gelöscht. Für Tabellen, deren Nutzlast selbst PII ist und die kein
-    /// Skelett tragen (`anhang`: Foto-BLOBs Betroffener); CASCADE räumt abhängige Zeilen mit.
+    /// Skelett tragen; CASCADE räumt abhängige Zeilen mit.
     ZeileLoeschen,
+    /// Die Zeile wird gelöscht, aber nicht im atomaren Vorgang (LFH-905, nur `anhang`): unter
+    /// `secure_delete = ON` nullt der Commit jedes freigewordene Byte, und alle Datei-Anhänge
+    /// eines Einsatzes in einer Transaktion hielten die Schreibsperre so lange, wie das dauert
+    /// (Pi mit SD-Karte, 500 MB: ~25 s). Der atomare Vorgang löscht deshalb nur jede
+    /// Verknüpfung (Chat-Linker und `anhang::repo::MODUL_LINKER`), damit der Anhang
+    /// unerreichbar ist; die Zeile selbst löscht `anhang::repo::entferne_vorgesehene` danach je
+    /// Anhang in einer eigenen Transaktion. Wer Anhänge auf einem anderen Weg in einer
+    /// Transaktion löscht, holt die lange Sperre zurück. Herleitung:
+    /// `openspec/changes/lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`.
+    ZeileEinzelnLoeschen,
 }
 
 /// Welcher Frist eine Scrub-Spalte folgt (LFH-749, Spec `aufbewahrung-kategorien`, design.md
@@ -573,28 +583,30 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     TabellenRegel {
         // Ganze Zeile löschen: `daten` sind Fotos/Dateien Betroffener, kein Kartografie-Skelett.
-        // CASCADE räumt die Linker chat_nachricht_anhang, einsatz_dokument, etb_eintrag_anhang,
+        // Einzeln im Nachlauf (LFH-905, `Strategie::ZeileEinzelnLoeschen`): der atomare Vorgang
+        // löscht die Linker chat_nachricht_anhang, einsatz_dokument, etb_eintrag_anhang,
         // einsatz_schaden_anhang, einsatz_tier_anhang, uhs_anhang (LFH-758) und
-        // einsatz_person_anhang (LFH-757) mit.
+        // einsatz_person_anhang (LFH-757), die Zeile selbst danach der Nachlauf.
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
         person_bezug: None,
         spalten: &[
-            scrub("id", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("dateiname", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("mime", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("groesse", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("sha256", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("daten", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("hochgeladen_von", Strategie::ZeileLoeschen, Z_ANHAENGE),
-            scrub("erstellt_at", Strategie::ZeileLoeschen, Z_ANHAENGE),
+            scrub("id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("dateiname", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("mime", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("groesse", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("sha256", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("daten", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("hochgeladen_von", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("erstellt_at", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
         // Ganze Zeile löschen wie `anhang`: der Titel ist Freitext, und die Datei ist ohnehin weg
-        // (CASCADE; `anhang` steht deshalb VOR dieser Regel). Seit LFH-752 nennen die
+        // (die `anhang`-Regel davor löscht diesen Linker schon mit, die Datei der Nachlauf,
+        // LFH-905). Seit LFH-752 nennen die
         // System-ETB-Einträge den Titel nicht mehr, nur die Kategorie und den Ablage-Eintrag
         // („Dokument abgelegt (Foto)“, „Dokument entfernt: Ablage ETB 12 (Foto)“). Ältere
         // Einträge mit Titel bleiben, ETB-Freitext ist Führungsdokumentation (G_ETB). Gepinnt in
@@ -620,8 +632,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Ganze Zeile löschen wie `anhang`: die Datei ist weg (CASCADE; `anhang` steht VOR dieser
-        // Regel), und ein Linker ohne Datei trägt nichts. Die System-ETB-Einträge nennen nur
+        // Ganze Zeile löschen wie `anhang`: die Datei ist weg (die `anhang`-Regel davor löscht den
+        // Linker schon mit, die Datei der Nachlauf, LFH-905), und ein Linker ohne Datei trägt
+        // nichts. Die System-ETB-Einträge nennen nur
         // Registriernummer und Art, nie den Dateinamen. Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_schaden_anhaenge_und_haelt_den_etb_nachweis`.
         tabelle: "einsatz_schaden_anhang",
@@ -640,9 +653,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // LFH-758, wie `einsatz_schaden_anhang`: ganze Zeile löschen, die Datei ist weg (CASCADE;
-        // `anhang` steht VOR dieser Regel). Die System-ETB-Einträge nennen nur „Tier T-007“ und
-        // die Art, nie Dateiname, Kennzeichnung oder Halter. Gepinnt in
+        // LFH-758, wie `einsatz_schaden_anhang`: ganze Zeile löschen, die Datei ist weg (die
+        // `anhang`-Regel davor löscht den Linker mit, LFH-905). Die System-ETB-Einträge nennen
+        // nur „Tier T-007“ und die Art, nie Dateiname, Kennzeichnung oder Halter. Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_tier_anhaenge_und_haelt_den_etb_nachweis`.
         tabelle: "einsatz_tier_anhang",
         scoping: Scoping::EinsatzId,
@@ -660,9 +673,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // LFH-758, wie `einsatz_schaden_anhang`: ganze Zeile löschen, die Datei ist weg (CASCADE;
-        // `anhang` steht VOR dieser Regel). Die System-ETB-Einträge nennen nur „UHS {bezeichnung}“
-        // (die Bezeichnung bleibt ohnehin, G_OP_LABEL) und die Art, nie den Dateinamen. Das
+        // LFH-758, wie `einsatz_schaden_anhang`: ganze Zeile löschen, die Datei ist weg (die
+        // `anhang`-Regel davor löscht den Linker mit, LFH-905). Die System-ETB-Einträge nennen
+        // nur „UHS {bezeichnung}“ (die Bezeichnung bleibt ohnehin, G_OP_LABEL) und die Art, nie
+        // den Dateinamen. Das
         // Lese-Audit `anhang_zugriff_audit` bleibt stehen. Gepinnt in
         // `einsatz::repo::tests::schwaerzung_loescht_uhs_anhaenge_und_haelt_etb_und_audit`.
         tabelle: "uhs_anhang",
@@ -682,9 +696,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     TabellenRegel {
         // LFH-757, Linker der Personen-Anhänge: ganze Zeile löschen wie bei
-        // einsatz_schaden_anhang — die Datei geht ohnehin per CASCADE mit (`anhang` steht vor
-        // dieser Regel), und ein Linker ohne Datei trägt nichts. Die System-ETB-Einträge nennen
-        // nur Registriernummer und Art („Person R-007: Foto abgelegt“), nie Dateinamen oder
+        // einsatz_schaden_anhang — die `anhang`-Regel davor löscht den Linker schon mit, die Datei
+        // der Nachlauf (LFH-905), und ein Linker ohne Datei trägt nichts. Die
+        // System-ETB-Einträge nennen nur Registriernummer und Art („Person R-007: Foto abgelegt“), nie Dateinamen oder
         // Namen; das Zugriffsprotokoll (person_zugriff_audit, Art `anhang`) bleibt retain. Gepinnt
         // in `einsatz::repo::tests::schwaerzung_loescht_personen_anhaenge_und_haelt_etb_und_audit`.
         tabelle: "einsatz_person_anhang",
@@ -1947,7 +1961,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Junction; `anhang` ist ZeileLoeschen, die Verknüpfung geht per CASCADE mit (belegt in
+        // Junction; die `anhang`-Regel (ZeileEinzelnLoeschen, LFH-905) löscht die Verknüpfung im
+        // atomaren Vorgang, die Datei danach der Nachlauf (belegt in
         // `repo::tests::schwaerzung_entfernt_chat_und_erinnerungs_freitexte`).
         tabelle: "chat_nachricht_anhang",
         scoping: Scoping::UeberParent {
@@ -1959,8 +1974,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[retain("nachricht_id", G_FK), retain("anhang_id", G_FK)],
     },
     TabellenRegel {
-        // Junction (Linker auf `anhang`); die Verknüpfung geht per CASCADE mit, der Eintrag bleibt
-        // (G_ETB). Der Dateiname steht in keinem ETB-Text. Belegt in
+        // Junction (Linker auf `anhang`); die `anhang`-Regel (ZeileEinzelnLoeschen, LFH-905) löscht
+        // die Verknüpfung im atomaren Vorgang, der Eintrag bleibt (G_ETB). Der Dateiname steht in
+        // keinem ETB-Text. Belegt in
         // `einsatz::repo::tests::schwaerzung_loescht_etb_anhang_und_haelt_den_eintrag`.
         tabelle: "etb_eintrag_anhang",
         scoping: Scoping::UeberParent {
@@ -2280,7 +2296,9 @@ pub(super) fn set_zuweisungen(scrubs: &[(&'static str, Strategie)]) -> (Vec<Stri
                 platzhalter_binds += 1;
             }
             Strategie::LeeresJsonArray => sets.push(format!("{spalte} = '[]'")),
-            Strategie::ZeileLoeschen => unreachable!("ZeileLoeschen ist kein Spalten-Scrub"),
+            Strategie::ZeileLoeschen | Strategie::ZeileEinzelnLoeschen => {
+                unreachable!("ZeileLoeschen ist kein Spalten-Scrub")
+            }
         }
     }
     (sets, platzhalter_binds)
@@ -2375,6 +2393,35 @@ pub async fn scrubbe_aus_registry(
                 "{where_teil} AND {bezug} NOT IN ({})",
                 behandlungsbezug_sql()
             );
+        }
+
+        // Einzeln im Nachlauf (LFH-905): hier nur jede Verknüpfung, die Zeile bleibt für
+        // `anhang::repo::entferne_vorgesehene` stehen.
+        if scrubs
+            .iter()
+            .any(|(_, s)| *s == Strategie::ZeileEinzelnLoeschen)
+        {
+            debug_assert!(
+                regel.tabelle == "anhang"
+                    && scrubs
+                        .iter()
+                        .all(|(_, s)| *s == Strategie::ZeileEinzelnLoeschen),
+                "ZeileEinzelnLoeschen gilt nur für anhang und dort für ALLE Scrub-Spalten"
+            );
+            let linker = std::iter::once(crate::anhang::repo::CHAT_LINKER)
+                .chain(crate::anhang::repo::MODUL_LINKER.iter().map(|l| l.tabelle));
+            for tabelle in linker {
+                let sql = format!(
+                    "DELETE FROM {tabelle} WHERE anhang_id IN \
+                     (SELECT id FROM {} WHERE {where_teil})",
+                    regel.tabelle
+                );
+                sqlx::query(sqlx::AssertSqlSafe(sql))
+                    .bind(einsatz_id)
+                    .execute(&mut *conn)
+                    .await?;
+            }
+            continue;
         }
 
         // ZeileLoeschen muss für alle Scrub-Spalten der Tabelle gelten, sonst mischte die Registry
@@ -2891,7 +2938,10 @@ mod tests {
                 let Klassifikation::Scrub(strategie, zuordnung) = s.klassifikation else {
                     continue;
                 };
-                hat_loeschen |= strategie == Strategie::ZeileLoeschen;
+                hat_loeschen |= matches!(
+                    strategie,
+                    Strategie::ZeileLoeschen | Strategie::ZeileEinzelnLoeschen
+                );
                 zuordnungen.insert(format!("{zuordnung:?}"));
                 let schluessel = match zuordnung {
                     Zuordnung::Einsatz => continue,
@@ -3047,26 +3097,40 @@ mod tests {
         );
     }
 
-    /// `ZeileLoeschen` gilt (wenn überhaupt) für ALLE Scrub-Spalten einer Tabelle.
+    /// `ZeileLoeschen` und `ZeileEinzelnLoeschen` gelten (wenn überhaupt) für ALLE
+    /// Scrub-Spalten einer Tabelle; `ZeileEinzelnLoeschen` nur für `anhang`, denn nur dort
+    /// kennt der atomare Vorgang die Linker (LFH-905).
     #[test]
     fn zeile_loeschen_ist_kohaerent() {
-        for regel in TABELLEN {
-            let hat_loeschen = regel.spalten.iter().any(|s| {
-                matches!(
-                    s.klassifikation,
-                    Klassifikation::Scrub(Strategie::ZeileLoeschen, _)
-                )
-            });
-            if hat_loeschen {
-                assert!(
-                    regel.spalten.iter().all(|s| matches!(
-                        s.klassifikation,
-                        Klassifikation::Scrub(Strategie::ZeileLoeschen, _)
-                    )),
-                    "Tabelle {} mischt ZeileLoeschen mit anderen Strategien",
-                    regel.tabelle
+        for strategie in [Strategie::ZeileLoeschen, Strategie::ZeileEinzelnLoeschen] {
+            for regel in TABELLEN {
+                let hat = regel.spalten.iter().any(
+                    |s| matches!(s.klassifikation, Klassifikation::Scrub(st, _) if st == strategie),
                 );
+                if hat {
+                    assert!(
+                        regel.spalten.iter().all(|s| matches!(
+                            s.klassifikation,
+                            Klassifikation::Scrub(st, _) if st == strategie
+                        )),
+                        "Tabelle {} mischt {strategie:?} mit anderen Strategien",
+                        regel.tabelle
+                    );
+                }
             }
         }
+        let einzeln: Vec<&str> = TABELLEN
+            .iter()
+            .filter(|r| {
+                r.spalten.iter().any(|s| {
+                    matches!(
+                        s.klassifikation,
+                        Klassifikation::Scrub(Strategie::ZeileEinzelnLoeschen, _)
+                    )
+                })
+            })
+            .map(|r| r.tabelle)
+            .collect();
+        assert_eq!(einzeln, vec!["anhang"]);
     }
 }

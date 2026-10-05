@@ -73,7 +73,7 @@ Nachlauf, je Anhang eine Transaktion (`write_retry!`, `DELETE FROM anhang WHERE 
 Die Schwärzung löscht in ihrem Vorgang **jede Verknüpfung** der betroffenen Anhänge: den
 Chat-Linker und alle Tabellen aus `anhang::repo::MODUL_LINKER` (darunter `etb_eintrag_anhang`).
 Die Zeile `anhang` selbst bleibt bis zum Nachlauf stehen. Dazu bekommt die Registry eine
-Strategie `ZeileLoeschenEinzeln` für `anhang`: `scrubbe_aus_registry` löscht für sie die
+Strategie `ZeileEinzelnLoeschen` für `anhang`: `scrubbe_aus_registry` löscht für sie die
 Linker-Zeilen statt der Zeile, der Guard-Test der Registry bleibt vollständig. Ein Linker, der
 neu ins Register kommt, ist damit automatisch erfasst.
 
@@ -115,26 +115,49 @@ sperren; der TRUNCATE-Rückschrieb am Ende findet nur noch den Rest vor.
 ### 5. Beleg ohne Uhr: WAL-Wachstum je Transaktion
 
 Ein Test misst nicht Zeit, sondern Bytes: Nach der atomaren Schwärzung eines Einsatzes mit
-20 × 1 MB Anhängen ist der WAL kleiner als ein Anhang; nach dem Nachlauf ist er höchstens so
-groß wie ein Anhang plus Verwaltungsseiten (der automatische Checkpoint setzt ihn zwischen den
-Anhängen zurück). Das ist hardwareunabhängig und überträgt sich über die Schreibrate auf den Pi.
+6 × 5 MB Anhängen ist der WAL kleiner als 1 MB; nach dem Nachlauf ist er kleiner als zwei
+Anhänge (der automatische Checkpoint setzt ihn zwischen den Anhängen zurück). 5 MB liegen über
+seiner Schwelle von 1000 Seiten (≈ 4 MB), damit er nach jedem Anhang greift; mit 1-MB-Anhängen
+stünde der WAL bis zur Schwelle und unterschiede einen Nachlauf nicht von wenigen großen
+Transaktionen. Das ist hardwareunabhängig und überträgt sich über die Schreibrate auf den Pi.
 
 ### 6. Messung
 
 `secure_delete_messung` (`src/db/physisch.rs`) bekommt einen dritten Modus `ON-einzeln`:
 atomarer Scrub ohne Anhänge, dann ein `DELETE` je Anhang, und gibt neben der Summe die längste
-einzelne Transaktion aus. Gemessen wird im Container und auf dem Pi mit SD-Karte und mit SSD
-(`cargo test --release --lib secure_delete_messung -- --ignored --nocapture`,
-`LFH725_MB=50,200,500`). Die Werte stehen hier unter „Messung“, sobald sie vorliegen.
+einzelne Transaktion aus. Dazu schreibt während Schwärzung und Rückschrieb eine zweite
+Verbindung fortlaufend kurze Transaktionen wie ein laufender Einsatz; ihre längste Wartezeit
+(`warten max`) ist genau die Größe, um die es geht. Der Pool läuft dafür wie in Produktion mit
+dem automatischen Checkpoint (LFH-725 maß ohne, um die WAL-Summe zu zeigen); `WAL` ist deshalb
+der höchste Stand der Datei. Gemessen wird im Container und auf dem Pi mit SD-Karte und mit SSD
+(`LFH725_MB=50,200,500 cargo test --release --lib secure_delete_messung -- --ignored
+--nocapture`).
 
 ## Messung
 
-| Umgebung | Anhänge | Schwärzung ON (eine Tx) | ON-einzeln: längste Tx / Summe | Rückschrieb |
-| --- | --- | --- | --- | --- |
-| Container (LFH-725) | 500 MB | 1,47 s | – | 1,21 s |
-| Container | 50 / 200 / 500 MB | offen | offen | offen |
-| Pi, SD-Karte | 50 / 200 / 500 MB | offen | offen | offen |
-| Pi, SSD | 50 / 200 / 500 MB | offen | offen | offen |
+**Container** (Release-Build, 4 Xeon-Kerne à 2,1 GHz, Cloud-Platte, 05.10.2026). `warten max`
+ist die längste Wartezeit des nebenher Schreibenden, `WAL` der höchste Stand der Datei.
+
+| Anhänge | Modus | Schwärzung gesamt | längste Tx | WAL | Rückschrieb | warten max |
+| --- | --- | --- | --- | --- | --- | --- |
+| 50 MB | OFF | 0,03 s | 0,03 s | 0,5 MB | 0,00 s | 0,02 s |
+| 50 MB | ON | 0,22 s | 0,22 s | 50,8 MB | 0,13 s | 0,19 s |
+| 50 MB | ON-einzeln | 0,39 s | 0,02 s | 6,2 MB | 0,02 s | 0,04 s |
+| 200 MB | OFF | 0,11 s | 0,11 s | 0,6 MB | 0,04 s | 0,12 s |
+| 200 MB | ON | 0,92 s | 0,92 s | 201,9 MB | 0,48 s | 0,83 s |
+| 200 MB | ON-einzeln | 1,63 s | 0,03 s | 7,2 MB | 0,01 s | 0,04 s |
+| 500 MB | OFF | 0,22 s | 0,22 s | 0,9 MB | 0,01 s | 0,23 s |
+| 500 MB | ON | 2,22 s | 2,22 s | 504,2 MB | 1,12 s | 1,74 s |
+| 500 MB | ON-einzeln | 3,96 s | 0,04 s | 7,2 MB | 0,01 s | 0,08 s |
+
+Einordnung: Der Nachlauf braucht insgesamt etwas länger (je Anhang ein Commit mit `fsync`), die
+Wartezeit eines anderen Schreibenden fällt aber von „wächst mit der Anhangsmenge“ (1,74 s bei
+500 MB) auf „ein Anhang“ (0,08 s) und hängt nicht mehr von der Menge ab. Der WAL bleibt bei
+gut 7 MB, der Rückschrieb am Ende ist praktisch leer. Auf der SD-Karte wächst `warten max` im
+Modus ON mit der Schreibrate (hochgerechnet ~25 s bei 500 MB), im Modus ON-einzeln nur bis
+zur Dauer eines Anhangs (1 MB ≈ 0,05 s, höchstens 26 MB ≈ 1,3 s bei 20 MB/s).
+
+**Pi** (mit SD-Karte und mit SSD): offen.
 
 ## Risks / Trade-offs
 
@@ -149,7 +172,7 @@ einzelne Transaktion aus. Gemessen wird im Container und auf dem Pi mit SD-Karte
   nicht abgewiesen.] → Hingenommen: einmal je Einsatz, im Hintergrund.
 - [Ein neuer Weg, der Anhänge in einer Transaktion löscht, umgeht den Nachlauf.] → Die
   Registry-Strategie trägt den Nachlauf; ein Weg ohne Registry fiele im WAL-Test nicht auf.
-  Der Kommentar an `ZeileLoeschenEinzeln` nennt die Regel.
+  Der Kommentar an `ZeileEinzelnLoeschen` nennt die Regel.
 
 ## Migration Plan
 

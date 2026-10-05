@@ -993,7 +993,37 @@ async fn scrubbe_einsatz_ganz_tx(
 /// [`super::schwaerzung_registry::scrubbe_aus_registry`] treibt den Scrub data-driven aus
 /// denselben Konstanten (kein Guard↔Scrub-Drift). Der eigentliche Scrub steht dort, nicht
 /// mehr hier als handgepflegte UPDATE-Liste.
+///
+/// Datei-Anhänge löscht der atomare Vorgang nicht selbst, er macht sie nur unerreichbar; die
+/// Zeilen löscht danach [`crate::anhang::repo::entferne_vorgesehene`] je Anhang in einer eigenen
+/// Transaktion (LFH-905, `Strategie::ZeileEinzelnLoeschen`). Scheitert dieser Nachlauf, bleibt
+/// es beim `Ok(true)`: die Schwärzung steht, und der nächste Purge-Lauf holt die Reste nach.
 pub async fn schwaerze_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let geschwaerzt = schwaerze_einsatz_atomar(pool, einsatz_id, jetzt).await?;
+    if geschwaerzt {
+        anhaenge_nachlaufen(pool, einsatz_id).await;
+    }
+    Ok(geschwaerzt)
+}
+
+/// Nachlauf einer Schwärzung für einen Einsatz (LFH-905): löscht seine zur Entfernung
+/// vorgesehenen Anhänge einzeln. Ein Fehler wird nur geloggt, der Purge-Lauf holt nach.
+pub(crate) async fn anhaenge_nachlaufen(pool: &SqlitePool, einsatz_id: i64) {
+    if let Err(e) = crate::anhang::repo::entferne_vorgesehene(pool, Some(einsatz_id)).await {
+        tracing::warn!(
+            einsatz_id,
+            "Nachlauf der Schwärzung: Anhänge nicht vollständig entfernt, der Purge-Lauf holt \
+             nach: {e}"
+        );
+    }
+}
+
+/// Der atomare Teil von [`schwaerze_einsatz`], ohne den Nachlauf der Anhänge.
+pub(crate) async fn schwaerze_einsatz_atomar(
     pool: &SqlitePool,
     einsatz_id: i64,
     jetzt: &str,
@@ -1950,8 +1980,8 @@ mod tests {
 
     #[tokio::test]
     async fn schwaerzung_loescht_etb_anhang_und_haelt_den_eintrag() {
-        // LFH-117, design.md D8: die Datei geht (anhang ist ZeileLoeschen), die Verknüpfung
-        // per CASCADE mit, der Eintrag bleibt mit Inhalt und Nummer (G_ETB) und trägt danach
+        // LFH-117, design.md D8: die Datei geht (Nachlauf, LFH-905), die Verknüpfung schon im
+        // atomaren Vorgang, der Eintrag bleibt mit Inhalt und Nummer (G_ETB) und trägt danach
         // `anhaenge: []`. Die Bindungsabfrage des ETB-Downloads trifft nichts mehr → 404.
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
@@ -2037,6 +2067,99 @@ mod tests {
                 .unwrap(),
             "der frühere Download-Pfad findet nichts mehr (Route antwortet 404)"
         );
+    }
+
+    /// LFH-905, Spec `aufbewahrung`, „Anhänge zwischen Schwärzung und Entfernung“: Der atomare
+    /// Vorgang löscht die Anhang-Zeilen nicht mehr (das tut der Nachlauf einzeln), macht sie
+    /// aber unerreichbar: keine Verknüpfung mehr, und auch der generische Abruf eines
+    /// ungebundenen Uploads durch die hochladende Person findet nichts.
+    #[tokio::test]
+    async fn atomare_schwaerzung_macht_anhaenge_unerreichbar_und_laesst_die_zeilen_stehen() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let foto = crate::anhang::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            "Familie Müller.jpg",
+            "image/jpeg",
+            b"JPEG",
+        )
+        .await
+        .unwrap();
+        let lose = crate::anhang::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            "nie gesendet.jpg",
+            "image/jpeg",
+            b"JPEG2",
+        )
+        .await
+        .unwrap();
+        crate::etb::repo::anlegen_idempotent(
+            &pool,
+            einsatz.id,
+            leit,
+            None,
+            &[foto.id],
+            crate::etb::repo::EintragDaten {
+                typ: "meldung",
+                inhalt: "Foto der Schadenstelle",
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: None,
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(
+            schwaerze_einsatz_atomar(&pool, einsatz.id, "2026-02-01 00:00:00")
+                .await
+                .unwrap()
+        );
+
+        let (dateien, links): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?1), \
+                    (SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?2)",
+        )
+        .bind(einsatz.id)
+        .bind(foto.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            (dateien, links),
+            (2, 0),
+            "Zeilen stehen bis zum Nachlauf, Verknüpfung weg"
+        );
+        for id in [foto.id, lose.id] {
+            assert!(matches!(
+                crate::anhang::repo::meta_fuer_download(&pool, id).await,
+                Err(AppError::NotFound)
+            ));
+            assert!(matches!(
+                crate::anhang::repo::laden_bytes(&pool, id).await,
+                Err(AppError::NotFound)
+            ));
+            assert!(matches!(
+                crate::anhang::repo::anzeige_laden(&pool, id).await,
+                Err(AppError::NotFound)
+            ));
+        }
     }
 
     #[tokio::test]

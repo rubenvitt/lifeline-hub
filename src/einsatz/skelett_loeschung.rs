@@ -41,11 +41,14 @@ impl Kandidat {
 /// Ein geschwärzter, abgeschlossener Einsatz mit der Skelett-Frist seiner Org. Die Fälligkeit
 /// prüft [`Kandidat::faellig`] in Rust gegen das injizierte `jetzt` (wie die Karenz in
 /// Phase B); `status` und `geschwaerzt_at` stehen hart im WHERE — aktive und ungeschwärzte
-/// Einsätze sind nie dabei.
+/// Einsätze sind nie dabei. Ein Einsatz, an dem noch ein Anhang steht, wartet auf den Nachlauf
+/// der Schwärzung (LFH-905): die Kaskade beim Löschen nähme die Reste sonst in einer
+/// Transaktion mit, und die hielte die Schreibsperre so lange, wie das Nullen dauert.
 const KANDIDAT_SELECT: &str = "SELECT e.id, e.abgeschlossen_at, e.geschwaerzt_at, \
             o.skelett_dauer_tage \
      FROM einsatz e JOIN org_einstellungen o ON o.org_id = e.org_id \
-     WHERE e.status = ? AND e.geschwaerzt_at IS NOT NULL AND o.skelett_dauer_tage IS NOT NULL";
+     WHERE e.status = ? AND e.geschwaerzt_at IS NOT NULL AND o.skelett_dauer_tage IS NOT NULL \
+       AND NOT EXISTS (SELECT 1 FROM anhang a WHERE a.einsatz_id = e.id)";
 
 /// Phase-D-Kandidaten: IDs abgeschlossener, geschwärzter Einsätze, deren Org eine
 /// Skelett-Frist hat und deren Frist zu `jetzt` abgelaufen ist.
