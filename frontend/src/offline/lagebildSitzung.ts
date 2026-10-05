@@ -16,6 +16,7 @@ import {
   lagebildLoeschenPlatte,
 } from './lagebildSpeicher';
 import { startEntscheidung, type MeErgebnis } from './lagebildStart';
+import { schwaerzungsWaechterVorbelegen } from './schwaerzungsWaechter';
 
 /**
  * Steuerung der Lagebild-Vorhaltung je QueryClient (LFH-723, design.md D2/D5): Start nach
@@ -91,6 +92,10 @@ function abonnieren(
   { drosselMs }: SitzungsOptionen,
   vorrat: VorratEintrag[] = [],
 ): void {
+  // Stände und Liste, unter denen der Vorrat gespeichert wurde (LFH-996, design.md D5): eine
+  // Schwärzung zwischen zwei Sitzungen fällt bei der ersten Antwort mit höherem Stand auf, und
+  // die Räummarke nimmt die älteren Einträge bei der nächsten Speicherung aus dem Vorrat.
+  schwaerzungsWaechterVorbelegen(qc, vorrat);
   const innen = erzeugeLagebildPersister(benutzerId, { drosselMs });
   const persister: LagebildPersister = {
     ...innen,
