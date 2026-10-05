@@ -12,7 +12,7 @@
 - [ ] 2.2 `src/auth/provider/password.rs`: Suche mit `COLLATE NOCASE`. Tests im Modul: `Admin`/`ADMIN`/`" admin "` über den Handlerpfad bzw. normalisiert, deaktivierter Benutzer in anderer Schreibweise bleibt 401. Prüfen: grün
 - [ ] 2.3 Sperre bei Überlast: Test mit injizierten `Schranken` (ausgeschöpftes Gate) über den Login-Kern, mehr als 10 Mal 503, danach `ist_gesperrt(ip)` falsch und keine `login_fehlgeschlagen`-Zeile; Gegenprobe: 10 falsche Passwörter sperren. Wo der Handler die produktiven Schranken nutzt, den Kern so schneiden, dass der Test die Schranken setzen kann. Mutationsprobe: mit dem alten `Err(e)`-Arm wird der Test rot. Prüfen: Ergebnis der Mutationsprobe hier notieren
 - [ ] 2.4 `webauthn_auth_start`: `normalisiere` vor der Suche, Suche mit `COLLATE NOCASE`. Test: Start mit `MAX` für `max` mit Passkey liefert eine Challenge; 129 Zeichen → 400. Prüfen: grün
-- [ ] 2.5 `src/app.rs`: Body-Limits 4 KiB (Login, beide Starts) und 16 KiB (beide Finish), Entscheidung 6. Test in `tests/fehler_vertrag.rs`: Login-Body über 4 KiB → 413 im `{error}`-Format; ein Passkey-Finish-Body von 6 KiB wird nicht wegen der Größe abgewiesen. Prüfen: grün
+- [ ] 2.5 `src/app.rs`: Body-Limits 4 KiB (Login, beide Starts) und 16 KiB (beide Finish), Entscheidung 6. Test in `tests/fehler_vertrag.rs`: Login-Body über 4 KiB → 400 im `{error}`-Format mit der Größen-Meldung (`JsonBody` kennt kein 413); ein Passkey-Finish-Body von 6 KiB wird nicht wegen der Größe abgewiesen. Prüfen: grün
 
 ## 3. Anlage, SSO und Migration
 

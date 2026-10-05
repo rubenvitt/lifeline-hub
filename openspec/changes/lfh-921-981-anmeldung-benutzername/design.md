@@ -89,7 +89,9 @@ Hash hält ebenso einen Zulassungsplatz. `benutzer::anlegen` und `passwort_aende
 `/api/auth/webauthn/discoverable/start`; `16 * 1024` auf die beiden Passkey-`finish`. Ein
 Assertion-Body (authenticatorData, clientDataJSON, Signatur, userHandle in base64url) liegt meist
 unter 2 KiB, kann mit Erweiterungen aber darüber gehen; 16 KiB lässt Luft und deckelt trotzdem.
-Die Rejection läuft durch `JsonBody`, also im `{error}`-Format; der Status (413) kommt aus axum.
+Die Rejection läuft durch `JsonBody` und kommt wie jeder unlesbare Body als 400 im
+`{error}`-Format („Anfrage-Body konnte nicht gelesen werden.“); `AppError` kennt kein 413, und
+`src/extract.rs` hält diese Ungenauigkeit bewusst.
 
 ### 7. Migration `0150_benutzername_nocase.sql`
 

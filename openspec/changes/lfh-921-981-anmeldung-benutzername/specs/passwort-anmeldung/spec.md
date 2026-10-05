@@ -94,12 +94,12 @@ Ist er länger, MUST der Server Login, Passkey-Start und Anlage mit 400 abweisen
 
 Die öffentlichen Anmelderouten MUST Bodies über ihrer Grenze abweisen, bevor sie den Inhalt
 verarbeiten: Passwort-Login und die Passkey-Starts bei 4 KiB, die Passkey-Abschlüsse bei 16 KiB.
-Die Abweisung MUST im `{error}`-Format kommen.
+Die Abweisung MUST als 400 im `{error}`-Format kommen, wie jeder unlesbare Body.
 
 #### Scenario: Zu großer Login-Body
 
 - **WHEN** an `POST /api/auth/login` ein Body über 4 KiB geschickt wird
-- **THEN** antwortet der Server mit 413 im `{error}`-Format
+- **THEN** antwortet der Server mit 400 im `{error}`-Format
 
 ### Requirement: Benutzernamen in Protokollen sind gekürzt
 

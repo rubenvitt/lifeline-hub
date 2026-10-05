@@ -59,7 +59,9 @@ pub struct AuditEintrag<'a> {
     pub provider: &'a str,
 }
 
-/// Schreibt ein Audit-Ereignis.
+/// Schreibt ein Audit-Ereignis. Der Benutzername geht gekürzt hinein
+/// ([`crate::auth::benutzername::fuer_protokoll`], LFH-921): ein versuchter Name bleibt 90 Tage
+/// liegen, und kein Aufrufer soll die Grenze selbst einhalten müssen.
 ///
 /// **Schlägt bewusst nie nach außen durch.** Ein Schreibfehler wird laut geloggt, aber
 /// nicht propagiert: einen Einsatzkräfte-Login zu verweigern, weil die Audit-Tabelle
@@ -71,7 +73,11 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AuditEintrag<'_>) {
          VALUES (?, ?, ?, ?, ?)",
     )
     .bind(eintrag.ereignis.as_str())
-    .bind(eintrag.benutzername)
+    .bind(
+        eintrag
+            .benutzername
+            .map(crate::auth::benutzername::fuer_protokoll),
+    )
     .bind(eintrag.benutzer_id)
     .bind(eintrag.peer_ip.as_deref())
     .bind(eintrag.provider)
@@ -133,6 +139,31 @@ mod tests {
             Ereignis::ALLE.len() as i64,
             "jede Ereignis-Variante muss den CHECK passieren (migrations/0091, erweitert in 0143)"
         );
+    }
+
+    /// Ein langer versuchter Name liegt 90 Tage in der Tabelle; geschrieben wird er gekürzt.
+    #[tokio::test]
+    async fn langer_name_wird_gekuerzt_geschrieben() {
+        let pool = db::test_pool().await;
+        let lang = "x".repeat(100);
+
+        schreibe(
+            &pool,
+            AuditEintrag {
+                ereignis: Ereignis::LoginFehlgeschlagen,
+                benutzername: Some(&lang),
+                benutzer_id: None,
+                peer_ip: None,
+                provider: "passwort",
+            },
+        )
+        .await;
+
+        let gespeichert: String = sqlx::query_scalar("SELECT benutzername FROM auth_audit")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(gespeichert, format!("{}…", "x".repeat(64)));
     }
 
     #[tokio::test]

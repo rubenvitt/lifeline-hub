@@ -133,15 +133,20 @@ pub async fn finde_oder_provisioniere(
         }
     };
 
-    // Vergebene Namen einmal laden, damit `plane_benutzername` pur bleibt.
+    // Vergebene Namen einmal laden, damit `plane_benutzername` pur bleibt. Kleingeschrieben
+    // verglichen wie der Index ohne Groß-/Kleinschreibung (Migration 0150, LFH-981): ein lokales
+    // `Max` belegt auch `max`, sonst scheiterte das Insert an der Eindeutigkeit.
     let vergebene_namen: HashSet<String> =
         sqlx::query_scalar::<_, String>("SELECT benutzername FROM benutzer")
             .fetch_all(pool)
             .await?
             .into_iter()
+            .map(|name| name.to_ascii_lowercase())
             .collect();
 
-    let benutzername = plane_benutzername(claims, |kandidat| vergebene_namen.contains(kandidat));
+    let benutzername = plane_benutzername(claims, |kandidat| {
+        vergebene_namen.contains(&kandidat.to_ascii_lowercase())
+    });
 
     let anzeigename = plane_anzeigename(claims);
 
@@ -384,6 +389,19 @@ mod tests {
             ist_unique_verletzung(&err),
             "erwartete Unique-Erkennung, fand {err:?}"
         );
+    }
+
+    /// Ein lokales `Max` belegt `max` auch für SSO (Index ohne Groß-/Kleinschreibung, LFH-981).
+    #[tokio::test]
+    async fn lokaler_name_in_anderer_schreibweise_gilt_als_vergeben() {
+        let pool = crate::db::test_pool().await;
+        seed_org(&pool).await;
+        seed_lokalen_benutzer(&pool, "Max").await;
+
+        let c = claims("https://idp.example", "sub-max-gross", Some("max"), None);
+        let sso_benutzer = finde_oder_provisioniere(&pool, &c).await.unwrap();
+
+        assert_eq!(sso_benutzer.benutzername, "max-2");
     }
 
     #[tokio::test]

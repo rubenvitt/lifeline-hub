@@ -57,12 +57,23 @@ pub fn build_router(state: AppState) -> Router {
     build_router_mit(state, RouterOptionen::default())
 }
 
+/// Body-Grenze der öffentlichen Anmelde-Starts (Passwort-Login, Passkey-Starts, LFH-921): ohne
+/// sie gälte axums Vorgabe von 2 MiB, und ein Unangemeldeter schickte Megabyte-Namen.
+const AUTH_START_BODY_MAX: usize = 4 * 1024;
+
+/// Body-Grenze der Passkey-Abschlüsse: eine Assertion liegt meist unter 2 KiB, mit Erweiterungen
+/// auch darüber (LFH-921, design.md Entscheidung 6).
+const AUTH_FINISH_BODY_MAX: usize = 16 * 1024;
+
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
 pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
-        .route("/api/auth/login", post(routes::auth::login))
+        .route(
+            "/api/auth/login",
+            post(routes::auth::login).layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
+        )
         .route("/api/auth/logout", post(routes::auth::logout))
         .route("/api/auth/me", get(routes::auth::me))
         .route("/api/auth/providers", get(routes::auth::providers))
@@ -96,19 +107,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/auth/webauthn/auth/start",
-            post(routes::auth::webauthn_auth_start),
+            post(routes::auth::webauthn_auth_start)
+                .layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
         )
         .route(
             "/api/auth/webauthn/auth/finish",
-            post(routes::auth::webauthn_auth_finish),
+            post(routes::auth::webauthn_auth_finish)
+                .layer(DefaultBodyLimit::max(AUTH_FINISH_BODY_MAX)),
         )
         .route(
             "/api/auth/webauthn/discoverable/start",
-            post(routes::auth::webauthn_discoverable_start),
+            post(routes::auth::webauthn_discoverable_start)
+                .layer(DefaultBodyLimit::max(AUTH_START_BODY_MAX)),
         )
         .route(
             "/api/auth/webauthn/discoverable/finish",
-            post(routes::auth::webauthn_discoverable_finish),
+            post(routes::auth::webauthn_discoverable_finish)
+                .layer(DefaultBodyLimit::max(AUTH_FINISH_BODY_MAX)),
         )
         .route(
             "/api/auth/totp/enroll/start",

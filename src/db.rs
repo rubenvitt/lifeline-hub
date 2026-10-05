@@ -334,6 +334,86 @@ mod tests {
             .expect("die eingeschobene Migration ist angewendet");
     }
 
+    /// Eine Datenbank mit allen Migrationen vor `0150` und den übergebenen Benutzernamen.
+    async fn benutzer_vor_0150(namen: &[&str]) -> SqlitePool {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(SqliteConnectOptions::new().filename(":memory:"))
+            .await
+            .unwrap();
+        let vorher: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version < 150)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor 0150");
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        for name in namen {
+            sqlx::query(
+                "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+                 VALUES (1, 'X', ?, 'h')",
+            )
+            .bind(name)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        pool
+    }
+
+    /// LFH-981: Zwei Namen, die sich nur in der Schreibweise unterscheiden, brechen `0150` mit
+    /// einer lesbaren Meldung ab, und keiner wird umbenannt.
+    #[tokio::test]
+    async fn migration_0150_bricht_bei_kollision_mit_klarer_meldung_ab() {
+        let pool = benutzer_vor_0150(&["max", "Max", "moritz"]).await;
+
+        let fehler = migrate(&pool).await.unwrap_err().to_string();
+        assert!(
+            fehler.contains("Benutzernamen kollidieren ohne Groß-/Kleinschreibung"),
+            "Meldung muss die Kollision nennen, war: {fehler}"
+        );
+
+        let namen: Vec<String> =
+            sqlx::query_scalar("SELECT benutzername FROM benutzer ORDER BY benutzername")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(namen, ["Max", "max", "moritz"], "nichts still umbenannt");
+    }
+
+    /// Ohne Kollision läuft `0150` durch, und danach ist `Max` neben `max` vergeben.
+    #[tokio::test]
+    async fn migration_0150_macht_namen_ohne_schreibweise_eindeutig() {
+        let pool = benutzer_vor_0150(&["max", "Moritz"]).await;
+        migrate(&pool)
+            .await
+            .expect("ohne Kollision läuft 0150 durch");
+
+        let err = sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'X', 'MAX', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&err, sqlx::Error::Database(e) if e.is_unique_violation()),
+            "MAX neben max muss die Eindeutigkeit verletzen, war: {err:?}"
+        );
+    }
+
     /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.
     /// Verglichen werden der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
     /// und die Migrationsbuchhaltung.

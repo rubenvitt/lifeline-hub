@@ -144,6 +144,23 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `static_files::content_type` braucht ihren richtigen MIME-Typ. Weitere Köpfe (App-CSP, HSTS
   …) sind eine eigene Entscheidung, s. „Anhänge“ zur CSP.
 
+## Backend — Benutzername und KDF (LFH-921, LFH-981)
+
+Spec `passwort-anmeldung`, Herleitung
+`openspec/changes/archive/2026-10-05-lfh-921-981-anmeldung-benutzername/design.md`.
+- **Ein Name von außen geht durch `auth::benutzername::normalisiere`** (Trim, höchstens 128
+  Zeichen, sonst 400) — als erster Schritt, vor Sperre, Audit und Log. Login, Passkey-Start und
+  Anlage tun das; ein neuer Eingang auch.
+- **Gesucht wird mit `benutzername = ? COLLATE NOCASE`**; eindeutig ist der Name ohne
+  Groß-/Kleinschreibung (Index aus `0150`, Verstoß → 409). `NOCASE` faltet nur A–Z; wer Namen
+  vergleicht (SSO-Kollision, `rate_limit::konto`), faltet ebenso mit `to_ascii_lowercase`.
+- Namen in `auth_audit` kürzt `audit::schreibe` selbst; Log-Felder der Anmeldung nehmen
+  `benutzername::fuer_protokoll`. Die 429-Zeile nennt keinen Namen.
+- **Nur ein 401 ist ein Fehlversuch** (`rate_limit::fehlversuch`, `login_fehlgeschlagen`); ein 503
+  aus dem KDF-Gate geht unverändert durch.
+- **Argon2 im Handler nur über `provider::password::hash_gedrosselt`** (KDF-Gate, Andrang,
+  `spawn_blocking`). Synchrones `password::hash` bleibt `bootstrap.rs`, `dev/seed.rs` und Tests.
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und

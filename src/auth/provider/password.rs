@@ -21,7 +21,7 @@ use crate::auth::{password, Benutzer};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::sync::{Arc, LazyLock};
-use tokio::sync::Semaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Gleichzeitig zugelassene KDF-Läufe: die Hälfte der Parallelität, mindestens 2. Der
 /// Speicherbedarf (Plätze × ~19 MiB) ist der harte Deckel.
@@ -65,7 +65,7 @@ pub(crate) struct Schranken {
 
 impl Schranken {
     /// Die prozessweiten Produktionsgrenzen.
-    fn produktiv() -> Self {
+    pub(crate) fn produktiv() -> Self {
         Self {
             andrang: ANDRANG.clone(),
             kdf: KDF_GATE.clone(),
@@ -77,6 +77,9 @@ impl Schranken {
 /// Prüft Anmeldedaten und liefert den aktiven Benutzer. `AppError::Unauthorized` bei
 /// unbekanntem Benutzer ODER falschem Passwort, mit angeglichener Antwortzeit (auch für
 /// SSO-only-Konten). 503, wenn nach [`WARTEFRIST`] kein KDF-Platz frei wurde.
+///
+/// `benutzername` kommt schon normalisiert ([`crate::auth::benutzername::normalisiere`]); die
+/// Suche vergleicht ohne Groß-/Kleinschreibung (`COLLATE NOCASE`, LFH-981).
 pub async fn anmelden(
     pool: &SqlitePool,
     benutzername: &str,
@@ -94,31 +97,13 @@ pub(crate) async fn anmelden_mit_schranken(
 ) -> Result<Benutzer, AppError> {
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE benutzername = ? AND aktiv = 1",
+         FROM benutzer WHERE benutzername = ? COLLATE NOCASE AND aktiv = 1",
     )
     .bind(benutzername)
     .fetch_optional(pool)
     .await?;
 
-    // Erste Schranke: wer nicht einmal warten darf, wird sofort abgewiesen (s. [`MAX_ANDRANG`]).
-    let Ok(_andrang) = schranken.andrang.clone().try_acquire_owned() else {
-        tracing::warn!("Login-Andrang über {MAX_ANDRANG}, Anmeldeversuch sofort abgewiesen (503)");
-        return Err(AppError::ServiceUnavailable(
-            ANMELDUNG_AUSGELASTET.to_string(),
-        ));
-    };
-
-    // Zweite Schranke: gedeckelte Wartezeit auf einen KDF-Platz, s. [`WARTEFRIST`].
-    let wartefrist = schranken.wartefrist;
-    let platz = tokio::time::timeout(wartefrist, schranken.kdf.clone().acquire_owned()).await;
-    let Ok(Ok(platz)) = platz else {
-        tracing::warn!(
-            "KDF-Gate seit {wartefrist:?} ausgeschöpft, Anmeldeversuch abgewiesen (503)"
-        );
-        return Err(AppError::ServiceUnavailable(
-            ANMELDUNG_AUSGELASTET.to_string(),
-        ));
-    };
+    let (_andrang, platz) = platz_holen(schranken).await?;
 
     // Der gesamte Match — Verifikation UND beide Wegwerf-Hashes — läuft auf dem Blocking-Pool.
     // `platz` wandert mit in die Closure, damit ein Client-Abbruch ihn nicht freigibt, solange der
@@ -137,6 +122,55 @@ pub(crate) async fn anmelden_mit_schranken(
     })
     .await
     .map_err(|e| AppError::Internal(format!("KDF-Task abgebrochen: {e}")))?
+}
+
+/// Hasht ein neues Passwort unter denselben Schranken wie der Login (LFH-921): Benutzeranlage
+/// und Self-Service-Wechsel rechnen Argon2 sonst außerhalb des Speicherdeckels, die Anlage
+/// sogar auf einem Tokio-Worker. 503, wenn nach [`WARTEFRIST`] kein KDF-Platz frei wurde.
+pub async fn hash_gedrosselt(passwort: &str) -> Result<String, AppError> {
+    hash_gedrosselt_mit_schranken(passwort, &Schranken::produktiv()).await
+}
+
+/// Kern von [`hash_gedrosselt`] mit injizierbaren Schranken für Tests.
+pub(crate) async fn hash_gedrosselt_mit_schranken(
+    passwort: &str,
+    schranken: &Schranken,
+) -> Result<String, AppError> {
+    let (_andrang, platz) = platz_holen(schranken).await?;
+    let passwort = passwort.to_string();
+    // Der Platz liegt in der Closure, wie beim Login (s. Modul-Doku).
+    tokio::task::spawn_blocking(move || {
+        let _platz = platz;
+        password::hash(&passwort)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("KDF-Task abgebrochen: {e}")))?
+}
+
+/// Erwirbt erst einen Andrangsplatz ohne Warten, dann den KDF-Platz mit gedeckelter Wartezeit;
+/// beide Abweisungen sind 503. Der Aufrufer hält den Andrangsplatz bis zum Ende seines Futures
+/// und gibt den KDF-Platz in die Blocking-Closure (s. Modul-Doku).
+async fn platz_holen(
+    schranken: &Schranken,
+) -> Result<(OwnedSemaphorePermit, OwnedSemaphorePermit), AppError> {
+    // Erste Schranke: wer nicht einmal warten darf, wird sofort abgewiesen (s. [`MAX_ANDRANG`]).
+    let Ok(andrang) = schranken.andrang.clone().try_acquire_owned() else {
+        tracing::warn!("KDF-Andrang über {MAX_ANDRANG}, Versuch sofort abgewiesen (503)");
+        return Err(AppError::ServiceUnavailable(
+            ANMELDUNG_AUSGELASTET.to_string(),
+        ));
+    };
+
+    // Zweite Schranke: gedeckelte Wartezeit auf einen KDF-Platz, s. [`WARTEFRIST`].
+    let wartefrist = schranken.wartefrist;
+    let platz = tokio::time::timeout(wartefrist, schranken.kdf.clone().acquire_owned()).await;
+    let Ok(Ok(platz)) = platz else {
+        tracing::warn!("KDF-Gate seit {wartefrist:?} ausgeschöpft, Versuch abgewiesen (503)");
+        return Err(AppError::ServiceUnavailable(
+            ANMELDUNG_AUSGELASTET.to_string(),
+        ));
+    };
+    Ok((andrang, platz))
 }
 
 /// Eine Meldung für beide Abweisungsgründe; die Unterscheidung Andrang/KDF-Gate gehört ins Log.
@@ -236,6 +270,60 @@ mod tests {
         benutzer_mit_pw(&pool, "geheim123").await;
         let err = anmelden(&pool, "niemand", "geheim123").await.unwrap_err();
         assert!(matches!(err, AppError::Unauthorized));
+    }
+
+    /// Die Bildschirmtastatur schreibt den ersten Buchstaben groß (LFH-981).
+    #[tokio::test]
+    async fn schreibweise_des_namens_spielt_keine_rolle() {
+        let pool = crate::db::test_pool().await;
+        benutzer_mit_pw(&pool, "geheim123").await;
+        for name in ["Max", "MAX", "mAx"] {
+            let b = anmelden(&pool, name, "geheim123")
+                .await
+                .unwrap_or_else(|e| panic!("`{name}` muss `max` finden, war: {e:?}"));
+            assert_eq!(
+                b.benutzername, "max",
+                "die gespeicherte Schreibweise bleibt"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn deaktiviertes_konto_bleibt_in_jeder_schreibweise_abgewiesen() {
+        let pool = crate::db::test_pool().await;
+        benutzer_mit_pw(&pool, "geheim123").await;
+        sqlx::query("UPDATE benutzer SET aktiv = 0 WHERE benutzername = 'max'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        for name in ["max", "Max"] {
+            let err = anmelden(&pool, name, "geheim123").await.unwrap_err();
+            assert!(matches!(err, AppError::Unauthorized), "`{name}`: {err:?}");
+        }
+    }
+
+    /// Anlage und Passwortwechsel hashen unter demselben Gate wie der Login (LFH-921).
+    #[tokio::test]
+    async fn hash_gedrosselt_weist_bei_belegtem_gate_ab() {
+        let s = schranken(0, TEST_FRIST);
+        let err = hash_gedrosselt_mit_schranken("geheim123", &s)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::ServiceUnavailable(_)),
+            "erwartet 503 bei ausgeschöpftem KDF-Gate, war: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hash_gedrosselt_liefert_pruefbaren_hash_und_gibt_den_platz_zurueck() {
+        let s = schranken(1, TEST_FRIST);
+        let hash = hash_gedrosselt_mit_schranken("geheim123", &s)
+            .await
+            .unwrap();
+        assert!(password::verifizieren("geheim123", &hash));
+        assert_eq!(s.kdf.available_permits(), 1, "der KDF-Platz fällt zurück");
+        assert_eq!(s.andrang.available_permits(), MAX_ANDRANG);
     }
 
     /// Bleibt das Gate über die Wartefrist hinaus voll, wird abgewiesen.

@@ -182,7 +182,9 @@ export default function LoginPage() {
     setHinweis(null);
     setLaedt('passwort');
     try {
-      const ergebnis = await login(werte.benutzername, werte.passwort);
+      // Randleerzeichen einer Wortvorschau gehören nicht zum Namen (LFH-981); der Server trimmt
+      // ebenso. Das Passwort bleibt unverändert.
+      const ergebnis = await login(werte.benutzername.trim(), werte.passwort);
       if (ergebnis.status === 'mfa_erforderlich') {
         setMfaAktiv(true);
         return;
@@ -406,7 +408,16 @@ export default function LoginPage() {
                     name="benutzername"
                     rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
                   >
-                    <Input size="large" autoFocus autoComplete="username" />
+                    {/* Bildschirmtastaturen schreiben sonst den ersten Buchstaben groß und
+                        hängen bei Wortvorschlägen ein Leerzeichen an (LFH-981). */}
+                    <Input
+                      size="large"
+                      autoFocus
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
                   </Form.Item>
                 )}
                 {passwortAktiv && (

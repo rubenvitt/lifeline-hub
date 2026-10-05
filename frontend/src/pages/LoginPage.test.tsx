@@ -67,6 +67,33 @@ describe('LoginPage', () => {
     );
   });
 
+  describe('Benutzername auf der Bildschirmtastatur (LFH-981)', () => {
+    it('schaltet Großschreibung, Autokorrektur und Rechtschreibprüfung am Feld ab', () => {
+      setup();
+      const feld = screen.getByLabelText('Benutzername');
+      expect(feld).toHaveAttribute('autocapitalize', 'none');
+      expect(feld).toHaveAttribute('autocorrect', 'off');
+      expect(feld).toHaveAttribute('spellcheck', 'false');
+    });
+
+    it('schickt den Namen ohne Leerzeichen am Rand', async () => {
+      let gesendet: unknown;
+      server.use(
+        http.post('/api/auth/login', async ({ request }) => {
+          gesendet = await request.json();
+          return HttpResponse.json({ error: 'Nicht angemeldet' }, { status: 401 });
+        }),
+      );
+      setup();
+      await userEvent.type(screen.getByLabelText('Benutzername'), ' admin ');
+      await userEvent.type(screen.getByLabelText('Passwort'), ' geheim ');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+      await waitFor(() => expect(gesendet).toBeDefined());
+      // Das Passwort bleibt, wie es ist: Leerzeichen können zu ihm gehören.
+      expect(gesendet).toEqual({ benutzername: 'admin', passwort: ' geheim ' });
+    });
+  });
+
   it('füllt das Formular bei Auswahl eines Dev-Benutzers', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
     server.use(

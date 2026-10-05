@@ -1,8 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::AdminUser;
 use crate::auth::{
-    password, BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY,
-    ROLLE_ADMIN, ROLLE_KEINER,
+    BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY, ROLLE_ADMIN,
+    ROLLE_KEINER,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -119,6 +119,8 @@ pub async fn anlegen(
     JsonBody(req): JsonBody<NeuerBenutzer>,
 ) -> Result<(StatusCode, Json<BenutzerAnzeige>), AppError> {
     pflicht(&req.benutzername, "Benutzername")?;
+    // Dieselbe Vorverarbeitung wie der Login (LFH-921, LFH-981): getrimmt, höchstens 128 Zeichen.
+    let benutzername = crate::auth::benutzername::normalisiere(&req.benutzername)?;
     pflicht(&req.anzeigename, "Anzeigename")?;
     pruefe_passwort_laenge(&req.passwort)?;
     let rolle = req.system_rolle.as_deref().unwrap_or(ROLLE_KEINER);
@@ -127,7 +129,8 @@ pub async fn anlegen(
     let org_rolle = req.org_rolle.as_deref().unwrap_or(ORG_ROLLE_KEINE);
     pruefe_org_rolle(org_rolle)?;
 
-    let hash = password::hash(&req.passwort)?;
+    // Unter dem KDF-Gate und auf dem Blocking-Pool, nicht auf dem Worker (LFH-921).
+    let hash = crate::auth::provider::password::hash_gedrosselt(&req.passwort).await?;
     // Der neue Benutzer gehört zur Organisation DES ANLEGENDEN ADMINS (F05/LFH-232).
     // Vorher stand hier `ORDER BY id LIMIT 1` — mit einer zweiten Organisation wäre jedes
     // angelegte Konto still in Org 1 gelandet, und für Org 2 hätte sich überhaupt kein
@@ -141,13 +144,15 @@ pub async fn anlegen(
     )
     .bind(org_id)
     .bind(req.anzeigename.trim())
-    .bind(req.benutzername.trim())
+    .bind(benutzername)
     .bind(&hash)
     .bind(rolle)
     .bind(org_rolle)
     .execute(&state.pool)
     .await;
 
+    // Auch der Index ohne Groß-/Kleinschreibung (Migration 0150) meldet sich hier: `Admin` neben
+    // `admin` ist vergeben.
     if let Err(sqlx::Error::Database(db_err)) = &ergebnis {
         if db_err.is_unique_violation() {
             return Err(AppError::Conflict(

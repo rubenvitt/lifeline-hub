@@ -60,12 +60,14 @@ const NACH_VERDRAENGUNG: usize = OBERGRENZE - OBERGRENZE / 10;
 
 /// Das Zielkonto eines Versuchs, als Hash des Benutzernamens: so belegt ein langer erfundener
 /// Name keinen Speicher. Der Schlüssel ist je Prozess zufällig, also nicht vorab berechenbar.
+/// Gehasht wird kleingeschrieben (A–Z), wie die Suche vergleicht (`COLLATE NOCASE`, LFH-981):
+/// sonst räumte ein Erfolg als `max` nicht die Fehlversuche derselben Quelle als `Max`.
 type Konto = u64;
 
 static KONTO_SCHLUESSEL: LazyLock<RandomState> = LazyLock::new(RandomState::new);
 
 fn konto(benutzername: &str) -> Konto {
-    KONTO_SCHLUESSEL.hash_one(benutzername)
+    KONTO_SCHLUESSEL.hash_one(benutzername.to_ascii_lowercase())
 }
 
 struct Versuch {
@@ -247,6 +249,22 @@ mod tests {
             "wer sich vertippt und dann anmeldet, bringt die Quelle (NAT) nicht näher an die Sperre"
         );
         assert_eq!(t.quellen[&quelle].len(), 1);
+    }
+
+    /// Die Suche vergleicht ohne Groß-/Kleinschreibung; die Zählung je Konto muss es auch.
+    #[test]
+    fn erfolg_raeumt_fehlversuche_in_anderer_schreibweise() {
+        let mut t = Tabelle::default();
+        let jetzt = Instant::now();
+        let quelle = ip("192.0.2.9");
+
+        t.fehlversuch(quelle, Some(konto("Max")), jetzt);
+        t.fehlversuch(quelle, Some(konto("MAX")), jetzt);
+        t.erfolg(quelle, konto("max"));
+        assert!(
+            !t.quellen.contains_key(&quelle),
+            "`Max` und `max` sind dasselbe Konto (LFH-981)"
+        );
     }
 
     #[test]
