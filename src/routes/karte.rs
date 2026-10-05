@@ -1325,44 +1325,17 @@ pub struct OfflineDownloadBody {
     /// Erwarteter SHA256 (hex) aus dem Katalog-Pin — gegen den berechneten Hash verifiziert.
     #[serde(default)]
     pub sha256_erwartet: Option<String>,
-    /// One-Click-Update (B2): id der Karte, die dieser Download ERSETZT. Nach Erfolg wird die neue
-    /// Karte aktiviert und die alte (id) gelöscht. `None` = normaler Erst-Download.
-    #[serde(default)]
-    pub ersetzt_karte_id: Option<i64>,
 }
 
-/// Finalisiert einen erfolgreich heruntergeladenen Download: aktiviert die fertige Karte passend.
-/// Bei einem Update (`ersetzt_karte_id = Some`) wird die neue Version aktiviert (erbt den
-/// Aktiv-Status der alten) und die alte Karte + Datei entfernt; sonst wird die erste bereite Karte
-/// automatisch aktiviert, solange keine andere aktiv ist (Bestand bleibt). Best-effort — Fehler
-/// werden geloggt, nicht propagiert (der Download selbst ist bereits `bereit`).
-async fn finalisiere_erfolgreichen_download(
-    pool: &sqlx::SqlitePool,
-    karten_dir: &FsPath,
-    id: i64,
-    ersetzt_karte_id: Option<i64>,
-) {
-    if let Some(alt) = ersetzt_karte_id {
-        // One-Click-Update (B2): neue Version aktivieren (erbt Aktiv-Status), alte Karte + Datei
-        // entfernen. Bei Download-Fehler wird diese Fn nicht aufgerufen → alte Karte bleibt aktiv.
-        match repo::ersetze_aktive_offline_karte(pool, id, alt).await {
-            Ok(Some(_)) => {
-                download::entferne_download_dateien(karten_dir, alt).await;
-                // Reader-Cache s. offline_loeschen: gleicher Pfad, neue Inode möglich — sonst
-                // würde der alte, gecachte Reader die entlinkte Datei weiterservieren.
-                crate::karte::mbtiles::invalidate_reader().await;
-                tracing::info!("Offline-Karte {id}: Update aktiviert, alte Karte {alt} entfernt");
-            }
-            Ok(None) => tracing::warn!("Update-Swap {id}: neue Karte verschwand"),
-            Err(e) => tracing::error!("Update-Swap {id}->ersetzt {alt} fehlgeschlagen: {e}"),
-        }
-    } else {
-        // Erst-Download: erste fertige Karte automatisch aktivieren, solange keine andere aktiv ist.
-        match repo::aktiviere_wenn_keine_aktive(pool, id).await {
-            Ok(true) => tracing::info!("Offline-Karte {id}: als Basemap aktiviert (erste bereite)"),
-            Ok(false) => {}
-            Err(e) => tracing::warn!("Auto-Aktivieren der Offline-Karte {id} fehlgeschlagen: {e}"),
-        }
+/// Finalisiert einen erfolgreich heruntergeladenen Download: die erste bereite Karte wird
+/// automatisch aktiviert, solange keine andere aktiv ist (Bestand bleibt). Aktualisiert wird eine
+/// Karte nicht über eine neue Zeile, sondern in-place (`starte_in_place_reload`, LFH-994).
+/// Best-effort — Fehler werden geloggt, nicht propagiert (der Download selbst ist bereits `bereit`).
+async fn finalisiere_erfolgreichen_download(pool: &sqlx::SqlitePool, id: i64) {
+    match repo::aktiviere_wenn_keine_aktive(pool, id).await {
+        Ok(true) => tracing::info!("Offline-Karte {id}: als Basemap aktiviert (erste bereite)"),
+        Ok(false) => {}
+        Err(e) => tracing::warn!("Auto-Aktivieren der Offline-Karte {id} fehlgeschlagen: {e}"),
     }
 }
 
@@ -1460,17 +1433,6 @@ async fn verarbeite_in_place_ergebnis(
     }
 }
 
-/// Request-Body für den In-Place-Reload (B3): neue Quell-URL + optionale Größe/Pin. Lizenz/Name
-/// bleiben die der bestehenden Karte (ein Update, kein neuer Eintrag).
-#[derive(Debug, Deserialize)]
-pub struct OfflineNeuLadenBody {
-    pub url: String,
-    #[serde(default)]
-    pub groesse_erwartet: Option<i64>,
-    #[serde(default)]
-    pub sha256_erwartet: Option<String>,
-}
-
 /// Nur unsere gemanagten Downloads (`karte-{id}.mbtiles`) dürfen in-place ersetzt werden —
 /// extern registrierte Karten (beliebiger admin-gelieferter Pfad) verwalten wir nicht.
 pub(crate) fn ist_gemanagt(karte: &OfflineKarte) -> bool {
@@ -1482,13 +1444,13 @@ fn pruefe_gemanagt(karte: &OfflineKarte) -> Result<(), AppError> {
         Ok(())
     } else {
         Err(AppError::UnprocessableEntity(
-            "In-Place-Neu-Laden nur für heruntergeladene Karten (nicht extern registrierte)".into(),
+            "In-Place-Aktualisierung nur für heruntergeladene Karten (nicht extern registrierte)"
+                .into(),
         ))
     }
 }
 
-/// Gemeinsamer In-Place-Start (D3, LFH-993) für „Neu laden“, „Jetzt aktualisieren“ und den
-/// Wächter: Plattenplatz prüfen, Fortschritts-Slot atomar reservieren, Download im Hintergrund,
+/// Gemeinsamer In-Place-Start (D3, LFH-993) für „Jetzt aktualisieren“ und den Wächter: Plattenplatz prüfen, Fortschritts-Slot atomar reservieren, Download im Hintergrund,
 /// danach Tausch oder Aufräumen und Meldung an den Wächter. Die `url` ist bereits geprüft
 /// (`validiere_download_url`). `422` bei registrierter Karte, zu wenig Platz oder laufendem
 /// Download.
@@ -1552,42 +1514,12 @@ pub(crate) async fn starte_in_place_reload(
     Ok(())
 }
 
-/// POST /api/karte/offline-karten/{id}/neu-laden — In-Place-Hot-Swap (B3, LFH-187).
-///
-/// Lädt ein Update der bestehenden GEMANAGTEN Karte in DIESELBE Zeile/Datei. Anders als
-/// `offline_download` (neue Zeile) wird KEINE neue Zeile angelegt: die alte Datei bleibt während
-/// des Downloads `bereit`+aktiv und wird ausgeliefert; erst nach vollständigem Download erfolgt der
-/// atomare Swap + Cache-Bust. Bei Download-Fehler bleibt die alte Karte unangetastet aktiv (KEIN
-/// Status-Downgrade). `404` unbekannt; `422` bei extern registrierter Karte oder laufendem Download.
-pub async fn offline_neu_laden(
-    State(state): State<AppState>,
-    _admin: AdminUser,
-    PfadParam(id): PfadParam<i64>,
-    JsonBody(body): JsonBody<OfflineNeuLadenBody>,
-) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
-    let karte = repo::finde_offline_karte(&state.pool, id)
-        .await?
-        .ok_or(AppError::NotFound)?;
-    pruefe_gemanagt(&karte)?;
-    let url = download::validiere_download_url(&body.url).map_err(AppError::Validation)?;
-    starte_in_place_reload(
-        &state,
-        &karte,
-        url,
-        body.sha256_erwartet.clone(),
-        body.groesse_erwartet,
-    )
-    .await?;
-    Ok((StatusCode::ACCEPTED, Json(karte)))
-}
-
 /// POST /api/karte/offline-karten/download — startet einen Hintergrund-Download (Admin).
 ///
 /// Legt IMMER eine NEUE Zeile an (kein Re-Download in eine aktive Karte) — die Live-Lagekarte
 /// bleibt während des Mehr-GB-Downloads verfügbar, bis der Admin die neue Karte aktiviert.
 /// Antwortet sofort `202` mit der Zeile (Status `laedt`); das Frontend pollt die Liste.
-/// „Aktualisieren" = neue Karte laden + aktivieren + alte löschen; „Neu laden" (B3) = In-Place-Swap
-/// derselben Zeile (siehe `offline_neu_laden`).
+/// Aktualisiert wird eine bestehende Karte in-place in derselben Zeile (`starte_in_place_reload`).
 pub async fn offline_download(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -1654,7 +1586,6 @@ pub async fn offline_download(
     let fortschritt_map = state.download_fortschritt.clone();
     let id = karte.id;
     let sha256_erwartet = body.sha256_erwartet.clone();
-    let ersetzt_karte_id = body.ersetzt_karte_id;
     tokio::spawn(async move {
         let dateiname = format!("karte-{id}.mbtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
@@ -1696,8 +1627,7 @@ pub async fn offline_download(
                         "Offline-Karte {id}: Download fertig ({} Bytes)",
                         erg.groesse
                     );
-                    finalisiere_erfolgreichen_download(&pool, &karten_dir, id, ersetzt_karte_id)
-                        .await;
+                    finalisiere_erfolgreichen_download(&pool, id).await;
                 }
             }
             Err(fehler) => {
@@ -1718,7 +1648,7 @@ pub async fn offline_download(
 /// POST /api/karte/offline-karten/{id}/abbrechen — laufenden Download ODER In-Place-Reload
 /// abbrechen (Admin). Setzt das Abbruch-Flag; der Task bricht beim nächsten Chunk ab und räumt die
 /// `.part`-Datei auf. Ein Neu-Zeile-Download (`offline_download`) geht danach auf Status `fehler`;
-/// ein In-Place-Reload (`offline_neu_laden`) lässt die alte Karte bewusst UNANGETASTET bereit+aktiv
+/// ein In-Place-Reload (`starte_in_place_reload`) lässt die alte Karte bewusst UNANGETASTET bereit+aktiv
 /// (kein Downgrade). `404`, wenn für die `id` kein Download/Reload läuft.
 pub async fn offline_abbrechen(
     State(state): State<AppState>,
@@ -2437,33 +2367,13 @@ mod finalisierung_tests {
         k.id
     }
 
-    // One-Click-Update über die Handler-Finalisierung: aktiviert die neue Version, entfernt alt.
-    #[tokio::test]
-    async fn finalisiere_update_aktiviert_neu_und_entfernt_alt() {
-        let pool = crate::db::test_pool().await;
-        let tmp = tempfile::tempdir().unwrap();
-        let alt = bereite_karte(&pool, "A").await;
-        repo::aktiviere_offline_karte(&pool, alt).await.unwrap();
-        let neu = bereite_karte(&pool, "A2").await;
-
-        finalisiere_erfolgreichen_download(&pool, tmp.path(), neu, Some(alt)).await;
-
-        let liste = repo::liste_offline_karten(&pool).await.unwrap();
-        assert!(liste.iter().all(|k| k.id != alt), "alte Karte entfernt");
-        assert!(
-            liste.iter().find(|k| k.id == neu).unwrap().aktiv_basemap,
-            "neue Version aktiv"
-        );
-    }
-
-    // Erst-Download (ohne ersetzt_karte_id): erste bereite Karte wird automatisch aktiviert.
+    // Erst-Download: erste bereite Karte wird automatisch aktiviert.
     #[tokio::test]
     async fn finalisiere_erstdownload_aktiviert_erste_bereite() {
         let pool = crate::db::test_pool().await;
-        let tmp = tempfile::tempdir().unwrap();
         let m = bereite_karte(&pool, "M").await;
 
-        finalisiere_erfolgreichen_download(&pool, tmp.path(), m, None).await;
+        finalisiere_erfolgreichen_download(&pool, m).await;
 
         let liste = repo::liste_offline_karten(&pool).await.unwrap();
         assert!(

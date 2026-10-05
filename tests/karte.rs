@@ -1465,6 +1465,34 @@ async fn offline_registrieren_aktivieren_loeschen() {
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
 }
 
+/// LFH-994: Der alte Update-Weg `neu-laden` ist entfernt; aktualisiert wird nur noch über
+/// `jetzt-aktualisieren` und den Wächter. Eine vorhandene Karte unterscheidet „Route fehlt“ (404)
+/// von „Route da, Karte nicht gemanagt“ (422).
+#[tokio::test]
+async fn offline_neu_laden_gibt_es_nicht_mehr() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten",
+        Some(&cookie),
+        Some(r#"{"name":"DE","pfad":"de.pmtiles","lizenz":"© OpenStreetMap contributors (ODbL)"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let id = json(res).await["id"].as_i64().unwrap();
+
+    let res = anfrage(
+        &app,
+        "POST",
+        &format!("/api/karte/offline-karten/{id}/neu-laden"),
+        Some(&cookie),
+        Some(r#"{"url":"https://example.test/de.pmtiles"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
 #[tokio::test]
 async fn offline_registrieren_ohne_pfad_ist_400() {
     let (app, cookie) = admin_app().await;

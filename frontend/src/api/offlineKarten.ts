@@ -36,8 +36,6 @@ interface OfflineDownloadBody {
   groesse_erwartet?: number;
   /** Erwarteter SHA256 (hex) aus dem Katalog-Pin — Backend verifiziert beim Download. */
   sha256_erwartet?: string;
-  /** One-Click-Update: id der Karte, die dieser Download ersetzt (Backend swappt nach Erfolg). */
-  ersetzt_karte_id?: number;
 }
 
 /** Ein kuratierter, herunterladbarer Vorschlag (Server-autoritativ). */
