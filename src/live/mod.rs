@@ -238,6 +238,9 @@ pub struct LiveHub {
     /// Prozess-Epoch (Prozessstart). Teil jeder Nachrichten-Id; ein Neustart erzeugt eine
     /// andere Epoch → Replay über einen Neustart hinweg wird als `Luecke` erkannt.
     epoch: u64,
+    /// Beendete Gerätekopplungen (LFH-892, design.md D7): Widerruf, neuer Code, Einsatzabschluss.
+    /// Ein Live-Strom einer Gerätesitzung endet, sobald seine Kopplung hier erscheint.
+    kopplung_ende: broadcast::Sender<i64>,
 }
 
 impl Default for LiveHub {
@@ -299,7 +302,19 @@ impl LiveHub {
             kanaele: Arc::new(RwLock::new(HashMap::new())),
             org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
             epoch,
+            kopplung_ende: broadcast::channel(256).0,
         }
+    }
+
+    /// Meldet eine beendete Gerätekopplung (LFH-892): offene Live-Ströme dieser Kopplung enden.
+    pub fn melde_kopplung_ende(&self, kopplung_id: i64) {
+        // Ohne Abonnenten ist `send` ein Fehler ohne Folgen: dann ist kein Strom offen.
+        let _ = self.kopplung_ende.send(kopplung_id);
+    }
+
+    /// Abonniert die beendeten Gerätekopplungen.
+    pub fn abonniere_kopplung_ende(&self) -> broadcast::Receiver<i64> {
+        self.kopplung_ende.subscribe()
     }
 
     /// Abonniert den Org-Kanal (LFH-734). Gefiltert wird beim Abonnenten, nicht hier.

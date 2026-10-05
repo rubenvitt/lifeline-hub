@@ -1301,3 +1301,20 @@ fn pfad_match_ist_token_genau() {
     // Kein Substring-Fehlpass: TierGeschlecht befriedigt Geschlecht nicht.
     assert!(!pfad_kommt_vor(text, "lifeline_hub::person::Geschlecht"));
 }
+
+/// LFH-892: Gerätekopplung. Die Ansichten stehen als CHECK in
+/// `migrations/0147_geraet_kopplung.sql`; das Frontend wählt nach ihnen Hülle und Startseite.
+#[test]
+fn geraet_kopplung_wire() {
+    enum_wire!(lifeline_hub::geraet::Funktionsansicht {
+        UhsTablet => "uhs-tablet",
+        UhsLaptop => "uhs-laptop",
+        Lagemonitor => "lagemonitor",
+    } in lifeline_hub::geraet::Funktionsansicht::ALLE);
+    enum_wire!(lifeline_hub::geraet::repo::KopplungStatus {
+        Wartend => "wartend",
+        Aktiv => "aktiv",
+        Abgelaufen => "abgelaufen",
+        Widerrufen => "widerrufen",
+    });
+}

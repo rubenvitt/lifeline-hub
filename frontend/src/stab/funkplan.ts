@@ -6,7 +6,11 @@ import type {
   Einsatzabschnitt,
   Sprechgruppe,
 } from '../api/types';
-import { kommunikationsmittelLabel, teileSprechgruppen } from '../components/kommunikationsmittel';
+import {
+  kommunikationsmittelLabel,
+  mitBetriebsart,
+  teileSprechgruppen,
+} from '../components/kommunikationsmittel';
 import type { Fernmeldenetz, NetzStelle } from './fernmeldeskizze';
 import {
   FUEHRUNGSSTELLE_STELLE,
@@ -416,8 +420,9 @@ function zeileMarkdown(z: FunkplanZeile, tiefe: number): string[] {
     kopf,
     z.rufname ? `${z.art === 'fahrzeug' ? 'OPTA' : 'Rufname'} ${md(z.rufname)}` : null,
     leitungMarkdown(z),
-    z.tmo.length > 0 ? `TMO ${z.tmo.map(md).join(', ')}` : null,
-    z.dmo.length > 0 ? `DMO ${z.dmo.map(md).join(', ')}` : null,
+    // „TMO 311, 312“, aber „TMO 412_F_DRK“ statt „TMO TMO …“: dieselbe Regel wie die Skizze.
+    z.tmo.length > 0 ? mitBetriebsart('TMO', z.tmo.map(md).join(', ')) : null,
+    z.dmo.length > 0 ? mitBetriebsart('DMO', z.dmo.map(md).join(', ')) : null,
     z.kommunikationsmittel ? md(z.kommunikationsmittel) : null,
   ].filter((t): t is string => t != null);
   const zeile = `${'  '.repeat(tiefe)}- ${teile.join(' · ')}`;

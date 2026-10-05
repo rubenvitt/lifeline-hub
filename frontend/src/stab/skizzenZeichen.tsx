@@ -27,6 +27,7 @@ import type {
   Verbindungsstatus,
 } from '../api/fernmeldeskizzeVertrag';
 import type { Sprechgruppe } from '../api/types';
+import { mitBetriebsart } from '../components/kommunikationsmittel';
 
 export type { Komponentenart, Verbindungsart, Verbindungsmedium, Verbindungsstatus };
 export type Betriebsart = Sprechgruppe['betriebsart'];
@@ -144,9 +145,12 @@ export function umbrich(text: string, schrift: number, breite: number): string[]
   return zeilen;
 }
 
-/** Inhalt des Bedingungszeichens: Betriebsart und Bezeichnung, z. B. „TMO BN_BOS“. */
+/**
+ * Inhalt des Bedingungszeichens: Betriebsart und Bezeichnung, z. B. „TMO BN_BOS“; trägt die
+ * Bezeichnung die Betriebsart schon, steht sie einmal (`mitBetriebsart`, wie Funkplan-Bericht).
+ */
 export function bedingungszeichenText(betriebsart: Betriebsart, bezeichnung: string): string {
-  return `${betriebsart} ${bezeichnung}`.trim();
+  return mitBetriebsart(betriebsart, bezeichnung).trim();
 }
 
 /** Breite des Langsechsecks samt Spitzen; wächst mit dem Text, nie gekürzt. */

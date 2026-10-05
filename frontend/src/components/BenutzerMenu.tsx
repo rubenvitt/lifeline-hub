@@ -93,7 +93,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
   }
   if (benutzer.org_rolle === 'fuehrungskraft') {
     rollenTags.push(
-      <Tag key="fk" color="blue" style={{ marginInlineEnd: 0 }}>
+      <Tag key="fk" style={{ marginInlineEnd: 0 }}>
         Führungskraft
       </Tag>,
     );

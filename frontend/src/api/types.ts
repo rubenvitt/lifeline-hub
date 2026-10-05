@@ -21,6 +21,20 @@ export type AppCode = S['AppCode'];
 // TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
 export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
+/** Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) mit `geraet`. */
+export type MeAntwort = S['MeAntwort'];
+
+// ============================== Gerätekopplung (LFH-892) ==============================
+export type Funktionsansicht = S['Funktionsansicht'];
+export type GeraetAnzeige = S['GeraetAnzeige'];
+export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
+export type LagemonitorUhs = S['LagemonitorUhs'];
+export type KopplungAnzeige = S['KopplungAnzeige'];
+export type KopplungStatus = S['KopplungStatus'];
+export type KopplungMitCode = S['KopplungMitCode'];
+export type KopplungsCode = S['KopplungsCode'];
+export type GeraeteUebersicht = S['GeraeteUebersicht'];
+export type AnsichtSperre = S['AnsichtSperre'];
 
 // ============================== Benutzer / Einsatz ==============================
 export type SystemRolle = S['SystemRolle'];

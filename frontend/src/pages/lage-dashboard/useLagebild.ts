@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { abrufZustand, type AbrufZustand } from '../../api/abrufZustand';
+import { abrufZustand, schlechtesterZustand, type AbrufZustand } from '../../api/abrufZustand';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -65,6 +65,17 @@ export type GebundeneQuelle = keyof typeof LAGEBILD_QUELLEN;
 /** Ist die Liste für die Person frei? Ohne bekannte Freigaben nie. */
 export function quelleFrei(quelle: GebundeneQuelle, freigaben: ModulFreigaben | undefined) {
   return istKeyFreigegeben(LAGEBILD_QUELLEN[quelle].modul, freigaben);
+}
+
+/**
+ * Zustand der Kennzahl „Kräfte": sie rechnet nur aus dem Personal (Stärke) und den Einheiten
+ * (Anzahl in der Notiz), also sperrt nur deren Modul sie (LFH-887). Gesperrte Fahrzeuge, Material
+ * oder Abschnitte verstecken die bekannte Stärke nicht. Für Dashboard und Vorbereitung gleich.
+ */
+export function kraefteZustand(
+  zustand: Pick<Record<GebundeneQuelle, AbrufZustand>, 'personal' | 'einheiten'>,
+): AbrufZustand {
+  return schlechtesterZustand(zustand.personal, zustand.einheiten);
 }
 
 /**

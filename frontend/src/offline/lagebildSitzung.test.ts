@@ -3,7 +3,8 @@ import { QueryClient, dehydrate } from '@tanstack/react-query';
 import type { PersistedClient } from '@tanstack/query-persist-client-core';
 import { ApiError, NetzFehler } from '../api/client';
 import { erzeugeQueryClient } from '../api/queryClient';
-import type { BenutzerAnzeige } from '../api/types';
+import type { BenutzerAnzeige, MeAntwort } from '../api/types';
+import { merkeGeraet } from '../geraet/geraetMarke';
 import { einsatzKeys } from '../api/queryKeys';
 import { lagebildAnlegen, lagebildLesen, lagebildLoeschenPlatte } from './lagebildSpeicher';
 import {
@@ -364,5 +365,46 @@ describe('Lagebild-Sitzung', () => {
     await qc.fetchQuery({ queryKey: einsatzKeys.einheiten(3), queryFn: async () => [] });
     await warte(DROSSEL * 3);
     expect((await lagebildLesen())?.bestaetigtAt).toBeGreaterThan(1000);
+  });
+
+  describe('gekoppeltes Gerät (LFH-892, design.md D8): kein Lagebild auf der Platte', () => {
+    const GERAET = {
+      id: 9,
+      benutzername: 'geraet-3',
+      anzeigename: 'UHS Nord · Tablet 1',
+      geraet: { kopplung_id: 3, einsatz_id: 7, ansicht: 'uhs-tablet', bezeichnung: 'Tablet 1' },
+    } as unknown as MeAntwort;
+
+    afterEach(() => merkeGeraet(false));
+
+    it('schreibt mit Serverbestätigung nichts und räumt einen fremden Stand', async () => {
+      await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]));
+      const qc = neuerClient();
+      expect(
+        await lagebildStarten(qc, { art: 'ok', benutzer: GERAET }, { drosselMs: DROSSEL }),
+      ).toBe(GERAET);
+      expect(await lagebildLesen()).toBeUndefined();
+      qc.setQueryData(einsatzKeys.personen(3), [{ id: 2 }]);
+      await warte(DROSSEL * 3);
+      expect(await lagebildLesen()).toBeUndefined();
+      expect(qc.getQueryData(einsatzKeys.personen(3))).toEqual([{ id: 2 }]);
+    });
+
+    it('stellt ohne Netz nichts wieder her und meldet niemanden an', async () => {
+      await vorratAnlegen((q) => q.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]));
+      merkeGeraet(true);
+      const qc = neuerClient();
+      expect(await lagebildStarten(qc, { art: 'netzfehler' }, { drosselMs: DROSSEL })).toBeNull();
+      expect(qc.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
+      expect(await lagebildLesen()).toBeUndefined();
+    });
+
+    it('legt beim Koppeln keinen Datensatz an', async () => {
+      const qc = neuerClient();
+      await lagebildAnmelden(qc, GERAET, { drosselMs: DROSSEL });
+      qc.setQueryData(einsatzKeys.personen(3), [{ id: 2 }]);
+      await warte(DROSSEL * 3);
+      expect(await lagebildLesen()).toBeUndefined();
+    });
   });
 });

@@ -4,7 +4,8 @@ import {
   persistQueryClientSubscribe,
   type PersistedClient,
 } from '@tanstack/query-persist-client-core';
-import type { BenutzerAnzeige } from '../api/types';
+import type { BenutzerAnzeige, MeAntwort } from '../api/types';
+import { warGeraet } from '../geraet/geraetMarke';
 import { fetchErfolgeVerfolgen } from './lagebildBestaetigung';
 import { lagebildDehydrierOptionen, lagebildStandZulaessig } from './lagebildFilter';
 import { erzeugeLagebildPersister, type LagebildPersister } from './lagebildPersister';
@@ -195,6 +196,15 @@ export function lagebildStarten(
     const jetzt = optionen.jetzt ?? Date.now();
     const buster = __APP_VERSION__;
     const satz = await lagebildLesen();
+    // Ein gekoppeltes Gerät hält kein Lagebild vor (LFH-892, design.md D8): ein verlorenes,
+    // ausgeschaltetes Tablet ließe sich nicht mehr leeren. Auch ohne Server gibt es dort keine
+    // Offline-Identität; ein Stand auf der Platte stammt von einer Person, die den Browser
+    // vorher nutzte, und geht.
+    if (me.art === 'ok' ? me.benutzer.geraet != null : warGeraet()) {
+      await beenden(qc);
+      if (satz) await lagebildLoeschenPlatte();
+      return me.art === 'ok' ? me.benutzer : null;
+    }
     const entscheidung = startEntscheidung(me, satz, jetzt, buster);
     // Beim Start nur die PLATTE: im Speicher steht noch nichts vom verworfenen Stand — er
     // wurde nicht wiederhergestellt, und `RequireAuth` hält die Seiten bis zum Ende des
@@ -251,10 +261,15 @@ export function lagebildStarten(
  */
 export function lagebildAnmelden(
   qc: QueryClient,
-  benutzer: BenutzerAnzeige,
+  benutzer: MeAntwort,
   optionen: SitzungsOptionen = {},
 ): Promise<void> {
   return reihe(qc, async () => {
+    // Gerät (LFH-892, design.md D8): nichts vorhalten, Stand einer Person räumen.
+    if (benutzer.geraet) {
+      await loeschen(qc);
+      return;
+    }
     const jetzt = optionen.jetzt ?? Date.now();
     const buster = __APP_VERSION__;
     const laufend = SITZUNGEN.get(qc);

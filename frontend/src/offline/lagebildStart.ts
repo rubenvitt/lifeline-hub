@@ -1,4 +1,4 @@
-import type { BenutzerAnzeige } from '../api/types';
+import type { BenutzerAnzeige, MeAntwort } from '../api/types';
 import type { LagebildDatensatz } from './lagebildSpeicher';
 
 /**
@@ -13,7 +13,7 @@ export const HOECHSTLIEGEZEIT_MS = 24 * 60 * 60 * 1000;
 /** Ausgang der Sitzungsprüfung beim Start. `abgelehnt` ist JEDE Server-Antwort ungleich
  *  Erfolg (401 und alle anderen) — nur ein Netzfehler öffnet die Offline-Identität. */
 export type MeErgebnis =
-  { art: 'ok'; benutzer: BenutzerAnzeige } | { art: 'abgelehnt' } | { art: 'netzfehler' };
+  { art: 'ok'; benutzer: MeAntwort } | { art: 'abgelehnt' } | { art: 'netzfehler' };
 
 export interface StartEntscheidung {
   benutzer: BenutzerAnzeige | null;

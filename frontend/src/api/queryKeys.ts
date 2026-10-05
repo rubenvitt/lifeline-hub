@@ -58,6 +58,9 @@ export const EINSATZ_KEYS = {
   // Modulzähler des Navigationsrahmens: hängt an jedem Ereignis, das die Liste eines gezählten
   // Moduls invalidiert (Vollständigkeit: `queryKeys.test.ts`).
   modulZaehler: 'einsatz-modul-zaehler',
+  // Verdichtetes Lagebild des Lagemonitors (LFH-892): Zahlen ohne Personenbezug. Personen-
+  // Ereignisse erreichen den Monitor nicht; er holt die Zahlen zusätzlich im Takt.
+  lagemonitor: 'einsatz-lagemonitor',
   dokumente: 'einsatz-dokumente',
   abloesungen: 'einsatz-abloesungen',
   // Kräfte-Zeitachse (LFH-552): Perioden je Einheit/Person und Zeitachse einer Kraft unter EINEM
@@ -79,6 +82,8 @@ export const EINSATZ_KEYS = {
   mitglieder: 'einsatz-mitglieder',
   sprechgruppen: 'einsatz-sprechgruppen',
   modulOverrides: 'einsatz-modul-overrides',
+  // Gerätekopplungen der Einsatzleitung (LFH-892).
+  geraete: 'einsatz-geraete',
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
   modulFreigaben: 'einsatz-modul-freigaben',
   ortVorschau: 'ort-vorschau',
@@ -128,8 +133,15 @@ export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
  * - `lagged`: rein abgeleitet (Union aller Keys hier, dedupliziert) → im Hook.
  */
 export const EINSATZ_STREAM_EVENTS = {
-  // Ablegen und Entfernen einer UHS-Datei verteilen `uhs` (LFH-758).
-  uhs: [EINSATZ_KEYS.uhs, EINSATZ_KEYS.uhsAnhaenge],
+  // Ablegen und Entfernen einer UHS-Datei verteilen `uhs` (LFH-758). Das Detail trägt die Plätze
+  // und ist live, weil der UHS-Laptop den Grundriss offen hält, den die Einsatzleitung ändert
+  // (LFH-892).
+  uhs: [
+    EINSATZ_KEYS.uhs,
+    EINSATZ_KEYS.uhsDetail,
+    EINSATZ_KEYS.uhsAnhaenge,
+    EINSATZ_KEYS.lagemonitor,
+  ],
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Anhangliste der Detailseite hängt
   // deshalb mit daran.
   schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenAnhaenge],
@@ -141,7 +153,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.kraefteZeitachse,
   ],
-  material: [EINSATZ_KEYS.material],
+  // Das UHS-Detail trägt das dort verortete Material (LFH-892).
+  material: [EINSATZ_KEYS.material, EINSATZ_KEYS.uhsDetail],
   // Ablegen und Entfernen einer Tier-Datei verteilen `tier` (LFH-758).
   tier: [EINSATZ_KEYS.tiere, EINSATZ_KEYS.tierAnhaenge],
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],
@@ -160,6 +173,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.abloesungen,
     // Handstatus, Nachtrag und Streichung an einer Einheit (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
+    EINSATZ_KEYS.lagemonitor,
   ],
   // Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung; Bezirke und
   // Betreuungsstellen tragen den Abschnittsnamen per Join. Umbenennen oder Löschen eines
@@ -194,6 +208,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
     // Statuswechsel, Nachtrag, Streichung und Fan-out an einer Person (LFH-552).
     EINSATZ_KEYS.kraefteZeitachse,
+    EINSATZ_KEYS.lagemonitor,
   ],
   lagebericht: [EINSATZ_KEYS.lageberichte, EINSATZ_KEYS.lagebericht],
   chat: [EINSATZ_KEYS.chatKanaele, EINSATZ_KEYS.chatNachrichten, EINSATZ_KEYS.modulZaehler],
@@ -256,10 +271,12 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *
  * - `einstellungen`/`mitglieder`/`sprechgruppen`: selten geändert, kein Live-Event. Der
  *   Einsatzkopf `einsatz` ist seit LFH-555 live.
- * - `uhsDetail`/`person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
+ * - `person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
  *   eines anderen Nutzers propagiert nicht live.
+ * - `geraete` (LFH-892): Kopplungen sieht nur die Einsatzleitung auf ihrer Einstellungsseite; die
+ *   eigene Änderung setzt die Antwort, der letzte Zugriff eines Geräts ist kein Ereignis.
  * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).
  *   Die eigene Änderung invalidiert die Mutation; die eines anderen wirkt beim nächsten Abruf,
  *   das 403 der Server-Gates bleibt das Netz.
@@ -289,11 +306,11 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.mitglieder,
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.modulOverrides,
+  EINSATZ_KEYS.geraete,
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.ortSuche,
   EINSATZ_KEYS.anhangHeicVorschau,
-  EINSATZ_KEYS.uhsDetail,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
   EINSATZ_KEYS.tier,
@@ -359,6 +376,8 @@ export const einsatzKeys = {
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulOverrides: (einsatzId: number | null) => [EINSATZ_KEYS.modulOverrides, einsatzId] as const,
+  /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
+  geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
   modulFreigaben: (einsatzId: number | null) => [EINSATZ_KEYS.modulFreigaben, einsatzId] as const,
   // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe wirkt auf jeden Einsatz der Org.
@@ -547,6 +566,7 @@ export const einsatzKeys = {
 
   // Modulzähler des Navigationsrahmens
   modulZaehler: (einsatzId: number) => [EINSATZ_KEYS.modulZaehler, einsatzId] as const,
+  lagemonitor: (einsatzId: number) => [EINSATZ_KEYS.lagemonitor, einsatzId] as const,
 
   // Abgeleitetes
   // Die gerundeten Koordinaten sind Teil des Keys (Cache-Trefferquote + serverseitiger

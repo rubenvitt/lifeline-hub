@@ -3,7 +3,9 @@
 Gilt für `frontend/src/offline/`, `api/queryKeys.ts`, `api/queryClient.ts` und den
 `AuthProvider`, ergänzt `frontend/AGENTS.md`. Der Abschnitt „Schreiben ohne Netz“ gilt
 außerdem für jede Mutation, die eine `erfasse…OfflineFaehig`-Funktion ruft, für
-`api/client.ts` und für `setzeOnline` in `test/utils.tsx`. Pfade relativ zu `frontend/src/`.
+`api/client.ts`, für `setzeOnline` in `test/utils.tsx` und für jede Stelle, die beim Erfassen
+„jetzt“ nimmt (ETB-Erfassung, Meldungsformular, `anzeige/ZeitpunktEingabe.tsx`). Pfade relativ
+zu `frontend/src/`.
 
 **Was ohne Netz lesbar bleibt, steht in der Registry, nicht im Persister:** `LAGEBILD_OFFLINE`
 und `istLagebildOfflineKey` in `api/queryKeys.ts`. Das sind ETB, Meldebild, Betroffene,
@@ -95,6 +97,15 @@ draußen gelassen werden.
 - **Der Erfassungszeitpunkt (`zeitpunkt_at`) einer vorgemerkten Stand- oder
   Belegungsmeldung gilt nach der Serveruhr** (`serverJetzt()` aus `offline/serveruhr.ts`,
   Versatz aus dem `Date`-Header jeder Antwort von `apiGet`, `apiSend` und `apiUpload`). Ohne
-  frischen Versatz gilt die Geräteuhr. Die Ereigniszeit von Meldung und ETB-Eintrag kommt
-  weiter aus der Geräteuhr; ob sie umgerechnet wird, ist offen (LFH-895). Herleitung:
+  frischen Versatz gilt die Geräteuhr. Herleitung:
   `openspec/changes/archive/2026-10-01-lfh-705-serveruhr-versatz-offline/design.md`.
+- **„Jetzt“ beim Erfassen gilt nach der Serveruhr** (LFH-895), online wie offline: die
+  vorbelegte Ereigniszeit von ETB-Eintrag (samt `erfasst_lokal_at`) und Meldung, der Vorschlag
+  im Zeit-Chip der ETB-Erfassung, der Knopf „Jetzt“ jeder `ZeitpunktEingabe`, die Bausteine
+  `{datum}`/`{uhrzeit}` und der Nachtrag der Kräfte-Zeitachse. Alle nehmen `serverJetzt()`, nie
+  `dayjs()`, damit „Chip öffnen, OK“ und „Chip weglassen“ dieselbe Zeit ergeben. Eine
+  Zukunftsprüfung im Client an einer Zeiteingabe misst an derselben Uhr, sonst fällt „Jetzt“ auf
+  einem nachgehenden Gerät durch. Eine eingetragene Zeit geht unverändert hinaus. Der Server
+  begrenzt ETB- und Meldungs-Ereigniszeiten bewusst nicht. Weitere Vorbelegungen aus `dayjs()`
+  sind offen (LFH-1031). Herleitung:
+  `openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`.

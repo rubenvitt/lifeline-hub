@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Button } from 'antd';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { schlechtesterZustand, type AbrufZustand } from '../api/abrufZustand';
+import type { AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulFreigaben, Stab } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -16,7 +16,7 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { auftragsStand, meldungsStand } from '../pages/lage-dashboard/fuehrungsZahlen';
 import { baueLagebild, kennzahlReihe } from '../pages/lage-dashboard/lagebild';
-import { useLagebild } from '../pages/lage-dashboard/useLagebild';
+import { kraefteZustand, useLagebild } from '../pages/lage-dashboard/useLagebild';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { quellenLaden, vorbereitungMarkdown, vorbereitungsZeilen } from './vorbereitung';
 
@@ -87,13 +87,7 @@ export default function VorbereitungPaneel({
       lagebild,
       zustand: {
         personen: zustand.personen,
-        kraefte: schlechtesterZustand(
-          zustand.abschnitte,
-          zustand.einheiten,
-          zustand.personal,
-          zustand.fahrzeuge,
-          zustand.material,
-        ),
+        kraefte: kraefteZustand(zustand),
         gefahren: zustand.gefahren,
         lageberichte: zustand.lageberichte,
         stab: stabZustand,

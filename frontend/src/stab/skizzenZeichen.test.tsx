@@ -65,6 +65,8 @@ describe('schaetzeTextbreite', () => {
 describe('Bedingungszeichen', () => {
   it('setzt Betriebsart und Bezeichnung zusammen', () => {
     expect(bedingungszeichenText('TMO', 'BN_BOS')).toBe('TMO BN_BOS');
+    // Dieselbe Regel wie Funkplan-Bericht und Einsatzdaten (LFH-884): kein „TMO TMO …“.
+    expect(bedingungszeichenText('TMO', 'TMO 412_F_DRK')).toBe('TMO 412_F_DRK');
   });
 
   it('wächst mit dem Text und kürzt nie', () => {

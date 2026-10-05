@@ -443,6 +443,26 @@
           }
         }
       },
+      "AnsichtSperre": {
+        "type": "object",
+        "description": "Module einer Ansicht, die in diesem Einsatz einem einfachen Mitglied gesperrt sind.",
+        "required": [
+          "ansicht",
+          "gesperrte_module"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/Funktionsansicht"
+          },
+          "gesperrte_module": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Modul-Keys, die das Gerät nicht nutzen könnte. Leer: die Ansicht ist voll nutzbar."
+          }
+        }
+      },
       "AntragStand": {
         "type": "string",
         "description": "Stand eines Antrags.",
@@ -5507,6 +5527,15 @@
           "fachberater"
         ]
       },
+      "Funktionsansicht": {
+        "type": "string",
+        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0147_geraet_kopplung.sql`.",
+        "enum": [
+          "uhs-tablet",
+          "uhs-laptop",
+          "lagemonitor"
+        ]
+      },
       "GefahrBewertungAnzeige": {
         "type": "object",
         "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit\n`warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.",
@@ -5677,6 +5706,72 @@
           "coordinates": {},
           "type": {
             "type": "string"
+          }
+        }
+      },
+      "GeraetAnzeige": {
+        "type": "object",
+        "description": "Wie ein Gerät sich selbst sieht (`GET /api/auth/me`, Feld `geraet`).",
+        "required": [
+          "kopplung_id",
+          "einsatz_id",
+          "ansicht",
+          "bezeichnung",
+          "laeuft_ab_at"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/Funktionsansicht"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kopplung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          },
+          "stelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung der UHS, falls stellengebunden."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "GeraeteUebersicht": {
+        "type": "object",
+        "description": "Geräteübersicht der Einsatzleitung.",
+        "required": [
+          "kopplungen",
+          "sperren"
+        ],
+        "properties": {
+          "kopplungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KopplungAnzeige"
+            }
+          },
+          "sperren": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnsichtSperre"
+            }
           }
         }
       },
@@ -6264,6 +6359,128 @@
           "gk"
         ]
       },
+      "KopplungAnzeige": {
+        "type": "object",
+        "description": "Eine Kopplung für die Geräteübersicht der Einsatzleitung.",
+        "required": [
+          "id",
+          "ansicht",
+          "bezeichnung",
+          "anzeigename",
+          "status",
+          "erstellt_at",
+          "erstellt_von_name",
+          "laeuft_ab_at"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/Funktionsansicht"
+          },
+          "anzeigename": {
+            "type": "string",
+            "description": "Anzeigename des Gerätekontos, so wie er an Einträgen steht."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von_name": {
+            "type": "string"
+          },
+          "gekoppelt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          },
+          "letzter_zugriff_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/KopplungStatus"
+          },
+          "stelle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung der UHS, falls stellengebunden."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "widerrufen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "KopplungMitCode": {
+        "type": "object",
+        "description": "Antwort auf das Anlegen und das Neuausstellen: Kopplung plus Code.",
+        "required": [
+          "kopplung",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/KopplungsCode"
+          },
+          "kopplung": {
+            "$ref": "#/components/schemas/KopplungAnzeige"
+          }
+        }
+      },
+      "KopplungStatus": {
+        "type": "string",
+        "description": "Zustand einer Kopplung, aus Sicht der Einsatzleitung.",
+        "enum": [
+          "wartend",
+          "aktiv",
+          "abgelaufen",
+          "widerrufen"
+        ]
+      },
+      "KopplungsCode": {
+        "type": "object",
+        "description": "Ein frisch ausgestellter Kopplungscode. Der Klartext verlässt den Server nur hier, einmal.",
+        "required": [
+          "code",
+          "laeuft_ab_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "laeuft_ab_at": {
+            "type": "string"
+          }
+        }
+      },
       "LageMeldungAnzeige": {
         "type": "object",
         "description": "Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)\nper JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.",
@@ -6707,6 +6924,166 @@
           "evakuiert"
         ]
       },
+      "LagemonitorAnzeige": {
+        "type": "object",
+        "required": [
+          "stand_at",
+          "betroffene",
+          "kraefte",
+          "uhs"
+        ],
+        "properties": {
+          "betroffene": {
+            "$ref": "#/components/schemas/LagemonitorBetroffene"
+          },
+          "kraefte": {
+            "$ref": "#/components/schemas/LagemonitorKraefte"
+          },
+          "stand_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Berechnung (UTC, SQLite-Format)."
+          },
+          "uhs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorUhs"
+            }
+          }
+        }
+      },
+      "LagemonitorBetroffene": {
+        "type": "object",
+        "description": "Betroffene in Zahlen, wie die Kopfzahl des Lage-Dashboards (`lageVerdichtung.ts`).",
+        "required": [
+          "gesamt",
+          "patienten",
+          "sk1",
+          "sk2",
+          "sk3",
+          "sk4",
+          "tot",
+          "unverletzt",
+          "ohne",
+          "vermisst"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ohne": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Noch nicht gesichtet."
+          },
+          "patienten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "SK I bis SK IV."
+          },
+          "sk1": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk2": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk3": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sk4": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tot": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unverletzt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vermisst": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LagemonitorKraefte": {
+        "type": "object",
+        "description": "Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke.",
+        "required": [
+          "einheiten",
+          "personal",
+          "staerke"
+        ],
+        "properties": {
+          "einheiten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "personal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "staerke": {
+            "$ref": "#/components/schemas/Staerke"
+          }
+        }
+      },
+      "LagemonitorUhs": {
+        "type": "object",
+        "description": "Eine nicht aufgelöste UHS mit ihrer Belegung als Zahl.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "typ",
+          "status",
+          "belegt",
+          "plaetze"
+        ],
+        "properties": {
+          "belegt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personen, die gerade in dieser UHS liegen."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Plätze ohne Wartebereich."
+          },
+          "status": {
+            "$ref": "#/components/schemas/UhsStatus"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/UhsTyp"
+          }
+        }
+      },
       "LetzteRueckmeldung": {
         "type": "object",
         "description": "Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).\nAls Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher\nMeldungsart; maßgeblich ist die jüngste `ereigniszeit`.",
@@ -6859,6 +7236,29 @@
           "verbraucht",
           "desinfektion_noetig"
         ]
+      },
+      "MeAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BenutzerAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "geraet": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/GeraetAnzeige"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) zusätzlich\ndie Kopplung. Eine Person bekommt `geraet: null`."
       },
       "MedienkontaktAnzeige": {
         "type": "object",

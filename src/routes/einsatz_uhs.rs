@@ -6,6 +6,7 @@ use crate::einsatz::modul::Unfallhilfsstellen;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::geraet::stelle;
 use crate::live::LiveEvent;
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
@@ -65,15 +66,18 @@ pub async fn liste(
         params.status.as_deref(),
         "Unbekannter UHS-Status im Filter",
     )?;
-    Ok(Json(
-        uhs_repo::liste(
-            &state.pool,
-            einsatz_id,
-            params.status.as_deref(),
-            params.abschnitt_id,
-        )
-        .await?,
-    ))
+    let mut liste = uhs_repo::liste(
+        &state.pool,
+        einsatz_id,
+        params.status.as_deref(),
+        params.abschnitt_id,
+    )
+    .await?;
+    // Stellenbindung (LFH-892): ein UHS-Gerät kennt nur seine eigene UHS.
+    if let Some(eigene) = stelle::stelle(ctx.geraet.as_ref()) {
+        liste.retain(|u| u.id == eigene);
+    }
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,12 +126,21 @@ pub async fn detail(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<UhsDetail>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let uhs = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
     let plaetze = platz_repo::liste_je_uhs(&state.pool, uhs_id).await?;
     let belegungen = belegung_repo::liste_je_uhs(&state.pool, uhs_id).await?;
-    let material =
+    // Das Tablet liest kein Material (Scope-Matrix); der Laptop das seiner UHS.
+    let material = if ctx
+        .geraet
+        .as_ref()
+        .is_some_and(|g| g.ansicht == crate::geraet::Funktionsansicht::UhsTablet)
+    {
+        Vec::new()
+    } else {
         material_repo::liste_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
-            .await?;
+            .await?
+    };
     Ok(Json(UhsDetail {
         uhs,
         plaetze,
@@ -164,6 +177,7 @@ pub async fn aktualisieren(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<UhsAnzeige>, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
     if vorher.storniert_at.is_some() {
@@ -288,6 +302,7 @@ pub async fn platz_anlegen(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PlatzAnlegenBody>,
 ) -> Result<(StatusCode, Json<PlatzAnzeige>), AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     parse_enum(PlatzTyp::parse, &body.typ, "Unbekannter Platz-Typ")?;
     let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
@@ -324,6 +339,7 @@ pub async fn plaetze_bulk_anlegen(
     PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PlatzBulkBody>,
 ) -> Result<(StatusCode, Json<Vec<PlatzAnzeige>>), AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     let Some(typ) = PlatzTyp::parse(&body.typ) else {
         return Err(AppError::Validation("Unbekannter Platz-Typ".into()));
@@ -365,6 +381,7 @@ pub async fn platz_aktualisieren(
     PfadParam((_eid, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
     JsonBody(body): JsonBody<PlatzPatchBody>,
 ) -> Result<Json<PlatzAnzeige>, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
@@ -399,6 +416,7 @@ pub async fn platz_verfuegbarkeit(
     JsonBody(body): JsonBody<VerfuegbarkeitBody>,
 ) -> Result<Json<PlatzAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
     parse_enum(
@@ -411,6 +429,7 @@ pub async fn platz_verfuegbarkeit(
         let pid_ziel = body.reserviert_fuer_person_id.ok_or_else(|| {
             AppError::Validation("Reservierung erfordert eine Ziel-Person".into())
         })?;
+        stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), pid_ziel).await?;
         person_repo::laden(&state.pool, einsatz_id, pid_ziel).await?;
     }
     let platz = platz_repo::setze_verfuegbarkeit(
@@ -432,6 +451,7 @@ pub async fn platz_stornieren(
     ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
     PfadParam((_eid, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
+    stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let einsatz_id = ctx.einsatz.id;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
@@ -462,8 +482,21 @@ pub async fn belegung(
     let einsatz_id = ctx.einsatz.id;
     let art = BelegungsArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Belegungs-Art".into()))?;
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let person = person_repo::laden(&state.pool, einsatz_id, person_id).await?;
     let notiz = trimme(body.notiz);
+    // Stellenbindung (LFH-892): ein UHS-Gerät bucht nur in der eigenen UHS. Ein Wechsel bleibt
+    // in ihr (Platz), ein Austritt nimmt nur aus ihr.
+    match art {
+        BelegungsArt::Eintritt => stelle::fordere_ziel_uhs(ctx.geraet.as_ref(), body.uhs_id)?,
+        BelegungsArt::Wechsel => {
+            stelle::fordere_ziel_uhs(ctx.geraet.as_ref(), person.aktuelle_uhs_id)?;
+            stelle::fordere_ziel_uhs(ctx.geraet.as_ref(), body.uhs_id)?;
+        }
+        BelegungsArt::Austritt => {
+            stelle::fordere_ziel_uhs(ctx.geraet.as_ref(), person.aktuelle_uhs_id)?
+        }
+    }
 
     // Für ETB-Texte brauchen wir den ehemaligen Platz/UHS (vor dem Event).
     let vorher_uhs = person.aktuelle_uhs_id;

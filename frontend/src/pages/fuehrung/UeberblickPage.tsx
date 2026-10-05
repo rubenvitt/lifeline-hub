@@ -7,7 +7,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
-import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
+import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
@@ -25,6 +25,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { schlechtesterZustand, type AbrufZustand } from '../../api/abrufZustand';
 import { verfasserText } from '../../etb/verfasser';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
+import type { ModulFreigaben } from '../../api/types';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -106,8 +107,13 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * Gesperrt ist weder Ausfall noch leerer Bestand: eine Kennzahl steht als „—" mit „nicht
  * freigegeben" (wie die Aufträge aus dem Modulzähler), ein Paneel nennt den Grund; Altstand im
  * Cache bleibt unsichtbar. Scheitern die Freigaben selbst, zeigen die gebundenen Blöcke „Stand
- * unbekannt". Nur Beiwerk (Rückmeldungen, Aufträge in der Abschnittszeile, Fristen der Marken)
- * entfällt still, wie die Ablösungsmarken.
+ * unbekannt". Nur Beiwerk (Rückmeldungen, Aufträge in der Abschnittszeile) entfällt still.
+ *
+ * Ein Block hängt nur an den Quellen, aus denen er rechnet (LFH-887): die Kräfte-Kennzahl am
+ * Personal (die Stärke kommt nur von dort), das Abschnittspaneel an Abschnitten, Einheiten und
+ * Personal. Fahrzeuge und Material tragen dort nur den Auffangknoten „Ohne Abschnitt" und
+ * entfallen gesperrt still. Eine Liste, der eine gesperrte Quelle fehlt, sagt das, statt „keine"
+ * zu behaupten (`ohneFreigabeHinweis`): die Marken immer, das Abschnittspaneel im Leerzustand.
  *
  * Keine erfundenen Daten: Lagezustand, Kürzel, fester Auftrag und Fortschritt kommen aus dem
  * Abschnitt selbst und fehlen, solange sie dort nicht gepflegt sind.
@@ -126,6 +132,22 @@ type Zustand = AbrufZustand;
 interface Quelle {
   q: UseQueryResult<unknown>;
   frei: boolean;
+}
+
+/**
+ * „Nicht freigegeben: …" für die Quellen einer Liste, deren Modul für die Person gesperrt ist
+ * (LFH-887); `null`, wenn keine fehlt oder die Freigaben unbekannt sind (dann ist der Block
+ * ohnehin unbestimmt). Ein ausgeblendetes Modul gehört nicht zum Einsatz und fehlt deshalb nicht.
+ */
+function ohneFreigabeHinweis(
+  freigaben: ModulFreigaben | undefined,
+  quellen: { key: string; frei: boolean }[],
+): string | null {
+  if (!freigaben) return null;
+  const namen = quellen
+    .filter(({ key, frei }) => !frei && freigaben[key]?.sichtbar)
+    .map(({ key }) => modulRegistry.find((m) => m.key === key)?.label ?? key);
+  return namen.length > 0 ? `Nicht freigegeben: ${namen.join(', ')}.` : null;
 }
 
 /** Stand der Freigaben: solange sie fehlen, ist jede gebundene Quelle unbestimmt. */
@@ -335,12 +357,12 @@ export default function UeberblickPage() {
     enabled: erinnerungenFrei,
   });
   // Ablösungsmarken nur, wenn das Modul sichtbar und frei ist — sonst 403 und ein Seitenkanal über
-  // ausgeblendete Daten (dieselbe Prüfung wie `darfZaehlerZeigen`).
-  const abloesungSichtbar = freigabenQ.isSuccess && darfZaehlerZeigen('abloesung', freigabenQ.data);
+  // ausgeblendete Daten (dieselbe Prüfung wie `darfZaehlerZeigen`). Aus denselben Freigaben wie
+  // die übrigen Quellen: ein gescheiterter Neuabruf lässt sie gültig.
+  const abloesungSichtbar = darfZaehlerZeigen('abloesung', freigaben);
   // „Erwarteter Höchststand" führt auf „Wetter & Pegel", wenn das Modul frei ist, sonst auf die
   // Pflege (`pegelZielPfad`).
-  const wetterPegelFrei =
-    freigabenQ.isSuccess && istKeyFreigegeben('wetter-pegel', freigabenQ.data);
+  const wetterPegelFrei = istKeyFreigegeben('wetter-pegel', freigaben);
   const abloesungenQ = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
@@ -384,10 +406,7 @@ export default function UeberblickPage() {
     !rueckmeldungenFrei || rueckmeldungenQ.isError ? undefined : rueckmeldungenQ.data;
 
   const betroffene = useMemo(() => betroffeneKennzahl(personen ?? [], jetzt), [personen, jetzt]);
-  const kraefte = useMemo(
-    () => kraefteKennzahl(personal ?? [], fahrzeuge ?? [], material ?? []),
-    [personal, fahrzeuge, material],
-  );
+  const kraefte = useMemo(() => kraefteKennzahl(personal ?? []), [personal]);
   const warnstufe = useMemo(() => warnstufeKennzahlVon(gefahren ?? []), [gefahren]);
   const pegel = pegelQ.data;
   const pegelNotiz = useMemo(
@@ -463,7 +482,7 @@ export default function UeberblickPage() {
     quellen.filter((x) => x.frei || freigabenStand !== 'da');
 
   const zBetroffene = zustandVon(freigabenStand, qPersonen);
-  const zKraefte = zustandVon(freigabenStand, qPersonal, qFahrzeuge, qMaterial);
+  const zKraefte = zustandVon(freigabenStand, qPersonal);
   const zWarnstufe = zustandVon(freigabenStand, qGefahren);
   const zAuftraege = zustandVon(freigabenStand, qAuftraege);
   const zAbschnitteZahl = zustandVon(freigabenStand, qAbschnitte);
@@ -472,13 +491,23 @@ export default function UeberblickPage() {
     qAbschnitte,
     qEinheiten,
     qPersonal,
-    qFahrzeuge,
-    qMaterial,
+    ...ohneGesperrte(qFahrzeuge, qMaterial),
   );
+  // Ohne Fahrzeuge oder Material ist „keine Kräfte" keine Aussage (LFH-887, Dateikopf).
+  const abschnitteHinweis = ohneFreigabeHinweis(freigaben, [
+    { key: 'fahrzeuge', frei: fahrzeugeFrei },
+    { key: 'material', frei: materialFrei },
+  ]);
   const zEntscheidungen = zustandVon(freigabenStand, qEtb);
-  // Die Marken sammeln Fristen aus mehreren Quellen; eine gesperrte trägt nichts bei (wie die
-  // Ablösungen), die Lagebesprechung bleibt.
+  // Die Marken sammeln Fristen aus mehreren Quellen; eine gesperrte trägt nichts bei, die
+  // Lagebesprechung bleibt. Was fehlt, nennt der Hinweis — sonst läse sich die Liste vollständig.
   const zMarken = zustandVon(freigabenStand, qEinsatz, ...ohneGesperrte(qAuftraege, qErinnerungen));
+  const markenHinweis = ohneFreigabeHinweis(freigaben, [
+    { key: 'auftraege', frei: auftraegeFrei },
+    { key: 'erinnerungen', frei: erinnerungenFrei },
+    { key: 'abloesung', frei: abloesungSichtbar },
+    { key: 'wetter-pegel', frei: wetterPegelFrei },
+  ]);
   /** „Erneut abrufen": gescheiterte Freigaben zuerst, Listen nur freier Module. */
   const nachladen = (...quellen: Quelle[]) => {
     if (freigabenStand === 'fehler') void freigabenQ.refetch();
@@ -661,10 +690,21 @@ export default function UeberblickPage() {
             <div style={rasterStil(breit, token.marginLG)}>
               <Paneel
                 titel="Einsatzabschnitte"
+                // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
+                // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
+                // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883).
                 meta={
-                  zAbschnitte === 'daten'
-                    ? `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
-                    : undefined
+                  zAbschnitte === 'daten' ? (
+                    `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
+                  ) : zAbschnitte === 'laden' ? (
+                    <span
+                      data-lfh="paneel-meta-platzhalter"
+                      aria-hidden="true"
+                      style={{ visibility: 'hidden' }}
+                    >
+                      0 Abschnitte · 0 Einheiten
+                    </span>
+                  ) : undefined
                 }
                 fuss={
                   zAbschnitte === 'daten' && zeilen.length > 0 ? (
@@ -678,7 +718,11 @@ export default function UeberblickPage() {
                 <Zustandsfeld
                   zustand={zAbschnitte}
                   leer={zeilen.length === 0}
-                  leerText="Noch keine Abschnitte und keine Kräfte erfasst."
+                  leerText={
+                    abschnitteHinweis
+                      ? `Noch keine Abschnitte, Einheiten oder Personal erfasst. ${abschnitteHinweis}`
+                      : 'Noch keine Abschnitte und keine Kräfte erfasst.'
+                  }
                   leerAktion={
                     darfSchreiben
                       ? { text: 'Abschnitt anlegen', ziel: einsatzabschnittePfad(einsatzId) }
@@ -881,11 +925,21 @@ export default function UeberblickPage() {
                       ? `+${marken.weitere} weitere`
                       : undefined
                   }
+                  fuss={
+                    // Im Leerzustand steht der Hinweis im Leertext.
+                    zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
+                      <span style={{ fontSize: 12, color: rollen.gedaempft }}>{markenHinweis}</span>
+                    ) : undefined
+                  }
                 >
                   <Zustandsfeld
                     zustand={zMarken}
                     leer={marken.marken.length === 0}
-                    leerText="Keine anstehenden Fristen."
+                    leerText={
+                      markenHinweis
+                        ? `Keine sichtbaren Fristen. ${markenHinweis}`
+                        : 'Keine anstehenden Fristen.'
+                    }
                     onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
                   >
                     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>

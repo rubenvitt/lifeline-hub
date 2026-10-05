@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Button, Popconfirm, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
+import type { UploadFortschritt } from '../../api/client';
 import {
   Paneel,
   PaneelZeile,
@@ -49,7 +50,11 @@ export interface ErfassungsAnhangEintrag {
 export interface ErfassungsAnhangQuelle {
   queryKey: QueryKey;
   liste: () => Promise<ErfassungsAnhangEintrag[]>;
-  ablegen: (datei: File) => Promise<{ id: number }>;
+  /** Meldet den Stand der Übertragung an `onFortschritt` (LFH-878). */
+  ablegen: (
+    datei: File,
+    onFortschritt: (stand: UploadFortschritt) => void,
+  ) => Promise<{ id: number }>;
   entfernen: (anhangId: number) => Promise<unknown>;
   downloadPfad: (anhangId: number) => string;
 }

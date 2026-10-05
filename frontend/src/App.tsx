@@ -7,6 +7,18 @@ import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import AppAnmeldungPage from './pages/AppAnmeldungPage';
+import KoppelnPage from './geraet/KoppelnPage';
+import KopplungBeendetPage from './geraet/KopplungBeendetPage';
+import GeraeteLayout, {
+  GeraetAufnahme,
+  GeraetEinsatzRahmen,
+  GeraetStart,
+  GeraetMonitor,
+  GeraetStelle,
+  GeraetUhsRahmen,
+  GeraetUhs,
+} from './geraet/GeraeteLayout';
+import GeraetPatientenPage from './geraet/GeraetPatientenPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
 import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
@@ -31,6 +43,7 @@ import EinsatzVerhalten from './pages/einstellungen/EinsatzVerhalten';
 import EinsatzAufbewahrung from './pages/einstellungen/EinsatzAufbewahrung';
 import EinsatzModule from './pages/einstellungen/EinsatzModule';
 import EinsatzPegel from './pages/einstellungen/EinsatzPegel';
+import EinsatzGeraete from './pages/einstellungen/EinsatzGeraete';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
@@ -82,7 +95,12 @@ import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
 import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
-import { EINSTELLUNGEN_SEKTIONEN } from './routing/deeplinks';
+import {
+  EINSTELLUNGEN_SEKTIONEN,
+  GERAET_START_PFAD,
+  KOPPELN_PFAD,
+  KOPPLUNG_BEENDET_PFAD,
+} from './routing/deeplinks';
 import LiveStatusBanner from './live/LiveStatusBanner';
 import { useOrgLiveStream } from './live/useOrgLiveStream';
 import { abgleichFuer, useOfflineSync } from './offline/useOfflineSync';
@@ -157,6 +175,7 @@ const EINSTELLUNGEN_ROUTEN = (
     <Route path="aufbewahrung" element={<EinsatzAufbewahrung />} />
     <Route path="module" element={<EinsatzModule />} />
     <Route path="pegel" element={<EinsatzPegel />} />
+    <Route path="geraete" element={<EinsatzGeraete />} />
     {/* Unbekanntes Segment → erste Sektion, statt ein leeres `<Outlet>` unter markiertem Reiter. */}
     <Route path="*" element={<Navigate to={`../${EINSTELLUNGEN_SEKTIONEN[0].key}`} replace />} />
   </>
@@ -205,7 +224,28 @@ function SitzungsLayout() {
 export const appRouten = createRoutesFromElements(
   <Route element={<App />}>
     <Route path="/login" element={<LoginPage />} />
+    {/* Gerätekopplung (LFH-892): Einlösen und Ende ohne Sitzung, ohne Anmeldung für Personen. */}
+    <Route path={KOPPELN_PFAD} element={<KoppelnPage />} />
+    <Route path={KOPPLUNG_BEENDET_PFAD} element={<KopplungBeendetPage />} />
     <Route element={<RequireAuth />}>
+      {/* Hülle eines gekoppelten Geräts; die Ansichten hängen darunter (LFH-892, design.md D9). */}
+      <Route path={GERAET_START_PFAD} element={<GeraeteLayout />}>
+        <Route index element={<GeraetStart />} />
+        <Route path=":id" element={<GeraetEinsatzRahmen />}>
+          <Route index element={<GeraetStart />} />
+          <Route path="monitor" element={<GeraetMonitor />} />
+          {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
+          <Route element={<GeraetUhsRahmen />}>
+            <Route path="patienten" element={<GeraetPatientenPage />} />
+            <Route path="patienten/:personId" element={<PersonenDetailPage />} />
+            <Route path="aufnahme" element={<GeraetAufnahme />} />
+            <Route path="uhs/:uhsId" element={<GeraetUhs />} />
+            <Route path="stelle" element={<GeraetStelle />} />
+          </Route>
+          <Route path="*" element={<GeraetStart />} />
+        </Route>
+        <Route path="*" element={<GeraetStart />} />
+      </Route>
       {/* Bestätigung im Systembrowser für die Mac-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
       <Route path="/app-anmeldung" element={<AppAnmeldungPage />} />
       <Route element={<BetriebsLayout />}>
