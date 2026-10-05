@@ -641,3 +641,205 @@ async fn bezug_an_geloeschter_nachricht_ist_konflikt() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
 }
+
+// ---------------- Heraufstufen verlangt die Freigabe des Zielmoduls (LFH-904) ----------------
+
+/// Führungsperson „frieda" im Einsatz: Chat-Schreibrecht, aber kein System-Admin.
+async fn fuehrungsperson(app: &axum::Router, admin: &str, einsatz: i64) -> String {
+    let id = benutzer_anlegen(app, admin, "frieda", "keine").await;
+    rolle_setzen(app, admin, einsatz, id, "fuehrungspersonal").await;
+    login_cookie(app, "frieda", "friedapw1").await
+}
+
+/// Beschränkt ein Modul des Einsatzes auf System-Admins (Override, LFH-132).
+async fn nur_fuer_admins(app: &axum::Router, admin: &str, einsatz: i64, modul: &str) {
+    let (s, v) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Sendet als `cookie` eine Nachricht in den Default-Kanal; liefert (Kanal-ID, Nachrichten-ID).
+async fn nachricht(app: &axum::Router, einsatz: i64, cookie: &str, inhalt: &str) -> (i64, i64) {
+    let kid = default_kanal(app, einsatz, cookie).await;
+    let (s, m) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        cookie,
+        Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    (kid, m["id"].as_i64().unwrap())
+}
+
+async fn etb_meldungen(app: &axum::Router, einsatz: i64, admin: &str) -> usize {
+    let (_, etb) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        admin,
+        None,
+    )
+    .await;
+    etb.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "meldung")
+        .count()
+}
+
+const AUFTRAG_BODY: &str = r#"{"auftrag_text":"Sandsäcke","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S4"}]}"#;
+
+#[tokio::test]
+async fn heraufstufen_etb_ohne_etb_freigabe_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    nur_fuer_admins(&app, &admin, einsatz, "etb").await;
+    let (kid, mid) = nachricht(&app, einsatz, &frieda, "Deich km12 instabil").await;
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &frieda,
+        Some(r#"{"typ":"meldung"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    assert_eq!(
+        etb_meldungen(&app, einsatz, &admin).await,
+        0,
+        "kein Eintrag"
+    );
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        liste.as_array().unwrap()[0]["etb_eintrag_id"].is_null(),
+        "kein Rückverweis an der Nachricht"
+    );
+}
+
+#[tokio::test]
+async fn heraufstufen_etb_mit_etb_freigabe_gelingt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    // Ein anderes Modul gesperrt: stört das Heraufstufen ins ETB nicht.
+    nur_fuer_admins(&app, &admin, einsatz, "auftraege").await;
+    let (_, mid) = nachricht(&app, einsatz, &frieda, "Deich km12 instabil").await;
+
+    let (s, hoch) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &frieda,
+        Some(r#"{"typ":"meldung"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{hoch}");
+    assert!(hoch["etb_eintrag_id"].is_i64());
+    assert_eq!(etb_meldungen(&app, einsatz, &admin).await, 1);
+}
+
+#[tokio::test]
+async fn heraufstufen_auftrag_ohne_auftrags_freigabe_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    nur_fuer_admins(&app, &admin, einsatz, "auftraege").await;
+    let (kid, mid) = nachricht(&app, einsatz, &frieda, "Sandsäcke").await;
+    let anordnungen_vorher = anordnungen(&app, einsatz, &admin).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"),
+        &frieda,
+        Some(AUFTRAG_BODY),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    let (_, auftraege) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(auftraege.as_array().unwrap().is_empty(), "kein Auftrag");
+    assert_eq!(
+        anordnungen(&app, einsatz, &admin).await,
+        anordnungen_vorher,
+        "keine ETB-Anordnung"
+    );
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        liste.as_array().unwrap()[0]["auftrag_id"].is_null(),
+        "kein Rückverweis an der Nachricht"
+    );
+}
+
+#[tokio::test]
+async fn heraufstufen_auftrag_verlangt_kein_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    // Wie POST /auftraege: die ETB-Anordnung ist Nebeneffekt, kein zweites Gate (design.md D2).
+    nur_fuer_admins(&app, &admin, einsatz, "etb").await;
+    let (_, mid) = nachricht(&app, einsatz, &frieda, "Sandsäcke").await;
+
+    let (s, hoch) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"),
+        &frieda,
+        Some(AUFTRAG_BODY),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{hoch}");
+    assert!(hoch["auftrag_id"].is_i64());
+}
+
+async fn anordnungen(app: &axum::Router, einsatz: i64, admin: &str) -> usize {
+    let (_, etb) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        admin,
+        None,
+    )
+    .await;
+    etb.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "anordnung")
+        .count()
+}

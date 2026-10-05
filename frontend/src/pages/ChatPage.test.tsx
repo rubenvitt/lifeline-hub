@@ -7,7 +7,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import ChatPage from './ChatPage';
 import type { ChatKanal, ChatNachricht } from '../api/types';
-import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -364,6 +364,24 @@ describe('ChatPage', () => {
 
     await waitFor(() =>
       expect(gesendet).toEqual({ typ: 'meldung', inhalt: 'Erste Lage', anhang_ids: [31] }),
+    );
+  });
+
+  it('sperrt „Zu ETB" nach den Freigaben des Servers (LFH-904)', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
+      ),
+    );
+    setup();
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Zu ETB (Keine Berechtigung)' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('menuitem', { name: 'Zu Auftrag' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
     );
   });
 
