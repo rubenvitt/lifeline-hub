@@ -6,7 +6,7 @@ Gates ohne `| tail`, Node und pnpm über `mise exec --`.
 
 ## 1. Tabelle, Annahme eines Bildes, Repo (design.md D2, D3, D5)
 
-- [x] 1.1 Migration `0150_uhs_plan.sql` (Nummer gegen frisches `origin/alpha` prüfen) nach D2 anlegen, mit Kopfkommentar (kein Anhang, Schwärzung `ZeileLoeschen`).
+- [x] 1.1 Migration `0151_uhs_plan.sql` (Nummer gegen frisches `origin/alpha` prüfen) nach D2 anlegen, mit Kopfkommentar (kein Anhang, Schwärzung `ZeileLoeschen`).
   - Verifiziert durch `scripts/check-migrationen.sh` und `cargo test --lib db::tests`.
 - [x] 1.2 `src/uhs/plan.rs`: `pruefe_bild(bytes) -> GeprueftesBild` (Größe, Format PNG/JPEG/WebP, Bereinigung, Maße, Kantengrenze 10 000 px, sha256) und `raste(v)`, `startlage(plaetze, bild_breite, bild_hoehe)`.
   - Unit-Tests zuerst: PNG/JPEG/WebP angenommen; PDF, GIF, HEIC, leer und 25 MiB + 1 abgelehnt mit dem Fehler nach D3; JPEG mit GPS-EXIF kommt ohne GPS heraus; Maße aus dem Kopf; Kante 10 001 px → 422; `raste(37) = 40`, `raste(-37) = -40`, `raste(35) = 40`; `startlage` ohne Plätze `0/0/820`, mit zehn Rasterplätzen überdeckt sie alle (Rahmen plus 20 px).

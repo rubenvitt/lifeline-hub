@@ -80,7 +80,7 @@ für alle Modul-Lesenden sichtbares Bild wie ein Bild-Hintergrund der Lagekarte.
 
 ### D2 Tabelle `uhs_plan`, eine Zeile je UHS
 
-Migration `0150_uhs_plan.sql` (Nummer vor dem PR gegen frisches `origin/alpha` prüfen):
+Migration `0151_uhs_plan.sql` (Nummer vor dem PR gegen frisches `origin/alpha` prüfen):
 
 ```sql
 CREATE TABLE uhs_plan (
