@@ -10,7 +10,7 @@ export function ladeOrganisation(): Promise<OrganisationInfo> {
 }
 
 /** Änderbare Felder der Organisation; was fehlt, bleibt auf dem Server unverändert. */
-export interface OrganisationAenderung {
+export interface OrganisationPatch {
   name?: string;
   tz_organisation?: string;
 }
@@ -20,8 +20,8 @@ export interface OrganisationAenderung {
  * Schickt nur die übergebenen Felder: der PATCH nimmt beide optional, ein mitgeschicktes Feld
  * überschriebe einen inzwischen fremd geänderten Stand.
  */
-export function aendereOrganisation(felder: OrganisationAenderung): Promise<OrganisationInfo> {
-  const body: OrganisationAenderung = {};
+export function aendereOrganisation(felder: OrganisationPatch): Promise<OrganisationInfo> {
+  const body: OrganisationPatch = {};
   if (felder.name !== undefined) body.name = felder.name;
   if (felder.tz_organisation !== undefined) body.tz_organisation = felder.tz_organisation;
   return apiSend<OrganisationInfo>(PFAD, 'PATCH', body);

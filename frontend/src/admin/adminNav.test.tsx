@@ -122,7 +122,8 @@ describe('adminNav — Seitenkopf trägt den Registry-Titel', () => {
     'Sektion %s trägt ihren Registry-Titel im Seitenkopf',
     async (label, element) => {
       stammdatenHandler();
-      renderMitProviders(element);
+      // Data Router: Formularseiten tragen den Verlassen-Schutz (`useBlocker`, LFH-979).
+      renderMitProviders(element, { datenRouter: true });
       // Der Kopf von `AdminPage` ist ein h1.
       expect(await screen.findByRole('heading', { level: 1, name: label })).toBeInTheDocument();
     },

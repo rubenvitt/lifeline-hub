@@ -11,7 +11,7 @@ import {
   ladeOrganisation,
   ladeOrgLogoHoch,
   orgLogoPfad,
-  type OrganisationAenderung,
+  type OrganisationPatch,
 } from '../api/organisation';
 import type { OrganisationInfo } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
@@ -63,8 +63,8 @@ const ORG_OPTIONEN = [
 function geaenderteFelder(
   werte: FormWerte,
   server: OrganisationInfo | undefined,
-): OrganisationAenderung | null {
-  const felder: OrganisationAenderung = {};
+): OrganisationPatch | null {
+  const felder: OrganisationPatch = {};
   const name = werte.name.trim();
   if (name !== server?.name) felder.name = name;
   if (werte.tz_organisation != null && werte.tz_organisation !== server?.tz_organisation) {
@@ -74,7 +74,7 @@ function geaenderteFelder(
 }
 
 /** Die Erfolgsmeldung nennt genau, was gespeichert wurde (LFH-979). */
-function erfolgsText(felder: OrganisationAenderung): string {
+function erfolgsText(felder: OrganisationPatch): string {
   if (felder.name !== undefined && felder.tz_organisation !== undefined) {
     return 'Name und DV-102-Organisation gespeichert';
   }
