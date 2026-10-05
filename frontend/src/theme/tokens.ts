@@ -827,6 +827,30 @@ export function antdKlappkopf(dichte: Dichte): NonNullable<ConfigProviderProps['
 }
 
 /**
+ * Der Boden des beschrifteten Kästchens für JEDE `Checkbox` (LFH-907): `minHeight` = kurze Achse
+ * der Stufe, also 24 / 48 / 72 (A1 Gate 3), dazu Box und Text senkrecht mittig.
+ *
+ * antd rendert Box und Text als EIN `label.ant-checkbox-wrapper` (`display: inline-flex`) und
+ * kennt für dessen Höhe kein Komponenten-Token: das Label ist so hoch wie seine Schrift, gemessen
+ * 21,5 px in `kompakt` und 36 px in `handschuh`. Ohne `alignItems` stünde die Box im 72-px-Label
+ * oben (antd: `baseline`). Der Boden ist `kleineZeilenhoehe`, nicht `zeilenhoehe`: in `kompakt`
+ * steht das Kästchen oft in einer Text- oder Chipzeile (ETB „Werte behalten“) und wächst dort nur
+ * auf den Gate-3-Boden, nicht auf die Steuerhöhe 30.
+ *
+ * Am Kontext statt als eigener Baustein oder als Regel in `rollen.css`: der Kontext erreicht jede
+ * `Checkbox` auf einmal, ohne die rund zehn Stellen umzubauen, und folgt der Stufe aus derselben
+ * Zeile von {@link dichten} wie `controlHeightSM` — ein Baustein bräuchte einen Wächter gegen das
+ * nackte antd-Kästchen, und `rollen.css` trägt in den `[data-dichte]`-Blöcken nur Dichte-Properties
+ * (`rollen.guard.test.ts`). Muster wie {@link antdKlappkopf}. Ein eigener `minHeight` an der Stelle
+ * schlägt den Kontext (Stab-Checkliste: `checklistenZeileStil`).
+ */
+export function antdKaestchen(dichte: Dichte): NonNullable<ConfigProviderProps['checkbox']> {
+  return {
+    styles: { root: { minHeight: dichten[dichte].kleineZeilenhoehe, alignItems: 'center' } },
+  };
+}
+
+/**
  * Leitet die antd-Tokens aus den Rollen ab, eine Richtung, keine zweite Liste. Was antd nicht
  * kennt (Marke, Kartenraster, Versal-Sperrung), lebt allein in `rollen.css`.
  */

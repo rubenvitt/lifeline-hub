@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button, Collapse, Popconfirm, Switch, theme } from 'antd';
+import { Button, Checkbox, Collapse, Popconfirm, Switch, theme } from 'antd';
 import { ThemeModeProvider, useDichte } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { sendeZeigerAenderung, setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
@@ -343,4 +343,44 @@ describe('Klappkopf folgt der Staffel über den Kontext (LFH-653)', () => {
       expect(kopf!.style.alignItems).toBe('center');
     });
   }
+});
+
+/**
+ * Beschriftetes Kästchen am Kontext (LFH-907): antd hat für die Höhe des `<label>` um Box und Text
+ * kein Komponenten-Token, es ist nur so hoch wie seine Schrift (gemessen 21,5 / 36 px). Geprüft
+ * wird die Verdrahtung am gerenderten Label; die Rechnung prüft `tokens.test.ts`.
+ */
+describe('Beschriftetes Kästchen folgt der Staffel über den Kontext (LFH-907)', () => {
+  for (const [stufe, soll] of [
+    ['kompakt', '24px'],
+    ['komfortabel', '48px'],
+    ['handschuh', '72px'],
+  ] as const) {
+    it(`auf ${stufe} trägt das Label min-height ${soll} und steht mittig`, () => {
+      localStorage.setItem(SPEICHER_SCHLUESSEL, stufe);
+      const { container } = render(
+        <ThemeModeProvider>
+          <Checkbox>Werte behalten</Checkbox>
+        </ThemeModeProvider>,
+      );
+      const label = container.querySelector<HTMLElement>('label.ant-checkbox-wrapper');
+      expect(label, 'Kästchen-Label im Baum').not.toBeNull();
+      expect(label!.style.minHeight).toBe(soll);
+      expect(label!.style.alignItems).toBe('center');
+    });
+  }
+
+  // Dieselbe Zusammenführung je Eigenschaft wie beim Knopf: ein eigener Stil ohne `minHeight`
+  // (Lagebericht: `marginBottom`) behält den Boden.
+  it('ein eigener Stil OHNE minHeight behält den Boden', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    const { container } = render(
+      <ThemeModeProvider>
+        <Checkbox style={{ marginBottom: 8 }}>Vorschau neben dem Text</Checkbox>
+      </ThemeModeProvider>,
+    );
+    const label = container.querySelector<HTMLElement>('label.ant-checkbox-wrapper')!;
+    expect(label.style.minHeight).toBe('72px');
+    expect(label.style.marginBottom).toBe('8px');
+  });
 });

@@ -10,6 +10,7 @@ import { seitenrinne } from './tokens';
 import { navDrawerBreite } from './tokens';
 import {
   antdAlgorithmus,
+  antdKaestchen,
   antdKlappkopf,
   antdKomponenten,
   kopfzeilenMasse,
@@ -277,6 +278,31 @@ describe('Klappkopf folgt der Staffel (LFH-653)', () => {
         alignItems: 'center',
       });
     }
+  });
+});
+
+/**
+ * Beschriftetes Kästchen (LFH-907): antds `label.ant-checkbox-wrapper` ist nur so hoch wie seine
+ * Schrift (gemessen 21,5 / 36 px) und hat dafür kein Komponenten-Token. Der Boden ist die kurze
+ * Achse aus Gate 3, 24 / 48 / 72 — in `kompakt` die kleine Steuerhöhe, nicht 30: das Kästchen
+ * steht oft in einer Textzeile und bliebe dort optisch, wie es war. Literale, nicht die Quelle.
+ */
+describe('Beschriftetes Kästchen folgt der Staffel (LFH-907)', () => {
+  const SOLL: Record<Dichte, number> = { kompakt: 24, komfortabel: 48, handschuh: 72 };
+
+  it('setzt den Boden der GEWÄHLTEN Stufe am Label und stellt Box und Text mittig', () => {
+    for (const d of Object.keys(SOLL) as Dichte[]) {
+      const stile = antdKaestchen(d).styles;
+      expect(typeof stile, d).toBe('object');
+      expect((stile as { root?: unknown }).root, d).toEqual({
+        minHeight: SOLL[d],
+        alignItems: 'center',
+      });
+    }
+  });
+
+  it('kein Komponenten-Token für das Kästchen — antd kennt keins für die Höhe des Labels', () => {
+    expect(antdKomponenten(farbenHell, 'handschuh').Checkbox).toBeUndefined();
   });
 });
 
