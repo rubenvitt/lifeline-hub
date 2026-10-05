@@ -250,6 +250,13 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     expect(r!.koerper).toMatch(/display:\s*table-header-group/);
   });
 
+  /** LFH-893: die Funkplan-Tabelle folgt der Fernmeldeskizze als Anlage ab neuer Seite. */
+  it('beginnt eine Anlage auf einer neuen Seite', () => {
+    const r = regelFuer(`${WURZEL} [data-lfh='druck-anlage']`);
+    expect(r, 'keine Anlage-Regel').toBeDefined();
+    expect(r!.koerper).toMatch(/break-before:\s*page/);
+  });
+
   it('schreibt break-* statt page-break-*', () => {
     expect(css).not.toMatch(/page-break-/);
   });

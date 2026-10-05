@@ -3,7 +3,9 @@ import type {
   Einheit,
   Einsatzabschnitt,
   KommunikationsStelle,
+  SkizzenVerbindung,
   Stab,
+  StellenKanal,
   Stellenart,
   Verbindungsmittel,
 } from '../api/types';
@@ -12,6 +14,7 @@ import { einheitDetailPfad, einsatzabschnittePfad } from '../routing/deeplinks';
 import { besetzungDarstellung, zeileFuer } from './besetzung';
 import { ZUSTAND_GRUND } from './funkplan';
 import type { Quelle } from './luecken';
+import { bedingungszeichenText } from './skizzenZeichen';
 
 /**
  * Kommunikationsplan des S6 (LFH-848): wer im Einsatz über welche Verbindung außerhalb des Funks
@@ -85,6 +88,12 @@ interface ZeileBasis {
   kennung: string;
   /** Nebentext unter der Kennung (Besetzung, Art der Stelle), `null` = keiner. */
   nebentext: string | null;
+  /**
+   * Kanäle einer externen Stelle als Nebentext (LFH-893), z. B. „TMO SL AS (geplant)“; gepflegt
+   * in der Fernmeldeskizze. Funktionen, Abschnitte und Einheiten: leer (ihre Sprechgruppen stehen
+   * im Funkplan).
+   */
+  kanaele: string[];
   verbindungen: VerbindungsAnzeige[];
 }
 
@@ -165,6 +174,12 @@ function besetzungsText(
   return besetzungDarstellung(zeileFuer(stab.daten, f)).label;
 }
 
+/** Ein Kanal als Text: Bedingungszeichen wie in der Skizze, „geplant“ als Wort (D7). */
+function kanalText(k: StellenKanal): string {
+  const zeichen = bedingungszeichenText(k.sprechgruppe.betriebsart, k.sprechgruppe.bezeichnung);
+  return k.status === 'geplant' ? `${zeichen} (geplant)` : zeichen;
+}
+
 function gepflegteZeile(
   stelle: KommunikationsStelle,
   stab: KommunikationsplanQuellen['stab'],
@@ -179,6 +194,7 @@ function gepflegteZeile(
     schluessel,
     kennung,
     nebentext: istFunktion ? besetzungsText(stelle, stab) : STELLENART_LABEL[stelle.stellenart],
+    kanaele: istFunktion ? [] : stelle.sprechgruppen.map(kanalText),
     stelle,
     verbindungen: stelle.verbindungen.map((v) => ({
       schluessel: `${schluessel}-v${v.id}`,
@@ -226,6 +242,7 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
           schluessel,
           kennung: a.name,
           nebentext: a.kurzbezeichnung ?? null,
+          kanaele: [],
           ziel: einsatzabschnittePfad(q.einsatzId, { abschnitt: a.id }),
           verbindungen: abgeleiteteVerbindung(schluessel, a.kommunikationsmittel, a.erreichbarkeit),
         };
@@ -241,6 +258,7 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
           schluessel,
           kennung: e.name,
           nebentext: e.funkrufname ?? null,
+          kanaele: [],
           ziel: einheitDetailPfad(q.einsatzId, e.id),
           verbindungen: abgeleiteteVerbindung(schluessel, e.kommunikationsmittel, e.erreichbarkeit),
         };
@@ -252,4 +270,66 @@ export function baueKommunikationsplan(q: KommunikationsplanQuellen): Kommunikat
       stellen.filter((s) => s.stellenart !== 'funktion').map((s) => gepflegteZeile(s, q.stab)),
     ),
   ];
+}
+
+// ── Entfernen einer Stelle (LFH-893, Spec-Delta `stab-kommunikationsplan`) ─────────────────────
+
+/**
+ * Was mit einer Stelle verloren geht: ihre Verbindungen, ihre Kanäle und ihre Verbindungen in der
+ * Fernmeldeskizze (der Server räumt alle drei mit). `skizzenVerbindungen` ist `null`, solange die
+ * Skizze nicht geladen ist — dann ist die Zahl unbekannt, nicht null.
+ */
+export interface EntfernUmfang {
+  verbindungen: number;
+  sprechgruppen: number;
+  skizzenVerbindungen: number | null;
+}
+
+export function entfernUmfang(
+  stelle: KommunikationsStelle,
+  skizzenVerbindungen: Quelle<SkizzenVerbindung>,
+): EntfernUmfang {
+  const trifft = (b: SkizzenVerbindung['von']) => b.art === 'stelle' && b.id === stelle.id;
+  return {
+    verbindungen: stelle.verbindungen.length,
+    sprechgruppen: stelle.sprechgruppen.length,
+    skizzenVerbindungen:
+      skizzenVerbindungen.zustand === 'daten'
+        ? skizzenVerbindungen.daten.filter((v) => trifft(v.von) || trifft(v.nach)).length
+        : null,
+  };
+}
+
+/** Eine Rückfrage, sobald etwas mitgeht — oder unbekannt ist, ob etwas mitgeht. */
+export function brauchtRueckfrage(u: EntfernUmfang): boolean {
+  return (
+    u.verbindungen > 0 ||
+    u.sprechgruppen > 0 ||
+    u.skizzenVerbindungen == null ||
+    u.skizzenVerbindungen > 0
+  );
+}
+
+function anzahl(n: number, einzahl: string, mehrzahl: string): string {
+  return `${n} ${n === 1 ? einzahl : mehrzahl}`;
+}
+
+/** Der Text der Rückfrage: nennt jede Zahl größer null, eine unbekannte mit Grund. */
+export function entfernText(kennung: string, u: EntfernUmfang): string {
+  const teile = [
+    u.verbindungen > 0 ? anzahl(u.verbindungen, 'Verbindung', 'Verbindungen') : null,
+    u.sprechgruppen > 0 ? anzahl(u.sprechgruppen, 'Sprechgruppe', 'Sprechgruppen') : null,
+    u.skizzenVerbindungen
+      ? anzahl(u.skizzenVerbindungen, 'Skizzen-Verbindung', 'Skizzen-Verbindungen')
+      : null,
+  ].filter((t): t is string => t != null);
+  const mit =
+    teile.length === 0
+      ? ''
+      : `, mit ${teile.length === 1 ? teile[0] : `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}`}`;
+  const satz = `„${kennung}“ wird aus dem Kommunikationsplan entfernt${mit}.`;
+  return u.skizzenVerbindungen == null
+    ? `${satz} Ob sie in der Fernmeldeskizze verbunden ist, ist nicht bekannt (Fernmeldeskizze ` +
+        'nicht geladen); ihre Verbindungen dort gehen mit.'
+    : satz;
 }

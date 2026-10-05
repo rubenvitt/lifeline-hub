@@ -1,7 +1,20 @@
 import type { AbrufZustand } from '../api/abrufZustand';
-import type { Betriebsart, Sprechgruppe } from '../api/types';
-import { einheitDetailPfad, einsatzabschnittePfad } from '../routing/deeplinks';
+import type {
+  Betriebsart,
+  KommunikationsStelle,
+  Sprechgruppe,
+  Verbindungsstatus,
+} from '../api/types';
+import {
+  einheitDetailPfad,
+  einsatzabschnittePfad,
+  kommunikationsplanPfad,
+} from '../routing/deeplinks';
 import { ZUSTAND_GRUND, type FunkplanQuellen } from './funkplan';
+import { STELLENART_LABEL } from './kommunikationsplan';
+import type { Quelle, SkizzenQuelle } from './luecken';
+import { komponentenartWort } from './skizzenZeichen';
+import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
 
 /**
  * Die Kanalbelegung des Funkplans (LFH-848): eine Zeile je Sprechgruppe des Einsatzes mit den
@@ -12,15 +25,18 @@ import { ZUSTAND_GRUND, type FunkplanQuellen } from './funkplan';
  *   einsatzlokale, nach `id` entdoppelt (ein lokaler und ein Katalog-Eintrag können dieselbe
  *   Bezeichnung tragen, wie in `verbindungsurteil`). Ein Katalog-Eintrag ohne Zuordnung ist keine
  *   Sprechgruppe DIESES Einsatzes und fehlt.
- * - **Ordnung:** TMO vor DMO, sonst wie die Quelle (`ORDER BY sortier, bezeichnung` in
- *   `src/sprechgruppe/repo.rs`, deshalb binär verglichen). Die Quelle selbst ordnet nach
- *   `betriebsart` alphabetisch, also DMO zuerst; das kehrt die Spec um.
+ * - **Ordnung:** TMO vor DMO, sonst wie die Quelle (`stab/sprechgruppenOrdnung.ts`).
  * - **Teilnehmer:** Abschnitte (Name, Kurzbezeichnung), dann Einheiten (Name, Funkrufname), je in
  *   der Reihenfolge ihrer Liste, mit Ziel wie im Funkplan. Fehlt eine Strukturquelle, ist „keine
  *   Teilnehmer“ nicht belegbar: die Zelle trägt dann den Grund, bei schon bekannten Teilnehmern
  *   die bekannten plus „unvollständig“.
+ * - **Netz (LFH-893):** reicht der Aufrufer Stellen und Skizzendaten mit, tragen auch externe
+ *   Stellen des Kommunikationsplans (mit Status, Ziel Kommunikationsplan) und Komponenten der
+ *   Skizze (ohne Ziel) Sprechgruppen; beide sind dann eigene Strukturquellen. Eine
+ *   Führungsfunktion ist nie Teilnehmer (wie `kanalbelegung` in `stab/luecken.ts`).
  *
- * Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D8).
+ * Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D8),
+ * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`.
  */
 
 export type Herkunft = 'katalog' | 'einsatzlokal';
@@ -31,19 +47,27 @@ export const HERKUNFT_LABEL: Record<Herkunft, string> = {
 };
 
 export interface SprechgruppenTeilnehmer {
-  art: 'abschnitt' | 'einheit';
-  /** `ab-<id>` bzw. `eh-<id>`, wie im Funkplan. */
+  art: 'abschnitt' | 'einheit' | 'extern' | 'komponente';
+  /** `ab-<id>`, `eh-<id>`, `ks-<id>` bzw. `ko-<id>`, wie im Funkplan und in der Skizze. */
   key: string;
   /** Datenbank-ID — nur für Deeplinks, nie für die Anzeige. */
   id: number;
   name: string;
   /** Abschnitt: Kurzbezeichnung · Einheit: Funkrufname. Nie geraten. */
   rufname: string | null;
-  /** Pflegeort der Stelle. */
-  ziel: string;
+  /** Pflegeort der Stelle; eine Komponente hat keinen außerhalb der Skizze. */
+  ziel: string | null;
+  /** Nur externe Stellen und Komponenten (LFH-893 D7): eine geplante Teilnahme ist keine Tatsache. */
+  status?: Verbindungsstatus;
 }
 
-type Strukturquelle = 'abschnitte' | 'einheiten';
+/** Die zusätzlichen Quellen des Netzes (LFH-893). */
+export interface NetzTeilnehmerQuellen {
+  stellen: Quelle<KommunikationsStelle>;
+  skizze: SkizzenQuelle;
+}
+
+type Strukturquelle = 'abschnitte' | 'einheiten' | 'stellen' | 'skizze';
 
 export interface FehlendeStruktur {
   quelle: Strukturquelle;
@@ -76,32 +100,29 @@ export interface SprechgruppenZeile {
 const STRUKTUR_NAME: Record<Strukturquelle, string> = {
   abschnitte: 'Abschnitte',
   einheiten: 'Einheiten',
+  stellen: 'Externe Stellen',
+  skizze: 'Daten der Skizze',
 };
 /** Aus dem Record, nicht als Literal: `['abschnitte', …]` läse der Query-Key-Guard als Key. */
 const STRUKTUR = Object.keys(STRUKTUR_NAME) as Strukturquelle[];
 
-const BETRIEBSART_RANG: Record<string, number> = { TMO: 0, DMO: 1 };
-
-/** Binär wie SQLites Standardkollation, damit die Ordnung der Quelle erhalten bleibt. */
-function binaer(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function vergleiche(a: Sprechgruppe, b: Sprechgruppe): number {
-  return (
-    (BETRIEBSART_RANG[a.betriebsart] ?? 2) - (BETRIEBSART_RANG[b.betriebsart] ?? 2) ||
-    a.sortier - b.sortier ||
-    binaer(a.bezeichnung, b.bezeichnung) ||
-    a.id - b.id
-  );
-}
-
-export function baueSprechgruppenplan(q: FunkplanQuellen, einsatzId: number): SprechgruppenZeile[] {
+export function baueSprechgruppenplan(
+  q: FunkplanQuellen,
+  einsatzId: number,
+  netz?: NetzTeilnehmerQuellen,
+): SprechgruppenZeile[] {
   const abschnitte = q.abschnitte.zustand === 'daten' ? q.abschnitte.daten : [];
   const einheiten = q.einheiten.zustand === 'daten' ? q.einheiten.daten : [];
+  const zustandJe: Partial<Record<Strukturquelle, AbrufZustand>> = {
+    abschnitte: q.abschnitte.zustand,
+    einheiten: q.einheiten.zustand,
+    ...(netz ? { stellen: netz.stellen.zustand, skizze: netz.skizze.zustand } : {}),
+  };
   const fehlend: FehlendeStruktur[] = STRUKTUR.flatMap((quelle) => {
-    const { zustand } = q[quelle];
-    return zustand === 'daten' ? [] : [{ quelle, name: STRUKTUR_NAME[quelle], zustand }];
+    const zustand = zustandJe[quelle];
+    return zustand == null || zustand === 'daten'
+      ? []
+      : [{ quelle, name: STRUKTUR_NAME[quelle], zustand }];
   });
 
   const gruppen = new Map<number, Sprechgruppe>();
@@ -136,6 +157,37 @@ export function baueSprechgruppenplan(q: FunkplanQuellen, einsatzId: number): Sp
     };
     for (const s of e.sprechgruppen) trage(s, t);
   }
+  if (netz?.stellen.zustand === 'daten') {
+    const ziel = kommunikationsplanPfad(einsatzId);
+    for (const st of netz.stellen.daten) {
+      if (st.stellenart === 'funktion') continue;
+      for (const { sprechgruppe, status } of st.sprechgruppen) {
+        trage(sprechgruppe, {
+          art: 'extern',
+          key: `ks-${st.id}`,
+          id: st.id,
+          name: st.bezeichnung?.trim() || STELLENART_LABEL[st.stellenart],
+          rufname: null,
+          ziel,
+          status,
+        });
+      }
+    }
+  }
+  if (netz?.skizze.zustand === 'daten') {
+    for (const ko of netz.skizze.daten?.komponenten ?? []) {
+      const t: SprechgruppenTeilnehmer = {
+        art: 'komponente',
+        key: `ko-${ko.id}`,
+        id: ko.id,
+        name: ko.bezeichnung?.trim() || komponentenartWort(ko.art),
+        rufname: null,
+        ziel: null,
+        status: 'bestehend',
+      };
+      for (const s of ko.sprechgruppen) trage(s, t);
+    }
+  }
   // Ohne Liste fehlen nur die lokalen ohne Zuordnung; die Seite nennt den Grund.
   if (q.sprechgruppen.zustand === 'daten') {
     for (const s of q.sprechgruppen.daten) {
@@ -149,7 +201,7 @@ export function baueSprechgruppenplan(q: FunkplanQuellen, einsatzId: number): Sp
     return { art: 'unbekannt', fehlend };
   };
 
-  return [...gruppen.values()].sort(vergleiche).map((s) => ({
+  return [...gruppen.values()].sort(vergleicheSprechgruppen).map((s) => ({
     key: `sg-${s.id}`,
     id: s.id,
     bezeichnung: s.bezeichnung,

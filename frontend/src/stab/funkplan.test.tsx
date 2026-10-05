@@ -19,8 +19,13 @@ import {
   type FunkplanQuellen,
   type FunkplanZeile,
 } from './funkplan';
+import type {
+  Fernmeldeskizze,
+  KommunikationsStelleMitKanaelen,
+} from '../api/fernmeldeskizzeVertrag';
+import { baueFernmeldenetz } from './fernmeldeskizze';
 import { fuehrungsstelleErfasst } from './fuehrungsstelle';
-import type { Quelle } from './luecken';
+import type { Quelle, SkizzenQuelle } from './luecken';
 
 /** Namen, die remark-gfm ohne Schutz als Link läse (LFH-868). */
 const AUTOLINKS = {
@@ -658,6 +663,142 @@ describe('baueFunkplan · eigene Führungsstelle', () => {
     });
     expect(rendereFunkplanMarkdown(baueFunkplan(q), 'X', funkplanLuecken(q), q)).toContain(
       '- Verbindungen ohne gemeinsame Sprechgruppe: 1 (Abschnitt Nord → Führungsstelle)',
+    );
+  });
+});
+
+// ── Kommunikationsskizze im Lagebericht (LFH-893 D10) ──────────────────────────────────────────
+
+describe('rendereFunkplanMarkdown · Kommunikationsskizze', () => {
+  const BN = sg(1, 'TMO', 'BN_BOS');
+  const LEER_SKIZZE: Fernmeldeskizze = {
+    lage: [],
+    komponenten: [],
+    verbindungen: [],
+    bereiche: [],
+    schriftfeld: {
+      herausgeber: null,
+      vs_vermerk: 'keiner',
+      gueltig_ab: null,
+      gez_name: null,
+      gez_at: null,
+    },
+    stand: null,
+  };
+  const leitstelle: KommunikationsStelleMitKanaelen = {
+    id: 4,
+    stellenart: 'leitstelle',
+    bezeichnung: 'ILS Musterhausen',
+    verbindungen: [{ id: 1, mittel: 'festnetz', wert: '0421 112233' }],
+    sprechgruppen: [{ sprechgruppe: BN, status: 'geplant' }],
+  };
+  const funkQuellen = quellen({
+    fuehrungsstelle: fs({ rufname: 'Florian Musterstadt 10/1', sprechgruppen: [BN] }),
+    abschnitte: daten([
+      abschnitt(1, { name: 'EA 1', kurzbezeichnung: 'EA_1', sprechgruppen: [BN] }),
+    ]),
+  });
+  function bericht(
+    p: {
+      stellen?: Quelle<KommunikationsStelleMitKanaelen>;
+      skizze?: SkizzenQuelle;
+      gueltigAb?: string | null;
+      q?: FunkplanQuellen;
+    } = {},
+  ): string {
+    const q = p.q ?? funkQuellen;
+    const netz = baueFernmeldenetz({
+      ...q,
+      einsatzId: 1,
+      stellen: p.stellen ?? daten([leitstelle]),
+      skizze: p.skizze ?? {
+        zustand: 'daten',
+        daten: {
+          ...LEER_SKIZZE,
+          verbindungen: [
+            {
+              id: 1,
+              von: { art: 'fuehrungsstelle', id: null },
+              nach: { art: 'stelle', id: 4 },
+              art: 'daten',
+              medium: 'leitung',
+              status: 'geplant',
+              verkehr: null,
+              hinweis: 'Rückruf 0171 999',
+            },
+          ],
+        },
+      },
+    });
+    return rendereFunkplanMarkdown(baueFunkplan(q), 'X', funkplanLuecken(q), q, {
+      netz,
+      gueltigAb: p.gueltigAb === undefined ? '041200Okt26' : p.gueltigAb,
+    });
+  }
+
+  it('Kanäle im Lagebericht: die Schiene mit Einsatzleitung, „EA 1“ und der Leitstelle samt „geplant“', () => {
+    const text = bericht();
+    const ab = text.indexOf('## Kommunikationsskizze');
+    expect(ab).toBeGreaterThan(text.indexOf('## Gliederung'));
+    const teil = text.slice(ab);
+    expect(teil).toContain('**Gültig ab:** 041200Okt26');
+    expect(teil).toContain(
+      '- TMO BN\\_BOS: Einsatzleitung (Rufname Florian Musterstadt 10/1), EA 1 (Rufname EA\\_1), ILS Musterhausen (geplant)',
+    );
+    expect(teil).toContain('### Verbindungen');
+    expect(teil).toContain('- Einsatzleitung – ILS Musterhausen: Daten, leitergebunden, geplant');
+  });
+
+  it('schreibt keine Rufnummer, auch nicht aus dem Hinweis einer Verbindung', () => {
+    const text = bericht();
+    expect(text).not.toContain('0421');
+    expect(text).not.toContain('0171');
+  });
+
+  it('bleibt im Renderer Text: der Name der Sprechgruppe wird nicht zur Auszeichnung', () => {
+    const { container } = render(<Markdown unterEbene={2}>{bericht()}</Markdown>);
+    expect(container.textContent).toContain('TMO BN_BOS: Einsatzleitung');
+    expect(container.querySelectorAll('del, em, a, code')).toHaveLength(0);
+  });
+
+  it('schreibt „—“ bei fehlendem „Gültig ab“ und nennt Schienen ohne Teilnehmer und leere Verbindungen', () => {
+    const lokal = sg(9, 'DMO', '999', true);
+    const text = bericht({
+      gueltigAb: null,
+      q: quellen({ sprechgruppen: daten([lokal]) }),
+      stellen: daten([]),
+      skizze: { zustand: 'daten', daten: LEER_SKIZZE },
+    });
+    expect(text).toContain('**Gültig ab:** —');
+    expect(text).toContain('- DMO 999: keine Teilnehmer');
+    expect(text).toContain('### Verbindungen\n\n_(keine)_');
+  });
+
+  it('nennt fehlende externe Stellen und Skizzendaten mit Grund', () => {
+    const text = bericht({
+      stellen: { zustand: 'fehler', daten: [] },
+      skizze: { zustand: 'gesperrt', daten: null },
+    });
+    const teil = text.slice(text.indexOf('## Kommunikationsskizze'));
+    expect(teil).toContain('**Gültig ab:** — (nicht freigegeben)');
+    expect(teil).toContain('- Externe Stellen: nicht geladen — diese Angaben fehlen');
+    expect(teil).toContain('- Daten der Skizze: nicht freigegeben — diese Angaben fehlen');
+    expect(teil).toContain('### Verbindungen\n\n— (nicht freigegeben)');
+    // Die Schiene steht trotzdem, mit den bekannten Teilnehmern.
+    expect(teil).toContain('- TMO BN\\_BOS: Einsatzleitung');
+  });
+
+  it('nennt den Grund, wenn ohne Abschnitte keine Skizze entsteht', () => {
+    const text = bericht({ q: quellen({ abschnitte: { zustand: 'gesperrt', daten: [] } }) });
+    expect(text).toContain(
+      '## Kommunikationsskizze\n\n_(keine Kanäle: Abschnitte nicht freigegeben)_',
+    );
+  });
+
+  it('lässt den Abschnitt weg, solange der Aufrufer kein Netz übergibt', () => {
+    const q = quellen();
+    expect(rendereFunkplanMarkdown([], 'X', funkplanLuecken(q), q)).not.toContain(
+      'Kommunikationsskizze',
     );
   });
 });

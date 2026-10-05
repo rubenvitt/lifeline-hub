@@ -904,3 +904,26 @@ export type Pressemitteilung = S['PressemitteilungAnzeige'];
 export type InfotelefonAnliegen = S['InfotelefonAnliegen'];
 export type InfotelefonStatus = S['InfotelefonStatus'];
 export type InfotelefonAnruf = S['InfotelefonAnrufAnzeige'];
+
+// ============================== LFH-893 Taktische Fernmeldeskizze ==============================
+// API-Vertrag: openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md (D14).
+export type Fernmeldeskizze = S['Fernmeldeskizze'];
+export type SkizzenLage = S['SkizzenLage'];
+/** 409 auf `PUT …/stab/fernmeldeskizze/lage/{element}`: Fehlertext und gespeicherter Stand. */
+export type SkizzenLageKonflikt = S['SkizzenLageKonflikt'];
+export type SkizzenKomponente = S['SkizzenKomponente'];
+export type SkizzenVerbindung = S['SkizzenVerbindung'];
+export type SkizzenBezug = S['SkizzenBezug'];
+export type SkizzenBezugArt = S['SkizzenBezugArt'];
+export type SkizzenBereich = S['SkizzenBereich'];
+/** 409 auf `PATCH …/stab/fernmeldeskizze/bereiche/{bid}`: Fehlertext und gespeicherter Stand. */
+export type SkizzenBereichKonflikt = S['SkizzenBereichKonflikt'];
+export type Schriftfeld = S['Schriftfeld'];
+export type Komponentenart = S['Komponentenart'];
+export type Verbindungsart = S['Verbindungsart'];
+export type Verbindungsmedium = S['Verbindungsmedium'];
+export type Verbindungsstatus = S['Verbindungsstatus'];
+export type Verkehrsart = S['Verkehrsart'];
+export type VsVermerk = S['VsVermerk'];
+/** Kanal einer externen Stelle des Kommunikationsplans (`KommunikationsStelle.sprechgruppen`). */
+export type StellenKanal = S['StellenKanal'];

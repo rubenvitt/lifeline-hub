@@ -20,6 +20,9 @@ export interface PdfSeite {
   text: string;
   /** Jedes gezeichnete Rasterbild mit seinen Pixelmaßen im PDF. */
   bilder: PdfBild[];
+  /** Seitenmaß in Punkt (1/72 Zoll) aus der MediaBox, z. B. A3 quer 1190,55 × 841,89 (LFH-893). */
+  breite: number;
+  hoehe: number;
 }
 
 export async function pdfAuszug(pdf: Buffer): Promise<PdfSeite[]> {
@@ -51,7 +54,8 @@ export async function pdfAuszug(pdf: Buffer): Promise<PdfSeite[]> {
           bilder.push({ breite: args[0].width, hoehe: args[0].height });
         }
       });
-      seiten.push({ text, bilder });
+      const [x0, y0, x1, y1] = seite.view;
+      seiten.push({ text, bilder, breite: x1 - x0, hoehe: y1 - y0 });
     }
     return seiten;
   } finally {

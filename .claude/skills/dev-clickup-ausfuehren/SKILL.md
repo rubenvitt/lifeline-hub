@@ -10,7 +10,8 @@ description: Per-single-(sub)task execution layer for the Lifeline-Hub ClickUp E
 Einen Task vom **Entwicklungsboard** (`901523554968`) umsetzen. Dieser Skill macht wenige
 **eigene Entscheidungen** — Workspace (Branch/Worktree), Komplexitäts-Routing und das
 **Mitführen des Board-Status** — und delegiert alles andere weiter. Nichts davon
-reimplementieren.
+reimplementieren. Subagents und Workflows startest du dabei nach eigenem Ermessen (Abschnitt
+„Agenten nach Bedarf“).
 
 **Zwei Quellen, die ineinandergreifen:** **OpenSpec** (`/opsx:*`) besitzt den
 **Änderungszyklus** — klären, entwerfen, Spec und Aufgabenschnitt, Aufgabenliste abarbeiten,
@@ -33,6 +34,44 @@ verliert die Zusicherung, ohne dass ein Test rot wird.
 **Nicht** zum Anlegen neuer Tasks → `clickup-task-anlegen`.
 **Ganzer Task mit Subtasks / „mit subagents" / „ultracode"** → `dev-clickup-orchestrieren`
 orchestriert und ruft diesen Skill pro (Sub)Task auf.
+
+## Agenten nach Bedarf (LFH-1032)
+
+**Festlegung des Users vom 04.10.2026: „Agenten dürfen nach Bedarf selbst erstellt werden.“**
+Wer einen Task vom Entwicklungsboard umsetzt, startet Subagents (Agent-Tool) und Workflows
+(Workflow-Tool) nach eigenem Ermessen — ohne „ultracode“, „mit subagents“ oder ein anderes
+Opt-in im Auftrag. Diese Festlegung **ist** das ausdrückliche Opt-in, das das Workflow-Tool
+verlangt, und sie reicht über „Agent-Tool nur für echte Parallelarbeit“ hinaus: Ein Agent ist
+auch dann recht, wenn er den Main-Loop von breitem Lesen entlastet. Herleitung:
+`openspec/changes/archive/2026-10-05-lfh-1032-agenten-nach-bedarf/design.md`.
+
+**Nach Bedarf heißt: wo es Zeit spart oder die Güte hebt, sonst nicht.**
+
+| Lohnt sich | Lohnt sich nicht |
+|---|---|
+| Scope über mehr als ein Subsystem oder mehrere Subtasks | Was ein Grep oder ein Read beantwortet |
+| Review parallel zu laufenden Gates (`check-all.sh`, Vitest) | Route `trivial` |
+| Ursachensuche über viel unbekannten Code (`bug-unklar`) | Alles Interaktive: Checkpoint, Rückfrage, Freigabe |
+| Unabhängige Subtasks im autonomen Modus (`dev-clickup-orchestrieren`, Phase 3) | `/opsx:*`, TDD-Zyklus des Main-Loops |
+| Gegenlesen eines Entwurfs oder eines heiklen Diffs | |
+
+**Agent oder Workflow:** Für einen bis drei unabhängige Jobs das Agent-Tool (kein Skript,
+gleich im Hintergrund). Ein Workflow, wenn es mehrstufig wird (finden → verifizieren) oder mehr
+als drei Agents braucht; Skelette in `dev-clickup-orchestrieren/references/workflow-bausteine.md`.
+Der Größenrichtwert der Umgebung für Workflows gilt weiter.
+
+**Jeder Worker-Prompt bringt mit**, denn Worker sehen weder Systemprompt noch Skill:
+
+- Keine `mcp__hearthbot__`-Tools: nur der Main-Loop spricht mit dem Menschen.
+- Kein `/opsx:*` und nichts unter `openspec/changes/` anlegen oder ändern (Ausnahme: der autonome
+  Dev-Agent hakt Aufgaben einer freigegebenen Change ab).
+- Kein Push, kein PR, kein Board-Status — das bleibt beim Main-Loop.
+- Bei einer Frage, die nur der Mensch beantworten kann: abbrechen und den Blocker strukturiert
+  zurückgeben, nicht raten.
+- Nutzt er `/mnt/project-files`: die Regeln des geteilten Ordners, wie sie im Systemprompt der
+  Sitzung stehen.
+
+Ergebnisse fließen in den Main-Loop zurück; dort fallen Entscheidung und Meldung.
 
 ## Board-Status mitführen
 
@@ -218,6 +257,8 @@ hier** — der Orchestrator sammelt Bediensicht/Klickweg je Subtask ein und gibt
 - Worktree-/Branch-Logik **nicht** selbst bauen — an `using-git-worktrees` delegieren.
 - Einen Branch mit fremder Arbeit **nicht** umbenennen oder zurücksetzen — dann neuer Worktree.
 - Komplexität nicht überspringen — auch „kleine" Features brauchen TDD.
+- Keine Agents für Interaktives, `/opsx:*` oder Triviales, und kein Worker-Prompt ohne die
+  Pflichtpunkte aus „Agenten nach Bedarf“.
 - Keinen neuen Task anlegen — das ist `clickup-task-anlegen`.
 - Status nicht rückwärts oder redundant setzen — nur vorwärts entlang der Spur.
 - Abschlussmeldung **nicht** als Commit-Liste oder mit Dateinamen — Bediensicht und
