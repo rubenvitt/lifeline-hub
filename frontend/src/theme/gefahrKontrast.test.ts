@@ -7,9 +7,9 @@ import { antdAlgorithmus, antdKomponenten, antdToken, farbenDunkel, farbenHell }
  *
  * LFH-693, Spec `farbrollen-kontrast`: der rote Menüeintrag, der gefüllte und der umrandete
  * Gefahrknopf halten den Textboden aus Kriterium 5, Tag ≥ 7 : 1, Nacht ≥ 5 : 1, in Ruhe, unter
- * dem Zeiger und (gefüllt) beim Drücken. Die Farben kommen aus den KOMPONENTEN-Tokens, nicht aus
- * den Rollen: ein vergessenes Token muss hier rot werden. Böden als Literale; der
- * Browser-Nachweis steht in `e2e/gefahr-kontrast.spec.ts`.
+ * dem Zeiger und beim Drücken (gefüllt seit LFH-693, ohne Rahmen und umrandet seit LFH-897). Die
+ * Farben kommen aus den KOMPONENTEN-Tokens, nicht aus den Rollen: ein vergessenes Token muss hier
+ * rot werden. Böden als Literale; der Browser-Nachweis steht in `e2e/gefahr-kontrast.spec.ts`.
  */
 function luminanz(hex: string): number {
   const h = hex.replace('#', '');
@@ -60,7 +60,7 @@ describe.each([
     },
   );
 
-  it.each(['colorError', 'colorErrorHover'])(
+  it.each(['colorError', 'colorErrorHover', 'colorErrorActive'])(
     'umrandeter Gefahrknopf: Beschriftung %s auf der Knopffläche',
     (schrift) => {
       expect(kontrast(token(Button, schrift), farben.flaeche)).toBeGreaterThanOrEqual(boden);
@@ -77,6 +77,18 @@ describe.each([
   it('Gefahrknopf ohne Rahmen: Beschriftung unter dem Zeiger auf der Gefahrtönung', () => {
     expect(colorErrorBg).toMatch(/^#[0-9a-f]{6}$/i);
     expect(kontrast(token(Button, 'colorErrorHover'), colorErrorBg)).toBeGreaterThanOrEqual(boden);
+  });
+
+  // Gedrückt (LFH-897): antd legte die SATTE Tönung `colorErrorBgActive` darunter (Tag 4,13,
+  // Nacht 4,49). Das Komponenten-Token muss gesetzt sein.
+  it('Gefahrknopf ohne Rahmen: Beschriftung gedrückt auf der gedrückten Tönung', () => {
+    expect(
+      kontrast(token(Button, 'colorErrorActive'), token(Button, 'colorErrorBgActive')),
+    ).toBeGreaterThanOrEqual(boden);
+  });
+
+  it('Gefahrknopf ohne Rahmen: die gedrückte Tönung hebt sich vom Grund ab', () => {
+    expect(token(Button, 'colorErrorBgActive').toLowerCase()).not.toBe(farben.grund.toLowerCase());
   });
 
   it('die Gefahrfläche unter dem Zeiger unterscheidet sich von der Ruhe', () => {

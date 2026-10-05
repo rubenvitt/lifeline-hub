@@ -411,3 +411,43 @@ export async function ruheUndZeiger(
   );
   return { ruhe, zeiger };
 }
+
+/**
+ * Beschriftung im Zustand GEDRÜCKT (LFH-897, Spec `farbrollen-kontrast`). Beim Antippen ohne
+ * Zeiger ist das Drücken die einzige Rückmeldung eines Knopfs, deshalb gilt derselbe Textboden.
+ * Gedrückt gehalten wird mit der Maus auf der Knopfmitte; losgelassen wird erst, nachdem der
+ * Zeiger den Knopf verlassen hat, damit kein Klick entsteht (keine Anmeldung, keine Rückfrage).
+ * Gemessen wird erst, wenn der Zustand gegenüber der Ruhe gewechselt hat; sonst wäre „gedrückt
+ * gemessen“ trivial wahr. Was wechselt, sagt `wechsel` wie bei {@link ruheUndZeiger}: die Fläche
+ * (gefüllter Knopf, Knopf ohne Rahmen) oder die Schrift (umrandeter Knopf). `ruhe` kommt aus
+ * {@link ruheUndZeiger}.
+ */
+export async function gedrueckt(
+  page: Page,
+  ziel: Locator,
+  schranke: number,
+  name: string,
+  ruhe: Awaited<ReturnType<typeof kontrast>>,
+  wechsel: 'grund' | 'text' = 'grund',
+) {
+  const box = await ziel.boundingBox();
+  if (!box) throw new Error(`${name}: Knopf hat keine Box`);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  try {
+    const wechselText = `${name}: ${wechsel === 'grund' ? 'Fläche' : 'Schrift'} gedrückt wechselt gegenüber der Ruhe`;
+    await expect(async () => {
+      expect((await kontrast(ziel))[wechsel], wechselText).not.toEqual(ruhe[wechsel]);
+    }).toPass({ timeout: 10_000 });
+    const messung = await stehend(ziel, `${name}, gedrückt`);
+    expect(messung[wechsel], wechselText).not.toEqual(ruhe[wechsel]);
+    expect(
+      messung.verhaeltnis,
+      `${name}, gedrückt: ${JSON.stringify(messung)}`,
+    ).toBeGreaterThanOrEqual(schranke);
+    return messung;
+  } finally {
+    await page.mouse.move(0, 0);
+    await page.mouse.up();
+  }
+}
