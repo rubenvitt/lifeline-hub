@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { QueryObserver, type QueryClient } from '@tanstack/react-query';
+import { QueryObserver, dehydrate, hydrate, type QueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { erzeugeQueryClient } from '../api/queryClient';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -61,6 +61,37 @@ describe('Schwärzungswächter — Stand im Einsatzkopf', () => {
     ab();
   });
 
+  it('verwirft einen laufenden Erstabruf, der vor der Schwärzung beantwortet wurde', async () => {
+    const qc = neuerClient();
+    await kopfAbrufen(qc, 7);
+    let alteAntwort: (v: unknown) => void = () => {};
+    const personen = vi
+      .fn<() => Promise<unknown>>()
+      .mockImplementationOnce(() => new Promise((r) => (alteAntwort = r)))
+      .mockResolvedValue([]);
+    const ab = beobachten(qc, einsatzKeys.personen(7), personen);
+    await vi.waitFor(() => expect(personen).toHaveBeenCalledTimes(1));
+
+    await kopfAbrufen(qc, 7, 1);
+    alteAntwort([{ id: 1, name: 'Muster' }]);
+
+    await vi.waitFor(() => expect(personen).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(qc.getQueryData(einsatzKeys.personen(7))).toEqual([]));
+    ab();
+  });
+
+  it('wertet einen Stand aus `hydrate` nicht als Schwärzung', async () => {
+    const qc = neuerClient();
+    await kopfAbrufen(qc, 7);
+    qc.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    const quelle = neuerClient();
+    await warte(2);
+    await kopfAbrufen(quelle, 7, 1);
+    hydrate(qc, dehydrate(quelle));
+    expect(qc.getQueryData(einsatzKeys.einsatz(7))).toEqual(kopf(7, 1));
+    expect(qc.getQueryData(einsatzKeys.personen(7))).toEqual([{ id: 1 }]);
+  });
+
   it('räumt nichts bei gleichem Stand', async () => {
     const qc = neuerClient();
     await kopfAbrufen(qc, 7, 1);
@@ -99,6 +130,39 @@ describe('Schwärzungswächter — Einsatzliste', () => {
     await listeAbrufen(qc, [kopf(7, 1), kopf(8)]);
     expect(qc.getQueryData(einsatzKeys.personen(7))).toBeUndefined();
     expect(qc.getQueryData(einsatzKeys.personen(8))).toEqual([{ id: 2 }]);
+  });
+
+  it('ruft einen älteren Kopf neu ab, wenn die Liste den höheren Stand zuerst trägt', async () => {
+    const qc = neuerClient();
+    const kopfAbruf = vi.fn(async () => kopf(7, 1));
+    await qc.fetchQuery({ queryKey: einsatzKeys.einsatz(7), queryFn: async () => kopf(7) });
+    await listeAbrufen(qc, [kopf(7)]);
+    await warte(2);
+    qc.getQueryCache()
+      .find({ queryKey: einsatzKeys.einsatz(7) })!
+      .setOptions({
+        queryKey: einsatzKeys.einsatz(7),
+        queryFn: kopfAbruf,
+      });
+    await listeAbrufen(qc, [kopf(7, 1)]);
+    await vi.waitFor(() => expect(kopfAbruf).toHaveBeenCalledTimes(1));
+    const marke = qc.getQueryState(globalKeys.einsaetze())!.dataUpdatedAt;
+    const kopfStand = qc.getQueryState(einsatzKeys.einsatz(7))!.dataUpdatedAt;
+    expect(lagebildStandZulaessig(qc, einsatzKeys.einsatz(7), kopfStand)).toBe(true);
+    expect(kopfStand).toBeGreaterThanOrEqual(marke);
+  });
+
+  it('vergleicht eine Liste aus `hydrate` nicht mit der vorigen', async () => {
+    const qc = neuerClient();
+    await listeAbrufen(qc, [kopf(7), kopf(8)]);
+    qc.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    const quelle = neuerClient();
+    await warte(2);
+    await listeAbrufen(quelle, [kopf(8)]);
+    hydrate(qc, dehydrate(quelle));
+    expect(qc.getQueryData(globalKeys.einsaetze())).toEqual([kopf(8)]);
+    expect(qc.getQueryData(einsatzKeys.personen(7))).toEqual([{ id: 1 }]);
+    expect(istLagebildGesperrt(qc, einsatzKeys.personen(7))).toBe(false);
   });
 
   it('räumt einen verschwundenen Einsatz und sperrt ihn für die Platte', async () => {
@@ -176,9 +240,44 @@ describe('Schwärzungswächter — Vorbelegung aus dem Vorrat', () => {
   it('verwirft ihn auch, wenn die Liste schon vor der Vorbelegung kam', async () => {
     const qc = neuerClient();
     const alt = Date.now();
+    await warte(2);
     await listeAbrufen(qc, [kopf(7, 1)]);
+    schwaerzungsWaechterVorbelegen(qc, [eintrag(einsatzKeys.einsatz(7), kopf(7))]);
+    expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(false);
+  });
+
+  it('nimmt je Einsatz den höchsten Stand im Vorrat, in welcher Reihenfolge auch immer', async () => {
+    for (const reihe of [
+      [eintrag(einsatzKeys.einsatz(7), kopf(7, 1)), eintrag(globalKeys.einsaetze(), [kopf(7)])],
+      [eintrag(globalKeys.einsaetze(), [kopf(7)]), eintrag(einsatzKeys.einsatz(7), kopf(7, 1))],
+    ]) {
+      const qc = neuerClient();
+      const alt = Date.now();
+      schwaerzungsWaechterVorbelegen(qc, reihe);
+      await warte(2);
+      await listeAbrufen(qc, [kopf(7, 1)]);
+      expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(true);
+    }
+  });
+
+  it('zählt einen Einsatz ohne Kopf und Liste im Vorrat als Stand 0', async () => {
+    const qc = neuerClient();
+    const alt = Date.now();
+    schwaerzungsWaechterVorbelegen(qc, [eintrag(einsatzKeys.personen(7), [{ id: 1 }])]);
+    await warte(2);
+    await listeAbrufen(qc, [kopf(7, 1)]);
+    expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(false);
+  });
+
+  it('lässt den Live-Kopf auf der Platte, der den höheren Stand vor der Vorbelegung trug', async () => {
+    const qc = neuerClient();
+    const alt = Date.now();
+    await warte(2);
+    await kopfAbrufen(qc, 7, 1);
+    const live = qc.getQueryState(einsatzKeys.einsatz(7))!.dataUpdatedAt;
     await warte(2);
     schwaerzungsWaechterVorbelegen(qc, [eintrag(einsatzKeys.einsatz(7), kopf(7))]);
+    expect(lagebildStandZulaessig(qc, einsatzKeys.einsatz(7), live)).toBe(true);
     expect(lagebildStandZulaessig(qc, einsatzKeys.personen(7), alt)).toBe(false);
   });
 

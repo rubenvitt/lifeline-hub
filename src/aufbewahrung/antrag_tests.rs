@@ -716,6 +716,8 @@ async fn vollzug_einsatz_meldet_kopf_und_liste() {
     );
     assert!(einsatz_ereignisse(&mut rx).contains(&crate::live::LiveEvent::Einsatz));
     assert!(org_ereignisse(&mut org).contains(&crate::live::org::OrgLiveEvent::Einsatzliste));
+    // Der Einsatz-Antrag sperrt den ganzen Einsatz, er ist keine Teilschwärzung (design.md D1).
+    assert_eq!(kopf_stand(&pool, b.e1).await, None);
 }
 
 /// Spec „Vollzug ohne Wirkung“: war der Einsatz schon geschwärzt, meldet der Vollzug nichts.

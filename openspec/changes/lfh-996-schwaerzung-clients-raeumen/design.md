@@ -55,13 +55,17 @@ Motivation in `proposal.md`. Der Ist-Stand, auf dem der Entwurf aufsetzt:
 
 `EinsatzAnzeige` bekommt `teilschwaerzungen: Option<i64>`, ausgelassen bei 0
 (`skip_serializing_if`, Norm LFH-265). Berechnet beim Lesen in derselben Abfrage wie die
-`EXISTS`-Spalten des Kopfs und der Liste:
+`EXISTS`-Spalten des Kopfs und der Liste, über zwei gruppierte Joins (einmal gezählt, nicht je
+Einsatzzeile korreliert):
 
 ```sql
-(SELECT COUNT(*) FROM schwaerzung_antrag a
-  WHERE a.einsatz_id = e.id AND a.ziel_art <> 'einsatz' AND a.vollzogen_at IS NOT NULL)
-+ (SELECT COUNT(*) FROM einsatz_aufbewahrung_kategorie k
-  WHERE k.einsatz_id = e.id AND k.geschwaerzt_at IS NOT NULL)
+LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM schwaerzung_antrag
+           WHERE ziel_art <> 'einsatz' AND vollzogen_at IS NOT NULL
+           GROUP BY einsatz_id) tsa ON tsa.einsatz_id = e.id
+LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM einsatz_aufbewahrung_kategorie
+           WHERE geschwaerzt_at IS NOT NULL
+           GROUP BY einsatz_id) tka ON tka.einsatz_id = e.id
+-- Spalte: NULLIF(COALESCE(tsa.n, 0) + COALESCE(tka.n, 0), 0)
 ```
 
 Beide Mengen wachsen nur (Vollzug und Kategorie-Schwärzung sind irreversibel, die Zeilen gehen nur
@@ -110,6 +114,13 @@ nur zwei Keys: den Kopf `[einsatz, X]` und die Liste `[einsaetze]`.
   Antwort, dann für jede Query des Einsatzes außer dem Kopf: unbeobachtet entfernen, beobachtet
   neu abrufen (`invalidateQueries`, `refetchType: 'active'`). Die Detail-Keys sind damit
   eingeschlossen, ohne live zu werden.
+- Ein laufender Abruf einer beobachteten Query wird vorher abgebrochen (`cancelQueries`):
+  `invalidateQueries` bricht nur ab, wenn die Query schon Daten hat, sonst hängt es sich an den
+  alten Abruf, und dessen Antwort von vor der Schwärzung landete mit einem Zeitpunkt nach der
+  Marke (Fund aus dem Review).
+- Ist der Kopf älter als die Marke (die Liste trug den höheren Stand zuerst), wird er neu
+  abgerufen, auch unbeobachtet (`refetchType: 'all'`); sonst fiele er bis zum nächsten Abruf aus
+  dem Offline-Lagebild. Der neue Kopf trägt denselben Stand und löst nichts aus.
 - **Kein `resetQueries`** und kein Leeren beobachteter Queries: die Seite behält bis zur neuen
   Antwort ihren Stand und springt nicht in einen Lade- oder Fehlerzweig. Auf die Platte kommt der
   alte Stand in dieser Zeit trotzdem nicht (D5).
@@ -138,9 +149,12 @@ Vorrat bei jeder Speicherung und das `hydrate`. Damit gilt:
 - Der Kopf selbst ist neu (seine Antwort setzt die Marke) und bleibt.
 
 Bei Sitzungsbeginn belegt `abonnieren` den Wächter aus dem Vorrat vor (`bekannt` aus Kopf- und
-Listeneinträgen des Vorrats, die Vorgänger-Liste aus dem Listeneintrag). So fällt eine
-Schwärzung zwischen zwei Sitzungen bei der ersten Antwort auf, die einen höheren Stand bringt.
-Ein Einsatz, dessen Stand im Vorrat fehlt, zählt als 0.
+Listeneinträgen des Vorrats, je Einsatz der höchste Stand unabhängig von der Reihenfolge, die
+Vorgänger-Liste aus dem Listeneintrag). So fällt eine Schwärzung zwischen zwei Sitzungen bei der
+ersten Antwort auf, die einen höheren Stand bringt. Ein Einsatz, von dem der Vorrat nur Daten und
+weder Kopf noch Liste hält, zählt als 0. Kam die Live-Antwort schon vor der Vorbelegung, ist die
+Marke der Zeitpunkt dieser Antwort (`bekannt` merkt ihn), nicht die Uhr bei der Vorbelegung: so
+bleibt der Live-Kopf auf der Platte.
 
 ### D6 — Personendetail und Lese-Audit
 
@@ -161,10 +175,10 @@ Detail-Abruf ohne Handlung bei jedem `person`-Ereignis bleibt weiter ausgeschlos
 - [Liste ohne einen Einsatz, der doch lesbar ist] → `liste_fuer` filtert mit derselben
   `darf_lesen`-Policy wie der Kopf; fehlt er dort, liefert der Kopf 403/404. Ein Fehlerabruf der
   Liste setzt keine Daten und löst nichts aus.
-- [Zählung im Kopf kostet zwei Unterabfragen je Abruf] → die Kategorie über ihren
-  Primärschlüssel, der Antrag ohne passenden Index (beide bestehenden sind Teilindizes auf offene
-  bzw. fällige Anträge). Ein Einsatz hat höchstens eine Handvoll Anträge; die Liste zählt je
-  Einsatz. Reicht das nicht, ist ein Index eine eigene Migration über `alpha`.
+- [Zählung kostet je Abruf einen Durchlauf über die Anträge] → für Anträge gibt es keinen
+  passenden Index (beide bestehenden sind Teilindizes auf offene bzw. fällige Anträge). Die
+  gruppierten Joins lesen die Tabelle einmal je Abfrage, auch für die ganze Liste, nicht einmal
+  je Einsatz. Reicht das nicht, ist ein Index eine eigene Migration über `alpha`.
 - [Wächter bei `gcTime: 0` im Test] → Wächtertests nehmen einen eigenen `QueryClient` (Testfalle
   aus `frontend/src/offline/AGENTS.md`).
 

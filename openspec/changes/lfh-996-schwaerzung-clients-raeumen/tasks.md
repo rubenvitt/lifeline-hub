@@ -57,5 +57,12 @@
   Prettier über `frontend/`.
 - [ ] 5.2 `./scripts/check-all.sh` grün (Umgebungsrot nach Gegenprobe gegen `alpha` benannt),
   Vitest und Rust-Tests grün.
-- [ ] 5.3 Code-Review (`superpowers:requesting-code-review`), Befunde eingearbeitet.
+- [x] 5.3 Code-Review (`superpowers:requesting-code-review`), Befunde eingearbeitet. Ergebnis
+  05.10.2026, kein blockierender Befund; eingearbeitet: laufender Erstabruf wird vor dem Neuladen
+  abgebrochen (D3), älterer Kopf lädt neu, wenn die Liste den Stand zuerst trägt (D3),
+  Vorbelegung nimmt je Einsatz das Maximum, zählt Einsätze ohne Kopf und Liste als 0 und markiert
+  ab der Live-Antwort (D5), Zählung über gruppierte Joins statt je Zeile (D1), Tests für
+  „Einsatz-Antrag zählt nicht“ und für `hydrate` auf Kopf und Liste. Mutationsproben: Abbruch,
+  Kopf-Abruf, Maximum, Stand 0, `setState` als Vergleich, Listenvergleich bei `hydrate` und der
+  `ziel_art`-Filter je einzeln entfernt, jeweils genau der zugehörige Test rot; zurückgedreht.
 - [ ] 5.4 `/opsx:archive` im selben Branch, danach der PR gegen `alpha`.

@@ -129,7 +129,7 @@ pub struct Einsatz {
     /// der Lagekennzahl `evakuiert`, siehe [`lagekennzahl::ableiten`].
     pub evakuierung_angeordnet: bool,
     /// Read-only abgeleitet (LFH-996): Schwärzungsstand, `None` bei 0. Siehe
-    /// [`EinsatzAnzeige::teilschwaerzungen`] und `teilschwaerzungen_sql!` in `repo`.
+    /// [`EinsatzAnzeige::teilschwaerzungen`] und `teilschwaerzungen_spalte!` in `repo`.
     pub teilschwaerzungen: Option<i64>,
 }
 

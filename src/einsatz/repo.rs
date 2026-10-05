@@ -176,15 +176,24 @@ pub(crate) async fn anlegen_tx(
 
 /// Schwärzungsstand eines Einsatzes `e` als Spalte `teilschwaerzungen` (LFH-996, design.md D1):
 /// vollzogene Personen-Anträge plus geschwärzte Datenkategorien, `NULL` bei 0. Beide Mengen
-/// wachsen nur. Steht in `laden` und `liste_fuer` (ein Makro, damit beide wortgleich bleiben).
-macro_rules! teilschwaerzungen_sql {
+/// wachsen nur. Steht in `laden` und `liste_fuer` (Makros, damit beide wortgleich bleiben):
+/// die Spalte hinter das SELECT, die Joins hinter `FROM einsatz e`. Gruppiert gezählt statt je
+/// Zeile korreliert, damit `GET /api/einsaetze` die Anträge einmal liest und nicht einmal je
+/// Einsatz (für Anträge gibt es keinen Index über `einsatz_id`, beide sind Teilindizes).
+macro_rules! teilschwaerzungen_spalte {
     () => {
-        "NULLIF((SELECT COUNT(*) FROM schwaerzung_antrag sa \
-                 WHERE sa.einsatz_id = e.id AND sa.ziel_art <> 'einsatz' \
-                   AND sa.vollzogen_at IS NOT NULL) \
-              + (SELECT COUNT(*) FROM einsatz_aufbewahrung_kategorie ka \
-                 WHERE ka.einsatz_id = e.id AND ka.geschwaerzt_at IS NOT NULL), 0) \
-            AS teilschwaerzungen"
+        "NULLIF(COALESCE(tsa.n, 0) + COALESCE(tka.n, 0), 0) AS teilschwaerzungen"
+    };
+}
+
+macro_rules! teilschwaerzungen_joins {
+    () => {
+        " LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM schwaerzung_antrag \
+                     WHERE ziel_art <> 'einsatz' AND vollzogen_at IS NOT NULL \
+                     GROUP BY einsatz_id) tsa ON tsa.einsatz_id = e.id \
+          LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM einsatz_aufbewahrung_kategorie \
+                     WHERE geschwaerzt_at IS NOT NULL \
+                     GROUP BY einsatz_id) tka ON tka.einsatz_id = e.id "
     };
 }
 
@@ -204,9 +213,10 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
                     AS evakuierung_angeordnet, ",
-        teilschwaerzungen_sql!(),
-        " FROM einsatz e \
-         LEFT JOIN organisation o ON o.id = e.org_id \
+        teilschwaerzungen_spalte!(),
+        " FROM einsatz e",
+        teilschwaerzungen_joins!(),
+        "LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
     ))
     .bind(einsatz_id)
@@ -331,9 +341,10 @@ pub async fn liste_fuer(
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
                     AS evakuierung_angeordnet, ",
-        teilschwaerzungen_sql!(),
-        " FROM einsatz e \
-         LEFT JOIN organisation o ON o.id = e.org_id \
+        teilschwaerzungen_spalte!(),
+        " FROM einsatz e",
+        teilschwaerzungen_joins!(),
+        "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          ORDER BY e.begonnen_at DESC, e.id DESC",
