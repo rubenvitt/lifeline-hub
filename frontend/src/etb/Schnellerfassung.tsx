@@ -55,6 +55,7 @@ import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { neueClientId } from '../offline/clientId';
 import { serverJetzt } from '../offline/serveruhr';
 import { lageberichtePfad } from '../routing/deeplinks';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
@@ -310,6 +311,8 @@ export default function Schnellerfassung({
   // Freitext bleibt Fallback (AC#1).
   const funkrufnamen = useFunkrufnamen(einsatz.id);
   const funktionen = useFunktionsVorschlaege(einsatz.id);
+  // Ohne Zugriff auf Lageberichte entfällt der Sprung dorthin (LFH-888, `frontend/AGENTS.md`).
+  const lageberichteGesperrt = useSprungSperre(einsatz.id)('lageberichte');
   // „Von“/„An“: Funkrufnamen plus Sachgebiete (LFH-545/549) — der Stabsvorschlag tritt neben die
   // Funkrufnamen, er ersetzt sie nicht.
   const vonAnOptionen = useMemo(
@@ -880,7 +883,7 @@ export default function Schnellerfassung({
           )}
           {!istSchmal && feldKnopf}
           {!istSchmal && anhangTeil}
-          {!berichtigungZu && typ === 'lage' && (
+          {!berichtigungZu && typ === 'lage' && !lageberichteGesperrt && (
             // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
             // weiter und ein Upload-Fehler stünde nirgends.
             <Button

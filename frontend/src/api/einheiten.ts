@@ -61,6 +61,21 @@ export function aktualisiereEinheit(
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', daten);
 }
 
+/**
+ * Teiländerung einer Einheit (LFH-306, Tri-State): nur die übergebenen Schlüssel gehen hinaus,
+ * `null` leert. Für Einzelfelder ohne Formular, etwa Funkrufname und Kommunikationsmittel aus der
+ * Fernmeldeskizze (LFH-893).
+ */
+export type EinheitPatch = Partial<EinheitEingabe>;
+
+export function patcheEinheit(
+  einsatzId: number,
+  eid: number,
+  patch: EinheitPatch,
+): Promise<Einheit> {
+  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', patch);
+}
+
 export function loeseEinheitAuf(einsatzId: number, eid: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'DELETE');
 }

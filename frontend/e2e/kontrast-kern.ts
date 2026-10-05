@@ -275,6 +275,73 @@ export async function schattenKontrast(ziel: Locator, nachbar: Locator) {
   };
 }
 
+/**
+ * Kontrast eines SVG-Textes (`<text>`) gegen den Grund der Zeichenfläche, MIT der Deckkraft seiner
+ * Gruppen (LFH-893, Prüfliste Kriterium 5: zurückgenommene Elemente der Fernmeldeskizze stehen
+ * als Gruppe mit `opacity` da). `messe` lehnt Deckkraft ab, weil sie bei HTML-Flächen die
+ * Komposition verfälscht; hier ist sie modelliert: SVG-Gruppen mit `opacity` komponieren ihren
+ * Inhalt als Ganzes, und unter dem Text liegt in der Gruppe nur Fläche in der Farbe des Grundes
+ * (Kasten) oder nichts. Die Füllung wird mit dem Produkt aus `fill-opacity` und den
+ * Gruppendeckkräften bis zum `<svg>` über den Grund gelegt; der Grund ist die komponierte
+ * HTML-Fläche unter dem `<svg>` (Vorfahren opak, ohne Bild und Mischmodus, wie in `messe`).
+ */
+export async function svgTextKontrast(text: Locator) {
+  await eingeschwungen(text);
+  return text.evaluate((element) => {
+    type F = [number, number, number, number];
+    function rgb(wert: string): F {
+      const m = /^rgba?\(([^)]+)\)$/.exec(wert);
+      if (!m) throw new Error(`Nicht unterstützte Farbe: ${wert}`);
+      const teile = m[1].split(/[\s,/]+/).map(Number);
+      if (teile.length < 3 || teile.some((n) => !Number.isFinite(n))) throw new Error(wert);
+      return [teile[0], teile[1], teile[2], teile[3] ?? 1];
+    }
+    function darueber(vorne: F, hinten: F): F {
+      const a = vorne[3] + hinten[3] * (1 - vorne[3]);
+      if (a === 0) return [0, 0, 0, 0];
+      return [0, 1, 2]
+        .map((i) => (vorne[i] * vorne[3] + hinten[i] * hinten[3] * (1 - vorne[3])) / a)
+        .concat(a) as F;
+    }
+    function luminanz(f: F) {
+      const linear = f.slice(0, 3).map((n) => {
+        const s = n / 255;
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+    }
+    if (!(element instanceof SVGTextElement)) throw new Error(`Kein SVG-Text: ${element.tagName}`);
+    const svg = element.ownerSVGElement;
+    if (!svg) throw new Error('Text ohne <svg>');
+    const vorfahren: Element[] = [];
+    for (let e: Element | null = svg.parentElement; e; e = e.parentElement) vorfahren.push(e);
+    let grund: F = [0, 0, 0, 0];
+    for (const e of vorfahren.reverse()) {
+      const stil = getComputedStyle(e);
+      if (
+        stil.backgroundImage !== 'none' ||
+        Number(stil.opacity) !== 1 ||
+        stil.mixBlendMode !== 'normal'
+      ) {
+        throw new Error(
+          `Nicht unterstützte Komposition an ${e.tagName}.${e.className}: ${stil.backgroundImage}, opacity=${stil.opacity}, blend=${stil.mixBlendMode}`,
+        );
+      }
+      grund = darueber(rgb(stil.backgroundColor), grund);
+    }
+    if (grund[3] !== 1) throw new Error('Kein opaker Hintergrund belegt');
+    const stil = getComputedStyle(element);
+    let deckkraft = Number(stil.fillOpacity) * Number(stil.opacity);
+    for (let e: Element | null = element.parentElement; e && e !== svg; e = e.parentElement) {
+      deckkraft *= Number(getComputedStyle(e).opacity);
+    }
+    const fuellung = rgb(stil.fill);
+    const vorne = darueber([fuellung[0], fuellung[1], fuellung[2], fuellung[3] * deckkraft], grund);
+    const [a, b] = [luminanz(vorne), luminanz(grund)].sort((x, y) => x - y);
+    return { text: vorne, grund, deckkraft, verhaeltnis: (b + 0.05) / (a + 0.05) };
+  });
+}
+
 /** Komponierte Fläche eines Elements (alle Vorfahren übereinander), opak. */
 export async function flaeche(ziel: Locator): Promise<Farbe> {
   return (await messe(ziel, { vordergrund: 'color', grund: 'selbst' })).grund;

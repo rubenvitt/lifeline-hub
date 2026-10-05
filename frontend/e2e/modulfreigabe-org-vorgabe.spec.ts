@@ -4,7 +4,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 // Akzeptanz LFH-669 (Spec `modul-freigabe`): eine Org-Vorgabe `fuehrungskraft` sperrt ein Modul
 // für ein normales Mitglied. Der Client kennt die Org-Vorgaben nicht; er folgt den Freigaben des
 // Servers. Die Navigation zeigt das Modul gesperrt, die Lagekarte fragt dessen Liste nicht an, und
-// es steht kein Ausfallhinweis da.
+// es steht kein Ausfallhinweis da. Ein Deeplink in das Modul zeigt den Hinweis des Rahmens
+// (LFH-888).
 //
 // Modul `lagemeldungen`: eine Quelle der Lagekarte, die kein anderer Spec mit einer
 // Nicht-Admin-Rolle bedient. Die Org-Vorgabe gilt für JEDEN Einsatz der (einen) e2e-Organisation
@@ -68,6 +69,23 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     // Kein Abruf der gesperrten Liste und kein Ausfallhinweis.
     expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/lage/meldungen`);
     await expect(page.getByTestId('lagebild-unvollstaendig')).toHaveCount(0);
+
+    // Deeplink in das gesperrte Modul (LFH-888): der Rahmen zeigt den Hinweis statt der Seite,
+    // die Liste wird nicht abgerufen, und der Rückweg führt in ein freies Modul.
+    await page.goto(`/einsaetze/${einsatzId}/lagemeldungen`);
+    const hinweis = page.getByRole('heading', { level: 1, name: 'Lagemeldungen' });
+    await expect(hinweis).toBeVisible();
+    await expect(page.getByText('Keine Berechtigung', { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText(/für deine Rolle in diesem Einsatz nicht freigegeben/),
+    ).toBeVisible();
+    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/lage/meldungen`);
+
+    const rueckweg = page.getByRole('button', { name: / öffnen$/ });
+    await rueckweg.click();
+    await expect(page).not.toHaveURL(/\/lagemeldungen/);
+    await expect(hinweis).toHaveCount(0);
+    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/lage/meldungen`);
   } finally {
     // Zurück auf den Admin — nur er darf die Org-Vorgabe setzen.
     await page.request.post('/api/auth/logout');

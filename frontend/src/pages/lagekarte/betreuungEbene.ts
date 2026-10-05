@@ -1,5 +1,5 @@
 import type { ModulFreigaben } from '../../api/types';
-import type { ModulEintrag } from '../../einsatz/modulRegistry';
+import { KEINE_BERECHTIGUNG, type ModulEintrag } from '../../einsatz/modulRegistry';
 import { personenZugriffVon, type PersonenZugriff } from './personenEbene';
 
 /**
@@ -24,4 +24,4 @@ export function betreuungZugriffVon(a: {
 }
 
 /** Sichtbarer Grund an der gesperrten Zeile — derselbe Wortlaut wie bei „Betroffene". */
-export const BETREUUNG_SPERRGRUND = 'Keine Berechtigung';
+export const BETREUUNG_SPERRGRUND = KEINE_BERECHTIGUNG;

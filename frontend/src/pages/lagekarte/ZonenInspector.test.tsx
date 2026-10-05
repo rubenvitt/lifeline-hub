@@ -42,6 +42,7 @@ function renderInspector(opts: {
   onAendern?: Mock<ZonenInspectorProps['onAendern']>;
   onLoeschen?: Mock<ZonenInspectorProps['onLoeschen']>;
   onMatrixOeffnen?: Mock<ZonenInspectorProps['onMatrixOeffnen']>;
+  matrixGesperrt?: boolean;
 }) {
   const onAendern = opts.onAendern ?? vi.fn<ZonenInspectorProps['onAendern']>();
   const onLoeschen = opts.onLoeschen ?? vi.fn<ZonenInspectorProps['onLoeschen']>();
@@ -54,6 +55,7 @@ function renderInspector(opts: {
     onMatrixOeffnen,
     onLoeschen,
     ansichten: [],
+    matrixGesperrt: opts.matrixGesperrt,
   } satisfies Omit<ZonenInspectorProps, 'zone'>;
   const ergebnis = renderMitProviders(
     <ZonenInspector zone={opts.zone ?? basisZone} {...gemeinsameProps} />,
@@ -123,6 +125,16 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
     renderInspector({ onMatrixOeffnen });
     await userEvent.click(screen.getByRole('button', { name: /Gefahrenmatrix bearbeiten/i }));
     expect(onMatrixOeffnen).toHaveBeenCalledWith(10);
+  });
+
+  it('LFH-888: gesperrtes Modul Gefahren → „Gefahrenmatrix bearbeiten" gesperrt mit Grund', async () => {
+    const onMatrixOeffnen = vi.fn<ZonenInspectorProps['onMatrixOeffnen']>();
+    renderInspector({ onMatrixOeffnen, matrixGesperrt: true });
+    const knopf = screen.getByRole('button', { name: /Gefahrenmatrix bearbeiten/i });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    await userEvent.click(knopf);
+    expect(onMatrixOeffnen).not.toHaveBeenCalled();
   });
 
   it('wählt ein anderes Gebiet → ruft onAendern mit gefahrengebiet_id auf', async () => {

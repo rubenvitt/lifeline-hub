@@ -857,6 +857,13 @@ pub async fn loese_auf_tx(
         .await?;
     sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE ueber_einheit_id = ? AND einsatz_id = ?")
         .bind(parent).bind(id).bind(einsatz_id).execute(&mut *conn).await?;
+    // Polymorphe Bezüge der Fernmeldeskizze haben keinen FK (LFH-893, design.md D3).
+    crate::stab::fernmeldeskizze::vergiss(
+        conn,
+        einsatz_id,
+        crate::stab::fernmeldeskizze::Element::Einheit(id),
+    )
+    .await?;
     sqlx::query("DELETE FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
         .bind(id)
         .bind(einsatz_id)

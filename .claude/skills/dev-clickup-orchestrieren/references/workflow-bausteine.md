@@ -4,6 +4,12 @@ Fertige, adaptierbare Skripte für die Fan-out-Phasen. Kopieren, Platzhalter (`<
 Subtask-Liste/Pfade einsetzen. Alle laufen über das **Workflow-Tool** (Hintergrund, keine
 User-Interaktion im Lauf). Ergebnisse landen im Main-Loop → dort Checkpoint/Entscheidung.
 
+Ein Skelett muss nicht als Workflow laufen: Bei wenigen Jobs startest du dieselben Prompts als
+einzelne Subagents (Agent-Tool) und führst die Ergebnisse im Main-Loop zusammen. Die Wahl
+triffst du selbst, ohne Opt-in (`dev-clickup-ausfuehren`, Abschnitt „Agenten nach Bedarf“). Die
+Grundregeln unten gelten für Subagents genauso, und jeder Subagent-Prompt bringt die
+Pflichtpunkte aus jenem Abschnitt mit.
+
 Grundregeln (aus der Workflow-Tool-Doku):
 - `pipeline()` ist der Default für Mehrstufiges ohne Barriere. `parallel()` nur, wenn du
   **alle** Ergebnisse gemeinsam brauchst (Dedup, Early-Exit, Synthese).

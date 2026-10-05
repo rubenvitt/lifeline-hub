@@ -319,7 +319,9 @@ export default function EinsatzSeite({
         )}
       </div>
       {(beschreibung || hinweis) && (
-        <div style={koerperStil}>
+        // Haken für den Druck (LFH-893): eine Druckwurzel kann Beschreibung und Hinweis samt Hülle
+        // ausblenden — schon eine leere Hülle vor einem benannten Blatt erzwingt eine eigene Seite.
+        <div data-lfh="seiten-beschreibung" style={koerperStil}>
           {beschreibung && (
             <div style={{ marginBottom: token.margin }}>
               <Typography.Text type="secondary">{beschreibung}</Typography.Text>

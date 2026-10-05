@@ -100,6 +100,12 @@
     display: table-header-group;
   }
 
+  /* Eine Anlage beginnt auf einer neuen Seite (LFH-893: die Funkplan-Tabelle hinter der
+     Fernmeldeskizze). Die Seite markiert nur, die Mechanik steht hier. */
+  [data-lfh='druckwurzel'] [data-lfh='druck-anlage'] {
+    break-before: page;
+  }
+
   [data-lfh='druckwurzel'] img {
     max-width: 100%;
   }

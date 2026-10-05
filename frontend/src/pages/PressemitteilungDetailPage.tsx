@@ -1,4 +1,5 @@
 import { App, Breadcrumb, Button, Checkbox, Form, Input, Space, Typography } from 'antd';
+import ZumEtbEintrag from '../etb/ZumEtbEintrag';
 import type { Dayjs } from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -6,13 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import {
-  etbPfad,
-  parseRouteId,
-  pressemitteilungPfad,
-  pressePfad,
-  stabPfad,
-} from '../routing/deeplinks';
+import { parseRouteId, pressemitteilungPfad, pressePfad, stabPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import {
   aktualisierePressemitteilung,
@@ -290,7 +285,7 @@ function PressemitteilungDetail() {
             <Space wrap>
               <DruckKnopf />
               {!istEntwurf && pm.etb_eintrag_id != null && (
-                <Link to={etbPfad(einsatzId, { eintrag: pm.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
+                <ZumEtbEintrag einsatzId={einsatzId} eintragId={pm.etb_eintrag_id} />
               )}
               {!istEntwurf && darfSchreiben && (
                 <Button

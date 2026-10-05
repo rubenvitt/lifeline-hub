@@ -12,14 +12,17 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
 }));
+const freigaben = vi.hoisted(() => ({ wert: undefined as unknown }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
+  // Freigaben für die Sprung-Sperre (LFH-888); Vorgabe: alles frei.
+  ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),
 }));
 vi.mock('../api/einsatzabschnitte', () => ({
   listeAbschnitte: vi.fn().mockResolvedValue([{ id: 3, name: 'Deichwache Nord' }]),
@@ -184,6 +187,7 @@ describe('BetreuungPage (LFH-639)', () => {
       meine_rolle: 'einsatzleitung',
     };
     api.ladeBetreuung.mockResolvedValue(MIT_DATEN);
+    freigaben.wert = freigabenFixture();
   });
 
   it('Leerzustand: beide Blöcke sagen, dass nichts da ist', async () => {
@@ -644,6 +648,34 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
       '/einsaetze/1/lagekarte?platzieren=betreuungsstelle%3A8',
     );
+  });
+
+  it('gesperrte Lagekarte: „Auf Karte verorten" steht gesperrt mit Grund (LFH-888)', async () => {
+    freigaben.wert = freigabenFixture({ lagekarte: { zugriff: false } });
+    api.ladeBetreuung.mockResolvedValue({ bezirke: [], stellen: [TURNHALLE] });
+    const { client } = renderPage();
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.modulFreigaben(1))).toBeDefined());
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
+    );
+    const eintrag = within(await offenesMenue()).getByRole('menuitem', {
+      name: /Auf Karte verorten \(Keine Berechtigung\)/,
+    });
+    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('gesperrte Lagekarte: „Auf Karte zeigen" am Bezirk steht gesperrt mit Grund (LFH-888)', async () => {
+    freigaben.wert = freigabenFixture({ lagekarte: { zugriff: false } });
+    api.ladeBetreuung.mockResolvedValue({ bezirke: [{ ...UFER, flaechen: 2 }], stellen: [] });
+    const { client } = renderPage();
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.modulFreigaben(1))).toBeDefined());
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
+    );
+    const eintrag = within(await offenesMenue()).getByRole('menuitem', {
+      name: /Auf Karte zeigen \(Keine Berechtigung\)/,
+    });
+    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('„Auf Karte zeigen" am Bezirk mit Fläche führt zur Fläche (LFH-673)', async () => {

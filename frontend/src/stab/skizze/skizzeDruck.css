@@ -1,0 +1,59 @@
+/* Eigenheiten der Fernmeldeskizze im Druck (LFH-893 D13). Die Mechanik (Ausblenden des Rahmens,
+   Fluss, Papierfarben, Umbruch) liegt in `druck/druck.css`; die Seite setzt die Klasse aus
+   `skizzenDruckKlasse` an das Element, das Druckkopf, Skizze, Schriftfeld und Lücken trägt.
+
+   Quer und das Format kommen über benannte Seiten: `page` an der Klasse wählt die Seite, das
+   Format selbst steht in der benannten `@page`. Die unbenannte `@page` von `druck.css` (Rand,
+   Seitenzahl) bleibt unberührt, die benannte erbt sie. Die Skizze passt über ihre `viewBox` auf
+   die erste Seite; die Höhe begrenzt sie, damit der Kopf mit auf dieses Blatt passt. */
+@media print {
+  @page fernmeldeskizze-a3 {
+    size: A3 landscape;
+  }
+
+  @page fernmeldeskizze-a4 {
+    size: A4 landscape;
+  }
+
+  /* Die Skizze steht direkt unter dem Druckkopf, die Lücken folgen ihr: über der Skizze ließen Kopf
+     (45 mm) und Lücken (89 mm) auf A3 quer 122 mm, auf A4 quer 35 mm, und die Skizze rutschte ganz
+     auf die zweite Seite (LFH-893 4.3, e2e `fernmeldeskizze-druck.spec.ts`). */
+  .lfh-skizze-druck-a3 {
+    page: fernmeldeskizze-a3;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lfh-skizze-druck-a4 {
+    page: fernmeldeskizze-a4;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lfh-skizze-druck-a3 > [data-lfh='paneel'],
+  .lfh-skizze-druck-a4 > [data-lfh='paneel'] {
+    order: 1;
+  }
+
+  /* Bedienung (Werkzeugleiste, Palette, Paneel, Hinweise) gehört nicht aufs Papier. */
+  .lfh-skizze-bedienung {
+    display: none !important;
+  }
+
+  /* Eine Meldung am Element ist Rückmeldung an den Arbeitsplatz, kein Teil des Blatts (Prüfliste
+     O4). Die Fläche lässt sie im Druck schon weg (`druck` über `beforeprint`); diese Regel deckt
+     Druckwege ohne `beforeprint` (`page.pdf`, `emulateMedia`, `useDruckModus`). */
+  .lfh-skizze-flaeche [data-teil='meldung'] {
+    display: none !important;
+  }
+
+  /* Nutzhöhe quer bei 15 mm Rand (`druck/druck.css`): A3 267 mm, A4 180 mm; davon Druckkopf
+     45 mm und Abstände. */
+  .lfh-skizze-druck-a3 .lfh-skizze-flaeche svg {
+    max-height: 205mm;
+  }
+
+  .lfh-skizze-druck-a4 .lfh-skizze-flaeche svg {
+    max-height: 120mm;
+  }
+}

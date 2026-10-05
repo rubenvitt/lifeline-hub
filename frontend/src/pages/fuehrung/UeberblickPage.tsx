@@ -7,7 +7,12 @@ import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
-import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
+import {
+  istKeyFreigegeben,
+  istSprungGesperrt,
+  KEINE_BERECHTIGUNG,
+  modulRegistry,
+} from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
@@ -304,6 +309,12 @@ export default function UeberblickPage() {
   const erinnerungenFrei = istKeyFreigegeben('erinnerungen', freigaben);
   const etbFrei = istKeyFreigegeben('etb', freigaben);
   const rueckmeldungenFrei = istKeyFreigegeben('meldungen', freigaben);
+  // Sprungziele (LFH-888, design.md D4): Lesart der Navigation — gesperrt nur, wenn der Server
+  // es sagt; solange die Freigaben laden, steht kein Knopf gesperrt da.
+  const lageberichtGesperrt = istSprungGesperrt('lageberichte', freigaben);
+  const etbSprungGesperrt = istSprungGesperrt('etb', freigaben);
+  const meldebildGesperrt = istSprungGesperrt('kraefteuebersicht', freigaben);
+  const stabGesperrt = istSprungGesperrt('stab', freigaben);
 
   const personenQ = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
@@ -519,7 +530,8 @@ export default function UeberblickPage() {
   const frist = (s: string | null | undefined) => formatUhrzeitMitTag(s, konventionen);
   const auftraegeFehlen = auftraegeFrei && auftraegeQ.isError;
 
-  const markenZiel = (m: Marke): string =>
+  /** Ziel einer Marke; die Lagebesprechung führt nur in einen freien Stab (LFH-888). */
+  const markenZiel = (m: Marke): string | undefined =>
     m.art === 'auftrag'
       ? auftraegePfad(einsatzId, { auftrag: m.id ?? undefined })
       : m.art === 'erinnerung'
@@ -530,7 +542,9 @@ export default function UeberblickPage() {
             ? abloesungPfad(einsatzId)
             : m.art === 'unwetter'
               ? wetterPegelPfad(einsatzId)
-              : stabPfad(einsatzId);
+              : stabGesperrt
+                ? undefined
+                : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
@@ -582,6 +596,9 @@ export default function UeberblickPage() {
                   <IconBericht size={14} />
                 </Icon>
               }
+              // Gesperrt statt versteckt, mit Grund (M16, LFH-888).
+              disabled={lageberichtGesperrt}
+              title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : undefined}
               onClick={() => waehle(lageberichtePfad(einsatzId))}
             >
               Lagebericht
@@ -589,7 +606,8 @@ export default function UeberblickPage() {
             {/* Gesperrt statt versteckt: der Hinweis darüber nennt den Grund. */}
             <Button
               type="primary"
-              disabled={!darfSchreiben}
+              disabled={!darfSchreiben || etbSprungGesperrt}
+              title={etbSprungGesperrt ? KEINE_BERECHTIGUNG : undefined}
               icon={
                 <Icon>
                   <IconPlus size={14} />
@@ -632,7 +650,7 @@ export default function UeberblickPage() {
                 wert={zKraefte === 'gesperrt' ? '—' : kraefte.gesamt}
                 einheit={zKraefte === 'gesperrt' ? undefined : 'Ges.'}
                 notiz={zKraefte === 'gesperrt' ? NICHT_FREIGEGEBEN : `F/UF/M//Σ ${kraefte.text}`}
-                ziel={kraefteuebersichtPfad(einsatzId)}
+                ziel={meldebildGesperrt ? undefined : kraefteuebersichtPfad(einsatzId)}
               />
               <Kennzahl
                 titel="Warnstufe"
@@ -945,10 +963,9 @@ export default function UeberblickPage() {
                     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                       {marken.marken.map((m) => (
                         <li key={m.key}>
-                          <Link
-                            to={markenZiel(m)}
-                            data-lfh="ueberblick-marke"
-                            data-ton={m.ton}
+                          <MarkenZeile
+                            ziel={markenZiel(m)}
+                            ton={m.ton}
                             style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
                           >
                             <span
@@ -978,7 +995,7 @@ export default function UeberblickPage() {
                             >
                               {m.text}
                             </span>
-                          </Link>
+                          </MarkenZeile>
                         </li>
                       ))}
                     </ul>
@@ -1203,5 +1220,31 @@ function AbschnittEintrag({
         )}
       </span>
     </Link>
+  );
+}
+
+/**
+ * Eine Zeile der „Nächsten Marken": mit Ziel ein Link, ohne (Zielmodul gesperrt, LFH-888) dieselbe
+ * Zeile als Text — die Frist bleibt eine Aussage, auch wenn sie in kein Modul führt.
+ */
+function MarkenZeile({
+  ziel,
+  ton,
+  style,
+  children,
+}: {
+  ziel: string | undefined;
+  ton: Marke['ton'];
+  style: CSSProperties;
+  children: ReactNode;
+}) {
+  return ziel != null ? (
+    <Link to={ziel} data-lfh="ueberblick-marke" data-ton={ton} style={style}>
+      {children}
+    </Link>
+  ) : (
+    <div data-lfh="ueberblick-marke" data-ton={ton} style={{ ...style, cursor: 'default' }}>
+      {children}
+    </div>
   );
 }

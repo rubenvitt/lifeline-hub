@@ -11,6 +11,7 @@ import {
   mitBetriebsart,
   teileSprechgruppen,
 } from '../components/kommunikationsmittel';
+import type { Fernmeldenetz, NetzStelle } from './fernmeldeskizze';
 import {
   FUEHRUNGSSTELLE_STELLE,
   fuehrungsstelleErfasst,
@@ -22,9 +23,11 @@ import {
   einheitenOhneSprechgruppe,
   lokaleSprechgruppenOhneZuordnung,
   verbindungenOhneGemeinsameSprechgruppe,
+  type KanalTeilnehmer,
   type Luecke,
   type Quelle,
   type Verbindung,
+  type WeitereKanalQuellen,
 } from './luecken';
 
 /**
@@ -285,11 +288,16 @@ export interface FunkplanLuecken {
   lokaleSprechgruppenOhneZuordnung: Luecke<Sprechgruppe>;
 }
 
-/** Was die Lücken lesen: Fahrzeuge und Personal tragen keine (LFH-869 liest nur diese). */
+/**
+ * Was die Lücken lesen: Fahrzeuge und Personal tragen keine (LFH-869 liest nur diese). Externe
+ * Stellen und Daten der Skizze (LFH-893) tragen Sprechgruppen wie die Struktur; reicht der
+ * Aufrufer sie mit, zählt „lokale Sprechgruppen ohne Zuordnung“ wie das Bild (Review O2).
+ */
 export type LueckenQuellen = Pick<
   FunkplanQuellen,
   'abschnitte' | 'einheiten' | 'sprechgruppen' | 'fuehrungsstelle'
->;
+> &
+  Partial<WeitereKanalQuellen>;
 
 export function funkplanLuecken(q: LueckenQuellen): FunkplanLuecken {
   return {
@@ -306,6 +314,7 @@ export function funkplanLuecken(q: LueckenQuellen): FunkplanLuecken {
       q.abschnitte,
       q.einheiten,
       q.fuehrungsstelle,
+      q.stellen && q.skizze ? { stellen: q.stellen, skizze: q.skizze } : undefined,
     ),
   };
 }
@@ -469,11 +478,81 @@ export function funkplanLueckenZeilen(
   ];
 }
 
+/** Was die Übernahme aus der Fernmeldeskizze braucht (LFH-893 D10). */
+export interface KommunikationsskizzeAngabe {
+  netz: Fernmeldenetz;
+  /** „Gültig ab“ aus dem Schriftfeld, vom Aufrufer als DTG formatiert; `null` = nicht erfasst. */
+  gueltigAb: string | null;
+}
+
+function teilnehmerMarkdown(s: NetzStelle, t: KanalTeilnehmer): string {
+  const name = md(s.bezeichnung);
+  // Status nur bei externen Stellen: Zuordnungen am Datensatz sind der Funkplan, also bestehend (D7).
+  if (s.art === 'extern') return `${name} (${t.status})`;
+  return s.rufname ? `${name} (Rufname ${md(s.rufname)})` : name;
+}
+
+/**
+ * Der Abschnitt „Kommunikationsskizze“ (LFH-893 D10): „Gültig ab“, je Schiene Bedingungszeichen
+ * und Teilnehmer, danach die übrigen Verbindungen mit Art, Medium und Status. Das Netz trägt
+ * weder Erreichbarkeit noch Rufnummern; den Hinweis einer Verbindung (Freitext, darin könnte eine
+ * Nummer stehen) lässt der Bericht weg. Fehlen externe Stellen oder Skizzendaten, steht der Grund.
+ */
+function kommunikationsskizzeMarkdown({ netz, gueltigAb }: KommunikationsskizzeAngabe): string[] {
+  const kopf = ['## Kommunikationsskizze', ''];
+  if (!netz.darstellbar) {
+    const abschnitte = netz.fehlend.find((f) => f.quelle === 'abschnitte');
+    const grund = abschnitte ? ZUSTAND_GRUND[abschnitte.zustand] : 'fehlen';
+    return [...kopf, `_(keine Kanäle: Abschnitte ${grund})_`, ''];
+  }
+  const skizzeFehlt = netz.fehlend.find((f) => f.quelle === 'skizze');
+  const fehlend = netz.fehlend.filter((f) => f.quelle === 'stellen' || f.quelle === 'skizze');
+  const stelle = new Map(netz.stellen.map((s) => [s.key, s]));
+  const schienen = netz.schienen.map((s) => {
+    const teilnehmer = s.teilnehmer.map((t) => teilnehmerMarkdown(stelle.get(t.element)!, t));
+    return `- ${md(s.zeichen)}: ${teilnehmer.length > 0 ? teilnehmer.join(', ') : 'keine Teilnehmer'}`;
+  });
+  const verbindungen = skizzeFehlt
+    ? [`— (${ZUSTAND_GRUND[skizzeFehlt.zustand]})`]
+    : netz.verbindungen.length > 0
+      ? netz.verbindungen.map(
+          (v) =>
+            `- ${md(stelle.get(v.von)!.bezeichnung)} – ${md(stelle.get(v.nach)!.bezeichnung)}: ${v.beschreibung}`,
+        )
+      : ['_(keine)_'];
+  return [
+    ...kopf,
+    `**Gültig ab:** ${
+      skizzeFehlt ? `— (${ZUSTAND_GRUND[skizzeFehlt.zustand]})` : gueltigAb ? md(gueltigAb) : '—'
+    }`,
+    '',
+    ...(fehlend.length > 0
+      ? [
+          ...fehlend.map((f) => `- ${f.name}: ${ZUSTAND_GRUND[f.zustand]} — diese Angaben fehlen`),
+          '',
+        ]
+      : []),
+    '### Sprechgruppen',
+    '',
+    ...(schienen.length > 0 ? schienen : ['_(keine)_']),
+    '',
+    '### Verbindungen',
+    '',
+    ...verbindungen,
+    '',
+  ];
+}
+
+/**
+ * @param skizze die Fernmeldeskizze für den Abschnitt „Kommunikationsskizze“ (LFH-893 D10).
+ *   Fehlt sie, fehlt der Abschnitt — Übergang, bis die Seite das Netz übergibt (tasks.md 2.6).
+ */
 export function rendereFunkplanMarkdown(
   zeilen: readonly FunkplanZeile[],
   stand: string,
   luecken: FunkplanLuecken,
   quellen: FunkplanQuellen,
+  skizze?: KommunikationsskizzeAngabe,
 ): string {
   const fehlend = fehlendeQuellen(quellen);
   // Der Bericht geht bei Freigabe unveränderlich ins ETB: was fehlt, steht darin, sonst läse
@@ -504,5 +583,6 @@ export function rendereFunkplanMarkdown(
     '',
     ...(zeilen.length > 0 ? zeilen.flatMap((z) => zeileMarkdown(z, 0)) : [leer]),
     '',
+    ...(skizze ? kommunikationsskizzeMarkdown(skizze) : []),
   ].join('\n');
 }

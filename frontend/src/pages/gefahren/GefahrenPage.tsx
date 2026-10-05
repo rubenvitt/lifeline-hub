@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
+import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Space, Spin, Typography, theme } from 'antd';
@@ -54,6 +56,8 @@ export function gebietszeileStil(token: {
 export default function GefahrenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  // Sprünge auf die Lagekarte nur, wenn sie frei ist (LFH-888, design.md D4).
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const { benutzer } = useAuth();
   const qc = useQueryClient();
 
@@ -171,7 +175,9 @@ export default function GefahrenPage() {
         <SeitenLeer
           titel="Noch keine Gefahrengebiete"
           hinweis="Auf der Lagekarte ein Gefahrengebiet zeichnen."
-          aktion={{ label: 'Zur Lagekarte', pfad: lagekartePfad(einsatzId) }}
+          aktion={
+            karteGesperrt ? undefined : { label: 'Zur Lagekarte', pfad: lagekartePfad(einsatzId) }
+          }
         />
       </div>,
       gebieteQuery.dataUpdatedAt,
@@ -258,9 +264,15 @@ export default function GefahrenPage() {
             </Typography.Title>
             {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an. */}
             {/* Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider. */}
-            <Link to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
-              <Button>Auf Karte zeigen</Button>
-            </Link>
+            {karteGesperrt ? (
+              <Button disabled title={KEINE_BERECHTIGUNG}>
+                Auf Karte zeigen
+              </Button>
+            ) : (
+              <Link to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
+                <Button>Auf Karte zeigen</Button>
+              </Link>
+            )}
           </div>
         )}
         {!darfSchreiben && (

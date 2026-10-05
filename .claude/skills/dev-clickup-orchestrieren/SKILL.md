@@ -1,6 +1,6 @@
 ---
 name: dev-clickup-orchestrieren
-description: Use as the primary entry point whenever the user wants to implement, pick up, "umsetzen", or work through a task from the Lifeline-Hub ClickUp Entwicklungsboard — including epics/parent tasks with subtasks, and any request phrased "mit subagents", "ultracode", "als Workflow", "automode", or "mach alle Subtasks". This skill orchestrates the whole task (and its subtasks) with Workflow-backed fan-out (scope scan, design-option judging, review), OpenSpec changes per task in the main loop, and human checkpoints in between. It supersedes and internally invokes dev-clickup-ausfuehren for per-(sub)task execution. NOT for capturing/creating new tasks — that's clickup-task-anlegen.
+description: Use as the primary entry point whenever the user wants to implement, pick up, "umsetzen", or work through a task from the Lifeline-Hub ClickUp Entwicklungsboard — including epics/parent tasks with subtasks, and any request phrased "mit subagents", "ultracode", "als Workflow", "automode", or "mach alle Subtasks". This skill orchestrates the whole task (and its subtasks) with fan-out via Workflow or subagents, started at its own discretion without opt-in (scope scan, design-option judging, review), OpenSpec changes per task in the main loop, and human checkpoints in between. It supersedes and internally invokes dev-clickup-ausfuehren for per-(sub)task execution. NOT for capturing/creating new tasks — that's clickup-task-anlegen.
 ---
 
 # ClickUp-Task umsetzen — Orchestrierung (Lifeline Hub)
@@ -9,27 +9,30 @@ description: Use as the primary entry point whenever the user wants to implement
 
 Primärer Einstieg, um einen Task vom **Entwicklungsboard** (`901523554968`) — und **alle
 seine Subtasks** — umzusetzen. Dieser Skill ist eine **Orchestrierungs-Schicht**: er treibt
-den Ablauf im Main-Loop, nutzt das **Workflow-Tool** für die Fan-out-Phasen (Scope,
-Bewertung von Entwurfsoptionen, Review) und präsentiert **Zwischenstände vor der Dev**. Die
+den Ablauf im Main-Loop, nutzt **Workflows oder parallele Subagents** für die Fan-out-Phasen
+(Scope, Bewertung von Entwurfsoptionen, Review) und präsentiert **Zwischenstände vor der Dev**. Die
 eigentliche Pro-(Sub)Task-Ausführung — Status-Spur, Komplexitäts-Routing, Worktree — delegiert er an
 `dev-clickup-ausfuehren`. Diese Logik **nicht** hier reimplementieren; es gibt eine Quelle der
 Wahrheit.
 
 ## Kernprinzip: Hybrid, nicht ein großer Workflow
 
-Das **Workflow-Tool läuft im Hintergrund und kann den User nicht mitten im Lauf fragen.**
-Daraus folgt die ganze Architektur:
+Das **Workflow-Tool und Subagents laufen im Hintergrund und können den User nicht mitten im
+Lauf fragen.** Daraus folgt die ganze Architektur:
 
 - **Der Main-Loop (du) besitzt alles Interaktive**: Checkpoints, Entscheidungen,
   Worktree-Anlage, interaktives TDD, Code-Review-Anfragen. Diese Dinge dürfen **nie** in
-  einem Workflow stecken.
-- **Workflows besitzen das parallele Schwerlast-Lesen/Bewerten**: viele Subtasks/Subsysteme
-  gleichzeitig scannen, konkurrierende Entwürfe bewerten, Review-Dimensionen adversarial
-  verifizieren.
+  einem Workflow oder Subagent stecken.
+- **Workflows und Subagents besitzen das parallele Schwerlast-Lesen/Bewerten**: viele
+  Subtasks/Subsysteme gleichzeitig scannen, konkurrierende Entwürfe bewerten,
+  Review-Dimensionen adversarial verifizieren.
 
-„Immer ultracode/Workflow" heißt deshalb: **Workflow für Scope, Entwurfsbewertung und Review**
-(den Entwurf selbst schreibt `/opsx:propose` im Main-Loop, s. „Entwurfs-Hoheit“) — nicht,
-jede einzelne Subtask-Code-Änderung in einen Workflow zu wickeln (das ist Zeremonie). Die
+**Ob und wie viel Fan-out, entscheidest du selbst** — ein Opt-in wie „ultracode“ braucht es
+nicht (Festlegung des Users, 04.10.2026; Regeln, Abwägung Agent oder Workflow und Pflichtinhalt
+jedes Worker-Prompts in `dev-clickup-ausfuehren`, Abschnitt „Agenten nach Bedarf“). Fan-out
+lohnt sich für Scope, Entwurfsbewertung und Review (den Entwurf selbst schreibt
+`/opsx:propose` im Main-Loop, s. „Entwurfs-Hoheit“) — nicht dafür, jede einzelne
+Subtask-Code-Änderung in einen Workflow zu wickeln (das ist Zeremonie). Die
 Ausnahme ist der autonome Dev-Modus (s. Phase 3), der bewusst worktree-isolierte Agents
 fan-out.
 
@@ -41,10 +44,10 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 | Phase | Wer | Werkzeug | Checkpoint? |
 |---|---|---|---|
 | 0 Laden & Statuskontext | Main-Loop | ClickUp-Connector, ggf. Worktree | — |
-| 1 Scope/Verstehen | **Workflow** (Scan) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, bei Unklarheit; Route bestätigen** |
-| 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel-**Workflow** als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
+| 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, bei Unklarheit; Route bestätigen** |
+| 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel (**Workflow** oder Subagents) als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
-| 4 Review | **Workflow** + Main-Loop | Dimensionen→finden→verifizieren, dann Review-Anfrage | bei Findings |
+| 4 Review | **Fan-out** (Workflow oder Subagents) + Main-Loop | Dimensionen→finden→verifizieren, dann Review-Anfrage | bei Findings |
 | 5 Abschluss & Status | Main-Loop | Merge, Board-Status | — |
 
 Konkrete, adaptierbare Workflow-Skripte für Phase 1/2/4 stehen in
@@ -58,7 +61,8 @@ Scope und Entwurf beantworten der Workflow und OpenSpec, aber **nie beide diesel
 
 - **Workflow = die Menge.** Er liest und bewertet parallel über viele Subtasks: den Scope-Scan
   (Phase 1) und das Judge-Panel (Phase 2, nur Zulieferer). Er schreibt keine Datei unter
-  `openspec/changes/` und ruft kein `/opsx:*`.
+  `openspec/changes/` und ruft kein `/opsx:*`. Dasselbe gilt, wenn Subagents statt eines
+  Workflows den Fan-out tragen.
 - **OpenSpec = der einzelne Datensatz.** Er entwirft einen Task als Change
   (`/opsx:propose`), klärt eine unklare Anforderung (`/opsx:explore`) und setzt nach Freigabe um
   (`/opsx:apply`). Alle drei laufen **im Main-Loop**, weil sie den Menschen brauchen.
@@ -80,16 +84,17 @@ Scope und Entwurf beantworten der Workflow und OpenSpec, aber **nie beide diesel
 
 Task mehrdeutig oder keine Subtasks auffindbar → kurz beim User rückfragen, nicht raten.
 
-## Phase 1 — Scope/Verstehen (Workflow + Main-Loop)
+## Phase 1 — Scope/Verstehen (Fan-out + Main-Loop)
 
-**Mechanismus: der Scope-Workflow.** Er lässt pro Subtask (und pro berührtem Subsystem) einen
+**Mechanismus: der Scope-Fan-out**, als Workflow oder als parallel gestartete Subagents. Er lässt
+pro Subtask (und pro berührtem Subsystem) einen
 Reader-Agent parallel laufen: was berührt der Subtask, welche Files, welche Abhängigkeiten zu
 anderen Subtasks, welche offenen Fragen, welche Fähigkeiten unter `openspec/specs/` er ändert
 oder neu anlegt (`faehigkeiten`; bloßes Berühren zählt nicht). Jeder
 Reader **schlägt eine Route vor** (`trivial` · `klar` · `bug-unklar` · `unklar` · `entwurf`,
 bei `entwurf` mit den zutreffenden Gründen E1–E3). Ergebnis ist eine **strukturierte Map**
 (Skelett in `references/workflow-bausteine.md` → „Scope-Fan-out“). `/opsx:explore` läuft hier
-**nicht** im Workflow, denn es ist ein Gespräch.
+**nicht** im Workflow oder Subagent, denn es ist ein Gespräch.
 
 **Erkennungsmerkmal: das Feld `route` je Map-Eintrag.**
 
@@ -129,8 +134,8 @@ Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Chang
   anderen Route bleibt ohne Change, auch wenn er dieselbe Fähigkeit nennt.
 
 **Judge-Panel nur als Zulieferer.** Ist der Lösungsraum weit (E1 mit mehr als zwei ernsthaften
-Wegen), bewertet vorher ein Workflow konkurrierende Entwürfe (Skelett:
-`references/workflow-bausteine.md` → „Design-Judge-Panel“). Das Panel liest nur. Den Sieger
+Wegen), bewertet vorher ein Workflow oder eine Handvoll Subagents konkurrierende Entwürfe
+(Skelett: `references/workflow-bausteine.md` → „Design-Judge-Panel“). Das Panel liest nur. Den Sieger
 übergibst du `/opsx:propose` als Entscheidung, die übrigen als verworfene Alternativen, und
 beides landet in `design.md`. Zwischen Panel und Proposal hältst du **nicht** an. Die Wahl
 trifft der Mensch am Freigabe-Checkpoint, und will er einen anderen Weg, läuft `/opsx:update`.
@@ -178,9 +183,9 @@ sammelst diese ein und legst sie dem User vor, statt zu raten.
 Im Zweifel sequenziell. Bei gemischter Lage: unabhängige Subtasks autonom bündeln, abhängige
 sequenziell — aber das nur, wenn der Schnitt sauber ist.
 
-## Phase 4 — Review (Workflow + Main-Loop)
+## Phase 4 — Review (Fan-out + Main-Loop)
 
-1. **Workflow:** Review über Dimensionen (Bugs, Sicherheit, Konventionen, Tests) →
+1. **Workflow oder Subagents:** Review über Dimensionen (Bugs, Sicherheit, Konventionen, Tests) →
    Findings finden → **adversarial verifizieren** (Skelett: „Review-find-verify"). Nur
    bestätigte Findings übernehmen.
 2. Bestätigte Findings abarbeiten (zurück in Phase 3, sequenziell).
@@ -239,12 +244,13 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 
 - Status-Spur, Routing, Task-Laden, Worktree-Logik **nicht** hier kopieren → an
   `dev-clickup-ausfuehren` delegieren.
-- **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Review) in einen Workflow stecken —
-  Workflows können nicht fragen.
-- **Kein `/opsx:*` im Workflow** (`explore`, `propose`, `update`, `apply`, `archive`) und kein
-  Anlegen oder Ändern unter `openspec/changes/`. Einzige Ausnahme: Ein autonomer Dev-Agent hakt
-  Aufgaben einer freigegebenen Change ab. Ein Workflow-Agent, der `/opsx:propose` ausführt,
-  endet einfach an dessen Halt, und das sähe aus wie ein Erfolg.
+- **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Review) in einen Workflow oder
+  Subagent stecken — beide können nicht fragen.
+- **Kein `/opsx:*` im Workflow oder Subagent** (`explore`, `propose`, `update`, `apply`,
+  `archive`) und kein Anlegen oder Ändern unter `openspec/changes/`. Einzige Ausnahme: Ein
+  autonomer Dev-Agent hakt Aufgaben einer freigegebenen Change ab. Ein Workflow-Agent oder
+  Subagent, der `/opsx:propose` ausführt, endet einfach an dessen Halt, und das sähe aus wie ein
+  Erfolg.
 - Keinen Plan-Workflow „je Subtask“ neben einer Change laufen lassen, denn die `tasks.md` ist
   der Plan.
 - Einzelne Subtask-Code-Änderungen **nicht** zwanghaft in Workflows wickeln (Zeremonie) —

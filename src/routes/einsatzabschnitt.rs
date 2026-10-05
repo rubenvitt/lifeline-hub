@@ -309,6 +309,44 @@ pub async fn aufloesen(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// PUT /api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg} — eine Sprechgruppe zuordnen
+/// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung wie der
+/// PATCH mit `sprechgruppe_ids`, kein ETB (auch der PATCH schreibt dafür keinen).
+pub async fn sprechgruppe_zuordnen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid, sg)): PfadParam<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Abschnitt(aid);
+    if crate::sprechgruppe::repo::einzeln_zuordnen(
+        &state.pool,
+        ctx.einsatz.org_id,
+        einsatz_id,
+        ziel,
+        sg,
+    )
+    .await?
+    {
+        sse_abschnitt(&state, einsatz_id, aid);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg} — Zuordnung lösen, idempotent.
+pub async fn sprechgruppe_loesen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid, sg)): PfadParam<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Abschnitt(aid);
+    if crate::sprechgruppe::repo::einzeln_loesen(&state.pool, einsatz_id, ziel, sg).await? {
+        sse_abschnitt(&state, einsatz_id, aid);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct FlaecheBody {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
