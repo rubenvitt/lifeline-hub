@@ -385,10 +385,28 @@ async fn personen_antrag_bis_zum_vollzug() {
         .await,
         0
     );
+    // Schwärzungsstand im Kopf (LFH-996, Spec `einsatzkopf-live`): vor dem Vollzug fehlt das
+    // Feld, danach tragen Kopf und Liste `teilschwaerzungen: 1`.
+    let kopf_uri = format!("/api/einsaetze/{}", l.einsatz);
+    let (_, kopf) = anfrage(&l.app, "GET", &kopf_uri, &l.admin, None).await;
+    assert!(
+        !kopf.as_object().unwrap().contains_key("teilschwaerzungen"),
+        "{kopf}"
+    );
     assert_eq!(
         lifeline_hub::einsatz::purge_scheduler::tick_einmal(&l.pool, &live, faellig).await,
         1
     );
+    let (_, kopf) = anfrage(&l.app, "GET", &kopf_uri, &l.admin, None).await;
+    assert_eq!(kopf["teilschwaerzungen"], 1, "{kopf}");
+    let (_, liste) = anfrage(&l.app, "GET", "/api/einsaetze", &l.admin, None).await;
+    let eintrag = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == l.einsatz)
+        .unwrap();
+    assert_eq!(eintrag["teilschwaerzungen"], 1, "{eintrag}");
 
     let (name, vorname, kontakt, nr): (Option<String>, Option<String>, Option<String>, i64) =
         sqlx::query_as(
