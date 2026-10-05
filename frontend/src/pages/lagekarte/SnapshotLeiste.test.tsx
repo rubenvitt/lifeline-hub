@@ -21,7 +21,13 @@ vi.mock('../../api/lageSnapshot', () => ({
 import { SnapshotLeiste, ANZEIGE_MS, bandStile, startEingeklappt } from './SnapshotLeiste';
 import { setzeViewportBreite } from '../../test/viewport';
 import { dichten } from '../../theme/tokens';
-import { formatZeitKurz } from '../../anzeige/format';
+import {
+  formatZeitKurz,
+  type AnzeigeKonventionen,
+  DEFAULT_KONVENTIONEN,
+} from '../../anzeige/format';
+import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../../test/prozessZone';
 
 type Snap = Record<string, unknown>;
 function snapshot(over: Snap = {}): Snap {
@@ -39,13 +45,19 @@ function snapshot(over: Snap = {}): Snap {
 }
 
 /** Rendert mit vorbefülltem Cache (Liste synchron verfügbar → deterministisch, timer-freundlich). */
-function renderLeiste(liste: Snap[], props: Record<string, unknown>) {
+function renderLeiste(
+  liste: Snap[],
+  props: Record<string, unknown>,
+  konventionen: AnzeigeKonventionen = {},
+) {
   const client = neuerQueryClient();
   client.setQueryData(einsatzKeys.lageSnapshot(5), liste);
   ladeLageSnapshots.mockResolvedValue(liste);
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>
-      <AntApp>{children}</AntApp>
+      <AnzeigeKonventionenProvider konventionen={konventionen}>
+        <AntApp>{children}</AntApp>
+      </AnzeigeKonventionenProvider>
     </QueryClientProvider>
   );
   return render(
@@ -157,7 +169,12 @@ describe('SnapshotLeiste', () => {
       return t;
     });
     // Ohne Bezeichnung die Uhrzeit (`formatZeitKurz`, UTC-Wire-String).
-    expect(titel).toEqual(['Live', formatZeitKurz('2026-07-24 10:15:00'), 'Stand B', 'Stand A']);
+    expect(titel).toEqual([
+      'Live',
+      formatZeitKurz('2026-07-24 10:15:00', DEFAULT_KONVENTIONEN),
+      'Stand B',
+      'Stand A',
+    ]);
   });
 
   it('die Auswahl zeigt den aktiven Stand, sonst „Live“', () => {
@@ -480,5 +497,19 @@ describe('SnapshotLeiste — zwei Gruppen, Abstände aus der Staffel (LFH-899)',
   it('„Stand sichern" heißt so — ohne das englische Symbol-Label „camera" davor', () => {
     renderLeiste([snapshot()], { darfSichern: true });
     expect(screen.getByRole('button', { name: 'Stand sichern' })).toBeInTheDocument();
+  });
+});
+
+/** LFH-913 (Spec `zeiteingabe`): ein Stand ohne Bezeichnung heißt nach seiner Zeit in der Anzeigezone. */
+describe('SnapshotLeiste — Standzeit in der Anzeigezone (LFH-913)', () => {
+  mitProzessZone('UTC');
+
+  it('ein Stand von 08:00 UTC heißt in der Auswahl 241000 (Berlin)', async () => {
+    renderLeiste(
+      [snapshot({ id: 7, bezeichnung: null, stand_at: '2026-07-24 08:00:00' })],
+      { aktiverSnapshotId: 7 },
+      { zeitzone: 'Europe/Berlin' },
+    );
+    expect(auswahlText()).toBe('241000');
   });
 });

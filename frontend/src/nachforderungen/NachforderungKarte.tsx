@@ -2,9 +2,9 @@ import { Button, Flex, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
-import { formatZeit } from '../anzeige/format';
 import KommKarte from '../kommunikation/KommKarte';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 
 const { Text } = Typography;
 
@@ -42,6 +42,7 @@ export default function NachforderungKarte({
   onStatus,
   onAblehnen,
 }: NachforderungKarteProps) {
+  const { formatZeit } = useAnzeigeKonventionen();
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
   const next = NAECHSTER[n.status];
   const istAbg = ansicht === 'abgeschlossen';

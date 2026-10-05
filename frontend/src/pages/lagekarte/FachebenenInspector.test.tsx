@@ -6,7 +6,9 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import FachebenenInspector from './FachebenenInspector';
 import { fachebeneFarbenHell } from '../../theme/tokens';
-import { taktischeDtgVoll } from '../../anzeige/format';
+import { taktischeDtgVoll, DEFAULT_KONVENTIONEN } from '../../anzeige/format';
+import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../../test/prozessZone';
 
 describe('FachebenenInspector', () => {
   it('Warnung (DWD): Headline, Schwere-Label, Beschreibung, Handlungsempfehlung', () => {
@@ -88,7 +90,9 @@ describe('FachebenenInspector', () => {
         />,
       );
       const zeile = screen.getByText(/angekündigt/);
-      expect(zeile).toHaveTextContent(`angekündigt · ab ${taktischeDtgVoll(KUENFTIG)}`);
+      expect(zeile).toHaveTextContent(
+        `angekündigt · ab ${taktischeDtgVoll(KUENFTIG, DEFAULT_KONVENTIONEN)}`,
+      );
     });
 
     it('wird bei offenem Inspector geltend, sobald der Beginn erreicht ist', async () => {
@@ -341,7 +345,9 @@ describe('FachebenenInspector', () => {
     // Die Meldeklasse bleibt — sie ist nur als alt gekennzeichnet.
     expect(screen.getByText('großes Hochwasser')).toBeInTheDocument();
     const zeile = screen.getByText(/Ebene abgerufen/).closest('[data-lfh="fachebene-stand"]')!;
-    expect(zeile).toHaveTextContent(`veraltet · Ebene abgerufen ${taktischeDtgVoll(vor40h)}`);
+    expect(zeile).toHaveTextContent(
+      `veraltet · Ebene abgerufen ${taktischeDtgVoll(vor40h, DEFAULT_KONVENTIONEN)}`,
+    );
   });
 
   it('ohne Abrufzeitpunkt keine Zeile zur Ebene (LFH-591)', () => {
@@ -398,7 +404,9 @@ describe('FachebenenInspector', () => {
     expect(leitLabel.closest('tr')?.textContent).toContain('NO₂');
     expect(screen.getByText('145 µg/m³')).toBeInTheDocument();
     expect(screen.getByText('12 µg/m³')).toBeInTheDocument();
-    expect(screen.getByText(taktischeDtgVoll('2026-09-21T09:00:00+01:00'))).toBeInTheDocument();
+    expect(
+      screen.getByText(taktischeDtgVoll('2026-09-21T09:00:00+01:00', DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
     expect(screen.getByText('DEBB021')).toBeInTheDocument();
     expect(screen.getByText(/Verkehr/)).toBeInTheDocument();
     // Ohne Kennzeichnung der Quelle steht kein Unvollständigkeits-Hinweis da.
@@ -1125,5 +1133,27 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
       ).toBeEnabled(),
     );
     expect(screen.queryByText(/Schon 5 maßgebliche Pegel/)).toBeNull();
+  });
+});
+
+/** LFH-913 (Spec `zeiteingabe`): Zeitangaben der Quelle stehen in der Anzeigezone. */
+describe('FachebenenInspector — Zeiten in der Anzeigezone (LFH-913)', () => {
+  mitProzessZone('UTC');
+
+  it('ein Messzeitpunkt von 08:00 UTC steht als Berliner 241000JUL2026 da', () => {
+    render(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <FachebenenInspector
+          quelle="luftqualitaet"
+          properties={{
+            titel: 'Potsdam-Zentrum',
+            klasse: 'gut',
+            zeitpunkt: '2026-07-24T08:00:00Z',
+          }}
+          onSchliessen={() => {}}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    expect(screen.getByText('241000JUL2026')).toBeInTheDocument();
   });
 });

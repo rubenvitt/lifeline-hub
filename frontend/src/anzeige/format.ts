@@ -18,7 +18,15 @@ export interface AnzeigeKonventionen {
   koordinatenformat?: Koordinatenformat | null;
 }
 
-/** Default: alles null → lokal, 24h, dezimal, metrisch. */
+/**
+ * Default: alles null → lokal, 24h, dezimal, metrisch.
+ *
+ * Die Zeitformatierer unten nehmen ihn NICHT als Vorgabe, die Konventionen sind dort Pflicht
+ * (LFH-913): ein Aufruf ohne Konventionen formatierte still in der Browserzone, auch unter dem
+ * `EinsatzAnzeigeProvider`. Der Typprüfer findet so jede vergessene Stelle; in Komponenten die
+ * gebundenen Formatierer aus `useAnzeigeKonventionen()` oder `ZeitAnzeige`. Wer bewusst die
+ * Browserzone will, übergibt `DEFAULT_KONVENTIONEN` ausdrücklich.
+ */
 export const DEFAULT_KONVENTIONEN: AnzeigeKonventionen = {
   zeitzone: null,
   zeitformat: null,
@@ -62,26 +70,23 @@ const MONATE_DE = [
 
 /** Taktische Uhrzeit „1430". BOS-Konvention ist 24h; das 12h/24h-Setting gilt hier nicht. */
 export function taktischeUhrzeit(
-  utcStr?: string | null,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  utcStr: string | null | undefined,
+  konv: AnzeigeKonventionen,
 ): string {
   if (!utcStr) return '';
   return inZone(utcStr, konv).format('HHmm');
 }
 
 /** Taktische Datum-Zeit-Gruppe kurz „161430" (Tag + Uhrzeit, ohne Monat/Jahr). */
-export function taktischeDtg(
-  utcStr?: string | null,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): string {
+export function taktischeDtg(utcStr: string | null | undefined, konv: AnzeigeKonventionen): string {
   if (!utcStr) return '';
   return inZone(utcStr, konv).format('DDHHmm');
 }
 
 /** Volle taktische DTG „161430JUL2026" (Tag + Uhrzeit + dt. Monatskürzel + Jahr). */
 export function taktischeDtgVoll(
-  utcStr?: string | null,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  utcStr: string | null | undefined,
+  konv: AnzeigeKonventionen,
 ): string {
   if (!utcStr) return '';
   const d = inZone(utcStr, konv);
@@ -89,17 +94,14 @@ export function taktischeDtgVoll(
 }
 
 /** Volle Zeitangabe → taktische DTG „161430JUL2026". */
-export function formatZeit(
-  utcStr?: string | null,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): string {
+export function formatZeit(utcStr: string | null | undefined, konv: AnzeigeKonventionen): string {
   return taktischeDtgVoll(utcStr, konv);
 }
 
 /** Kurze Zeitangabe → taktische Uhrzeit „1430" wenn heute, sonst kurze DTG „161430". */
 export function formatZeitKurz(
-  utcStr?: string | null,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  utcStr: string | null | undefined,
+  konv: AnzeigeKonventionen,
 ): string {
   if (!utcStr) return '';
   const d = inZone(utcStr, konv);
@@ -114,8 +116,8 @@ export function formatZeitKurz(
  * die Nachbarzeilen nicht verschiebt.
  */
 export function formatUhrzeit(
-  utcStr?: string | null,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  utcStr: string | null | undefined,
+  konv: AnzeigeKonventionen,
 ): string {
   if (!utcStr) return '——:——';
   return inZone(utcStr, konv).format('HH:mm');
@@ -127,8 +129,8 @@ export function formatUhrzeit(
  * Zeitzone wie die Formatierung.
  */
 export function formatUhrzeitMitTag(
-  utcStr?: string | null,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  utcStr: string | null | undefined,
+  konv: AnzeigeKonventionen,
 ): string {
   if (!utcStr) return '——:——';
   const d = inZone(utcStr, konv);

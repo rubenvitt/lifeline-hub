@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import KanalListe, { sortiereKanaele } from './KanalListe';
 import type { ChatKanal } from '../api/types';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 
 function kanal(over: Partial<ChatKanal> = {}): ChatKanal {
   return {
@@ -192,5 +194,25 @@ describe('KanalListe', () => {
     // Wieder geöffnet: leer.
     await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
     expect(await screen.findByLabelText('Name')).toHaveValue('');
+  });
+});
+
+/** LFH-913 (Spec `zeiteingabe`): die Zeit der letzten Nachricht steht in der Anzeigezone. */
+describe('KanalListe — Zeit in der Anzeigezone (LFH-913)', () => {
+  mitProzessZone('UTC');
+
+  it('letzte Nachricht um 10:00 UTC steht als Berliner 1200 da', () => {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <KanalListe
+          kanaele={[kanal({ letzte_nachricht_at: '2026-06-10 10:00:00' })]}
+          aktiverKanalId={1}
+          onWechsel={vi.fn()}
+          darfSchreiben={false}
+          onKanalAnlegen={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    expect(screen.getByTitle('Letzte Nachricht')).toHaveTextContent('101200');
   });
 });

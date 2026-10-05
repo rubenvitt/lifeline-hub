@@ -11,7 +11,8 @@ import type { GlobalToken } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
-import { formatZeitKurz } from '../../anzeige/format';
+import { formatZeitKurz, type AnzeigeKonventionen } from '../../anzeige/format';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useLageSnapshots } from './useLageSnapshots';
 import { bandStil } from './KartenFuss';
 import { useViewport } from '../../components/useViewport';
@@ -124,9 +125,14 @@ interface SnapshotLeisteProps {
   fehler: (e: unknown) => void;
 }
 
-function chipLabel(bezeichnung: string | null | undefined, standAt: string): string {
+function chipLabel(
+  bezeichnung: string | null | undefined,
+  standAt: string,
+  konv: AnzeigeKonventionen,
+): string {
   // `formatZeitKurz` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String.
-  return bezeichnung?.trim() || formatZeitKurz(standAt);
+  // In der Anzeigezone wie jede andere Zeit der Seite (LFH-913).
+  return bezeichnung?.trim() || formatZeitKurz(standAt, konv);
 }
 
 /**
@@ -153,6 +159,7 @@ export function SnapshotLeiste({
 }: SnapshotLeisteProps) {
   const { message } = App.useApp();
   const { token } = theme.useToken();
+  const { konventionen } = useAnzeigeKonventionen();
   const qc = useQueryClient();
   const { snapshots, sichern, sichertGerade } = useLageSnapshots(einsatzId);
   const [sichernOffen, setSichernOffen] = useState(false);
@@ -258,7 +265,7 @@ export function SnapshotLeiste({
   const optionen = [
     { value: LIVE, label: 'Live', title: 'Live' },
     ...[...chrono].reverse().map((s) => {
-      const label = chipLabel(s.bezeichnung, s.stand_at);
+      const label = chipLabel(s.bezeichnung, s.stand_at, konventionen);
       return { value: s.id, label, title: s.notiz ? `${label} · ${s.notiz}` : label };
     }),
   ];
@@ -310,7 +317,7 @@ export function SnapshotLeiste({
               tooltip={{
                 formatter: (i) =>
                   i != null && chrono[i]
-                    ? chipLabel(chrono[i].bezeichnung, chrono[i].stand_at)
+                    ? chipLabel(chrono[i].bezeichnung, chrono[i].stand_at, konventionen)
                     : '',
               }}
               onChange={(i) => {

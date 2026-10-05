@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { formatZeitKurz } from '../anzeige/format';
+import { formatZeitKurz, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { renderMitProviders } from '../test/utils';
 import { ORIGINAL_TEXT } from '../components/DownloadAnker';
 import NachrichtenStrom from './NachrichtenStrom';
 import type { ChatNachricht } from '../api/types';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { mitProzessZone } from '../test/prozessZone';
 
 function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
   return {
@@ -279,12 +281,14 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    const meier = `Aktionen zu Nachricht von Meier, ${formatZeitKurz('2026-06-10 12:02:00')}`;
-    const schulz = `Aktionen zu Nachricht von Schulz, ${formatZeitKurz('2026-06-10 12:05:00')}`;
+    const meier = `Aktionen zu Nachricht von Meier, ${formatZeitKurz('2026-06-10 12:02:00', DEFAULT_KONVENTIONEN)}`;
+    const schulz = `Aktionen zu Nachricht von Schulz, ${formatZeitKurz('2026-06-10 12:05:00', DEFAULT_KONVENTIONEN)}`;
     expect(screen.getByRole('button', { name: meier })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: schulz })).toBeInTheDocument();
     // Dieselbe Uhrzeit steht sichtbar in der Kopfzeile.
-    expect(screen.getByText(formatZeitKurz('2026-06-10 12:02:00'))).toBeInTheDocument();
+    expect(
+      screen.getByText(formatZeitKurz('2026-06-10 12:02:00', DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
   });
 
   it('„Löschen" fragt in einem Dialog nach; erst „Ja, löschen" löscht', async () => {
@@ -384,7 +388,7 @@ describe('NachrichtenStrom', () => {
         onHeraufstufenAuftrag={vi.fn()}
       />,
     );
-    const zeit = formatZeitKurz('2026-06-10 12:02:05');
+    const zeit = formatZeitKurz('2026-06-10 12:02:05', DEFAULT_KONVENTIONEN);
     const namen = screen
       .getAllByRole('button', { name: AKTIONEN })
       .map((k) => k.getAttribute('aria-label'));
@@ -767,5 +771,35 @@ describe('NachrichtenStrom — Pille „n neue Nachrichten"', () => {
     zeige([A, B, C]);
     expect(scrollTo).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /neue Nachricht/ })).not.toBeInTheDocument();
+  });
+});
+
+/** LFH-913 (Spec `zeiteingabe`): Kopfzeile, Tooltip und Auslösername in der Anzeigezone. */
+describe('NachrichtenStrom — Zeiten in der Anzeigezone (LFH-913)', () => {
+  mitProzessZone('UTC');
+
+  it('eine Nachricht um 10:00 UTC trägt überall die Berliner Zeit', async () => {
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <NachrichtenStrom
+          nachrichten={[
+            nachricht({ erstellt_at: '2026-06-10 10:00:00', bearbeitet_at: '2026-06-10 10:30:00' }),
+          ]}
+          eigeneBenutzerId={2}
+          darfSchreiben
+          onBearbeiten={vi.fn()}
+          onLoeschen={vi.fn()}
+          onHeraufstufen={vi.fn()}
+          onHeraufstufenAuftrag={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Aktionen zu Nachricht von Max, 101200' }),
+    ).toBeInTheDocument();
+    await userEvent.hover(screen.getByText('101200'));
+    expect(await screen.findByText('101200JUN2026')).toBeInTheDocument();
+    await userEvent.hover(screen.getByText('bearbeitet'));
+    expect(await screen.findByText('bearbeitet am 101230JUN2026')).toBeInTheDocument();
   });
 });

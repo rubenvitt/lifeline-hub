@@ -16,6 +16,7 @@ import {
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { formatUhrzeitMitTag } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
@@ -54,7 +55,10 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
   const { token } = theme.useToken();
   const jetzt = useMinutenTakt();
   const bald = kopplungEndetBald(laeuftAbAt, jetzt);
-  const uhrzeit = formatUhrzeitMitTag(laeuftAbAt);
+  // Die Hülle hat keinen `EinsatzAnzeigeProvider` (`geraet/AGENTS.md`): der Hook liefert dort die
+  // Browserzone, unter einem Provider dessen Zone (LFH-913).
+  const { konventionen } = useAnzeigeKonventionen();
+  const uhrzeit = formatUhrzeitMitTag(laeuftAbAt, konventionen);
   const farbe = bald ? farbenDunkel.achtung : rahmenFarben.gedaempft;
   return (
     <div

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import MeldungKarte from './MeldungKarte';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeit } from '../anzeige/format';
+import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
 import type { Meldung } from '../api/types';
 
@@ -315,7 +315,9 @@ describe('MeldungKarte — Zeiten in der Anzeigezone (LFH-692)', () => {
         </MemoryRouter>
       </AnzeigeKonventionenProvider>,
     );
-    expect(formatZeit('2026-06-12 09:00:00', berlin)).not.toBe(formatZeit('2026-06-12 09:00:00'));
+    expect(formatZeit('2026-06-12 09:00:00', berlin)).not.toBe(
+      formatZeit('2026-06-12 09:00:00', DEFAULT_KONVENTIONEN),
+    );
     expect(
       screen.getByText(formatZeit('2026-06-12 09:00:00', berlin), { exact: false }),
     ).toBeInTheDocument();

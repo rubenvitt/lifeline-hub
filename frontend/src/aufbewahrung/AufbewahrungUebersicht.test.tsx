@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { AufbewahrungEintrag, BenutzerAnzeige } from '../api/types';
-import { formatZeit } from '../anzeige/format';
+import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import AufbewahrungUebersicht from './AufbewahrungUebersicht';
@@ -109,9 +109,13 @@ describe('AufbewahrungUebersicht', () => {
     expect(within(t).getByText('geschwärzt')).toBeInTheDocument();
     // Zeitpunkt der Vormerkung — Pflichtangabe der Übersicht (Spec „Aufbewahrungsübersicht").
     expect(within(t).getByRole('columnheader', { name: /Vorgemerkt am/ })).toBeInTheDocument();
-    expect(within(t).getByText(formatZeit('2026-06-01 10:10:00'))).toBeInTheDocument();
+    expect(
+      within(t).getByText(formatZeit('2026-06-01 10:10:00', DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
     // Karenz-Ende als taktische DTG, nicht als roher UTC-String.
-    expect(within(t).getByText(formatZeit('2026-07-01 10:10:00'))).toBeInTheDocument();
+    expect(
+      within(t).getByText(formatZeit('2026-07-01 10:10:00', DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
     expect(t).not.toHaveTextContent('2026-07-01 10:10:00');
     // Keine DB-id im sichtbaren Text.
     for (const id of ['9101', '9102', '9103', '9104']) expect(t).not.toHaveTextContent(id);
@@ -125,7 +129,9 @@ describe('AufbewahrungUebersicht', () => {
     expect(
       within(t).getByRole('columnheader', { name: /Schwärzung auf Antrag ab/ }),
     ).toBeInTheDocument();
-    expect(within(t).getByText(formatZeit('2026-10-03 08:00:00'))).toBeInTheDocument();
+    expect(
+      within(t).getByText(formatZeit('2026-10-03 08:00:00', DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
   });
 
   it('filtert je Zustand über die Segmentleiste', async () => {
@@ -169,8 +175,12 @@ describe('AufbewahrungUebersicht', () => {
     const t = await tabelle();
     await within(t).findByText('E-2025-0001');
     expect(within(t).getByRole('columnheader', { name: /Löschung am/ })).toBeInTheDocument();
-    expect(within(t).getByText(formatZeit('2035-01-02 10:00:00'))).toBeInTheDocument();
-    expect(within(t).getByText(formatZeit('2026-01-01 10:00:00'))).toBeInTheDocument();
+    expect(
+      within(t).getByText(formatZeit('2035-01-02 10:00:00', DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
+    expect(
+      within(t).getByText(formatZeit('2026-01-01 10:00:00', DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
   });
 
   it('ein endgültig gelöschter Einsatz führt in keine Akte und nennt statt der Bezeichnung die Löschung', async () => {

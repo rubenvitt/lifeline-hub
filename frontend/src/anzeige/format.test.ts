@@ -36,8 +36,8 @@ describe('taktische Zeit-Varianten', () => {
     );
   });
   it('leer/null → leerer String', () => {
-    expect(taktischeUhrzeit(null)).toBe('');
-    expect(taktischeDtgVoll(undefined)).toBe('');
+    expect(taktischeUhrzeit(null, DEFAULT_KONVENTIONEN)).toBe('');
+    expect(taktischeDtgVoll(undefined, DEFAULT_KONVENTIONEN)).toBe('');
   });
 });
 
@@ -46,7 +46,7 @@ describe('formatZeit (taktische DTG)', () => {
     const wire = '2026-06-11 09:00:00';
     const d = dayjs.utc(wire).local();
     const erwartet = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`;
-    expect(formatZeit(wire)).toBe(erwartet);
+    expect(formatZeit(wire, DEFAULT_KONVENTIONEN)).toBe(erwartet);
     expect(formatZeit(wire, DEFAULT_KONVENTIONEN)).toBe(erwartet);
   });
 
@@ -65,14 +65,14 @@ describe('formatZeit (taktische DTG)', () => {
   });
 
   it('leer/null → leerer String', () => {
-    expect(formatZeit(null)).toBe('');
-    expect(formatZeit(undefined)).toBe('');
-    expect(formatZeit('')).toBe('');
+    expect(formatZeit(null, DEFAULT_KONVENTIONEN)).toBe('');
+    expect(formatZeit(undefined, DEFAULT_KONVENTIONEN)).toBe('');
+    expect(formatZeit('', DEFAULT_KONVENTIONEN)).toBe('');
   });
 
   it('ungültige Zeitzone crasht nicht, fällt auf lokal zurück (Review LFH-136)', () => {
     const wire = '2026-06-11 09:00:00';
-    const lokal = formatZeit(wire); // Default = lokal
+    const lokal = formatZeit(wire, DEFAULT_KONVENTIONEN); // Default = lokal
     expect(() => formatZeit(wire, { zeitzone: 'Europe/Brelin' })).not.toThrow();
     expect(formatZeit(wire, { zeitzone: 'Müll/Quatsch' })).toBe(lokal);
   });
@@ -81,9 +81,11 @@ describe('formatZeit (taktische DTG)', () => {
 describe('formatZeitKurz (taktisch)', () => {
   it('Uhrzeit 1430 wenn heute, sonst kurze DTG 161430', () => {
     const heute = dayjs().utc().format('YYYY-MM-DD HH:mm:ss');
-    expect(formatZeitKurz(heute)).toBe(dayjs.utc(heute).local().format('HHmm'));
+    expect(formatZeitKurz(heute, DEFAULT_KONVENTIONEN)).toBe(
+      dayjs.utc(heute).local().format('HHmm'),
+    );
     const alt = dayjs().utc().subtract(3, 'day').format('YYYY-MM-DD HH:mm:ss');
-    expect(formatZeitKurz(alt)).toBe(dayjs.utc(alt).local().format('DDHHmm'));
+    expect(formatZeitKurz(alt, DEFAULT_KONVENTIONEN)).toBe(dayjs.utc(alt).local().format('DDHHmm'));
   });
 });
 
@@ -126,8 +128,8 @@ describe('formatUhrzeit', () => {
   });
 
   it('liefert den Leerstrich, wenn nichts da ist', () => {
-    expect(formatUhrzeit(null)).toBe('——:——');
-    expect(formatUhrzeit(undefined)).toBe('——:——');
+    expect(formatUhrzeit(null, DEFAULT_KONVENTIONEN)).toBe('——:——');
+    expect(formatUhrzeit(undefined, DEFAULT_KONVENTIONEN)).toBe('——:——');
   });
 
   it('fällt bei ungültiger Zone auf lokale Zeit zurück statt zu werfen', () => {
@@ -153,8 +155,8 @@ describe('formatUhrzeitMitTag', () => {
   });
 
   it('liefert den Leerstrich, wenn nichts da ist', () => {
-    expect(formatUhrzeitMitTag(null)).toBe('——:——');
-    expect(formatUhrzeitMitTag(undefined)).toBe('——:——');
+    expect(formatUhrzeitMitTag(null, DEFAULT_KONVENTIONEN)).toBe('——:——');
+    expect(formatUhrzeitMitTag(undefined, DEFAULT_KONVENTIONEN)).toBe('——:——');
   });
 });
 

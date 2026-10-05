@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
-import { taktischeDtgVoll } from '../anzeige/format';
+import { taktischeDtgVoll, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { SkizzenLage } from '../api/fernmeldeskizzeVertrag';
 import {
   abschnitt,
@@ -236,7 +236,7 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
       const n = netz();
       return { ...n, schriftfeld: { ...n.schriftfeld!, gueltig_ab: '2026-10-04T16:00:00Z' } };
     };
-    const erwartet = taktischeDtgVoll('2026-10-04T16:00:00Z');
+    const erwartet = taktischeDtgVoll('2026-10-04T16:00:00Z', DEFAULT_KONVENTIONEN);
     const { unmount } = bild(mitGueltig());
     expect(element('schriftfeld')!.textContent).toContain(erwartet);
     unmount();
