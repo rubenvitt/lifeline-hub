@@ -8,8 +8,9 @@
 //! Übergang nicht aus `offen`, `beantwortet` ohne Antwort, Bezug auf eine nicht freigegebene oder
 //! fremde Pressemitteilung); 404 für einen fremden Kontakt.
 //!
-//! **Kein ETB-Eintrag:** das Log ist selbst der Nachweis der Pressearbeit; ins ETB geht nur die
-//! freigegebene Pressemitteilung (design.md D4/D5).
+//! **Kein ETB-Eintrag:** das Log ist Arbeitsstand der Pressearbeit; ins ETB geht nur die
+//! freigegebene Pressemitteilung (design.md D4/D5), und nur sie bleibt nach der Schwärzung als
+//! Nachweis. Die Schwärzung entfernt jeden Freitext des Logs (LFH-901, Linie A).
 
 use sqlx::{SqliteConnection, SqlitePool};
 

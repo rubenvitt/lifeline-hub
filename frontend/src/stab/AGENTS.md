@@ -84,8 +84,10 @@ Unterrouten `stab/presse` (Presse-Log, Pressemitteilungen, Medienlage), `stab/pr
 (Snapshot, Fortschreibung, ETB `meldung`), **freigeben darf nur die Einsatzleitung**
 (`EinsatzLeitungszugriff<Stab>`, Paar-Test gegen Lagebericht/Befehl), die Seite ist Zwilling von
 `LageberichtDetailPage`. Personenbezug (Ansprechperson, Erreichbarkeit, Anrufer, Rückruf, Notiz)
-wird geschwärzt, `rueckruf` per `PlatzhalterWennGesetzt`; die Medienlage (`stab/medienlage.ts`,
-„Aus S5 übernehmen“ im Lagevortrag, Quelle `stab/medienlageQuelle.ts` des Übernahme-Bausteins,
+und jeder Freitext des Presse-Logs (Medium, Thema, Antwort, Freigabeangabe; Linie A, LFH-901)
+werden geschwärzt, `rueckruf` und `antwort` per `PlatzhalterWennGesetzt`; die Medienlage
+(`stab/medienlage.ts`, „Aus S5 übernehmen“ im Lagevortrag, Quelle `stab/medienlageQuelle.ts` des
+Übernahme-Bausteins,
 `frontend/src/entwurf/AGENTS.md`) nimmt nie Namen, Nummern oder Thema. **Nicht offline**: die
 Keys fehlen in `LAGEBILD_OFFLINE` (LFH-767). Informationstelefon: Vollliste mit eigener
 Zufluss-Schleuse (`infotelefon/zufluss.ts`), Zählung aus derselben Menge (serverseitig LFH-862).

@@ -272,7 +272,14 @@ fn guard_markierungen_erkennt_luecke_retain_und_ohne_an_der_wurzel() {
 
     let mut v = PERSONENBEZUEGE.to_vec();
     let w = v.iter().position(|b| b.tabelle == "medienkontakt").unwrap();
-    v[w].spalten = &[("kontakt_name", Mit), ("kontakt_erreichbarkeit", Ohne("x"))];
+    v[w].spalten = &[
+        ("medium", Mit),
+        ("thema", Mit),
+        ("kontakt_name", Mit),
+        ("kontakt_erreichbarkeit", Ohne("x")),
+        ("antwort", Mit),
+        ("freigabe_durch", Mit),
+    ];
     assert!(befund_markierungen(&v)
         .iter()
         .any(|x| x.contains("an der Wurzel")));
