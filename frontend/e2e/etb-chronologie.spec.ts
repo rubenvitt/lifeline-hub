@@ -338,6 +338,10 @@ test.describe('LFH-683: Menüauslöser per Tastatur', () => {
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
     await expect(sicht.getByText(MELDUNG, { exact: true })).toBeVisible();
+    // Erst den Ladefokus abwarten: ab `md` fokussiert die Erfassung ihr Feld, sobald die Entwürfe
+    // aus IndexedDB stehen. Kam das nach dem Öffnen, zog es den Fokus aus dem Menü (auf alpha
+    // 4 von 5 Läufen rot).
+    await expect(page.locator('.etb-erfassung-sticky textarea')).toBeFocused();
 
     const ausloeser = sicht.getByRole('button', { name: 'Aktionen zu Eintrag 1', exact: true });
     await ausloeser.focus();
