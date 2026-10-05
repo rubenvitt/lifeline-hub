@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Die Druckregeln des hängenden Gerüsts (LFH-626 D6, geteilt seit LFH-625 D4). Geprüft wird die
  * CSS-Quelle, jsdom kennt kein `@media print`; ob sie wirkt, messen
- * `e2e/fuehrungsorganisation.spec.ts` und `e2e/funkplan.spec.ts`.
+ * `e2e/fuehrungsorganisation-druck.spec.ts`.
  */
 const HIER = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(HIER, 'haengenderBaumPrint.css'), 'utf8').replace(

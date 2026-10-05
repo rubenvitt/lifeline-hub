@@ -350,7 +350,7 @@ function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
   const { token, rollen } = useRollen();
   // Umbrechend: die Einheitenspalte hat keine feste Breite, und ein nicht umbrechender Nebentext
   // höbe die Mindestbreite der ganzen Tabelle — im Druck auf A4 ragte sie aus dem Blatt
-  // (`e2e/meldebild-tabelle.spec.ts`).
+  // (`e2e/meldebild-druck.spec.ts`).
   const nebentext = z.zusatz && (
     <span style={{ display: 'block', fontSize: 11, color: rollen.gedaempft }}>{z.zusatz}</span>
   );

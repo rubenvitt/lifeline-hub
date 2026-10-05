@@ -267,7 +267,7 @@ describe('druck.css — Tabellen des Primitivs (LFH-548, D8)', () => {
    * Die Neutralisierer der `KatalogTabelle` sind Mechanik, keine Eigenheit einer Seite: jede
    * antd-Tabelle in einer Druckwurzel (Meldebild, Funkplan) braucht sie. Ohne sie wäre der
    * Ausdruck rechts abgeschnitten, der Kopf verrutscht, die Kennungsspalte über dem Text. Ob sie
-   * WIRKEN, messen `e2e/meldebild-tabelle.spec.ts` und `e2e/funkplan.spec.ts`.
+   * WIRKEN, messen `e2e/meldebild-druck.spec.ts` und `e2e/funkplan-druck.spec.ts`.
    */
   it('lässt Bildlaufcontainer auslaufen und die Tabelle die volle Breite nehmen', () => {
     for (const sel of [`${WURZEL} .ant-table-body`, `${WURZEL} .ant-table-content`]) {

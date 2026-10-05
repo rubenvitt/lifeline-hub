@@ -139,8 +139,8 @@
      Kopfzeile (zwei getrennte Tabellen plus Sticky-Holder) und `position: sticky` an Spalte 0.
      Ohne diese Regeln wäre der Ausdruck rechts abgeschnitten, die Kopfzeile verrutscht und die
      Kennungsspalte über den Text geschoben — und jeder Vitest bliebe grün, weil jsdom kein
-     Layout rechnet. Der Layoutbeweis steht in `e2e/meldebild-tabelle.spec.ts` und
-     `e2e/funkplan.spec.ts`. Standen bis LFH-548 nur unter `.kraefte-print-root`; der Funkplan
+     Layout rechnet. Der Layoutbeweis steht in `e2e/meldebild-druck.spec.ts` und
+     `e2e/funkplan-druck.spec.ts`. Standen bis LFH-548 nur unter `.kraefte-print-root`; der Funkplan
      braucht dieselben, und Mechanik gehört hierher, nicht in ein Seitenblatt. */
   [data-lfh='druckwurzel'] .ant-table-body,
   [data-lfh='druckwurzel'] .ant-table-content {
@@ -150,7 +150,7 @@
   /* Beide Bildlaufhüllen: mit `sticky` (Druck ohne `beforeprint`, etwa `page.pdf()`) liegt die
      Tabelle in `.ant-table-body`, ohne `sticky` (`useDruckModus`, der echte Druckweg) in
      `.ant-table-content`. Dort trägt sie inline die Bildschirmbreite `scroll.x`; ohne diese
-     Regel ragte der Funkplan auf A4 340 px über den Rand (LFH-548, `e2e/funkplan.spec.ts`). */
+     Regel ragte der Funkplan auf A4 340 px über den Rand (LFH-548, `e2e/funkplan-druck.spec.ts`). */
   [data-lfh='druckwurzel'] .ant-table-body table,
   [data-lfh='druckwurzel'] .ant-table-content table {
     width: 100% !important;
@@ -158,7 +158,7 @@
     box-sizing: border-box;
   }
   /* Auf Papier gibt es keinen Bildlauf, die Tabelle muss ins Blatt. Zwei Dinge hielten sie
-     breiter (LFH-548, gemessen in `e2e/funkplan.spec.ts`: 80 px Überhang auf A4):
+     breiter (LFH-548, gemessen in `e2e/funkplan-druck.spec.ts`: 80 px Überhang auf A4):
      - antds unsichtbare Messzeile wiederholt jeden Spaltenkopf fett in Bildschirmgröße und setzt
        damit die Mindestbreite jeder Spalte, an allen Druckregeln vorbei. Sie misst nur für den
        Bildschirm und fällt im Druck weg.

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Die Eigenheiten des Funkplans im Druck (LFH-548, D8). Geprüft wird die CSS-Quelle, jsdom kennt
  * kein `@media print`. Die Mechanik (Rahmen, Fluss, Papier, Umbruch, Tabellen-Neutralisierer)
- * steht in `druck/druck.css`; ob sie am Funkplan wirkt, misst `e2e/funkplan.spec.ts`.
+ * steht in `druck/druck.css`; ob sie am Funkplan wirkt, misst `e2e/funkplan-druck.spec.ts`.
  */
 const HIER = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(HIER, 'funkplanPrint.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

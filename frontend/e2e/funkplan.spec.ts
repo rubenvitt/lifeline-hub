@@ -1,4 +1,27 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import {
+  ABSCHNITT,
+  A4_DRUCKBREITE,
+  EINHEIT,
+  EINHEIT_RUF,
+  EINHEIT_ZWEI,
+  ERREICHBAR,
+  FAHRZEUG,
+  FUEKW,
+  KURZ,
+  LOKAL,
+  SG_HINWEIS,
+  SG_LANG,
+  SUBPIXEL,
+  anmelden,
+  einsatzAnlegen,
+  oeffne,
+  seede,
+  seedeSprechgruppen,
+  sgZeile,
+  sprechgruppenSicht,
+  tabelle,
+} from './funkplan-kern';
 
 /**
  * Funkplan S6 (LFH-548): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein Layout,
@@ -9,101 +32,15 @@ import { expect, test, type Page } from '@playwright/test';
  *   hier bleiben sie als Annotation stehen, und die Tabelle hat am Fükw keinen Überhang.
  * - LÜCKEN IM ERSTEN BILD bei 1366 × 768 mit offenem Modulpanel (`toBeInViewport`).
  * - 390 px: Tabelle, nicht Karten; die Kennung bleibt fixiert.
- * - DRUCKPFAD bei A4-Breite (680 px, unter `xl`): alle Knoten offen, die Erreichbarkeit steht
- *   trotzdem da (`beforeprint` selbst ausgelöst, `emulateMedia` feuert es nicht), nichts ragt
- *   rechts aus der Druckwurzel.
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, kein PATCH, danach der Bericht offen.
  * - ZEILENLINK: die Kennung einer Einheit führt auf ihre Detailseite.
  *
- * Mutationsprobe (Prüfliste): `abBreite: 'xl'` an der Erreichbarkeit auch im Druck → der
- * Druckpfad wird rot.
+ * Der Druckpfad (A4-Breite, `beforeprint`) steht in `funkplan-druck.spec.ts` und läuft dort auch
+ * in Firefox und WebKit (`DRUCK_SPECS`, LFH-915). Hier bleibt nur der Druckschritt der
+ * Führungsstelle: er hängt an der Erfassung auf den Einsatzdaten und an der Übernahme.
  */
 
-const ADMIN = 'admin';
-const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const FUEKW = { width: 1366, height: 768 };
 const HANDSCHIRM = { width: 390, height: 844 };
-/** A4 hoch, nutzbar (wie `meldebild-tabelle.spec.ts`, `druck-fluss.spec.ts`). */
-const A4_DRUCKBREITE = 680;
-const SUBPIXEL = 0.5;
-
-/** Absichtlich lange, aber reale Werte (dieselben wie in der Messung vor dem Bau). */
-const ABSCHNITT = 'Deichverteidigung Nordwest II';
-const KURZ = 'EA-NORD-2';
-const EINHEIT = 'Fachgruppe Wasserschaden Musterstadt-Nordwest';
-const EINHEIT_RUF = 'Florian Musterstadt 1/10';
-const ERREICHBAR = '+49 171 1234567';
-const FAHRZEUG = 'Florian Musterstadt-Nordwest 1/42-1';
-const FUEHRER = 'Kirchgassner-Wohlfahrt, Maximiliane';
-const LOKAL = 'DMO 999 Reserve';
-
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
-}
-
-/**
- * Ein Abschnitt mit Sprechgruppen, eine Einheit darunter mit Erreichbarkeit und ohne
- * Sprechgruppe, ein Fahrzeug mit Führer in der Einheit, ein Fahrzeug ohne Einheit (Sammelknoten)
- * und eine nicht zugeordnete einsatzlokale Sprechgruppe: jede Lücke hat einen Treffer.
- */
-async function seede(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
-  const post = async (pfad: string, data: unknown) => {
-    const antwort = await page.request.post(`${basis}/${pfad}`, { data });
-    expect(
-      antwort.ok(),
-      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
-    ).toBeTruthy();
-    return ((await antwort.json()) as { id: number }).id;
-  };
-  const tmo = await post('sprechgruppen', { bezeichnung: 'TMO 412_F_DRK', betriebsart: 'TMO' });
-  const dmo = await post('sprechgruppen', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
-  await post('sprechgruppen', { bezeichnung: LOKAL, betriebsart: 'DMO' });
-  const abschnitt = await post('abschnitte', {
-    name: ABSCHNITT,
-    kurzbezeichnung: KURZ,
-    kommunikationsmittel: 'digitalfunk',
-    sprechgruppe_ids: [tmo, dmo],
-  });
-  const einheit = await post('einheiten', {
-    name: EINHEIT,
-    funkrufname: EINHEIT_RUF,
-    abschnitt_id: abschnitt,
-    erreichbarkeit: ERREICHBAR,
-  });
-  const fahrzeug = await post('fahrzeuge', {
-    adhoc: { funkrufname: FAHRZEUG, fahrzeugtyp: 'HLF 20' },
-  });
-  const zuordnung = await page.request.put(`${basis}/einheiten/${einheit}/fahrzeug/${fahrzeug}`);
-  expect(zuordnung.ok(), `Zuordnung: ${await zuordnung.text()}`).toBeTruthy();
-  const fuehrer = await post('personal', {
-    adhoc: { name: FUEHRER, staerke_position: 'fuehrer' },
-  });
-  const besatzung = await page.request.put(`${basis}/fahrzeuge/${fahrzeug}/besatzung/${fuehrer}`);
-  expect(besatzung.ok(), `Besatzung: ${await besatzung.text()}`).toBeTruthy();
-  await post('fahrzeuge', { adhoc: { funkrufname: 'Florian ELW 1' } });
-  return { einheit };
-}
-
-const tabelle = (page: Page) => page.getByRole('region', { name: 'Funkplan' });
-
-async function oeffne(page: Page, einsatzId: string) {
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan`);
-  // Datenanker: das Fahrzeug steht erst, wenn Abschnitt, Einheit und Fahrzeug geladen sind.
-  await expect(tabelle(page).getByText(FAHRZEUG)).toBeVisible();
-}
 
 test('Fükw mit offenem Panel: Messwerte, kein Überhang, Lücken im ersten Bild', async ({
   page,
@@ -192,61 +129,6 @@ test('390 px: Tabelle statt Karten, die Kennung bleibt fixiert', async ({ page }
   await expect(fixiert).toHaveCount(1);
   await expect(fixiert).toHaveText('Stelle');
   await expect(fixiert).toHaveCSS('position', 'sticky');
-});
-
-test('Druckpfad bei A4-Breite: alles offen, Erreichbarkeit da, nichts ragt heraus', async ({
-  page,
-}) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Druck ${Date.now()}`);
-  await seede(page, einsatzId);
-  await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
-  await oeffne(page, einsatzId);
-
-  // Vorbedingung: unter `xl` fehlt die personenbezogene Spalte am Schirm.
-  await expect(tabelle(page).getByRole('columnheader', { name: 'Erreichbarkeit' })).toHaveCount(0);
-  // Einen Knoten zuklappen: der Druck muss ihn wieder öffnen (hier über `beforeprint` + Knopf).
-  await tabelle(page).locator(`tr[data-row-key^="eh-"] td`).nth(1).click();
-  await expect(tabelle(page).getByText(FAHRZEUG)).toHaveCount(0);
-
-  // Der Knopf öffnet alle Knoten und druckt; `window.print` als Stub, der wie der Browser
-  // synchron `beforeprint` feuert. Danach bleibt die Seite im Druckzustand (kein `afterprint`).
-  await page.evaluate(() => {
-    window.print = () => {
-      window.dispatchEvent(new Event('beforeprint'));
-    };
-  });
-  await page.getByRole('button', { name: /Drucken/ }).click();
-  await page.emulateMedia({ media: 'print' });
-
-  await expect(tabelle(page).getByText(FAHRZEUG)).toHaveCount(1);
-  await expect(tabelle(page).getByRole('columnheader', { name: 'Erreichbarkeit' })).toHaveCount(1);
-  await expect(tabelle(page).getByText(ERREICHBAR)).toHaveCount(1);
-
-  const lage = await page.evaluate(() => {
-    const wurzel = document.querySelector('.funkplan-print-root')!.getBoundingClientRect();
-    // Ohne `sticky` (Druckmodus) trägt antd den Bildlauf an `.ant-table-content`.
-    const koerper = (document.querySelector('.funkplan-print-root .ant-table-body') ??
-      document.querySelector('.funkplan-print-root .ant-table-content'))!;
-    const zellen = Array.from(
-      document.querySelector('tr.ant-table-row')!.querySelectorAll(':scope > td'),
-    ) as HTMLElement[];
-    return {
-      wurzelRechts: wurzel.right,
-      letzteRechts: zellen[zellen.length - 1].getBoundingClientRect().right,
-      ueberhang: koerper.scrollWidth - koerper.clientWidth,
-      werkzeuge: getComputedStyle(document.querySelector('.funkplan-no-print')!).display,
-    };
-  });
-  expect(lage.werkzeuge, 'Werkzeugzeile im Druck aus').toBe('none');
-  expect(lage.ueberhang, `nichts im Bildlauf verborgen (${lage.ueberhang}px)`).toBeLessThanOrEqual(
-    1,
-  );
-  expect(
-    lage.letzteRechts,
-    `letzte Spalte in der Druckwurzel (Zelle ${lage.letzteRechts}px, Wurzel ${lage.wurzelRechts}px)`,
-  ).toBeLessThanOrEqual(lage.wurzelRechts + SUBPIXEL);
-  await page.emulateMedia({ media: null });
 });
 
 test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page }) => {
@@ -347,65 +229,15 @@ test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck m
 // Tastatur, Rechte, Lage) und `fernmeldeskizze-druck.spec.ts` (Druck). Die Tests der alten
 // Baum-Skizze (LFH-625: Klappen, Kante, Schleuse) sind dort ersetzt.
 
-/** Eine absichtlich lange, aber reale Bezeichnung (≥ 24 Zeichen). */
-const SG_LANG = 'TMO 412_F_DRK Nordwest-Reserve';
-
 // ── Darstellung „Sprechgruppen“: die Kanalbelegung (LFH-848 D8) ───────────────────────────────────
 //
 // - UMSCHALTEN am Fükw mit offenem Panel: dritte Stellung des Umschalters, eine Zeile je
 //   Sprechgruppe mit ihren Teilnehmern; der Teilnehmer-Verweis führt (geklickt) zur Einheit.
 // - BREITE: Σ Spaltenbreiten 930 px gegen die gemessene Contentbreite (LFH-548 D4) — kein
 //   waagerechter Bildlauf, die Lücken stehen im ersten Bild.
-// - DRUCKPFAD bei A4 (680 px): Druckkopf „Funkplan – Sprechgruppen“, Bedienung aus, die letzte
-//   Spalte endet in der Druckwurzel.
 //
 // Mutationsprobe: `mindestBreite` der Teilnehmer auf 600 → am Fükw Überhang, die Breitenprobe wird
 // rot.
-
-/** Ein Zweck von 60 Zeichen, wie ihn der S6 in den Hinweis schreibt. */
-const SG_HINWEIS = 'Führungskanal EA Nordwest, Ausweich bei Störung auf DMO 505';
-const EINHEIT_ZWEI = 'Technischer Zug Musterstadt-Südost';
-
-async function seedeSprechgruppen(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
-  const post = async (pfad: string, data: unknown) => {
-    const antwort = await page.request.post(`${basis}/${pfad}`, { data });
-    expect(
-      antwort.ok(),
-      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
-    ).toBeTruthy();
-    return ((await antwort.json()) as { id: number }).id;
-  };
-  const tmo = await post('sprechgruppen', {
-    bezeichnung: SG_LANG,
-    betriebsart: 'TMO',
-    hinweis: SG_HINWEIS,
-  });
-  const dmo = await post('sprechgruppen', { bezeichnung: 'DMO 505', betriebsart: 'DMO' });
-  await post('sprechgruppen', { bezeichnung: LOKAL, betriebsart: 'DMO' });
-  const abschnitt = await post('abschnitte', {
-    name: ABSCHNITT,
-    kurzbezeichnung: KURZ,
-    sprechgruppe_ids: [tmo, dmo],
-  });
-  const einheit = await post('einheiten', {
-    name: EINHEIT,
-    funkrufname: EINHEIT_RUF,
-    abschnitt_id: abschnitt,
-    sprechgruppe_ids: [tmo],
-  });
-  await post('einheiten', {
-    name: EINHEIT_ZWEI,
-    funkrufname: 'Florian Musterstadt 2/10',
-    abschnitt_id: abschnitt,
-    sprechgruppe_ids: [tmo, dmo],
-  });
-  return { einheit };
-}
-
-const sprechgruppenSicht = (page: Page) => page.getByRole('region', { name: 'Sprechgruppen' });
-const sgZeile = (page: Page, bezeichnung: string) =>
-  sprechgruppenSicht(page).locator('tr.ant-table-row').filter({ hasText: bezeichnung });
 
 test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im ersten Bild', async ({
   page,
@@ -447,52 +279,4 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   // Der Verweis eines Teilnehmers bedient (geklickt, nicht nur sichtbar).
   await tmo.getByRole('link', { name: EINHEIT, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einheiten/${einheit}$`));
-});
-
-test('Sprechgruppen im Druck bei A4-Breite: Druckkopf, Bedienung aus, nichts ragt heraus', async ({
-  page,
-}) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Sprechgruppen Druck ${Date.now()}`);
-  await seedeSprechgruppen(page, einsatzId);
-  await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
-  await page.goto(`/einsaetze/${einsatzId}/stab/funkplan?ansicht=sprechgruppen`);
-  await expect(sgZeile(page, SG_LANG).getByRole('link', { name: EINHEIT_ZWEI })).toBeVisible();
-
-  await page.evaluate(() => {
-    window.print = () => {
-      window.dispatchEvent(new Event('beforeprint'));
-    };
-  });
-  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
-  await page.emulateMedia({ media: 'print' });
-
-  const lage = await page.evaluate(() => {
-    const wurzel = document.querySelector('.funkplan-print-root')!.getBoundingClientRect();
-    const sicht = document.querySelector('[aria-label="Sprechgruppen"]')!;
-    const koerper = (sicht.querySelector('.ant-table-body') ??
-      sicht.querySelector('.ant-table-content'))!;
-    const zellen = Array.from(sicht.querySelectorAll('tr.ant-table-row > td')) as HTMLElement[];
-    return {
-      wurzelRechts: wurzel.right,
-      zellenRechts: Math.max(...zellen.map((z) => z.getBoundingClientRect().right)),
-      ueberhang: koerper.scrollWidth - koerper.clientWidth,
-      werkzeuge: getComputedStyle(document.querySelector('.funkplan-no-print')!).display,
-      umschalterKaesten: document
-        .querySelector('[role="radiogroup"][aria-label="Darstellung"]')!
-        .getClientRects().length,
-      kopf: document.querySelector('[data-lfh="druckkopf"]')!.textContent!,
-    };
-  });
-  expect(lage.werkzeuge, 'Werkzeugzeile im Druck aus').toBe('none');
-  expect(lage.umschalterKaesten, 'Umschalter im Druck aus').toBe(0);
-  expect(lage.kopf, 'Druckkopf nennt die Darstellung').toContain('Funkplan – Sprechgruppen');
-  expect(lage.ueberhang, `nichts im Bildlauf verborgen (${lage.ueberhang}px)`).toBeLessThanOrEqual(
-    1,
-  );
-  expect(
-    lage.zellenRechts,
-    `keine Zelle über der Druckwurzel (Zelle ${lage.zellenRechts}px, Wurzel ${lage.wurzelRechts}px)`,
-  ).toBeLessThanOrEqual(lage.wurzelRechts + SUBPIXEL);
-  await page.emulateMedia({ media: null });
 });

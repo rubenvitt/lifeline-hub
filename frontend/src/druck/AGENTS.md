@@ -9,8 +9,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 
 - **Eine Druckwurzel je Seite** (`data-lfh="druckwurzel"`); Mechanik nur in `druck/druck.css`
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen
-  nur Eigenheiten. Nachweis `druck/druck.test.ts`, `e2e/druck-fluss.spec.ts` und
-  `e2e/etb-druck.spec.ts` in Chromium, Firefox und WebKit (LFH-729: Mechanik unter Druckmedium).
+  nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
+  `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
+  `fuehrungsorganisation-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  Druckmedium).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
   `DRUCK_SPECS` der `playwright.config.ts`.
@@ -22,7 +24,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - Ein Editor druckt nie seine `<textarea>` (`MarkdownEditor` `druckfassung`).
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
-  brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan.spec.ts`), nicht nur
+  brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur
   `emulateMedia`: erst ohne `sticky` ragte eine Baumtabelle über A4.
 - **„In Lagebericht übernehmen“ ist EIN Aufruf** (LFH-548): `POST …/lageberichte`/`…/befehle`
   mit `abschnitte` als Startinhalt (`AnlegenBody<A>`, Schlüssel wie beim PATCH, doppelt → 400),

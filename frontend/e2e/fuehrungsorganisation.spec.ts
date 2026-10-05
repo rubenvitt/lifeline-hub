@@ -1,4 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  A4_DRUCKBREITE,
+  ABSCHNITT,
+  EINHEIT,
+  EINHEIT_RUF,
+  FUEHRER,
+  FUEKW,
+  KURZ,
+  STAERKE,
+  SUBPIXEL,
+  anmelden,
+  einsatzAnlegen,
+  oeffneOrganigramm,
+  organigramm,
+  post,
+  seedeGross,
+} from './fuehrungsorganisation-kern';
 
 /**
  * Führungsorganisation als Organigramm (LFH-626): die Nachweise, die NUR im Browser gehen. jsdom
@@ -10,59 +27,22 @@ import { expect, test, type Page } from '@playwright/test';
  * - BREITE: acht oberste Abschnitte mit je drei Einheiten — am Fükw (1366 × 768, Panel offen) in
  *   mehreren Zeilen von Spalten, bei 1024, 768 und 390 px ebenso ohne waagerechten Überhang von
  *   Seite und Organigramm.
- * - DRUCKPFAD bei A4-Breite (680 px): ein zugeklappter Abschnitt ist nach dem Druckknopf offen
- *   (`beforeprint` selbst ausgelöst, `emulateMedia` feuert es nicht), zwei Spalten, kein Knoten
- *   ragt aus der Druckwurzel, Werkzeugzeile und Umschalter sind aus.
  * - LIVE: ein per API umgehängter Unterabschnitt steht ohne Neuladen unter dem neuen Abschnitt.
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, kein PATCH, danach der Bericht offen.
  *
- * Mutationsproben (Prüfliste): `SPALTE_MIN_PX` auf 600 → am Fükw nur eine Spalte je Zeile, der
- * Mehrspaltennachweis wird rot; `organigrammPrint.css` ohne Ausblenden der Klappziele → Druckpfad
- * rot. Die festen zwei Druckspalten sind bei A4 (680 px) mit 300 px Mindestbreite ohnehin zwei;
- * die Regel sichert nur gegen eine spätere Änderung von `SPALTE_MIN_PX` ab.
+ * Der Druckpfad bei A4-Breite steht in `fuehrungsorganisation-druck.spec.ts` und läuft dort auch
+ * in Firefox und WebKit (`DRUCK_SPECS`, LFH-915). Hier bleibt „Schleuse im Druck“: er prüft die
+ * Zufluss-Schleuse (Fokus, Live-Strom), nicht die Druckmechanik einer Engine.
+ *
+ * Mutationsprobe (Prüfliste): `SPALTE_MIN_PX` auf 600 → am Fükw nur eine Spalte je Zeile, der
+ * Mehrspaltennachweis wird rot.
  */
 
-const ADMIN = 'admin';
-const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const FUEKW = { width: 1366, height: 768 };
-
-/** Absichtlich lange, aber reale Werte. */
-const ABSCHNITT = 'Deichverteidigung Nordwest II';
-const KURZ = 'EA-NORD-2';
-const EINHEIT = 'Fachgruppe Wasserschaden Musterstadt-Nordwest';
-const EINHEIT_RUF = 'Florian Musterstadt 1/10';
-const FUEHRER = 'Kirchgassner-Wohlfahrt, Maximiliane';
-const STAERKE = '12/34/156//202';
-const SUBPIXEL = 0.5;
-/** A4 hoch, nutzbar (wie `funkplan.spec.ts`, `druck-fluss.spec.ts`). */
-const A4_DRUCKBREITE = 680;
 const BREITEN = [
   { width: 1024, height: 768 },
   { width: 768, height: 1024 },
   { width: 390, height: 844 },
 ];
-
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
-}
-
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(name);
-  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
-  return page.url().match(/\/einsaetze\/(\d+)/)![1];
-}
-
-async function post(page: Page, einsatzId: string, pfad: string, data: unknown): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
-  expect(antwort.ok(), `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
-  return ((await antwort.json()) as { id: number }).id;
-}
 
 test('Messung vor dem Bau: Contentbreite am Fükw und Laufweiten langer Werte', async ({ page }) => {
   await page.setViewportSize(FUEKW);
@@ -119,42 +99,6 @@ test('Messung vor dem Bau: Contentbreite am Fükw und Laufweiten langer Werte', 
   }
   expect(messwerte.contentBreite).toBeGreaterThan(0);
 });
-
-/** Acht oberste Abschnitte mit je drei Einheiten, im ersten ein Unterabschnitt. */
-async function seedeGross(page: Page, einsatzId: string) {
-  const abschnitte: number[] = [];
-  for (let i = 1; i <= 8; i++) {
-    const id = await post(page, einsatzId, 'abschnitte', {
-      name: i === 1 ? ABSCHNITT : `Einsatzabschnitt ${i}`,
-      kurzbezeichnung: `EA-${i}`,
-    });
-    abschnitte.push(id);
-    for (let j = 1; j <= 3; j++) {
-      await post(page, einsatzId, 'einheiten', {
-        name: i === 1 && j === 1 ? EINHEIT : `Einheit ${i}.${j}`,
-        funkrufname: i === 1 && j === 1 ? EINHEIT_RUF : `Florian ${i}/${j}`,
-        abschnitt_id: id,
-      });
-    }
-  }
-  const unter = await post(page, einsatzId, 'abschnitte', {
-    name: 'Unterabschnitt Deich',
-    ueber_abschnitt_id: abschnitte[0],
-  });
-  await post(page, einsatzId, 'einheiten', { name: 'Gruppe Deich', abschnitt_id: unter });
-  return { abschnitte, unter };
-}
-
-const organigramm = (page: Page) => page.getByRole('region', { name: 'Organigramm' });
-
-async function oeffneOrganigramm(page: Page, einsatzId: string) {
-  await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte?ansicht=organigramm`);
-  // Der Zeiger steht noch, wo der letzte Klick war, womöglich über dem Organigramm: dann hielte
-  // die Zufluss-Schleuse (LFH-867) jede Live-Änderung zurück. Ruhestellung oben links.
-  await page.mouse.move(0, 0);
-  // Datenanker: die Einheit steht erst, wenn Abschnitte und Einheiten geladen sind.
-  await expect(organigramm(page).getByRole('link', { name: 'Gruppe Deich' })).toBeVisible();
-}
 
 /** Überhang von Seite und Organigramm sowie der Knoten über den rechten Rand. */
 async function ueberhaenge(page: Page) {
@@ -225,64 +169,6 @@ for (const groesse of BREITEN) {
     expect(m.knoten, `kein Knoten über dem Rand (${m.knoten}px)`).toBeLessThanOrEqual(SUBPIXEL);
   });
 }
-
-test('Druckpfad bei A4-Breite: alles offen, zwei Spalten, nichts ragt heraus', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Organigramm Druck ${Date.now()}`);
-  await seedeGross(page, einsatzId);
-  await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
-  await oeffneOrganigramm(page, einsatzId);
-
-  // Einen Abschnitt zuklappen: der Druck muss ihn wieder öffnen.
-  await organigramm(page)
-    .getByRole('button', { name: `Unterstellte von ${ABSCHNITT}` })
-    .click();
-  await expect(organigramm(page).getByRole('link', { name: 'Gruppe Deich' })).toHaveCount(0);
-
-  // `window.print` als Stub, der wie der Browser synchron `beforeprint` feuert.
-  await page.evaluate(() => {
-    window.print = () => {
-      window.dispatchEvent(new Event('beforeprint'));
-    };
-  });
-  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
-  await page.emulateMedia({ media: 'print' });
-
-  await expect(organigramm(page).getByRole('link', { name: 'Gruppe Deich' })).toHaveCount(1);
-  const lage = await page.evaluate(() => {
-    const wurzel = document.querySelector('.organigramm-print-root')!.getBoundingClientRect();
-    const knotenRechts = Math.max(
-      ...Array.from(document.querySelectorAll('[data-lfh="org-knoten"]')).map(
-        (k) => k.getBoundingClientRect().right,
-      ),
-    );
-    return {
-      wurzelRechts: wurzel.right,
-      knotenRechts,
-      spalten: new Set(
-        Array.from(document.querySelectorAll('[data-lfh="org-spalte"]')).map((s) =>
-          Math.round(s.getBoundingClientRect().left),
-        ),
-      ).size,
-      werkzeuge: getComputedStyle(document.querySelector('.organigramm-no-print')!).display,
-      umschalter: getComputedStyle(document.querySelector('[role="radiogroup"]')!).display,
-      klappen: getComputedStyle(document.querySelector('[data-lfh="org-klappen"]')!).display,
-      kopf: document
-        .querySelector('.organigramm-print-root')!
-        .textContent!.includes('Führungsorganisation'),
-    };
-  });
-  expect(lage.werkzeuge, 'Werkzeugzeile im Druck aus').toBe('none');
-  expect(lage.umschalter, 'Umschalter im Druck aus').toBe('none');
-  expect(lage.klappen, 'Klappziele im Druck aus').toBe('none');
-  expect(lage.kopf, 'Druckkopf „Führungsorganisation“').toBe(true);
-  expect(lage.spalten, 'A4: zwei feste Spalten').toBe(2);
-  expect(
-    lage.knotenRechts,
-    `kein Knoten über der Druckwurzel (Knoten ${lage.knotenRechts}px, Wurzel ${lage.wurzelRechts}px)`,
-  ).toBeLessThanOrEqual(lage.wurzelRechts + SUBPIXEL);
-  await page.emulateMedia({ media: null });
-});
 
 test('live: ein umgehängter Unterabschnitt steht ohne Neuladen am neuen Ort', async ({ page }) => {
   await page.setViewportSize(FUEKW);

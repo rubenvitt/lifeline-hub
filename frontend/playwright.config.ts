@@ -121,11 +121,16 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * halten, und dort prüfen sie, ob ihre CSS-Engine die Druckmechanik unter Druckmedium genauso
  * anwendet (`:has()`, komplexe `:not()`, Wurzel im Fluss). Den Seitenumbruch selbst zeigt nur
  * `page.pdf()`, und das gibt es nur in Chromium — die Specs fragen dafür `browserName`.
- * Eine weitere Druck-Spec kommt hier hinein, nicht als eigenes Projekt. Die CI verteilt alle drei
- * Projekte über die vier Pflicht-Shards (`.github/workflows/ci.yml`); lokal wählt
- * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
+ * Eine weitere Druck-Spec kommt hier hinein, nicht als eigenes Projekt. Die Druckfälle von
+ * Meldebild, Funkplan und Führungsorganisation stehen deshalb in eigenen `*-druck.spec.ts`
+ * (Hilfen in `*-kern.ts`): sonst liefe jeweils die ganze Spec dreifach (LFH-915). Die CI fährt
+ * alle drei Projekte in jedem der vier Pflicht-Shards (`.github/workflows/ci.yml`); Playwright
+ * teilt nach Testzahl in Projektreihenfolge, die Firefox- und WebKit-Fälle landen dabei alle im
+ * letzten Shard (gemessen in LFH-915). Lokal wählt `PW_PROJEKTE` in `scripts/check-all.sh` eine
+ * Teilmenge.
  */
-const DRUCK_SPECS = /\/(druck-fluss|etb-druck|fernmeldeskizze-druck)\.spec\.ts$/;
+const DRUCK_SPECS =
+  /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck)\.spec\.ts$/;
 
 const { backendPort, frontendPort, datenbank } = lauf;
 const backendUrl = `http://127.0.0.1:${backendPort}`;
