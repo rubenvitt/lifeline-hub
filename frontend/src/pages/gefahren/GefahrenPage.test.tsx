@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -16,9 +16,9 @@ import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 const einsatz = einsatzFixture({ bezeichnung: 'Lage' });
 const gebiet = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
 
-function handlers(gebiete: unknown[] = [gebiet], matrix: unknown[] = []) {
+function handlers(gebiete: unknown[] = [gebiet], matrix: unknown[] = [], e = einsatz) {
   return [
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(e)),
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json(gebiete)),
     http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json(matrix)),
   ];
@@ -36,7 +36,7 @@ describe('GefahrenPage', () => {
   it('listet Gefahrengebiete und zeigt die Matrix des gewählten', async () => {
     server.use(...handlers());
     renderPage();
-    // „Nord" erscheint in der Liste UND als editierbarer Titel → mehrere Treffer.
+    // „Nord" erscheint in der Liste UND als Titel → mehrere Treffer.
     expect((await screen.findAllByText('Nord'))[0]).toBeInTheDocument();
     // Erstes Gebiet automatisch gewählt → Matrix sichtbar.
     expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
@@ -135,6 +135,66 @@ describe('GefahrenPage', () => {
     expect(link).toHaveAttribute('href', '/einsaetze/1/lagekarte?gefahrengebiet=7');
   });
 
+  /**
+   * LFH-969: der Sprung ist EIN Link, kein Knopf darin (`a > button` hielt die Tabulatorkette
+   * zweimal an derselben Handlung an).
+   */
+  it('„Auf Karte zeigen" ist ein einzelner Sprung, kein Knopf im Link', async () => {
+    server.use(...handlers());
+    const { container } = renderPage();
+    const link = await screen.findByRole('link', { name: 'Auf Karte zeigen' });
+    expect(link).toHaveTextContent('Auf Karte zeigen ↗');
+    expect(link.querySelector('button')).toBeNull();
+    expect(container.querySelectorAll('a button')).toHaveLength(0);
+  });
+
+  it('benennt das Gebiet über den Knopf „Umbenennen" um (PATCH mit dem neuen Namen)', async () => {
+    let patch: unknown = null;
+    server.use(
+      ...handlers(),
+      http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
+        patch = await request.json();
+        return HttpResponse.json({ ...gebiet, label: 'Nord-Ost' });
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Umbenennen' }));
+    const feld = screen.getByRole('textbox', { name: 'Bezeichnung' });
+    expect(feld).toHaveValue('Nord');
+    await user.clear(feld);
+    await user.type(feld, '  Nord-Ost {Enter}');
+    await waitFor(() => expect(patch).toEqual({ label: 'Nord-Ost' }));
+  });
+
+  it('sendet beim Umbenennen mit leerer Eingabe nichts — die Bezeichnung ist Pflicht', async () => {
+    let patches = 0;
+    server.use(
+      ...handlers(),
+      http.patch('/api/einsaetze/1/gefahrengebiete/7', () => {
+        patches += 1;
+        return HttpResponse.json(gebiet);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Umbenennen' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Bezeichnung' }));
+    await user.type(screen.getByRole('textbox', { name: 'Bezeichnung' }), '   {Enter}');
+    expect(await screen.findByText(/Bezeichnung ist eine Pflichtangabe/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Nord');
+    expect(patches).toBe(0);
+  });
+
+  it('ohne Schreibrecht: Hinweis steht, kein „Umbenennen", der Sprung bleibt', async () => {
+    server.use(...handlers([gebiet], [], einsatzFixture({ meine_rolle: 'beobachter' })));
+    renderPage();
+    expect(await screen.findByText(/Nur Lesezugriff/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Nord');
+    expect(screen.queryByRole('button', { name: 'Umbenennen' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Auf Karte zeigen' })).toBeInTheDocument();
+  });
+
   it('korrigiert die Auswahl, wenn das gewählte Gebiet aus der Liste verschwindet', async () => {
     const nord = {
       id: 7,
@@ -215,7 +275,7 @@ describe('GefahrenPage', () => {
       </StrictMode>,
       { route: '/einsaetze/1/gefahren?gefahrengebiet=8', client },
     );
-    // Finale Auswahl: der editierbare Titel zeigt nur das gewählte Gebiet.
+    // Finale Auswahl: der Titel zeigt nur das gewählte Gebiet.
     const titel = await screen.findByRole('heading', { level: 3 });
     expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
   });
@@ -241,7 +301,7 @@ describe('GefahrenPage', () => {
     renderPage();
     // Die Zelle trägt einen Auslöser; sein Name nennt Zeile, Spalte und aktuelle Stufe.
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
+      await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: nicht bewertet' }),
     );
     // Über das offene Menü greifen — antd lässt Portale geschlossener Dropdowns stehen.
     const menue = document.querySelector<HTMLElement>(
@@ -257,36 +317,6 @@ describe('GefahrenPage', () => {
         warnstufe: 'hoch',
       }),
     );
-  });
-
-  it('benennt das gewählte Gefahrengebiet um (PATCH)', async () => {
-    let patch: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers(),
-      http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
-        patch = (await request.json()) as typeof patch;
-        return HttpResponse.json({
-          id: 7,
-          einsatz_id: 1,
-          label: (patch as { label: string }).label,
-          zonen_ids: [9],
-          hoechste_warnstufe: 'hoch',
-        });
-      }),
-    );
-    renderPage();
-    // Editierbarer Titel des gewählten Gebiets „Nord" rendert ein Edit-Control.
-    await screen.findAllByText('Nord');
-    // antd Typography.editable rendert genau EIN Edit-Trigger-Button (aria-label „Edit").
-    const editBtn = screen.getByLabelText('Edit');
-    await userEvent.click(editBtn);
-    const input = await screen.findByRole('textbox');
-    await userEvent.clear(input);
-    await userEvent.type(input, 'Süd');
-    // Das Edit-Feld ist ein <textarea>; bestätigt wird über Enter-keyDown + Blur.
-    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
-    fireEvent.blur(input);
-    await waitFor(() => expect(patch).toEqual({ label: 'Süd' }));
   });
 
   // Unter `lg` stapeln Gebietsliste und Matrix. Geprüft wird die Flex-Richtung (jsdom rechnet kein

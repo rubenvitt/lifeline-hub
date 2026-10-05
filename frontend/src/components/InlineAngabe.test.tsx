@@ -228,3 +228,43 @@ describe('InlineAngabe · Fehler und Fokus', () => {
     expect(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' })).toHaveFocus();
   });
 });
+
+/**
+ * Eigener Auslöser (LFH-969): der Wert steht schon als Überschrift, der Auslöser heißt nach der
+ * Handlung. Pflicht-Riegel und Fokusrückgabe bleiben die des Primitivs.
+ */
+describe('InlineAngabe · eigener Auslöser', () => {
+  const umbenennen: InlineAngabeProps<string>['ausloeser'] = ({ ref, onClick }) => (
+    <button type="button" ref={ref} onClick={onClick}>
+      Umbenennen
+    </button>
+  );
+
+  it('ersetzt den Wertknopf, gefüllt wie leer, und öffnet dieselbe Eingabe', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" ausloeser={umbenennen} />);
+    expect(screen.queryByRole('button', { name: 'Leitstellen-Nr. bearbeiten' })).toBeNull();
+    rerender(<TextAngabe wert="" ausloeser={umbenennen} />);
+    expect(screen.queryByRole('button', { name: 'Leitstellen-Nr. eintragen' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Umbenennen' }));
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveFocus();
+  });
+
+  it('Pflicht geleert: kein Senden, Hinweis steht, der Fokus kehrt auf den Auslöser zurück', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <TextAngabe wert="ILS-1" pflicht ausloeser={umbenennen} onSpeichern={onSpeichern} />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Umbenennen' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }));
+    await user.keyboard('{Enter}');
+    expect(onSpeichern).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('Pflichtangabe');
+    expect(screen.getByRole('button', { name: 'Umbenennen' })).toHaveFocus();
+  });
+
+  it('ohne Schreibrecht kein Auslöser', () => {
+    renderMitProviders(<TextAngabe wert="ILS-1" darfSchreiben={false} ausloeser={umbenennen} />);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+});

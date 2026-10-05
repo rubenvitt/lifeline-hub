@@ -6,11 +6,13 @@ import { renderMitProviders } from '../../test/utils';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
 import GefahrenMatrix, {
   SPALTEN_FREIRAUM,
+  ZELLE_UNBEWERTET,
   setzeSpaltenFreiraum,
   type GefahrenMatrixProps,
   zellBalkenStil,
 } from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
+import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSchema';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
   id: 1,
@@ -89,7 +91,7 @@ describe('GefahrenMatrix', () => {
     const onSetzen = vi.fn();
     rendereMatrix({ onSetzen });
     await userEvent.click(
-      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
+      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: nicht bewertet' }),
     );
     // Regex mit `i`: der Normalisierer von Testing Library faltet Leerraum, schreibt aber nicht
     // klein.
@@ -143,15 +145,65 @@ describe('GefahrenMatrix', () => {
     rendereMatrix({ laufendeZelle: 'brand×menschen' });
     // antd klont den Auslöser mit `disabled` — die Prop am Dropdown erreicht wirklich den Knopf.
     expect(
-      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
+      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: nicht bewertet' }),
     ).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Bewertung Brand × Tiere: keine' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Bewertung Brand × Tiere: nicht bewertet' }),
+    ).toBeEnabled();
   });
 
   it('zeigt die Stufe als Kürzel — die Fläche allein wäre der einzige Kanal', () => {
     rendereMatrix({ matrix: [zelle({ warnstufe: 'akut' })] });
     const knopf = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: akut' });
     expect(knopf).toHaveTextContent('A');
+  });
+
+  /**
+   * LFH-969: „keine" ist eine Meldung, eine gültige Zelle ohne Bewertung eine Lücke. Mit dem alten
+   * Rückfall `?? 'keine'` hießen beide „keine" und zeigten beide „–" — dann wird dieser Fall rot.
+   */
+  it('trennt „nicht bewertet" von „keine" im Zeichen, im Namen und an der Zelle', () => {
+    rendereMatrix({ matrix: [zelle({ warnstufe: 'keine' })] });
+
+    const keine = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' });
+    expect(keine).toHaveTextContent('–');
+    expect(keine.closest('td')).toHaveAttribute('data-warnstufe', 'keine');
+
+    const offen = screen.getByRole('button', { name: 'Bewertung Brand × Tiere: nicht bewertet' });
+    expect(offen.textContent).toBe(ZELLE_UNBEWERTET.kuerzel);
+    expect(offen.textContent).not.toBe('–');
+    expect(offen.closest('td')).toHaveAttribute('data-warnstufe', 'unbewertet');
+
+    // „n. a." bleibt, wie es war: Text, kein Knopf.
+    expect(screen.getByLabelText('Atemgifte × Sachwerte: nicht anwendbar')).toHaveTextContent(
+      'n. a.',
+    );
+  });
+
+  it('nennt über der Matrix alle Zellzeichen und zählt die unbewerteten Felder', () => {
+    rendereMatrix({
+      matrix: [zelle({ warnstufe: 'keine' }), zelle({ id: 2, schutzobjekt: 'tiere' })],
+    });
+    const legende = screen.getByRole('note', { name: 'Legende der Matrix' });
+    for (const teil of ['– keine', 'N niedrig', 'M mittel', 'H hoch', 'A akut']) {
+      expect(legende).toHaveTextContent(teil);
+    }
+    expect(legende).toHaveTextContent('leer unbewertet');
+    expect(legende).toHaveTextContent('n. a. nicht anwendbar');
+    // 58 gültige Felder, zwei bewertet — „keine" zählt als bewertet.
+    expect(screen.getByText(/Felder unbewertet/)).toHaveTextContent('56 Felder unbewertet');
+  });
+
+  it('zählt ein einzelnes unbewertetes Feld in der Einzahl und meldet die volle Matrix', () => {
+    const alle = GEFAHRENTYPEN.flatMap((g, i) =>
+      SCHUTZOBJEKTE.filter((o) => kombinationGueltig(g.wert, o.wert)).map((o, j) =>
+        zelle({ id: i * 10 + j, gefahrentyp: g.wert, schutzobjekt: o.wert, warnstufe: 'keine' }),
+      ),
+    );
+    const { rerender } = rendereMatrix({ matrix: alle.slice(1) });
+    expect(screen.getByText('1 Feld unbewertet')).toBeInTheDocument();
+    rerender(matrixElement({ matrix: alle }));
+    expect(screen.getByText('Alle Felder bewertet')).toBeInTheDocument();
   });
 
   it('hält den Detail-Wortlaut, wenn das Speichern abgelehnt wird', async () => {
@@ -303,9 +355,10 @@ describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
     expect(bewertet!.style.boxShadow).toMatch(/^inset 0(px)? -3px 0(px)? 0(px)? /);
     // Gegenprobe: ohne Warnstufe kein Balken — sonst wäre die erste Aussage auch mit einem
     // unbedingten Schatten wahr.
-    const leer = container.querySelector<HTMLElement>('td[data-warnstufe="keine"]');
+    const leer = container.querySelector<HTMLElement>('td[data-warnstufe="unbewertet"]');
     expect(leer).not.toBeNull();
     expect(leer!.style.boxShadow).toBe('');
+    expect(leer!.style.backgroundColor).toBe('');
   });
 });
 

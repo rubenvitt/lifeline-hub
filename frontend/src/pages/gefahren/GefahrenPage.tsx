@@ -3,7 +3,7 @@ import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Breadcrumb, Button, Space, Spin, Typography, theme } from 'antd';
+import { Alert, Breadcrumb, Button, Input, Space, Spin, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
@@ -26,6 +26,8 @@ import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
+import { InlineAngabe } from '../../components/InlineAngabe';
+import { KennungsLink } from '../../components/kennungsLink';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
 /**
@@ -115,10 +117,12 @@ export default function GefahrenPage() {
     },
     onError: fehler,
   });
+  // Kein `onError`-Toast: `InlineAngabe` zeigt die Ablehnung an der Zeile (`mutateAsync` lehnt
+  // ab). `onSuccess` gibt die Invalidierung zurück, damit `mutateAsync` erst mit dem neuen Namen
+  // im Cache erfüllt.
   const umbenennen = useMutation({
     mutationFn: (label: string) => benenneGefahrengebiet(einsatzId, gewaehlt as number, label),
     onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
-    onError: fehler,
   });
 
   if (einsatzQuery.isLoading)
@@ -240,39 +244,65 @@ export default function GefahrenPage() {
           <div
             style={{
               display: 'flex',
-              alignItems: 'baseline',
+              flexWrap: 'wrap',
+              alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 12,
+              gap: `${token.marginXS}px ${token.margin}px`,
+              marginBottom: token.marginXS,
             }}
           >
+            {/* h3 unter dem Paneel „Bewertung" (h2); Satz bleibt der von h5. Reiner Text: das
+                Umbenennen hat einen eigenen Auslöser (LFH-969) statt antds 13-px-Stift. */}
             <Typography.Title
-              // h3 unter dem Paneel „Bewertung" (h2); Satz bleibt der von h5.
               level={3}
-              style={{ marginTop: 0, fontSize: token.fontSizeHeading5 }}
-              editable={
-                darfSchreiben
-                  ? {
-                      onChange: (v) => {
-                        const t = v.trim();
-                        if (t !== (aktuell.label ?? '')) umbenennen.mutate(t);
-                      },
-                    }
-                  : false
-              }
+              style={{ margin: 0, fontSize: token.fontSizeHeading5, minWidth: 0 }}
             >
               {gefahrengebietName(aktuell.label, aktuell.id)}
             </Typography.Title>
-            {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an. */}
-            {/* Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider. */}
-            {karteGesperrt ? (
-              <Button disabled title={KEINE_BERECHTIGUNG}>
-                Auf Karte zeigen
-              </Button>
-            ) : (
-              <Link to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
-                <Button>Auf Karte zeigen</Button>
-              </Link>
-            )}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: token.marginXS,
+              }}
+            >
+              {/* Pflichtangabe (frontend/AGENTS.md, „Inline-Bearbeitung und Status"): leer sendet
+                  nichts. Früher setzte ein leerer Name still auf „Gefahrengebiet #<id>" zurück.
+                  `key` je Gebiet: ein offener Entwurf wandert nicht ins nächste Gebiet. */}
+              <InlineAngabe<string>
+                key={aktuell.id}
+                etikett="Bezeichnung"
+                wert={aktuell.label ?? ''}
+                anzeige={null}
+                leer={(w) => w.trim() === ''}
+                gleich={(a, b) => a.trim() === b.trim()}
+                darfSchreiben={darfSchreiben}
+                pflicht
+                eingabe={({ feld, value, onChange }) => (
+                  <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+                )}
+                // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).
+                ausloeser={({ ref, onClick }) => (
+                  <Button ref={ref} onClick={onClick}>
+                    Umbenennen
+                  </Button>
+                )}
+                onSpeichern={(w) => umbenennen.mutateAsync(w.trim())}
+              />
+              {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an.
+                  Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗", kein Knopf darin
+                  (LFH-969). `KennungsLink` trägt den Boden, ein `<a>` erbt keine Steuerhöhe. */}
+              {karteGesperrt ? (
+                <Button disabled title={KEINE_BERECHTIGUNG}>
+                  Auf Karte zeigen
+                </Button>
+              ) : (
+                <KennungsLink to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
+                  Auf Karte zeigen <span aria-hidden="true">↗</span>
+                </KennungsLink>
+              )}
+            </div>
           </div>
         )}
         {!darfSchreiben && (
