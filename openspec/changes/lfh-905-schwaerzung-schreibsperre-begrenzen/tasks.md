@@ -22,5 +22,5 @@
 
 ## 4. Integration
 
-- [ ] 4.1 `cargo test --lib` (Schwärzung, Kategorie, Antrag, Purge, Registry, Anhang) und `./scripts/check-all.sh` grün
-- [ ] 4.2 `openspec validate lfh-905-schwaerzung-schreibsperre-begrenzen --strict` grün
+- [x] 4.1 `cargo test --lib` (Schwärzung, Kategorie, Antrag, Purge, Registry, Anhang) und `./scripts/check-all.sh` grün (Cloud-Sitzung: Bündel `rust` mit 4268 Tests und `schnell` grün; Schritt 4 nur wegen der Desktop-Hülle ohne GTK rot, auf `alpha` ebenso; Frontend und e2e ohne Änderung, voller Lauf in der CI)
+- [x] 4.2 `openspec validate lfh-905-schwaerzung-schreibsperre-begrenzen --strict` grün
