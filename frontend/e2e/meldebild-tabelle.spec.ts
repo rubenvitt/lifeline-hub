@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 
 /**
  * Die Nachweise des Meldebilds, die NUR im Browser gehen (jsdom rechnet kein Layout und
@@ -223,6 +224,27 @@ async function druckLage(page: Page) {
  * 390 px Sichtfeld ragt die Tabelle heraus; das ist kein Druckbefund.
  */
 const A4_DRUCKBREITE = 680;
+
+/**
+ * Derselbe Baum-Zweig wie der Funkplan (LFH-977): die Kräfte unter „Ohne Einheit“ stehen rechts
+ * von ihrer Sammelzeile, auch mit langen Namen, auf dem Handschirm und am Desktop.
+ */
+test('Meldebild: der Baum-Einzug hält bei langen Namen, 390 und 1440 px', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Meldebild Einzug ${Date.now()}`);
+  await seedeKraefte(page, einsatzId, 3);
+  for (const viewport of [HANDSCHIRM, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+    const zeilen = page.getByRole('region', { name: 'Meldebild' }).locator('tr.ant-table-row');
+    await expect(zeilen).toHaveCount(1);
+    await zeilen.first().locator('.ant-table-row-expand-icon').click();
+    await expect(zeilen, 'Aufklappen bringt die 3 gesäten Kräfte').toHaveCount(4);
+    const lage = await baumLage(page, '[aria-label="Meldebild"]');
+    expect(lage.filter((z) => z.ebene === 1)).toHaveLength(3);
+    pruefeHaengendenEinzug(lage, `Meldebild ${viewport.width} px`, 'inhalt');
+  }
+});
 
 test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt aus dem Druck-Wurzelknoten', async ({
   page,

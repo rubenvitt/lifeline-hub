@@ -1983,4 +1983,24 @@ describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
     expect(screen.queryByRole('link', { name: 'Sammel' })).toBeNull();
     expect(screen.getByText('Sammel')).toBeInTheDocument();
   });
+
+  /**
+   * Hängender Einzug (LFH-977): antd setzt Einzug und Symbol als Floats vor den Inhalt. Nur eine
+   * eigene Block-Hülle mit eigenem Formatierungskontext steht NEBEN den Floats; als Inline-Inhalt
+   * bräche der Text unter ihnen an den Zellrand. Die Lage selbst misst `e2e/funkplan.spec.ts`.
+   */
+  it('der Zelleninhalt steht in einer Block-Hülle hinter Einzug und Symbol', () => {
+    const { container } = rendereBaum(vi.fn());
+    const zelle = container.querySelector('tr[data-row-key="a"] td') as HTMLElement;
+    const kinder = Array.from(zelle.children);
+    expect(kinder.map((k) => k.className.split(' ')[0])).toEqual([
+      'ant-table-row-indent',
+      'ant-table-row-expand-icon',
+      '',
+    ]);
+    const huelle = kinder[2] as HTMLElement;
+    expect(huelle).toHaveAttribute('data-lfh', 'datensicht-baum-text');
+    expect(huelle.style.display).toBe('flow-root');
+    expect(huelle).toContainElement(screen.getByRole('link', { name: 'Abschnitt Nord' }));
+  });
 });

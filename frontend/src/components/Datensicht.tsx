@@ -1143,38 +1143,56 @@ export default function Datensicht<T extends object, const K extends string>(
    * Mit `aufklappen` trägt die KENNUNGSZELLE den Auslöser, keine eigene Aufklappspalte: hinter der
    * fixierten Kennung glitt eine solche Spalte bei 390 px unter sie (Gate 1), an Position 0 erbte
    * sie deren `fixed`. Die Kennungszelle ist immer sichtbar, wie in der Karte.
+   *
+   * Mit `baum` steht der Inhalt der ersten Spalte in einer Block-Hülle mit eigenem
+   * Formatierungskontext (LFH-977, hängender Einzug): antd setzt Einzug (1 px hoch) und
+   * Aufklappsymbol als Floats VOR den Inhalt. Als Inline-Inhalt bräche ein langer Name unter den
+   * Floats an den Zellrand um, und ein zu breiter Titel-Link (`inline-flex`, atomar) rutschte ganz
+   * darunter: das Fahrzeug stand links von seiner Einheit, das Symbol allein darüber. Die Hülle
+   * steht neben den Floats und bricht nur in sich um. Breitere Spalten heilten nur das Symptom.
    */
   const ersteSpalte = gezeigteSpalten[0];
+  const ersteZelle = (wert: unknown, zeile: T, index: number): ReactNode => {
+    const basis = antdSpalten[0].render;
+    // Der Titel-Link ersetzt das Spalten-`render`; sonst die Zelle über `zelle`.
+    return basis && basis !== ersteSpalte.render
+      ? (basis(wert, zeile, index) as ReactNode)
+      : zelle(ersteSpalte, zeile, index);
+  };
   const tabellenSpalten: KatalogSpalte<T>[] =
     aufklappen && antdSpalten.length > 0 && ersteSpalte
       ? [
           {
             ...antdSpalten[0],
-            render: (wert: unknown, zeile: T, index: number) => {
-              const basis = antdSpalten[0].render;
-              // Der Titel-Link ersetzt das Spalten-`render`; sonst die Zelle über `zelle`.
-              const inhalt =
-                basis && basis !== ersteSpalte.render
-                  ? (basis(wert, zeile, index) as ReactNode)
-                  : zelle(ersteSpalte, zeile, index);
-              return (
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: token.marginXXS,
-                  }}
-                >
-                  {inhalt}
-                  {aufklappAusloeser(zeile, false)}
-                </div>
-              );
-            },
+            render: (wert: unknown, zeile: T, index: number) => (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: token.marginXXS,
+                }}
+              >
+                {ersteZelle(wert, zeile, index)}
+                {aufklappAusloeser(zeile, false)}
+              </div>
+            ),
           },
           ...antdSpalten.slice(1),
         ]
-      : antdSpalten;
+      : baum && antdSpalten.length > 0 && ersteSpalte
+        ? [
+            {
+              ...antdSpalten[0],
+              render: (wert: unknown, zeile: T, index: number) => (
+                <div data-lfh="datensicht-baum-text" style={{ display: 'flow-root' }}>
+                  {ersteZelle(wert, zeile, index)}
+                </div>
+              ),
+            },
+            ...antdSpalten.slice(1),
+          ]
+        : antdSpalten;
 
   const tabelle = (
     <KatalogTabelle<T>

@@ -182,7 +182,9 @@ function StelleZelle({ zeile: z }: { zeile: FunkplanZeile }) {
   }
   return (
     // Umbrechend: die Kennung wird gelesen, nicht verglichen. Ein langer Fahrzeug-Funkrufname
-    // (gemessen 245 px in Mono 12) bricht in der 240er-Spalte um, statt die Summe zu sprengen.
+    // (gemessen 245 px in Mono 12) bricht in der 240er-Spalte um, statt die Summe zu sprengen,
+    // und zwar hängend unter seinem eigenen Textanfang: die Block-Hülle des Baum-Zweigs in
+    // `Datensicht` hält ihn neben Einzug und Symbol (LFH-977).
     <span style={{ overflowWrap: 'anywhere' }}>
       {z.art === 'fahrzeug' ? <Mono>{z.stelle}</Mono> : z.stelle}
       {z.stelleZusatz && (
