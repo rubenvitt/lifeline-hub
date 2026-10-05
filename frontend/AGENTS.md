@@ -188,6 +188,14 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   den Signalfarben ist am Tag trüb. Ein Knopf darauf behält `steuerRahmen` (≥ 3 : 1,
   `theme/hinweisKontrast.test.ts`, `e2e/hinweis-kontrast.spec.ts`). Der Override färbt nur die
   Fläche des Hinweises, antd-Bausteine darin sehen weiter die globalen Tokens.
+- **Die Auswahlfläche ist eine eigene Rolle** (LFH-984, Spec `farbrollen-kontrast`,
+  `openspec/changes/archive/2026-10-05-lfh-984-auswahlflaeche-rolle/design.md`): gewählte
+  Option, gewählter Menüeintrag und Knoten tragen `auswahlFlaeche`, GLOBAL über
+  `colorPrimaryBg`/`colorPrimaryBgHover` in `antdToken` (daraus `controlItemBgActive`), nie je
+  Stelle; eigene Stellen lesen das Token. Unter dem Zeiger keine eigene Stufe. Der gewählte
+  Dropdown-Eintrag schreibt in `bedienText` (`Dropdown.colorPrimary`). Nachweis
+  `theme/auswahlKontrast.test.ts` (auch ΔE ≥ 7 gegen Ruhe und Zeigerspur),
+  `e2e/auswahl-kontrast.spec.ts`.
 - **Deeplink-Hervorhebung** (LFH-698, Spec `deeplink-hervorhebung`; `.zeile-hervorgehoben` an
   Datensicht und Zeitachse): `bedienFlaeche` plus Ober- und Unterlinie in `bedien` (`box-shadow`,
   `index.css`); ein `Zeitachseneintrag` setzt die Fläche inline mit, ebenso die

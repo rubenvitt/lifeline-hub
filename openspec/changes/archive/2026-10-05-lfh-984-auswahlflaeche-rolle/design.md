@@ -16,13 +16,17 @@ Motivation und Messwerte: `proposal.md`. Hier nur, was den Weg bestimmt.
   | `dropdown/style` (gewählter Eintrag) | `components/StatusWahl.tsx`, `etb/Schnellerfassung.tsx` (Typwahl) | `colorPrimary` = `bedien` |
   | `select/style` (`optionSelectedBg`) | jede `Select`/`AutoComplete` (rund 90 Dateien) | `colorText`, fett |
   | `tree/style` (`nodeSelectedBg`) | `pages/EinsatzabschnittePage.tsx` | `colorText` |
-  | `date-picker/style` (Bereichszellen) | eine `DatePicker`-Stelle, kein Bereich | — |
+  | `date-picker/style` (gewählte Zeitzelle, Bereichszellen) | rund 33 Stellen mit `ZeitpunktEingabe`/`showTime`, `ZeitraumEingabe` (RangePicker) in der Verpflegung | `colorText` |
+  | `dropdown/style` über die Spaltenfilter (`filters`) | vier Stammdaten-Tabellen | `colorPrimary` |
   | eigene Stellen mit `token.colorPrimaryBg` | `pages/gefahren/GefahrenPage.tsx` (gewähltes Gebiet), `pages/lagekarte/Sidebar.tsx` (Bild platzieren), `pages/uhs/Grundriss.tsx` (Drop-Ziel, drei Stellen) | Text, Beschreibung |
   | eigene Stelle mit `token.controlItemBgActive` | `etb/SlashMenu.tsx` (aktiver Eintrag) | `colorText` |
   | `menu/style` | `admin/AdminLayout.tsx` überschreibt `itemSelectedBg` schon mit `flaeche3` | — |
 
   Weitere Leser (Table-Zeilenauswahl, Steps, Transfer, Splitter, Cascader, Calendar,
   `Button` `variant="filled"`) nutzt die App heute nicht.
+- `colorPrimaryBg` speist außerdem einen Alias, der KEINE Auswahl ist: den Fokus-Halo
+  `controlOutline` (`theme/util/alias.js`, gelesen als `activeShadow` jedes Eingabefelds,
+  `activeOutlineColor` der Auswahlliste, `primaryShadow` des Primärknopfs). Dazu E5.
 - Die Gründe, auf denen gewählt wird: Dropdown und Auswahlliste stehen auf `colorBgElevated`
   (= `flaeche2`), der Baum auf `flaeche`/`paneel`. Der Zeiger legt `controlItemBgHover`
   (Tag `rgba(0,0,0,0.04)`, Nacht `rgba(255,255,255,0.08)`) darüber.
@@ -114,7 +118,19 @@ keine Information, die der Nutzer braucht. Verworfen: zweite Rolle `auswahlFlaec
   `bedienText` den Boden halten, `steuerRahmen` ≥ 3, und ΔE ≥ 7 gegen Ruhe und Zeigerspur auf
   `flaeche2` und `flaeche`. Böden als Literale.
 - Browser-Spec `e2e/auswahl-kontrast.spec.ts` mit `kontrast-kern.ts`: Statuswahl (gewählter
-  Eintrag in Ruhe und unter dem Zeiger) und eine Auswahlliste (gewählte Option), Tag und Nacht.
+  Eintrag in Ruhe und unter dem Zeiger) und eine Auswahlliste (gewählte Option ruhend und aktiv),
+  Tag und Nacht. Weil Ruhe und Zeiger gleich aussehen, sichert der Spec den Zustand vor jeder
+  Messung zu (Aktivmarke, `:hover`); beim Öffnen sind die gewählten Einträge beider Bausteine
+  zugleich aktiv, für die Ruhe steht der Zeiger deshalb auf einem anderen Eintrag.
+
+### E5 — Der Fokus-Halo bleibt eine Tönung der Bedienfarbe
+
+Aus der Auswahlfläche abgeleitet würde der Halo nachts `rgba(0,29,69,0.46)`, dunkler als die
+Fläche (1,04 : 1 statt 1,61) und damit unsichtbar; am Tag blasser (1,25 statt 1,83). Gewählt:
+`controlOutline` in `antdToken` ausdrücklich als `bedien` mit Deckkraft 0,25, in beiden Modi.
+Der Halo ist dekorativ, den Fokus trägt der Ring in `bedien` (LFH-737), deshalb kein Boden.
+Verworfen: die alten abgeleiteten Werte als Literale festschreiben; sie hingen an der trüben
+Ableitung, die dieses Ticket ablöst.
 
 ## Risks / Trade-offs
 

@@ -215,8 +215,8 @@ export default function GefahrenPage() {
                 // Trefflächenboden zuerst, die Färbung danach — `ListenEintrag` spreizt `style`
                 // zuletzt, damit `padding` gegen die Längsformen der Liste gewinnt.
                 ...gebietszeileStil(token),
-                // `colorPrimaryBg` leitet antd aus unserer Rolle `colorPrimary` ab — hält in beiden
-                // Modi.
+                // `colorPrimaryBg` ist die Rolle `auswahlFlaeche` (LFH-984, `antdToken`): Text und
+                // Beschreibung halten darauf den Textboden beider Modi.
                 background: g.id === gewaehlt ? token.colorPrimaryBg : undefined,
               }}
             >
