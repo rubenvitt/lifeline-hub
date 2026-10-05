@@ -1843,6 +1843,73 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn schwaerzung_loescht_den_uhs_plan_und_haelt_die_plaetze() {
+        // LFH-999: `uhs_plan` ist ZeileLoeschen (Bild samt Bytes geht), das Platz-Layout und die
+        // Bezeichnung der UHS bleiben.
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let uhs = crate::uhs::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            crate::uhs::repo::NeueDaten {
+                typ: "behandlungsplatz",
+                bezeichnung: "BHP 50",
+                abschnitt_id: None,
+                standort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        crate::uhs::platz_repo::anlegen_bulk(&pool, uhs.id, "behandlungsplatz", "P", 3)
+            .await
+            .unwrap();
+        let positionen = |pool: sqlx::SqlitePool| async move {
+            sqlx::query_as::<_, (Option<f64>, Option<f64>)>(
+                "SELECT pos_x, pos_y FROM uhs_platz WHERE uhs_id = ? ORDER BY id",
+            )
+            .bind(uhs.id)
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = positionen(pool.clone()).await;
+        let bild = crate::uhs::plan::pruefe_bild(&crate::uhs::plan::testbild::png(16, 16)).unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        crate::uhs::plan::repo::hinterlegen_tx(&mut conn, einsatz.id, uhs.id, leit, &bild)
+            .await
+            .unwrap();
+        drop(conn);
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let plaene: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uhs_plan WHERE einsatz_id = ?")
+            .bind(einsatz.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(plaene, 0, "der Plan ist weg");
+        assert_eq!(positionen(pool.clone()).await, vorher, "die Plätze stehen");
+        let bez: String = sqlx::query_scalar("SELECT bezeichnung FROM uhs WHERE id = ?")
+            .bind(uhs.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(bez, "BHP 50");
+    }
+
+    #[tokio::test]
     async fn schwaerzung_loescht_uhs_anhaenge_und_haelt_etb_und_audit() {
         // LFH-758: `uhs_anhang` ist ZeileLoeschen (Datei und Linker gehen, auch entfernte), die
         // pseudonymen Nachweise „UHS BHP 50: …“ und das Lese-Audit `anhang_zugriff_audit`

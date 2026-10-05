@@ -121,7 +121,8 @@ Eintrag schreiben.
 
 Ein Plan SHALL einen Versatz und eine Breite in den Koordinaten der Platzfläche tragen, die
 Höhe MUST aus dem Seitenverhältnis des Bildes folgen. Versatz und Breite MUST auf Vielfache von
-10 px gerundet gespeichert werden. Die Breite MUST zwischen 100 und 5000 px liegen, sonst 400.
+10 px gerundet gespeichert werden. Die Breite MUST zwischen 100 und 5000 px liegen, der Versatz
+je Achse zwischen 0 und 10 000 px, sonst 400.
 Ein neuer Plan MUST so liegen, dass er alle vorhandenen Plätze überdeckt. Die Platzfläche MUST
 groß genug sein, um Plan und Plätze ganz zu zeigen.
 

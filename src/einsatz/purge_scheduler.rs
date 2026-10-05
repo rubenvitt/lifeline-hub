@@ -2058,6 +2058,8 @@ mod tests {
 
     const NAME_KLARTEXT: &str = "LFH725-Gepflanzter-Name";
     const ANHANG_KLARTEXT: &[u8] = b"LFH725-GEPFLANZTER-ANHANG";
+    /// Bytes eines UHS-Plans (LFH-999), der mit der Schwärzung ganz verschwinden muss.
+    const PLAN_KLARTEXT: &[u8] = b"LFH999-GEPFLANZTER-PLAN";
 
     // ---------- LFH-751: Schwärzungsanträge im Purge-Lauf ----------
 
@@ -2221,6 +2223,38 @@ mod tests {
             || crate::db::datei_oder_wal_enthaelt(pfad, ANHANG_KLARTEXT)
     }
 
+    /// Ein UHS-Plan mit gepflanzten Bytes am Einsatz `e` (LFH-999), direkt per SQL.
+    async fn plan_mit_klartext(pool: &SqlitePool, e: i64) {
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let plan = PLAN_KLARTEXT.repeat(1000);
+        sqlx::query(
+            "INSERT INTO uhs_plan (uhs_id, einsatz_id, daten, mime, groesse, sha256, bild_breite, \
+                                   bild_hoehe, breite, hinterlegt_von) \
+             VALUES (?, ?, ?, 'image/png', ?, 'x', 10, 10, 820, ?)",
+        )
+        .bind(uhs)
+        .bind(e)
+        .bind(&plan)
+        .bind(plan.len() as i64)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
     /// Spec `aufbewahrung`, „Physische Entfernung geschwärzter Werte“: nach dem Purge-Lauf steht
     /// der gepflanzte Klartext weder in der DB-Datei noch im WAL. Mutationsproben: ohne
     /// `secure_delete` in `db::connect`, mit `FAST` oder ohne den Rückschrieb wird dieser Test rot.
@@ -2228,8 +2262,9 @@ mod tests {
     async fn schwaerzung_hinterlaesst_keine_altbytes() {
         let (_dir, pfad, pool) = produktions_pool().await;
         let e = faelliger_einsatz_mit_klartext(&pool).await;
+        plan_mit_klartext(&pool, e).await;
         assert!(
-            enthaelt_klartext(&pfad),
+            enthaelt_klartext(&pfad) && crate::db::datei_oder_wal_enthaelt(&pfad, PLAN_KLARTEXT),
             "Vorbedingung: Klartext liegt in der Datei"
         );
 
@@ -2252,6 +2287,10 @@ mod tests {
         assert!(
             !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
             "Anhang-Bytes stehen noch in DB-Datei oder WAL"
+        );
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, PLAN_KLARTEXT),
+            "Bytes des UHS-Plans stehen noch in DB-Datei oder WAL"
         );
     }
 

@@ -785,3 +785,60 @@ pub async fn erfassungs_anhang(pool: &sqlx::SqlitePool, einsatz: i64, art: Erfas
         .await
         .0
 }
+
+// ---------- UHS-Plan (LFH-999) ----------
+
+/// Ein echtes, dekodierbares Bild (Plan-Annahme liest die Maße aus dem Kopf).
+pub fn bild_bytes(breite: u32, hoehe: u32, format: image::ImageFormat) -> Vec<u8> {
+    let bild = image::RgbImage::from_fn(breite, hoehe, |x, y| {
+        image::Rgb([(x % 256) as u8, (y % 256) as u8, 180])
+    });
+    let mut out = std::io::Cursor::new(Vec::new());
+    bild.write_to(&mut out, format).unwrap();
+    out.into_inner()
+}
+
+pub fn png_bytes(breite: u32, hoehe: u32) -> Vec<u8> {
+    bild_bytes(breite, hoehe, image::ImageFormat::Png)
+}
+
+/// `PUT /api/einsaetze/{einsatz}/uhs/{uhs}/plan` als Multipart mit dem Feld `datei`.
+pub async fn plan_hochladen(
+    app: &axum::Router,
+    einsatz: i64,
+    uhs: i64,
+    cookie: &str,
+    dateiname: &str,
+    daten: &[u8],
+) -> (StatusCode, Value) {
+    let b = "LFHPLANBOUNDARY";
+    let mut body = format!(
+        "--{b}\r\nContent-Disposition: form-data; name=\"datei\"; filename=\"{dateiname}\"\r\n\
+         Content-Type: application/octet-stream\r\n\r\n"
+    )
+    .into_bytes();
+    body.extend_from_slice(daten);
+    body.extend_from_slice(format!("\r\n--{b}--\r\n").as_bytes());
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plan"))
+                .header(header::COOKIE, cookie.to_string())
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={b}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
