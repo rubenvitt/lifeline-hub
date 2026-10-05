@@ -88,9 +88,12 @@ pub async fn liste(
             return Err(AppError::Validation("Ungültiger Richtungs-Filter".into()));
         }
     }
-    Ok(Json(
-        repo::liste(&state.pool, einsatz_id, status, richtung, &jetzt()).await?,
-    ))
+    let mut meldungen = repo::liste(&state.pool, einsatz_id, status, richtung, &jetzt()).await?;
+    // Ein Gerät (UHS-Laptop, LFH-892) liest nur seine eigenen Meldungen.
+    if ctx.geraet.is_some() {
+        meldungen.retain(|m| m.erfasst_von_id == ctx.benutzer.id);
+    }
+    Ok(Json(meldungen))
 }
 
 #[derive(Debug, Deserialize)]
@@ -232,6 +235,10 @@ pub async fn anlegen(
         if let Some(meldung) =
             repo::laden_nach_client_id(&state.pool, einsatz_id, cid, &aktuell).await?
         {
+            // Eine fremde Meldung gibt die Wiederholung einem Gerät nicht heraus (LFH-892).
+            if ctx.geraet.is_some() && meldung.erfasst_von_id != ctx.benutzer.id {
+                return Err(AppError::Conflict("client_id bereits vergeben".into()));
+            }
             live_publikation_sicherstellen(&state, &meldung).await?;
             auto_frist_erinnerung_sicherstellen(&state, &meldung).await?;
             return Ok((StatusCode::CREATED, Json(meldung)));

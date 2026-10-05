@@ -1196,16 +1196,18 @@ pub async fn setze_mitgliedschaft(
     // Mandanten-Grenze. Eine org-fremde Mitgliedschaft würde die Isolation aus LFH-115
     // vollständig aushebeln — `darf_lesen` prüft bei vorhandener Rolle die Org nicht mehr.
     // Als `WHERE EXISTS` kann kein künftiger Aufrufer den Check vergessen.
-    let betroffen = sqlx::query(
+    // Ein Gerätekonto (LFH-892) ist nie Mitglied; seine Rolle kommt aus der Ansicht.
+    let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO einsatz_mitgliedschaft \
             (einsatz_id, benutzer_id, einsatz_rolle, fuehrungsstelle, fuehrungsfunktion) \
          SELECT ?1, ?2, ?3, ?4, ?6 \
          WHERE EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
-                       WHERE b.id = ?2 AND b.org_id = e.org_id) \
+                       WHERE b.id = ?2 AND b.org_id = e.org_id AND {}) \
          ON CONFLICT(einsatz_id, benutzer_id) DO UPDATE SET einsatz_rolle = excluded.einsatz_rolle, \
          fuehrungsstelle = CASE WHEN ?5 THEN excluded.fuehrungsstelle ELSE einsatz_mitgliedschaft.fuehrungsstelle END, \
          fuehrungsfunktion = CASE WHEN ?5 THEN excluded.fuehrungsfunktion ELSE einsatz_mitgliedschaft.fuehrungsfunktion END",
-    )
+        crate::geraet::repo::OHNE_GERAETEKONTEN
+    )))
     .bind(einsatz_id)
     .bind(benutzer_id)
     .bind(rolle.as_str())

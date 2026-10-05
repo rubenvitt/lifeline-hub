@@ -185,7 +185,9 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   Fläche des Hinweises, antd-Bausteine darin sehen weiter die globalen Tokens.
 - **Deeplink-Hervorhebung** (LFH-698, Spec `deeplink-hervorhebung`; `.zeile-hervorgehoben` an
   Datensicht und Zeitachse): `bedienFlaeche` plus Ober- und Unterlinie in `bedien` (`box-shadow`,
-  `index.css`); ein `Zeitachseneintrag` setzt die Fläche inline mit. Nie `flaeche3` (das ist der
+  `index.css`); ein `Zeitachseneintrag` setzt die Fläche inline mit, ebenso die
+  Kommunikationskarte (`kommunikation/KommKarte.tsx`, LFH-896: Linien inline, nie ein Ring; eine
+  Alarmkarte behält ihre Fläche, `kartenGrund`). Nie `flaeche3` (das ist der
   Hover; die Tagmodus-Regel unten meint Hover und aktive Segmente) und nie eine Statusfläche;
   Nachweis `e2e/deeplink-hervorhebung-kontrast.spec.ts`. **Farbliterale
   in CSS nur in `theme/rollen.css`** (Spec `css-farbquelle`, `theme/cssFarbquelle.guard.test.ts`,

@@ -849,7 +849,8 @@ export function parseRouteId(param: string | undefined): number | null {
 // ── Sektions-Routen der Einsatz-Einstellungen ────────────────────────────────
 
 /** Die Sektionen von `/einsaetze/:id/einstellungen`. */
-export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel';
+export type EinstellungenSektion =
+  'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel' | 'geraete';
 
 /**
  * Sektionen in Bedienreihenfolge — EINE Wahrheit für Tab-Band, Routentabelle und das Ziel des
@@ -863,6 +864,8 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   { key: 'module', label: 'Module' },
   // Hinten angehängt: die erste Sektion ist das Redirect-Ziel.
   { key: 'pegel', label: 'Pegel' },
+  // Gerätekopplung (LFH-892): nur die Einsatzleitung koppelt, die Sektion erklärt das selbst.
+  { key: 'geraete', label: 'Geräte' },
 ];
 
 /**
@@ -875,3 +878,57 @@ export function einsatzEinstellungenPfad(
 ): string {
   return `${einsatzModulPfad(einsatzId, 'einstellungen')}/${sektion}`;
 }
+
+// ── Gerätekopplung (LFH-892) ─────────────────────────────────────────────────
+
+/** Einlöseseite eines Kopplungscodes. Ohne Einsatz-Präfix: das Gerät kennt seinen Einsatz erst
+ *  nach dem Einlösen. */
+export const KOPPELN_PFAD = '/koppeln';
+
+/**
+ * Adresse im QR-Code einer Kopplung: der Code steht im **Fragment** (`#…`), das der Browser nie
+ * an den Server schickt — so landet er in keinem Zugriffslog (design.md D3).
+ */
+export function koppelnAdresse(origin: string, code: string): string {
+  return `${origin}${KOPPELN_PFAD}#${encodeURIComponent(code)}`;
+}
+
+/** Startseite eines gekoppelten Geräts; die Hülle wählt darunter die Ansicht. */
+export const GERAET_START_PFAD = '/geraet';
+
+/*
+ * Pfade der Gerätehülle (LFH-892, design.md D9). Die Einsatz-ID steht wie unter `/einsaetze` als
+ * Segment `:id`, die Detailkennungen tragen dieselben Namen (`:personId`, `:uhsId`): die geteilten
+ * Seiten lesen sie unverändert über `useParams`.
+ */
+
+/** Patientenliste der UHS eines Geräts, Startseite von Tablet und Laptop. */
+export function geraetPatientenPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/patienten`;
+}
+
+export function geraetPersonPfad(einsatzId: number, personId: number): string {
+  return `${geraetPatientenPfad(einsatzId)}/${personId}`;
+}
+
+export function geraetAufnahmePfad(einsatzId: number, opts: { uhs?: number } = {}): string {
+  return mitQuery(`${GERAET_START_PFAD}/${einsatzId}/aufnahme`, { uhs: opts.uhs });
+}
+
+/** Grundriss der eigenen UHS. */
+export function geraetUhsPfad(einsatzId: number, uhsId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/uhs/${uhsId}`;
+}
+
+/** Großbild des Lagemonitors. */
+export function geraetMonitorPfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/monitor`;
+}
+
+/** Bereich „UHS“ des UHS-Laptops: Plätze, Material, Meldungen, Dateien der eigenen UHS. */
+export function geraetStellePfad(einsatzId: number): string {
+  return `${GERAET_START_PFAD}/${einsatzId}/stelle`;
+}
+
+/** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
+export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';

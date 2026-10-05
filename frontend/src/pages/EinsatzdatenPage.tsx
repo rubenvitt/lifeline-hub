@@ -61,6 +61,7 @@ import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import {
   KOMMUNIKATIONSMITTEL_OPTIONEN,
   kommunikationsmittelLabel,
+  mitBetriebsart,
   teileSprechgruppen,
 } from '../components/kommunikationsmittel';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
@@ -321,8 +322,8 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
 function sprechgruppenText(fs: Pick<Fuehrungsstelle, 'sprechgruppen'>): string {
   const { tmo, dmo } = teileSprechgruppen(fs.sprechgruppen);
   return [
-    tmo.length > 0 ? `TMO ${tmo.map((s) => s.bezeichnung).join(', ')}` : null,
-    dmo.length > 0 ? `DMO ${dmo.map((s) => s.bezeichnung).join(', ')}` : null,
+    tmo.length > 0 ? mitBetriebsart('TMO', tmo.map((s) => s.bezeichnung).join(', ')) : null,
+    dmo.length > 0 ? mitBetriebsart('DMO', dmo.map((s) => s.bezeichnung).join(', ')) : null,
   ]
     .filter((t): t is string => t != null)
     .join(' · ');

@@ -147,16 +147,12 @@ describe('Kennzahlen', () => {
   });
 
   it('Kräfte: Gesamtstärke und BOS-Schreibweise F/UF/M//Σ', () => {
-    const k = kraefteKennzahl(
-      [
-        personal(1, null, 'fuehrer', null),
-        personal(2, null, 'unterfuehrer', null),
-        personal(3, null, 'mannschaft', null),
-        personal(4, null, 'mannschaft', null),
-      ],
-      [],
-      [],
-    );
+    const k = kraefteKennzahl([
+      personal(1, null, 'fuehrer', null),
+      personal(2, null, 'unterfuehrer', null),
+      personal(3, null, 'mannschaft', null),
+      personal(4, null, 'mannschaft', null),
+    ]);
     expect(k).toEqual({ gesamt: 4, text: '1/1/2//4' });
   });
 

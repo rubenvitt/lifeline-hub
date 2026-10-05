@@ -59,6 +59,9 @@ async function dashboardWerte(page: Page, einsatzId: string) {
       .first()
       .locator('[data-lfh="kennzahl-wert"]');
   await expect(wert('Aufträge offen')).toHaveText('2');
+  // Jede Kachel hat ihre eigene Quelle: „Aufträge offen“ steht aus dem Modulzähler, während die
+  // Personen noch laden („····“). Erst lesen, wenn alle drei eine Zahl zeigen.
+  for (const titel of ['Betroffene', 'Kräfte']) await expect(wert(titel)).toHaveText(/^\d+$/);
   return {
     betroffene: (await wert('Betroffene').textContent())!.trim(),
     kraefte: (await wert('Kräfte').textContent())!.trim(),

@@ -3,6 +3,7 @@ import { render, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { useSitzungsWache } from './useSitzungsWache';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
+import { merkeGeraet } from '../geraet/geraetMarke';
 
 const logout = vi.fn(() => Promise.resolve(true));
 const abmeldenLokal = vi.fn();
@@ -91,5 +92,30 @@ describe('useSitzungsWache', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(getByTestId('ort').textContent).toBe('/login|');
     expect(abmeldenLokal).not.toHaveBeenCalled();
+  });
+
+  it('zeigt einem gekoppelten Gerät „Kopplung beendet“ statt der Anmeldung (LFH-892)', async () => {
+    merkeGeraet(true);
+    try {
+      const { getByTestId } = renderWache('/geraet/patienten');
+      window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
+      await waitFor(() => expect(getByTestId('ort').textContent).toBe('/kopplung-beendet|'));
+      expect(abmeldenLokal).toHaveBeenCalledWith('sitzungsende');
+    } finally {
+      merkeGeraet(false);
+    }
+  });
+
+  it('leitet auf „Kopplung beendet“ nicht erneut um (keine Schleife)', async () => {
+    merkeGeraet(true);
+    try {
+      const { getByTestId } = renderWache('/kopplung-beendet');
+      window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(getByTestId('ort').textContent).toBe('/kopplung-beendet|');
+      expect(abmeldenLokal).not.toHaveBeenCalled();
+    } finally {
+      merkeGeraet(false);
+    }
   });
 });
