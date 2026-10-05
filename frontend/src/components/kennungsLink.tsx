@@ -48,7 +48,9 @@ export function KennungsLink({ style, klein, children, ...rest }: KennungsLinkPr
   });
   return (
     <Link {...rest} style={{ ...boden, ...style }}>
-      <span>{children}</span>
+      {/* `minWidth: 0`: als Flex-Kind läge der Boden sonst bei der längsten Zeile des Inhalts, und
+          eine abgeschnittene Zelle (Kräfteübersicht, `-webkit-box`) spannte die Spalte wieder auf. */}
+      <span style={{ minWidth: 0 }}>{children}</span>
     </Link>
   );
 }
