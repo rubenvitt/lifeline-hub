@@ -726,6 +726,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       stilJsonAngewandtRef.current = false;
       karteGeladenRef.current = false;
       zoneStartAnstehendRef.current = false;
+      // Eine neue Karte bekommt die Flächen auch bei gleichem Inhalt (LFH-945).
+      flaechenSchluesselRef.current = null;
       // Testhaken mit abräumen: sonst zeigte er auf eine entfernte Map, und ein späterer Test wäre
       // grün, ohne dass eine Karte lief. (Unter StrictMode zeigt er danach korrekt auf die zweite
       // Instanz.)
@@ -1667,6 +1669,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     );
     handlesRef.current = handles;
     return () => {
+      // Beim Aushängen hat der Karten-Effekt die Griffe schon abgebaut (LFH-943).
+      if (handlesRef.current !== handles) return;
       handles.zerstoeren();
       handlesRef.current = null;
     };

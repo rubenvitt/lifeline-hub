@@ -63,6 +63,40 @@ describe('kartenbilder API', () => {
     expect(zweites.aborted).toBe(true);
   });
 
+  it('ohne AbortSignal.any: Abbruch wirkt, und nach dem Download hängt kein Hörer mehr am Signal', async () => {
+    const original = AbortSignal.any;
+    Object.defineProperty(AbortSignal, 'any', { value: undefined, configurable: true });
+    try {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation(async () => new Response(new Blob(['bild']), { status: 200 }));
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+      const aufrufer = new AbortController();
+      const an = vi.spyOn(aufrufer.signal, 'addEventListener');
+      const ab = vi.spyOn(aufrufer.signal, 'removeEventListener');
+
+      for (let i = 0; i < 3; i += 1) await ladeBildBlobUrl(7, 3, aufrufer.signal);
+      expect(an).toHaveBeenCalledTimes(3);
+      expect(ab.mock.calls.map((c) => c[1])).toEqual(an.mock.calls.map((c) => c[1]));
+
+      // Läuft der Download noch, schlägt der Abbruch des Aufrufers durch.
+      let signal: AbortSignal | undefined;
+      fetchMock.mockImplementation(
+        (_pfad, init) =>
+          new Promise((_ok, fehler) => {
+            signal = init?.signal ?? undefined;
+            signal?.addEventListener('abort', () => fehler(signal?.reason));
+          }),
+      );
+      const laeuft = ladeBildBlobUrl(7, 3, aufrufer.signal);
+      aufrufer.abort();
+      await expect(laeuft).rejects.toBeDefined();
+      expect(signal?.aborted).toBe(true);
+    } finally {
+      Object.defineProperty(AbortSignal, 'any', { value: original, configurable: true });
+    }
+  });
+
   it('upload hängt datei + ecken als FormData an', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

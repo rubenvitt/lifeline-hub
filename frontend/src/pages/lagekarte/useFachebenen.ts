@@ -40,6 +40,15 @@ interface FachebenenArgs {
 }
 
 /**
+ * Liegezeit einer nicht mehr gezeigten KRITIS- bzw. Energie-Antwort im Cache (LFH-945, D6). Der
+ * Schlüssel trägt die gerasterte bbox, jede besuchte Zelle ist ein eigener Eintrag von grob 1–3 MB
+ * (bis 5 000 Objekte). Mit 6 h lag alles im Speicher, was in den letzten 6 h zu sehen war. Gebraucht
+ * wird der gerade gezeigte Ausschnitt, der Vorgänger für `keepPreviousData` (beobachtet, also nicht
+ * betroffen) und ein kurzes Zurückschieben — dafür reichen 5 min. Die `staleTime` bleibt eigen.
+ */
+const BBOX_ABFRAGE_GC_MS = 5 * 60_000;
+
+/**
  * Fachebenen-Leg der Lagekarte: die externen Daten-Queries (eine je Fachebene) und ihre
  * Ableitungen. Die Sichtbarkeit hält `useKartenAnsicht` (geteilte Ansicht); dieser Hook bietet
  * nur den Toggle, ohne eigenen State und ohne Persistenz.
@@ -53,14 +62,6 @@ interface FachebenenArgs {
  * woran es festhält, und die Ebene blinkte bei jedem Pannen leer. `combine` liest das Ergebnis
  * über die Closure.
  */
-/**
- * Liegezeit einer nicht mehr gezeigten KRITIS- bzw. Energie-Antwort im Cache (LFH-945, D6). Der
- * Schlüssel trägt die gerasterte bbox, jede besuchte Zelle ist ein eigener Eintrag von grob 1–3 MB
- * (bis 5 000 Objekte). Mit 6 h lag alles im Speicher, was in den letzten 6 h zu sehen war. Gebraucht
- * wird der gerade gezeigte Ausschnitt, der Vorgänger für `keepPreviousData` (beobachtet, also nicht
- * betroffen) und ein kurzes Zurückschieben — dafür reichen 5 min. Die `staleTime` bleibt eigen.
- */
-const BBOX_ABFRAGE_GC_MS = 5 * 60_000;
 
 export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
   // Hochwasser, ODL und Luftqualität färben je Punkt nach Stufe und brauchen den aufgelösten
