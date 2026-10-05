@@ -1,13 +1,4 @@
-# deeplink-hervorhebung Specification
-
-## Purpose
-Legt fest, wie eine per Deeplink angesteuerte Zeile oder Karte einer Datensicht, ein
-Eintrag einer Zeitachse (ETB, Infotelefon) oder eine Kommunikationskarte (Meldung, Auftrag)
-markiert wird:
-aus vorhandenen Farbrollen, in beiden Modi sichtbar und unterscheidbar von Hover, Fokus und
-Statustönungen, ohne den Kontrastboden des Zeilentexts zu unterschreiten.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Hervorhebung aus vorhandenen Rollen
 
@@ -29,24 +20,6 @@ kein Zustand ist.
 - **WHEN** im Tag- oder Nachtmodus eine nicht alarmierte Meldung per `?meldung=` oder ein nicht alarmierter Auftrag per `?auftrag=` angesprungen wird
 - **THEN** trägt die Karte die Fläche und die Linie der Bedienrollen des Modus, wie die Tabellenzeile
 
-### Requirement: Zwei Kanäle, in beiden Modi sichtbar
-
-Die Markierung MUST neben einer getönten Fläche einen zweiten Kanal tragen, eine Linie oben und
-unten an der Zeile bzw. Karte. Die Linie MUST gegen die Markierungsfläche und gegen die Fläche der
-Nachbarzeile mindestens 3 : 1 halten, im Tag- wie im Nachtmodus.
-
-#### Scenario: Nachts sichtbar
-- **WHEN** im Nachtmodus eine Tabellenzeile per Deeplink angesprungen wird
-- **THEN** misst die Linie gegen die Markierungsfläche und gegen die Fläche der Nachbarzeile jeweils mindestens 3 : 1
-
-#### Scenario: Am Tag sichtbar
-- **WHEN** im Tagmodus eine Tabellenzeile per Deeplink angesprungen wird
-- **THEN** misst die Linie gegen die Markierungsfläche und gegen die Fläche der Nachbarzeile jeweils mindestens 3 : 1
-
-#### Scenario: Kartenzweig unter md
-- **WHEN** auf schmalem Schirm (Kartenform der Datensicht) eine Karte per Deeplink angesprungen wird
-- **THEN** trägt die Karte dieselbe Fläche und dieselbe Linie wie die Tabellenzeile
-
 ### Requirement: Unterscheidbar von Hover und Fokus
 
 Die Markierung MUST sich von einer gehoverten Zeile und vom Fokusring unterscheiden. Eine
@@ -66,18 +39,7 @@ Fokusrings ist; das gilt auch für Kommunikationskarten.
 - **WHEN** eine Meldung oder ein Auftrag per Deeplink angesprungen wird
 - **THEN** trägt die Karte genau eine Linie oben und eine unten und keinen umlaufenden Ring
 
-### Requirement: Zeilentext hält den Textboden
-
-Der Text einer markierten Zeile oder Karte MUST gegen die tatsächlich komponierte Fläche, auf der
-er steht, im Tagmodus mindestens 7 : 1 und im Nachtmodus mindestens 5 : 1 halten.
-
-#### Scenario: Text am Tag
-- **WHEN** im Tagmodus eine Zeile per Deeplink angesprungen wird
-- **THEN** misst ihr Zellentext gegen die komponierte Zellfläche mindestens 7 : 1
-
-#### Scenario: Text in der Nacht
-- **WHEN** im Nachtmodus eine Zeile per Deeplink angesprungen wird
-- **THEN** misst ihr Zellentext gegen die komponierte Zellfläche mindestens 5 : 1
+## ADDED Requirements
 
 ### Requirement: Gefahr gewinnt an der markierten Karte
 
