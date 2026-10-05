@@ -34,7 +34,7 @@
 
 - [x] 6.1 `src/AGENTS.md`: kurzer Abschnitt „Backend — Benutzername und KDF (LFH-921, LFH-981)“: Namen von außen nur über `auth::benutzername::normalisiere`, Suche nach `benutzername` mit `COLLATE NOCASE`, Argon2 in Handlern nur über `hash_gedrosselt`, Herleitung auf das Archiv dieser Change. Tabelle der Wurzel-`AGENTS.md` bleibt unverändert (Bereichsdatei existiert). Prüfen: Wurzel-`AGENTS.md` unter 200 Zeilen **Ergebnis:** Abschnitt steht; Wurzel-`AGENTS.md` 129 Zeilen
 - [x] 6.2 `rg "benutzername = \?" src` prüfen: jede Suche nach einem Namen von außen nutzt `COLLATE NOCASE`. Prüfen: Fundstellen hier notieren **Ergebnis:** Fundstellen ohne `NOCASE` nur `src/dev/seed.rs` (feste Seed-Namen) und ein Test-Helfer in `src/einsatz/repo.rs`; kein Eingang von außen
-- [ ] 6.3 `./scripts/check-all.sh` (Bündel, die in der Cloud-Sitzung laufen), `cargo test`, Vitest für die Login-Seite. Prüfen: grün oder umgebungsbedingt rot wie auf `alpha` (Gegenprobe notieren); voller Lauf über die CI des PRs
+- [x] 6.3 `./scripts/check-all.sh` (Bündel, die in der Cloud-Sitzung laufen), `cargo test`, Vitest für die Login-Seite. Prüfen: grün oder umgebungsbedingt rot wie auf `alpha` (Gegenprobe notieren); voller Lauf über die CI des PRs **Ergebnis (Cloud-Sitzung):** Bündel `schnell` grün; `--nur frontend` grün (719 Dateien, 10 348 Tests, Node aus `mise`); `cargo test -p lifeline-hub` grün (133 Testläufe) mit `CARGO_INCREMENTAL=0` und ohne Debug-Info. Der erste Lauf von `--nur rust` brach mit voller Platte ab (Linker „Bus error“), umgebungsbedingt; die Desktop-Hülle baut hier ohne GTK nicht. Voller Lauf: CI des PRs
 
 ## 7. Nachzüge aus dem Review
 
