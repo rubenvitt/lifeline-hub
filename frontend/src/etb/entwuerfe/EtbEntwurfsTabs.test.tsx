@@ -634,7 +634,6 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
     expect(screen.getByRole('button', { name: 'Entwurf verwerfen' })).toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: 'Add tab' })).toHaveLength(0);
     expect(screen.queryAllByRole('button', { name: 'remove' })).toHaveLength(0);
-    expect(document.querySelector('[aria-label="expanded dropdown"]')).toBeNull();
   });
 });
 

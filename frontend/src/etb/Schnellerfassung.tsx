@@ -274,7 +274,7 @@ export default function Schnellerfassung({
   // Unter `md` steht das Feld auf eigener Zeile: zwischen Typ-Präfix und „Erfassen" bliebe es
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
   // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
-  const { istSchmal, istBeruehrung } = useViewport();
+  const { istSchmal, istBeruehrung, screens } = useViewport();
   const [vorschauOffen, setVorschauOffen] = useState(false);
   const chipZeileRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<TextAreaRef>(null);
@@ -333,6 +333,15 @@ export default function Schnellerfassung({
    */
   const [menuModus, setMenuModus] = useState<'slash' | 'at'>('slash');
   const [typenAnbieten, setTypenAnbieten] = useState(false);
+  /**
+   * Einklappen schließt Feld-Editor und Menü. Der Editor hängt in der Feldzeile, die eingeklappt
+   * entfällt; bliebe `editFeld` stehen, montierte das nächste Aufklappen ihn neu, und sein
+   * Selbstfokus zöge den Fokus aus dem Textfeld (LFH-955). Abgeleitet im Rendern, kein Effekt.
+   */
+  if (eingeklappt && (editFeld != null || menuOffen)) {
+    setEditFeld(null);
+    setMenuOffen(false);
+  }
 
   const [bausteinOffen, setBausteinOffen] = useState<EtbBaustein | null>(null);
 
@@ -368,11 +377,17 @@ export default function Schnellerfassung({
 
   // Fokus beim Mount. State-Reset bei Tab-/Modus-Wechsel erfolgt über key-basiertes
   // Remounting im Container (EtbEntwurfsTabs / EtbPage-Berichtigung).
-  // Nur der Wert beim Mount zählt: ein späteres Aufklappen fokussiert nicht von selbst.
-  const startFokusBeimMount = useRef(startFokus);
+  // Einmal, sobald die Breite bekannt ist: auf dem ersten Render gilt sie als breit
+  // (`useViewport`), und der Wechsel in die gestapelte Form montierte das Feld neu — ein früher
+  // Fokus ginge verloren, und `startFokus` (unter `md` aus) stünde noch auf dem breiten Wert.
+  // Danach fokussiert kein Aufklappen von selbst.
+  const breiteBekannt = Object.keys(screens).length > 0;
+  const startFokusErledigt = useRef(false);
   useEffect(() => {
-    if (startFokusBeimMount.current) textRef.current?.focus();
-  }, []);
+    if (!breiteBekannt || startFokusErledigt.current) return;
+    startFokusErledigt.current = true;
+    if (startFokus) textRef.current?.focus();
+  }, [breiteBekannt, startFokus]);
 
   /**
    * Klick daneben schließt das Menü.

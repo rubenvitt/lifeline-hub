@@ -1127,3 +1127,18 @@ describe('Ereigniszeit eines vorgehenden Geräts (LFH-895)', () => {
     expect(eintrag.ereigniszeit).toBe('2026-10-04 09:30:00');
   });
 });
+
+describe('Schnellerfassung — eingeklappt (LFH-955)', () => {
+  it('Einklappen schließt einen offenen Feld-Editor, Aufklappen holt ihn nicht zurück', async () => {
+    const p = props();
+    const { rerender } = renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Feld' }));
+    await userEvent.click(await screen.findByText(/^An( ✓)?$/));
+    expect(await screen.findByLabelText('An')).toBeInTheDocument();
+    rerender(<Schnellerfassung {...p} eingeklappt />);
+    expect(screen.queryByLabelText('An')).toBeNull();
+    rerender(<Schnellerfassung {...p} eingeklappt={false} />);
+    await screen.findByRole('button', { name: 'Feld' });
+    expect(screen.queryByLabelText('An')).toBeNull();
+  });
+});

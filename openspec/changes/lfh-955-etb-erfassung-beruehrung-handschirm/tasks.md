@@ -15,7 +15,7 @@
 
 - [x] 3.1 `EtbPage.tsx`: unter `md` Menü „Weitere“ (Druckansicht, Abschließen mit `<Modal>`-Rückfrage), Test in `EtbPage.test.tsx`
 - [x] 3.2 Typfilter einzeilig rollend unter `md`
-- [x] 3.3 Knopf „Filter (n)“ klappt `EtbFilterleiste` auf, aktiver Filter hält sie offen, Test
+- [x] 3.3 Knopf „Filter (n)“ klappt `EtbFilterleiste` auf, ein Filter von außen klappt sie auf, Test
 - [x] 3.4 Erfassungsleiste eingeklappt: `eingeklappt` an der Schnellerfassung, Reiterband nur ab zwei Entwürfen, Fokusweiche in `EtbPage`, kein Mount-Fokus unter `md`; Tests für Einklappen, Aufklappen bei Fokus und bei Inhalt
 - [x] 3.5 Infotelefon-Erfassung bei 390 × 844 messen, Ergebnis hier notieren
   - Gemessen (05.10.2026, 6 Anrufe, Admin): kompakt Leiste 191 px (23 %), 2 Anrufe ganz darüber;

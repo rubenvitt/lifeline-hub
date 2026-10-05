@@ -95,7 +95,10 @@ Nur unter `md` (`istSchmal`), ab `md` bleibt der Kopf wie er ist.
    `overflowX: auto`), wie die Feldzeile der Erfassung (LFH-373).
 3. **Filter:** Ein Knopf „Filter“ zeigt die Zahl gesetzter Filter aus Volltext, Zeitraum und
    Einheit („Filter (2)“) und klappt die `EtbFilterleiste` inline auf (`aria-expanded`). Ein
-   aktiver Filter hält sie offen, damit ein Treffer nie ohne sichtbaren Grund dasteht. Der
+   Filter, der von außen kommt (Deeplink, „ETB ↗“, Zurück), klappt sie auf, damit ein Treffer
+   nie ohne sichtbaren Grund dasteht. Zuklappen darf man sie trotzdem, die Zahl am Knopf nennt
+   den Grund; das Leeren eines Filters klappt nichts zu (Review 05.10.2026: die Leiste
+   verschwand sonst unter dem Finger, und der Knopf war bei aktivem Filter wirkungslos). Der
    Typfilter zählt nicht, er steht sichtbar daneben.
 4. **Erfassungsleiste eingeklappt:** Die Schnellerfassung bekommt `eingeklappt?: boolean`.
    Eingeklappt entfallen Hinweiszeile, Feldzeile (Chips, „Feld“, „Anhang“) und die
@@ -103,7 +106,10 @@ Nur unter `md` (`istSchmal`), ab `md` bleibt der Kopf wie er ist.
    blendet das Reiterband aus, solange genau ein Entwurf besteht. Eingeklappt ist die Leiste,
    wenn `istSchmal`, kein Fokus in ihr liegt (`focusin`/`focusout` an der Wurzel der Leiste in
    `EtbPage`) und der aktive Entwurf leer ist (Text, Felder, Dateien; keine Berichtigung). Der
-   Fokus beim Mount entfällt unter `md`; `?neu=1` fokussiert weiter und klappt damit auf.
+   Fokus beim Mount entfällt unter `md` und wartet auf die bekannte Breite (der erste Render
+   gilt als breit, der Wechsel in die gestapelte Form montierte das Feld neu); `?neu=1` zählt als
+   Fokus in der Leiste, fokussiert weiter und klappt damit auf. Einklappen schließt einen offenen
+   Feld-Editor und das Menü.
    Senden lässt den Fokus im Feld (`fokusInsFeld`), die Leiste bleibt also offen.
 
 - **Verworfen: die Leiste unter `md` ganz als Knopf „Eintrag erfassen“.** Ein Extra-Tipp vor

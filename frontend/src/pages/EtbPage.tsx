@@ -289,9 +289,24 @@ export default function EtbPage() {
    * Zeitraum und Einheit hinter „Filter“, Druck und Abschluss im Menü „Weitere“, und die
    * Erfassungsleiste klappt ohne Fokus ein.
    */
-  const [filterOffen, setFilterOffen] = useState(false);
+  const filterZahl = leistenFilterZahl(filter);
+  /**
+   * Die Filterleiste unter `md`: offen, wenn gewählt. Ein Filter, der von außen kommt (Deeplink,
+   * „ETB ↗“, Zurück), klappt sie auf, damit ein Treffer nicht ohne sichtbaren Grund dasteht;
+   * zuklappen darf man sie trotzdem, die Zahl am Knopf nennt den Grund. Das Leeren eines Filters
+   * klappt nichts zu: die Leiste verschwände sonst unter dem Finger.
+   */
+  const [filterOffen, setFilterOffen] = useState(filterZahl > 0);
+  const [vorigeFilterZahl, setVorigeFilterZahl] = useState(filterZahl);
+  if (vorigeFilterZahl !== filterZahl) {
+    setVorigeFilterZahl(filterZahl);
+    if (vorigeFilterZahl === 0) setFilterOffen(true);
+  }
   const [abschliessenFrage, setAbschliessenFrage] = useState(false);
   const [fokusInLeiste, setFokusInLeiste] = useState(false);
+  // `?neu=1` (Schnellaktion) gilt als Fokus in der Leiste: kommt sie erst nach dem Laden der
+  // Entwürfe, montiert sie damit aufgeklappt und fokussiert ihr Feld selbst (`startFokus`).
+  if (searchParams.get('neu') === '1' && !fokusInLeiste) setFokusInLeiste(true);
   const { token, rollen } = useRollen();
   // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11): sonst rollte der Browser jeden per
   // Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht als `scroll-margin` an der
@@ -497,9 +512,7 @@ export default function EtbPage() {
   }
 
   const breit = abBreite('xl');
-  const filterZahl = leistenFilterZahl(filter);
-  // Ein gesetzter Filter hält die Leiste offen: ein Treffer stünde sonst ohne sichtbaren Grund da.
-  const filterleisteSichtbar = !istSchmal || filterOffen || filterZahl > 0;
+  const filterleisteSichtbar = !istSchmal || filterOffen;
   const puffer = pufferZustand(ausstehend, abgelehnt);
   const segmentOptionen: SegmentOption<TypSegment>[] = typSegmente(filter.typ).map((t) => ({
     wert: t,
@@ -592,7 +605,7 @@ export default function EtbPage() {
       <Button
         aria-expanded={filterleisteSichtbar}
         aria-controls="etb-filterleiste"
-        onClick={() => setFilterOffen(!filterleisteSichtbar)}
+        onClick={() => setFilterOffen((o) => !o)}
       >
         {filterZahl > 0 ? `Filter (${filterZahl})` : 'Filter'}
       </Button>

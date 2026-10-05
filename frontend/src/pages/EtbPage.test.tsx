@@ -2,7 +2,7 @@ import { http, HttpResponse, type RequestHandler } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Link, Route, Routes, useLocation } from 'react-router';
 import { act, type ReactElement } from 'react';
 import { meHandler, server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
@@ -1572,6 +1572,57 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     } finally {
       schwebe.remove();
     }
+  });
+
+  it('?neu=1 fokussiert die Leiste auch unter md und klappt sie auf', async () => {
+    setzeViewportBreite(390);
+    setup('/einsaetze/7/etb?neu=1');
+    const feld = await screen.findByPlaceholderText(/^Inhalt/);
+    await waitFor(() => expect(feld).toHaveFocus());
+    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+  });
+
+  it('ein geleerter Filter lässt die offene Filterleiste stehen', async () => {
+    setzeViewportBreite(390);
+    setup('/einsaetze/7/etb?q=Damm');
+    const suche = await screen.findByPlaceholderText('Volltextsuche');
+    await userEvent.clear(suche);
+    await waitFor(() => expect(screen.getByTestId('ort-suche').textContent).toBe(''));
+    expect(screen.getByPlaceholderText('Volltextsuche')).toBe(suche);
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('ein Filter von außen (Sprung „ETB ↗“) klappt die Leiste auf', async () => {
+    setzeViewportBreite(390);
+    setupMSW();
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+        <Link to="/einsaetze/7/etb?einheit_id=5">Sprung</Link>
+      </>,
+      { route: '/einsaetze/7/etb' },
+    );
+    expect(await screen.findByRole('button', { name: 'Filter' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await userEvent.click(screen.getByRole('link', { name: 'Sprung' }));
+    expect(await screen.findByRole('button', { name: 'Filter (1)' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByPlaceholderText('Volltextsuche')).toBeInTheDocument();
+  });
+
+  it('„Filter (n)“ klappt die Leiste auch mit gesetztem Filter zu', async () => {
+    setzeViewportBreite(390);
+    setup('/einsaetze/7/etb?q=Damm');
+    const knopf = await screen.findByRole('button', { name: 'Filter (1)' });
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByPlaceholderText('Volltextsuche')).toBeNull();
   });
 
   it('ab md ist die Leiste nie eingeklappt und das Feld hat den Fokus', async () => {
