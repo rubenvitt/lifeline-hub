@@ -411,39 +411,46 @@ export function MeldungsstromPaneel({
         onLeerAktion={onErfassen}
         onNeuladen={onNeuladen}
       >
-        {neu > 0 && (
-          <Sammelbanner aktion={{ label: 'anzeigen', onKlick: onAnzeigen }}>
-            {bannerText(neu, neuMindestens)}
-          </Sammelbanner>
-        )}
-        <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {sichtbar.map((e) => (
-            <Zeitachseneintrag
-              key={e.id}
-              als="li"
-              data-lfd-nr={e.lfd_nr}
-              zeit={stromZeit(e, konv)}
-              nr={`Nr. ${e.lfd_nr}`}
-              typ={e.typ}
-              typwort={etbTyp[e.typ].label}
-              meta={stromQuelle(e)}
+        <div style={{ position: 'relative' }}>
+          {/* Überlagerung über dem Listenkopf (LFH-900): im Fluss machte der Banner das Paneel
+            höher, die Paneelreihe wuchs mit, und das Band „Führungsstand“ rutschte nach unten. */}
+          {neu > 0 && (
+            <Sammelbanner
+              aktion={{ label: 'anzeigen', onKlick: onAnzeigen }}
+              style={{ position: 'absolute', insetInline: 0, top: 0, zIndex: 1 }}
             >
-              <span
-                style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  fontSize: 12,
-                  lineHeight: 1.4,
-                }}
-                title={e.inhalt}
+              {bannerText(neu, neuMindestens)}
+            </Sammelbanner>
+          )}
+          <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {sichtbar.map((e) => (
+              <Zeitachseneintrag
+                key={e.id}
+                als="li"
+                data-lfd-nr={e.lfd_nr}
+                zeit={stromZeit(e, konv)}
+                nr={`Nr. ${e.lfd_nr}`}
+                typ={e.typ}
+                typwort={etbTyp[e.typ].label}
+                meta={stromQuelle(e)}
               >
-                {e.inhalt}
-              </span>
-            </Zeitachseneintrag>
-          ))}
-        </ol>
+                <span
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                  }}
+                  title={e.inhalt}
+                >
+                  {e.inhalt}
+                </span>
+              </Zeitachseneintrag>
+            ))}
+          </ol>
+        </div>
       </PaneelZustand>
     </Paneel>
   );
