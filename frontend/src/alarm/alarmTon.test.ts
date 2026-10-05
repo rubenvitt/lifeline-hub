@@ -235,7 +235,30 @@ describe('gesperrter Alarmton ohne Rückstau (LFH-950)', () => {
     await freigeben();
     await expect(entsperrt).resolves.toBe('bereit');
     expect(start).toHaveBeenCalledOnce();
+    // Der Hinweis danach dämpft den Alarm nicht: es spielt die lautere Stufe.
+    expect(ctx.createOscillator.mock.results[0].value.frequency.value).toBe(880);
     // Die Geste ruft `resume()` selbst: nur ein Aufruf aus einer Aktivierung hebt die Sperre auf.
     expect(ctx.resume).toHaveBeenCalledTimes(2);
+  });
+
+  it('ein Alarm nach einem aufgestauten Hinweis hebt die Stufe an', async () => {
+    const { ctx, start, freigeben } = mockGesperrtesAudio();
+    spieleAlarmTon('dezent');
+    spieleAlarmTon('alarm');
+    void entsperreAlarmTon();
+    await freigeben();
+    expect(start).toHaveBeenCalledOnce();
+    expect(ctx.createOscillator.mock.results[0].value.frequency.value).toBe(880);
+  });
+
+  it('ein Alarm jenseits der Frist hebt einen späteren Hinweis nicht an', async () => {
+    const { ctx, start, freigeben } = mockGesperrtesAudio();
+    spieleAlarmTon('alarm');
+    await vi.advanceTimersByTimeAsync(ALARM_TON_FRIST_MS + 1);
+    spieleAlarmTon('dezent');
+    void entsperreAlarmTon();
+    await freigeben();
+    expect(start).toHaveBeenCalledOnce();
+    expect(ctx.createOscillator.mock.results[0].value.frequency.value).toBe(440);
   });
 });

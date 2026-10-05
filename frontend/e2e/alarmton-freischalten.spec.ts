@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -80,6 +80,43 @@ async function einsatzAnlegen(page: Page): Promise<string> {
   return String(((await antwort.json()) as { id: number }).id);
 }
 
+/**
+ * Alle Ziele der Einsatz-Kopfzeile liegen in EINER Zeile: die oberste Oberkante liegt über der
+ * untersten Unterkante. Bricht die Zeile um, kippt das.
+ */
+async function kopfIstEinzeilig(page: Page, kontext: string) {
+  const ziele = await page
+    .locator('header')
+    .first()
+    .evaluate((kopf) =>
+      [...kopf.querySelectorAll('button, a, input')]
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0)
+        .map((r) => ({ oben: r.top, unten: r.bottom })),
+    );
+  expect(ziele.length, `${kontext}: Ziele im Kopf`).toBeGreaterThan(2);
+  const oberste = Math.max(...ziele.map((z) => z.oben));
+  const unterste = Math.min(...ziele.map((z) => z.unten));
+  expect(oberste, `${kontext}: alle Kopfziele in EINER Zeile`).toBeLessThan(unterste);
+}
+
+/**
+ * Benachrichtigungen ausdrücklich verweigert statt der Vorgabe der Umgebung: die Marke nennt dann
+ * „Benachrichtigung blockiert", das längste Störungswort neben „Ton blockiert".
+ */
+async function benachrichtigungVerweigert(context: BrowserContext) {
+  await context.addInitScript(() => {
+    class VerweigerteBenachrichtigung {
+      static permission = 'denied';
+      static requestPermission = async () => 'denied';
+    }
+    Object.defineProperty(window, 'Notification', {
+      value: VerweigerteBenachrichtigung,
+      configurable: true,
+    });
+  });
+}
+
 test('Fükw 1440: ohne Geste „Ton blockiert", ein Klick irgendwo schaltet frei', async ({
   page,
 }) => {
@@ -121,40 +158,7 @@ test('Fükw 1440: ein Klick auf die gesperrte Glocke schaltet frei und nicht stu
 test.describe('Führungs-Tablet mit Finger', () => {
   test.use({ hasTouch: true });
 
-  // Benachrichtigungen ausdrücklich verweigert statt der Vorgabe der Umgebung: nach dem
-  // Freischalten nennt die Marke dann „Benachrichtigung blockiert", das längste Störungswort.
-  test.beforeEach(async ({ context }) => {
-    await context.addInitScript(() => {
-      class VerweigerteBenachrichtigung {
-        static permission = 'denied';
-        static requestPermission = async () => 'denied';
-      }
-      Object.defineProperty(window, 'Notification', {
-        value: VerweigerteBenachrichtigung,
-        configurable: true,
-      });
-    });
-  });
-
-  /**
-   * Alle Ziele der Einsatz-Kopfzeile liegen in EINER Zeile: die oberste Oberkante liegt über der
-   * untersten Unterkante. Bricht die Zeile um, kippt das.
-   */
-  async function kopfIstEinzeilig(page: Page, kontext: string) {
-    const ziele = await page
-      .locator('header')
-      .first()
-      .evaluate((kopf) =>
-        [...kopf.querySelectorAll('button, a, input')]
-          .map((el) => el.getBoundingClientRect())
-          .filter((r) => r.width > 0 && r.height > 0)
-          .map((r) => ({ oben: r.top, unten: r.bottom })),
-      );
-    expect(ziele.length, `${kontext}: Ziele im Kopf`).toBeGreaterThan(2);
-    const oberste = Math.max(...ziele.map((z) => z.oben));
-    const unterste = Math.min(...ziele.map((z) => z.unten));
-    expect(oberste, `${kontext}: alle Kopfziele in EINER Zeile`).toBeLessThan(unterste);
-  }
+  test.beforeEach(({ context }) => benachrichtigungVerweigert(context));
 
   async function messe(angemeldet: Page, einsatzId: string, rolle: string, breite: number) {
     const page = await frischerTab(angemeldet, einsatzId, breite);
@@ -203,6 +207,49 @@ test.describe('Führungs-Tablet mit Finger', () => {
       await messe(page, einsatzId, 'Admin', breite);
       await wechsleZuRolle(page, 'beobachter', einsatzId);
       await messe(page, einsatzId, 'Beobachter', breite);
+    });
+  }
+});
+
+/**
+ * Mit Maus stehen zwischen `md` und `xl` zwei Knöpfe; eine Störung trägt ihr Wort auf jeder
+ * Breite, ab `xl` jeder Zustand. Die längsten Wörter zugleich dürfen die Kopfzeile nicht
+ * umbrechen — der Umbruch bei 1024 px war der Anlass von LFH-637.
+ */
+test.describe('Fükw mit Maus: die längsten Zustandswörter in einer Kopfzeile', () => {
+  const faelle = [
+    { breite: 1024, benachrichtigung: 'blockiert' },
+    { breite: 1280, benachrichtigung: 'blockiert' },
+    { breite: 1280, benachrichtigung: 'nicht verfügbar' },
+  ] as const;
+
+  for (const { breite, benachrichtigung } of faelle) {
+    test(`${breite} px: „Ton blockiert" und „Benachrichtigung ${benachrichtigung}" brechen nicht um (auch als Beobachter)`, async ({
+      page,
+      context,
+    }) => {
+      test.setTimeout(90_000);
+      if (benachrichtigung === 'blockiert') await benachrichtigungVerweigert(context);
+      else {
+        await context.addInitScript(() => {
+          delete (window as { Notification?: unknown }).Notification;
+        });
+      }
+      await anmeldenAlsAdmin(page);
+      const einsatzId = await einsatzAnlegen(page);
+      for (const rolle of ['Admin', 'Beobachter']) {
+        if (rolle === 'Beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+        const tab = await frischerTab(page, einsatzId, breite);
+        const alarm = tab.locator('header [data-lfh="kopf-alarm"]');
+        await expect(
+          alarm.getByRole('button', { name: 'Alarmton blockiert – tippen zum Freischalten' }),
+        ).toHaveText('Ton blockiert', { timeout: NACH_DER_FRIST });
+        await expect(
+          alarm.getByRole('button', { name: `Benachrichtigungen: ${benachrichtigung}` }),
+        ).toHaveText(`Benachrichtigung ${benachrichtigung}`);
+        await kopfIstEinzeilig(tab, `${rolle} ${breite} px`);
+        await tab.close();
+      }
     });
   }
 });

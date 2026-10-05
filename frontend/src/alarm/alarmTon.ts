@@ -71,7 +71,7 @@ export const ALARM_TON_FRIST_MS = 2000;
 
 /** Das EINE offene `resume()` aller Anforderungen ohne Geste; `null`, wenn keins wartet. */
 let resumeLaeuft: Promise<AlarmTonStatus> | null = null;
-/** Nur die zuletzt angeforderte Stufe wartet auf die Freischaltung, nie eine Schlange. */
+/** Nur EINE Anforderung wartet auf die Freischaltung, nie eine Schlange (Stufe: die lautere). */
 let ausstehend: { stufe: AlarmStufe; seit: number } | null = null;
 
 /**
@@ -223,8 +223,11 @@ export function spieleAlarmTon(stufe: AlarmStufe): void {
       return;
     }
 
-    // Gesperrt: nur diese Anforderung merken und das gemeinsame `resume()` abwarten.
-    ausstehend = { stufe, seit: Date.now() };
+    // Gesperrt: nur diese Anforderung merken und das gemeinsame `resume()` abwarten. Wartet
+    // noch ein junger Alarm, behält der eine Ton dessen Stufe: ein Hinweis danach dämpft ihn nicht.
+    const lauter =
+      ausstehend?.stufe === 'alarm' && Date.now() - ausstehend.seit <= ALARM_TON_FRIST_MS;
+    ausstehend = { stufe: lauter ? 'alarm' : stufe, seit: Date.now() };
     void freigabeOhneGeste(context);
   } catch {
     meldeStatus('blockiert');

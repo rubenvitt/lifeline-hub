@@ -125,6 +125,25 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     expect(istAlarmGemutet()).toBe(false);
   });
 
+  it('ein Doppelklick auf die gesperrte Glocke schaltet frei und nicht stumm; erst ein späterer Klick schaltet stumm', async () => {
+    // Der erste Klick schaltet schon beim Drücken frei; der zweite sieht beim Drücken „bereit".
+    stubGesperrtesAudio();
+    renderAlarm();
+    const ton = await screen.findByRole('button', {
+      name: 'Alarmton blockiert – tippen zum Freischalten',
+    });
+    geste.erlaubt = true;
+    await userEvent.dblClick(ton);
+    await waitFor(() => expect(ton).toHaveTextContent('Ton bereit'));
+    expect(istAlarmGemutet()).toBe(false);
+
+    // Jenseits der Doppelklickzeit (500 ms) ist ein Klick auf „bereit" wieder das Stummschalten.
+    await new Promise((weiter) => setTimeout(weiter, 600));
+    await userEvent.click(ton);
+    await waitFor(() => expect(ton).toHaveTextContent('Ton stumm'));
+    expect(istAlarmGemutet()).toBe(true);
+  });
+
   it('die erste Bediengeste irgendwo in der App schaltet den Ton frei', async () => {
     const ctx = stubGesperrtesAudio();
     renderAlarm();

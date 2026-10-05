@@ -167,6 +167,8 @@ const FREISCHALT_GESTEN = ['pointerdown', 'pointerup', 'keydown'] as const;
 
 /** So lange gilt der Zustand beim Drücken für den folgenden Klick (siehe `tonUmschalten`). */
 const GESTE_GILT_MS = 2000;
+/** Gängige Doppelklickzeit der Betriebssysteme (Windows-Vorgabe 500 ms). */
+const DOPPELKLICK_MS = 500;
 
 /**
  * Einsatzweite Alarm-Zentrale: lauscht auf `lfh:sofortmeldung`, `lfh:erinnerung-alarm` und die
@@ -216,6 +218,35 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     // Mit den Toasts gehen die OS-Meldungen: Einsatzwechsel, Unmount und „Zu …" (LFH-951).
     schliesseAlleDesktopAlarme();
   }, [alarmScope, notification]);
+
+  /**
+   * Schließt die OS-Meldung zum Toast `key` (LFH-951). Über das Objekt, nicht den `tag`: zum
+   * selben Bezug kann inzwischen eine neuere Meldung stehen, die niemand quittiert hat.
+   */
+  const desktopMeldungSchliessen = useCallback(
+    (key: string) => {
+      const desktop = alarmScope.desktopMeldungen.get(key);
+      if (!desktop) return;
+      alarmScope.desktopMeldungen.delete(key);
+      schliesseDesktopMeldung(desktop);
+    },
+    [alarmScope],
+  );
+
+  /**
+   * Ein Einzel-Toast ist erledigt (✕ oder „Öffnen"): Buchführung aufräumen, OS-Meldung schließen.
+   * „Öffnen" ruft das selbst, denn `notification.destroy` ruft kein `onClose`; ein in die
+   * Zusammenfassung verdrängter Toast geht ebenfalls über `destroy` und bleibt so unquittiert.
+   */
+  const toastErledigt = useCallback(
+    (key: string) => {
+      desktopMeldungSchliessen(key);
+      alarmScope.eigeneToastKeys.delete(key);
+      alarmScope.einzelneToastZiele.delete(key);
+      alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys.filter((k) => k !== key);
+    },
+    [alarmScope, desktopMeldungSchliessen],
+  );
 
   const zielPfad = useCallback(
     (ziel: AlarmZiel) => {
@@ -287,10 +318,19 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       ),
       onClose: () => {
         alarmScope.eigeneToastKeys.delete(alarmScope.sammelKey);
+        // Mit der Zusammenfassung sind ihre Alarme quittiert, auch die OS-Meldungen dazu.
+        for (const key of alarmScope.gebuendelteToastZiele.keys()) desktopMeldungSchliessen(key);
         alarmScope.gebuendelteToastZiele.clear();
       },
     });
-  }, [alarmScope, alleToastsSchliessen, navigate, notification, zielPfad]);
+  }, [
+    alarmScope,
+    alleToastsSchliessen,
+    desktopMeldungSchliessen,
+    navigate,
+    notification,
+    zielPfad,
+  ]);
 
   /**
    * Höchstens drei sichtbare Notices, unabhängig von der globalen AntApp-Konfiguration: beim
@@ -300,21 +340,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   const zeigeAlarmToast = useCallback(
     (toast: AlarmToast) => {
       if (!alarmScope.aktiv) return;
-      const toastEntfernen = () => {
-        // Quittiert, nicht in die Zusammenfassung verdrängt: die OS-Meldung ist erledigt. Über
-        // das Objekt, nicht den `tag`: zum selben Bezug kann inzwischen eine neuere Meldung
-        // stehen, die niemand quittiert hat.
-        const desktop = alarmScope.desktopMeldungen.get(toast.key);
-        if (desktop && !alarmScope.gebuendelteToastZiele.has(toast.key)) {
-          alarmScope.desktopMeldungen.delete(toast.key);
-          schliesseDesktopMeldung(desktop);
-        }
-        alarmScope.eigeneToastKeys.delete(toast.key);
-        alarmScope.einzelneToastZiele.delete(toast.key);
-        alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys.filter(
-          (key) => key !== toast.key,
-        );
-      };
+      const toastEntfernen = () => toastErledigt(toast.key);
       if (alarmScope.einzelneToastKeys.includes(toast.key)) {
         alarmScope.eigeneToastKeys.add(toast.key);
         notification[toast.art]({
@@ -356,7 +382,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         onClose: toastEntfernen,
       });
     },
-    [alarmScope, notification, zeigeZusammenfassung],
+    [alarmScope, notification, toastErledigt, zeigeZusammenfassung],
   );
 
   // `duration: 0`-Notices überleben sonst ihre Komponente. Bei Logout/Unmount und vor dem nächsten
@@ -421,7 +447,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         if (!alarmScope.aktiv) return;
         navigate(meldungenPfad(einsatzId));
         notification.destroy(key);
-        if (desktopTag) schliesseDesktopAlarm(desktopTag);
+        toastErledigt(key);
       };
       zeigeAlarmToast({
         key,
@@ -446,7 +472,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
     window.addEventListener('lfh:sofortmeldung', onSofort);
     return () => window.removeEventListener('lfh:sofortmeldung', onSofort);
-  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
+  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast]);
 
   // Fällige Erinnerung / Auftrags-Eskalation.
   useEffect(() => {
@@ -478,7 +504,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         if (!alarmScope.aktiv) return;
         navigate(ziel);
         notification.destroy(key);
-        if (desktopTag) schliesseDesktopAlarm(desktopTag);
+        toastErledigt(key);
       };
       zeigeAlarmToast({
         key,
@@ -503,7 +529,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
     window.addEventListener('lfh:erinnerung-alarm', onErinnerung);
     return () => window.removeEventListener('lfh:erinnerung-alarm', onErinnerung);
-  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
+  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast]);
 
   // Fällige oder anstehende Ablösung — durch DENSELBEN Budget-Weg (`zeigeAlarmToast`), ein
   // eigener Zähler hebelte das gemeinsame Budget aus. Vorwarnung und Fälligkeit sind zwei
@@ -526,7 +552,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         if (!alarmScope.aktiv) return;
         navigate(ziel);
         notification.destroy(key);
-        if (desktopTag) schliesseDesktopAlarm(desktopTag);
+        toastErledigt(key);
       };
       zeigeAlarmToast({
         key,
@@ -551,7 +577,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
     window.addEventListener('lfh:abloesung-alarm', onAbloesung);
     return () => window.removeEventListener('lfh:abloesung-alarm', onAbloesung);
-  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast, zone]);
+  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast, zone]);
 
   // Neue Unwetterwarnung am Einsatzort (LFH-663,
   // `openspec/changes/archive/2026-10-01-lfh-663-unwetterwarnung-alarmbudget/design.md` D1/D6). Kein Live-Ereignis:
@@ -567,9 +593,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
       const vorher = alarmScope.unwetterKey;
       if (vorher && alarmScope.einzelneToastKeys.includes(vorher)) {
         notification.destroy(vorher);
-        alarmScope.eigeneToastKeys.delete(vorher);
-        alarmScope.einzelneToastZiele.delete(vorher);
-        alarmScope.einzelneToastKeys = alarmScope.einzelneToastKeys.filter((k) => k !== vorher);
+        toastErledigt(vorher);
       }
       alarmScope.unwetterKey = key;
       // Die OS-Meldung zieht mit dem Toast gleich (LFH-951): die neue ersetzt die ältere, auch
@@ -587,7 +611,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
         if (!alarmScope.aktiv) return;
         navigate(ziel);
         notification.destroy(key);
-        schliesseDesktopAlarm(desktopTag);
+        toastErledigt(key);
       };
       zeigeAlarmToast({
         key,
@@ -612,7 +636,7 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
     };
     window.addEventListener('lfh:unwetter-alarm', onUnwetter);
     return () => window.removeEventListener('lfh:unwetter-alarm', onUnwetter);
-  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
+  }, [alarmScope, notification, navigate, einsatzId, toastErledigt, zeigeAlarmToast]);
 
   // Freischaltung bei der ersten Bediengeste irgendwo in der App (LFH-950): ein Klick auf die
   // Karte genügt, niemand muss die Glocke finden. Der Zuhörer merkt sich außerdem den Zustand
@@ -622,13 +646,18 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
   // Gelesen wird der Zustand aus dem Modul, nicht aus React: der gerenderte Wert hinkt nach, bis
   // der nächste Render samt Effekten durch ist, und eine Geste in dieser Lücke ginge verloren.
   const gesteRef = useRef<{ gemutet: boolean; tonStatus: TonZustand; zeit: number } | null>(null);
+  /** Zeitpunkt der letzten Geste, die freischalten musste (siehe `tonUmschalten`). */
+  const freigabeRef = useRef(0);
   useEffect(() => {
     const beiGeste = (ev: Event) => {
       const status = alarmTonStatus() ?? 'prueft';
       if (ev.type !== 'pointerup') {
         gesteRef.current = { gemutet: istAlarmGemutet(), tonStatus: status, zeit: Date.now() };
       }
-      if (status !== 'bereit') void entsperreAlarmTon();
+      if (status !== 'bereit') {
+        freigabeRef.current = Date.now();
+        void entsperreAlarmTon();
+      }
     };
     for (const typ of FREISCHALT_GESTEN) window.addEventListener(typ, beiGeste, true);
     return () => {
@@ -638,12 +667,15 @@ export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
 
   // In `prueft` und `blockiert` schaltet ein Tipp frei, NIE stumm (LFH-950): stumm hieße dort,
   // den Alarm abzuschalten, den die Person gerade hören wollte. Maßgeblich ist der Zustand, den
-  // sie beim Drücken gesehen hat.
+  // sie beim Drücken gesehen hat. Der zweite Klick eines Doppelklicks auf die gesperrte Glocke
+  // sieht schon „bereit"; er gehört noch zum Freischalten und schaltet nicht stumm.
   const tonUmschalten = async () => {
     const geste = gesteRef.current;
     gesteRef.current = null;
     const vorher =
       geste && Date.now() - geste.zeit <= GESTE_GILT_MS ? geste : { gemutet, tonStatus };
+    const freigabeGerade = Date.now() - freigabeRef.current <= DOPPELKLICK_MS;
+    if (!vorher.gemutet && vorher.tonStatus === 'bereit' && freigabeGerade) return;
     if (vorher.gemutet) {
       setzeAlarmMute(false);
       setGemutet(false);

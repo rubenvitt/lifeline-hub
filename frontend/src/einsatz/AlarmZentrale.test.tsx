@@ -1003,6 +1003,47 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     expect(meldungen.filter((m) => m.close.mock.calls.length > 0)).toHaveLength(1);
   });
 
+  it('Öffnen schließt genau die Desktop-Meldung seines Toasts, auch ohne fachlichen Schlüssel', async () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:unwetter-alarm', { detail: { schluessel: 'sturm-1' } }),
+      );
+      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail: {} }));
+    });
+    expect(meldungen.map((m) => m.tag)).toEqual(['1-unwetter-sturm-1', '']);
+    setzeHidden(false);
+    const toast = (await screen.findByText('Sofortmeldung eingegangen')).closest<HTMLElement>(
+      '.ant-notification-notice',
+    )!;
+    await userEvent.click(within(toast).getByRole('button', { name: 'Öffnen' }));
+    expect(meldungen[1].close).toHaveBeenCalledOnce();
+    expect(meldungen[0].close).not.toHaveBeenCalled();
+    expect(offeneDesktopAlarme()).toBe(1);
+  });
+
+  it('Schließen der Zusammenfassung schließt die Desktop-Meldungen der gebündelten Alarme', async () => {
+    stubAudioReady();
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderAlarm();
+    for (const id of [1, 2, 3, 4]) sofortmeldung(id);
+    setzeHidden(false);
+    const sammel = (await screen.findByText('3 weitere Sofortmeldungen')).closest<HTMLElement>(
+      '.ant-notification-notice',
+    )!;
+    await userEvent.click(sammel.querySelector<HTMLElement>('.ant-notification-notice-close')!);
+    await waitFor(() => expect(offeneDesktopAlarme()).toBe(1));
+    expect(meldungen.filter((m) => m.close.mock.calls.length > 0).map((m) => m.tag)).toEqual([
+      '1-sofort-1',
+      '1-sofort-2',
+      '1-sofort-3',
+    ]);
+  });
+
   it('der Unmount der Alarmzentrale schließt alle Desktop-Meldungen', () => {
     stubAudioReady();
     const { meldungen } = stubMeldungen();
