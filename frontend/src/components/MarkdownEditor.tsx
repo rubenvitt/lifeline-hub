@@ -1,7 +1,7 @@
 import { IconAuge } from '../icons';
 import { Button, Input, Tabs, Typography } from 'antd';
 import type { GetRef } from 'antd';
-import { forwardRef, useState, type KeyboardEvent } from 'react';
+import { forwardRef, useState, type KeyboardEvent, type TextareaHTMLAttributes } from 'react';
 import Markdown, { type UnterEbene } from './Markdown';
 import './MarkdownEditor.css';
 
@@ -35,6 +35,8 @@ interface Props {
   /** Von antd Form.Item gesetzt (für Label-Verknüpfung). */
   id?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+  /** Beschriftung der Eingabetaste auf der Bildschirmtastatur (LFH-955: ETB „enter“). */
+  enterKeyHint?: TextareaHTMLAttributes<HTMLTextAreaElement>['enterKeyHint'];
   /**
    * Sperrt die Eingabe, ohne den Fokus zu nehmen (`readOnly`, nicht `disabled`): die
    * ETB-Schnellerfassung hält so den Wortlaut fest, während ein Versand läuft (LFH-117).
@@ -76,6 +78,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     rows,
     id,
     onKeyDown,
+    enterKeyHint,
     readOnly,
     druckfassung = false,
     umschalterAussen = false,
@@ -96,6 +99,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
       rows={rows}
       onChange={(e) => onChange?.(e.target.value)}
       onKeyDown={onKeyDown}
+      enterKeyHint={enterKeyHint}
       readOnly={readOnly}
     />
   );

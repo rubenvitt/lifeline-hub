@@ -1,7 +1,7 @@
 import { createRef } from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { setzeViewportBreite } from '../test/viewport';
+import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
@@ -299,7 +299,7 @@ describe('Schnellerfassung', () => {
     // bleiben.
     expect(screen.getByPlaceholderText(/^Inhalt …/)).toHaveAttribute(
       'placeholder',
-      'Inhalt … ( / für Befehle · @ für Einheit )',
+      'Inhalt … ( / für Typ & Felder · @ für Einheit )',
     );
     expect(screen.queryByText('@ Einheit')).toBeNull();
   });
@@ -601,6 +601,84 @@ describe('Schnellerfassung', () => {
 // Hier steht nur, was OHNE Remount gilt. Der Fall mit Remount (Entwurfs-Tab schließt) liegt
 // in `entwuerfe/EtbEntwurfsTabs.test.tsx`.
 // ---------------------------------------------------------------------------
+
+/**
+ * Return der Bildschirmtastatur (LFH-955, Spec `etb-schnellerfassung-tastatur`, design.md D1):
+ * iOS und Gboard liefern Return als `Enter` ohne Umschalt. Mit grobem Zeiger sendet Enter
+ * deshalb nicht, sondern bricht die Zeile um; gesendet wird über „Erfassen“ oder Strg/⌘+Enter.
+ */
+describe('Schnellerfassung — Tastatur nach Zeigerart (LFH-955)', () => {
+  it('grober Zeiger: Return sendet nicht und lässt den Umbruch stehen', async () => {
+    setzeZeigerGrob(true);
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pegel 3,20 m{Enter}steigend');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('Pegel 3,20 m\nsteigend');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(p.erfassen.mock.calls[0][0].inhalt).toBe('Pegel 3,20 m\nsteigend');
+  });
+
+  it('grober Zeiger: Return verhindert den nativen Umbruch nicht', () => {
+    setzeZeigerGrob(true);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    fireEvent.change(feld, { target: { value: 'Einzeiler' } });
+    expect(fireEvent.keyDown(feld, { key: 'Enter' })).toBe(true);
+  });
+
+  it.each([
+    ['Ctrl', '{Control>}{Enter}{/Control}'],
+    ['Meta', '{Meta>}{Enter}{/Meta}'],
+  ])('grober Zeiger: %s+Enter sendet (Hardware-Tastatur am Tablet)', async (_m, folge) => {
+    setzeZeigerGrob(true);
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), `Lage ruhig${folge}`);
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('das Textfeld trägt enterKeyHint="enter"', () => {
+    setzeZeigerGrob(true);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveAttribute('enterkeyhint', 'enter');
+  });
+
+  it.each([1180, 390])(
+    'grober Zeiger bei %i px: der Hinweis nennt keine Tastenkombination',
+    (breite) => {
+      setzeViewportBreite(breite);
+      setzeZeigerGrob(true);
+      renderMitProviders(<Schnellerfassung {...props()} />);
+      expect(screen.getAllByText('Return neue Zeile · „Erfassen“ sendet')).toHaveLength(1);
+      const leiste = document.querySelector('[data-lfh="etb-erfassung"]')!;
+      expect(leiste.textContent).not.toMatch(/Shift\+Enter|Strg\+Enter|Enter sendet/);
+    },
+  );
+
+  it('feiner Zeiger: der bisherige Vertrag bleibt', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(
+      screen.getByText('Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden'),
+    ).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Einzeiler{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('kein Platzhalter nennt „Befehle“', () => {
+    for (const breite of [390, 1440]) {
+      setzeViewportBreite(breite);
+      const { unmount } = renderMitProviders(<Schnellerfassung {...props()} />);
+      expect(screen.getByPlaceholderText(/Inhalt/).getAttribute('placeholder')).not.toMatch(
+        /Befehl/,
+      );
+      unmount();
+    }
+  });
+});
 
 describe('Schnellerfassung – Wertübernahme', () => {
   async function setzeTextfeld(feld: HTMLElement, trigger: string, label: string, wert: string) {

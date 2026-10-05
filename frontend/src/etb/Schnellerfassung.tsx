@@ -167,6 +167,12 @@ const ENTER_HINWEIS =
  * (Erfassungs-Norm). Cmd/Strg+Enter entfällt, die Taste gibt es dort nicht.
  */
 const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
+/**
+ * Mit grobem Zeiger (Finger, Handschuh) sendet Return nicht (LFH-955, design.md D1): die
+ * Bildschirmtastatur liefert Return als `Enter`, schon das erste brach einen Mehrzeiler ab. Der
+ * Hinweis nennt deshalb keine Tastenkombination, auf jeder Breite.
+ */
+const ENTER_HINWEIS_BERUEHRUNG = 'Return neue Zeile · „Erfassen“ sendet';
 
 /**
  * Platzhalter: sagt, WAS in das Feld gehört (der Tastaturvertrag steht in der Hinweiszeile).
@@ -174,7 +180,8 @@ const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
  * den Platzhalter mit, und die angepinnte Leiste riss den 50-%-Deckel (LFH-373).
  */
 const PLATZHALTER = 'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )';
-const PLATZHALTER_KURZ = 'Inhalt … ( / für Befehle · @ für Einheit )';
+// „Befehl“ ist im Einsatz ein Fachobjekt (Aufträge/Befehle), nicht der Slash (LFH-955).
+const PLATZHALTER_KURZ = 'Inhalt … ( / für Typ & Felder · @ für Einheit )';
 
 /**
  * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen Knopf
@@ -253,7 +260,8 @@ export default function Schnellerfassung({
   const online = useOnline();
   // Unter `md` steht das Feld auf eigener Zeile: zwischen Typ-Präfix und „Erfassen" bliebe es
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
-  const { istSchmal } = useViewport();
+  // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
+  const { istSchmal, istBeruehrung } = useViewport();
   const [vorschauOffen, setVorschauOffen] = useState(false);
   const chipZeileRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<TextAreaRef>(null);
@@ -481,12 +489,14 @@ export default function Schnellerfassung({
       e.preventDefault();
       return;
     }
+    // Grober Zeiger: nur Strg/⌘+Enter sendet, Return bricht um (LFH-955, design.md D1).
+    const einzeilerSendet = !istBeruehrung && inhalt.trim() !== '' && !inhalt.includes('\n');
     const istSendeTaste =
       e.key === 'Enter' &&
       !e.repeat &&
       !e.shiftKey &&
       !e.altKey &&
-      (e.ctrlKey || e.metaKey || (inhalt.trim() !== '' && !inhalt.includes('\n')));
+      (e.ctrlKey || e.metaKey || einzeilerSendet);
     if (istSendeTaste && editFeld == null) {
       e.preventDefault();
       void absenden();
@@ -704,10 +714,16 @@ export default function Schnellerfassung({
     </Tooltip>
   ) : null;
 
-  // Unter `md` die Kurzform: die volle Zeile bräche auf dem Handschirm dreizeilig um.
+  // Unter `md` die Kurzform: die volle Zeile bräche auf dem Handschirm dreizeilig um. Der
+  // Tastaturvertrag folgt der Zeigerart, nicht der Breite (LFH-955).
+  const enterHinweis = istBeruehrung
+    ? ENTER_HINWEIS_BERUEHRUNG
+    : istSchmal
+      ? ENTER_HINWEIS_KURZ
+      : ENTER_HINWEIS;
   const hinweiszeile = istSchmal ? (
     <>
-      <span>{ENTER_HINWEIS_KURZ}</span>
+      <span>{enterHinweis}</span>
       {schalter && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
     </>
   ) : (
@@ -717,7 +733,7 @@ export default function Schnellerfassung({
       )}
       {!berichtigungZu && <span>@ Einheit</span>}
       <span>/zeit ⧖ Nachtrag</span>
-      <span>{ENTER_HINWEIS}</span>
+      <span>{enterHinweis}</span>
     </>
   );
 
@@ -860,6 +876,8 @@ export default function Schnellerfassung({
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
+            // Die Bildschirmtastatur zeigt „Return“, nicht „Senden“: Return bricht dort um (D1).
+            enterKeyHint="enter"
             readOnly={sendet}
           />
         </Schnellerfassungszeile>
