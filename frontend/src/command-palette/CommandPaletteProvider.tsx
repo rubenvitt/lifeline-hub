@@ -234,6 +234,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       const aktion = tastaturAktionFuerEreignis(e);
       if (!aktion) return;
       if (offen) {
+        // Strg/⌘+Rücktaste gehört bei offener Palette dem Suchfeld (Wort bzw. Zeile löschen); die
+        // Ebene darunter sieht sie nicht, der Browser schon.
+        if (aktion === 'filter-zuruecksetzen') return;
         e.preventDefault();
         if (aktion === 'verwerfen') schliesse();
         return;

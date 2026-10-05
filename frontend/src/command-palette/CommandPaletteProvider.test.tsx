@@ -734,3 +734,26 @@ describe('verschmelzeAktionen', () => {
     expect(Object.keys(verschmelzeAktionen([]))).toEqual([]);
   });
 });
+
+describe('CommandPaletteProvider · Bearbeitungstasten bei offener Palette (LFH-1055)', () => {
+  it('lässt Strg/⌘+Rücktaste dem Suchfeld und gibt sie nicht an die Ebene darunter', async () => {
+    const u = userEvent.setup();
+    const filterZuruecksetzen = vi.fn();
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <Ebene name="liste" aktionen={{ 'filter-zuruecksetzen': filterZuruecksetzen }} />
+      </CommandPaletteProvider>,
+    );
+    screen.getByRole('button', { name: 'liste fokussieren' }).focus();
+    await u.keyboard('{Control>}k{/Control}');
+    const feld = screen.getByRole('combobox');
+
+    const strg = taste(feld, { key: 'Backspace', ctrlKey: true });
+    const cmd = taste(feld, { key: 'Backspace', metaKey: true });
+
+    expect(strg.defaultPrevented).toBe(false);
+    expect(cmd.defaultPrevented).toBe(false);
+    expect(filterZuruecksetzen).not.toHaveBeenCalled();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+});

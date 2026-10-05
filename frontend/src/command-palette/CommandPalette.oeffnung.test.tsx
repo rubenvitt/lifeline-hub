@@ -289,13 +289,13 @@ describe('CommandPalette · Fußzeile und Zeilenmarke (LFH-645)', () => {
   it('nennt den neuen Tab mit dem Kürzel der Plattform', () => {
     palette([modul()]);
     expect(fuss()).toHaveTextContent('neuer Tab');
-    expect(screen.getByText('Strg + ↵', { selector: 'kbd' })).toBeInTheDocument();
+    expect(screen.getByText('Strg ↵', { selector: 'kbd' })).toBeInTheDocument();
   });
 
   it('nimmt unter macOS das ⌘-Zeichen', () => {
     palette([modul()], { userAgent: MAC });
     expect(screen.getByText('⌘ ↵', { selector: 'kbd' })).toBeInTheDocument();
-    expect(screen.queryByText('Strg + ↵', { selector: 'kbd' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Strg ↵', { selector: 'kbd' })).not.toBeInTheDocument();
   });
 
   it('nennt die Vorschau nur, wo es sie geben kann', () => {

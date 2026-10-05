@@ -25,8 +25,8 @@ describe('CommandPalette', () => {
       />,
     );
     await u.type(screen.getByRole('combobox'), 'lage');
-    expect(screen.queryByText('ETB')).not.toBeInTheDocument();
-    expect(screen.getByText('Lagekarte')).toBeInTheDocument();
+    // `ETB` ist zugleich das Kurzwort des `#`-Präfixes in der Fußzeile: gezählt wird die Liste.
+    expect(screen.getAllByRole('option').map(optionsText)).toEqual(['Lagekarte']);
   });
 
   it('führt den aktiven Befehl per Enter aus und schließt', async () => {
@@ -127,7 +127,7 @@ const rangKorpus: Befehl[] = [
   {
     id: 'aktion:personen',
     gruppe: 'schnellaktionen',
-    label: 'Neue Person erfassen',
+    label: 'Person erfassen',
     schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'],
     ausfuehren: () => {},
   },
@@ -166,13 +166,13 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
       {
         id: 'aktion:etb',
         gruppe: 'schnellaktionen',
-        label: 'Neuer ETB-Eintrag',
+        label: 'ETB-Eintrag schreiben',
         ausfuehren: () => {},
       },
     ];
     renderMitProviders(<CommandPalette befehle={befehle} schliesse={() => {}} />);
     const optionen = screen.getAllByRole('option');
-    expect(optionen[0]).toHaveTextContent('Neuer ETB-Eintrag');
+    expect(optionen[0]).toHaveTextContent('ETB-Eintrag schreiben');
     expect(optionen[0]).toHaveAttribute('aria-selected', 'true');
   });
 
@@ -183,7 +183,7 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
       {
         id: 'aktion:etb',
         gruppe: 'schnellaktionen',
-        label: 'Neuer ETB-Eintrag',
+        label: 'ETB-Eintrag schreiben',
         ausfuehren: () => {},
       },
     ];
@@ -201,7 +201,7 @@ describe('CommandPalette · Startansicht (LFH-337 · M11)', () => {
   it('behält bei leerer Suche die Gruppenrahmen', () => {
     renderMitProviders(<CommandPalette befehle={rangKorpus} schliesse={() => {}} />);
     expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Neue Person erfassen');
+    expect(screen.getAllByRole('option')[0]).toHaveTextContent('Person erfassen');
   });
 
   it('deckelt die Listenhöhe relativ statt auf 380 px', () => {
@@ -238,15 +238,13 @@ describe('CommandPalette · label-gleiche Zwillinge (LFH-391 · A3)', () => {
     expect(screen.getAllByRole('option').map(optionsText)).toEqual(['Lagekarte', 'Lagemeldungen']);
   });
 
-  it('behält die Abkürzung „Zuletzt" bei LEERER Suche', () => {
+  it('behält die Abkürzung „Zuletzt" bei LEERER Suche, ohne das Modul doppelt zu zeigen (LFH-1055)', () => {
     renderMitProviders(<CommandPalette befehle={zwillingsKorpus} schliesse={() => {}} />);
 
-    expect(screen.getAllByRole('option').map(optionsText)).toEqual([
-      'Lagekarte',
-      'Lagekarte',
-      'Lagemeldungen',
-    ]);
-    expect(screen.getByRole('group', { name: 'Zuletzt' })).toBeInTheDocument();
+    // Die oberste Gruppe gewinnt: „Lagekarte" steht in „Zuletzt", nicht noch einmal in „Module".
+    expect(screen.getAllByRole('option').map(optionsText)).toEqual(['Lagekarte', 'Lagemeldungen']);
+    expect(screen.getByRole('group', { name: 'Zuletzt' })).toHaveTextContent('Lagekarte');
+    expect(screen.getByRole('group', { name: 'Module' })).not.toHaveTextContent('Lagekarte');
   });
 });
 
@@ -256,7 +254,7 @@ const modusKorpus: Befehl[] = [
   {
     id: 'schnell:person',
     gruppe: 'schnellaktionen',
-    label: 'Neue Person erfassen',
+    label: 'Person erfassen',
     ausfuehren: () => {},
   },
   { id: 'modul:personen', gruppe: 'module', label: 'Personen', ausfuehren: () => {} },
@@ -286,7 +284,7 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
 
     await u.type(screen.getByRole('combobox'), '>');
 
-    expect(optionsTexte()).toEqual(['Speichern', 'Neue Person erfassen']);
+    expect(optionsTexte()).toEqual(['Speichern', 'Person erfassen']);
     // Der Rest ist leer, also gilt die Startansicht MIT Rahmen, eingeschränkt, nicht umsortiert.
     expect(screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'))).toEqual([
       'Aktionen',
@@ -298,7 +296,7 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
   it('zeigt ohne Präfix weiterhin Modul- und Einstellungsbefehle', () => {
     renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
 
-    expect(optionsTexte()).toEqual(['Speichern', 'Neue Person erfassen', 'Personen', 'Dunkel']);
+    expect(optionsTexte()).toEqual(['Speichern', 'Person erfassen', 'Personen', 'Dunkel']);
   });
 
   it('sucht mit „>" nur innerhalb der zwei Gruppen', async () => {
@@ -307,7 +305,7 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
 
     await u.type(screen.getByRole('combobox'), '>person');
 
-    expect(optionsTexte()).toEqual(['Neue Person erfassen']);
+    expect(optionsTexte()).toEqual(['Person erfassen']);
   });
 
   /** Gegenprobe mit demselben Suchwort ohne Präfix: erst das Paar zeigt, dass der Modus filtert
@@ -333,9 +331,13 @@ describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
 
     // Die Legende steht in der Fußzeile; die Modusanzeige oben nennt nur den AKTIVEN Modus, bei
     // leerem Feld also keinen.
+    // Kurzwort in der Zeile, der Langtext als Tooltip (LFH-1055).
     const fuss = document.querySelector('[data-lfh="palette-fuss"]');
-    expect(fuss).toHaveTextContent('zeigt nur Aktionen');
-    expect(fuss).toHaveTextContent('sucht im Einsatztagebuch');
+    expect(fuss).toHaveTextContent('Aktionen');
+    expect(fuss).toHaveTextContent('ETB');
+    expect(fuss).toHaveTextContent('Personen & Kräfte');
+    expect(fuss?.querySelector('[title="zeigt nur Aktionen"]')).not.toBeNull();
+    expect(fuss?.querySelector('[title="sucht im Einsatztagebuch"]')).not.toBeNull();
     expect(fuss).toHaveTextContent('öffnen');
     // Nur, was funktioniert: kein „im Panel“, und die Koordinate nur mit `koordinatenSprung`
     // (außerhalb eines Einsatzes wäre der Hinweis eine Einladung ins Leere).
@@ -894,14 +896,14 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
     expect(screen.queryByText(/Auf Lagekarte zeigen/)).not.toBeInTheDocument();
   });
 
-  it('die Fußzeile nennt den Weg nur, wenn es den Sprung gibt', () => {
+  it('die Fußzeile wirbt nicht für den Sprung, die Zeile erscheint beim Tippen (LFH-1055)', () => {
     renderMitProviders(
       <CommandPalette befehle={[]} koordinatenSprung={sprung} schliesse={() => {}} />,
     );
     const fuss = document.querySelector('[data-lfh="palette-fuss"]');
-    expect(fuss).toHaveTextContent('Koordinate → Lagekarte');
+    expect(fuss).not.toHaveTextContent('Koordinate');
     // `#` bleibt das ETB-Präfix.
-    expect(fuss).toHaveTextContent('sucht im Einsatztagebuch');
+    expect(fuss?.querySelector('[title="sucht im Einsatztagebuch"]')).not.toBeNull();
     expect(fuss).not.toHaveTextContent('Panel');
   });
 });
@@ -969,5 +971,101 @@ describe('CommandPalette · Adresszeile (LFH-638)', () => {
     renderMitProviders(<CommandPalette befehle={[]} adressSprung={adresse} schliesse={() => {}} />);
     await u.type(screen.getByRole('combobox'), '#Rathausplatz');
     expect(screen.queryByText(/Adresse auf Lagekarte suchen/)).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * LFH-1055: Die Markierung folgt nur einem BEWEGTEN Zeiger. Läuft die Liste beim Öffnen, Tippen
+ * oder Scrollen unter einem ruhenden Zeiger durch, meldet der Browser `mouseenter` bzw. eine
+ * Mausbewegung an derselben Stelle; beides darf die Markierung nicht verschieben, sonst öffnete ↵
+ * die Zeile unter der Maus statt des besten Treffers.
+ */
+describe('CommandPalette · Zeiger (LFH-1055)', () => {
+  const korpus = () => [befehl('a', 'Erstes'), befehl('b', 'Zweites'), befehl('c', 'Drittes')];
+  const markiert = () =>
+    screen.getAllByRole('option').find((o) => o.getAttribute('aria-selected') === 'true')
+      ?.textContent;
+
+  it('lässt die Markierung stehen, wenn eine Zeile unter einen ruhenden Zeiger rückt', () => {
+    renderMitProviders(<CommandPalette befehle={korpus()} schliesse={() => {}} />);
+    const drittes = screen.getByRole('option', { name: /Drittes/ });
+
+    fireEvent.mouseEnter(drittes, { clientX: 100, clientY: 200 });
+    fireEvent.mouseOver(drittes, { clientX: 100, clientY: 200 });
+    fireEvent.mouseMove(drittes, { clientX: 100, clientY: 200 });
+
+    expect(markiert()).toMatch(/^Erstes/);
+  });
+
+  it('markiert die Zeile, über die der Zeiger wirklich fährt', () => {
+    renderMitProviders(<CommandPalette befehle={korpus()} schliesse={() => {}} />);
+    const drittes = screen.getByRole('option', { name: /Drittes/ });
+
+    fireEvent.mouseMove(drittes, { clientX: 100, clientY: 200 });
+    fireEvent.mouseMove(drittes, { clientX: 104, clientY: 202 });
+
+    expect(markiert()).toMatch(/^Drittes/);
+  });
+
+  it('↵ öffnet nach dem Tippen den besten Treffer, auch wenn der Zeiger auf einer anderen Zeile ruht', async () => {
+    const u = userEvent.setup();
+    const erstes = vi.fn();
+    const zweites = vi.fn();
+    renderMitProviders(
+      <CommandPalette
+        befehle={[befehl('a', 'Helligkeit', erstes), befehl('b', 'Hellmodus', zweites)]}
+        schliesse={() => {}}
+      />,
+    );
+    await u.type(screen.getByRole('combobox'), 'hell');
+    // Die zweite Zeile rückt unter den ruhenden Zeiger.
+    fireEvent.mouseEnter(screen.getByRole('option', { name: /Hellmodus/ }), {
+      clientX: 50,
+      clientY: 80,
+    });
+    await u.keyboard('{Enter}');
+
+    expect(erstes).toHaveBeenCalledTimes(1);
+    expect(zweites).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/** LFH-1055: In der Startansicht steht jeder Befehl einmal, in der obersten Gruppe, die ihn führt. */
+describe('CommandPalette · Startansicht ohne Dubletten (LFH-1055)', () => {
+  const korpus = (): Befehl[] => [
+    befehl('aktion:etb', 'ETB-Eintrag schreiben', () => {}, 'schnellaktionen'),
+    befehl('aktion:personen', 'Person erfassen', () => {}, 'schnellaktionen'),
+    befehl('zuletzt:lagekarte', 'Lagekarte', () => {}, 'zuletzt'),
+    befehl('modul:lagekarte', 'Lagekarte', () => {}, 'module'),
+    befehl('modul:etb', 'ETB', () => {}, 'module'),
+    befehl('ausgefuehrt:aktion:etb', 'ETB-Eintrag schreiben', () => {}, 'ausgefuehrt'),
+  ];
+  const gruppe = (name: string) =>
+    Array.from(
+      screen.getByRole('group', { name }).querySelectorAll('[role="option"]'),
+      (o) => o.id,
+    );
+
+  it('nimmt eine gemerkte Zeile aus ihrer Herkunftsgruppe', () => {
+    renderMitProviders(<CommandPalette befehle={korpus()} schliesse={() => {}} />);
+
+    expect(gruppe('Zuletzt ausgeführt')).toEqual(['cmd-ausgefuehrt:aktion:etb']);
+    expect(gruppe('Schnellaktionen')).toEqual(['cmd-aktion:personen']);
+  });
+
+  it('nimmt ein zuletzt besuchtes Modul aus „Module“', () => {
+    renderMitProviders(<CommandPalette befehle={korpus()} schliesse={() => {}} />);
+
+    expect(gruppe('Zuletzt')).toEqual(['cmd-zuletzt:lagekarte']);
+    expect(gruppe('Module')).toEqual(['cmd-modul:etb']);
+  });
+
+  it('kein Label steht in der Startansicht zweimal', () => {
+    renderMitProviders(<CommandPalette befehle={korpus()} schliesse={() => {}} />);
+    const labels = screen.getAllByRole('option').map(optionsText);
+
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });

@@ -547,7 +547,7 @@ Spec `bedien-arbeitsplatz`).
   Datenzeilen bleiben offen, für sie gilt der Rahmen. Stabsfunktionen S1–S6 ebenso (LFH-46).
 - **Aufnahme** (`personenAufnahmePfad`): Einstiege sind die UHS-Kopfzeile „Patient aufnehmen“
   (LFH-341/C6, nur `aktiv` und mit Schreibrecht) und die Leeraktion des Sichtungspaneels. Die
-  Palette führt „Neue Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.
+  Palette führt „Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.
 - **Wiedervorlage** einer wählbaren Arbeitsweise nur mit Feldbefund (Personenwechsel zwischen
   Arbeitsplätzen auf einem geteilten Gerät, dem Lesezeichen und Einstiege nicht genügen) oder bei
   einem dritten Einstieg in dieselbe Fläche. Transport hat keine eigene Fläche (Lücke, kein Anlass).

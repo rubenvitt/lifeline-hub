@@ -4,7 +4,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
-import { paletteMaske, schrift } from '../theme/tokens';
+import { paletteMaske, schrift, schriftskala } from '../theme/tokens';
 import { istApplePlattform } from './befehle';
 import { sichtbareDatensaetze } from './datensaetze';
 import {
@@ -46,11 +46,28 @@ const PALETTE = { breite: 640, oben: 120, kopf: 52 } as const;
 const KEINE_TREFFER: Treffer[] = [];
 
 /**
+ * Der Befehl hinter einer Ordnungszeile: die Gedächtniszeile `ausgefuehrt:<id>` und die
+ * Besuchszeile `zuletzt:<modul>` sind Zwillinge von `<id>` bzw. `modul:<modul>`.
+ */
+function kernId(b: Befehl): string {
+  const id = b.id.startsWith('ausgefuehrt:') ? b.id.slice('ausgefuehrt:'.length) : b.id;
+  return id.startsWith('zuletzt:') ? `modul:${id.slice('zuletzt:'.length)}` : id;
+}
+
+/**
+ * Die Tastenmarken der Palette in EINEM Maß, unabhängig von der Dichte: sie sind Satz, kein Ziel,
+ * und eine mitwachsende Polsterung bräche die Fußzeile in `komfortabel` auf zwei Zeilen. Ein-Zeichen-
+ * Tasten (↵, →, >, #, @) werden gleich breite Quadrate, damit die Legende nicht flattert.
+ */
+const tasteStil = { padding: '0 4px', fontSize: 11, lineHeight: '16px' } as const;
+const tasteQuadrat = { ...tasteStil, minWidth: 18, justifyContent: 'center' } as const;
+
+/**
  * Das Kürzel „neuer Tab“ als Marke, in derselben Schreibweise wie das Speichern-Kürzel in
  * `TASTATUR_AKTIONEN`.
  */
 function neuerTabKuerzel(userAgent: string): string {
-  return istApplePlattform(userAgent) ? '⌘ ↵' : 'Strg + ↵';
+  return istApplePlattform(userAgent) ? '⌘ ↵' : 'Strg ↵';
 }
 
 /**
@@ -144,6 +161,12 @@ export function CommandPalette({
   const [vorschau, setVorschau] = useState<Befehl | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<InputRef>(null);
+  /**
+   * Letzte Zeigerposition über der Liste. Die Markierung folgt nur einem BEWEGTEN Zeiger: ein
+   * ruhender, unter dem die Liste beim Öffnen, Tippen oder Scrollen wegläuft, stähle sonst die
+   * Auswahl, und ↵ öffnete die Zeile unter der Maus statt des besten Treffers.
+   */
+  const zeigerRef = useRef<{ x: number; y: number } | null>(null);
 
   // Fokus sicherstellen: antd Modal kann den Fokus nach Mount verschieben.
   useEffect(() => {
@@ -222,16 +245,23 @@ export function CommandPalette({
   // Maßgeblich ist der REST: ein nacktes '>' schränkt ein, sucht aber nicht.
   const sucheAktiv = rest !== '';
 
-  const gruppen = useMemo(
-    () =>
-      sucheAktiv
-        ? []
-        : GRUPPEN_REIHENFOLGE.map((g) => ({
-            gruppe: g,
-            items: treffer.map((t) => t.befehl).filter((b) => b.gruppe === g),
-          })).filter((x) => x.items.length > 0),
-    [treffer, sucheAktiv],
-  );
+  const gruppen = useMemo(() => {
+    if (sucheAktiv) return [];
+    // Jeder Befehl steht in der Startansicht EINMAL: in der obersten Gruppe, die ihn führt.
+    const gesehen = new Set<string>();
+    return GRUPPEN_REIHENFOLGE.map((g) => ({
+      gruppe: g,
+      items: treffer
+        .map((t) => t.befehl)
+        .filter((b) => {
+          if (b.gruppe !== g) return false;
+          const kern = kernId(b);
+          if (gesehen.has(kern)) return false;
+          gesehen.add(kern);
+          return true;
+        }),
+    })).filter((x) => x.items.length > 0);
+  }, [treffer, sucheAktiv]);
   // EINZIGE Indexquelle für beide Zweige: `indexVon`, `aria-activedescendant`, `aria-expanded`,
   // der Leerzustand und `aufTaste` lesen nur von hier.
   const flach = useMemo(
@@ -274,6 +304,13 @@ export function CommandPalette({
       el.scrollIntoView({ block: 'nearest' });
     }
   }, [aktiv, vorschau]);
+
+  function aufZeiger(e: MouseEvent, b: Befehl) {
+    const vorher = zeigerRef.current;
+    zeigerRef.current = { x: e.clientX, y: e.clientY };
+    if (!vorher || (vorher.x === e.clientX && vorher.y === e.clientY)) return;
+    if (b.id !== aktiverId) setAktivId(b.id);
+  }
 
   function fuehreAus(b: Befehl | undefined) {
     if (!b) return;
@@ -368,11 +405,7 @@ export function CommandPalette({
   }
 
   const aktiverId = flach[aktiv]?.id;
-  const hinweisStil = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: token.marginXS,
-  } as const;
+  const hinweisStil = { display: 'inline-flex', alignItems: 'center', gap: 6 } as const;
   // Gilt für JEDEN Modus, der Datensätze durchsucht, auch für den Vorgabemodus. Ab dem PRÄFIX, nicht
   // erst ab dem Zeichen dahinter: wer '@' tippt, soll nicht „Keine Treffer“ lesen. Im präfixlosen
   // Vorgabemodus bleibt die leere Eingabe die Startansicht.
@@ -408,43 +441,70 @@ export function CommandPalette({
         aria-selected={istAktiv}
         // Der Kontext BESCHREIBT, er benennt nicht (Begründung an `Befehl.kontext`).
         aria-describedby={kontextId}
-        onMouseEnter={() => setAktivId(b.id)}
+        onMouseMove={(e: MouseEvent) => aufZeiger(e, b)}
         onClick={(e: MouseEvent) => (e.ctrlKey || e.metaKey ? oeffneImNeuenTab(b) : fuehreAus(b))}
         style={{
           ...palettenZeilenStil(token),
-          // Aktive Zeile: Grund `flaeche3`, Icon in Bedienfarbe. Der Text bleibt `text`; die Auswahl
-          // trägt die Fläche plus `aria-selected`.
+          // Aktive Zeile: Fläche `flaeche3` plus 2-px-Marke in `bedien` links (wie das Modulpanel).
           background: istAktiv ? farben.flaeche3 : 'transparent',
-          color: token.colorText,
+          boxShadow: istAktiv ? `inset 2px 0 0 ${farben.bedien}` : undefined,
+          color: farben.text,
         }}
       >
-        {Icon && (
-          <span
-            aria-hidden="true"
-            style={{
-              display: 'inline-flex',
-              flexShrink: 0,
-              color: istAktiv ? token.colorPrimary : farben.schwach,
-            }}
-          >
-            <Icon size={16} />
-          </span>
-        )}
-        <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{b.label}</span>
+        {/* Die Icon-Spalte steht auch ohne Icon: sonst springt das Label einer Zeile ohne Icon nach links. */}
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-flex',
+            justifyContent: 'center',
+            width: 18,
+            flexShrink: 0,
+            color: istAktiv ? farben.bedien : farben.gedaempft,
+          }}
+        >
+          {Icon && <Icon size={16} />}
+        </span>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: schriftskala.text.groesse,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {b.label}
+        </span>
         {b.kontext && (
           <span
             id={kontextId}
             aria-hidden="true"
-            style={{ flexShrink: 0, fontSize: 11, color: farben.schwach, whiteSpace: 'nowrap' }}
+            style={{
+              flexShrink: 0,
+              fontSize: schriftskala.textKlein.groesse,
+              color: farben.schwach,
+              whiteSpace: 'nowrap',
+            }}
           >
             {b.kontext}
           </span>
         )}
-        {b.kuerzel && <Tastenkuerzel>{b.kuerzel}</Tastenkuerzel>}
+        {b.kuerzel && (
+          <Tastenkuerzel style={{ ...tasteStil, color: farben.schwach }}>{b.kuerzel}</Tastenkuerzel>
+        )}
         {/* Die Enter-Marke steht NUR an der aktiven Zeile: sie sagt, was Enter gerade auslöst.
-            Satz, kein Ziel, deshalb `aria-hidden`. */}
-        {istAktiv && !b.kuerzel && (
-          <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
+            Satz, kein Ziel, deshalb `aria-hidden`. Ihre Breite ist auch an den übrigen Zeilen
+            reserviert, sonst rückte der Kontext beim Pfeilen hin und her. */}
+        {!b.kuerzel && (
+          <Tastenkuerzel
+            aria-hidden
+            style={{
+              ...tasteQuadrat,
+              color: farben.schwach,
+              visibility: istAktiv ? 'visible' : 'hidden',
+            }}
+          >
             ↵
           </Tastenkuerzel>
         )}
@@ -469,7 +529,7 @@ export function CommandPalette({
             }}
             style={{
               ...vorschauZielStil(token),
-              color: istAktiv ? token.colorPrimary : farben.schwach,
+              color: istAktiv ? farben.bedien : farben.schwach,
             }}
           >
             <IconChevronRechts size={16} />
@@ -538,30 +598,36 @@ export function CommandPalette({
               setSuche(e.target.value);
             }}
             onKeyDown={aufTaste}
-            style={{ flex: 1, padding: 0, fontSize: 16 }}
+            // 16 px: kleiner zoomt iOS beim Fokus die Seite. KEIN eigener Fokusrahmen: die Palette
+            // hat genau dieses eine Feld, ihr Rahmen in Bedienfarbe und die Schreibmarke zeigen den
+            // Fokus; ein zweiter Kasten in der Kopfzeile wäre Kasten im Kasten.
+            style={{ flex: 1, padding: 0, fontSize: 16, outline: 'none', boxShadow: 'none' }}
           />
-          <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
-            ESC
+          {/*
+           * Die Modusanzeige: solange ein Präfix steht, nennt sie ihn; ohne sie wäre ein Filter, der
+           * die Liste um zwei Drittel kürzt, von einem kaputten nicht zu unterscheiden. Als Marke im
+           * Kopf, nicht als eigene Zeile darunter: die Liste rückt beim Tippen von '>' nicht.
+           */}
+          {modus !== 'alles' && (
+            <span
+              data-lfh="palette-modus"
+              style={{
+                flexShrink: 0,
+                padding: `0 ${token.paddingXS}px`,
+                lineHeight: 1.6,
+                fontSize: schriftskala.textKlein.groesse,
+                color: farben.bedienText,
+                background: farben.bedienFlaeche,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {PALETTE_MODI[modus].hinweis}
+            </span>
+          )}
+          <Tastenkuerzel aria-hidden style={{ ...tasteStil, color: farben.schwach }}>
+            Esc
           </Tastenkuerzel>
         </div>
-        {/*
-         * Die Modusanzeige: solange ein Präfix steht, nennt sie ihn; ohne sie wäre ein Filter, der die
-         * Liste um zwei Drittel kürzt, von einem kaputten nicht zu unterscheiden. Die Legende steht in
-         * der Fußzeile. Der Tastaturvertrag steht in Steuer- und Fußzeile, NICHT im Platzhalter.
-         * Satz, kein Ziel, also kein `controlHeight`-Boden.
-         */}
-        {modus !== 'alles' && (
-          <div
-            data-lfh="palette-modus"
-            style={{
-              padding: `${token.paddingXS}px ${token.padding}px`,
-              fontSize: token.fontSizeSM,
-              color: token.colorTextSecondary,
-            }}
-          >
-            {PALETTE_MODI[modus].hinweis}
-          </div>
-        )}
         {vorschau?.vorschau ? (
           // DIE VORSCHAU (Taste →) ersetzt die Liste: 640 px tragen Liste und Lese-Ansicht nicht
           // nebeneinander. Der Fokus bleibt im Suchfeld. Nur LESEN, dasselbe Bauteil wie der
@@ -589,9 +655,17 @@ export function CommandPalette({
               <Button type="text" icon={<IconPfeilLinks />} onClick={zurueckZurListe}>
                 Zurück
               </Button>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{vorschau.label}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: schriftskala.text.groesse }}>
+                {vorschau.label}
+              </span>
               {vorschau.kontext && (
-                <span style={{ flexShrink: 0, fontSize: 11, color: farben.schwach }}>
+                <span
+                  style={{
+                    flexShrink: 0,
+                    fontSize: schriftskala.textKlein.groesse,
+                    color: farben.schwach,
+                  }}
+                >
                   {vorschau.kontext}
                 </span>
               )}
@@ -616,7 +690,7 @@ export function CommandPalette({
             style={{
               maxHeight: 'min(60vh, 480px)',
               overflowY: 'auto',
-              paddingBlock: token.paddingXS,
+              padding: token.paddingXS,
             }}
           >
             {sucheAktiv && flach.map((b) => optionsZeile(b))}
@@ -626,7 +700,9 @@ export function CommandPalette({
                 <div
                   style={{
                     ...augenbraueStil(farben.schwach),
-                    padding: `${token.paddingSM}px ${token.padding}px ${token.paddingXS}px`,
+                    // Bündig mit der Icon-Spalte der Zeilen; Luft nach oben trennt die Gruppen, die
+                    // Überschrift sitzt dicht über ihrer ersten Zeile.
+                    padding: `${token.paddingSM + token.paddingXS}px ${token.paddingSM}px ${token.paddingXXS}px`,
                   }}
                 >
                   {GRUPPEN_LABEL[x.gruppe]}
@@ -670,46 +746,47 @@ export function CommandPalette({
           data-lfh="palette-fuss"
           style={{
             display: 'flex',
+            alignItems: 'center',
             flexWrap: 'wrap',
-            columnGap: token.margin,
-            rowGap: token.paddingXS,
-            padding: `${token.paddingSM}px ${token.padding}px`,
+            columnGap: 12,
+            rowGap: 4,
+            padding: '6px 16px',
             borderTop: `1px solid ${token.colorBorderSecondary}`,
-            fontFamily: schrift.zahl,
-            fontSize: 10,
+            fontFamily: schrift.text,
+            fontSize: schriftskala.textKlein.groesse,
             color: farben.schwach,
           }}
         >
           <span style={hinweisStil}>
-            <Tastenkuerzel>↵</Tastenkuerzel>
+            <Tastenkuerzel style={tasteQuadrat}>↵</Tastenkuerzel>
             öffnen
           </span>
           <span style={hinweisStil}>
-            <Tastenkuerzel>{neuerTabKuerzel(userAgent)}</Tastenkuerzel>
+            <Tastenkuerzel style={tasteStil}>{neuerTabKuerzel(userAgent)}</Tastenkuerzel>
             neuer Tab
           </span>
           {vorschau ? (
             <span style={hinweisStil}>
-              <Tastenkuerzel>Esc</Tastenkuerzel>
+              <Tastenkuerzel style={tasteStil}>Esc</Tastenkuerzel>
               zurück
             </span>
           ) : (
             <>
               {vorschauVerfuegbar && (
                 <span style={hinweisStil}>
-                  <Tastenkuerzel>→</Tastenkuerzel>
+                  <Tastenkuerzel style={tasteQuadrat}>→</Tastenkuerzel>
                   Vorschau
                 </span>
               )}
-              {modiMitPraefix().map((m) => (
-                // Das Präfixzeichen als Marke: JSX verschluckt den Umbruch zwischen zwei Elementen, deshalb
-                // die Flex-Zeile mit `gap`.
-                <span key={m.modus} style={hinweisStil}>
-                  <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
-                  {m.legende}
-                </span>
-              ))}
-              {koordinatenSprung && <span>Koordinate → Lagekarte</span>}
+              {/* Die Präfixe als eigene Gruppe rechts: sie filtern, die übrigen Tasten handeln. */}
+              <span style={{ ...hinweisStil, gap: 12, marginInlineStart: 'auto' }}>
+                {modiMitPraefix().map((m) => (
+                  <span key={m.modus} style={hinweisStil} title={m.legende ?? undefined}>
+                    <Tastenkuerzel style={tasteQuadrat}>{m.praefix}</Tastenkuerzel>
+                    {m.kurz}
+                  </span>
+                ))}
+              </span>
             </>
           )}
         </div>

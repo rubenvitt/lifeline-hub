@@ -40,8 +40,8 @@ const rangKorpus: Befehl[] = [
   b('modul:etb', 'ETB', ['tagebuch'], 'module'),
   b(
     'aktion:personen',
-    'Neue Person erfassen',
-    ['registrieren', 'vermisst', 'betroffen', 'patient'],
+    'Person erfassen',
+    ['registrieren', 'vermisst', 'betroffen', 'patient', 'Neue Person erfassen'],
     'schnellaktionen',
   ),
 ];
@@ -235,11 +235,19 @@ describe('parsePraefix', () => {
       expect(parsePraefix(`${praefix}lage`), praefix).toEqual({ modus, rest: 'lage' });
     }
   });
+
+  /** Die einzeilige Fußzeile nennt jedes Präfix mit Kurzwort, der Langtext ist Tooltip (LFH-1055). */
+  it('führt zu jedem Präfix Kurzwort und Langtext', () => {
+    for (const { praefix, kurz, legende } of modiMitPraefix()) {
+      expect(kurz, praefix).toBeTruthy();
+      expect(legende, praefix).toBeTruthy();
+    }
+  });
 });
 
 const modusKorpus: Befehl[] = [
   b('aktion:speichern', 'Speichern', undefined, 'aktionen'),
-  b('schnell:person', 'Neue Person erfassen', undefined, 'schnellaktionen'),
+  b('schnell:person', 'Person erfassen', undefined, 'schnellaktionen'),
   b('modul:personen', 'Personen', undefined, 'module'),
   b('einstellung:dunkel', 'Dunkel', undefined, 'einstellungen'),
 ];

@@ -34,7 +34,7 @@ Ausführung, nicht beim Anzeigen eines Ziels.
 
 #### Scenario: Schnellaktion der Palette
 
-- **WHEN** eine Person in der Sprungpalette die Schnellaktion „Neuer ETB-Eintrag" ausführt
+- **WHEN** eine Person in der Sprungpalette die Schnellaktion „ETB-Eintrag schreiben" ausführt
 - **THEN** steht „ETB" danach als jüngster Eintrag in „Zuletzt besucht"
 
 #### Scenario: Ziel ohne Modul
