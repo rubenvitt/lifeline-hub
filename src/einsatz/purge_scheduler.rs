@@ -14,6 +14,9 @@
 //! - **Phase B** (IRREVERSIBEL): nach Ablauf der Karenz (`KARENZ_TAGE`) werden die
 //!   Personendaten gescrubbt (`repo::schwaerze_einsatz`), das operative Skelett
 //!   (Einsatz, ETB, Zähler) bleibt erhalten. `geschwaerzt_at`-Tombstone = Idempotenz.
+//! - **Nachlauf** (LFH-905): Anhänge geschwärzter Einsätze und Kategorien löscht jede
+//!   Schwärzung nach ihrem Commit einzeln, je Anhang eine Transaktion
+//!   (`anhang::repo::entferne_vorgesehene`); der Tick holt Reste nach.
 //! - **Phase C**: abgelaufene Einträge des Auth-Audits (eigene Frist, an keinem Einsatz).
 //! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
 //!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
@@ -193,6 +196,23 @@ pub async fn tick_mit_rueckschrieb(
         Err(e) => tracing::warn!("Purge Phase B: Abfrage fehlgeschlagen: {e}"),
     }
 
+    // --- Nachlauf: Anhänge geschwärzter Einsätze und Kategorien einzeln (LFH-905) ---
+    // Die Wege oben laufen ihren Einsatz schon selbst nach; hier fallen nur Reste an (Absturz
+    // oder Fehler zwischen atomarer Schwärzung und Nachlauf). Vor Phase D, deren Kaskade die
+    // Reste sonst in einer Transaktion löschte, und vor dem Rückschrieb.
+    let mut nachgelaufen = 0;
+    match crate::anhang::repo::entferne_vorgesehene(pool, None).await {
+        Ok(0) => {}
+        Ok(n) => {
+            tracing::warn!(
+                anzahl = n,
+                "Purge Nachlauf: verbliebene Anhänge geschwärzter Einsätze einzeln gelöscht"
+            );
+            nachgelaufen = n;
+        }
+        Err(e) => tracing::warn!("Purge Nachlauf fehlgeschlagen, nächster Tick versucht es: {e}"),
+    }
+
     // --- Phase C: abgelaufene Auth-Audit-Einträge (LFH-249/F30) ---
     // Die Audit-Spur trägt personenbezogene Daten (Benutzername, Quell-IP), hängt aber an
     // keinem Einsatz und damit an keiner Einsatz-Aufbewahrungsfrist. Ohne eigene Frist
@@ -238,7 +258,7 @@ pub async fn tick_mit_rueckschrieb(
 
     // --- Rückschrieb nach Schwärzung oder Löschung (LFH-725, LFH-750) ---
     // Nicht in jedem Tick: TRUNCATE hält beim Warten auf Lesende die Schreibsperre.
-    if geschwaerzt > 0 || geloescht > 0 || *rueckschrieb_ausstehend {
+    if geschwaerzt > 0 || geloescht > 0 || nachgelaufen > 0 || *rueckschrieb_ausstehend {
         match crate::db::wal_zurueckschreiben(pool).await {
             Ok(true) => {
                 if *rueckschrieb_ausstehend {
@@ -758,7 +778,7 @@ mod tests {
     /// der Registry mit-geschwärzt; ETB-Wortlaut + operatives Skelett bleiben, der Meldungs-Freitext
     /// geht seit LFH-701 mit (die Führungsdokumentation ist das ETB).
     /// Exerziert zugleich alle Generator-Pfade: SelbstId (Kopf), EinsatzId (NullSetzen),
-    /// Platzhalter (lage_meldung.text NOT NULL), ZeileLoeschen (anhang), UeberParent
+    /// Platzhalter (lage_meldung.text NOT NULL), ZeileLoeschen (Linker), UeberParent
     /// (gefahr_bewertung über gefahrengebiet).
     #[tokio::test]
     async fn phase_b_schwaerzt_neue_luecken_und_haelt_fuehrungsdoku() {
@@ -2117,6 +2137,185 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(geschwaerzt, None, "der Einsatz selbst ist nicht geschwärzt");
+    }
+
+    // ---------- LFH-905: Anhänge im Nachlauf, je Anhang eine Transaktion ----------
+
+    /// Größe je Anhang in den WAL-Tests: über der Schwelle des automatischen Checkpoints
+    /// (1000 Seiten ≈ 4 MB), damit er nach jedem Anhang greift und der WAL nicht schon an der
+    /// Schwelle stehen bleibt.
+    const NACHLAUF_ANHANG_BYTES: usize = 5_000_000;
+
+    fn wal_bytes(pfad: &std::path::Path) -> u64 {
+        let mut wal = pfad.as_os_str().to_owned();
+        wal.push("-wal");
+        std::fs::metadata(std::path::PathBuf::from(wal))
+            .map(|m| m.len())
+            .unwrap_or(0)
+    }
+
+    async fn anhang_mit_bytes(pool: &SqlitePool, einsatz: i64, daten: &[u8]) {
+        let b: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'l'")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'foto.jpg', 'image/jpeg', ?, 'x', ?, ?)",
+        )
+        .bind(einsatz)
+        .bind(daten.len() as i64)
+        .bind(daten)
+        .bind(b)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn anhaenge_von(pool: &SqlitePool, einsatz: i64) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// Spec `aufbewahrung`, „Entfernung der Datei-Inhalte in Einzelschritten“, Szenarien „Viele
+    /// Anhänge“ und „Anhänge anderer Einsätze bleiben“. Gemessen werden Bytes, nicht Zeit: Der
+    /// WAL ist die Schreibarbeit, die eine Transaktion unter der Sperre leistet. Mutationsprobe:
+    /// löscht die atomare Schwärzung die Anhänge wieder selbst, wächst der WAL dort auf die
+    /// Summe aller Anhänge; löscht der Nachlauf alle in einer Transaktion, ebenso.
+    #[tokio::test]
+    async fn nachlauf_haelt_jede_transaktion_auf_einen_anhang() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        for i in 0..6u8 {
+            anhang_mit_bytes(&pool, e, &vec![i + 1; NACHLAUF_ANHANG_BYTES]).await;
+        }
+        let anderer: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1, 'Anders', 'aktiv') \
+             RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        anhang_mit_bytes(&pool, anderer, b"bleibt").await;
+        assert!(crate::db::wal_zurueckschreiben(&pool).await.unwrap());
+        assert_eq!(wal_bytes(&pfad), 0, "Vorbedingung: WAL leer");
+
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        assert!(
+            wal_bytes(&pfad) < 1_000_000,
+            "der atomare Vorgang schreibt die Anhänge nicht ins WAL: {} Bytes",
+            wal_bytes(&pfad)
+        );
+        assert_eq!(
+            anhaenge_von(&pool, e).await,
+            7,
+            "Zeilen stehen bis zum Nachlauf"
+        );
+
+        assert_eq!(
+            crate::anhang::repo::entferne_vorgesehene(&pool, None)
+                .await
+                .unwrap(),
+            7
+        );
+        assert_eq!(anhaenge_von(&pool, e).await, 0);
+        assert_eq!(
+            anhaenge_von(&pool, anderer).await,
+            1,
+            "fremder Einsatz bleibt"
+        );
+        assert!(
+            wal_bytes(&pfad) < 2 * NACHLAUF_ANHANG_BYTES as u64,
+            "WAL wuchs über zwei Anhänge (eine Transaktion für mehrere?): {} Bytes",
+            wal_bytes(&pfad)
+        );
+    }
+
+    /// Szenario „Abbruch nach der atomaren Schwärzung“: die atomare Schwärzung steht, der
+    /// Nachlauf lief nie. Der nächste Tick löscht die Reste und schreibt danach zurück, obwohl
+    /// er selbst nichts schwärzt.
+    #[tokio::test]
+    async fn tick_holt_den_nachlauf_nach_einem_abbruch_nach() {
+        let (_dir, pfad, pool) = produktions_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        assert_eq!(anhaenge_von(&pool, e).await, 1);
+
+        tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:10:00")).await;
+
+        assert_eq!(anhaenge_von(&pool, e).await, 0);
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, ANHANG_KLARTEXT),
+            "Anhang-Bytes stehen noch in DB-Datei oder WAL"
+        );
+    }
+
+    /// Nach der atomaren Schwärzung sehen die Anhänge verwaist aus (kein Linker). Der
+    /// Verwaisten-Sweep darf sie trotzdem nicht in seinem einen `DELETE` nehmen, sonst kehrte die
+    /// lange Sperre zurück, sobald der Nachlauf einmal scheitert; sie gehören dem Nachlauf.
+    #[tokio::test]
+    async fn verwaisten_sweep_uebergeht_vorgesehene_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        let spaeter = Utc::now() + chrono::Duration::days(2);
+        assert_eq!(
+            crate::anhang::repo::sweep_verwaiste(&pool, spaeter)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(anhaenge_von(&pool, e).await, 1, "bleibt für den Nachlauf");
+    }
+
+    /// Szenario „Endgültige Löschung wartet auf den Nachlauf“: Phase D nimmt einen Einsatz mit
+    /// verbliebenen Anhängen nicht, sonst löschte die Kaskade sie in einer Transaktion.
+    #[tokio::test]
+    async fn phase_d_wartet_auf_den_nachlauf() {
+        let pool = crate::db::test_pool().await;
+        let e = faelliger_einsatz_mit_klartext(&pool).await;
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, skelett_dauer_tage) VALUES (1, 1) \
+             ON CONFLICT(org_id) DO UPDATE SET skelett_dauer_tage = excluded.skelett_dauer_tage",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(
+            repo::schwaerze_einsatz_atomar(&pool, e, "2026-03-01 12:00:00")
+                .await
+                .unwrap()
+        );
+        let spaeter = t("2026-06-01 12:00:00");
+        assert!(
+            skelett_loeschung::faellige(&pool, spaeter)
+                .await
+                .unwrap()
+                .is_empty(),
+            "Einsatz mit Anhängen ist nicht fällig"
+        );
+        crate::anhang::repo::entferne_vorgesehene(&pool, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            skelett_loeschung::faellige(&pool, spaeter).await.unwrap(),
+            vec![e]
+        );
     }
 
     /// Spec `aufbewahrung`, Szenario „Rückschrieb blockiert“: ein Lesender mit älterem Stand

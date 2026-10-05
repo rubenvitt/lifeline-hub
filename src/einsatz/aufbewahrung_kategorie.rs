@@ -458,7 +458,8 @@ pub async fn faellige_schwaerzung(
 
 /// IRREVERSIBLE Schwärzung einer Kategorie nach ihrer Karenz (Spec „Kategorie-Schwärzung“):
 /// Tombstone, Scrub der Kategorie aus der Registry, Personenstamm-Schritt (design.md D3) und
-/// ETB-Eintrag in EINER Transaktion. Idempotent über den Tombstone-Guard; `false` = nichts zu
+/// ETB-Eintrag in EINER Transaktion; Anhänge löscht danach der Nachlauf einzeln (LFH-905).
+/// Idempotent über den Tombstone-Guard; `false` = nichts zu
 /// tun (schon geschwärzt, Karenz läuft noch, Einsatz geschwärzt oder nicht abgeschlossen).
 pub async fn schwaerzen(
     pool: &SqlitePool,
@@ -552,6 +553,10 @@ pub async fn schwaerzen(
         kategorie = kategorie.as_str(),
         "Purge Phase K2 abgeschlossen: Datenkategorie geschwärzt"
     );
+    // Die Anhänge löscht der Nachlauf einzeln nach dem Commit (LFH-905).
+    if kategorie == Datenkategorie::Anhaenge {
+        super::repo::anhaenge_nachlaufen(pool, einsatz_id).await;
+    }
     Ok(true)
 }
 

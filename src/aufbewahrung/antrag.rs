@@ -534,10 +534,11 @@ pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64
 }
 
 /// Vollzieht einen fälligen Antrag (LFH-751) — Scrub, Kennzeichen und ETB-Eintrag in EINER
-/// Transaktion. `Ok(true)`, wenn etwas geschwärzt wurde (der Aufrufer schreibt dann den WAL
-/// zurück), `Ok(false)`, wenn der Antrag nicht (mehr) offen und fällig ist oder der Einsatz
-/// schon geschwärzt war (dann nur das Kennzeichen samt Eintrag). Ein Fehler rollt alles zurück;
-/// der nächste Lauf versucht es erneut.
+/// Transaktion; die Anhänge eines geschwärzten Einsatzes löscht danach der Nachlauf einzeln
+/// (LFH-905, `einsatz::repo::schwaerze_einsatz`). `Ok(true)`, wenn etwas geschwärzt wurde
+/// (der Aufrufer schreibt dann den WAL zurück), `Ok(false)`, wenn der Antrag nicht (mehr)
+/// offen und fällig ist oder der Einsatz schon geschwärzt war (dann nur das Kennzeichen samt
+/// Eintrag). Ein Fehler rollt alles zurück; der nächste Lauf versucht es erneut.
 ///
 /// ETB-Erfasser ist die Person, die den Antrag gestellt hat (FK, nie gelöscht), ersatzweise
 /// die Akteurskette des Purge-Laufs.
@@ -565,7 +566,7 @@ pub async fn vollziehen_ergebnis(
         return Ok(Vollzug::Nichts);
     };
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
-    crate::write_retry!(pool, |conn| {
+    let vollzug = crate::write_retry!(pool, |conn| {
         let zeile: Option<AntragZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "UPDATE schwaerzung_antrag SET vollzogen_at = ?1 \
              WHERE id = ?2 AND zurueckgenommen_at IS NULL AND vollzogen_at IS NULL \
@@ -661,7 +662,12 @@ pub async fn vollziehen_ergebnis(
         )
         .await?;
         Ok(geaendert)
-    })
+    })?;
+    // Nachlauf nach dem Commit (LFH-905): die Anhänge des Einsatzes einzeln.
+    if let Vollzug::Einsatz(einsatz_id) = vollzug {
+        crate::einsatz::repo::anhaenge_nachlaufen(pool, einsatz_id).await;
+    }
+    Ok(vollzug)
 }
 
 /// Was ein Vollzug geschwärzt hat.

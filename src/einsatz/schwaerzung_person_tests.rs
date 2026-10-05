@@ -107,7 +107,10 @@ fn befund_markierungen(bezuege: &[PersonenBezug]) -> Vec<String> {
                 befund.push(format!("{}.{spalte} doppelt markiert", b.tabelle));
             }
             match klassifikation_von(b.tabelle, spalte) {
-                Some(Klassifikation::Scrub(Strategie::ZeileLoeschen, _)) => befund.push(format!(
+                Some(Klassifikation::Scrub(
+                    Strategie::ZeileLoeschen | Strategie::ZeileEinzelnLoeschen,
+                    _,
+                )) => befund.push(format!(
                     "{}.{spalte}: ZeileLoeschen gehört nicht in einen Personen-Scrub",
                     b.tabelle
                 )),

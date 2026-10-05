@@ -7,7 +7,9 @@
 //! mehr; das räumt [`bereinige_altbestand_einmalig`] beim Serverstart.
 //!
 //! Herleitung und Messung:
-//! `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
+//! `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`;
+//! die Schreibsperre der Schwärzung bei vielen Anhängen (Nachlauf je Anhang, LFH-905):
+//! `openspec/changes/archive/2026-10-05-lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`.
 
 use sqlx::SqlitePool;
 
@@ -187,13 +189,23 @@ mod tests {
         assert!(datei_oder_wal_enthaelt(&pfad, zweiter));
     }
 
-    /// Messung OFF gegen ON (LFH-725, `design.md`, Entscheidung 5). Nicht Teil der Suite:
+    /// Messung OFF gegen ON (LFH-725, `design.md`, Entscheidung 5) und Nachlauf je Anhang
+    /// (LFH-905, Modus `ON-einzeln`). Nicht Teil der Suite:
     /// `cargo test --release --lib secure_delete_messung -- --ignored --nocapture`.
     /// Anhangsgrößen in MB über `LFH725_MB` (Vorgabe `50,500`).
-    #[tokio::test]
+    ///
+    /// Während Schwärzung und Rückschrieb schreibt eine zweite Verbindung fortlaufend kurze
+    /// Transaktionen wie ein laufender Einsatz; `warten max` ist ihre längste Wartezeit, also die
+    /// Schreibsperre, die andere Einsätze spüren. Der Pool läuft wie in Produktion mit dem
+    /// automatischen Checkpoint (LFH-725 maß ohne, um die WAL-Größe zu zeigen); `WAL` ist deshalb
+    /// der höchste Stand der Datei, nicht die Summe.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[ignore]
     async fn secure_delete_messung() {
-        use std::time::Instant;
+        use sqlx::Connection;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        use std::time::{Duration, Instant};
 
         fn zufall(n: usize, mut x: u64) -> Vec<u8> {
             let mut v = Vec::with_capacity(n);
@@ -217,20 +229,20 @@ mod tests {
             .collect();
 
         for &anhang_mb in &groessen {
-            for modus in ["OFF", "ON"] {
+            for modus in ["OFF", "ON", "ON-einzeln"] {
+                let einzeln = modus == "ON-einzeln";
                 let dir = tempfile::tempdir().unwrap();
                 let pfad = dir.path().join("mess.db");
                 let wal = dir.path().join("mess.db-wal");
+                let optionen = SqliteConnectOptions::new()
+                    .filename(&pfad)
+                    .create_if_missing(true)
+                    .journal_mode(SqliteJournalMode::Wal)
+                    .busy_timeout(Duration::from_secs(120))
+                    .pragma("secure_delete", if einzeln { "ON" } else { modus });
                 let pool = SqlitePoolOptions::new()
                     .max_connections(1)
-                    .connect_with(
-                        SqliteConnectOptions::new()
-                            .filename(&pfad)
-                            .create_if_missing(true)
-                            .journal_mode(SqliteJournalMode::Wal)
-                            .pragma("wal_autocheckpoint", "0")
-                            .pragma("secure_delete", modus),
-                    )
+                    .connect_with(optionen.clone())
                     .await
                     .unwrap();
                 for ddl in [
@@ -251,7 +263,6 @@ mod tests {
                         .unwrap();
                 }
                 let anhaengen = t.elapsed();
-                let anhaengen_wal = std::fs::metadata(&wal).unwrap().len();
                 assert!(wal_zurueckschreiben(&pool).await.unwrap());
 
                 // Bestand für die Schwärzung: 2000 Personen, Anhänge zu je 1 MB.
@@ -272,18 +283,65 @@ mod tests {
                 }
                 assert!(wal_zurueckschreiben(&pool).await.unwrap());
 
-                // Last 2: Schwärzung als eine Transaktion; ihre Dauer ist die Schreibsperre.
+                // Ein laufender Einsatz schreibt nebenher; gemessen wird seine längste Wartezeit.
+                let stopp = Arc::new(AtomicBool::new(false));
+                let schreiber = {
+                    let stopp = stopp.clone();
+                    let mut conn = sqlx::SqliteConnection::connect_with(&optionen)
+                        .await
+                        .unwrap();
+                    tokio::spawn(async move {
+                        let mut max = Duration::ZERO;
+                        while !stopp.load(Ordering::Relaxed) {
+                            let t = Instant::now();
+                            sqlx::query("BEGIN IMMEDIATE")
+                                .execute(&mut conn)
+                                .await
+                                .unwrap();
+                            sqlx::query("INSERT INTO etb (inhalt) VALUES ('laufend')")
+                                .execute(&mut conn)
+                                .await
+                                .unwrap();
+                            sqlx::query("COMMIT").execute(&mut conn).await.unwrap();
+                            max = max.max(t.elapsed());
+                            tokio::time::sleep(Duration::from_millis(20)).await;
+                        }
+                        max
+                    })
+                };
+                tokio::time::sleep(Duration::from_millis(100)).await;
+
+                // Last 2: Schwärzung. Eine Transaktion (OFF, ON), oder atomar ohne Anhänge und
+                // danach je Anhang eine Transaktion (ON-einzeln).
                 let t = Instant::now();
                 let mut tx = pool.begin().await.unwrap();
                 sqlx::query("UPDATE person SET name = NULL, notiz = NULL")
                     .execute(&mut *tx)
                     .await
                     .unwrap();
-                sqlx::query("DELETE FROM anhang")
-                    .execute(&mut *tx)
-                    .await
-                    .unwrap();
+                if !einzeln {
+                    sqlx::query("DELETE FROM anhang")
+                        .execute(&mut *tx)
+                        .await
+                        .unwrap();
+                }
                 tx.commit().await.unwrap();
+                let mut laengste = t.elapsed();
+                if einzeln {
+                    let ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM anhang")
+                        .fetch_all(&pool)
+                        .await
+                        .unwrap();
+                    for id in ids {
+                        let t1 = Instant::now();
+                        sqlx::query("DELETE FROM anhang WHERE id = ?")
+                            .bind(id)
+                            .execute(&pool)
+                            .await
+                            .unwrap();
+                        laengste = laengste.max(t1.elapsed());
+                    }
+                }
                 let schwaerzen = t.elapsed();
                 let schwaerzen_wal = std::fs::metadata(&wal).unwrap().len();
 
@@ -292,15 +350,19 @@ mod tests {
                 assert!(wal_zurueckschreiben(&pool).await.unwrap());
                 let rueckschrieb = t.elapsed();
 
+                stopp.store(true, Ordering::Relaxed);
+                let warten = schreiber.await.unwrap();
+
                 println!(
-                    "anhang={anhang_mb} MB secure_delete={modus}: \
-                     anhaengen {:.2} s / WAL {:.1} MB | schwaerzen {:.2} s / WAL {:.1} MB | \
-                     rueckschrieb {:.2} s",
+                    "anhang={anhang_mb} MB modus={modus}: anhaengen {:.2} s | \
+                     schwaerzen {:.2} s (laengste Tx {:.2} s) / WAL {:.1} MB | \
+                     rueckschrieb {:.2} s | warten max {:.2} s",
                     anhaengen.as_secs_f64(),
-                    mb(anhaengen_wal),
                     schwaerzen.as_secs_f64(),
+                    laengste.as_secs_f64(),
                     mb(schwaerzen_wal),
                     rueckschrieb.as_secs_f64(),
+                    warten.as_secs_f64(),
                 );
                 pool.close().await;
             }
