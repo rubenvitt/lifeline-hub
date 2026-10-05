@@ -6,6 +6,7 @@ import {
   TASTATUR_AKTIONEN,
   TASTATUR_AKTION_REIHENFOLGE,
 } from './befehle';
+import { filtereBefehle, ordneTreffer } from './fuzzy';
 import { GRUPPEN_REIHENFOLGE } from './typen';
 import type { BefehlKontext } from './typen';
 import type { BenutzerAnzeige, EinsatzAnzeige, Koordinatenformat } from '../api/types';
@@ -151,6 +152,34 @@ describe('baueBefehle — Schnellaktionen', () => {
       expect(k.navigate).toHaveBeenCalledWith(ziel);
     }
   });
+  /**
+   * LFH-1055: Schnellaktionen tragen Icon und Namen des Trägermoduls, die Beschriftung heißt
+   * Objekt + Verb. Wer die alte Beschriftung („Neuer ETB-Eintrag“) gewohnt ist, findet sie weiter.
+   */
+  it('zeigt Icon und Namen des Trägermoduls und heißt Objekt + Verb (LFH-1055)', () => {
+    const b = baueBefehle(kontext());
+    const etb = b.find((x) => x.id === 'aktion:etb')!;
+    const modulEtb = b.find((x) => x.id === 'modul:etb')!;
+    expect(etb.label).toBe('ETB-Eintrag schreiben');
+    expect(etb.kontext).toBe(modulEtb.label);
+    expect(etb.icon).toBe(modulEtb.icon);
+    expect(b.find((x) => x.id === 'aktion:personen')!.label).toBe('Person erfassen');
+  });
+  it.each([
+    ['neuer etb', 'aktion:etb'],
+    ['neue person', 'aktion:personen'],
+    ['neue unfallhilfsstelle', 'aktion:unfallhilfsstellen'],
+    ['neuen schaden', 'aktion:schaeden'],
+    ['neues tier', 'aktion:tiere'],
+    ['neuen bereitstellungsraum', 'aktion:bereitstellungsraeume'],
+    ['neuen einsatzabschnitt', 'aktion:einsatzabschnitte'],
+  ])(
+    'die alte Beschriftung „%s“ findet die Schnellaktion als ersten Treffer (LFH-1055)',
+    (q, id) => {
+      const b = baueBefehle(kontext());
+      expect(ordneTreffer(filtereBefehle(b, q), q)[0]?.id).toBe(id);
+    },
+  );
   /**
    * „Gefahrengebiet zeichnen“ (LFH-825, Spec `sprungpalette`): Träger ist die Lagekarte, nicht
    * das Modul Gefahren — gezeichnet wird auf der Karte, und das Paneel dort fragt die

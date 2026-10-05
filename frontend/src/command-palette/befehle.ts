@@ -9,7 +9,6 @@ import {
   IconPerson,
   IconPfeileAuswaerts,
   IconPfeileEinwaerts,
-  IconPlus,
   IconSonne,
   IconZahnrad,
   type Icon,
@@ -85,6 +84,7 @@ export const SCHNELLAKTIONEN: {
    */
   kennung?: string;
   pfad: (einsatzId: number) => string;
+  /** Objekt + Verb (LFH-1055); die frühere Beschriftung steht als letztes Schlagwort. */
   label: string;
   schlagworte: string[];
 }[] = [
@@ -92,29 +92,29 @@ export const SCHNELLAKTIONEN: {
     modulKey: 'personen',
     parameter: 'neu',
     pfad: (id) => personenPfad(id, { neu: true }),
-    label: 'Neue Person erfassen',
-    schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient'],
+    label: 'Person erfassen',
+    schlagworte: ['registrieren', 'vermisst', 'betroffen', 'patient', 'Neue Person erfassen'],
   },
   {
     modulKey: 'etb',
     parameter: 'neu',
     pfad: (id) => etbPfad(id, { neu: true }),
-    label: 'Neuer ETB-Eintrag',
-    schlagworte: ['tagebuch', 'meldung', 'eintrag'],
+    label: 'ETB-Eintrag schreiben',
+    schlagworte: ['tagebuch', 'meldung', 'eintrag', 'Neuer ETB-Eintrag'],
   },
   {
     modulKey: 'unfallhilfsstellen',
     parameter: 'neu',
     pfad: (id) => unfallhilfsstellenListePfad(id, { neu: true }),
-    label: 'Neue Unfallhilfsstelle',
-    schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage'],
+    label: 'Unfallhilfsstelle anlegen',
+    schlagworte: ['uhs', 'behandlungsplatz', 'patientenablage', 'Neue Unfallhilfsstelle'],
   },
   {
     modulKey: 'schaeden',
     parameter: 'neu',
     pfad: (id) => schaedenPfad(id, { neu: true }),
-    label: 'Neuen Schaden erfassen',
-    schlagworte: ['schaden', 'objekt'],
+    label: 'Schaden erfassen',
+    schlagworte: ['schaden', 'objekt', 'Neuen Schaden erfassen'],
   },
   {
     // Ans ENDE: eine Lagebesprechung fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden.
@@ -140,22 +140,34 @@ export const SCHNELLAKTIONEN: {
     modulKey: 'tiere',
     parameter: 'neu',
     pfad: (id) => tierePfad(id, { neu: true }),
-    label: 'Neues Tier erfassen',
-    schlagworte: ['tier', 'hund', 'katze', 'haustier', 'nutztier'],
+    label: 'Tier erfassen',
+    schlagworte: ['tier', 'hund', 'katze', 'haustier', 'nutztier', 'Neues Tier erfassen'],
   },
   {
     modulKey: 'bereitstellungsraeume',
     parameter: 'neu',
     pfad: (id) => bereitstellungsraeumeListePfad(id, { neu: true }),
-    label: 'Neuen Bereitstellungsraum anlegen',
-    schlagworte: ['br', 'bereitstellung', 'sammelraum', 'kräfte'],
+    label: 'Bereitstellungsraum anlegen',
+    schlagworte: [
+      'br',
+      'bereitstellung',
+      'sammelraum',
+      'kräfte',
+      'Neuen Bereitstellungsraum anlegen',
+    ],
   },
   {
     modulKey: 'einsatzabschnitte',
     parameter: 'neu',
     pfad: (id) => einsatzabschnittePfad(id, { neu: true }),
-    label: 'Neuen Einsatzabschnitt anlegen',
-    schlagworte: ['abschnitt', 'unterabschnitt', 'gliederung', 'ea'],
+    label: 'Einsatzabschnitt anlegen',
+    schlagworte: [
+      'abschnitt',
+      'unterabschnitt',
+      'gliederung',
+      'ea',
+      'Neuen Einsatzabschnitt anlegen',
+    ],
   },
   {
     // Ans ENDE (LFH-825): eine neue Zeile ordnet die Bestandszeilen nicht um. Leser:
@@ -386,7 +398,9 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
           id: `aktion:${a.kennung ?? a.modulKey}`,
           gruppe: 'schnellaktionen',
           label: a.label,
-          icon: IconPlus,
+          // Das Icon und der Name des Trägermoduls: die Zeile sagt ohne Lesen, WO sie landet.
+          kontext: m.label,
+          icon: m.icon,
           schlagworte: a.schlagworte,
           // Gemerkt wird das MODUL der Aktion (LFH-436): ein Griff, ein Modul.
           ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(a.modulKey)),

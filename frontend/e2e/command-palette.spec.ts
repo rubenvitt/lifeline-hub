@@ -135,6 +135,15 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
   // in den darunterliegenden Drawer.
   await expect(palette).toBeFocused();
   await expect(page.locator(':focus-visible')).toHaveAttribute('placeholder', /Suchen: Module/);
+  // Die Tab-Kette erst prüfen, wenn das Einblenden durch ist (LFH-1055). Die Fokusfalle der
+  // Palette greift erst einige Effekte nach dem Autofokus; bis dahin hält die Falle des Drawers,
+  // holt den Fokus kurz zu sich (Feld → Drawer-Schließen → Feld), und am Ende der Animation setzt
+  // der Dialog ihn ggf. auf seinen Rahmen. Ein Tab in diesem Fenster landete unter Last im
+  // Drawer und kam nie in der Liste an.
+  await expect(page.locator('.ant-modal').filter({ has: palette })).not.toHaveClass(
+    /ant-zoom-(appear|enter)/,
+  );
+  await expect(palette).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(palette).not.toBeFocused();
   await expect(paletteDialog.locator(':focus-visible')).toBeVisible();
@@ -153,7 +162,7 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
 });
 
-test('Schnellaktion „Neue Person" navigiert und öffnet die Schnellerfassung (Schnellaktionen)', async ({
+test('Schnellaktion „Person erfassen" navigiert und öffnet die Schnellerfassung (Schnellaktionen)', async ({
   page,
 }) => {
   await anmelden(page);
@@ -162,9 +171,10 @@ test('Schnellaktion „Neue Person" navigiert und öffnet die Schnellerfassung (
 
   await page.keyboard.press('Control+k');
   await expect(paletteInput(page)).toBeVisible();
+  // Die frühere Beschriftung bleibt Schlagwort (LFH-1055).
   await paletteInput(page).fill('Neue Person');
   // Verankert: am Ende steht auch „Adresse auf Lagekarte suchen · „Neue Person““ (LFH-638).
-  await page.getByRole('option', { name: /^Neue Person/ }).click();
+  await page.getByRole('option', { name: /^Person erfassen/ }).click();
 
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/personen`));
   await expect(page.getByRole('dialog', { name: 'Schnellerfassung' })).toBeVisible();
@@ -311,4 +321,88 @@ test('„Status setzen“ öffnet das Statusmenü der Fokuszeile UND legt den Fo
   await menue.getByRole('menuitem', { name: ziel.label, exact: true }).click();
   await expect(ausloeser(2)).toContainText(ziel.label);
   await expect(ausloeser(1)).toContainText(start.label);
+});
+
+/*
+ * ── Suchfeld und Fußzeile (LFH-1055) ────────────────────────────────────────────────
+ *
+ * Was jsdom nicht kann: Chromium schickt nach Layoutwechseln Mausereignisse an einen RUHENDEN
+ * Zeiger, und die Bearbeitungstasten wirken nur im echten Feld. Die Fußzeilenhöhe hängt an
+ * Schrift und Breite.
+ */
+async function oeffnePalette(page: Page) {
+  await expect(async () => {
+    if (!(await paletteInput(page).isVisible())) await page.keyboard.press('Control+k');
+    await expect(paletteInput(page)).toBeFocused({ timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
+}
+
+function feldZustand(page: Page) {
+  return paletteInput(page).evaluate((el: HTMLInputElement) => ({
+    wert: el.value,
+    start: el.selectionStart,
+    ende: el.selectionEnd,
+    fokus: document.activeElement === el,
+  }));
+}
+
+test('ein ruhender Zeiger über der Liste stiehlt die Markierung nicht (LFH-1055)', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await anmelden(page);
+  const id = await einsatzAnlegen(page, `E2E Zeiger ${Date.now()}`);
+  await zumModul(page, id, 'etb');
+  await oeffnePalette(page);
+
+  // Der Zeiger steht mitten über der Liste, wie nach einem Klick; danach bewegt er sich nicht.
+  const liste = (await page.getByRole('listbox').boundingBox())!;
+  await page.mouse.move(liste.x + liste.width / 2, liste.y + liste.height / 2);
+  await paletteInput(page).pressSequentially('hell', { delay: 40 });
+
+  await expect(page.getByRole('option').first()).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[role="option"][aria-selected="true"]')).toHaveCount(1);
+});
+
+test('Strg+Rücktaste löscht ein Wort, Strg/⌘+A markiert den Begriff (LFH-1055)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await oeffnePalette(page);
+
+  await paletteInput(page).fill('einsatz tage');
+  await paletteInput(page).press('Control+Backspace');
+  expect(await feldZustand(page)).toMatchObject({ wert: 'einsatz ', fokus: true });
+  await expect(paletteInput(page)).toBeVisible();
+
+  await paletteInput(page).fill('einsatz tage');
+  await paletteInput(page).press('ControlOrMeta+a');
+  expect(await feldZustand(page)).toEqual({
+    wert: 'einsatz tage',
+    start: 0,
+    ende: 12,
+    fokus: true,
+  });
+});
+
+test('die Fußzeile bleibt bei 1440 px in jeder Dichte einzeilig (LFH-1055)', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await anmelden(page);
+  for (const [label, stufe] of [
+    ['Dichte: Kompakt', 'kompakt'],
+    ['Dichte: Komfortabel', 'komfortabel'],
+    ['Dichte: Handschuh', 'handschuh'],
+  ] as const) {
+    await oeffnePalette(page);
+    await paletteInput(page).fill(label);
+    await page.getByRole('option', { name: label }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', stufe);
+
+    await oeffnePalette(page);
+    const fuss = page.locator('[data-lfh="palette-fuss"]');
+    // Eine Zeile Tastenmarken (16 px) plus 2 × 6 px Polsterung und Rand; zwei Zeilen lägen über 50.
+    expect((await fuss.boundingBox())!.height, stufe).toBeLessThanOrEqual(36);
+    await page.keyboard.press('Escape');
+    await expect(paletteInput(page)).toBeHidden();
+  }
 });
