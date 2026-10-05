@@ -1470,6 +1470,32 @@ describe('LageDashboardPage — Modulgrenze des Lagebilds (LFH-669)', () => {
     expect(within(box).queryByText('Daten nicht abrufbar')).toBeNull();
     expect(within(box).queryByRole('button')).toBeNull();
   });
+
+  it('Kräfte hängen nur an Personal und Einheiten (LFH-887): gesperrte Fahrzeuge zeigen die Stärke', async () => {
+    const abrufe: Record<string, number> = {};
+    const freigabenGeliefert = { n: 0 };
+    mockEndpunkte({
+      abrufe,
+      freigabenGeliefert,
+      personal: [
+        { id: 1, name: 'A', staerke_position: 'fuehrer', status_kategorie: 'verfuegbar' },
+        { id: 2, name: 'B', staerke_position: 'mannschaft', status_kategorie: 'verfuegbar' },
+      ],
+      freigaben: {
+        fahrzeuge: { zugriff: false },
+        material: { zugriff: false },
+        einsatzabschnitte: { zugriff: false },
+      },
+    });
+    render();
+    await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
+    const kraefte = await kennzahlGeladen('Kräfte');
+    expect(wert(kraefte)).toBe('2');
+    expect(kraefte).toHaveTextContent('1/0/1//2');
+    expect(kraefte).not.toHaveTextContent('nicht freigegeben');
+    expect(abrufe.fahrzeuge).toBeUndefined();
+    expect(abrufe.material).toBeUndefined();
+  });
 });
 
 describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {

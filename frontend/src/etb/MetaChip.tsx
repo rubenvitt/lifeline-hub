@@ -3,6 +3,7 @@ import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
+import { serverJetzt } from '../offline/serveruhr';
 import { useState } from 'react';
 import type { MeldeWeg } from '../api/types';
 import { MELDEWEG_OPTIONEN, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
@@ -179,7 +180,10 @@ export default function MetaChip({
         ref={fokusOhneRollen}
         aria-label={d.label}
         disabled={gesperrt}
-        defaultValue={dayjs.isDayjs(wert) ? wert : dayjs()}
+        // Der Vorschlag kommt von derselben Uhr wie die Vorgabe ohne Chip, sonst lieferten „Chip
+        // öffnen, OK“ und „Chip weglassen“ zwei Zeiten (LFH-895, `frontend/src/offline/AGENTS.md`,
+        // „Schreiben ohne Netz“).
+        defaultValue={dayjs.isDayjs(wert) ? wert : serverJetzt()}
         onOk={(v) => {
           if (v) onCommit(feld, v);
         }}

@@ -60,6 +60,13 @@ import '../../theme/sprache.css';
  * Die tragende Aussage einer Notiz steht deshalb vorn. Herleitung:
  * `openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`.
  *
+ * HANDSCHUH UNTER `md` (LFH-883): die Polsterung `paddingLG` (44 px) lässt auf 390 px eine
+ * Textspalte von rund 94 px (kompakt 146, komfortabel 126). Darin bricht eine Augenbraue wie
+ * „Schäden offen“ zweizeilig um und die Pegel-Notiz dreizeilig, die Platzhalter aber tragen eine
+ * Zeile Augenbraue und „wird abgerufen“: die Reihen wuchsen mit den Daten um 13 bzw. 16 px. In
+ * dieser Stufe hält das Band deshalb zwei Zeilen Augenbraue und eine Notizzeile mehr als
+ * `notizZeilenSchmal` (`sprache.css`, an `[data-dichte]`, damit der Platz vom ersten Bild an steht).
+ *
  * ── STATUSPUNKT ────────────────────────────────────────────────────────────────────
  *
  * `punkt` setzt ein 8-px-Quadrat in der Tonfarbe VOR die Augenbraue — die Kachel benennt damit
@@ -287,10 +294,10 @@ export function Kennzahl({
               background: punktFarbe(rollen, punkt, zustand),
             }}
           />
-          <Augenbraue>{titel}</Augenbraue>
+          <Augenbraue className="lfh-kennzahl__titel">{titel}</Augenbraue>
         </span>
       ) : (
-        <Augenbraue>{titel}</Augenbraue>
+        <Augenbraue className="lfh-kennzahl__titel">{titel}</Augenbraue>
       )}
       <span style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS }}>
         <span
@@ -303,8 +310,10 @@ export function Kennzahl({
         >
           {zahl}
         </span>
+        {/* `lineHeight: 1` wie die Zahl: mit der normalen Zeilenhöhe ragte die Einheit an der
+            Grundlinie über die Zahl hinaus, und die Zeile wuchs mit den Daten um 1 px (LFH-883). */}
         {einheit != null && zustand === 'daten' && (
-          <span style={{ ...monoStil(12), color: rollen.schwach }}>{einheit}</span>
+          <span style={{ ...monoStil(12), lineHeight: 1, color: rollen.schwach }}>{einheit}</span>
         )}
       </span>
       {aufgliederung != null && zustand === 'daten' && (

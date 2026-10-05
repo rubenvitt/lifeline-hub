@@ -769,6 +769,10 @@ pub async fn zaehle(
 /// Leerzeichen verbunden (FTS5 = implizites UND). Verhindert Syntaxfehler bei
 /// Sonderzeichen wie `:`, `*`, `AND`.
 ///
+/// Jede Phrase trägt ein Präfix-`*`: die Suche trifft Wortanfänge („Deich“ →
+/// „Deichbruch“), keine Wortmitten (LFH-880, Spec `etb-volltextsuche`). FTS5 wendet
+/// das `*` auf das letzte Token der Phrase an (`"B-1"*` → `b` gefolgt von `1…`).
+///
 /// Tokens ohne alphanumerische Zeichen (z.B. `*`, `:`) werden verworfen: sie
 /// würden nach dem Quoten zu einer leeren Phrase, die FTS5 als Syntaxfehler
 /// ablehnt. Enthält die Eingabe nur solche Tokens, ist das Ergebnis ein leerer
@@ -777,7 +781,7 @@ fn fts_query(eingabe: &str) -> String {
     eingabe
         .split_whitespace()
         .filter(|t| t.chars().any(|c| c.is_alphanumeric()))
-        .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
+        .map(|t| format!("\"{}\"*", t.replace('"', "\"\"")))
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -1409,6 +1413,92 @@ mod tests {
         let e = anlegen(&pool, einsatz, benutzer, d).await.unwrap();
         assert_eq!(e.von.as_deref(), Some("Florian 1"));
         assert_eq!(e.an.as_deref(), Some("System"));
+    }
+
+    /// LFH-880: Die Suche trifft Wortanfänge („Deich“ → „Deichbruch“), aber keine Wortmitte.
+    #[tokio::test]
+    async fn suche_trifft_wortanfaenge_nicht_wortmitten() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        for inhalt in ["Deichbruch gemeldet", "Deich hält", "Funkgerät defekt"] {
+            anlegen(&pool, einsatz, benutzer, daten(inhalt))
+                .await
+                .unwrap();
+        }
+        let treffer = |q: &str| {
+            let mut f = filter();
+            f.q = Some(q.into());
+            let pool = pool.clone();
+            async move {
+                let mut inhalte: Vec<String> = abfrage(&pool, einsatz, &f)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|e| e.inhalt)
+                    .collect();
+                inhalte.sort();
+                inhalte
+            }
+        };
+
+        assert_eq!(
+            treffer("Deich").await,
+            ["Deich hält", "Deichbruch gemeldet"]
+        );
+        assert_eq!(treffer("funk").await, ["Funkgerät defekt"]);
+        assert_eq!(treffer("Deich gem").await, ["Deichbruch gemeldet"]);
+        assert!(treffer("bruch").await.is_empty(), "Wortmitte trifft nicht");
+    }
+
+    /// LFH-880: Liste und beide Zählungen legen zur Wortanfangssuche dieselbe Menge zugrunde.
+    #[tokio::test]
+    async fn wortanfangssuche_liste_und_zaehlungen_deckungsgleich() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        for inhalt in [
+            "Deichbruch gemeldet",
+            "Deich hält",
+            "Deichverteidigung",
+            "Lage ruhig",
+        ] {
+            anlegen(&pool, einsatz, benutzer, daten(inhalt))
+                .await
+                .unwrap();
+        }
+        let mut f = filter();
+        f.q = Some("Deich".into());
+
+        let liste = abfrage(&pool, einsatz, &f).await.unwrap().len() as i64;
+        let gesamt = anzahl(&pool, einsatz, &f.merkmale()).await.unwrap();
+        let je_typ: i64 = zaehle(&pool, einsatz, &f.merkmale())
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|(_, n)| n)
+            .sum();
+        assert_eq!((liste, gesamt, je_typ), (3, 3, 3));
+    }
+
+    /// Eine Eingabe nur aus Sonderzeichen filtert nichts — auch mit Präfixsuche nicht (LFH-880).
+    #[tokio::test]
+    async fn suche_nur_aus_sonderzeichen_filtert_nicht() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        for inhalt in ["eins", "zwei"] {
+            anlegen(&pool, einsatz, benutzer, daten(inhalt))
+                .await
+                .unwrap();
+        }
+        let mut f = filter();
+        f.q = Some("* : \"\"".into());
+        assert_eq!(abfrage(&pool, einsatz, &f).await.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn fts_query_setzt_praefix_je_wort() {
+        assert_eq!(fts_query("Deich Nord"), "\"Deich\"* \"Nord\"*");
+        assert_eq!(fts_query("sag \"hi\""), "\"sag\"* \"\"\"hi\"\"\"*");
+        assert_eq!(fts_query("* :"), "");
     }
 
     #[tokio::test]

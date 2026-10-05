@@ -1,4 +1,4 @@
-import type { AppCode, AuthProvider, BenutzerAnzeige } from './types';
+import type { AppCode, AuthProvider, BenutzerAnzeige, MeAntwort } from './types';
 import { apiGet, apiSend } from './client';
 
 /** Schmale Antwort auf `POST /api/auth/login`, wenn TOTP als zweiter Faktor aktiv ist: KEIN
@@ -23,8 +23,9 @@ export function logout(): Promise<void> {
   return apiSend<void>('/api/auth/logout', 'POST');
 }
 
-export function me(): Promise<BenutzerAnzeige> {
-  return apiGet<BenutzerAnzeige>('/api/auth/me');
+/** Der angemeldete Benutzer; eine Gerätesitzung (LFH-892) trägt zusätzlich `geraet`. */
+export function me(): Promise<MeAntwort> {
+  return apiGet<MeAntwort>('/api/auth/me');
 }
 
 /** Lädt die aktiven Auth-Provider für die Login-UI (serverseitig auf `aktiviert==true`

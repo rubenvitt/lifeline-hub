@@ -6,7 +6,8 @@ import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { useEffect } from 'react';
-import dayjs from 'dayjs';
+import type dayjs from 'dayjs';
+import { serverJetzt } from '../offline/serveruhr';
 import type {
   Einheit,
   Einsatzabschnitt,
@@ -128,8 +129,9 @@ export default function MeldungFormular({
       meldungsart: w.meldungsart,
       prioritaet: w.prioritaet,
       richtung: w.richtung,
-      // Ereigniszeit Pflicht: leer ⇒ jetzt (Funk-Realität: meist „eben empfangen").
-      ereigniszeit: alsBackendZeit(w.ereigniszeit ?? dayjs()),
+      // Ereigniszeit Pflicht: leer ⇒ jetzt (Funk-Realität: meist „eben empfangen"), nach der
+      // Serveruhr, sonst verschöbe eine vorgehende Geräteuhr auch die Rückmeldefrist (LFH-895).
+      ereigniszeit: alsBackendZeit(w.ereigniszeit ?? serverJetzt()),
       bestaetigung_pflicht: w.bestaetigung_pflicht,
       bestaetigung_frist_min:
         w.bestaetigung_pflicht && w.frist_min != null ? w.frist_min : undefined,

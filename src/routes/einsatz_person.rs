@@ -7,6 +7,7 @@ use crate::einsatz::modul::Personen;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::geraet::stelle;
 use crate::live::LiveEvent;
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
@@ -107,9 +108,13 @@ pub async fn liste(
         params.status.as_deref(),
         "Unbekannter Status im Filter",
     )?;
-    Ok(Json(
-        repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?,
-    ))
+    let mut liste = repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?;
+    // Stellenbindung (LFH-892): ein UHS-Gerät sieht, wer je in seiner UHS belegt war.
+    if let Some(eigene) = stelle::stelle(ctx.geraet.as_ref()) {
+        let sichtbar = stelle::personen_der_uhs(&state.pool, eigene).await?;
+        liste.retain(|p| sichtbar.contains(&p.id));
+    }
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]
@@ -156,9 +161,17 @@ pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibfreigabe<Personen>,
     headers: HeaderMap,
-    JsonBody(body): JsonBody<AnlegenBody>,
+    JsonBody(mut body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<PersonAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Aufnahme am UHS-Gerät (LFH-892, Spec `funktionsansichten`): immer in den Eingang der
+    // eigenen UHS, im selben Schritt wie die Anlage. Eine andere UHS ist 403.
+    if let Some(eigene) = stelle::stelle(ctx.geraet.as_ref()) {
+        if body.uhs_id.is_some_and(|u| u != eigene) {
+            return Err(AppError::Forbidden);
+        }
+        body.uhs_id = Some(eigene);
+    }
     if body.uhs_id.is_some() {
         ctx.fordere_modul_zugriff(&state.pool, "unfallhilfsstellen")
             .await?;
@@ -391,6 +404,7 @@ pub async fn detail(
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<PersonDetail>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     audit_repo::anlegen(
         &state.pool,
@@ -404,7 +418,13 @@ pub async fn detail(
     let sichtungen = sichtung_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let notizen = verlaufsnotiz_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
-    let abgleiche = abgleich_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    // Den Abgleich mit Vermisstenmeldungen führt kein Gerät (Scope-Matrix): er nennt andere
+    // Personen des Einsatzes.
+    let abgleiche = if ctx.geraet.is_some() {
+        Vec::new()
+    } else {
+        abgleich_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?
+    };
 
     Ok(Json(PersonDetail {
         person,
@@ -465,6 +485,7 @@ pub async fn aktualisieren(
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     // Bleibt bewusst VOR der Normalisierung und vor allen weiteren Prüfungen — die
     // Fehler-Präzedenz gegenüber Storno/Zustandsfehlern hängt an dieser Position.
     // Normalisiert wird deshalb nur für diese eine Prüfung inline; ein leerer Wert ist
@@ -659,6 +680,7 @@ pub async fn sichten(
     JsonBody(body): JsonBody<SichtungBody>,
 ) -> Result<(StatusCode, Json<SichtungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let kategorie = Sichtungskategorie::parse(&body.kategorie)
         .ok_or_else(|| AppError::Validation("Unbekannte Sichtungskategorie".into()))?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
@@ -810,6 +832,7 @@ pub async fn verbleib(
     JsonBody(body): JsonBody<VerbleibBody>,
 ) -> Result<(StatusCode, Json<VerbleibAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let art = VerbleibArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
     parse_enum_opt(
@@ -909,6 +932,7 @@ pub async fn notiz(
     JsonBody(body): JsonBody<NotizBody>,
 ) -> Result<(StatusCode, Json<NotizAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let text = pflicht(&body.text, "Notiztext")?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if person.storniert_at.is_some() {

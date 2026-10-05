@@ -1,5 +1,12 @@
 import type { Tier, TierAnhang, TierStatus, Spezies } from './types';
-import { apiDatei, apiGet, apiSend, apiUpload, mitParametern } from './client';
+import {
+  apiDatei,
+  apiGet,
+  apiSend,
+  apiUploadMitFortschritt,
+  mitParametern,
+  type UploadFortschritt,
+} from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 import { EXPORT_TIMEOUT_MS } from './exportTimeout';
 import { patchBody } from './patchTriState';
@@ -119,16 +126,18 @@ export function listeTierAnhaenge(einsatzId: number, tierId: number): Promise<Ti
   return apiGet<TierAnhang[]>(anhangBasis(einsatzId, tierId));
 }
 
-/** Legt EINE Datei am Tier ab (Feld `datei`); Timeout wie die übrigen Uploads. */
+/** Legt EINE Datei am Tier ab (Feld `datei`); Timeout und Fortschritt wie die übrigen Uploads. */
 export function legeTierAnhangAb(
   einsatzId: number,
   tierId: number,
   datei: File,
+  onFortschritt?: (stand: UploadFortschritt) => void,
 ): Promise<TierAnhang> {
   const fd = new FormData();
   fd.append('datei', datei);
-  return apiUpload<TierAnhang>(anhangBasis(einsatzId, tierId), fd, {
+  return apiUploadMitFortschritt<TierAnhang>(anhangBasis(einsatzId, tierId), fd, {
     timeoutMs: UPLOAD_TIMEOUT_MS,
+    onFortschritt,
   });
 }
 

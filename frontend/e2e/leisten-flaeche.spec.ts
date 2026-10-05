@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { beobachteShifts, bericht, ruheShifts, setzeShiftsZurueck } from './cls-kern';
 import { ADMIN, ADMIN_PW, wechsleZuRolle } from './rollen-kern';
+import { SUBPIXEL, ZIELABSTAND } from './trefflaeche-kern';
 
 /**
  * Prüflisten-Zeile 12 der Bedien-Leitlinie — „kein Sprung, kein Flächenfraß" — für die
@@ -255,6 +256,45 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
 });
 
 /**
+ * Bedienziele der ausgeklappten Zeitachse (LFH-899): der kleinste Abstand zwischen zwei Zielen und
+ * die Zahl der Reihen. Ziele sind die Knöpfe, die Auswahl, der Schieber und sein Griff; Griff und
+ * Schieber gegeneinander zählen nicht (der Griff liegt auf der Schiene). Abstand zweier Kästen =
+ * Lücke auf der trennenden Achse, 0 bei Überlappung. Reihen = Gruppen gleicher Mittellage der
+ * Knöpfe und der Auswahl.
+ */
+async function zeitachsenZiele(page: Page): Promise<{ abstand: number; reihen: number }> {
+  return page.evaluate(() => {
+    const band = document.querySelector('[data-lfh="zeitachse"]')!;
+    const ziele = Array.from(
+      band.querySelectorAll<HTMLElement>('button, .ant-select, .ant-slider, .ant-slider-handle'),
+    )
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter((z) => z.r.width > 0 && z.r.height > 0);
+    let abstand = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < ziele.length; i += 1) {
+      for (let j = i + 1; j < ziele.length; j += 1) {
+        const [a, b] = [ziele[i], ziele[j]];
+        if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+        const dx = Math.max(b.r.left - a.r.right, a.r.left - b.r.right, 0);
+        const dy = Math.max(b.r.top - a.r.bottom, a.r.top - b.r.bottom, 0);
+        abstand = Math.min(abstand, Math.max(dx, dy));
+      }
+    }
+    const mitten = ziele
+      .filter((z) => z.el.matches('button, .ant-select'))
+      .map((z) => z.r.top + z.r.height / 2)
+      .sort((a, b) => a - b);
+    let reihen = 0;
+    let letzte = Number.NEGATIVE_INFINITY;
+    for (const y of mitten) {
+      if (y - letzte > 2) reihen += 1;
+      letzte = y;
+    }
+    return { abstand, reihen };
+  });
+}
+
+/**
  * Lagekarte: die ausgeklappte Zeitachse belegt höchstens die halbe Kartenhöhe, kein Kind ragt
  * aus dem Band, das Band bleibt in der Kartenspalte, und „Abspielen" hält die kurze Achse.
  *
@@ -304,7 +344,8 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
         await expect(page.getByRole('complementary', { name: 'Kartenleiste' })).toBeVisible();
       }
       const band = page.locator('[data-lfh="zeitachse"]');
-      await expect(band.getByRole('button', { name: 'Stand A' })).toBeVisible();
+      // Die Auswahl steht erst, wenn die Stände geladen sind (LFH-899: keine Stand-Knöpfe mehr).
+      await expect(band.getByRole('combobox', { name: 'Stand' })).toBeVisible();
       await schriftenGeladen(page);
 
       const m = await page.evaluate(() => {
@@ -343,6 +384,16 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
         Math.min(abspielen.width, abspielen.height),
         `${lauf}: „Abspielen" ${abspielen.width}×${abspielen.height}, kurze Achse Soll ≥ ${SOLL[dichte]}`,
       ).toBeGreaterThanOrEqual(SOLL[dichte] - 0.5);
+      // LFH-899: zwei Gruppen, höchstens zwei Reihen; im Handschuh ≥ 16 px zwischen den Zielen.
+      const ziele = await zeitachsenZiele(page);
+      gemessen.push(`${lauf}: ${ziele.reihen} Reihen, Zielabstand ${Math.round(ziele.abstand)} px`);
+      expect(ziele.reihen, `${lauf}: Reihen der Zeitachse`).toBeLessThanOrEqual(2);
+      const sollAbstand = ZIELABSTAND[dichte];
+      if (sollAbstand != null) {
+        expect(ziele.abstand, `${lauf}: kleinster Abstand zwischen Zielen`).toBeGreaterThanOrEqual(
+          sollAbstand - SUBPIXEL,
+        );
+      }
     }
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -632,6 +683,16 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
         Math.min(abspielen.width, abspielen.height),
         `${lauf}: „Abspielen" ${abspielen.width}×${abspielen.height}, kurze Achse Soll ≥ ${SOLL[dichte]}`,
       ).toBeGreaterThanOrEqual(SOLL[dichte] - 0.5);
+      // LFH-899: zwei Gruppen, höchstens zwei Reihen; im Handschuh ≥ 16 px zwischen den Zielen.
+      const ziele = await zeitachsenZiele(page);
+      gemessen.push(`${lauf}: ${ziele.reihen} Reihen, Zielabstand ${Math.round(ziele.abstand)} px`);
+      expect(ziele.reihen, `${lauf}: Reihen der Zeitachse`).toBeLessThanOrEqual(2);
+      const sollAbstand = ZIELABSTAND[dichte];
+      if (sollAbstand != null) {
+        expect(ziele.abstand, `${lauf}: kleinster Abstand zwischen Zielen`).toBeGreaterThanOrEqual(
+          sollAbstand - SUBPIXEL,
+        );
+      }
     }
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

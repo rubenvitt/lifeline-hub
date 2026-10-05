@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { installiereXhrAttrappe } from '../test/xhrAttrappe';
+import type { UploadFortschritt } from './client';
 import {
   entferneTierAnhang,
   legeTierAnhangAb,
@@ -13,7 +15,10 @@ import {
   uhsAnhangDownloadPfad,
 } from './einsatzUhs';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 // LFH-758: Anhänge an Tieren und UHS laufen ausschließlich über die Route ihres Moduls.
 const faelle = [
@@ -47,21 +52,27 @@ describe.each(faelle)(
     });
 
     it('legt EINE Datei im Feld `datei` ab, mit dem 120-s-Upload-Timeout', async () => {
-      const timeout = vi
-        .spyOn(AbortSignal, 'timeout')
-        .mockReturnValue(new AbortController().signal);
-      const fetchMock = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(new Response(JSON.stringify({ id: 1 }), { status: 201 }));
+      const anfragen = installiereXhrAttrappe();
       const datei = new File(['x'], 'plan.pdf', { type: 'application/pdf' });
-      await ablegen(7, 3, datei);
-      const [pfad, init] = fetchMock.mock.calls[0];
-      expect(pfad).toBe(basis);
-      expect(init?.method).toBe('POST');
-      const fd = init?.body as FormData;
+      const ergebnis = ablegen(7, 3, datei);
+      const [xhr] = anfragen;
+      expect(xhr.url).toBe(basis);
+      expect(xhr.methode).toBe('POST');
+      const fd = xhr.body as FormData;
       expect(fd.get('datei')).toBe(datei);
       expect([...fd.keys()]).toEqual(['datei']);
-      expect(timeout).toHaveBeenCalledWith(120_000);
+      expect(xhr.timeout).toBe(120_000);
+      xhr.antworten(201, { id: 1 });
+      await expect(ergebnis).resolves.toEqual({ id: 1 });
+    });
+
+    it('reicht den Fortschritt an den Aufrufer durch (LFH-878)', () => {
+      const anfragen = installiereXhrAttrappe();
+      const meldungen: UploadFortschritt[] = [];
+      void ablegen(7, 3, new File(['x'], 'plan.pdf'), (f) => meldungen.push(f));
+      anfragen[0].fortschritt(1, 4);
+      anfragen[0].uebertragen();
+      expect(meldungen).toEqual([{ phase: 'senden', anteil: 0.25 }, { phase: 'pruefen' }]);
     });
 
     it('entfernt per DELETE auf die Linker-id', async () => {

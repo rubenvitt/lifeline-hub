@@ -167,6 +167,8 @@ const KONSUMENTEN = [
   // Tabelle), je mit eigener Formbegründung und eigenem Spaltenregister.
   '/src/betreuung/EvakuierungBlock.tsx',
   '/src/betreuung/StellenBlock.tsx',
+  // Die Patientenliste eines UHS-Geräts (LFH-892): Register der eigenen UHS plus Spalte „Ort“.
+  '/src/geraet/GeraetPatientenPage.tsx',
   // Die Dokumentenablage: Titel als nativer Download-Anker aus dem Spalten-`render` (kein
   // `titel.ziel`, das wäre eine Client-Navigation).
   '/src/pages/DokumentePage.tsx',

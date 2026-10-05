@@ -82,7 +82,14 @@ fn hash_token(token: &str) -> String {
 pub const SITZUNG_TAGE: i64 = 7;
 
 /// Legt eine neue Session für den Benutzer an (TTL [`SITZUNG_TAGE`]) und liefert den Token.
+///
+/// Ein Gerätekonto (LFH-892) bekommt hier nie eine Sitzung: jeder Anmeldeweg einer Person läuft
+/// durch diese Funktion, ein Gerät meldet sich nur über den Kopplungscode an
+/// ([`anlegen_geraet`]). Zusätzlich zum Passwort-Sentinel, der den Passwortweg schon sperrt.
 pub async fn anlegen(pool: &SqlitePool, benutzer_id: i64) -> Result<String, AppError> {
+    if crate::geraet::repo::ist_geraetekonto(pool, benutzer_id).await? {
+        return Err(AppError::Unauthorized);
+    }
     let token = neuer_token();
     sqlx::query(
         "INSERT INTO session (token_hash, benutzer_id, expires_at) \
@@ -132,23 +139,70 @@ pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64>
         .flatten()
 }
 
+/// Legt die Sitzung eines gekoppelten Geräts an (LFH-892) und liefert den Token. Läuft in der
+/// Transaktion der Code-Einlösung; das Ende ist das der Kopplung (eine Verlängerung zieht es
+/// nach, `geraet::repo::verlaengern`).
+pub async fn anlegen_geraet(
+    conn: &mut sqlx::SqliteConnection,
+    benutzer_id: i64,
+    kopplung_id: i64,
+    expires_at: &str,
+) -> Result<String, AppError> {
+    let token = neuer_token();
+    sqlx::query(
+        "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id) VALUES (?, ?, ?, ?)",
+    )
+    .bind(hash_token(&token))
+    .bind(benutzer_id)
+    .bind(expires_at)
+    .bind(kopplung_id)
+    .execute(conn)
+    .await?;
+    Ok(token)
+}
+
 /// Löst eine gültige (nicht abgelaufene) Session zu einem aktiven Benutzer auf.
 pub(crate) async fn benutzer_aus_token(
     pool: &SqlitePool,
     token: &str,
 ) -> Result<Benutzer, AppError> {
-    let benutzer = sqlx::query_as::<_, Benutzer>(
+    sitzung_aus_token(pool, token).await.map(|(b, _)| b)
+}
+
+/// Wie [`benutzer_aus_token`], liefert bei einer Gerätesitzung zusätzlich deren Kontext. Eine
+/// Gerätesitzung, deren Kopplung widerrufen, abgelaufen oder deren Einsatz nicht mehr aktiv ist,
+/// ist tot (401), bei jeder Anfrage neu geprüft: so wirkt ein Widerruf sofort (design.md D7).
+pub(crate) async fn sitzung_aus_token(
+    pool: &SqlitePool,
+    token: &str,
+) -> Result<(Benutzer, Option<crate::geraet::GeraetKontext>), AppError> {
+    #[derive(sqlx::FromRow)]
+    struct Zeile {
+        #[sqlx(flatten)]
+        benutzer: Benutzer,
+        kopplung_id: Option<i64>,
+    }
+    let zeile = sqlx::query_as::<_, Zeile>(
         "SELECT b.id, b.org_id, b.anzeigename, b.benutzername, b.passwort_hash, \
-                b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at \
+                b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at, s.kopplung_id \
          FROM session s \
          JOIN benutzer b ON b.id = s.benutzer_id \
          WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND b.aktiv = 1",
     )
     .bind(hash_token(token))
     .fetch_optional(pool)
-    .await?;
+    .await?
+    .ok_or(AppError::Unauthorized)?;
 
-    benutzer.ok_or(AppError::Unauthorized)
+    let geraet = match zeile.kopplung_id {
+        None => None,
+        Some(kopplung_id) => Some(
+            crate::geraet::repo::kontext_wenn_gueltig(pool, kopplung_id)
+                .await?
+                .ok_or(AppError::Unauthorized)?,
+        ),
+    };
+    Ok((zeile.benutzer, geraet))
 }
 
 /// Kopf, mit dem ein Browser-Tab bei schreibenden Anfragen den Benutzer nennt, den er anzeigt
@@ -209,10 +263,44 @@ impl FromRequestParts<AppState> for CurrentUser {
             .map(|c| c.value().to_string())
             .ok_or(AppError::Unauthorized)?;
 
-        let benutzer = benutzer_aus_token(&state.pool, &token).await?;
+        let (benutzer, geraet) = sitzung_aus_token(&state.pool, &token).await?;
+        if let Some(geraet) = geraet {
+            fordere_geraeteroute(parts, state, &geraet).await?;
+            parts.extensions.insert(geraet);
+        }
         pruefe_erwarteten_benutzer(&parts.method, &parts.headers, benutzer.id)?;
         Ok(CurrentUser(benutzer))
     }
+}
+
+/// Schranke einer Gerätesitzung (LFH-892, design.md D5): die Route muss in der Routenliste der
+/// Ansicht stehen (sonst 403), und eine Einsatzroute muss den gekoppelten Einsatz meinen (sonst
+/// 404 wie ein unbekannter Einsatz). Ohne `MatchedPath` (Fallback) ist nichts erlaubt.
+async fn fordere_geraeteroute(
+    parts: &mut Parts,
+    state: &AppState,
+    geraet: &crate::geraet::GeraetKontext,
+) -> Result<(), AppError> {
+    let pfad = parts
+        .extensions
+        .get::<axum::extract::MatchedPath>()
+        .map(|p| p.as_str().to_owned())
+        .ok_or(AppError::Forbidden)?;
+    if !crate::geraet::darf_route(geraet.ansicht, parts.method.as_str(), &pfad) {
+        return Err(AppError::Forbidden);
+    }
+    if pfad.starts_with("/api/einsaetze/{id}") {
+        use axum::extract::Path;
+        use std::collections::HashMap;
+        let Path(params) = Path::<HashMap<String, String>>::from_request_parts(parts, state)
+            .await
+            .map_err(|_| AppError::NotFound)?;
+        let einsatz_id: Option<i64> = params.get("id").and_then(|s| s.parse().ok());
+        if einsatz_id != Some(geraet.einsatz_id) {
+            return Err(AppError::NotFound);
+        }
+    }
+    Ok(())
 }
 
 /// Extractor: der aktuell angemeldete Benutzer, der zusätzlich Admin sein muss.

@@ -3,7 +3,9 @@ import { flaeche, kontrast, schattenKontrast } from './kontrast-kern';
 
 /**
  * Deeplink-Hervorhebung (LFH-698, Spec `deeplink-hervorhebung`): die angesprungene Zeile trägt
- * zwei Kanäle aus Rollen — getönte Fläche und eine Linie oben und unten. Gemessen im Browser,
+ * zwei Kanäle aus Rollen — getönte Fläche und eine Linie oben und unten. Die Kommunikationskarten
+ * (Meldung, Auftrag) tragen dieselbe Form statt eines Rings; eine alarmierte Karte behält ihre
+ * Alarmfläche, die Markierung legt nur die Linie darüber (LFH-896). Gemessen im Browser,
  * weil jsdom kein CSS rechnet (`css: false`) und antd seine Zellfarben zur Laufzeit injiziert.
  *
  * Böden als Literale (Kriterium 5 und WCAG 1.4.11): Text Tag ≥ 7, Nacht ≥ 5; Linie ≥ 3 gegen
@@ -216,6 +218,76 @@ for (const modus of ['light', 'dark'] as const) {
       await pruefeText(zeile.getByText('Angesprungene Meldung'), TEXT[modus], 'ETB-Zeile');
       // Fläche inline aus `rollen.bedienFlaeche`, Linie aus `index.css`: dieselben Rollen.
       await pruefeRollen(page, zeile, nachbar, 'ETB-Zeile');
+    }).toPass({ timeout: 10_000 });
+  });
+
+  test(`${modus}: Kommunikationskarte per Deeplink — Linie statt Ring, Gefahr gewinnt`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await anmelden(page, modus);
+    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E 896 ${modus} ${Date.now()}`,
+    });
+    const auftrag = async (auftrag_text: string, frist_at?: string) =>
+      (
+        await post(page, `/api/einsaetze/${einsatzId}/auftraege`, {
+          auftrag_text,
+          empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
+          ...(frist_at ? { frist_at } : {}),
+        })
+      ).id;
+    const nachbarId = await auftrag('Nachbarauftrag');
+    const zielId = await auftrag('Angesprungener Auftrag');
+    // Frist in der Vergangenheit, Empfänger unquittiert: überfällig, die Karte ist alarmiert.
+    const alarmId = await auftrag('Überfälliger Auftrag', '2026-06-01 10:00:00');
+    const karte = (id: number) => page.locator(`[data-lfh="komm-karte"][data-auftrag-id="${id}"]`);
+    const nachbar = karte(nachbarId);
+
+    // Gewöhnliche Karte: dieselbe Fläche und Linie wie die Tabellenzeile, kein Ring
+    // (`schattenKontrast` prüft die Linienform vorab: genau zwei `inset`-Linien oben und unten).
+    await page.goto(`/einsaetze/${einsatzId}/auftraege?auftrag=${zielId}`);
+    const ziel = karte(zielId);
+    await expect(ziel).toHaveAttribute('data-hervorgehoben', 'true');
+    await expect(nachbar).not.toHaveAttribute('data-hervorgehoben');
+    await zeigerWeg(page);
+    await expect(async () => {
+      const m = await schattenKontrast(ziel, nachbar);
+      expect(m.gegenFlaeche, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
+      expect(m.gegenNachbar, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
+      await pruefeRollen(page, ziel, nachbar, 'Kommunikationskarte');
+      await pruefeText(
+        ziel.getByText('Angesprungener Auftrag', { exact: true }),
+        TEXT[modus],
+        'Kommunikationskarte',
+      );
+    }).toPass({ timeout: 10_000 });
+
+    // Alarmierte Karte: Alarmfläche und Alarmkante bleiben, die Linie kommt dazu und hält auf
+    // der Alarmfläche.
+    await page.goto(`/einsaetze/${einsatzId}/auftraege?auftrag=${alarmId}`);
+    const alarm = karte(alarmId);
+    await expect(alarm).toHaveAttribute('data-hervorgehoben', 'true');
+    await expect(alarm).toHaveAttribute('data-alarm', 'true');
+    await zeigerWeg(page);
+    await expect(async () => {
+      const m = await schattenKontrast(alarm, nachbar);
+      expect(m.gegenFlaeche, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
+      expect(m.gegenNachbar, JSON.stringify(m)).toBeGreaterThanOrEqual(LINIE);
+      expect(rgb(m.linie), 'Alarmkarte: Linie').toBe(await rolle(page, '--lfh-bedien'));
+      expect(rgb(await flaeche(alarm)), 'Alarmkarte: Fläche').toBe(
+        await rolle(page, '--lfh-alarm-flaeche'),
+      );
+      const kante = await alarm.evaluate((el) => getComputedStyle(el).borderLeftColor);
+      expect(rgb((kante.match(/[\d.]+/g) ?? []).map(Number)), 'Alarmkarte: Kante').toBe(
+        await rolle(page, '--lfh-alarm'),
+      );
+      await pruefeText(
+        alarm.getByText('Überfälliger Auftrag', { exact: true }),
+        TEXT[modus],
+        'Alarmkarte',
+      );
     }).toPass({ timeout: 10_000 });
   });
 }

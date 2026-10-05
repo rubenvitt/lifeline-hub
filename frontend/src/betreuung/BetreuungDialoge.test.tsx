@@ -9,6 +9,7 @@ import { ApiError } from '../api/client';
 import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { renderMitProviders } from '../test/utils';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import {
   BelegungMeldenDialog,
   BezirkAnlegenDialog,
@@ -833,5 +834,43 @@ describe('BelegungMeldenDialog — Zeitpunkt in der Anzeigezone (LFH-692)', () =
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ belegt: 89, zeitpunkt_at: '2026-09-30 23:00:00' }),
     );
+  });
+});
+
+/** LFH-895: „Jetzt“ setzt die Serverzeit; die Zukunftsprüfung misst an derselben Uhr. */
+describe('Betreuung — „Jetzt“ auf einem nachgehenden Gerät (LFH-895)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+    serveruhrVergessenFuerTests();
+  });
+
+  it('die Serverzeit aus „Jetzt“ gilt nicht als Zukunft, auch wenn die Geräteuhr 10 min nachgeht', async () => {
+    const server = Date.parse('2026-09-30T10:00:00Z');
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(server - 10 * 60_000);
+    serveruhrVergessenFuerTests();
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(server).toUTCString() } }));
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BelegungMeldenDialog
+        stelle={stelle()}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '89');
+    await userEvent.click(within(dialog).getByRole('textbox', { name: 'Zeitpunkt' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Jetzt' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    const gesendet = Date.parse(
+      `${(onErfassen.mock.calls[0][0] as { zeitpunkt_at: string }).zeitpunkt_at.replace(' ', 'T')}Z`,
+    );
+    expect(Math.abs(gesendet - server)).toBeLessThanOrEqual(5_000);
   });
 });
