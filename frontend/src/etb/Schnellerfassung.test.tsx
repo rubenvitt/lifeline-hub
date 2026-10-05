@@ -618,7 +618,9 @@ describe('Schnellerfassung — Tastatur nach Zeigerart (LFH-955)', () => {
     expect(feld).toHaveValue('Pegel 3,20 m\nsteigend');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect(p.erfassen.mock.calls[0][0].inhalt).toBe('Pegel 3,20 m\nsteigend');
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0].inhalt).toBe(
+      'Pegel 3,20 m\nsteigend',
+    );
   });
 
   it('grober Zeiger: Return verhindert den nativen Umbruch nicht', () => {
@@ -662,7 +664,9 @@ describe('Schnellerfassung — Tastatur nach Zeigerart (LFH-955)', () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     expect(
-      screen.getByText('Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden'),
+      screen.getByText(
+        'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden',
+      ),
     ).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Einzeiler{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));

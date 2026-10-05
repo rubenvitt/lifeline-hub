@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space } from 'antd';
+import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Space, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben, schliesseEinsatzAb } from '../api/einsaetze';
@@ -45,6 +45,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { neueClientId } from '../offline/clientId';
 import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
@@ -58,6 +59,29 @@ import {
 
 /** Breite der Seitenleiste „Bilanz" — ab `xl`. */
 const LEISTE_BREITE = 260;
+
+/** Rückfrage vor dem Abschließen — im Kopf als Blase, im Menü „Weitere“ als Dialog. */
+const ABSCHLIESSEN_FOLGE = 'Danach sind keine neuen Einträge oder Berichtigungen mehr möglich.';
+
+/**
+ * Schwebende Teile der Leiste, die antd an `document.body` hängt (Typ-Auswahl, Chip-Editoren,
+ * Baustein-Dialog). Ein Fokuswechsel dorthin verlässt die Leiste nicht.
+ */
+const LEISTEN_SCHWEBE =
+  '.ant-select-dropdown, .ant-dropdown, .ant-picker-dropdown, .ant-popover, .ant-modal-wrap';
+
+/** Liegt `ziel` in der Leiste oder in einem ihrer schwebenden Teile? */
+function inLeiste(wurzel: HTMLElement, ziel: EventTarget | Element | null): boolean {
+  if (!(ziel instanceof Element)) return false;
+  return wurzel.contains(ziel) || ziel.closest(LEISTEN_SCHWEBE) != null;
+}
+
+/** Wie viele Filter der aufklappbaren Leiste gesetzt sind: Volltext, Zeitraum, Einheit. */
+function leistenFilterZahl(filter: EtbFilterWerte): number {
+  return (
+    (filter.q ? 1 : 0) + (filter.von || filter.bis ? 1 : 0) + (filter.einheit_id != null ? 1 : 0)
+  );
+}
 
 export default function EtbPage() {
   const { id } = useParams();
@@ -259,7 +283,15 @@ export default function EtbPage() {
   const [hervorhebung, setHervorhebung] = useState<{ id: number; marke: number } | null>(null);
   const highlightId = hervorhebung?.id ?? null;
   const zeitachseKopf = useRef<HTMLDivElement>(null);
-  const { abBreite } = useViewport();
+  const { abBreite, istSchmal } = useViewport();
+  /**
+   * Handschirm, zuerst die Zeitachse (LFH-955, design.md D4): unter `md` stehen Volltext,
+   * Zeitraum und Einheit hinter „Filter“, Druck und Abschluss im Menü „Weitere“, und die
+   * Erfassungsleiste klappt ohne Fokus ein.
+   */
+  const [filterOffen, setFilterOffen] = useState(false);
+  const [abschliessenFrage, setAbschliessenFrage] = useState(false);
+  const [fokusInLeiste, setFokusInLeiste] = useState(false);
   const { token, rollen } = useRollen();
   // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11): sonst rollte der Browser jeden per
   // Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht als `scroll-margin` an der
@@ -465,6 +497,9 @@ export default function EtbPage() {
   }
 
   const breit = abBreite('xl');
+  const filterZahl = leistenFilterZahl(filter);
+  // Ein gesetzter Filter hält die Leiste offen: ein Treffer stünde sonst ohne sichtbaren Grund da.
+  const filterleisteSichtbar = !istSchmal || filterOffen || filterZahl > 0;
   const puffer = pufferZustand(ausstehend, abgelehnt);
   const segmentOptionen: SegmentOption<TypSegment>[] = typSegmente(filter.typ).map((t) => ({
     wert: t,
@@ -484,6 +519,18 @@ export default function EtbPage() {
         breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
       }
       style={breit ? { marginInlineEnd: LEISTE_BREITE + token.marginLG } : undefined}
+      // Fokus in der Leiste klappt sie auf (D4). `focusin`/`focusout` steigen auf, auch aus den
+      // Portalen der Leiste (React-Baum). Verlässt der Fokus sie in einen ihrer schwebenden Teile,
+      // bleibt sie offen; ohne `relatedTarget` (Fenster verliert den Fokus, Element entfällt)
+      // entscheidet der Fokus eine Runde später.
+      onFocus={() => setFokusInLeiste(true)}
+      onBlur={(e) => {
+        const wurzel = e.currentTarget;
+        if (inLeiste(wurzel, e.relatedTarget)) return;
+        window.setTimeout(() => {
+          if (!inLeiste(wurzel, document.activeElement)) setFokusInLeiste(false);
+        }, 0);
+      }}
     >
       {berichtigungZu ? (
         <Schnellerfassung
@@ -508,10 +555,91 @@ export default function EtbPage() {
           onSendetChange={setEntwurfSendet}
           dateien={entwurfsDateien}
           versand={entwurfsVersand}
+          einklappbar={istSchmal && !fokusInLeiste}
         />
       )}
     </div>
   ) : null;
+
+  // Der Typfilter als Segmentleiste. Er schreibt in denselben URL-Filter wie die Leiste darunter
+  // (`etbPfad`/`parseEtbFilter`); das gewählte Segment wird aus der URL gelesen, Zurück/Vor
+  // stimmen also. Unter `md` einzeilig mit waagerechtem Bildlauf (wie die Feldzeile, LFH-373):
+  // umbrochen kostete er zwei Zeilen über der Zeitachse.
+  const typleiste = (
+    <Segmentleiste<TypSegment>
+      optionen={segmentOptionen}
+      wert={filter.typ ?? 'alle'}
+      onWechsel={typGewaehlt}
+      beschriftung="Einträge nach Typ filtern"
+      style={
+        istSchmal
+          ? { flexWrap: 'nowrap', overflowX: 'auto', flex: '1 1 0', minWidth: 0, maxWidth: '100%' }
+          : undefined
+      }
+    />
+  );
+
+  const weitereEintraege: MenueEintrag<'druck' | 'abschliessen'>[] = [
+    { key: 'druck', label: 'Drucken / als PDF' },
+    ...(darfAbschliessen
+      ? [{ key: 'abschliessen' as const, label: 'Einsatz abschließen', gefahr: true as const }]
+      : []),
+  ];
+
+  const kopfAktionen = istSchmal ? (
+    <>
+      {typleiste}
+      <Button
+        aria-expanded={filterleisteSichtbar}
+        aria-controls="etb-filterleiste"
+        onClick={() => setFilterOffen(!filterleisteSichtbar)}
+      >
+        {filterZahl > 0 ? `Filter (${filterZahl})` : 'Filter'}
+      </Button>
+      {/* Druck und Abschluss im Menü: auf dem Handschirm kosteten sie eine Kopfzeile über der
+          Zeitachse. Die Rückfrage zum Abschließen steht beim Aufrufer (`MenueAusloeser`). */}
+      <MenueAusloeser
+        eintraege={weitereEintraege}
+        zugaenglicherName="Weitere Aktionen zum Einsatztagebuch"
+        laeuft={abschliessenMutation.isPending}
+        onWahl={(key) => {
+          if (key === 'druck') navigate(etbDruckPfad(einsatzId, filter));
+          else setAbschliessenFrage(true);
+        }}
+      />
+    </>
+  ) : (
+    <>
+      {/* Einstieg in die Druckansicht: öffnet und sendet nichts ab, gehört also in den Kopf
+          — sekundär, „genau eine Primäraktion" bleibt. Link mit Knopfgestalt (Strg/⌘+Klick
+          öffnet einen Tab). Der aktive Filter geht mit. */}
+      <Button
+        href={etbDruckPfad(einsatzId, filter)}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          navigate(etbDruckPfad(einsatzId, filter));
+        }}
+      >
+        Drucken / als PDF
+      </Button>
+      {typleiste}
+      {darfAbschliessen && (
+        <Popconfirm
+          title="Einsatz abschließen?"
+          description={ABSCHLIESSEN_FOLGE}
+          okText="Ja"
+          cancelText="Abbrechen"
+          okButtonProps={{ danger: true }}
+          onConfirm={() => abschliessenMutation.mutate()}
+        >
+          <Button danger loading={abschliessenMutation.isPending}>
+            Einsatz abschließen
+          </Button>
+        </Popconfirm>
+      )}
+    </>
+  );
 
   return (
     <EinsatzSeite
@@ -523,46 +651,7 @@ export default function EtbPage() {
       }
       meta={kopfMeta({ gesamt: zaehlerQuery.data?.gesamt, filterAktiv })}
       dataUpdatedAt={etbQuery.dataUpdatedAt}
-      aktionen={
-        <>
-          {/* Einstieg in die Druckansicht: öffnet und sendet nichts ab, gehört also in den Kopf
-              — sekundär, „genau eine Primäraktion" bleibt. Link mit Knopfgestalt (Strg/⌘+Klick
-              öffnet einen Tab). Der aktive Filter geht mit. */}
-          <Button
-            href={etbDruckPfad(einsatzId, filter)}
-            onClick={(e) => {
-              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-              e.preventDefault();
-              navigate(etbDruckPfad(einsatzId, filter));
-            }}
-          >
-            Drucken / als PDF
-          </Button>
-          {/* Der Typfilter als Segmentleiste. Er schreibt in denselben URL-Filter wie die
-              Leiste darunter (`etbPfad`/`parseEtbFilter`); das gewählte Segment wird aus der
-              URL gelesen, Zurück/Vor stimmen also. */}
-          <Segmentleiste<TypSegment>
-            optionen={segmentOptionen}
-            wert={filter.typ ?? 'alle'}
-            onWechsel={typGewaehlt}
-            beschriftung="Einträge nach Typ filtern"
-          />
-          {darfAbschliessen && (
-            <Popconfirm
-              title="Einsatz abschließen?"
-              description="Danach sind keine neuen Einträge oder Berichtigungen mehr möglich."
-              okText="Ja"
-              cancelText="Abbrechen"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => abschliessenMutation.mutate()}
-            >
-              <Button danger loading={abschliessenMutation.isPending}>
-                Einsatz abschließen
-              </Button>
-            </Popconfirm>
-          )}
-        </>
-      }
+      aktionen={kopfAktionen}
       hinweis={
         einsatz.status !== 'aktiv' ? (
           <Space>
@@ -584,25 +673,27 @@ export default function EtbPage() {
         <div style={{ flex: '1 1 auto', minWidth: 0 }}>
           {/* Volltext und Zeitraum: die schmale Filterzeile unter dem Kopf. Entprellung und die
               Weiche „eigene gegen fremde Änderung" in `EtbFilterleiste` und im Effekt oben. */}
-          <div ref={filterWurzel}>
-            <EtbFilterleiste
-              key={filterMarke}
-              startWerte={filter}
-              onChange={leisteGeaendert}
-              zusatz={
-                // Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an der
-                // Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert.
-                <Select<number>
-                  aria-label="Nach Einheit filtern"
-                  placeholder="Einheit"
-                  allowClear
-                  style={{ minWidth: 180 }}
-                  value={filter.einheit_id}
-                  options={einheitOptionen}
-                  onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
-                />
-              }
-            />
+          <div ref={filterWurzel} id="etb-filterleiste" hidden={!filterleisteSichtbar}>
+            {filterleisteSichtbar && (
+              <EtbFilterleiste
+                key={filterMarke}
+                startWerte={filter}
+                onChange={leisteGeaendert}
+                zusatz={
+                  // Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an der
+                  // Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert.
+                  <Select<number>
+                    aria-label="Nach Einheit filtern"
+                    placeholder="Einheit"
+                    allowClear
+                    style={{ minWidth: 180 }}
+                    value={filter.einheit_id}
+                    options={einheitOptionen}
+                    onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
+                  />
+                }
+              />
+            )}
           </div>
 
           {/* Die Meldung steht über der Zeitachse, statt sie auszutauschen: geladene Einträge
@@ -726,6 +817,23 @@ export default function EtbPage() {
         )}
       </div>
 
+      {darfAbschliessen && (
+        <Modal
+          open={abschliessenFrage}
+          title="Einsatz abschließen?"
+          okText="Abschließen"
+          okButtonProps={{ danger: true }}
+          cancelText="Abbrechen"
+          onOk={() => {
+            setAbschliessenFrage(false);
+            abschliessenMutation.mutate();
+          }}
+          onCancel={() => setAbschliessenFrage(false)}
+          destroyOnHidden
+        >
+          <Typography.Paragraph>{ABSCHLIESSEN_FOLGE}</Typography.Paragraph>
+        </Modal>
+      )}
       {darfSchreiben && (
         <WiedervorlageModal
           einsatzId={einsatzId}

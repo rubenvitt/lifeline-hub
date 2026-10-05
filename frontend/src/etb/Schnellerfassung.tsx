@@ -102,6 +102,17 @@ interface Props {
    */
   versand?: Versand;
   onVersandChange?: (aenderung: Partial<Versand>) => void;
+  /**
+   * Eingeklappt (Handschirm, LFH-955 D4): nur Präfix, Feld, „Vorschau“ und „Erfassen“. Hinweis-,
+   * Feld- und Rufnamenzeile entfallen. Ob, entscheiden `EtbPage` (Fokus) und `EtbEntwurfsTabs`
+   * (leerer Entwurf); die Zeilen hängen hinter dem Feld, es behält dabei seinen Platz im Baum.
+   */
+  eingeklappt?: boolean;
+  /**
+   * Fokus beim Mount. Aus unter `md`: dort klappte er die Leiste beim Laden auf und öffnete die
+   * Bildschirmtastatur über der Zeitachse.
+   */
+  startFokus?: boolean;
 }
 
 /** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
@@ -254,6 +265,8 @@ export default function Schnellerfassung({
   clientId,
   versand: versandVonAussen,
   onVersandChange,
+  eingeklappt = false,
+  startFokus = true,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -355,8 +368,10 @@ export default function Schnellerfassung({
 
   // Fokus beim Mount. State-Reset bei Tab-/Modus-Wechsel erfolgt über key-basiertes
   // Remounting im Container (EtbEntwurfsTabs / EtbPage-Berichtigung).
+  // Nur der Wert beim Mount zählt: ein späteres Aufklappen fokussiert nicht von selbst.
+  const startFokusBeimMount = useRef(startFokus);
   useEffect(() => {
-    textRef.current?.focus();
+    if (startFokusBeimMount.current) textRef.current?.focus();
   }, []);
 
   /**
@@ -818,7 +833,7 @@ export default function Schnellerfassung({
         />
       )}
 
-      {rufnameAbfrageOffen && (
+      {rufnameAbfrageOffen && !eingeklappt && (
         <RufnameAbfrage
           // Neu montiert beim Wechsel zwischen erster Abfrage und Ändern: die Felder starten
           // dann mit dem jeweils richtigen Wert.
@@ -864,7 +879,7 @@ export default function Schnellerfassung({
               </Button>
             </div>
           }
-          hinweiszeile={hinweiszeile}
+          hinweiszeile={eingeklappt ? undefined : hinweiszeile}
         >
           {/* Die Schnellerfassung steht ohne eigene Überschrift unter dem Seitentitel (h1). */}
           <MarkdownEditor
@@ -903,79 +918,82 @@ export default function Schnellerfassung({
       {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt, die
          EINSTELLUNG „Werte behalten". Nicht neben „Erfassen" und nicht zwischen Aktionen: ein
          Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
-      <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
-        {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
+      {!eingeklappt && (
+        <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
+          {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
            brächen ihren Text IN sich um — die Leiste wüchse trotz einzeiliger Zeile. */}
-        <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
-          {/* Unter `md` steht „Feld" VORN: in der einzeilig rollenden Zeile rutschte er sonst hinter die
+          <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
+            {/* Unter `md` steht „Feld" VORN: in der einzeilig rollenden Zeile rutschte er sonst hinter die
              gesetzten Chips aus dem Bild. */}
-          {istSchmal && feldKnopf}
-          {istSchmal && anhangTeil}
-          {gesetzteFelder.map((feld) => (
-            <MetaChip
-              key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
-              feld={feld}
-              editing={editFeld === feld}
-              wert={wirksam[feld]}
-              ausStandard={
-                (feld === 'von' || feld === 'an') && ausStandard(feld, metadaten, rufname.standard)
-              }
-              // Der Weg zum Standard selbst (Spec `etb-absender-empfaenger`); in der Berichtigung
-              // wird er nicht geändert.
-              onStandardAendern={
-                berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
-              }
-              optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
-              onCommit={commitFeld}
-              onCancel={() => {
-                setEditFeld(null);
-                fokusInsFeld();
-              }}
-              onRemove={(f) => {
-                if (!sendet) setMetadaten((m) => ({ ...m, [f]: undefined }));
-              }}
-              onEdit={(f) => {
-                if (!sendet) setEditFeld(f);
-              }}
-              gesperrt={sendet}
-            />
-          ))}
-          {editFeld != null && wirksam[editFeld] == null && (
-            <MetaChip
-              key={`${editFeld}-edit-new`}
-              feld={editFeld}
-              editing
-              wert={undefined}
-              optionen={editFeld === 'von' || editFeld === 'an' ? vonAnOptionen : undefined}
-              onCommit={commitFeld}
-              onCancel={() => {
-                setEditFeld(null);
-                fokusInsFeld();
-              }}
-              onRemove={() => setEditFeld(null)}
-              onEdit={() => {}}
-              // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
-              gesperrt={sendet}
-            />
+            {istSchmal && feldKnopf}
+            {istSchmal && anhangTeil}
+            {gesetzteFelder.map((feld) => (
+              <MetaChip
+                key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
+                feld={feld}
+                editing={editFeld === feld}
+                wert={wirksam[feld]}
+                ausStandard={
+                  (feld === 'von' || feld === 'an') &&
+                  ausStandard(feld, metadaten, rufname.standard)
+                }
+                // Der Weg zum Standard selbst (Spec `etb-absender-empfaenger`); in der Berichtigung
+                // wird er nicht geändert.
+                onStandardAendern={
+                  berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
+                }
+                optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
+                onCommit={commitFeld}
+                onCancel={() => {
+                  setEditFeld(null);
+                  fokusInsFeld();
+                }}
+                onRemove={(f) => {
+                  if (!sendet) setMetadaten((m) => ({ ...m, [f]: undefined }));
+                }}
+                onEdit={(f) => {
+                  if (!sendet) setEditFeld(f);
+                }}
+                gesperrt={sendet}
+              />
+            ))}
+            {editFeld != null && wirksam[editFeld] == null && (
+              <MetaChip
+                key={`${editFeld}-edit-new`}
+                feld={editFeld}
+                editing
+                wert={undefined}
+                optionen={editFeld === 'von' || editFeld === 'an' ? vonAnOptionen : undefined}
+                onCommit={commitFeld}
+                onCancel={() => {
+                  setEditFeld(null);
+                  fokusInsFeld();
+                }}
+                onRemove={() => setEditFeld(null)}
+                onEdit={() => {}}
+                // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
+                gesperrt={sendet}
+              />
+            )}
+            {!istSchmal && feldKnopf}
+            {!istSchmal && anhangTeil}
+            {!berichtigungZu && typ === 'lage' && !lageberichteGesperrt && (
+              // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
+              // weiter und ein Upload-Fehler stünde nirgends.
+              <Button
+                type="link"
+                disabled={sendet}
+                onClick={() => navigate(lageberichtePfad(einsatz.id))}
+              >
+                Als strukturierten Lagebericht erfassen →
+              </Button>
+            )}
+          </Space>
+          {!istSchmal && zeigeSchalter && (
+            <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
           )}
-          {!istSchmal && feldKnopf}
-          {!istSchmal && anhangTeil}
-          {!berichtigungZu && typ === 'lage' && !lageberichteGesperrt && (
-            // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
-            // weiter und ein Upload-Fehler stünde nirgends.
-            <Button
-              type="link"
-              disabled={sendet}
-              onClick={() => navigate(lageberichtePfad(einsatz.id))}
-            >
-              Als strukturierten Lagebericht erfassen →
-            </Button>
-          )}
-        </Space>
-        {!istSchmal && zeigeSchalter && (
-          <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
-        )}
-      </div>
+        </div>
+      )}
 
       {dateien.length > 0 && (
         <ul

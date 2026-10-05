@@ -1396,3 +1396,189 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
     ).toBeInTheDocument();
   });
 });
+
+/**
+ * Handschirm zuerst die Zeitachse (LFH-955, design.md D4): bei 390 × 844 stand beim Öffnen kein
+ * Eintrag im Bild. Unter `md` liegen Druck und Abschluss im Menü „Weitere“, die Filter hinter
+ * „Filter (n)“, der Typfilter rollt einzeilig, und die Erfassungsleiste startet eingeklappt. Die
+ * Pixel misst `e2e/leisten-flaeche.spec.ts`.
+ */
+describe('EtbPage — Handschirm (LFH-955)', () => {
+  const kopf = () =>
+    waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+
+  async function weitereWaehlen(name: string) {
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Weitere Aktionen zum Einsatztagebuch' }),
+    );
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    await userEvent.click(within(menue).getByRole('menuitem', { name }));
+  }
+
+  it('Druck und Abschluss stehen im Menü „Weitere“, nicht als Knöpfe im Kopf', async () => {
+    setzeViewportBreite(390);
+    setup('/einsaetze/7/etb?typ=meldung');
+    const k = await kopf();
+    await within(k).findByRole('button', { name: 'Weitere Aktionen zum Einsatztagebuch' });
+    expect(within(k).queryByRole('link', { name: 'Drucken / als PDF' })).toBeNull();
+    expect(within(k).queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
+    await weitereWaehlen('Drucken / als PDF');
+    await waitFor(() => expect(screen.getByTestId('ort-suche').textContent).toBe('?typ=meldung'));
+  });
+
+  it('„Einsatz abschließen“ aus dem Menü fragt nach und schließt erst nach Bestätigung ab', async () => {
+    setzeViewportBreite(390);
+    let abgeschlossen = 0;
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/abschliessen', () => {
+        abgeschlossen += 1;
+        return HttpResponse.json({ ...einsatz, status: 'abgeschlossen' });
+      }),
+    ]);
+    await kopf();
+    await weitereWaehlen('Einsatz abschließen');
+    const dialog = await screen.findByRole('dialog', { name: 'Einsatz abschließen?' });
+    expect(abgeschlossen).toBe(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    await waitFor(() => expect(abgeschlossen).toBe(1));
+  });
+
+  it('ohne Leitungsrecht trägt das Menü nur die Druckansicht', async () => {
+    setzeViewportBreite(390);
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: 'fuehrungspersonal' }),
+      ),
+      meHandler({ ...admin, system_rolle: 'keiner' }),
+    ]);
+    await kopf();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Weitere Aktionen zum Einsatztagebuch' }),
+    );
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Drucken / als PDF']);
+  });
+
+  it('die Filter stehen hinter „Filter“ und klappen auf', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const knopf = await screen.findByRole('button', { name: 'Filter' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByPlaceholderText('Volltextsuche')).toBeNull();
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByPlaceholderText('Volltextsuche')).toBeInTheDocument();
+  });
+
+  it('ein aktiver Filter zählt am Knopf und hält die Leiste offen', async () => {
+    setzeViewportBreite(390);
+    setup('/einsaetze/7/etb?q=Damm&einheit_id=5&typ=meldung');
+    const knopf = await screen.findByRole('button', { name: 'Filter (2)' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('Damm');
+  });
+
+  it('der Typfilter steht einzeilig und rollt waagerecht', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const leiste = await screen.findByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
+    expect(leiste).toHaveStyle({ flexWrap: 'nowrap', overflowX: 'auto' });
+  });
+
+  it('ab md bleibt der Kopf: Druck und Filter stehen offen, kein Knopf „Filter“', async () => {
+    setzeViewportBreite(820);
+    setup();
+    const k = await kopf();
+    await within(k).findByRole('link', { name: 'Drucken / als PDF' });
+    expect(screen.getByPlaceholderText('Volltextsuche')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Filter/ })).toBeNull();
+  });
+
+  const feldKnopf = () => screen.queryByRole('button', { name: 'Feld' });
+
+  it('die Erfassungsleiste startet eingeklappt, ohne Fokus, und klappt beim Fokus auf', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const feld = await screen.findByPlaceholderText(/^Inhalt/);
+    await waitFor(() => expect(screen.getAllByText('Erste Meldung').length).toBeGreaterThan(0));
+    expect(feld).not.toHaveFocus();
+    expect(feldKnopf()).toBeNull();
+    expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).toHaveStyle({
+      display: 'none',
+    });
+    act(() => feld.focus());
+    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).not.toHaveStyle({
+      display: 'none',
+    });
+  });
+
+  it('klappt beim Verlassen nur zu, solange der Entwurf leer ist', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const feld = await screen.findByPlaceholderText(/^Inhalt/);
+    act(() => feld.focus());
+    await screen.findByRole('button', { name: 'Feld' });
+    act(() => feld.blur());
+    await waitFor(() => expect(feldKnopf()).toBeNull());
+
+    act(() => feld.focus());
+    await userEvent.type(feld, 'Pegel steigt');
+    act(() => feld.blur());
+    // Mit Inhalt bleibt alles stehen: gesetzte Felder wären sonst unsichtbar.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(feldKnopf()).toBeInTheDocument();
+  });
+
+  it('ein Fokuswechsel in ein schwebendes Teil der Leiste klappt sie nicht zu', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const feld = await screen.findByPlaceholderText(/^Inhalt/);
+    act(() => feld.focus());
+    await screen.findByRole('button', { name: 'Feld' });
+    // Die Typ-Auswahl und die Chip-Editoren hängt antd an `document.body`.
+    const schwebe = document.createElement('div');
+    schwebe.className = 'ant-select-dropdown';
+    const ziel = document.createElement('button');
+    schwebe.appendChild(ziel);
+    document.body.appendChild(schwebe);
+    try {
+      act(() => {
+        fireEvent.focusOut(feld, { relatedTarget: ziel });
+        ziel.focus();
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(feldKnopf()).toBeInTheDocument();
+    } finally {
+      schwebe.remove();
+    }
+  });
+
+  it('ab md ist die Leiste nie eingeklappt und das Feld hat den Fokus', async () => {
+    setzeViewportBreite(820);
+    setup();
+    const feld = await screen.findByPlaceholderText(/^Inhalt/);
+    await waitFor(() => expect(feld).toHaveFocus());
+    expect(feldKnopf()).toBeInTheDocument();
+  });
+});

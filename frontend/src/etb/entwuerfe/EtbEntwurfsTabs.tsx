@@ -33,6 +33,17 @@ interface EtbEntwurfsTabsProps {
   dateien?: EntwurfsDateien;
   /** Sendezustand je Entwurf; fehlt es, führt der Container ihn selbst (LFH-748). */
   versand?: EntwurfsVersand;
+  /**
+   * Darf die Leiste einklappen (Handschirm ohne Fokus in der Leiste, LFH-955 D4)? Eingeklappt
+   * wird erst hier: nur bei genau einem leeren Entwurf, ohne Dateien und ohne Versandstand.
+   * Zugleich entfällt der Fokus beim Mount, der die Leiste sonst sofort aufklappte.
+   */
+  einklappbar?: boolean;
+}
+
+/** Kein Versand, kein Fortschritt, kein stehender Grund. */
+function istRuhe(v: Versand) {
+  return !v.sendet && v.fortschritt == null && v.hinweis == null;
 }
 
 /** Stabile leere Liste: ein frisches `[]` je Render wäre für die Schnellerfassung jedes Mal neu. */
@@ -81,6 +92,7 @@ export default function EtbEntwurfsTabs({
   onSendetChange,
   dateien: dateienVonAussen,
   versand: versandVonAussen,
+  einklappbar = false,
 }: EtbEntwurfsTabsProps) {
   const { token } = theme.useToken();
   const benutzerId = useAuth().benutzer?.id ?? null;
@@ -181,6 +193,19 @@ export default function EtbEntwurfsTabs({
     [neuerEntwurf, werteBehalten, uebernahme, versandJe, entwuerfe, dateien.je, verwerfen],
   );
 
+  /**
+   * Eingeklappt nur, wenn dabei nichts aus dem Blick gerät: ein zweiter Entwurf hielte sein
+   * Reiterband, gesetzte Felder ihre Chips, Dateien und ein Versandstand ihre Zeilen.
+   */
+  const aktiverEntwurf = entwuerfe.find((e) => e.id === aktiverId);
+  const eingeklappt =
+    einklappbar &&
+    entwuerfe.length === 1 &&
+    aktiverEntwurf != null &&
+    istLeer(zuWerte(aktiverEntwurf)) &&
+    (dateien.je[aktiverEntwurf.id]?.length ?? 0) === 0 &&
+    istRuhe(versandJe[aktiverEntwurf.id] ?? VERSAND_RUHE);
+
   const items = entwuerfe.map((e) => ({
     key: e.id,
     label: entwurfLabel(e),
@@ -242,6 +267,8 @@ export default function EtbEntwurfsTabs({
           }}
           versand={versandJe[e.id] ?? VERSAND_RUHE}
           onVersandChange={(a) => versandAendern(e.id, a)}
+          eingeklappt={eingeklappt}
+          startFokus={!einklappbar}
         />
       ) : null,
   }));
@@ -264,6 +291,8 @@ export default function EtbEntwurfsTabs({
         onChange={aktivenSetzen}
         onEdit={onEdit}
         items={items}
+        // Ausgeblendet, nicht abgehängt: das Feld darunter behält beim Aufklappen seinen Fokus.
+        tabBarStyle={eingeklappt ? { display: 'none' } : undefined}
       />
       {/* Kontrolliertes `<Modal>` statt `Popconfirm`: am × lässt sich keine Blase verankern, und
          der Tastaturweg (Entf) hat gar kein Ziel dafür. */}
