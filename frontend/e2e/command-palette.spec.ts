@@ -396,6 +396,8 @@ test('die Fußzeile bleibt bei 1440 px in jeder Dichte einzeilig (LFH-1055)', as
     await oeffnePalette(page);
     await paletteInput(page).fill(label);
     await page.getByRole('option', { name: label }).click();
+    // Erst ganz schließen lassen: sonst fände `oeffnePalette` noch das ausblendende Feld und tippte hinein.
+    await expect(paletteInput(page)).toBeHidden();
     await expect(page.locator('html')).toHaveAttribute('data-dichte', stufe);
 
     await oeffnePalette(page);
