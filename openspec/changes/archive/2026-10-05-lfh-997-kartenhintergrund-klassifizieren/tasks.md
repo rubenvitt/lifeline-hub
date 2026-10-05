@@ -33,5 +33,5 @@
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh` grün (bzw. umgebungsbedingte Schritte gegen `alpha` gegengeprüft), Vitest und `cargo test` grün.
-- [ ] 6.2 Change archivieren (`/opsx:archive`) samt Spec-Sync, im selben Branch vor dem PR.
+- [x] 6.1 `./scripts/check-all.sh` grün (bzw. umgebungsbedingte Schritte gegen `alpha` gegengeprüft), Vitest und `cargo test` grün.
+- [x] 6.2 Change archivieren (`/opsx:archive`) samt Spec-Sync, im selben Branch vor dem PR.
