@@ -6,24 +6,24 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import {
+  aendereOrganisation,
   entferneOrgLogo,
   ladeOrganisation,
   ladeOrgLogoHoch,
   orgLogoPfad,
-  setzeOrgDefault,
-  setzeOrgName,
+  type OrganisationAenderung,
 } from '../api/organisation';
+import type { OrganisationInfo } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Formularpaneel, Paneel } from '../components/instrument';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 
 interface FormWerte {
-  tz_organisation: string;
-}
-
-interface NameWerte {
   name: string;
+  tz_organisation?: string;
 }
 
 /** Höchstlänge des Namens in Zeichen — deckungsgleich mit `MAX_NAME_ZEICHEN` im Backend. */
@@ -56,6 +56,31 @@ const ORG_OPTIONEN = [
   { value: 'fuehrung', label: 'Führung' },
 ];
 
+/**
+ * Was gegenüber dem Serverstand geändert ist — nur das geht in den PATCH (LFH-979). Der Name
+ * zählt getrimmt: nur angehängte Leerzeichen sind keine Umbenennung. `null` = nichts geändert.
+ */
+function geaenderteFelder(
+  werte: FormWerte,
+  server: OrganisationInfo | undefined,
+): OrganisationAenderung | null {
+  const felder: OrganisationAenderung = {};
+  const name = werte.name.trim();
+  if (name !== server?.name) felder.name = name;
+  if (werte.tz_organisation != null && werte.tz_organisation !== server?.tz_organisation) {
+    felder.tz_organisation = werte.tz_organisation;
+  }
+  return Object.keys(felder).length > 0 ? felder : null;
+}
+
+/** Die Erfolgsmeldung nennt genau, was gespeichert wurde (LFH-979). */
+function erfolgsText(felder: OrganisationAenderung): string {
+  if (felder.name !== undefined && felder.tz_organisation !== undefined) {
+    return 'Name und DV-102-Organisation gespeichert';
+  }
+  return felder.name !== undefined ? 'Name gespeichert' : 'DV-102-Organisation gespeichert';
+}
+
 export default function OrganisationTab() {
   /**
    * Rechte-Gate: `PATCH /api/organisation` lehnt zwar serverseitig ab, aber erst nach dem
@@ -71,59 +96,63 @@ export default function OrganisationTab() {
 
   const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
 
+  /**
+   * Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“). Sein Merker ist zugleich
+   * der Riegel des Abgleichs unten — ein EIGENER Merker, nicht `isFieldTouched`: antd setzt
+   * `touched` beim Speichern nie zurück, die Felder folgten dem Serverstand sonst für den ganzen
+   * Besuch nicht mehr — eine fremde Umbenennung käme nicht an.
+   */
+  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin });
+  const server = orgQuery.data;
   useEffect(() => {
-    if (orgQuery.data?.tz_organisation) {
-      form.setFieldsValue({ tz_organisation: orgQuery.data.tz_organisation });
-    }
-  }, [orgQuery.data, form]);
+    // Nur solange nichts Ungespeichertes im Formular steht: ein Refetch (Fensterfokus) darf eine
+    // angefangene Eingabe nicht überschreiben. `ungespeichert` steht mit in den Abhängigkeiten:
+    // bleibt der Server beim selben Stand, ändert sich `server` nicht, und erst das Zurückfallen
+    // des Merkers bringt ihn ins Feld zurück.
+    if (!server || schutz.ungespeichert) return;
+    form.setFieldsValue({
+      name: server.name,
+      ...(server.tz_organisation ? { tz_organisation: server.tz_organisation } : {}),
+    });
+  }, [server, schutz.ungespeichert, form]);
 
+  /**
+   * EIN Speicherweg für Name und DV-102-Organisation (LFH-979): vorher hatte jedes Feld sein
+   * eigenes `<form>`, und die auffällige Leiste schickte nur die DV-102-Organisation — ein
+   * umbenannter Name ging mit grünem Toast still verloren. Ein PATCH mit genau den geänderten
+   * Feldern; der Server schreibt beide in einem `UPDATE`, halb gespeichert gibt es nicht.
+   */
   const speichern = useMutation({
-    mutationFn: (werte: FormWerte) => setzeOrgDefault(werte.tz_organisation),
-    onSuccess: () => {
-      message.success('DV-102-Organisation gespeichert');
+    mutationFn: aendereOrganisation,
+    onSuccess: (antwort, felder) => {
+      // ERST den Cache auf die Antwort setzen (sie ist die volle `OrganisationAnzeige`), DANN den
+      // Merker zurücknehmen (`onSuccess` am `mutate`): sonst übernähme der Abgleich den noch ALTEN
+      // Stand aus dem Cache, und scheiterte der Refetch, machte ein zweites Speichern die
+      // Umbenennung rückgängig.
+      qc.setQueryData(globalKeys.organisation(), antwort);
+      message.success(erfolgsText(felder));
       qc.invalidateQueries({ queryKey: globalKeys.organisation() });
     },
     /**
      * KEIN `onError`: ein Toast wäre nach drei Sekunden weg, und das unveränderte Formular wirkte
-     * gespeichert. Der Fehler hängt als Alert an SEINEM PANEEL und räumt sich beim nächsten
+     * gespeichert. Der Fehler hängt als Alert über der Leiste und räumt sich beim nächsten
      * Absenden selbst weg (react-query setzt `error` beim Übergang nach `pending` zurück). Der
      * ERFOLG bleibt beim Toast.
      */
   });
 
-  // ── Name (LFH-22) ─────────────────────────────────────────────────────────────
-  const [nameForm] = Form.useForm<NameWerte>();
-  const serverName = orgQuery.data?.name;
-  /**
-   * Hat die Person am Namen getippt, seit er zuletzt gespeichert wurde? Ein EIGENER Merker,
-   * nicht `isFieldTouched`: antd setzt `touched` beim Speichern nie zurück, das Feld folgte dem
-   * Serverstand sonst für den ganzen Besuch nicht mehr — eine fremde Umbenennung käme nicht an,
-   * und ein erneutes Speichern schriebe still den alten lokalen Wert zurück.
-   */
-  const [nameGeaendert, setNameGeaendert] = useState(false);
-  useEffect(() => {
-    // Nur solange niemand tippt: ein Refetch (Fensterfokus) darf einen angefangenen Namen
-    // nicht überschreiben. `nameGeaendert` steht mit in den Abhängigkeiten: bleibt der
-    // Server beim selben Namen, ändert sich `serverName` nicht, und erst das Zurückfallen
-    // des Merkers bringt ihn ins Feld zurück.
-    if (serverName != null && !nameGeaendert) {
-      nameForm.setFieldsValue({ name: serverName });
+  function absenden(werte: FormWerte) {
+    // Stand beim Absenden: wer während des Speicherns weitertippt, behält den Schutz.
+    const fassung = schutz.fassung();
+    const felder = geaenderteFelder(werte, server);
+    if (felder === null) {
+      // Nichts zu speichern, also auch kein Erfolg zu melden. Ein alter Grund gilt nicht mehr.
+      speichern.reset();
+      schutz.gespeichert(fassung);
+      return;
     }
-  }, [serverName, nameGeaendert, nameForm]);
-  const nameSpeichern = useMutation({
-    mutationFn: (werte: NameWerte) => setzeOrgName(werte.name.trim()),
-    onSuccess: (antwort, werte) => {
-      // ERST den Cache auf die Antwort setzen (sie ist die volle `OrganisationAnzeige`), DANN den
-      // Merker zurücknehmen: sonst übernähme der Sync-Effekt den noch ALTEN Namen aus dem Cache, und
-      // scheiterte der Refetch, machte ein zweites „Namen speichern" die Umbenennung rückgängig.
-      qc.setQueryData(globalKeys.organisation(), antwort);
-      // Wer während des Speicherns weitertippt, behält seinen Stand.
-      if (nameForm.getFieldValue('name') === werte.name) setNameGeaendert(false);
-      message.success('Name gespeichert');
-      qc.invalidateQueries({ queryKey: globalKeys.organisation() });
-    },
-    // Kein `onError`: der Grund steht am Paneel, siehe `speichern`.
-  });
+    speichern.mutate(felder, { onSuccess: () => schutz.gespeichert(fassung) });
+  }
 
   // ── Logo (LFH-22) ─────────────────────────────────────────────────────────────
   const logo = orgQuery.data?.logo ?? null;
@@ -157,18 +186,22 @@ export default function OrganisationTab() {
       titel="Organisation"
       breite="schmal"
       hinweis={
-        /* Nur der Rechte-Hinweis gilt für die ganze Seite. Speicherfehler stehen an IHREM Paneel:
-           drei unabhängige Speicherwege, eine Kette `a ?? b ?? c` zeigte nur den ersten. */
+        /* Nur der Rechte-Hinweis gilt für die ganze Seite. Speicherfehler stehen an IHREM Ort:
+           zwei unabhängige Speicherwege (Formular, Logo), eine Kette `a ?? b` zeigte nur den
+           ersten. */
         <SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />
       }
     >
-      {/* NAME: eigenes `<form>`, damit Enter nur den Namen sendet und der Knopf darin liegt. */}
-      <Form<NameWerte>
-        form={nameForm}
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
+      {/* EIN `<form>` für die ganze Seite (LFH-979): Enter im Namen und die Leiste senden
+         dasselbe. `disabled` am Formular sperrt die Felder, `disabled` am Knopf den Absendeweg —
+         der Knopf VERSCHWINDET nicht. */}
+      <Form<FormWerte>
+        form={form}
         layout="vertical"
         disabled={!istAdmin}
-        onValuesChange={() => setNameGeaendert(true)}
-        onFinish={(w) => nameSpeichern.mutate(w)}
+        onValuesChange={schutz.geaendert}
+        onFinish={absenden}
       >
         <Formularpaneel
           titel="Name"
@@ -185,91 +218,115 @@ export default function OrganisationTab() {
           >
             <Input />
           </Form.Item>
-          <div style={{ marginBlockEnd: token.marginSM }}>
-            <SpeicherFehler fehler={nameSpeichern.error} />
-          </div>
-          <Button htmlType="submit" disabled={!istAdmin} loading={nameSpeichern.isPending}>
-            Namen speichern
-          </Button>
         </Formularpaneel>
-      </Form>
 
-      {/* LOGO (LFH-22): kein Formular — Hochladen wirkt sofort, Entfernen fragt nach,
+        {/* LOGO (LFH-22): keine Felder — Hochladen wirkt sofort, Entfernen fragt nach,
           weil die Datei danach weg ist (unumkehrbar, LFH-363). */}
-      <Paneel
-        titel="Logo"
-        meta={
-          logo
-            ? `${logo.mime === 'image/png' ? 'PNG' : 'JPEG'} · ${Math.ceil(logo.groesse / 1024)} KiB`
-            : 'kein Logo'
-        }
-        koerperPolster
-        style={{ marginBlockEnd: token.marginLG }}
-      >
-        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-          {logo && kaputtesLogo === logo.sha256 ? (
-            // Anders als im Druckkopf mit Hinweis: hier ist der Ort, an dem man es behebt.
-            <Alert
-              type="warning"
-              showIcon
-              title="Das hinterlegte Logo lässt sich nicht anzeigen."
-              description="Auf Ausdrucken fehlt es, bis es ersetzt oder entfernt ist."
-            />
-          ) : logo ? (
-            <img
-              src={orgLogoPfad(logo.sha256)}
-              alt={`Logo von ${orgQuery.data?.name ?? 'der Organisation'}`}
-              style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
-              onError={() => setKaputtesLogo(logo.sha256)}
-            />
-          ) : (
-            <Typography.Text type="secondary">
-              Kein Logo hinterlegt. Der Druckkopf zeigt dann nur den Namen.
-            </Typography.Text>
-          )}
-          <Typography.Text type="secondary">PNG oder JPEG, höchstens 1 MiB.</Typography.Text>
-          {vorpruefung && (
-            <Alert type="error" showIcon title="Logo nicht übernommen" description={vorpruefung} />
-          )}
-          <SpeicherFehler fehler={logoHoch.error} titel="Logo nicht übernommen" />
-          {/* `size="middle"`: Rot steht nicht bündig neben Neutralem (LFH-352). */}
-          <Space wrap size="middle">
-            <Upload
-              accept={LOGO_TYPEN.join(',')}
-              showUploadList={false}
-              disabled={!istAdmin}
-              beforeUpload={(datei) => {
-                const grund = logoVorpruefung(datei);
-                setVorpruefung(grund);
-                // Ein alter Server-Grund stünde sonst neben dem neuen Versuch (`mutate`
-                // räumt ihn nur, wenn die Vorprüfung besteht).
-                logoHoch.reset();
-                if (grund === null) logoHoch.mutate(datei);
-                // Nie antds eigenen Upload: der Aufruf läuft über `api/organisation.ts`.
-                return Upload.LIST_IGNORE;
-              }}
-            >
-              <Button disabled={!istAdmin} loading={logoHoch.isPending}>
-                {logo ? 'Logo ersetzen' : 'Logo hochladen'}
-              </Button>
-            </Upload>
-            {logo && (
-              <Button
-                danger
+        <Paneel
+          titel="Logo"
+          meta={
+            logo
+              ? `${logo.mime === 'image/png' ? 'PNG' : 'JPEG'} · ${Math.ceil(logo.groesse / 1024)} KiB`
+              : 'kein Logo'
+          }
+          koerperPolster
+          style={{ marginBlockEnd: token.marginLG }}
+        >
+          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+            {logo && kaputtesLogo === logo.sha256 ? (
+              // Anders als im Druckkopf mit Hinweis: hier ist der Ort, an dem man es behebt.
+              <Alert
+                type="warning"
+                showIcon
+                title="Das hinterlegte Logo lässt sich nicht anzeigen."
+                description="Auf Ausdrucken fehlt es, bis es ersetzt oder entfernt ist."
+              />
+            ) : logo ? (
+              <img
+                src={orgLogoPfad(logo.sha256)}
+                alt={`Logo von ${orgQuery.data?.name ?? 'der Organisation'}`}
+                style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
+                onError={() => setKaputtesLogo(logo.sha256)}
+              />
+            ) : (
+              <Typography.Text type="secondary">
+                Kein Logo hinterlegt. Der Druckkopf zeigt dann nur den Namen.
+              </Typography.Text>
+            )}
+            <Typography.Text type="secondary">PNG oder JPEG, höchstens 1 MiB.</Typography.Text>
+            {vorpruefung && (
+              <Alert
+                type="error"
+                showIcon
+                title="Logo nicht übernommen"
+                description={vorpruefung}
+              />
+            )}
+            <SpeicherFehler fehler={logoHoch.error} titel="Logo nicht übernommen" />
+            {/* `size="middle"`: Rot steht nicht bündig neben Neutralem (LFH-352). */}
+            <Space wrap size="middle">
+              <Upload
+                accept={LOGO_TYPEN.join(',')}
+                showUploadList={false}
                 disabled={!istAdmin}
-                onClick={() => {
-                  // Ein Grund aus einem früheren Versuch gehört nicht in einen frischen
-                  // Dialog — react-query hält `error` bis zum nächsten `mutate()` (LFH-535).
-                  logoEntfernen.reset();
-                  setEntfernenOffen(true);
+                beforeUpload={(datei) => {
+                  const grund = logoVorpruefung(datei);
+                  setVorpruefung(grund);
+                  // Ein alter Server-Grund stünde sonst neben dem neuen Versuch (`mutate`
+                  // räumt ihn nur, wenn die Vorprüfung besteht).
+                  logoHoch.reset();
+                  if (grund === null) logoHoch.mutate(datei);
+                  // Nie antds eigenen Upload: der Aufruf läuft über `api/organisation.ts`.
+                  return Upload.LIST_IGNORE;
                 }}
               >
-                Logo entfernen
-              </Button>
-            )}
+                <Button disabled={!istAdmin} loading={logoHoch.isPending}>
+                  {logo ? 'Logo ersetzen' : 'Logo hochladen'}
+                </Button>
+              </Upload>
+              {logo && (
+                <Button
+                  danger
+                  disabled={!istAdmin}
+                  onClick={() => {
+                    // Ein Grund aus einem früheren Versuch gehört nicht in einen frischen
+                    // Dialog — react-query hält `error` bis zum nächsten `mutate()` (LFH-535).
+                    logoEntfernen.reset();
+                    setEntfernenOffen(true);
+                  }}
+                >
+                  Logo entfernen
+                </Button>
+              )}
+            </Space>
           </Space>
-        </Space>
-      </Paneel>
+        </Paneel>
+
+        <Formularpaneel
+          titel="Taktische Zeichen"
+          beschreibung="Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar."
+        >
+          <Form.Item label="DV-102-Organisation" name="tz_organisation" style={{ maxWidth: 480 }}>
+            <Select
+              options={ORG_OPTIONEN}
+              placeholder="Organisation wählen"
+              loading={orgQuery.isLoading}
+            />
+          </Form.Item>
+        </Formularpaneel>
+        {/* Ein Speicherweg, ein Grund: direkt über dem Knopf, der ihn ausgelöst hat. */}
+        <SpeicherFehler fehler={speichern.error} />
+        <div {...speicherLeiste}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            disabled={!istAdmin}
+            loading={speichern.isPending}
+          >
+            Speichern
+          </Button>
+        </div>
+      </Form>
       <Modal
         open={entfernenOffen}
         title="Logo entfernen?"
@@ -289,40 +346,6 @@ export default function OrganisationTab() {
           <SpeicherFehler fehler={logoEntfernen.error} titel="Logo nicht entfernt" />
         </Space>
       </Modal>
-
-      {/* `disabled` am Formular sperrt die Felder, `disabled` am Knopf den Absendeweg — der Knopf
-         VERSCHWINDET nicht. Der Knopf steht in der sticky Leiste IM `<form>` wie auf den
-         Einstellungsseiten. */}
-      <Form<FormWerte>
-        form={form}
-        layout="vertical"
-        disabled={!istAdmin}
-        onFinish={(w) => speichern.mutate(w)}
-      >
-        <Formularpaneel
-          titel="Taktische Zeichen"
-          beschreibung="Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar."
-        >
-          <Form.Item label="DV-102-Organisation" name="tz_organisation" style={{ maxWidth: 480 }}>
-            <Select
-              options={ORG_OPTIONEN}
-              placeholder="Organisation wählen"
-              loading={orgQuery.isLoading}
-            />
-          </Form.Item>
-          <SpeicherFehler fehler={speichern.error} />
-        </Formularpaneel>
-        <div {...speicherLeiste}>
-          <Button
-            type="primary"
-            htmlType="submit"
-            disabled={!istAdmin}
-            loading={speichern.isPending}
-          >
-            Speichern
-          </Button>
-        </div>
-      </Form>
     </AdminPage>
   );
 }

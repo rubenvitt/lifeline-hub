@@ -2,15 +2,15 @@
 
 ## 1. Testgrundlage und Bausteine
 
-- [ ] 1.1 `test/utils.tsx`: Option `datenRouter` in `renderMitProviders` (D5) mit `rerender`-tauglichem Kinder-Kontext; belegt durch einen Test, der `useBlocker` mit der Option rendert und nach `rerender` den neuen Inhalt sieht
-- [ ] 1.2 `components/VerlassenRueckfrage.tsx` aus `EntwurfNavigationSchutz` herauslösen (D1), „Speichern und weiter“ nur mit `speichern`; `EntwurfNavigationSchutz` wird Hülle. Belegt durch einen neuen Test (blockiert bei Pfadwechsel, Bleiben erhält, Verwerfen führt aus, ohne `speichern` kein dritter Knopf) und unverändert grüne Tests von `BefehlDetailPage`
-- [ ] 1.3 `components/useFormularVerlassenSchutz.ts` (D2) per TDD: Fassungszähler, `aktiv: false` schaltet ab, `beforeunload` nur bei `ungespeichert`, Eingabe während des Speicherns bleibt geschützt, gescheitertes Speichern hält den Merker. Mutationsprobe: `gespeichert` ohne Fassungsvergleich macht den Weitertipp-Test rot
+- [x] 1.1 `test/utils.tsx`: Option `datenRouter` in `renderMitProviders` (D5) mit `rerender`-tauglichem Kinder-Kontext; belegt durch einen Test, der `useBlocker` mit der Option rendert und nach `rerender` den neuen Inhalt sieht
+- [x] 1.2 `components/VerlassenRueckfrage.tsx` aus `EntwurfNavigationSchutz` herauslösen (D1), „Speichern und weiter“ nur mit `speichern`; `EntwurfNavigationSchutz` wird Hülle. Belegt durch einen neuen Test (blockiert bei Pfadwechsel, Bleiben erhält, Verwerfen führt aus, ohne `speichern` kein dritter Knopf) und unverändert grüne Tests von `BefehlDetailPage`
+- [x] 1.3 `components/useFormularVerlassenSchutz.ts` (D2) per TDD: Fassungszähler, `aktiv: false` schaltet ab, `beforeunload` nur bei `ungespeichert`, Eingabe während des Speicherns bleibt geschützt, gescheitertes Speichern hält den Merker. Mutationsprobe: `gespeichert` ohne Fassungsvergleich macht den Weitertipp-Test rot
 
 ## 2. Organisation (U79)
 
-- [ ] 2.1 Rot zuerst: `OrganisationTab.test.tsx` „Name ändern, Leiste Speichern → PATCH enthält `name`, Toast nennt den Namen“ gegen den heutigen Stand rot sehen
-- [ ] 2.2 `api/organisation.ts`: `aendereOrganisation` (nur übergebene Felder); verwaiste `setzeOrgName`/`setzeOrgDefault` entfernen; belegt durch `pnpm typecheck`
-- [ ] 2.3 `OrganisationTab` auf ein Formular, einen PATCH, nur geänderte Felder, Toast nach D4, Fehler über der Leiste, Abgleich Server → Feld nur ohne offene Änderung, Verlassen-Schutz eingebunden. Bestehende Tests auf den einen Speicherweg umstellen (Enter im Namen, fremde Umbenennung, Refetch während des Tippens, gescheiterter Refetch, Nicht-Admin); neu: „nichts geändert → kein Aufruf, kein Toast“, „beide Felder → ein PATCH mit beiden“, „genau ein Speichern-Knopf“, Rückfrage beim Verlassen. Test aus 2.1 grün
+- [x] 2.1 Rot zuerst: `OrganisationTab.test.tsx` „Name ändern, Leiste Speichern → PATCH enthält `name`, Toast nennt den Namen“ gegen den heutigen Stand rot sehen
+- [x] 2.2 `api/organisation.ts`: `aendereOrganisation` (nur übergebene Felder); verwaiste `setzeOrgName`/`setzeOrgDefault` entfernen; belegt durch `pnpm typecheck`
+- [x] 2.3 `OrganisationTab` auf ein Formular, einen PATCH, nur geänderte Felder, Toast nach D4, Fehler über der Leiste, Abgleich Server → Feld nur ohne offene Änderung, Verlassen-Schutz eingebunden. Bestehende Tests auf den einen Speicherweg umstellen (Enter im Namen, fremde Umbenennung, Refetch während des Tippens, gescheiterter Refetch, Nicht-Admin); neu: „nichts geändert → kein Aufruf, kein Toast“, „beide Felder → ein PATCH mit beiden“, „genau ein Speichern-Knopf“, Rückfrage beim Verlassen. Test aus 2.1 grün
 
 ## 3. Schutz auf den übrigen Formularseiten (U80)
 

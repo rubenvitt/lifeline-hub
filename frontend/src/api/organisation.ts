@@ -9,17 +9,22 @@ export function ladeOrganisation(): Promise<OrganisationInfo> {
   return apiGet<OrganisationInfo>(PFAD);
 }
 
-/** L‑2: Setzt die taktische Default-Organisation für Verortungen. */
-export function setzeOrgDefault(tz_organisation: string): Promise<OrganisationInfo> {
-  return apiSend<OrganisationInfo>(PFAD, 'PATCH', { tz_organisation });
+/** Änderbare Felder der Organisation; was fehlt, bleibt auf dem Server unverändert. */
+export interface OrganisationAenderung {
+  name?: string;
+  tz_organisation?: string;
 }
 
 /**
- * Benennt die eigene Organisation um (LFH-22, nur Admin). Schickt NUR den Namen: der PATCH
- * nimmt beide Felder optional, ein mitgeschicktes `tz_organisation` überschriebe die Vorgabe.
+ * Ändert Name (LFH-22, nur Admin) und/oder DV-102-Organisation (L‑2) in EINEM PATCH (LFH-979).
+ * Schickt nur die übergebenen Felder: der PATCH nimmt beide optional, ein mitgeschicktes Feld
+ * überschriebe einen inzwischen fremd geänderten Stand.
  */
-export function setzeOrgName(name: string): Promise<OrganisationInfo> {
-  return apiSend<OrganisationInfo>(PFAD, 'PATCH', { name });
+export function aendereOrganisation(felder: OrganisationAenderung): Promise<OrganisationInfo> {
+  const body: OrganisationAenderung = {};
+  if (felder.name !== undefined) body.name = felder.name;
+  if (felder.tz_organisation !== undefined) body.tz_organisation = felder.tz_organisation;
+  return apiSend<OrganisationInfo>(PFAD, 'PATCH', body);
 }
 
 /**

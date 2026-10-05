@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { Link, Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import OrganisationTab from './OrganisationTab';
@@ -11,10 +12,38 @@ import { adminFixture } from '../test/fixtures';
 const admin = adminFixture();
 
 function renderTab() {
-  return renderMitProviders(<OrganisationTab />);
+  // Data Router: der Verlassen-Schutz nutzt `useBlocker` (LFH-979).
+  return renderMitProviders(<OrganisationTab />, { datenRouter: true });
 }
 
 describe('OrganisationTab', () => {
+  /**
+   * LFH-979: Die auffällige Leiste „Speichern" schickte nur die DV-102-Organisation und meldete
+   * trotzdem Erfolg — der umbenannte Name ging still verloren.
+   */
+  it('speichert einen umbenannten Namen über die Leiste „Speichern" und nennt ihn im Toast', async () => {
+    let patched: unknown = null;
+    server.use(
+      meHandler(admin),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json({ id: 1, name: 'DRK Nord', tz_organisation: 'hilfsorganisation' });
+      }),
+    );
+    renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.type(feld, ' Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(patched).toEqual({ name: 'DRK Nord' }));
+    expect(await screen.findByText('Name gespeichert')).toBeInTheDocument();
+    expect(screen.queryByText('DV-102-Organisation gespeichert')).toBeNull();
+  });
+
   it('lädt Org-Default und speichert Änderung', async () => {
     let patched: unknown = null;
     server.use(
@@ -67,8 +96,9 @@ describe('OrganisationTab', () => {
   });
 
   /**
-   * Der Speicherfehler steht an seinem Paneel, nicht im Toast (LFH-345). Die zweite Hälfte —
-   * er verschwindet beim nächsten Absenden — lässt einen stehenbleibenden Alert auffliegen.
+   * Der Speicherfehler steht an der Seite, nicht im Toast (LFH-345) — über der Leiste, die ihn
+   * ausgelöst hat (LFH-979). Die zweite Hälfte — er verschwindet beim nächsten Absenden — lässt
+   * einen stehenbleibenden Alert auffliegen.
    */
   it('zeigt einen Speicherfehler dauerhaft an der Seite und räumt ihn beim nächsten Versuch', async () => {
     let scheitern = true;
@@ -86,18 +116,117 @@ describe('OrganisationTab', () => {
 
     renderTab();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    const alert = await within(
-      screen.getByRole('region', { name: 'Taktische Zeichen' }),
-    ).findByText('Organisation gesperrt');
+    const select = await screen.findByLabelText('DV-102-Organisation');
+    await waitFor(() => expect(screen.getByLabelText('Name der Organisation')).toHaveValue('DRK'));
+    await userEvent.click(select);
+    await userEvent.click(await screen.findByText('Feuerwehr'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const alert = await screen.findByText('Organisation gesperrt');
     // NICHT in antds Message-Queue — die räumt sich nach ~3 s von selbst weg.
     expect(alert.closest('.ant-message')).toBeNull();
+    expect(alert.closest('form')).not.toBeNull();
 
     scheitern = false;
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(screen.queryByText('Organisation gesperrt')).not.toBeInTheDocument(),
     );
+  });
+
+  it('schickt Name und DV-102-Organisation in EINEM PATCH und nennt beide', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      meHandler(admin),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({ id: 1, name: 'DRK Nord', tz_organisation: 'feuerwehr' });
+      }),
+    );
+    renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.type(feld, ' Nord');
+    await userEvent.click(screen.getByLabelText('DV-102-Organisation'));
+    await userEvent.click(await screen.findByText('Feuerwehr'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    expect(await screen.findByText('Name und DV-102-Organisation gespeichert')).toBeInTheDocument();
+    expect(patches).toEqual([{ name: 'DRK Nord', tz_organisation: 'feuerwehr' }]);
+  });
+
+  it('speichert ohne Änderung nichts und meldet keinen Erfolg', async () => {
+    let gerufen = 0;
+    server.use(
+      meHandler(admin),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', () => {
+        gerufen += 1;
+        return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
+      }),
+    );
+    renderTab();
+    await waitFor(() => expect(screen.getByLabelText('Name der Organisation')).toHaveValue('DRK'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(gerufen).toBe(0);
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  /** Verlassen-Schutz (LFH-979): eine offene Änderung hält den Wechsel an, eine gespeicherte nicht. */
+  it('fragt vor dem Verlassen mit ungespeichertem Namen nach, nach dem Speichern nicht mehr', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK Nord', tz_organisation: 'hilfsorganisation' }),
+      ),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <>
+              <OrganisationTab />
+              <Link to="/anderswo">Weg</Link>
+            </>
+          }
+        />
+        <Route path="/anderswo" element={<div>ANDERSWO</div>} />
+      </Routes>,
+      { datenRouter: true },
+    );
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.type(feld, ' Nord');
+    await userEvent.click(screen.getByRole('link', { name: 'Weg' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(feld).toHaveValue('DRK Nord');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Name gespeichert');
+    await userEvent.click(screen.getByRole('link', { name: 'Weg' }));
+    expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
+  });
+
+  it('hat genau einen Speichern-Knopf (kein „Namen speichern" daneben)', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+    );
+    renderTab();
+    await screen.findByLabelText('Name der Organisation');
+    expect(screen.getAllByRole('button', { name: /speichern/i })).toHaveLength(1);
   });
 });
 
@@ -154,18 +283,20 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     renderTab();
     const feld = await screen.findByLabelText('Name der Organisation');
     await waitFor(() => expect(feld).toHaveValue('DRK'));
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
-    const alert = await within(screen.getByRole('region', { name: 'Name' })).findByText(
-      'Name ist zu lang (höchstens 120 Zeichen)',
-    );
+    await userEvent.type(feld, ' Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const alert = await screen.findByText('Name ist zu lang (höchstens 120 Zeichen)');
     expect(alert.closest('.ant-message')).toBeNull();
+    // Gescheitert heißt ungespeichert: die Eingabe bleibt im Feld.
+    expect(feld).toHaveValue('DRK Nord');
   });
 
-  it('Nicht-Admin: Namen speichern und Logo hochladen gesperrt, Grund genannt', async () => {
+  it('Nicht-Admin: Namensfeld, Speichern und Logo hochladen gesperrt, Grund genannt', async () => {
     server.use(http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)));
     renderTab();
     expect(await screen.findByText(STAMMDATEN_RECHTE_TEXT)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Namen speichern' })).toBeDisabled();
+    expect(screen.getByLabelText('Name der Organisation')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(await screen.findByRole('button', { name: 'Logo ersetzen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Logo entfernen' })).toBeDisabled();
   });
@@ -304,10 +435,10 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   });
 
   /**
-   * Drei unabhängige Paneele, drei Speicherwege: jeder Fehler steht an SEINEM Paneel. Eine feste
+   * Zwei unabhängige Speicherwege (Formular, Logo): jeder Fehler steht an SEINEM Ort. Eine feste
    * Rangfolge zeigte nur den ersten, und der Logo-Grund bliebe nach einem Namensfehler unsichtbar.
    */
-  it('zeigt jeden Fehler an seinem Paneel, auch wenn zwei Speicherwege nacheinander scheitern', async () => {
+  it('zeigt jeden Fehler an seinem Ort, auch wenn zwei Speicherwege nacheinander scheitern', async () => {
     server.use(
       meHandler(admin),
       http.get('/api/organisation', () =>
@@ -323,18 +454,16 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     renderTab();
     const feld = await screen.findByLabelText('Name der Organisation');
     await waitFor(() => expect(feld).toHaveValue('DRK'));
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
-    const namePaneel = screen.getByRole('region', { name: 'Name' });
-    expect(await within(namePaneel).findByText('Name abgelehnt')).toBeInTheDocument();
+    await userEvent.type(feld, ' Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Name abgelehnt')).toBeInTheDocument();
 
     const datei = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' });
     await userEvent.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, datei);
     const logoPaneel = screen.getByRole('region', { name: 'Logo' });
     expect(await within(logoPaneel).findByText('Kein gültiges PNG')).toBeInTheDocument();
-    // Beide stehen, jeder an seinem Ort — nicht einer von beiden an der Seite.
-    expect(within(namePaneel).getByText('Name abgelehnt')).toBeInTheDocument();
+    // Beide stehen, jeder an seinem Ort: der Formular-Grund nicht im Logo-Paneel.
     expect(within(logoPaneel).queryByText('Name abgelehnt')).toBeNull();
-    expect(within(namePaneel).queryByText('Kein gültiges PNG')).toBeNull();
     // Und kein zweiter Ort daneben.
     expect(screen.getAllByText('Name abgelehnt')).toHaveLength(1);
     expect(screen.getAllByText('Kein gültiges PNG')).toHaveLength(1);
@@ -360,7 +489,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     await waitFor(() => expect(feld).toHaveValue('DRK'));
     await userEvent.type(feld, '   ');
     expect(feld).toHaveValue('DRK   ');
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(feld).toHaveValue('DRK'));
   });
 
@@ -381,7 +510,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     const feld = await screen.findByLabelText('Name der Organisation');
     await waitFor(() => expect(feld).toHaveValue('DRK'));
     await userEvent.type(feld, ' KV');
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(feld).toHaveValue('DRK Kreisverband'));
   });
 
@@ -409,7 +538,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
    * Refetch den ALTEN Namen, und sobald der Merker fällt, spränge das Feld darauf zurück.
    * Geprüft wird deshalb der Stand OHNE Refetch (er hängt hier).
    */
-  it('zeigt nach „Namen speichern" sofort den gespeicherten Namen, auch wenn der Refetch nicht kommt', async () => {
+  it('zeigt nach dem Speichern sofort den gespeicherten Namen, auch wenn der Refetch nicht kommt', async () => {
     let gespeichert = false;
     server.use(
       meHandler(admin),
@@ -427,7 +556,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     await waitFor(() => expect(feld).toHaveValue('DRK'));
     await userEvent.clear(feld);
     await userEvent.type(feld, 'DRK Neu');
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await screen.findByText('Name gespeichert');
     await new Promise((r) => setTimeout(r, 30));
     expect(feld).toHaveValue('DRK Neu');
@@ -435,7 +564,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
 
   /**
    * Die Folge, wenn das Feld auf den alten Namen zurückspringt und der Refetch scheitert:
-   * ein zweites „Namen speichern" macht die Umbenennung still rückgängig.
+   * ein zweites Speichern macht die Umbenennung still rückgängig.
    */
   it('macht die Umbenennung bei gescheitertem Refetch nicht durch erneutes Speichern rückgängig', async () => {
     let gespeichert = false;
@@ -459,12 +588,16 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     await waitFor(() => expect(feld).toHaveValue('DRK'));
     await userEvent.clear(feld);
     await userEvent.type(feld, 'DRK Neu');
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(patches).toHaveLength(1));
     await new Promise((r) => setTimeout(r, 50));
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
-    await waitFor(() => expect(patches).toHaveLength(2));
-    expect(patches[1]).toEqual({ name: 'DRK Neu' });
+    expect(feld).toHaveValue('DRK Neu');
+    // Der Cache trägt die Antwort: ein zweites Speichern sieht keine Änderung und schickt
+    // weder den alten Namen noch sonst etwas.
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(patches).toEqual([{ name: 'DRK Neu' }]);
+    expect(feld).toHaveValue('DRK Neu');
   });
 
   it('zeigt ein hochgeladenes Logo sofort aus der Antwort, auch wenn der Refetch nicht kommt', async () => {
@@ -507,7 +640,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     const invalidiert = vi.spyOn(client, 'invalidateQueries');
     const feld = await screen.findByLabelText('Name der Organisation');
     await waitFor(() => expect(feld).toHaveValue('DRK'));
-    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await userEvent.type(feld, ' Nord');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['organisation'] }));
   });
 });
