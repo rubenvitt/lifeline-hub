@@ -92,6 +92,13 @@ Lese-Audit (wie Tiere insgesamt).
   Linker-Guard ein Linker, und die Schwärzung nähme das Protokoll mit); `ablage` hält den Ort
   lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
   protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
+- **UHS-Plan (LFH-999)** (Spec `uhs-plan`, Herleitung
+  `openspec/changes/archive/2026-10-05-lfh-999-uhs-plan-hintergrund/design.md`): der Plan unter
+  dem Platz-Layout ist **kein Anhang**, sondern eigene, bereinigte Bytes in `uhs_plan` (einer je
+  UHS, `uhs::plan`, `routes::uhs_plan`). Seine Anzeige (`GET …/uhs/{uid}/plan/bild`) schreibt
+  weder Lese-Audit noch ETB; nur die Übernahme aus einem UHS-Anhang (`…/plan/aus-anhang`) ist
+  EIN protokollierter Abruf, vor dem Lesen der Bytes über `support::anhang_bereinigt_kopieren`.
+  Keinen Verweis vom Plan auf einen Anhang einführen: das Audit verlöre seine Aussage.
 
 **Personen-Anhänge (LFH-757)** (Spec `personen-anhaenge`, Herleitung
 `openspec/changes/archive/2026-10-02-lfh-757-personen-anhaenge/design.md`): `einsatz_person_anhang` im Register;

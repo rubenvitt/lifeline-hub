@@ -86,32 +86,42 @@ function raeumeNachRechteentzug(
   });
 }
 
+/** Object-URLs, die eine Query dieses Prefix in ihren Daten trägt (leer: keine). */
+const OBJECT_URLS: Partial<Record<string, (daten: unknown) => string[]>> = {
+  [EINSATZ_KEYS.anhangHeicVorschau]: (daten) => {
+    const d = daten as { klein?: string; gross?: string } | undefined;
+    return d?.klein && d.gross ? [d.klein, d.gross] : [];
+  },
+  // Planbild einer UHS (LFH-999): die Daten sind die URL selbst.
+  [EINSATZ_KEYS.uhsPlanBild]: (daten) => (typeof daten === 'string' ? [daten] : []),
+};
+
 /**
- * Die HEIC-Vorschau (LFH-759) hält Object-URLs im Cache. Sie werden freigegeben, sobald die Query
- * den Cache verlässt (gcTime, Abmelden) oder ihre Daten wechseln (Rechteentzug setzt sie auf
- * `undefined`, ein Neuversuch ersetzt sie). Gemerkt wird je Query, welche URLs sie zuletzt trug.
+ * HEIC-Vorschau (LFH-759) und Planbild (LFH-999) halten Object-URLs im Cache. Sie werden
+ * freigegeben, sobald die Query den Cache verlässt (gcTime, Abmelden) oder ihre Daten wechseln
+ * (Rechteentzug setzt sie auf `undefined`, ein Neuversuch ersetzt sie). Gemerkt wird je Query,
+ * welche URLs sie zuletzt trug.
  */
-function heicVorschauFreigeben(client: QueryClient): void {
-  const gehalten = new Map<string, { klein: string; gross: string }>();
+function objectUrlsFreigeben(client: QueryClient): void {
+  const gehalten = new Map<string, string[]>();
   const freigeben = (hash: string) => {
     const alt = gehalten.get(hash);
     if (!alt) return;
-    URL.revokeObjectURL(alt.klein);
-    URL.revokeObjectURL(alt.gross);
+    for (const url of alt) URL.revokeObjectURL(url);
     gehalten.delete(hash);
   };
   client.getQueryCache().subscribe((ereignis) => {
     const { query } = ereignis;
-    if (query.queryKey[0] !== EINSATZ_KEYS.anhangHeicVorschau) return;
+    const urls = OBJECT_URLS[query.queryKey[0] as string];
+    if (!urls) return;
     if (ereignis.type === 'removed') {
       freigeben(query.queryHash);
       return;
     }
-    const daten = query.state.data as { klein?: string; gross?: string } | undefined;
-    const jetzt = daten?.klein && daten.gross ? { klein: daten.klein, gross: daten.gross } : null;
-    if (gehalten.get(query.queryHash)?.klein === jetzt?.klein) return;
+    const jetzt = urls(query.state.data);
+    if ((gehalten.get(query.queryHash)?.[0] ?? null) === (jetzt[0] ?? null)) return;
     freigeben(query.queryHash);
-    if (jetzt) gehalten.set(query.queryHash, jetzt);
+    if (jetzt.length > 0) gehalten.set(query.queryHash, jetzt);
   });
 }
 
@@ -153,7 +163,7 @@ export function erzeugeQueryClient(
       meldeServerErreichbar(false);
     }
   });
-  heicVorschauFreigeben(client);
+  objectUrlsFreigeben(client);
   // Ein höherer Schwärzungsstand in Kopf oder Liste räumt den Einsatz, ein aus der Liste
   // verschwundener Einsatz wird geräumt wie beim 404 (LFH-996, `offline/schwaerzungsWaechter.ts`).
   schwaerzungsWaechterStarten(client);

@@ -63,7 +63,7 @@ export function bildDownloadPfad(einsatzId: number, id: number): string {
  * meldet sich mit `loesen()` wieder ab, sonst sammelte das langlebige Signal des Aufrufers je
  * Download einen Hörer.
  */
-function eines(a: AbortSignal, b: AbortSignal): { signal: AbortSignal; loesen: () => void } {
+export function eines(a: AbortSignal, b: AbortSignal): { signal: AbortSignal; loesen: () => void } {
   if (typeof AbortSignal.any === 'function')
     return { signal: AbortSignal.any([a, b]), loesen() {} };
   const ctrl = new AbortController();

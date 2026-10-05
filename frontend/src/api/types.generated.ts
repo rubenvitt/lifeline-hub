@@ -4220,6 +4220,39 @@ export interface components {
             belegungen: components["schemas"]["BelegungAnzeige"][];
             material: components["schemas"]["EinsatzMaterialAnzeige"][];
             plaetze: components["schemas"]["PlatzAnzeige"][];
+            plan?: components["schemas"]["UhsPlanAnzeige"] | null;
+        };
+        /** @description Der Plan einer UHS ohne Bytes: Teil von `UhsDetail` und Antwort der schreibenden Routen. */
+        UhsPlanAnzeige: {
+            /** Format: int64 */
+            bild_breite: number;
+            /** Format: int64 */
+            bild_hoehe: number;
+            /** Format: int64 */
+            breite: number;
+            geaendert_at: string;
+            /**
+             * Format: int64
+             * @description Prozent: Helligkeit 20–100, Kontrast 50–150.
+             */
+            helligkeit: number;
+            hinterlegt_at: string;
+            /** Format: int64 */
+            kontrast: number;
+            mime: string;
+            /** @description Im dunklen Thema umkehren (helle Flächen werden dunkel). */
+            nacht_umkehren: boolean;
+            /** @description Prüfsumme der gespeicherten Bytes; ETag des Bildes und Cache-Schlüssel im Client. */
+            sha256: string;
+            /** Format: int64 */
+            uhs_id: number;
+            /**
+             * Format: int64
+             * @description Versatz und Breite in Koordinaten der Platzfläche; Höhe = breite × bild_hoehe / bild_breite.
+             */
+            x: number;
+            /** Format: int64 */
+            y: number;
         };
         /**
          * @description Status einer UHS. String = CHECK-Constraint. `aufgeloest` ist terminal.

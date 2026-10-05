@@ -992,6 +992,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
             )),
         )
+        // UHS-Plan (LFH-999): eigene Bytes, kein Anhang; die Anzeige schreibt kein Lese-Audit.
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plan",
+            put(routes::uhs_plan::hinterlegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024))
+                .patch(routes::uhs_plan::aendern)
+                .delete(routes::uhs_plan::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang",
+            post(routes::uhs_plan::uebernehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plan/bild",
+            get(routes::uhs_plan::bild).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plaetze",
             post(routes::einsatz_uhs::platz_anlegen),

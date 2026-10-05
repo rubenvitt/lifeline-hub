@@ -14,7 +14,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
-    rolle_setzen, setup_mit_pool_und_live, system_etb_inhalte,
+    plan_hochladen, png_bytes, rolle_setzen, setup_mit_pool_und_live, system_etb_inhalte,
 };
 
 // ---------- Helfer ----------
@@ -1451,6 +1451,77 @@ async fn laptop_liest_material_und_anhaenge_der_eigenen_uhs() {
     assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS");
     let (s, _) = anfrage(&app, "GET", &anhaenge(nord), &tablet, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Tablet liest keine Anhänge");
+}
+
+/// Status eines `GET` auf das Plan-Bild (ohne JSON-Antwort).
+async fn plan_bild_status(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64) -> StatusCode {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plan/bild"))
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+/// LFH-999: das Tablet sieht den Plan seiner UHS, ändert ihn aber nicht; der Laptop setzt ihn.
+#[tokio::test]
+async fn tablet_sieht_den_plan_laptop_setzt_ihn() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let bild = png_bytes(40, 30);
+
+    let (s, v) = plan_hochladen(&app, einsatz, nord, &geraet, "halle.png", &bild).await;
+    assert_eq!(s, StatusCode::OK, "Laptop setzt den Plan: {v}");
+    let (s, v) = plan_hochladen(&app, einsatz, sued, &admin, "halle.png", &bild).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, _) = plan_hochladen(&app, einsatz, sued, &geraet, "halle.png", &bild).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Laptop: fremde UHS");
+
+    assert_eq!(
+        plan_bild_status(&app, &tablet, einsatz, nord).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        plan_bild_status(&app, &tablet, einsatz, sued).await,
+        StatusCode::NOT_FOUND,
+        "fremde UHS"
+    );
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}"),
+        &tablet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["plan"]["bild_breite"], 40, "Detail trägt den Plan: {v}");
+
+    let (s, _) = plan_hochladen(&app, einsatz, nord, &tablet, "halle.png", &bild).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Tablet hinterlegt nicht");
+    let plan = format!("/api/einsaetze/{einsatz}/uhs/{nord}/plan");
+    let (s, _) = anfrage(&app, "PATCH", &plan, &tablet, Some(r#"{"x":20}"#)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Tablet ändert nicht");
+    let (s, _) = anfrage(&app, "DELETE", &plan, &tablet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Tablet entfernt nicht");
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{plan}/aus-anhang"),
+        &tablet,
+        Some(r#"{"anhang_id":1}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Tablet übernimmt nicht");
+    let (s, v) = anfrage(&app, "PATCH", &plan, &geraet, Some(r#"{"x":20}"#)).await;
+    assert_eq!(s, StatusCode::OK, "Laptop ändert: {v}");
 }
 
 #[tokio::test]

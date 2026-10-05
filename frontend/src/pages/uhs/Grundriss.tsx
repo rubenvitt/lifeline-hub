@@ -57,6 +57,8 @@ import type {
 } from '../../api/types';
 import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
+import { ladePlanBild, type UhsPlan } from '../../api/uhsPlan';
+import UhsPlanPaneel from './UhsPlanPaneel';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
@@ -830,6 +832,58 @@ type VerbleibWerte = { art: VerbleibArt; ziel?: string; transportmittel?: string
 /** Einziges Feld des Klick-Zuweisungswegs. */
 type ZuweisenWerte = { personId: number };
 
+/**
+ * CSS-Filter des Plans (LFH-999, design.md D8). Im dunklen Thema mit `nacht_umkehren` erst
+ * umkehren, dann dimmen: in umgekehrter Reihenfolge hellte „Helligkeit 40 %“ den Plan auf.
+ * `hue-rotate(180deg)` hält die Farbtöne annähernd (Fluchtwege bleiben grün).
+ */
+export function planFilter(plan: UhsPlan, dunkel: boolean): string {
+  const dimmen = `brightness(${plan.helligkeit}%) contrast(${plan.kontrast}%)`;
+  return dunkel && plan.nacht_umkehren ? `invert(1) hue-rotate(180deg) ${dimmen}` : dimmen;
+}
+
+/** Höhe des Plans in Pixeln der Fläche: die Breite trägt das Seitenverhältnis des Bildes. */
+export function planHoehe(plan: UhsPlan): number {
+  return Math.round((plan.breite * plan.bild_hoehe) / plan.bild_breite);
+}
+
+/**
+ * Plan unter den Platzkarten (LFH-999). Er trägt keine Information, die nicht auch in den Karten
+ * steht: kein Zeiger, kein Vorlesen, nicht ziehbar. Das Bild hängt am sha256, ein Live-Ereignis
+ * ohne neuen Plan lädt es nicht neu; die Object-URL gibt `erzeugeQueryClient` frei. Scheitert der
+ * Abruf, bleibt die Fläche ohne Bild — die Plätze sind ohne Plan voll bedienbar.
+ */
+function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
+  const { dunkel } = useRollen();
+  const bild = useQuery({
+    queryKey: einsatzKeys.uhsPlanBild(einsatzId, plan.uhs_id, plan.sha256),
+    queryFn: ({ signal }) => ladePlanBild(einsatzId, plan.uhs_id, plan.sha256, signal),
+    staleTime: Infinity,
+    retry: false,
+  });
+  if (!bild.data) return null;
+  return (
+    <img
+      data-testid="uhs-plan"
+      src={bild.data}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      style={{
+        position: 'absolute',
+        left: plan.x,
+        top: plan.y,
+        width: plan.breite,
+        height: planHoehe(plan),
+        maxWidth: 'none',
+        pointerEvents: 'none',
+        userSelect: 'none',
+        filter: planFilter(plan, dunkel),
+      }}
+    />
+  );
+}
+
 export default function Grundriss({
   einsatzId,
   uhs,
@@ -867,6 +921,10 @@ export default function Grundriss({
     setPlatzBearbeitung(uhs.status === 'geplant');
   }, [uhs.status]);
   const platzEditAktiv = platzBearbeitung && !schreibgeschuetzt && platzBearbeitbar;
+  // Bedienfeld des Plans (LFH-999): nur im Bearbeiten-Modus; das Tablet sieht nur das Bild.
+  const [planOffen, setPlanOffen] = useState(false);
+  const planPaneelSichtbar = planOffen && platzEditAktiv;
+  const planPaneelId = useId();
 
   // Die gezogene Person rendert im DragOverlay (Portal); Platz-Drags nutzen ihren Inline-Transform
   // innerhalb der Fläche.
@@ -915,8 +973,10 @@ export default function Grundriss({
   // Innenfläche so groß, dass alle Plätze hineinpassen — sie scrollt innerhalb der Mittelspalte.
   const maxX = Math.max(0, ...uhs.plaetze.map((p) => p.pos_x ?? 0));
   const maxY = Math.max(0, ...uhs.plaetze.map((p) => p.pos_y ?? 0));
-  const flaecheBreite = Math.max(700, maxX + 160);
-  const flaecheHoehe = Math.max(420, maxY + 140);
+  // Der Plan (LFH-999) zählt mit: die Fläche wächst auf seine rechte und untere Kante.
+  const plan = uhs.plan ?? null;
+  const flaecheBreite = Math.max(700, maxX + 160, plan ? plan.x + plan.breite : 0);
+  const flaecheHoehe = Math.max(420, maxY + 140, plan ? plan.y + planHoehe(plan) : 0);
 
   function invalidate() {
     // Promise zurückgeben: React Query hält die Mutation so bis zum Ende aller Refetches `pending`,
@@ -1194,24 +1254,46 @@ export default function Grundriss({
         }}
       >
         <Augenbraue als="h3">Unfallhilfsstelle</Augenbraue>
-        {!schreibgeschuetzt &&
-          platzBearbeitbar &&
-          (uhs.status === 'geplant' ? (
-            <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
-          ) : (
-            <Space>
+        {!schreibgeschuetzt && platzBearbeitbar && (
+          <Space>
+            {platzEditAktiv && (
               <Button
-                type={platzBearbeitung ? 'primary' : 'text'}
-                onClick={() => setPlatzBearbeitung((v) => !v)}
+                type="text"
+                aria-expanded={planPaneelSichtbar}
+                aria-controls={planPaneelId}
+                onClick={() => setPlanOffen((v) => !v)}
               >
-                {platzBearbeitung ? 'Bearbeiten beenden' : 'Plätze bearbeiten'}
+                Plan
               </Button>
-              {platzEditAktiv && (
-                <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />
-              )}
-            </Space>
-          ))}
+            )}
+            {uhs.status === 'geplant' ? (
+              <NeuerPlatzKnopf
+                einsatzId={einsatzId}
+                uhsId={uhs.id}
+                primaer
+                onSuccess={invalidate}
+              />
+            ) : (
+              <>
+                <Button
+                  type={platzBearbeitung ? 'primary' : 'text'}
+                  onClick={() => setPlatzBearbeitung((v) => !v)}
+                >
+                  {platzBearbeitung ? 'Bearbeiten beenden' : 'Plätze bearbeiten'}
+                </Button>
+                {platzEditAktiv && (
+                  <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />
+                )}
+              </>
+            )}
+          </Space>
+        )}
       </div>
+      {planPaneelSichtbar && (
+        <div id={planPaneelId}>
+          <UhsPlanPaneel einsatzId={einsatzId} uhs={uhs} />
+        </div>
+      )}
       <div
         style={{
           flex: 1,
@@ -1223,6 +1305,7 @@ export default function Grundriss({
         }}
       >
         <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
+          {plan && <PlanEbene einsatzId={einsatzId} plan={plan} />}
           {uhs.plaetze.map((p) => {
             const belegt = belegtAn(p.id);
             return (

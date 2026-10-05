@@ -66,6 +66,7 @@ pub mod stichwort;
 pub mod support;
 pub mod tier_anhang;
 pub mod uhs_anhang;
+pub mod uhs_plan;
 pub mod verpflegung;
 pub mod vorlagendokument;
 pub mod wetter;
