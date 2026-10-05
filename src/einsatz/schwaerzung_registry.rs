@@ -147,11 +147,9 @@ const G_OP_LABEL: &str =
 const G_OP_SNAP: &str =
     "Disponier-Snapshot von Betriebsmittel-Stammdaten (Fahrzeug/Material/Einheit der eigenen Org, kein Betroffenen-Bezug)";
 // Die Freitexte der Führungsmodule (Meldung, Auftrag, Nachforderung, Lagebericht, Befehl,
-// Pressemitteilung, Lagebesprechung) werden gescrubbt: Die Führungsdokumentation ist allein
-// der ETB-Wortlaut (G_ETB), die Module sind Arbeitsstand (LFH-701, Linie A).
-const G_PRESSE_LOG: &str =
-    "Presse-Log ist selbst der Nachweis der Pressearbeit (kein ETB-Eintrag, LFH-554 D9); \
-     Medium, Thema, Antwort und Freigabeangabe ohne Ansprechperson";
+// Pressemitteilung, Lagebesprechung) und des Presse-Logs werden gescrubbt: Die
+// Führungsdokumentation ist allein der ETB-Wortlaut (G_ETB), die Module sind Arbeitsstand
+// (LFH-701, Linie A; Presse-Log LFH-901).
 const G_ETB: &str =
     "ETB — rechtsverbindliche Führungs-/Einsatzdokumentation, gesetzliches Aufbewahrungs-Skelett";
 const G_TRIAGE: &str =
@@ -1824,11 +1822,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("etb_eintrag_id", G_FK),
         ],
     },
-    // Presse-Log: Ansprechperson und Erreichbarkeit sind personenbezogen. Medium (eine
-    // Redaktion, keine Person), Thema, Antwort und Freigabeangabe bleiben als Nachweis der
-    // Pressearbeit (LFH-554 design.md D9). Anders als die Führungsmodule schreibt das Log kein
-    // ETB; ob es Linie A folgen soll, ist eine eigene Abwägung (LFH-901; Herleitung
-    // `openspec/changes/archive/2026-10-01-lfh-701-fuehrungs-freitexte-klassifikation/design.md`, D5).
+    // Presse-Log: folgt Linie A wie die Führungsmodule (LFH-901). Nach der Sperre liest es keine
+    // Funktion; nachgewiesen wird die freigegebene Pressemitteilung im ETB, der Verweis darauf
+    // bleibt. Jeder Freitext geht, auch Medium (kann eine Person sein) und Freigabeangabe
+    // (nennt oft einen Namen). `antwort` nimmt den Platzhalter nur, wenn sie gesetzt ist: ein
+    // CHECK verlangt sie bei `beantwortet`. Herleitung
+    // `openspec/changes/lfh-901-presse-log-schwaerzung/design.md`, D1/D2.
     TabellenRegel {
         tabelle: "medienkontakt",
         scoping: Scoping::EinsatzId,
@@ -1838,14 +1837,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
             retain("art", G_ENUM),
-            retain("medium", G_PRESSE_LOG),
-            retain("thema", G_PRESSE_LOG),
+            scrub("medium", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("thema", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             scrub("kontakt_name", Strategie::NullSetzen, Z_EINSATZ),
             scrub("kontakt_erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             retain("eingang_at", G_ZEIT),
             retain("status", G_ENUM),
-            retain("antwort", G_PRESSE_LOG),
-            retain("freigabe_durch", G_PRESSE_LOG),
+            scrub("antwort", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
+            scrub("freigabe_durch", Strategie::NullSetzen, Z_EINSATZ),
             retain("pressemitteilung_id", G_FK),
             retain("bearbeitet_von_id", G_FK),
             retain("bearbeitet_at", G_ZEIT),

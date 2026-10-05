@@ -2,6 +2,16 @@
 
 ## MODIFIED Requirements
 
+### Requirement: Presse-Log bearbeiten, nicht löschen
+Medium, Thema, Ansprechperson, Erreichbarkeit und Eingang eines Medienkontakts SHALL sich
+bearbeiten lassen. Ein Medienkontakt MUST NOT gelöscht werden können. Während des Einsatzes ist
+das Log der Arbeitsstand der Pressearbeit; über die Schwärzung hinaus bleibt als Nachweis nur die
+freigegebene Pressemitteilung im ETB.
+
+#### Scenario: Kein Löschen
+- **WHEN** eine Person versucht, einen Medienkontakt zu löschen
+- **THEN** bietet die Oberfläche keine solche Aktion an, und das System hat keinen Endpunkt dafür
+
 ### Requirement: Datenschutz der Kontaktdaten
 Ansprechperson und Erreichbarkeit MUST als personenbezogen gelten. Die Schwärzung eines Einsatzes
 MUST beide entfernen, ebenso die Freitexte des Presse-Logs: Medium, Thema, Antwort und

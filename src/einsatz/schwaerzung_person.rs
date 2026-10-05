@@ -289,7 +289,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         art: PersonenArt::Medienkontakt,
         tabelle: "medienkontakt",
         bezug: Bezug::SelbstId,
-        spalten: &[("kontakt_name", Mit), ("kontakt_erreichbarkeit", Mit)],
+        spalten: &[
+            ("medium", Mit),
+            ("thema", Mit),
+            ("kontakt_name", Mit),
+            ("kontakt_erreichbarkeit", Mit),
+            ("antwort", Mit),
+            ("freigabe_durch", Mit),
+        ],
     },
 ];
 

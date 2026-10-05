@@ -898,7 +898,8 @@ pub(crate) fn schwaerzungs_audit(grund: &str) -> String {
          Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte, \
          die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen sowie die \
          Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, Lageberichte, \
-         Befehle, Pressemitteilungen, Lagebesprechungen)) wurden unwiderruflich entfernt. \
+         Befehle, Pressemitteilungen, Lagebesprechungen) und des Presse-Logs) wurden \
+         unwiderruflich entfernt. \
          Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
          operative Objekte, die Struktur von Chat, Erinnerungen und Führungsmodulen mit \
          Nummern, Zeitpunkten, Verfassern und Status), die Führungsdokumentation im ETB im \
@@ -2826,9 +2827,10 @@ mod tests {
         assert!(
             audit.contains(
                 "Freitexte der Führungsmodule (Meldungen, Aufträge, Nachforderungen, \
-                 Lageberichte, Befehle, Pressemitteilungen, Lagebesprechungen)"
+                 Lageberichte, Befehle, Pressemitteilungen, Lagebesprechungen) und des \
+                 Presse-Logs"
             ),
-            "Audit nennt die Führungs-Freitexte als entfernt: {audit}"
+            "Audit nennt die Führungs- und Presse-Log-Freitexte als entfernt: {audit}"
         );
         assert!(
             audit.contains("die Führungsdokumentation im ETB im Wortlaut"),

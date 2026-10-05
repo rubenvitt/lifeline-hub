@@ -26,6 +26,11 @@ pub const ZIEL_KLARTEXTE: &[&str] = &[
     "0151 1112223",
     "Maria Beispiel",
     "+49 511 1234567",
+    // LFH-901: alle Freitexte des Medienkontakts hängen an der Ansprechperson (Wurzel).
+    "NDR 1",
+    "Pegelstand Deichstraße",
+    "Pegel sinkt seit Mittag",
+    "EL Brandt",
 ];
 
 /// Klartexte der Nachbarn — müssen nach einem Personen-Vollzug stehen bleiben.
@@ -37,6 +42,7 @@ pub const NACHBAR_KLARTEXTE: &[&str] = &[
     "Stamm-Dora",
     "Anrufer Tom",
     "Paul Presse",
+    "Sperrung Brücke",
     "Anderer Einsatz Meier",
     "Mustermann-Ausweis.pdf",
     "Meier-Foto-E2.jpg",
@@ -316,9 +322,11 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
     let medien1 = id(
         pool,
         "INSERT INTO medienkontakt (einsatz_id, art, medium, thema, kontakt_name, \
-            kontakt_erreichbarkeit, eingang_at, angelegt_von_id) \
-         VALUES (?, 'anfrage', 'NDR 1', 'Pegel', 'Maria Beispiel', '+49 511 1234567', \
-            '2026-01-01 00:00:00', ?) RETURNING id",
+            kontakt_erreichbarkeit, eingang_at, status, antwort, freigabe_durch, \
+            angelegt_von_id) \
+         VALUES (?, 'anfrage', 'NDR 1', 'Pegelstand Deichstraße', 'Maria Beispiel', \
+            '+49 511 1234567', '2026-01-01 00:00:00', 'beantwortet', \
+            'Pegel sinkt seit Mittag', 'EL Brandt', ?) RETURNING id",
         &[e1, leitung],
     )
     .await;
@@ -326,7 +334,7 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
         pool,
         "INSERT INTO medienkontakt (einsatz_id, art, medium, thema, kontakt_name, eingang_at, \
             angelegt_von_id) \
-         VALUES (?, 'anfrage', 'HAZ', 'Pegel', 'Paul Presse', '2026-01-01 00:00:00', ?) \
+         VALUES (?, 'anfrage', 'HAZ', 'Sperrung Brücke', 'Paul Presse', '2026-01-01 00:00:00', ?) \
          RETURNING id",
         &[e1, leitung],
     )
