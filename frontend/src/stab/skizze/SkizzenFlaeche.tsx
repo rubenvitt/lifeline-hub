@@ -585,15 +585,18 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
           hoehe: Math.abs(nach.y - von.y),
         },
         <>
-          {/* Breite, unsichtbare Trefferlinie für Zeiger und Finger. */}
-          <line
-            x1={von.x}
-            y1={von.y}
-            x2={nach.x}
-            y2={nach.y}
-            stroke="transparent"
-            strokeWidth={linienTreffer / s}
-          />
+          {/* Breite, unsichtbare Trefferlinie für Zeiger und Finger; nicht im Druck: Firefox
+              zählt den Strich in die Box, sie ragte aus dem Blatt. */}
+          {!druck ? (
+            <line
+              x1={von.x}
+              y1={von.y}
+              x2={nach.x}
+              y2={nach.y}
+              stroke="transparent"
+              strokeWidth={linienTreffer / s}
+            />
+          ) : null}
           <VerbindungBild
             verbindung={v}
             von={von}
@@ -621,7 +624,15 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
         { x: p.x, y: y - treffer / 2, breite: p.breite, hoehe: treffer },
         <>
           {/* Trefffläche nach Dichte, auch bei kleinem Maßstab (Prüfliste Kriterium 1). */}
-          <rect x={p.x} y={y - treffer / 2} width={p.breite} height={treffer} fill="transparent" />
+          {!druck ? (
+            <rect
+              x={p.x}
+              y={y - treffer / 2}
+              width={p.breite}
+              height={treffer}
+              fill="transparent"
+            />
+          ) : null}
           <SchieneBild
             schiene={sch}
             platz={p}
@@ -656,12 +667,14 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
           hoehe: Math.max(...ys) - Math.min(...ys),
         },
         <>
-          <polyline
-            points={punkte.map((q) => `${q.x},${q.y}`).join(' ')}
-            fill="none"
-            stroke="transparent"
-            strokeWidth={linienTreffer / s}
-          />
+          {!druck ? (
+            <polyline
+              points={punkte.map((q) => `${q.x},${q.y}`).join(' ')}
+              fill="none"
+              stroke="transparent"
+              strokeWidth={linienTreffer / s}
+            />
+          ) : null}
           <StichBild punkte={punkte} geplant={st.status === 'geplant'} zustand={zustand(st.key)} />
         </>,
       ),
@@ -678,7 +691,9 @@ export default function SkizzenFlaeche(props: SkizzenFlaecheProps) {
         stellenLabel(st) + (meldung(st.key) ? `, ${meldung(st.key)}` : ''),
         p,
         <>
-          <rect x={p.x} y={p.y} width={p.breite} height={p.hoehe} fill="transparent" />
+          {!druck ? (
+            <rect x={p.x} y={p.y} width={p.breite} height={p.hoehe} fill="transparent" />
+          ) : null}
           <StelleBild stelle={st} platz={p} zustand={zustand(st.key)} meldung={meldung(st.key)} />
           {p.neu && !druck ? <NeuMarke platz={p} zustand={zustand(st.key)} /> : null}
         </>,

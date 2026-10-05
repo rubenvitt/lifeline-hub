@@ -417,6 +417,9 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
     expect(svg().getAttribute('viewBox')).toMatch(/^0 0 \d+(\.\d+)? \d+(\.\d+)?$/);
     expect(document.querySelectorAll('[opacity]').length).toBe(0);
     expect(document.querySelectorAll('[data-lfh="skizze-element"]').length).toBe(0);
+    // Unsichtbare Trefferflächen gehören nicht in den Druck: Firefox zählt den Strich in die
+    // Box eines Elements, eine breite Trefferlinie ragte so aus dem Blatt.
+    expect(svg().querySelectorAll('[stroke="transparent"], [fill="transparent"]').length).toBe(0);
   });
 
   it('ohne Abschnitte keine Fläche, nur der Grund', () => {

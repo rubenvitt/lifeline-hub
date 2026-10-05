@@ -142,9 +142,10 @@ for (const fall of [
       const wurzel = document.querySelector('.funkplan-print-root')!.getBoundingClientRect();
       const svg = blatt.querySelector('[data-lfh="skizze-flaeche"] svg')!;
       const s = svg.getBoundingClientRect();
-      const teile = Array.from(svg.querySelectorAll('g[data-key]')).map((g) =>
-        g.getBoundingClientRect(),
-      );
+      const teile = Array.from(svg.querySelectorAll('g[data-key]')).map((g) => ({
+        key: g.getAttribute('data-key'),
+        r: g.getBoundingClientRect(),
+      }));
       const anlage = document.querySelector('[data-lfh="druck-anlage"]')!;
       const sichtbar = (sel: string) =>
         Array.from(document.querySelectorAll(sel)).some((e) => e.getClientRects().length > 0);
@@ -154,14 +155,21 @@ for (const fall of [
         bedienung: sichtbar('.lfh-skizze-bedienung') || sichtbar('[data-lfh="skizze-paneel"]'),
         svg: { links: s.left, rechts: s.right, oben: s.top, unten: s.bottom, hoehe: s.height },
         wurzelRechts: wurzel.right,
-        teileAusserhalb: teile.filter(
-          (r) =>
-            r.width > 0 &&
-            (r.left < s.left - 0.5 ||
-              r.right > s.right + 0.5 ||
-              r.top < s.top - 0.5 ||
-              r.bottom > s.bottom + 0.5),
-        ).length,
+        // Mit Schlüssel und Box, damit ein Ausreißer im Bericht benannt ist (Firefox zählt
+        // anders als Chromium den Strich in die Box).
+        teileAusserhalb: teile
+          .filter(
+            ({ r }) =>
+              r.width > 0 &&
+              (r.left < s.left - 0.5 ||
+                r.right > s.right + 0.5 ||
+                r.top < s.top - 0.5 ||
+                r.bottom > s.bottom + 0.5),
+          )
+          .map(
+            ({ key, r }) =>
+              `${key} ${Math.round(r.left)}…${Math.round(r.right)} × ${Math.round(r.top)}…${Math.round(r.bottom)}`,
+          ),
         teile: teile.length,
         umbruch: getComputedStyle(anlage).breakBefore,
         kopf: blatt.querySelector('[data-lfh="druckkopf"]')?.textContent ?? '',
@@ -176,7 +184,7 @@ for (const fall of [
     expect(lage.kopf, 'Druckkopf „Fernmeldeskizze“').toContain('Fernmeldeskizze');
     expect(lage.zurueck, 'im Druck ist nichts zurückgenommen (kein Filter)').toBe(0);
     expect(lage.bedienung, 'keine Bedienung im Druck').toBe(false);
-    expect(lage.teileAusserhalb, 'jedes Element liegt in der Skizze').toBe(0);
+    expect(lage.teileAusserhalb, 'jedes Element liegt in der Skizze').toEqual([]);
     expect(lage.svg.rechts, 'die Skizze ragt nicht aus der Druckwurzel').toBeLessThanOrEqual(
       lage.wurzelRechts + SUBPIXEL,
     );
