@@ -103,7 +103,7 @@ export default defineConfig(({ mode }) => {
     },
     // maplibre-gl nicht vorbündeln (nur Dev-Server): maplibre baut seine Worker-URL relativ zu
     // `import.meta.url` und suchte den Worker sonst unter `node_modules/.vite/deps/`, wo er nicht
-    // liegt. Den Prod-Build versorgt `setWorkerUrl` in Kartenflaeche.tsx.
+    // liegt. Den Prod-Build versorgt `setWorkerUrl` in `pages/lagekarte/maplibreWorker.ts`.
     optimizeDeps: { exclude: ['maplibre-gl'] },
     server: {
       port: frontendPort, // undefined → Vite-Default (5173) bzw. nächster freier Port

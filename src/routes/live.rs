@@ -36,31 +36,94 @@ pub async fn stream(
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let erlaubt =
+    let mut erlaubt =
         erlaubte_module(&state.pool, einsatz_id, ctx.einsatz.org_id, &ctx.benutzer).await?;
+    // Ein Gerät (LFH-892) erhält nur die Ereignisse seiner Ansicht.
+    if let Some(g) = &ctx.geraet {
+        erlaubt = g.schneide_module(erlaubt);
+    }
 
     // Reconnect-Resync: mit `Last-Event-ID` liefert der LiveHub die verpassten Nachrichten nach
     // (bzw. `lagged` bei Ring-Overflow/Neustart). Der Filter greift auf beiden Wegen.
     let seit = crate::routes::support::last_event_id(&headers);
     let (replay, rx) = state.live.abonniere_mit_replay(einsatz_id, seit);
-    let org_rx = state.live.abonniere_org();
-    let stream = crate::routes::support::sse_stream_mit_replay(replay, rx, move |ev| {
+    let einsatz_strom = crate::routes::support::sse_stream_mit_replay(replay, rx, move |ev| {
         ev.sichtbar_fuer(&erlaubt)
-    })
+    });
     // Org-Ereignisse ohne `id:` und ohne Replay (LFH-734, design.md D4); gefiltert gegen den Benutzer,
-    // nicht gegen die Modulrechte des Einsatzes.
-    .merge(crate::routes::support::sse_org_stream(
-        org_rx,
-        OrgAbonnent::aus(&ctx.benutzer),
-    ));
+    // nicht gegen die Modulrechte des Einsatzes. Ein Gerät kennt weder Einsatzliste noch
+    // Stammdaten und bekommt sie nicht.
+    let org_strom = match &ctx.geraet {
+        None => futures::StreamExt::boxed(crate::routes::support::sse_org_stream(
+            state.live.abonniere_org(),
+            OrgAbonnent::aus(&ctx.benutzer),
+        )),
+        Some(_) => futures::StreamExt::boxed(futures::stream::empty()),
+    };
+    let stream = einsatz_strom.merge(org_strom);
 
     // Sofort ein erstes Byte: ein Proxy, der die Header erst mit dem ersten Body-Byte weitergibt
     // (etwa der Vite-Dev-Proxy), hielte sie sonst bis zum ersten Keep-Alive zurück, und
     // `EventSource.onopen` feuerte erst dann. Ein Kommentar trägt kein `id:` und lässt die
     // `Last-Event-ID` unberührt.
     let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")));
+    let ende = kopplung_ende(&state, ctx.geraet.as_ref());
 
-    Ok(Sse::new(verbunden.chain(stream)).keep_alive(KeepAlive::default()))
+    Ok(Sse::new(futures::StreamExt::take_until(
+        verbunden.chain(stream),
+        ende,
+    ))
+    .keep_alive(KeepAlive::default()))
+}
+
+/// Abstand, in dem ein Strom einer Gerätesitzung seine Kopplung neu prüft (Ablauf,
+/// Einsatzabschluss). Widerruf und Gerätetausch wirken sofort über den Broadcast.
+const KOPPLUNG_PRUEFTAKT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Endet, sobald die Kopplung einer Gerätesitzung beendet ist (LFH-892, design.md D7): sofort
+/// bei Widerruf und Gerätetausch über [`crate::live::LiveHub::melde_kopplung_ende`], sonst
+/// spätestens nach [`KOPPLUNG_PRUEFTAKT`]. Eine Personensitzung endet hier nie (Snapshot-Regel
+/// im Modulkopf bleibt).
+fn kopplung_ende(
+    state: &AppState,
+    geraet: Option<&crate::geraet::GeraetKontext>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+    let Some(geraet) = geraet else {
+        return Box::pin(std::future::pending());
+    };
+    let kopplung_id = geraet.kopplung_id;
+    // Vor dem ersten `await` abonniert: ein Widerruf zwischen Prüfung und Abo fängt der erste,
+    // sofortige Takt.
+    let mut rx = state.live.abonniere_kopplung_ende();
+    let pool = state.pool.clone();
+    Box::pin(async move {
+        let gueltig = |pool: sqlx::SqlitePool| async move {
+            matches!(
+                crate::geraet::repo::kontext_wenn_gueltig(&pool, kopplung_id).await,
+                Ok(Some(_))
+            )
+        };
+        let mut takt = tokio::time::interval(KOPPLUNG_PRUEFTAKT);
+        loop {
+            tokio::select! {
+                nachricht = rx.recv() => match nachricht {
+                    Ok(id) if id == kopplung_id => return,
+                    Ok(_) => {}
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                        if !gueltig(pool.clone()).await {
+                            return;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                },
+                _ = takt.tick() => {
+                    if !gueltig(pool.clone()).await {
+                        return;
+                    }
+                }
+            }
+        }
+    })
 }
 
 /// GET /api/live — der Org-Strom (LFH-734) für Tabs außerhalb eines Einsatzes.

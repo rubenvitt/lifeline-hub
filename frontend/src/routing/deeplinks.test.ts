@@ -60,6 +60,7 @@ import {
   einsatzdatenPfad,
   einsatzEinstellungenPfad,
   EINSTELLUNGEN_SEKTIONEN,
+  koppelnAdresse,
   erinnerungenPfad,
   kraefteuebersichtPfad,
   parseRouteId,
@@ -678,6 +679,14 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     );
     expect(einsatzEinstellungenPfad(E, 'module')).toBe('/einsaetze/5/einstellungen/module');
     expect(einsatzEinstellungenPfad(E, 'pegel')).toBe('/einsaetze/5/einstellungen/pegel');
+    expect(einsatzEinstellungenPfad(E, 'geraete')).toBe('/einsaetze/5/einstellungen/geraete');
+  });
+
+  it('trägt den Kopplungscode im Fragment, nie im Pfad oder in der Abfrage (LFH-892)', () => {
+    const adresse = new URL(koppelnAdresse('https://hub.example', 'ABCD1234'));
+    expect(adresse.pathname).toBe('/koppeln');
+    expect(adresse.search).toBe('');
+    expect(adresse.hash).toBe('#ABCD1234');
   });
 
   /**
@@ -691,6 +700,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'aufbewahrung',
       'module',
       'pegel',
+      'geraete',
     ]);
     expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
       einsatzEinstellungenPfad(E),

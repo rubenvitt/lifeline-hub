@@ -134,12 +134,22 @@ pub async fn detail(
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let id = ctx.einsatz.id;
-    Ok(Json(ctx.einsatz.anzeige(
+    let mut anzeige = ctx.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
-    )))
+    );
+    // Der Lagemonitor erhält keine Freitexte, die Personen nennen können (LFH-892, Spec
+    // `lagemonitor`, „Keine personenbezogenen Daten“): Sachverhalt, meldende Stelle und die
+    // Ortsangabe fehlen (eine Wohnanschrift ist personenbezogen). Die Karte braucht nur den Punkt.
+    if ctx.geraet.as_ref().map(|g| g.ansicht) == Some(crate::geraet::Funktionsansicht::Lagemonitor)
+    {
+        anzeige.sachverhalt = None;
+        anzeige.meldende_stelle = None;
+        anzeige.einsatzort = None;
+    }
+    Ok(Json(anzeige))
 }
 
 /// POST /api/einsaetze/{id}/abschliessen — Einsatz abschließen (read-only).
@@ -151,6 +161,11 @@ pub async fn abschliessen(
     let id = ctx.einsatz.id;
 
     let ergebnis = repo::abschliessen(&state.pool, id, ctx.benutzer.id).await?;
+    // Mit dem Abschluss enden alle Kopplungen (LFH-892): jede Gerätesitzung prüft den Einsatz
+    // bei der nächsten Anfrage, offene Live-Ströme enden hier sofort.
+    for kopplung_id in crate::geraet::repo::offene_ids(&state.pool, id).await? {
+        state.live.melde_kopplung_ende(kopplung_id);
+    }
     kopf_geaendert(&state, id).await;
     etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
     Ok(Json(ergebnis.einsatz.anzeige(
@@ -712,15 +727,15 @@ pub async fn modul_freigaben_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<HashMap<&'static str, crate::einsatz::berechtigung::ModulFreigabe>>, AppError> {
-    Ok(Json(
-        crate::einsatz::berechtigung::modul_freigaben(
-            &state.pool,
-            ctx.einsatz.id,
-            ctx.einsatz.org_id,
-            &ctx.benutzer,
-        )
-        .await?,
-    ))
+    let mut freigaben = crate::einsatz::berechtigung::modul_freigaben(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+    )
+    .await?;
+    crate::geraet::verenge_freigaben(ctx.geraet.as_ref(), &mut freigaben);
+    Ok(Json(freigaben))
 }
 
 #[derive(Debug, Deserialize)]
@@ -831,10 +846,12 @@ pub async fn mitglied_setzen(
     // VORHER. Ohne `org_id`-Filter träfe ein org-fremdes, deaktiviertes Konto auf
     // 409 „deaktiviert", ein unbekanntes auf 404 — eine Einsatzleitung (kein Admin!)
     // könnte damit den ID-Raum abklopfen und die Existenz fremder Konten feststellen.
-    let ziel_aktiv: Option<bool> = sqlx::query_scalar(
+    // Ein Gerätekonto (LFH-892) ist nie Mitglied: es zählt hier als unbekannt.
+    let ziel_aktiv: Option<bool> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT b.aktiv FROM benutzer b JOIN einsatz e ON e.id = ? \
-         WHERE b.id = ? AND b.org_id = e.org_id",
-    )
+         WHERE b.id = ? AND b.org_id = e.org_id AND {}",
+        crate::geraet::repo::OHNE_GERAETEKONTEN
+    )))
     .bind(id)
     .bind(ziel_id)
     .fetch_optional(&state.pool)
