@@ -173,6 +173,12 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
   await expect(page.locator('.etb-erfassung-sticky').getByPlaceholder(/^Inhalt …/)).toBeVisible();
   await schriftenGeladen(page);
   await page.evaluate(() => window.scrollTo(0, 0));
+  // Unter `md` startet die Leiste eingeklappt (LFH-955, D4). Gemessen wird die aufgeklappte:
+  // erst der Fokus im Feld bringt „Feld“ und die Chip-Zeile.
+  await klickeWieEinMensch(page, page.locator('.etb-erfassung-sticky textarea'));
+  await expect(
+    page.locator('.etb-erfassung-sticky').getByRole('button', { name: 'Feld', exact: true }),
+  ).toBeVisible();
 
   const lageDerZeilen = () =>
     zeilen.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().y * 2) / 2));
@@ -254,6 +260,111 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     description: `Leiste ${Math.round(kastenVorher.hoehe)} → ${Math.round(kastenNachher.hoehe)} px, Unterkante ${Math.round(kastenNachher.unterkante)} von ${kastenNachher.fenster}`,
   });
 });
+
+/**
+ * ETB ab `md` (LFH-955, D2): das Textfeld füllt die Erfassungszeile zwischen Präfix und
+ * „Vorschau“. Vorher maß es rund 160 px in einer 770 bis 870 px breiten Zeile. Mutationsprobe:
+ * ohne `feldFuellt` an der `Schnellerfassungszeile` fällt der Anteil unter 30 %.
+ */
+test('ETB (LFH-955): das Textfeld füllt ab md die Erfassungszeile', async ({ page }) => {
+  test.setTimeout(120_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Flaeche 955 Breite ${Date.now()}`);
+  const gemessen: string[] = [];
+  for (const flaeche of [
+    { width: 820, height: 1180 },
+    { width: 1180, height: 820 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await expect(page.locator('.etb-erfassung-sticky textarea')).toBeVisible();
+    await schriftenGeladen(page);
+    const m = await page.evaluate(() => {
+      const zeile = document
+        .querySelector('.etb-erfassung-sticky .lfh-schnellerfassung')!
+        .getBoundingClientRect();
+      const feld = document
+        .querySelector('.etb-erfassung-sticky textarea')!
+        .getBoundingClientRect();
+      return { zeile: zeile.width, feld: feld.width };
+    });
+    const anteil = m.feld / m.zeile;
+    gemessen.push(
+      `${flaeche.width}: Feld ${Math.round(m.feld)} von ${Math.round(m.zeile)} px = ${Math.round(anteil * 100)} %`,
+    );
+    expect(
+      anteil,
+      `${flaeche.width}: Textfeld ${Math.round(m.feld)} px in ${Math.round(m.zeile)} px Zeile`,
+    ).toBeGreaterThanOrEqual(0.6);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * ETB auf dem Handschirm (LFH-955, D4): beim Öffnen stehen mindestens zwei Einträge ganz über der
+ * Oberkante der angepinnten Leiste, auch ohne Abschließen-Recht. Vorher begann die Leiste bei
+ * y = 549 und der erste Eintrag bei y = 681. Mutationsprobe: ohne Einklappen der Leiste
+ * (`einklappbar` aus) oder mit dem alten Kopf wird der Fall rot.
+ */
+for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
+  test(`ETB (LFH-955): auf 390 × 844 stehen beim Öffnen zwei Einträge ganz im Bild (${rolle})`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `Flaeche 955 Hand ${Date.now()}`);
+    for (let n = 1; n <= 6; n += 1) {
+      const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+        data: {
+          typ: 'meldung',
+          inhalt: `Probe ${n}: Lage unverändert`,
+          von: 'ELW 1',
+          an: 'Leitstelle',
+        },
+      });
+      expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
+    }
+    if (rolle !== 'admin') await wechsleZuRolle(page, rolle, String(einsatzId));
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    const zeilen = page
+      .getByRole('region', { name: 'Einsatztagebuch' })
+      .getByTestId('etb-ereigniszeile');
+    await expect(zeilen).toHaveCount(6);
+    await expect(page.locator('.etb-erfassung-sticky textarea')).toBeVisible();
+    await schriftenGeladen(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    // Vorbedingung: die Seite rollt — sonst stünden die Einträge trivial im Bild.
+    const reserve = await page.evaluate(
+      () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    );
+    expect(reserve, 'Vorbedingung: die Seite hat eine Bildlaufreserve').toBeGreaterThan(0);
+
+    const m = await page.evaluate(() => {
+      const leiste = document.querySelector('.etb-erfassung-sticky')!.getBoundingClientRect();
+      const zeilen = [...document.querySelectorAll('[data-testid="etb-ereigniszeile"]')].map((z) =>
+        z.getBoundingClientRect(),
+      );
+      return {
+        oberkante: leiste.top,
+        leiste: leiste.height,
+        ganz: zeilen.filter((z) => z.top >= 0 && z.bottom <= leiste.top + 0.5).length,
+        erste: zeilen[0]?.top ?? -1,
+        fokus: document.activeElement?.tagName ?? '',
+      };
+    });
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `${rolle}: Leiste ab y = ${Math.round(m.oberkante)} (${Math.round(m.leiste)} px), erster Eintrag y = ${Math.round(m.erste)}, ganz sichtbar ${m.ganz}`,
+    });
+    expect(m.fokus, 'das Feld ist beim Laden nicht fokussiert').not.toBe('TEXTAREA');
+    expect(
+      m.ganz,
+      `ganz sichtbare Einträge über der Leiste (Leiste ab y = ${Math.round(m.oberkante)}, erster Eintrag y = ${Math.round(m.erste)})`,
+    ).toBeGreaterThanOrEqual(2);
+  });
+}
 
 /**
  * Bedienziele der ausgeklappten Zeitachse (LFH-899): der kleinste Abstand zwischen zwei Zielen und

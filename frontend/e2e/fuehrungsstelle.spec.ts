@@ -57,6 +57,12 @@ for (const breite of [1280, 390]) {
     await page.getByRole('button', { name: 'Erfassung', exact: true }).click();
     await page.getByRole('button', { name: 'ETB', exact: true }).click();
     await expect(page).toHaveURL(etbPfad(a));
+    // Unter `md` startet die Erfassungsleiste eingeklappt (LFH-955): Chips und Rufname-Abfrage
+    // stehen erst, wenn der Fokus in ihr liegt.
+    const insFeld = async () => {
+      if (breite < 768) await page.getByPlaceholder(/^Inhalt …/).click();
+    };
+    await insFeld();
     await expect(page.getByText('An: ELW 1', { exact: true })).toBeVisible();
     await expect(page.getByText('An: Florian A', { exact: true })).toHaveCount(0);
     await page.screenshot({
@@ -72,6 +78,7 @@ for (const breite of [1280, 390]) {
     expect(eingetragen.ok(), await eingetragen.text()).toBeTruthy();
     await wechsleZu(page, konto);
     await page.goto(etbPfad(b));
+    await insFeld();
     const abfrage = page.getByRole('group', { name: 'Mit welchem Rufnamen schreibst du ins ETB?' });
     await expect(
       abfrage.getByRole('combobox', { name: 'Rufname für Von und An', exact: true }),

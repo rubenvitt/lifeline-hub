@@ -90,6 +90,12 @@ interface SchnellerfassungszeileProps {
    * entscheidet anhand seiner Breite, die Hülle kennt keinen Breakpoint.
    */
   gestapelt?: boolean;
+  /**
+   * Das Kind der Feldzelle füllt die Zelle auch ungestapelt (LFH-955). Opt-in: eine Zelle mit
+   * mehreren Feldern nebeneinander (Infotelefon) streckt ihre Kinder nicht; ein Kind ohne eigene
+   * Breite (die Wurzel des `MarkdownEditor` im ETB) blieb sonst auf seiner Inhaltsbreite.
+   */
+  feldFuellt?: boolean;
   style?: CSSProperties;
 }
 
@@ -99,17 +105,20 @@ export default function Schnellerfassungszeile({
   hinweis,
   hinweiszeile,
   gestapelt = false,
+  feldFuellt = false,
   style,
 }: SchnellerfassungszeileProps) {
   const { token, rollen } = useRollen();
   const zellen = zellenStile(rollen, token, gestapelt);
   const feldZelle = (
     <div
-      className={
-        gestapelt
-          ? 'lfh-schnellerfassung__feld lfh-schnellerfassung__feld--gestapelt'
-          : 'lfh-schnellerfassung__feld'
-      }
+      className={[
+        'lfh-schnellerfassung__feld',
+        gestapelt && 'lfh-schnellerfassung__feld--gestapelt',
+        feldFuellt && 'lfh-schnellerfassung__feld--fuellt',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={zellen.feld}
     >
       {children}

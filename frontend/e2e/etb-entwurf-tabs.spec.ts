@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 // ETB-Entwurf-Tabs und Autosave; nach dem Anlegen wird direkt die ETB-Modul-URL angesteuert.
 
@@ -187,3 +188,37 @@ test('ETB-Entwurf-Autosave: bereits gespeicherter Entwurf kommt nach dem Reload 
   await page.reload();
   await expect(page.getByPlaceholder('Inhalt …')).toHaveValue(entwurf);
 });
+
+/**
+ * Das × verwirft einen Entwurf mit Inhalt erst nach der Rückfrage (LFH-957). Geklickt, nicht nur
+ * gesehen (LFH-355): ein Knopf hinter einer Überdeckung bestünde ein `toBeVisible()`. Auch als
+ * Führungspersonal, denn die Erfassung hängt an der Einsatzrolle (LFH-435).
+ */
+for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
+  test(`ETB-Entwurf verwerfen (${rolle}): × fragt nach, „Behalten“ hält den Text, „Verwerfen“ nimmt ihn`, async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const id = await einsatzAnlegenUndOeffnen(page, `E2E Verwerfen ${Date.now()}`);
+    if (rolle !== 'admin') {
+      await wechsleZuRolle(page, rolle, id);
+      await page.goto(`/einsaetze/${id}/etb`);
+    }
+
+    const feld = page.getByPlaceholder('Inhalt …');
+    const inhalt = `Wasserstand Pegel Mühlbach ${Date.now()}`;
+    await feld.fill(inhalt);
+    await expect.poll(() => entwurfGesichert(page, inhalt)).toBe(true);
+
+    const dialog = page.getByRole('dialog', { name: 'Entwurf verwerfen?' });
+    await page.getByRole('button', { name: 'Entwurf verwerfen' }).click();
+    await dialog.getByRole('button', { name: 'Behalten' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(feld).toHaveValue(inhalt);
+
+    await page.getByRole('button', { name: 'Entwurf verwerfen' }).click();
+    await dialog.getByRole('button', { name: 'Verwerfen' }).click();
+    await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
+    await expect.poll(() => entwurfGesichert(page, inhalt)).toBe(false);
+  });
+}
