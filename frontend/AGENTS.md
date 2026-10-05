@@ -477,6 +477,18 @@ und `pages/personen/`.
   mit (LFH-475, `scroll-padding` über `:root:has(...)` in `index.css`, Nachweis
   `e2e/fokus-verdeckung.spec.ts`); `speicherLeisteStil`/`feldrasterStil` rein, die Breite liest
   der Aufrufer aus `useViewport`.
+- **Eine Speichern-Leiste je Seite, und sie speichert jedes Feld der Seite** (LFH-979, Spec
+  `formularseiten`): kein zweites `<Form>` mit eigenem Knopf daneben; ein PATCH schickt nur die
+  geänderten Felder, der Toast nennt genau sie. Sofort wirkende Wege (Logo, Modulzeilen) sind
+  keine Felder.
+- **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
+  `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
+  `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
+  Erfolg; `aktiv` = Schreibrecht, `schluessel` = Datensatz-ID bei `key={id}`) plus
+  `<VerlassenRueckfrage>` (`components/VerlassenRueckfrage.tsx`, `useBlocker` bei Pfadwechsel,
+  „Bleiben“/„Verwerfen“). Seiten, die jede Zeile sofort speichern (`EinsatzModule`), nicht. Tests
+  solcher Seiten rendern mit `renderMitProviders(…, { datenRouter: true })` — `useBlocker` wirft
+  ohne Data Router.
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;

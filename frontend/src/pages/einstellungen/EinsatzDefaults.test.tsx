@@ -62,7 +62,7 @@ describe('EinsatzDefaults', () => {
   });
 
   it('sendet beim Speichern den VOLLEN Payload — Anzeige-Felder bleiben erhalten (Vollersatz)', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
@@ -92,7 +92,7 @@ describe('EinsatzDefaults', () => {
   // ---------- LFH-749: Dauer und Rechtsgrundlage je Datenkategorie ----------
 
   it('Spec „Vorschlag wird nicht eingesetzt“: Dauerfelder leer, je Kategorie Vorschlag mit Quelle', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     for (const name of ['Behandlung', 'Personenauskunft', 'Anhänge']) {
       const feld = await screen.findByLabelText(`Dauer ${name} (Tage)`);
       expect(feld).toHaveValue('');
@@ -103,7 +103,7 @@ describe('EinsatzDefaults', () => {
   });
 
   it('Spec „Dauer länger als Einsatz-Dauer“: Hinweis, dass die Einsatz-Frist zuerst greift', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     const feld = await screen.findByLabelText('Dauer Behandlung (Tage)');
     expect(screen.queryByText(/greift die Einsatz-Frist zuerst/)).not.toBeInTheDocument();
     await userEvent.type(feld, '3650');
@@ -111,7 +111,7 @@ describe('EinsatzDefaults', () => {
   });
 
   it('verlangt bei gesetzter Dauer eine Rechtsgrundlage und speichert nichts ohne sie', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     await userEvent.type(await screen.findByLabelText('Dauer Anhänge (Tage)'), '30');
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(await screen.findByText('Rechtsgrundlage angeben')).toBeInTheDocument();
@@ -119,7 +119,7 @@ describe('EinsatzDefaults', () => {
   });
 
   it('schickt Dauer und Rechtsgrundlage je Kategorie mit; leere Kategorien fehlen in der Liste', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     await userEvent.type(await screen.findByLabelText('Dauer Personenauskunft (Tage)'), '0');
     await userEvent.type(
       screen.getByLabelText('Rechtsgrundlage Personenauskunft'),
@@ -139,7 +139,7 @@ describe('EinsatzDefaults', () => {
         { kategorie: 'anhaenge', dauer_tage: 30, rechtsgrundlage: '§ 32b Abs. 3 NKatSG' },
       ],
     } as never);
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     expect(await screen.findByLabelText('Dauer Anhänge (Tage)')).toHaveValue('30');
     expect(screen.getByLabelText('Rechtsgrundlage Anhänge')).toHaveValue('§ 32b Abs. 3 NKatSG');
   });
@@ -148,7 +148,7 @@ describe('EinsatzDefaults', () => {
     const FELD = 'Skelett endgültig löschen nach (Tage ab Abschluss)';
 
     it('fragt beim erstmaligen Setzen zurück und sendet erst nach der Bestätigung', async () => {
-      renderMitProviders(<EinsatzDefaults />);
+      renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
       await userEvent.type(await screen.findByLabelText(FELD), '3650');
       fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -170,7 +170,7 @@ describe('EinsatzDefaults', () => {
     });
 
     it('Abbrechen sendet nichts', async () => {
-      renderMitProviders(<EinsatzDefaults />);
+      renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
       await userEvent.type(await screen.findByLabelText(FELD), '3650');
       fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const dialog = await screen.findByRole('dialog');
@@ -188,7 +188,7 @@ describe('EinsatzDefaults', () => {
         ...VOLL,
         skelett_dauer_tage: 3650,
       } as never);
-      renderMitProviders(<EinsatzDefaults />);
+      renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
       const feld = await screen.findByLabelText(FELD);
       expect(feld).toHaveValue('3650');
       await userEvent.clear(feld);
@@ -215,7 +215,7 @@ describe('EinsatzDefaults', () => {
     client.setQueryData(['einsatz-meldungen', 7, 'rueckmeldungen'], { frist_min: 60 });
     client.setQueryData(['einsatz-meldungen', 8, 'rueckmeldungen'], { frist_min: 60 });
     client.setQueryData(['einsatz-meldungen', 7, 'intern'], []);
-    renderMitProviders(<EinsatzDefaults />, { client });
+    renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
@@ -231,7 +231,7 @@ describe('EinsatzDefaults', () => {
   });
 
   it('geleertes Präfix-Feld geht als null raus (nicht "") — trim/leer→null-Semantik', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     const etb = await screen.findByLabelText('Präfix ETB');
     await userEvent.clear(etb);
@@ -245,7 +245,7 @@ describe('EinsatzDefaults', () => {
   });
 
   it('LFH-617: das Einsatznummer-Präfix ist editierbar und geht in den PUT', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     const feld = await screen.findByLabelText('Präfix Einsatznummer');
     expect(feld).toHaveValue('WF-');
@@ -268,7 +268,7 @@ describe('EinsatzDefaults', () => {
     client.setQueryData(['einsatz-modul-freigaben', 7], {});
     client.setQueryData(['einsatz-modul-freigaben', 8], {});
     client.setQueryData(['einsatz-modul-overrides', 7], {});
-    renderMitProviders(<EinsatzDefaults />, { client });
+    renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
     fireEvent.click(await screen.findByText('Admin'));
@@ -284,7 +284,7 @@ describe('EinsatzDefaults', () => {
   it('speichert Modul-Rollen-Default sofort per PUT', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({ etb: 'fuehrungskraft' } as never);
 
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     const etbSelect = await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' });
     fireEvent.mouseDown(etbSelect);
@@ -294,7 +294,7 @@ describe('EinsatzDefaults', () => {
   });
 
   it('stapelt die Quittung beim Serienschalten nicht (LFH-478)', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     for (const [i, modul] of ['ETB', 'Chat'].entries()) {
       fireEvent.mouseDown(
@@ -311,7 +311,7 @@ describe('EinsatzDefaults', () => {
   it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {
     // 'einsatzdaten' und 'einsatz-einstellungen' sind NICHT_AUSBLENDBAR — ihr Rollen-Select bleibt
     // gesperrt; ein ausblendbares Modul (ETB) ist editierbar.
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     expect(
       await screen.findByRole('combobox', { name: 'Benötigte Rolle: Einsatzdaten' }),
@@ -327,7 +327,7 @@ describe('EinsatzDefaults', () => {
       authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
     );
 
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     await screen.findByText('Aufbewahrung');
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
@@ -360,7 +360,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
 
   it('meldet den Fehler an der Seite, NICHT als Toast', async () => {
     vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     const treffer = await screen.findByText('Startwert zu groß');
@@ -372,7 +372,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     vi.mocked(speichereOrgEinstellungen)
       .mockRejectedValueOnce(new ApiError(422, 'Startwert zu groß'))
       .mockResolvedValue({ ...VOLL } as never);
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Startwert zu groß');
@@ -387,7 +387,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
       authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
     );
 
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     expect(await screen.findByText(/Nur Benutzer mit der Systemrolle/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
@@ -401,7 +401,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
   it('haelt Formular- und Modulfehler auseinander', async () => {
     vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
     vi.mocked(setzeOrgModulEinstellung).mockRejectedValue(new ApiError(409, 'Modul gesperrt'));
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Startwert zu groß');
@@ -417,7 +417,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
 
   it('schweigt ueber Berechtigungen, wenn welche da sind', async () => {
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     await screen.findByText('Aufbewahrung');
     expect(screen.queryByText(/Nur Benutzer mit der Systemrolle/)).not.toBeInTheDocument();
@@ -438,7 +438,7 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
   });
 
   it('traegt den Speichern-Knopf IM Formular, nicht im Kopf-Slot', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     const knopf = await screen.findByRole('button', { name: 'Speichern' });
     // Nur im `<form>` sendet Enter. Geprüft wird die Struktur — ein Tastendruck ist bei
@@ -457,7 +457,7 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
   }
 
   it('warnt beim Verlassen nur mit ungespeicherter Fassung', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     const feld = await screen.findByLabelText('Präfix ETB');
 
     // Gegenaussage zuerst: ohne offene Fassung schweigt der Guard.
@@ -473,7 +473,7 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
    * gibt.
    */
   it('schweigt wieder, sobald gespeichert ist', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     const feld = await screen.findByLabelText('Präfix ETB');
 
     fireEvent.change(feld, { target: { value: 'EB2-' } });
@@ -485,7 +485,7 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
   });
 
   it('gruppiert die Modul-Rollen-Defaults und filtert sie (M48, Durchgriff der Liste)', async () => {
-    renderMitProviders(<EinsatzDefaults />);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
     // Über Rollen abgefragt: „Einstellungen" ist zugleich Kategorie- und Modul-Label.
     expect(await screen.findByRole('heading', { name: 'Kommunikation' })).toBeInTheDocument();

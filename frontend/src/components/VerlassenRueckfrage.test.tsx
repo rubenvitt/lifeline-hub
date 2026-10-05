@@ -70,6 +70,26 @@ describe('VerlassenRueckfrage (LFH-979)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  /**
+   * Fällt der Merker, während die Rückfrage offen steht, läuft der angehaltene Wechsel weiter.
+   * Das trägt auch das Abmelden und das Sitzungsende (`useSitzungsWache` navigiert zu `/login`):
+   * auf den Admin-Seiten hängt `aktiv` am Benutzer, mit ihm fällt der Merker, und die Umleitung
+   * kommt ohne Klick durch. In den Einsatz-Einstellungen hängt das Recht an der Einsatzrolle;
+   * dort bleibt die Rückfrage stehen, und „Verwerfen" führt zur Anmeldung.
+   */
+  it('holt den angehaltenen Wechsel nach, sobald nichts mehr ungespeichert ist', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderMitProviders(<Seite ungespeichert />, {
+      route: '/formular',
+      datenRouter: true,
+    });
+    await user.click(screen.getByRole('link', { name: 'Weg' }));
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+
+    rerender(<Seite ungespeichert={false} />);
+    expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
+  });
+
   it('bietet „Speichern und weiter" nur mit `speichern` an', async () => {
     const user = userEvent.setup();
     const speichern = vi.fn(async () => {});

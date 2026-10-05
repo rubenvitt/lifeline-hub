@@ -56,7 +56,7 @@ function rendern() {
     <Routes>
       <Route path="/einsaetze/:id/einstellungen/allgemein" element={<EinsatzAllgemein />} />
     </Routes>,
-    { route: '/einsaetze/1/einstellungen/allgemein' },
+    { route: '/einsaetze/1/einstellungen/allgemein', datenRouter: true },
   );
 }
 

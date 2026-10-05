@@ -24,6 +24,8 @@ import {
   type FormWerteAllgemein,
 } from './einsatzEinstellungenForm';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { teilwortSuche } from '../../components/teilwortSuche';
 
 /**
@@ -42,6 +44,12 @@ export default function EinsatzAllgemein() {
   const [form] = Form.useForm<FormWerteAllgemein>();
   const speicherLeiste = useSpeicherLeiste();
   const daten = useEinstellungenDaten(einsatzId);
+  // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“): die Reiter sind eigene
+  // Routen, ein Wechsel baut die Sektion ab und verwürfe die Eingabe still.
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: daten.darfBearbeiten,
+    schluessel: einsatzId,
+  });
 
   // Kein `onError`-Toast: der Fehler steht als Alert über dem Formular, bis der nächste Versuch
   // läuft. Der Erfolg bleibt beim Toast.
@@ -77,6 +85,7 @@ export default function EinsatzAllgemein() {
 
   return (
     <>
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <SeitenHinweise
         fehler={speichern.error}
         // Nur bei fehlender Rolle. Einen abgeschlossenen Einsatz nennt schon der Alert im
@@ -88,7 +97,11 @@ export default function EinsatzAllgemein() {
         form={form}
         layout="vertical"
         initialValues={initialAllgemein(daten.einstellungen)}
-        onFinish={(werte) => speichern.mutate(werte)}
+        onValuesChange={schutz.geaendert}
+        onFinish={(werte) => {
+          const fassung = schutz.fassung();
+          speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+        }}
         disabled={!daten.darfBearbeiten}
       >
         <Formularpaneel titel="Einstieg">

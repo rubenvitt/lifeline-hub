@@ -21,11 +21,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *   geschützt.
  * - `gespeichert` nur bei Erfolg rufen: ein gescheitertes Speichern lässt den Schutz stehen.
  * - `aktiv: false` (kein Schreibrecht, Formular `disabled`): nie ungespeichert.
+ * - `schluessel` (Datensatz-ID): bleibt die Seite beim Wechsel auf einen anderen Datensatz
+ *   montiert (gleiche Route, anderer Parameter, Formular per `key` neu), gilt die verworfene
+ *   Eingabe des vorigen nicht als offene Änderung des neuen.
  */
-export function useFormularVerlassenSchutz({ aktiv }: { aktiv: boolean }) {
+export function useFormularVerlassenSchutz({
+  aktiv,
+  schluessel,
+}: {
+  aktiv: boolean;
+  schluessel?: string | number | null;
+}) {
   const zaehlerRef = useRef(0);
   const aktivRef = useRef(aktiv);
   const [stand, setStand] = useState({ geaendert: 0, gesichert: 0 });
+  const [letzterSchluessel, setLetzterSchluessel] = useState(schluessel);
+  if (schluessel !== letzterSchluessel) {
+    // Zustand beim Rendern anpassen statt per Effekt: sonst stünde ein Frame lang die alte
+    // Änderung am neuen Datensatz.
+    setLetzterSchluessel(schluessel);
+    setStand((s) => ({ ...s, gesichert: s.geaendert }));
+  }
 
   useEffect(() => {
     aktivRef.current = aktiv;

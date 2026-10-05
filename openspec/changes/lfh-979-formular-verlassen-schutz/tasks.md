@@ -14,15 +14,15 @@
 
 ## 3. Schutz auf den übrigen Formularseiten (U80)
 
-- [ ] 3.1 `FahrzeugDetailPage` und `PersonalDetailPage` einbinden; Seitenprobe Fahrzeug: Kennzeichen ändern, Menülink → Rückfrage; nach Speichern keine; Nicht-Admin keine. Tests auf `datenRouter: true`
-- [ ] 3.2 `EinsatzAllgemein`, `EinsatzVerhalten`, `EinsatzAufbewahrung` einbinden (`aktiv: darfBearbeiten`); Seitenprobe Allgemein: Feld ändern, Reiterwechsel → Rückfrage, „Bleiben“ erhält die Eingabe. Tests der Sektionen und `EinsatzEinstellungenPage.test.tsx` auf `datenRouter: true`; `EinsatzModule` unverändert, belegt durch seinen grünen Test ohne Data Router
-- [ ] 3.3 `AnzeigeEinstellungen` und `EinsatzDefaults` einbinden; in `EinsatzDefaults` `hatFassung` und eigenen `beforeunload` durch den Hook ersetzen, bestehender `beforeunload`-Test bleibt grün
-- [ ] 3.4 Übrige Tests, die eine der Seiten rendern (`rechteGate.test.tsx`, ggf. `EinsatzdatenPage.test.tsx`), auf `datenRouter: true`; belegt durch grünen Vitest-Gesamtlauf
-- [ ] 3.5 Abmelden/Sitzungsende mit offener Änderung prüfen (Risiko in design.md) und das Ergebnis im Test oder in einem Code-Kommentar festhalten
+- [x] 3.1 `FahrzeugDetailPage` und `PersonalDetailPage` einbinden; Seitenprobe Fahrzeug: Kennzeichen ändern, Menülink → Rückfrage; nach Speichern keine; Nicht-Admin keine. Tests auf `datenRouter: true`
+- [x] 3.2 `EinsatzAllgemein`, `EinsatzVerhalten`, `EinsatzAufbewahrung` einbinden (`aktiv: darfBearbeiten`); Seitenprobe Allgemein: Feld ändern, Reiterwechsel → Rückfrage, „Bleiben“ erhält die Eingabe. Tests der Sektionen und `EinsatzEinstellungenPage.test.tsx` auf `datenRouter: true`; `EinsatzModule` unverändert, belegt durch seinen grünen Test ohne Data Router
+- [x] 3.3 `AnzeigeEinstellungen` und `EinsatzDefaults` einbinden; in `EinsatzDefaults` `hatFassung` und eigenen `beforeunload` durch den Hook ersetzen, bestehender `beforeunload`-Test bleibt grün
+- [x] 3.4 Übrige Tests, die eine der Seiten rendern (`rechteGate.test.tsx`, ggf. `EinsatzdatenPage.test.tsx`), auf `datenRouter: true`; belegt durch grünen Vitest-Gesamtlauf
+- [x] 3.5 Abmelden/Sitzungsende mit offener Änderung prüfen (Risiko in design.md) und das Ergebnis im Test oder in einem Code-Kommentar festhalten
 
 ## 4. Regel
 
-- [ ] 4.1 `frontend/AGENTS.md` „Formularseiten“ um die Regel aus D6 ergänzen, `frontend/src/entwurf/AGENTS.md` auf den Baustein verweisen; belegt durch den Prettier-Schritt in `check-all.sh`
+- [x] 4.1 `frontend/AGENTS.md` „Formularseiten“ um die Regel aus D6 ergänzen, `frontend/src/entwurf/AGENTS.md` auf den Baustein verweisen; belegt durch den Prettier-Schritt in `check-all.sh`
 
 ## 5. Abschluss
 

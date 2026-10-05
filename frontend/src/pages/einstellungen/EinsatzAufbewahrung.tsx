@@ -14,6 +14,8 @@ import {
   type FormWerteAufbewahrung,
 } from './einsatzEinstellungenForm';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
 import FristPaneel from '../../aufbewahrung/FristPaneel';
 
@@ -35,6 +37,12 @@ export default function EinsatzAufbewahrung() {
   const [form] = Form.useForm<FormWerteAufbewahrung>();
   const speicherLeiste = useSpeicherLeiste();
   const daten = useEinstellungenDaten(einsatzId);
+  // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“): die Reiter sind eigene
+  // Routen, ein Wechsel baut die Sektion ab und verwürfe die Eingabe still.
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: daten.darfBearbeiten,
+    schluessel: einsatzId,
+  });
 
   // Kein `onError`-Toast — der Fehler steht als Alert über dem Formular.
   const speichern = useMutation({
@@ -61,6 +69,7 @@ export default function EinsatzAufbewahrung() {
 
   return (
     <>
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <SeitenHinweise
         fehler={speichern.error}
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
@@ -71,7 +80,11 @@ export default function EinsatzAufbewahrung() {
         form={form}
         layout="vertical"
         initialValues={initialAufbewahrung(daten.einstellungen)}
-        onFinish={(werte) => speichern.mutate(werte)}
+        onValuesChange={schutz.geaendert}
+        onFinish={(werte) => {
+          const fassung = schutz.fassung();
+          speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+        }}
         disabled={!daten.darfBearbeiten}
       >
         <Formularpaneel

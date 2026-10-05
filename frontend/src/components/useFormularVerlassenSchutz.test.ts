@@ -62,6 +62,19 @@ describe('useFormularVerlassenSchutz (LFH-979)', () => {
     expect(result.current.ungespeichert).toBe(false);
   });
 
+  it('vergisst die Änderung beim Wechsel auf einen anderen Datensatz', () => {
+    const { result, rerender } = renderHook(
+      ({ id }) => useFormularVerlassenSchutz({ aktiv: true, schluessel: id }),
+      { initialProps: { id: 1 } },
+    );
+    act(() => result.current.geaendert());
+    expect(result.current.ungespeichert).toBe(true);
+    rerender({ id: 2 });
+    expect(result.current.ungespeichert).toBe(false);
+    act(() => result.current.geaendert());
+    expect(result.current.ungespeichert).toBe(true);
+  });
+
   it('räumt den beforeunload-Hörer beim Abbau weg', () => {
     const entfernen = vi.spyOn(window, 'removeEventListener');
     const { result, unmount } = renderHook(() => useFormularVerlassenSchutz({ aktiv: true }));

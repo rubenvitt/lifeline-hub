@@ -19,6 +19,8 @@ import { listeBenutzer } from '../api/benutzer';
 import { globalKeys } from '../api/queryKeys';
 // Wiederverwendet statt nachgebaut — siehe Kopf von `FahrzeugDetailPage`.
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
 import type { Personal, StaerkePosition } from '../api/types';
@@ -58,6 +60,9 @@ export default function PersonalDetailPage() {
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
+  // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“); `schluessel` wie `key={id}`
+  // am Formular.
+  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin, schluessel: id });
 
   const personalQuery = useQuery({
     queryKey: globalKeys.personalListe('alle'),
@@ -126,6 +131,7 @@ export default function PersonalDetailPage() {
 
   return (
     <div>
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <Breadcrumb
         style={{ marginBottom: token.marginSM }}
         items={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
@@ -168,8 +174,12 @@ export default function PersonalDetailPage() {
           key={id}
           layout="vertical"
           disabled={!istAdmin}
+          onValuesChange={schutz.geaendert}
           initialValues={zuFormWerten(person)}
-          onFinish={(werte) => speichern.mutate(werte)}
+          onFinish={(werte) => {
+            const fassung = schutz.fassung();
+            speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+          }}
         >
           <Formularpaneel titel="Identität" dataUpdatedAt={personalQuery.dataUpdatedAt}>
             <Row gutter={token.margin}>

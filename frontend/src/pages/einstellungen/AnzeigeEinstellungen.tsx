@@ -20,6 +20,8 @@ import {
   zuUpdate,
 } from './orgEinstellungenForm';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
 import { teilwortSuche } from '../../components/teilwortSuche';
 
@@ -35,6 +37,8 @@ export default function AnzeigeEinstellungen() {
   const [form] = Form.useForm<FormWerteAnzeige>();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const speicherLeiste = useSpeicherLeiste();
+  // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“).
+  const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin });
 
   const einstellungenQuery = useQuery({
     queryKey: globalKeys.orgEinstellungen(),
@@ -71,7 +75,11 @@ export default function AnzeigeEinstellungen() {
 
   function speichern(werte: FormWerteAnzeige) {
     // Vollersatz-PUT: Basis aus geladenen Daten, Anzeige-Felder überschreiben.
-    speichernMutation.mutate({ ...zuUpdate(einstellungen), ...normalisiereAnzeige(werte) });
+    const fassung = schutz.fassung();
+    speichernMutation.mutate(
+      { ...zuUpdate(einstellungen), ...normalisiereAnzeige(werte) },
+      { onSuccess: () => schutz.gespeichert(fassung) },
+    );
   }
 
   return (
@@ -87,6 +95,7 @@ export default function AnzeigeEinstellungen() {
         />
       }
     >
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       {/* Der Speichern-Knopf liegt im `<form>` (sticky Leiste unten, `htmlType="submit"`), nicht
           im Kopf-Slot: nur im `<form>` sendet Enter ab. Ohne Recht steht er gesperrt da, mit
           Grund. */}
@@ -94,6 +103,7 @@ export default function AnzeigeEinstellungen() {
         form={form}
         layout="vertical"
         initialValues={initialAnzeige(einstellungen)}
+        onValuesChange={schutz.geaendert}
         onFinish={speichern}
         disabled={!istAdmin}
       >

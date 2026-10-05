@@ -18,6 +18,8 @@ import {
   type FormWerteVerhalten,
 } from './einsatzEinstellungenForm';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Formularpaneel } from '../../components/instrument';
 
 /** Tristate-Optionen für automatische ETB-Einträge (leer = erbt Org, true = An, false = Aus).
@@ -42,6 +44,12 @@ export default function EinsatzVerhalten() {
   const speicherLeiste = useSpeicherLeiste();
   const { abBreite } = useViewport();
   const daten = useEinstellungenDaten(einsatzId);
+  // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“): die Reiter sind eigene
+  // Routen, ein Wechsel baut die Sektion ab und verwürfe die Eingabe still.
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: daten.darfBearbeiten,
+    schluessel: einsatzId,
+  });
 
   // Kein `onError`-Toast — der Fehler steht als Alert über dem Formular.
   const speichern = useMutation({
@@ -73,6 +81,7 @@ export default function EinsatzVerhalten() {
 
   return (
     <>
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <SeitenHinweise
         fehler={speichern.error}
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
@@ -82,7 +91,11 @@ export default function EinsatzVerhalten() {
         form={form}
         layout="vertical"
         initialValues={initialVerhalten(einstellungen)}
-        onFinish={(werte) => speichern.mutate(werte)}
+        onValuesChange={schutz.geaendert}
+        onFinish={(werte) => {
+          const fassung = schutz.fassung();
+          speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+        }}
         disabled={!daten.darfBearbeiten}
       >
         <Formularpaneel
