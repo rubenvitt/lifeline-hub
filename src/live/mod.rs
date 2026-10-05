@@ -206,9 +206,10 @@ const KANAL_SWEEP_TAKT: Duration = Duration::from_secs(5 * 60);
 /// `id` = `"{epoch}-{n}"`: `n` ist pro Einsatz streng monoton, `epoch` ist prozess-eindeutig
 /// (Prozessstart). Nach einem Serverneustart ändert sich die epoch → alte `Last-Event-ID`s
 /// werden als `Luecke` erkannt statt auf wiederverwendete `n` zu aliasen (best-effort-Replay).
-/// Innerhalb des Prozesses wird ein `n` nie zweimal vergeben, auch nicht, wenn der Sweep den
-/// Kanal abräumt und ein neues Abonnement ihn neu anlegt (LFH-918): der neue Kanal beginnt
-/// hinter jeder bisher vergebenen Nummer (`Kanaele::hoechste_id`).
+/// Innerhalb des Prozesses vergibt ein Einsatz kein `n` zweimal, auch nicht, wenn der Sweep
+/// seinen Kanal abräumt und ein neues Abonnement ihn neu anlegt (LFH-918): der neue Kanal
+/// beginnt hinter jeder bisher im Prozess vergebenen Nummer (`Kanaele::hoechste_id`).
+/// Verschiedene Einsätze dürfen dieselbe Nummer tragen, der Replay läuft je Einsatz.
 #[derive(Clone, Debug)]
 pub struct LiveNachricht {
     pub id: String,
@@ -1011,6 +1012,36 @@ mod tests {
 
         let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
         assert!(matches!(replay, Replay::Events(v) if v.is_empty()));
+    }
+
+    /// Ein anderer Einsatz mit kleineren Nummern darf den Neubeginn nicht nach vorn ziehen:
+    /// sonst aliaste eine alte Id des abgeräumten Einsatzes auf eine neue Nummer.
+    #[tokio::test]
+    async fn neuanlage_beginnt_hinter_der_hoechsten_nummer_aller_einsaetze() {
+        let hub = LiveHub::new();
+        let mut a = hub.abonniere(1);
+        let _b = hub.abonniere(2);
+        for i in 0..10 {
+            hub.publiziere_event(1, LiveEvent::Etb, format!("a{i}"));
+        }
+        let mut alte_ids = Vec::new();
+        for _ in 0..10 {
+            alte_ids.push(a.recv().await.unwrap().id);
+        }
+        hub.publiziere_event(2, LiveEvent::Etb, "b".into()); // Einsatz 2 steht erst bei 1
+        drop(a);
+        hub.raeume_verwaiste(Instant::now());
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+        assert!(!hat_kanal(&hub, 1));
+        assert!(hat_kanal(&hub, 2));
+
+        // Alte Id mitten aus dem abgeräumten Bereich: nie „nichts verpasst", nie ein Replay.
+        let (replay, _rx) = hub.abonniere_mit_replay(1, Some(alte_ids[4].clone()));
+        assert!(matches!(replay, Replay::Luecke));
+        let (_, mut rx) = hub.abonniere_mit_replay(1, None);
+        hub.publiziere_event(1, LiveEvent::Etb, "neu".into());
+        let neu = rx.recv().await.unwrap();
+        assert!(parse_id(&neu.id).unwrap().1 > parse_id(&alte_ids[9]).unwrap().1);
     }
 
     #[tokio::test]
