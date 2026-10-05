@@ -665,7 +665,7 @@ pub struct KanalSetzen {
 // ── Fernmeldeskizze (LFH-893) ───────────────────────────────────────────────────────────────
 //
 // Gates wie die übrigen Stab-Routen; jede wirksame Schreibaktion sendet `LiveEvent::Stab`, kein
-// ETB. API-Vertrag: `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md` (D14). Die
+// ETB. API-Vertrag: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D14). Die
 // Linie 400 ↔ 422 wie überall (LFH-267): unbekannter Wert, Länge, fehlendes Pflichtfeld,
 // nicht-positive Größe → 400; Endpunkte, die nicht zusammenpassen oder nicht zum Einsatz
 // gehören → 422; abweichende Version → 409 mit dem gespeichertem Stand.

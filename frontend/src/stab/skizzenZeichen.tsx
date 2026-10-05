@@ -1,6 +1,6 @@
 /**
  * Zeichen-Bausteine der taktischen Fernmeldeskizze (LFH-893, D12/D13/D7 in
- * `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md`; Vorlage BBK „Taktische Zeichen
+ * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`; Vorlage BBK „Taktische Zeichen
  * im Bevölkerungsschutz“, Anhang J).
  *
  * Reine SVG-Inhalte: jeder Baustein ist eine `<g>`, die in ein `<svg>` mit Benutzerkoordinaten

@@ -892,7 +892,7 @@ export type InfotelefonStatus = S['InfotelefonStatus'];
 export type InfotelefonAnruf = S['InfotelefonAnrufAnzeige'];
 
 // ============================== LFH-893 Taktische Fernmeldeskizze ==============================
-// API-Vertrag: openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md (D14).
+// API-Vertrag: openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md (D14).
 export type Fernmeldeskizze = S['Fernmeldeskizze'];
 export type SkizzenLage = S['SkizzenLage'];
 /** 409 auf `PUT …/stab/fernmeldeskizze/lage/{element}`: Fehlertext und gespeicherter Stand. */

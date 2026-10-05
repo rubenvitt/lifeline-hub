@@ -101,7 +101,7 @@ import './funkplanPrint.css';
  *   `stab/sprechgruppenplan.ts`). Dieselben Quellen, dasselbe Lücken-Paneel, dieselbe Übernahme
  *   (sie schreibt immer die Tabelle); eine Druckwurzel, der Druckkopf nennt die aktive
  *   Darstellung. Die Tabelle klappt, die Sprechgruppen sind flach.
- * - **Taktische Fernmeldeskizze** (LFH-893, `openspec/changes/lfh-893-taktische-fernmeldeskizze/
+ * - **Taktische Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/
  *   design.md`): zwei weitere Quellen mit eigener Weiche — die Stellen des Kommunikationsplans und
  *   die Daten der Skizze (ohne Netz „nicht geladen“, die Skizze ist nicht offline). Das Netz
  *   (`baueFernmeldenetz`) entsteht EINMAL und speist Skizze, Lücken-Paneel und Übernahme; das

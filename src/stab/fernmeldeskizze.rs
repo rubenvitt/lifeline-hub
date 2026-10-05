@@ -15,7 +15,7 @@
 //! **Kein ETB** je Skizzenänderung: die Skizze ist ein Arbeitsmittel des S6 wie der
 //! Kommunikationsplan. Jede wirksame Änderung meldet das Stab-Ereignis (Route).
 //!
-//! Herleitung: `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md` (D3, D4, D14).
+//! Herleitung: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D3, D4, D14).
 
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};

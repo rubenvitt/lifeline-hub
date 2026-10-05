@@ -16,7 +16,7 @@ import type {
 
 /**
  * Client der taktischen Fernmeldeskizze (LFH-893). Vertrag:
- * `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md` (D5, D14).
+ * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D5, D14).
  *
  * - **Skizzendaten** (Lage, Schriftfeld, Komponenten, Verbindungen, Bereiche) unter
  *   `…/stab/fernmeldeskizze`, Recht des Stabs, Live über das `stab`-Ereignis.

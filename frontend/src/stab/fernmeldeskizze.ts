@@ -63,7 +63,7 @@ import type { Herkunft } from './sprechgruppenplan';
  * weg; eine fehlende Quelle wird benannt und ist nie eine leere. Erreichbarkeit und Rufnummern
  * kommen nicht ins Modell.
  *
- * Herleitung: `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md` (D2, D7, D8, D11).
+ * Herleitung: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md` (D2, D7, D8, D11).
  */
 
 /** Wie die eigene Führungsstelle in der Skizze heißt (Spec „Einsatzleitung ohne erfundene

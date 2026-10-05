@@ -13,7 +13,7 @@ gepflegt im Paneel auf Einsatzdaten, live über `einsatz`): erfasst (`fuehrungss
 eine Regel) steht sie als Zeile `fs` vor den Wurzeln und an der Skizzenwurzel und ist Gegenstelle
 der obersten Abschnitte in `verbindungsurteil`; sonst nennt `gegenstelleHinweis` sie als Lücke.
 
-**Fernmeldeskizze** (LFH-893, `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md`;
+**Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`;
 Vorgänger LFH-625): taktische Skizze nach BBK-Anhang J.5 als zweite Darstellung des Funkplans
 (`?ansicht=skizze`), kein Modul, keine Route. **Ein Modell:** `stab/fernmeldeskizze.ts:
 baueFernmeldenetz` (Stellen `fs`/`ab-`/`eh-`/`ks-`/`ko-`, Schienen `sg-` aus

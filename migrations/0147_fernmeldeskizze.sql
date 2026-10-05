@@ -8,7 +8,7 @@
 -- Fremdschlüssel. Jeder Löschpfad von Abschnitt, Einheit, Kommunikationsstelle und Komponente
 -- räumt sie im selben Transaktionsschritt ab (`stab::fernmeldeskizze::vergiss`, Guard-Test dort).
 --
--- Herleitung: openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md (D3, D4, D14).
+-- Herleitung: openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md (D3, D4, D14).
 
 -- Kanäle externer Stellen am Datensatz des Kommunikationsplans: eine Leitstelle ist eine Stelle,
 -- nicht zwei. Eine Funktion (stellenart = 'funktion') trägt keine; das prüft der Code (422).

@@ -36,7 +36,7 @@ import { vergleicheSprechgruppen } from './sprechgruppenOrdnung';
  *   Führungsfunktion ist nie Teilnehmer (wie `kanalbelegung` in `stab/luecken.ts`).
  *
  * Herleitung: `openspec/changes/archive/2026-10-04-lfh-848-kommunikationsplan/design.md` (D8),
- * `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md`.
+ * `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`.
  */
 
 export type Herkunft = 'katalog' | 'einsatzlokal';

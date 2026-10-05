@@ -290,5 +290,12 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
     jeder Löschpfad ruft `vergiss`, Schreibwege nur über `skizzenAktionen.ts`); `frontend/AGENTS.md`
     (Organigramm) angepasst; `src/AGENTS.md` braucht keine neue Regel (Schwärzung über die
     Registry). Verweise auf das Altmodell gegrept, keiner übrig.
-- [ ] 9.4 `./scripts/check-all.sh` grün, Vitest und Rust-Tests grün.
-- [ ] 9.5 `/opsx:archive lfh-893-taktische-fernmeldeskizze` im selben Branch vor dem PR.
+- [x] 9.4 `./scripts/check-all.sh` grün, Vitest und Rust-Tests grün.
+  - Erledigt: Bündel `schnell` grün (13 Schritte ohne Suiten), Vitest 701 Dateien / 10007 Tests
+    grün, Rust 4203 Tests grün (in Gruppen gefahren, ein Zug passte nicht ins Plattenkontingent der
+    Cloud-Sitzung; Desktop-Hülle unberührt, nicht gefahren). e2e Chromium: 608 grün, 63 rot unter
+    Last; im Nachlauf mit zwei Workern 44 grün, 19 rot. 18 davon sind auf `origin/alpha` genauso rot
+    (Anhang-Downloads, Fokus-Verdeckung, ETB-Zeitachse, Chat; Umgebung mit Chromium-Shim), die
+    Sprungpalette `palette-oeffnung.spec.ts:341` lief einzeln 3/3 und als Datei 10/10 grün. Keine
+    Skizzen-Spec rot. Firefox/WebKit lokal nicht vorhanden, die CI fährt sie.
+- [x] 9.5 `/opsx:archive lfh-893-taktische-fernmeldeskizze` im selben Branch vor dem PR.

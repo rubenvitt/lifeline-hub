@@ -78,7 +78,7 @@ import './kommunikationsplanPrint.css';
  * - **Kein Lagebericht** (D6): ein Bericht wird verteilt und fortgeschrieben, Rufnummern gehören
  *   nicht hinein. Druck ja.
  * - **Ohne Netz** lesbar (Unter-Key in `LAGEBILD_OFFLINE`), die Bedienung ist gesperrt (D9).
- * - **Fernmeldeskizze** (LFH-893, `openspec/changes/lfh-893-taktische-fernmeldeskizze/`): die
+ * - **Fernmeldeskizze** (LFH-893, `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/`): die
  *   Kanäle einer externen Stelle stehen als Nebentext (gepflegt in der Skizze); die Verbindungen
  *   der Skizze sind eine eigene Quelle mit Weiche. Sie belegen die Leitstelle als verbunden
  *   (`leitstelleOhneVerbindung`) und zählen in der Rückfrage beim Entfernen mit.

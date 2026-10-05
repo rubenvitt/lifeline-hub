@@ -1,6 +1,6 @@
 /**
  * Die taktische Fernmeldeskizze des S6 (LFH-893) — Zeichenfläche, Palette, Werkzeugleiste und
- * Eigenschaftspaneel. Herleitung: `openspec/changes/lfh-893-taktische-fernmeldeskizze/design.md`
+ * Eigenschaftspaneel. Herleitung: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/design.md`
  * (D1 Fläche, D4 Lage und ruhige Fläche, D6 Bedienung, D8 Rechte, D10 Hervorheben und Filter,
  * D13 Druck). Die Logik steht rein und getestet in `stab/skizze/` (`ansicht.ts` Zoom,
  * `ebenen.ts` Filter und Hervorheben, `geometrie.ts` Treffer, `bedienung.ts` Fokusfolge, Tasten

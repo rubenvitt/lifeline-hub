@@ -1,6 +1,6 @@
 //! Integrationstests der taktischen Fernmeldeskizze (LFH-893), Backend-Teil.
 //!
-//! Spec: `openspec/changes/lfh-893-taktische-fernmeldeskizze/specs/stab-fernmeldeskizze-bearbeitung/spec.md`,
+//! Spec: `openspec/changes/archive/2026-10-05-lfh-893-taktische-fernmeldeskizze/specs/stab-fernmeldeskizze-bearbeitung/spec.md`,
 //! API-Vertrag `design.md` D14. Die tragenden Aussagen: Lesen mit Vorgaben, Lage mit erwarteter
 //! Version (409 statt stillem Überschreiben), Neu anordnen verwirft nur Lagen, Komponenten,
 //! Verbindungen und Bereiche mit Validierung (400/422), Schriftfeld Tri-State, jede Änderung sendet
