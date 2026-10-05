@@ -30,6 +30,7 @@ import {
   type Ortsfilter,
   type Zeitfenster,
 } from '../lagemeldungen/zeitachse';
+import { KennungsLink } from '../components/kennungsLink';
 
 const FENSTER_OPTIONEN: SegmentOption<Zeitfenster | 'alle'>[] = [
   { wert: 'alle', label: 'Alle' },
@@ -106,9 +107,9 @@ export default function LagemeldungenPage() {
         // Deeplink zur Quellmeldung — der einzige Weg zurück zum Vorgang.
         <>
           {'aus '}
-          <Link to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
+          <KennungsLink to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
             Meldung #{l.meldung_lfd_nr}
-          </Link>
+          </KennungsLink>
         </>
       }
       hinweis={

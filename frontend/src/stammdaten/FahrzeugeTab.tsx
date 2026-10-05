@@ -1,6 +1,5 @@
 import { Button, Space, type TableColumnsType } from 'antd';
 import DemoMarke from '../components/DemoMarke';
-import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -17,6 +16,7 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
 import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 import { staerkeText } from '../anzeige/staerke';
+import { KennungsLink } from '../components/kennungsLink';
 
 export default function FahrzeugeTab() {
   const { benutzer } = useAuth();
@@ -58,9 +58,9 @@ export default function FahrzeugeTab() {
        */
       render: (_, f) => (
         <Space size={4}>
-          <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
+          <KennungsLink to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
             {f.funkrufname}
-          </Link>
+          </KennungsLink>
           {f.ist_demo && <DemoMarke />}
         </Space>
       ),

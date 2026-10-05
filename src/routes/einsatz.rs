@@ -266,6 +266,7 @@ pub async fn aufbewahrungsfrist_setzen(
         ctx.benutzer.id,
         neue_frist.as_deref(),
         &audit,
+        chrono::Utc::now(),
     )
     .await?;
     kopf_geaendert(&state, id).await;

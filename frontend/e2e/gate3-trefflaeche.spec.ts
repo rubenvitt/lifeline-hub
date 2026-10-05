@@ -3636,17 +3636,8 @@ test('Lagekarte (LFH-600): im Handschuh-Modus zoomt ein Tipp neben ein KRITIS-B�
   }
 });
 
-test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszeilen die Staffel', async ({
-  page,
-}) => {
-  test.setTimeout(180_000);
-  // Fükw OHNE `hasTouch`: mit grobem Zeiger belegte die App `komfortabel` vor, und die Wache
-  // könnte eine halb umgeschaltete Stufe nicht von einer gewählten unterscheiden. Den
-  // Tablet-Nachweis trägt `gefahren-matrix-zelle.spec.ts`.
-  await page.setViewportSize(FUEKW);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E 373 Sued ${Date.now()}`);
-  const gebiete = ['Sektor Sued 1', 'Sektor Sued 2'];
+/** Zwei Gefahrengebiete als Zonen, je ein kleines Quadrat nebeneinander. */
+async function gefahrengebieteSaeen(page: Page, einsatzId: string, gebiete: readonly string[]) {
   for (const [i, label] of gebiete.entries()) {
     const x = 10 + i / 20;
     await anlegen(
@@ -3673,6 +3664,20 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
       `Gefahrengebiet ${label}`,
     );
   }
+}
+
+test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszeilen die Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  // Fükw OHNE `hasTouch`: mit grobem Zeiger belegte die App `komfortabel` vor, und die Wache
+  // könnte eine halb umgeschaltete Stufe nicht von einer gewählten unterscheiden. Den
+  // Tablet-Nachweis trägt `gefahren-matrix-zelle.spec.ts`.
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 373 Sued ${Date.now()}`);
+  const gebiete = ['Sektor Sued 1', 'Sektor Sued 2'];
+  await gefahrengebieteSaeen(page, einsatzId, gebiete);
 
   const gemessen: string[] = [];
   const je = new Map<string, number>();
@@ -3700,19 +3705,101 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
       );
     }
 
+    // LFH-969: Umbenennen ist ein Knopf in Steuerhöhe statt antds 13-px-Stift, der Sprung ein
+    // einzelner Link — beide halten die Stufe.
+    const umbenennen = await haeltStufe(
+      page.getByRole('button', { name: 'Umbenennen', exact: true }),
+      soll,
+      `Umbenennen (${dichte})`,
+    );
+    const sprung = await haeltStufe(
+      page.getByRole('link', { name: 'Auf Karte zeigen', exact: true }),
+      soll,
+      `Auf Karte zeigen (${dichte})`,
+    );
+    await expect(page.locator('a button'), 'kein Knopf in einem Link').toHaveCount(0);
+    // Knopf und Sprung stehen nebeneinander: der Zielabstand der Stufe gilt zwischen ihnen.
+    const abstand = await abstandZuNachbarn(
+      page.locator('[data-lfh="gefahrengebiet-kopf"]'),
+      page.getByRole('button', { name: 'Umbenennen', exact: true }),
+    );
+    const sollAbstand = ZIELABSTAND[dichte];
+    if (sollAbstand != null) {
+      expect(abstand, `Abstand Umbenennen ↔ Sprung (${dichte})`).toBeGreaterThanOrEqual(
+        sollAbstand - SUBPIXEL,
+      );
+    }
+
     je.set(`${dichte} Matrixzelle`, zelle.kleinstes);
     je.set(`${dichte} Gebietszeile`, gebiet);
+    je.set(`${dichte} Umbenennen`, umbenennen);
+    je.set(`${dichte} Sprung`, sprung);
     gemessen.push(
-      `${dichte}: Zelle kurz ${zelle.kleinstes} / lang ${zelle.groesstes}, Gebietszeile ${gebiet}`,
+      `${dichte}: Zelle kurz ${zelle.kleinstes} / lang ${zelle.groesstes}, Gebietszeile ${gebiet}, ` +
+        `Umbenennen ${umbenennen}, Sprung ${sprung}, Abstand ${abstand}`,
     );
   }
 
-  for (const sorte of ['Matrixzelle', 'Gebietszeile']) gegenprobe(je, sorte);
+  for (const sorte of ['Matrixzelle', 'Gebietszeile', 'Umbenennen', 'Sprung'])
+    gegenprobe(je, sorte);
   // Obergrenze: in `kompakt` ist keine Zelle ≥ 48 px — sonst stünde sie auch ohne Staffel auf
   // komfortabel-Maß, und die Messung oben bewiese nichts.
   expect(
     groesstesKompakt,
     `Matrixzelle in kompakt: größtes Maß ${groesstesKompakt} px, Soll < 48`,
   ).toBeLessThan(48);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen der Staffel, „Umbenennen" fehlt', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 969 Lesend ${Date.now()}`);
+  const gebiete = ['Sektor Lesend 1', 'Sektor Lesend 2'];
+  await gefahrengebieteSaeen(page, einsatzId, gebiete);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/gefahren`);
+    await stelleDichte(page, dichte);
+    // Datenanker: die Matrix des ersten Gebiets steht.
+    await expect(page.getByRole('heading', { level: 3, name: gebiete[0] })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Bewertung / })).toHaveCount(58);
+    // Vorbedingung: der Rollenzweig steht, bevor gemessen wird.
+    await expect(page.getByText(/Nur Lesezugriff/)).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: 'Umbenennen', exact: true }),
+      'Vorbedingung: ohne Schreibrecht kein „Umbenennen"',
+    ).toHaveCount(0);
+    // Die Legende bleibt auch lesend da (LFH-969).
+    await expect(page.getByRole('note', { name: 'Legende der Matrix' })).toBeVisible();
+    await expect(page.getByText('58 Felder unbewertet')).toBeVisible();
+
+    let gebiet = Number.POSITIVE_INFINITY;
+    for (const label of gebiete) {
+      gebiet = Math.min(
+        gebiet,
+        await haeltStufe(
+          page.getByRole('button', { name: new RegExp(label) }),
+          soll,
+          `Gebietszeile ${label} (${dichte})`,
+        ),
+      );
+    }
+    const sprung = await haeltStufe(
+      page.getByRole('link', { name: 'Auf Karte zeigen', exact: true }),
+      soll,
+      `Auf Karte zeigen (${dichte})`,
+    );
+    je.set(`${dichte} Gebietszeile`, gebiet);
+    je.set(`${dichte} Sprung`, sprung);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): Gebietszeile ${gebiet}, Sprung ${sprung}`);
+  }
+  for (const sorte of ['Gebietszeile', 'Sprung']) gegenprobe(je, sorte);
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

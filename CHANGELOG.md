@@ -1,3 +1,28 @@
+## [1.0.0-alpha.80](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.79...v1.0.0-alpha.80) (2026-10-05)
+
+### Wichtige Änderungen
+
+- Der Einsatzbericht kann jetzt individuell zusammengestellt werden: Einzelne Blöcke lassen sich über Auswahlkästchen aktivieren oder deaktivieren. Zwei neue optionale Anlagen stehen zur Verfügung: eine Übersicht der eingesetzten Einheiten mit Einsatzzeiten sowie eine personenbezogene Aufstellung mit Namen, Funktionen und Einsatzzeiten.
+
+### Bedienung
+
+- Alle Bedienelemente mit Text (Auswahlkästchen, Navigationslinks im Seitenkopf) halten jetzt die vorgegebenen Mindesthöhen für Bedien­ziele in allen drei Dichte­stufen (kompakt/normal/handschuh). Die Schriftgröße bleibt unverändert, die zusätzliche Trefffläche wird durch transparente Ränder realisiert.
+- Der Sammelbanner im Meldungs­strom auf dem Lage-Dashboard verschiebt beim Eintreffen neuer Einträge keine Inhalte mehr – er liegt als Überlagerung über der Liste. Nach dem Klick auf „anzeigen" erhält die Liste den Fokus.
+
+### Schwärzung und Aufbewahrung
+
+- Bei der Schwärzung werden aus dem Presse-Log jetzt auch Medium, Thema, Antwort und Freigabe­angabe entfernt. Erhalten bleiben Art, Status, Zeitangaben und Verweise.
+- Die Schreib­sperre beim Schwärzen eines Einsatzes mit vielen Anhängen wurde deutlich verkürzt: Die Anhänge werden nicht mehr in einer einzigen Transaktion gelöscht, sondern einzeln im Nachlauf.
+
+### Berechtigungen
+
+- Das Heraufstufen einer Chat-Nachricht ins Einsatz­tageb­uch oder zum Auftrag verlangt jetzt die entsprechende Modul­freigabe. Ohne Berechtigung werden die Menü­einträge gesperrt angezeigt.
+- Beim Senden von Chat-Nachrichten können nur noch eigene freie Uploads oder Dateien verknüpft werden, die an mindestens einer nicht gelöschten Nachricht hängen. Dies verhindert das Verknüpfen fremder Entwürfe oder gesperrter Dateien.
+
+### Betrieb und Installation
+
+- Ein neuer Prüfschritt im Build-Prozess meldet Dateien, die sich nur in der Groß-/Klein­schreibung unterscheiden. Dies verhindert Build-Fehler auf Systemen mit groß-/klein­schreibungs­empfindlichen Dateisystemen.
+
 ## [1.0.0-alpha.79](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.78...v1.0.0-alpha.79) (2026-10-05)
 
 ### Betrieb und Installation

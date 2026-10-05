@@ -221,6 +221,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("sachverhalt", Strategie::NullSetzen, Z_EINSATZ),
             retain("anzahl_betroffene_initial", G_ZAEHLER),
             retain("retention_bis", G_ZEIT),
+            retain("retention_gesetzt_at", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
             retain("geschwaerzt_at", G_ZEIT),
         ],

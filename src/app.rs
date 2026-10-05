@@ -37,6 +37,8 @@ pub struct AppState {
     /// Automatische Aktualisierung der Offline-Karten (LFH-993): Vorgabe, Laufzustand des
     /// Wächters, Katalogquelle und Lader.
     pub auto_aktualisierung: crate::karte::auto_aktualisierung::AutoAktualisierung,
+    /// Lässt höchstens einen Sicherungs-Download zugleich zu (LFH-926, `GET /api/backup`).
+    pub backup_download: crate::backup::DownloadSperre,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).

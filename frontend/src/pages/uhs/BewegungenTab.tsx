@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -11,6 +10,7 @@ import StatusTag from '../../components/StatusTag';
 import { monoStil } from '../../components/instrument';
 import { belegungsArt } from '../../theme/statusFarben';
 import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
+import { KennungsLink } from '../../components/kennungsLink';
 
 interface Props {
   uhs: UhsDetail;
@@ -94,7 +94,11 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
             // auch unbekannte Personen. Ohne `ziel` trägt `zelle()` diesen Knoten unverändert in
             // die Kartentitelzeile.
             if (!personenById.has(personId)) return etikett;
-            return <Link to={pfade.personDetail(uhs.einsatz_id, personId)}>{etikett}</Link>;
+            return (
+              <KennungsLink to={pfade.personDetail(uhs.einsatz_id, personId)}>
+                {etikett}
+              </KennungsLink>
+            );
           },
         },
         {

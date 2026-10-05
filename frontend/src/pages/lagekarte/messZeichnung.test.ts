@@ -14,6 +14,7 @@ const td = vi.hoisted(() => ({
     entfernt: number[];
     mode: string;
     enabled: boolean;
+    stop: () => void;
   },
 }));
 
@@ -194,6 +195,21 @@ describe('createMessung (LFH-616)', () => {
     // … die Figur wächst weiter und wird weiter gemeldet.
     draw.change([1], 'update');
     expect(letzte(meldungen)).toEqual([{ type: 'Polygon', coordinates: [ring] }, false]);
+  });
+
+  it('zerstoeren() wirft nicht, wenn die Karte schon entfernt ist (LFH-943)', () => {
+    const { m, draw } = setup();
+    m.starten('strecke');
+    // Wie der Adapter nach `map.remove()`: `clear()` → `getSource(…).setData` auf undefined.
+    draw.stop = () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'setData')");
+    };
+    expect(() => m.zerstoeren()).not.toThrow();
+    // Danach meldet ein Nachzügler nichts mehr: die Messung gilt als beendet.
+    meldungen = [];
+    draw.features.set(9, linie(9, [0, 0], [1, 1]));
+    draw.change([9], 'create');
+    expect(meldungen).toEqual([]);
   });
 
   it('nach stoppen() meldet ein Nachzügler von terra-draw nichts mehr', () => {

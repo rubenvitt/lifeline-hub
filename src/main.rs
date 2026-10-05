@@ -117,14 +117,33 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
         Err(e) => tracing::warn!("Crash-Recovery der Offline-Downloads fehlgeschlagen: {e}"),
     }
+    // Crash-Recovery der Sicherungen (LFH-926): Teildateien eines abgebrochenen Laufs und
+    // Download-Kopien neben der DB wegräumen.
+    if let Some(verzeichnis) = &config.backup_verzeichnis {
+        backup::scheduler::raeume_teildateien(Path::new(verzeichnis));
+    }
+    match backup::db_verzeichnis(&pool).await {
+        Ok(Some(verzeichnis)) => {
+            let anzahl = backup::raeume_download_reste(&verzeichnis);
+            if anzahl > 0 {
+                tracing::info!(anzahl, "Reste abgebrochener Sicherungs-Downloads entfernt");
+            }
+        }
+        Ok(None) => {}
+        Err(e) => tracing::warn!("Download-Reste nicht geprüft: {e}"),
+    }
 
     let live = LiveHub::new();
+    // Live-Kanäle ohne Empfänger nach der Replay-Karenz abräumen (LFH-918).
+    live.starte_kanal_sweep();
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
     // Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone(), live.clone());
-    // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`.
-    lifeline_hub::backup::scheduler::starte_backup_scheduler(
+    // Automatische Sicherungen; No-op ohne `--backup-verzeichnis`. Das Stoppsignal setzt der
+    // Shutdown-Handler, das Handle wartet am Ende von `run_server` (LFH-926).
+    let (stopp, stopp_empfang) = tokio::sync::watch::channel(false);
+    let backup_task = lifeline_hub::backup::scheduler::starte_backup_scheduler(
         pool.clone(),
         lifeline_hub::backup::scheduler::BackupConfig {
             verzeichnis: config
@@ -134,6 +153,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             intervall: std::time::Duration::from_secs(config.backup_intervall_minuten * 60),
             behalten: config.backup_behalten,
         },
+        stopp_empfang,
     );
 
     // AV-Scan-Konfiguration prozessweit setzen (nicht in `AppState`, wegen der
@@ -271,6 +291,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         auto_vorgabe,
         fachebenen.client.clone(),
     );
+    let pool_fuer_ende = pool.clone();
     let state = AppState {
         pool,
         live,
@@ -284,6 +305,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .as_ref()
             .map(|t| t.als_str().to_string()),
         auto_aktualisierung,
+        backup_download: Default::default(),
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());
@@ -294,7 +316,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         },
     );
 
-    if config.tls {
+    let ergebnis = if config.tls {
         // rustls 0.23 wählt bei genau einem kompilierten Provider-Feature dessen Default
         // automatisch;
         // deshalb keine hartkodierte Provider-Zeile.
@@ -335,7 +357,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         })?;
         tracing::info!("Server (HTTPS) lauscht auf {}", addr);
 
-        let handle = graceful_handle();
+        let handle = graceful_handle(stopp.clone());
         // Slow-Loris-Schutz (LFH-231). Der innere Akzeptor läuft vor dem TLS-Handshake, das
         // Verbindungs-Permit deckt ihn mit ab.
         let mut server = axum_server::bind_rustls(addr, tls_config)
@@ -347,7 +369,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         server
             .handle(handle)
             .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
-            .await?;
+            .await
     } else {
         // `axum::serve` gibt keinen Zugriff auf die hyper-Parameter; ohne Header-Lese-Timeout wäre
         // der
@@ -357,7 +379,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         let listener = tokio::net::TcpListener::bind(&config.bind).await?;
         tracing::info!("Server lauscht auf {}", config.bind);
 
-        let handle = graceful_handle();
+        let handle = graceful_handle(stopp.clone());
         // `from_tcp` liefert ein `io::Result` (die Konvertierung nach tokio kann scheitern).
         let mut server = axum_server::from_tcp(listener.into_std()?)?
             .acceptor(verbindung::SemaphorAkzeptor::default());
@@ -365,10 +387,37 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         server
             .handle(handle)
             .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
-            .await?;
-    }
+            .await
+    };
 
+    herunterfahren(&stopp, backup_task, pool_fuer_ende).await;
+    ergebnis?;
     Ok(())
+}
+
+/// Frist, die eine beim Herunterfahren laufende Sicherung noch bekommt. Zusammen mit den 10 s
+/// des Graceful Shutdown bleibt das unter den 90 s, nach denen systemd per Vorgabe SIGKILL
+/// schickt; was länger dauert, räumt der nächste Start als Teildatei weg.
+const BACKUP_ENDE_FRIST: std::time::Duration = std::time::Duration::from_secs(45);
+
+/// Nach dem Serve (LFH-926): Sicherungs-Task stoppen und begrenzt abwarten, dann den Pool
+/// schließen, damit SQLite den WAL zurückschreibt und keine Verbindung mitten im Schreiben
+/// abreißt.
+async fn herunterfahren(
+    stopp: &tokio::sync::watch::Sender<bool>,
+    backup_task: Option<tokio::task::JoinHandle<()>>,
+    pool: sqlx::SqlitePool,
+) {
+    let _ = stopp.send(true);
+    if let Some(task) = backup_task {
+        backup::scheduler::auf_ende_warten(task, BACKUP_ENDE_FRIST).await;
+    }
+    if tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
+        .await
+        .is_err()
+    {
+        tracing::warn!("Datenbank-Pool beim Herunterfahren nicht rechtzeitig geschlossen");
+    }
 }
 
 /// Subkommando `sqlite-version`: die einkompilierte SQLite-Version ausgeben (LFH-233). Fragt die
@@ -420,12 +469,16 @@ async fn cmd_restore(
 
 /// `Handle` für den Graceful Shutdown mit 10-Sekunden-Frist für beide Serve-Pfade — eine
 /// SSE-Verbindung hielte den Shutdown sonst beliebig offen. `SocketAddr`, weil beide Pfade auf
-/// IP binden (`Handle<A: Address>` kann auch Unix-Sockets tragen).
-fn graceful_handle() -> axum_server::Handle<std::net::SocketAddr> {
+/// IP binden (`Handle<A: Address>` kann auch Unix-Sockets tragen). Das Signal stoppt zugleich die
+/// automatische Sicherung, damit während der Frist keine neue beginnt (LFH-926).
+fn graceful_handle(
+    stopp: tokio::sync::watch::Sender<bool>,
+) -> axum_server::Handle<std::net::SocketAddr> {
     let handle = axum_server::Handle::new();
     let h2 = handle.clone();
     tokio::spawn(async move {
         shutdown_signal().await;
+        let _ = stopp.send(true);
         h2.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
     });
     handle

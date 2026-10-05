@@ -3,7 +3,6 @@ import { Button, Flex, Modal, Popconfirm, Space, Typography } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
 import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge } from '../kommunikation';
@@ -13,6 +12,7 @@ import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
+import { KennungsLink } from '../components/kennungsLink';
 
 const { Text } = Typography;
 
@@ -177,7 +177,9 @@ export default function MeldungKarte({
           {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
           {m.lagerelevant && <StatusChip ton="bedien" wort="Lagerelevant ✓" />}
           {m.auftrag_id != null && darf('fremde-module') && (
-            <Link to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>↗ Auftrag</Link>
+            <KennungsLink to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>
+              ↗ Auftrag
+            </KennungsLink>
           )}
         </Space>
         <Space size={10} wrap>

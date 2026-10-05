@@ -1,7 +1,6 @@
 import { IconUhr } from '../icons';
 import { Button, Collapse, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
 import type { Auftrag } from '../api/types';
 import { AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -10,6 +9,7 @@ import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
+import { KennungsLink } from '../components/kennungsLink';
 
 const { Text } = Typography;
 
@@ -150,7 +150,9 @@ export default function AuftragKarte({
           />
           {a.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
           {a.quell_etb_eintrag_id != null && einsatzId != null && (
-            <Link to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>↗ ETB-Eintrag</Link>
+            <KennungsLink to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>
+              ↗ ETB-Eintrag
+            </KennungsLink>
           )}
         </Space>
         <Space size={10} wrap>

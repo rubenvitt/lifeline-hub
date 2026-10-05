@@ -22,8 +22,10 @@
 //! ## Warum die Ausnahmen auch vom Cap befreit sind
 //!
 //! SSE-Streams, Uploads und BLOB-Downloads halten ihren Slot über die ganze Dauer; ein
-//! routerweiter Cap würde von ihnen aufgezehrt (s. `src/app.rs`). Sie behalten stattdessen ihre
-//! eigene, engere Admission-Control (`ConcurrencyLimitLayer(16)` auf den Download-Routen).
+//! routerweiter Cap würde von ihnen aufgezehrt (s. `src/app.rs`). Die Anhang- und
+//! Dokument-Downloads haben stattdessen eine eigene, engere Grenze (`ConcurrencyLimitLayer(16)`,
+//! wartet auf einen Platz), der Sicherungs-Download eine Sperre für genau einen Lauf
+//! (`backup::DownloadSperre`, ein zweiter bekommt sofort 503, LFH-926).
 
 use crate::error::AppError;
 use axum::{
@@ -59,7 +61,8 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Org-Strom (LFH-734), dieselbe SSE-Dauerverbindung außerhalb eines Einsatzes.
     ("GET", "/api/live"),
     // Admin-Download der gesamten DB: VACUUM INTO + 64-KiB-Chunk-Stream. Dauer skaliert mit
-    // DB-Größe und Leitung des Clients.
+    // DB-Größe und Leitung des Clients. Eigene Sperre für einen Lauf und Leerlauf-Frist je Chunk
+    // in `routes::backup` (LFH-926).
     ("GET", "/api/backup"),
     // Multipart-Upload bis 26 MiB, plus clamd-INSTREAM-Scan im Request (Default 30 s).
     ("POST", "/api/einsaetze/{id}/anhaenge"),
