@@ -694,7 +694,7 @@ describe('Nacht-Algorithmus hält die Signalfarben auf dem Rollenwert (Neuentwur
       algorithm: theme.darkAlgorithm,
       token: antdToken(farbenDunkel),
     });
-    expect(dunkelToken.colorPrimaryBg).toBe(nurDunkel.colorPrimaryBg);
+    // `colorPrimaryBg` ist keine Ableitung mehr, sondern die Rolle `auswahlFlaeche` (LFH-984).
     expect(dunkelToken.colorBgBase).toBe(nurDunkel.colorBgBase);
   });
 });

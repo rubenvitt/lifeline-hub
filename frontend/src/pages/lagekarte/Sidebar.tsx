@@ -1259,6 +1259,7 @@ export default function Sidebar(props: SidebarProps) {
                   <div
                     style={{
                       padding: token.paddingXS,
+                      // Rolle `auswahlFlaeche` (LFH-984): die Beschreibung darin hält den Textboden.
                       background: token.colorPrimaryBg,
                       borderRadius: token.borderRadiusSM,
                     }}
