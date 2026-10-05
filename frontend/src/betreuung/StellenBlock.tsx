@@ -1,4 +1,6 @@
 import { Button, Space, Typography, theme } from 'antd';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useMemo, type CSSProperties } from 'react';
 import type {
   Betreuungsstelle,
@@ -64,12 +66,20 @@ const MENUE: readonly MenueEintrag<StelleAktion>[] = [
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
 
-/** Menü einer Zeile: unverortet zuerst „Auf Karte verorten". */
+/**
+ * Menü einer Zeile: unverortet zuerst „Auf Karte verorten" — bei gesperrter Lagekarte gesperrt
+ * mit Grund (LFH-888, M16).
+ */
 function stellenMenue(
   s: Pick<Betreuungsstelle, 'lat' | 'lon'>,
+  karteGesperrt: boolean,
 ): readonly MenueEintrag<StelleAktion>[] {
   const verortet = s.lat != null && s.lon != null;
-  return verortet ? MENUE : [{ key: 'verorten', label: 'Auf Karte verorten' }, ...MENUE];
+  if (verortet) return MENUE;
+  const verorten: MenueEintrag<StelleAktion> = karteGesperrt
+    ? { key: 'verorten', label: `Auf Karte verorten (${KEINE_BERECHTIGUNG})`, gesperrt: true }
+    : { key: 'verorten', label: 'Auf Karte verorten' };
+  return [verorten, ...MENUE];
 }
 
 const ARTEN = Object.keys(ART_LABEL) as BetreuungsstelleArt[];
@@ -84,6 +94,8 @@ const stellenSpalten = (
   namentlich: ReadonlyMap<number, number> | undefined,
   /** Mono-Stil der Zahl in „davon namentlich n". */
   zahlStil: CSSProperties,
+  /** Lagekarte für den Benutzer gesperrt (LFH-888): „Auf Karte verorten" gesperrt mit Grund. */
+  karteGesperrt: boolean,
 ) =>
   spaltenFuer<Betreuungsstelle>()([
     {
@@ -199,7 +211,7 @@ const stellenSpalten = (
                   </Button>
                 )}
                 <MenueAusloeser
-                  eintraege={stellenMenue(s)}
+                  eintraege={stellenMenue(s, karteGesperrt)}
                   zugaenglicherName={`Aktionen zu Stelle ${s.bezeichnung}`}
                   onWahl={(aktion) => onAktion(aktion, s)}
                 />
@@ -249,6 +261,7 @@ export default function StellenBlock({
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void;
 }) {
   const { token } = theme.useToken();
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const namentlichJeStelle = useMemo(
     () => (namentlich ? new Map(namentlich.map((n) => [n.stelle_id, n.anzahl])) : undefined),
     [namentlich],
@@ -261,8 +274,9 @@ export default function StellenBlock({
         onAktion,
         namentlichJeStelle,
         monoStil(token.fontSize),
+        karteGesperrt,
       ),
-    [darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle, token.fontSize],
+    [darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle, token.fontSize, karteGesperrt],
   );
   const aufklappen = useMemo(
     () => ({

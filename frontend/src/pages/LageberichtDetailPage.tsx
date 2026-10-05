@@ -10,6 +10,7 @@ import {
   Typography,
   theme,
 } from 'antd';
+import ZumEtbEintrag from '../etb/ZumEtbEintrag';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
@@ -17,12 +18,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import {
-  parseRouteId,
-  lageberichtePfad,
-  lageberichtDetailPfad,
-  etbPfad,
-} from '../routing/deeplinks';
+import { parseRouteId, lageberichtePfad, lageberichtDetailPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import {
   aktualisiereLagebericht,
@@ -408,9 +404,7 @@ function LageberichtDetail() {
             <Space wrap>
               <DruckKnopf />
               {!istEntwurf && bericht.etb_eintrag_id != null && (
-                <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>
-                  Zum ETB-Eintrag
-                </Link>
+                <ZumEtbEintrag einsatzId={einsatzId} eintragId={bericht.etb_eintrag_id} />
               )}
               {!istEntwurf && darfSchreiben && (
                 <Button

@@ -1,4 +1,6 @@
 import { Typography, theme } from 'antd';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useMemo } from 'react';
 import type { Evakuierungsbezirk } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -72,14 +74,22 @@ const MENUE: readonly (MenueEintrag & { key: BezirkAktion })[] = [
 
 /**
  * Menü einer Bezirkskarte: „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche hat — auch
- * OHNE Schreibrecht, denn ein Sprung ist Lesen. Die Handlungen folgen nur mit Schreibrecht.
+ * OHNE Schreibrecht, denn ein Sprung ist Lesen. Die Handlungen folgen nur mit Schreibrecht. Ist
+ * die Lagekarte gesperrt, steht der Sprung gesperrt mit Grund da (LFH-888, M16).
  */
 function bezirkMenue(
   b: Pick<Evakuierungsbezirk, 'flaechen'>,
   darfSchreiben: boolean,
+  karteGesperrt: boolean,
 ): readonly (MenueEintrag & { key: BezirkAktion })[] {
   const karte: (MenueEintrag & { key: BezirkAktion })[] =
-    b.flaechen > 0 ? [{ key: 'karte', label: 'Auf Karte zeigen' }] : [];
+    b.flaechen > 0
+      ? [
+          karteGesperrt
+            ? { key: 'karte', label: `Auf Karte zeigen (${KEINE_BERECHTIGUNG})`, gesperrt: true }
+            : { key: 'karte', label: 'Auf Karte zeigen' },
+        ]
+      : [];
   return darfSchreiben ? [...karte, ...MENUE] : karte;
 }
 
@@ -104,6 +114,7 @@ export default function EvakuierungBlock({
   onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void;
 }) {
   const { token } = theme.useToken();
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const kennzahl = useMemo(() => evakuierungKennzahl(bezirke), [bezirke]);
   const karte = useMemo<Kartenplan<Evakuierungsbezirk, BezirkSpalte>>(
     () => ({
@@ -121,12 +132,12 @@ export default function EvakuierungBlock({
         : undefined,
       // Ohne Schreibrecht bleibt nur der Sprung auf die Karte; ohne Fläche dann kein Auslöser.
       weitere: {
-        eintraege: (b) => bezirkMenue(b, darfSchreiben),
+        eintraege: (b) => bezirkMenue(b, darfSchreiben, karteGesperrt),
         zugaenglicherName: (b) => `Aktionen zu Bezirk ${b.bezeichnung}`,
         onWahl: (key, b) => onAktion(key as BezirkAktion, b),
       },
     }),
-    [darfSchreiben, onStandMelden, onAktion],
+    [darfSchreiben, karteGesperrt, onStandMelden, onAktion],
   );
   const aufklappen = useMemo(
     () => ({

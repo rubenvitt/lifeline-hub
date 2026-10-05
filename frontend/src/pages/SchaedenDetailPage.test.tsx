@@ -7,7 +7,7 @@ import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import SchaedenDetailPage from './SchaedenDetailPage';
-import { benutzerFixture } from '../test/fixtures';
+import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
@@ -119,6 +119,19 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       'href',
       '/einsaetze/1/lagekarte?platzieren=schaden%3A10',
     );
+  });
+
+  it('gesperrte Lagekarte: „Auf Karte verorten" steht gesperrt mit Grund (LFH-888)', async () => {
+    render(einsatzAktiv, basisSchaden({ lat: null, lon: null }), [
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
+      ),
+    ]);
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    const knopf = await screen.findByRole('button', { name: 'Auf Karte verorten' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    expect(screen.queryByRole('link', { name: 'Auf Karte verorten' })).toBeNull();
   });
 
   it('zeigt bei vorhandener Koordinate die Koordinate statt des Auftrags', async () => {

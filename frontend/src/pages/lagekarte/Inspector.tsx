@@ -1,4 +1,10 @@
 import { Button, Popconfirm, Space, Typography } from 'antd';
+import {
+  istPfadGesperrt,
+  istSprungGesperrt,
+  KEINE_BERECHTIGUNG,
+} from '../../einsatz/modulRegistry';
+import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { useId, useMemo } from 'react';
 import { renderSvg } from '@einsatzzeichen/core';
 // Nur noch für freie Zeichen, bis LFH-836 sie auf @einsatzzeichen umstellt.
@@ -169,6 +175,12 @@ export default function Inspector({
   const fachaufgabeId = useId();
   const organisationId = useId();
   const modulLink = markerToUrl(marker, einsatzId);
+  // Sprünge nur in freie Module (LFH-888, design.md D4): das Ziel entsteht aus dem Marker, also
+  // über den Pfad geprüft; gesperrt steht der Knopf mit Grund da.
+  const freigaben = useModulFreigaben(einsatzId);
+  const fachmodulGesperrt = istPfadGesperrt(modulLink, freigaben);
+  const etbGesperrt = istSprungGesperrt('etb', freigaben);
+  const fachmodulText = marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen';
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => markerBildUrl(marker.typ, marker.tz), [marker.typ, marker.tz]);
@@ -285,13 +297,37 @@ export default function Inspector({
         >
           {/* `display: block` am inline-Anker, sonst bliebe die Zeile auf Textbreite. Das ↗
               steht `aria-hidden`. */}
-          <Link to={modulLink} style={{ display: 'block', flex: '1 1 auto' }}>
-            <Button type="primary" block>
-              {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen'}
+          {fachmodulGesperrt ? (
+            <Button
+              type="primary"
+              block
+              disabled
+              title={KEINE_BERECHTIGUNG}
+              style={{ flex: '1 1 auto', width: 'auto' }}
+            >
+              {fachmodulText}
               <span aria-hidden="true">↗</span>
             </Button>
-          </Link>
-          {marker.typ === 'einheit' && (
+          ) : (
+            <Link to={modulLink} style={{ display: 'block', flex: '1 1 auto' }}>
+              <Button type="primary" block>
+                {fachmodulText}
+                <span aria-hidden="true">↗</span>
+              </Button>
+            </Link>
+          )}
+          {marker.typ === 'einheit' && etbGesperrt && (
+            <Button
+              block
+              disabled
+              title={KEINE_BERECHTIGUNG}
+              aria-label={`Einsatztagebuch zu ${marker.label}`}
+              style={{ flex: '1 1 auto', width: 'auto' }}
+            >
+              ETB<span aria-hidden="true">↗</span>
+            </Button>
+          )}
+          {marker.typ === 'einheit' && !etbGesperrt && (
             // Der zugängliche Name trägt die Einheit: „ETB" allein sagte nicht, wessen.
             <Link
               to={etbPfad(einsatzId, { einheit_id: marker.id })}

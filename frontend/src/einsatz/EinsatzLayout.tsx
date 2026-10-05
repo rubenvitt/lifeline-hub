@@ -3,11 +3,14 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
   erstesFreigegebenesModul,
+  freiesRueckwegModul,
+  istModulAusblendbar,
+  istModulGesperrt,
   kategorien,
   modulAusPfad,
   moduleNachKategorie,
@@ -15,6 +18,7 @@ import {
   type KategorieKey,
   type ModulEintrag,
 } from './modulRegistry';
+import ModulGesperrt from './ModulGesperrt';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -37,9 +41,9 @@ import {
   Wortmarke,
   kopfZelleStil,
 } from '../components/Kopfleiste';
-import { SeitenSackgasse } from '../components/SeitenZustand';
+import { SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
 import { useViewport } from '../components/useViewport';
-import type { EinsatzAnzeige } from '../api/types';
+import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
 import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
 import { einsaetzePfad, einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
@@ -450,7 +454,29 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
             <UnwetterHinweis einsatzId={einsatzId} benutzer={benutzer} freigaben={modulFreigaben} />
-            <Outlet />
+            {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
+               `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`):
+               meldet der Server für das Modul der Route `zugriff: false`, steht der Hinweis an der
+               Stelle der Seite — auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
+               Rahmen (sonst ginge beim Kaltstart die Anfrage der Seite an ein gesperrtes Modul
+               raus); Einsatzdaten und Einstellungen sind nie gesperrt und warten nicht. Ein
+               gescheiterter oder pausierter Abruf (offline) sperrt nicht, dann bleibt der
+               403-Zustand der Seite das Netz. */}
+            {aktuellesModul &&
+            istModulAusblendbar(aktuellesModul.key) &&
+            modulFreigabenQuery.isLoading ? (
+              <div data-testid="modulwaechter-laedt">
+                <SeitenSkeleton />
+              </div>
+            ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
+              <GesperrtesModul
+                einsatzId={einsatzId}
+                modul={aktuellesModul}
+                freigaben={modulFreigaben!}
+              />
+            ) : (
+              <Outlet />
+            )}
           </EinsatzAnzeigeProvider>
         </Content>
       </Layout>
@@ -481,5 +507,41 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         </Drawer>
       )}
     </Layout>
+  );
+}
+
+/**
+ * Der Wächter-Hinweis mit Rückweg (LFH-888, design.md D3): das freie Standardmodul, sonst der
+ * Überblick, sonst das erste freie Modul. Der Knopf erscheint erst nach dem Laden der
+ * Einstellungen — sonst zeigte er kurz auf den Überblick und wechselte unter dem Zeigefinger
+ * (wie `ModulStub`).
+ */
+function GesperrtesModul({
+  einsatzId,
+  modul,
+  freigaben,
+}: {
+  einsatzId: number;
+  modul: ModulEintrag;
+  freigaben: ModulFreigaben;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: einsatzKeys.einstellungen(einsatzId),
+    queryFn: () => ladeEinstellungen(einsatzId),
+  });
+  const ziel = freiesRueckwegModul(freigaben, data?.standard_modul);
+  return (
+    <ModulGesperrt
+      modul={modul}
+      ausgeblendet={freigaben[modul.key]?.sichtbar === false}
+      rueckweg={
+        isLoading
+          ? undefined
+          : {
+              pfad: einsatzModulPfad(einsatzId, modulZielRoute(ziel)),
+              label: `${ziel.label} öffnen`,
+            }
+      }
+    />
   );
 }

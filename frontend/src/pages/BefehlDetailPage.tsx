@@ -1,11 +1,12 @@
 import { App, Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
+import ZumEtbEintrag from '../etb/ZumEtbEintrag';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { parseRouteId, befehlDetailPfad, auftraegePfad, etbPfad } from '../routing/deeplinks';
+import { parseRouteId, befehlDetailPfad, auftraegePfad } from '../routing/deeplinks';
 import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
@@ -264,7 +265,7 @@ function BefehlDetail() {
       <Space wrap>
         <DruckKnopf />
         {!istEntwurf && befehl.etb_eintrag_id != null && (
-          <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
+          <ZumEtbEintrag einsatzId={einsatzId} eintragId={befehl.etb_eintrag_id} />
         )}
         {!istEntwurf && darfSchreiben && (
           <Button

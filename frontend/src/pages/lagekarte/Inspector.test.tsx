@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -14,6 +14,7 @@ import type { KarteMarker } from './marker';
 import type { AuswahlRoh } from './leistenDaten';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import type { EinsatzEinstellungen } from '../../api/types';
+import { freigabenFixture } from '../../test/fixtures';
 
 const marker = {
   schluessel: 'uhs-1',
@@ -475,6 +476,53 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     const zeile = etb.closest('[data-lfh="inspector-sprung"]');
     expect(zeile).toContainElement(screen.getByRole('link', { name: 'Im Fachmodul öffnen' }));
     expect(zeile).not.toContainElement(screen.getByRole('button', { name: 'Verortung löschen' }));
+  });
+
+  it('LFH-888: gesperrtes Zielmodul — „Im Fachmodul öffnen" gesperrt mit Grund, ohne Link', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ personal: { zugriff: false } })),
+      ),
+    );
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={{ ...einheitMarker, schluessel: 'fuehrung-3', typ: 'fuehrung', id: 3 }}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: 'Im Fachmodul öffnen' })).toBeNull(),
+    );
+    const knopf = screen.getByRole('button', { name: 'Im Fachmodul öffnen' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+  });
+
+  it('LFH-888: gesperrtes ETB — „ETB ↗" an der Einheit gesperrt mit Grund', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
+      ),
+    );
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    const name = `Einsatztagebuch zu ${einheitMarker.label}`;
+    await waitFor(() => expect(screen.queryByRole('link', { name })).toBeNull());
+    const knopf = screen.getByRole('button', { name });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    // Der Fachmodul-Sprung (Einheiten frei) bleibt ein Link.
+    expect(screen.getByRole('link', { name: 'Im Fachmodul öffnen' })).toBeInTheDocument();
   });
 
   it('LFH-616: andere Marker bekommen keinen ETB-Sprung — der Filter kennt nur Einheiten', () => {

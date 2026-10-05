@@ -1,4 +1,6 @@
 import { IconPlus, IconTrichter } from '../icons';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { App as AntApp, Button, Input, Segmented, Space, Tag, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
@@ -564,6 +566,10 @@ function useJetzt(intervallMs = 30_000): Dayjs {
 export default function KraefteuebersichtPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  // Sprungziele in fremde Module (LFH-888, design.md D4): gesperrt mit Grund statt ins 403.
+  const sprungGesperrt = useSprungSperre(einsatzId);
+  const einheitenGesperrt = sprungGesperrt('einheiten');
+  const lageberichtGesperrt = sprungGesperrt('lageberichte');
   const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
@@ -917,7 +923,8 @@ export default function KraefteuebersichtPage() {
                     <IconPlus />
                   </span>
                 }
-                title="Einheit anlegen (Einheiten-Seite)"
+                disabled={einheitenGesperrt}
+                title={einheitenGesperrt ? KEINE_BERECHTIGUNG : 'Einheit anlegen (Einheiten-Seite)'}
                 onClick={() => navigate(einheitenPfad(einsatzId))}
               >
                 Einheit
@@ -1038,7 +1045,12 @@ export default function KraefteuebersichtPage() {
             ]}
           />
           {darfSchreiben && (
-            <Button loading={uebernehmen.isPending} onClick={() => uebernehmen.mutate()}>
+            <Button
+              loading={uebernehmen.isPending}
+              disabled={lageberichtGesperrt}
+              title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : undefined}
+              onClick={() => uebernehmen.mutate()}
+            >
               In Lagebericht übernehmen
             </Button>
           )}
@@ -1083,7 +1095,7 @@ export default function KraefteuebersichtPage() {
           leerText={
             <span>
               Keine Einheiten und keine Kräfte im Einsatz
-              {darfSchreiben && (
+              {darfSchreiben && !einheitenGesperrt && (
                 <>
                   {' — '}
                   <Link to={einheitenPfad(einsatzId)}>Einheit bilden</Link>

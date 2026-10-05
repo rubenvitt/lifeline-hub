@@ -14,6 +14,10 @@ import {
   modulAusPfad,
   istKeyFreigegeben,
   istModulFreigegeben,
+  istSprungGesperrt,
+  istPfadGesperrt,
+  freiesRueckwegModul,
+  KEINE_BERECHTIGUNG,
   type ModulEintrag,
 } from './modulRegistry';
 import { freigabenFixture } from '../test/fixtures';
@@ -357,5 +361,76 @@ describe('istKeyFreigegeben (LFH-633)', () => {
     expect(istKeyFreigegeben('gibt-es-nicht', freigabenFixture({ 'gibt-es-nicht': {} }))).toBe(
       false,
     );
+  });
+});
+
+describe('istSprungGesperrt (LFH-888)', () => {
+  it('gesperrt allein bei bekanntem `zugriff: false`', () => {
+    expect(istSprungGesperrt('etb', freigabenFixture({ etb: { zugriff: false } }))).toBe(true);
+    expect(istSprungGesperrt('etb', freigabenFixture())).toBe(false);
+  });
+
+  it('unbekannte Freigaben sperren keinen Sprung (kein Aufblitzen beim Laden)', () => {
+    expect(istSprungGesperrt('etb', undefined)).toBe(false);
+  });
+
+  it('System-Admin im ausgeblendeten Modul: erreichbar, also nicht gesperrt', () => {
+    expect(
+      istSprungGesperrt('meldungen', freigabenFixture({ meldungen: { sichtbar: false } })),
+    ).toBe(false);
+  });
+
+  it('ein unbekannter Key ist nie gesperrt — der Server kennt ihn nicht', () => {
+    expect(istSprungGesperrt('gibt-es-nicht', freigabenFixture())).toBe(false);
+  });
+
+  it('der Grundtext ist EINE Konstante', () => {
+    expect(KEINE_BERECHTIGUNG).toBe('Keine Berechtigung');
+  });
+});
+
+describe('istPfadGesperrt (LFH-888)', () => {
+  it('liest das Modul aus dem Pfad, auch mit Query und Unterroute', () => {
+    const f = freigabenFixture({ personen: { zugriff: false } });
+    expect(istPfadGesperrt('/einsaetze/1/personen?sichtung=rot', f)).toBe(true);
+    expect(istPfadGesperrt('/einsaetze/1/personen/5', f)).toBe(true);
+    expect(istPfadGesperrt('/einsaetze/1/etb', f)).toBe(false);
+  });
+
+  it('außerhalb eines Moduls oder bei unbekannten Freigaben nie gesperrt', () => {
+    expect(istPfadGesperrt('/admin/stammdaten/personal', freigabenFixture())).toBe(false);
+    expect(istPfadGesperrt('/einsaetze/1/personen', undefined)).toBe(false);
+  });
+});
+
+describe('freiesRueckwegModul (LFH-888)', () => {
+  it('nimmt das Standardmodul, wenn es frei ist', () => {
+    expect(freiesRueckwegModul(freigabenFixture(), 'etb').key).toBe('etb');
+  });
+
+  it('gesperrtes Standardmodul → Überblick', () => {
+    expect(freiesRueckwegModul(freigabenFixture({ etb: { zugriff: false } }), 'etb').key).toBe(
+      'ueberblick',
+    );
+  });
+
+  it('ohne Standardmodul → Überblick', () => {
+    expect(freiesRueckwegModul(freigabenFixture(), null).key).toBe('ueberblick');
+  });
+
+  it('gesperrter Überblick → erstes freies Modul in Registry-Reihenfolge', () => {
+    const freigaben = freigabenFixture({ ueberblick: { zugriff: false } });
+    const erwartet = modulRegistry.find(
+      (m) => m.key !== 'ueberblick' && istModulFreigegeben(m, freigaben),
+    );
+    expect(erwartet).toBeDefined();
+    expect(freiesRueckwegModul(freigaben, 'ueberblick').key).toBe(erwartet!.key);
+  });
+
+  it('nichts frei → Einsatzdaten, die nie gesperrt sind', () => {
+    const alleZu = Object.fromEntries(
+      modulRegistry.map((m) => [m.key, { sichtbar: true, zugriff: false }]),
+    );
+    expect(freiesRueckwegModul(alleZu, 'etb').key).toBe('einsatzdaten');
   });
 });

@@ -1,4 +1,5 @@
 import { Space } from 'antd';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
@@ -67,6 +68,8 @@ export default function Verdichtungszeile({
   pfad: string;
 }) {
   const { token, rollen } = useRollen();
+  // Kein Link in ein gesperrtes Meldebild (LFH-888, design.md D4); die Zahlen bleiben.
+  const meldebildGesperrt = useSprungSperre(einsatzId)('kraefteuebersicht');
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
@@ -100,9 +103,11 @@ export default function Verdichtungszeile({
         {v.fahrzeugStatus.nicht_verfuegbar} n. verf.
       </span>
       {/* Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`. */}
-      <Link to={pfad} style={verdichtungsLinkStil(token)}>
-        Meldebild
-      </Link>
+      {!meldebildGesperrt && (
+        <Link to={pfad} style={verdichtungsLinkStil(token)}>
+          Meldebild
+        </Link>
+      )}
     </Space>
   );
 }

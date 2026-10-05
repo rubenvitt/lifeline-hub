@@ -1246,3 +1246,92 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     ).toBeInTheDocument();
   });
 });
+
+/**
+ * Sprungziele in fremde Module (LFH-888, Spec `modul-freigabe`, design.md D4): ein Knopf steht bei
+ * gesperrtem Ziel gesperrt mit Grund da, ein Kennzahl- oder Zeilenziel entfällt. Unbekannte
+ * Freigaben sperren nichts.
+ */
+describe('UeberblickPage Sprungziele (LFH-888)', () => {
+  function mitFreigaben(freigaben: Record<string, Partial<ModulFreigabe>> | 'haengt') {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/modul-freigaben', async () => {
+        if (freigaben === 'haengt') await delay('infinite');
+        return HttpResponse.json(freigabenFixture(freigaben === 'haengt' ? {} : freigaben));
+      }),
+    ]);
+  }
+  const zelle = (titel: string) =>
+    within(band()).getByText(titel).closest('[data-lfh="kennzahl"]') as HTMLElement;
+
+  it('gesperrtes ETB und Lageberichte: beide Kopfaktionen gesperrt mit „Keine Berechtigung“', async () => {
+    mitFreigaben({ etb: { zugriff: false }, lageberichte: { zugriff: false } });
+    rendern();
+    const eintrag = await screen.findByRole('button', { name: /Eintrag/ });
+    const lagebericht = screen.getByRole('button', { name: /Lagebericht/ });
+    await waitFor(() => expect(eintrag).toBeDisabled());
+    expect(eintrag).toHaveAttribute('title', 'Keine Berechtigung');
+    expect(lagebericht).toBeDisabled();
+    expect(lagebericht).toHaveAttribute('title', 'Keine Berechtigung');
+  });
+
+  it('freie Ziele: beide Kopfaktionen bedienbar, ohne Sperrgrund', async () => {
+    mitFreigaben({});
+    rendern();
+    await bandDa();
+    const lagebericht = screen.getByRole('button', { name: /Lagebericht/ });
+    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    expect(lagebericht).toBeEnabled();
+    expect(lagebericht).not.toHaveAttribute('title');
+    expect(screen.getByRole('button', { name: /Eintrag/ })).toBeEnabled();
+  });
+
+  it('Freigaben laden noch: die Kopfaktionen bleiben bedienbar (kein Aufblitzen)', async () => {
+    mitFreigaben('haengt');
+    rendern();
+    await bandDa();
+    expect(screen.getByRole('button', { name: /Lagebericht/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Eintrag/ })).toBeEnabled();
+  });
+
+  it('gesperrtes Meldebild: „Kräfte im Einsatz“ zeigt den Wert ohne Link', async () => {
+    mitFreigaben({ kraefteuebersicht: { zugriff: false } });
+    rendern();
+    await bandDa();
+    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    await waitFor(() =>
+      expect(within(band()).getByText('Kräfte im Einsatz').closest('a')).toBeNull(),
+    );
+    // Gegenprobe: eine freie Nachbarzelle trägt ihren Link — sonst wäre „kein Link" trivial.
+    expect(within(band()).getByText('Warnstufe').closest('a')).not.toBeNull();
+    expect(zelle('Kräfte im Einsatz')).not.toHaveTextContent('—');
+  });
+
+  it('freies Meldebild: „Kräfte im Einsatz“ verlinkt', async () => {
+    mitFreigaben({});
+    rendern();
+    await bandDa();
+    await waitFor(() =>
+      expect(within(band()).getByText('Kräfte im Einsatz').closest('a')).toHaveAttribute(
+        'href',
+        '/einsaetze/1/kraefteuebersicht',
+      ),
+    );
+  });
+
+  it('gesperrter Stab: die Marke „Lagebesprechung“ steht ohne Link', async () => {
+    mitFreigaben({ stab: { zugriff: false } });
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    const marke = await within(p).findByText('Lagebesprechung');
+    await waitFor(() => expect(marke.closest('a')).toBeNull());
+  });
+
+  it('freier Stab: die Marke „Lagebesprechung“ führt in den Stab', async () => {
+    mitFreigaben({});
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    const marke = await within(p).findByText('Lagebesprechung');
+    expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/stab');
+  });
+});

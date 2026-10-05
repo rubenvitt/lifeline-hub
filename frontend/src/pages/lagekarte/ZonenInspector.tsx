@@ -20,6 +20,7 @@ import { evakuiertText } from '../../betreuung/betreuungText';
 import { parseGeometry, geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
+import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
@@ -53,6 +54,8 @@ export interface ZonenInspectorProps {
   betreuungFrei?: boolean;
   /** Ziel des Sprungs „Im Fachmodul öffnen" zu einem Bezirk (`betreuungPfad(?bezirk=)`). */
   bezirkPfad?: (bezirkId: number) => string;
+  /** Zielmodul Gefahren gesperrt: „Gefahrenmatrix bearbeiten" steht gesperrt (LFH-888). */
+  matrixGesperrt?: boolean;
 }
 
 export default function ZonenInspector({
@@ -67,6 +70,7 @@ export default function ZonenInspector({
   bezirke = [],
   betreuungFrei = false,
   bezirkPfad,
+  matrixGesperrt = false,
 }: ZonenInspectorProps) {
   const { token } = theme.useToken();
   const gebietId = useId();
@@ -253,7 +257,12 @@ export default function ZonenInspector({
               />
             </FeldLabel>
             {entwurf.gefahrengebiet_id != null && (
-              <Button block onClick={() => onMatrixOeffnen(entwurf.gefahrengebiet_id as number)}>
+              <Button
+                block
+                disabled={matrixGesperrt}
+                title={matrixGesperrt ? KEINE_BERECHTIGUNG : undefined}
+                onClick={() => onMatrixOeffnen(entwurf.gefahrengebiet_id as number)}
+              >
                 Gefahrenmatrix bearbeiten
               </Button>
             )}
