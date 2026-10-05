@@ -174,12 +174,35 @@ pub(crate) async fn anlegen_tx(
     Ok(einsatz_id)
 }
 
+/// Schwärzungsstand eines Einsatzes `e` als Spalte `teilschwaerzungen` (LFH-996, design.md D1):
+/// vollzogene Personen-Anträge plus geschwärzte Datenkategorien, `NULL` bei 0. Beide Mengen
+/// wachsen nur. Steht in `laden` und `liste_fuer` (Makros, damit beide wortgleich bleiben):
+/// die Spalte hinter das SELECT, die Joins hinter `FROM einsatz e`. Gruppiert gezählt statt je
+/// Zeile korreliert, damit `GET /api/einsaetze` die Anträge einmal liest und nicht einmal je
+/// Einsatz (für Anträge gibt es keinen Index über `einsatz_id`, beide sind Teilindizes).
+macro_rules! teilschwaerzungen_spalte {
+    () => {
+        "NULLIF(COALESCE(tsa.n, 0) + COALESCE(tka.n, 0), 0) AS teilschwaerzungen"
+    };
+}
+
+macro_rules! teilschwaerzungen_joins {
+    () => {
+        " LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM schwaerzung_antrag \
+                     WHERE ziel_art <> 'einsatz' AND vollzogen_at IS NOT NULL \
+                     GROUP BY einsatz_id) tsa ON tsa.einsatz_id = e.id \
+          LEFT JOIN (SELECT einsatz_id, COUNT(*) AS n FROM einsatz_aufbewahrung_kategorie \
+                     WHERE geschwaerzt_at IS NOT NULL \
+                     GROUP BY einsatz_id) tka ON tka.einsatz_id = e.id "
+    };
+}
+
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     // Die beiden EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607); sie
     // stehen wortgleich auch in `liste_fuer`, das Bezirksprädikat wie `istAktiverBezirk` im
     // Frontend — siehe `lagekennzahl::ableiten`.
-    sqlx::query_as::<_, Einsatz>(
+    sqlx::query_as::<_, Einsatz>(concat!(
         "SELECT e.id, e.org_id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
@@ -189,11 +212,13 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet \
-         FROM einsatz e \
-         LEFT JOIN organisation o ON o.id = e.org_id \
+                    AS evakuierung_angeordnet, ",
+        teilschwaerzungen_spalte!(),
+        " FROM einsatz e",
+        teilschwaerzungen_joins!(),
+        "LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
-    )
+    ))
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?
@@ -300,10 +325,11 @@ pub async fn liste_fuer(
         meine_fuehrungsfunktion: Option<String>,
         pegel_festgelegt: bool,
         evakuierung_angeordnet: bool,
+        teilschwaerzungen: Option<i64>,
     }
 
     // EXISTS-Spalten wortgleich zu `laden` (Auslöser der Lagekennzahlen, `lagekennzahl::ableiten`).
-    let rows = sqlx::query_as::<_, Row>(
+    let rows = sqlx::query_as::<_, Row>(concat!(
         "SELECT e.id, e.org_id, o.name AS org_name, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
@@ -314,13 +340,15 @@ pub async fn liste_fuer(
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet \
-         FROM einsatz e \
-         LEFT JOIN organisation o ON o.id = e.org_id \
+                    AS evakuierung_angeordnet, ",
+        teilschwaerzungen_spalte!(),
+        " FROM einsatz e",
+        teilschwaerzungen_joins!(),
+        "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          ORDER BY e.begonnen_at DESC, e.id DESC",
-    )
+    ))
     .bind(benutzer.id)
     .fetch_all(pool)
     .await?;
@@ -407,6 +435,7 @@ pub async fn liste_fuer(
                     r.pegel_festgelegt,
                     r.evakuierung_angeordnet,
                 ),
+                teilschwaerzungen: r.teilschwaerzungen,
             }
         })
         .collect())

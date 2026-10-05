@@ -12,6 +12,7 @@ import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
 import { fetchErfolgeVerfolgen } from '../offline/lagebildBestaetigung';
 import { lagebildEntsperren, lagebildSperren } from '../offline/lagebildFilter';
 import { istVerbindungsfehler, meldeServerErreichbar } from '../offline/verbindung';
+import { schwaerzungsWaechterStarten } from '../offline/schwaerzungsWaechter';
 
 /** Produktionsdefaults an einem importierbaren Seam statt versteckt in `main.tsx`.
  *  Nur reine Query-Pfade dürfen einen Leitungsfehler zweimal wiederholen; fachliche
@@ -163,6 +164,9 @@ export function erzeugeQueryClient(
     }
   });
   objectUrlsFreigeben(client);
+  // Ein höherer Schwärzungsstand in Kopf oder Liste räumt den Einsatz, ein aus der Liste
+  // verschwundener Einsatz wird geräumt wie beim 404 (LFH-996, `offline/schwaerzungsWaechter.ts`).
+  schwaerzungsWaechterStarten(client);
   if (defaultOptions === queryClientDefaults) lagebildLiegezeitSetzen(client);
   return client;
 }

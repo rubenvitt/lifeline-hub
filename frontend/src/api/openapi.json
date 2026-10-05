@@ -3524,6 +3524,14 @@
               "string",
               "null"
             ]
+          },
+          "teilschwaerzungen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Schwärzungsstand (LFH-996): vollzogene Personen-Anträge plus geschwärzte\nDatenkategorien dieses Einsatzes. Wächst nur; fehlt bei 0. Ein Gerät, das einen höheren\nStand sieht, verwirft jeden älteren Stand des Einsatzes (`frontend/src/offline/AGENTS.md`).\nNennt bewusst weder Person noch Zeitpunkt noch Modul."
           }
         }
       },

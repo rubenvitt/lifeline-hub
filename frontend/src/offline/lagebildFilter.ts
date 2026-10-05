@@ -51,9 +51,30 @@ export function istLagebildGesperrt(qc: QueryClient, key: readonly unknown[]): b
 }
 
 /**
+ * Räummarken nach einer Schwärzung (LFH-996, design.md D3/D5), je QueryClient und nur im
+ * Speicher: ein Stand eines Einsatzes, der vor seiner Marke abgerufen wurde, gilt nicht mehr.
+ * Gesetzt nur vom Schwärzungswächter (`schwaerzungsWaechter.ts`); die Zeit ist Geräteuhr wie
+ * `dataUpdatedAt`, es wird nie gegen die Serveruhr verglichen.
+ */
+const RAEUMMARKEN = new WeakMap<QueryClient, Map<number, number>>();
+
+export function lagebildRaeummarkeSetzen(qc: QueryClient, einsatzId: number, zeit: number): void {
+  let marken = RAEUMMARKEN.get(qc);
+  if (!marken) RAEUMMARKEN.set(qc, (marken = new Map()));
+  marken.set(einsatzId, Math.max(zeit, marken.get(einsatzId) ?? 0));
+}
+
+function vorRaeummarke(qc: QueryClient, key: readonly unknown[], dataUpdatedAt: number): boolean {
+  const einsatzId = key[1];
+  if (typeof einsatzId !== 'number') return false;
+  const marke = RAEUMMARKEN.get(qc)?.get(einsatzId);
+  return marke !== undefined && dataUpdatedAt < marke;
+}
+
+/**
  * Darf dieser Einzelstand auf die Platte bzw. zurück in den Speicher? Nur die Allowlist, nichts
- * Gesperrtes, und nur ein Stand, dessen letzter Abruf höchstens {@link HOECHSTLIEGEZEIT_MS}
- * zurückliegt: `bestaetigtAt` gilt je Benutzer — ein Einsatz, den niemand mehr öffnet, trüge
+ * Gesperrtes, nichts vor der Räummarke seines Einsatzes (LFH-996), und nur ein Stand, dessen
+ * letzter Abruf höchstens {@link HOECHSTLIEGEZEIT_MS} zurückliegt: `bestaetigtAt` gilt je Benutzer — ein Einsatz, den niemand mehr öffnet, trüge
  * seinen alten Stand sonst unbegrenzt weiter, solange die Person anderswo arbeitet, auch nach
  * einem Rechteentzug, den kein Abruf mehr bemerkt (Review LFH-723, Befund 3).
  */
@@ -66,6 +87,7 @@ export function lagebildStandZulaessig(
   return (
     istLagebildOfflineKey(key) &&
     !istLagebildGesperrt(qc, key) &&
+    !vorRaeummarke(qc, key, dataUpdatedAt) &&
     dataUpdatedAt >= jetzt - HOECHSTLIEGEZEIT_MS
   );
 }

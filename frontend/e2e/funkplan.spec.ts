@@ -22,6 +22,8 @@ import {
   sprechgruppenSicht,
   tabelle,
 } from './funkplan-kern';
+import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Funkplan S6 (LFH-548): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein Layout,
@@ -34,10 +36,15 @@ import {
  * - 390 px: Tabelle, nicht Karten; die Kennung bleibt fixiert.
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, kein PATCH, danach der Bericht offen.
  * - ZEILENLINK: die Kennung einer Einheit führt auf ihre Detailseite.
+ * - HÄNGENDER EINZUG (LFH-977): bei 390, 820, 1180 und 1440 px und im Druck bei A4-Breite steht
+ *   der Text jeder Zeile rechts von dem ihrer Elternzeile, auch wenn er umbricht; als Admin und
+ *   als Beobachter (LFH-435).
  *
  * Der Druckpfad (A4-Breite, `beforeprint`) steht in `funkplan-druck.spec.ts` und läuft dort auch
  * in Firefox und WebKit (`DRUCK_SPECS`, LFH-915). Hier bleibt nur der Druckschritt der
  * Führungsstelle: er hängt an der Erfassung auf den Einsatzdaten und an der Übernahme.
+ *
+ * Mutationsprobe (LFH-977): mit dem `Datensicht` von vor LFH-977 wird der Einzug rot.
  */
 
 const HANDSCHIRM = { width: 390, height: 844 };
@@ -130,6 +137,66 @@ test('390 px: Tabelle statt Karten, die Kennung bleibt fixiert', async ({ page }
   await expect(fixiert).toHaveText('Stelle');
   await expect(fixiert).toHaveCSS('position', 'sticky');
 });
+
+// ── Hängender Einzug (LFH-977) ──────────────────────────────────────────────────────────────
+
+/** Die vier Viewports der Prüfung: Handy, Tablet hoch, Tablet quer, Desktop. */
+const EINZUG_VIEWPORTS = [
+  { width: 390, height: 844 },
+  { width: 820, height: 1180 },
+  { width: 1180, height: 820 },
+  { width: 1440, height: 900 },
+];
+
+/** Vorbedingung: der lange Fahrzeug-Funkrufname bricht auf Ebene ≥ 2 wirklich um. */
+function pruefeUmbruch(zeilen: Awaited<ReturnType<typeof baumLage>>, wo: string) {
+  const fahrzeug = zeilen.find((z) => z.text.startsWith(FAHRZEUG));
+  expect(fahrzeug, `${wo}: Fahrzeugzeile fehlt`).toBeDefined();
+  expect(fahrzeug!.ebene, `${wo}: Fahrzeug unter Abschnitt und Einheit`).toBeGreaterThanOrEqual(2);
+  expect(fahrzeug!.zeilen, `${wo}: der Funkrufname bricht um`).toBeGreaterThan(1);
+}
+
+for (const rolle of ['admin', 'beobachter'] as const) {
+  test(`Einzug bleibt beim Umbruch erhalten, 390 bis 1440 px und im Druck (${rolle})`, async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Funkplan Einzug ${Date.now()}`);
+    await seede(page, einsatzId);
+    if (rolle === 'beobachter') {
+      await wechsleZuRolle(page, 'beobachter', einsatzId);
+      await page.setViewportSize(FUEKW);
+      await oeffne(page, einsatzId);
+      // Rollenzweig als Vorbedingung: ohne Schreibrecht fehlt die Übernahme.
+      await expect(page.getByRole('button', { name: 'In Lagebericht übernehmen' })).toHaveCount(0);
+    }
+
+    for (const viewport of EINZUG_VIEWPORTS) {
+      await page.setViewportSize(viewport);
+      await oeffne(page, einsatzId);
+      const wo = `${viewport.width} px (${rolle})`;
+      const zeilen = await baumLage(page, '[aria-label="Funkplan"]');
+      pruefeUmbruch(zeilen, wo);
+      pruefeHaengendenEinzug(zeilen, wo);
+    }
+
+    // Druckpfad bei A4-Breite, alle Knoten offen (wie im Druck-Test oben).
+    await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
+    await oeffne(page, einsatzId);
+    await page.evaluate(() => {
+      window.print = () => {
+        window.dispatchEvent(new Event('beforeprint'));
+      };
+    });
+    await page.getByRole('button', { name: /Drucken/ }).click();
+    await page.emulateMedia({ media: 'print' });
+    await expect(tabelle(page).getByText(ERREICHBAR)).toHaveCount(1);
+    const druck = await baumLage(page, '.funkplan-print-root');
+    pruefeUmbruch(druck, `Druck A4 (${rolle})`);
+    pruefeHaengendenEinzug(druck, `Druck A4 (${rolle})`);
+    await page.emulateMedia({ media: null });
+  });
+}
 
 test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page }) => {
   await anmelden(page);

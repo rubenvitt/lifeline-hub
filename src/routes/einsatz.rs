@@ -27,7 +27,8 @@ use utoipa::ToSchema;
 ///
 /// Meldet zugleich `einsatzliste` an die Leser des Einsatzes (LFH-734): die Liste zeigt
 /// dieselben Kopfspalten. Jeder `einsatz`-Emitter läuft hierüber oder über
-/// [`kopf_geaendert_fuer`], auch der aus dem Stab.
+/// [`kopf_geaendert_fuer`], auch der aus dem Stab; der Purge-Lauf ruft denselben Kern
+/// `live::org::kopf_melden`.
 pub(crate) async fn kopf_geaendert(state: &AppState, einsatz_id: i64) {
     kopf_geaendert_fuer(state, einsatz_id, &[]).await;
 }
@@ -40,10 +41,7 @@ pub(crate) async fn kopf_geaendert(state: &AppState, einsatz_id: i64) {
 /// `meine_rolle` auf dem Schirm der betroffenen Person ohne Neuladen frisch, und mit ihr das
 /// Schreibrecht.
 pub(crate) async fn kopf_geaendert_fuer(state: &AppState, einsatz_id: i64, betroffene: &[i64]) {
-    state
-        .live
-        .publiziere_einsatz(einsatz_id, LiveEvent::Einsatz);
-    einsatzliste_melden(&state.pool, &state.live, einsatz_id, betroffene).await;
+    crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, betroffene).await;
 }
 
 #[derive(Debug, Deserialize)]

@@ -1983,4 +1983,53 @@ describe('Datensicht · Baum mit Titel-Link (LFH-548)', () => {
     expect(screen.queryByRole('link', { name: 'Sammel' })).toBeNull();
     expect(screen.getByText('Sammel')).toBeInTheDocument();
   });
+
+  /**
+   * Hängender Einzug (LFH-977): antd setzt Einzug und Symbol als Floats vor den Inhalt; als
+   * Inline-Inhalt bräche der Text unter ihnen an den Zellrand. Die erste Spalte zeichnet beides
+   * selbst als Flex-Zeile vor einem eigenen Textblock. Die Lage misst `e2e/funkplan.spec.ts`.
+   */
+  it('Einzug, Symbol und Text stehen als getrennte Blöcke in einer Flex-Zeile', async () => {
+    const onAufgeklappt = vi.fn();
+    const { container } = renderMitProviders(
+      <Datensicht<Knoten, 'stelle'>
+        bezeichnung="Baum"
+        form="tabelle"
+        spalten={knotenSpalten}
+        daten={BAUM}
+        zeilenSchluessel="key"
+        baum={{ kinder: 'kinder', aufgeklappt: ['a'], onAufgeklappt }}
+        karte={{
+          art: 'plan',
+          titel: { spalte: 'stelle', ziel: (k) => `/ziel/${k.key}` },
+          sekundaer: [],
+        }}
+      />,
+    );
+    const zeile = (k: string) =>
+      container.querySelector(
+        `tr[data-row-key="${k}"] [data-lfh="datensicht-baum-zelle"]`,
+      ) as HTMLElement;
+    const oben = zeile('a');
+    const unten = zeile('e');
+    expect(oben.style.display).toBe('flex');
+    expect(oben.style.paddingInlineStart).toBe('0px');
+    expect(unten.style.paddingInlineStart).toBe('15px');
+    // Symbol und Text sind Geschwister: der Text bricht nur in seinem eigenen Block um.
+    const text = oben.querySelector('[data-lfh="datensicht-baum-text"]') as HTMLElement;
+    expect(text.parentElement).toBe(oben);
+    expect(text.style.minWidth).toBe('0px');
+    expect(text).toContainElement(screen.getByRole('link', { name: 'Abschnitt Nord' }));
+    const symbol = oben.querySelector('button.ant-table-row-expand-icon') as HTMLElement;
+    expect(symbol).toHaveAttribute('aria-expanded', 'true');
+    expect(text.contains(symbol)).toBe(false);
+    // Das Blatt trägt den unsichtbaren Platzhalter, keinen Knopf.
+    expect(unten.querySelector('button')).toBeNull();
+    expect(unten.querySelector('.ant-table-row-expand-icon-spaced')).not.toBeNull();
+    // antds eigener Einzug und eigenes Symbol entfallen.
+    expect(container.querySelector('td > button.ant-table-row-expand-icon')).toBeNull();
+    await userEvent.click(symbol);
+    expect(onAufgeklappt).toHaveBeenCalledTimes(1);
+    expect(onAufgeklappt).toHaveBeenLastCalledWith([]);
+  });
 });

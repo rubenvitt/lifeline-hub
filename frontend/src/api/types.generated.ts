@@ -1315,6 +1315,14 @@ export interface components {
             sachverhalt?: string | null;
             status: components["schemas"]["EinsatzStatus"];
             stichwort?: string | null;
+            /**
+             * Format: int64
+             * @description Schwärzungsstand (LFH-996): vollzogene Personen-Anträge plus geschwärzte
+             *     Datenkategorien dieses Einsatzes. Wächst nur; fehlt bei 0. Ein Gerät, das einen höheren
+             *     Stand sieht, verwirft jeden älteren Stand des Einsatzes (`frontend/src/offline/AGENTS.md`).
+             *     Nennt bewusst weder Person noch Zeitpunkt noch Modul.
+             */
+            teilschwaerzungen?: number | null;
         };
         /**
          * @description Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel
