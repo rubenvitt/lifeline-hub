@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { App as AntApp } from 'antd';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
@@ -248,5 +249,48 @@ describe('MeldungFormular — Ereigniszeit in der Anzeigezone (LFH-692)', () => 
         expect.objectContaining({ ereigniszeit: '2026-09-24 11:00:00' }),
       ),
     );
+  });
+});
+
+/** LFH-895: „leer = jetzt“ gilt nach der Serveruhr, eine eingetragene Ereigniszeit bleibt. */
+describe('MeldungFormular — Ereigniszeit eines vorgehenden Geräts (LFH-895)', () => {
+  mitProzessZone('UTC');
+  const SERVER = Date.parse('2026-10-04T10:00:00Z');
+  const VORLAUF = 5 * 60_000;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER + VORLAUF);
+    serveruhrVergessenFuerTests();
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(SERVER).toUTCString() } }));
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  function gesendeteEreigniszeit(onAnlegen: ReturnType<typeof anlegenMock>): string {
+    return (onAnlegen.mock.calls[0][0] as { ereigniszeit: string }).ereigniszeit;
+  }
+
+  it('ein leeres Feld sendet die Serverzeit', async () => {
+    const onAnlegen = renderFormular();
+    await fuellePflichtfelder('RTW 2', 'MANV');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    const ms = Date.parse(gesendeteEreigniszeit(onAnlegen).replace(' ', 'T') + 'Z');
+    expect(Math.abs(ms - SERVER)).toBeLessThanOrEqual(1_000);
+  });
+
+  it('eine eingetragene Ereigniszeit bleibt unverändert', async () => {
+    const onAnlegen = renderFormular();
+    await fuellePflichtfelder('RTW 2', 'MANV');
+    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit (≠ Erfassung)' });
+    await userEvent.click(feld);
+    await userEvent.type(feld, '2026-10-04 09:30');
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(gesendeteEreigniszeit(onAnlegen)).toBe('2026-10-04 09:30:00');
   });
 });

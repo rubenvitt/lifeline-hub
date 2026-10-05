@@ -1,5 +1,5 @@
 import { Button, Form, Input, Typography } from 'antd';
-import dayjs, { type Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import { useEffect, useRef, useState, type FocusEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -28,6 +28,7 @@ import {
   dauerText,
   kraftDauern,
 } from './zeitachse';
+import { serverJetzt } from '../offline/serveruhr';
 
 /**
  * Zeitachse einer Kraft (LFH-552) — Einheit-Detailseite und aufgeklappte Personalzeile teilen
@@ -111,9 +112,10 @@ export default function KraftZeitachse({
 
   // Vorbelegung „jetzt" bei JEDEM Öffnen, nach dem Einhängen des Dialogs (Muster
   // `KatalogVerwaltung`). Nicht über `initialValues`: der Formularspeicher überlebt das Schließen
-  // und hielte sonst den Zeitpunkt des vorigen Nachtrags (Review LFH-552).
+  // und hielte sonst den Zeitpunkt des vorigen Nachtrags (Review LFH-552). „jetzt“ nach der
+  // Serveruhr, sonst scheiterte ein vorgehendes Gerät an der Uhrentoleranz (LFH-895).
   useEffect(() => {
-    if (nachtragOffen) nachtragForm.setFieldsValue({ zeitpunkt: dayjs() });
+    if (nachtragOffen) nachtragForm.setFieldsValue({ zeitpunkt: serverJetzt() });
   }, [nachtragOffen, nachtragForm]);
 
   const schluessel = zeitachseKey(einsatzId, art, id);

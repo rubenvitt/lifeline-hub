@@ -329,7 +329,8 @@ anwendbar), „nicht geprüft" ist keins.
   `anzeige/zeitEingabe.ts`), in die Wanduhr der Anzeigezone wandelt nur das Feld. Tagesgrenzen
   über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über `useZeitEingabe().formatiere`;
   `.local()` steht nur in `anzeige/` (Guard `anzeige/zeitEingabe.guard.test.ts`). Außerhalb eines
-  Einsatzes `OrgAnzeigeProvider`. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Zonentests
+  Einsatzes `OrgAnzeigeProvider`. „Jetzt“ beim Erfassen: `frontend/src/offline/AGENTS.md`,
+  „Schreiben ohne Netz“. Bewusst Gerätezeit: Uhr und Datenstand im Kopf. Zonentests
   stellen die Prozesszone per `test/prozessZone.ts` auf UTC — unter der Suiten-Zone Berlin wäre
   Anzeigezone Berlin blind.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
