@@ -291,6 +291,44 @@ pub async fn aktualisieren(
     Ok(Json(final_anzeige))
 }
 
+/// PUT /api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg} — eine Sprechgruppe zuordnen
+/// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung wie der
+/// PATCH mit `sprechgruppe_ids`, kein ETB (auch der PATCH schreibt dafür keinen).
+pub async fn sprechgruppe_zuordnen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, sg)): PfadParam<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Einheit(eid);
+    if crate::sprechgruppe::repo::einzeln_zuordnen(
+        &state.pool,
+        ctx.einsatz.org_id,
+        einsatz_id,
+        ziel,
+        sg,
+    )
+    .await?
+    {
+        sse_einheit(&state, einsatz_id, eid);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg} — Zuordnung lösen, idempotent.
+pub async fn sprechgruppe_loesen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, sg)): PfadParam<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Einheit(eid);
+    if crate::sprechgruppe::repo::einzeln_loesen(&state.pool, einsatz_id, ziel, sg).await? {
+        sse_einheit(&state, einsatz_id, eid);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// DELETE /api/einsaetze/{id}/einheiten/{eid} — auflösen. ETB-Eintrag.
 pub async fn aufloesen(
     State(state): State<AppState>,

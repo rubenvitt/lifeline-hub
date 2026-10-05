@@ -125,7 +125,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * Projekte über die vier Pflicht-Shards (`.github/workflows/ci.yml`); lokal wählt
  * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
  */
-const DRUCK_SPECS = /\/(druck-fluss|etb-druck)\.spec\.ts$/;
+const DRUCK_SPECS = /\/(druck-fluss|etb-druck|fernmeldeskizze-druck)\.spec\.ts$/;
 
 const { backendPort, frontendPort, datenbank } = lauf;
 const backendUrl = `http://127.0.0.1:${backendPort}`;

@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 import type {
   KommunikationsStelle,
   NeueKommunikationsStelle,
@@ -24,6 +24,22 @@ export function legeKommunikationsStelleAn(
   daten: NeueKommunikationsStelle,
 ): Promise<KommunikationsStelle[]> {
   return apiSend<KommunikationsStelle[]>(`${basis(einsatzId)}/stellen`, 'POST', daten);
+}
+
+/**
+ * Legt eine Stelle an und antwortet mit GENAU dieser Stelle statt mit dem Plan
+ * (`?antwort=stelle`, LFH-893 Review S4): die Fernmeldeskizze nimmt das Anlegen per Rückgängig
+ * zurück und braucht dafür die id, die der Plan allein nicht eindeutig nennt.
+ */
+export function legeKommunikationsStelleEinzelnAn(
+  einsatzId: number,
+  daten: NeueKommunikationsStelle,
+): Promise<KommunikationsStelle> {
+  return apiSend<KommunikationsStelle>(
+    mitParametern(`${basis(einsatzId)}/stellen`, { antwort: 'stelle' }),
+    'POST',
+    daten,
+  );
 }
 
 /** Nur die Bezeichnung; Stellenart und Funktion sind nach dem Anlegen fest. */

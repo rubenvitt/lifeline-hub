@@ -691,24 +691,37 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       },
     },
     {
-      // Fernmeldeskizze (LFH-625): Darstellung „Skizze“ des Funkplans, über die Sichtvorgabe
-      // geöffnet. Datenanker ist die gesäte Einheit mit langem Namen IN der Skizze (sie steht
-      // auch in den Lücken, deshalb auf die Skizze verengt).
+      // Fernmeldeskizze (LFH-893): Darstellung „Skizze“ des Funkplans, über die Sichtvorgabe
+      // geöffnet — gemessen im breitesten Zustand: Palette auf (wo es sie gibt: Stab-Schreibrecht,
+      // nicht mobil; ab `xxl` ohnehin offen) und die gesäte Einheit mit langem Namen gewählt,
+      // also Werkzeugleiste, Palette, Fläche und Eigenschaftspaneel nebeneinander bzw. darunter.
+      // Datenanker ist der Titel des Paneels mit ihrem Namen.
       pfad: `/einsaetze/${einsatzId}/stab/funkplan?ansicht=skizze`,
+      vorbereiten: async (p: Page) => {
+        const einheit = p
+          .getByRole('group', { name: 'Fernmeldeskizze', exact: true })
+          .getByRole('button', { name: /^Einheit Fachgruppe Wasserschaden\/Pumpen / });
+        await expect(einheit).toBeVisible();
+        const palette = p.locator('[data-lfh="skizze-palette-knopf"]');
+        if ((await palette.count()) > 0 && (await palette.getAttribute('aria-expanded')) !== 'true')
+          await palette.click();
+        await einheit.click();
+      },
       anker: (p: Page) =>
-        p.getByRole('region', { name: 'Fernmeldeskizze' }).getByRole('link', {
-          name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+        p.locator('[data-lfh="skizze-paneel-titel"]').filter({
+          hasText: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
         }),
       lesend: {
-        anker: (p: Page) =>
-          p.getByRole('region', { name: 'Fernmeldeskizze' }).getByRole('link', {
-            name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
-          }),
-        vorbedingung: (p: Page) =>
-          expect(
-            p.getByRole('button', { name: 'In Lagebericht übernehmen' }),
-            'Vorbedingung: ohne Schreibrecht keine Übernahme',
-          ).toHaveCount(0),
+        vorbedingung: async (p: Page) => {
+          await expect(
+            p.locator('[data-lfh="skizze-rechte-grund"]'),
+            'Vorbedingung: ohne Schreibrecht nennt das Paneel den Grund',
+          ).toContainText('Kein Schreibrecht im Einsatz');
+          await expect(
+            p.locator('[data-lfh="skizze-palette-knopf"]'),
+            'Vorbedingung: ohne Schreibrecht keine Palette',
+          ).toHaveCount(0);
+        },
       },
     },
     {

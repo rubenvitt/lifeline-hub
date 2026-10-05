@@ -1,6 +1,6 @@
 use super::{Sprechgruppe, SprechgruppeAnzeige};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Sprechgruppe` (FromRow).
@@ -232,6 +232,149 @@ pub(crate) async fn pruefe_zuordenbar(
     Ok(())
 }
 
+/// Wer eine Sprechgruppe trägt (Zuordnungen aus 0073 und 0145). Eine Zuordnung entsteht und
+/// vergeht für alle Wege — PATCH mit `sprechgruppe_ids` als ganze Menge und die Einzel-Endpunkte
+/// `PUT/DELETE …/sprechgruppen/{sg}` (LFH-893, design.md D5) — nur über [`zuordnen_tx`] und
+/// [`loesen_tx`]. Die IDs prüft der Aufrufer vorher ([`pruefe_zuordenbar`]); dass der Datensatz
+/// zum Einsatz gehört, ebenfalls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Zuordnungsziel {
+    Abschnitt(i64),
+    Einheit(i64),
+    /// Die eigene Führungsstelle; die id ist die des Einsatzes.
+    Fuehrungsstelle(i64),
+}
+
+impl Zuordnungsziel {
+    /// Tabelle, Bezugsspalte und Bezugs-id. Compile-time-Konstanten → `AssertSqlSafe` sicher.
+    fn ort(self) -> (&'static str, &'static str, i64) {
+        match self {
+            Zuordnungsziel::Abschnitt(id) => ("einsatzabschnitt_sprechgruppe", "abschnitt_id", id),
+            Zuordnungsziel::Einheit(id) => ("einsatz_einheit_sprechgruppe", "einheit_id", id),
+            Zuordnungsziel::Fuehrungsstelle(id) => {
+                ("einsatz_fuehrungsstelle_sprechgruppe", "einsatz_id", id)
+            }
+        }
+    }
+}
+
+/// Ordnet dem Ziel eine Sprechgruppe zu, idempotent. `true`, wenn die Zuordnung neu ist.
+pub async fn zuordnen_tx(
+    conn: &mut SqliteConnection,
+    ziel: Zuordnungsziel,
+    sprechgruppe_id: i64,
+) -> Result<bool, AppError> {
+    let (tabelle, spalte, bezug) = ziel.ort();
+    let r = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "INSERT OR IGNORE INTO {tabelle} ({spalte}, sprechgruppe_id) VALUES (?, ?)"
+    )))
+    .bind(bezug)
+    .bind(sprechgruppe_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(r.rows_affected() > 0)
+}
+
+/// Löst eine Zuordnung, idempotent. `true`, wenn es sie gab.
+pub async fn loesen_tx(
+    conn: &mut SqliteConnection,
+    ziel: Zuordnungsziel,
+    sprechgruppe_id: i64,
+) -> Result<bool, AppError> {
+    let (tabelle, spalte, bezug) = ziel.ort();
+    let r = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "DELETE FROM {tabelle} WHERE {spalte} = ? AND sprechgruppe_id = ?"
+    )))
+    .bind(bezug)
+    .bind(sprechgruppe_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(r.rows_affected() > 0)
+}
+
+/// Ersetzt die Zuordnung des Ziels durch genau `ids` (PATCH mit `sprechgruppe_ids`): löst, was
+/// nicht mehr dazugehört, und ordnet jede ID über [`zuordnen_tx`] zu.
+pub async fn ersetzen_tx(
+    conn: &mut SqliteConnection,
+    ziel: Zuordnungsziel,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    let (tabelle, spalte, bezug) = ziel.ort();
+    let vorhanden: Vec<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT sprechgruppe_id FROM {tabelle} WHERE {spalte} = ?"
+    )))
+    .bind(bezug)
+    .fetch_all(&mut *conn)
+    .await?;
+    for sg in vorhanden.into_iter().filter(|sg| !ids.contains(sg)) {
+        loesen_tx(conn, ziel, sg).await?;
+    }
+    for &id in ids {
+        zuordnen_tx(conn, ziel, id).await?;
+    }
+    Ok(())
+}
+
+/// Prüft, dass das Ziel zum Einsatz gehört; fremd oder unbekannt → 404.
+async fn pruefe_ziel(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ziel: Zuordnungsziel,
+) -> Result<(), AppError> {
+    let (sql, id) = match ziel {
+        Zuordnungsziel::Abschnitt(id) => (
+            "SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
+            id,
+        ),
+        Zuordnungsziel::Einheit(id) => (
+            "SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+            id,
+        ),
+        Zuordnungsziel::Fuehrungsstelle(id) if id == einsatz_id => return Ok(()),
+        Zuordnungsziel::Fuehrungsstelle(_) => return Err(AppError::NotFound),
+    };
+    let da: Option<i64> = sqlx::query_scalar(sql)
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    da.map(|_| ()).ok_or(AppError::NotFound)
+}
+
+/// Einzel-Zuordnung `PUT …/sprechgruppen/{sg}` (LFH-893, design.md D5): dieselbe Prüfung wie der
+/// PATCH ([`pruefe_zuordenbar`], 422) und dieselbe Zuordnung ([`zuordnen_tx`]). Idempotent;
+/// `true`, wenn die Zuordnung neu ist. Ein fremdes Ziel ist 404.
+pub async fn einzeln_zuordnen(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    ziel: Zuordnungsziel,
+    sprechgruppe_id: i64,
+) -> Result<bool, AppError> {
+    // Erst das Ziel (404), dann die Sprechgruppe (422) — und das Ziel in der Transaktion noch
+    // einmal, gegen ein gleichzeitiges Löschen.
+    pruefe_ziel(&mut *pool.acquire().await?, einsatz_id, ziel).await?;
+    pruefe_zuordenbar(pool, org_id, einsatz_id, &[sprechgruppe_id]).await?;
+    crate::write_retry!(pool, |conn| {
+        pruefe_ziel(conn, einsatz_id, ziel).await?;
+        zuordnen_tx(conn, ziel, sprechgruppe_id).await
+    })
+}
+
+/// Einzel-Lösung `DELETE …/sprechgruppen/{sg}`: idempotent über [`loesen_tx`]; `true`, wenn es
+/// die Zuordnung gab. Ein fremdes Ziel ist 404.
+pub async fn einzeln_loesen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ziel: Zuordnungsziel,
+    sprechgruppe_id: i64,
+) -> Result<bool, AppError> {
+    crate::write_retry!(pool, |conn| {
+        pruefe_ziel(conn, einsatz_id, ziel).await?;
+        loesen_tx(conn, ziel, sprechgruppe_id).await
+    })
+}
+
 /// Ersetzt die Sprechgruppen-Zuordnung eines Abschnitts vollständig.
 /// Validiert jede ID gegen `org_id`/`einsatz_id` — fremde oder falsche Einsätze → `UnprocessableEntity`.
 pub async fn setze_abschnitt_sprechgruppen(
@@ -242,22 +385,12 @@ pub async fn setze_abschnitt_sprechgruppen(
     ids: &[i64],
 ) -> Result<(), AppError> {
     pruefe_zuordenbar(pool, org_id, einsatz_id, ids).await?;
-    let mut tx = pool.begin().await?;
-    sqlx::query("DELETE FROM einsatzabschnitt_sprechgruppe WHERE abschnitt_id = ?")
-        .bind(abschnitt_id)
-        .execute(&mut *tx)
-        .await?;
-    for &id in ids {
-        sqlx::query(
-            "INSERT OR IGNORE INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) VALUES (?, ?)",
-        )
-        .bind(abschnitt_id)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    }
-    tx.commit().await?;
-    Ok(())
+    // Lesen, dann schreiben: unter einem aufgeschobenen `BEGIN` scheiterte das neben den
+    // Einzel-Zuordnungen am Sperr-Upgrade (SQLITE_BUSY → 503). `write_retry!` öffnet mit
+    // BEGIN IMMEDIATE und versucht erneut (Muster `einsatz::fuehrungsstelle`).
+    crate::write_retry!(pool, |conn| {
+        ersetzen_tx(conn, Zuordnungsziel::Abschnitt(abschnitt_id), ids).await
+    })
 }
 
 /// Lädt alle Sprechgruppen eines Abschnitts, sortiert nach `betriebsart, sortier, bezeichnung`.
@@ -298,22 +431,12 @@ pub async fn setze_einheit_sprechgruppen(
     ids: &[i64],
 ) -> Result<(), AppError> {
     pruefe_zuordenbar(pool, org_id, einsatz_id, ids).await?;
-    let mut tx = pool.begin().await?;
-    sqlx::query("DELETE FROM einsatz_einheit_sprechgruppe WHERE einheit_id = ?")
-        .bind(einheit_id)
-        .execute(&mut *tx)
-        .await?;
-    for &id in ids {
-        sqlx::query(
-            "INSERT OR IGNORE INTO einsatz_einheit_sprechgruppe (einheit_id, sprechgruppe_id) VALUES (?, ?)",
-        )
-        .bind(einheit_id)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    }
-    tx.commit().await?;
-    Ok(())
+    // Lesen, dann schreiben: unter einem aufgeschobenen `BEGIN` scheiterte das neben den
+    // Einzel-Zuordnungen am Sperr-Upgrade (SQLITE_BUSY → 503). `write_retry!` öffnet mit
+    // BEGIN IMMEDIATE und versucht erneut (Muster `einsatz::fuehrungsstelle`).
+    crate::write_retry!(pool, |conn| {
+        ersetzen_tx(conn, Zuordnungsziel::Einheit(einheit_id), ids).await
+    })
 }
 
 /// Lädt alle Sprechgruppen einer Einheit, sortiert nach `betriebsart, sortier, bezeichnung`.
@@ -1085,5 +1208,55 @@ mod tests {
             .collect();
         assert!(ids.contains(&kat.id) && ids.contains(&lokal.id));
         assert_eq!(ids.len(), 2, "inaktiver Katalogeintrag nicht enthalten");
+    }
+
+    /// LFH-893 (Review S2): Der PATCH mit der ganzen Menge liest erst und schreibt dann. Unter
+    /// einem aufgeschobenen `BEGIN` scheitert das neben gleichzeitigen Einzel-Zuordnungen am
+    /// Sperr-Upgrade (SQLITE_BUSY, 503) — unter `write_retry!` (BEGIN IMMEDIATE) gelingt jeder
+    /// Aufruf. Braucht das Datei/WAL-Harness.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn ganze_menge_neben_einzel_zuordnungen_scheitert_nicht_an_der_sperre() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (e, a) = setup_einsatz_abschnitt(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut katalog = Vec::new();
+        for i in 0..6 {
+            let name = format!("TMO {i}");
+            katalog.push(
+                anlegen_katalog(&pool, 1, daten(&name, "TMO"))
+                    .await
+                    .unwrap()
+                    .id,
+            );
+        }
+        let mut handles = Vec::new();
+        for runde in 0..24usize {
+            let pool = pool.clone();
+            let katalog = katalog.clone();
+            handles.push(tokio::spawn(async move {
+                let sg = katalog[runde % katalog.len()];
+                match runde % 4 {
+                    0 => setze_abschnitt_sprechgruppen(&pool, 1, e, a, &katalog[..3]).await,
+                    1 => setze_einheit_sprechgruppen(&pool, 1, e, einheit, &katalog[2..]).await,
+                    2 => einzeln_zuordnen(&pool, 1, e, Zuordnungsziel::Abschnitt(a), sg)
+                        .await
+                        .map(|_| ()),
+                    _ => einzeln_zuordnen(&pool, 1, e, Zuordnungsziel::Einheit(einheit), sg)
+                        .await
+                        .map(|_| ()),
+                }
+            }));
+        }
+        for h in handles {
+            h.await
+                .unwrap()
+                .expect("kein Aufruf scheitert an der Sperre");
+        }
     }
 }

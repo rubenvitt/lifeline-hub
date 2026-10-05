@@ -121,12 +121,17 @@ Oberhalb der Tabelle SHALL der Funkplan diese Lücken als Anzahl zeigen:
 - Verbindungen ohne gemeinsame Sprechgruppe: eine Stelle und ihre übergeordnete Stelle haben beide
   Sprechgruppen, aber keine gemeinsame. Übergeordnete Stelle eines obersten Abschnitts ist die
   eigene Führungsstelle.
+- Sprechgruppen mit nur einem Teilnehmer (Stelle oder Komponente); eine einsatzlokale ohne
+  Teilnehmer zählt nur bei „ohne Zuordnung“
+- Leitstelle ohne Verbindung, nach derselben Regel wie im Kommunikationsplan
 
 Jede Zahl MUST aus denselben geladenen Listen gerechnet werden wie die Tabelle. Hängt eine Zahl an
 einer gesperrten, nicht geladenen oder noch ladenden Liste, MUST sie „—“ mit Grund zeigen und
 MUST NOT „0“ zeigen. Bei einer Zahl größer null MUST der Funkplan die betroffenen Datensätze
 nennen: Abschnitte und Einheiten als Verweis auf die Stelle, an der sie gepflegt werden,
-einsatzlokale Sprechgruppen mit ihrer Bezeichnung, Verbindungen als Verweis auf die untere Stelle.
+einsatzlokale Sprechgruppen und Sprechgruppen mit nur einem Teilnehmer mit ihrer Bezeichnung,
+Verbindungen als Verweis auf die untere Stelle, die fehlende Leitstelle als Verweis auf den
+Kommunikationsplan.
 Die Lücken MUST im ersten Bild stehen, bei 1366 × 768 px mit offenem Modulpanel. Sie MUST in
 jeder Darstellung des Funkplans (Tabelle, Skizze und Sprechgruppen) dieselben sein.
 
@@ -167,6 +172,20 @@ jeder Darstellung des Funkplans (Tabelle, Skizze und Sprechgruppen) dieselben se
 - **WHEN** eine Einheit gar keine Sprechgruppe trägt
 - **THEN** zählt sie bei „Einheiten ohne Sprechgruppe“, aber nicht bei „Verbindungen ohne
   gemeinsame Sprechgruppe“
+
+#### Scenario: Sprechgruppe mit nur einem Teilnehmer
+- **WHEN** „DMO 505“ nur der Einheit „1. Zug“ zugeordnet ist
+- **THEN** zeigt der Funkplan „1“ bei „Sprechgruppen mit nur einem Teilnehmer“ und nennt „DMO 505“
+
+#### Scenario: Leitstelle ohne Verbindung
+- **WHEN** keine Stelle der Art Leitstelle eine Verbindung, eine Sprechgruppe oder eine Verbindung
+  in der Fernmeldeskizze trägt
+- **THEN** zeigt der Funkplan die Lücke „Leitstelle: keine Verbindung erfasst“ mit Verweis auf den
+  Kommunikationsplan
+
+#### Scenario: Kommunikationsplan nicht geladen
+- **WHEN** der Abruf des Kommunikationsplans scheitert
+- **THEN** zeigt die Lücke „Leitstelle“ „—“ mit Grund, nicht „0“
 
 ### Requirement: Fehlende eigene Gegenstelle wird benannt
 Ist die eigene Führungsstelle des Einsatzes erfasst, SHALL der Funkplan sie als erste Zeile vor den
@@ -239,6 +258,10 @@ Lagebericht (Vorlage Freitext) mit dem Titel „Funkplan <DTG>“ übernehmen k�
   Führungsstelle als erste Zeile. Fehlt eine Quelle (gesperrt, nicht geladen), MUST der Bericht sie
   mit Grund nennen. „Keine Kräfte erfasst“ MUST er nur schreiben, wenn Abschnitte, Einheiten und
   Fahrzeuge geladen sind.
+- Nach dem Baum MUST der Inhalt einen Abschnitt „Kommunikationsskizze“ tragen: „Gültig ab“, je
+  Sprechgruppe Bedingungszeichen und Teilnehmer mit Rufname (externe Stellen mit Status), danach
+  die übrigen Verbindungen der Skizze mit Art, Medium und Status. Rufnummern MUST NOT darin stehen.
+  Fehlen die Daten der Skizze oder die externen Stellen, MUST der Abschnitt das mit Grund nennen.
 - Namen und Kennungen MUST als Text erscheinen, nie als Auszeichnung des Renderers (etwa `~x~`
   als Durchstreichung).
 - Die Aktion MUST gesperrt sein, solange eine Quelle noch lädt. Sie MUST fehlen, wenn das Modul
@@ -262,9 +285,17 @@ Lagebericht (Vorlage Freitext) mit dem Titel „Funkplan <DTG>“ übernehmen k�
 - **WHEN** das Anlegen des Lageberichts abgelehnt wird
 - **THEN** zeigt die Seite den Fehler, und im Einsatz ist kein neuer Lagebericht entstanden
 
+#### Scenario: Kanäle im Lagebericht
+- **WHEN** Führungsstelle, „EA 1“ und die Leitstelle (geplant) „TMO BN_BOS“ tragen und der Funkplan
+  übernommen wird
+- **THEN** enthält der Lagebericht unter „Kommunikationsskizze“ die Zeile „TMO BN_BOS“ mit
+  Einsatzleitung, „EA 1“ und der Leitstelle samt „geplant“, und keine Rufnummer
+
 ### Requirement: Darstellung „Sprechgruppen“
 Der Funkplan SHALL eine dritte Darstellung „Sprechgruppen“ haben: eine Zeile je Sprechgruppe des
-Einsatzes, also jede einem Abschnitt oder einer Einheit zugeordnete und jede einsatzlokale. Spalten:
+Einsatzes, also jede einem Abschnitt oder einer Einheit zugeordnete und jede einsatzlokale. Teilnehmer sind
+auch die externen Stellen des Kommunikationsplans mit ihrem Status und die Komponenten der
+Fernmeldeskizze. Spalten:
 Sprechgruppe (fixiert, Festbreitenschrift), Betriebsart, Hinweis, Herkunft (Katalog oder
 einsatzlokal) und Teilnehmer. Zuerst TMO, dann DMO, je in der Sortierung der Sprechgruppen. Sie ist
 schreibgeschützt und aus denselben Quellen abgeleitet wie die Tabelle.
@@ -298,3 +329,8 @@ schreibgeschützt und aus denselben Quellen abgeleitet wie die Tabelle.
 - **WHEN** eine Person in der Darstellung „Sprechgruppen“ druckt
 - **THEN** nennt der Druckkopf die Darstellung „Sprechgruppen“, und jede Zeile steht ohne
   waagerechten Überhang auf A4
+
+#### Scenario: Leitstelle als Teilnehmer
+- **WHEN** der Leitstelle „ILS Musterhausen“ „TMO SL AS“ mit Status „geplant“ zugeordnet ist
+- **THEN** nennt die Zeile „TMO SL AS“ die Leitstelle als Teilnehmer mit dem Wort „geplant“, und
+  sie führt zum Kommunikationsplan

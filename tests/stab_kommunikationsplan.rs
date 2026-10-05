@@ -337,6 +337,60 @@ async fn statuscodes_beim_anlegen() {
 
 // ---------- Stellen ändern und entfernen ----------
 
+/// LFH-893 (Review S4): Die Fernmeldeskizze legt eine externe Stelle an und braucht für
+/// Rückgängig genau DIESE Stelle. `?antwort=stelle` antwortet mit der neuen Stelle statt mit dem
+/// ganzen Plan — auch wenn schon eine gleichnamige Stelle derselben Art besteht.
+#[tokio::test]
+async fn anlegen_mit_antwort_stelle_nennt_genau_die_neue() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let alt = stelle(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart": "leitstelle", "bezeichnung": "ILS Musterhausen"}),
+    )
+    .await;
+    let pfad = format!("{}?antwort=stelle", stellen_pfad(einsatz));
+    let body = json!({"stellenart": "leitstelle", "bezeichnung": "ILS Musterhausen"});
+    let (status, neu) = anfrage(&app, "POST", &pfad, &admin, Some(&body.to_string())).await;
+    assert_eq!(status, StatusCode::CREATED, "{neu:?}");
+    let neu_id = neu["id"].as_i64().unwrap();
+    assert_ne!(neu_id, alt, "die neue, nicht die bestehende Stelle");
+    assert_eq!(neu["stellenart"], "leitstelle");
+    assert_eq!(neu["bezeichnung"], "ILS Musterhausen");
+    assert_eq!(neu["verbindungen"], json!([]));
+    assert_eq!(
+        laden(&app, &admin, einsatz).await.as_array().unwrap().len(),
+        2
+    );
+
+    // Ohne Parameter bleibt die Antwort der ganze Plan; ein unbekannter Wert ist 400.
+    let (status, plan) = stelle_neu(
+        &app,
+        &admin,
+        einsatz,
+        json!({"stellenart": "behoerde", "bezeichnung": "Polizei"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(plan.as_array().unwrap().len(), 3);
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}?antwort=alles", stellen_pfad(einsatz)),
+        &admin,
+        Some(&json!({"stellenart": "sonstige", "bezeichnung": "X"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        laden(&app, &admin, einsatz).await.as_array().unwrap().len(),
+        3
+    );
+}
+
 #[tokio::test]
 async fn umbenennen_aendert_nur_die_bezeichnung() {
     let app = setup().await;

@@ -18,13 +18,17 @@ import {
   legeVerbindungAn,
 } from '../api/kommunikationsplan';
 import { ApiError } from '../api/client';
+import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import { freigabenFixture } from '../test/fixtures';
 import type {
   Einheit,
   EinsatzAnzeige,
   Einsatzabschnitt,
+  Fernmeldeskizze,
   FuehrungsfunktionEintrag,
   KommunikationsStelle,
+  SkizzenVerbindung,
+  Sprechgruppe,
   Stab,
 } from '../api/types';
 
@@ -33,6 +37,7 @@ vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/stab', () => ({ ladeStab: vi.fn() }));
 vi.mock('../api/fuehrungsfunktionen', () => ({ ladeFuehrungsfunktionen: vi.fn() }));
+vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
 vi.mock('../api/kommunikationsplan', () => ({
   ladeKommunikationsplan: vi.fn(),
   legeKommunikationsStelleAn: vi.fn(),
@@ -56,6 +61,7 @@ const S2: KommunikationsStelle = {
   funktion: 's2',
   funktion_label: 'S2 Lage',
   verbindungen: [{ id: 11, mittel: 'mobil', wert: '0170 1234567', hinweis: 'nur tagsüber' }],
+  sprechgruppen: [],
 };
 const POLIZEI: KommunikationsStelle = {
   id: 2,
@@ -65,13 +71,56 @@ const POLIZEI: KommunikationsStelle = {
     { id: 21, mittel: 'festnetz', wert: '0421 110' },
     { id: 22, mittel: 'fax', wert: '0421 111' },
   ],
+  sprechgruppen: [],
 };
 const ILS: KommunikationsStelle = {
   id: 3,
   stellenart: 'leitstelle',
   bezeichnung: 'ILS Nord',
   verbindungen: [{ id: 31, mittel: 'festnetz', wert: '0421 112' }],
+  sprechgruppen: [],
 };
+
+const TMO_SL_AS: Sprechgruppe = {
+  id: 31,
+  bezeichnung: 'SL AS',
+  betriebsart: 'TMO',
+  aktiv: true,
+  einsatz_lokal: false,
+  sortier: 1,
+};
+
+/** Die Daten der Fernmeldeskizze (LFH-893): hier zählen nur ihre Verbindungen. */
+function skizze(verbindungen: SkizzenVerbindung[] = []): Fernmeldeskizze {
+  return {
+    lage: [],
+    komponenten: [],
+    verbindungen,
+    bereiche: [],
+    schriftfeld: {
+      herausgeber: null,
+      vs_vermerk: 'keiner',
+      gueltig_ab: null,
+      gez_name: null,
+      gez_at: null,
+    },
+    stand: null,
+  };
+}
+
+/** Eine Datenverbindung der Skizze von der Führungsstelle zur Stelle `stelleId`. */
+function datenverbindung(stelleId: number): SkizzenVerbindung {
+  return {
+    id: 90 + stelleId,
+    von: { art: 'fuehrungsstelle', id: null },
+    nach: { art: 'stelle', id: stelleId },
+    art: 'daten',
+    medium: 'leitung',
+    status: 'bestehend',
+    verkehr: null,
+    hinweis: null,
+  };
+}
 
 const ABSCHNITTE: Einsatzabschnitt[] = [
   {
@@ -149,6 +198,7 @@ beforeEach(() => {
   vi.mocked(ladeStab).mockResolvedValue(STAB);
   vi.mocked(ladeFuehrungsfunktionen).mockResolvedValue(KATALOG);
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, POLIZEI]);
+  vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze());
   for (const f of [
     legeKommunikationsStelleAn,
     entferneKommunikationsStelle,
@@ -248,6 +298,110 @@ describe('KommunikationsplanPage — Anzeige', () => {
     expect(container.querySelector('[data-lfh="druckkopf"]')?.textContent).toContain(
       'Kommunikationsplan',
     );
+  });
+});
+
+describe('KommunikationsplanPage — Fernmeldeskizze (LFH-893)', () => {
+  const ilsOhne: KommunikationsStelle = { ...ILS, verbindungen: [] };
+
+  it('zeigt die Kanäle einer externen Stelle als Nebentext, geplante mit dem Wort', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([
+      S2,
+      { ...ILS, sprechgruppen: [{ sprechgruppe: TMO_SL_AS, status: 'geplant' }] },
+    ]);
+    const { container } = setup();
+    await screen.findByText('ILS Nord');
+    expect(within(zeile(container, 'st-3')).getByText('TMO SL AS (geplant)')).toBeInTheDocument();
+    expect(within(zeile(container, 'st-1')).queryByText(/TMO/)).toBeNull();
+  });
+
+  it('Leitstelle nur über Funk: kein Hinweis', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([
+      S2,
+      { ...ilsOhne, sprechgruppen: [{ sprechgruppe: TMO_SL_AS, status: 'bestehend' }] },
+    ]);
+    setup();
+    await screen.findByText('ILS Nord');
+    await waitFor(() => expect(ladeFernmeldeskizze).toHaveBeenCalled());
+    expect(screen.queryByText('Leitstelle: keine Verbindung erfasst')).toBeNull();
+  });
+
+  it('Leitstelle nur in der Skizze verbunden: kein Hinweis', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, ilsOhne]);
+    vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze([datenverbindung(3)]));
+    setup();
+    await screen.findByText('ILS Nord');
+    await waitFor(() => expect(ladeFernmeldeskizze).toHaveBeenCalled());
+    expect(screen.queryByRole('region', { name: 'Lücken' })).toBeNull();
+    expect(screen.queryByText('Leitstelle: keine Verbindung erfasst')).toBeNull();
+  });
+
+  it('Leitstelle ganz ohne Verbindung: der Hinweis steht, sobald die Skizze geladen ist', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, ilsOhne]);
+    setup();
+    expect(await screen.findByText('Leitstelle: keine Verbindung erfasst')).toBeInTheDocument();
+  });
+
+  it('Skizze nicht geladen und sonst keine Verbindung: „—“ mit Grund statt Hinweis', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, ilsOhne]);
+    vi.mocked(ladeFernmeldeskizze).mockRejectedValue(new ApiError(500, 'kaputt'));
+    setup();
+    const luecken = await screen.findByRole('region', { name: 'Lücken' });
+    expect(within(luecken).getByText('Fernmeldeskizze nicht geladen')).toBeInTheDocument();
+    expect(screen.queryByText('Leitstelle: keine Verbindung erfasst')).toBeNull();
+  });
+
+  it('Skizze nicht geladen, Leitstelle per Telefon verbunden: kein Hinweis', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, ILS]);
+    vi.mocked(ladeFernmeldeskizze).mockRejectedValue(new ApiError(500, 'kaputt'));
+    setup();
+    await screen.findByText('ILS Nord');
+    await waitFor(() => expect(ladeFernmeldeskizze).toHaveBeenCalled());
+    expect(screen.queryByRole('region', { name: 'Lücken' })).toBeNull();
+  });
+
+  it('nennt beim Entfernen der Leitstelle eine Sprechgruppe und eine Skizzen-Verbindung', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([
+      S2,
+      { ...ilsOhne, sprechgruppen: [{ sprechgruppe: TMO_SL_AS, status: 'bestehend' }] },
+    ]);
+    vi.mocked(ladeFernmeldeskizze).mockResolvedValue(skizze([datenverbindung(3)]));
+    vi.mocked(entferneKommunikationsStelle).mockResolvedValue([S2]);
+    const { container } = setup();
+    await screen.findByText('ILS Nord');
+    await waitFor(() => expect(ladeFernmeldeskizze).toHaveBeenCalledTimes(1));
+    await userEvent.click(
+      within(zeile(container, 'st-3')).getByRole('button', {
+        name: 'Weitere Aktionen zu ILS Nord',
+      }),
+    );
+    await userEvent.click(await screen.findByText('Stelle entfernen'));
+    const rueckfrage = await screen.findByRole('dialog');
+    expect(
+      within(rueckfrage).getByText(/1 Sprechgruppe und 1 Skizzen-Verbindung/),
+    ).toBeInTheDocument();
+    expect(entferneKommunikationsStelle).not.toHaveBeenCalled();
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Entfernen' }));
+    await waitFor(() => expect(entferneKommunikationsStelle).toHaveBeenCalledWith(1, 3));
+    // Der Server räumt die Skizzen-Verbindung mit: die Skizzendaten werden neu geholt.
+    await waitFor(() => expect(ladeFernmeldeskizze).toHaveBeenCalledTimes(2));
+  });
+
+  it('fragt nach, wenn die Skizze nicht geladen ist, auch ohne Verbindungen', async () => {
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([S2, ilsOhne]);
+    vi.mocked(ladeFernmeldeskizze).mockRejectedValue(new ApiError(500, 'kaputt'));
+    const { container } = setup();
+    await screen.findByText('ILS Nord');
+    await screen.findByText('Fernmeldeskizze nicht geladen');
+    await userEvent.click(
+      within(zeile(container, 'st-3')).getByRole('button', {
+        name: 'Weitere Aktionen zu ILS Nord',
+      }),
+    );
+    await userEvent.click(await screen.findByText('Stelle entfernen'));
+    const rueckfrage = await screen.findByRole('dialog');
+    expect(within(rueckfrage).getByText(/nicht bekannt/)).toBeInTheDocument();
+    expect(entferneKommunikationsStelle).not.toHaveBeenCalled();
   });
 });
 
