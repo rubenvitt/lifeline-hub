@@ -725,8 +725,9 @@ pub async fn sichten(
     Ok((StatusCode::CREATED, Json(sichtung)))
 }
 
-/// GET /api/einsaetze/{id}/personen/{pid}/audit — Lese-Audit der Person.
-/// Nur Einsatzleitung. Selbst NICHT auditiert (kein detail-Eintrag).
+/// GET /api/einsaetze/{id}/personen/{pid}/audit — Lese-Audit der Person, samt den Listenzugriffen
+/// aus ihrem Erfassungsfenster (LFH-916, design.md D3). Nur Einsatzleitung. Selbst NICHT
+/// auditiert (kein detail-Eintrag).
 pub async fn audit(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personen>,
@@ -738,6 +739,19 @@ pub async fn audit(
     repo::laden(&state.pool, einsatz_id, person_id).await?;
     Ok(Json(
         audit_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/personen/listenzugriffe — Zugriffe auf die ganze Personenliste
+/// (Export, Druck), neueste zuerst (LFH-916, Spec `personen-zugriffsprotokoll`). Gate wie
+/// `audit`: nur Einsatzleitung, selbst NICHT auditiert.
+pub async fn listenzugriffe(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Json<Vec<ZugriffAnzeige>>, AppError> {
+    ctx.fordere_einsatzleitung()?;
+    Ok(Json(
+        audit_repo::liste_listenweit(&state.pool, ctx.einsatz.id).await?,
     ))
 }
 
