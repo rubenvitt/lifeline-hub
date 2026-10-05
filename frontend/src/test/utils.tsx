@@ -1,8 +1,8 @@
 import { QueryClientProvider, onlineManager, type QueryClient } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
 import { App as AntApp, ConfigProvider } from 'antd';
-import { MemoryRouter } from 'react-router';
-import type { ReactElement, ReactNode } from 'react';
+import { MemoryRouter, RouterProvider, createMemoryRouter } from 'react-router';
+import { createContext, useContext, useState, type ReactElement, type ReactNode } from 'react';
 import { AuthProvider } from '../auth/AuthContext';
 import { erzeugeQueryClient } from '../api/queryClient';
 
@@ -31,10 +31,37 @@ export function neuerQueryClient(): QueryClient {
 interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
   route?: string;
   client?: QueryClient;
+  /**
+   * Data Router statt `MemoryRouter` — Pflicht für alles, was `useBlocker` nutzt (Verlassen-Schutz
+   * der Formularseiten, `frontend/AGENTS.md` „Formularseiten“): `useBlocker` wirft ohne ihn.
+   */
+  datenRouter?: boolean;
+}
+
+/**
+ * Trägt die Kinder in den Data Router. Der Router entsteht EINMAL je Render; die einzige Route
+ * liest die Kinder aus dem Kontext, damit `rerender` mit neuem Element ankommt.
+ */
+const KinderKontext = createContext<ReactNode>(null);
+function KinderAusKontext() {
+  return <>{useContext(KinderKontext)}</>;
+}
+function DatenRouter({ route, children }: { route: string; children: ReactNode }) {
+  const [router] = useState(() =>
+    createMemoryRouter([{ path: '*', element: <KinderAusKontext /> }], {
+      initialEntries: [route],
+    }),
+  );
+  return (
+    <KinderKontext.Provider value={children}>
+      <RouterProvider router={router} />
+    </KinderKontext.Provider>
+  );
 }
 
 /** Rendert eine Komponente mit Query-, antd- und Router-Providern. */
 export function renderMitProviders(ui: ReactElement, options: ProviderOptions = {}) {
+  const { datenRouter = false, ...renderOptionen } = options;
   const client = options.client ?? neuerQueryClient();
   const route = options.route ?? '/';
   function Wrapper({ children }: { children: ReactNode }) {
@@ -46,12 +73,16 @@ export function renderMitProviders(ui: ReactElement, options: ProviderOptions = 
                `/api/auth/me` (401 → anonym) liegt im MSW-Server; einen konkreten Benutzer setzt
                `server.use()`. */}
             <AuthProvider>
-              <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+              {datenRouter ? (
+                <DatenRouter route={route}>{children}</DatenRouter>
+              ) : (
+                <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+              )}
             </AuthProvider>
           </AntApp>
         </ConfigProvider>
       </QueryClientProvider>
     );
   }
-  return { client, ...render(ui, { wrapper: Wrapper, ...options }) };
+  return { client, ...render(ui, { wrapper: Wrapper, ...renderOptionen }) };
 }

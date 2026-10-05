@@ -247,7 +247,7 @@ export function komponentenPiktogramm(art: Komponentenart): Zeichenquelle {
 }
 
 /**
- * Was @einsatzzeichen (3.0.0) und taktische-zeichen-react nicht haben und hier gezeichnet wird —
+ * Was @einsatzzeichen (Stand 4.1.0) und taktische-zeichen-react nicht haben und hier gezeichnet wird —
  * Vorlage für das Folgeticket an `@einsatzzeichen`.
  */
 export const SELBST_GEZEICHNET: readonly { zeichen: string; vorlage: string; grund: string }[] = [

@@ -70,7 +70,7 @@ function renderRoute(pfad: string) {
       <Route path="/admin/stammdaten/personal" element={<PersonalTab />} />
       <Route path="/admin/stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
     </Routes>,
-    { route: pfad },
+    { route: pfad, datenRouter: true },
   );
 }
 
@@ -89,7 +89,7 @@ function renderMitWechsel() {
         <Route path="/admin/stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
       </Routes>
     </>,
-    { route: personalDetailPfad(5) },
+    { route: personalDetailPfad(5), datenRouter: true },
   );
 }
 

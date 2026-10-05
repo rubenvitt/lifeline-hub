@@ -54,7 +54,7 @@ function rendern() {
     <Routes>
       <Route path="/einsaetze/:id/einstellungen/verhalten" element={<EinsatzVerhalten />} />
     </Routes>,
-    { route: '/einsaetze/1/einstellungen/verhalten' },
+    { route: '/einsaetze/1/einstellungen/verhalten', datenRouter: true },
   );
 }
 

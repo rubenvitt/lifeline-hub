@@ -102,6 +102,17 @@ interface Props {
    */
   versand?: Versand;
   onVersandChange?: (aenderung: Partial<Versand>) => void;
+  /**
+   * Eingeklappt (Handschirm, LFH-955 D4): nur Präfix, Feld, „Vorschau“ und „Erfassen“. Hinweis-,
+   * Feld- und Rufnamenzeile entfallen. Ob, entscheiden `EtbPage` (Fokus) und `EtbEntwurfsTabs`
+   * (leerer Entwurf); die Zeilen hängen hinter dem Feld, es behält dabei seinen Platz im Baum.
+   */
+  eingeklappt?: boolean;
+  /**
+   * Fokus beim Mount. Aus unter `md`: dort klappte er die Leiste beim Laden auf und öffnete die
+   * Bildschirmtastatur über der Zeitachse.
+   */
+  startFokus?: boolean;
 }
 
 /** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
@@ -167,6 +178,12 @@ const ENTER_HINWEIS =
  * (Erfassungs-Norm). Cmd/Strg+Enter entfällt, die Taste gibt es dort nicht.
  */
 const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
+/**
+ * Mit grobem Zeiger (Finger, Handschuh) sendet Return nicht (LFH-955, design.md D1): die
+ * Bildschirmtastatur liefert Return als `Enter`, schon das erste brach einen Mehrzeiler ab. Der
+ * Hinweis nennt deshalb keine Tastenkombination, auf jeder Breite.
+ */
+const ENTER_HINWEIS_BERUEHRUNG = 'Return neue Zeile · „Erfassen“ sendet';
 
 /**
  * Platzhalter: sagt, WAS in das Feld gehört (der Tastaturvertrag steht in der Hinweiszeile).
@@ -174,7 +191,8 @@ const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
  * den Platzhalter mit, und die angepinnte Leiste riss den 50-%-Deckel (LFH-373).
  */
 const PLATZHALTER = 'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )';
-const PLATZHALTER_KURZ = 'Inhalt … ( / für Befehle · @ für Einheit )';
+// „Befehl“ ist im Einsatz ein Fachobjekt (Aufträge/Befehle), nicht der Slash (LFH-955).
+const PLATZHALTER_KURZ = 'Inhalt … ( / für Typ & Felder · @ für Einheit )';
 
 /**
  * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen Knopf
@@ -247,13 +265,16 @@ export default function Schnellerfassung({
   clientId,
   versand: versandVonAussen,
   onVersandChange,
+  eingeklappt = false,
+  startFokus = true,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
   const online = useOnline();
   // Unter `md` steht das Feld auf eigener Zeile: zwischen Typ-Präfix und „Erfassen" bliebe es
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
-  const { istSchmal } = useViewport();
+  // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
+  const { istSchmal, istBeruehrung, screens } = useViewport();
   const [vorschauOffen, setVorschauOffen] = useState(false);
   const chipZeileRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<TextAreaRef>(null);
@@ -312,6 +333,15 @@ export default function Schnellerfassung({
    */
   const [menuModus, setMenuModus] = useState<'slash' | 'at'>('slash');
   const [typenAnbieten, setTypenAnbieten] = useState(false);
+  /**
+   * Einklappen schließt Feld-Editor und Menü. Der Editor hängt in der Feldzeile, die eingeklappt
+   * entfällt; bliebe `editFeld` stehen, montierte das nächste Aufklappen ihn neu, und sein
+   * Selbstfokus zöge den Fokus aus dem Textfeld (LFH-955). Abgeleitet im Rendern, kein Effekt.
+   */
+  if (eingeklappt && (editFeld != null || menuOffen)) {
+    setEditFeld(null);
+    setMenuOffen(false);
+  }
 
   const [bausteinOffen, setBausteinOffen] = useState<EtbBaustein | null>(null);
 
@@ -347,9 +377,17 @@ export default function Schnellerfassung({
 
   // Fokus beim Mount. State-Reset bei Tab-/Modus-Wechsel erfolgt über key-basiertes
   // Remounting im Container (EtbEntwurfsTabs / EtbPage-Berichtigung).
+  // Einmal, sobald die Breite bekannt ist: auf dem ersten Render gilt sie als breit
+  // (`useViewport`), und der Wechsel in die gestapelte Form montierte das Feld neu — ein früher
+  // Fokus ginge verloren, und `startFokus` (unter `md` aus) stünde noch auf dem breiten Wert.
+  // Danach fokussiert kein Aufklappen von selbst.
+  const breiteBekannt = Object.keys(screens).length > 0;
+  const startFokusErledigt = useRef(false);
   useEffect(() => {
-    textRef.current?.focus();
-  }, []);
+    if (!breiteBekannt || startFokusErledigt.current) return;
+    startFokusErledigt.current = true;
+    if (startFokus) textRef.current?.focus();
+  }, [breiteBekannt, startFokus]);
 
   /**
    * Klick daneben schließt das Menü.
@@ -481,12 +519,14 @@ export default function Schnellerfassung({
       e.preventDefault();
       return;
     }
+    // Grober Zeiger: nur Strg/⌘+Enter sendet, Return bricht um (LFH-955, design.md D1).
+    const einzeilerSendet = !istBeruehrung && inhalt.trim() !== '' && !inhalt.includes('\n');
     const istSendeTaste =
       e.key === 'Enter' &&
       !e.repeat &&
       !e.shiftKey &&
       !e.altKey &&
-      (e.ctrlKey || e.metaKey || (inhalt.trim() !== '' && !inhalt.includes('\n')));
+      (e.ctrlKey || e.metaKey || einzeilerSendet);
     if (istSendeTaste && editFeld == null) {
       e.preventDefault();
       void absenden();
@@ -704,10 +744,16 @@ export default function Schnellerfassung({
     </Tooltip>
   ) : null;
 
-  // Unter `md` die Kurzform: die volle Zeile bräche auf dem Handschirm dreizeilig um.
+  // Unter `md` die Kurzform: die volle Zeile bräche auf dem Handschirm dreizeilig um. Der
+  // Tastaturvertrag folgt der Zeigerart, nicht der Breite (LFH-955).
+  const enterHinweis = istBeruehrung
+    ? ENTER_HINWEIS_BERUEHRUNG
+    : istSchmal
+      ? ENTER_HINWEIS_KURZ
+      : ENTER_HINWEIS;
   const hinweiszeile = istSchmal ? (
     <>
-      <span>{ENTER_HINWEIS_KURZ}</span>
+      <span>{enterHinweis}</span>
       {schalter && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
     </>
   ) : (
@@ -717,7 +763,7 @@ export default function Schnellerfassung({
       )}
       {!berichtigungZu && <span>@ Einheit</span>}
       <span>/zeit ⧖ Nachtrag</span>
-      <span>{ENTER_HINWEIS}</span>
+      <span>{enterHinweis}</span>
     </>
   );
 
@@ -802,7 +848,7 @@ export default function Schnellerfassung({
         />
       )}
 
-      {rufnameAbfrageOffen && (
+      {rufnameAbfrageOffen && !eingeklappt && (
         <RufnameAbfrage
           // Neu montiert beim Wechsel zwischen erster Abfrage und Ändern: die Felder starten
           // dann mit dem jeweils richtigen Wert.
@@ -823,6 +869,9 @@ export default function Schnellerfassung({
       <div style={{ position: 'relative' }}>
         <Schnellerfassungszeile
           gestapelt={istSchmal}
+          // Ab `md` füllt das Textfeld die Zeile, damit ein Funkspruch am Stück gegenzulesen ist
+          // (LFH-955, design.md D2).
+          feldFuellt
           praefix={praefix}
           hinweis={
             // „Vorschau" neben „Erfassen" statt auf eigener Zeile: eine eigene Knopfzeile kostete im
@@ -845,7 +894,7 @@ export default function Schnellerfassung({
               </Button>
             </div>
           }
-          hinweiszeile={hinweiszeile}
+          hinweiszeile={eingeklappt ? undefined : hinweiszeile}
         >
           {/* Die Schnellerfassung steht ohne eigene Überschrift unter dem Seitentitel (h1). */}
           <MarkdownEditor
@@ -860,6 +909,8 @@ export default function Schnellerfassung({
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
+            // Die Bildschirmtastatur zeigt „Return“, nicht „Senden“: Return bricht dort um (D1).
+            enterKeyHint="enter"
             readOnly={sendet}
           />
         </Schnellerfassungszeile>
@@ -882,79 +933,82 @@ export default function Schnellerfassung({
       {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt, die
          EINSTELLUNG „Werte behalten". Nicht neben „Erfassen" und nicht zwischen Aktionen: ein
          Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
-      <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
-        {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
+      {!eingeklappt && (
+        <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
+          {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
            brächen ihren Text IN sich um — die Leiste wüchse trotz einzeiliger Zeile. */}
-        <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
-          {/* Unter `md` steht „Feld" VORN: in der einzeilig rollenden Zeile rutschte er sonst hinter die
+          <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
+            {/* Unter `md` steht „Feld" VORN: in der einzeilig rollenden Zeile rutschte er sonst hinter die
              gesetzten Chips aus dem Bild. */}
-          {istSchmal && feldKnopf}
-          {istSchmal && anhangTeil}
-          {gesetzteFelder.map((feld) => (
-            <MetaChip
-              key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
-              feld={feld}
-              editing={editFeld === feld}
-              wert={wirksam[feld]}
-              ausStandard={
-                (feld === 'von' || feld === 'an') && ausStandard(feld, metadaten, rufname.standard)
-              }
-              // Der Weg zum Standard selbst (Spec `etb-absender-empfaenger`); in der Berichtigung
-              // wird er nicht geändert.
-              onStandardAendern={
-                berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
-              }
-              optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
-              onCommit={commitFeld}
-              onCancel={() => {
-                setEditFeld(null);
-                fokusInsFeld();
-              }}
-              onRemove={(f) => {
-                if (!sendet) setMetadaten((m) => ({ ...m, [f]: undefined }));
-              }}
-              onEdit={(f) => {
-                if (!sendet) setEditFeld(f);
-              }}
-              gesperrt={sendet}
-            />
-          ))}
-          {editFeld != null && wirksam[editFeld] == null && (
-            <MetaChip
-              key={`${editFeld}-edit-new`}
-              feld={editFeld}
-              editing
-              wert={undefined}
-              optionen={editFeld === 'von' || editFeld === 'an' ? vonAnOptionen : undefined}
-              onCommit={commitFeld}
-              onCancel={() => {
-                setEditFeld(null);
-                fokusInsFeld();
-              }}
-              onRemove={() => setEditFeld(null)}
-              onEdit={() => {}}
-              // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
-              gesperrt={sendet}
-            />
+            {istSchmal && feldKnopf}
+            {istSchmal && anhangTeil}
+            {gesetzteFelder.map((feld) => (
+              <MetaChip
+                key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
+                feld={feld}
+                editing={editFeld === feld}
+                wert={wirksam[feld]}
+                ausStandard={
+                  (feld === 'von' || feld === 'an') &&
+                  ausStandard(feld, metadaten, rufname.standard)
+                }
+                // Der Weg zum Standard selbst (Spec `etb-absender-empfaenger`); in der Berichtigung
+                // wird er nicht geändert.
+                onStandardAendern={
+                  berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
+                }
+                optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
+                onCommit={commitFeld}
+                onCancel={() => {
+                  setEditFeld(null);
+                  fokusInsFeld();
+                }}
+                onRemove={(f) => {
+                  if (!sendet) setMetadaten((m) => ({ ...m, [f]: undefined }));
+                }}
+                onEdit={(f) => {
+                  if (!sendet) setEditFeld(f);
+                }}
+                gesperrt={sendet}
+              />
+            ))}
+            {editFeld != null && wirksam[editFeld] == null && (
+              <MetaChip
+                key={`${editFeld}-edit-new`}
+                feld={editFeld}
+                editing
+                wert={undefined}
+                optionen={editFeld === 'von' || editFeld === 'an' ? vonAnOptionen : undefined}
+                onCommit={commitFeld}
+                onCancel={() => {
+                  setEditFeld(null);
+                  fokusInsFeld();
+                }}
+                onRemove={() => setEditFeld(null)}
+                onEdit={() => {}}
+                // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
+                gesperrt={sendet}
+              />
+            )}
+            {!istSchmal && feldKnopf}
+            {!istSchmal && anhangTeil}
+            {!berichtigungZu && typ === 'lage' && !lageberichteGesperrt && (
+              // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
+              // weiter und ein Upload-Fehler stünde nirgends.
+              <Button
+                type="link"
+                disabled={sendet}
+                onClick={() => navigate(lageberichtePfad(einsatz.id))}
+              >
+                Als strukturierten Lagebericht erfassen →
+              </Button>
+            )}
+          </Space>
+          {!istSchmal && zeigeSchalter && (
+            <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
           )}
-          {!istSchmal && feldKnopf}
-          {!istSchmal && anhangTeil}
-          {!berichtigungZu && typ === 'lage' && !lageberichteGesperrt && (
-            // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
-            // weiter und ein Upload-Fehler stünde nirgends.
-            <Button
-              type="link"
-              disabled={sendet}
-              onClick={() => navigate(lageberichtePfad(einsatz.id))}
-            >
-              Als strukturierten Lagebericht erfassen →
-            </Button>
-          )}
-        </Space>
-        {!istSchmal && zeigeSchalter && (
-          <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
-        )}
-      </div>
+        </div>
+      )}
 
       {dateien.length > 0 && (
         <ul

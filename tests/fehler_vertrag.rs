@@ -188,3 +188,50 @@ async fn nicht_numerische_route_id_liefert_400_im_fehler_envelope() {
         "Path-Rejection ist formal ungültig → 400"
     );
 }
+
+/// Meldung, mit der `JsonBody` einen Body über der Grenze abweist (400, s. `src/extract.rs`).
+const BODY_UNLESBAR: &str = "Anfrage-Body konnte nicht gelesen werden.";
+
+/// Öffentliche Anmelde-Starts begrenzen den Body auf 4 KiB (LFH-921): ohne Grenze gälte axums
+/// Vorgabe von 2 MiB. Die Abweisung kommt wie jede `JsonBody`-Rejection als 400 im
+/// `{error}`-Format.
+#[tokio::test]
+async fn zu_grosser_login_body_liefert_400_im_fehler_envelope() {
+    let app = common::setup().await;
+    let body =
+        serde_json::json!({ "benutzername": "a".repeat(5 * 1024), "passwort": "x" }).to_string();
+    let resp = app
+        .oneshot(login_request(&body, Some("application/json")))
+        .await
+        .unwrap();
+
+    let status = resp.status();
+    let json = assert_fehler_envelope(resp, "Login-Body über 4 KiB").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(json["error"], BODY_UNLESBAR, "abgewiesen wegen der Größe");
+}
+
+/// Die Passkey-Abschlüsse haben 16 KiB (LFH-921): ein 6-KiB-Body scheitert dort an seinem
+/// Inhalt, nicht an der Größe.
+#[tokio::test]
+async fn passkey_abschluss_nimmt_mehr_als_4_kib_an() {
+    let app = common::setup().await;
+    let body = serde_json::json!({ "polster": "a".repeat(6 * 1024) }).to_string();
+    for pfad in [
+        "/api/auth/webauthn/auth/finish",
+        "/api/auth/webauthn/discoverable/finish",
+    ] {
+        let req = Request::builder()
+            .method("POST")
+            .uri(pfad)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.clone()))
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        let json = assert_fehler_envelope(resp, pfad).await;
+        assert_ne!(
+            json["error"], BODY_UNLESBAR,
+            "{pfad}: 6 KiB müssen unter der Grenze liegen"
+        );
+    }
+}

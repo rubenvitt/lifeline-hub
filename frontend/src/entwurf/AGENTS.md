@@ -8,7 +8,8 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
   `LageberichtDetailPage` rendern mit `key={<id>}`. Merker ist
   eigener State, **nicht** `form.isFieldsTouched()`. Riegel als Paar testen. Autosave ohne
   Erfolgs-Toast, sondern „zuletzt gespeichert HH:MM".
-- Interne Navigation: `entwurf/EntwurfNavigationSchutz.tsx` (`useBlocker`, Data Router).
+- Interne Navigation: `entwurf/EntwurfNavigationSchutz.tsx`, Hülle um die Rückfrage der
+  Formularseiten (`components/VerlassenRueckfrage.tsx`, LFH-979) mit „Speichern und weiter“.
 - **Ein Klick auf „Entwurf speichern" ist EIN PATCH:** einzige Pforte `speichereJetzt`,
   `gesichertRef` (Start `-1`), `speichertGerade` speist den Blocker, **nicht** `loading` am Knopf.
 - Einstiegsfokus im ersten LEEREN Abschnitt (`entwurf/Einstiegsfokus.tsx`).

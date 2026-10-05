@@ -128,7 +128,7 @@ async fn audit_anmeldung(
         Ok(benutzer) => {
             tracing::info!(
                 benutzer_id = benutzer.id,
-                benutzername = %benutzer.benutzername,
+                benutzername = %crate::auth::benutzername::fuer_protokoll(&benutzer.benutzername),
                 peer_ip = ?peer_ip,
                 provider,
                 "Anmeldung erfolgreich"
@@ -192,12 +192,16 @@ pub async fn login(
     jar: CookieJar,
     JsonBody(req): JsonBody<LoginRequest>,
 ) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
-    // Bremse vor jeder Passwort-Arbeit: ein gesperrter Aufrufer löst kein Hashing aus.
+    // Erst der Name (LFH-921, LFH-981): Randleerzeichen fallen weg, ein überlanger Name endet hier
+    // mit 400, bevor Sperre, Audit oder Log ihn sehen, und zählt nicht als Fehlversuch.
+    let benutzername = crate::auth::benutzername::normalisiere(&req.benutzername)?;
+
+    // Bremse vor jeder Passwort-Arbeit: ein gesperrter Aufrufer löst kein Hashing aus. Der Name
+    // bleibt aus dieser Zeile: sie entsteht bei jeder Anfrage einer gesperrten Quelle, ohne Drossel.
     if let Some(ip) = peer_ip {
         if crate::auth::rate_limit::ist_gesperrt(ip) {
             tracing::warn!(
                 peer_ip = %ip,
-                benutzername = %req.benutzername,
                 "Anmeldeversuch abgewiesen: zu viele Fehlversuche aus dieser Quelle"
             );
             return Err(AppError::TooManyRequests(
@@ -214,38 +218,14 @@ pub async fn login(
         return Err(AppError::Forbidden);
     }
 
-    let benutzer = match crate::auth::provider::password::anmelden(
+    let benutzer = passwort_pruefen(
         &state.pool,
-        &req.benutzername,
+        peer_ip,
+        benutzername,
         &req.passwort,
+        &crate::auth::provider::password::Schranken::produktiv(),
     )
-    .await
-    {
-        Ok(b) => b,
-        Err(e) => {
-            if let Some(ip) = peer_ip {
-                crate::auth::rate_limit::fehlversuch(ip, Some(&req.benutzername));
-            }
-            tracing::warn!(
-                benutzername = %req.benutzername,
-                peer_ip = ?peer_ip,
-                "Anmeldung fehlgeschlagen"
-            );
-            crate::auth::audit::schreibe(
-                &state.pool,
-                crate::auth::audit::AuditEintrag {
-                    ereignis: crate::auth::audit::Ereignis::LoginFehlgeschlagen,
-                    // Der VERSUCHTE Name — er muss keinem Benutzer entsprechen.
-                    benutzername: Some(&req.benutzername),
-                    benutzer_id: None,
-                    peer_ip: peer_ip.map(|ip| ip.to_string()),
-                    provider: crate::auth::provider::ID_PASSWORT,
-                },
-            )
-            .await;
-            return Err(e);
-        }
-    };
+    .await?;
 
     let totp_aktiviert: bool =
         sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
@@ -281,7 +261,7 @@ pub async fn login(
     let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,
-        benutzername = %benutzer.benutzername,
+        benutzername = %crate::auth::benutzername::fuer_protokoll(&benutzer.benutzername),
         peer_ip = ?peer_ip,
         "Anmeldung erfolgreich"
     );
@@ -300,6 +280,55 @@ pub async fn login(
         jar,
         Json(LoginAntwort::Angemeldet(benutzer.anzeige(totp_aktiviert))),
     ))
+}
+
+/// Der Passwortschritt von [`login`], mit injizierbaren Schranken für Tests.
+///
+/// **Nur ein 401 ist ein Fehlversuch** (LFH-921, Muster von [`passwort_aendern`]): er zählt für
+/// die Sperre und schreibt `login_fehlgeschlagen`. Ein 503 aus Andrang oder KDF-Wartefrist geht
+/// unverändert durch; zählte er, sperrte sich eine Anmeldewelle hinter einer NAT-IP genau in der
+/// Lastspitze selbst aus, und das Audit sähe aus wie Brute-Force.
+async fn passwort_pruefen(
+    pool: &SqlitePool,
+    peer_ip: Option<std::net::IpAddr>,
+    benutzername: &str,
+    passwort: &str,
+    schranken: &crate::auth::provider::password::Schranken,
+) -> Result<Benutzer, AppError> {
+    match crate::auth::provider::password::anmelden_mit_schranken(
+        pool,
+        benutzername,
+        passwort,
+        schranken,
+    )
+    .await
+    {
+        Ok(b) => Ok(b),
+        Err(AppError::Unauthorized) => {
+            if let Some(ip) = peer_ip {
+                crate::auth::rate_limit::fehlversuch(ip, Some(benutzername));
+            }
+            tracing::warn!(
+                benutzername = %crate::auth::benutzername::fuer_protokoll(benutzername),
+                peer_ip = ?peer_ip,
+                "Anmeldung fehlgeschlagen"
+            );
+            crate::auth::audit::schreibe(
+                pool,
+                crate::auth::audit::AuditEintrag {
+                    ereignis: crate::auth::audit::Ereignis::LoginFehlgeschlagen,
+                    // Der VERSUCHTE Name — er muss keinem Benutzer entsprechen.
+                    benutzername: Some(benutzername),
+                    benutzer_id: None,
+                    peer_ip: peer_ip.map(|ip| ip.to_string()),
+                    provider: crate::auth::provider::ID_PASSWORT,
+                },
+            )
+            .await;
+            Err(AppError::Unauthorized)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// POST /api/auth/logout — löscht die Session und entfernt das Cookie.
@@ -477,11 +506,8 @@ pub async fn passwort_aendern(
         crate::auth::rate_limit::erfolg(ip, &benutzer.benutzername);
     }
 
-    // Argon2 blockiert den Worker ~50–100 ms; auf den Blocking-Pool damit.
-    let neues = req.neues_passwort;
-    let hash = tokio::task::spawn_blocking(move || crate::auth::password::hash(&neues))
-        .await
-        .map_err(|e| AppError::Internal(format!("KDF-Task abgebrochen: {e}")))??;
+    // Argon2 unter dem KDF-Gate und auf dem Blocking-Pool (LFH-921).
+    let hash = crate::auth::provider::password::hash_gedrosselt(&req.neues_passwort).await?;
 
     // `CurrentUser` hat die Sitzung eben aufgelöst; das Cookie ist also da.
     let token = jar
@@ -1005,12 +1031,14 @@ pub async fn webauthn_auth_start(
         return Err(AppError::NotFound);
     }
     let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+    // Wie beim Passwort-Login (LFH-921, LFH-981): getrimmt, Höchstlänge, ohne Schreibweise.
+    let benutzername = crate::auth::benutzername::normalisiere(&req.benutzername)?;
 
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
-         aktiv, erstellt_at FROM benutzer WHERE benutzername = ? AND aktiv = 1",
+         aktiv, erstellt_at FROM benutzer WHERE benutzername = ? COLLATE NOCASE AND aktiv = 1",
     )
-    .bind(&req.benutzername)
+    .bind(benutzername)
     .fetch_optional(&state.pool)
     .await?;
 
@@ -1773,7 +1801,7 @@ pub async fn app_code_einloesen(
     let jar = jar.add(session_cookie(token, secure));
     tracing::info!(
         benutzer_id = benutzer.id,
-        benutzername = %benutzer.benutzername,
+        benutzername = %crate::auth::benutzername::fuer_protokoll(&benutzer.benutzername),
         peer_ip = ?peer_ip,
         "Anmeldung aus dem Browser eingelöst"
     );
@@ -1929,6 +1957,89 @@ mod tests {
         assert!(
             admin.iter().any(|p| p.id == "oidc" && !p.aktiviert),
             "admin: deaktiviertes oidc sichtbar"
+        );
+    }
+
+    /// Schranken, die jeden KDF-Platz sofort verweigern (wie ein volles Gate nach der Wartefrist).
+    fn volles_gate() -> crate::auth::provider::password::Schranken {
+        use std::sync::Arc;
+        use tokio::sync::Semaphore;
+        crate::auth::provider::password::Schranken {
+            andrang: Arc::new(Semaphore::new(32)),
+            kdf: Arc::new(Semaphore::new(0)),
+            wartefrist: std::time::Duration::from_millis(20),
+        }
+    }
+
+    async fn pool_mit_max() -> SqlitePool {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Max', 'max', ?)",
+        )
+        .bind(crate::auth::password::hash("geheim123").unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool
+    }
+
+    async fn fehlgeschlagen_im_audit(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM auth_audit WHERE ereignis = 'login_fehlgeschlagen'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Spec `passwort-anmeldung`, „Überlast in der Anmeldewelle“ (LFH-921): ein 503 aus dem
+    /// KDF-Gate ist kein Fehlversuch. Mutationsprobe: mit dem alten `Err(e)`-Arm, der jeden
+    /// Fehler zählte, ist die Quelle nach zehn 503 gesperrt und das Audit voll.
+    #[tokio::test]
+    async fn ueberlast_zaehlt_nicht_als_fehlversuch() {
+        let pool = pool_mit_max().await;
+        let ip: std::net::IpAddr = "198.51.100.21".parse().unwrap();
+
+        for i in 0..12 {
+            let err = passwort_pruefen(&pool, Some(ip), "max", "geheim123", &volles_gate())
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(err, AppError::ServiceUnavailable(_)),
+                "Versuch {i}: 503 bleibt 503, war {err:?}"
+            );
+        }
+
+        assert!(
+            !crate::auth::rate_limit::ist_gesperrt(ip),
+            "Überlast darf die Quelle nicht sperren"
+        );
+        assert_eq!(fehlgeschlagen_im_audit(&pool).await, 0);
+    }
+
+    /// Gegenprobe: ein falsches Passwort zählt weiter und steht im Audit.
+    #[tokio::test]
+    async fn falsches_passwort_zaehlt_weiter() {
+        let pool = pool_mit_max().await;
+        let ip: std::net::IpAddr = "198.51.100.22".parse().unwrap();
+        let schranken = crate::auth::provider::password::Schranken::produktiv();
+
+        for _ in 0..crate::auth::rate_limit::MAX_FEHLVERSUCHE {
+            let err = passwort_pruefen(&pool, Some(ip), "Max", "falsch", &schranken)
+                .await
+                .unwrap_err();
+            assert!(matches!(err, AppError::Unauthorized), "{err:?}");
+        }
+
+        assert!(crate::auth::rate_limit::ist_gesperrt(ip));
+        assert_eq!(
+            fehlgeschlagen_im_audit(&pool).await,
+            crate::auth::rate_limit::MAX_FEHLVERSUCHE as i64
         );
     }
 }

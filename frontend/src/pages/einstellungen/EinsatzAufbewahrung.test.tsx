@@ -67,7 +67,7 @@ function rendern() {
     <Routes>
       <Route path="/einsaetze/:id/einstellungen/aufbewahrung" element={<EinsatzAufbewahrung />} />
     </Routes>,
-    { route: '/einsaetze/1/einstellungen/aufbewahrung' },
+    { route: '/einsaetze/1/einstellungen/aufbewahrung', datenRouter: true },
   );
 }
 

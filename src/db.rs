@@ -334,6 +334,86 @@ mod tests {
             .expect("die eingeschobene Migration ist angewendet");
     }
 
+    /// Eine Datenbank mit allen Migrationen vor `0151` und den übergebenen Benutzernamen.
+    async fn benutzer_vor_0151(namen: &[&str]) -> SqlitePool {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(SqliteConnectOptions::new().filename(":memory:"))
+            .await
+            .unwrap();
+        let vorher: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version < 151)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor 0151");
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        for name in namen {
+            sqlx::query(
+                "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+                 VALUES (1, 'X', ?, 'h')",
+            )
+            .bind(name)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        pool
+    }
+
+    /// LFH-981: Zwei Namen, die sich nur in der Schreibweise unterscheiden, brechen `0151` mit
+    /// einer lesbaren Meldung ab, und keiner wird umbenannt.
+    #[tokio::test]
+    async fn migration_0151_bricht_bei_kollision_mit_klarer_meldung_ab() {
+        let pool = benutzer_vor_0151(&["max", "Max", "moritz"]).await;
+
+        let fehler = migrate(&pool).await.unwrap_err().to_string();
+        assert!(
+            fehler.contains("Benutzernamen kollidieren ohne Groß-/Kleinschreibung"),
+            "Meldung muss die Kollision nennen, war: {fehler}"
+        );
+
+        let namen: Vec<String> =
+            sqlx::query_scalar("SELECT benutzername FROM benutzer ORDER BY benutzername")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(namen, ["Max", "max", "moritz"], "nichts still umbenannt");
+    }
+
+    /// Ohne Kollision läuft `0151` durch, und danach ist `Max` neben `max` vergeben.
+    #[tokio::test]
+    async fn migration_0151_macht_namen_ohne_schreibweise_eindeutig() {
+        let pool = benutzer_vor_0151(&["max", "Moritz"]).await;
+        migrate(&pool)
+            .await
+            .expect("ohne Kollision läuft 0151 durch");
+
+        let err = sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'X', 'MAX', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&err, sqlx::Error::Database(e) if e.is_unique_violation()),
+            "MAX neben max muss die Eindeutigkeit verletzen, war: {err:?}"
+        );
+    }
+
     /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.
     /// Verglichen werden der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
     /// und die Migrationsbuchhaltung.
@@ -2917,6 +2997,112 @@ mod tests {
         );
         assert_eq!(gesetzt(vorgemerkt).await, None);
         assert_eq!(gesetzt(ohne_frist).await, None);
+    }
+
+    // --- Migration 0150: Giftzeilen des Erinnerungs-Planers (LFH-924) ---
+    //
+    // Alt-DB mit allem, was vor den Eingabegrenzen durchkam: unplausible Intervalle werden
+    // einmalig, Zeilen mit unplausiblem Jahr gelten als ausgelöst (auch erledigte); gesunde
+    // Zeilen bleiben, wie sie sind.
+    #[tokio::test]
+    async fn migration_0151_entschaerft_erinnerungs_giftzeilen() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        let bis = |version: i64| Migrator {
+            migrations: Cow::Owned(
+                alle.iter()
+                    .filter(|m| m.version <= version)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        };
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        bis(149).run(&pool).await.expect("Migrationen bis 0149");
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 1, 'L', 'l', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let erinnerung = |faellig: &'static str, intervall: Option<i64>, status: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO erinnerung (einsatz_id, titel, faellig_at, intervall_minuten, \
+                                             status, erstellt_von_id) \
+                     VALUES (1, 'X', ?, ?, ?, 1) RETURNING id",
+                )
+                .bind(faellig)
+                .bind(intervall)
+                .bind(status)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let gesund = erinnerung("2026-06-11 10:00:00", Some(30), "offen").await;
+        let wochenrhythmus = erinnerung("2026-06-11 10:00:00", Some(10_080), "offen").await;
+        let riesig = erinnerung("2026-06-11 10:00:00", Some(999_999_999_999), "offen").await;
+        let null_intervall = erinnerung("2026-06-11 10:00:00", Some(0), "offen").await;
+        let jahr_0226 = erinnerung("0226-05-01 10:00:00", Some(1), "offen").await;
+        let jahr_negativ = erinnerung("-262000-05-01 10:00:00", Some(1), "offen").await;
+        let jahr_fern = erinnerung("+10000-05-01 10:00:00", None, "offen").await;
+        let jahr_0226_erledigt = erinnerung("0226-05-01 10:00:00", Some(1), "erledigt").await;
+
+        bis(150).run(&pool).await.expect("Migration 0150");
+
+        let zeile = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (Option<i64>, Option<String>)>(
+                    "SELECT intervall_minuten, zuletzt_ausgeloest_at FROM erinnerung WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(zeile(gesund).await, (Some(30), None));
+        assert_eq!(zeile(wochenrhythmus).await, (Some(10_080), None));
+        assert_eq!(zeile(riesig).await, (None, None), "einmalig, löst noch aus");
+        assert_eq!(zeile(null_intervall).await, (None, None));
+        for (id, faellig) in [
+            (jahr_0226, "0226-05-01 10:00:00"),
+            (jahr_negativ, "-262000-05-01 10:00:00"),
+            (jahr_fern, "+10000-05-01 10:00:00"),
+        ] {
+            assert_eq!(
+                zeile(id).await,
+                (None, Some(faellig.to_string())),
+                "{faellig}: gilt als ausgelöst"
+            );
+        }
+        assert_eq!(
+            zeile(jahr_0226_erledigt).await,
+            (None, Some("0226-05-01 10:00:00".to_string())),
+            "auch erledigte: nach einer Rücknahme liefe sie sonst minütlich"
+        );
     }
 
     // --- Migration 0111: Lagedaten an einsatz_person ---

@@ -29,11 +29,15 @@ const kartenHandle = vi.hoisted(() => ({
 
 const KONTEXT_PUNKT = vi.hoisted(() => ({ lng: 8.6, lat: 50.1, quelle: 'maus' as const }));
 
+/** Jede `flaechen`-Prop, die die Karte bekommt, in Render-Folge (LFH-945: Identität). */
+const flaechenProps = vi.hoisted(() => [] as unknown[]);
+
 vi.mock('./lagekarte/Kartenflaeche', async () => {
   const { forwardRef, useImperativeHandle } = await import('react');
   return {
     default: forwardRef(function KartenStub(props: Partial<KartenflaecheProps>, ref) {
       useImperativeHandle(ref, () => kartenHandle as never, []);
+      flaechenProps.push(props.flaechen);
       return (
         <div data-testid="kartenflaeche-stub">
           {/* Stand der laufenden Figur, wie die echte Karte ihn bei jedem Klick meldet. */}
@@ -1816,6 +1820,40 @@ function erstelleZonenPostSpy() {
   });
   return { handler, count: () => anzahl, lastBody: () => letzterBody! };
 }
+
+describe('LagekartePage · Abschnittsflächen behalten ihre Identität (LFH-945)', () => {
+  it('ein Rerender ohne Flächenänderung gibt der Karte dieselbe Flächenliste', async () => {
+    const abschnitt = {
+      ...ABSCHNITT_OHNE_FLAECHE,
+      flaeche_geojson: JSON.stringify({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [8.6, 50.1],
+            [8.7, 50.1],
+            [8.7, 50.2],
+            [8.6, 50.1],
+          ],
+        ],
+      }),
+    };
+    basisHandler([http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([abschnitt]))]);
+    const ansicht = renderSeite();
+    await screen.findByRole('button', { name: 'flaeche-3' });
+    const vorher = flaechenProps[flaechenProps.length - 1];
+    const renders = flaechenProps.length;
+
+    // Rerender der Seite wie bei einem Eigenpositions-Fix oder einer Live-Invalidierung anderer
+    // Daten: die Karte darf keine neue Liste sehen, sonst setzte sie die Flächen neu.
+    ansicht.rerender(
+      <Routes>
+        <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+      </Routes>,
+    );
+    expect(flaechenProps.length).toBeGreaterThan(renders);
+    expect(flaechenProps[flaechenProps.length - 1]).toBe(vorher);
+  });
+});
 
 describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () => {
   it('KRITIS aus, Energie an → der Ausschnitt wird gemeldet und die Ebene damit abgefragt', async () => {

@@ -1,8 +1,10 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../test/utils';
 import EinsatzEinstellungenPage from './EinsatzEinstellungenPage';
+import EinsatzAllgemein from './einstellungen/EinsatzAllgemein';
 
 /**
  * Layout-Tests der Sektions-Zerlegung. Die fachlichen Tests liegen in den vier Sektionsdateien
@@ -18,6 +20,7 @@ vi.mock('../auth/AuthContext', () => ({
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
   ladeEinstellungen: vi.fn(),
+  speichereEinstellungen: vi.fn(),
 }));
 
 import { ladeEinsatz, ladeEinstellungen } from '../api/einsaetze';
@@ -127,5 +130,43 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
 
     await screen.findByRole('tab', { name: 'Allgemein' });
     expect(container.querySelector('[data-lfh="seitenkopf-aktionen"]')).toBeNull();
+  });
+
+  /**
+   * Die Reiter sind eigene Routen: ein Wechsel baut die Sektion ab. Mit offener Änderung hält der
+   * Verlassen-Schutz den Wechsel an (LFH-979, Spec `formularseiten`) — geprüft mit der ECHTEN
+   * Sektion „Allgemein“, die Nachbarn bleiben Attrappen.
+   */
+  it('fragt beim Reiterwechsel mit ungespeicherter Änderung nach; „Bleiben" erhält sie', async () => {
+    const nutzer = userEvent.setup();
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einstellungen" element={<EinsatzEinstellungenPage />}>
+          <Route path="allgemein" element={<EinsatzAllgemein />} />
+          <Route path="verhalten" element={<div>Sektionsinhalt Verhalten</div>} />
+        </Route>
+      </Routes>,
+      { route: '/einsaetze/1/einstellungen/allgemein', datenRouter: true },
+    );
+
+    await nutzer.click(await screen.findByLabelText('Zeitformat'));
+    await nutzer.click(await screen.findByTitle('12 Stunden (AM/PM)'));
+    await nutzer.click(screen.getByRole('tab', { name: 'Verhalten & Automatik' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await nutzer.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(screen.queryByText('Sektionsinhalt Verhalten')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Allgemein', selected: true })).toBeInTheDocument();
+    // Der gewählte Wert steht weiter im Feld (nicht nur als Option in der Auswahlliste).
+    expect(
+      screen
+        .getAllByTitle('12 Stunden (AM/PM)')
+        .some((el) => el.closest('.ant-select-dropdown') == null),
+    ).toBe(true);
+
+    await nutzer.click(screen.getByRole('tab', { name: 'Verhalten & Automatik' }));
+    const zweiter = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await nutzer.click(within(zweiter).getByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('Sektionsinhalt Verhalten')).toBeInTheDocument();
   });
 });
