@@ -593,3 +593,152 @@ async fn fristbasierte_schwaerzung_schliesst_offene_antraege() {
         Err(AppError::Conflict(_))
     ));
 }
+
+// ---------- LFH-996: Schwärzungsstand und Meldungen ----------
+
+async fn kopf_stand(pool: &SqlitePool, e: i64) -> Option<i64> {
+    crate::einsatz::repo::laden(pool, e)
+        .await
+        .unwrap()
+        .teilschwaerzungen
+}
+
+async fn listen_stand(pool: &SqlitePool, benutzer: i64, e: i64) -> Option<i64> {
+    let b: crate::auth::Benutzer = sqlx::query_as("SELECT * FROM benutzer WHERE id = ?")
+        .bind(benutzer)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    crate::einsatz::repo::liste_fuer(pool, &b)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|a| a.id == e)
+        .expect("Einsatz in der Liste")
+        .teilschwaerzungen
+}
+
+/// Spec `einsatzkopf-live`, „Schwärzungsstand im Einsatzkopf“: vollzogene Personen-Anträge
+/// zählen in Kopf und Liste, offene nicht, und der Nachbareinsatz bleibt ohne Feld.
+#[tokio::test]
+async fn teilschwaerzungen_zaehlt_vollzogene_personen_antraege() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    assert_eq!(kopf_stand(&pool, b.e1).await, None, "offen zählt nicht");
+    vollziehe_faellige(
+        &pool,
+        &crate::live::LiveHub::new(),
+        t(T0) + Duration::hours(24),
+    )
+    .await;
+    assert_eq!(kopf_stand(&pool, b.e1).await, Some(1));
+    assert_eq!(listen_stand(&pool, b.admin, b.e1).await, Some(1));
+    assert_eq!(kopf_stand(&pool, b.e2).await, None);
+    assert_eq!(listen_stand(&pool, b.admin, b.e2).await, None);
+
+    stelle(
+        &pool,
+        &b,
+        b.e1,
+        betroffene(b.p2),
+        "R-002",
+        "2026-10-04 08:00:00",
+    )
+    .await
+    .unwrap();
+    vollziehe_faellige(
+        &pool,
+        &crate::live::LiveHub::new(),
+        t("2026-10-05 08:00:00"),
+    )
+    .await;
+    assert_eq!(kopf_stand(&pool, b.e1).await, Some(2));
+}
+
+/// Leert einen Einsatz-Empfänger und liefert die Ereignisse.
+fn einsatz_ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<crate::live::LiveNachricht>,
+) -> Vec<crate::live::LiveEvent> {
+    let mut aus = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        aus.push(n.event);
+    }
+    aus
+}
+
+fn org_ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<crate::live::org::OrgNachricht>,
+) -> Vec<crate::live::org::OrgLiveEvent> {
+    let mut aus = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        aus.push(n.event);
+    }
+    aus
+}
+
+/// Spec `aufbewahrung-loeschersuchen`, „Vollzug erreicht offene Clients und Geräte“: nach dem
+/// Vollzug für eine Person gehen `einsatz` an den Strom und `einsatzliste` an die Leser.
+#[tokio::test]
+async fn vollzug_person_meldet_kopf_und_liste() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    let live = crate::live::LiveHub::new();
+    let mut rx = live.abonniere(b.e1);
+    let mut org = live.abonniere_org();
+    assert_eq!(
+        vollziehe_faellige(&pool, &live, t(T0) + Duration::hours(24)).await,
+        1
+    );
+    assert!(einsatz_ereignisse(&mut rx).contains(&crate::live::LiveEvent::Einsatz));
+    assert!(org_ereignisse(&mut org).contains(&crate::live::org::OrgLiveEvent::Einsatzliste));
+}
+
+/// Dasselbe für den Einsatz-Antrag: der offene Tab ruft den Kopf ab und räumt am 404.
+#[tokio::test]
+async fn vollzug_einsatz_meldet_kopf_und_liste() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    stelle(&pool, &b, b.e1, AntragZiel::Einsatz, "E-2026-0751", T0)
+        .await
+        .unwrap();
+    let live = crate::live::LiveHub::new();
+    let mut rx = live.abonniere(b.e1);
+    let mut org = live.abonniere_org();
+    assert_eq!(
+        vollziehe_faellige(&pool, &live, t(T0) + Duration::hours(24)).await,
+        1
+    );
+    assert!(einsatz_ereignisse(&mut rx).contains(&crate::live::LiveEvent::Einsatz));
+    assert!(org_ereignisse(&mut org).contains(&crate::live::org::OrgLiveEvent::Einsatzliste));
+}
+
+/// Spec „Vollzug ohne Wirkung“: war der Einsatz schon geschwärzt, meldet der Vollzug nichts.
+#[tokio::test]
+async fn vollzug_ohne_wirkung_meldet_nichts() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE einsatz SET geloescht_at = ?1, geschwaerzt_at = ?1 WHERE id = ?2")
+        .bind(T0)
+        .bind(b.e1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let live = crate::live::LiveHub::new();
+    let mut rx = live.abonniere(b.e1);
+    let mut org = live.abonniere_org();
+    assert_eq!(
+        vollziehe_faellige(&pool, &live, t(T0) + Duration::hours(24)).await,
+        0
+    );
+    assert_eq!(einsatz_ereignisse(&mut rx), vec![]);
+    assert_eq!(org_ereignisse(&mut org), vec![]);
+}

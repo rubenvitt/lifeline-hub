@@ -50,8 +50,9 @@ const TICK_SEKUNDEN: u64 = 600;
 /// Ohne Gedächtnis für einen ausstehenden WAL-Rückschrieb; der laufende Scheduler nimmt
 /// [`tick_mit_rueckschrieb`].
 ///
-/// Ein Soft-Delete meldet `einsatzliste` an die Leser des Einsatzes (LFH-734): er verschwindet
-/// aus ihrer Liste. Die Schwärzung (Phase B) trifft nur schon gesperrte Einsätze und meldet nichts.
+/// Ein Soft-Delete meldet Kopf und Liste (LFH-734, LFH-996): er verschwindet aus der Liste seiner
+/// Leser, und offene Tabs räumen am 404. Die Schwärzung (Phase B) trifft nur schon gesperrte
+/// Einsätze und meldet nichts.
 pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>) -> usize {
     tick_mit_rueckschrieb(pool, live, jetzt, &mut false).await
 }
@@ -86,7 +87,9 @@ pub async fn tick_mit_rueckschrieb(
                             "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)"
                         );
                         anzahl += 1;
-                        crate::live::org::einsatzliste_melden(pool, live, id, &[]).await;
+                        // Kopf und Liste (LFH-996): ein offener Tab ruft den Kopf ab und räumt am
+                        // 404, ein Gerät auf der Einsatzauswahl sieht ihn verschwinden.
+                        crate::live::org::kopf_melden(pool, live, id, &[]).await;
                     }
                     Ok(false) => {} // Race: bereits soft-gelöscht.
                     Err(e) => tracing::error!(einsatz_id = id, "Purge Phase A fehlgeschlagen: {e}"),
@@ -157,6 +160,8 @@ pub async fn tick_mit_rueckschrieb(
                         ] {
                             live.publiziere_einsatz(id, event);
                         }
+                        // `teilschwaerzungen` steigt: Geräte verwerfen ihre älteren Stände (LFH-996).
+                        crate::live::org::kopf_melden(pool, live, id, &[]).await;
                     }
                     Ok(false) => {}
                     Err(e) => tracing::error!(
@@ -3023,5 +3028,82 @@ mod tests {
             &pfad,
             ETB_KLARTEXT.as_bytes()
         ));
+    }
+
+    // ---------- LFH-996: Meldungen an offene Clients ----------
+
+    fn ereignisse(
+        rx: &mut tokio::sync::broadcast::Receiver<crate::live::LiveNachricht>,
+    ) -> Vec<LiveEvent> {
+        let mut aus = Vec::new();
+        while let Ok(n) = rx.try_recv() {
+            aus.push(n.event);
+        }
+        aus
+    }
+
+    fn org_ereignisse(
+        rx: &mut tokio::sync::broadcast::Receiver<crate::live::org::OrgNachricht>,
+    ) -> Vec<crate::live::org::OrgLiveEvent> {
+        let mut aus = Vec::new();
+        while let Ok(n) = rx.try_recv() {
+            aus.push(n.event);
+        }
+        aus
+    }
+
+    /// Spec `einsatzkopf-live`, „Vormerkung sperrt einen offenen Einsatz“: Phase A meldet
+    /// `einsatz`, damit ein offener Tab den Kopf abruft und am 404 räumt.
+    #[tokio::test]
+    async fn phase_a_meldet_den_kopf() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(id);
+        let mut org = live.abonniere_org();
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-02 12:00:00")).await, 1);
+        assert!(ereignisse(&mut rx).contains(&LiveEvent::Einsatz));
+        assert!(org_ereignisse(&mut org).contains(&crate::live::org::OrgLiveEvent::Einsatzliste));
+    }
+
+    /// Spec `einsatzkopf-live`, „Schwärzung nach der Karenz“: Phase B bleibt stumm.
+    #[tokio::test]
+    async fn phase_b_meldet_keinen_kopf() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-05-01 00:00:00").await;
+        sqlx::query("UPDATE einsatz SET geloescht_at = '2026-05-01 00:00:00' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(id);
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-30 12:00:00")).await, 1);
+        assert!(!ereignisse(&mut rx).contains(&LiveEvent::Einsatz));
+    }
+
+    /// Spec `aufbewahrung-kategorien`, „Kategorie-Schwärzung erreicht offene Clients und
+    /// Geräte“: K2 meldet zusätzlich Kopf und Liste, und der Kopf zählt die Kategorie.
+    #[tokio::test]
+    async fn kategorie_schwaerzung_meldet_kopf_und_zaehlt() {
+        let pool = crate::db::test_pool().await;
+        let e = abgeschlossen_mit_frist(&pool, "2099-01-01 00:00:00").await;
+        person_mit_adresse(&pool, e).await;
+        kategorie_mit_frist(&pool, e, "personenauskunft", "2026-06-01 00:00:00").await;
+        let live = LiveHub::new();
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-01 00:00:00")).await, 1);
+        assert_eq!(repo::laden(&pool, e).await.unwrap().teilschwaerzungen, None);
+
+        let mut rx = live.abonniere(e);
+        let mut org = live.abonniere_org();
+        assert_eq!(tick_einmal(&pool, &live, t("2026-07-01 00:00:00")).await, 1);
+        let ev = ereignisse(&mut rx);
+        assert!(ev.contains(&LiveEvent::Einsatz), "{ev:?}");
+        assert!(ev.contains(&LiveEvent::Person), "{ev:?}");
+        assert!(org_ereignisse(&mut org).contains(&crate::live::org::OrgLiveEvent::Einsatzliste));
+        assert_eq!(
+            repo::laden(&pool, e).await.unwrap().teilschwaerzungen,
+            Some(1)
+        );
     }
 }

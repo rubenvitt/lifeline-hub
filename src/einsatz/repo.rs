@@ -174,12 +174,26 @@ pub(crate) async fn anlegen_tx(
     Ok(einsatz_id)
 }
 
+/// Schwärzungsstand eines Einsatzes `e` als Spalte `teilschwaerzungen` (LFH-996, design.md D1):
+/// vollzogene Personen-Anträge plus geschwärzte Datenkategorien, `NULL` bei 0. Beide Mengen
+/// wachsen nur. Steht in `laden` und `liste_fuer` (ein Makro, damit beide wortgleich bleiben).
+macro_rules! teilschwaerzungen_sql {
+    () => {
+        "NULLIF((SELECT COUNT(*) FROM schwaerzung_antrag sa \
+                 WHERE sa.einsatz_id = e.id AND sa.ziel_art <> 'einsatz' \
+                   AND sa.vollzogen_at IS NOT NULL) \
+              + (SELECT COUNT(*) FROM einsatz_aufbewahrung_kategorie ka \
+                 WHERE ka.einsatz_id = e.id AND ka.geschwaerzt_at IS NOT NULL), 0) \
+            AS teilschwaerzungen"
+    };
+}
+
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     // Die beiden EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607); sie
     // stehen wortgleich auch in `liste_fuer`, das Bezirksprädikat wie `istAktiverBezirk` im
     // Frontend — siehe `lagekennzahl::ableiten`.
-    sqlx::query_as::<_, Einsatz>(
+    sqlx::query_as::<_, Einsatz>(concat!(
         "SELECT e.id, e.org_id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
@@ -189,11 +203,12 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet \
-         FROM einsatz e \
+                    AS evakuierung_angeordnet, ",
+        teilschwaerzungen_sql!(),
+        " FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
-    )
+    ))
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?
@@ -300,10 +315,11 @@ pub async fn liste_fuer(
         meine_fuehrungsfunktion: Option<String>,
         pegel_festgelegt: bool,
         evakuierung_angeordnet: bool,
+        teilschwaerzungen: Option<i64>,
     }
 
     // EXISTS-Spalten wortgleich zu `laden` (Auslöser der Lagekennzahlen, `lagekennzahl::ableiten`).
-    let rows = sqlx::query_as::<_, Row>(
+    let rows = sqlx::query_as::<_, Row>(concat!(
         "SELECT e.id, e.org_id, o.name AS org_name, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
@@ -314,13 +330,14 @@ pub async fn liste_fuer(
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
                 EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
                         AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
-                    AS evakuierung_angeordnet \
-         FROM einsatz e \
+                    AS evakuierung_angeordnet, ",
+        teilschwaerzungen_sql!(),
+        " FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          ORDER BY e.begonnen_at DESC, e.id DESC",
-    )
+    ))
     .bind(benutzer.id)
     .fetch_all(pool)
     .await?;
@@ -407,6 +424,7 @@ pub async fn liste_fuer(
                     r.pegel_festgelegt,
                     r.evakuierung_angeordnet,
                 ),
+                teilschwaerzungen: r.teilschwaerzungen,
             }
         })
         .collect())

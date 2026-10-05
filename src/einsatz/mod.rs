@@ -128,6 +128,9 @@ pub struct Einsatz {
     /// Read-only abgeleitet (LFH-607): mindestens ein aktiver Evakuierungsbezirk. Auslöser
     /// der Lagekennzahl `evakuiert`, siehe [`lagekennzahl::ableiten`].
     pub evakuierung_angeordnet: bool,
+    /// Read-only abgeleitet (LFH-996): Schwärzungsstand, `None` bei 0. Siehe
+    /// [`EinsatzAnzeige::teilschwaerzungen`] und `teilschwaerzungen_sql!` in `repo`.
+    pub teilschwaerzungen: Option<i64>,
 }
 
 impl Einsatz {
@@ -181,6 +184,7 @@ impl Einsatz {
                 self.pegel_festgelegt,
                 self.evakuierung_angeordnet,
             ),
+            teilschwaerzungen: self.teilschwaerzungen,
         }
     }
 }
@@ -242,6 +246,12 @@ pub struct EinsatzAnzeige {
     /// `#[schema(required)]` und kein `skip_serializing_if`.
     #[schema(required)]
     pub lagekennzahlen: Vec<lagekennzahl::Lagekennzahl>,
+    /// Schwärzungsstand (LFH-996): vollzogene Personen-Anträge plus geschwärzte
+    /// Datenkategorien dieses Einsatzes. Wächst nur; fehlt bei 0. Ein Gerät, das einen höheren
+    /// Stand sieht, verwirft jeden älteren Stand des Einsatzes (`frontend/src/offline/AGENTS.md`).
+    /// Nennt bewusst weder Person noch Zeitpunkt noch Modul.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub teilschwaerzungen: Option<i64>,
 }
 
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).
@@ -309,6 +319,7 @@ mod tests {
             org_name: "Orga".into(),
             pegel_festgelegt: false,
             evakuierung_angeordnet: false,
+            teilschwaerzungen: None,
             bezeichnung: "Lage".into(),
             stichwort: None,
             status: EinsatzStatus::Aktiv,
