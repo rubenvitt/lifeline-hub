@@ -32,8 +32,8 @@ dem Menschen, der gerade etwas anderes ausprobieren wollte (gefunden bei LFH-736
 ## Impact
 
 - Gate und CI: `scripts/check-all.sh` (Schritt 15, Bündel `rust` wird `4 15`). Mehrlaufzeit im
-  Job `Rust-Suite`: der Neubau des eigenen Crates mit dem Feature, keine Abhängigkeit wird neu
-  gebaut (Messung in design.md).
+  Job `Rust-Suite` rund 2 min: nur das eigene Crate wird mit dem Feature neu gebaut, keine
+  Abhängigkeit (Messung in design.md).
 - Arbeitsanleitungen: `scripts/AGENTS.md`.
 - Kein Produktcode. Der heutige Stand von `alpha` ist mit dem Feature grün (Sweep, design.md).
 - Nicht abgedeckt: die übrigen Bibliothekstests mit eingeschaltetem Feature (ein zweiter voller

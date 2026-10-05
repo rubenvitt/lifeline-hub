@@ -2,12 +2,13 @@
 
 ## 1. Schritt 15 im Sammel-Gate
 
-- [ ] 1.1 Rot vorher belegen: in `src/dev/seed.rs` den Test
-  `seed_benutzer_enthaelt_erwartete_konten` kippen (`"admin"` → `"admin-x"`) und
-  `./scripts/check-all.sh --nur rust` fahren. Erwartet: grün, weil heute kein Schritt den Test
-  baut. Mutation zurückdrehen.
+- [ ] 1.1 Lücke vorher belegen: in `src/dev/seed.rs` den Test
+  `seed_benutzer_enthaelt_erwartete_konten` kippen (`"admin"` → `"admin-x"`) und das Kommando
+  von Schritt 4 (`cargo test --workspace --exclude lifeline-desktop`) fahren. Erwartet: grün,
+  weil heute kein Schritt den Test baut. Mutation zurückdrehen.
 - [ ] 1.2 `scripts/check-all.sh`: `schritt_15` nach design.md D1 bis D3 (Build-Ziel prüfen,
-  `ohne_dev_env`, zwei Cargo-Aufrufe mit `-p lifeline-hub --features dev-seeds`), `SCHRITTE=15`,
+  `ohne_dev_env`, ein `--no-run`-Bau und zwei Läufe mit dem Paketzuschnitt von Schritt 4 und
+  `--features lifeline-hub/dev-seeds`; Kommentar nennt, warum nicht `-p`), `SCHRITTE=15`,
   `BUENDEL_rust="4 15"`, `BUENDEL_alle` bis 15, Kopfkommentar und Bündelbeschreibung
   (`--nur rust`) nachziehen, Abschnittstitel „Die fünfzehn Schritte“. Die Bündel-Selbstprüfung
   bleibt grün: `./scripts/check-all.sh --nur schnell` startet ohne „FEHLER: die Bündel …“.
