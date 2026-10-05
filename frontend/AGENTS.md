@@ -158,6 +158,11 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   Formularmeldung über `Form`-Token in `alarmText`/`achtungText`, das globale `colorError` bleibt
   Füllfarbe; Standardknopf unter dem Zeiger in `bedienText`. Alles in `tokens.ts:antdToken`/
   `antdKomponenten`, nicht je Stelle.
+- **Roter Fehlertext außerhalb von Formularen** (LFH-874, Spec `textkontrast-rollen`):
+  `Typography` `danger` („nicht gefunden“, „Überfällig“, Ablehnungsgrund) liest `alarmText`, ein
+  Link `danger` unter dem Zeiger `alarmHover`, über das GLOBALE `colorErrorText*` in `antdToken`
+  (antd liest es nur als Schrift); das globale `colorError` bleibt Füllfarbe für Knopf, Rand und
+  Kartenkante. Gemessen in `e2e/fehlertext-kontrast.spec.ts`.
 - Kontrast: `e2e/betroffene-kontrast.spec.ts` (Tag ≥ 7:1, Nacht ≥ 5:1, Alpha mitgerechnet).
 - **Kein eigener Knopfboden** (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung des
   Primärknopfs hält den Textboden in Ruhe und unter dem Zeiger; Werte und Messung am Wert in
@@ -337,13 +342,14 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 31 am 02.10.2026, LFH-751); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 32 am 04.10.2026, LFH-881); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4,
   `schwaerzungsantragStand` in
   `openspec/changes/archive/2026-10-02-lfh-751-sofort-schwaerzung-auf-antrag/design.md` D9, `capSchwere` in
-  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
+  `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5,
+  `pegelZustand` in `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D2). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
   der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
 
 **Farbe und Zeichen**

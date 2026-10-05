@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { installiereXhrAttrappe } from '../test/xhrAttrappe';
+import type { UploadFortschritt } from './client';
 import {
   entferneSchadenAnhang,
   legeSchadenAnhangAb,
@@ -6,7 +8,10 @@ import {
   schadenAnhangDownloadPfad,
 } from './einsatzSchaden';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 // LFH-21: Anhänge an einem Schaden laufen ausschließlich über die Schadensroute.
 describe('Schaden-Anhänge-API', () => {
@@ -19,19 +24,27 @@ describe('Schaden-Anhänge-API', () => {
   });
 
   it('legt EINE Datei im Feld `datei` ab, mit dem 120-s-Upload-Timeout', async () => {
-    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(JSON.stringify({ id: 1 }), { status: 201 }));
+    const anfragen = installiereXhrAttrappe();
     const datei = new File(['x'], 'dach.jpg', { type: 'image/jpeg' });
-    await legeSchadenAnhangAb(7, 3, datei);
-    const [pfad, init] = fetchMock.mock.calls[0];
-    expect(pfad).toBe('/api/einsaetze/7/schaeden/3/anhaenge');
-    expect(init?.method).toBe('POST');
-    const fd = init?.body as FormData;
+    const ergebnis = legeSchadenAnhangAb(7, 3, datei);
+    const [xhr] = anfragen;
+    expect(xhr.url).toBe('/api/einsaetze/7/schaeden/3/anhaenge');
+    expect(xhr.methode).toBe('POST');
+    const fd = xhr.body as FormData;
     expect(fd.get('datei')).toBe(datei);
     expect([...fd.keys()]).toEqual(['datei']);
-    expect(timeout).toHaveBeenCalledWith(120_000);
+    expect(xhr.timeout).toBe(120_000);
+    xhr.antworten(201, { id: 1 });
+    await expect(ergebnis).resolves.toEqual({ id: 1 });
+  });
+
+  it('reicht den Fortschritt an den Aufrufer durch (LFH-878)', () => {
+    const anfragen = installiereXhrAttrappe();
+    const meldungen: UploadFortschritt[] = [];
+    void legeSchadenAnhangAb(7, 3, new File(['x'], 'dach.jpg'), (f) => meldungen.push(f));
+    anfragen[0].fortschritt(1, 2);
+    anfragen[0].uebertragen();
+    expect(meldungen).toEqual([{ phase: 'senden', anteil: 0.5 }, { phase: 'pruefen' }]);
   });
 
   it('entfernt per DELETE auf die Linker-id', async () => {

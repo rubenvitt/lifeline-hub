@@ -128,7 +128,9 @@ export default function KanalListe({
                     {k.ungelesen_anzahl > 0 && (
                       <span
                         data-lfh="kanal-ungelesen"
-                        style={{ ...monoStil(11, 500), color: rollen.bedien }}
+                        // `bedienText`, nicht `bedien`: die aktive Zeile trägt `flaeche3`, darauf
+                        // hielt `bedien` am Tag nur 6,71 : 1 (LFH-879, Boden 7 : 1).
+                        style={{ ...monoStil(11, 500), color: rollen.bedienText }}
                       >
                         {k.ungelesen_anzahl}
                         <span style={NUR_VORLESER}> ungelesen</span>

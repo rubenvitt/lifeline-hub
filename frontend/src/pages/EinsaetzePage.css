@@ -51,9 +51,18 @@
   color: var(--lfh-text-2);
 }
 
+/* Unter dem Zeiger bleibt die Farbe, die Rückmeldung ist antds Unterstreichung
+   (`linkHoverDecoration`) wie an jedem Link (LFH-879). `bedien-hover` stand hier auf der Kachel
+   unter dem Zeiger (`flaeche-3`) am Tag bei 5,74 : 1, unter dem Textboden 7 : 1 aus Kriterium 5.
+   Die Farbe steht trotzdem da: ohne sie färbte antds `a:hover` den Link blau. */
 .lfh-einsatzkachel__link:hover,
 .lfh-einsatzkachel__link:focus-visible {
-  color: var(--lfh-bedien-hover);
+  color: var(--lfh-text);
+}
+
+.lfh-einsatzkachel--abgeschlossen .lfh-einsatzkachel__link:hover,
+.lfh-einsatzkachel--abgeschlossen .lfh-einsatzkachel__link:focus-visible {
+  color: var(--lfh-text-2);
 }
 
 .lfh-einsatzkachel__leib {

@@ -12,7 +12,7 @@ import {
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
-import { ApiError } from '../api/client';
+import { ApiError, AusgangUnbekannt, type UploadFortschritt } from '../api/client';
 import { ETB_ANHAENGE_MAX, ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import { useOnline } from '../offline/useOnline';
@@ -27,6 +27,8 @@ import { ERFASSBARE_TYPEN } from './typFarben';
 import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
+import UploadFortschrittAnzeige from '../components/UploadFortschritt';
+import { weiter } from '../components/useUploadFortschritt';
 import { Schnellerfassungszeile, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import MetaChip from './MetaChip';
@@ -95,7 +97,8 @@ interface Props {
 /** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
 export interface Versand {
   sendet: boolean;
-  fortschritt: { n: number; von: number } | null;
+  /** Datei `n` von `von`, mit dem Stand ihrer Übertragung (LFH-878). */
+  fortschritt: { n: number; von: number; stand: UploadFortschritt } | null;
   /** Hinweis an der Dateiliste — bleibt stehen bis zur nächsten Wahl oder zum nächsten Absenden. */
   hinweis: string | null;
 }
@@ -126,6 +129,24 @@ function gleicheDatei(a: File, b: File): boolean {
 
 function fehlerGrund(e: unknown): string {
   return e instanceof Error && e.message ? e.message : 'unbekannter Fehler';
+}
+
+/**
+ * Hinweis zu einem gescheiterten Anhang-Upload. Nach dem letzten Byte ohne Antwort
+ * (`AusgangUnbekannt`, LFH-878) ist offen, ob die DATEI angekommen ist — sicher ist nur, dass der
+ * EINTRAG nicht erfasst ist: er entsteht erst nach allen Uploads. „NICHT abgeschickt“ wäre hier
+ * falsch, eine Liste zum Prüfen gibt es nicht (der Anhang hängt noch an keinem Eintrag). Ein
+ * erneutes Erfassen lädt die Datei noch einmal hoch; eine ungebundene Erstfassung räumt der
+ * Server nach 24 h ab (`src/anhang/repo.rs`, `sweep_verwaiste`).
+ */
+function uploadFehlerHinweis(datei: File, e: unknown): string {
+  if (e instanceof AusgangUnbekannt) {
+    return (
+      `${datei.name} ist übertragen, aber ohne Antwort geblieben — ob die Datei angekommen ist, ` +
+      'ist unklar. Der Eintrag ist nicht erfasst; „Erfassen“ lädt sie erneut hoch.'
+    );
+  }
+  return `${datei.name} konnte nicht hochgeladen werden: ${fehlerGrund(e)}. Der Eintrag ist nicht erfasst.`;
 }
 
 const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
@@ -485,15 +506,25 @@ export default function Schnellerfassung({
     for (const [i, d] of dateien.entries()) {
       let id = hochgeladeneIds.get(d);
       if (id == null) {
-        setFortschritt({ n: i + 1, von: dateien.length });
+        const n = i + 1;
+        const von = dateien.length;
+        // Sofort ein Balken ohne Zahl; danach nur vorwärts (`weiter`), wie im Ablegen-Dialog.
+        let stand: UploadFortschritt = { phase: 'senden', anteil: null };
+        let laeuft = true;
+        setFortschritt({ n, von, stand });
         try {
-          id = (await ladeEtbAnhangHoch(einsatz.id, d)).id;
+          id = (
+            await ladeEtbAnhangHoch(einsatz.id, d, (neu) => {
+              if (!laeuft) return;
+              stand = weiter(stand, neu);
+              setFortschritt({ n, von, stand });
+            })
+          ).id;
         } catch (e) {
-          setAnhangHinweis(
-            `${d.name} konnte nicht hochgeladen werden: ${fehlerGrund(e)}. ` +
-              'Der Eintrag ist nicht erfasst.',
-          );
+          setAnhangHinweis(uploadFehlerHinweis(d, e));
           return null;
+        } finally {
+          laeuft = false;
         }
         hochgeladeneIds.set(d, id);
       }
@@ -903,6 +934,11 @@ export default function Schnellerfassung({
             </li>
           ))}
         </ul>
+      )}
+      {fortschritt && (
+        <div style={{ marginTop: token.marginXS }}>
+          <UploadFortschrittAnzeige stand={fortschritt.stand} />
+        </div>
       )}
       {anhangHinweis && (
         <Alert type="error" showIcon style={{ marginTop: token.marginXS }} title={anhangHinweis} />
