@@ -22,6 +22,7 @@ import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { KennungsLink } from '../components/kennungsLink';
 
 /**
  * Lageberichte als Kartensicht — Zwilling der Befehlsliste. `form="karte"` in jeder Breite: ein
@@ -98,7 +99,9 @@ function lageberichtSpalten(einsatzId: number) {
               {k.vorgaenger.map((v, i) => (
                 <span key={v.id}>
                   {i > 0 && ', '}
-                  <Link to={lageberichtDetailPfad(einsatzId, v.id)}>v{v.version}</Link>
+                  <KennungsLink to={lageberichtDetailPfad(einsatzId, v.id)}>
+                    v{v.version}
+                  </KennungsLink>
                 </span>
               ))}
             </span>

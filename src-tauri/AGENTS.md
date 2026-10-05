@@ -22,7 +22,9 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   jedem Aufruf frisch: eigene Origin → Nebenfenster (`neben-*`, gleicher Fensterbau
   `baue_fenster`, Druckfreigabe per Muster), `/api/` → Download, **außer `/api/auth/`** (OIDC
   läuft im Fenster), fremde `http(s)`/`mailto`/`tel` → System (`tauri_plugin_opener::open_url`,
-  Plugin nicht registriert). Fremde Navigation im Fenster bleibt erlaubt (Anbieter).
+  Plugin nicht registriert). Fremde Navigation im Fenster bleibt erlaubt (Anbieter). Ein
+  `blob:` mit `<a download>` (CSV-Export) geht in beiden Webviews ohne Hüllencode an
+  `on_download` (LFH-914, `links.rs`); eine `blob:`-Navigation nicht verwerfen.
 - **Version: eine Quelle** in `[workspace.package]` der Wurzel, Server und Hülle erben
   (`version.workspace = true`), `tauri.conf.json` trägt keine; `prepareCmd` setzt sie über
   `-p lifeline-hub`. Kein eigenes Versionsfeld in `src-tauri` (driftet beim alpha-Merge; Test

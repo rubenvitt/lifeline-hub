@@ -1,4 +1,3 @@
-import { Link } from 'react-router';
 import { Typography } from 'antd';
 import StatusTag from '../../components/StatusTag';
 import { bezugsDarstellung } from '../../theme/statusFarben';
@@ -14,6 +13,7 @@ export {
   schadenStatus as STATUS_META,
   schadenAusmass as AUSMASS_META,
 } from '../../theme/statusFarben';
+import { KennungsLink } from '../../components/kennungsLink';
 
 export const TYP_LABEL: Record<SchadenTyp, string> = {
   sachschaden: 'Sachschaden',
@@ -81,18 +81,18 @@ export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNo
       return <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>;
     }
     return s.geschaedigt_person_id != null ? (
-      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}>
+      <KennungsLink to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}>
         <StatusTag darstellung={bezugsDarstellung(label)} />
-      </Link>
+      </KennungsLink>
     ) : (
       <StatusTag darstellung={bezugsDarstellung(label)} />
     );
   }
   if (s.geschaedigt_personal_id != null) {
     return (
-      <Link to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
+      <KennungsLink to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
         <StatusTag darstellung={bezugsDarstellung(s.geschaedigt_personal_name ?? 'Einsatzkraft')} />
-      </Link>
+      </KennungsLink>
     );
   }
   if (s.geschaedigt_organisation_id != null) {

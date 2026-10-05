@@ -70,6 +70,7 @@ import DruckKnopf from '../components/druck/DruckKnopf';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import './kraefteuebersichtPrint.css';
+import { KennungsLink } from '../components/kennungsLink';
 
 /**
  * Meldebild: Statusraster über alle Einheiten.
@@ -486,21 +487,23 @@ function AuftragZelle({
     .filter(Boolean)
     .join(' · ');
   return (
-    <Link
-      to={auftraegePfad(einsatzId, { auftrag: a.id })}
-      title={text}
-      // Zwei Zeilen mit Auslassung: eine nicht umbrechende Zeile setzte die Mindestbreite der
-      // Spalte auf die Textlänge. Der Volltext steht im `title`.
-      style={{
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        overflow: 'hidden',
-        maxWidth: 360,
-      }}
-    >
-      {text}
-    </Link>
+    // Der Boden sitzt am Link (LFH-908), die Auslassung am inneren Span: `-webkit-box` und
+    // `inline-flex` schließen einander aus.
+    <KennungsLink to={auftraegePfad(einsatzId, { auftrag: a.id })} title={text}>
+      <span
+        // Zwei Zeilen mit Auslassung: eine nicht umbrechende Zeile setzte die Mindestbreite der
+        // Spalte auf die Textlänge. Der Volltext steht im `title`.
+        style={{
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          maxWidth: 360,
+        }}
+      >
+        {text}
+      </span>
+    </KennungsLink>
   );
 }
 
