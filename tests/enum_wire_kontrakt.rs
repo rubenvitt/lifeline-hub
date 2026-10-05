@@ -648,7 +648,7 @@ fn stab_kommunikation_verbindungsmittel_wire() {
 }
 
 /// LFH-893: taktische Fernmeldeskizze. Die Werte stehen als CHECK in
-/// `migrations/0147_fernmeldeskizze.sql`; der Client zeichnet je Wert ein Zeichen (J.1–J.3).
+/// `migrations/0148_fernmeldeskizze.sql`; der Client zeichnet je Wert ein Zeichen (J.1–J.3).
 #[test]
 fn stab_fernmeldeskizze_wire() {
     enum_wire!(lifeline_hub::stab::fernmeldeskizze::Komponentenart {

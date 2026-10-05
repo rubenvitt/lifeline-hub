@@ -83,7 +83,7 @@ folgt den Schnitten des Tickets; jeder Schnitt ist für sich lauffähig und grü
 - [x] 3.1 Migration `NNNN_fernmeldeskizze.sql` mit `einsatz_kommunikation_stelle_sprechgruppe` und
   den Skizzen-Tabellen nach D3. Nummer per `git fetch origin alpha && scripts/check-migrationen.sh`.
   - Nachweis: `db::tests::migrationsnummern_sind_eindeutig` und `check-migrationen.sh` grün.
-  - Erledigt: `migrations/0147_fernmeldeskizze.sql` (sieben Tabellen nach D3, dazu
+  - Erledigt: `migrations/0148_fernmeldeskizze.sql` (sieben Tabellen nach D3, dazu
     `geaendert_at` an allen für den abgeleiteten Stand). `migrationsnummern_sind_eindeutig` grün;
     `check-migrationen.sh` meldet „alle über 0146 (origin/alpha)“ — die Datei ist noch nicht
     committet und wird erst im Commit vom Skript gesehen, 0147 = 0146 + 1.
