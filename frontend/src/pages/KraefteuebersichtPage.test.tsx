@@ -13,7 +13,8 @@ import KraefteuebersichtPage, {
   meldebildMeta,
 } from './KraefteuebersichtPage';
 import { Routes, Route } from 'react-router';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { freigabenFixture } from '../test/fixtures';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -37,7 +38,7 @@ import type {
 
 dayjs.extend(utc);
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn(), setzeEinheitStatus: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
@@ -206,6 +207,7 @@ beforeEach(() => {
   navigiere.mockReset();
   vi.stubGlobal('print', drucke);
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
+  vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
   vi.mocked(listeEinheiten).mockResolvedValue([]);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue([]);
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([]);
@@ -1117,5 +1119,35 @@ describe('KraefteuebersichtPage — Stand der Übernahme in der Anzeigezone (LFH
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalled());
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte?.[0]?.text;
     expect(text).toContain('**Stand:** 141200JUL2026');
+  });
+});
+
+/**
+ * Sprungziele in fremde Module (LFH-888, design.md D4): gesperrtes Ziel → Knopf gesperrt mit
+ * Grund, Leeraktion entfällt; frei → wie bisher (die Gegenproben stehen oben).
+ */
+describe('KraefteuebersichtPage Sprungziele (LFH-888)', () => {
+  it('gesperrte Einheiten: Kopfknopf „Einheit" gesperrt mit Grund, keine Leeraktion', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ einheiten: { zugriff: false } }),
+    );
+    setup();
+    const knopf = await screen.findByRole('button', { name: /^Einheit$/ });
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    expect(screen.queryByRole('link', { name: 'Einheit bilden' })).toBeNull();
+    expect(screen.getByText(/Keine Einheiten und keine Kräfte im Einsatz/)).toBeInTheDocument();
+  });
+
+  it('gesperrte Lageberichte: „In Lagebericht übernehmen" gesperrt mit Grund', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ lageberichte: { zugriff: false } }),
+    );
+    setup();
+    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    // Gegenprobe im selben Bild: der Einheiten-Knopf bleibt frei.
+    expect(screen.getByRole('button', { name: /^Einheit$/ })).toBeEnabled();
   });
 });

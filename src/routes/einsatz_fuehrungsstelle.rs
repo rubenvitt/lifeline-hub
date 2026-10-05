@@ -9,9 +9,10 @@ use crate::app::AppState;
 use crate::einsatz::fuehrungsstelle::{self, FuehrungsstelleAnzeige, FuehrungsstellePatch};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::error::AppError;
-use crate::extract::JsonBody;
+use crate::extract::{JsonBody, PfadParam};
 use crate::routes::support::{deserialize_optional_field, pruefe_kommunikationsmittel, trimme_tri};
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
@@ -78,4 +79,42 @@ pub async fn aendern(
     // Erst nach dem Commit (Reinheits-Kontrakt), wie jeder `einsatz`-Emitter.
     crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
     Ok(Json(anzeige))
+}
+
+/// PUT /api/einsaetze/{id}/fuehrungsstelle/sprechgruppen/{sg} — eine Sprechgruppe zuordnen
+/// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung (`einsatz`)
+/// wie der PATCH mit `sprechgruppe_ids`, kein ETB.
+pub async fn sprechgruppe_zuordnen(
+    State(state): State<AppState>,
+    ctx: EinsatzVerwaltungszugriff,
+    PfadParam((_eid, sg)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Fuehrungsstelle(einsatz_id);
+    if crate::sprechgruppe::repo::einzeln_zuordnen(
+        &state.pool,
+        ctx.einsatz.org_id,
+        einsatz_id,
+        ziel,
+        sg,
+    )
+    .await?
+    {
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/einsaetze/{id}/fuehrungsstelle/sprechgruppen/{sg} — Zuordnung lösen, idempotent.
+pub async fn sprechgruppe_loesen(
+    State(state): State<AppState>,
+    ctx: EinsatzVerwaltungszugriff,
+    PfadParam((_eid, sg)): PfadParam<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ziel = crate::sprechgruppe::repo::Zuordnungsziel::Fuehrungsstelle(einsatz_id);
+    if crate::sprechgruppe::repo::einzeln_loesen(&state.pool, einsatz_id, ziel, sg).await? {
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
+    Ok(StatusCode::NO_CONTENT)
 }

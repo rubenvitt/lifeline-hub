@@ -6,8 +6,13 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeMeldungen } from '../api/meldungen';
 import { ladeModulZaehler } from '../api/modulZaehler';
+import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
+import { ladeKommunikationsplan } from '../api/kommunikationsplan';
 import { listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import type {
+  Fernmeldeskizze,
+  KommunikationsStelle,
+  Sprechgruppe,
   Auftrag,
   Einheit,
   Einsatzabschnitt,
@@ -26,6 +31,8 @@ vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/sprechgruppen', () => ({ listeEinsatzSprechgruppen: vi.fn() }));
 vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn() }));
+vi.mock('../api/kommunikationsplan', () => ({ ladeKommunikationsplan: vi.fn() }));
+vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
 
 const ZAEHLER = {
   auftraege: { offen: 3, in_arbeit: 1, ueberfaellig: 2 },
@@ -132,6 +139,10 @@ beforeEach(() => {
   vi.mocked(listeEinheiten).mockReset().mockResolvedValue(EINHEITEN);
   vi.mocked(listeEinsatzSprechgruppen).mockReset().mockResolvedValue([]);
   vi.mocked(ladeFuehrungsstelle).mockReset().mockResolvedValue(FUEHRUNGSSTELLE);
+  vi.mocked(ladeKommunikationsplan).mockReset().mockResolvedValue([]);
+  vi.mocked(ladeFernmeldeskizze)
+    .mockReset()
+    .mockResolvedValue({ komponenten: [] } as unknown as Fernmeldeskizze);
 });
 
 describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
@@ -196,6 +207,30 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
       '**Meldungen**\n- keine mit überfälliger Bestätigung\n- keine neu, noch nicht gesichtet\n',
     );
     expect(text).toContain('**Funkplan**\n- keine Lücken');
+  });
+
+  // LFH-893 (Review O2): dieselben Träger wie das Paneel des Funkplans, sonst zählte die Übernahme
+  // eine Sprechgruppe an einer externen Stelle oder Komponente als „ohne Zuordnung“.
+  it('zählt Sprechgruppen an externen Stellen und Komponenten wie der Funkplan', async () => {
+    const lokal = (id: number, bezeichnung: string) =>
+      ({ id, bezeichnung, betriebsart: 'TMO', einsatz_lokal: true }) as unknown as Sprechgruppe;
+    vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue([
+      lokal(41, 'TMO SL AS'),
+      lokal(42, 'TMO Strom'),
+      lokal(43, 'TMO frei'),
+    ]);
+    vi.mocked(ladeKommunikationsplan).mockResolvedValue([
+      {
+        id: 5,
+        stellenart: 'leitstelle',
+        sprechgruppen: [{ sprechgruppe: { id: 41 }, status: 'bestehend' }],
+      },
+    ] as unknown as KommunikationsStelle[]);
+    vi.mocked(ladeFernmeldeskizze).mockResolvedValue({
+      komponenten: [{ id: 7, sprechgruppen: [{ id: 42 }] }],
+    } as unknown as Fernmeldeskizze);
+    const text = await erzeuge();
+    expect(text).toContain('Einsatzlokale Sprechgruppen ohne Zuordnung: 1 (TMO frei)');
   });
 
   it('übernimmt keinen Freitext aus Aufträgen und Meldungen', async () => {

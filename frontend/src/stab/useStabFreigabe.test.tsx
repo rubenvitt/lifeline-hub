@@ -45,4 +45,22 @@ describe('useStabFreigabe', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('Inhalt der Seite')).toBeNull();
   });
+
+  it('Rückweg der Sackgasse: ein freies Modul, nicht fest der Überblick (LFH-888)', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false }, ueberblick: { zugriff: false } }),
+    );
+    renderMitProviders(<Probe />);
+    expect(await screen.findByText('Informationstelefon nicht verfügbar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Überblick/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /öffnen$/ })).toBeInTheDocument();
+  });
+
+  it('Rückweg der Sackgasse: der freie Überblick', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
+    renderMitProviders(<Probe />);
+    expect(await screen.findByRole('button', { name: 'Überblick öffnen' })).toBeInTheDocument();
+  });
 });

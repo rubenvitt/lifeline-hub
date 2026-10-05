@@ -269,15 +269,14 @@ export function VerbindungModal({
  * mitgehen. Ein Dialog statt `Popconfirm`, weil der Auslöser ein Menüeintrag ist, an dem kein
  * Popover hängen kann. Ohne Verbindungen entfernt die Seite ohne Rückfrage.
  */
+/** Rückfrage beim Entfernen; der Text nennt, was mitgeht (`stab/kommunikationsplan.ts:entfernText`). */
 export function StelleEntfernenRueckfrage({
-  kennung,
-  anzahl,
+  text,
   laeuft,
   onEntfernen,
   onSchliessen,
 }: {
-  kennung: string;
-  anzahl: number;
+  text: string;
   laeuft: boolean;
   onEntfernen: () => void;
   onSchliessen: () => void;
@@ -293,7 +292,7 @@ export function StelleEntfernenRueckfrage({
       onOk={onEntfernen}
       onCancel={onSchliessen}
     >
-      {`„${kennung}“ und ${anzahl === 1 ? 'ihre Verbindung' : `ihre ${anzahl} Verbindungen`} werden aus dem Kommunikationsplan entfernt.`}
+      {text}
     </Modal>
   );
 }

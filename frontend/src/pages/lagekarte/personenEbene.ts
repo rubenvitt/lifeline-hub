@@ -1,5 +1,10 @@
 import type { ModulFreigaben } from '../../api/types';
-import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from '../../einsatz/modulRegistry';
+import {
+  istModulGesperrt,
+  istModulSichtbar,
+  KEINE_BERECHTIGUNG,
+  type ModulEintrag,
+} from '../../einsatz/modulRegistry';
 
 /**
  * Zugriff auf die Ebene „Betroffene" der Lagekarte — rein, damit die Zustände ohne Rendern prüfbar
@@ -42,6 +47,6 @@ export function personenZugriffVon(a: {
 
 /** Sichtbarer Grund an einer gesperrten Ebenen-Zeile — genau dort, wo keine Zahl steht. */
 export const PERSONEN_SPERRGRUND: Record<'gesperrt' | 'rueckblick', string> = {
-  gesperrt: 'Keine Berechtigung',
+  gesperrt: KEINE_BERECHTIGUNG,
   rueckblick: 'Nicht in gesicherten Lageständen',
 };

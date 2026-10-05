@@ -74,6 +74,7 @@ import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
 import Datenstand from '../components/Datenstand';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird. Beim Totalausfall
@@ -107,6 +108,7 @@ export function kopfMeta(verortet: number, nichtVerortet: number, fehler: boolea
 export default function LagekartePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const sprungGesperrt = useSprungSperre(einsatzId);
   const { message } = App.useApp();
   const { effektiv } = useThemeMode();
   const navigate = useNavigate();
@@ -876,6 +878,7 @@ export default function LagekartePage() {
             ansichten={ansichten ?? []}
             bezirke={bezirke}
             betreuungFrei={betreuungZugriff === 'frei'}
+            matrixGesperrt={sprungGesperrt('gefahrenzonen')}
             bezirkPfad={(bid) => betreuungPfad(einsatzId, { bezirk: bid })}
           />
         )}

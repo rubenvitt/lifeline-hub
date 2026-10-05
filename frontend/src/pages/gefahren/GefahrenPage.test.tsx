@@ -11,7 +11,7 @@ import GefahrenPage, { gebietszeileStil } from './GefahrenPage';
 import { dichten } from '../../theme/tokens';
 import { einsatzKeys } from '../../api/queryKeys';
 import { formatiereDatenstand } from '../../components/Datenstand';
-import { einsatzFixture } from '../../test/fixtures';
+import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 
 const einsatz = einsatzFixture({ bezeichnung: 'Lage' });
 const gebiet = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
@@ -366,5 +366,29 @@ describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
     expect(gebietszeileStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
     expect(gebietszeileStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+  });
+});
+
+/** Sprünge auf die Lagekarte bei gesperrter Lagekarte (LFH-888, design.md D4). */
+describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
+  const gesperrt = http.get('/api/einsaetze/1/modul-freigaben', () =>
+    HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
+  );
+
+  it('„Auf Karte zeigen" steht gesperrt mit Grund, ohne Link', async () => {
+    server.use(...handlers(), gesperrt);
+    renderPage();
+    const knopf = await screen.findByRole('button', { name: /Auf Karte zeigen/i });
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    expect(screen.queryByRole('link', { name: /Auf Karte zeigen/i })).toBeNull();
+  });
+
+  it('Leerzustand ohne Aktion „Zur Lagekarte", der Hinweis bleibt', async () => {
+    server.use(...handlers([]), gesperrt);
+    renderPage();
+    expect(await screen.findByText(/keine Gefahrengebiete/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Zur Lagekarte' })).toBeNull());
+    expect(screen.getByText('Auf der Lagekarte ein Gefahrengebiet zeichnen.')).toBeInTheDocument();
   });
 });

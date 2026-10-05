@@ -71,6 +71,10 @@ describe('EinsatzSeite', () => {
     expect(leiste).toContainElement(screen.getByRole('button', { name: 'Anlegen' }));
     // 14/600 — der Satz des Entwurfs, die Ebene bleibt h1.
     expect(heading).toHaveStyle({ fontSize: '14px', fontWeight: '600' });
+    // Ein Haken für den Druck (LFH-893): eine Druckwurzel kann die Bildschirmhilfe ausblenden.
+    expect(container.querySelector('[data-lfh="seiten-beschreibung"]')).toHaveTextContent(
+      'Betreute und vermisste Personen',
+    );
   });
 
   it('zeigt ein optionales Mono-Meta neben dem Titel', () => {

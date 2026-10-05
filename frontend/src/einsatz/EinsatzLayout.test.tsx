@@ -836,3 +836,123 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
     expect(localStorage.getItem('lifeline-hub.helligkeit')).toBe('40');
   });
 });
+
+/**
+ * Modulwächter (LFH-888, Spec `modul-freigabe`, design.md D1): eine Route in ein Modul, für das
+ * der Server `zugriff: false` meldet, zeigt den einheitlichen Hinweis statt der Modulseite. Die
+ * Kindseiten sind Sonden — wird eine gerendert, ist der Wächter offen.
+ */
+describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
+  function setupWaechter(
+    route: string,
+    freigaben: ModulFreigaben | 'laden' | 'fehler',
+    einstellungen: Record<string, unknown> = {},
+  ) {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/modul-freigaben', async () => {
+        if (freigaben === 'laden') await new Promise(() => {});
+        if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
+        return HttpResponse.json(freigaben);
+      }),
+      http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json(einstellungen)),
+    );
+    return renderMitProviders(
+      <CommandPaletteProvider>
+        <Routes>
+          <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+            <Route path="lagemeldungen" element={<div>Lagemeldungen-Inhalt</div>} />
+            <Route path="stab/funkplan" element={<div>Funkplan-Inhalt</div>} />
+            <Route path="einsatzdaten" element={<div>Einsatzdaten-Inhalt</div>} />
+            <Route path="ueberblick" element={<div>Überblick-Inhalt</div>} />
+            <Route path="etb" element={<div>ETB-Inhalt</div>} />
+          </Route>
+        </Routes>
+        <PfadAnzeige />
+        <FreigabenSonde />
+      </CommandPaletteProvider>,
+      { route },
+    );
+  }
+
+  it('gesperrtes Modul: Hinweis statt Seite, Rail bleibt bedienbar', async () => {
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { zugriff: false } }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /Lagemeldungen/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/für deine Rolle in diesem Einsatz nicht freigegeben/)).toBeVisible();
+    expect(screen.queryByText('Lagemeldungen-Inhalt')).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
+  });
+
+  it('Rückweg: das freie Standardmodul, sonst der Überblick', async () => {
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { zugriff: false }, etb: { zugriff: false } }),
+      { standard_modul: 'etb' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Überblick öffnen' }));
+    expect(pfad()).toBe('/einsaetze/7/ueberblick');
+    expect(await screen.findByText('Überblick-Inhalt')).toBeInTheDocument();
+  });
+
+  it('Unterroute eines gesperrten Moduls (Stab › Funkplan) zeigt den Hinweis für „Stab“', async () => {
+    setupWaechter('/einsaetze/7/stab/funkplan', freigabenFixture({ stab: { zugriff: false } }));
+    expect(await screen.findByRole('heading', { level: 1, name: /Stab/ })).toBeInTheDocument();
+    expect(screen.queryByText('Funkplan-Inhalt')).not.toBeInTheDocument();
+  });
+
+  it('ausgeblendetes Modul für ein Mitglied heißt „ausgeblendet“', async () => {
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { sichtbar: false, zugriff: false } }),
+    );
+    expect(await screen.findByText(/in diesem Einsatz ausgeblendet/)).toBeInTheDocument();
+  });
+
+  it('System-Admin im ausgeblendeten Modul (`zugriff: true`): die Seite rendert', async () => {
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { sichtbar: false, zugriff: true } }),
+    );
+    await freigabenAngekommen();
+    expect(screen.getByText('Lagemeldungen-Inhalt')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
+  });
+
+  it('Freigaben laden noch: der Rahmen wartet, die Seite rendert noch nicht', async () => {
+    // Kaltstart per Deeplink: rendert die Seite vor der Antwort, ginge ihre Listen-Anfrage an
+    // ein gesperrtes Modul raus (design.md D1, Nachtrag).
+    setupWaechter('/einsaetze/7/lagemeldungen', 'laden');
+    expect(await screen.findByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
+    expect(screen.getByTestId('modulwaechter-laedt')).toBeInTheDocument();
+    expect(screen.queryByText('Lagemeldungen-Inhalt')).not.toBeInTheDocument();
+    expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
+  });
+
+  it('Einsatzdaten warten nie auf die Freigaben und zeigen nie den Hinweis', async () => {
+    setupWaechter('/einsaetze/7/einsatzdaten', 'laden');
+    expect(await screen.findByText('Einsatzdaten-Inhalt')).toBeInTheDocument();
+    expect(screen.queryByTestId('modulwaechter-laedt')).not.toBeInTheDocument();
+  });
+
+  it('Freigaben gescheitert: die Seite rendert, ihr eigener 403-Zustand bleibt das Netz', async () => {
+    setupWaechter('/einsaetze/7/lagemeldungen', 'fehler');
+    expect(
+      await screen.findByText(/Modulfreigaben konnten nicht geladen werden/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Lagemeldungen-Inhalt')).toBeInTheDocument();
+  });
+
+  it('freies Modul: die Seite rendert', async () => {
+    setupWaechter('/einsaetze/7/lagemeldungen', freigabenFixture());
+    await freigabenAngekommen();
+    expect(screen.getByText('Lagemeldungen-Inhalt')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
+  });
+});

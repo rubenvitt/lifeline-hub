@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, Einsatzabschnitt, KommunikationsStelle, Stab } from '../api/types';
+import type {
+  Einheit,
+  Einsatzabschnitt,
+  KommunikationsStelle,
+  SkizzenVerbindung,
+  Sprechgruppe,
+  Stab,
+} from '../api/types';
 import {
   baueKommunikationsplan,
+  brauchtRueckfrage,
+  entfernText,
+  entfernUmfang,
   verbindungsVerweis,
   type KommunikationsplanQuellen,
 } from './kommunikationsplan';
@@ -29,7 +39,14 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
 }
 
 function stelle(id: number, p: Partial<KommunikationsStelle> = {}): KommunikationsStelle {
-  return { id, stellenart: 'leitstelle', bezeichnung: `Stelle ${id}`, verbindungen: [], ...p };
+  return {
+    id,
+    stellenart: 'leitstelle',
+    bezeichnung: `Stelle ${id}`,
+    verbindungen: [],
+    sprechgruppen: [],
+    ...p,
+  };
 }
 
 const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
@@ -323,5 +340,109 @@ describe('verbindungsVerweis', () => {
     expect(verbindungsVerweis('email', 'a@b.de')).toBe('mailto:a@b.de');
     expect(verbindungsVerweis('email', 'Postfach Lage')).toBeNull();
     expect(verbindungsVerweis('email', 'a @b.de')).toBeNull();
+  });
+});
+
+// ── LFH-893: Kanäle externer Stellen und Entfernen mit Skizzen-Verbindungen ──────────────────
+
+const TMO_SL_AS: Sprechgruppe = {
+  id: 31,
+  bezeichnung: 'SL AS',
+  betriebsart: 'TMO',
+  aktiv: true,
+  einsatz_lokal: false,
+  sortier: 1,
+};
+const DMO_505: Sprechgruppe = { ...TMO_SL_AS, id: 32, bezeichnung: '505', betriebsart: 'DMO' };
+
+function skizzenVerbindung(id: number, stelleId: number): SkizzenVerbindung {
+  return {
+    id,
+    von: { art: 'fuehrungsstelle', id: null },
+    nach: { art: 'stelle', id: stelleId },
+    art: 'daten',
+    medium: 'leitung',
+    status: 'bestehend',
+    verkehr: null,
+    hinweis: null,
+  };
+}
+
+describe('Kanäle externer Stellen (LFH-893)', () => {
+  it('nennt die Kanäle einer externen Stelle mit Betriebsart, geplante mit dem Wort', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([
+          stelle(2, {
+            bezeichnung: 'ILS Musterhausen',
+            sprechgruppen: [
+              { sprechgruppe: TMO_SL_AS, status: 'geplant' },
+              { sprechgruppe: DMO_505, status: 'bestehend' },
+            ],
+          }),
+        ]),
+      }),
+    );
+    expect(plan[3].zeilen[0].kanaele).toEqual(['TMO SL AS (geplant)', 'DMO 505']);
+  });
+
+  it('hat an Funktionen, Abschnitten und Einheiten keine Kanäle', () => {
+    const plan = baueKommunikationsplan(
+      quellen({
+        stellen: daten([stelle(1, { stellenart: 'funktion', funktion: 's2' })]),
+        abschnitte: daten([abschnitt(4, { kommunikationsmittel: 'festnetz' })]),
+      }),
+    );
+    expect(plan[0].zeilen[0].kanaele).toEqual([]);
+    expect(plan[1].zeilen[0].kanaele).toEqual([]);
+  });
+});
+
+describe('entfernUmfang / entfernText (LFH-893)', () => {
+  const ils = stelle(3, {
+    bezeichnung: 'ILS',
+    verbindungen: [],
+    sprechgruppen: [{ sprechgruppe: TMO_SL_AS, status: 'bestehend' }],
+  });
+
+  it('zählt Verbindungen, Sprechgruppen und Skizzen-Verbindungen der Stelle', () => {
+    const u = entfernUmfang(ils, {
+      zustand: 'daten',
+      daten: [skizzenVerbindung(1, 3), skizzenVerbindung(2, 9)],
+    });
+    expect(u).toEqual({ verbindungen: 0, sprechgruppen: 1, skizzenVerbindungen: 1 });
+    expect(brauchtRueckfrage(u)).toBe(true);
+    expect(entfernText('ILS', u)).toBe(
+      '„ILS“ wird aus dem Kommunikationsplan entfernt, mit 1 Sprechgruppe und 1 Skizzen-Verbindung.',
+    );
+  });
+
+  it('zählt eine Verbindung von der Stelle aus ebenso', () => {
+    const v = { ...skizzenVerbindung(1, 9), von: { art: 'stelle' as const, id: 3 } };
+    expect(entfernUmfang(ils, { zustand: 'daten', daten: [v] }).skizzenVerbindungen).toBe(1);
+  });
+
+  it('fragt ohne Verbindungen, Kanäle und Skizzen-Verbindungen nicht nach', () => {
+    const leer = stelle(4, { verbindungen: [], sprechgruppen: [] });
+    const u = entfernUmfang(leer, { zustand: 'daten', daten: [skizzenVerbindung(1, 3)] });
+    expect(brauchtRueckfrage(u)).toBe(false);
+  });
+
+  it('fragt nach, wenn die Skizze nicht geladen ist, und sagt das', () => {
+    const leer = stelle(4, { verbindungen: [], sprechgruppen: [] });
+    const u = entfernUmfang(leer, { zustand: 'fehler', daten: [] });
+    expect(u.skizzenVerbindungen).toBeNull();
+    expect(brauchtRueckfrage(u)).toBe(true);
+    expect(entfernText('Polizei', u)).toBe(
+      '„Polizei“ wird aus dem Kommunikationsplan entfernt. Ob sie in der Fernmeldeskizze ' +
+        'verbunden ist, ist nicht bekannt (Fernmeldeskizze nicht geladen); ihre Verbindungen ' +
+        'dort gehen mit.',
+    );
+  });
+
+  it('nennt mehrere Verbindungen in der Mehrzahl', () => {
+    expect(
+      entfernText('Polizei PI Nord', { verbindungen: 2, sprechgruppen: 0, skizzenVerbindungen: 0 }),
+    ).toBe('„Polizei PI Nord“ wird aus dem Kommunikationsplan entfernt, mit 2 Verbindungen.');
   });
 });

@@ -17,8 +17,10 @@ use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
+use super::fernmeldeskizze::{self, Verbindungsstatus};
 use crate::error::AppError;
 use crate::fuehrung::{Fuehrungsfunktion, Labelkarte};
+use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
 use crate::wire_enum::wire_enum;
 use crate::write_retry;
 
@@ -92,6 +94,16 @@ pub struct KommunikationsStelle {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bezeichnung: Option<String>,
     pub verbindungen: Vec<KommunikationsVerbindung>,
+    /// Kanäle der externen Stelle (LFH-893, design.md D3/D14), sortiert wie an Abschnitt und
+    /// Einheit; bei einer Funktion immer leer. Gepflegt in der Fernmeldeskizze.
+    pub sprechgruppen: Vec<StellenKanal>,
+}
+
+/// Eine Sprechgruppe am Datensatz einer externen Stelle, mit Status (D7).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct StellenKanal {
+    pub sprechgruppe: SprechgruppeAnzeige,
+    pub status: Verbindungsstatus,
 }
 
 /// Validierte Eingabe zum Anlegen einer Stelle (Invarianten geprüft im Handler).
@@ -126,6 +138,14 @@ struct StelleRoh {
     funktion: Option<String>,
     bezeichnung: Option<String>,
     sortier: i64,
+}
+
+#[derive(sqlx::FromRow)]
+struct KanalRoh {
+    stelle_id: i64,
+    kanal_status: String,
+    #[sqlx(flatten)]
+    sprechgruppe: Sprechgruppe,
 }
 
 #[derive(sqlx::FromRow)]
@@ -164,6 +184,21 @@ async fn laden_conn(
     let verbindungen = sqlx::query_as::<_, VerbindungRoh>(
         "SELECT id, stelle_id, mittel, wert, hinweis \
          FROM einsatz_kommunikation_verbindung WHERE einsatz_id = ? ORDER BY sortier, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let kanaele = sqlx::query_as::<_, KanalRoh>(
+        "SELECT ss.stelle_id AS stelle_id, ss.status AS kanal_status, \
+                sg.id AS id, sg.org_id AS org_id, sg.einsatz_id AS einsatz_id, \
+                sg.bezeichnung AS bezeichnung, sg.betriebsart AS betriebsart, \
+                sg.hinweis AS hinweis, sg.aktiv AS aktiv, sg.sortier AS sortier, \
+                sg.angelegt_at AS angelegt_at \
+         FROM einsatz_kommunikation_stelle_sprechgruppe ss \
+         JOIN einsatz_kommunikation_stelle s ON s.id = ss.stelle_id \
+         JOIN sprechgruppe sg ON sg.id = ss.sprechgruppe_id \
+         WHERE s.einsatz_id = ? AND s.stellenart <> 'funktion' \
+         ORDER BY sg.betriebsart, sg.sortier, sg.bezeichnung",
     )
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
@@ -210,6 +245,15 @@ async fn laden_conn(
                     funktion_label: funktion.map(|f| karte.kurz_mit_label(f)),
                     bezeichnung: s.bezeichnung,
                     verbindungen: eigene,
+                    sprechgruppen: kanaele
+                        .iter()
+                        .filter(|k| k.stelle_id == s.id)
+                        .map(|k| StellenKanal {
+                            sprechgruppe: k.sprechgruppe.anzeige(),
+                            status: Verbindungsstatus::parse(&k.kanal_status)
+                                .unwrap_or(Verbindungsstatus::Bestehend),
+                        })
+                        .collect(),
                 },
             )
         })
@@ -236,14 +280,16 @@ async fn stelle_im_einsatz(
 }
 
 /// Legt eine Stelle an. Eine schon vorhandene Funktion (bei FHP/FB: dieselbe Bezeichnung,
-/// ohne Groß-/Kleinschreibung) ist 409; der UNIQUE-Index ist das Netz dahinter.
+/// ohne Groß-/Kleinschreibung) ist 409; der UNIQUE-Index ist das Netz dahinter. Gibt die id der
+/// neuen Stelle und den ganzen Plan zurück: die Fernmeldeskizze braucht für Rückgängig genau diese
+/// Stelle (LFH-893, Review S4), der Plan allein nennt sie nicht eindeutig.
 pub async fn stelle_anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
     eingabe: &StelleEingabe,
-) -> Result<Vec<KommunikationsStelle>, AppError> {
-    write_retry!(pool, |conn| {
+) -> Result<(i64, Vec<KommunikationsStelle>), AppError> {
+    let id = write_retry!(pool, |conn| {
         super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         if let Some(f) = eingabe.funktion {
             let vorhanden: Option<i64> = sqlx::query_scalar(
@@ -262,7 +308,7 @@ pub async fn stelle_anlegen(
                 ));
             }
         }
-        sqlx::query(
+        let r = sqlx::query(
             "INSERT INTO einsatz_kommunikation_stelle \
                 (einsatz_id, stellenart, funktion, bezeichnung, sortier, geaendert_von_id) \
              VALUES (?1, ?2, ?3, ?4, \
@@ -276,9 +322,9 @@ pub async fn stelle_anlegen(
         .bind(benutzer_id)
         .execute(&mut *conn)
         .await?;
-        Ok(())
+        Ok(r.last_insert_rowid())
     })?;
-    laden(pool, einsatz_id).await
+    Ok((id, laden(pool, einsatz_id).await?))
 }
 
 /// Ändert die Bezeichnung einer Stelle. Stellenart und Funktion sind nach dem Anlegen fest
@@ -360,7 +406,8 @@ pub fn pruefe_bezeichnung_fuer(
     Ok(angabe.text)
 }
 
-/// Entfernt eine Stelle samt ihren Verbindungen (CASCADE).
+/// Entfernt eine Stelle samt ihren Verbindungen und Kanälen (CASCADE) und ihrer Lage und ihren
+/// Verbindungen in der Fernmeldeskizze ([`fernmeldeskizze::vergiss`], LFH-893).
 pub async fn stelle_entfernen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -369,6 +416,12 @@ pub async fn stelle_entfernen(
     write_retry!(pool, |conn| {
         super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
         stelle_im_einsatz(conn, einsatz_id, stelle_id).await?;
+        fernmeldeskizze::vergiss(
+            conn,
+            einsatz_id,
+            fernmeldeskizze::Element::Stelle(stelle_id),
+        )
+        .await?;
         sqlx::query("DELETE FROM einsatz_kommunikation_stelle WHERE id = ?")
             .bind(stelle_id)
             .execute(&mut *conn)
@@ -376,6 +429,78 @@ pub async fn stelle_entfernen(
         Ok(())
     })?;
     laden(pool, einsatz_id).await
+}
+
+/// Lädt eine externe Stelle für eine Kanal-Änderung: unbekannt oder fremd → 404, Funktion → 422
+/// (eine Führungsfunktion trägt keine Sprechgruppe, Spec `stab-kommunikationsplan`).
+async fn externe_stelle(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    stelle_id: i64,
+) -> Result<(), AppError> {
+    let stelle = stelle_im_einsatz(conn, einsatz_id, stelle_id).await?;
+    if stelle.stellenart == Stellenart::Funktion.as_str() {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Führungsfunktion trägt keine Sprechgruppe".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Setzt einen Kanal der externen Stelle mit Status, idempotent (LFH-893, design.md D5). Erst
+/// die Stelle (404, Funktion 422), dann die Sprechgruppe wie der PATCH der Datensätze
+/// (`sprechgruppe::repo::pruefe_zuordenbar`, 422). `true`, wenn sich etwas geändert hat (neu
+/// oder anderer Status).
+pub async fn kanal_setzen(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    stelle_id: i64,
+    sprechgruppe_id: i64,
+    status: Verbindungsstatus,
+) -> Result<bool, AppError> {
+    externe_stelle(&mut *pool.acquire().await?, einsatz_id, stelle_id).await?;
+    crate::sprechgruppe::repo::pruefe_zuordenbar(pool, org_id, einsatz_id, &[sprechgruppe_id])
+        .await?;
+    write_retry!(pool, |conn| {
+        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        externe_stelle(conn, einsatz_id, stelle_id).await?;
+        let r = sqlx::query(
+            "INSERT INTO einsatz_kommunikation_stelle_sprechgruppe \
+                (stelle_id, sprechgruppe_id, status) VALUES (?1, ?2, ?3) \
+             ON CONFLICT(stelle_id, sprechgruppe_id) DO UPDATE SET \
+                status = excluded.status, geaendert_at = datetime('now') \
+             WHERE status <> excluded.status",
+        )
+        .bind(stelle_id)
+        .bind(sprechgruppe_id)
+        .bind(status.as_str())
+        .execute(&mut *conn)
+        .await?;
+        Ok(r.rows_affected() > 0)
+    })
+}
+
+/// Löst einen Kanal der Stelle, idempotent. `true`, wenn es ihn gab.
+pub async fn kanal_loesen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    stelle_id: i64,
+    sprechgruppe_id: i64,
+) -> Result<bool, AppError> {
+    write_retry!(pool, |conn| {
+        super::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+        externe_stelle(conn, einsatz_id, stelle_id).await?;
+        let r = sqlx::query(
+            "DELETE FROM einsatz_kommunikation_stelle_sprechgruppe \
+             WHERE stelle_id = ? AND sprechgruppe_id = ?",
+        )
+        .bind(stelle_id)
+        .bind(sprechgruppe_id)
+        .execute(&mut *conn)
+        .await?;
+        Ok(r.rows_affected() > 0)
+    })
 }
 
 /// Hängt eine Verbindung an die Stelle (`sortier` = MAX+1 je Stelle, server-autoritativ).

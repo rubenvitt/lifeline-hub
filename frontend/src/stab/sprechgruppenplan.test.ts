@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, Einsatzabschnitt, Sprechgruppe } from '../api/types';
+import type {
+  Einheit,
+  Einsatzabschnitt,
+  Fernmeldeskizze,
+  KommunikationsStelle,
+  Sprechgruppe,
+} from '../api/types';
 import type { FunkplanQuellen } from './funkplan';
-import type { Quelle } from './luecken';
+import type { Quelle, SkizzenQuelle } from './luecken';
 import {
   HERKUNFT_LABEL,
+  type FehlendeStruktur,
+  type SprechgruppenTeilnehmer,
   baueSprechgruppenplan,
   fehlendText,
   sprechgruppenplanLeerText,
@@ -302,6 +310,95 @@ describe('fehlendText und Leertext', () => {
       ),
     ).toBe(
       'Keine Zeilen darstellbar — Abschnitte: nicht freigegeben · Sprechgruppen: nicht geladen',
+    );
+  });
+});
+
+// ── LFH-893: externe Stellen und Komponenten als Teilnehmer ───────────────────────────────────
+
+describe('baueSprechgruppenplan — externe Stellen und Komponenten (LFH-893)', () => {
+  const SL_AS = sg(31, 'TMO', 'TMO SL AS', { sortier: 3 });
+  const ILS: KommunikationsStelle = {
+    id: 5,
+    stellenart: 'leitstelle',
+    bezeichnung: 'ILS Musterhausen',
+    verbindungen: [],
+    sprechgruppen: [{ sprechgruppe: SL_AS, status: 'geplant' }],
+  };
+  const S2: KommunikationsStelle = {
+    id: 6,
+    stellenart: 'funktion',
+    funktion: 's2',
+    verbindungen: [],
+    sprechgruppen: [{ sprechgruppe: TMO311, status: 'bestehend' }],
+  };
+  const skizze = (komponenten: Fernmeldeskizze['komponenten']): SkizzenQuelle => ({
+    zustand: 'daten',
+    daten: {
+      lage: [],
+      komponenten,
+      verbindungen: [],
+      bereiche: [],
+      schriftfeld: {
+        herausgeber: null,
+        vs_vermerk: 'keiner',
+        gueltig_ab: null,
+        gez_name: null,
+        gez_at: null,
+      },
+      stand: null,
+    },
+  });
+
+  it('nennt die Leitstelle mit Status als Teilnehmer, mit Ziel Kommunikationsplan', () => {
+    const zeilen = baueSprechgruppenplan(quellen({ abschnitte: daten([EA_NORD]) }), 1, {
+      stellen: daten([ILS, S2]),
+      skizze: skizze([]),
+    });
+    const z = zeile(zeilen, 'TMO SL AS');
+    expect(z.teilnehmer).toEqual({
+      art: 'vollstaendig',
+      teilnehmer: [
+        {
+          art: 'extern',
+          key: 'ks-5',
+          id: 5,
+          name: 'ILS Musterhausen',
+          rufname: null,
+          ziel: '/einsaetze/1/stab/kommunikationsplan',
+          status: 'geplant',
+        },
+      ],
+    });
+    // Eine Führungsfunktion ist nie Teilnehmer.
+    expect(
+      (zeile(zeilen, 'TMO 311').teilnehmer as { teilnehmer: { key: string }[] }).teilnehmer.map(
+        (t) => t.key,
+      ),
+    ).toEqual(['ab-1']);
+  });
+
+  it('nennt eine Komponente als Teilnehmer, ohne Ziel', () => {
+    const zeilen = baueSprechgruppenplan(quellen(), 1, {
+      stellen: daten([]),
+      skizze: skizze([{ id: 2, art: 'repeater', bezeichnung: null, sprechgruppen: [DMO505] }]),
+    });
+    const z = zeile(zeilen, 'DMO 505');
+    expect(z.teilnehmer.art).toBe('vollstaendig');
+    const [t] = (z.teilnehmer as { teilnehmer: SprechgruppenTeilnehmer[] }).teilnehmer;
+    expect(t).toMatchObject({ art: 'komponente', key: 'ko-2', ziel: null, status: 'bestehend' });
+    expect(t.name).toBe('Repeater');
+  });
+
+  it('sagt „unvollständig“, wenn die externen Stellen nicht geladen sind', () => {
+    const zeilen = baueSprechgruppenplan(quellen({ abschnitte: daten([EA_NORD]) }), 1, {
+      stellen: ohne('fehler'),
+      skizze: skizze([]),
+    });
+    const z = zeile(zeilen, 'TMO 311');
+    expect(z.teilnehmer.art).toBe('unvollstaendig');
+    expect(fehlendText((z.teilnehmer as { fehlend: FehlendeStruktur[] }).fehlend)).toBe(
+      'Externe Stellen nicht geladen',
     );
   });
 });

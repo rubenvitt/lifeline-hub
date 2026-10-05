@@ -1,8 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import Platzhalter, { type PlatzhalterRueckweg } from '../components/Platzhalter';
-import { aufloeseStandardModul, modulZuRoute, type ModulEintrag } from './modulRegistry';
-import { ladeEinstellungen } from '../api/einsaetze';
+import {
+  aufloeseStandardModul,
+  freiesRueckwegModul,
+  modulZielRoute,
+  modulZuRoute,
+  type ModulEintrag,
+} from './modulRegistry';
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
 
@@ -36,9 +42,18 @@ export default function ModulStub({ modul }: { modul: ModulEintrag }) {
   // Fallback und wechselte unter dem Zeigefinger auf das konfigurierte Modul.
   // Bei einem Fehlschlag greift `aufloeseStandardModul(undefined)` = globaler
   // Fallback; ein Rückweg ist dann besser als keiner.
+  // Die Freigaben aus dem Cache des Rahmens (LFH-888): ein gesperrtes Standardmodul ist kein
+  // Rückweg. Ohne Freigaben (Fehler) bleibt die alte Auflösung — ein Rückweg ist besser als keiner.
+  const freigabenQ = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId ?? 0),
+    queryFn: () => ladeModulFreigaben(einsatzId!),
+    enabled: einsatzId !== null,
+  });
   let rueckweg: PlatzhalterRueckweg | undefined;
-  if (einsatzId !== null && !isLoading) {
-    const zielRoute = aufloeseStandardModul(data?.standard_modul);
+  if (einsatzId !== null && !isLoading && !freigabenQ.isLoading) {
+    const zielRoute = freigabenQ.data
+      ? modulZielRoute(freiesRueckwegModul(freigabenQ.data, data?.standard_modul))
+      : aufloeseStandardModul(data?.standard_modul);
     rueckweg = { pfad: einsatzModulPfad(einsatzId, zielRoute), label: rueckwegLabel(zielRoute) };
   }
   return <Platzhalter titel={modul.label} beschreibung={modul.beschreibung} rueckweg={rueckweg} />;

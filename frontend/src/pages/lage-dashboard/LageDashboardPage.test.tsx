@@ -508,6 +508,25 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(kennzahl('Kräfte')).toHaveTextContent('0 Einheiten · 0/0/0//0');
   });
 
+  it('gesperrtes Meldebild: „Kräfte" zeigt die Stärke ohne Link (LFH-888)', async () => {
+    mockEndpunkte({ freigaben: { kraefteuebersicht: { zugriff: false } } });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() => expect(kennzahl('Kräfte').tagName).not.toBe('A'));
+    expect(kennzahl('Kräfte').querySelector('[data-lfh="kennzahl-wert"]')?.textContent).not.toBe(
+      '—',
+    );
+  });
+
+  it('freies Meldebild: „Kräfte" führt in die Kräfteübersicht (LFH-888, Gegenprobe)', async () => {
+    mockEndpunkte({});
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() =>
+      expect(kennzahl('Kräfte')).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht'),
+    );
+  });
+
   it('die Einsatzdauer läuft seit Beginn und nennt die Beginnzeit', async () => {
     mockEndpunkte({});
     render();

@@ -9,7 +9,7 @@ import PersonenDetailPage from './PersonenDetailPage';
 import type { Person, PersonDetail, Sichtungskategorie } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { erzeugeQueryClient } from '../api/queryClient';
-import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
@@ -144,7 +144,12 @@ describe('PersonenDetailPage — Ladehoheit', () => {
     try {
       render(einsatzAktiv, detail);
       await screen.findByRole('heading', { name: /Person R-001/ });
-      expect(pfade).toEqual(['/api/einsaetze/1', '/api/einsaetze/1/personen/10']);
+      // Die Modulfreigaben (Sprung-Sperre „Auf Lagekarte verorten", LFH-888) zählen nicht: sie
+      // liegen in der App schon im Cache des Einsatzrahmens; nur dieser nackte Test lädt sie.
+      expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
+        '/api/einsaetze/1',
+        '/api/einsaetze/1/personen/10',
+      ]);
     } finally {
       loesen();
     }
@@ -1247,6 +1252,19 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     expect(ziel.searchParams.get('platzieren')).toBe('person:10');
     // Nicht vermisst → keine Zeile „vermisst seit".
     expect(screen.queryByText('vermisst seit')).not.toBeInTheDocument();
+  });
+
+  it('gesperrte Lagekarte: „Auf Lagekarte verorten" steht gesperrt mit Grund (LFH-888)', async () => {
+    render(einsatzAktiv, mitKoordinate, [
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
+      ),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const knopf = await screen.findByRole('button', { name: 'Auf Lagekarte verorten' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
+    expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
   });
 
   it('zeigt Beobachtern keinen Verorten-Link', async () => {

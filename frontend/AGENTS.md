@@ -110,11 +110,11 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Organigramm der Führungsorganisation** (LFH-626, `pages/einsatzabschnitte/Organigramm.tsx`,
   `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
-  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, die Fernmeldeskizze
-  LFH-625 baut darauf); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
+  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan; Vorlage für Auto-Layout
+  und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
   „Einsatzleitung“ trägt keine Zahl; Stab nur mit Stab-Freigabe. Layout und Druckregeln nur über
   das Gerüst `components/organigramm/HaengenderBaum` (erste Ebene als Spalten-Grid,
-  `SPALTE_MIN_PX` gemessen, tiefer senkrecht), geteilt mit der Fernmeldeskizze — keine
+  `SPALTE_MIN_PX` gemessen, tiefer senkrecht) — keine
   Graph-Bibliothek, kein zweites Gerüst. **Live-Zufluss nur über die Schleuse des Gerüsts**
   (LFH-867, `components/organigramm/baumSchleuse.ts`,
   `openspec/changes/archive/2026-10-04-lfh-867-organigramm-zufluss-schleuse/design.md`): Zeiger
@@ -499,8 +499,13 @@ Spec `bedien-arbeitsplatz`).
   den ganzen Einsatz. Je Person liegt nur das Palettengedächtnis „Zuletzt“
   (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener Schlüsselraum).
 - **Nicht zuständig für Rechte:** Sichtbarkeit und Schreibrecht kommen allein aus `EinsatzRolle`,
-  Systemrolle und Modulfreigabe (`einsatz/schreibrecht.ts`, `berechtigung::erlaubte_module`); ein
-  Einstieg ist keine Freigabe, die Zielseite prüft selbst. Stabsfunktionen S1–S6 ebenso (LFH-46).
+  Systemrolle und Modulfreigabe (`einsatz/schreibrecht.ts`, `berechtigung::erlaubte_module`). Ein
+  Einstieg prüft die Modulfreigabe seines Ziels (`istSprungGesperrt`, gesperrt sichtbar: Knopf
+  `disabled` mit `title={KEINE_BERECHTIGUNG}`, Link und Kennzahl-Ziel entfallen). Der Rahmen fängt
+  jede Route in ein gesperrtes Modul ab (`ModulGesperrt`, LFH-888,
+  `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`) und wartet
+  beim Kaltstart auf die Freigaben; die Zielseite prüft weiter ihren Datensatz. Verweise in
+  Datenzeilen bleiben offen, für sie gilt der Rahmen. Stabsfunktionen S1–S6 ebenso (LFH-46).
 - **Aufnahme** (`personenAufnahmePfad`): Einstiege sind die UHS-Kopfzeile „Patient aufnehmen“
   (LFH-341/C6, nur `aktiv` und mit Schreibrecht) und die Leeraktion des Sichtungspaneels. Die
   Palette führt „Neue Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.

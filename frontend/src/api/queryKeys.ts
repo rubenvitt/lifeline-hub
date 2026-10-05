@@ -513,6 +513,14 @@ export const einsatzKeys = {
    */
   stabKommunikationsplan: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'kommunikationsplan'] as const,
+  /**
+   * Daten der taktischen Fernmeldeskizze (LFH-893), unter dem Stab-Prefix: das `stab`-Ereignis
+   * trifft sie mit, jede Schreibaktion des Servers sendet es. Nicht ohne Netz lesbar (fehlt in
+   * `LAGEBILD_OFFLINE.einsatzUnterKeys`): bearbeitet wird die Skizze nur mit Server, und der
+   * Funkplan nennt sie ohne Netz als „nicht geladen“.
+   */
+  stabFernmeldeskizze: (einsatzId: number) =>
+    [EINSATZ_KEYS.stab, einsatzId, 'fernmeldeskizze'] as const,
 
   // Dokumentenablage.
   dokumente: (einsatzId: number) => [EINSATZ_KEYS.dokumente, einsatzId] as const,
@@ -831,7 +839,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Führungsstelle (LFH-849: Erreichbarkeit ist personenbezogen), der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), dazu S5
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
- * LFH-554 design.md D8, offen mit LFH-767).
+ * LFH-554 design.md D8, offen mit LFH-767), die Daten der Fernmeldeskizze (LFH-893: bearbeitet
+ * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {
