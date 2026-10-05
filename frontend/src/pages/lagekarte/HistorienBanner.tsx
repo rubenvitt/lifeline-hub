@@ -1,5 +1,5 @@
 import { Alert, Button } from 'antd';
-import { formatZeit } from '../../anzeige/format';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 
 interface HistorienBannerProps {
   /** Zeitstempel des angezeigten Standes (`stand_at`, naiver UTC-Wire-String). */
@@ -18,7 +18,8 @@ interface HistorienBannerProps {
  */
 export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: HistorienBannerProps) {
   // `formatZeit` (dayjs.utc) statt `new Date()`: `stand_at` ist ein naiver UTC-Wire-String, den
-  // `new Date()` als Lokalzeit läse.
+  // `new Date()` als Lokalzeit läse. Gebunden an die Anzeigezone (LFH-913).
+  const { formatZeit } = useAnzeigeKonventionen();
   const stand = standAt ? formatZeit(standAt) : '';
   const beschreibung = [bezeichnung?.trim(), stand].filter(Boolean).join(' · ');
   return (

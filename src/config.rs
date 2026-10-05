@@ -250,6 +250,11 @@ pub fn default_karten_dir(db_path: &str) -> std::path::PathBuf {
         .join("karten")
 }
 
+/// Obergrenze von `--backup-intervall-minuten`: ein Jahr. Ein beliebig großer Wert liefe beim
+/// Umrechnen in Sekunden oder beim Addieren auf einen `Instant` über und brächte den
+/// Scheduler-Task zum Absturz wie die 0 (LFH-926).
+pub const MAX_BACKUP_INTERVALL_MINUTEN: u64 = 365 * 24 * 60;
+
 /// Laufzeit-Konfiguration für den lifeline-hub-Server.
 #[derive(Parser, Debug, Clone)]
 #[command(version, about = "lifeline-hub Server")]
@@ -334,13 +339,26 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_BACKUP_VERZEICHNIS")]
     pub backup_verzeichnis: Option<String>,
 
-    /// Abstand zwischen automatischen Sicherungen in Minuten. Greift nur mit
-    /// `--backup-verzeichnis`.
-    #[arg(long, env = "LIFELINE_BACKUP_INTERVALL_MINUTEN", default_value_t = 360)]
+    /// Abstand zwischen automatischen Sicherungen in Minuten (1 bis 525600, ein Jahr). Greift
+    /// nur mit `--backup-verzeichnis`. `0` heißt nicht „aus“, sondern bricht den Start ab
+    /// (LFH-926); abgeschaltet wird die Automatik durch Weglassen von `--backup-verzeichnis`.
+    #[arg(
+        long,
+        env = "LIFELINE_BACKUP_INTERVALL_MINUTEN",
+        default_value_t = 360,
+        value_parser = clap::value_parser!(u64).range(1..=MAX_BACKUP_INTERVALL_MINUTEN)
+    )]
     pub backup_intervall_minuten: u64,
 
-    /// Wie viele automatische Sicherungen aufgehoben werden; ältere werden rotiert.
-    #[arg(long, env = "LIFELINE_BACKUP_BEHALTEN", default_value_t = 7)]
+    /// Wie viele automatische Sicherungen aufgehoben werden (mindestens 1); ältere werden
+    /// rotiert. `0` bricht den Start ab (LFH-926); abgeschaltet wird die Automatik durch
+    /// Weglassen von `--backup-verzeichnis`.
+    #[arg(
+        long,
+        env = "LIFELINE_BACKUP_BEHALTEN",
+        default_value_t = 7,
+        value_parser = clap::builder::RangedU64ValueParser::<usize>::new().range(1..)
+    )]
     pub backup_behalten: usize,
 
     /// KRITIS-Fachebene aus dem Deutschland-OSM-Extrakt periodisch importieren (LFH-83).
@@ -1081,6 +1099,53 @@ mod tests {
             Some(Command::Backup { out }) => assert_eq!(out, "/mnt/usb/b.sqlite"),
             andere => panic!("erwartete Backup, fand {andere:?}"),
         }
+    }
+
+    /// LFH-926: `0` ist kein „aus“. Ein Intervall von 0 ließ den Scheduler-Task panicken, ein
+    /// `behalten` von 0 rotierte die frische Sicherung gleich wieder weg — beide Male bei
+    /// „Sicherung aktiv“ im Log. Der Start bricht stattdessen laut ab, über Env und Flag.
+    #[test]
+    fn backup_werte_null_brechen_den_start_ab() {
+        for (env, flag) in [
+            (
+                "LIFELINE_BACKUP_INTERVALL_MINUTEN",
+                "--backup-intervall-minuten",
+            ),
+            ("LIFELINE_BACKUP_BEHALTEN", "--backup-behalten"),
+        ] {
+            assert!(
+                try_parse_mit_env(env, "0", &["lifeline-hub"]).is_err(),
+                "{env}=0 muss den Start abbrechen"
+            );
+            assert!(
+                try_parse_mit_env(env, "1", &["lifeline-hub", flag, "0"]).is_err(),
+                "{flag} 0 muss den Start abbrechen"
+            );
+            assert!(
+                try_parse_mit_env(env, "1", &["lifeline-hub"]).is_ok(),
+                "{env}=1 ist gültig"
+            );
+        }
+    }
+
+    /// Ein Intervall, dessen Sekunden nicht mehr in einen Zeitpunkt passen, ließe den Scheduler
+    /// genauso panicken wie die 0; die Obergrenze ist ein Jahr.
+    #[test]
+    fn backup_intervall_hat_eine_obergrenze() {
+        let ein_jahr = (365 * 24 * 60).to_string();
+        let darueber = (365 * 24 * 60 + 1).to_string();
+        assert!(try_parse_mit_env(
+            "LIFELINE_BACKUP_INTERVALL_MINUTEN",
+            &ein_jahr,
+            &["lifeline-hub"]
+        )
+        .is_ok());
+        assert!(try_parse_mit_env(
+            "LIFELINE_BACKUP_INTERVALL_MINUTEN",
+            &darueber,
+            &["lifeline-hub"]
+        )
+        .is_err());
     }
 
     #[test]

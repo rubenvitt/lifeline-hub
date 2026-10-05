@@ -77,6 +77,70 @@ async fn anlegen_lehnt_leeren_titel_ab() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+// --- Eingabegrenzen (LFH-924): Giftzeilen für den Planer gar nicht erst annehmen ---
+
+async fn anlegen_status(faellig_at: &str, intervall: Option<i64>) -> StatusCode {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "titel": "Lagemeldung", "faellig_at": faellig_at, "intervall_minuten": intervall
+    })
+    .to_string();
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/erinnerungen"),
+        &admin,
+        Some(&body),
+    )
+    .await
+    .0
+}
+
+#[tokio::test]
+async fn intervall_ueber_sieben_tagen_ist_400() {
+    assert_eq!(
+        anlegen_status("2026-06-11 10:00", Some(999_999_999_999)).await,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        anlegen_status("2026-06-11 10:00", Some(10_081)).await,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        anlegen_status("2026-06-11 10:00", Some(0)).await,
+        StatusCode::BAD_REQUEST
+    );
+    // Die Grenze selbst gilt: 7 Tage.
+    assert_eq!(
+        anlegen_status("2026-06-11 10:00", Some(10_080)).await,
+        StatusCode::CREATED
+    );
+}
+
+#[tokio::test]
+async fn faelligkeit_ausserhalb_des_jahresbereichs_ist_400() {
+    for faellig in [
+        "0226-05-01 10:00",
+        "-262000-05-01 10:00",
+        "2101-01-01 00:00",
+    ] {
+        assert_eq!(
+            anlegen_status(faellig, Some(1)).await,
+            StatusCode::BAD_REQUEST,
+            "{faellig}"
+        );
+    }
+    for faellig in ["2000-01-01 00:00", "2100-12-31 23:59"] {
+        assert_eq!(
+            anlegen_status(faellig, None).await,
+            StatusCode::CREATED,
+            "{faellig}"
+        );
+    }
+}
+
 // --- Sachbezug-Guard (LFH-112): Allowlist + einsatz-gescopter Existenz-Check ---
 
 #[tokio::test]
