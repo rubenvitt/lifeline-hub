@@ -67,6 +67,23 @@ draußen gelassen werden.
   Prüfliste `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`. Die übrigen Gerätedaten
   regelt der nächste Abschnitt.
 
+## Räumen nach einer Schwärzung (LFH-996)
+
+- **Erkannt wird an Antworten, nicht an Ereignissen:** Einsatzkopf und Einsatzliste tragen
+  `teilschwaerzungen` (fehlt = 0, wächst nur). `offline/schwaerzungsWaechter.ts` hängt an jedem
+  QueryClient aus `erzeugeQueryClient`, auch an gekoppelten Geräten. Ein höherer Stand setzt die
+  **Räummarke** des Einsatzes (`lagebildRaeummarkeSetzen`, Geräteuhr = Zeitpunkt der Antwort),
+  entfernt unbeobachtete Queries des Einsatzes und ruft beobachtete neu ab, auch Detail-Keys.
+  Kein `resetQueries`. Erstes Sehen (Abruf, `hydrate`, Vorrat) merkt nur den Stand.
+- **Die Marke gilt in `lagebildStandZulaessig`:** ein Stand vor ihr kommt nicht auf die Platte,
+  nicht aus dem Vorrat und nicht ins `hydrate`. `abonnieren` belegt den Wächter aus dem Vorrat
+  vor, sonst fiele eine Schwärzung zwischen zwei Sitzungen nicht auf.
+- **Ein Einsatz, den die vorige Liste kannte und die neue nicht, wird geräumt wie beim 404 auf
+  den Kopf** (Sperrmarke, unbeobachtete weg, der beobachtete Kopf lädt neu). Ohne vorige Liste
+  wird nichts geräumt; `clear()` vergisst sie.
+- Die Offline-Queue und die ETB-Entwürfe bleiben (eigene Eingaben, Beweissicherung).
+- Herleitung: `openspec/changes/lfh-996-schwaerzung-clients-raeumen/design.md`.
+
 ## Gerätedaten beim Abmelden (LFH-767)
 
 - **Jeder Speicherort steht in `GERAETESPEICHER`** (`offline/geraetRaeumung.ts`) mit
