@@ -153,8 +153,15 @@ export function createZeichnung(
       zuruecksetzen();
     },
     zerstoeren: () => {
-      if (draw.enabled) draw.stop();
-      zuruecksetzen();
+      // Abbau ist der letzte Schritt: wirft terra-draw, weil die Karte schon entfernt ist, läuft
+      // der übrige Abbau trotzdem (`lagekarte/AGENTS.md`, „Zeichnen und Messen“, LFH-943).
+      try {
+        if (draw.enabled) draw.stop();
+      } catch {
+        /* Karte schon entfernt */
+      } finally {
+        zuruecksetzen();
+      }
     },
     abschliessen: () => {
       if (!aktiv || punkte < mindestPunkte()) return false;

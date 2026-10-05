@@ -310,7 +310,7 @@ function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
  * Tabelle (LFH-548 D4: 1050 px Contentbreite am Fükw mit offenem Panel): Σ Zahlbreiten 630 +
  * `mindestBreite` 300 = 930 px, Rest als Reserve. EINE fließende Spalte (Teilnehmer, LFH-523);
  * Kennung und Hinweis brechen um, statt die Summe zu sprengen. Im Druck neutralisiert
- * `druck/druck.css` die Breiten (A4 ohne Überhang, `e2e/funkplan.spec.ts`).
+ * `druck/druck.css` die Breiten (A4 ohne Überhang, `e2e/funkplan-druck.spec.ts`).
  */
 function sprechgruppenSpalten() {
   return spaltenFuer<SprechgruppenZeile>()([

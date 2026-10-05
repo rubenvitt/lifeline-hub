@@ -1,7 +1,7 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { hashKey, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
-import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
+import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS, einsatzKeys } from '../api/queryKeys';
 import { meldeEinsatzStrom } from './einsatzStromStore';
 import { oeffneLiveVerbindung } from './liveVerbindung';
 import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
@@ -108,42 +108,73 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['abloesung', onAbloesung as EventListener]);
 
-    // Endzustand (LFH-732): bei gültiger Sitzung fragt eine zweite Probe den Einsatz selbst ab.
-    // Ein 404 (hart gelöscht, etwa beim Entfernen der Demo-Daten, oder vom Aufbewahrungs-Purge)
-    // ist kein Netzproblem: dann kein Reconnect mehr. Die Detailroute steht hinter demselben
-    // Lese-Gate wie `/live` (`EinsatzLesezugriff`), ihr 404 ist also der des Feeds.
-    const einsatzExistiertNicht = async (): Promise<boolean> => {
+    // Endzustand (LFH-732, LFH-910): bei gültiger Sitzung fragt eine zweite Probe den Einsatz
+    // selbst ab. Die Detailroute steht hinter demselben Lese-Gate wie `/live`
+    // (`EinsatzLesezugriff`), ihr Status ist also der des Feeds. Ein 404 (hart gelöscht, etwa beim
+    // Entfernen der Demo-Daten, oder vom Aufbewahrungs-Purge) und ein 403 (Mitgliedschaft
+    // entzogen, Lesefrist abgelaufen) sind kein Netzproblem: dann kein Reconnect mehr. Beide
+    // behandelt auch der Query-Cache am Einsatzkopf gleich (`api/queryClient.ts`,
+    // `raeumeNachRechteentzug`).
+    const einsatzUnerreichbar = async (): Promise<boolean> => {
       try {
         const res = await fetch(`/api/einsaetze/${einsatzId}`, {
           credentials: 'same-origin',
           signal: AbortSignal.timeout(15_000),
         });
-        return res.status === 404;
+        return res.status === 404 || res.status === 403;
       } catch {
         // Netzfehler → kein Beleg für einen Endzustand, weiter per Backoff.
         return false;
       }
     };
 
+    // Ein 403 kann sich umkehren (Zugriff wieder gewährt). Dann lädt der Einsatzkopf wieder,
+    // etwa über „Wiederholen" in der Sackgasse, und der Rahmen zeigt den Einsatz — ohne
+    // Neustart stünde er still ohne Live-Feed da, und die Betriebszeile sagte es nicht (`idle`).
+    // Erst ein ABGERUFENER Kopf belegt den Zugriff, ein von Hand gesetzter (`manual`) nicht.
+    const kopfHash = hashKey(einsatzKeys.einsatz(einsatzId));
+    let schliessen: () => void = () => {};
+    let wartenBeenden: (() => void) | null = null;
+    const aufWiedergewaehrenWarten = () => {
+      wartenBeenden = qc.getQueryCache().subscribe((ereignis) => {
+        if (
+          ereignis.type !== 'updated' ||
+          ereignis.action.type !== 'success' ||
+          ereignis.action.manual === true ||
+          ereignis.query.queryHash !== kopfHash
+        ) {
+          return;
+        }
+        wartenBeenden?.();
+        wartenBeenden = null;
+        // Zwischen Endzustand und Neustart sind Ereignisse verloren: der Erst-Open dieser
+        // Verbindung gleicht deshalb ab wie ein Wiederaufbau.
+        verbinde(vollabgleich);
+      });
+    };
+
     // Reconnect-Resync: jeder Folge-Open gleicht ab wie `lagged`. Der Erst-Open lädt nur die
     // Org-Keys nach (die Einsatz-Abfragen laden beim Mount ohnehin): ein Org-Ereignis kann beim
     // Wechsel aus dem Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734).
-    const schliessen = oeffneLiveVerbindung({
-      url: `/api/einsaetze/${einsatzId}/live`,
-      listeners,
-      beiWiederaufbau: vollabgleich,
-      beimErstenOpen: () => invalidiereOrgLiveKeys(qc),
-      istEndzustand: einsatzExistiertNicht,
-      // Den Weg in die Sackgasse öffnet der neu geholte Einsatzkopf, dessen 404 `EinsatzLayout`
-      // dorthin führt.
-      beiEndzustand: () => inval(EINSATZ_KEYS.einsatz),
-    });
+    const verbinde = (beimErstenOpen: () => void) => {
+      schliessen = oeffneLiveVerbindung({
+        url: `/api/einsaetze/${einsatzId}/live`,
+        listeners,
+        beiWiederaufbau: vollabgleich,
+        beimErstenOpen,
+        istEndzustand: einsatzUnerreichbar,
+        beiEndzustand: () => {
+          aufWiedergewaehrenWarten();
+          // Den Weg in die Sackgasse öffnet der neu geholte Einsatzkopf, dessen 403/404
+          // `EinsatzLayout` dorthin führt.
+          inval(EINSATZ_KEYS.einsatz);
+        },
+      });
+    };
+    verbinde(() => invalidiereOrgLiveKeys(qc));
     const abmelden = meldeEinsatzStrom();
     return () => {
-      schliessen();
-      abmelden();
-    };
-    return () => {
+      wartenBeenden?.();
       schliessen();
       abmelden();
     };

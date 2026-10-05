@@ -21,8 +21,9 @@ const leereZonen = baueZonenFc([]);
 /**
  * Regressionsschutz: nach einem Basemap-/Theme-Wechsel müssen die Zeichnungen zurückkommen. Die
  * Re-Anlage hing am `styledata`-Event mit `isStyleLoaded()`-Gate; beim Wechsel auf einen
- * Online-Style kam das nie. Jetzt läuft sie über den render-Frame-Poller — geprüft wird das Wann:
- * keine vorzeitige Anlage, aber zuverlässige beim ersten Frame mit geladenem Style.
+ * Online-Style kam das nie. Jetzt läuft sie über die Warteschlange von `wendeKartenDatenAn` —
+ * geprüft wird das Wann: keine vorzeitige Anlage, aber zuverlässige beim ersten Frame mit
+ * angewandtem Stil.
  */
 
 /** Fake-Map mit Source-Registry; protokolliert addSource/addLayer und treibt render-Frames. */
@@ -33,6 +34,10 @@ function fakeMap(istGeladen: () => boolean, stil?: unknown) {
   const setData = vi.fn();
   const map = {
     isStyleLoaded: istGeladen,
+    // Bereit ist für `wendeKartenDatenAn` der angewandte Stil (LFH-943, D3).
+    get style() {
+      return { _loaded: istGeladen() };
+    },
     on: vi.fn((ev: string, cb: () => void) => {
       (handler[ev] ??= []).push(cb);
     }),
