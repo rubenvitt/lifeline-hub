@@ -54,7 +54,8 @@ pub async fn anlegen(
 
 /// Audit-Einträge einer Person (neueste zuerst), mit Benutzername — samt den Listenzugriffen
 /// (Export, Druck) aus ihrem Erfassungsfenster: nach `erfasst_at`, nicht nach `storniert_at`
-/// (LFH-916, design.md D3). Beide Grenzen schließen die gleiche Sekunde ein: eher ein Eintrag
+/// (LFH-916, `openspec/changes/archive/2026-10-05-lfh-916-listenzugriffe-einsicht/design.md` D3,
+/// Spec `personen-zugriffsprotokoll`). Beide Grenzen schließen die gleiche Sekunde ein: eher ein Eintrag
 /// zu viel als einer zu wenig. Beide Spalten tragen dasselbe `strftime`-Format wie `zugriff_at`,
 /// der Textvergleich ist also ein Zeitvergleich.
 pub async fn liste_je_person(

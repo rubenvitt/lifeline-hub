@@ -20,4 +20,11 @@
 
 ## 4. Integration
 
-- [ ] 4.1 `./scripts/check-all.sh` sowie Vitest und Rust-Tests lokal grün (umgebungsbedingte Abweichungen gegen `alpha` gegengeprüft)
+- [x] 4.1 `./scripts/check-all.sh` sowie Vitest und Rust-Tests lokal grün (umgebungsbedingte Abweichungen gegen `alpha` gegengeprüft)
+
+  Lauf vom 05.10.2026 in der Cloud-Sitzung: `schnell` grün; Rust-Suite grün, rot nur die
+  Desktop-Hülle (GTK fehlt, auf `alpha` ebenso); Vitest grün (719 Dateien, 10 347 Tests); e2e in
+  Chromium 694 grün, nach Wiederholung mit einem Worker 11 rot, alle aus der bekannten
+  Umgebungsliste (`fokus-verdeckung`, Download-Dateinamen in `etb-anhang`, `schaden-anhaenge`,
+  `tier-anhaenge`). Der Fall „Personenliste“ in `fokus-verdeckung` ist mit der Personenliste von
+  `alpha` gleich rot. Den vollen Lauf belegt die CI des PRs.
