@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, isInaccessible, screen, within } from '@testing-library/react';
+import { act, fireEvent, isInaccessible, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -117,7 +117,7 @@ function rendere(dokument: Dokument = lageplan) {
 async function dialog() {
   const d = (await screen.findAllByRole('dialog'))[0];
   const erstes = within(d).getByRole('combobox', { name: 'Kategorie' });
-  await vi.waitFor(() => expect(document.activeElement).toBe(erstes));
+  await waitFor(() => expect(document.activeElement).toBe(erstes));
   return d;
 }
 
@@ -147,14 +147,14 @@ function optionsLabels() {
 
 async function oeffneBezugsliste(d: HTMLElement) {
   await userEvent.click(within(d).getByRole('combobox', { name: 'Bezug' }));
-  await vi.waitFor(() => expect(optionsLabels()).toContain('ETB 12 · Lage erkundet'));
+  await waitFor(() => expect(optionsLabels()).toContain('ETB 12 · Lage erkundet'));
 }
 
 /** Ein Takt für React: der Query-Cache meldet seine Beobachter gebündelt per `setTimeout`. */
 const neuGezeichnet = () => act(() => new Promise((r) => setTimeout(r, 20)));
 
 async function warteBisDialogWeg() {
-  await vi.waitFor(() => {
+  await waitFor(() => {
     const modal = document.querySelector<HTMLElement>('.ant-modal');
     if (modal) {
       fireEvent.transitionEnd(modal);
@@ -171,7 +171,7 @@ describe('DokumentBearbeitenModal', () => {
     expect(within(d).getByText('Dokument bearbeiten')).toBeInTheDocument();
     expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Lageplan');
     expect(selectWert(d, 'Kategorie')).toBe('Lagekarte/Plan');
-    await vi.waitFor(() => expect(selectWert(d, 'Bezug')).toBe('EA Nord'));
+    await waitFor(() => expect(selectWert(d, 'Bezug')).toBe('EA Nord'));
   });
 
   it('zeigt einen ETB-Bezug außerhalb der geladenen Einträge mit seiner Nummer', async () => {
@@ -183,7 +183,7 @@ describe('DokumentBearbeitenModal', () => {
       bezug_etb_lfd_nr: 3,
     });
     const d = await dialog();
-    await vi.waitFor(() => expect(selectWert(d, 'Bezug')).toBe('ETB 3'));
+    await waitFor(() => expect(selectWert(d, 'Bezug')).toBe('ETB 3'));
   });
 
   it('Feldbudget: drei sichtbare Felder, der Bezug steht offen', async () => {
@@ -210,7 +210,7 @@ describe('DokumentBearbeitenModal', () => {
     await waehleOption('EA Süd');
     await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
 
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(aendere).toHaveBeenCalledWith(1, 7, {
         titel: 'Lageplan Süd',
         kategorie: 'befehl',
@@ -225,13 +225,13 @@ describe('DokumentBearbeitenModal', () => {
     aendere.mockResolvedValue(lageplan);
     rendere();
     const d = await dialog();
-    await vi.waitFor(() => expect(selectWert(d, 'Bezug')).toBe('EA Nord'));
+    await waitFor(() => expect(selectWert(d, 'Bezug')).toBe('EA Nord'));
     const bezug = within(d).getByRole('combobox', { name: 'Bezug' }).closest('.ant-select')!;
     await userEvent.hover(bezug);
     await userEvent.click(bezug.querySelector('.ant-select-clear')!);
     await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
 
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(aendere).toHaveBeenCalledWith(1, 7, {
         titel: 'Lageplan',
         kategorie: 'lagekarte_plan',
@@ -279,11 +279,11 @@ describe('DokumentBearbeitenModal', () => {
       expect(optionsLabels()).not.toContain('ETB 412 · Pumpe 2');
 
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'ETB 412');
-      await vi.waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
+      await waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
       await waehleOption('ETB 412 · Pumpe 2');
       await userEvent.click(within(d).getByRole('button', { name: 'Speichern' }));
 
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(aendere).toHaveBeenCalledWith(1, 7, {
           titel: 'Lageplan',
           kategorie: 'lagekarte_plan',
@@ -298,7 +298,7 @@ describe('DokumentBearbeitenModal', () => {
       const d = await dialog();
       await oeffneBezugsliste(d);
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), '412');
-      await vi.waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
+      await waitFor(() => expect(optionsLabels()).toEqual(['ETB 412 · Pumpe 2']));
     });
 
     it('sucht einen Volltext-Begriff am Server und zeigt den gewählten Treffer danach weiter', async () => {
@@ -307,13 +307,13 @@ describe('DokumentBearbeitenModal', () => {
       await oeffneBezugsliste(d);
       const feld = within(d).getByRole('combobox', { name: 'Bezug' });
       await userEvent.type(feld, 'Deichbruch');
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(etbAnfragen.some((qs) => qs.get('q') === 'Deichbruch')).toBe(true),
       );
       await waehleOption('ETB 3 · Deichbruch gemeldet');
 
       // Nach der Wahl gilt wieder das jüngste Fenster, in dem der Eintrag nicht steht.
-      await vi.waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
+      await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
       await act(() => new Promise((r) => setTimeout(r, 400)));
       expect(selectWert(d, 'Bezug')).toBe('ETB 3 · Deichbruch gemeldet');
     });
@@ -326,7 +326,7 @@ describe('DokumentBearbeitenModal', () => {
 
       etbFenster = [eintrag(10, 13, 'Neue Meldung'), ...etbFenster];
       await client.invalidateQueries({ queryKey: einsatzKeys.etb(1) });
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(
           client
             .getQueriesData<EtbStub[]>({ queryKey: einsatzKeys.etb(1) })
@@ -349,7 +349,7 @@ describe('DokumentBearbeitenModal', () => {
       await oeffneBezugsliste(d);
       expect(optionsLabels()).toContain('ETB 3');
       await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Nord');
-      await vi.waitFor(() => expect(optionsLabels()).toEqual(['EA Nord']));
+      await waitFor(() => expect(optionsLabels()).toEqual(['EA Nord']));
     });
   });
 

@@ -269,7 +269,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
     const feld = screen.getByRole('textbox');
     await userEvent.type(feld, 'gehfähig, unterkühlt');
     fireEvent.blur(feld);
-    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await waitFor(() => expect(koerper).toHaveLength(1));
     expect(koerper[0]).toEqual({ zustand: 'gehfähig, unterkühlt' });
   });
 
@@ -327,8 +327,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
 
-    await vi.waitFor(() => expect(koerper).toHaveLength(1));
-    await vi.waitFor(() => expect(client.invalidateQueries).toHaveBeenCalled());
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    await waitFor(() => expect(client.invalidateQueries).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 30));
     const knopf = screen.getByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
     expect(knopf).toHaveTextContent('gehfähig');
@@ -373,7 +373,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
-    await vi.waitFor(() => expect(zellHuelle).not.toHaveAttribute('data-fehler'));
+    await waitFor(() => expect(zellHuelle).not.toHaveAttribute('data-fehler'));
     expect(screen.queryByRole('alert')).toBeNull();
   });
 

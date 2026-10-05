@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, isInaccessible, screen, within } from '@testing-library/react';
+import { act, fireEvent, isInaccessible, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useNavigate } from 'react-router';
@@ -171,7 +171,7 @@ async function modalDialog() {
  * Verhalten — die Felder sind weg.
  */
 async function warteBisDialogWeg() {
-  await vi.waitFor(() => {
+  await waitFor(() => {
     const modal = document.querySelector<HTMLElement>('.ant-modal');
     if (modal) {
       fireEvent.transitionEnd(modal);
@@ -334,7 +334,7 @@ describe('SchaedenPage', () => {
       .getByRole('textbox', { name: 'Koordinate' })
       .closest('.ant-collapse-panel')!;
     await userEvent.click(weitereAngaben);
-    await vi.waitFor(() => {
+    await waitFor(() => {
       // jsdom liefert keinen CSS-Übergang. Collapse akzeptiert nur das Ende der Höhenanimation;
       // danach muss der Inhalt verborgen sein.
       const ende = new window.Event('transitionend', { bubbles: true });
@@ -409,7 +409,7 @@ describe('SchaedenPage', () => {
     await waehleOption('groß');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await vi.waitFor(() => expect(body.typ).toBe('umweltschaden'));
+    await waitFor(() => expect(body.typ).toBe('umweltschaden'));
     expect(body.ausmass).toBe('gross');
     expect(body.ort).toBe('Hauptstr. 17');
   });
@@ -439,8 +439,8 @@ describe('SchaedenPage', () => {
     await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
 
-    await vi.waitFor(() => expect(koerper).toHaveLength(1));
-    await vi.waitFor(() =>
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    await waitFor(() =>
       expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBe('Hauptstr. 17'),
     );
     // Der Datensatz ist angekommen (Zähler der Hülle) …
@@ -478,7 +478,7 @@ describe('SchaedenPage', () => {
     await waehleOption('R-007 · Anna Meier');
     await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await waitFor(() => expect(koerper).toHaveLength(1));
 
     // Zweiter Schaden: Typ und Ausmaß neu wählen, Ort ist übernommen, Geschädigt unberührt.
     await userEvent.click(within(dialog).getAllByRole('combobox')[0]);
@@ -487,7 +487,7 @@ describe('SchaedenPage', () => {
     await waehleOption('groß');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
-    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    await waitFor(() => expect(koerper).toHaveLength(2));
     expect(koerper[0].geschaedigt_person_id).toBe(42);
     expect(koerper[0]).toMatchObject({ lat: 52.1, lon: 8.5 });
     expect(koerper[1].geschaedigt_person_id).toBeNull();
@@ -529,7 +529,7 @@ describe('SchaedenPage', () => {
     await userEvent.clear(feld);
     await userEvent.type(feld, '52.1, 8.5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await waitFor(() => expect(koerper).toHaveLength(1));
     expect(koerper[0]).toMatchObject({ lat: 52.1, lon: 8.5 });
   });
 
@@ -547,7 +547,7 @@ describe('SchaedenPage', () => {
     await fuelleSchaden(dialog, 'Umweltschaden', 'groß', 'Hauptstr. 17');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
-    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await waitFor(() => expect(koerper).toHaveLength(1));
     await warteBisDialogWeg();
   });
 
@@ -570,13 +570,13 @@ describe('SchaedenPage', () => {
       '52.1, 8.5',
     );
     await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Anlegen' }));
-    await vi.waitFor(() => expect(versuche).toBe(1));
+    await waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Schnellerfassung' }));
     const zweiterDialog = await modalDialog();
     await oeffneWeitereAngaben(zweiterDialog);
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(within(zweiterDialog).getByLabelText('Ort')).toHaveValue('Hauptstr. 17'),
     );
     expect(
@@ -600,7 +600,7 @@ describe('SchaedenPage', () => {
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Fehlerort Schaden');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
-    await vi.waitFor(() => expect(versuche).toBe(1));
+    await waitFor(() => expect(versuche).toBe(1));
     expect(within(dialog).getByLabelText('Ort')).toHaveValue('Fehlerort Schaden');
     expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBeNull();
   });
@@ -681,9 +681,7 @@ describe('SchaedenPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     const dialogA = await modalDialog();
-    await vi.waitFor(() =>
-      expect(within(dialogA).getByLabelText('Ort')).toHaveValue('Schadenort A'),
-    );
+    await waitFor(() => expect(within(dialogA).getByLabelText('Ort')).toHaveValue('Schadenort A'));
     await userEvent.click(within(dialogA).getAllByRole('combobox')[0]);
     await waehleOption('Sachschaden');
     await userEvent.click(within(dialogA).getAllByRole('combobox')[1]);
@@ -696,9 +694,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
 
     const dialogB = await modalDialog();
-    await vi.waitFor(() =>
-      expect(within(dialogB).getByLabelText('Ort')).toHaveValue('Schadenort B'),
-    );
+    await waitFor(() => expect(within(dialogB).getByLabelText('Ort')).toHaveValue('Schadenort B'));
     expect(within(dialogB).getAllByRole('combobox')[0]).toHaveValue('');
     expect(within(dialogB).getAllByRole('combobox')[1]).toHaveValue('');
     expect(within(dialogB).getByLabelText('Beschreibung')).toHaveValue('');
@@ -728,7 +724,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
     await waehleOption('R-007 · Anna Meier');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await vi.waitFor(() => expect(body.geschaedigt_person_id).toBe(42));
+    await waitFor(() => expect(body.geschaedigt_person_id).toBe(42));
     expect(body.geschaedigt_personal_id).toBeNull();
     expect(body.geschaedigt_organisation_id).toBeNull();
     expect(body.geschaedigt_kontakt).toBeNull();
@@ -754,7 +750,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
     await waehleOption('Schulz · Sanitäter');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await vi.waitFor(() => expect(body.geschaedigt_personal_id).toBe(99));
+    await waitFor(() => expect(body.geschaedigt_personal_id).toBe(99));
     expect(body.geschaedigt_person_id).toBeNull();
     expect(body.geschaedigt_organisation_id).toBeNull();
     expect(body.geschaedigt_kontakt).toBeNull();
@@ -787,7 +783,7 @@ describe('SchaedenPage', () => {
     expect(externOption).toBeTruthy();
     await userEvent.click(externOption!);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await vi.waitFor(() => expect(body.geschaedigt_kontakt).toBe('Familie Krause'));
+    await waitFor(() => expect(body.geschaedigt_kontakt).toBe('Familie Krause'));
     expect(body.geschaedigt_person_id).toBeNull();
     expect(body.geschaedigt_personal_id).toBeNull();
     expect(body.geschaedigt_organisation_id).toBeNull();
@@ -915,7 +911,7 @@ describe('SchaedenPage', () => {
 /** Einstieg in den Druck (LFH-727, design.md D7): sekundär im Kopf, mit der aktiven Sicht. */
 describe('SchaedenPage — Einstieg in den Druck (LFH-727)', () => {
   async function druckLink(): Promise<HTMLElement> {
-    const kopf = await vi.waitFor(() => {
+    const kopf = await waitFor(() => {
       const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
       expect(k).not.toBeNull();
       return k!;
@@ -930,7 +926,7 @@ describe('SchaedenPage — Einstieg in den Druck (LFH-727)', () => {
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/druck?sicht=offen');
     expect(link).not.toHaveClass('ant-btn-primary');
     await userEvent.click(screen.getByRole('radio', { name: 'Alle' }));
-    await vi.waitFor(async () =>
+    await waitFor(async () =>
       expect(await druckLink()).toHaveAttribute('href', '/einsaetze/1/schaeden/druck'),
     );
   });

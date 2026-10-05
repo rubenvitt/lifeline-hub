@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -34,7 +34,7 @@ async function dialog(hinweis?: string) {
   renderMitProviders(<Rahmen hinweis={hinweis} />);
   const d = (await screen.findAllByRole('dialog'))[0];
   const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
-  await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+  await waitFor(() => expect(document.activeElement).toBe(knopf));
   return d;
 }
 
@@ -76,12 +76,12 @@ describe('ErfassungsAnhangAblegenModal (LFH-21, LFH-758)', () => {
     await userEvent.upload(dateiInput(d), foto('erstes.jpg'));
     await userEvent.click(within(d).getByRole('button', { name: /Speichern und nächste/ }));
 
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     expect(legeAb).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'erstes.jpg' }),
       expect.any(Function),
     );
-    await vi.waitFor(() => expect(within(d).queryByText('erstes.jpg')).not.toBeInTheDocument());
+    await waitFor(() => expect(within(d).queryByText('erstes.jpg')).not.toBeInTheDocument());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
@@ -116,7 +116,7 @@ describe('ErfassungsAnhangAblegenModal (LFH-21, LFH-758)', () => {
 describe('ErfassungsAnhangAblegenModal — Rückmeldung beim Ablegen (LFH-878)', () => {
   /** Wartet, bis der Dialog seinen Inhalt abgeräumt hat (Muster `DokumentAblegenModal.test.tsx`). */
   async function warteBisDialogWeg() {
-    await vi.waitFor(() => {
+    await waitFor(() => {
       const modal = document.querySelector<HTMLElement>('.ant-modal');
       if (modal) {
         fireEvent.transitionEnd(modal);
@@ -131,7 +131,7 @@ describe('ErfassungsAnhangAblegenModal — Rückmeldung beim Ablegen (LFH-878)',
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     const d = (await screen.findAllByRole('dialog'))[0];
     const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
-    await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+    await waitFor(() => expect(document.activeElement).toBe(knopf));
     return d;
   }
 
@@ -149,7 +149,7 @@ describe('ErfassungsAnhangAblegenModal — Rückmeldung beim Ablegen (LFH-878)',
     const d = await dialog();
     await userEvent.upload(dateiInput(d), foto('dach.jpg'));
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     const fortschritt = (f: UploadFortschritt) => act(() => melde!(f));
     return { d, fortschritt, erfuellen, ablehnen };
   }
@@ -197,14 +197,14 @@ describe('ErfassungsAnhangAblegenModal — Rückmeldung beim Ablegen (LFH-878)',
     let d = await dialog();
     await userEvent.upload(dateiInput(d), foto('erstes.jpg'));
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
     await userEvent.click(within(d).getByRole('button', { name: 'Abbrechen' }));
     await warteBisDialogWeg();
 
     d = await wiederOeffnen();
     await userEvent.upload(dateiInput(d), foto('zweites.jpg'));
     await userEvent.click(within(d).getByRole('button', { name: /Ablegen/ }));
-    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(legeAb).toHaveBeenCalledTimes(2));
     act(() => melder[1]({ phase: 'senden', anteil: 0.1 }));
     // Die alte Übertragung läuft serverseitig weiter und meldet noch.
     act(() => melder[0]({ phase: 'pruefen' }));

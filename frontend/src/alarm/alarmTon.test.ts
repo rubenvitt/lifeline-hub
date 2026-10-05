@@ -1,3 +1,4 @@
+import { waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // `alarmTon` cacht den AudioContext modulweit; damit jeder Test seinen eigenen Mock sieht,
@@ -80,7 +81,7 @@ describe('spieleAlarmTon', () => {
   it('spielt nach resume nur, wenn der Context danach wirklich running ist', async () => {
     const { ctx, start } = mockAudio('suspended', 'suspended');
     spieleAlarmTon('alarm');
-    await vi.waitFor(() => expect(ctx.resume).toHaveBeenCalled());
+    await waitFor(() => expect(ctx.resume).toHaveBeenCalled());
     expect(start).not.toHaveBeenCalled();
   });
 });

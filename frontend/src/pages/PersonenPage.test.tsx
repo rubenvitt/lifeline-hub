@@ -208,7 +208,7 @@ describe('PersonenPage', () => {
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: 'Neu' }));
-    await vi.waitFor(() => expect(screen.queryByText('R-002')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('R-002')).not.toBeInTheDocument());
     expect(screen.getByText('R-001')).toBeInTheDocument();
   });
 
@@ -259,7 +259,7 @@ describe('PersonenPage', () => {
 
     // 1. Die Suche wirkt überhaupt: die nicht passende Zeile fällt heraus.
     await userEvent.type(screen.getByRole('searchbox', { name: 'Suche in Personen' }), 'Müller');
-    await vi.waitFor(() => expect(screen.queryByText('Krause, Bernd')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Krause, Bernd')).not.toBeInTheDocument());
     expect(screen.getByText('Müller, Anna')).toBeInTheDocument();
 
     // 2. + 3. Reiterwechsel: die fremde Menge steht ungefiltert da, das Feld ist leer.
@@ -442,9 +442,7 @@ describe('PersonenPage', () => {
     await act(async () => {
       zweiterAbrufFreigeben();
     });
-    await vi.waitFor(() =>
-      expect(client.getQueryData(einsatzKeys.personen(1))).toEqual([alt, neu]),
-    );
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.personen(1))).toEqual([alt, neu]));
     expect(await screen.findByText('R-046')).toBeInTheDocument();
     expect(screen.getByText('R-047')).toBeInTheDocument();
   });
@@ -504,7 +502,7 @@ describe('PersonenPage', () => {
     await act(async () => {
       antwortFreigeben();
     });
-    await vi.waitFor(() => expect(screen.queryByText('Erfasst als R-077')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Erfasst als R-077')).not.toBeInTheDocument());
     expect(screen.getByText('Person B')).toBeInTheDocument();
     expect(screen.queryByText('Person A')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Alle' })).toHaveAttribute('aria-selected', 'true');
@@ -580,11 +578,11 @@ describe('PersonenPage', () => {
 
     setzeOnline(true);
     const globalerSync = renderMitProviders(<OfflineSyncTest benutzerId={nutzer.id} />);
-    await vi.waitFor(() => expect(post).toHaveBeenCalledOnce());
-    await vi.waitFor(async () =>
+    await waitFor(() => expect(post).toHaveBeenCalledOnce());
+    await waitFor(async () =>
       expect(await queueZaehlerLaden(nutzer.id, 1)).toMatchObject({ ausstehend: 0 }),
     );
-    await vi.waitFor(async () =>
+    await waitFor(async () =>
       expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1),
     );
     expect(await personErfassungsQuittungenLaden(2, 1)).toHaveLength(0);
@@ -601,7 +599,7 @@ describe('PersonenPage', () => {
     const schliessen = quittungSchliessenButton();
     if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
     await userEvent.click(schliessen);
-    await vi.waitFor(async () =>
+    await waitFor(async () =>
       expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0),
     );
     zweiteSeite.unmount();
@@ -700,7 +698,7 @@ describe('PersonenPage', () => {
     const schliessen = quittungSchliessenButton();
     if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
     await userEvent.click(schliessen);
-    await vi.waitFor(async () =>
+    await waitFor(async () =>
       expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0),
     );
   });
@@ -737,13 +735,13 @@ describe('PersonenPage', () => {
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await vi.waitFor(() => expect(quittungSchliessenButton()).toBeInTheDocument());
+    await waitFor(() => expect(quittungSchliessenButton()).toBeInTheDocument());
     const schliessen = quittungSchliessenButton();
     if (!schliessen) throw new Error('Schließen-Knopf der Quittung fehlt');
     // visibilitychange hat erneut aus IDB gelesen, aber nicht automatisch gelöscht.
     expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
     await userEvent.click(schliessen);
-    await vi.waitFor(async () =>
+    await waitFor(async () =>
       expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(0),
     );
   });
@@ -887,7 +885,7 @@ describe('PersonenPage', () => {
     await screen.findByText('R-001');
 
     const verbleib = screen.getByRole('region', { name: 'Verbleib' });
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(verbleib.querySelector('[data-verbleib="uhs:7"]')).toHaveTextContent('Weserstadion1'),
     );
     expect(verbleib.querySelector('[data-verbleib="transport"]')).toHaveTextContent('Transport1');
@@ -926,11 +924,11 @@ describe('PersonenPage', () => {
     expect(knopf).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(knopf);
     expect(knopf).toHaveAttribute('aria-pressed', 'true');
-    await vi.waitFor(() => expect(regFolge()).toEqual(['R-001']));
+    await waitFor(() => expect(regFolge()).toEqual(['R-001']));
 
     // Gegenhälfte: aus wieder an → alle drei zurück.
     await userEvent.click(knopf);
-    await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
+    await waitFor(() => expect(regFolge()).toHaveLength(3));
   });
 
   it('Sichtungsraster gruppiert ALLE Personen nach Sichtung, samt unverletzt und ohne Sichtung', async () => {
@@ -976,10 +974,10 @@ describe('PersonenPage', () => {
     expect(screen.getByText('unverletzt · 1')).toBeInTheDocument();
     expect(screen.getByText('ohne Sichtung · 1')).toBeInTheDocument();
     // Dringlichkeit zuerst: SK II vor tot vor unverletzt vor ohne Sichtung.
-    await vi.waitFor(() => expect(regFolge()).toEqual(['R-003', 'R-004', 'R-005', 'R-001']));
+    await waitFor(() => expect(regFolge()).toEqual(['R-003', 'R-004', 'R-005', 'R-001']));
     // Der Statusfilter gilt auch im Raster.
     await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
-    await vi.waitFor(() => expect(regFolge()).toEqual(['R-004']));
+    await waitFor(() => expect(regFolge()).toEqual(['R-004']));
   });
 
   it('öffnet via ?neu=1 die Schnellerfassung (die Maske, nicht die Zeile)', async () => {
@@ -1007,7 +1005,7 @@ describe('PersonenPage', () => {
     ];
     render(einsatzAktiv, drei);
     await screen.findByText('R-001');
-    await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
+    await waitFor(() => expect(regFolge()).toHaveLength(3));
     // Jüngste Registrierung oben: die zuletzt Erfasste steht dort, wo die Erfassungszeile ist.
     expect(regFolge()).toEqual(['R-003', 'R-002', 'R-001']);
   });
@@ -1036,7 +1034,7 @@ describe('PersonenPage', () => {
     };
     render(einsatzAktiv, [spaet, frueh]);
     await userEvent.click(await screen.findByRole('radio', { name: 'Sichtungsraster' }));
-    await vi.waitFor(() => expect(regFolge()).toHaveLength(2));
+    await waitFor(() => expect(regFolge()).toHaveLength(2));
     // Die Spalte existiert überhaupt …
     expect(screen.getByRole('columnheader', { name: /Zeit/ })).toBeInTheDocument();
     // … und trägt eine taktische DTG `DDHHmm` (Muster, kein Fixwert — Lokalzeit des Testrechners) …
@@ -1262,7 +1260,7 @@ describe('PersonenPage', () => {
       expect(erkannt.querySelector('[data-sichtung="sk3"]')).toHaveTextContent('SK III');
 
       await userEvent.keyboard('{Enter}');
-      await vi.waitFor(() => expect(feld()).toHaveValue(''));
+      await waitFor(() => expect(feld()).toHaveValue(''));
       expect(koerper[0]).toMatchObject({
         name: 'Kowalski',
         vorname: 'Anna',
@@ -1273,7 +1271,7 @@ describe('PersonenPage', () => {
         client_id: expect.any(String),
       });
       expect(koerper[0]).not.toHaveProperty('uhs_id');
-      await vi.waitFor(() => expect(feld()).toHaveFocus());
+      await waitFor(() => expect(feld()).toHaveFocus());
       const zuletzt = document.querySelector('[data-lfh="zuletzt"]')!;
       expect(zuletzt).toHaveTextContent(/^Zuletzt: \d{4} R-060 Kowalski, Anna · SK III$/);
       // Die Zeile quittiert an sich selbst — kein Alert je Person, der weggeklickt werden müsste.
@@ -1284,10 +1282,10 @@ describe('PersonenPage', () => {
       // Zweiter Datensatz, direkt weiter — per Knopf statt Enter, derselbe Weg.
       await userEvent.type(feld(), 'Hoffmann SK II');
       await userEvent.click(screen.getByRole('button', { name: 'Person erfassen' }));
-      await vi.waitFor(() => expect(koerper).toHaveLength(2));
+      await waitFor(() => expect(koerper).toHaveLength(2));
       expect(koerper[1]).toMatchObject({ name: 'Hoffmann', sichtung: 'sk2' });
       expect(koerper[1].client_id).not.toBe(koerper[0].client_id);
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(document.querySelector('[data-lfh="zuletzt"]')).toHaveTextContent(
           /R-061 Hoffmann · SK II$/,
         ),
@@ -1315,13 +1313,13 @@ describe('PersonenPage', () => {
         await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
         'Bauer sk3 @weser',
       );
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(document.querySelector('[data-lfh="erkannt"]')).toHaveTextContent(
           '→ UHS Weserstadion',
         ),
       );
       await userEvent.keyboard('{Enter}');
-      await vi.waitFor(() =>
+      await waitFor(() =>
         expect(koerper).toMatchObject({ name: 'Bauer', sichtung: 'sk3', uhs_id: 7 }),
       );
     });
@@ -1393,7 +1391,7 @@ describe('PersonenPage', () => {
       await userEvent.type(zeile, 'Kowalski, Anna w 34 sk3 #52.2691/9.1342');
       expect(document.querySelector('[data-lfh="erkannt"]')).toHaveTextContent('#52.2691/9.1342');
       await userEvent.keyboard('{Enter}');
-      await vi.waitFor(() => expect(koerper).toBeDefined());
+      await waitFor(() => expect(koerper).toBeDefined());
       expect(koerper).toMatchObject({
         name: 'Kowalski',
         vorname: 'Anna',
@@ -1446,7 +1444,7 @@ describe('PersonenPage', () => {
       // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
       setzeOnline(false);
       await userEvent.type(kurzeingabe, 'Neumann, Ilse w 84 sk2{Enter}');
-      await vi.waitFor(() => expect(feld()).toHaveValue(''));
+      await waitFor(() => expect(feld()).toHaveValue(''));
       expect(document.querySelector('[data-lfh="zuletzt"]')).toHaveTextContent(
         'Zuletzt: offline vorgemerkt · Neumann, Ilse · SK II',
       );
@@ -1561,7 +1559,7 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
     // Die erfasste Person steht unter „Vermisst" nicht — die Vorgabe wirkt auf die Zeilen.
     expect(screen.queryByText('R-001')).not.toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
   it('?ansicht=raster öffnet das Sichtungsraster über alle Personen', async () => {
@@ -1570,7 +1568,7 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
       await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
   it('?ansicht=karte öffnet die Kartenansicht und räumt den Parameter', async () => {
@@ -1584,7 +1582,7 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     expect(await screen.findByText('Keine Person mit Koordinate')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Karte' })).toBeChecked();
     expect(screen.getByText('1 Person ohne Koordinate — nicht auf der Karte')).toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
   it('räumt einen unbrauchbaren Wert, ohne die Sicht zu verbiegen', async () => {
@@ -1593,7 +1591,7 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     await screen.findByText('R-001');
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Zeilen' })).toBeChecked();
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?x=1'));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?x=1'));
   });
 });
 
@@ -1729,7 +1727,7 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     await screen.findByTestId('kartenflaeche-stub');
     expect(screen.getAllByRole('button', { name: /^marker-person-/ })).toHaveLength(2);
     await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(screen.getAllByRole('button', { name: /^marker-person-/ })).toHaveLength(1),
     );
     expect(screen.getByRole('button', { name: /marker-person-21/ })).toBeInTheDocument();

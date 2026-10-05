@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -294,7 +294,7 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     const knopf = within(dialog).getByRole('button', { name: 'Anlegen' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
-    await vi.waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
+    await waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveFocus());
   });
 
   it('legt per Enter im Titel an und ist danach beim erneuten Öffnen leer', async () => {
@@ -304,7 +304,7 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     let dialog = await oeffneDialog(nutzer);
     await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl an 2. Zug{Enter}');
 
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(befehleApi.legeBefehlAn).toHaveBeenCalledWith(1, {
         vorlage: 'befehl_lad',
         titel: 'Befehl an 2. Zug',
@@ -322,7 +322,7 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     await nutzer.type(within(dialog).getByLabelText('Titel'), 'Befehl X');
     await nutzer.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
-    await vi.waitFor(() => expect(befehleApi.legeBefehlAn).toHaveBeenCalled());
+    await waitFor(() => expect(befehleApi.legeBefehlAn).toHaveBeenCalled());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Titel')).toHaveValue('Befehl X');
   });

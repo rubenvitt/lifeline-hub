@@ -72,7 +72,7 @@ describe('Verdichtungszeile', () => {
      * „0/0/0//0" sähe aus wie „keine Kräfte im Einsatz". Diese Zusicherung allein belegt den
      * Fehlerzweig nicht (ohne Daten ist auch der Ladezweig still); das trägt der Test darunter.
      */
-    await vi.waitFor(() => expect(container.textContent).not.toContain('Stärke'));
+    await waitFor(() => expect(container.textContent).not.toContain('Stärke'));
     expect(container.textContent).not.toContain('0/0/0//0');
   });
 
@@ -95,7 +95,7 @@ describe('Verdichtungszeile', () => {
 
     // Gewartet wird auf den FEHLERZUSTAND im Cache, nicht auf die Zahl der Aufrufe — direkt nach
     // dem Aufruf ist der Fehler noch nicht propagiert.
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(client.getQueryState(einsatzKeys.fahrzeuge(1))?.status).toBe('error'),
     );
     // …und EINEN Tick, damit React den Fehlerzustand gerendert hat.

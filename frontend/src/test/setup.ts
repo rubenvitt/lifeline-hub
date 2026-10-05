@@ -16,7 +16,8 @@ dayjs.extend(utc);
 // RTL wartet in findBy*/waitFor per Default nur 1 s, Vitest gesteht 10 s zu. Unter Last
 // überschreitet ein erster Render die Sekunde, und der Test scheiterte an der Wartezeit statt
 // an der Sache. 5 s bleiben unter testTimeout, damit ein echter Fehlschlag weiter die lesbare
-// RTL-Meldung mit DOM-Dump liefert.
+// RTL-Meldung mit DOM-Dump liefert. Vitests `vi.waitFor` liest diese Einstellung nicht und wartet
+// fest 1 s; die Suite wartet deshalb mit RTLs `waitFor` (LFH-890).
 configure({ asyncUtilTimeout: 5000 });
 
 // Signalisiert React, dass wir in einer act-fähigen Umgebung testen — entfernt die

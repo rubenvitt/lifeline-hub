@@ -192,7 +192,7 @@ describe('TierePage', () => {
       screen.getByRole('searchbox', { name: 'Suche in Tiere im Einsatz' }),
       'Mimi',
     );
-    await vi.waitFor(() => expect(screen.queryByText('Bello')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Bello')).not.toBeInTheDocument());
     expect(screen.getByText('Mimi')).toBeInTheDocument();
 
     // 2. + 3. Reiterwechsel: die fremde Zeile steht ungefiltert da, das Feld ist leer.
@@ -407,7 +407,7 @@ describe('TierePage', () => {
     render(einsatzAktiv, [], '/einsaetze/1/tiere?neu=1');
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Schnellerfassung')).toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
   it('ohne ?neu=1 bleibt die Erfassung zu', async () => {
@@ -422,7 +422,7 @@ describe('TierePage', () => {
   it('?neu=1 öffnet die Erfassung NICHT für Beobachter', async () => {
     render(einsatzBeobachter, [tierBasis], '/einsaetze/1/tiere?neu=1');
     // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt entschieden.
-    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
@@ -440,7 +440,7 @@ describe('TierePage', () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-    await vi.waitFor(() => expect(body.status).toBe('aktiv'));
+    await waitFor(() => expect(body.status).toBe('aktiv'));
     expect(body.spezies).toBe('hund'); // initialValues
   });
 
@@ -455,7 +455,7 @@ describe('TierePage', () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
-    await vi.waitFor(() => expect(body.status).toBe('vermisst'));
+    await waitFor(() => expect(body.status).toBe('vermisst'));
   });
 
   it('wechselt nach dem Erfassen in die Antwort-Sicht und hebt das neue Tier hervor', async () => {
@@ -839,7 +839,7 @@ describe('TierePage', () => {
       { ...tierBasis, id: 22, registrier_nr: 3, rufname: 'Cleo' },
     ];
     render(einsatzAktiv, drei);
-    await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
+    await waitFor(() => expect(regFolge()).toHaveLength(3));
     expect(regFolge()).toEqual(['T-003', 'T-002', 'T-001']);
   });
 
@@ -868,7 +868,7 @@ describe('TierePage', () => {
       },
     ];
     render(einsatzAktiv, drei);
-    await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
+    await waitFor(() => expect(regFolge()).toHaveLength(3));
     // Muster statt Fixwert: ohne `EinsatzAnzeigeProvider` rendert die Zeit in der Zeitzone des
     // Testrechners.
     const dtg = screen

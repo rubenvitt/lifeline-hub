@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -104,7 +104,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body).not.toBeNull());
+    await waitFor(() => expect(body).not.toBeNull());
     expect(body!.halter_person_id).toBeNull();
     expect(body!.halter_kontakt).toBeNull();
   });
@@ -119,7 +119,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body).not.toBeNull());
+    await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
   });
 
@@ -143,14 +143,14 @@ describe('TiereDetailPage — Stammdaten', () => {
     await act(async () => {
       await client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) });
     });
-    await vi.waitFor(() =>
+    await waitFor(() =>
       expect(client.getQueryData<Tier>(einsatzKeys.tier(1, 10))?.geaendert_at).toBe(
         '2026-05-29 11:30:00',
       ),
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body).not.toBeNull());
+    await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
   });
 
@@ -170,7 +170,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    await waitFor(() => expect(koerper).toHaveLength(2));
     expect(koerper[0].basis_geaendert_at).toBe('2026-05-29 09:00:00');
     expect(koerper[1].basis_geaendert_at).toBeUndefined();
   });
@@ -191,7 +191,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    await waitFor(() => expect(koerper).toHaveLength(2));
     // Die Servermeldung erscheint — der else-Zweig (`fehler`) lief, nicht erneut der
     // Konfliktdialog.
     expect(
@@ -229,7 +229,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(option).toBeTruthy();
     await userEvent.click(option!);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body.halter_person_id).toBe(5));
+    await waitFor(() => expect(body.halter_person_id).toBe(5));
     expect(body.halter_kontakt).toBeNull();
   });
 
@@ -251,7 +251,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(extern).toBeTruthy();
     await userEvent.click(extern!);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body.halter_kontakt).toBe('Familie Krause'));
+    await waitFor(() => expect(body.halter_kontakt).toBe('Familie Krause'));
     expect(body.halter_person_id).toBeNull();
   });
 
@@ -278,7 +278,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     fireEvent.mouseDown(clear);
     fireEvent.click(clear);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(body.halter_person_id).toBeNull());
+    await waitFor(() => expect(body.halter_person_id).toBeNull());
     expect(body.halter_kontakt).toBeNull();
   });
 
@@ -292,7 +292,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
     await userEvent.click(await screen.findByRole('button', { name: 'OK' })); // Popconfirm bestätigen
-    await vi.waitFor(() => expect(geloescht).toBe(true));
+    await waitFor(() => expect(geloescht).toBe(true));
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
   });
 });
@@ -319,7 +319,7 @@ describe('TiereDetailPage — Status/Abschluss', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Als vermisst markieren' }));
-    await vi.waitFor(() => expect(body.status).toBe('vermisst'));
+    await waitFor(() => expect(body.status).toBe('vermisst'));
   });
 
   it('Abschließen-Modal erzwingt einen Grund und schickt ihn', async () => {
@@ -346,7 +346,7 @@ describe('TiereDetailPage — Status/Abschluss', () => {
     await userEvent.click(within(dialog).getByRole('combobox'));
     await userEvent.click(await screen.findByText('Freilauf')); // Option rendert im Portal → global
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
-    await vi.waitFor(() => expect(body.abschluss_grund).toBe('freilauf'));
+    await waitFor(() => expect(body.abschluss_grund).toBe('freilauf'));
     expect(body.status).toBe('abgeschlossen');
   });
 });

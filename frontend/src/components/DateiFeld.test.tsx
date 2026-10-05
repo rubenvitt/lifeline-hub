@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button, Form } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
@@ -46,7 +46,7 @@ describe('DateiFeld (LFH-21)', () => {
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
     await userEvent.upload(input, mitGroesse(UPLOAD_MAX_GROESSE));
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-    await vi.waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
   });
 
   it('verlangt eine Datei', async () => {
@@ -64,7 +64,7 @@ describe('DateiFeld (LFH-21)', () => {
     );
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
     await userEvent.upload(input, new File(['x'], 'dach.jpg'));
-    await vi.waitFor(() => expect(onDateiWahl).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onDateiWahl).toHaveBeenCalledTimes(1));
     expect(onDateiWahl.mock.calls[0][0]).toMatchObject({ name: 'dach.jpg' });
     const liste = container.querySelector<HTMLElement>('.ant-upload-list')!;
     await userEvent.click(within(liste).getByRole('button', { name: /remove|entfernen/i }));
