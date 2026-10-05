@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import type { GefahrBewertung } from '../../api/types';
 import GefahrenMatrixAuszug from './GefahrenMatrixAuszug';
+import { ZELLE_UNBEWERTET } from './GefahrenMatrix';
 
 const bewertung = (o: Partial<GefahrBewertung>): GefahrBewertung =>
   ({
@@ -57,7 +58,9 @@ describe('GefahrenMatrixAuszug (LFH-664, Entscheidung 5a)', () => {
     // Ausdrücklich „keine" ist etwas anderes als gar nicht bewertet — im Text UND im Namen.
     expect(screen.getByRole('cell', { name: 'Brand × Tiere: keine' })).toHaveTextContent('–');
     const offen = screen.getByRole('cell', { name: 'Brand × Umwelt: nicht bewertet' });
-    expect(offen).toHaveTextContent('');
+    // Dasselbe Zeichen wie die Matrix (LFH-969): beide lesen es aus einer Quelle.
+    expect(offen.textContent).toBe(ZELLE_UNBEWERTET.kuerzel);
+    expect(offen).toHaveAttribute('data-warnstufe', 'unbewertet');
   });
 
   it('trägt „n. a." an ungültigen Paaren', () => {
