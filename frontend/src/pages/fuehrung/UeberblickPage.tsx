@@ -661,10 +661,21 @@ export default function UeberblickPage() {
             <div style={rasterStil(breit, token.marginLG)}>
               <Paneel
                 titel="Einsatzabschnitte"
+                // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
+                // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
+                // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883).
                 meta={
-                  zAbschnitte === 'daten'
-                    ? `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
-                    : undefined
+                  zAbschnitte === 'daten' ? (
+                    `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
+                  ) : zAbschnitte === 'laden' ? (
+                    <span
+                      data-lfh="paneel-meta-platzhalter"
+                      aria-hidden="true"
+                      style={{ visibility: 'hidden' }}
+                    >
+                      0 Abschnitte · 0 Einheiten
+                    </span>
+                  ) : undefined
                 }
                 fuss={
                   zAbschnitte === 'daten' && zeilen.length > 0 ? (

@@ -332,16 +332,17 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
   expect(abrufeVorher, 'vor dem Refetch mindestens der Erstabruf').toBeGreaterThanOrEqual(1);
   const laufVorher = (await leseShifts(page)).lauf;
 
-  // Das Warten wird VOR dem Auslöser aufgesetzt, sonst ginge die Antwort verloren. Bleibt
-  // der Refetch aus, stirbt der Test hier.
-  const antwort = page.waitForResponse(
-    (r) => /\/api\/einsaetze(\?|$)/.test(r.url()) && r.request().method() === 'GET',
-  );
-
   // react-querys `focusManager` hängt an `visibilitychange`; es von Hand zu feuern ist die
   // deterministische Fassung des Fensterwechsels (`bringToFront` ist headless unzuverlässig).
-  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
-  await antwort;
+  // WIEDERHOLT, bis ein Abruf kommt: legt ein paralleler Test einen Einsatz an, lädt das
+  // Org-Ereignis `einsatzliste` (LFH-734) die Liste im Wartefenster neu, die Query ist beim
+  // Fokus wieder frisch, und ein einzelnes Ereignis löste nichts aus — der Test starb dann im
+  // Warten auf die Antwort (LFH-879). Ein solcher Abruf liefert dieselbe Liste; kommt er nach
+  // dem Zurücksetzen, ist er selbst der Refetch mit unveränderten Daten, den der Test misst.
+  await expect(async () => {
+    await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+    expect(zaehler.abrufe, 'noch kein Abruf nach dem Fokus').toBeGreaterThan(abrufeVorher);
+  }).toPass({ timeout: 45_000, intervals: [1_000] });
 
   await expect
     .poll(() => zaehler.abrufe, {

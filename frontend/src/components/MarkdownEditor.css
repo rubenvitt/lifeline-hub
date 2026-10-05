@@ -1,18 +1,13 @@
 /* Eingabe mit Live-Markdown-Vorschau. Farben/Akzente erbt die Vorschau aus
-   der geteilten .markdown-Komponente; hier nur das Editor-Layout. */
+   der geteilten .markdown-Komponente; hier nur das Editor-Layout.
+   Die Vorschau grenzt allein ihr Rahmen ab (`linie`, wie `Markdown.css`), sie hat keine
+   eigene Fläche mehr (LFH-889): eine getönte Vorschau schluckte nachts den Code-Grund
+   darin (`flaeche-3` auf `flaeche-2` 1,02 : 1). Radius aus der Rolle, im Neuentwurf 0. */
 .markdown-editor__vorschau {
-  --me-rahmen: rgba(0, 0, 0, 0.12);
-  --me-flaeche: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--me-rahmen);
-  border-radius: 6px;
+  border: 1px solid var(--lfh-linie);
+  border-radius: var(--lfh-radius-flaeche);
   padding: 8px 12px;
-  background: var(--me-flaeche);
   overflow: auto;
-}
-
-[data-theme='dark'] .markdown-editor__vorschau {
-  --me-rahmen: rgba(255, 255, 255, 0.18);
-  --me-flaeche: rgba(255, 255, 255, 0.03);
 }
 
 .markdown-editor__label {

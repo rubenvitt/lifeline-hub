@@ -11,7 +11,13 @@ import type {
   UhsAnhang,
   AnhangZugriff,
 } from './types';
-import { apiGet, apiSend, apiUpload, mitParametern } from './client';
+import {
+  apiGet,
+  apiSend,
+  apiUploadMitFortschritt,
+  mitParametern,
+  type UploadFortschritt,
+} from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 
 // ---------- UHS ----------
@@ -154,12 +160,18 @@ export function listeUhsAnhaenge(einsatzId: number, uhsId: number): Promise<UhsA
   return apiGet<UhsAnhang[]>(anhangBasis(einsatzId, uhsId));
 }
 
-/** Legt EINE Datei an der UHS ab (Feld `datei`); Timeout wie die übrigen Uploads. */
-export function legeUhsAnhangAb(einsatzId: number, uhsId: number, datei: File): Promise<UhsAnhang> {
+/** Legt EINE Datei an der UHS ab (Feld `datei`); Timeout und Fortschritt wie die übrigen Uploads. */
+export function legeUhsAnhangAb(
+  einsatzId: number,
+  uhsId: number,
+  datei: File,
+  onFortschritt?: (stand: UploadFortschritt) => void,
+): Promise<UhsAnhang> {
   const fd = new FormData();
   fd.append('datei', datei);
-  return apiUpload<UhsAnhang>(anhangBasis(einsatzId, uhsId), fd, {
+  return apiUploadMitFortschritt<UhsAnhang>(anhangBasis(einsatzId, uhsId), fd, {
     timeoutMs: UPLOAD_TIMEOUT_MS,
+    onFortschritt,
   });
 }
 

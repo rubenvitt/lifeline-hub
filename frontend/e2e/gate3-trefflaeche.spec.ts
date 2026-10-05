@@ -22,6 +22,7 @@ import {
   gesperrtHaeltStufe,
   haeltStufe,
   kurzeAchseHaelt,
+  mindestensKnoten,
   rechteHinweisSteht,
   ruhigeHoehe,
   stelleDichte,
@@ -211,9 +212,7 @@ test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px',
       .getByRole('main')
       .getByRole('button', { name: /^Bezeichnung .+ bearbeiten$/ });
     // EL, S1–S6, Führungshilfspersonal, Fachberater — S7 ist ohne Schalter nicht bearbeitbar.
-    // Erst warten, bis der Katalog geladen ist: `alleHaltenStufe` zählt sofort, und nach dem
-    // Neuladen der Dichte stand die Liste in der CI noch im Ladezustand (0 statt 9 Knöpfe).
-    await expect(knoepfe.nth(8)).toBeVisible();
+    // Auf den geladenen Katalog wartet `alleHaltenStufe` selbst (`mindestensKnoten`).
     const kleinstes = await alleHaltenStufe(knoepfe, soll, `Bezeichnung bearbeiten (${dichte})`, 9);
     gemessen.push(`${dichte} (Soll ≥ ${soll}): ${kleinstes}px`);
   }
@@ -2531,10 +2530,7 @@ async function zielabstandImFugenraster(
   name: string,
   mindestens: number,
 ): Promise<number> {
-  const anzahl = await ziele.count();
-  expect(anzahl, `${name}: mindestens ${mindestens} Ziele erwartet`).toBeGreaterThanOrEqual(
-    mindestens,
-  );
+  const anzahl = await mindestensKnoten(ziele, mindestens, name);
   let abstand = Number.POSITIVE_INFINITY;
   for (let i = 0; i < anzahl; i += 1) {
     abstand = Math.min(abstand, await abstandZuNachbarn(raster, ziele.nth(i)));
@@ -3052,17 +3048,17 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeit
       3,
     );
 
-    // Zeitachse: beschriftete Knöpfe halten die Höhe, Symbolknöpfe die kurze Achse.
+    // Zeitachse (LFH-899): die Auswahl „Stand“ hält die Höhe, die Symbolknöpfe die kurze Achse.
     const band = page.locator('[data-lfh="zeitachse"]');
-    // Erst zählen, wenn die Stände geladen sind — sonst steht nur „Stand sichern" im Band.
-    await expect(band.getByRole('button', { name: 'Stand B' })).toBeVisible();
-    const beschriftet = band.getByRole('button', {
-      // „Stand sichern" ohne `^` (vorn kann ein Icon-Label stehen); der Name ist in Vitest gepinnt.
-      name: /(Stand sichern|^Aktuell|^Stand A|^Stand B)$/,
+    // Erst messen, wenn die Stände geladen sind — sonst steht nur „Stand sichern" im Band.
+    await expect(band.getByRole('combobox', { name: 'Stand' })).toBeVisible();
+    // Gemessen wird der Kasten der Auswahl, nicht ihr inneres Suchfeld.
+    const beschriftet = band.locator('.ant-select');
+    const zeitBeschriftet = await alleHaltenStufe(beschriftet, soll, `Zeitachse (${dichte})`, 1);
+    const symbole = band.getByRole('button', {
+      name: /^(Abspielen|Zeitachse ausblenden|Stand sichern)$/,
     });
-    const zeitBeschriftet = await alleHaltenStufe(beschriftet, soll, `Zeitachse (${dichte})`, 4);
-    const symbole = band.getByRole('button', { name: /^(Abspielen|Zeitachse ausblenden)$/ });
-    const zeitSymbol = await kurzeAchseHaelt(symbole, soll, `Zeitachse Symbol (${dichte})`, 2);
+    const zeitSymbol = await kurzeAchseHaelt(symbole, soll, `Zeitachse Symbol (${dichte})`, 3);
 
     je.set(`${dichte} Verortet`, verortet);
     je.set(`${dichte} Kartenknopf`, karte.kleinstes);

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mitProzessZone } from '../test/prozessZone';
+import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
 import { ermittlePlatzhalter, setzeBausteinEin } from './bausteinEinsetzen';
 import { einsatzFixture } from '../test/fixtures';
@@ -92,5 +93,24 @@ describe('Auto-Platzhalter Datum und Uhrzeit in der Anzeigezone (LFH-692)', () =
     expect(setzeBausteinEin(b, einsatz, {}, 'Europe/Berlin').inhalt).toBe('Stand 01.10.2026 01:30');
     // Ohne Anzeigezone bleibt es die Browserzone.
     expect(setzeBausteinEin(b, einsatz, {}).inhalt).toBe('Stand 30.09.2026 23:30');
+  });
+});
+
+/** LFH-895: `{uhrzeit}` kommt von derselben Uhr wie die Ereigniszeit des Eintrags. */
+describe('Auto-Platzhalter nach der Serveruhr (LFH-895)', () => {
+  mitProzessZone('UTC');
+  afterEach(() => {
+    vi.useRealTimers();
+    serveruhrVergessenFuerTests();
+  });
+
+  it('ein 5 min vorgehendes Gerät setzt die Uhrzeit des Servers ein', () => {
+    const server = Date.parse('2026-09-30T10:00:00Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(server + 5 * 60_000);
+    serveruhrVergessenFuerTests();
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(server).toUTCString() } }));
+    const b = baustein({ inhalt: 'Stand {datum} {uhrzeit}' });
+    expect(setzeBausteinEin(b, einsatz, {}).inhalt).toBe('Stand 30.09.2026 10:00');
   });
 });

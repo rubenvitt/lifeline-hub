@@ -43,16 +43,16 @@ let abschnitte = [{ id: 3, einsatz_id: 1, name: 'EA Nord' }];
 /** Suchbegriffe, auf die der Server mit 400 antwortet. */
 let scheitertBei: string[] = [];
 
-/** Wie `fts_query` in `src/etb/repo.rs`: jedes Wort ist eine Phrase, gefunden werden nur GANZE
- *  Wörter (unicode61, kein Präfix-`*`). Ein Teilstring-Mock verdeckte, dass „Deich" am Server
- *  „Deichbruch" nicht trifft. */
+/** Wie `fts_query` in `src/etb/repo.rs`: jedes Wort trifft Wortanfänge, keine Wortmitten
+ *  (unicode61, Präfix-`*`, LFH-880). Ein Teilstring-Mock verdeckte, dass „kundet" am Server
+ *  „erkundet" nicht trifft. */
 function ftsTrifft(inhalt: string, q: string) {
   const woerter = inhalt.toLowerCase().split(/[^\p{L}\p{N}]+/u);
   return q
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
-    .every((t) => woerter.includes(t));
+    .every((t) => woerter.some((w) => w.startsWith(t)));
 }
 
 beforeEach(() => {
@@ -68,7 +68,7 @@ beforeEach(() => {
     http.get('/api/einsaetze/1/einheiten', () =>
       HttpResponse.json([{ id: 4, einsatz_id: 1, name: 'Florian 1' }]),
     ),
-    // Ahmt den Server nach: `q` sucht ganze Wörter im Inhalt, `before_lfd_nr` + `limit` schneidet
+    // Ahmt den Server nach: `q` sucht Wortanfänge im Inhalt, `before_lfd_nr` + `limit` schneidet
     // am Cursor.
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       etbAbrufe += 1;
@@ -393,12 +393,20 @@ describe('DokumentAblegenModal', () => {
       );
     });
 
-    it('findet Wortanfänge im jüngsten Fenster, die die Volltextsuche nicht trifft', async () => {
+    it('findet einen Wortanfang am Server, auch jenseits des jüngsten Fensters', async () => {
       rendere();
       const d = await dialog();
       await oeffneBezugsliste(d);
-      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'erkund');
-      await waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'erkund')).toBe(true));
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'Deich');
+      await waitFor(() => expect(optionsLabels()).toEqual(['ETB 3 · Deichbruch gemeldet']));
+    });
+
+    it('findet Wortmitten im jüngsten Fenster, die die Volltextsuche nicht trifft', async () => {
+      rendere();
+      const d = await dialog();
+      await oeffneBezugsliste(d);
+      await userEvent.type(within(d).getByRole('combobox', { name: 'Bezug' }), 'kundet');
+      await waitFor(() => expect(etbAnfragen.some((qs) => qs.get('q') === 'kundet')).toBe(true));
       await neuGezeichnet();
       expect(optionsLabels()).toEqual(['ETB 12 · Lage erkundet']);
     });
