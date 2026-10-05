@@ -163,7 +163,7 @@ pub async fn anlegen(
     .execute(&state.pool)
     .await;
 
-    // Auch der Index ohne Groß-/Kleinschreibung (Migration 0150) meldet sich hier: `Admin` neben
+    // Auch der Index ohne Groß-/Kleinschreibung (Migration 0151) meldet sich hier: `Admin` neben
     // `admin` ist vergeben.
     if let Err(sqlx::Error::Database(db_err)) = &ergebnis {
         if db_err.is_unique_violation() {

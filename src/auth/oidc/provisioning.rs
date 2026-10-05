@@ -134,7 +134,7 @@ pub async fn finde_oder_provisioniere(
     };
 
     // Vergebene Namen einmal laden, damit `plane_benutzername` pur bleibt. Kleingeschrieben
-    // verglichen wie der Index ohne Groß-/Kleinschreibung (Migration 0150, LFH-981): ein lokales
+    // verglichen wie der Index ohne Groß-/Kleinschreibung (Migration 0151, LFH-981): ein lokales
     // `Max` belegt auch `max`, sonst scheiterte das Insert an der Eindeutigkeit.
     let vergebene_namen: HashSet<String> =
         sqlx::query_scalar::<_, String>("SELECT benutzername FROM benutzer")

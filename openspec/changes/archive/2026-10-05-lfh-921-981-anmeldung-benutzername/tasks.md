@@ -39,7 +39,7 @@
 ## 7. Nachzüge aus dem Review
 
 - [x] 7.1 `pruefe_passwort_laenge` mit Höchstlänge 128 Zeichen, damit jedes setzbare Passwort in die 4-KiB-Grenze des Logins passt. Prüfen: `anlage_begrenzt_das_passwort_auf_128_zeichen` grün (129 → 400, 128 meldet an)
-- [x] 7.2 Migration `0150`: Vorprüfung gruppiert mit `COLLATE NOCASE` statt `lower()`. Prüfen: Migrationstests grün
+- [x] 7.2 Migration `0151`: Vorprüfung gruppiert mit `COLLATE NOCASE` statt `lower()`. Prüfen: Migrationstests grün
 - [x] 7.3 `bootstrap_admin` normalisiert `LIFELINE_ADMIN_USER` und bricht bei leerem oder überlangem Namen ab. Prüfen: `admin_name_wird_getrimmt_und_begrenzt` grün
 - [x] 7.4 503-Meldung neutral („Passwortprüfung vorübergehend ausgelastet“), Doku von `WARTEFRIST`/`MAX_ANDRANG`/Modul nennt Anlage und Wechsel
 - [x] 7.5 Login-Seite: Name aus lauter Leerzeichen gilt als leer (`whitespace: true`). Prüfen: Vitest grün

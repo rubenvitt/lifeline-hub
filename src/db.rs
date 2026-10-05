@@ -334,8 +334,8 @@ mod tests {
             .expect("die eingeschobene Migration ist angewendet");
     }
 
-    /// Eine Datenbank mit allen Migrationen vor `0150` und den übergebenen Benutzernamen.
-    async fn benutzer_vor_0150(namen: &[&str]) -> SqlitePool {
+    /// Eine Datenbank mit allen Migrationen vor `0151` und den übergebenen Benutzernamen.
+    async fn benutzer_vor_0151(namen: &[&str]) -> SqlitePool {
         use sqlx::migrate::Migrator;
         use std::borrow::Cow;
 
@@ -346,7 +346,7 @@ mod tests {
             .unwrap();
         let vorher: Vec<_> = sqlx::migrate!("./migrations")
             .iter()
-            .filter(|m| m.version < 150)
+            .filter(|m| m.version < 151)
             .cloned()
             .collect();
         Migrator {
@@ -355,7 +355,7 @@ mod tests {
         }
         .run(&pool)
         .await
-        .expect("Migrationen vor 0150");
+        .expect("Migrationen vor 0151");
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
             .await
@@ -373,11 +373,11 @@ mod tests {
         pool
     }
 
-    /// LFH-981: Zwei Namen, die sich nur in der Schreibweise unterscheiden, brechen `0150` mit
+    /// LFH-981: Zwei Namen, die sich nur in der Schreibweise unterscheiden, brechen `0151` mit
     /// einer lesbaren Meldung ab, und keiner wird umbenannt.
     #[tokio::test]
-    async fn migration_0150_bricht_bei_kollision_mit_klarer_meldung_ab() {
-        let pool = benutzer_vor_0150(&["max", "Max", "moritz"]).await;
+    async fn migration_0151_bricht_bei_kollision_mit_klarer_meldung_ab() {
+        let pool = benutzer_vor_0151(&["max", "Max", "moritz"]).await;
 
         let fehler = migrate(&pool).await.unwrap_err().to_string();
         assert!(
@@ -393,13 +393,13 @@ mod tests {
         assert_eq!(namen, ["Max", "max", "moritz"], "nichts still umbenannt");
     }
 
-    /// Ohne Kollision läuft `0150` durch, und danach ist `Max` neben `max` vergeben.
+    /// Ohne Kollision läuft `0151` durch, und danach ist `Max` neben `max` vergeben.
     #[tokio::test]
-    async fn migration_0150_macht_namen_ohne_schreibweise_eindeutig() {
-        let pool = benutzer_vor_0150(&["max", "Moritz"]).await;
+    async fn migration_0151_macht_namen_ohne_schreibweise_eindeutig() {
+        let pool = benutzer_vor_0151(&["max", "Moritz"]).await;
         migrate(&pool)
             .await
-            .expect("ohne Kollision läuft 0150 durch");
+            .expect("ohne Kollision läuft 0151 durch");
 
         let err = sqlx::query(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
@@ -3005,7 +3005,7 @@ mod tests {
     // einmalig, Zeilen mit unplausiblem Jahr gelten als ausgelöst (auch erledigte); gesunde
     // Zeilen bleiben, wie sie sind.
     #[tokio::test]
-    async fn migration_0150_entschaerft_erinnerungs_giftzeilen() {
+    async fn migration_0151_entschaerft_erinnerungs_giftzeilen() {
         use sqlx::migrate::Migrator;
         use std::borrow::Cow;
 

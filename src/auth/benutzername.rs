@@ -3,7 +3,7 @@
 //! Eine Stelle für alle Eingänge, die einen Namen annehmen (Passwort-Login, Passkey-Start mit
 //! Namen, Benutzeranlage): **erst trimmen, dann die Länge prüfen.** Angehängte Leerzeichen einer
 //! Bildschirmtastatur zählen so weder zur Länge noch zum Vergleich. Die Groß-/Kleinschreibung
-//! bleibt hier unberührt; sie faltet die Suche selbst (`COLLATE NOCASE`, Migration `0150`).
+//! bleibt hier unberührt; sie faltet die Suche selbst (`COLLATE NOCASE`, Migration `0151`).
 //!
 //! Ein überlanger Name verlässt den Handler mit 400, bevor Sperre, Audit oder Log ihn sehen:
 //! sonst landete ein 2-MiB-Name 90 Tage in `auth_audit` und in jeder WARN-Zeile.

@@ -17,7 +17,7 @@ denselben frühen Schritt des Login-Handlers; die Normalisierung des Namens geh�
   Gilt für Passwort-Login, Passkey-Start mit Namen, Benutzeranlage.
 - **Benutzernamen werden ohne Groß-/Kleinschreibung verglichen** (Entscheidung, s. `design.md`):
   Login und Passkey-Start finden `admin` auch als `Admin`; ein zweiter Name, der sich nur in der
-  Schreibweise unterscheidet, ist vergeben (409). Neue Migration `0150` mit eindeutigem Index
+  Schreibweise unterscheidet, ist vergeben (409). Neue Migration `0151` mit eindeutigem Index
   `benutzer(benutzername COLLATE NOCASE)`, die bei vorhandener Kollision mit klarer Meldung
   abbricht.
 - Öffentliche Auth-Routen bekommen ein eigenes Body-Limit (4 KiB für Login und Passkey-Start mit

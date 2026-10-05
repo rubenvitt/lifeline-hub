@@ -152,7 +152,7 @@ Spec `passwort-anmeldung`, Herleitung
   Zeichen, sonst 400) — als erster Schritt, vor Sperre, Audit und Log. Login, Passkey-Start,
   Anlage und `bootstrap_admin` tun das; ein neuer Eingang auch.
 - **Ein Name von außen wird mit `benutzername = ? COLLATE NOCASE` gesucht**; eindeutig ist er ohne
-  Groß-/Kleinschreibung (Index aus `0150`, Verstoß → 409). `NOCASE` faltet nur A–Z; wer Namen
+  Groß-/Kleinschreibung (Index aus `0151`, Verstoß → 409). `NOCASE` faltet nur A–Z; wer Namen
   vergleicht (SSO-Kollision, `rate_limit::konto`), faltet ebenso mit `to_ascii_lowercase`.
 - Namen in `auth_audit` kürzt `audit::schreibe` selbst; Log-Felder der Anmeldung nehmen
   `benutzername::fuer_protokoll`. Die 429-Zeile nennt keinen Namen.
