@@ -2,7 +2,7 @@ import { Alert, App, Button, Form, Input, Modal, Space, Typography, Upload, them
 import AdminPage from '../components/AdminPage';
 import { Select } from '../components/Select';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -56,18 +56,21 @@ const ORG_OPTIONEN = [
   { value: 'fuehrung', label: 'Führung' },
 ];
 
+/** Stand, den das Formular zuletzt vom Server übernommen oder selbst gespeichert hat. */
+type Basis = Partial<Pick<OrganisationInfo, 'name' | 'tz_organisation'>>;
+
 /**
- * Was gegenüber dem Serverstand geändert ist — nur das geht in den PATCH (LFH-979). Der Name
- * zählt getrimmt: nur angehängte Leerzeichen sind keine Umbenennung. `null` = nichts geändert.
+ * Was gegenüber der BASIS geändert ist — nur das geht in den PATCH (LFH-979). Verglichen wird
+ * mit dem Stand im Formular, NICHT mit dem Cache: der Abgleich Server → Feld ruht, solange etwas
+ * ungespeichert ist, und eine fremde Änderung an einem unberührten Feld stünde sonst als
+ * „geändert“ da — das Speichern schriebe den alten Wert darüber. Der Name zählt getrimmt: nur
+ * angehängte Leerzeichen sind keine Umbenennung. `null` = nichts geändert.
  */
-function geaenderteFelder(
-  werte: FormWerte,
-  server: OrganisationInfo | undefined,
-): OrganisationPatch | null {
+function geaenderteFelder(werte: FormWerte, basis: Basis): OrganisationPatch | null {
   const felder: OrganisationPatch = {};
   const name = werte.name.trim();
-  if (name !== server?.name) felder.name = name;
-  if (werte.tz_organisation != null && werte.tz_organisation !== server?.tz_organisation) {
+  if (name !== basis.name) felder.name = name;
+  if (werte.tz_organisation != null && werte.tz_organisation !== basis.tz_organisation) {
     felder.tz_organisation = werte.tz_organisation;
   }
   return Object.keys(felder).length > 0 ? felder : null;
@@ -104,12 +107,14 @@ export default function OrganisationTab() {
    */
   const schutz = useFormularVerlassenSchutz({ aktiv: istAdmin });
   const server = orgQuery.data;
+  const basisRef = useRef<Basis>({});
   useEffect(() => {
     // Nur solange nichts Ungespeichertes im Formular steht: ein Refetch (Fensterfokus) darf eine
     // angefangene Eingabe nicht überschreiben. `ungespeichert` steht mit in den Abhängigkeiten:
     // bleibt der Server beim selben Stand, ändert sich `server` nicht, und erst das Zurückfallen
     // des Merkers bringt ihn ins Feld zurück.
     if (!server || schutz.ungespeichert) return;
+    basisRef.current = { name: server.name, tz_organisation: server.tz_organisation };
     form.setFieldsValue({
       name: server.name,
       ...(server.tz_organisation ? { tz_organisation: server.tz_organisation } : {}),
@@ -130,6 +135,8 @@ export default function OrganisationTab() {
       // Stand aus dem Cache, und scheiterte der Refetch, machte ein zweites Speichern die
       // Umbenennung rückgängig.
       qc.setQueryData(globalKeys.organisation(), antwort);
+      // Was gesendet wurde, steht jetzt so auf dem Server; ungesendete Felder behalten ihre Basis.
+      basisRef.current = { ...basisRef.current, ...felder };
       message.success(erfolgsText(felder));
       qc.invalidateQueries({ queryKey: globalKeys.organisation() });
     },
@@ -144,7 +151,7 @@ export default function OrganisationTab() {
   function absenden(werte: FormWerte) {
     // Stand beim Absenden: wer während des Speicherns weitertippt, behält den Schutz.
     const fassung = schutz.fassung();
-    const felder = geaenderteFelder(werte, server);
+    const felder = geaenderteFelder(werte, basisRef.current);
     if (felder === null) {
       // Nichts zu speichern, also auch kein Erfolg zu melden. Ein alter Grund gilt nicht mehr.
       speichern.reset();

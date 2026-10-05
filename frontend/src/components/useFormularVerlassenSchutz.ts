@@ -34,13 +34,18 @@ export function useFormularVerlassenSchutz({
 }) {
   const zaehlerRef = useRef(0);
   const aktivRef = useRef(aktiv);
-  const [stand, setStand] = useState({ geaendert: 0, gesichert: 0 });
+  /**
+   * Nur der Wahrheitswert ist State, der Zähler lebt in einem Ref: `setOffen(true)` bei schon
+   * offener Änderung bricht ab, die Seite rendert also nicht bei jedem Tastendruck neu (gemessen
+   * auf `EinsatzDefaults`: mit Zähler-State mehr als doppelt so langsam).
+   */
+  const [offen, setOffen] = useState(false);
   const [letzterSchluessel, setLetzterSchluessel] = useState(schluessel);
   if (schluessel !== letzterSchluessel) {
     // Zustand beim Rendern anpassen statt per Effekt: sonst stünde ein Frame lang die alte
     // Änderung am neuen Datensatz.
     setLetzterSchluessel(schluessel);
-    setStand((s) => ({ ...s, gesichert: s.geaendert }));
+    setOffen(false);
   }
 
   useEffect(() => {
@@ -50,18 +55,19 @@ export function useFormularVerlassenSchutz({
   const geaendert = useCallback(() => {
     if (!aktivRef.current) return;
     zaehlerRef.current += 1;
-    const zaehler = zaehlerRef.current;
-    setStand((s) => ({ ...s, geaendert: zaehler }));
+    setOffen(true);
   }, []);
 
   /** Stand beim Absenden — an `gespeichert` zurückgeben, wenn das Speichern gelingt. */
   const fassung = useCallback(() => zaehlerRef.current, []);
 
   const gespeichert = useCallback((bis: number) => {
-    setStand((s) => (bis > s.gesichert ? { ...s, gesichert: bis } : s));
+    // Nur wenn seit dem Absenden nichts dazukam; ein späterer Erfolg mit älterer Fassung ändert
+    // nichts mehr.
+    if (bis === zaehlerRef.current) setOffen(false);
   }, []);
 
-  const ungespeichert = aktiv && stand.geaendert > stand.gesichert;
+  const ungespeichert = aktiv && offen;
 
   useEffect(() => {
     if (!ungespeichert) return;

@@ -72,10 +72,9 @@ describe('VerlassenRueckfrage (LFH-979)', () => {
 
   /**
    * Fällt der Merker, während die Rückfrage offen steht, läuft der angehaltene Wechsel weiter.
-   * Das trägt auch das Abmelden und das Sitzungsende (`useSitzungsWache` navigiert zu `/login`):
-   * auf den Admin-Seiten hängt `aktiv` am Benutzer, mit ihm fällt der Merker, und die Umleitung
-   * kommt ohne Klick durch. In den Einsatz-Einstellungen hängt das Recht an der Einsatzrolle;
-   * dort bleibt die Rückfrage stehen, und „Verwerfen" führt zur Anmeldung.
+   * Das Abmelden und das Sitzungsende hängen nicht daran: ohne Benutzer baut `RequireAuth`
+   * (`routes/RequireAuth.tsx`) den ganzen Teilbaum samt Blocker ab, und die Umleitung zur
+   * Anmeldung geht ohne Rückfrage durch.
    */
   it('holt den angehaltenen Wechsel nach, sobald nichts mehr ungespeichert ist', async () => {
     const user = userEvent.setup();

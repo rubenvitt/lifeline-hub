@@ -46,10 +46,7 @@ export default function EinsatzAllgemein() {
   const daten = useEinstellungenDaten(einsatzId);
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“): die Reiter sind eigene
   // Routen, ein Wechsel baut die Sektion ab und verwürfe die Eingabe still.
-  const schutz = useFormularVerlassenSchutz({
-    aktiv: daten.darfBearbeiten,
-    schluessel: einsatzId,
-  });
+  const schutz = useFormularVerlassenSchutz({ aktiv: daten.darfBearbeiten });
 
   // Kein `onError`-Toast: der Fehler steht als Alert über dem Formular, bis der nächste Versuch
   // läuft. Der Erfolg bleibt beim Toast.

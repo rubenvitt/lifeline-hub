@@ -157,6 +157,45 @@ describe('OrganisationTab', () => {
     expect(patches).toEqual([{ name: 'DRK Nord', tz_organisation: 'feuerwehr' }]);
   });
 
+  /**
+   * Eine fremde Umbenennung, die per Refetch in den Cache kommt, während hier die
+   * DV-102-Organisation offen ist, erreicht das Namensfeld nicht (der Abgleich ruht). Das
+   * unberührte Namensfeld darf beim Speichern deshalb NICHT mitgehen — es schriebe den alten
+   * Namen über die fremde Umbenennung.
+   */
+  it('schickt ein unberührtes Feld nicht mit, auch wenn es fremd geändert wurde', async () => {
+    let name = 'DRK';
+    let abrufe = 0;
+    let patched: unknown = null;
+    server.use(
+      meHandler(admin),
+      http.get('/api/organisation', () => {
+        abrufe += 1;
+        return HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' });
+      }),
+      http.patch('/api/organisation', async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json({ id: 1, name, tz_organisation: 'feuerwehr' });
+      }),
+    );
+    const { client } = renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.click(screen.getByLabelText('DV-102-Organisation'));
+    await userEvent.click(await screen.findByText('Feuerwehr'));
+
+    name = 'DRK Süd';
+    await client.invalidateQueries({ queryKey: ['organisation'] });
+    await waitFor(() => expect(abrufe).toBe(2));
+    await new Promise((r) => setTimeout(r, 30));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(patched).toEqual({ tz_organisation: 'feuerwehr' }));
+    expect(await screen.findByText('DV-102-Organisation gespeichert')).toBeInTheDocument();
+    // Danach kommt der fremde Name ins Feld.
+    await waitFor(() => expect(feld).toHaveValue('DRK Süd'));
+  });
+
   it('speichert ohne Änderung nichts und meldet keinen Erfolg', async () => {
     let gerufen = 0;
     server.use(
