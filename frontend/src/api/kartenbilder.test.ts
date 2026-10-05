@@ -42,6 +42,27 @@ describe('kartenbilder API', () => {
     );
   });
 
+  it('bricht mit dem Signal des Aufrufers ab, die 15-s-Grenze bleibt (LFH-943)', async () => {
+    const grenze = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(grenze.signal);
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => new Response(new Blob(['bild']), { status: 200 }));
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+    const aufrufer = new AbortController();
+
+    await ladeBildBlobUrl(7, 3, aufrufer.signal);
+    const signal = fetchMock.mock.calls[0][1]?.signal as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    aufrufer.abort();
+    expect(signal.aborted).toBe(true);
+
+    await ladeBildBlobUrl(7, 3, new AbortController().signal);
+    const zweites = fetchMock.mock.calls[1][1]?.signal as AbortSignal;
+    grenze.abort();
+    expect(zweites.aborted).toBe(true);
+  });
+
   it('upload hängt datei + ecken als FormData an', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')

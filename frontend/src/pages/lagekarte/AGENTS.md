@@ -125,6 +125,14 @@ diese Zusage.
   selbst keinen (`getSource` vor `isSourceLoaded`).
   Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
   `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
+- **Vertagte Kartendaten tragen einen Schlüssel** (LFH-943, D2/D3 in
+  `openspec/changes/archive/2026-10-05-lfh-943-945-lagekarte-ressourcen/design.md`):
+  `wendeKartenDatenAn(map, schluessel, anwenden)` hält je Karte und Schlüssel höchstens eine
+  wartende Anwendung; die Schlange läuft in der Folge der letzten Anmeldung (zuletzt angemeldet
+  liegt oben), sofort nur bei leerer Schlange. Bereit ist der angewandte Stil (`style._loaded`),
+  nie `isStyleLoaded()` — das wartet auf jede Kachel. Eine neue Ebene bekommt einen eigenen
+  Schlüssel; Daten, die je Render neu entstehen, vergleicht der Effekt vorher mit dem Inhalt
+  (Abschnitte, LFH-945).
 - **Ein aufgefächertes Bündel überlebt eine reine Inhaltsänderung** (LFH-668,
   `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`, D5): gleiche Schlüssel in gleicher
   Folge an gleicher Lage (`nurInhaltGeaendert`, `spiderfy.ts`) → Blätter bleiben stehen und nehmen die
@@ -146,6 +154,13 @@ diese Zusage.
   Lagedaten, aber unter der ersten `td-*`-Ebene (LFH-766,
   `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md` D3);
   Messung vor `setStyle` räumen, nach `style.load` neu.
+- **Controller vor `map.remove()`** (LFH-943, Spec `lagekarte-ressourcen`,
+  `openspec/changes/archive/2026-10-05-lfh-943-945-lagekarte-ressourcen/design.md` D1): die
+  terra-draw-Controller (Abschnitt, Zone, Messen) und die Bildgriffe baut der Cleanup des
+  Karten-Effekts in `Kartenflaeche.tsx` ab, BEVOR er `map.remove()` ruft. Ein eigener Abbau-Effekt
+  liefe erst danach (Deklarationsreihenfolge), terra-draws `stop()` schriebe auf eine fehlende
+  Quelle, und der Modulwechsel endete in der Fehlerseite. `zerstoeren()` fängt einen Wurf
+  trotzdem ab. Nachweis `e2e/lagekarte-modulwechsel.spec.ts`.
 - **Zeichnen per Link** (LFH-825, Spec `lagekarte-zeichnen`,
   `openspec/changes/archive/2026-10-03-lfh-825-zeichnen-deeplink-lagekarte/design.md`): `?zeichnen=<zonentyp>[:flaeche|:linie]`
   liest `LagekartePage` als **Literal** (Guard der Sprungpalette), wartet auf `ladt`, startet nur

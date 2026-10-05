@@ -53,6 +53,15 @@ interface FachebenenArgs {
  * woran es festhält, und die Ebene blinkte bei jedem Pannen leer. `combine` liest das Ergebnis
  * über die Closure.
  */
+/**
+ * Liegezeit einer nicht mehr gezeigten KRITIS- bzw. Energie-Antwort im Cache (LFH-945, D6). Der
+ * Schlüssel trägt die gerasterte bbox, jede besuchte Zelle ist ein eigener Eintrag von grob 1–3 MB
+ * (bis 5 000 Objekte). Mit 6 h lag alles im Speicher, was in den letzten 6 h zu sehen war. Gebraucht
+ * wird der gerade gezeigte Ausschnitt, der Vorgänger für `keepPreviousData` (beobachtet, also nicht
+ * betroffen) und ein kurzes Zurückschieben — dafür reichen 5 min. Die `staleTime` bleibt eigen.
+ */
+const BBOX_ABFRAGE_GC_MS = 5 * 60_000;
+
 export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
   // Hochwasser, ODL und Luftqualität färben je Punkt nach Stufe und brauchen den aufgelösten
   // Modus-Token; die Kartenstil-Module haben ihn bewusst nicht, also wird er hier in die Features
@@ -97,7 +106,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     // erneuert, daher 6 h frisch.
     placeholderData: keepPreviousData,
     staleTime: 6 * 60 * 60_000,
-    gcTime: 6 * 60 * 60_000,
+    gcTime: BBOX_ABFRAGE_GC_MS,
     // Mit Bestand kein Timer, in der Aufwärmphase des ersten Imports der kurze Takt. Die
     // Callback-Form geht hier; die Typinferenz-Falle (siehe `autobahn` unten) betrifft nur das
     // `useQueries`-Tupel. `error` zählt als offline, weil react-query nach einem gescheiterten
@@ -117,7 +126,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
     // unvollständige Antwort stehen. Ein erneuter Abruf trifft den Server-Cache.
     placeholderData: keepPreviousData,
     staleTime: 2 * 60_000,
-    gcTime: 6 * 60 * 60_000,
+    gcTime: BBOX_ABFRAGE_GC_MS,
   });
 
   // Sieben Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von

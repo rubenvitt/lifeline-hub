@@ -121,7 +121,13 @@ export function createMessung(
     },
     zerstoeren: () => {
       aktiv = false;
-      if (draw.enabled) draw.stop();
+      // Wirft terra-draw, weil die Karte schon entfernt ist, bleibt der Abbau trotzdem vollständig
+      // (`lagekarte/AGENTS.md`, „Zeichnen und Messen“, LFH-943).
+      try {
+        if (draw.enabled) draw.stop();
+      } catch {
+        /* Karte schon entfernt */
+      }
     },
     abschliessen: () => {
       if (!aktiv || laufend == null) return false;

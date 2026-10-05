@@ -463,6 +463,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const attribControlRef = useRef<maplibregl.AttributionControl | null>(null);
   // Aktuelle Flächendaten; nach setStyle ist die Source leer → re-Anlage liest hieraus.
   const flaechenDatenRef = useRef<FlaechenFeatureCollection>(baueFlaechenFc(flaechen));
+  // Inhalt des zuletzt übernommenen Stands als Schlüssel: gleicher Inhalt → kein `setData`
+  // (LFH-945). Leer bis zum ersten Lauf des Flächen-Effekts.
+  const flaechenSchluesselRef = useRef<string | null>(null);
   // Aktuelle Zonendaten; analog flaechenDatenRef für die Re-Anlage nach setStyle.
   const zonenDatenRef = useRef<ZonenFeatureCollection>(baueZonenFc(zonen));
   // Aktuelle Fachebenen; nach setStyle re-angelegt.
@@ -520,13 +523,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
    * (LFH-825, D6): terra-draw hängt seine `td-zone-*`-Ebenen beim Start oben an. Gestartet vor dem
    * Neuaufbau, lägen Zonen, Abschnitte und Marker darüber; danach liegt die Zeichnung wie beim
    * Start über das Paneel oben. Der Neuaufbau läuft am `load` der Karte (einmalig) bzw. im
-   * Render-Poller von `planeReAnlegenNachStyle` — `wendeKartenDatenAn` reiht sich dahinter ein.
+   * Eintrag `stil-neuaufbau` von `planeReAnlegenNachStyle` — der Zonen-Start reiht sich dahinter ein.
    */
   const planeZonenStart = useRef((map: maplibregl.Map) => {
     if (zoneStartAnstehendRef.current) return;
     zoneStartAnstehendRef.current = true;
     const nachAufbau = () =>
-      wendeKartenDatenAn(map, () => {
+      wendeKartenDatenAn(map, 'zonen-start', () => {
         zoneStartAnstehendRef.current = false;
         starteZonenZeichnung(map);
       });
@@ -538,6 +541,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Dritter Controller: Messen. Eigene Instanz, weil er bei jeder Änderung meldet statt erst beim
   // Abschluss (`messZeichnung.ts`).
   const messRef = useRef<MessZeichnung | null>(null);
+  // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus. Hier oben, weil der
+  // Karten-Effekt sie vor `map.remove()` abbaut (LFH-943).
+  const handlesRef = useRef<BildHandles | null>(null);
   const onMessungRef = useRef(onMessung);
   onMessungRef.current = onMessung;
   const messenRef = useRef(messen);
@@ -701,6 +707,18 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (import.meta.env.DEV) (window as unknown as { __lfhKarte?: unknown }).__lfhKarte = map;
     return () => {
       pixeldichteAbmelden();
+      // Controller VOR `map.remove()` abbauen (`lagekarte/AGENTS.md`, „Zeichnen und Messen“,
+      // LFH-943): React räumt die Effekte in Deklarationsreihenfolge, dieser Effekt steht vor denen
+      // der Werkzeuge. Danach fehlte `map.style`, terra-draws `stop()` liefe über `clear()` in
+      // `getSource(…).setData` auf undefined, und der Wurf bräche den Modulwechsel ab.
+      drawRef.current?.zerstoeren();
+      drawRef.current = null;
+      zoneDrawRef.current?.zerstoeren();
+      zoneDrawRef.current = null;
+      messRef.current?.zerstoeren();
+      messRef.current = null;
+      handlesRef.current?.zerstoeren();
+      handlesRef.current = null;
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
       // Die Merker gehören zu DIESER Karte: eine neue (Remount, Fast Refresh) lädt ihren Style
@@ -769,11 +787,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       () => markerDatenRef.current,
       () => einsatzortDatenRef.current,
     );
-    wendeKartenDatenAn(map, () =>
+    wendeKartenDatenAn(map, 'suchnadel', () =>
       sorgeFuerSuchnadelLayer(map, suchnadelRef.current.daten, suchnadelRef.current.farbe),
     );
-    // Zuletzt angemeldet → dieser Poller läuft zuletzt, der Punkt liegt oben.
-    wendeKartenDatenAn(map, () =>
+    // Zuletzt angemeldet → dieser Eintrag läuft zuletzt, der Punkt liegt oben.
+    wendeKartenDatenAn(map, 'eigenposition', () =>
       sorgeFuerEigenpositionLayer(
         map,
         eigenpositionRef.current.daten,
@@ -908,15 +926,21 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     return hoereAufBedienung(map, () => onBedienungRef.current?.());
   }, []);
 
-  // Abschnittsflächen-Daten in die Source spielen (und für setStyle-Re-Anlage merken).
+  // Abschnittsflächen-Daten in die Source spielen (und für setStyle-Re-Anlage merken). Nur bei
+  // inhaltlicher Änderung (LFH-945, D5): neue Query-Daten mit gleichem Inhalt (Live-Kanal) oder eine
+  // neu gebaute Prop kosteten sonst je Eigenpositions-Fix ein `setData` samt Neuaufbau im Worker.
+  // Der Schlüssel ist billiger: Abschnittsflächen sind wenige Polygone.
   useEffect(() => {
     const fc = baueFlaechenFc(flaechen);
+    const schluessel = JSON.stringify(fc);
+    if (schluessel === flaechenSchluesselRef.current) return;
+    flaechenSchluesselRef.current = schluessel;
     flaechenDatenRef.current = fc; // unbedingt: load/styledata/idle-Handler lesen daraus
     const map = mapRef.current;
     if (!map) return;
-    // Style noch nicht geladen → auf das nächste idle vertagen, sonst ginge eine frisch gezeichnete
-    // Fläche bis zum Reload verloren. Immer aus dem Ref lesen.
-    wendeKartenDatenAn(map, () => {
+    // Stil noch nicht angewandt → vertagen (`wendeKartenDatenAn`), sonst ginge eine frisch
+    // gezeichnete Fläche bis zum Reload verloren. Immer aus dem Ref lesen.
+    wendeKartenDatenAn(map, 'abschnitte', () => {
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       const src = map.getSource('abschnitte') as maplibregl.GeoJSONSource | undefined;
       if (src) src.setData(flaechenDatenRef.current as never);
@@ -1072,9 +1096,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     zonenDatenRef.current = fc; // unbedingt: load/styledata/idle-Handler lesen daraus
     const map = mapRef.current;
     if (!map) return;
-    // Style noch nicht geladen (z. B. während terra-draw seine Layer auf-/abbaut) → auf das nächste
-    // idle vertagen. Immer aus dem Ref lesen.
-    wendeKartenDatenAn(map, () => {
+    // Stil noch nicht angewandt → vertagen (`wendeKartenDatenAn`). Immer aus dem Ref lesen.
+    wendeKartenDatenAn(map, 'zonen', () => {
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       const src = map.getSource('zonen') as maplibregl.GeoJSONSource | undefined;
       if (src) src.setData(zonenDatenRef.current as never);
@@ -1107,7 +1130,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     const aktiv = fachebenen ?? [];
     fachebenenRef.current = aktiv;
-    wendeKartenDatenAn(map, () => {
+    wendeKartenDatenAn(map, 'fachebenen', () => {
       const aktivKeys = new Set(aktiv.map((f) => f.def.key));
       // entfernte Ebenen abbauen
       for (const key of vorherigeFachebenenRef.current) {
@@ -1131,7 +1154,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     const aktiv = bilder ?? [];
     bilderRef.current = aktiv;
-    wendeKartenDatenAn(map, () => {
+    wendeKartenDatenAn(map, 'bilder', () => {
       const aktivIds = synchronisiereBildLayer(map, aktiv, 'abschnitte-fill');
       for (const id of vorherigeBilderRef.current) {
         if (!aktivIds.has(id)) entferneBildLayer(map, id);
@@ -1140,7 +1163,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     });
   }, [bilder]);
 
-  // Marker als GeoJSON-Layer + Clustering. Als letzter Daten-Effekt registriert → sein Poller läuft
+  // Marker als GeoJSON-Layer + Clustering. Als letzter Daten-Effekt registriert → sein Eintrag läuft
   // zuletzt, die Marker-Layer liegen über Abschnitten/Zonen/Bildern; `sorgeFuerMarkerLayer` pinnt
   // sie zusätzlich nach oben.
   useEffect(() => {
@@ -1164,7 +1187,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       clusterDomOnScreenRef.current = {};
       clusterDomRef.current = {};
     };
-    wendeKartenDatenAn(map, () => {
+    wendeKartenDatenAn(map, 'marker', () => {
       // Verglichen wird mit dem EINGESPIELTEN Stand: wurde vertagt, kann der Spider im Fenster
       // dazwischen auf dem alten Stand aufgegangen sein.
       const nurInhaltAngewandt = nurInhaltGeaendert(
@@ -1195,7 +1218,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const map = mapRef.current;
     if (!map) return;
     suchnadelRef.current = { daten: suchnadelFc(suchnadel ?? null), farbe: rollen.bedien };
-    wendeKartenDatenAn(map, () =>
+    wendeKartenDatenAn(map, 'suchnadel', () =>
       sorgeFuerSuchnadelLayer(map, suchnadelRef.current.daten, suchnadelRef.current.farbe),
     );
   }, [suchnadel, rollen.bedien]);
@@ -1208,7 +1231,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       daten: eigenpositionFc(eigenposition ?? null),
       farbe: rollen.bedien,
     };
-    wendeKartenDatenAn(map, () =>
+    wendeKartenDatenAn(map, 'eigenposition', () =>
       sorgeFuerEigenpositionLayer(
         map,
         eigenpositionRef.current.daten,
@@ -1606,27 +1629,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     messRef.current?.setzeStartpunkt(messStart);
   }, [messen, messStart]);
 
-  // Controller bei Unmount sauber zerstören.
-  useEffect(
-    () => () => {
-      drawRef.current?.zerstoeren();
-      drawRef.current = null;
-      zoneDrawRef.current?.zerstoeren();
-      zoneDrawRef.current = null;
-      messRef.current?.zerstoeren();
-      messRef.current = null;
-    },
-    [],
-  );
-
   // Stabile Ref für onPlatzierGeometrie (Callback-Identität soll den Effekt nicht neu auslösen).
   const onPlatzierGeometrieRef = useRef(onPlatzierGeometrie);
   onPlatzierGeometrieRef.current = onPlatzierGeometrie;
   const onGriffStandRef = useRef(onGriffStand);
   onGriffStandRef.current = onGriffStand;
 
-  // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus.
-  const handlesRef = useRef<BildHandles | null>(null);
   // Modus und Maße gehen über Refs in die Erzeugung: als Deps zerstörten sie die Griffe bei jedem
   // Umschalten. Einen Wechsel mitten in einer Ziehgeste stellt `bildHandles` bis `dragend` zurück;
   // die Maße gelten ab dem nächsten Platzieren.

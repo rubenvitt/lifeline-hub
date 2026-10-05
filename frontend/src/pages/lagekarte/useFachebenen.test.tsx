@@ -1,10 +1,11 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { ConfigProvider } from 'antd';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { neuerQueryClient } from '../../test/utils';
+import { GLOBAL_KEYS, globalKeys } from '../../api/queryKeys';
 import {
   ladeFachebene,
   type FachebeneAntwort,
@@ -214,8 +215,7 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
   };
 });
 
-function wrapper(controlHeight?: number) {
-  const client = neuerQueryClient();
+function wrapper(controlHeight?: number, client = neuerQueryClient()) {
   return ({ children }: { children: ReactNode }) => {
     const inhalt = <QueryClientProvider client={client}>{children}</QueryClientProvider>;
     return controlHeight === undefined ? (
@@ -228,15 +228,82 @@ function wrapper(controlHeight?: number) {
 
 // Die Sichtbarkeit ist externer State (useKartenAnsicht); im Test hält ihn ein kontrollierter
 // useState, damit onFachebeneToggle den Hook re-rendert.
-function rendere(controlHeight?: number) {
+function rendere(controlHeight?: number, client?: QueryClient) {
   return renderHook(
     () => {
       const [sichtbar, setSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
       return useFachebenen({ fachebenenSichtbar: sichtbar, setFachebenenSichtbar: setSichtbar });
     },
-    { wrapper: wrapper(controlHeight) },
+    { wrapper: wrapper(controlHeight, client) },
   );
 }
+
+/**
+ * Liegezeit der Ausschnitts-Abfragen (LFH-945, D6): je besuchter Kartenzelle lag die Antwort 6 h
+ * im Cache. Geprüft am echten Cache des Clients — `gcTime` setzen die Abfragen selbst, der
+ * `gcTime: 0` des Test-Clients greift dort nicht.
+ */
+describe('useFachebenen: Liegezeit der Ausschnitte (LFH-945)', () => {
+  const eintraege = (client: QueryClient, quelle: 'kritis' | 'energie') =>
+    client
+      .getQueryCache()
+      .findAll({ queryKey: [GLOBAL_KEYS.fachebene, quelle] })
+      .map((q) => q.queryKey[2]);
+
+  it('nicht mehr gezeigte KRITIS- und Energie-Ausschnitte sind nach 5 min aus dem Cache', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const client = neuerQueryClient();
+      const { result } = rendere(undefined, client);
+      act(() => result.current.onFachebeneToggle('kritis', true));
+      act(() => result.current.onFachebeneToggle('energie', true));
+      act(() => result.current.setKartenZoom(10));
+      for (const bbox of ['bbox1', 'bbox2', 'bbox3']) {
+        act(() => result.current.setViewportBbox(bbox));
+        await waitFor(() => {
+          expect(eintraege(client, 'kritis')).toContain(bbox);
+          expect(client.getQueryState(globalKeys.fachebeneKritis(bbox))?.status).toBe('success');
+          expect(client.getQueryState(globalKeys.fachebeneEnergie(bbox))?.status).toBe('success');
+        });
+      }
+
+      await act(() => vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000));
+      expect(eintraege(client, 'kritis')).toEqual(['bbox3']);
+      expect(eintraege(client, 'energie')).toEqual(['bbox3']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('eine Rückkehr innerhalb von 5 min ruft KRITIS nicht neu ab', async () => {
+    const lade = vi.mocked(ladeFachebene);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const client = neuerQueryClient();
+      const { result } = rendere(undefined, client);
+      const rufe = (bbox: string) =>
+        lade.mock.calls.filter(([q, b]) => q === 'kritis' && b === bbox).length;
+      const vorher = rufe('bbox1');
+      act(() => result.current.onFachebeneToggle('kritis', true));
+      act(() => result.current.setViewportBbox('bbox1'));
+      await waitFor(() => expect(rufe('bbox1')).toBe(vorher + 1));
+      await waitFor(() =>
+        expect(client.getQueryState(globalKeys.fachebeneKritis('bbox1'))?.status).toBe('success'),
+      );
+      act(() => result.current.setViewportBbox('bbox2'));
+      await waitFor(() =>
+        expect(client.getQueryState(globalKeys.fachebeneKritis('bbox2'))?.status).toBe('success'),
+      );
+
+      await act(() => vi.advanceTimersByTimeAsync(4 * 60_000));
+      act(() => result.current.setViewportBbox('bbox1'));
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(rufe('bbox1')).toBe(vorher + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe('useFachebenen', () => {
   // Der Luftqualitäts-Status ist modulweit veränderlich; ein scheiternder Test darf `offline` nicht

@@ -35,6 +35,7 @@ import Kartenflaeche, {
   type KartenHandle,
   type KartenKontextmenue,
   type KartenKontextPunkt,
+  type KartenflaecheProps,
 } from './lagekarte/Kartenflaeche';
 import { kontextEintraege, kontextMenueItems, kopiereKoordinate } from './lagekarte/kontextmenue';
 import ZeichenHierDialog from './lagekarte/ZeichenHierDialog';
@@ -82,6 +83,9 @@ import { useSprungSperre } from '../einsatz/useSprungSperre';
  * ersten drei Namen den Einstieg für den häufigeren Einzelfall.
  */
 const QUELLEN_NAMEN_MAX = 3;
+
+/** Leere Flächenliste mit fester Identität (LFH-945): ein neues `[]` je Render setzte die Karte neu. */
+const LEER_FLAECHEN: NonNullable<KartenflaecheProps['flaechen']> = [];
 
 /** Meldungszeile des Warn-Overlays. Exportiert, damit die Kürzungsregel ohne Karte prüfbar ist. */
 export function quellenMeldung(quellen: string[]): string {
@@ -231,6 +235,15 @@ export default function LagekartePage() {
         ? personenVerortet.map((m) => ({ ...m, clusterQuelle: 'personen' as const }))
         : [],
     [layer.person, personenZugriff, personenVerortet],
+  );
+  // Abschnittsflächen für die Karte mit stabiler Identität: die Karte setzt sie bei neuer Liste
+  // per `setData` neu, und die Seite rendert bei jedem Eigenpositions-Fix (LFH-945, D5).
+  const kartenFlaechen = useMemo(
+    () =>
+      layer.abschnitt
+        ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon }))
+        : LEER_FLAECHEN,
+    [layer.abschnitt, flaechen],
   );
   const waehlbar = useMemo(
     () => (personenAufKarte.length ? [...alleVerortet, ...personenAufKarte] : alleVerortet),
@@ -1018,11 +1031,7 @@ export default function LagekartePage() {
         flyToZiel={flyToZiel}
         startAnsicht={start}
         onStyleFehler={onStyleFehler}
-        flaechen={
-          layer.abschnitt
-            ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon }))
-            : []
-        }
+        flaechen={kartenFlaechen}
         zeichnen={zeichneAbschnittId != null}
         onFlaecheGezeichnet={onFlaecheGezeichnet}
         onFlaecheKlick={onFlaecheKlick}
