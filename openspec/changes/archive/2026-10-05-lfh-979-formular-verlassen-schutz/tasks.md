@@ -26,5 +26,5 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh` grün (Umgebungsrot gegen `alpha` gegengeprüft) und Vitest-Gesamtlauf grün
-- [ ] 5.2 Mutationsproben dokumentiert: Fix in `OrganisationTab` zurückgenommen → 2.1 rot; Rückfrage abgeklemmt → Seitenproben 3.1/3.2 rot
+- [x] 5.1 `./scripts/check-all.sh` grün (Umgebungsrot gegen `alpha` gegengeprüft) und Vitest-Gesamtlauf grün
+- [x] 5.2 Mutationsproben dokumentiert: Fix in `OrganisationTab` zurückgenommen → 2.1 rot; Rückfrage abgeklemmt → Seitenproben 3.1/3.2 rot

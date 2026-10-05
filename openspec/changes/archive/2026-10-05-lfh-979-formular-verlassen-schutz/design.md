@@ -59,7 +59,12 @@ mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
 - Eigener Zustand, **nicht** `isFieldsTouched`: antd setzt `touched` nach dem Speichern nie zurück.
 - Ein Fassungszähler statt eines Booleans: `geaendert()` zählt hoch, `gespeichert(f)` setzt nur
   zurück, wenn seit `fassung()` nichts dazukam. So bleibt eine Eingabe während des Speicherns
-  geschützt (Spec „Weitertippen …“), ohne Werte vergleichen zu müssen.
+  geschützt (Spec „Weitertippen …“), ohne Werte vergleichen zu müssen. Der Zähler lebt in einem
+  Ref, nur der Wahrheitswert ist State: ein Zähler-State renderte die Seite bei jedem Tastendruck
+  neu (im Review gemessen auf `EinsatzDefaults`, Test von rund 3 s auf rund 10 s).
+- `schluessel` nur bei `key={id}` am Formular (Fahrzeug- und Personal-Detail). Die
+  Einsatz-Einstellungen halten `Form.useForm()` ohne Schlüssel; dort bliebe die alte Eingabe im
+  Formular stehen, also bleibt auch der Merker stehen.
 - `ungespeichert = aktiv && zaehler > gesichert`. `aktiv: false` (kein Schreibrecht) schaltet
   Rückfrage und Warnung ab, auch wenn ein programmatisches `setFieldsValue` je ein
   `onValuesChange` auslösen sollte.
@@ -85,8 +90,11 @@ Maske. Der Gewinn ist ein Klick. Deshalb ohne; die Entwürfe behalten ihn.
 - Neue Funktion `aendereOrganisation(felder: { name?: string; tz_organisation?: string })` in
   `api/organisation.ts` schickt genau die übergebenen Felder. `setzeOrgName` und
   `setzeOrgDefault` entfallen, wenn kein anderer Aufrufer bleibt.
-- Geändert heißt: getrimmter Name ungleich Serverstand, DV-102-Organisation ungleich
-  Serverstand. Ohne Änderung kein Aufruf, kein Toast; der Merker fällt zurück.
+- Geändert heißt: getrimmter Name bzw. DV-102-Organisation ungleich der **Basis**, also dem
+  Stand, den das Formular zuletzt vom Server übernommen oder selbst gespeichert hat — nicht dem
+  Cache. Der Abgleich ruht bei offener Änderung; eine fremde Änderung an einem unberührten Feld
+  stünde gegen den Cache als „geändert“ da und würde überschrieben (im Review gefunden). Ohne
+  Änderung kein Aufruf, kein Toast; der Merker fällt zurück.
 - Toast: „Name gespeichert“, „DV-102-Organisation gespeichert“ oder „Name und
   DV-102-Organisation gespeichert“.
 - Die Antwort ist die volle `OrganisationAnzeige`: erst `setQueryData`, dann
@@ -126,10 +134,10 @@ Baustein.
 
 ## Risks / Trade-offs
 
-- [Eine erzwungene Navigation (Abmeldung, Sitzungsende) läuft in die Rückfrage] → Gleiches
-  Verhalten wie heute bei den Entwürfen; „Verwerfen“ führt sie aus. Geht die Abmeldung über
-  `window.location`, greift nur die Browser-Warnung. Beim Umsetzen prüfen und im Test belegen,
-  dass der Weg nicht hängen bleibt.
+- [Eine erzwungene Navigation (Abmeldung, Sitzungsende) läuft in die Rückfrage] → Geprüft: ohne
+  Benutzer baut `routes/RequireAuth.tsx` den Teilbaum samt Blocker ab, die Umleitung zur
+  Anmeldung geht ohne Rückfrage durch. Das Nachholen eines angehaltenen Wechsels, sobald der
+  Merker fällt, belegt `VerlassenRueckfrage.test.tsx`.
 - [Speichern löst selbst eine Navigation aus] → Keine der acht Seiten navigiert nach dem
   Speichern; `gespeichert()` läuft vor jeder späteren Navigation.
 - [Zurückgetippter Ausgangswert gilt als geändert] → Die Rückfrage erscheint dann unnötig. Auf
