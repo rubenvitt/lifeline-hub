@@ -125,7 +125,7 @@ Ein Test misst nicht Zeit, sondern Bytes: Nach der atomaren Schwärzung eines Ei
 Anhänge (der automatische Checkpoint setzt ihn zwischen den Anhängen zurück). 5 MB liegen über
 seiner Schwelle von 1000 Seiten (≈ 4 MB), damit er nach jedem Anhang greift; mit 1-MB-Anhängen
 stünde der WAL bis zur Schwelle und unterschiede einen Nachlauf nicht von wenigen großen
-Transaktionen. Das ist hardwareunabhängig und überträgt sich über die Schreibrate auf den Pi.
+Transaktionen. Das ist hardwareunabhängig und überträgt sich über die Schreibrate auf jede Zielhardware.
 
 ### 6. Messung
 
@@ -135,9 +135,9 @@ einzelne Transaktion aus. Dazu schreibt während Schwärzung und Rückschrieb ei
 Verbindung fortlaufend kurze Transaktionen wie ein laufender Einsatz; ihre längste Wartezeit
 (`warten max`) ist genau die Größe, um die es geht. Der Pool läuft dafür wie in Produktion mit
 dem automatischen Checkpoint (LFH-725 maß ohne, um die WAL-Summe zu zeigen); `WAL` ist deshalb
-der höchste Stand der Datei. Gemessen wird im Container und auf dem Pi mit SD-Karte und mit SSD
+der höchste Stand der Datei. Gemessen wird im Container; auf der Zielhardware mit demselben Befehl
 (`LFH725_MB=50,200,500 cargo test --release --lib secure_delete_messung -- --ignored
---nocapture`).
+--nocapture`), sobald es sie gibt (siehe „Messung“).
 
 ## Messung
 
@@ -163,7 +163,16 @@ gut 7 MB, der Rückschrieb am Ende ist praktisch leer. Auf der SD-Karte wächst 
 Modus ON mit der Schreibrate (hochgerechnet ~25 s bei 500 MB), im Modus ON-einzeln nur bis
 zur Dauer eines Anhangs (1 MB ≈ 0,05 s, höchstens 26 MB ≈ 1,3 s bei 20 MB/s).
 
-**Pi** (mit SD-Karte und mit SSD): offen.
+**Zielhardware:** Einen Pi gibt es nicht (Ruben, 05.10.2026); welcher Rechner das System im
+Einsatz trägt, steht noch nicht fest. Gemessen ist deshalb nur im Container. Die Grenze aus dem
+Ticket gilt trotzdem unabhängig von der Hardware: Kein Schreibvorgang der Schwärzung gibt mehr
+als einen Anhang frei (WAL-Test, Entscheidung 5), ein Anhang hat höchstens 26 MB, und die
+Wartezeit eines anderen Schreibenden bleibt damit unter `busy_timeout` (5 s), solange der
+Datenträger mehr als ~5,2 MB/s schreibt. Das schafft jede SD-Karte ab Klasse 10 und jede SSD.
+Der Rückschrieb am Ende findet nur noch den Rest eines Anhangs vor. Langsamer als diese Grenze
+schreibt allenfalls ein defekter Datenträger; dann scheitert auch der normale Betrieb. Die
+Messung auf dem künftigen Rechner ist als eigene Aufgabe auf dem Entwicklungsboard
+nachzuholen, sobald er feststeht.
 
 ## Risks / Trade-offs
 
@@ -172,8 +181,8 @@ zur Dauer eines Anhangs (1 MB ≈ 0,05 s, höchstens 26 MB ≈ 1,3 s bei 20 MB/s
   nicht abrufbar (Entscheidung 2). Dieselbe Lücke gab es schon vor dem Rückschrieb (LFH-725,
   Entscheidung 2); die Spec misst die physische Entfernung am Ende des Laufs.
 - [Ein einzelner 26-MB-Anhang sperrt auf einer langsamen SD-Karte länger als gedacht.] →
-  Gedeckelt durch die Upload-Grenze; liegt die Pi-Messung darüber, bleibt die Sperre trotzdem
-  unter `busy_timeout`, solange die Karte mehr als ~6 MB/s schreibt.
+  Gedeckelt durch die Upload-Grenze; die Sperre bleibt unter `busy_timeout`, solange der
+  Datenträger mehr als ~5,2 MB/s schreibt (siehe „Messung“, Zielhardware).
 - [Die SD-Karte ist während des Nachlaufs ausgelastet; Schreibende werden langsamer, aber
   nicht abgewiesen.] → Hingenommen: einmal je Einsatz, im Hintergrund.
 - [Eine Sicherung (`VACUUM INTO`) zwischen atomarer Schwärzung und Nachlauf enthält die

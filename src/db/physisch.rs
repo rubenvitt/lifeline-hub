@@ -9,7 +9,7 @@
 //! Herleitung und Messung:
 //! `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`;
 //! die Schreibsperre der Schwärzung bei vielen Anhängen (Nachlauf je Anhang, LFH-905):
-//! `openspec/changes/lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`.
+//! `openspec/changes/archive/2026-10-05-lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`.
 
 use sqlx::SqlitePool;
 

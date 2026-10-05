@@ -5,7 +5,7 @@
 Seit LFH-725 nullt SQLite (`secure_delete = ON`) jedes freigewordene Byte. Die Schwärzung eines
 Einsatzes löscht seine Datei-Anhänge in derselben Transaktion wie den übrigen Scrub, und diese
 Transaktion hält die Schreibsperre der ganzen Datenbank, bis der Commit 1 MB WAL je gelöschtem
-MB Anhang geschrieben hat. Auf einem Pi mit SD-Karte (~20 MB/s) sind das bei 500 MB Anhängen
+MB Anhang geschrieben hat. Auf einer SD-Karte (~20 MB/s) sind das bei 500 MB Anhängen
 rund 25 s, danach noch einmal so lange für den Rückschrieb. In dieser Zeit bekommen
 Schreibende **laufender** Einsätze nach `busy_timeout` und `write_retry!` eine 503: Eine
 ETB-Meldung im Einsatz scheitert, weil im Hintergrund ein alter Einsatz geschwärzt wird.
@@ -23,7 +23,7 @@ ETB-Meldung im Einsatz scheitert, weil im Hintergrund ein alter Einsatz geschwä
   Kategorie `anhaenge` geschwärzt, Anhang noch da). Jeder Purge-Lauf holt Reste nach, auch nach
   einem Absturz oder Neustart, vor dem WAL-Rückschrieb.
 - Die Messung `secure_delete_messung` bekommt den Nachlauf als dritten Modus und gibt die längste
-  einzelne Transaktion aus, damit dieselbe Messung auf dem Pi die Sperrdauer belegt.
+  einzelne Transaktion aus, damit dieselbe Messung auf der Zielhardware die Sperrdauer belegt.
 
 ## Capabilities
 

@@ -18,7 +18,7 @@
 ## 3. Messung
 
 - [x] 3.1 `secure_delete_messung` um den Modus `ON-einzeln` erweitern (atomarer Scrub ohne Anhänge, dann ein `DELETE` je Anhang; Ausgabe längste Tx und Summe); Lauf im Container mit `LFH725_MB=50,200,500`, Werte in `design.md` „Messung“
-- [ ] 3.2 Messung auf dem Pi mit SD-Karte und mit SSD (Ruben) mit demselben Befehl; Werte in `design.md` „Messung“, Einordnung gegen `busy_timeout`
+- [x] 3.2 Messung auf dem Pi mit SD-Karte und mit SSD (Ruben) mit demselben Befehl; Werte in `design.md` „Messung“, Einordnung gegen `busy_timeout` — entfällt, es gibt keinen Pi und die Zielhardware steht noch nicht fest (Ruben, 05.10.2026); `design.md` „Messung“ begründet die Grenze hardwareunabhängig, die Messung auf dem künftigen Rechner ist eine eigene Aufgabe
 
 ## 4. Integration
 

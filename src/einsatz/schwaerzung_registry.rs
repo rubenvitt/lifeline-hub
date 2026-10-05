@@ -51,7 +51,7 @@ pub enum Strategie {
     /// unerreichbar ist; die Zeile selbst löscht `anhang::repo::entferne_vorgesehene` danach je
     /// Anhang in einer eigenen Transaktion. Wer Anhänge auf einem anderen Weg in einer
     /// Transaktion löscht, holt die lange Sperre zurück. Herleitung:
-    /// `openspec/changes/lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`.
+    /// `openspec/changes/archive/2026-10-05-lfh-905-schwaerzung-schreibsperre-begrenzen/design.md`.
     ZeileEinzelnLoeschen,
 }
 
