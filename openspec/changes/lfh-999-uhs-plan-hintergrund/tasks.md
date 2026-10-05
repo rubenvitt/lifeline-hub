@@ -52,12 +52,12 @@ Gates ohne `| tail`, Node und pnpm über `mise exec --`.
 - [x] 5.1 Knopf „Plan“ in der Kopfzeile der Fläche nur bei `platzEditAktiv`; aufklappbares Paneel über der Fläche mit Upload, Übernahme aus Dateien (nur Bild-Anhänge, Hinweis auf das Protokoll), Lagefeldern (Schritt 10), Helligkeit, Kontrast, Umkehr-Schalter, „An Plätze einpassen“, „Plan entfernen“ mit roter Rückfrage, Hinweis „Nur Pläne, keine Fotos von Patienten“.
   - Vitest zuerst: Knopf fehlt ohne Schreibrecht, ohne Bearbeiten-Modus und mit `platzBearbeitbar={false}`; Übernahme listet nur PNG/JPEG/WebP-Anhänge; PATCH erst beim Loslassen des Reglers; Einpassen schickt die Werte von `einpassen`; Entfernen fragt vorher.
   - Verifiziert durch `mise exec -- pnpm -C frontend test -- Grundriss UhsPlan`, `mise exec -- pnpm -C frontend lint` und `typecheck`.
-- [ ] 5.2 e2e in `frontend/e2e/` (Regeln `frontend/e2e/AGENTS.md`): Plan hochladen, in „Handschuh“ auf einen Platz über dem Plan tippen → Menü; Plätze verschieben, einpassen; Seite neu laden → kein neuer Eintrag in „Zugriffe“.
+- [x] 5.2 e2e in `frontend/e2e/` (Regeln `frontend/e2e/AGENTS.md`): Plan hochladen, in „Handschuh“ auf einen Platz über dem Plan tippen → Menü; Plätze verschieben, einpassen; Seite neu laden → kein neuer Eintrag in „Zugriffe“.
   - Verifiziert durch den e2e-Lauf dieser Spec.
 
 ## 6. Gesamtnachweise
 
-- [ ] 6.1 Mutationsproben: (a) Audit-Zeile in der Übernahme entfernt → Test „genau eine Zeile“ rot; (b) `pointer-events: none` entfernt → Vitest der Bildebene rot; (c) Stornoprüfung im PATCH entfernt → 409-Test rot. Ergebnis im Commit-Text.
+- [x] 6.1 Mutationsproben: (a) Audit-Zeile in der Übernahme entfernt → Test „genau eine Zeile“ rot; (b) `pointer-events: none` entfernt → Vitest der Bildebene rot; (c) Stornoprüfung im PATCH entfernt → 409-Test rot. Ergebnis im Commit-Text.
   - Verifiziert durch die drei roten Läufe vor dem Zurücknehmen.
 - [ ] 6.2 `./scripts/check-all.sh` grün (umgebungsbedingte Schritte gegen `alpha` gegengeprüft).
   - Verifiziert durch den Exit-Code bzw. die CI des PRs.
