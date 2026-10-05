@@ -20,4 +20,4 @@
 
 ## 3. Abschluss
 
-- [ ] 3.1 `./scripts/check-all.sh` gelaufen; umgebungsbedingt rote Schritte gegen `origin/alpha` gegengeprüft
+- [x] 3.1 `./scripts/check-all.sh` gelaufen; umgebungsbedingt rote Schritte gegen `origin/alpha` gegengeprüft (Desktop-Hülle ohne GTK, `kartenbilder` unter Node 22, e2e-Dichte-Fälle in `trefflaeche-pruefflaechen`); der volle Lauf belegt die CI des PRs
