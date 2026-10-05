@@ -31,4 +31,7 @@ dann der Code. Vor jeder „fertig“-Aussage gelten `verification-before-comple
 
 - [x] 5.1 e2e `frontend/e2e/einsatzbericht-druck.spec.ts` erweitern: Bilanz und Lage abwählen → Abschnitte fehlen, Kopf nennt die Auswahl, Neuladen behält sie; Adresse mit unbekanntem Schlüssel → nicht im Kopf; Anlage Personal je Kopf wählen → die gesäte Einsatzkraft steht mit Einsatzzeit, Kopf vermerkt den Personenbezug; unter `emulateMedia('print')` mit `beforeprint` ist das Paneel `display: none`. Verifiziert durch grünen Spec-Lauf in Chromium, 3/3. Die Spec steht wie seit LFH-726 nicht in `DRUCK_SPECS`; die Druckmechanik ist unverändert (`pruefliste.md`, Browser).
 - [x] 5.2 `pruefliste.md` dieser Change: Prüfliste Einsatztauglichkeit für die Auswahlleiste (Bedienung mit Handschuh, Tastatur, schmale Breite), je Zeile Verdikt und Beleg. Verifiziert durch die vollständige Liste.
-- [x] 5.3 Gesamtlauf `./scripts/check-all.sh` (ohne `| tail`) grün. Verifiziert durch den Lauf bzw. die CI dieses PRs.
+- [x] 5.3 Gesamtlauf `./scripts/check-all.sh` (ohne `| tail`) grün. In der Cloud-Sitzung: Bündel `schnell`
+      grün; Vitest gesamt 10312 von 10322 grün, die 10 roten Fälle in fünf nicht berührten Dateien
+      hängen an der Zeitzone (UTC statt Europe/Berlin, mit `TZ=Europe/Berlin` grün) bzw. an Node 22
+      (`api/kartenbilder.test.ts`); e2e `einsatzbericht-druck` 3/3 grün. Der Rest über die CI dieses PRs.
