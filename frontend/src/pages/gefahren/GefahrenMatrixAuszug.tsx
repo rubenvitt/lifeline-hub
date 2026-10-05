@@ -4,7 +4,13 @@ import type { GefahrBewertung, Gefahrentyp, Schutzobjekt } from '../../api/types
 import { monoStil, useRollen } from '../../components/instrument';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSchema';
-import { SPALTENKOPF, zellFlaechenStil } from './GefahrenMatrix';
+import {
+  DATEN_UNBEWERTET,
+  SPALTENKOPF,
+  ZELLE_NICHT_ANWENDBAR,
+  ZELLE_UNBEWERTET,
+  zellFlaechenStil,
+} from './GefahrenMatrix';
 
 /**
  * Auszug der Gefahrenmatrix zum Lesen, für die Gefahrengebiet-Vorschau der Sprungpalette.
@@ -16,6 +22,7 @@ import { SPALTENKOPF, zellFlaechenStil } from './GefahrenMatrix';
  *
  * Drei Zellzustände, im Text und im zugänglichen Namen getrennt: bewertet → Kürzel (auch „–" für
  * „keine"); gültig ohne Bewertung → leer, „nicht bewertet"; ungültig → „n. a.", „nicht anwendbar".
+ * Zeichen und Namen der beiden letzten kommen aus `GefahrenMatrix` (LFH-969), wie in der Matrix.
  */
 export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertung[] }) {
   const { token, rollen } = useRollen();
@@ -97,17 +104,24 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
                 return (
                   <td
                     key={obj.wert}
-                    aria-label={`${name}: nicht anwendbar`}
+                    aria-label={`${name}: ${ZELLE_NICHT_ANWENDBAR.label}`}
                     style={{ ...zellStil, fontFamily: undefined, color: rollen.gedaempft }}
                   >
-                    n. a.
+                    {ZELLE_NICHT_ANWENDBAR.kuerzel}
                   </td>
                 );
               }
               const zelle = zelleVon(g.wert, obj.wert);
               if (!zelle) {
                 return (
-                  <td key={obj.wert} aria-label={`${name}: nicht bewertet`} style={zellStil} />
+                  <td
+                    key={obj.wert}
+                    data-warnstufe={DATEN_UNBEWERTET}
+                    aria-label={`${name}: ${ZELLE_UNBEWERTET.label}`}
+                    style={zellStil}
+                  >
+                    {ZELLE_UNBEWERTET.kuerzel}
+                  </td>
                 );
               }
               const stufe = warnstufeFlaeche[zelle.warnstufe];

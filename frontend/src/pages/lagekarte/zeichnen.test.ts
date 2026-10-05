@@ -18,6 +18,8 @@ const aufrufe = vi.hoisted(() => ({
   clear: 0,
   /** Nächster Klick setzt in terra-draw KEINEN Punkt (Mikro-Ziehen, Phantomklick). */
   verschlucken: false,
+  /** `stop()` wirft wie der Adapter auf einer schon entfernten Karte (LFH-943). */
+  stopWirft: false,
 }));
 
 vi.mock('terra-draw', () => ({
@@ -71,6 +73,9 @@ vi.mock('terra-draw', () => ({
       this.enabled = true;
     }
     stop() {
+      // Wie der Adapter nach `map.remove()`: `clear()` → `getSource(…).setData` auf undefined.
+      if (aufrufe.stopWirft)
+        throw new TypeError("Cannot read properties of undefined (reading 'setData')");
       this.enabled = false;
     }
     clear() {
@@ -147,6 +152,7 @@ beforeEach(() => {
   aufrufe.undo = 0;
   aufrufe.clear = 0;
   aufrufe.verschlucken = false;
+  aufrufe.stopWirft = false;
 });
 
 describe('createZeichnung — expliziter Abschluss', () => {
@@ -300,5 +306,21 @@ describe('createZeichnung — Verwerfen (LFH-712)', () => {
     zeichnung.verwerfen();
     expect(aufrufe.clear).toBe(0);
     expect(stand).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Modulwechsel mit laufendem Zeichnen (LFH-943): ist die Karte schon entfernt, wirft terra-draws
+ * `stop()`. `zerstoeren()` darf den Abbau der übrigen Controller nicht abbrechen.
+ */
+describe('createZeichnung — zerstoeren auf entfernter Karte (LFH-943)', () => {
+  it('wirft nicht, und der Stand fällt trotzdem auf leer', () => {
+    const { zeichnung, klick, letzter } = aufbau();
+    zeichnung.starten('polygon');
+    klick(10, 10);
+    expect(letzter()?.punkte).toBe(1);
+    aufrufe.stopWirft = true;
+    expect(() => zeichnung.zerstoeren()).not.toThrow();
+    expect(letzter()).toEqual({ punkte: 0, bereit: false, kannZurueck: false });
   });
 });

@@ -16,8 +16,8 @@ import { kontrast } from './kontrast-kern';
  * Vorschau fiele sonst durch. Damit die Menge nicht still schrumpft, muss jede Stilart unten in
  * `FUNDSTELLEN` unter den Messwerten stehen.
  *
- * Nicht gemessen: Zitate (`> …`) im Markdown. `Markdown.css` dimmt sie per `opacity`, und das
- * modelliert der Messkern nicht (er lehnt ab, statt zu schätzen). Nachzug: LFH-911.
+ * Zitate (`> …`) zählen mit (LFH-911): `Markdown.css` setzt sie in der Textrolle `text2` ab statt
+ * per `opacity`, die der Messkern ablehnt.
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
@@ -34,6 +34,7 @@ const FUNDSTELLEN = [
   'Deich Nord', // Fettung im Markdown
   'Pegel', // Inline-Code im Markdown (eigene Fläche)
   'Lagekarte', // Link im Markdown (eigene Farbe)
+  'Deichwache', // Zitat im Markdown (eigene Textrolle, LFH-911)
 ] as const;
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {
@@ -63,7 +64,7 @@ for (const modus of ['light', 'dark'] as const) {
     const grund = await post(page, etb, {
       typ: 'meldung',
       inhalt:
-        '**Deich Nord** gesichert, `Pegel` 4,20 m\n\n- Sandsäcke verbaut\n- [Lagekarte](https://example.org/karte) aktualisiert',
+        '**Deich Nord** gesichert, `Pegel` 4,20 m\n\n- Sandsäcke verbaut\n- [Lagekarte](https://example.org/karte) aktualisiert\n\n> Deichwache meldet Sickerstelle',
       von: 'Florian 1',
       an: 'ELW',
       meldeweg: 'funk',
