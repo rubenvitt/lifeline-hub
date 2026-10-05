@@ -686,7 +686,10 @@ export default function Schnellerfassung({
    * in den Eintrag; „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt.
    */
   // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile — in der
-  // einzeilig rollenden Chip-Zeile läge er sonst hinter dem Bildlauf.
+  // einzeilig rollenden Chip-Zeile läge er sonst hinter dem Bildlauf. In der Hinweiszeile OHNE den
+  // Kästchen-Boden (`antdKaestchen`, LFH-907): im Handschuh-Betrieb höbe er die Zeile von 36 auf
+  // 72 px, und die angepinnte Leiste risse auf dem Handschirm den Deckel der halben Fensterhöhe
+  // (`e2e/leisten-flaeche.spec.ts`, 451 statt höchstens 422 px). Benannte Ausnahme.
   const schalter = zeigeSchalter ? (
     <Tooltip title={UEBERNAHME_ERKLAERUNG}>
       {/* Gesperrt beim Senden: der laufende Versand hat die Übernahme schon gelesen. */}
@@ -694,6 +697,7 @@ export default function Schnellerfassung({
         checked={werteBehalten}
         disabled={sendet}
         onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
+        style={istSchmal ? { minHeight: 0 } : undefined}
       >
         <Typography.Text type="secondary">Werte behalten</Typography.Text>
       </Checkbox>

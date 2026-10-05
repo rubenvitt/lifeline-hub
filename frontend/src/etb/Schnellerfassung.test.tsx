@@ -854,6 +854,11 @@ describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
     );
     const schalter = screen.getByRole('checkbox', { name: /Werte behalten/ });
     expect(schalter.closest('[data-lfh="schnellerfassung"]') != null).toBe(inHinweiszeile);
+    // Der Kästchen-Boden (`antdKaestchen`, LFH-907) ist in der Hinweiszeile aufgehoben: im
+    // Handschuh-Betrieb höbe er die Zeile von 36 auf 72 px, und die Leiste risse auf dem
+    // Handschirm den Deckel der halben Fensterhöhe (`e2e/leisten-flaeche.spec.ts`).
+    const label = schalter.closest<HTMLElement>('label.ant-checkbox-wrapper')!;
+    expect(label.style.minHeight).toBe(inHinweiszeile ? '0px' : '');
   });
 
   it('holt einen Chip hinter dem rechten Rand waagerecht ins Bild, ohne das Dokument zu rollen', () => {
