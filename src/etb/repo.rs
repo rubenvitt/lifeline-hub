@@ -589,6 +589,9 @@ pub struct EtbFilter {
     /// Eine Einheit aus einem fremden Einsatz liefert über `ee.einsatz_id = e.einsatz_id`
     /// nichts statt fremder Treffer.
     pub einheit_id: Option<i64>,
+    /// Systemeinträge ausschließen (LFH-958, Schalter „Systemeinträge zeigen“). Nie zusammen
+    /// mit `typ = system` (der Handler weist das ab).
+    pub ohne_system: bool,
     /// Cursor: nur Einträge mit `lfd_nr <` diesem Wert (für ältere Seiten).
     pub before_lfd_nr: Option<i64>,
     /// Cursor nach oben (LFH-947): die `limit` Einträge mit der kleinsten `lfd_nr >` diesem
@@ -610,6 +613,7 @@ impl EtbFilter {
             bis_zeit: self.bis_zeit.clone(),
             erfasser_id: self.erfasser_id,
             einheit_id: self.einheit_id,
+            ohne_system: self.ohne_system,
         }
     }
 }
@@ -626,6 +630,7 @@ pub struct EtbZaehlFilter {
     pub bis_zeit: Option<String>,
     pub erfasser_id: Option<i64>,
     pub einheit_id: Option<i64>,
+    pub ohne_system: bool,
 }
 
 /// Schreibt FTS-Join und WHERE-Bedingung einer ETB-Abfrage (Einsatz + Filtermerkmale) in
@@ -664,6 +669,9 @@ fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &Etb
     if let Some(typ) = &filter.typ {
         qb.push(" AND e.typ = ");
         qb.push_bind(typ.clone());
+    }
+    if filter.ohne_system {
+        qb.push(" AND e.typ <> 'system'");
     }
     if let Some(v) = &filter.von_zeit {
         qb.push(" AND e.ereigniszeit >= ");
