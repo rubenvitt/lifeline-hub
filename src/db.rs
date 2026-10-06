@@ -3465,7 +3465,7 @@ mod tests {
         .await
         .unwrap();
 
-        let migration = include_str!("../migrations/0153_karte_proxy_asset_herkunft.sql");
+        let migration = include_str!("../migrations/0154_karte_proxy_asset_herkunft.sql");
         assert!(
             migration.starts_with("-- no-transaction"),
             "sqlx erkennt die Direktive nur am Dateianfang"
