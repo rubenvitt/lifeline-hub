@@ -489,6 +489,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('auftraegePfad mit ?reiter=befehle (LFH-972); „Aufträge" ist die Vorgabe ohne Parameter', () => {
     expect(auftraegePfad(E, { reiter: 'befehle' })).toBe('/einsaetze/5/auftraege?reiter=befehle');
     expect(auftraegePfad(E, { reiter: 'auftraege' })).toBe('/einsaetze/5/auftraege');
+    // `?auftrag=` gewinnt: der hervorgehobene Auftrag steht im Reiter Aufträge.
+    expect(auftraegePfad(E, { auftrag: 13, reiter: 'befehle' })).toBe(
+      '/einsaetze/5/auftraege?auftrag=13',
+    );
   });
   it('parseAuftraegeReiter: Round-Trip, unbekannter und fehlender Wert ergeben die Vorgabe', () => {
     const rund = (pfad: string) => parseAuftraegeReiter(new URL(pfad, 'http://x').searchParams);

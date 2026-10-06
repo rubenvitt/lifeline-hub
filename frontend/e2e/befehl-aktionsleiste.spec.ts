@@ -190,7 +190,8 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     await seite.getByRole('link', { name: 'Aufträge/Befehle' }).click();
     // Auf den ABGEHÄNGTEN Baum warten, nicht auf die URL: React räumt eine Runde später auf,
     // als der Router navigiert.
-    await expect(page).toHaveURL(/\/auftraege$/);
+    // Die Brotkrume führt auf den Reiter Befehle (LFH-972).
+    await expect(page).toHaveURL(/\/auftraege\?reiter=befehle$/);
     await expect(page.locator('.befehl-print-root')).toHaveCount(0);
     expect(
       await page.evaluate(() =>

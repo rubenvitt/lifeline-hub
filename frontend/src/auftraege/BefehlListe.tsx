@@ -1,7 +1,7 @@
 import { IconPlus } from '../icons';
 import { Button, Form, Input } from 'antd';
 import { Select } from '../components/Select';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
@@ -117,6 +117,15 @@ export default function BefehlListe({
    * hinter sich, ein Sprung schon in `onSuccess` liefe einem Abbruch während der Mutation davon.
    */
   const neuerEntwurf = useRef<number | null>(null);
+  // Wer die Seite während des Anlegens verlassen hat (Zurück, Hardware-Taste), wird nicht
+  // zurückgeholt: `navigate` liefe auch nach dem Abhängen noch.
+  const eingehaengt = useRef(true);
+  useEffect(() => {
+    eingehaengt.current = true;
+    return () => {
+      eingehaengt.current = false;
+    };
+  }, []);
 
   const befehle = befehleQuery.data ?? [];
   const entwuerfe = befehle.filter((b) => b.status === 'entwurf').length;
@@ -190,7 +199,7 @@ export default function BefehlListe({
           setAnlegenOffen(false);
           const id = neuerEntwurf.current;
           neuerEntwurf.current = null;
-          if (id != null) navigate(befehlDetailPfad(einsatzId, id));
+          if (id != null && eingehaengt.current) navigate(befehlDetailPfad(einsatzId, id));
         }}
         onAbbrechen={() => setAnlegenOffen(false)}
       >

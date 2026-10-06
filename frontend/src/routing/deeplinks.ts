@@ -710,7 +710,9 @@ export function auftraegePfad(
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'auftraege'), {
     auftrag: opts.auftrag,
-    reiter: opts.reiter === 'befehle' ? 'befehle' : undefined,
+    // Ein `?auftrag=`-Sprung meint immer den Reiter Aufträge: im Reiter Befehle hinge die
+    // Auftragsliste nicht ein, und der Parameter würde nie angewendet und geräumt.
+    reiter: opts.reiter === 'befehle' && opts.auftrag === undefined ? 'befehle' : undefined,
   });
 }
 
