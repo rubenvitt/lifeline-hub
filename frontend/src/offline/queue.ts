@@ -1,4 +1,10 @@
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import {
+  openDB,
+  type DBSchema,
+  type IDBPDatabase,
+  type IDBPTransaction,
+  type StoreNames,
+} from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import { neueClientId } from './clientId';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
@@ -45,12 +51,16 @@ export type PersonErfassungsSicht = Extract<Person['status'], 'erfasst' | 'vermi
 
 /** Dauerhafte Erfolgsquittung einer offline vorgemerkten Person. Sie wird erst
  * nach erfolgreichem Server-Replay zusammen mit dem Entfernen der Pending-Zeile
- * geschrieben und bleibt bis zur Darstellung auf der Personen-Seite erhalten. */
-interface PersonErfassungsQuittung {
+ * geschrieben und bleibt bis zur Darstellung auf der Personen-Seite erhalten.
+ *
+ * Nur Kennungen (LFH-941, design.md D6): Die Person liegt nach dem Replay auf dem Server, die
+ * Anzeige braucht nur Kennung und R-Nr. Name, Sichtung und Status bleiben vom Gerät fern. */
+export interface PersonErfassungsQuittung {
   benutzer_id: number;
   einsatz_id: number;
   client_id: string;
-  person: Person;
+  person_id: number;
+  registrier_nr: number;
   sicht: PersonErfassungsSicht;
   erstellt_at: string;
 }
@@ -134,9 +144,10 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
     // v2: `abgelehnt`-Store. v3: Personen-/Meldungs-Schreibaktionen; die ETB-Stores bleiben
     // byte-kompatibel. v4 bindet alle Stores an die Benutzer-ID; Legacy-Zeilen ohne `benutzer_id`
     // erscheinen in keinem Index und werden nie automatisch unter einer späteren Sitzung versendet.
-    // v5: Personen-Erfolgsquittungen. Jeder Store wird versionsgeguardet angelegt, sonst würfe
-    // `createObjectStore` auf einer Bestands-DB.
-    dbPromise = openDB<OfflineDB>('lifeline-offline', 5, {
+    // v5: Personen-Erfolgsquittungen. v6 (LFH-941): Quittungen tragen nur noch Kennungen,
+    // Bestandsquittungen werden umgeschrieben. Jeder Store wird versionsgeguardet angelegt, sonst
+    // würfe `createObjectStore` auf einer Bestands-DB.
+    dbPromise = openDB<OfflineDB>('lifeline-offline', 6, {
       upgrade(d, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           const store = d.createObjectStore('ausstehend', { keyPath: 'id', autoIncrement: true });
@@ -187,10 +198,32 @@ function db(): Promise<IDBPDatabase<OfflineDB>> {
           quittungen.createIndex('by-benutzer', 'benutzer_id');
           quittungen.createIndex('by-benutzer-einsatz', ['benutzer_id', 'einsatz_id']);
         }
+        if (oldVersion >= 5 && oldVersion < 6) void quittungenKuerzen(tx);
       },
     });
   }
   return dbPromise;
+}
+
+/** v5 → v6 (LFH-941, design.md D6): jede Bestandsquittung auf ihre Kennungen kürzen. */
+async function quittungenKuerzen(
+  tx: IDBPTransaction<OfflineDB, ArrayLike<StoreNames<OfflineDB>>, 'versionchange'>,
+): Promise<void> {
+  let cursor = await tx.objectStore('personErfassungsQuittungen').openCursor();
+  while (cursor) {
+    const alt = cursor.value as PersonErfassungsQuittung & { person?: Person };
+    if (alt.person) {
+      const { person, ...rest } = alt;
+      await cursor.update({ ...rest, person_id: person.id, registrier_nr: person.registrier_nr });
+    }
+    cursor = await cursor.continue();
+  }
+}
+
+/** Nur für Tests: vergisst die offene Verbindung, damit ein Test ein Upgrade nachstellen kann. */
+export function queueDbZuruecksetzenFuerTests(): void {
+  void dbPromise?.then((d) => d.close()).catch(() => {});
+  dbPromise = null;
 }
 
 /**
@@ -475,7 +508,8 @@ export async function schreibaktionPersonAbschliessen(
     benutzer_id: benutzerId,
     einsatz_id: aktuell.einsatz_id,
     client_id: clientId,
-    person,
+    person_id: person.id,
+    registrier_nr: person.registrier_nr,
     sicht: aktuell.aktion.daten.status ?? 'erfasst',
     erstellt_at: new Date().toISOString(),
   };

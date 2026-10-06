@@ -38,12 +38,12 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 4. Erfassungsquittung (D6)
 
-- [ ] 4.1 `offline/queue.ts`: v6, Quittung mit `person_id`/`registrier_nr`, Upgrade schreibt
+- [x] 4.1 `offline/queue.ts`: v6, Quittung mit `person_id`/`registrier_nr`, Upgrade schreibt
   v5-Quittungen um. Prüfen: gespeicherte Quittung ohne Name und Sichtung (rohe IDB); eine
   v5-Quittung ist nach dem Öffnen umgeschrieben.
-- [ ] 4.2 `pages/PersonenPage.tsx`: Personen aus dem Cache, Fallback nur Hervorhebung.
+- [x] 4.2 `pages/PersonenPage.tsx`: Personen aus dem Cache, Fallback nur Hervorhebung.
   Prüfen: Sammelquittung zeigt weiter „Erfasst als …“; ohne Person im Cache bleibt die Sicht.
-- [ ] 4.3 `offline/geraetRaeumung.ts`: Grund der Quittung im Verzeichnis nachführen.
+- [x] 4.3 `offline/geraetRaeumung.ts`: Grund der Quittung im Verzeichnis nachführen.
 
 ## 5. Ortscache (D7)
 
