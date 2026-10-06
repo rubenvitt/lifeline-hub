@@ -5,6 +5,8 @@
  * Web-Audio statt Audiodatei: kein Asset, kein Netz. Scheitert das Abspielen an der
  * Autoplay-Policy, bleibt es still (die visuelle Spur trägt).
  */
+import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
+
 type AlarmStufe = 'dezent' | 'alarm';
 export type AlarmTonStatus = 'bereit' | 'blockiert';
 
@@ -17,21 +19,14 @@ const MUTE_KEY = 'lfh:alarm:mute';
 const ALT_MUTE_KEY = 'lfh:sofortmeldung:mute';
 
 export function istAlarmGemutet(): boolean {
-  try {
-    const aktuell = localStorage.getItem(MUTE_KEY);
-    if (aktuell !== null) return aktuell === '1';
-    return localStorage.getItem(ALT_MUTE_KEY) === '1';
-  } catch {
-    return false;
-  }
+  const aktuell = sicherLesen(MUTE_KEY);
+  if (aktuell !== null) return aktuell === '1';
+  return sicherLesen(ALT_MUTE_KEY) === '1';
 }
 
 export function setzeAlarmMute(gemutet: boolean): void {
-  try {
-    localStorage.setItem(MUTE_KEY, gemutet ? '1' : '0');
-  } catch {
-    /* localStorage nicht verfügbar → nicht persistierbar, kein harter Fehler */
-  }
+  // Ohne Speicher nicht persistierbar, kein harter Fehler.
+  sicherSchreiben(MUTE_KEY, gemutet ? '1' : '0');
 }
 
 let ctx: AudioContext | null = null;

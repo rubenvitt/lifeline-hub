@@ -72,7 +72,7 @@ function handlers(
       einsatz_id: 1,
       ueber_abschnitt_id: null,
       name: 'Nord',
-      leiter_id: null,
+      leiter_id: 3,
       leiter_name: 'Leiter Nord',
       bemerkung: null,
       sortier: 0,
@@ -394,7 +394,8 @@ describe('EinsatzabschnittePage', () => {
     await userEvent.click(await screen.findByText('Nord'));
     expect(await screen.findByText('Lagezustand')).toBeInTheDocument();
     expect(screen.getByText('EA-N')).toBeInTheDocument();
-    expect(screen.getByText('angespannt')).toBeInTheDocument();
+    // Einmal im Baumknoten (LFH-962), einmal in den Abschnittsdaten.
+    expect(screen.getAllByText('angespannt')).toHaveLength(2);
     expect(screen.getByText('Deichsicherung km 3,8 – 5,4')).toBeInTheDocument();
     expect(screen.getByText('72 %')).toBeInTheDocument();
   });

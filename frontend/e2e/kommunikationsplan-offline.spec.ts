@@ -69,12 +69,12 @@ async function vorgehalteneKeys(page: Page): Promise<string[]> {
             fertig([]);
             return;
           }
-          const lesen = db.transaction('stand').objectStore('stand').get('aktuell');
+          const lesen = db.transaction('stand').objectStore('stand').get('client');
           lesen.onsuccess = () => {
             const satz = lesen.result as
-              { client: { clientState: { queries: { queryKey: unknown[] }[] } } } | undefined;
+              { clientState: { queries: { queryKey: unknown[] }[] } } | undefined;
             db.close();
-            fertig(satz ? satz.client.clientState.queries.map((q) => q.queryKey.join('/')) : []);
+            fertig(satz ? satz.clientState.queries.map((q) => q.queryKey.join('/')) : []);
           };
           lesen.onerror = () => {
             db.close();

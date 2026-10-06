@@ -311,3 +311,109 @@ describe('Bindung an den Benutzer (LFH-767)', () => {
     localStorage.removeItem('lifeline-etb-entwuerfe-ausstehend:kaputt');
   });
 });
+
+describe('Leere Entwürfe und verwaiste Merker räumen (LFH-941, design.md D8)', () => {
+  const TAG = 24 * 60 * 60 * 1000;
+  const vorTagen = (tage: number) => new Date(Date.now() - tage * TAG).toISOString();
+
+  it('räumt beim Laden leere eigene Entwürfe älter als 24 h über alle Einsätze samt Merker', async () => {
+    await entwurfSpeichern(
+      entwurf({ id: 'leer-alt', einsatz_id: 3, inhalt: ' ', geaendert_at: vorTagen(2) }),
+    );
+    localStorage.setItem(aktivSchluessel(A, 3), 'leer-alt');
+
+    expect(await entwuerfeLaden(A, 7)).toEqual([]);
+
+    expect(await rohLesen('lifeline-etb-entwuerfe', 'entwuerfe')).toEqual([]);
+    expect(localStorage.getItem(aktivSchluessel(A, 3))).toBeNull();
+  });
+
+  it('behält Entwürfe mit Text, auch nach 20 Tagen, und frische leere', async () => {
+    await entwurfSpeichern(
+      entwurf({ id: 'text-alt', einsatz_id: 3, inhalt: 'Lage', geaendert_at: vorTagen(20) }),
+    );
+    await entwurfSpeichern(
+      entwurf({ id: 'von-alt', einsatz_id: 4, inhalt: '', von: 'ELW', geaendert_at: vorTagen(20) }),
+    );
+    await entwurfSpeichern(
+      entwurf({ id: 'leer-frisch', einsatz_id: 5, inhalt: '', geaendert_at: vorTagen(0.5) }),
+    );
+    localStorage.setItem(aktivSchluessel(A, 3), 'text-alt');
+
+    await entwuerfeLaden(A, 7);
+
+    const ids = ((await rohLesen('lifeline-etb-entwuerfe', 'entwuerfe')) as EtbEntwurf[])
+      .map((e) => e.id)
+      .sort();
+    expect(ids).toEqual(['leer-frisch', 'text-alt', 'von-alt']);
+    expect(localStorage.getItem(aktivSchluessel(A, 3))).toBe('text-alt');
+  });
+
+  it('räumt verwaiste Merker der Person, nicht die anderer Personen', async () => {
+    localStorage.setItem(aktivSchluessel(A, 9), 'weg');
+    localStorage.setItem(aktivSchluessel(B, 9), 'fremd');
+    await entwuerfeLaden(A, 7);
+    expect(localStorage.getItem(aktivSchluessel(A, 9))).toBeNull();
+    expect(localStorage.getItem(aktivSchluessel(B, 9))).toBe('fremd');
+    localStorage.removeItem(aktivSchluessel(B, 9));
+  });
+
+  it('lässt einen leeren Entwurf einer anderen Person stehen', async () => {
+    await entwurfSpeichern(
+      entwurf({
+        id: 'leer-b',
+        benutzer_id: B,
+        einsatz_id: 3,
+        inhalt: '',
+        geaendert_at: vorTagen(3),
+      }),
+    );
+    await entwuerfeLaden(A, 7);
+    expect(await rohLesen('lifeline-etb-entwuerfe', 'entwuerfe')).toHaveLength(1);
+  });
+
+  it('lässt einen leeren Altentwurf stehen, an dem ein anderer Tab gerade schreibt', async () => {
+    await entwurfSpeichern(
+      entwurf({ id: 'leer-alt', einsatz_id: 3, inhalt: '', geaendert_at: vorTagen(2) }),
+    );
+    // Der andere Tab merkt seinen Auftrag vor, nachdem dieser Tab nachgetragen hat und bevor er
+    // räumt — also beim Öffnen des Räum-Cursors.
+    const oeffnen = IDBIndex.prototype.openCursor;
+    vi.spyOn(IDBIndex.prototype, 'openCursor').mockImplementation(function (
+      this: IDBIndex,
+      ...args
+    ) {
+      localStorage.setItem(
+        'lifeline-etb-entwuerfe-ausstehend:leer-alt',
+        JSON.stringify({
+          stand: 'anderer-tab',
+          entwurf: entwurf({
+            id: 'leer-alt',
+            einsatz_id: 3,
+            inhalt: 'gerade getippt',
+            geaendert_at: new Date().toISOString(),
+          }),
+        }),
+      );
+      return oeffnen.apply(this, args);
+    });
+    await entwuerfeLaden(A, 7);
+    vi.restoreAllMocks();
+    expect((await entwuerfeLaden(A, 3)).map((e) => e.inhalt)).toEqual(['gerade getippt']);
+  });
+
+  it('verliert keinen offenen Vorlauf', async () => {
+    const spione = schreibenBrichtAb();
+    await entwurfSpeichern(
+      entwurf({
+        id: 'vorlauf',
+        einsatz_id: 3,
+        inhalt: 'nur im Vorlauf',
+        geaendert_at: vorTagen(5),
+      }),
+    ).catch(() => {});
+    neuStarten(spione);
+    await entwuerfeLaden(A, 7);
+    expect((await entwuerfeLaden(A, 3)).map((e) => e.id)).toEqual(['vorlauf']);
+  });
+});

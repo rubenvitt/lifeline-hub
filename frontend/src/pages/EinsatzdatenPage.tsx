@@ -685,6 +685,7 @@ export default function EinsatzdatenPage() {
           {/* Kopfleiste — die vier Angaben, die im Fükw zuerst gebraucht werden. Sie stehen
               nicht zusätzlich in der Tabelle darunter. */}
           <div
+            data-fugenraster=""
             style={{
               ...kennzahlenbandStil(rollen),
               gridTemplateColumns: `repeat(auto-fit, minmax(min(${KOPF_MIN_BREITE}px, 100%), 1fr))`,

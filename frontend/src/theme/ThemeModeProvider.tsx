@@ -14,6 +14,7 @@ import {
   type Dichte,
 } from './tokens';
 import { zeigerIstGrob } from '../components/useViewport';
+import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 import { DICHTE_DEFAULT, startDichte } from './dichte';
 import {
   HELLIGKEIT_DEFAULT,
@@ -65,8 +66,9 @@ function istThemeModus(wert: string | null): wert is ThemeModus {
  */
 const MODUS_DEFAULT: ThemeModus = 'dark';
 
+/** Ohne Speicher (gesperrt, LFH-942) gilt die Vorgabe wie ohne gespeicherte Wahl. */
 function gespeicherterModus(): ThemeModus {
-  const wert = localStorage.getItem(SPEICHER_SCHLUESSEL);
+  const wert = sicherLesen(SPEICHER_SCHLUESSEL);
   return istThemeModus(wert) ? wert : MODUS_DEFAULT;
 }
 
@@ -78,11 +80,11 @@ function gespeicherterModus(): ThemeModus {
  * Absicht (Spec: keine Umschaltung während der Sitzung).
  */
 function gespeicherteDichte(): Dichte {
-  return startDichte(localStorage.getItem(DICHTE_SCHLUESSEL), zeigerIstGrob());
+  return startDichte(sicherLesen(DICHTE_SCHLUESSEL), zeigerIstGrob());
 }
 
 function gespeicherteHelligkeit(): Helligkeit {
-  return alsHelligkeit(localStorage.getItem(HELLIGKEIT_SCHLUESSEL));
+  return alsHelligkeit(sicherLesen(HELLIGKEIT_SCHLUESSEL));
 }
 
 function systemBevorzugtDunkel(): boolean {
@@ -107,18 +109,19 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setModus = useCallback((m: ThemeModus) => {
+    // Erst der State: Scheitert das Speichern, gilt die Wahl bis zum Neuladen (LFH-942).
     setModusState(m);
-    localStorage.setItem(SPEICHER_SCHLUESSEL, m);
+    sicherSchreiben(SPEICHER_SCHLUESSEL, m);
   }, []);
 
   const setDichte = useCallback((d: Dichte) => {
     setDichteState(d);
-    localStorage.setItem(DICHTE_SCHLUESSEL, d);
+    sicherSchreiben(DICHTE_SCHLUESSEL, d);
   }, []);
 
   const setHelligkeit = useCallback((h: Helligkeit) => {
     setHelligkeitState(h);
-    localStorage.setItem(HELLIGKEIT_SCHLUESSEL, String(h));
+    sicherSchreiben(HELLIGKEIT_SCHLUESSEL, String(h));
   }, []);
 
   const meldeWarnung = useCallback((quelle: string, aktiv: boolean) => {

@@ -1,5 +1,6 @@
 import type { Meldung, Person } from '../api/types';
 import type { PersonErfassungsSicht } from './queue';
+import { sicherEntfernen, sicherSchreiben } from '../lib/sichererSpeicher';
 
 /** Korrelation zwischen einer lokal vorgemerkten Aktion und ihrer späteren
  * Server-Antwort. Das Ereignis ist bewusst nur ein UI-Signal; die Wahrheit
@@ -70,13 +71,10 @@ function meldePersonQuittungTabUebergreifend(benutzerId: number, einsatzId: numb
   // `storage` erreicht wie BroadcastChannel nur andere Dokumente. Entfernen vor
   // dem Setzen sorgt dafür, dass auch zwei identische Scope-Signale nacheinander
   // ein Ereignis auslösen; der Payload bleibt trotzdem exakt datenarm.
-  try {
-    window.localStorage.removeItem(OFFLINE_QUITTUNG_STORAGE_KEY);
-    window.localStorage.setItem(OFFLINE_QUITTUNG_STORAGE_KEY, JSON.stringify(signal));
-  } catch {
-    // Private-/Quota-Modi dürfen den lokalen, bereits erfolgreichen Flush nicht
-    // in einen Fehler verwandeln. Der nächste Mount/visibilitychange liest IDB.
-  }
+  // Private-/Quota-Modi dürfen den lokalen, bereits erfolgreichen Flush nicht
+  // in einen Fehler verwandeln. Der nächste Mount/visibilitychange liest IDB.
+  sicherEntfernen(OFFLINE_QUITTUNG_STORAGE_KEY);
+  sicherSchreiben(OFFLINE_QUITTUNG_STORAGE_KEY, JSON.stringify(signal));
 }
 
 /** Beobachtet ausschließlich datenarme Signale anderer Tabs. Der Empfänger muss

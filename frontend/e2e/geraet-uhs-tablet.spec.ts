@@ -95,7 +95,15 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
     await expect(tablet.getByRole('heading', { level: 1, name: /UHS Nord/ })).toBeVisible();
     await expect(tablet.getByRole('button', { name: 'Plätze bearbeiten' })).toHaveCount(0);
     await expect(tablet.getByRole('button', { name: 'Auflösen' })).toHaveCount(0);
-    await expect(tablet.getByRole('tablist')).toHaveCount(0);
+    // Keine Reiterleiste für Material, Bewegungen und Dateien. Die Reiter des Grundrisses selbst
+    // stehen: bei 1024 px passt die Fläche nicht neben beide Seitenspalten (`dreiSpaltenPassen`).
+    await expect(tablet.getByRole('tablist', { name: /Material|Bewegungen|Dateien/ })).toHaveCount(
+      0,
+    );
+    await expect(tablet.getByRole('tab', { name: 'Fläche' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
 
     // Widerruf durch die Einsatzleitung: das Tablet endet von selbst, ohne Neuladen.
     await anlegen(page, `/api/einsaetze/${e}/geraete/${kopplung.kopplung.id}/widerrufen`);

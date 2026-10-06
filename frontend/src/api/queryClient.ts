@@ -7,7 +7,12 @@ import {
 } from '@tanstack/react-query';
 import { ApiError, NetzFehler } from './client';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
-import { EINSATZ_KEYS, LAGEBILD_OFFLINE, istKeyDesEinsatzes } from './queryKeys';
+import {
+  EINSATZ_KEYS,
+  LAGEBILD_OFFLINE,
+  istFesteEtbAnsicht,
+  istKeyDesEinsatzes,
+} from './queryKeys';
 import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
 import { fetchErfolgeVerfolgen } from '../offline/lagebildBestaetigung';
 import { lagebildEntsperren, lagebildSperren } from '../offline/lagebildFilter';
@@ -193,4 +198,24 @@ function lagebildLiegezeitSetzen(client: QueryClient): void {
   for (const prefix of prefixe) {
     client.setQueryDefaults([prefix], { gcTime: HOECHSTLIEGEZEIT_MS });
   }
+  // Unter dem ETB-Prefix gilt die lange Liegezeit nur für die festen Ansichten (LFH-939,
+  // design.md D4). `setQueryDefaults` matcht allein per Prefix, deshalb ergänzt der Client die
+  // Vorgaben selbst: Ergebnisse freier Eingaben gehen nie auf die Platte und sollen den Tab nicht
+  // 24 h lang belegen (jede Tipp-Pause der Volltextsuche ist ein eigener Key). Ein eigenes
+  // `gcTime` des Aufrufers (Palette, 30 s) gewinnt.
+  const vorgaben = client.defaultQueryOptions.bind(client);
+  client.defaultQueryOptions = ((optionen) => {
+    const ergebnis = vorgaben(optionen);
+    if (
+      optionen?.gcTime === undefined &&
+      ergebnis.queryKey?.[0] === EINSATZ_KEYS.etb &&
+      !istFesteEtbAnsicht(ergebnis.queryKey)
+    ) {
+      ergebnis.gcTime = ETB_FREI_GC_MS;
+    }
+    return ergebnis;
+  }) as typeof client.defaultQueryOptions;
 }
+
+/** Liegezeit eines ETB-Ergebnisses aus freier Eingabe im Speicher (LFH-939, design.md D4). */
+export const ETB_FREI_GC_MS = 5 * 60 * 1000;

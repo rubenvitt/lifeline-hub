@@ -43,7 +43,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle zweiunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle dreiunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -51,6 +51,7 @@ describe('Statusfarb-Vertrag', () => {
       'abschnittLagezustand',
       'aufbewahrungZustand',
       'belegungsArt',
+      'besatzungsUrteil',
       'betreuungsstelleStatus',
       'brStatus',
       'capSchwere',
@@ -99,6 +100,20 @@ describe('Statusfarb-Vertrag', () => {
   it('nutzt keine gesättigte Farbe für den Normalzustand (ASM, A1 Festlegung 5)', () => {
     expect(sf.uhsStatus.aktiv.rolle).toBe('normal');
     expect(sf.statusKategorie.verfuegbar.rolle).toBe('normal');
+  });
+
+  it('färbt den planmäßigen Endzustand „aufgelöst" neutral, nicht rot (LFH-962)', () => {
+    expect(sf.uhsStatus.aufgeloest).toEqual({ rolle: 'neutral', label: 'aufgelöst' });
+    expect(sf.brStatus.aufgeloest).toEqual({ rolle: 'neutral', label: 'aufgelöst' });
+  });
+
+  it('färbt nur die echte Unterbesetzung rot — „nicht erfasst" und „kein Soll" sind neutral (LFH-962)', () => {
+    expect(sf.besatzungsUrteil).toEqual({
+      nicht_erfasst: { rolle: 'neutral', label: 'Besatzung nicht erfasst' },
+      kein_soll: { rolle: 'neutral', label: 'kein Soll' },
+      erfuellt: { rolle: 'normal', label: 'Soll erfüllt' },
+      unterbesetzt: { rolle: 'alarm', label: 'unterbesetzt' },
+    });
   });
 
   it('übersetzt den Dienststatus der Stammdaten an EINER Stelle (LFH-476)', () => {
@@ -192,7 +207,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(32);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(33);
   });
 });
 

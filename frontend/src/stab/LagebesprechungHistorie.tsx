@@ -25,7 +25,18 @@ const SICHTBAR = 3;
  * Neue Einträge erscheinen OBEN; dass darunter nichts springt, trägt die Begrenzung auf
  * {@link SICHTBAR} Einträge plus eingeklappten Expander (aus derselben Query).
  */
-export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: number }) {
+export default function LagebesprechungHistorie({
+  einsatzId,
+  leerAusgesagt = false,
+}: {
+  einsatzId: number;
+  /**
+   * Der Stand darüber sagt schon „Letzte: noch keine" (`anzahl_lagebesprechungen === 0`). Dann
+   * fällt der eigene Leertext weg, statt dieselbe Aussage ein drittes Mal zu wiederholen
+   * (LFH-961). Laden und Fehler zeigt die Historie weiter selbst.
+   */
+  leerAusgesagt?: boolean;
+}) {
   const { token } = theme.useToken();
   const query = useQuery({
     queryKey: einsatzKeys.stabLagebesprechungen(einsatzId),
@@ -77,6 +88,7 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
     </ListenEintrag>
   );
   const frueher = query.data?.slice(SICHTBAR) ?? [];
+  if (leerAusgesagt && query.isSuccess && anzahl === 0) return null;
 
   return (
     <>

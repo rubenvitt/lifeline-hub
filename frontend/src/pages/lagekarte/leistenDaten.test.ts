@@ -18,6 +18,7 @@ import {
   ebenenFarbe,
   ebenenZeilen,
   grundlageAufloesen,
+  blindHinweis,
   grundlageOptionen,
   grundlageWert,
   letzteMeldungBlock,
@@ -431,14 +432,14 @@ describe('Kartengrundlage', () => {
     { name: 'Satellit (Esri)', url: 'z', typ: 'raster', attribution: null },
   ] as never[];
 
-  it('ein Segment je Online-Stil, dazu Offline und Blind — Satellit ist ein Stil (LFH-616)', () => {
+  it('ein Segment je Online-Stil, dazu Offline und „Ohne Karte“ — Satellit ist ein Stil (LFH-616)', () => {
     const optionen = grundlageOptionen(STILE, true);
     expect(optionen.map((o) => o.label)).toEqual([
       'Liberty',
       'TopPlus',
       'Satellit (Esri)',
       'Offline',
-      'Blind',
+      'Ohne Karte',
     ]);
     expect(optionen.every((o) => o.gesperrt == null)).toBe(true);
   });
@@ -448,8 +449,31 @@ describe('Kartengrundlage', () => {
     expect(optionen.map((o) => [o.label, o.gesperrt != null])).toEqual([
       ['Online', true],
       ['Offline', true],
-      ['Blind', false],
+      ['Ohne Karte', false],
     ]);
+  });
+
+  it('LFH-971: der Grund einer Sperre sagt, wo die Grundlage eingerichtet wird', () => {
+    const optionen = grundlageOptionen([], false);
+    expect(optionen.map((o) => o.gesperrt)).toEqual([
+      'Online-Karte nicht konfiguriert (Verwaltung › Karten)',
+      'Offline-Karte nicht konfiguriert (Verwaltung › Karten)',
+      undefined,
+    ]);
+    // Der Wert bleibt `blind`, nur die Beschriftung wechselt.
+    expect(optionen[2].wert).toBe('blind');
+  });
+
+  it('LFH-971: der Hinweis ohne Karte unterscheidet gewählt und nicht konfiguriert', () => {
+    expect(blindHinweis(grundlageOptionen(STILE, false))).toBe(
+      'Ohne Hintergrundkarte – Marker und Verorten funktionieren weiterhin.',
+    );
+    expect(blindHinweis(grundlageOptionen([], true))).toBe(
+      'Ohne Hintergrundkarte – Marker und Verorten funktionieren weiterhin.',
+    );
+    expect(blindHinweis(grundlageOptionen([], false))).toBe(
+      'Keine Kartengrundlage konfiguriert (Verwaltung › Karten) – Marker und Verorten funktionieren weiterhin.',
+    );
   });
 
   it('bildet Modus und Stil hin und zurück ab', () => {

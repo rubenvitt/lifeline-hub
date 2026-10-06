@@ -416,8 +416,28 @@ export type GrundlageWert = string;
 export interface GrundlageOption {
   wert: GrundlageWert;
   label: string;
-  /** Gesetzt = nicht wählbar, mit Grund (Tooltip/Name) — statt still zu fehlen. */
+  /**
+   * Gesetzt = nicht wählbar, mit Grund — statt still zu fehlen. Die Leiste nennt ihn beim
+   * Antippen als Text und als Beschreibung (`GrundlageLeiste`, LFH-971).
+   */
   gesperrt?: string;
+}
+
+/** Wo eine Kartengrundlage eingerichtet wird — sagt dem Bediener, wer die Sperre lösen kann. */
+const EINRICHTEN = 'Verwaltung › Karten';
+
+const OHNE_KARTE_WIRKT = 'Marker und Verorten funktionieren weiterhin.';
+
+/**
+ * Hinweis zur Grundlage „Ohne Karte" (Wert `blind`) — EINE Quelle für Karte und Leiste (LFH-971).
+ * Ist keine andere Grundlage wählbar, ist die schwarze Karte keine Wahl, sondern die Installation:
+ * dann sagt der Hinweis, wo man das ändert.
+ */
+export function blindHinweis(optionen: readonly GrundlageOption[]): string {
+  const andereWaehlbar = optionen.some((o) => o.wert !== 'blind' && o.gesperrt == null);
+  return andereWaehlbar
+    ? `Ohne Hintergrundkarte – ${OHNE_KARTE_WIRKT}`
+    : `Keine Kartengrundlage konfiguriert (${EINRICHTEN}) – ${OHNE_KARTE_WIRKT}`;
 }
 
 /**
@@ -434,15 +454,22 @@ export function grundlageOptionen(
   const online: GrundlageOption[] =
     onlineStyles.length > 0
       ? onlineStyles.map((s) => ({ wert: `online:${s.name}`, label: s.name }))
-      : [{ wert: 'online:', label: 'Online', gesperrt: 'Online-Karte nicht konfiguriert' }];
+      : [
+          {
+            wert: 'online:',
+            label: 'Online',
+            gesperrt: `Online-Karte nicht konfiguriert (${EINRICHTEN})`,
+          },
+        ];
   return [
     ...online,
     {
       wert: 'offline',
       label: 'Offline',
-      gesperrt: offlineVerfuegbar ? undefined : 'Offline-Karte nicht konfiguriert',
+      gesperrt: offlineVerfuegbar ? undefined : `Offline-Karte nicht konfiguriert (${EINRICHTEN})`,
     },
-    { wert: 'blind', label: 'Blind' },
+    // Der Wert bleibt `blind` (Ansicht, Gedächtnis), nur das Wort ist für den Bediener (LFH-971).
+    { wert: 'blind', label: 'Ohne Karte' },
   ];
 }
 

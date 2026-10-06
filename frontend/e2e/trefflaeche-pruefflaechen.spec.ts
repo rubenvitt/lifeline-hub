@@ -360,7 +360,7 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
           mindestens: 3,
         },
         {
-          sorte: 'Auftrag Befehlsdetails',
+          sorte: 'Auftragsdetails',
           ziele: (page) => inMain(page).locator('.ant-collapse-header'),
           mindestens: 1,
         },
@@ -376,7 +376,7 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
         await expect(inMain(page).getByText('Befehl Brücke Nord').first()).toBeVisible();
       },
       ziele: [
-        { sorte: 'Befehl erteilen', ziele: knopf('Befehl erteilen'), mindestens: 1 },
+        { sorte: 'Befehl entwerfen', ziele: knopf('Befehl entwerfen'), mindestens: 1 },
         {
           sorte: 'Befehl Karte',
           ziele: (page) => inMain(page).getByRole('link', { name: 'Befehl Brücke Nord' }),
@@ -445,7 +445,7 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
           mindestens: 2,
         },
         {
-          sorte: 'Auftrag Befehlsdetails',
+          sorte: 'Auftragsdetails',
           ziele: (page) => inMain(page).locator('.ant-collapse-header'),
           mindestens: 1,
         },
@@ -460,7 +460,7 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
           .click();
         await expect(inMain(page).getByText('Befehl Brücke Nord').first()).toBeVisible();
       },
-      fehlt: knopf('Befehl erteilen'),
+      fehlt: knopf('Befehl entwerfen'),
       ziele: [
         {
           sorte: 'Befehl Karte',
@@ -758,7 +758,7 @@ function gliederungFlaechen(einsatzId: string, abschnittId: number, brId: number
       anker: (page) => inMain(page).getByTestId('kraefte-ohne-br'),
       ziele: [
         { sorte: 'BR Raumwechsler', ziele: knopf('BR Sportplatz'), mindestens: 1 },
-        { sorte: 'BR zuweisen', ziele: knopf('zuweisen'), mindestens: 2 },
+        { sorte: 'BR zuweisen', ziele: knopf(/ zuweisen$/), mindestens: 2 },
       ],
     },
   ];
@@ -796,7 +796,7 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
     {
       pfad: `${R}/bereitstellungsraeume/${brId}`,
       anker: (page) => inMain(page).getByTestId('kraefte-ohne-br'),
-      fehlt: knopf('zuweisen'),
+      fehlt: knopf(/zuweisen$/),
       ziele: [{ sorte: 'BR Raumwechsler', ziele: knopf('BR Sportplatz'), mindestens: 1 }],
     },
   ]);

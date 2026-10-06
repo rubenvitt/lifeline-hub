@@ -456,7 +456,7 @@ export default function AuftragFormular({
 
   if (!card) return formular;
   return (
-    <Paneel titel="Neuer Auftrag/Befehl" koerperPolster>
+    <Paneel titel="Neuer Auftrag" koerperPolster>
       {formular}
     </Paneel>
   );

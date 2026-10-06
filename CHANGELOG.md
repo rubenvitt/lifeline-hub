@@ -1,3 +1,13 @@
+## [1.0.0-alpha.85](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.84...v1.0.0-alpha.85) (2026-10-06)
+
+### Betrieb und Installation
+
+- **Verbesserte Stabilität bei externen Dienstausfällen**: Die Anwendung begrenzt nun die Größe eingehender Antworten von externen Diensten (Geocodierung, Fachebenen, Authentifizierung) auf ein sicheres Maximum. Dies verhindert übermäßigen Speicherverbrauch bei fehlerhaften oder manipulierten Antworten.
+
+- **Robustere Authentifizierung bei Netzproblemen**: Wenn der Authentifizierungsdienst (Identity Provider) nicht erreichbar ist, werden bereits abgerufene Konfigurationsdaten zwischengespeichert und weiterverwendet. Die Anwendung bleibt dadurch bei temporären Netzausfällen oder Problemen des Authentifizierungsdienstes einsatzfähig. Parallele Authentifizierungsanfragen werden gebündelt, um die Belastung externer Dienste zu reduzieren.
+
+- **Optimierte Netzwerk-Kommunikation**: Die Verbindungen zu externen Diensten wurden überarbeitet, um Ressourcen effizienter zu nutzen und Fehler durch wiederverwendete Verbindungen zu vermeiden.
+
 ## [1.0.0-alpha.84](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.83...v1.0.0-alpha.84) (2026-10-06)
 
 ### Wichtige Änderungen
