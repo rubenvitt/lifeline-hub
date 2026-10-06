@@ -393,7 +393,7 @@ describe('gruppiere()', () => {
   });
 
   it('eine leere Gruppe aus der Reihenfolge erscheint NICHT', () => {
-    // `'THW'` steht in der Reihenfolge, hat aber keine Zeile: kein leerer Gruppenkopf „· 0".
+    // `'THW'` steht in der Reihenfolge, hat aber keine Zeile: kein leerer Gruppenkopf „0 THW".
     expect(gruppiere(daten, achse).map((g) => g.wert)).not.toContain('THW');
   });
 });
@@ -1009,6 +1009,24 @@ describe('Datensicht · Kartenzweig', () => {
     expect(onWaehlen).toHaveBeenCalledWith('gebunden');
   });
 
+  it('der Zählerstreifen der Tabelle schreibt Zahl vor Wort, mit sichtbarem Trenner (LFH-973)', () => {
+    // Wort vor Zahl und nur ein Abstand („Feuerwehr · 2 Hilfsorganisation · 1") las sich als
+    // „2 Hilfsorganisation".
+    setzeViewportBreite(1366);
+    const { container } = rendere({
+      form: 'tabelle',
+      gruppen: {
+        schluessel: (f) => f.traeger ?? 'ohne',
+        etikett: (w) => (w === 'FW' ? 'Feuerwehr' : 'Hilfsorganisation'),
+        reihenfolge: ['FW', 'HiOrg'],
+        unterEbene: 1,
+      },
+    });
+    const streifen = container.querySelector('[data-lfh="datensicht-gruppenzaehler"]');
+    expect(streifen).toHaveTextContent(/^2 Feuerwehr · 1 Hilfsorganisation$/);
+    expect(screen.getByText('2 Feuerwehr')).toBeInTheDocument();
+  });
+
   it('Gruppen erscheinen im Kartenzweig als Köpfe mit Zähler', () => {
     setzeViewportBreite(390);
     rendere({
@@ -1019,8 +1037,8 @@ describe('Datensicht · Kartenzweig', () => {
         unterEbene: 1,
       },
     });
-    expect(screen.getByText('Feuerwehr · 2')).toBeInTheDocument();
-    expect(screen.getByText('Hilfsorganisation · 1')).toBeInTheDocument();
+    expect(screen.getByText('2 Feuerwehr')).toBeInTheDocument();
+    expect(screen.getByText('1 Hilfsorganisation')).toBeInTheDocument();
   });
 
   it('Gruppenköpfe im Kartenzweig sind Überschriften unter `unterEbene` und benennen ihre Liste (LFH-470)', () => {
@@ -1034,10 +1052,10 @@ describe('Datensicht · Kartenzweig', () => {
       },
     });
     expect(screen.getAllByRole('heading', { level: 2 }).map((k) => k.textContent)).toEqual([
-      'Feuerwehr · 2',
-      'Hilfsorganisation · 1',
+      '2 Feuerwehr',
+      '1 Hilfsorganisation',
     ]);
-    expect(screen.getByRole('list', { name: 'Feuerwehr · 2' })).toBeVisible();
+    expect(screen.getByRole('list', { name: '2 Feuerwehr' })).toBeVisible();
   });
 
   it('leerText läuft über emptyText — es entsteht KEIN Empty-Knoten', () => {
@@ -1933,8 +1951,8 @@ describe('Datensicht · Zeilenschleuse', () => {
       unterEbene: 1 as const,
     };
     const { rerender } = rendere({ gruppen });
-    expect(screen.getByText('Feuerwehr · 2')).toBeInTheDocument();
-    expect(screen.getByText('Hilfsorganisation · 1')).toBeInTheDocument();
+    expect(screen.getByText('2 Feuerwehr')).toBeInTheDocument();
+    expect(screen.getByText('1 Hilfsorganisation')).toBeInTheDocument();
 
     screen.getByRole('link', { name: 'Florian 1' }).focus();
     rerender(
@@ -1949,10 +1967,10 @@ describe('Datensicht · Zeilenschleuse', () => {
     );
 
     expect(
-      screen.getByText('Feuerwehr · 2'),
+      screen.getByText('2 Feuerwehr'),
       'die Karte bleibt unter ihrem alten Kopf',
     ).toBeInTheDocument();
-    expect(screen.getByText('Hilfsorganisation · 1')).toBeInTheDocument();
+    expect(screen.getByText('1 Hilfsorganisation')).toBeInTheDocument();
     // Der neue Wert steht trotzdem in der Karte — eingefroren ist die POSITION, nicht der Inhalt.
     expect(screen.getAllByText('HiOrg')).toHaveLength(2);
   });

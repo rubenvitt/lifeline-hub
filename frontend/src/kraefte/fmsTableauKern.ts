@@ -1,7 +1,7 @@
 import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
 import type { StatusOption } from '../components/StatusWahl';
 import { statusKategorie } from '../theme/statusFarben';
-import { fmsWort } from './meldebildRaster';
+import { fmsEtikett } from './meldebildRaster';
 
 /**
  * Reines Modell des FMS-Tableaus — Gliederung, Menüwerte, Ziffernzuordnung.
@@ -107,7 +107,7 @@ export function baueFmsTableau(
 export function fmsStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
   return katalog.map((s) => ({
     wert: s.id,
-    label: s.fms_anker != null ? `S${s.fms_anker} · ${fmsWort(s.label, s.fms_anker)}` : s.label,
+    label: fmsEtikett(s.label, s.fms_anker),
     darstellung: statusKategorie[s.kategorie],
     farbe: s.farbe,
   }));

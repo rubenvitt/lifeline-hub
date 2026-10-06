@@ -251,7 +251,8 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Fahrzeug' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
-    expect(screen.getByText('disponiert')).toBeInTheDocument();
+    // Ein FMS-Format überall: „S3 · disponiert“ aus dem Katalog-Anker (LFH-973).
+    expect(screen.getByText('S3 · disponiert')).toBeInTheDocument();
   });
 
   it('abgeschlossener Einsatz ist read-only und zeigt Hinweis', async () => {
@@ -424,9 +425,13 @@ describe('FahrzeugePage', () => {
     const { container } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
     await screen.findByText('Florian 1');
     // Ein Textknoten, nicht zwei: sonst würfe dieselbe Abfrage später mit Mehrfachtreffern, sobald
-    // ein Zähler daneben steht.
-    expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
-    expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
+    // ein Zähler daneben steht. Im Streifen gesucht: die Verdichtungszeile darüber schreibt
+    // dieselben Wörter in derselben Folge (LFH-973).
+    const streifen = within(
+      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+    );
+    expect(streifen.getByText('1 verfügbar')).toBeInTheDocument();
+    expect(streifen.getByText('1 gebunden')).toBeInTheDocument();
     // Und die Gruppenachse führt wirklich: verfügbar (Florian 9) steht vor gebunden.
     expect(zeilenFolge(container)).toEqual(['11', '10']);
   });
@@ -465,8 +470,11 @@ describe('FahrzeugePage', () => {
      * eingefroren. Und weil der Statuswechsel keinen Schlüssel ändert, ist `zufluessig === 0`, ein
      * Sammelbanner erscheint nie. Beides gehört dem Primitiv.
      */
-    expect(screen.getByText('verfügbar · 2')).toBeInTheDocument();
-    expect(screen.queryByText(/^gebunden · /)).toBeNull();
+    const streifen = within(
+      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+    );
+    expect(streifen.getByText('2 verfügbar')).toBeInTheDocument();
+    expect(streifen.queryByText(/^\d+ gebunden$/)).toBeNull();
     expect(screen.queryByRole('button', { name: /neue? Ein(trag|träge)/ })).toBeNull();
   });
 

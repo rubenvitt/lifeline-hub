@@ -39,7 +39,9 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
         <StaerkeAnzeige wert={staerke} />
       </span>
       <span style={{ ...monoStil(12), color: token.colorTextSecondary }}>
-        {anzahlEinheiten} Einh.
+        {/* Was gezählt wird, steht dran (LFH-973): nur die direkt zugeordneten, der Überblick
+            zählt „inkl. UA“. */}
+        {anzahlEinheiten === 1 ? '1 Einheit' : `${anzahlEinheiten} Einheiten`} direkt
       </span>
       {!besetzt && <StatusChip ton="achtung" wort="ohne Leiter" />}
       {abschnitt.leiter_name && (

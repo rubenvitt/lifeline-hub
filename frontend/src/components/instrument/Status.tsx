@@ -100,6 +100,9 @@ export function StatusChip({ ton, wort, code, title, style }: StatusChipProps) {
       }}
     >
       {code != null && <span style={monoStil(11, 500)}>{code}</span>}
+      {/* Sichtbarer Trenner „S4 · Am Einsatzort“, ein Format für FMS überall (LFH-973).
+          Vorgelesen trennt der Abstand. */}
+      {code != null && <span aria-hidden="true">·</span>}
       <span style={{ fontSize: 11 }}>{wort}</span>
     </span>
   );

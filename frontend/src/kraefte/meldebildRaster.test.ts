@@ -8,6 +8,7 @@ import {
   fahrzeugStatus,
   fmsWort,
   istProblemZeile,
+  toenungsGruende,
   istRueckmeldungProblem,
   keineRueckmeldungZelle,
   offeneAuftraegeJeEinheit,
@@ -533,6 +534,24 @@ describe('istProblemZeile', () => {
     // Eine einzelne ausgefallene Mittelzeile tönt nicht — sie trägt ihren Status als Chip.
     expect(alleBlaetter(raster).some(istProblemZeile)).toBe(false);
   });
+
+  it('nennt den Ausfall als Wort, nicht aber einen Status „nicht verfügbar“ (sein Chip sagt es)', () => {
+    const raster = baueMeldebildRaster(
+      eingabe({
+        einheiten: [eh(1, null), eh(2, null), eh(3, null)],
+        personal: [p(1, 1, 'nicht_verfuegbar'), p(2, 2, 'gebunden')],
+        fahrzeuge: [fz(1, 3, 106, 'nicht_verfuegbar')],
+      }),
+    );
+    expect(raster.map((z) => toenungsGruende(z, null))).toEqual([['1 Ausfall'], [], ['1 Ausfall']]);
+    const [hand] = baueMeldebildRaster(
+      eingabe({
+        einheiten: [eh(9, null, null, { status: st.hand(S6) } as Partial<Einheit>)],
+        personal: [p(3, 9, 'nicht_verfuegbar')],
+      }),
+    );
+    expect(toenungsGruende(hand, null)).toEqual([]);
+  });
 });
 
 describe('aufklappbareSchluessel', () => {
@@ -604,6 +623,14 @@ describe('Rückmeldung je Rasterzeile', () => {
     expect(urteil('eh-2')).toBe(true);
     expect(urteil('eh-3')).toBe(true);
     expect(istRueckmeldungProblem(null)).toBe(false);
+  });
+
+  it('begründet die Tönung mit einem Wort je Rückmeldungszustand', () => {
+    const gruende = (key: string) =>
+      toenungsGruende(zeile(key), rueckmeldungDerZeile(zeile(key), je, JETZT));
+    expect(gruende('eh-1')).toEqual([]);
+    expect(gruende('eh-2')).toEqual(['Rückm. überfällig']);
+    expect(gruende('eh-3')).toEqual(['keine Rückm.']);
   });
 
   it('die Kachel zählt NUR nie zurückgemeldete Einheiten — überfällige nicht', () => {

@@ -54,7 +54,8 @@ describe('AbschnittKnoten', () => {
     renderKnoten(nord);
     expect(screen.getByText('Nord')).toBeInTheDocument();
     expect(screen.getByText('1/3/4//8')).toBeInTheDocument();
-    expect(screen.getByText('2 Einh.')).toBeInTheDocument();
+    // Was gezählt wird, steht dran: nur die direkt zugeordneten (LFH-973).
+    expect(screen.getByText('2 Einheiten direkt')).toBeInTheDocument();
   });
 
   it('färbt den Leitername aus dem Sekundär-Token, nicht aus einem Literal', () => {

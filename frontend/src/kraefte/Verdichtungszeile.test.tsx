@@ -52,9 +52,11 @@ describe('Verdichtungszeile', () => {
     // BOS-Schreibweise mit Doppelstrich vor der Gesamtstärke.
     expect(await screen.findByText('1/0/1//2')).toBeInTheDocument();
     // Die Farbe ist der zweite Kanal, nicht der einzige: jede Zahl trägt ihr Wort.
-    expect(screen.getByText('1 frei')).toBeInTheDocument();
+    // Zahl vor Wort, dieselben Wörter wie der Zählerstreifen der Tabelle (LFH-973).
+    expect(screen.getByText('1 verfügbar')).toBeInTheDocument();
     expect(screen.getByText('1 gebunden')).toBeInTheDocument();
-    expect(screen.getByText('0 n. verf.')).toBeInTheDocument();
+    expect(screen.getByText('0 nicht verfügbar')).toBeInTheDocument();
+    expect(screen.queryByText(/frei|n\. verf\./)).toBeNull();
 
     // Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`.
     expect(screen.getByRole('link', { name: 'Meldebild' })).toHaveAttribute(
@@ -195,9 +197,9 @@ describe('Verdichtungszeile — Kontrast der Statuszahlen (LFH-538)', () => {
     setup();
     // `test/utils` rendert ein nacktes (helles) Theme — also die Tagespalette.
     for (const [text, kategorie] of [
-      ['1 frei', 'verfuegbar'],
+      ['1 verfügbar', 'verfuegbar'],
       ['1 gebunden', 'gebunden'],
-      ['1 n. verf.', 'nicht_verfuegbar'],
+      ['1 nicht verfügbar', 'nicht_verfuegbar'],
     ] as const) {
       expect(await screen.findByText(text)).toHaveStyle({
         color: verdichtungsTextfarbe(farbenHell, statusKategorie[kategorie].rolle),
