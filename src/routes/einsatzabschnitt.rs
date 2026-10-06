@@ -98,6 +98,11 @@ pub async fn anlegen(
     JsonBody(body): JsonBody<AbschnittBody>,
 ) -> Result<(StatusCode, Json<EinsatzabschnittAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Liste vor jedem Schreiben begrenzen (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    let sprechgruppe_ids = body
+        .sprechgruppe_ids
+        .map(crate::sprechgruppe::normalisiere_ids)
+        .transpose()?;
     let name = pflicht(&body.name, "Name")?;
     let bemerkung = trimme(body.bemerkung);
     let mittel = trimme(body.kommunikationsmittel);
@@ -131,7 +136,7 @@ pub async fn anlegen(
         },
     )
     .await?;
-    if let Some(ids) = body.sprechgruppe_ids {
+    if let Some(ids) = sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
             &state.pool,
             ctx.einsatz.org_id,
@@ -195,6 +200,11 @@ pub async fn aktualisieren(
     JsonBody(body): JsonBody<AbschnittPatchBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Vor jedem Schreiben, auch vor dem Lagewechsel (LFH-937, design.md D5).
+    let sprechgruppe_ids = body
+        .sprechgruppe_ids
+        .map(crate::sprechgruppe::normalisiere_ids)
+        .transpose()?;
     let name = match body.name {
         Some(n) => {
             let n = pflicht(&n, "Name")?;
@@ -272,7 +282,7 @@ pub async fn aktualisieren(
         }
         anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
     }
-    if let Some(ids) = body.sprechgruppe_ids {
+    if let Some(ids) = sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
             &state.pool,
             ctx.einsatz.org_id,
@@ -366,6 +376,8 @@ pub async fn flaeche(
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     if let Some(Some(gj)) = &body.flaeche_geojson {
+        // Größe vor dem Parsen, Struktur nach den bestehenden 422 (LFH-937, design.md D7).
+        crate::lage_zone::pruefe_geometrie_groesse(gj, "flaeche_geojson")?;
         let v: serde_json::Value = serde_json::from_str(gj).map_err(|_| {
             AppError::UnprocessableEntity("flaeche_geojson ist kein gültiges JSON".into())
         })?;
@@ -374,6 +386,7 @@ pub async fn flaeche(
                 "flaeche_geojson muss ein GeoJSON-Polygon sein".into(),
             ));
         }
+        crate::lage_zone::pruefe_geometrie_struktur(&v, "flaeche_geojson")?;
     }
 
     let nachher = abschnitt_repo::aktualisiere_flaeche(

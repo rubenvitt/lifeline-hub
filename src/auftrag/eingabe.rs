@@ -4,11 +4,13 @@
 //! Route-Modul. Routes rufen dieses Modul, nicht andere Routes.
 use crate::auftrag::repo;
 use crate::auftrag::{
-    EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_EXTERN, EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON,
-    PRIO_NORMAL, RICHTUNG_INTERN,
+    AUFTRAG_TEXT_MAX, BEFEHLSFELD_MAX, EMPFAENGER_MAX, EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_EXTERN,
+    EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON, EXTERN_BEZEICHNUNG_MAX, PRIO_NORMAL,
+    RICHTUNG_INTERN,
 };
 use crate::error::AppError;
-use crate::routes::support::pflicht;
+use crate::routes::support::{hoechstens, pflicht_max};
+use std::collections::HashSet;
 
 use serde::Deserialize;
 
@@ -20,6 +22,32 @@ fn parse_zeit(roh: &str) -> Result<String, AppError> {
 
 fn trimme(o: &Option<String>) -> Option<&str> {
     o.as_deref().map(str::trim).filter(|s| !s.is_empty())
+}
+
+/// Ein Feld des Befehlsschemas: getrimmt, leer → `None`, höchstens [`BEFEHLSFELD_MAX`].
+fn befehlsfeld(o: &Option<String>, feld: &str) -> Result<Option<String>, AppError> {
+    let w = trimme(o);
+    if let Some(w) = w {
+        hoechstens(w, feld, BEFEHLSFELD_MAX)?;
+    }
+    Ok(w.map(str::to_string))
+}
+
+/// Schlüssel, unter dem zwei Empfänger-Zeilen dasselbe Ziel meinen (LFH-937, design.md D3):
+/// Typ wörtlich (wie ihn die Validierung prüft) und jedes Ziel-Feld, Texte getrimmt.
+type EmpfaengerSchluessel<'a> = (&'a str, [Option<i64>; 4], [Option<&'a str>; 4]);
+
+fn empfaenger_schluessel(r: &EmpfaengerEingabeReq) -> EmpfaengerSchluessel<'_> {
+    (
+        r.empfaenger_typ.as_str(),
+        [r.abschnitt_id, r.einheit_id, r.person_id, r.fahrzeug_id],
+        [
+            trimme(&r.funktion),
+            trimme(&r.funktion_text),
+            trimme(&r.extern_kategorie),
+            trimme(&r.extern_bezeichnung),
+        ],
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,10 +86,12 @@ pub struct NeuerAuftrag {
 }
 
 /// Prüft Slot-Konsistenz + Einsatz-Zugehörigkeit einer Empfänger-Zeile.
+/// `s7_aktiv` kommt aus der Labelkarte, die [`validiere_neuen_auftrag`] einmal je Request lädt.
 async fn validiere_empfaenger(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     req: &EmpfaengerEingabeReq,
+    s7_aktiv: bool,
 ) -> Result<repo::EmpfaengerEingabe, AppError> {
     let belegt = [
         req.abschnitt_id.is_some(),
@@ -154,6 +184,7 @@ async fn validiere_empfaenger(
                     "Ungültige externe Adressat-Kategorie".into(),
                 ));
             }
+            // Die Länge prüft schon `validiere_neuen_auftrag` vor der ersten Abfrage.
             if trimme(&req.extern_bezeichnung).is_none() {
                 return Err(AppError::Validation("externe Bezeichnung fehlt".into()));
             }
@@ -165,12 +196,6 @@ async fn validiere_empfaenger(
     // Katalogcode und Text in ihrer Doppelrolle (LFH-549). Nur am Funktionsempfänger; ein
     // Code an einem anderen Typ ist ein zweites Ziel und oben schon als solches abgewiesen.
     let angabe = if typ == EMPF_FUNKTION {
-        let s7_aktiv = {
-            let mut conn = pool.acquire().await?;
-            crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut conn, einsatz_id)
-                .await?
-                .s7_aktiv
-        };
         crate::fuehrung::pruefe_funktion(
             req.funktion.as_deref(),
             req.funktion_text.as_deref(),
@@ -261,12 +286,25 @@ pub async fn validiere_neuen_auftrag(
     now: &str,
     default_quittierung_frist_min: Option<i64>,
 ) -> Result<ValidierterAuftrag, AppError> {
-    let text = pflicht(&req.auftrag_text, "Auftragstext")?;
+    // Grenzen vor jeder Abfrage (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    let text = pflicht_max(&req.auftrag_text, "Auftragstext", AUFTRAG_TEXT_MAX)?;
     if req.empfaenger.is_empty() {
         return Err(AppError::Validation(
             "Mindestens ein Empfänger ist erforderlich".into(),
         ));
     }
+    if req.empfaenger.len() > EMPFAENGER_MAX {
+        return Err(AppError::Validation(format!(
+            "Höchstens {EMPFAENGER_MAX} Empfänger je Auftrag"
+        )));
+    }
+    let absicht = befehlsfeld(&req.absicht, "Absicht")?;
+    let lage = befehlsfeld(&req.lage, "Lage")?;
+    let ort = befehlsfeld(&req.ort, "Ort")?;
+    let zeit = befehlsfeld(&req.zeit, "Zeit")?;
+    let mittel = befehlsfeld(&req.mittel, "Mittel")?;
+    let verbindung = befehlsfeld(&req.verbindung, "Verbindung")?;
+    let sicherheit = befehlsfeld(&req.sicherheit, "Sicherheit")?;
     let prioritaet = req.prioritaet.as_deref().unwrap_or(PRIO_NORMAL);
     if !crate::auftrag::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
@@ -291,20 +329,49 @@ pub async fn validiere_neuen_auftrag(
         None => default_quittierung_frist_min.and_then(|min| frist_aus_minuten(&erteilt, min)),
     };
 
-    let mut empfaenger = Vec::with_capacity(req.empfaenger.len());
-    for r in &req.empfaenger {
-        empfaenger.push(validiere_empfaenger(pool, einsatz_id, r).await?);
+    // Gleiche Ziele zusammenführen, erste Nennung und Reihenfolge bleiben (D3).
+    let mut gesehen = HashSet::new();
+    let eindeutig: Vec<&EmpfaengerEingabeReq> = req
+        .empfaenger
+        .iter()
+        .filter(|r| gesehen.insert(empfaenger_schluessel(r)))
+        .collect();
+    // Textgrenzen der Empfänger vor der ersten Abfrage, damit eine 400 nie hinter einer 422
+    // eines früheren Empfängers verschwindet (`src/AGENTS.md`, „Eingabegrenzen“).
+    for r in &eindeutig {
+        if let Some(t) = trimme(&r.funktion_text) {
+            hoechstens(t, "Funktion/Bezeichnung", crate::fuehrung::TEXT_MAX)?;
+        }
+        if let Some(b) = trimme(&r.extern_bezeichnung) {
+            hoechstens(b, "Externe Bezeichnung", EXTERN_BEZEICHNUNG_MAX)?;
+        }
+    }
+    // Die Labelkarte einmal je Request, nicht je Funktionsempfänger.
+    let s7_aktiv = if eindeutig
+        .iter()
+        .any(|r| r.empfaenger_typ.as_str() == EMPF_FUNKTION)
+    {
+        let mut conn = pool.acquire().await?;
+        crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut conn, einsatz_id)
+            .await?
+            .s7_aktiv
+    } else {
+        false
+    };
+    let mut empfaenger = Vec::new();
+    for r in eindeutig {
+        empfaenger.push(validiere_empfaenger(pool, einsatz_id, r, s7_aktiv).await?);
     }
 
     Ok(ValidierterAuftrag {
         text: text.to_string(),
-        absicht: trimme(&req.absicht).map(str::to_string),
-        lage: trimme(&req.lage).map(str::to_string),
-        ort: trimme(&req.ort).map(str::to_string),
-        zeit: trimme(&req.zeit).map(str::to_string),
-        mittel: trimme(&req.mittel).map(str::to_string),
-        verbindung: trimme(&req.verbindung).map(str::to_string),
-        sicherheit: trimme(&req.sicherheit).map(str::to_string),
+        absicht,
+        lage,
+        ort,
+        zeit,
+        mittel,
+        verbindung,
+        sicherheit,
         prioritaet: prioritaet.to_string(),
         richtung: richtung.to_string(),
         frist_at: frist,

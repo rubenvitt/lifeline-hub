@@ -152,3 +152,36 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
         .count();
     assert_eq!(n, 1);
 }
+
+/// Spec `listen-projektion`: die Befehlsliste trägt Köpfe ohne Abschnitte (LFH-931).
+#[tokio::test]
+async fn liste_liefert_koepfe_ohne_abschnitte() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let id = befehl_anlegen(&app, &admin, einsatz).await;
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let zeile = liste[0].as_object().unwrap();
+    assert_eq!(zeile["id"], id);
+    assert!(
+        !zeile.contains_key("abschnitte"),
+        "Kopf ohne Abschnitte: {zeile:?}"
+    );
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/befehle/{id}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(!detail["abschnitte"].as_array().unwrap().is_empty());
+}

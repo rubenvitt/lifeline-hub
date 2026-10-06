@@ -33,6 +33,28 @@ Lebenszyklus (storniert).
   `tests/fehler_vertrag.rs`), damit Rejections im `{error}`-Format ankommen. `PfadParam` → 400,
   `EinsatzKontext` → 404 (`src/einsatz/kontext.rs`); beide sind orthogonal.
 
+## Backend — Eingabegrenzen (LFH-937)
+
+Spec `eingabegrenzen`, Herleitung
+`openspec/changes/archive/2026-10-06-lfh-937-eingabegrenzen/design.md`. Neu und Angefasstes:
+- **Freitext an einem Schreibendpunkt hat eine Grenze:** Konstante `<FELD>_MAX` im Modul, das
+  das Feld besitzt, Prüfung über `routes::support::pflicht_max`/`pflicht_max_tri`/`optional_max`
+  (`hoechstens` für schon getrimmten Text): Zeichen nach dem Trimmen, 400
+  „{Feld} darf höchstens {max} Zeichen lang sein“, vor jedem 422 des Zusammenhangs.
+- **Text, der unverändert ins ETB gelangt, trägt die ETB-Grenzen** (`etb::INHALT_MAX`,
+  `etb::PARTEI_MAX`) an seinem Eingang, nicht in `etb::repo`: Systemtexte dürfen dort nicht
+  scheitern. Ein neuer Weg ins ETB prüft selbst.
+- **Listen von außen** werden gegen ein `*_MAX` geprüft (400) und entdoppelt, bevor eine
+  Abfrage läuft. **ID-Listen** brauchen zum Prüfen und Schreiben eine von N unabhängige Zahl
+  von Anweisungen (`json_each(?)`, Muster `sprechgruppe::repo::ersetzen_tx`); die
+  **Auftragsempfänger** bleiben je Zeile geprüft und geschrieben, gedeckelt durch
+  `auftrag::EMPFAENGER_MAX` (gezählt vor dem Entdoppeln).
+- **Geometrien** von Zonen und Flächen gehen durch `lage_zone::pruefe_geometrie_groesse` und
+  `pruefe_geometrie_struktur` (400); kaputtes JSON und falscher Typ bleiben 422.
+- **Spiegel:** jede Grenze, die eine Maske kennt, steht in `frontend/src/api/eingabegrenzen.ts`;
+  `tests/eingabegrenzen_spiegel.rs` vergleicht Name für Name. Neue Grenze → beide Seiten und
+  die Tabelle im Test.
+
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 
 Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →

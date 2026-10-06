@@ -78,6 +78,11 @@ pub async fn bilden(
     JsonBody(body): JsonBody<EinheitBody>,
 ) -> Result<(StatusCode, Json<EinheitAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Liste vor jedem Schreiben begrenzen (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    let sprechgruppe_ids = body
+        .sprechgruppe_ids
+        .map(crate::sprechgruppe::normalisiere_ids)
+        .transpose()?;
     let name = pflicht(&body.name, "Name")?;
     Staerke::aus_optionen(
         body.soll_fuehrer,
@@ -111,7 +116,7 @@ pub async fn bilden(
         ctx.benutzer.id,
     )
     .await?;
-    if let Some(ids) = &body.sprechgruppe_ids {
+    if let Some(ids) = &sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
             &state.pool,
             ctx.einsatz.org_id,
@@ -180,6 +185,11 @@ pub async fn aktualisieren(
     JsonBody(body): JsonBody<EinheitPatchBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Liste vor jedem Schreiben begrenzen (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    let sprechgruppe_ids = body
+        .sprechgruppe_ids
+        .map(crate::sprechgruppe::normalisiere_ids)
+        .transpose()?;
     let name = match body.name {
         Some(n) => {
             let n = pflicht(&n, "Name")?;
@@ -247,7 +257,7 @@ pub async fn aktualisieren(
     if fuehrer_wechsel {
         einheit_repo::setze_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
     }
-    if let Some(ids) = &body.sprechgruppe_ids {
+    if let Some(ids) = &sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
             &state.pool,
             ctx.einsatz.org_id,

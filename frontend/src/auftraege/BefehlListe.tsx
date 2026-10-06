@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BefehlAnzeige, BefehlVorlageKey } from '../api/types';
+import type { BefehlKopf, BefehlVorlageKey } from '../api/types';
 import { VORLAGEN } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
@@ -39,7 +39,7 @@ function schemaLabel(schluessel: BefehlVorlageKey | string): string {
  * Modulkonstante IN dieser Datei (der Guard verlangt `spaltenFuer` je Konsumentendatei). Nie
  * annotieren — eine Typangabe weitete `K` auf `string`, und der Kartenplan nähme Tippfehler an.
  */
-const befehlSpalten = spaltenFuer<BefehlAnzeige>()([
+const befehlSpalten = spaltenFuer<BefehlKopf>()([
   {
     key: 'titel',
     title: 'Titel',

@@ -72,7 +72,7 @@ fn normalisiere(body: PersonalBody) -> Result<Normalisiert, AppError> {
         telefon: trimme(body.telefon),
         staerke_position,
         bemerkung: trimme(body.bemerkung),
-        qualifikation_ids: body.qualifikation_ids,
+        qualifikation_ids: crate::personal::normalisiere_qualifikation_ids(body.qualifikation_ids)?,
     })
 }
 
@@ -155,7 +155,10 @@ fn normalisiere_patch(body: PatchPersonal) -> Result<PatchNormalisiert, AppError
         telefon: trimme_tri(body.telefon),
         staerke_position,
         bemerkung: trimme_tri(body.bemerkung),
-        qualifikation_ids: body.qualifikation_ids,
+        qualifikation_ids: body
+            .qualifikation_ids
+            .map(crate::personal::normalisiere_qualifikation_ids)
+            .transpose()?,
     })
 }
 

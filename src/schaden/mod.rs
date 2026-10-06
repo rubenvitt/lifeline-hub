@@ -1,6 +1,12 @@
 pub mod anhang;
 pub mod repo;
 
+/// Höchstlänge von Ort und Geschädigt-Kontakt eines Schadens (LFH-937, design.md D6). Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const ORT_MAX: usize = 500;
+/// Höchstlänge der Beschreibung eines Schadens (LFH-937, design.md D6).
+pub const BESCHREIBUNG_MAX: usize = 8_000;
+
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -209,6 +215,21 @@ pub struct SchadenAnzeige {
     // Read-only Join-Felder (Geschädigt-Auflösung über einsatz_personal / organisation):
     pub geschaedigt_personal_name: Option<String>, // einsatz_personal.snap_name
     pub geschaedigt_organisation_name: Option<String>, // organisation.name
+}
+
+/// Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931, `listen-projektion`): nur, was
+/// Marker, Inspector und Kennzahl brauchen. Ort, Beschreibung und Geschädigte fehlen bewusst.
+/// Optionale Felder wie in [`SchadenAnzeige`] als `null`: der Client leitet einen Marker auch
+/// aus einer nachgeladenen vollen Zeile ab.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct SchadenMarker {
+    pub id: i64,
+    pub registrier_nr: i64,
+    pub status: SchadenStatus,
+    pub typ: SchadenTyp,
+    pub ausmass: Ausmass,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
 }
 
 #[cfg(test)]

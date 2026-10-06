@@ -1,7 +1,12 @@
 use axum::http::StatusCode;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, recv_until_tag, rolle_setzen, setup,
+    setup_mit_live,
+};
+use serde_json::Value;
+use std::time::Duration;
 
 #[tokio::test]
 async fn anlegen_und_liste() {
@@ -367,4 +372,123 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
         .filter(|e| e["typ"] == "lage")
         .count();
     assert_eq!(n, 1);
+}
+
+/// Spec `listen-projektion`, „Liste ohne Abschnitte“ und „Detail mit Abschnitten“ (LFH-931).
+#[tokio::test]
+async fn liste_liefert_koepfe_ohne_abschnitte() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, angelegt) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte"),
+        &admin,
+        Some(r#"{"vorlage":"lagebericht","titel":"Lage 10:00"}"#),
+    )
+    .await;
+    let id = angelegt["id"].as_i64().unwrap();
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/lageberichte"),
+        &admin,
+        None,
+    )
+    .await;
+    let zeile = liste[0].as_object().unwrap();
+    assert!(
+        !zeile.contains_key("abschnitte"),
+        "Kopf ohne Abschnitte: {zeile:?}"
+    );
+    assert!(!zeile.contains_key("aktualisiert_at"), "{zeile:?}");
+    assert_eq!(zeile["id"], id);
+    assert_eq!(zeile["titel"], "Lage 10:00");
+    assert_eq!(zeile["vorlage"], "lagebericht");
+    assert_eq!(zeile["status"], "entwurf");
+    assert_eq!(zeile["version"], 1);
+    assert!(zeile["ersteller_name"].is_string(), "{zeile:?}");
+    let (_, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/lageberichte/{id}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(detail["abschnitte"].as_array().unwrap().len(), 8);
+}
+
+/// Spec `live-abgleich`, „Autosave in einem zweiten Tab“ und „Titel geändert“: ein PATCH nur
+/// an Abschnitten kennzeichnet das Ereignis mit `nur_inhalt`, ein Titelwechsel nicht (LFH-931).
+#[tokio::test]
+async fn entwurfs_patch_nur_an_abschnitten_kennzeichnet_das_ereignis() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, angelegt) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte"),
+        &admin,
+        Some(r#"{"vorlage":"lagebericht","titel":"Lage 10:00"}"#),
+    )
+    .await;
+    let id = angelegt["id"].as_i64().unwrap();
+    let schluessel = angelegt["abschnitte"][0]["schluessel"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let pfad = format!("/api/einsaetze/{einsatz}/lageberichte/{id}");
+    let mut rx = live.abonniere(einsatz);
+
+    let inhalt = format!(
+        r#"{{"titel":"Lage 10:00","abschnitte":[{{"schluessel":"{schluessel}","text":"Pegel steigt bei Familie Muster"}}]}}"#
+    );
+    let (s, _) = anfrage(&app, "PATCH", &pfad, &admin, Some(&inhalt)).await;
+    assert_eq!(s, StatusCode::OK);
+    let n = recv_until_tag(&mut rx, "lagebericht", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(v["lagebericht_id"], id);
+    assert_eq!(v["nur_inhalt"], true, "{:?}", n.data);
+    assert!(
+        !n.data.contains("Muster"),
+        "keine Inhalte im Ereignis: {:?}",
+        n.data
+    );
+
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"titel":"Lage 11:00"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let n = recv_until_tag(&mut rx, "lagebericht", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert!(
+        v.get("nur_inhalt").is_none(),
+        "Titelwechsel ändert die Liste: {:?}",
+        n.data
+    );
+
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"zeitstand":"2026-06-02 11:30:00"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let n = recv_until_tag(&mut rx, "lagebericht", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert!(
+        v.get("nur_inhalt").is_none(),
+        "Zeitstand ändert die Liste: {:?}",
+        n.data
+    );
 }

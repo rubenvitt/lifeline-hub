@@ -8,7 +8,7 @@ import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
-import { listeSchaeden } from '../../api/einsatzSchaden';
+import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeEinheiten } from '../../api/einheiten';
 import { ladeGefahrengebiete } from '../../api/gefahren';
@@ -25,7 +25,7 @@ vi.mock('../../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() })
 vi.mock('../../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../../api/einsatzPerson', () => ({ listePersonen: vi.fn() }));
 vi.mock('../../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
-vi.mock('../../api/einsatzSchaden', () => ({ listeSchaeden: vi.fn() }));
+vi.mock('../../api/einsatzSchaden', () => ({ listeSchadenMarker: vi.fn() }));
 vi.mock('../../api/einsatzUhs', () => ({ listeUhs: vi.fn() }));
 vi.mock('../../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../../api/gefahren', () => ({ ladeGefahrengebiete: vi.fn() }));
@@ -61,7 +61,7 @@ const LISTEN: Record<GebundeneQuelle, unknown[]> = {
 const ABRUF: Record<GebundeneQuelle, ReturnType<typeof vi.fn>> = {
   personen: vi.mocked(listePersonen),
   uhs: vi.mocked(listeUhs),
-  schaeden: vi.mocked(listeSchaeden),
+  schaeden: vi.mocked(listeSchadenMarker),
   gefahren: vi.mocked(ladeGefahrengebiete),
   lageberichte: vi.mocked(listeLageberichte),
   einheiten: vi.mocked(listeEinheiten),
@@ -147,7 +147,7 @@ describe('ladeLagebasis (LFH-869 D1)', () => {
   });
 
   it('nennt einen gescheiterten Abruf „fehler“, nie leere Daten mit „daten“', async () => {
-    vi.mocked(listeSchaeden).mockRejectedValue(new Error('weg'));
+    vi.mocked(listeSchadenMarker).mockRejectedValue(new Error('weg'));
     const geladen = await ladeLagebasis(neuerClient(), 1, freigabenFixture(), {
       quellen: ['schaeden'],
       mitPegel: false,

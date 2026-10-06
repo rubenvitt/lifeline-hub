@@ -2,6 +2,8 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
 import type { NeuerEintrag } from '../api/etb';
+import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
+import { grenzeText, istZuLang, zeichenZahl } from '../components/zeichenGrenze';
 
 dayjs.extend(utc);
 
@@ -181,6 +183,34 @@ export function baueEintrag({
     erfasst_lokal_at: jetztIso,
     berichtigt_eintrag_id: berichtigungZuId,
   };
+}
+
+/** Was der Server an einem ETB-Eintrag zählt, mit Grenze und Wort für den Hinweis (LFH-937). */
+const LAENGEN_FELDER = [
+  { wort: 'Inhalt', max: ETB_INHALT_MAX, wert: (inhalt: string) => inhalt },
+  { wort: 'Von', max: ETB_PARTEI_MAX, wert: (_: string, m: MetadatenWerte) => m.von },
+  { wort: 'An', max: ETB_PARTEI_MAX, wert: (_: string, m: MetadatenWerte) => m.an },
+  {
+    wort: 'Veranlassung',
+    max: ETB_PARTEI_MAX,
+    wert: (_: string, m: MetadatenWerte) => m.veranlassung,
+  },
+] as const;
+
+/**
+ * Hinweis, wenn der Server den Eintrag wegen eines zu langen Felds ablehnte, sonst `null`
+ * (LFH-937, design.md D8). Das Textfeld endet an der Grenze, aber ein Baustein oder ein
+ * Slash-Befehl setzt den Text von außen: geprüft wird deshalb vor Upload und Warteschlange, wie
+ * bei der Von/An-Pflicht.
+ */
+export function laengenVerstoss(inhalt: string, metadaten: MetadatenWerte): string | null {
+  const gruende = LAENGEN_FELDER.flatMap(({ wort, max, wert }) => {
+    const w = wert(inhalt, metadaten);
+    if (!istZuLang(w, max)) return [];
+    const jetzt = grenzeText(zeichenZahl((w ?? '').trim()));
+    return [`${wort} ist zu lang: höchstens ${grenzeText(max)} Zeichen (jetzt ${jetzt})`];
+  });
+  return gruende.length > 0 ? `${gruende.join(' · ')}. Bitte kürzen.` : null;
 }
 
 /**

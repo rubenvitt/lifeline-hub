@@ -42,6 +42,8 @@ pub trait Dokumentart: Send + Sync + 'static {
     type Abschnitt: Abschnittsart;
     /// Wire-Typ der Anzeige; entsteht aus dem geladenen [`repo::Dokument`].
     type Anzeige: From<repo::Dokument<Self::Abschnitt>> + Send;
+    /// Wire-Typ einer Listenzeile: Kopfdaten ohne Abschnitte (LFH-931).
+    type Kopf: From<repo::DokumentKopf> + Send;
 
     /// Tabelle der Dokumente.
     const TABELLE: &'static str;

@@ -1,8 +1,9 @@
 import { apiGet, apiSend } from './client';
-import type { BefehlAbschnitt, BefehlAnzeige, BefehlVorlageKey } from './types';
+import type { BefehlAbschnitt, BefehlAnzeige, BefehlKopf, BefehlVorlageKey } from './types';
 
-export function listeBefehle(einsatzId: number): Promise<BefehlAnzeige[]> {
-  return apiGet<BefehlAnzeige[]>(`/api/einsaetze/${einsatzId}/befehle`);
+/** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
+export function listeBefehle(einsatzId: number): Promise<BefehlKopf[]> {
+  return apiGet<BefehlKopf[]>(`/api/einsaetze/${einsatzId}/befehle`);
 }
 
 export function ladeBefehl(einsatzId: number, id: number): Promise<BefehlAnzeige> {

@@ -113,19 +113,52 @@ fn zu_dokument<T: Dokumentart>(row: Row) -> Result<Dokument<T::Abschnitt>, AppEr
     })
 }
 
-/// Alle Dokumente eines Einsatzes, neueste Fortschreibung/Anlage zuerst.
-pub async fn liste<T: Dokumentart>(
+/// Kopfdaten eines Dokuments für die Listen (LFH-931, `listen-projektion`): alle Felder von
+/// [`Dokument`] außer `abschnitte` und `aktualisiert_at`. Ohne `aktualisiert_at` ändert ein
+/// Entwurfs-PATCH, der nur Abschnitte schreibt, keinen Kopf (`nur_inhalt` im Live-Ereignis).
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct DokumentKopf {
+    pub id: i64,
+    pub einsatz_id: i64,
+    pub vorlage: String,
+    pub titel: String,
+    pub zeitstand: String,
+    pub status: String,
+    pub version: i64,
+    pub vorgaenger_id: Option<i64>,
+    pub ersteller_id: i64,
+    pub ersteller_name: String,
+    pub erstellt_at: String,
+    pub freigegeben_von_id: Option<i64>,
+    pub freigegeben_von_name: Option<String>,
+    pub freigegeben_at: Option<String>,
+    pub etb_eintrag_id: Option<i64>,
+}
+
+/// Kopfdaten aller Dokumente eines Einsatzes, neueste Fortschreibung/Anlage zuerst. Liest die
+/// Abschnitte nicht: die Liste wächst sonst mit jeder Fortschreibung um den ganzen Text.
+pub async fn liste_koepfe<T: Dokumentart>(
     pool: &SqlitePool,
     einsatz_id: i64,
-) -> Result<Vec<Dokument<T::Abschnitt>>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{} WHERE l.einsatz_id = ? ORDER BY l.zeitstand DESC, l.id DESC",
-        select::<T>()
-    )))
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
-    rows.into_iter().map(zu_dokument::<T>).collect()
+) -> Result<Vec<DokumentKopf>, AppError> {
+    Ok(
+        sqlx::query_as::<_, DokumentKopf>(sqlx::AssertSqlSafe(format!(
+            "\
+    SELECT l.id, l.einsatz_id, l.vorlage, l.titel, l.zeitstand, l.status, \
+           l.version, l.vorgaenger_id, \
+           l.ersteller_id, b1.anzeigename AS ersteller_name, l.erstellt_at, \
+           l.freigegeben_von_id, b2.anzeigename AS freigegeben_von_name, \
+           l.freigegeben_at, l.etb_eintrag_id \
+    FROM {} l \
+    JOIN benutzer b1 ON b1.id = l.ersteller_id \
+    LEFT JOIN benutzer b2 ON b2.id = l.freigegeben_von_id \
+    WHERE l.einsatz_id = ? ORDER BY l.zeitstand DESC, l.id DESC",
+            T::TABELLE
+        )))
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 /// Lädt ein Dokument (aufgelöst); `NotFound`, wenn nicht zum Einsatz.
@@ -612,7 +645,12 @@ mod tests {
         );
         assert!(d.abschnitte.iter().all(|a| a.text().is_empty()));
         assert_eq!(laden::<T>(&pool, einsatz, d.id).await.unwrap(), d);
-        assert_eq!(liste::<T>(&pool, einsatz).await.unwrap().len(), 1);
+        let koepfe = liste_koepfe::<T>(&pool, einsatz).await.unwrap();
+        assert_eq!(koepfe.len(), 1);
+        assert_eq!(
+            (koepfe[0].id, koepfe[0].titel.as_str()),
+            (d.id, d.titel.as_str())
+        );
     }
 
     #[tokio::test]

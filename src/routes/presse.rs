@@ -26,7 +26,9 @@ use crate::einsatz::modul::Stab;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
-use crate::presse::mitteilung::{Abschnitt, Pressemitteilung, PressemitteilungAnzeige};
+use crate::presse::mitteilung::{
+    Abschnitt, Pressemitteilung, PressemitteilungAnzeige, PressemitteilungKopf,
+};
 use crate::presse::repo::{self, KontaktAenderung, KontaktEingabe, StatusWechsel};
 use crate::presse::{MedienkontaktAnzeige, MedienkontaktArt, MedienkontaktStatus};
 use crate::routes::support;
@@ -78,6 +80,16 @@ pub async fn medienkontakte_liste(
     ctx: EinsatzLesezugriff<Stab>,
 ) -> Result<Json<Vec<MedienkontaktAnzeige>>, AppError> {
     Ok(Json(repo::liste(&state.pool, ctx.einsatz.id).await?))
+}
+
+/// GET /api/einsaetze/{id}/stab/medienkontakte/{kid} — ein Kontakt, 404 bei fremdem Einsatz.
+/// Auf ein `presse`-Ereignis lädt der Client nur diese Zeile nach (LFH-931).
+pub async fn medienkontakt_detail(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Stab>,
+    PfadParam((_eid, kid)): PfadParam<(i64, i64)>,
+) -> Result<Json<MedienkontaktAnzeige>, AppError> {
+    Ok(Json(repo::laden(&state.pool, ctx.einsatz.id, kid).await?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -201,7 +213,7 @@ pub async fn medienkontakt_status(
 pub async fn pressemitteilungen_liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Stab>,
-) -> Result<Json<Vec<PressemitteilungAnzeige>>, AppError> {
+) -> Result<Json<Vec<PressemitteilungKopf>>, AppError> {
     kern::liste::<Pressemitteilung>(&state, &ctx.benutzer, ctx.einsatz.id).await
 }
 

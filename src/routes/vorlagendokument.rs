@@ -35,6 +35,14 @@ fn sse<T: DokumentRoute>(state: &AppState, einsatz_id: i64, id: i64) {
         .publiziere_objekt(einsatz_id, T::LIVE, T::LIVE_ID, id);
 }
 
+/// SSE-Notify eines Entwurfs-PATCH, der nur Abschnitte geändert hat (LFH-931): `nur_inhalt`
+/// sagt anderen Tabs, dass die Kopfliste gleich bleibt und nur das Detail abzugleichen ist.
+fn sse_nur_inhalt<T: DokumentRoute>(state: &AppState, einsatz_id: i64, id: i64) {
+    state
+        .live
+        .publiziere_objekt_mit(einsatz_id, T::LIVE, T::LIVE_ID, id, &["nur_inhalt"]);
+}
+
 /// Lesezugriff (inkl. Beobachter) plus Modul-Freigabe.
 async fn fordere_lesen<T: DokumentRoute>(
     state: &AppState,
@@ -78,9 +86,9 @@ pub async fn liste<T: DokumentRoute>(
     state: &AppState,
     benutzer: &Benutzer,
     einsatz_id: i64,
-) -> Result<Json<Vec<T::Anzeige>>, AppError> {
+) -> Result<Json<Vec<T::Kopf>>, AppError> {
     fordere_lesen::<T>(state, benutzer, einsatz_id).await?;
-    let alle = dok_repo::liste::<T>(&state.pool, einsatz_id).await?;
+    let alle = dok_repo::liste_koepfe::<T>(&state.pool, einsatz_id).await?;
     Ok(Json(alle.into_iter().map(Into::into).collect()))
 }
 
@@ -217,7 +225,13 @@ pub async fn aktualisieren<T: DokumentRoute>(
         },
     )
     .await?;
-    sse::<T>(state, einsatz_id, id);
+    // Titel und Zeitstand sind die einzigen Kopffelder, die ein PATCH ändern kann; bleiben sie,
+    // sieht die Liste nichts Neues (`DokumentKopf` trägt kein `aktualisiert_at`).
+    if dok.titel == vorher.titel && dok.zeitstand == vorher.zeitstand {
+        sse_nur_inhalt::<T>(state, einsatz_id, id);
+    } else {
+        sse::<T>(state, einsatz_id, id);
+    }
     Ok(Json(dok.into()))
 }
 

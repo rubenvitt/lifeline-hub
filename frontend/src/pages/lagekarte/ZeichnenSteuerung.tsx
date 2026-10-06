@@ -1,6 +1,8 @@
-import { IconPfeilZurueckGebogen } from '../../icons';
-import { Button, Card, Space, Switch, Typography, theme } from 'antd';
-import { monoStil } from '../../components/instrument';
+import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
+import { Button, Card, Space, Switch, Typography } from 'antd';
+import { monoStil, useRollen } from '../../components/instrument';
+import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
+import { grenzeText } from '../../components/zeichenGrenze';
 import { bandStil } from './KartenFuss';
 import './lagekarte.css';
 
@@ -16,8 +18,18 @@ interface ZeichnenSteuerungProps {
   /** Mindestens drei Punkte sind gesetzt; bis dahin ist der explizite Abschluss gesperrt. */
   abschliessenMoeglich?: boolean;
   onAbschliessen: () => void;
-  /** Punkte der laufenden Figur, als Zähler in der Zeichenphase. Nicht gesetzt → kein Zähler. */
+  /**
+   * Punkte der laufenden Figur, als Zähler in der Zeichenphase. Nicht gesetzt → kein Zähler. In der
+   * Bestätigung die Stützpunkte des Entwurfs: über der Grenze des Servers sperren beide Phasen
+   * (LFH-937, `GEOMETRIE_STUETZPUNKTE_MAX`).
+   */
   punkte?: number;
+  /**
+   * Art der laufenden Figur, Vorgabe 'flaeche'. In der Zeichenphase zählt `punkte` Ecken; der Server
+   * zählt beim Polygon den Schlusspunkt mit, also sperrt eine Fläche schon ab
+   * `GEOMETRIE_STUETZPUNKTE_MAX` Ecken. Die Bestätigung zählt die Geometrie selbst (`stuetzpunkte`).
+   */
+  figur?: 'flaeche' | 'linie';
   /** Es gibt einen Punkt zum Zurücknehmen; bis dahin ist „Letzten Punkt zurück" gesperrt. */
   punktZurueckMoeglich?: boolean;
   /** „Letzten Punkt zurück". Nicht gesetzt → kein Knopf. */
@@ -45,9 +57,28 @@ interface ZeichnenSteuerungProps {
  *   Präsentationsfrei: keine Karten-/terra-draw-Kenntnis, nur Props + Callbacks.
  */
 export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   if (!props.aktiv) return null;
   const bestaetigen = props.phase === 'bestaetigen';
+  // Über der Grenze des Servers (LFH-937, design.md D8): Hinweis neben dem Zähler, in derselben
+  // Zeile — ein eigenes Band höbe den Fuß bei 390 px über die Karte. Zeichen und Wort tragen ihn
+  // neben der Farbe (WCAG 1.4.1); Abschließen und Speichern sind gesperrt.
+  const schlusspunkt = !bestaetigen && props.figur !== 'linie' ? 1 : 0;
+  const zuViele = props.punkte != null && props.punkte + schlusspunkt > GEOMETRIE_STUETZPUNKTE_MAX;
+  const zuVieleHinweis = zuViele && (
+    <Typography.Text
+      data-lfh="zeichnen-zu-viele"
+      style={{
+        color: rollen.alarmText,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: token.marginXXS,
+      }}
+    >
+      <IconWarndreieck />
+      <span>zu viele Punkte (höchstens {grenzeText(GEOMETRIE_STUETZPUNKTE_MAX)})</span>
+    </Typography.Text>
+  );
   const gespeichert = props.serieAnzahl ?? 0;
   // Der Serien-Schalter steht in beiden Phasen: vor dem Zeichnen ist er die Ansage, danach die
   // letzte Gelegenheit, sie vor dem Speichern zu widerrufen.
@@ -99,16 +130,29 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             justifyContent: 'space-between',
             alignItems: 'baseline',
             gap: token.marginXS,
           }}
         >
           <Typography.Text strong>{props.titel}</Typography.Text>
-          {!bestaetigen && props.punkte != null && (
-            <Typography.Text data-lfh="zeichnen-punkte" style={monoStil(token.fontSize)}>
-              {props.punkte === 1 ? '1 Punkt' : `${props.punkte} Punkte`}
-            </Typography.Text>
+          {(zuViele || (!bestaetigen && props.punkte != null)) && (
+            <span
+              style={{
+                display: 'inline-flex',
+                flexWrap: 'wrap',
+                alignItems: 'baseline',
+                columnGap: token.marginXS,
+              }}
+            >
+              {!bestaetigen && props.punkte != null && (
+                <Typography.Text data-lfh="zeichnen-punkte" style={monoStil(token.fontSize)}>
+                  {props.punkte === 1 ? '1 Punkt' : `${grenzeText(props.punkte)} Punkte`}
+                </Typography.Text>
+              )}
+              {zuVieleHinweis}
+            </span>
           )}
         </div>
         {bestaetigen ? (
@@ -117,7 +161,12 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
             {escHinweis}
             {serienZeile}
             <Space>
-              <Button type="primary" loading={props.speichernLaeuft} onClick={props.onSpeichern}>
+              <Button
+                type="primary"
+                loading={props.speichernLaeuft}
+                disabled={zuViele}
+                onClick={props.onSpeichern}
+              >
                 Speichern
               </Button>
               <Button disabled={props.speichernLaeuft} onClick={props.onVerwerfen}>
@@ -138,7 +187,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
             <Space wrap>
               <Button
                 type="primary"
-                disabled={props.abschliessenMoeglich === false}
+                disabled={props.abschliessenMoeglich === false || zuViele}
                 onClick={props.onAbschliessen}
               >
                 Abschließen

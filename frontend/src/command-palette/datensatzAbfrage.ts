@@ -9,7 +9,7 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEtb } from '../api/etb';
-import { listeLageberichte } from '../api/lageberichte';
+import { ladeLagebericht, listeLageberichte } from '../api/lageberichte';
 import { ladeGefahrengebiete } from '../api/gefahren';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 
@@ -129,5 +129,17 @@ export function etbNummerAbfrage(einsatzId: number, nummer: number) {
     queryFn: () => listeEtb(einsatzId, { before_lfd_nr: nummer + 1, limit: 1 }),
     staleTime: FRISCH_MS,
     gcTime: ETB_SUCH_GC_MS,
+  });
+}
+
+/**
+ * Detail eines Lageberichts für die Vorschau (LFH-931): die Liste trägt nur Kopfdaten, den Text
+ * liefert nur der Einzelabruf. Gleiche Frist wie die Listenfächer; der Detail-Key ist live.
+ */
+export function lageberichtAbfrage(einsatzId: number, id: number) {
+  return queryOptions({
+    queryKey: einsatzKeys.lagebericht(einsatzId, id),
+    queryFn: () => ladeLagebericht(einsatzId, id),
+    staleTime: FRISCH_MS,
   });
 }

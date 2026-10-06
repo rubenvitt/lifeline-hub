@@ -49,6 +49,44 @@ pub struct SprechgruppeAnzeige {
     pub sortier: i64,
 }
 
+/// Höchstzahl verschiedener Sprechgruppen je Ziel (Abschnitt, Einheit, Führungsstelle; LFH-937,
+/// design.md D5). Darüber ist die Liste für sich unbrauchbar → 400.
+pub const SPRECHGRUPPEN_JE_ZIEL_MAX: usize = 32;
+
+/// Sprechgruppen-Liste von außen: sortiert, entdoppelt, höchstens
+/// [`SPRECHGRUPPEN_JE_ZIEL_MAX`] (sonst 400). Jede Route ruft das als ersten Schritt, vor jedem
+/// Schreiben (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+pub fn normalisiere_ids(mut ids: Vec<i64>) -> Result<Vec<i64>, crate::error::AppError> {
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() > SPRECHGRUPPEN_JE_ZIEL_MAX {
+        return Err(crate::error::AppError::Validation(format!(
+            "Höchstens {SPRECHGRUPPEN_JE_ZIEL_MAX} Sprechgruppen je Zuordnung"
+        )));
+    }
+    Ok(ids)
+}
+
+#[cfg(test)]
+mod normalisiere_tests {
+    use super::*;
+
+    #[test]
+    fn entdoppelt_und_begrenzt() {
+        assert_eq!(normalisiere_ids(vec![8, 7, 7, 8, 7]).unwrap(), vec![7, 8]);
+        let voll: Vec<i64> = (1..=SPRECHGRUPPEN_JE_ZIEL_MAX as i64).collect();
+        assert_eq!(normalisiere_ids(voll.clone()).unwrap(), voll);
+        // Dubletten zählen nicht mit.
+        let mit_dubletten: Vec<i64> = voll.iter().chain(voll.iter()).copied().collect();
+        assert!(normalisiere_ids(mit_dubletten).is_ok());
+        let zu_viele: Vec<i64> = (1..=SPRECHGRUPPEN_JE_ZIEL_MAX as i64 + 1).collect();
+        assert!(matches!(
+            normalisiere_ids(zu_viele),
+            Err(crate::error::AppError::Validation(_))
+        ));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

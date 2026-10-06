@@ -231,3 +231,53 @@ describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', ()
     ).toBeInTheDocument();
   });
 });
+
+describe('ZeichnenSteuerung — Stützpunkte (LFH-937)', () => {
+  // Beim Polygon zählt der Server den Schlusspunkt mit; die Zeichenphase zählt Ecken. 4 999 Ecken
+  // ergeben 5 000 Stützpunkte, 5 000 Ecken schon 5 001.
+  it('Fläche in der Zeichenphase: 4 999 Ecken ohne Hinweis, Abschließen frei', () => {
+    setup({ punkte: 4_999 });
+    expect(screen.queryByText(/zu viele Punkte/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeEnabled();
+  });
+
+  it('Fläche in der Zeichenphase: 5 000 Ecken sind mit dem Schlusspunkt zu viele', () => {
+    setup({ punkte: 5_000 });
+    expect(screen.getByText('zu viele Punkte (höchstens 5.000)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeDisabled();
+  });
+
+  it('Linie in der Zeichenphase: 5 000 Punkte frei, 5 001 gesperrt (kein Schlusspunkt)', () => {
+    setup({ punkte: 5_000, figur: 'linie', titel: 'Gefahrengebiet · Linie' });
+    expect(screen.queryByText(/zu viele Punkte/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeEnabled();
+  });
+
+  it('Linie mit 5 001 Punkten ist gesperrt', () => {
+    setup({ punkte: 5_001, figur: 'linie', titel: 'Gefahrengebiet · Linie' });
+    expect(screen.getByText('zu viele Punkte (höchstens 5.000)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeDisabled();
+  });
+
+  it('in der Bestätigung zählen die Stützpunkte des Entwurfs: 5 000 frei', () => {
+    setup({ phase: 'bestaetigen', punkte: 5_000 });
+    expect(screen.queryByText(/zu viele Punkte/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled();
+  });
+
+  it('über der Grenze: Hinweis neben dem Zähler mit Zeichen, Abschließen gesperrt', () => {
+    setup({ punkte: 5_001 });
+    const hinweis = screen.getByText('zu viele Punkte (höchstens 5.000)');
+    const zeile = screen.getByText('5.001 Punkte').parentElement!;
+    expect(zeile.contains(hinweis)).toBe(true);
+    // Zweiter Kanal neben der Farbe: ein Zeichen vor dem Wort.
+    expect(hinweis.closest('[data-lfh="zeichnen-zu-viele"]')?.querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeDisabled();
+  });
+
+  it('in der Bestätigung sperrt eine zu große Figur das Speichern', () => {
+    setup({ phase: 'bestaetigen', punkte: 5_001 });
+    expect(screen.getByText('zu viele Punkte (höchstens 5.000)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+});

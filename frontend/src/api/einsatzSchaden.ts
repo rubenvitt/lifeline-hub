@@ -1,4 +1,11 @@
-import type { Schaden, SchadenAnhang, SchadenStatus, SchadenTyp, Ausmass } from './types';
+import type {
+  Schaden,
+  SchadenAnhang,
+  SchadenMarker,
+  SchadenStatus,
+  SchadenTyp,
+  Ausmass,
+} from './types';
 import {
   apiGet,
   apiSend,
@@ -58,6 +65,35 @@ export function listeSchaeden(einsatzId: number, filter: SchaedenFilter = {}): P
       inkl_storniert: filter.inklStorniert,
     }),
   );
+}
+
+/**
+ * Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931): Kennung, Nummer, Typ, Ausmaß,
+ * Status und Lage aller nicht stornierten Schäden, neueste Nummer zuerst. Ohne Freitexte.
+ */
+export function listeSchadenMarker(einsatzId: number): Promise<SchadenMarker[]> {
+  return apiGet<SchadenMarker[]>(`/api/einsaetze/${einsatzId}/schaeden/marker`);
+}
+
+/** Der Marker einer vollen Zeile; ein nachgeladener Schaden aktualisiert so auch die Karte. */
+export function alsSchadenMarker(s: Schaden): SchadenMarker {
+  return {
+    id: s.id,
+    registrier_nr: s.registrier_nr,
+    status: s.status,
+    typ: s.typ,
+    ausmass: s.ausmass,
+    lat: s.lat ?? null,
+    lon: s.lon ?? null,
+  };
+}
+
+/** Ordnung der Schadenliste und der Marker wie im SQL: neueste Registriernummer zuerst. */
+export function vergleicheSchaeden(
+  a: { registrier_nr: number },
+  b: { registrier_nr: number },
+): number {
+  return b.registrier_nr - a.registrier_nr;
 }
 
 export function ladeSchaden(einsatzId: number, schadenId: number): Promise<Schaden> {

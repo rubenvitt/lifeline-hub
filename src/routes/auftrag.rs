@@ -8,7 +8,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::kommunikation::VOLLZUG_IN_ARBEIT;
 use crate::live::LiveEvent;
-use crate::routes::support::pflicht;
+use crate::routes::support::pflicht_max;
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -261,9 +261,11 @@ pub async fn vollzug(
             .await?;
         }
         "vollzogen" => {
-            let text = pflicht(
+            // Wird der Inhalt einer ETB-Meldung: dessen Grenze (LFH-937, design.md D2).
+            let text = pflicht_max(
                 req.vollzugsmeldung.as_deref().unwrap_or_default(),
                 "Vollzugsmeldung",
+                crate::etb::INHALT_MAX,
             )?;
             // Doppel-Vollzug verhindern → sonst zweite ETB-Meldung (append-only).
             if repo::laden(&state.pool, auftrag_id, &now)

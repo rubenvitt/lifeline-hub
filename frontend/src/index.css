@@ -78,6 +78,17 @@ body {
   color: var(--lfh-bedien-text);
 }
 
+/* Feld über seiner Zeichengrenze (LFH-937, `components/zeichenGrenze.tsx`): antd schreibt Text und
+   Zähler in `colorError`, das als Füllfarbe den Textboden nicht hält. Roter TEXT liest `alarmText`
+   (frontend/AGENTS.md, Formularmeldung). Doppelte Klasse hebt die Spezifität über antds Regel. */
+.ant-input-out-of-range.ant-input-out-of-range,
+.ant-input-out-of-range.ant-input-out-of-range input,
+.ant-input-out-of-range.ant-input-out-of-range textarea,
+.ant-input-out-of-range.ant-input-out-of-range .ant-input-show-count-suffix,
+.ant-input-out-of-range.ant-input-out-of-range .ant-input-data-count {
+  color: var(--lfh-alarm-text);
+}
+
 /* Fußfuge der Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und
    Bestätigungsblase trennen ihre Knöpfe mit `marginXS` = 3 / 5 / 7 px; in einer Rückfrage steht
    fast immer Rot neben „Abbrechen", und im Handschuh-Betrieb verlangt die Leitlinie ≥ 16 px.

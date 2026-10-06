@@ -9,7 +9,8 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::{
-    anhang_antwort, original_freigeben, parse_enum_opt, pflicht, Fassung, FassungParam,
+    anhang_antwort, optional_max, original_freigeben, parse_enum_opt, pflicht_max, Fassung,
+    FassungParam,
 };
 use crate::zeit::jetzt;
 use axum::extract::{Multipart, Query, State};
@@ -119,12 +120,21 @@ pub async fn erfassen(
         ));
     }
 
-    let inhalt = pflicht(&req.inhalt, "Inhalt")?;
+    // Grenzen nach dem Replay-Check (LFH-937, `src/AGENTS.md`, „Eingabegrenzen“).
+    let inhalt = pflicht_max(&req.inhalt, "Inhalt", crate::etb::INHALT_MAX)?;
     // Von und An sind Pflicht (LFH-894, Spec `etb-absender-empfaenger`): fehlend oder leer ist
     // 400. Der DTO behält `Option`, damit ein fehlendes Feld diese Meldung bekommt und keinen
     // Deserialisierungsfehler.
-    let von = pflicht(req.von.as_deref().unwrap_or(""), "Von")?;
-    let an = pflicht(req.an.as_deref().unwrap_or(""), "An")?;
+    let von = pflicht_max(
+        req.von.as_deref().unwrap_or(""),
+        "Von",
+        crate::etb::PARTEI_MAX,
+    )?;
+    let an = pflicht_max(
+        req.an.as_deref().unwrap_or(""),
+        "An",
+        crate::etb::PARTEI_MAX,
+    )?;
 
     // Meldeweg validieren (falls gesetzt).
     let meldeweg = bereinige(req.meldeweg);
@@ -156,7 +166,7 @@ pub async fn erfassen(
         None => None,
     };
 
-    let veranlassung = bereinige(req.veranlassung);
+    let veranlassung = optional_max(req.veranlassung, "Veranlassung", crate::etb::PARTEI_MAX)?;
 
     let (anzeige, war_neu) = repo::anlegen_idempotent(
         &state.pool,
