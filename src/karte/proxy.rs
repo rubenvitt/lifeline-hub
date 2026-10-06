@@ -51,11 +51,35 @@ pub fn ist_absolute_http_url(s: &str) -> bool {
     l.starts_with("http://") || l.starts_with("https://") || l.starts_with("//")
 }
 
+/// Größter Zoom einer XYZ-Kachel, den Proxy und Offline-Auslieferung annehmen. Kein Anbieter und
+/// keine MBTiles-Datei reicht darüber hinaus.
+pub const MAX_KACHEL_ZOOM: i64 = 24;
+
+/// Ob `z/x/y` eine existierende XYZ-Kachel bezeichnet: `0 <= z <= 24` und `0 <= x, y < 2^z`. Die
+/// Werte kommen roh aus dem Pfad einer anmeldefreien Route (LFH-930); alles andere ist keine
+/// Kachel und darf weder den Upstream noch den Kachel-Cache erreichen.
+pub fn kachel_koordinate_gueltig(z: i64, x: i64, y: i64) -> bool {
+    if !(0..=MAX_KACHEL_ZOOM).contains(&z) {
+        return false;
+    }
+    let Some(anzahl) = u32::try_from(z).ok().and_then(|z| 1i64.checked_shl(z)) else {
+        return false;
+    };
+    (0..anzahl).contains(&x) && (0..anzahl).contains(&y)
+}
+
 /// Ersetzt die MapLibre-Tile-Platzhalter `{z}/{x}/{y}` (namensbasiert, Reihenfolge-unabhängig)
 /// und `{-y}` (TMS-Flip = `2^z - 1 - y`) **rein textuell** im rohen Template (kein Url-Roundtrip,
 /// damit `{}` nicht percent-kodiert wird). Ein Template ohne Platzhalter bleibt unverändert.
+/// Die Aufrufer prüfen vorher [`kachel_koordinate_gueltig`]; der Flip rechnet trotzdem geprüft
+/// und setzt bei einem absurden `z` 0 ein, statt zu paniken (LFH-930).
 pub fn subst_template(template: &str, z: i64, x: i64, y: i64) -> String {
-    let flip = (1i64 << z) - 1 - y;
+    let flip = u32::try_from(z)
+        .ok()
+        .filter(|&z| z < 63)
+        .map(|z| 1i64 << z)
+        .and_then(|anzahl| (anzahl - 1).checked_sub(y))
+        .unwrap_or(0);
     template
         .replace("{-y}", &flip.to_string())
         .replace("{z}", &z.to_string())
@@ -435,6 +459,7 @@ use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 /// Filtert aufgelöste Adressen: liefert sie nur, wenn **keine** intern ist (fail-closed). Sobald
 /// eine Adresse intern/nicht-routbar ist (auch bei gemischtem Ergebnis), kommt nichts zurück —
@@ -492,12 +517,36 @@ pub fn proxy_client() -> &'static reqwest::Client {
     })
 }
 
+/// Obergrenze gleichzeitiger Upstream-Abrufe aller Proxy-Routen zusammen (LFH-930). Die Routen
+/// sind anmeldefrei, und jeder hängende Abruf hielte bis zum 30-s-Timeout von [`proxy_client`]
+/// einen globalen Zulassungsplatz (`zulassung::MAX_GLEICHZEITIGE_REQUESTS`). Darüber wird sofort
+/// abgewiesen ([`ProxyFehler::Ueberlast`] → 503), nicht gestaut: ein wartender Abruf hielte den
+/// globalen Platz genauso. Cache-Hits und Wartende auf einen gebündelten Abruf belegen keinen
+/// Platz (`tile_cache::hole_asset_cached`).
+pub const MAX_GLEICHZEITIGE_PROXY_ABRUFE: usize = 32;
+
+/// Prozessweite Grenze nach [`MAX_GLEICHZEITIGE_PROXY_ABRUFE`]. Wie [`proxy_client`] bewusst kein
+/// `AppState`-Feld; Tests reichen eine eigene, enge Grenze durch.
+pub fn proxy_abruf_grenze() -> &'static Arc<Semaphore> {
+    static GRENZE: std::sync::OnceLock<Arc<Semaphore>> = std::sync::OnceLock::new();
+    GRENZE.get_or_init(|| Arc::new(Semaphore::new(MAX_GLEICHZEITIGE_PROXY_ABRUFE)))
+}
+
+/// Belegt einen Platz für einen Upstream-Abruf oder gibt sofort [`ProxyFehler::Ueberlast`].
+pub fn abruf_platz(grenze: &Arc<Semaphore>) -> Result<OwnedSemaphorePermit, ProxyFehler> {
+    grenze.clone().try_acquire_owned().map_err(|_| {
+        tracing::warn!("Kartenproxy: Grenze gleichzeitiger Upstream-Abrufe erreicht (503)");
+        ProxyFehler::Ueberlast
+    })
+}
+
 /// Obergrenze pro geproxytem Asset (Tiles/Sprite/Glyphs sind klein). Content-Length wird NICHT
 /// vertraut — beim Streamen hart gekappt.
 pub const ASSET_BYTE_CAP: usize = 8 * 1024 * 1024;
 
-/// Ergebnis eines geproxyten Assets: Bytes + hygienisierte, durchgereichte Header.
-#[derive(Debug)]
+/// Ergebnis eines geproxyten Assets: Bytes + hygienisierte, durchgereichte Header. `Clone`, weil
+/// ein gebündelter Abruf sein Ergebnis an jeden Wartenden ausgibt (`tile_cache`).
+#[derive(Debug, Clone)]
 pub struct AssetAntwort {
     pub bytes: Vec<u8>,
     /// Content-Type — `text/*` ist auf `application/octet-stream` geklemmt (Anti-XSS; Handler
@@ -511,7 +560,7 @@ pub struct AssetAntwort {
 }
 
 /// Fehlerursachen der Proxy-Service-Schicht.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ProxyFehler {
     /// Upstream-Nicht-Erfolgs-Status (Body wird NICHT weitergereicht).
     Status(u16),
@@ -521,6 +570,9 @@ pub enum ProxyFehler {
     ZuGross,
     /// Backstop: ein Key war nach dem Rewrite noch im Dokument → fail-closed (Task 7).
     Secret,
+    /// Die Grenze gleichzeitiger Upstream-Abrufe ist erschöpft ([`abruf_platz`]); der Handler
+    /// antwortet 503.
+    Ueberlast,
 }
 
 impl std::fmt::Display for ProxyFehler {
@@ -530,6 +582,7 @@ impl std::fmt::Display for ProxyFehler {
             ProxyFehler::Http(e) => write!(f, "Netzwerkfehler: {e}"),
             ProxyFehler::ZuGross => write!(f, "Asset überschreitet die Größengrenze"),
             ProxyFehler::Secret => write!(f, "Key nach Rewrite nicht entfernt (fail-closed)"),
+            ProxyFehler::Ueberlast => write!(f, "Kartenproxy ausgelastet"),
         }
     }
 }
@@ -792,6 +845,39 @@ mod tests {
             subst_template("https://h/static.png", 3, 2, 1),
             "https://h/static.png"
         );
+    }
+
+    #[test]
+    fn kachel_koordinate_gueltig_grenzen() {
+        // Zoom: 0..=24.
+        assert!(kachel_koordinate_gueltig(0, 0, 0));
+        assert!(kachel_koordinate_gueltig(24, 0, 0));
+        assert!(!kachel_koordinate_gueltig(-1, 0, 0));
+        assert!(!kachel_koordinate_gueltig(25, 0, 0));
+        assert!(!kachel_koordinate_gueltig(64, 0, 0));
+        assert!(!kachel_koordinate_gueltig(i64::MAX, 0, 0));
+        assert!(!kachel_koordinate_gueltig(i64::MIN, 0, 0));
+        // x/y: 0..2^z.
+        assert!(kachel_koordinate_gueltig(3, 7, 7));
+        assert!(!kachel_koordinate_gueltig(3, 8, 0), "x = 2^z");
+        assert!(!kachel_koordinate_gueltig(3, 0, 8), "y = 2^z");
+        assert!(
+            !kachel_koordinate_gueltig(0, 1, 0),
+            "z 0 hat genau eine Kachel"
+        );
+        assert!(kachel_koordinate_gueltig(24, (1 << 24) - 1, (1 << 24) - 1));
+        assert!(!kachel_koordinate_gueltig(24, 1 << 24, 0));
+        assert!(!kachel_koordinate_gueltig(5, -1, 0));
+        assert!(!kachel_koordinate_gueltig(5, 0, -1));
+    }
+
+    #[test]
+    fn subst_template_panikt_nicht_bei_absurdem_zoom() {
+        // Defense-in-Depth hinter dem Guard: ohne geprüftes Schieben panikt das im Debug-Build.
+        for z in [-1, 63, 64, i64::MAX, i64::MIN] {
+            let s = subst_template("https://h/{z}/{x}/{-y}", z, 0, i64::MIN);
+            assert!(s.starts_with(&format!("https://h/{z}/0/")), "{s}");
+        }
     }
 
     #[test]

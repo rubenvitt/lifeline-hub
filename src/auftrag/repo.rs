@@ -3,6 +3,7 @@ use crate::kommunikation::{
     repo as krepo, OBJEKT_AUFTRAG, VOLLZUG_IN_ARBEIT, VOLLZUG_OFFEN, VOLLZUG_VOLLZOGEN,
 };
 use sqlx::SqlitePool;
+use std::collections::HashMap;
 
 use super::{
     empfaenger_typ_gueltig, prioritaet_gueltig, AuftragAnzeige, AuftragDetail,
@@ -44,29 +45,30 @@ pub struct AuftragDaten<'a> {
     pub empfaenger: Vec<EmpfaengerEingabe>,
 }
 
-/// Empfänger-Filter fürs Board (genau ein Ziel-Slot gesetzt).
+/// Empfänger-Filter fürs Board (genau ein Ziel-Slot gesetzt). Wirkt in SQL (`EXISTS` auf
+/// `auftrag_empfaenger`, LFH-933): ein Auftrag passt, wenn MINDESTENS EIN Empfänger den Slot
+/// trägt. Sind beide Slots leer, passt jeder Auftrag mit mindestens einem Empfänger. Ist beides
+/// gesetzt, gilt der Abschnitt (die Route lässt nur einen zu).
 #[derive(Debug, Default)]
 pub struct EmpfaengerFilter {
     pub abschnitt_id: Option<i64>,
     pub einheit_id: Option<i64>,
 }
 
-impl EmpfaengerFilter {
-    fn passt(&self, e: &AuftragEmpfaengerAnzeige) -> bool {
-        if let Some(a) = self.abschnitt_id {
-            return e.abschnitt_id == Some(a);
-        }
-        if let Some(u) = self.einheit_id {
-            return e.einheit_id == Some(u);
-        }
-        true
-    }
+/// Bearbeitungsstatus als SQL-Ausdruck: `'abgenommen'`, wenn `abgenommen_at` gesetzt ist, sonst
+/// die Vollzugs-Achse. EINMAL definiert für die Spalte in [`ANZEIGE_SELECT`] und den
+/// Status-Filter in [`liste`] (LFH-933).
+macro_rules! bearbeitungsstatus_sql {
+    () => {
+        "(CASE WHEN a.abgenommen_at IS NOT NULL THEN 'abgenommen' \
+              ELSE COALESCE(ks.vollzug_status, 'offen') END)"
+    };
 }
 
 /// SELECT-Projektion inkl. Vollzugs-Achse (LEFT JOIN kommunikation_status),
 /// Quittungs-Aggregat (Subquery auf auftrag_empfaenger) und abgeleiteten Feldern.
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
-const ANZEIGE_SELECT: &str =
+const ANZEIGE_SELECT: &str = concat!(
     "SELECT a.id, a.einsatz_id, a.lfd_nr, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
             a.verbindung, a.sicherheit, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
             a.vollzugsmeldung, a.abgenommen_at, a.abgenommen_von_id, a.etb_anordnung_id, \
@@ -77,11 +79,12 @@ const ANZEIGE_SELECT: &str =
             (SELECT COUNT(*) FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id) AS empfaenger_anzahl, \
             (SELECT COUNT(*) FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NOT NULL) AS quittiert_anzahl, \
             (a.frist_at IS NOT NULL AND a.frist_at <= ? \
-             AND EXISTS (SELECT 1 FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NULL)) AS ist_ueberfaellig, \
-            CASE WHEN a.abgenommen_at IS NOT NULL THEN 'abgenommen' \
-                 ELSE COALESCE(ks.vollzug_status, 'offen') END AS bearbeitungsstatus \
+             AND EXISTS (SELECT 1 FROM auftrag_empfaenger ae WHERE ae.auftrag_id = a.id AND ae.quittiert_at IS NULL)) AS ist_ueberfaellig, ",
+    bearbeitungsstatus_sql!(),
+    " AS bearbeitungsstatus \
      FROM auftrag a \
-     LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'auftrag' AND ks.objekt_id = a.id";
+     LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'auftrag' AND ks.objekt_id = a.id"
+);
 
 /// Lädt einen Auftrag samt Empfängern. `NotFound`, wenn unbekannt.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
@@ -101,25 +104,59 @@ pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<AuftragDet
     })
 }
 
+/// Spalten einer Empfänger-Zeile, geteilt von [`empfaenger_von`] und [`empfaenger_von_allen`].
+const EMPFAENGER_SPALTEN: &str =
+    "id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
+     funktion_text, funktion, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, \
+     quittiert_von_id";
+
 /// Lädt die Empfänger-Zeilen eines Auftrags (Quittung pro Empfänger).
 pub async fn empfaenger_von(
     pool: &SqlitePool,
     auftrag_id: i64,
 ) -> Result<Vec<AuftragEmpfaengerAnzeige>, AppError> {
-    sqlx::query_as::<_, AuftragEmpfaengerAnzeige>(
-        "SELECT id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
-                funktion_text, funktion, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, \
-                quittiert_von_id \
-         FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
-    )
+    sqlx::query_as::<_, AuftragEmpfaengerAnzeige>(sqlx::AssertSqlSafe(format!(
+        "SELECT {EMPFAENGER_SPALTEN} FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id"
+    )))
     .bind(auftrag_id)
     .fetch_all(pool)
     .await
     .map_err(Into::into)
 }
 
-/// Listet Aufträge eines Einsatzes (optional gefiltert nach Bearbeitungsstatus
+/// Lädt die Empfänger-Zeilen VIELER Aufträge in EINER Abfrage (kein N+1, LFH-933), je Auftrag
+/// nach `id` sortiert wie [`empfaenger_von`]. Die ids reisen als EIN JSON-Array (`json_each`,
+/// Muster `pegel::repo`): eine Bind-Variable, gleich wie viele Aufträge, also keine Grenze
+/// `SQLITE_MAX_VARIABLE_NUMBER`. Aufträge ohne Empfänger fehlen in der Karte.
+pub async fn empfaenger_von_allen(
+    pool: &SqlitePool,
+    auftrag_ids: &[i64],
+) -> Result<HashMap<i64, Vec<AuftragEmpfaengerAnzeige>>, AppError> {
+    let mut je_auftrag: HashMap<i64, Vec<AuftragEmpfaengerAnzeige>> = HashMap::new();
+    if auftrag_ids.is_empty() {
+        return Ok(je_auftrag);
+    }
+    let ids = serde_json::to_string(auftrag_ids)
+        .map_err(|e| AppError::Internal(format!("Auftrags-ids serialisieren: {e}")))?;
+    let zeilen = sqlx::query_as::<_, AuftragEmpfaengerAnzeige>(sqlx::AssertSqlSafe(format!(
+        "SELECT {EMPFAENGER_SPALTEN} FROM auftrag_empfaenger \
+         WHERE auftrag_id IN (SELECT value FROM json_each(?)) ORDER BY auftrag_id, id"
+    )))
+    .bind(ids)
+    .fetch_all(pool)
+    .await?;
+    for e in zeilen {
+        je_auftrag.entry(e.auftrag_id).or_default().push(e);
+    }
+    Ok(je_auftrag)
+}
+
+/// Listet Aufträge eines Einsatzes (optional gefiltert nach Bearbeitungsstatus, Richtung
 /// und/oder Empfänger). Sortierung: Priorität (sofort→normal), dann Frist, dann ID.
+///
+/// Zwei Statements, gleich wie viele Aufträge (LFH-933): alle Filter wirken im WHERE, die
+/// Empfänger kommen gebündelt aus [`empfaenger_von_allen`]. Kein `empfaenger_von` je Zeile —
+/// das war N+1 hinter Board, Kräfteübersicht und Modulzähler.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -132,38 +169,52 @@ pub async fn liste(
     if richtung_filter.is_some() {
         sql.push_str(" AND a.richtung = ?");
     }
+    if status_filter.is_some() {
+        sql.push_str(concat!(" AND ", bearbeitungsstatus_sql!(), " = ?"));
+    }
+    let empfaenger_slot = empfaenger_filter.map(|f| match (f.abschnitt_id, f.einheit_id) {
+        (Some(a), _) => Some(("abschnitt_id", a)),
+        (None, Some(u)) => Some(("einheit_id", u)),
+        (None, None) => None,
+    });
+    match empfaenger_slot {
+        Some(Some((spalte, _))) => sql.push_str(&format!(
+            " AND EXISTS (SELECT 1 FROM auftrag_empfaenger fe \
+               WHERE fe.auftrag_id = a.id AND fe.{spalte} = ?)"
+        )),
+        Some(None) => sql.push_str(
+            " AND EXISTS (SELECT 1 FROM auftrag_empfaenger fe WHERE fe.auftrag_id = a.id)",
+        ),
+        None => {}
+    }
     sql.push_str(
         " ORDER BY CASE a.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
           a.frist_at IS NULL, a.frist_at, a.id",
     );
-    // Bind-Reihenfolge: jetzt (computed) → einsatz_id → optional richtung.
+    // Bind-Reihenfolge: jetzt (computed) → einsatz_id → richtung → status → Empfänger-Slot.
     let mut q = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(&*sql))
         .bind(jetzt)
         .bind(einsatz_id);
     if let Some(r) = richtung_filter {
         q = q.bind(r);
     }
+    if let Some(s) = status_filter {
+        q = q.bind(s);
+    }
+    if let Some(Some((_, id))) = empfaenger_slot {
+        q = q.bind(id);
+    }
     let auftraege = q.fetch_all(pool).await?;
 
-    let mut out = Vec::with_capacity(auftraege.len());
-    for auftrag in auftraege {
-        if let Some(s) = status_filter {
-            if auftrag.bearbeitungsstatus.as_str() != s {
-                continue;
-            }
-        }
-        let empfaenger = empfaenger_von(pool, auftrag.id).await?;
-        if let Some(f) = empfaenger_filter {
-            if !empfaenger.iter().any(|e| f.passt(e)) {
-                continue;
-            }
-        }
-        out.push(AuftragDetail {
+    let ids: Vec<i64> = auftraege.iter().map(|a| a.id).collect();
+    let mut empfaenger = empfaenger_von_allen(pool, &ids).await?;
+    Ok(auftraege
+        .into_iter()
+        .map(|auftrag| AuftragDetail {
+            empfaenger: empfaenger.remove(&auftrag.id).unwrap_or_default(),
             auftrag,
-            empfaenger,
-        });
-    }
-    Ok(out)
+        })
+        .collect())
 }
 
 /// Prüft, ob ein Auftrag zum Einsatz gehört (Cross-Einsatz-Schutz).
@@ -1579,5 +1630,247 @@ mod tests {
                 .unwrap_err(),
             AppError::Validation(_)
         ));
+    }
+
+    /// Empfänger, der auf einen Abschnitt oder eine Einheit zeigt (Filter-Tests, LFH-933).
+    fn ziel(typ: &str, abschnitt_id: Option<i64>, einheit_id: Option<i64>) -> EmpfaengerEingabe {
+        EmpfaengerEingabe {
+            empfaenger_typ: typ.into(),
+            abschnitt_id,
+            einheit_id,
+            person_id: None,
+            fahrzeug_id: None,
+            funktion_text: None,
+            funktion: None,
+            extern_kategorie: None,
+            extern_bezeichnung: None,
+        }
+    }
+
+    /// LFH-933: Status-, Richtungs- und Empfänger-Filter wirken in SQL und liefern genau, was
+    /// das frühere Filtern in Rust über die ungefilterte Liste lieferte — dieselben Aufträge, in
+    /// derselben Reihenfolge, mit allen Empfängern in `id`-Reihenfolge.
+    #[tokio::test]
+    async fn liste_filter_in_sql_wie_rust_filter_ueber_alle() {
+        use crate::auftrag::{
+            PRIO_DRINGEND, PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_EXTERN, RICHTUNG_INTERN,
+        };
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut abschnitte = Vec::new();
+        for name in ["Nord", "Süd"] {
+            abschnitte.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let mut einheiten = Vec::new();
+        for name in ["TLF 1", "GW 2"] {
+            einheiten.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let (a1, a2, u1, u2) = (abschnitte[0], abschnitte[1], einheiten[0], einheiten[1]);
+        let abschnitt = |id| ziel("abschnitt", Some(id), None);
+        let einheit = |id| ziel("einheit", None, Some(id));
+
+        // (Text, Priorität, Frist, Richtung, Empfänger) — gemischt, damit die Sortierung trägt.
+        let faelle = vec![
+            ("a", PRIO_NORMAL, None, RICHTUNG_INTERN, vec![abschnitt(a1)]),
+            (
+                "b",
+                PRIO_SOFORT,
+                Some("2026-06-11 12:00:00"),
+                RICHTUNG_INTERN,
+                vec![einheit(u1), abschnitt(a2)],
+            ),
+            (
+                "c",
+                PRIO_DRINGEND,
+                None,
+                RICHTUNG_EXTERN,
+                vec![einheit(u2), funktion("S3")],
+            ),
+            (
+                "d",
+                PRIO_NORMAL,
+                Some("2026-06-11 08:00:00"),
+                RICHTUNG_INTERN,
+                vec![funktion("EA")],
+            ),
+            (
+                "e",
+                PRIO_SOFORT,
+                None,
+                RICHTUNG_INTERN,
+                vec![abschnitt(a1), einheit(u2), einheit(u1)],
+            ),
+            (
+                "f",
+                PRIO_NORMAL,
+                Some("2026-06-11 08:00:00"),
+                RICHTUNG_EXTERN,
+                vec![einheit(u1)],
+            ),
+        ];
+        let mut ids = Vec::new();
+        for (text, prio, frist, richtung, empf) in faelle {
+            let d = AuftragDaten {
+                richtung,
+                ..daten_prio(text, prio, frist, empf)
+            };
+            ids.push(
+                anlegen(&pool, e, b, d, "2026-06-11 09:00:00")
+                    .await
+                    .unwrap()
+                    .auftrag
+                    .id,
+            );
+        }
+        // Bearbeitungsstatus streuen: in Arbeit, vollzogen, abgenommen, Rest offen.
+        for (id, status) in [
+            (ids[1], VOLLZUG_IN_ARBEIT),
+            (ids[2], VOLLZUG_VOLLZOGEN),
+            (ids[4], VOLLZUG_VOLLZOGEN),
+        ] {
+            krepo::setze_vollzug(
+                &pool,
+                1,
+                e,
+                OBJEKT_AUFTRAG,
+                id,
+                status,
+                b,
+                "2026-06-11 10:00:00",
+            )
+            .await
+            .unwrap();
+        }
+        sqlx::query("UPDATE auftrag SET abgenommen_at = '2026-06-11 10:30:00' WHERE id = ?")
+            .bind(ids[4])
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let jetzt = "2026-06-11 11:00:00";
+        let alle = liste(&pool, e, None, None, None, jetzt).await.unwrap();
+        assert_eq!(alle.len(), 6);
+        assert_eq!(
+            alle.iter().map(|d| d.empfaenger.len()).sum::<usize>(),
+            10,
+            "alle Empfänger geladen"
+        );
+        let als_json = |l: &[AuftragDetail]| serde_json::to_value(l).unwrap();
+
+        let filter = [
+            None,
+            Some((None, None)),
+            Some((Some(a1), None)),
+            Some((Some(a2), None)),
+            Some((None, Some(u1))),
+            Some((None, Some(u2))),
+            Some((Some(a2), Some(u1))),
+        ];
+        let status = [
+            None,
+            Some("offen"),
+            Some("in_arbeit"),
+            Some("vollzogen"),
+            Some("abgenommen"),
+            Some("unbekannt"),
+        ];
+        let richtungen = [None, Some(RICHTUNG_INTERN), Some(RICHTUNG_EXTERN)];
+        let mut treffer_gesamt = 0;
+        for f in filter {
+            let ef = f.map(|(abschnitt_id, einheit_id)| EmpfaengerFilter {
+                abschnitt_id,
+                einheit_id,
+            });
+            for s in status {
+                for r in richtungen {
+                    // Referenz: das frühere Verhalten — Rust-Filter über die volle Liste.
+                    let erwartet: Vec<AuftragDetail> = alle
+                        .iter()
+                        .filter(|d| s.is_none_or(|s| d.auftrag.bearbeitungsstatus.as_str() == s))
+                        .filter(|d| r.is_none_or(|r| d.auftrag.richtung.as_str() == r))
+                        .filter(|d| match &ef {
+                            None => true,
+                            Some(f) => {
+                                d.empfaenger
+                                    .iter()
+                                    .any(|x| match (f.abschnitt_id, f.einheit_id) {
+                                        (Some(a), _) => x.abschnitt_id == Some(a),
+                                        (None, Some(u)) => x.einheit_id == Some(u),
+                                        (None, None) => true,
+                                    })
+                            }
+                        })
+                        .cloned()
+                        .collect();
+                    let ist = liste(&pool, e, s, r, ef.as_ref(), jetzt).await.unwrap();
+                    assert_eq!(
+                        als_json(&ist),
+                        als_json(&erwartet),
+                        "Filter {f:?}, Status {s:?}, Richtung {r:?}"
+                    );
+                    treffer_gesamt += ist.len();
+                }
+            }
+        }
+        assert!(
+            treffer_gesamt > 50,
+            "die Filter treffen tatsächlich etwas: {treffer_gesamt}"
+        );
+    }
+
+    /// LFH-933: die Empfänger vieler Aufträge kommen gebündelt, je Auftrag in `id`-Reihenfolge,
+    /// und gleich denen aus [`empfaenger_von`]. Aufträge ohne Empfänger und fremde ids fehlen.
+    #[tokio::test]
+    async fn empfaenger_von_allen_wie_einzeln() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let x = anlegen(
+            &pool,
+            e,
+            b,
+            daten("x", None, vec![funktion("A"), funktion("B"), funktion("C")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let y = anlegen(
+            &pool,
+            e,
+            b,
+            daten("y", None, vec![funktion("D")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let karte = empfaenger_von_allen(&pool, &[y.auftrag.id, x.auftrag.id, 9999])
+            .await
+            .unwrap();
+        assert_eq!(karte.len(), 2);
+        for id in [x.auftrag.id, y.auftrag.id] {
+            let einzeln = empfaenger_von(&pool, id).await.unwrap();
+            assert_eq!(
+                serde_json::to_value(&karte[&id]).unwrap(),
+                serde_json::to_value(&einzeln).unwrap()
+            );
+        }
+        assert!(empfaenger_von_allen(&pool, &[]).await.unwrap().is_empty());
     }
 }

@@ -6,6 +6,10 @@ mod physisch;
 pub(crate) use physisch::datei_oder_wal_enthaelt;
 pub use physisch::{bereinige_altbestand_einmalig, wal_zurueckschreiben};
 
+/// Größe, auf die SQLite die WAL-Datei nach einem zurücksetzenden Checkpoint stutzt (64 MiB,
+/// `PRAGMA journal_size_limit`, s. [`connect`]).
+pub const WAL_GRENZE_BYTES: i64 = 64 * 1024 * 1024;
+
 /// Öffnet einen SQLite-Pool auf der angegebenen Datei.
 /// Aktiviert WAL-Journal, Foreign Keys und legt die Datei bei Bedarf an.
 ///
@@ -15,6 +19,12 @@ pub use physisch::{bereinige_altbestand_einmalig, wal_zurueckschreiben};
 /// ungenullt auf der Freelist. Den Rest erledigt [`wal_zurueckschreiben`] nach der Schwärzung;
 /// Messung und Herleitung in
 /// `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
+///
+/// `journal_size_limit` (LFH-928): mit `secure_delete = ON` schreibt jedes gelöschte MB ein MB
+/// genullter Seiten ins WAL (Messung LFH-725, design.md Abschnitt 5). Ohne Grenze behält die
+/// WAL-Datei nach einem großen Upload oder Sweep ihren Höchststand bis zum nächsten Kürzen;
+/// mit ihr stutzt SQLite sie nach jedem Checkpoint, der den WAL zurücksetzt, auf
+/// [`WAL_GRENZE_BYTES`].
 pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
     let options = SqliteConnectOptions::new()
         .filename(db_path)
@@ -26,7 +36,8 @@ pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
         // `BEGIN IMMEDIATE`.
         .busy_timeout(std::time::Duration::from_secs(5))
         .foreign_keys(true)
-        .pragma("secure_delete", "ON");
+        .pragma("secure_delete", "ON")
+        .pragma("journal_size_limit", WAL_GRENZE_BYTES.to_string());
 
     SqlitePoolOptions::new()
         .max_connections(5)
@@ -146,7 +157,8 @@ pub async fn test_pool_datei() -> (tempfile::TempDir, SqlitePool) {
         .journal_mode(SqliteJournalMode::Wal)
         .busy_timeout(std::time::Duration::from_secs(5))
         .foreign_keys(true)
-        .pragma("secure_delete", "ON");
+        .pragma("secure_delete", "ON")
+        .pragma("journal_size_limit", WAL_GRENZE_BYTES.to_string());
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
@@ -217,6 +229,26 @@ mod tests {
                 wert, 1,
                 "secure_delete muss ON sein (1), nicht OFF (0) oder FAST (2)"
             );
+        }
+    }
+
+    /// LFH-928: auch `journal_size_limit` ist ein Verbindungs-PRAGMA, deshalb jede Verbindung.
+    #[tokio::test]
+    async fn connect_begrenzt_den_wal_auf_jeder_verbindung() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let pool = connect(path.to_str().unwrap()).await.unwrap();
+
+        let mut verbindungen = Vec::new();
+        for _ in 0..pool.options().get_max_connections() {
+            verbindungen.push(pool.acquire().await.unwrap());
+        }
+        for conn in &mut verbindungen {
+            let wert: i64 = sqlx::query_scalar("PRAGMA journal_size_limit;")
+                .fetch_one(&mut **conn)
+                .await
+                .unwrap();
+            assert_eq!(wert, WAL_GRENZE_BYTES);
         }
     }
 

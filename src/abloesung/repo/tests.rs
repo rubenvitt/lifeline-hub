@@ -884,3 +884,40 @@ async fn ruecknahme_nach_zweiter_abloesung_trifft_die_richtige() {
     assert_eq!(p[0].ende_at.as_deref(), Some("2026-09-22 15:40:00"));
     assert_eq!(p[1].ende_at, None);
 }
+
+/// LFH-933: die Folgeschicht ist ein Indexzugriff (`idx_abloesung_vorgaenger`), kein Scan über
+/// die Ablösungen aller Einsätze. Geprüft für jeden Statusfilter der Liste: KEINE Zeile des
+/// Abfrageplans ist ein `SCAN` — jede Tabelle (auch `a`, `fv` und `o`) wird über einen Index
+/// oder den Primärschlüssel gesucht.
+#[tokio::test]
+async fn liste_plan_ohne_scan() {
+    let w = welt().await;
+    for status in [
+        None,
+        Some(AbloesungStatus::Laufend),
+        Some(AbloesungStatus::Abgeloest),
+    ] {
+        let plan = plan_zeilen(&w.pool, &liste_sql(status), w.e).await;
+        assert!(
+            plan.iter().any(|z| z.contains("idx_abloesung_vorgaenger")),
+            "{status:?}: Folgeschicht über den Index: {plan:#?}"
+        );
+        assert!(
+            !plan.iter().any(|z| z.starts_with("SCAN")),
+            "{status:?}: kein Scan im Plan: {plan:#?}"
+        );
+    }
+}
+
+/// `EXPLAIN QUERY PLAN` als Textzeilen (`detail`-Spalte).
+async fn plan_zeilen(pool: &SqlitePool, sql: &str, einsatz_id: i64) -> Vec<String> {
+    use sqlx::Row;
+    sqlx::query(sqlx::AssertSqlSafe(format!("EXPLAIN QUERY PLAN {sql}")))
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| r.get::<String, _>("detail"))
+        .collect()
+}

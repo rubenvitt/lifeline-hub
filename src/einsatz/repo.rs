@@ -3,7 +3,7 @@ use super::{
     Einsatz, EinsatzAnzeige, EinsatzRolle, EinsatzStatus, Einsatzart, MitgliedAnzeige,
     EINSATZ_ROLLE_LEITUNG, STATUS_ABGESCHLOSSEN,
 };
-use crate::auth::Benutzer;
+use crate::auth::{Benutzer, FremdeinsatzLesezugriff};
 use crate::error::AppError;
 use chrono::Utc;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -288,8 +288,13 @@ pub async fn labelkarte(
 }
 
 /// Alle für den Benutzer lesbaren Einsätze, annotiert mit dessen Rolle
-/// (`meine_rolle`). Die DSGVO-Lese-Policy (`darf_lesen`) filtert Einsätze,
-/// die der Benutzer nicht sehen darf, vor der Rückgabe heraus.
+/// (`meine_rolle`).
+///
+/// Die harten Sperren der DSGVO-Lese-Policy wirken schon im SQL (LFH-933): Tombstone,
+/// abgelaufene Aufbewahrungsfrist und die Org-Grenze aus
+/// [`Benutzer::fremdeinsatz_lesezugriff`] (ohne Mitgliedschaft nur, was der Benutzer fremd
+/// lesen darf). Das SQL lässt nur weg, was `darf_lesen` sicher ablehnt; `darf_lesen` bleibt als
+/// Netz dahinter und entscheidet den Rest (Schonfrist, Einsatzleitung).
 pub async fn liste_fuer(
     pool: &SqlitePool,
     benutzer: &Benutzer,
@@ -328,8 +333,21 @@ pub async fn liste_fuer(
         teilschwaerzungen: Option<i64>,
     }
 
+    // Ein Zeitpunkt für SQL und `darf_lesen`, damit beide dieselbe Fristgrenze ziehen. Die
+    // Frist vergleicht als Text wie der Purge (`? >= retention_bis`), aber nur im kanonischen
+    // Format (GLOB): einen Wert, den `retention_abgelaufen` nicht parst und deshalb NICHT
+    // sperrt, darf das SQL auch nicht weglassen.
+    let jetzt = Utc::now();
+    let jetzt_text = crate::zeit::formatiere_utc(jetzt);
+    let zugriff = benutzer.fremdeinsatz_lesezugriff();
+    let org_grenze = match zugriff {
+        FremdeinsatzLesezugriff::Serverweit => "",
+        FremdeinsatzLesezugriff::EigeneOrg(_) => " AND (e.org_id = ? OR m.benutzer_id IS NOT NULL)",
+        FremdeinsatzLesezugriff::Keiner => " AND m.benutzer_id IS NOT NULL",
+    };
+
     // EXISTS-Spalten wortgleich zu `laden` (Auslöser der Lagekennzahlen, `lagekennzahl::ableiten`).
-    let rows = sqlx::query_as::<_, Row>(concat!(
+    const LISTE_SELECT: &str = concat!(
         "SELECT e.id, e.org_id, o.name AS org_name, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
@@ -347,11 +365,20 @@ pub async fn liste_fuer(
         "LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
-         ORDER BY e.begonnen_at DESC, e.id DESC",
-    ))
-    .bind(benutzer.id)
-    .fetch_all(pool)
-    .await?;
+         WHERE (e.geloescht_at IS NULL OR e.geloescht_at = '') \
+           AND NOT (e.status = 'abgeschlossen' AND e.retention_bis IS NOT NULL \
+                    AND e.retention_bis GLOB \
+                        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]' \
+                    AND ? >= e.retention_bis)",
+    );
+    let sql = format!("{LISTE_SELECT}{org_grenze} ORDER BY e.begonnen_at DESC, e.id DESC");
+    let mut q = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(sql))
+        .bind(benutzer.id)
+        .bind(&jetzt_text);
+    if let FremdeinsatzLesezugriff::EigeneOrg(org_id) = zugriff {
+        q = q.bind(org_id);
+    }
+    let rows: Vec<Row> = q.fetch_all(pool).await?;
 
     // ZWEITE, ebenfalls EINMALIGE Abfrage (LFH-46): die Sachgebiete des Benutzers über ALLE
     // Einsätze. Die Detail-Abfrage (`stab::repo::sachgebiete_von`) je Zeile zu rufen wäre N+1
@@ -359,21 +386,7 @@ pub async fn liste_fuer(
     // O(1) in der Zahl der Einsätze; genau das sichert `liste_fuer` zu.
     let mut sachgebiete = crate::stab::repo::sachgebiete_je_einsatz(pool, benutzer.id).await?;
 
-    // Labelkarten je Org, einmal geladen (LFH-549): die Liste bleibt O(1) in der Zahl der
-    // Einsätze, weil ein Benutzer nur Einsätze weniger Orgs sieht.
-    let mut karten: std::collections::HashMap<i64, crate::fuehrung::Labelkarte> =
-        std::collections::HashMap::new();
-    {
-        let mut conn = pool.acquire().await?;
-        for r in &rows {
-            if let std::collections::hash_map::Entry::Vacant(v) = karten.entry(r.org_id) {
-                v.insert(crate::fuehrung::repo::labelkarte(&mut conn, r.org_id).await?);
-            }
-        }
-    }
-
-    let jetzt = Utc::now();
-    Ok(rows
+    let rows: Vec<Row> = rows
         .into_iter()
         .filter(|r| {
             darf_lesen(
@@ -387,6 +400,25 @@ pub async fn liste_fuer(
                 jetzt,
             )
         })
+        .collect();
+
+    // Labelkarten je Org, einmal geladen (LFH-549), und erst NACH dem Filter (LFH-933): nur für
+    // Orgs, deren Einsätze der Benutzer tatsächlich sieht. Eine Abfrage je sichtbarer Org —
+    // das ist die eigene, bei Mitgliedschaften in fremden Einsätzen deren Orgs; nur der
+    // System-Admin sieht alle.
+    let mut karten: std::collections::HashMap<i64, crate::fuehrung::Labelkarte> =
+        std::collections::HashMap::new();
+    {
+        let mut conn = pool.acquire().await?;
+        for r in &rows {
+            if let std::collections::hash_map::Entry::Vacant(v) = karten.entry(r.org_id) {
+                v.insert(crate::fuehrung::repo::labelkarte(&mut conn, r.org_id).await?);
+            }
+        }
+    }
+
+    Ok(rows
+        .into_iter()
         .map(|r| {
             let meine_sachgebiete = sachgebiete.remove(&r.id).unwrap_or_default();
             let karte = karten.get(&r.org_id).cloned().unwrap_or_default();
@@ -4097,6 +4129,175 @@ mod tests {
         assert_eq!(fuer_admin.len(), 1);
         assert_eq!(fuer_admin[0].id, einsatz.id);
         assert_eq!(fuer_admin[0].meine_rolle, None);
+    }
+
+    /// LFH-933: `liste_fuer` zieht die harten Sperren schon im SQL, liefert aber für jede
+    /// Benutzerart genau, was `darf_lesen` über ALLE Einsätze zuließe — in derselben
+    /// Reihenfolge. Abgedeckt: Tombstone (auch leerer Wert), abgelaufene und künftige Frist,
+    /// Schonfrist, fremde Org mit und ohne Mitgliedschaft, System-Admin, Führungskraft, Helfer.
+    #[tokio::test]
+    async fn liste_fuer_wie_darf_lesen_ueber_alle() {
+        use crate::einsatz::{EINSATZ_ROLLE_BEOBACHTER, EINSATZ_ROLLE_FUEHRUNG};
+        let pool = crate::db::test_pool().await;
+        sqlx::query(
+            "INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga'), (2, 'Fremd')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let admin = benutzer_in_org(&pool, 1, "admin1", true, true).await;
+        let fk1 = benutzer_in_org(&pool, 1, "fk1", false, true).await;
+        let fk2 = benutzer_in_org(&pool, 2, "fk2", false, true).await;
+        let helfer = benutzer_in_org(&pool, 1, "helfer1", false, true).await;
+        sqlx::query("UPDATE benutzer SET org_rolle = 'fuehrungskraft' WHERE id IN (?, ?)")
+            .bind(fk1)
+            .bind(fk2)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let jetzt = Utc::now();
+        let vor =
+            |stunden: i64| crate::zeit::formatiere_utc(jetzt - chrono::Duration::hours(stunden));
+        let nach =
+            |stunden: i64| crate::zeit::formatiere_utc(jetzt + chrono::Duration::hours(stunden));
+        // (Org, Status, abgeschlossen_at, retention_bis, geloescht_at, begonnen vor Stunden)
+        let faelle: Vec<(
+            i64,
+            &str,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            i64,
+        )> = vec![
+            (1, "aktiv", None, None, None, 1),
+            (1, "abgeschlossen", Some(vor(2)), None, None, 2),
+            (1, "abgeschlossen", Some(vor(72)), None, None, 3),
+            (1, "abgeschlossen", Some(vor(72)), Some(vor(1)), None, 4),
+            (1, "abgeschlossen", Some(vor(72)), Some(nach(24)), None, 5),
+            (
+                1,
+                "abgeschlossen",
+                Some(vor(72)),
+                Some(vor(1)),
+                Some(vor(1)),
+                6,
+            ),
+            (1, "aktiv", None, None, Some(String::new()), 7),
+            (1, "aktiv", None, Some(vor(1)), None, 8),
+            // Nicht kanonische Fristen sperrt `darf_lesen` nicht, also auch das SQL nicht.
+            (
+                1,
+                "abgeschlossen",
+                Some(vor(72)),
+                Some(String::new()),
+                None,
+                14,
+            ),
+            (
+                1,
+                "abgeschlossen",
+                Some(vor(72)),
+                Some(vor(1).replace(' ', "T")),
+                None,
+                15,
+            ),
+            (2, "aktiv", None, None, None, 9),
+            (2, "abgeschlossen", Some(vor(72)), None, None, 10),
+            (2, "abgeschlossen", Some(vor(72)), Some(vor(1)), None, 11),
+            (2, "aktiv", None, None, None, 12),
+            (2, "aktiv", None, None, Some(vor(1)), 13),
+        ];
+        let mut ids = Vec::new();
+        for (org, status, abg, ret, gel, std) in &faelle {
+            ids.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, \
+                     retention_bis, geloescht_at, begonnen_at) \
+                     VALUES (?, 'Lage', ?, ?, ?, ?, ?) RETURNING id",
+                )
+                .bind(org)
+                .bind(status)
+                .bind(abg)
+                .bind(ret)
+                .bind(gel)
+                .bind(vor(*std))
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        // Mitgliedschaften quer über beide Orgs, auch an gesperrten Einsätzen.
+        for (benutzer, i, rolle) in [
+            (helfer, 0, EINSATZ_ROLLE_FUEHRUNG),
+            (helfer, 2, EINSATZ_ROLLE_BEOBACHTER),
+            (helfer, 3, EINSATZ_ROLLE_LEITUNG),
+            (helfer, 8, EINSATZ_ROLLE_FUEHRUNG),
+            (helfer, 9, EINSATZ_ROLLE_LEITUNG),
+            (helfer, 12, EINSATZ_ROLLE_LEITUNG),
+            (fk2, 1, EINSATZ_ROLLE_BEOBACHTER),
+            (fk2, 4, EINSATZ_ROLLE_LEITUNG),
+            (fk1, 10, EINSATZ_ROLLE_LEITUNG),
+        ] {
+            sqlx::query(
+                "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+                 VALUES (?, ?, ?)",
+            )
+            .bind(ids[i])
+            .bind(benutzer)
+            .bind(rolle)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        for id in [admin, fk1, fk2, helfer] {
+            let benutzer = benutzer_laden(&pool, id).await;
+            // Referenz: alle Einsätze, nur `darf_lesen` filtert (das frühere Verhalten).
+            let alle: Vec<(
+                i64,
+                i64,
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            )> = sqlx::query_as(
+                "SELECT e.id, e.org_id, e.status, e.abgeschlossen_at, e.retention_bis, \
+                            e.geloescht_at, m.einsatz_rolle \
+                     FROM einsatz e LEFT JOIN einsatz_mitgliedschaft m \
+                          ON m.einsatz_id = e.id AND m.benutzer_id = ? \
+                     ORDER BY e.begonnen_at DESC, e.id DESC",
+            )
+            .bind(id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            let erwartet: Vec<i64> = alle
+                .iter()
+                .filter(|(_, org, status, abg, ret, gel, rolle)| {
+                    darf_lesen(
+                        &benutzer,
+                        *org,
+                        status,
+                        abg.as_deref(),
+                        ret.as_deref(),
+                        gel.as_deref(),
+                        rolle.as_deref().and_then(EinsatzRolle::parse),
+                        jetzt,
+                    )
+                })
+                .map(|z| z.0)
+                .collect();
+            let ist: Vec<i64> = liste_fuer(&pool, &benutzer)
+                .await
+                .unwrap()
+                .iter()
+                .map(|e| e.id)
+                .collect();
+            assert_eq!(ist, erwartet, "Benutzer {}", benutzer.benutzername);
+            assert!(!ist.is_empty(), "{} sieht etwas", benutzer.benutzername);
+        }
     }
 
     // ---------- LFH-23: Akteurskette des System-Audits ----------
