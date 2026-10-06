@@ -334,7 +334,9 @@ pub async fn liste_fuer(
     }
 
     // Ein Zeitpunkt für SQL und `darf_lesen`, damit beide dieselbe Fristgrenze ziehen. Die
-    // Frist vergleicht als Text wie der Purge (`? >= retention_bis`, kanonisches Format).
+    // Frist vergleicht als Text wie der Purge (`? >= retention_bis`), aber nur im kanonischen
+    // Format (GLOB): einen Wert, den `retention_abgelaufen` nicht parst und deshalb NICHT
+    // sperrt, darf das SQL auch nicht weglassen.
     let jetzt = Utc::now();
     let jetzt_text = crate::zeit::formatiere_utc(jetzt);
     let zugriff = benutzer.fremdeinsatz_lesezugriff();
@@ -365,6 +367,8 @@ pub async fn liste_fuer(
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          WHERE (e.geloescht_at IS NULL OR e.geloescht_at = '') \
            AND NOT (e.status = 'abgeschlossen' AND e.retention_bis IS NOT NULL \
+                    AND e.retention_bis GLOB \
+                        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]' \
                     AND ? >= e.retention_bis)",
     );
     let sql = format!("{LISTE_SELECT}{org_grenze} ORDER BY e.begonnen_at DESC, e.id DESC");
@@ -4181,6 +4185,23 @@ mod tests {
             ),
             (1, "aktiv", None, None, Some(String::new()), 7),
             (1, "aktiv", None, Some(vor(1)), None, 8),
+            // Nicht kanonische Fristen sperrt `darf_lesen` nicht, also auch das SQL nicht.
+            (
+                1,
+                "abgeschlossen",
+                Some(vor(72)),
+                Some(String::new()),
+                None,
+                14,
+            ),
+            (
+                1,
+                "abgeschlossen",
+                Some(vor(72)),
+                Some(vor(1).replace(' ', "T")),
+                None,
+                15,
+            ),
             (2, "aktiv", None, None, None, 9),
             (2, "abgeschlossen", Some(vor(72)), None, None, 10),
             (2, "abgeschlossen", Some(vor(72)), Some(vor(1)), None, 11),
