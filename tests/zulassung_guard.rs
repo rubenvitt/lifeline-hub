@@ -31,12 +31,12 @@ const OHNE_EIGENE_GRENZE: &[(&str, &str, &str)] = &[
     (
         "GET",
         "/api/einsaetze/{id}/live",
-        "SSE-Dauerverbindung, gedeckelt nur über die Verbindungs-Obergrenze",
+        "SSE-Dauerverbindung, Grenze je Benutzer und insgesamt mit Lebensdauer in `live::strom` (LFH-920)",
     ),
     (
         "GET",
         "/api/live",
-        "SSE-Dauerverbindung, gedeckelt nur über die Verbindungs-Obergrenze",
+        "SSE-Dauerverbindung, Grenze je Benutzer und insgesamt mit Lebensdauer in `live::strom` (LFH-920)",
     ),
     (
         "GET",

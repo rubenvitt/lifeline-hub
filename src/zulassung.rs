@@ -34,7 +34,9 @@
 //!   die Leerlauf-Frist lang nichts abnimmt, gibt Puffer und Platz frei.
 //! * Der Sicherungs-Download hat eine Sperre für genau einen Lauf (`backup::DownloadSperre`, ein
 //!   zweiter bekommt sofort 503, LFH-926) und eine eigene Leerlauf-Frist.
-//! * SSE-Ströme und CSV-Exporte sind die einzigen Ausnahmen ohne eigene Grenze;
+//! * Die Live-Ströme haben eine Grenze je Benutzer und insgesamt samt Lebensdauer
+//!   (`live::strom`, 429 bzw. 503, LFH-920).
+//! * Die CSV-Exporte sind die einzigen Ausnahmen ohne eigene Grenze;
 //!   `tests/zulassung_guard.rs` führt sie namentlich.
 //!
 //! [`transfer::LEERLAUF_FRIST`]: crate::transfer::LEERLAUF_FRIST
@@ -70,9 +72,11 @@ pub const MAX_GLEICHZEITIGE_REQUESTS: usize = 256;
 /// Ausnahmen ohne eigene Grenze.
 pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // SSE-Dauerverbindung: jede Zeitschranke kappte sie, und jede offene Verbindung bände einen
-    // Cap-Slot.
+    // Cap-Slot. Eigene Grenze je Benutzer und insgesamt, Lebensdauer statt Zeitbudget:
+    // `live::strom` (LFH-920).
     ("GET", "/api/einsaetze/{id}/live"),
-    // Org-Strom (LFH-734), dieselbe SSE-Dauerverbindung außerhalb eines Einsatzes.
+    // Org-Strom (LFH-734), dieselbe SSE-Dauerverbindung außerhalb eines Einsatzes, mit derselben
+    // Grenze.
     ("GET", "/api/live"),
     // Admin-Download der gesamten DB: VACUUM INTO + 64-KiB-Chunk-Stream. Dauer skaliert mit
     // DB-Größe und Leitung des Clients. Eigene Sperre für einen Lauf und Leerlauf-Frist je Chunk

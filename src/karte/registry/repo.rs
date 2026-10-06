@@ -517,8 +517,8 @@ pub async fn aktiviere_wenn_keine_aktive(pool: &SqlitePool, id: i64) -> Result<b
 }
 
 /// Crash-Recovery beim Start: alle in `'laedt'` hängenden Zeilen auf `'fehler'` setzen und ihre
-/// `id`s liefern (der Aufrufer löscht die `*.part`-Dateien). Download-Tasks überleben keinen
-/// Neustart.
+/// `id`s liefern. Download-Tasks überleben keinen Neustart. Die `*.part`-Dateien räumt
+/// `download::raeume_teildateien` ohne Statusfilter (LFH-934).
 pub async fn reset_haengende_downloads(pool: &SqlitePool) -> Result<Vec<i64>, sqlx::Error> {
     let ids: Vec<i64> =
         sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE status = 'laedt'")

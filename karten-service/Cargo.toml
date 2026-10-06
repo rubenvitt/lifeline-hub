@@ -32,3 +32,5 @@ bytes = "1"
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 tempfile = "3"
+# LFH-927: `start_paused` für den Fristtest des Baus (sechs Stunden ohne echtes Warten).
+tokio = { version = "1", features = ["full", "test-util"] }

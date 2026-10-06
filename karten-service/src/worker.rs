@@ -73,6 +73,35 @@ mod tests {
             })
         }
     }
+    struct HaengtRunner;
+    #[async_trait::async_trait]
+    impl BuildRunner for HaengtRunner {
+        async fn baue(&self, _a: &str) -> anyhow::Result<BuildArtefakt> {
+            std::future::pending().await
+        }
+    }
+    /// LFH-927: Ein hängender Bau gibt nach seiner Frist den Bauplatz frei, der nächste Auftrag
+    /// läuft ohne Neustart an.
+    #[tokio::test(start_paused = true)]
+    async fn haengender_bau_gibt_den_bauplatz_frei() {
+        let reg = Registry::neu(4);
+        let st = WorkerState {
+            registry: reg.clone(),
+            runner: Arc::new(HaengtRunner),
+            storage: Arc::new(FakeStorage::neu("https://cdn.example/maps")),
+            bestand: Arc::new(Mutex::new(Vec::<PublishedVersion>::new())),
+        };
+        let a = reg.enqueue("bayern").unwrap();
+        let b = reg.enqueue("bremen").unwrap();
+        assert!(tick(&st).await);
+        assert!(matches!(
+            reg.get(a).unwrap().status,
+            crate::jobs::JobStatus::Failed(_)
+        ));
+        assert!(reg.try_lock_build().is_some(), "Guard freigegeben");
+        assert_eq!(reg.naechster_queued().unwrap().0, b);
+        assert!(tick(&st).await, "nächster Auftrag läuft an");
+    }
     #[tokio::test]
     async fn tick_faehrt_queued_job() {
         let mut f = tempfile::NamedTempFile::new().unwrap();
