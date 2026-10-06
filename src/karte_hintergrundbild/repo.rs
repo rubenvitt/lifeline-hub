@@ -1,5 +1,5 @@
 //! Speicher der Karten-Hintergrundbilder. Metadaten in `karte_hintergrundbild`, die Bytes in
-//! `karte_hintergrundbild_daten` (LFH-936, Migration 0153): Liste, 304-Pfad und
+//! `karte_hintergrundbild_daten` (LFH-936, Migration 0154): Liste, 304-Pfad und
 //! `MAX(reihenfolge)` lesen so keine Seite der Bilddaten. Nur [`laden_bytes`] berührt die
 //! zweite Tabelle; gelöscht werden die Bytes per CASCADE mit der Metadaten-Zeile.
 
@@ -374,7 +374,7 @@ mod tests {
     }
 
     /// LFH-936: die Metadaten-Tabelle trägt keine BLOB-Spalte; sonst läsen Liste und 304-Pfad
-    /// wieder die Überlaufketten der Bilder (Messung: `db::tests::migration_0153_*`).
+    /// wieder die Überlaufketten der Bilder (Messung: `db::tests::migration_0154_*`).
     #[tokio::test]
     async fn metadaten_tabelle_traegt_keine_blob_spalte() {
         let pool = crate::db::test_pool().await;

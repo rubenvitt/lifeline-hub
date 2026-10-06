@@ -529,7 +529,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Die Bytes eines Bilds der Lagekarte (LFH-936, Migration 0153), getrennt von den
+        // Die Bytes eines Bilds der Lagekarte (LFH-936, Migration 0154), getrennt von den
         // Metadaten, damit Liste und 304-Pfad keine Seite davon lesen. Klassifiziert wie das Bild;
         // die Zeile fällt per CASCADE mit der Bild-Zeile, die der Nachlauf einzeln löscht — in
         // derselben Transaktion (`schwaerzung_nachlauf::MIT_GELOESCHT`).

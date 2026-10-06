@@ -17,7 +17,7 @@
 -- Betrieb: bei großen Bestandsdaten braucht der Lauf einmalig Zeit und vorübergehend den doppelten
 -- Plattenplatz der Bilder (die Bytes stehen kurz in beiden Tabellen; `secure_delete` nullt danach
 -- die alten Seiten).
--- Abgesichert von db::tests::migration_0153_* (Bytes und sha256 bleiben gleich, Schema, FK).
+-- Abgesichert von db::tests::migration_0154_* (Bytes und sha256 bleiben gleich, Schema, FK).
 
 -- Schema = 0075 + ansicht_id (0096), ohne `daten`.
 CREATE TABLE karte_hintergrundbild_neu (

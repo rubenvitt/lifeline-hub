@@ -3969,7 +3969,7 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
-    // --- Migration 0153: Bytes der Karten-Hintergrundbilder auslagern (LFH-936) ---
+    // --- Migration 0154: Bytes der Karten-Hintergrundbilder auslagern (LFH-936) ---
 
     /// Pool mit genau einer Verbindung auf `ort`, ohne Migrationen.
     async fn verbinden(ort: SqliteConnectOptions) -> SqlitePool {
@@ -4060,8 +4060,8 @@ mod tests {
     /// `ansicht_id`), die Tabelle trägt keine BLOB-Spalte mehr, Index und Fremdschlüssel stehen,
     /// und das Löschen eines Bilds nimmt seine Bytes per CASCADE mit.
     #[tokio::test]
-    async fn migration_0153_lagert_bytes_verlustfrei_aus() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 152).await;
+    async fn migration_0154_lagert_bytes_verlustfrei_aus() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 153).await;
         let (e, b) = bild_grundlage(&pool).await;
         let ansicht: i64 = sqlx::query_scalar(
             "INSERT INTO karten_ansicht (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
@@ -4086,7 +4086,7 @@ mod tests {
         };
         let vorher = meta().await;
 
-        migriere_bis(&pool, 153).await;
+        migriere_bis(&pool, 154).await;
 
         assert_eq!(meta().await, vorher, "Metadaten unverändert");
         let spalten: Vec<(String, String)> =
@@ -4196,7 +4196,7 @@ mod tests {
     /// Bytes wieder vor den Metadaten liegen. Gemessen auf einer Datei-DB mit frischer
     /// Verbindung je Messung (leerer Seiten-Cache).
     #[tokio::test]
-    async fn migration_0153_liste_und_meta_lesen_keine_bilddaten() {
+    async fn migration_0154_liste_und_meta_lesen_keine_bilddaten() {
         const BILDER: usize = 5;
         const GROESSE: usize = 5 * 1024 * 1024;
         let dir = tempfile::tempdir().unwrap();
@@ -4206,7 +4206,7 @@ mod tests {
                 .filename(&datei)
                 .create_if_missing(true)
         };
-        let pool = pool_bis(ort(), 152).await;
+        let pool = pool_bis(ort(), 153).await;
         let (e, b) = bild_grundlage(&pool).await;
         let mut ids = Vec::new();
         for n in 0..BILDER {
@@ -4248,7 +4248,7 @@ mod tests {
              Seiten) — sonst misst der Test nichts"
         );
 
-        let pool = pool_bis(ort(), 153).await;
+        let pool = pool_bis(ort(), 154).await;
         pool.close().await;
         let nachher = messen(ids.clone()).await;
         assert!(
@@ -4257,7 +4257,7 @@ mod tests {
         );
 
         // Die Bytes selbst kommen unverändert.
-        let pool = pool_bis(ort(), 153).await;
+        let pool = pool_bis(ort(), 154).await;
         let (_, _, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, ids[2])
             .await
             .unwrap();

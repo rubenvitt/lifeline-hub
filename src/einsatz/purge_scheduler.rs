@@ -2279,7 +2279,7 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap();
-        // Metadaten und Bytes getrennt (LFH-936, Migration 0153).
+        // Metadaten und Bytes getrennt (LFH-936, Migration 0154).
         let bild: i64 = sqlx::query_scalar(
             "INSERT INTO karte_hintergrundbild (einsatz_id, name, mime, groesse, sha256, \
                 ecken_json, hochgeladen_von) \
