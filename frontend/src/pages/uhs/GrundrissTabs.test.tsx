@@ -545,5 +545,11 @@ describe('Grundriss — Personenmarke und Verbleib in den Listen (LFH-970)', () 
     expect(
       screen.queryByRole('button', { name: /Verbleib \/ Entlassung erfassen/ }),
     ).not.toBeInTheDocument();
+    // Ohne Zug ist die Hülle kein gesperrter Knopf, sondern „Person öffnen“ — auch per Tastatur.
+    expect(huelle).not.toHaveAttribute('aria-disabled');
+    expect(huelle).not.toHaveAttribute('aria-roledescription');
+    huelle.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 });

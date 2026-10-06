@@ -469,6 +469,11 @@ test.describe('UHS-Grundriss unter Touch', () => {
       expect(Math.round(kasten!.width)).toBe(140);
       expect(Math.round(kasten!.height)).toBe(116);
 
+      // Den Mauszeiger aus dem Setup aus dem Weg räumen: er bleibt an seinem letzten Klickpunkt
+      // stehen. Geht das Menü darüber auf (bei 1024 px in der Reiterform der Fall), meldet Chrome
+      // ihm ein Hover, rc-menu macht den Eintrag darunter aktiv, und `autoFocus` fokussiert ihn
+      // statt des ersten — auch beim erneuten Öffnen per Enter (das Menü bleibt montiert).
+      await page.mouse.move(0, 0);
       await karte.tap();
       const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
       await expect(menue).toHaveCount(1);

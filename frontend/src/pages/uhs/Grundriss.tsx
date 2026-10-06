@@ -335,6 +335,7 @@ function PersonenkarteDrag({
     disabled,
   });
   const { token } = theme.useToken();
+  const nurOeffnen = disabled && onOeffnen !== undefined;
   // Ein Klick ohne 5-px-Bewegung (PointerSensor) öffnet den Detail-Drawer; ein echter Drag
   // unterdrückt den nativen Click. In Listen ist die Hülle das Bedienziel und misst die Steuerhöhe
   // der Stufe (LFH-970, U72); auf der Platzkarte (`kompakt`) bleibt sie im 24-px-Streifen.
@@ -357,7 +358,21 @@ function PersonenkarteDrag({
             'aria-roledescription': undefined,
             'aria-describedby': undefined,
           }
-        : {})}
+        : nurOeffnen
+          ? {
+              // Ohne Zug (kein Schreibrecht, laufende Belegung) bleibt die Hülle das Ziel „Person
+              // öffnen“: dnd-kits `aria-disabled` meldete sie der Hilfstechnik als gesperrt, und
+              // ohne Zug-Listener öffnete die Tastatur nichts (LFH-970).
+              'aria-disabled': undefined,
+              'aria-roledescription': undefined,
+              'aria-describedby': undefined,
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                onOeffnen?.(person.id);
+              },
+            }
+          : {})}
       style={style}
       onClick={onOeffnen ? () => onOeffnen(person.id) : undefined}
     >
