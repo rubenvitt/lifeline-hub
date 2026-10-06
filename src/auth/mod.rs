@@ -73,6 +73,17 @@ pub struct Benutzer {
     pub erstellt_at: String,
 }
 
+/// Ohne Mitgliedschaft lesbare Einsätze eines Benutzers ([`Benutzer::fremdeinsatz_lesezugriff`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FremdeinsatzLesezugriff {
+    /// System-Admin: jeder Einsatz, auch fremder Organisationen.
+    Serverweit,
+    /// Org-weite Führungskraft: jeder Einsatz der eigenen Organisation.
+    EigeneOrg(i64),
+    /// Alle anderen: nur über die Mitgliedschaft.
+    Keiner,
+}
+
 impl Benutzer {
     /// Ob dieser Benutzer die System-Rolle Admin hat.
     pub fn ist_admin(&self) -> bool {
@@ -121,8 +132,24 @@ impl Benutzer {
     /// Chokepoint für den Cross-Org-Lesezugriff; wird aus [`crate::einsatz::berechtigung::darf_lesen`]
     /// heraus aufgerufen, nachdem die DSGVO-Hard-Blocks (Tombstone/Aufbewahrungsfrist) geprüft sind.
     pub fn darf_fremdeinsatz_lesen(&self, einsatz_org_id: i64) -> bool {
-        self.ist_admin()
-            || (self.org_rolle == OrgRolle::Fuehrungskraft && self.org_id == einsatz_org_id)
+        match self.fremdeinsatz_lesezugriff() {
+            FremdeinsatzLesezugriff::Serverweit => true,
+            FremdeinsatzLesezugriff::EigeneOrg(org_id) => org_id == einsatz_org_id,
+            FremdeinsatzLesezugriff::Keiner => false,
+        }
+    }
+
+    /// Reichweite von [`Self::darf_fremdeinsatz_lesen`] als Wert, damit eine Listenabfrage
+    /// dieselbe Grenze in SQL ziehen kann (`einsatz::repo::liste_fuer`, LFH-933) — die eine
+    /// Quelle für beide.
+    pub fn fremdeinsatz_lesezugriff(&self) -> FremdeinsatzLesezugriff {
+        if self.ist_admin() {
+            FremdeinsatzLesezugriff::Serverweit
+        } else if self.org_rolle == OrgRolle::Fuehrungskraft {
+            FremdeinsatzLesezugriff::EigeneOrg(self.org_id)
+        } else {
+            FremdeinsatzLesezugriff::Keiner
+        }
     }
 
     /// Sichere, serialisierbare Darstellung ohne Passwort-Hash.

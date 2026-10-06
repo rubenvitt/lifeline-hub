@@ -108,23 +108,26 @@ impl Zeile {
     }
 }
 
-/// Anzeige-Projektion. Die Folgeschicht ist die jüngste Schicht mit `vorgaenger_id` = diese.
+/// Anzeige-Projektion. Die Folgeschicht ist die jüngste Schicht mit `vorgaenger_id` = diese:
+/// EIN Zugriff je Zeile (`MAX(id)` über `idx_abloesung_vorgaenger`, Migration 0153), dann der
+/// Join über den Primärschlüssel. Ohne den Index war jede der früheren zwei Unterabfragen ein
+/// Scan über die Ablösungen aller Einsätze (LFH-933); `liste_plan_ohne_scan` hält das fest.
 const ANZEIGE_SELECT: &str = "SELECT a.id, a.einsatz_id, a.einheit_id, e.name AS einheit_name, \
             a.abschnitt_id, s.name AS abschnitt_name, a.beginn_at, a.rhythmus_minuten, \
             a.rhythmus_quelle, a.faellig_at, a.abloesende_einheit_id, \
             ae.name AS abloesende_einheit_name, a.status, a.vollzogen_at, a.vollzogen_von_id, \
             a.vorgaenger_id, \
-            (SELECT f.id FROM einsatz_abloesung f WHERE f.vorgaenger_id = a.id \
-               ORDER BY f.id DESC LIMIT 1) AS folgeschicht_id, \
-            (SELECT f.status = 'laufend' FROM einsatz_abloesung f WHERE f.vorgaenger_id = a.id \
-               ORDER BY f.id DESC LIMIT 1) AS folgeschicht_laufend, \
+            f.id AS folgeschicht_id, \
+            f.status = 'laufend' AS folgeschicht_laufend, \
             EXISTS (SELECT 1 FROM einsatz_abloesung o WHERE o.einheit_id = a.einheit_id \
                AND o.status = 'laufend' AND o.id <> a.id) AS einheit_laeuft_anderswo, \
             a.angelegt_at \
      FROM einsatz_abloesung a \
      JOIN einsatz_einheit e ON e.id = a.einheit_id \
      LEFT JOIN einsatzabschnitt s ON s.id = a.abschnitt_id \
-     LEFT JOIN einsatz_einheit ae ON ae.id = a.abloesende_einheit_id";
+     LEFT JOIN einsatz_einheit ae ON ae.id = a.abloesende_einheit_id \
+     LEFT JOIN einsatz_abloesung f ON f.id = \
+               (SELECT MAX(fv.id) FROM einsatz_abloesung fv WHERE fv.vorgaenger_id = a.id)";
 
 /// Laufende nach Fälligkeit (die dringendste zuerst), abgelöste nach Vollzug absteigend.
 pub async fn liste(
@@ -133,7 +136,16 @@ pub async fn liste(
     status: Option<AbloesungStatus>,
     jetzt: &str,
 ) -> Result<Vec<AbloesungAnzeige>, AppError> {
-    let sql = match status {
+    let zeilen = sqlx::query_as::<_, Zeile>(sqlx::AssertSqlSafe(liste_sql(status)))
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?;
+    Ok(zeilen.into_iter().map(|z| z.anzeige(jetzt)).collect())
+}
+
+/// SQL der Liste je Statusfilter; ein Platzhalter (`einsatz_id`).
+fn liste_sql(status: Option<AbloesungStatus>) -> String {
+    match status {
         Some(AbloesungStatus::Laufend) => format!(
             "{ANZEIGE_SELECT} WHERE a.einsatz_id = ? AND a.status = 'laufend' \
              ORDER BY a.faellig_at, a.id"
@@ -146,12 +158,7 @@ pub async fn liste(
             "{ANZEIGE_SELECT} WHERE a.einsatz_id = ? \
              ORDER BY a.status = 'abgeloest', a.faellig_at, a.id"
         ),
-    };
-    let zeilen = sqlx::query_as::<_, Zeile>(sqlx::AssertSqlSafe(sql))
-        .bind(einsatz_id)
-        .fetch_all(pool)
-        .await?;
-    Ok(zeilen.into_iter().map(|z| z.anzeige(jetzt)).collect())
+    }
 }
 
 /// Lädt eine Schicht. `NotFound`, wenn sie nicht zum Einsatz gehört.
