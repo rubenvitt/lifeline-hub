@@ -8,19 +8,28 @@
    Darum unter `md`: das Popup steht fest am unteren Rand über die volle Breite, Kalender und
    Uhrzeit untereinander, die Spalten teilen sich die Breite. Ein Ausrichten am Feld scheitert in
    jeder Lage (rechtsbündig gekippt lag es links außerhalb), deshalb `!important` gegen die
-   Inline-Lage, die rc-trigger setzt. Ist das Blatt höher als der Schirm (Stufe `handschuh`),
-   rollt es in sich. Nachweis: `e2e/dialoge-handy.spec.ts`. */
+   Inline-Lage, die rc-trigger setzt.
+
+   Das Blatt nimmt höchstens 85 % der Höhe: darüber bleibt ein Streifen, auf den man tippt, um es
+   ohne Wert zu schließen (am Handy gibt es kein Escape, und „OK“ ist ohne Wert gesperrt). Ist der
+   Inhalt höher (`komfortabel`, `handschuh`), rollt der Container in sich, und der Fuß mit „Jetzt“
+   und „OK“ bleibt unten stehen. Gerollt wird im Container, nicht am Popup: antd setzt am Container
+   `overflow: hidden`, ein klebender Fuß bezöge sich sonst auf ihn und klebte nie.
+   Nachweis: `e2e/dialoge-handy.spec.ts`. */
 
 .lfh-zeit-blatt.ant-picker-dropdown {
   position: fixed !important;
   inset: auto 0 0 0 !important;
-  max-height: 100dvh;
-  overflow-y: auto;
 }
 
-/* Der Pfeil zeigt auf das Feld; das Blatt steht nicht mehr daran. */
+/* Der Pfeil zeigt auf das Feld; das Blatt steht nicht mehr daran. Der Bereich hält für ihn oben
+   einen Rand frei, der das Blatt über die 85 % hinaus höbe. */
 .lfh-zeit-blatt .ant-picker-range-arrow {
   display: none;
+}
+
+.lfh-zeit-blatt.ant-picker-dropdown-range {
+  padding: 0 !important;
 }
 
 .lfh-zeit-blatt .ant-picker-range-wrapper,
@@ -35,6 +44,14 @@
 /* Der Bereich verschiebt den Container per Inline-Rand zum zweiten Feld hin. */
 .lfh-zeit-blatt .ant-picker-panel-container {
   margin: 0 !important;
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+
+.lfh-zeit-blatt .ant-picker-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--ant-color-bg-elevated);
 }
 
 .lfh-zeit-blatt .ant-picker-datetime-panel {
@@ -46,11 +63,18 @@
   border-top: 1px solid var(--lfh-linie);
 }
 
-/* Der Kopf der Uhrzeit ist leer (ein geschütztes Leerzeichen); untereinander kostet er nur Höhe. */
-.lfh-zeit-blatt .ant-picker-time-panel .ant-picker-header {
-  display: none;
-}
-
 .lfh-zeit-blatt .ant-picker-time-panel-column {
   flex: 1;
+}
+
+/* antd hält die Uhrzeitzellen fest auf 28 px (`timeCellHeight`), unabhängig von der Dichte. Im
+   Blatt sind sie das einzige Ziel für die Uhrzeit (getippt wird dort nicht), deshalb tragen sie die
+   Steuerhöhe der Stufe (30 / 48 / 72, `frontend/AGENTS.md`, Dichte-Staffel). Die zusätzliche Klasse
+   am Popup hebt die Regel über antds Selektor. */
+.lfh-zeit-blatt.ant-picker-dropdown
+  .ant-picker-time-panel-column
+  > li.ant-picker-time-panel-cell
+  .ant-picker-time-panel-cell-inner {
+  height: var(--ant-control-height);
+  line-height: var(--ant-control-height);
 }
