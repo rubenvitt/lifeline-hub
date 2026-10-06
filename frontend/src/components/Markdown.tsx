@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef } from 'react';
+import { memo, type ComponentPropsWithoutRef } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './Markdown.css';
@@ -69,6 +69,9 @@ const KOMPONENTEN = Object.fromEntries(
   ]),
 ) as Record<UnterEbene, Components>;
 
+/** Eine Plugin-Liste für alle Aufrufe: ein neues Array je Render stieße den Parse jedes Mal an. */
+const REMARK_PLUGINS = [remarkGfm];
+
 /**
  * Rendert Markdown sicher als formatiertes HTML.
  *
@@ -77,12 +80,18 @@ const KOMPONENTEN = Object.fromEntries(
  * über seine eingebaute URL-Transformation. Damit ist die Anzeige XSS-sicher,
  * ohne dass wir selbst sanitisieren müssen.
  */
-export default function Markdown({ children, variante = 'dokument', unterEbene }: Props) {
+function Markdown({ children, variante = 'dokument', unterEbene }: Props) {
   return (
     <div className={`markdown markdown--${variante}`}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={KOMPONENTEN[unterEbene]}>
+      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={KOMPONENTEN[unterEbene]}>
         {children}
       </ReactMarkdown>
     </div>
   );
 }
+
+/**
+ * Gemerkt (LFH-947): alle Eigenschaften sind Werte, ein Rerender des Aufrufers mit demselben
+ * Text parst nicht neu. Die Zeitachse rendert hunderte davon.
+ */
+export default memo(Markdown);

@@ -19,6 +19,13 @@ import { neueClientId } from './clientId';
 import { istOfflineTransient } from './fehler';
 
 /**
+ * Stabile leere Listen: die Zeitachse leitet ihre Chronologie gemerkt ab (LFH-947), ein neues
+ * `[]` je Render ließe das Memo leerlaufen.
+ */
+const KEINE_AUSSTEHENDEN: AusstehenderEintrag[] = [];
+const KEINE_ABGELEHNTEN: AbgelehnterEintrag[] = [];
+
+/**
  * Entscheidet, ob ein Fehler den Eintrag in der Queue belässt (transient → Retry) oder als
  * fachliche Ablehnung gilt. Das ETB ist beweissicherndes Tagebuch — im Zweifel behalten:
  *  - `TypeError` = Netzwerkfehler (offline).
@@ -139,7 +146,9 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       if (!darfFortsetzen()) return;
       await ladeAusstehend();
       await ladeAbgelehnt();
-      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      // Nur nach einem Versand: die leere Queue beim Mount löste sonst jedes Mal ein Neuladen
+      // des ganzen Seitenfensters aus, und das brach ein laufendes „Neuere laden“ ab (LFH-947).
+      if (liste.length > 0) qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
 
       if (transientOffen) {
         // Automatischer Retry mit Backoff — zusätzlich zu den online-/mount-Triggern.
@@ -237,9 +246,9 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
 
   return {
     erfassen,
-    ausstehend: ausstehendStand.scope === scopeKey ? ausstehendStand.werte : [],
+    ausstehend: ausstehendStand.scope === scopeKey ? ausstehendStand.werte : KEINE_AUSSTEHENDEN,
     flush,
-    abgelehnt: abgelehntStand.scope === scopeKey ? abgelehntStand.werte : [],
+    abgelehnt: abgelehntStand.scope === scopeKey ? abgelehntStand.werte : KEINE_ABGELEHNTEN,
     abgelehntVerwerfen,
   };
 }
