@@ -128,8 +128,9 @@ pub async fn herunterladen(
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    // Cache-Kurzschluss (LFH-258): sha256-Meta OHNE BLOB; passt der If-None-Match-Header,
-    // antworten wir 304 und sparen den teuren Voll-BLOB-Read.
+    // Cache-Kurzschluss (LFH-258): sha256-Meta aus der Metadaten-Tabelle; passt der
+    // If-None-Match-Header, antworten wir 304, ohne eine Seite der Bilddaten zu lesen (die Bytes
+    // liegen seit LFH-936 in `karte_hintergrundbild_daten`).
     let (name, mime, sha256) =
         bild_repo::meta_fuer_download(&state.pool, einsatz_id, bild_id).await?;
     let etag = etag_von(&sha256);

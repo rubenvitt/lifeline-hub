@@ -1,3 +1,8 @@
+//! Speicher der Karten-Hintergrundbilder. Metadaten in `karte_hintergrundbild`, die Bytes in
+//! `karte_hintergrundbild_daten` (LFH-936, Migration 0153): Liste, 304-Pfad und
+//! `MAX(reihenfolge)` lesen so keine Seite der Bilddaten. Nur [`laden_bytes`] berührt die
+//! zweite Tabelle; gelöscht werden die Bytes per CASCADE mit der Metadaten-Zeile.
+
 use super::HintergrundbildAnzeige;
 // „Zur Entfernung vorgesehen“ (LFH-997): nach der Schwärzung des Einsatzes oder seiner Kategorie
 // `anhaenge` steht ein Bild noch bis zum Nachlauf in der Tabelle; die Lesewege hier übergehen es.
@@ -62,8 +67,9 @@ pub async fn laden(
 }
 
 /// Download-Metadaten OHNE Bytes: `(name, mime, sha256)` für die Cache-Header und den
-/// `If-None-Match`-304-Kurzschluss, ohne den BLOB zu lesen. `NotFound`, wenn das Bild nicht (zu
-/// diesem Einsatz) existiert oder zur Entfernung vorgesehen ist.
+/// `If-None-Match`-304-Kurzschluss. Liest nur die Metadaten-Tabelle, also keine Seite der
+/// Bilddaten. `NotFound`, wenn das Bild nicht (zu diesem Einsatz) existiert oder zur Entfernung
+/// vorgesehen ist.
 pub async fn meta_fuer_download(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -90,9 +96,10 @@ pub async fn laden_bytes(
     id: i64,
 ) -> Result<(String, String, Vec<u8>), AppError> {
     sqlx::query_as::<_, (String, String, Vec<u8>)>(sqlx::AssertSqlSafe(format!(
-        "SELECT name, mime, daten FROM karte_hintergrundbild \
-         WHERE id = ? AND einsatz_id = ? AND NOT {}",
-        zur_entfernung_vorgesehen_sql("karte_hintergrundbild")
+        "SELECT b.name, b.mime, d.daten FROM karte_hintergrundbild b \
+         JOIN karte_hintergrundbild_daten d ON d.bild_id = b.id \
+         WHERE b.id = ? AND b.einsatz_id = ? AND NOT {}",
+        zur_entfernung_vorgesehen_sql("b")
     )))
     .bind(id)
     .bind(einsatz_id)
@@ -114,18 +121,36 @@ pub async fn anlegen(
 ) -> Result<HintergrundbildAnzeige, AppError> {
     let groesse = daten.len() as i64;
     let sha = hex(&Sha256::digest(daten));
-    // Neue Bilder oben auf den Stapel: max(reihenfolge)+1.
-    let id: i64 = sqlx::query_scalar(
-        "INSERT INTO karte_hintergrundbild \
-            (einsatz_id, name, daten, mime, groesse, sha256, ecken_json, reihenfolge, ansicht_id, hochgeladen_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, \
-            (SELECT COALESCE(MAX(reihenfolge), -1) + 1 FROM karte_hintergrundbild WHERE einsatz_id = ?), \
-            ?, ?) RETURNING id",
-    )
-    .bind(einsatz_id).bind(name).bind(daten).bind(mime).bind(groesse).bind(sha)
-    .bind(ecken_json).bind(einsatz_id).bind(ansicht_id).bind(hochgeladen_von)
-    .fetch_one(pool)
-    .await?;
+    // Metadaten und Bytes in EINER Transaktion: ein Bild ohne Bytes gibt es nicht.
+    let id = crate::write_retry!(pool, |conn| {
+        // Neue Bilder oben auf den Stapel: max(reihenfolge)+1.
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO karte_hintergrundbild \
+                (einsatz_id, name, mime, groesse, sha256, ecken_json, reihenfolge, ansicht_id, \
+                 hochgeladen_von) \
+             VALUES (?, ?, ?, ?, ?, ?, \
+                (SELECT COALESCE(MAX(reihenfolge), -1) + 1 FROM karte_hintergrundbild \
+                 WHERE einsatz_id = ?), \
+                ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(name)
+        .bind(mime)
+        .bind(groesse)
+        .bind(&sha)
+        .bind(ecken_json)
+        .bind(einsatz_id)
+        .bind(ansicht_id)
+        .bind(hochgeladen_von)
+        .fetch_one(&mut *conn)
+        .await?;
+        sqlx::query("INSERT INTO karte_hintergrundbild_daten (bild_id, daten) VALUES (?, ?)")
+            .bind(id)
+            .bind(daten)
+            .execute(&mut *conn)
+            .await?;
+        Ok(id)
+    })?;
     laden(pool, einsatz_id, id).await
 }
 
@@ -346,5 +371,55 @@ mod tests {
         assert!(liste(&pool, eid, None).await.unwrap().is_empty());
         // Zweites Löschen trifft keine Zeile mehr → NotFound (rows_affected == 0).
         assert!(loeschen(&pool, eid, a.id).await.is_err());
+    }
+
+    /// LFH-936: die Metadaten-Tabelle trägt keine BLOB-Spalte; sonst läsen Liste und 304-Pfad
+    /// wieder die Überlaufketten der Bilder (Messung: `db::tests::migration_0153_*`).
+    #[tokio::test]
+    async fn metadaten_tabelle_traegt_keine_blob_spalte() {
+        let pool = crate::db::test_pool().await;
+        let spalten: Vec<(String, String)> =
+            sqlx::query_as("SELECT name, type FROM pragma_table_info('karte_hintergrundbild')")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert!(!spalten.is_empty());
+        for (name, typ) in spalten {
+            assert_ne!(typ, "BLOB", "karte_hintergrundbild.{name} ist ein BLOB");
+        }
+    }
+
+    /// Upload, Bytes (byte-gleich, sha256 gleich) und Löschen samt Bytes (CASCADE).
+    #[tokio::test]
+    async fn bytes_roundtrip_und_cascade() {
+        let pool = crate::db::test_pool().await;
+        let (eid, uid) = setup(&pool).await;
+        let bytes: Vec<u8> = (0..40_000u32).map(|i| (i % 241) as u8).collect();
+        let a = anlegen(
+            &pool,
+            eid,
+            uid,
+            "luftbild.png",
+            "image/png",
+            &bytes,
+            ecken(),
+            None,
+        )
+        .await
+        .unwrap();
+        let (_, _, daten) = laden_bytes(&pool, eid, a.id).await.unwrap();
+        assert_eq!(daten, bytes);
+        let (_, _, sha) = meta_fuer_download(&pool, eid, a.id).await.unwrap();
+        assert_eq!(sha, hex(&Sha256::digest(&daten)));
+
+        loeschen(&pool, eid, a.id).await.unwrap();
+        let rest: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM karte_hintergrundbild_daten WHERE bild_id = ?",
+        )
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rest, 0, "die Bytes fallen mit dem Bild");
     }
 }

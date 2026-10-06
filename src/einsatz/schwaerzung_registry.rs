@@ -502,10 +502,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
         // Drohnenbild in der Regel (Personen, Kennzeichen, Hausansichten; § 32b Abs. 3 NKatSG),
         // ein Plan möglicherweise (Bewohnernamen, Beschriftung). Die Quelle wird nicht
         // unterschieden. Zuordnung `anhaenge` wie Datei-Anhänge; einzeln im Nachlauf
-        // (`Strategie::ZeileEinzelnLoeschen`), denn ein Bild hat bis 25 MB. Keine Tabelle verweist
-        // auf diese, der atomare Vorgang übergeht sie, und ihre Lesewege übergehen vorgesehene
-        // Bilder. Herleitung:
+        // (`Strategie::ZeileEinzelnLoeschen`), denn ein Bild hat bis 25 MB. Der atomare Vorgang
+        // übergeht sie, und ihre Lesewege übergehen vorgesehene Bilder. Herleitung:
         // `openspec/changes/archive/2026-10-05-lfh-997-kartenhintergrund-klassifizieren/design.md`.
+        // Die Bytes liegen seit LFH-936 in `karte_hintergrundbild_daten` (Regel unten); nur diese
+        // Tabelle verweist hierher, per CASCADE.
         tabelle: "karte_hintergrundbild",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -514,7 +515,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("einsatz_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("name", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
-            scrub("daten", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("mime", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("groesse", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("sha256", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
@@ -526,6 +526,23 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("erstellt_at", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("geaendert_at", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("ansicht_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+        ],
+    },
+    TabellenRegel {
+        // Die Bytes eines Bilds der Lagekarte (LFH-936, Migration 0153), getrennt von den
+        // Metadaten, damit Liste und 304-Pfad keine Seite davon lesen. Klassifiziert wie das Bild;
+        // die Zeile fällt per CASCADE mit der Bild-Zeile, die der Nachlauf einzeln löscht — in
+        // derselben Transaktion (`schwaerzung_nachlauf::MIT_GELOESCHT`).
+        tabelle: "karte_hintergrundbild_daten",
+        scoping: Scoping::UeberParent {
+            fk: "bild_id",
+            parent: "karte_hintergrundbild",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("bild_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("daten", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
         ],
     },
     TabellenRegel {
@@ -2432,7 +2449,8 @@ pub async fn scrubbe_aus_registry(
             .any(|(_, s)| *s == Strategie::ZeileEinzelnLoeschen)
         {
             debug_assert!(
-                super::schwaerzung_nachlauf::EINZELN_GELOESCHT.contains(&regel.tabelle)
+                (super::schwaerzung_nachlauf::EINZELN_GELOESCHT.contains(&regel.tabelle)
+                    || super::schwaerzung_nachlauf::ist_mit_geloescht(regel.tabelle))
                     && scrubs
                         .iter()
                         .all(|(_, s)| *s == Strategie::ZeileEinzelnLoeschen),
@@ -3024,6 +3042,7 @@ mod tests {
             "uhs_anhang",
             "einsatz_person_anhang",
             "karte_hintergrundbild",
+            "karte_hintergrundbild_daten",
         ] {
             anhaenge.extend(spalten_von(t));
         }
@@ -3167,6 +3186,11 @@ mod tests {
             .map(|r| r.tabelle)
             .collect();
         let mut nachlauf = super::super::schwaerzung_nachlauf::EINZELN_GELOESCHT.to_vec();
+        nachlauf.extend(
+            super::super::schwaerzung_nachlauf::MIT_GELOESCHT
+                .iter()
+                .map(|(kind, _)| *kind),
+        );
         nachlauf.sort_unstable();
         let mut einzeln = einzeln;
         einzeln.sort_unstable();
@@ -3176,6 +3200,8 @@ mod tests {
     /// Der atomare Vorgang löst für `ZeileEinzelnLoeschen` nur die Verknüpfungen von `anhang`
     /// (`scrubbe_aus_registry`). Jede andere Tabelle des Nachlaufs darf deshalb kein Ziel eines
     /// Fremdschlüssels sein, sonst bliebe ein Verweis bis zum Nachlauf erreichbar (LFH-997).
+    /// Ausgenommen sind nur die Kinder aus `MIT_GELOESCHT`: sie fallen per CASCADE mit der Zeile
+    /// (LFH-936), das prüft [`mit_geloeschte_kinder_fallen_per_cascade`].
     #[tokio::test]
     async fn einzeln_geloeschte_tabellen_ausser_anhang_haben_keine_verweise() {
         let pool = crate::db::test_pool().await;
@@ -3183,14 +3209,20 @@ mod tests {
             .iter()
             .filter(|t| **t != "anhang")
         {
-            let verweise: Vec<String> = sqlx::query_scalar(
+            let verweise: Vec<String> = sqlx::query_scalar::<_, String>(
                 "SELECT m.name FROM sqlite_master m, pragma_foreign_key_list(m.name) f \
                  WHERE m.type = 'table' AND f.\"table\" = ?",
             )
             .bind(tabelle)
             .fetch_all(&pool)
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .filter(|kind| {
+                !super::super::schwaerzung_nachlauf::MIT_GELOESCHT
+                    .contains(&(kind.as_str(), *tabelle))
+            })
+            .collect();
             assert!(
                 verweise.is_empty(),
                 "{tabelle} ist Ziel von {verweise:?}: Verknüpfung in scrubbe_aus_registry lösen"
@@ -3200,19 +3232,57 @@ mod tests {
 
     /// Bilder der Lagekarte tragen Personenbezug (Drohnen- und Luftbilder, beschriftete Pläne)
     /// und fallen mit der Kategorie `anhaenge`, einzeln im Nachlauf (LFH-997, Spec
-    /// `aufbewahrung`, „Bild-Hintergründe der Lagekarte“).
+    /// `aufbewahrung`, „Bild-Hintergründe der Lagekarte“). Ihre Bytes ebenso (LFH-936).
     #[test]
     fn kartenhintergrund_ist_anhang_und_faellt_einzeln() {
-        let regel = TABELLEN
-            .iter()
-            .find(|t| t.tabelle == "karte_hintergrundbild")
-            .expect("Regel karte_hintergrundbild");
-        for s in regel.spalten {
+        for tabelle in ["karte_hintergrundbild", "karte_hintergrundbild_daten"] {
+            let regel = TABELLEN
+                .iter()
+                .find(|t| t.tabelle == tabelle)
+                .unwrap_or_else(|| panic!("Regel {tabelle}"));
+            for s in regel.spalten {
+                assert_eq!(
+                    s.klassifikation,
+                    Klassifikation::Scrub(Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+                    "{tabelle}.{}",
+                    s.spalte
+                );
+            }
+        }
+    }
+
+    /// Ein Kind aus `MIT_GELOESCHT` fällt nur dann mit der Zeile seines Elternteils, wenn sein
+    /// Fremdschlüssel `ON DELETE CASCADE` trägt und die Registry es über genau diesen Elternteil
+    /// eingrenzt (LFH-936). Ohne CASCADE blieben die Bytes nach dem Nachlauf stehen, oder der
+    /// Nachlauf scheiterte am Fremdschlüssel.
+    #[tokio::test]
+    async fn mit_geloeschte_kinder_fallen_per_cascade() {
+        let pool = crate::db::test_pool().await;
+        for (kind, parent) in super::super::schwaerzung_nachlauf::MIT_GELOESCHT {
+            assert!(
+                super::super::schwaerzung_nachlauf::EINZELN_GELOESCHT.contains(parent),
+                "{kind}: Elternteil {parent} wird nicht einzeln gelöscht"
+            );
+            let regel = TABELLEN
+                .iter()
+                .find(|t| t.tabelle == *kind)
+                .unwrap_or_else(|| panic!("Regel {kind}"));
+            let Scoping::UeberParent { fk, parent: p } = regel.scoping else {
+                panic!("{kind}: Scoping muss UeberParent sein");
+            };
+            assert_eq!(p, *parent, "{kind}: Scoping über den falschen Elternteil");
+            let kaskaden: Vec<(String, String)> = sqlx::query_as(
+                "SELECT \"from\", on_delete FROM pragma_foreign_key_list(?) WHERE \"table\" = ?",
+            )
+            .bind(kind)
+            .bind(parent)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
             assert_eq!(
-                s.klassifikation,
-                Klassifikation::Scrub(Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
-                "karte_hintergrundbild.{}",
-                s.spalte
+                kaskaden,
+                vec![(fk.to_string(), "CASCADE".to_string())],
+                "{kind}: Verweis auf {parent} muss genau über {fk} mit CASCADE laufen"
             );
         }
     }
