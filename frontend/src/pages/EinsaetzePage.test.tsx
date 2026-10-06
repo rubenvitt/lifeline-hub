@@ -843,4 +843,25 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     await waitFor(() => expect(rumpf).not.toBeNull());
     expect(rumpf!.begonnen_at).toBe('2026-07-14 10:00:00');
   });
+
+  it('LFH-966: ein abgelehntes Anlegen steht im Dialog, ohne Toast; Abbrechen räumt es', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.post('/api/einsaetze', () =>
+        HttpResponse.json({ error: 'Bezeichnung bereits vergeben' }, { status: 409 }),
+      ),
+    );
+    renderMitProviders(<EinsaetzePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText('Bezeichnung bereits vergeben')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Neuer Einsatz' }));
+    await screen.findByLabelText('Bezeichnung');
+    expect(screen.queryByText('Bezeichnung bereits vergeben')).toBeNull();
+  });
 });

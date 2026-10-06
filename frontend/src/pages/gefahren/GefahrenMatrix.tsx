@@ -157,6 +157,10 @@ export interface GefahrenMatrixProps {
    * Detail-Speichern kostete sonst den getippten Wortlaut, weil die Hülle leert und schließt.
    */
   onDetailsSpeichern: (daten: BewertungEingabe) => Promise<unknown>;
+  /** Grund eines abgelehnten Detail-Speicherns — steht IM Dialog, nicht als Toast (LFH-966). */
+  detailsFehler?: unknown;
+  /** Der Detail-Dialog schließt: der Aufrufer räumt seinen Fehler, der nächste öffnet leer. */
+  onDetailsSchliessen?: () => void;
 }
 
 /** Das 13×5-Raster eines Gefahrengebiets. */
@@ -167,6 +171,8 @@ export default function GefahrenMatrix({
   laufendeZelle,
   onSetzen,
   onDetailsSpeichern,
+  detailsFehler,
+  onDetailsSchliessen,
 }: GefahrenMatrixProps) {
   const { token } = theme.useToken();
   // Freiraum unter der stehenden Kopfzeile beim Rückwärtstabben.
@@ -367,7 +373,11 @@ export default function GefahrenMatrix({
             gemeldet_von: gemeldetVon,
           })
         }
-        onSchliessen={() => setDetailKennung(null)}
+        fehler={detailsFehler}
+        onSchliessen={() => {
+          setDetailKennung(null);
+          onDetailsSchliessen?.();
+        }}
       />
     </>
   );

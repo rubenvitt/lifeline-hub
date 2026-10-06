@@ -462,4 +462,73 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Zur Lagekarte' })).toBeNull());
     expect(screen.getByText('Auf der Lagekarte ein Gefahrengebiet zeichnen.')).toBeInTheDocument();
   });
+
+  describe('LFH-966: abgelehnte Bewertung ohne Toast', () => {
+    const keinToast = () =>
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    function offenesMenue(): HTMLElement {
+      const menue = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      if (!menue) throw new Error('kein offenes Menü im Baum');
+      return menue;
+    }
+
+    it('ein abgelehnter Stufenwechsel steht über der Matrix, bis zum nächsten Absenden', async () => {
+      let versuch = 0;
+      server.use(
+        ...handlers(),
+        http.put('/api/einsaetze/1/gefahrengebiete/7/matrix/bewertung', () => {
+          versuch += 1;
+          return versuch === 1
+            ? HttpResponse.json({ error: 'Bewertung abgelehnt' }, { status: 409 })
+            : new Promise<never>(() => {});
+        }),
+      );
+      renderPage();
+      const zelle = await screen.findByRole('button', {
+        name: 'Bewertung Brand × Menschen: nicht bewertet',
+      });
+      await userEvent.click(zelle);
+      await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: /hoch/i }));
+      const hinweis = await screen.findByText('Bewertung abgelehnt');
+      expect(hinweis.closest('[data-fehler]')).not.toBeNull();
+      keinToast();
+      await userEvent.click(zelle);
+      await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: /mittel/i }));
+      await waitFor(() => expect(screen.queryByText('Bewertung abgelehnt')).toBeNull());
+    });
+
+    it('ein abgelehntes Detail-Speichern steht im Dialog, nicht über der Matrix', async () => {
+      const bewertung = {
+        id: 1,
+        gefahrengebiet_id: 7,
+        gefahrentyp: 'brand',
+        schutzobjekt: 'menschen',
+        warnstufe: 'hoch',
+        beschreibung: null,
+        gemeldet_von: null,
+        aktualisiert_von: 1,
+        erstellt_at: '',
+        geaendert_at: '',
+      };
+      server.use(
+        ...handlers([gebiet], [bewertung]),
+        http.put('/api/einsaetze/1/gefahrengebiete/7/matrix/bewertung', () =>
+          HttpResponse.json({ error: 'Details abgelehnt' }, { status: 422 }),
+        ),
+      );
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /^Bewertung Brand × Menschen: hoch/ }),
+      );
+      await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: 'Details …' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(within(dialog).getByLabelText('Beschreibung'), 'Rauch');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      expect(await within(dialog).findByText('Details abgelehnt')).toBeInTheDocument();
+      expect(document.querySelector('[data-fehler]')).toBeNull();
+      keinToast();
+    });
+  });
 });

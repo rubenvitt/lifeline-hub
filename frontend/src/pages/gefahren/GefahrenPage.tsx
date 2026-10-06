@@ -28,7 +28,7 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
 import { InlineAngabe } from '../../components/InlineAngabe';
 import { KennungsLink } from '../../components/kennungsLink';
-import { useFehlerMeldung } from '../../components/useFehlerMeldung';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
 
 /**
  * Trefflächenboden der Gebietszeile. Sie ist ein handgebautes Bedienziel (`ListenEintrag` legt
@@ -109,15 +109,22 @@ export default function GefahrenPage() {
     enabled: gewaehlt != null,
   });
 
-  const fehler = useFehlerMeldung();
+  // Kein `onError`-Toast (LFH-966, „Speicherfehler an die Seite“): ein abgelehnter Stufenwechsel
+  // steht als Hinweis über der Matrix, ein abgelehntes Detail-Speichern im Dialog. Zwei
+  // Mutationen, damit jeder Fehler an SEINEM Ort steht und der eine den anderen nicht räumt.
+  const bewertungGespeichert = () => {
+    qc.invalidateQueries({ queryKey: einsatzKeys.gefahrenmatrix(einsatzId, gewaehlt) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
+  };
   const setzen = useMutation({
     mutationFn: (d: BewertungEingabe) => setzeBewertung(einsatzId, gewaehlt as number, d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.gefahrenmatrix(einsatzId, gewaehlt) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
-    },
-    onError: fehler,
+    onSuccess: bewertungGespeichert,
   });
+  const detailsSetzen = useMutation({
+    mutationFn: (d: BewertungEingabe) => setzeBewertung(einsatzId, gewaehlt as number, d),
+    onSuccess: bewertungGespeichert,
+  });
+  const laufend = setzen.isPending ? setzen : detailsSetzen.isPending ? detailsSetzen : null;
   // Kein `onError`-Toast: `InlineAngabe` zeigt die Ablehnung an der Zeile (`mutateAsync` lehnt
   // ab). `onSuccess` gibt die Invalidierung zurück, damit `mutateAsync` erst mit dem neuen Namen
   // im Cache erfüllt.
@@ -337,6 +344,11 @@ export default function GefahrenPage() {
             style={{ marginBottom: 12 }}
           />
         )}
+        {setzen.isError && (
+          <div data-fehler style={{ marginBottom: 12 }}>
+            <SpeicherFehler fehler={setzen.error} titel="Bewertung nicht gespeichert" />
+          </div>
+        )}
         {matrixQuery.isError ? (
           <Alert type="error" title="Matrix konnte nicht geladen werden" showIcon />
         ) : (
@@ -348,15 +360,17 @@ export default function GefahrenPage() {
             // Nur die Zelle des laufenden PUT sperren; `variables` ist genau die Eingabe der
             // laufenden Mutation, kein Parallel-State.
             laufendeZelle={
-              setzen.isPending && setzen.variables
-                ? zellSchluessel(setzen.variables.gefahrentyp, setzen.variables.schutzobjekt)
+              laufend?.variables
+                ? zellSchluessel(laufend.variables.gefahrentyp, laufend.variables.schutzobjekt)
                 : null
             }
             onSetzen={(d) => setzen.mutate(d)}
             // `mutateAsync`: der Detail-Dialog braucht die Ablehnung, sonst leert die Hülle den
-            // Wortlaut trotz 422. Den Toast macht `onError`, die Ablehnung fängt `abschicken` in
+            // Wortlaut trotz 422. Den Grund zeigt der Dialog, die Ablehnung fängt `abschicken` in
             // der Hülle.
-            onDetailsSpeichern={(d) => setzen.mutateAsync(d)}
+            onDetailsSpeichern={(d) => detailsSetzen.mutateAsync(d)}
+            detailsFehler={detailsSetzen.error}
+            onDetailsSchliessen={() => detailsSetzen.reset()}
           />
         )}
       </Paneel>
