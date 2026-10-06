@@ -1415,7 +1415,7 @@ export default function Sidebar(props: SidebarProps) {
           )}
           {props.basemap === 'blind' && (
             <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
-              Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
+              Keine Kartengrundlage eingerichtet — Marker und Verorten funktionieren weiterhin.
             </Typography.Paragraph>
           )}
         </Space>

@@ -435,7 +435,7 @@ for (const { name, feld, seite } of [
     },
   },
   {
-    name: 'Einsatz-Defaults',
+    name: 'Einsatz-Vorgaben',
     feld: 'Aufbewahrungs-Dauer (Tage)',
     seite: async () => '/admin/einstellungen/einsatz',
   },

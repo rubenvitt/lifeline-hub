@@ -250,18 +250,18 @@ describe('feldrasterStil', () => {
 });
 
 describe('orgHinweisWert / orgHinweisSelect / orgHinweisAutoEtb', () => {
-  it('liefert OHNE Org-Default gar nichts — sonst stuende „Standard (Org): null" da', () => {
+  it('liefert OHNE Org-Default gar nichts — sonst stuende „Vorgabe der Organisation: null" da', () => {
     expect(orgHinweisWert(null)).toBeUndefined();
     expect(orgHinweisSelect(null, [{ value: '24h', label: '24 Stunden' }])).toBeUndefined();
     expect(orgHinweisAutoEtb(null)).toBeUndefined();
   });
 
   it('nennt das sichtbare Label, nicht den Wire-Wert', () => {
-    expect(orgHinweisWert(365, 'Tage')).toBe('Standard (Org): 365 Tage');
+    expect(orgHinweisWert(365, 'Tage')).toBe('Vorgabe der Organisation: 365 Tage');
     expect(orgHinweisSelect('24h', [{ value: '24h', label: '24 Stunden' }])).toBe(
-      'Standard (Org): 24 Stunden',
+      'Vorgabe der Organisation: 24 Stunden',
     );
-    expect(orgHinweisAutoEtb(0)).toBe('Standard (Org): Aus');
-    expect(orgHinweisAutoEtb(1)).toBe('Standard (Org): An');
+    expect(orgHinweisAutoEtb(0)).toBe('Vorgabe der Organisation: Aus');
+    expect(orgHinweisAutoEtb(1)).toBe('Vorgabe der Organisation: An');
   });
 });

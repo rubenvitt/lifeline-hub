@@ -67,7 +67,7 @@ export default function Anmeldeverfahren() {
     <AdminPage
       titel="Anmeldeverfahren"
       breite="schmal"
-      beschreibung="Verfügbare Login-Wege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren erscheinen hier. Änderungen werden sofort gespeichert."
+      beschreibung="Verfügbare Anmeldewege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren erscheinen hier. Änderungen werden sofort gespeichert."
       hinweis={
         <SeitenHinweise
           fehler={schaltenMutation.error}
@@ -78,7 +78,7 @@ export default function Anmeldeverfahren() {
       }
     >
       <Paneel
-        titel="Login-Wege"
+        titel="Anmeldewege"
         meta={providerQuery.isSuccess ? provider.length : undefined}
         koerperPolster
       >

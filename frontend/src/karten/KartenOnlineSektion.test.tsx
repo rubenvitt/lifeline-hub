@@ -28,6 +28,9 @@ describe('KartenOnlineSektion', () => {
     expect(screen.getByRole('heading', { name: 'Online-Quellen' })).toBeInTheDocument();
     expect(screen.getByText('online-kind')).toBeInTheDocument();
     expect(screen.queryByText('Nur lesend')).not.toBeInTheDocument();
+    // Der Begriff der Spec heißt „Kartengrundlage“, nicht „Basemap“ (LFH-944).
+    expect(screen.getByText(/Wahl der Kartengrundlage/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Basemap/);
   });
 
   it('zeigt read-only-Alert für Nicht-Admin (fuehrungskraft)', () => {

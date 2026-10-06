@@ -306,13 +306,13 @@ describe('App-Routing', () => {
     einstellungenServer();
     renderApp('/einsaetze/7/einstellungen');
     // Ein sektionseigenes Feld beweist, dass NICHT nur das Reiterband gerendert hat.
-    expect(await screen.findByLabelText('Standard-Modul (Einstieg)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Einstiegsmodul')).toBeInTheDocument();
   });
 
   it('ein unbekanntes Einstellungs-Segment landet ebenfalls dort', async () => {
     einstellungenServer();
     renderApp('/einsaetze/7/einstellungen/quatsch');
-    expect(await screen.findByLabelText('Standard-Modul (Einstieg)')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Einstiegsmodul')).toBeInTheDocument();
   });
 
   // Gegenaussage: die Umleitung ist keine Zwangsumleitung — eine benannte Sektion kommt an.
@@ -320,7 +320,7 @@ describe('App-Routing', () => {
     einstellungenServer();
     renderApp('/einsaetze/7/einstellungen/aufbewahrung');
     expect(await screen.findByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Standard-Modul (Einstieg)')).toBeNull();
+    expect(screen.queryByLabelText('Einstiegsmodul')).toBeNull();
   });
 
   it('betreuung-Route rendert die BetreuungPage statt Stub (LFH-639)', async () => {

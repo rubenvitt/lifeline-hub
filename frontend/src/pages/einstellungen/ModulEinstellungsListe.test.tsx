@@ -38,12 +38,12 @@ describe('ModulEinstellungsListe', () => {
       <ModulEinstellungsListe
         {...einsatzProps()}
         sichtbarSpalte={undefined}
-        rollenSpalte="Benötigte Rolle (Default)"
+        rollenSpalte="Benötigte Rolle (Vorgabe)"
       />,
     );
 
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-    expect(screen.getByText('Benötigte Rolle (Default)')).toBeInTheDocument();
+    expect(screen.getByText('Benötigte Rolle (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' })).toBeInTheDocument();
   });
 

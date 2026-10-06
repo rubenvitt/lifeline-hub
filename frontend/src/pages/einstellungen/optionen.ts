@@ -1,11 +1,17 @@
 import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/types';
 
 /**
- * Auswahllisten der Einstellungsseiten. Der Platzhalter der Selects bleibt an der Aufrufstelle: die
- * Einsatzseite sagt „(Standard)", die Org-Seite „(Fallback)" — die eine erbt von der Organisation,
- * die andere ist sie. `command-palette/befehle.ts` (`KOORD_BEFEHLE`) trägt dieselben
- * Koordinatenwerte mit eigenen Labels für den Palettenkontext.
+ * Auswahllisten der Einstellungsseiten. Der Platzhalter der Selects bleibt an der Aufrufstelle und
+ * nennt den System-Wert mit „(Vorgabe)“ (`components/vorgabeText.ts`, LFH-944).
+ * `command-palette/befehle.ts` (`KOORD_BEFEHLE`) trägt dieselben Koordinatenwerte mit eigenen
+ * Labels für den Palettenkontext.
  */
+
+/**
+ * Tooltip der Zeitzone an beiden Ebenen. Leer gilt die Gerätezeit (`anzeige/format.ts`, `inZone`),
+ * deshalb nennt auch der Platzhalter „Gerätezeit“ und nicht Europe/Berlin (LFH-944).
+ */
+export const ZEITZONE_HILFE = 'Zeitzone wie Europe/Berlin. Leer = Gerätezeit.';
 
 /** Benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
 export const ROLLEN_OPTIONEN: { value: string; label: string }[] = [

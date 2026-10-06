@@ -900,7 +900,7 @@ describe('LagekartePage', () => {
     renderSeite();
     // Der Hinweis steht im Paneel „Kartengrundlage" der Leiste — zu Beginn zugeklappt.
     await user.click(await screen.findByRole('button', { name: 'Kartengrundlage' }));
-    expect(await screen.findByText(/Keine Basemap konfiguriert/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Keine Kartengrundlage eingerichtet/i)).toBeInTheDocument();
   });
 
   it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
@@ -921,7 +921,7 @@ describe('LagekartePage', () => {
     expect(screen.getByRole('radio', { name: 'Offline' })).toBeEnabled();
     // Default-Modus ist 'online' → kein Blind-Hinweis, auch bei aufgeklapptem Paneel.
     await user.click(screen.getByRole('button', { name: 'Kartengrundlage' }));
-    expect(screen.queryByText(/Keine Basemap konfiguriert/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Keine Kartengrundlage eingerichtet/i)).not.toBeInTheDocument();
   });
 
   it('Basemap-Umschalter: nur Offline konfiguriert → Online disabled, Offline aktiv', async () => {

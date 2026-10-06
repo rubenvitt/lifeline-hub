@@ -12,7 +12,9 @@ import {
   KOORDINATEN_OPTIONEN,
   ZEITFORMAT_OPTIONEN,
   ZEITZONEN_OPTIONEN,
+  ZEITZONE_HILFE,
 } from './optionen';
+import { LEER_SYSTEM_VORGABE, mitVorgabe } from '../../components/vorgabeText';
 import {
   type FormWerteAnzeige,
   initialAnzeige,
@@ -86,7 +88,7 @@ export default function AnzeigeEinstellungen() {
     <AdminPage
       titel="Anzeige-Konventionen"
       breite="schmal"
-      beschreibung="Org-weite Darstellungs-Defaults für alle Einsätze. Leer = hartkodierter Fallback."
+      beschreibung={`Darstellung für alle Einsätze der Organisation. ${LEER_SYSTEM_VORGABE}`}
       hinweis={
         <SeitenHinweise
           fehler={speichernMutation.error}
@@ -108,28 +110,28 @@ export default function AnzeigeEinstellungen() {
         disabled={!istAdmin}
       >
         <Formularpaneel titel="Darstellung">
-          <Form.Item
-            label="Zeitzone"
-            name="zeitzone"
-            tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
-          >
+          <Form.Item label="Zeitzone" name="zeitzone" tooltip={ZEITZONE_HILFE}>
             <AutoComplete
               allowClear
               options={ZEITZONEN_OPTIONEN}
-              placeholder="Europe/Berlin (Fallback)"
+              placeholder={mitVorgabe('Gerätezeit')}
               showSearch={teilwortSuche}
             />
           </Form.Item>
           <Form.Item label="Zeitformat" name="zeitformat">
-            <Select allowClear placeholder="24 Stunden (Fallback)" options={ZEITFORMAT_OPTIONEN} />
+            <Select
+              allowClear
+              placeholder={mitVorgabe('24 Stunden')}
+              options={ZEITFORMAT_OPTIONEN}
+            />
           </Form.Item>
           <Form.Item label="Einheiten" name="einheiten">
-            <Select allowClear placeholder="Metrisch (Fallback)" options={EINHEITEN_OPTIONEN} />
+            <Select allowClear placeholder={mitVorgabe('Metrisch')} options={EINHEITEN_OPTIONEN} />
           </Form.Item>
           <Form.Item label="Koordinatenformat" name="koordinatenformat">
             <Select
               allowClear
-              placeholder="WGS84 dezimal (Fallback)"
+              placeholder={mitVorgabe('WGS84 dezimal')}
               options={KOORDINATEN_OPTIONEN}
             />
           </Form.Item>
@@ -138,10 +140,10 @@ export default function AnzeigeEinstellungen() {
           <Form.Item
             label="Geocoder-URL"
             name="geocoder_url"
-            tooltip="Nominatim-kompatible Basis-URL für die Ort-Vorschau (Reverse-Geocoding). Leer = öffentlicher Nominatim. Die Einsatz-Koordinate wird an diesen Dienst gesendet — für Produktivlast/Datenschutz eigenen Geocoder hinterlegen."
+            tooltip="Adresse eines Nominatim-kompatiblen Dienstes, der zur Koordinate den Ort nennt. Leer = öffentlicher Nominatim. Die Einsatz-Koordinate wird an diesen Dienst gesendet — für Produktivlast und Datenschutz einen eigenen Dienst hinterlegen."
           >
             <Input
-              placeholder="https://nominatim.openstreetmap.org (Default)"
+              placeholder={mitVorgabe('https://nominatim.openstreetmap.org')}
               allowClear
               style={{ width: '100%' }}
             />

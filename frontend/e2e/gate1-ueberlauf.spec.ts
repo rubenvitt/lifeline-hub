@@ -880,7 +880,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
   ];
 }
 
-/** Nur Systemrolle „Admin" ändert Stammdaten und Org-Defaults — der Rest liest nach. */
+/** Nur Systemrolle „Admin" ändert Stammdaten und Org-Vorgaben — der Rest liest nach. */
 const NUR_SYSTEM_ADMIN = /^Nur Benutzer mit der Systemrolle „Admin“ dürfen/;
 
 const FAHRZEUG_STOFF = 'Florian Musterstadt-Nordwest 46/11-1 Wechsellader Abrollbehälter';
@@ -906,7 +906,7 @@ function gate1VerwaltungRouten(): Gate1Route[] {
     },
     {
       pfad: '/admin/einstellungen/einsatz',
-      anker: (p: Page) => p.getByRole('heading', { name: 'Einsatz-Defaults', level: 1 }),
+      anker: (p: Page) => p.getByRole('heading', { name: 'Einsatz-Vorgaben', level: 1 }),
       lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SYSTEM_ADMIN) },
     },
     {

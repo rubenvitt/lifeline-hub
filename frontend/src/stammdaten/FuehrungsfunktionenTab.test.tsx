@@ -66,7 +66,7 @@ describe('FuehrungsfunktionenTab', () => {
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Versorgung (Logistik){Enter}');
     expect(
-      await screen.findByText('Versorgung (Logistik) (Standard: Versorgung)'),
+      await screen.findByText('Versorgung (Logistik) (Vorgabe: Versorgung)'),
     ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Bezeichnung S4 bearbeiten' }));

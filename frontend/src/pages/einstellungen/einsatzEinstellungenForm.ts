@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { orgVorgabe } from '../../components/vorgabeText';
 import type {
   EinheitenSystem,
   EinsatzEinstellungen,
@@ -173,13 +174,13 @@ export function initialAufbewahrung(e: EinsatzEinstellungen): FormWerteAufbewahr
 
 // ── Geteilte Darstellungs-Helfer der vier Sektionen (rein, ohne React) ──
 
-/** „Standard (Org): X", wenn ein Org-Default gesetzt ist; sonst nichts. */
+/** „Vorgabe der Organisation: X“, wenn die Organisation einen Wert gesetzt hat; sonst nichts (LFH-944). */
 export function orgHinweisWert(
   wert: string | number | null | undefined,
   suffix?: string,
 ): string | undefined {
   if (wert == null) return undefined;
-  return `Standard (Org): ${wert}${suffix ? ` ${suffix}` : ''}`;
+  return orgVorgabe(`${wert}${suffix ? ` ${suffix}` : ''}`);
 }
 
 /** Wie {@link orgHinweisWert}, aber mit dem sichtbaren Options-Label statt dem Wire-Wert. */
@@ -189,13 +190,13 @@ export function orgHinweisSelect<T extends string>(
 ): string | undefined {
   if (wert == null) return undefined;
   const opt = optionen.find((o) => o.value === wert);
-  return opt ? `Standard (Org): ${opt.label}` : undefined;
+  return opt ? orgVorgabe(opt.label) : undefined;
 }
 
 /** Org-Hinweis für die Auto-ETB-Tristate: 0 = Aus, alles andere = An. */
 export function orgHinweisAutoEtb(wert: number | null | undefined): string | undefined {
   if (wert == null) return undefined;
-  return `Standard (Org): ${wert === 0 ? 'Aus' : 'An'}`;
+  return orgVorgabe(wert === 0 ? 'Aus' : 'An');
 }
 
 /**

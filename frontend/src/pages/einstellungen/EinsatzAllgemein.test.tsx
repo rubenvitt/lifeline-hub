@@ -83,7 +83,7 @@ describe('EinsatzAllgemein', () => {
 
     rendern();
 
-    expect(await screen.findByText('Standard-Modul (Einstieg)')).toBeInTheDocument();
+    expect(await screen.findByText('Einstiegsmodul')).toBeInTheDocument();
     // Karten-Defaults (Basemap/Fachebenen) stehen nicht im Formular (sie leben auf der Lagekarte).
     expect(screen.queryByText('Karten-Defaults')).not.toBeInTheDocument();
     // Gewähltes Standard-Modul: das Select-Selection-Item trägt title="ETB".
@@ -159,10 +159,15 @@ describe('EinsatzAllgemein', () => {
 
     rendern();
 
-    expect(await screen.findByText('Standard (Org): Europe/Berlin')).toBeInTheDocument();
-    expect(screen.getByText('Standard (Org): 24 Stunden')).toBeInTheDocument();
-    expect(screen.getByText('Standard (Org): Metrisch (m, km)')).toBeInTheDocument();
-    expect(screen.getByText('Standard (Org): WGS84 dezimal')).toBeInTheDocument();
+    expect(await screen.findByText('Vorgabe der Organisation: Europe/Berlin')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: 24 Stunden')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: Metrisch (m, km)')).toBeInTheDocument();
+    expect(screen.getByText('Vorgabe der Organisation: WGS84 dezimal')).toBeInTheDocument();
+    // Platzhalter nennen den System-Wert, die leere Zeitzone die Gerätezeit (LFH-944).
+    expect(screen.getByText('Gerätezeit (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('24 Stunden (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('Lage-Dashboard bzw. ETB (Vorgabe)')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Standard|Default|Fallback/);
 
     // Der Org-Default darf NICHT in den Payload fließen — leer bleibt null (das Backend löst auf).
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));

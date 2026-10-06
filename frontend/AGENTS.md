@@ -310,6 +310,14 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Sprungpalette**: `frontend/src/command-palette/AGENTS.md`.
 
+**Begriffe**
+
+- **Voreingestellte Werte heißen „Vorgabe“** (LFH-944, Spec `bedien-begriffe`): nie „Default“,
+  „Fallback“ oder „Standard“ im sichtbaren Text. Platzhalter nennen den Wert, der leer wirklich
+  gilt. Bausteine in `components/vorgabeText.ts` („… (Vorgabe)“, „Leer = Vorgabe des Systems.“,
+  „Vorgabe der Organisation: …“), Wächter `components/vorgabe.guard.test.ts` mit Ausnahmeliste
+  für Eigennamen („Standard-Rufname“, „Standardansicht“).
+
 **Aktionen**
 
 - **Datensatz-Aktionen werden gebündelt** (LFH-365): ab drei (nach Rechteprüfung) hinter

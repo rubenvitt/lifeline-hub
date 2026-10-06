@@ -311,7 +311,7 @@ export default function OrganisationTab() {
 
         <Formularpaneel
           titel="Taktische Zeichen"
-          beschreibung="Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar."
+          beschreibung="Vorgabe der Organisation für taktische Zeichen; je Objekt änderbar."
         >
           <Form.Item label="DV-102-Organisation" name="tz_organisation" style={{ maxWidth: 480 }}>
             <Select
