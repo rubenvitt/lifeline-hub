@@ -1,3 +1,4 @@
+use crate::log_drossel::Sammelzeile;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -163,11 +164,26 @@ impl IntoResponse for AppError {
                     // Log-Zeile
                     // unterscheidet die zwei Quellen, weil sie verschiedene Gegenmaßnahmen
                     // nahelegen.
+                    //
+                    // Gedrosselt (LFH-925): unter Überlast entsteht der Zweig je Anfrage, auch auf
+                    // Pfaden ohne Anmeldung.
+                    static POOL_ERSCHOEPFT: Sammelzeile = Sammelzeile::neu();
+                    static SCHREIBKONFLIKT: Sammelzeile = Sammelzeile::neu();
                     if matches!(e, sqlx::Error::PoolTimedOut) {
                         // Alle Pool-Slots belegt, `acquire_timeout` abgelaufen.
-                        tracing::warn!("Verbindungspool erschöpft (503): {e}");
-                    } else {
-                        tracing::warn!("Schreibkonflikt nach Busy-Retries (503): {e}");
+                        if let Some(f) = POOL_ERSCHOEPFT.zaehlen() {
+                            tracing::warn!(
+                                anzahl = f.anzahl,
+                                seit_s = f.seit_s,
+                                "Verbindungspool erschöpft (503), Sammelzeile: {e}"
+                            );
+                        }
+                    } else if let Some(f) = SCHREIBKONFLIKT.zaehlen() {
+                        tracing::warn!(
+                            anzahl = f.anzahl,
+                            seit_s = f.seit_s,
+                            "Schreibkonflikt nach Busy-Retries (503), Sammelzeile: {e}"
+                        );
                     }
                     "Dienst vorübergehend ausgelastet — bitte erneut versuchen.".to_string()
                 } else if let Some((_, generic)) = self.constraint_violation() {

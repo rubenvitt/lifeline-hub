@@ -174,6 +174,43 @@ pub enum LoginAntwort {
     MfaErforderlich { mfa_erforderlich: String },
 }
 
+/// Wo eine gesperrte Quelle abgewiesen wird; bestimmt die Logzeile.
+#[derive(Clone, Copy)]
+enum GesperrterWeg {
+    Anmeldung,
+    Zweitfaktor,
+}
+
+/// 429 für eine gesperrte Quelle (`rate_limit`), mit gedrosselter Logzeile (LFH-925): höchstens
+/// eine je Quelle und Minute, mit der Zahl der seither still abgewiesenen. Ohne Drossel schriebe
+/// jede Anfrage einer gesperrten Quelle eine Zeile, und der Zweig ist für einen Fremden billig.
+fn quelle_pruefen(peer_ip: Option<std::net::IpAddr>, weg: GesperrterWeg) -> Result<(), AppError> {
+    use crate::auth::rate_limit::{sperre, Sperre};
+    let Some(ip) = peer_ip else {
+        return Ok(());
+    };
+    let Sperre::Gesperrt { zeile } = sperre(ip) else {
+        return Ok(());
+    };
+    if let Some(ungemeldet) = zeile {
+        match weg {
+            GesperrterWeg::Anmeldung => tracing::warn!(
+                peer_ip = %ip,
+                ungemeldet,
+                "Anmeldeversuch abgewiesen: zu viele Fehlversuche aus dieser Quelle"
+            ),
+            GesperrterWeg::Zweitfaktor => tracing::warn!(
+                peer_ip = %ip,
+                ungemeldet,
+                "Zweitfaktor abgewiesen: zu viele Fehlversuche aus dieser Quelle"
+            ),
+        }
+    }
+    Err(AppError::TooManyRequests(
+        "Zu viele fehlgeschlagene Anmeldeversuche. Bitte kurz warten.".to_string(),
+    ))
+}
+
 /// POST /api/auth/login — prüft Anmeldedaten, legt Session an, setzt Cookie.
 ///
 /// Ist der `passwort`-Provider in der Registry deaktiviert → 403. Heute hält der Aussperr-Guard
@@ -197,18 +234,8 @@ pub async fn login(
     let benutzername = crate::auth::benutzername::normalisiere(&req.benutzername)?;
 
     // Bremse vor jeder Passwort-Arbeit: ein gesperrter Aufrufer löst kein Hashing aus. Der Name
-    // bleibt aus dieser Zeile: sie entsteht bei jeder Anfrage einer gesperrten Quelle, ohne Drossel.
-    if let Some(ip) = peer_ip {
-        if crate::auth::rate_limit::ist_gesperrt(ip) {
-            tracing::warn!(
-                peer_ip = %ip,
-                "Anmeldeversuch abgewiesen: zu viele Fehlversuche aus dieser Quelle"
-            );
-            return Err(AppError::TooManyRequests(
-                "Zu viele fehlgeschlagene Anmeldeversuche. Bitte kurz warten.".to_string(),
-            ));
-        }
-    }
+    // bleibt aus der Logzeile: sie entsteht bei Anfragen einer gesperrten Quelle.
+    quelle_pruefen(peer_ip, GesperrterWeg::Anmeldung)?;
 
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     let passwort_aktiv = liste
@@ -1610,17 +1637,7 @@ pub async fn totp_finish(
     jar: CookieJar,
     JsonBody(req): JsonBody<TotpFinishRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
-    if let Some(ip) = peer_ip {
-        if crate::auth::rate_limit::ist_gesperrt(ip) {
-            tracing::warn!(
-                peer_ip = %ip,
-                "Zweitfaktor abgewiesen: zu viele Fehlversuche aus dieser Quelle"
-            );
-            return Err(AppError::TooManyRequests(
-                "Zu viele fehlgeschlagene Anmeldeversuche. Bitte kurz warten.".to_string(),
-            ));
-        }
-    }
+    quelle_pruefen(peer_ip, GesperrterWeg::Zweitfaktor)?;
 
     let key = jar.get(MFA_PENDING_COOKIE).map(|c| c.value().to_string());
     let ergebnis = totp_pruefen(&state.pool, key, &req.code, peer_ip).await;
@@ -2093,6 +2110,25 @@ mod tests {
             "Überlast darf die Quelle nicht sperren"
         );
         assert_eq!(fehlgeschlagen_im_audit(&pool).await, 0);
+    }
+
+    /// LFH-925: 1000 abgewiesene Anmeldungen einer gesperrten Quelle schreiben eine WARN-Zeile.
+    /// Mutationsprobe: mit `zeile` stets `Some` (ohne Drossel) stehen 1000 Zeilen im Log.
+    #[tokio::test]
+    async fn gesperrte_quelle_schreibt_hoechstens_eine_zeile() {
+        let ip: std::net::IpAddr = "198.51.100.23".parse().unwrap();
+        for _ in 0..crate::auth::rate_limit::MAX_FEHLVERSUCHE {
+            crate::auth::rate_limit::fehlversuch(ip, None);
+        }
+
+        let (puffer, _log) = crate::test_log::LogPuffer::einfangen();
+        for _ in 0..1000 {
+            let err = quelle_pruefen(Some(ip), GesperrterWeg::Anmeldung).unwrap_err();
+            assert!(matches!(err, AppError::TooManyRequests(_)), "{err:?}");
+        }
+        let log = puffer.text();
+        assert_eq!(log.matches("Anmeldeversuch abgewiesen").count(), 1, "{log}");
+        assert!(log.contains("WARN"), "{log}");
     }
 
     /// Gegenprobe: ein falsches Passwort zählt weiter und steht im Audit.
