@@ -5,6 +5,7 @@
 //! bis zu einer Wartefrist abgewartet (`liefere_geloest`).
 
 use crate::error::AppError;
+use crate::http_begrenzt::{lies_json_begrenzt, lies_text_begrenzt, DECKEL_FACHEBENE};
 use crate::karte::cache;
 use crate::karte::luftqualitaet::{luftqualitaet_fenster, normalisiere_luftqualitaet};
 use crate::karte::normalisierung::{
@@ -93,12 +94,18 @@ where
 }
 
 /// Holt eine externe URL und parst sie als GeoJSON-Value (FeatureCollection durchgereicht).
-async fn hole_geojson(client: &reqwest::Client, url: &str) -> Result<serde_json::Value, String> {
+async fn hole_geojson(
+    client: &reqwest::Client,
+    url: &str,
+    deckel: usize,
+) -> Result<serde_json::Value, String> {
     let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
     }
-    let v: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let v: serde_json::Value = lies_json_begrenzt(resp, deckel)
+        .await
+        .map_err(|e| e.to_string())?;
     if v.get("type").and_then(|t| t.as_str()) == Some("FeatureCollection") {
         Ok(v)
     } else {
@@ -115,7 +122,9 @@ pub(crate) async fn hole_json(
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
     }
-    resp.json().await.map_err(|e| e.to_string())
+    lies_json_begrenzt(resp, DECKEL_FACHEBENE)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Holt eine URL und liefert den Rumpf als Text (für Quellen, deren Antwort kein JSON ist).
@@ -124,13 +133,19 @@ async fn hole_text(client: &reqwest::Client, url: &str) -> Result<String, String
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
     }
-    resp.text().await.map_err(|e| e.to_string())
+    lies_text_begrenzt(resp, DECKEL_FACHEBENE)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------- DWD
 
 const DWD_ATTRIB: &str = "Datenbasis: Deutscher Wetterdienst";
 const DWD_TTL: Duration = Duration::from_secs(300);
+/// Eigener, weiter Deckel (LFH-923): Die DWD-Antwort trägt ganze Gemeindepolygone und wächst mit
+/// der Wetterlage; gemessen ist nur der ruhige Fall (`docs/fachebenen-quellen.md`). Bei einer
+/// bundesweiten Lage darf die Ebene nicht am Deckel für ruhiges Wetter scheitern.
+const DWD_DECKEL: usize = 64 * 1024 * 1024;
 const DWD_URL: &str = "https://maps.dwd.de/geoserver/dwd/ows?service=WFS&version=2.0.0&request=GetFeature&typeName=dwd:Warnungen_Gemeinden_vereinigt&outputFormat=application/json&srsName=EPSG:4326";
 
 pub async fn fetch_dwd(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
@@ -196,7 +211,7 @@ pub(crate) fn dwd_gueltige(
 }
 
 async fn erneuere_dwd(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
-    match hole_geojson(&client, DWD_URL).await {
+    match hole_geojson(&client, DWD_URL, DWD_DECKEL).await {
         Ok(fc) => {
             let a = FachebeneAntwort::ok("dwd", DWD_ATTRIB, None, fc);
             cache::setze(&pool, "dwd", &a).await;
@@ -343,7 +358,7 @@ async fn erneuere_grundpegel(client: reqwest::Client, pool: SqlitePool) -> bool 
         .send()
         .await
     {
-        Ok(r) if r.status().is_success() => match r.json::<Value>().await {
+        Ok(r) if r.status().is_success() => match lies_json_begrenzt(r, DECKEL_FACHEBENE).await {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!("BfS-ODL-Zeitreihe nicht lesbar: {e}");
@@ -513,7 +528,8 @@ async fn hole_overpass(client: &reqwest::Client, query: &str, ebene: &str) -> Op
             .send()
             .await;
         match resp {
-            Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
+            Ok(r) if r.status().is_success() => match lies_json_begrenzt(r, DECKEL_FACHEBENE).await
+            {
                 Ok(roh) => return Some(roh),
                 Err(e) => tracing::debug!("Overpass-JSON-Parse ({url}) fehlgeschlagen: {e}"),
             },
@@ -582,7 +598,7 @@ async fn erneuere_hochwasser(
         .send()
         .await
     {
-        Ok(r) if r.status().is_success() => match r.text().await {
+        Ok(r) if r.status().is_success() => match lies_text_begrenzt(r, DECKEL_FACHEBENE).await {
             // Ein abgelaufener oder ungültiger Token liefert HTTP 200 mit leerem Rumpf. Die eigene
             // Meldung
             // hält den Fall im Log von „JSON kaputt“ unterscheidbar.
@@ -1320,7 +1336,9 @@ async fn hole_mastr(client: &reqwest::Client) -> Result<Vec<Value>, String> {
         if !resp.status().is_success() {
             return Err(format!("HTTP {}", resp.status()));
         }
-        let roh: Value = resp.json().await.map_err(|e| e.to_string())?;
+        let roh: Value = lies_json_begrenzt(resp, DECKEL_FACHEBENE)
+            .await
+            .map_err(|e| e.to_string())?;
         if seite == 1 {
             let total = roh
                 .get("Total")
@@ -2688,5 +2706,72 @@ mod warnebenen_tests {
         assert_eq!(events(&a), vec!["STURM"]);
         let (roh, _) = cache::eintrag(&pool, "dwd").await.unwrap();
         assert_eq!(events(&roh), vec!["FROST", "STURM"]);
+    }
+}
+
+/// LFH-923: Fachebenen-Quellen lesen ihre Antwort nur bis [`DECKEL_FACHEBENE`] ein, auch
+/// gzip-gepackt (der Fachebenen-Client entpackt selbst).
+#[cfg(test)]
+mod deckel_tests {
+    use super::*;
+    use crate::http_begrenzt::fixture::{bediene, gzip_antwort, gzip_nullen, strom_antwort};
+    use axum::routing::get;
+
+    #[tokio::test]
+    async fn gzip_bombe_endet_am_deckel() {
+        let gepackt = gzip_nullen(DECKEL_FACHEBENE + 1024 * 1024);
+        let basis = bediene(axum::Router::new().route(
+            "/",
+            get(move || {
+                let g = gepackt.clone();
+                async move { gzip_antwort(g) }
+            }),
+        ))
+        .await;
+        let client = FachebenenState::neu().client;
+        let url = format!("{basis}/");
+        for fehler in [
+            hole_json(&client, &url).await.unwrap_err(),
+            hole_geojson(&client, &url, DECKEL_FACHEBENE)
+                .await
+                .unwrap_err(),
+            hole_text(&client, &url).await.unwrap_err(),
+        ] {
+            assert!(fehler.contains("größer als"), "{fehler}");
+        }
+    }
+
+    #[tokio::test]
+    async fn strom_ueber_dem_deckel_ist_fehler() {
+        let basis = bediene(
+            axum::Router::new().route("/", get(|| async { strom_antwort(DECKEL_FACHEBENE + 1) })),
+        )
+        .await;
+        let client = FachebenenState::neu().client;
+        let fehler = hole_json(&client, &format!("{basis}/")).await.unwrap_err();
+        assert!(fehler.contains("größer als"), "{fehler}");
+    }
+
+    /// Gegenprobe: eine gepackte, gewöhnliche Antwort kommt entpackt an.
+    #[tokio::test]
+    async fn gepackte_antwort_unter_dem_deckel_wird_gelesen() {
+        use std::io::Write;
+        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        enc.write_all(br#"{"type":"FeatureCollection","features":[]}"#)
+            .unwrap();
+        let gepackt = enc.finish().unwrap();
+        let basis = bediene(axum::Router::new().route(
+            "/",
+            get(move || {
+                let g = gepackt.clone();
+                async move { gzip_antwort(g) }
+            }),
+        ))
+        .await;
+        let client = FachebenenState::neu().client;
+        let v = hole_geojson(&client, &format!("{basis}/"), DECKEL_FACHEBENE)
+            .await
+            .unwrap();
+        assert_eq!(v["type"], "FeatureCollection");
     }
 }
