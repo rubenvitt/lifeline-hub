@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Grid } from 'antd';
+import { useSyncExternalStore } from 'react';
+import { theme } from 'antd';
 import type { Breakpoint } from 'antd';
 
 /**
@@ -16,18 +16,25 @@ import type { Breakpoint } from 'antd';
  * dessen, was der Name verspricht. {@link AbBreitePunkt} schließt die Stufe am Typ aus. Dieselbe
  * Warnung gilt für die roh mitgelieferte {@link ViewportZustand.screens}-Karte.
  *
- * ── Erst-Render ist BREIT, nicht schmal ─────────────────────────────────────────────────
- * `Grid.useBreakpoint()` liefert auf dem ersten Render `{}`. „Noch unbekannt" gilt als breit:
- * der Primärkontext Fükw bekommt den unkorrigierten Render, statt dass für einen Frame das
- * Handy-Layout aufblitzt.
+ ── Ein Satz Hörer für die ganze Seite (LFH-947) ───────────────────────────────────────
+ * Die Abfragen leben in EINEM modulweiten Store (`useSyncExternalStore`): sieben Breiten aus
+ * antds Schwellen (`theme.getDesignToken()`, dieselbe Karte wie `Grid.useBreakpoint`) und die
+ * Zeigerfrage, also höchstens 8 Hörer, egal wie viele Zeilen fragen. Vorher hing jede
+ * Zeitachsenzeile 8 eigene an (`Grid.useBreakpoint` baut seinen Beobachter je Instanz). Der
+ * Store hängt sich beim ersten Abonnenten an und beim letzten ab; der Snapshot ist ein
+ * stabiles Objekt, das nur bei einer geänderten Antwort neu entsteht.
+ *
+ * ── „Unbekannt" ist BREIT, nicht schmal ────────────────────────────────────────────────
+ * Der Store antwortet schon beim ersten Render. Fehlt eine Stufe in der Karte (rohe Karte von
+ * außen, `abBreiteAus`), gilt sie als breit: der Primärkontext Fükw bekommt den unkorrigierten
+ * Render, statt dass für einen Frame das Handy-Layout aufblitzt.
  *
  * ── Zeigersignal: `(pointer: coarse)`, nicht `(any-pointer: coarse)` ────────────────────
  * `pointer` beschreibt den PRIMÄREN Zeiger; `any-pointer` schlüge auch am Fükw-Laptop mit
  * Touchscreen an. Das Signal belegt über {@link zeigerIstGrob} die Dichtestufe vor, wenn keine
  * Wahl gespeichert ist (LFH-361). Preis: ein 2-in-1-Tablet mit Tastatur meldet `fine` und
  * startet kompakt — lieber eine Stufe zu eng als ein Umschalter, der sich beim Neuladen
- * zurückdreht. Bauform wie `theme/ThemeModeProvider.tsx`: Abfrage im
- * `useState`-Initialisierer, Änderung über einen `change`-Zuhörer im Effekt.
+ * zurückdreht.
  *
  * ── Neben, nicht statt der Container-Abfragen ───────────────────────────────────────────
  * Die Staffelung in `theme/sprache.css` (1100/700 px) misst die Fläche des INHALTS, dieser Hook
@@ -40,12 +47,12 @@ const ZEIGER_GROB = '(pointer: coarse)';
 /** Breakpoints, ab denen sinnvoll „mindestens so breit" gefragt werden kann — ohne `xs`. */
 export type AbBreitePunkt = Exclude<Breakpoint, 'xs'>;
 
-/** Die von antd gelieferte Screens-Karte; auf dem ersten Render leer. */
+/** Die Screens-Karte in antds Form (`Grid.useBreakpoint`). */
 type ScreensKarte = Partial<Record<Breakpoint, boolean>>;
 
 interface ViewportZustand {
   /**
-   * Rohe antd-Karte, unverändert durchgereicht. Achtung: `screens.xs` ist eine
+   * Karte in antds Form. Achtung: `screens.xs` ist eine
    * `max-width`-Aussage und damit nicht wie die übrigen Stufen zu lesen.
    */
   screens: ScreensKarte;
@@ -79,18 +86,98 @@ export function zeigerIstGrob(): boolean {
   return window.matchMedia(ZEIGER_GROB).matches;
 }
 
+/** Die Breitenabfragen in antds Form (`responsiveObserver`), aus den Schwellen des Themes. */
+function breitenAbfragen(): Record<Breakpoint, string> {
+  const t = theme.getDesignToken();
+  return {
+    xs: `(max-width: ${t.screenXSMax}px)`,
+    sm: `(min-width: ${t.screenSM}px)`,
+    md: `(min-width: ${t.screenMD}px)`,
+    lg: `(min-width: ${t.screenLG}px)`,
+    xl: `(min-width: ${t.screenXL}px)`,
+    xxl: `(min-width: ${t.screenXXL}px)`,
+    xxxl: `(min-width: ${t.screenXXXL}px)`,
+  };
+}
+
+interface Momentaufnahme {
+  screens: ScreensKarte;
+  istBeruehrung: boolean;
+}
+
+/**
+ * Die Abfragen, gebaut beim ersten Fragen und gehalten, solange jemand abonniert. Eine
+ * `MediaQueryList` antwortet über `matches` immer aktuell; Hörer hängen nur an Abonnenten.
+ */
+let abfragen: { breiten: [Breakpoint, MediaQueryList][]; zeiger: MediaQueryList } | null = null;
+const abonnenten = new Set<() => void>();
+let letzte: Momentaufnahme | null = null;
+
+function gebaut() {
+  abfragen ??= {
+    breiten: Object.entries(breitenAbfragen()).map(([punkt, abfrage]) => [
+      punkt as Breakpoint,
+      window.matchMedia(abfrage),
+    ]),
+    zeiger: window.matchMedia(ZEIGER_GROB),
+  };
+  return abfragen;
+}
+
+function benachrichtige() {
+  for (const melde of [...abonnenten]) melde();
+}
+
+function abonniere(melde: () => void): () => void {
+  const { breiten, zeiger } = gebaut();
+  if (abonnenten.size === 0) {
+    for (const [, mql] of breiten) mql.addEventListener('change', benachrichtige);
+    zeiger.addEventListener('change', benachrichtige);
+  }
+  abonnenten.add(melde);
+  return () => {
+    abonnenten.delete(melde);
+    if (abonnenten.size === 0) {
+      for (const [, mql] of breiten) mql.removeEventListener('change', benachrichtige);
+      zeiger.removeEventListener('change', benachrichtige);
+      // Ohne Abonnenten frisch bauen: die nächste Seite fragt die dann gültige Umgebung.
+      abfragen = null;
+    }
+  };
+}
+
+/**
+ * Liest die Antworten (`matches`) und gibt die letzte Momentaufnahme zurück, solange sie gleich
+ * sind — `useSyncExternalStore` verlangt einen stabilen Snapshot.
+ */
+function momentaufnahme(): Momentaufnahme {
+  const { breiten, zeiger } = gebaut();
+  const istBeruehrung = zeiger.matches;
+  const vorher = letzte;
+  if (
+    vorher &&
+    vorher.istBeruehrung === istBeruehrung &&
+    breiten.every(([punkt, mql]) => vorher.screens[punkt] === mql.matches)
+  ) {
+    return vorher;
+  }
+  const screens: ScreensKarte = {};
+  for (const [punkt, mql] of breiten) screens[punkt] = mql.matches;
+  letzte = { screens, istBeruehrung };
+  return letzte;
+}
+
+/** Gemeinsame Ableitung je Momentaufnahme, damit auch `abBreite` eine stabile Referenz bleibt. */
+const zustaende = new WeakMap<Momentaufnahme, ViewportZustand>();
+
 export function useViewport(): ViewportZustand {
-  const screens = Grid.useBreakpoint();
-  const [istBeruehrung, setIstBeruehrung] = useState<boolean>(zeigerIstGrob);
-
-  useEffect(() => {
-    const abfrage = window.matchMedia(ZEIGER_GROB);
-    const aktualisiere = (e: MediaQueryListEvent) => setIstBeruehrung(e.matches);
-    abfrage.addEventListener('change', aktualisiere);
-    return () => abfrage.removeEventListener('change', aktualisiere);
-  }, []);
-
-  const abBreite = (punkt: AbBreitePunkt) => abBreiteAus(screens, punkt);
-
-  return { screens, abBreite, istSchmal: !abBreite('md'), istBeruehrung };
+  const aufnahme = useSyncExternalStore(abonniere, momentaufnahme);
+  let zustand = zustaende.get(aufnahme);
+  if (!zustand) {
+    const { screens, istBeruehrung } = aufnahme;
+    const abBreite = (punkt: AbBreitePunkt) => abBreiteAus(screens, punkt);
+    zustand = { screens, abBreite, istSchmal: !abBreite('md'), istBeruehrung };
+    zustaende.set(aufnahme, zustand);
+  }
+  return zustand;
 }
