@@ -34,6 +34,7 @@ export default function Datenraster({
     <dl
       aria-label={beschriftung}
       data-lfh="datenraster"
+      data-fugenraster=""
       style={{ ...datenrasterStil(rollen, spalten), ...style }}
     >
       {children}

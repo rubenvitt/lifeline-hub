@@ -193,7 +193,10 @@ export default function StabPage() {
             // Vor dem Laden wird kein Termin behauptet.
             <Skeleton title={false} paragraph={{ rows: 3 }} />
           )}
-          <LagebesprechungHistorie einsatzId={einsatzId} />
+          <LagebesprechungHistorie
+            einsatzId={einsatzId}
+            leerAusgesagt={stabQuery.data?.anzahl_lagebesprechungen === 0}
+          />
         </Flex>
       </Paneel>
 

@@ -269,13 +269,29 @@ describe('Kennzahl — Abstand zwischen Zielen (LFH-630, Bedien-Leitlinie Kriter
 });
 
 describe('Kennzahlenband', () => {
-  it('Fugenraster: gap 1 px auf linie', () => {
-    expect(kennzahlenbandStil(farbenHell, 5)).toMatchObject({
+  // LFH-961: der Grund ist `flaeche`, nicht `linie` — sonst schiene er in einer leeren Restspur
+  // als graue Kachel durch. Die Fuge zeichnet die Zelle (`fugenraster.test.ts`).
+  it('Fugenraster: gap 1 px, Grund flaeche, Rahmen linie', () => {
+    const stil = kennzahlenbandStil(farbenHell, 5);
+    expect(stil).toMatchObject({
       gap: 1,
-      background: farbenHell.linie,
+      background: farbenHell.flaeche,
+      border: `1px solid ${farbenHell.linie}`,
       gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
     });
+    expect(stil.background).not.toBe(farbenHell.linie);
     expect(String(kennzahlenbandStil(farbenHell).gridTemplateColumns)).toMatch(/auto-fit/);
+  });
+
+  it('meldet sich als Fugenraster, damit jede Zelle ihre Fuge zeichnet', () => {
+    renderMitProviders(
+      <Kennzahlenband beschriftung="Lage in Zahlen">
+        <Kennzahl titel="A" wert={1} />
+      </Kennzahlenband>,
+    );
+    expect(screen.getByRole('group', { name: 'Lage in Zahlen' })).toHaveAttribute(
+      'data-fugenraster',
+    );
   });
 
   it('ist mit Beschriftung eine benannte Gruppe', () => {
