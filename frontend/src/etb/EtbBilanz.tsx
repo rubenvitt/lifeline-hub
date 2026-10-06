@@ -36,6 +36,11 @@ interface Props {
   puffer: PufferZustand;
   /** Der Listenabruf läuft oder ist gescheitert — dann gibt es keine Berichtigungen. */
   unbestimmt: boolean;
+  /**
+   * Das Seitenfenster steht nicht am neuesten Eintrag (LFH-947): die geladenen Berichtigungen
+   * sind dann nicht die jüngsten, die Zeile sagt das.
+   */
+  ausschnitt?: boolean;
 }
 
 /** Die Mehrzahl der Bilanzzeile — „Meldungen", nicht „Meldung". */
@@ -66,6 +71,7 @@ export default function EtbBilanz({
   filterAktiv,
   puffer,
   unbestimmt,
+  ausschnitt = false,
 }: Props) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
@@ -131,6 +137,11 @@ export default function EtbBilanz({
       <PaneelZeile style={{ borderBlockStart: `1px solid ${rollen.linie}` }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
           <Augenbraue als="h3">Berichtigungen</Augenbraue>
+          {ausschnitt && !unbestimmt && (
+            <span data-lfh="bilanz-ausschnitt" style={{ fontSize: 11, color: rollen.gedaempft }}>
+              Im geladenen Ausschnitt, nicht die jüngsten.
+            </span>
+          )}
           {berichtigungen.length === 0 ? (
             <span style={{ fontSize: 11, color: rollen.gedaempft }}>
               {unbestimmt ? '—' : 'Keine in den geladenen Einträgen.'}

@@ -1,6 +1,12 @@
 import { Alert, App, Breadcrumb, Button, Modal, Popconfirm, Space, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben, schliesseEinsatzAb } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -397,11 +403,14 @@ export default function EtbPage() {
     if (etbQuery.isLoading) return;
     if (etbQuery.isFetchingNextPage || etbQuery.isFetchingPreviousPage) return;
     const richtung = sprungRichtung(etbQuery.data?.pages ?? [], zielEintragId);
-    if (richtung === 'aelter' && etbQuery.hasNextPage) {
+    // Scheiterte das letzte Blättern an einer Serverantwort, gibt der Sprung auf: sonst riefe der
+    // Effekt nach jedem Fehler sofort wieder ab (ohne Wiederholung, `api/queryClient.ts`).
+    const gescheitert = etbQuery.isFetchNextPageError || etbQuery.isFetchPreviousPageError;
+    if (!gescheitert && richtung === 'aelter' && etbQuery.hasNextPage) {
       etbQuery.fetchNextPage();
       return; // nach dem Laden re-läuft der Effekt (etbQuery.data ändert sich)
     }
-    if (richtung === 'neuer' && etbQuery.hasPreviousPage) {
+    if (!gescheitert && richtung === 'neuer' && etbQuery.hasPreviousPage) {
       etbQuery.fetchPreviousPage();
       return;
     }
@@ -418,6 +427,8 @@ export default function EtbPage() {
     etbQuery.hasPreviousPage,
     etbQuery.isFetchingNextPage,
     etbQuery.isFetchingPreviousPage,
+    etbQuery.isFetchNextPageError,
+    etbQuery.isFetchPreviousPageError,
     etbQuery.isLoading,
   ]);
 
@@ -464,6 +475,27 @@ export default function EtbPage() {
   );
 
   /**
+   * Steht das Fenster tief im Tagebuch, läge der eigene neue Eintrag außerhalb (LFH-947): das
+   * Neuladen nach dem Senden beginnt bei der ersten gehaltenen Seite. Die Seite holt deshalb den
+   * Kopf und ersetzt das Fenster durch ihn. Scheitert der Abruf, bleibt das Fenster, wie es ist —
+   * kein `resetQueries`, das ließe bei schlechtem Netz eine leere Zeitachse zurück.
+   */
+  async function zumKopf() {
+    const schluessel = einsatzKeys.etbListe(einsatzId, filter);
+    let kopf: EtbEintragAnzeige[];
+    try {
+      kopf = await listeEtb(einsatzId, filter);
+    } catch {
+      return;
+    }
+    await qc.cancelQueries({ queryKey: schluessel, exact: true });
+    qc.setQueryData<InfiniteData<EtbEintragAnzeige[], EtbSeitenParam>>(schluessel, {
+      pages: [kopf],
+      pageParams: [undefined],
+    });
+  }
+
+  /**
    * Eingabe unten, neueste oben — und was nach dem eigenen Eintrag passiert.
    *
    * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, die Zeitachse läuft neueste
@@ -477,6 +509,7 @@ export default function EtbPage() {
   async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
       await erfassen(e);
+      if (etbQuery.hasPreviousPage) await zumKopf();
       zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
     } catch (err) {
       message.error(fehlerText(err, 'Senden fehlgeschlagen'));
@@ -874,6 +907,7 @@ export default function EtbPage() {
               filterAktiv={filterAktiv}
               puffer={puffer}
               unbestimmt={!etbQuery.isSuccess}
+              ausschnitt={etbQuery.hasPreviousPage}
             />
           </aside>
         )}

@@ -54,7 +54,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
   Richtung (`{ aelter }` → `before_lfd_nr`, `{ neuer }` → `after_lfd_nr`), nie eine nackte Zahl.
   Fällt der Kopf heraus, steht „Neuere laden“ über der Zeitachse. Ein `?eintrag=` wählt die
   Richtung aus der Kennung (`sprungRichtung`); kein `resetQueries`, das räumte das Lagebild ohne
-  Netz. Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
+  Netz. Nach einem eigenen Eintrag aus tiefem Fenster ersetzt die Seite das Fenster durch die
+  neueste Seite (`zumKopf`). Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
   laufendes Nachladen ab (`offline/useEtbErfassung.ts`).
 - **Gemerktes Rendern** (LFH-947): `eintraege`, `chronologie`, Zufluss und Gruppen sind
   `useMemo`, die Zeile (`EtbZeitachsenZeile`) und `components/Markdown` sind `memo`, Handler

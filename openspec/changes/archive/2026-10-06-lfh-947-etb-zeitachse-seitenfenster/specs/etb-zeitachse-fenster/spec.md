@@ -64,6 +64,14 @@ der neueste Eintrag im Fenster, MUST der Knopf fehlen.
 - **WHEN** die Seite frisch geöffnet ist
 - **THEN** steht kein „Neuere laden“ da
 
+#### Scenario: Eigener Eintrag aus tiefem Fenster
+- **WHEN** jemand im tiefen Fenster einen Eintrag erfasst und der Server ihn annimmt
+- **THEN** ersetzt die Seite das Fenster durch die neueste Seite, der neue Eintrag steht oben; scheitert dieser Abruf, bleibt das Fenster
+
+#### Scenario: Blättern scheitert am Server
+- **WHEN** beim Sprung auf einen Eintrag eine Seite mit einem Serverfehler antwortet
+- **THEN** gibt der Sprung auf und räumt den Parameter, statt sofort erneut abzurufen
+
 ### Requirement: Sprung auf einen Eintrag im Seitenfenster
 Ein Sprung per `?eintrag=<id>` SHALL in die Richtung des Ziels nachladen (älter oder neuer), bis
 der Eintrag im Fenster liegt, ihn hervorheben und ins Bild rollen. Das Ziel MUST nach dem Nachladen

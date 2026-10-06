@@ -56,6 +56,8 @@ function eintrag(n: number): EtbEintragAnzeige {
 
 let gesamt = GESAMT;
 let abrufe: string[] = [];
+/** Ältere Seiten unter dieser Nummer antworten mit 500 (Sprung scheitert am Server). */
+let fehlerUnter: number | null = null;
 
 function tagebuch() {
   return http.get('/api/einsaetze/7/etb', ({ request }) => {
@@ -68,6 +70,9 @@ function tagebuch() {
     if (nach != null) {
       const ueber = alle.filter((n) => n > Number(nach));
       return HttpResponse.json(ueber.slice(Math.max(0, ueber.length - limit)).map(eintrag));
+    }
+    if (fehlerUnter != null && vor != null && Number(vor) < fehlerUnter) {
+      return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
     }
     const unter = vor != null ? alle.filter((n) => n < Number(vor)) : alle;
     return HttpResponse.json(unter.slice(0, limit).map(eintrag));
@@ -103,6 +108,10 @@ function setup(route: string) {
       }),
     ),
     tagebuch(),
+    http.post('/api/einsaetze/7/etb', () => {
+      gesamt += 1;
+      return HttpResponse.json(eintrag(gesamt), { status: 201 });
+    }),
     http.get('/api/einsaetze/7/etb/zaehler', () =>
       HttpResponse.json({
         gesamt,
@@ -159,6 +168,7 @@ beforeEach(async () => {
   localStorage.clear();
   gesamt = GESAMT;
   abrufe = [];
+  fehlerUnter = null;
 });
 
 describe('EtbPage — Seitenfenster (LFH-947)', () => {
@@ -230,4 +240,30 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     await warteAufHervorhebung(container, 1190);
     expect(abrufe.some((a) => a.includes('after_lfd_nr='))).toBe(true);
   }, 120000);
+
+  it('der eigene neue Eintrag erscheint auch aus einem tiefen Fenster', async () => {
+    const user = userEvent.setup();
+    const { container } = setup('/einsaetze/7/etb?eintrag=50');
+    await warteAufHervorhebung(container, 50);
+    // Die Bilanz sagt, dass ihre Berichtigungen nicht die jüngsten sind.
+    expect(document.querySelector('[data-lfh="bilanz-ausschnitt"]')).not.toBeNull();
+
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Pegel steigt{Enter}');
+    await waitFor(() => expect(zeile(container, GESAMT + 1)).not.toBeNull(), { timeout: 30000 });
+    expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull();
+    expect(document.querySelector('[data-lfh="bilanz-ausschnitt"]')).toBeNull();
+  }, 120000);
+
+  it('scheitert das Blättern am Server, gibt der Sprung auf, statt endlos abzurufen', async () => {
+    fehlerUnter = 900;
+    setup('/einsaetze/7/etb?eintrag=50');
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''), {
+      timeout: 30000,
+    });
+    const vorher = abrufe.length;
+    await new Promise((r) => setTimeout(r, 500));
+    expect(abrufe.length).toBe(vorher);
+    expect(abrufe.filter((a) => a.includes('before_lfd_nr=')).length).toBeLessThanOrEqual(5);
+  }, 60000);
 });

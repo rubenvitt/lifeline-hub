@@ -162,7 +162,23 @@ neu, und kam der Abgleich nach einem Klick auf „Neuere laden“, brach das Neu
 (beobachtet im e2e-Gate als Admin, nicht als Beobachter: nur mit Schreibrecht hängt die
 Erfassung). Invalidiert wird jetzt nur, wenn die Warteschlange etwas enthielt.
 
+### D9 Nach dem Review
+
+- **Eigener Eintrag aus tiefem Fenster:** Das Neuladen nach dem Senden beginnt bei der ersten
+  gehaltenen Seite, der neue Eintrag läge außerhalb. `EtbPage` holt deshalb nach einem
+  angenommenen Eintrag die neueste Seite und ersetzt das Fenster durch sie (`cancelQueries`, dann
+  `setQueryData`); scheitert der Abruf, bleibt das Fenster.
+- **Sprung bei Serverfehler:** Ohne Wiederholung (`api/queryClient.ts`) rief der Effekt nach
+  jedem Fehler sofort wieder ab; ein gescheitertes Blättern räumt jetzt den Parameter.
+- **Bilanz:** Ihre Berichtigungen stammen aus dem Fenster; steht es nicht am Kopf, sagt eine
+  Zeile „Im geladenen Ausschnitt, nicht die jüngsten.“
+
 ## Risks / Trade-offs
+
+- **Bildlauf beim Verdrängen einer Seite** → „Ältere laden“ verdrängt jetzt die oberste Seite,
+  „Neuere laden“ die unterste. Chromium und Firefox halten den Sichtbereich per Scroll-Verankerung;
+  WebKit (Safari, iPad) kennt sie nicht, dort springt die Ansicht um die verdrängte Höhe. Die
+  e2e-Gates messen nur Chromium.
 
 - **Live-Ereignis während „Neuere laden“/„Ältere laden“** → `invalidateQueries` bricht einen
   laufenden Abruf am Rand ab (`cancelRefetch`), das Fenster lädt sich neu, der Klick ist verloren
