@@ -1,9 +1,13 @@
-import { Button, Space, type TableColumnsType } from 'antd';
+import { Button, Space } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import KatalogTabelle from '../components/KatalogTabelle';
+import KatalogTabelle, {
+  KENNUNG_SCHMAL_BREITE,
+  type KatalogSpalte,
+} from '../components/KatalogTabelle';
+import { useViewport } from '../components/useViewport';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -18,6 +22,7 @@ import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } fro
 export default function MaterialTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
+  const { istSchmal } = useViewport();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Material | null>(null);
 
@@ -32,11 +37,15 @@ export default function MaterialTab() {
 
   const dienststatusMutation = useDienststatusMutation(setzeDienststatus, globalKeys.material());
 
-  const spalten: TableColumnsType<Material> = [
+  // Gleiche Bauform wie Fahrzeuge und Personal (LFH-980): Träger fällt unter `lg` weg, der
+  // Spaltenschalter zählt ihn.
+  const spalten: KatalogSpalte<Material>[] = [
     {
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
+      // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
+      width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       /**
        * Leitspalte: an der Bezeichnung wird ein Materialposten gesucht, nicht an der DB-Kennung —
        * dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert. `numeric: true`,
@@ -48,8 +57,8 @@ export default function MaterialTab() {
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
       // LFH-733: die Marke steht neben der Bezeichnung; `dataIndex` hält den Suchkorpus beim Rohwert.
       render: (_, m) => (
-        <Space size={4}>
-          {m.bezeichnung}
+        <Space size={4} wrap>
+          <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
           {m.ist_demo && <DemoMarke />}
         </Space>
       ),
@@ -61,10 +70,18 @@ export default function MaterialTab() {
       key: 'bestandsnummer',
       render: (t) => (t ? <span style={monoStil(13)}>{t}</span> : '—'),
     },
-    { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
+    {
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      abBreite: 'lg',
+      render: (t) => t ?? '—',
+    },
     ...dienststatusSpalten<Material>({
       mutation: dienststatusMutation,
       istAdmin,
+      schmal: istSchmal,
+      kennung: (m) => `Material ${m.bezeichnung}`,
       onBearbeiten: (m) => {
         setBearbeite(m);
         setModalOffen(true);
@@ -117,9 +134,10 @@ export default function MaterialTab() {
           columns={spalten}
           locale={{ emptyText: 'Noch kein Material' }}
           // Durchsucht werden die vier Spalten mit Datenbezug (Bezeichnung, Kategorie, Bestandsnummer,
-          // Träger); die Statusspalte ist render-only. Der Platzhalter nennt zwei — die volle
-          // Aufzählung würde im schmalen Feld abgeschnitten.
-          suche={{ platzhalter: 'Bezeichnung oder Kategorie' }}
+          // Träger); die Statusspalte ist render-only. Der Platzhalter nennt alle vier: das Feld wächst
+          // mit ihm (`suchfeldStil`, LFH-980).
+          suche={{ platzhalter: 'Bezeichnung, Kategorie, Bestandsnr. oder Träger' }}
+          spaltenSchalter={{ bezeichnung: 'Material' }}
         />
       )}
       <MaterialFormModal

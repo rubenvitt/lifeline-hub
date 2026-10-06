@@ -132,7 +132,7 @@ describe('MaterialTab', () => {
      * kein Suchfeld, und der Griff fällt schon am `null`.
      *
      * Gesucht wird über die Kategorie: das belegt, dass die Suche mehr als die Leitspalte liest,
-     * und damit den Platzhalter „Bezeichnung oder Kategorie".
+     * und damit den Platzhalter „Bezeichnung, Kategorie, Bestandsnr. oder Träger".
      */
     const { container } = render(admin, [
       material,
@@ -143,7 +143,7 @@ describe('MaterialTab', () => {
     expect(zeilen()).toHaveLength(2);
 
     const feld = container.querySelector<HTMLInputElement>('input[type="search"]')!;
-    expect(feld.placeholder).toBe('Bezeichnung oder Kategorie');
+    expect(feld.placeholder).toBe('Bezeichnung, Kategorie, Bestandsnr. oder Träger');
 
     await userEvent.type(feld, 'Technik');
     expect(zeilen()).toHaveLength(1);

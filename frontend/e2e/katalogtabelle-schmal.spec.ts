@@ -68,6 +68,22 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
   const zeile = page.locator('tr.ant-table-row').first();
   await expect(zeile).toBeVisible();
 
+  // Unter `md` blendet die Benutzerliste Benutzername und Rollen aus (LFH-980), dann passt sie in
+  // 390 px. Für den Bildlaufnachweis holt der Spec beide über den Spaltenschalter zurück — der
+  // Weg, den auch ein Nutzer nimmt.
+  const schalter = page.getByRole('button', { name: 'Spalten · 2 ausgeblendet — Benutzer' });
+  await expect(schalter).toBeVisible();
+  for (const spalte of ['Benutzername', 'Rollen']) {
+    await page.getByRole('button', { name: /— Benutzer$/ }).click();
+    await page
+      .locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')
+      .getByRole('menuitem', { name: spalte })
+      .click();
+    await page.keyboard.press('Escape');
+  }
+  await expect(schalter).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Spalten — Benutzer' })).toBeVisible();
+
   const koerper = page.locator('.ant-table-body');
   const rahmen = page.locator('.ant-table').first();
 

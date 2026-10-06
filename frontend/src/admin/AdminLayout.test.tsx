@@ -5,7 +5,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
-import AdminLayout from './AdminLayout';
+import AdminLayout, { holeInsBild, seitenleistenStil } from './AdminLayout';
 import { adminBenutzerPfad, defaultAdminPfad, ersteSektionPfad } from './adminNav';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige } from '../api/types';
@@ -189,5 +189,55 @@ describe('AdminLayout — unter lg (Handschirm)', () => {
     expect(document.querySelector('.ant-layout-sider')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /^Verwaltung/ })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Fahrzeuge' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Seitenleiste ab lg (LFH-980): das Menü klebt, scrollt in sich und trägt zur Seitenhöhe nicht mehr
+ * bei als die Verwaltung. Die Geometrie misst `e2e/verwaltungstabellen-schmal.spec.ts`.
+ */
+describe('AdminLayout — klebende Seitenleiste', () => {
+  it('Stil: klebt oben, höchstens die Resthöhe, eigener Bildlauf; Verwaltung mindestens so hoch', () => {
+    const { verwaltung, menue } = seitenleistenStil(76);
+    const rest = 'calc(100dvh - 76px - var(--lfh-seiten-polsterung))';
+    expect(menue).toEqual({ position: 'sticky', top: 0, maxHeight: rest, overflowY: 'auto' });
+    expect(verwaltung).toEqual({ minHeight: rest });
+  });
+
+  it('ab lg trägt das Menü der Seitenleiste den Stil', async () => {
+    setzeViewportBreite(1024);
+    setup(fuehrungskraft, '/admin/stammdaten/fahrzeuge');
+    await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge');
+    const menue = screen.getByRole('navigation', { name: 'Verwaltung' });
+    expect(menue).toHaveStyle({ position: 'sticky', overflowY: 'auto' });
+    expect(menue.closest('.ant-layout-sider')).not.toBeNull();
+  });
+
+  /** Rahmen per Attrappe: jsdom rechnet kein Layout. */
+  function attrappe(oben: number, unten: number): HTMLElement {
+    const el = document.createElement('div');
+    el.getBoundingClientRect = () => ({ top: oben, bottom: unten }) as DOMRect;
+    return el;
+  }
+
+  it('holeInsBild: ein Eintrag unter dem Rand wird bis an den Rand gerollt, nicht weiter', () => {
+    const rahmen = attrappe(100, 500);
+    rahmen.scrollTop = 0;
+    holeInsBild(rahmen, attrappe(600, 664));
+    expect(rahmen.scrollTop).toBe(164);
+  });
+
+  it('holeInsBild: ein Eintrag über dem Rand wird nach oben geholt', () => {
+    const rahmen = attrappe(100, 500);
+    rahmen.scrollTop = 300;
+    holeInsBild(rahmen, attrappe(40, 104));
+    expect(rahmen.scrollTop).toBe(240);
+  });
+
+  it('holeInsBild: ein sichtbarer Eintrag bleibt, wo er ist', () => {
+    const rahmen = attrappe(100, 500);
+    rahmen.scrollTop = 50;
+    holeInsBild(rahmen, attrappe(200, 264));
+    expect(rahmen.scrollTop).toBe(50);
   });
 });

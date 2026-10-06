@@ -1,5 +1,5 @@
 import { IconChevronHoch, IconChevronRunter } from '../icons';
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button, ConfigProvider, Layout, Menu, Spin, theme } from 'antd';
 import { Augenbraue, useRollen } from '../components/instrument';
 import type { MenuProps } from 'antd';
@@ -43,6 +43,39 @@ function markierterKey(keys: string[], aktiv: string): string | undefined {
     );
 }
 
+/**
+ * Hält den markierten Eintrag im eigenen Bildlauf der Seitenleiste sichtbar (LFH-980), wie
+ * `scrollIntoView({ block: 'nearest' })`, aber NUR im Container: `scrollIntoView` rollte auch das
+ * Fenster, und die Seite spränge beim Routenwechsel.
+ */
+export function holeInsBild(container: HTMLElement, eintrag: HTMLElement): void {
+  const rahmen = container.getBoundingClientRect();
+  const ziel = eintrag.getBoundingClientRect();
+  if (ziel.top < rahmen.top) container.scrollTop -= rahmen.top - ziel.top;
+  else if (ziel.bottom > rahmen.bottom) container.scrollTop += ziel.bottom - rahmen.bottom;
+}
+
+/**
+ * Die Seitenleiste ab `lg` (LFH-980), rein und exportiert. Bei 21 Einträgen in Touch-Dichte ist das
+ * Menü rund 1400 px hoch; im Fluss bestimmte es die Seitenhöhe, und die unteren Einträge lagen
+ * unter dem Bildschirmrand. Deshalb:
+ * · `rest` ist die Höhe vom oberen Rand der Verwaltung bis zum unteren Seitenpolster
+ *   (`oben` gemessen, das Polster aus `--lfh-seiten-polsterung`);
+ * · die Verwaltung ist mindestens so hoch, kurze Seiten scrollen also nicht;
+ * · das Menü klebt oben, ist höchstens `rest` hoch und scrollt in sich, es trägt zur Seitenhöhe
+ *   nie mehr bei als die Verwaltung selbst.
+ */
+export function seitenleistenStil(oben: number): {
+  verwaltung: CSSProperties;
+  menue: CSSProperties;
+} {
+  const rest = `calc(100dvh - ${Math.max(0, Math.round(oben))}px - var(--lfh-seiten-polsterung))`;
+  return {
+    verwaltung: { minHeight: rest },
+    menue: { position: 'sticky', top: 0, maxHeight: rest, overflowY: 'auto' },
+  };
+}
+
 export default function AdminLayout() {
   const { benutzer, laedt } = useAuth();
   const navigate = useNavigate();
@@ -54,8 +87,32 @@ export default function AdminLayout() {
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const [navOffen, setNavOffen] = useState(false);
+  const verwaltungRef = useRef<HTMLElement>(null);
+  const menueRef = useRef<HTMLElement>(null);
+  const [oben, setOben] = useState(0);
   // Demo-Daten: fragt nur für den System-Admin ab, 404 heißt aus.
   const { freigeschaltet: demoFreigeschaltet } = useDemoDatenStatus();
+
+  // Der obere Rand der Verwaltung im Dokument (Kopfleiste, Seitenpolster). Gemessen statt aus
+  // Konstanten gerechnet: die Kopfleiste wächst mit der Dichte-Staffel.
+  useLayoutEffect(() => {
+    if (!breit) return;
+    const messe = () => {
+      const el = verwaltungRef.current;
+      if (el) setOben(el.getBoundingClientRect().top + window.scrollY);
+    };
+    messe();
+    window.addEventListener('resize', messe);
+    return () => window.removeEventListener('resize', messe);
+  }, [breit, laedt]);
+
+  // Nach jedem Routenwechsel den markierten Eintrag in den Bildlauf des Menüs holen.
+  useEffect(() => {
+    if (!breit) return;
+    const menue = menueRef.current;
+    const eintrag = menue?.querySelector<HTMLElement>('.ant-menu-item-selected');
+    if (menue && eintrag) holeInsBild(menue, eintrag);
+  }, [breit, pathname, laedt, demoFreigeschaltet]);
 
   if (laedt) {
     return (
@@ -175,16 +232,20 @@ export default function AdminLayout() {
     );
   }
 
+  const stil = seitenleistenStil(oben);
   return (
-    <Layout style={{ background: 'transparent' }}>
+    <Layout ref={verwaltungRef} style={{ background: 'transparent', ...stil.verwaltung }}>
       {/* Die Verwaltungs-Seitenleiste im Stil des Modulpanels: Grund `paneel`, Haarlinie, Radius 0,
-         aktive Zeile auf `flaeche3`. Ab `lg` immer sichtbar; die schmale Bauform steht oben. */}
+         aktive Zeile auf `flaeche3`. Ab `lg` immer sichtbar; die schmale Bauform steht oben. Grund
+         und Haarlinie reichen über die ganze Höhe, das Menü darin klebt (`seitenleistenStil`). */}
       <Sider
         theme="light"
         width={220}
         style={{ background: rollen.paneel, borderInlineEnd: `1px solid ${rollen.linie}` }}
       >
-        {menue}
+        <nav ref={menueRef} aria-label="Verwaltung" data-lfh="verwaltung-menue" style={stil.menue}>
+          {menue}
+        </nav>
       </Sider>
       <Content style={{ paddingInlineStart: token.paddingLG }}>
         <Outlet />
