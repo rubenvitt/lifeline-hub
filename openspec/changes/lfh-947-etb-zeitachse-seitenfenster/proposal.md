@@ -30,6 +30,8 @@ Schnellerfassung.
   geschätzten Höhe; keine neue Abhängigkeit.
 - **Ein Satz Medienabfrage-Hörer:** Die Viewport-Abfrage registriert ihre Breiten- und
   Zeigerabfragen einmal für die ganze Seite statt je Komponente. Ihre Antwort bleibt dieselbe.
+- **Kein Neuladen beim Öffnen:** Der Abgleich der Offline-Warteschlange lädt die Liste nur noch
+  neu, wenn er etwas gesendet hat.
 - Kopfzahl und Bilanz zählt weiter der Server; eine Zahl des geladenen Fensters erscheint
   nirgends.
 
@@ -52,7 +54,7 @@ Keine. `etb-zaehler` (Kopfzahl und Bilanz über denselben Filter) gilt unveränd
 - Backend: `src/routes/etb.rs` (`EtbAbfrageParams.after_lfd_nr`, Validierung), `src/etb/repo.rs`
   (`EtbFilter`, `abfrage`), Tests in `src/etb/repo.rs` und `tests/`. Keine Migration, kein neues
   Response-DTO.
-- Frontend: `api/etb.ts`, `pages/EtbPage.tsx`, `etb/EtbZeitachse.tsx` (Zeile als eigene
+- Frontend: `api/etb.ts`, `pages/EtbPage.tsx`, `offline/useEtbErfassung.ts`, `etb/EtbZeitachse.tsx` (Zeile als eigene
   Komponente), `components/Markdown.tsx`, `components/useViewport.ts`, `index.css` oder
   Zeitachsen-Stil, Tests dazu; e2e-Gate für den Sprung auf einen alten Eintrag.
 - Regeln: `frontend/src/etb/AGENTS.md` (Seitenfenster), `frontend/AGENTS.md` bzw. Dateikopf von

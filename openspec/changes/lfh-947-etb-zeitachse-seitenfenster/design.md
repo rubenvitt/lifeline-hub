@@ -101,8 +101,8 @@ Kopf, die „Neuere laden“ ohnehin schließt. Kann später kommen, ohne dieses
 ### D5 Gemerktes Rendern
 
 - `EtbPage`: `eintraege` per `useMemo` über `etbQuery.data`, `chronologie` über
-  `[eintraege, ausstehend, abgelehnt]`. Handler an die Zeitachse per `useCallback` mit stabilen
-  Setzern.
+  `[eintraege, ausstehend, abgelehnt]`. Die Handler der Seite dürfen ihre Identität wechseln;
+  die Zeitachse fängt das über eine Ref ab (nächster Punkt).
 - `EtbZeitachse`: `teileZufluss` und `gruppiereNachStunde` per `useMemo`; die Zeile wird eine
   eigene Komponente `EtbZeitachsenZeile` mit `memo`. Sie bekommt nur, was sich je Zeile ändert:
   die Zeile, „hervorgehoben“, ihre Dokumente, ihren Berichtigungsindex-Ausschnitt als Werte und
@@ -110,7 +110,15 @@ Kopf, die „Neuere laden“ ohnehin schließt. Kann später kommen, ohne dieses
   damit neue Handler-Identitäten keine Zeile neu rendern.
 - `Markdown`: `memo`; `remarkPlugins` als Modulkonstante (`[remarkGfm]`).
 
-Nachweis: Vitest mit `vi.mock` auf `Markdown` (Zähler je Render) und einem Zähler in der Zeile.
+- **Gruppenschlüssel:** Stunde plus Vorkommen dieser Stunde (`10:00#0`), nicht die erste Zeile.
+  Mit der ersten Zeile im Schlüssel hängte ein neuer Eintrag oben die ganze Gruppe neu ein, und
+  jeder Text darin würde neu geparst.
+- **Stabile Leerlisten:** `useEtbErfassung` gibt für „keine ausstehenden/abgelehnten“ dieselbe
+  Modulkonstante zurück, sonst liefe das Memo der Chronologie bei jedem Render leer.
+
+Nachweis: Vitest mit `vi.mock` auf `react-markdown` (Zähler je Parse, `Markdown` selbst bleibt
+echt): ein Rerender über neu gebauten Zeilen derselben Einträge parst nichts, ein neuer Eintrag
+nur seinen Text.
 
 ### D6 Fensterung per `content-visibility`
 
@@ -135,6 +143,8 @@ Layout des Ziels. Marke `data-lfh="datensicht-karte"`, Zeilenklasse, `h2`-Stunde
 - **Snapshot:** `getSnapshot` liest `matches` der gehaltenen Listen (kein neuer Hörer) und gibt
   dasselbe Objekt zurück, solange sich kein Wert ändert. `abBreite` hängt am Snapshot und ist
   dadurch ebenso stabil. Die Signatur `ViewportZustand` bleibt.
+- **Lebenszeit:** Die `MediaQueryList`s entstehen beim ersten Fragen und werden verworfen, wenn
+  der letzte Abonnent geht; die nächste Seite fragt frisch.
 - **Erst-Render:** Der Store kennt die Breite schon beim ersten Render. „Unbekannt ⇒ breit“
   (`abBreiteAus`) bleibt für die leere Karte gültig, tritt aber nur noch ohne `matchMedia` auf.
 - Der Viewport-Guard bleibt: Medienabfragen stehen weiter nur im Primitiv; `useBreakpoint` fällt
@@ -144,7 +154,20 @@ Verworfen: eine einmal eingehängte Quelle, die `Grid.useBreakpoint()` ruft und 
 schreibt: jede Komponente außerhalb des Baums (Tests, Portale vor dem Einhängen) bekäme die leere
 Karte, und die Quelle wäre eine zweite Pflichtstelle.
 
+### D8 Kein Neuladen nach leerem Warteschlangen-Abgleich
+
+`useEtbErfassung` gleicht beim Einhängen die Offline-Warteschlange ab und invalidierte danach
+immer `['etb', id]`, auch bei leerer Warteschlange. Das lud bei jedem Öffnen das ganze Fenster
+neu, und kam der Abgleich nach einem Klick auf „Neuere laden“, brach das Neuladen den Abruf ab
+(beobachtet im e2e-Gate als Admin, nicht als Beobachter: nur mit Schreibrecht hängt die
+Erfassung). Invalidiert wird jetzt nur, wenn die Warteschlange etwas enthielt.
+
 ## Risks / Trade-offs
+
+- **Live-Ereignis während „Neuere laden“/„Ältere laden“** → `invalidateQueries` bricht einen
+  laufenden Abruf am Rand ab (`cancelRefetch`), das Fenster lädt sich neu, der Klick ist verloren
+  und muss wiederholt werden. Selten (Klick und Ereignis im selben Augenblick) und ohne Datenverlust;
+  das Abbruchverhalten der Live-Invalidierung ist Sache der Schwester-Aufgabe zum Live-Stream.
 
 - **Fenster nicht am Kopf, neue Einträge unsichtbar** → „Neuere laden“ steht sichtbar über der
   Zeitachse; Kopfzahl und Lesemarke zählen weiter vom Server. Am Kopf ändert sich nichts.

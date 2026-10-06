@@ -182,9 +182,7 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     const { container } = setup('/einsaetze/7/etb?eintrag=50');
     await warteAufHervorhebung(container, 50);
     await waitFor(() =>
-      expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent(
-        '1200 Einträge',
-      ),
+      expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent('1200 Einträge'),
     );
   }, 120000);
 

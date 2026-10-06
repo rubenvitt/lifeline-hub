@@ -28,6 +28,15 @@ body {
   transition: background-color 0.4s ease;
 }
 
+/* Fensterung der ETB-Zeitachse (LFH-947, design.md D6): Stundengruppen außerhalb des Bilds
+   überspringt der Browser bei Layout und Malen. `auto` vor der Höhe merkt sich die zuletzt
+   gemessene Höhe, die Bildlaufleiste springt auf dem Rückweg nicht. `scrollIntoView`
+   (`scrolleZurZeile`) legt das Ziel vorher aus; Marke, Zeilenklasse und `h2` bleiben. */
+.etb-stundengruppe {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
 /* ETB-Erfassung als angepinnte Leiste am Fuß der Zeitachse (Begründung in `pages/EtbPage.tsx`).
    Negative Seitenränder ziehen sie randlos über die Seitenrinne, der Innenrand nimmt dieselbe
    Rinne wieder auf, damit der Text mit dem Seiteninhalt fluchtet; beide lesen dieselbe

@@ -195,8 +195,7 @@ export default function EtbZeitachse({
     [zeilen, gefroren, eigeneBenutzerId],
   );
   const gruppen = useMemo(
-    () =>
-      gruppiereNachStunde(sichtbar, (utc) => inZone(utc, konventionen).format('YYYY-MM-DD HH')),
+    () => gruppiereNachStunde(sichtbar, (utc) => inZone(utc, konventionen).format('YYYY-MM-DD HH')),
     [sichtbar, konventionen],
   );
 
@@ -270,31 +269,40 @@ export default function EtbZeitachse({
   if (sichtbar.length === 0) {
     inhalt = ladend ? <SeitenSkeleton /> : fehler ? null : leerText;
   } else {
-    inhalt = gruppen.map((g, i) => (
-      <div
-        key={`${g.schluessel}-${g.zeilen[0].schluessel}`}
-        role="group"
-        // Benannt ÜBER den Kopf, nicht per eigenem `aria-label`: sonst sagte der Vorleser die
-        // Stunde doppelt an — einmal als Gruppe, einmal als Überschrift (LFH-621).
-        aria-labelledby={`${kopfIdBasis}-kopf-${i}`}
-      >
+    // Schlüssel: Stunde plus wievielte Gruppe dieser Stunde (dieselbe Stunde kann bei Nachträgen
+    // zweimal vorkommen). NICHT die erste Zeile: ein neuer Eintrag oben hängte sonst die ganze
+    // Gruppe neu ein und parste jeden Text darin neu (LFH-947).
+    const vorkommen = new Map<string, number>();
+    inhalt = gruppen.map((g, i) => {
+      const n = vorkommen.get(g.schluessel) ?? 0;
+      vorkommen.set(g.schluessel, n + 1);
+      return (
         <div
-          style={{
-            paddingBlock: token.paddingXS,
-            paddingInline: token.padding,
-            borderBlockEnd: `1px solid ${rollen.linie}`,
-            background: rollen.grund,
-          }}
+          key={`${g.schluessel}#${n}`}
+          className="etb-stundengruppe"
+          role="group"
+          // Benannt ÜBER den Kopf, nicht per eigenem `aria-label`: sonst sagte der Vorleser die
+          // Stunde doppelt an — einmal als Gruppe, einmal als Überschrift (LFH-621).
+          aria-labelledby={`${kopfIdBasis}-kopf-${i}`}
         >
-          {/* Der Stundenkopf ist eine echte Überschrift (h2): er gliedert die Zeitachse, und
+          <div
+            style={{
+              paddingBlock: token.paddingXS,
+              paddingInline: token.padding,
+              borderBlockEnd: `1px solid ${rollen.linie}`,
+              background: rollen.grund,
+            }}
+          >
+            {/* Der Stundenkopf ist eine echte Überschrift (h2): er gliedert die Zeitachse, und
               die Überschriften IN den Einträgen hängen darunter (LFH-621). */}
-          <Augenbraue als="h2" id={`${kopfIdBasis}-kopf-${i}`}>
-            {g.etikett}
-          </Augenbraue>
+            <Augenbraue als="h2" id={`${kopfIdBasis}-kopf-${i}`}>
+              {g.etikett}
+            </Augenbraue>
+          </div>
+          <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
         </div>
-        <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
-      </div>
-    ));
+      );
+    });
   }
 
   return (

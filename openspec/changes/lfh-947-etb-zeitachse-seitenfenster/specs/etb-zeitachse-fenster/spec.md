@@ -47,6 +47,10 @@ Fenster liegen.
 - **WHEN** 5 Seiten geladen sind und „Ältere laden“ eine sechste holt
 - **THEN** fällt die neueste Seite aus dem Fenster, und die Zeitachse zeigt 500 Einträge
 
+#### Scenario: Leere Offline-Warteschlange beim Öffnen
+- **WHEN** die Seite öffnet und die Offline-Warteschlange des Einsatzes leer ist
+- **THEN** lädt der Abgleich der Warteschlange das Fenster nicht neu; erst ein gesendeter, abgelehnter oder zurückgestellter Eintrag tut es
+
 ### Requirement: Neuere laden bis zum neuesten Eintrag
 Liegt der neueste Eintrag nicht im Fenster, SHALL die Zeitachse über den Zeilen den Knopf „Neuere
 laden“ zeigen. Er lädt die Seite direkt über dem jüngsten Eintrag des Fensters, ohne Lücke. Liegt
