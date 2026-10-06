@@ -170,6 +170,17 @@ function offenesMenue(): HTMLElement {
   )!;
 }
 
+/**
+ * Ist die Rückfrage zu? jsdom kennt kein `transitionend`: antd beginnt das Ausblenden
+ * (`ant-zoom-leave`), beendet es aber nie, und der Dialog bliebe im Baum. Zählt also, ob jede
+ * Rückfrage fort ist oder ausblendet; eine offene steht in `ant-zoom-appear` oder ohne Klasse.
+ */
+function rueckfrageZu(): boolean {
+  return [...document.querySelectorAll('.ant-modal')].every((m) =>
+    m.classList.contains('ant-zoom-leave'),
+  );
+}
+
 describe.each(FAELLE)('Verwaltungstabelle $name (LFH-980)', (fall) => {
   it('trägt den Spaltenschalter; Status und Aktionen stehen rechts fixiert und sind nicht abwählbar', async () => {
     setzeViewportBreite(1024);
@@ -238,5 +249,30 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     expect(gesendet).toEqual([]);
     await userEvent.click(knopf);
     await waitFor(() => expect(gesendet).toEqual(['2']));
+    // Nach der Antwort schließt die Rückfrage, sonst stünde sie über der aktualisierten Liste.
+    await waitFor(() => expect(rueckfrageZu()).toBe(true));
   });
+
+  it.each([
+    ['Benutzer', 0, '/api/benutzer/:id/deaktivieren', 'Benutzer deaktivieren'],
+    ['Sprechgruppen', 3, '/api/sprechgruppen/:id/deaktivieren', 'Sprechgruppe deaktivieren'],
+  ] as const)(
+    '%s: scheitert die Deaktivierung, schließt die Rückfrage trotzdem',
+    async (_name, index, pfad, knopfName) => {
+      setzeViewportBreite(1024);
+      let versucht = 0;
+      server.use(
+        http.post(pfad, () => {
+          versucht += 1;
+          return HttpResponse.json({ fehler: 'Abgelehnt' }, { status: 409 });
+        }),
+      );
+      FAELLE[index].render();
+      await screen.findByText(FAELLE[index].zeile);
+      await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
+      await userEvent.click(await screen.findByRole('button', { name: knopfName }));
+      await waitFor(() => expect(versucht).toBe(1));
+      await waitFor(() => expect(rueckfrageZu()).toBe(true));
+    },
+  );
 });

@@ -94,25 +94,43 @@ export default function AdminLayout() {
   const { freigeschaltet: demoFreigeschaltet } = useDemoDatenStatus();
 
   // Der obere Rand der Verwaltung im Dokument (Kopfleiste, Seitenpolster). Gemessen statt aus
-  // Konstanten gerechnet: die Kopfleiste wächst mit der Dichte-Staffel.
+  // Konstanten gerechnet: die Kopfleiste wächst mit der Dichte-Staffel, ohne dass sich die
+  // Fensterbreite ändert. Deshalb beobachtet ein ResizeObserver die Vorfahren mit, gebündelt in
+  // einem Frame wie in `components/FensterRahmen.tsx`.
   useLayoutEffect(() => {
-    if (!breit) return;
-    const messe = () => {
-      const el = verwaltungRef.current;
-      if (el) setOben(el.getBoundingClientRect().top + window.scrollY);
-    };
+    const el = verwaltungRef.current;
+    if (!breit || !el) return;
+    const messe = () => setOben(el.getBoundingClientRect().top + window.scrollY);
     messe();
-    window.addEventListener('resize', messe);
-    return () => window.removeEventListener('resize', messe);
+    let frame: number | undefined;
+    const messungPlanen = () => {
+      if (frame != null) return;
+      frame = requestAnimationFrame(() => {
+        frame = undefined;
+        messe();
+      });
+    };
+    const observer = new ResizeObserver(messungPlanen);
+    for (let knoten = el.parentElement; knoten; knoten = knoten.parentElement) {
+      observer.observe(knoten);
+    }
+    window.addEventListener('resize', messungPlanen);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', messungPlanen);
+      if (frame != null) cancelAnimationFrame(frame);
+    };
   }, [breit, laedt]);
 
-  // Nach jedem Routenwechsel den markierten Eintrag in den Bildlauf des Menüs holen.
+  // Nach jedem Routenwechsel den markierten Eintrag in den Bildlauf des Menüs holen. `oben` steht
+  // in den Abhängigkeiten: vor der ersten Messung ist das Menü zu hoch, und ein Eintrag, der dann
+  // „im Bild“ war, läge nach der Messung unter dem Rand.
   useEffect(() => {
     if (!breit) return;
     const menue = menueRef.current;
     const eintrag = menue?.querySelector<HTMLElement>('.ant-menu-item-selected');
     if (menue && eintrag) holeInsBild(menue, eintrag);
-  }, [breit, pathname, laedt, demoFreigeschaltet]);
+  }, [breit, pathname, laedt, demoFreigeschaltet, oben]);
 
   if (laedt) {
     return (

@@ -230,6 +230,25 @@ test.describe('Verwaltungstabellen ohne Schreibrecht', () => {
     await vollImBild(zeile.getByText('in Dienst', { exact: true }), 390, 'Status „in Dienst“');
     await expect(page.getByRole('button', { name: /— Fahrzeuge$/ })).toBeVisible();
   });
+
+  /** Sprechgruppen ändert nur der System-Admin; ohne ihn fehlt die Aktionsspalte, „Aktiv“ bleibt. */
+  test('Sprechgruppen (Führungskraft): Aktiv ohne Wischen, keine Aktionen', async ({ page }) => {
+    await anmeldenAlsAdmin(page);
+    const marke = `${LAUF}-fk`;
+    const kennung = await TABELLEN[3].saeen(page, marke);
+    await wechsleZuRolle(page, 'fuehrungskraft');
+    await page.goto('/admin/stammdaten/sprechgruppen');
+    await page.locator('[data-lfh="katalog-werkzeuge"] input').fill(marke);
+    const zeile = page.locator('tr.ant-table-row').filter({ hasText: kennung });
+    await expect(zeile).toHaveCount(1);
+    await expect(
+      page.locator('.ant-table-thead th').filter({ hasText: /^Aktionen$/ }),
+      'Vorbedingung: ohne Recht keine Aktionsspalte',
+    ).toHaveCount(0);
+    await expect(zeile.getByRole('button', { name: /Aktionen zu/ })).toHaveCount(0);
+    await vollImBild(zeile.getByText('Aktiv', { exact: true }), 390, 'Status „Aktiv“');
+    await expect(page.getByRole('button', { name: /— Sprechgruppen$/ })).toBeVisible();
+  });
 });
 
 test.describe('Abschneide-Indikator', () => {
@@ -374,6 +393,43 @@ test.describe('Seitenleiste der Verwaltung', () => {
       expect(hoehe, `Seitenhöhe ${hoehe} folgt dem Menü`).toBeLessThanOrEqual(ansicht.hoehe);
     });
   }
+
+  /**
+   * Ohne Demo-Daten ist „Aufbewahrung“ der unterste Eintrag. Die Seite rollt hier nicht mit: der
+   * Eintrag muss allein durch den Bildlauf des Menüs ins Bild kommen, und zwar mit der GEMESSENEN
+   * Höhe des Menüs, nicht mit der Höhe vor der ersten Messung.
+   */
+  test('Tablet quer 1180: ohne Demo-Daten steht „Aufbewahrung“ markiert im Bild', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await page.route(
+      (url) => url.pathname === '/api/demo-daten',
+      (route) =>
+        route.request().method() === 'GET' ? route.fulfill({ status: 404 }) : route.fallback(),
+    );
+    await anmeldenAlsAdmin(page);
+    await page.goto('/admin/aufbewahrung');
+    const menue = page.locator('[data-lfh="verwaltung-menue"]');
+    const eintrag = menue.getByRole('menuitem', { name: 'Aufbewahrung' });
+    await expect(eintrag).toHaveClass(/ant-menu-item-selected/);
+    await expect(
+      menue.getByRole('menuitem', { name: 'Demo-Daten' }),
+      'Vorbedingung: ohne Demo-Daten ist „Aufbewahrung“ der unterste Eintrag',
+    ).toHaveCount(0);
+    expect(
+      await menue.evaluate((el) => el.scrollHeight),
+      'Vorbedingung: das Menü überragt den Schirm',
+    ).toBeGreaterThan(820);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    const box = (await eintrag.boundingBox())!;
+    const rahmen = (await menue.boundingBox())!;
+    expect(box.y, 'Eintrag oben angeschnitten').toBeGreaterThanOrEqual(rahmen.y);
+    expect(box.y + box.height, 'Eintrag unter dem Rand des Menüs').toBeLessThanOrEqual(
+      rahmen.y + rahmen.height + 0.5,
+    );
+    expect(rahmen.y + rahmen.height, 'Menü reicht unter den Schirmrand').toBeLessThanOrEqual(820);
+  });
 
   test('Desktop 1440: auf einer langen Seite klebt das Menü beim Bildlauf', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
