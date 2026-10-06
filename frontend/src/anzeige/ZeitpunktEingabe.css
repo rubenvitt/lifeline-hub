@@ -1,0 +1,56 @@
+/* Zeiteingabe unter `md` als Blatt am unteren Rand (LFH-953, `ZeitpunktEingabe.tsx`).
+
+   antd legt Kalender und Uhrzeitspalten nebeneinander (ETB-Filter 437 px, mit Sekunden; in
+   `komfortabel` breiter) und richtet das Popup am Feld aus. Auf 390 px ragte es über den Rand:
+   Freitag, Samstag, die Uhrzeit und „OK“ lagen außerhalb, und die Seite bekam einen waagerechten
+   Überlauf. Mit `showTime` übernimmt antd den Wert erst nach „OK“, der Filter war unbedienbar.
+
+   Darum unter `md`: das Popup steht fest am unteren Rand über die volle Breite, Kalender und
+   Uhrzeit untereinander, die Spalten teilen sich die Breite. Ein Ausrichten am Feld scheitert in
+   jeder Lage (rechtsbündig gekippt lag es links außerhalb), deshalb `!important` gegen die
+   Inline-Lage, die rc-trigger setzt. Ist das Blatt höher als der Schirm (Stufe `handschuh`),
+   rollt es in sich. Nachweis: `e2e/dialoge-handy.spec.ts`. */
+
+.lfh-zeit-blatt.ant-picker-dropdown {
+  position: fixed !important;
+  inset: auto 0 0 0 !important;
+  max-height: 100dvh;
+  overflow-y: auto;
+}
+
+/* Der Pfeil zeigt auf das Feld; das Blatt steht nicht mehr daran. */
+.lfh-zeit-blatt .ant-picker-range-arrow {
+  display: none;
+}
+
+.lfh-zeit-blatt .ant-picker-range-wrapper,
+.lfh-zeit-blatt .ant-picker-panel-container,
+.lfh-zeit-blatt .ant-picker-panel-layout > div,
+.lfh-zeit-blatt .ant-picker-panel,
+.lfh-zeit-blatt .ant-picker-date-panel,
+.lfh-zeit-blatt .ant-picker-date-panel .ant-picker-content {
+  width: 100%;
+}
+
+/* Der Bereich verschiebt den Container per Inline-Rand zum zweiten Feld hin. */
+.lfh-zeit-blatt .ant-picker-panel-container {
+  margin: 0 !important;
+}
+
+.lfh-zeit-blatt .ant-picker-datetime-panel {
+  flex-direction: column;
+}
+
+.lfh-zeit-blatt .ant-picker-time-panel {
+  border-inline-start: 0;
+  border-top: 1px solid var(--lfh-linie);
+}
+
+/* Der Kopf der Uhrzeit ist leer (ein geschütztes Leerzeichen); untereinander kostet er nur Höhe. */
+.lfh-zeit-blatt .ant-picker-time-panel .ant-picker-header {
+  display: none;
+}
+
+.lfh-zeit-blatt .ant-picker-time-panel-column {
+  flex: 1;
+}
