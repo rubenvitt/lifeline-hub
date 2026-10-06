@@ -1,5 +1,7 @@
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
+import { erwarteHandyBreite, mitHandy } from './druckansicht-mobil-kern';
 import { pdfAuszug } from './pdf-kern';
+import { benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /**
  * ETB-Druckansicht gegen einen echten Server: Vollabruf über MEHR als eine Serverseite (höchstens
@@ -11,6 +13,11 @@ import { pdfAuszug } from './pdf-kern';
  *
  * DREI ENGINES (LFH-729): läuft auch in `firefox` und `webkit` (Druckbild unter Druckmedium).
  * Das PDF — Seitenzählung je Seite, letzter Eintrag auf der letzten Seite — nur in Chromium.
+ *
+ * Am Handy (LFH-956, `e2e/druckansicht-mobil-kern.ts`, als Admin und als Beobachter): der
+ * Layout-Viewport bleibt bei 390 px, die Inhaltsspalte nimmt mindestens die halbe Tabelle, und
+ * der Text von Nr. 1 steht im ersten Bildschirm. Typ, Von/An und Erfasser stehen dann als
+ * Metazeile in der Inhaltszelle.
  */
 
 const ADMIN = 'admin';
@@ -112,8 +119,9 @@ function zeile(page: Page, nr: number) {
   });
 }
 
-test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, Berichtigung, Druckbild', async ({
+test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, Berichtigung, Druckbild, Handy', async ({
   page,
+  browser,
   browserName,
 }) => {
   await anmelden(page);
@@ -168,6 +176,13 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
       rail: anzeige('nav[aria-label="Kategorien"]'),
       seitenkopf: anzeige('[data-lfh="seitenkopf"]'),
       tabellenkopf: anzeige('[data-lfh="etb-druck-tabelle"] thead'),
+      // Das Blatt behält seine sechs Spalten; die Metazeile gilt nur am schmalen Schirm (LFH-956).
+      spalten: Array.from(document.querySelectorAll('[data-lfh="etb-druck-tabelle"] thead th'))
+        .filter((th) => getComputedStyle(th).display !== 'none')
+        .map((th) => th.textContent),
+      metazeilen: Array.from(document.querySelectorAll('.druckansicht-nur-schmal')).filter(
+        (el) => getComputedStyle(el).display !== 'none',
+      ).length,
     };
   });
   expect(druck.position).toBe('static');
@@ -176,6 +191,8 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   expect(druck.rail).toBe('none');
   expect(druck.seitenkopf, 'Bedienung der Druckansicht steht nicht auf dem Papier').toBe('none');
   expect(druck.tabellenkopf, 'Tabellenkopf wiederholt sich je Seite').toBe('table-header-group');
+  expect(druck.spalten).toEqual(['Nr.', 'Zeit', 'Typ', 'Von/An', 'Inhalt', 'Erfasser']);
+  expect(druck.metazeilen, 'keine Metazeile auf dem Blatt').toBe(0);
   await page.emulateMedia({ media: null });
 
   // ── PDF (nur Chromium): jede Seite trägt „Seite n von m", der letzte Eintrag steht hinten.
@@ -207,4 +224,49 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
     `berichtigt durch Nr. ${saat.berichtigung.lfd_nr}`,
   );
   await expect(zeile(page, saat.berichtigung.lfd_nr)).toHaveCount(0);
+
+  // ── Am Handy (LFH-956): angepasste Tabelle statt eines 588 px breiten Blatts.
+  const beobachter = await benutzerAnlegen(page, 'beobachter');
+  await mitgliedEintragen(page, einsatzId, beobachter.id, 'beobachter');
+  for (const [wer, konto] of [
+    ['Admin', { benutzername: ADMIN, passwort: PW }],
+    ['Beobachter', beobachter],
+  ] as const) {
+    const { viewport, ergebnis } = await mitHandy(
+      browser,
+      browserName,
+      konto,
+      `/einsaetze/${einsatzId}/etb/druck`,
+      async (p) => {
+        const erste = zeile(p, saat.grund.lfd_nr);
+        // Vorbedingung: die Metazeile trägt Typ und Von/An, der Erfasser den langen Namen.
+        await expect(erste).toContainText('Meldung · von Florian 1 · an ELW');
+        await expect(erste).toContainText('Erfasser: Administrator');
+        return p.evaluate(() => {
+          const tabelle = document.querySelector('[data-lfh="etb-druck-tabelle"]')!;
+          const inhalt = Array.from(tabelle.querySelectorAll('thead th')).find(
+            (th) => th.textContent === 'Inhalt',
+          )!;
+          const text = Array.from(tabelle.querySelectorAll('tbody tr:first-child p')).find(
+            (el) => el.textContent === 'Grundmeldung Deich Nord',
+          )!;
+          return {
+            anteil: inhalt.getBoundingClientRect().width / tabelle.getBoundingClientRect().width,
+            textOben: text.getBoundingClientRect().top + window.scrollY,
+            textRechts: text.getBoundingClientRect().right,
+          };
+        });
+      },
+    );
+    erwarteHandyBreite(wer, viewport);
+    expect
+      .soft(ergebnis.anteil, `${wer}: Inhalt nimmt mindestens die halbe Tabelle`)
+      .toBeGreaterThanOrEqual(0.5);
+    expect
+      .soft(ergebnis.textOben, `${wer}: Text von Nr. 1 im ersten Bildschirm`)
+      .toBeLessThan(viewport.innerHeight);
+    expect
+      .soft(ergebnis.textRechts, `${wer}: Text von Nr. 1 nicht rechts außerhalb`)
+      .toBeLessThanOrEqual(viewport.innerWidth);
+  }
 });

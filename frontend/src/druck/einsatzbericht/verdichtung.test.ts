@@ -334,13 +334,51 @@ describe('3.4 Bilanz', () => {
       konv,
     );
     const a = abschnitt(b, 'bilanz', 'Personen');
-    expect(wert(a, 'Erfasst')).toBe('3');
+    expect(wert(a, 'Personen gesamt')).toBe('3');
     expect(wert(a, 'Patienten (SK I–IV)')).toBe('2');
     expect(wert(a, 'SK I')).toBe('1');
     expect(wert(a, 'SK II')).toBe('1');
-    expect(wert(a, 'ohne Sichtung')).toBe('1');
-    expect(wert(a, 'vermisst')).toBe('1');
+    expect(wert(a, 'Ohne Sichtung')).toBe('1');
+    expect(wert(a, 'Vermisst')).toBe('1');
     expect(wert(a, 'Transportiert')).toBe('1');
+  });
+
+  it('Personenbilanz in drei betitelten Gruppen, kein Etikett doppelt, Summe „Personen gesamt“ (LFH-956)', () => {
+    const personen = [
+      person({
+        id: 1,
+        aktuelle_sichtung: 'tot',
+        status: 'verstorben',
+        aktuelle_verbleib_art: 'verstorben',
+      }),
+      person({ id: 2, aktuelle_sichtung: 'sk2', status: 'erfasst' }),
+      person({ id: 3, aktuelle_sichtung: null, status: 'vermisst' }),
+      person({
+        id: 4,
+        aktuelle_sichtung: 'unverletzt',
+        status: 'betroffen',
+        aktuelle_verbleib_art: 'vor_ort',
+      }),
+    ];
+    const b = verdichteEinsatzbericht(rohBericht({ personen: daten(personen) }), konv);
+    const a = abschnitt(b, 'bilanz', 'Personen');
+    const gruppen = a.inhalt.flatMap((i) => (i.art === 'zeilen' && i.titel ? [i.titel] : []));
+    expect(gruppen).toEqual(['Nach Sichtung', 'Nach Personenstatus', 'Nach Verbleib']);
+    expect(wert(a, 'Personen gesamt')).toBe(String(personen.length));
+
+    const etiketten = a.inhalt.flatMap((i) =>
+      i.art === 'zeilen' ? i.zeilen.map((z) => z.etikett) : [],
+    );
+    const klein = etiketten.map((e) => e.toLocaleLowerCase('de'));
+    expect(new Set(klein).size, `doppelt: ${etiketten.join(', ')}`).toBe(klein.length);
+    // Einheitlich: jedes Etikett beginnt groß; das Präfix trägt jetzt die Überschrift.
+    for (const e of etiketten) expect(e[0], e).toBe(e[0].toLocaleUpperCase('de'));
+    expect(etiketten.some((e) => e.startsWith('Verbleib:'))).toBe(false);
+
+    // „Tot“ (Sichtung) und „Verstorben“ (Status) sind getrennte Achsen; der Vermerk sagt es.
+    expect(wert(a, 'Tot')).toBe('1');
+    expect(wert(a, 'Verstorben')).toBe('1');
+    expect(vermerke(a).join(' ')).toMatch(/Tot.*Sichtung.*Verstorben.*Personenstatus/);
   });
 
   it('enthält keinen Namen, kein Geburtsdatum, keine Registriernummer Betroffener', () => {
@@ -351,9 +389,13 @@ describe('3.4 Bilanz', () => {
   it('Schäden nach Status und Ausmaß; ohne Schaden „keine Einträge“', () => {
     const b = verdichteEinsatzbericht(rohBericht(), konv);
     const a = abschnitt(b, 'bilanz', 'Schäden');
-    expect(wert(a, 'Erfasst')).toBe('1');
-    expect(wert(a, 'offen')).toBe('1');
-    expect(wert(a, 'mittel')).toBe('1');
+    expect(wert(a, 'Schäden gesamt')).toBe('1');
+    expect(wert(a, 'Offen')).toBe('1');
+    expect(wert(a, 'Mittel')).toBe('1');
+    expect(a.inhalt.flatMap((i) => (i.art === 'zeilen' && i.titel ? [i.titel] : []))).toEqual([
+      'Nach Status',
+      'Nach Ausmaß',
+    ]);
     const leer = verdichteEinsatzbericht(rohBericht({ schaeden: daten([] as Schaden[]) }), konv);
     expect(vermerke(abschnitt(leer, 'bilanz', 'Schäden'))).toEqual([KEINE_EINTRAEGE]);
   });

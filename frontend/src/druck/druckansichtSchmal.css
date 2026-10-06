@@ -1,0 +1,44 @@
+/* Druckansichten am Bildschirm (LFH-956): Einsatzbericht und ETB-Druck dienen am Handy der
+   Kontrolle vor dem PDF. Ohne diese Regeln weitete eine Tabelle dort den Layout-Viewport
+   (Einsatzbericht 418 px, ETB-Druck 588 px bei 390 px Gerätebreite).
+
+   Was etwas zeigt, verschiebt oder umbricht, gilt nur unter `@media screen`: das Blatt setzt
+   `druck/druck.css`, und es bleibt, wie es war (die Metazeile ist auch dort aus). Die Seiten
+   markieren nur mit Klassen, die Regeln stehen hier. Nachweis
+   `e2e/einsatzbericht-druck.spec.ts` und `e2e/etb-druck.spec.ts` (390 px, mobiler Kontext). */
+
+@media screen {
+  /* Eine Berichtstabelle, die trotz Umbruch nicht passt, rollt in sich, nicht die Seite. */
+  .druckansicht-bildlauf {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* Nur am schmalen Schirm: die Metazeile im ETB-Druck. Auf Papier und ab `md` stehen Typ, Von/An
+   und Erfasser in eigenen Spalten. */
+.druckansicht-nur-schmal {
+  display: none;
+}
+
+@media screen and (max-width: 767.98px) {
+  .druckansicht-nur-schmal {
+    display: block;
+  }
+
+  .druckansicht-nicht-schmal {
+    display: none;
+  }
+
+  /* Datum über Uhrzeit: die Zelle bricht an der Lücke, nicht mitten in der Zahl. Gegen das
+     `nowrap` der Zelle (inline), deshalb `!important`. */
+  .druckansicht-zeit {
+    white-space: normal !important;
+  }
+
+  /* Die Textspalte nimmt, was die übrigen Spalten übrig lassen; ein langes Wort bricht. */
+  .druckansicht-textspalte {
+    width: 100%;
+    overflow-wrap: anywhere;
+  }
+}
