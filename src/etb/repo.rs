@@ -1368,7 +1368,8 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         for i in 1..=6 {
-            let mut d = daten(&format!("e{i}"));
+            let text = format!("e{i}");
+            let mut d = daten(&text);
             if i % 2 == 0 {
                 d.typ = "anordnung";
             }

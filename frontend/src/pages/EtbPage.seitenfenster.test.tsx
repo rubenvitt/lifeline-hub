@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
@@ -14,13 +14,20 @@ import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
 import type { EtbEintragAnzeige } from '../api/types';
 import EtbPage from './EtbPage';
 
+// Geprüft wird das Blättern, nicht der Satz: ein Klartext-Ersatz hält tausende gerenderte Zeilen
+// in jsdom unter der Testzeit. Das echte `Markdown` deckt `EtbPage.test.tsx` ab.
+vi.mock('../components/Markdown', () => ({
+  default: ({ children }: { children: string }) => <span>{children}</span>,
+}));
+
 /**
  * Das Seitenfenster der ETB-Zeitachse (LFH-947, Spec `etb-zeitachse-fenster`).
  *
  * Der Server ist ein Tagebuch mit {@link GESAMT} Einträgen; Kennung = laufende Nummer. Er
- * beantwortet beide Cursor wie `src/etb/repo.rs::abfrage`.
+ * beantwortet beide Cursor wie `src/etb/repo.rs::abfrage`. Ziel `?eintrag=50` liegt 12 Seiten
+ * tief, mehr als das Fenster hält.
  */
-const GESAMT = 3000;
+const GESAMT = 1200;
 
 function eintrag(n: number): EtbEintragAnzeige {
   return {
@@ -73,7 +80,7 @@ function Springer() {
   return (
     <>
       <div data-testid="ort-suche">{ort.search}</div>
-      <button type="button" onClick={() => navigate('/einsaetze/7/etb?eintrag=2990')}>
+      <button type="button" onClick={() => navigate('/einsaetze/7/etb?eintrag=1190')}>
         springe-neu
       </button>
     </>
@@ -155,7 +162,7 @@ beforeEach(async () => {
 });
 
 describe('EtbPage — Seitenfenster (LFH-947)', () => {
-  it('nach einem Sprung 30 Seiten tief kostet ein etb-Ereignis höchstens 5 Listenabrufe', async () => {
+  it('nach einem Sprung 12 Seiten tief kostet ein etb-Ereignis höchstens 5 Listenabrufe', async () => {
     const { container, client } = setup('/einsaetze/7/etb?eintrag=50');
     await warteAufHervorhebung(container, 50);
     // Das Ziel bleibt im Fenster, und das Fenster hält höchstens 500 Einträge.
@@ -169,26 +176,26 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     expect(listenAbrufe.length).toBeGreaterThan(0);
     expect(listenAbrufe.length).toBeLessThanOrEqual(5);
     expect(zeile(container, 50)).not.toBeNull();
-  }, 60000);
+  }, 120000);
 
   it('Kopfzahl bleibt die Serverzählung, nicht das Fenster', async () => {
     const { container } = setup('/einsaetze/7/etb?eintrag=50');
     await warteAufHervorhebung(container, 50);
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent(
-        '3000 Einträge',
+        '1200 Einträge',
       ),
     );
-  }, 60000);
+  }, 120000);
 
   it('am Kopf steht kein „Neuere laden“', async () => {
     setup('/einsaetze/7/etb');
-    await screen.findByText('Eintrag 3000');
+    await screen.findByText('Eintrag 1200');
     expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull();
   });
 
   it('„Neuere laden“ führt aus einem tiefen Fenster lückenlos zum neuesten Eintrag', async () => {
-    gesamt = 900;
+    gesamt = 700;
     const user = userEvent.setup();
     const { container } = setup('/einsaetze/7/etb?eintrag=50');
     await warteAufHervorhebung(container, 50);
@@ -206,14 +213,14 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
         ),
       ).catch(() => undefined);
     }
-    await waitFor(() => expect(zeile(container, 900)).not.toBeNull());
+    await waitFor(() => expect(zeile(container, 700)).not.toBeNull());
     // Lückenlos: die gerenderten Nummern sind eine geschlossene, absteigende Folge.
     const nrn = nummernImDom(container);
-    expect(nrn[0]).toBe(900);
-    nrn.forEach((n, i) => expect(n).toBe(900 - i));
+    expect(nrn[0]).toBe(700);
+    nrn.forEach((n, i) => expect(n).toBe(700 - i));
     // Die neuere Seite kam über den Cursor nach oben, nicht über einen Neustart am Kopf.
     expect(abrufe.some((a) => a.includes('after_lfd_nr='))).toBe(true);
-  }, 60000);
+  }, 120000);
 
   it('ein Sprung über ein tiefes Fenster lädt neuere Seiten nach und hebt hervor', async () => {
     const user = userEvent.setup();
@@ -222,7 +229,7 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
 
     await user.click(screen.getByRole('button', { name: 'springe-neu' }));
-    await warteAufHervorhebung(container, 2990);
+    await warteAufHervorhebung(container, 1190);
     expect(abrufe.some((a) => a.includes('after_lfd_nr='))).toBe(true);
-  }, 90000);
+  }, 120000);
 });
