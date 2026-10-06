@@ -148,6 +148,11 @@ export function einsatzdatenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'einsatzdaten');
 }
 
+/** Material des Einsatzes (`MaterialPage`); Sprungziel des Sperrgrunds im UHS-Materialreiter. */
+export function materialPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'material');
+}
+
 /**
  * Druckansicht des Einsatzberichts (LFH-726): Unterroute der Einsatzdaten, erbt deren Freigabe.
  * Die Auswahl der Blöcke reist als `?bloecke=` (LFH-902); der Standardumfang schreibt nichts.

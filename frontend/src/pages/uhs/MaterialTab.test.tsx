@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../test/server';
+import { freigabenFixture } from '../../test/fixtures';
 import { renderMitProviders } from '../../test/utils';
 import type { EinsatzMaterial, MaterialStatus, UhsDetail } from '../../api/types';
 import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
@@ -272,5 +273,66 @@ describe('MaterialTab · Statusspalte (LFH-341 · C6)', () => {
     const zellen = await screen.findAllByTestId('material-status-zelle');
     expect(zellen.length).toBeGreaterThan(0);
     for (const zelle of zellen) expect(zelle.textContent).not.toMatch(/_/);
+  });
+});
+
+/**
+ * Sperrgrund statt stummer Sperre (LFH-970, U78): ohne freies Material steht neben dem Knopf, warum
+ * er nicht geht, und der Sprung ins Modul Material als eine Zeile (`frontend/AGENTS.md`, „Ein
+ * Sprung ist keine Handlung“).
+ */
+describe('MaterialTab · Sperrgrund „Material zuordnen" (LFH-970)', () => {
+  it('nennt den Grund und springt ins Modul Material, wenn kein freies Material da ist', async () => {
+    render([verortet]);
+    const knopf = await screen.findByRole('button', { name: 'Material zuordnen' });
+    await waitFor(() => expect(knopf).toBeDisabled());
+
+    const grund = await screen.findByTestId('material-sperrgrund');
+    expect(grund).toHaveTextContent('Kein freies Material im Einsatz');
+    // Der Grund hängt am Knopf, nicht nur daneben: Vorleser hören ihn mit.
+    expect(knopf).toHaveAttribute('aria-describedby', grund.id);
+    const sprung = within(grund).getByRole('link', { name: /im Modul Material erfassen/ });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/material');
+  });
+
+  it('zeigt keinen Sperrgrund, solange freies Material da ist', async () => {
+    render([frei, verortet]);
+    await waitFor(async () =>
+      expect(await screen.findByRole('button', { name: 'Material zuordnen' })).toBeEnabled(),
+    );
+    expect(screen.queryByTestId('material-sperrgrund')).not.toBeInTheDocument();
+  });
+
+  it('lässt den Sprung ohne Zugriff auf das Modul Material weg und sagt warum', async () => {
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ material: { zugriff: false } })),
+      ),
+    );
+    render([verortet]);
+
+    const grund = await screen.findByTestId('material-sperrgrund');
+    await waitFor(() => expect(grund).toHaveTextContent('(Keine Berechtigung)'));
+    expect(within(grund).queryByRole('link')).not.toBeInTheDocument();
+    expect(grund).toHaveTextContent('Kein freies Material im Einsatz');
+  });
+
+  it('meldet einen gescheiterten Abruf als Fehler, nicht als stumme Sperre', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/material', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <MaterialTab einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />
+      </CommandPaletteProvider>,
+      { route: '/einsaetze/1/unfallhilfsstellen/3' },
+    );
+
+    const grund = await screen.findByTestId('material-sperrgrund');
+    expect(grund).toHaveTextContent('Material konnte nicht geladen werden');
+    expect(within(grund).queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Material zuordnen' })).toBeDisabled();
   });
 });
