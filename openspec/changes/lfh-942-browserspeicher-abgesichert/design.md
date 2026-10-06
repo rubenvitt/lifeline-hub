@@ -71,9 +71,10 @@ nicht ausgewertet, die Wahl gilt im Tab ohnehin.
 
 ### D3 Koordinatensystem: Wert im Modul bevorzugt
 
-`setzeOverride` merkt die Wahl in einer Modulvariablen (`gewaehlt`, mit Kennung „nicht gesetzt“),
-schreibt bzw. entfernt über den Helfer und benachrichtigt danach die Abonnenten, gleich ob das
-Schreiben gelang. `lies()` liefert die Modulvariable, sobald sie gesetzt ist, sonst den
+`setzeOverride` schreibt bzw. entfernt über den Helfer. Gelingt das nicht, merkt es die Wahl in
+einer Modulvariablen (`gewaehlt`); gelingt es, vergisst es sie wieder, damit der Speicher die
+Quelle bleibt (auch für Tests, die ihn leeren). Danach benachrichtigt es die Abonnenten, gleich
+ob das Schreiben gelang. `lies()` liefert die Modulvariable, solange sie gesetzt ist, sonst den
 gespeicherten Wert. Der Snapshot bleibt ein String oder `null`, also stabil für
 `useSyncExternalStore`. Für Tests kommt `koordinatenSystemVergessenFuerTests()` dazu.
 
@@ -84,7 +85,11 @@ die gespeicherte Messung (`ausSpeicherLesen`, gleich aus welchem Tab) und schrei
 
 - keine gültige gespeicherte Messung vorliegt, oder
 - `|neu.versatzMs − gespeichert.versatzMs| > 1 000`, oder
-- `neu.gemessenAt − gespeichert.gemessenAt > 10 min` oder `< 0` (Geräteuhr zurückgestellt).
+- `neu.gemessenAt − gespeichert.gemessenAt > 10 min`.
+
+Ein Stellen der Geräteuhr ändert den Versatz und schreibt deshalb über die erste Bedingung sofort;
+eine eigene Prüfung auf ein negatives Alter braucht es nicht (sie schriebe nur bei zwei fast
+gleichzeitigen Antworten zweier Tabs unnötig).
 
 Geprüft wird gegen den Speicher, nicht gegen die letzte eigene Schreibung: So schreiben sechs Tabs
 zusammen etwa einmal je 10 min statt je einmal. Das kostet je Antwort ein `getItem` und ein

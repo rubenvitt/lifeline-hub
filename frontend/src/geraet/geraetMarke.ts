@@ -8,23 +8,17 @@
  * {@link merkeGeraet} aus dem `AuthProvider`, wenn der Server einen Benutzer bestätigt. Steht in
  * `GERAETESPEICHER` (`offline/geraetRaeumung.ts`).
  */
+import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 const SCHLUESSEL = 'lifeline-hub.geraet-gekoppelt';
 
 /** Setzt oder löscht die Marke. Wirft nie (gesperrter Speicher im privaten Modus). */
 export function merkeGeraet(istGeraet: boolean): void {
-  try {
-    if (istGeraet) localStorage.setItem(SCHLUESSEL, '1');
-    else localStorage.removeItem(SCHLUESSEL);
-  } catch {
-    // Ohne Speicher zeigt ein beendetes Gerät die Anmeldung; die Schranke bleibt beim Server.
-  }
+  // Ohne Speicher zeigt ein beendetes Gerät die Anmeldung; die Schranke bleibt beim Server.
+  if (istGeraet) sicherSchreiben(SCHLUESSEL, '1');
+  else sicherEntfernen(SCHLUESSEL);
 }
 
 /** Lief dieser Browser zuletzt als gekoppeltes Gerät? */
 export function warGeraet(): boolean {
-  try {
-    return localStorage.getItem(SCHLUESSEL) === '1';
-  } catch {
-    return false;
-  }
+  return sicherLesen(SCHLUESSEL) === '1';
 }

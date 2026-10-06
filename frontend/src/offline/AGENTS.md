@@ -91,7 +91,8 @@ draußen gelassen werden.
 
 - **Jeder Speicherort steht in `GERAETESPEICHER`** (`offline/geraetRaeumung.ts`) mit
   Entscheidung und Grund. `geraetRaeumung.guard.test.ts` findet jede Datei, die `openDB`
-  aufruft oder in `localStorage`/`sessionStorage` schreibt, und wird ohne Eintrag rot.
+  aufruft oder in `localStorage`/`sessionStorage` schreibt (auch über `sicherSchreiben`), und
+  wird ohne Eintrag rot.
 - **Grundsatz:** Was der Server wieder liefern kann, geht bei jedem Ausgang (Quittungen,
   Ortscache, Erfassungswerte). Was nur auf dem Gerät liegt (ETB-Entwürfe), überlebt ein
   Sitzungsende, gebunden an `benutzer_id` und ohne angemeldeten Besitzer höchstens 24 h. Die

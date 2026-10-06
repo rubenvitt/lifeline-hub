@@ -1,6 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { EtbEntwurf } from './entwurfModell';
 import { neueClientId } from '../../offline/clientId';
+import {
+  sicherEntfernen,
+  sicherLesen,
+  sicherSchluessel,
+  sicherSchreiben,
+} from '../../lib/sichererSpeicher';
 
 interface EntwurfDB extends DBSchema {
   entwuerfe: {
@@ -43,8 +49,8 @@ interface Vorlaufeintrag {
 }
 
 function vorlaufLesen(id: string): Vorlaufeintrag | null {
+  const roh = sicherLesen(VORLAUF_PRAEFIX + id);
   try {
-    const roh = localStorage.getItem(VORLAUF_PRAEFIX + id);
     const wert: unknown = roh ? JSON.parse(roh) : null;
     return wert && typeof wert === 'object' ? (wert as Vorlaufeintrag) : null;
   } catch {
@@ -54,33 +60,22 @@ function vorlaufLesen(id: string): Vorlaufeintrag | null {
 
 /** Alle Entwurfs-ids mit offenem Vorlauf, gleich aus welchem Tab. */
 function vorlaufIds(): string[] {
-  try {
-    return Object.keys(localStorage)
-      .filter((k) => k.startsWith(VORLAUF_PRAEFIX))
-      .map((k) => k.slice(VORLAUF_PRAEFIX.length));
-  } catch {
-    return [];
-  }
+  return sicherSchluessel()
+    .filter((k) => k.startsWith(VORLAUF_PRAEFIX))
+    .map((k) => k.slice(VORLAUF_PRAEFIX.length));
 }
 
 /** Synchron — muss vor dem ersten `await` des Schreibauftrags stehen. */
 function vormerken(id: string, entwurf: EtbEntwurf | null): string {
   const stand = neueClientId();
-  try {
-    localStorage.setItem(VORLAUF_PRAEFIX + id, JSON.stringify({ stand, entwurf }));
-  } catch {
-    // Speicher voll oder gesperrt: dann trägt allein die IndexedDB, wie vor LFH-521.
-  }
+  // Speicher voll oder gesperrt: dann trägt allein die IndexedDB, wie vor LFH-521.
+  sicherSchreiben(VORLAUF_PRAEFIX + id, JSON.stringify({ stand, entwurf }));
   return stand;
 }
 
 function quittieren(id: string, stand: string): void {
   if (vorlaufLesen(id)?.stand !== stand) return;
-  try {
-    localStorage.removeItem(VORLAUF_PRAEFIX + id);
-  } catch {
-    // s. vormerken
-  }
+  sicherEntfernen(VORLAUF_PRAEFIX + id);
 }
 
 let dbPromise: Promise<IDBPDatabase<EntwurfDB>> | null = null;
@@ -174,13 +169,10 @@ export async function entwurfEntfernen(id: string): Promise<void> {
 /** Abmelden (LFH-767, design.md D2): alle Entwürfe samt Vorlauf und Aktiv-Merkern. Wirft bei
  *  einem Plattenfehler — `geraetRaeumen` protokolliert ihn und räumt die übrigen Orte. */
 export async function entwuerfeRaeumen(): Promise<void> {
-  for (const id of vorlaufIds()) localStorage.removeItem(VORLAUF_PRAEFIX + id);
-  try {
-    for (const k of Object.keys(localStorage)) {
-      if (k.startsWith(AKTIV_PRAEFIX)) localStorage.removeItem(k);
-    }
-  } catch {
-    // localStorage gesperrt: dann liegt dort auch kein Merker.
+  // Gesperrter Speicher liefert keine Schlüssel: dann liegt dort auch kein Merker.
+  for (const id of vorlaufIds()) sicherEntfernen(VORLAUF_PRAEFIX + id);
+  for (const k of sicherSchluessel()) {
+    if (k.startsWith(AKTIV_PRAEFIX)) sicherEntfernen(k);
   }
   const d = await db();
   await d.clear('entwuerfe');
@@ -222,7 +214,7 @@ export async function entwuerfeAufraeumen(benutzerId: number | null, jetzt: numb
 
 /** Nur für Tests: leert den Store (fake-indexeddb persistiert sonst zwischen Tests). */
 export async function entwuerfeLeerenFuerTests(): Promise<void> {
-  for (const id of vorlaufIds()) localStorage.removeItem(VORLAUF_PRAEFIX + id);
+  for (const id of vorlaufIds()) sicherEntfernen(VORLAUF_PRAEFIX + id);
   const d = await db();
   await d.clear('entwuerfe');
 }

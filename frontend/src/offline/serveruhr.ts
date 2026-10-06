@@ -1,4 +1,5 @@
 import dayjs, { type Dayjs } from 'dayjs';
+import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 
 /**
  * Versatz der Geräteuhr zur Serveruhr (LFH-705,
@@ -15,6 +16,13 @@ const SCHLUESSEL = 'lifeline-serveruhr';
 const RAUSCHGRENZE_MS = 5_000;
 /** Wie lange eine Messung gilt, dieselbe Frist wie die Offline-Identität (D4). */
 const HALTBARKEIT_MS = 24 * 60 * 60 * 1000;
+/**
+ * Geschrieben wird nur, wenn die gespeicherte Messung um mehr als das abweicht oder älter ist
+ * (LFH-942, design.md D4). Jede Schreibung weckt alle anderen Tabs mit einem `storage`-Ereignis;
+ * im Tab gilt jede Messung ohnehin sofort.
+ */
+const SCHREIBSCHWELLE_MS = 1_000;
+const SCHREIBALTER_MS = 10 * 60 * 1000;
 
 interface Messung {
   /** Serveruhr minus Geräteuhr. */
@@ -47,14 +55,23 @@ function gueltig(m: unknown): m is Messung {
 }
 
 function ausSpeicherLesen(): Messung | null {
+  const roh = sicherLesen(SCHLUESSEL);
+  if (roh == null) return null;
   try {
-    const roh = localStorage.getItem(SCHLUESSEL);
-    if (roh == null) return null;
     const m: unknown = JSON.parse(roh);
     return gueltig(m) ? m : null;
   } catch {
     return null;
   }
+}
+
+function mussSchreiben(neu: Messung, gespeichert: Messung | null): boolean {
+  if (!gespeichert) return true;
+  // Ein Stellen der Geräteuhr ändert den Versatz und schreibt deshalb sofort.
+  return (
+    Math.abs(neu.versatzMs - gespeichert.versatzMs) > SCHREIBSCHWELLE_MS ||
+    neu.gemessenAt - gespeichert.gemessenAt > SCHREIBALTER_MS
+  );
 }
 
 /** Liest den `Date`-Header einer Antwort des eigenen Servers ein. Wirft nie. */
@@ -65,12 +82,11 @@ export function merkeServerzeit(res: Response, empfangenMs: number = Date.now())
     const serverMs = Date.parse(datum);
     if (!Number.isFinite(serverMs)) return;
     // `Date` ist auf die Sekunde abgeschnitten: die Serverzeit lag in [Date, Date + 1 s).
-    imSpeicher = { versatzMs: serverMs + 500 - empfangenMs, gemessenAt: empfangenMs };
-    try {
-      localStorage.setItem(SCHLUESSEL, JSON.stringify(imSpeicher));
-    } catch {
-      // Ohne Speicher gilt die Messung nur in diesem Tab.
-    }
+    const neu = { versatzMs: serverMs + 500 - empfangenMs, gemessenAt: empfangenMs };
+    imSpeicher = neu;
+    // Gegen den Speicher geprüft, nicht gegen die eigene letzte Schreibung: so schreiben alle
+    // Tabs zusammen etwa einmal je 10 min. Ohne Speicher gilt die Messung nur in diesem Tab.
+    if (mussSchreiben(neu, ausSpeicherLesen())) sicherSchreiben(SCHLUESSEL, JSON.stringify(neu));
   } catch {
     // Eine Uhrmessung darf keinen API-Aufruf scheitern lassen.
   }
@@ -98,11 +114,5 @@ export function serveruhrVergessenFuerTests({
   speicherBehalten = false,
 }: { speicherBehalten?: boolean } = {}): void {
   imSpeicher = null;
-  if (!speicherBehalten) {
-    try {
-      localStorage.removeItem(SCHLUESSEL);
-    } catch {
-      // egal
-    }
-  }
+  if (!speicherBehalten) sicherEntfernen(SCHLUESSEL);
 }
