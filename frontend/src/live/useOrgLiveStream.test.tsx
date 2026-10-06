@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { neuerQueryClient } from '../test/utils';
 import { useOrgLiveStream } from './useOrgLiveStream';
 import { meldeEinsatzStrom } from './einsatzStromStore';
+import { LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
 
 /** Zeichnet Verbindungen auf; `emit` spielt ein Ereignis oder `open` ein. */
 class FakeEventSource {
@@ -43,9 +44,15 @@ class FakeEventSource {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   FakeEventSource.instanzen = [];
 });
+
+/** Die Argumente, mit denen der Sammler einen Key abgleicht (LFH-922, liveInvalidierung.ts). */
+function abgleich(queryKey: unknown[]) {
+  return [{ queryKey, refetchType: 'active' }, { cancelRefetch: false }] as const;
+}
 
 function Probe({ angemeldet }: { angemeldet: boolean }) {
   useOrgLiveStream(angemeldet);
@@ -74,16 +81,35 @@ describe('useOrgLiveStream (LFH-734)', () => {
   });
 
   it('gleicht schon beim ersten open die Org-Keys ab (Lücke beim Wechsel aus dem Einsatz)', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
     mount(true, client);
     FakeEventSource.instanzen[0].emit('open');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['einsaetze'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['personal'] });
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['personal']));
+  });
+
+  it('gleicht auch beim Neuaufbau durch den Browser die Org-Keys ab (kein Nachlieferweg)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    mount(true, client);
+    const quelle = FakeEventSource.instanzen[0];
+    quelle.emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    spy.mockClear();
+    quelle.emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
+    expect(spy).toHaveBeenCalledWith(...abgleich(['personal']));
   });
 
   it('frischt bei einsatzliste und stammdaten die globalen Prefixe auf, bei lagged alle', () => {
+    vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = new QueryClient();
     client.setQueryData(['einsaetze'], []);
@@ -92,13 +118,16 @@ describe('useOrgLiveStream (LFH-734)', () => {
     mount(true, client);
     const quelle = FakeEventSource.instanzen[0];
     quelle.emit('einsatzliste');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     expect(client.getQueryState(['einsaetze'])?.isInvalidated).toBe(true);
     expect(client.getQueryState(['material', 'alle'])?.isInvalidated).toBe(false);
     quelle.emit('stammdaten');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     expect(client.getQueryState(['material', 'alle'])?.isInvalidated).toBe(true);
     const spy = vi.spyOn(client, 'invalidateQueries');
     quelle.emit('lagged', 'resync');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['aufbewahrung'] });
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['aufbewahrung']));
     expect(client.getQueryState(['benutzer'])?.isInvalidated).toBe(false); // nicht live
   });
 

@@ -55,11 +55,13 @@ pub async fn stream(
 
     // Reconnect-Resync: mit `Last-Event-ID` liefert der LiveHub die verpassten Nachrichten nach
     // (bzw. `lagged` bei Ring-Overflow/Neustart). Der Filter greift auf beiden Wegen.
+    // Danach die Position des Abonnements als `id:` ohne Daten (LFH-922, design.md D4).
     let seit = crate::routes::support::last_event_id(&headers);
-    let (replay, rx) = state.live.abonniere_mit_replay(einsatz_id, seit);
-    let einsatz_strom = crate::routes::support::sse_stream_mit_replay(replay, rx, move |ev| {
-        ev.sichtbar_fuer(&erlaubt)
-    });
+    let (replay, rx, position) = state.live.abonniere_mit_position(einsatz_id, seit);
+    let einsatz_strom =
+        crate::routes::support::sse_stream_mit_replay(replay, rx, position, move |ev| {
+            ev.sichtbar_fuer(&erlaubt)
+        });
     // Org-Ereignisse ohne `id:` und ohne Replay (LFH-734, design.md D4); gefiltert gegen den Benutzer,
     // nicht gegen die Modulrechte des Einsatzes. Ein Gerät kennt weder Einsatzliste noch
     // Stammdaten und bekommt sie nicht.

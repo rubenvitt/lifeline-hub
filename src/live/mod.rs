@@ -417,17 +417,34 @@ impl LiveHub {
         self.abonniere_mit_replay(einsatz_id, None).1
     }
 
-    /// Abonniert mit optionaler `Last-Event-ID` und liefert `(Replay, Empfänger)`.
-    ///
-    /// Snapshot des Replay-Rings UND `subscribe()` passieren unter EINER Write-Lock-
-    /// Acquisition — dieselbe Lock, die `publiziere_event` nimmt. Dadurch kann zwischen dem
-    /// Snapshot und dem Abonnieren kein `send` dazwischenkommen: der Client erhält jede
-    /// Nachricht genau einmal (per Replay ODER live), ohne Lücke oder Dublette am Nahtpunkt.
+    /// Abonniert mit optionaler `Last-Event-ID` und liefert `(Replay, Empfänger)`. Dünner
+    /// Wrapper um [`Self::abonniere_mit_position`].
     pub fn abonniere_mit_replay(
         &self,
         einsatz_id: i64,
         seit: Option<String>,
     ) -> (Replay, broadcast::Receiver<LiveNachricht>) {
+        let (replay, rx, _) = self.abonniere_mit_position(einsatz_id, seit);
+        (replay, rx)
+    }
+
+    /// Abonniert mit optionaler `Last-Event-ID` und liefert `(Replay, Empfänger, Position)`.
+    ///
+    /// Snapshot des Replay-Rings UND `subscribe()` passieren unter EINER Write-Lock-
+    /// Acquisition — dieselbe Lock, die `publiziere_event` nimmt. Dadurch kann zwischen dem
+    /// Snapshot und dem Abonnieren kein `send` dazwischenkommen: der Client erhält jede
+    /// Nachricht genau einmal (per Replay ODER live), ohne Lücke oder Dublette am Nahtpunkt.
+    ///
+    /// Die Position ist die Id der zuletzt vergebenen Nummer, unter derselben Sperre gelesen
+    /// (LFH-922, design.md D4). Der Einsatz-Strom sendet sie nach dem Replay als `id:` ohne
+    /// Daten; so schickt auch ein Tab, der noch kein Ereignis empfangen hat, beim Neuverbinden
+    /// eine `Last-Event-ID`. Ein Kanal ohne Nachricht hat `erste_id - 1`: das ergibt in
+    /// [`bestimme_replay`] „nichts verpasst", nicht `Luecke`.
+    pub fn abonniere_mit_position(
+        &self,
+        einsatz_id: i64,
+        seit: Option<String>,
+    ) -> (Replay, broadcast::Receiver<LiveNachricht>, String) {
         let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
         let Kanaele { map, hoechste_id } = &mut *kanaele;
         let kanal = map
@@ -445,7 +462,8 @@ impl LiveHub {
             ),
         };
         let rx = kanal.sender.subscribe();
-        (replay, rx)
+        let position = format!("{}-{}", self.epoch, kanal.naechste_id.saturating_sub(1));
+        (replay, rx, position)
     }
 
     /// Räumt Kanäle ab, die seit mindestens [`REPLAY_KARENZ`] keinen Empfänger haben (LFH-918).
@@ -786,6 +804,63 @@ mod tests {
             parse_id(&b1.id).unwrap().1,
             1,
             "Einsatz 2 zählt unabhängig ab 1"
+        );
+    }
+
+    /// Die Position eines Abonnements (LFH-922, design.md D4) ist die zuletzt vergebene
+    /// Nummer des Kanals: ein Neuverbinden damit liefert genau das, was danach kam.
+    #[tokio::test]
+    async fn position_ist_die_zuletzt_vergebene_nummer() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "zwei".into());
+        rx.recv().await.unwrap();
+        let n2 = rx.recv().await.unwrap();
+
+        let (_, _rx2, position) = hub.abonniere_mit_position(1, None);
+        assert_eq!(position, n2.id);
+        let Replay::Events(nichts) = hub.abonniere_mit_replay(1, Some(position.clone())).0 else {
+            panic!("die Position ist bedienbar");
+        };
+        assert!(nichts.is_empty());
+
+        hub.publiziere_event(1, LiveEvent::Etb, "drei".into());
+        let Replay::Events(verpasst) = hub.abonniere_mit_replay(1, Some(position)).0 else {
+            panic!("die Position ist bedienbar");
+        };
+        assert_eq!(
+            verpasst.iter().map(|m| m.data.as_str()).collect::<Vec<_>>(),
+            ["drei"]
+        );
+    }
+
+    /// Ein Kanal ohne Nachricht hat eine Position, die beim Neuverbinden „nichts verpasst"
+    /// ergibt, nicht `Luecke`: frisch im Prozess und nach Sweep und Neuanlage (LFH-918).
+    #[tokio::test]
+    async fn position_eines_leeren_kanals_ergibt_nichts_verpasst() {
+        let hub = LiveHub::new();
+        let (_, rx, position) = hub.abonniere_mit_position(1, None);
+        assert!(
+            matches!(hub.abonniere_mit_replay(1, Some(position)).0, Replay::Events(v) if v.is_empty()),
+            "frischer Kanal"
+        );
+
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
+        drop(rx);
+        hub.raeume_verwaiste(Instant::now());
+        hub.raeume_verwaiste(Instant::now() + REPLAY_KARENZ);
+        assert!(!hat_kanal(&hub, 1));
+
+        let (_, _rx, position) = hub.abonniere_mit_position(1, None);
+        assert!(
+            matches!(hub.abonniere_mit_replay(1, Some(position.clone())).0, Replay::Events(v) if v.is_empty()),
+            "neu angelegter Kanal nach dem Sweep"
+        );
+        hub.publiziere_event(1, LiveEvent::Etb, "zwei".into());
+        assert!(
+            matches!(hub.abonniere_mit_replay(1, Some(position)).0, Replay::Events(v) if v.len() == 1),
+            "was nach der Position kam, wird nachgeliefert"
         );
     }
 
