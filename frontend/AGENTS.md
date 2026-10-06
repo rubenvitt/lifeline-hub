@@ -256,6 +256,22 @@ Die Lagekarte bedient den Kontext mobil (LFH-557): `frontend/src/pages/lagekarte
 ein Modul-Task nicht fertig. Jede Zeile trägt ein Verdikt (erfüllt / offen → Zielticket / nicht
 anwendbar), „nicht geprüft" ist keins.
 
+**Texte: zeigen statt erklären** (LFH-1078)
+
+- **Text erklärt nie die Bedienung.** Was ein Knopf tut, zeigt seine Beschriftung; wie ein Feld
+  gefüllt wird, zeigen Platzhalter (der wirksame Wert, etwa „jetzt“), Einheit und Prüfung; was
+  fehlt, zeigt der Leerzustand mit Knopf (`SeitenLeer` mit `aktion`); warum etwas gesperrt ist,
+  steht in wenigen Wörtern sichtbar am Element, nie nur im Tooltip (Touch).
+- Kein Satz nennt Dateiformate, Server, Phasen oder Datenflüsse; Seiten tragen keinen
+  Zweck-Absatz unter dem Titel.
+- Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
+  zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
+  Modulbeschreibungen aus wenigen Fachwörtern.
+- Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
+  „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. `OFFEN` ist
+  eine Schuldmenge, die nur schrumpft: wer eine Datei bereinigt, verkleinert ihren Eintrag; neue
+  Einträge gibt es nicht.
+
 **Tabelle und Dichte**
 
 - **Tabelle nur, wenn verglichen wird**: stehende Kopfzeile, fixierte **menschenlesbare** Kennung
@@ -465,9 +481,9 @@ und `pages/personen/`.
 - **Gescheiterter Zustandsübergang meldet sich im Dialog** (LFH-535):
   `entwurf/FreigabeDialog.tsx`, kein `modal.confirm`; `freigabeGrund`, Vorrang Speicherfehler;
   Öffnen ruft `freigebenMutation.reset()`. Test zählt `.ant-message`, offen/zu über `ant-zoom-leave`.
-- **Fehlende Berechtigung wird erklärt, nicht stumm weggeschaltet** (M16): `RechteHinweis`,
-  Primäraktion gesperrt sichtbar; Zeilenaktionsspalte entfällt (M45); Wortlaut in
-  `stammdaten/rechteText.ts`.
+- **Fehlende Berechtigung wird benannt, nicht stumm weggeschaltet** (M16): `RechteHinweis` zeigt
+  „Nur Ansicht · Grund“ (Grund aus `components/nurAnsicht.ts`, wenige Wörter, kein Satz),
+  Primäraktion gesperrt sichtbar; Zeilenaktionsspalte entfällt (M45).
 - Sofort-Speichern-Zeile sperrt nur sich (`ModulEinstellungsListe`: `laeuftKey`/`fehlerKey` aus
   `mutation.variables`, Fehlerzeile `data-fehler`).
 - Zeilenlayouts ohne feste Spaltenbreite (Grid `minmax(0, 1fr) auto auto`, unter `md` gestapelt
