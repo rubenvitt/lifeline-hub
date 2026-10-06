@@ -69,7 +69,7 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 - [x] 7.1 `frontend/src/offline/AGENTS.md`: Persister-Drossel und Kopf, ETB-Allowlist,
   Quittung nur mit Kennungen, Ortscache-Frist. `frontend/src/etb/AGENTS.md`: Räumen leerer
   Entwürfe.
-- [ ] 7.2 Vitest der berührten Bereiche (TZ=Europe/Berlin), `./scripts/check-all.sh` (in der
+- [x] 7.2 Vitest der berührten Bereiche (TZ=Europe/Berlin), `./scripts/check-all.sh` (in der
   Cloud-Sitzung: Bündel ohne die umgebungsbedingt roten Schritte, siehe Projektnotiz), e2e
   `lagebild-offline.spec.ts`.
-- [ ] 7.3 `requesting-code-review`, dann `/opsx:archive` im selben Branch.
+- [x] 7.3 `requesting-code-review`, dann `/opsx:archive` im selben Branch.
