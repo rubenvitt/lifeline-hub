@@ -7,8 +7,8 @@
 
 ## 2. Frontend: Sammler (D1, D2)
 
-- [ ] 2.1 Tests zuerst (`frontend/src/live/liveInvalidierung.test.ts`, Fake-Timer): N Vormerkungen desselben Keys → genau ein `invalidateQueries` nach 300 ms mit `cancelRefetch: false`; verschiedene Keys je einmal; verdeckter Tab beim Ablauf → `refetchType: 'none'`, sichtbar → `'active'`; `raeumen()` vor Ablauf → kein Aufruf.
-- [ ] 2.2 `live/liveInvalidierung.ts` umsetzen. Mutationsprobe: Bündelung entfernen bzw. `cancelRefetch` weglassen → 2.1 rot.
+- [x] 2.1 Tests zuerst (`frontend/src/live/liveInvalidierung.test.ts`, Fake-Timer): N Vormerkungen desselben Keys → genau ein `invalidateQueries` nach 300 ms mit `cancelRefetch: false`; verschiedene Keys je einmal; verdeckter Tab beim Ablauf → `refetchType: 'none'`, sichtbar → `'active'`; `raeumen()` vor Ablauf → kein Aufruf.
+- [x] 2.2 `live/liveInvalidierung.ts` umsetzen. Mutationsprobe: Bündelung entfernen bzw. `cancelRefetch` weglassen → 2.1 rot.
 
 ## 3. Frontend: Ströme auf den Sammler umstellen (D1)
 
