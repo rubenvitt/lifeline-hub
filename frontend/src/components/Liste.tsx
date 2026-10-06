@@ -248,7 +248,7 @@ interface ListenEintragAuswahlProps extends ListenEintragBasisProps {
 }
 
 interface ListenEintragAnzeigeProps extends ListenEintragBasisProps {
-  /** Rechts ausgerichtete Aktionen (analog antd `List.Item` `actions`). */
+  /** Aktionen rechts, mit `gestapelt` darunter (analog antd `List.Item` `actions`). */
   actions?: ReactNode[];
   onClick?: never;
 }
@@ -277,8 +277,11 @@ export function ListenEintrag({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: token.padding,
-      ...(gestapelt ? { flexWrap: 'wrap' as const, rowGap: token.paddingXS } : {}),
+      // Getrennt statt `gap`: wechselt `gestapelt` (Handy quer über `md`), fiele sonst ein
+      // Einzelwert neben der Kurzform weg, und React warnte.
+      columnGap: token.padding,
+      rowGap: gestapelt ? token.paddingXS : token.padding,
+      ...(gestapelt ? { flexWrap: 'wrap' as const } : {}),
       paddingBlock,
       paddingInline,
       // Die Spread-Position ist TRAGEND (LFH-366): ein Aufrufer mit Trefflächenboden übergibt die
@@ -298,7 +301,7 @@ export function ListenEintrag({
             display: 'flex',
             alignItems: 'center',
             ...(gestapelt
-              ? { flex: '1 1 100%', flexBasis: '100%', justifyContent: 'flex-start' }
+              ? { flex: '1 1 100%', justifyContent: 'flex-start' }
               : { flex: '0 0 auto' }),
             margin: 0,
             padding: 0,

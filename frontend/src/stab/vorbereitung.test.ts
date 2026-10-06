@@ -102,7 +102,13 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
     expect(zeile(zeilen, 'betroffene').wert).toBe('3');
     expect(zeile(zeilen, 'kraefte').wert).toBe('2');
     expect(zeile(zeilen, 'sichtung').wert).toBe(
-      'SK\u00a0I\u00a01 · SK\u00a0II\u00a00 · SK\u00a0III\u00a01 · SK\u00a0IV\u00a00 · ohne\u00a0Sichtung\u00a01',
+      [
+        'SK\u00a0I\u00a01',
+        'SK\u00a0II\u00a00',
+        'SK\u00a0III\u00a01',
+        'SK\u00a0IV\u00a00',
+        'ohne\u00a0Sichtung\u00a01',
+      ].join('\u00a0· '),
     );
     expect(zeile(zeilen, 'warnstufe')).toMatchObject({
       wert: 'hoch',
@@ -258,19 +264,22 @@ describe('vorbereitungMarkdown', () => {
 
 /**
  * LFH-978 (U69): die Wertspalte bricht bei 390 und 820 px um. Mit normalen Leerzeichen riss sie
- * mitten in „SK III 6" und „ohne Sichtung 1". Umbrechen darf sie nur am Trenner.
+ * mitten in „SK III 6" und „ohne Sichtung 1". Umbrechen darf sie nur hinter dem Trenner.
  */
 describe('sichtungText (LFH-978)', () => {
   const sk = { sk1: 1, sk2: 3, sk3: 6, sk4: 1, tot: 2, unverletzt: 4, ohne: 1 };
 
-  it('verbindet die Teile mit „ · “, der einzigen Umbruchstelle', () => {
-    const teile = sichtungText(sk).split(' · ');
-    expect(teile).toHaveLength(7);
-    for (const teil of teile) expect(teil, teil).not.toMatch(/[ \t\n]/);
+  it('bricht nur hinter dem Punkt: geschützt davor, normales Leerzeichen danach', () => {
+    const text = sichtungText(sk);
+    expect(text.split('\u00a0· ')).toHaveLength(7);
+    // Das einzige normale Leerzeichen steht je Trenner hinter dem Punkt.
+    expect(text.match(/ /g)).toHaveLength(6);
+    expect(text).not.toMatch(/ ·/);
+    for (const teil of text.split('\u00a0· ')) expect(teil, teil).not.toMatch(/[ \t\n]/);
   });
 
   it('hält Kennung und Zahl jedes Teils mit geschütztem Leerzeichen zusammen', () => {
-    expect(sichtungText(sk).split(' · ')).toEqual([
+    expect(sichtungText(sk).split('\u00a0· ')).toEqual([
       'SK\u00a0I\u00a01',
       'SK\u00a0II\u00a03',
       'SK\u00a0III\u00a06',

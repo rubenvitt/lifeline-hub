@@ -244,7 +244,7 @@
 /* Schnellerfassungszeile: die ZEILE trägt Rahmen und Grund, das Feld darin nicht.
    Drei Klassen tief, damit antds `:where()`-gekapselte Feldregeln (bis 0,2,0 samt
    `:focus`) unterliegen, ohne `!important`.
-   Nur für das EINE Feld (ETB): mehrere Felder nebeneinander (Informationstelefon) behalten
+   Nur für das EINE Feld (ETB, Betroffene): mehrere Felder nebeneinander (Informationstelefon) behalten
    ihren Steuerrahmen über das Opt-in `felderUmrandet` (LFH-978). Dort war das Select umrandet,
    die Notiz nicht, und am Handy las sie sich wie eine Beschriftung. */
 .lfh-schnellerfassung

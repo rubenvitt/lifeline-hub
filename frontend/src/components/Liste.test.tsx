@@ -162,10 +162,6 @@ describe('Liste', () => {
 });
 
 /**
- * Gruppenkopf als Überschrift (LFH-470): ein Vorleser springt zwischen Überschriften, nicht
- * zwischen Divs. Die Ebene kennt nur der Einbauort — deshalb `unterEbene` wie bei `Markdown`.
- */
-/**
  * LFH-978 (U67): auf 390 px quetschte der Knopf rechts die Beschreibung auf ~190 px. `gestapelt`
  * ist ein Opt-in, die Zeile kennt keinen Breakpoint: der Aufrufer entscheidet nach seiner Breite.
  * Die Lage im Browser misst `e2e/stab-schmal.spec.ts`.
@@ -190,7 +186,7 @@ describe('ListenEintrag — gestapelt (LFH-978)', () => {
   it('stellt die Aktionen auf eine eigene Zeile unter den Inhalt, linksbündig', () => {
     const { wurzel, aktionen } = zeile(true);
     expect(wurzel.style.flexWrap).toBe('wrap');
-    expect(aktionen.style.flexBasis).toBe('100%');
+    expect(aktionen.style.flex).toBe('1 1 100%');
     expect(aktionen.style.justifyContent).toBe('flex-start');
   });
 
@@ -202,6 +198,10 @@ describe('ListenEintrag — gestapelt (LFH-978)', () => {
   });
 });
 
+/**
+ * Gruppenkopf als Überschrift (LFH-470): ein Vorleser springt zwischen Überschriften, nicht
+ * zwischen Divs. Die Ebene kennt nur der Einbauort — deshalb `unterEbene` wie bei `Markdown`.
+ */
 describe('Liste — Kopf ist eine Überschrift und benennt die Liste', () => {
   it('rendert den Kopf als Überschrift eine Ebene unter `unterEbene`', () => {
     renderMitProviders(

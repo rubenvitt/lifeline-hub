@@ -110,7 +110,7 @@ async function sichtungWert(page: Page): Promise<Locator> {
 }
 
 /**
- * Zahl der Zeilen der ganzen Wertzeile und je Teil (getrennt an „ · "): verschiedene Oberkanten
+ * Zahl der Zeilen der ganzen Wertzeile und je Teil samt folgendem „ ·": verschiedene Oberkanten
  * der Zeilenkästen eines `Range` über den Textknoten.
  */
 async function zeilenJeTeil(wert: Locator) {
@@ -126,11 +126,15 @@ async function zeilenJeTeil(wert: Locator) {
       ).size;
     };
     const inhalt = text.data;
+    const trenner = '\u00a0· ';
     const teile: { teil: string; zeilen: number }[] = [];
     let pos = 0;
-    for (const teil of inhalt.split(' · ')) {
-      teile.push({ teil, zeilen: zeilen(pos, pos + teil.length) });
-      pos += teil.length + ' · '.length;
+    const stuecke = inhalt.split(trenner);
+    for (const [i, teil] of stuecke.entries()) {
+      // Gemessen mit dem folgenden „ ·": auch der Punkt steht nie am Anfang einer Zeile.
+      const ende = pos + teil.length + (i < stuecke.length - 1 ? 2 : 0);
+      teile.push({ teil, zeilen: zeilen(pos, ende) });
+      pos += teil.length + trenner.length;
     }
     return { gesamt: zeilen(0, inhalt.length), teile };
   });
@@ -138,6 +142,8 @@ async function zeilenJeTeil(wert: Locator) {
 
 async function sichtungBrichtNurAmTrenner(page: Page, was: string) {
   const wert = await sichtungWert(page);
+  // Die Umbrüche hängen an der Schriftbreite: erst messen, wenn die Webfonts stehen.
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   const m = await zeilenJeTeil(wert);
   expect(
     m.gesamt,

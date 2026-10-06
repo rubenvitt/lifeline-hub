@@ -101,7 +101,7 @@ interface SchnellerfassungszeileProps {
    * Die Felder der Zelle behalten ihren Steuerrahmen (LFH-978). Opt-in für eine Zelle mit
    * mehreren Feldern (Informationstelefon: Anliegen, Notiz, Haken, Knopf): rahmenlos stand das
    * Textfeld neben einem umrandeten Select und las sich am Handy wie eine Beschriftung. Das
-   * eine Feld des ETB bleibt rahmenlos, dort trägt die Zeile den Rahmen.
+   * eine Feld (ETB, Betroffene) bleibt rahmenlos, dort trägt die Zeile den Rahmen.
    */
   felderUmrandet?: boolean;
   style?: CSSProperties;

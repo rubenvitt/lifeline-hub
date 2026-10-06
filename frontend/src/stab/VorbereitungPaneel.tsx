@@ -180,7 +180,7 @@ export default function VorbereitungPaneel({
             style={{
               display: 'grid',
               // Beide Spalten dürfen schrumpfen: die Sichtung ist lang und bricht um, statt auf
-              // 390 px über den Rand zu laufen. Nur an „ · “: innerhalb eines Teils stehen
+              // 390 px über den Rand zu laufen. Nur hinter „ · “: im Teil und vor dem Punkt stehen
               // geschützte Leerzeichen (`sichtungText`, LFH-978); `overflowWrap` an der
               // Wertspalte bleibt Notbremse für einen Teil, der allein nicht passt.
               gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)',
