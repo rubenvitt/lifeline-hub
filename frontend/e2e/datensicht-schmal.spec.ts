@@ -389,8 +389,9 @@ test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet d
   const werkzeuge = page.locator('[data-lfh="datensicht-werkzeuge"]');
   const schalter = werkzeuge.getByRole('button', { name: /^Spalten/ });
   await expect(schalter).toHaveCount(1);
-  // Namentlich: „Träger" ist bei 1366 px sichtbar UND wählbar — beides braucht der Test.
-  const ZIELSPALTE = 'Träger';
+  // Namentlich: „Funktion" ist bei 1366 px sichtbar UND wählbar — beides braucht der Test.
+  // „Träger" weicht seit LFH-975 unterhalb von `xxl` und stünde hier schon im Zähler.
+  const ZIELSPALTE = 'Funktion';
 
   // Der Zähler steht als Text im Namen des Knopfes und zählt Handauswahl und `abBreite`.
   const zaehler = async () => {

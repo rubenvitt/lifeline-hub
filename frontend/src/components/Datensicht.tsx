@@ -1247,13 +1247,20 @@ export default function Datensicht<T extends object, const K extends string>(
       ? [
           {
             ...antdSpalten[0],
+            // NEBENEINANDER, NICHT GESTAPELT (LFH-975): der Auslöser steht in derselben Zeile wie
+            // die Kennung und bricht erst um, wenn der Platz fehlt (am Handy). Gestapelt verdoppelte
+            // er die Zeilenhöhe (rund 71 px am Desktop), und nur die Hälfte der Kräfte passte auf
+            // einen Schirm. Der Ort bleibt die Kennungszelle (LFH-676, keine eigene Spalte); die
+            // Höhe des Knopfs folgt weiter der Dichte, die Trefffläche bleibt also.
             render: (wert: unknown, zeile: T, index: number) => (
               <div
+                data-lfh="datensicht-aufklapp-zelle"
                 style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: token.marginXXS,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  columnGap: token.marginXS,
+                  rowGap: token.marginXXS,
                 }}
               >
                 {ersteZelle(wert, zeile, index)}

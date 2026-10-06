@@ -1176,6 +1176,23 @@ describe('Datensicht · Aufklappbereich (LFH-676)', () => {
     expect(container.querySelector('.ant-table-row-expand-icon-cell')).toBeNull();
   });
 
+  it('tabelle: Auslöser und Kennung stehen in EINER umbrechenden Zeile, nicht gestapelt (LFH-975)', () => {
+    // Gestapelt verdoppelte der Auslöser die Zeilenhöhe; nebeneinander bricht er nur um, wenn
+    // der Platz fehlt.
+    const { container } = rendere({
+      form: 'tabelle',
+      aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`),
+    });
+    const kennung = container.querySelector('tr[data-row-key="1"] > td') as HTMLElement;
+    const knopf = within(kennung).getByRole('button', { name: 'Verlauf zu Florian 1' });
+    const zeile = knopf.parentElement as HTMLElement;
+    expect(zeile).toHaveTextContent('Florian 1');
+    expect(zeile.style.display).toBe('flex');
+    expect(zeile.style.flexDirection).not.toBe('column');
+    expect(zeile.style.flexWrap).toBe('wrap');
+    expect(zeile.style.alignItems).toBe('center');
+  });
+
   it('karte: der Inhalt steht in einer Region, auf die der Auslöser zeigt', async () => {
     rendere({ form: 'karte', aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`) });
     const knopf = screen.getByRole('button', { name: 'Verlauf zu Rotkreuz 2' });
