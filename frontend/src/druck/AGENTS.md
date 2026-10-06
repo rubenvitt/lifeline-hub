@@ -39,8 +39,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **Modul-Listen-Druck** (LFH-727, Herleitung
   `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/design.md`): `/einsaetze/:id/{personen|tiere|schaeden}/druck`
   über den Rahmen `druck/ListenDruckSeite.tsx` und `druck/DruckTabelle.tsx` (schlichtes `<table>`,
-  aufsteigend nach Registriernummer); Einstieg `druck/DruckAnsichtKnopf.tsx` im Kopf der Liste, auch
-  ohne Schreibrecht. Der Seitenfilter reist in der Adresse (`personenDruckPfad` usw.), fehlend =
+  aufsteigend nach Registriernummer); Einstieg als Nebenweg `weitere` der `EinsatzSeite` im Kopf
+  der Liste (LFH-963), auch ohne Schreibrecht. Der Seitenfilter reist in der Adresse (`personenDruckPfad` usw.), fehlend =
   „alle“; gefiltert wird mit der Funktion der Liste. Keys `personenDruck`/`tiereDruck`/`schaedenDruck`
   nicht live, außerhalb des Offline-Lagebilds. Query-Felder einzeln an den Rahmen geben, nie das
   Ergebnisobjekt (`useQuery` beobachtet nur, was die Seite liest).

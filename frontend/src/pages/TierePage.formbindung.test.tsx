@@ -88,7 +88,7 @@ describe('TierePage · Formularbindung (LFH-627)', () => {
     render('/einsaetze/1/tiere');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Zu Einsatz B' }));
-    await screen.findByRole('button', { name: 'Schnellerfassung' });
+    await screen.findByRole('button', { name: 'Tier erfassen' });
     await act(naechsterMakrotask);
 
     expect(unverbundenWarnungen(spy)).toEqual([]);

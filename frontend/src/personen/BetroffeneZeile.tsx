@@ -97,6 +97,8 @@ export default function BetroffeneZeile({
   const eigenesFeld = useRef<InputRef>(null);
   const sendetRef = useRef(false);
   const [text, setText] = useState('');
+  /** Kürzel-Hinweis unter `md` aufgeklappt? Ab `md` steht er immer (LFH-963). */
+  const [kuerzelOffen, setKuerzelOffen] = useState(false);
   /** Fehler des letzten Absende-Versuchs (Prüfung ODER Server) — steht bis zur nächsten Eingabe. */
   const [versuchFehler, setVersuchFehler] = useState<string[] | null>(null);
 
@@ -152,14 +154,39 @@ export default function BetroffeneZeile({
             visibility: leer ? 'visible' : 'hidden',
           }}
         >
-          <span>
-            Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
-          </span>
-          <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
-          <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
-          {/* Das Format zeigt der Platzhalter nicht, also hier. */}
-          <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
-          <span style={{ color: rollen.gedaempft }}>@UHS</span>
+          {/* Unter `md` eingeklappt (LFH-963, design.md D6): drei Zeilen Kürzel kosteten am Handy
+              den Platz der ersten Person. Ein Knopf klappt sie auf. */}
+          {istSchmal && !kuerzelOffen ? (
+            <Button
+              type="link"
+              aria-expanded={false}
+              onClick={() => setKuerzelOffen(true)}
+              style={{ paddingInline: 0 }}
+            >
+              Kürzel anzeigen
+            </Button>
+          ) : (
+            <>
+              <span>
+                Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
+              </span>
+              <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
+              <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+              {/* Das Format zeigt der Platzhalter nicht, also hier. */}
+              <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
+              <span style={{ color: rollen.gedaempft }}>@UHS</span>
+              {istSchmal && (
+                <Button
+                  type="link"
+                  aria-expanded
+                  onClick={() => setKuerzelOffen(false)}
+                  style={{ paddingInline: 0 }}
+                >
+                  Kürzel ausblenden
+                </Button>
+              )}
+            </>
+          )}
         </span>
         {!leer && (
           <span

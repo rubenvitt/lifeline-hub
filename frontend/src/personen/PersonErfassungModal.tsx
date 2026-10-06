@@ -17,10 +17,10 @@ import AufnahmeFelder, {
 /** Erfassungs-Modi der Personen-Schnellerfassung. `null` = Modal geschlossen. */
 export type ErfassungsModus = AufnahmeModus;
 
-const TITEL: Record<ErfassungsModus, string> = {
-  schnell: 'Schnellerfassung',
+/** Ein Titel je Modus — eine allgemeine Maske, dazu „Vermisst melden“ (LFH-963). */
+export const ERFASSUNG_TITEL: Record<ErfassungsModus, string> = {
+  erfassen: 'Betroffene erfassen',
   vermisst: 'Vermisst melden',
-  betroffen: 'Betroffene/n erfassen',
 };
 
 interface Props {
@@ -42,7 +42,7 @@ interface Props {
 }
 
 /**
- * Schnellerfassungs-Modal für Personen (Schnell/Vermisst/Betroffen) auf `ErfassungsModal`.
+ * Erfassungs-Modal für Betroffene (allgemein oder vermisst) auf `ErfassungsModal`.
  * Der Aufrufer hält `modus` und die Anlege-Mutation, das Modal nur das Formular; zurückgesetzt
  * wird von der Hülle. Die Felder kommen aus `AufnahmeFelder` (dort begründet).
  *
@@ -90,7 +90,7 @@ export default function PersonErfassungModal({
   return (
     <ErfassungsModal<AufnahmeWerte>
       offen={modus !== null}
-      titel={modus === null ? '' : TITEL[modus]}
+      titel={modus === null ? '' : ERFASSUNG_TITEL[modus]}
       form={form}
       // Die Koordinate ist im Formular EIN Textfeld; zerlegt wird hier (dieselbe Funktion wie an der
       // Aufnahme-Route).
@@ -103,7 +103,7 @@ export default function PersonErfassungModal({
       uebernahme={['antreff_ort']}
     >
       <FormularEingehaengt onWechsel={formular.melde} />
-      <AufnahmeFelder modus={modus ?? 'schnell'} />
+      <AufnahmeFelder modus={modus ?? 'erfassen'} />
     </ErfassungsModal>
   );
 }
