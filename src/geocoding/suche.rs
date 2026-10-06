@@ -221,13 +221,21 @@ pub async fn suche_mit(
 
     // Fehler werden ohne URL geloggt: sie trüge den Suchtext.
     let treffer = match client.get(url).send().await {
-        Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
-            Ok(v) => lies_treffer(&v),
-            Err(_) => {
-                tracing::debug!("Geocoder-Suche: Antwort kein JSON");
-                None
+        Ok(r) if r.status().is_success() => {
+            match crate::http_begrenzt::lies_json_begrenzt::<serde_json::Value>(
+                r,
+                crate::http_begrenzt::DECKEL_GEOCODER,
+            )
+            .await
+            {
+                Ok(v) => lies_treffer(&v),
+                // Der Fehler trägt keine URL (`lies_begrenzt`), also keinen Suchtext.
+                Err(e) => {
+                    tracing::debug!("Geocoder-Suche: {e}");
+                    None
+                }
             }
-        },
+        }
         Ok(r) => {
             tracing::debug!("Geocoder-Suche HTTP {}", r.status());
             None
@@ -409,6 +417,38 @@ mod tests {
         )
         .await;
         assert_eq!(e, SuchErgebnis::NichtErreichbar);
+    }
+
+    /// LFH-923: Eine gzip-Bombe auf `/search` endet am Deckel als `NichtErreichbar` und wird
+    /// nicht gecacht.
+    #[tokio::test]
+    async fn gzip_bombe_ist_nicht_erreichbar() {
+        let gepackt = crate::http_begrenzt::fixture::gzip_nullen(8 * 1024 * 1024);
+        let base = crate::http_begrenzt::fixture::bediene(axum::Router::new().route(
+            "/search",
+            axum::routing::get(move || {
+                let g = gepackt.clone();
+                async move { crate::http_begrenzt::fixture::gzip_antwort(g) }
+            }),
+        ))
+        .await;
+        let cache = Mutex::new(SuchCache::default());
+        let e = suche_mit(
+            &super::super::geocoder_client(),
+            &bucket_voll(),
+            &cache,
+            &base,
+            "Hauptstraße",
+            None,
+            Duration::ZERO,
+        )
+        .await;
+        assert_eq!(e, SuchErgebnis::NichtErreichbar);
+        assert!(cache
+            .lock()
+            .unwrap()
+            .lese(&cache_schluessel(&base, "Hauptstraße", None))
+            .is_none());
     }
 
     #[tokio::test]

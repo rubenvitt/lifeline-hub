@@ -121,7 +121,10 @@ async fn hole(
         if !resp.status().is_success() {
             return Err(format!("HTTP {}", resp.status()));
         }
-        let roh: Value = resp.json().await.map_err(|e| e.to_string())?;
+        let roh: Value =
+            crate::http_begrenzt::lies_json_begrenzt(resp, crate::http_begrenzt::DECKEL_FACHEBENE)
+                .await
+                .map_err(|e| e.to_string())?;
         parse_reihe(&roh)
             .map(Some)
             .ok_or_else(|| "Antwort ist keine Vorhersage-Reihe".to_string())

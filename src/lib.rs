@@ -32,6 +32,7 @@ pub mod fuehrung;
 pub mod gefahr;
 pub mod geocoding;
 pub mod geraet;
+pub mod http_begrenzt;
 pub mod infotelefon;
 pub mod karte;
 pub mod karte_hintergrundbild;

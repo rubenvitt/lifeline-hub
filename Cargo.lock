@@ -3393,6 +3393,7 @@ dependencies = [
  "chrono-tz",
  "clamav-client",
  "clap",
+ "flate2",
  "fs4",
  "futures",
  "http-body",

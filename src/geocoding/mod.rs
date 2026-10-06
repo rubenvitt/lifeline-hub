@@ -48,15 +48,24 @@ static STATICS: OnceLock<Statics> = OnceLock::new();
 
 fn statics() -> &'static Statics {
     STATICS.get_or_init(|| Statics {
-        client: reqwest::Client::builder()
-            .timeout(GEOCODER_TIMEOUT)
-            .user_agent("LifelineHub-Geocoder/1.0 (+https://github.com/)")
-            .build()
-            .expect("reqwest-Client baubar"),
+        client: geocoder_client(),
         bucket: Arc::new(Mutex::new(TokenBucket::neu(1.0, 1.0))),
         inflight: Arc::new(Mutex::new(HashSet::new())),
         suche_cache: Mutex::new(suche::SuchCache::default()),
     })
+}
+
+/// Prozessweiter Geocoder-Client. Folgt keinem Redirect (LFH-923): ein Redirect wiese den Abruf
+/// auf ein Ziel, das der Admin nicht eingetragen hat; die freie Wahl der Geocoder-URL selbst
+/// bleibt davon unberührt. Die Antwort liest jeder Abruf über [`crate::http_begrenzt`] mit
+/// [`DECKEL_GEOCODER`](crate::http_begrenzt::DECKEL_GEOCODER), auch die gzip-gepackte.
+fn geocoder_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(GEOCODER_TIMEOUT)
+        .user_agent("LifelineHub-Geocoder/1.0 (+https://github.com/)")
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("reqwest-Client baubar")
 }
 
 /// Einfacher Token-Bucket (max. `kapazitaet` Tokens, Nachfüllrate `rate_pro_sek`).
@@ -142,16 +151,23 @@ async fn geocode_und_schreibe(
         base_url.trim_end_matches('/')
     );
     let name = match client.get(&url).send().await {
-        Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
-            Ok(v) => v
-                .get("display_name")
-                .and_then(|n| n.as_str())
-                .map(String::from),
-            Err(e) => {
-                tracing::debug!("Geocoder-JSON-Parse: {e}");
-                None
+        Ok(r) if r.status().is_success() => {
+            match crate::http_begrenzt::lies_json_begrenzt::<serde_json::Value>(
+                r,
+                crate::http_begrenzt::DECKEL_GEOCODER,
+            )
+            .await
+            {
+                Ok(v) => v
+                    .get("display_name")
+                    .and_then(|n| n.as_str())
+                    .map(String::from),
+                Err(e) => {
+                    tracing::debug!("Geocoder-Antwort: {e}");
+                    None
+                }
             }
-        },
+        }
         Ok(r) => {
             tracing::debug!("Geocoder HTTP {}", r.status());
             None
@@ -219,6 +235,7 @@ pub async fn reverse_mit(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::response::IntoResponse;
 
     #[test]
     fn token_bucket_erlaubt_eines_dann_sperrt() {
@@ -405,6 +422,76 @@ mod tests {
         assert!(
             aktualisiert,
             "Hintergrund-Refresh hätte den Cache aktualisieren müssen"
+        );
+    }
+
+    /// Bedient `/reverse` mit einer beliebigen Antwort (LFH-923).
+    async fn reverse_fixture(
+        antwort: impl Fn() -> axum::response::Response + Clone + Send + Sync + 'static,
+    ) -> String {
+        crate::http_begrenzt::fixture::bediene(axum::Router::new().route(
+            "/reverse",
+            axum::routing::get(move || {
+                let a = antwort.clone();
+                async move { a() }
+            }),
+        ))
+        .await
+    }
+
+    async fn reverse_ueber_prod_client(base: &str) -> Option<String> {
+        let pool = crate::db::test_pool().await;
+        reverse_mit(
+            &geocoder_client(),
+            &arc_bucket(false),
+            &arc_inflight(),
+            &pool,
+            base,
+            50.0,
+            9.0,
+        )
+        .await
+    }
+
+    /// LFH-923: Eine gzip-Bombe (8 MiB Nullen, wenige KB gepackt) endet am Deckel mit `None`,
+    /// nicht mit einem Speicherwachstum um das Entpackte.
+    #[tokio::test]
+    async fn gzip_bombe_liefert_none() {
+        let gepackt = crate::http_begrenzt::fixture::gzip_nullen(8 * 1024 * 1024);
+        let base =
+            reverse_fixture(move || crate::http_begrenzt::fixture::gzip_antwort(gepackt.clone()))
+                .await;
+        assert_eq!(reverse_ueber_prod_client(&base).await, None);
+    }
+
+    /// LFH-923: Ein Rumpf über dem Deckel liefert `None`, auch ohne Content-Length.
+    #[tokio::test]
+    async fn uebergrosse_antwort_liefert_none() {
+        let base = reverse_fixture(|| {
+            crate::http_begrenzt::fixture::strom_antwort(crate::http_begrenzt::DECKEL_GEOCODER + 1)
+        })
+        .await;
+        assert_eq!(reverse_ueber_prod_client(&base).await, None);
+    }
+
+    /// LFH-923: Der Client folgt keinem Redirect; das Ziel hätte einen Namen geliefert.
+    #[tokio::test]
+    async fn redirect_wird_nicht_verfolgt() {
+        let (ziel, _h) = stub(serde_json::json!({ "display_name": "Umgeleitet" })).await;
+        let base = reverse_fixture(move || {
+            axum::response::Redirect::temporary(&format!("{ziel}/reverse")).into_response()
+        })
+        .await;
+        assert_eq!(reverse_ueber_prod_client(&base).await, None);
+    }
+
+    /// Gegenprobe zu den Tests oben: der Prod-Client liest eine gewöhnliche Antwort.
+    #[tokio::test]
+    async fn prod_client_liest_gewoehnliche_antwort() {
+        let (base, _h) = stub(serde_json::json!({ "display_name": "Hauptstr. 5" })).await;
+        assert_eq!(
+            reverse_ueber_prod_client(&base).await.as_deref(),
+            Some("Hauptstr. 5")
         );
     }
 }
