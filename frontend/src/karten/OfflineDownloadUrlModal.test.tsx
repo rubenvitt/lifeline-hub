@@ -170,7 +170,7 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
 
   it.each([
     ['http://example.test/de.mbtiles', 'Nur https-Adressen'],
-    ['https://example.test/de.pmtiles', 'Keine .mbtiles-Datei'],
+    ['example.test/de.mbtiles', 'Keine gültige Adresse'],
   ])('prüft die URL statt sie zu erklären: %s', async (url, meldung) => {
     const gesendet = vi.fn();
     handler(gesendet);

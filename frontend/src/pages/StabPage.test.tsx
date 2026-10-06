@@ -205,8 +205,8 @@ describe('StabPage', () => {
     await waitFor(() => expect(within(r).getAllByRole('checkbox')).toHaveLength(7));
     for (const b of within(r).getAllByRole('checkbox')) expect(b).toBeDisabled();
     // Der Grund steht EINMAL im Kopf der Seite, nicht noch einmal im Paneel.
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-    expect(within(r).queryByRole('alert')).toBeNull();
+    expect(screen.getAllByText('Nur Ansicht')).toHaveLength(1);
+    expect(within(r).queryByText('Nur Ansicht')).toBeNull();
   });
 
   it('nennt die Besetzung beim Wort', async () => {
