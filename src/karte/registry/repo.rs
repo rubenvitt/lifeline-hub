@@ -77,23 +77,177 @@ pub async fn aktive_online_quellen_fuer_config(
 
 // --- Proxy-Slot-Map (LFH-182): opake Slot-IDs ↔ Upstream-URLs (inkl. Key, nur serverseitig) ---
 
-/// Legt einen Slot für (`quelle_id`, `upstream_url`) an oder gibt den bestehenden zurück
-/// (dedup via UNIQUE). Liefert die Slot-`id`.
-pub async fn slot_upsert(
+/// Ein Proxy-Slot mit seiner Herkunft (LFH-932): `herkunft_id` `None` = aus dem Style-Dokument
+/// der Quelle, sonst die Slot-id des TileJSON-Dokuments, das ihn nennt. `verwaist_seit` (Unix-
+/// Sekunden) ist gesetzt, solange sein Dokument ihn nicht mehr nennt.
+#[derive(Debug, sqlx::FromRow)]
+pub struct SlotZeile {
+    pub id: i64,
+    pub upstream_url: String,
+    pub art: String,
+    pub herkunft_id: Option<i64>,
+    pub verwaist_seit: Option<i64>,
+}
+
+/// Alle Slots einer Quelle (reiner Lesezugriff).
+pub async fn slots_der_quelle(
     pool: &SqlitePool,
     quelle_id: i64,
-    upstream_url: &str,
-    art: &str,
-) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar::<_, i64>(
-        "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (?, ?, ?) \
-         ON CONFLICT(quelle_id, upstream_url, art) DO UPDATE SET art = excluded.art RETURNING id",
+) -> Result<Vec<SlotZeile>, sqlx::Error> {
+    sqlx::query_as::<_, SlotZeile>(
+        "SELECT id, upstream_url, art, herkunft_id, verwaist_seit \
+         FROM karte_proxy_asset WHERE quelle_id = ?",
     )
     .bind(quelle_id)
-    .bind(upstream_url)
-    .bind(art)
-    .fetch_one(pool)
+    .fetch_all(pool)
     .await
+}
+
+/// Ein wiedergefundener Slot: `(id, upstream_url, art)` aus dem gelesenen Bestand.
+pub type Wiedergefunden = (i64, String, String);
+
+/// Sichert die Slots, die ein Dokument nennt, in EINER Schreibtransaktion (Writer-Disziplin,
+/// `write_retry!`): legt `neu` (`(upstream_url, art)`) mit `herkunft` an, hängt `umhaengen`
+/// (Bestandszeilen ohne Herkunft) auf `herkunft` um und hebt bei `wiedergefunden` die
+/// Verwaisung auf; das nennende Dokument übernimmt sie (Herkunft `herkunft`), sonst markierte
+/// das alte sie beim nächsten Abruf wieder. Liefert die ids zu `neu` und zu `wiedergefunden`,
+/// je in deren Reihenfolge: hat ein paralleler Abruf einen wiedergefundenen Slot inzwischen
+/// gelöscht, wird er neu angelegt, und seine id ändert sich. Wer nichts zu sichern hat, ruft das
+/// nicht auf: ein unverändertes Dokument schreibt nichts.
+pub async fn slots_sichern(
+    pool: &SqlitePool,
+    quelle_id: i64,
+    herkunft: Option<i64>,
+    neu: &[(String, String)],
+    umhaengen: &[i64],
+    wiedergefunden: &[Wiedergefunden],
+) -> Result<(Vec<i64>, Vec<i64>), crate::error::AppError> {
+    crate::write_retry!(pool, |conn| {
+        let mut wieder_ids = Vec::with_capacity(wiedergefunden.len());
+        for (id, url, art) in wiedergefunden {
+            let getroffen = sqlx::query(
+                "UPDATE karte_proxy_asset SET verwaist_seit = NULL, herkunft_id = ? \
+                 WHERE id = ? AND quelle_id = ? AND verwaist_seit IS NOT NULL",
+            )
+            .bind(herkunft)
+            .bind(id)
+            .bind(quelle_id)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected();
+            let id = if getroffen == 1 {
+                *id
+            } else {
+                // Inzwischen gelöscht (oder schon von einem parallelen Abruf entmarkiert).
+                slot_sichern_tx(&mut *conn, quelle_id, herkunft, url, art).await?
+            };
+            wieder_ids.push(id);
+        }
+        for &id in umhaengen {
+            sqlx::query(
+                "UPDATE karte_proxy_asset SET herkunft_id = ? \
+                 WHERE id = ? AND quelle_id = ? AND herkunft_id IS NULL",
+            )
+            .bind(herkunft)
+            .bind(id)
+            .bind(quelle_id)
+            .execute(&mut *conn)
+            .await?;
+        }
+        let mut ids = Vec::with_capacity(neu.len());
+        for (url, art) in neu {
+            ids.push(slot_sichern_tx(&mut *conn, quelle_id, herkunft, url, art).await?);
+        }
+        Ok((ids, wieder_ids))
+    })
+}
+
+/// Legt einen Slot an, falls es ihn nicht gibt, und liefert seine id.
+async fn slot_sichern_tx(
+    conn: &mut sqlx::SqliteConnection,
+    quelle_id: i64,
+    herkunft: Option<i64>,
+    url: &str,
+    art: &str,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art, herkunft_id) \
+         VALUES (?, ?, ?, ?) ON CONFLICT (quelle_id, upstream_url, art) DO NOTHING",
+    )
+    .bind(quelle_id)
+    .bind(url)
+    .bind(art)
+    .bind(herkunft)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query_scalar(
+        "SELECT id FROM karte_proxy_asset WHERE quelle_id = ? AND upstream_url = ? AND art = ?",
+    )
+    .bind(quelle_id)
+    .bind(url)
+    .bind(art)
+    .fetch_one(&mut *conn)
+    .await
+}
+
+/// Pflegt die Waisen einer Herkunft in EINER Schreibtransaktion: markiert `verwaisen` mit
+/// `jetzt` und löscht `loeschen`, sofern sie noch dieser Herkunft gehören und seit spätestens
+/// `verwaist_bis` verwaist sind (ein paralleler Abruf kann sie inzwischen wiedergefunden haben).
+/// Vor dem Löschen eines TileJSON-Slots gehen seine Kachel-Slots verwaist an den Style zurück
+/// (Herkunft NULL, Markierung `jetzt`, eine ältere bleibt): nennt ein anderes Dokument sie noch,
+/// holt es sie zurück, statt dass sie mit ihrem Dokument verschwinden.
+pub async fn waisen_pflegen(
+    pool: &SqlitePool,
+    quelle_id: i64,
+    herkunft: Option<i64>,
+    verwaisen: &[i64],
+    loeschen: &[i64],
+    jetzt: i64,
+    verwaist_bis: i64,
+) -> Result<(), crate::error::AppError> {
+    crate::write_retry!(pool, |conn| {
+        for &id in verwaisen {
+            sqlx::query(
+                "UPDATE karte_proxy_asset SET verwaist_seit = ? \
+                 WHERE id = ? AND quelle_id = ? AND herkunft_id IS ? AND verwaist_seit IS NULL",
+            )
+            .bind(jetzt)
+            .bind(id)
+            .bind(quelle_id)
+            .bind(herkunft)
+            .execute(&mut *conn)
+            .await?;
+        }
+        for &id in loeschen {
+            // Erst die Kachel-Slots freigeben (nur wenn der Slot wirklich geht), dann löschen.
+            sqlx::query(
+                "UPDATE karte_proxy_asset \
+                 SET herkunft_id = NULL, verwaist_seit = COALESCE(verwaist_seit, ?) \
+                 WHERE herkunft_id = ? AND EXISTS (SELECT 1 FROM karte_proxy_asset p \
+                     WHERE p.id = ? AND p.quelle_id = ? AND p.herkunft_id IS ? \
+                       AND p.verwaist_seit <= ?)",
+            )
+            .bind(jetzt)
+            .bind(id)
+            .bind(id)
+            .bind(quelle_id)
+            .bind(herkunft)
+            .bind(verwaist_bis)
+            .execute(&mut *conn)
+            .await?;
+            sqlx::query(
+                "DELETE FROM karte_proxy_asset \
+                 WHERE id = ? AND quelle_id = ? AND herkunft_id IS ? AND verwaist_seit <= ?",
+            )
+            .bind(id)
+            .bind(quelle_id)
+            .bind(herkunft)
+            .bind(verwaist_bis)
+            .execute(&mut *conn)
+            .await?;
+        }
+        Ok(())
+    })
 }
 
 /// Löst einen Slot zu seiner Upstream-URL auf — nur bei passender `quelle_id` UND `art`
@@ -971,20 +1125,39 @@ mod tests {
         assert_eq!(row.typ, "vektor");
     }
 
+    /// Ein Slot aus dem Style-Dokument über den Abgleich (legt an oder findet den bestehenden).
+    async fn slot_anlegen(
+        pool: &SqlitePool,
+        quelle_id: i64,
+        url: &str,
+        art: &str,
+    ) -> Result<i64, crate::error::AppError> {
+        let (ids, _) = slots_sichern(
+            pool,
+            quelle_id,
+            None,
+            &[(url.to_string(), art.to_string())],
+            &[],
+            &[],
+        )
+        .await?;
+        Ok(ids[0])
+    }
+
     #[tokio::test]
-    async fn slot_upsert_dedupliziert_und_aufloesen_scoped() {
+    async fn slot_anlegen_dedupliziert_und_aufloesen_scoped() {
         let pool = test_pool().await;
         let q = anlegen_online_quelle(&pool, &eingabe("S", 1, true))
             .await
             .unwrap();
-        let s1 = slot_upsert(&pool, q.id, "https://h/a?key=K", "template")
+        let s1 = slot_anlegen(&pool, q.id, "https://h/a?key=K", "template")
             .await
             .unwrap();
-        let s1b = slot_upsert(&pool, q.id, "https://h/a?key=K", "template")
+        let s1b = slot_anlegen(&pool, q.id, "https://h/a?key=K", "template")
             .await
             .unwrap();
         assert_eq!(s1, s1b, "gleiche url → gleiche id (dedup)");
-        let s2 = slot_upsert(&pool, q.id, "https://h/b", "sprite")
+        let s2 = slot_anlegen(&pool, q.id, "https://h/b", "sprite")
             .await
             .unwrap();
         assert_ne!(s1, s2, "andere url → neue id");
@@ -1019,17 +1192,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn slot_upsert_gleiche_url_zwei_arten_zwei_slots() {
+    async fn slot_anlegen_gleiche_url_zwei_arten_zwei_slots() {
         // `art` ist Teil der Identität: dieselbe URL in zwei Rollen bekommt zwei Slots (sonst
         // überschriebe ON CONFLICT eine Art).
         let pool = test_pool().await;
         let q = anlegen_online_quelle(&pool, &eingabe("U", 1, true))
             .await
             .unwrap();
-        let a = slot_upsert(&pool, q.id, "https://h/x", "sprite")
+        let a = slot_anlegen(&pool, q.id, "https://h/x", "sprite")
             .await
             .unwrap();
-        let b = slot_upsert(&pool, q.id, "https://h/x", "tilejson")
+        let b = slot_anlegen(&pool, q.id, "https://h/x", "tilejson")
             .await
             .unwrap();
         assert_ne!(a, b, "gleiche URL, andere art → eigener Slot");
@@ -1049,6 +1222,114 @@ mod tests {
         );
     }
 
+    async fn slot_zeile(pool: &SqlitePool, id: i64) -> Option<(Option<i64>, Option<i64>)> {
+        sqlx::query_as("SELECT herkunft_id, verwaist_seit FROM karte_proxy_asset WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn wiedergefundener_slot_den_ein_paralleler_abruf_loeschte_wird_neu_angelegt() {
+        let pool = test_pool().await;
+        let q = anlegen_online_quelle(&pool, &eingabe("S", 1, true))
+            .await
+            .unwrap();
+        let alt = slot_anlegen(&pool, q.id, "https://h/a", "sprite")
+            .await
+            .unwrap();
+        // Abruf B hat `alt` verwaist gelesen; Abruf A löscht ihn vorher nach der Karenz.
+        waisen_pflegen(&pool, q.id, None, &[alt], &[], 1, 0)
+            .await
+            .unwrap();
+        waisen_pflegen(&pool, q.id, None, &[], &[alt], 1, 1)
+            .await
+            .unwrap();
+        assert_eq!(slot_zeile(&pool, alt).await, None);
+
+        let (_, wieder) = slots_sichern(
+            &pool,
+            q.id,
+            None,
+            &[],
+            &[],
+            &[(alt, "https://h/a".into(), "sprite".into())],
+        )
+        .await
+        .unwrap();
+        assert_ne!(
+            wieder[0], alt,
+            "AUTOINCREMENT vergibt die gelöschte id nicht neu"
+        );
+        assert_eq!(
+            slot_aufloesen(&pool, q.id, wieder[0], "sprite")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("https://h/a"),
+            "das ausgelieferte Dokument zeigt auf einen lebenden Slot"
+        );
+    }
+
+    #[tokio::test]
+    async fn waisen_pflegen_faellt_nur_was_seit_der_karenz_verwaist_ist_und_gibt_kinder_frei() {
+        let pool = test_pool().await;
+        let q = anlegen_online_quelle(&pool, &eingabe("S", 1, true))
+            .await
+            .unwrap();
+        let tj = slot_anlegen(&pool, q.id, "https://h/tj", "tilejson")
+            .await
+            .unwrap();
+        let (kinder, _) = slots_sichern(
+            &pool,
+            q.id,
+            Some(tj),
+            &[
+                ("https://h/k1".into(), "template".into()),
+                ("https://h/k2".into(), "template".into()),
+            ],
+            &[],
+            &[],
+        )
+        .await
+        .unwrap();
+        // k2 hat das TileJSON selbst schon früher verwaist.
+        waisen_pflegen(&pool, q.id, Some(tj), &[kinder[1]], &[], 5, 0)
+            .await
+            .unwrap();
+
+        // Nicht verwaist (ein paralleler Abruf hat es wiedergefunden): bleibt, Kinder auch.
+        waisen_pflegen(&pool, q.id, None, &[], &[tj], 100, 50)
+            .await
+            .unwrap();
+        assert_eq!(slot_zeile(&pool, tj).await, Some((None, None)));
+        assert_eq!(slot_zeile(&pool, kinder[0]).await, Some((Some(tj), None)));
+
+        // Verwaist, aber jünger als die Karenz: bleibt.
+        waisen_pflegen(&pool, q.id, None, &[tj], &[], 60, 0)
+            .await
+            .unwrap();
+        waisen_pflegen(&pool, q.id, None, &[], &[tj], 100, 50)
+            .await
+            .unwrap();
+        assert_eq!(slot_zeile(&pool, tj).await, Some((None, Some(60))));
+
+        // Fremde Herkunft: bleibt.
+        waisen_pflegen(&pool, q.id, Some(tj), &[], &[tj], 100, 70)
+            .await
+            .unwrap();
+        assert!(slot_zeile(&pool, tj).await.is_some());
+
+        // Fällig: geht, die Kinder gehen verwaist an den Style (ältere Markierung bleibt).
+        waisen_pflegen(&pool, q.id, None, &[], &[tj], 100, 70)
+            .await
+            .unwrap();
+        assert_eq!(slot_zeile(&pool, tj).await, None);
+        assert_eq!(slot_zeile(&pool, kinder[0]).await, Some((None, Some(100))));
+        assert_eq!(slot_zeile(&pool, kinder[1]).await, Some((None, Some(5))));
+    }
+
     #[tokio::test]
     async fn slots_loeschen_nur_eigene() {
         let pool = test_pool().await;
@@ -1058,10 +1339,10 @@ mod tests {
         let b = anlegen_online_quelle(&pool, &eingabe("B", 2, true))
             .await
             .unwrap();
-        let sa = slot_upsert(&pool, a.id, "https://h/a", "static")
+        let sa = slot_anlegen(&pool, a.id, "https://h/a", "static")
             .await
             .unwrap();
-        let sb = slot_upsert(&pool, b.id, "https://h/b", "static")
+        let sb = slot_anlegen(&pool, b.id, "https://h/b", "static")
             .await
             .unwrap();
         let n = slots_loeschen(&pool, a.id).await.unwrap();
@@ -1090,7 +1371,7 @@ mod tests {
         let q = anlegen_online_quelle(&pool, &eingabe("C", 1, true))
             .await
             .unwrap();
-        let s = slot_upsert(&pool, q.id, "https://h/x", "tilejson")
+        let s = slot_anlegen(&pool, q.id, "https://h/x", "tilejson")
             .await
             .unwrap();
         loesche_online_quelle(&pool, q.id).await.unwrap();

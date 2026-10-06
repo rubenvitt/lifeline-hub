@@ -2294,9 +2294,15 @@ pub async fn proxy_style(
     let q = aktive_proxy_quelle(&state, id).await?;
     let u = ssrf_geprueft(&q.url)?;
     let _platz = proxy::abruf_platz(proxy::proxy_abruf_grenze()).map_err(proxy_fehler)?;
-    let json = proxy::hole_style(proxy::proxy_client(), &state.pool, id, u)
-        .await
-        .map_err(proxy_fehler)?;
+    let json = proxy::hole_style(
+        proxy::proxy_client(),
+        &state.pool,
+        id,
+        u,
+        tile_cache::unix_now(),
+    )
+    .await
+    .map_err(proxy_fehler)?;
     Ok(json_proxy_antwort(json))
 }
 
@@ -2336,9 +2342,16 @@ pub async fn proxy_tilejson(
     let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Tilejson).await?;
     let u = ssrf_geprueft(&upstream)?;
     let _platz = proxy::abruf_platz(proxy::proxy_abruf_grenze()).map_err(proxy_fehler)?;
-    let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
-        .await
-        .map_err(proxy_fehler)?;
+    let json = proxy::hole_tilejson(
+        proxy::proxy_client(),
+        &state.pool,
+        id,
+        slot,
+        u,
+        tile_cache::unix_now(),
+    )
+    .await
+    .map_err(proxy_fehler)?;
     Ok(json_proxy_antwort(json))
 }
 
