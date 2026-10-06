@@ -31,9 +31,9 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 3. Queue-Zähler (D5)
 
-- [ ] 3.1 `offline/queue.ts`: `queueNichtZugeordnetZaehlen` per `count()`. Prüfen: zählt
+- [x] 3.1 `offline/queue.ts`: `queueNichtZugeordnetZaehlen` per `count()`. Prüfen: zählt
   Altzeilen korrekt über alle vier Stores; `getAll` wird nicht gerufen (Spion).
-- [ ] 3.2 `offline/useOfflineQueueZaehler.ts`: Single-Flight mit Drosselfenster. Prüfen: 50
+- [x] 3.2 `offline/useOfflineQueueZaehler.ts`: Single-Flight mit Drosselfenster. Prüfen: 50
   Ereignisse in schneller Folge → höchstens zwei Ladevorgänge, der letzte Stand wird angezeigt.
 
 ## 4. Erfassungsquittung (D6)

@@ -648,18 +648,27 @@ const OFFLINE_STORE_NAMEN = [
 
 /** Liefert ausschließlich eine globale Anzahl der v1-v3-Zeilen ohne sichere
  * Benutzerbindung. Weder Payload, Einsatz, Art noch Zeitstempel verlassen die
- * Queue-Schicht; eine spätere Sitzung darf daraus keine fremden Rohdaten lernen. */
+ * Queue-Schicht; eine spätere Sitzung darf daraus keine fremden Rohdaten lernen.
+ *
+ * Gezählt, nicht gelesen (LFH-939, design.md D5): Der Index `by-benutzer` enthält genau die
+ * Zeilen mit `benutzer_id` (ein fehlendes oder `null`-Feld ist kein gültiger Schlüssel), der
+ * Rest des Stores ist Altbestand. Der Zähler läuft bei jeder Queue-Änderung; ein `getAll`
+ * deserialisierte dabei jede Payload aller Benutzer. */
 export async function queueNichtZugeordnetZaehlen(): Promise<number> {
   const d = await db();
-  const [etbOffen, etbAbgelehnt, aktionenOffen, aktionenAbgelehnt] = await Promise.all([
-    d.getAll('ausstehend'),
-    d.getAll('abgelehnt'),
-    d.getAll('schreibaktionen'),
-    d.getAll('schreibaktionenAbgelehnt'),
-  ]);
-  return [...etbOffen, ...etbAbgelehnt, ...aktionenOffen, ...aktionenAbgelehnt].filter(
-    ohneBenutzerbindung,
-  ).length;
+  const tx = d.transaction(OFFLINE_STORE_NAMEN, 'readonly');
+  const je = await Promise.all(
+    OFFLINE_STORE_NAMEN.map(async (name) => {
+      const store = tx.objectStore(name);
+      const [alle, gebunden] = await Promise.all([
+        store.count(),
+        store.index('by-benutzer').count(),
+      ]);
+      return alle - gebunden;
+    }),
+  );
+  await tx.done;
+  return je.reduce((summe, n) => summe + n, 0);
 }
 
 /** Verwirft alle nicht attribuierbaren Alt-Daten in einer Transaktion. Eine

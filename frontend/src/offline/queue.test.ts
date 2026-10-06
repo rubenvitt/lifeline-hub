@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { openDB } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import {
   abgelehntLaden,
@@ -175,6 +176,47 @@ describe('benutzergebundene Offline-Queue (LFH-334)', () => {
     expect(await queueNichtZugeordnetAlleVerwerfen()).toBe(0);
     expect(await queueNichtZugeordnetZaehlen()).toBe(0);
     expect((await queueLaden(BENUTZER_B, 7))[0].eintrag.client_id).toBe('bleibt-erhalten');
+  });
+});
+
+describe('Queue-Zähler ohne Payload (LFH-939, design.md D5)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** Eine Altzeile ohne `benutzer_id` direkt in einen Store legen (vor v4). */
+  async function altzeile(store: string) {
+    const d = await openDB('lifeline-offline');
+    try {
+      await d.add(store, { einsatz_id: 7, erstellt_at: '2026-01-01T00:00:00Z' });
+    } finally {
+      d.close();
+    }
+  }
+
+  it('zählt Altzeilen über alle vier Stores, ohne eine Zeile zu lesen', async () => {
+    await queueEinreihen(BENUTZER_A, 7, eintrag);
+    await schreibaktionEinreihen(BENUTZER_B, 7, {
+      art: 'person',
+      daten: { name: 'Muster', status: 'vermisst', client_id: 'p-1' },
+    });
+    await queueLegacyEinreihenFuerTests(7, eintrag);
+    await altzeile('abgelehnt');
+    await altzeile('schreibaktionen');
+    await altzeile('schreibaktionenAbgelehnt');
+    await altzeile('schreibaktionenAbgelehnt');
+    const storeGetAll = vi.spyOn(IDBObjectStore.prototype, 'getAll');
+    const indexGetAll = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const cursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
+
+    expect(await queueZaehlerLaden(BENUTZER_A)).toEqual({
+      ausstehend: 1,
+      abgelehnt: 0,
+      nicht_zugeordnet: 5,
+    });
+    expect(storeGetAll).not.toHaveBeenCalled();
+    expect(indexGetAll).not.toHaveBeenCalled();
+    expect(cursor).not.toHaveBeenCalled();
   });
 });
 
