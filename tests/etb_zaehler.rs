@@ -352,3 +352,61 @@ async fn nichtmitglied_ist_403_und_unbekannter_einsatz_404() {
     let (status, _) = zaehler(&app, &admin, 9999, "").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+/// LFH-947: der Cursor nach oben über die Route. Er ist ein Seiten-, kein Filtermerkmal —
+/// Zählungen ignorieren ihn wie `before_lfd_nr`; beide Cursor zugleich sind eine unzulässige
+/// Kombination (422).
+#[tokio::test]
+async fn cursor_nach_oben_liefert_die_seite_ueber_dem_cursor() {
+    let (app, admin, einsatz) = aufbau().await;
+    for i in 1..=5 {
+        typ_erfassen(&app, &admin, einsatz, "meldung", &format!("m{i}")).await;
+    }
+    let (status, alle) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?limit=500"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let nrn: Vec<i64> = alle
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["lfd_nr"].as_i64().unwrap())
+        .collect();
+    // Absteigend; der Cursor sitzt auf dem viertneuesten Eintrag.
+    let cursor = nrn[3];
+    let (status, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?limit=2&after_lfd_nr={cursor}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{v:?}");
+    let seite: Vec<i64> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["lfd_nr"].as_i64().unwrap())
+        .collect();
+    assert_eq!(seite, vec![nrn[1], nrn[2]]);
+
+    let ohne = zaehler_ok(&app, &admin, einsatz, "").await;
+    let mit = zaehler_ok(&app, &admin, einsatz, &format!("?after_lfd_nr={cursor}")).await;
+    assert_eq!(ohne, mit);
+
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb?before_lfd_nr={cursor}&after_lfd_nr=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}

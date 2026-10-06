@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { openDB } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import {
   abgelehntLaden,
@@ -14,6 +15,7 @@ import {
   queueNichtZugeordnetZaehlen,
   queueZaehlerLaden,
   personErfassungsQuittungenAufraeumen,
+  personErfassungsQuittungenLaden,
   personErfassungsQuittungenRaeumen,
   schreibaktionAblehnen,
   schreibaktionAbgelehntVerwerfen,
@@ -22,6 +24,7 @@ import {
   schreibaktionenAbgelehntLaden,
   schreibaktionenLaden,
   schreibaktionPersonAbschliessen,
+  queueDbZuruecksetzenFuerTests,
 } from './queue';
 import type { Person } from '../api/types';
 import { rohLesen } from '../test/rohIdb';
@@ -178,6 +181,47 @@ describe('benutzergebundene Offline-Queue (LFH-334)', () => {
   });
 });
 
+describe('Queue-Zähler ohne Payload (LFH-939, design.md D5)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** Eine Altzeile ohne `benutzer_id` direkt in einen Store legen (vor v4). */
+  async function altzeile(store: string) {
+    const d = await openDB('lifeline-offline');
+    try {
+      await d.add(store, { einsatz_id: 7, erstellt_at: '2026-01-01T00:00:00Z' });
+    } finally {
+      d.close();
+    }
+  }
+
+  it('zählt Altzeilen über alle vier Stores, ohne eine Zeile zu lesen', async () => {
+    await queueEinreihen(BENUTZER_A, 7, eintrag);
+    await schreibaktionEinreihen(BENUTZER_B, 7, {
+      art: 'person',
+      daten: { name: 'Muster', status: 'vermisst', client_id: 'p-1' },
+    });
+    await queueLegacyEinreihenFuerTests(7, eintrag);
+    await altzeile('abgelehnt');
+    await altzeile('schreibaktionen');
+    await altzeile('schreibaktionenAbgelehnt');
+    await altzeile('schreibaktionenAbgelehnt');
+    const storeGetAll = vi.spyOn(IDBObjectStore.prototype, 'getAll');
+    const indexGetAll = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const cursor = vi.spyOn(IDBObjectStore.prototype, 'openCursor');
+
+    expect(await queueZaehlerLaden(BENUTZER_A)).toEqual({
+      ausstehend: 1,
+      abgelehnt: 0,
+      nicht_zugeordnet: 5,
+    });
+    expect(storeGetAll).not.toHaveBeenCalled();
+    expect(indexGetAll).not.toHaveBeenCalled();
+    expect(cursor).not.toHaveBeenCalled();
+  });
+});
+
 describe('Personen-Erfassungsquittungen räumen (LFH-767)', () => {
   async function quittungAnlegen(benutzerId: number, clientId: string): Promise<void> {
     await schreibaktionEinreihen(benutzerId, 7, {
@@ -227,5 +271,131 @@ describe('Personen-Erfassungsquittungen räumen (LFH-767)', () => {
 
     await personErfassungsQuittungenAufraeumen(null, Date.now() + tag + 60_000);
     expect(await rohLesen('lifeline-offline', 'personErfassungsQuittungen')).toEqual([]);
+  });
+});
+
+describe('Erfassungsquittung nur mit Kennungen (LFH-941, design.md D6)', () => {
+  const person = {
+    id: 41,
+    registrier_nr: 12,
+    name: 'Muster',
+    vorname: 'Erika',
+    status: 'betroffen',
+    aktuelle_sichtung: 'SK1',
+  } as unknown as Person;
+
+  it('legt nach dem Abgleich weder Namen noch Sichtung ab', async () => {
+    await schreibaktionEinreihen(BENUTZER_A, 7, {
+      art: 'person',
+      daten: { name: 'Muster', status: 'erfasst', client_id: 'p-41' },
+    });
+    const [zeile] = await schreibaktionenLaden(BENUTZER_A, 7);
+    // Der Aufrufer bekommt die volle Person weiter im Speicher (Signal an die Seite).
+    expect(await schreibaktionPersonAbschliessen(BENUTZER_A, zeile, person)).toMatchObject({
+      person_id: 41,
+      registrier_nr: 12,
+    });
+    const [roh] = (await rohLesen('lifeline-offline', 'personErfassungsQuittungen')) as Record<
+      string,
+      unknown
+    >[];
+    expect(roh).toEqual({
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      client_id: 'p-41',
+      person_id: 41,
+      registrier_nr: 12,
+      sicht: 'erfasst',
+      erstellt_at: expect.any(String),
+    });
+    expect(JSON.stringify(roh)).not.toContain('Muster');
+    expect(JSON.stringify(roh)).not.toContain('SK1');
+  });
+
+  it('kürzt eine Bestandsquittung mit voller Person beim Öffnen, ohne Versionssprung', async () => {
+    queueDbZuruecksetzenFuerTests();
+    await new Promise<void>((fertig, fehler) => {
+      const loeschen = indexedDB.deleteDatabase('lifeline-offline');
+      loeschen.onsuccess = () => fertig();
+      loeschen.onerror = () => fehler(loeschen.error);
+    });
+    // Das Schema von v5, wie es auf einem Gerät der Vorversion liegt.
+    const alt = await openDB('lifeline-offline', 5, {
+      upgrade(d) {
+        for (const name of [
+          'ausstehend',
+          'abgelehnt',
+          'schreibaktionen',
+          'schreibaktionenAbgelehnt',
+        ]) {
+          const store = d.createObjectStore(name, { keyPath: 'id', autoIncrement: true });
+          store.createIndex('by-einsatz', 'einsatz_id');
+          store.createIndex('by-benutzer', 'benutzer_id');
+          store.createIndex('by-benutzer-einsatz', ['benutzer_id', 'einsatz_id']);
+        }
+        const quittungen = d.createObjectStore('personErfassungsQuittungen', {
+          keyPath: ['benutzer_id', 'einsatz_id', 'client_id'],
+        });
+        quittungen.createIndex('by-benutzer', 'benutzer_id');
+        quittungen.createIndex('by-benutzer-einsatz', ['benutzer_id', 'einsatz_id']);
+      },
+    });
+    await alt.put('personErfassungsQuittungen', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      client_id: 'alt-41',
+      person,
+      sicht: 'betroffen',
+      erstellt_at: '2026-10-05T10:00:00.000Z',
+    });
+    alt.close();
+
+    const gekuerzt = {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      client_id: 'alt-41',
+      person_id: 41,
+      registrier_nr: 12,
+      sicht: 'betroffen',
+      erstellt_at: '2026-10-05T10:00:00.000Z',
+    };
+    expect(await personErfassungsQuittungenLaden(BENUTZER_A, 7)).toEqual([gekuerzt]);
+    const roh = await openDB('lifeline-offline');
+    expect(roh.version).toBe(5);
+    expect(await roh.getAll('personErfassungsQuittungen')).toEqual([gekuerzt]);
+    roh.close();
+  });
+
+  it('liefert auch eine später von einem alten Tab geschriebene Quittung nur mit Kennungen', async () => {
+    await queueLeerenFuerTests();
+    const roh = await openDB('lifeline-offline');
+    await roh.put('personErfassungsQuittungen', {
+      benutzer_id: BENUTZER_A,
+      einsatz_id: 7,
+      client_id: 'alt-42',
+      person,
+      sicht: 'erfasst',
+      erstellt_at: '2026-10-05T10:00:00.000Z',
+    });
+    roh.close();
+    const [q] = await personErfassungsQuittungenLaden(BENUTZER_A, 7);
+    expect(q).toMatchObject({ person_id: 41, registrier_nr: 12 });
+    expect(q).not.toHaveProperty('person');
+  });
+
+  it('gibt die DB frei, wenn ein neueres Bundle hochstufen will', async () => {
+    await queueNichtZugeordnetZaehlen();
+    const neu = await Promise.race([
+      openDB('lifeline-offline', 6),
+      new Promise<'blockiert'>((fertig) => setTimeout(() => fertig('blockiert'), 500)),
+    ]);
+    expect(neu).not.toBe('blockiert');
+    if (neu !== 'blockiert') neu.close();
+    queueDbZuruecksetzenFuerTests();
+    await new Promise<void>((fertig) => {
+      const loeschen = indexedDB.deleteDatabase('lifeline-offline');
+      loeschen.onsuccess = () => fertig();
+      loeschen.onblocked = () => fertig();
+    });
   });
 });

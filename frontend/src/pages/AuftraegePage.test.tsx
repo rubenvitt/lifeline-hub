@@ -3,7 +3,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation, useNavigationType } from 'react-router';
 import AuftraegePage from './AuftraegePage';
 import type { Auftrag } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -108,7 +108,12 @@ const empf = (id: number, anzeige: string, quittiert: string | null) => ({
 
 /** Macht den aktuellen Query-String im DOM sichtbar (für apply-then-clean-Assertions). */
 function LocationProbe() {
-  return <span data-testid="loc-search">{useLocation().search}</span>;
+  return (
+    <>
+      <span data-testid="loc-search">{useLocation().search}</span>
+      <span data-testid="loc-art">{useNavigationType()}</span>
+    </>
+  );
 }
 
 function renderPage(route = '/einsaetze/1/auftraege') {
@@ -217,7 +222,7 @@ describe('AuftraegePage', () => {
     renderPage();
     await screen.findByText('Deich sichern');
     // Detail-Panel ist eingeklappt → erst nach Klick sichtbar.
-    await userEvent.click(screen.getByText('Befehlsdetails'));
+    await userEvent.click(screen.getByText('Auftragsdetails (Schema)'));
     expect(await screen.findByText('Deichkrone Süd')).toBeInTheDocument();
     expect(screen.getByText('sofort')).toBeInTheDocument();
   });
@@ -226,9 +231,9 @@ describe('AuftraegePage', () => {
     quittiereEmpfaenger.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
-    // Aktion in einem Popconfirm → Trigger + Bestätigen.
+    // Aktion in einem Popconfirm → Trigger + benannter Bestätigungsknopf.
     await userEvent.click(screen.getByText('quittieren'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
   });
 
@@ -249,7 +254,7 @@ describe('AuftraegePage', () => {
     ]);
 
     await userEvent.click(screen.getByText('quittieren'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
 
     expect(await screen.findByText('1 Empfänger · 1/1 quittiert')).toBeInTheDocument();
     expect(client.getQueryData<Auftrag[]>(zweiterKey)?.[0].quittiert_anzahl).toBe(1);
@@ -308,7 +313,7 @@ describe('AuftraegePage', () => {
     // Beide Knöpfe heißen sichtbar „quittieren"; auseinanderhalten muss sie der zugängliche Name.
     expect(screen.getAllByRole('button', { name: /quittieren$/ })).toHaveLength(2);
     await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Süd quittieren' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 2));
   });
 
@@ -338,18 +343,20 @@ describe('AuftraegePage', () => {
     expect(screen.getAllByRole('button', { name: /quittieren$/ })).toHaveLength(2);
 
     await userEvent.click(screen.getByRole('button', { name: 'Empfang für Florian 4 quittieren' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Empfang quittieren' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 4));
 
     await userEvent.click(
       await screen.findByRole('button', { name: 'Empfang für Florian 5 quittieren' }),
     );
-    // Der erste Popconfirm bleibt bis zum Ende seiner Animation im Baum — der zweite „Bestätigen"
+    // Der erste Popconfirm bleibt bis zum Ende seiner Animation im Baum — der zweite Bestätigungsknopf
     // ist der jüngste.
     await waitFor(() =>
-      expect(screen.getAllByRole('button', { name: 'Bestätigen' }).length).toBeGreaterThan(0),
+      expect(screen.getAllByRole('button', { name: 'Empfang quittieren' }).length).toBeGreaterThan(
+        0,
+      ),
     );
-    const bestaetigen = screen.getAllByRole('button', { name: 'Bestätigen' });
+    const bestaetigen = screen.getAllByRole('button', { name: 'Empfang quittieren' });
     await userEvent.click(bestaetigen[bestaetigen.length - 1]);
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 5));
   });
@@ -486,7 +493,7 @@ describe('AuftraegePage', () => {
     await userEvent.click(await screen.findByText(/^Abgeschlossen/));
     await screen.findByText('Deich sichern');
     await userEvent.click(screen.getByRole('button', { name: 'Abnehmen' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Auftrag abnehmen' }));
     await waitFor(() => expect(nimmAb).toHaveBeenCalledWith(1, 1));
   });
 
@@ -544,7 +551,7 @@ describe('AuftraegePage', () => {
     );
   });
 
-  it('Tab-Wechsel zu Befehle zeigt BefehlListe mit „Befehl erteilen"-Button', async () => {
+  it('Tab-Wechsel zu Befehle zeigt BefehlListe mit „Befehl entwerfen"-Button', async () => {
     renderPage();
     // Default-Tab "Aufträge" ist aktiv — erst Aufträge-Tab sichtbar
     await screen.findByText('Deich sichern');
@@ -552,7 +559,63 @@ describe('AuftraegePage', () => {
     expect(screen.getByRole('tab', { name: 'Befehle' })).toBeInTheDocument();
     // Zum Befehle-Tab wechseln
     await userEvent.click(screen.getByRole('tab', { name: 'Befehle' }));
-    // BefehlListe rendert den „Befehl erteilen"-Button (darfSchreiben = true)
-    expect(await screen.findByRole('button', { name: 'Befehl erteilen' })).toBeInTheDocument();
+    // Der Knopf verspricht keine Erteilung: angelegt wird ein Entwurf (LFH-972).
+    expect(await screen.findByRole('button', { name: 'Befehl entwerfen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Befehl erteilen/ })).not.toBeInTheDocument();
+  });
+
+  describe('Reiter in der Adresse (LFH-972)', () => {
+    it('?reiter=befehle öffnet direkt den Reiter Befehle', async () => {
+      renderPage('/einsaetze/1/auftraege?reiter=befehle');
+      expect(await screen.findByRole('button', { name: 'Befehl entwerfen' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Befehle' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('ein unbekannter Reiter fällt auf „Aufträge" zurück', async () => {
+      renderPage('/einsaetze/1/auftraege?reiter=chat');
+      expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Aufträge' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    });
+
+    it('der Reiterwechsel schreibt die Adresse per replace, zurück auf „Aufträge" ohne Parameter', async () => {
+      renderPage();
+      await screen.findByText('Deich sichern');
+      await userEvent.click(screen.getByRole('tab', { name: 'Befehle' }));
+      await waitFor(() =>
+        expect(screen.getByTestId('loc-search')).toHaveTextContent('?reiter=befehle'),
+      );
+      expect(screen.getByTestId('loc-art')).toHaveTextContent('REPLACE');
+      await userEvent.click(screen.getByRole('tab', { name: 'Aufträge' }));
+      await waitFor(() => expect(screen.getByTestId('loc-search')).toBeEmptyDOMElement());
+      expect(screen.getByRole('tab', { name: 'Aufträge' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    });
+
+    it('im Reiter Aufträge steht „Befehl" nur im Fachbegriff „Befehlsschema"', async () => {
+      listeAuftraege.mockResolvedValue([auftrag({ ort: 'Deichkrone Süd' })]);
+      renderPage();
+      await screen.findByText('Deich sichern');
+      await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+      const reiter = screen.getByRole('tabpanel');
+      expect(within(reiter).getByText('Neuer Auftrag')).toBeInTheDocument();
+      expect(reiter.textContent).not.toMatch(/Befehl(?!sschema)/);
+    });
+
+    it('jeder Reiter grenzt sich in einer Zeile ab', async () => {
+      renderPage();
+      await screen.findByText('Deich sichern');
+      expect(
+        screen.getByText('Einzelauftrag an Abschnitt oder Einheit, mit Quittung und Vollzug.'),
+      ).toBeVisible();
+      await userEvent.click(screen.getByRole('tab', { name: 'Befehle' }));
+      expect(
+        await screen.findByText('Schriftlicher Einsatzbefehl, wird freigegeben und gedruckt.'),
+      ).toBeVisible();
+    });
   });
 });

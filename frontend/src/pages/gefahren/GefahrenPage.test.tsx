@@ -43,6 +43,21 @@ describe('GefahrenPage', () => {
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
+  it('nennt die Zonenzahl eines Gebiets mit Einheit, Zahl vor Wort (LFH-971)', async () => {
+    const sued = {
+      id: 8,
+      einsatz_id: 1,
+      label: 'Süd',
+      zonen_ids: [11, 12],
+      hoechste_warnstufe: 'mittel',
+    };
+    server.use(...handlers([gebiet, sued]));
+    renderPage();
+    expect(await screen.findByText('1 Zone')).toBeInTheDocument();
+    expect(screen.getByText('2 Zonen')).toBeInTheDocument();
+    expect(screen.queryByText('(1)')).not.toBeInTheDocument();
+  });
+
   it('wählt ein Gefahrengebiet mit Enter über die Auswahlzeile', async () => {
     const sued = {
       id: 8,

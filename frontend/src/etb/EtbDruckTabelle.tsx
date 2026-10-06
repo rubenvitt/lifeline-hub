@@ -8,6 +8,7 @@ import { etbTyp } from '../theme/statusFarben';
 import { istNachgetragen } from './typFarben';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { berichtigungsindex } from './zeitachseModell';
+import '../druck/druckansichtSchmal.css';
 
 /**
  * Die Papierform des Einsatztagebuchs (LFH-22, design.md D5).
@@ -26,9 +27,24 @@ import { berichtigungsindex } from './zeitachseModell';
  * Anhänge (LFH-744) stehen als Text unter dem Inhalt, „Name · Größe" wie in der Zeitachse, aber
  * ohne Verweis: auf Papier führt er nirgendwohin, er soll nur zeigen, dass es Dateien gibt.
  *
+ * Am schmalen Schirm (unter `md`, LFH-956) bleibt es eine Tabelle, nur angepasst: die Zeit steht
+ * zweizeilig, Typ, Von/An und Erfasser wandern als Metazeile in die Inhaltszelle, und der Inhalt
+ * nimmt die übrige Breite. Die Regeln stehen in `druck/druckansichtSchmal.css` und gelten nur am
+ * Bildschirm; das Blatt behält seine sechs Spalten.
+ *
  * Wer hier Sortierung oder Filter nachrüstet, baut einen zweiten Bedienort für das ETB und
  * gehört auf `Datensicht` zurück — mit Begründung gegen die Zeitachse.
  */
+
+/** Kopf der Papierform; die Klasse sagt, wie die Spalte am schmalen Schirm steht. */
+const SPALTEN: readonly (readonly [string, string | undefined])[] = [
+  ['Nr.', undefined],
+  ['Zeit', 'druckansicht-zeit'],
+  ['Typ', 'druckansicht-nicht-schmal'],
+  ['Von/An', 'druckansicht-nicht-schmal'],
+  ['Inhalt', 'druckansicht-textspalte'],
+  ['Erfasser', 'druckansicht-nicht-schmal'],
+];
 
 const MELDEWEG_WORT = Object.fromEntries(
   MELDEWEG_OPTIONEN.map((o) => [o.value, o.label]),
@@ -56,6 +72,18 @@ function nachtrag(e: EtbEintragAnzeige, konventionen: AnzeigeKonventionen): stri
   return `nachgetragen um ${erfasst.format(erfasst.isSame(ereignis, 'day') ? 'HH:mm' : 'DD.MM.YYYY HH:mm')}`;
 }
 
+/** Typ, Von/An und Meldeweg in einer Zeile: was am schmalen Schirm über dem Inhalt steht. */
+function metazeile(e: EtbEintragAnzeige): string {
+  return [
+    etbTyp[e.typ].label,
+    e.von && `von ${e.von}`,
+    e.an && `an ${e.an}`,
+    e.meldeweg && MELDEWEG_WORT[e.meldeweg],
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 export default function EtbDruckTabelle({ eintraege, berichtigungen, konventionen }: Props) {
   const { token } = theme.useToken();
   const geordnet = [...eintraege].sort((a, b) => a.lfd_nr - b.lfd_nr);
@@ -80,10 +108,11 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
     >
       <thead>
         <tr>
-          {['Nr.', 'Zeit', 'Typ', 'Von/An', 'Inhalt', 'Erfasser'].map((k) => (
+          {SPALTEN.map(([k, klasse]) => (
             <th
               key={k}
               scope="col"
+              className={klasse}
               style={{
                 ...zelle,
                 borderBlockEnd: `1px solid ${token.colorBorder}`,
@@ -104,19 +133,27 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
               <td style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}>
                 {e.lfd_nr}
               </td>
-              <td style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}>
+              <td
+                className="druckansicht-zeit"
+                style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}
+              >
                 <div>{zeit(e.ereigniszeit, konventionen)}</div>
                 {istNachgetragen(e.ereigniszeit, e.received_at) && (
                   <div style={hinweis}>{nachtrag(e, konventionen)}</div>
                 )}
               </td>
-              <td style={zelle}>{etbTyp[e.typ].label}</td>
-              <td style={zelle}>
+              <td className="druckansicht-nicht-schmal" style={zelle}>
+                {etbTyp[e.typ].label}
+              </td>
+              <td className="druckansicht-nicht-schmal" style={zelle}>
                 {e.von && <div>von {e.von}</div>}
                 {e.an && <div>an {e.an}</div>}
                 {e.meldeweg && <div style={hinweis}>{MELDEWEG_WORT[e.meldeweg]}</div>}
               </td>
-              <td style={zelle}>
+              <td className="druckansicht-textspalte" style={zelle}>
+                <div className="druckansicht-nur-schmal" style={hinweis}>
+                  {metazeile(e)}
+                </div>
                 {/* Über dem Text steht der Titel des Druckkopfs (hier `h2`, weil der
                     Seitenkopf am Bildschirm das `h1` trägt); eine Gruppenüberschrift gibt es
                     nicht — `#` im Inhalt wird `h3`. */}
@@ -157,8 +194,12 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
                       .join(', ')}
                   </div>
                 )}
+                <div className="druckansicht-nur-schmal" style={hinweis}>
+                  Erfasser: {e.erfasser_name}
+                  {e.erfasser_funktion && `, ${e.erfasser_funktion}`}
+                </div>
               </td>
-              <td style={zelle}>
+              <td className="druckansicht-nicht-schmal" style={zelle}>
                 {e.erfasser_name}
                 {e.erfasser_funktion && <div style={hinweis}>{e.erfasser_funktion}</div>}
               </td>

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 test.setTimeout(90_000);
 
@@ -21,13 +22,15 @@ async function vorbereiten(page: Page) {
   const api = `/api/einsaetze/${einsatzId}/befehle/${befehlId}`;
   const liste = `/einsaetze/${einsatzId}/auftraege`;
   const detail = `${liste}/befehle/${befehlId}`;
-  return { api, liste, detail };
+  // Der Rückweg aus einem Befehl führt auf den Reiter Befehle (LFH-972).
+  const befehle = `${liste}?reiter=befehle`;
+  return { einsatzId, api, liste, befehle, detail };
 }
 
 test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor der Navigation', async ({
   page,
 }) => {
-  const { api, liste, detail } = await vorbereiten(page);
+  const { api, befehle, detail } = await vorbereiten(page);
   let fehler = true;
   await page.route(`**${api}`, async (route) => {
     if (route.request().method() === 'PATCH' && fehler) {
@@ -48,7 +51,7 @@ test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor d
   await expect(speichern).not.toHaveClass(/ant-btn-loading/);
   fehler = false;
   await speichern.click();
-  await expect(page).toHaveURL(liste);
+  await expect(page).toHaveURL(befehle);
   const gespeichert = await page.request.get(api);
   expect(gespeichert.ok()).toBe(true);
   expect((await gespeichert.json()).titel).toBe('Gesicherte neue Fassung');
@@ -57,7 +60,7 @@ test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor d
 test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten Versuch aus', async ({
   page,
 }) => {
-  const { api, liste, detail } = await vorbereiten(page);
+  const { api, liste, befehle, detail } = await vorbereiten(page);
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   await page.goto(liste);
   await page.getByRole('tab', { name: /Befehle/ }).click();
@@ -99,5 +102,46 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
   await page.evaluate(() => window.history.back());
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Verwerfen', exact: true }).click();
-  await expect(page).toHaveURL(liste);
+  await expect(page).toHaveURL(befehle);
 });
+
+/**
+ * Rückweg auf den Reiter Befehle (LFH-972): Der Reiter steht in der Adresse, Brotkrume,
+ * Browser-Zurück und die Weiterleitung bei ungültiger Kennung landen auf „Befehle", nicht auf der
+ * Vorgabe „Aufträge". Auch als Beobachter (`e2e/AGENTS.md`, nicht-privilegiert): ohne Schreibrecht
+ * fehlt die Anlegen-Aktion, und die Befehlsliste muss trotzdem erreichbar bleiben.
+ */
+for (const rolle of ['admin', 'beobachter'] as const) {
+  test(`Rückweg aus dem Befehl landet auf dem Reiter Befehle (${rolle})`, async ({ page }) => {
+    const { einsatzId, liste, befehle, detail } = await vorbereiten(page);
+    if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+    const reiterBefehle = page.getByRole('tab', { name: 'Befehle' });
+
+    await page.goto(liste);
+    await reiterBefehle.click();
+    // Der Reiterwechsel ersetzt den Eintrag: Zurück führt danach nicht auf „Aufträge".
+    await expect(page).toHaveURL(befehle);
+    await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
+    // Vorbedingung des Rollenzweigs: der Beobachter sieht keine Anlegen-Aktion.
+    const entwerfen = page.getByRole('button', { name: 'Befehl entwerfen', exact: true });
+    if (rolle === 'beobachter') await expect(entwerfen).toHaveCount(0);
+    else await expect(entwerfen).toBeVisible();
+
+    await page.getByRole('link', { name: 'Befehl Navigation', exact: true }).click();
+    await expect(page).toHaveURL(detail);
+    await page.getByRole('link', { name: 'Aufträge/Befehle', exact: true }).click();
+    await expect(page).toHaveURL(befehle);
+    await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
+
+    await page.getByRole('link', { name: 'Befehl Navigation', exact: true }).click();
+    await expect(page).toHaveURL(detail);
+    await page.goBack();
+    await expect(page).toHaveURL(befehle);
+    await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('link', { name: 'Befehl Navigation', exact: true })).toBeVisible();
+
+    await page.goto(`${liste}/befehle/kein-befehl`);
+    await expect(page).toHaveURL(befehle);
+    await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
+  });
+}
