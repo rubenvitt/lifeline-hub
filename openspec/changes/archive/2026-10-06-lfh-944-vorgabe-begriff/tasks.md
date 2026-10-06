@@ -18,5 +18,5 @@
 ## 3. Regel, e2e, Abschluss
 
 - [x] 3.1 Regelzeile in `frontend/AGENTS.md` (Bedien-Leitlinie) mit Verweis auf Spec `bedien-begriffe`, `components/vorgabeText.ts` und den Guard
-- [ ] 3.2 e2e-Anker nachziehen (`gate1-ueberlauf`, `fokus-verdeckung`, `verwaltung-vereinheitlicht`); Einsatz-Vorgaben auf 390 auch nicht-privilegiert messen (bestehender Lauf)
-- [ ] 3.3 `./scripts/check-all.sh` und Vitest grün
+- [x] 3.2 e2e-Anker nachziehen (`gate1-ueberlauf`, `fokus-verdeckung`, `verwaltung-vereinheitlicht`); Einsatz-Vorgaben auf 390 auch nicht-privilegiert messen (bestehender Lauf)
+- [x] 3.3 `./scripts/check-all.sh` und Vitest grün
