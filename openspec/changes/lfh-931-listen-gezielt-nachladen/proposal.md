@@ -30,7 +30,7 @@ Gesamtbestand kostet, bleibt. ClickUp: LFH-931.
   lädt nur die Anhangliste dieses Schadens.
 - Ereignisse ohne Kennung, `lagged`, ein Neuaufbau ohne Nachlieferung und jeder Fehler beim
   Zeilenabruf fallen auf den bisherigen Abgleich der ganzen Liste zurück.
-- **Nicht in diesem Schnitt (Entscheidung offen, siehe design.md):** Blättern der Schadenliste
+- **Nicht in diesem Schnitt (entschieden 06.10.2026: eigenes Ticket nach Feldbefund, siehe design.md):** Blättern der Schadenliste
   und der erledigten Medienkontakte. Beides verändert sichtbares Verhalten und kehrt beim
   Presse-Log die Festlegung aus dem S5-Entwurf um, dass die Medienlage aus der vollständig
   geladenen Liste rechnet.

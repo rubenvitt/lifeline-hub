@@ -40,7 +40,8 @@ Anlass: proposal.md. Stand `alpha` 619b973, nach der zentralen Live-Bündelung (
   serverseitigen Zählung.
 - Feldlängen an Schreibendpunkten (eigenes Ticket „Eingabegrenzen“).
 - Ein globaler `CompressionLayer`.
-- Blättern der Schadenliste und der erledigten Medienkontakte (siehe „Entscheidung offen“).
+- Blättern der Schadenliste und der erledigten Medienkontakte (siehe „Entschieden: ohne
+  Blättern“).
 - Autosave und Verlustschutz der Entwürfe bleiben unverändert.
 
 ## Decisions
@@ -50,7 +51,8 @@ Anlass: proposal.md. Stand `alpha` 619b973, nach der zentralen Live-Bündelung (
 `vorlagendokument::repo` bekommt `liste_koepfe::<T>` mit einem eigenen Select ohne
 `l.abschnitte` und ohne `l.aktualisiert_at` und eine Struktur `DokumentKopf`. Jede Art bekommt
 ihr Wire-DTO `LageberichtKopf`, `BefehlKopf`, `PressemitteilungKopf` (Schemanamen je Art wie
-bei den Anzeige-DTOs, `skip_serializing_if` bzw. `#[schema(required)]` nach LFH-265). Die
+bei den Anzeige-DTOs; leere Felder gehen wie dort als `null` über die Leitung, kein
+`skip_serializing_if`). Die
 Listenroute im Kern liefert `Vec<T::Kopf>`; der Trait bekommt dafür einen zweiten assoziierten
 Typ. `liste` (mit Abschnitten) entfällt, wenn ihn nach der Umstellung niemand mehr ruft.
 
@@ -142,7 +144,7 @@ Die Anhang-Routen senden `schaden` mit `"anhang": true` (Variante aus D2).
   freigegebenen Kettenkopfs (eine zusätzliche Anfrage). `verdichtung.ts` bekommt Kopfliste und
   diesen einen Volltext getrennt.
 
-### Entscheidung offen: Blättern (Umkehr aus LFH-554)
+### Entschieden: ohne Blättern (Umkehr aus LFH-554 vermieden)
 
 Das Ticket verlangt außerdem: erledigte Medienkontakte nur geblättert (`?vor_id=`,
 `LIMIT 200`) und die Schaden-Modulliste per Cursor nach Registriernummer. Beides ist in diesem
@@ -161,6 +163,9 @@ Entwurf **nicht** enthalten, weil es sichtbares Verhalten ändert:
 Mit D3 kostet ein Ereignis nur noch eine Zeile; Blättern spart danach nur noch am ersten Laden
 einer Seite. Empfehlung: erst messen (Feldbefund), Blättern als eigenes Ticket, wenn das erste
 Laden bei echten Beständen stört.
+
+Entscheidung (Ruben, 06.10.2026): ohne Blättern umsetzen; das Blättern wird nach einem
+Feldbefund ein eigenes Ticket. Die Festlegung aus LFH-554 bleibt damit unverändert.
 
 ## Risks / Trade-offs
 
