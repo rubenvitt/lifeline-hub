@@ -34,6 +34,7 @@
  *
  * Einziger LESER ist die Kommandopalette (Gruppe „Zuletzt besucht").
  */
+import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 
 /** Höchstzahl gemerkter Module: genug für einen Arbeitsrhythmus, kurz genug, dass die Zeile
     keine zweite Modulliste wird. */
@@ -56,9 +57,9 @@ const schluessel = (benutzerId: number, einsatzId: number) =>
  * (dem Format vor LFH-436, ohne Zeitstempel): fremder Inhalt gilt als „nichts gemerkt".
  */
 function leseEintraege(benutzerId: number, einsatzId: number, jetzt: number): Eintrag[] {
+  const roh = sicherLesen(schluessel(benutzerId, einsatzId));
+  if (!roh) return [];
   try {
-    const roh = localStorage.getItem(schluessel(benutzerId, einsatzId));
-    if (!roh) return [];
     const wert: unknown = JSON.parse(roh);
     if (!Array.isArray(wert)) return [];
     return wert
@@ -88,15 +89,12 @@ export function merkeModulBesuch(
   modulKey: string,
   jetzt: number = Date.now(),
 ): void {
-  try {
-    const liste = [
-      { key: modulKey, at: jetzt },
-      ...leseEintraege(benutzerId, einsatzId, jetzt).filter((e) => e.key !== modulKey),
-    ].slice(0, ZULETZT_MAX);
-    localStorage.setItem(schluessel(benutzerId, einsatzId), JSON.stringify(liste));
-  } catch {
-    /* Speicher gesperrt (Privatmodus) — ohne Persistenz weiterarbeiten */
-  }
+  const liste = [
+    { key: modulKey, at: jetzt },
+    ...leseEintraege(benutzerId, einsatzId, jetzt).filter((e) => e.key !== modulKey),
+  ].slice(0, ZULETZT_MAX);
+  // Speicher gesperrt (Privatmodus): ohne Persistenz weiterarbeiten.
+  sicherSchreiben(schluessel(benutzerId, einsatzId), JSON.stringify(liste));
 }
 
 /** Liest die gemerkten Modulschlüssel innerhalb der Frist, jüngstes zuerst. */

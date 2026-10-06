@@ -148,6 +148,13 @@ export function erfassteQueries(): string[] {
   return [...erfasst];
 }
 
+/** Zahl der angehängten `change`-Zuhörer über alle Abfragen (LFH-947: Hörer je Seite, nicht je Zeile). */
+export function hoererAnzahl(): number {
+  let summe = 0;
+  for (const menge of hoerer.values()) summe += menge.size;
+  return summe;
+}
+
 /** Räumt Breite, Zeigerart, Mitschrift und Zuhörer auf den Ausgangszustand zurück. */
 export function setzeViewportZurueck(): void {
   breite = VIEWPORT_STANDARD;

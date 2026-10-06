@@ -18,6 +18,7 @@ import { bandStil } from './KartenFuss';
 import { useViewport } from '../../components/useViewport';
 import { Select } from '../../components/Select';
 import { ErfassungsModal } from '../../components/Erfassung';
+import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /** Feste Anzeigedauer je Stand im Replay. */
 export const ANZEIGE_MS = 2500;
@@ -29,12 +30,8 @@ const SPEICHER_SCHLUESSEL = 'lfh:lagekarte:zeitachse-eingeklappt';
 
 /** Gemerkte Wahl: `true`/`false`, oder `null`, wenn nie gewählt wurde. */
 function gespeichertEingeklappt(): boolean | null {
-  try {
-    const wert = localStorage.getItem(SPEICHER_SCHLUESSEL);
-    return wert === '1' ? true : wert === '0' ? false : null;
-  } catch {
-    return null;
-  }
+  const wert = sicherLesen(SPEICHER_SCHLUESSEL);
+  return wert === '1' ? true : wert === '0' ? false : null;
 }
 
 /**
@@ -48,11 +45,8 @@ export function startEingeklappt(gemerkt: boolean | null, kartenEng: boolean): b
 }
 
 function merkeEingeklappt(wert: boolean): void {
-  try {
-    localStorage.setItem(SPEICHER_SCHLUESSEL, wert ? '1' : '0');
-  } catch {
-    /* localStorage nicht verfügbar → nicht persistierbar, kein harter Fehler */
-  }
+  // Ohne Speicher nicht persistierbar, kein harter Fehler.
+  sicherSchreiben(SPEICHER_SCHLUESSEL, wert ? '1' : '0');
 }
 
 /** Die Werte der Dichte-Staffel, die das Band trägt (aufgelöste antd-Tokens). */

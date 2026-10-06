@@ -162,6 +162,43 @@ describe('Liste', () => {
 });
 
 /**
+ * LFH-978 (U67): auf 390 px quetschte der Knopf rechts die Beschreibung auf ~190 px. `gestapelt`
+ * ist ein Opt-in, die Zeile kennt keinen Breakpoint: der Aufrufer entscheidet nach seiner Breite.
+ * Die Lage im Browser misst `e2e/stab-schmal.spec.ts`.
+ */
+describe('ListenEintrag — gestapelt (LFH-978)', () => {
+  const zeile = (gestapelt?: boolean) => {
+    renderMitProviders(
+      <Liste
+        dataSource={['Eintrag']}
+        renderItem={(t) => (
+          <ListenEintrag gestapelt={gestapelt} actions={[<button key="a">Aktion</button>]}>
+            {t}
+          </ListenEintrag>
+        )}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Aktion' });
+    const aktionen = knopf.closest('ul') as HTMLElement;
+    return { wurzel: aktionen.parentElement as HTMLElement, aktionen };
+  };
+
+  it('stellt die Aktionen auf eine eigene Zeile unter den Inhalt, linksbündig', () => {
+    const { wurzel, aktionen } = zeile(true);
+    expect(wurzel.style.flexWrap).toBe('wrap');
+    expect(aktionen.style.flex).toBe('1 1 100%');
+    expect(aktionen.style.justifyContent).toBe('flex-start');
+  });
+
+  it('ohne Opt-in bleibt die Zeile einzeilig, die Aktionen rechts', () => {
+    const { wurzel, aktionen } = zeile();
+    expect(wurzel.style.flexWrap).toBe('');
+    expect(wurzel.style.justifyContent).toBe('space-between');
+    expect(aktionen.style.flex).toBe('0 0 auto');
+  });
+});
+
+/**
  * Gruppenkopf als Überschrift (LFH-470): ein Vorleser springt zwischen Überschriften, nicht
  * zwischen Divs. Die Ebene kennt nur der Einbauort — deshalb `unterEbene` wie bei `Markdown`.
  */

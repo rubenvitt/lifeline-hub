@@ -1,5 +1,13 @@
 import { ConfigProvider, Input, Table, type InputRef, type TableProps, type TableRef } from 'antd';
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import {
@@ -33,7 +41,8 @@ import '../theme/sprache.css';
  * (siehe unten).
  *
  * **Suche: opt-in.** Ohne `suche` gibt es weder Feld noch Werkzeugzeile (manche Seiten haben eine
- * eigene Suche, `Datensicht` bringt seine mit). Gesucht wird über {@link zellenWert}, also nur in
+ * eigene Suche, `Datensicht` bringt seine mit). Der Platzhalter nennt die durchsuchten Felder und
+ * steht deshalb ganz im Feld ({@link suchfeldStil}, LFH-980). Gesucht wird über {@link zellenWert}, also nur in
  * Spalten mit auflösbarem Datenbezug; render-only-Spalten tragen NICHT bei, außer mit einem
  * {@link KatalogSpalte.suchText}-Haken (dieselbe Signatur wie `DatensichtSpalte.suchText`).
  * **`suchText` gewinnt**: trägt eine Spalte beides, wird nur der Haken bewertet, ein Haken kann
@@ -49,6 +58,8 @@ import '../theme/sprache.css';
  * · Ohne Opt-in bleiben alle Spalten sichtbar: `abBreite` wirkt nicht (DEV-Meldung), antds
  *   `responsive`/`hidden` sind am Typ und per Guard gesperrt.
  * · `Datensicht` setzt das Prop NIE, es rendert seinen eigenen Schalter.
+ * · Eine Spalte, die immer im Bild stehen muss (Status, Aktionen), trägt `immerSichtbar` und
+ *   `fixed: 'right'` (LFH-980); die Fixierung der ersten Spalte bleibt davon unberührt.
  * · Was man nicht sieht, wirkt nicht: antd hält Filter- und Sortierzustand nur für übergebene
  *   Spalten, eine ausgeblendete gefilterte Spalte siebt nicht (gepinnt in
  *   `OnlineQuellenVerwaltung.test.tsx`).
@@ -166,6 +177,43 @@ export type KatalogTabelleProps<T> = Omit<
    */
   spaltenSchalter?: { bezeichnung: string };
 };
+
+/**
+ * Breite der fixierten Kennungsspalte unter `md`, wenn rechts Status und Aktionen fixiert stehen
+ * (LFH-980, Bauform der Benutzerliste aus LFH-819). rc-table schiebt fixierte Spalten, die
+ * zusammen breiter als die Sicht sind, übereinander: eine lange Kennung läge in 390 px über dem
+ * Status. Mit dieser Zahl bricht die Kennung um (`overflowWrap: 'anywhere'` in der Zelle) und
+ * bleibt ganz lesbar. Gegen die schmalste Fläche gewählt.
+ */
+export const KENNUNG_SCHMAL_BREITE = 136;
+
+/** Höchstbreite des Platzhaltertexts im Suchfeld ab `md`, in px (LFH-980). */
+export const SUCHFELD_TEXT_MAX = 360;
+
+/**
+ * Breite des Suchfelds, rein und exportiert (jsdom rechnet kein Layout; LFH-980).
+ *
+ * Der Platzhalter nennt, wonach gesucht werden kann („Funkrufname, Typ oder Kennzeichen“). Ein
+ * fester Deckel kürzte ihn auf jedem Schirm, auch neben 900 px freier Zeile. Deshalb:
+ * · unter `md` die volle Zeile;
+ * · ab `md` so breit wie der Platzhalter, höchstens {@link SUCHFELD_TEXT_MAX} px Text, plus der
+ *   Rahmen des Felds: Polster beidseits, das Löschzeichen und der quadratische Suchknopf, alle
+ *   aus der Dichte-Staffel. `ch` ist die Breite der Ziffer 0 und liegt in der Textschrift über
+ *   dem Mittel deutscher Kleinbuchstaben; die Schätzung ist eine Obergrenze, gemessen in
+ *   `e2e/verwaltungstabellen-schmal.spec.ts`.
+ */
+export function suchfeldStil(
+  platzhalter: string,
+  schmal: boolean,
+  token: { controlHeight: number; paddingSM: number; fontSize: number },
+): CSSProperties {
+  if (schmal) return { width: '100%' };
+  const rahmen = 2 * token.paddingSM + token.fontSize + 8 + token.controlHeight + 2;
+  return {
+    width: `calc(min(${platzhalter.length}ch, ${SUCHFELD_TEXT_MAX}px) + ${rahmen}px)`,
+    maxWidth: '100%',
+  };
+}
 
 /** Ab dieser Zeilenzahl blättert das Primitiv von selbst. */
 export const BLAETTER_SCHWELLE = 50;
@@ -582,8 +630,8 @@ export default function KatalogTabelle<T extends object>({
               placeholder={suche.platzhalter}
               value={suchbegriff}
               onChange={(e) => setSuchbegriff(e.target.value)}
-              // Kein `size`-Prop: die Höhe kommt aus `controlHeight`. Fluide Breite statt fester Zahl.
-              style={{ width: '100%', maxWidth: 220 }}
+              // Kein `size`-Prop: die Höhe kommt aus `controlHeight`. Die Breite folgt dem Platzhalter.
+              style={suchfeldStil(suche.platzhalter, !abBreite('md'), token)}
             />
           )}
           {schalterDa && (

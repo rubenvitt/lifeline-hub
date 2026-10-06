@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Button, Input, Typography } from 'antd';
 import { Augenbraue, Paneel, monoStil, useRollen } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
@@ -17,6 +17,21 @@ interface Props {
   schreibgeschuetzt: boolean;
   onZuweisenEinheit: (einheit: Einheit) => void;
   onZuweisenFahrzeug: (fahrzeug: EinsatzFahrzeug) => void;
+}
+
+/**
+ * Eine Zeile der Seitenleiste (Name + „zuweisen“), rein und exportiert (Muster `bedienzielStil`).
+ * Der Zeilenabstand ist der Zielabstand zwischen zwei „zuweisen“-Knöpfen (LFH-968): `marginSM` =
+ * 7 / 11 / 16 px hält komfortabel ≥ 8 und handschuh ≥ 16; die festen 6 px vorher hielten keins.
+ */
+export function kraftZeileStil(token: { marginXS: number; marginSM: number }) {
+  return {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: token.marginXS,
+    marginBottom: token.marginSM,
+  } satisfies CSSProperties;
 }
 
 /**
@@ -84,42 +99,27 @@ export default function KraefteOhneBrSidebar({
                 {g.titel}
               </Augenbraue>
               {g.einheiten.map((e) => (
-                <div
-                  key={`einheit-${e.id}`}
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: 4,
-                    marginBottom: 6,
-                  }}
-                >
+                <div key={`einheit-${e.id}`} style={kraftZeileStil(token)}>
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: rollen.text }}>
                     {e.name}
                   </span>
                   {!schreibgeschuetzt && (
-                    <Button type="primary" onClick={() => onZuweisenEinheit(e)}>
+                    <Button aria-label={`${e.name} zuweisen`} onClick={() => onZuweisenEinheit(e)}>
                       zuweisen
                     </Button>
                   )}
                 </div>
               ))}
               {g.fahrzeuge.map((f) => (
-                <div
-                  key={`fahrzeug-${f.id}`}
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                    gap: 4,
-                    marginBottom: 6,
-                  }}
-                >
+                <div key={`fahrzeug-${f.id}`} style={kraftZeileStil(token)}>
                   <span style={{ flex: 1, minWidth: 0, ...monoStil(13), color: rollen.text }}>
                     {f.funkrufname}
                   </span>
                   {!schreibgeschuetzt && (
-                    <Button type="primary" onClick={() => onZuweisenFahrzeug(f)}>
+                    <Button
+                      aria-label={`${f.funkrufname} zuweisen`}
+                      onClick={() => onZuweisenFahrzeug(f)}
+                    >
                       zuweisen
                     </Button>
                   )}

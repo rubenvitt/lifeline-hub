@@ -1,9 +1,13 @@
-import { Button, Space, type TableColumnsType } from 'antd';
+import { Button, Space } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import KatalogTabelle from '../components/KatalogTabelle';
+import KatalogTabelle, {
+  KENNUNG_SCHMAL_BREITE,
+  type KatalogSpalte,
+} from '../components/KatalogTabelle';
+import { useViewport } from '../components/useViewport';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -21,6 +25,7 @@ import { KennungsLink } from '../components/kennungsLink';
 export default function FahrzeugeTab() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
+  const { istSchmal } = useViewport();
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Fahrzeug | null>(null);
 
@@ -35,11 +40,15 @@ export default function FahrzeugeTab() {
 
   const dienststatusMutation = useDienststatusMutation(setzeDienststatus, globalKeys.fahrzeuge());
 
-  const spalten: TableColumnsType<Fahrzeug> = [
+  // Träger und Kennzeichen sind nachrangig und fallen unter `lg` weg; der Spaltenschalter zählt
+  // sie und holt sie zurück (LFH-980).
+  const spalten: KatalogSpalte<Fahrzeug>[] = [
     {
       title: 'Funkrufname',
       dataIndex: 'funkrufname',
       key: 'funkrufname',
+      // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
+      width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       /**
        * Leitspalte: am Funkrufname wird ein Fahrzeug gesucht, nie an der DB-Kennung — dieselbe
        * Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
@@ -57,8 +66,11 @@ export default function FahrzeugeTab() {
        * gleichzeitig feuern könnten.
        */
       render: (_, f) => (
-        <Space size={4}>
-          <KennungsLink to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
+        <Space size={4} wrap>
+          <KennungsLink
+            to={fahrzeugDetailPfad(f.id)}
+            style={{ ...monoStil(13), overflowWrap: 'anywhere' }}
+          >
             {f.funkrufname}
           </KennungsLink>
           {f.ist_demo && <DemoMarke />}
@@ -66,11 +78,18 @@ export default function FahrzeugeTab() {
       ),
     },
     { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },
-    { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
+    {
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      abBreite: 'lg',
+      render: (t) => t ?? '—',
+    },
     {
       title: 'Kennzeichen',
       dataIndex: 'kennzeichen',
       key: 'kennzeichen',
+      abBreite: 'lg',
       render: (t) => (t ? <span style={monoStil(12)}>{t}</span> : '—'),
     },
     {
@@ -81,6 +100,8 @@ export default function FahrzeugeTab() {
     ...dienststatusSpalten<Fahrzeug>({
       mutation: dienststatusMutation,
       istAdmin,
+      schmal: istSchmal,
+      kennung: (f) => `Fahrzeug ${f.funkrufname}`,
       onBearbeiten: (f) => {
         setBearbeite(f);
         setModalOffen(true);
@@ -133,9 +154,10 @@ export default function FahrzeugeTab() {
           columns={spalten}
           locale={{ emptyText: 'Noch keine Fahrzeuge' }}
           // Durchsucht werden die vier Spalten mit Datenbezug (Funkrufname, Typ, Träger, Kennzeichen);
-          // Stärke und Status sind render-only. Der Platzhalter nennt drei — die volle Aufzählung würde
-          // im schmalen Feld abgeschnitten.
-          suche={{ platzhalter: 'Funkrufname, Typ oder Kennzeichen' }}
+          // Stärke und Status sind render-only. Der Platzhalter nennt alle vier: das Feld wächst mit
+          // ihm (`suchfeldStil`), eine ausgeblendete Spalte bleibt durchsuchbar.
+          suche={{ platzhalter: 'Funkrufname, Typ, Träger oder Kennzeichen' }}
+          spaltenSchalter={{ bezeichnung: 'Fahrzeuge' }}
         />
       )}
       <FahrzeugFormModal

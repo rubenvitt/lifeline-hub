@@ -44,22 +44,20 @@ async function vorgehalteneEtbInhalte(page: Page): Promise<string[]> {
             fertig([]);
             return;
           }
-          const lesen = db.transaction('stand').objectStore('stand').get('aktuell');
+          const lesen = db.transaction('stand').objectStore('stand').get('client');
           lesen.onsuccess = () => {
             db.close();
             const satz = lesen.result as
               | {
-                  client: {
-                    clientState: {
-                      queries: {
-                        queryKey: unknown[];
-                        state: { data?: { pages?: { inhalt: string }[][] } };
-                      }[];
-                    };
+                  clientState: {
+                    queries: {
+                      queryKey: unknown[];
+                      state: { data?: { pages?: { inhalt: string }[][] } };
+                    }[];
                   };
                 }
               | undefined;
-            const liste = satz?.client.clientState.queries.find(
+            const liste = satz?.clientState.queries.find(
               (q) => q.queryKey[0] === 'etb' && typeof q.queryKey[2] === 'object',
             );
             fertig((liste?.state.data?.pages ?? []).flat().map((e) => e.inhalt));

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Button, Space, Form, App } from 'antd';
+import { useId, useState } from 'react';
+import { Button, Space, Form, App, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
@@ -13,6 +13,10 @@ import { monoStil } from '../../components/instrument';
 import { materialStatus } from '../../theme/statusFarben';
 import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 import { useAuthOptional } from '../../auth/AuthContext';
+import { KennungsLink } from '../../components/kennungsLink';
+import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
+import { useSprungSperre } from '../../einsatz/useSprungSperre';
+import { materialPfad } from '../../routing/deeplinks';
 
 interface Props {
   einsatzId: number;
@@ -44,6 +48,22 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   const material = materialQuery.data ?? [];
   const verortet = nurDetail ? uhs.material : material.filter((em) => em.uhs_id === uhs.id);
   const freiVerortbar = material.filter((em) => em.uhs_id == null);
+  // Sperrgrund statt stummer Sperre (LFH-970, U78; `frontend/AGENTS.md`, M16): ohne freies
+  // Material nennt eine Zeile neben dem Knopf den Grund und springt ins Modul Material, ein
+  // gescheiterter Abruf ohne Daten meldet sich als Fehler. Solange die Liste lädt, steht nichts
+  // daneben. Scheitert nur ein Abgleich im Hintergrund, bleiben die alten Daten maßgeblich: ein
+  // Fehlertext neben einem bedienbaren Knopf widerspräche ihm.
+  const sperrgrund: 'fehler' | 'leer' | null =
+    materialQuery.data === undefined
+      ? materialQuery.isError
+        ? 'fehler'
+        : null
+      : freiVerortbar.length === 0
+        ? 'leer'
+        : null;
+  const sperrgrundId = useId();
+  // Ein Sprung in ein gesperrtes Modul entfällt, die Beschriftung bleibt (Spec `modul-freigabe`).
+  const materialGesperrt = useSprungSperre(einsatzId)('material');
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
@@ -126,9 +146,34 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
     <Space orientation="vertical" style={{ width: '100%' }}>
       {!nurDetail && <Datenstand dataUpdatedAt={materialQuery.dataUpdatedAt} />}
       {bedienbar && (
-        <Button onClick={() => setZuordnenOffen(true)} disabled={freiVerortbar.length === 0}>
-          Material zuordnen
-        </Button>
+        <Space wrap size="small" align="center">
+          <Button
+            onClick={() => setZuordnenOffen(true)}
+            disabled={freiVerortbar.length === 0}
+            aria-describedby={sperrgrund ? sperrgrundId : undefined}
+          >
+            Material zuordnen
+          </Button>
+          {sperrgrund === 'fehler' && (
+            <Typography.Text type="danger" id={sperrgrundId} data-testid="material-sperrgrund">
+              Material konnte nicht geladen werden – Zuordnen ist gerade nicht möglich.
+            </Typography.Text>
+          )}
+          {sperrgrund === 'leer' && (
+            // Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗", kein Knopf; der Link trägt
+            // die Steuerhöhe über `KennungsLink`.
+            <Typography.Text type="secondary" id={sperrgrundId} data-testid="material-sperrgrund">
+              Kein freies Material im Einsatz –{' '}
+              {materialGesperrt ? (
+                `im Modul Material erfassen (${KEINE_BERECHTIGUNG})`
+              ) : (
+                <KennungsLink to={materialPfad(einsatzId)}>
+                  im Modul Material erfassen <span aria-hidden="true">↗</span>
+                </KennungsLink>
+              )}
+            </Typography.Text>
+          )}
+        </Space>
       )}
       <KatalogTabelle<EinsatzMaterial>
         rowKey="id"

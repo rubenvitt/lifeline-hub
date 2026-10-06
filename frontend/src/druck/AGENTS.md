@@ -32,6 +32,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **ETB-Druck** (`pages/EtbDruckPage.tsx`, `etb/EtbDruckTabelle.tsx`): schlichtes `<table>` nach
   `lfd_nr`, Vollabruf `etb/druckAbruf.ts` über die bestehende Liste, Drucken erst komplett;
   `einsatzKeys.etbDruck` nicht live, `refetchOnMount: 'always'`.
+- **Druckansichten am Handy** (LFH-956): Einsatzbericht und ETB-Druck bleiben bei 390 px im
+  Layout-Viewport. Ihre Bildschirmregeln stehen in `druck/druckansichtSchmal.css`, nur unter
+  `@media screen`, nie in `druck.css`; das Blatt bleibt unberührt. Gate im mobilen Kontext,
+  auch nicht-privilegiert: `e2e/druckansicht-mobil-kern.ts`.
 - **Modul-Listen-Druck** (LFH-727, Herleitung
   `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/design.md`): `/einsaetze/:id/{personen|tiere|schaeden}/druck`
   über den Rahmen `druck/ListenDruckSeite.tsx` und `druck/DruckTabelle.tsx` (schlichtes `<table>`,

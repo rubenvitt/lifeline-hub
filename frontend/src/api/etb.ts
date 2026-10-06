@@ -32,6 +32,8 @@ export interface EtbFilterWerte {
 
 export interface EtbAbfrage extends EtbFilterWerte {
   before_lfd_nr?: number;
+  /** Seite direkt über dieser Nummer, absteigend geliefert (LFH-947, `etb/seitenfenster.ts`). */
+  after_lfd_nr?: number;
   limit?: number;
 }
 
@@ -53,6 +55,7 @@ function filterParameter(filter: EtbFilterWerte): URLSearchParams {
 export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<EtbEintragAnzeige[]> {
   const qs = filterParameter(params);
   if (params.before_lfd_nr != null) qs.set('before_lfd_nr', String(params.before_lfd_nr));
+  if (params.after_lfd_nr != null) qs.set('after_lfd_nr', String(params.after_lfd_nr));
   qs.set('limit', String(params.limit ?? SEITENGROESSE));
   return apiGet<EtbEintragAnzeige[]>(`/api/einsaetze/${einsatzId}/etb?${qs.toString()}`);
 }

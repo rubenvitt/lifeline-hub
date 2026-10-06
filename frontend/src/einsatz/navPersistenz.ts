@@ -17,6 +17,7 @@
  * Jeder Zugriff liegt in `try`/`catch`: im Privatmodus wirft der Speicher, und eine
  * vergessene Navigation ist kein Grund, den Einsatz-Rahmen abstürzen zu lassen.
  */
+import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 
 const SCHLUESSEL = 'lfh:nav:eingeklappt';
 
@@ -25,23 +26,16 @@ export type NavWahl = 'zu' | 'offen';
 
 /** Liest die gemerkte Wahl; ohne (lesbaren) Eintrag und bei gesperrtem Speicher `null`. */
 export function leseNavWahl(): NavWahl | null {
-  try {
-    const wert = localStorage.getItem(SCHLUESSEL);
-    if (wert === '1') return 'zu';
-    if (wert === '0') return 'offen';
-    return null;
-  } catch {
-    return null;
-  }
+  const wert = sicherLesen(SCHLUESSEL);
+  if (wert === '1') return 'zu';
+  if (wert === '0') return 'offen';
+  return null;
 }
 
 /** Merkt eine Wahl. Es gibt kein „Wahl löschen“: wer gewählt hat, bekommt seine Wahl. */
 export function schreibeNavWahl(wahl: NavWahl): void {
-  try {
-    localStorage.setItem(SCHLUESSEL, wahl === 'zu' ? '1' : '0');
-  } catch {
-    /* Speicher gesperrt (Privatmodus) — ohne Persistenz weiterarbeiten */
-  }
+  // Speicher gesperrt (Privatmodus): ohne Persistenz weiterarbeiten.
+  sicherSchreiben(SCHLUESSEL, wahl === 'zu' ? '1' : '0');
 }
 
 /** Ob das Panel zu ist: die Wahl, sonst die Vorgabe (`weit` = ab `xl` offen). */

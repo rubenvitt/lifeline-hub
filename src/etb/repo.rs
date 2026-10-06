@@ -591,6 +591,10 @@ pub struct EtbFilter {
     pub einheit_id: Option<i64>,
     /// Cursor: nur Einträge mit `lfd_nr <` diesem Wert (für ältere Seiten).
     pub before_lfd_nr: Option<i64>,
+    /// Cursor nach oben (LFH-947): die `limit` Einträge mit der kleinsten `lfd_nr >` diesem
+    /// Wert, geliefert absteigend wie jede Seite. Nie zusammen mit `before_lfd_nr` (der Handler
+    /// weist das ab).
+    pub after_lfd_nr: Option<i64>,
     /// Seitengröße (vom Handler auf [1, MAX_LIMIT] geklemmt).
     pub limit: i64,
 }
@@ -693,7 +697,7 @@ fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &Etb
 }
 
 /// Fragt Einträge eines Einsatzes ab. Sortierung: `lfd_nr DESC` (neueste zuerst),
-/// stabiler Cursor über `before_lfd_nr`. Die fachliche Anzeige-Sortierung nach
+/// stabiler Cursor über `before_lfd_nr` (ältere Seite) bzw. `after_lfd_nr` (neuere Seite). Die fachliche Anzeige-Sortierung nach
 /// `ereigniszeit` erfolgt clientseitig (beide Zeitstempel werden geliefert).
 pub async fn abfrage(
     pool: &SqlitePool,
@@ -716,14 +720,25 @@ pub async fn abfrage(
         qb.push(" AND e.lfd_nr < ");
         qb.push_bind(cursor);
     }
-
-    qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
+    // Nach oben: aufsteigend lesen, damit die Seite DIREKT über dem Cursor beginnt (absteigend
+    // gelesen käme die neueste Seite, und der Weg zurück nach oben hätte eine Lücke).
+    if let Some(cursor) = filter.after_lfd_nr {
+        qb.push(" AND e.lfd_nr > ");
+        qb.push_bind(cursor);
+        qb.push(" ORDER BY e.lfd_nr ASC LIMIT ");
+    } else {
+        qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
+    }
     qb.push_bind(filter.limit);
 
     let mut eintraege = qb
         .build_query_as::<EtbEintragAnzeige>()
         .fetch_all(pool)
         .await?;
+    // Jede Seite liefert dieselbe Ordnung: neueste zuerst.
+    if filter.after_lfd_nr.is_some() {
+        eintraege.reverse();
+    }
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
     anhaenge_nachladen(pool, &mut eintraege).await?;
     berichtigungen_nachladen(pool, &mut eintraege).await?;
@@ -1313,6 +1328,85 @@ mod tests {
         f.before_lfd_nr = Some(seite1[0].lfd_nr);
         let seite2 = abfrage(&pool, einsatz, &f).await.unwrap();
         assert_eq!(seite2[0].lfd_nr, 2);
+    }
+
+    /// LFH-947: `after_lfd_nr` liefert die Einträge DIREKT über dem Cursor, absteigend wie jede
+    /// Seite — nicht die neuesten. Sonst entstünde beim Weg zurück nach oben eine Lücke.
+    #[tokio::test]
+    async fn abfrage_cursor_blaettert_zu_neueren_ohne_luecke() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        for i in 1..=6 {
+            anlegen(&pool, einsatz, benutzer, daten(&format!("e{i}")))
+                .await
+                .unwrap();
+        }
+
+        let mut f = filter();
+        f.limit = 2;
+        f.after_lfd_nr = Some(2);
+        let nrn: Vec<i64> = abfrage(&pool, einsatz, &f)
+            .await
+            .unwrap()
+            .iter()
+            .map(|e| e.lfd_nr)
+            .collect();
+        assert_eq!(nrn, vec![4, 3], "direkt über dem Cursor, absteigend");
+
+        f.after_lfd_nr = Some(5);
+        let oben: Vec<i64> = abfrage(&pool, einsatz, &f)
+            .await
+            .unwrap()
+            .iter()
+            .map(|e| e.lfd_nr)
+            .collect();
+        assert_eq!(oben, vec![6], "am oberen Ende der Rest");
+    }
+
+    #[tokio::test]
+    async fn abfrage_cursor_zu_neueren_folgt_dem_filter() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        for i in 1..=6 {
+            let text = format!("e{i}");
+            let mut d = daten(&text);
+            if i % 2 == 0 {
+                d.typ = "anordnung";
+            }
+            anlegen(&pool, einsatz, benutzer, d).await.unwrap();
+        }
+        let mut f = filter();
+        f.typ = Some("anordnung".into());
+        f.after_lfd_nr = Some(1);
+        f.limit = 2;
+        let nrn: Vec<i64> = abfrage(&pool, einsatz, &f)
+            .await
+            .unwrap()
+            .iter()
+            .map(|e| e.lfd_nr)
+            .collect();
+        assert_eq!(nrn, vec![4, 2]);
+    }
+
+    /// Grundlage des Sprungs mit Richtung (LFH-947, design.md D4): innerhalb eines Einsatzes
+    /// wächst die Kennung mit der laufenden Nummer.
+    #[tokio::test]
+    async fn kennung_waechst_mit_lfd_nr() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let (_, anderer) = setup(&pool).await;
+        for i in 1..=4 {
+            anlegen(&pool, einsatz, benutzer, daten(&format!("a{i}")))
+                .await
+                .unwrap();
+            anlegen(&pool, anderer, benutzer, daten(&format!("b{i}")))
+                .await
+                .unwrap();
+        }
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        for paar in liste.windows(2) {
+            assert!(paar[0].lfd_nr > paar[1].lfd_nr && paar[0].id > paar[1].id);
+        }
     }
 
     #[tokio::test]

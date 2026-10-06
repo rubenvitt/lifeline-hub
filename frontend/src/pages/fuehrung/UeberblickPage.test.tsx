@@ -363,7 +363,9 @@ describe('UeberblickPage', () => {
       'bedien',
       'alarm',
     ]);
-    expect(within(p).getByText(/Einheiten nach Status/)).toBeInTheDocument();
+    // Die Legende steht über den Zeilen, nicht am Fuß (LFH-962): sie geht dem ersten Raster voraus.
+    const legende = within(p).getByText(/Einheiten nach Status: bereit · gebunden · Ausfall/);
+    expect(legende.compareDocumentPosition(zeile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
   });
 
@@ -857,6 +859,20 @@ describe('UeberblickPage', () => {
     const entscheidungen = await waitFor(() => paneel('Entscheidungen der letzten Stunde'));
     expect(await within(entscheidungen).findByText('2 Aufträge')).toBeInTheDocument();
     expect(screen.queryByText(/Folgeaufträge werden nicht gezählt/)).toBeNull();
+  });
+
+  it('Abschnitte: fehlen die Aufträge, sagt es der Fuß, die Legende bleibt oben (LFH-962)', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/auftraege', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(
+      await within(p).findByText('Aufträge nicht abrufbar, Auftragstexte fehlen'),
+    ).toBeInTheDocument();
+    expect(within(p).getByText(/Einheiten nach Status: bereit/)).toBeInTheDocument();
   });
 
   it('Ladezustand: Kennzahlen und Paneele zeigen „wird abgerufen", keine Null', async () => {

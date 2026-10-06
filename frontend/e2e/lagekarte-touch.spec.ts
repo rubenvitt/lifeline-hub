@@ -1,4 +1,5 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 // Die Lagekarte unter Touch, auf Handschirm (390 px) und Führungs-Tablet (1024 px).
 //
@@ -1424,6 +1425,13 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
     // Der Messwert steht im Fuß über der Kartenmitte: den Punkt in die freie Fläche darüber holen.
     await springe(page, west, 15);
     const frei = await kartenMitte(page);
+    // Im Messmodus bleibt über dem Fuß nur ein Streifen, und die Kartenmitte liegt in Höhe der
+    // Grundlage-Leiste: den Punkt rechts neben sie holen, vor die Knopfspalte.
+    const leiste = await page.locator('[data-lfh="grundlage-leiste"]').boundingBox();
+    const knoepfe = await page.locator('[data-lfh="karten-knoepfe"]').boundingBox();
+    if (leiste && knoepfe && frei.y < leiste.y + leiste.height) {
+      frei.x = (leiste.x + leiste.width + knoepfe.x) / 2;
+    }
     const jetzt = await aufSchirm(page, west);
     await page.evaluate(
       (d) =>
@@ -1858,5 +1866,98 @@ test.describe('Kontextmenü per Rechtsklick am Fükw (LFH-776)', () => {
     await page.keyboard.press('Escape');
     await expect(menue).toHaveCount(0);
     await expect(page.locator('canvas.maplibregl-canvas')).toBeFocused();
+  });
+});
+
+// ── Kartengrundlage und Zeigerkoordinate ohne feinen Zeiger (LFH-971) ──────────────────────────
+//
+// Eine gesperrte Grundlage nannte ihren Grund nur im `title` eines nativ gesperrten Knopfs: auf
+// Touch kam der Tipp nie an. Jetzt wählt der Tipp nicht, sondern zeigt den Grund als Text an der
+// Leiste. Die Zeigerkoordinate wird nur über `mousemove` gespeist und blieb auf Touch ein
+// „—“-Kästchen; sie steht nur mit feinem Zeiger da. Die e2e-DB hat keine Offline-Region, „Offline“
+// ist also immer gesperrt. Auch als Beobachter (LFH-435): Lesen ist dessen Hauptweg.
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 820, height: 1180 },
+]) {
+  test.describe(`Kartengrundlage unter Touch bei ${viewport.width} px (LFH-971)`, () => {
+    test.use({ hasTouch: true, viewport });
+
+    for (const rolle of ['admin', 'beobachter'] as const) {
+      test(`${rolle}: Tipp auf gesperrtes „Offline“ nennt den Grund, keine Zeigerkoordinate`, async ({
+        page,
+      }) => {
+        test.setTimeout(90_000);
+        const seitenFehler: Error[] = [];
+        page.on('pageerror', (f) => seitenFehler.push(f));
+        await anmelden(page);
+        const einsatzId = await einsatzMitLage(page);
+        if (rolle === 'beobachter') await wechsleZuRolle(page, rolle, String(einsatzId));
+        await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+        await ruhe(page);
+        // Vorbedingung: der Browser meldet wirklich keinen feinen Zeiger.
+        expect(await page.evaluate(() => window.matchMedia('(any-pointer: fine)').matches)).toBe(
+          false,
+        );
+
+        // Unter `md` steht die Grundlage im Paneel „Kartengrundlage“ der Leiste, die dort per
+        // Vorgabe zu ist.
+        if (viewport.width < 768) {
+          await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
+          await leisteOffen(page);
+          await page.getByRole('button', { name: 'Kartengrundlage' }).tap();
+        }
+        const grundlage = page.getByRole('radiogroup', { name: 'Kartengrundlage' });
+        const offline = grundlage.getByRole('radio', { name: 'Offline' });
+        await expect(offline).toHaveAttribute('aria-disabled', 'true');
+        const gewaehlt = await grundlage.getByRole('radio', { checked: true }).textContent();
+        // Die Zeile unter der Leiste; am Handschirm steht der Hinweis „Ohne Karte“ zusätzlich
+        // allein über der Karte.
+        const hinweis = page.locator('[data-lfh="grundlage"] [data-lfh="grundlage-hinweis"]');
+        await expect(hinweis.filter({ hasText: 'Offline-Karte nicht konfiguriert' })).toHaveCount(
+          0,
+        );
+
+        // Ein echter Fingertipp auf die Mitte des Segments: Playwrights `tap()` verweigert sich
+        // einem `aria-disabled`-Element („not enabled“), der Browser nimmt den Tipp aber an — genau
+        // das ist hier die Zusage.
+        await offline.scrollIntoViewIfNeeded();
+        const box = await offline.boundingBox();
+        expect(box, 'Offline-Segment hat keine Box').not.toBeNull();
+        await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
+        await expect(hinweis).toBeVisible();
+        await expect(hinweis).toContainText(
+          'Offline-Karte nicht konfiguriert (Verwaltung › Karten)',
+        );
+        // Der Tipp wählt nicht: die Grundlage bleibt, wie sie war.
+        await expect(offline).not.toBeChecked();
+        await expect(grundlage.getByRole('radio', { checked: true })).toHaveText(gewaehlt!);
+
+        await expect(page.locator('[data-lfh="zeiger-koordinate"]')).toBeHidden();
+        expect(seitenFehler.map((f) => f.message)).toEqual([]);
+      });
+    }
+  });
+}
+
+test.describe('Zeigerkoordinate mit feinem Zeiger (LFH-971)', () => {
+  test.use({ viewport: { width: 1024, height: 768 } });
+
+  test('steht mit Maus da und zeigt die Lage des Zeigers', async ({ page }) => {
+    test.setTimeout(90_000);
+    await anmelden(page);
+    const einsatzId = await einsatzMitLage(page);
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await ruhe(page);
+    expect(await page.evaluate(() => window.matchMedia('(any-pointer: fine)').matches)).toBe(true);
+    // Die Maus steht noch über dem Anmeldeknopf, also über der Karte: erst wegführen.
+    await page.mouse.move(0, 0);
+    const koordinate = page.locator('[data-lfh="zeiger-koordinate"]');
+    await expect(koordinate).toBeVisible();
+    await expect(koordinate).toHaveText('—');
+    const m = await kartenMitte(page);
+    await aufKarte(page, [m], 'Zeiger über der Karte');
+    await page.mouse.move(m.x, m.y);
+    await expect(koordinate).not.toHaveText('—');
   });
 });

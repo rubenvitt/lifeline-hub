@@ -243,8 +243,8 @@ export default function MeldungKarte({
          Zeilenhöhe 1.5, weil er regelmäßig mehrzeilig ist. */}
       <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
 
-      {/* `<Space size="middle">`: „Bestätigen" ist `danger` und braucht Abstand zur Nachbaraktion
-         (gepinnt in `components/aktionsabstand.guard.test.ts`). */}
+      {/* „Bestätigen" ist der Primärknopf, nicht `danger` (LFH-962): die Kenntnisnahme löscht nichts,
+         und Rot bedient nichts. Der weite Abstand bleibt als Trennung der Handschuh-Ziele. */}
       {gesamt > 0 && (
         <Space
           size="middle"
@@ -258,7 +258,7 @@ export default function MeldungKarte({
               cancelText="Abbrechen"
               onConfirm={() => onBestaetigen?.(m.id)}
             >
-              <Button danger>Bestätigen</Button>
+              <Button type="primary">Bestätigen</Button>
             </Popconfirm>
           )}
           {naechster &&

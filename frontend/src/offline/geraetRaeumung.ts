@@ -52,7 +52,7 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     datei: 'offline/queue.ts',
     entscheidung: 'jeder-ausgang',
     grund:
-      'Volle Person-Objekte; die Person liegt nach dem Replay auf dem Server, die Quittung ist nur der Hinweis darauf.',
+      'Nur Kennung und R-Nr der Person (LFH-941); die Person liegt nach dem Replay auf dem Server, die Quittung ist nur der Hinweis darauf.',
   },
   {
     ort: 'IndexedDB lifeline-etb-entwuerfe; localStorage lifeline-etb-entwuerfe-ausstehend:<id>',

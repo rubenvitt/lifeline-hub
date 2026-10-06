@@ -1,9 +1,5 @@
-import { hydrate, type QueryClient } from '@tanstack/react-query';
-import {
-  persistQueryClientSave,
-  persistQueryClientSubscribe,
-  type PersistedClient,
-} from '@tanstack/query-persist-client-core';
+import { dehydrate, hydrate, type QueryClient } from '@tanstack/react-query';
+import type { PersistedClient } from '@tanstack/query-persist-client-core';
 import type { BenutzerAnzeige, MeAntwort } from '../api/types';
 import { warGeraet } from '../geraet/geraetMarke';
 import { fetchErfolgeVerfolgen } from './lagebildBestaetigung';
@@ -79,8 +75,8 @@ function zulaessigeEintraege(qc: QueryClient, eintraege: VorratEintrag[]): Vorra
  *
  * `vorrat` ist der gelesene Stand einer SERVERBESTÄTIGTEN Sitzung, der bewusst NICHT im
  * Speicher liegt (design.md D2). Jede Speicherung führt ihn mit dem Live-Stand zusammen: der
- * Live-Stand gewinnt je `queryHash`, übrige Vorrat-Einträge kommen dazu — gefiltert bei JEDER
- * Speicherung, damit ein Rechteentzug im Lauf der Sitzung (Sperrmarke) und die Höchstliegezeit
+ * Live-Stand gewinnt je `queryHash`, übrige Vorrat-Einträge kommen dazu — gefiltert und
+ * gekürzt bei JEDER Speicherung (LFH-939 D3), damit ein Rechteentzug im Lauf der Sitzung (Sperrmarke) und die Höchstliegezeit
  * auch den Vorrat treffen. Ohne das Zusammenführen überschriebe die erste Speicherung den
  * Datensatz mit dem fast leeren Cache eines frisch geladenen Tabs, und offline wäre nur noch
  * da, was seit dem letzten Neuladen besucht wurde.
@@ -96,33 +92,36 @@ function abonnieren(
   // Schwärzung zwischen zwei Sitzungen fällt bei der ersten Antwort mit höherem Stand auf, und
   // die Räummarke nimmt die älteren Einträge bei der nächsten Speicherung aus dem Vorrat.
   schwaerzungsWaechterVorbelegen(qc, vorrat);
-  const innen = erzeugeLagebildPersister(benutzerId, { drosselMs });
-  const persister: LagebildPersister = {
-    ...innen,
-    persistClient: (client) => {
-      const live = new Set(client.clientState.queries.map((q) => q.queryHash));
-      const dazu = zulaessigeEintraege(qc, vorrat).filter((q) => !live.has(q.queryHash));
-      return innen.persistClient({
-        ...client,
-        clientState: {
-          ...client.clientState,
-          queries: [...client.clientState.queries, ...dazu],
-        },
-      });
-    },
+  const persister = erzeugeLagebildPersister(benutzerId, { drosselMs });
+  let rest = vorrat;
+  const dehydrierOptionen = lagebildDehydrierOptionen(qc);
+  // Erst der Durchlauf des Persisters ruft das (LFH-939 D1): bei vielen Ereignissen in einem
+  // Drosselfenster genau ein Dehydrieren, nicht eines je Ereignis.
+  const erzeuge = (): PersistedClient => {
+    const clientState = dehydrate(qc, dehydrierOptionen);
+    const live = new Set(clientState.queries.map((q) => q.queryHash));
+    // Der Vorrat schrumpft bei jeder Speicherung (LFH-939 D3): Was live überdeckt ist, ist
+    // jünger, und verlässt es den Cache, ist der ältere Vorrat-Stand auch nicht mehr gewollt.
+    rest = zulaessigeEintraege(qc, rest).filter((q) => !live.has(q.queryHash));
+    return {
+      timestamp: Date.now(),
+      buster,
+      clientState: { ...clientState, queries: [...clientState.queries, ...rest] },
+    };
   };
-  const speichern = {
-    queryClient: qc,
-    persister,
-    buster,
-    dehydrateOptions: lagebildDehydrierOptionen(qc),
-  };
-  const speichernAbmelden = persistQueryClientSubscribe(speichern);
+  // Nur der Query-Cache (LFH-939 D1): Mutationen werden nie geschrieben
+  // (`shouldDehydrateMutation`), ihre Ereignisse lösten nur leere Durchläufe aus. Dieselben
+  // Ereignisarten wie `persistQueryClientSubscribe`.
+  const speichernAbmelden = qc.getQueryCache().subscribe((ereignis) => {
+    if (ereignis.type === 'added' || ereignis.type === 'removed' || ereignis.type === 'updated') {
+      persister.vormerken(erzeuge);
+    }
+  });
   // Einmal sofort (gedrosselt): das Abonnement sieht nur KÜNFTIGE Änderungen. Serverbestätigt
   // hängen die Seiten ihre Abfragen schon ein, während der Start noch die IndexedDB liest —
   // sind sie fertig, bevor das Abonnement steht, käme sonst nie ein Ereignis, und der Stand
   // bliebe leer (gemessen an der Lagekarte, e2e `lagebild-offline.spec.ts`).
-  void persistQueryClientSave(speichern);
+  persister.vormerken(erzeuge);
   let zuletztBestaetigt = 0;
   const bestaetigungAbmelden = fetchErfolgeVerfolgen(qc, () => {
     const jetzt = Date.now();

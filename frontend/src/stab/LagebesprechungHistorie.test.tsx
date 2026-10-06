@@ -102,6 +102,33 @@ describe('LagebesprechungHistorie', () => {
     expect(screen.queryByText(/konnten nicht geladen werden/)).toBeNull();
   });
 
+  // LFH-961: der Stand darüber sagt schon „noch keine".
+  it('leer und schon ausgesagt: kein eigener Leertext', async () => {
+    let geladen = false;
+    server.use(
+      http.get('/api/einsaetze/1/stab/lagebesprechungen', () => {
+        geladen = true;
+        return HttpResponse.json([]);
+      }),
+    );
+    const { client } = renderMitProviders(<LagebesprechungHistorie einsatzId={1} leerAusgesagt />);
+    await waitFor(() => expect(geladen).toBe(true));
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.stabLagebesprechungen(1))?.status).toBe('success'),
+    );
+    expect(screen.queryByText(LEER)).toBeNull();
+  });
+
+  it('schon ausgesagt, aber Fehler: der Fehler steht trotzdem', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/stab/lagebesprechungen', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderMitProviders(<LagebesprechungHistorie einsatzId={1} leerAusgesagt />);
+    expect(await screen.findByText(FEHLER)).toBeInTheDocument();
+  });
+
   it('Fehler ist nicht leer', async () => {
     zeige(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
     expect(

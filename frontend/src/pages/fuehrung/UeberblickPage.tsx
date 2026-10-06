@@ -726,10 +726,9 @@ export default function UeberblickPage() {
                   ) : undefined
                 }
                 fuss={
-                  zAbschnitte === 'daten' && zeilen.length > 0 ? (
+                  zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
                     <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                      Einheiten nach Status: bereit · gebunden · Ausfall
-                      {auftraegeFehlen && ' — Aufträge nicht abrufbar, Auftragstexte fehlen'}
+                      Aufträge nicht abrufbar, Auftragstexte fehlen
                     </span>
                   ) : undefined
                 }
@@ -751,6 +750,20 @@ export default function UeberblickPage() {
                     nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
                   }
                 >
+                  {/* Die Legende der Statusraster steht über den Zeilen, nicht am Fuß (LFH-962):
+                      am Handy läge der Fuß 500–700 px unter dem ersten Raster, und auf Touch
+                      gibt es kein `title`. */}
+                  <div
+                    data-lfh="status-legende"
+                    style={{
+                      ...monoStil(10),
+                      color: rollen.schwach,
+                      padding: `${token.paddingXS}px ${token.padding}px`,
+                      borderBlockEnd: `1px solid ${rollen.linie}`,
+                    }}
+                  >
+                    Einheiten nach Status: bereit · gebunden · Ausfall
+                  </div>
                   <ul
                     className="ueberblick-abschnitte"
                     style={{ listStyle: 'none', margin: 0, padding: 0 }}

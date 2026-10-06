@@ -337,17 +337,23 @@ export default function PersonenPage() {
         return;
 
       const neueste = quittungen[quittungen.length - 1];
-      const bestaetigenNach = qc.getQueryState(einsatzKeys.personen(einsatzId))?.dataUpdatedAt ?? 0;
-      merkeFrisch(
-        einsatzId,
-        quittungen.map((quittung) => quittung.person),
-        bestaetigenNach,
+      // Die Quittung trägt nur Kennungen (LFH-941, design.md D6); die Person selbst kommt aus
+      // dem Cache, in den der Abgleich sie gelegt hat. Fehlt sie dort, bleibt die Sicht stehen,
+      // und nur die Hervorhebung wird gesetzt — die Liste lädt unten ohnehin neu.
+      const bekannt = new Map(
+        (qc.getQueryData<Person[]>(einsatzKeys.personen(einsatzId)) ?? []).map((p) => [p.id, p]),
       );
-      setSichtNachEinsatz((alt) => ({
-        ...alt,
-        [einsatzId]: sichtFuerNeuePerson(alt[einsatzId] ?? SICHT_VORGABE, neueste.person),
-      }));
-      setHighlightNachEinsatz((alt) => ({ ...alt, [einsatzId]: neueste.person.id }));
+      const personen = quittungen.flatMap((q) => bekannt.get(q.person_id) ?? []);
+      const neuestePerson = bekannt.get(neueste.person_id);
+      const bestaetigenNach = qc.getQueryState(einsatzKeys.personen(einsatzId))?.dataUpdatedAt ?? 0;
+      if (personen.length > 0) merkeFrisch(einsatzId, personen, bestaetigenNach);
+      if (neuestePerson) {
+        setSichtNachEinsatz((alt) => ({
+          ...alt,
+          [einsatzId]: sichtFuerNeuePerson(alt[einsatzId] ?? SICHT_VORGABE, neuestePerson),
+        }));
+      }
+      setHighlightNachEinsatz((alt) => ({ ...alt, [einsatzId]: neueste.person_id }));
       setQuittungNachEinsatz((alt) => {
         const bisher = alt[einsatzId];
         const bisherigeIds =
@@ -358,9 +364,9 @@ export default function PersonenPage() {
             typ: 'success',
             text:
               quittungen.length === 1
-                ? `Erfasst als ${registrierAnzeige(neueste.person.registrier_nr)}`
+                ? `Erfasst als ${registrierAnzeige(neueste.registrier_nr)}`
                 : `Erfasst als ${quittungen
-                    .map((quittung) => registrierAnzeige(quittung.person.registrier_nr))
+                    .map((quittung) => registrierAnzeige(quittung.registrier_nr))
                     .join(', ')}`,
             benutzerId: zielBenutzerId,
             persistenzClientIds: [

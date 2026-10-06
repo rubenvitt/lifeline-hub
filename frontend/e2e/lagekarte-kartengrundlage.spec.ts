@@ -445,8 +445,8 @@ test('frische Seite mit aktiver Offline-Karte zeigt sofort Kacheln, ohne Kartenf
     .toBe(true);
   expect(await kartenFehler(page)).toEqual([]);
 
-  // Wechsel von Hand: Blind, dann wieder Offline — dieselbe Grundlage, wieder ohne Fehler.
-  await grundlage.getByRole('radio', { name: 'Blind' }).click();
+  // Wechsel von Hand: „Ohne Karte“, dann wieder Offline — dieselbe Grundlage, wieder ohne Fehler.
+  await grundlage.getByRole('radio', { name: 'Ohne Karte' }).click();
   await expect
     .poll(() => offlineStand(page, quelle, OFFLINE_ERST.layer), { timeout: 10_000 })
     .toMatch(/^keine Offline-Quelle im Style/);

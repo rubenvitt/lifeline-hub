@@ -5,7 +5,7 @@ import {
   kopfFelder,
   zuordnungsKarte,
 } from './einheit-fixture';
-import { benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
+import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import {
   BODEN_KARTE,
   BODEN_MENUE,
@@ -3162,7 +3162,7 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeit
 
     // Kartengrundlage über der Karte (ab `md`): Segmente der lokalen Leiste, dieselbe Zelle.
     const grundlage = page.locator('[data-lfh="grundlage-leiste"]');
-    // Online-Stile je nach e2e-Konfiguration, dazu immer Offline und Blind: mindestens drei.
+    // Online-Stile je nach e2e-Konfiguration, dazu immer Offline und „Ohne Karte“: mindestens drei.
     const grundSegmente = grundlage.getByRole('radio');
     const grundHoehe = await alleHaltenStufe(
       grundSegmente,
@@ -3801,5 +3801,269 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Gebietszeile ${gebiet}, Sprung ${sprung}`);
   }
   for (const sorte of ['Gebietszeile', 'Sprung']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── LFH-968 · ETB-Sprung der Detailseiten und „Kräfte ohne BR“ ─────────────────────────
+//
+// Der ETB-Sprung stand als nackter Link (15 px) 3 px neben „Fortschreiben“, das ohne Rückfrage
+// einen Entwurf anlegt. Die „zuweisen“-Knöpfe der BR-Seitenleiste standen fest 6 px auseinander,
+// auch im Handschuh. Gemessen auf beiden Tablet-Lagen, weil der Befehl seine Aktionen unter `lg`
+// am unteren Rand verankert und darüber im Kopf trägt.
+
+const TABLET_HOCH = { width: 820, height: 1180 };
+const TABLET_QUER = { width: 1180, height: 820 };
+
+/** Lagebericht, Befehl und Pressemitteilung, je freigegeben: erst dann trägt die Seite den Sprung. */
+async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
+  const E = `/api/einsaetze/${einsatzId}`;
+  // Die Freigabe verlangt jeden Abschnitt der Vorlage mit Text (sonst 422).
+  const freigegeben = async (
+    pfad: string,
+    data: object,
+    abschnitte: string[],
+    was: string,
+  ): Promise<number> => {
+    const neu = await page.request.post(`${E}/${pfad}`, { data });
+    expect(neu.ok(), `Seeding ${was}: ${neu.status()} ${await neu.text()}`).toBe(true);
+    const { id } = (await neu.json()) as { id: number };
+    const text = await page.request.patch(`${E}/${pfad}/${id}`, {
+      data: {
+        abschnitte: abschnitte.map((schluessel) => ({ schluessel, text: `${was} ${schluessel}` })),
+      },
+    });
+    expect(text.ok(), `Text ${was}: ${text.status()} ${await text.text()}`).toBe(true);
+    const frei = await page.request.post(`${E}/${pfad}/${id}/freigeben`);
+    expect(frei.ok(), `Freigabe ${was}: ${frei.status()} ${await frei.text()}`).toBe(true);
+    return id;
+  };
+  const R = `/einsaetze/${einsatzId}`;
+  return [
+    {
+      name: 'Lagebericht',
+      pfad: `${R}/lageberichte/${await freigegeben(
+        'lageberichte',
+        { vorlage: 'lagebericht', titel: 'Lage 968' },
+        [
+          'auftrag',
+          'gefahren_schadenlage',
+          'eigene_lage',
+          'lageentwicklung',
+          'fuehrungsprobleme',
+          'antraege_vorschlaege',
+          'medienlage',
+          'zusammenfassung',
+        ],
+        'Lagebericht',
+      )}`,
+      // Lagebericht und Pressemitteilung tragen die Aktionen im Seitenkopf.
+      aktionen: '[data-lfh="seitenkopf-aktionen"]',
+      fortschreiben: 'Fortschreiben',
+    },
+    {
+      name: 'Befehl',
+      pfad: `${R}/auftraege/befehle/${await freigegeben(
+        'befehle',
+        { vorlage: 'befehl_lad', titel: 'Befehl 968' },
+        ['lage', 'auftrag', 'durchfuehrung'],
+        'Befehl',
+      )}`,
+      // Unter `lg` verankert am unteren Rand, darüber im Kopf: derselbe Block, eine Marke.
+      aktionen: '[data-lfh="befehl-aktionen"]',
+      fortschreiben: 'Fortschreiben',
+    },
+    {
+      name: 'Pressemitteilung',
+      pfad: `${R}/stab/presse/mitteilungen/${await freigegeben(
+        'stab/pressemitteilungen',
+        { vorlage: 'erstinformation', titel: 'Presse 968' },
+        ['sachverhalt', 'massnahmen', 'hinweise', 'naechste_information', 'rueckfragen'],
+        'Pressemitteilung',
+      )}`,
+      aktionen: '[data-lfh="seitenkopf-aktionen"]',
+      fortschreiben: 'Folgemeldung schreiben',
+    },
+  ];
+}
+
+/**
+ * Misst den ETB-Sprung einer Detailseite: Stufe, „↗“ und Abstand zu jedem anderen Ziel im
+ * Aktionsblock (Drucken, Fortschreiben). Liefert Höhe und Abstand für die Anmerkung.
+ */
+async function etbSprungMessen(
+  page: Page,
+  aktionen: string,
+  dichte: keyof typeof ZIELABSTAND,
+  soll: number,
+  name: string,
+): Promise<{ hoehe: number; abstand: number }> {
+  const sprung = page.getByRole('link', { name: 'Zum ETB-Eintrag', exact: true });
+  const hoehe = await haeltStufe(sprung, soll, `${name}: ETB-Sprung (${dichte})`);
+  await expect(sprung, `${name}: der Sprung trägt „↗“`).toContainText('↗');
+  const abstand = await abstandZuNachbarn(page.locator(aktionen), sprung);
+  const sollAbstand = ZIELABSTAND[dichte];
+  if (sollAbstand != null) {
+    expect(abstand, `${name}: Abstand ETB-Sprung ↔ Nachbarziel (${dichte})`).toBeGreaterThanOrEqual(
+      sollAbstand - SUBPIXEL,
+    );
+  }
+  return { hoehe, abstand };
+}
+
+test('Detailseiten (LFH-968): der ETB-Sprung hält die Staffel und den Zielabstand zu Drucken und Fortschreiben', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await page.setViewportSize(TABLET_HOCH);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Sprung`);
+  const seiten = await freigegebeneDokumenteSaeen(page, einsatzId);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const lage of [TABLET_HOCH, TABLET_QUER]) {
+    await page.setViewportSize(lage);
+    for (const seite of seiten) {
+      for (const { dichte, soll } of STAFFEL) {
+        await page.goto(seite.pfad);
+        await stelleDichte(page, dichte);
+        // Vorbedingung: der Schreibzweig steht, „Fortschreiben“ ist Nachbar des Sprungs.
+        await expect(
+          page.getByRole('button', { name: seite.fortschreiben, exact: true }),
+          `Vorbedingung ${seite.name}: „${seite.fortschreiben}“ steht`,
+        ).toHaveCount(1);
+        const name = `${seite.name} ${lage.width}`;
+        const { hoehe, abstand } = await etbSprungMessen(page, seite.aktionen, dichte, soll, name);
+        je.set(`${dichte} ${name}`, hoehe);
+        gemessen.push(`${name} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}`);
+      }
+      gegenprobe(je, `${seite.name} ${lage.width}`);
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschreiben“ die Staffel, gesperrt nennt er den Grund sichtbar', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await page.setViewportSize(TABLET_HOCH);
+  await anmelden(page);
+  const stempel = Date.now();
+  const frei = await einsatzAnlegen(page, `E2E Gate3 ${stempel} Sprung lesend`);
+  const gesperrt = await einsatzAnlegen(page, `E2E Gate3 ${stempel} Sprung gesperrt`);
+  const seitenFrei = await freigegebeneDokumenteSaeen(page, frei);
+  const [berichtGesperrt] = await freigegebeneDokumenteSaeen(page, gesperrt);
+  // Modulsperre per Override (`e2e/AGENTS.md`, LFH-820): das ETB nur für Admins.
+  const sperre = await page.request.put(`/api/einsaetze/${gesperrt}/modul-overrides/etb`, {
+    data: { sichtbar: true, benoetigte_rolle: 'admin' },
+  });
+  expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();
+  const konto = await benutzerAnlegen(page, 'beobachter');
+  await mitgliedEintragen(page, frei, konto.id, 'beobachter');
+  await mitgliedEintragen(page, gesperrt, konto.id, 'beobachter');
+  await wechsleZu(page, konto);
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  for (const { dichte, soll } of STAFFEL) {
+    for (const seite of seitenFrei) {
+      await page.goto(seite.pfad);
+      await stelleDichte(page, dichte);
+      await expect(page.getByRole('button', { name: 'Drucken' })).toHaveCount(1);
+      // Vorbedingung: der Rollenzweig steht — ohne Schreibrecht kein „Fortschreiben“.
+      await expect(
+        page.getByRole('button', { name: seite.fortschreiben, exact: true }),
+        `Vorbedingung ${seite.name}: ohne Schreibrecht kein „${seite.fortschreiben}“`,
+      ).toHaveCount(0);
+      const { hoehe, abstand } = await etbSprungMessen(
+        page,
+        seite.aktionen,
+        dichte,
+        soll,
+        seite.name,
+      );
+      je.set(`${dichte} ${seite.name}`, hoehe);
+      gemessen.push(`${seite.name} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}`);
+    }
+
+    // Gesperrtes ETB: der Grund steht im Text, nicht nur im `title` (auf Touch unsichtbar).
+    await page.goto(berichtGesperrt.pfad);
+    await stelleDichte(page, dichte);
+    const gesperrterSprung = page.getByRole('button', {
+      name: 'Zum ETB-Eintrag (Keine Berechtigung)',
+      exact: true,
+    });
+    const hoehe = await gesperrtHaeltStufe(
+      gesperrterSprung,
+      soll,
+      `gesperrter ETB-Sprung (${dichte})`,
+    );
+    await expect(gesperrterSprung).toContainText('Keine Berechtigung');
+    await expect(page.getByRole('link', { name: 'Zum ETB-Eintrag' })).toHaveCount(0);
+    je.set(`${dichte} gesperrt`, hoehe);
+    gemessen.push(`gesperrt ${dichte}: Höhe ${hoehe}`);
+  }
+  for (const seite of seitenFrei) gegenprobe(je, seite.name);
+  gegenprobe(je, 'gesperrt');
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten den Zielabstand, lesend fehlen sie', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} BR`);
+  const E = `/api/einsaetze/${einsatzId}`;
+  // Drei einheitenlose Fahrzeuge: eine Gruppe „Fahrzeuge ohne Einheit“, Zeile an Zeile.
+  for (const funkrufname of ['Florian BR 1', 'Florian BR 2', 'Florian BR 3']) {
+    await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, funkrufname);
+  }
+  const br = await page.request.post(`${E}/bereitstellungsraeume`, {
+    data: { bezeichnung: 'BR Festplatz' },
+  });
+  expect(br.ok(), `Seeding BR: ${br.status()} ${await br.text()}`).toBe(true);
+  const { id: brId } = (await br.json()) as { id: number };
+  const aktiv = await page.request.post(`${E}/bereitstellungsraeume/${brId}/status`, {
+    data: { status: 'aktiv' },
+  });
+  expect(aktiv.ok(), 'Vorbedingung: der BR ist in Betrieb, sonst fehlen die Zuweisungen').toBe(
+    true,
+  );
+  const pfad = `/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`;
+  const leiste = page.getByTestId('kraefte-ohne-br');
+  const zuweisen = leiste.getByRole('button', { name: /^Florian BR \d zuweisen$/ });
+
+  const gemessen: string[] = [];
+  for (const lage of [TABLET_HOCH, TABLET_QUER]) {
+    await page.setViewportSize(lage);
+    for (const { dichte, soll } of STAFFEL) {
+      await page.goto(pfad);
+      await stelleDichte(page, dichte);
+      const anzahl = await mindestensKnoten(zuweisen, 3, `zuweisen (${dichte})`);
+      const hoehe = await alleHaltenStufe(zuweisen, soll, `zuweisen (${dichte})`, 3);
+      let abstand = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < anzahl; i += 1) {
+        abstand = Math.min(abstand, await abstandZuNachbarn(leiste, zuweisen.nth(i)));
+      }
+      const sollAbstand = ZIELABSTAND[dichte];
+      if (sollAbstand != null) {
+        expect(
+          abstand,
+          `kleinster Abstand zwischen „zuweisen“ (${lage.width}, ${dichte})`,
+        ).toBeGreaterThanOrEqual(sollAbstand - SUBPIXEL);
+      }
+      gemessen.push(`${lage.width} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}`);
+    }
+  }
+
+  // Lesend (LFH-435): die Kräfte stehen, die Zuweisung fehlt.
+  await page.setViewportSize(TABLET_HOCH);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await page.goto(pfad);
+  await expect(leiste.getByText('Florian BR 1')).toBeVisible();
+  await expect(leiste.getByRole('button', { name: /zuweisen$/ })).toHaveCount(0);
+
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

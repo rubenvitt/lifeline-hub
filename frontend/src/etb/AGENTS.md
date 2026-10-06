@@ -48,6 +48,20 @@ Ableitungen in `etb/zeitachseModell.ts`)
   (`ClientZaehlerQuelle`). Ohne Recht **fehlt** das Modul (`berechtigung::erlaubte_module`). Wer
   eine gezählte Liste invalidiert, invalidiert `modulZaehler` mit (`ZAEHLER_LISTEN_KEYS`,
   `queryKeys.test.ts`).
+- **Seitenfenster** (LFH-947, Spec `etb-zeitachse-fenster`, Herleitung
+  `openspec/changes/archive/2026-10-06-lfh-947-etb-zeitachse-seitenfenster/design.md`): die Liste
+  hält höchstens `ETB_MAX_SEITEN` (5) Seiten (`etb/seitenfenster.ts`); Seitenparameter mit
+  Richtung (`{ aelter }` → `before_lfd_nr`, `{ neuer }` → `after_lfd_nr`), nie eine nackte Zahl.
+  Fällt der Kopf heraus, steht „Neuere laden“ über der Zeitachse. Ein `?eintrag=` wählt die
+  Richtung aus der Kennung (`sprungRichtung`); kein `resetQueries`, das räumte das Lagebild ohne
+  Netz. Nach einem eigenen Eintrag aus tiefem Fenster ersetzt die Seite das Fenster durch die
+  neueste Seite (`zumKopf`). Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
+  laufendes Nachladen ab (`offline/useEtbErfassung.ts`).
+- **Gemerktes Rendern** (LFH-947): `eintraege`, `chronologie`, Zufluss und Gruppen sind
+  `useMemo`, die Zeile (`EtbZeitachsenZeile`) und `components/Markdown` sind `memo`, Handler
+  laufen über eine Ref, die Gruppe wird über Stunde und Vorkommen geschlüsselt (nie über die
+  erste Zeile). Ein neuer Eintrag parst nur seinen Text (`etb/EtbZeitachse.render.test.tsx`).
+  Jede Stundengruppe trägt `.etb-stundengruppe` (`content-visibility: auto`, `index.css`).
 - Jede Zeile trägt `data-lfh="datensicht-karte"` und die Zeilenklasse (`scrolleZurZeile`,
   `?eintrag=`). Ein neuer `KARTEN_EIGENBAU` wird gegen den Plan-Modus begründet (Titel, Status,
   ≤ 3 Sekundärfelder, eine Primäraktion, optional Menü `weitere`) und setzt Marke/Klasse selbst.
@@ -65,6 +79,11 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   höchstens 24 h ab der letzten Änderung. Regel und Weg hinaus: `offline/AGENTS.md`,
   „Gerätedaten“; Nachweis `auth/geraetRaeumung.integration.test.tsx`,
   `e2e/geraet-raeumung.spec.ts`.
+- **Leere Entwürfe räumt `entwuerfeLaden`** (LFH-941, D8): eigene Entwürfe ohne Inhalt, die
+  länger als 24 h unverändert sind, über alle Einsätze, mit Vorlauf-Disziplin; danach jeder
+  eigene Aktiv-Merker eines Einsatzes ohne Entwurf. Entwürfe mit Inhalt bleiben unabhängig vom
+  Alter (Entscheidung Ruben, 06.10.2026: keine Frist für ungesendeten Text). Herleitung:
+  `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
 - **Von und An sind Pflicht für jeden neuen Eintrag** (LFH-894, Spec `etb-absender-empfaenger`):
   der Server lehnt einen Eintrag ohne eine Seite mit 400 ab (`routes/etb.rs::erfassen`), der
   Client sendet ihn gar nicht erst (`fehlendeSeite`, vor Upload und Warteschlange). Bestehende

@@ -146,6 +146,92 @@ test('Chat: unter md trägt eine Segmentleiste die Kanäle, nicht die Seitenspal
   await expect(page.getByTestId('kanal-leiste')).toHaveCount(0);
 });
 
+/**
+ * Viele Kanäle mit langen Namen, als Admin über die API gesät: die Leiste muss sie tragen, ohne
+ * dass das Dokument quer läuft (LFH-976).
+ */
+async function vieleKanaeleSaeen(page: Page, einsatzId: string) {
+  // Erst die Liste abrufen: der Server legt „Allgemein" beim ersten Abruf an, danach sind es
+  // fest neun Kanäle.
+  const liste = await page.request.get(`/api/einsaetze/${einsatzId}/chat/kanaele`);
+  expect(liste.ok(), `Kanäle: ${liste.status()}`).toBe(true);
+  for (let i = 1; i <= 8; i += 1) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/chat/kanaele`, {
+      data: { name: `Einsatzabschnitt Nord ${i} Deichverteidigung` },
+    });
+    expect(antwort.status(), `Seeding Kanal ${i}: ${await antwort.text()}`).toBe(201);
+  }
+}
+
+/**
+ * LFH-976 · Zweig: Führungspersonal (schreibt, leitet nicht). Unter `md` ersetzt die Leiste die
+ * Kanalliste samt Kopfaktion; der Knopf neben ihr öffnet dieselbe Anlage. Vorbedingung vor der
+ * Messung: der Knopf steht für diese Rolle. Gemessen wird nach der Anlage — der neue Kanal steht
+ * als Segment da, wählbar, und das Dokument läuft auch mit vielen Kanälen nicht quer.
+ */
+test('Chat: unter md legt das Führungspersonal einen Kanal über die Leiste an', async ({
+  page,
+}) => {
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Chat Kanal anlegen ${Date.now()}`);
+  await vieleKanaeleSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
+
+  await page.setViewportSize(SCHMAL);
+  await page.goto(`/einsaetze/${einsatzId}/chat`);
+  await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();
+
+  // ── VORBEDINGUNG: der Rollenzweig steht — Leiste statt Spalte, Anlage für diese Rolle da.
+  const leiste = page.getByTestId('kanal-leiste');
+  await expect(leiste).toBeVisible();
+  await expect(page.getByTestId('kanal-spalte')).toHaveCount(0);
+  const anlegen = leiste.getByRole('button', { name: 'Kanal anlegen' });
+  await expect(anlegen, 'Vorbedingung: Führungspersonal sieht die Anlage').toHaveCount(1);
+  expect(await ueberstand(page)).toBeLessThanOrEqual(0);
+
+  // Geklickt, nicht bloß sichtbar geprüft (LFH-355).
+  await anlegen.click();
+  const dialog = page.getByRole('dialog', { name: 'Neuer Kanal' });
+  await dialog.getByLabel('Name').fill('Verpflegung');
+  await dialog.getByLabel('Name').press('Enter');
+  await expect(dialog).toBeHidden();
+
+  // ── MESSUNG: ohne Neuladen als Segment da und wählbar; kein Querlauf.
+  const segment = leiste.getByRole('tab', { name: 'Verpflegung' });
+  await segment.click();
+  await expect(segment).toHaveAttribute('aria-selected', 'true');
+  await expect(anlegen).toBeInViewport();
+  expect(await ueberstand(page)).toBeLessThanOrEqual(0);
+});
+
+/** LFH-976 · Zweig: Beobachter. Ohne Schreibrecht fehlt die Anlage, wie in der Kanalliste ab `md`. */
+test('Chat: unter md fehlt dem Beobachter die Kanalanlage, die Leiste läuft nicht quer', async ({
+  page,
+}) => {
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Chat Kanal lesend ${Date.now()}`);
+  await vieleKanaeleSaeen(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  await page.setViewportSize(SCHMAL);
+  await page.goto(`/einsaetze/${einsatzId}/chat`);
+
+  // ── VORBEDINGUNG: Nur-Lese-Zweig steht, die Leiste trägt die gesäten Kanäle.
+  const leiste = page.getByTestId('kanal-leiste');
+  await expect(leiste.getByRole('tab')).toHaveCount(9);
+  await expect(
+    page.getByRole('alert').filter({
+      hasText: 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.',
+    }),
+  ).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Kanal anlegen' })).toHaveCount(0);
+
+  // ── MESSUNG
+  expect(await ueberstand(page)).toBeLessThanOrEqual(0);
+});
+
 test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Auftraege ${Date.now()}`);

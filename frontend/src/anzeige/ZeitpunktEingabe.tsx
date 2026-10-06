@@ -11,15 +11,19 @@
  *   — jetzt nach der Serveruhr, soweit der Versatz bekannt ist (LFH-895,
  *   `openspec/changes/archive/2026-10-04-lfh-895-ereigniszeit-serveruhr/design.md`, D3).
  * - Weicht die Anzeigezone von der Browserzone ab, steht die Zone am Feld und im Panel-Fuß.
+ * - Unter `md` öffnet das Panel als Blatt am unteren Rand, Kalender und Uhrzeit untereinander
+ *   (LFH-953, {@link useSchmalesBlatt}); die Popup-Klassen besitzt deshalb der Baustein.
  */
 import { Button, DatePicker, type GetRef } from 'antd';
 import type { RangePickerProps } from 'antd/es/date-picker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useMemo, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import { monoStil, useRollen } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
 import { serverJetzt } from '../offline/serveruhr';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { browserZone, effektiveZone, istZukunftstag, ausWanduhr, zuWanduhr } from './zeitEingabe';
+import './ZeitpunktEingabe.css';
 
 /** Kanonischer Name einer Zone (Aliasse wie `Etc/UTC` → `UTC`), damit der Hinweis nicht flackert. */
 function kanonisch(zone: string): string {
@@ -108,6 +112,27 @@ function usePickerWert(
   return useMemo(() => (ms == null ? leer : zuPicker(dayjs(ms))), [ms, leer, zuPicker]);
 }
 
+/** Klasse des Blatts unter `md`; die Regeln stehen in `ZeitpunktEingabe.css`. */
+export const ZEIT_BLATT = 'lfh-zeit-blatt';
+
+/**
+ * Das Panel unter `md` (LFH-953): antd legt Kalender und Uhrzeit nebeneinander und richtet das
+ * Popup am Feld aus. Auf 390 px ragte es über den Rand, „OK“ und die Uhrzeit lagen außerhalb.
+ * Unter `md` steht es deshalb als Blatt am unteren Rand (Begründung in `ZeitpunktEingabe.css`).
+ *
+ * Auf dem Handschirm mit Fingerbedienung ist das Feld zudem schreibgeschützt (`inputReadOnly`,
+ * antds Weg dafür): die Bildschirmtastatur ginge sonst beim Antippen auf und deckte das Blatt.
+ * Getippt wird dort nicht, gewählt wird im Blatt. Am breiten Schirm und mit Maus bleibt das Feld
+ * beschreibbar.
+ */
+function useSchmalesBlatt(inputReadOnly: boolean | undefined) {
+  const { istSchmal, istBeruehrung } = useViewport();
+  return {
+    classNames: istSchmal ? { popup: { root: ZEIT_BLATT } } : undefined,
+    inputReadOnly: inputReadOnly ?? (istSchmal && istBeruehrung),
+  };
+}
+
 type EinzelBasis = Omit<
   ComponentProps<typeof DatePicker>,
   | 'value'
@@ -120,6 +145,7 @@ type EinzelBasis = Omit<
   | 'prefix'
   | 'ref'
   | 'multiple'
+  | 'classNames'
 >;
 
 /** antds Einzelpicker typisiert auch den Mehrfachmodus; den bietet der Baustein nicht an. */
@@ -148,9 +174,11 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     showTime,
     open,
     onOpenChange,
+    inputReadOnly,
     ...rest
   } = props;
   const z = useZeitEingabe();
+  const blatt = useSchmalesBlatt(inputReadOnly);
   // Form.Item reicht `value` immer durch, auch als `undefined` — der Schlüssel entscheidet.
   const gesteuert = Object.prototype.hasOwnProperty.call(props, 'value');
   const [intern, setIntern] = useState<Dayjs | null | undefined>(defaultValue);
@@ -171,6 +199,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   return (
     <DatePicker
       {...rest}
+      {...blatt}
       showTime={showTime ?? true}
       showNow={false}
       open={open ?? offenIntern}
@@ -205,7 +234,13 @@ export type Zeitraum = [Dayjs | null, Dayjs | null];
 
 type BereichBasis = Omit<
   RangePickerProps,
-  'value' | 'defaultValue' | 'onChange' | 'renderExtraFooter' | 'prefix' | 'disabledDate'
+  | 'value'
+  | 'defaultValue'
+  | 'onChange'
+  | 'renderExtraFooter'
+  | 'prefix'
+  | 'disabledDate'
+  | 'classNames'
 >;
 
 export interface ZeitraumEingabeProps extends BereichBasis {
@@ -214,8 +249,15 @@ export interface ZeitraumEingabeProps extends BereichBasis {
 }
 
 /** Ein Zeitraum (Beginn und Ende, je Datum + Uhrzeit) in der Anzeigezone. */
-export function ZeitraumEingabe({ value, onChange, showTime, ...rest }: ZeitraumEingabeProps) {
+export function ZeitraumEingabe({
+  value,
+  onChange,
+  showTime,
+  inputReadOnly,
+  ...rest
+}: ZeitraumEingabeProps) {
   const z = useZeitEingabe();
+  const blatt = useSchmalesBlatt(inputReadOnly);
   const von = usePickerWert(value?.[0], z.zuPicker);
   const bis = usePickerWert(value?.[1], z.zuPicker);
   // `null` (geleert) bleibt `null`, sonst hielte antd das Feld für ungesteuert.
@@ -228,6 +270,7 @@ export function ZeitraumEingabe({ value, onChange, showTime, ...rest }: Zeitraum
   return (
     <DatePicker.RangePicker
       {...rest}
+      {...blatt}
       showTime={showTime ?? true}
       value={pickerWert}
       onChange={(d) =>
