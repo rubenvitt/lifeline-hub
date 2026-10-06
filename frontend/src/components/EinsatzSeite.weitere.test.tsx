@@ -85,6 +85,17 @@ describe('EinsatzSeite — Nebenwege unter md', () => {
     expect(druck).not.toHaveBeenCalled();
   });
 
+  it('steht vor den Aktionen — sonst bräche er bei 390 px in eine eigene Zeile', () => {
+    setzeViewportBreite(390);
+    const { container } = zeige([{ key: 'csv', label: 'CSV exportieren', onWahl: vi.fn() }]);
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    const knoepfe = within(kopf).getAllByRole('button');
+    expect(knoepfe.map((k) => k.getAttribute('aria-label') ?? k.textContent)).toEqual([
+      NAME,
+      'Betroffene erfassen',
+    ]);
+  });
+
   it('sperrt bei einem laufenden Nebenweg nur dessen Eintrag, nicht den Auslöser', async () => {
     setzeViewportBreite(390);
     const druck = vi.fn();
