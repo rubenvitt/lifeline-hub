@@ -85,6 +85,19 @@ zeigen“. Der zweite Durchlauf findet ihn oder räumt den Parameter wie bisher.
 Verworfen: Schalter bei jedem Sprung vorab aufheben — ein Sprung auf eine Meldung soll den
 gewählten Ausschluss nicht verlieren.
 
+### D6 Nachträge aus dem Review
+
+- **Bedienbarer Verfasser bleibt in der Spalte:** nur ein Text-Verfasser wandert in die Kopfzeile.
+  Ein Verweis mit eigener Trefffläche (Infotelefon: Anrufer als `stabZeilenzielStil`) zöge die
+  Kopfzeile auf 30 px; er bleibt mit dem Weg rechts, das Menü steht trotzdem oben.
+- **Der Text hält dem Menüknopf die Breite frei** (`paddingInlineEnd = controlHeight`): der Knopf
+  ragt mit negativer Blockkante in die erste Textzeile und läge sonst über den letzten Zeichen.
+- **Sprung unter Typfilter:** D5 greift nur ohne `typ`. Unter einem Typfilter verbirgt der
+  Ausschluss nichts, was der Filter zeigen würde; der Ausschluss bleibt, der Param wird geräumt.
+- **Schaltername fest:** `aria-label` „Systemeinträge zeigen“, die Zahl hängt als
+  `aria-describedby` daran; sonst änderte jede Zählung den Namen.
+- **Prüffolge am Server:** Feldfehler (400) vor der unzulässigen Kombination (422).
+
 ## Risks / Trade-offs
 
 - **Andere Zeitachsen ändern ihre kompakte Gestalt** → gewollt und klein (Meta wandert in die

@@ -13,15 +13,22 @@
 
 - [x] 3.1 Tests zuerst (`components/instrument/Zeitachseneintrag.test.tsx`): `zeitachsenAufbau` je Token; kompakt: Verfasser und Weg in der Metazeile, Menü in der Kopfzeile, keine senkrechte Metaspalte, Verfasser mit `title`; komfortabel: Spalte wie bisher; `aktionen` bleiben rechts.
 - [x] 3.2 `Zeitachseneintrag` umbauen, `EtbZeitachse` reicht das Menü über `menue`. Mutationsprobe: Aufbau fest auf `spalte` → 3.1 rot.
-- [ ] 3.3 Übrige Verwender gegenprüfen (Archivakte, Infotelefon, Lagemeldungen, Überblick, Meldeverlauf, Kräfte, Verpflegung, Lage-Dashboard): ihre Vitest-Dateien grün, Sichtprüfung in kompakt.
+- [x] 3.3 Übrige Verwender gegenprüfen (Archivakte, Infotelefon, Lagemeldungen, Überblick, Meldeverlauf, Kräfte, Verpflegung, Lage-Dashboard): ihre Vitest-Dateien grün (33 Dateien, 606 Tests), e2e `kraefte-*` und `verpflegung-kontrast` grün. Infotelefon reicht einen bedienbaren Verfasser: er bleibt in der Spalte (D6).
 
 ## 4. e2e
 
-- [ ] 4.1 Neues Gate (`e2e/etb-zeilenhoehe.spec.ts`): einzeiliger Eintrag mit „Administrator · EL“ und Meldeweg in kompakt bei 1440×900 und 1366×768 ≤ 56 px, bei 1440×900 ≥ 9 Einträge zwischen den Leisten; auch als Beobachter über `e2e/rollen-kern.ts`.
-- [ ] 4.2 `etb-chronologie`, `leisten-flaeche`, `gate3-trefflaeche`, `fokus-verdeckung` grün halten.
+- [x] 4.1 Neues Gate (`e2e/etb-zeilenhoehe.spec.ts`): einzeiliger Eintrag mit „Administrator · EL“ und Meldeweg in kompakt bei 1440×900 und 1366×768 ≤ 56 px, bei 1440×900 ≥ 9 Einträge zwischen den Leisten; auch als Beobachter über `e2e/rollen-kern.ts`.
+- [x] 4.2 `etb-chronologie`, `leisten-flaeche`, `gate3-trefflaeche`, `fokus-verdeckung` grün halten. Ergebnis mit einem Worker: `leisten-flaeche`, `etb-seitenfenster`, `etb-*`, `kraefte-*` grün. Rot und auf alpha in derselben Cloud-Umgebung genauso rot: `etb-chronologie:112` (×3), `fokus-verdeckung` 538, 568, 683, 777, 902, 1027, 1296, `gate3-trefflaeche:650` (`ERR_INSUFFICIENT_RESOURCES`, mit den alpha-Dateien geprüft), `etb-anhang:41` (Download-Name); Firefox/WebKit fehlen.
 
 ## 5. Regeln und Abschluss
 
-- [ ] 5.1 `frontend/src/etb/AGENTS.md`: Ausschluss über denselben Filter; Kopfplatz der Zeile für Menüs (`menue`).
+- [x] 5.1 `frontend/src/etb/AGENTS.md`: Ausschluss über denselben Filter; Kopfplatz der Zeile für Menüs (`menue`).
 - [ ] 5.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests `etb_zaehler`, `etb_anzahl`.
 - [ ] 5.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der ETB-Specs).
+
+## Messung
+
+| | vorher | nachher |
+| --- | --- | --- |
+| einzeiliger Eintrag, kompakt, 1440 × 900 (Admin) | 106 px | ≤ 56 px |
+| Mutationsprobe `zeitachsenAufbau` fest auf `spalte` | | Gate rot (105,95 px) |

@@ -11,11 +11,17 @@ im Zusammenhang liest.
 ### Requirement: Kompakte Zeile ohne senkrechte Metaspalte
 In der kompakten Dichte SHALL eine Zeitachsenzeile Verfasser und Meldeweg in der Metazeile neben
 Typwort und Von→An zeigen und ein Zeilenmenü am Ende dieser Zeile. Der Verfasser MUST einzeilig
-bleiben, bei Überlänge gekürzt, mit dem Volltext als Titel.
+bleiben, bei Überlänge gekürzt, mit dem Volltext als Titel. Ein bedienbarer Verfasser (ein Verweis
+mit eigener Trefffläche) MUST mit dem Meldeweg rechts bleiben; das Zeilenmenü steht trotzdem in
+der Kopfzeile, und der Text MUST ihm die Breite freihalten.
 
 #### Scenario: Einzeiliger Eintrag im Fükw
 - **WHEN** ein einzeiliger ETB-Eintrag mit Verfasser „Administrator · EL“ und Meldeweg „Funk“ in kompakter Dichte bei 1440×900 steht
 - **THEN** ist die Zeile höchstens 56 px hoch, und zwischen Filter- und Erfassungsleiste stehen mindestens 9 Einträge
+
+#### Scenario: Bedienbarer Verfasser
+- **WHEN** eine Zeile in kompakter Dichte einen Verweis als Verfasser trägt
+- **THEN** steht er mit dem Meldeweg rechts in der Spalte, und die Kopfzeile wird nicht höher als ohne ihn
 
 #### Scenario: Langer Verfasser
 - **WHEN** der Verfasser länger ist als der verfügbare Platz
@@ -45,3 +51,7 @@ stehen und Neuladen, Teilen und Druck überstehen; der Schalter nennt die Zahl d
 #### Scenario: Sprung auf einen ausgeblendeten Eintrag
 - **WHEN** `?eintrag=` auf einen Systemeintrag zeigt, während Systemeinträge ausgeblendet sind
 - **THEN** blendet die Seite sie wieder ein, hebt den Eintrag hervor und sagt, dass sie eingeblendet hat
+
+#### Scenario: Sprung unter einem Typfilter
+- **WHEN** `?eintrag=` unter einem Typfilter und ausgeblendeten Systemeinträgen ins Leere zeigt
+- **THEN** bleibt der Ausschluss bestehen, und die Seite räumt den Sprungparameter ohne Hinweis
