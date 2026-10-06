@@ -37,14 +37,12 @@ export function aktivMerkerAufraeumen(
   einsaetzeMitEntwurf: ReadonlySet<number>,
 ): void {
   const praefix = `${AKTIV_PRAEFIX}${benutzerId}-`;
-  try {
-    for (const k of Object.keys(localStorage)) {
-      if (!k.startsWith(praefix)) continue;
-      const einsatzId = Number(k.slice(praefix.length));
-      if (!einsaetzeMitEntwurf.has(einsatzId)) localStorage.removeItem(k);
-    }
-  } catch {
-    // localStorage gesperrt: dann liegt dort auch kein Merker.
+  // Über `lib/sichererSpeicher`: ist localStorage gesperrt, liefert `sicherSchluessel` nichts,
+  // und dann liegt dort auch kein Merker.
+  for (const k of sicherSchluessel()) {
+    if (!k.startsWith(praefix)) continue;
+    const einsatzId = Number(k.slice(praefix.length));
+    if (!einsaetzeMitEntwurf.has(einsatzId)) sicherEntfernen(k);
   }
 }
 

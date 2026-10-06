@@ -13,6 +13,7 @@ import Datensicht, { HERVORGEHOBEN, spaltenFuer, type Kartenplan } from '../comp
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { monoStil } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
 import {
@@ -34,11 +35,17 @@ import MeldeVerlauf from './MeldeVerlauf';
  * als `StatusTag` neben der Belegung, das Wort ist der zweite Kanal; unter 90 % kein Wort und
  * keine Farbe.
  *
+ * RANGFOLGE NACH DER ZIELFRAGE (LFH-967): belegt und frei stehen direkt hinter der Kennung,
+ * Status und Kapazität folgen, die Art weicht ab `lg` (`abBreite`, zurückholbar über den
+ * Spaltenschalter). Sonst sah man bei 390 px nur Bezeichnung und Art, und die Belegung lag
+ * hinter dem Querscrollen.
+ *
  * Volle Stellen: Block- und Seitenkopf nennen „n voll", weil die Tabelle oft unter der Falz
  * liegt. Sortiert wird nach Anlagereihenfolge — nach Auslastung sprängen die Zeilen bei jeder
  * Meldung unter dem Cursor.
  *
- * Zeilenaktionen: „Belegung melden" direkt, „Bearbeiten" und „Stornieren" im Menü, an einer
+ * Zeilenaktionen: „Belegung melden" direkt — unter `md` in der fixierten Kennung unter dem Namen,
+ * sonst läge der Knopf bei 390 px hinter dem Querscrollen (LFH-967) —, „Bearbeiten" und „Stornieren" im Menü, an einer
  * unverorteten Stelle zuerst „Auf Karte verorten". Auch an einer geschlossenen Stelle (ohne
  * „Belegung melden") bleibt es ein Menü: gezählt wird NACH der Rechteprüfung, nicht nach dem
  * Zeilenzustand, sonst wechselte die Form der Spalte mit jedem Statuswechsel. Ohne
@@ -82,6 +89,9 @@ function stellenMenue(
   return [verorten, ...MENUE];
 }
 
+/** Breite, in der ein langer Stellenname unter `md` umbricht (LFH-967, gemessen bei 390 px). */
+const KENNUNG_MAX_PX = 150;
+
 const ARTEN = Object.keys(ART_LABEL) as BetreuungsstelleArt[];
 const STATUS = Object.keys(betreuungsstelleStatus) as BetreuungsstelleStatus[];
 
@@ -96,43 +106,60 @@ const stellenSpalten = (
   zahlStil: CSSProperties,
   /** Lagekarte für den Benutzer gesperrt (LFH-888): „Auf Karte verorten" gesperrt mit Grund. */
   karteGesperrt: boolean,
-) =>
-  spaltenFuer<Betreuungsstelle>()([
+  /** Unter `md`: „Belegung melden" reitet in der fixierten Kennung mit (LFH-967). */
+  meldenInKennung: boolean,
+  /** Abstand zwischen Name und Meldeknopf in der Kennung. */
+  kennungAbstand: number,
+) => {
+  const meldeKnopf = (s: Betreuungsstelle) =>
+    darfSchreiben && s.status !== 'geschlossen' ? (
+      <Button
+        aria-label={`Belegung melden für ${s.bezeichnung}`}
+        onClick={() => onBelegungMelden(s)}
+      >
+        Belegung melden
+      </Button>
+    ) : null;
+  return spaltenFuer<Betreuungsstelle>()([
     {
       key: 'bezeichnung',
       title: 'Bezeichnung',
       immerSichtbar: true,
       sortWert: (s) => s.bezeichnung,
       suchText: (s) => s.bezeichnung,
-      render: (_, s) => <Typography.Text strong>{s.bezeichnung}</Typography.Text>,
-    },
-    {
-      key: 'art',
-      title: 'Art',
-      sortWert: (s) => ARTEN.indexOf(s.art),
-      filter: {
-        werte: ARTEN.map((a) => ({ text: ART_LABEL[a], value: a })),
-        trifft: (s, w) => s.art === w,
+      render: (_, s) => {
+        /*
+         * Unter `md` bricht ein langer Name in einer gedeckelten Breite um, sonst schöbe er belegt
+         * und frei aus dem Bild (die Tabelle ist inhaltsgetrieben breit, `max-content`). Darüber
+         * steht er wie bisher einzeilig.
+         */
+        const name = (
+          <Typography.Text
+            strong
+            style={
+              meldenInKennung ? { display: 'inline-block', maxWidth: KENNUNG_MAX_PX } : undefined
+            }
+          >
+            {s.bezeichnung}
+          </Typography.Text>
+        );
+        const knopf = meldenInKennung ? meldeKnopf(s) : null;
+        return knopf ? (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              gap: kennungAbstand,
+            }}
+          >
+            {name}
+            {knopf}
+          </div>
+        ) : (
+          name
+        );
       },
-      render: (_, s) => ART_LABEL[s.art],
-    },
-    {
-      key: 'status',
-      title: 'Status',
-      sortWert: (s) => STATUS.indexOf(s.status),
-      filter: {
-        werte: STATUS.map((st) => ({ text: betreuungsstelleStatus[st].label, value: st })),
-        trifft: (s, w) => s.status === w,
-      },
-      render: (_, s) => <StatusTag darstellung={betreuungsstelleStatus[s.status]} />,
-    },
-    {
-      key: 'kapazitaet',
-      title: 'Kapazität',
-      zahl: true,
-      sortWert: (s) => s.kapazitaet_personen,
-      render: (_, s) =>
-        s.kapazitaet_personen != null ? personenZahl(s.kapazitaet_personen) : leer,
     },
     {
       key: 'belegt',
@@ -176,6 +203,36 @@ const stellenSpalten = (
       },
     },
     {
+      key: 'status',
+      title: 'Status',
+      sortWert: (s) => STATUS.indexOf(s.status),
+      filter: {
+        werte: STATUS.map((st) => ({ text: betreuungsstelleStatus[st].label, value: st })),
+        trifft: (s, w) => s.status === w,
+      },
+      render: (_, s) => <StatusTag darstellung={betreuungsstelleStatus[s.status]} />,
+    },
+    {
+      key: 'kapazitaet',
+      title: 'Kapazität',
+      zahl: true,
+      sortWert: (s) => s.kapazitaet_personen,
+      render: (_, s) =>
+        s.kapazitaet_personen != null ? personenZahl(s.kapazitaet_personen) : leer,
+    },
+    {
+      key: 'art',
+      title: 'Art',
+      // Immer derselbe Wert je Stelle, keine Antwort auf die Zielfrage: weicht als Erste.
+      abBreite: 'lg',
+      sortWert: (s) => ARTEN.indexOf(s.art),
+      filter: {
+        werte: ARTEN.map((a) => ({ text: ART_LABEL[a], value: a })),
+        trifft: (s, w) => s.art === w,
+      },
+      render: (_, s) => ART_LABEL[s.art],
+    },
+    {
       key: 'stand',
       title: 'Stand',
       zahl: true,
@@ -202,14 +259,7 @@ const stellenSpalten = (
               // `middle`: die Vorgabe ergäbe im Handschuh-Betrieb 7 px zwischen „Belegung melden" und dem
               // Dreipunkt; `middle` hält ≥ 16 px (gemessen in `e2e/gate3-trefflaeche.spec.ts`).
               <Space wrap size="middle">
-                {s.status !== 'geschlossen' && (
-                  <Button
-                    aria-label={`Belegung melden für ${s.bezeichnung}`}
-                    onClick={() => onBelegungMelden(s)}
-                  >
-                    Belegung melden
-                  </Button>
-                )}
+                {!meldenInKennung && meldeKnopf(s)}
                 <MenueAusloeser
                   eintraege={stellenMenue(s, karteGesperrt)}
                   zugaenglicherName={`Aktionen zu Stelle ${s.bezeichnung}`}
@@ -221,6 +271,7 @@ const stellenSpalten = (
         ]
       : []),
   ]);
+};
 
 type StelleSpalte = ReturnType<typeof stellenSpalten>[number]['key'];
 
@@ -261,6 +312,7 @@ export default function StellenBlock({
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void;
 }) {
   const { token } = theme.useToken();
+  const { istSchmal } = useViewport();
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const namentlichJeStelle = useMemo(
     () => (namentlich ? new Map(namentlich.map((n) => [n.stelle_id, n.anzahl])) : undefined),
@@ -275,8 +327,19 @@ export default function StellenBlock({
         namentlichJeStelle,
         monoStil(token.fontSize),
         karteGesperrt,
+        istSchmal,
+        token.marginXS,
       ),
-    [darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle, token.fontSize, karteGesperrt],
+    [
+      darfSchreiben,
+      onBelegungMelden,
+      onAktion,
+      namentlichJeStelle,
+      token.fontSize,
+      karteGesperrt,
+      istSchmal,
+      token.marginXS,
+    ],
   );
   const aufklappen = useMemo(
     () => ({
