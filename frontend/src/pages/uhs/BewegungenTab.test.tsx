@@ -216,7 +216,9 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     const { container } = await rendereDrei();
     await userEvent.type(suchfeld(), 'Klinik');
     expect(zeilenSchluessel(container)).toHaveLength(0);
-    expect(screen.getByText('Keine Bewegungen erfasst')).toBeInTheDocument();
+    // Die Suche leert die Sicht, nicht der Bestand: der Leerzustand nennt die Einschränkung (LFH-967).
+    expect(screen.getByText('Keine Treffer für die gewählten Filter')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Bewegungen erfasst')).toBeNull();
   });
 
   it('findet eine nicht aufgelöste Person unter ihrem angezeigten #id', async () => {
