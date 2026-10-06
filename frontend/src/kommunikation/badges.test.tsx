@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import StatusBadge from './StatusBadge';
@@ -65,5 +65,15 @@ describe('QuittungIndikator', () => {
     const zeit = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`; // taktische DTG (LFH-141)
     render(<QuittungIndikator quittiert von="EA Nord" am={am} />);
     expect(screen.getByText(`✓ Quittiert von EA Nord ${zeit}`)).toBeInTheDocument();
+  });
+
+  /** Das Wort im Chip trägt die Aussage; ein Erklärtext per Hover entfällt (LFH-959). */
+  it('trägt keinen Tooltip', async () => {
+    render(<QuittungIndikator quittiert von="EA Nord" />);
+    const ziel = chip('✓ Quittiert von EA Nord');
+    fireEvent.mouseEnter(ziel);
+    fireEvent.mouseEnter(ziel.parentElement!);
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });

@@ -74,8 +74,8 @@ erübrigten Erinnerung steht „Erübrigt: ‹Zeit›“ wie heute „Erledigt: 
 Bleibt: Meldungen („✓ Quittiert von …“ an der bestätigten Sofortmeldung), Aufträge („Quittung
 offen“, Knopf „Quittieren“ je Empfänger), die Kenntnisnahme einer Meldung an einem Element der
 Fernmeldeskizze (Empfang einer Meldung, also dieselbe Bedeutung). Weg: alles an Erinnerungen.
-Der Erklärungstext des `QuittungIndikator` bleibt als Tooltip, weil das Chip-Wort die Aussage
-schon trägt (Regel: nie die EINZIGE Erklärung).
+Der Erklärungstext des `QuittungIndikator` entfällt ebenfalls (Nachtrag 06.10.2026, Übergabe
+aus dem Abbau der Erklärtexte): das Chip-Wort trägt die Aussage allein.
 
 ### D4 Guard über Daten und Quelltext
 
