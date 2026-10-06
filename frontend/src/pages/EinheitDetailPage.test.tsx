@@ -119,6 +119,31 @@ async function oeffneAuswahl(container: HTMLElement, platzhalter: string) {
 }
 
 describe('EinheitDetailPage · die Route selbst', () => {
+  it('nennt die Stärke-Position in Klartext und erklärt Führer ohne Einheitsführer-Merkmal', async () => {
+    const mitPersonal = [
+      {
+        ...einheiten[0],
+        personal_mitglieder: [
+          { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
+          { ep_id: 2, name: 'Uwe Unter', staerke_position: 'unterfuehrer', ist_fuehrer: false },
+          { ep_id: 3, name: 'Nora Platzhalter', staerke_position: 'mannschaft', ist_fuehrer: true },
+          { ep_id: 4, name: 'Frida Führer', staerke_position: 'fuehrer', ist_fuehrer: true },
+        ],
+      },
+    ];
+    const { container } = zeige(
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(mitPersonal)),
+    );
+    expect(await screen.findByText(/Max Mustermann \(Führer\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Uwe Unter \(Unterführer\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Nora Platzhalter \(Mannschaft\)/)).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/\((fuehrer|unterfuehrer|mannschaft)\)/);
+    // Der Hinweis steht nur beim Führer, dem das Merkmal fehlt — genau einmal.
+    expect(
+      screen.getAllByText(/als Führer gezählt, noch nicht als Einheitsführer gesetzt/),
+    ).toHaveLength(1);
+  });
+
   it('zeigt die Kopfdaten der adressierten Einheit', async () => {
     server.use(...handlers());
     rendere();

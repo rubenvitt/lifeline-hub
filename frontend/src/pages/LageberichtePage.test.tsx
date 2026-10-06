@@ -881,6 +881,11 @@ describe('LageberichtePage', () => {
     ).toBeInTheDocument();
     expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
   });
+
+  it('zählt einen einzelnen Bericht in einer Kette in der Einzahl', async () => {
+    setup([bericht]);
+    expect(await screen.findByText(/^1 Bericht in 1 Kette · /)).toBeInTheDocument();
+  });
 });
 
 /**

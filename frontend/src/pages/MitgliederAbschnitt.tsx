@@ -20,12 +20,8 @@ import KatalogTabelle from '../components/KatalogTabelle';
 import Datenstand from '../components/Datenstand';
 import { Paneel, useRollen } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
-
-const ROLLEN: { value: EinsatzRolle; label: string }[] = [
-  { value: 'einsatzleitung', label: 'Einsatzleitung' },
-  { value: 'fuehrungspersonal', label: 'Führungspersonal' },
-  { value: 'beobachter', label: 'Beobachter' },
-];
+import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
+import { anzahl } from '../anzeige/anzahl';
 
 interface Props {
   einsatzId: number;
@@ -212,7 +208,7 @@ export default function MitgliederAbschnitt({
           // `minWidth` statt fester `width`: eine feste Breite drückt die Zelle am schmalen Schirm
           // auf. Der Boden bleibt, damit „Führungspersonal" nicht abgeschnitten wird.
           style={{ minWidth: 170, maxWidth: '100%' }}
-          options={ROLLEN}
+          options={EINSATZ_ROLLE_OPTIONEN}
           onChange={(rolle) => setzen.mutate({ benutzerId: m.benutzer_id, rolle })}
         />
       ),
@@ -248,7 +244,7 @@ export default function MitgliederAbschnitt({
       meta={
         mitgliederQuery.isSuccess ? (
           <>
-            {mitglieder.length} Mitglieder{' '}
+            {anzahl(mitglieder.length, 'Mitglied', 'Mitglieder')}{' '}
             <Datenstand dataUpdatedAt={mitgliederQuery.dataUpdatedAt} />
           </>
         ) : undefined
@@ -274,7 +270,7 @@ export default function MitgliederAbschnitt({
           <Select
             value={neueRolle}
             style={{ width: 170 }}
-            options={ROLLEN}
+            options={EINSATZ_ROLLE_OPTIONEN}
             onChange={setNeueRolle}
           />
           <Button

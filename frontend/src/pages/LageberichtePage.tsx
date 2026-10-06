@@ -15,6 +15,7 @@ import { legeLageberichtAn, listeLageberichte } from '../api/lageberichte';
 import type { LageberichtKopf, LageberichtVorlageKey } from '../api/types';
 import { VORLAGEN } from '../lageberichte/vorlagen';
 import { kettenKoepfe, type KettenKopf } from '../lageberichte/ketten';
+import { anzahl } from '../anzeige/anzahl';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -209,7 +210,7 @@ export default function LageberichtePage() {
     // die Auskunft über die Trefferliste.
     <EinsatzSeite
       titel="Lageberichte"
-      meta={`${berichte.length} Berichte in ${koepfe.length} Ketten · ${entwuerfe} im Entwurf`}
+      meta={`${anzahl(berichte.length, 'Bericht', 'Berichte')} in ${anzahl(koepfe.length, 'Kette', 'Ketten')} · ${entwuerfe} im Entwurf`}
       dataUpdatedAt={berichteQuery.dataUpdatedAt}
       breadcrumb={
         <Breadcrumb

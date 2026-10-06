@@ -270,6 +270,31 @@ describe('MitgliederAbschnitt', () => {
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
   });
 
+  it('zählt im Kopf „1 Mitglied“ in der Einzahl und ab zwei in der Mehrzahl', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+    );
+    const { unmount } = renderMitProviders(
+      <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+    );
+    expect(await screen.findByText(/^1 Mitglied\s*$/)).toBeInTheDocument();
+    unmount();
+
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () =>
+        HttpResponse.json([
+          mitglied(),
+          mitglied({ benutzer_id: 3, anzeigename: 'Udo Unter', benutzername: 'udo' }),
+        ]),
+      ),
+    );
+    renderMitProviders(
+      <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+    );
+    expect(await screen.findByText(/^2 Mitglieder\s*$/)).toBeInTheDocument();
+  });
+
   it('entfernt ein Mitglied', async () => {
     let entfernt = false;
     server.use(

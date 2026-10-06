@@ -37,6 +37,7 @@ import {
 } from '../api/einheiten';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit, Staerke } from '../api/types';
+import { POSITION_LABELS } from '../api/personal';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
@@ -569,7 +570,15 @@ export default function EinheitDetailPage() {
               m.ep_id,
               <span>
                 {m.name}
-                {m.staerke_position ? ` (${m.staerke_position})` : ''}
+                {m.staerke_position ? ` (${POSITION_LABELS[m.staerke_position]})` : ''}
+                {/* Die Stärke-Position „Führer“ zählt in F/UF/M, das Merkmal Einheitsführer ist
+                    ein eigenes (LFH-946). Ohne den Satz hielte man es für schon gesetzt. */}
+                {m.staerke_position === 'fuehrer' && !m.ist_fuehrer && (
+                  <span style={{ color: rollen.gedaempft }}>
+                    {' '}
+                    · als Führer gezählt, noch nicht als Einheitsführer gesetzt
+                  </span>
+                )}
                 {m.ist_fuehrer && (
                   <Tag color="gold" style={{ marginLeft: token.marginXXS }}>
                     Einheitsführer

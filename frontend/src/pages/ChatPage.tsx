@@ -67,6 +67,7 @@ import { Segmentleiste, useRollen } from '../components/instrument';
 const CHAT_MINDESTHOEHE = 320;
 import { useViewport } from '../components/useViewport';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { anzahl } from '../anzeige/anzahl';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -529,7 +530,7 @@ export default function ChatPage() {
     <EinsatzSeite
       titel="Chat"
 
-      meta={kanaeleQuery.isSuccess ? `${kanaele.length} Kanäle` : undefined}
+      meta={kanaeleQuery.isSuccess ? anzahl(kanaele.length, 'Kanal', 'Kanäle') : undefined}
       dataUpdatedAt={gemeinsamerDatenstand(
         kanaeleQuery.dataUpdatedAt,
         nachrichtenQuery.dataUpdatedAt,

@@ -169,6 +169,12 @@ describe('BefehlListe', () => {
     expect(await screen.findByText(/3 Befehle · 1 im Entwurf/)).toBeInTheDocument();
   });
 
+  it('zählt einen einzelnen Befehl in der Einzahl', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockResolvedValue([KETTE[0]] as never);
+    renderListe();
+    expect(await screen.findByText(/^1 Befehl · 0 im Entwurf/)).toBeInTheDocument();
+  });
+
   it('zeigt "Befehl erteilen" bei Schreibrecht — mit exaktem Namen', async () => {
     renderListe();
     // EXAKT, nicht als Regex: antds Icon schiebt sein Etikett („plus") in den berechneten Namen.

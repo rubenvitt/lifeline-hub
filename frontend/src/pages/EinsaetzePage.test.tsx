@@ -42,7 +42,7 @@ describe('EinsaetzePage', () => {
     server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
-    expect(screen.getByText('einsatzleitung')).toBeInTheDocument();
+    expect(screen.getByText('Deine Rolle: Einsatzleitung')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
@@ -373,6 +373,13 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     // Die Map trägt eine Beschriftung statt des Wire-Werts (Vertrag in `theme/statusFarben.ts`).
     expect(await screen.findByText('Aktiv')).toBeInTheDocument();
     expect(screen.getByText('Übung')).toBeInTheDocument();
+  });
+
+  it('die Karte nennt die eigene Rolle in Klartext und mit Kontext, nie den Rohwert', async () => {
+    mockEinsaetze([e({ meine_rolle: 'fuehrungspersonal' })]);
+    const { container } = render();
+    expect(await screen.findByText('Deine Rolle: Führungspersonal')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('fuehrungspersonal');
   });
 
   it('ohne Einsatzort bleibt die Ortszeile ganz weg statt leer zu stehen', async () => {

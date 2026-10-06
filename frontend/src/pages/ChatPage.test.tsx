@@ -80,6 +80,11 @@ function setup(ungelesen = 0, onGelesen?: () => void) {
 }
 
 describe('ChatPage', () => {
+  it('zählt einen einzelnen Kanal im Kopf in der Einzahl', async () => {
+    setup();
+    expect(await screen.findByText('1 Kanal')).toBeInTheDocument();
+  });
+
   it('zeigt Kanal und Nachrichten und erlaubt das Senden', async () => {
     setup();
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();

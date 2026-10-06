@@ -457,6 +457,13 @@ export default function LoginPage() {
                 )}
               </Form>
             )}
+            {/* Statisch, damit die 401-Meldung enumerationssicher bleibt: der Satz nennt den Weg,
+                ohne etwas über das Konto zu verraten (LFH-946). */}
+            {passwortAktiv && (
+              <p className="login-hinweis">
+                Passwort vergessen? Die Administration deiner Organisation setzt es zurück.
+              </p>
+            )}
             {imBrowserAnmelden && (
               <>
                 {(formSichtbar || ssoProvider.length > 0) && <Divider>oder</Divider>}

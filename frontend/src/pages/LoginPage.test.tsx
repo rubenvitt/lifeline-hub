@@ -156,6 +156,12 @@ describe('LoginPage', () => {
     renderMitProviders(<LoginPage />);
 
     expect(await screen.findByLabelText('Passwort')).toBeInTheDocument();
+    // Weg zur Hilfe bei vergessenem Passwort (LFH-946): statisch, verrät nichts über das Konto.
+    expect(
+      screen.getByText(
+        'Passwort vergessen? Die Administration deiner Organisation setzt es zurück.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('blendet das Passwort-Feld aus, wenn kein aktiver Passwort-Provider konfiguriert ist', async () => {
@@ -171,6 +177,8 @@ describe('LoginPage', () => {
     // Das Formular ist initial sichtbar (provider.length === 0, bevor der Effect greift) und
     // verschwindet erst nach geladener Provider-Liste.
     await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
+    // Ohne Passwortweg gibt es auch kein Passwort zu vergessen.
+    expect(screen.queryByText(/Passwort vergessen\?/)).not.toBeInTheDocument();
   });
 
   it('blendet das Passwort-Feld aus, wenn der Passwort-Provider deaktiviert ist', async () => {
