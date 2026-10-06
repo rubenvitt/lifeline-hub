@@ -142,14 +142,17 @@ impl<V> BegrenzterAblaufSpeicher<V> {
     /// Test-Hook: Eintrag mit vorgegebener Ablaufzeit, ohne Obergrenze und ohne Aufräumlauf.
     #[doc(hidden)]
     pub fn einfuegen_mit_ablauf(&mut self, schluessel: String, wert: V, ablauf: Instant) {
-        self.eintraege.insert(
-            schluessel,
+        let alt = self.eintraege.insert(
+            schluessel.clone(),
             Eintrag {
                 wert,
                 ablauf,
                 besitzer: None,
             },
         );
+        if let Some(b) = alt.and_then(|e| e.besitzer) {
+            self.besitzer_loesen(b, &schluessel);
+        }
     }
 
     /// Entfernt den Besitzer-Verweis nur, wenn er noch auf `schluessel` zeigt.

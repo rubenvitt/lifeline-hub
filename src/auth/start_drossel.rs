@@ -4,8 +4,16 @@
 //! Jeder Start legt einen Eintrag im begrenzten Zeremonie-Speicher an (`oidc/state.rs`,
 //! `webauthn/state.rs`). Die Obergrenze dort schützt den Speicher, aber eine einzelne Quelle
 //! könnte sie allein füllen und damit alle anderen aussperren. Die Drossel lässt je Quelle
-//! höchstens [`MAX_STARTS`] je [`FENSTER`] zu; darüber antworten die Starts mit 429. So füllt eine
-//! Quelle in der TTL des Speichers nur einen kleinen Teil davon.
+//! höchstens [`MAX_STARTS`] je [`FENSTER`] zu; darüber antworten die Starts mit 429. Eine Quelle
+//! belegt so in der TTL höchstens 150 (WebAuthn, 5 min) bzw. 300 (OIDC, 10 min) der 10.000 Plätze.
+//!
+//! **Grenze der Drossel:** Wer viele Quellen hat (ein Botnetz, oder rund 70 bzw. 35 IPv6-/64 aus
+//! einem eigenen Präfix), füllt den Speicher trotzdem. Dann antworten Passkey- und SSO-Start bis
+//! zum Ablauf der Einträge mit 503 bzw. mit dem Fehler-Redirect; der Passwort-Login bleibt. Das
+//! ist der bewusste Tausch gegen unbegrenzten Speicher.
+//!
+//! Ohne `LIFELINE_TRUSTED_PROXIES` hinter einem Reverse-Proxy ist der Proxy die einzige Quelle,
+//! und alle teilen sich [`MAX_STARTS`] (`docs/betrieb/env-registry.md`).
 //!
 //! Eigener Zähler, getrennt von den Fehlversuchen in `rate_limit.rs`: ein Start ist kein
 //! Fehlversuch, und eine Wache hinter einer NAT-Adresse meldet sich zu Dienstbeginn gesammelt an.
@@ -23,7 +31,7 @@ use std::time::{Duration, Instant};
 use crate::auth::rate_limit::quelle;
 
 /// Erlaubte Starts je Quelle innerhalb von [`FENSTER`].
-pub const MAX_STARTS: u32 = 60;
+pub const MAX_STARTS: u32 = 30;
 
 /// Zählfenster.
 pub const FENSTER: Duration = Duration::from_secs(60);

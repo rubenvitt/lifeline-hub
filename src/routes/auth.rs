@@ -683,6 +683,10 @@ fn oidc_state_binding_ok(cookie_state: Option<&str>, state_query: &str) -> bool 
 /// GET /api/auth/oidc/start — Authorization-Redirect zum OIDC-Provider. Ist `oidc` nicht
 /// konfiguriert oder deaktiviert → 404. Ein IdP-/Discovery-Fehler wird kein 500, sondern ein
 /// Redirect auf die Login-Seite mit generischem Hinweis. Setzt das `oidc_state`-Binding-Cookie.
+///
+/// Gedrosselte Quelle und voller State-Speicher (LFH-919) enden ebenfalls in diesem Redirect statt
+/// in 429/503: der Start ist eine Top-Level-Navigation, ein JSON-Fehler stünde als nackte Seite
+/// im Browser.
 pub async fn oidc_start(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -697,7 +701,9 @@ pub async fn oidc_start(
     if !oidc_aktiv {
         return Err(AppError::NotFound);
     }
-    start_drosseln(peer_ip)?;
+    if start_drosseln(peer_ip).is_err() {
+        return Ok((jar, oidc_fehler_redirect()));
+    }
 
     let client = match crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await {
         Ok(client) => client,
@@ -719,8 +725,8 @@ pub async fn oidc_start(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    // Synchron, kein Guard über ein `.await`.
-    crate::auth::oidc::state::speichere(
+    // Synchron, kein Guard über ein `.await`. Voll: noch kein Binding-Cookie.
+    let gespeichert = crate::auth::oidc::state::speichere(
         csrf.secret().clone(),
         crate::auth::oidc::state::StateEintrag {
             nonce: nonce.secret().clone(),
@@ -728,7 +734,10 @@ pub async fn oidc_start(
             ziel_pfad,
         },
     )
-    .map_err(anmeldungen_voll)?;
+    .map_err(anmeldungen_voll);
+    if gespeichert.is_err() {
+        return Ok((jar, oidc_fehler_redirect()));
+    }
 
     // Binding-Cookie, s. `baue_oidc_state_cookie`.
     let jar = jar.add(baue_oidc_state_cookie(csrf.secret().clone(), secure));
@@ -1056,6 +1065,9 @@ pub struct WebauthnAuthStartRequest {
 /// Protokoll-inhärent verrät `allowCredentials` Anzahl/IDs der Credentials, sobald ein Nutzer
 /// Passkeys hat; verhindert wird, dass Status oder Fehlertext die Fälle unterscheiden. Der
 /// discoverable Login hat diesen Tradeoff nicht.
+///
+/// Gedrosselt je Quelle (429, `auth/start_drossel.rs`); ist der Zeremonie-Speicher voll, 503
+/// (LFH-919).
 pub async fn webauthn_auth_start(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -1251,7 +1263,8 @@ fn webauthn_disc_cookie(key: String, secure: bool) -> Cookie<'static> {
 /// POST /api/auth/webauthn/discoverable/start — beginnt eine **usernameless**
 /// Passkey-Zeremonie (öffentlich, LFH-313). Kein Body: der Authenticator entdeckt den Benutzer
 /// selbst, die Antwort verrät nichts über Konten oder Passkeys. 404, wenn `webauthn` nicht aktiv
-/// ist.
+/// ist. Gedrosselt je Quelle (429, `auth/start_drossel.rs`); ist der Zeremonie-Speicher voll, 503
+/// (LFH-919).
 ///
 /// `mediation` wird auf `None` gesetzt: die Bibliothek setzt `Conditional` (Autofill), gewollt
 /// ist der Button-Flow. Das Frontend reicht ohnehin nur `rcr.publicKey` weiter; das Nullen

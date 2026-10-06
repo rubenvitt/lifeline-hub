@@ -430,10 +430,14 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (basis, _) = quelle_404().await;
         let fe = FachebenenState::neu().mit_pegel_basis_url(&basis);
-        fe.pegel_fehlschlag.lock().unwrap().insert(
-            "eine-laengst-vergessene-station".into(),
-            std::time::Instant::now() - ABKUEHLUNG,
-        );
+        // `checked_sub`: `Instant::now() - …` panickt auf Hosts, die kürzer als die Abkühlung laufen.
+        let Some(abgelaufen) = std::time::Instant::now().checked_sub(ABKUEHLUNG) else {
+            return;
+        };
+        fe.pegel_fehlschlag
+            .lock()
+            .unwrap()
+            .insert("eine-laengst-vergessene-station".into(), abgelaufen);
         messungen(&fe, &pool, &[UUID], Modus::Warten).await;
         let merker = fe.pegel_fehlschlag.lock().unwrap();
         assert!(!merker.contains_key("eine-laengst-vergessene-station"));

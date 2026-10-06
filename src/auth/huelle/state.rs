@@ -3,7 +3,10 @@
 //!
 //! **Ein offener Code je Person** (LFH-919): ein neuer Code macht den vorigen derselben Person
 //! ungültig. Dazu höchstens [`OBERGRENZE`] Codes insgesamt; darüber stellt `app-code` keinen aus
-//! und antwortet mit 429.
+//! und antwortet mit 429. Der Preis: Meldet dasselbe Konto zwei Macs in derselben Minute an,
+//! scheitert die erste Einlösung mit 401 und muss neu bestätigt werden. Das Fenster zwischen
+//! Bestätigen und Einlösen dauert Sekunden; anders als beim TOTP-Login (`totp/state.rs`) liegt
+//! zwischen den beiden Schritten keine Eingabe der Person.
 
 use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -61,8 +64,9 @@ pub fn speichere_mit_ablauf(code: String, eintrag: CodeEintrag, ablauf: Instant)
 
 /// Test-Hook: lässt nur noch Platz für `platz` weitere Einträge (`None`: zurück auf die
 /// [`OBERGRENZE`]), damit ein Integrationstest die Grenze mit wenigen Anfragen erreicht. Nicht
-/// `cfg(test)`, kein Aufrufer im Produktcode; nur in einem eigenen Test-Binary aufrufen, der
-/// Speicher ist prozessweit.
+/// `cfg(test)`, kein Aufrufer im Produktcode. Der Speicher ist prozessweit: nur in einem
+/// Test-Binary aufrufen, dessen Tests nacheinander laufen (`NACHEINANDER` in
+/// `tests/anmelde_start_grenzen.rs`, `tests/app_anmeldung.rs`).
 #[doc(hidden)]
 pub fn platz_fuer_tests(platz: Option<usize>) {
     let mut store = store();

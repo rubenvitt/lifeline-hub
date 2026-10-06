@@ -9,8 +9,10 @@
 //! **Begrenzt** (LFH-919, [`BegrenzterAblaufSpeicher`]): höchstens [`OBERGRENZE`] offene
 //! Anmeldungen; darüber antwortet der Login mit 503. Bewusst **kein** Ersatz je Person wie beim
 //! Einmalcode der Hülle: ein Funktionskonto meldet sich oft auf zwei Geräten zugleich an, und
-//! der zweite Login machte den ersten zwischen Passwort und Code still ungültig. Wachsen kann
-//! der Speicher hier ohnehin nur mit richtigem Passwort.
+//! der zweite Login machte den ersten zwischen Passwort und Code still ungültig, während die
+//! Person noch ihren Code abtippt. Wachsen kann der Speicher hier nur mit richtigem Passwort,
+//! gebremst durch die KDF; ein Innentäter mit eigenem TOTP-Konto könnte ihn mit vielen Logins
+//! dennoch füllen und TOTP-Anmeldungen bis zum Ablauf (5 min) mit 503 abweisen lassen.
 //!
 //! **!Send-Disziplin:** `entnehme` gibt den std-`MutexGuard` frei, bevor der Aufrufer
 //! `session::anlegen().await` ausführt; dieses Modul enthält kein `.await`.

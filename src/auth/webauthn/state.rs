@@ -58,8 +58,9 @@ pub fn entnehme(key: &str) -> Option<CeremonyZustand> {
 
 /// Test-Hook: lässt nur noch Platz für `platz` weitere Einträge (`None`: zurück auf die
 /// [`OBERGRENZE`]), damit ein Integrationstest die Grenze mit wenigen Anfragen erreicht. Nicht
-/// `cfg(test)`, kein Aufrufer im Produktcode; nur in einem eigenen Test-Binary aufrufen, der
-/// Speicher ist prozessweit.
+/// `cfg(test)`, kein Aufrufer im Produktcode. Der Speicher ist prozessweit: nur in einem
+/// Test-Binary aufrufen, dessen Tests nacheinander laufen (`NACHEINANDER` in
+/// `tests/anmelde_start_grenzen.rs`, `tests/app_anmeldung.rs`).
 #[doc(hidden)]
 pub fn platz_fuer_tests(platz: Option<usize>) {
     let mut store = store();

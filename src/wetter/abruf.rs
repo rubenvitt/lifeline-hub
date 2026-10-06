@@ -790,10 +790,14 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (basis, _) = quelle_404().await;
         let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
-        fe.wetter_fehlschlag.lock().unwrap().insert(
-            "ein-ort-von-vorgestern".into(),
-            std::time::Instant::now() - ABKUEHLUNG,
-        );
+        // `checked_sub`: `Instant::now() - …` panickt auf Hosts, die kürzer als die Abkühlung laufen.
+        let Some(abgelaufen) = std::time::Instant::now().checked_sub(ABKUEHLUNG) else {
+            return;
+        };
+        fe.wetter_fehlschlag
+            .lock()
+            .unwrap()
+            .insert("ein-ort-von-vorgestern".into(), abgelaufen);
         warnlage(&fe, &pool, &ort(), Utc::now()).await;
         let merker = fe.wetter_fehlschlag.lock().unwrap();
         assert!(!merker.contains_key("ein-ort-von-vorgestern"));

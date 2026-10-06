@@ -1,5 +1,6 @@
 //! Grenzen der öffentlichen Anmelde-Starts (LFH-919): Drossel je Quelle (429), volle
-//! Zeremonie-Speicher (503) und die Längengrenze des OIDC-Ziel-Pfads.
+//! Zeremonie-Speicher (503) und die Längengrenze des OIDC-Ziel-Pfads. Der OIDC-Start ist eine
+//! Navigation und antwortet in beiden Fällen mit dem Fehler-Redirect auf die Login-Seite.
 //!
 //! Eigenes Test-Binary: Drossel und Speicher sind prozessweit, und die Tests setzen die
 //! Obergrenze herab. Innerhalb des Binaries laufen sie nacheinander ([`NACHEINANDER`]).
@@ -94,6 +95,7 @@ fn oidc_aktivieren() {
 
 struct Antwort {
     status: StatusCode,
+    location: Option<String>,
     set_cookie: Vec<String>,
     body: Value,
 }
@@ -119,6 +121,10 @@ async fn sende(
     }
     let resp = app.clone().oneshot(req).await.unwrap();
     let status = resp.status();
+    let location = resp
+        .headers()
+        .get(header::LOCATION)
+        .map(|v| v.to_str().unwrap().to_string());
     let set_cookie = resp
         .headers()
         .get_all(header::SET_COOKIE)
@@ -128,6 +134,7 @@ async fn sende(
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
     Antwort {
         status,
+        location,
         set_cookie,
         body: serde_json::from_slice(&bytes).unwrap_or(Value::Null),
     }
@@ -179,16 +186,27 @@ async fn auth_start_wird_je_quelle_gedrosselt() {
     assert_eq!(a.status, StatusCode::TOO_MANY_REQUESTS, "{:?}", a.body);
 }
 
+const FEHLER_REDIRECT: &str = "/login?fehler=oidc";
+
+/// Der Start führt zum IdP, nicht auf den Fehler-Redirect, und bindet einen State.
+fn fuehrt_zum_idp(a: &Antwort) -> bool {
+    a.status == StatusCode::SEE_OTHER
+        && a.location.as_deref().is_some_and(|l| l.starts_with(&*IDP))
+        && a.set_cookie.iter().any(|c| c.starts_with("oidc_state="))
+}
+
 #[tokio::test]
 async fn oidc_start_wird_je_quelle_gedrosselt() {
     let (_reihe, app) = aufbau().await;
     let quelle = "192.0.2.30:40000";
     for n in 0..lifeline_hub::auth::start_drossel::MAX_STARTS {
         let a = sende(&app, "GET", "/api/auth/oidc/start", None, Some(quelle)).await;
-        assert_eq!(a.status, StatusCode::SEE_OTHER, "Start {n}: {:?}", a.body);
+        assert!(fuehrt_zum_idp(&a), "Start {n}: {:?}", a.location);
     }
     let a = sende(&app, "GET", "/api/auth/oidc/start", None, Some(quelle)).await;
-    assert_eq!(a.status, StatusCode::TOO_MANY_REQUESTS, "{:?}", a.body);
+    assert_eq!(a.status, StatusCode::SEE_OTHER);
+    assert_eq!(a.location.as_deref(), Some(FEHLER_REDIRECT));
+    assert!(a.set_cookie.is_empty(), "kein Binding-Cookie ohne State");
 }
 
 /// Ist der Speicher voll, entsteht keine Zeremonie: 503, kein Cookie.
@@ -217,20 +235,16 @@ async fn voller_webauthn_speicher_ist_503() {
 }
 
 #[tokio::test]
-async fn voller_oidc_speicher_ist_503() {
+async fn voller_oidc_speicher_fuehrt_auf_den_fehler_redirect() {
     let (_reihe, app) = aufbau().await;
     lifeline_hub::auth::oidc::state::platz_fuer_tests(Some(1));
     let erster = sende(&app, "GET", "/api/auth/oidc/start", None, None).await;
     let zweiter = sende(&app, "GET", "/api/auth/oidc/start", None, None).await;
     lifeline_hub::auth::oidc::state::platz_fuer_tests(None);
 
-    assert_eq!(erster.status, StatusCode::SEE_OTHER, "{:?}", erster.body);
-    assert_eq!(
-        zweiter.status,
-        StatusCode::SERVICE_UNAVAILABLE,
-        "{:?}",
-        zweiter.body
-    );
+    assert!(fuehrt_zum_idp(&erster), "{:?}", erster.location);
+    assert_eq!(zweiter.status, StatusCode::SEE_OTHER);
+    assert_eq!(zweiter.location.as_deref(), Some(FEHLER_REDIRECT));
     assert!(
         zweiter.set_cookie.is_empty(),
         "kein Binding-Cookie ohne State"
@@ -250,7 +264,7 @@ async fn ueberlanges_von_wird_nicht_gespeichert() {
         None,
     )
     .await;
-    assert_eq!(a.status, StatusCode::SEE_OTHER, "{:?}", a.body);
+    assert!(fuehrt_zum_idp(&a), "{:?}", a.location);
     let state = a
         .set_cookie
         .iter()
