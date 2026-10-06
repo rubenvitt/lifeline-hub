@@ -1413,11 +1413,6 @@ export default function Sidebar(props: SidebarProps) {
               </Radio.Group>
             </div>
           )}
-          {props.basemap === 'blind' && (
-            <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 12 }}>
-              Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
-            </Typography.Paragraph>
-          )}
         </Space>
       </KlappPaneel>
     </div>

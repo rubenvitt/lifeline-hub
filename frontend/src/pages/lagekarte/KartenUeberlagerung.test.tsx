@@ -10,7 +10,7 @@ import KartenUeberlagerung, {
   naechsterFreierIndex,
 } from './KartenUeberlagerung';
 import { erzeugeZeigerQuelle } from './mausPosition';
-import { grundlageOptionen } from './leistenDaten';
+import { blindHinweis, grundlageOptionen } from './leistenDaten';
 
 const STILE = [{ name: 'Liberty', url: 'x', typ: 'vektor', attribution: null }] as never[];
 
@@ -250,19 +250,74 @@ describe('KartenUeberlagerung — Zeigerkoordinate', () => {
     // Ohne Einsatz-Provider gilt die Vorgabe (WGS84 dezimal) — dieselbe wie im Inspector.
     expect(anzeige).toHaveTextContent('51.10000, 4.10000');
   });
+
+  it('LFH-971: steht nur mit feinem Zeiger da — auf Touch bliebe sie bei „—“', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    // Die Klasse blendet sie über `@media not (any-pointer: fine)` aus (`lagekarte.css`, LFH-712);
+    // jsdom wertet die Media-Query nicht aus, der Browser-Nachweis steht in
+    // `e2e/lagekarte-touch.spec.ts`.
+    expect(document.querySelector('[data-lfh="zeiger-koordinate"]')).toHaveClass(
+      'lfh-nur-feiner-zeiger',
+    );
+  });
 });
 
 describe('GrundlageLeiste', () => {
-  it('sperrt nicht konfigurierte Grundlagen mit Grund, statt sie wegzulassen', () => {
+  const OFFLINE_GRUND = 'Offline-Karte nicht konfiguriert (Verwaltung › Karten)';
+  const hinweis = () => document.querySelector('[data-lfh="grundlage-hinweis"]');
+
+  it('sperrt nicht konfigurierte Grundlagen mit Grund, statt sie wegzulassen (LFH-971)', () => {
     renderMitProviders(
       <GrundlageLeiste optionen={grundlageOptionen([], false)} wert="blind" onWechsel={() => {}} />,
     );
-    expect(screen.getByRole('radio', { name: 'Online' })).toBeDisabled();
-    expect(screen.getByRole('radio', { name: 'Offline' })).toHaveAttribute(
-      'title',
-      'Offline-Karte nicht konfiguriert',
+    const offline = screen.getByRole('radio', { name: 'Offline' });
+    // `aria-disabled`, nicht `disabled`: der Tipp muss ankommen, sonst bliebe der Grund auf
+    // Touch unerreichbar; ein `title` erscheint dort nie.
+    expect(offline).toHaveAttribute('aria-disabled', 'true');
+    expect(offline).not.toBeDisabled();
+    expect(offline).not.toHaveAttribute('title');
+    expect(offline).toHaveAccessibleDescription(OFFLINE_GRUND);
+    expect(screen.getByRole('radio', { name: 'Online' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('radio', { name: 'Ohne Karte' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Ohne Karte' })).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('LFH-971: ein Tipp auf Gesperrtes wählt nicht, sondern nennt den Grund an der Leiste', () => {
+    const onWechsel = vi.fn();
+    renderMitProviders(
+      <GrundlageLeiste
+        optionen={grundlageOptionen(STILE, false)}
+        wert="online:Liberty"
+        onWechsel={onWechsel}
+      />,
     );
-    expect(screen.getByRole('radio', { name: 'Blind' })).toBeChecked();
+    expect(hinweis()).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: 'Offline' }));
+    expect(onWechsel).not.toHaveBeenCalled();
+    expect(hinweis()).toHaveTextContent(OFFLINE_GRUND);
+    // Eine freie Wahl räumt den Grund wieder ab.
+    fireEvent.click(screen.getByRole('radio', { name: 'Ohne Karte' }));
+    expect(onWechsel).toHaveBeenCalledWith('blind');
+    expect(hinweis()).toBeNull();
+  });
+
+  it('LFH-971: ohne Karte steht der Hinweis an der Leiste, ohne etwas aufzuklappen', () => {
+    const { rerender } = renderMitProviders(
+      <GrundlageLeiste
+        optionen={grundlageOptionen(STILE, false)}
+        wert="blind"
+        onWechsel={() => {}}
+      />,
+    );
+    expect(hinweis()).toHaveTextContent(blindHinweis(grundlageOptionen(STILE, false)));
+    rerender(
+      <GrundlageLeiste
+        optionen={grundlageOptionen(STILE, false)}
+        wert="online:Liberty"
+        onWechsel={() => {}}
+      />,
+    );
+    expect(hinweis()).toBeNull();
   });
 
   it('LFH-865: jedes Segment steht in einer eigenen Zelle wie in der Segmentleiste', () => {

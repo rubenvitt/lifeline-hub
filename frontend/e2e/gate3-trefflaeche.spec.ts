@@ -3162,7 +3162,7 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeit
 
     // Kartengrundlage über der Karte (ab `md`): Segmente der lokalen Leiste, dieselbe Zelle.
     const grundlage = page.locator('[data-lfh="grundlage-leiste"]');
-    // Online-Stile je nach e2e-Konfiguration, dazu immer Offline und Blind: mindestens drei.
+    // Online-Stile je nach e2e-Konfiguration, dazu immer Offline und „Ohne Karte“: mindestens drei.
     const grundSegmente = grundlage.getByRole('radio');
     const grundHoehe = await alleHaltenStufe(
       grundSegmente,
