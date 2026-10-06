@@ -450,11 +450,15 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('die Einheitenzeile trägt die verdichtete Verteilung bereit / gebunden / Ausfall — auch die 0', async () => {
-    // Die Spalte „Mittel" steht ab `xl`, darunter im Spaltenschalter.
+    // Die Spalte „Fahrzeuge und Personal" steht ab `xl`, darunter im Spaltenschalter.
     setzeViewportBreite(1440);
     mitEinheit();
     const { container } = setup();
     await screen.findByText('1. Zug');
+    // Der Spaltenkopf heißt wie die Gruppe und trägt die Legende sichtbar (LFH-962): das Wort der
+    // Zelle steht sonst nur im `title`, den es auf Touch nicht gibt.
+    const kopf = screen.getByRole('columnheader', { name: /Fahrzeuge und Personal/ });
+    expect(kopf).toHaveTextContent('bereit · gebunden · Ausfall');
     const gruppe = within(zeile(container, 'eh-20')!).getByRole('group', {
       name: 'Fahrzeuge und Personal',
     });
@@ -466,7 +470,7 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('tönt eine Einheit mit Ausfall als Problemzeile — mit der Ausfall-Zahl als zweitem Kanal', async () => {
-    // Die Spalte „Mittel" steht ab `xl`.
+    // Die Spalte „Fahrzeuge und Personal" steht ab `xl`.
     setzeViewportBreite(1440);
     // Beide Einheiten haben in der Frist zurückgemeldet: sonst tönte schon die fehlende Rückmeldung
     // die Zeile, und die Gegenprobe an eh-20 prüfte nichts über Ausfall.

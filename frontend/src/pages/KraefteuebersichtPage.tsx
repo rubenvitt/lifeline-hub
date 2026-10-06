@@ -279,9 +279,18 @@ function rasterSpalten(
           },
         ]),
     // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht auf
-    // schmalem Schirm zuerst (Zähler im Spaltenschalter).
+    // schmalem Schirm zuerst (Zähler im Spaltenschalter). Der Kopf heißt wie die Gruppe der Zellen
+    // und trägt ihre Legende (LFH-962): das Wort der Zelle steht sonst nur im `title`.
     {
-      title: 'Mittel',
+      title: (
+        <span style={{ display: 'flex', flexDirection: 'column' }}>
+          <span>Fahrzeuge und Personal</span>
+          <span data-lfh="status-legende" style={{ ...monoStil(10), fontWeight: 400 }}>
+            bereit · gebunden · Ausfall
+          </span>
+        </span>
+      ),
+      etikett: 'Fahrzeuge und Personal',
       key: 'mittel',
       width: 190,
       abBreite: 'xl',

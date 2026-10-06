@@ -71,14 +71,8 @@ const MIT_NACHBARSCHAFT = [
   // Aktionen.
   'pages/SchaedenDetailPage.tsx',
   'pages/TiereDetailPage.tsx',
-  // ── Meldungskarte (LFH-372) ───────────────────────────────────────────────
-  // „Bestätigen" (`danger`) steht als Knopf neben Statusbewegung und ⋮-Trigger in
-  // `<Space size="middle">` — anders als `Sidebar.tsx` in der Reihe, nicht im Menü.
-  // Die Nachbarschaft ist BEDINGT („Bestätigen" nur bei `bestaetigung_pflicht && !ist_bestaetigt`);
-  // der Scanner liest Quelltext und sichert den Abstand für den Fall zu, in dem es ihn braucht.
-  // Beide Renderformen (⋮-Menü ab drei Aktionen, darunter Direktknöpfe) liegen in derselben
-  // `<Space size="middle">` — ein eigenes `<Flex gap>` für den Direktzweig fiele aus dem Scanner.
-  'meldungen/MeldungKarte.tsx',
+  // Die Meldungskarte steht in keiner Liste mehr: „Bestätigen" ist seit LFH-962 Primärknopf, nicht
+  // `danger`, und sonst trägt die Karte keine destruktive Aktion als Knopf.
   // ── Personen-Detailseite (LFH-340) ────────────────────────────────────────
   // ZWEI Reihen: Abgleich („Bestätigen" neben „Verwerfen"/`danger`) und UHS-Zuordnung
   // („UHS ändern" neben „Austragen"/`danger`). Das Stornieren steht im Kopfmenü; dessen Trenner

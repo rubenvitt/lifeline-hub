@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ConfigProvider, theme } from 'antd';
 import type { Einsatzabschnitt } from '../../api/types';
-import { rollenFarbe } from '../../theme/statusFarben';
 import AbschnittKnoten from './AbschnittKnoten';
 
 const nord = {
@@ -23,14 +22,7 @@ const nord = {
  *  Token gegen die Anzeige, nicht ein Literal gegen ein Literal. */
 function TokenSonde() {
   const { token } = theme.useToken();
-  return (
-    <span
-      data-testid="sonde"
-      data-sekundaer={token.colorTextSecondary}
-      data-normal={rollenFarbe('normal', token)}
-      data-achtung={rollenFarbe('achtung', token)}
-    />
-  );
+  return <span data-testid="sonde" data-sekundaer={token.colorTextSecondary} />;
 }
 
 /**
@@ -75,21 +67,37 @@ describe('AbschnittKnoten', () => {
     expect(normalisiere(leiter.style.color)).not.toBe(normalisiere(verbotenerLiteralwert));
   });
 
-  it('zeigt die besetzte Führung als Punkt aus der Rolle „normal" — mit Wort als zweitem Kanal', () => {
-    const sonde = renderKnoten(nord);
-    const punkt = screen.getByRole('img', { name: 'Führung besetzt' });
-    expect(normalisiere(punkt.style.backgroundColor)).toBe(normalisiere(sonde.dataset.normal));
+  it('zeigt bei besetzter Führung den Leiternamen und kein Führungssignal', () => {
+    renderKnoten(nord);
+    expect(screen.getByText(/Leiter Nord/)).toBeInTheDocument();
+    expect(screen.queryByText('ohne Leiter')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="status-chip"]')).toBeNull();
   });
 
-  it('zeigt die unbesetzte Führung als Punkt aus der Rolle „achtung"', () => {
-    const sonde = renderKnoten({ ...nord, leiter_id: null, leiter_name: null });
-    const punkt = screen.getByRole('img', { name: 'Führung unbesetzt' });
-    expect(normalisiere(punkt.style.backgroundColor)).toBe(normalisiere(sonde.dataset.achtung));
+  it('zeigt die unbesetzte Führung als sichtbares Wort „ohne Leiter", nicht als reinen Farbpunkt (LFH-962)', () => {
+    renderKnoten({ ...nord, leiter_id: null, leiter_name: null });
+    const chip = screen.getByText('ohne Leiter').closest('[data-lfh="status-chip"]');
+    expect(chip).not.toBeNull();
+    expect(chip).toHaveAttribute('data-ton', 'achtung');
+    // Kein Punkt mehr, der die Bedeutung nur über Farbe trägt.
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('zeigt den Lagezustand mit demselben Wort wie der Überblick', () => {
+    renderKnoten({ ...nord, lagezustand: 'angespannt' } as Einsatzabschnitt);
+    expect(screen.getByText('angespannt')).toBeInTheDocument();
+  });
+
+  it('lässt einen nicht beurteilten Lagezustand leer', () => {
+    renderKnoten({ ...nord, lagezustand: null } as Einsatzabschnitt);
+    for (const wort of ['planmäßig', 'angespannt', 'kritisch']) {
+      expect(screen.queryByText(wort)).not.toBeInTheDocument();
+    }
   });
 
   it('versteckt die Icons vor dem Vorleser — die Gruppe heißt nach dem Namen, nicht nach „user"', () => {
     renderKnoten(nord);
-    // Genau EIN role=img: der Führungspunkt. Die antd-Icons (user/phone) dürfen keinen eigenen liefern.
-    expect(screen.getAllByRole('img')).toHaveLength(1);
+    // Kein role=img: die antd-Icons (user/phone) dürfen keinen eigenen liefern.
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
   });
 });

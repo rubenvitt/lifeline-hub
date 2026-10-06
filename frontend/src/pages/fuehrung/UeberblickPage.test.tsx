@@ -363,7 +363,9 @@ describe('UeberblickPage', () => {
       'bedien',
       'alarm',
     ]);
-    expect(within(p).getByText(/Einheiten nach Status/)).toBeInTheDocument();
+    // Die Legende steht über den Zeilen, nicht am Fuß (LFH-962): sie geht dem ersten Raster voraus.
+    const legende = within(p).getByText(/Einheiten nach Status: bereit · gebunden · Ausfall/);
+    expect(legende.compareDocumentPosition(zeile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
   });
 
