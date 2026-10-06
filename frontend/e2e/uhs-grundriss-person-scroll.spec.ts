@@ -1,5 +1,11 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
 
+// Gezogen wird zwischen Liste und Platz: das verlangt die Drei-Spalten-Form, und die steht erst,
+// wenn die Fläche neben beiden Seitenspalten ganz in den Rahmen passt (`dreiSpaltenPassen` in
+// `pages/uhs/grundrissLayout.ts`). Bei 1280 px neben Rail und Modulpanel steht die Reiterform.
+// Die Höhe bleibt die des Standardfensters.
+test.use({ viewport: { width: 1920, height: 720 } });
+
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 

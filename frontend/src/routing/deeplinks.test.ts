@@ -64,6 +64,7 @@ import {
   koppelnAdresse,
   erinnerungenPfad,
   kraefteuebersichtPfad,
+  materialPfad,
   parseRouteId,
   ueberblickPfad,
 } from './deeplinks';
@@ -151,6 +152,10 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
     expect(erinnerungenPfad(7)).toBe('/einsaetze/7/erinnerungen');
   });
   /** Die aggregierende Kräfteübersicht. */
+  it('materialPfad', () => {
+    expect(materialPfad(7)).toBe('/einsaetze/7/material');
+  });
+
   it('kraefteuebersichtPfad', () => {
     expect(kraefteuebersichtPfad(E)).toBe('/einsaetze/5/kraefteuebersicht');
   });
