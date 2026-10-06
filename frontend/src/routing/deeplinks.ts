@@ -701,8 +701,38 @@ export function parseNachforderungVorbelegung(
   return begruendung ? { art, bezeichnung, anzahl, begruendung } : { art, bezeichnung, anzahl };
 }
 
-export function auftraegePfad(einsatzId: number, opts: { auftrag?: number } = {}): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'auftraege'), { auftrag: opts.auftrag });
+/**
+ * Reiter der Seite Aufträge/Befehle (LFH-972): Einzelaufträge oder schriftliche Einsatzbefehle.
+ * Anders als `ansicht` bei {@link fahrzeugePfad} ist der Reiter ZUSTAND, kein Auftrag: er bleibt
+ * in der Adresse stehen, damit Brotkrume und Browser-Zurück aus einem Befehl auf „Befehle"
+ * landen und die Befehlsliste als Lesezeichen taugt. Die Vorgabe „Aufträge" steht ohne Parameter.
+ */
+export type AuftraegeReiter = 'auftraege' | 'befehle';
+
+export function auftraegePfad(
+  einsatzId: number,
+  opts: { auftrag?: number; reiter?: AuftraegeReiter } = {},
+): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'auftraege'), {
+    auftrag: opts.auftrag,
+    // Ein `?auftrag=`-Sprung meint immer den Reiter Aufträge: im Reiter Befehle hinge die
+    // Auftragsliste nicht ein, und der Parameter würde nie angewendet und geräumt.
+    reiter: opts.reiter === 'befehle' && opts.auftrag === undefined ? 'befehle' : undefined,
+  });
+}
+
+/** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
+const AUFTRAEGE_REITER_ERLAUBT: Record<AuftraegeReiter, true> = {
+  auftraege: true,
+  befehle: true,
+};
+
+/** Umkehr von {@link auftraegePfad}: ein unbekannter oder fehlender Wert ergibt die Vorgabe. */
+export function parseAuftraegeReiter(params: URLSearchParams): AuftraegeReiter {
+  const reiter = params.get('reiter');
+  return reiter && Object.prototype.hasOwnProperty.call(AUFTRAEGE_REITER_ERLAUBT, reiter)
+    ? (reiter as AuftraegeReiter)
+    : 'auftraege';
 }
 
 export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number } = {}): string {

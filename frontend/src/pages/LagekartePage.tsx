@@ -62,11 +62,15 @@ import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
 import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
-import KartenUeberlagerung, { GrundlageLeiste } from './lagekarte/KartenUeberlagerung';
+import KartenUeberlagerung, {
+  GrundlageHinweis,
+  GrundlageLeiste,
+} from './lagekarte/KartenUeberlagerung';
 import { erzeugeZeigerQuelle } from './lagekarte/mausPosition';
 import { startAnsicht } from './lagekarte/startAnsicht';
 import {
   grundlageAufloesen,
+  blindHinweis,
   grundlageOptionen,
   grundlageWert,
   verortetAnzahl,
@@ -924,11 +928,14 @@ export default function LagekartePage() {
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte. Auf dem Handschirm bräche sie
   // mit mehreren Online-Stilen mehrzeilig um und läge über Knopfblock und Karte — dort steht sie im
   // Paneel „Kartengrundlage" der Leiste.
+  const grundlageWahlen = grundlageOptionen(onlineStyles, !!config?.offline_verfuegbar);
+  const grundlageAktiv = grundlageWert(basemap, onlineStilName, onlineStyles);
   const grundlageWahl = (
     <GrundlageLeiste
       einzeilig={!istSchmal}
-      optionen={grundlageOptionen(onlineStyles, !!config?.offline_verfuegbar)}
-      wert={grundlageWert(basemap, onlineStilName, onlineStyles)}
+      blindHinweisZeigen={!istSchmal}
+      optionen={grundlageWahlen}
+      wert={grundlageAktiv}
       onWechsel={(w) => {
         const { basemap: modus, stilName } = grundlageAufloesen(w);
         if (stilName) setOnlineStilName(stilName);
@@ -1072,7 +1079,17 @@ export default function LagekartePage() {
         suchnadel={suchnadel}
       />
       <KartenUeberlagerung
-        grundlage={istSchmal ? null : grundlageWahl}
+        grundlage={
+          istSchmal ? (
+            // Die Leiste liegt im zugeklappten Paneel; die schwarze Karte erklärt sich trotzdem
+            // ohne Aufklappen (LFH-971).
+            <GrundlageHinweis
+              zeilen={grundlageAktiv === 'blind' ? [blindHinweis(grundlageWahlen)] : []}
+            />
+          ) : (
+            grundlageWahl
+          )
+        }
         zeigerQuelle={zeigerQuelle}
         onZoomRein={() => kartenRef.current?.zoomRein()}
         onZoomRaus={() => kartenRef.current?.zoomRaus()}

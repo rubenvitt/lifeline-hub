@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { lagebildDehydrierOptionen } from '../offline/lagebildFilter';
 import { ApiError, NetzFehler } from './client';
-import { erzeugeQueryClient } from './queryClient';
+import { ETB_FREI_GC_MS, erzeugeQueryClient } from './queryClient';
 import { einsatzKeys } from './queryKeys';
 import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
@@ -113,6 +113,25 @@ describe('erzeugeQueryClient — Liegezeit der Lagebild-Allowlist (LFH-723, desi
     expect(client.getQueryDefaults(einsatzKeys.etbListe(7, {})).gcTime).toBe(HOECHSTLIEGEZEIT_MS);
     expect(client.getQueryDefaults(einsatzKeys.personen(7)).gcTime).toBe(HOECHSTLIEGEZEIT_MS);
     expect(client.getQueryDefaults(['karte-config']).gcTime).toBe(HOECHSTLIEGEZEIT_MS);
+  });
+
+  it('hält freie ETB-Varianten nur kurz, feste 24 h (LFH-939, design.md D4)', () => {
+    const client = erzeugeQueryClient();
+    const gc = (queryKey: readonly unknown[], gcTime?: number) =>
+      client.defaultQueryOptions(gcTime === undefined ? { queryKey } : { queryKey, gcTime }).gcTime;
+    expect(gc(einsatzKeys.etbListe(7, { q: 'Pumpe' }))).toBe(ETB_FREI_GC_MS);
+    expect(gc(einsatzKeys.etbZaehler(7, { von: '2026-10-01' }))).toBe(ETB_FREI_GC_MS);
+    expect(gc(einsatzKeys.etbListe(7, {}))).toBe(HOECHSTLIEGEZEIT_MS);
+    expect(gc(einsatzKeys.etbListe(7, { typ: 'meldung' }))).toBe(HOECHSTLIEGEZEIT_MS);
+    // Eine ausdrückliche Angabe des Aufrufers (Palette) gewinnt.
+    expect(gc(einsatzKeys.etbListe(7, { q: 'x', limit: 5 }), 30_000)).toBe(30_000);
+    // Der echte Cache-Eintrag trägt die kurze Liegezeit.
+    void client.prefetchQuery({
+      queryKey: einsatzKeys.etbListe(7, { q: 'y' }),
+      queryFn: () => new Promise(() => {}),
+    });
+    const query = client.getQueryCache().find({ queryKey: einsatzKeys.etbListe(7, { q: 'y' }) });
+    expect(query?.gcTime).toBe(ETB_FREI_GC_MS);
   });
 
   it('lässt ungelistete Keys beim Vorgabewert', () => {

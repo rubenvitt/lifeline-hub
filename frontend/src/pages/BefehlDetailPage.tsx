@@ -172,9 +172,9 @@ function BefehlDetail() {
     onError: fehler,
   });
 
-  // Ungültige Befehl-ID → zurück zu Aufträge/Befehle.
+  // Ungültige Befehl-ID → zurück auf den Reiter Befehle, nicht auf die Vorgabe „Aufträge" (LFH-972).
   if (!idGueltig) {
-    return <Navigate to={auftraegePfad(einsatzId)} replace />;
+    return <Navigate to={auftraegePfad(einsatzId, { reiter: 'befehle' })} replace />;
   }
   if (einsatzQuery.isLoading || befehlQuery.isLoading) {
     return (
@@ -184,7 +184,12 @@ function BefehlDetail() {
     );
   }
   if (befehlQuery.isError || !befehlQuery.data || !einsatzQuery.data) {
-    return <Typography.Text type="danger">Befehl nicht gefunden.</Typography.Text>;
+    return (
+      <Typography.Paragraph>
+        <Typography.Text type="danger">Befehl nicht gefunden.</Typography.Text>{' '}
+        <Link to={auftraegePfad(einsatzId, { reiter: 'befehle' })}>Zu den Befehlen</Link>
+      </Typography.Paragraph>
+    );
   }
   const einsatz = einsatzQuery.data;
   const befehl = befehlQuery.data;
@@ -384,7 +389,11 @@ function BefehlDetail() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={auftraegePfad(einsatzId)}>Aufträge/Befehle</Link> },
+              {
+                title: (
+                  <Link to={auftraegePfad(einsatzId, { reiter: 'befehle' })}>Aufträge/Befehle</Link>
+                ),
+              },
               { title: befehl.titel },
             ]}
           />

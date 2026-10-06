@@ -70,7 +70,7 @@ interface Verweis {
   lfd_nr: number;
 }
 
-interface Berichtigungsindex {
+export interface Berichtigungsindex {
   /** Berichtigung → ihr Grundeintrag (lfd_nr nur, wenn der Grundeintrag geladen ist). */
   grundeintrag: (e: EtbEintragAnzeige) => { id: number; lfd_nr: number | null } | null;
   /** Grundeintrag → die Berichtigung(en), die ihn korrigieren (nur geladene). */
