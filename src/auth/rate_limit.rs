@@ -77,7 +77,7 @@ struct Versuch {
 }
 
 /// Der Schlüssel einer Quelle in der Tabelle (s. Modulkopf).
-fn quelle(ip: IpAddr) -> IpAddr {
+pub(crate) fn quelle(ip: IpAddr) -> IpAddr {
     match ip.to_canonical() {
         IpAddr::V6(v6) => IpAddr::V6((u128::from(v6) & !u128::from(u64::MAX)).into()),
         v4 => v4,
