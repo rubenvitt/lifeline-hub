@@ -1,4 +1,5 @@
 pub mod org;
+pub mod strom;
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
@@ -286,6 +287,9 @@ pub struct LiveHub {
     /// Beendete Gerätekopplungen (LFH-892, design.md D7): Widerruf, neuer Code, Einsatzabschluss.
     /// Ein Live-Strom einer Gerätesitzung endet, sobald seine Kopplung hier erscheint.
     kopplung_ende: broadcast::Sender<i64>,
+    /// Zulassung und Lebensdauer der Live-Ströme (LFH-920): je Benutzer und insgesamt
+    /// gedeckelt, jeder Strom endet nach seiner Lebensdauer.
+    pub stroeme: strom::StromZulassung,
 }
 
 impl Default for LiveHub {
@@ -345,6 +349,11 @@ fn bestimme_replay(
 impl LiveHub {
     /// Neuer, leerer Hub mit einer prozess-eindeutigen Epoch (Prozessstart-Zeitstempel).
     pub fn new() -> Self {
+        Self::mit_stromgrenzen(strom::StromGrenzen::default())
+    }
+
+    /// Wie [`Self::new`], mit eigenen Grenzen für die Live-Ströme (Tests stellen sie klein).
+    pub fn mit_stromgrenzen(grenzen: strom::StromGrenzen) -> Self {
         let epoch = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
@@ -354,6 +363,7 @@ impl LiveHub {
             org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
             epoch,
             kopplung_ende: broadcast::channel(256).0,
+            stroeme: strom::StromZulassung::neu(grenzen),
         }
     }
 

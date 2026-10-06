@@ -25,7 +25,8 @@
 //! routerweiter Cap würde von ihnen aufgezehrt (s. `src/app.rs`). Die Anhang- und
 //! Dokument-Downloads haben stattdessen eine eigene, engere Grenze (`ConcurrencyLimitLayer(16)`,
 //! wartet auf einen Platz), der Sicherungs-Download eine Sperre für genau einen Lauf
-//! (`backup::DownloadSperre`, ein zweiter bekommt sofort 503, LFH-926).
+//! (`backup::DownloadSperre`, ein zweiter bekommt sofort 503, LFH-926), die Live-Ströme eine
+//! Grenze je Benutzer und insgesamt samt Lebensdauer (`live::strom`, 429 bzw. 503, LFH-920).
 
 use crate::error::AppError;
 use axum::{
@@ -56,9 +57,11 @@ pub const MAX_GLEICHZEITIGE_REQUESTS: usize = 256;
 /// sein könnte, gehört nicht hierher. Gegen tote Einträge wacht `tests/zulassung_guard.rs`.
 pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // SSE-Dauerverbindung: jede Zeitschranke kappte sie, und jede offene Verbindung bände einen
-    // Cap-Slot.
+    // Cap-Slot. Eigene Grenze je Benutzer und insgesamt, Lebensdauer statt Zeitbudget:
+    // `live::strom` (LFH-920).
     ("GET", "/api/einsaetze/{id}/live"),
-    // Org-Strom (LFH-734), dieselbe SSE-Dauerverbindung außerhalb eines Einsatzes.
+    // Org-Strom (LFH-734), dieselbe SSE-Dauerverbindung außerhalb eines Einsatzes, mit derselben
+    // Grenze.
     ("GET", "/api/live"),
     // Admin-Download der gesamten DB: VACUUM INTO + 64-KiB-Chunk-Stream. Dauer skaliert mit
     // DB-Größe und Leitung des Clients. Eigene Sperre für einen Lauf und Leerlauf-Frist je Chunk
