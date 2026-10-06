@@ -13,6 +13,11 @@ import { monoStil, useRollen } from './rollenwerte';
  * TYPWORT Mono 10 Versalien, Sperrung .1em, in Wortfarbe, daneben Meta Mono 10 · Text 13/1.5 ·
  * optionale Hinweiszeile 11 · rechts Verfasser Mono 11 / Weg Mono 10 · Aktionen.
  *
+ * DICHTE (LFH-958, {@link zeitachsenAufbau}): in `kompakt` stehen Verfasser und Weg als Mono-Meta
+ * in der Kopfzeile neben dem Typwort, das Zeilenmenü (`menue`) an ihrem Ende; die Spalte rechts
+ * trägt dann nur noch Text-Aktionen (`aktionen`). So ist ein einzeiliger Eintrag im Fükw eine
+ * Zeile hoch statt drei. In `komfortabel` und `handschuh` bleibt die Spalte.
+ *
  * TYP ALS KANTE + WORT, NICHT ALS ETIKETT. Die Farbe kommt aus `etbTypFarbe`
  * (`theme/statusFarben.ts`): Kante und Wort sind zwei Werte, weil sie verschiedene Böden haben
  * (Dekoration gegen Text). Der zweite Kanal ist das TYPWORT; es ist Pflicht und kommt vom
@@ -49,6 +54,15 @@ export function zeilenGrund(rollen: Farbrollen, toenung?: Zeilentoenung): string
 }
 
 /**
+ * Aufbau der Zeile aus der Dichte — rein und exportiert (LFH-958, Muster `zielEinzug.ts`): unter
+ * 48 px Bedienhöhe (`kompakt`) `zeile`, sonst `spalte`. Über das Token, nicht `useDichte()`: unter
+ * einem lokal überschriebenen Theme liefen Höhe und Aufbau sonst auseinander.
+ */
+export function zeitachsenAufbau(token: { controlHeight: number }): 'zeile' | 'spalte' {
+  return token.controlHeight < 48 ? 'zeile' : 'spalte';
+}
+
+/**
  * Waagerechte Rinne der drei Spalten — rein und exportiert (Muster `bedienzielStil`).
  *
  * Unter `md` die kleine Stufe (`paddingSM`), sonst `padding`: bei 390 px in `handschuh` ließen
@@ -80,8 +94,10 @@ interface ZeitachseneintragProps extends Hueller {
   verfasser?: ReactNode;
   weg?: ReactNode;
   toenung?: Zeilentoenung;
-  /** Aktionen rechts (Dreipunkt-Menü o. ä., gebündelt nach LFH-365). */
+  /** Text-Aktionen rechts („Zurücknehmen“, „Erneut senden“), in jeder Dichte in der Spalte. */
   aktionen?: ReactNode;
+  /** Dreipunkt-Menü der Zeile (LFH-365); in `kompakt` am Ende der Kopfzeile, sonst rechts. */
+  menue?: ReactNode;
   /** Element der Hülle; Vorgabe `div`, in einer Liste `li`, eigenständig `article`. */
   als?: 'div' | 'li' | 'article';
   style?: CSSProperties;
@@ -101,6 +117,7 @@ export default function Zeitachseneintrag({
   weg,
   toenung,
   aktionen,
+  menue,
   als: Element = 'div',
   style,
   ...rest
@@ -111,6 +128,12 @@ export default function Zeitachseneintrag({
   const farbe: EtbTypFarbe =
     farben ?? (typ ? etbTypFarbe(typ, token) : { kante: rollen.schwach, wort: rollen.gedaempft });
   const spalte = { paddingBlock: token.paddingSM } as const;
+  const einzeilig = zeitachsenAufbau(token) === 'zeile';
+  const trenner = (
+    <span aria-hidden="true" style={{ ...monoStil(10), color: rollen.schwach }}>
+      ·
+    </span>
+  );
   return (
     <Element
       {...rest}
@@ -158,7 +181,7 @@ export default function Zeitachseneintrag({
           paddingInline: rinne,
           display: 'flex',
           flexDirection: 'column',
-          gap: 5,
+          gap: einzeilig ? 2 : 5,
         }}
       >
         <div
@@ -176,6 +199,40 @@ export default function Zeitachseneintrag({
             {typwort}
           </span>
           {meta != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{meta}</span>}
+          {einzeilig && verfasser != null && (
+            <>
+              {trenner}
+              {/* Einzeilig statt des 15ch-Deckels (LFH-615), der in die Höhe umbrach; der volle
+                  Name steht im Titel. */}
+              <span
+                data-lfh="verfasser"
+                title={typeof verfasser === 'string' ? verfasser : undefined}
+                style={{
+                  ...monoStil(10),
+                  color: rollen.gedaempft,
+                  maxWidth: '24ch',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {verfasser}
+              </span>
+            </>
+          )}
+          {einzeilig && weg != null && (
+            <>
+              {trenner}
+              <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>
+            </>
+          )}
+          {einzeilig && menue != null && (
+            // Die negative Blockkante lässt den 30-px-Knopf in die Polsterung ragen, statt die
+            // Kopfzeile auf seine Höhe zu ziehen; die Trefffläche bleibt ganz.
+            <span style={{ marginInlineStart: 'auto', marginBlock: -token.paddingSM }}>
+              {menue}
+            </span>
+          )}
         </div>
         <div
           style={{
@@ -193,8 +250,11 @@ export default function Zeitachseneintrag({
           </div>
         )}
       </div>
-      {(verfasser != null || weg != null || aktionen != null) && (
+      {(einzeilig
+        ? aktionen != null
+        : verfasser != null || weg != null || aktionen != null || menue != null) && (
         <div
+          data-lfh="metaspalte"
           style={{
             ...spalte,
             flex: '0 0 auto',
@@ -207,7 +267,7 @@ export default function Zeitachseneintrag({
             textAlign: 'end',
           }}
         >
-          {verfasser != null && (
+          {!einzeilig && verfasser != null && (
             // Gedeckelt (LFH-615): mit Funktion („Administrator ·\u00A0EL") drückte die Spalte den
             // Meldungstext bei 1200 px unter die halbe Sicht. `ch` misst in der Mono-Schrift DIESES
             // Elements; ein längerer Verfasser bricht um.
@@ -223,8 +283,11 @@ export default function Zeitachseneintrag({
               {verfasser}
             </span>
           )}
-          {weg != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>}
+          {!einzeilig && weg != null && (
+            <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>
+          )}
           {aktionen}
+          {!einzeilig && menue}
         </div>
       )}
     </Element>

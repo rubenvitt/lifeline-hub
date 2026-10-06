@@ -11,8 +11,8 @@
 
 ## 3. Frontend: kompakte Zeile (D1, D2)
 
-- [ ] 3.1 Tests zuerst (`components/instrument/Zeitachseneintrag.test.tsx`): `zeitachsenAufbau` je Token; kompakt: Verfasser und Weg in der Metazeile, Menü in der Kopfzeile, keine senkrechte Metaspalte, Verfasser mit `title`; komfortabel: Spalte wie bisher; `aktionen` bleiben rechts.
-- [ ] 3.2 `Zeitachseneintrag` umbauen, `EtbZeitachse` reicht das Menü über `menue`. Mutationsprobe: Aufbau fest auf `spalte` → 3.1 rot.
+- [x] 3.1 Tests zuerst (`components/instrument/Zeitachseneintrag.test.tsx`): `zeitachsenAufbau` je Token; kompakt: Verfasser und Weg in der Metazeile, Menü in der Kopfzeile, keine senkrechte Metaspalte, Verfasser mit `title`; komfortabel: Spalte wie bisher; `aktionen` bleiben rechts.
+- [x] 3.2 `Zeitachseneintrag` umbauen, `EtbZeitachse` reicht das Menü über `menue`. Mutationsprobe: Aufbau fest auf `spalte` → 3.1 rot.
 - [ ] 3.3 Übrige Verwender gegenprüfen (Archivakte, Infotelefon, Lagemeldungen, Überblick, Meldeverlauf, Kräfte, Verpflegung, Lage-Dashboard): ihre Vitest-Dateien grün, Sichtprüfung in kompakt.
 
 ## 4. e2e
