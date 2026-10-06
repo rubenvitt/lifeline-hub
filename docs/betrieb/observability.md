@@ -14,6 +14,35 @@ Die Request-ID (`x-request-id`) wird gesetzt, wenn der Client keine mitschickt, 
 Antwort gespiegelt. Meldet jemand einen Fehler, ist die ID aus seiner Antwort der direkte
 Weg zu den passenden Logzeilen.
 
+### Schutz vor Log-Flut (LFH-925)
+
+Methode, Pfad und Request-ID hängen an jeder Logzeile eines Requests, und mehrere Zeilen
+entstehen ohne Anmeldung. Ohne Schranken könnte ein Fremder im Netz der Führungsstelle das
+Journal fluten; journald verwirft dann für den Rest des Intervalls **alle** Meldungen des
+Dienstes, auch Backup-, Purge- und DB-Fehler.
+
+- **Request-ID des Clients:** übernommen wird sie nur mit 1 bis 64 Zeichen aus
+  `[A-Za-z0-9-]` (eine UUID passt) und nur einmal gesendet. Jede andere ersetzt der Server
+  durch eine eigene UUID, in Log und Antwort.
+- **Pfad:** im Span höchstens 256 Zeichen, gekürzt mit `…`.
+- **Kopfgröße:** HTTP/1-Köpfe über 32 KiB weist der Server mit `431` ab, bevor ein Handler
+  läuft (`verbindung::HTTP1_MAX_KOPF`). HTTP/2 begrenzt die Kopfliste ohnehin auf 16 KiB.
+- **Gesperrte Quelle bei der Anmeldung:** „Anmeldeversuch abgewiesen“ bzw. „Zweitfaktor
+  abgewiesen“ steht höchstens einmal je Quelle und Minute im Log; das Feld `ungemeldet`
+  nennt die seit der letzten Zeile still abgewiesenen. Jeder Versuch bleibt in `auth_audit`.
+- **Überlast als Sammelzeile:** Lastabwurf („Zulassungsgrenze erreicht“), erschöpfter
+  Verbindungspool, Schreibkonflikt und 503-Antworten im `TraceLayer` schreiben höchstens eine
+  WARN-Zeile je Minute. Die erste kommt sofort, die nächste trägt `anzahl` (Ereignisse seit der
+  letzten Zeile) und `seit_s`. Ebbt die Last ab, steht der Rest der Zählung erst in der Zeile
+  des nächsten Ereignisses.
+- **503 ist kein ERROR mehr:** der `TraceLayer` schreibt einen 503 als WARN-Sammelzeile; jeder
+  andere 5xx bleibt eine ERROR-Zeile („response failed“).
+- **Nicht blockierend:** ein eigener Thread schreibt das Log auf stdout. Staut journald, fallen
+  Zeilen aus dem Puffer (16 Ki Zeilen) weg, statt dass ein Tokio-Worker hängt.
+
+Wer eine neue Logzeile auf einem Weg ohne Anmeldung einführt, die je Anfrage entstehen kann,
+drosselt sie mit `log_drossel::Sammelzeile`.
+
 Log-Level steuern (Standard `info`):
 
 ```bash

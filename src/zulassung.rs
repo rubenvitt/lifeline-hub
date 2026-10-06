@@ -42,6 +42,7 @@
 //! [`transfer::LEERLAUF_FRIST`]: crate::transfer::LEERLAUF_FRIST
 
 use crate::error::AppError;
+use crate::log_drossel::Sammelzeile;
 use axum::{
     extract::{MatchedPath, Request, State},
     http::Method,
@@ -184,10 +185,17 @@ pub async fn zulassung(State(cfg): State<Zulassung>, req: Request, next: Next) -
     // Lastabwurf: `try_acquire_owned` wartet nicht. Ein stauender Limiter hielte die Verbindungen
     // genau dann fest, wenn ohnehin zu viele offen sind.
     let Ok(_platz) = cfg.plaetze.clone().try_acquire_owned() else {
-        tracing::warn!(
-            "Zulassungsgrenze erreicht ({} gleichzeitige Requests), Anfrage abgewiesen (503)",
-            MAX_GLEICHZEITIGE_REQUESTS
-        );
+        // Gedrosselt (LFH-925): den Lastabwurf kann ein Fremder je Anfrage auslösen.
+        static LASTABWURF: Sammelzeile = Sammelzeile::neu();
+        if let Some(f) = LASTABWURF.zaehlen() {
+            tracing::warn!(
+                abgewiesen = f.anzahl,
+                seit_s = f.seit_s,
+                "Zulassungsgrenze erreicht ({} gleichzeitige Requests), Anfragen abgewiesen (503); \
+                 Sammelzeile, höchstens eine je Minute",
+                MAX_GLEICHZEITIGE_REQUESTS
+            );
+        }
         return AppError::ServiceUnavailable(UEBERLASTET.to_string()).into_response();
     };
 
