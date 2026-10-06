@@ -19,6 +19,22 @@ ohne den Standard-Rufnamen hielte die Von/An-Pflicht jede Erfassung nach einem K
 Prefix landet also nicht still auf der Platte, er muss aufgenommen oder ausdrücklich
 draußen gelassen werden.
 
+- **Das ETB nur in festen Ansichten** (LFH-939, D4, Entscheidung Ruben 06.10.2026): Ein
+  ETB-Key geht nur auf die Platte, wenn sein Filter allein `typ` und `limit` trägt
+  (`istFesteEtbAnsicht`, Positivliste), dazu Zähler und Lesemarke. Ergebnisse freier Eingaben
+  (Volltext, Zeitraum, Einheit, Nummernsprung, Bezugssuche, Lageentwicklung) bleiben draußen
+  und liegen nur `ETB_FREI_GC_MS` (5 min) im Speicher: `api/queryClient.ts` ergänzt dafür
+  `defaultQueryOptions`, weil `setQueryDefaults` nur per Prefix matcht. Ein eigenes `gcTime`
+  des Aufrufers gewinnt. Ein neues Filterfeld kommt nur über die Positivliste offline.
+- **Gedrosselt wird vor dem Dehydrieren** (LFH-939, D1): `abonnieren` hört nur auf den
+  Query-Cache und übergibt dem Persister einen Erzeuger (`vormerken`); erst dessen Durchlauf
+  dehydriert. Der Persister ist Single-Flight: höchstens ein laufender Schreibvorgang und ein
+  wartender Erzeuger, keine `.then`-Kette. Der Vorrat schrumpft bei jeder Speicherung auf das,
+  was zulässig und nicht live überdeckt ist (D3).
+- **Kopf und Stand liegen getrennt** (`lifeline-lagebild` v2, D2): `kopf` (Identität,
+  `bestaetigtAt`, `buster`) und `client`. Bestätigung und Identitätsprüfung lesen nur den Kopf,
+  in derselben Transaktion wie das Schreiben (Mehrtab-Schutz). Herleitung: `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
+
 - **Offline-Identität nur bei einem Leitungsfehler.** Scheitert `/api/auth/me` an einem
   Netzfehler oder an einer Gateway-Antwort 502/503/504, gilt der zuletzt bestätigte Benutzer
   aus dem Datensatz. Jede Antwort des Servers selbst, auch eine 500, löscht. Die Frist beträgt
@@ -97,6 +113,12 @@ draußen gelassen werden.
   `geraetRaeumen(anlass)`. `logout()` übergibt `'abmelden'`, die beiden 401-Wege
   `'sitzungsende'`; eine 401 schon beim Start räumt mit demselben Anlass. Nach Start und jeder Anmeldung räumt `geraetFuerBenutzerRaeumen` fremde und
   abgelaufene Daten. Beide werfen nie, jeder Ort wird einzeln versucht, und **keiner wird abgewartet**: Ein Tab mit altem Bundle hält eine DB im alten Schema offen, dann hinge das Upgrade und mit ihm der Login (`auth/geraetRaeumung.haengt.test.tsx`). Die Kanalmeldung `abgemeldet` trägt den Anlass, damit andere Tabs beim Abmelden auch die Entwürfe räumen.
+- **Während der Sitzung begrenzt** (LFH-941): Die Personen-Erfassungsquittung trägt nur
+  `person_id` und `registrier_nr` (`lifeline-offline` v6, Upgrade kürzt den Bestand); die
+  Personenseite holt die Person aus dem Cache. Der Ortscache (`lifeline-ortcache` v2) löscht
+  beim Öffnen, was älter als 30 Tage ist, und hält höchstens 5 000 Einträge. Leere Entwürfe:
+  `etb/AGENTS.md`. Der Queue-Zähler zählt Altzeilen per `count()` ohne Payload, der Hook lädt
+  höchstens einmal je `ZAEHLER_DROSSEL_MS` (LFH-939, D5). Herleitung: `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
 - **Testfalle:** Ein Räumtest liest die Platte über `test/rohIdb.ts` (eigene Verbindung), nicht
   über die Modulfunktionen — ein Index blendet fremde Zeilen nur aus.
 - Herleitung: `openspec/changes/archive/2026-10-02-lfh-767-geraet-raeumung-abmelden/design.md`.

@@ -60,7 +60,7 @@ Code, dazu eine Mutationsprobe (Kernzeile zurückdrehen → Test rot). Pfade rel
 
 ## 7. Regeln und Abschluss
 
-- [ ] 7.1 `frontend/src/offline/AGENTS.md`: Persister-Drossel und Kopf, ETB-Allowlist,
+- [x] 7.1 `frontend/src/offline/AGENTS.md`: Persister-Drossel und Kopf, ETB-Allowlist,
   Quittung nur mit Kennungen, Ortscache-Frist. `frontend/src/etb/AGENTS.md`: Räumen leerer
   Entwürfe.
 - [ ] 7.2 Vitest der berührten Bereiche (TZ=Europe/Berlin), `./scripts/check-all.sh` (in der
