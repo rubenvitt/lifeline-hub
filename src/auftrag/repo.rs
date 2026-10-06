@@ -325,7 +325,7 @@ pub async fn anlegen_tx(
     // Wirksame Mandantenlabels für den Snapshot eines Katalogempfängers (LFH-549).
     let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut *tx, einsatz_id).await?;
     // Jeder Anzeigename entsteht einmal: für die Zeile und für das ETB-`an` (LFH-937, D3).
-    let mut namen = Vec::with_capacity(daten.empfaenger.len());
+    let mut namen = Vec::new();
     for e in &daten.empfaenger {
         debug_assert!(empfaenger_typ_gueltig(&e.empfaenger_typ));
         let snap = snap_anzeige_fuer(&mut *tx, e, &karte).await?;

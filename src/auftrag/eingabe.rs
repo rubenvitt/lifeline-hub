@@ -358,7 +358,7 @@ pub async fn validiere_neuen_auftrag(
     } else {
         false
     };
-    let mut empfaenger = Vec::with_capacity(eindeutig.len());
+    let mut empfaenger = Vec::new();
     for r in eindeutig {
         empfaenger.push(validiere_empfaenger(pool, einsatz_id, r, s7_aktiv).await?);
     }
