@@ -13,7 +13,7 @@
 //!   Body ganz gesendet oder verworfen ist. `tower`s `ConcurrencyLimit` gab ihn schon frei, sobald
 //!   der Handler antwortete, also bevor der 25-MiB-Puffer geschrieben war.
 //! * **Leerlauf-Frist** ([`LEERLAUF_FRIST`]) — ein Upload, der so lange keine Daten liefert,
-//!   endet mit einem Body-Fehler; ein Download, dessen Client so lange nichts abnimmt, gibt
+//!   endet mit 408 (nicht mit dem 400 des Multipart-Extractors); ein Download, dessen Client so lange nichts abnimmt, gibt
 //!   Puffer und Platz frei. Ein Transfer, der fortlaufend Daten liefert, darf beliebig lange
 //!   dauern.
 
@@ -21,13 +21,14 @@ use crate::error::AppError;
 use axum::{
     body::{Body, Bytes},
     extract::{Request, State},
-    http::{header, HeaderValue},
+    http::{header, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
 use http_body::{Body as HttpBody, Frame, SizeHint};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -64,6 +65,10 @@ const RETRY_AFTER_SEKUNDEN: u32 = 5;
 const UPLOADS_AUSGELASTET: &str =
     "Gerade laufen zu viele Uploads — bitte in einigen Sekunden erneut versuchen.";
 
+/// Meldung zum 408 nach der Leerlauf-Frist.
+const UPLOAD_LEERLAUF: &str =
+    "Upload abgebrochen: die Verbindung lieferte zu lange keine Daten (Leerlauf).";
+
 /// Die gemeinsame Upload-Grenze. `Clone` teilt die Semaphore: `app.rs` baut sie einmal und
 /// hängt Klone an jede Upload-Route.
 #[derive(Clone)]
@@ -89,7 +94,8 @@ impl Default for UploadGrenze {
 
 /// Middleware der Upload-Routen: holt einen Platz ohne zu warten und versieht den Request-Body
 /// mit der Leerlauf-Frist. Der Platz lebt, bis der Handler geantwortet hat; die Antwort eines
-/// Uploads ist klein.
+/// Uploads ist klein. Ist die Frist abgelaufen, ersetzt 408 die Antwort des Handlers, der den
+/// Body-Fehler sonst als 400 „ungültiger Upload“ meldete.
 pub async fn upload_grenze(
     State(grenze): State<UploadGrenze>,
     req: Request,
@@ -108,9 +114,17 @@ pub async fn upload_grenze(
         return antwort;
     };
     let frist = grenze.frist;
-    let req = req.map(|body| Body::new(LeerlaufBody::neu(body, frist)));
+    let abgelaufen = Arc::new(AtomicBool::new(false));
+    let req = req.map(|body| Body::new(LeerlaufBody::neu(body, frist, abgelaufen.clone())));
     let antwort = next.run(req).await;
     drop(platz);
+    if abgelaufen.load(Ordering::Relaxed) {
+        return (
+            StatusCode::REQUEST_TIMEOUT,
+            axum::Json(serde_json::json!({ "error": UPLOAD_LEERLAUF })),
+        )
+            .into_response();
+    }
     antwort
 }
 
@@ -120,14 +134,17 @@ struct LeerlaufBody {
     inner: Body,
     frist: Duration,
     wecker: Pin<Box<Sleep>>,
+    /// Meldet der Middleware, dass der Fehler aus der Frist stammt.
+    abgelaufen: Arc<AtomicBool>,
 }
 
 impl LeerlaufBody {
-    fn neu(inner: Body, frist: Duration) -> Self {
+    fn neu(inner: Body, frist: Duration, abgelaufen: Arc<AtomicBool>) -> Self {
         Self {
             inner,
             frist,
             wecker: Box::pin(tokio::time::sleep(frist)),
+            abgelaufen,
         }
     }
 }
@@ -152,6 +169,7 @@ impl HttpBody for LeerlaufBody {
                         frist_sekunden = this.frist.as_secs(),
                         "Upload abgebrochen: der Client liefert keine Daten mehr"
                     );
+                    this.abgelaufen.store(true, Ordering::Relaxed);
                     return Poll::Ready(Some(Err(axum::Error::new(std::io::Error::new(
                         std::io::ErrorKind::TimedOut,
                         "Upload nach Leerlauf abgebrochen",
@@ -413,7 +431,7 @@ mod tests {
             .layer(axum::middleware::from_fn_with_state(grenze, upload_grenze))
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn upload_ueber_der_grenze_ist_sofort_503_mit_retry_after() {
         let router = upload_router(UploadGrenze::neu(1, Duration::from_secs(30)));
         let (_halten, body) = kanal_body();
@@ -433,7 +451,7 @@ mod tests {
         erster.abort();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn upload_platz_wird_nach_dem_handler_frei() {
         let router = upload_router(UploadGrenze::neu(1, Duration::from_secs(30)));
         for durchgang in 1..=3 {
@@ -447,7 +465,7 @@ mod tests {
     }
 
     /// Ein Upload, der fortlaufend liefert, läuft weit über die Frist hinaus.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn fliessender_upload_ueberlebt_die_frist() {
         let router = upload_router(UploadGrenze::neu(1, KURZ));
         let (tx, body) = kanal_body();
@@ -466,9 +484,10 @@ mod tests {
         assert_eq!(&text[..], b"80");
     }
 
-    /// Bleibt der Upload stumm, endet das Lesen mit einem Fehler, und der Platz wird frei.
-    #[tokio::test]
-    async fn stummer_upload_endet_nach_der_frist_und_gibt_den_platz_frei() {
+    /// Bleibt der Upload stumm, endet er mit 408 (der Handler sah einen Body-Fehler), und der
+    /// Platz wird frei.
+    #[tokio::test(start_paused = true)]
+    async fn stummer_upload_endet_nach_der_frist_mit_408_und_gibt_den_platz_frei() {
         let grenze = UploadGrenze::neu(1, KURZ);
         let router = upload_router(grenze.clone());
         let (_halten, body) = kanal_body();
@@ -480,12 +499,11 @@ mod tests {
         .await
         .expect("der Leerlauf muss den Handler beenden")
         .unwrap();
-        assert_eq!(antwort.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        let text = antwort.into_body().collect().await.unwrap().to_bytes();
-        assert!(
-            String::from_utf8_lossy(&text).contains("Leerlauf"),
-            "Fehler muss aus der Frist stammen: {text:?}"
-        );
+        assert_eq!(antwort.status(), StatusCode::REQUEST_TIMEOUT);
+        let json: serde_json::Value =
+            serde_json::from_slice(&antwort.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(json["error"], UPLOAD_LEERLAUF, "{{error}}-Format");
         assert_eq!(grenze.plaetze.available_permits(), 1);
     }
 
@@ -511,7 +529,7 @@ mod tests {
     }
 
     /// Der Body kommt byte-gleich an, mit `Content-Length`-fähigem Größenhinweis.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn download_liefert_alle_bytes_in_stuecken() {
         let groesse = 3 * STUECK + 17;
         let router = download_router(DownloadGrenze::neu(2, Duration::from_secs(30)), groesse);
@@ -536,7 +554,7 @@ mod tests {
 
     /// Kern von L23: der Platz bleibt belegt, solange der Body nicht abgenommen ist. Mit
     /// `ConcurrencyLimit` liefe die dritte Anfrage sofort durch.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn download_platz_haelt_bis_der_body_verworfen_ist() {
         let grenze = DownloadGrenze::neu(2, Duration::from_secs(30));
         let router = download_router(grenze.clone(), 4 * STUECK);
@@ -565,7 +583,7 @@ mod tests {
         assert_eq!(grenze.plaetze.available_permits(), 2);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn vollstaendig_gelesener_download_gibt_den_platz_frei() {
         let grenze = DownloadGrenze::neu(1, Duration::from_secs(30));
         let router = download_router(grenze.clone(), 2 * STUECK);
@@ -579,7 +597,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn leere_antwort_haelt_keinen_platz() {
         let grenze = DownloadGrenze::neu(1, Duration::from_secs(30));
         let router = download_router(grenze.clone(), 0);
@@ -590,7 +608,7 @@ mod tests {
 
     /// Ein Client, der nichts abnimmt, gibt Puffer und Platz nach der Frist frei, obwohl
     /// niemand den Body mehr abfragt.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn stummer_download_gibt_nach_der_frist_den_platz_frei() {
         let grenze = DownloadGrenze::neu(1, KURZ);
         let router = download_router(grenze.clone(), 4 * STUECK);

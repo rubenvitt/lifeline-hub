@@ -4088,6 +4088,24 @@ mod tests {
         .await
         .unwrap();
         assert!(index.is_some(), "Index auf einsatz_id erhalten");
+        // Das RENAME hat den Verweis der Bytes auf den endgültigen Namen umgeschrieben.
+        let ziel: Vec<(String, String)> = sqlx::query_as(
+            "SELECT \"table\", on_delete FROM pragma_foreign_key_list('karte_hintergrundbild_daten')",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            ziel,
+            vec![("karte_hintergrundbild".to_string(), "CASCADE".to_string())]
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE instr(sql, 'karte_hintergrundbild_neu') > 0",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "kein Verweis auf die Zwischentabelle");
         let verletzungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
             .fetch_one(&pool)
             .await

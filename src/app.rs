@@ -75,7 +75,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     // Grenzen der großen Transfers (LFH-938, `src/transfer.rs`): EINE Upload-Grenze für alle
     // Upload-Routen, je Download-Route eine eigene Grenze, deren Platz im Response-Body reist.
     // Beide Routenarten stehen in `zulassung::OHNE_ZULASSUNGSGRENZE`; `tests/zulassung_guard.rs`
-    // verlangt das eine mit dem anderen.
+    // verlangt das eine mit dem anderen. Als `route_layer`: die 405-Antwort des Fallbacks belegt
+    // keinen Platz.
     let upload_grenze = axum::middleware::from_fn_with_state(
         crate::transfer::UploadGrenze::default(),
         crate::transfer::upload_grenze,
@@ -267,11 +268,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/etb/anhaenge",
             post(routes::etb::anhang_hochladen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid}",
-            get(routes::etb::anhang_herunterladen).layer(download_grenze()),
+            get(routes::etb::anhang_herunterladen).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/chat/kanaele",
@@ -323,11 +324,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/anhaenge",
             post(routes::anhang::hochladen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/anhaenge/{aid}",
-            get(routes::anhang::herunterladen).layer(download_grenze()),
+            get(routes::anhang::herunterladen).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/anhaenge/{aid}",
@@ -342,7 +343,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/dokumente",
             post(routes::dokument::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}",
@@ -350,7 +351,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/dokumente/{did}/datei",
-            get(routes::dokument::datei).layer(download_grenze()),
+            get(routes::dokument::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/erinnerungen",
@@ -854,7 +855,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/personen/{pid}/anhaenge",
             post(routes::person_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}",
@@ -862,7 +863,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei",
-            get(routes::person_anhang::datei).layer(download_grenze()),
+            get(routes::person_anhang::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/tiere",
@@ -901,7 +902,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
             post(routes::tier_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}",
@@ -909,7 +910,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei",
-            get(routes::tier_anhang::datei).layer(download_grenze()),
+            get(routes::tier_anhang::datei).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/schaeden",
@@ -948,7 +949,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
             post(routes::schaden_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}",
@@ -956,7 +957,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
-            get(routes::schaden_anhang::datei).layer(download_grenze()),
+            get(routes::schaden_anhang::datei).route_layer(download_grenze()),
         )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
         .route(
@@ -1005,7 +1006,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
             post(routes::uhs_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge/zugriffe",
@@ -1017,14 +1018,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei",
-            get(routes::uhs_anhang::datei).layer(download_grenze()),
+            get(routes::uhs_anhang::datei).route_layer(download_grenze()),
         )
         // UHS-Plan (LFH-999): eigene Bytes, kein Anhang; die Anzeige schreibt kein Lese-Audit.
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plan",
             put(routes::uhs_plan::hinterlegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone())
+                .route_layer(upload_grenze.clone())
                 .patch(routes::uhs_plan::aendern)
                 .delete(routes::uhs_plan::entfernen),
         )
@@ -1034,7 +1035,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plan/bild",
-            get(routes::uhs_plan::bild).layer(download_grenze()),
+            get(routes::uhs_plan::bild).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}/plaetze",
@@ -1210,11 +1211,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/karte/hintergrundbilder",
             post(routes::karte_hintergrundbild::hochladen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
-                .layer(upload_grenze.clone()),
+                .route_layer(upload_grenze.clone()),
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
-            get(routes::karte_hintergrundbild::herunterladen).layer(download_grenze()),
+            get(routes::karte_hintergrundbild::herunterladen).route_layer(download_grenze()),
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",

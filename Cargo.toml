@@ -120,6 +120,9 @@ webauthn-rs-core = "=0.5.5"
 http-body-util = "0.1"
 # `all` nur für Tests: liest die Keepalive-Frist zurück (`verbindung::tests`).
 socket2 = { version = "0.6", features = ["all"] }
+# `test-util` für `#[tokio::test(start_paused = true)]`: die Fristen in `transfer::tests` laufen
+# auf einer angehaltenen Uhr und hängen nicht an der Last der Maschine.
+tokio = { version = "1", features = ["full", "test-util"] }
 
 [features]
 # clamav ist Default-AN (reines Rust). Der echte Scan braucht einen erreichbaren clamd; ohne

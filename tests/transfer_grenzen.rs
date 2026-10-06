@@ -60,19 +60,23 @@ fn gedrosselt(daten: Vec<u8>, stuecke: usize, pause: Duration) -> Body {
 }
 
 /// Ein Body, der den Kopf des Datei-Felds liefert und dann offen bleibt, solange der Sender
-/// lebt: der Handler wartet im Lesen und hält seinen Platz.
-fn haengend() -> (tokio::sync::mpsc::Sender<Bytes>, Body) {
+/// lebt: der Handler wartet im Lesen und hält seinen Platz. Sobald der Handler den Kopf liest,
+/// meldet der Body das über `liest` — erst dann hält er sicher einen Platz.
+fn haengend(
+    liest: tokio::sync::mpsc::UnboundedSender<()>,
+) -> (tokio::sync::mpsc::Sender<Bytes>, Body) {
     let (tx, rx) = tokio::sync::mpsc::channel::<Bytes>(1);
     let kopf = Bytes::from(format!(
         "--{GRENZE}\r\nContent-Disposition: form-data; name=\"datei\"; \
          filename=\"foto.jpg\"\r\nContent-Type: application/octet-stream\r\n\r\n"
     ));
-    let strom = futures::stream::once(async move { Ok::<_, std::io::Error>(kopf) }).chain(
-        futures::stream::unfold(
-            rx,
-            |mut rx| async move { rx.recv().await.map(|b| (Ok(b), rx)) },
-        ),
-    );
+    let strom = futures::stream::once(async move {
+        let _ = liest.send(());
+        Ok::<_, std::io::Error>(kopf)
+    })
+    .chain(futures::stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|b| (Ok(b), rx))
+    }));
     (tx, Body::from_stream(strom))
 }
 
@@ -115,17 +119,24 @@ async fn eine_upload_grenze_ueber_alle_upload_routen() {
         format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge"),
         format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
     ];
+    let (liest_tx, mut liest) = tokio::sync::mpsc::unbounded_channel();
     let mut halten = Vec::new();
     let mut laufend = Vec::new();
     for uri in &belegend {
-        let (tx, body) = haengend();
+        let (tx, body) = haengend(liest_tx.clone());
         halten.push(tx);
         laufend.push((
             uri.clone(),
             tokio::spawn(app.clone().oneshot(post(uri, &admin, body))),
         ));
     }
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Warten, bis jeder hängende Upload im Handler liest, also seinen Platz hält.
+    for _ in &belegend {
+        tokio::time::timeout(Duration::from_secs(10), liest.recv())
+            .await
+            .expect("jeder hängende Upload erreicht seinen Handler")
+            .unwrap();
+    }
     for (uri, aufgabe) in &laufend {
         assert!(
             !aufgabe.is_finished(),
@@ -134,15 +145,14 @@ async fn eine_upload_grenze_ueber_alle_upload_routen() {
     }
 
     let dokumente = format!("/api/einsaetze/{einsatz}/dokumente");
-    let antwort = app
-        .clone()
-        .oneshot(post(
+    let dokument_hochladen = || {
+        app.clone().oneshot(post(
             &dokumente,
             &admin,
             Body::from(multipart("plan.png", MINI_PNG)),
         ))
-        .await
-        .unwrap();
+    };
+    let antwort = dokument_hochladen().await.unwrap();
     assert_eq!(
         antwort
             .headers()
@@ -154,27 +164,24 @@ async fn eine_upload_grenze_ueber_alle_upload_routen() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{text}");
     assert!(text.contains("Uploads"), "eigene Meldung: {text}");
 
-    // Abgebrochene Uploads geben ihre Plätze zurück.
+    // Abgebrochene Uploads geben ihre Plätze zurück; das Aufräumen läuft nebenläufig, also bis
+    // zu einer Frist wiederholen statt fest zu warten.
     for (_, aufgabe) in laufend {
         aufgabe.abort();
     }
     drop(halten);
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let antwort = app
-        .clone()
-        .oneshot(post(
-            &dokumente,
-            &admin,
-            Body::from(multipart("plan.png", MINI_PNG)),
-        ))
-        .await
-        .unwrap();
-    let (status, text) = status_und_text(antwort).await;
-    assert_ne!(
-        status,
-        StatusCode::SERVICE_UNAVAILABLE,
-        "nach dem Abbruch ist wieder Platz: {text}"
-    );
+    let frist = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        let (status, text) = status_und_text(dokument_hochladen().await.unwrap()).await;
+        if status != StatusCode::SERVICE_UNAVAILABLE {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < frist,
+            "nach dem Abbruch ist wieder Platz: {text}"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
 }
 
 /// Enges Budget für die Drosseltests; der Upload braucht ein Vielfaches davon.
