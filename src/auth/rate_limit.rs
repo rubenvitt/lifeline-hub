@@ -30,6 +30,11 @@
 //! abgelaufenen weg (höchstens alle [`AUFRAEUM_PAUSE`]), bei [`OBERGRENZE`] verdrängt er die
 //! Quellen mit dem ältesten letzten Versuch auf [`NACH_VERDRAENGUNG`]. Sonst wüchse sie mit vielen
 //! einmaligen Quelladressen (IPv6, Botnetz) bis zum Neustart.
+//!
+//! **Die Sperre meldet sich höchstens einmal je [`MELDE_ABSTAND`] und Quelle** (LFH-925). Eine
+//! gesperrte Quelle kostet den Server kein Hashing, wohl aber eine Logzeile je Anfrage; ohne
+//! Drossel flutete ein Fremder damit das Journal. [`sperre`] sagt deshalb mit, ob die Zeile fällig
+//! ist, und zählt die übergangenen. Die Spur jedes Versuchs bleibt in `auth_audit`.
 
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
@@ -43,6 +48,9 @@ pub const MAX_FEHLVERSUCHE: usize = 10;
 
 /// Beobachtungsfenster für Fehlversuche.
 pub const FENSTER: Duration = Duration::from_secs(300);
+
+/// Mindestabstand zweier Logzeilen über dieselbe gesperrte Quelle (LFH-925).
+pub const MELDE_ABSTAND: Duration = Duration::from_secs(60);
 
 /// Ab so vielen Quellen räumt ein neuer Eintrag die abgelaufenen weg.
 const AUFRAEUM_SCHWELLE: usize = 1_024;
@@ -84,6 +92,27 @@ pub(crate) fn quelle(ip: IpAddr) -> IpAddr {
     }
 }
 
+/// Ein Eintrag der Tabelle: die Versuche einer Quelle und ihre Sperrmeldung.
+#[derive(Default)]
+struct Eintrag {
+    versuche: Vec<Versuch>,
+    /// Zeitpunkt der letzten Logzeile über die Sperre dieser Quelle.
+    letzte_meldung: Option<Instant>,
+    /// Abgewiesene Anfragen seit dieser Zeile, ohne eigene Zeile.
+    ungemeldet: u64,
+}
+
+/// Ergebnis der Sperrprüfung mit Meldedrossel, s. [`sperre`].
+#[derive(Debug, PartialEq, Eq)]
+pub enum Sperre {
+    Frei,
+    /// `zeile`: `Some(n)`, wenn diese Anfrage eine Logzeile schreiben soll; `n` sind die seit der
+    /// letzten Zeile still abgewiesenen. `None`: still abweisen.
+    Gesperrt {
+        zeile: Option<u64>,
+    },
+}
+
 fn laeuft(v: &Versuch, jetzt: Instant) -> bool {
     jetzt.saturating_duration_since(v.zeit) < FENSTER
 }
@@ -92,7 +121,7 @@ fn laeuft(v: &Versuch, jetzt: Instant) -> bool {
 /// Warten überspringen.
 #[derive(Default)]
 struct Tabelle {
-    quellen: HashMap<IpAddr, Vec<Versuch>>,
+    quellen: HashMap<IpAddr, Eintrag>,
     /// Frühester Zeitpunkt des nächsten Aufräumlaufs.
     naechste_raeumung: Option<Instant>,
 }
@@ -100,24 +129,45 @@ struct Tabelle {
 impl Tabelle {
     fn ist_gesperrt(&mut self, ip: IpAddr, jetzt: Instant) -> bool {
         let ip = quelle(ip);
-        let Some(versuche) = self.quellen.get_mut(&ip) else {
+        let Some(eintrag) = self.quellen.get_mut(&ip) else {
             return false;
         };
-        versuche.retain(|v| laeuft(v, jetzt));
-        if versuche.is_empty() {
+        eintrag.versuche.retain(|v| laeuft(v, jetzt));
+        if eintrag.versuche.is_empty() {
             self.quellen.remove(&ip);
             return false;
         }
-        versuche.len() >= MAX_FEHLVERSUCHE
+        eintrag.versuche.len() >= MAX_FEHLVERSUCHE
+    }
+
+    fn sperre(&mut self, ip: IpAddr, jetzt: Instant) -> Sperre {
+        if !self.ist_gesperrt(ip, jetzt) {
+            return Sperre::Frei;
+        }
+        let Some(eintrag) = self.quellen.get_mut(&quelle(ip)) else {
+            return Sperre::Frei;
+        };
+        let faellig = eintrag
+            .letzte_meldung
+            .is_none_or(|t| jetzt.saturating_duration_since(t) >= MELDE_ABSTAND);
+        if faellig {
+            eintrag.letzte_meldung = Some(jetzt);
+            Sperre::Gesperrt {
+                zeile: Some(std::mem::take(&mut eintrag.ungemeldet)),
+            }
+        } else {
+            eintrag.ungemeldet += 1;
+            Sperre::Gesperrt { zeile: None }
+        }
     }
 
     fn fehlversuch(&mut self, ip: IpAddr, konto: Option<Konto>, jetzt: Instant) {
         let ip = quelle(ip);
         if !self.quellen.contains_key(&ip) && self.quellen.len() >= AUFRAEUM_SCHWELLE {
             if self.naechste_raeumung.is_none_or(|t| jetzt >= t) {
-                self.quellen.retain(|_, versuche| {
-                    versuche.retain(|v| laeuft(v, jetzt));
-                    !versuche.is_empty()
+                self.quellen.retain(|_, eintrag| {
+                    eintrag.versuche.retain(|v| laeuft(v, jetzt));
+                    !eintrag.versuche.is_empty()
                 });
                 self.naechste_raeumung = Some(jetzt + AUFRAEUM_PAUSE);
             }
@@ -125,7 +175,7 @@ impl Tabelle {
                 self.aelteste_verdraengen();
             }
         }
-        let versuche = self.quellen.entry(ip).or_default();
+        let versuche = &mut self.quellen.entry(ip).or_default().versuche;
         versuche.retain(|v| laeuft(v, jetzt));
         // Über der Schwelle zählt nichts mehr dazu; die ältesten bleiben (s. Modulkopf).
         if versuche.len() < MAX_FEHLVERSUCHE {
@@ -142,7 +192,7 @@ impl Tabelle {
         let mut nach_alter: Vec<(Option<Instant>, IpAddr)> = self
             .quellen
             .iter()
-            .map(|(ip, versuche)| (versuche.last().map(|v| v.zeit), *ip))
+            .map(|(ip, eintrag)| (eintrag.versuche.last().map(|v| v.zeit), *ip))
             .collect();
         nach_alter.select_nth_unstable_by_key(zuviel - 1, |(zeit, _)| *zeit);
         for (_, ip) in &nach_alter[..zuviel] {
@@ -152,11 +202,11 @@ impl Tabelle {
 
     fn erfolg(&mut self, ip: IpAddr, konto: Konto) {
         let ip = quelle(ip);
-        let Some(versuche) = self.quellen.get_mut(&ip) else {
+        let Some(eintrag) = self.quellen.get_mut(&ip) else {
             return;
         };
-        versuche.retain(|v| v.konto != Some(konto));
-        if versuche.is_empty() {
+        eintrag.versuche.retain(|v| v.konto != Some(konto));
+        if eintrag.versuche.is_empty() {
             self.quellen.remove(&ip);
         }
     }
@@ -174,6 +224,13 @@ fn tabelle() -> std::sync::MutexGuard<'static, Tabelle> {
 /// Synchron: der `MutexGuard` darf kein `.await` überleben, sonst wird der Handler `!Send`.
 pub fn ist_gesperrt(ip: IpAddr) -> bool {
     tabelle().ist_gesperrt(ip, Instant::now())
+}
+
+/// Wie [`ist_gesperrt`], sagt aber zusätzlich, ob die Abweisung eine Logzeile schreiben soll:
+/// höchstens eine je [`MELDE_ABSTAND`] und Quelle (s. Modulkopf). Für Wege, die eine gesperrte
+/// Quelle loggen.
+pub fn sperre(ip: IpAddr) -> Sperre {
+    tabelle().sperre(ip, Instant::now())
 }
 
 /// Vermerkt einen Fehlversuch der Quelle gegen `benutzername`; `None`, wenn das Ziel unbekannt
@@ -201,6 +258,55 @@ mod tests {
         IpAddr::V6(std::net::Ipv6Addr::from(
             0x2001_0db8_u128 << 96 | (n as u128) << 64 | 1,
         ))
+    }
+
+    /// LFH-925: eine gesperrte Quelle schreibt höchstens eine Zeile je Minute, egal wie viele
+    /// Anfragen sie schickt. Mutationsprobe: ohne die Abstandsprüfung ist jede Anfrage fällig.
+    #[test]
+    fn gesperrte_quelle_meldet_sich_hoechstens_einmal_je_minute() {
+        let mut t = Tabelle::default();
+        let start = Instant::now();
+        let quelle = ip("192.0.2.20");
+        assert_eq!(t.sperre(quelle, start), Sperre::Frei);
+        for _ in 0..MAX_FEHLVERSUCHE {
+            t.fehlversuch(quelle, None, start);
+        }
+
+        let zeilen = (0..1000)
+            .map(|i| t.sperre(quelle, start + Duration::from_millis(i * 50)))
+            .filter(|s| matches!(s, Sperre::Gesperrt { zeile: Some(_) }))
+            .count();
+        assert_eq!(zeilen, 1, "1000 Anfragen in 50 s: genau eine Zeile");
+
+        assert_eq!(
+            t.sperre(quelle, start + MELDE_ABSTAND),
+            Sperre::Gesperrt { zeile: Some(999) },
+            "nach der Minute die nächste Zeile, mit den still abgewiesenen"
+        );
+        assert_eq!(
+            t.sperre(quelle, start + MELDE_ABSTAND),
+            Sperre::Gesperrt { zeile: None }
+        );
+    }
+
+    /// Die Drossel gilt je Quelle: eine zweite gesperrte Quelle meldet sich trotzdem.
+    #[test]
+    fn meldedrossel_gilt_je_quelle() {
+        let mut t = Tabelle::default();
+        let jetzt = Instant::now();
+        for q in ["192.0.2.21", "192.0.2.22"] {
+            for _ in 0..MAX_FEHLVERSUCHE {
+                t.fehlversuch(ip(q), None, jetzt);
+            }
+        }
+        assert_eq!(
+            t.sperre(ip("192.0.2.21"), jetzt),
+            Sperre::Gesperrt { zeile: Some(0) }
+        );
+        assert_eq!(
+            t.sperre(ip("192.0.2.22"), jetzt),
+            Sperre::Gesperrt { zeile: Some(0) }
+        );
     }
 
     #[test]
@@ -248,7 +354,7 @@ mod tests {
             !t.ist_gesperrt(quelle, jetzt),
             "wer sich vertippt und dann anmeldet, bringt die Quelle (NAT) nicht näher an die Sperre"
         );
-        assert_eq!(t.quellen[&quelle].len(), 1);
+        assert_eq!(t.quellen[&quelle].versuche.len(), 1);
     }
 
     /// Die Suche vergleicht ohne Groß-/Kleinschreibung; die Zählung je Konto muss es auch.
@@ -387,7 +493,7 @@ mod tests {
         for _ in 0..3 * MAX_FEHLVERSUCHE {
             t.fehlversuch(quelle, Some(konto("opfer")), jetzt);
         }
-        assert_eq!(t.quellen[&quelle].len(), MAX_FEHLVERSUCHE);
+        assert_eq!(t.quellen[&quelle].versuche.len(), MAX_FEHLVERSUCHE);
         assert!(t.ist_gesperrt(quelle, jetzt));
     }
 

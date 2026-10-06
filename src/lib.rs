@@ -42,6 +42,7 @@ pub mod lage_snapshot;
 pub mod lage_zone;
 pub mod lagebericht;
 pub mod live;
+pub mod log_drossel;
 pub mod material;
 pub mod meldung;
 pub mod nachforderung;
@@ -58,6 +59,8 @@ pub mod staerke;
 pub mod static_files;
 pub mod stichwort;
 pub mod storno;
+#[cfg(test)]
+mod test_log;
 pub mod tier;
 pub mod tls;
 pub mod transfer;
