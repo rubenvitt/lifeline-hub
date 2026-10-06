@@ -197,9 +197,11 @@ export default function MitgliederAbschnitt({
         type="link"
         disabled={stelleSetzen.isPending}
         aria-label={`Führungsstelle für ${m.anzeigename} bearbeiten`}
-        // Darf umbrechen: unter `md` steht der Knopf in der schmalen Namenszelle.
+        // Darf umbrechen: unter `md` steht der Knopf in der schmalen Namenszelle. `minHeight`
+        // hält die Trefffläche auf der Dichte-Staffel, die `height: auto` sonst aufgibt.
         style={{
           height: 'auto',
+          minHeight: token.controlHeight,
           maxWidth: '100%',
           whiteSpace: 'normal',
           textAlign: 'start',
