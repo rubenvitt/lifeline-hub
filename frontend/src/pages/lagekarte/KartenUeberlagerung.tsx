@@ -190,11 +190,13 @@ export function GrundlageLeiste({
         aria-label="Kartengrundlage"
         className="lfh-segmente"
         data-lfh="grundlage-leiste"
-        style={
-          einzeilig
+        style={{
+          // Bedienbar, auch wenn die Überlagerung darüber Tipps durchreicht.
+          pointerEvents: 'auto',
+          ...(einzeilig
             ? { flexWrap: 'nowrap', maxWidth: '100%', overflowX: 'auto', scrollbarWidth: 'thin' }
-            : undefined
-        }
+            : {}),
+        }}
       >
         {optionen.map((o, i) => {
           const aktiv = i === aktivIndex;
@@ -259,6 +261,10 @@ export function GrundlageHinweis({ zeilen }: { zeilen: readonly string[] }) {
     <div
       data-lfh="grundlage-hinweis"
       style={{
+        // Reiner Text über der Karte: ein Tipp darauf gehört der Karte darunter (die linke
+        // Überlagerung reicht durch). Auf dem kleinen Ausschnitt (Handschirm quer, Messmodus am
+        // Tablet) läge sonst ein Ziel unter dem Hinweis.
+        pointerEvents: 'none',
         padding: `${token.paddingXXS}px ${token.paddingSM}px`,
         background: rollen.kopf,
         border: `1px solid ${rollen.linieStark}`,
@@ -283,7 +289,10 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
     // Nur mit feinem Zeiger (`.lfh-nur-feiner-zeiger`, LFH-712/LFH-971): gespeist wird sie über
     // `mousemove`, auf reinem Touch bliebe sie ein „—“-Kästchen, das wie ein Fehler aussieht. Die
     // Klasse sitzt an einer Hülle ohne Inline-`display` — der schlüge die Regel.
-    <div className="lfh-nur-feiner-zeiger" style={{ alignSelf: 'flex-start' }}>
+    <div
+      className="lfh-nur-feiner-zeiger"
+      style={{ alignSelf: 'flex-start', pointerEvents: 'auto' }}
+    >
       <div
         data-lfh="zeiger-koordinate"
         title="Position des Zeigers"
@@ -451,6 +460,9 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           flexDirection: 'column',
           // Nicht strecken: die Segmentleiste und die Koordinate sind so breit wie ihr Inhalt.
           alignItems: 'flex-start',
+          // Der Block reicht Tipps durch, bedienbar sind nur seine Ziele (Muster `KartenFuss`):
+          // der Hinweis unter der Leiste macht ihn so breit wie die Überlagerung (LFH-971).
+          pointerEvents: 'none',
           gap: token.marginXS,
         }}
       >

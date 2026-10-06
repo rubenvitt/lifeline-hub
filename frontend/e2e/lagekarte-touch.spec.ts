@@ -1425,6 +1425,13 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
     // Der Messwert steht im Fuß über der Kartenmitte: den Punkt in die freie Fläche darüber holen.
     await springe(page, west, 15);
     const frei = await kartenMitte(page);
+    // Im Messmodus bleibt über dem Fuß nur ein Streifen, und die Kartenmitte liegt in Höhe der
+    // Grundlage-Leiste: den Punkt rechts neben sie holen, vor die Knopfspalte.
+    const leiste = await page.locator('[data-lfh="grundlage-leiste"]').boundingBox();
+    const knoepfe = await page.locator('[data-lfh="karten-knoepfe"]').boundingBox();
+    if (leiste && knoepfe && frei.y < leiste.y + leiste.height) {
+      frei.x = (leiste.x + leiste.width + knoepfe.x) / 2;
+    }
     const jetzt = await aufSchirm(page, west);
     await page.evaluate(
       (d) =>
