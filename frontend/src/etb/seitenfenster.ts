@@ -1,8 +1,8 @@
 import { SEITENGROESSE } from '../api/etb';
 
 /**
- * Seitenfenster der ETB-Zeitachse (LFH-947, Spec `etb-zeitachse-fenster`, design.md D1/D4 der
- * Change `lfh-947-etb-zeitachse-seitenfenster`).
+ * Seitenfenster der ETB-Zeitachse (LFH-947, Spec `etb-zeitachse-fenster`, D1/D4 in
+ * `openspec/changes/archive/2026-10-06-lfh-947-etb-zeitachse-seitenfenster/design.md`).
  *
  * Die Liste hält höchstens {@link ETB_MAX_SEITEN} Seiten. TanStack lädt bei einer Invalidierung
  * so viele Seiten nach, wie im Cache liegen, nacheinander — ohne Deckel kostete jeder neue Eintrag

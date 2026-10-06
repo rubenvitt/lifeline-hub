@@ -40,8 +40,8 @@
 ## 8. Regeln und Abschluss
 
 - [x] 8.1 `frontend/src/etb/AGENTS.md`: Seitenfenster, „Neuere laden“, Sprung mit Richtung; Dateikopf `useViewport.ts` und `frontend/AGENTS.md` zum Hörersatz, falls dort Regeln stehen.
-- [ ] 8.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests der ETB.
-- [ ] 8.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der ETB-Specs).
+- [x] 8.2 Lint, Typecheck, Vitest der berührten Dateien, Rust-Tests der ETB.
+- [x] 8.3 `./scripts/check-all.sh` (Bündel `schnell`, Rust, Vitest; e2e der ETB-Specs).
 
 ## Messung (jsdom, 3 000 Einträge, Sprung auf Nr. 50; Render über 1 000 Einträge)
 
