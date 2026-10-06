@@ -7,7 +7,7 @@ use crate::storage::Storage;
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use karten_katalog::OfflineKatalogEintrag;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 pub struct BuildArtefakt {
@@ -19,8 +19,15 @@ pub struct BuildArtefakt {
 #[async_trait]
 pub trait BuildRunner: Send + Sync {
     async fn baue(&self, geofabrik_area: &str) -> anyhow::Result<BuildArtefakt>;
+    /// Räumt nach einem gescheiterten oder abgebrochenen Bau auf: Container stoppen,
+    /// Teilartefakte löschen (LFH-927). Default: nichts zu tun.
+    async fn raeume_ab(&self, _geofabrik_area: &str) {}
 }
 
+/// Baut, prüft und lädt die Datei einer Region hoch. Die lokale Ergebnisdatei samt Beilagen wird
+/// danach in jedem Fall gelöscht — nach dem Upload wird sie nicht mehr gebraucht, nach einem
+/// Fehlschlag ist sie unbrauchbar; sonst füllt `out/result/` Quartal für Quartal die Platte
+/// (LFH-927). Den Bestand ändert das nicht: der wird erst nach dem Manifest-Upload gesetzt.
 pub async fn build_region(
     reg: &Region,
     heute: NaiveDate,
@@ -29,6 +36,18 @@ pub async fn build_region(
     bestand: &[PublishedVersion],
 ) -> anyhow::Result<Vec<PublishedVersion>> {
     let art = runner.baue(reg.geofabrik_area).await?;
+    let ergebnis = lade_hoch(reg, heute, &art, storage, bestand).await;
+    entferne_artefakt(&art.datei).await;
+    ergebnis
+}
+
+async fn lade_hoch(
+    reg: &Region,
+    heute: NaiveDate,
+    art: &BuildArtefakt,
+    storage: &dyn Storage,
+    bestand: &[PublishedVersion],
+) -> anyhow::Result<Vec<PublishedVersion>> {
     let erwartet = validate::erwartete_box(reg.region)
         .ok_or_else(|| anyhow::anyhow!("keine Erwartungs-Box für {}", reg.region))?;
     if !validate::bounds_passen(art.bounds, erwartet) {
@@ -39,7 +58,7 @@ pub async fn build_region(
         );
     }
     let key = datei_key(reg.slug, heute);
-    let groesse = std::fs::metadata(&art.datei)?.len() as i64;
+    let groesse = tokio::fs::metadata(&art.datei).await?.len() as i64;
     storage.put_datei(&key, &art.datei).await?; // gestreamt, nie in den RAM
     let mut out: Vec<PublishedVersion> = bestand
         .iter()
@@ -50,9 +69,32 @@ pub async fn build_region(
         slug: reg.slug.into(),
         url: storage.public_url(&key),
         groesse,
-        sha256: art.sha256,
+        sha256: art.sha256.clone(),
     });
     Ok(out)
+}
+
+/// Löscht die Ergebnisdatei und ihre Beilagen (`.sha256` aus `--checksum`, die ungenutzte
+/// `.versatiles`). Fehlt eine, ist das kein Fehler.
+async fn entferne_artefakt(datei: &Path) {
+    let mut pfade = vec![datei.to_path_buf(), beilage(datei, ".sha256")];
+    let versatiles = datei.with_extension("versatiles");
+    pfade.push(beilage(&versatiles, ".sha256"));
+    pfade.push(versatiles);
+    for p in pfade {
+        match tokio::fs::remove_file(&p).await {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => tracing::warn!(pfad = %p.display(), "Ergebnisdatei nicht gelöscht: {e}"),
+        }
+    }
+}
+
+/// `<datei><endung>`, etwa `osm.bayern.2026-07-06.mbtiles.sha256`.
+pub(crate) fn beilage(datei: &Path, endung: &str) -> PathBuf {
+    let mut s = datei.as_os_str().to_owned();
+    s.push(endung);
+    PathBuf::from(s)
 }
 
 /// Fährt einen kompletten Build-Job: Status-FSM Building→Publishing→Done/Failed. Der geteilte
@@ -69,7 +111,26 @@ pub async fn fahre_build(
     registry.set_status(job_id, JobStatus::Building);
     let heute = chrono::Utc::now().date_naive();
     let snapshot = bestand.lock().unwrap().clone();
-    match build_region(reg, heute, runner.as_ref(), storage.as_ref(), &snapshot).await {
+    // LFH-927: Ein hängender make-/docker-Lauf darf den einzigen Bauplatz nicht dauerhaft belegen.
+    // Läuft die Frist ab, wird der Bau-Future verworfen (make stirbt über `kill_on_drop`), der
+    // Runner räumt Container und Teilartefakte ab, und der Aufrufer gibt den Guard regulär frei.
+    let frist = reg.max_dauer();
+    let gebaut = match tokio::time::timeout(
+        frist,
+        build_region(reg, heute, runner.as_ref(), storage.as_ref(), &snapshot),
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(_) => Err(anyhow::anyhow!(
+            "Zeitüberschreitung: Bau länger als {} h",
+            frist.as_secs() / 3600
+        )),
+    };
+    if gebaut.is_err() {
+        runner.raeume_ab(reg.geofabrik_area).await;
+    }
+    match gebaut {
         Ok(neu) => {
             registry.set_status(job_id, JobStatus::Publishing);
             match serde_json::to_vec(&baue_manifest(&neu)) {
@@ -163,6 +224,59 @@ mod tests {
         assert_eq!(v.groesse, 10);
         assert!(s.inhalt("bayern.20260705.shortbread.mbtiles").is_some());
     }
+    /// Legt wie Planetiler eine Ergebnisdatei samt Beilagen in `dir` an.
+    struct DateiRunner {
+        dir: std::path::PathBuf,
+        bounds: (f64, f64, f64, f64),
+    }
+    #[async_trait::async_trait]
+    impl BuildRunner for DateiRunner {
+        async fn baue(&self, a: &str) -> anyhow::Result<BuildArtefakt> {
+            let datei = self.dir.join(format!("osm.{a}.2026-07-05.mbtiles"));
+            std::fs::write(&datei, [9; 10])?;
+            std::fs::write(beilage(&datei, ".sha256"), "a".repeat(64))?;
+            std::fs::write(datei.with_extension("versatiles"), [1])?;
+            Ok(BuildArtefakt {
+                datei,
+                sha256: "a".repeat(64),
+                bounds: Some(self.bounds),
+            })
+        }
+    }
+    fn dateien(dir: &std::path::Path) -> Vec<String> {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect()
+    }
+    #[tokio::test]
+    async fn ergebnisdateien_sind_nach_upload_weg() {
+        let dir = tempfile::tempdir().unwrap();
+        let runner = DateiRunner {
+            dir: dir.path().into(),
+            bounds: (8.9, 47.2, 13.9, 50.6),
+        };
+        let s = FakeStorage::neu("https://cdn.example/maps");
+        let d = chrono::NaiveDate::from_ymd_opt(2026, 7, 5).unwrap();
+        let by = regions::finde("bayern").unwrap();
+        build_region(by, d, &runner, &s, &[]).await.unwrap();
+        assert!(s.inhalt("bayern.20260705.shortbread.mbtiles").is_some());
+        assert_eq!(dateien(dir.path()), Vec::<String>::new());
+    }
+    #[tokio::test]
+    async fn ergebnisdateien_sind_nach_fehlschlag_weg() {
+        let dir = tempfile::tempdir().unwrap();
+        // Bounds von AT: Falschregion für Bayern, wie im FalschRunner.
+        let runner = DateiRunner {
+            dir: dir.path().into(),
+            bounds: (9.5, 46.3, 17.2, 49.1),
+        };
+        let s = FakeStorage::neu("https://cdn.example/maps");
+        let d = chrono::NaiveDate::from_ymd_opt(2026, 7, 5).unwrap();
+        let by = regions::finde("bayern").unwrap();
+        assert!(build_region(by, d, &runner, &s, &[]).await.is_err());
+        assert_eq!(dateien(dir.path()), Vec::<String>::new());
+    }
     #[tokio::test]
     async fn falschregion_bricht_ab_ohne_upload() {
         let f = tempdatei(&[9; 10]);
@@ -231,6 +345,58 @@ mod fahrt_tests {
         assert!(m.iter().any(|e| e.name == "Bayern"));
         // seed_bestand liest das Manifest zurück (2 Einträge)
         assert_eq!(seed_bestand(s.as_ref()).await.unwrap().len(), 2);
+    }
+
+    /// Bau, der nie fertig wird (hängender Download, hängender Docker-Daemon).
+    #[derive(Default)]
+    struct HaengtRunner {
+        abgeraeumt: std::sync::Mutex<Vec<String>>,
+    }
+    #[async_trait::async_trait]
+    impl BuildRunner for HaengtRunner {
+        async fn baue(&self, _a: &str) -> anyhow::Result<BuildArtefakt> {
+            std::future::pending().await
+        }
+        async fn raeume_ab(&self, a: &str) {
+            self.abgeraeumt.lock().unwrap().push(a.into());
+        }
+    }
+    #[tokio::test(start_paused = true)]
+    async fn frist_beendet_haengenden_bau_ohne_bestand_zu_aendern() {
+        let s = Arc::new(FakeStorage::neu("https://cdn.example/maps"));
+        let bestand = Arc::new(Mutex::new(Vec::<PublishedVersion>::new()));
+        let runner = Arc::new(HaengtRunner::default());
+        let r = Registry::neu(4);
+        let id = r.enqueue("bayern").unwrap();
+        let frist = regions::finde("bayern").unwrap().max_dauer();
+        let start = tokio::time::Instant::now();
+        // Äußere Grenze, damit ein Bau ohne Frist den Test rot macht statt ihn hängen zu lassen.
+        tokio::time::timeout(
+            frist * 2,
+            fahre_build(
+                regions::finde("bayern").unwrap(),
+                id,
+                &r,
+                runner.clone(),
+                s.clone(),
+                bestand.clone(),
+            ),
+        )
+        .await
+        .expect("fahre_build endet an der Frist der Region");
+        match r.get(id).unwrap().status {
+            crate::jobs::JobStatus::Failed(f) => {
+                assert!(f.starts_with("Zeitüberschreitung"), "{f}")
+            }
+            anders => panic!("erwartet Failed, war {anders:?}"),
+        }
+        assert_eq!(
+            start.elapsed(),
+            regions::finde("bayern").unwrap().max_dauer()
+        );
+        assert_eq!(*runner.abgeraeumt.lock().unwrap(), ["bayern"]);
+        assert!(bestand.lock().unwrap().is_empty());
+        assert!(s.inhalt("offline-katalog-manifest.json").is_none());
     }
 
     #[tokio::test]

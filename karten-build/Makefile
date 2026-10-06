@@ -24,7 +24,11 @@ tiles:
 	# und JEDER Build dieselbe Region liefert. Also die Region-PBFs (klein, werden neu geladen) +
 	# renumbered.osm.pbf vor dem Build entfernen; Wasser-Polygone/Countries/tile_weights bleiben gecacht.
 	rm -f "$(CURDIR)/$(OUT)/sources/"*.osm.pbf "$(CURDIR)/$(OUT)/sources/renumbered.osm.pbf"
-	docker run --rm -v "$(HOST_OUT):/app/data" $(IMAGE) \
+	# LFH-927: Der Container trägt einen festen Namen, damit karten-service ihn nach einer
+	# Zeitüberschreitung gezielt beenden kann (`docker rm -f ks-<area>`) — ein beendetes `make`
+	# nimmt den Container nicht mit. Ein verwaister Container gleichen Namens geht vorher weg.
+	docker rm -f ks-$(AREA) >/dev/null 2>&1 || true
+	docker run --name ks-$(AREA) --rm -v "$(HOST_OUT):/app/data" $(IMAGE) \
 	  --area $(AREA) --format $(FORMAT) --checksum
 	@echo "Fertig. Fertige Datei liegt in $(CURDIR)/$(OUT)/result/osm*.$(FORMAT) (+ .sha256)."
 	@echo "Diese .mbtiles hosten und URL + Groesse + SHA256 in src/config.rs::default_offline_katalog() pinnen."

@@ -131,16 +131,37 @@ docker pull versatiles/versatiles-planetiler:latest
 Laut `karten-build/README.md`: das Wasser-Polygon-ZIP (`out/sources/`, bleibt über Builds
 gecacht) ist **~880 MB**; das Design-Dokument veranschlagt zusätzlich **~1 GB** für Region-
 Extrakt + `tmp/` **pro laufendem Build** (Disk-Guard-Sollwert — s. Abschnitt 9, dieser Guard
-ist im Code **nicht implementiert**). Über die Zeit sammeln sich außerdem die fertigen
-`.mbtiles`-Ergebnisse pro Region in `out/result/` an, bis sie hochgeladen sind. Ein
-Deutschland-weiter Shortbread-Bau liegt üblicherweise im niedrigen bis mittleren
-GB-Bereich; kleinere Bundesländer entsprechend weniger.
+ist im Code **nicht implementiert**). Das fertige `.mbtiles`-Ergebnis einer Region liegt in
+`out/result/` nur, bis es hochgeladen ist: danach löscht der Service die Datei samt `.sha256`
+und `.versatiles`, nach einem Fehlschlag ebenso die Teilartefakte (LFH-927). Vor jedem Bau
+räumt er außerdem Altstände derselben Region in `out/result/` und leert `out/tmp/`. Es liegt
+also höchstens das Ergebnis des laufenden Baus auf der Platte. Ein Deutschland-weiter
+Shortbread-Bau liegt üblicherweise im niedrigen bis mittleren GB-Bereich; kleinere
+Bundesländer entsprechend weniger.
 
 **Empfehlung:** dedizierte Platte/Volume mit **mindestens 20–30 GB** frei einplanen (Puffer
 für Wasser-Polygone + größtes Regions-Ergebnis + `tmp` gleichzeitig, plus Marge, da es
 aktuell keinen automatisierten Disk-Guard gibt). `out/` ist gitignored und kann bei Bedarf
 manuell geleert werden (`out/sources/` außer den `.osm.pbf`/`renumbered.osm.pbf` bleibt
 sinnvoll gecacht, siehe README/Makefile-Kommentar zu LFH-200).
+
+**Ganze Welt (`planet`) ist ein eigener Fall (LFH-929):** etwa **70–80 GB Download** und
+rund **300 GB Build-Platte**, dazu ein Planetiler-Lauf mit hohem RAM-Bedarf im zweistelligen
+GB-Bereich (genaue Werte vor dem Bau in der Planetiler-Dokumentation nachsehen; zu wenig RAM
+lässt den Lauf swappen oder am OOM sterben). Das sprengt die Empfehlung oben bei
+Weitem. Deshalb läuft planet **weder im Quartals-Cron noch in `build --all`**; die Region
+bleibt in `GET /regions` gelistet und wird nur von Hand angestoßen:
+
+```bash
+# im Dauerbetrieb über die API
+curl -fsS -X POST -H "Authorization: Bearer $KS_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"slug":"planet"}' http://127.0.0.1:8088/builds
+# oder einmalig ohne HTTP-Server
+./target/release/karten-service build --slug planet
+```
+
+Vorher Platte und RAM des Build-Hosts prüfen. Ein Bau der Welt hat eine Frist von 72 Stunden
+(Abschnitt 6.3).
 
 ### 2.3 Binary bauen
 
@@ -336,10 +357,10 @@ Manifest-URL ist admin-nicht-editierbar, kompiliert-gepinnt). Sobald der Bucket 
 
 ### 6.1 Initialer Vollbau (stundenlang)
 
-Regionssatz ist im Service selbst kodiert (`karten-service/src/regions.rs`), aktuell 7
-Einträge: `germany`, `bayern`, `baden-wuerttemberg`, `nordrhein-westfalen`,
-`niedersachsen`, `austria`, `switzerland` (kein `dach`-Kombi — bewusst, s. Design-Doc §A.1;
-neue Region = Code-Zeile + Deploy, kein UI). Einmaliger Lauf **ohne** HTTP-Server:
+Regionssatz ist im Service selbst kodiert (`karten-service/src/regions.rs`), aktuell 27
+Einträge: `germany`, die 16 Bundesländer, die 9 Nachbarländer und `planet` (kein `dach`-Kombi
+— bewusst, s. Design-Doc §A.1; neue Region = Code-Zeile + Deploy, kein UI). `build --all`
+baut alle außer `planet` (Abschnitt 2.2, LFH-929). Einmaliger Lauf **ohne** HTTP-Server:
 
 ```bash
 ./target/release/karten-service build --all
@@ -361,7 +382,9 @@ gerade publizierte Manifest zurück, sodass der Bestand nicht verloren geht.
 
 In-Service-Cron (`KS_SCHEDULE`, Default `"0 0 3 1 1,4,7,10 *"` = **quartalsweise**, 03:00 am
 1. Januar/April/Juli/Oktober, **UTC**) — läuft nur im `serve`-Prozess, enqueued dieselbe Build-Queue
-wie On-Demand-Trigger (ein Lock, kein Cross-Prozess-Race, `main.rs`/`scheduler.rs`). Das
+wie On-Demand-Trigger (ein Lock, kein Cross-Prozess-Race, `main.rs`/`scheduler.rs`). Der Cron
+reiht alle Regionen außer `planet` ein (LFH-929). Passt eine Region nicht mehr in die Queue,
+steht das als `warn` „Cron-Lauf: Region nicht eingereiht“ mit dem Slug im Log (LFH-927). Das
 deckt sich mit der Aufgabenvorgabe „quartalsweise" — Default muss i.d.R. **nicht** verändert
 werden. Anpassung nur über `KS_SCHEDULE` (6-Feld-Cron inkl. Sekunden, Felder in UTC). Den
 nächsten Lauf nennt `GET /zeitplan` (`{"naechster_lauf": "<RFC 3339, UTC>", "cron": "…"}`,
@@ -372,6 +395,17 @@ Fallback ohne Dauerbetrieb (falls 24/7-Hosting zu schwer wiegt, Design-Doc „Se
 `karten-service build --all` unter System-Cron aufrufen — dann existiert kein On-Demand-
 Trigger/Admin-UI-Button (Komponente B), der Cron-Kern hält die Karten aber weiterhin
 automatisch aktuell.
+
+### 6.3 Zeitgrenze und hängende Bauten (LFH-927)
+
+Jeder Bau hat eine Frist: **6 Stunden** für Länder und Bundesländer, **72 Stunden** für
+`planet` (`Region::max_dauer`, `karten-service/src/regions.rs`). Läuft sie ab, endet der Job
+auf `failed` mit „Zeitüberschreitung: Bau länger als … h“, der Service beendet `make` und
+entfernt den Bau-Container. Der Container heißt `ks-<area>` (`docker run --name` im
+Makefile); ein verwaister Container gleichen Namens wird vor dem nächsten Bau derselben
+Region entfernt. Danach läuft der nächste wartende Auftrag ohne Neustart an.
+
+Von Hand prüfen, ob noch ein Bau-Container läuft: `docker ps --filter name=ks-`.
 
 ---
 
@@ -427,8 +461,8 @@ Update-/Download-Flow (unverändert, LFH-181/183).
   beiden Status-Proxies verlangen den `_admin`-Guard (`AdminUser`-Extractor,
   `src/routes/karte.rs`) — kein Nicht-Admin kann einen Bau anstoßen oder Job-Status lesen.
 - **Ein Build gleichzeitig:** `jobs::Registry::try_lock_build` — ein globaler
-  In-Process-Lock; weitere Trigger landen `queued` (Cap = Anzahl konfigurierter Regionen,
-  aktuell 7) oder werden mit **`409 Conflict`** abgelehnt, wenn die Queue voll ist (nicht
+  In-Process-Lock; weitere Trigger landen `queued` (Cap = Regionen eines Cron-Laufs plus
+  5 für Aufträge von Hand, aktuell 31) oder werden mit **`409 Conflict`** abgelehnt, wenn die Queue voll ist (nicht
   `429`, wie im Design-Doc noch erwogen — Code-Stand ist `409`).
 - **Token bleibt server-side:** Browser → lifeline-hub (Session-Cookie/Admin-Guard) →
   lifeline-hub hält `LIFELINE_KARTEN_SERVICE_TOKEN` (`GeheimesPasswort`, Debug-maskiert) und
@@ -440,6 +474,9 @@ Update-/Download-Flow (unverändert, LFH-181/183).
   nach einem Neustart mitten in einem Bau ist der Job nicht mehr sichtbar/abfragbar — der
   nächste Cron-Tick bzw. manuelle Trigger baut die Region erneut, ohne Datenverlust (Builds
   sind idempotent wiederholbar, keine Nutzerdaten betroffen).
+- **Verlauf ist begrenzt (LFH-929):** `GET /builds` liefert alle offenen Aufträge und höchstens
+  die letzten 100 abgeschlossenen; der jeweils neueste abgeschlossene Auftrag je Region bleibt
+  dabei immer erhalten. Ältere Fehlschläge fallen aus der Liste.
 - **Manifest-Publish ist atomar:** Datei zuerst, Manifest zuletzt — ein gescheiterter Build
   hinterlässt weder ein halb-verweisendes Manifest noch verwaiste Katalog-Einträge.
 - **Kein Multi-Tenant/Rollen-Auth am Service:** ein einziges Bearer-Token für alle
@@ -457,7 +494,9 @@ Posten mitführen:
   Build; im Code (`build/make_runner.rs`, `build/mod.rs`) gibt es **keinen** Disk-Space-Check.
   Ein voller Build-Host würde den Bau erst mitten im Docker-Lauf scheitern lassen. Operator-
   Workaround bis dahin: großzügige Plattenreserve (Abschnitt 2.2) + externes Monitoring
-  (`df`-Alarm) auf dem Build-Host.
+  (`df`-Alarm) auf dem Build-Host. Zeitgrenze und Container-Name (Abschnitt 6.3) sowie das
+  Löschen der Ergebnisdateien nach dem Upload (Abschnitt 2.2) sind umgesetzt (LFH-927); der
+  Disk-Guard bleibt offen.
 - **`make validate` wird nicht aufgerufen.** Der `MakeRunner` liest die `bounds` selbst per
   `sqlite3`-Query (Falschregion-Schutz bleibt aktiv), ruft aber **nicht** `make -C
   karten-build validate` (Tile-Anzahl/`vector_layers`-Sanity-Check aus dem README) auf. Bei
