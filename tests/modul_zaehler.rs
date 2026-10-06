@@ -374,6 +374,87 @@ async fn bestaetigung_ueberfaellig_zaehlt_wie_die_liste() {
     );
 }
 
+/// Der Server zählt Meldungen und Aufträge gruppiert nach ihren Merkmalen (LFH-935). Zwei
+/// Zeilen, die sich nur in EINEM Merkmal unterscheiden, dürfen dabei nicht verschmelzen, und ein
+/// quittierter Auftrag mit abgelaufener Frist ist nicht überfällig — in Liste und Zähler gleich.
+#[tokio::test]
+async fn merkmale_trennen_sich_im_zaehler() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+
+    // Zwei pflichtige, unbestätigte Meldungen mit künftiger Frist; nur eine ist eskaliert.
+    let mut ids = vec![];
+    for inhalt in ["Deich bricht", "Pegel steigt"] {
+        let body = json!({
+            "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+            "inhalt": inhalt, "ereigniszeit": "2026-06-12 09:00:00",
+            "prioritaet": "sofort", "bestaetigung_frist_min": 5
+        });
+        let m = post(
+            &app,
+            &admin,
+            &format!("{basis}/meldungen"),
+            &body.to_string(),
+        )
+        .await;
+        ids.push(m["id"].as_i64().unwrap());
+    }
+    sqlx::query(
+        "UPDATE meldung SET bestaetigung_frist_at = '2999-01-01 00:00:00', \
+         eskaliert = (id = ?) WHERE id IN (?, ?)",
+    )
+    .bind(ids[0])
+    .bind(ids[0])
+    .bind(ids[1])
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Zwei Aufträge mit abgelaufener Frist; beim zweiten haben alle Empfänger quittiert.
+    let auftrag = json!({
+        "auftrag_text": "Deich sichern", "frist_at": "2026-06-01 10:00:00",
+        "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Abschnitt Nord" }]
+    })
+    .to_string();
+    post(&app, &admin, &format!("{basis}/auftraege"), &auftrag).await;
+    let quittiert = post(&app, &admin, &format!("{basis}/auftraege"), &auftrag).await;
+    post(
+        &app,
+        &admin,
+        &format!(
+            "{basis}/auftraege/{}/empfaenger/{}/quittieren",
+            quittiert["id"], quittiert["empfaenger"][0]["id"]
+        ),
+        "{}",
+    )
+    .await;
+
+    let meldungen = get(&app, &admin, &format!("{basis}/meldungen")).await;
+    let alarmiert = anzahl(&meldungen, |m| {
+        m["bestaetigung_pflicht"] == json!(true)
+            && m["ist_bestaetigt"] != json!(true)
+            && (m["ist_ueberfaellig"] == json!(true) || m["eskaliert"] == json!(true))
+    });
+    let auftraege = get(&app, &admin, &format!("{basis}/auftraege")).await;
+    let ueberfaellig = anzahl(&auftraege, |a| a["ist_ueberfaellig"] == json!(true));
+    assert_eq!(
+        (alarmiert, ueberfaellig),
+        (1, 1),
+        "Erwartung aus den Listen"
+    );
+
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(
+        v["meldungen"]["bestaetigung_ueberfaellig"],
+        json!(1),
+        "{v:?}"
+    );
+    assert_eq!(v["auftraege"]["ueberfaellig"], json!(1), "{v:?}");
+    assert_eq!(v["auftraege"]["offen"], json!(2), "{v:?}");
+}
+
 #[tokio::test]
 async fn chat_zaehlt_je_benutzer() {
     let (app, admin, einsatz) = aufbau().await;

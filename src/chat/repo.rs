@@ -29,6 +29,25 @@ pub async fn liste_kanaele(
     kanaele_lesen(pool, einsatz_id, benutzer_id).await
 }
 
+/// Ungelesen für einen Benutzer: eine Nachricht (Alias `n`) eines anderen, nicht gelöscht und
+/// ohne Lesevermerk in der Zustellung (Alias `z`). Trägt EIN `?` für den Benutzer. EINMAL
+/// definiert für [`kanaele_lesen`] und den Modulzähler [`ungelesen_gesamt`] (LFH-935).
+macro_rules! ungelesen_sql {
+    () => {
+        "(n.autor_id <> ? AND n.geloescht_at IS NULL AND z.gelesen_at IS NULL)"
+    };
+}
+
+/// Der Lesevermerk einer Nachricht für einen Benutzer (Alias `z`). Trägt zwei `?`: Objekttyp,
+/// Benutzer.
+macro_rules! zustellung_join_sql {
+    () => {
+        " LEFT JOIN kommunikation_zustellung z \
+           ON z.einsatz_id = k.einsatz_id AND z.objekt_typ = ? AND z.objekt_id = n.id \
+          AND z.empfaenger_id = ?"
+    };
+}
+
 /// Die Kanäle eines Einsatzes mit Ungelesen-Zahl für `benutzer_id` — rein lesend, OHNE den
 /// Standardkanal anzulegen (LFH-612). Der Modulzähler ruft sie bei jedem gezählten
 /// Live-Ereignis; ein INSERT dort nähme bei jedem Abruf die Schreibsperre der Datenbank, auch
@@ -39,29 +58,54 @@ pub async fn kanaele_lesen(
     einsatz_id: i64,
     benutzer_id: i64,
 ) -> Result<Vec<ChatKanalAnzeige>, AppError> {
-    sqlx::query_as::<_, ChatKanalAnzeige>(
+    const SQL: &str = concat!(
         "SELECT k.id, k.einsatz_id, k.name, k.beschreibung, k.erstellt_von_id, \
                 k.erstellt_at, k.archiviert_at, MAX(n.erstellt_at) AS letzte_nachricht_at, \
-                COALESCE(SUM(CASE \
-                  WHEN n.id IS NOT NULL AND n.autor_id <> ? AND n.geloescht_at IS NULL \
-                       AND z.gelesen_at IS NULL THEN 1 ELSE 0 END), 0) AS ungelesen_anzahl \
+                COALESCE(SUM(CASE WHEN n.id IS NOT NULL AND ",
+        ungelesen_sql!(),
+        " THEN 1 ELSE 0 END), 0) AS ungelesen_anzahl \
          FROM chat_kanal k \
-         LEFT JOIN chat_nachricht n ON n.kanal_id = k.id AND n.einsatz_id = k.einsatz_id \
-         LEFT JOIN kommunikation_zustellung z \
-           ON z.einsatz_id = k.einsatz_id AND z.objekt_typ = ? AND z.objekt_id = n.id \
-          AND z.empfaenger_id = ? \
-         WHERE k.einsatz_id = ? \
+         LEFT JOIN chat_nachricht n ON n.kanal_id = k.id AND n.einsatz_id = k.einsatz_id",
+        zustellung_join_sql!(),
+        " WHERE k.einsatz_id = ? \
          GROUP BY k.id, k.einsatz_id, k.name, k.beschreibung, k.erstellt_von_id, \
                   k.erstellt_at, k.archiviert_at \
-         ORDER BY k.erstellt_at, k.id",
-    )
-    .bind(benutzer_id)
-    .bind(OBJEKT_CHAT_NACHRICHT)
-    .bind(benutzer_id)
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await
-    .map_err(Into::into)
+         ORDER BY k.erstellt_at, k.id"
+    );
+    sqlx::query_as::<_, ChatKanalAnzeige>(SQL)
+        .bind(benutzer_id)
+        .bind(OBJEKT_CHAT_NACHRICHT)
+        .bind(benutzer_id)
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// Modulzähler des Chats (LFH-935): ungelesene Nachrichten über alle Kanäle des Einsatzes in
+/// EINEM `COUNT(*)`, ohne Gruppierung je Kanal. Dieselben Fragmente und dieselbe Kanalbindung
+/// wie [`kanaele_lesen`]; rein lesend, legt keinen Standardkanal an. Bind-Reihenfolge:
+/// Objekttyp, Benutzer (Zustellung), `einsatz_id`, Benutzer (Prädikat).
+pub async fn ungelesen_gesamt(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    benutzer_id: i64,
+) -> Result<i64, AppError> {
+    const SQL: &str = concat!(
+        "SELECT COUNT(*) FROM chat_kanal k \
+         JOIN chat_nachricht n ON n.kanal_id = k.id AND n.einsatz_id = k.einsatz_id",
+        zustellung_join_sql!(),
+        " WHERE k.einsatz_id = ? AND ",
+        ungelesen_sql!()
+    );
+    sqlx::query_scalar(SQL)
+        .bind(OBJEKT_CHAT_NACHRICHT)
+        .bind(benutzer_id)
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .fetch_one(pool)
+        .await
+        .map_err(Into::into)
 }
 
 /// Legt einen neuen Kanal an und liefert ihn als Anzeige.
