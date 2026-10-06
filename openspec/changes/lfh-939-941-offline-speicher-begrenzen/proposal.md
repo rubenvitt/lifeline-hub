@@ -38,7 +38,7 @@ Das Räumen beim Abmelden, Sitzungsende und Benutzerwechsel hat LFH-767 schon um
   Altdatensatz wird beim Upgrade verworfen (er trägt ohnehin den alten `buster`).
 - **Vorrat schrumpft:** Nach jeder Speicherung bleibt im Vorrat nur, was zulässig und nicht live
   überdeckt ist.
-- **ETB offline nur in festen Ansichten** *(Entscheidung offen, Vorschlag)*: Auf die Platte gehen
+- **ETB offline nur in festen Ansichten** (entschieden 06.10.2026): Auf die Platte gehen
   nur ETB-Keys ohne freie Eingabe, also die Gesamtliste, die Typ-Reiter und die festen
   Ausschnitte (Überblick, Lage-Dashboard) samt Zählern und Lesemarke. Varianten mit Volltext,
   Zeitraum, Einheit, Erfasser oder Bezugssuche bleiben nur 5 min im Speicher und nie auf der
@@ -53,7 +53,7 @@ Das Räumen beim Abmelden, Sitzungsende und Benutzerwechsel hat LFH-767 schon um
 - **Ortscache befristet** (`lifeline-ortcache` v2): Wert `{ name, at }`, Index `by-at`. Beim
   ersten Öffnen gehen Einträge älter als 30 Tage, die Anzahl ist auf 5 000 gedeckelt (älteste
   zuerst).
-- **Leere ETB-Entwürfe** *(Entscheidung offen, Vorschlag)*: Beim Laden der Entwürfe gehen
+- **Leere ETB-Entwürfe** (entschieden 06.10.2026): Beim Laden der Entwürfe gehen
   einsatzübergreifend die eigenen Entwürfe ohne Inhalt, die länger als 24 h unverändert sind,
   und jeder eigene Aktiv-Merker eines Einsatzes ohne Entwurf. Entwürfe mit Text bleiben wie in
   LFH-767 D4 unabhängig vom Alter.

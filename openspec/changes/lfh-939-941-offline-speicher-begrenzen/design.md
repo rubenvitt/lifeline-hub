@@ -90,7 +90,7 @@ Bei jeder Speicherung wird `vorrat` auf die Einträge gekürzt, die zulässig si
 Cache, ist auch der ältere Vorrat-Stand nicht mehr gewollt (Liegezeit, Sperrmarke,
 Räummarke).
 
-### D4 — ETB nur in festen Ansichten offline *(Vorschlag, Entscheidung offen)*
+### D4 — ETB nur in festen Ansichten offline (Entscheidung Ruben, 06.10.2026)
 
 Eine ETB-Ansicht ist **fest**, wenn ihr Filterobjekt nur die Felder `typ` und `limit` trägt.
 Diese Menge ist begrenzt: Gesamtliste, je ein Reiter je Typ, Überblick, Lage-Dashboard,
@@ -108,8 +108,8 @@ Bezugswahl ohne Suche. Alles mit `q`, `von`, `bis`, `einheit_id`, `erfasser_id`,
 - Der Kommentar an `LAGEBILD_OFFLINE.einsatz` („ihr kurzes `gcTime` räumt sie ohnehin“) wird
   richtiggestellt.
 
-*Alternativen (Karte im Thread):* nur die Gesamtliste (Typ-Reiter offline leer) oder alles
-lassen (Entscheidung aus LFH-723 bleibt).
+*Verworfen (Entscheidung 06.10.2026):* nur die Gesamtliste (Typ-Reiter offline leer) oder
+alles lassen (Entscheidung aus LFH-723 bleibt).
 
 ### D5 — Queue-Zähler
 
@@ -144,7 +144,7 @@ löscht ein Cursor über `by-at` alles älter als 30 Tage und, falls danach mehr
 nicht auf: Ortsnamen ändern sich nicht, und Schreiben beim Lesen kostete mehr als ein erneutes
 Nachschlagen nach 30 Tagen.
 
-### D8 — Leere Entwürfe und verwaiste Merker *(Vorschlag, Entscheidung offen)*
+### D8 — Leere Entwürfe und verwaiste Merker (Entscheidung Ruben, 06.10.2026)
 
 `entwuerfeLaden(benutzerId, einsatzId)` löscht nach `vorlaufNachtragen` in einer
 Schreibtransaktion über `by-benutzer-einsatz` (alle Einsätze der Person) jeden Entwurf, dessen
@@ -158,8 +158,8 @@ Ein leerer Entwurf mit gewählten Dateien in einem anderen, seit über 24 h offe
 dabei von der Platte gehen. Dieser Tab hält ihn weiter im Speicher und sichert ihn bei der
 nächsten Änderung neu; die Dateien selbst liegen nie auf der Platte.
 
-*Alternativen (Karte im Thread):* 14 Tage Frist für alle Entwürfe (ändert D4 aus LFH-767) oder
-nichts ändern.
+*Verworfen (Entscheidung 06.10.2026):* 14 Tage Frist für alle Entwürfe (ändert D4 aus
+LFH-767) oder nichts ändern.
 
 ## Risks / Trade-offs
 
