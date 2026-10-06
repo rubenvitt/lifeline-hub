@@ -12,6 +12,7 @@ import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { Farbrollen } from '../theme/tokens';
 import { useRollen } from './instrument/rollenwerte';
 import { useDruckModus } from './druck/useDruckModus';
+import { useRahmenOben } from './rahmenOben';
 // Kopfzellen-Typografie und Mono-Spalten liegen als Klassen in der Gestaltungssprache
 // (`.lfh-katalog …`). Der Import gehört HIERHER: nicht jeder Konsument montiert `EinsatzSeite`.
 import '../theme/sprache.css';
@@ -401,6 +402,7 @@ export default function KatalogTabelle<T extends object>({
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
   const tabelleRef = useRef<TableRef>(null);
   const druckt = useDruckModus();
+  const rahmenOben = useRahmenOben();
   useKopfFreiraum(tabelleRef);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
 
@@ -624,9 +626,10 @@ export default function KatalogTabelle<T extends object>({
           /*
            * Stehende Kopfzeile am Bildschirm, NICHT im Druck: mit `sticky` legt rc-table den Kopf in eine
            * eigene Tabelle, der Körper trüge kein `thead`, und die Kopfwiederholung aus `druck/druck.css`
-           * griffe nicht. Umgeschaltet über `beforeprint`/`afterprint`.
+           * griffe nicht. Umgeschaltet über `beforeprint`/`afterprint`. Der Kopf steht unter dem
+           * klebenden Rahmen, nicht an der Fensterkante (LFH-952, `frontend/AGENTS.md`, Rahmen).
            */
-          sticky={!druckt}
+          sticky={druckt ? false : { offsetHeader: rahmenOben }}
         />
       </ConfigProvider>
     </>

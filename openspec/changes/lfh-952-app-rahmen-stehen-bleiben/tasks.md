@@ -2,14 +2,14 @@
 
 ## 1. Benutzermenü (D4)
 
-- [ ] 1.1 `components/BenutzerMenu.test.tsx`: Reihenfolge Kopf · Profil · Abmelden vor den Gruppen; Funktion im Menükopf unter `xl`. Prüfen: rot vor 1.2
-- [ ] 1.2 `components/BenutzerMenu.tsx`: Reihenfolge, Funktion im Kopf, Dateikopf. Prüfen: 1.1 grün, `bedien-helligkeit`-Tests grün
+- [x] 1.1 `components/BenutzerMenu.test.tsx`: Reihenfolge Kopf · Profil · Abmelden vor den Gruppen; Funktion im Menükopf unter `xl`. Prüfen: rot vor 1.2
+- [x] 1.2 `components/BenutzerMenu.tsx`: Reihenfolge, Funktion im Kopf, Dateikopf. Prüfen: 1.1 grün, `bedien-helligkeit`-Tests grün
 
 ## 2. Gemessene Rahmenhöhe (D2)
 
-- [ ] 2.1 Test und Umsetzung `components/rahmenOben.ts` (Store, `useRahmenOben`, Beobachter-Hook, `--lfh-rahmen-oben`, `0px` ohne Element)
-- [ ] 2.2 Guard `components/rahmenOben.guard.test.ts`: kein klebendes `top: 0` unter `src/` außerhalb des Rahmens. Prüfen: rot vor 2.3
-- [ ] 2.3 Abnehmer: `KatalogTabelle` und Gefahrenmatrix (`offsetHeader`, Fokusfreiraum in `sprache.css`/`gefahrenMatrix.css`), ETB-Bilanz, Sammelbanner in ETB-Zeitachse, Erfassungsanhängen, Infotelefon. Prüfen: 2.2 grün
+- [x] 2.1 Test und Umsetzung `components/rahmenOben.ts` (Store, `useRahmenOben`, Beobachter-Hook, `--lfh-rahmen-oben`, `0px` ohne Element)
+- [x] 2.2 Guard `components/rahmenOben.guard.test.ts`: kein klebendes `top: 0` unter `src/` außerhalb des Rahmens. Prüfen: rot vor 2.3
+- [x] 2.3 Abnehmer: `KatalogTabelle` und Gefahrenmatrix (`offsetHeader`, Fokusfreiraum in `sprache.css`/`gefahrenMatrix.css`), ETB-Bilanz, Sammelbanner in ETB-Zeitachse, Erfassungsanhängen, Infotelefon. Prüfen: 2.2 grün
 
 ## 3. Kopf und Betriebszeile kleben (D1)
 

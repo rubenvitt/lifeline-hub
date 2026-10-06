@@ -303,8 +303,11 @@ export default function ErfassungsAnhaenge({
         onNeuladen={() => void query.refetch()}
       >
         <div ref={listeRef} style={{ position: 'relative' }}>
-          {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. */}
-          <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 5 }}>
+          {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. Es klebt unter dem
+              Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen). */}
+          <div
+            style={{ position: 'sticky', top: 'var(--lfh-rahmen-oben, 0px)', height: 0, zIndex: 5 }}
+          >
             {zurueckgehalten.length > 0 && (
               <Sammelbanner
                 aktion={{ label: 'anzeigen', onKlick: zeigeZurueckgehaltene }}

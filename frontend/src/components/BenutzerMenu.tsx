@@ -44,8 +44,8 @@ function umschaltEintrag(praefix: string, wert: string, titel: string, Icon: Ico
 }
 
 /**
- * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit Rollen-Übersicht,
- * Profil und Abmelden. Holt sich Benutzer und Logout selbst, damit es in beiden Layout-Ebenen
+ * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit Rollen-Übersicht und
+ * Funktion, darunter sofort Profil und Abmelden, danach die Umschaltgruppen (LFH-952). Holt sich Benutzer und Logout selbst, damit es in beiden Layout-Ebenen
  * gleich nutzbar ist.
  *
  * DIE INITIALEN STEHEN NEUTRAL: eine 24-px-Kachel auf `flaeche3`. Rot ist im Rahmen genau
@@ -104,7 +104,10 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
       key: 'kopf',
       type: 'group',
       label: (
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '4px 0' }}>
+        <div
+          data-testid="benutzermenue-kopf"
+          style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '4px 0' }}
+        >
           <Avatar
             shape="square"
             style={{
@@ -123,6 +126,16 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               @{benutzer.benutzername}
             </Typography.Text>
+            {/* Die Funktion auf JEDER Breite (LFH-952, U89): am Auslöser steht sie erst ab `xl`, auf
+                Tablet und Handy war sie sonst nirgends zu sehen. */}
+            {funktion && (
+              <Typography.Text
+                data-lfh="benutzermenue-funktion"
+                style={{ display: 'block', fontSize: 12, marginTop: 4 }}
+              >
+                {funktion}
+              </Typography.Text>
+            )}
             {rollenTags.length > 0 && (
               <div style={{ marginTop: 6 }}>
                 <Space size={4} wrap>
@@ -140,6 +153,12 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         </div>
       ),
     },
+    // DIREKT UNTER DEM KOPF (LFH-952, U89): in `komfortabel` ist das Menü 920 px hoch, am Handy
+    // sichtbar 702 px — ganz unten lagen Profil und Abmelden unter dem Rand, beim Schichtwechsel
+    // am geteilten Gerät. Rot steht durch den Trenner darunter abgesetzt.
+    { type: 'divider' },
+    { key: 'profil', icon: <IconPerson />, label: 'Profil' },
+    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true },
     // AUF JEDER BREITE (LFH-392): die Kopfzeile ist die Aktionsreihe, eine Einstellung gehört dort
     // nicht hinein. Wer das an eine Breite hängt, nimmt beiden Achsen ihren einzigen sichtbaren
     // Bedienweg — die Palette zeigt keinen aktiven Wert (`command-palette/typen.ts` kennt kein
@@ -190,9 +209,6 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         };
       }),
     },
-    { type: 'divider' },
-    { key: 'profil', icon: <IconPerson />, label: 'Profil' },
-    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {

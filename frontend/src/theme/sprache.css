@@ -296,7 +296,9 @@
 /* Freiraum unter der stehenden Kopfzeile (LFH-677, WCAG 2.4.11). Rückwärts getabbt rollt
    der Browser das Fokusziel an den oberen Rand — ohne diesen Rand genau unter die Kopfzeile.
    `scroll-margin` wirkt am Element, das in die Sicht gerollt wird, also am Ziel selbst:
-   deshalb `*`, nicht die Zeile. Die Höhe misst `KatalogTabelle` (`setzeKopfFreiraum`). */
+   deshalb `*`, nicht die Zeile. Die Höhe misst `KatalogTabelle` (`setzeKopfFreiraum`).
+   Den klebenden Rahmen darüber trägt `scroll-padding` am Dokument (`index.css`, LFH-952): beide
+   Abstände addieren sich, hier steht nur die Kopfzeile. */
 .ant-table-wrapper.lfh-katalog .ant-table-tbody * {
   scroll-margin-top: var(--lfh-tabellenkopf-hoehe, 0px);
 }
