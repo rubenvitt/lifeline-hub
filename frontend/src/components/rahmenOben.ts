@@ -3,7 +3,8 @@ import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 /**
  * Die Höhe dessen, was am oberen Fensterrand klebt (LFH-952, `frontend/AGENTS.md`, Rahmen):
  * ab `md` die Kopfleiste, unter `md` die Betriebszeile, solange sie eine Verbindungsstörung
- * meldet. Herleitung: `openspec/changes/lfh-952-app-rahmen-stehen-bleiben/design.md`, D2.
+ * meldet. Herleitung: D2 in
+ * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`.
  *
  * GEMESSEN, nicht aus Tokens gerechnet: der Kopf bricht auf schmalen Schirmen um (LFH-460) und
  * wächst mit der Dichte-Staffel. Jede Quelle meldet ihre Höhe, die Summe steht

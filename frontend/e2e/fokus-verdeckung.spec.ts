@@ -360,7 +360,8 @@ test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async 
 /**
  * LFH-952 (D3): ab `md` klebt der Kopf. Rückwärts getabbt rollt der Browser ein Ziel an den
  * oberen Rand — ohne Fokusabstand genau HINTER den Kopf, und ein Ziel, das schon ganz hinter ihm
- * im Fenster liegt, rollt Chromium gar nicht (gemessen, `design.md` D3). Den Abstand trägt
+ * im Fenster liegt, rollt Chromium gar nicht (gemessen, D3 in
+ * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`). Den Abstand trägt
  * `scroll-padding-block-start` am Dokument (`index.css`).
  *
  * Eigene Messung statt `pruefeFokusVerdeckung`: dessen `stoppsBeruehrt` zählt jede klebende

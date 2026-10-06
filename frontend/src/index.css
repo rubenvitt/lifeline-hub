@@ -121,7 +121,8 @@ body {
 /* Fokusabstand zum klebenden Rahmen oben (LFH-952, WCAG 2.4.11, `frontend/AGENTS.md`, Rahmen).
    `scroll-padding-block-start` am SCROLLPORT, nicht `scroll-margin` an den Zielen: rückwärts
    getabbt bleibt ein Ziel, das schon im Fenster liegt, sonst ganz hinter dem Kopf (gemessen in
-   Chromium, `openspec/changes/lfh-952-app-rahmen-stehen-bleiben/design.md`, D3). Die Höhe misst
+   Chromium, D3 in
+   `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`). Die Höhe misst
    `components/rahmenOben.ts`; ohne klebenden Rahmen ist sie 0.
    Die Ausnahme per `:has` hält den Abstand aus, solange der Fokus IM Rahmen steht — sonst rollte
    jeder Tab durch den Kopf die Seite (dieselbe Falle wie die ETB-Leiste unten, LFH-373). Der

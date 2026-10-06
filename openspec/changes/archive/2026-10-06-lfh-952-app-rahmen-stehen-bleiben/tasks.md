@@ -43,6 +43,6 @@
 ## 7. Regel und Nachweis
 
 - [x] 7.1 `frontend/AGENTS.md`, Abschnitt „Rahmen“: Stehenbleiben gestuft, `--lfh-rahmen-oben`, Panel-Vorgabe
-- [ ] 7.2 `e2e/rahmen-stehen-bleiben.spec.ts` (vier Breiten, offline, Abmelden in `handschuh`, Stärke bei 1180, Tabellenkopf), Admin und nicht-privilegiert; Mutationsprobe ohne sticky dokumentieren
-- [ ] 7.3 Mitlaufen: `kopfzeile-schmal`, `fokus-verdeckung`, `rail-etikett`, `nav-schmal`, `gate1-ueberlauf`, `gate3-trefflaeche`, `leisten-flaeche`, `trefflaeche-tablet`, `katalogtabelle-schmal`, `lagekarte-*`; Specs, die bei 1024 px das offene Panel erwarten, öffnen es über den Griff
-- [ ] 7.4 Vitest, Lint, Typen, `check-all.sh --nur schnell`
+- [x] 7.2 `e2e/rahmen-stehen-bleiben.spec.ts` (vier Breiten, offline, Abmelden in `handschuh`, Stärke bei 1180, Tabellenkopf), Admin und nicht-privilegiert; Mutationsprobe ohne sticky dokumentieren
+- [x] 7.3 Mitlaufen: `kopfzeile-schmal`, `fokus-verdeckung`, `rail-etikett`, `nav-schmal`, `gate1-ueberlauf`, `gate3-trefflaeche`, `leisten-flaeche`, `trefflaeche-tablet`, `katalogtabelle-schmal`, `lagekarte-*`; Specs, die bei 1024 px das offene Panel erwarten, öffnen es über den Griff
+- [x] 7.4 Vitest, Lint, Typen, `check-all.sh --nur schnell`
