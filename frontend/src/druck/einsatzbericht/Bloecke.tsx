@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import Markdown from '../../components/Markdown';
 import { monoStil } from '../../components/instrument';
 import type { Abschnitt, Einsatzbericht, Inhalt } from './verdichtung';
+import '../druckansichtSchmal.css';
 
 /**
  * Die gewählten Blöcke des Einsatzberichts auf Papier (LFH-726, Auswahl LFH-902). Bildet nur das
@@ -14,7 +15,9 @@ import type { Abschnitt, Einsatzbericht, Inhalt } from './verdichtung';
  * zerrissen, Tabellenkopf je Seite) kommen aus `druck/druck.css`.
  *
  * Tabellen sind schlichtes HTML wie im ETB-Druck (`etb/EtbDruckTabelle.tsx`, benannte Ausnahme):
- * ein Vordruck ohne Sortierung, Filter oder Zeilenaktion, kein Bedienort.
+ * ein Vordruck ohne Sortierung, Filter oder Zeilenaktion, kein Bedienort. Am schmalen Schirm
+ * steht eine Zeit zweizeilig, und was dann noch nicht passt, rollt in der Tabelle statt in der
+ * Seite (`druck/druckansichtSchmal.css`, LFH-956).
  */
 
 /** Ziffern vorn (Zahl, Zeit, Stärke, Dauer) setzen Mono mit Tabellenziffern (`frontend/AGENTS.md`). */
@@ -33,77 +36,87 @@ function InhaltAnzeige({ inhalt }: { inhalt: Inhalt }) {
   switch (inhalt.art) {
     case 'zeilen':
       return (
-        <dl
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(10em, max-content) 1fr',
-            columnGap: token.marginSM,
-            rowGap: 2,
-            margin: `0 0 ${token.marginXS}px`,
-          }}
-        >
-          {inhalt.zeilen.map((z, i) => (
-            <div key={`${z.etikett}-${i}`} style={{ display: 'contents' }}>
-              <dt style={{ color: token.colorTextSecondary }}>{z.etikett}</dt>
-              <dd
-                style={{
-                  margin: 0,
-                  whiteSpace: 'pre-wrap',
-                  ...(BEGINNT_MIT_ZIFFER.test(z.wert) ? monoStil(token.fontSize) : {}),
-                }}
-              >
-                {z.wert}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <>
+          {inhalt.titel && (
+            <h5 style={{ fontSize: token.fontSize, margin: `${token.marginXS}px 0 2px` }}>
+              {inhalt.titel}
+            </h5>
+          )}
+          <dl
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(10em, max-content) 1fr',
+              columnGap: token.marginSM,
+              rowGap: 2,
+              margin: `0 0 ${token.marginXS}px`,
+            }}
+          >
+            {inhalt.zeilen.map((z, i) => (
+              <div key={`${z.etikett}-${i}`} style={{ display: 'contents' }}>
+                <dt style={{ color: token.colorTextSecondary }}>{z.etikett}</dt>
+                <dd
+                  style={{
+                    margin: 0,
+                    whiteSpace: 'pre-wrap',
+                    ...(BEGINNT_MIT_ZIFFER.test(z.wert) ? monoStil(token.fontSize) : {}),
+                  }}
+                >
+                  {z.wert}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </>
       );
     case 'tabelle':
       return (
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: token.fontSize,
-            marginBlockEnd: token.marginXS,
-          }}
-        >
-          <thead>
-            <tr>
-              {inhalt.kopf.map((k) => (
-                <th
-                  key={k}
-                  scope="col"
-                  style={{
-                    ...zelle,
-                    borderBlockEnd: `1px solid ${token.colorBorder}`,
-                    fontWeight: 600,
-                  }}
-                >
-                  {k}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {inhalt.zeilen.map((zeile, i) => (
-              <tr key={i}>
-                {zeile.map((wert, j) => (
-                  <td
-                    key={j}
+        <div className="druckansicht-bildlauf">
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              fontSize: token.fontSize,
+              marginBlockEnd: token.marginXS,
+            }}
+          >
+            <thead>
+              <tr>
+                {inhalt.kopf.map((k) => (
+                  <th
+                    key={k}
+                    scope="col"
                     style={{
                       ...zelle,
-                      whiteSpace: NUR_ZAHL_ODER_ZEIT.test(wert) ? 'nowrap' : 'pre-wrap',
-                      ...(BEGINNT_MIT_ZIFFER.test(wert) ? monoStil(token.fontSize) : {}),
+                      borderBlockEnd: `1px solid ${token.colorBorder}`,
+                      fontWeight: 600,
                     }}
                   >
-                    {wert}
-                  </td>
+                    {k}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {inhalt.zeilen.map((zeile, i) => (
+                <tr key={i}>
+                  {zeile.map((wert, j) => (
+                    <td
+                      key={j}
+                      className={NUR_ZAHL_ODER_ZEIT.test(wert) ? 'druckansicht-zeit' : undefined}
+                      style={{
+                        ...zelle,
+                        whiteSpace: NUR_ZAHL_ODER_ZEIT.test(wert) ? 'nowrap' : 'pre-wrap',
+                        ...(BEGINNT_MIT_ZIFFER.test(wert) ? monoStil(token.fontSize) : {}),
+                      }}
+                    >
+                      {wert}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       );
     case 'vermerk':
       return (
