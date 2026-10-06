@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     let runner: Arc<dyn build::BuildRunner> = Arc::new(build::make_runner::MakeRunner {
         karten_build_dir: cfg.karten_build_dir.clone(),
     });
-    let registry = Registry::neu(regions::alle().len());
+    let registry = Registry::neu(scheduler::offene_cap());
     // Seed gilt für BEIDE Modi (serve UND build) — ein einzelner `build --slug` darf den
     // Vorbestand der übrigen Regionen im Manifest nicht durch einen leeren Bestand ersetzen.
     // Ein Storage-Lesefehler oder korruptes Manifest propagiert per `?` und bricht ab, statt
@@ -46,9 +46,7 @@ async fn main() -> anyhow::Result<()> {
             // LFH-993: Scheduler + Job-ID wandern zusätzlich in den AppState (`GET /zeitplan`); die
             // Bindung hier hält ihn trotzdem über die ganze serve-Dauer.
             let (cron_scheduler, cron_job) = scheduler::starte(&cfg.schedule, move || {
-                for r in regions::alle() {
-                    let _ = reg_for_cron.enqueue(r.slug);
-                }
+                scheduler::cron_lauf(&reg_for_cron);
             })
             .await?;
 
@@ -82,18 +80,11 @@ async fn build_lokal(
     storage: Arc<dyn Storage>,
     bestand: Arc<Mutex<Vec<karten_service::manifest::PublishedVersion>>>,
 ) -> anyhow::Result<()> {
-    let slugs: Vec<&'static str> = match (slug, all) {
-        (Some(s), _) => {
-            let reg = regions::finde(&s).ok_or_else(|| anyhow::anyhow!("unbekannter slug {s}"))?;
-            vec![reg.slug]
-        }
-        (None, true) => regions::alle().iter().map(|r| r.slug).collect(),
-        (None, false) => anyhow::bail!("build braucht --slug <x> oder --all"),
-    };
+    let slugs = regions::fuer_build(slug.as_deref(), all)?;
 
     let mut fehlgeschlagen = Vec::new();
     for slug in slugs {
-        let reg = regions::finde(slug).expect("slug stammt aus regions::alle()/finde");
+        let reg = regions::finde(slug).expect("slug stammt aus regions::fuer_build");
         let id = registry
             .enqueue(slug)
             .map_err(|_| anyhow::anyhow!("Queue voll für {slug}"))?;

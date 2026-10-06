@@ -10,12 +10,17 @@ pub enum EnqueueError {
     Voll,
 }
 
+/// So viele abgeschlossene Aufträge behält der Verlauf (LFH-929). Ohne Grenze wächst er über
+/// Monate `serve` und geht bei jedem 2-s-Poll der Admin-Ansicht komplett über die Leitung.
+pub const VERLAUF_MAX: usize = 100;
+
 #[derive(Clone)]
 pub struct Registry {
     inner: Arc<Mutex<Vec<BuildJob>>>,
     seq: Arc<AtomicU64>,
     building: Arc<AtomicBool>,
     offene_cap: usize,
+    verlauf_max: usize,
 }
 pub struct BuildGuard(Arc<AtomicBool>);
 impl Drop for BuildGuard {
@@ -31,7 +36,13 @@ impl Registry {
             seq: Arc::new(AtomicU64::new(1)),
             building: Arc::new(AtomicBool::new(false)),
             offene_cap,
+            verlauf_max: VERLAUF_MAX,
         }
+    }
+    /// Andere Verlaufsgrenze, für Tests.
+    pub fn mit_verlauf_max(mut self, n: usize) -> Self {
+        self.verlauf_max = n;
+        self
     }
     pub fn enqueue(&self, slug: &str) -> Result<u64, EnqueueError> {
         let mut v = self.inner.lock().unwrap();
@@ -65,11 +76,16 @@ impl Registry {
     }
     pub fn set_status(&self, id: u64, s: JobStatus) {
         let mut v = self.inner.lock().unwrap();
-        if let Some(j) = v.iter_mut().find(|j| j.id == id) {
-            if matches!(s, JobStatus::Done | JobStatus::Failed(_)) {
-                j.beendet = Some(now_iso());
-            }
-            j.status = s;
+        let Some(j) = v.iter_mut().find(|j| j.id == id) else {
+            return;
+        };
+        let abgeschlossen = abgeschlossen(&s);
+        if abgeschlossen {
+            j.beendet = Some(now_iso());
+        }
+        j.status = s;
+        if abgeschlossen {
+            kappe_verlauf(&mut v, self.verlauf_max);
         }
     }
     /// Ältester Job im Status Queued (FIFO). Für den Worker-Drain.
@@ -93,6 +109,36 @@ impl Registry {
         }
     }
 }
+fn abgeschlossen(s: &JobStatus) -> bool {
+    matches!(s, JobStatus::Done | JobStatus::Failed(_))
+}
+
+/// Kappt die abgeschlossenen Aufträge auf `max`. Offene (`Queued`, laufend) bleiben immer. Von den
+/// abgeschlossenen bleibt zuerst der neueste je Slug — `neuesterJob` und die Verkettung „bauen →
+/// fertig → laden“ im `OfflineRegionPicker` lesen ihn —, der Rest füllt nach Alter (höchste id
+/// zuerst) bis `max` auf.
+fn kappe_verlauf(v: &mut Vec<BuildJob>, max: usize) {
+    if v.iter().filter(|j| abgeschlossen(&j.status)).count() <= max {
+        return;
+    }
+    let mut fertig: Vec<&BuildJob> = v.iter().filter(|j| abgeschlossen(&j.status)).collect();
+    fertig.sort_by_key(|j| std::cmp::Reverse(j.id));
+    let mut behalten = std::collections::HashSet::new();
+    let mut slugs = std::collections::HashSet::new();
+    for j in &fertig {
+        if slugs.insert(j.slug.as_str()) {
+            behalten.insert(j.id);
+        }
+    }
+    for j in &fertig {
+        if behalten.len() >= max {
+            break;
+        }
+        behalten.insert(j.id);
+    }
+    v.retain(|j| !abgeschlossen(&j.status) || behalten.contains(&j.id));
+}
+
 fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
@@ -121,6 +167,51 @@ mod tests {
             "germany",
             "Building wird übersprungen"
         );
+    }
+    #[test]
+    fn verlauf_bleibt_begrenzt_und_behaelt_neuesten_je_slug() {
+        let r = Registry::neu(100).mit_verlauf_max(3);
+        // Ältester Auftrag einer Region, die danach nie wieder gebaut wird.
+        let bremen = r.enqueue("bremen").unwrap();
+        r.set_status(bremen, JobStatus::Failed("alt".into()));
+        let offen = r.enqueue("saarland").unwrap();
+        let mut letzter_bayern = 0;
+        for i in 0..10 {
+            let id = r.enqueue("bayern").unwrap();
+            let s = if i % 2 == 0 {
+                JobStatus::Done
+            } else {
+                JobStatus::Failed("x".into())
+            };
+            r.set_status(id, s);
+            letzter_bayern = id;
+        }
+        let alle = r.alle();
+        let fertig = alle.iter().filter(|j| abgeschlossen(&j.status)).count();
+        let offene = alle.len() - fertig;
+        assert!(
+            alle.len() <= 3 + offene,
+            "höchstens N abgeschlossene + offene"
+        );
+        assert!(r.get(offen).is_some(), "Queued wird nie verworfen");
+        assert!(
+            r.get(bremen).is_some(),
+            "neuester je Slug bleibt, auch wenn alt"
+        );
+        assert!(r.get(letzter_bayern).is_some());
+        assert_eq!(r.naechster_queued().unwrap().0, offen);
+    }
+    #[test]
+    fn laufender_auftrag_wird_nie_gekappt() {
+        let r = Registry::neu(100).mit_verlauf_max(1);
+        let laeuft = r.enqueue("germany").unwrap();
+        r.set_status(laeuft, JobStatus::Building);
+        for _ in 0..5 {
+            let id = r.enqueue("bayern").unwrap();
+            r.set_status(id, JobStatus::Done);
+        }
+        assert!(matches!(r.get(laeuft).unwrap().status, JobStatus::Building));
+        assert_eq!(r.alle().len(), 2);
     }
     #[test]
     fn queue_cap_greift() {
