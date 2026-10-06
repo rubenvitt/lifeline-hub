@@ -6,7 +6,7 @@ use crate::auth::session::CurrentUser;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::lagebericht::repo::LageberichtAnzeige;
+use crate::lagebericht::repo::{LageberichtAnzeige, LageberichtKopf};
 use crate::lagebericht::{Abschnitt, Lagebericht};
 use crate::live::LiveEvent;
 use crate::routes::vorlagendokument::{
@@ -26,12 +26,13 @@ impl DokumentRoute for Lagebericht {
     const LIVE_ID: &'static str = "lagebericht_id";
 }
 
-/// GET /api/einsaetze/{id}/lageberichte — Liste. Nur Lesezugriff (inkl. Beobachter).
+/// GET /api/einsaetze/{id}/lageberichte — Liste der Köpfe ohne Abschnitte (LFH-931). Nur
+/// Lesezugriff (inkl. Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
-) -> Result<Json<Vec<LageberichtAnzeige>>, AppError> {
+) -> Result<Json<Vec<LageberichtKopf>>, AppError> {
     kern::liste::<Lagebericht>(&state, &benutzer, einsatz_id).await
 }
 

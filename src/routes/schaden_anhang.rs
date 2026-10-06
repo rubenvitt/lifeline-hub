@@ -21,7 +21,7 @@ use crate::extract::PfadParam;
 use crate::schaden::anhang::{self as schaden_anhang, Ablage, SchadenAnhangAnzeige};
 use crate::schaden::repo as schaden_repo;
 
-use super::einsatz_schaden::sse_lebenszyklus;
+use super::einsatz_schaden::sse_anhang;
 use super::support::{anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam};
 
 /// GET /api/einsaetze/{id}/schaeden/{sid}/anhaenge — lebende Anhänge, neueste zuerst.
@@ -70,7 +70,7 @@ pub async fn ablegen(
     )
     .await?;
     // Nach dem Commit: ETB (ID-only) und `schaden` (nur Kennungen, modulgefiltert).
-    sse_lebenszyklus(&state, einsatz_id, schaden_id, etb_id);
+    sse_anhang(&state, einsatz_id, schaden_id, etb_id);
     Ok((
         StatusCode::CREATED,
         Json(schaden_anhang::laden(&state.pool, einsatz_id, schaden_id, id).await?),
@@ -120,6 +120,6 @@ pub async fn entfernen(
         startwert,
     )
     .await?;
-    sse_lebenszyklus(&state, einsatz_id, schaden_id, etb_id);
+    sse_anhang(&state, einsatz_id, schaden_id, etb_id);
     Ok(StatusCode::NO_CONTENT)
 }

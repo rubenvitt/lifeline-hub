@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listePersonen } from '../api/einsatzPerson';
-import { listeSchaeden } from '../api/einsatzSchaden';
+import { listeSchadenMarker } from '../api/einsatzSchaden';
 import { ladeGefahrengebiete } from '../api/gefahren';
 import { listePegel } from '../api/pegel';
 import { einsatzKeys } from '../api/queryKeys';
@@ -15,7 +15,7 @@ import { SCHADENLAGE_QUELLE } from './schadenlageUebernahme';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
 vi.mock('../api/einsatzPerson', () => ({ listePersonen: vi.fn() }));
-vi.mock('../api/einsatzSchaden', () => ({ listeSchaeden: vi.fn() }));
+vi.mock('../api/einsatzSchaden', () => ({ listeSchadenMarker: vi.fn() }));
 vi.mock('../api/gefahren', () => ({ ladeGefahrengebiete: vi.fn() }));
 vi.mock('../api/pegel', async () => {
   const { einsatzKeys } = await import('../api/queryKeys');
@@ -187,7 +187,7 @@ beforeEach(() => {
   vi.setSystemTime(JETZT);
   vi.mocked(ladeEinsatz).mockReset().mockResolvedValue(EINSATZ);
   vi.mocked(listePersonen).mockReset().mockResolvedValue(PERSONEN);
-  vi.mocked(listeSchaeden).mockReset().mockResolvedValue(SCHAEDEN);
+  vi.mocked(listeSchadenMarker).mockReset().mockResolvedValue(SCHAEDEN);
   vi.mocked(ladeGefahrengebiete).mockReset().mockResolvedValue(GEFAHREN);
   vi.mocked(listePegel).mockReset().mockResolvedValue(PEGEL);
   vi.mocked(ladeWetter).mockReset().mockResolvedValue(WETTER);
@@ -313,7 +313,7 @@ describe('Gefahren-/Schadenlage (LFH-872)', () => {
   });
 
   it('eine gescheiterte Liste steht als „— (nicht geladen)“, nie als 0', async () => {
-    vi.mocked(listeSchaeden).mockRejectedValue(new Error('500'));
+    vi.mocked(listeSchadenMarker).mockRejectedValue(new Error('500'));
     const text = await erzeuge();
     expect(text).toContain('- Schäden offen: — (nicht geladen)');
   });

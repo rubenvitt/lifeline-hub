@@ -9,6 +9,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import type { EinsatzberichtRoh } from '../druck/einsatzbericht/abruf';
+import type { LageberichtQuelle } from '../druck/einsatzbericht/verdichtung';
 import { BETROFFENEN_MERKMALE, rohBericht } from '../druck/einsatzbericht/testdaten';
 import EinsatzberichtDruckPage from './EinsatzberichtDruckPage';
 
@@ -48,7 +49,15 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/personal', 'personal'),
     json('/personal/zeitachse', 'personalPerioden'),
     json('/fahrzeuge', 'fahrzeuge'),
-    json('/lageberichte', 'lageberichte'),
+    // LFH-931: die Liste trägt nur Köpfe, den Text des letzten freigegebenen Berichts das Detail.
+    http.get(`/api/einsaetze/${E}/lageberichte`, () => {
+      zaehle('/lageberichte');
+      return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').liste);
+    }),
+    http.get(`/api/einsaetze/${E}/lageberichte/:lid`, () => {
+      zaehle('/lageberichte/:lid');
+      return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').letzter);
+    }),
     json('/personen', 'personen'),
     json('/schaeden', 'schaeden'),
     json('/betreuung', 'betreuung'),

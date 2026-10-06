@@ -24,7 +24,6 @@ import type {
   Medienkontakt,
   MedienkontaktArt,
   MedienkontaktStatus,
-  Pressemitteilung,
   PressemitteilungVorlageKey,
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
@@ -541,7 +540,7 @@ export default function PressePage() {
           <Select
             allowClear
             placeholder="optional"
-            options={freigegeben.map((m: Pressemitteilung) => ({
+            options={freigegeben.map((m) => ({
               value: m.id,
               label: `${m.titel} (v${m.version})`,
             }))}

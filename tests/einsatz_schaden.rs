@@ -877,11 +877,120 @@ async fn lifecycle_meldet_etb_und_schaden_live() {
         let feed = live_bei(&app, &admin, e, methode, pfad, body.as_ref()).await;
         let etb_id = etb_id_mit(&app, &admin, e, etb_text).await;
         assert!(feed.contains("event: schaden"), "{etb_text}: {feed:?}");
+        // LFH-931: nur Anhang-Ereignisse tragen das Kennzeichen `anhang`.
+        assert!(!feed.contains(r#""anhang""#), "{etb_text}: {feed:?}");
         assert!(
             feed.contains("event: etb") && feed.contains(&format!(r#""etb_id":{etb_id}}}"#)),
             "{etb_text}: etb-Ereignis mit der Id des neuen Eintrags fehlt: {feed:?}"
         );
     }
+}
+
+// ---------- Tests: Marker-Projektion (LFH-931) ----------
+
+/// Spec `listen-projektion`, „Marker ohne Freitext“ und „Stornierter Schaden“.
+#[tokio::test]
+async fn marker_ohne_freitext_und_ohne_stornierte() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let erster = schaden_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({ "typ": "sachschaden", "ausmass": "gross", "ort": "Hauptstraße 3",
+                 "beschreibung": "Dach abgedeckt", "lat": 52.1, "lon": 9.9 }),
+    )
+    .await;
+    let zweiter = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let dritter = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/schaeden/{dritter}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "stornieren: {s}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/schaeden/marker"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zeilen = v.as_array().unwrap();
+    let ids: Vec<i64> = zeilen.iter().map(|z| z["id"].as_i64().unwrap()).collect();
+    assert_eq!(
+        ids,
+        [zweiter, erster],
+        "neueste Nummer zuerst, ohne Stornierte"
+    );
+    let m = &zeilen[1];
+    assert_eq!(m["registrier_nr"], 1);
+    assert_eq!(m["typ"], "sachschaden");
+    assert_eq!(m["ausmass"], "gross");
+    assert_eq!(m["status"], "offen");
+    assert_eq!(m["lat"], 52.1);
+    assert_eq!(m["lon"], 9.9);
+    let mut felder: Vec<&str> = m.as_object().unwrap().keys().map(String::as_str).collect();
+    felder.sort_unstable();
+    assert_eq!(
+        felder,
+        [
+            "ausmass",
+            "id",
+            "lat",
+            "lon",
+            "registrier_nr",
+            "status",
+            "typ"
+        ],
+        "nur Markerfelder, kein Ort, keine Beschreibung, keine Geschädigten"
+    );
+    assert!(!v.to_string().contains("Hauptstraße") && !v.to_string().contains("Dach"));
+}
+
+/// Spec `listen-projektion`, „Ohne Modulrecht“: dieselbe Sperre wie die Schadenliste.
+#[tokio::test]
+async fn marker_hinter_dem_modulrecht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let gid = benutzer_anlegen(&app, &admin, "gustav", "fuehrungskraft").await;
+    rolle_setzen(&app, &admin, e, gid, "fuehrungspersonal").await;
+    let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
+    let marker = format!("/api/einsaetze/{e}/schaeden/marker");
+    let (s, _) = anfrage(&app, "GET", &marker, &gustav, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: sichtbar liest er");
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/schaeden"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override: {v}");
+    let (s_liste, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/schaeden"),
+        &gustav,
+        None,
+    )
+    .await;
+    let (s_marker, _) = anfrage(&app, "GET", &marker, &gustav, None).await;
+    assert_eq!(
+        s_liste,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: Liste gesperrt"
+    );
+    assert_eq!(s_marker, StatusCode::FORBIDDEN);
 }
 
 // ---------- Tests: Rechte-Matrix + Org-Isolation + Read-only ----------

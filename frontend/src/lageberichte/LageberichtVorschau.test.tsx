@@ -4,7 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { server } from '../test/server';
-import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
+import { lageberichtAbfrage } from '../command-palette/datensatzAbfrage';
 import type { LageberichtAnzeige } from '../api/types';
 import LageberichtVorschau from './LageberichtVorschau';
 
@@ -28,12 +28,15 @@ const bericht = (o: Partial<LageberichtAnzeige> = {}): LageberichtAnzeige =>
     ...o,
   }) as LageberichtAnzeige;
 
-function liefereListe(liste: LageberichtAnzeige[]) {
+/** Liefert den Lagebericht 11 als Detail (LFH-931: die Liste trägt keinen Text mehr). */
+function liefereDetail(b: LageberichtAnzeige | null) {
   let abrufe = 0;
   server.use(
-    http.get('/api/einsaetze/5/lageberichte', () => {
+    http.get('/api/einsaetze/5/lageberichte/11', () => {
       abrufe += 1;
-      return HttpResponse.json(liste);
+      return b
+        ? HttpResponse.json(b)
+        : HttpResponse.json({ error: 'Lagebericht nicht gefunden' }, { status: 404 });
     }),
   );
   return () => abrufe;
@@ -41,7 +44,7 @@ function liefereListe(liste: LageberichtAnzeige[]) {
 
 describe('LageberichtVorschau (LFH-664)', () => {
   it('zeigt Status mit Wort, Kopfangaben und den Berichtstext', async () => {
-    liefereListe([bericht({ id: 4, titel: 'Anderer' }), bericht()]);
+    liefereDetail(bericht());
     renderMitProviders(<LageberichtVorschau einsatzId={5} id={11} />);
 
     expect(await screen.findByText('Freigegeben')).toBeInTheDocument();
@@ -58,7 +61,7 @@ describe('LageberichtVorschau (LFH-664)', () => {
   });
 
   it('setzt die Abschnittstitel unter die Vorschau-Ebene, `#` im Text eine tiefer', async () => {
-    liefereListe([bericht()]);
+    liefereDetail(bericht());
     renderMitProviders(<LageberichtVorschau einsatzId={5} id={11} />);
 
     expect(await screen.findByRole('heading', { level: 3, name: 'Bericht' })).toBeInTheDocument();
@@ -66,7 +69,7 @@ describe('LageberichtVorschau (LFH-664)', () => {
   });
 
   it('zeigt einen leeren Abschnitt als „—" und einen Entwurf ohne Freigabe', async () => {
-    liefereListe([
+    liefereDetail(
       bericht({
         vorlage: 'lagebericht',
         status: 'entwurf',
@@ -75,7 +78,7 @@ describe('LageberichtVorschau (LFH-664)', () => {
         freigegeben_von_name: null,
         abschnitte: [{ schluessel: 'auftrag', text: 'Deich halten.' }],
       }),
-    ]);
+    );
     renderMitProviders(<LageberichtVorschau einsatzId={5} id={11} />);
 
     expect(await screen.findByText('Entwurf')).toBeInTheDocument();
@@ -87,7 +90,7 @@ describe('LageberichtVorschau (LFH-664)', () => {
   });
 
   it('sagt, dass der Lagebericht nicht mehr vorhanden ist', async () => {
-    liefereListe([bericht({ id: 4 })]);
+    liefereDetail(null);
     renderMitProviders(<LageberichtVorschau einsatzId={5} id={11} />);
 
     expect(
@@ -96,9 +99,9 @@ describe('LageberichtVorschau (LFH-664)', () => {
   });
 
   it('liest den geladenen Stand ohne Abruf', async () => {
-    const abrufe = liefereListe([]);
+    const abrufe = liefereDetail(null);
     const client = new QueryClient();
-    client.setQueryData(datensatzAbfrage.lageberichte(5).queryKey, [bericht()]);
+    client.setQueryData(lageberichtAbfrage(5, 11).queryKey, bericht());
     renderMitProviders(<LageberichtVorschau einsatzId={5} id={11} />, { client });
 
     expect(await screen.findByText('Pegel steigt weiter.')).toBeInTheDocument();

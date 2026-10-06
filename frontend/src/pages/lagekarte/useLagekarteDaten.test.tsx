@@ -252,7 +252,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         () => new HttpResponse(null, { status: 403 }),
       ),
       ...[
-        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/schaeden/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
         '/api/einsaetze/5/abschnitte',
@@ -297,7 +297,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/schaeden/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
         '/api/einsaetze/5/abschnitte',
@@ -363,7 +363,7 @@ describe('useLagekarteDaten markerLaden', () => {
       }),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/schaeden/marker',
         '/api/einsaetze/5/fahrzeuge',
         '/api/einsaetze/5/abschnitte',
         '/api/einsaetze/5/zonen',
@@ -430,7 +430,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/schaeden/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
         '/api/einsaetze/5/abschnitte',
@@ -589,7 +589,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/schaeden/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
         '/api/einsaetze/5/abschnitte',
@@ -819,7 +819,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
 describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
   const GEBUNDEN = [
     '/api/einsaetze/5/uhs',
-    '/api/einsaetze/5/schaeden',
+    '/api/einsaetze/5/schaeden/marker',
     '/api/einsaetze/5/einheiten',
     '/api/einsaetze/5/fahrzeuge',
     '/api/einsaetze/5/abschnitte',
@@ -861,15 +861,15 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
         '/api/einsaetze/5/zonen',
         '/api/einsaetze/5/freie-zeichen',
         '/api/einsaetze/5/karte/fuehrungskraefte',
-        ...GEBUNDEN.filter((p) => !p.endsWith('/schaeden')),
+        ...GEBUNDEN.filter((p) => !p.endsWith('/schaeden/marker')),
       ].map((pfad) =>
         http.get(pfad, () => {
           zaehle(pfad);
           return HttpResponse.json([]);
         }),
       ),
-      http.get('/api/einsaetze/5/schaeden', () => {
-        zaehle('/api/einsaetze/5/schaeden');
+      http.get('/api/einsaetze/5/schaeden/marker', () => {
+        zaehle('/api/einsaetze/5/schaeden/marker');
         return schaeden();
       }),
       http.get('/api/einsaetze/5/modul-freigaben', async () => {
@@ -893,7 +893,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     await waitFor(() => expect(result.current.markerLaden).toBe(false));
     // Vorbedingung: die freien Quellen liefen — sonst wäre „kein Request" trivial.
     expect(aufrufe['/api/einsaetze/5/uhs']).toBe(1);
-    expect(aufrufe['/api/einsaetze/5/schaeden']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/5/schaeden/marker']).toBeUndefined();
     expect(result.current.rohdaten.schaeden).toEqual([]);
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
@@ -905,7 +905,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     });
     const { result } = render();
     await waitFor(() => expect(result.current.markerLaden).toBe(false));
-    expect(aufrufe['/api/einsaetze/5/schaeden']).toBe(1);
+    expect(aufrufe['/api/einsaetze/5/schaeden/marker']).toBe(1);
     expect(aufrufe['/api/einsaetze/5/uhs']).toBeUndefined();
     // Rückmeldungen hängen am Modul „Meldungen": ohne Recht keine Anfrage, keine Daten.
     expect(aufrufe['/api/einsaetze/5/meldungen/rueckmeldungen']).toBeUndefined();
@@ -937,7 +937,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     // `new QueryClient()`-Verhalten über eigenen Client: der Altstand muss den ersten await
     // überleben. Literaler Key, nicht die Factory.
     const client = new QueryClient();
-    client.setQueryData(['einsatz-schaeden', 5], [{ id: 1 }], { updatedAt: 1_000 });
+    client.setQueryData(['einsatz-schaeden-marker', 5], [{ id: 1 }], { updatedAt: 1_000 });
     const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
       wrapper: ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>{children}</QueryClientProvider>

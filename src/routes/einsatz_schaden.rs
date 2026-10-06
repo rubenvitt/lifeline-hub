@@ -13,7 +13,7 @@ use crate::routes::support::{
 };
 use crate::schaden::{
     darf_uebergehen, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
-    SchadenAnzeige, SchadenStatus, SchadenTyp,
+    SchadenAnzeige, SchadenMarker, SchadenStatus, SchadenTyp,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -29,10 +29,23 @@ fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::Schaden, "schaden_id", schaden_id);
 }
 
+/// Anhang abgelegt oder entfernt (LFH-931): `schaden` mit Kennzeichen `anhang`, damit andere
+/// Sitzungen nur die Anhangliste dieses Schadens nachladen, nicht Liste und Marker. Davor `etb`
+/// wie bei [`sse_lebenszyklus`].
+pub(crate) fn sse_anhang(state: &AppState, einsatz_id: i64, schaden_id: i64, etb_id: i64) {
+    state.live.publiziere(einsatz_id, etb_id);
+    state.live.publiziere_objekt_mit(
+        einsatz_id,
+        LiveEvent::Schaden,
+        "schaden_id",
+        schaden_id,
+        &["anhang"],
+    );
+}
+
 /// Nach dem Commit eines Schreibwegs mit System-ETB-Eintrag: erst `etb` (ID-only), dann
 /// `schaden`. Ohne `etb` sehen andere Sitzungen das Tagebuch erst nach dem Neuladen (LFH-760).
-/// Auch von den Anhang-Routen genutzt (LFH-21, `routes::schaden_anhang`), deshalb `pub(crate)`.
-pub(crate) fn sse_lebenszyklus(state: &AppState, einsatz_id: i64, schaden_id: i64, etb_id: i64) {
+fn sse_lebenszyklus(state: &AppState, einsatz_id: i64, schaden_id: i64, etb_id: i64) {
     state.live.publiziere(einsatz_id, etb_id);
     sse_schaden(state, einsatz_id, schaden_id);
 }
@@ -85,6 +98,19 @@ pub async fn liste(
             params.inkl_storniert,
         )
         .await?,
+    ))
+}
+
+// ---------- GET /schaeden/marker ----------
+
+/// Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931): Kennung, Nummer, Typ, Ausmaß,
+/// Status und Lage, ohne Stornierte. Gleiches Gate wie die Liste.
+pub async fn marker(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Schaeden>,
+) -> Result<Json<Vec<SchadenMarker>>, AppError> {
+    Ok(Json(
+        schaden_repo::marker(&state.pool, ctx.einsatz.id).await?,
     ))
 }
 

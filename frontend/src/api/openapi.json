@@ -1609,6 +1609,91 @@
           }
         }
       },
+      "BefehlKopf": {
+        "type": "object",
+        "description": "Listenzeile eines Befehls: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie in der Anzeige\nals `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "vorlage",
+          "titel",
+          "zeitstand",
+          "status",
+          "version",
+          "ersteller_id",
+          "ersteller_name",
+          "erstellt_at"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_name": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freigegeben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BefehlStatus"
+          },
+          "titel": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorlage": {
+            "$ref": "#/components/schemas/BefehlVorlage"
+          },
+          "zeitstand": {
+            "type": "string"
+          }
+        }
+      },
       "BefehlStatus": {
         "type": "string",
         "description": "Befehls-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
@@ -6856,6 +6941,91 @@
           }
         }
       },
+      "LageberichtKopf": {
+        "type": "object",
+        "description": "Listenzeile eines Lageberichts: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie in der Anzeige\nals `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "vorlage",
+          "titel",
+          "zeitstand",
+          "status",
+          "version",
+          "ersteller_id",
+          "ersteller_name",
+          "erstellt_at"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_name": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freigegeben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LageberichtStatus"
+          },
+          "titel": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorlage": {
+            "$ref": "#/components/schemas/LageberichtVorlage"
+          },
+          "zeitstand": {
+            "type": "string"
+          }
+        }
+      },
       "LageberichtStatus": {
         "type": "string",
         "description": "Lagebericht-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
@@ -9640,6 +9810,91 @@
           }
         }
       },
+      "PressemitteilungKopf": {
+        "type": "object",
+        "description": "Listenzeile einer Pressemitteilung: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie\nin der Anzeige als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "vorlage",
+          "titel",
+          "zeitstand",
+          "status",
+          "version",
+          "ersteller_id",
+          "ersteller_name",
+          "erstellt_at"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_name": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freigegeben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PressemitteilungStatus"
+          },
+          "titel": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorlage": {
+            "$ref": "#/components/schemas/PressemitteilungVorlage"
+          },
+          "zeitstand": {
+            "type": "string"
+          }
+        }
+      },
       "PressemitteilungStatus": {
         "type": "string",
         "description": "Status einer Pressemitteilung (Schema-Anker für die OpenAPI-Union). Wire == `status`.",
@@ -10015,6 +10270,50 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "SchadenMarker": {
+        "type": "object",
+        "description": "Schadenmarker für Lagekarte und Lage-Dashboard (LFH-931, `listen-projektion`): nur, was\nMarker, Inspector und Kennzahl brauchen. Ort, Beschreibung und Geschädigte fehlen bewusst.\nOptionale Felder wie in [`SchadenAnzeige`] als `null`: der Client leitet einen Marker auch\naus einer nachgeladenen vollen Zeile ab.",
+        "required": [
+          "id",
+          "registrier_nr",
+          "status",
+          "typ",
+          "ausmass"
+        ],
+        "properties": {
+          "ausmass": {
+            "$ref": "#/components/schemas/Ausmass"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SchadenStatus"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/SchadenTyp"
           }
         }
       },

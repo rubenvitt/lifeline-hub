@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   listePersonalPerioden: vi.fn(),
   listeEinsatzFahrzeuge: vi.fn(),
   listeLageberichte: vi.fn(),
+  ladeLagebericht: vi.fn(),
   listePersonen: vi.fn(),
   listeSchaeden: vi.fn(),
   ladeBetreuung: vi.fn(),
@@ -38,7 +39,10 @@ vi.mock('../../api/kraefteZeitachse', () => ({
 }));
 vi.mock('../../api/einsatzPersonal', () => ({ listeEinsatzPersonal: api.listeEinsatzPersonal }));
 vi.mock('../../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: api.listeEinsatzFahrzeuge }));
-vi.mock('../../api/lageberichte', () => ({ listeLageberichte: api.listeLageberichte }));
+vi.mock('../../api/lageberichte', () => ({
+  listeLageberichte: api.listeLageberichte,
+  ladeLagebericht: api.ladeLagebericht,
+}));
 vi.mock('../../api/einsatzPerson', () => ({ listePersonen: api.listePersonen }));
 vi.mock('../../api/einsatzSchaden', () => ({ listeSchaeden: api.listeSchaeden }));
 vi.mock('../../api/betreuung', () => ({ ladeBetreuung: api.ladeBetreuung }));
@@ -58,19 +62,53 @@ beforeEach(() => {
     fn.mockReset();
     fn.mockResolvedValue({ quelle: name });
   }
+  // Die Lageberichte sind eine Kopfliste; ohne freigegebenen Bericht kein Detailabruf.
+  api.listeLageberichte.mockResolvedValue([]);
 });
 
 describe('ladeEinsatzbericht', () => {
   it('lädt jede freigegebene Quelle für den Einsatz und setzt einen Stand', async () => {
     const bericht = await ladeEinsatzbericht(5, alle('abrufen'));
-    for (const fn of Object.values(api)) expect(fn).toHaveBeenCalledTimes(1);
+    for (const [name, fn] of Object.entries(api)) {
+      expect(fn, name).toHaveBeenCalledTimes(name === 'ladeLagebericht' ? 0 : 1);
+    }
     expect(api.ladeEinsatz).toHaveBeenCalledWith(5);
     expect(api.ladeEtbVollstaendig).toHaveBeenCalledWith(5, { typ: 'entscheidung' });
     expect(bericht.quellen.lageberichte).toEqual({
       zustand: 'daten',
-      daten: { quelle: 'listeLageberichte' },
+      daten: { liste: [], letzter: null },
     });
     expect(Number.isNaN(Date.parse(bericht.geladenAt))).toBe(false);
+  });
+
+  it('lädt den Volltext nur des zuletzt freigegebenen Lageberichts aus dem Detail (LFH-931)', async () => {
+    const kopf = (id: number, status: string, freigegeben_at: string | null) => ({
+      id,
+      status,
+      version: 1,
+      vorgaenger_id: null,
+      zeitstand: `2026-03-29T0${id}:00:00`,
+      freigegeben_at,
+    });
+    const liste = [
+      kopf(1, 'freigegeben', '2026-03-29T01:10:00'),
+      kopf(2, 'freigegeben', '2026-03-29T02:10:00'),
+      kopf(3, 'entwurf', null),
+    ];
+    api.listeLageberichte.mockResolvedValue(liste);
+    api.ladeLagebericht.mockResolvedValue({
+      id: 2,
+      abschnitte: [{ schluessel: 'text', text: 'x' }],
+    });
+
+    const bericht = await ladeEinsatzbericht(5, alle('abrufen'));
+
+    expect(api.ladeLagebericht).toHaveBeenCalledTimes(1);
+    expect(api.ladeLagebericht).toHaveBeenCalledWith(5, 2);
+    expect(bericht.quellen.lageberichte).toEqual({
+      zustand: 'daten',
+      daten: { liste, letzter: { id: 2, abschnitte: [{ schluessel: 'text', text: 'x' }] } },
+    });
   });
 
   it('ruft eine nicht genutzte Quelle nicht ab', async () => {

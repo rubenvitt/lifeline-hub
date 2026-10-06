@@ -2,7 +2,7 @@ import type {
   GefahrBewertung,
   Gefahrengebiet,
   Gefahrentyp,
-  LageberichtAnzeige,
+  LageberichtKopf,
   Person,
   Schaden,
   Sichtungskategorie,
@@ -162,7 +162,7 @@ export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
  * Jüngster Lagebericht nach `erstellt_at` (das Format ist lexikografisch sortierbar). Null bei
  * leerer Liste.
  */
-export function neuesterLagebericht(berichte: LageberichtAnzeige[]): LageberichtAnzeige | null {
+export function neuesterLagebericht(berichte: LageberichtKopf[]): LageberichtKopf | null {
   if (berichte.length === 0) return null;
   return berichte.reduce((neuester, b) => (b.erstellt_at > neuester.erstellt_at ? b : neuester));
 }
@@ -197,7 +197,9 @@ interface SchadenVerdichtung {
   abgeschlossen: number;
   gesamt: number;
 }
-export function verdichteSchaeden(schaeden: Schaden[]): SchadenVerdichtung {
+export function verdichteSchaeden(
+  schaeden: readonly Pick<Schaden, 'status'>[],
+): SchadenVerdichtung {
   const v: SchadenVerdichtung = {
     offen: 0,
     uebergeben: 0,

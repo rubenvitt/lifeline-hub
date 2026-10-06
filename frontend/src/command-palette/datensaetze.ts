@@ -42,7 +42,7 @@ import type {
   EinsatzFahrzeug,
   EtbAnzahl,
   Gefahrengebiet,
-  LageberichtAnzeige,
+  LageberichtKopf,
   EinsatzPersonal,
   EtbEintragAnzeige,
   Meldung,
@@ -92,7 +92,7 @@ export interface DatensatzQuellen {
    */
   etbAnzahl?: EtbAnzahl;
   /** Lageberichte (im Kern auf die Kettenköpfe reduziert), Gefahrengebiete, Abschnitte. */
-  lageberichte?: LageberichtAnzeige[];
+  lageberichte?: LageberichtKopf[];
   gefahrengebiete?: Gefahrengebiet[];
   abschnitte?: Einsatzabschnitt[];
 }

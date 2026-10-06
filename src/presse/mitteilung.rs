@@ -9,7 +9,7 @@
 //! Suchhinweise (Personenfahndung) sind bewusst keine Vorlage: sie sind Sache der Polizei und
 //! trügen personenbezogene Beschreibungen in einen öffentlichen Text (design.md Non-Goals).
 
-use crate::vorlagendokument::repo::Dokument;
+use crate::vorlagendokument::repo::{Dokument, DokumentKopf};
 use crate::vorlagendokument::{self as kern, AbschnittDef, Abschnittsart, Dokumentart, VorlageDef};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -118,6 +118,7 @@ pub struct Pressemitteilung;
 impl Dokumentart for Pressemitteilung {
     type Abschnitt = Abschnitt;
     type Anzeige = PressemitteilungAnzeige;
+    type Kopf = PressemitteilungKopf;
     const TABELLE: &'static str = "pressemitteilung";
     const ETB_TYP: &'static str = crate::etb::TYP_MELDUNG;
     const ETB_VERWEIS: &'static str = "pressemitteilung_id";
@@ -197,6 +198,51 @@ impl From<Dokument<Abschnitt>> for PressemitteilungAnzeige {
             freigegeben_von_name: d.freigegeben_von_name,
             freigegeben_at: d.freigegeben_at,
             etb_eintrag_id: d.etb_eintrag_id,
+        }
+    }
+}
+
+/// Listenzeile einer Pressemitteilung: Kopfdaten ohne Abschnitte (LFH-931). Optionale Felder wie
+/// in der Anzeige als `null`, damit Abnehmer beider Formen dieselben Prüfungen nutzen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct PressemitteilungKopf {
+    pub id: i64,
+    pub einsatz_id: i64,
+    #[schema(value_type = PressemitteilungVorlage)]
+    pub vorlage: String,
+    pub titel: String,
+    pub zeitstand: String,
+    #[schema(value_type = PressemitteilungStatus)]
+    pub status: String,
+    pub version: i64,
+    pub vorgaenger_id: Option<i64>,
+    pub ersteller_id: i64,
+    pub ersteller_name: String,
+    pub erstellt_at: String,
+    pub freigegeben_von_id: Option<i64>,
+    pub freigegeben_von_name: Option<String>,
+    pub freigegeben_at: Option<String>,
+    pub etb_eintrag_id: Option<i64>,
+}
+
+impl From<DokumentKopf> for PressemitteilungKopf {
+    fn from(k: DokumentKopf) -> Self {
+        Self {
+            id: k.id,
+            einsatz_id: k.einsatz_id,
+            vorlage: k.vorlage,
+            titel: k.titel,
+            zeitstand: k.zeitstand,
+            status: k.status,
+            version: k.version,
+            vorgaenger_id: k.vorgaenger_id,
+            ersteller_id: k.ersteller_id,
+            ersteller_name: k.ersteller_name,
+            erstellt_at: k.erstellt_at,
+            freigegeben_von_id: k.freigegeben_von_id,
+            freigegeben_von_name: k.freigegeben_von_name,
+            freigegeben_at: k.freigegeben_at,
+            etb_eintrag_id: k.etb_eintrag_id,
         }
     }
 }
