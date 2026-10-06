@@ -9,6 +9,7 @@
 //! * **Verbindungs-Obergrenze** — höchstens [`MAX_VERBINDUNGEN`] Verbindungen werden
 //!   gleichzeitig bedient ([`SemaphorAkzeptor`]).
 //! * **Streams je HTTP/2-Verbindung** — höchstens [`HTTP2_MAX_STREAMS`] zugleich (LFH-920).
+//! * **Kopfgröße** — HTTP/1-Köpfe über [`HTTP1_MAX_KOPF`] weist hyper mit 431 ab (LFH-925).
 //!
 //! ## Die Timer-Falle
 //!
@@ -67,6 +68,12 @@ const _: () = assert!(
     HTTP2_MAX_STREAMS <= 64,
     "LFH-920: höchstens 64 Streams je Verbindung"
 );
+
+/// Lesepuffer für HTTP/1-Köpfe (LFH-925). Ein längerer Kopf endet mit 431, bevor ein Handler
+/// läuft. Ohne Grenze nähme hyper bis etwa 408 KiB an, und jeder Kopfwert, der in eine Logzeile
+/// gerät (Request-ID, Pfad), flutete das Journal. 32 KiB lassen Cookies und lange Abfragen weit
+/// hinter sich. HTTP/2 braucht nichts Eigenes: hypers Kopflistengrenze steht dort schon auf 16 KiB.
+pub const HTTP1_MAX_KOPF: usize = 32 * 1024;
 
 /// Akzeptor, der jede Verbindung an ein Semaphore-Permit bindet. Das Permit lebt in
 /// [`PermitStream`] und fällt zurück, sobald die Verbindung geschlossen wird.
@@ -144,7 +151,8 @@ pub fn zeitschranken_setzen<A: axum_server::Address, Acc>(
     builder
         .http1()
         .timer(hyper_util::rt::TokioTimer::new())
-        .header_read_timeout(Some(fristen.header_read));
+        .header_read_timeout(Some(fristen.header_read))
+        .max_buf_size(HTTP1_MAX_KOPF);
     builder
         .http2()
         .timer(hyper_util::rt::TokioTimer::new())
@@ -356,6 +364,52 @@ mod tests {
             ergebnis.is_ok(),
             "Server hat die stille h2-Verbindung nicht abgeräumt — Keep-Alive-Prüfung wirkungslos"
         );
+    }
+
+    /// LFH-925: ein HTTP/1-Kopf über 32 KiB wird auf Verbindungsebene abgewiesen. Mutationsprobe:
+    /// ohne `max_buf_size` antwortet der Server mit 200.
+    #[tokio::test]
+    async fn uebergrosser_kopf_wird_abgewiesen() {
+        let (addr, _) = server_starten(Fristen::default(), 8).await;
+
+        let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        let anfrage = format!(
+            "GET /ping HTTP/1.1\r\nHost: localhost\r\nx-request-id: {}\r\nConnection: close\r\n\r\n",
+            "a".repeat(HTTP1_MAX_KOPF + 1024)
+        );
+        // Der Server kann die Verbindung schließen, bevor alles gesendet ist.
+        let _ = sock.write_all(anfrage.as_bytes()).await;
+
+        let mut antwort = Vec::new();
+        let _ = tokio::time::timeout(Duration::from_secs(5), sock.read_to_end(&mut antwort))
+            .await
+            .expect("Antwort oder Abbruch binnen 5 s");
+        let text = String::from_utf8_lossy(&antwort);
+        assert!(
+            text.is_empty() || text.starts_with("HTTP/1.1 431"),
+            "erwartet 431 oder Abbruch, Antwort war: {}",
+            &text[..text.len().min(200)]
+        );
+    }
+
+    /// Gegenprobe: ein Kopf knapp unter der Grenze wird bedient.
+    #[tokio::test]
+    async fn kopf_unter_der_grenze_wird_bedient() {
+        let (addr, _) = server_starten(Fristen::default(), 8).await;
+
+        let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        let anfrage = format!(
+            "GET /ping HTTP/1.1\r\nHost: localhost\r\nx-gross: {}\r\nConnection: close\r\n\r\n",
+            "a".repeat(HTTP1_MAX_KOPF / 2)
+        );
+        sock.write_all(anfrage.as_bytes()).await.expect("senden");
+        let mut antwort = Vec::new();
+        tokio::time::timeout(Duration::from_secs(5), sock.read_to_end(&mut antwort))
+            .await
+            .expect("Antwort binnen 5 s")
+            .expect("lesen");
+        let text = String::from_utf8_lossy(&antwort);
+        assert!(text.starts_with("HTTP/1.1 200"), "Antwort war: {text}");
     }
 
     /// Slow Loris im Kleinen: Header nie abschließen; der Server muss die Verbindung nach der Frist
