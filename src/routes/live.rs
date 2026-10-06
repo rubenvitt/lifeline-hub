@@ -9,9 +9,16 @@
 //! Chat-Volltexten.
 //!
 //! **Revokation = Snapshot:** die erlaubten Module werden einmal beim Verbindungsaufbau
-//! berechnet; ein Rechteentzug wirkt erst beim Reconnect. Das Restfenster verrät nur Metadaten
-//! (alle Payloads tragen nur IDs), der Inhalts-GET antwortet sofort 403. Ein DB-Read je Event
-//! vervielfachte die Kosten bei Erfassungs-Bursts.
+//! berechnet; ein Rechteentzug wirkt erst beim Reconnect. Den erzwingt die Lebensdauer jedes
+//! Stroms (LFH-920, [`crate::live::strom`]): das Restfenster nach einem Entzug von Sitzung oder
+//! Modulrecht ist höchstens `STROM_LEBENSDAUER + STROM_LEBENSDAUER_STREUUNG` (45 min). Es
+//! verrät nur Metadaten (alle Payloads tragen nur IDs), der Inhalts-GET antwortet sofort 403.
+//! Ein DB-Read je Event vervielfachte die Kosten bei Erfassungs-Bursts.
+//!
+//! **Zulassung:** beide Ströme stehen außerhalb der routerweiten Zulassung
+//! ([`crate::zulassung::OHNE_ZULASSUNGSGRENZE`]) und belegen stattdessen vor jeder weiteren
+//! Datenbankabfrage einen Platz in [`crate::live::strom::StromZulassung`] (je Benutzer 429,
+//! insgesamt 503). Der Platz lebt im Strom.
 
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
@@ -19,6 +26,7 @@ use crate::einsatz::berechtigung::erlaubte_module;
 use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::error::AppError;
 use crate::live::org::OrgAbonnent;
+use crate::live::strom;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -35,6 +43,8 @@ pub async fn stream(
     ctx: EinsatzLesezugriff,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
+    // Erst der Platz, dann die Aufbauphase: ein abgewiesener Strom kostet keine Modulabfrage.
+    let platz = state.live.stroeme.belegen(ctx.benutzer.id)?;
     let einsatz_id = ctx.einsatz.id;
     let mut erlaubt =
         erlaubte_module(&state.pool, einsatz_id, ctx.einsatz.org_id, &ctx.benutzer).await?;
@@ -66,12 +76,17 @@ pub async fn stream(
     // (etwa der Vite-Dev-Proxy), hielte sie sonst bis zum ersten Keep-Alive zurück, und
     // `EventSource.onopen` feuerte erst dann. Ein Kommentar trägt kein `id:` und lässt die
     // `Last-Event-ID` unberührt.
-    let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")));
+    // Danach die gestreute Wartezeit für das Neuverbinden (LFH-920), als eigenes Ereignis: das
+    // erste Frame bleibt reiner Kommentar.
+    let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")))
+        .chain(tokio_stream::once(strom::retry_ereignis()));
     let ende = kopplung_ende(&state, ctx.geraet.as_ref());
+    let feed = futures::StreamExt::take_until(verbunden.chain(stream), ende);
 
-    Ok(Sse::new(futures::StreamExt::take_until(
-        verbunden.chain(stream),
-        ende,
+    Ok(Sse::new(strom::begrenzt(
+        feed,
+        platz,
+        state.live.stroeme.lebensdauer(),
     ))
     .keep_alive(KeepAlive::default()))
 }
@@ -129,15 +144,23 @@ fn kopplung_ende(
 /// GET /api/live — der Org-Strom (LFH-734) für Tabs außerhalb eines Einsatzes.
 ///
 /// Tür: angemeldet und aktiv (`CurrentUser`), sonst 401. Trägt nur Org-Ereignisse und `lagged`,
-/// keine Einsatz-Ereignisse. Empfänger-Schnappschuss beim Aufbau wie beim Einsatz-Feed.
+/// keine Einsatz-Ereignisse. Empfänger-Schnappschuss beim Aufbau wie beim Einsatz-Feed; Platz
+/// und Lebensdauer teilt er mit ihm (LFH-920).
 pub async fn org_stream(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
+    let platz = state.live.stroeme.belegen(benutzer.id)?;
     let rx = state.live.abonniere_org();
     let stream = crate::routes::support::sse_org_stream(rx, OrgAbonnent::aus(&benutzer));
-    let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")));
-    Sse::new(verbunden.chain(stream)).keep_alive(KeepAlive::default())
+    let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")))
+        .chain(tokio_stream::once(strom::retry_ereignis()));
+    Ok(Sse::new(strom::begrenzt(
+        verbunden.chain(stream),
+        platz,
+        state.live.stroeme.lebensdauer(),
+    ))
+    .keep_alive(KeepAlive::default()))
 }
 
 /// Pfadpräfixe der Stammdaten-Kataloge (LFH-734). Eine schreibende Anfrage, deren Route unter

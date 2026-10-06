@@ -8,6 +8,7 @@
 //!   [`HEADER_READ_TIMEOUT`] vollständig sendet, wird abgeräumt.
 //! * **Verbindungs-Obergrenze** — höchstens [`MAX_VERBINDUNGEN`] Verbindungen werden
 //!   gleichzeitig bedient ([`SemaphorAkzeptor`]).
+//! * **Streams je HTTP/2-Verbindung** — höchstens [`HTTP2_MAX_STREAMS`] zugleich (LFH-920).
 //!
 //! ## Die Timer-Falle
 //!
@@ -51,6 +52,21 @@ pub const HTTP2_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(20);
 
 /// Wie lange auf die PING-Antwort gewartet wird. Muss deutlich unter dem Intervall liegen.
 pub const HTTP2_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Gleichzeitige Streams je HTTP/2-Verbindung (LFH-920), dem Client per SETTINGS mitgeteilt; ein
+/// Browser stellt weitere Anfragen zurück, bis ein Stream frei wird. Ohne diese Grenze gälten
+/// hypers 200 Streams mit je bis zu 400 KiB Sendepuffer, und ein Client hielte auf einer einzigen
+/// Verbindung beliebig viele Live-Ströme offen.
+///
+/// Ein Browser teilt EINE Verbindung über alle Tabs einer Origin: jeder Tab hält einen Live-Strom
+/// (höchstens `live::strom::STROEME_JE_BENUTZER`), die übrigen Streams tragen die Abrufe. 64
+/// lässt dafür genug Raum; der Sendepuffer je Stream bleibt bei hypers Vorgabe, damit große
+/// Downloads auf langsamer Leitung nicht ausbremsen.
+pub const HTTP2_MAX_STREAMS: u32 = 64;
+const _: () = assert!(
+    HTTP2_MAX_STREAMS <= 64,
+    "LFH-920: höchstens 64 Streams je Verbindung"
+);
 
 /// Akzeptor, der jede Verbindung an ein Semaphore-Permit bindet. Das Permit lebt in
 /// [`PermitStream`] und fällt zurück, sobald die Verbindung geschlossen wird.
@@ -118,7 +134,8 @@ where
 /// **Beide Protokolle müssen konfiguriert werden:** `hyper_util`s `auto::Builder` hält getrennte
 /// h1-/h2-Konfigurationen. TLS bietet per ALPN `h2` an, und h2 ist als h2c auch im Klartext
 /// erreichbar. Für h2 tritt die PING-Prüfung an die Stelle des Header-Timeouts; `.http2()`
-/// braucht dafür einen **eigenen** Timer.
+/// braucht dafür einen **eigenen** Timer. Die Stream-Grenze [`HTTP2_MAX_STREAMS`] gilt damit
+/// ebenfalls für TLS und h2c.
 pub fn zeitschranken_setzen<A: axum_server::Address, Acc>(
     server: &mut axum_server::Server<A, Acc>,
     fristen: Fristen,
@@ -132,7 +149,8 @@ pub fn zeitschranken_setzen<A: axum_server::Address, Acc>(
         .http2()
         .timer(hyper_util::rt::TokioTimer::new())
         .keep_alive_interval(Some(fristen.h2_intervall))
-        .keep_alive_timeout(fristen.h2_timeout);
+        .keep_alive_timeout(fristen.h2_timeout)
+        .max_concurrent_streams(HTTP2_MAX_STREAMS);
 }
 
 /// Die Verbindungsfristen, gebündelt, damit Tests sie auf Millisekunden stellen können.
@@ -269,6 +287,41 @@ mod tests {
             "erster Server-Frame muss SETTINGS sein, war Typ {}",
             kopf[3]
         );
+    }
+
+    /// Die Stream-Grenze (LFH-920) steht im ersten SETTINGS-Frame des Servers. Ohne sie schickte
+    /// hyper keinen `SETTINGS_MAX_CONCURRENT_STREAMS` (Kennung 0x3), und es gälten 200 Streams.
+    #[tokio::test]
+    async fn h2_settings_begrenzen_die_streams() {
+        let (addr, _) = server_starten(Fristen::default(), 8).await;
+
+        let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        sock.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
+            .await
+            .expect("Preface");
+        sock.write_all(&[0, 0, 0, 4, 0, 0, 0, 0, 0])
+            .await
+            .expect("SETTINGS");
+
+        let mut kopf = [0u8; 9];
+        tokio::time::timeout(Duration::from_secs(5), sock.read_exact(&mut kopf))
+            .await
+            .expect("Antwort binnen 5 s")
+            .expect("lesen");
+        assert_eq!(kopf[3], 0x4, "erster Server-Frame muss SETTINGS sein");
+        let laenge = u32::from_be_bytes([0, kopf[0], kopf[1], kopf[2]]) as usize;
+        let mut nutzlast = vec![0u8; laenge];
+        tokio::time::timeout(Duration::from_secs(5), sock.read_exact(&mut nutzlast))
+            .await
+            .expect("Nutzlast binnen 5 s")
+            .expect("lesen");
+
+        // Je Eintrag 2 Byte Kennung, 4 Byte Wert (RFC 9113, 6.5.1).
+        let max_streams = nutzlast
+            .chunks_exact(6)
+            .find(|e| u16::from_be_bytes([e[0], e[1]]) == 0x3)
+            .map(|e| u32::from_be_bytes([e[2], e[3], e[4], e[5]]));
+        assert_eq!(max_streams, Some(HTTP2_MAX_STREAMS));
     }
 
     /// Der h2-Schutz: ein Client, der die Verbindung offen hält und auf PINGs nicht antwortet, muss
